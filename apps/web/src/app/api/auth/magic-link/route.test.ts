@@ -97,6 +97,40 @@ describe('POST /api/auth/magic-link', () => {
     expect(mockSendMagicLinkEmail).toHaveBeenCalledWith(mockMagicLinkToken, undefined);
   });
 
+  describe('while email signups are disabled', () => {
+    beforeEach(() => {
+      process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+    });
+    afterEach(() => {
+      process.env.EMAIL_SIGNUPS_ENABLED = 'true';
+    });
+
+    it('refuses a new user before creating a token', async () => {
+      const response = await POST(createRequest({ email: 'new@example.com' }));
+
+      expect(response.status).toBe(403);
+      await expect(response.json()).resolves.toEqual({
+        success: false,
+        error: 'EMAIL-SIGNUP-DISABLED',
+      });
+      expect(mockCreateMagicLinkToken).not.toHaveBeenCalled();
+      expect(mockSendMagicLinkEmail).not.toHaveBeenCalled();
+    });
+
+    it('still sends a magic link to an existing user', async () => {
+      mockFindUserByNormalizedEmail.mockResolvedValue({
+        id: 'existing-user',
+        google_user_email: 'user@example.com',
+      } as Awaited<ReturnType<typeof findUserByNormalizedEmail>>);
+
+      const response = await POST(createRequest({ email: 'user@example.com' }));
+
+      expect(response.status).toBe(200);
+      expect(mockCreateMagicLinkToken).toHaveBeenCalledWith('user@example.com');
+      expect(mockSendMagicLinkEmail).toHaveBeenCalled();
+    });
+  });
+
   it('rejects magic links for an SSO-protected domain before creating a token', async () => {
     mockResolveSsoAuthorityForDomain.mockResolvedValue({
       status: 'required',
@@ -191,9 +225,9 @@ describe('POST /api/auth/magic-link', () => {
     await POST(createRequest({ email: 'User@Example.com' }));
     await POST(createRequest({ email: 'user@example.com' }));
 
-    expect(mockCheckRateLimit).toHaveBeenCalledTimes(2);
+    expect(mockCheckRateLimit).toHaveBeenCalledTimes(4);
     const firstKey = mockCheckRateLimit.mock.calls[0]?.[1]?.rateLimitKey;
-    const secondKey = mockCheckRateLimit.mock.calls[1]?.[1]?.rateLimitKey;
+    const secondKey = mockCheckRateLimit.mock.calls[2]?.[1]?.rateLimitKey;
     expect(firstKey).toEqual(expect.stringMatching(/^magic-link-email:[A-Za-z0-9_-]+$/));
     expect(secondKey).toBe(firstKey);
   });
@@ -203,7 +237,7 @@ describe('POST /api/auth/magic-link', () => {
     await POST(createRequest({ email: 'test+second@googlemail.com' }));
 
     const firstKey = mockCheckRateLimit.mock.calls[0]?.[1]?.rateLimitKey;
-    const secondKey = mockCheckRateLimit.mock.calls[1]?.[1]?.rateLimitKey;
+    const secondKey = mockCheckRateLimit.mock.calls[2]?.[1]?.rateLimitKey;
     expect(secondKey).toBe(firstKey);
   });
 

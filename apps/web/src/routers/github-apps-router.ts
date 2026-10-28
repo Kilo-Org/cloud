@@ -169,13 +169,27 @@ export const githubAppsRouter = createTRPCRouter({
       url.searchParams.set('code_challenge_method', 'S256');
       return { authorizationUrl: url.toString() };
     }),
-  // List all integrations
+  // Display contract shared by personal and organization integration pickers.
   listIntegrations: baseProcedure.input(optionalOrgInput).query(async ({ ctx, input }) => {
     if (input?.organizationId) {
       await ensureOrganizationAccess(ctx, input.organizationId);
     }
     const owner = resolveOwner(ctx, input?.organizationId);
-    return githubAppsService.listIntegrations(owner);
+    const integrations = await githubAppsService.listIntegrations(owner);
+    return integrations.map(integration => ({
+      id: integration.id,
+      platform: integration.platform,
+      integration_status: integration.integration_status,
+      platform_account_id: integration.platform_account_id,
+      platform_account_login: integration.platform_account_login,
+      repository_access: integration.repository_access,
+      repositories: integration.repositories,
+      repositories_synced_at: integration.repositories_synced_at,
+      suspended_at: integration.suspended_at,
+      installed_at: integration.installed_at,
+      created_at: integration.created_at,
+      updated_at: integration.updated_at,
+    }));
   }),
 
   listOrganizationInstallations: baseProcedure
@@ -449,12 +463,16 @@ export const githubAppsRouter = createTRPCRouter({
         return {
           hasPending: false,
           pendingOrganizationId: null,
+          pendingIntegrationId: null,
         };
       }
 
       return {
         hasPending: true,
         pendingOrganizationId: pendingInstallation.owned_by_organization_id,
+        // Names the exact pending row this response describes, so a cancel is
+        // pinned to it instead of to whichever pending row matches the owner.
+        pendingIntegrationId: pendingInstallation.id,
       };
     }),
 
@@ -533,43 +551,36 @@ export const githubAppsRouter = createTRPCRouter({
       return githubAppsService.listBranches(owner, input.integrationId, input.repositoryFullName);
     }),
 
-  // Cancel pending installation
+  // Cancel one pending installation request, named by its integration id so a
+  // user with several pending requests cancels the one the client displayed.
   cancelPendingInstallation: baseProcedure
     .input(
-      z
-        .object({
-          organizationId: z.string().uuid().optional(),
-          integrationId: z.string().uuid().optional(),
-        })
-        .optional()
+      z.object({
+        organizationId: z.string().uuid().optional(),
+        integrationId: z.string().uuid(),
+      })
     )
     .mutation(async ({ ctx, input }) => {
-      let role: Awaited<ReturnType<typeof ensureOrganizationAccess>> | null = null;
-      if (input?.organizationId) {
-        role = await ensureOrganizationAccess(ctx, input.organizationId);
-        if (!input.integrationId) {
-          throw new TRPCError({ code: 'BAD_REQUEST', message: 'Integration ID is required' });
-        }
+      const role = input.organizationId
+        ? await ensureOrganizationAccess(ctx, input.organizationId)
+        : null;
+      const owner = resolveOwner(ctx, input.organizationId);
+      const integration = await getGitHubIntegrationById(owner, input.integrationId);
+      if (!integration) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Pending installation not found' });
       }
-      const owner = resolveOwner(ctx, input?.organizationId);
-      if (input?.integrationId) {
-        const integration = await getGitHubIntegrationById(owner, input.integrationId);
-        if (!integration) {
-          throw new TRPCError({ code: 'NOT_FOUND', message: 'Pending installation not found' });
-        }
-        const canCancel =
-          !input.organizationId ||
-          ctx.user.is_admin ||
-          role === 'owner' ||
-          role === 'admin' ||
-          integration.kilo_requester_user_id === ctx.user.id;
-        if (!canCancel) {
-          throw new TRPCError({ code: 'FORBIDDEN', message: 'Cannot cancel this request' });
-        }
+      const canCancel =
+        !input.organizationId ||
+        ctx.user.is_admin ||
+        role === 'owner' ||
+        role === 'admin' ||
+        integration.kilo_requester_user_id === ctx.user.id;
+      if (!canCancel) {
+        throw new TRPCError({ code: 'FORBIDDEN', message: 'Cannot cancel this request' });
       }
-      const result = await githubAppsService.cancelPendingInstallation(owner, input?.integrationId);
+      const result = await githubAppsService.cancelPendingInstallation(owner, input.integrationId);
 
-      if (input?.organizationId) {
+      if (input.organizationId) {
         await createAuditLog({
           organization_id: input.organizationId,
           action: 'organization.settings.change',

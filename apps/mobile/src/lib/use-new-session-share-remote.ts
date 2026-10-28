@@ -42,6 +42,10 @@ type UseNewSessionShareRemoteArgs = {
    * `useRemoteSpawnDispatch` so the CLI import carries it on the wire.
    */
   cloneFromKiloSessionId?: string | null;
+  /** Inclusive fork cut; forwarded to `useRemoteSpawnDispatch`. */
+  cloneUpToMessageId?: string | null;
+  /** A forked user message's text for the new composer; forwarded to `useRemoteSpawnDispatch`. */
+  forkPrefillText?: string | null;
   /**
    * Invoked with an inline failure i18n key when a clone/import spawn fails
    * non-retryably. Forwarded to `useRemoteSpawnDispatch`.
@@ -52,6 +56,11 @@ type UseNewSessionShareRemoteArgs = {
    * to `useRemoteSpawnDispatch`; the route arms its busy leave-lock bypass here.
    */
   onSpawnReady?: () => void;
+  /**
+   * Invoked with the spawned session id on a `ready` spawn. Forwarded to
+   * `useRemoteSpawnDispatch`; the new-session screen links a to-do start.
+   */
+  onSpawnSucceeded?: (sessionId: string) => void;
 };
 
 /**
@@ -73,8 +82,11 @@ export function useNewSessionShareRemote({
   onSpawnAdmitted,
   onSpawnFailed,
   cloneFromKiloSessionId,
+  cloneUpToMessageId,
+  forkPrefillText,
   onCloneImportFailure,
   onSpawnReady,
+  onSpawnSucceeded,
 }: UseNewSessionShareRemoteArgs) {
   // Render-time ref assignment, the same pattern `share-prefill.ts:80` and
   // `share-gate-sheet.tsx:91` use, so the snapshot callback stays stable
@@ -109,8 +121,11 @@ export function useNewSessionShareRemote({
     onSpawnAdmitted,
     onSpawnFailed,
     cloneFromKiloSessionId,
+    cloneUpToMessageId,
+    forkPrefillText,
     onCloneImportFailure,
     onSpawnReady,
+    onSpawnSucceeded,
   });
 
   return { remoteSpawn, handleRunOnInstanceChange: remoteSpawn.onChangeRunOnInstance };

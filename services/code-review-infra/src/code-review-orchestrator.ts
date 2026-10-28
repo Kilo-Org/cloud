@@ -139,6 +139,16 @@ function isSelectedModelActionRequiredMessage(message: string): boolean {
   );
 }
 
+const TRANSIENT_TRANSPORT_ERROR_PHRASES = [
+  'network connection lost',
+  'durable object instance is no longer active',
+  'durable object reset because its code was updated',
+] as const;
+
+function isTransientTransportErrorMessage(normalizedErrorMessage: string): boolean {
+  return TRANSIENT_TRANSPORT_ERROR_PHRASES.some(phrase => normalizedErrorMessage.includes(phrase));
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
@@ -272,6 +282,15 @@ function classifyCloudAgentNextFreshSessionRetry(
       false,
       'deterministic_action_required_failure',
       'deterministic_action_required_failure_not_retryable'
+    );
+  }
+
+  if (isTransientTransportErrorMessage(normalizedErrorMessage)) {
+    return cloudAgentNextFreshRetryClassification(
+      cloudAgentNextError,
+      true,
+      'sandbox_api_or_storage_failure',
+      'transient_transport_error_retryable'
     );
   }
 
@@ -1269,6 +1288,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       };
       if (this.state.skipBalanceCheck) {
         userHeaders['x-skip-balance-check'] = 'true';
+        userHeaders['x-internal-api-key'] = this.env.INTERNAL_API_SECRET;
       }
 
       console.log('[CodeReviewOrchestrator] Calling initiateFromKilocodeSessionV2', {
@@ -1389,6 +1409,7 @@ export class CodeReviewOrchestrator extends DurableObject<Env> {
       };
       if (this.state.skipBalanceCheck) {
         userHeaders['x-skip-balance-check'] = 'true';
+        userHeaders['x-internal-api-key'] = this.env.INTERNAL_API_SECRET;
       }
 
       let health: CloudAgentSessionHealthOutput;

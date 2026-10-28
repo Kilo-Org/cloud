@@ -2,7 +2,11 @@ import { z } from 'zod';
 
 import { API_BASE_URL } from '@/lib/config';
 import { clearAttestKeyOnRefusal } from '@/lib/auth/admission';
-import { classifyAuthResponse, reportAuthTerminalFailure } from '@/lib/auth/auth-response-class';
+import {
+  type AuthTerminalRoute,
+  classifyAuthResponse,
+  reportAuthTerminalFailure,
+} from '@/lib/auth/auth-response-class';
 import { parseAuthError } from '@/lib/auth/native-auth-contract';
 import { buildClientMetadataHeaders } from '@/lib/client-metadata';
 
@@ -19,6 +23,8 @@ export type PostAuthFailure = {
   ok: false;
   errorCode: string | undefined;
   ssoOrganizationId: string | undefined;
+  /** The sign-in methods a `SIGNUP-STEP-UP` refusal admits, unfiltered. */
+  signupMethods?: string[];
   /** The HTTP status the route answered with; absent when it never answered. */
   httpStatus?: number;
   /** True for a refusal retrying cannot change (a 401, or a 4xx with no retry guidance). */
@@ -44,7 +50,7 @@ export type PostAuthFailure = {
  * none, and only the authenticated passkey registration route sets it.
  */
 export async function postAuth(
-  path: string,
+  path: AuthTerminalRoute,
   body: unknown,
   extraHeaders?: Record<string, string>
 ): Promise<{ ok: true; data: unknown } | PostAuthFailure> {
@@ -92,6 +98,7 @@ export async function postAuth(
         ok: false,
         errorCode: parsed?.code,
         ssoOrganizationId: parsed?.ssoOrganizationId,
+        signupMethods: parsed?.signupMethods,
         httpStatus: response.status,
         terminal: classified.kind === 'terminal',
         retryAfterMs: classified.kind === 'retry' ? classified.retryAfterMs : undefined,

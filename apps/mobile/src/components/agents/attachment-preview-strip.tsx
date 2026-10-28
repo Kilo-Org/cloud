@@ -8,6 +8,7 @@ import {
   Pressable,
   ScrollView,
   View,
+  type ViewInstance,
 } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import {
@@ -22,7 +23,7 @@ import { useActionSheet } from '@expo/react-native-action-sheet';
 import { useTranslation } from 'react-i18next';
 
 import { AlertCircle, File as FileIcon, RotateCcw, X } from '@/components/ui/icons';
-import { moveA11yFocus } from '@/lib/a11y/announce';
+import { requestA11yFocus } from '@/lib/a11y/announce';
 
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
@@ -35,7 +36,7 @@ import {
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { describeAttachmentChip } from '@/components/agents/attachment-chip-description';
 import { CenteredState } from '@/components/centered-state';
-import { ImageViewerModal } from '@/components/image-viewer-modal';
+import { ImageViewer } from '@/components/ui/image-viewer';
 import { SheetHeader } from '@/components/sheet-header';
 import { SelectableText } from '@/components/ui/selectable-text';
 import {
@@ -116,7 +117,9 @@ function renderPreviewBody(preview: { mode: 'markdown' | 'text'; text: string })
     return <MarkdownText value={preview.text} />;
   }
   return (
-    <SelectableText className="text-sm leading-5 text-foreground">{preview.text}</SelectableText>
+    <SelectableText className="text-sm leading-[1.25rem] text-foreground">
+      {preview.text}
+    </SelectableText>
   );
 }
 
@@ -167,7 +170,7 @@ function AttachmentChip({
 
   // The chip body is the single accessible element; focus restoration targets
   // it after a move so VoiceOver/TalkBack stays on the chip that changed slot.
-  const bodyRef = useRef<View>(null);
+  const bodyRef = useRef<ViewInstance>(null);
   const focusPendingRef = useRef(false);
   const [focusEpoch, setFocusEpoch] = useState(0);
 
@@ -179,7 +182,7 @@ function AttachmentChip({
   useEffect(() => {
     if (focusPendingRef.current) {
       focusPendingRef.current = false;
-      moveA11yFocus(bodyRef);
+      requestA11yFocus(bodyRef);
     }
   }, [focusEpoch]);
 
@@ -342,7 +345,10 @@ function AttachmentChip({
               {description.filename}
             </Text>
             <Text numberOfLines={1} className="text-[10px] text-muted-foreground">
-              {description.message ?? `${description.sizeText} · ${description.progressText}`}
+              {description.message ??
+                (description.progressText === ''
+                  ? description.sizeText
+                  : `${description.sizeText} · ${description.progressText}`)}
             </Text>
           </View>
         </View>
@@ -461,7 +467,7 @@ function AttachmentChip({
       </GestureDetector>
 
       {viewerVisible ? (
-        <ImageViewerModal
+        <ImageViewer
           visible={viewerVisible}
           uri={attachment.localUri}
           filename={attachment.filename}
@@ -473,6 +479,7 @@ function AttachmentChip({
 
       {textPreview !== null ? (
         <SessionPageSheet
+          dismissible
           visible
           onClose={() => {
             setTextPreview(null);

@@ -254,6 +254,22 @@ describe('resolveScenarioApi', () => {
 });
 
 describe('missingCapabilities', () => {
+  it('treats direct database access as an explicit scenario capability', () => {
+    expect(
+      missingCapabilities(['database'], {
+        profile: 'deployed',
+        requireControlPlaneSession: true,
+      })
+    ).toEqual(['database']);
+    expect(
+      missingCapabilities(['database'], {
+        profile: 'local',
+        requireControlPlaneSession: false,
+        database: { url: 'postgres://localhost/test' },
+      })
+    ).toEqual([]);
+  });
+
   it('names every absent declared capability without duplicates', () => {
     expect(
       missingCapabilities(['sandbox', 'deployedHttpAuthBoundary'], {
@@ -364,6 +380,7 @@ describe('assessScenarioSupport', () => {
             containerEnvironment: vi.fn(async () => ({})),
             gitRemoteUrl: vi.fn(async () => null),
             summaryCount: vi.fn(async () => 0),
+            startPreviewFixture: vi.fn(async () => ({ port: 8765, stop: async () => undefined })),
           },
         }
       )

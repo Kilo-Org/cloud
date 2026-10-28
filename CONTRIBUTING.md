@@ -16,7 +16,7 @@ The Kilo Community is [on Discord](https://kilo.ai/discord).
 
 ## Prerequisites
 
-- **Node.js 24** (`.nvmrc` pins `24.14.1`) — required for all packages.
+- **Node.js 24** (`.nvmrc` pins `24.22.1`) — required for all packages.
 - **pnpm 11.1.2** — use Corepack so the active version matches `package.json` `packageManager`:
   ```bash
   corepack enable
@@ -126,6 +126,12 @@ The repo includes a seed runner for creating local fixtures via `pnpm dev:seed`.
 
 - `pnpm dev:seed app:create-user <name> <email>` — creates a `kilocode_users` row with a real Stripe test customer, pre-bypassing onboarding gates so you can use the app immediately.
 - `pnpm dev:seed app:add-credits <user-id> <usd>` — grants credits to an existing user, updating the `total_microdollars_acquired` balance and creating a `credit_transactions` row. Supports `--paid`/`--free`, `--category`, `--expires-in-days`, etc. Useful for testing billing and credit flows without manual DB edits.
+
+### Sales demos
+
+The scheduled `/api/cron/sales-demo-reset` route refreshes demo credits and usage.
+Scheduled and manual resets preserve organization membership, sub-organization membership, roles, and group assignments.
+Resets do not restore assignments that an earlier reset removed.
 
 ### KiloClaw
 

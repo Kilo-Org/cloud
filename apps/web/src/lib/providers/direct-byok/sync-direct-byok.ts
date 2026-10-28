@@ -1,28 +1,27 @@
 import * as z from 'zod';
-import {
-  type DirectByokModel,
-  type DirectByokModelFlag,
+import type {
+  DirectByokModel,
+  DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
+import DIRECT_BYOK_PROVIDERS from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import type { DirectUserByokInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { direct_byok_model_lists } from '@kilocode/db/schema';
 import {
-  ReasoningEffortSchema,
-  VerbositySchema,
-  type OpenCodeSettings,
-} from '@kilocode/db/schema-types';
-import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
-import {
-  getFallbackModelVariants,
-  REASONING_VARIANTS_BINARY,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/variants';
+  ModalitySchema,
+  ModelsDevProviderSchema,
+  isUsableModelsDevModel,
+  shortenDisplayName,
+  toRawModel,
+  type ModelsDevProvider,
+  type RawModel,
+} from './models-dev';
+import { parseAwsBedrockModelsDevModels } from './bedrock-models';
+import { parseGcpVertexModelsDevModels } from './vertex-models';
+import { recordSyncCompleted } from '@/lib/providers/openrouter/sync-providers-stale-alert';
 
 const DEFAULT_CONTENT_LENGTH = 200_000;
 const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;
-
-const ModalitySchema = z
-  .enum(['text', 'image', 'video', 'pdf', 'audio', 'unknown'])
-  .catch('unknown');
 
 const OpenAICompatibleModelsResponseSchema = z.object({
   data: z.array(
@@ -38,69 +37,29 @@ const OpenAICompatibleModelsResponseSchema = z.object({
   ),
 });
 
-const ModelsDevReasoningOptionSchema = z.discriminatedUnion('type', [
-  z.object({ type: z.literal('toggle') }),
-  z.object({
-    type: z.literal('effort'),
-    values: z.array(z.union([z.null(), ReasoningEffortSchema, z.literal('default')])),
-  }),
+// A models.dev per-model `provider.npm` names the SDK for the model's own endpoint. Several SDK
+// names, such as `@ai-sdk/mistral`, still speak Chat Completions, so only SDKs for the native
+// Gemini API, which the gateway cannot proxy, are excluded.
+const GEMINI_API_MODELS_DEV_SDKS: ReadonlySet<string> = new Set([
+  '@ai-sdk/google',
+  '@ai-sdk/google-vertex',
 ]);
-
-const ModelsDevModelSchema = z.object({
-  id: z.string(),
-  name: z.string().optional(),
-  reasoning: z.boolean().optional(),
-  reasoning_options: z.array(ModelsDevReasoningOptionSchema).optional().catch(undefined),
-  status: z.enum(['alpha', 'beta', 'deprecated']).optional().catch(undefined),
-  limit: z
-    .object({
-      context: z.number().optional(),
-      output: z.number().optional(),
-    })
-    .optional(),
-  modalities: z
-    .object({
-      input: z.array(ModalitySchema).optional(),
-      output: z.array(ModalitySchema).optional(),
-    })
-    .optional(),
-  tool_call: z.boolean().optional(),
-});
-
-const ModelsDevProviderSchema = z.object({
-  models: z.record(z.string(), ModelsDevModelSchema),
-});
 
 const ModelsDevCatalogSchema = z.record(z.string(), z.unknown());
 
 type ModelsDevCatalog = z.infer<typeof ModelsDevCatalogSchema>;
 
-type RawModel = {
-  id: string;
-  name?: string;
-  context_length?: number;
-  max_completion_tokens?: number;
-  input_modalities?: ReadonlyArray<z.infer<typeof ModalitySchema>>;
-  flags?: ReadonlyArray<DirectByokModelFlag>;
-  variants?: OpenCodeSettings['variants'];
-};
+const MODELS_DEV_OPENROUTER_ID = 'openrouter';
 
 type SyncContext = {
   getModelsDevCatalog(): Promise<ModelsDevCatalog>;
+  getCatalogModelIdsByCanonicalId(): Promise<ReadonlyMap<string, string>>;
 };
 
 type ProviderFetcher = {
   providerId: DirectUserByokInferenceProviderId;
   fetch(ctx: SyncContext): Promise<RawModel[]>;
 };
-
-function shortenDisplayName(id: string): string;
-function shortenDisplayName(id: string | undefined): string | undefined;
-function shortenDisplayName(id: string | undefined) {
-  if (!id) return undefined;
-  const slash = id.lastIndexOf('/');
-  return slash >= 0 ? id.slice(slash + 1).trim() : id;
-}
 
 function openAICompatibleFetcher(options: {
   providerId: DirectUserByokInferenceProviderId;
@@ -135,47 +94,6 @@ export function parseOpenAICompatibleProviderModels(entry: unknown): RawModel[] 
     }));
 }
 
-function modelsDevReasoningOptionsToVariants(
-  options: ReadonlyArray<z.infer<typeof ModelsDevReasoningOptionSchema>>
-): OpenCodeSettings['variants'] {
-  const hasToggle = options.some(option => option.type === 'toggle');
-  const effortVariants: NonNullable<OpenCodeSettings['variants']> = {};
-  for (const option of options) {
-    if (option.type !== 'effort') continue;
-    for (const value of option.values) {
-      const effort = ReasoningEffortSchema.safeParse(value);
-      if (!effort.success) continue;
-      effortVariants[effort.data] = {
-        reasoning: { enabled: effort.data !== 'none', effort: effort.data },
-      };
-    }
-  }
-
-  if (Object.keys(effortVariants).length > 0) {
-    return hasToggle && !effortVariants.none
-      ? { none: { reasoning: { enabled: false, effort: 'none' } }, ...effortVariants }
-      : effortVariants;
-  }
-  if (hasToggle) {
-    return REASONING_VARIANTS_BINARY;
-  }
-  return undefined;
-}
-
-function addAnthropicVariantVerbosity(
-  variants: OpenCodeSettings['variants'],
-  aiSdkProvider: OpenCodeSettings['ai_sdk_provider']
-): OpenCodeSettings['variants'] {
-  if (aiSdkProvider !== 'anthropic' || !variants) return variants;
-
-  return Object.fromEntries(
-    Object.entries(variants).map(([name, variant]) => {
-      const verbosity = VerbositySchema.safeParse(variant.reasoning?.effort);
-      return [name, verbosity.success ? { ...variant, verbosity: verbosity.data } : variant];
-    })
-  );
-}
-
 export function parseModelsDevProviderModels(
   entry: unknown,
   providerId: DirectUserByokInferenceProviderId,
@@ -185,43 +103,100 @@ export function parseModelsDevProviderModels(
   return Object.values(provider.models)
     .filter(
       model =>
-        model.status !== 'deprecated' &&
-        (!model.modalities?.output || model.modalities.output.includes('text')) &&
+        isUsableModelsDevModel(model) &&
         (!availableModelIds || availableModelIds.has(model.id)) &&
-        model.tool_call !== false &&
-        (!model.modalities?.input || model.modalities.input.includes('text'))
+        (!model.provider?.npm || !GEMINI_API_MODELS_DEV_SDKS.has(model.provider.npm))
     )
-    .map(model => {
-      const modelId = `${providerId}/${model.id}`.toLowerCase();
-      const aiSdkProvider = getAiSdkProvider(modelId, providerId);
-      const variants =
-        modelsDevReasoningOptionsToVariants(model.reasoning_options ?? []) ??
-        (model.reasoning ? getFallbackModelVariants(modelId) : undefined);
-      return {
-        id: model.id,
-        name: shortenDisplayName(model.name),
-        context_length: model.limit?.context,
-        max_completion_tokens: model.limit?.output,
-        input_modalities: model.modalities?.input,
-        flags: model.reasoning ? ['reasoning'] : undefined,
-        variants: addAnthropicVariantVerbosity(variants, aiSdkProvider),
-      };
-    });
+    .map(model => toRawModel(model));
+}
+
+function getModelsDevId(providerId: DirectUserByokInferenceProviderId): string | undefined {
+  const providers: ReadonlyArray<DirectByokProvider> = DIRECT_BYOK_PROVIDERS;
+  return providers.find(provider => provider.id === providerId)?.models_dev_id;
+}
+
+function isPreferredCatalogModelId(candidate: string, current: string, canonicalId: string) {
+  if (current === canonicalId) return false;
+  return candidate === canonicalId || candidate.length < current.length;
+}
+
+// models.dev keys its `openrouter` provider by OpenRouter model ID, so its canonical IDs translate
+// the models.dev vendor namespace (`zhipuai/glm-5.2`) into the catalog's (`z-ai/glm-5.2`).
+export function indexCatalogModelIdsByCanonicalId(
+  catalog: ModelsDevCatalog
+): ReadonlyMap<string, string> {
+  const index = new Map<string, string>();
+  const entry = catalog[MODELS_DEV_OPENROUTER_ID];
+  if (!entry) {
+    console.warn('[sync-direct-byok-providers] models.dev catalog missing openrouter entry');
+    return index;
+  }
+  for (const model of Object.values(ModelsDevProviderSchema.parse(entry).models)) {
+    const canonicalId = model.canonical_model_id;
+    // Variants such as `:free` are routing options of a catalog model, not separate models.
+    if (!canonicalId || model.id.includes(':')) continue;
+    const current = index.get(canonicalId);
+    if (!current || isPreferredCatalogModelId(model.id, current, canonicalId)) {
+      index.set(canonicalId, model.id);
+    }
+  }
+  return index;
+}
+
+async function getCatalogModelIds(
+  providerId: DirectUserByokInferenceProviderId,
+  ctx: SyncContext
+): Promise<ReadonlyMap<string, string>> {
+  const catalogModelIds = new Map<string, string>();
+  const modelsDevId = getModelsDevId(providerId);
+  if (!modelsDevId) return catalogModelIds;
+  const entry = (await ctx.getModelsDevCatalog())[modelsDevId];
+  if (!entry) return catalogModelIds;
+  const byCanonicalId = await ctx.getCatalogModelIdsByCanonicalId();
+  for (const model of Object.values(ModelsDevProviderSchema.parse(entry).models)) {
+    const catalogModelId = model.canonical_model_id && byCanonicalId.get(model.canonical_model_id);
+    if (catalogModelId) catalogModelIds.set(model.id, catalogModelId);
+  }
+  return catalogModelIds;
+}
+
+function getModelsDevEntry(
+  providerId: DirectUserByokInferenceProviderId,
+  catalog: ModelsDevCatalog
+) {
+  const catalogKey = getModelsDevId(providerId);
+  if (!catalogKey) {
+    throw new Error(`${providerId} has no models.dev ID`);
+  }
+  const entry = catalog[catalogKey];
+  if (!entry) {
+    throw new Error(`models.dev catalog missing ${catalogKey} entry`);
+  }
+  return entry;
+}
+
+/** Parses a provider's models.dev entry with a provider-specific selection. */
+function customModelsDevFetcher(
+  providerId: DirectUserByokInferenceProviderId,
+  parse: (provider: ModelsDevProvider) => RawModel[]
+): ProviderFetcher {
+  return {
+    providerId,
+    async fetch(ctx) {
+      const entry = getModelsDevEntry(providerId, await ctx.getModelsDevCatalog());
+      return parse(ModelsDevProviderSchema.parse(entry));
+    },
+  };
 }
 
 function modelsDevFetcher(
   providerId: DirectUserByokInferenceProviderId,
-  catalogKey: string,
   availableModelsUrl?: string
 ): ProviderFetcher {
   return {
     providerId,
     async fetch(ctx) {
-      const catalog = await ctx.getModelsDevCatalog();
-      const entry = catalog[catalogKey];
-      if (!entry) {
-        throw new Error(`models.dev catalog missing ${catalogKey} entry`);
-      }
+      const entry = getModelsDevEntry(providerId, await ctx.getModelsDevCatalog());
       if (!availableModelsUrl) {
         return parseModelsDevProviderModels(entry, providerId);
       }
@@ -257,7 +232,7 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
     label: 'Neuralwatt',
     url: 'https://api.neuralwatt.com/v1/models',
   }),
-  modelsDevFetcher('nvidia-byok', 'nvidia', 'https://integrate.api.nvidia.com/v1/models'),
+  modelsDevFetcher('nvidia-byok', 'https://integrate.api.nvidia.com/v1/models'),
   openAICompatibleFetcher({
     providerId: 'chutes-byok',
     label: 'Chutes',
@@ -288,17 +263,22 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
     label: 'Morph BYOK',
     url: 'https://www.morphllm.com/api/models/json',
   }),
-  modelsDevFetcher('alibaba-token-plan', 'alibaba-token-plan'),
-  modelsDevFetcher('edenai', 'edenai', 'https://api.edenai.run/v3/models'),
-  modelsDevFetcher('zai-coding', 'zai-coding-plan'),
-  modelsDevFetcher('ollama-cloud', 'ollama-cloud', 'https://ollama.com/v1/models'),
-  modelsDevFetcher('opencode-go', 'opencode-go', 'https://opencode.ai/zen/go/v1/models'),
-  modelsDevFetcher('xiaomi-token-plan-ams', 'xiaomi-token-plan-ams'),
-  modelsDevFetcher('xiaomi-token-plan-sgp', 'xiaomi-token-plan-sgp'),
+  modelsDevFetcher('alibaba-token-plan'),
+  modelsDevFetcher('edenai', 'https://api.edenai.run/v3/models'),
+  modelsDevFetcher('zai-coding'),
+  modelsDevFetcher('ollama-cloud', 'https://ollama.com/v1/models'),
+  modelsDevFetcher('opencode-go', 'https://opencode.ai/zen/go/v1/models'),
+  modelsDevFetcher('xiaomi-token-plan-ams'),
+  modelsDevFetcher('xiaomi-token-plan-sgp'),
+  customModelsDevFetcher('bedrock-byok', parseAwsBedrockModelsDevModels),
+  customModelsDevFetcher('vertex-byok', parseGcpVertexModelsDevModels),
 ];
 
 async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise<number> {
-  const fetched = await fetcher.fetch(ctx);
+  const [fetched, catalogModelIds] = await Promise.all([
+    fetcher.fetch(ctx),
+    getCatalogModelIds(fetcher.providerId, ctx),
+  ]);
   const models: DirectByokModel[] = [];
 
   for (const raw of fetched) {
@@ -316,7 +296,9 @@ async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise
       flags: flags.size > 0 ? [...flags] : undefined,
       context_length,
       max_completion_tokens,
-      variants: raw.variants,
+      reasoning_options: raw.reasoning_options,
+      catalog_model_id: catalogModelIds.get(raw.id),
+      ...(raw.endpoint && { endpoint: raw.endpoint }),
     });
   }
 
@@ -336,14 +318,32 @@ export async function syncDirectByokModels(): Promise<
   Partial<Record<DirectUserByokInferenceProviderId, number>>
 > {
   let catalogPromise: Promise<ModelsDevCatalog> | null = null;
+  let catalogModelIdsPromise: Promise<ReadonlyMap<string, string>> | null = null;
+  const getModelsDevCatalog = () => (catalogPromise ??= fetchModelsDevCatalog());
   const ctx: SyncContext = {
-    getModelsDevCatalog() {
-      catalogPromise ??= fetchModelsDevCatalog();
-      return catalogPromise;
+    getModelsDevCatalog,
+    getCatalogModelIdsByCanonicalId() {
+      catalogModelIdsPromise ??= getModelsDevCatalog().then(indexCatalogModelIdsByCanonicalId);
+      return catalogModelIdsPromise;
     },
   };
   const entries = await Promise.all(
     FETCHERS.map(async fetcher => [fetcher.providerId, await syncProvider(fetcher, ctx)] as const)
   );
   return Object.fromEntries(entries);
+}
+
+export async function syncAndStoreDirectByokProviders() {
+  const startTime = performance.now();
+  const direct_byok_model_counts = await syncDirectByokModels();
+  console.log('[sync-direct-byok-providers] model counts:', direct_byok_model_counts);
+  const completed_at = await recordSyncCompleted('direct_byok');
+  const counts = Object.values(direct_byok_model_counts);
+  return {
+    completed_at,
+    total_providers: counts.length,
+    total_models: counts.reduce((sum, count) => sum + count, 0),
+    direct_byok_model_counts,
+    time: performance.now() - startTime,
+  };
 }

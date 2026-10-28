@@ -2,22 +2,27 @@ import 'server-only';
 
 import { createHash } from 'crypto';
 
+import * as z from 'zod';
+
 import { BOUNCER_URL, INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
 
 /**
  * Client for the bouncer worker (https://bouncer.kiloapps.io, repo Kilo-Org/bouncer).
  *
- * Every bouncer verdict is report-only (`enforced: false`). Callers must not act on a verdict, and
- * a bouncer failure must never fail the caller: every best-effort function here resolves, and it
- * logs on failure. The request contracts mirror the typia types in the bouncer repo
- * (`src/credit-event.ts`, `src/usage-event.ts`, `src/decide.ts`). Bouncer rejects an invalid body
- * with 400.
+ * Best-effort event reports resolve and log on failure. Admission callers apply their own failure
+ * policy. The request contracts mirror the typia types in the bouncer repo
+ * (`src/credit-event.ts`, `src/usage-event.ts`, `src/decide.ts`, `src/signup.ts`).
+ * Bouncer rejects an invalid body with 400.
  *
- * `reportUsageEvent` and `decide` stay best-effort transport (they never delay or fail inference).
- * `deliverCreditEventWireBody` (and its `deliverCreditEvent` wrapper) returns an explicit delivery
- * result instead of swallowing it: the durable outbox drainer is its caller, and it must
- * distinguish a real HTTP success from a failure so a transport error can never mark an event
- * delivered. Webhooks and store notifications never call it: they only enqueue to the outbox.
+ * `decide` returns bouncer's verdict, or null on a timeout, transport error, non-2xx, or a body that
+ * is not a `DecideResponse`; the gateway rejects a request only when the verdict says
+ * `enforced: true`, and sends it upstream in every other case. `reportUsageEvent` stays best-effort
+ * transport. `deliverCreditEventWireBody` and `deliverUsageEventWireBody` return an explicit
+ * delivery result instead of swallowing it: the durable outbox drainers are their callers, and they
+ * must distinguish a real HTTP success from a failure so a transport error can never mark an event
+ * delivered. Webhooks and store notifications never call them: they only enqueue to the outbox.
+ * Signup admission returns null on an unavailable or invalid verdict. The caller rejects signup
+ * with a retryable error before creating a Stripe customer or account.
  */
 
 /** Bouncer keeps ids to 128 characters. */
@@ -31,6 +36,22 @@ const MAX_ID_LENGTH = 128;
 const CREDIT_TIMEOUT_MS = 5_000;
 /** Usage reports run after the inference response and have a larger trial budget. */
 const USAGE_TIMEOUT_MS = 30_000;
+/**
+ * Per-delivery budget for one usage event from the durable usage-event outbox, so the immediate
+ * delivery after the usage write and one drainer delivery both stay short.
+ */
+const USAGE_OUTBOX_TIMEOUT_MS = 5_000;
+/** A lease release runs in `after()` once the request has ended. */
+const RELEASE_TIMEOUT_MS = 5_000;
+
+/** Signup runs on the auth critical path, before Stripe or the user insert. */
+const SIGNUP_TIMEOUT_MS = 3_000;
+
+/**
+ * A charge verdict sits on the checkout path, before Stripe creates or reuses a session, and on the
+ * decline webhook, so it stays short: an unavailable verdict admits the charge.
+ */
+const CHARGE_DECIDE_TIMEOUT_MS = 1_500;
 
 export type CreditFlow = 'auto_topup' | 'kilo_pass' | 'kiloclaw' | 'seats' | 'topup';
 
@@ -107,6 +128,8 @@ export type CreditEvent =
             flow: CreditFlow;
             amountCents: number;
             accountCreatedAt: Date | string;
+            /** The payer's `microdollars_used` at charge time. */
+            accountUsedMicrodollars?: number | null;
             ipCountry?: string | null;
             cardCountry?: string | null;
           }
@@ -155,6 +178,8 @@ type UsageEventFields = {
   samples?: number | null;
   /** A 64-bit SimHash of the user prompt, as 16 hex characters. */
   promptSimHash?: string | null;
+  /** The request's charged cost in microdollars, after free-model and BYOK zeroing. */
+  costMicrodollars?: number | null;
 };
 
 /**
@@ -163,7 +188,11 @@ type UsageEventFields = {
  * `accountId`, so it can never be joined to a payer.
  */
 export type UsageEvent =
-  | (UsageEventFields & { accountId: string })
+  | (UsageEventFields & {
+      accountId: string;
+      /** The request ran on the person's own ChatGPT subscription through Sign in with ChatGPT. */
+      siwc?: boolean;
+    })
   | (UsageEventFields & { tier: 'anonymous'; ip: string });
 
 export type DecideTier = 'anonymous' | 'free' | 'paid' | 'team';
@@ -174,6 +203,8 @@ export type DecideRequest =
       requestId: string;
       tier: Exclude<DecideTier, 'anonymous'>;
       accountId: string;
+      /** The authenticated actor, independently of the paying account. */
+      userId?: string;
       /** The request's client IP as a bare IPv4/IPv6 literal, when one resolved. */
       ip?: string | null;
       /**
@@ -183,17 +214,155 @@ export type DecideRequest =
        * Kilo's edge, not a person or device.
        */
       ja4?: string | null;
+      /** `created_at` of the paying user, or of the organization for an `org:` account. */
+      accountCreatedAt?: Date | string | null;
+      /** `microdollars_used` of the paying user or organization. */
+      usedMicrodollars?: number | null;
+      /** `total_microdollars_acquired` of the paying user or organization. */
+      acquiredMicrodollars?: number | null;
     };
 
-export type DecideVerdict = {
-  decision: 'allow' | 'block' | 'review' | 'throttle';
-  reasons: string[];
-  retryAfterMs?: number;
-  enforced: false;
+const bouncerFlagSchema = z.object({
+  name: z.string(),
+  decision: z.enum(['review', 'throttle', 'block']),
+  enforced: z.boolean(),
+  until: z.number().nullable(),
+  // Log-only metadata; a new source must not invalidate the whole verdict.
+  source: z.string().optional(),
+});
+
+/**
+ * Bouncer's decide verdict. `enforced: true` is the only answer that rejects a request; `code` says
+ * how. `flags` are internal: log them server-side and never return them to a client. `spendWatch`
+ * asks the gateway to send this request's usage event through the durable usage-event outbox.
+ */
+const decideResponseSchema = z.object({
+  enforced: z.boolean(),
+  code: z.enum(['rate_limited', 'spend_limited', 'restricted']).optional(),
+  retryAfterMs: z.number().nonnegative().optional(),
+  spendWatch: z.boolean(),
+  flags: z.array(bouncerFlagSchema),
+});
+
+export type DecideResponse = z.infer<typeof decideResponseSchema>;
+export type DecideFlag = DecideResponse['flags'][number];
+
+/**
+ * A charge verdict. `enforced: true` refuses a checkout or expires the payer's open sessions;
+ * `flags` are internal and are logged, never returned to a client.
+ *
+ * `enforced` is the only field that decides, so it is the only required one: a new block `code`, a
+ * renamed one, or a flag shape from a newer bouncer must never turn an enforced verdict into a
+ * fail-open. `code` and the whole `flags` list are log-only metadata, kept when they match the
+ * known shape and dropped otherwise.
+ */
+const chargeDecideResponseSchema = z.object({
+  enforced: z.boolean(),
+  code: z.literal('charge_blocked').optional().catch(undefined),
+  flags: z.array(bouncerFlagSchema).catch([]),
+});
+
+export type ChargeDecideResponse = z.infer<typeof chargeDecideResponseSchema>;
+export type ChargeDecideFlag = ChargeDecideResponse['flags'][number];
+
+/** One charge-gate question: before a checkout, or after a declined charge. */
+export type ChargeDecideRequest = {
+  /** An id for the audit log; the charge id on the failure stage. */
+  requestId: string;
+  /** `user:<id>` or `org:<id>`, the payer key the credit events use. */
+  accountId: string;
+  /** The acting user, also for an org payer. */
+  userId?: string;
+  /** The client IP, omitted when unknown (the failure stage has no client request). */
+  ip?: string | null;
+  ja4?: string | null;
+  stage: 'checkout' | 'failure';
+  flow?: CreditFlow;
 };
 
-/** The explicit outcome of delivering one credit event, for the durable outbox drainer. */
-export type CreditEventDeliveryResult =
+/** Bouncer's shape for a signup method (a Cloud `AuthProviderId`) and a step-up method. */
+const SIGNUP_METHOD = /^[a-z0-9-]{1,32}$/;
+/** Bouncer's shape for the lowercase domain part of a normalized email. */
+const SIGNUP_EMAIL_DOMAIN = /^[a-z0-9.-]{1,253}$/;
+/** Bouncer emits at most 8 signup flags: IP ≤4, domain ≤2, JA4 ≤2, or one ban flag. */
+const MAX_SIGNUP_FLAGS = 8;
+
+/**
+ * The optional step-up facts are dropped whole when invalid, like JA4. Without `method`, Bouncer
+ * applies its method-less policy, which an old Cloud build also gets.
+ */
+const signupRequestSchema = z.strictObject({
+  operationId: z.string().min(1).max(MAX_ID_LENGTH),
+  ip: z.union([z.ipv4(), z.ipv6()]),
+  ja4: z.string().nullable().optional().transform(normalizeJa4),
+  method: z
+    .string()
+    .nullable()
+    .optional()
+    .transform(value => (value && SIGNUP_METHOD.test(value) ? value : undefined)),
+  emailDomain: z
+    .string()
+    .nullable()
+    .optional()
+    .transform(value => {
+      const domain = value?.trim().toLowerCase();
+      return domain && SIGNUP_EMAIL_DOMAIN.test(domain) ? domain : undefined;
+    }),
+});
+
+export type SignupDecideRequest = z.input<typeof signupRequestSchema>;
+
+const signupFlagSchema = z.strictObject({
+  name: z.enum([
+    'signup:burst',
+    'signup:sustained',
+    'signup:busy',
+    'signup:domain',
+    'signup:ja4',
+    'signup:saturated',
+    'signup:banned',
+  ]),
+  decision: z.enum(['review', 'throttle', 'block']),
+  enforced: z.boolean(),
+  until: z.number().nonnegative().nullable(),
+  source: z.string().max(MAX_ID_LENGTH).optional(),
+});
+
+const signupFlagsSchema = z.array(signupFlagSchema).max(MAX_SIGNUP_FLAGS);
+
+/**
+ * Signup requires a validated verdict; an unavailable verdict prevents account creation. A
+ * `signup_step_up` verdict lists the sign-in methods that would be admitted now; callers render
+ * only the ones they know.
+ */
+const signupResponseSchema = z.union([
+  z.strictObject({
+    enforced: z.literal(false),
+    flags: signupFlagsSchema,
+  }),
+  z.strictObject({
+    enforced: z.literal(true),
+    code: z.literal('signup_rate_limited'),
+    retryAfterMs: z
+      .number()
+      .int()
+      .nonnegative()
+      // Allow clock and request-order skew beyond the longest supported window.
+      .max(31 * 24 * 60 * 60 * 1000),
+    flags: signupFlagsSchema,
+  }),
+  z.strictObject({
+    enforced: z.literal(true),
+    code: z.literal('signup_step_up'),
+    methods: z.array(z.string().regex(SIGNUP_METHOD)).min(1).max(8),
+    flags: signupFlagsSchema,
+  }),
+]);
+
+export type SignupDecideResponse = z.infer<typeof signupResponseSchema>;
+
+/** The explicit outcome of delivering one outbox event, for a durable outbox drainer. */
+export type BouncerDeliveryResult =
   | { delivered: true; status: number }
   | {
       delivered: false;
@@ -220,6 +389,16 @@ function country(value: string | null | undefined): string | undefined {
 
 function id(value: string | null | undefined): string | undefined {
   return value ? value.slice(0, MAX_ID_LENGTH) : undefined;
+}
+
+/**
+ * A microdollar amount as bouncer's typia types accept it: a non-negative integer (it may exceed
+ * uint32). Anything else is dropped rather than sent, so one odd value cannot fail the whole body.
+ */
+function microdollars(value: number | null | undefined): number | undefined {
+  if (value == null || !Number.isFinite(value)) return undefined;
+  const rounded = Math.round(value);
+  return Number.isSafeInteger(rounded) && rounded >= 0 ? rounded : undefined;
 }
 
 /**
@@ -320,7 +499,9 @@ async function post(
     }
   }
   // A decide timeout is expected on a slow call; it is not worth an error line each time.
-  if (!(result.error === 'TimeoutError' && path === DECIDE_PATH)) {
+  const timedOutVerdict =
+    result.error === 'TimeoutError' && (path === DECIDE_PATH || path === CHARGE_DECIDE_PATH);
+  if (!timedOutVerdict) {
     console.error('[bouncer] request failed', { path, status: result.status, error: result.error });
   }
   return null;
@@ -333,6 +514,9 @@ async function post(
 const CREDIT_EVENT_PATH = '/api/v2/credit-event';
 const USAGE_EVENT_PATH = '/api/v1/usage-event';
 const DECIDE_PATH = '/api/v1/decide';
+const CHARGE_DECIDE_PATH = '/api/v1/charge-decide';
+const SIGNUP_DECIDE_PATH = '/api/v1/signup-decide';
+const RELEASE_PATH = '/api/v1/release';
 
 const STORE_EVENT_TYPES: Record<StoreCreditEvent['type'], true> = {
   'store.purchase': true,
@@ -393,6 +577,7 @@ export function creditEventWireBody(event: CreditEvent): Record<string, unknown>
         flow: event.flow,
         amountCents: Math.max(0, Math.round(event.amountCents)),
         accountCreatedAt: isoTime(event.accountCreatedAt),
+        accountUsedMicrodollars: microdollars(event.accountUsedMicrodollars),
         ipCountry: country(event.ipCountry),
         cardCountry: country(event.cardCountry),
       });
@@ -423,7 +608,7 @@ export function creditEventWireBody(event: CreditEvent): Record<string, unknown>
 export async function deliverCreditEvent(
   event: CreditEvent,
   signal?: AbortSignal
-): Promise<CreditEventDeliveryResult> {
+): Promise<BouncerDeliveryResult> {
   return deliverCreditEventWireBody(creditEventWireBody(event), signal);
 }
 
@@ -435,11 +620,31 @@ export async function deliverCreditEvent(
 export async function deliverCreditEventWireBody(
   body: Record<string, unknown>,
   signal?: AbortSignal
-): Promise<CreditEventDeliveryResult> {
+): Promise<BouncerDeliveryResult> {
+  return deliverWireBody(CREDIT_EVENT_PATH, body, CREDIT_TIMEOUT_MS, signal);
+}
+
+/**
+ * Delivers an already-shaped usage-event wire body from the durable usage-event outbox, returning
+ * the real outcome. Bouncer dedupes a usage event by `requestId`, so a redelivery counts once.
+ */
+export async function deliverUsageEventWireBody(
+  body: Record<string, unknown>,
+  signal?: AbortSignal
+): Promise<BouncerDeliveryResult> {
+  return deliverWireBody(USAGE_EVENT_PATH, body, USAGE_OUTBOX_TIMEOUT_MS, signal);
+}
+
+async function deliverWireBody(
+  path: string,
+  body: Record<string, unknown>,
+  timeoutMs: number,
+  signal?: AbortSignal
+): Promise<BouncerDeliveryResult> {
   if (!BOUNCER_URL || !INTERNAL_API_SECRET) {
     return { delivered: false, permanent: true, status: null, error: 'bouncer_not_configured' };
   }
-  const result = await postWithResult(CREDIT_EVENT_PATH, body, CREDIT_TIMEOUT_MS, signal);
+  const result = await postWithResult(path, body, timeoutMs, signal);
   if (result.ok) {
     // Drain the tiny acknowledgement body so the connection is reusable. The 2xx status is
     // authoritative for delivery; a read error is ignored and never causes a redelivery.
@@ -449,8 +654,11 @@ export async function deliverCreditEventWireBody(
   return { delivered: false, permanent: false, status: result.status, error: result.error };
 }
 
-/** Reports one inference request after its upstream response. Resolves on any failure. */
-export async function reportUsageEvent(event: UsageEvent): Promise<void> {
+/**
+ * Shapes one usage event into the exact body bouncer's typia types accept. The usage-event outbox
+ * persists this body, so a retry sends exactly what was enqueued.
+ */
+export function usageEventWireBody(event: UsageEvent): Record<string, unknown> {
   const common = {
     requestId: id(event.requestId),
     occurredAt: isoTime(event.occurredAt),
@@ -465,23 +673,44 @@ export async function reportUsageEvent(event: UsageEvent): Promise<void> {
     requestedLogprobs: event.requestedLogprobs,
     samples: event.samples && event.samples >= 1 ? Math.round(event.samples) : undefined,
     promptSimHash: event.promptSimHash ?? undefined,
+    costMicrodollars: microdollars(event.costMicrodollars),
   };
   // An anonymous request carries only the tier and its required ip; a signed-in one adds accountId.
-  const body =
-    'tier' in event
-      ? compact({ ...common, tier: event.tier })
-      : compact({ ...common, accountId: event.accountId });
-  await post(USAGE_EVENT_PATH, body, USAGE_TIMEOUT_MS);
+  return 'tier' in event
+    ? compact({ ...common, tier: event.tier })
+    : compact({ ...common, accountId: event.accountId, siwc: event.siwc === true || undefined });
+}
+
+/** Reports one inference request after its upstream response. Resolves on any failure. */
+export async function reportUsageEvent(event: UsageEvent): Promise<void> {
+  await post(USAGE_EVENT_PATH, usageEventWireBody(event), USAGE_TIMEOUT_MS);
 }
 
 /**
- * Asks bouncer for a report-only verdict. Resolves to `null` on a timeout or any error,
- * so the gateway always sends the request.
+ * Releases the concurrency lease a watched account's decide took for `requestId`, for a request
+ * that ended without a usage event (a usage event releases it itself). Best-effort: resolves on any
+ * failure, and a lost release only holds the slot until bouncer's lease TTL.
+ */
+export async function releaseDecideLease(request: {
+  requestId: string;
+  accountId: string;
+}): Promise<void> {
+  await post(
+    RELEASE_PATH,
+    { requestId: id(request.requestId), accountId: request.accountId },
+    RELEASE_TIMEOUT_MS
+  );
+}
+
+/**
+ * Asks bouncer for a verdict. Resolves to `null` on a timeout, transport error, non-2xx, or a body
+ * that is not a `DecideResponse` (for example a pre-enforcement bouncer), so the gateway then sends
+ * the request. Never rejects.
  */
 export async function decide(
   request: DecideRequest,
   { timeoutMs, signal }: { timeoutMs: number; signal?: AbortSignal }
-): Promise<DecideVerdict | null> {
+): Promise<DecideResponse | null> {
   const body =
     request.tier === 'anonymous'
       ? {
@@ -494,8 +723,76 @@ export async function decide(
           requestId: id(request.requestId),
           tier: request.tier,
           accountId: request.accountId,
+          userId: request.userId,
           ip: request.ip ?? undefined,
           ja4: normalizeJa4(request.ja4),
+          accountCreatedAt: isoTime(request.accountCreatedAt ?? undefined),
+          usedMicrodollars: microdollars(request.usedMicrodollars),
+          acquiredMicrodollars: microdollars(request.acquiredMicrodollars),
         });
-  return (await post(DECIDE_PATH, body, timeoutMs, signal)) as DecideVerdict | null;
+  const response = await post(DECIDE_PATH, body, timeoutMs, signal);
+  if (response === null) return null;
+  const parsed = decideResponseSchema.safeParse(response);
+  if (!parsed.success) {
+    console.error('[bouncer] decide returned an unknown verdict shape', {
+      issues: parsed.error.issues.map(issue => ({ path: issue.path.join('.'), code: issue.code })),
+    });
+    return null;
+  }
+  return parsed.data;
+}
+
+/**
+ * Asks bouncer whether the payer's standing permits a charge. Resolves to `null` on a timeout,
+ * transport error, non-2xx (including an older bouncer's 404), or a body that is not a
+ * `ChargeDecideResponse`, so the caller fails open: a checkout proceeds and a failure webhook
+ * leaves the payer's sessions alone. Never rejects.
+ */
+export async function chargeDecide(
+  request: ChargeDecideRequest,
+  {
+    timeoutMs = CHARGE_DECIDE_TIMEOUT_MS,
+    signal,
+  }: { timeoutMs?: number; signal?: AbortSignal } = {}
+): Promise<ChargeDecideResponse | null> {
+  const body = compact({
+    requestId: id(request.requestId),
+    accountId: request.accountId,
+    userId: id(request.userId),
+    ip: request.ip || undefined,
+    ja4: normalizeJa4(request.ja4),
+    stage: request.stage,
+    flow: request.flow,
+  });
+  const response = await post(CHARGE_DECIDE_PATH, body, timeoutMs, signal);
+  if (response === null) return null;
+  const parsed = chargeDecideResponseSchema.safeParse(response);
+  if (!parsed.success) {
+    console.error('[bouncer] charge-decide returned an unknown verdict shape', {
+      requestId: body.requestId,
+      issues: parsed.error.issues.map(issue => ({ path: issue.path.join('.'), code: issue.code })),
+    });
+    return null;
+  }
+  return parsed.data;
+}
+
+/** Signup admission returns null on failure so the caller can reject it with a retryable error. */
+export async function signupDecide(
+  request: SignupDecideRequest,
+  { timeoutMs = SIGNUP_TIMEOUT_MS, signal }: { timeoutMs?: number; signal?: AbortSignal } = {}
+): Promise<SignupDecideResponse | null> {
+  const parsedRequest = signupRequestSchema.safeParse(request);
+  if (!parsedRequest.success) return null;
+  const response = await post(SIGNUP_DECIDE_PATH, parsedRequest.data, timeoutMs, signal);
+  if (response === null) return null;
+  const parsed = signupResponseSchema.safeParse(response);
+  if (!parsed.success) {
+    console.error('[bouncer] signup-decide returned an unknown verdict shape', {
+      operationId: request.operationId,
+      issues: parsed.error.issues.map(issue => ({ path: issue.path.join('.'), code: issue.code })),
+    });
+    return null;
+  }
+  return parsed.data;
 }

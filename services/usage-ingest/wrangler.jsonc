@@ -1,0 +1,63 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "usage-ingest",
+  "account_id": "e115e769bcdd4c3d66af59d3332cb394",
+  "main": "src/index.ts",
+  // Matches the workerd runtime pinned by the repository's Wrangler version.
+  "compatibility_date": "2026-09-18",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": { "enabled": true },
+  // Production merge/deployment prerequisites: eu-queues.md.
+  "vars": {
+    "USAGE_INGEST_PARALLELISM": "2",
+    "USAGE_WRITER_URL": "https://app.kilo.ai/api/internal/usage/record",
+  },
+  "queues": {
+    "producers": [
+      { "binding": "USAGE_INGEST_QUEUE", "queue": "usage-ingest-processing-eu" },
+      // Unused by the Worker: exposes the matching DLQ to queue preparation.
+      { "binding": "USAGE_INGEST_DLQ", "queue": "usage-ingest-processing-dlq-eu" },
+    ],
+    "consumers": [
+      {
+        "queue": "usage-ingest-processing-eu",
+        "max_batch_size": 2,
+        "max_batch_timeout": 0,
+        "max_retries": 3,
+        "retry_delay": 60,
+        "max_concurrency": 200,
+        "dead_letter_queue": "usage-ingest-processing-dlq-eu",
+      },
+    ],
+  },
+  "env": {
+    "staging": {
+      "name": "usage-ingest-staging",
+      "workers_dev": true,
+      "vars": {
+        "USAGE_INGEST_DIAGNOSTICS": "all",
+        "USAGE_INGEST_PARALLELISM": "2",
+        "USAGE_WRITER_URL": "https://staging-app.kilo.ai/api/internal/usage/record",
+      },
+      "queues": {
+        "producers": [
+          { "binding": "USAGE_INGEST_QUEUE", "queue": "usage-ingest-processing-staging-eu" },
+          { "binding": "USAGE_INGEST_DLQ", "queue": "usage-ingest-processing-dlq-staging-eu" },
+        ],
+        "consumers": [
+          {
+            "queue": "usage-ingest-processing-staging-eu",
+            "max_batch_size": 2,
+            "max_batch_timeout": 0,
+            "max_retries": 3,
+            "retry_delay": 60,
+            "max_concurrency": 200,
+            "dead_letter_queue": "usage-ingest-processing-dlq-staging-eu",
+          },
+        ],
+      },
+    },
+  },
+}

@@ -10,6 +10,11 @@ import * as SecureStore from '@/lib/auth/secure-store';
 import * as SQLite from 'expo-sqlite';
 import migrations from '../../../drizzle/migrations';
 import { readStoredValueWithRetry } from '@/lib/auth/secure-store-read';
+import {
+  isProtectedDataAvailable,
+  ProtectedDataUnavailableError,
+  whenProtectedDataAvailable,
+} from '@/lib/protected-data';
 import { PERSIST_DB_KEY } from '@/lib/storage-keys';
 import { kv } from './schema';
 
@@ -20,10 +25,12 @@ import { kv } from './schema';
  * SecureStore. All plaintext lives only inside the encrypted database file;
  * no unencrypted store is created.
  *
- * Every statement runs through Drizzle: the table lives in `./schema.ts`, the
- * `drizzle/` migrations are generated from it, and the pragmas and probes use
- * Drizzle's `sql` template. Only the database lifecycle (open, close, delete)
- * stays on expo-sqlite, which has no Drizzle equivalent. Drizzle's expo driver
+ * Connection setup stays on the raw synchronous expo-sqlite handle: the
+ * SQLCipher probe, `PRAGMA key`, and the busy-timeout and journal-mode
+ * pragmas must all run before anything reads the schema, and Drizzle would
+ * prepare a statement that itself reads it. Once the connection is keyed, the
+ * table lives in `./schema.ts`, the `drizzle/` migrations are generated from
+ * it, and this module's queries go through Drizzle. Drizzle's expo driver
  * wraps the *synchronous* handle, so the statements themselves block the JS
  * thread; the exported API stays async because opening and keying do not.
  *
@@ -161,20 +168,43 @@ async function closeQuietly(client: SQLite.SQLiteDatabase): Promise<boolean> {
 }
 
 /**
- * Configures the single connection to wait out a lock and to use WAL. Both
+ * Configures the single connection to wait out a lock and to prefer WAL. Both
  * pragmas must run after `PRAGMA key` and before any statement reads the
  * schema, so a concurrent writer waits instead of failing immediately.
- * SQLCipher supports WAL, and `PRAGMA journal_mode = WAL` returns the mode it
- * switched to, so the switch is verified, not assumed.
+ *
+ * WAL is a preference, not a precondition. Some engines and files refuse the
+ * switch (a held lock, a read-only file, a build without WAL), and a refusal
+ * says nothing about whether the database works: the row reports the mode the
+ * connection is in after the request, and any supported mode is usable. An
+ * open that failed here would be read as a corrupt file, so the store would be
+ * deleted and recreated on every launch, losing its cache and drafts. The
+ * `sqlite_master` probe that follows is the real usability test.
  */
 function configureConnection(client: SQLite.SQLiteDatabase): void {
   client.execSync(`PRAGMA busy_timeout = ${BUSY_TIMEOUT_MS}`);
-  const row = client.getFirstSync<{ journal_mode?: string }>('PRAGMA journal_mode = WAL');
-  if (row?.journal_mode?.toLowerCase() !== 'wal') {
-    throw new Error(
-      `encrypted-kv: journal_mode did not switch to WAL (got ${String(row?.journal_mode)})`
-    );
+  let journalMode = 'unknown';
+  let pragmaFailed = false;
+  try {
+    const row = client.getFirstSync<{ journal_mode?: string }>('PRAGMA journal_mode = WAL');
+    journalMode = row?.journal_mode?.toLowerCase() ?? journalMode;
+  } catch {
+    // Rejected by the engine (for example SQLITE_BUSY). The connection keeps
+    // the mode it already had; nothing about the store is decided here.
+    pragmaFailed = true;
   }
+  if (!pragmaFailed && journalMode === 'wal') {
+    return;
+  }
+  // A breadcrumb, not an event: it rides on the next captured event, so a
+  // device that never reaches WAL does not file an issue on every launch.
+  Sentry.addBreadcrumb({
+    category: 'encrypted-kv',
+    level: 'warning',
+    message: pragmaFailed
+      ? 'PRAGMA journal_mode = WAL was rejected'
+      : 'journal_mode did not switch to WAL',
+    data: { journal_mode: journalMode },
+  });
 }
 
 async function openWithKey(key: string): Promise<KVDatabase> {
@@ -234,6 +264,14 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
     await probeAndMigrate(db);
     return db;
   } catch (openError) {
+    // The device locked during the open, so the failure says nothing about the
+    // key or the file. Never delete the database for it.
+    if (!isProtectedDataAvailable()) {
+      if (db) {
+        await closeQuietly(db.$client);
+      }
+      throw new ProtectedDataUnavailableError();
+    }
     if (openError instanceof MissingSQLCipherError) {
       // Deleting and recreating cannot add SQLCipher to the build, and the
       // existing file may hold the user's drafts. Fail loud, touch nothing.
@@ -289,6 +327,26 @@ async function openEncryptedDatabase(): Promise<KVDatabase> {
 
 let openPromise: Promise<KVDatabase> | null = null;
 
+/**
+ * The key lives in the keychain, which refuses every call while the device is
+ * locked. A background run waits for unlock instead of failing the open, and
+ * a lock during the open drops the memo so the next caller opens again.
+ */
+async function openWhenProtectedDataAvailable(): Promise<KVDatabase> {
+  await whenProtectedDataAvailable();
+  try {
+    return await openEncryptedDatabase();
+  } catch (error) {
+    // The key read and write sit outside the open's own lock check, and the
+    // keychain refuses them with a raw native error, not the typed one. Any
+    // failure while locked drops the memo.
+    if (error instanceof ProtectedDataUnavailableError || !isProtectedDataAvailable()) {
+      openPromise = null;
+    }
+    throw error;
+  }
+}
+
 // eslint-disable-next-line require-await, @typescript-eslint/require-await -- single-flight must memoize the open synchronously before any await; the awaits live inside the memoized open chain (same pattern as chainSave in save-chain.ts)
 async function openDatabase(): Promise<KVDatabase> {
   // Single-flight: one module-level open promise, awaited by every caller.
@@ -297,8 +355,9 @@ async function openDatabase(): Promise<KVDatabase> {
   // database, regenerate the key, and report to Sentry once per call — and
   // the read cache calls on every query settle. Nothing an open failure hits
   // is transient: a wrong key, a corrupt file, and a build without SQLCipher
-  // all need a relaunch or a rebuild.
-  openPromise ??= openEncryptedDatabase();
+  // all need a relaunch or a rebuild. A locked device is the one exception
+  // (see `openWhenProtectedDataAvailable`).
+  openPromise ??= openWhenProtectedDataAvailable();
   return openPromise;
 }
 
@@ -306,6 +365,19 @@ async function openDatabase(): Promise<KVDatabase> {
 // (the same pattern as `inFlightSaveCount` in save-chain.ts).
 export function resetEncryptedKvOpenForTests(): void {
   openPromise = null;
+}
+
+/**
+ * The encrypted database itself, for a caller that owns tables of its own.
+ *
+ * The chat store is the one: it hands this handle to the harness SDK, which
+ * keeps the conversations in tables of its own on the same file. One file
+ * means one key, one SQLCipher probe, and one delete-and-recreate recovery
+ * rather than a second copy of all three.
+ */
+export async function encryptedDatabase(): Promise<SQLite.SQLiteDatabase> {
+  const db = await openDatabase();
+  return db.$client;
 }
 
 /** Reads one value; returns null when the key is absent. */

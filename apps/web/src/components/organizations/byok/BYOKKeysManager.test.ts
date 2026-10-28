@@ -1,5 +1,5 @@
 import { describe, expect, it } from '@jest/globals';
-import { VERCEL_BYOK_PROVIDER_NAMES } from './BYOKKeysManager';
+import { getStructuredCredentialKind, VERCEL_BYOK_PROVIDER_NAMES } from './BYOKKeysManager';
 
 // The personal BYOK page renders the "Sign in with ChatGPT" connection card
 // above this key list, and the Add Key dialog offers these entries. The pasted
@@ -12,5 +12,21 @@ describe('BYOKKeysManager provider names', () => {
 
   it('leaves no entry named exactly "OpenAI"', () => {
     expect(Object.values(VERCEL_BYOK_PROVIDER_NAMES)).not.toContain('OpenAI');
+  });
+});
+
+describe('getStructuredCredentialKind', () => {
+  it.each([
+    ['azure', 'azure'],
+    ['bedrock', 'bedrock'],
+    ['bedrock-byok', 'bedrock'],
+    ['vertex', 'vertex'],
+    ['vertex-byok', 'vertex'],
+  ] as const)('maps %s to %s JSON credentials', (providerId, kind) => {
+    expect(getStructuredCredentialKind(providerId)).toBe(kind);
+  });
+
+  it.each(['anthropic', 'openai', 'codestral', ''])('uses a single API key for %j', providerId => {
+    expect(getStructuredCredentialKind(providerId)).toBeNull();
   });
 });

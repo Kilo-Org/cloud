@@ -12,10 +12,6 @@ test.setTimeout(150_000);
 const localBackendUrl = process.env['LOCAL_BACKEND_ORIGIN'] ?? 'http://localhost:3000';
 const localUserEmail = process.env['LOCAL_USER_EMAIL'] ?? 'fl@fl.fl';
 
-// ---------------------------------------------------------------------------
-// Sign-in helper (adapted from local-backend-live.test.ts)
-// ---------------------------------------------------------------------------
-
 const signInWithLocalDeviceAuth = async ({
   context,
   extensionId,
@@ -80,10 +76,6 @@ const signInWithLocalDeviceAuth = async ({
   await expect(sidePanel.getByLabel('Message agent')).toBeVisible({ timeout: 30_000 });
   await authPage.close();
 };
-
-// ---------------------------------------------------------------------------
-// Shared phase helpers
-// ---------------------------------------------------------------------------
 
 /**
  * A prompt whose output keeps the session busy for the whole reopen round
@@ -368,10 +360,6 @@ const runExistingCloudSessionFallback = async ({
   await expect(reopenedStop).toBeHidden({ timeout: 30_000 });
 };
 
-// ---------------------------------------------------------------------------
-// Cloud new-session form helpers
-// ---------------------------------------------------------------------------
-
 const readFormError = async (sidePanel: Page): Promise<string | null> => {
   const errorText = await sidePanel
     .locator('p.text-status-red-400')
@@ -427,10 +415,6 @@ const decideCloudForm = async (sidePanel: Page): Promise<string | null> => {
   await repoOption.click();
   return null;
 };
-
-// ---------------------------------------------------------------------------
-// Tests
-// ---------------------------------------------------------------------------
 
 test('live local backend: remote CLI agent covers start, reopen, queue, and stop', async () => {
   const fixture = await startFixtureServer({ title: 'Kilo live agents session target' });

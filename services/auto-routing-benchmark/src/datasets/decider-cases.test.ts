@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { classifierTaxonomy } from '@kilocode/auto-routing-contracts/classifier';
-import { DECIDER_CASES } from './decider-cases';
+import { DECIDER_CASES, FRONTIER_CASES } from './decider-cases';
 
 const TAXONOMY_PAIRS = classifierTaxonomy.taskTypes.flatMap(taskType =>
   taskType.subtypes.map(subtype => ({ taskType: taskType.id, subtaskType: subtype.id }))
@@ -18,18 +18,18 @@ describe('DECIDER_CASES', () => {
     expect(TAXONOMY_PAIRS.length).toBe(18);
   });
 
-  it('has exactly 180 cases with unique ids', () => {
-    expect(DECIDER_CASES.length).toBe(180);
+  it('has exactly 576 cases with unique ids', () => {
+    expect(DECIDER_CASES.length).toBe(576);
     const ids = new Set(DECIDER_CASES.map(c => c.id));
     expect(ids.size).toBe(DECIDER_CASES.length);
   });
 
-  it('has at least 10 cases per (taskType, subtaskType) pair', () => {
+  it('has at least 30 cases per (taskType, subtaskType) pair', () => {
     for (const pair of TAXONOMY_PAIRS) {
       const count = DECIDER_CASES.filter(
         c => c.taskType === pair.taskType && c.subtaskType === pair.subtaskType
       ).length;
-      expect(count, `${pair.taskType}/${pair.subtaskType}`).toBeGreaterThanOrEqual(10);
+      expect(count, `${pair.taskType}/${pair.subtaskType}`).toBeGreaterThanOrEqual(30);
     }
   });
 
@@ -58,6 +58,10 @@ describe('DECIDER_CASES', () => {
       const check = c.check;
       if (check.kind === 'json_equal') {
         expect(JSON.parse(JSON.stringify(check.value)), c.id).toEqual(check.value);
+        expect(
+          typeof check.value === 'object' && check.value !== null,
+          `${c.id}: json_equal needs an object or array`
+        ).toBe(true);
       }
     }
   });
@@ -75,5 +79,46 @@ describe('DECIDER_CASES', () => {
         }
       }
     }
+  });
+
+  it('keeps judged checks to at most 30% of each pair, each with a rubric', () => {
+    for (const pair of TAXONOMY_PAIRS) {
+      const cases = DECIDER_CASES.filter(
+        c => c.taskType === pair.taskType && c.subtaskType === pair.subtaskType
+      );
+      const judged = cases.filter(c => c.check.kind === 'judged');
+      expect(
+        judged.length / cases.length,
+        `${pair.taskType}/${pair.subtaskType}`
+      ).toBeLessThanOrEqual(0.3);
+      for (const c of judged) {
+        if (c.check.kind === 'judged')
+          expect(c.check.rubric.trim().length, c.id).toBeGreaterThan(0);
+      }
+    }
+  });
+});
+
+describe('FRONTIER_CASES', () => {
+  it('preserves UTF-16 surrogate halves in the Unicode identity counterexample', () => {
+    const benchCase = FRONTIER_CASES.find(
+      candidate => candidate.id === 'frontier-refactoring-code-cleanup-unicode-key-identity'
+    );
+    expect(benchCase?.check).toMatchObject({
+      kind: 'json_equal',
+      value: {
+        witnesses: [
+          { candidate: 1 },
+          {
+            candidate: 3,
+            actual: {
+              value: {
+                points: ['é', 'é', '𝌆'].map(text => text.split('')),
+              },
+            },
+          },
+        ],
+      },
+    });
   });
 });

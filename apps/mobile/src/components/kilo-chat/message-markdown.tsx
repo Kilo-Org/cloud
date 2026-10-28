@@ -6,25 +6,9 @@ import { isMessageTextSelectionEnabled, textBlockHasVisibleContent } from './mes
 type MessageMarkdownProps = {
   text: string;
   isFromMe: boolean;
-  /**
-   * Render-cache scope for the markdown, so identical message text in another
-   * message never reuses the cached elements whose handlers close over a
-   * specific message.
-   */
-  renderScope?: string;
-  /**
-   * Long-press handler forwarded into rendered code fences' copy trigger so a
-   * press-and-hold on a fence still opens the bubble's message actions.
-   */
-  onLongPressCode?: () => void;
 };
 
-export function MessageMarkdown({
-  text,
-  isFromMe,
-  renderScope,
-  onLongPressCode,
-}: Readonly<MessageMarkdownProps>) {
+export function MessageMarkdown({ text, isFromMe }: Readonly<MessageMarkdownProps>) {
   if (!textBlockHasVisibleContent(text)) {
     return null;
   }
@@ -35,8 +19,6 @@ export function MessageMarkdown({
         value={text}
         variant={isFromMe ? 'kilo-chat-user' : 'assistant'}
         selectable={isMessageTextSelectionEnabled()}
-        renderScope={renderScope}
-        onLongPressCode={onLongPressCode}
       />
     );
   } catch {
@@ -45,8 +27,8 @@ export function MessageMarkdown({
         selectable={isMessageTextSelectionEnabled()}
         className={
           isFromMe
-            ? 'text-sm leading-5 text-primary-foreground'
-            : 'text-sm leading-5 text-foreground'
+            ? 'text-sm leading-[1.25rem] text-primary-foreground'
+            : 'text-sm leading-[1.25rem] text-foreground'
         }
       >
         {text}

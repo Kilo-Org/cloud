@@ -3,12 +3,15 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
   cli_sessions_v2,
+  cloud_agent_sessions,
+  cloud_agent_session_runs,
   cloud_agent_worktrees,
   github_branch_pull_requests,
   organization_memberships,
   organizations,
   type CliSessionV2,
   type NewCliSessionV2,
+  type NewCloudAgentSessionRun,
   type User,
 } from '@kilocode/db/schema';
 import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
@@ -37,6 +40,14 @@ const BRANCH = 'feature/worktree';
 const PR_URL = `${GIT_URL}/pull/42`;
 
 const mockRuntimeDelete = jest.fn<(sessionId: string) => Promise<{ success: boolean }>>();
+const mockHostedRuntimeDelete =
+  jest.fn<
+    (input: {
+      workspaceId: string;
+      sessionId: string;
+      operationKey: string;
+    }) => Promise<{ success: true; workspaceId: string; sessionId: string }>
+  >();
 const mockWorktreeDelete = jest.fn<(input: DeleteWorktreeInput) => Promise<DeleteWorktreeOutput>>();
 const mockGetRuntimeSession = jest.fn<(sessionId: string) => Promise<Record<string, unknown>>>();
 const mockDeleteSessionIngest = jest.fn<(sessionId: string, userId: string) => Promise<void>>();
@@ -48,6 +59,7 @@ const mockBatchReviewDecisionFetch =
 const mockGenerateCloudAgentToken = jest.fn((_user: User) => 'cloud-agent-token');
 const mockCreateCloudAgentNextClient = jest.fn((_token: string) => ({
   deleteSession: mockRuntimeDelete,
+  deleteHostedWorkspaceSession: mockHostedRuntimeDelete,
   deleteWorktree: mockWorktreeDelete,
   getSession: mockGetRuntimeSession,
 }));
@@ -92,10 +104,6 @@ jest.mock('@/lib/session-ingest-client', () => ({
 jest.mock('@kilocode/web-shared/lib/admin/admin-access-log', () => ({
   recordKiloAdminElevation: jest.fn(),
   UNSCOPED_TARGET: 'unscoped',
-}));
-
-jest.mock('@/lib/webhook-trigger-ownership', () => ({
-  verifyWebhookTriggerAccess: jest.fn(),
 }));
 
 jest.mock('@/lib/integrations/platforms/github/adapter', () => ({
@@ -150,8 +158,12 @@ const ownershipRow = {
   pr_link_verified_at: null,
   status: null,
   status_updated_at: null,
+  status_transition_id: null,
   last_activity_at: null,
   total_cost_microdollars: null,
+  live_summary: null,
+  briefing_excerpt: null,
+  briefing_excerpt_scope_changed_at: null,
   created_at: INITIAL_TIME,
   updated_at: INITIAL_TIME,
 } satisfies CliSessionV2;
@@ -213,6 +225,17 @@ beforeEach(async () => {
   afterCallbacks.length = 0;
   const userIds = [USER_ID, OTHER_USER_ID];
   await db
+    .delete(cloud_agent_sessions)
+    .where(
+      inArray(
+        cloud_agent_sessions.kilo_session_id,
+        db
+          .select({ sessionId: cli_sessions_v2.session_id })
+          .from(cli_sessions_v2)
+          .where(inArray(cli_sessions_v2.kilo_user_id, userIds))
+      )
+    );
+  await db
     .delete(cli_sessions_v2)
     .where(
       and(
@@ -245,6 +268,11 @@ beforeEach(async () => {
   ]);
   await db.insert(cli_sessions_v2).values(ownershipRow);
   mockRuntimeDelete.mockReset().mockResolvedValue({ success: true });
+  mockHostedRuntimeDelete.mockReset().mockResolvedValue({
+    success: true,
+    workspaceId: WORKTREE_ID,
+    sessionId: WORKSPACE_ID,
+  });
   mockWorktreeDelete
     .mockReset()
     .mockResolvedValue({ success: true, deletedSessionIds: [SESSION_ID] });
@@ -325,11 +353,62 @@ describe('cliSessionsV2 worktree projections and session deletion', () => {
     expect(mockGetRuntimeSession).not.toHaveBeenCalled();
   });
 
-  it.each([
-    ['reports success false', () => mockRuntimeDelete.mockResolvedValueOnce({ success: false })],
-    ['throws', () => mockRuntimeDelete.mockRejectedValueOnce(new Error('Worker unavailable'))],
-  ])('preserves ownership when runtime deletion %s', async (_, failDeletion) => {
-    failDeletion();
+  it.each(['kilo/assigned', 'feature/selected'])(
+    'returns assigned branch %s before preparation or CLI metadata arrives',
+    async branchName => {
+      mockGetRuntimeSession.mockResolvedValueOnce({
+        sessionId: WORKSPACE_ID,
+        userId: USER_ID,
+        branchName,
+        execution: null,
+        timestamp: 1,
+        version: 1,
+      });
+
+      const result = await createCaller({ user }).getWithRuntimeState({ session_id: SESSION_ID });
+
+      expect(result.git_branch).toBe(branchName);
+      expect(result.runtimeState?.branchName).toBe(branchName);
+      expect(result.runtimeState?.preparedAt).toBeUndefined();
+    }
+  );
+
+  it('preserves a reported branch switch instead of replacing it with the assignment', async () => {
+    await db
+      .update(cli_sessions_v2)
+      .set({ git_branch: 'feature/switched' })
+      .where(eq(cli_sessions_v2.session_id, SESSION_ID));
+    mockGetRuntimeSession.mockResolvedValueOnce({
+      sessionId: WORKSPACE_ID,
+      userId: USER_ID,
+      branchName: 'kilo/assigned',
+      execution: null,
+      timestamp: 1,
+      version: 1,
+    });
+
+    const result = await createCaller({ user }).getWithRuntimeState({ session_id: SESSION_ID });
+
+    expect(result.git_branch).toBe('feature/switched');
+  });
+
+  it('does not mistake a legacy upstream branch for a known assignment', async () => {
+    mockGetRuntimeSession.mockResolvedValueOnce({
+      sessionId: WORKSPACE_ID,
+      userId: USER_ID,
+      upstreamBranch: 'main',
+      execution: null,
+      timestamp: 1,
+      version: 1,
+    });
+
+    const result = await createCaller({ user }).getWithRuntimeState({ session_id: SESSION_ID });
+
+    expect(result.git_branch).toBeNull();
+  });
+
+  it('preserves ownership when the authoritative hosted delete fails', async () => {
+    mockHostedRuntimeDelete.mockRejectedValueOnce(new Error('Worker unavailable'));
     await expect(createCaller({ user }).delete({ session_id: SESSION_ID })).rejects.toMatchObject({
       code: 'INTERNAL_SERVER_ERROR',
       message: 'Failed to clean up cloud-agent session',
@@ -340,15 +419,234 @@ describe('cliSessionsV2 worktree projections and session deletion', () => {
     expect(mockCaptureException).toHaveBeenCalled();
   });
 
-  it('removes ownership only after runtime deletion confirms success', async () => {
+  it('delegates workspace-root deletion to the authoritative operation', async () => {
     await expect(createCaller({ user }).delete({ session_id: SESSION_ID })).resolves.toEqual({
       success: true,
       session_id: SESSION_ID,
     });
 
-    expect(await readSessions()).toHaveLength(0);
-    expect(mockRuntimeDelete.mock.invocationCallOrder[0]).toBeLessThan(
-      mockDeleteSessionIngest.mock.invocationCallOrder[0]
+    expect(mockHostedRuntimeDelete).toHaveBeenCalledWith({
+      workspaceId: WORKTREE_ID,
+      sessionId: WORKSPACE_ID,
+      operationKey: expect.any(String),
+    });
+    expect(mockRuntimeDelete).not.toHaveBeenCalled();
+    expect(mockDeleteSessionIngest).not.toHaveBeenCalled();
+  });
+
+  it('surfaces a final-root conflict before deleting the ownership row', async () => {
+    mockHostedRuntimeDelete.mockRejectedValueOnce(
+      new TRPCClientError('workspace_requires_root_session', {
+        result: {
+          error: {
+            code: -32603,
+            message: 'workspace_requires_root_session',
+            data: { code: 'CONFLICT' },
+          },
+        },
+      })
+    );
+
+    await expect(createCaller({ user }).delete({ session_id: SESSION_ID })).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'workspace_requires_root_session',
+    });
+
+    expect(await readSessions()).toHaveLength(1);
+    expect(mockDeleteSessionIngest).not.toHaveBeenCalled();
+    expect(mockCaptureException).not.toHaveBeenCalled();
+  });
+
+  it('falls back to ingest cleanup when the authoritative operation reports not found', async () => {
+    mockHostedRuntimeDelete.mockRejectedValueOnce(
+      new TRPCClientError('workspace_not_found', {
+        result: {
+          error: {
+            code: -32603,
+            message: 'workspace_not_found',
+            data: { code: 'NOT_FOUND' },
+          },
+        },
+      })
+    );
+
+    await expect(createCaller({ user }).delete({ session_id: SESSION_ID })).resolves.toEqual({
+      success: true,
+      session_id: SESSION_ID,
+    });
+
+    expect(mockDeleteSessionIngest).toHaveBeenCalledWith(SESSION_ID, user.id);
+  });
+});
+
+describe('cliSessionsV2 latest run outcomes', () => {
+  async function insertRuns(runs: Omit<NewCloudAgentSessionRun, 'cloud_agent_session_id'>[]) {
+    await db.insert(cloud_agent_sessions).values({
+      cloud_agent_session_id: WORKSPACE_ID,
+      kilo_session_id: SESSION_ID,
+      initial_message_id: 'msg_initial',
+      created_at: INITIAL_TIME,
+    });
+    await db
+      .insert(cloud_agent_session_runs)
+      .values(runs.map(run => ({ ...run, cloud_agent_session_id: WORKSPACE_ID })));
+  }
+
+  it.each([
+    { status: 'failed', failure_code: 'assistant_error', kind: 'failed' },
+    { status: 'failed', failure_code: null, kind: 'failed' },
+    { status: 'interrupted', failure_code: 'system_interrupt', kind: 'system_interrupted' },
+    { status: 'interrupted', failure_code: 'container_shutdown', kind: 'system_interrupted' },
+    { status: 'interrupted', failure_code: 'user_interrupt', kind: null },
+    { status: 'interrupted', failure_code: null, kind: null },
+    { status: 'completed', failure_code: null, kind: null },
+    { status: 'queued', failure_code: null, kind: null },
+    { status: 'accepted', failure_code: null, kind: null },
+  ] satisfies {
+    status: NewCloudAgentSessionRun['status'];
+    failure_code: NewCloudAgentSessionRun['failure_code'];
+    kind: 'failed' | 'system_interrupted' | null;
+  }[])(
+    'projects $status / $failure_code from the latest run across sidebar reads',
+    async ({ status, failure_code, kind }) => {
+      await insertRuns([
+        {
+          message_id: 'msg_old',
+          status: 'failed',
+          failure_code: 'assistant_error',
+          queued_at: INITIAL_TIME,
+          terminal_at: '2026-08-27T00:00:00.000Z',
+        },
+        {
+          message_id: 'msg_latest',
+          status,
+          failure_code,
+          queued_at: LATER_TIME,
+          terminal_at:
+            status === 'queued' || status === 'accepted' ? null : '2026-08-26 01:16:12.945+00',
+        },
+      ]);
+      const caller = createCaller({ user });
+      const expected = {
+        latest_run_status: status,
+        latest_run_failure_kind: kind,
+        latest_run_terminal_at:
+          status === 'queued' || status === 'accepted' ? null : '2026-08-26T01:16:12.945Z',
+      };
+      const list = await caller.list({ organizationId: null });
+      const search = await caller.search({ search_string: 'Grouped', organizationId: null });
+      const details = await caller.worktreeDetails({
+        worktreeIds: [WORKTREE_ID],
+        organizationId: null,
+      });
+
+      expect(list.cliSessions).toEqual([expect.objectContaining(expected)]);
+      expect(search.results).toEqual([expect.objectContaining(expected)]);
+      expect(details.worktrees[WORKTREE_ID].sessions).toEqual([expect.objectContaining(expected)]);
+      expect(await caller.get({ session_id: SESSION_ID })).toMatchObject(expected);
+      expect(
+        await caller.getByCloudAgentSessionId({ cloud_agent_session_id: WORKSPACE_ID })
+      ).toMatchObject(expected);
+      expect(mockGetRuntimeSession).not.toHaveBeenCalled();
+    }
+  );
+
+  it('returns nulls without run telemetry or a cloud session and isolates sibling outcomes', async () => {
+    const sibling = await insertSession({ cloud_agent_session_id: null });
+    await insertRuns([{ message_id: 'msg_failed', status: 'failed', queued_at: INITIAL_TIME }]);
+    const caller = createCaller({ user });
+    const details = await caller.worktreeDetails({
+      worktreeIds: [WORKTREE_ID],
+      organizationId: null,
+    });
+    expect(details.worktrees[WORKTREE_ID].sessions).toContainEqual(
+      expect.objectContaining({
+        sessionId: sibling.session_id,
+        latest_run_status: null,
+        latest_run_failure_kind: null,
+        latest_run_terminal_at: null,
+      })
+    );
+    await db
+      .delete(cloud_agent_sessions)
+      .where(eq(cloud_agent_sessions.cloud_agent_session_id, WORKSPACE_ID));
+    expect(
+      await caller.getByCloudAgentSessionId({ cloud_agent_session_id: WORKSPACE_ID })
+    ).toMatchObject({
+      latest_run_status: null,
+      latest_run_failure_kind: null,
+      latest_run_terminal_at: null,
+    });
+  });
+
+  it('sorts unknown queue timestamps last and breaks equal timestamps deterministically', async () => {
+    await insertRuns([
+      { message_id: 'msg_unknown', status: 'failed', queued_at: null },
+      { message_id: 'msg_a', status: 'failed', queued_at: LATER_TIME },
+      { message_id: 'msg_z', status: 'completed', queued_at: LATER_TIME },
+    ]);
+    expect(
+      await createCaller({ user }).getByCloudAgentSessionId({
+        cloud_agent_session_id: WORKSPACE_ID,
+      })
+    ).toMatchObject({
+      latest_run_status: 'completed',
+      latest_run_failure_kind: null,
+      latest_run_terminal_at: null,
+    });
+  });
+
+  it('preserves a terminal failure and ISO timestamp despite a stale persisted busy status', async () => {
+    await insertRuns([
+      {
+        message_id: 'msg_failed',
+        status: 'failed',
+        queued_at: INITIAL_TIME,
+        terminal_at: '2026-08-26 01:16:12.945+00',
+      },
+    ]);
+    await db
+      .update(cli_sessions_v2)
+      .set({
+        pr_url: PR_URL,
+        pr_number: 42,
+        platform: 'github',
+        pr_link_verified_at: INITIAL_TIME,
+        status: 'busy',
+        status_updated_at: '2026-08-26 01:15:12.945+00',
+      })
+      .where(eq(cli_sessions_v2.session_id, SESSION_ID));
+    mockGetRuntimeSession.mockResolvedValueOnce({
+      sessionId: WORKSPACE_ID,
+      userId: USER_ID,
+      execution: null,
+      timestamp: 1,
+      version: 1,
+    });
+    expect(
+      await createCaller({ user }).getWithRuntimeState({ session_id: SESSION_ID })
+    ).toMatchObject({
+      latest_run_status: 'failed',
+      latest_run_failure_kind: 'failed',
+      latest_run_terminal_at: '2026-08-26T01:16:12.945Z',
+    });
+    const details = await createCaller({ user }).worktreeDetails({
+      worktreeIds: [WORKTREE_ID],
+      organizationId: null,
+    });
+    expect(details.worktrees[WORKTREE_ID].prSession).toMatchObject({
+      session_id: SESSION_ID,
+      latest_run_status: 'failed',
+      latest_run_failure_kind: 'failed',
+      latest_run_terminal_at: '2026-08-26T01:16:12.945Z',
+    });
+    expect(details.worktrees[WORKTREE_ID].sessions).toContainEqual(
+      expect.objectContaining({
+        sessionId: SESSION_ID,
+        sessionStatus: 'busy',
+        sessionStatusUpdatedAt: '2026-08-26T01:15:12.945Z',
+        latest_run_terminal_at: '2026-08-26T01:16:12.945Z',
+      })
     );
   });
 });
@@ -368,7 +666,17 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
           name: null,
           defaultTitle: ownershipRow.title,
           prSession: null,
-          sessions: [{ sessionId: SESSION_ID, sessionStatus: null, sessionStatusUpdatedAt: null }],
+          sessions: [
+            {
+              sessionId: SESSION_ID,
+              sessionStatus: null,
+              sessionStatusUpdatedAt: null,
+              latest_run_status: null,
+              latest_run_failure_kind: null,
+              latest_run_terminal_at: null,
+              updatedAt: new Date(ownershipRow.updated_at).toISOString(),
+            },
+          ],
         },
       },
     });
@@ -379,6 +687,7 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
     const sibling = await insertSession({
       status: 'busy',
       status_updated_at: '2026-04-29 01:16:12.945+00',
+      updated_at: '2026-04-29 01:17:12.945+00',
     });
     await insertSession({ kilo_user_id: OTHER_USER_ID, status: 'question' });
     await insertSession({ organization_id: ORGANIZATION_ID, status: 'permission' });
@@ -397,11 +706,23 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
 
     expect(details.worktrees[WORKTREE_ID].sessions).toEqual(
       [
-        { sessionId: SESSION_ID, sessionStatus: null, sessionStatusUpdatedAt: null },
+        {
+          sessionId: SESSION_ID,
+          sessionStatus: null,
+          sessionStatusUpdatedAt: null,
+          latest_run_status: null,
+          latest_run_failure_kind: null,
+          latest_run_terminal_at: null,
+          updatedAt: new Date(ownershipRow.updated_at).toISOString(),
+        },
         {
           sessionId: sibling.session_id,
           sessionStatus: 'busy',
           sessionStatusUpdatedAt: '2026-04-29T01:16:12.945Z',
+          latest_run_status: null,
+          latest_run_failure_kind: null,
+          latest_run_terminal_at: null,
+          updatedAt: '2026-04-29T01:17:12.945Z',
         },
       ].sort((a, b) => a.sessionId.localeCompare(b.sessionId))
     );
@@ -410,6 +731,10 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
         sessionId: otherWorktreeSession.session_id,
         sessionStatus: 'retry',
         sessionStatusUpdatedAt: null,
+        latest_run_status: null,
+        latest_run_failure_kind: null,
+        latest_run_terminal_at: null,
+        updatedAt: new Date(otherWorktreeSession.updated_at).toISOString(),
       },
     ]);
     expect(mockFetchSessionSnapshot).not.toHaveBeenCalled();
@@ -465,6 +790,10 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
       sessionId: SESSION_ID,
       sessionStatus: 'question',
       sessionStatusUpdatedAt: '2020-01-01T00:00:00.000Z',
+      latest_run_status: null,
+      latest_run_failure_kind: null,
+      latest_run_terminal_at: null,
+      updatedAt: '2020-01-01T00:00:00.000Z',
     });
     expect(mockFetchSessionSnapshot).not.toHaveBeenCalled();
   });
@@ -742,7 +1071,17 @@ describe('cliSessionsV2 worktreeDetails and persistent names', () => {
         name: null,
         defaultTitle: ownershipRow.title,
         prSession: null,
-        sessions: [{ sessionId: SESSION_ID, sessionStatus: null, sessionStatusUpdatedAt: null }],
+        sessions: [
+          {
+            sessionId: SESSION_ID,
+            sessionStatus: null,
+            sessionStatusUpdatedAt: null,
+            latest_run_status: null,
+            latest_run_failure_kind: null,
+            latest_run_terminal_at: null,
+            updatedAt: new Date(ownershipRow.updated_at).toISOString(),
+          },
+        ],
       },
     });
     expect(
@@ -1008,6 +1347,9 @@ describe('cliSessionsV2 worktree PR projection', () => {
         'git_branch',
         'status',
         'status_updated_at',
+        'latest_run_status',
+        'latest_run_failure_kind',
+        'latest_run_terminal_at',
         'created_at',
         'updated_at',
         'version',

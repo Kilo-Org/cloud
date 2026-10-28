@@ -1,3 +1,4 @@
+import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { env, reset, runInDurableObject } from 'cloudflare:test';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
@@ -6,7 +7,7 @@ import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-d
 import { allocation as allocationTable } from '../../src/control-plane/sandbox/sqlite-schema.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
-import { sessionDoName } from '../../src/session-plane.js';
+import { sessionDoName } from '../../src/session-identity.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import { SandboxStatusSnapshotSchema } from '../../src/shared/sandbox-status.js';
@@ -15,8 +16,12 @@ import type {
   ProviderCreateIntent,
   StopResult,
 } from '../../src/sandbox-control/provider.js';
-import type { ControlPlanePromptPayload } from '../../src/shared/control-plane-protocol.js';
 import {
+  CONTROL_PLANE_PROTOCOL_VERSION,
+  type ControlPlanePromptPayload,
+} from '../../src/shared/control-plane-protocol.js';
+import {
+  FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   createFakeCredentialBroker,
   FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
   installFakeCredentialEnv,
@@ -57,7 +62,7 @@ function metadata(input: { sessionId: string; kiloSessionId: string; sandboxId: 
       orgId: ORG_ID,
       createdOnPlatform: 'cloud-agent-web',
     },
-    auth: { kiloSessionId: input.kiloSessionId, kilocodeToken: 'native-token' },
+    auth: { kiloSessionId: input.kiloSessionId, kilocodeToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN },
     agent: { mode: 'code', model: 'test/model' },
     repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
     workspace: {
@@ -80,15 +85,13 @@ function promptPayload(id: string): ControlPlanePromptPayload {
 function createFakeProvider(): { adapter: ProviderAdapter; launchEnvs: Record<string, string>[] } {
   const provider = { adapter: null as unknown as ProviderAdapter, launchEnvs: [] };
   provider.adapter = {
-    resumable: false,
-    persistentWorkspace: false,
-    destroysOnStop: true,
     async ensureBillingAdmission() {},
     async create(intent: ProviderCreateIntent) {
       return { providerRef: `mem_${intent.intentId}` };
     },
-    async launch(_ref, launchEnv) {
+    async launch(_ref, { env: launchEnv }) {
       provider.launchEnvs.push({ ...launchEnv });
+      return { startSource: 'image' as const };
     },
     async observe(ref) {
       return { status: 'active' as const, ...(ref === null ? {} : { providerRef: ref }) };
@@ -119,6 +122,7 @@ async function injectProvider(
       KILO_OPENROUTER_BASE: 'https://control.test',
       KILO_SESSION_INGEST_URL: 'https://control.test',
     });
+    installFakeRuntimeProxyPeer(instance);
     Object.assign(instance, {
       createProviderAdapter: () => provider.adapter,
       provider: provider.adapter,
@@ -149,12 +153,11 @@ async function patchAllocation(
 }
 
 /** Creates an owned sandbox with a provider pin but no wrapper connection. */
-async function startOwnedSandbox(): Promise<{
+async function startOwnedSandbox(provider = createFakeProvider()): Promise<{
   sandboxId: string;
   sandbox: DurableObjectStub<SandboxControlV2>;
 }> {
   const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
-  const provider = createFakeProvider();
   const sandbox = await injectProvider(sandboxId, provider);
   const sessionId = newSessionId();
   await sessions.getByName(sessionDoName(USER_ID, sessionId)).createSessionWithInitialAdmission({
@@ -207,7 +210,7 @@ describe('sandbox status badge projection (B10)', () => {
       wrapperId: WRAPPER_ID,
       allocationId: launchEnv.CONTROL_PLANE_ALLOCATION_ID!,
     });
-    expect(hello).toEqual({ type: 'welcome', protocolVersion: 2 });
+    expect(hello).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
     wrapper.send({ type: 'session.ready', sessionId });
     await waitFor(async () => {
       const snapshot = await session.getSession();
@@ -264,6 +267,41 @@ describe('sandbox status badge projection (B10)', () => {
     expect(active.estimatedSleepAt as number).toBeGreaterThan(Date.now());
   });
 
+  it('projects stored billing without admitting or starting another allocation', async () => {
+    const provider = createFakeProvider();
+    let projectionCalls = 0;
+    provider.adapter.getBillingProjection = async () => {
+      projectionCalls += 1;
+      return {
+        sandboxClassName: 'SandboxContainersStandard3' as const,
+        blocked: true,
+        context: {
+          service: 'cloud-agent',
+          instanceId: 'instance',
+          sku: 'cloud-agent-containers-standard-3-2026-09',
+          subject: { type: 'user' as const, id: USER_ID },
+          actor: { type: 'user' as const, id: USER_ID },
+          startEpochMs: 17,
+        },
+      };
+    };
+    const { sandbox } = await startOwnedSandbox(provider);
+    const launches = provider.launchEnvs.length;
+
+    await expect(sandbox.getWorkspaceBillingProjection()).resolves.toEqual({
+      payer: { type: 'user', id: USER_ID },
+      actor: { type: 'user', id: USER_ID },
+      onBehalfOf: null,
+      sku: 'cloud-agent-containers-standard-3-2026-09',
+      blocked: true,
+      enforcementRequested: false,
+      intervalStartedAt: 17,
+      meterInstanceId: null,
+    });
+    expect(projectionCalls).toBe(1);
+    expect(provider.launchEnvs).toHaveLength(launches);
+  });
+
   it('returns the Sandbox DO snapshot through the Session DO RPC', async () => {
     const sessionId = newSessionId();
     const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
@@ -289,7 +327,7 @@ describe('sandbox status badge projection (B10)', () => {
       credentials: {
         userId: USER_ID,
         kiloSessionId: kiloSessionId(),
-        kiloToken: 'native-token',
+        kiloToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
         orgId: ORG_ID,
         repository: { type: 'github', repo: 'acme/widgets' },
         scopeId: sessionId,
@@ -308,6 +346,57 @@ describe('sandbox status badge projection (B10)', () => {
       detailCode: 'status_unavailable',
       inactivityTimeoutMs: null,
     });
+  });
+
+  it('composes the passive workspace runtime status without preparing a route', async () => {
+    const sessionId = newSessionId();
+    const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+    const stub = sessions.getByName(sessionId);
+    const peer = new FakeSandboxPeer();
+    const expected = {
+      status: 'sleeping' as const,
+      provider: 'Cloudflare Containers' as const,
+      observedAt: 42,
+      detailCode: 'sandbox_stopped' as const,
+      inactivityTimeoutMs: 600_000,
+      estimatedSleepAt: null,
+    };
+    peer.statusSnapshot = expected;
+    peer.billingProjection = {
+      payer: { type: 'user', id: USER_ID },
+      actor: { type: 'user', id: USER_ID },
+      onBehalfOf: null,
+      sku: 'cloud-agent-standard-2026-07',
+      blocked: false,
+      enforcementRequested: true,
+      intervalStartedAt: null,
+      meterInstanceId: 'sbx-meter',
+    };
+    await stub.registerSession({
+      sandboxId,
+      spec: {
+        sessionId,
+        kiloSessionId: kiloSessionId(),
+        directory: `/workspace/${sessionId}`,
+        attemptId: `${sessionId}-requested`,
+      },
+      credentials: {
+        userId: USER_ID,
+        kiloSessionId: kiloSessionId(),
+        kiloToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
+        orgId: ORG_ID,
+        repository: { type: 'github', repo: 'acme/widgets' },
+        scopeId: sessionId,
+      },
+    });
+    await installPeer(stub, peer);
+
+    await expect(stub.getWorkspaceRuntimeStatus()).resolves.toEqual({
+      sandbox: expected,
+      billing: peer.billingProjection,
+    });
+    expect(peer.prepareCalls).toEqual([]);
+    expect(peer.deliverCalls).toEqual([]);
   });
 });
 

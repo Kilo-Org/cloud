@@ -1,7 +1,6 @@
 import type { ClientConfig } from 'pg';
 
 export function computeDatabaseUrl(): string {
-  // Check if we should use production database
   const useProductionDb = process.env.USE_PRODUCTION_DB === 'true';
 
   const postgresUrl = useProductionDb
@@ -14,9 +13,17 @@ export function computeDatabaseUrl(): string {
     );
   }
 
-  return process.env.NODE_ENV === 'test'
-    ? `${postgresUrl}-${process.env.JEST_WORKER_ID || '1'}`
-    : postgresUrl;
+  if (process.env.NODE_ENV !== 'test') {
+    return postgresUrl;
+  }
+
+  // Isolate each Jest worker's database. Append to the path segment so query
+  // parameters such as sslmode stay valid instead of becoming part of the
+  // last parameter's value.
+  const workerId = process.env.JEST_WORKER_ID || '1';
+  const url = new URL(postgresUrl);
+  url.pathname = `${url.pathname}-${workerId}`;
+  return url.toString();
 }
 
 export function getDatabaseClientConfig(postgresUrl: string): ClientConfig {
@@ -36,8 +43,44 @@ export function getDatabaseClientConfig(postgresUrl: string): ClientConfig {
       servername: databaseUrl.hostname,
     };
   } else {
-    clientConfig.ssl = false;
+    clientConfig.ssl = resolveSslFromSslmode(databaseUrl);
   }
 
   return clientConfig;
+}
+
+/**
+ * The connection string's sslmode decides whether TLS is used when `DATABASE_CA`
+ * is unset. `require`, `prefer` and `no-verify` select the encrypted mode;
+ * `verify-ca`/`verify-full` select the encrypted mode that also verifies the
+ * server certificate against the Node system trust store. `allow` negotiates
+ * plaintext first and upgrades to TLS, which Node's `pg` cannot retry, so it is
+ * treated like `disable` rather than forcing a connection style the caller did
+ * not pin down.
+ */
+const VERIFY_CERTIFICATE_BY_SSLMODE: Record<string, boolean> = {
+  prefer: false,
+  require: false,
+  'no-verify': false,
+  'verify-ca': true,
+  'verify-full': true,
+};
+
+/**
+ * `DATABASE_CA` is unset, so the connection string itself decides whether TLS is
+ * used. `require`, `prefer` and `no-verify` encrypt the session; `verify-ca` and
+ * `verify-full` also check the server certificate against the Node system trust
+ * store.
+ */
+function resolveSslFromSslmode(databaseUrl: URL): ClientConfig['ssl'] {
+  const sslmode = databaseUrl.searchParams.get('sslmode')?.trim().toLowerCase();
+
+  if (!sslmode || sslmode === 'disable' || sslmode === 'allow') return false;
+
+  // Object.hasOwn so inherited keys like 'constructor' never resolve to a mode.
+  if (!Object.hasOwn(VERIFY_CERTIFICATE_BY_SSLMODE, sslmode)) {
+    throw new Error(`Unsupported sslmode in database URL: ${sslmode}`);
+  }
+
+  return { rejectUnauthorized: VERIFY_CERTIFICATE_BY_SSLMODE[sslmode] };
 }

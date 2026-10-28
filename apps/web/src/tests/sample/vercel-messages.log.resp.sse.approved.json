@@ -8,7 +8,7 @@
   "upstream_id": "305d0d3d-1a2c-47fe-a99f-96f30082adbd",
   "latency": null,
   "moderation_latency": null,
-  "generation_time": null,
+  "generation_time": 0,
   "streamed": true,
   "cancelled": null,
   "status_code": 200,
@@ -17,5 +17,6 @@
   "cacheHitTokens": 0,
   "cacheWriteTokens": 0,
   "cost_mUsd": 402,
+  "nonInferenceCost_mUsd": 0,
   "is_byok": true
 }

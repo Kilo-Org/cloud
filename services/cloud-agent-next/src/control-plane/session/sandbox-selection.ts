@@ -1,8 +1,12 @@
+import { byocVercelOwnerSchema } from '../../byoc/vercel-owner.js';
 import { z } from 'zod';
+import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import { agentSandboxProviderSchema } from '../../types.js';
 import { sandboxProviderConfigurationSchema } from '../../sandbox-control/provider.js';
 import { sandboxBillingInputEnvelopeSchema } from '../../container-usage-context.js';
 import { credentialContainmentSchema } from '../../sandbox-control/credential-containment.js';
+import { sandboxKindSchema } from '../../sandbox-placement.js';
+import { environmentReferenceSchema } from '../../environment-build/reference.js';
 import {
   controlPlaneCredentialSourceSchema,
   controlPlaneRouteSpecSchema,
@@ -14,15 +18,30 @@ import {
  * applies it to its provider pin while the allocation is `stopped`. Same private
  * boundary as the credential source: it never reaches the wrapper.
  */
-export const controlPlaneSandboxSelectionSchema = z
-  .object({
+export const controlPlaneSandboxSelectionSchema = egressPolicySchema
+  .safeExtend({
     provider: agentSandboxProviderSchema,
     allocationName: z.string().min(1).max(256).optional(),
     configuration: sandboxProviderConfigurationSchema.optional(),
     billing: sandboxBillingInputEnvelopeSchema.optional(),
     containment: credentialContainmentSchema.optional(),
+    /** The stored kind of a placed (`sbx-`) key; absent for a legacy prefixed key. */
+    sandboxKind: sandboxKindSchema.optional(),
+    byoc: z.object({ credentialId: z.uuid() }).and(byocVercelOwnerSchema).optional(),
   })
-  .strict();
+  .strict()
+  .refine(
+    selection =>
+      selection.egressMode !== 'allowlist' ||
+      (selection.provider === 'cloudflare-containers' &&
+        (selection.sandboxKind === undefined || selection.sandboxKind === 'isolated')),
+    'allowlist egress requires an isolated Cloudflare containers sandbox'
+  )
+  .refine(input => input.byoc === undefined || input.provider === 'vercel', 'BYOC requires Vercel')
+  .refine(
+    input => input.provider !== 'vercel' || input.byoc !== undefined,
+    'Vercel requires BYOC credentials'
+  );
 
 export type ControlPlaneSandboxSelection = z.infer<typeof controlPlaneSandboxSelectionSchema>;
 
@@ -36,6 +55,8 @@ export const controlPlanePrepareInputWithSelectionSchema = z
     spec: controlPlaneRouteSpecSchema,
     credentials: controlPlaneCredentialSourceSchema,
     sandboxSelection: controlPlaneSandboxSelectionSchema.optional(),
+    /** The admitted repository environment; DO-private like `credentials`. */
+    environment: environmentReferenceSchema.optional(),
   })
   .strict();
 

@@ -50,6 +50,7 @@ vi.mock('react-i18next', async importOriginal => {
   };
 });
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   Switch: 'Switch',
@@ -80,6 +81,9 @@ vi.mock('@/components/agents/context-usage-ring', () => ({
 }));
 vi.mock('@/components/agents/session-page-sheet', () => ({
   SessionPageSheet: 'SessionPageSheet',
+}));
+vi.mock('@/components/todos/session-todo-link', () => ({
+  SessionTodoLinkRow: 'SessionTodoLinkRow',
 }));
 
 const WARNING_COPY =

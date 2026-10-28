@@ -13,6 +13,7 @@ import {
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
 import { sendOrgSSOUserJoinedEmail } from '@kilocode/web-shared/lib/email';
 import { SSO_SIGNIN_PATH } from '@kilocode/web-shared/lib/auth/constants';
+import { authFailureRedirectUrl } from '@/lib/auth/redirect-urls';
 import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 
 const workos = new WorkOS(WORKOS_API_KEY);
@@ -71,7 +72,14 @@ async function processSSOInternal(
     trackingContext
   );
   if (!res.success) {
-    if (res.error === 'SIGNUP-RATE-LIMITED' || res.error === 'EMAIL-ALREADY-USED') {
+    if (res.error === 'SIGNUP-STEP-UP') {
+      return authFailureRedirectUrl(res.error, false, res.methods);
+    }
+    if (
+      res.error === 'SIGNUP-RATE-LIMITED' ||
+      res.error === 'SIGNUP-UNAVAILABLE' ||
+      res.error === 'EMAIL-ALREADY-USED'
+    ) {
       return `${SSO_SIGNIN_PATH}?error=${res.error}`;
     }
     throw new Error(res.error);

@@ -6,7 +6,18 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { eq } from 'drizzle-orm';
-import type { CustomLlmDefinition } from '@kilocode/db/schema-types';
+import type { CustomLlmDefinition, StoredModel } from '@kilocode/db/schema-types';
+import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { useKiloExclusiveModel } from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+  ...jest.requireActual<typeof GatewayModelsCache>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache'
+  ),
+  getOpenRouterModelsMetadataFromDatabase: jest.fn(),
+}));
 
 let admin: User;
 let nonAdmin: User;
@@ -21,7 +32,19 @@ const validDefinition: CustomLlmDefinition = {
   group_ids: ['00000000-0000-4000-8000-000000000123'],
 };
 
+const publicDefinition: CustomLlmDefinition = {
+  internal_id: 'upstream-model',
+  display_name: 'Public model',
+  context_length: 128000,
+  max_completion_tokens: 4096,
+  base_url: 'https://upstream.example.com/v1',
+  public: { inference_providers: ['acme'], description: 'A public custom model' },
+};
+
 beforeEach(async () => {
+  jest
+    .mocked(getOpenRouterModelsMetadataFromDatabase)
+    .mockResolvedValue({ 'openai/gpt-4o': {} as StoredModel });
   await cleanupDbForTest();
   admin = await insertTestUser({
     google_user_email: `custom-llm-admin-${Math.random()}@admin.example.com`,
@@ -33,6 +56,8 @@ beforeEach(async () => {
 });
 
 describe('adminCustomLlmRouter', () => {
+  useKiloExclusiveModel();
+
   it('rejects a non-admin caller', async () => {
     const caller = await createCallerForUser(nonAdmin.id);
     await expect(caller.admin.customLlm.list()).rejects.toMatchObject({
@@ -134,6 +159,33 @@ describe('adminCustomLlmRouter', () => {
       expect(decrypted.type).toBe('service_account');
       expect(decrypted.project_id).toBe('test-project');
       expect(decrypted.private_key).toBe('pk-secret');
+    });
+
+    it('creates a new custom LLM with Amazon Bedrock IAM credentials', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const publicId = 'kilo-internal/test-model-bedrock';
+      const credentials = {
+        type: 'aws_bedrock' as const,
+        region: 'us-east-1',
+        access_key_id: 'AKIDEXAMPLE',
+        secret_access_key: 'bedrock-secret',
+      };
+
+      await caller.admin.customLlm.upsert({
+        public_id: publicId,
+        definition: {
+          ...validDefinition,
+          base_url: 'https://bedrock-runtime.us-east-1.amazonaws.com/openai/v1',
+        },
+        credentials,
+      });
+
+      const [row] = await db.select().from(custom_llm2).where(eq(custom_llm2.public_id, publicId));
+      expect(row?.encrypted_api_key).toBeDefined();
+      expect(JSON.stringify(row?.definition)).not.toContain('bedrock-secret');
+      expect(JSON.parse(decryptApiKey(row.encrypted_api_key!, BYOK_ENCRYPTION_KEY))).toEqual(
+        credentials
+      );
     });
 
     it('rejects creating new custom LLM when credentials are completely missing', async () => {
@@ -406,6 +458,245 @@ describe('adminCustomLlmRouter', () => {
         .from(custom_llm2)
         .where(eq(custom_llm2.public_id, copiedPublicId));
       expect(copiedRow).toBeUndefined();
+    });
+  });
+
+  describe('public_id rules', () => {
+    const credentials = { type: 'api_key', api_key: 'sk-secret' } as const;
+
+    it('accepts an id without the kilo-internal/ prefix and trims it', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      const result = await caller.admin.customLlm.upsert({
+        public_id: '  acme/model  ',
+        definition: validDefinition,
+        credentials,
+      });
+
+      expect(result.public_id).toBe('acme/model');
+    });
+
+    it.each([
+      ['Acme/Model', 'lowercase letters'],
+      ['acme/my model', 'lowercase letters'],
+      ['acme/model:free', 'must not contain ":" or "~"'],
+      ['acme/model~latest', 'must not contain ":" or "~"'],
+      ['kilo/model', 'must not start with'],
+      ['kilo-auto/model', 'must not start with'],
+      ['kilocode/model', 'must not start with'],
+      ['kimi-coding/model', 'direct BYOK prefix'],
+      ['openai/gpt-4o', 'OpenRouter model list'],
+    ])('rejects %s', async (publicId, message) => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: publicId,
+          definition: validDefinition,
+          credentials,
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: expect.stringContaining(message) });
+    });
+
+    it('rejects a free model id', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: 'stealth/custom-alpha',
+          definition: validDefinition,
+          credentials,
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('free model id'),
+      });
+    });
+
+    it.each([
+      ['a private', validDefinition],
+      ['a public', publicDefinition],
+    ])('lets %s custom LLM claim a Kilo-exclusive model id', async (_access, definition) => {
+      const caller = await createCallerForUser(admin.id);
+
+      for (const exclusiveModel of kiloExclusiveModels.filter(
+        model => !model.public_id.includes(':')
+      )) {
+        await expect(
+          caller.admin.customLlm.upsert({
+            public_id: exclusiveModel.public_id,
+            definition,
+            credentials,
+          })
+        ).resolves.toMatchObject({ public_id: exclusiveModel.public_id });
+      }
+    });
+
+    it('lists whether a Kilo-exclusive model still serves the id', async () => {
+      const exclusiveModelId = kiloExclusiveModels.find(
+        model => !model.public_id.includes(':')
+      )?.public_id;
+      if (!exclusiveModelId) throw new Error('Expected a Kilo-exclusive id without a variant');
+      const caller = await createCallerForUser(admin.id);
+      await caller.admin.customLlm.upsert({
+        public_id: exclusiveModelId,
+        definition: publicDefinition,
+        credentials,
+      });
+      await caller.admin.customLlm.upsert({
+        public_id: 'acme/own-model',
+        definition: publicDefinition,
+        credentials,
+      });
+
+      const { items } = await caller.admin.customLlm.list();
+
+      expect(
+        items.map(item => [item.public_id, item.shadowedByKiloExclusiveModel]).toSorted()
+      ).toEqual(
+        [
+          ['acme/own-model', false],
+          [exclusiveModelId, true],
+        ].toSorted()
+      );
+    });
+
+    it('rejects an id that differs only in case from an existing custom LLM', async () => {
+      await db
+        .insert(custom_llm2)
+        .values({ public_id: 'kilo-internal/Legacy-Model', definition: validDefinition });
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: 'kilo-internal/legacy-model',
+          definition: validDefinition,
+          credentials,
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('differs only in case'),
+      });
+    });
+
+    it('keeps accepting updates to an existing row with a legacy id', async () => {
+      await db
+        .insert(custom_llm2)
+        .values({ public_id: 'kilo-internal/Legacy-Model', definition: validDefinition });
+      const caller = await createCallerForUser(admin.id);
+
+      const result = await caller.admin.customLlm.upsert({
+        public_id: 'kilo-internal/Legacy-Model',
+        definition: { ...validDefinition, display_name: 'Renamed' },
+        credentials,
+      });
+
+      expect(result.definition.display_name).toBe('Renamed');
+    });
+
+    it('applies the same rules to the copy target', async () => {
+      const caller = await createCallerForUser(admin.id);
+      await caller.admin.customLlm.upsert({
+        public_id: 'acme/copy-source',
+        definition: validDefinition,
+        credentials,
+      });
+
+      await expect(
+        caller.admin.customLlm.copy({
+          source_public_id: 'acme/copy-source',
+          public_id: 'kilo/copy',
+          display_name: 'Copy',
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+  });
+
+  describe('public definitions', () => {
+    const credentials = { type: 'api_key', api_key: 'sk-secret' } as const;
+
+    it('creates a public custom LLM', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      const result = await caller.admin.customLlm.upsert({
+        public_id: 'acme/public-model',
+        definition: publicDefinition,
+        credentials,
+      });
+
+      expect(result.definition.public).toEqual({
+        inference_providers: ['acme'],
+        description: 'A public custom model',
+      });
+    });
+
+    it.each([
+      ['organization_ids', { organization_ids: [] }],
+      ['group_ids', { group_ids: ['00000000-0000-4000-8000-000000000123'] }],
+      ['description', { public: { inference_providers: ['acme'], description: ' ' } }],
+    ])('rejects a public definition with an invalid %s', async (_field, overrides) => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: 'acme/invalid-public-model',
+          definition: { ...publicDefinition, ...overrides },
+          credentials,
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+
+    it('stores a private definition that nobody is granted yet', async () => {
+      const caller = await createCallerForUser(admin.id);
+      const {
+        organization_ids: _organizationIds,
+        group_ids: _groupIds,
+        ...definition
+      } = validDefinition;
+
+      const result = await caller.admin.customLlm.upsert({
+        public_id: 'acme/unassigned-model',
+        definition,
+        credentials,
+      });
+
+      expect(result.definition.organization_ids).toBeUndefined();
+    });
+
+    it('rejects api_kinds without the API that clients use', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: 'acme/api-kinds-model',
+          definition: { ...publicDefinition, api_kinds: ['messages', 'responses'] },
+          credentials,
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: 'acme/api-kinds-model',
+          definition: { ...publicDefinition, api_kinds: ['chat_completions', 'messages'] },
+          credentials,
+        })
+      ).resolves.toMatchObject({
+        definition: { api_kinds: ['chat_completions', 'messages'] },
+      });
+    });
+
+    it('rejects an inference provider that is not a lowercase slug', async () => {
+      const caller = await createCallerForUser(admin.id);
+
+      await expect(
+        caller.admin.customLlm.upsert({
+          public_id: 'acme/public-model',
+          definition: {
+            ...publicDefinition,
+            public: { inference_providers: ['Acme AI'], description: 'A public custom model' },
+          },
+          credentials,
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     });
   });
 

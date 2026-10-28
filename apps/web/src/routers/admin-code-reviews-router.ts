@@ -9,6 +9,7 @@ import {
 import * as z from 'zod';
 import { sql, and, gte, lt, eq, isNotNull, desc, ilike, or, inArray, type SQL } from 'drizzle-orm';
 import {
+  nonTerminalCodeReviewStatusListSql,
   reconsiderableCodeReviewWorkCondition,
   staleQueuedCodeReviewCutoffSql,
   staleRunningCodeReviewCutoffSql,
@@ -113,6 +114,7 @@ const TERMINAL_REASON_LABELS: Record<string, string> = {
   assistant_timeout: 'Assistant Timeout',
   assistant_unauthorized: 'Assistant Unauthorized',
   assistant_invalid_request: 'Assistant Invalid Request',
+  assistant_invalid_request_byok: 'Request Rejected (customer provider)',
   assistant_context_limit: 'Assistant Context Limit',
   assistant_output_limit: 'Assistant Output Limit',
   assistant_content_filter: 'Assistant Content Filter',
@@ -442,7 +444,7 @@ export const adminCodeReviewsRouter = createTRPCRouter({
         failed_count: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'failed' AND ${excludeBilling} AND ${excludeModelUnavailable})`,
         cancelled_count: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'cancelled' OR (${statusTable.status} = 'failed' AND ${modelUnavailable}))`,
         interrupted_count: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'interrupted')`,
-        in_progress_count: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} IN ('pending', 'queued', 'running'))`,
+        in_progress_count: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} IN (${nonTerminalCodeReviewStatusListSql()}))`,
         // Reaped reviews get completed_at stamped at reap time, ~48h+ after they
         // started, so a handful of them would dominate an average built from
         // minutes-long real runs. They are closures, not measurements.
@@ -542,7 +544,7 @@ export const adminCodeReviewsRouter = createTRPCRouter({
         failed: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'failed' AND ${excludeBilling} AND ${excludeModelUnavailable})`,
         cancelled: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'cancelled' OR (${statusTable.status} = 'failed' AND ${modelUnavailable}))`,
         interrupted: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'interrupted')`,
-        in_progress: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} IN ('pending', 'queued', 'running'))`,
+        in_progress: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} IN (${nonTerminalCodeReviewStatusListSql()}))`,
         billing_errors: sql<number>`COUNT(*) FILTER (WHERE ${statusTable.status} = 'failed' AND ${billingError})`,
       })
       .from(cloud_agent_code_reviews);

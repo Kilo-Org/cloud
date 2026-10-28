@@ -250,26 +250,6 @@ describe('the same native identifiers on both platforms', () => {
 });
 
 describe('one code path on both platforms', () => {
-  it('registers the one shared JS dispatcher under the same module name', () => {
-    // `registerAppActionDispatcher` (s3) is the only dispatcher: each
-    // platform's Expo module hands the same JS handler to its native entry
-    // points, and the JS side requires the same module name on both.
-    expect(iosModuleSource).toContain('AsyncFunction("registerAppActionDispatcher")');
-    expect(androidModuleSource).toContain('Function("registerAppActionDispatcher")');
-    expect(iosModuleSource).toContain('Name("KiloAppActions")');
-    expect(androidModuleSource).toContain('Name("KiloAppActions")');
-  });
-
-  it('drops the registered dispatcher when the runtime goes away, on both platforms', () => {
-    // The bridge/dispatcher outlives the module on both platforms, so each
-    // module's `OnDestroy` is what releases the JS dispatcher it registered.
-    expect(androidModuleSource).toContain('OnDestroy');
-    expect(androidModuleSource).toContain('AppActionDispatcher.clear()');
-    expect(iosModuleSource).toContain('OnDestroy');
-    expect(iosModuleSource).toContain('KiloAppActionBridge.shared.unregister()');
-    expect(bridgeSource).toContain('func unregister()');
-  });
-
   it('carries an action URL the contract parses in every literal of either tree', () => {
     for (const { file, literal, slug } of [...iosLiterals, ...androidLiterals]) {
       expect(
@@ -334,7 +314,7 @@ describe('the same payload and result surface', () => {
     expect(sorted([...keys])).toEqual(ALL_FIELDS);
   });
 
-  it('carries the awaited result back to the caller on both platforms', () => {
+  it('carries the awaited result back to the caller on the intent surface', () => {
     // iOS: the App Intent's perform returns the bridge's answer — the session
     // id a StartAgent run created on success — and a refusal throws with the
     // pipeline's message for Shortcuts to show.
@@ -346,11 +326,12 @@ describe('the same payload and result surface', () => {
     expect(swiftStruct('StartAgentIntent')).toContain(
       '.result(value: try await KiloAppActionBridge.shared.perform(payload: payload))'
     );
-    // Android: a caller that asked for a result gets the dispatcher's real
-    // outcome through setResult, even across a cold start.
-    expect(activitySource).toContain('AppActionDispatcher.await(payload)');
-    expect(activitySource).toMatch(/putExtra\(KiloActionContract\.EXTRA_RESULT, result\)/);
-    expect(activitySource).toContain('setResult(');
+    // Android: the exported entry point hands the request to the dispatcher
+    // and keeps no result channel at all. The app is the surface that shows
+    // what the action produced.
+    expect(activitySource).not.toContain('setResult(');
+    expect(activitySource).not.toContain('EXTRA_RESULT');
+    expect(androidModuleSource).not.toContain('completeAppAction');
   });
 });
 

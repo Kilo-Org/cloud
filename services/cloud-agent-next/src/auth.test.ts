@@ -1,13 +1,128 @@
 import { describe, expect, it } from 'vitest';
 import jwt from 'jsonwebtoken';
 import {
+  mintPreviewSessionToken,
   mintWrapperDispatchTicket,
+  validatePreviewEntryTicket,
+  validatePreviewSessionToken,
   validateStreamTicket,
   validateWrapperDispatchTicket,
   type WrapperDispatchTicketClaims,
 } from './auth.js';
 
 const secret = 'test-secret';
+
+describe('preview session token', () => {
+  const claims = {
+    userId: 'user-1',
+    cloudAgentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
+    port: 5173,
+  } as const;
+
+  it('round-trips its claims and organization', () => {
+    const token = mintPreviewSessionToken({ ...claims, organizationId: 'org-1' }, secret);
+    expect(validatePreviewSessionToken(token, secret)).toEqual({
+      success: true,
+      claims: { ...claims, organizationId: 'org-1' },
+    });
+  });
+
+  it('rejects a missing secret and a missing token', () => {
+    expect(validatePreviewSessionToken('token', null)).toMatchObject({ success: false });
+    expect(validatePreviewSessionToken(null, secret)).toMatchObject({ success: false });
+  });
+
+  it('rejects a token signed with another secret', () => {
+    const token = mintPreviewSessionToken(claims, 'other-secret');
+    expect(validatePreviewSessionToken(token, secret)).toMatchObject({ success: false });
+  });
+
+  it('rejects a stream ticket presented as a preview session token', () => {
+    const ticket = jwt.sign(
+      {
+        type: 'stream_ticket',
+        purpose: 'preview',
+        userId: 'u',
+        cloudAgentSessionId: 'workspace_x',
+      },
+      secret,
+      { algorithm: 'HS256', expiresIn: '1 minute', audience: 'cloud-agent-preview-session' }
+    );
+    expect(validatePreviewSessionToken(ticket, secret)).toMatchObject({
+      success: false,
+      error: 'Invalid preview session type',
+    });
+  });
+
+  it('rejects an expired preview session token', () => {
+    const token = mintPreviewSessionToken(claims, secret, Math.floor(Date.now() / 1000) - 7200);
+    expect(validatePreviewSessionToken(token, secret)).toMatchObject({ success: false });
+  });
+});
+
+describe('preview entry ticket', () => {
+  function entryTicket(payload: Record<string, unknown>, audience = 'cloud-agent-preview') {
+    return jwt.sign(
+      {
+        type: 'stream_ticket',
+        purpose: 'preview',
+        userId: 'user-1',
+        cloudAgentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
+        port: 5173,
+        nonce: 'nonce-1',
+        ...payload,
+      },
+      secret,
+      { algorithm: 'HS256', expiresIn: 60, audience }
+    );
+  }
+
+  it('returns the claims, nonce and expiry of a valid entry ticket', () => {
+    const ticket = entryTicket({ organizationId: 'org-1' });
+    const { exp } = jwt.decode(ticket) as { exp: number };
+    expect(validatePreviewEntryTicket(ticket, secret)).toEqual({
+      success: true,
+      claims: {
+        userId: 'user-1',
+        cloudAgentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
+        port: 5173,
+        organizationId: 'org-1',
+      },
+      nonce: 'nonce-1',
+      expiresAtMs: exp * 1000,
+    });
+  });
+
+  it('rejects an entry ticket without a nonce', () => {
+    expect(validatePreviewEntryTicket(entryTicket({ nonce: undefined }), secret)).toMatchObject({
+      success: false,
+    });
+  });
+
+  it('rejects a ticket for another purpose, audience or without a port', () => {
+    expect(validatePreviewEntryTicket(entryTicket({ purpose: 'terminal' }), secret)).toMatchObject({
+      success: false,
+    });
+    expect(
+      validatePreviewEntryTicket(entryTicket({}, 'cloud-agent-terminal'), secret)
+    ).toMatchObject({ success: false });
+    expect(validatePreviewEntryTicket(entryTicket({ port: undefined }), secret)).toMatchObject({
+      success: false,
+    });
+  });
+
+  it('rejects the preview session token presented as an entry ticket', () => {
+    const token = mintPreviewSessionToken(
+      {
+        userId: 'user-1',
+        cloudAgentSessionId: 'workspace_11111111-1111-4111-8111-111111111111',
+        port: 5173,
+      },
+      secret
+    );
+    expect(validatePreviewEntryTicket(token, secret)).toMatchObject({ success: false });
+  });
+});
 
 describe('validateStreamTicket', () => {
   it('returns a configuration error when NEXTAUTH_SECRET is missing', () => {

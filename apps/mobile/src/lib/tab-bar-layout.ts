@@ -28,13 +28,37 @@ const TAB_ICON_MAX_SIZE = 26;
 
 // Label metrics mirrored from `TabBarLabel`
 // (`apps/mobile/src/components/tab-bar-label.tsx`): `font-mono-medium text-[11px]
-// leading-4 uppercase tracking-[0.2px]`. Keep these in step with that style.
+// leading-[1rem] uppercase tracking-[0.2px]`. Keep these in step with that style.
 const TAB_LABEL_FONT_SIZE = 11;
 const TAB_LABEL_LETTER_SPACING = 0.2;
 /** JetBrains Mono (the `font-mono-medium` label) advances 0.6em per glyph. */
 const MONO_ADVANCE_EM = 0.6;
 /** CJK/Kana/Hangul/fullwidth glyphs render one em wide in the same stack. */
 const FULL_WIDTH_ADVANCE_EM = 1;
+/**
+ * RTL-script glyphs (Arabic and Hebrew) render in the system fallback font, not
+ * the mono family (`Text` drops `font-mono*` for RTL-script copy —
+ * `withoutMonoFamily`), and a proportional glyph of either script averages
+ * roughly half an em at this size. Counting those glyphs at the mono advance
+ * inflated the width estimate until the width rule dropped every label in
+ * Arabic at phone widths (الملف الشخصي measured wider than its tab while
+ * fitting comfortably on screen), so the bar rendered icon-only with no labels.
+ * The value bounds the true advance the same way the full-width class does: a
+ * stray over-estimate hides the labels slightly early rather than leaving a
+ * clipped label on screen.
+ */
+const RTL_SCRIPT_ADVANCE_EM = 0.55;
+/**
+ * The script blocks whose glyphs take the fallback advance: the Hebrew block
+ * and its presentation forms, then Arabic, Arabic Supplement, Arabic
+ * Extended-B, Arabic Extended-A, and the Arabic Presentation Forms-A and -B.
+ * Mirrors `RTL_SCRIPT` in `rtl-text.ts` — the class `hasRtlScript` uses to drop
+ * the mono family, so the measure and the renderer agree on which copy is
+ * proportional. Inlined because that module imports react-native, which this
+ * node-side module must not (`tab-bar-layout.test.ts` runs untransformed).
+ */
+const RTL_SCRIPT =
+  /[\u0590-\u05FF\uFB1D-\uFB4F\u0600-\u06FF\u0750-\u077F\u0870-\u089F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]/;
 /**
  * react-navigation's vertical tab item (`tabVerticalUiKit: { padding: 5 }` in
  * `BottomTabItem`), so a tab's label box is `tabWidth - 10`.
@@ -51,17 +75,39 @@ type TabBarPlatform = 'android' | 'ios' | 'macos' | 'windows' | 'web';
  * ("PROFIL E", 480x1000 @ 480 = 160 dp, e1, 2026-09-21). Above the threshold the
  * bar grows the second line for the two-line `tabs.kiloclawWrapped` label.
  */
-export function tabLabelLineCount(fontScale = 1): 1 | 2 {
-  return fontScale > TAB_LABEL_WRAP_FONT_SCALE ? 2 : 1;
+export function tabLabelLineCount(fontScale = 1, needsWrap = false): 1 | 2 {
+  return fontScale > TAB_LABEL_WRAP_FONT_SCALE || needsWrap ? 2 : 1;
 }
 
-export function getTabBarOverlayHeight(
-  bottomInset: number,
-  platform: TabBarPlatform,
-  fontScale = 1
-): number {
-  const labelLines = tabLabelLineCount(fontScale);
-  const tabContentHeight = 34 + 16 * fontScale * labelLines;
+/**
+ * Lines one tab's label needs at the current window width. Copy that carries
+ * its own break keeps two lines. A label that fits its tab keeps one. A label
+ * that does not fit takes a second line only when it can break between words:
+ * a single word wider than its tab stays on one line and shrinks, because a
+ * mid-word wrap leaves the bar unreadable (155c33b5).
+ */
+export function tabLabelLines(label: string, tabWidth: number, fontScale = 1): 1 | 2 {
+  if (tabLabelNumberOfLines(label) === 2) {
+    return 2;
+  }
+  if (fontScale > TAB_LABEL_WRAP_FONT_SCALE || tabLabelFits(label, tabWidth, fontScale)) {
+    return 1;
+  }
+  return label.includes(' ') ? 2 : 1;
+}
+
+export function getTabBarOverlayHeight({
+  bottomInset,
+  platform,
+  fontScale = 1,
+  lines = tabLabelLineCount(fontScale),
+}: {
+  bottomInset: number;
+  platform: TabBarPlatform;
+  fontScale?: number;
+  lines?: 1 | 2;
+}): number {
+  const tabContentHeight = 34 + 16 * fontScale * lines;
   return (
     Math.max(TAB_BAR_BASE_HEIGHT, tabContentHeight) +
     Math.max(bottomInset, 0) +
@@ -97,24 +143,27 @@ export function getTabBarIconSize(fontScale = 1): number {
  * is the single source of truth for both the tab bar itself and the content
  * clearance below it: it switches to the compact icon-forward height once labels
  * are hidden, and otherwise uses the label-inclusive overlay height. Callers
- * that already decided the label state (from the window width) pass it as
- * `showLabel`; the default keeps the font-scale-only answer. Tab screens use
- * `useEffectiveTabBarHeight` (`tab-bar-clearance.ts`), which supplies the tab
- * layout's decision so the clearance cannot drift from the rendered height.
+ * that already decided the label state and the reserved line count pass them as
+ * `showLabel` and `labelLines`; the defaults keep the font-scale-only answer.
+ * Tab screens use `useEffectiveTabBarHeight` (`tab-bar-clearance.ts`), which
+ * supplies the tab layout's decision so the clearance cannot drift from the
+ * rendered height.
  */
 export function getEffectiveTabBarHeight({
   bottomInset,
   platform,
   fontScale = 1,
   showLabel = shouldShowTabLabel(fontScale),
+  labelLines = tabLabelLineCount(fontScale),
 }: {
   bottomInset: number;
   platform: TabBarPlatform;
   fontScale?: number;
   showLabel?: boolean;
+  labelLines?: 1 | 2;
 }): number {
   return showLabel
-    ? getTabBarOverlayHeight(bottomInset, platform, fontScale)
+    ? getTabBarOverlayHeight({ bottomInset, platform, fontScale, lines: labelLines })
     : getTabBarIconForwardHeight(bottomInset, platform);
 }
 
@@ -138,25 +187,14 @@ export function getTabBarHorizontalInset({
 }
 
 /**
- * Whether the tab bar shows visible labels. Labels are dropped at and above
- * `TAB_ICON_FORWARD_FONT_SCALE` (the bar would balloon with the scaled label),
- * and when any label is too wide for its tab at the current window width (RN
- * would tail-ellipsize it, or wrap a `\n` line mid-word). With no `labels` the
- * per-tab width is unknown, so only the font-scale rule applies — the previous
- * behaviour, unchanged for callers that do not pass a tab width.
+ * Whether the tab bar shows visible labels at all. Labels are dropped only at
+ * and above `TAB_ICON_FORWARD_FONT_SCALE`, where the bar would balloon with the
+ * scaled label; assistive tech still names every tab. Width never hides the
+ * labels: one label too wide for its tab takes a second line, or shrinks on its
+ * own, while the others keep their full-size label (`tabLabelLines`).
  */
-export function shouldShowTabLabel(
-  fontScale = 1,
-  tabWidth = Number.POSITIVE_INFINITY,
-  labels: readonly string[] = []
-): boolean {
-  if (fontScale >= TAB_ICON_FORWARD_FONT_SCALE) {
-    return false;
-  }
-  if (labels.length === 0) {
-    return true;
-  }
-  return labels.every(label => tabLabelFits(label, tabWidth, fontScale));
+export function shouldShowTabLabel(fontScale = 1): boolean {
+  return fontScale < TAB_ICON_FORWARD_FONT_SCALE;
 }
 
 /**
@@ -179,16 +217,27 @@ function isFullWidthCharacter(character: string): boolean {
  * (`Kilo\nClaw`), whose wider line is the one that has to fit. Only an explicit
  * break starts a new line: an ordinary space stays on the same one line and
  * counts toward its width (the renderer tail-ellipsizes, it does not wrap on a
- * space). The estimate is deliberately conservative: it only decides whether
- * the labels are dropped, so over-estimating hides them slightly early and
- * never leaves a clipped label on screen.
+ * space). The estimate is deliberately
+ * conservative: it only decides whether the labels are dropped, so
+ * over-estimating hides them slightly early and never leaves a clipped label
+ * on screen. Per-glyph advances: full-width glyphs one em, RTL-script glyphs
+ * (Arabic and Hebrew — the fallback font the label renders in, see
+ * `RTL_SCRIPT_ADVANCE_EM`) about half an em, every other glyph the mono
+ * advance.
  */
+function glyphAdvanceEm(character: string): number {
+  if (isFullWidthCharacter(character)) {
+    return FULL_WIDTH_ADVANCE_EM;
+  }
+  return RTL_SCRIPT.test(character) ? RTL_SCRIPT_ADVANCE_EM : MONO_ADVANCE_EM;
+}
+
 export function tabLabelWidth(label: string, fontScale = 1): number {
   let widest = 0;
   for (const line of label.split('\n')) {
     let lineWidth = 0;
     for (const character of line) {
-      const advanceEm = isFullWidthCharacter(character) ? FULL_WIDTH_ADVANCE_EM : MONO_ADVANCE_EM;
+      const advanceEm = glyphAdvanceEm(character);
       lineWidth += advanceEm * TAB_LABEL_FONT_SIZE * fontScale + TAB_LABEL_LETTER_SPACING;
     }
     widest = Math.max(widest, lineWidth);
@@ -217,12 +266,23 @@ export function tabLabelNumberOfLines(label: string): 1 | 2 {
   return label.includes('\n') ? 2 : 1;
 }
 
-export function shouldHideTabBar(pathname: string): boolean {
+/**
+ * The route group of the Chat tab, and the one screen in it that is not the
+ * list. A conversation puts its composer where the tab bar sits, so the bar
+ * goes while one is open. The group is read from the segments rather than the
+ * path, because a conversation's path is the session id and nothing else.
+ */
+const CHAT_TAB_GROUP = '(4_chat)';
+const CHAT_CONVERSATION = '[id]';
+
+export function shouldHideTabBar(pathname: string, segments: readonly string[]): boolean {
   const parts = pathname.split('/').filter(Boolean);
   const isKiloClawInstancePicker = parts[0] === 'chat' && parts.length === 3;
   const isSecurityFindingFilter =
     parts[0] === 'security-agent' && parts.length === 3 && parts[2] === 'filter';
-  return isKiloClawInstancePicker || isSecurityFindingFilter;
+  const isChatConversation =
+    segments.includes(CHAT_TAB_GROUP) && segments.at(-1) === CHAT_CONVERSATION;
+  return isKiloClawInstancePicker || isSecurityFindingFilter || isChatConversation;
 }
 
 /** One tab bar entry, in render order. */
@@ -231,21 +291,17 @@ export type TabBarTab = 'home' | 'kiloclaw' | 'agents' | 'chat' | 'profile';
 /** Flag state that changes which tabs render. */
 export type TabBarTabFlags = {
   showKiloClaw: boolean;
-  showQuickChat: boolean;
 };
 
-/**
- * Number of rendered tabs. Base three (Home, Agents, Profile) plus the two
- * flagged tabs when shown.
- */
-export function visibleTabCount(showKiloClaw: boolean, showQuickChat: boolean): number {
-  return 3 + Number(showKiloClaw) + Number(showQuickChat);
+/** Number of rendered tabs: Home, Agents, Chat, Profile, and optional KiloClaw. */
+export function visibleTabCount(showKiloClaw: boolean): number {
+  return 4 + Number(showKiloClaw);
 }
 
 /**
  * One-based render position of a tab, or null when the tab is hidden. Home is
  * always 1; KiloClaw sits at 2 when shown; Agents follows KiloClaw; Chat
- * follows Agents when shown; Profile is always last.
+ * follows Agents; Profile is always last.
  */
 export function tabBarPosition(tab: TabBarTab, flags: TabBarTabFlags): number | null {
   switch (tab) {
@@ -259,10 +315,10 @@ export function tabBarPosition(tab: TabBarTab, flags: TabBarTabFlags): number | 
       return 2 + Number(flags.showKiloClaw);
     }
     case 'chat': {
-      return flags.showQuickChat ? 3 + Number(flags.showKiloClaw) : null;
+      return 3 + Number(flags.showKiloClaw);
     }
     case 'profile': {
-      return visibleTabCount(flags.showKiloClaw, flags.showQuickChat);
+      return visibleTabCount(flags.showKiloClaw);
     }
     default: {
       // `TabBarTab` is a closed union; this branch is unreachable but keeps

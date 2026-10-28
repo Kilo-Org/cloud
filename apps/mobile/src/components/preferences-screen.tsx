@@ -1,5 +1,13 @@
 import { type Href, useRouter } from 'expo-router';
-import { Bell, Globe, Mic, SlidersHorizontal, Wallet, WandSparkles } from '@/components/ui/icons';
+import {
+  Bell,
+  Globe,
+  History,
+  Mic,
+  SlidersHorizontal,
+  Wallet,
+  WandSparkles,
+} from '@/components/ui/icons';
 import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -29,7 +37,7 @@ export function PreferencesScreen() {
       <ScreenHeader title={t('common.preferences')} />
       <TabScreenScrollView
         className="flex-1"
-        contentContainerClassName="px-6 gap-3 pt-4"
+        contentContainerClassName="px-4 gap-3 pt-4"
         showsVerticalScrollIndicator={false}
       >
         <ConfigureRow
@@ -96,7 +104,17 @@ export function PreferencesScreen() {
           className="rounded-lg bg-secondary px-3"
           last
           onPress={() => {
-            router.push('/(app)/(tabs)/(3_profile)/notifications' as Href);
+            router.push('/(app)/notifications' as Href);
+          }}
+        />
+        <ConfigureRow
+          icon={History}
+          title={t('notifications.history.title')}
+          subtitle={t('notifications.history.subtitle')}
+          className="rounded-lg bg-secondary px-3"
+          last
+          onPress={() => {
+            router.push('/(app)/(tabs)/(3_profile)/notification-history' as Href);
           }}
         />
         <ConfigureRow

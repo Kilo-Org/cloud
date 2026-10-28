@@ -2,11 +2,13 @@ import {
   GLANCEABLE_SNAPSHOT_EXPIRY_MS,
   GLANCEABLE_SNAPSHOT_SCHEMA_VERSION,
   type GlanceableAgentsSnapshot,
+  NO_GLANCEABLE_WORK,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
+import { clearHomeWidgetData } from './home-widget-data';
 import { getLastGlanceableSnapshot } from './persist';
 import { withStatus } from './publisher';
-import { forEachSink, getGlanceableDelivery } from './sink-registry';
+import { forEachSink, getGlanceableDelivery, guardSink } from './sink-registry';
 
 // Monotonic epoch bumped on every terminal blank (signed-out or privacy). The
 // publisher captures it at construction and refuses to emit once it advances,
@@ -83,12 +85,7 @@ function buildTerminalSnapshot(status: 'signed_out' | 'privacy'): GlanceableAgen
     scopeKey: `terminal:${status}`,
     organizationBound: false,
     status,
-    running: 0,
-    needsInput: 0,
-    idle: 0,
-    scheduled: 0,
-    needsInputSince: null,
-    scheduledAt: null,
+    ...NO_GLANCEABLE_WORK,
     // A terminal scope asserts nothing about work, so the newest-result fact is
     // blank with the counts.
     newestResultKind: null,
@@ -96,10 +93,27 @@ function buildTerminalSnapshot(status: 'signed_out' | 'privacy'): GlanceableAgen
   };
 }
 
+/**
+ * Surfaces that are not snapshot sinks but end with every terminal blank: the
+ * followed session cards. A sink's `endImmediate` also runs when the counted
+ * work goes empty, which must not end a followed card, so these ends hang off
+ * the terminal blank alone.
+ */
+const terminalEnds = new Set<() => void>();
+
+export function subscribeGlanceableTerminalEnd(end: () => void): () => void {
+  terminalEnds.add(end);
+  return () => {
+    terminalEnds.delete(end);
+  };
+}
+
 function writeTerminalAndEnd(status: 'signed_out' | 'privacy'): void {
   // Arm the publisher gate before any sink writes, so a cache success that
   // lands during this window can never emit for the torn-down session.
   terminalBlankEpoch += 1;
+  clearHomeWidgetData();
+  // The scope cleanup also deletes the followed session card tokens.
   getGlanceableDelivery().cleanupTokens('scope');
   const snapshot = buildTerminalSnapshot(status);
   // Write the snapshot first, then end: the surface shows the terminal copy
@@ -110,6 +124,9 @@ function writeTerminalAndEnd(status: 'signed_out' | 'privacy'): void {
   forEachSink('terminal_end', sink => {
     sink.endImmediate();
   });
+  for (const end of terminalEnds) {
+    guardSink('terminal_end', end);
+  }
 }
 
 /** Blank on logout or direct account switch. */

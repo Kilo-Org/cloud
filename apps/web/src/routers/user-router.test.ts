@@ -2,6 +2,7 @@ import { createCallerForUser } from '@/routers/test-utils';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
   agent_configs,
+  cli_sessions_v2,
   credit_transactions,
   device_sessions,
   kiloclaw_instances,
@@ -535,14 +536,29 @@ describe('user router - credit purchase history', () => {
   const manualPurchaseId = crypto.randomUUID();
   const automaticPurchaseId = crypto.randomUUID();
 
+  const organizationPurchaseId = crypto.randomUUID();
+  let purchaseOrganizationId: string;
   beforeAll(async () => {
     purchaser = await insertTestUser({
       total_microdollars_acquired: 35_000_000,
       microdollars_used: 35_000_000,
     });
     otherUser = await insertTestUser();
+    const organization = await createTestOrganization('purchase-history-org', purchaser.id, 0);
+    purchaseOrganizationId = organization.id;
 
     await db.insert(credit_transactions).values([
+      {
+        id: organizationPurchaseId,
+        kilo_user_id: purchaser.id,
+        organization_id: purchaseOrganizationId,
+        amount_microdollars: 50_000_000,
+        is_free: false,
+        description: 'Organization top-up via stripe',
+        stripe_payment_id: `ch_${crypto.randomUUID()}`,
+        created_at: '2026-06-24T10:00:00.000Z',
+        expiry_date: '2027-06-24T10:00:00.000Z',
+      },
       {
         id: manualPurchaseId,
         kilo_user_id: purchaser.id,
@@ -551,6 +567,7 @@ describe('user router - credit purchase history', () => {
         description: 'Top-up via stripe',
         stripe_payment_id: `ch_${crypto.randomUUID()}`,
         created_at: '2026-06-20T10:00:00.000Z',
+        expiry_date: '2027-06-20T10:00:00.000Z',
       },
       {
         id: automaticPurchaseId,
@@ -585,6 +602,10 @@ describe('user router - credit purchase history', () => {
     await db
       .delete(credit_transactions)
       .where(inArray(credit_transactions.kilo_user_id, [purchaser.id, otherUser.id]));
+    await db
+      .delete(organization_memberships)
+      .where(eq(organization_memberships.organization_id, purchaseOrganizationId));
+    await db.delete(organizations).where(eq(organizations.id, purchaseOrganizationId));
     await db.delete(kilocode_users).where(inArray(kilocode_users.id, [purchaser.id, otherUser.id]));
   });
 
@@ -598,11 +619,13 @@ describe('user router - credit purchase history', () => {
         id: automaticPurchaseId,
         description: 'Automatic top-up',
         amount_mUsd: 15_000_000,
+        expiryDate: null,
       }),
       expect.objectContaining({
         id: manualPurchaseId,
         description: 'Credit purchase',
         amount_mUsd: 20_000_000,
+        expiryDate: '2027-06-20T10:00:00.000Z',
       }),
     ]);
     expect(result.nextCursor).toBeNull();
@@ -619,10 +642,45 @@ describe('user router - credit purchase history', () => {
       transactionId: manualPurchaseId,
       amount_mUsd: 20_000_000,
       purchasedAt: '2026-06-20T10:00:00.000Z',
+      expiryDate: '2027-06-20T10:00:00.000Z',
     });
     await expect(
       otherCaller.user.getCreditPurchaseConfirmation({ transactionId: manualPurchaseId })
     ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  });
+
+  it('returns organization purchase deadlines only to authorized billing users', async () => {
+    const purchaserCaller = await createCallerForUser(purchaser.id);
+    const otherCaller = await createCallerForUser(otherUser.id);
+    const result = await purchaserCaller.user.getCreditPurchaseHistory({
+      cursor: 0,
+      organizationId: purchaseOrganizationId,
+    });
+    expect(result.entries).toEqual([
+      expect.objectContaining({
+        id: organizationPurchaseId,
+        amount_mUsd: 50_000_000,
+        expiryDate: '2027-06-24T10:00:00.000Z',
+      }),
+    ]);
+    await expect(
+      purchaserCaller.user.getCreditPurchaseConfirmation({
+        transactionId: organizationPurchaseId,
+        organizationId: purchaseOrganizationId,
+      })
+    ).resolves.toMatchObject({ expiryDate: '2027-06-24T10:00:00.000Z' });
+    await expect(
+      otherCaller.user.getCreditPurchaseHistory({
+        cursor: 0,
+        organizationId: purchaseOrganizationId,
+      })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    await expect(
+      otherCaller.user.getCreditPurchaseReceipt({
+        transactionId: organizationPurchaseId,
+        organizationId: purchaseOrganizationId,
+      })
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
   });
 
   it('authorizes receipt lookup by purchase ownership', async () => {
@@ -1181,23 +1239,32 @@ describe('user router - notification capabilities', () => {
 
 describe('user router - register push token', () => {
   let tokenUser: User;
+  let otherTokenUser: User;
 
   beforeAll(async () => {
     tokenUser = await insertTestUser({
       google_user_email: 'push-token-register@example.com',
       google_user_name: 'Push Token Register',
     });
+    otherTokenUser = await insertTestUser({
+      google_user_email: 'push-token-register-other@example.com',
+      google_user_name: 'Push Token Register Other',
+    });
   });
 
   afterEach(async () => {
-    await db.delete(user_push_tokens).where(eq(user_push_tokens.user_id, tokenUser.id));
+    await db
+      .delete(user_push_tokens)
+      .where(inArray(user_push_tokens.user_id, [tokenUser.id, otherTokenUser.id]));
     await db
       .delete(user_notification_preferences)
-      .where(eq(user_notification_preferences.user_id, tokenUser.id));
+      .where(inArray(user_notification_preferences.user_id, [tokenUser.id, otherTokenUser.id]));
   });
 
   afterAll(async () => {
-    await db.delete(kilocode_users).where(eq(kilocode_users.id, tokenUser.id));
+    await db
+      .delete(kilocode_users)
+      .where(inArray(kilocode_users.id, [tokenUser.id, otherTokenUser.id]));
   });
 
   it('stores the app version when provided', async () => {
@@ -1291,6 +1358,95 @@ describe('user router - register push token', () => {
       .where(eq(user_push_tokens.user_id, tokenUser.id));
     expect(rows).toHaveLength(1);
     expect(rows[0]?.locale).toBeNull();
+  });
+
+  it('updates platform, app version, and locale on re-registration by the same account', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+    const token = 'ExponentPushToken[token-same-account-update]';
+
+    await caller.user.registerPushToken({
+      token,
+      platform: 'android',
+      appVersion: '1.0.4',
+      locale: 'es',
+    });
+    await expect(
+      caller.user.registerPushToken({ token, platform: 'ios', appVersion: '1.0.6', locale: 'fr' })
+    ).resolves.toEqual({ success: true });
+
+    const [row] = await db.select().from(user_push_tokens).where(eq(user_push_tokens.token, token));
+    expect(row).toMatchObject({
+      user_id: tokenUser.id,
+      platform: 'ios',
+      app_version: '1.0.6',
+      locale: 'fr',
+    });
+  });
+
+  it('keeps one row when the same account registers a token twice', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+    const token = 'ExponentPushToken[token-idempotent]';
+
+    await caller.user.registerPushToken({ token, platform: 'ios', appVersion: '1.0.5' });
+    await expect(
+      caller.user.registerPushToken({ token, platform: 'ios', appVersion: '1.0.5' })
+    ).resolves.toEqual({ success: true });
+
+    const rows = await db.select().from(user_push_tokens).where(eq(user_push_tokens.token, token));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]?.user_id).toBe(tokenUser.id);
+  });
+
+  it('accepts simultaneous registrations of a new token by the same account', async () => {
+    const caller = await createCallerForUser(tokenUser.id);
+    const input = {
+      token: 'ExponentPushToken[token-simultaneous]',
+      platform: 'ios' as const,
+      appVersion: '1.0.5',
+      locale: 'es',
+    };
+
+    await expect(
+      Promise.all([caller.user.registerPushToken(input), caller.user.registerPushToken(input)])
+    ).resolves.toEqual([{ success: true }, { success: true }]);
+
+    const rows = await db
+      .select()
+      .from(user_push_tokens)
+      .where(eq(user_push_tokens.token, input.token));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      user_id: tokenUser.id,
+      platform: input.platform,
+      app_version: input.appVersion,
+      locale: input.locale,
+    });
+  });
+
+  it('rejects a token registered by another account and leaves the row with its owner', async () => {
+    const owner = await createCallerForUser(tokenUser.id);
+    const otherCaller = await createCallerForUser(otherTokenUser.id);
+    const token = 'ExponentPushToken[token-owned-elsewhere]';
+
+    await owner.user.registerPushToken({ token, platform: 'ios', appVersion: '1.0.4' });
+
+    await expect(
+      otherCaller.user.registerPushToken({
+        token,
+        platform: 'android',
+        appVersion: '1.0.6',
+        locale: 'fr',
+      })
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+
+    const rows = await db.select().from(user_push_tokens).where(eq(user_push_tokens.token, token));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      user_id: tokenUser.id,
+      platform: 'ios',
+      app_version: '1.0.4',
+      locale: null,
+    });
   });
 
   it('registerPushToken and unregisterPushToken never read or write user_notification_preferences', async () => {
@@ -1736,6 +1892,169 @@ describe('user router - register activity token', () => {
       .from(user_activity_tokens)
       .where(eq(user_activity_tokens.user_id, tokenUser.id));
     expect(afterOwn).toHaveLength(0);
+  });
+
+  describe('session cards', () => {
+    const ownSessionId = `ses_card_own_${crypto.randomUUID()}`;
+    const secondSessionId = `ses_card_second_${crypto.randomUUID()}`;
+    const otherSessionId = `ses_card_other_${crypto.randomUUID()}`;
+    const orgSessionId = `ses_card_org_${crypto.randomUUID()}`;
+
+    beforeAll(async () => {
+      const org = await createTestOrganization('session-card-org', tokenUser.id, 0);
+      await db.insert(cli_sessions_v2).values([
+        { session_id: ownSessionId, kilo_user_id: tokenUser.id },
+        { session_id: secondSessionId, kilo_user_id: tokenUser.id },
+        { session_id: otherSessionId, kilo_user_id: otherUser.id },
+        { session_id: orgSessionId, kilo_user_id: tokenUser.id, organization_id: org.id },
+      ]);
+    });
+
+    afterAll(async () => {
+      await db
+        .delete(cli_sessions_v2)
+        .where(
+          inArray(cli_sessions_v2.session_id, [
+            ownSessionId,
+            secondSessionId,
+            otherSessionId,
+            orgSessionId,
+          ])
+        );
+      await db
+        .delete(organization_memberships)
+        .where(eq(organization_memberships.kilo_user_id, tokenUser.id));
+      await db.delete(organizations).where(eq(organizations.created_by_kilo_user_id, tokenUser.id));
+    });
+
+    it('requires sessionId for a session card and rejects it for every other kind', async () => {
+      const caller = await createCallerForUser(tokenUser.id);
+      await expect(
+        caller.user.registerActivityToken({
+          token: 'session-card-missing-id',
+          kind: 'ios_session_activity',
+          platform: 'ios',
+          organizationId: null,
+        })
+      ).rejects.toThrow();
+      await expect(
+        caller.user.registerActivityToken({
+          token: 'session-card-extra-id',
+          kind: 'ios_activity',
+          platform: 'ios',
+          organizationId: null,
+          sessionId: ownSessionId,
+        })
+      ).rejects.toThrow();
+      const rows = await db
+        .select()
+        .from(user_activity_tokens)
+        .where(eq(user_activity_tokens.user_id, tokenUser.id));
+      expect(rows).toHaveLength(0);
+    });
+
+    it('rejects a session the caller does not own in the given scope', async () => {
+      const caller = await createCallerForUser(tokenUser.id);
+      await expect(
+        caller.user.registerActivityToken({
+          token: 'session-card-foreign',
+          kind: 'ios_session_activity',
+          platform: 'ios',
+          organizationId: null,
+          sessionId: otherSessionId,
+        })
+      ).rejects.toThrow('Session not found');
+      // An organization session is not in the personal scope.
+      await expect(
+        caller.user.registerActivityToken({
+          token: 'session-card-wrong-scope',
+          kind: 'ios_session_activity',
+          platform: 'ios',
+          organizationId: null,
+          sessionId: orgSessionId,
+        })
+      ).rejects.toThrow('Session not found');
+      const rows = await db
+        .select()
+        .from(user_activity_tokens)
+        .where(eq(user_activity_tokens.user_id, tokenUser.id));
+      expect(rows).toHaveLength(0);
+      expect(mockRefreshGlanceableScope).not.toHaveBeenCalled();
+    });
+
+    it('keeps many live session cards beside the aggregate card and refreshes the scope', async () => {
+      const caller = await createCallerForUser(tokenUser.id);
+      await caller.user.registerActivityToken({
+        token: 'session-card-aggregate',
+        kind: 'ios_activity',
+        platform: 'ios',
+        organizationId: null,
+      });
+      mockRefreshGlanceableScope.mockClear();
+
+      await caller.user.registerActivityToken({
+        token: 'session-card-a',
+        kind: 'ios_session_activity',
+        platform: 'ios',
+        organizationId: null,
+        sessionId: ownSessionId,
+      });
+      await caller.user.registerActivityToken({
+        token: 'session-card-b',
+        kind: 'ios_session_activity',
+        platform: 'ios',
+        organizationId: null,
+        sessionId: secondSessionId,
+      });
+
+      const rows = await db
+        .select({
+          token: user_activity_tokens.token,
+          kind: user_activity_tokens.kind,
+          sessionId: user_activity_tokens.session_id,
+        })
+        .from(user_activity_tokens)
+        .where(
+          and(
+            eq(user_activity_tokens.user_id, tokenUser.id),
+            isNull(user_activity_tokens.superseded_at)
+          )
+        );
+      expect(rows.sort((a, b) => a.token.localeCompare(b.token))).toEqual([
+        { token: 'session-card-a', kind: 'ios_session_activity', sessionId: ownSessionId },
+        { token: 'session-card-aggregate', kind: 'ios_activity', sessionId: null },
+        { token: 'session-card-b', kind: 'ios_session_activity', sessionId: secondSessionId },
+      ]);
+      expect(mockRefreshGlanceableScope).toHaveBeenCalledTimes(2);
+      expect(mockRefreshGlanceableScope).toHaveBeenCalledWith({
+        userId: tokenUser.id,
+        organizationId: null,
+      });
+    });
+
+    it('refreshes the scope when a session card is unregistered', async () => {
+      const caller = await createCallerForUser(tokenUser.id);
+      await caller.user.registerActivityToken({
+        token: 'session-card-unfollow',
+        kind: 'ios_session_activity',
+        platform: 'ios',
+        organizationId: null,
+        sessionId: ownSessionId,
+      });
+      mockRefreshGlanceableScope.mockClear();
+
+      await caller.user.unregisterActivityToken({ token: 'session-card-unfollow' });
+
+      expect(mockRefreshGlanceableScope).toHaveBeenCalledWith({
+        userId: tokenUser.id,
+        organizationId: null,
+      });
+      const rows = await db
+        .select()
+        .from(user_activity_tokens)
+        .where(eq(user_activity_tokens.user_id, tokenUser.id));
+      expect(rows).toHaveLength(0);
+    });
   });
 });
 

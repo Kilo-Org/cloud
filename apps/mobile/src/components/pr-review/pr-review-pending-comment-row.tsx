@@ -7,7 +7,7 @@ import { useTranslation } from 'react-i18next';
 import { Trash2 } from '@/components/ui/icons';
 import { Pressable, TextInput, View } from 'react-native';
 
-import { announceForA11y, moveA11yFocus } from '@/lib/a11y/announce';
+import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
 import { useFormSheetKeyboardVisible } from '@/components/pr-review/pr-form-sheet-chrome';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
@@ -51,7 +51,7 @@ export function PrReviewPendingCommentRow({
         <Text className="font-mono-medium text-[11px] text-muted-foreground" numberOfLines={1}>
           {location}
         </Text>
-        <Text className="text-xs leading-4 text-foreground" numberOfLines={1}>
+        <Text className="text-xs leading-[1rem] text-foreground" numberOfLines={1}>
           {item.body.trim().length > 0 ? item.body : t('prReview.diff.emptyLine')}
         </Text>
         {stale ? (
@@ -95,7 +95,7 @@ export function focusAfterPendingCommentRemoval(
     return;
   }
   announceForA11y(i18n.t('prReview.pendingComment.deletedAnnouncement'));
-  moveA11yFocus(inputRef);
+  requestA11yFocus(inputRef);
 }
 
 /** Mono location label matching the composer range format (en dash). */
@@ -173,11 +173,11 @@ export function ReviewSummaryField({
       }}
       multiline
       textAlignVertical="top"
-      // Compact so half-detent and keyboard-open keep footer CTAs at y=0.
+      // Keep complete summary lines visible after padding, including with the keyboard open.
       className={cn(
-        'rounded-md border border-input bg-background px-3 py-2 text-sm leading-5 text-foreground',
+        'min-h-20 rounded-md border border-input bg-background pl-3 pr-3 pt-2 pb-2 text-sm leading-[1.25rem] text-foreground',
         'focus:border-ring',
-        keyboardVisible ? 'max-h-16 min-h-12' : 'min-h-14 max-h-32'
+        keyboardVisible ? 'max-h-20' : 'max-h-32'
       )}
     />
   );

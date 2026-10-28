@@ -1,7 +1,8 @@
+import { FlashList } from '@shopify/flash-list';
 import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
-import { FlatList, Pressable, View, type ViewStyle } from 'react-native';
+import { Pressable, View, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -12,11 +13,18 @@ import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { FolderOpen } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type DirectoryEntry, useListDirectories } from '@/lib/hooks/use-list-directories';
 import { folderPickerSlot, UNFENCED_ROUTE_KEY, useRouteRegistry } from '@/lib/route-registry';
 
 const SKELETON_ROW_COUNT = 5;
+
+// FlashList takes `style`/`contentContainerStyle` (never `className`), so the
+// list's `flex-1 bg-background` classes become the list style plus the themed
+// background. The picker sheet renders its own scroll container
+// (`scrollable={false}`), so the list fills the sheet's body.
+const listStyle = { flex: 1 } satisfies ViewStyle;
 
 /** One navigation step in the in-sheet drill/Back stack. */
 type NavFrame = { path: string; title: string };
@@ -82,14 +90,19 @@ export default function FolderPickerScreen() {
     [list]
   );
 
-  const goBack = useCallback(() => {
+  // One drill step shared by the in-sheet Back control and the hardware Back
+  // listener: pops the deepest frame and restores the cached parent listing.
+  // Returns whether a frame was popped (the sheet stays open).
+  const goBack = useCallback((): boolean => {
     const parent = stack.at(-2);
     setStack(prev => (prev.length > 1 ? prev.slice(0, -1) : prev));
     if (parent) {
       // Restores the cached parent in-sheet and advances the generation so
       // any in-flight child listing is ignored. Never `router.back`.
       list(parent.path);
+      return true;
     }
+    return false;
   }, [list, stack]);
 
   if (!bridge) {
@@ -129,6 +142,7 @@ export default function FolderPickerScreen() {
         description={t('agentChat.folderPicker.retryableDescription')}
         action={
           <Button
+            className={STATE_ACTION_CLASS}
             variant="outline"
             onPress={() => {
               list(currentState.path);
@@ -162,15 +176,17 @@ export default function FolderPickerScreen() {
     <PickerSheet
       title={title}
       onDone={handleDone}
-      onCancel={isNested ? goBack : undefined}
+      onCancel={isNested ? () => void goBack() : undefined}
       cancelLabel={isNested ? t('common.back') : undefined}
+      onHardwareBack={goBack}
       scrollable={false}
     >
       {currentState !== null && currentState.phase !== 'skeleton' && data.length === 0 ? (
         empty
       ) : (
-        <FlatList
-          className="flex-1 bg-background"
+        <FlashList
+          nestedScrollEnabled
+          style={[listStyle, { backgroundColor: colors.background }]}
           data={data}
           keyExtractor={entry => entry.path}
           contentContainerStyle={listContentStyle}

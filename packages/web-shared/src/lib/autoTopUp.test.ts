@@ -1,3 +1,4 @@
+import { client } from '@kilocode/web-shared/lib/stripe-client';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import {
   auto_top_up_configs,
@@ -19,7 +20,7 @@ import {
 import { sendAutoTopUpFailedEmail } from '@kilocode/web-shared/lib/email';
 import {
   AUTO_TOP_UP_THRESHOLD_DOLLARS,
-  ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS,
+  DEFAULT_ORG_AUTO_TOP_UP_THRESHOLD_CENTS,
 } from '@kilocode/web-shared/lib/autoTopUpConstants';
 import type { UserForBalance } from '@kilocode/web-shared/lib/user/balance-types';
 import {
@@ -36,9 +37,11 @@ import {
 } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import crypto from 'node:crypto';
 import Stripe from 'stripe';
+import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
 
 // Convert dollars to microdollars
 const toMicrodollars = (dollars: number) => dollars * 1_000_000;
+const ORG_AUTO_TOP_UP_THRESHOLD_DOLLARS = DEFAULT_ORG_AUTO_TOP_UP_THRESHOLD_CENTS / 100;
 
 // Mock email sending to avoid CustomerIO errors in tests
 jest.mock('@kilocode/web-shared/lib/email', () => ({
@@ -535,6 +538,68 @@ describe('autoTopUp', () => {
       });
       expect(updatedOrg?.auto_top_up_enabled).toBe(true);
     });
+
+    it('triggers auto-top-up below a configured threshold above the default', async () => {
+      const balance = toMicrodollars(200);
+      await db.insert(auto_top_up_configs).values({
+        owned_by_organization_id: testOrg.id,
+        stripe_payment_method_id: 'pm_test_org_123',
+        amount_cents: 100000,
+        threshold_cents: 50000,
+      });
+      await db
+        .update(organizations)
+        .set({
+          auto_top_up_enabled: true,
+          stripe_customer_id: null,
+          total_microdollars_acquired: balance,
+          microdollars_used: 0,
+        })
+        .where(eq(organizations.id, testOrg.id));
+
+      await maybePerformOrganizationAutoTopUp({
+        id: testOrg.id,
+        auto_top_up_enabled: true,
+        total_microdollars_acquired: balance,
+        microdollars_used: 0,
+      });
+
+      const config = await db.query.auto_top_up_configs.findFirst({
+        where: eq(auto_top_up_configs.owned_by_organization_id, testOrg.id),
+      });
+      expect(config?.disabled_reason).toBe('no_stripe_customer');
+    });
+
+    it('does not trigger auto-top-up above a configured threshold', async () => {
+      const balance = toMicrodollars(99);
+      await db.insert(auto_top_up_configs).values({
+        owned_by_organization_id: testOrg.id,
+        stripe_payment_method_id: 'pm_test_org_123',
+        amount_cents: 100000,
+        threshold_cents: 5000,
+      });
+      await db
+        .update(organizations)
+        .set({ auto_top_up_enabled: true })
+        .where(eq(organizations.id, testOrg.id));
+
+      await maybePerformOrganizationAutoTopUp({
+        id: testOrg.id,
+        auto_top_up_enabled: true,
+        total_microdollars_acquired: balance,
+        microdollars_used: 0,
+      });
+
+      const config = await db.query.auto_top_up_configs.findFirst({
+        where: eq(auto_top_up_configs.owned_by_organization_id, testOrg.id),
+      });
+      expect(config?.attempt_started_at).toBeNull();
+      expect(config?.disabled_reason).toBeNull();
+      const updatedOrg = await db.query.organizations.findFirst({
+        where: eq(organizations.id, testOrg.id),
+      });
+      expect(updatedOrg?.auto_top_up_enabled).toBe(true);
+    });
   });
 });
 
@@ -715,6 +780,7 @@ describe('invoice metadata includes traceId', () => {
         metadata: expect.objectContaining({
           traceId: expect.stringMatching(uuidPattern),
           type: 'auto-topup',
+          paid_credit_policy: getPaidCreditTerms('stripe', new Date()),
           serviceFeePrincipalMinor: '5000',
           serviceFeeFlow: 'personal_auto_top_up',
         }),
@@ -725,6 +791,7 @@ describe('invoice metadata includes traceId', () => {
       expect.objectContaining({
         metadata: expect.objectContaining({
           serviceFeePrincipalMinor: '5000',
+          paid_credit_policy: getPaidCreditTerms('stripe', new Date()),
           serviceFeeAssessmentKey: expect.stringMatching(/^invoice:inv_trace_test$/),
         }),
       })
@@ -747,6 +814,7 @@ describe('invoice metadata includes traceId', () => {
         userId: user.id,
         amountCents: 5000,
         accountCreatedAt: new Date(user.created_at).toISOString(),
+        accountUsedMicrodollars: toMicrodollars(10),
       })
     );
   });
@@ -804,6 +872,112 @@ describe('invoice metadata includes traceId', () => {
   });
 });
 
+describe('auto top-up card errors with empty decline codes', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+    jest.clearAllMocks();
+  });
+
+  test.each([
+    ['user', '', 'unknown_error'],
+    ['user', 'authentication_required', 'authentication_required'],
+    ['organization', '', 'unknown_error'],
+    ['organization', 'authentication_required', 'authentication_required'],
+  ] as const)(
+    '%s auto top-up with empty decline_code and code "%s" disables with %s without crediting',
+    async (entityType, code, expectedReason) => {
+      const user = await insertTestUser({
+        auto_top_up_enabled: true,
+        stripe_customer_id: `cus_empty_decline_${crypto.randomUUID()}`,
+        total_microdollars_acquired: 0,
+        microdollars_used: toMicrodollars(10),
+      });
+      const org =
+        entityType === 'organization'
+          ? await createOrganization('Empty decline code test', user.id)
+          : undefined;
+
+      if (org) {
+        await db
+          .update(organizations)
+          .set({
+            auto_top_up_enabled: true,
+            stripe_customer_id: `cus_empty_decline_org_${crypto.randomUUID()}`,
+            total_microdollars_acquired: 0,
+            microdollars_used: toMicrodollars(10),
+          })
+          .where(eq(organizations.id, org.id));
+      }
+
+      await db.insert(auto_top_up_configs).values({
+        owned_by_user_id: org ? null : user.id,
+        owned_by_organization_id: org?.id ?? null,
+        created_by_user_id: user.id,
+        stripe_payment_method_id: 'pm_empty_decline_test',
+        amount_cents: 2000,
+        disabled_reason: null,
+      });
+
+      const invoiceId = `inv_empty_decline_${crypto.randomUUID()}`;
+      (client.invoices.create as jest.Mock).mockResolvedValue({
+        id: invoiceId,
+        created: 1_700_000_000,
+      });
+      (client.invoices.update as jest.Mock).mockResolvedValue({
+        id: invoiceId,
+        created: 1_700_000_000,
+      });
+      (client.invoiceItems.create as jest.Mock).mockResolvedValue({
+        id: `ii_empty_decline_${crypto.randomUUID()}`,
+      });
+      (client.invoices.pay as jest.Mock).mockRejectedValue(
+        new Stripe.errors.StripeCardError({
+          type: 'card_error',
+          message: 'This payment requires authentication.',
+          decline_code: '',
+          code,
+        })
+      );
+
+      if (org) {
+        await maybePerformOrganizationAutoTopUp({
+          id: org.id,
+          auto_top_up_enabled: true,
+          total_microdollars_acquired: 0,
+          microdollars_used: toMicrodollars(10),
+        });
+      } else {
+        await maybePerformAutoTopUp(toUserForBalance(user));
+      }
+
+      expect(client.invoices.pay).toHaveBeenCalledTimes(1);
+      expect(client.invoices.pay).toHaveBeenCalledWith(invoiceId, {
+        payment_method: 'pm_empty_decline_test',
+        off_session: true,
+      });
+      const config = await db.query.auto_top_up_configs.findFirst({
+        where: org
+          ? eq(auto_top_up_configs.owned_by_organization_id, org.id)
+          : eq(auto_top_up_configs.owned_by_user_id, user.id),
+      });
+      expect(config?.disabled_reason).toBe(expectedReason);
+      expect(config?.attempt_started_at).toBeNull();
+      const account = org
+        ? await db.query.organizations.findFirst({ where: eq(organizations.id, org.id) })
+        : await db.query.kilocode_users.findFirst({ where: eq(kilocode_users.id, user.id) });
+      expect(account).toMatchObject({
+        auto_top_up_enabled: false,
+        total_microdollars_acquired: 0,
+        microdollars_used: toMicrodollars(10),
+      });
+      expect(await db.select().from(credit_transactions)).toHaveLength(0);
+      const events = await db.select().from(bouncer_credit_event_outbox);
+      expect(events).toHaveLength(1);
+      expect(events[0].event_type).toBe('charge.attempted');
+    }
+  );
+});
+
 describe('auto top-up failed email recipients for organizations', () => {
   beforeEach(async () => {
     await cleanupDbForTest();
@@ -842,4 +1016,53 @@ describe('auto top-up failed email recipients for organizations', () => {
     expect(recipients).toEqual([owner.google_user_email, billingManager.google_user_email].sort());
     expect(recipients).not.toContain(member.google_user_email);
   });
+});
+
+describe('deferred funding opt-out', () => {
+  beforeEach(async () => {
+    await cleanupDbForTest();
+    jest.clearAllMocks();
+  });
+
+  test.each(['user', 'organization'] as const)(
+    'honors a fresh %s opt-out after an opted-in usage snapshot',
+    async type => {
+      const user = await insertTestUser({
+        auto_top_up_enabled: false,
+        stripe_customer_id: 'cus_opt_out',
+        total_microdollars_acquired: 0,
+        microdollars_used: 0,
+      });
+      const organization =
+        type === 'organization'
+          ? await createOrganization('Opted out funding', user.id)
+          : undefined;
+      const [config] = await db
+        .insert(auto_top_up_configs)
+        .values({
+          ...(organization
+            ? { owned_by_organization_id: organization.id }
+            : { owned_by_user_id: user.id }),
+          stripe_payment_method_id: 'pm_opt_out',
+          amount_cents: 5000,
+        })
+        .returning();
+
+      if (organization) {
+        await maybePerformOrganizationAutoTopUp({
+          ...organization,
+          auto_top_up_enabled: true,
+        });
+      } else {
+        await maybePerformAutoTopUp({ ...user, auto_top_up_enabled: true });
+      }
+
+      expect(client.invoices.create).not.toHaveBeenCalled();
+      const savedConfig = await db.query.auto_top_up_configs.findFirst({
+        where: eq(auto_top_up_configs.id, config.id),
+      });
+      expect(savedConfig?.attempt_started_at).toBeNull();
+      expect(sendAutoTopUpFailedEmail).not.toHaveBeenCalled();
+    }
+  );
 });

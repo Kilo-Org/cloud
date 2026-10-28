@@ -80,7 +80,7 @@ describe('shared branded splash', () => {
           { name: 'Kilo', slug: 'kilo-app', _internal: { projectRoot } },
           {
             image: path.join(projectRoot, 'assets/images/logo-mark.png'),
-            backgroundColor: '#FAF74F',
+            backgroundColor: '#FFDD00',
             imageWidth: 100,
           }
         ),
@@ -95,7 +95,7 @@ describe('shared branded splash', () => {
     const styles = readFileSync(path.join(values, 'styles.xml'), 'utf8');
     expect(styles).toContain('@drawable/splashscreen_window_background');
     expect(styles).toContain('@style/Theme.App.Launch');
-    expect(readFileSync(path.join(values, 'colors.xml'), 'utf8')).toContain('#FAF74F');
+    expect(readFileSync(path.join(values, 'colors.xml'), 'utf8')).toContain('#FFDD00');
     expect(existsSync(path.join(values, '../drawable-mdpi/splashscreen_logo.png'))).toBe(true);
 
     await compile();
@@ -111,7 +111,7 @@ describe('shared branded splash', () => {
     const stylesBefore = readFileSync(path.join(values, 'styles.xml'), 'utf8');
     const config = withBrandedSplash(
       { name: 'Kilo', slug: 'kilo-app', _internal: { projectRoot } },
-      { image: './assets/images/logo-mark.png', backgroundColor: '#FAF74F', imageWidth: 100 }
+      { image: './assets/images/logo-mark.png', backgroundColor: '#FFDD00', imageWidth: 100 }
     );
 
     const evaluated = await compileModsAsync(config, {
@@ -145,7 +145,7 @@ describe('shared branded splash', () => {
       { name: 'Kilo', slug: 'kilo-app', _internal: { projectRoot } },
       {
         image: path.join(projectRoot, 'assets/images/logo-mark.png'),
-        backgroundColor: '#FAF74F',
+        backgroundColor: '#FFDD00',
         imageWidth: 100,
       }
     );
@@ -173,9 +173,9 @@ describe('shared branded splash', () => {
                 color: [
                   {
                     $: {
-                      red: (250 / 255).toPrecision(15),
-                      green: (247 / 255).toPrecision(15),
-                      blue: (79 / 255).toPrecision(15),
+                      red: (255 / 255).toPrecision(15),
+                      green: (221 / 255).toPrecision(15),
+                      blue: (0 / 255).toPrecision(15),
                     },
                   },
                 ],
@@ -198,13 +198,13 @@ describe('shared branded splash', () => {
     // entries to the array. The plugin's contract is that its own color is
     // present, not that it is the only one: assert the splash color this plugin
     // owns by containment, not by pinning the whole array or its exact length,
-    // and keep the exact `#FAF74F` value, the same way the styles assertion
+    // and keep the exact `#FFDD00` value, the same way the styles assertion
     // below pins its theme, so this case speaks only for the entry this plugin
     // writes.
     expect(evaluated._internal?.modResults?.android?.colors).toMatchObject({
       resources: {
         color: expect.arrayContaining([
-          expect.objectContaining({ $: { name: 'splashscreen_background' }, _: '#FAF74F' }),
+          expect.objectContaining({ $: { name: 'splashscreen_background' }, _: '#FFDD00' }),
         ]),
       },
     });

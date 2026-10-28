@@ -3,10 +3,16 @@ import type { ControlDiagnosticFields } from '../../../src/shared/control-diagno
 import type { ControlPlaneConnection } from './connection.js';
 import {
   controlPlaneExitPolicy,
+  createControlPlaneFrameDispatcher,
   createControlPlaneLifecycle,
   type ControlPlaneLifecycle,
   type ControlPlaneProcess,
 } from './main.js';
+import type { PreparationManager } from './prepare.js';
+import type {
+  ControlPlaneRouteSpec,
+  ControlPlaneWrapperFrame,
+} from '../../../src/shared/control-plane-protocol.js';
 import {
   createNativeStatusReporter,
   type NativeStatusScheduler,
@@ -135,11 +141,60 @@ function createLifecycle(
 }
 
 describe('controlPlaneExitPolicy', () => {
-  it('exits 0 on shutdown and SIGTERM, 1 on an uncaught exception, and never on a rejection', () => {
+  it('exits 0 on shutdown, 1 on SIGTERM/uncaught exception, and never on a rejection', () => {
     expect(controlPlaneExitPolicy('shutdown')).toBe(0);
-    expect(controlPlaneExitPolicy('sigterm')).toBe(0);
+    expect(controlPlaneExitPolicy('sigterm')).toBe(1);
     expect(controlPlaneExitPolicy('uncaught_exception')).toBe(1);
     expect(controlPlaneExitPolicy('unhandled_rejection')).toBeNull();
+  });
+});
+
+describe('workspace session attachment', () => {
+  function createDispatcher() {
+    const prepared: ControlPlaneRouteSpec[] = [];
+    const frames: ControlPlaneWrapperFrame[] = [];
+    const retained = { setupCommands: ['pnpm install'], env: { WORKSPACE_FLAG: 'retained' } };
+    const preparation: PreparationManager = {
+      workspaceConfiguration: () => retained,
+      prepare: async spec => {
+        prepared.push(spec);
+      },
+      release: () => undefined,
+      isPrepared: () => false,
+      preparedRoute: () => null,
+      isPreparing: () => false,
+      preparingCount: () => 0,
+      sessionCount: () => 0,
+      installCredentials: async () => undefined,
+    };
+    const dispatch = createControlPlaneFrameDispatcher({
+      preparation: { current: preparation },
+      turns: {},
+      terminals: {},
+      worktreeChanges: {},
+      worktreeDeletion: {},
+      kiloRequests: {},
+      send: frame => frames.push(frame),
+      log: () => undefined,
+    });
+    const spec = {
+      sessionId: 'workspace_first',
+      kiloSessionId: 'ses_first',
+      directory: '/workspace/app',
+      attemptId: 'attempt_first',
+    };
+    return { dispatch, prepared, frames, spec, retained };
+  }
+
+  it('prepares the route with the configuration the preparation manager selects', () => {
+    const h = createDispatcher();
+    h.dispatch({
+      type: 'session.attach',
+      spec: h.spec,
+      workspace: { setupCommands: ['echo offered'] },
+    });
+    expect(h.prepared).toEqual([{ ...h.spec, ...h.retained }]);
+    expect(h.frames).toEqual([]);
   });
 });
 
@@ -152,12 +207,13 @@ describe('createControlPlaneLifecycle', () => {
     expect(connectionState.recycled()).toBe(1);
   });
 
-  it('exits 0 on SIGTERM after flushing diagnostics and logs', async () => {
+  it('exits 1 on SIGTERM so the supervisor restarts, after flushing diagnostics and logs', async () => {
     const state = createLifecycle();
     state.process.emit('SIGTERM');
     await Bun.sleep(0);
-    expect(state.exits).toEqual([0]);
+    expect(state.exits).toEqual([1]);
     expect(state.phases).toContain('stopping');
+    expect(state.phases).not.toContain('failed');
     expect(state.finalizes()).toEqual({ diagnostics: 1, fileLogs: 1 });
     expect(state.connectionState.closed()).toBe(1);
   });

@@ -1,8 +1,14 @@
 import * as z from 'zod';
-import { BenchmarkProfileEntryStatusSchema } from './benchmark';
 import { NormalizedClassifierInputSchema } from './input';
+import { OwnerTypeSchema } from './owner';
 import { ReasoningEffortSchema } from './reasoning';
-import { EfficientModelPoolSchema, PoolEntrySchema, poolEntryKey } from './routing-table';
+import {
+  CustomRouterClientEntryIdSchema,
+  CustomRouterEntryRefSchema,
+  CustomRouterReferenceSchema,
+  customRouterCandidateModel,
+} from './custom-router';
+import { AutoRouterSchema, AutoRoutingModeSchema } from './router';
 import {
   ClassifierSubtaskTypeSchema,
   ClassifierTaskTypeSchema,
@@ -16,9 +22,17 @@ export {
   type NormalizedClassifierInput,
 } from './input';
 
-export const AutoRoutingModeSchema = z.enum(['cost_per_accuracy', 'best_accuracy']);
-export type AutoRoutingMode = z.infer<typeof AutoRoutingModeSchema>;
-export const DEFAULT_AUTO_ROUTING_MODE: AutoRoutingMode = 'cost_per_accuracy';
+export {
+  AUTO_ROUTERS,
+  AutoRouterSchema,
+  AutoRoutingModeSchema,
+  DEFAULT_AUTO_ROUTER,
+  DEFAULT_AUTO_ROUTING_MODE,
+  type AutoRouter,
+  type AutoRoutingMode,
+} from './router';
+
+export { OwnerTypeSchema, type OwnerType } from './owner';
 
 // Capability-aware routing hints attached to the mirrored request payload.
 // Absent `constraints` (or absent fields within it) means "no extra
@@ -43,6 +57,7 @@ export function isVirtualAutoModelId(model: string): boolean {
 // leaves it, and skips the mirror entirely when normalization fails.
 export const MirrorPayloadSchema = z.object({
   input: NormalizedClassifierInputSchema,
+  router: AutoRouterSchema.optional(),
   routingPolicy: z
     .object({
       deniedModelIds: z.array(z.string().trim().min(1)),
@@ -68,6 +83,10 @@ export const MirrorPayloadSchema = z.object({
   // supply them. The schema is non-strict (plain z.object above) so an old
   // worker can safely ignore unknown keys added by a newer gateway.
   constraints: RoutingConstraintsSchema.optional(),
+  // Custom router reference (ADR 0005). Optional so an old worker or gateway still parses.
+  customRouter: CustomRouterReferenceSchema.optional(),
+  // Client entries the caller can serve; present only on the public CLI decide path.
+  clientEntries: z.array(CustomRouterClientEntryIdSchema).optional(),
 });
 export type MirrorPayload = z.infer<typeof MirrorPayloadSchema>;
 
@@ -107,13 +126,14 @@ export type ClassifierOutput = z.infer<typeof ClassifierOutputSchema>;
  * legacy variant key. New writers emit `variant` only; old writers emitted
  * `reasoningEffort` only. Both non-null is malformed.
  */
-const BenchmarkAutoRoutingDecisionSchema = z
+export const AutoRoutingDecisionSchema = z
   .object({
     model: z.string(),
-    taskType: ClassifierTaskTypeSchema,
-    subtaskType: ClassifierSubtaskTypeSchema,
+    // Null only on a custom router fallback decision made without a classification (ADR 0005).
+    taskType: ClassifierTaskTypeSchema.nullable(),
+    subtaskType: ClassifierSubtaskTypeSchema.nullable(),
     source: z.literal('benchmark'),
-    tableVersion: z.string(),
+    tableVersion: z.string().nullable(),
     // Canonical catalog variant key the chosen model was benchmarked with.
     variant: z.string().trim().min(1).nullable().optional(),
     // Legacy effort the chosen model was benchmarked with; retained for
@@ -130,6 +150,11 @@ const BenchmarkAutoRoutingDecisionSchema = z
     // capability filters. Null when there was no incumbent or it was kept.
     // Optional so responses from a not-yet-redeployed worker still parse.
     switchReason: z.enum(['threshold', 'cost', 'capability']).nullable().optional(),
+    // Custom router fields (ADR 0005). Optional so decisions from or to a not-yet-redeployed
+    // worker or gateway still parse.
+    entry: CustomRouterEntryRefSchema.optional(),
+    stale: z.boolean().optional(),
+    fallback: z.boolean().optional(),
   })
   .superRefine((decision, ctx) => {
     if (decision.variant != null && decision.reasoningEffort != null) {
@@ -139,22 +164,23 @@ const BenchmarkAutoRoutingDecisionSchema = z
         message: 'Decision must not set both variant and reasoningEffort; emit variant only',
       });
     }
+    if (decision.entry && decision.model !== customRouterCandidateModel(decision.entry)) {
+      ctx.addIssue({ code: 'custom', path: ['model'], message: 'model must match entry' });
+    }
+    if (
+      decision.fallback !== true &&
+      (decision.taskType === null ||
+        decision.subtaskType === null ||
+        decision.tableVersion === null)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['taskType'],
+        message: 'Only a fallback decision may omit taskType, subtaskType, and tableVersion',
+      });
+    }
   });
 
-const CodingPlanDefaultDecisionSchema = z.object({
-  model: z.string(),
-  taskType: z.null(),
-  subtaskType: z.null(),
-  source: z.literal('coding_plan_default'),
-  tableVersion: z.string(),
-  reasoningEffort: ReasoningEffortSchema.nullable().optional(),
-  sticky: z.boolean().default(false),
-});
-
-export const AutoRoutingDecisionSchema = z.discriminatedUnion('source', [
-  BenchmarkAutoRoutingDecisionSchema,
-  CodingPlanDefaultDecisionSchema,
-]);
 export type AutoRoutingDecision = z.infer<typeof AutoRoutingDecisionSchema>;
 
 export const AutoRoutingDecisionResponseSchema = z.object({
@@ -188,11 +214,8 @@ export type AutoRoutingClassifierModelResponse = z.infer<
   typeof AutoRoutingClassifierModelResponseSchema
 >;
 
-export const AutoRoutingModeOwnerTypeSchema = z.enum(['user', 'org']);
-export type AutoRoutingModeOwnerType = z.infer<typeof AutoRoutingModeOwnerTypeSchema>;
-
 export const AutoRoutingModeOwnerQuerySchema = z.object({
-  ownerType: AutoRoutingModeOwnerTypeSchema,
+  ownerType: OwnerTypeSchema,
   ownerId: z.string().trim().min(1),
 });
 export type AutoRoutingModeOwnerQuery = z.infer<typeof AutoRoutingModeOwnerQuerySchema>;
@@ -209,50 +232,6 @@ export const AutoRoutingModeResponseSchema = AutoRoutingModeOwnerQuerySchema.ext
 });
 export type AutoRoutingModeResponse = z.infer<typeof AutoRoutingModeResponseSchema>;
 
-// Combined mode + Efficient model pool settings. Null on each field means
-// inherit independently (mode and pool do not imply each other).
-export const UpdateAutoRoutingSettingsRequestSchema = AutoRoutingModeOwnerQuerySchema.extend({
-  mode: AutoRoutingModeSchema.nullable(),
-  pool: EfficientModelPoolSchema.nullable(),
-  // Subset of `pool` the owner explicitly retries after a terminal failure.
-  // Forwarded to benchmark profile registration when present.
-  retryEntries: z.array(PoolEntrySchema).optional(),
-}).superRefine((request, ctx) => {
-  if (!request.retryEntries || request.retryEntries.length === 0) return;
-  if (request.pool === null) {
-    ctx.addIssue({
-      code: 'custom',
-      path: ['retryEntries'],
-      message: 'retryEntries require a non-null pool',
-    });
-    return;
-  }
-  const entryKeys = new Set(request.pool.map(poolEntryKey));
-  request.retryEntries.forEach((entry, index) => {
-    const key = poolEntryKey(entry);
-    if (!entryKeys.has(key)) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['retryEntries', index],
-        message: `retryEntry must appear in pool: ${key}`,
-      });
-    }
-  });
-});
-export type UpdateAutoRoutingSettingsRequest = z.infer<
-  typeof UpdateAutoRoutingSettingsRequestSchema
->;
-
-export const AutoRoutingSettingsResponseSchema = AutoRoutingModeOwnerQuerySchema.extend({
-  mode: AutoRoutingModeSchema,
-  configuredMode: AutoRoutingModeSchema.nullable(),
-  defaultMode: AutoRoutingModeSchema,
-  configuredPool: EfficientModelPoolSchema.nullable(),
-  // Empty when configuredPool is null.
-  poolStatuses: z.array(BenchmarkProfileEntryStatusSchema),
-});
-export type AutoRoutingSettingsResponse = z.infer<typeof AutoRoutingSettingsResponseSchema>;
-
 export const AutoRoutingAnalyticsPeriodSchema = z.enum(['1h', '24h', '7d', '30d']);
 export type AutoRoutingAnalyticsPeriod = z.infer<typeof AutoRoutingAnalyticsPeriodSchema>;
 
@@ -262,7 +241,6 @@ export const AutoRoutingClassifierAnalyticsResponseSchema = z.object({
     totalRequests: z.number(),
     classifiedRequests: z.number(),
     cachedRequests: z.number(),
-    fallbackRequests: z.number(),
     classifierErrors: z.number(),
     invalidRequests: z.number(),
     totalCostCredits: z.number(),
@@ -298,6 +276,9 @@ export {
 } from './normalize';
 
 export * from './reasoning';
+export * from './reasoning-variants';
 export * from './taxonomy';
 export * from './routing-table';
+export * from './policy-settings';
 export * from './benchmark';
+export * from './custom-router';

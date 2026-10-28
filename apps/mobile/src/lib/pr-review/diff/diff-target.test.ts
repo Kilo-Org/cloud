@@ -15,8 +15,4 @@ describe('hitSlopForRow', () => {
     expect(hitSlop).not.toHaveProperty('top');
     expect(hitSlop).not.toHaveProperty('bottom');
   });
-
-  it('is deterministic (pure: depends only on constants)', () => {
-    expect(hitSlopForRow()).toEqual(hitSlopForRow());
-  });
 });

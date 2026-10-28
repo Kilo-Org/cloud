@@ -2,6 +2,7 @@ import { createTRPCRouter, baseProcedure } from '@kilocode/web-shared/lib/trpc/i
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import {
+  getGitHubConnectionStatusForOwner,
   getIntegrationForOwner,
   updateIntegrationMetadataForOwner,
 } from '@/lib/integrations/db/platform-integrations';
@@ -19,7 +20,10 @@ import {
   syncWebhooksForRepositories,
   type ConfiguredWebhook,
 } from '@/lib/integrations/platforms/gitlab/webhook-sync';
-import { getValidGitLabToken } from '@/lib/integrations/gitlab-service';
+import {
+  getValidGitLabToken,
+  isGitLabCredentialConnected,
+} from '@/lib/integrations/gitlab-service';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import {
   clearCodeReviewActionRequiredState,
@@ -168,24 +172,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
    */
   getGitHubStatus: baseProcedure.query(async ({ ctx }) => {
     const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
-    const integration = await getIntegrationForOwner(owner, 'github');
-
-    if (!integration || integration.integration_status !== 'active') {
-      return {
-        connected: false,
-        integration: null,
-      };
-    }
-
-    return {
-      connected: true,
-      integration: {
-        accountLogin: integration.platform_account_login,
-        repositorySelection: integration.repository_access,
-        installedAt: integration.installed_at,
-        isValid: !integration.suspended_at,
-      },
-    };
+    return await getGitHubConnectionStatusForOwner(owner);
   }),
 
   /**
@@ -204,9 +191,39 @@ export const personalReviewAgentRouter = createTRPCRouter({
     const owner = { type: 'user' as const, id: ctx.user.id, userId: ctx.user.id };
     const integration = await getIntegrationForOwner(owner, PLATFORM.GITLAB);
 
-    if (!integration || integration.integration_status !== 'active') {
+    // An existing row that cannot serve a review is a different state from
+    // "never connected": the account already authorized this integration, so
+    // the connect gate must explain that the connection has to be
+    // re-authorized instead of asking for a first-time connect that the user
+    // already completed.
+    if (!integration) {
       return {
         connected: false,
+        reconnectRequired: false,
+        integration: null,
+      };
+    }
+
+    if (integration.integration_status !== 'active') {
+      return {
+        connected: false,
+        reconnectRequired: true,
+        integration: null,
+      };
+    }
+
+    // The row being active says nothing about the stored credential. Ask the
+    // token service to resolve it, exactly as a review read would, so an
+    // expired or revoked credential reports as not connected instead of
+    // sending the settings surface into review-only content.
+    if (
+      !(await isGitLabCredentialConnected(integration, {
+        userId: ctx.user.id,
+      }))
+    ) {
+      return {
+        connected: false,
+        reconnectRequired: true,
         integration: null,
       };
     }
@@ -220,6 +237,7 @@ export const personalReviewAgentRouter = createTRPCRouter({
 
     return {
       connected: true,
+      reconnectRequired: false,
       integration: {
         accountLogin: integration.platform_account_login,
         repositorySelection: integration.repository_access,
@@ -474,8 +492,8 @@ export const personalReviewAgentRouter = createTRPCRouter({
    * and `review_analytics_enabled` on the row even when the patch supplies
    * neither, matching the full-save contract.
    *
-   * Throws `NOT_FOUND` if no stored config exists — a PATCH cannot
-   * bootstrap a row (use `saveReviewConfig` for that).
+   * With no stored config, the patch applies to the defaults that
+   * `getReviewConfig` returns and creates the row (disabled).
    */
   patchReviewConfig: baseProcedure
     .input(PatchReviewConfigInputSchema)
@@ -495,17 +513,10 @@ export const personalReviewAgentRouter = createTRPCRouter({
         }
 
         const previousConfig = await getAgentConfigForOwner(owner, 'code_review', platform);
-        if (!previousConfig) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message:
-              'No existing review agent configuration to patch. Save one with saveReviewConfig first.',
-          });
-        }
-        const previousRepoIds =
-          ((previousConfig.config as CodeReviewAgentConfig | undefined)?.selected_repository_ids as
-            | Array<number | string>
-            | undefined) || [];
+        const prevCfg: Partial<CodeReviewAgentConfig> = previousConfig
+          ? (previousConfig.config as CodeReviewAgentConfig)
+          : {};
+        const previousRepoIds = prevCfg.selected_repository_ids ?? [];
 
         // Delta repository selection: `selectedRepositoryDelta` computes
         // next = (stored ∪ add) \ remove, with remove winning on overlap.
@@ -523,7 +534,6 @@ export const personalReviewAgentRouter = createTRPCRouter({
         // the merge helper. Mirrors the field mapping used in
         // `getReviewConfig` so a round-trip PATCH is a no-op on the read
         // shape.
-        const prevCfg = previousConfig.config as CodeReviewAgentConfig;
         const stored: CodeReviewStoredConfig = {
           reviewStyle: prevCfg.review_style || 'balanced',
           focusAreas: prevCfg.focus_areas || [],

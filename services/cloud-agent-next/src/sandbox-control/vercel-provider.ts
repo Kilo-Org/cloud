@@ -11,10 +11,11 @@ import {
 import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-runtime-config.js';
 import { DEADLINE_MS } from './deadlines.js';
 import { logControlDiagnostic } from './diagnostics.js';
+import { buildControlNetworkPolicy, type SessionCredentialGrant } from './session-credentials.js';
 import type { ObserveResult } from './provider.js';
 import type { ProviderAdapter, ProviderCreateIntent } from './provider.js';
 import { ProviderCreationError } from './provider.js';
-import { CONTROL_SUPERVISOR_PATH, CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
+import { CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
 
 const LOG_MAX_BYTES = 1024 * 1024;
 
@@ -30,6 +31,14 @@ const providerRefSchema = z
   .object({
     sandboxName: z.string().min(1),
     sessionId: z.string().min(1),
+    metadata: z
+      .object({
+        region: z.string().min(1).max(128),
+        sourceSnapshotId: z.string().min(1).max(128).optional(),
+        instanceType: z.enum(['small', 'large']).optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict();
 
@@ -64,15 +73,29 @@ export function encodeVercelProviderRef(ref: VercelProviderRef): string {
   return JSON.stringify(ref);
 }
 
-/**
- * Lifetime evidence the adapter writes to the current billing generation's
- * binding. The adapter does not know the generation; the sink resolves it.
- */
-export type VercelBillingLifetimeSink = (evidence: {
-  providerRef: string;
-  createdAtMs?: number;
-  terminalAtMs?: number;
-}) => Promise<void>;
+function encodeVercelSessionProviderRef(
+  runtime: VercelProviderRef,
+  session: VercelSandboxSession
+): string {
+  const instanceType =
+    session.vcpus === 2 && session.memory === 4096
+      ? 'small'
+      : session.vcpus === 4 && session.memory === 8192
+        ? 'large'
+        : undefined;
+  const metadata = providerRefSchema.shape.metadata.safeParse({
+    region: session.region,
+    ...(instanceType === undefined ? {} : { instanceType }),
+    ...(session.sourceSnapshotId === undefined
+      ? {}
+      : { sourceSnapshotId: session.sourceSnapshotId }),
+  });
+  return encodeVercelProviderRef({
+    sandboxName: runtime.sandboxName,
+    sessionId: runtime.sessionId,
+    ...(metadata.success ? { metadata: metadata.data } : {}),
+  });
+}
 
 export function decodeVercelProviderRef(raw: string | null): VercelProviderRef | null {
   if (raw === null) return null;
@@ -99,7 +122,14 @@ export function createVercelProviderAdapter(deps: {
   config?: VercelSandboxRuntimeConfig;
   restClient?: VercelControlRestClient;
   now?: () => number;
-  billingLifetimeSink?: VercelBillingLifetimeSink;
+  /**
+   * Authoritative contained grants for this sandbox, read at create and on
+   * every credential refresh. Required: a Vercel sandbox must never open
+   * without a network policy derived from current grants, and a reader failure
+   * must prevent the REST create.
+   */
+  readContainedGrants: () => Promise<readonly SessionCredentialGrant[]>;
+  readAcceptedRuntimeProxyHandles?: () => Promise<ReadonlyMap<string, readonly string[]>>;
 }): ProviderAdapter {
   const config = deps.config;
   if (!config) {
@@ -107,9 +137,6 @@ export function createVercelProviderAdapter(deps: {
       throw new ProviderCreationError('invalid_configuration');
     };
     return {
-      resumable: false,
-      persistentWorkspace: true,
-      destroysOnStop: false,
       ensureBillingAdmission: unavailable,
       create: unavailable,
       launch: unavailable,
@@ -117,7 +144,7 @@ export function createVercelProviderAdapter(deps: {
       stop: async () => 'retryable',
       ensureLeaseAtLeast: unavailable,
       logs: async () => 'Vercel sandbox runtime configuration is unavailable',
-      updateNetworkPolicy: unavailable,
+      applyContainedCredentials: unavailable,
     };
   }
   const restClient =
@@ -125,6 +152,7 @@ export function createVercelProviderAdapter(deps: {
     new VercelSandboxRestClient({
       accessToken: config.accessToken,
       teamId: config.teamId,
+      scope: config.scope,
       projectId: config.projectId,
       fetch,
     });
@@ -144,35 +172,43 @@ export function createVercelProviderAdapter(deps: {
       );
     }
   };
-  const recordBillingLifetime = async (
-    providerRef: string,
-    session: VercelSandboxSession
-  ): Promise<void> => {
-    if (!deps.billingLifetimeSink) return;
-    const terminalAtMs = session.stoppedAt ?? session.abortedAt;
-    await deps.billingLifetimeSink({
-      providerRef,
-      createdAtMs: session.createdAt,
-      ...(terminalAtMs === undefined ? {} : { terminalAtMs }),
-    });
-  };
 
   return {
-    resumable: false,
-    persistentWorkspace: true,
-    destroysOnStop: false,
     ensureBillingAdmission,
+    describeRuntime(ref) {
+      const parsed = decodeOwnedProviderRef(ref);
+      if (parsed === null) return undefined;
+      return {
+        provider: 'vercel',
+        sandboxId: parsed.sandboxName,
+        instanceId: parsed.sessionId,
+        ...(parsed.metadata?.instanceType === undefined
+          ? {}
+          : { instanceType: parsed.metadata.instanceType }),
+        ...(parsed.metadata === undefined ? {} : { region: parsed.metadata.region }),
+        snapshotId: parsed.metadata?.sourceSnapshotId ?? config.snapshotId,
+        runtimeBuildId: config.runtimeBuildId,
+        startSource: 'snapshot',
+      };
+    },
     async create(intent: ProviderCreateIntent) {
+      // Read the authoritative grants and build the policy before the REST
+      // create: the sandbox must never open with an empty or stale policy, so a
+      // reader failure prevents the create entirely.
+      const networkPolicy = buildControlNetworkPolicy(
+        await deps.readContainedGrants(),
+        await deps.readAcceptedRuntimeProxyHandles?.()
+      );
       const created = await restClient
         .createSandbox({
           name: intent.allocationName ?? deps.sandboxName,
           operationId: intent.intentId,
           runtimeBuildId: config.runtimeBuildId,
-          snapshotId: config.snapshotId,
+          source: { type: 'snapshot', snapshotId: config.snapshotId },
           runtime: config.runtime,
           timeoutMs: config.initialTimeoutMs,
           ...(config.resources === undefined ? {} : { resources: config.resources }),
-          ...(intent.networkPolicy === undefined ? {} : { networkPolicy: intent.networkPolicy }),
+          networkPolicy,
         })
         .catch((error: unknown) => {
           if (
@@ -183,32 +219,33 @@ export function createVercelProviderAdapter(deps: {
           }
           throw error;
         });
-      const providerRef = encodeVercelProviderRef(created.runtime);
-      await recordBillingLifetime(providerRef, created.session);
+      const providerRef = encodeVercelSessionProviderRef(created.runtime, created.session);
       return { providerRef };
     },
-    async launch(ref, env) {
+    async launch(ref, { command, env }) {
       const parsed = decodeOwnedProviderRef(ref);
       if (!parsed) throw new ProviderCreationError('invalid_configuration');
+      const [executable, ...args] = command.argv;
+      if (!executable) throw new ProviderCreationError('invalid_configuration');
       await restClient.executeCommand(parsed.sessionId, {
-        command: 'sh',
-        args: ['-lc', `exec ${CONTROL_SUPERVISOR_PATH}`],
+        command: executable,
+        args,
         cwd: '/',
         env: {
           ...env,
           PROVIDER_INSTANCE_ID: ref,
           WRAPPER_LOG_PATH: CONTROL_WRAPPER_LOG_PATH,
         },
-        sudo: false,
+        sudo: command.user === 'root',
         wait: false,
       });
+      return { startSource: 'image' };
     },
     async observe(ref, intent) {
       const parsed = decodeOwnedProviderRef(ref);
       try {
         if (parsed) {
           const { session } = await restClient.getSession(parsed.sessionId, parsed.sandboxName);
-          await recordBillingLifetime(ref ?? encodeVercelProviderRef(parsed), session);
           return { status: classifyVercelSessionStatus(session.status) };
         }
         if (ref !== null || !intent) return { status: 'unknown' };
@@ -225,8 +262,7 @@ export function createVercelProviderAdapter(deps: {
             status: now() < intent.createdAt + DEADLINE_MS.createSettle ? 'unknown' : 'terminal',
           };
         }
-        const providerRef = encodeVercelProviderRef(inspected.runtime);
-        await recordBillingLifetime(providerRef, inspected.session);
+        const providerRef = encodeVercelSessionProviderRef(inspected.runtime, inspected.session);
         return {
           status: classifyVercelSessionStatus(inspected.session.status),
           providerRef,
@@ -251,7 +287,6 @@ export function createVercelProviderAdapter(deps: {
       logControlDiagnostic('native_stop', { ...diagnostic, result: 'started' });
       try {
         const session = await restClient.stopSession(parsed.sessionId, parsed.sandboxName);
-        await recordBillingLifetime(ref ?? encodeVercelProviderRef(parsed), session);
         const result = TERMINAL_STATUSES.has(session.status) ? 'terminal' : 'retryable';
         logControlDiagnostic('native_stop', {
           ...diagnostic,
@@ -315,9 +350,13 @@ export function createVercelProviderAdapter(deps: {
         return `vercel ${parsed.sessionId} logs unavailable`;
       }
     },
-    async updateNetworkPolicy(providerRef, networkPolicy) {
+    async applyContainedCredentials(providerRef, grants) {
       const parsed = decodeOwnedProviderRef(providerRef);
       if (parsed === null) throw new Error('Invalid Vercel sandbox provider reference');
+      const networkPolicy = buildControlNetworkPolicy(
+        grants,
+        await deps.readAcceptedRuntimeProxyHandles?.()
+      );
       const session = await restClient.updateNetworkPolicy(
         parsed.sessionId,
         parsed.sandboxName,

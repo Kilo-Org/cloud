@@ -16,6 +16,7 @@ import {
   initializeControlWorkload,
   readWorkloadStats,
 } from '../control/workload-cgroup.js';
+import { createSetupSpawn } from '../control/setup-cgroup.js';
 import {
   createControlFileLogUploader,
   type ControlFileLogUploader,
@@ -26,14 +27,21 @@ import {
   cleanupStaleKiloPidfiles,
   createKiloRuntimes,
   defaultKiloPidfileDirectory,
+  type KiloRuntimesOptions,
+  liveRuntimeClient,
 } from './kilo-runtime.js';
-import { createPreparationManager, runtimeKey } from './prepare.js';
-import { createTurnManager, type TurnManager } from './turn.js';
-import { createControlPlaneTerminals } from './terminals.js';
+import { createPreparationManager, runtimeKey, type PreparationManager } from './prepare.js';
+import { createTurnManager, type TurnManager, type TurnManagerDeps } from './turn.js';
+import { createControlPlaneTerminals, type ControlPlaneTerminalRuntime } from './terminals.js';
 import { createNativeStatusReporter } from './native-status.js';
 import { createControlPlaneWorktreeChanges } from './worktree-changes.js';
 import { createControlPlaneWorktreeDeletion } from './worktree-deletion.js';
+import { createControlPlaneKiloRequests } from './kilo-requests.js';
 import { createWorktreeKiloCleanupClient } from '../control/delete-worktree.js';
+import {
+  CONTROL_SANDBOX_PROVIDER_ENV,
+  parseAgentSandboxProvider,
+} from '../../../src/shared/sandbox-provider.js';
 
 const DIAGNOSTICS_FINALIZE_TIMEOUT_MS = 4_000;
 const FILE_LOG_FINALIZE_TIMEOUT_MS = 5_000;
@@ -46,15 +54,17 @@ export type ControlPlaneExitEvent =
 
 /**
  * Spec §7 "Crash resistance": the wrapper exits only on `shutdown` (exit 0 so
- * the supervisor does not restart it), SIGTERM (exit 0), or an uncaught
- * exception (exit 1 so the supervisor restarts it). An unhandled rejection is
- * logged and does not exit.
+ * the supervisor does not restart it), a wrapper-only SIGTERM (exit 1 so the
+ * supervisor restarts it within its existing budget), or an uncaught exception
+ * (exit 1). An unhandled rejection is logged and does not exit. The supervisor's
+ * own TERM/INT trap forwards SIGTERM here too and then exits terminally whatever
+ * this exit code is.
  */
 export function controlPlaneExitPolicy(event: ControlPlaneExitEvent): number | null {
   switch (event) {
     case 'shutdown':
-    case 'sigterm':
       return 0;
+    case 'sigterm':
     case 'uncaught_exception':
       return 1;
     case 'unhandled_rejection':
@@ -105,7 +115,11 @@ export function createControlPlaneLifecycle(
   const proc = deps.process ?? process;
   let shuttingDown = false;
 
-  async function shutdown(exitCode: number, reason: string): Promise<void> {
+  async function shutdown(
+    exitCode: number,
+    reason: string,
+    phase: 'stopping' | 'failed' = exitCode === 0 ? 'stopping' : 'failed'
+  ): Promise<void> {
     if (shuttingDown) return;
     shuttingDown = true;
     log(`control-plane wrapper stopping exitCode=${exitCode} reason=${reason}`);
@@ -113,7 +127,7 @@ export function createControlPlaneLifecycle(
     await settle(() => deps.stop?.() ?? Promise.resolve());
     const detail = diagnosticDetail(reason);
     deps.diagnostics.onDiagnostic('wrapper.lifecycle', {
-      phase: exitCode === 0 ? 'stopping' : 'failed',
+      phase,
       exitCode,
       ...(detail ? { detail } : {}),
     });
@@ -128,7 +142,10 @@ export function createControlPlaneLifecycle(
       log(`control-plane wrapper ignored ${reason}`);
       return;
     }
-    void shutdown(exitCode, reason);
+    // SIGTERM is a stop, not a wrapper failure: the wrapper cannot tell the
+    // supervisor's forwarded TERM from a stray one, and the supervisor's
+    // `wrapper_restart` or `supervisor_exit` line records which it was.
+    void shutdown(exitCode, reason, event === 'sigterm' ? 'stopping' : 'failed');
   }
 
   proc.once('SIGTERM', () => handleExitEvent('sigterm', 'SIGTERM'));
@@ -152,6 +169,144 @@ export function createControlPlaneLifecycle(
       if (shuttingDown) return;
       deps.connection.recycle();
     },
+  };
+}
+
+/** The production composition of native supervision, Cloud turns and heartbeat activity. */
+export function createControlPlaneSessionHost(options: {
+  runtime: Omit<
+    KiloRuntimesOptions,
+    'onEvent' | 'onRestart' | 'onUnavailable' | 'onDeadline' | 'onActivityChange' | 'onMemoryHold'
+  >;
+  turn: Omit<TurnManagerDeps, 'runtimes' | 'timers'>;
+  isPreparing(): boolean;
+}) {
+  const runtimes = createKiloRuntimes({
+    ...options.runtime,
+    onEvent: event => turns?.observeKiloEvent(event),
+    onActivityChange: key => turns?.refreshActivity(key),
+    onDeadline: (identity, reason, retry, key) =>
+      turns?.onNativeDeadline(identity, reason, retry, key),
+    onRestart: info => turns?.onRuntimeRestart(info),
+    onUnavailable: (directory, key) => turns?.onRuntimeUnavailable(directory, key),
+    onMemoryHold: info => turns?.onRuntimeMemoryHold(info),
+  });
+  const turns = createTurnManager({ ...options.turn, timers: options.runtime.timers, runtimes });
+  const manager = turns;
+  return {
+    runtimes,
+    turns: manager,
+    getHeartbeat: () => ({
+      active: options.isPreparing() || runtimes.needsCompute() || manager.hasPendingWork(),
+      degraded: runtimes.suspected(),
+    }),
+  };
+}
+
+/**
+ * The `session.*`/`terminal.*`/`worktree.*` frame dispatcher, split out of
+ * {@link runControlPlaneWrapper} so the production routing can be constructed
+ * with real managers in a test. The holder objects are read at frame time, so
+ * construction order does not change behavior.
+ */
+export type ControlPlaneFrameDispatcherDeps = {
+  preparation: { current?: PreparationManager };
+  turns: { current?: TurnManager };
+  terminals: { current?: ControlPlaneTerminalRuntime };
+  worktreeChanges: { current?: ReturnType<typeof createControlPlaneWorktreeChanges> };
+  worktreeDeletion: { current?: ReturnType<typeof createControlPlaneWorktreeDeletion> };
+  kiloRequests: { current?: ReturnType<typeof createControlPlaneKiloRequests> };
+  send: (frame: ControlPlaneWrapperFrame) => void;
+  log: (message: string) => void;
+};
+
+export function createControlPlaneFrameDispatcher(
+  deps: ControlPlaneFrameDispatcherDeps
+): (frame: ControlPlaneWrapperFrame) => void {
+  return function onFrame(frame: ControlPlaneWrapperFrame): void {
+    switch (frame.type) {
+      case 'session.attach': {
+        const preparation = deps.preparation.current;
+        if (preparation === undefined) return;
+        onFrame({
+          type: 'session.prepare',
+          spec: {
+            ...frame.spec,
+            ...preparation.workspaceConfiguration(frame.spec, frame.workspace),
+          },
+          credentials: frame.credentials,
+        });
+        return;
+      }
+      case 'session.prepare':
+        deps.turns.current?.registerRoute(frame.spec);
+        void deps.preparation.current
+          ?.prepare(frame.spec, frame.credentials)
+          .then(() => {
+            if (deps.preparation.current?.isPrepared(frame.spec.sessionId)) {
+              try {
+                deps.terminals.current?.rememberAttachedSession(
+                  {
+                    sessionId: frame.spec.sessionId,
+                    kiloSessionId: frame.spec.kiloSessionId,
+                    directory: frame.spec.directory,
+                  },
+                  runtimeKey(frame.spec)
+                );
+              } catch {
+                // Terminal attachment is best-effort; a missing runtime is
+                // reported as `not_ready` when a terminal is requested.
+              }
+            }
+            return deps.turns.current?.publishCommands(frame.spec.sessionId);
+          })
+          .catch(() => undefined);
+        return;
+      case 'workspace.captured':
+        // Sessions never capture; a reply to a pre-change request is ignored.
+        return;
+      case 'session.credentials':
+        void deps.preparation.current?.installCredentials(frame).catch(() => {
+          deps.log('control-plane session credential refresh failed');
+        });
+        return;
+      case 'session.prompt':
+        deps.turns.current?.submit(frame.sessionId, frame.payload);
+        return;
+      case 'session.abort':
+        deps.turns.current?.abort(frame.sessionId);
+        return;
+      case 'session.answer':
+        void deps.turns.current?.answer(frame.sessionId, frame.reply);
+        return;
+      case 'session.release':
+        deps.turns.current?.release(frame.sessionId);
+        deps.preparation.current?.release(frame.sessionId);
+        void deps.terminals.current?.forgetSession(frame.sessionId);
+        return;
+      case 'worktree.snapshot':
+      case 'worktree.summary':
+        void deps.worktreeChanges.current?.handle(frame);
+        return;
+      case 'worktree.prepareDeletion':
+      case 'worktree.delete':
+        void deps.worktreeDeletion.current?.handle(frame);
+        return;
+      case 'kilo.request':
+        void deps.kiloRequests.current?.handle(frame);
+        return;
+      case 'terminal.create':
+      case 'terminal.resize':
+      case 'terminal.close':
+      case 'terminal.connect':
+        void deps.terminals.current
+          ?.handle(frame)
+          .then(result => deps.send(result))
+          .catch(() => undefined);
+        return;
+      default:
+        deps.log(`control-plane frame ${frame.type}`);
+    }
   };
 }
 
@@ -226,15 +381,29 @@ export async function runControlPlaneWrapper(
   const worktreeDeletionRef: {
     current?: ReturnType<typeof createControlPlaneWorktreeDeletion>;
   } = {};
-  const runtimes = createKiloRuntimes({
-    timers,
-    log: logToFile,
-    workload,
-    onNativeDiagnostic: projector,
-    onEvent: event => turnsRef.current?.observeKiloEvent(event),
-    onRestart: info => turnsRef.current?.onRuntimeRestart(info),
-    onUnavailable: (directory, key) => turnsRef.current?.onRuntimeUnavailable(directory, key),
+  // Allowlisted native reads answer over the same connection.
+  const kiloRequestsRef: {
+    current?: ReturnType<typeof createControlPlaneKiloRequests>;
+  } = {};
+  const sandboxProvider = parseAgentSandboxProvider(env[CONTROL_SANDBOX_PROVIDER_ENV]);
+  const host = createControlPlaneSessionHost({
+    runtime: {
+      timers,
+      ...(sandboxProvider ? { sandboxProvider } : {}),
+      log: logToFile,
+      workload,
+      onNativeDiagnostic: projector,
+    },
+    turn: {
+      emit: frame => connection.send(frame),
+      log: logToFile,
+      onDiagnostic: diagnostics.onDiagnostic,
+      onNativeDiagnostic: projector,
+    },
+    isPreparing: () => preparationRef.current?.isPreparing() ?? false,
   });
+  const { runtimes } = host;
+  turnsRef.current = host.turns;
   const connection = createControlPlaneConnection({
     url,
     credential,
@@ -242,77 +411,17 @@ export async function runControlPlaneWrapper(
     timers,
     log: logToFile,
     onNativeDiagnostic: projector,
-    getHeartbeat: () => ({
-      active:
-        (preparationRef.current?.isPreparing() ?? false) ||
-        (turnsRef.current?.isActive() ?? false) ||
-        (terminalsRef.current?.hasRecentInput() ?? false),
-      degraded: runtimes.suspected(),
+    getHeartbeat: host.getHeartbeat,
+    onFrame: createControlPlaneFrameDispatcher({
+      preparation: preparationRef,
+      turns: turnsRef,
+      terminals: terminalsRef,
+      worktreeChanges: worktreeChangesRef,
+      worktreeDeletion: worktreeDeletionRef,
+      kiloRequests: kiloRequestsRef,
+      send: frame => connection.send(frame),
+      log: logToFile,
     }),
-    onFrame: (frame: ControlPlaneWrapperFrame) => {
-      switch (frame.type) {
-        case 'session.prepare':
-          turnsRef.current?.registerRoute(frame.spec);
-          void preparationRef.current
-            ?.prepare(frame.spec, frame.credentials)
-            .then(() => {
-              if (preparationRef.current?.isPrepared(frame.spec.sessionId)) {
-                try {
-                  terminalsRef.current?.rememberAttachedSession(
-                    {
-                      sessionId: frame.spec.sessionId,
-                      kiloSessionId: frame.spec.kiloSessionId,
-                      directory: frame.spec.directory,
-                    },
-                    runtimeKey(frame.spec)
-                  );
-                } catch {
-                  // Terminal attachment is best-effort; a missing runtime is
-                  // reported as `not_ready` when a terminal is requested.
-                }
-              }
-              return turnsRef.current?.publishCommands(frame.spec.sessionId);
-            })
-            .catch(() => undefined);
-          return;
-        case 'session.credentials':
-          void preparationRef.current?.installCredentials(frame);
-          return;
-        case 'session.prompt':
-          turnsRef.current?.submit(frame.sessionId, frame.payload);
-          return;
-        case 'session.abort':
-          turnsRef.current?.abort(frame.sessionId);
-          return;
-        case 'session.answer':
-          void turnsRef.current?.answer(frame.sessionId, frame.reply);
-          return;
-        case 'session.release':
-          turnsRef.current?.release(frame.sessionId);
-          preparationRef.current?.release(frame.sessionId);
-          void terminalsRef.current?.forgetSession(frame.sessionId);
-          return;
-        case 'worktree.snapshot':
-        case 'worktree.summary':
-          void worktreeChangesRef.current?.handle(frame);
-          return;
-        case 'worktree.prepareDeletion':
-        case 'worktree.delete':
-          void worktreeDeletionRef.current?.handle(frame);
-          return;
-        case 'terminal.create':
-        case 'terminal.resize':
-        case 'terminal.close':
-        case 'terminal.connect':
-          void terminalsRef.current
-            ?.handle(frame)
-            .then(result => connection.send(result))
-            .catch(() => undefined);
-          return;
-        default:
-          logToFile(`control-plane frame ${frame.type}`);
-      }
-    },
     onShutdown: reason => shutdownRef.current?.(reason),
     onConnected: () => diagnostics.onDiagnostic('wrapper.lifecycle', { phase: 'ready', ok: true }),
     onDisconnected: reason => logToFile(`control-plane disconnected: ${reason}`),
@@ -322,27 +431,21 @@ export async function runControlPlaneWrapper(
     wrapperId: connection.wrapperId,
     runtimes,
   });
-  turnsRef.current = createTurnManager({
-    timers,
-    emit: frame => connection.send(frame),
-    runtimes: { get: key => runtimes.get(key) },
-    log: logToFile,
-    onDiagnostic: diagnostics.onDiagnostic,
-    onNativeDiagnostic: projector,
-  });
   preparationRef.current = createPreparationManager({
     timers,
     onNativeDiagnostic: projector,
+    allocationId,
     runtimes: {
       ensure: input => runtimes.ensure(input),
-      installCredentials: async (key, nextEnv) => {
-        await runtimes.get(key)?.installCredentials(nextEnv);
+      installCredentials: async (key, nextEnv, cloudAgentMcp) => {
+        await runtimes.get(key)?.installCredentials(nextEnv, cloudAgentMcp);
         turnsRef.current?.credentialsInstalled(key);
       },
       isUnavailable: key => {
         const runtime = runtimes.get(key);
         return !runtime || runtime.isUnavailable();
       },
+      getLiveClient: key => liveRuntimeClient(runtimes.get(key)),
       remove: key => runtimes.remove(key),
       release: key => runtimes.remove(key),
     },
@@ -350,6 +453,7 @@ export async function runControlPlaneWrapper(
     emit: frame => connection.send(frame),
     log: logToFile,
     inheritedEnv: env,
+    spawnSetup: createSetupSpawn(workload),
   });
   worktreeChangesRef.current = createControlPlaneWorktreeChanges({
     emit: frame => connection.send(frame),
@@ -361,11 +465,17 @@ export async function runControlPlaneWrapper(
     clients: directory =>
       runtimes
         .runtimesForDirectory(directory)
-        .map(runtime => createWorktreeKiloCleanupClient(runtime.client.serverUrl)),
+        .map(runtime => createWorktreeKiloCleanupClient(runtime.client.server)),
     retireDirectory: directory => runtimes.retireDirectory(directory),
     detachTerminals: directory =>
       terminalsRef.current?.detachDirectory(directory) ?? Promise.resolve(),
     onDiagnostic: diagnostics.onDiagnostic,
+    log: logToFile,
+  });
+  kiloRequestsRef.current = createControlPlaneKiloRequests({
+    emit: frame => connection.send(frame),
+    preparedRoute: sessionId => preparationRef.current?.preparedRoute(sessionId) ?? null,
+    clientFor: key => liveRuntimeClient(runtimes.get(key)) ?? null,
     log: logToFile,
   });
   const nativeStatus = createNativeStatusReporter({

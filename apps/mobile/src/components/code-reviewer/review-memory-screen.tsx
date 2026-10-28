@@ -1,46 +1,51 @@
 import { FlashList } from '@shopify/flash-list';
 import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
-import { type ReactNode, useMemo } from 'react';
+import { type ReactNode, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { Pressable, View, type ViewStyle } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 
 import { CenteredState } from '@/components/centered-state';
+import { ReviewMemoryProposalSheet } from '@/components/code-reviewer/review-memory-proposal-sheet';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { Brain } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
-import { PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
 import { useReviewerPermission, useSetReviewMemoryEnabled } from '@/lib/hooks/use-code-reviewer';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { reviewMemoryOwnerInput } from '@/lib/hooks/use-review-memory';
+import {
+  ACTIVE_PROPOSAL_STATUSES,
+  proposalStatusLabel,
+  type ReviewMemoryProposal,
+} from '@/lib/review-memory-proposals';
 import { useTRPC } from '@/lib/trpc';
 
 const PAGE_SIZE = 20;
 
-// Review memory only exists for GitHub, so the owner input pins the platform
-// and only varies the scope segment (personal vs. an organization id).
-function reviewMemoryOwnerInput(scope: string) {
-  return scope === PERSONAL_SCOPE
-    ? ({ platform: 'github' } as const)
-    : ({ organizationId: scope, platform: 'github' } as const);
-}
+const listStyle = { flex: 1 } satisfies ViewStyle;
 
 export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
   const trpc = useTRPC();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const paddingBottom = useTabBarBottomPadding();
   const ownerInput = reviewMemoryOwnerInput(scope);
   const permission = useReviewerPermission(scope);
+  const [selectedProposal, setSelectedProposal] = useState<ReviewMemoryProposal | null>(null);
 
   const summaryQuery = useQuery(trpc.reviewMemory.getDashboardSummary.queryOptions(ownerInput));
+  const setEnabled = useSetReviewMemoryEnabled(scope);
   const enabled = summaryQuery.data?.enabled === true;
 
   const proposalsQuery = useInfiniteQuery(
     trpc.reviewMemory.listProposalsPage.infiniteQueryOptions(
-      { ...ownerInput, limit: PAGE_SIZE },
+      { ...ownerInput, limit: PAGE_SIZE, statuses: ACTIVE_PROPOSAL_STATUSES },
       {
         enabled,
         getNextPageParam: lastPage => lastPage.nextCursor ?? undefined,
@@ -48,21 +53,20 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
     )
   );
 
-  const setEnabled = useSetReviewMemoryEnabled(scope);
-
   const proposals = useMemo(
     () => (proposalsQuery.data?.pages ?? []).flatMap(page => page.proposals),
     [proposalsQuery.data?.pages]
   );
 
   const readOnly = permission.status === 'ready' && !permission.canEdit;
+  const canToggle = !readOnly && !setEnabled.isPending;
   const hasLoadedPages = (proposalsQuery.data?.pages.length ?? 0) > 0;
   const firstPageError = proposalsQuery.isError && !hasLoadedPages;
   const laterPageError = proposalsQuery.isError && hasLoadedPages;
 
   const summaryLoading = summaryQuery.isPending;
   const summaryError = summaryQuery.isError && !summaryQuery.data;
-  const disabled = summaryQuery.data != null && !summaryQuery.data.enabled;
+  const disabled = summaryQuery.data?.enabled === false;
   const proposalsLoading = enabled && proposalsQuery.isPending;
   const empty = enabled && !proposalsLoading && !firstPageError && proposals.length === 0;
   const happy = enabled && !proposalsLoading && !firstPageError && proposals.length > 0;
@@ -169,18 +173,38 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
     body = (
       <FlashList
         data={proposals}
+        style={listStyle}
         keyExtractor={proposal => proposal.id}
         renderItem={({ item }) => (
-          <View className="border-b-[0.5px] border-hair-soft px-6 py-3">
+          <Pressable
+            className="min-h-11 border-b-[0.5px] border-hair-soft px-6 py-3 active:opacity-70"
+            accessibilityRole="button"
+            accessibilityLabel={[
+              item.title,
+              item.repo_full_name,
+              proposalStatusLabel(item.status, t),
+            ].join('\n')}
+            onPress={() => {
+              setSelectedProposal(item);
+            }}
+          >
             <Text className="text-sm font-medium" numberOfLines={1}>
               {item.title}
             </Text>
             <Text variant="muted" className="mt-0.5 text-xs">
               {item.repo_full_name}
             </Text>
-          </View>
+            <Text variant="muted" className="mt-1 text-xs">
+              {proposalStatusLabel(item.status, t)}
+            </Text>
+          </Pressable>
         )}
-        ListFooterComponent={footer}
+        ListFooterComponent={
+          <>
+            {footer}
+            <View style={{ height: paddingBottom }} pointerEvents="none" />
+          </>
+        }
         onEndReached={() => {
           if (proposalsQuery.hasNextPage && !proposalsQuery.isFetchingNextPage) {
             void proposalsQuery.fetchNextPage();
@@ -197,7 +221,73 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
         title={t('codeReviewer.reviewMemory.title')}
         eyebrow={t('common.codeReviewer')}
       />
+      {enabled ? (
+        <View className="px-6 pt-4">
+          <View className="rounded-lg bg-secondary p-4">
+            <View className="flex-row items-center justify-between gap-3">
+              {/* One named control with a 44pt target: the sentence is what a
+                  tap moves, and the native Switch carries the name, hint and
+                  state. The text cannot be a switch of its own: Android ignores
+                  `accessible={false}` on a native switch, so both controls would
+                  reach the screen reader, one of them unnamed. PreferenceRow
+                  lays out the same shape. */}
+              <Pressable
+                className="min-h-11 min-w-0 flex-1 justify-center active:opacity-70"
+                disabled={!canToggle}
+                onPress={() => {
+                  setEnabled.mutate(!enabled);
+                }}
+                accessible={false}
+                importantForAccessibility="no-hide-descendants"
+              >
+                <Text
+                  accessible={false}
+                  importantForAccessibility="no"
+                  className="text-sm font-medium"
+                >
+                  {t('codeReviewer.reviewMemory.on')}
+                </Text>
+              </Pressable>
+              <Switch
+                value={enabled}
+                disabled={!canToggle}
+                accessibilityLabel={t('codeReviewer.reviewMemory.title')}
+                accessibilityHint={
+                  readOnly ? t('codeReviewer.reviewMemory.readOnlyDescription') : undefined
+                }
+                accessibilityState={{
+                  disabled: !canToggle,
+                  busy: setEnabled.isPending,
+                  checked: enabled,
+                }}
+                onValueChange={value => {
+                  setEnabled.mutate(value);
+                }}
+              />
+            </View>
+            {readOnly ? (
+              <Text variant="muted" className="mt-2 text-xs">
+                {t('codeReviewer.reviewMemory.readOnlyDescription')}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+      ) : null}
       {body}
+      {selectedProposal ? (
+        <ReviewMemoryProposalSheet
+          key={`${scope}:${selectedProposal.id}`}
+          scope={scope}
+          proposal={
+            proposals.find(proposal => proposal.id === selectedProposal.id) ?? selectedProposal
+          }
+          available={proposals.some(proposal => proposal.id === selectedProposal.id)}
+          permission={permission}
+          onClose={() => {
+            setSelectedProposal(null);
+          }}
+        />
+      ) : null}
     </View>
   );
 }

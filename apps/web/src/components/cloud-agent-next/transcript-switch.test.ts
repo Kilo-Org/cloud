@@ -9,12 +9,78 @@ const base: ResolveTranscriptPhaseInput = {
   requestedSessionId: 'ses_b',
   lastStartedSessionId: 'ses_b',
   ownerSessionId: 'ses_b',
+  cachedSessionId: null,
   isLoading: false,
   hasMessages: false,
   terminalOpenFailure: false,
+  localMessageCount: null,
+  isReplayingLiveHistory: false,
+  hasKnownSettings: false,
 };
 
 describe('resolveTranscriptPhase', () => {
+  it('shows a chat created here as local until its live transcript loads', () => {
+    const local = { ...base, localMessageCount: 0 };
+    expect(resolveTranscriptPhase({ ...local, ownerSessionId: 'ses_a', hasMessages: true })).toBe(
+      'local'
+    );
+    expect(resolveTranscriptPhase({ ...local, isLoading: true })).toBe('local');
+    expect(resolveTranscriptPhase(local)).toBe('live');
+    // A new session's first prompt stays until the live transcript has it.
+    const withPrompt = { ...base, localMessageCount: 1, isReplayingLiveHistory: true };
+    expect(resolveTranscriptPhase(withPrompt)).toBe('local');
+    expect(resolveTranscriptPhase({ ...withPrompt, hasMessages: true })).toBe('live');
+    expect(resolveTranscriptPhase({ ...withPrompt, isReplayingLiveHistory: false })).toBe('live');
+  });
+
+  it('shows the requested cached transcript before its metadata arrives', () => {
+    expect(
+      resolveTranscriptPhase({
+        ...base,
+        ownerSessionId: null,
+        cachedSessionId: 'ses_b',
+        hasMessages: true,
+      })
+    ).toBe('live');
+  });
+
+  it('shows a known chat without a loading state before its switch starts', () => {
+    expect(
+      resolveTranscriptPhase({ ...base, lastStartedSessionId: 'ses_a', hasKnownSettings: true })
+    ).toBe('local');
+  });
+
+  it("does not show another session's cache, but shows this session's empty one", () => {
+    expect(
+      resolveTranscriptPhase({
+        ...base,
+        ownerSessionId: null,
+        cachedSessionId: 'ses_a',
+        hasMessages: true,
+      })
+    ).toBe('opening');
+    expect(
+      resolveTranscriptPhase({
+        ...base,
+        ownerSessionId: null,
+        cachedSessionId: 'ses_b',
+        hasMessages: false,
+      })
+    ).toBe('live');
+  });
+
+  it('keeps the switch pending until it starts even with a matching cached identity', () => {
+    expect(
+      resolveTranscriptPhase({
+        ...base,
+        lastStartedSessionId: 'ses_a',
+        ownerSessionId: null,
+        cachedSessionId: 'ses_b',
+        hasMessages: true,
+      })
+    ).toBe('opening');
+  });
+
   it('is live without a requested session even while stale state remains', () => {
     expect(
       resolveTranscriptPhase({

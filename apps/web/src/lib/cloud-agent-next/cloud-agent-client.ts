@@ -1,8 +1,11 @@
 import 'server-only';
 import { createTRPCClient, httpLink, TRPCClientError } from '@trpc/client';
 import { TRPCError } from '@trpc/server';
+import { getHTTPStatusCodeFromError } from '@trpc/server/http';
+import { TRPC_ERROR_CODES_BY_KEY, type TRPC_ERROR_CODE_KEY } from '@trpc/server/rpc';
 import * as z from 'zod';
 import type { AgentConfig } from '@kilocode/db/schema-types';
+import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import {
   sandboxSelectionCapabilitiesSchema,
   type SandboxAllocationInput,
@@ -10,11 +13,10 @@ import {
 } from '@kilocode/worker-utils/sandbox-allocation';
 import type { EncryptedEnvelope } from '@kilocode/web-shared/lib/encryption';
 import type { CloudAgentAttachments } from '@/lib/cloud-agent/constants';
-import type { Images } from '@/lib/images-schema';
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import { captureException } from '@sentry/nextjs';
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { parseCustomerBillingFailure } from '@kilocode/cloud-agent-sdk';
+import { parseCustomerBillingFailure, type PreparationAttempt } from '@kilocode/cloud-agent-sdk';
 import type { CloudAgentWorktreeId } from '@kilocode/session-ingest-contracts';
 import {
   getWorktreeChangesOutputSchema,
@@ -26,36 +28,18 @@ import {
   type WorktreeFileQuery,
 } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import type { SendMessagePayload } from './types.js';
-import { baseGetMessageResultNextOutputSchema } from '@/routers/cloud-agent-next-schemas';
+import {
+  baseGetMessageResultNextOutputSchema,
+  workerPreviewOptionsSchema,
+} from '@/routers/cloud-agent-next-schemas';
 import {
   SandboxStatusSnapshotSchema,
   type SandboxStatusSnapshot,
 } from '../../../../../services/cloud-agent-next/src/shared/sandbox-status';
+import { fetchWithinBudget } from '@/lib/bounded-service-fetch';
 export type { SendMessagePayload } from './types.js';
 
-/**
- * Cloud Agent Next Client
- *
- * Client for the new cloud-agent-next worker that uses the V2 WebSocket-based API
- * with the new message format (Message + Part[]).
- *
- * PLACEHOLDER: Update CLOUD_AGENT_NEXT_API_URL when the new worker is ready.
- */
-
-// TODO: Update this URL when the new cloud-agent-next worker is deployed
 const CLOUD_AGENT_NEXT_API_URL = getEnvVariable('CLOUD_AGENT_NEXT_API_URL') || '';
-
-function isConnectionResetError(error: unknown): boolean {
-  const seen = new Set<object>();
-  while (typeof error === 'object' && error !== null && !seen.has(error)) {
-    seen.add(error);
-    if ('code' in error && error.code === 'ECONNRESET') {
-      return true;
-    }
-    error = 'cause' in error ? error.cause : undefined;
-  }
-  return false;
-}
 
 // MCP server config types — CLI-native local/remote format.
 // Each env/header value is either a plain string (passed through verbatim)
@@ -130,19 +114,16 @@ type PrepareSessionSharedFields = {
   mode: AgentMode;
   model: string;
   variant?: string;
-  // GitHub-specific params
   githubRepo?: string;
   githubIntegrationId?: string;
   /** GitHub Personal Access Token for private repositories */
   githubToken?: string;
-  // Generic git params for GitLab and other providers
   gitUrl?: string;
   gitToken?: string;
   /** Explicit platform type for correct env var setup (avoids URL-based detection) */
   platform?: 'github' | 'gitlab' | 'bitbucket';
   bitbucketWorkspaceUuid?: string;
   bitbucketRepositoryUuid?: string;
-  // Common params
   kilocodeOrganizationId?: string;
   /** Profile ID forwarded to cloud-agent-next for server-side merge. */
   profileId?: string;
@@ -165,18 +146,18 @@ type PrepareSessionSharedFields = {
   appendSystemPrompt?: string;
   /** Canonical Cloud Agent attachments for the prompt */
   attachments?: CloudAgentAttachments;
-  /** Legacy image attachments accepted during client migration */
-  images?: Images;
   /** Callback configuration for execution completion events */
   callbackTarget?: CallbackTarget;
-  /** Platform that created this session (e.g. 'security-agent', 'slack', 'app-builder') */
+  /** Platform that created this session (e.g. 'security-agent', 'slack') */
   createdOnPlatform?: string;
   clientProvenance?: 'browser' | 'mobile';
   /** PR gate threshold — when not 'off', the agent reports gateResult in its callback */
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
-  /** When true, route the session to a Docker-in-Docker sandbox that supports devcontainer runtimes */
+  /** Deprecated: true is rejected because devcontainer support is retired. */
   devcontainer?: boolean;
   sandboxAllocation?: SandboxAllocationInput;
+  egressMode?: EgressMode;
+  egressAllowlist?: string[];
 };
 
 /** Non-clone prepare input: required `prompt` and the current optional initial fields. */
@@ -188,12 +169,17 @@ export type PrepareSessionNonCloneInput = PrepareSessionSharedFields & {
   autoInitiate?: boolean;
   /** Stable per-user-intent UUID; with `autoInitiate`, dedupes retries in the operation ledger. */
   operationKey?: string;
+  /** Client-proposed Kilo session ID, so the client can show the session before prepare returns. */
+  kiloSessionId?: string;
   cloneFromKiloSessionId?: undefined;
+  cloneUpToMessageId?: undefined;
 };
 
 /** Clone-only prepare input: copies the source session and forbids a synthetic initial turn. */
 export type PrepareSessionCloneInput = PrepareSessionSharedFields & {
   cloneFromKiloSessionId: string;
+  /** Inclusive cut: copy source messages up to and including this ID. */
+  cloneUpToMessageId?: string;
   autoInitiate: true;
   operationKey: string;
 };
@@ -204,6 +190,9 @@ export type PrepareSessionInput = PrepareSessionNonCloneInput | PrepareSessionCl
 export type GetSandboxSelectionOptionsInput = {
   kilocodeOrganizationId?: string;
   devcontainer?: boolean;
+  repositoryType?: 'github' | 'gitlab' | 'bitbucket' | 'git';
+  /** With `repositoryType`, resolves saved repository overrides into `effectiveDestination`. */
+  repositoryFullName?: string;
 };
 
 /** Output from prepareSession procedure */
@@ -219,6 +208,7 @@ export type CreateWorktreeChatInput = {
   sourceKiloSessionId: string;
   sourceCloudAgentSessionId: string;
   operationKey: string;
+  kiloSessionId?: string;
   kilocodeOrganizationId?: string;
   clientProvenance: 'browser';
 };
@@ -256,8 +246,6 @@ export type SendMessageInput = {
   gitToken?: string;
   /** Canonical Cloud Agent attachments for the message */
   attachments?: CloudAgentAttachments;
-  /** Legacy image attachments accepted during client migration */
-  images?: Images;
   condenseOnComplete?: boolean;
   /** Custom text to append to the system prompt */
   appendSystemPrompt?: string;
@@ -348,7 +336,6 @@ export type ExecutionStatus = {
 
 /** Output from getSession procedure (sanitized, no secrets) */
 export type GetSessionOutput = {
-  // Session identifiers
   sessionId: string;
   kiloSessionId?: string;
   userId: string;
@@ -361,17 +348,16 @@ export type GetSessionOutput = {
   parentSessionId?: string | null;
   cloudAgentSessionScopeId?: string | null;
 
-  // Repository info (no tokens)
   githubRepo?: string;
   gitUrl?: string;
   platform?: 'github' | 'gitlab' | 'bitbucket';
 
-  // Execution params
   prompt?: string;
   mode?: AgentMode;
   model?: string;
   autoCommit?: boolean;
   upstreamBranch?: string;
+  branchName?: string;
 
   /** Custom agents stored on this session (slug + name, plus optional model and thinking-effort overrides). */
   runtimeAgents?: Array<{
@@ -381,7 +367,6 @@ export type GetSessionOutput = {
     variant?: string;
   }>;
 
-  // Execution status (grouped for cleaner API)
   execution: ExecutionStatus;
 
   // Lifecycle timestamps (critical for idempotency)
@@ -393,10 +378,8 @@ export type GetSessionOutput = {
   // by Worker callback ingresses), and getSession is reachable by the
   // session's owning user.
 
-  // Initial message ID for correlation
   initialMessageId?: string;
 
-  // Versioning
   timestamp: number;
   version: number;
 
@@ -416,7 +399,6 @@ export type GetSessionOutput = {
  */
 export type UpdateSessionInput = {
   cloudAgentSessionId: string;
-  // Scalar fields - null to clear, value to set, undefined to skip
   mode?: AgentMode | null;
   model?: string | null;
   variant?: string | null;
@@ -426,7 +408,6 @@ export type UpdateSessionInput = {
   autoCommit?: boolean | null;
   condenseOnComplete?: boolean | null;
   appendSystemPrompt?: string | null;
-  // Collection fields - empty to clear, value to set, undefined to skip
   envVars?: Record<string, string>;
   encryptedSecrets?: Record<string, EncryptedEnvelope>;
   setupCommands?: string[];
@@ -478,23 +459,6 @@ export type HealthOutput = {
   version: string;
 };
 
-export type ComputeBillingStatus = {
-  payer: { type: 'user' | 'org'; id: string };
-  attribution: 'payer_shared' | 'session';
-  phase: 'idle' | 'active' | 'stopping' | 'settling' | 'unavailable';
-  estimatedHourlyRateMicrodollars: number | null;
-  estimatedIntervalAmountMicrodollars: number | null;
-  billingMode: 'shadow' | 'paid' | null;
-  interval: {
-    id: string;
-    startedAt: string;
-    lastSeenAt: string;
-    stoppedAt: string | null;
-    confirmedSeconds: number;
-    settledBillableSeconds: number;
-  } | null;
-};
-
 /**
  * Custom error class for payment-related errors from cloud-agent.
  */
@@ -518,10 +482,16 @@ export class CloudAgentBillingError extends Error {
   }
 }
 
+function isTRPCErrorCode(code: unknown): code is TRPC_ERROR_CODE_KEY {
+  return typeof code === 'string' && Object.hasOwn(TRPC_ERROR_CODES_BY_KEY, code);
+}
+
 /**
- * Helper to re-throw InsufficientCreditsError as TRPCError with PAYMENT_REQUIRED code.
+ * Re-throws a Cloud Agent error as a TRPCError for the web tRPC response.
+ * Billing errors keep their billing status. A worker 4xx error keeps its tRPC
+ * code and message; tRPC reports any other error as a 500.
  */
-export function rethrowAsPaymentRequired(error: unknown): never {
+export function rethrowCloudAgentError(error: unknown): never {
   if (error instanceof CloudAgentBillingError) {
     throw new TRPCError({
       code:
@@ -539,6 +509,15 @@ export function rethrowAsPaymentRequired(error: unknown): never {
       code: 'PAYMENT_REQUIRED',
       message: error.message,
     });
+  }
+  if (error instanceof TRPCClientError) {
+    const code: unknown = error.data?.code ?? error.shape?.data?.code;
+    if (isTRPCErrorCode(code)) {
+      const workerError = new TRPCError({ code, message: error.message, cause: error });
+      if (getHTTPStatusCodeFromError(workerError) < 500) {
+        throw workerError;
+      }
+    }
   }
   throw error;
 }
@@ -602,6 +581,13 @@ type CloudAgentNextTRPCClient = {
   deleteSession: {
     mutate: (input: { sessionId: string }) => Promise<{ success: boolean; message?: string }>;
   };
+  deleteHostedWorkspaceSession: {
+    mutate: (input: {
+      workspaceId: string;
+      sessionId: string;
+      operationKey: string;
+    }) => Promise<{ success: true; workspaceId: string; sessionId: string }>;
+  };
   deleteWorktree: {
     mutate: (input: DeleteWorktreeInput) => Promise<DeleteWorktreeOutput>;
   };
@@ -620,6 +606,9 @@ type CloudAgentNextTRPCClient = {
   getSandboxStatus: {
     query: (input: GetSessionInput) => Promise<unknown>;
   };
+  getPreparationAttempts: {
+    query: (input: GetSessionInput) => Promise<PreparationAttempt[]>;
+  };
   getPendingInteractions: {
     query: (input: GetSessionInput) => Promise<GetPendingInteractionsOutput>;
   };
@@ -632,11 +621,11 @@ type CloudAgentNextTRPCClient = {
   getWorktreeFile: {
     query: (input: GetWorktreeFileInput) => Promise<unknown>;
   };
-  getComputeBillingStatus: {
-    query: (input: GetSessionInput) => Promise<ComputeBillingStatus>;
-  };
   getSandboxSelectionOptions: {
     query: (input: GetSandboxSelectionOptionsInput) => Promise<SandboxSelectionCapabilities>;
+  };
+  getPreviewOptions: {
+    query: (input: { cloudAgentSessionId: string; organizationId?: string }) => Promise<unknown>;
   };
   prepareSession: {
     mutate: (input: PrepareSessionInput) => Promise<PrepareSessionOutput>;
@@ -647,7 +636,6 @@ type CloudAgentNextTRPCClient = {
   updateSession: {
     mutate: (input: UpdateSessionInput) => Promise<UpdateSessionOutput>;
   };
-  // V2 mutation-based procedures (WebSocket streaming)
   initiateFromKilocodeSessionV2: {
     mutate: (input: InitiateFromPreparedSessionInput) => Promise<InitiateSessionOutput>;
   };
@@ -682,7 +670,7 @@ type CloudAgentNextTRPCClient = {
  */
 export type CloudAgentNextClientOptions = {
   /**
-   * Skip balance validation in cloud-agent (used by App Builder which handles its own billing).
+   * Skip balance validation in cloud-agent for free/BYOK model sessions.
    */
   skipBalanceCheck?: boolean;
 };
@@ -702,7 +690,6 @@ export class CloudAgentNextClient {
     this.authToken = authToken;
     this.options = options;
 
-    // Build common headers
     const baseHeaders: Record<string, string> = {
       Authorization: `Bearer ${this.authToken}`,
     };
@@ -758,6 +745,8 @@ export class CloudAgentNextClient {
         error instanceof TRPCClientError &&
         (error.data?.code === 'NOT_FOUND' ||
           error.shape?.data?.code === 'NOT_FOUND' ||
+          error.data?.code === 'CONFLICT' ||
+          error.shape?.data?.code === 'CONFLICT' ||
           error.data?.httpStatus === 404 ||
           error.shape?.data?.httpStatus === 404)
       ) {
@@ -771,6 +760,14 @@ export class CloudAgentNextClient {
       });
       return { success: false };
     }
+  }
+
+  async deleteHostedWorkspaceSession(input: {
+    workspaceId: string;
+    sessionId: string;
+    operationKey: string;
+  }): Promise<{ success: true; workspaceId: string; sessionId: string }> {
+    return this.client.deleteHostedWorkspaceSession.mutate(input);
   }
 
   async deleteWorktree(input: DeleteWorktreeInput): Promise<DeleteWorktreeOutput> {
@@ -857,6 +854,19 @@ export class CloudAgentNextClient {
     }
   }
 
+  /** The session's preparation attempts, as its stream replays them. */
+  async getPreparationAttempts(cloudAgentSessionId: string): Promise<PreparationAttempt[]> {
+    try {
+      return await this.client.getPreparationAttempts.query({ cloudAgentSessionId });
+    } catch (error) {
+      captureException(error, {
+        tags: { source: 'cloud-agent-next-client', endpoint: 'getPreparationAttempts' },
+        extra: { cloudAgentSessionId },
+      });
+      throw error;
+    }
+  }
+
   async getSandboxStatus(cloudAgentSessionId: string): Promise<SandboxStatusSnapshot> {
     try {
       return SandboxStatusSnapshotSchema.parse(
@@ -926,18 +936,6 @@ export class CloudAgentNextClient {
     return result;
   }
 
-  async getComputeBillingStatus(cloudAgentSessionId: string): Promise<ComputeBillingStatus> {
-    try {
-      return await this.client.getComputeBillingStatus.query({ cloudAgentSessionId });
-    } catch (error) {
-      if (!isConnectionResetError(error)) {
-        throw error;
-      }
-      await new Promise(resolve => setTimeout(resolve, 100 + Math.random() * 100));
-      return await this.client.getComputeBillingStatus.query({ cloudAgentSessionId });
-    }
-  }
-
   async createWorktreeChat(input: CreateWorktreeChatInput): Promise<CreateWorktreeChatOutput> {
     try {
       return await this.client.createWorktreeChat.mutate(input);
@@ -959,6 +957,13 @@ export class CloudAgentNextClient {
     return sandboxSelectionCapabilitiesSchema.parse(
       await this.client.getSandboxSelectionOptions.query(input)
     );
+  }
+
+  async getPreviewOptions(input: {
+    cloudAgentSessionId: string;
+    organizationId?: string;
+  }): Promise<z.infer<typeof workerPreviewOptionsSchema>> {
+    return workerPreviewOptionsSchema.parse(await this.client.getPreviewOptions.query(input));
   }
 
   /**
@@ -990,7 +995,6 @@ export class CloudAgentNextClient {
         error: normalizedError instanceof Error ? normalizedError.message : String(normalizedError),
       });
 
-      // Check for insufficient credits error
       if (isInsufficientCreditsError(normalizedError)) {
         throw new InsufficientCreditsError();
       }
@@ -1046,7 +1050,6 @@ export class CloudAgentNextClient {
       const normalizedError = normalizeCloudAgentProtocolError(error);
       preserveBillingFailure(normalizedError);
 
-      // Check for insufficient credits error
       if (isInsufficientCreditsError(normalizedError)) {
         throw new InsufficientCreditsError();
       }
@@ -1075,7 +1078,6 @@ export class CloudAgentNextClient {
       const normalizedError = normalizeCloudAgentProtocolError(error);
       preserveBillingFailure(normalizedError);
 
-      // Check for insufficient credits error
       if (isInsufficientCreditsError(normalizedError)) {
         throw new InsufficientCreditsError();
       }
@@ -1228,9 +1230,11 @@ export function createCloudAgentNextClient(
 }
 
 /**
- * Create a cloud agent next client instance configured for App Builder.
+ * Create a client that skips the worker balance check, used for free/BYOK models.
  */
-export function createAppBuilderCloudAgentNextClient(authToken: string): CloudAgentNextClient {
+export function createSkippedBalanceCheckCloudAgentNextClient(
+  authToken: string
+): CloudAgentNextClient {
   return new CloudAgentNextClient(authToken, {
     skipBalanceCheck: true,
   });
@@ -1242,7 +1246,7 @@ export function createAppBuilderCloudAgentNextClient(authToken: string): CloudAg
  *
  * Free models (and BYOK-capable models, where the user provides their own key
  * and the model is therefore not billed against their balance) cost the user
- * nothing, so we mirror AppBuilder and set `x-skip-balance-check: true` to
+ * nothing, so we set `x-skip-balance-check: true` to
  * allow $0-balance users to still create sessions when their selected model
  * is free. Paid models stay on the default client so the worker balance
  * middleware can still enforce the $1 minimum on paid-model sessions.
@@ -1256,7 +1260,7 @@ export function createCloudAgentNextClientForModel(
   model: { isFree: boolean; hasUserByokAvailable: boolean }
 ): CloudAgentNextClient {
   if (model.isFree || model.hasUserByokAvailable) {
-    return createAppBuilderCloudAgentNextClient(authToken);
+    return createSkippedBalanceCheckCloudAgentNextClient(authToken);
   }
   return createCloudAgentNextClient(authToken);
 }
@@ -1285,5 +1289,230 @@ export async function closeCloudAgentOrgStreams(
     throw new Error(
       `Cloud Agent stream close failed: ${response.status} ${response.statusText}${errorText ? ` - ${errorText}` : ''}`
     );
+  }
+}
+
+// Optional enrichment that runs after the active-session read inside the native
+// widget route's ten-second deadline: a slow identity read drops only the key.
+const WIDGET_APPROVAL_KEY_BUDGET_MS = 1_500;
+
+const widgetApprovalKeyResponseSchema = z.object({
+  approvalKey: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/)
+    .nullable(),
+  // Absent when an older Worker answers; the session card then shows no command.
+  command: z.string().max(60).nullable().optional(),
+});
+
+/** The approval binding and the pending request's command, both null when none waits. */
+export type CloudAgentWidgetApproval = { approvalKey: string | null; command: string | null };
+
+/**
+ * The binding of the oldest pending permission on one owned control-plane
+ * session: SHA-256 of `JSON.stringify([kiloSessionId, permissionId])`, computed
+ * in the Worker so the raw permission never reaches this process, plus that
+ * request's command (one trimmed line, at most 60 characters) for the session
+ * card. The Worker re-checks user, organization scope and the Kilo/cloud
+ * session pairing; the key grants no authority. Bounded, and throws on any
+ * non-OK answer so the caller can drop the identity while keeping counts.
+ */
+export async function readCloudAgentWidgetApprovalKey(
+  input: {
+    userId: string;
+    organizationId: string | null;
+    kiloSessionId: string;
+    cloudAgentSessionId: string;
+  },
+  signal?: AbortSignal
+): Promise<CloudAgentWidgetApproval> {
+  const budget = AbortSignal.timeout(WIDGET_APPROVAL_KEY_BUDGET_MS);
+  const response = await fetchWithinBudget(
+    `${CLOUD_AGENT_NEXT_API_URL}/internal/widgets/approval-key`,
+    {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-internal-api-key': INTERNAL_API_SECRET,
+      },
+      body: JSON.stringify(input),
+      cache: 'no-store',
+      signal: signal ? AbortSignal.any([budget, signal]) : budget,
+    }
+  );
+  if (!response.ok) {
+    throw new Error(`Cloud Agent widget approval key failed: ${response.status}`);
+  }
+  const parsed = widgetApprovalKeyResponseSchema.parse(await response.json());
+  return { approvalKey: parsed.approvalKey, command: parsed.command ?? null };
+}
+
+export type VercelSnapshotBuildStartInput = (
+  | { organizationId: string; userId?: never }
+  | { userId: string; organizationId?: never }
+) & {
+  credentialId: string;
+  buildGeneration: string;
+};
+
+/**
+ * Start an organization-scoped BYOC Vercel snapshot build through the
+ * authenticated Cloud Agent internal API. This is intentionally not part of
+ * the browser-facing tRPC client.
+ */
+export async function startVercelSnapshotBuild(
+  input: VercelSnapshotBuildStartInput
+): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${CLOUD_AGENT_NEXT_API_URL}/internal/byoc/vercel-snapshot-build/start`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': INTERNAL_API_SECRET,
+        },
+        body: JSON.stringify(input),
+        signal: AbortSignal.timeout(30_000),
+      }
+    );
+  } catch {
+    throw new Error('Cloud Agent snapshot build request failed');
+  }
+
+  if (!response.ok) {
+    throw new Error('Cloud Agent snapshot build request was rejected');
+  }
+}
+
+export type VercelRuntimeIdentity = {
+  wrapperVersion: string;
+  releasedAt: string;
+  digest: string;
+};
+
+export async function getVercelRuntimeIdentity(): Promise<VercelRuntimeIdentity> {
+  let response: Response;
+  try {
+    response = await fetch(`${CLOUD_AGENT_NEXT_API_URL}/internal/byoc/vercel-runtime-identity`, {
+      headers: { 'x-internal-api-key': INTERNAL_API_SECRET },
+      cache: 'no-store',
+      signal: AbortSignal.timeout(30_000),
+    });
+  } catch {
+    throw new Error('Cloud Agent runtime identity could not be verified');
+  }
+
+  if (!response.ok) {
+    throw new Error('Cloud Agent runtime identity could not be verified');
+  }
+
+  const body: unknown = await response.json().catch(() => null);
+  const parsed = z
+    .object({
+      wrapperVersion: z.string().min(1),
+      releasedAt: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+      digest: z.string().min(1),
+    })
+    .safeParse(body);
+  if (!parsed.success) {
+    throw new Error('Cloud Agent runtime identity could not be verified');
+  }
+  return parsed.data;
+}
+
+export async function getVercelComputeEnrollment(organizationId: string): Promise<boolean> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${CLOUD_AGENT_NEXT_API_URL}/internal/byoc/vercel-enrollment/${encodeURIComponent(organizationId)}`,
+      {
+        headers: { 'x-internal-api-key': INTERNAL_API_SECRET },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(30_000),
+      }
+    );
+  } catch {
+    throw new Error('Cloud Agent Vercel compute enrollment could not be verified');
+  }
+
+  if (!response.ok) {
+    throw new Error('Cloud Agent Vercel compute enrollment could not be verified');
+  }
+
+  const body: unknown = await response.json().catch(() => null);
+  if (
+    typeof body !== 'object' ||
+    body === null ||
+    !('enrolled' in body) ||
+    typeof body.enrolled !== 'boolean'
+  ) {
+    throw new Error('Cloud Agent Vercel compute enrollment could not be verified');
+  }
+
+  return body.enrolled;
+}
+
+export async function getVercelComputeEnrollmentForUser(userId: string): Promise<boolean> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${CLOUD_AGENT_NEXT_API_URL}/internal/byoc/vercel-enrollment/user/${encodeURIComponent(userId)}`,
+      {
+        headers: { 'x-internal-api-key': INTERNAL_API_SECRET },
+        cache: 'no-store',
+        signal: AbortSignal.timeout(30_000),
+      }
+    );
+  } catch {
+    throw new Error('Cloud Agent Vercel compute enrollment could not be verified');
+  }
+
+  if (!response.ok) {
+    throw new Error('Cloud Agent Vercel compute enrollment could not be verified');
+  }
+
+  const body: unknown = await response.json().catch(() => null);
+  if (
+    typeof body !== 'object' ||
+    body === null ||
+    !('enrolled' in body) ||
+    typeof body.enrolled !== 'boolean'
+  ) {
+    throw new Error('Cloud Agent Vercel compute enrollment could not be verified');
+  }
+
+  return body.enrolled;
+}
+
+/** Exactly one of organizationId or userId must be set. */
+export type VercelSnapshotBuildCleanupInput = VercelSnapshotBuildStartInput & {
+  snapshotId?: string;
+};
+
+export async function cleanupVercelSnapshotBuild(
+  input: VercelSnapshotBuildCleanupInput
+): Promise<void> {
+  let response: Response;
+  try {
+    response = await fetch(
+      `${CLOUD_AGENT_NEXT_API_URL}/internal/byoc/vercel-snapshot-build/cleanup`,
+      {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': INTERNAL_API_SECRET,
+        },
+        body: JSON.stringify(input),
+        signal: AbortSignal.timeout(30_000),
+      }
+    );
+  } catch {
+    throw new Error('Cloud Agent Vercel compute cleanup could not be completed');
+  }
+
+  if (!response.ok) {
+    throw new Error('Cloud Agent Vercel compute cleanup could not be completed');
   }
 }

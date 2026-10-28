@@ -30,7 +30,37 @@ import { sendBalanceAlertEmail } from '@kilocode/web-shared/lib/email';
 import { dispatchLowBalancePush } from '@kilocode/web-shared/lib/notifications-worker-client';
 import { after } from 'next/server';
 import { subHours } from 'date-fns';
-import { maybePerformOrganizationAutoTopUp } from '@kilocode/web-shared/lib/autoTopUp';
+
+import {
+  maybePerformAutoTopUp,
+  maybePerformOrganizationAutoTopUp,
+  type AutoTopUpOrganization,
+} from '@kilocode/web-shared/lib/autoTopUp';
+import {
+  accountBalanceMicrodollars,
+  findOrganizationMemberBalanceRow,
+  organizationMemberBalance,
+} from '@kilocode/worker-utils/account-access';
+
+/**
+ * The paying account's row as the balance check read it: the user for a personal request, the
+ * organization for an org request. Bouncer's decide uses it to judge whether an account is
+ * established.
+ */
+export type BalancePayer = {
+  createdAt: string;
+  microdollarsUsed: number;
+  totalMicrodollarsAcquired: number;
+};
+
+export type BalanceAndOrgSettings = {
+  balance: number;
+  settings?: OrganizationSettings;
+  plan?: OrganizationPlan;
+  balanceLimitedByUserAllowance?: boolean;
+  /** Absent when the user is not a member of the organization. */
+  payer?: BalancePayer;
+};
 
 /**
  * @param fromDb - Database instance to use (defaults to primary db, pass readDb for replica)
@@ -38,17 +68,31 @@ import { maybePerformOrganizationAutoTopUp } from '@kilocode/web-shared/lib/auto
 export async function getBalanceAndOrgSettings(
   organizationId: string | undefined,
   user: User,
-  fromDb: typeof db = db
-): Promise<{
-  balance: number;
-  settings?: OrganizationSettings;
-  plan?: OrganizationPlan;
-  balanceLimitedByUserAllowance?: boolean;
-}> {
+  fromDb: typeof db = db,
+  funding?: 'usage'
+): Promise<BalanceAndOrgSettings> {
   const balanceSpan = startInactiveSpan({ name: 'balance-check' });
-  const result = organizationId
-    ? await getBalanceForOrganizationUser(organizationId, user.id, { fromDb })
-    : { ...(await getBalanceForUser(user)), balanceLimitedByUserAllowance: false };
+  let result: BalanceAndOrgSettings;
+  if (organizationId) {
+    result = await getBalanceForOrganizationUser(organizationId, user.id, { fromDb, funding });
+  } else {
+    const { balance, microdollars_used, total_microdollars_acquired } =
+      await getBalanceForUser(user);
+    result = {
+      balance,
+      balanceLimitedByUserAllowance: false,
+      payer: {
+        createdAt: user.created_at,
+        microdollarsUsed: microdollars_used,
+        totalMicrodollarsAcquired: total_microdollars_acquired,
+      },
+    };
+    if (funding === 'usage' && user.auto_top_up_enabled) {
+      after(() =>
+        maybePerformAutoTopUp({ ...user, microdollars_used, total_microdollars_acquired })
+      );
+    }
+  }
   balanceSpan.end();
   return result;
 }
@@ -61,63 +105,28 @@ export async function getBalanceForOrganizationUser(
     limitType?: OrganizationUserLimitType;
     /** Database instance to use (defaults to primary db, pass readDb for replica) */
     fromDb?: typeof db;
+    funding?: 'usage';
+    /** Instant the expiry cut-off is measured from. Defaults to the current time. */
+    now?: Date;
+    /** How many hours the cut-off trails `now` by. Defaults to no jitter. */
+    expiryJitterHours?: number;
   } = {}
-): Promise<{
-  balance: number;
-  settings?: OrganizationSettings;
-  plan?: OrganizationPlan;
-  balanceLimitedByUserAllowance?: boolean;
-}> {
-  const { limitType = 'daily', fromDb = db } = options;
+): Promise<BalanceAndOrgSettings> {
+  const {
+    limitType = 'daily',
+    fromDb = db,
+    funding,
+    now = new Date(),
+    expiryJitterHours = 0,
+  } = options;
   const startTime = performance.now();
   logExceptInTest(
     `[getBalanceForOrganizationUser] Starting balance check for user ${userId} in org ${organizationId}`
   );
 
-  const result = await fromDb
-    .select({
-      microdollar_limit: organization_user_limits.microdollar_limit,
-      microdollar_usage: organization_user_usage.microdollar_usage,
-      total_microdollars_acquired: organizations.total_microdollars_acquired,
-      microdollars_used: organizations.microdollars_used,
-      settings: organizations.settings,
-      require_seats: organizations.require_seats,
-      plan: organizations.plan,
-      auto_top_up_enabled: organizations.auto_top_up_enabled,
-      next_credit_expiration_at: organizations.next_credit_expiration_at,
-    })
-    .from(organizations)
-    .innerJoin(
-      organization_memberships,
-      eq(organization_memberships.organization_id, organizations.id)
-    )
-    .leftJoin(
-      organization_user_limits,
-      and(
-        eq(organization_user_limits.organization_id, organizations.id),
-        eq(organization_user_limits.kilo_user_id, userId),
-        eq(organization_user_limits.limit_type, limitType)
-      )
-    )
-    .leftJoin(
-      organization_user_usage,
-      and(
-        eq(organization_user_usage.organization_id, organizations.id),
-        eq(organization_user_usage.kilo_user_id, userId),
-        eq(organization_user_usage.limit_type, limitType),
-        eq(organization_user_usage.usage_date, sql`CURRENT_DATE`)
-      )
-    )
-    .where(
-      and(
-        eq(organizations.id, organizationId),
-        eq(organization_memberships.kilo_user_id, userId),
-        not(eq(organization_memberships.role, 'billing_manager'))
-      )
-    )
-    .limit(1);
+  const row = await findOrganizationMemberBalanceRow(fromDb, organizationId, userId, limitType);
 
-  if (result.length === 0) {
+  if (!row) {
     const endTime = performance.now();
     const duration = endTime - startTime;
     logExceptInTest(
@@ -130,102 +139,75 @@ export async function getBalanceForOrganizationUser(
   const {
     microdollar_limit,
     microdollar_usage,
-    total_microdollars_acquired: initial_total_microdollars_acquired,
-    microdollars_used,
     settings,
     require_seats,
     plan,
     auto_top_up_enabled,
     next_credit_expiration_at,
-  } = result[0];
+    created_at,
+  } = row;
 
-  let total_microdollars_acquired = initial_total_microdollars_acquired;
-  let organization_balance = total_microdollars_acquired - microdollars_used;
+  let { microdollars_used, total_microdollars_acquired } = row;
 
   // Lazy credit expiry check (mirrors user pattern in getBalanceForUser)
-  const expireBefore = subHours(new Date(), Math.random());
+  const expireBefore = subHours(now, expiryJitterHours);
   const needsExpirationComputation =
     next_credit_expiration_at && expireBefore >= new Date(next_credit_expiration_at);
 
   if (needsExpirationComputation) {
-    const expiryResult = await processOrganizationExpirations(
-      {
+    const expiryResult = await processOrganizationExpirations(organizationId, expireBefore);
+    microdollars_used = expiryResult.microdollars_used;
+    total_microdollars_acquired = expiryResult.total_microdollars_acquired;
+  }
+
+  if (
+    funding === 'usage' &&
+    auto_top_up_enabled &&
+    (require_seats || microdollar_limit == null || microdollar_limit > (microdollar_usage || 0))
+  ) {
+    after(() =>
+      maybePerformOrganizationAutoTopUp({
         id: organizationId,
-        microdollars_used,
-        next_credit_expiration_at,
+        auto_top_up_enabled,
         total_microdollars_acquired,
-      },
-      expireBefore
+        microdollars_used,
+      })
     );
-    if (expiryResult) {
-      total_microdollars_acquired = expiryResult.total_microdollars_acquired;
-      organization_balance = total_microdollars_acquired - microdollars_used;
-    }
   }
 
-  // Trigger org auto-top-up after expiration check so it receives post-expiry values
-  after(() =>
-    maybePerformOrganizationAutoTopUp({
-      id: organizationId,
-      auto_top_up_enabled,
-      total_microdollars_acquired,
-      microdollars_used,
-    })
-  );
+  const payer: BalancePayer = {
+    createdAt: created_at,
+    microdollarsUsed: microdollars_used,
+    totalMicrodollarsAcquired: total_microdollars_acquired,
+  };
 
-  // If organization requires seats, ignore any user limits and return full organization balance
-  if (require_seats) {
-    const endTime = performance.now();
-    const duration = endTime - startTime;
-    logExceptInTest(
-      `[getBalanceForOrganizationUser] Completed balance check for user ${userId} in org ${organizationId} in ${duration.toFixed(2)}ms - balance: ${fromMicrodollars(organization_balance)} (require_seats: ignoring limits)`
-    );
+  const organization_balance = accountBalanceMicrodollars({
+    total_microdollars_acquired,
+    microdollars_used,
+  });
+  const { balanceMicrodollars, limitedByUserAllowance } = organizationMemberBalance({
+    ...row,
+    total_microdollars_acquired,
+    microdollars_used,
+  });
 
-    return {
-      balance: fromMicrodollars(organization_balance),
-      settings,
-      plan,
-      balanceLimitedByUserAllowance: false,
-    };
-  }
-
-  if (microdollar_limit == null) {
-    const endTime = performance.now();
-    const duration = endTime - startTime;
-    logExceptInTest(
-      `[getBalanceForOrganizationUser] Completed balance check for user ${userId} in org ${organizationId} in ${duration.toFixed(2)}ms - balance: ${fromMicrodollars(organization_balance)} (no limits)`
-    );
-
-    return {
-      balance: fromMicrodollars(organization_balance),
-      settings,
-      plan,
-      balanceLimitedByUserAllowance: false,
-    };
-  }
-
-  const usageAmount = microdollar_usage || 0;
-  const remainingAllowance = microdollar_limit - usageAmount;
-
-  // Cap the remaining allowance at the organization's actual balance
-  // This ensures a user's balance cannot exceed what the organization has available
-  const cappedBalance = Math.min(remainingAllowance, organization_balance);
-
-  // Return capped balance (can be negative if over limit or org has negative balance)
   const endTime = performance.now();
   const duration = endTime - startTime;
+  const detail = require_seats
+    ? 'require_seats: ignoring limits'
+    : microdollar_limit == null
+      ? 'no limits'
+      : `allowance: ${fromMicrodollars(microdollar_limit - (microdollar_usage ?? 0))}, org balance: ${fromMicrodollars(organization_balance)}`;
   logExceptInTest(
-    `[getBalanceForOrganizationUser] Completed balance check for user ${userId} in org ${organizationId} in ${duration.toFixed(2)}ms - balance: ${fromMicrodollars(cappedBalance)} (allowance: ${fromMicrodollars(remainingAllowance)}, org balance: ${fromMicrodollars(organization_balance)})`
+    `[getBalanceForOrganizationUser] Completed balance check for user ${userId} in org ${organizationId} in ${duration.toFixed(2)}ms - balance: ${fromMicrodollars(balanceMicrodollars)} (${detail})`
   );
 
   return {
-    balance: fromMicrodollars(cappedBalance),
+    balance: fromMicrodollars(balanceMicrodollars),
     settings,
     plan,
-    // An organization top-up raises only the organization balance, so it clears
-    // the block only while the member still has allowance left. An exhausted
-    // allowance (remainingAllowance <= 0) is a per-user limit no top-up fixes.
-    balanceLimitedByUserAllowance: remainingAllowance <= 0,
+    balanceLimitedByUserAllowance: limitedByUserAllowance,
+    payer,
   };
 }
 
@@ -233,6 +215,7 @@ export type OrganizationUsageMutationResult = {
   crossedMinimumBalance: boolean;
   recipients: string[];
   minimumBalanceMicrodollars: number | null;
+  autoTopUpOrganization?: AutoTopUpOrganization;
 };
 
 const NO_ORGANIZATION_BALANCE_ALERT: OrganizationUsageMutationResult = {
@@ -289,7 +272,14 @@ export async function mutateOrganizationUsage(
       updated_at = NOW()
   `);
 
-  const [orgData] = await tx
+  type OrganizationBalanceRow = {
+    total_microdollars_acquired: number;
+    previous_microdollars_used: number;
+    new_microdollars_used: number;
+    settings: OrganizationSettings | null;
+    auto_top_up_enabled: boolean;
+  };
+  const balanceRows: OrganizationBalanceRow[] = await tx
     .update(organizations)
     .set({
       microdollars_used: sql`${organizations.microdollars_used} + ${cost}`,
@@ -303,8 +293,10 @@ export async function mutateOrganizationUsage(
       ),
       new_microdollars_used: organizations.microdollars_used,
       settings: organizations.settings,
+      auto_top_up_enabled: organizations.auto_top_up_enabled,
     });
 
+  const [orgData] = balanceRows;
   if (!orgData) return NO_ORGANIZATION_BALANCE_ALERT;
 
   const currentBalance = orgData.total_microdollars_acquired - orgData.previous_microdollars_used;
@@ -322,6 +314,16 @@ export async function mutateOrganizationUsage(
     crossedMinimumBalance,
     recipients,
     minimumBalanceMicrodollars: minimumBalance,
+    ...(cost > 0 && orgData.auto_top_up_enabled
+      ? {
+          autoTopUpOrganization: {
+            id: organization_id,
+            auto_top_up_enabled: orgData.auto_top_up_enabled,
+            total_microdollars_acquired: orgData.total_microdollars_acquired,
+            microdollars_used: orgData.new_microdollars_used,
+          },
+        }
+      : {}),
   };
 }
 
@@ -389,10 +391,18 @@ export function scheduleOrganizationLowBalanceAlert(
   });
 }
 
+export function scheduleOrganizationUsageAutoTopUp(result: OrganizationUsageMutationResult): void {
+  const organization = result.autoTopUpOrganization;
+  if (organization) {
+    after(() => maybePerformOrganizationAutoTopUp(organization));
+  }
+}
+
 export async function ingestOrganizationTokenUsage(usage: MicrodollarUsage): Promise<void> {
   if (!usage.organization_id) return;
   const result = await db.transaction(tx => mutateOrganizationUsage(tx, usage));
   scheduleOrganizationLowBalanceAlert(usage.organization_id, result);
+  scheduleOrganizationUsageAutoTopUp(result);
 }
 
 const MAX_DAILY_LIMIT_USD = 2000;

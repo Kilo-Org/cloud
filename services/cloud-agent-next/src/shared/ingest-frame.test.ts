@@ -316,6 +316,63 @@ describe('prepareIngestFrame', () => {
     }
   );
 
+  it.each([400, 402, 403, 408])(
+    'preserves BYOK APIError %s ownership and cause through compaction',
+    statusCode => {
+      for (const marked of [false, true]) {
+        const gatewayMessage =
+          statusCode === 408
+            ? '[BYOK] Your provider rejected the request. Check your provider account and settings.'
+            : '[BYOK] Provider rejected the request: poison-message';
+        const error = {
+          name: 'APIError',
+          data: {
+            statusCode,
+            message: marked ? gatewayMessage : 'Opaque SDK failure: poison-message',
+            responseBody: JSON.stringify({
+              error: gatewayMessage,
+              error_type: 'byok_error',
+              message: gatewayMessage,
+            }),
+          },
+        };
+        const failure = classifyAssistantFailure(error);
+        if (statusCode === 408) {
+          expect(failure).toEqual({
+            reason: 'timeout',
+            providerOwnership: 'byok',
+            safeMessage: 'Assistant request timed out',
+          });
+        }
+        const frame = prepareIngestFrame({
+          streamEventType: 'kilocode',
+          timestamp: '2026-01-01T00:00:00.000Z',
+          data: {
+            event: 'message.updated',
+            properties: {
+              info: {
+                id: 'asst_byok',
+                parentID: 'msg_parent',
+                role: 'assistant',
+                error,
+                metadata: 'poison-metadata'.repeat(MAX_INGEST_EVENT_BYTES),
+              },
+            },
+          },
+        });
+
+        expect(frame.kind).toBe('send');
+        if (frame.kind !== 'send') return;
+        expect(frame.compacted).toBe(true);
+        expect(frame.serialized).not.toContain('poison');
+        const compactError = JSON.parse(frame.serialized).data.properties.info.error;
+        expect(compactError).toBe(`[BYOK] ${failure.safeMessage}`);
+        expect(classifyAssistantFailure(compactError)).toEqual(failure);
+        expect(projectSafeAssistantError(compactError)).toBe(compactError);
+      }
+    }
+  );
+
   it.each(['legacy error with poison-message', { metadata: 'poison-metadata' }])(
     'preserves terminal error presence without SDK metadata for %j',
     error => {
@@ -776,6 +833,83 @@ describe('slimPersistedKilocodeEvent', () => {
             input: { path: 'src/a.ts' },
             output: 'ok',
           },
+        },
+      },
+    });
+  });
+
+  it('keeps task child-session linkage and routed model while dropping other tool metadata', () => {
+    const childSessionId = `ses_${'a'.repeat(26)}`;
+    expect(
+      slimPersistedKilocodeEvent({
+        event: 'message.part.updated',
+        properties: {
+          part: {
+            type: 'tool',
+            id: 'part_task',
+            messageID: 'msg_asst',
+            tool: 'task',
+            state: {
+              status: 'running',
+              input: { description: 'Explore repo', subagent_type: 'explore' },
+              metadata: {
+                sessionId: childSessionId,
+                model: { providerID: 'kilo', modelID: 'anthropic/claude-opus-4.6' },
+                diff: 'large',
+                snapshot: { huge: true },
+              },
+            },
+          },
+        },
+      })
+    ).toEqual({
+      event: 'message.part.updated',
+      properties: {
+        part: {
+          type: 'tool',
+          id: 'part_task',
+          messageID: 'msg_asst',
+          tool: 'task',
+          state: {
+            status: 'running',
+            input: { description: 'Explore repo', subagent_type: 'explore' },
+            metadata: {
+              sessionId: childSessionId,
+              model: { providerID: 'kilo', modelID: 'anthropic/claude-opus-4.6' },
+            },
+          },
+        },
+      },
+    });
+  });
+
+  it.each([
+    ['no linkage fields', { diff: 'large' }],
+    ['malformed session id', { sessionId: 42 }],
+    ['incomplete model only', { model: { providerID: 'kilo' } }],
+  ])('drops tool metadata that carries no usable child-session linkage (%s)', (_name, metadata) => {
+    expect(
+      slimPersistedKilocodeEvent({
+        event: 'message.part.updated',
+        properties: {
+          part: {
+            type: 'tool',
+            id: 'part_task',
+            messageID: 'msg_asst',
+            tool: 'task',
+            state: { status: 'running', input: {}, metadata },
+          },
+        },
+      })
+    ).toEqual({
+      event: 'message.part.updated',
+      properties: {
+        part: {
+          type: 'tool',
+          id: 'part_task',
+          messageID: 'msg_asst',
+          tool: 'task',
+          state: { status: 'running', input: {} },
         },
       },
     });

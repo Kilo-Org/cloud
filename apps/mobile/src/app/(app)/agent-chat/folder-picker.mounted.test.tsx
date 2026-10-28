@@ -12,6 +12,7 @@ const connection = vi.hoisted(() => ({
   isConnected: () => true,
   retryConnection: () => undefined,
 }));
+const folderPickerSlotClear = vi.hoisted(() => vi.fn());
 const bridge = vi.hoisted(() => ({
   connectionId: 'conn-1',
   projectName: 'my-project',
@@ -20,12 +21,24 @@ const bridge = vi.hoisted(() => ({
 }));
 const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 const router = vi.hoisted(() => ({ back: vi.fn() }));
+// Live BackHandler harness: every armed listener registers here so a test can
+// press hardware Back and observe exactly what the sheet's listener does.
+const backHandlers = vi.hoisted(() => {
+  const listeners = new Set<() => boolean>();
+  return {
+    listeners,
+    press(): boolean[] {
+      return [...listeners].map(listener => listener());
+    },
+  };
+});
+const navigation = vi.hoisted(() => ({ isFocused: (): boolean => true }));
 
-// FlatList renders through a callback, so a host-string mock would drop every
+// FlashList renders through a callback, so a host-string mock would drop every
 // row and empty state. This mock mirrors the real list: rows via renderItem,
 // the header only when there are rows, and the empty component only when the
 // data is empty — which lets each phase assert its own content.
-const flatListMock = vi.hoisted(
+const flashListMock = vi.hoisted(
   () =>
     (props: {
       data: readonly { name: string; path: string }[];
@@ -43,18 +56,30 @@ const flatListMock = vi.hoisted(
       );
       const header = props.data.length > 0 ? props.ListHeaderComponent : null;
       const empty = props.data.length === 0 ? props.ListEmptyComponent : null;
-      return createElement('FlatList', null, header, ...rows, empty);
+      return createElement('FlashList', null, header, ...rows, empty);
     }
 );
 
+vi.mock('@shopify/flash-list', () => ({ FlashList: flashListMock }));
 vi.mock('react-native', () => ({
-  FlatList: flatListMock,
+  FlatList: 'FlatList',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
+  BackHandler: {
+    addEventListener: (_event: string, listener: () => boolean) => {
+      backHandlers.listeners.add(listener);
+      return {
+        remove: () => {
+          backHandlers.listeners.delete(listener);
+        },
+      };
+    },
+  },
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => router,
+  useNavigation: () => navigation,
 }));
 vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(),
@@ -63,6 +88,10 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => insets,
 }));
 vi.mock('react-i18next', () => ({
+  // The app's real i18n module installs this plugin at import time; the hook
+  // reads the active language through it, so the mock has to accept the
+  // install the way the plugin does.
+  initReactI18next: { type: '3rdParty', init: () => undefined },
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
@@ -80,7 +109,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('@/lib/route-registry', () => ({
   folderPickerSlot: {
     get: () => bridge,
-    clear: vi.fn(),
+    clear: folderPickerSlotClear,
   },
   UNFENCED_ROUTE_KEY: 'unscoped',
   useRouteRegistry: vi.fn(),
@@ -156,14 +185,16 @@ describe('FolderPickerScreen body', () => {
     bridge.onSelect.mockClear();
     router.back.mockClear();
     insets.bottom = 0;
+    backHandlers.listeners.clear();
+    navigation.isFocused = () => true;
   });
 
-  it('renders one FlatList in the skeleton phase, with skeleton rows as the empty content', async () => {
+  it('renders one FlashList in the skeleton phase, with skeleton rows as the empty content', async () => {
     // Never resolve: the listing stays in the skeleton phase for the whole mount.
     listFn.mockReturnValueOnce(new Promise(() => undefined));
     const renderer = await mount();
 
-    expect(findByType(renderer.root, 'FlatList')).toHaveLength(1);
+    expect(findByType(renderer.root, 'FlashList')).toHaveLength(1);
     expect(findByType(renderer.root, 'Skeleton')).toHaveLength(5);
     expect(findByType(renderer.root, 'EmptyState')).toHaveLength(0);
 
@@ -176,7 +207,7 @@ describe('FolderPickerScreen body', () => {
     listFn.mockResolvedValueOnce({ ok: false, reason: 'transport' });
     const renderer = await mount();
 
-    expect(findByType(renderer.root, 'FlatList')).toHaveLength(0);
+    expect(findByType(renderer.root, 'FlashList')).toHaveLength(0);
     const emptyState = findByType(renderer.root, 'EmptyState');
     expect(emptyState).toHaveLength(1);
     expect(propOf(emptyState[0], 'action')).toBeTruthy();
@@ -191,7 +222,7 @@ describe('FolderPickerScreen body', () => {
     listFn.mockResolvedValueOnce({ ok: false, reason: 'unsupported' });
     const renderer = await mount();
 
-    expect(findByType(renderer.root, 'FlatList')).toHaveLength(0);
+    expect(findByType(renderer.root, 'FlashList')).toHaveLength(0);
     const emptyState = findByType(renderer.root, 'EmptyState');
     expect(emptyState).toHaveLength(1);
     expect(propOf(emptyState[0], 'action')).toBeUndefined();
@@ -223,7 +254,7 @@ describe('FolderPickerScreen body', () => {
     await settle();
     expect(findByType(renderer.root, 'SheetHeader')[0]).toBe(header);
     expect(header.parent).toBe(group);
-    expect(findByType(renderer.root, 'FlatList')).toHaveLength(0);
+    expect(findByType(renderer.root, 'FlashList')).toHaveLength(0);
     expect(findByType(renderer.root, 'EmptyState')).toHaveLength(1);
     act(() => {
       (header.props.onDone as () => void)();
@@ -238,7 +269,7 @@ describe('FolderPickerScreen body', () => {
     listFn.mockResolvedValueOnce({ ok: true, path: '', directories: [] });
     const renderer = await mount();
 
-    expect(findByType(renderer.root, 'FlatList')).toHaveLength(0);
+    expect(findByType(renderer.root, 'FlashList')).toHaveLength(0);
     expect(findByType(renderer.root, 'EmptyState')).toHaveLength(1);
     expect(findByType(renderer.root, 'Skeleton')).toHaveLength(0);
     expect(findByType(renderer.root, 'Button')).toHaveLength(0);
@@ -248,3 +279,4 @@ describe('FolderPickerScreen body', () => {
     });
   });
 });
+// Hardware Back behavior lives in folder-picker.back.mounted.test.tsx.

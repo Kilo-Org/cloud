@@ -16,7 +16,11 @@ requirements remain in force.
 
 Draft -- created 2026-08-24, revised 2026-08-27 to define the passive sandbox
 status contract alongside shared worktree navigation and durability; revised
-2026-09-11 to add the continuity contract for long-lived, recoverable chats.
+2026-09-11 to add the continuity contract for long-lived, recoverable chats;
+revised 2026-10-07 to add the optional repository environment; revised
+2026-10-21 to apply the repository environment automatically and move the
+sandbox size into it; revised 2026-10-22 to simplify environment editing and
+show profile conflicts before saving.
 
 ## Conventions
 
@@ -29,6 +33,12 @@ they appear in all capitals, as shown here.
 
 - **Session**: one chat bound to one repository and one environment.
 - **Environment**: the isolated workspace where the agent runs.
+- **Repository environment**: an optional saved setup for one repository --
+  setup commands, plaintext variables, secrets, and a sandbox size -- distinct
+  from the sandbox Environment. An owner has at most one per repository.
+- **Environment snapshot**: a prepared copy of a repository environment's
+  default branch after its saved setup, built from the base image on request
+  or for a session, that later sessions of that environment start from.
 - **Worktree**: a group of independent browser chats that share the same
   checked-out repository files while their environment exists.
 - **Preparation**: visible setup of that environment -- clone, branch, setup
@@ -59,6 +69,44 @@ repository.
 4. A first prompt that is exactly a known slash command MUST run as that
    command, not as free text.
 5. An over-long prompt, or an attachment still uploading, MUST block submission.
+6. A session started from Cloud Agent web, Slack, GitHub, Linear, Discord,
+   a webhook, or a schedule MUST use the owner's repository environment
+   for the chosen repository when one exists. The user does not select it. Code
+   review and security sessions MUST NOT use it. A repository without one
+   launches unchanged. Its setup commands MUST run as preparation steps and
+   MUST NOT reveal secret values.
+7. While a repository environment applies, profile setup commands MUST NOT run.
+   Profile variables, and variables and commands sent with the request, still
+   apply over the environment.
+8. The new-session form MUST show the chosen repository's environment beside
+   the repository. Organization owners and admins, and personal owners, MAY
+   create, edit, or delete it. Other organization members, including billing
+   managers, MAY only see it. The API MUST enforce these permissions. The form
+   MUST NOT offer a sandbox choice.
+9. A session MUST start on the environment's sandbox size when the owner can
+   use it. Otherwise the repository override applies, then the owner default,
+   then the platform default. A request that names a sandbox wins over all of
+   them.
+10. Saving an environment with a new sandbox size MUST fail when the owner
+    cannot use that size for the repository. A saved size that later becomes
+    unavailable MUST NOT block other edits to the environment.
+11. The environment editor MUST identify the applicable profiles whose setup
+    commands will not run, including when the environment has no setup script.
+    When a profile overrides an environment variable, the editor MUST identify
+    the winning profile and variable name without revealing its value.
+12. New or replaced variables entered in the environment editor MUST be saved
+    as secrets. Untouched plaintext values and saved secrets MUST be retained.
+    The editor MUST NOT show saved secret values. A saved secret appears as
+    `KEY=<unchanged>` in the editor. Keeping this marker retains the value;
+    replacing it changes the value; deleting its line removes the variable.
+    The marker MUST NOT be saved as the secret value.
+13. The environment editor MUST offer one setup script. New or edited setup
+    MUST save at most one script. Existing multi-script setups MUST remain
+    intact when the user changes only variables or the sandbox size.
+    Setup scripts MUST run with Bash and stop on an unhandled command or
+    pipeline failure without requiring `set -e` in the script. A failed script
+    MUST stop preparation and show the failure. Each script MAY contain up to
+    16,000 characters.
 
 ### Preparation
 
@@ -66,8 +114,8 @@ repository.
    preparation under the triggering message: the current step, and the running
    setup command's output.
 2. Steps the user MUST be able to see when they run: cloning the repository,
-   checking out the branch, restoring a previous workspace, running setup
-   commands.
+   using a prepared repository, checking out the branch, restoring a previous
+   workspace, running setup commands.
 3. Preparation that only acquired and booted an environment -- warm reuse, no
    real provisioning -- MUST NOT leave a completed preparation row.
 4. Running and failed preparation MUST always be visible. Failed preparation,
@@ -88,6 +136,38 @@ repository.
    transport permits sending. A later submission MUST use fresh message and
    preparation-attempt identities.
 
+### Environment snapshots
+
+1. A session MUST NOT save its workspace as a snapshot. Only an environment
+   build MAY create an environment snapshot.
+2. A session that uses a repository environment MAY start from that
+   environment's published snapshot when the owner, repository, sandbox image
+   and runtime match and the snapshot revision is not newer than the
+   session's configuration revision. Otherwise, and when the lookup is unavailable, it MUST start from
+   the base image. The lookup MUST NOT delay the start by more than 15 seconds
+   and MUST NOT wait for a build.
+3. A session that starts from a snapshot MUST still run setup with the
+   configuration admitted for that session. Cached files MAY retain earlier
+   values, including secrets.
+4. When a session starts from an older snapshot revision, preparation MUST
+   show the snapshot revision, the session's revision, and the actual
+   replacement build status, including a skipped build or backoff.
+5. If a snapshot start fails, the session MUST start once from the base image
+   within the same preparation deadline.
+6. A snapshot MUST NOT contain git or build credentials, reflogs, or a Kilo
+   home.
+7. Organization managers and personal owners MAY build, refresh, or cancel a
+   build and read its redacted log. Members MAY read the build status only. A
+   build MUST use saved settings only; the UI MUST require saving first.
+8. A build whose revision changes before publication MUST NOT publish. A
+   failed refresh MUST NOT remove the previous snapshot. Deleting the
+   environment MUST cancel its builds.
+9. Automatic builds started by sessions MUST back off after repeated failures
+   of one revision. A manual build MUST stay available during backoff.
+10. Environment, profile, and launch screens MUST show a non-blocking notice
+    that sessions can reuse a snapshot and cached files may retain earlier
+    values. The notice MUST NOT block a save or a launch or show a value.
+
 ### Turn
 
 1. The agent MUST stream text, reasoning, and tool calls in the same chat.
@@ -103,21 +183,44 @@ repository.
    session. The repository MUST remain the one chosen at start.
 8. The user MAY change model and mode for later turns. When a profile or agent
    pins the model, the picker MUST be disabled and MUST say why.
-9. A turn that makes no real agent progress for seven minutes MUST fail, MUST
-   tell the user the turn did not complete, MUST re-enable the composer, and
-   MUST leave the session usable for a later message. Retry and offline status
-   are not real progress. A tool or subagent that is still running within its
-   own timeout MUST hold the inactivity check so the turn is not failed while it
-   runs; the seven-minute check restarts when the tool completes or errors.
-   Tool-part updates remain real progress; silent running time adds no new
-   progress events. A stop during a retry MUST still end the turn immediately
-   (rule 6).
-   For `workspace_*` sessions, the wrapper owns the seven-minute Kilo-progress
-   check and the 120-minute hard execution cap. A tool part that is `running`
-   in the routed root session or a resolved descendant tree (including a
-   subagent `task`) holds the seven-minute check until it ends, and the
-   120-minute cap still fails the turn. If the control plane cannot
-   reach the wrapper, missing updates MUST NOT be treated as Kilo inactivity.
+9. For legacy `agent_*` turns, seven minutes without real progress MUST fail
+   the turn, tell the user it did not complete, re-enable the composer, and
+   leave the chat usable. A tool or subagent within its own timeout holds that
+   legacy inactivity check until it completes or errors.
+   For `workspace_*`, every native Kilo execution MUST be supervised, including
+   work started without an accepted Cloud message or an open browser. Twenty
+   minutes without real assistant text/reasoning or tool output/state progress
+   MUST interrupt the affected session/tree with `no_progress`. Silent running
+   tools MUST receive the same bound. Repeated parts, metadata-only changes,
+   user messages, retry/busy status and heartbeats MUST NOT reset it. Useful
+   descendant progress MUST count for its ancestors, never unrelated roots.
+   Requests waiting on the user MUST pause only the no-progress clock when no
+   independent work is runnable. Resolving one request MUST NOT clear another.
+   A Kilo that stops answering while the sandbox reclaims at its memory cap
+   MUST be held instead of restarted, for at most ten minutes; the hold MUST
+   pause the no-progress clock and post a non-fatal notice. A turn failed by the
+   hang restart that ends an expired hold MUST say that the sandbox ran out of
+   memory. A turn failed by another hang restart MUST say that Kilo was not
+   responding, unless the restart was for exhausted activity-tracking capacity
+   or failed activity observation while Kilo still answered. After two minutes
+   of failed observation, a healthy probe plus real progress within 30 seconds
+   MUST permit continued recovery for at most two more minutes. Health and
+   progress MUST be rechecked during recovery; heartbeats MUST NOT extend it.
+   A healthy runtime that still cannot be observed at that bound, or no longer
+   has recent real progress, MUST use bounded restart recovery without claiming
+   that Kilo was unresponsive. The existing memory hold MUST retain precedence.
+   The separate 120-minute execution cap MUST include user waits. Native
+   cancellation MUST be bounded and confirmed; unconfirmed cancellation MUST
+   use bounded runtime recovery. Accepted Cloud messages MUST settle once;
+   autonomous routed failures MUST remain visible without inventing new message
+   identities or rewriting earlier outcomes.
+   Any working native session or actual wrapper operation MUST keep shared
+   compute alive. Entirely waiting or idle sessions MUST permit the existing
+   10-minute idle stop and same-chat recovery. UI selection MUST have no effect.
+   Reconciliation MUST repair missed events without resetting known clocks;
+   missing or failed observations MUST trigger bounded observation recovery,
+   not a false inactivity result. A stop during retry MUST still end the turn
+   immediately (rule 6).
    The user MUST still be able to Stop or queue another message while the
    wrapper reconnects. If the connection returns, accepted work MUST
    NOT fail because the connection dropped. If no wrapper frame arrives for
@@ -144,6 +247,9 @@ repository.
 1. The user MUST be able to open a terminal on the environment as a tab beside
    the chat, and close it. A read-only session MUST NOT offer terminals.
 2. A pull request the session opened MUST be visible with its current state.
+3. Open workspace tabs — the workspace terminal and file tabs, their order, and
+   the active tab — MUST survive refresh and navigation between worktrees, and
+   MUST remain scoped to the current user and personal or organization context.
 
 ### Shared Worktrees
 
@@ -380,8 +486,8 @@ asks questions, and opens more chats -- and the chat stays usable throughout.
 
 ## Out of Scope
 
-Cloud administration surfaces beyond the existing chat sidebar (MCP Gateway,
-triggers, webhooks), profile and organization administration, the mobile app,
+Cloud administration surfaces beyond the existing chat sidebar (triggers,
+webhooks), profile and organization administration, the mobile app,
 and the CLI.
 The bounded provider, sandbox type, debug metadata, and known lifecycle dates in
 Sandbox Status are a narrow exception to runtime opacity. They do not permit
@@ -403,6 +509,40 @@ The following use SHOULD and are not enforced today:
    ready with setup half-done.)
 
 ## Changelog
+
+### 2026-10-22 -- Environment editor and profile transition
+
+- Added focused setup script and variable editors, with readable sandbox sizes.
+- New environments use the repository name without a separate name field.
+- Added notices for skipped profile commands and overridden variable keys.
+- New and replaced variable values are encrypted. Existing configuration stays
+  intact until the user changes or removes it.
+- Saved variables remain in the editor with explicit retention markers.
+- Setup uses Bash with automatic failure handling and supports scripts up to
+  16,000 characters.
+
+### 2026-10-21 -- Automatic repository environments
+
+- A repository has at most one environment per owner, and approved origins
+  apply it automatically. The user no longer selects one.
+- Moved the sandbox size into the environment and removed the sandbox choice
+  from the new-session form.
+- Profile setup commands do not run while an environment applies, so a setup
+  moved into the environment never runs twice.
+- Saving a sandbox size that the owner cannot use for the repository fails.
+### 2026-10-16 -- Environment snapshots
+
+- Added environment snapshots: built from saved environment settings on the
+  base image, consumed by sessions of the same environment and an equal or
+  newer revision, with a bounded lookup and one fresh fallback.
+- Removed session capture and the "saving the repository" preparation step.
+
+### 2026-10-07 -- Repository environments
+
+- Added the repository environment definition and a Start rule: an optional
+  saved setup for the chosen repository, distinct from the sandbox Environment.
+  Omitting it leaves launch unchanged; its setup commands run as preparation
+  steps and never reveal secret values.
 
 ### 2026-09-26 -- Bounded workspace control recovery
 

@@ -5,6 +5,7 @@
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
+    "./account-access": "./src/account-access.ts",
     "./bitbucket-workspace-access-token": "./src/bitbucket-workspace-access-token.ts",
     "./gitlab-credential": "./src/gitlab-credential.ts",
     "./slack-credential": "./src/slack-credential.ts",
@@ -14,12 +15,15 @@
     "./kilo-token-auth": "./src/kilo-token-auth.ts",
     "./kilo-token": "./src/kilo-token.ts",
     "./kilo-token-policy": "./src/kilo-token-policy.ts",
+    "./cloud-agent-authority": "./src/cloud-agent-authority.ts",
     "./runtime-authorization": "./src/runtime-authorization.ts",
     "./runtime-authorization-contract": "./src/runtime-authorization-contract.ts",
     "./runtime-proxy-attestation": "./src/runtime-proxy-attestation.ts",
     "./kilo-auth-middleware": "./src/kilo-auth-middleware.ts",
     "./sandbox-id": "./src/sandbox-id.ts",
     "./sandbox-allocation": "./src/sandbox-allocation.ts",
+    "./egress-allowlist": "./src/egress-allowlist.ts",
+    "./sha256": "./src/sha256.ts",
     "./hostname-label": "./src/hostname-label.ts",
     "./deployment-slug": "./src/deployment-slug.ts",
     "./redact-headers": "./src/redact-headers.ts",
@@ -49,7 +53,11 @@
     "./r2-client": "./src/r2-client.ts",
     "./direct-byok-model": "./src/direct-byok-model.ts",
     "./user-id-encoding": "./src/user-id-encoding.ts",
-    "./github-authorization": "./src/github-authorization.ts"
+    "./github-authorization": "./src/github-authorization.ts",
+    "./bounded-stream-reader": "./src/bounded-stream-reader.ts",
+    "./usage-writer-client": "./src/usage-writer-client.ts",
+    "./organization-membership": "./src/organization-membership.ts",
+    "./webhook-body-validation": "./src/webhook-body-validation.ts"
   },
   "scripts": {
     "test": "vitest run",
@@ -58,18 +66,21 @@
     "lint": "pnpm -w exec oxlint --config .oxlintrc.json packages/worker-utils/src"
   },
   "dependencies": {
+    "@kilocode/app-shared": "workspace:*",
     "@kilocode/db": "workspace:*",
     "@kilocode/encryption": "workspace:*",
     "@kilocode/session-ingest-contracts": "workspace:*",
+    "@kilocode/usage-contracts": "workspace:*",
     "aws4fetch": "catalog:",
     "drizzle-orm": "catalog:",
     "hono": "catalog:",
     "jose": "catalog:",
-    "zod": "catalog:"
+    "zod": "catalog:",
+    "@cfworker/json-schema": "catalog:"
   },
   "devDependencies": {
     "@typescript/native-preview": "catalog:",
     "typescript": "catalog:",
-    "vitest": "catalog:"
+    "vitest": "catalog:vitest5"
   }
 }

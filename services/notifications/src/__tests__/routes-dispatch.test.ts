@@ -126,6 +126,42 @@ describe('POST /internal/v1/dispatch', () => {
     expect(mockDispatchInternalPushCore).not.toHaveBeenCalled();
   });
 
+  it('refuses a spend alert whose scope and organizationId disagree at the route', async () => {
+    const alert = {
+      kind: 'spend_alert' as const,
+      recipientUserIds: ['user-a'],
+      alertKind: 'threshold' as const,
+      scopeName: 'Acme Corp',
+      amountUsd: 12,
+      thresholdUsd: 10,
+      dedupeKey: 'org:org-1:threshold:push:2026-01-01T00:00:00.000Z:armed',
+    };
+    const disagreeing = [
+      { ...alert, scope: 'organization' },
+      { ...alert, scope: 'personal', organizationId: 'org-1' },
+    ];
+
+    for (const body of disagreeing) {
+      const res = await SELF.fetch(
+        'https://example.com/internal/v1/dispatch',
+        dispatchRequest({ secret: TEST_INTERNAL_SECRET, body })
+      );
+      expect(res.status).toBe(400);
+      expect(await res.json()).toEqual({ error: 'Invalid body' });
+    }
+    expect(mockDispatchInternalPushCore).not.toHaveBeenCalled();
+
+    const accepted = await SELF.fetch(
+      'https://example.com/internal/v1/dispatch',
+      dispatchRequest({
+        secret: TEST_INTERNAL_SECRET,
+        body: { ...alert, scope: 'organization', organizationId: 'org-1' },
+      })
+    );
+    expect(accepted.status).toBe(200);
+    expect(mockDispatchInternalPushCore).toHaveBeenCalledTimes(1);
+  });
+
   it('returns 2xx and invokes dispatch core with the parsed request', async () => {
     const res = await SELF.fetch(
       'https://example.com/internal/v1/dispatch',
@@ -144,5 +180,47 @@ describe('POST /internal/v1/dispatch', () => {
         readPreferences: expect.any(Function),
       })
     );
+  });
+
+  it('logs failed recipients with the caller-supplied dispatch id and no recipient ids', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    mockDispatchInternalPushCore.mockResolvedValue({
+      perRecipient: [
+        { userId: 'user-a', outcome: 'delivered' },
+        { userId: 'user-b', outcome: 'failed', reason: 'expo_ticket_rejected' },
+      ],
+    });
+
+    const res = await SELF.fetch('https://example.com/internal/v1/dispatch', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'X-Internal-Secret': TEST_INTERNAL_SECRET,
+        'X-Dispatch-Id': 'dispatch-123',
+      },
+      body: JSON.stringify(validLowBalanceBody),
+    });
+
+    expect(res.status).toBe(200);
+    expect(warnSpy).toHaveBeenCalledWith('Internal dispatch completed with failed recipients', {
+      dispatchId: 'dispatch-123',
+      kind: 'low_balance',
+      failedRecipients: 1,
+      totalRecipients: 2,
+    });
+    warnSpy.mockRestore();
+  });
+
+  it('does not log when every recipient succeeded', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+
+    const res = await SELF.fetch(
+      'https://example.com/internal/v1/dispatch',
+      dispatchRequest({ secret: TEST_INTERNAL_SECRET, body: validLowBalanceBody })
+    );
+
+    expect(res.status).toBe(200);
+    expect(warnSpy).not.toHaveBeenCalled();
+    warnSpy.mockRestore();
   });
 });

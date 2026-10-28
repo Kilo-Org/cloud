@@ -1,9 +1,14 @@
 import { sandboxControlWebSocketUrl } from './control-url.js';
 import { mintControlLogUploadGrant } from './log-upload-grant.js';
+import {
+  CONTROL_SANDBOX_PROVIDER_ENV,
+  type AgentSandboxProvider,
+} from '../shared/sandbox-provider.js';
 
 export type ControlWrapperLaunchEnvInput = {
   workerUrl?: string;
   sandboxId: string;
+  provider: AgentSandboxProvider;
   credential: string;
   workloadCgroup?: string;
   diagnostics?: {
@@ -49,10 +54,18 @@ export function buildControlWrapperLaunchEnv(
   }
   return {
     ...diagnosticEnv,
+    // The Vercel node24 snapshot installs Bun and global CLIs in /usr/local/bin.
+    // Supply the runtime path directly instead of reading a snapshot's login profile.
+    ...(input.provider === 'vercel'
+      ? {
+          PATH: '/usr/local/bin:/vercel/runtimes/node24/bin:/usr/local/sbin:/usr/sbin:/usr/bin:/sbin:/bin',
+        }
+      : {}),
     ...(input.workloadCgroup ? { CONTROL_WORKLOAD_CGROUP: input.workloadCgroup } : {}),
     SANDBOX_CONTROL_URL: sandboxControlWebSocketUrl(workerUrl, input.sandboxId),
     SANDBOX_CONTROL_CREDENTIAL: input.credential,
     PROVIDER_INSTANCE_ID: input.sandboxId,
+    [CONTROL_SANDBOX_PROVIDER_ENV]: input.provider,
     KILO_PLATFORM: 'cloud-agent',
     KILO_DISABLE_AUTOUPDATE: 'true',
     KILO_DEBUG_SESSION_INGEST: '1',

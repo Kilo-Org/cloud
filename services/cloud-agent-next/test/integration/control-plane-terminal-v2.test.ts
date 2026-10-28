@@ -3,11 +3,12 @@ import { afterEach, describe, expect, it } from 'vitest';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
-import { sessionDoName } from '../../src/session-plane.js';
+import { sessionDoName } from '../../src/session-identity.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
-import type {
-  ControlPlanePromptPayload,
-  ControlPlaneWrapperFrame,
+import {
+  CONTROL_PLANE_PROTOCOL_VERSION,
+  type ControlPlanePromptPayload,
+  type ControlPlaneWrapperFrame,
 } from '../../src/shared/control-plane-protocol.js';
 import type {
   ProviderAdapter,
@@ -15,11 +16,13 @@ import type {
   StopResult,
 } from '../../src/sandbox-control/provider.js';
 import {
+  FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   createFakeCredentialBroker,
   FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
   installFakeCredentialEnv,
 } from './helpers/fake-credentials.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
+import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { waitFor } from './wait-for.js';
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
@@ -30,6 +33,9 @@ const sessions = (env as unknown as { SANDBOX_SESSION: SessionNamespace }).SANDB
 const USER_ID = 'user_term';
 const ORG_ID = 'org_term';
 const WRAPPER_ID = 'wr_terminal';
+// Half the integration wait budget, so a dropped readiness frame is retried
+// while a genuinely stuck route still fails within the normal timeout.
+const ROUTE_READY_RETRY_MS = 5_000;
 
 type FakeProvider = { adapter: ProviderAdapter; launchEnvs: Record<string, string>[] };
 
@@ -56,7 +62,7 @@ function metadata(input: { sessionId: string; kiloSessionId: string; sandboxId: 
       orgId: ORG_ID,
       createdOnPlatform: 'cloud-agent-web',
     },
-    auth: { kiloSessionId: input.kiloSessionId, kilocodeToken: 'native-token' },
+    auth: { kiloSessionId: input.kiloSessionId, kilocodeToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN },
     agent: { mode: 'code', model: 'test/model' },
     repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
     workspace: {
@@ -79,15 +85,13 @@ function promptPayload(id: string): ControlPlanePromptPayload {
 function createFakeProvider(): FakeProvider {
   const provider: FakeProvider = { adapter: null as unknown as ProviderAdapter, launchEnvs: [] };
   provider.adapter = {
-    resumable: false,
-    persistentWorkspace: false,
-    destroysOnStop: true,
     async ensureBillingAdmission() {},
     async create(intent: ProviderCreateIntent) {
       return { providerRef: `mem_${intent.intentId}` };
     },
-    async launch(_ref, launchEnv) {
+    async launch(_ref, { env: launchEnv }) {
       provider.launchEnvs.push({ ...launchEnv });
+      return { startSource: 'image' as const };
     },
     async observe(ref) {
       return { status: 'active', ...(ref === null ? {} : { providerRef: ref }) };
@@ -118,6 +122,7 @@ async function injectProvider(
       KILO_OPENROUTER_BASE: 'https://control.test',
       KILO_SESSION_INGEST_URL: 'https://control.test',
     });
+    installFakeRuntimeProxyPeer(instance);
     Object.assign(instance, {
       createProviderAdapter: () => provider.adapter,
       provider: provider.adapter,
@@ -143,7 +148,7 @@ async function connectAndHello(
   const { credential, allocationId } = launchIdentity(provider);
   const wrapper = await FakeWrapper.connect({ sandboxId, credential });
   const reply = await wrapper.hello({ wrapperId, allocationId });
-  expect(reply).toEqual({ type: 'welcome', protocolVersion: 2 });
+  expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
   return wrapper;
 }
 
@@ -298,6 +303,31 @@ describe('control-plane terminals on the Sandbox DO (B10)', () => {
       error: { code: 'not_ready', retryable: true },
     });
   });
+
+  it('settles pending requests during allocation policy closure', async () => {
+    const { stub, wrapper } = await startTerminalSandbox();
+    const pending = stub.terminal({
+      operation: 'create',
+      session: sessionInput('workspace_policy'),
+      payload: { operationId: crypto.randomUUID() },
+    });
+    await awaitFrame(wrapper, 'terminal.create');
+    await runInDurableObject(stub, (instance, state) => {
+      Object.assign(instance, {
+        readWrapperBillingBlock: async () => true,
+        webSocketClose: async () => undefined,
+      });
+      for (const socket of state.getWebSockets()) {
+        socket.serializeAttachment({ ...socket.deserializeAttachment(), billingCheckedAt: 0 });
+      }
+    });
+    wrapper.heartbeat(true);
+    expect(await wrapper.waitForClose()).toBe(4402);
+    await expect(pending).resolves.toMatchObject({
+      ok: false,
+      error: { code: 'not_ready', retryable: true },
+    });
+  });
 });
 
 async function markRouteReady(
@@ -305,11 +335,23 @@ async function markRouteReady(
   wrapper: FakeWrapper,
   sessionId: string
 ): Promise<void> {
-  wrapper.send({ type: 'session.ready', sessionId });
-  await waitFor(async () => {
+  const isRouteReady = async (): Promise<boolean> => {
     const snapshot = await sessionStub.getSession();
-    expect(snapshot.type === 'found' && snapshot.route.state === 'ready').toBe(true);
-  });
+    return snapshot.type === 'found' && snapshot.route.state === 'ready';
+  };
+  // The first announce can reach the sandbox DO before it records this socket
+  // as the current connection, and a frame from a superseded connection is
+  // dropped without a reply. Announce once more after a shorter wait, so one
+  // dropped frame does not fail a correct run while a stuck route still fails.
+  wrapper.send({ type: 'session.ready', sessionId });
+  try {
+    await waitFor(async () => expect(await isRouteReady()).toBe(true), {
+      timeout: ROUTE_READY_RETRY_MS,
+    });
+  } catch {
+    wrapper.send({ type: 'session.ready', sessionId });
+    await waitFor(async () => expect(await isRouteReady()).toBe(true));
+  }
 }
 
 async function startTerminalSession(): Promise<{
@@ -330,6 +372,7 @@ async function startTerminalSession(): Promise<{
   });
   await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
   const wrapper = await connectAndHello(provider, sandboxId, WRAPPER_ID);
+  await awaitFrame(wrapper, 'session.prepare');
   await markRouteReady(sessionStub, wrapper, sessionId);
   return { sessionId, sandboxId, sessionStub, wrapper };
 }
@@ -473,6 +516,139 @@ describe('control-plane terminal bridge routing on the Session DO (B10)', () => 
       result: { connected: true },
     });
     await expect(browser).resolves.toMatchObject({ status: 409 });
+    wrapper.close();
+  });
+});
+
+type ChannelClose = { code: number; reason: string };
+
+function closedWith(socket: WebSocket): Promise<ChannelClose> {
+  const { promise, resolve } = Promise.withResolvers<ChannelClose>();
+  socket.addEventListener('close', event => {
+    resolve({ code: event.code, reason: event.reason });
+  });
+  return promise;
+}
+
+async function openBrowserTerminal(
+  sessionStub: DurableObjectStub<SandboxSessionV2>,
+  wrapper: FakeWrapper
+): Promise<{
+  socket: WebSocket;
+  closed: Promise<ChannelClose>;
+  peerClosed: Promise<ChannelClose>;
+}> {
+  const created = sessionStub.terminalCreate({ operationId: crypto.randomUUID() });
+  const createFrame = await awaitFrame(wrapper, 'terminal.create');
+  wrapper.send({
+    type: 'terminal.result',
+    requestId: createFrame.requestId,
+    ok: true,
+    result: { pty: pty('pty_1', createFrame.session.directory) },
+  });
+  await created;
+
+  const browserUpgrade = sessionStub.fetch(
+    new Request('https://control.test/terminal/browser?ptyId=pty_1', {
+      headers: { Upgrade: 'websocket' },
+    })
+  );
+  const connectFrame = await awaitFrame(wrapper, 'terminal.connect');
+  const wrapperUpgrade = await sessionStub.fetch(
+    new Request('https://control.test/terminal/wrapper?ptyId=pty_1', {
+      headers: {
+        Upgrade: 'websocket',
+        Authorization: `Bearer ${connectFrame.payload.capability}`,
+      },
+    })
+  );
+  expect(wrapperUpgrade.status).toBe(101);
+  const peer = wrapperUpgrade.webSocket;
+  if (!peer) throw new Error('Missing terminal wrapper socket');
+  peer.accept();
+  const peerClosed = closedWith(peer);
+  wrapper.send({
+    type: 'terminal.result',
+    requestId: connectFrame.requestId,
+    ok: true,
+    result: { connected: true },
+  });
+
+  const browser = await browserUpgrade;
+  expect(browser.status).toBe(101);
+  const socket = browser.webSocket;
+  if (!socket) throw new Error('Missing terminal browser socket');
+  socket.accept();
+  return { socket, closed: closedWith(socket), peerClosed };
+}
+
+async function openStreamSocket(
+  sessionStub: DurableObjectStub<SandboxSessionV2>
+): Promise<{ socket: WebSocket; closed: Promise<ChannelClose> }> {
+  const response = await sessionStub.fetch(
+    new Request('https://control.test/stream?replay=false', {
+      headers: { Upgrade: 'websocket' },
+    })
+  );
+  expect(response.status).toBe(101);
+  const socket = response.webSocket;
+  if (!socket) throw new Error('Missing stream socket');
+  socket.accept();
+  return { socket, closed: closedWith(socket) };
+}
+
+describe('control-plane session organization close on the Session DO', () => {
+  it('closes terminal browser and stream sockets for the session organization', async () => {
+    const { sessionStub, wrapper } = await startTerminalSession();
+    const terminal = await openBrowserTerminal(sessionStub, wrapper);
+    const stream = await openStreamSocket(sessionStub);
+
+    await expect(sessionStub.closeOrgStreams(ORG_ID)).resolves.toBe(2);
+
+    await expect(terminal.closed).resolves.toEqual({
+      code: 1000,
+      reason: 'session access revoked',
+    });
+    await expect(stream.closed).resolves.toEqual({
+      code: 1000,
+      reason: 'session access revoked',
+    });
+    // The bridge ends the wrapper side through the browser-disconnect path.
+    await expect(terminal.peerClosed).resolves.toEqual({
+      code: 1000,
+      reason: 'Browser disconnected',
+    });
+
+    // The terminal record stays running.
+    const record = await runInDurableObject(sessionStub, (_instance, state) =>
+      state.storage.get<{ state: string }>('control_terminal:pty_1')
+    );
+    expect(record).toMatchObject({ state: 'running' });
+    wrapper.close();
+  });
+
+  it('leaves terminal browser and stream sockets open for an unrelated organization', async () => {
+    const { sessionStub, wrapper } = await startTerminalSession();
+    const terminal = await openBrowserTerminal(sessionStub, wrapper);
+    const stream = await openStreamSocket(sessionStub);
+
+    await expect(sessionStub.closeOrgStreams('org_elsewhere')).resolves.toBe(0);
+    expect(terminal.socket.readyState).toBe(WebSocket.OPEN);
+    expect(stream.socket.readyState).toBe(WebSocket.OPEN);
+
+    await expect(sessionStub.closeOrgStreams(ORG_ID)).resolves.toBe(2);
+    await expect(terminal.closed).resolves.toEqual({
+      code: 1000,
+      reason: 'session access revoked',
+    });
+    await expect(stream.closed).resolves.toEqual({
+      code: 1000,
+      reason: 'session access revoked',
+    });
+    await expect(terminal.peerClosed).resolves.toEqual({
+      code: 1000,
+      reason: 'Browser disconnected',
+    });
     wrapper.close();
   });
 });

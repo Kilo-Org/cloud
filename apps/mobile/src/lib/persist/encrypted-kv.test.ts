@@ -14,9 +14,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // recovery behavior is driven by the test seams below.
 
 const store = new Map<string, string>();
-// Every SQL statement Drizzle prepares, in order. `PRAGMA key`, the probes, and
-// the migration all pass through `prepareSync`, so this is the whole statement
-// stream for one open.
+// Every SQL statement in the order it ran. All three seams append: `getFirstSync`
+// (the cipher and journal-mode probes), `execSync` (`PRAGMA key`, busy_timeout),
+// and `prepareSync` (Drizzle's queries and the migration), so this is the whole
+// statement stream for one open.
 const sqlLog: string[] = [];
 let randomCallCount = 0;
 let failNextProbe = false;
@@ -27,6 +28,9 @@ let failEveryPragma = false;
 // node:sqlite's `:memory:` database cannot use WAL, so the fake answers with
 // this seam and the test can force a rejected switch.
 let journalMode = 'wal';
+// Simulates an engine that rejects the pragma outright instead of answering
+// with the mode it kept.
+let failJournalMode = false;
 // Simulates a native handle that will not close. A leaked handle must not be
 // replaced by a second connection to the same file.
 let failClose = false;
@@ -132,6 +136,9 @@ function createFakeDatabase(): FakeDatabase {
         return hasSQLCipher ? { cipher_version: '4.5.5 community' } : null;
       }
       if (source.startsWith('PRAGMA journal_mode')) {
+        if (failJournalMode) {
+          throw new Error('PRAGMA journal_mode failed');
+        }
         return { journal_mode: journalMode };
       }
       return native.prepare(source).get() ?? null;
@@ -181,6 +188,7 @@ vi.mock('expo-sqlite', () => ({
 }));
 
 vi.mock('@sentry/react-native', () => ({
+  addBreadcrumb: vi.fn(),
   captureException: vi.fn(),
 }));
 
@@ -188,6 +196,7 @@ vi.mock('@sentry/react-native', () => ({
 import * as SecureStore from 'expo-secure-store';
 import * as SQLite from 'expo-sqlite';
 import { PERSIST_DB_KEY } from '@/lib/storage-keys';
+import { ProtectedDataUnavailableError, setProtectedDataAvailable } from '@/lib/protected-data';
 import {
   clearScope,
   clearScopePrefix,
@@ -215,10 +224,12 @@ beforeEach(() => {
   failNextPragma = false;
   failEveryPragma = false;
   journalMode = 'wal';
+  failJournalMode = false;
   failClose = false;
   hasSQLCipher = true;
   cipherProbedAtSqlCount = -1;
   closeCallCount = 0;
+  setProtectedDataAvailable(true);
   resetEncryptedKvOpenForTests();
 });
 
@@ -387,6 +398,63 @@ describe('transient keychain read', () => {
   });
 });
 
+describe('locked device', () => {
+  it('waits for unlock before it reads the key or opens the database', async () => {
+    store.set(PERSIST_DB_KEY, 'a'.repeat(64));
+    setProtectedDataAvailable(false);
+
+    const read = getItem('s', 'k');
+    await Promise.resolve();
+    expect(SecureStore.getItemAsync).not.toHaveBeenCalled();
+    expect(SQLite.openDatabaseSync).not.toHaveBeenCalled();
+
+    setProtectedDataAvailable(true);
+    await expect(read).resolves.toBeNull();
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(1);
+  });
+
+  it('never resets the database when the device locks during the open, and opens again after unlock', async () => {
+    const storedKey = 'a'.repeat(64);
+    store.set(PERSIST_DB_KEY, storedKey);
+    failNextProbe = true;
+    vi.mocked(SecureStore.getItemAsync).mockImplementationOnce(async () => {
+      setProtectedDataAvailable(false);
+      return storedKey;
+    });
+
+    await expect(getItem('s', 'k')).rejects.toBeInstanceOf(ProtectedDataUnavailableError);
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+    expect(store.get(PERSIST_DB_KEY)).toBe(storedKey);
+    expect(closeCallCount).toBe(1);
+
+    setProtectedDataAvailable(true);
+    await expect(getItem('s', 'k')).resolves.toBeNull();
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(2);
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+  });
+
+  it('opens again after unlock when the key read rejects because the device locked', async () => {
+    const storedKey = 'a'.repeat(64);
+    store.set(PERSIST_DB_KEY, storedKey);
+    const refusal = new Error('keychain refused: device locked');
+    vi.mocked(SecureStore.getItemAsync).mockImplementationOnce(async () => {
+      setProtectedDataAvailable(false);
+      throw refusal;
+    });
+
+    await expect(getItem('s', 'k')).rejects.toBe(refusal);
+    expect(SQLite.openDatabaseSync).not.toHaveBeenCalled();
+
+    // The raw native refusal must not keep the open memo rejected until relaunch.
+    setProtectedDataAvailable(true);
+    await expect(getItem('s', 'k')).resolves.toBeNull();
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(1);
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(store.get(PERSIST_DB_KEY)).toBe(storedKey);
+  });
+});
+
 describe('connection configuration', () => {
   it('configures busy_timeout and WAL after the key and before the first schema read', async () => {
     await setItem('s', 'a', 'x');
@@ -410,9 +478,43 @@ describe('connection configuration', () => {
     expect(busy).toBe('PRAGMA busy_timeout = 5000');
   });
 
-  it('fails the open when journal_mode does not switch to WAL', async () => {
+  it('accepts the journal mode the engine reports when WAL is refused', async () => {
     journalMode = 'delete';
-    await expect(setItem('s', 'a', 'x')).rejects.toThrow(/journal_mode did not switch to WAL/);
+    await setItem('s', 'a', 'x');
+
+    // The store opened, kept its file, and serves reads from it.
+    await expect(getItem('s', 'a')).resolves.toBe('x');
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(SQLite.openDatabaseSync).toHaveBeenCalledTimes(1);
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+    // The refusal is visible in the diagnostic trail without filing an event.
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledTimes(1);
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith({
+      category: 'encrypted-kv',
+      level: 'warning',
+      message: 'journal_mode did not switch to WAL',
+      data: { journal_mode: 'delete' },
+    });
+  });
+
+  it('opens when the engine rejects the journal_mode pragma', async () => {
+    failJournalMode = true;
+    await setItem('s', 'a', 'x');
+
+    await expect(getItem('s', 'a')).resolves.toBe('x');
+    expect(SQLite.deleteDatabaseAsync).not.toHaveBeenCalled();
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+    expect(Sentry.addBreadcrumb).toHaveBeenCalledWith({
+      category: 'encrypted-kv',
+      level: 'warning',
+      message: 'PRAGMA journal_mode = WAL was rejected',
+      data: { journal_mode: 'unknown' },
+    });
+  });
+
+  it('records no journal-mode breadcrumb when WAL takes effect', async () => {
+    await setItem('s', 'a', 'x');
+    expect(Sentry.addBreadcrumb).not.toHaveBeenCalled();
   });
 });
 

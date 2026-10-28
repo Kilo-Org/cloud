@@ -1,13 +1,23 @@
 import type { ClassifierSubtaskType, ClassifierTaskType } from '@kilocode/auto-routing-contracts';
 import type { DeciderCheck } from '../grading';
+import { AGENTIC_EXECUTION_V2_CASES } from './decider-cases-v2/agentic-execution';
+import { DEBUGGING_V2_CASES } from './decider-cases-v2/debugging';
+import { IMPLEMENTATION_V2_CASES } from './decider-cases-v2/implementation';
+import { INVESTIGATION_V2_CASES } from './decider-cases-v2/investigation';
+import { PLANNING_DESIGN_V2_CASES } from './decider-cases-v2/planning-design';
+import { REFACTORING_V2_CASES } from './decider-cases-v2/refactoring';
+import { FRONTIER_V1_CASES } from './frontier-cases';
+import { FRONTIER_LONG_CONTEXT_CASES, LONG_CONTEXT_CASES } from './long-context/cases';
 
 export type DeciderCase = {
-  id: string; // stable slug, e.g. 'impl-gen-squares-array' (<taskType>-<subtype>-<topic>)
+  id: string;
   taskType: ClassifierTaskType;
   subtaskType: ClassifierSubtaskType;
   systemPrompt: string;
   userPrompt: string;
   check: DeciderCheck;
+  tier?: 'efficient' | 'frontier';
+  longContext?: { generator: string; seed: number; targetTokens: number };
 };
 
 const CODE_SYS =
@@ -26,7 +36,7 @@ const AGENT_SYS =
 // agentic_execution cases are self-contained tasks performed with file/terminal
 // tools inside the benchmark container (node:22-slim, no repo, no network) and
 // every command involved is deterministic there.
-export const DECIDER_CASES: readonly DeciderCase[] = [
+const V1_DECIDER_CASES: readonly DeciderCase[] = [
   {
     id: 'impl-feat-ternary-parity',
     taskType: 'implementation',
@@ -1674,4 +1684,20 @@ export const DECIDER_CASES: readonly DeciderCase[] = [
       'Create /tmp/bench-numbers.json containing [5,10,15]. Read it, sum the numbers, and answer only the sum.',
     check: { kind: 'exact', value: '30' },
   },
+];
+
+export const DECIDER_CASES: readonly DeciderCase[] = [
+  ...V1_DECIDER_CASES,
+  ...IMPLEMENTATION_V2_CASES,
+  ...DEBUGGING_V2_CASES,
+  ...INVESTIGATION_V2_CASES,
+  ...PLANNING_DESIGN_V2_CASES,
+  ...REFACTORING_V2_CASES,
+  ...AGENTIC_EXECUTION_V2_CASES,
+  ...LONG_CONTEXT_CASES,
+];
+
+export const FRONTIER_CASES: readonly DeciderCase[] = [
+  ...FRONTIER_V1_CASES,
+  ...FRONTIER_LONG_CONTEXT_CASES,
 ];

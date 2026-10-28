@@ -48,7 +48,7 @@ export function MergesPageClient({ townId }: { townId: string }) {
       <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.06] bg-[oklch(0.1_0_0)] px-6 py-3">
         <div className="flex items-center gap-2">
           <SidebarTrigger className="-ml-3" />
-          <GitMerge className="size-4 text-[color:oklch(95%_0.15_108_/_0.6)]" />
+          <GitMerge className="size-4 text-primary/60" />
           <h1 className="text-lg font-semibold tracking-tight text-white/90">Merge Queue</h1>
           {totalAttention > 0 && (
             <span className="ml-1 rounded-full bg-amber-500/15 px-2 py-0.5 font-mono text-[10px] font-medium text-amber-400">

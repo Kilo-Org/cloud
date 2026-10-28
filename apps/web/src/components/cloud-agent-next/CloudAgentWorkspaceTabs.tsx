@@ -21,7 +21,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip
 import { cn } from '@/lib/utils';
 import {
   ChevronDown,
+  CircleAlert,
   FileDiff,
+  Globe,
   LoaderCircle,
   MessageSquare,
   Plus,
@@ -32,9 +34,10 @@ import { toast } from 'sonner';
 import { CHAT_TAB_ID, fileTabId, terminalTabId } from './workspace-tabs';
 import type { FileWorkspaceTab, TerminalWorkspaceTab, WorkspaceTabId } from './workspace-tabs';
 import type { StoredSession } from './types';
+import type { TerminalStatus } from './useCloudAgentTerminal';
 
 type TerminalStatusSummary = {
-  status: 'connecting' | 'connected' | 'reconnecting' | 'disconnected' | 'exited' | 'error';
+  status: TerminalStatus;
   statusText: string;
 };
 
@@ -52,7 +55,7 @@ function statusDotClass(status: TerminalStatusSummary['status']): string {
 }
 
 const tabClassName =
-  'border-border bg-muted/40 text-muted-foreground flex h-8 min-w-0 max-w-full shrink-0 items-center rounded-md border [@media(any-pointer:coarse)]:h-12';
+  'border-border bg-muted/40 text-muted-foreground relative flex h-8 min-w-0 max-w-full shrink-0 items-center rounded-md border [@media(any-pointer:coarse)]:h-12';
 const activeTabClassName = 'border-foreground/30 bg-secondary text-foreground shadow-sm';
 const tabTriggerClassName =
   'h-full min-w-0 gap-1.5 px-2 text-xs hover:bg-accent/60 focus-visible:ring-offset-0 focus-visible:ring-inset data-[state=active]:border-0 data-[state=active]:bg-transparent data-[state=active]:shadow-none [@media(any-pointer:coarse)]:min-w-11';
@@ -65,6 +68,7 @@ export function CloudAgentWorkspaceTabs({
   activeTabRef,
   chatSessions,
   currentChatProgress,
+  currentChatLoadingLabel,
   currentSessionId,
   worktreeId,
   openChatSessionIds,
@@ -72,7 +76,7 @@ export function CloudAgentWorkspaceTabs({
   onSelectChat,
   onCloseChat,
   onCreateChat,
-  isCreatingChat = false,
+  canCreateChat = true,
   onRenameChat,
   deletingSessionIds = [],
   terminals,
@@ -80,8 +84,10 @@ export function CloudAgentWorkspaceTabs({
   onCloseFile,
   terminalStatuses,
   canCreateTerminal,
+  canOpenPreview = false,
   onSelectTab,
   onCreateTerminal,
+  onOpenPreview,
   onCloseTerminal,
   onActivateTab,
   selectionSuppressed = false,
@@ -93,6 +99,7 @@ export function CloudAgentWorkspaceTabs({
   onCloseFile: (path: string) => void;
   chatSessions: StoredSession[];
   currentChatProgress?: { sessionId: string; message: string } | null;
+  currentChatLoadingLabel?: string | null;
   currentSessionId: string | null;
   worktreeId?: string | null;
   openChatSessionIds?: readonly string[];
@@ -100,14 +107,17 @@ export function CloudAgentWorkspaceTabs({
   onSelectChat: (sessionId: string) => void;
   onCloseChat?: (sessionId: string) => void;
   onCreateChat?: () => void;
-  isCreatingChat?: boolean;
+  /** False while the selected chat cannot seed a new one; the button stays in place, disabled. */
+  canCreateChat?: boolean;
   onRenameChat?: (sessionId: string, title: string) => Promise<void>;
   deletingSessionIds?: readonly string[];
   terminals: TerminalWorkspaceTab[];
   terminalStatuses: Record<string, TerminalStatusSummary | undefined>;
   canCreateTerminal: boolean;
+  canOpenPreview?: boolean;
   onSelectTab: (tabId: WorkspaceTabId) => void;
   onCreateTerminal: () => void;
+  onOpenPreview?: () => void;
   onCloseTerminal: (terminalId: string) => void;
   onActivateTab?: () => void;
   selectionSuppressed?: boolean;
@@ -157,6 +167,16 @@ export function CloudAgentWorkspaceTabs({
     ? { 'aria-selected': false, 'data-state': 'inactive' }
     : {};
 
+  const loadingIndicator = currentChatLoadingLabel ? (
+    <span role="status" aria-label={currentChatLoadingLabel}>
+      <LoaderCircle
+        className="text-muted-foreground h-3.5 w-3.5 animate-spin motion-reduce:animate-none"
+        aria-hidden="true"
+      />
+      <span className="sr-only">{currentChatLoadingLabel}</span>
+    </span>
+  ) : null;
+
   useEffect(() => {
     if (!editingSessionId) return;
     editInputRef.current?.focus();
@@ -165,7 +185,14 @@ export function CloudAgentWorkspaceTabs({
 
   useEffect(() => {
     const revealActiveTab = () => {
-      activeTabWrapperRef.current?.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+      const tab = activeTabWrapperRef.current;
+      const list = tabListRef.current;
+      if (!tab || !list) return;
+      const tabBounds = tab.getBoundingClientRect();
+      const listBounds = list.getBoundingClientRect();
+      if (tabBounds.left < listBounds.left) list.scrollLeft += tabBounds.left - listBounds.left;
+      else if (tabBounds.right > listBounds.right)
+        list.scrollLeft += tabBounds.right - listBounds.right;
     };
     revealActiveTab();
     if (restoreTabFocusRef.current) {
@@ -352,13 +379,23 @@ export function CloudAgentWorkspaceTabs({
                   >
                     <TooltipTrigger>
                       <span className="flex h-4 w-4 shrink-0 items-center justify-center">
-                        {activityKind ? (
+                        {session.localSync === 'failed' ? (
+                          <CircleAlert
+                            className="text-destructive h-3.5 w-3.5 shrink-0"
+                            aria-label="Not created"
+                          />
+                        ) : selected && !isEditing && loadingIndicator ? (
+                          loadingIndicator
+                        ) : activityKind ? (
                           <SessionStatusIndicator
                             status={session.sessionStatus ?? null}
                             statusUpdatedAt={session.sessionStatusUpdatedAt ?? null}
                           />
                         ) : progress && !isEditing ? (
-                          <StatusSpinner className="h-4 w-4 shrink-0 text-gray-600" title="Busy" />
+                          <StatusSpinner
+                            className="text-muted-foreground h-4 w-4 shrink-0"
+                            title="Busy"
+                          />
                         ) : (
                           <MessageSquare className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
                         )}
@@ -366,16 +403,7 @@ export function CloudAgentWorkspaceTabs({
                       {isEditing ? (
                         <span className="sr-only">{session.prompt}</span>
                       ) : (
-                        <span className="relative min-w-0 max-w-36">
-                          <span className={cn('block truncate', progress && 'text-transparent')}>
-                            {session.prompt}
-                          </span>
-                          {progress && (
-                            <span aria-hidden="true" className="absolute inset-0 block truncate">
-                              {progress.message}
-                            </span>
-                          )}
-                        </span>
+                        <span className="min-w-0 max-w-36 truncate">{session.prompt}</span>
                       )}
                     </TooltipTrigger>
                   </TabsTrigger>
@@ -451,7 +479,13 @@ export function CloudAgentWorkspaceTabs({
               value={CHAT_TAB_ID}
               className={tabTriggerClassName}
             >
-              <MessageSquare className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span className="flex h-4 w-4 shrink-0 items-center justify-center">
+                {activeTabId === CHAT_TAB_ID && !selectionSuppressed && loadingIndicator ? (
+                  loadingIndicator
+                ) : (
+                  <MessageSquare className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                )}
+              </span>
               <span className="min-w-0 truncate">Chat</span>
             </TabsTrigger>
           </div>
@@ -556,18 +590,13 @@ export function CloudAgentWorkspaceTabs({
                 type="button"
                 size="sm"
                 variant="ghost"
-                disabled={isCreatingChat}
+                disabled={!canCreateChat}
                 aria-label="New chat"
-                aria-busy={isCreatingChat || undefined}
-                title={isCreatingChat ? 'Creating chat…' : 'New chat'}
+                title="New chat"
                 className="h-full w-8 rounded-r-none px-0 focus-visible:ring-inset [@media(any-pointer:coarse)]:w-11"
                 onClick={onCreateChat}
               >
-                {isCreatingChat ? (
-                  <LoaderCircle className="h-4 w-4 animate-spin" aria-hidden="true" />
-                ) : (
-                  <Plus className="h-4 w-4" aria-hidden="true" />
-                )}
+                <Plus className="h-4 w-4" aria-hidden="true" />
               </Button>
             )}
             <DropdownMenu>
@@ -594,7 +623,7 @@ export function CloudAgentWorkspaceTabs({
               >
                 {onCreateChat && (
                   <DropdownMenuItem
-                    disabled={isCreatingChat}
+                    disabled={!canCreateChat}
                     onSelect={onCreateChat}
                     className="[@media(any-pointer:coarse)]:min-h-11"
                   >
@@ -671,6 +700,23 @@ export function CloudAgentWorkspaceTabs({
             <Terminal className="h-4 w-4" aria-hidden="true" />
           </Button>
         ) : null}
+        {(selectedWorktreeId || canOpenPreview) && (
+          <div className="h-8 w-8 shrink-0 [@media(any-pointer:coarse)]:h-11 [@media(any-pointer:coarse)]:w-11">
+            {canOpenPreview && onOpenPreview && (
+              <Button
+                type="button"
+                size="sm"
+                variant="ghost"
+                aria-label="Open preview"
+                title="Open preview"
+                className="text-muted-foreground h-8 w-8 shrink-0 px-0 focus-visible:ring-inset [@media(any-pointer:coarse)]:h-11 [@media(any-pointer:coarse)]:w-11"
+                onClick={onOpenPreview}
+              >
+                <Globe className="h-4 w-4" aria-hidden="true" />
+              </Button>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );

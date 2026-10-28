@@ -58,7 +58,11 @@ describe('createWrapperKiloClient prompt handoff', () => {
       .mockResolvedValueOnce(Response.json(completion))
       .mockResolvedValueOnce(new Response(null, { status: 204 }));
     vi.stubGlobal('fetch', fetchMock);
-    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+    const client = createWrapperKiloClient(
+      createSdkClient(),
+      { url: 'http://127.0.0.1:0' },
+      workspacePath
+    );
     const opts: Parameters<WrapperKiloClient['sendPrompt']>[0] = {
       sessionId: 'kilo_sess',
       messageId: 'msg_prompt',
@@ -117,7 +121,11 @@ describe('createWrapperKiloClient prompt handoff', () => {
       'fetch',
       vi.fn(() => Promise.resolve(Response.json(failedCompletion)))
     );
-    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+    const client = createWrapperKiloClient(
+      createSdkClient(),
+      { url: 'http://127.0.0.1:0' },
+      workspacePath
+    );
 
     const prompt = await client.sendPrompt({
       sessionId: 'kilo_sess',
@@ -142,7 +150,7 @@ describe('createWrapperKiloClient prompt handoff', () => {
       vi.stubGlobal('fetch', fetchMock);
       const client = createWrapperKiloClient(
         createSdkClient(),
-        'http://127.0.0.1:0',
+        { url: 'http://127.0.0.1:0' },
         workspacePath
       );
       const invoke = () =>
@@ -165,7 +173,11 @@ describe('createWrapperKiloClient prompt handoff', () => {
         })
       )
     );
-    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+    const client = createWrapperKiloClient(
+      createSdkClient(),
+      { url: 'http://127.0.0.1:0' },
+      workspacePath
+    );
 
     await expect(
       client.sendCommand({ sessionId: 'kilo_sess', command: 'compact', messageId: 'msg_command' })
@@ -178,7 +190,11 @@ describe('createWrapperKiloClient prompt handoff', () => {
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
       .mockResolvedValueOnce(Response.json(completion));
     vi.stubGlobal('fetch', fetchMock);
-    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+    const client = createWrapperKiloClient(
+      createSdkClient(),
+      { url: 'http://127.0.0.1:0' },
+      workspacePath
+    );
     const model = { providerID: 'kilo', modelID: 'vendor/Team/Model:free~Alias' };
 
     await client.sendPromptAsync({
@@ -229,7 +245,11 @@ describe('createWrapperKiloClient prompt handoff', () => {
   it('defaults a selected command model to the Kilo provider without stripping an inner kilo prefix', async () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json(completion));
     vi.stubGlobal('fetch', fetchMock);
-    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+    const client = createWrapperKiloClient(
+      createSdkClient(),
+      { url: 'http://127.0.0.1:0' },
+      workspacePath
+    );
 
     await client.sendCommand({
       sessionId: 'kilo_sess',
@@ -249,7 +269,11 @@ describe('createWrapperKiloClient prompt handoff', () => {
   it('leaves the command model absent when only agent and variant are selected', async () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json(completion));
     vi.stubGlobal('fetch', fetchMock);
-    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+    const client = createWrapperKiloClient(
+      createSdkClient(),
+      { url: 'http://127.0.0.1:0' },
+      workspacePath
+    );
 
     await client.sendCommand({
       sessionId: 'kilo_sess',
@@ -276,7 +300,11 @@ describe('createWrapperKiloClient prompt handoff', () => {
       })
     );
     vi.stubGlobal('fetch', fetchMock);
-    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+    const client = createWrapperKiloClient(
+      createSdkClient(),
+      { url: 'http://127.0.0.1:0' },
+      workspacePath
+    );
 
     const result = await client.summarizeSession({
       sessionId: 'kilo_sess',
@@ -300,7 +328,7 @@ describe('createWrapperKiloClient prompt handoff', () => {
     async auto => {
       const fetchMock = vi.fn().mockResolvedValue(Response.json(true));
       vi.stubGlobal('fetch', fetchMock);
-      const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', '/');
+      const client = createWrapperKiloClient(createSdkClient(), { url: 'http://127.0.0.1:0' }, '/');
       const directory = '/workspace/attached repo & tests';
 
       await expect(
@@ -332,7 +360,11 @@ describe('createWrapperKiloClient prompt handoff', () => {
         .fn()
         .mockResolvedValue(new Response(body, { headers: { 'content-type': 'application/json' } }))
     );
-    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+    const client = createWrapperKiloClient(
+      createSdkClient(),
+      { url: 'http://127.0.0.1:0' },
+      workspacePath
+    );
 
     await expect(
       client.summarizeSession({ sessionId: 'kilo_sess', model: { modelID: 'vendor/model' } })
@@ -346,7 +378,11 @@ describe('createWrapperKiloClient prompt handoff', () => {
       .mockResolvedValueOnce(new Response(null, { status: 204 }))
       .mockResolvedValueOnce(Response.json(null));
     vi.stubGlobal('fetch', fetchMock);
-    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+    const client = createWrapperKiloClient(
+      createSdkClient(),
+      { url: 'http://127.0.0.1:0' },
+      workspacePath
+    );
     const opts = { path: '/workspace/attached repo & tests' };
 
     await expect(client.generateCommitMessage(opts)).resolves.toEqual({
@@ -371,7 +407,11 @@ describe('createWrapperKiloClient prompt handoff', () => {
         .fn()
         .mockResolvedValue(Response.json({ message: 'private upstream detail' }, { status: 422 }))
     );
-    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+    const client = createWrapperKiloClient(
+      createSdkClient(),
+      { url: 'http://127.0.0.1:0' },
+      workspacePath
+    );
 
     await expect(client.generateCommitMessage({ path: workspacePath })).rejects.toThrow(
       'Commit message generation failed: HTTP 422'
@@ -389,7 +429,11 @@ describe('createWrapperKiloClient prompt handoff', () => {
       )
     );
 
-    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+    const client = createWrapperKiloClient(
+      createSdkClient(),
+      { url: 'http://127.0.0.1:0' },
+      workspacePath
+    );
 
     await expect(
       client.sendPromptAsync({
@@ -429,7 +473,11 @@ describe('createWrapperKiloClient prompt handoff', () => {
       )
     );
     vi.stubGlobal('fetch', fetchMock);
-    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+    const client = createWrapperKiloClient(
+      createSdkClient(),
+      { url: 'http://127.0.0.1:0' },
+      workspacePath
+    );
 
     await expect(client.listEffectiveModels('kilo')).resolves.toEqual([
       'anthropic/claude-sonnet-4-20250514',
@@ -452,7 +500,11 @@ describe('createWrapperKiloClient prompt handoff', () => {
       })
     );
     vi.stubGlobal('fetch', fetchMock);
-    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+    const client = createWrapperKiloClient(
+      createSdkClient(),
+      { url: 'http://127.0.0.1:0' },
+      workspacePath
+    );
 
     await client.sendCommand({ sessionId: 'kilo_sess_default', command: 'review' });
 
@@ -481,7 +533,7 @@ describe('createWrapperKiloClient abort acknowledgement', () => {
       );
       const client = createWrapperKiloClient(
         createSdkClient(),
-        'http://127.0.0.1:0',
+        { url: 'http://127.0.0.1:0' },
         workspacePath
       );
 
@@ -502,7 +554,7 @@ describe('createWrapperKiloClient session initialization', () => {
       .fn()
       .mockResolvedValue(Response.json({ id: 'kilo_sess', title: 'My chosen title' }));
     vi.stubGlobal('fetch', fetchMock);
-    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', '/');
+    const client = createWrapperKiloClient(createSdkClient(), { url: 'http://127.0.0.1:0' }, '/');
 
     await client.ensureSession('kilo_sess', workspacePath);
 
@@ -520,7 +572,7 @@ describe('createWrapperKiloClient session initialization', () => {
       .mockResolvedValueOnce(Response.json({ id: nativeProjectId }))
       .mockResolvedValueOnce(Response.json({ ok: true, id: 'kilo_sess' }));
     vi.stubGlobal('fetch', fetchMock);
-    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', '/');
+    const client = createWrapperKiloClient(createSdkClient(), { url: 'http://127.0.0.1:0' }, '/');
 
     await client.ensureSession('kilo_sess', workspacePath);
 
@@ -558,7 +610,7 @@ describe('createWrapperKiloClient session initialization', () => {
         .mockResolvedValueOnce(Response.json({ id: nativeProjectId }))
         .mockResolvedValueOnce(Response.json({ message: 'sensitive import data' }, { status: 500 }))
     );
-    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', '/');
+    const client = createWrapperKiloClient(createSdkClient(), { url: 'http://127.0.0.1:0' }, '/');
 
     const error: unknown = await client
       .ensureSession('kilo_sess', workspacePath)
@@ -571,7 +623,7 @@ describe('createWrapperKiloClient session initialization', () => {
   it('requires the lookup to return the requested session', async () => {
     const fetchMock = vi.fn().mockResolvedValue(Response.json({ id: 'another_session' }));
     vi.stubGlobal('fetch', fetchMock);
-    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', '/');
+    const client = createWrapperKiloClient(createSdkClient(), { url: 'http://127.0.0.1:0' }, '/');
 
     await expect(client.ensureSession('kilo_sess', workspacePath)).rejects.toThrow(
       'returned an invalid session'
@@ -588,7 +640,7 @@ describe('createWrapperKiloClient session initialization', () => {
         .mockResolvedValueOnce(Response.json({ id: nativeProjectId }))
         .mockResolvedValueOnce(Response.json({ ok: false, id: 'kilo_sess' }))
     );
-    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', '/');
+    const client = createWrapperKiloClient(createSdkClient(), { url: 'http://127.0.0.1:0' }, '/');
 
     await expect(client.ensureSession('kilo_sess', workspacePath)).rejects.toThrow(
       'Session import for kilo_sess returned an invalid session'
@@ -713,7 +765,7 @@ describe('createWrapperKiloClient generated SDK request cancellation', () => {
         });
       });
       vi.stubGlobal('fetch', fetchMock);
-      const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', '/');
+      const client = createWrapperKiloClient(createSdkClient(), { url: 'http://127.0.0.1:0' }, '/');
       const directory = '/workspace/attached repo & tests';
       const controller = new AbortController();
       const reason = new Error('cancel request');
@@ -758,7 +810,11 @@ describe('createWrapperKiloClient network endpoints', () => {
       )
     );
 
-    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+    const client = createWrapperKiloClient(
+      createSdkClient(),
+      { url: 'http://127.0.0.1:0' },
+      workspacePath
+    );
 
     await expect(client.getNetworkWaits()).rejects.toThrow('Network list failed: HTTP 500');
   });
@@ -774,7 +830,11 @@ describe('createWrapperKiloClient network endpoints', () => {
       )
     );
 
-    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+    const client = createWrapperKiloClient(
+      createSdkClient(),
+      { url: 'http://127.0.0.1:0' },
+      workspacePath
+    );
 
     await expect(client.resumeNetworkWait('net_req_missing')).rejects.toThrow(
       'Network reply net_req_missing failed: HTTP 404'
@@ -811,7 +871,11 @@ describe('createWrapperKiloClient event subscription', () => {
         )
       );
     vi.stubGlobal('fetch', fetchMock);
-    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+    const client = createWrapperKiloClient(
+      createSdkClient(),
+      { url: 'http://127.0.0.1:0' },
+      workspacePath
+    );
 
     const { stream } = await client.subscribeEvents({});
     if (!stream) throw new Error('Expected event stream');
@@ -865,7 +929,11 @@ describe('createWrapperKiloClient PTY endpoints', () => {
       })
     );
 
-    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+    const client = createWrapperKiloClient(
+      createSdkClient(),
+      { url: 'http://127.0.0.1:0' },
+      workspacePath
+    );
 
     await client.resizePty('pty_resize', { cols: 120, rows: 40 });
 
@@ -898,7 +966,11 @@ describe('createWrapperKiloClient PTY endpoints', () => {
       })
     );
 
-    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+    const client = createWrapperKiloClient(
+      createSdkClient(),
+      { url: 'http://127.0.0.1:0' },
+      workspacePath
+    );
 
     await client.resizePty('pty_resize_control', { cols: 100, rows: 35 }, sessionDirectory);
 
@@ -923,7 +995,11 @@ describe('createWrapperKiloClient PTY endpoints', () => {
       })
     );
 
-    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+    const client = createWrapperKiloClient(
+      createSdkClient(),
+      { url: 'http://127.0.0.1:0' },
+      workspacePath
+    );
 
     await client.deletePty('pty_delete');
 
@@ -948,7 +1024,11 @@ describe('createWrapperKiloClient PTY endpoints', () => {
       })
     );
 
-    const client = createWrapperKiloClient(createSdkClient(), 'http://127.0.0.1:0', workspacePath);
+    const client = createWrapperKiloClient(
+      createSdkClient(),
+      { url: 'http://127.0.0.1:0' },
+      workspacePath
+    );
 
     await client.deletePty('pty_delete_control', sessionDirectory);
 

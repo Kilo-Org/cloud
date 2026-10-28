@@ -44,26 +44,15 @@ const groups: ServiceGroup[] = [
     groupDependsOn: ['git-token-service', 'notifications'],
   },
   { id: 'code-review', label: 'Code Review', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
-  { id: 'app-builder', label: 'App Builder', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
   { id: 'gastown', label: 'Gastown', alwaysOn: false, groupDependsOn: ['git-token-service'] },
-  {
-    id: 'auto-triage',
-    label: 'Auto Triage',
-    alwaysOn: false,
-    groupDependsOn: ['cloud-agent'],
-    sectionBreakBefore: true,
-  },
-  { id: 'auto-fix', label: 'Auto Fix', alwaysOn: false, groupDependsOn: ['cloud-agent'] },
   {
     id: 'security-agent',
     label: 'Security Agent',
     alwaysOn: false,
     groupDependsOn: ['cloud-agent'],
   },
-  { id: 'deploy', label: 'Deploy', alwaysOn: false },
   { id: 'observability', label: 'Observability', alwaysOn: false },
   { id: 'auto-routing', label: 'Auto Routing', alwaysOn: false, sectionBreakBefore: true },
-  { id: 'ai-gateway', label: 'AI Gateway', alwaysOn: false },
   { id: 'mobile', label: 'Mobile', alwaysOn: false, sectionBreakBefore: true },
   { id: 'storybook', label: 'Storybook', alwaysOn: false, sectionBreakBefore: true },
   { id: 'deletion-mock', label: 'Deletion Mock', alwaysOn: false, sectionBreakBefore: true },
@@ -94,34 +83,49 @@ type ServiceMeta = {
 };
 
 const serviceMeta: Record<string, ServiceMeta> = {
-  // core
   // The web app mints web tickets from Session Ingest
   // (`activeSessions.createWebTicket` / `getToken` in
   // apps/web/src/routers/active-sessions-router.ts), so starting the web app
   // must pull the worker in transitively — otherwise the mutation's fetch hits
   // a dead `SESSION_INGEST_WORKER_URL` and every run that asks for a web ticket
   // gets a 412 PRECONDITION_FAILED. Same precedent as mobile -> latency-ingest.
+  // The web app rewrites its AI gateway routes to the ai-gateway app (see
+  // apps/web/ai-gateway-rewrites.mjs), so it pulls that app in too.
+  // Every code-review read and write reaches git-token-service for the caller's
+  // provider credential (apps/web/src/lib/integrations/platforms/{github,gitlab,
+  // bitbucket}/ plus lib/provider-review/), so the web stack must pull the
+  // worker in transitively — otherwise those fetches hit a dead
+  // `GIT_TOKEN_SERVICE_API_URL` and a connected GitHub account renders as a
+  // service outage with no pull requests.
   nextjs: {
     group: 'core',
-    dependsOn: ['postgres', 'redis', 'redis-http', 'stripe', 'cloudflare-session-ingest'],
+    dependsOn: [
+      'postgres',
+      'redis',
+      'redis-http',
+      'stripe',
+      'cloudflare-session-ingest',
+      'ai-gateway',
+      'cloudflare-git-token-service',
+      'byok-kms',
+    ],
   },
   postgres: { group: 'core', dependsOn: [] },
   redis: { group: 'core', dependsOn: [] },
   'redis-http': { group: 'core', dependsOn: ['redis'] },
+  'local-kms': { group: 'core', dependsOn: [] },
+  'byok-kms': { group: 'core', dependsOn: ['local-kms'] },
   stripe: { group: 'core', dependsOn: [] },
+  'ai-gateway': {
+    group: 'core',
+    dependsOn: ['postgres', 'redis', 'redis-http'],
+    dir: 'apps/ai-gateway',
+  },
   'user-data-export': {
     group: 'data-export',
     dependsOn: ['postgres', 'nextjs'],
     dir: 'services/user-data-export',
   },
-  // The standalone AI gateway app (apps/ai-gateway). It serves the gateway
-  // routes the web app also serves, from the same database and Redis.
-  'ai-gateway': {
-    group: 'ai-gateway',
-    dependsOn: ['postgres', 'redis', 'redis-http'],
-    dir: 'apps/ai-gateway',
-  },
-  // auto-routing (kilo-auto/efficient decision engine + benchmark runner)
   'auto-routing': {
     group: 'auto-routing',
     dependsOn: [],
@@ -132,7 +136,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: [],
     dir: 'services/auto-routing-benchmark',
   },
-  // cloud-agent
   'cloud-agent-next': {
     group: 'cloud-agent',
     dependsOn: [
@@ -189,26 +192,11 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dir: 'services/cloud-agent-next',
   },
   'cloud-agent-public-tunnels': { group: 'cloud-agent-public-tunnels', dependsOn: [] },
-  // git-token-service (shared by cloud-agent, app-builder, gastown)
   'cloudflare-git-token-service': {
     group: 'git-token-service',
     dependsOn: ['postgres'],
     dir: 'services/git-token-service',
   },
-  // app-builder
-  'app-builder-tunnel': { group: 'app-builder', dependsOn: [] },
-  'cloudflare-app-builder': {
-    group: 'app-builder',
-    dependsOn: ['cloudflare-db-proxy', 'cloudflare-git-token-service', 'app-builder-tunnel'],
-    dir: 'services/app-builder',
-    useLanIp: true,
-  },
-  'cloudflare-db-proxy': {
-    group: 'app-builder',
-    dependsOn: ['postgres'],
-    dir: 'services/db-proxy',
-  },
-  // code-review
   'bitbucket-webhook-tunnel': {
     group: 'code-review',
     dependsOn: ['nextjs'],
@@ -218,19 +206,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: ['cloud-agent-next', 'nextjs'],
     dir: 'services/code-review-infra',
   },
-  // auto-triage
-  'cloudflare-auto-triage-infra': {
-    group: 'auto-triage',
-    dependsOn: ['cloud-agent-next', 'nextjs'],
-    dir: 'services/auto-triage-infra',
-  },
-  // auto-fix
-  'cloudflare-auto-fix-infra': {
-    group: 'auto-fix',
-    dependsOn: ['cloud-agent-next', 'nextjs'],
-    dir: 'services/auto-fix-infra',
-  },
-  // security-agent
   'cloudflare-security-sync': {
     group: 'security-agent',
     dependsOn: ['postgres', 'cloudflare-git-token-service'],
@@ -247,18 +222,6 @@ const serviceMeta: Record<string, ServiceMeta> = {
     ],
     dir: 'services/security-auto-analysis',
   },
-  // deploy
-  'cloudflare-deploy-builder': {
-    group: 'deploy',
-    dependsOn: ['nextjs'],
-    dir: 'services/deploy-infra/builder',
-  },
-  'cloudflare-deploy-dispatcher': {
-    group: 'deploy',
-    dependsOn: [],
-    dir: 'services/deploy-infra/dispatcher',
-  },
-  // kiloclaw
   'kiloclaw-tunnel': { group: 'kiloclaw', dependsOn: [] },
   'kiloclaw-docker-tcp': { group: 'kiloclaw', dependsOn: [] },
   notifications: {
@@ -286,12 +249,16 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dependsOn: [],
     dir: 'services/event-service',
   },
+  'kilo-mcp': {
+    group: 'cloud-agent',
+    dependsOn: [],
+    dir: 'services/kilo-mcp',
+  },
   'kilo-chat': {
     group: 'kiloclaw',
     dependsOn: ['kiloclaw', 'event-service'],
     dir: 'services/kilo-chat',
   },
-  // observability
   'cloudflare-o11y': {
     group: 'observability',
     dependsOn: ['nextjs'],
@@ -313,22 +280,18 @@ const serviceMeta: Record<string, ServiceMeta> = {
     dir: 'services/ai-attribution',
   },
   grafana: { group: 'observability', dependsOn: [] },
-  // mobile
   // The app POSTs its client-observed latency batches to the latency-ingest
   // worker in every dev session (`LATENCY_INGEST_URL` in the mobile env points
   // at its wrangler port), so a stack started for mobile work runs it;
   // otherwise the app POSTs to a dead listener and the ingest path cannot be
   // observed locally.
   mobile: { group: 'mobile', dependsOn: ['latency-ingest'], dir: 'apps/mobile' },
-  // storybook
   storybook: { group: 'storybook', dependsOn: [] },
-  // deletion-mock
   'deletion-mock': {
     group: 'deletion-mock',
     dependsOn: [],
     dir: 'dev/local/scripts',
   },
-  // gastown
   'cloudflare-gastown': {
     group: 'gastown',
     dependsOn: ['postgres', 'cloudflare-git-token-service', 'container-usage-meter', 'nextjs'],
@@ -481,7 +444,6 @@ export function resolveDeletionMockSessionEnv(args: {
     PYLON_HOST: origin,
     SUBSTACK_PUBLICATION_URL: origin,
     CUSTOMERIO_TRACK_BASE: origin,
-    CSA_APP_BASE_URL: origin,
   };
   if (!env.PYLON_API_KEY?.trim()) sessionEnv.PYLON_API_KEY = DELETION_MOCK_DUMMY;
   if (!env.POSTHOG_PERSONAL_API_KEY?.trim()) {
@@ -545,10 +507,6 @@ export function resolveE2eInternalSecretSessionEnv(args: {
   return { E2E_INTERNAL_API_SECRET: resolveE2eInternalSecret(env) };
 }
 
-// ---------------------------------------------------------------------------
-// Wrangler config discovery
-// ---------------------------------------------------------------------------
-
 function stripJsonComments(text: string): string {
   let result = '';
   let i = 0;
@@ -608,10 +566,6 @@ export function resolveFakeLlmWorkerPort(): number {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Build service definitions from serviceMeta + wrangler.jsonc
-// ---------------------------------------------------------------------------
-
 // Base host ports for the Compose stack. A worktree with a port offset runs its
 // own Compose project on offset host ports, so its database, its data, and its
 // container lifecycle are its own — a sibling worktree's `docker compose down`
@@ -621,8 +575,15 @@ const INFRA_PORTS: Record<string, number> = {
   postgres: 5432,
   redis: 6379,
   'redis-http': 8079,
+  'local-kms': 8900,
   grafana: 4000,
 };
+
+const BYOK_KMS_SERVICE_BASE_PORT = 8901;
+
+export function byokKmsServicePort(offset: number = portOffset): number {
+  return BYOK_KMS_SERVICE_BASE_PORT + offset;
+}
 
 export function getInfraBasePort(serviceName: string): number | undefined {
   return INFRA_PORTS[serviceName];
@@ -683,7 +644,12 @@ function workerEnvPrefix(): string[] {
   return vars.length > 0 ? ['env', ...vars] : [];
 }
 
+// Clear of the 3000-3009 range the web app's dev script probes.
 const AI_GATEWAY_BASE_PORT = 3010;
+
+function aiGatewayPort(): number {
+  return AI_GATEWAY_BASE_PORT + portOffset;
+}
 
 function buildServiceDefs(): ServiceDef[] {
   const repoRoot = REPO_ROOT;
@@ -699,24 +665,38 @@ function buildServiceDefs(): ServiceDef[] {
         dir: 'apps/web',
         port: nextjsTargetPort,
         dependsOn: meta.dependsOn,
-        command: ['pnpm', 'run', 'dev'],
+        command: [
+          'env',
+          `AI_GATEWAY_URL=http://localhost:${aiGatewayPort()}`,
+          'pnpm',
+          'run',
+          'dev',
+        ],
         group: meta.group,
       });
       continue;
     }
 
     if (name === 'ai-gateway') {
-      // Clear of the 3000-3009 range the web app's dev script probes. The port
-      // is passed as AI_GATEWAY_PORT because the session exports PORT for the
-      // web app.
-      const port = AI_GATEWAY_BASE_PORT + portOffset;
+      // The port is passed as AI_GATEWAY_PORT because the session exports PORT
+      // for the web app. The gateway starts before the web app writes
+      // `.dev-port`, so it gets the web port that dev:start already verified
+      // is free.
+      const port = aiGatewayPort();
       defs.push({
         name,
         type: 'nextjs',
         dir: meta.dir ?? name,
         port,
         dependsOn: meta.dependsOn,
-        command: ['env', `AI_GATEWAY_PORT=${port}`, 'pnpm', 'run', 'dev'],
+        command: [
+          'env',
+          `AI_GATEWAY_PORT=${port}`,
+          `AI_GATEWAY_WEB_PORT=${nextjsTargetPort}`,
+          'pnpm',
+          'run',
+          'dev',
+        ],
         group: meta.group,
       });
       continue;
@@ -867,6 +847,28 @@ function buildServiceDefs(): ServiceDef[] {
       continue;
     }
 
+    if (name === 'byok-kms') {
+      const byokKmsPort = byokKmsServicePort();
+      defs.push({
+        name,
+        type: 'process',
+        dir: '.',
+        port: byokKmsPort,
+        dependsOn: meta.dependsOn,
+        command: [
+          'env',
+          `BYOK_KMS_SERVICE_PORT=${byokKmsPort}`,
+          `BYOK_KMS_ENDPOINT=http://127.0.0.1:${INFRA_PORTS['local-kms'] + portOffset}`,
+          'pnpm',
+          'exec',
+          'tsx',
+          'dev/byok-kms/server.ts',
+        ],
+        group: meta.group,
+      });
+      continue;
+    }
+
     if (name === 'kiloclaw-tunnel') {
       const kiloclawPort = readWranglerPort(path.join(repoRoot, 'services/kiloclaw')) + portOffset;
       const kiloChatPort = readWranglerPort(path.join(repoRoot, 'services/kilo-chat')) + portOffset;
@@ -930,21 +932,6 @@ function buildServiceDefs(): ServiceDef[] {
           'TCP-LISTEN:23750,bind=127.0.0.1,reuseaddr,fork',
           'UNIX-CONNECT:/var/run/docker.sock',
         ],
-        group: meta.group,
-      });
-      continue;
-    }
-
-    if (name === 'app-builder-tunnel') {
-      const appBuilderPort =
-        readWranglerPort(path.join(repoRoot, 'services/app-builder')) + portOffset;
-      defs.push({
-        name,
-        type: 'process',
-        dir: '.',
-        port: 0,
-        dependsOn: meta.dependsOn,
-        command: ['tsx', 'dev/local/scripts/start-app-builder-tunnel.ts', String(appBuilderPort)],
         group: meta.group,
       });
       continue;
@@ -1025,15 +1012,6 @@ const SERVICES_EXCLUDED_FROM_ALL = new Set([
 export const shortcuts: Record<string, string[]> = {
   app: ['nextjs'],
   'data-export': ['nextjs', 'user-data-export'],
-  'app-builder': [
-    'nextjs',
-    'cloud-agent-next',
-    'cloudflare-session-ingest',
-    'cloudflare-db-proxy',
-    'cloudflare-git-token-service',
-    'app-builder-tunnel',
-    'cloudflare-app-builder',
-  ],
   agents: ['cloud-agent-next', 'nextjs', 'cloudflare-session-ingest'],
   all: serviceDefs.map(s => s.name).filter(name => !SERVICES_EXCLUDED_FROM_ALL.has(name)),
 };
@@ -1158,6 +1136,44 @@ export function resolveTargets(targets: string[]): string[] {
   const uniqueGroupIds = [...new Set(groupIdsToExpand)];
   const allNames = resolveGroups(resolveGroupTransitiveDeps(uniqueGroupIds));
   return topologicalSort(resolveTransitiveDeps(allNames));
+}
+
+export type ServiceExclusion = {
+  serviceNames: string[];
+  skipped: string[];
+  /** Selected services that declare a dependency on a skipped service. */
+  dependents: Map<string, string[]>;
+};
+
+/**
+ * Drop explicitly unwanted services from a resolved selection, for memory-
+ * constrained environments that run only what they exercise. Unknown names
+ * throw so a typo cannot silently start the full stack.
+ */
+export function excludeServices(
+  serviceNames: readonly string[],
+  excluded: readonly string[]
+): ServiceExclusion {
+  for (const name of excluded) getService(name);
+  const excludedSet = new Set(excluded);
+  const kept = serviceNames.filter(name => !excludedSet.has(name));
+  const dependents = new Map<string, string[]>();
+  for (const name of kept) {
+    const missing = getService(name).dependsOn.filter(dep => excludedSet.has(dep));
+    if (missing.length > 0) dependents.set(name, missing);
+  }
+  return {
+    serviceNames: kept,
+    skipped: serviceNames.filter(name => excludedSet.has(name)),
+    dependents,
+  };
+}
+
+export function parseServiceList(value: string | undefined): string[] {
+  return (value ?? '')
+    .split(',')
+    .map(name => name.trim())
+    .filter(name => name !== '');
 }
 
 export function getService(name: string): ServiceDef {

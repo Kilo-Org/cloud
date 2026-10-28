@@ -7,11 +7,8 @@ import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { code_indexing_search, code_indexing_manifest } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { eq, getTableName, sql, desc } from 'drizzle-orm';
-import {
-  ensureOrganizationAccessAndFetchOrg,
-  organizationMemberProcedure,
-} from '@kilocode/web-shared/routers/organizations/utils';
+import { getTableName, sql } from 'drizzle-orm';
+import { ensureOrganizationAccessAndFetchOrg } from '@kilocode/web-shared/routers/organizations/utils';
 import {
   elevateViaKiloAdmin,
   organizationTarget,
@@ -19,11 +16,14 @@ import {
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { codeIndexingAdminRouter } from './code-indexing-admin-router';
-import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
 import { getIndexStorage } from '@/lib/code-indexing/storage';
 import { getUserUUID } from '@kilocode/web-shared/lib/user/server';
 import { findUserByEmail } from '@/lib/user';
 import { chunkCountToSizeKbSql } from '@/lib/code-indexing/util';
+import {
+  CODE_INDEXING_GONE_MESSAGE,
+  isCodeIndexingEnabled,
+} from '@/lib/code-indexing/availability.server';
 import {
   trackCodeIndexingSearch,
   trackCodeIndexingDelete,
@@ -33,15 +33,28 @@ import {
   trackCodeIndexingDeleteBeforeDate,
 } from '@/lib/code-indexing/posthog-tracking';
 
-// we have a max context lenght of embeddings for 8192 tokens
-// if we receive a chunk longer than aproximately this, we just
-// truncate it to fit within the limit
-// this should only happen when weird minified files get indexed so they're not generally relavant in search results
-
-// const MAX_CHUNK_LENGTH = 8192 * 1.2;
-
 const errorLogger = sentryLogger('code-indexing', 'error');
-const storage = getIndexStorage();
+
+let storage: ReturnType<typeof getIndexStorage> | undefined;
+
+function getStorage() {
+  return (storage ??= getIndexStorage());
+}
+
+function codeIndexingNotAvailable() {
+  return new TRPCError({
+    code: 'NOT_FOUND',
+    message: CODE_INDEXING_GONE_MESSAGE,
+  });
+}
+
+const codeIndexingProcedure = baseProcedure.use(async ({ next }) => {
+  if (!isCodeIndexingEnabled()) {
+    throw codeIndexingNotAvailable();
+  }
+
+  return next();
+});
 
 const CodebaseIndexingSearchRequestSchema = z.object({
   organizationId: z.uuid().nullable().optional(),
@@ -133,6 +146,10 @@ const CodebaseIndexingProjectFilesResponseSchema = z.object({
 
 type Input = { organizationId?: string | null | undefined };
 export async function getCodeIndexOrganizationId(ctx: TRPCContext, input: Input) {
+  if (!isCodeIndexingEnabled()) {
+    throw codeIndexingNotAvailable();
+  }
+
   if (input.organizationId) {
     const org = await ensureOrganizationAccessAndFetchOrg(ctx, input.organizationId);
     if (org.settings.code_indexing_enabled === false) {
@@ -147,11 +164,6 @@ export async function getCodeIndexOrganizationId(ctx: TRPCContext, input: Input)
   return getUserUUID(ctx.user);
 }
 
-/**
- * Resolves the organization ID for code indexing operations, with optional admin override.
- * If overrideUser is provided, validates that the requesting user is an admin and resolves
- * the organization ID from either a UUID or email address.
- */
 async function resolveOrganizationIdWithOverride(
   ctx: TRPCContext,
   input: { organizationId?: string | null | undefined; overrideUser?: string }
@@ -164,17 +176,14 @@ async function resolveOrganizationIdWithOverride(
       });
     }
 
-    // Check if overrideUser is a UUID (organization ID) or an email
     const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
     if (uuidRegex.test(input.overrideUser)) {
-      // It's an organization ID
       return await elevateViaKiloAdmin(ctx, {
         reason: 'code_index_user_override',
         target: organizationTarget(input.overrideUser),
         grant: input.overrideUser,
       });
     } else {
-      // It's an email - look up the user
       const user = await findUserByEmail(input.overrideUser);
       if (!user) {
         throw new TRPCError({
@@ -182,7 +191,6 @@ async function resolveOrganizationIdWithOverride(
           message: `User not found with email: ${input.overrideUser}`,
         });
       }
-      // Format the user ID using getUserUUID
       return await elevateViaKiloAdmin(ctx, {
         reason: 'code_index_user_override',
         target: userTarget(user.id),
@@ -191,19 +199,17 @@ async function resolveOrganizationIdWithOverride(
     }
   }
 
-  // Normal flow - use the context user/org
   return await getCodeIndexOrganizationId(ctx, input);
 }
 
 export const codeIndexingRouter = createTRPCRouter({
-  search: baseProcedure
+  search: codeIndexingProcedure
     .input(CodebaseIndexingSearchRequestSchema)
     .output(CodebaseIndexingSearchResponseSchema)
     .query(async ({ ctx, input }) => {
       const organizationId = await getCodeIndexOrganizationId(ctx, input);
 
-      // Search using storage class with default provider and collection
-      const finalResults = await storage.search({
+      const finalResults = await getStorage().search({
         query: input.query,
         organizationId: organizationId,
         projectId: input.projectId,
@@ -227,7 +233,6 @@ export const codeIndexingRouter = createTRPCRouter({
         },
       });
 
-      // Track search event in PostHog
       trackCodeIndexingSearch({
         distinctId: ctx.user.google_user_email,
         organizationId,
@@ -244,20 +249,19 @@ export const codeIndexingRouter = createTRPCRouter({
 
       return finalResults;
     }),
-  delete: baseProcedure
+  delete: codeIndexingProcedure
     .input(CodebaseIndexingDeleteRequestSchema)
     .mutation(async ({ ctx, input }) => {
       try {
         const organizationId = await getCodeIndexOrganizationId(ctx, input);
 
-        const deletedFiles = await storage.delete({
+        const deletedFiles = await getStorage().delete({
           organizationId,
           projectId: input.projectId,
           gitBranch: input.gitBranch,
           filePaths: input.filePaths,
         });
 
-        // Track delete event in PostHog
         trackCodeIndexingDelete({
           distinctId: ctx.user.google_user_email,
           organizationId,
@@ -277,7 +281,6 @@ export const codeIndexingRouter = createTRPCRouter({
           errorLogger('error deleting files');
         }
 
-        // Track failed delete event
         try {
           const organizationId = await getCodeIndexOrganizationId(ctx, input);
           trackCodeIndexingDelete({
@@ -297,20 +300,18 @@ export const codeIndexingRouter = createTRPCRouter({
         return { success: false, deletedFiles: 0 };
       }
     }),
-  getManifest: baseProcedure
+  getManifest: codeIndexingProcedure
     .input(CodebaseIndexingManifestRequestSchema)
     .output(CodebaseIndexingManifestResponseSchema)
     .query(async ({ ctx, input }) => {
       const organizationId = await getCodeIndexOrganizationId(ctx, input);
 
-      // Get manifest using storage class
-      const manifest = await storage.getManifest({
+      const manifest = await getStorage().getManifest({
         organizationId: organizationId,
         projectId: input.projectId,
         gitBranch: input.gitBranch,
       });
 
-      // Track manifest retrieval in PostHog
       trackCodeIndexingManifest({
         distinctId: ctx.user.google_user_email,
         organizationId,
@@ -322,54 +323,8 @@ export const codeIndexingRouter = createTRPCRouter({
 
       return manifest;
     }),
-  // Fetch recent searches for an organization
-  getRecentSearches: organizationMemberProcedure
-    .output(
-      z.array(
-        z.object({
-          id: z.uuid(),
-          query: z.string(),
-          project_id: z.string(),
-          created_at: z.string(),
-          kilo_user_id: z.string(),
-          results_count: z.number(),
-          metadata: z.any(),
-        })
-      )
-    )
-    .query(async ({ input }) => {
-      const organization = await getOrganizationById(input.organizationId);
-      if (!organization) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Organization not found',
-        });
-      }
-
-      const searches = await db
-        .select({
-          id: code_indexing_search.id,
-          query: code_indexing_search.query,
-          project_id: code_indexing_search.project_id,
-          created_at: code_indexing_search.created_at,
-          kilo_user_id: code_indexing_search.kilo_user_id,
-          metadata: code_indexing_search.metadata,
-        })
-        .from(code_indexing_search)
-        .where(eq(code_indexing_search.organization_id, input.organizationId))
-        .orderBy(desc(code_indexing_search.created_at))
-        .limit(50);
-
-      return searches.map(search => {
-        const metadata = search.metadata as { results?: unknown[] };
-        return {
-          ...search,
-          results_count: metadata?.results?.length || 0,
-        };
-      });
-    }),
   // Non-admin procedures for organization members to view their own org's stats
-  getOrganizationStats: baseProcedure
+  getOrganizationStats: codeIndexingProcedure
     .input(CodebaseIndexingStatsSchema)
     .output(
       z.array(
@@ -455,7 +410,6 @@ export const codeIndexingRouter = createTRPCRouter({
         ORDER BY os.chunk_count DESC;
       `);
 
-      // Convert BigInt and numeric values, preserving all fields
       const result = rows.map(row => ({
         project_id: String(row.project_id),
         chunk_count: Number(row.chunk_count),
@@ -472,7 +426,6 @@ export const codeIndexingRouter = createTRPCRouter({
         }>,
       }));
 
-      // Track stats retrieval in PostHog
       const totalChunks = result.reduce((sum, p) => sum + p.chunk_count, 0);
       const totalFiles = result.reduce((sum, p) => sum + p.file_count, 0);
       const totalSizeKb = result.reduce((sum, p) => sum + p.size_kb, 0);
@@ -490,7 +443,7 @@ export const codeIndexingRouter = createTRPCRouter({
 
       return result;
     }),
-  getProjectFiles: baseProcedure
+  getProjectFiles: codeIndexingProcedure
     .input(CodebaseIndexingProjectFilesRequestSchema)
     .output(CodebaseIndexingProjectFilesResponseSchema)
     .query(async ({ ctx, input }) => {
@@ -499,13 +452,11 @@ export const codeIndexingRouter = createTRPCRouter({
       const manifestTableName = getTableName(code_indexing_manifest);
       const offset = (input.page - 1) * input.pageSize;
 
-      // Build filter conditions
       const branchFilter = input.gitBranch ? sql`AND git_branch = ${input.gitBranch}` : sql``;
       const fileSearchFilter = input.fileSearch
         ? sql`AND file_path ILIKE ${'%' + input.fileSearch + '%'}`
         : sql``;
 
-      // Get total count and AI lines statistics
       // Use a subquery to get unique file stats to avoid double-counting when a file exists in multiple branches
       const countResult = await db.execute(sql`
         SELECT
@@ -532,7 +483,6 @@ export const codeIndexingRouter = createTRPCRouter({
       const totalAILines = Number(countResult.rows[0]?.total_ai_lines || 0);
       const percentageOfAILines = totalLines > 0 ? (totalAILines / totalLines) * 100 : 0;
 
-      // Get paginated files sorted by size with AI lines data
       // Use MAX for total_lines and total_ai_lines since they should be the same across branches for the same file
       const { rows } = await db.execute(sql`
         SELECT
@@ -580,7 +530,6 @@ export const codeIndexingRouter = createTRPCRouter({
         percentageOfAILines,
       };
 
-      // Track project files retrieval in PostHog
       trackCodeIndexingProjectFiles({
         distinctId: ctx.user.google_user_email,
         organizationId,
@@ -595,17 +544,16 @@ export const codeIndexingRouter = createTRPCRouter({
 
       return response;
     }),
-  deleteBeforeDate: baseProcedure
+  deleteBeforeDate: codeIndexingProcedure
     .input(CodebaseIndexingDeleteBeforeDateRequestSchema)
     .mutation(async ({ ctx, input }) => {
       const organizationId = await getCodeIndexOrganizationId(ctx, input);
 
-      await storage.deleteByOrganizationBeforeDate({
+      await getStorage().deleteByOrganizationBeforeDate({
         organizationId,
         beforeDate: input.beforeDate,
       });
 
-      // Track delete before date in PostHog
       trackCodeIndexingDeleteBeforeDate({
         distinctId: ctx.user.google_user_email,
         organizationId,

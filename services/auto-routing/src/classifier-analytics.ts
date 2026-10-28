@@ -2,10 +2,8 @@ import type { ClassifierOutput } from '@kilocode/auto-routing-contracts/classifi
 
 export type ClassifierAnalyticsStatus =
   | 'classified'
-  | 'coding_plan_default'
   | 'invalid_json'
   | 'invalid_envelope'
-  | `fallback:${string}`
   | `classifier_error:${string}`;
 
 type ClassifierAnalyticsParams = {
@@ -28,10 +26,10 @@ type ClassifierAnalyticsEnv = Pick<Env, 'AUTO_ROUTING_CLASSIFIER_METRICS_V2'>;
  *   index1  = classifierModel, or "unknown" when no classifier call happened
  *   blob1   = classifierModel
  *   blob2   = requestedModel
- *   blob3   = status; heuristic fallbacks use fallback:<reason>, classifier
- *             failures use classifier_error:<subtype>. Fallbacks still carry
- *             a classification, so "produced a classification" queries must
- *             match both 'classified' and 'fallback:%'.
+ *   blob3   = status: 'classified', an invalid-request status, or
+ *             classifier_error:<subtype> for classifier failures
+ *             (which carry no classification, so classification-derived
+ *             blobs are empty)
  *   blob4   = taskType
  *   blob5   = subtaskType
  *   blob6   = contextComplexity

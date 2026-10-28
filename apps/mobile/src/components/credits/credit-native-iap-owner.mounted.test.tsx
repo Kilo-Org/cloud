@@ -4,6 +4,10 @@ import { createElement } from 'react';
 import { type Purchase } from 'expo-iap';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import {
+  loadStoreCreditProducts,
+  StoreCreditProductsError,
+} from '@/lib/credits/store-products-loader';
 import { type StoreCreditProduct } from '@/lib/credits/store-products';
 import { bumpAuthEpoch } from '@/lib/auth/auth-epoch';
 import { act, TestRenderer } from '@/test/renderer';
@@ -36,7 +40,11 @@ const mockedQuery = vi.hoisted(() => ({
   completePurchase: vi.fn(),
   invalidateQueries: vi.fn(),
   serverProductsData: undefined as
-    | { appAccountToken: string; products: { appleProductId: string; googleProductId: string }[] }
+    | {
+        appAccountToken: string;
+        products: { appleProductId: string; googleProductId: string }[];
+        recoveryGoogleProductIds?: string[];
+      }
     | undefined,
 }));
 
@@ -45,6 +53,7 @@ vi.mock('expo-iap', () => ({
     AlreadyOwned: 'already-owned',
     BillingUnavailable: 'billing-unavailable',
     DeferredPayment: 'deferred-payment',
+    NotPrepared: 'not-prepared',
     Pending: 'pending',
     UserCancelled: 'user-cancelled',
   },
@@ -143,6 +152,7 @@ function createPurchase(overrides: Partial<Purchase> = {}): Purchase {
     purchaseToken: 'signed-jws',
     quantity: 1,
     store: 'apple',
+    storeId: 'apple',
     transactionDate: Date.now(),
     transactionId: 'tx-1',
     ...overrides,
@@ -700,6 +710,37 @@ describe('CreditNativeIapOwner', () => {
     expect(handle.value?.errorMessageKey).toBe('kiloPass.purchaseFailed');
   });
 
+  it('recovers a legacy Play receipt after the purchasable catalog switches to expiring SKUs', async () => {
+    mockedPlatform.OS = 'android';
+    mockedIap.connected = true;
+    mockedQuery.serverProductsData = {
+      appAccountToken: APP_ACCOUNT_TOKEN,
+      products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10_1year_v2' }],
+      recoveryGoogleProductIds: ['credits_usd10', 'credits_usd10_1year_v2'],
+    };
+    const legacyPurchase = createPurchase({
+      store: 'google',
+      productId: 'credits_usd10',
+      purchaseToken: 'legacy-play-token',
+    });
+    mockedIap.getAvailablePurchases.mockResolvedValue([legacyPurchase]);
+    const { handle } = await mountOwner();
+    await flushPromises();
+
+    expect(mockedQuery.completePurchase).toHaveBeenCalledWith({
+      productId: 'credits_usd10',
+      purchaseToken: 'legacy-play-token',
+    });
+    expect(mockedIap.finishTransaction).toHaveBeenCalledWith({
+      purchase: legacyPurchase,
+      isConsumable: true,
+    });
+    expect(mockedQuery.invalidateQueries).toHaveBeenCalled();
+    // The background recovery pass is silent: it refreshes the balance but
+    // announces nothing.
+    expect(handle.value?.completedPurchaseCount).toBe(0);
+  });
+
   it('does not submit a recovery pass that outlived an account change', async () => {
     const pendingLookup = Promise.withResolvers<Purchase[]>();
     mockedIap.getAvailablePurchases.mockReturnValueOnce(pendingLookup.promise);
@@ -750,5 +791,124 @@ describe('CreditNativeIapOwner', () => {
       isConsumable: true,
     });
     expect(handle.value?.completingProductId).toBeNull();
+  });
+
+  describe('when Play dropped its billing client after connecting', () => {
+    const notReady = { code: 'not-prepared', message: 'Billing client not ready' };
+    const playListing = { type: 'in-app', id: 'credits_usd10', displayPrice: '$10.99' };
+
+    async function loadPlayCatalog(handle: ProbeHandle) {
+      const fetchStoreProducts = handle.value?.fetchStoreProducts;
+      if (!fetchStoreProducts) {
+        throw new Error('CreditNativeIapOwner exposed no product fetch');
+      }
+      const products = await loadStoreCreditProducts({
+        fetchStoreProducts,
+        loadBackendProducts: vi.fn().mockResolvedValue({
+          appAccountToken: APP_ACCOUNT_TOKEN,
+          products: [creditPack.backend],
+        }),
+        storefront: 'play',
+      });
+      return products;
+    }
+
+    it('reconnects and prices the packs on the second ask', async () => {
+      mockedIap.connected = true;
+      mockedIap.fetchProducts.mockRejectedValueOnce(notReady).mockResolvedValueOnce([playListing]);
+      const { handle } = await mountOwner();
+
+      await expect(loadPlayCatalog(handle)).resolves.toEqual([
+        { backend: creditPack.backend, storeProductId: 'credits_usd10', displayPrice: '$10.99' },
+      ]);
+      expect(mockedIap.reconnect).toHaveBeenCalledTimes(1);
+      expect(mockedIap.fetchProducts).toHaveBeenCalledTimes(2);
+    });
+
+    it('shows the connection copy when the second ask also fails', async () => {
+      mockedIap.connected = true;
+      mockedIap.fetchProducts.mockRejectedValue(notReady);
+      const { handle } = await mountOwner();
+
+      const failure = await loadPlayCatalog(handle).catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(StoreCreditProductsError);
+      expect(failure).toMatchObject({ key: 'kiloPass.couldNotConnectToPlay' });
+      expect(mockedIap.reconnect).toHaveBeenCalledTimes(1);
+      expect(mockedIap.fetchProducts).toHaveBeenCalledTimes(2);
+    });
+
+    it('does not ask again once the caller has given up on the store', async () => {
+      mockedIap.connected = true;
+      mockedIap.fetchProducts.mockRejectedValue(notReady);
+      const { handle } = await mountOwner();
+      const controller = new AbortController();
+      controller.abort();
+
+      await expect(
+        handle.value?.fetchStoreProducts(['credits_usd10'], { signal: controller.signal })
+      ).rejects.toBe(notReady);
+      expect(mockedIap.reconnect).not.toHaveBeenCalled();
+      expect(mockedIap.fetchProducts).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not ask again when the caller gives up during the reconnect', async () => {
+      mockedIap.connected = true;
+      mockedIap.fetchProducts.mockRejectedValue(notReady);
+      const { handle } = await mountOwner();
+      const controller = new AbortController();
+      // eslint-disable-next-line eslint/require-await -- the abort is the behavior under test; reconnect answers at once
+      mockedIap.reconnect.mockImplementation(async () => {
+        controller.abort();
+        return true;
+      });
+
+      await expect(
+        handle.value?.fetchStoreProducts(['credits_usd10'], { signal: controller.signal })
+      ).rejects.toBe(notReady);
+      expect(mockedIap.fetchProducts).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not ask again when the reconnect fails', async () => {
+      mockedIap.connected = true;
+      mockedIap.reconnect.mockResolvedValue(false);
+      mockedIap.fetchProducts.mockRejectedValue(notReady);
+      const { handle } = await mountOwner();
+
+      await expect(handle.value?.fetchStoreProducts(['credits_usd10'])).rejects.toBe(notReady);
+      expect(mockedIap.fetchProducts).toHaveBeenCalledTimes(1);
+    });
+
+    it('does not reconnect for a store failure that is not a lost connection', async () => {
+      mockedIap.connected = true;
+      const queryFailed = { code: 'query-product', message: 'Failed to query product' };
+      mockedIap.fetchProducts.mockRejectedValue(queryFailed);
+      const { handle } = await mountOwner();
+
+      await expect(handle.value?.fetchStoreProducts(['credits_usd10'])).rejects.toBe(queryFailed);
+      expect(mockedIap.reconnect).not.toHaveBeenCalled();
+      expect(mockedIap.fetchProducts).toHaveBeenCalledTimes(1);
+    });
+
+    it('reconnects after a purchase the store rejected as not ready', async () => {
+      mockedPlatform.OS = 'android';
+      mockedIap.connected = true;
+      mockedQuery.serverProductsData = {
+        appAccountToken: APP_ACCOUNT_TOKEN,
+        products: [{ appleProductId: APPLE_PRODUCT_ID, googleProductId: 'credits_usd10' }],
+      };
+      const { handle } = await mountOwner();
+
+      expect(await handle.value?.purchase(creditPack)).toBe(true);
+      await flushPromises();
+      mockedIap.handlers?.onPurchaseError(notReady);
+      await flushPromises();
+
+      // The request never reached the store: it is released with the generic
+      // copy, and the connection is restored so the next tap can buy.
+      expect(mockedIap.reconnect).toHaveBeenCalledTimes(1);
+      expect(handle.value?.completingProductId).toBeNull();
+      expect(handle.value?.errorMessageKey).toBe('kiloPass.purchaseFailed');
+    });
   });
 });

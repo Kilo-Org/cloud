@@ -129,6 +129,11 @@ describe('classifyCodeReviewActionRequiredFailure', () => {
   it('does not classify unrelated auth, rate-limit, or BYOK quota failures', () => {
     expect(classifyCodeReviewActionRequiredFailure('GitHub returned 401 Unauthorized')).toBeNull();
     expect(classifyCodeReviewActionRequiredFailure('GitHub returned 403 Forbidden')).toBeNull();
+    expect(
+      classifyCodeReviewActionRequiredFailure(
+        'GitLab rejected the connected credential while preparing this review of owner/repo. Reconnect the GitLab integration, then retry.'
+      )
+    ).toBeNull();
     expect(classifyCodeReviewActionRequiredFailure('Rate limit exceeded: 429')).toBeNull();
     expect(
       classifyCodeReviewActionRequiredFailure('[BYOK] Your account quota is exhausted.')
@@ -173,7 +178,7 @@ describe('classifyCodeReviewActionRequiredFailure', () => {
 
   it('routes repeated repository clone timeout recovery to support email', () => {
     expect(getCodeReviewActionRequiredRecoveryHref('repeated_repository_clone_timeout')).toBe(
-      'mailto:hi@kilocode.ai?subject=Repository%20clone%20timeouts%20for%20Code%20Reviewer'
+      'mailto:hi@kilo.ai?subject=Repository%20clone%20timeouts%20for%20Code%20Reviewer'
     );
   });
 

@@ -4,16 +4,30 @@
  *
  * Processes ServiceEvents from the normalizer and provides a reactive snapshot
  * of the current service state via subscribe().
+ *
+ * Preparation diagnostics use the PREPARATION_MAX_* history budgets in schemas.ts:
+ * setup messages follow arrival order, attempts follow startedAt, and steps follow
+ * causal start order. Each list retains its newest entries. Output tails use the
+ * UTF-8 byte budget in limits.ts.
  */
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
 import type { ServiceEvent } from './normalizer';
-import { sessionCommitDataSchema } from './schemas';
+import { PREPARATION_OUTPUT_TAIL_MAX_BYTES } from './limits';
+import {
+  PREPARATION_MAX_ATTEMPTS,
+  PREPARATION_MAX_SETUP_LOG_ENTRIES,
+  PREPARATION_MAX_STEPS,
+  knownSessionStatus,
+  sessionCommitDataSchema,
+  type KnownSessionStatus,
+} from './schemas';
 import type {
   SessionInfo,
   SessionActivity,
   AgentStatus,
   QuestionState,
   PermissionState,
+  UnreadablePermissionState,
   ServiceStateSnapshot,
   SuggestionAction,
   SuggestionState,
@@ -23,6 +37,18 @@ import type {
   SessionCommit,
   PreparationStepSnapshot,
 } from './types';
+
+/**
+ * Keep the most recent `maxBytes` UTF-8 bytes of `text`, advancing past any
+ * continuation byte so the decoded result never starts mid-code-point.
+ */
+function utf8Tail(text: string, maxBytes: number): { text: string; truncated: boolean } {
+  const bytes = new TextEncoder().encode(text);
+  if (bytes.length <= maxBytes) return { text, truncated: false };
+  let start = bytes.length - maxBytes;
+  while (start < bytes.length && ((bytes[start] ?? 0) & 0b1100_0000) === 0b1000_0000) start++;
+  return { text: new TextDecoder().decode(bytes.subarray(start)), truncated: true };
+}
 
 /**
  * Keep a known goal reason when a later update for the same session carries the
@@ -95,6 +121,9 @@ type ServiceStateConfig = {
 
 type ServiceState = {
   process(event: ServiceEvent): void;
+  beginReplay(): void;
+  endReplay(): void;
+  cancelReplay(): void;
   getActivity(): SessionActivity;
   getStatus(): AgentStatus;
   getCloudStatus(): CloudStatus | null;
@@ -103,11 +132,16 @@ type ServiceState = {
   getPreparationAttempts(): readonly PreparationAttempt[];
   getCommits(): readonly SessionCommit[];
   clearCommits(): void;
+  /** Drop the preparation rows held by the live state. */
+  clearPreparationAttempts(): void;
   getQuestion(): QuestionState | null;
   getPermission(): PermissionState | null;
+  /** Pending permission requests this app could not read, oldest first. */
+  getUnreadablePermissions(): readonly UnreadablePermissionState[];
   getSuggestion(): SuggestionState | null;
   getSessionInfo(): SessionInfo | null;
   getPendingMessages(): ReadonlyMap<string, MessageDeliveryState>;
+  getActiveMessageId(): string | null;
   /**
    * Remove one failed delivery entry (called after a successful retry).
    * Returns true when that entry was also the failure that set the terminal
@@ -128,6 +162,16 @@ type ServiceState = {
 const INITIAL_ACTIVITY: SessionActivity = { type: 'connecting' };
 const IDLE_STATUS: AgentStatus = { type: 'idle' };
 
+type ServiceReplayBatch = {
+  statusAtStart: AgentStatus;
+  questions: readonly QuestionState[];
+  permissions: readonly PermissionState[];
+  infos: Map<string, SessionInfo>;
+  childErrors: Map<string, string>;
+  branch: string | null;
+  hadSessionInfo: boolean;
+};
+
 /**
  * FIFO upsert. A repeat of the same requestId replaces the entry in place —
  * the wrapper replays pending requests after a snapshot, and a replay must
@@ -145,7 +189,8 @@ function upsertByRequestId<T extends { requestId: string }>(
   return copy;
 }
 
-function createServiceState(config: ServiceStateConfig): ServiceState {
+function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
+  let config = initialConfig;
   let rootSessionId = config.rootSessionId;
   let activity: SessionActivity = INITIAL_ACTIVITY;
   let status: AgentStatus = IDLE_STATUS;
@@ -157,6 +202,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   let sessionInfo: SessionInfo | null = null;
   let questions: readonly QuestionState[] = [];
   let permissions: readonly PermissionState[] = [];
+  let unreadablePermissions: readonly UnreadablePermissionState[] = [];
   let suggestion: SuggestionState | null = null;
   const pendingMessages = new Map<string, MessageDeliveryState>();
   let activeMessageId: string | null = null;
@@ -186,8 +232,10 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   let terminalFailure: { messageId: string; status: AgentStatus } | null = null;
 
   const subscribers = new Set<() => void>();
+  let replay: ServiceReplayBatch | null = null;
 
   function notify(): void {
+    if (replay) return;
     for (const cb of subscribers) {
       cb();
     }
@@ -195,6 +243,62 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
 
   function isRootSession(sessionId: string): boolean {
     return sessionId === rootSessionId;
+  }
+
+  /**
+   * The one mapping from a session status to this state's activity and
+   * lifecycle status. A `session.status` event and the status carried by a
+   * `connected` snapshot both go through it, so the same reported status lands
+   * in the same place whether it arrives live or on connect.
+   *
+   * `null` is a status this SDK does not know yet: the event is kept but it has
+   * no meaning here, so the previous activity and status stand, never idle.
+   * Only the root session repaints activity and status; a child's `busy` still
+   * clears the replay error recorded for it.
+   */
+  function applySessionStatus(sessionId: string, known: KnownSessionStatus | null): void {
+    if (known === null) return;
+    if (known.type === 'busy') {
+      replay?.childErrors.delete(sessionId);
+    }
+    if (!isRootSession(sessionId)) return;
+
+    switch (known.type) {
+      case 'busy':
+        activity = { type: 'busy' };
+        status = IDLE_STATUS;
+        disconnectedSource = null;
+        completed = false;
+        terminated = false;
+        break;
+      case 'retry':
+        // A retry is the same turn making progress again, so it only reports
+        // the attempt; the lifecycle status the turn already carries stays.
+        // The turn is in flight, so a later wrapper disconnect is a real loss
+        // and must install the lost-connection status.
+        completed = false;
+        activity = {
+          type: 'retrying',
+          attempt: known.attempt,
+          message: known.message,
+        };
+        break;
+      case 'idle':
+        if (activity.type !== 'idle') activity = { type: 'idle' };
+        break;
+      case 'scheduled':
+        // A scheduled session does nothing now, so the activity reads idle
+        // while the lifecycle status carries the wake time.
+        if (activity.type !== 'idle') activity = { type: 'idle' };
+        status = {
+          type: 'scheduled',
+          ...(known.scheduledAt ? { scheduledAt: known.scheduledAt } : {}),
+        };
+        break;
+      // `question` and `permission` name a pending interaction that the
+      // question.asked / permission.asked events already carry, so the status
+      // alone changes nothing here.
+    }
   }
 
   function processSessionStatus(event: Extract<ServiceEvent, { type: 'session.status' }>): void {
@@ -206,39 +310,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       terminated = false;
     }
 
-    if (sessionStatus.type === 'busy') {
-      if (isRootSession(sessionId)) {
-        activity = { type: 'busy' };
-        status = IDLE_STATUS;
-        disconnectedSource = null;
-        completed = false;
-        terminated = false;
-      }
-    } else if (sessionStatus.type === 'retry') {
-      activity = {
-        type: 'retrying',
-        attempt: sessionStatus.attempt,
-        message: sessionStatus.message,
-      };
-    } else if (sessionStatus.type === 'idle') {
-      if (isRootSession(sessionId) && activity.type !== 'idle') {
-        activity = { type: 'idle' };
-      }
-    } else if (sessionStatus.type === 'scheduled') {
-      // A scheduled session does nothing now, so the activity reads idle while
-      // the lifecycle status carries the wake time. Like `busy`, a child
-      // session's status must not repaint the root's status.
-      if (isRootSession(sessionId)) {
-        if (activity.type !== 'idle') activity = { type: 'idle' };
-        status = {
-          type: 'scheduled',
-          ...(sessionStatus.scheduledAt ? { scheduledAt: sessionStatus.scheduledAt } : {}),
-        };
-      }
-    }
-    // Any other (unknown) status string leaves the previous status untouched —
-    // it is never coerced to idle.
-
+    applySessionStatus(sessionId, knownSessionStatus(sessionStatus));
     notify();
   }
 
@@ -368,12 +440,26 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       metadata,
       always,
     });
+    // A readable request supersedes an unreadable notice for the same id.
+    unreadablePermissions = unreadablePermissions.filter(entry => entry.requestId !== requestId);
     config.onPermissionAsked?.(requestId, permissionType, patterns, metadata, always);
+    notify();
+  }
+
+  function processPermissionUnreadable(requestId: string): void {
+    // The scope could not be read, so no consent card may stand for this id: a
+    // card already shown for it would describe a scope the app no longer holds.
+    if (permissions.some(entry => entry.requestId === requestId)) {
+      permissions = permissions.filter(entry => entry.requestId !== requestId);
+      config.onPermissionResolved?.(requestId);
+    }
+    unreadablePermissions = upsertByRequestId(unreadablePermissions, { requestId });
     notify();
   }
 
   function processPermissionResolved(requestId: string): void {
     permissions = permissions.filter(entry => entry.requestId !== requestId);
+    unreadablePermissions = unreadablePermissions.filter(entry => entry.requestId !== requestId);
     config.onPermissionResolved?.(requestId);
     notify();
   }
@@ -433,7 +519,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     } else {
       cloudStatus = { type: 'preparing', step: event.step, message: event.message };
       if (event.step === 'setup_commands' && event.message) {
-        setupLog = [...setupLog, event.message];
+        setupLog = [...setupLog.slice(-(PREPARATION_MAX_SETUP_LOG_ENTRIES - 1)), event.message];
       }
     }
     notify();
@@ -503,11 +589,10 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
           ? settleRunningSteps(handedOff.steps, 'completed')
           : (existing?.steps ?? []),
       };
-      preparationAttempts = [
-        ...preparationAttempts.filter(item => item.id !== attempt.id),
-        attempt,
-      ].sort((a, b) => a.startedAt - b.startedAt);
-      return attempt;
+      preparationAttempts = [...preparationAttempts.filter(item => item.id !== attempt.id), attempt]
+        .sort((a, b) => a.startedAt - b.startedAt)
+        .slice(-PREPARATION_MAX_ATTEMPTS);
+      return preparationAttempts.includes(attempt) ? attempt : null;
     }
     if (event.action === 'attempt_snapshot' && event.attempt) {
       if (existing && existing.revision > event.attempt.revision) return null;
@@ -522,11 +607,10 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
         revision: snapshot.revision,
         steps: existing?.steps ?? [],
       };
-      preparationAttempts = [
-        ...preparationAttempts.filter(item => item.id !== attempt.id),
-        attempt,
-      ].sort((a, b) => a.startedAt - b.startedAt);
-      return attempt;
+      preparationAttempts = [...preparationAttempts.filter(item => item.id !== attempt.id), attempt]
+        .sort((a, b) => a.startedAt - b.startedAt)
+        .slice(-PREPARATION_MAX_ATTEMPTS);
+      return preparationAttempts.includes(attempt) ? attempt : null;
     }
     if (!existing) return null;
     if (event.action === 'attempt_completed' || event.action === 'attempt_failed') {
@@ -560,7 +644,9 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
         label: event.label,
         status: 'running',
         startedAt: event.timestamp,
+        startedRevision: event.revision,
         revision: event.revision,
+        ...(event.parentStepId === undefined ? {} : { parentStepId: event.parentStepId }),
         ...(event.command === undefined ? {} : { command: event.command }),
         ...(event.commandIndex === undefined ? {} : { commandIndex: event.commandIndex }),
         ...(event.commandCount === undefined ? {} : { commandCount: event.commandCount }),
@@ -573,9 +659,14 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       if (event.action === 'step_progress' && event.detail !== undefined) {
         nextStep = { ...existingStep, latestDetail: event.detail, revision: event.revision };
       } else if (event.action === 'step_output' && event.output !== undefined) {
+        const tail = utf8Tail(
+          `${existingStep.outputTail ?? ''}${event.output}`,
+          PREPARATION_OUTPUT_TAIL_MAX_BYTES
+        );
         nextStep = {
           ...existingStep,
-          outputTail: `${existingStep.outputTail ?? ''}${event.output}`,
+          outputTail: tail.text,
+          outputTruncated: existingStep.outputTruncated === true || tail.truncated,
           revision: event.revision,
         };
       } else if (event.action === 'step_completed') {
@@ -602,9 +693,17 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     const attempt: PreparationAttempt = {
       ...existing,
       revision: Math.max(existing.revision, step.revision),
-      steps: [...existing.steps.filter(item => item.id !== step.id), step].sort(
-        (a, b) => a.startedAt - b.startedAt
-      ),
+      steps: [...existing.steps.filter(item => item.id !== step.id), step]
+        .sort(
+          (a, b) =>
+            Number(a.startedRevision !== undefined) - Number(b.startedRevision !== undefined) ||
+            (a.startedRevision !== undefined && b.startedRevision !== undefined
+              ? a.startedRevision - b.startedRevision
+              : 0) ||
+            a.startedAt - b.startedAt ||
+            a.id.localeCompare(b.id)
+        )
+        .slice(-PREPARATION_MAX_STEPS),
     };
     preparationAttempts = preparationAttempts.map(item =>
       item.id === existing.id ? attempt : item
@@ -707,7 +806,11 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   function processMessageCompleted(
     event: Extract<ServiceEvent, { type: 'cloud.message.completed' }>
   ): void {
-    if (activeMessageId === event.messageId) activeMessageId = null;
+    if (activeMessageId === event.messageId) {
+      activeMessageId = null;
+      terminalFailure = null;
+      if (status.type === 'error') status = IDLE_STATUS;
+    }
     pendingMessages.delete(event.messageId);
     config.onMessageCompleted?.(event.messageId);
     notify();
@@ -776,6 +879,25 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   }
 
   /**
+   * Drops every pending delivery entry that is not a failure, keeping failed
+   * ones so their recovery affordance survives a reconciliation. `excludeIds`
+   * names the ids the caller is about to write from an authoritative source
+   * (the queue snapshot); a failed entry for one of those is stale and goes.
+   *
+   * The Map identity is preserved: subscribers hold onto the previous
+   * reference.
+   */
+  function retainFailedMessages(excludeIds?: ReadonlySet<string>): void {
+    const failed = [...pendingMessages.entries()].filter(
+      ([messageId, state]) => state.status === 'failed' && !excludeIds?.has(messageId)
+    );
+    pendingMessages.clear();
+    for (const [messageId, state] of failed) {
+      pendingMessages.set(messageId, state);
+    }
+  }
+
+  /**
    * CLI-only: `queue.changed` carries the authoritative FIFO snapshot of
    * queued user-message IDs. Each emission is a full reconciliation, not a
    * delta — entries absent from the new snapshot are dropped.
@@ -789,38 +911,13 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
    */
   function processQueueChanged(event: Extract<ServiceEvent, { type: 'queue.changed' }>): void {
     if (!isRootSession(event.sessionId)) return;
-    if (event.queued.length === 0) {
-      if (pendingMessages.size === 0) return;
-      // Preserve failed entries — a failed delivery row must survive a
-      // reconciliation so its recovery affordance stays visible.
-      const failed = [...pendingMessages.entries()].filter(
-        ([messageId, state]) => state.status === 'failed' && !event.queued.includes(messageId)
-      );
-      pendingMessages.clear();
-      for (const [messageId, state] of failed) {
-        pendingMessages.set(messageId, state);
-      }
-      notify();
-      return;
-    }
-    const next = new Map<string, MessageDeliveryState>();
-    for (const messageId of event.queued) {
-      next.set(messageId, { status: 'queued' });
-    }
-    // Preserve failed entries before the wholesale replace, then re-insert
-    // them after the queued entries are written. Skip any failed id that is
-    // also in this snapshot: the queue is authoritative for those ids.
-    const failed = [...pendingMessages.entries()].filter(
-      ([messageId, state]) => state.status === 'failed' && !event.queued.includes(messageId)
-    );
-    // Reuse the same Map identity where possible to avoid invalidating
-    // existing subscribers that hold onto the previous reference.
-    pendingMessages.clear();
-    for (const [messageId, state] of next) {
-      pendingMessages.set(messageId, state);
-    }
-    for (const [messageId, state] of failed) {
-      pendingMessages.set(messageId, state);
+    if (event.queued.length === 0 && pendingMessages.size === 0) return;
+    const queued = new Set(event.queued);
+    // The snapshot is authoritative for the ids it names, so a failed entry for
+    // one of them gives way to the queued state; every other failed entry stays.
+    retainFailedMessages(queued);
+    for (const messageId of queued) {
+      pendingMessages.set(messageId, { status: 'queued' });
     }
     notify();
   }
@@ -828,47 +925,41 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
   function clearPendingInteractions(): void {
     const clearedQuestions = questions;
     const clearedPermissions = permissions;
+    const clearedUnreadablePermissions = unreadablePermissions;
     const clearedSuggestion = suggestion;
     questions = [];
     permissions = [];
+    unreadablePermissions = [];
     suggestion = null;
     for (const entry of clearedQuestions) config.onQuestionResolved?.(entry.requestId);
     for (const entry of clearedPermissions) config.onPermissionResolved?.(entry.requestId);
+    for (const entry of clearedUnreadablePermissions)
+      config.onPermissionResolved?.(entry.requestId);
     if (clearedSuggestion) config.onSuggestionResolved?.(clearedSuggestion.requestId);
   }
 
   function processConnected(event: Extract<ServiceEvent, { type: 'connected' }>): void {
-    // Set activity from sessionStatus. When sessionStatus is absent (server
-    // has no execution-derived state yet), default to idle — we know the
-    // transport connected, so we're at least no longer in the 'connecting' phase.
+    // The status mapping is the same one `session.status` uses; only the
+    // bootstrap below is connect-specific. A connected payload describes the
+    // root session.
     const sessionStatus = event.sessionStatus;
     if (event.activeMessageId !== undefined) {
       activeMessageId = event.activeMessageId;
     } else if (sessionStatus?.type === 'idle') {
       activeMessageId = null;
     }
-    if (sessionStatus?.type === 'busy' || sessionStatus?.type === 'retry') {
-      status = IDLE_STATUS;
-      disconnectedSource = null;
-      completed = false;
-    }
     if (sessionStatus === undefined) {
-      // Only default to idle on initial connect (activity === 'connecting').
-      // On reconnect, preserve existing activity — the server will send a
-      // separate session.status event with the authoritative state.
+      // When sessionStatus is absent (server has no execution-derived state
+      // yet), default to idle — we know the transport connected, so we're at
+      // least no longer in the 'connecting' phase. Only on initial connect
+      // (activity === 'connecting'); on reconnect, preserve existing activity —
+      // the server will send a separate session.status event with the
+      // authoritative state.
       if (activity.type === 'connecting') {
         activity = { type: 'idle' };
       }
-    } else if (sessionStatus.type === 'busy') {
-      activity = { type: 'busy' };
-    } else if (sessionStatus.type === 'idle') {
-      activity = { type: 'idle' };
-    } else if (sessionStatus.type === 'retry') {
-      activity = {
-        type: 'retrying',
-        attempt: sessionStatus.attempt,
-        message: sessionStatus.message,
-      };
+    } else {
+      applySessionStatus(rootSessionId, knownSessionStatus(sessionStatus));
     }
 
     // Set cloudStatus (undefined means not provided — leave as null)
@@ -891,14 +982,9 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
 
     // Clear pending-message delivery state — replayed cloud.message.queued
     // events following the snapshot will repopulate it with the current truth.
-    // Failed entries survive the reconnect: replayed cloud.message.queued events
-    // repopulate the queued half, and the failed half must survive a reconnect
-    // so the row keeps its recovery affordance.
-    const failed = [...pendingMessages.entries()].filter(([, state]) => state.status === 'failed');
-    pendingMessages.clear();
-    for (const [messageId, state] of failed) {
-      pendingMessages.set(messageId, state);
-    }
+    // Failed entries survive the reconnect so the row keeps its recovery
+    // affordance.
+    retainFailedMessages();
 
     notify();
   }
@@ -940,6 +1026,9 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
         break;
       case 'permission.replied':
         processPermissionResolved(event.requestId);
+        break;
+      case 'permission.unreadable':
+        processPermissionUnreadable(event.requestId);
         break;
       case 'suggestion.shown':
         processSuggestionShown(event);
@@ -984,13 +1073,93 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       case 'session.idle':
       case 'session.turn.close':
       case 'warning':
+      case 'bootstrap.complete':
         // No-op events
         break;
     }
   }
 
+  function publishReplayEffects(batch: ServiceReplayBatch): void {
+    for (const info of batch.infos.values()) {
+      if (!batch.hadSessionInfo && isRootSession(info.id)) config.onSessionCreated?.(info);
+      else config.onSessionUpdated?.(info);
+    }
+    if (batch.branch !== null) config.onBranchChanged?.(batch.branch);
+    for (const entry of batch.questions) {
+      if (!questions.some(current => current.requestId === entry.requestId)) {
+        config.onQuestionResolved?.(entry.requestId);
+      }
+    }
+    for (const entry of batch.permissions) {
+      if (!permissions.some(current => current.requestId === entry.requestId)) {
+        config.onPermissionResolved?.(entry.requestId);
+      }
+    }
+    for (const entry of questions) {
+      if (!batch.questions.includes(entry))
+        config.onQuestionAsked?.(entry.requestId, entry.questions);
+    }
+    for (const entry of permissions) {
+      if (!batch.permissions.includes(entry)) {
+        config.onPermissionAsked?.(
+          entry.requestId,
+          entry.permission,
+          entry.patterns,
+          entry.metadata,
+          entry.always
+        );
+      }
+    }
+    for (const [id, error] of batch.childErrors) config.onChildSessionError?.(id, error);
+  }
+
   return {
     process,
+
+    beginReplay(): void {
+      if (replay) return;
+      const batch: ServiceReplayBatch = {
+        statusAtStart: status,
+        questions,
+        permissions,
+        infos: new Map(),
+        childErrors: new Map(),
+        branch: null,
+        hadSessionInfo: sessionInfo !== null,
+      };
+      replay = batch;
+      config = {
+        rootSessionId: initialConfig.rootSessionId,
+        isDeliveryFailureResolved: initialConfig.isDeliveryFailureResolved,
+        onSessionCreated: info => batch.infos.set(info.id, info),
+        onSessionUpdated: info => batch.infos.set(info.id, info),
+        onBranchChanged: branch => {
+          batch.branch = branch;
+        },
+        onChildSessionError: (id, error) => batch.childErrors.set(id, error),
+      };
+    },
+
+    endReplay(): void {
+      const batch = replay;
+      if (!batch) return;
+      replay = null;
+      config = initialConfig;
+      publishReplayEffects(batch);
+      if (status.type === 'error' && status !== batch.statusAtStart)
+        config.onError?.(status.message);
+      notify();
+    },
+
+    cancelReplay(): void {
+      const batch = replay;
+      replay = null;
+      config = initialConfig;
+      if (batch) {
+        publishReplayEffects(batch);
+        notify();
+      }
+    },
 
     getActivity: () => activity,
     getStatus: () => status,
@@ -1002,11 +1171,17 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       commits = [];
       notify();
     },
+    clearPreparationAttempts(): void {
+      preparationAttempts = [];
+      notify();
+    },
     getQuestion: () => questions[0] ?? null,
     getPermission: () => permissions[0] ?? null,
+    getUnreadablePermissions: () => unreadablePermissions,
     getSuggestion: () => suggestion,
     getSessionInfo: () => sessionInfo,
     getPendingMessages: () => pendingMessages,
+    getActiveMessageId: () => activeMessageId,
 
     clearFailedMessage(messageId: string): boolean {
       pendingMessages.delete(messageId);
@@ -1036,6 +1211,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       sessionInfo,
       question: questions[0] ?? null,
       permission: permissions[0] ?? null,
+      unreadablePermissions,
       suggestion,
       pendingMessages,
     }),
@@ -1063,6 +1239,8 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
     },
 
     reset(): void {
+      replay = null;
+      config = initialConfig;
       activity = INITIAL_ACTIVITY;
       status = IDLE_STATUS;
       cloudStatus = null;
@@ -1073,6 +1251,7 @@ function createServiceState(config: ServiceStateConfig): ServiceState {
       sessionInfo = null;
       questions = [];
       permissions = [];
+      unreadablePermissions = [];
       suggestion = null;
       pendingMessages.clear();
       activeMessageId = null;

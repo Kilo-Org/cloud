@@ -1,3 +1,4 @@
+import { onlineManager } from '@tanstack/react-query';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // The mock harness is imported before any product module so its `vi.mock`
@@ -5,71 +6,46 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   advanceUntil,
   authState,
+  connectivityState,
   findConfigureRows,
   findNode,
-  flushInteractions,
+  flushIdle,
   getProfileAgentScopeMock,
-  interactionState,
+  idleState,
   keys,
   mountProfile,
   nodeCount,
   nodeCountWithChildren,
   organizationsQueryFn,
+  organizationState,
   providersQueryFn,
   routerPush,
+  setOrganizationIdFn,
   signOutFn,
 } from '@/components/profile-screen.test-helpers';
 import { i18n } from '@/i18n';
-import { AFTER_INTERACTIONS_FALLBACK_MS } from '@/lib/hooks/use-after-interactions';
-import { act, type ReactTestInstance } from '@/test/renderer';
+import { AFTER_IDLE_FALLBACK_MS } from '@/lib/hooks/use-after-idle';
+import { act } from '@/test/renderer';
 import { createTestQueryClient, waitFor } from '@/test/render-with-providers';
-
-// This spec is the only one that varies the safe-area insets, so it owns that
-// mock instead of the shared harness.
-const safeArea = vi.hoisted(() => ({ top: 24, bottom: 0, left: 0, right: 0 }));
-
-vi.mock('react-native-safe-area-context', () => ({
-  useSafeAreaInsets: () => safeArea,
-}));
-
-// ── Helpers ────────────────────────────────────────────────────────────────
-
-function expectAlignedContent(root: ReactTestInstance) {
-  const scroll = findNode(root, 'ScrollView');
-  expect.soft(scroll?.props.contentContainerClassName).toBe('px-4 pt-4');
-  expect(scroll?.props.style).toEqual({ marginLeft: safeArea.left, marginRight: safeArea.right });
-  expect(findNode(root, 'CreditsCard')?.parent).toBe(scroll);
-}
-
-// ── Tests ──────────────────────────────────────────────────────────────────
 
 describe('ProfileScreen deferred queries', () => {
   beforeEach(() => {
     vi.useRealTimers();
+    // A test that simulates the app reporting offline must not leak that state.
+    onlineManager.setOnline(true);
+    connectivityState.value = 'online';
     providersQueryFn.mockReset();
     organizationsQueryFn.mockReset();
     signOutFn.mockReset();
     routerPush.mockReset();
     authState.token = 'token-1';
-    interactionState.storedCallback = undefined;
-    interactionState.cancel.mockReset();
+    idleState.storedCallback = undefined;
+    idleState.cancel.mockReset();
     getProfileAgentScopeMock.mockReset();
     getProfileAgentScopeMock.mockReturnValue('personal');
-    Object.assign(safeArea, { top: 24, bottom: 0, left: 0, right: 0 });
-  });
-
-  it.each([
-    { left: 0, right: 0 },
-    { left: 40, right: 0 },
-    { left: 0, right: 40 },
-    { left: 47, right: 59 },
-  ])('aligns the content with the header gutter for side insets $left/$right', async insets => {
-    Object.assign(safeArea, insets);
-    const { renderer, unmount } = await mountProfile();
-
-    expectAlignedContent(renderer.root);
-
-    unmount();
+    organizationState.organizationId = 'org-1';
+    organizationState.isLoaded = true;
+    setOrganizationIdFn.mockReset();
   });
 
   it('defers both queries until interactions settle, showing the skeleton first', async () => {
@@ -79,15 +55,14 @@ describe('ProfileScreen deferred queries', () => {
     const { renderer, unmount } = await mountProfile();
 
     // Before the flush: neither query fired, the content-shaped skeleton
-    // (icon tile + two text bars) shows, and the agent rows are held
-    // disabled (refreshing argument is true).
+    // (icon tile + two text bars) shows, and the scope resolver has no list to
+    // read yet, so the agent rows stay disabled.
     expect(providersQueryFn).not.toHaveBeenCalled();
     expect(organizationsQueryFn).not.toHaveBeenCalled();
     expect(nodeCount(renderer.root, 'Skeleton')).toBe(3);
-    expectAlignedContent(renderer.root);
-    expect(getProfileAgentScopeMock.mock.calls.at(-1)?.[2]).toBe(true);
+    expect(getProfileAgentScopeMock.mock.calls.at(-1)?.[1]).toBeUndefined();
 
-    flushInteractions();
+    flushIdle();
 
     await waitFor(
       () => providersQueryFn.mock.calls.length > 0 && organizationsQueryFn.mock.calls.length > 0
@@ -95,8 +70,8 @@ describe('ProfileScreen deferred queries', () => {
     expect(providersQueryFn).toHaveBeenCalledTimes(1);
     expect(organizationsQueryFn).toHaveBeenCalledTimes(1);
 
-    // Once the deferred fetch settles, the refreshing argument is false.
-    await waitFor(() => getProfileAgentScopeMock.mock.calls.at(-1)?.[2] === false);
+    // Once the deferred read answers, the resolver receives the list itself.
+    await waitFor(() => Array.isArray(getProfileAgentScopeMock.mock.calls.at(-1)?.[1]));
 
     unmount();
   });
@@ -111,15 +86,14 @@ describe('ProfileScreen deferred queries', () => {
     const { renderer, unmount } = await mountProfile();
 
     // The automated-session state: the callback captured by the
-    // `runAfterInteractions` mock is never flushed, so the interaction queue
-    // stays open and only the hook's fallback can release the gated queries.
-    // Before the fix this mount stayed on the skeleton forever and the
-    // signed-in address -- the only place the app renders it -- never
-    // appeared.
+    // `requestIdleCallback` stub is never flushed, so the deferred reads stay
+    // gated and only the hook's timer fallback can release them. Before the
+    // fix this mount stayed on the skeleton forever and the signed-in address
+    // -- the only place the app renders it -- never appeared.
     expect(providersQueryFn).not.toHaveBeenCalled();
     await advanceUntil(
       () => findConfigureRows(renderer.root, 'GitHub').length === 1,
-      AFTER_INTERACTIONS_FALLBACK_MS * 4
+      AFTER_IDLE_FALLBACK_MS * 4
     );
     vi.useRealTimers();
 
@@ -144,7 +118,6 @@ describe('ProfileScreen deferred queries', () => {
     expect(providersQueryFn).not.toHaveBeenCalled();
     expect(nodeCount(renderer.root, 'Skeleton')).toBe(0);
     expect(renderer.root.findAllByProps({ title: 'GitHub' })).toHaveLength(1);
-    expectAlignedContent(renderer.root);
 
     unmount();
   });
@@ -202,7 +175,7 @@ describe('ProfileScreen deferred queries', () => {
 
     const { renderer, unmount } = await mountProfile();
 
-    flushInteractions();
+    flushIdle();
     await waitFor(() => findConfigureRows(renderer.root, 'GitHub').length === 1);
 
     const row = findConfigureRows(renderer.root, 'GitHub')[0];
@@ -232,13 +205,96 @@ describe('ProfileScreen deferred queries', () => {
 
     const { renderer, unmount } = await mountProfile();
 
-    flushInteractions();
+    flushIdle();
     await waitFor(() => nodeCount(renderer.root, 'QueryError') > 0);
 
     const queryError = findNode(renderer.root, 'QueryError');
     expect(queryError?.props.title).toBe('Could not load accounts');
     expect(typeof queryError?.props.onRetry).toBe('function');
-    expectAlignedContent(renderer.root);
+
+    unmount();
+  });
+
+  it('settles the linked-accounts read while the app reports offline', async () => {
+    // NetInfo can hold the device offline while the backend is reachable. A
+    // paused read is pending without fetching, so neither the row nor the error
+    // surface renders: the screen must ask Query to settle regardless.
+    providersQueryFn.mockResolvedValue({
+      providers: [{ provider: 'github', email: 'dev@kilo.ai' }],
+    });
+    organizationsQueryFn.mockResolvedValue([]);
+    onlineManager.setOnline(false);
+
+    const { renderer, unmount } = await mountProfile();
+
+    flushIdle();
+    await waitFor(() => findConfigureRows(renderer.root, 'GitHub').length === 1);
+
+    expect(findConfigureRows(renderer.root, 'GitHub')[0]?.props.subtitle).toBe('dev@kilo.ai');
+    expect(nodeCount(renderer.root, 'Skeleton')).toBe(0);
+
+    unmount();
+  });
+
+  it('settles the organizations read while the app reports offline', async () => {
+    // Same trap as the linked-accounts read: the organizations list resolves
+    // the Agents scope, so a read paused by the online manager leaves the
+    // organization section and both agent rows waiting on a request that never
+    // starts. It must ask Query to settle regardless.
+    providersQueryFn.mockResolvedValue({ providers: [] });
+    organizationsQueryFn.mockResolvedValue([
+      { organizationId: 'org-1', organizationName: 'Kilo', role: 'admin' },
+    ]);
+    onlineManager.setOnline(false);
+
+    const { renderer, unmount } = await mountProfile();
+
+    flushIdle();
+    await waitFor(
+      () =>
+        findConfigureRows(renderer.root, i18n.t('profile.manageOrganization'))[0]?.props
+          .subtitle === 'Kilo'
+    );
+
+    const [organizationRow] = findConfigureRows(
+      renderer.root,
+      i18n.t('profile.manageOrganization')
+    );
+    expect(organizationRow?.props.subtitle).toBe('Kilo');
+    expect(nodeCount(renderer.root, 'QueryError')).toBe(0);
+
+    unmount();
+  });
+
+  it('settles an unreachable linked-accounts read to its retry surface while offline', async () => {
+    providersQueryFn.mockRejectedValue(new Error('Network request failed'));
+    organizationsQueryFn.mockResolvedValue([]);
+    onlineManager.setOnline(false);
+
+    const { renderer, unmount } = await mountProfile();
+
+    flushIdle();
+    await waitFor(() => nodeCount(renderer.root, 'QueryError') > 0);
+
+    const queryError = findNode(renderer.root, 'QueryError');
+    expect(queryError?.props.title).toBe('Could not load accounts');
+    expect(typeof queryError?.props.onRetry).toBe('function');
+    expect(nodeCount(renderer.root, 'Skeleton')).toBe(0);
+
+    unmount();
+  });
+
+  it('names connectivity when the failed read lands on a confirmed-offline device', async () => {
+    providersQueryFn.mockRejectedValue(new Error('Network request failed'));
+    organizationsQueryFn.mockResolvedValue([]);
+    connectivityState.value = 'offline';
+
+    const { renderer, unmount } = await mountProfile();
+
+    flushIdle();
+    await waitFor(() => nodeCount(renderer.root, 'QueryError') > 0);
+
+    expect(findNode(renderer.root, 'QueryError')?.props.variant).toBe('offline');
 
     unmount();
   });
@@ -248,7 +304,7 @@ describe('ProfileScreen deferred queries', () => {
 
     const { unmount } = await mountProfile();
 
-    flushInteractions();
+    flushIdle();
     await act(async () => {
       await Promise.resolve();
     });
@@ -262,9 +318,9 @@ describe('ProfileScreen deferred queries', () => {
   it('cancels the interaction handle on unmount', async () => {
     const { unmount } = await mountProfile();
 
-    expect(interactionState.cancel).not.toHaveBeenCalled();
+    expect(idleState.cancel).not.toHaveBeenCalled();
     unmount();
-    expect(interactionState.cancel).toHaveBeenCalledTimes(1);
+    expect(idleState.cancel).toHaveBeenCalledTimes(1);
   });
 
   it('renders a cached providers error without the skeleton or a refire before the flush', async () => {
@@ -275,7 +331,7 @@ describe('ProfileScreen deferred queries', () => {
     const first = await mountProfile(queryClient);
 
     // Settle the first mount into the error state so the error is cached.
-    flushInteractions();
+    flushIdle();
     await waitFor(() => nodeCount(first.renderer.root, 'QueryError') > 0);
 
     // Unmount without clearing the cache (the harness `unmount` clears it).
@@ -322,7 +378,7 @@ describe('ProfileScreen deferred queries', () => {
 
     const { renderer, unmount } = await mountProfile();
 
-    flushInteractions();
+    flushIdle();
     await waitFor(
       () => providersQueryFn.mock.calls.length > 0 && organizationsQueryFn.mock.calls.length > 0
     );
@@ -335,7 +391,6 @@ describe('ProfileScreen deferred queries', () => {
     );
 
     expect(nodeCountWithChildren(renderer.root, 'Text', 'Linked accounts')).toBe(0);
-    expectAlignedContent(renderer.root);
 
     unmount();
   });

@@ -15,11 +15,13 @@ import { CommitCard } from './CommitCard';
 import { isMessageStreaming, type StoredMessage } from './types';
 
 const emptyCommitAnchors: ReadonlyMap<string, readonly SessionCommit[]> = new Map();
+const emptySendingMessageIds: ReadonlySet<string> = new Set();
 
 type ConversationMessageGroupProps = {
   messages: StoredMessage[];
   isStreaming: boolean;
   deliveryState?: MessageDeliveryState;
+  isSending?: boolean;
   preparations?: readonly PreparationAttempt[];
   commits?: readonly SessionCommit[];
   getChildMessages?: (sessionId: string) => StoredMessage[];
@@ -32,6 +34,7 @@ const ConversationMessageGroup = memo(
     messages,
     isStreaming,
     deliveryState,
+    isSending,
     preparations,
     commits,
     getChildMessages,
@@ -54,6 +57,7 @@ const ConversationMessageGroup = memo(
           displayTimestamp={last.info.time.created}
           isStreaming={isStreaming}
           deliveryState={deliveryState}
+          isSending={isSending}
           getChildMessages={getChildMessages}
           onOpenChildSession={onOpenChildSession}
         />
@@ -73,6 +77,7 @@ const ConversationMessageGroup = memo(
   (previous, next) =>
     previous.isStreaming === next.isStreaming &&
     previous.deliveryState === next.deliveryState &&
+    previous.isSending === next.isSending &&
     previous.preparations === next.preparations &&
     previous.commits === next.commits &&
     previous.onOpenChildSession === next.onOpenChildSession &&
@@ -87,6 +92,7 @@ type ConversationMessagesProps = {
   staticMessages: StoredMessage[];
   dynamicMessages: StoredMessage[];
   pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
+  sendingMessageIds?: ReadonlySet<string>;
   preparationByMessageId: ReadonlyMap<string, readonly PreparationAttempt[]>;
   commitsAfterMessage?: ReadonlyMap<string, readonly SessionCommit[]>;
   getChildMessages?: (sessionId: string) => StoredMessage[];
@@ -100,6 +106,7 @@ export const ConversationMessages = memo(
     staticMessages,
     dynamicMessages,
     pendingMessages,
+    sendingMessageIds = emptySendingMessageIds,
     preparationByMessageId,
     commitsAfterMessage = emptyCommitAnchors,
     getChildMessages,
@@ -120,6 +127,7 @@ export const ConversationMessages = memo(
           messages={messages}
           isStreaming={isStreaming && isMessageStreaming(last)}
           deliveryState={pendingMessages.get(first.info.id)}
+          isSending={sendingMessageIds.has(first.info.id)}
           preparations={preparationByMessageId.get(first.info.id)}
           commits={commitsAfterMessage.get(last.info.id)}
           getChildMessages={getChildMessages}
@@ -137,6 +145,7 @@ export const ConversationMessages = memo(
       previous.staticMessages === next.staticMessages &&
       previous.dynamicMessages === next.dynamicMessages &&
       previous.pendingMessages === next.pendingMessages &&
+      previous.sendingMessageIds === next.sendingMessageIds &&
       previous.preparationByMessageId === next.preparationByMessageId &&
       previous.commitsAfterMessage === next.commitsAfterMessage &&
       previous.onOpenChildSession === next.onOpenChildSession &&

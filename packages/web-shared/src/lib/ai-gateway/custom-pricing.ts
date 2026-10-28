@@ -1,46 +1,48 @@
 import { captureMessage } from '@sentry/nextjs';
+import type { CustomPricing, CustomPricingConfig } from '@kilocode/db/schema-types';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { JustTheCostsUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
-import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import {
-  calculateCost_mUsd,
-  type Pricing,
-  type PricingTiers,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
+  formatPricePerToken,
+  getCustomPricing,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 
-export type CustomPricing = {
-  pricing: PricingTiers;
-  /** Human-readable discount shown in the model name; never used in calculations. */
-  discountPercentage?: number;
-  /** Only use this pricing when the upstream response does not report a market cost. */
-  fallbackOnly?: boolean;
+type PricingTiers = CustomPricing['pricing'];
+type Pricing = PricingTiers[number]['pricing'];
+
+type Usage = {
+  uncachedInputTokens: number;
+  totalOutputTokens: number;
+  cacheWriteTokens: number;
+  cacheHitTokens: number;
 };
 
-export const customPricingByModelId: Record<string, CustomPricing> = {
-  // Google's 50% promotional discount is available through the end of 2026.
-  [GEMINI_FLASH_CURRENT_MODEL_ID]: {
-    discountPercentage: 50,
-    pricing: [
-      {
-        start_context_length: 0,
-        pricing: {
-          prompt_per_million: 0.75,
-          completion_per_million: 3.75,
-          input_cache_read_per_million: 0.075,
-          input_cache_write_per_million: 0.0416666666667,
-        },
-      },
-    ],
-  },
-};
+function calculateCost_mUsd(usage: Usage, pricingTiers: PricingTiers): number {
+  if (pricingTiers[0].start_context_length !== 0) {
+    throw new Error('The first pricing tier must start at context length 0');
+  }
 
-export function getCustomPricing(modelId: string): CustomPricing | undefined {
-  if (!Object.hasOwn(customPricingByModelId, modelId)) return undefined;
-  return customPricingByModelId[modelId];
-}
+  const totalInputTokens =
+    usage.uncachedInputTokens + usage.cacheWriteTokens + usage.cacheHitTokens;
+  let selectedTier = pricingTiers[0];
+  let previousTier = pricingTiers[0];
+  for (const tier of pricingTiers.slice(1)) {
+    if (tier.start_context_length <= previousTier.start_context_length) {
+      throw new Error('Pricing tiers must be ordered by ascending start context length');
+    }
+    if (tier.start_context_length <= totalInputTokens) {
+      selectedTier = tier;
+    }
+    previousTier = tier;
+  }
 
-function formatPricePerToken(pricePerMillion: number): string {
-  return (pricePerMillion / 1_000_000).toFixed(12);
+  const pricing = selectedTier.pricing;
+  return (
+    usage.uncachedInputTokens * pricing.prompt_per_million +
+    usage.cacheWriteTokens * (pricing.input_cache_write_per_million ?? pricing.prompt_per_million) +
+    usage.cacheHitTokens * (pricing.input_cache_read_per_million ?? pricing.prompt_per_million) +
+    usage.totalOutputTokens * pricing.completion_per_million
+  );
 }
 
 function applyPricing(pricing: OpenRouterModel['pricing'], customPricing: Pricing) {
@@ -60,18 +62,22 @@ function applyPricing(pricing: OpenRouterModel['pricing'], customPricing: Pricin
 }
 
 export function applyCustomPricingToPricing(
+  config: CustomPricingConfig,
   modelId: string,
   pricing: OpenRouterModel['pricing']
 ): OpenRouterModel['pricing'] {
-  const customPricing = getCustomPricing(modelId);
+  const customPricing = getCustomPricing(config, modelId);
   return customPricing && !customPricing.fallbackOnly
     ? applyPricing(pricing, customPricing.pricing[0].pricing)
     : pricing;
 }
 
-export function applyCustomPricingToModel(model: OpenRouterModel): OpenRouterModel {
-  const customPricing = getCustomPricing(model.id);
-  if (!customPricing) return model;
+export function applyCustomPricingToModel(
+  config: CustomPricingConfig,
+  model: OpenRouterModel
+): OpenRouterModel {
+  const customPricing = getCustomPricing(config, model.id);
+  if (!customPricing || customPricing.fallbackOnly) return model;
 
   const discountSuffix =
     customPricing.discountPercentage === undefined
@@ -86,10 +92,11 @@ export function applyCustomPricingToModel(model: OpenRouterModel): OpenRouterMod
 }
 
 export function calculateCustomCost_mUsd(
+  config: CustomPricingConfig,
   modelId: string,
   usage: JustTheCostsUsageStats
 ): number | undefined {
-  const customPricing = getCustomPricing(modelId);
+  const customPricing = getCustomPricing(config, modelId);
   if (!customPricing || (customPricing.fallbackOnly && usage.cost_mUsd > 0)) return undefined;
 
   const uncachedInputTokens = usage.inputTokens - usage.cacheHitTokens - usage.cacheWriteTokens;

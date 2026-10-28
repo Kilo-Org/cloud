@@ -6,6 +6,7 @@ import {
   updateUserRoleInOrganization,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import {
+  admin_action_audit_logs,
   organization_audit_logs,
   organization_memberships,
   organization_invitations,
@@ -155,6 +156,142 @@ describe('organizations members trpc router', () => {
       expect(invitedMember).not.toHaveProperty('inviteUrl');
       expect(invitedMember).not.toHaveProperty('dailyUsageLimitUsd');
       expect(invitedMember).not.toHaveProperty('currentDailyUsageUsd');
+    });
+  });
+
+  describe('Kilo admin elevated writes', () => {
+    async function elevatedAudits(actorId: string, organizationId: string) {
+      return db
+        .select()
+        .from(admin_action_audit_logs)
+        .where(
+          and(
+            eq(admin_action_audit_logs.actor_id, actorId),
+            eq(admin_action_audit_logs.target_id, organizationId)
+          )
+        );
+    }
+
+    it('records role changes and self-invites by a non-member Kilo admin', async () => {
+      const owner = await insertTestUser({ is_admin: false });
+      const organization = await createOrganization('Elevated Audit Org', owner.id);
+      const member = await insertTestUser({ is_admin: false });
+      await addUserToOrganization(organization.id, member.id, 'member');
+      const caller = await createCallerForUser(adminUser.id);
+
+      await caller.organizations.members.update({
+        organizationId: organization.id,
+        memberId: member.id,
+        role: 'admin',
+      });
+      await caller.organizations.members.invite({
+        organizationId: organization.id,
+        email: adminUser.google_user_email,
+        role: 'owner',
+      });
+
+      const audits = await elevatedAudits(adminUser.id, organization.id);
+      expect(
+        audits.find(audit => audit.action === 'organization.member.role.update')
+      ).toMatchObject({
+        target_type: 'organization',
+        metadata: {
+          memberKiloUserId: member.id,
+          previousRole: 'member',
+          role: 'admin',
+          heldRoles: [],
+        },
+      });
+      const invite = audits.find(audit => audit.action === 'organization.member.invite');
+      expect(invite?.metadata).toMatchObject({
+        role: 'owner',
+        invitedSelf: true,
+        invitedEmailDomain: 'admin.example.com',
+      });
+      expect(JSON.stringify([invite?.message, invite?.metadata])).not.toContain(
+        adminUser.google_user_email
+      );
+    });
+
+    it('records owner-authority actions by a Kilo admin who only holds the admin role', async () => {
+      const owner = await insertTestUser({ is_admin: false });
+      const organization = await createOrganization('Owner Authority Org', owner.id);
+      const member = await insertTestUser({ is_admin: false });
+      await addUserToOrganization(organization.id, member.id, 'member');
+      const kiloAdmin = await insertTestUser({
+        is_admin: true,
+        google_user_email: `kilo-admin-${crypto.randomUUID()}@admin.example.com`,
+      });
+      await addUserToOrganization(organization.id, kiloAdmin.id, 'admin');
+      const caller = await createCallerForUser(kiloAdmin.id);
+
+      await caller.organizations.members.update({
+        organizationId: organization.id,
+        memberId: member.id,
+        role: 'owner',
+      });
+      const [localPart, domain] = kiloAdmin.google_user_email.split('@');
+      await caller.organizations.members.invite({
+        organizationId: organization.id,
+        email: `${localPart}+alias@${domain}`,
+        role: 'owner',
+      });
+
+      const audits = await elevatedAudits(kiloAdmin.id, organization.id);
+      expect(
+        audits.find(a => a.action === 'organization.member.role.update')?.metadata
+      ).toMatchObject({ role: 'owner', heldRoles: ['admin'] });
+      expect(audits.find(a => a.action === 'organization.member.invite')?.metadata).toMatchObject({
+        role: 'owner',
+        invitedSelf: true,
+      });
+    });
+
+    it('records Kilo admin self-removal with the roles held before removal', async () => {
+      const owner = await insertTestUser({ is_admin: false });
+      const organization = await createOrganization('Self Removal Org', owner.id);
+      const kiloAdmin = await insertTestUser({ is_admin: true });
+      await addUserToOrganization(organization.id, kiloAdmin.id, 'admin');
+
+      await (
+        await createCallerForUser(kiloAdmin.id)
+      ).organizations.members.remove({
+        organizationId: organization.id,
+        memberId: kiloAdmin.id,
+      });
+
+      const [audit] = await elevatedAudits(kiloAdmin.id, organization.id);
+      expect(audit).toMatchObject({
+        action: 'organization.member.remove',
+        metadata: { previousRole: 'admin', heldRoles: ['admin'] },
+      });
+    });
+
+    it('does not record writes by members acting within their own role', async () => {
+      const owner = await insertTestUser({ is_admin: false });
+      const organization = await createOrganization('Member Write Org', owner.id);
+      const member = await insertTestUser({ is_admin: false });
+      await addUserToOrganization(organization.id, member.id, 'member');
+      const kiloAdminOwner = await insertTestUser({ is_admin: true });
+      await addUserToOrganization(organization.id, kiloAdminOwner.id, 'owner');
+
+      await (
+        await createCallerForUser(owner.id)
+      ).organizations.members.update({
+        organizationId: organization.id,
+        memberId: member.id,
+        role: 'admin',
+      });
+      await (
+        await createCallerForUser(kiloAdminOwner.id)
+      ).organizations.members.update({
+        organizationId: organization.id,
+        memberId: member.id,
+        role: 'member',
+      });
+
+      expect(await elevatedAudits(owner.id, organization.id)).toEqual([]);
+      expect(await elevatedAudits(kiloAdminOwner.id, organization.id)).toEqual([]);
     });
   });
 
@@ -1285,7 +1422,7 @@ describe('organizations members trpc router', () => {
       expect(result.acceptInviteUrl).toMatch(/^https?:\/\/.+\/users\/accept-invite\/.+$/);
     });
 
-    it('should reject inviting members into a child organization', async () => {
+    it('should reject inviting someone who is not a parent organization member', async () => {
       const childOrg = await createOrganization('Child Members Organization', regularUser.id);
       await db
         .update(organizations)
@@ -1300,7 +1437,29 @@ describe('organizations members trpc router', () => {
           email: 'child-org-invite@example.com',
           role: 'member',
         })
-      ).rejects.toThrow('Child organizations manage membership through their parent organization.');
+      ).rejects.toThrow(
+        'Child organizations can only invite people who are already members of the parent organization.'
+      );
+    });
+
+    it('should invite a parent organization member into a child organization', async () => {
+      const childOrg = await createOrganization(
+        'Child Members Invite Organization',
+        regularUser.id
+      );
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: testOrganization.id })
+        .where(eq(organizations.id, childOrg.id));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.organizations.members.invite({
+        organizationId: childOrg.id,
+        email: memberUser.google_user_email,
+        role: 'member',
+      });
+
+      expect(result).toHaveProperty('acceptInviteUrl');
     });
 
     it('should reject billing managers inviting owners', async () => {

@@ -280,7 +280,6 @@ export const PARALLEL_SHARED_SCENARIOS: Record<string, SharedScenario> = {
     defaultApi: 'unified',
     defaultConversation: '_',
     defaultTimeoutMs: PARALLEL_TIMEOUT_MS,
-    requiresWorktreeCreation: true,
     run: runWorktreeMultiChatParallel,
   },
 };

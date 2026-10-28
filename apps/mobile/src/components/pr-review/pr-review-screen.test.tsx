@@ -31,6 +31,7 @@ vi.mock('react-i18next', async importOriginal => {
 const routerPush = vi.fn();
 const routerBack = vi.fn();
 const routerCanGoBack = vi.fn(() => true);
+const routerDismissTo = vi.fn();
 const shareMock = vi.hoisted(() => vi.fn(() => ({ action: 'sharedAction' })));
 
 vi.mock('react', async () => {
@@ -58,11 +59,17 @@ vi.mock('react', async () => {
 
 vi.mock('expo-router', () => ({
   useFocusEffect: vi.fn(),
-  useRouter: () => ({ push: routerPush, back: routerBack, canGoBack: routerCanGoBack }),
+  useRouter: () => ({
+    push: routerPush,
+    back: routerBack,
+    canGoBack: routerCanGoBack,
+    dismissTo: routerDismissTo,
+  }),
 }));
 
 vi.mock('@/components/ui/refresh-control', () => ({ RefreshControl: 'RefreshControl' }));
 vi.mock('react-native', () => ({
+  BackHandler: { addEventListener: () => ({ remove: vi.fn() }) },
   Pressable: 'Pressable',
   RefreshControl: 'RefreshControl',
   ScrollView: 'ScrollView',
@@ -129,6 +136,9 @@ vi.mock('@/lib/pr-review/recent-prs', () => ({
 // test can assert the header's contract directly. `headerRight` stays a named
 // slot prop, which the walker follows into.
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/organization/organization-boundary', () => ({
+  OrganizationBoundary: 'OrganizationBoundary',
+}));
 vi.mock('@/components/pr-review/merge/pr-merge-partial-success-banner', () => ({
   PrMergePartialSuccessBanner: 'PrMergePartialSuccessBanner',
 }));
@@ -420,6 +430,49 @@ describe('PrReviewScreen share action', () => {
       const buttonProps = button?.props as { onPress: () => void };
       buttonProps.onPress();
       expect(shareMock).not.toHaveBeenCalled();
+    } finally {
+      vi.mocked(React.useContext).mockReturnValue(null);
+    }
+  });
+
+  it('shares the merge request URL the read returned', () => {
+    vi.mocked(React.useContext).mockReturnValue({
+      ref: {
+        platform: 'gitlab',
+        projectPath: 'group/repo',
+        mrIid: 12,
+        // The instance the reader opened on, kept as identity.
+        instanceHint: 'https://gitlab.staging.example',
+      },
+      organizationId: null,
+    });
+    prQueryResult = {
+      data: {
+        title: 'Bump the dep',
+        webUrl: 'https://gl.example.com/group/repo/-/merge_requests/12',
+      },
+      isLoading: false,
+      isError: false,
+      isFetching: false,
+    };
+    try {
+      // eslint-disable-next-line new-cap
+      const element = PrReviewScreen({ owner: 'group', repo: 'repo', number: 12 });
+      const button = findElement({
+        node: element,
+        type: 'Button',
+        prop: 'accessibilityLabel',
+        value: 'Share merge request',
+      });
+      if (!button) {
+        throw new Error('Share button not found');
+      }
+      expect(button.props).toEqual(expect.objectContaining({ disabled: false }));
+      (button.props as { onPress: () => void }).onPress();
+
+      expect(shareMock).toHaveBeenCalledWith({
+        message: 'Bump the dep\nhttps://gl.example.com/group/repo/-/merge_requests/12',
+      });
     } finally {
       vi.mocked(React.useContext).mockReturnValue(null);
     }
@@ -785,5 +838,35 @@ describe('PrReviewScreen header eyebrow cap', () => {
       value: 1,
     });
     expect(header).not.toBeNull();
+  });
+});
+
+describe('PrReviewScreen Back target', () => {
+  beforeEach(() => {
+    routerDismissTo.mockClear();
+    prQueryResult = {
+      data: undefined,
+      isLoading: true,
+      isError: false,
+      isFetching: false,
+    };
+  });
+
+  it('dismisses to the PR Review inbox instead of popping to the tab anchor', () => {
+    // eslint-disable-next-line new-cap
+    const element = PrReviewScreen({ owner: 'octocat', repo: 'hello', number: 7 });
+    const header = findElement({
+      node: element,
+      type: 'ScreenHeader',
+      prop: 'showBackButton',
+      value: true,
+    });
+    expect(header).not.toBeNull();
+
+    const onBack = (header?.props as { onBack?: () => void } | undefined)?.onBack;
+    onBack?.();
+
+    expect(routerDismissTo).toHaveBeenCalledExactlyOnceWith('/(app)/pr-review');
+    expect(routerBack).not.toHaveBeenCalled();
   });
 });

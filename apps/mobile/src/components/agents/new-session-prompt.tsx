@@ -14,6 +14,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { CornerDownLeft } from '@/components/ui/icons';
 import { toast } from 'sonner-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -40,7 +41,10 @@ import {
 } from '@/components/agents/chat-composer-input-height';
 import { useReturnSendsMessagePreference } from '@/lib/hooks/use-return-sends-message-preference';
 import { resolveNewSessionPromptControlState } from '@/components/agents/new-session-prompt-state';
-import { resolveNewSessionPromptMinHeight } from '@/components/agents/new-session-prompt-fit';
+import {
+  resolveNewSessionPromptMaxHeight,
+  resolveNewSessionPromptMinHeight,
+} from '@/components/agents/new-session-prompt-fit';
 import { NewSessionPromptClone } from '@/components/agents/new-session-prompt-clone';
 import { NewSessionPromptControls } from '@/components/agents/new-session-prompt-controls';
 import { type NewSessionPromptProps } from '@/components/agents/new-session-prompt-types';
@@ -123,12 +127,14 @@ export function NewSessionPrompt({
   initialPrompt,
   frameHeight,
   cardTop = 0,
+  belowCardHeight = 0,
   onStartSession,
   isCloneEntry = false,
 }: Readonly<NewSessionPromptComponentProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { height: windowHeight, fontScale } = useWindowDimensions();
+  const { height: windowHeight } = useWindowDimensions();
+  const fontScale = useLiveFontScale();
   const insets = useSafeAreaInsets();
   const { returnSendsMessage } = useReturnSendsMessagePreference();
   const [keyboardHeight, setKeyboardHeight] = useState(0);
@@ -177,15 +183,27 @@ export function NewSessionPrompt({
     lineHeight: promptLineHeight,
     preferredLines: NEW_SESSION_PROMPT_DEFAULT_LINES,
   });
-  const promptMaxHeight = resolveComposerMaxHeight({
-    windowHeight,
-    safeAreaInsetTop: insets.top,
-    safeAreaInsetBottom: insets.bottom,
-    keyboardHeight,
-    sessionHeaderHeight: SESSION_HEADER_HEIGHT * fontScale,
-    composerChromeHeight: NEW_SESSION_PROMPT_CHROME_HEIGHT * fontScale,
+  // The window cap (keyboard, safe areas, header, chrome) bounds how large the
+  // input may ever get; the frame fit bounds it further, and reserves the Run
+  // on row under the card while the floor still fits beside it.
+  const promptMaxHeight = resolveNewSessionPromptMaxHeight({
+    frameHeight: frameHeight ?? 0,
+    cardTop,
+    cardChromeHeight,
+    belowCardHeight,
+    preferredMaxHeight: resolveComposerMaxHeight({
+      windowHeight,
+      safeAreaInsetTop: insets.top,
+      safeAreaInsetBottom: insets.bottom,
+      keyboardHeight,
+      sessionHeaderHeight: SESSION_HEADER_HEIGHT * fontScale,
+      composerChromeHeight: NEW_SESSION_PROMPT_CHROME_HEIGHT * fontScale,
+      minHeight: promptMinHeight,
+      absoluteMaxHeight: NEW_SESSION_PROMPT_INPUT_MAX_HEIGHT * fontScale,
+    }),
     minHeight: promptMinHeight,
-    absoluteMaxHeight: NEW_SESSION_PROMPT_INPUT_MAX_HEIGHT * fontScale,
+    lineHeight: promptLineHeight,
+    verticalPadding: NEW_SESSION_PROMPT_VERTICAL_PADDING,
   });
 
   // Track the keyboard's reported height so the remaining-space cap follows it.
@@ -205,6 +223,7 @@ export function NewSessionPrompt({
   }, []);
 
   const promptInputStyle = {
+    color: colors.foreground,
     includeFontPadding: false,
     fontSize: PROMPT_INPUT_FONT_SIZE * fontScale,
     lineHeight: promptLineHeight,
@@ -417,15 +436,13 @@ export function NewSessionPrompt({
         />
       ) : (
         <ChatToolbar
-          mode={mode}
-          onModeChange={onModeChange}
+          modeControl={{ mode, onModeChange, customOptions }}
           model={model}
           variant={variant}
           modelOptions={modelOptions}
           onModelSelect={onModelSelect}
           disabled={isCreating}
           isLoadingModels={isLoadingModels}
-          customOptions={customOptions}
           modelLocked={modelLocked}
           modelLockLabel={modelLockLabel}
           className="border-b border-border bg-neutral-100 dark:bg-neutral-900 px-3 py-3"
@@ -459,7 +476,7 @@ export function NewSessionPrompt({
           // the Start button's own spinner. An edit made mid-flight is not
           // discarded: the creator cancels the attempt before it dispatches
           // and keeps this draft (see `createSessionFromDraft`).
-          className="w-full px-2 py-2 text-base leading-6 text-foreground"
+          className="w-full px-2 py-2 text-base leading-[1.5rem] text-foreground"
           style={[
             promptInputStyle,
             { height: promptMeasure.height },
@@ -479,6 +496,9 @@ export function NewSessionPrompt({
           // A shared payload prefills this input, so raising the keyboard on
           // arrival hides the attachment strip and the Start button.
           autoFocus={shareId === undefined || shareId === ''}
+          // Android's IME swaps the app for its full-screen extract editor in a
+          // landscape window; IME_FLAG_NO_FULLSCREEN keeps the field in place.
+          disableFullscreenUI
         />
         {showsCounter ? (
           <View className="flex-row justify-end px-1 pb-1">

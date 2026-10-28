@@ -1,0 +1,175 @@
+import type { GatewayRequest, OpenRouterChatCompletionRequest } from '../openrouter/types';
+import { replaceReasoningObjectWithReasoningEffort } from '../openrouter/request-helpers';
+import { applyReasoningDetailsTransform } from '../apply-provider-specific-logic';
+import type { Provider, TransformRequestContext } from '../types';
+import type { DirectByokProvider } from './types';
+import alibabaTokenPlan from './alibaba-token-plan';
+import byteplusCoding from './byteplus-coding';
+import chutes from './chutes-byok';
+import edenai from './edenai';
+import inceptron from './inceptron-byok';
+import kimiCoding from './kimi-coding';
+import morph from './morph';
+import neuralwatt from './neurowatt';
+import nvidia from './nvidia-byok';
+import openCodeGo from './opencode-go';
+import ollamaCloud from './ollama-cloud';
+import orcaRouter from './orcarouter';
+import synthetic from './synthetic';
+import xiaomiTokenPlanAms from './xiaomi-token-plan-ams';
+import xiaomiTokenPlanSgp from './xiaomi-token-plan-sgp';
+import zaiCoding from './zai-coding';
+
+function chatRequest(
+  body: Partial<OpenRouterChatCompletionRequest>
+): Extract<GatewayRequest, { kind: 'chat_completions' }> {
+  return { kind: 'chat_completions', body: { model: 'test', messages: [], ...body } };
+}
+
+async function transform(provider: DirectByokProvider, request: GatewayRequest) {
+  provider.transformRequest({
+    request,
+    extraHeaders: {},
+    kilo_user_id: 'user-1',
+    session_id: 'session-1',
+    provider: { id: 'direct-byok', apiKey: 'test-api-key' },
+  } as unknown as TransformRequestContext);
+  const { responseTransforms } = await provider.resolveUpstream({
+    credential: 'test-api-key',
+    model: { id: 'test' },
+    stream: false,
+  });
+  applyReasoningDetailsTransform({ responseTransforms } as Provider, request);
+}
+
+describe('replaceReasoningObjectWithReasoningEffort', () => {
+  test('carries the reasoning effort over to reasoning_effort', () => {
+    const request = chatRequest({ reasoning: { effort: 'high', enabled: true } });
+
+    replaceReasoningObjectWithReasoningEffort(request);
+
+    expect(request.body).not.toHaveProperty('reasoning');
+    expect(request.body.reasoning_effort).toBe('high');
+  });
+
+  test('keeps an explicit reasoning_effort', () => {
+    const request = chatRequest({ reasoning: { effort: 'high' }, reasoning_effort: 'low' });
+
+    replaceReasoningObjectWithReasoningEffort(request);
+
+    expect(request.body).not.toHaveProperty('reasoning');
+    expect(request.body.reasoning_effort).toBe('low');
+  });
+
+  test('does not add reasoning_effort without an effort', () => {
+    const request = chatRequest({ reasoning: { enabled: true } });
+
+    replaceReasoningObjectWithReasoningEffort(request);
+
+    expect(request.body).not.toHaveProperty('reasoning');
+    expect(request.body).not.toHaveProperty('reasoning_effort');
+  });
+
+  test('maps disabled reasoning to none only when opted in', () => {
+    const optedIn = chatRequest({ reasoning: { enabled: false } });
+    const defaultRequest = chatRequest({ reasoning: { enabled: false } });
+
+    replaceReasoningObjectWithReasoningEffort(optedIn, { disableWithNoneEffort: true });
+    replaceReasoningObjectWithReasoningEffort(defaultRequest);
+
+    expect(optedIn.body.reasoning_effort).toBe('none');
+    expect(defaultRequest.body).not.toHaveProperty('reasoning_effort');
+    expect(optedIn.body).not.toHaveProperty('reasoning');
+    expect(defaultRequest.body).not.toHaveProperty('reasoning');
+  });
+
+  test('leaves the Responses API reasoning object alone', () => {
+    const request: GatewayRequest = {
+      kind: 'responses',
+      body: { model: 'test', input: 'hello', reasoning: { effort: 'high' } },
+    };
+
+    replaceReasoningObjectWithReasoningEffort(request);
+
+    expect(request.body.reasoning).toEqual({ effort: 'high' });
+  });
+});
+
+describe('direct BYOK providers that receive OpenRouter reasoning settings', () => {
+  const providers = [
+    alibabaTokenPlan,
+    byteplusCoding,
+    chutes,
+    edenai,
+    inceptron,
+    kimiCoding,
+    morph,
+    neuralwatt,
+    nvidia,
+    openCodeGo,
+    ollamaCloud,
+    orcaRouter,
+    synthetic,
+    xiaomiTokenPlanAms,
+    xiaomiTokenPlanSgp,
+    zaiCoding,
+  ];
+
+  test.each(providers.map(provider => [provider.id, provider] as const))(
+    '%s replaces the reasoning object with reasoning_effort',
+    async (_id, provider) => {
+      const request = chatRequest({ reasoning: { effort: 'high' } });
+
+      await transform(provider, request);
+
+      expect(request.body).not.toHaveProperty('reasoning');
+      expect(request.body.reasoning_effort).toBe('high');
+    }
+  );
+
+  test.each(
+    [byteplusCoding, kimiCoding, zaiCoding].map(provider => [provider.id, provider] as const)
+  )('%s still derives thinking from the reasoning object', async (_id, provider) => {
+    const disabled = chatRequest({ reasoning: { enabled: false, effort: 'none' } });
+    const enabled = chatRequest({ reasoning: { enabled: true } });
+
+    await transform(provider, disabled);
+    await transform(provider, enabled);
+
+    expect(disabled.body.thinking).toEqual({ type: 'disabled' });
+    expect(enabled.body.thinking).toEqual({ type: 'enabled' });
+    expect(disabled.body).not.toHaveProperty('reasoning');
+    expect(enabled.body).not.toHaveProperty('reasoning');
+  });
+
+  test.each([nvidia, edenai].map(provider => [provider.id, provider] as const))(
+    '%s maps disabled reasoning to none',
+    async (_id, provider) => {
+      const request = chatRequest({ reasoning: { enabled: false } });
+
+      await transform(provider, request);
+
+      expect(request.body).not.toHaveProperty('reasoning');
+      expect(request.body.reasoning_effort).toBe('none');
+    }
+  );
+
+  test('chutes-byok does not send none, which Chutes rejects', async () => {
+    const request = chatRequest({ reasoning: { enabled: false } });
+
+    await transform(chutes, request);
+
+    expect(request.body).not.toHaveProperty('reasoning');
+    expect(request.body).not.toHaveProperty('reasoning_effort');
+  });
+
+  test('kimi-coding drops a carried-over none effort', async () => {
+    const request = chatRequest({ reasoning: { effort: 'none' } });
+
+    await transform(kimiCoding, request);
+
+    expect(request.body).not.toHaveProperty('reasoning');
+    expect(request.body).not.toHaveProperty('reasoning_effort');
+    expect(request.body.thinking).toEqual({ type: 'disabled' });
+  });
+});

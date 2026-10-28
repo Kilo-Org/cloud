@@ -2,6 +2,7 @@ export type {
   Part,
   TextPart,
   ToolPart,
+  ToolState,
   FilePart,
   ReasoningPart,
   StepStartPart,
@@ -165,6 +166,15 @@ export type PermissionState = {
   always: string[];
 };
 
+/**
+ * A permission request that is still pending for the CLI while this app cannot
+ * read its scope. No consent card can be offered for it, so the surfaces show a
+ * notice that names the request and points the user at the CLI.
+ */
+export type UnreadablePermissionState = {
+  requestId: string;
+};
+
 export type SuggestionAction = {
   label: string;
   description?: string | undefined;
@@ -240,6 +250,8 @@ export type PreparationStepSnapshot = {
   label: string;
   status: PreparationStepStatus;
   startedAt: number;
+  startedRevision?: number | undefined;
+  parentStepId?: string | undefined;
   completedAt?: number | undefined;
   revision: number;
   latestDetail?: string | undefined;
@@ -275,6 +287,8 @@ export type ServiceStateSnapshot = {
   sessionInfo: SessionInfo | null;
   question: QuestionState | null;
   permission: PermissionState | null;
+  /** Pending permission requests this app could not read, oldest first. */
+  unreadablePermissions: readonly UnreadablePermissionState[];
   suggestion: SuggestionState | null;
   pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
 };
@@ -324,6 +338,36 @@ export type SessionSnapshotPage = {
   nextCursor: string | null;
   omittedItemCount: number;
   watermarkEventId?: number | null;
+  /** The preparation rows the stream replays first, so the first page can show them. */
+  preparationAttempts?: readonly PreparationAttempt[];
+};
+
+/**
+ * A caller-cached transcript page plus the rows the transcript draws from
+ * service state, so a cached repaint matches the live transcript's layout.
+ */
+export type SessionConfig = {
+  sessionId: CloudAgentSessionId | KiloSessionId;
+  repository: string;
+  mode: string;
+  model: string;
+  providerID?: string | null | undefined;
+  variant?: string | null | undefined;
+  /** Custom modes exposed by this session's profile stack (slug + name, plus optional model and thinking-effort overrides). */
+  runtimeAgents?:
+    | Array<{
+        slug: string;
+        name: string;
+        model?: string | undefined;
+        variant?: string | undefined;
+      }>
+    | undefined;
+};
+
+export type CachedSessionSnapshotPage = SessionSnapshotPage & {
+  commits?: readonly SessionCommit[];
+  /** A Cloud Agent session's last settings, shown on reopen until its metadata loads. */
+  sessionConfig?: SessionConfig;
 };
 
 /**

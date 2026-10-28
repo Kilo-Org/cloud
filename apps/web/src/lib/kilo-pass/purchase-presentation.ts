@@ -7,7 +7,6 @@ import {
   KILO_PASS_MANAGE_CTA_LABEL,
   mapKiloPassStatusToClass,
   resolvePurchasePresentation,
-  type KiloPassSubscriptionStatus,
   type PurchaseCtaAction,
   type PurchasePresentationKind,
   type PurchasePresentationReason,
@@ -35,12 +34,11 @@ export type PurchasePresentationInput = {
   storefront: PurchaseStorefront | null | undefined;
   product: PurchaseProduct;
   program?: string | null;
-  supportsNativePlayKiloPass?: boolean;
 };
 
 type SubscriptionForPresentation = {
   paymentProvider: KiloPassPaymentProvider;
-  status: KiloPassSubscriptionStatus;
+  status: string;
 };
 
 /**
@@ -71,7 +69,6 @@ export function buildPurchasePresentation(params: {
     product: input.product,
     program: input.program,
     hasStripeManagedPass,
-    supportsNativePlayKiloPass: input.supportsNativePlayKiloPass,
   });
 
   const cta =

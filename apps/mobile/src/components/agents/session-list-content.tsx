@@ -22,14 +22,18 @@ import {
 } from '@/components/agents/session-list-rows';
 import { shouldResetScrollOnCommittedQuery } from '@/components/agents/session-list-scroll-reset';
 import { SessionListSectionHeader } from '@/components/agents/session-list-section-header';
+import {
+  SessionRowSkeleton,
+  SessionSectionHeaderSkeleton,
+} from '@/components/agents/session-list-skeleton-rows';
 import { StoredSessionRow } from '@/components/agents/session-row';
 import { usePullRefresh } from '@/components/agents/use-pull-refresh';
 import { QueryError } from '@/components/query-error';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { moveA11yFocus } from '@/lib/a11y/announce';
+import { requestA11yFocus } from '@/lib/a11y/announce';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { SESSION_LIST_SORT } from '@/lib/agent-session-sort';
 import { useSessionMutations } from '@/lib/hooks/use-session-mutations';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -41,7 +45,7 @@ export const FAB_MARGIN = 16;
 
 type AgentSessionListContentProps = {
   /** Post-deletion focus anchor: the screen's always-mounted search input. */
-  searchInputRef: Parameters<typeof moveA11yFocus>[0];
+  searchInputRef: Parameters<typeof requestA11yFocus>[0];
   sections: SessionSection[];
   activeSessionIds: ReadonlySet<string>;
   hasAnySessions: boolean;
@@ -69,11 +73,13 @@ type AgentSessionListContentProps = {
   nonPullRefreshes: number;
   hasActiveQuery: boolean;
   isSearching: boolean;
+  /** True while the driving query fetches — the error body's retry in flight. */
+  isRetrying: boolean;
   /** Committed (debounced) search query — scroll-to-top fires when this value changes. */
   searchQuery: string;
   onClearQuery: () => void;
-  /** Optional no-op accepted for the history screen's call-site compatibility. */
-  onCreateSession?: () => void;
+  /** The no-history body's next step: open the new-session composer. */
+  onCreateSession: () => void;
 };
 
 export function AgentSessionListContent({
@@ -92,8 +98,10 @@ export function AgentSessionListContent({
   nonPullRefreshes,
   hasActiveQuery,
   isSearching,
+  isRetrying,
   searchQuery,
   onClearQuery,
+  onCreateSession,
 }: Readonly<AgentSessionListContentProps>) {
   const listRef = useRef<FlashListRef<SessionListRow>>(null);
   useScrollToTop(listRef);
@@ -122,13 +130,20 @@ export function AgentSessionListContent({
   // The stored refetch resolves void: a pull failure surfaces through the
   // query error state (showInlineError below), so a settlement is always
   // "accepted" here. Only the feedback budget can fail a history pull.
+  const pullStartedFromHistoryError = useRef(false);
   const pull = usePullRefresh(async () => {
     await refetch();
     return true;
   });
   const { markSettled } = pull;
   const pullBusy = pull.refreshing || pull.busy;
+  // Preserve the full-screen error during a pull only when the pull began there;
+  // an empty-history pull must keep its empty state while the refresh is pending.
+  const errorPullBusy = pullStartedFromHistoryError.current && pullBusy;
+  const errorPullFailed = pullStartedFromHistoryError.current && pull.failed;
   const handleRefresh = () => {
+    pullStartedFromHistoryError.current =
+      (isError || errorPullFailed) && !hasActiveQuery && !hasFreshHistory;
     pull.startPull();
   };
   const handlePullRetry = () => {
@@ -167,7 +182,8 @@ export function AgentSessionListContent({
 
   const surface = selectSessionListContentSurface({
     isLoading,
-    isError,
+    isError: isError || errorPullFailed,
+    isRetrying: isRetrying || errorPullBusy,
     hasAnySessions,
     hasHistoryContent: sections.length > 0,
     hasActiveQuery,
@@ -176,11 +192,20 @@ export function AgentSessionListContent({
 
   const clearQueryAction = useMemo(
     () => (
-      <Button variant="outline" onPress={onClearQuery}>
+      <Button variant="outline" onPress={onClearQuery} className={STATE_ACTION_CLASS}>
         <Text>{isSearching ? t('common.clearSearch') : t('common.clearFilters')}</Text>
       </Button>
     ),
     [isSearching, onClearQuery, t]
+  );
+
+  // The no-history body's next step. It opens the same composer the Agents
+  // tab's "New session" action does, so an empty history never dead-ends at a
+  // message.
+  const createSessionAction = (
+    <Button onPress={onCreateSession}>
+      <Text>{t('common.newSession')}</Text>
+    </Button>
   );
 
   // The tabs navigator uses `freezeOnBlur`, so while the session detail screen
@@ -284,14 +309,17 @@ export function AgentSessionListContent({
   const renderItem = useCallback(
     ({ item }: ListRenderItemInfo<SessionListRow>) => {
       if (item.kind === 'skeleton') {
-        // Reserved cold-open slot. The pitch must equal the stored session-row
-        // pitch (SessionRow: py-[13px] + eyebrow/title ≈ 61dp) so the rows
-        // swap into the reserved space without a surrounding jump:
-        // 12dp wrapper padding + 49dp block = 61dp.
-        return (
-          <View className="py-1.5">
-            <Skeleton className="mx-[22px] h-[49px] rounded-none" />
+        // Reserved cold-open slot in the stored list's own shape (a date header
+        // above the first row, then eyebrow and title rows), so the rows swap
+        // into the reserved space without a jump.
+        const row = <SessionRowSkeleton index={item.index} subtitle={false} />;
+        return item.index === 0 ? (
+          <View>
+            <SessionSectionHeaderSkeleton />
+            {row}
           </View>
+        ) : (
+          row
         );
       }
       if (item.kind === 'section-header') {
@@ -311,11 +339,8 @@ export function AgentSessionListContent({
             );
           }}
           onDelete={() => {
-            // The hook's success toast announces the deletion; onDeleted only
-            // restores focus, and moveA11yFocus no-ops once the header is
-            // unmounted (last session deleted).
             deleteSession(item.session.session_id, () => {
-              moveA11yFocus(searchInputRef);
+              requestA11yFocus(searchInputRef);
             });
           }}
           onRename={newTitle => {
@@ -345,16 +370,16 @@ export function AgentSessionListContent({
         <QueryError
           message={t('common.couldNotLoadSessions')}
           onRetry={onRetry}
+          isRetrying={isRetrying || errorPullBusy}
           refreshControl={refreshControl}
         />
       </Animated.View>
     );
   }
 
-  // No stored rows and no active query: render the history-empty body ("No
-  // past sessions" with no create CTA) full-screen, skipping the list.
-  // Gated on !isLoading (via surface) so a cold open with an empty cache does
-  // not flash this while queries run.
+  // No stored rows and no active query: render the history-empty body with its
+  // new-session action full-screen. The surface selector gates this on !isLoading
+  // so a cold open with an empty cache does not flash before queries settle.
   if (surface.kind === 'history-empty') {
     return (
       <Animated.View entering={FadeIn.duration(200)} className="flex-1">
@@ -363,6 +388,7 @@ export function AgentSessionListContent({
           kind="no-past-sessions"
           isSearching={isSearching}
           clearQueryAction={clearQueryAction}
+          createSessionAction={createSessionAction}
           onRetry={onRetry}
           refreshControl={refreshControl}
         />
@@ -385,6 +411,7 @@ export function AgentSessionListContent({
             bodyModel.kind === 'query-error-empty' ? bodyModel.secondaryAction : undefined
           }
           clearQueryAction={clearQueryAction}
+          isRetrying={isRetrying}
           onRetry={onRetry}
           refreshControl={refreshControl}
         />
@@ -397,15 +424,6 @@ export function AgentSessionListContent({
   // 200ms fade reads as a blank list area on a fast cold open (the skeleton
   // phase would live entirely inside the fade). The skeleton → rows swap is
   // a same-pitch data update inside the mounted list.
-  //
-  // `gap-2` is the clearance between the status band and the rows — the same
-  // gap the live surface leaves below its band (`mx-4 gap-2` in
-  // `AgentSessionsSection`). Without it the list's top edge sits flush on the
-  // band, and a row resting across that edge is cut mid-text directly under
-  // "Couldn't refresh", so the two read as colliding (device defect p5). The
-  // gap lives on the container rather than as the band's padding on purpose:
-  // the clearance must not depend on whether the status line renders, or the
-  // failure line would push the rows down by the gap as it appears.
   return (
     <Animated.View className="flex-1 gap-2">
       {/* The band's height is allocated whenever the rows show, so the

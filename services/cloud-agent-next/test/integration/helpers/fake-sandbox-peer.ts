@@ -1,6 +1,8 @@
 import type { ControlPlaneSandboxPeer } from '../../../src/control-plane/session/session-do.js';
 import type { ControlRuntimeCredentialProxyFence } from '../../../src/control-plane/sandbox/sandbox-do.js';
+import type { PreviewTargetResult } from '../../../src/control-plane/sandbox/preview-target.js';
 import type { SandboxStatusSnapshot } from '../../../src/shared/sandbox-status.js';
+import type { WorkspaceBillingProjection } from '../../../src/shared/workspace-runtime-status.js';
 import type {
   ControlPlaneAnswerPayload,
   ControlPlaneDeliverPayload,
@@ -15,6 +17,23 @@ import type {
  * `prepare`/`deliver` results deterministically.
  */
 export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
+  async getWorktreeChanges() {
+    return { snapshot: null };
+  }
+  async getWorktreeFile() {
+    return { status: 'not_captured' as const };
+  }
+  async refreshWorktreeChanges() {
+    return { status: 'offline' as const, snapshot: null };
+  }
+  async getWorktreeRecovery() {
+    return undefined;
+  }
+  readonly fetchCalls: Request[] = [];
+  async fetch(request: Request): Promise<Response> {
+    this.fetchCalls.push(request);
+    return new Response('status-stream');
+  }
   /** The route attempt every view/notification from this peer belongs to. */
   attemptId = crypto.randomUUID();
   prepareView: ControlPlaneRouteView = { state: 'preparing', attemptId: this.attemptId };
@@ -86,8 +105,39 @@ export class FakeSandboxPeer implements ControlPlaneSandboxPeer {
     return this.runtimeCredentialProxyFence;
   }
 
+  /** The synthetic peer never has an accepted scope handle. */
+  async resolveScopeHandle(): Promise<{ type: 'denied' }> {
+    return { type: 'denied' };
+  }
+
+  async getAcceptedHandleIssuerLocator(): Promise<null> {
+    return null;
+  }
+
   async getStatusSnapshot(): Promise<SandboxStatusSnapshot> {
     return this.statusSnapshot;
+  }
+
+  /** The stored billing projection returned by `getWorkspaceBillingProjection`. */
+  billingProjection: WorkspaceBillingProjection | null = null;
+
+  async getWorkspaceBillingProjection(): Promise<WorkspaceBillingProjection | null> {
+    return this.billingProjection;
+  }
+
+  previewTargetResult: PreviewTargetResult = {
+    status: 'ok',
+    coordinates: {
+      provider: 'cloudflare',
+      allocationName: 'sbx',
+      containment: false,
+    },
+  };
+  readonly previewTargetCalls: string[] = [];
+
+  async previewTarget(sessionId: string): Promise<PreviewTargetResult> {
+    this.previewTargetCalls.push(sessionId);
+    return this.previewTargetResult;
   }
 }
 

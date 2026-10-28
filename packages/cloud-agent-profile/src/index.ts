@@ -2,6 +2,8 @@
 export type {
   ProfileOwner,
   ProfileOwnerType,
+  ProfileDatabase,
+  RepositoryPlatform,
   ProfileVarResponse,
   ProfileCommandResponse,
   ProfileMcpServerResponse,
@@ -9,6 +11,7 @@ export type {
   ProfileSkillResponse,
   ProfileAgentResponse,
   ProfileKiloCommandResponse,
+  ProfileInstructionResponse,
   ProfileResponse,
   ProfileResponseWithOwner,
   ProfileSummary,
@@ -33,9 +36,11 @@ export {
   ProfileNotFoundError,
   type MergeProfileConfigurationArgs,
   type MergeProfileConfigurationResult,
+  type EnvironmentInlineArgs,
   type MergedSkillForSession,
   type MergedAgentForSession,
   type MergedKiloCommandForSession,
+  type MergedInstructionForSession,
   type ClientMcpServerValue,
   type InlineSkillInput,
   type InlineAgentInput,
@@ -51,6 +56,7 @@ export {
   deleteProfile,
   listProfiles,
   getProfile,
+  getProfileOverview,
   setDefaultProfile,
   clearDefaultProfile,
   getDefaultProfile,
@@ -104,17 +110,22 @@ export {
   skillFilesSchema,
   skillCustomInputSchema,
   skillUpdateInputSchema,
+  skillsShInputSchema,
   parseSkillFrontmatter,
   listSkillsForProfile,
   createCustomSkill,
+  createSkillsShSkill,
   updateSkill,
   deleteSkill,
   setSkillEnabled,
   getSkillsForSession,
   type SkillCustomInput,
   type SkillUpdateInput,
+  type SkillsShInput,
   type SkillForSession,
 } from './profile-skills-service';
+
+export type { SkillsShSource } from './skills-sh';
 
 // Agent CRUD + session helpers
 export {
@@ -127,6 +138,7 @@ export {
   agentCreateInputSchema,
   agentUpdateInputSchema,
   listAgentsForProfile,
+  getProfileAgents,
   createAgent,
   updateAgent,
   deleteAgent,
@@ -144,6 +156,7 @@ export {
   MAX_KILO_COMMAND_DESCRIPTION_LENGTH,
   BUILTIN_COMMAND_NAMES,
   kiloCommandNameSchema,
+  kiloCommandReorderIdsSchema,
   kiloCommandCreateInputSchema,
   kiloCommandUpdateInputSchema,
   listKiloCommandsForProfile,
@@ -158,10 +171,100 @@ export {
   type KiloCommandForSession,
 } from './profile-kilo-commands-service';
 
+// Instruction CRUD + session helpers
+export {
+  MAX_PROFILE_INSTRUCTIONS,
+  instructionCreateInputSchema,
+  instructionUpdateInputSchema,
+  listInstructionsForProfile,
+  createInstruction,
+  updateInstruction,
+  deleteInstruction,
+  setInstructionEnabled,
+  getInstructionsForSession,
+  type InstructionCreateInput,
+  type InstructionUpdateInput,
+  type InstructionForSession,
+} from './profile-instructions-service';
+
 // Repo binding CRUD
 export {
   bindProfileToRepo,
   unbindRepo,
+  removeRepoBinding,
   getBindingForRepo,
   listBindings,
 } from './repo-binding-service';
+export { canonicalRepoFullName } from './repo-binding-db';
+
+// Combined repository settings (profile binding + allocation override)
+export {
+  setRepositorySettings,
+  removeRepositorySettings,
+  type RepositorySettingsInput,
+} from './repository-settings-service';
+
+// Sandbox allocation settings (context default + per-repository overrides)
+export {
+  getSandboxAllocationSettings,
+  getSandboxAllocationCandidates,
+  setContextSandboxAllocation,
+  clearContextSandboxAllocation,
+  setRepoSandboxAllocation,
+  clearRepoSandboxAllocation,
+  type SandboxAllocationSettings,
+  type SandboxAllocationCandidates,
+  type RepositoryAllocationSetting,
+} from './sandbox-allocation-settings-service';
+
+// Local config import (preview diff + selective upsert)
+export {
+  buildImportPreview,
+  applyImport,
+  type ConfigImportPreview,
+  type ImportCategoryPreview,
+  type ImportChangedItem,
+  type ImportFieldChange,
+  type PostImportAgent,
+  type PostImportInstruction,
+  type PostImportKiloCommand,
+  type PostImportSkill,
+} from './profile-import-service';
+// Repository environments
+export {
+  ENVIRONMENT_SECRET_PLACEHOLDER,
+  ENVIRONMENT_LIMITS,
+  ENVIRONMENT_KEY_PATTERN,
+  isReservedEnvironmentKey,
+  validateEnvironmentName,
+  assertValidEnvironmentKey,
+  validateEnvironmentPlainVars,
+  validateEnvironmentSecretValue,
+  validateEnvironmentCommands,
+  validateEnvironmentVarCount,
+  type EnvironmentOwner,
+  type EnvironmentPlatform,
+  type EnvironmentRepositoryIdentity,
+  type EnvironmentCreateInput,
+  type EnvironmentSecretChange,
+  type EnvironmentUpdateInput,
+  type EnvironmentSessionLayer,
+  type EnvironmentReference,
+  type EnvironmentForSession,
+  type EnvironmentBuildInput,
+  type EnvironmentResponse,
+  type EnvironmentSummary,
+} from './environment-contracts';
+export {
+  createEnvironment,
+  updateEnvironment,
+  deleteEnvironment,
+  getEnvironment,
+  listEnvironments,
+  listEnvironmentsForOwner,
+  loadEnvironmentForSession,
+  loadEnvironmentBuildInput,
+  readEnvironmentReference,
+  lockActiveOrganization,
+  type EnvironmentTransaction,
+} from './environment-service';

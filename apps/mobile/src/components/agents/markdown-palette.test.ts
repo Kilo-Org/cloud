@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { getMarkdownStyles, getPalette } from './markdown-palette';
+import { getPalette } from './markdown-palette';
 import { type ThemeColors } from '@/lib/hooks/use-theme-colors';
 
 const colors = {
@@ -20,7 +20,7 @@ const colors = {
   ink2: '#3C382F',
   mutedSoft: '#A9A39A',
   hairSoft: 'rgba(20, 15, 10, 0.05)',
-  accentSoft: '#E8F27A',
+  accentSoft: '#FFDD00',
   accentSoftForeground: '#1A1A10',
   good: '#2F9A5F',
   warn: '#B27214',
@@ -51,15 +51,5 @@ describe('markdown palette', () => {
     const palette = getPalette('kilo-chat-user', colors);
 
     expect(palette.textColor).toBe(colors.primaryForeground);
-  });
-
-  it('keeps list marker boxes free of a top margin so markers align with the first line', () => {
-    for (const variant of ['assistant', 'user', 'kilo-chat-user'] as const) {
-      const styles = getMarkdownStyles(getPalette(variant, colors));
-
-      // react-native-marked applies `list` to each item's marker box View;
-      // any top margin pushes the marker below the first text line.
-      expect(styles.list).toEqual({ marginBottom: 4 });
-    }
   });
 });

@@ -2,9 +2,8 @@
 
 import { useQuery } from '@tanstack/react-query';
 import { useTRPC } from '@/lib/trpc/utils';
-import { buildPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/models';
 
-const PREFERRED_MODELS_WITHOUT_FREE_SECTION = buildPreferredModels([]);
+const NO_PREFERRED_MODELS: ReadonlyArray<string> = [];
 
 export function usePreferredModels(): ReadonlyArray<string> {
   const trpc = useTRPC();
@@ -12,5 +11,5 @@ export function usePreferredModels(): ReadonlyArray<string> {
     ...trpc.models.preferred.queryOptions(),
     staleTime: 5 * 60_000,
   });
-  return data ?? PREFERRED_MODELS_WITHOUT_FREE_SECTION;
+  return data ?? NO_PREFERRED_MODELS;
 }

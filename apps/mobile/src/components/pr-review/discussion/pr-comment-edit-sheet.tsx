@@ -19,7 +19,14 @@
 import * as Haptics from 'expo-haptics';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, BackHandler, Keyboard, ScrollView, type TextInput, View } from 'react-native';
+import {
+  BackHandler,
+  Keyboard,
+  ScrollView,
+  type ScrollViewInstance,
+  type TextInput,
+  View,
+} from 'react-native';
 
 import {
   ComposerInlineError,
@@ -29,6 +36,7 @@ import { PrFormSheetFooter, PrFormSheetHeader } from '@/components/pr-review/pr-
 import { CommentBodyField } from '@/components/pr-review/pr-review-comment-composer-parts';
 import { ensureTermsAcceptedOutcome } from '@/components/pr-review/discussion/reply-input';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Text } from '@/components/ui/text';
 import { getCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { type PrCommentKind } from '@/lib/pr-review/discussion/review-discussion-types';
@@ -55,12 +63,13 @@ export function PrCommentEditSheet({
   onDismiss,
 }: PrCommentEditSheetProps) {
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   const updateComment = useUpdatePrCommentMutation();
 
   // iOS uncontrolled: ref + defaultValue; no value+state.
   const bodyRef = useRef<string>(initialBody);
   const bodyInputRef = useRef<TextInput | null>(null);
-  const scrollRef = useRef<ScrollView | null>(null);
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
 
   // State only for derived UI: an empty body and an unchanged body both have
   // nothing to save, so each keeps Save down.
@@ -158,10 +167,13 @@ export function PrCommentEditSheet({
     // the user just typed, even before the re-render that refreshes the
     // header/footer handlers.
     if (bodyRef.current !== initialBody) {
-      Alert.alert(t('prReview.composer.discardTitle'), t('prReview.composer.discardMessage'), [
-        { text: t('common.keepEditing'), style: 'cancel' },
-        { text: t('common.discard'), style: 'destructive', onPress: onDismiss },
-      ]);
+      confirm({
+        title: t('prReview.composer.discardTitle'),
+        message: t('prReview.composer.discardMessage'),
+        confirmLabel: t('common.discard'),
+        cancelLabel: t('common.keepEditing'),
+        onConfirm: onDismiss,
+      });
       return;
     }
     onDismiss();
@@ -251,6 +263,7 @@ export function PrCommentEditSheet({
           </Button>
         </PrFormSheetFooter>
       </ScrollView>
+      {dialog}
     </>
   );
 }

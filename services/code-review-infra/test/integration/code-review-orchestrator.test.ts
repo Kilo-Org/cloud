@@ -456,6 +456,7 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(rawMarkdown).toContain('Every list read uses --paginate');
     expect(rawMarkdown).toContain('current HEAD');
     expect(rawMarkdown).toContain('one atomic call only');
+    expect(rawMarkdown).toContain('Publish the summary next');
     expect(rawMarkdown).toContain('trusted existing Kilo summary ID');
     expect(rawMarkdown).toContain('fix link and verify it ends with the current review ID');
 
@@ -1338,6 +1339,42 @@ describe('CodeReviewOrchestrator recovery', () => {
   ])('retries prepareSession once after $name', async ({ response, sessionId, cliSessionId }) => {
     await expectPrepareFailureSchedulesFreshRetry(response, sessionId, cliSessionId);
   });
+
+  it.each([
+    {
+      name: '500 network connection lost',
+      firstPrepare: () =>
+        trpcError(
+          500,
+          '{"error":{"message":"Network connection lost.","code":-32603,"data":{"code":"INTERNAL_SERVER_ERROR","httpStatus":500,"path":"prepareSession","clientError":{"code":"INTERNAL_SERVER_ERROR","message":"Network connection lost.","retryable":true}}}}'
+        ),
+      sessionId: 'agent-network-lost-retry',
+      cliSessionId: 'ses_network_lost_retry',
+    },
+    {
+      name: 'thrown Durable Object reset for code update',
+      firstPrepare: () => {
+        throw new Error('Durable Object reset because its code was updated.');
+      },
+      sessionId: 'agent-do-reset-retry',
+      cliSessionId: 'ses_do_reset_retry',
+    },
+    {
+      name: 'thrown Durable Object instance no longer active',
+      firstPrepare: () => {
+        throw new Error(
+          'Connection closed: this Durable Object instance is no longer active. Reconnect or retry the request.'
+        );
+      },
+      sessionId: 'agent-do-inactive-retry',
+      cliSessionId: 'ses_do_inactive_retry',
+    },
+  ])(
+    'retries prepareSession once after transient transport error: $name',
+    async ({ firstPrepare, sessionId, cliSessionId }) => {
+      await expectPrepareFailureSchedulesFreshRetry(firstPrepare, sessionId, cliSessionId);
+    }
+  );
 
   it('retries prepareSession once after wrapper waitForPort readiness timeout', async () => {
     const stub = getReviewStub();
@@ -2462,33 +2499,38 @@ describe('CodeReviewOrchestrator recovery', () => {
     expect(fetchCalls(fetchMock, '/trpc/initiateFromKilocodeSessionV2')).toHaveLength(0);
   });
 
-  it('aborts alarm recovery before cloud-agent calls when DB is already terminal', async () => {
-    const stub = getReviewStub();
-    const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
-      const url = String(request);
-      if (url.includes('/api/internal/code-review-status/')) {
-        return Response.json({
-          success: true,
-          message: 'Review already in terminal state',
-          currentStatus: 'cancelled',
-        });
-      }
-      return new Response('cloud-agent should not be called', { status: 500 });
-    });
-    globalThis.fetch = fetchMock;
+  it.each([undefined, 'assistant_invalid_request_byok'] as const)(
+    'aborts alarm recovery and preserves terminal reason %s when DB is already terminal',
+    async terminalReason => {
+      const stub = getReviewStub();
+      const fetchMock = vi.fn(async (request: RequestInfo | URL) => {
+        const url = String(request);
+        if (url.includes('/api/internal/code-review-status/')) {
+          return Response.json({
+            success: true,
+            message: 'Review already in terminal state',
+            currentStatus: 'cancelled',
+            terminalReason,
+          });
+        }
+        return new Response('cloud-agent should not be called', { status: 500 });
+      });
+      globalThis.fetch = fetchMock;
 
-    await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
-      await state.storage.put('state', codeReview());
-      await state.storage.setAlarm(Date.now() + 30_000);
-    });
+      await runInDurableObject(stub, async (_instance: CodeReviewOrchestrator, state) => {
+        await state.storage.put('state', codeReview());
+        await state.storage.setAlarm(Date.now() + 30_000);
+      });
 
-    const ran = await runDurableObjectAlarm(stub);
+      const ran = await runDurableObjectAlarm(stub);
 
-    expect(ran).toBe(true);
-    const status = await stub.status();
-    expect(status.status).toBe('cancelled');
-    expect(fetchMock).toHaveBeenCalledTimes(1);
-  });
+      expect(ran).toBe(true);
+      const status = await stub.status();
+      expect(status.status).toBe('cancelled');
+      expect(status.terminalReason).toBe(terminalReason);
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    }
+  );
 
   it('ignores unknown DB terminal reasons when DB is already terminal', async () => {
     const stub = getReviewStub();

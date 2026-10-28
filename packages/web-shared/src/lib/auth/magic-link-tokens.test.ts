@@ -11,7 +11,7 @@ import {
   verifyAndConsumeMagicLinkToken,
 } from './magic-link-tokens';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { sql, eq, and } from 'drizzle-orm';
+import { sql, eq, and, isNull } from 'drizzle-orm';
 import { magic_link_tokens } from '@kilocode/db/schema';
 import { createHash } from 'crypto';
 
@@ -525,6 +525,34 @@ describe('Magic Link Tokens', () => {
     });
 
     describe('challenge-keyed budget isolation', () => {
+      it('reserves and counts attempts in one locked transaction', async () => {
+        const { code, challengeId } = await createSignInCode(testEmail);
+        const wrongCode = code === '000000' ? '111111' : '000000';
+
+        const results = await Promise.all(
+          Array.from({ length: 20 }, () => reserveSignInCode(testEmail, wrongCode, challengeId))
+        );
+
+        const maxAttempts = 5;
+        const invalid = results.filter(r => r === 'invalid').length;
+        const tooMany = results.filter(r => r === 'too_many_attempts').length;
+        expect(invalid).toBe(maxAttempts);
+        expect(tooMany).toBe(20 - maxAttempts);
+        expect(results.every(r => r === 'invalid' || r === 'too_many_attempts')).toBe(true);
+
+        const [row] = await db
+          .select({ attempts: magic_link_tokens.attempts })
+          .from(magic_link_tokens)
+          .where(
+            and(
+              eq(magic_link_tokens.email, testEmail),
+              eq(magic_link_tokens.purpose, 'sign_in_code'),
+              isNull(magic_link_tokens.consumed_at)
+            )
+          );
+        expect(row?.attempts).toBe(maxAttempts);
+      });
+
       it('five wrong guesses against challenge A do not spend challenge B budget', async () => {
         const { code: codeA, challengeId: challengeA } = await createSignInCode(testEmail);
         const { code: codeB, challengeId: challengeB } =
@@ -626,27 +654,91 @@ describe('Magic Link Tokens', () => {
         expect(first.challengeId).not.toBe(first.code);
       });
 
-      it('R6: no-challenge wrong guesses spend the challenge-bound row budget (same email)', async () => {
+      it('settles a valid challenge', async () => {
         const { code, challengeId } = await createSignInCode(testEmail);
         const wrongCode = code === '000000' ? '111111' : '000000';
 
-        // Five wrong guesses without challengeId — the legacy email-keyed path
-        // finds the challenge-bearing row and increments its attempts.
         for (let i = 0; i < 5; i++) {
-          const result = await reserveSignInCode(testEmail, wrongCode);
-          expect(result).toBe('invalid');
+          expect(await reserveSignInCode(testEmail, wrongCode)).toBe('invalid');
         }
 
-        // The challenge-bound row has spent its whole budget.
+        expect(await reserveSignInCode(testEmail, code)).toBe('too_many_attempts');
+        expect(await verifyAndConsumeSignInCode(testEmail, code, challengeId)).toBe('ok');
+      });
+
+      it('settles a valid compatibility code', async () => {
+        const { code, challengeId } = await createSignInCode(testEmail);
+        const wrongCode = code === '000000' ? '111111' : '000000';
+
+        for (let i = 0; i < 5; i++) {
+          expect(await reserveSignInCode(testEmail, wrongCode, challengeId)).toBe('invalid');
+        }
+
+        expect(await reserveSignInCode(testEmail, code, challengeId)).toBe('too_many_attempts');
+        expect(await verifyAndConsumeSignInCode(testEmail, code)).toBe('ok');
+      });
+
+      it('serializes one wrong-guess allowance across both modes', async () => {
+        const { code, challengeId } = await createSignInCode(testEmail);
+        const wrongCode = code === '000000' ? '111111' : '000000';
+        const results = await Promise.all(
+          Array.from({ length: 20 }, async (_, index) => ({
+            mode: index % 2 === 0 ? 'challenge' : 'legacy',
+            result: await reserveSignInCode(
+              testEmail,
+              wrongCode,
+              index % 2 === 0 ? challengeId : undefined
+            ),
+          }))
+        );
+
+        expect(results.filter(result => result.result === 'invalid')).toHaveLength(5);
+        expect(results.filter(result => result.result === 'too_many_attempts')).toHaveLength(15);
+
         const [row] = await db
-          .select({ attempts: magic_link_tokens.attempts })
+          .select({
+            attempts: magic_link_tokens.attempts,
+            legacy_attempts: magic_link_tokens.legacy_attempts,
+            consumed_at: magic_link_tokens.consumed_at,
+          })
           .from(magic_link_tokens)
           .where(eq(magic_link_tokens.email, testEmail));
-        expect(row?.attempts).toBe(5);
+        expect(row?.attempts + (row?.legacy_attempts ?? 0)).toBe(5);
+        expect(row?.consumed_at).toBeNull();
 
-        // The correct code with the real challengeId is now locked out.
-        const verifyResult = await verifyAndConsumeSignInCode(testEmail, code, challengeId);
-        expect(verifyResult).toBe('too_many_attempts');
+        expect(await reserveSignInCode(testEmail, wrongCode, challengeId)).toBe(
+          'too_many_attempts'
+        );
+        expect(await reserveSignInCode(testEmail, wrongCode)).toBe('too_many_attempts');
+      });
+
+      it('spends one wrong-guess allowance across both modes', async () => {
+        const { code, challengeId } = await createSignInCode(testEmail);
+        const wrongCode = code === '000000' ? '111111' : '000000';
+
+        for (let i = 0; i < 3; i++) {
+          expect(await reserveSignInCode(testEmail, wrongCode, challengeId)).toBe('invalid');
+        }
+        for (let i = 0; i < 2; i++) {
+          expect(await reserveSignInCode(testEmail, wrongCode)).toBe('invalid');
+        }
+
+        expect(await reserveSignInCode(testEmail, wrongCode, challengeId)).toBe(
+          'too_many_attempts'
+        );
+        expect(await reserveSignInCode(testEmail, wrongCode)).toBe('too_many_attempts');
+
+        const [row] = await db
+          .select({
+            attempts: magic_link_tokens.attempts,
+            legacy_attempts: magic_link_tokens.legacy_attempts,
+          })
+          .from(magic_link_tokens)
+          .where(eq(magic_link_tokens.email, testEmail));
+        expect(row).toEqual({ attempts: 3, legacy_attempts: 2 });
+
+        // Spending the allowance never denies the holder of the correct code.
+        expect(await verifyAndConsumeSignInCode(testEmail, code, challengeId)).toBe('ok');
       });
 
       it('legacy no-challenge caller can settle a challenge-bound row by email', async () => {
@@ -686,8 +778,7 @@ describe('Magic Link Tokens', () => {
         expect(row?.attempts).toBe(0);
         expect(row?.consumed_at).toBeNull();
       });
-      it('legacy null-challenge row: email-keyed path still increments attempts', async () => {
-        // Manually insert a row without challenge_id to simulate a legacy rollout row.
+      it('records compatibility attempts', async () => {
         const code = '999999';
         const token_hash = createHash('sha256').update(`${testEmail}:${code}`).digest('hex');
         await db.insert(magic_link_tokens).values({
@@ -698,15 +789,17 @@ describe('Magic Link Tokens', () => {
           challenge_id: null,
         });
 
-        // A wrong guess without challengeId hits the legacy path and increments attempts.
         const first = await reserveSignInCode(testEmail, '000000');
         expect(first).toBe('invalid');
 
         const [row] = await db
-          .select({ attempts: magic_link_tokens.attempts })
+          .select({
+            attempts: magic_link_tokens.attempts,
+            legacy_attempts: magic_link_tokens.legacy_attempts,
+          })
           .from(magic_link_tokens)
           .where(eq(magic_link_tokens.email, testEmail));
-        expect(row?.attempts).toBe(1);
+        expect(row).toEqual({ attempts: 0, legacy_attempts: 1 });
       });
     });
   });

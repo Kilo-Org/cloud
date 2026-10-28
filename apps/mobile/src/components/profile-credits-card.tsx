@@ -1,21 +1,23 @@
-import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
 import { type Href, useRouter } from 'expo-router';
+import { useState } from 'react';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { ChevronDown, Eye, EyeOff } from '@/components/ui/icons';
-import { Pressable, useWindowDimensions, View } from 'react-native';
+import { Pressable, ScrollView, useWindowDimensions, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { AddCreditsButton, AddCreditsRow } from '@/components/add-credits-row';
 import { useContextPicker } from '@/components/context-control';
+import { CreditExpiryNote } from '@/components/credits/credit-expiry-note';
 import { KiloPassSubscriptionCard } from '@/components/kilo-pass/kilo-pass-subscription-card';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { WEB_BASE_URL } from '@/lib/config';
-import { formatDate, formatMoney } from '@/lib/format';
+import { formatMoney } from '@/lib/format';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -23,7 +25,7 @@ import { isMoneyRole, type OrgListEntry } from '@/lib/hooks/use-organization-que
 import { isNarrowLayout } from '@/lib/narrow-layout';
 import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
-import { cn, parseTimestamp } from '@/lib/utils';
+import { cn } from '@/lib/utils';
 
 const HIDDEN_BALANCE = '*****';
 
@@ -37,6 +39,11 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const colors = useThemeColors();
   const router = useRouter();
   const { width } = useWindowDimensions();
+  const fontScale = useLiveFontScale();
+  const [availableWidth, setAvailableWidth] = useState<number | null>(null);
+  // Reserve room for the amount, visibility toggle and purchase action in
+  // scaled text units, using the card's width rather than the display's.
+  const stackBalance = availableWidth === null || availableWidth / fontScale < 320;
   // Below NARROW_LAYOUT_WIDTH the account picker's 65% share leaves the
   // "CREDITS" eyebrow too little room for one word and Android breaks it
   // mid-word ("CREDIT S", 160 dp, e1, 2026-09-21). Stacking gives each line the
@@ -70,24 +77,41 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const {
     data: balance,
     isLoading: balanceLoading,
-    isFetching: balanceFetching,
+    isPlaceholderData: balancePlaceholder,
     isError: balanceQueryError,
     refetch: refetchBalance,
   } = useQuery({
     ...balanceOptions,
     enabled: enabled && hasUserId,
     placeholderData: keepPreviousData,
+    // The card must stop waiting while the online manager reports offline: a
+    // paused read is pending without fetching, so the skeleton below had no
+    // exit. This one either answers or fails once the control-plane deadline
+    // lands, and `balanceFailed` then offers the retry.
+    networkMode: 'always',
+    // `networkMode: 'always'` also disables the derived reconnect refetch
+    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
+    // 'always'` when it is undefined), so ask for it explicitly.
+    refetchOnReconnect: true,
   });
 
-  const { data: personalCreditData, isLoading: personalCreditsLoading } = useQuery({
+  const { data: personalCreditData, isError: personalCreditsError } = useQuery({
     ...personalCreditOptions,
     enabled: enabled && hasUserId && !selectedOrgId,
+    networkMode: 'always',
+    refetchOnReconnect: true,
   });
 
-  const { data: orgCreditData, isLoading: orgCreditsLoading } = useQuery({
+  const {
+    data: orgCreditData,
+    isError: orgCreditsError,
+    isPlaceholderData: orgCreditsPlaceholder,
+  } = useQuery({
     ...orgCreditOptions,
     enabled: enabled && hasUserId && Boolean(selectedOrgId),
     placeholderData: keepPreviousData,
+    networkMode: 'always',
+    refetchOnReconnect: true,
   });
 
   // A failed getMe (no userId) can never render a trusted balance, so it shares
@@ -95,25 +119,26 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const balanceFailed = balanceQueryError || userIdError;
 
   const creditData = selectedOrgId ? orgCreditData : personalCreditData;
-  const creditsLoading = selectedOrgId ? orgCreditsLoading : personalCreditsLoading;
+  const creditsFailed = selectedOrgId ? orgCreditsError : personalCreditsError;
+  const creditsPending =
+    creditData === undefined || (Boolean(selectedOrgId) && orgCreditsPlaceholder);
 
   const balanceDollars = balance?.balance ?? 0;
-  // A paused query (offline/unknown connectivity, empty cache) is pending but
-  // not fetching, so `balanceLoading` (isLoading) is false while `balance`
-  // is still undefined. Treat "no data yet" as loading so the card shows a
-  // skeleton instead of `$0` on a cold launch before NetInfo settles.
+  // A read that has not answered yet is pending without fetching while the
+  // owner is still unresolved (the balance query is gated on the identity), so
+  // `balanceLoading` (isLoading) is false while `balance` is still undefined.
+  // Treat "no data yet" as loading so the card shows a skeleton instead of `$0`
+  // on a cold launch. The read itself settles regardless of the online manager,
+  // and an unreachable one lands on `balanceFailed` instead of this branch.
   const balancePending = balance === undefined && !balanceFailed;
+  // `keepPreviousData` keeps the last account's amount on screen while the next
+  // account's read runs, which would paint the previous account's balance under
+  // the newly selected account's name with no cue at all. The skeleton owns that
+  // window too, so a context switch never shows an amount that belongs to
+  // another account; the read either answers or lands on `balanceFailed`.
   const showBalanceSkeleton =
-    (balanceLoading || balancePending || !hideBalanceLoaded) && !balanceFailed;
-  const expiringBlocks = creditData?.creditBlocks.filter(b => b.expiry_date !== null) ?? [];
-  const expiringTotal = fromMicrodollars(
-    expiringBlocks.reduce((sum, b) => sum + b.balance_mUsd, 0)
-  );
-  const earliestExpiry = expiringBlocks
-    .map(b => b.expiry_date)
-    .filter((d): d is string => d !== null)
-    // eslint-disable-next-line unicorn/no-array-sort -- toSorted() is not available in Hermes
-    .sort((a, b) => parseTimestamp(a).getTime() - parseTimestamp(b).getTime())[0];
+    (balanceLoading || balancePending || balancePlaceholder || !hideBalanceLoaded) &&
+    !balanceFailed;
 
   const selectedLabel = selectedOrgId
     ? (orgs?.find(o => o.organizationId === selectedOrgId)?.organizationName ??
@@ -131,7 +156,12 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const canManageOrgBilling = selectedOrgId != null && isMoneyRole(selectedOrgRole);
 
   return (
-    <View className="gap-3">
+    <View
+      className="gap-3"
+      onLayout={event => {
+        setAvailableWidth(event.nativeEvent.layout.width);
+      }}
+    >
       <View
         className={cn(
           'min-h-11 gap-3',
@@ -217,57 +247,73 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
         />
       )}
       {!showBalanceSkeleton && !balanceFailed && (
-        <View className="min-h-16 flex-row items-center rounded-lg bg-secondary px-3 py-2">
-          <Animated.View className="flex-1 justify-center" layout={LinearTransition.duration(200)}>
-            <View className="flex-row items-center gap-1">
-              <Text
-                className="text-2xl font-bold tabular-nums"
-                accessibilityLabel={hideBalance ? t('profile.balanceHidden') : undefined}
-              >
-                {hideBalance ? HIDDEN_BALANCE : formatMoney(balanceDollars, i18n.language)}
-              </Text>
-              <Pressable
-                className="min-h-11 min-w-11 items-center justify-center active:opacity-70"
-                onPress={() => {
-                  void Haptics.selectionAsync();
-                  setHideBalance(!hideBalance);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  hideBalance ? t('profile.showBalance') : t('profile.hideBalance')
-                }
-                hitSlop={4}
-              >
-                {hideBalance ? (
-                  <Eye size={18} color={colors.mutedForeground} />
-                ) : (
-                  <EyeOff size={18} color={colors.mutedForeground} />
-                )}
-              </Pressable>
-            </View>
-            {!hideBalance &&
-              (creditsLoading ? (
+        <View
+          className={cn(
+            'min-h-16 gap-2 rounded-lg bg-secondary px-3 py-2',
+            stackBalance ? 'items-stretch' : 'flex-row items-center'
+          )}
+        >
+          <Animated.View
+            className={cn('min-w-0 flex-row items-center gap-1', !stackBalance && 'flex-1')}
+            layout={LinearTransition.duration(200)}
+          >
+            <View className="min-w-0 flex-1 gap-1">
+              <ScrollView horizontal className="min-w-0">
+                <Text
+                  className="text-2xl font-bold tabular-nums"
+                  accessibilityLabel={hideBalance ? t('profile.balanceHidden') : undefined}
+                >
+                  {hideBalance ? HIDDEN_BALANCE : formatMoney(balanceDollars, i18n.language)}
+                </Text>
+              </ScrollView>
+              {creditsFailed && (
+                <Text className="text-xs text-muted-foreground">
+                  {t('credits.expiryUnavailable')}
+                </Text>
+              )}
+              {!creditsFailed && creditsPending && (
                 <Animated.View exiting={FadeOut.duration(150)}>
-                  <Skeleton className="mt-1 h-3 w-48 rounded bg-muted-soft" />
+                  <Skeleton className="h-3 w-40 max-w-full rounded bg-muted-soft" />
                 </Animated.View>
+              )}
+              {!creditsFailed && !creditsPending && (
+                <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
+                  <CreditExpiryNote
+                    creditBlocks={creditData.creditBlocks}
+                    hiddenAmount={hideBalance ? HIDDEN_BALANCE : undefined}
+                    emptyMessage={t('credits.noExpiringCredits')}
+                  />
+                </Animated.View>
+              )}
+            </View>
+            <Pressable
+              className="min-h-11 min-w-11 items-center justify-center active:opacity-70"
+              onPress={() => {
+                void Haptics.selectionAsync();
+                setHideBalance(!hideBalance);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={hideBalance ? t('profile.showBalance') : t('profile.hideBalance')}
+              hitSlop={4}
+            >
+              {hideBalance ? (
+                <Eye size={18} color={colors.mutedForeground} />
               ) : (
-                expiringTotal > 0 &&
-                earliestExpiry != null && (
-                  <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
-                    <Text className="text-xs text-muted-foreground">
-                      {t('profile.bonusCreditsExpiring', {
-                        amount: formatMoney(expiringTotal, i18n.language),
-                        date: formatDate(parseTimestamp(earliestExpiry), i18n.language),
-                      })}
-                    </Text>
-                  </Animated.View>
-                )
-              ))}
+                <EyeOff size={18} color={colors.mutedForeground} />
+              )}
+            </Pressable>
           </Animated.View>
-          <View className="flex-row items-center gap-2">
-            {balanceFetching && <ActivityIndicator size="small" color={colors.mutedForeground} />}
+          <View className="max-w-full flex-row flex-wrap items-center gap-2">
+            {/* No in-progress indicator here: this row paints a balance that
+                belongs to the selected account, and a background refresh may
+                legitimately take a while or never finish. The first load and a
+                context switch own the skeleton above; a refresh that fails owns
+                the retry surface. An indicator tied to every in-flight refresh
+                spun for as long as a stalled one lasted (and announced itself
+                as "In progress"). */}
             {selectedOrgId == null && (
               <AddCreditsButton
+                className={cn('h-auto min-h-11 max-w-full py-2', stackBalance && 'flex-1')}
                 onPress={() => {
                   router.push('/(app)/credits' as Href);
                 }}
@@ -292,7 +338,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           stacking a second skeleton card. The card's queries still run from
           mount, so the swap adds no fetch latency. */}
       {enabled && !selectedOrgId ? (
-        <KiloPassSubscriptionCard hideLoadingSkeleton={balanceLoading || balancePending} />
+        <KiloPassSubscriptionCard hideLoadingSkeleton={showBalanceSkeleton} />
       ) : null}
     </View>
   );

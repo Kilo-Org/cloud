@@ -1,4 +1,7 @@
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { PAID_CREDIT_EXPIRATION_EFFECTIVE_AT } from '@kilocode/web-shared/lib/config.server';
+import { getPaidCreditPolicyPresentation } from '@kilocode/web-shared/lib/paidCreditPolicy';
+import { invalidateDeviceSession } from '@kilocode/web-shared/lib/auth/device-session-cache';
 import {
   assertUserCanBeSoftDeleted,
   getUserAuthProviders,
@@ -31,6 +34,10 @@ import { assertNoTrpcError, successResult } from '@kilocode/web-shared/lib/maybe
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { timedUsageQuery } from '@/lib/usage-query';
 import {
+  listNotificationHistory,
+  NOTIFICATION_HISTORY_MAX_PAGE_SIZE,
+} from '@/lib/notification-history';
+import {
   kilocode_users,
   microdollar_usage,
   credit_transactions,
@@ -44,6 +51,7 @@ import {
   user_activity_tokens,
   agent_configs,
   passkey_credentials,
+  cli_sessions_v2,
 } from '@kilocode/db/schema';
 import { eq, and, isNull, inArray, or, sql, gte, gt, desc, isNotNull, ne } from 'drizzle-orm';
 import crypto from 'crypto';
@@ -57,6 +65,7 @@ import {
   ipCountryFromHeaders,
   ja4FromHeaders,
 } from '@kilocode/web-shared/lib/bouncer/credit-events';
+import { assertChargeAllowed } from '@kilocode/web-shared/lib/bouncer/charge-gate';
 import { retrievePaymentMethodInfo } from '@/lib/stripePaymentMethodInfo';
 import type { AutoTopUpAmountCents } from '@kilocode/web-shared/lib/autoTopUpConstants';
 import {
@@ -140,6 +149,7 @@ async function revokeOwnedDeviceSession(
         isNull(device_sessions.revoked_at)
       )
     );
+  invalidateDeviceSession(sessionId);
 }
 
 const ViewTypeSchema = z.union([z.literal('personal'), z.literal('all'), z.uuid()]);
@@ -206,6 +216,19 @@ const CreditDeductionSchema = z.object({
   description: z.string(),
   amount_mUsd: z.number(),
   kind: CreditDeductionKindSchema,
+  /** The grant this deduction closed, present for an expiry row. */
+  purchase: z
+    .object({
+      id: z.string(),
+      date: z.string(),
+      description: z.string(),
+      amount_mUsd: z.number(),
+      /** True for promotional, referral, and Pass grants the user did not buy. */
+      is_free: z.boolean(),
+      /** The recorded purchase channel, null for legacy and internal grants. */
+      credit_source: z.string().nullable(),
+    })
+    .nullable(),
 });
 
 const GetCreditBlocksOutputSchema = z.object({
@@ -218,6 +241,7 @@ const GetCreditBlocksOutputSchema = z.object({
 
 const CreditPurchaseHistoryInputSchema = z.object({
   cursor: z.number().int().min(0).default(0),
+  organizationId: z.uuid().optional(),
 });
 
 const CreditPurchaseHistoryOutputSchema = z.object({
@@ -227,6 +251,7 @@ const CreditPurchaseHistoryOutputSchema = z.object({
       date: z.iso.datetime(),
       description: z.string(),
       amount_mUsd: z.number().positive(),
+      expiryDate: z.iso.datetime().nullable(),
     })
   ),
   nextCursor: z.number().int().positive().nullable(),
@@ -235,12 +260,14 @@ const CreditPurchaseHistoryOutputSchema = z.object({
 
 const CreditPurchaseTransactionInputSchema = z.object({
   transactionId: z.uuid(),
+  organizationId: z.uuid().optional(),
 });
 
 const CreditPurchaseConfirmationOutputSchema = z.object({
   transactionId: z.uuid(),
   amount_mUsd: z.number().positive(),
   purchasedAt: z.iso.datetime(),
+  expiryDate: z.iso.datetime().nullable(),
 });
 
 const CreditPurchaseReceiptOutputSchema = z.object({
@@ -253,6 +280,14 @@ type RawDeduction = {
   description: string;
   credit_category: string | null;
   amount_mUsd: number;
+  purchase: {
+    id: string;
+    date: string;
+    description: string;
+    amount_mUsd: number;
+    is_free: boolean;
+    credit_source: string | null;
+  } | null;
 };
 
 /**
@@ -309,6 +344,11 @@ function activityTokenScopeLockKey(userId: string, organizationId: string | null
   return `user-activity-token-scope:${userId}:${organizationId ?? ''}`;
 }
 
+/** The token kinds that follow one session and carry its `session_id`. */
+function isSessionTokenKind(kind: string): boolean {
+  return kind === 'ios_session_activity' || kind === 'android_session_ongoing';
+}
+
 function getDeductionKind(
   creditCategory: string | null
 ): z.infer<typeof CreditDeductionKindSchema> {
@@ -334,6 +374,18 @@ function getPersonalTopUpConditions(userId: string) {
   );
 }
 
+function getTopUpConditions(userId: string, organizationId?: string) {
+  return organizationId
+    ? and(
+        eq(credit_transactions.organization_id, organizationId),
+        eq(credit_transactions.is_free, false),
+        gt(credit_transactions.amount_microdollars, 0),
+        isNotNull(credit_transactions.stripe_payment_id),
+        eq(credit_transactions.description, 'Organization top-up via stripe')
+      )
+    : getPersonalTopUpConditions(userId);
+}
+
 /**
  * Enrich KiloClaw deduction descriptions with instance names so users
  * can distinguish charges across multiple instances.
@@ -348,6 +400,7 @@ async function enrichDeductionsWithInstanceNames(
     description: string;
     amount_mUsd: number;
     kind: z.infer<typeof CreditDeductionKindSchema>;
+    purchase: RawDeduction['purchase'];
   }[]
 > {
   // Collect unique instance IDs from pure-credit deduction categories.
@@ -438,6 +491,7 @@ async function enrichDeductionsWithInstanceNames(
       description,
       amount_mUsd: d.amount_mUsd,
       kind: getDeductionKind(d.credit_category),
+      purchase: d.purchase,
     };
   });
 }
@@ -539,6 +593,9 @@ async function computeNotificationCapabilities(userId: string): Promise<Notifica
 }
 
 export const userRouter = createTRPCRouter({
+  getPaidCreditPolicy: baseProcedure.query(() =>
+    getPaidCreditPolicyPresentation(PAID_CREDIT_EXPIRATION_EFFECTIVE_AT)
+  ),
   // Account linking routes
   getMe: baseProcedure.query(async ({ ctx }) => {
     return successResult({
@@ -767,15 +824,23 @@ export const userRouter = createTRPCRouter({
     .input(CreditPurchaseHistoryInputSchema)
     .output(CreditPurchaseHistoryOutputSchema)
     .query(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId, [
+          'owner',
+          'admin',
+          'billing_manager',
+        ]);
+      }
       const transactions = await db
         .select({
           id: credit_transactions.id,
           date: credit_transactions.created_at,
           description: credit_transactions.description,
           amount_mUsd: credit_transactions.amount_microdollars,
+          expiryDate: credit_transactions.expiry_date,
         })
         .from(credit_transactions)
-        .where(getPersonalTopUpConditions(ctx.user.id))
+        .where(getTopUpConditions(ctx.user.id, input.organizationId))
         .orderBy(desc(credit_transactions.created_at), desc(credit_transactions.id))
         .limit(CREDIT_PURCHASE_HISTORY_PAGE_SIZE + 1)
         .offset(input.cursor);
@@ -789,6 +854,7 @@ export const userRouter = createTRPCRouter({
             ? 'Automatic top-up'
             : 'Credit purchase',
         amount_mUsd: transaction.amount_mUsd,
+        expiryDate: transaction.expiryDate ? new Date(transaction.expiryDate).toISOString() : null,
       }));
 
       return {
@@ -803,15 +869,23 @@ export const userRouter = createTRPCRouter({
     .input(CreditPurchaseTransactionInputSchema)
     .output(CreditPurchaseConfirmationOutputSchema)
     .query(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId, [
+          'owner',
+          'admin',
+          'billing_manager',
+        ]);
+      }
       const transaction = await db.query.credit_transactions.findFirst({
         where: and(
-          getPersonalTopUpConditions(ctx.user.id),
+          getTopUpConditions(ctx.user.id, input.organizationId),
           eq(credit_transactions.id, input.transactionId)
         ),
         columns: {
           id: true,
           amount_microdollars: true,
           created_at: true,
+          expiry_date: true,
         },
       });
 
@@ -823,6 +897,9 @@ export const userRouter = createTRPCRouter({
         transactionId: transaction.id,
         amount_mUsd: transaction.amount_microdollars,
         purchasedAt: new Date(transaction.created_at).toISOString(),
+        expiryDate: transaction.expiry_date
+          ? new Date(transaction.expiry_date).toISOString()
+          : null,
       };
     }),
 
@@ -830,9 +907,16 @@ export const userRouter = createTRPCRouter({
     .input(CreditPurchaseTransactionInputSchema)
     .output(CreditPurchaseReceiptOutputSchema)
     .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId, [
+          'owner',
+          'admin',
+          'billing_manager',
+        ]);
+      }
       const transaction = await db.query.credit_transactions.findFirst({
         where: and(
-          getPersonalTopUpConditions(ctx.user.id),
+          getTopUpConditions(ctx.user.id, input.organizationId),
           eq(credit_transactions.id, input.transactionId)
         ),
         columns: { stripe_payment_id: true },
@@ -964,11 +1048,18 @@ export const userRouter = createTRPCRouter({
           return { enabled: true } as const;
         } else {
           const amountCents = input.amountCents ?? 5000;
+          await assertChargeAllowed({
+            userId: ctx.user.id,
+            flow: 'auto_topup',
+            ip: ctx.ip,
+            ja4: ja4FromHeaders(ctx.headersList),
+          });
           await reportChargeAttempted({
             flow: 'auto_topup',
             userId: ctx.user.id,
             amountCents,
             accountCreatedAt: ctx.user.created_at,
+            accountUsedMicrodollars: ctx.user.microdollars_used,
             ip: ctx.ip,
             ipCountry: ipCountryFromHeaders(ctx.headersList),
             ja4: ja4FromHeaders(ctx.headersList),
@@ -995,11 +1086,18 @@ export const userRouter = createTRPCRouter({
     .input(z.object({ amountCents: z.number().optional() }).optional())
     .mutation(async ({ ctx, input }) => {
       const amountCents = input?.amountCents ?? 5000;
+      await assertChargeAllowed({
+        userId: ctx.user.id,
+        flow: 'auto_topup',
+        ip: ctx.ip,
+        ja4: ja4FromHeaders(ctx.headersList),
+      });
       await reportChargeAttempted({
         flow: 'auto_topup',
         userId: ctx.user.id,
         amountCents,
         accountCreatedAt: ctx.user.created_at,
+        accountUsedMicrodollars: ctx.user.microdollars_used,
         ip: ctx.ip,
         ipCountry: ipCountryFromHeaders(ctx.headersList),
         ja4: ja4FromHeaders(ctx.headersList),
@@ -1339,7 +1437,9 @@ export const userRouter = createTRPCRouter({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await db
+      // A token belongs to the account that registered it. A device that
+      // switches accounts releases the token with unregisterPushToken first.
+      const registered = await db
         .insert(user_push_tokens)
         .values({
           user_id: ctx.user.id,
@@ -1351,13 +1451,22 @@ export const userRouter = createTRPCRouter({
         .onConflictDoUpdate({
           target: [user_push_tokens.token],
           set: {
-            user_id: ctx.user.id,
             platform: input.platform,
             app_version: input.appVersion ?? null,
             locale: input.locale ?? null,
             updated_at: sql`now()`,
           },
+          setWhere: eq(user_push_tokens.user_id, ctx.user.id),
+        })
+        .returning({ id: user_push_tokens.id });
+
+      if (registered.length === 0) {
+        throw new TRPCError({
+          code: 'CONFLICT',
+          message: 'Push token is registered to another account.',
         });
+      }
+
       return { success: true };
     }),
 
@@ -1377,21 +1486,67 @@ export const userRouter = createTRPCRouter({
     }),
 
   // Activity tokens for glanceable surfaces (Live Activity / push-to-start /
-  // Android ongoing). Upsert on `token` so a re-registration of the same
-  // device token replaces the row instead of failing the unique index, and
+  // Android ongoing / followed session cards). Upsert on (token, session) so a
+  // re-registration replaces the row instead of failing the unique key, and
   // retire the scope's previous live `ios_activity` row in the same
-  // transaction so one scope never has two live cards.
+  // transaction so one scope never has two live cards. An Android device
+  // registers its one Expo push token once per followed session.
 
   registerActivityToken: baseProcedure
     .input(
-      z.object({
-        token: z.string().min(1),
-        kind: z.enum(['ios_push_to_start', 'ios_activity', 'android_ongoing']),
-        platform: z.enum(['ios', 'android']),
-        organizationId: z.string().min(1).nullable(),
-      })
+      z
+        .object({
+          token: z.string().min(1),
+          kind: z.enum([
+            'ios_push_to_start',
+            'ios_activity',
+            'ios_session_activity',
+            'android_ongoing',
+            'android_session_ongoing',
+          ]),
+          platform: z.enum(['ios', 'android']),
+          organizationId: z.string().min(1).nullable(),
+          /** The followed session; required for a session kind, rejected for every other kind. */
+          sessionId: z.string().min(1).optional(),
+        })
+        .refine(input => isSessionTokenKind(input.kind) === (input.sessionId !== undefined), {
+          message: 'sessionId is required for a session card and rejected for every other kind',
+          path: ['sessionId'],
+        })
     )
     .mutation(async ({ ctx, input }) => {
+      const sessionId = isSessionTokenKind(input.kind) ? (input.sessionId ?? null) : null;
+      if (sessionId !== null) {
+        const platform = input.kind === 'ios_session_activity' ? 'ios' : 'android';
+        if (input.platform !== platform) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: `A ${input.kind} token is ${platform} only`,
+          });
+        }
+        // A session card shows the session title on the Lock Screen, so the
+        // caller must own the session in the scope the card counts against.
+        if (input.organizationId !== null) {
+          await ensureOrganizationAccess(ctx, input.organizationId);
+        }
+        const [session] = await db
+          .select({ sessionId: cli_sessions_v2.session_id })
+          .from(cli_sessions_v2)
+          .where(
+            and(
+              eq(cli_sessions_v2.session_id, sessionId),
+              eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
+              input.organizationId === null
+                ? isNull(cli_sessions_v2.organization_id)
+                : eq(cli_sessions_v2.organization_id, input.organizationId)
+            )
+          )
+          .limit(1);
+        if (!session) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Session not found' });
+        }
+      }
+
       const retiredTokens = await db.transaction(async tx => {
         // Registration is a replace. An `ios_activity` token is the app adopting
         // its Lock Screen card, and only one card may be live per (user,
@@ -1439,14 +1594,16 @@ export const userRouter = createTRPCRouter({
             kind: input.kind,
             platform: input.platform,
             organization_id: input.organizationId,
+            session_id: sessionId,
           })
           .onConflictDoUpdate({
-            target: [user_activity_tokens.token],
+            target: [user_activity_tokens.token, user_activity_tokens.session_id],
             set: {
               user_id: ctx.user.id,
               kind: input.kind,
               platform: input.platform,
               organization_id: input.organizationId,
+              session_id: sessionId,
               // The app re-adopting its own card must not leave its row marked
               // dead: a re-registration of the same token un-supersedes it.
               superseded_at: null,
@@ -1465,7 +1622,10 @@ export const userRouter = createTRPCRouter({
       // row is already retired and the DB holds the one-live-card invariant, so
       // this is best-effort: a failure only leaves the end to the next
       // scheduled refresh and must never fail the registration.
-      if (retiredTokens.length > 0) {
+      // A new session card leaves the aggregate count and needs its first
+      // server content (the approval key the app cannot mint), so it asks for
+      // the same scope refresh.
+      if (retiredTokens.length > 0 || sessionId !== null) {
         await refreshGlanceableScope({
           userId: ctx.user.id,
           organizationId: input.organizationId,
@@ -1481,17 +1641,40 @@ export const userRouter = createTRPCRouter({
     .input(
       z.object({
         token: z.string().min(1),
+        /**
+         * Delete only this session's row. An Android device shares one token
+         * across its followed sessions, so an unfollow names the session.
+         * Without it, every row of the token goes: the device left the scope.
+         */
+        sessionId: z.string().min(1).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
-      await db
+      const removed = await db
         .delete(user_activity_tokens)
         .where(
           and(
             eq(user_activity_tokens.user_id, ctx.user.id),
-            eq(user_activity_tokens.token, input.token)
+            eq(user_activity_tokens.token, input.token),
+            input.sessionId === undefined
+              ? undefined
+              : eq(user_activity_tokens.session_id, input.sessionId)
           )
-        );
+        )
+        .returning({
+          kind: user_activity_tokens.kind,
+          organizationId: user_activity_tokens.organization_id,
+        });
+      // An unfollowed session counts on the aggregate card again. Best-effort,
+      // as for registration: the next session change carries it otherwise.
+      const scopes = new Set(
+        removed.filter(row => isSessionTokenKind(row.kind)).map(row => row.organizationId)
+      );
+      for (const organizationId of scopes) {
+        await refreshGlanceableScope({ userId: ctx.user.id, organizationId }).catch(error => {
+          console.error('[unregisterActivityToken] Failed to request glanceable refresh:', error);
+        });
+      }
       return { success: true };
     }),
 
@@ -1550,6 +1733,32 @@ export const userRouter = createTRPCRouter({
       capabilities,
     };
   }),
+
+  // ─── Notification History ──────────────────────────────────────────
+
+  getNotificationHistory: baseProcedure
+    .input(
+      z.object({
+        /**
+         * Settings category to filter by, or omitted for every recorded kind.
+         * Bounded rather than enumerated: the column only ever holds a category
+         * the recorder mapped, and a chip for a category with no rows must
+         * answer an empty page, not a validation error.
+         */
+        category: z.string().min(1).max(64).optional(),
+        /** Opaque cursor from a previous page's `nextCursor`. */
+        cursor: z.string().min(1).max(512).optional(),
+        limit: z.number().int().min(1).max(NOTIFICATION_HISTORY_MAX_PAGE_SIZE).optional(),
+      })
+    )
+    .query(({ ctx, input }) =>
+      listNotificationHistory({
+        userId: ctx.user.id,
+        category: input.category,
+        cursor: input.cursor,
+        limit: input.limit,
+      })
+    ),
 
   setNotificationPreferences: baseProcedure
     .input(

@@ -4,6 +4,8 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 
+import { createProjectHashAsync } from '@expo/fingerprint';
+
 import { hashRootNativeInputs } from './mobile-native-build';
 
 import {
@@ -13,6 +15,7 @@ import {
   buildXcodeBuildCommand,
   computeArtifactChecksum,
   defaultIsLockActive,
+  ensureCurrentNativeProject,
   isValidManifest,
   locateProducedApp,
   lookupCache,
@@ -93,34 +96,88 @@ function sharedResult<T>(initialValue: T): { set: (value: T) => void; read: () =
   };
 }
 
-// ── Fingerprint options ──────────────────────────────────────────────
-
 test('fingerprint options include iOS platform and only skip the Expo extra section beyond defaults', () => {
   const options = buildFingerprintOptions();
   assert.deepEqual(options.platforms, ['ios']);
   assert.equal(options.silent, true);
   // The generated tree is ignored so the hash is input-deterministic across
-  // worktrees and machines.
-  assert.deepEqual(options.ignorePaths, ['ios/**']);
+  // worktrees and machines. Android, JS, and test files in local modules do
+  // not shape the iOS binary.
+  assert.deepEqual(options.ignorePaths, [
+    'ios/**',
+    'modules/*/android/**',
+    'modules/*/src/**',
+    'modules/**/*.test.ts',
+  ]);
   // SourceSkips.ExpoConfigExtraSection === 4096
   assert.equal(options.sourceSkips & 4096, 4096);
   assert.deepEqual(
-    options.extraSources.map(source => ({
-      type: source.type,
-      id: source.id,
-      contents: source.contents,
-    })),
+    options.extraSources.map(source =>
+      source.type === 'contents'
+        ? { type: source.type, id: source.id, contents: source.contents }
+        : { type: source.type, filePath: source.filePath }
+    ),
     [
       {
         type: 'contents',
         id: 'repoRootNativeInputs',
         contents: hashRootNativeInputs(path.resolve(import.meta.dirname, '..', '..')),
       },
+      { type: 'dir', filePath: 'modules' },
+      { type: 'dir', filePath: 'targets' },
     ]
   );
 });
 
-// ── Compatibility key ────────────────────────────────────────────────
+test('fingerprint changes for iOS module and extension sources and ignores unrelated files', async () => {
+  const project = makeTempDir('fingerprint');
+  const write = (relative: string, contents: string) => {
+    fs.mkdirSync(path.dirname(path.join(project, relative)), { recursive: true });
+    fs.writeFileSync(path.join(project, relative), contents);
+  };
+  const hash = () =>
+    createProjectHashAsync(
+      project,
+      buildFingerprintOptions() as Parameters<typeof createProjectHashAsync>[1]
+    );
+  try {
+    write('package.json', '{"name":"fixture"}');
+    write('modules/existing/expo-module.config.json', '{"platforms":["apple"]}');
+    write('modules/existing/ios/Existing.swift', 'let a = 1');
+    write('modules/existing/android/Existing.kt', 'val a = 1');
+    write('modules/existing/src/index.ts', 'export {};');
+    write('modules/existing/existing.test.ts', 'export {};');
+    write('targets/Extension/Extension.swift', 'let b = 1');
+    write('src/app.ts', 'export {};');
+    write('ios/Podfile', '# generated');
+    let current = await hash();
+
+    for (const [relative, contents] of [
+      ['modules/added/expo-module.config.json', '{"platforms":["apple"]}'],
+      ['modules/added/ios/Added.podspec', 'Pod::Spec.new'],
+      ['modules/existing/ios/Existing.swift', 'let a = 2'],
+      ['targets/Extension/Extension.swift', 'let b = 2'],
+    ]) {
+      write(relative, contents);
+      const next = await hash();
+      assert.notEqual(next, current, `${relative} must change the fingerprint`);
+      current = next;
+    }
+
+    for (const [relative, contents] of [
+      ['src/app.ts', 'export const changed = 1;'],
+      ['modules/existing/android/Existing.kt', 'val a = 2'],
+      ['modules/existing/src/index.ts', 'export const changed = 1;'],
+      ['modules/existing/existing.test.ts', 'export const changed = 1;'],
+      ['ios/Podfile', '# regenerated'],
+    ]) {
+      write(relative, contents);
+      assert.equal(await hash(), current, `${relative} must not change the fingerprint`);
+    }
+  } finally {
+    fs.rmSync(project, { recursive: true, force: true });
+  }
+});
 
 test('buildCompatibilityKey is stable for identical dimensions and changes on each dimension', () => {
   const dimensions = fixedDimensions();
@@ -139,8 +196,6 @@ test('buildCompatibilityKey is stable for identical dimensions and changes on ea
   }
 });
 
-// ── Cache root resolution ────────────────────────────────────────────
-
 test('resolveCacheRoot prefers macOS Library/Caches/Kilo with XDG fallback chain', () => {
   assert.equal(
     resolveCacheRoot({ home: '/Users/test', platform: 'darwin', env: {} }),
@@ -155,8 +210,6 @@ test('resolveCacheRoot prefers macOS Library/Caches/Kilo with XDG fallback chain
     '/home/test/.cache/Kilo/mobile-ios-builds'
   );
 });
-
-// ── Artifact checksum ────────────────────────────────────────────────
 
 test('computeArtifactChecksum is deterministic and content-sensitive', async () => {
   const dir = makeTempDir('checksum');
@@ -173,8 +226,6 @@ test('computeArtifactChecksum is deterministic and content-sensitive', async () 
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
-
-// ── Concurrency: withFingerprintLock ─────────────────────────────────
 
 test('withFingerprintLock runs producer once for matching concurrent callers', async () => {
   const cacheRoot = makeTempDir('lock-once');
@@ -300,8 +351,6 @@ test('withFingerprintLock bounds wait when an active lock holds the producer', a
   }
 });
 
-// ── Cache lookup ─────────────────────────────────────────────────────
-
 test('cache hit returns the published manifest and avoids the producer', async () => {
   const cacheRoot = makeTempDir('hit');
   const key = 'k-hit';
@@ -418,8 +467,6 @@ test('cache miss when the entry is missing the app bundle directory', async () =
   fs.rmSync(cacheRoot, { recursive: true, force: true });
 });
 
-// ── Simulator claim validation ───────────────────────────────────────
-
 test('validateSimulatorClaim accepts the current worktree and rejects foreign worktrees', () => {
   const claimRoot = makeTempDir('claims');
   const worktree = makeTempDir('wt');
@@ -445,8 +492,6 @@ test('validateSimulatorClaim accepts the current worktree and rejects foreign wo
   }
 });
 
-// ── Install command ──────────────────────────────────────────────────
-
 test('buildInstallCommand uses xcrun simctl install with the cached bundle', () => {
   const command = buildInstallCommand('UDID-1234', '/cache/key/Kilo.app');
   assert.deepEqual(command, {
@@ -454,8 +499,6 @@ test('buildInstallCommand uses xcrun simctl install with the cached bundle', () 
     args: ['simctl', 'install', 'UDID-1234', '/cache/key/Kilo.app'],
   });
 });
-
-// ── Pruning ──────────────────────────────────────────────────────────
 
 test('pruneCache removes entries older than the threshold and protects active locks', async () => {
   const cacheRoot = makeTempDir('prune');
@@ -507,8 +550,6 @@ test('pruneCache removes entries older than the threshold and protects active lo
   fs.rmSync(cacheRoot, { recursive: true, force: true });
 });
 
-// ── CLI parsing ──────────────────────────────────────────────────────
-
 test('parseCliArgs supports fingerprint, build, and prune subcommands', () => {
   assert.deepEqual(parseCliArgs(['fingerprint']), { command: 'fingerprint' });
   assert.deepEqual(parseCliArgs(['build', 'UDID-1']), { command: 'build', udid: 'UDID-1' });
@@ -517,8 +558,6 @@ test('parseCliArgs supports fingerprint, build, and prune subcommands', () => {
   assert.throws(() => parseCliArgs(['build']), /Usage/);
   assert.throws(() => parseCliArgs(['unknown']), /Usage/);
 });
-
-// ── Publication boundary ─────────────────────────────────────────────
 
 test('withFingerprintLock does not publish a usable entry when the producer throws', async () => {
   const cacheRoot = makeTempDir('lock-publish-fail');
@@ -620,8 +659,6 @@ test('withFingerprintLock publishes atomically via a temp directory rename', asy
   fs.rmSync(cacheRoot, { recursive: true, force: true });
 });
 
-// ── xcodebuild command ──────────────────────────────────────────────
-
 test('validateXcodeWorkspace accepts the generated workspace and rejects missing', () => {
   const mobileRoot = makeTempDir('ws-ok');
   try {
@@ -640,6 +677,40 @@ test('validateXcodeWorkspace throws with a clear instruction when ios/ is missin
       () => validateXcodeWorkspace(mobileRoot),
       /Kilo\.xcworkspace|run.*expo.*prebuild|prebuild/
     );
+  } finally {
+    fs.rmSync(mobileRoot, { recursive: true, force: true });
+  }
+});
+
+test('ensureCurrentNativeProject prebuilds when ios/ is missing or stale, and only then', () => {
+  const mobileRoot = makeTempDir('prebuild');
+  const prebuilt: string[] = [];
+  const prebuild = (root: string) => {
+    prebuilt.push(root);
+    fs.mkdirSync(path.join(root, 'ios', 'Kilo.xcworkspace'), { recursive: true });
+  };
+  try {
+    ensureCurrentNativeProject({ mobileRoot, nativeHash: 'hash-a', prebuild });
+    assert.equal(prebuilt.length, 1);
+    assert.equal(
+      fs.readFileSync(path.join(mobileRoot, 'ios', '.kilo-native-hash'), 'utf8'),
+      'hash-a\n'
+    );
+
+    ensureCurrentNativeProject({ mobileRoot, nativeHash: 'hash-a', prebuild });
+    assert.equal(prebuilt.length, 1);
+
+    ensureCurrentNativeProject({ mobileRoot, nativeHash: 'hash-b', prebuild });
+    assert.equal(prebuilt.length, 2);
+    assert.equal(
+      fs.readFileSync(path.join(mobileRoot, 'ios', '.kilo-native-hash'), 'utf8'),
+      'hash-b\n'
+    );
+
+    fs.rmSync(path.join(mobileRoot, 'ios', 'Kilo.xcworkspace'), { recursive: true });
+    ensureCurrentNativeProject({ mobileRoot, nativeHash: 'hash-b', prebuild });
+    assert.equal(prebuilt.length, 3);
+    assert.deepEqual(prebuilt, [mobileRoot, mobileRoot, mobileRoot]);
   } finally {
     fs.rmSync(mobileRoot, { recursive: true, force: true });
   }
@@ -691,8 +762,6 @@ test('locateProducedApp throws when the canonical .app is missing', () => {
     fs.rmSync(derived, { recursive: true, force: true });
   }
 });
-
-// ── runBuild orchestration ──────────────────────────────────────────
 
 function makeBuildDeps(overrides: Partial<BuildDeps> = {}): BuildDeps {
   return {
@@ -1007,6 +1076,47 @@ test('runBuild falls back to the local builder when the remote fetch misses', as
   }
 });
 
+test('runBuild with requireRemote fails instead of building locally when the remote fetch misses', async () => {
+  const cacheRoot = makeTempDir('build-remote-required');
+  const claimRoot = makeTempDir('claims');
+  const worktree = makeTempDir('wt');
+  const udid = 'UDID-remote-required';
+  fs.writeFileSync(
+    path.join(claimRoot, `${udid}.json`),
+    JSON.stringify({
+      worktreeRoot: worktree,
+      claimId: 'c',
+      status: 'ready',
+      claimedAt: new Date().toISOString(),
+      deviceId: udid,
+    })
+  );
+  let builderCalls = 0;
+  let installs = 0;
+  const deps: BuildDeps = makeBuildDeps({
+    env: fixedEnv({ cacheRoot }),
+    worktreeRoot: worktree,
+    claimRoot,
+    fetchRemote: async () => false,
+    requireRemote: true,
+    build: async () => {
+      builderCalls += 1;
+    },
+    install: () => {
+      installs += 1;
+    },
+  });
+  try {
+    await assert.rejects(() => runBuild(udid, deps), /KILO_REMOTE_NATIVE=required/);
+    assert.equal(builderCalls, 0);
+    assert.equal(installs, 0);
+  } finally {
+    fs.rmSync(cacheRoot, { recursive: true, force: true });
+    fs.rmSync(claimRoot, { recursive: true, force: true });
+    fs.rmSync(worktree, { recursive: true, force: true });
+  }
+});
+
 test('runBuild waiter: two concurrent callers invoke the builder once and both install the same entry', async () => {
   const cacheRoot = makeTempDir('build-waiter');
   const claimRoot = makeTempDir('claims');
@@ -1247,8 +1357,6 @@ test('runBuild installs via the exact xcrun simctl install command shape', async
   }
 });
 
-// ── runFingerprint orchestration ────────────────────────────────────
-
 test('runFingerprint prints sanitized compatibility dimensions and key only', async () => {
   const outputs: string[] = [];
   const write = (chunk: string): void => {
@@ -1290,8 +1398,6 @@ test('runFingerprint prints sanitized compatibility dimensions and key only', as
   );
 });
 
-// ── runPrune orchestration ──────────────────────────────────────────
-
 test('runPrune reports the removed count and keeps the rest', async () => {
   const cacheRoot = makeTempDir('prune-run');
   const entriesRoot = path.join(cacheRoot, 'entries');
@@ -1326,8 +1432,6 @@ test('runPrune reports the removed count and keeps the rest', async () => {
     fs.rmSync(cacheRoot, { recursive: true, force: true });
   }
 });
-
-// ── Spec-review findings ────────────────────────────────────────────
 
 test('atomic lock takeover: two simultaneous adopters produce exactly once', async () => {
   const cacheRoot = makeTempDir('lock-atomic-takeover');
@@ -1641,8 +1745,6 @@ test('computeArtifactChecksum rejects symlinks outside root', async () => {
     fs.rmSync(outsideDir, { recursive: true, force: true });
   }
 });
-
-// ── Review findings ────────────────────────────────────────────────
 
 test('tryAdoptLock does not steal a lock that has been replaced by a fresh active record', async () => {
   const cacheRoot = makeTempDir('lock-steal-toctou');

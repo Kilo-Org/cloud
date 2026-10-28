@@ -6,11 +6,9 @@
  * CLI live, or CLI historical transport.
  */
 import type { QuestionInfo } from '@kilocode/app-shared/opencode';
-import type { CloudAgentAttachments } from '@kilocode/app-shared/cloud-agent';
-import type { Images } from '@kilocode/app-shared/images-schema';
-import type { NormalizedEvent } from './normalizer';
+import type { NormalizedEvent, ServiceEvent } from './normalizer';
 import type { SuggestionAction } from './types';
-import type { RemoteModelOverride, RemoteModelState } from './remote-model-catalog';
+import type { RemoteModelState } from './remote-model-catalog';
 import type { RemoteCommandState } from './remote-command-catalog';
 import { createChatProcessor } from './chat-processor';
 import { heartbeatDataSchema, sessionsListDataSchema } from './schemas';
@@ -25,10 +23,9 @@ import type {
   CloudAgentApi,
   CloudAgentStreamTicketResult,
   CreateRemoteSessionInput,
-  RemoteAttachmentPart,
   TransportFactory,
   TransportSink,
-  TransportSendPayload,
+  TransportSendInput,
   Transport,
 } from './transport';
 import { createMemoryStorage } from './storage/memory';
@@ -119,21 +116,8 @@ type CloudAgentSessionConfig = {
     | undefined;
 };
 
-type CloudAgentSessionSendInput = {
-  payload: TransportSendPayload;
-  messageId?: string | undefined;
-  attachments?: CloudAgentAttachments | undefined;
-  images?: Images | undefined;
-  remoteModelOverride?: RemoteModelOverride | undefined;
-  /**
-   * Ready file parts to forward to a remote CLI session. The session-manager
-   * gate already enforces that this is only non-empty for a `remote` session
-   * the CLI has not reported as incapable (unknown capabilities are
-   * optimistic); transports that don't support the path (cloud-agent,
-   * read-only, a CLI that reported `attachments: false`) simply ignore it.
-   */
-  attachmentParts?: RemoteAttachmentPart[] | undefined;
-};
+/** The session sends straight through, so its input is the transport contract. */
+type CloudAgentSessionSendInput = TransportSendInput;
 
 type CloudAgentSessionAnswerInput = {
   requestId: string;
@@ -249,6 +233,11 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
   });
 
   let transport: Transport | null = null;
+  let replaying = false;
+  const replayedQueuedMessages = new Map<
+    string,
+    Extract<ServiceEvent, { type: 'cloud.message.queued' }>
+  >();
   let connectGeneration = 0;
   let disarmUpgradeWatcher: (() => void) | null = null;
 
@@ -293,10 +282,25 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
     void resolveAndConnect(connectGeneration);
   }
 
+  function emitEventToListener(event: NormalizedEvent): void {
+    try {
+      config.onEvent?.(event);
+    } catch (error) {
+      console.error(`[Session] Event listener threw on ${event.type}:`, error);
+    }
+  }
+
   const sink: TransportSink = {
     onChatEvent(event) {
-      chatProcessor.process(event);
-      config.onEvent?.(event);
+      // Keep one event's failure from taking the events after it: report and
+      // carry on rather than surfacing a session error for a single chat
+      // event, so the transcript keeps streaming.
+      try {
+        chatProcessor.process(event);
+      } catch (error) {
+        console.error(`[Session] Failed to process ${event.type}:`, error);
+      }
+      emitEventToListener(event);
     },
     onServiceEvent(event) {
       serviceState.process(event);
@@ -304,20 +308,52 @@ function createCloudAgentSession(config: CloudAgentSessionConfig): CloudAgentSes
       // synthetic user message when none exists so the UI renders the
       // prompt as soon as the server acknowledges it.
       if (event.type === 'cloud.message.queued') {
+        if (replaying) replayedQueuedMessages.set(event.messageId, event);
+        else {
+          chatProcessor.synthesizeQueuedUserMessage({
+            messageId: event.messageId,
+            sessionId: config.kiloSessionId,
+            content: event.content,
+          });
+        }
+      }
+      // `cloud.message.canceled` removes the synthetic (or real) local row the
+      // queued event materialized, so a replay of queued then canceled nets empty.
+      if (event.type === 'cloud.message.canceled') {
+        replayedQueuedMessages.delete(event.messageId);
+        storage.deleteMessage(event.messageId);
+      }
+      if (event.type === 'cloud.message.completed') replayedQueuedMessages.delete(event.messageId);
+      emitEventToListener(event);
+    },
+    onReplayStarted: () => {
+      replaying = true;
+      replayedQueuedMessages.clear();
+      serviceState.beginReplay();
+    },
+    onReplayCanceled: () => {
+      replaying = false;
+      replayedQueuedMessages.clear();
+      serviceState.cancelReplay();
+    },
+    onReplayComplete: () => {
+      for (const event of replayedQueuedMessages.values()) {
+        if (
+          !serviceState.getPendingMessages().has(event.messageId) &&
+          serviceState.getActiveMessageId() !== event.messageId
+        )
+          continue;
         chatProcessor.synthesizeQueuedUserMessage({
           messageId: event.messageId,
           sessionId: config.kiloSessionId,
           content: event.content,
         });
       }
-      // `cloud.message.canceled` removes the synthetic (or real) local row the
-      // queued event materialized, so a replay of queued then canceled nets empty.
-      if (event.type === 'cloud.message.canceled') {
-        storage.deleteMessage(event.messageId);
-      }
-      config.onEvent?.(event);
+      replayedQueuedMessages.clear();
+      replaying = false;
+      serviceState.endReplay();
+      config.onReplayComplete?.();
     },
-    onReplayComplete: () => config.onReplayComplete?.(),
   };
 
   function pickTransportFactory(resolved: ResolvedSession): TransportFactory {

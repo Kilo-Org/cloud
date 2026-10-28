@@ -13,6 +13,8 @@ import {
   agent_environment_profile_mcp_servers,
   agent_environment_profile_skills,
   agent_environment_profile_agents,
+  agent_environment_profile_instructions,
+  cloud_agent_environments,
 } from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
@@ -151,8 +153,24 @@ async function addAgent(
   });
 }
 
+async function addInstruction(
+  profileId: string,
+  name: string,
+  content: string,
+  opts: { enabled?: boolean } = {}
+): Promise<void> {
+  await db.insert(agent_environment_profile_instructions).values({
+    profile_id: profileId,
+    name,
+    content,
+    enabled: opts.enabled ?? true,
+  });
+}
+
 describe('mergeProfileConfiguration', () => {
   afterEach(async () => {
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(cloud_agent_environments);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(agent_environment_profile_repo_bindings);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
@@ -161,6 +179,8 @@ describe('mergeProfileConfiguration', () => {
     await db.delete(agent_environment_profile_skills);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(agent_environment_profile_agents);
+    // eslint-disable-next-line drizzle/enforce-delete-with-where
+    await db.delete(agent_environment_profile_instructions);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
     await db.delete(agent_environment_profile_commands);
     // eslint-disable-next-line drizzle/enforce-delete-with-where
@@ -430,6 +450,96 @@ describe('mergeProfileConfiguration', () => {
     });
   });
 
+  describe('environment layer', () => {
+    test('applies the environment under repo binding, selected profile, and manual args', async () => {
+      const user = await insertTestUser();
+      const owner: ProfileOwner = { type: 'user', id: user.id };
+
+      const repoProfileId = await createProfile(owner, 'repo-profile');
+      await addVar(repoProfileId, 'SHARED', 'from-repo');
+      await addVar(repoProfileId, 'REPO_ONLY', 'repo-val');
+      await addCommands(repoProfileId, ['repo-cmd']);
+      await bindRepo(owner, 'org/repo', 'github', repoProfileId);
+
+      const result = await mergeProfileConfiguration(db, {
+        owner,
+        repoFullName: 'org/repo',
+        platform: 'github',
+        environment: {
+          envVars: { SHARED: 'from-env', REPO: 'from-env' },
+          setupCommands: ['env-cmd'],
+        },
+        envVars: { SHARED: 'from-manual' },
+        setupCommands: ['manual-cmd'],
+      });
+
+      expect(result.envVars).toEqual({
+        REPO: 'from-env',
+        REPO_ONLY: 'repo-val',
+        SHARED: 'from-manual',
+      });
+      // The environment owns setup: the bound profile's command does not run.
+      expect(result.setupCommands).toEqual(['env-cmd', 'manual-cmd']);
+    });
+
+    test('an empty environment still replaces profile setup commands, not profile vars', async () => {
+      const user = await insertTestUser();
+      const owner: ProfileOwner = { type: 'user', id: user.id };
+      const repoProfileId = await createProfile(owner, 'repo-profile');
+      await addCommands(repoProfileId, ['repo-cmd']);
+      await bindRepo(owner, 'org/repo', 'github', repoProfileId);
+      const defaultProfileId = await createProfile(owner, 'default', { isDefault: true });
+      await addVar(defaultProfileId, 'FROM_DEFAULT', 'default-val');
+      await addCommands(defaultProfileId, ['default-cmd']);
+
+      const withEnvironment = await mergeProfileConfiguration(db, {
+        owner,
+        repoFullName: 'org/repo',
+        platform: 'github',
+        environment: {},
+      });
+      expect(withEnvironment.setupCommands).toBeUndefined();
+      expect(withEnvironment.envVars).toEqual({ FROM_DEFAULT: 'default-val' });
+
+      const withoutEnvironment = await mergeProfileConfiguration(db, {
+        owner,
+        repoFullName: 'org/repo',
+        platform: 'github',
+      });
+      expect(withoutEnvironment.setupCommands).toEqual(['repo-cmd', 'default-cmd']);
+    });
+
+    test('a profile plaintext var deletes an environment secret of the same key', async () => {
+      const user = await insertTestUser();
+      const owner: ProfileOwner = { type: 'user', id: user.id };
+      const profileId = await createProfile(owner, 'default', { isDefault: true });
+      await addVar(profileId, 'API_KEY', 'plain-from-profile');
+
+      const result = await mergeProfileConfiguration(db, {
+        owner,
+        environment: { encryptedSecrets: { API_KEY: fakeEnvelopeObject } },
+      });
+
+      expect(result.envVars).toEqual({ API_KEY: 'plain-from-profile' });
+      expect(result.encryptedSecrets).toBeUndefined();
+    });
+
+    test('a profile secret deletes an environment plaintext var of the same key', async () => {
+      const user = await insertTestUser();
+      const owner: ProfileOwner = { type: 'user', id: user.id };
+      const profileId = await createProfile(owner, 'default', { isDefault: true });
+      await addVar(profileId, 'API_KEY', fakeEnvelope, true);
+
+      const result = await mergeProfileConfiguration(db, {
+        owner,
+        environment: { envVars: { API_KEY: 'plain-from-env' } },
+      });
+
+      expect(result.envVars).toBeUndefined();
+      expect(result.encryptedSecrets).toEqual({ API_KEY: fakeEnvelopeObject });
+    });
+  });
+
   describe('organization context', () => {
     test('personal default profile takes precedence via getEffectiveDefaultProfileId', async () => {
       const user = await insertTestUser();
@@ -642,7 +752,32 @@ describe('mergeProfileConfiguration', () => {
     });
 
     expect(result.skills?.map(s => s.name).sort()).toEqual(['alpha', 'beta']);
-    expect(result.skills?.find(s => s.name === 'alpha')?.rawMarkdown).toContain('override body');
+    const alpha = result.skills?.find(s => s.name === 'alpha');
+    expect(alpha && 'rawMarkdown' in alpha ? alpha.rawMarkdown : null).toContain('override body');
+  });
+
+  test('includes only enabled instructions, merged by name across profile layers', async () => {
+    const user = await insertTestUser();
+    const owner: ProfileOwner = { type: 'user', id: user.id };
+
+    const baseProfileId = await createProfile(owner, 'base');
+    await addInstruction(baseProfileId, 'shared', 'base body');
+    await addInstruction(baseProfileId, 'disabled', 'disabled body', { enabled: false });
+    await bindRepo(owner, 'org/repo', 'github', baseProfileId);
+
+    const overrideId = await createProfile(owner, 'override');
+    await addInstruction(overrideId, 'shared', 'override body');
+    await addInstruction(overrideId, 'beta', 'beta body');
+
+    const result = await mergeProfileConfiguration(db, {
+      owner,
+      profileId: overrideId,
+      repoFullName: 'org/repo',
+      platform: 'github',
+    });
+
+    expect(result.instructions?.map(i => i.name).sort()).toEqual(['beta', 'shared']);
+    expect(result.instructions?.find(i => i.name === 'shared')?.content).toBe('override body');
   });
 
   test('MCP env values travel as encrypted envelopes in the client record', async () => {
@@ -756,10 +891,14 @@ describe('mergeProfileConfiguration', () => {
         'profile-only',
         'shared',
       ]);
-      expect(result.skills?.find(s => s.name === 'shared')?.rawMarkdown).toBe(
+      const shared = result.skills?.find(s => s.name === 'shared');
+      expect(shared && 'rawMarkdown' in shared ? shared.rawMarkdown : null).toBe(
         'inline body for shared'
       );
-      expect(result.skills?.find(s => s.name === 'inline-only')?.files).toEqual({ 'a.md': 'a' });
+      const inlineOnly = result.skills?.find(s => s.name === 'inline-only');
+      expect(inlineOnly && 'files' in inlineOnly ? inlineOnly.files : null).toEqual({
+        'a.md': 'a',
+      });
     });
 
     test('inline runtimeAgents layer on top of profile — inline wins on slug', async () => {

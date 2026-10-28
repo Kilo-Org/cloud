@@ -45,7 +45,11 @@ import {
   VercelUserByokInferenceProviderIdSchema,
   AzureCredentialsSchema,
   BedrockCredentialsSchema,
+  DirectVertexCredentialsSchema,
   VertexCredentialsSchema,
+  isExperimentalByokProviderId,
+  isGatewayUserByokProviderId,
+  type GatewayUserByokProviderId,
   type VercelUserByokInferenceProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
@@ -68,6 +72,7 @@ export const VERCEL_BYOK_PROVIDER_NAMES = {
   openai: 'OpenAI API key',
   inception: 'Inception',
   fireworks: 'Fireworks',
+  gmicloud: 'GMI Cloud',
   google: 'Google AI Studio',
   minimax: 'MiniMax',
   mistral: 'Mistral AI',
@@ -91,12 +96,46 @@ const DIRECT_BYOK_PROVIDERS_LIST = Object.entries(DIRECT_BYOK_PROVIDERS_META).ma
   name,
 }));
 
-const BYOK_PROVIDERS = [...DIRECT_BYOK_PROVIDERS_LIST, ...VERCEL_BYOK_PROVIDERS].toSorted((a, b) =>
-  a.name.localeCompare(b.name)
+const GATEWAY_BYOK_PROVIDER_NAMES = {
+  'vercel-ai-gateway': 'Vercel AI Gateway',
+  openrouter: 'OpenRouter',
+} satisfies Record<GatewayUserByokProviderId, string>;
+
+const GATEWAY_BYOK_PROVIDERS_LIST = Object.entries(GATEWAY_BYOK_PROVIDER_NAMES).map(
+  ([id, name]) => ({ id, name })
 );
+
+const BYOK_PROVIDERS = [
+  ...DIRECT_BYOK_PROVIDERS_LIST,
+  ...VERCEL_BYOK_PROVIDERS,
+  ...GATEWAY_BYOK_PROVIDERS_LIST,
+].toSorted((a, b) => a.name.localeCompare(b.name));
 const ADD_BYOK_PROVIDERS = BYOK_PROVIDERS.filter(
   provider => provider.id !== DirectUserByokInferenceProviderIdSchema.enum.codestral
 );
+
+function getProviderDisplayName(providerId: string) {
+  const provider = BYOK_PROVIDERS.find(p => p.id === providerId);
+  return provider?.name || providerId;
+}
+
+type StructuredCredentialKind = 'azure' | 'bedrock' | 'vertex';
+
+/** Providers whose credential is a JSON object rather than a single API key. */
+export function getStructuredCredentialKind(providerId: string): StructuredCredentialKind | null {
+  switch (providerId) {
+    case VercelUserByokInferenceProviderIdSchema.enum.azure:
+      return 'azure';
+    case VercelUserByokInferenceProviderIdSchema.enum.bedrock:
+    case DirectUserByokInferenceProviderIdSchema.enum['bedrock-byok']:
+      return 'bedrock';
+    case VercelUserByokInferenceProviderIdSchema.enum.vertex:
+    case DirectUserByokInferenceProviderIdSchema.enum['vertex-byok']:
+      return 'vertex';
+    default:
+      return null;
+  }
+}
 
 /**
  * The object of a key-row action ("Anthropic API key"). A display name that
@@ -160,6 +199,53 @@ function SupportedModelsList({ models }: { models: string[] }) {
   );
 }
 
+function CatalogModeSetting({
+  providerName,
+  enabled,
+  canChange,
+  isOrganizationKey,
+  isPending,
+  onChange,
+}: {
+  providerName: string;
+  enabled: boolean;
+  canChange: boolean;
+  isOrganizationKey: boolean;
+  isPending: boolean;
+  onChange: (enabled: boolean) => void;
+}) {
+  return (
+    <div className="mt-2 space-y-1">
+      <div className="flex items-center gap-2">
+        <Switch
+          checked={enabled}
+          onCheckedChange={onChange}
+          disabled={!canChange || isPending}
+          aria-label={`Use Kilo catalog model IDs for the ${apiKeyObjectLabel(providerName)}`}
+        />
+        <span className="text-muted-foreground text-xs">Use Kilo catalog model IDs</span>
+      </div>
+      {!enabled && canChange ? (
+        <p className="text-muted-foreground text-xs">
+          Turn this on to serve catalog models such as moonshotai/kimi-k2.6 with this key, including
+          for Auto models and custom routers.
+          {isOrganizationKey ? ' Organization model restrictions then apply to this key.' : ''}
+        </p>
+      ) : null}
+      {enabled && isOrganizationKey ? (
+        <p className="text-muted-foreground text-xs">
+          Organization model restrictions apply to requests through this key.
+        </p>
+      ) : null}
+      {!canChange && isOrganizationKey ? (
+        <p className="text-muted-foreground text-xs">
+          Only organization owners and admins can change this setting.
+        </p>
+      ) : null}
+    </div>
+  );
+}
+
 type BYOKKeysManagerProps = {
   organizationId?: string;
 };
@@ -212,6 +298,15 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   );
 
   const { data: supportedModels } = useQuery(trpc.byok.listSupportedModels.queryOptions());
+  const { data: catalogModeSupportedModels } = useQuery(
+    trpc.byok.listCatalogModeSupportedModels.queryOptions()
+  );
+  const { data: experimentalByokEnabled = false } = useQuery(
+    trpc.byok.experimentalByokEnabled.queryOptions(listQueryInput)
+  );
+  const addableProviders = ADD_BYOK_PROVIDERS.filter(
+    provider => experimentalByokEnabled || !isExperimentalByokProviderId(provider.id)
+  );
   const showsCodingPlanKey =
     !organizationId && (keys?.some(key => key.management_source === 'coding_plan') ?? false);
 
@@ -273,6 +368,24 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     })
   );
 
+  const setCatalogModeMutation = useMutation(
+    trpc.byok.setCatalogMode.mutationOptions({
+      onSuccess: data => {
+        void queryClient.invalidateQueries({
+          queryKey: trpc.byok.list.queryKey(listQueryInput),
+        });
+        toast.success(
+          data.serve_catalog_models
+            ? 'Key now serves Kilo catalog model IDs'
+            : 'Key now serves provider model IDs'
+        );
+      },
+      onError: (error: { message: string }) => {
+        toast.error(`Failed to update catalog model IDs: ${error.message}`);
+      },
+    })
+  );
+
   const testMutation = useMutation(
     trpc.byok.testApiKey.mutationOptions({
       onSuccess: result => {
@@ -295,13 +408,16 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
 
   const validateStructuredCredentials = (providerId: string, value: string): string | null => {
     if (!value) return null;
+    const kind = getStructuredCredentialKind(providerId);
     const schema =
-      providerId === VercelUserByokInferenceProviderIdSchema.enum.azure
+      kind === 'azure'
         ? AzureCredentialsSchema
-        : providerId === VercelUserByokInferenceProviderIdSchema.enum.bedrock
+        : kind === 'bedrock'
           ? BedrockCredentialsSchema
-          : providerId === VercelUserByokInferenceProviderIdSchema.enum.vertex
-            ? VertexCredentialsSchema
+          : kind === 'vertex'
+            ? providerId === DirectUserByokInferenceProviderIdSchema.enum['vertex-byok']
+              ? DirectVertexCredentialsSchema
+              : VertexCredentialsSchema
             : null;
     if (!schema) return null;
     let parsed: unknown;
@@ -312,12 +428,12 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     }
     const result = schema.safeParse(parsed);
     if (!result.success) {
-      if (providerId === VercelUserByokInferenceProviderIdSchema.enum.azure) {
+      if (kind === 'azure') {
         return result.error.issues.some(issue => issue.path[0] === 'modelMappings')
           ? 'Each model mapping must include gatewayModelSlug and customModelId.'
           : 'Enter JSON with apiKey and resourceName.';
       }
-      if (providerId === VercelUserByokInferenceProviderIdSchema.enum.bedrock) {
+      if (kind === 'bedrock') {
         return 'Enter JSON with apiKey and region, or accessKeyId, secretAccessKey, and region. Use only one authentication method.';
       }
       return `Invalid Google Vertex credentials:\n${z.prettifyError(result.error)}`;
@@ -380,6 +496,35 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     }
   };
 
+  const handleToggleCatalogMode = async (
+    key: { id: string; provider_id: string },
+    serve_catalog_models: boolean
+  ) => {
+    const providerName = getProviderDisplayName(key.provider_id);
+    const prefix = `${key.provider_id}/`;
+    const confirmed = await confirm(
+      serve_catalog_models
+        ? {
+            title: `Use Kilo catalog model IDs for the ${apiKeyObjectLabel(providerName)}?`,
+            description: `The key will serve catalog models such as moonshotai/kimi-k2.6, and model IDs that start with ${prefix} stop working with it. Models without a catalog ID are no longer available through this key. For the catalog models it serves, this key is used, and pays, ahead of a ChatGPT connection and other BYOK keys.${organizationId ? ' Organization model restrictions apply to every request through this key.' : ''}`,
+            confirmLabel: 'Use catalog model IDs',
+          }
+        : {
+            title: `Use provider model IDs for the ${apiKeyObjectLabel(providerName)}?`,
+            description: `The key will stop serving Kilo catalog models and serve model IDs that start with ${prefix} instead.${organizationId ? ' Organization model restrictions no longer apply to requests through this key.' : ''}`,
+            confirmLabel: 'Use provider model IDs',
+            destructive: !!organizationId,
+          }
+    );
+    if (confirmed) {
+      setCatalogModeMutation.mutate({
+        ...(organizationId && { organizationId }),
+        id: key.id,
+        serve_catalog_models,
+      });
+    }
+  };
+
   const handleToggleEnabled = (keyId: string, is_enabled: boolean) => {
     setEnabledMutation.mutate({
       ...(organizationId && { organizationId }),
@@ -414,19 +559,19 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   // it never appears here with edit, toggle, test or delete controls.
   const listedKeys = keys?.filter(key => key.provider_id !== OPENAI_CHATGPT_PROVIDER_ID);
 
-  // Map provider IDs to display names
-  const getProviderDisplayName = (providerId: string) => {
-    const provider = BYOK_PROVIDERS.find(p => p.id === providerId);
-    return provider?.name || providerId;
+  // A key in catalog mode serves catalog ids instead of the provider's prefixed ids.
+  const getProviderModels = (providerId: string, serveCatalogModels = false): string[] => {
+    const models = serveCatalogModels ? catalogModeSupportedModels : supportedModels;
+    return models?.[providerId] ?? [];
   };
-
-  const getProviderModels = (providerId: string): string[] => {
-    return supportedModels?.[providerId] ?? [];
-  };
-  const usesStructuredCredentials =
-    selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.azure ||
-    selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.bedrock ||
-    selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.vertex;
+  const editingKey = listedKeys?.find(key => key.id === editingKeyId);
+  const dialogModels = selectedProvider
+    ? getProviderModels(selectedProvider, editingKey?.serve_catalog_models)
+    : [];
+  const structuredCredentialKind = getStructuredCredentialKind(selectedProvider);
+  const usesStructuredCredentials = structuredCredentialKind !== null;
+  const isDirectVertex =
+    selectedProvider === DirectUserByokInferenceProviderIdSchema.enum['vertex-byok'];
   return (
     <div className="space-y-4">
       <BYOKDescription showsCodingPlanKey={showsCodingPlanKey} />
@@ -442,17 +587,28 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
         </CardHeader>
         <CardContent>
           {listedKeys && listedKeys.length > 0 ? (
-            <div className="rounded-md border">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-muted/50 border-b">
-                    <th className="p-4 text-left font-medium">Provider</th>
-                    <th className="p-4 text-left font-medium">Created</th>
-                    <th className="p-4 text-left font-medium">Enabled</th>
-                    <th className="p-4 text-right font-medium">Actions</th>
+            // Narrow containers stack each key into a grid instead of table
+            // columns. The explicit roles keep table semantics, which browsers
+            // otherwise drop when table elements get a non-table display.
+            <div className="@container rounded-md border">
+              <table role="table" className="block w-full @2xl:table">
+                <thead role="rowgroup" className="sr-only @2xl:not-sr-only">
+                  <tr role="row" className="bg-muted/50 border-b">
+                    <th role="columnheader" className="p-4 text-left font-medium">
+                      Provider
+                    </th>
+                    <th role="columnheader" className="p-4 text-left font-medium">
+                      Created
+                    </th>
+                    <th role="columnheader" className="p-4 text-left font-medium">
+                      Enabled
+                    </th>
+                    <th role="columnheader" className="p-4 text-right font-medium">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody role="rowgroup" className="block @2xl:table-row-group">
                   {listedKeys.map(
                     (key: {
                       id: string;
@@ -460,19 +616,30 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                       created_at: string;
                       management_source: 'user' | 'coding_plan';
                       is_enabled: boolean;
+                      serve_catalog_models: boolean;
+                      supports_catalog_mode: boolean;
+                      can_change_catalog_mode: boolean;
                     }) => {
                       const isManaged = !organizationId && key.management_source === 'coding_plan';
                       return (
                         <tr
                           key={key.id}
-                          className={
-                            !key.is_enabled
-                              ? 'bg-muted/20 border-b last:border-0'
-                              : 'border-b last:border-0'
-                          }
+                          role="row"
+                          className={cn(
+                            'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 border-b p-4 last:border-0 @2xl:table-row @2xl:p-0',
+                            !key.is_enabled && 'bg-muted/20'
+                          )}
                         >
-                          <td className={!key.is_enabled ? 'text-muted-foreground p-4' : 'p-4'}>
-                            <div>{getProviderDisplayName(key.provider_id)}</div>
+                          <td
+                            role="cell"
+                            className={cn(
+                              'col-span-2 min-w-0 @2xl:table-cell @2xl:p-4',
+                              !key.is_enabled && 'text-muted-foreground'
+                            )}
+                          >
+                            <div className="break-words">
+                              {getProviderDisplayName(key.provider_id)}
+                            </div>
                             {isManaged ? (
                               <p className="text-muted-foreground mt-1 text-xs">
                                 {getCodingPlanManagedKeyLabel(
@@ -480,12 +647,34 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                                 )}
                               </p>
                             ) : null}
-                            <SupportedModelsList models={getProviderModels(key.provider_id)} />
+                            <SupportedModelsList
+                              models={getProviderModels(key.provider_id, key.serve_catalog_models)}
+                            />
+                            {/* Shown while enabled so a key can leave catalog mode after its
+                                provider loses every catalog mapping. */}
+                            {key.supports_catalog_mode || key.serve_catalog_models ? (
+                              <CatalogModeSetting
+                                providerName={getProviderDisplayName(key.provider_id)}
+                                enabled={key.serve_catalog_models}
+                                canChange={key.can_change_catalog_mode}
+                                isOrganizationKey={!!organizationId}
+                                isPending={setCatalogModeMutation.isPending}
+                                onChange={serveCatalogModels =>
+                                  handleToggleCatalogMode(key, serveCatalogModels)
+                                }
+                              />
+                            ) : null}
                           </td>
-                          <td className="text-muted-foreground p-4">
+                          <td
+                            role="cell"
+                            className="text-muted-foreground col-span-2 text-sm @2xl:table-cell @2xl:p-4 @2xl:text-base"
+                          >
+                            <span className="@2xl:hidden" aria-hidden="true">
+                              Created{' '}
+                            </span>
                             {new Date(key.created_at).toLocaleDateString()}
                           </td>
-                          <td className="p-4">
+                          <td role="cell" className="@2xl:table-cell @2xl:p-4">
                             <div className="flex items-center gap-3">
                               {!isManaged ? (
                                 <Switch
@@ -497,51 +686,55 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                                   aria-label={`Toggle ${apiKeyObjectLabel(getProviderDisplayName(key.provider_id))}`}
                                 />
                               ) : null}
-                              <span className="text-sm">
+                              <span
+                                className={cn('text-sm', !isManaged && 'sr-only @sm:not-sr-only')}
+                              >
                                 {key.is_enabled ? 'Enabled' : 'Disabled'}
                               </span>
                             </div>
                           </td>
-                          <td className="space-x-2 p-4 text-right">
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() =>
-                                testMutation.mutate({
-                                  ...(organizationId && { organizationId }),
-                                  id: key.id,
-                                })
-                              }
-                              disabled={testMutation.isPending}
-                              title="Test API key"
-                              aria-label={`Test ${apiKeyObjectLabel(getProviderDisplayName(key.provider_id))}`}
-                            >
-                              <FlaskConical className="size-4" />
-                            </Button>
-                            {!isManaged ? (
-                              <>
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  onClick={() => handleEdit(key.id)}
-                                  disabled={updateMutation.isPending}
-                                  aria-label={`Update ${apiKeyObjectLabel(getProviderDisplayName(key.provider_id))}`}
-                                >
-                                  <Edit className="size-4" />
-                                </Button>
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleDelete(key.id, getProviderDisplayName(key.provider_id))
-                                  }
-                                  disabled={deleteMutation.isPending}
-                                  aria-label={`Delete ${apiKeyObjectLabel(getProviderDisplayName(key.provider_id))}`}
-                                >
-                                  <Trash2 className="size-4" />
-                                </Button>
-                              </>
-                            ) : null}
+                          <td role="cell" className="@2xl:table-cell @2xl:p-4">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() =>
+                                  testMutation.mutate({
+                                    ...(organizationId && { organizationId }),
+                                    id: key.id,
+                                  })
+                                }
+                                disabled={testMutation.isPending}
+                                title="Test API key"
+                                aria-label={`Test ${apiKeyObjectLabel(getProviderDisplayName(key.provider_id))}`}
+                              >
+                                <FlaskConical className="size-4" />
+                              </Button>
+                              {!isManaged ? (
+                                <>
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => handleEdit(key.id)}
+                                    disabled={updateMutation.isPending}
+                                    aria-label={`Update ${apiKeyObjectLabel(getProviderDisplayName(key.provider_id))}`}
+                                  >
+                                    <Edit className="size-4" />
+                                  </Button>
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() =>
+                                      handleDelete(key.id, getProviderDisplayName(key.provider_id))
+                                    }
+                                    disabled={deleteMutation.isPending}
+                                    aria-label={`Delete ${apiKeyObjectLabel(getProviderDisplayName(key.provider_id))}`}
+                                  >
+                                    <Trash2 className="size-4" />
+                                  </Button>
+                                </>
+                              ) : null}
+                            </div>
                           </td>
                         </tr>
                       );
@@ -559,12 +752,12 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
         </CardContent>
 
         <Dialog open={isDialogOpen} onOpenChange={closeDialog}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-2xl grid-rows-[auto_minmax(0,1fr)_auto]">
             <DialogHeader>
               <DialogTitle>{editingKeyId ? 'Update API Key' : 'Add API Key'}</DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-4 py-4">
+            <div className="-mx-6 min-h-0 space-y-4 overflow-y-auto px-6 py-4">
               <div className="space-y-2">
                 <Label htmlFor="provider">Provider</Label>
                 <Select
@@ -579,7 +772,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                     <SelectValue placeholder="Select provider" />
                   </SelectTrigger>
                   <SelectContent>
-                    {(editingKeyId ? BYOK_PROVIDERS : ADD_BYOK_PROVIDERS).map(provider => {
+                    {(editingKeyId ? BYOK_PROVIDERS : addableProviders).map(provider => {
                       const isDisabled = !editingKeyId && hasExistingKey(provider.id);
                       return (
                         <SelectItem
@@ -612,11 +805,11 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
 
               <div className="space-y-2">
                 <Label htmlFor="apiKey">
-                  {selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.azure
+                  {structuredCredentialKind === 'azure'
                     ? 'Azure OpenAI Credentials'
-                    : selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.bedrock
+                    : structuredCredentialKind === 'bedrock'
                       ? 'AWS Bedrock Credentials'
-                      : selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.vertex
+                      : structuredCredentialKind === 'vertex'
                         ? 'Google Vertex Credentials'
                         : 'API Key'}
                 </Label>
@@ -637,12 +830,13 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                           )
                         }
                         placeholder={
-                          selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.azure
+                          structuredCredentialKind === 'azure'
                             ? '{"apiKey": "...", "resourceName": "..."}'
-                            : selectedProvider ===
-                                VercelUserByokInferenceProviderIdSchema.enum.bedrock
+                            : structuredCredentialKind === 'bedrock'
                               ? '{"accessKeyId": "...", "secretAccessKey": "...", "region": "us-east-1"}'
-                              : '{"project": "...", "location": "global", "googleCredentials": {"clientEmail": "...", "privateKey": "..."}}'
+                              : isDirectVertex
+                                ? '{"type": "service_account", "project_id": "...", "client_email": "...", "private_key": "..."}'
+                                : '{"project": "...", "location": "global", "googleCredentials": {"clientEmail": "...", "privateKey": "..."}}'
                         }
                         className={cn(
                           'border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-20 w-full rounded-md border px-3 py-2 pr-10 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
@@ -657,10 +851,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                         data-lpignore="true"
                         data-form-type="other"
                         aria-label={
-                          selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.azure
+                          structuredCredentialKind === 'azure'
                             ? 'Azure OpenAI credentials'
-                            : selectedProvider ===
-                                VercelUserByokInferenceProviderIdSchema.enum.bedrock
+                            : structuredCredentialKind === 'bedrock'
                               ? 'AWS credentials'
                               : 'Google Vertex credentials'
                         }
@@ -707,7 +900,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                     </Button>
                   </div>
                 )}
-                {selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.azure && (
+                {structuredCredentialKind === 'azure' && (
                   <Alert>
                     <Info className="size-4" />
                     <AlertDescription>
@@ -729,7 +922,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                     </AlertDescription>
                   </Alert>
                 )}
-                {selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.bedrock && (
+                {structuredCredentialKind === 'bedrock' && (
                   <Alert>
                     <Info className="size-4" />
                     <AlertDescription>
@@ -749,11 +942,52 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                         Your IAM user needs <code className="text-xs">bedrock:InvokeModel</code> and{' '}
                         <code className="text-xs">bedrock:InvokeModelWithResponseStream</code>{' '}
                         permissions.
+                        {selectedProvider ===
+                        DirectUserByokInferenceProviderIdSchema.enum['bedrock-byok'] ? (
+                          <>
+                            {' '}
+                            Models served by the <code className="text-xs">
+                              bedrock-mantle
+                            </code>{' '}
+                            endpoint also need the matching{' '}
+                            <code className="text-xs">bedrock-mantle</code> permissions.
+                          </>
+                        ) : null}
                       </p>
                     </AlertDescription>
                   </Alert>
                 )}
-                {selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.vertex && (
+                {isDirectVertex && (
+                  <Alert>
+                    <Info className="size-4" />
+                    <AlertDescription>
+                      <p>Paste a service account key file as JSON:</p>
+                      <code className="mt-1 block text-xs break-all">
+                        {
+                          '{"type": "service_account", "project_id": "...", "client_email": "...", "private_key": "...", "location": "global"}'
+                        }
+                      </code>
+                      <p className="mt-1">
+                        <code className="text-xs">location</code> is optional and defaults to{' '}
+                        <code className="text-xs">global</code>. JSON with{' '}
+                        <code className="text-xs">project</code>,{' '}
+                        <code className="text-xs">location</code>, and{' '}
+                        <code className="text-xs">googleCredentials</code> also works.
+                      </p>
+                      <p className="mt-1">
+                        Enable the Vertex AI API and grant the service account the Vertex AI User
+                        role. Claude and partner models must also be enabled in Model Garden.
+                      </p>
+                      <p className="mt-1">
+                        Mistral models only run in <code className="text-xs">us-central1</code> and{' '}
+                        <code className="text-xs">europe-west4</code>; requests use{' '}
+                        <code className="text-xs">europe-west4</code> when the location is in
+                        Europe.
+                      </p>
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {structuredCredentialKind === 'vertex' && !isDirectVertex && (
                   <Alert>
                     <Info className="size-4" />
                     <AlertDescription>
@@ -788,12 +1022,12 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                 )}
               </div>
 
-              {selectedProvider && getProviderModels(selectedProvider).length > 0 && (
+              {dialogModels.length > 0 && (
                 <div className="space-y-2">
                   <Label>Supported Models</Label>
                   <div className="text-muted-foreground rounded-md border p-3 text-sm">
                     <ul className="max-h-32 space-y-0.5 overflow-y-auto">
-                      {getProviderModels(selectedProvider).map(model => (
+                      {dialogModels.map(model => (
                         <li key={model} className="text-xs">
                           {model}
                         </li>
@@ -808,6 +1042,31 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                   const directProvider = DIRECT_BYOK_PROVIDERS_LIST.find(
                     p => p.id === selectedProvider
                   );
+                  // New keys start outside catalog mode; updating a key keeps its mode.
+                  if (directProvider && editingKey?.serve_catalog_models) {
+                    return (
+                      <Alert>
+                        <Info className="size-4" />
+                        <AlertDescription>
+                          <p>
+                            This key uses Kilo catalog model IDs: select catalog models such as
+                            moonshotai/kimi-k2.6, and requests for models this provider serves use
+                            your key.
+                          </p>
+                          <p className="mt-1">
+                            {organizationId ? 'Organization owners and admins' : 'You'} can switch
+                            the key to model IDs with the <strong>{directProvider.name}</strong>{' '}
+                            prefix in the key list.
+                          </p>
+                          {organizationId ? (
+                            <p className="mt-2">
+                              Organization model restrictions apply to requests through this key.
+                            </p>
+                          ) : null}
+                        </AlertDescription>
+                      </Alert>
+                    );
+                  }
                   if (directProvider) {
                     return (
                       <Alert className="border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-400">
@@ -824,8 +1083,31 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                           </p>
                           {organizationId ? (
                             <p className="mt-2">
-                              This provider is considered trusted in the context of organization
-                              restrictions.
+                              Models with the <strong>{directProvider.name}</strong> prefix are not
+                              subject to organization model restrictions.
+                              {catalogModeSupportedModels?.[directProvider.id]?.length
+                                ? ' Owners and admins can switch this key to Kilo catalog model IDs in the key list, so these restrictions apply.'
+                                : ''}
+                            </p>
+                          ) : null}
+                        </AlertDescription>
+                      </Alert>
+                    );
+                  }
+                  if (isGatewayUserByokProviderId(selectedProvider)) {
+                    return (
+                      <Alert>
+                        <Info className="size-4" />
+                        <AlertDescription>
+                          <p>
+                            Once saved, this key is used for the supported models above that none of
+                            your provider keys cover. If you add both a Vercel AI Gateway key and an
+                            OpenRouter key, the Vercel AI Gateway key is used for models it serves.
+                          </p>
+                          {organizationId ? (
+                            <p className="mt-2">
+                              Organization model and provider restrictions apply to requests that
+                              use this key.
                             </p>
                           ) : null}
                         </AlertDescription>

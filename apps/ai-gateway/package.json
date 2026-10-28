@@ -4,21 +4,25 @@
   "private": true,
   "scripts": {
     "dev": "bash scripts/dev.sh",
-    "build": "next build",
+    "build": "node src/usage-queue/prepare.mjs && next build",
     "start": "next start",
-    "typecheck": "GOMEMLIMIT=2GiB tsgo --noEmit"
+    "typecheck": "GOMEMLIMIT=2GiB tsgo --noEmit",
+    "test:usage-queue": "node --test src/usage-queue/deployment.test.mjs"
   },
   "dependencies": {
+    "@kilocode/usage-queue": "workspace:*",
     "@kilocode/web-shared": "workspace:*",
     "@opentelemetry/api": "1.9.1",
-    "@sentry/nextjs": "10.69.0",
-    "next": "16.3.6",
+    "@sentry/nextjs": "11.7.0",
+    "next": "16.4.2",
     "react": "19.2.6",
     "react-dom": "19.2.6"
   },
   "devDependencies": {
+    "@jest/globals": "30.3.0",
     "@playwright/test": "1.58.2",
     "@swc/core": "1.15.18",
+    "@types/jest": "30.0.0",
     "@types/node": "catalog:",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",

@@ -2,10 +2,15 @@ import {
   CLOUD_AGENT_ASSISTANT_FAILURE_REASONS,
   CLOUD_AGENT_FAILURE_CODES,
   CLOUD_AGENT_PROVIDER_OWNERSHIPS,
+  CloudAgentCallbackFailureSchema,
   CloudAgentSafeFailureSchema,
+  classifyCloudAgentFailure,
 } from '@kilocode/worker-utils/cloud-agent-failure';
 import { describe, expect, it } from 'vitest';
 import { assistantErrorDetail } from '../shared/assistant-failure.js';
+import type { AssistantMessage } from '@kilocode/sdk/v2';
+import { sdkAssistantErrorSchema } from '@kilocode/session-ingest-contracts';
+import { projectSafeSdkAssistantError } from '../shared/assistant-failure.js';
 import {
   SAFE_FAILURE_MESSAGE_MAX_LENGTH,
   SafeFailureProjectionSchema,
@@ -17,6 +22,8 @@ import {
   projectSafeAssistantError,
   projectSafeFailure,
 } from './safe-failure-projection.js';
+
+const NESTED_PROVIDER_TIMEOUT_BODY = '{"type":"error","error":{"type":"timeout","code":504}}';
 
 describe('projectSafeAssistantError', () => {
   it.each([
@@ -93,12 +100,14 @@ describe('projectSafeAssistantError', () => {
       for (const prefix of ['', '[BYOK] ']) {
         const safeError = projectSafeAssistantError(`${prefix}${message}`);
 
-        expect(safeError).toBe(`${prefix}${message}`);
+        expect(safeError).toBe(
+          `${prefix}${assistantFailureMessage(reason, prefix ? 'byok' : undefined)}`
+        );
         expect(projectSafeAssistantError(safeError)).toBe(safeError);
         for (const providerOwnership of CLOUD_AGENT_PROVIDER_OWNERSHIPS) {
           expect(classifyAssistantFailure(safeError, providerOwnership)).toMatchObject({
             reason,
-            safeMessage: message,
+            safeMessage: assistantFailureMessage(reason, prefix ? 'byok' : providerOwnership),
             providerOwnership: prefix ? 'byok' : providerOwnership,
           });
         }
@@ -242,6 +251,194 @@ describe('projectSafeAssistantError', () => {
 
   it.each([null, undefined])('omits absent errors: %s', error => {
     expect(projectSafeAssistantError(error)).toBeUndefined();
+  });
+});
+
+describe('projectSafeSdkAssistantError', () => {
+  it.each([
+    [
+      'ProviderAuthError',
+      { providerID: 'poison-provider' },
+      {
+        name: 'ProviderAuthError',
+        data: { providerID: 'unknown', message: 'Assistant request was not authorized' },
+      },
+    ],
+    [
+      'UnknownError',
+      { ref: 'poison-reference' },
+      { name: 'UnknownError', data: { message: 'Assistant request failed' } },
+    ],
+    [
+      'MessageOutputLengthError',
+      {},
+      { name: 'MessageOutputLengthError', data: { message: 'The model output limit was reached' } },
+    ],
+    [
+      'MessageAbortedError',
+      {},
+      { name: 'MessageAbortedError', data: { message: 'The message was interrupted by the user' } },
+    ],
+    [
+      'StructuredOutputError',
+      { retries: 3 },
+      {
+        name: 'StructuredOutputError',
+        data: { message: 'The model response did not match the required format', retries: 3 },
+      },
+    ],
+    [
+      'ContextOverflowError',
+      {},
+      { name: 'ContextOverflowError', data: { message: 'The model context limit was exceeded' } },
+    ],
+    [
+      'ContentFilterError',
+      {},
+      {
+        name: 'UnknownError',
+        data: { message: 'The model provider blocked the response under its content policy' },
+      },
+    ],
+    [
+      'APIError',
+      { statusCode: 429, isRetryable: true },
+      {
+        name: 'APIError',
+        data: { message: 'Assistant request was rate limited', statusCode: 429, isRetryable: true },
+      },
+    ],
+    [
+      'APIError',
+      { statusCode: 402, isRetryable: false },
+      {
+        name: 'APIError',
+        data: {
+          message: 'Assistant request failed: insufficient credits',
+          statusCode: 402,
+          isRetryable: false,
+        },
+      },
+    ],
+  ] as const)(
+    'emits only safe SDK fields for %s without losing classification',
+    (name, data, expected) => {
+      for (const prefix of ['', '[BYOK] ']) {
+        const source = {
+          name,
+          message: 'poison-outer-message',
+          data: {
+            ...data,
+            message: `${prefix}Unrecognized failure poison-message`,
+            responseHeaders: { authorization: 'Bearer poison-header', cookie: 'poison-cookie' },
+            responseBody: 'poison-body',
+            metadata: { token: 'poison-metadata' },
+            extra: 'poison-extra',
+          },
+          extra: 'poison-outer-extra',
+        };
+        const safeError: AssistantMessage['error'] = projectSafeSdkAssistantError(source);
+
+        expect(safeError).toEqual({
+          ...expected,
+          data: { ...expected.data, message: `${prefix}${expected.data.message}` },
+        });
+        expect(sdkAssistantErrorSchema.parse(safeError)).toEqual(safeError);
+        expect(classifyAssistantFailure(safeError)).toEqual(classifyAssistantFailure(source));
+        expect(projectSafeSdkAssistantError(safeError)).toEqual(safeError);
+        expect(JSON.stringify(safeError)).not.toContain('poison');
+      }
+    }
+  );
+
+  it.each([undefined, null, '429', 99, 600, 429.5, NaN, Infinity, -Infinity, {}, []])(
+    'drops malformed API status %s without inventing retry semantics',
+    statusCode => {
+      const safeError = projectSafeSdkAssistantError({
+        name: 'APIError',
+        data: { message: 'poison-message', statusCode, isRetryable: false },
+      });
+
+      expect(safeError).toEqual({
+        name: 'APIError',
+        data: { message: 'Assistant request failed', isRetryable: false },
+      });
+      expect(sdkAssistantErrorSchema.parse(safeError)).toEqual(safeError);
+    }
+  );
+
+  it.each([undefined, null, 'true', 1, {}, []])(
+    'falls back safely for invalid API retryability %j while retaining the failure cause',
+    isRetryable => {
+      const safeError = projectSafeSdkAssistantError({
+        name: 'APIError',
+        data: { message: 'poison-message', statusCode: 429, isRetryable },
+      });
+
+      expect(safeError).toEqual({
+        name: 'UnknownError',
+        data: { message: 'Assistant request was rate limited' },
+      });
+      expect(sdkAssistantErrorSchema.parse(safeError)).toEqual(safeError);
+    }
+  );
+
+  it.each([undefined, null, '3', -1, 0.5, NaN, Infinity, Number.MAX_SAFE_INTEGER + 1])(
+    'does not forward invalid structured-output retry counts %s',
+    retries => {
+      const safeError = projectSafeSdkAssistantError({
+        name: 'StructuredOutputError',
+        data: { message: 'poison-message', retries },
+      });
+
+      expect(safeError).toEqual({
+        name: 'UnknownError',
+        data: { message: 'The model response did not match the required format' },
+      });
+      expect(sdkAssistantErrorSchema.parse(safeError)).toEqual(safeError);
+    }
+  );
+
+  it.each([
+    false,
+    0,
+    'poison-message',
+    [],
+    {},
+    {
+      name: 'FutureError',
+      data: { message: 'poison-message', statusCode: 402, isRetryable: true },
+    },
+    { name: ['APIError'], data: { statusCode: 402, isRetryable: true } },
+    { name: 'APIError', data: null },
+    { name: 'APIError', data: [{ statusCode: 402, isRetryable: true }] },
+    { name: 'APIError', data: 'poison-message' },
+  ])('normalizes unknown or malformed input into a safe SDK error: %j', source => {
+    const safeError = projectSafeSdkAssistantError(source);
+
+    expect(safeError).toEqual({
+      name: 'UnknownError',
+      data: { message: 'Assistant request failed' },
+    });
+    expect(sdkAssistantErrorSchema.parse(safeError)).toEqual(safeError);
+  });
+
+  it.each(['user-interrupt poison-message', { name: 'MessageAbortedError', data: null }])(
+    'preserves interruption in a valid envelope even for incomplete SDK input: %j',
+    source => {
+      const safeError = projectSafeSdkAssistantError(source);
+
+      expect(safeError).toEqual({
+        name: 'MessageAbortedError',
+        data: { message: 'The message was interrupted by the user' },
+      });
+      expect(sdkAssistantErrorSchema.parse(safeError)).toEqual(safeError);
+      expect(isAssistantInterrupt(safeError)).toBe(true);
+    }
+  );
+
+  it.each([null, undefined])('omits absent SDK errors: %s', source => {
+    expect(projectSafeSdkAssistantError(source)).toBeUndefined();
   });
 });
 
@@ -451,6 +648,208 @@ describe('classifyAssistantFailureMessage', () => {
 });
 
 describe('classifyAssistantFailure', () => {
+  it.each([
+    [
+      400,
+      'invalid_request',
+      'Your provider rejected the request. Check your provider account and settings.',
+      '[BYOK] Provider rejected the request: token=poison-token',
+      'user',
+    ],
+    [
+      402,
+      'insufficient_credits',
+      'Assistant request failed: insufficient credits',
+      '[BYOK] Your API account has insufficient funds. Please check your billing details with your API provider.',
+      'user',
+    ],
+    [
+      403,
+      'provider_authentication',
+      'Assistant request was not authorized',
+      '[BYOK] Your API key does not have permission to access this model. Please check your API key permissions.',
+      'user',
+    ],
+    [
+      408,
+      'timeout',
+      'Assistant request timed out',
+      '[BYOK] Your provider rejected the request. Check your provider account and settings.',
+      'provider',
+    ],
+  ] as const)(
+    'carries BYOK APIError %s through safe projection, callback facts and responsibility',
+    (statusCode, reason, safeMessage, gatewayMessage, responsibility) => {
+      for (const sdkMessage of [gatewayMessage, 'Opaque SDK failure: poison-sdk-message']) {
+        const error = {
+          name: 'APIError',
+          data: {
+            statusCode,
+            message: sdkMessage,
+            responseBody: JSON.stringify({
+              error: gatewayMessage,
+              error_type: 'byok_error',
+              message: gatewayMessage,
+            }),
+          },
+        };
+        const failure = classifyAssistantFailure(error, 'managed');
+        expect(failure).toMatchObject({ reason, providerOwnership: 'byok', safeMessage });
+        expect(projectSafeAssistantError(error)).toBe(`[BYOK] ${safeMessage}`);
+        expect(projectSafeAssistantError(error)).not.toContain(
+          gatewayMessage.slice('[BYOK] '.length)
+        );
+        expect(classifyAssistantFailure(projectSafeAssistantError(error), 'managed')).toEqual(
+          failure
+        );
+
+        const callbackFailure = projectSafeFailure({
+          failureStage: 'agent_activity',
+          failureCode: failure.terminalCode ?? 'assistant_error',
+          assistantFailureReason: failure.reason,
+          providerOwnership: failure.providerOwnership,
+          safeFailureMessage: failure.safeMessage,
+        });
+        expect(CloudAgentCallbackFailureSchema.parse(callbackFailure)).toEqual(callbackFailure);
+        expect(callbackFailure).toMatchObject({
+          assistantReason: reason,
+          providerOwnership: 'byok',
+          message: safeMessage,
+        });
+        expect(
+          classifyCloudAgentFailure({
+            source: 'run',
+            stage: 'agent_activity',
+            code: failure.terminalCode ?? 'assistant_error',
+            assistantReason: failure.reason,
+            providerOwnership: failure.providerOwnership,
+          })
+        ).toMatchObject({ responsibility });
+        expect(JSON.stringify(callbackFailure)).not.toContain('poison');
+        expect(JSON.stringify(callbackFailure)).not.toContain(
+          gatewayMessage.slice('[BYOK] '.length)
+        );
+      }
+    }
+  );
+
+  it('preserves legacy marker-only BYOK ownership without a structured gateway tag', () => {
+    const failure = classifyAssistantFailure(
+      {
+        name: 'APIError',
+        data: { statusCode: 400, message: '[BYOK] Provider rejected the request: poison-message' },
+      },
+      'managed'
+    );
+
+    expect(failure).toEqual({
+      reason: 'invalid_request',
+      providerOwnership: 'byok',
+      safeMessage: 'Your provider rejected the request. Check your provider account and settings.',
+    });
+  });
+
+  it.each([
+    ['[BYOK] Assistant request was invalid', 'invalid_request'],
+    ['[BYOK] Assistant service is unavailable', 'provider_unavailable'],
+  ] as const)(
+    'uses status over nonspecific BYOK wording only with the gateway tag: %s',
+    (message, legacyReason) => {
+      expect(
+        classifyAssistantFailure({
+          name: 'APIError',
+          data: { statusCode: 408, message },
+        })
+      ).toMatchObject({ reason: legacyReason, providerOwnership: 'byok' });
+      expect(
+        classifyAssistantFailure({
+          name: 'APIError',
+          data: { statusCode: 408, message, responseBody: '{"error_type":"byok_error"}' },
+        })
+      ).toEqual({
+        reason: 'timeout',
+        providerOwnership: 'byok',
+        safeMessage: 'Assistant request timed out',
+      });
+    }
+  );
+
+  it.each(['managed', 'unknown'] as const)(
+    'keeps %s invalid requests generic without a BYOK marker or tag',
+    providerOwnership => {
+      expect(
+        classifyAssistantFailure({ name: 'APIError', data: { statusCode: 400 } }, providerOwnership)
+      ).toEqual({
+        reason: 'invalid_request',
+        safeMessage: 'Assistant request was invalid',
+        providerOwnership,
+      });
+    }
+  );
+
+  it.each([
+    'not json',
+    'null',
+    '[]',
+    '{"error_type":42}',
+    '{"error_type":"constructor"}',
+    '{"error_type":"BYOK_ERROR"}',
+    '{"metadata":{"error_type":"byok_error"}}',
+    JSON.stringify({ error_type: 'byok_error', message: 'x'.repeat(4096) }),
+  ])(
+    'does not infer BYOK ownership from an unusable or unrecognized gateway body: %s',
+    responseBody => {
+      expect(
+        classifyAssistantFailure(
+          {
+            name: 'APIError',
+            data: { statusCode: 400, responseBody },
+          },
+          'managed'
+        )
+      ).toEqual({
+        reason: 'invalid_request',
+        providerOwnership: 'managed',
+        safeMessage: 'Assistant request was invalid',
+      });
+    }
+  );
+
+  it.each([400, 408])('keeps a specific assistant cause ahead of BYOK status %s', statusCode => {
+    expect(
+      classifyAssistantFailure({
+        name: 'APIError',
+        data: {
+          statusCode,
+          message: 'The prompt is too long',
+          responseBody: '{"error_type":"byok_error"}',
+        },
+      })
+    ).toEqual({
+      reason: 'context_limit',
+      providerOwnership: 'byok',
+      safeMessage: 'The model context limit was exceeded',
+    });
+  });
+
+  it('keeps an SDK error name ahead of a generic BYOK timeout response', () => {
+    expect(
+      classifyAssistantFailure({
+        name: 'ContextOverflowError',
+        data: {
+          statusCode: 408,
+          message:
+            '[BYOK] Your provider rejected the request. Check your provider account and settings.',
+          responseBody: '{"error_type":"byok_error"}',
+        },
+      })
+    ).toEqual({
+      reason: 'context_limit',
+      providerOwnership: 'byok',
+      safeMessage: 'The model context limit was exceeded',
+    });
+  });
+
   it.each([
     ['ContextOverflowError', 'context_limit', 'The model context limit was exceeded'],
     ['MessageOutputLengthError', 'output_limit', 'The model output limit was reached'],
@@ -819,6 +1218,278 @@ describe('classifyAssistantFailure', () => {
     expect(classifyAssistantFailure(safeError)).toEqual(failure);
   });
 
+  // Production provider timeouts arrive as an `APIError` with no `statusCode`,
+  // only a body whose cause is nested: the root `type` is "error" and the inner
+  // `error` carries `type` "timeout" and `code` 504 (numeric or string). The
+  // result must be identical to an explicit numeric 504 status, survive the safe
+  // projection, and classify identically downstream.
+  it('classifies the nested provider timeout envelope exactly like a numeric 504 status', () => {
+    const baseline = classifyAssistantFailure({
+      name: 'APIError',
+      data: { statusCode: 504, message: 'opaque provider failure' },
+    });
+
+    expect(baseline).toEqual({
+      reason: 'timeout',
+      safeMessage: 'Assistant request timed out',
+      providerOwnership: 'unknown',
+    });
+
+    for (const responseBody of [
+      '{"type":"error","error":{"type":"timeout","code":504}}',
+      '{"type":"error","error":{"type":"timeout","code":"504"}}',
+    ]) {
+      const error = {
+        name: 'APIError',
+        data: { message: 'opaque provider failure', responseBody },
+      };
+      const failure = classifyAssistantFailure(error);
+
+      expect(failure).toEqual(baseline);
+
+      const safeError = projectSafeAssistantError(error);
+      expect(safeError).toBe('Assistant request timed out');
+      expect(classifyAssistantFailure(safeError)).toEqual(failure);
+
+      expect(
+        classifyCloudAgentFailure({
+          source: 'run',
+          stage: 'agent_activity',
+          code: failure.terminalCode ?? 'assistant_error',
+          assistantReason: failure.reason,
+          providerOwnership: failure.providerOwnership,
+        })
+      ).toEqual(
+        classifyCloudAgentFailure({
+          source: 'run',
+          stage: 'agent_activity',
+          code: baseline.terminalCode ?? 'assistant_error',
+          assistantReason: baseline.reason,
+          providerOwnership: baseline.providerOwnership,
+        })
+      );
+    }
+  });
+
+  it.each([
+    ['a missing root type', '{"error":{"type":"timeout","code":504}}'],
+    ['a non-error root type', '{"type":"response","error":{"type":"timeout","code":504}}'],
+    ['a missing nested type', '{"type":"error","error":{"code":504}}'],
+    [
+      'a non-timeout nested type',
+      '{"type":"error","error":{"type":"invalid_request_error","code":504}}',
+    ],
+    ['a missing nested code', '{"type":"error","error":{"type":"timeout"}}'],
+    ['an unrelated nested code', '{"type":"error","error":{"type":"timeout","code":429}}'],
+    ['an unrelated string nested code', '{"type":"error","error":{"type":"timeout","code":"500"}}'],
+    ['a non-object nested error', '{"type":"error","error":"timeout"}'],
+    ['a null nested error', '{"type":"error","error":null}'],
+    ['a root string code without the nested envelope', '{"type":"error","code":"504"}'],
+    ['truncated JSON', '{"type":"error","error":{"type":"timeout","code":504}'],
+  ])('does not infer a timeout from %s', (_label, responseBody) => {
+    const error = {
+      name: 'APIError',
+      data: { message: 'opaque provider failure', responseBody },
+    };
+
+    expect(classifyAssistantFailure(error)).toEqual({
+      reason: 'unknown',
+      safeMessage: 'Assistant request failed',
+      providerOwnership: 'unknown',
+    });
+    expect(projectSafeAssistantError(error)).toBe('Assistant request failed');
+  });
+
+  it('keeps independently parsed origin and status signals when the nested envelope is malformed', () => {
+    // The gateway origin tag survives a malformed nested code field.
+    expect(
+      classifyAssistantFailure({
+        name: 'APIError',
+        data: {
+          message: 'opaque provider failure',
+          responseBody:
+            '{"error_type":"upstream_disconnect","type":"error","error":{"type":"timeout","code":{}}}',
+        },
+      }).reason
+    ).toBe('provider_disconnect');
+    // The body status survives a malformed nested code field.
+    expect(
+      classifyAssistantFailure({
+        name: 'APIError',
+        data: {
+          message: 'opaque provider failure',
+          responseBody: '{"type":"error","status":429,"error":{"type":"timeout","code":{}}}',
+        },
+      }).reason
+    ).toBe('rate_limited');
+    // The body error name survives a malformed nested type field.
+    expect(
+      classifyAssistantFailure({
+        name: 'APIError',
+        data: {
+          message: 'opaque provider failure',
+          responseBody:
+            '{"name":"ContentFilterError","type":"error","error":{"type":{},"code":504}}',
+        },
+      }).reason
+    ).toBe('content_filter');
+  });
+
+  it.each(['status', 'statusCode', 'code'] as const)(
+    'keeps the body %s numeric status ahead of the nested timeout envelope',
+    field => {
+      const responseBody = JSON.stringify({
+        type: 'error',
+        [field]: 429,
+        error: { type: 'timeout', code: 504 },
+      });
+
+      expect(
+        classifyAssistantFailure({
+          name: 'APIError',
+          data: { message: 'opaque provider failure', responseBody },
+        }).reason
+      ).toBe('rate_limited');
+    }
+  );
+
+  it('keeps a well-formed direct status outside the mapped range authoritative', () => {
+    expect(
+      classifyAssistantFailure({
+        name: 'APIError',
+        data: {
+          statusCode: 200,
+          message: 'opaque provider failure',
+          responseBody: NESTED_PROVIDER_TIMEOUT_BODY,
+        },
+      })
+    ).toEqual({
+      reason: 'unknown',
+      safeMessage: 'Assistant request failed',
+      providerOwnership: 'unknown',
+    });
+  });
+
+  it.each([
+    [400, 'invalid_request'],
+    [401, 'provider_authentication'],
+    [403, 'provider_authentication'],
+    [429, 'rate_limited'],
+    [503, 'provider_unavailable'],
+  ] as const)(
+    'keeps direct APIError status %s ahead of the nested timeout envelope',
+    (statusCode, reason) => {
+      expect(
+        classifyAssistantFailure({
+          name: 'APIError',
+          data: {
+            statusCode,
+            message: 'opaque provider failure',
+            responseBody: NESTED_PROVIDER_TIMEOUT_BODY,
+          },
+        }).reason
+      ).toBe(reason);
+    }
+  );
+
+  it('keeps the gateway origin tag and body error name ahead of the nested timeout envelope', () => {
+    expect(
+      classifyAssistantFailure({
+        name: 'APIError',
+        data: {
+          message: 'opaque provider failure',
+          responseBody:
+            '{"error_type":"upstream_disconnect","type":"error","error":{"type":"timeout","code":504}}',
+        },
+      }).reason
+    ).toBe('provider_disconnect');
+    expect(
+      classifyAssistantFailure({
+        name: 'APIError',
+        data: {
+          message: 'opaque provider failure',
+          responseBody:
+            '{"name":"ContextOverflowError","type":"error","error":{"type":"timeout","code":504}}',
+        },
+      }).reason
+    ).toBe('context_limit');
+  });
+
+  it.each(['managed', 'byok', 'unknown'] as const)(
+    'preserves %s provider ownership for the nested timeout envelope',
+    providerOwnership => {
+      const error = {
+        name: 'APIError',
+        data: { message: 'opaque provider failure', responseBody: NESTED_PROVIDER_TIMEOUT_BODY },
+      };
+      const failure = classifyAssistantFailure(error, providerOwnership);
+
+      expect(failure).toEqual({
+        reason: 'timeout',
+        safeMessage: 'Assistant request timed out',
+        providerOwnership,
+      });
+      expect(projectSafeAssistantError(error)).toBe('Assistant request timed out');
+    }
+  );
+
+  it('does not overwrite structured BYOK ownership with the nested timeout cause', () => {
+    const error = {
+      name: 'APIError',
+      data: {
+        message: 'opaque provider failure',
+        responseBody:
+          '{"error_type":"byok_error","type":"error","error":{"type":"timeout","code":504}}',
+      },
+    };
+
+    expect(classifyAssistantFailure(error, 'managed')).toEqual({
+      reason: 'timeout',
+      safeMessage: 'Assistant request timed out',
+      providerOwnership: 'byok',
+    });
+    expect(projectSafeAssistantError(error)).toBe('[BYOK] Assistant request timed out');
+  });
+
+  it('ignores a nested timeout envelope larger than the 64 KiB response-body cap', () => {
+    const responseBody = JSON.stringify({
+      type: 'error',
+      error: { type: 'timeout', code: 504 },
+      padding: 'x'.repeat(64 * 1024),
+    });
+    expect(responseBody.length).toBeGreaterThan(64 * 1024);
+
+    expect(
+      classifyAssistantFailure({
+        name: 'APIError',
+        data: { message: 'opaque provider failure', responseBody },
+      })
+    ).toEqual({
+      reason: 'unknown',
+      safeMessage: 'Assistant request failed',
+      providerOwnership: 'unknown',
+    });
+  });
+
+  it('does not retain nested timeout envelope text in the safe projection', () => {
+    const responseBody = JSON.stringify({
+      type: 'error',
+      error: { type: 'timeout', code: 504, message: 'poison-provider-detail' },
+      message: 'poison-root-detail',
+    });
+    const error = {
+      name: 'APIError',
+      data: { message: 'opaque provider failure', responseBody },
+    };
+    const failure = classifyAssistantFailure(error);
+    const safeError = projectSafeAssistantError(error);
+
+    expect(failure.reason).toBe('timeout');
+    expect(safeError).toBe('Assistant request timed out');
+    expect(safeError).not.toContain('poison');
+    expect(JSON.stringify(failure)).not.toContain('poison');
+  });
+
   it('keeps a valid error_type when a sibling field is malformed', () => {
     const error = {
       name: 'APIError',
@@ -855,6 +1526,134 @@ describe('classifyAssistantFailure', () => {
       providerOwnership: 'unknown',
     });
   });
+});
+
+// A direct provider 499 can still carry the gateway's bounded, recognized
+// `upstream_error` origin. The numeric 4xx fallback classified the 499 itself as
+// an invalid request before reading that token, so a model-serving failure was
+// reported as a user/platform defect (`assistant_invalid_request`). The
+// recognized origin must win for this exact envelope, while plain 400/422,
+// unrecognized 499 bodies and bounded parsing keep the status-derived result.
+describe('direct 499 with a recognized upstream_error body', () => {
+  const upstreamErrorBody = JSON.stringify({ error_type: 'upstream_error' });
+  const envelope = (responseBody: string | undefined, message = 'synthetic') => ({
+    name: 'APIError',
+    data: { statusCode: 499, message, responseBody },
+  });
+
+  it('classifies a managed 499 carrying a recognized upstream_error as a provider failure', () => {
+    const error = envelope(upstreamErrorBody);
+    const failure = classifyAssistantFailure(error, 'managed');
+
+    expect(failure).toEqual({
+      reason: 'provider_unavailable',
+      providerOwnership: 'managed',
+      safeMessage: 'Assistant service is unavailable',
+    });
+    expect(failure).not.toHaveProperty('terminalCode');
+    expect(projectSafeAssistantError(error)).toBe('Assistant service is unavailable');
+
+    const callbackFailure = projectSafeFailure({
+      failureStage: 'agent_activity',
+      failureCode: failure.terminalCode ?? 'assistant_error',
+      assistantFailureReason: failure.reason,
+      providerOwnership: failure.providerOwnership,
+      safeFailureMessage: failure.safeMessage,
+    });
+    expect(CloudAgentCallbackFailureSchema.parse(callbackFailure)).toEqual(callbackFailure);
+    expect(callbackFailure).toMatchObject({
+      code: 'assistant_error',
+      assistantReason: 'provider_unavailable',
+      providerOwnership: 'managed',
+      message: 'Assistant service is unavailable',
+    });
+
+    // The model-serving path is one `provider` bucket: our gateway and the
+    // upstream provider are indistinguishable here, so a managed outage stays
+    // provider responsibility and never counts as a platform defect.
+    expect(
+      classifyCloudAgentFailure({
+        source: 'run',
+        stage: 'agent_activity',
+        code: failure.terminalCode ?? 'assistant_error',
+        assistantReason: failure.reason,
+        providerOwnership: failure.providerOwnership,
+      })
+    ).toEqual({ responsibility: 'provider', reason: 'managed_provider_unavailable' });
+  });
+
+  it('keeps explicit BYOK ownership while correcting the 499 origin', () => {
+    const error = envelope(upstreamErrorBody, '[BYOK] synthetic');
+    const failure = classifyAssistantFailure(error, 'managed');
+
+    expect(failure).toEqual({
+      reason: 'provider_unavailable',
+      providerOwnership: 'byok',
+      safeMessage: 'Assistant service is unavailable',
+    });
+    expect(failure).not.toHaveProperty('terminalCode');
+    expect(projectSafeAssistantError(error)).toBe('[BYOK] Assistant service is unavailable');
+
+    expect(
+      classifyCloudAgentFailure({
+        source: 'run',
+        stage: 'agent_activity',
+        code: 'assistant_error',
+        assistantReason: failure.reason,
+        providerOwnership: failure.providerOwnership,
+      })
+    ).toEqual({ responsibility: 'provider', reason: 'provider_unavailable' });
+  });
+
+  it.each([
+    ['upstream_disconnect', 'provider_disconnect', 'Assistant provider connection was lost'],
+    [
+      'temporarily_unavailable',
+      'gateway_unavailable',
+      'Assistant gateway was temporarily unavailable',
+    ],
+  ] as const)(
+    'keeps existing gateway origin handling for a 499 tagged %s',
+    (errorType, reason, safeMessage) => {
+      expect(
+        classifyAssistantFailure(envelope(JSON.stringify({ error_type: errorType })), 'managed')
+      ).toMatchObject({ reason, safeMessage });
+    }
+  );
+
+  it.each([
+    ['plain 499 without a body', undefined],
+    ['499 with an unrecognized body token', JSON.stringify({ error_type: 'unrecognized_token' })],
+    ['499 with a malformed body', 'not json'],
+    [
+      '499 with an oversized upstream_error body',
+      JSON.stringify({ error_type: 'upstream_error', pad: 'x'.repeat(70_000) }),
+    ],
+  ])('preserves the status-derived invalid request for %s', (_label, responseBody) => {
+    const failure = classifyAssistantFailure(envelope(responseBody), 'managed');
+
+    expect(failure).toEqual({
+      reason: 'invalid_request',
+      providerOwnership: 'managed',
+      safeMessage: 'Assistant request was invalid',
+    });
+  });
+
+  it.each([400, 422])(
+    'does not reinterpret a %s carrying a recognized upstream_error body',
+    statusCode => {
+      const error = {
+        name: 'APIError',
+        data: { statusCode, message: 'synthetic', responseBody: upstreamErrorBody },
+      };
+
+      expect(classifyAssistantFailure(error, 'managed')).toEqual({
+        reason: 'invalid_request',
+        providerOwnership: 'managed',
+        safeMessage: 'Assistant request was invalid',
+      });
+    }
+  );
 });
 
 describe('isAssistantInterrupt', () => {

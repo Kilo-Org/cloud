@@ -22,12 +22,13 @@ jest.mock('next/navigation', () => ({
 }));
 
 import { afterEach, beforeEach, describe, test, expect } from '@jest/globals';
+import { isEmailBlacklistedByDomain } from '@kilocode/worker-utils/account-access';
 import {
-  isEmailBlacklistedByDomain,
-  isBlockedTLD,
+  isEmailOnBlockedTld,
   getUserUUID,
   uuidSchema,
   getUserFromAuth,
+  getUserFromSession,
   sessionAuthOptions,
   getUserFromBearerForCredentialExchange,
   getUserFromSessionForCredentialIssuance,
@@ -38,9 +39,10 @@ import {
   setAdminAccessSinkForTest,
   type AdminAccessEvent,
 } from '@kilocode/web-shared/lib/admin/admin-access-log';
-import { kilocode_users, organizations } from '@kilocode/db/schema';
+import { device_sessions, kilocode_users, organizations } from '@kilocode/db/schema';
 import type { User } from '@kilocode/db/schema';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { markOrganizationAsDeleted } from '@kilocode/web-shared/lib/organizations/organizations';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { generateApiToken, JWT_TOKEN_VERSION } from '@kilocode/web-shared/lib/tokens';
 import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
@@ -54,6 +56,10 @@ import {
 import { signKiloToken } from '@kilocode/worker-utils/kilo-token';
 import { buildModernKiloTokenPayload } from '@kilocode/worker-utils/kilo-token-policy';
 import { NEXTAUTH_SECRET } from '@kilocode/web-shared/lib/config.server';
+import {
+  DEVICE_SESSION_CACHE_TTL_MS,
+  resetDeviceSessionCacheForTest,
+} from '@kilocode/web-shared/lib/auth/device-session-cache';
 
 // Same namespace UUID used in user.server.ts
 const USER_UUID_NAMESPACE = '6ba7b810-9dad-11d1-80b4-00c04fd430c8';
@@ -62,6 +68,11 @@ beforeEach(() => {
   mockHeaders.mockReset();
   mockGetServerSession.mockReset();
   mockRedirect.mockClear();
+  resetDeviceSessionCacheForTest();
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
 });
 
 function signPolicyClaims(claims: Record<string, unknown>, secret = NEXTAUTH_SECRET): string {
@@ -147,50 +158,64 @@ describe('isEmailBlacklistedByDomain', () => {
   });
 });
 
-describe('isBlockedTLD', () => {
-  const blockedTlds = ['.shop', '.top'];
+describe('isEmailOnBlockedTld', () => {
+  const defaultTlds = ['shop', 'top'];
 
-  test('should block .shop TLD', () => {
-    expect(isBlockedTLD('user@example.shop', blockedTlds)).toBe(true);
+  test('should block the default .shop and .top TLDs', () => {
+    expect(isEmailOnBlockedTld('user@example.shop', defaultTlds)).toBe(true);
+    expect(isEmailOnBlockedTld('user@example.top', defaultTlds)).toBe(true);
   });
 
-  test('should block .top TLD', () => {
-    expect(isBlockedTLD('user@example.top', blockedTlds)).toBe(true);
+  test('should block a TLD added by an admin', () => {
+    expect(isEmailOnBlockedTld('user@example.asia', defaultTlds)).toBe(false);
+    expect(isEmailOnBlockedTld('user@example.asia', [...defaultTlds, 'asia'])).toBe(true);
   });
 
   test('should block subdomains under blocked TLDs', () => {
-    expect(isBlockedTLD('user@sub.domain.shop', blockedTlds)).toBe(true);
-    expect(isBlockedTLD('user@sub.domain.top', blockedTlds)).toBe(true);
+    expect(isEmailOnBlockedTld('user@sub.domain.shop', defaultTlds)).toBe(true);
+    expect(isEmailOnBlockedTld('user@sub.domain.top', defaultTlds)).toBe(true);
+    expect(isEmailOnBlockedTld('user@sub.domain.asia', ['asia'])).toBe(true);
   });
 
   test('should allow .com, .org, .io TLDs', () => {
-    expect(isBlockedTLD('user@example.com', blockedTlds)).toBe(false);
-    expect(isBlockedTLD('user@example.org', blockedTlds)).toBe(false);
-    expect(isBlockedTLD('user@example.io', blockedTlds)).toBe(false);
+    expect(isEmailOnBlockedTld('user@example.com', defaultTlds)).toBe(false);
+    expect(isEmailOnBlockedTld('user@example.org', defaultTlds)).toBe(false);
+    expect(isEmailOnBlockedTld('user@example.io', defaultTlds)).toBe(false);
   });
 
   test('should be case insensitive', () => {
-    expect(isBlockedTLD('user@example.SHOP', blockedTlds)).toBe(true);
-    expect(isBlockedTLD('user@example.TOP', blockedTlds)).toBe(true);
-    expect(isBlockedTLD('USER@EXAMPLE.Shop', blockedTlds)).toBe(true);
+    expect(isEmailOnBlockedTld('user@example.SHOP', defaultTlds)).toBe(true);
+    expect(isEmailOnBlockedTld('user@example.TOP', defaultTlds)).toBe(true);
+    expect(isEmailOnBlockedTld('user@example.ASIA', ['asia'])).toBe(true);
+    expect(isEmailOnBlockedTld('USER@EXAMPLE.Shop', defaultTlds)).toBe(true);
   });
 
   test('should not block domains containing blocked TLD as a non-TLD part', () => {
-    expect(isBlockedTLD('user@shop.example.com', blockedTlds)).toBe(false);
-    expect(isBlockedTLD('user@top.example.com', blockedTlds)).toBe(false);
-    expect(isBlockedTLD('user@myshop.com', blockedTlds)).toBe(false);
-    expect(isBlockedTLD('user@topnotch.com', blockedTlds)).toBe(false);
+    expect(isEmailOnBlockedTld('user@shop.example.com', defaultTlds)).toBe(false);
+    expect(isEmailOnBlockedTld('user@top.example.com', defaultTlds)).toBe(false);
+    expect(isEmailOnBlockedTld('user@myshop.com', defaultTlds)).toBe(false);
+    expect(isEmailOnBlockedTld('user@topnotch.com', defaultTlds)).toBe(false);
+    expect(isEmailOnBlockedTld('user@example.shop.com', defaultTlds)).toBe(false);
+    expect(isEmailOnBlockedTld('user@example.top.com', defaultTlds)).toBe(false);
+    expect(isEmailOnBlockedTld('user@example.asia.com', ['asia'])).toBe(false);
+    expect(isEmailOnBlockedTld('user@asia.example.com', ['asia'])).toBe(false);
+    expect(isEmailOnBlockedTld('user@notasia.com', ['asia'])).toBe(false);
   });
 
-  test('should return false when blocklist is empty', () => {
-    expect(isBlockedTLD('user@example.shop', [])).toBe(false);
+  test('should require a leading dot before the blocked TLD', () => {
+    expect(isEmailOnBlockedTld('user@exampleshop', defaultTlds)).toBe(false);
+    expect(isEmailOnBlockedTld('user@exampletop', defaultTlds)).toBe(false);
+    expect(isEmailOnBlockedTld('user@exampleasia', ['asia'])).toBe(false);
   });
 
-  test('should handle multi-part TLDs like .co.uk', () => {
-    const withMultiPart = ['.shop', '.co.uk'];
-    expect(isBlockedTLD('user@example.co.uk', withMultiPart)).toBe(true);
-    expect(isBlockedTLD('user@example.com', withMultiPart)).toBe(false);
-    expect(isBlockedTLD('user@example.uk', withMultiPart)).toBe(false);
+  test('should allow every TLD when the admin list is empty', () => {
+    expect(isEmailOnBlockedTld('user@example.shop', [])).toBe(false);
+    expect(isEmailOnBlockedTld('user@example.asia', [])).toBe(false);
+  });
+
+  test('should allow other TLDs including multi-part TLDs', () => {
+    expect(isEmailOnBlockedTld('user@example.co.uk', defaultTlds)).toBe(false);
+    expect(isEmailOnBlockedTld('user@example.uk', defaultTlds)).toBe(false);
   });
 });
 
@@ -461,6 +486,17 @@ describe('getUserFromAuth', () => {
     expect(result.credentialsRejected).toBe(false);
   });
 
+  test('returns 401 when the session read throws on malformed cookies', async () => {
+    mockHeaders.mockResolvedValue(new Headers());
+    mockGetServerSession.mockRejectedValue(new TypeError('argument name is invalid'));
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user).toBeNull();
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(result.credentialsRejected).toBe(false);
+  });
+
   test('flags an operation-scoped token presented to another endpoint', async () => {
     const user = await insertTestUser({ api_token_pepper: 'audience-fallthrough-pepper' });
     const token = signPolicyClaims({
@@ -623,6 +659,28 @@ describe('getUserFromAuth', () => {
     expect(result.organizationId).toBe(organization.id);
   });
 
+  test('rejects a token whose organization context was soft-deleted', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'deleted-organization-pepper' });
+    const organization = await createTestOrganization(
+      `Deleted Organization ${crypto.randomUUID()}`,
+      user.id,
+      0
+    );
+    await markOrganizationAsDeleted(organization.id);
+    const token = generateApiToken(user);
+    mockHeaders.mockResolvedValue(
+      new Headers({
+        Authorization: `Bearer ${token}`,
+        [ORGANIZATION_ID_HEADER]: organization.id,
+      })
+    );
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.user).toBeNull();
+    expect(result.authFailedResponse?.status).toBe(403);
+  });
+
   test('allows API-token authentication for users from SSO-protected domains', async () => {
     const ssoDomain = `${crypto.randomUUID()}.example.com`;
     const user = await insertTestUser({
@@ -649,15 +707,75 @@ describe('getUserFromAuth', () => {
       google_user_email: `api-token-device-session-${crypto.randomUUID()}@example.com`,
       api_token_pepper: 'device-session-pepper',
     });
-    const deviceSessionId = crypto.randomUUID();
-    const token = generateApiToken(user, { deviceSessionId });
+    const [session] = await db
+      .insert(device_sessions)
+      .values({ kilo_user_id: user.id })
+      .returning({ id: device_sessions.id });
+    const token = generateApiToken(user, { deviceSessionId: session!.id });
     mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
 
     const result = await getUserFromAuth({ adminOnly: false });
 
     expect(result.authFailedResponse).toBeNull();
     expect(result.user?.id).toBe(user.id);
-    expect(result.deviceSessionId).toBe(deviceSessionId);
+    expect(result.deviceSessionId).toBe(session!.id);
+  });
+
+  test('rejects a bearer token whose device session was revoked', async () => {
+    const user = await insertTestUser({
+      google_user_email: `api-token-revoked-session-${crypto.randomUUID()}@example.com`,
+      api_token_pepper: 'revoked-session-pepper',
+    });
+    const [session] = await db
+      .insert(device_sessions)
+      .values({
+        kilo_user_id: user.id,
+        revoked_at: new Date().toISOString(),
+        revoked_reason: 'logout',
+      })
+      .returning({ id: device_sessions.id });
+    const token = generateApiToken(user, { deviceSessionId: session!.id });
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    const result = await getUserFromAuth({ adminOnly: false });
+
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(result.user).toBeNull();
+    expect(result.credentialsRejected).toBe(true);
+  });
+
+  test('serves the cached session answer, then rechecks it after the revocation window', async () => {
+    const user = await insertTestUser({
+      google_user_email: `api-token-session-window-${crypto.randomUUID()}@example.com`,
+      api_token_pepper: 'session-window-pepper',
+    });
+    const [session] = await db
+      .insert(device_sessions)
+      .values({ kilo_user_id: user.id })
+      .returning({ id: device_sessions.id });
+    const token = generateApiToken(user, { deviceSessionId: session!.id });
+    mockHeaders.mockResolvedValue(new Headers({ Authorization: `Bearer ${token}` }));
+
+    let clock = Date.now();
+    jest.spyOn(Date, 'now').mockImplementation(() => clock);
+
+    expect((await getUserFromAuth({ adminOnly: false })).user?.id).toBe(user.id);
+
+    // Revoked without the app's invalidation, as another instance would.
+    await db
+      .update(device_sessions)
+      .set({ revoked_at: new Date().toISOString(), revoked_reason: 'logout' })
+      .where(eq(device_sessions.id, session!.id));
+
+    // Inside the window the cached answer is served without a database read.
+    expect((await getUserFromAuth({ adminOnly: false })).user?.id).toBe(user.id);
+
+    clock += DEVICE_SESSION_CACHE_TTL_MS;
+    const afterWindow = await getUserFromAuth({ adminOnly: false });
+
+    expect(afterWindow.authFailedResponse?.status).toBe(401);
+    expect(afterWindow.user).toBeNull();
+    expect(afterWindow.credentialsRejected).toBe(true);
   });
 
   test('web-session branch leaves deviceSessionId undefined', async () => {
@@ -704,6 +822,30 @@ describe('getUserFromAuth', () => {
   });
 });
 
+describe('getUserFromSession', () => {
+  test('returns the session user id for a valid session', async () => {
+    mockGetServerSession.mockResolvedValue({ kiloUserId: 'session-user-id' });
+
+    await expect(getUserFromSession()).resolves.toEqual({ id: 'session-user-id' });
+    expect(mockGetServerSession).toHaveBeenCalledWith(sessionAuthOptions);
+  });
+
+  test('returns null when the session read throws on malformed cookies', async () => {
+    mockGetServerSession.mockRejectedValue(new TypeError('argument name is invalid'));
+
+    await expect(getUserFromSession()).resolves.toBeNull();
+  });
+
+  test.each([
+    ['a non-cookie TypeError', new TypeError("Cannot read properties of undefined (reading 'id')")],
+    ['a generic error', new Error('session callback failed')],
+  ])('rethrows %s from the session read', async (_label, error) => {
+    mockGetServerSession.mockRejectedValue(error);
+
+    await expect(getUserFromSession()).rejects.toBe(error);
+  });
+});
+
 describe('credential issuance authentication guards', () => {
   test.each([
     ['Bearer token', { Authorization: 'Bearer token' }],
@@ -735,6 +877,16 @@ describe('credential issuance authentication guards', () => {
 
     expect(result.user?.id).toBe(user.id);
     expect(mockGetServerSession).toHaveBeenCalledWith(sessionAuthOptions);
+  });
+
+  test('returns 401 when the session read throws on malformed cookies', async () => {
+    mockHeaders.mockResolvedValue(new Headers());
+    mockGetServerSession.mockRejectedValue(new TypeError('argument name is invalid'));
+
+    const result = await getUserFromSessionForCredentialIssuance();
+
+    expect(result.user).toBeNull();
+    expect(result.authFailedResponse?.status).toBe(401);
   });
 
   test('rejects a revoked web session', async () => {
@@ -949,7 +1101,7 @@ describe('credential exchange bearer authentication guard', () => {
 
   test('rejects absent and mismatched pepper claims, including a null database pepper', async () => {
     const user = await insertTestUser({ api_token_pepper: null });
-    const noPepper = await signPolicyClaims({
+    const noPepper = signPolicyClaims({
       version: 3,
       kiloUserId: user.id,
       env: process.env.NODE_ENV,
@@ -1055,7 +1207,7 @@ describe('credential exchange bearer authentication guard', () => {
     ],
   ])('rejects an eligible-looking token with %s', async (_name, claimsFor) => {
     const user = await insertTestUser({ api_token_pepper: 'ineligible-claim-pepper' });
-    const token = await signPolicyClaims(claimsFor(user, Math.floor(Date.now() / 1000)));
+    const token = signPolicyClaims(claimsFor(user, Math.floor(Date.now() / 1000)));
 
     const result = await getUserFromBearerForCredentialExchange(
       new Headers({ authorization: `Bearer ${token}` }),
@@ -1066,7 +1218,6 @@ describe('credential exchange bearer authentication guard', () => {
   });
 
   test.each([
-    ['device session', { deviceSessionId: '' }],
     ['bot', { botId: '' }],
     ['organization', { organizationId: '' }],
     ['token source', { tokenSource: '' }],
@@ -1092,6 +1243,63 @@ describe('credential exchange bearer authentication guard', () => {
     );
 
     expect(result.authFailedResponse?.status).toBe(401);
+  });
+
+  test('exchanges a five-year bearer token bound to its device session', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'session-exchange-pepper' });
+    const [session] = await db
+      .insert(device_sessions)
+      .values({ kilo_user_id: user.id })
+      .returning({ id: device_sessions.id });
+    const now = Math.floor(Date.now() / 1000);
+    const token = signPolicyClaims({
+      version: 3,
+      kiloUserId: user.id,
+      apiTokenPepper: user.api_token_pepper,
+      env: process.env.NODE_ENV,
+      iat: now,
+      exp: now + 157_680_000,
+      deviceSessionId: session!.id,
+    });
+
+    const result = await getUserFromBearerForCredentialExchange(
+      new Headers({ authorization: `Bearer ${token}` }),
+      { legacy: 'five-year-api' }
+    );
+
+    expect(result.authFailedResponse).toBeNull();
+    expect(result.user?.id).toBe(user.id);
+    expect(result.deviceSessionId).toBe(session!.id);
+  });
+
+  test('refuses to exchange a five-year bearer token whose device session is revoked', async () => {
+    const user = await insertTestUser({ api_token_pepper: 'revoked-exchange-pepper' });
+    const [session] = await db
+      .insert(device_sessions)
+      .values({
+        kilo_user_id: user.id,
+        revoked_at: new Date().toISOString(),
+        revoked_reason: 'logout',
+      })
+      .returning({ id: device_sessions.id });
+    const now = Math.floor(Date.now() / 1000);
+    const token = signPolicyClaims({
+      version: 3,
+      kiloUserId: user.id,
+      apiTokenPepper: user.api_token_pepper,
+      env: process.env.NODE_ENV,
+      iat: now,
+      exp: now + 157_680_000,
+      deviceSessionId: session!.id,
+    });
+
+    const result = await getUserFromBearerForCredentialExchange(
+      new Headers({ authorization: `Bearer ${token}` }),
+      { legacy: 'five-year-api' }
+    );
+
+    expect(result.authFailedResponse?.status).toBe(401);
+    expect(result.user).toBeNull();
   });
 
   test.each([
@@ -1139,7 +1347,7 @@ describe('credential exchange bearer authentication guard', () => {
 
   test('rejects a valid token for a missing user', async () => {
     const now = Math.floor(Date.now() / 1000);
-    const token = await signPolicyClaims({
+    const token = signPolicyClaims({
       version: 3,
       kiloUserId: 'missing-credential-exchange-user',
       apiTokenPepper: 'pepper',
@@ -1198,7 +1406,7 @@ describe('credential exchange bearer authentication guard', () => {
 
     for (const claims of invalidClaims) {
       const result = await getUserFromBearerForCredentialExchange(
-        new Headers({ authorization: `Bearer ${await signPolicyClaims(claims)}` }),
+        new Headers({ authorization: `Bearer ${signPolicyClaims(claims)}` }),
         { legacy: 'deny' }
       );
       expect(result.authFailedResponse?.status).toBe(401);

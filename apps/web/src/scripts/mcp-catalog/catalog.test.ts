@@ -130,6 +130,53 @@ describe('mcp-catalog catalog', () => {
       expect(isDenylistedPath('slack.testConnection')).toBe(false);
       // `debug` is published and carries the guard marker, so it is not internal.
       expect(isDenylistedPath('debug.ping')).toBe(false);
+      // Native-only credential issuers are withheld by exact path.
+      expect(isDenylistedPath('activeSessions.widgetCredential')).toBe(true);
+      expect(isDenylistedPath('agentBriefing.updateContextPreferences')).toBe(true);
+      expect(isDenylistedPath('agentBriefing.estimateSummary')).toBe(false);
+      expect(isDenylistedPath('agentBriefing.dismiss')).toBe(false);
+      expect(isDenylistedPath('activeSessions.getToken')).toBe(false);
+    });
+
+    it('withholds Vercel secrets and resource mutations while retaining status reads', () => {
+      for (const prefix of ['vercelCompute', 'organizations.vercelCompute']) {
+        for (const method of [
+          'add',
+          'discoverTeams',
+          'discoverProjects',
+          'remove',
+          'retrySetup',
+          'upgradeRuntime',
+        ]) {
+          expect(isDenylistedPath(`${prefix}.${method}`)).toBe(true);
+        }
+        expect(isDenylistedPath(`${prefix}.getStatus`)).toBe(false);
+        expect(isDenylistedPath(`${prefix}.getEnrollment`)).toBe(false);
+      }
+    });
+
+    it('withholds paid scheduling consent while exposing scheduled report reads', () => {
+      const leaves = collectCatalogLeaves(rootRouter).filter(leaf =>
+        leaf.path.startsWith('agentBriefing.')
+      );
+      const { rows, missing } = buildCatalogRows(
+        leaves,
+        new Map(leaves.map(leaf => [leaf.path, 'Briefing procedure.']))
+      );
+      const paths = rows.map(row => row.path);
+      expect(missing).toEqual([]);
+      expect(paths).toEqual(
+        expect.arrayContaining([
+          'agentBriefing.estimateSummary',
+          'agentBriefing.get',
+          'agentBriefing.list',
+          'agentBriefing.dismiss',
+        ])
+      );
+      for (const path of ['agentBriefing.updateContextPreferences']) {
+        expect(leaves.some(leaf => leaf.path === path)).toBe(true);
+        expect(paths).not.toContain(path);
+      }
     });
 
     it('fails on a zero-row catalog instead of emitting an empty one', () => {

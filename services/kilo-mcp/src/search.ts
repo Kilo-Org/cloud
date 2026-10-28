@@ -1,10 +1,24 @@
 import type { Catalog, CatalogRow, SearchResult, SemanticCandidates } from './types';
+import {
+  cloudAgentAuthorityInputSchema,
+  type CloudAgentAuthority,
+} from '../../../packages/worker-utils/src/cloud-agent-authority';
 
 /** Default number of search rows returned when the caller omits `limit`. */
 export const DEFAULT_SEARCH_LIMIT = 10;
 
 /** Published upper bound on `search.limit`; the tool schema advertises the same value. */
 export const MAX_SEARCH_LIMIT = 50;
+
+/**
+ * Published upper bound on `search.query` characters (Unicode code points, the
+ * unit JSON Schema's `maxLength` uses); the tool schema and the argument parser
+ * enforce the same value. Every query is tokenized for the lexical pass and
+ * embedded for the semantic one, so the bound keeps a request's work
+ * proportional to one interactive query while leaving room for a pasted task
+ * description.
+ */
+export const MAX_SEARCH_QUERY_LENGTH = 1024;
 
 /**
  * A row is *guarded* when it is behind an admin guard (`admin`) or comes from
@@ -43,6 +57,25 @@ export function tokenize(text: string): string[] {
     .toLowerCase()
     .split(/[^a-z0-9]+/)
     .filter(token => token.length > 0);
+}
+
+/**
+ * Per-row token sets, computed once per catalog object. The bundled catalog is
+ * static, so its row tokens are reused across searches instead of recomputed;
+ * the map is keyed weakly so a caller-local catalog in a test is collected with
+ * the test.
+ */
+const catalogTokenSets = new WeakMap<Catalog, Map<string, Set<string>>>();
+
+function tokenSetsFor(catalog: Catalog): Map<string, Set<string>> {
+  const cached = catalogTokenSets.get(catalog);
+  if (cached) return cached;
+  const tokenSets = new Map<string, Set<string>>();
+  for (const row of Object.values(catalog)) {
+    tokenSets.set(row.path, new Set(tokenize(row.searchBlob)));
+  }
+  catalogTokenSets.set(catalog, tokenSets);
+  return tokenSets;
 }
 
 function isContiguousSequence(needles: string[], haystack: string[]): boolean {
@@ -93,6 +126,8 @@ export type SearchCatalogOptions = {
    * guarded (`admin` or `debug`) row from the ranking.
    */
   includeGuarded?: boolean;
+  allowedPaths?: readonly string[];
+  cloudAgentAuthority?: CloudAgentAuthority;
 };
 
 /**
@@ -140,12 +175,14 @@ export async function searchCatalogDetailed(
   type ScoredRow = SearchResult & { blobTokens: Set<string> };
   const rows: ScoredRow[] = [];
   const byPath = new Map<string, ScoredRow>();
+  const tokenSets = tokenSetsFor(catalog);
   // A withheld guarded row the query matched still leaves a signal: the caller's
   // empty-state answer names those rows. Score guarded rows on this pass too so
   // that answer costs no second embedding or Vectorize query.
   let hiddenGuardedMatches = false;
   for (const row of Object.values(catalog)) {
-    const blobTokens = new Set(tokenize(row.searchBlob));
+    if (options.allowedPaths && !options.allowedPaths.includes(row.path)) continue;
+    const blobTokens = tokenSets.get(row.path) ?? new Set(tokenize(row.searchBlob));
     const score = lexicalScore(queryTokens, normalizedQuery, row, blobTokens);
     if (isGuardedRow(row) && !includeGuarded) {
       if (score > 0) hiddenGuardedMatches = true;
@@ -158,7 +195,9 @@ export async function searchCatalogDetailed(
       summary: row.summary,
       tags: row.tags,
       score,
-      inputSchema: row.inputSchema,
+      inputSchema: options.cloudAgentAuthority
+        ? cloudAgentAuthorityInputSchema(options.cloudAgentAuthority)
+        : row.inputSchema,
       blobTokens,
       ...(isGuardedRow(row) ? { requiresApproval: true as const } : {}),
     };
@@ -187,6 +226,7 @@ export async function searchCatalogDetailed(
   for (const candidate of candidates) {
     const row = catalog[candidate.path];
     if (!row) continue;
+    if (options.allowedPaths && !options.allowedPaths.includes(row.path)) continue;
     // A semantic candidate must not smuggle a guarded row past the same gate
     // the lexical pass applies; the withheld candidate is the semantic form of
     // a hidden match and feeds the same single-pass signal.
@@ -204,7 +244,9 @@ export async function searchCatalogDetailed(
         summary: row.summary,
         tags: row.tags,
         score: candidate.score * minLexicalScore * 0.5,
-        inputSchema: row.inputSchema,
+        inputSchema: options.cloudAgentAuthority
+          ? cloudAgentAuthorityInputSchema(options.cloudAgentAuthority)
+          : row.inputSchema,
         blobTokens: new Set(),
         ...(isGuardedRow(row) ? { requiresApproval: true as const } : {}),
       };

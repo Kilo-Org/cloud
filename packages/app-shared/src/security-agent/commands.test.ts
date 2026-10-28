@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  getSecurityCommandFailureMessage,
   getSecurityCommandInvalidationScopes,
   isActiveSecurityCommand,
   mergeTrackedCommandIds,
@@ -47,5 +48,11 @@ describe('security agent command helpers', () => {
 
   it('deduplicates recovered and locally tracked command ids', () => {
     expect(mergeTrackedCommandIds(['a', 'b'], ['b', 'c'])).toEqual(['a', 'b', 'c']);
+  });
+
+  it('uses actionable GitHub authorization copy when a token is unavailable', () => {
+    expect(
+      getSecurityCommandFailureMessage(command({ resultCode: 'GITHUB_TOKEN_UNAVAILABLE' }))
+    ).toBe('GitHub authorization needs attention. Re-authorize GitHub App, then retry.');
   });
 });

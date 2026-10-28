@@ -6,7 +6,6 @@ import { View } from 'react-native';
 import { SectionHeader } from '@/components/home/section-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { GitMerge, GitPullRequest, ShieldCheck } from '@/components/ui/icons';
-import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { getCodeReviewerProfilePath, getPrReviewEntryPath } from '@/lib/profile-agent-navigation';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 
@@ -18,11 +17,7 @@ type ProductChoicesProps = {
 export function ProductChoices({ organizationId, contextReady }: Readonly<ProductChoicesProps>) {
   const router = useRouter();
   const { t } = useTranslation();
-  const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
   const scope = organizationId ?? PERSONAL_SECURITY_SCOPE;
-  if (!contextReady && !prReviewEnabled) {
-    return null;
-  }
 
   return (
     <View>
@@ -46,26 +41,23 @@ export function ProductChoices({ organizationId, contextReady }: Readonly<Produc
               subtitle={t('profile.securityAgentSubtitle')}
               hue="honey"
               className="rounded-lg bg-secondary px-3"
-              last={!prReviewEnabled}
               onPress={() => {
                 router.push(getSecurityAgentPath(scope));
               }}
             />
           </>
         )}
-        {prReviewEnabled ? (
-          <ConfigureRow
-            icon={GitMerge}
-            title={t('common.prReview')}
-            subtitle={t('profile.prReviewSubtitle')}
-            hue="gold"
-            className="rounded-lg bg-secondary px-3"
-            last
-            onPress={() => {
-              router.push(getPrReviewEntryPath());
-            }}
-          />
-        ) : null}
+        <ConfigureRow
+          icon={GitMerge}
+          title={t('common.prReview')}
+          subtitle={t('profile.prReviewSubtitle')}
+          hue="gold"
+          className="rounded-lg bg-secondary px-3"
+          last
+          onPress={() => {
+            router.push(getPrReviewEntryPath());
+          }}
+        />
       </View>
     </View>
   );

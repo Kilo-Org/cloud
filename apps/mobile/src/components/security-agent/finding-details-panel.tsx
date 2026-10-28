@@ -6,7 +6,7 @@ import {
 } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
 import { ExternalLink, GitMerge } from '@/components/ui/icons';
-import { Linking, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import {
@@ -14,6 +14,7 @@ import {
   FINDING_TONE_TO_KV_ROW_TONE,
 } from '@/components/security-agent/finding-tone';
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
+import { DISMISSAL_REASON_PHRASE_KEYS } from '@/components/security-agent/dismissal-reason-keys';
 import { getDeadlineCopy } from '@/lib/security-agent-copy';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
 import { KvRow } from '@/components/ui/kv-row';
@@ -21,6 +22,7 @@ import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath, type SecurityFinding } from '@/lib/security-agent';
+import { openFindingLink } from '@/lib/security-agent-link';
 import { cn, firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';
 
 type FindingDetailsPanelProps = {
@@ -45,14 +47,6 @@ const FINDING_STATUS_KEYS = {
   open: 'securityAgent.findingDetails.statusOpen',
 } satisfies Record<string, string>;
 
-const DISMISSAL_REASON_KEYS = {
-  fix_started: 'securityAgent.findingDetails.reasonFixStarted',
-  no_bandwidth: 'securityAgent.findingDetails.reasonNoBandwidth',
-  tolerable_risk: 'securityAgent.findingDetails.reasonTolerableRisk',
-  inaccurate: 'securityAgent.findingDetails.reasonInaccurate',
-  not_used: 'securityAgent.findingDetails.reasonNotUsed',
-} satisfies Record<string, string>;
-
 /** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
 function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | undefined {
   return (dictionary as Readonly<Record<string, V | undefined>>)[key];
@@ -62,7 +56,7 @@ function getDismissalReasonLabel(reason: string | null): string {
   if (!reason) {
     return i18n.t('securityAgent.findingDetails.reasonAfterReview');
   }
-  const key = lookup(DISMISSAL_REASON_KEYS, reason);
+  const key = lookup(DISMISSAL_REASON_PHRASE_KEYS, reason);
   return key ? i18n.t(key) : reason.replaceAll('_', ' ');
 }
 
@@ -124,12 +118,22 @@ function DismissalOrSupersessionNote({
 // dismissal/supersession context as plain facts rather than the web's
 // hero + next-step action card (Task 7 owns actions).
 export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsPanelProps>) {
+  const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
   const severity = getFindingSeverityPresentation(finding.severity);
   const status = getFindingLifecycleStatusPresentation(finding);
   const deadline = getSecurityDeadlinePresentation(finding);
   const deadlineCopy = getDeadlineCopy(deadline.state);
+  // The row already names the lifecycle status. A dismissed, superseded or
+  // after-deadline fixed finding carries that same word as its deadline label,
+  // so the badge would repeat the chip beside it; it renders only when it adds a
+  // deadline of its own. The SLA deadline row below keeps the detail either way.
+  const deadlineBadgeCopy =
+    deadline.state.kind === 'closed' ||
+    (deadline.state.kind === 'fixed' && !deadline.state.beforeDeadline)
+      ? null
+      : deadlineCopy;
   const supersedingFindingId = getSupersedingFindingId(finding);
   // A code the app does not know yet reads as the raw code, the same way
   // packages/app-shared renders it for web. A word like "Unknown" would hide
@@ -157,11 +161,13 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
           <Text className={cn('text-xs font-medium', FINDING_TONE_TEXT_CLASS[status.tone])}>
             {statusLabel}
           </Text>
-          <FindingStatusBadge
-            icon={deadline.icon}
-            label={deadlineCopy.label}
-            tone={deadline.tone}
-          />
+          {deadlineBadgeCopy ? (
+            <FindingStatusBadge
+              icon={deadline.icon}
+              label={deadlineBadgeCopy.label}
+              tone={deadline.tone}
+            />
+          ) : null}
         </View>
         {finding.description ? (
           <Text variant="muted" className="text-sm" selectable>
@@ -264,7 +270,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
         <Pressable
           className="flex-row items-center justify-center gap-2 rounded-lg bg-secondary p-3 active:opacity-70"
           onPress={() => {
-            void Linking.openURL(advisoryUrl);
+            openFindingLink(router, advisoryUrl, t('securityAgent.findingDetails.viewAdvisory'));
           }}
           accessibilityRole="link"
         >

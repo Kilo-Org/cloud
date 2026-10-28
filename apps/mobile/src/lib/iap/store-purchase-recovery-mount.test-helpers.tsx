@@ -7,7 +7,6 @@ import { act, TestRenderer } from '@/test/renderer';
 import { StorePurchaseRecoveryMount } from './store-purchase-recovery-mount';
 
 export const CREDIT_PRODUCT_ID = 'credits.usd10.v1';
-export const KILO_PASS_PRODUCT_ID = 'kilopass.pro.monthly';
 
 const mockedIap = vi.hoisted(() => ({
   finishTransaction: vi.fn(),
@@ -45,7 +44,6 @@ vi.mock('expo-iap', () => ({
   getPendingTransactionsIOS: mockedIap.getPendingTransactionsIOS,
   initConnection: mockedIap.initConnection,
   requestPurchase: vi.fn(),
-  restorePurchases: vi.fn(),
 }));
 
 vi.mock('react-native', () => ({ Platform: mockedPlatform }));
@@ -89,20 +87,6 @@ vi.mock('@/lib/trpc', () => ({
         queryOptions: () => ({ procedure: 'credits.getMobileStoreProducts' }),
       },
     },
-    kiloPass: {
-      completeAppStorePurchase: {
-        mutationOptions: () => ({ procedure: 'kiloPass.completeAppStorePurchase' }),
-      },
-      completePlayPurchase: {
-        mutationOptions: () => ({ procedure: 'kiloPass.completePlayPurchase' }),
-      },
-      getMobileStoreProducts: {
-        queryOptions: () => ({ procedure: 'kiloPass.getMobileStoreProducts' }),
-      },
-      getState: { pathFilter: () => ({ queryKey: ['kilo-pass-state'] }) },
-      getCreditHistory: { pathFilter: () => ({ queryKey: ['kilo-pass-history'] }) },
-      getPurchasePresentation: { pathFilter: () => ({ queryKey: ['kilo-pass-presentation'] }) },
-    },
     user: {
       getContextBalance: { pathFilter: () => ({ queryKey: ['balance'] }) },
       getCreditBlocks: { pathFilter: () => ({ queryKey: ['credits'] }) },
@@ -115,11 +99,6 @@ export const creditCatalog = {
   products: [{ appleProductId: CREDIT_PRODUCT_ID, googleProductId: 'credits_usd10' }],
 };
 
-export const kiloPassCatalog = {
-  appAccountToken: '550e8400-e29b-41d4-a716-446655440000',
-  products: [{ appleProductId: KILO_PASS_PRODUCT_ID, googleProductId: 'kilopass_pro_monthly' }],
-};
-
 export function createPurchase(overrides: Partial<Purchase> = {}): Purchase {
   return {
     id: 'purchase-1',
@@ -130,6 +109,7 @@ export function createPurchase(overrides: Partial<Purchase> = {}): Purchase {
     purchaseToken: 'signed-jws',
     quantity: 1,
     store: 'apple',
+    storeId: 'apple',
     transactionDate: Date.now(),
     transactionId: 'tx-1',
     ...overrides,

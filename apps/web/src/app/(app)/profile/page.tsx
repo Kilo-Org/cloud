@@ -19,7 +19,7 @@ import { AlertTriangle, Coins } from 'lucide-react';
 import { SurveyCredits } from '@/components/SurveyCredits';
 import { RedeemPromoCode } from '@/components/profile/RedeemPromoCode';
 import { AutoTopUpToggle } from '@/components/payment/AutoTopUpToggle';
-import { IntegrationsCard } from '@/components/profile/IntegrationsCard';
+import { SupportCard } from '@/components/support/SupportCard';
 import { getUserOrganizationsWithSeats } from '@kilocode/web-shared/lib/organizations/organizations';
 import { PageLayout } from '@/components/PageLayout';
 import { ProfileOrganizationsSection } from '@/components/profile/ProfileOrganizationsSection';
@@ -28,6 +28,7 @@ import { CreateKilocodeOrgButton } from '@/components/dev/CreateKilocodeOrgButto
 import { isFeatureFlagEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import { UserProfileCard } from '@/components/profile/UserProfileCard';
 import { getContributorChampionProfileBadgeForUser } from '@/lib/contributor-champions/service';
+import { CustomRoutersCard } from '@/components/auto-routing/CustomRoutersCard';
 import { AutoRoutingModeCard } from '@/components/auto-routing/AutoRoutingModeCard';
 import { smartAppBannerItunes } from '@/lib/smart-app-banner';
 import { DeleteAccountDialog } from '@/components/profile/DeleteAccountDialog';
@@ -114,13 +115,10 @@ export default async function ProfilePage({ searchParams }: AppPageProps) {
 
       <AutoRoutingModeCard />
 
+      <CustomRoutersCard />
+
       {params.source && (
-        <IntegrationsCard
-          kiloToken={kiloToken}
-          ideName={ideName}
-          logoSrc={logoSrc}
-          isProminent={true}
-        />
+        <SupportCard kiloToken={kiloToken} ideName={ideName} logoSrc={logoSrc} isProminent={true} />
       )}
 
       <SurveyCredits {...customerInfo} />
@@ -128,7 +126,7 @@ export default async function ProfilePage({ searchParams }: AppPageProps) {
       <RedeemPromoCode />
 
       {!params.source && (
-        <IntegrationsCard
+        <SupportCard
           kiloToken={kiloToken}
           ideName={ideName}
           logoSrc={logoSrc}

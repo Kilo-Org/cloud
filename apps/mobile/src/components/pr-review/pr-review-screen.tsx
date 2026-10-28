@@ -7,6 +7,7 @@ import { Share, View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 
 import { PrMergePartialSuccessBanner } from '@/components/pr-review/merge/pr-merge-partial-success-banner';
+import { OrganizationBoundary } from '@/components/organization/organization-boundary';
 import { PrReviewDiscussionTab } from '@/components/pr-review/pr-review-discussion-tab';
 import { PrReviewFilesTab } from '@/components/pr-review/pr-review-files-tab';
 import { PrReviewOverview } from '@/components/pr-review/pr-review-overview';
@@ -15,7 +16,6 @@ import {
   type PrReviewTabId,
   PrReviewTabSelector,
 } from '@/components/pr-review/pr-review-tab-selector';
-import { EmptyState } from '@/components/empty-state';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import {
@@ -24,8 +24,16 @@ import {
 } from '@/lib/pr-review/merge/merge-blocked-reasons';
 import { consumeMergePartialSuccess } from '@/lib/pr-review/merge/merge-result-banner-store';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
-import { providerPrTriple, providerPrWebUrl } from '@/lib/pr-review/provider-pr-ref';
+import {
+  usePrReviewInboxBack,
+  usePrReviewInboxHardwareBack,
+} from '@/lib/pr-review/pr-review-inbox-back';
+import { selectOverviewWebUrl, useProviderPrQueries } from '@/lib/pr-review/provider-pr-queries';
+import {
+  providerPrTriple,
+  providerPrWebUrl,
+  ProviderPrWebUrlProvider,
+} from '@/lib/pr-review/provider-pr-ref';
 import { markRecentPrFailed, upsertRecentPr } from '@/lib/pr-review/recent-prs';
 
 const REVIEW_SUBMIT_PATH = '/(app)/pr-review/[owner]/[repo]/[number]/review-submit' as const;
@@ -66,6 +74,10 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
   const { t } = useTranslation();
   const [tab, setTab] = useState<PrReviewTabId>('overview');
   const [refreshing, setRefreshing] = useState(false);
+  // Deep-linked PRs mount on top of the tab anchor, where a plain pop would
+  // leave PR review for Home; both Back affordances dismiss to the inbox.
+  const backToInbox = usePrReviewInboxBack();
+  usePrReviewInboxHardwareBack();
 
   // P1-F-46b: push the review-submit route with the same params the
   // Files-tab `PrDiffFloatingActions` uses, so a clean PR (no queued
@@ -174,9 +186,14 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
     void markRecentPrFailed(recentIdentity);
   }, [pr.isError, recentIdentity]);
 
-  // Share the provider's public URL via the native share sheet. Without an
-  // instance hint a GitLab ref has no public URL, so Share stays disabled.
-  const webUrl = providerPrWebUrl(queries.ref);
+  // Share the provider's public URL via the native share sheet. The URL is
+  // the provider's own: GitHub and Bitbucket name constant hosts, and a
+  // GitLab link names the instance the server resolved for the loaded PR/MR,
+  // so it is read off that answer. Share is disabled while there is no URL.
+  const webUrl = providerPrWebUrl({
+    ref: queries.ref,
+    serverWebUrl: selectOverviewWebUrl(pr.data),
+  });
   const sharePullRequest = useCallback(() => {
     if (!webUrl) {
       return;
@@ -238,15 +255,10 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
   let body: ReactNode = null;
   if (!queries.isReady) {
     // Non-retryable: Bitbucket Cloud review is organization-scoped and no
-    // organization is selected. Nothing on this screen can fix that, so the
-    // state names where the switch lives instead of offering a dead retry.
-    body = (
-      <EmptyState
-        icon={GitPullRequest}
-        title={t('organization.boundary.selectOrganization')}
-        description={t('organization.boundary.selectDescription')}
-      />
-    );
+    // organization is selected. The shared organization boundary owns the
+    // recovery states: it opens the context picker when memberships exist
+    // and sends accounts with no organization to the web organizations page.
+    body = <OrganizationBoundary icon={GitPullRequest} />;
   } else if (tab === 'overview') {
     body = (
       <>
@@ -297,6 +309,8 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
         eyebrow={`${owner}/${repo}`}
         eyebrowNumberOfLines={1}
         titleNumberOfLines={1}
+        showBackButton
+        onBack={backToInbox}
         allowHeaderRightStacking={false}
         headerRight={
           <View className="flex-row items-center gap-1">
@@ -344,7 +358,7 @@ export function PrReviewScreen({ owner, repo, number }: PrReviewScreenProps) {
           />
         </View>
       ) : null}
-      {body}
+      <ProviderPrWebUrlProvider value={webUrl}>{body}</ProviderPrWebUrlProvider>
     </View>
   );
 }

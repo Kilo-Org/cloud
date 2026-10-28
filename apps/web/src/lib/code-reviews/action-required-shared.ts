@@ -4,6 +4,7 @@ import {
   type CodeReviewActionRequiredReason,
   type CodeReviewActionRequiredState,
 } from '@kilocode/app-shared/code-reviews';
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 
 export {
   CODE_REVIEW_ACTION_REQUIRED_REASONS,
@@ -90,11 +91,11 @@ export function getCodeReviewActionRequiredRecoveryHref(
   }
 
   if (reason === 'github_ip_allow_list') {
-    return 'mailto:hi@kilocode.ai?subject=GitHub%20IP%20allow%20list%20for%20Code%20Reviewer';
+    return `mailto:${SUPPORT_EMAIL}?subject=GitHub%20IP%20allow%20list%20for%20Code%20Reviewer`;
   }
 
   if (reason === 'repeated_repository_clone_timeout') {
-    return 'mailto:hi@kilocode.ai?subject=Repository%20clone%20timeouts%20for%20Code%20Reviewer';
+    return `mailto:${SUPPORT_EMAIL}?subject=Repository%20clone%20timeouts%20for%20Code%20Reviewer`;
   }
 
   if (reason === 'gitlab_project_access_required') {

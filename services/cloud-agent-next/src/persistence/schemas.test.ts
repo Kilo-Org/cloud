@@ -1,14 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import {
   AttachmentsSchema,
-  ImagesSchema,
   MCPServerConfigSchema,
   MetadataSchema,
   modelIdSchema,
   RuntimeAgentSchema,
-  SessionProfileBundleSchema,
+  RuntimeInstructionSchema,
+  RuntimeInstructionsSchema,
   RuntimeSkillSchema,
   RuntimeSkillsSchema,
+  SessionProfileBundleSchema,
 } from './schemas.js';
 import type { MCPServerConfig } from './types.js';
 
@@ -101,70 +102,6 @@ describe('AttachmentsSchema', () => {
       AttachmentsSchema.safeParse({
         path: '123e4567-e89b-12d3-a456-426614174000',
         files: ['123e4567-e89b-12d3-a456-426614174001.TAR'],
-      }).success
-    ).toBe(false);
-  });
-});
-
-describe('ImagesSchema', () => {
-  it('retains legacy image descriptor acceptance without accepting document suffixes', () => {
-    const images = {
-      path: '123e4567-e89b-12d3-a456-426614174000',
-      files: [
-        '123e4567-e89b-12d3-a456-426614174001.png',
-        '123e4567-e89b-12d3-a456-426614174002.jpg',
-        '123e4567-e89b-12d3-a456-426614174003.webp',
-        '123e4567-e89b-12d3-a456-426614174004.gif',
-        '123e4567-e89b-12d3-a456-426614174005.jpeg',
-      ],
-    };
-
-    expect(ImagesSchema.parse(images)).toEqual(images);
-    expect(
-      ImagesSchema.safeParse({
-        path: images.path,
-        files: ['123e4567-e89b-12d3-a456-426614174006.pdf'],
-      }).success
-    ).toBe(false);
-  });
-
-  it('rejects client-provided R2 service prefixes', () => {
-    const result = ImagesSchema.safeParse({
-      path: 'app-builder/123e4567-e89b-12d3-a456-426614174000',
-      files: ['123e4567-e89b-12d3-a456-426614174001.png'],
-    });
-
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects hyphen-only image filenames without UUID segments', () => {
-    const result = ImagesSchema.safeParse({
-      path: '123e4567-e89b-12d3-a456-426614174000',
-      files: ['------------------------------------.png'],
-    });
-
-    expect(result.success).toBe(false);
-  });
-
-  it('rejects more than five files and unsafe filenames', () => {
-    expect(
-      ImagesSchema.safeParse({
-        path: '123e4567-e89b-12d3-a456-426614174000',
-        files: [
-          '123e4567-e89b-12d3-a456-426614174001.png',
-          '123e4567-e89b-12d3-a456-426614174002.png',
-          '123e4567-e89b-12d3-a456-426614174003.png',
-          '123e4567-e89b-12d3-a456-426614174004.png',
-          '123e4567-e89b-12d3-a456-426614174005.png',
-          '123e4567-e89b-12d3-a456-426614174006.png',
-        ],
-      }).success
-    ).toBe(false);
-
-    expect(
-      ImagesSchema.safeParse({
-        path: '123e4567-e89b-12d3-a456-426614174000',
-        files: ['../123e4567-e89b-12d3-a456-426614174001.svg'],
       }).success
     ).toBe(false);
   });
@@ -447,7 +384,7 @@ describe('MetadataSchema', () => {
         },
       },
     ],
-    ['setupCommands', ['pnpm install'], ['x'.repeat(501)]],
+    ['setupCommands', ['pnpm install'], ['x'.repeat(16_001)]],
     [
       'mcpServers',
       { docs: { type: 'remote', url: 'https://example.com/mcp' } },
@@ -651,7 +588,7 @@ describe('MetadataSchema', () => {
     });
 
     it('should accept commands at maximum length', () => {
-      const longCommand = 'A'.repeat(500);
+      const longCommand = 'A'.repeat(16_000);
 
       const metadata = {
         version: 1,
@@ -689,8 +626,8 @@ describe('MetadataSchema', () => {
   });
 
   describe('command too long', () => {
-    it('should reject commands exceeding 500 characters', () => {
-      const longCommand = 'A'.repeat(501);
+    it('should reject commands exceeding 16,000 characters', () => {
+      const longCommand = 'A'.repeat(16_001);
 
       const metadata = {
         version: 1,
@@ -1053,6 +990,51 @@ describe('RuntimeSkillSchema', () => {
       rawMarkdown: 'body',
     }));
     expect(RuntimeSkillsSchema.safeParse(many).success).toBe(false);
+  });
+});
+
+describe('RuntimeInstructionSchema', () => {
+  it('accepts a well-formed instruction', () => {
+    const instruction = { name: 'repo-rules', content: '# Rules\nFollow the repo policy.' };
+    expect(RuntimeInstructionSchema.parse(instruction)).toEqual(instruction);
+  });
+
+  it('rejects the reserved cloud-agent rules filename', () => {
+    const result = RuntimeInstructionSchema.safeParse({
+      name: 'cloud-agent',
+      content: 'overwrite the reserved rules file',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects unsafe or uppercase instruction names', () => {
+    for (const name of ['Repo-Rules', 'repo rules', '../escape', 'repo.rules', '-leading']) {
+      expect(RuntimeInstructionSchema.safeParse({ name, content: 'body' }).success).toBe(false);
+    }
+  });
+
+  it('rejects empty content and content over the size limit', () => {
+    expect(RuntimeInstructionSchema.safeParse({ name: 'rules', content: '' }).success).toBe(false);
+    expect(
+      RuntimeInstructionSchema.safeParse({ name: 'rules', content: 'x'.repeat(100_001) }).success
+    ).toBe(false);
+  });
+
+  it('caps the runtime instructions array at 50 entries', () => {
+    const many = Array.from({ length: 51 }, (_, i) => ({
+      name: `rules-${i}`,
+      content: 'body',
+    }));
+    expect(RuntimeInstructionsSchema.safeParse(many).success).toBe(false);
+  });
+
+  it('carries instructions on a session profile bundle', () => {
+    const bundle = {
+      runtimeInstructions: [{ name: 'repo-rules', content: 'body' }],
+    };
+    expect(SessionProfileBundleSchema.parse(bundle).runtimeInstructions).toEqual(
+      bundle.runtimeInstructions
+    );
   });
 });
 

@@ -1,0 +1,284 @@
+import {
+  type GgufDownload,
+  type GgufDownloadSource,
+  type GgufDownloadTask,
+  type GgufInspect,
+  type GgufInspection,
+  ggufModelName,
+  ggufPartialName,
+  ggufProjectorName,
+  ggufProjectorPartialName,
+  type GgufStorage,
+  removeQuietly,
+  type Settled,
+  settled,
+} from './gguf-records';
+
+/** One file of a model: the model itself, then its projector when it has one. */
+export type GgufTransfer = {
+  readonly url: string;
+  /** Where the finished file goes once the whole model is verified. */
+  readonly name: string;
+  readonly part: string;
+  readonly expected: number | undefined;
+  /** The published SHA-256; a direct link has none. */
+  readonly sha256: string | undefined;
+};
+
+/** The download in progress, as the store drives it. */
+export type GgufActiveDownload = {
+  readonly fileId: string;
+  readonly name: string;
+  readonly transfers: readonly GgufTransfer[];
+  /** The transfer in progress. */
+  step: number;
+  /** Bytes of the transfers already finished. */
+  done: number;
+  task: GgufDownloadTask;
+  phase: GgufDownload['phase'];
+  /** Progress of the transfer in progress. */
+  written: number;
+  total: number;
+  /** Why the store itself ended the task, as opposed to a network failure. */
+  stop: 'cancel' | 'space' | undefined;
+  /** Set while a paused download resumes; a refused resume starts once more from zero. */
+  resuming: boolean;
+  /** Set between a pause request and the task reporting itself paused. */
+  pausing: boolean;
+  restarted: boolean;
+  /** How many times the transfer in progress has been started from zero. */
+  attempts: number;
+};
+
+/** A download about to run its first transfer. */
+export function activeDownload(input: {
+  readonly fileId: string;
+  readonly name: string;
+  readonly transfers: readonly GgufTransfer[];
+  readonly task: GgufDownloadTask;
+}): GgufActiveDownload {
+  return {
+    ...input,
+    step: 0,
+    done: 0,
+    phase: 'downloading',
+    written: 0,
+    total: input.transfers[0]?.expected ?? 0,
+    stop: undefined,
+    resuming: false,
+    pausing: false,
+    restarted: false,
+    attempts: 1,
+  };
+}
+
+/**
+ * Moves every finished transfer that is still a partial file to its model name.
+ * A move that failed is no verdict on the bytes, so a file an earlier attempt
+ * left at a model name is cleared and the remaining moves run once more. False
+ * when a file is neither a partial nor in place afterwards.
+ */
+export function moveIntoPlace(storage: GgufStorage, transfers: readonly GgufTransfer[]): boolean {
+  if (moveAll(storage, transfers)) {
+    return true;
+  }
+  const names = new Set(storage.list());
+  for (const transfer of transfers) {
+    // A destination is only in the way while its own partial file is still waiting.
+    if (names.has(transfer.part)) {
+      removeQuietly(storage, transfer.name);
+    }
+  }
+  return moveAll(storage, transfers);
+}
+
+function moveAll(storage: GgufStorage, transfers: readonly GgufTransfer[]): boolean {
+  const names = new Set(storage.list());
+  try {
+    for (const transfer of transfers) {
+      // A move that already happened is never repeated or undone: its partial is gone.
+      if (!names.has(transfer.part) && !names.has(transfer.name)) {
+        return false;
+      }
+      if (names.has(transfer.part)) {
+        storage.move(transfer.part, transfer.name);
+      }
+    }
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * What a finished transfer delivered, measured against the size it promised.
+ * Undefined means the server never stated a length, so only an empty file is short.
+ */
+export function transferResult(
+  size: number,
+  expected: number | undefined
+): 'whole' | 'short' | 'long' {
+  if (expected === undefined) {
+    return size === 0 ? 'short' : 'whole';
+  }
+  if (size === expected) {
+    return 'whole';
+  }
+  return size < expected ? 'short' : 'long';
+}
+
+/** Whether a finished transfer may run once more before the download is called failed. */
+export function mayRetryTransfer(download: GgufActiveDownload): boolean {
+  return download.attempts < ATTEMPTS;
+}
+
+/** A transfer that stopped short is started from zero once more, and a file that was refused is read once more. */
+const ATTEMPTS = 2;
+export const PASSES = 2;
+
+export function currentTransfer(download: GgufActiveDownload): GgufTransfer {
+  const transfer = download.transfers[download.step];
+  if (transfer === undefined) {
+    throw new Error('download step out of range');
+  }
+  return transfer;
+}
+
+/** The files a source downloads, in order. Only a catalog model names a projector. */
+export function transfersOf(source: GgufDownloadSource, fileId: string): readonly GgufTransfer[] {
+  const model = (
+    url: string,
+    expected: number | undefined,
+    sha256: string | undefined
+  ): GgufTransfer => ({
+    url,
+    name: ggufModelName(fileId),
+    part: ggufPartialName(fileId),
+    expected,
+    sha256,
+  });
+  if (source.kind === 'url') {
+    return [model(source.url, undefined, undefined)];
+  }
+  const { projector } = source.model;
+  return [
+    model(source.model.url, source.model.sizeBytes, source.model.sha256),
+    ...(projector === undefined
+      ? []
+      : [
+          {
+            url: projector.url,
+            name: ggufProjectorName(fileId),
+            part: ggufProjectorPartialName(fileId),
+            expected: projector.sizeBytes,
+            sha256: projector.sha256,
+          },
+        ]),
+  ];
+}
+
+/**
+ * Every file with a published hash must hash to it before llama.cpp reads the
+ * model, so a wrong file is never loaded. One file at a time bounds memory and CPU.
+ */
+export async function readVerified(
+  storage: GgufStorage,
+  inspect: GgufInspect,
+  transfers: readonly GgufTransfer[]
+): Promise<Settled<GgufInspection> | 'checksum'> {
+  const [model, projector] = transfers;
+  if (model === undefined) {
+    return { ok: false };
+  }
+  for (const transfer of transfers) {
+    if (transfer.sha256 !== undefined) {
+      // eslint-disable-next-line no-await-in-loop -- files hash one after another on purpose
+      const hash = await settled(storage.sha256(transfer.part));
+      if (!hash.ok || hash.value !== transfer.sha256) {
+        return 'checksum';
+      }
+    }
+  }
+  const projectorPath = projector === undefined ? undefined : storage.path(projector.part);
+  const read = await settled(inspect(storage.path(model.part), projectorPath));
+  return read;
+}
+
+/** The bytes every transfer will write, or undefined while one has no stated size. */
+export function expectedBytes(transfers: readonly GgufTransfer[]): number | undefined {
+  let sum = 0;
+  for (const transfer of transfers) {
+    if (transfer.expected === undefined) {
+      return undefined;
+    }
+    sum += transfer.expected;
+  }
+  return sum;
+}
+
+/** A transfer a pause can still act on: running, and not already stopping. */
+function pausable(download: GgufActiveDownload): boolean {
+  return download.phase === 'downloading' && download.stop === undefined && !download.pausing;
+}
+
+/** A transfer a resume can act on: paused, and not stopping. */
+function resumable(download: GgufActiveDownload): boolean {
+  return download.phase === 'paused' && download.stop === undefined;
+}
+
+/**
+ * Asks the task to pause once. A task that refuses the call — it is already
+ * stopping — leaves the request cleared, so the next press tries again instead
+ * of the controls staying dead. True when the download's state changed.
+ */
+export function requestPause(download: GgufActiveDownload): boolean {
+  if (!pausable(download)) {
+    return false;
+  }
+  download.pausing = true;
+  try {
+    download.task.pause();
+  } catch {
+    download.pausing = false;
+  }
+  return true;
+}
+
+/**
+ * Puts the current transfer back at its first byte, with no pause or resume in
+ * flight on it, and answers where it writes and what it expects to read.
+ */
+export function transferStart(download: GgufActiveDownload): GgufTransfer {
+  const transfer = currentTransfer(download);
+  download.written = 0;
+  download.total = transfer.expected ?? 0;
+  download.resuming = false;
+  download.pausing = false;
+  return transfer;
+}
+
+/** Moves a paused download back to downloading. False when it cannot resume. */
+export function requestResume(download: GgufActiveDownload): boolean {
+  if (!resumable(download)) {
+    return false;
+  }
+  download.phase = 'downloading';
+  download.resuming = true;
+  return true;
+}
+
+/** One bar for the whole model: the finished transfers, the current one, and those to come. */
+export function downloadProgress(download: GgufActiveDownload): GgufDownload {
+  const later = download.transfers
+    .slice(download.step + 1)
+    .reduce((sum, transfer) => sum + (transfer.expected ?? 0), 0);
+  return {
+    fileId: download.fileId,
+    name: download.name,
+    phase: download.phase,
+    // A pause or a cancel the task has not answered yet: the buttons that ask for it are spent.
+    pending: download.pausing || download.stop !== undefined,
+    written: download.done + download.written,
+    total: download.total > 0 ? download.done + download.total + later : 0,
+  };
+}

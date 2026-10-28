@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { MessageCircle } from '@/components/ui/icons';
+import { isTerminalTrpcCode } from '@/lib/trpc-error';
 
 import { MessageBubble } from './message-bubble';
 import { SessionMessageList } from './session-message-list';
@@ -65,6 +66,11 @@ export function SessionPreviewTranscript({
         />
       );
     }
+    // A terminal read failure — an oversized or invalid page — cannot succeed
+    // on retry, so it renders without the retry action.
+    if (isTerminalTrpcCode(errorCode)) {
+      return <QueryError variant="server" placement="static" className="w-full" />;
+    }
     return <QueryError variant="server" placement="static" className="w-full" onRetry={onRetry} />;
   }
   if (empty) {
@@ -72,7 +78,6 @@ export function SessionPreviewTranscript({
       <EmptyState
         icon={MessageCircle}
         title={t('agentChat.session.emptyTitle')}
-        description={t('agentChat.session.emptyTranscriptDescription')}
         placement="static"
         className="w-full"
       />

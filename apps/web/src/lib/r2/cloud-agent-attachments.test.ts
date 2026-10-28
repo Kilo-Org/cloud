@@ -2,7 +2,6 @@ import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals
 import type {
   generateCloudAgentAttachmentDownloadUrl as GenerateCloudAgentAttachmentDownloadUrl,
   generateCloudAgentAttachmentUploadUrl as GenerateCloudAgentAttachmentUploadUrl,
-  generateImageUploadUrl as GenerateImageUploadUrl,
 } from './cloud-agent-attachments';
 
 jest.mock('@kilocode/web-shared/lib/r2/client', () => ({
@@ -31,7 +30,6 @@ let mockGetSignedUrl: jest.Mock<
 >;
 let generateCloudAgentAttachmentDownloadUrl: typeof GenerateCloudAgentAttachmentDownloadUrl;
 let generateCloudAgentAttachmentUploadUrl: typeof GenerateCloudAgentAttachmentUploadUrl;
-let generateImageUploadUrl: typeof GenerateImageUploadUrl;
 
 describe('cloud-agent attachment upload URL signing', () => {
   beforeAll(async () => {
@@ -42,7 +40,6 @@ describe('cloud-agent attachment upload URL signing', () => {
     >;
     generateCloudAgentAttachmentDownloadUrl = attachments.generateCloudAgentAttachmentDownloadUrl;
     generateCloudAgentAttachmentUploadUrl = attachments.generateCloudAgentAttachmentUploadUrl;
-    generateImageUploadUrl = attachments.generateImageUploadUrl;
   });
 
   beforeEach(() => {
@@ -118,25 +115,11 @@ describe('cloud-agent attachment upload URL signing', () => {
         contentLength: 42,
         extension: 'exe',
       })
-    ).rejects.toThrow('exe');
+    ).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'Attachment extension "exe" is not allowed',
+    });
     expect(mockGetSignedUrl).not.toHaveBeenCalled();
-  });
-
-  it('preserves image-only App Builder key generation and metadata', async () => {
-    await generateImageUploadUrl({
-      service: 'app-builder',
-      userId: 'user-1',
-      messageUuid: MESSAGE_UUID,
-      imageId: ATTACHMENT_ID,
-      contentType: 'image/png',
-      contentLength: 42,
-    });
-
-    const command = mockGetSignedUrl.mock.calls[0]?.[1] as { input: Record<string, unknown> };
-    expect(command.input).toMatchObject({
-      Key: `user-1/app-builder/${MESSAGE_UUID}/${ATTACHMENT_ID}.png`,
-      Metadata: { imageId: ATTACHMENT_ID },
-    });
   });
 });
 

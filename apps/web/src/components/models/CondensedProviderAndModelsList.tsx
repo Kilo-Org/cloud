@@ -71,7 +71,7 @@ export function CondensedProviderAndModelsList({
         ) : (
           <div
             onClick={onDefaultModelClick}
-            className="bg-muted/25 hover:bg-muted/30 mb-6 flex cursor-pointer items-center justify-between rounded-md border px-3 py-2 transition-all hover:border-yellow-300"
+            className="bg-muted/25 hover:bg-muted/30 mb-6 flex cursor-pointer items-center justify-between rounded-md border px-3 py-2 transition-all hover:border-primary"
           >
             <span className="mr-3 flex-1 truncate text-sm font-bold">{defaultModel}</span>
             <Badge variant="secondary" className="flex-shrink-0 text-xs">

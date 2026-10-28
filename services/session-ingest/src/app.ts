@@ -71,7 +71,7 @@ app.use('/internal/cloud-agent/v1/*', requireValidInternalSecret);
 app.route('/internal/cloud-agent/v1', cloudAgentSessionScopeApi);
 
 // Public session endpoint: resolve the purpose-bound share token, then return
-// all ingested DO events for the current session generation.
+// the public transcript for the current session generation.
 app.get('/session/:shareToken', async c => {
   const sharedSession = await resolveSessionShareToken(c.env, c.req.param('shareToken'));
   if (!sharedSession) {
@@ -86,8 +86,14 @@ app.get('/session/:shareToken', async c => {
         kiloUserId: sharedSession.kiloUserId,
         sessionId: sharedSession.sessionId,
       }),
-    s => s.getAllStream(),
-    'SessionIngestDO.getAllStream'
+    s =>
+      sharedSession.contentCutoffMs === null
+        ? s.getLiveSharedSessionStream()
+        : s.getSharedSessionStream({
+            publicId: sharedSession.publicId,
+            ingestedBeforeMs: sharedSession.contentCutoffMs,
+          }),
+    'SessionIngestDO.getSharedSessionStream'
   );
 
   return c.body(stream, 200, {
@@ -143,8 +149,8 @@ app.get('/internal/session/:sessionId/export', requireValidInternalSecret, async
   const parsed = sessionIdSchema.safeParse(c.req.param('sessionId'));
   if (!parsed.success) return c.json({ success: false, error: 'Invalid sessionId' }, 400);
 
-  const stream = await getSessionExport(c.env, parsed.data, kiloUserId);
-  if (stream === null) return c.json({ success: false, error: 'Session not found' }, 404);
+  const result = await getSessionExport(c.env, parsed.data, kiloUserId);
+  if (result.status !== 'ok') return c.json({ success: false, error: 'Session not found' }, 404);
 
-  return c.body(stream, 200, { 'content-type': 'application/json; charset=utf-8' });
+  return c.body(result.stream, 200, { 'content-type': 'application/json; charset=utf-8' });
 });

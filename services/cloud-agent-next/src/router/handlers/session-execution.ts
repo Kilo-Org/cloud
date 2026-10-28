@@ -26,9 +26,9 @@ import {
   queueMessage,
 } from '../../session/queue-message.js';
 import {
-  admitLegacyPreparedInitialMessage,
-  replayLegacyPreparedInitialMessageIfAlreadyAdmitted,
-} from '../../session/legacy-prepared-admission.js';
+  admitPreparedInitialMessage,
+  replayPreparedInitialMessageIfAlreadyAdmitted,
+} from '../../session/prepared-session-admission.js';
 import type {
   AgentSelectionOverride,
   ExecutionTurnSubmission,
@@ -68,7 +68,7 @@ export function createSessionExecutionV2Handlers() {
             botId: ctx.botId,
             authToken: ctx.authToken,
           };
-          const replay = await replayLegacyPreparedInitialMessageIfAlreadyAdmitted(
+          const replay = await replayPreparedInitialMessageIfAlreadyAdmitted(
             admissionInput,
             admissionContext
           );
@@ -83,7 +83,7 @@ export function createSessionExecutionV2Handlers() {
             procedure: 'initiateFromKilocodeSessionV2',
           });
 
-          const ack = await admitLegacyPreparedInitialMessage(admissionInput, admissionContext);
+          const ack = await admitPreparedInitialMessage(admissionInput, admissionContext);
           return withLegacyExecutionId(ack);
         });
       }),
@@ -124,14 +124,14 @@ export function createSessionExecutionV2Handlers() {
               id: input.messageId ?? undefined,
               command: commandPayload.command,
               arguments: commandPayload.arguments,
-              attachments: input.attachments ?? input.images,
+              attachments: input.attachments,
             };
           } else if (promptPayload) {
             turn = {
               type: 'prompt',
               id: input.messageId ?? undefined,
               prompt: promptPayload.prompt,
-              attachments: input.attachments ?? input.images,
+              attachments: input.attachments,
             };
             agent = {
               mode: promptPayload.mode,

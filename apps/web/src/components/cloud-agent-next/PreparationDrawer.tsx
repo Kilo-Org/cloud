@@ -18,13 +18,14 @@ import type {
 import { StatusSpinner } from '@/components/shared/StatusSpinner';
 import { cn } from '@/lib/utils';
 import { useManager } from './CloudAgentProvider';
-import { formatAttemptDuration, phaseStatus, phaseStatusLabel } from './preparation-phases';
+import { commandsForPhase, phaseStatus, phaseStatusLabel } from './preparation-phases';
 import {
   phaseDisplayText,
   preparationSummaryLine,
   summarizePreparationAttempt,
 } from './preparation-summary';
 import { useStickToBottom } from './hooks/useStickToBottom';
+import { PreparationDuration } from './PreparationDuration';
 
 type PreparationDrawerProps = {
   attemptId: string | null;
@@ -81,7 +82,14 @@ export function PreparationDrawer({
 function PreparationTimeline({ attempt }: { attempt: PreparationAttempt }) {
   const phaseSteps = attempt.steps.filter(step => step.kind === 'phase');
   const commands = attempt.steps.filter(step => step.kind === 'setup_command');
-  const commandsUnderPhase = phaseSteps.some(step => step.key === 'setup_commands');
+  const setupPhaseIds = new Set(
+    phaseSteps.filter(step => step.key === 'setup_commands').map(step => step.id)
+  );
+  const standaloneCommands = commands.filter(command =>
+    command.parentStepId === undefined
+      ? setupPhaseIds.size === 0
+      : !setupPhaseIds.has(command.parentStepId)
+  );
   // A failed command card displays attempt.safeError as its fallback, and a
   // failed phase row displays its own safeError inline — only surface the
   // attempt error separately when no step already carries an error.
@@ -93,19 +101,22 @@ function PreparationTimeline({ attempt }: { attempt: PreparationAttempt }) {
   return (
     <>
       <ol className="flex flex-col">
-        {phaseSteps.map(step => (
-          <PhaseRow key={step.id} step={step} status={phaseStatus(step, commands)}>
-            {step.key === 'setup_commands' && commands.length > 0 && (
-              <CommandList commands={commands} attemptError={attempt.safeError} />
-            )}
-          </PhaseRow>
-        ))}
+        {phaseSteps.map(step => {
+          const phaseCommands = commandsForPhase(step, attempt.steps);
+          return (
+            <PhaseRow key={step.id} step={step} status={phaseStatus(step, phaseCommands)}>
+              {phaseCommands.length > 0 && (
+                <CommandList commands={phaseCommands} attemptError={attempt.safeError} />
+              )}
+            </PhaseRow>
+          );
+        })}
       </ol>
 
-      {!commandsUnderPhase && commands.length > 0 && (
+      {standaloneCommands.length > 0 && (
         <div className="mt-4">
           <p className="type-label mb-2 text-muted-foreground">Setup commands</p>
-          <CommandList commands={commands} attemptError={attempt.safeError} />
+          <CommandList commands={standaloneCommands} attemptError={attempt.safeError} />
         </div>
       )}
 
@@ -125,8 +136,6 @@ function PhaseRow({
   status: PreparationStepStatus;
   children?: React.ReactNode;
 }) {
-  const duration = formatAttemptDuration(step);
-
   return (
     <li className="border-b border-border py-2 last:border-b-0">
       <div className="flex min-h-6 items-center gap-2">
@@ -150,9 +159,10 @@ function PhaseRow({
           {phaseDisplayText(step)}
         </span>
         <span className="sr-only">{phaseStatusLabel(status)}</span>
-        {duration && (
-          <span className="ml-auto shrink-0 text-foreground-subtle tabular-nums">{duration}</span>
-        )}
+        <PreparationDuration
+          step={step}
+          className="ml-auto shrink-0 text-foreground-subtle tabular-nums"
+        />
       </div>
       {step.safeError && <p className="ml-7 mt-0.5 text-status-destructive">{step.safeError}</p>}
       {children && <div className="ml-7 mt-2">{children}</div>}
@@ -217,11 +227,12 @@ function CommandCard({
         </code>
         <span
           className={cn(
-            'ml-auto shrink-0 text-muted-foreground tabular-nums',
+            'ml-auto flex shrink-0 items-center gap-2 text-muted-foreground tabular-nums',
             step.status === 'failed' && 'text-status-destructive'
           )}
         >
-          {commandStatus(step)}
+          <span>{commandStatus(step)}</span>
+          <PreparationDuration step={step} />
         </span>
       </div>
       {error && (

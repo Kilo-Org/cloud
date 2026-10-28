@@ -8,6 +8,7 @@ import { Pressable, View } from 'react-native';
 import { fileStatusIcon, fileStatusLabel } from '@/components/pr-review/diff/pr-diff-file-status';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Text } from '@/components/ui/text';
+import { selectableRowA11y } from '@/lib/a11y/selectable-row';
 import { openExternalUrl } from '@/lib/external-link';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type PrReviewFile } from '@/lib/pr-review/diff/pr-review-file-types';
@@ -45,8 +46,7 @@ export function MarkViewedToggle({
         onToggle();
       }}
       hitSlop={MARK_VIEWED_HIT_SLOP}
-      accessibilityRole="checkbox"
-      accessibilityState={{ checked: viewed }}
+      {...selectableRowA11y({ multi: true, selected: viewed })}
       accessibilityLabel={
         viewed
           ? t('prReview.fileRows.unmarkViewed', { path })
@@ -71,20 +71,21 @@ export function TruncationBannerRow({ text }: { text: string }) {
   );
 }
 
+/** A file's mark-viewed state and its toggle; `null` renders no toggle. */
+export type FileViewedToggle = { viewed: boolean; handleToggle: () => void } | null;
+
 export function FileHeaderRow({
   file,
   expanded,
   hasDiff,
-  viewed,
+  viewedToggle,
   onToggleExpand,
-  onToggleViewed,
 }: {
   file: PrReviewFile;
   expanded: boolean;
   hasDiff: boolean;
-  viewed: boolean;
+  viewedToggle: FileViewedToggle;
   onToggleExpand: () => void;
-  onToggleViewed: () => void;
 }) {
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -126,22 +127,31 @@ export function FileHeaderRow({
             </View>
           </View>
         </Pressable>
-        <MarkViewedToggle path={file.path} viewed={viewed} onToggle={onToggleViewed} />
+        {viewedToggle ? (
+          <MarkViewedToggle
+            path={file.path}
+            viewed={viewedToggle.viewed}
+            onToggle={viewedToggle.handleToggle}
+          />
+        ) : null}
       </View>
     </View>
   );
 }
 
+/**
+ * A file whose patch is absent. With a `githubUrl` (a PR) the patch was too
+ * large and the row links to GitHub; without one (a session diff, where an
+ * empty patch means a binary file) the row only says there is no preview.
+ */
 export function PatchMissingRow({
   file,
-  viewed,
+  viewedToggle,
   githubUrl,
-  onToggleViewed,
 }: {
   file: PrReviewFile;
-  viewed: boolean;
-  githubUrl: string;
-  onToggleViewed: () => void;
+  viewedToggle: FileViewedToggle;
+  githubUrl: string | null;
 }) {
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -150,29 +160,37 @@ export function PatchMissingRow({
       <View className="flex-row items-center gap-2">
         <File size={14} color={colors.mutedForeground} />
         <View className="flex-1">
-          <Text className="text-sm text-foreground">{t('prReview.fileRows.diffTooLarge')}</Text>
+          <Text className="text-sm text-foreground">
+            {githubUrl ? t('prReview.fileRows.diffTooLarge') : t('prReview.fileRows.noPreview')}
+          </Text>
           <Text variant="muted" className="text-xs">
             {file.path}
           </Text>
         </View>
-        <MarkViewedToggle path={file.path} viewed={viewed} onToggle={onToggleViewed} />
+        {viewedToggle ? (
+          <MarkViewedToggle
+            path={file.path}
+            viewed={viewedToggle.viewed}
+            onToggle={viewedToggle.handleToggle}
+          />
+        ) : null}
       </View>
-      <Pressable
-        onPress={() => {
-          if (githubUrl) {
+      {githubUrl ? (
+        <Pressable
+          onPress={() => {
             void openExternalUrl(githubUrl, { label: t('prReview.fileRows.githubDiff') });
-          }
-        }}
-        accessibilityRole="link"
-        accessibilityLabel={t('prReview.fileRows.openDiffOnGitHub')}
-        className="mt-2 flex-row items-center gap-1.5 self-start"
-      >
-        <Link2 size={14} color={colors.info} />
-        {/* eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic theme info color */}
-        <Text className="text-sm" style={{ color: colors.info }}>
-          {t('prReview.fileRows.openOnGitHub')}
-        </Text>
-      </Pressable>
+          }}
+          accessibilityRole="link"
+          accessibilityLabel={t('prReview.fileRows.openDiffOnGitHub')}
+          className="mt-2 flex-row items-center gap-1.5 self-start"
+        >
+          <Link2 size={14} color={colors.info} />
+          {/* eslint-disable-next-line react-native/no-inline-styles, react-native/no-color-literals -- dynamic theme info color */}
+          <Text className="text-sm" style={{ color: colors.info }}>
+            {t('prReview.fileRows.openOnGitHub')}
+          </Text>
+        </Pressable>
+      ) : null}
     </View>
   );
 }

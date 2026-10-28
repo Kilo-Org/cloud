@@ -1,9 +1,17 @@
 /* eslint-disable max-lines -- The selector and picker row share model disclosure behavior. */
 import * as Haptics from 'expo-haptics';
 import { type Href, type ImperativeRouter, useRouter } from 'expo-router';
-import { BookOpenCheck, Brain, Check, ChevronDown, Star } from '@/components/ui/icons';
+import {
+  BookOpenCheck,
+  Brain,
+  Check,
+  ChevronDown,
+  ImageIcon,
+  Star,
+  Wrench,
+} from '@/components/ui/icons';
 import { createContext, type ReactNode, useContext, useMemo } from 'react';
-import { Keyboard, Pressable, ScrollView, View } from 'react-native';
+import { Keyboard, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { i18n } from '@/i18n';
@@ -257,7 +265,7 @@ export function ModelPickerOptionRow({
 }>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const { free, byok, collectsData } = modelSelectorBadges(option);
+  const { free, byok, collectsData, tools, images } = modelSelectorBadges(option);
   const costLabel = modelPickerCostLabel(option);
   const name = autoModelLabel(option.displayId, option.name);
   // The name may already state the fact ("… (free)", "Auto Free" in every
@@ -273,6 +281,8 @@ export function ModelPickerOptionRow({
       byok ? BYOK_MODEL_LABEL : undefined,
       showFreeBadge ? freeModelFreeLabel() : undefined,
       collectsData ? freeModelDataLabel() : undefined,
+      tools ? t('modelChat.backends.modelTools') : undefined,
+      images ? t('modelChat.backends.modelImages') : undefined,
       costLabel ?? undefined,
       option.unavailable ? t('agentChat.modelSelector.unavailableState') : undefined,
       selected ? t('agentChat.modelSelector.selectedState') : undefined,
@@ -322,7 +332,7 @@ export function ModelPickerOptionRow({
                 {t('agentChat.modelSelector.unavailable')}
               </Text>
             ) : null}
-            {showFreeBadge || byok || collectsData ? (
+            {showFreeBadge || byok || collectsData || tools || images ? (
               <View className="mt-1 flex-row items-center gap-1 self-start">
                 {showFreeBadge ? (
                   <View className="rounded-full bg-good px-2 py-0.5">
@@ -345,6 +355,8 @@ export function ModelPickerOptionRow({
                     color={colors.warn}
                   />
                 ) : null}
+                {tools ? <Wrench size={13} color={colors.mutedForeground} /> : null}
+                {images ? <ImageIcon size={13} color={colors.mutedForeground} /> : null}
               </View>
             ) : null}
           </View>
@@ -379,25 +391,21 @@ export function ModelPickerOptionRow({
           <Text className="mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
             {t('agentChat.modelSelector.thinkingEffort')}
           </Text>
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            contentContainerClassName="gap-2"
-            keyboardShouldPersistTaps="handled"
-          >
+          <View className="flex-row flex-wrap gap-2">
             {option.variants.map(thinkingVariant => {
               const active = thinkingVariant === selectedVariant;
               return (
                 <Pressable
                   key={thinkingVariant}
                   className={cn(
-                    'rounded-full px-3 py-1.5 active:opacity-70',
+                    'min-h-[44px] items-center justify-center rounded-full px-4 active:opacity-70',
                     active ? 'bg-foreground' : 'bg-secondary'
                   )}
                   onPress={() => {
                     onSelectVariant(thinkingVariant);
                   }}
-                  accessibilityRole="button"
+                  accessibilityRole="radio"
+                  accessibilityState={{ checked: active }}
                   accessibilityLabel={
                     active
                       ? t('agentChat.modelSelector.thinkingEffortSelected', {
@@ -419,7 +427,7 @@ export function ModelPickerOptionRow({
                 </Pressable>
               );
             })}
-          </ScrollView>
+          </View>
         </View>
       ) : null}
     </View>

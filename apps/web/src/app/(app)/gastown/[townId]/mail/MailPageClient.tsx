@@ -21,7 +21,7 @@ export function MailPageClient({ townId }: { townId: string }) {
       <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.06] bg-[oklch(0.1_0_0)] px-6 py-3">
         <div className="flex items-center gap-2">
           <SidebarTrigger className="-ml-3" />
-          <Mail className="size-4 text-[color:oklch(95%_0.15_108_/_0.6)]" />
+          <Mail className="size-4 text-primary/60" />
           <h1 className="text-lg font-semibold tracking-tight text-white/90">Mail</h1>
           <span className="ml-1 font-mono text-xs text-white/30">{mailEvents.length}</span>
         </div>

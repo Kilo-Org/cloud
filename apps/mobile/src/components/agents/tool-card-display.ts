@@ -3,6 +3,7 @@ import { buildToolDetailSummary } from '@kilocode/app-shared/tool-detail';
 import { z } from 'zod';
 
 import { i18n } from '@/i18n';
+import { cloudAgentFileLabel } from '@kilocode/app-shared/cloud-agent';
 import { formatList, formatNumber } from '@/lib/format';
 import { getToolFileAttachments, getToolImageAttachments } from './tool-card-attachments';
 import { getDirectoryName, getFilename, truncateText } from './tool-card-utils';
@@ -17,7 +18,7 @@ export type ToolDisplay = {
   /**
    * Whether the shown label (`subtitle ?? title`) carries tool content worth
    * translating. The fallback labels are either already-localized UI copy
-   * (`read`, `Read todos`) or raw tool ids (`websearch`); sending those to the
+   * (`read`, `Read plan`) or raw tool ids (`websearch`); sending those to the
    * gateway would translate text that is already in the app language, so the
    * transcript row skips them.
    */
@@ -91,7 +92,9 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
 
       return {
         title: i18n.t('agentChat.toolCard.toolRead'),
-        subtitle: filePath ? getFilename(filePath) : i18n.t('agentChat.toolCard.toolRead'),
+        subtitle: filePath
+          ? getFilename(cloudAgentFileLabel(filePath))
+          : i18n.t('agentChat.toolCard.toolRead'),
         badge,
         translatable: filePath !== '',
       };
@@ -100,7 +103,9 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
       const filePath = fields.filePath ?? '';
       return {
         title: i18n.t('agentChat.toolCard.toolEdit'),
-        subtitle: filePath ? getFilename(filePath) : i18n.t('agentChat.toolCard.toolEdit'),
+        subtitle: filePath
+          ? getFilename(cloudAgentFileLabel(filePath))
+          : i18n.t('agentChat.toolCard.toolEdit'),
         translatable: filePath !== '',
       };
     }
@@ -108,7 +113,9 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
       const filePath = fields.filePath ?? '';
       return {
         title: i18n.t('agentChat.toolCard.toolWrite'),
-        subtitle: filePath ? getFilename(filePath) : i18n.t('agentChat.toolCard.toolWrite'),
+        subtitle: filePath
+          ? getFilename(cloudAgentFileLabel(filePath))
+          : i18n.t('agentChat.toolCard.toolWrite'),
         translatable: filePath !== '',
       };
     }
@@ -174,7 +181,7 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
       return {
         title: i18n.t('agentChat.toolCard.toolList'),
         subtitle: resolvedPath
-          ? getDirectoryName(resolvedPath)
+          ? getDirectoryName(cloudAgentFileLabel(resolvedPath))
           : i18n.t('agentChat.toolCard.toolList'),
         translatable: resolvedPath !== '',
       };
@@ -185,7 +192,7 @@ export function getToolDisplay(part: ToolPart): ToolDisplay {
       const files = patchText ? listPatchFilePaths(patchText) : [];
       let subtitle = i18n.t('agentChat.toolCard.toolPatch');
       if (files.length === 1) {
-        subtitle = getFilename(files[0] ?? '');
+        subtitle = getFilename(cloudAgentFileLabel(files[0] ?? ''));
       } else if (files.length > 1) {
         subtitle = i18n.t('agentChat.toolCard.filesBadge', {
           count: files.length,

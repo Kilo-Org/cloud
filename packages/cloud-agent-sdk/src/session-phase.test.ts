@@ -17,7 +17,7 @@ import {
 } from './__fixtures__/helpers';
 import { kiloId, cloudAgentId, makeSnapshot } from './test-helpers';
 import type { SessionActivity, AgentStatus, SessionInfo } from './types';
-import type { CloudAgentEvent } from './event-types';
+import type { CloudAgentEvent } from './schemas';
 
 type MockWebSocket = {
   onopen: ((ev: Event) => void) | null;
@@ -63,6 +63,13 @@ const emptySnapshot = makeSnapshot({ id: 'test-session' });
 async function flushConnect(): Promise<void> {
   await Promise.resolve(); // resolveSession resolves
   await new Promise(r => setTimeout(r, 0)); // Promise.all([ticket, snapshot]).then settles
+  sendRaw({
+    eventId: 0,
+    sessionId: 'test-session',
+    streamEventType: 'connected',
+    timestamp: new Date().toISOString(),
+    data: {},
+  });
 }
 
 type StateCapture = { activity: SessionActivity; status: AgentStatus };
@@ -457,7 +464,6 @@ describe('authoritative message failure settlement', () => {
         variant: null,
         repository: 'test/repo',
         isInitiated: true,
-        needsLegacyPrepare: false,
         isPreparingAsync: false,
         prompt: null,
         initialMessageId: null,

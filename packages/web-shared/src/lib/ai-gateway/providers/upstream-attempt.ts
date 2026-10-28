@@ -1,4 +1,4 @@
-import { after, type NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 
 import {
   getToolsAvailable,
@@ -23,6 +23,7 @@ import { isValidOpenRouterModelId } from '@kilocode/web-shared/lib/ai-gateway/pr
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { getReasoningEffort } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { upstreamRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
+import { enforceRequestCostLimit } from '@kilocode/web-shared/lib/ai-gateway/request-cost-limit';
 import type { FraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 
 type SendUpstreamAttemptInput = {
@@ -34,10 +35,12 @@ type SendUpstreamAttemptInput = {
   organizationId: string | null;
   sessionId: string | null;
   taskId: string | null;
+  isNonTrialEnterprise: boolean;
   search: string;
   method: string;
   signal?: AbortSignal;
   vercelRequestId?: string | null;
+  costLimit?: { maximumMicrodollars: string; availableBalanceMicrodollars: number };
 };
 
 type SendUpstreamAttemptResult =
@@ -60,10 +63,12 @@ export async function sendUpstreamAttempt({
   organizationId,
   sessionId,
   taskId,
+  isNonTrialEnterprise,
   search,
   method,
   signal,
   vercelRequestId,
+  costLimit,
 }: SendUpstreamAttemptInput): Promise<SendUpstreamAttemptResult> {
   const extraHeaders: Record<string, string> = {};
   await applyProviderSpecificLogic(
@@ -76,8 +81,27 @@ export async function sendUpstreamAttempt({
     userId,
     organizationId,
     sessionId,
-    taskId
+    taskId,
+    isNonTrialEnterprise
   );
+  if (costLimit) {
+    const decision = await enforceRequestCostLimit(
+      costLimit.maximumMicrodollars,
+      requestedModel,
+      request.body,
+      costLimit.availableBalanceMicrodollars,
+      {
+        id: providerContext.provider.id,
+        userFunded: providerContext.userByok !== null,
+      }
+    );
+    if (decision.refusal)
+      return {
+        type: 'error',
+        response: NextResponse.json({ error: decision.refusal }, { status: 402 }),
+      };
+    if (decision.providerConfig) request.body.provider = decision.providerConfig;
+  }
 
   if (providerContext.provider.id === 'openrouter') {
     const transformedModel = request.body.model;

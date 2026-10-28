@@ -1,0 +1,194 @@
+import { Asset } from 'expo-asset';
+import { Directory, File, Paths } from 'expo-file-system';
+import { useEffect, useMemo, useState } from 'react';
+import { Platform, useColorScheme, View } from 'react-native';
+import { WebView, type WebViewMessageEvent } from 'react-native-webview';
+import { z } from 'zod';
+
+import MERMAID_SCRIPT_ASSET from '@/../assets/vendor/mermaid-11.12.0.min.txt';
+
+import { CodeBlock } from './code-block';
+import { HOST_PAGE, MERMAID_VERSION, SCRIPT_FILE_NAME } from './markdown-mermaid-host';
+import { type MarkdownPalette } from './markdown-palette';
+
+/**
+ * Mermaid 11.12.0 (`dist/mermaid.min.js`, MIT) ships with the app as an asset,
+ * so a diagram never fetches code at runtime. SHA-256
+ * 07e37dfa97b337ccc85365d57eddf99b9706f09db3b59b260d0333b23b343c4b, the same
+ * bytes jsDelivr serves for that version.
+ *
+ * The script stays a file. Once per process it is copied next to a static host
+ * page in the cache directory, and every diagram WebView loads that page by
+ * file URL, so the 2.7 MB never enters the JS heap or crosses the bridge. Each
+ * diagram sends only its own source, after the page loads. The script's file
+ * name carries the version, so an app update can never pair a new page with an
+ * old script. The page is app code, so it is rewritten once per process and a
+ * page edit ships even when the Mermaid version stays the same.
+ */
+const HOST_DIRECTORY_NAME = 'mermaid-host';
+const PAGE_FILE_NAME = `diagram-${MERMAID_VERSION}.html`;
+
+type MermaidHost = { pageUri: string; directoryUri: string };
+
+let mermaidHost: Promise<MermaidHost> | null = null;
+
+async function prepareMermaidHost(): Promise<MermaidHost> {
+  const directory = new Directory(Paths.cache, HOST_DIRECTORY_NAME);
+  directory.create({ idempotent: true, intermediates: true });
+  const script = new File(directory, SCRIPT_FILE_NAME);
+  if (!script.exists) {
+    const asset = Asset.fromModule(MERMAID_SCRIPT_ASSET);
+    await asset.downloadAsync();
+    await new File(asset.localUri ?? asset.uri).copy(script);
+  }
+  const page = new File(directory, PAGE_FILE_NAME);
+  await page.write(HOST_PAGE);
+  return { pageUri: page.uri, directoryUri: directory.uri };
+}
+
+async function loadMermaidHost(): Promise<MermaidHost> {
+  mermaidHost ??= prepareMermaidHost();
+  try {
+    return await mermaidHost;
+  } catch (error) {
+    // A failed copy is retried by the next diagram instead of being cached.
+    mermaidHost = null;
+    throw error;
+  }
+}
+
+const MIN_HEIGHT = 48;
+
+type MarkdownMermaidProps = {
+  source: string;
+  palette: MarkdownPalette;
+};
+
+const DiagramMessageSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('height'), height: z.number() }),
+  z.object({ kind: z.literal('error') }),
+]);
+
+/**
+ * The script the app runs in the loaded page. The diagram travels as a JSON
+ * literal in a JS context (never as HTML), so its text cannot become markup.
+ */
+function renderCall(source: string, dark: boolean, background: string): string {
+  return `window.kiloRenderDiagram(${JSON.stringify({ source, dark, background })});true;`;
+}
+
+/** The page's message, or undefined when it is not one the page sends. */
+function parseDiagramMessage(data: string) {
+  try {
+    return DiagramMessageSchema.safeParse(JSON.parse(data)).data;
+  } catch {
+    return undefined;
+  }
+}
+
+/**
+ * A ```mermaid fence drawn as a diagram in a WebView. A load or parse failure
+ * falls back to the fence's source as a code block, so the text never disappears.
+ */
+export function MarkdownMermaid({ source, palette }: Readonly<MarkdownMermaidProps>) {
+  const dark = useColorScheme() === 'dark';
+  const [height, setHeight] = useState(MIN_HEIGHT);
+  // A failure belongs to the source that produced it: a recycled row hands a
+  // new diagram to a mounted instance, and a late host rejection or page
+  // message from the superseded diagram must not mask the new one.
+  const [failure, setFailure] = useState<{ source: string } | null>(null);
+  const failed = failure?.source === source;
+  const [host, setHost] = useState<MermaidHost | null>(null);
+  // Every source change starts a fresh render attempt: drop the previous
+  // diagram's failure and measured height synchronously during render (React's
+  // "adjust state when a prop changes" pattern). A source that comes back gets
+  // its own attempt rather than a failure recorded for an earlier one.
+  const [prevSource, setPrevSource] = useState(source);
+  if (prevSource !== source) {
+    setPrevSource(source);
+    setFailure(null);
+    setHeight(MIN_HEIGHT);
+  }
+  // The host is prepared once per process, so a source change only re-runs this
+  // after a failed copy: a failure clears the cached promise, and the retry then
+  // either recovers the host or re-asserts the fallback.
+  useEffect(() => {
+    let active = true;
+    const load = async () => {
+      try {
+        const prepared = await loadMermaidHost();
+        if (active) {
+          setHost(prepared);
+        }
+      } catch {
+        if (active) {
+          setFailure({ source });
+        }
+      }
+    };
+    void load();
+    return () => {
+      active = false;
+    };
+  }, [source]);
+  const webSource = useMemo(() => (host === null ? null : { uri: host.pageUri }), [host]);
+  const webViewStyle = useMemo(
+    () => ({ backgroundColor: palette.codeBackground }),
+    [palette.codeBackground]
+  );
+
+  if (failed) {
+    return (
+      <CodeBlock
+        code={source}
+        language="mermaid"
+        baseColor={palette.textColor}
+        tokenScheme={palette.codeTokenScheme}
+      />
+    );
+  }
+
+  return (
+    <View
+      className="my-1 overflow-hidden rounded-lg"
+      style={{ height, backgroundColor: palette.codeBackground }}
+    >
+      {host === null || webSource === null ? null : (
+        <WebView
+          // A new diagram or color scheme reloads the page instead of drawing
+          // a second diagram into the first one.
+          key={`${source}\n${String(dark)}\n${palette.codeBackground}`}
+          source={webSource}
+          originWhitelist={['file://*']}
+          // Android: let the file page load its sibling script. iOS: limit the
+          // page's file reads to the host directory.
+          allowFileAccess={Platform.OS === 'android'}
+          allowingReadAccessToURL={host.directoryUri}
+          injectedJavaScript={renderCall(source, dark, palette.codeBackground)}
+          scrollEnabled={false}
+          // Only the host page itself may load; every tap stays in the app. The
+          // page is matched by name because iOS can report the cache path
+          // through its `/private` alias.
+          onShouldStartLoadWithRequest={request =>
+            request.url.startsWith('file://') && request.url.endsWith(`/${PAGE_FILE_NAME}`)
+          }
+          onMessage={(event: WebViewMessageEvent): void => {
+            const message = parseDiagramMessage(event.nativeEvent.data);
+            if (message?.kind === 'height') {
+              setHeight(Math.max(MIN_HEIGHT, message.height));
+            } else {
+              // An error or a malformed message keeps the source as a code block.
+              setFailure({ source });
+            }
+          }}
+          onError={() => {
+            setFailure({ source });
+          }}
+          // The page paints the card color itself, so the native view must not
+          // flash its own white background before the diagram loads.
+          style={webViewStyle}
+        />
+      )}
+    </View>
+  );
+}

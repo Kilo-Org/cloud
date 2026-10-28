@@ -14,6 +14,16 @@ const MODULE_SOURCE = readFileSync(
 
 const BRIDGE_SOURCE = readFileSync(join(__dirname, 'live-update.ts'), 'utf8');
 
+const KOTLIN_DIR = join(
+  __dirname,
+  '../../modules/active-agents-live-update/android/src/main/java/com/kilocode/activeagentsliveupdate'
+);
+
+/** The one home of the durable write queue the module and the receivers share. */
+const DURABLE_WRITES_SOURCE = readFileSync(join(KOTLIN_DIR, 'DurableWrites.kt'), 'utf8');
+
+const SESSION_BRIDGE_SOURCE = readFileSync(join(__dirname, 'session-notification.ts'), 'utf8');
+
 /**
  * Expo's `Function` builder declares one overload per arity and stops at eight
  * (expo-modules-core `ObjectDefinitionBuilder`: `reified P0` … `reified P7`). A
@@ -61,11 +71,14 @@ function declaredArity(name: string): number {
 }
 
 /** The argument count the JS wrapper passes to `nativeModule?.<name>(…)`. */
-function bridgedArity(name: string): number {
+function bridgedArity(name: string, source = BRIDGE_SOURCE): number {
   const marker = `nativeModule?.${name}(`;
-  const start = BRIDGE_SOURCE.indexOf(marker);
-  expect(start, `${marker} is missing from live-update.ts`).toBeGreaterThan(-1);
-  const args = BRIDGE_SOURCE.slice(start + marker.length);
+  const lazyMarker = `nativeModule()?.${name}(`;
+  const start = source.includes(marker) ? source.indexOf(marker) : source.indexOf(lazyMarker);
+  const found = source.includes(marker) ? marker : lazyMarker;
+
+  expect(start, `${found} is missing from the bridge`).toBeGreaterThan(-1);
+  const args = source.slice(start + found.length);
   let depth = 1;
   let end = -1;
   for (let index = 0; index < args.length; index += 1) {
@@ -109,6 +122,10 @@ describe('ActiveAgentsLiveUpdate native bridge arity', () => {
       'end',
       'setWidgetSnapshot',
       'getWidgetSnapshot',
+      'postSession',
+      'dismissSession',
+      'pruneSessions',
+      'getSessionCards',
     ]) {
       expect(declaredArity(name), `${name} declares too many arguments`).toBeLessThanOrEqual(
         EXPO_FUNCTION_MAX_ARGS
@@ -119,6 +136,43 @@ describe('ActiveAgentsLiveUpdate native bridge arity', () => {
   it('passes exactly the arguments the native Function declares', () => {
     expect(bridgedArity('start')).toBe(declaredArity('start'));
     expect(bridgedArity('update')).toBe(declaredArity('update'));
+  });
+
+  /**
+   * The session card crosses the bridge as JSON text: the record converter
+   * rejects a null inside an object argument, and a card carries nullable
+   * fields. Both sides must agree on the argument count and on the text form.
+   */
+  it('passes the session card as JSON text with matching arity', () => {
+    expect(declaredArity('postSession')).toBe(2);
+    expect(declaredArity('dismissSession')).toBe(1);
+    expect(declaredArity('pruneSessions')).toBe(1);
+    expect(declaredArity('getSessionCards')).toBe(0);
+    for (const name of ['postSession', 'dismissSession', 'pruneSessions', 'getSessionCards']) {
+      expect(SESSION_BRIDGE_SOURCE, `${name} must be called from the session bridge`).toContain(
+        `nativeModule?.${name}(`
+      );
+    }
+
+    expect(SESSION_BRIDGE_SOURCE).toContain('JSON.stringify(card)');
+    expect(SESSION_BRIDGE_SOURCE).toContain('JSON.stringify(keep)');
+    expect(MODULE_SOURCE).toContain(
+      'SessionNotifications.post(context, sessionCardFromJson(cardJson)'
+    );
+    expect(MODULE_SOURCE).toContain('SessionNotifications.prune(context, keepJson)');
+  });
+
+  it('runs every session write on the module queue and keeps the read synchronous', () => {
+    for (const name of ['postSession', 'dismissSession', 'pruneSessions']) {
+      const block = registration(name);
+      expect(block, `${name} must be an AsyncFunction`).toContain(`AsyncFunction("${name}") {`);
+      expect(block, `${name} must run on the module queue`).toContain('.runOnQueue(moduleQueue)');
+    }
+    const read = registration('getSessionCards');
+    expect(read, 'getSessionCards must stay a synchronous Function').toContain(
+      'Function("getSessionCards") {'
+    );
+    expect(read, 'getSessionCards must not be queued').not.toContain('.runOnQueue(');
   });
 });
 
@@ -133,10 +187,12 @@ describe('ActiveAgentsLiveUpdate durable write queue', () => {
   it('owns one single-thread executor, not a pool or the UI thread', () => {
     // Queues.DEFAULT is a pool and Queues.MAIN would put the fsync on the UI
     // thread, so neither satisfies the finding.
-    expect((MODULE_SOURCE.match(/newSingleThreadExecutor/g) ?? []).length).toBe(1);
-    expect(MODULE_SOURCE).toContain('Thread(it, "active-agents-live-update")');
-    expect(MODULE_SOURCE).toContain('CoroutineScope(');
-    expect(MODULE_SOURCE).toContain('asCoroutineDispatcher()');
+    expect((DURABLE_WRITES_SOURCE.match(/newSingleThreadExecutor/g) ?? []).length).toBe(1);
+    expect(DURABLE_WRITES_SOURCE).toContain('Thread(it, "active-agents-live-update")');
+    expect(DURABLE_WRITES_SOURCE).toContain('asCoroutineDispatcher()');
+    expect(MODULE_SOURCE, 'the module must not declare an executor of its own').not.toContain(
+      'newSingleThreadExecutor'
+    );
   });
 
   it('runs every durable write on that queue', () => {
@@ -147,7 +203,13 @@ describe('ActiveAgentsLiveUpdate durable write queue', () => {
       );
       expect(block, `${name} must run on the module queue`).toContain('.runOnQueue(moduleQueue)');
       expect(block, `${name} must not stay on the default or main queue`).not.toContain('Queues.');
+      expect(block, `${name} must log a failure instead of throwing`).toContain(
+        'DurableWrites.durable'
+      );
     }
+    expect(MODULE_SOURCE, 'the module queue must be the shared queue').toContain(
+      'CoroutineScope(DurableWrites.dispatcher)'
+    );
 
     // `setWidgetSnapshot` keeps the durable commit on the queue but records the
     // snapshot on the JS thread first, so a read in the same turn as the write
@@ -157,7 +219,7 @@ describe('ActiveAgentsLiveUpdate durable write queue', () => {
       /^Function\("setWidgetSnapshot"\)/
     );
     expect(write, 'setWidgetSnapshot must submit its durable body to the module queue').toContain(
-      'durableQueue.execute'
+      'DurableWrites.queue.execute'
     );
     expect(write, 'the JS thread must not run the prefs commit itself').not.toContain('.commit()');
     expect(write, 'setWidgetSnapshot must not stay on the default or main queue').not.toContain(
@@ -203,17 +265,20 @@ describe('ActiveAgentsLiveUpdate durable write queue', () => {
     }
   });
 
-  it('keeps the queue process-wide so a replacement module cannot race it', () => {
+  it('keeps the queue process-wide so a replacement caller cannot race it', () => {
     // Destroying a module cannot drain its queue, so a per-instance executor
-    // would let a replaced module's already-queued write land after the
-    // replacement's newer write. One shared queue keeps every durable write in
-    // submission order across instances, and nothing may stop it on destroy:
-    // the work a replacement instance queued would otherwise never run.
-    expect(MODULE_SOURCE, 'the queue must be one shared executor').toContain(
-      'val durableQueue: ExecutorService'
+    // would let a replaced caller's already-queued write land after the newer
+    // one. One shared queue keeps every durable write — the module's and a
+    // receiver's — in submission order, and nothing may stop it: the work a
+    // replacement queued would otherwise never run.
+    expect(DURABLE_WRITES_SOURCE, 'the queue must be one shared executor').toMatch(
+      /val queue: ExecutorService =/
     );
-    expect(MODULE_SOURCE, 'the queue must live in the companion object').toMatch(
-      /private companion object \{[\s\S]*val durableQueue: ExecutorService/
+    expect(DURABLE_WRITES_SOURCE, 'the queue must live in one process-wide object').toContain(
+      'internal object DurableWrites'
+    );
+    expect(DURABLE_WRITES_SOURCE, 'no lifecycle hook may stop the shared queue').not.toContain(
+      '.shutdown()'
     );
     expect(MODULE_SOURCE, 'no lifecycle hook may stop the shared queue').not.toContain(
       '.shutdown()'

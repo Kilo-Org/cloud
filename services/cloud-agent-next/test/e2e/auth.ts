@@ -84,7 +84,7 @@ export function loadRepoEnvFiles(servicePackageDir: string): void {
 export type TestUser = {
   id: string;
   email: string;
-  api_token_pepper: string;
+  api_token_pepper: string | null;
 };
 
 /**
@@ -181,7 +181,7 @@ export async function loadExistingUserByEmail(
     return {
       id: row.id,
       email: row.email ?? email,
-      api_token_pepper: row.api_token_pepper ?? '',
+      api_token_pepper: row.api_token_pepper,
     };
   } finally {
     await driver.pool.end().catch(() => {});
@@ -192,28 +192,36 @@ export type MintedTokens = {
   apiToken: string;
 };
 
-/**
- * Mint a Kilo user JWT for tRPC authentication. Mirrors
- * `packages/web-shared/src/lib/tokens.ts:generateApiToken` but with a short expiry
- * since the driver is ephemeral.
- */
+/** Mint the Cloud Agent control token that authorizes local E2E runtime creation. */
 export function mintApiToken(
-  user: { id: string; api_token_pepper?: string },
-  nextAuthSecret: string | undefined
+  user: { id: string; api_token_pepper?: string | null },
+  nextAuthSecret: string | undefined,
+  expiresInSeconds = 60 * 60,
+  organizationId?: string
 ): string {
   if (!nextAuthSecret) {
     throw new Error('mintApiToken requires NEXTAUTH_SECRET for local JWT minting');
   }
+  const pepper = user.api_token_pepper ?? null;
   return jwt.sign(
     {
       env: 'development',
       kiloUserId: user.id,
-      ...(user.api_token_pepper ? { apiTokenPepper: user.api_token_pepper } : {}),
+      ...(organizationId ? { organizationId } : {}),
+      apiTokenPepper: pepper,
       version: JWT_TOKEN_VERSION,
+      aud: 'cloud-agent-next',
+      tokenPurpose: 'human-api',
+      credentialExchange: false,
+      runtimeAdmission: {
+        source: 'user',
+        authorizationUserId: user.id,
+        authorizationPepper: pepper,
+      },
       tokenSource: 'cloud-agent',
     },
     nextAuthSecret,
-    { algorithm: 'HS256', expiresIn: '1h' }
+    { algorithm: 'HS256', expiresIn: expiresInSeconds }
   );
 }
 
@@ -236,5 +244,46 @@ export function mintStreamTicket(
     },
     nextAuthSecret,
     { algorithm: 'HS256', expiresIn: expiresInSeconds, audience: 'cloud-agent-stream' }
+  );
+}
+
+/**
+ * Mint a `stream_ticket` for a preview port. Mirrors the entry-ticket claim
+ * shape: audience `cloud-agent-preview`, purpose `preview`, `port` in the
+ * ticket. The Worker exchanges this short-lived entry ticket for a host-bound
+ * session cookie it signs itself, so the default TTL is 60 seconds (matching
+ * the web `signPreviewTicket` `PREVIEW_TICKET_TTL_SECONDS`); the harness never
+ * mints a session token. The negative-observation overrides (`audience`, `purpose`,
+ * `expiresInSeconds`) exist so `preview-http` can mint a wrong-audience or
+ * already-expired ticket without a second signer.
+ */
+export function mintPreviewTicket(
+  user: { id: string },
+  cloudAgentSessionId: string,
+  port: number,
+  nextAuthSecret: string,
+  options: {
+    organizationId?: string;
+    expiresInSeconds?: number;
+    audience?: string;
+    purpose?: string;
+  } = {}
+): string {
+  return jwt.sign(
+    {
+      type: 'stream_ticket',
+      purpose: options.purpose ?? 'preview',
+      userId: user.id,
+      cloudAgentSessionId,
+      port,
+      ...(options.organizationId ? { organizationId: options.organizationId } : {}),
+      nonce: randomUUID(),
+    },
+    nextAuthSecret,
+    {
+      algorithm: 'HS256',
+      expiresIn: options.expiresInSeconds ?? 60,
+      audience: options.audience ?? 'cloud-agent-preview',
+    }
   );
 }

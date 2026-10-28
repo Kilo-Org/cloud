@@ -1,4 +1,6 @@
 import {
+  AutoRouterSchema,
+  DEFAULT_AUTO_ROUTER,
   BenchmarkKindSchema,
   BenchmarkRunPurposeSchema,
   StartBenchmarkRunRequestSchema,
@@ -17,9 +19,14 @@ export async function GET(request: NextRequest) {
 
   // Classifier, platform-queue and user-queue runs share one table and the user
   // queue is by far the busiest, so the list filters server-side.
+  const router = AutoRouterSchema.safeParse(
+    request.nextUrl.searchParams.get('router') ?? DEFAULT_AUTO_ROUTER
+  );
+  if (!router.success) return NextResponse.json({ error: 'Invalid router' }, { status: 400 });
   const kind = BenchmarkKindSchema.safeParse(request.nextUrl.searchParams.get('kind'));
   const purpose = BenchmarkRunPurposeSchema.safeParse(request.nextUrl.searchParams.get('purpose'));
   const result = await listBenchmarkRuns({
+    router: router.data,
     kind: kind.success ? kind.data : undefined,
     purpose: purpose.success ? purpose.data : undefined,
   });
@@ -42,6 +49,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid start benchmark run request' }, { status: 400 });
   }
 
-  const result = await startBenchmarkRun(parsed.data.kind, parsed.data.force, parsed.data.queue);
+  const result = await startBenchmarkRun(
+    parsed.data.kind,
+    parsed.data.force,
+    parsed.data.queue,
+    parsed.data.router
+  );
   return NextResponse.json(result.body, { status: result.status });
 }

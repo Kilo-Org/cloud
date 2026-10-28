@@ -1,0 +1,14 @@
+# Web app that records worker-owned classifier usage (/api/internal/usage/record).
+# @url nextjs
+KILO_WEB_API_BASE_URL=http://localhost:3000
+
+# AI gateway that evaluates organization model policy for the CLI decide path.
+# @url ai-gateway
+KILO_AI_GATEWAY_BASE_URL=http://localhost:3010
+
+# Seeds for the Secrets Store bindings UPSTASH_REDIS_REST_URL and UPSTASH_REDIS_REST_TOKEN
+# (secret names AUTO_ROUTING_UPSTASH_*_PROD): the dev redis-http container, read for the
+# blocked email domains. AUTO_ROUTING_DECISION_SECRET is seeded from .env.local.
+# @url redis-http
+AUTO_ROUTING_UPSTASH_REDIS_REST_URL=http://localhost:8079
+AUTO_ROUTING_UPSTASH_REDIS_REST_READONLY_TOKEN=example_token

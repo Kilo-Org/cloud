@@ -1,9 +1,14 @@
 import type { AgentConfig } from '@kilocode/db/schema-types';
+import type { LedgerDatabase } from '@kilocode/db/operation-ledger';
 
 /** Owner type for agent environment profiles - exactly one of organizationId or userId must be set. */
 export type ProfileOwner = { type: 'organization'; id: string } | { type: 'user'; id: string };
 
-/** Owner type discriminator for UI display. */
+/** Accepts a pool-backed database or an open transaction so callers can compose writes. */
+export type ProfileDatabase = LedgerDatabase;
+
+export type RepositoryPlatform = 'github' | 'gitlab';
+
 export type ProfileOwnerType = ProfileOwner['type'];
 
 /** Profile variable response type (for API responses). Secret values are masked. */
@@ -15,7 +20,6 @@ export type ProfileVarResponse = {
   updatedAt: string;
 };
 
-/** Profile command response type. */
 export type ProfileCommandResponse = {
   sequence: number;
   command: string;
@@ -62,7 +66,7 @@ export type ProfileSkillResponse = {
   id: string;
   name: string;
   description: string | null;
-  sourceType: 'marketplace' | 'custom';
+  sourceType: 'marketplace' | 'custom' | 'skills-sh';
   sourceUrl: string | null;
   rawMarkdown: string;
   /** Companion files (excluding SKILL.md). Relative path → content. */
@@ -72,7 +76,6 @@ export type ProfileSkillResponse = {
   updatedAt: string;
 };
 
-/** Agent response (as returned from the API). Mirrors the kilocode CLI's AgentConfig shape. */
 export type ProfileAgentResponse = {
   id: string;
   slug: string;
@@ -82,7 +85,6 @@ export type ProfileAgentResponse = {
   updatedAt: string;
 };
 
-/** Profile kilo command response type. */
 export type ProfileKiloCommandResponse = {
   id: string;
   name: string;
@@ -97,7 +99,19 @@ export type ProfileKiloCommandResponse = {
   updatedAt: string;
 };
 
-/** Profile response type for list/get operations. */
+/**
+ * Instruction response (as returned from the API). The name is the rules
+ * filename slug; the file is materialized as `.kilocode/rules/<name>.md`.
+ */
+export type ProfileInstructionResponse = {
+  id: string;
+  name: string;
+  content: string;
+  enabled: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
 export type ProfileResponse = {
   id: string;
   name: string;
@@ -111,14 +125,13 @@ export type ProfileResponse = {
   skills: ProfileSkillResponse[];
   agents: ProfileAgentResponse[];
   kiloCommands: ProfileKiloCommandResponse[];
+  instructions: ProfileInstructionResponse[];
 };
 
-/** Profile response with owner type for combined listings. */
 export type ProfileResponseWithOwner = ProfileResponse & {
   ownerType: ProfileOwnerType;
 };
 
-/** Profile summary for list operations (without vars/commands). */
 export type ProfileSummary = {
   id: string;
   name: string;
@@ -132,9 +145,9 @@ export type ProfileSummary = {
   skillCount: number;
   agentCount: number;
   kiloCommandCount: number;
+  instructionCount: number;
 };
 
-/** Profile summary with owner type for combined listings. */
 export type ProfileSummaryWithOwner = ProfileSummary & {
   ownerType: ProfileOwnerType;
 };

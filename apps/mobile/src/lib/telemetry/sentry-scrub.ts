@@ -13,13 +13,32 @@
  * dropping fields this walker isn't meant to know about. The scrubbers must
  * therefore accept and return opaque values. */
 
-/** Strip the query string from a URL. Returns empty string if parsing fails. */
+/**
+ * A URL authority's userinfo prefix, the part before the host.
+ */
+const URL_USERINFO_PATTERN = /^([a-z][\da-z+.-]*:\/\/)[^/?#]*@/iu;
+
+/**
+ * Reduce a URL to its origin and path. Returns empty string for a non-string.
+ * A plain string walk, since the React Native `URL` polyfill does not
+ * implement every component.
+ */
 function stripQuery(url: unknown): string {
   if (typeof url !== 'string') {
     return '';
   }
-  const idx = url.indexOf('?');
-  return idx === -1 ? url : url.slice(0, idx);
+  const cut = url.search(/[?#]/u);
+  const originAndPath = cut === -1 ? url : url.slice(0, cut);
+  return originAndPath.replace(URL_USERINFO_PATTERN, '$1');
+}
+
+/**
+ * The URL form telemetry carries: origin and path, with a long opaque run
+ * replaced by `[redacted]` and an app-set word-chain identifier
+ * (`session.list`, `/api/auth/native/token`) kept readable.
+ */
+export function redactUrlText(url: unknown): string {
+  return redactString(stripQuery(url), true);
 }
 
 /** A `scheme://host[:port]` origin. */
@@ -75,30 +94,50 @@ const TOKEN_RUN_PATTERN = /[A-Za-z0-9_-]{20,}/g;
 /** A chain of lowercase words: `agent-message-render`, `render_part`. */
 const LOWERCASE_WORD_CHAIN_PATTERN = /^[a-z]+(?:[-_][a-z]+)+$/;
 
-/** A chain of CapitalizedWords: React's `MessageErrorBoundary`. */
-const CAPITALIZED_WORD_CHAIN_PATTERN = /^[A-Z][a-z]+(?:[A-Z][a-z]+)+$/;
+/**
+ * A camelCase or CapitalizedWords chain: tRPC's `getSessionMessagesPage`,
+ * React's `MessageErrorBoundary`.
+ */
+const CAMEL_CASE_WORD_CHAIN_PATTERN = /^[A-Za-z][a-z]+(?:[A-Z][a-z]+)+$/;
+
+/** A chain of uppercase words: tRPC's `INTERNAL_SERVER_ERROR` code. */
+const UPPERCASE_WORD_CHAIN_PATTERN = /^[A-Z]+(?:_[A-Z]+)+$/;
 
 /** True when a token-shaped run is a word chain, i.e. maybe a name. */
 function isIdentifierRun(run: string): boolean {
-  return LOWERCASE_WORD_CHAIN_PATTERN.test(run) || CAPITALIZED_WORD_CHAIN_PATTERN.test(run);
+  return (
+    LOWERCASE_WORD_CHAIN_PATTERN.test(run) ||
+    CAMEL_CASE_WORD_CHAIN_PATTERN.test(run) ||
+    UPPERCASE_WORD_CHAIN_PATTERN.test(run)
+  );
 }
 
 /**
  * The exact event paths whose own value is a contractually app-set identifier
- * rather than payload data: the `error.subsystem` / `error.operation` tags the
- * app writes, and the React `componentStack` the render boundary attaches as a
- * direct `extra` field. Each entry is `<section>.<field>` for one of the maps
- * {@link scrubEvent} walks.
+ * rather than payload data: the `error.subsystem`, `error.operation`,
+ * `trpc.procedure`, `trpc.code`, `auth.cause`, `auth.branch` and `auth.keys`
+ * tags the app writes (code names such as `refresh_token_unreadable` or
+ * `cliSessionsV2.getSessionMessagesPage`), the `turbo_module.method` tag the
+ * Sentry SDK writes, and the React `componentStack` the render boundary
+ * attaches as a direct `extra` field. Each entry is `<section>.<field>` for one
+ * of the maps {@link scrubEvent} walks.
  *
  * The exemption is keyed on the full path, never on a bare property name: a
  * `componentStack` or `error.subsystem` nested inside another object is payload
  * data, and a word-chain secret there (`my-super-secret-prod-token`) must be
  * redacted like anywhere else. The shape alone is not proof a run is safe.
+ * `auth.route` stays out: its value is a request path, not a code name.
  */
 const IDENTIFIER_PATHS = new Set([
   'extra.componentStack',
   'tags.error.subsystem',
   'tags.error.operation',
+  'tags.trpc.procedure',
+  'tags.trpc.code',
+  'tags.auth.cause',
+  'tags.auth.branch',
+  'tags.auth.keys',
+  'tags.turbo_module.method',
 ]);
 
 /** True when a value reached through `path` is an app-set identifier field. */
@@ -120,10 +159,12 @@ function isIdentifierPath(path: readonly (string | number)[]): boolean {
  *
  * A run is 20+ consecutive base64url characters. At an identifier path a run
  * that is a chain of words is a name, not a credential: without that, the app's
- * `agent-message-render` tags and React's `MessageErrorBoundary` component
- * names are delivered as `[redacted]`, and they are the only copy of the
- * diagnostic the app sends. Everywhere else a run is redacted on shape alone. A
- * `Bearer ` prefix names the whole value a credential, so it redacts whole.
+ * `agent-message-render` tags, tRPC procedure names, and React's
+ * `MessageErrorBoundary` component names are delivered as `[redacted]`, and
+ * they are the only copy of the diagnostic the app sends. A random token or a
+ * JWT is not a word chain, so it is redacted at an identifier path too.
+ * Everywhere else a run is redacted on shape alone. A `Bearer ` prefix names
+ * the whole value a credential, so it redacts whole.
  */
 function redactString(value: string, keepIdentifiers: boolean): string {
   if (value.startsWith('Bearer ')) {
@@ -185,52 +226,109 @@ function redactTokens(
 }
 
 /**
- * The context key the network reporter stores a parsed tRPC error body under
- * (see `network-errors.ts`). The value is free-form payload, so
- * {@link scrubEvent} token-scrubs it like extra error data. It must not be the
- * synthesized exception's class name: `extraErrorDataIntegration` writes a
- * thrown error's own properties under `contexts[error.name]`, so a payload
- * under `NetworkError` is replaced with `{}` before `beforeSend` ever runs.
+ * The context key the network reporter stores parsed tRPC error metadata under
+ * (see `network-errors.ts`). The value is app-attached, so {@link scrubEvent}
+ * keeps only its allow-listed fields ({@link scrubPayloadField}) and
+ * token-scrubs every string it keeps. It must not be the synthesized
+ * exception's class name: `extraErrorDataIntegration` writes a thrown error's
+ * own properties under `contexts[error.name]`, so a payload under `NetworkError`
+ * is replaced with `{}` before `beforeSend` ever runs.
  */
 export const NETWORK_BODY_CONTEXT = 'network.body';
 
-/** Context names whose value is app-attached payload and must be token-scrubbed. */
+/** Context names whose value is app-attached payload and must be allow-listed. */
 const PAYLOAD_CONTEXT_NAMES: readonly string[] = [NETWORK_BODY_CONTEXT];
 
+/** The app-attached `network` context (see `network-errors.ts`). */
+const NETWORK_CONTEXT = 'network';
+
 /**
- * Names of the thrown errors in an event, i.e. the context keys that
- * `extraErrorDataIntegration` writes a thrown error's own properties under
- * (see lib/sentry-init.ts). Its data is free-form and must be token-scrubbed;
- * Sentry's structured contexts (device, trace, our `network`) are not.
+ * The `network` context fields whose value is an app-set code name: the
+ * endpoint path, the HTTP method, the outcome class, the tRPC procedure, and
+ * the tRPC code. `statusText` is free text, so it is not listed here.
  */
-function exceptionContextNames(event: Record<string, unknown>): string[] {
-  const exception = event.exception;
-  if (exception == null || typeof exception !== 'object') {
-    return [];
+const NETWORK_IDENTIFIER_FIELDS: Readonly<Record<string, true>> = {
+  url: true,
+  method: true,
+  outcome: true,
+  procedure: true,
+  trpcCode: true,
+};
+
+/**
+ * Scrub one `network` context field: `url` through {@link redactUrlText}, and
+ * any other string through {@link redactString}, with the identifier form for
+ * the fields listed in {@link NETWORK_IDENTIFIER_FIELDS}.
+ */
+function scrubNetworkField(key: string, item: string): string {
+  if (key === 'url') {
+    return redactUrlText(item);
   }
-  const values = (exception as Record<string, unknown>).values;
-  if (!Array.isArray(values)) {
-    return [];
-  }
-  const names: string[] = [];
-  for (const value of values) {
-    if (value != null && typeof value === 'object') {
-      const type = (value as Record<string, unknown>).type;
-      if (typeof type === 'string' && type.length > 0) {
-        names.push(type);
-      }
-    }
-  }
-  return names;
+  return redactString(item, NETWORK_IDENTIFIER_FIELDS[key] === true);
 }
 
 /**
- * Every context name whose value must be token-scrubbed: the app's payload
- * contexts ({@link PAYLOAD_CONTEXT_NAMES}) plus the thrown-error names
- * {@link exceptionContextNames} finds. Structured contexts stay out.
+ * Scrub the app-attached `network` context: each string field through
+ * {@link scrubNetworkField}, and any other value through the general walker.
  */
-function redactedContextNames(event: Record<string, unknown>): string[] {
-  return [...PAYLOAD_CONTEXT_NAMES, ...exceptionContextNames(event)];
+function scrubNetworkContext(value: unknown): unknown {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return redactValue(value, new WeakMap(), []);
+  }
+  const network = value as Record<string, unknown>;
+  const result: Record<string, unknown> = {};
+  for (const [key, item] of Object.entries(network)) {
+    result[key] =
+      typeof item === 'string'
+        ? scrubNetworkField(key, item)
+        : redactValue(item, new WeakMap(), []);
+  }
+  return result;
+}
+
+/**
+ * The scrubbed form of one payload-context field, or `undefined` when the field
+ * is not allow-listed. The payload is parsed tRPC metadata (see
+ * `network-errors.ts`): `code` and `path` are strings, `httpStatus` a number,
+ * and everything else a response body offers is untrusted text the event does
+ * not need, so it is dropped rather than scrubbed.
+ *
+ * `code` and `path` are identifier-shaped like the `trpc.code` and
+ * `trpc.procedure` tags ({@link IDENTIFIER_PATHS}), so their word chains stay
+ * readable; a token-shaped or `Bearer ` value is redacted either way.
+ */
+function scrubPayloadField(field: string, value: unknown): unknown {
+  switch (field) {
+    case 'code':
+    case 'path': {
+      return typeof value === 'string' ? redactString(value, true) : undefined;
+    }
+    case 'httpStatus': {
+      return typeof value === 'number' ? value : undefined;
+    }
+    default: {
+      return undefined;
+    }
+  }
+}
+
+/**
+ * Keep only the allow-listed payload fields ({@link scrubPayloadField}) and
+ * token-redact every string that survives. A non-object value yields `{}`, so a
+ * malformed payload becomes empty instead of forwarding.
+ */
+function scrubPayload(value: unknown): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+    return result;
+  }
+  for (const [field, item] of Object.entries(value)) {
+    const scrubbed = scrubPayloadField(field, item);
+    if (scrubbed !== undefined) {
+      result[field] = scrubbed;
+    }
+  }
+  return result;
 }
 
 /** The string at `key`, or undefined when it is absent or not a string. */
@@ -262,7 +360,7 @@ function hasFingerprint(event: Record<string, unknown>): boolean {
 }
 
 /**
- * The longest exception message {@link fallbackFingerprint} reads.
+ * The longest exception message a Sentry fingerprint reads.
  *
  * `beforeSend` runs on the JS thread, and an exception message is unbounded (a
  * server error body can be megabytes). A fingerprint only needs enough of the
@@ -272,6 +370,16 @@ function hasFingerprint(event: Record<string, unknown>): boolean {
  * path.
  */
 export const FINGERPRINT_MESSAGE_LIMIT = 512;
+
+/**
+ * The redacted, length-bounded message form a Sentry fingerprint uses: volatile
+ * values (host, path, port, query) removed and long opaque runs replaced,
+ * keeping the surrounding words readable. {@link fallbackFingerprint} and the
+ * app-error reporter both build from it, so both paths group on the same text.
+ */
+export function fingerprintMessage(message: string): string {
+  return redactString(stripVolatileValues(message.slice(0, FINGERPRINT_MESSAGE_LIMIT)), false);
+}
 
 /**
  * The fallback fingerprint for an event that sets none: the exception class
@@ -289,25 +397,47 @@ function fallbackFingerprint(event: Record<string, unknown>): string[] | undefin
   if (message === undefined || message.length === 0) {
     return undefined;
   }
-  return [
-    stringField(exception, 'type') ?? 'Error',
-    redactString(stripVolatileValues(message.slice(0, FINGERPRINT_MESSAGE_LIMIT)), false),
-  ];
+  return [stringField(exception, 'type') ?? 'Error', fingerprintMessage(message)];
+}
+
+/** Scrub exception messages and their attached contexts in one pass. */
+function scrubExceptions(exception: Record<string, unknown>, contexts: unknown): void {
+  const values = exception.values;
+  if (!Array.isArray(values)) {
+    return;
+  }
+  const ctx =
+    contexts != null && typeof contexts === 'object'
+      ? (contexts as Record<string, unknown>)
+      : undefined;
+  for (const value of values) {
+    if (value != null && typeof value === 'object') {
+      const entry = value as Record<string, unknown>;
+      const type = entry.type;
+      if (ctx !== undefined && typeof type === 'string' && type.length > 0 && type in ctx) {
+        ctx[type] = redactValue(ctx[type], new WeakMap(), []);
+      }
+      if (typeof entry.value === 'string') {
+        entry.value = redactString(entry.value, false);
+      }
+    }
+  }
 }
 
 /**
  * Scrub a Sentry event before it is sent.
  *
- * - Strips query strings from request URL and contexts.response URL.
+ * - Reduces request URL, contexts.response URL, and contexts.network URL to
+ *   their origin and path.
  * - Deletes `user.email`, `user.username`, and `user.ip_address`.
+ * - Rebuilds the app's payload context ({@link NETWORK_BODY_CONTEXT}) from its
+ *   allow-listed fields alone and token-redacts every string it keeps, so
+ *   response-body text outside that list never leaves the device.
  * - Redacts token-shaped runs (20+ base64url chars, or any `Bearer ` value) at
- *   any depth in `event.extra`, `event.tags`, the app's payload context
- *   ({@link NETWORK_BODY_CONTEXT}), and the exception-name context
- *   `extraErrorDataIntegration` attaches. A word-chain run stays only at an
- *   app-set identifier path (see {@link IDENTIFIER_PATHS}); anywhere else a
- *   word-chain secret is redacted on shape alone. Sentry's structured contexts
- *   are left intact: their identifiers trip the token heuristic without holding
- *   secrets.
+ *   any depth in `event.extra`, `event.tags`, and exception-name contexts.
+ *   The `network` context uses {@link scrubNetworkContext}, with app-set
+ *   identifiers preserved through {@link NETWORK_IDENTIFIER_FIELDS}.
+ * - Redacts exception messages and `event.message`.
  * - Gives an event with no fingerprint the fallback {@link fallbackFingerprint},
  *   so a volatile build path, host, or port inside the message or the stack
  *   cannot split one defect into many issues.
@@ -337,10 +467,13 @@ export function scrubEvent<T>(event: T): T {
           resp.url = stripQuery(resp.url);
         }
       }
-      for (const name of redactedContextNames(e)) {
+      for (const name of PAYLOAD_CONTEXT_NAMES) {
         if (name in ctx) {
-          ctx[name] = redactValue(ctx[name], new WeakMap(), []);
+          ctx[name] = scrubPayload(ctx[name]);
         }
+      }
+      if (NETWORK_CONTEXT in ctx) {
+        ctx[NETWORK_CONTEXT] = scrubNetworkContext(ctx[NETWORK_CONTEXT]);
       }
     }
 
@@ -361,11 +494,22 @@ export function scrubEvent<T>(event: T): T {
     }
 
     // Fingerprint fallback. Only fills a gap: an app-set fingerprint is kept.
+    // It reads the unredacted message; the redaction below would not change
+    // its result, but the fingerprint is the one copy that must stay stable.
     if (!hasFingerprint(e)) {
       const fallback = fallbackFingerprint(e);
       if (fallback !== undefined) {
         e.fingerprint = fallback;
       }
+    }
+
+    // The exception messages and event.message carry the same text the issue
+    // view shows, so both go through the same redaction as the fingerprint.
+    if (e.exception != null && typeof e.exception === 'object') {
+      scrubExceptions(e.exception as Record<string, unknown>, e.contexts);
+    }
+    if (typeof e.message === 'string') {
+      e.message = redactString(e.message, false);
     }
 
     return event;

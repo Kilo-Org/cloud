@@ -1,19 +1,13 @@
 /* eslint-disable max-lines -- The live list keeps its query, pull-refresh, keyboard container, and FAB orchestration together on one screen. */
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
-import {
-  AppState,
-  I18nManager,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { AppState, Keyboard, Pressable, View } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
+import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { Bot } from '@/components/ui/icons';
+import { Bot, History } from '@/components/ui/icons';
 
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
@@ -22,11 +16,9 @@ import { liveSessionContent, useLiveSessionContext } from '@/components/home/liv
 import { LiveSessionListEmptyState } from '@/components/agents/live-session-list-empty-state';
 import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
 import { RowsRefreshControl } from '@/components/agents/rows-refresh-control';
-import { SessionFilterButton } from '@/components/agents/session-filter-button';
+import { SessionListHeader } from '@/components/agents/session-list-header';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
 import { SessionListSkeletonRows } from '@/components/agents/session-list-skeleton-rows';
-import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
-import { estimateSessionListHeaderActionsWidth } from '@/components/agents/session-list-header-actions-width';
 import { useLiveSessionQuery } from '@/components/agents/use-live-session-query';
 import { usePullRefresh } from '@/components/agents/use-pull-refresh';
 import { SessionListFab } from '@/components/agents/session-list-fab';
@@ -39,10 +31,10 @@ import {
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { useAgentsListChrome } from '@/components/agents/use-agents-list-chrome';
 import { Button } from '@/components/ui/button';
-import { Eyebrow } from '@/components/ui/eyebrow';
-import { EYEBROW_LATIN_DISPLAY, Text } from '@/components/ui/text';
-import { ScreenHeader } from '@/components/screen-header';
-import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
+import { Text } from '@/components/ui/text';
+import { IconButton } from '@/components/ui/icon-button';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { STATE_ACTION_CLASS, textActionTargetClass } from '@/lib/a11y/tap-target';
 import { getRevisionSnapshot } from '@/lib/session-attention';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 import { type ActiveSession, useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
@@ -50,10 +42,12 @@ import { cn } from '@/lib/utils';
 
 import { type Href, useFocusEffect, useNavigation, useRouter, useScrollToTop } from 'expo-router';
 
-export function AgentSessionListScreen() {
+type AgentSessionListScreenProps = { tabHeader?: ReactNode };
+export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListScreenProps> = {}) {
   const router = useRouter();
   const navigation = useNavigation();
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const { left, right } = useSafeAreaInsets();
   // The tabs layout's width-aware label decision rides along, so this screen's
   // clearance (list frame, FAB and state-surface insets) tracks the bar height.
@@ -61,11 +55,7 @@ export function AgentSessionListScreen() {
   // The empty state's own height grows with Dynamic Type, so the list chrome's
   // presentation decision needs the window's text scale (see
   // `useAgentsListChrome`).
-  const { fontScale } = useWindowDimensions();
-  // Android runs edge-to-edge and never resizes the window for the IME, so the
-  // native KeyboardAvoidingView is inert there; the app-aware container follows
-  // the keyboard events instead (the repo's one platform fork for this).
-  const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
+  const fontScale = useLiveFontScale();
 
   const context = useLiveSessionContext();
   const { organizationId, isError: isContextError, refetch: refetchContext } = context;
@@ -92,28 +82,15 @@ export function AgentSessionListScreen() {
   // affordance while the list is failing.
   const noMatchBody = hasLiveRows && visibleSessions.length === 0;
   const showFab = context.isReady && content !== 'empty' && !noMatchBody;
-  // The screen's bottom bands. Both are keyboard-aware: while the keyboard is up
-  // the IME's occlusion replaces the tab-bar band, because the bar hides with
-  // the keyboard (`tabBarHideOnKeyboard`). Android's edge-to-edge window does
-  // not resize for the IME, so without that reserve the centered empty states
-  // draw their copy and Clear search action behind the keyboard (explorer
-  // finding, agents-list / agents-search-empty) and the last rows of a search
-  // park behind it (review finding, session-list-chrome.ts). The rows list's
-  // total band is floored at the FAB's own overlay band inside the hook, because
-  // the button keeps its screen-bottom-anchored position while the keyboard is
-  // up (device defect uxs1); the frame carries only the part the keyboard
-  // container leaves (`rowsFrameBand`). The chrome hook below supplies the
-  // keyboard-down geometry — the FAB-aware centered reserve and the
-  // short-window frame clamp — so this hook's `surfaceBand` is the IME half of
-  // the centered band while the keyboard is up and the keyboard-down rule is not
-  // re-resolved here (review findings, session-list-chrome.ts:48 and
-  // session-list-screen.tsx:418). This is the screen's only keyboard
-  // subscription beside the container below: calling the occlusion hook here as
-  // well subscribed to the same events a second time (review finding,
-  // session-list-screen.tsx:101).
   const { surfaceBand, rowsFrameBand } = useAgentsBottomBands(tabBarHeight, showFab);
   const [showFilterModal, setShowFilterModal] = useState(false);
-
+  const [searchOpen, setSearchOpen] = useState(false);
+  const showSearch = searchOpen || query.searchQuery.length > 0;
+  useEffect(() => {
+    if (searchOpen) {
+      query.searchInputRef.current?.focus();
+    }
+  }, [searchOpen, query.searchInputRef]);
   const refetchRef = useRef(refetch);
   useEffect(() => {
     refetchRef.current = refetch;
@@ -206,82 +183,34 @@ export function AgentSessionListScreen() {
 
   const navigateToSession = useAgentSessionNavigator();
 
-  // The header link opens the stored-session list, so it names that surface: a
-  // bare `home.seeAll` here claimed a longer live list that is not on screen
-  // (finding live-now-all).
   const historyLabel = t('agents.sessionList.pastSessions');
-  // The accepted-empty body names where its history route goes for the same
-  // reason: a bare See-all on an empty live list does not say what it opens, and
-  // this is the only route to stored sessions there (UX repair, agents-empty).
   const viewHistoryLabel = t('agents.sessionList.viewHistory');
-  // The list controls share the title's row through the header's `inlineActions`
-  // slot while the row can still hold a readable 30px title: the heading keeps
-  // `min-w-0 flex-1`, so the title tail-ellipsizes and the controls keep their
-  // full width instead of the old `headerRight` half-row cap wrapping them. The
-  // row holds only the two trailing controls — the history link and the filter
-  // button — packed to the row end, so the live count beside the title is the
-  // row's only label and nothing sits between the title and the controls. It
-  // reflows onto its own full-width row when the controls cannot share the
-  // title's row: the Croatian catalog made the row as wide as the title's
-  // readable minimum on a narrow phone, so `Agenti` broke mid-word into
-  // "Age" / "nti" (owner capture, agents-header-hr-20260929). The estimate below
-  // reserves the row's laid-out width for that decision; on its own row the
-  // controls keep the header's full width at every display size, and the box can
-  // shrink so an extreme accessibility scale ellipsizes the link instead of
-  // wrapping it to a second line.
-  const inlineActionsWidth = estimateSessionListHeaderActionsWidth({
-    historyLabel,
-    showFilter: query.canFilter,
-    fontScale,
-    isRTL: I18nManager.isRTL,
-  });
-  // The history route is the app's only route to the stored-session history,
-  // which exists independently of the live list, so it outlives the live
-  // section: the accepted-empty state carries the same control in the body,
-  // labeled by its destination (`viewHistoryAction`), while the header links to
-  // the same route with its own destination copy (`historyLabel`) over a
-  // non-empty live list.
   const historyControl = (label: string) => (
     <Pressable
       onPress={() => {
         router.push('/(app)/(tabs)/(2_agents)/history' as Href);
       }}
-      // left slop capped against the gap, right slop reaches 44pt wide
-      hitSlop={{ top: 12, bottom: 12, left: 8, right: 16 }}
       accessibilityRole="button"
       accessibilityLabel={label}
-      testID="agents-view-history"
-      className="min-w-0 shrink justify-center active:opacity-70"
+      testID="agents-view-history-empty"
+      className={cn(textActionTargetClass(), 'min-w-0 shrink justify-center active:opacity-70')}
     >
-      {/* An eyebrow-scale label, with the same LTR-only treatment: the
-          letterspaced capitals break a cursive script's joins, so an RTL
-          label drops them (home-ar-loading) while the variant and
-          `SectionHeader` keep the identical class string. */}
-      <Eyebrow
-        numberOfLines={1}
-        className={cn(
-          'shrink text-center text-[11px] text-primary',
-          !I18nManager.isRTL && EYEBROW_LATIN_DISPLAY
-        )}
-      >
+      <Text className="text-sm text-primary" numberOfLines={1}>
         {label}
-      </Eyebrow>
+      </Text>
     </Pressable>
   );
   const viewHistoryAction = historyControl(viewHistoryLabel);
-  const headerActions = (
-    <View className="min-h-11 min-w-0 shrink flex-row items-center justify-end gap-4">
-      {historyControl(historyLabel)}
-      {query.canFilter ? (
-        <SessionFilterButton
-          activeCount={query.activeFilterCount}
-          onPress={() => {
-            setShowFilterModal(true);
-          }}
-          testID="agents-open-filters"
-        />
-      ) : null}
-    </View>
+  const historyAction = (
+    <IconButton
+      accessibilityLabel={historyLabel}
+      testID="agents-view-history"
+      onPress={() => {
+        router.push('/(app)/(tabs)/(2_agents)/history' as Href);
+      }}
+    >
+      <History size={20} color={colors.mutedForeground} />
+    </IconButton>
   );
 
   // One handler shared by every row: with the row memoised, a poll that writes
@@ -344,13 +273,6 @@ export function AgentSessionListScreen() {
   const rowsListBand = Math.max(surfaceBand, showFab ? tabBarHeight + FAB_SIZE + FAB_MARGIN : 0);
   const keyboardUp = rowsFrameBand < rowsListBand;
 
-  // The centered states' reserve: the FAB-aware band the chrome hook resolves
-  // while the keyboard is down (a centered state's full-width action must not
-  // reach under the corner overlay, device defect e3) and the IME's occlusion
-  // while it is up, so the two never stack (explorer finding,
-  // agents-search-empty).
-  const centeredBand = keyboardUp ? surfaceBand : centeredBottomInset;
-
   // The rows list's frame and content insets. While the keyboard is down the
   // screen's own split owns them: the frame ends at the tab bar (no bare band)
   // and the FAB clearance rides on the content, so the button floats over the
@@ -365,7 +287,7 @@ export function AgentSessionListScreen() {
 
   let body: ReactNode = null;
   if (!query.hasLoaded || content === 'pending') {
-    body = <SessionListSkeletonRows sidePadding={sidePadding} />;
+    body = <SessionListSkeletonRows insets={{ left, right }} />;
   } else if (hasLiveRows && visibleSessions.length === 0) {
     // The reserved band is mounted here too (the sessions exist behind the
     // filter), so the native control gets the same treatment as the rows
@@ -396,6 +318,7 @@ export function AgentSessionListScreen() {
             variant="outline"
             size={compactEmptyState ? 'sm' : 'default'}
             onPress={isSearching ? query.handleClearSearch : query.handleClearFilters}
+            className={STATE_ACTION_CLASS}
           >
             <Text>{isSearching ? t('common.clearSearch') : t('common.clearFilters')}</Text>
           </Button>
@@ -442,13 +365,14 @@ export function AgentSessionListScreen() {
   const region = (
     <>
       <View
-        className={query.hasLoaded && content === 'error' ? 'flex-1' : undefined}
+        className={query.hasLoaded && content === 'error' ? 'flex-1' : 'min-h-5'}
         style={query.hasLoaded && content === 'error' ? undefined : sidePadding}
       >
         <LiveSessionFeedback
           context={context}
           sessions={sessions}
           failureLabel={t('agents.sessionList.couldNotLoadActive')}
+          compact
           centered={query.hasLoaded && content === 'error'}
           refresh={{
             busy: pull.refreshing || pull.busy,
@@ -474,75 +398,57 @@ export function AgentSessionListScreen() {
   );
 
   return (
-    // The band the centered states are laid out in: the chrome hook's FAB-aware
-    // reserve while the keyboard is down — the FAB's band joins the tab bar's so
-    // a centered state's full-width action (the load failure's Retry, the
-    // boundary's back-to-profile) cannot reach under the corner overlay (device
-    // defect e3) — and the IME's occlusion while it is up, because the raised
-    // keyboard hides the tab bar and its band must not stack on the IME's. See
-    // `centeredBand` above.
-    <StateSurfaceInsets bottomInset={centeredBand}>
+    <StateSurfaceInsets bottomInset={centeredBottomInset}>
       <View className="flex-1 bg-background">
-        <ScreenHeader
+        <SessionListHeader
           title={t('common.agents')}
-          eyebrow={
-            // The count is an assertion about the current snapshot, so it is
-            // withheld whenever that snapshot cannot be confirmed: while the
-            // list is unresolved (loading or membership unknown) and while the
-            // live query is in an error state, exactly as the tab badge is. An
-            // accepted-empty snapshot is confirmed but names no live sessions,
-            // so it withholds the count too, matching the badge's hide-at-zero,
-            // and the empty card below is the sole live-session content. The
-            // cached rows themselves stay on screen, so a failed refresh never
-            // blanks the list it kept.
-            !sessions.isLoading && !sessions.isError && hasLiveRows
-              ? t('agents.liveCount', { count: activeSessions.length })
-              : undefined
+          tabHeader={tabHeader}
+          headerAction={historyAction}
+          searchOpen={showSearch}
+          onOpenSearch={() => {
+            if (showSearch) {
+              query.searchInputRef.current?.focus();
+            } else {
+              setSearchOpen(true);
+            }
+          }}
+          canFilter={query.canFilter}
+          activeFilterCount={query.activeFilterCount}
+          onOpenFilters={() => {
+            Keyboard.dismiss();
+            setShowFilterModal(true);
+          }}
+          search={
+            <SessionListSearchHeader
+              inputRef={query.searchInputRef}
+              hasText={query.searchQuery.length > 0}
+              showSearchBusy={false}
+              onChangeText={query.handleSearchChange}
+              defaultValue={query.searchQuery}
+              compact
+              onClearSearch={query.handleClearSearch}
+            />
           }
-          reserveEyebrow
-          size="large"
-          showBackButton={false}
-          className="px-[22px] pb-1"
-          // An accepted empty live list carries the history route in its body
-          // (`LiveSessionListEmptyState`'s `historyAction`), so the controls row
-          // is withheld there: the empty state renders exactly one history
-          // control instead of a duplicate in the header. Rows, pending, and
-          // error keep the full row byte-identical, and the search/filter
-          // no-match body is a `rows` state
-          // (`hasLiveRows && visibleSessions.length === 0`), so its row stays.
-          inlineActions={content === 'empty' ? undefined : headerActions}
-          inlineActionsWidth={inlineActionsWidth}
         />
-        {hasLiveRows || isSearching ? (
-          <SessionListSearchHeader
-            inputRef={query.searchInputRef}
-            hasText={query.searchQuery.length > 0}
-            showSearchBusy={false}
-            onChangeText={query.handleSearchChange}
-            onClearSearch={query.handleClearSearch}
-          />
-        ) : null}
-        {keyboardContainerKind === 'app-aware-padding' ? (
-          <AppAwareKeyboardPaddingView className="flex-1">{region}</AppAwareKeyboardPaddingView>
-        ) : (
-          <KeyboardAvoidingView className="flex-1" behavior="padding">
-            {region}
-          </KeyboardAvoidingView>
-        )}
+        {/* Android runs edge-to-edge and never resizes the window for the IME,
+            so the keyboard is cleared natively: `KeyboardProvider` measures the
+            IME and this view lifts by the overlap it reports. */}
+        <KeyboardAvoidingView className="flex-1" behavior="padding">
+          {region}
+        </KeyboardAvoidingView>
         {/* Empty content owns its creation action; the no-match body owns the band. */}
         {showFab && <SessionListFab organizationId={organizationId} style={fabStyle} />}
-        {showFilterModal && (
-          <SessionFilterModal
-            selectedPlatforms={query.platformFilter}
-            selectedProjects={query.projectFilter}
-            projectOptions={query.options.projectOptions}
-            platformOptions={query.options.platformOptions}
-            onClose={() => {
-              setShowFilterModal(false);
-            }}
-            onApply={query.handleApplyFilters}
-          />
-        )}
+        <SessionFilterModal
+          visible={showFilterModal}
+          selectedPlatforms={query.platformFilter}
+          selectedProjects={query.projectFilter}
+          projectOptions={query.options.projectOptions}
+          platformOptions={query.options.platformOptions}
+          onClose={() => {
+            setShowFilterModal(false);
+          }}
+          onApply={query.handleApplyFilters}
+        />
       </View>
     </StateSurfaceInsets>
   );

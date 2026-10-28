@@ -96,4 +96,52 @@ describe('authMiddleware', () => {
       connectionString: 'postgres://test',
     });
   });
+
+  it('preserves verified scope for prepareSession and rejects every other Worker tRPC path', async () => {
+    const cloudAgentAuthority = {
+      version: 1 as const,
+      ownerId: 'user-1',
+      parentSessionId: 'workspace_12345678-1234-4234-8234-123456789abc',
+      organizationId: null,
+      authorizationId: '12345678-1234-4234-8234-123456789abc',
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+    };
+    vi.mocked(validateKiloToken).mockResolvedValue({
+      success: true,
+      userId: 'user-1',
+      token: 'scoped-token',
+      cloudAgentAuthority,
+    });
+    const app = new Hono<HonoContext>();
+    app.use('/trpc/*', authMiddleware);
+    app.post('/trpc/:procedure', c => c.json({ authority: c.get('cloudAgentAuthority') }));
+    const env = {
+      NEXTAUTH_SECRET: 'secret',
+      HYPERDRIVE: { connectionString: 'postgres://fixture' },
+    } as Env;
+    const allowed = await app.fetch(
+      new Request('https://worker.test/trpc/prepareSession', { method: 'POST' }),
+      env
+    );
+    expect(allowed.status).toBe(200);
+    expect(await allowed.json()).toEqual({ authority: cloudAgentAuthority });
+    expect(validateKiloToken).toHaveBeenCalledWith(
+      null,
+      expect.objectContaining({ allowCloudAgentAuthority: true })
+    );
+    for (const path of [
+      'start',
+      'send',
+      'updateSession',
+      'getSession',
+      'createWorktreeChat',
+      'prepareSession,send',
+    ]) {
+      const denied = await app.fetch(
+        new Request(`https://worker.test/trpc/${path}`, { method: 'POST' }),
+        env
+      );
+      expect(denied.status).toBe(403);
+    }
+  });
 });

@@ -1,6 +1,8 @@
+import type { SessionId } from './types/ids.js';
+import type { EnvironmentBuild } from './environment-build/environment-build-do.js';
 import type { getSandbox, ExecutionSession, Sandbox } from '@cloudflare/sandbox';
-import type { CloudAgentSession } from './persistence/CloudAgentSession.js';
 import type { CloudAgentQueueReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
+import type { CloudAgentAuthority } from '@kilocode/worker-utils/cloud-agent-authority';
 import type {
   GitHubRepositoryAuthorizationFailureReason,
   GitHubRepositoryAuthorizationResult,
@@ -9,12 +11,14 @@ import type { AccessibleCloudAgentSession } from '@kilocode/worker-utils/cloud-a
 import type { UserKiloFacade } from './kilo-facade/user-kilo-facade.js';
 import type { SandboxControlV2 as SandboxControl } from './control-plane/sandbox/sandbox-do.js';
 import type { SandboxSessionV2 as SandboxSession } from './control-plane/session/session-do.js';
+import type { VercelSnapshotBuild } from './persistence/VercelSnapshotBuild.js';
 import type { SandboxContainers } from './sandbox-containers/SandboxContainers.js';
 import type { StreamTicketNonceDO } from './persistence/StreamTicketNonceDO.js';
 // Type-only exception to "no reverse import from production code": erased at
 // build time, so it cannot make the e2e sink reachable or ship e2e code.
 import type { E2eCallbackSink } from './persistence/E2eCallbackSink.js';
 import type { CallbackJob } from './callbacks/index.js';
+import { AGENT_SANDBOX_PROVIDERS, type AgentSandboxProvider } from './shared/sandbox-provider.js';
 import type { NotificationsBinding } from './notifications-binding.js';
 import type { SessionIngestBinding } from './session-ingest-binding.js';
 import type { ContainerUsageRpcMethods } from '@kilocode/container-usage';
@@ -138,15 +142,16 @@ export type SandboxId =
   | `istd-${string}`
   | `crv-${string}`
   | `dind-${string}`
+  | `sbx-${string}`
   | `${string}__${string}`
   | `${string}__${string}__${string}`;
 
-export const agentSandboxProviderSchema = z.enum(['cloudflare', 'vercel', 'cloudflare-containers']);
+export const agentSandboxProviderSchema = z.enum(AGENT_SANDBOX_PROVIDERS);
 
-export type AgentSandboxProvider = z.infer<typeof agentSandboxProviderSchema>;
+export type { AgentSandboxProvider };
 
 /** Unique identifier for a session within a sandbox */
-export type SessionId = `agent_${string}` | `workspace_${string}`;
+export type { SessionId } from './types/ids.js';
 
 export type SessionContext = {
   sandboxId: SandboxId;
@@ -264,7 +269,8 @@ type IssueGitHubSessionCapabilityResult =
 type RedeemGitHubSessionCapabilityResult =
   | {
       success: true;
-      authorization: string;
+      /** Null means the request is forwarded anonymously. */
+      authorization: string | null;
       installationId?: string;
       source?: 'user' | 'installation';
       appType?: 'standard' | 'lite';
@@ -533,14 +539,16 @@ export type Env = {
   SandboxCodeReview: DurableObjectNamespace<Sandbox>;
   /** Durable Object namespace for ephemeral Code Reviewer sandbox containers with SCM credential containment */
   SandboxCodeReviewContainment: DurableObjectNamespace<Sandbox>;
-  /** Durable Object namespace for CloudAgentSession metadata (SQLite-backed) with RPC support */
-  CLOUD_AGENT_SESSION: DurableObjectNamespace<CloudAgentSession>;
   /** Durable Object namespace for sandbox-scoped wrapper call-home control */
   SANDBOX_CONTROL: DurableObjectNamespace<SandboxControl>;
+  /** Durable Object namespace for organization-scoped BYOC runtime snapshot builds. */
+  VERCEL_SNAPSHOT_BUILD?: DurableObjectNamespace<VercelSnapshotBuild>;
   /** Durable Object namespace for control-plane sessions */
   SANDBOX_SESSION: DurableObjectNamespace<SandboxSession>;
   /** Durable Object namespace for DO-managed Cloudflare containers (control-plane only) */
   SANDBOX_CONTAINERS: DurableObjectNamespace<SandboxContainers>;
+  /** One environment build coordinator per repository environment id. */
+  ENVIRONMENT_BUILD: DurableObjectNamespace<EnvironmentBuild>;
   /** Durable Object namespace for per-user Kilo SDK facade coordination */
   USER_KILO_FACADE: DurableObjectNamespace<UserKiloFacade>;
   /** Durable Object namespace for one-time stream/terminal ticket nonce consumption */
@@ -557,8 +565,14 @@ export type Env = {
   INTERNAL_API_SECRET_PROD: SecretsStoreSecret;
   /** R2 bucket for storing session logs */
   R2_BUCKET: R2Bucket;
-  /** R2 bucket used by Cloudflare Sandbox directory backups */
-  BACKUP_BUCKET?: R2Bucket;
+  /** Optional until a downloaded target provisions its private artifact bucket. */
+  RUNTIME_RELEASE_BUCKET?: R2Bucket;
+  RUNTIME_STARTUP_MODE?: string;
+  NATIVE_RUNTIME_IMAGE?: string;
+  /** Comma-separated org UUIDs whose interactive web routes use the scoped startup target. */
+  RUNTIME_INTERACTIVE_ORG_IDS?: string;
+  /** SHA-256 of the private R2 descriptor; existing allocations can retain inline JSON. */
+  RUNTIME_RELEASE_DESCRIPTOR?: string;
   /** Queue for callback messages (optional - supports incremental rollout) */
   CALLBACK_QUEUE?: Queue<CallbackJob>;
   /** Dedicated best-effort Cloud Agent reporting queue. */
@@ -577,8 +591,12 @@ export type Env = {
   WS_ALLOWED_ORIGINS?: string;
   /** Backend base URL (used for balance checks before session spin-up) */
   KILOCODE_BACKEND_BASE_URL?: string;
+  /** Optional organization context for model catalog validation. */
+  KILOCODE_ORG_ID_OVERRIDE?: string;
   /** Base URL override for OpenRouter-compatible Kilo API */
   KILO_OPENROUTER_BASE?: string;
+  /** Local-dev override for the scoped subagent-launch MCP endpoint; never set in deployed config */
+  CLOUD_AGENT_MCP_URL_OVERRIDE?: string;
   /** Kilocode CLI timeout override (seconds) */
   CLI_TIMEOUT_SECONDS?: string;
   /** Experimental default shell-tool timeout (ms) forwarded to the Kilo server */
@@ -604,15 +622,16 @@ export type Env = {
   GITHUB_APP_BOT_USER_ID?: string;
   /** Comma-separated org IDs that use per-session Cloudflare sandbox containers */
   PER_SESSION_SANDBOX_ORG_IDS?: string;
-  /** Comma-separated user or org IDs admitted to the call-home control plane for interactive web creates. `*` includes personal. */
-  CONTROL_PLANE_IDS?: string;
-  WORKTREE_CREATION_ENABLED_IDS?: string;
+  /** 'true' disables the per-account concurrent-container cap. Set only on the disposable e2e Worker. */
+  CLOUD_AGENT_CONTAINER_CONCURRENCY_DISABLED?: string;
+  /** Comma-separated user or org IDs whose Code Reviewer sessions use the Cloudflare Containers runtime. `*` includes personal. */
+  CODE_REVIEW_CONTAINERS_ORG_IDS?: string;
+  /** User or organization IDs enrolled in customer-paid Vercel compute. */
+  BYOC_VERCEL_IDS?: string;
   RUNTIME_ISOLATION_ENABLED?: string;
   /** Comma-separated user or org IDs allowed to pick a sandbox destination. `*` includes personal. */
   SANDBOX_SELECTION_IDS?: string;
   CREDENTIAL_CONTAINMENT_ENABLED?: string;
-  /** Comma-separated org IDs that receive workspace repo snapshots, or '*' for all */
-  REPO_SNAPSHOT_ORG_IDS?: string;
   /**
    * Wrapper-side tool/server memory cgroup partition configuration. See
    * MEMORY_CGROUPS_PLAN.md (W4).
@@ -623,18 +642,13 @@ export type Env = {
   TOOL_CGROUP_OOM_GROUP?: string;
   TOOL_CGROUP_CPU_WEIGHT?: string;
   TOOL_CGROUP_SERVER_CPU_WEIGHT?: string;
-  VERCEL_TOKEN?: string;
-  VERCEL_TEAM_ID?: string;
-  VERCEL_PROJECT_ID?: string;
-  VERCEL_SANDBOX_SNAPSHOT_ID?: string;
-  VERCEL_SANDBOX_RUNTIME_BUILD_ID?: string;
   VERCEL_SANDBOX_RUNTIME?: string;
   VERCEL_SANDBOX_INITIAL_TIMEOUT_MS?: string;
   VERCEL_SANDBOX_EXTEND_DURATION_MS?: string;
-  /** Comma-separated org IDs routed to Vercel. Empty is off. `*` includes personal. */
-  VERCEL_SANDBOX_ORG_IDS?: string;
   /** Comma-separated org IDs routed to DO-managed Cloudflare containers. Empty is off. `*` includes personal. */
   CLOUDFLARE_CONTAINERS_ORG_IDS?: string;
+  /** Explicit organization IDs allowed to build and restore environment snapshots. Empty is off. */
+  ENVIRONMENT_SNAPSHOT_ORG_IDS?: string;
   /** R2 endpoint for S3-compatible API access (presigned URL generation) */
   R2_ENDPOINT?: string;
   /** R2 read-only access key ID for downloading image attachments */
@@ -643,20 +657,19 @@ export type Env = {
   R2_ATTACHMENTS_READONLY_SECRET_ACCESS_KEY?: string;
   /** R2 bucket name for image attachments */
   R2_ATTACHMENTS_BUCKET?: string;
-  /** R2 bucket name used by Cloudflare Sandbox directory backups */
-  BACKUP_BUCKET_NAME?: string;
-  /** Cloudflare account ID used for R2 backup presigning */
-  CLOUDFLARE_R2_ACCOUNT_ID?: string;
-  /** R2 access key ID used for backup uploads */
-  R2_ACCESS_KEY_ID?: string;
-  /** R2 secret access key used for backup uploads */
-  R2_SECRET_ACCESS_KEY?: string;
   /**
    * Hyperdrive binding for reading Postgres (agent environment profiles).
    * The `connectionString` is proxied through Hyperdrive so the worker
    * authenticates against Hyperdrive, not directly against Postgres.
    */
   HYPERDRIVE: Hyperdrive;
+  /**
+   * Wildcard suffix for hostname-dispatched previews (for example `localhost`
+   * locally or a dedicated zone in production). Unset disables the feature.
+   */
+  PREVIEW_HOST_SUFFIX?: string;
+  /** Comma-separated user or org IDs shown the preview UI. `*` includes personal. Unset shows nobody. */
+  PREVIEW_ENABLED_IDS?: string;
 };
 
 export type ValidatedSessionAccess = AccessibleCloudAgentSession & {
@@ -666,6 +679,7 @@ export type ValidatedSessionAccess = AccessibleCloudAgentSession & {
 
 /** tRPC context passed to all procedures */
 export type TRPCContext = {
+  cloudAgentAuthority?: CloudAgentAuthority;
   env: Env;
   userId: string;
   request: Request;

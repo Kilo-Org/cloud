@@ -154,6 +154,8 @@ export const controlDiagnosticFieldsSchema = z
       'kilo_restarting',
       'kilo_restarted',
       'kilo_restart_failed',
+      'kilo_memory_hold_started',
+      'kilo_memory_hold_ended',
       'prepare_failed',
       'session_ready',
       'session_outcome',
@@ -239,6 +241,9 @@ export const controlDiagnosticFieldsSchema = z
     preparationStep: controlPlanePreparationStepSchema.optional(),
     subtype: controlPlaneWorkspaceFailureSubtypeSchema.optional(),
     kiloRestartReason: kiloRestartFaultReasonSchema.optional(),
+    memoryHoldOutcome: z
+      .enum(['recovered', 'cleared', 'expired', 'restarted', 'stopped'])
+      .optional(),
     interceptTrustFailure: z
       .enum(['cert_unavailable', 'cert_unreadable', 'cert_append_failed'])
       .optional(),
@@ -304,6 +309,20 @@ export const controlDiagnosticFieldsSchema = z
     connectionId: identifier.optional(),
     incarnation: identifier.optional(),
     elapsedMs: milliseconds.optional(),
+    directoryValidationMs: milliseconds.optional(),
+    deletionFenceMs: milliseconds.optional(),
+    manifestDiscoveryMs: milliseconds.optional(),
+    sessionAbortMs: milliseconds.optional(),
+    manifestGrowthMs: milliseconds.optional(),
+    processCleanupMs: milliseconds.optional(),
+    terminalCleanupMs: milliseconds.optional(),
+    sessionDeleteMs: milliseconds.optional(),
+    sessionDeleteConfirmationMs: milliseconds.optional(),
+    sessionDeleteUnconfirmedMs: milliseconds.optional(),
+    directoryDisposeMs: milliseconds.optional(),
+    runtimeRetirementMs: milliseconds.optional(),
+    directoryRemovalMs: milliseconds.optional(),
+    rootDetachMs: milliseconds.optional(),
     deadlineAt: milliseconds.optional(),
     lastSentAt: milliseconds.optional(),
     sinceLastSentMs: milliseconds.optional(),
@@ -365,7 +384,7 @@ export const controlDiagnosticFieldsSchema = z
     questionQueryPending: z.boolean().optional(),
     permissionQueryPending: z.boolean().optional(),
     workloadPhase: z
-      .enum(['probe', 'applied', 'migration', 'oom', 'stats', 'rollback', 'failed'])
+      .enum(['probe', 'applied', 'protection', 'migration', 'oom', 'stats', 'rollback', 'failed'])
       .optional(),
     workloadFailure: z
       .enum([
@@ -377,6 +396,7 @@ export const controlDiagnosticFieldsSchema = z
         'controller_unavailable',
         'readback_mismatch',
         'write_failed',
+        'oom_score_write_failed',
         'unavailable',
         'pid_changed',
         'membership_unconfirmed',
@@ -384,18 +404,30 @@ export const controlDiagnosticFieldsSchema = z
       .optional(),
     containerLimitBytes: count.optional(),
     aggregateMaxBytes: count.optional(),
+    toolsMaxBytes: count.optional(),
     reserveBytes: count.optional(),
     appliedMaxBytes: count.optional(),
     readbackMaxBytes: count.optional(),
+    serverMinBytes: count.optional(),
     currentBytes: count.optional(),
     peakBytes: count.optional(),
+    anonBytes: count.optional(),
+    fileBytes: count.optional(),
+    shmemBytes: count.optional(),
+    toolCurrentBytes: count.optional(),
+    toolPeakBytes: count.optional(),
+    serverCurrentBytes: count.optional(),
+    serverPeakBytes: count.optional(),
     oomKills: count.optional(),
     oomGroupKills: count.optional(),
+    toolOomKills: count.optional(),
+    serverOomKills: count.optional(),
     migratedCount: count.optional(),
     toolCount: count.optional(),
     serverCount: count.optional(),
     pressureSomeTotal: count.optional(),
     pressureFullTotal: count.optional(),
+    pressureAvailable: z.boolean().optional(),
     memoryMaxEvents: count.optional(),
     memoryOomEvents: count.optional(),
     cpuUsageUsec: count.optional(),
@@ -407,6 +439,12 @@ export const controlDiagnosticFieldsSchema = z
     serverCpuUsageUsec: count.optional(),
     toolIoReadBytes: count.optional(),
     toolIoWriteBytes: count.optional(),
+    toolAnonBytes: count.optional(),
+    toolFileBytes: count.optional(),
+    toolShmemBytes: count.optional(),
+    serverAnonBytes: count.optional(),
+    serverFileBytes: count.optional(),
+    serverShmemBytes: count.optional(),
     cpuController: z.boolean().optional(),
     siblingProtection: z.boolean().optional(),
     workloadLimitSource: z.enum(['cgroup', 'explicit', 'meminfo']).optional(),
@@ -434,7 +472,6 @@ export const controlDiagnosticRecordSchema = z
   .strict();
 
 export type ControlDiagnosticRecord = z.infer<typeof controlDiagnosticRecordSchema>;
-export type RetirementCause = NonNullable<ControlDiagnosticRecord['fields']['retirementCause']>;
 
 const NON_PROJECTABLE_PHASES = new Set(['keepalive_sent', 'keepalive_failed', 'retry_scheduled']);
 const PROJECTABLE_SOCKET_PHASES = new Set(['closed', 'connect_attempt', 'hello_rejected']);
@@ -448,6 +485,8 @@ const PROJECTABLE_LIFECYCLE_PHASES = new Set([
   'kilo_restarting',
   'kilo_restarted',
   'kilo_restart_failed',
+  'kilo_memory_hold_started',
+  'kilo_memory_hold_ended',
   'prepare_failed',
   'session_ready',
   'session_outcome',
@@ -503,44 +542,9 @@ export function isProjectableControlDiagnostic(
   }
 }
 
-const retirementCauseByReason = new Map<string, RetirementCause>([
-  ['Kilo event feed is no longer healthy', 'event_feed_unhealthy'],
-  ['feed_stale', 'event_feed_unhealthy'],
-  ['feed_reconnected', 'event_feed_unhealthy'],
-  ['feed_ended', 'event_feed_unhealthy'],
-  ['feed_failed', 'event_feed_unhealthy'],
-  ['process_exited', 'process_exited'],
-  ['credential_refresh_failed', 'credential_refresh_failed'],
-  ['Sandbox control connection lost', 'control_disconnected'],
-  ['control_disconnected', 'control_disconnected'],
-  ['Preparation event delivery failed', 'preparation_delivery_failed'],
-  ['Sandbox shutting down', 'requested_shutdown'],
-  ['Wrapper received SIGTERM', 'sigterm'],
-  ['Wrapper received SIGINT', 'sigint'],
-  ['Wrapper uncaught exception', 'uncaught_exception'],
-  ['Wrapper unhandled rejection', 'unhandled_rejection'],
-  ['Kilo cancellation failed', 'cancellation_failed'],
-  ['Kilo cancellation was not confirmed', 'cancellation_failed'],
-  ['Native cancellation did not settle', 'cancellation_failed'],
-  ['Session outcome delivery failed', 'outcome_delivery_failed'],
-  ['Session event delivery failed', 'outcome_delivery_failed'],
-  ['Execution exceeded the 60 minute limit', 'execution_deadline'],
-  ['Session preparation timed out', 'preparation_deadline'],
-]);
-
 export function diagnosticDetail(value: string): string | undefined {
   const detail = value.trim().slice(0, 128);
   return detail === '' ? undefined : detail;
-}
-
-export function classifyRetirementCause(...reasons: string[]): RetirementCause {
-  for (const reason of reasons) {
-    const mapped = retirementCauseByReason.get(reason);
-    if (mapped) return mapped;
-    if (reason.startsWith('feed_')) return 'event_feed_unhealthy';
-    if (reason.startsWith('Session event delivery')) return 'outcome_delivery_failed';
-  }
-  return 'unknown';
 }
 
 export const controlLogIdentitySchema = z
@@ -564,11 +568,6 @@ export const controlLogBatchSchema = z
   .strict();
 
 export type ControlLogBatch = z.infer<typeof controlLogBatchSchema>;
-
-export function diagnosticSyncStatus(value: unknown): z.infer<typeof syncStatusSchema> {
-  const parsed = syncStatusSchema.safeParse(value);
-  return parsed.success ? parsed.data : 'other';
-}
 
 export function isUnreapedOwnedProcessDiagnostic(record: ControlDiagnosticRecord): boolean {
   return (

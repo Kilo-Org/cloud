@@ -1,4 +1,5 @@
 'use client';
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 import {
   useOrganizationSubscription,
   useOrganizationWithMembers,
@@ -124,7 +125,7 @@ export function OrganizationSubscription({
                     <Button
                       variant="outline"
                       className="w-64 justify-center"
-                      onClick={() => (window.location.href = 'mailto:teams@kilocode.ai')}
+                      onClick={() => (window.location.href = `mailto:${SUPPORT_EMAIL}`)}
                     >
                       <Mail className="mr-2 h-4 w-4" />
                       Contact Support

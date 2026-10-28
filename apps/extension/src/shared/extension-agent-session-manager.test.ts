@@ -30,8 +30,6 @@ const { getCloudAgentWsUrl } = await import('./cloud-agent-config');
 const SESSION_ID = 'ses_test_session_id_0000000001' as KiloSessionId;
 const CLOUD_AGENT_ID = 'agent_12345678-1234-1234-1234-123456789abc';
 
-// ---- tRPC mock helpers ----
-
 function mockQuery(result: unknown) {
   return vi.fn(async () => result);
 }
@@ -144,10 +142,6 @@ function withFakeFetch(response: Response) {
   };
 }
 
-// ===========================================================================
-// ReadFetchSessionErrorCode
-// ===========================================================================
-
 describe('readFetchSessionErrorCode', () => {
   it('reads data.code', () => {
     expect(readFetchSessionErrorCode({ data: { code: 'NOT_FOUND' } })).toBe('NOT_FOUND');
@@ -166,10 +160,6 @@ describe('readFetchSessionErrorCode', () => {
     expect(readFetchSessionErrorCode('nope')).toBeUndefined();
   });
 });
-
-// ===========================================================================
-// FetchSessionWithNotFoundRetry
-// ===========================================================================
 
 describe('fetchSessionWithNotFoundRetry', () => {
   type QueryFn = NonNullable<Parameters<typeof fetchSessionWithNotFoundRetry>[1]>['query'];
@@ -268,10 +258,6 @@ describe('fetchSessionWithNotFoundRetry', () => {
   });
 });
 
-// ===========================================================================
-// CreateExtensionAgentSessionManager
-// ===========================================================================
-
 describe('createExtensionAgentSessionManager', () => {
   beforeEach(() => {
     capturedConfig = null;
@@ -286,8 +272,6 @@ describe('createExtensionAgentSessionManager', () => {
     expect(capturedConfig!.lifecycleHooks).toBeTruthy();
     expect(capturedConfig!.websocketBaseUrl).toBe(getCloudAgentWsUrl());
   });
-
-  // ---- resolveSession ----
 
   describe('resolveSession', () => {
     it('returns cloud-agent when cloud_agent_session_id is present', async () => {
@@ -412,8 +396,6 @@ describe('createExtensionAgentSessionManager', () => {
       expect(listQuery).toHaveBeenCalledWith({ organizationId: null });
     });
   });
-
-  // ---- getTicket ----
 
   describe('getTicket', () => {
     it('builds correct ticket URL and returns ticket', async () => {
@@ -544,8 +526,6 @@ describe('createExtensionAgentSessionManager', () => {
     });
   });
 
-  // ---- fetchSnapshot ----
-
   describe('fetchSnapshot', () => {
     it('fetches session data and messages in parallel', async () => {
       const trpc = makeTrpcMock();
@@ -569,8 +549,6 @@ describe('createExtensionAgentSessionManager', () => {
       expect(snapshot.messages).toStrictEqual([{ info: { role: 'user', time: {} }, parts: [] }]);
     });
   });
-
-  // ---- fetchSnapshotPage ----
 
   describe('fetchSnapshotPage', () => {
     it('returns empty success when history is null', async () => {
@@ -1246,8 +1224,6 @@ describe('createExtensionAgentSessionManager', () => {
     });
   });
 
-  // ---- API (personal) ----
-
   describe('api (personal — organizationId = null)', () => {
     function setup() {
       const trpc = makeTrpcMock();
@@ -1278,6 +1254,7 @@ describe('createExtensionAgentSessionManager', () => {
       const trpc = setup();
       await capturedConfig!.api.send({
         attachments: { files: [], path: '/f', type: 'file' } as never,
+        messageId: 'msg_123456789abc123456789ABC04',
         payload: { mode: 'code', model: 'gpt', prompt: 'hi', type: 'prompt' },
         sessionId: CLOUD_AGENT_ID as never,
       });
@@ -1334,8 +1311,6 @@ describe('createExtensionAgentSessionManager', () => {
     });
   });
 
-  // ---- API (org) ----
-
   describe('api (organization)', () => {
     function setup() {
       const trpc = makeTrpcMock();
@@ -1351,6 +1326,7 @@ describe('createExtensionAgentSessionManager', () => {
     it('send calls org cloudAgentNext.sendMessage including organizationId', async () => {
       const trpc = setup();
       await capturedConfig!.api.send({
+        messageId: 'msg_123456789abc123456789ABC03',
         payload: { mode: 'code', model: 'gpt', prompt: 'hi', type: 'prompt' },
         sessionId: CLOUD_AGENT_ID as never,
       });
@@ -1422,8 +1398,6 @@ describe('createExtensionAgentSessionManager', () => {
       );
     });
   });
-
-  // ---- prepare / initiate ----
 
   describe('prepare', () => {
     it('calls personal prepareSession when organizationId is null', async () => {
@@ -1526,8 +1500,6 @@ describe('createExtensionAgentSessionManager', () => {
     });
   });
 
-  // ---- fetchSession ----
-
   describe('fetchSession', () => {
     it('maps getWithRuntimeState result to FetchedSessionData with runtimeState', async () => {
       const trpc = makeTrpcMock();
@@ -1568,7 +1540,6 @@ describe('createExtensionAgentSessionManager', () => {
         kiloSessionId: SESSION_ID,
         mode: 'code',
         model: 'gpt-4',
-        needsLegacyPrepare: false,
         organizationId: null,
         prompt: 'do stuff',
         repository: 'user/repo',
@@ -1577,46 +1548,6 @@ describe('createExtensionAgentSessionManager', () => {
         variant: 'thinking',
       });
       expect(data.runtimeAgents).toStrictEqual([{ name: 'Ask', slug: 'ask' }]);
-    });
-
-    it('maps needsLegacyPrepare when cloud_agent_session_id exists but no runtimeState', async () => {
-      const trpc = makeTrpcMock();
-      trpc.cliSessionsV2.getWithRuntimeState.query = mockQuery({
-        associatedPr: null,
-        cloud_agent_session_id: CLOUD_AGENT_ID,
-        created_on_platform: 'cli',
-        git_branch: null,
-        git_url: null,
-        organization_id: null,
-        runtimeState: null,
-        session_id: SESSION_ID,
-        title: null,
-        total_cost_microdollars: null,
-      });
-      const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
-      createExtensionAgentSessionManager(opts);
-      const data = await capturedConfig!.fetchSession(SESSION_ID);
-      expect(data.needsLegacyPrepare).toBe(true);
-    });
-
-    it('sets needsLegacyPrepare false when cloud_agent_session_id is empty string', async () => {
-      const trpc = makeTrpcMock();
-      trpc.cliSessionsV2.getWithRuntimeState.query = mockQuery({
-        associatedPr: null,
-        cloud_agent_session_id: '',
-        created_on_platform: 'cli',
-        git_branch: null,
-        git_url: null,
-        organization_id: null,
-        runtimeState: null,
-        session_id: SESSION_ID,
-        title: null,
-        total_cost_microdollars: null,
-      });
-      const opts = { ...makeDefaultOptions(), trpcClient: trpc as never };
-      createExtensionAgentSessionManager(opts);
-      const data = await capturedConfig!.fetchSession(SESSION_ID);
-      expect(data.needsLegacyPrepare).toBe(false);
     });
 
     it('sets isPreparingAsync true when runtimeState exists but preparedAt is missing', async () => {

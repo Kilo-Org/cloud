@@ -14,6 +14,7 @@ node_modules/
 /out/
 /build
 packages/trpc/dist/
+packages/harness-sdk/dist/
 **/wrapper/dist/
 *.tsbuildinfo
 next-env.d.ts
@@ -48,6 +49,7 @@ dev-debug-request-logs/*
 .tmp/
 test-results/
 playwright-report/
+/.e2e-evidence/
 **/playwright/.auth/
 
 # debug logs
@@ -125,7 +127,6 @@ TMP_CI_commit_msg.txt
 *.csv
 run-milvus-test.sh
 
-.beads/
 .env*.local
 .tests/
 
@@ -140,3 +141,6 @@ run-milvus-test.sh
 # Harness markers: the kwf workflow drops these in a worktree, and one
 # reached a product commit (46640f5e8e96) before it was removed by hand.
 .kwf*
+
+# Staging-only usage queue callback, created by the gateway build.
+/apps/ai-gateway/src/app/api/v1/internal/queues/usage/route.ts

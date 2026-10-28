@@ -2,6 +2,7 @@
 import { useActionSheet } from '@expo/react-native-action-sheet';
 import { type FilePart } from '@kilocode/cloud-agent-sdk';
 import { Directory, File, Paths } from 'expo-file-system';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
@@ -10,10 +11,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { toast } from 'sonner-native';
 
 import { CenteredState } from '@/components/centered-state';
-import { ImageViewerModal } from '@/components/image-viewer-modal';
+import { ImageViewer } from '@/components/ui/image-viewer';
 import { SheetHeader } from '@/components/sheet-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
-import { AlertCircle, File as FileIcon } from '@/components/ui/icons';
+import { AlertCircle, File as FileIcon, Share } from '@/components/ui/icons';
 import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -35,12 +36,18 @@ import { stripDataUrlBase64Prefix } from './tool-card-image-cache';
 
 const CACHE_DIR_NAME = 'session-file-parts';
 
+/** 16:9 surface for an inline video part, matching the image part's frame. */
+const VIDEO_STYLE = { width: '100%', aspectRatio: 16 / 9 } as const;
+
 function cacheFilenameForPart(part: Pick<FilePart, 'id' | 'mime' | 'filename'>): string {
   return getSafeCacheFilename({ id: part.id, filename: part.filename ?? 'file' });
 }
 
 /** Write a base64 `data:` payload to the cache and return the file. */
-function writeDataUrlToCache(url: string, part: Pick<FilePart, 'id' | 'mime' | 'filename'>): File {
+async function writeDataUrlToCache(
+  url: string,
+  part: Pick<FilePart, 'id' | 'mime' | 'filename'>
+): Promise<File> {
   const payload = stripDataUrlBase64Prefix(url, part.mime);
   if (payload === undefined) {
     throw new Error('decode-failed');
@@ -48,7 +55,7 @@ function writeDataUrlToCache(url: string, part: Pick<FilePart, 'id' | 'mime' | '
   const directory = new Directory(Paths.cache, CACHE_DIR_NAME);
   directory.create({ idempotent: true, intermediates: true });
   const file = new File(directory, cacheFilenameForPart(part));
-  file.write(payload, { encoding: 'base64' });
+  await file.write(payload, { encoding: 'base64' });
   return file;
 }
 
@@ -59,7 +66,7 @@ async function resolveFileText(url: string, part: Pick<FilePart, 'id' | 'mime' |
   }
 
   if (url.startsWith('data:')) {
-    const file = writeDataUrlToCache(url, part);
+    const file = await writeDataUrlToCache(url, part);
     return file.text();
   }
 
@@ -83,7 +90,7 @@ async function shareFilePart(url: string, part: FilePart): Promise<void> {
     return;
   }
   if (url.startsWith('data:')) {
-    const file = writeDataUrlToCache(url, part);
+    const file = await writeDataUrlToCache(url, part);
     await shareLocalFile(file.uri, { mimeType: part.mime });
     return;
   }
@@ -305,7 +312,7 @@ export function FilePartRenderer({ part, onLongPress }: Readonly<FilePartRendere
             ) : null}
           </Pressable>
           {viewerVisible && (
-            <ImageViewerModal
+            <ImageViewer
               visible={viewerVisible}
               uri={url}
               // i18n-dup-ok: prReview.overview.file_* is a numeral count unit ('1 file'),
@@ -359,6 +366,60 @@ export function FilePartRenderer({ part, onLongPress }: Readonly<FilePartRendere
     );
   }
 
+  if (kind === 'video') {
+    if (url) {
+      return (
+        <FilePartVideo
+          part={part}
+          url={url}
+          onLongPress={onLongPress}
+          onShare={() => {
+            void handleShare();
+          }}
+          sharing={sharing}
+          shareError={shareError}
+        />
+      );
+    }
+    if (resolved.status === 'resolving') {
+      return (
+        <View
+          className="my-1 flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900"
+          accessibilityLabel={t('common.loading')}
+        >
+          <ActivityIndicator size="small" />
+          <Text className="text-xs text-muted-foreground">{t('common.loading')}</Text>
+        </View>
+      );
+    }
+    if (resolved.status === 'error') {
+      return (
+        <Pressable
+          onLongPress={onLongPress}
+          onPress={() => {
+            resolved.retry?.();
+          }}
+          className="my-1 flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 active:opacity-80 dark:bg-neutral-900"
+          accessibilityRole="button"
+          accessibilityLabel={t('agentChat.filePart.retryLoadingFile')}
+        >
+          <AlertCircle size={14} color={colors.mutedForeground} />
+          <Text className="text-xs text-muted-foreground">
+            {t('agentChat.filePart.couldNotLoadFile')}
+          </Text>
+        </Pressable>
+      );
+    }
+    return (
+      <View className="my-1 flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900">
+        <AlertCircle size={14} color={colors.mutedForeground} />
+        <Text className="text-xs text-muted-foreground">
+          {t('agentChat.filePart.fileUnavailableInSession')}
+        </Text>
+      </View>
+    );
+  }
+
   return (
     <>
       <Pressable
@@ -403,6 +464,79 @@ export function FilePartRenderer({ part, onLongPress }: Readonly<FilePartRendere
         />
       ) : null}
     </>
+  );
+}
+
+type FilePartVideoProps = {
+  part: FilePart;
+  url: string;
+  onLongPress?: () => void;
+  onShare: () => void;
+  sharing: boolean;
+  shareError: string | null;
+};
+
+/**
+ * Inline video surface. Native controls own play, scrub and fullscreen, so the
+ * viewer has no separate screen: the part plays in the transcript like an
+ * image. The share control reuses the file part's share path, and a share
+ * failure renders inline below the frame because the toast layer sits behind a
+ * presented sheet.
+ */
+function FilePartVideo({
+  part,
+  url,
+  onLongPress,
+  onShare,
+  sharing,
+  shareError,
+}: Readonly<FilePartVideoProps>) {
+  const { t } = useTranslation();
+  const colors = useThemeColors();
+  const player = useVideoPlayer(url, videoPlayer => {
+    videoPlayer.loop = false;
+  });
+
+  return (
+    <View className="my-1">
+      <View className="overflow-hidden rounded-lg bg-neutral-100 dark:bg-neutral-900">
+        <VideoView
+          player={player}
+          nativeControls
+          contentFit="contain"
+          style={VIDEO_STYLE}
+          accessibilityLabel={getFilePartAccessibilityLabel('video', part.filename)}
+        />
+      </View>
+      <View className="mt-1 flex-row items-center gap-2">
+        <Text
+          onLongPress={onLongPress}
+          className="min-w-0 flex-1 text-xs text-muted-foreground"
+          numberOfLines={1}
+        >
+          {/* i18n-dup-ok: prReview.overview.file_* is a numeral count unit ('1 file'),
+              which languages inflect by number; this key is the standalone noun label. */}
+          {part.filename ?? t('common.file')}
+        </Text>
+        <Pressable
+          onPress={onShare}
+          disabled={sharing}
+          accessibilityRole="button"
+          accessibilityState={{ busy: sharing }}
+          accessibilityLabel={t('common.share', { title: part.filename ?? t('common.file') })}
+          className="min-h-[44px] min-w-[44px] items-center justify-center rounded-md active:opacity-70"
+        >
+          {sharing ? (
+            <ActivityIndicator size="small" />
+          ) : (
+            <Share size={18} color={colors.mutedForeground} />
+          )}
+        </Pressable>
+      </View>
+      {shareError !== null ? (
+        <AccessibleStatus message={shareError} className="mt-1 text-xs text-destructive" />
+      ) : null}
+    </View>
   );
 }
 
@@ -507,7 +641,7 @@ function FilePreviewModal({
   }
 
   return (
-    <SessionPageSheet visible onClose={onClose}>
+    <SessionPageSheet visible onClose={onClose} dismissible>
       <SheetHeader
         // i18n-dup-ok: prReview.overview.file_* is a numeral count unit ('1 file'),
         // which languages inflect by number; this key is the standalone noun label.
@@ -521,7 +655,7 @@ function FilePreviewModal({
       />
       <AccessibleStatus message={shareError} className="px-6 pt-2 text-sm" />
       {status === 'error' || (status === 'ready' && text === '') ? (
-        <CenteredState className="px-6">
+        <CenteredState contentContainerClassName="px-6">
           <View className="items-center py-6">{renderBody()}</View>
         </CenteredState>
       ) : (

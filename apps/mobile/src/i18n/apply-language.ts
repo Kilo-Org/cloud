@@ -2,6 +2,7 @@ import { reloadAppAsync } from 'expo';
 import { I18nManager } from 'react-native';
 
 import { i18n } from '@/i18n';
+import { writeDirectionAttemptAsync } from '@/i18n/direction-attempt';
 import { type SupportedLanguage } from '@/i18n/languages';
 import { isRtlLanguage, syncRtl } from '@/i18n/rtl';
 import { type LanguageReturnTarget, writeLanguageReturnTarget } from '@/i18n/return-target';
@@ -16,6 +17,7 @@ import { prewarmIntl } from '@/lib/intl-cache';
 export type ApplyLanguageOutcome =
   | { kind: 'applied-ltr' }
   | { kind: 'restarting-rtl' }
+  | { kind: 'restart-skipped' }
   | { kind: 'reload-failed' }
   | { kind: 'persist-failed' }
   | { kind: 'catalog-failed' };
@@ -31,7 +33,9 @@ export type ApplyLanguageOutcome =
 export async function applyLanguagePreference(
   preference: LanguagePreference,
   resolved: SupportedLanguage,
-  returnTarget: LanguageReturnTarget,
+  // Optional: the manual picker reopens the screen it was on, while an
+  // agent-driven change has no screen of its own and reloads to the default.
+  returnTarget?: LanguageReturnTarget,
   beforeReload?: () => Promise<void>
 ): Promise<ApplyLanguageOutcome> {
   const needsDirectionChange = I18nManager.isRTL !== isRtlLanguage(resolved);
@@ -51,10 +55,20 @@ export async function applyLanguagePreference(
     try {
       // The return target is a convenience; the reload still applies the
       // direction change and the user lands on the default screen when this
-      // write fails.
-      await writeLanguageReturnTarget(returnTarget);
+      // write fails. A caller with no screen to reopen omits it.
+      if (returnTarget !== undefined) {
+        await writeLanguageReturnTarget(returnTarget);
+      }
     } catch {
       // Ignore: continue to the reload.
+    }
+    // Record the relaunch so a cold start that comes back with the previous
+    // direction does not relaunch again for it; the cold start then shows the
+    // retry screen instead of reloading forever. Without the record a relaunch
+    // that does not take the direction repeats on every launch, so a failed
+    // write skips the relaunch instead of risking that loop.
+    if (!(await writeDirectionAttemptAsync(resolved))) {
+      return { kind: 'restart-skipped' };
     }
     syncRtl(resolved);
     try {

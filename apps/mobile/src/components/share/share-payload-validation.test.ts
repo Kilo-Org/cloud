@@ -29,6 +29,7 @@ describe('validateMeasuredShareFiles', () => {
       if (result.kind === 'all-rejected') {
         expect(result.reason).toBe(reason);
         expect(result.message).toBe(describeClassificationFailure(reason));
+        expect(result.failedCopies).toEqual([]);
       }
     }
   });
@@ -211,6 +212,7 @@ describe('validateMeasuredShareFiles', () => {
     if (result.kind === 'all-rejected') {
       expect(result.reason).toBe('unreadable');
       expect(result.message).toBe(describeClassificationFailure('unreadable'));
+      expect(result.failedCopies).toEqual(['a.jpg']);
     }
   });
 });

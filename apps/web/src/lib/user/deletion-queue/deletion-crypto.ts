@@ -1,5 +1,5 @@
 import { decryptWithSymmetricKey, encryptWithSymmetricKey } from '@kilocode/encryption';
-import { USER_DELETION_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
+import { USER_DELETION_ENCRYPTION_KEY } from '@/lib/web-config.server';
 
 export class DeletionCryptoError extends Error {
   constructor(message: string) {

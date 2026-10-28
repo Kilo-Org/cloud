@@ -1,29 +1,15 @@
 import 'server-only';
-import { captureMessage } from '@sentry/nextjs';
-import { checkRateLimit } from '@vercel/firewall';
 import type { NextRequest } from 'next/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { getAnonymousUserId } from '@kilocode/web-shared/lib/anonymous';
 import { validateAuthorizationHeader } from '@kilocode/web-shared/lib/tokens';
+import { isFirewallRateLimited } from '@kilocode/web-shared/lib/ai-gateway/firewall-rate-limit';
 
 /**
  * Vercel Firewall rate limit that caps how much inference one account can ask
- * for. The rule lives in the project's firewall configuration; `checkRateLimit`
- * reports an unknown id as "not rate limited", so the Sentry report below is the
- * only signal that the rule has gone missing.
+ * for. The rule lives in the project's firewall configuration.
  */
 const GATEWAY_INFERENCE_RATE_LIMIT_ID = 'gateway-inference';
-
-/**
- * A missing rule disables the cap for every request an instance serves, so one
- * report a minute raises the alarm just as well as one per request. Reporting
- * per request floods Sentry at exactly the moment the cap is not working.
- *
- * The throttle is per instance, so a fleet of N instances reports up to N times
- * a minute. That is the ceiling worth paying for a module-level timestamp.
- */
-const MISSING_RULE_REPORT_INTERVAL_MS = 60_000;
-let lastMissingRuleReportAt = 0;
 
 /**
  * Builds the key the inference cap counts on, without a database query.
@@ -69,30 +55,9 @@ export async function isGatewayAccountRateLimited(
   request: NextRequest,
   accountKey: string
 ): Promise<boolean> {
-  const host = request.headers.get('host') ?? new URL(request.url).host;
-  if (!host) {
-    throw new Error('Cannot check the gateway rate limit without a host header');
-  }
-
-  const { rateLimited, error } = await checkRateLimit(GATEWAY_INFERENCE_RATE_LIMIT_ID, {
-    headers: {
-      host,
-      'x-real-ip': request.headers.get('x-real-ip') ?? '',
-      'x-forwarded-for': request.headers.get('x-forwarded-for') ?? '',
-    },
-    rateLimitKey: `${GATEWAY_INFERENCE_RATE_LIMIT_ID}:${accountKey}`,
+  return isFirewallRateLimited(request, {
+    id: GATEWAY_INFERENCE_RATE_LIMIT_ID,
+    key: accountKey,
+    sentrySource: 'gateway_inference',
   });
-
-  if (error === 'not-found') {
-    const now = Date.now();
-    if (now - lastMissingRuleReportAt >= MISSING_RULE_REPORT_INTERVAL_MS) {
-      lastMissingRuleReportAt = now;
-      captureMessage(`Firewall rate limit '${GATEWAY_INFERENCE_RATE_LIMIT_ID}' is not configured`, {
-        level: 'error',
-        tags: { source: 'gateway_inference' },
-      });
-    }
-  }
-
-  return rateLimited;
 }

@@ -1,0 +1,326 @@
+import { type ModelRequest } from '@kilocode/harness-sdk';
+import { asOffered } from '@kilocode/harness-sdk/core';
+import { Effect } from 'effect';
+import { describe, expect, it } from 'vitest';
+
+import {
+  answerOf,
+  contextWindowFor,
+  paramsOf,
+  readCompletion,
+  stopOf,
+  templateSupportsThinking,
+  templateSupportsTools,
+} from './gguf-template';
+
+describe('the context window', () => {
+  it('caps a long trained window and rounds down to the 256-token block', () => {
+    expect(
+      contextWindowFor({ 'general.architecture': 'qwen2', 'qwen2.context_length': 32_768 })
+    ).toBe(4096);
+    expect(
+      contextWindowFor({ 'general.architecture': 'llama', 'llama.context_length': 1000 })
+    ).toBe(768);
+  });
+
+  it('uses the cap for a model that states no length, and for metadata it cannot read', () => {
+    expect(contextWindowFor({})).toBe(4096);
+    expect(contextWindowFor('nonsense')).toBe(4096);
+    expect(contextWindowFor(undefined)).toBe(4096);
+  });
+});
+
+type Templates = Parameters<typeof templateSupportsTools>[0];
+type Caps = Templates['jinja']['defaultCaps'];
+
+const CAPS: Caps = { tools: true, toolCalls: true, systemRole: true, parallelToolCalls: false };
+
+describe('the tool rule', () => {
+  it('sends tools only for a Jinja template that renders them and earlier calls', () => {
+    expect(
+      templateSupportsTools({
+        llamaChat: false,
+        jinja: { default: true, defaultCaps: CAPS, toolUse: false },
+      })
+    ).toBe(true);
+    expect(
+      templateSupportsTools({
+        llamaChat: false,
+        jinja: { default: true, defaultCaps: { ...CAPS, toolCalls: false }, toolUse: false },
+      })
+    ).toBe(false);
+    expect(
+      templateSupportsTools({
+        llamaChat: true,
+        jinja: { default: false, defaultCaps: CAPS, toolUse: false },
+      })
+    ).toBe(false);
+  });
+
+  it('prefers the tool-use template when the model ships one', () => {
+    expect(
+      templateSupportsTools({
+        llamaChat: false,
+        jinja: {
+          default: false,
+          defaultCaps: CAPS,
+          toolUse: true,
+          toolUseCaps: { ...CAPS, tools: false },
+        },
+      })
+    ).toBe(false);
+  });
+});
+
+describe('the thinking rule', () => {
+  it('offers the switch only for a template that reads enable_thinking', () => {
+    expect(
+      templateSupportsThinking({
+        'tokenizer.chat_template':
+          '{%- if enable_thinking is defined and enable_thinking is false %}',
+      })
+    ).toBe(true);
+    expect(templateSupportsThinking({ 'tokenizer.chat_template': '{{ messages }}' })).toBe(false);
+    expect(templateSupportsThinking({})).toBe(false);
+    expect(templateSupportsThinking(undefined)).toBe(false);
+  });
+});
+
+const request: ModelRequest = {
+  model: 'file-a',
+  maxTokens: 8192,
+  tools: [{ name: 'time', description: 'now', parameters: { type: 'object', properties: {} } }],
+  prompt: {
+    system: [{ text: 'Be brief.', cache: false }],
+    messages: [
+      { role: 'user', cache: false, parts: [{ kind: 'text', text: 'Hi' }] },
+      {
+        role: 'assistant',
+        cache: false,
+        parts: [{ kind: 'toolCall', callId: 'c1', name: 'time', arguments: '{}' }],
+      },
+      {
+        role: 'user',
+        cache: false,
+        parts: [{ kind: 'toolResult', callId: 'c1', body: 'noon', failed: false }],
+      },
+    ],
+  },
+};
+
+describe('the llama.rn call', () => {
+  it('renders the history through the model template and caps the answer to the window', () => {
+    const params = paramsOf(request, {
+      path: '/m/a.gguf',
+      contextWindow: 2048,
+      tools: false,
+      projector: undefined,
+    });
+    expect(params.n_predict).toBe(2048);
+    expect(params.jinja).toBe(true);
+    expect(params.enable_thinking).toBe(false);
+    expect(params.tools).toBeUndefined();
+    expect(params.messages).toEqual([
+      { role: 'system', content: 'Be brief.' },
+      { role: 'user', content: 'Hi' },
+    ]);
+  });
+
+  it('thinks only when the chat asks with an effort other than none', () => {
+    const file = { path: '/m/a.gguf', contextWindow: 2048, tools: false, projector: undefined };
+    const thinking = paramsOf({ ...request, effort: 'high' }, file);
+    expect(thinking.enable_thinking).toBe(true);
+    expect(thinking.reasoning_format).toBe('auto');
+    expect(paramsOf({ ...request, effort: 'none' }, file).enable_thinking).toBe(false);
+  });
+
+  it('sends the tool list and keeps calls and results for a model that supports tools', () => {
+    const params = paramsOf(request, {
+      path: '/m/a.gguf',
+      contextWindow: 4096,
+      tools: true,
+      projector: undefined,
+    });
+    expect(params.tool_choice).toBe('auto');
+    expect(params.tools).toHaveLength(1);
+    expect(params.messages).toEqual([
+      { role: 'system', content: 'Be brief.' },
+      { role: 'user', content: 'Hi' },
+      {
+        role: 'assistant',
+        content: '',
+        tool_calls: [{ type: 'function', id: 'c1', function: { name: 'time', arguments: '{}' } }],
+      },
+      { role: 'tool', tool_call_id: 'c1', content: 'noon' },
+    ]);
+  });
+
+  it('sends the tool list without the harness wait field, so no call goes to the background', () => {
+    const offered = asOffered({
+      definition: {
+        name: 'time',
+        description: 'now',
+        parameters: { type: 'object', properties: {} },
+      },
+      run: () => Effect.succeed('now'),
+    });
+    expect(Object.keys(offered.parameters.properties)).toEqual(['wait']);
+    const params = paramsOf(
+      { ...request, tools: [offered] },
+      { path: '/m/a.gguf', contextWindow: 4096, tools: true, projector: undefined }
+    );
+    const sent = params.tools as unknown as readonly {
+      function: { parameters: Record<string, unknown> };
+    }[];
+    expect(sent.at(0)?.function.parameters).toEqual({ type: 'object', properties: {} });
+  });
+
+  const imageRequest: ModelRequest = {
+    model: 'file-a',
+    maxTokens: 512,
+    prompt: {
+      system: [],
+      messages: [
+        {
+          role: 'user',
+          cache: false,
+          parts: [
+            { kind: 'text', text: 'What is this?' },
+            { kind: 'image', media: 'image/jpeg', data: 'AAAA' },
+          ],
+        },
+        {
+          role: 'user',
+          cache: false,
+          parts: [{ kind: 'image', media: 'image/png', data: 'BBBB' }],
+        },
+      ],
+    },
+  };
+
+  it('sends each image as a data URL in its place for a model whose projector is loaded', () => {
+    const params = paramsOf(imageRequest, {
+      path: '/m/a.gguf',
+      contextWindow: 4096,
+      tools: false,
+      projector: '/m/a.mmproj.gguf',
+    });
+    expect(params.messages).toEqual([
+      {
+        role: 'user',
+        content: [
+          { type: 'text', text: 'What is this?' },
+          { type: 'image_url', image_url: { url: 'data:image/jpeg;base64,AAAA' } },
+        ],
+      },
+      {
+        role: 'user',
+        content: [{ type: 'image_url', image_url: { url: 'data:image/png;base64,BBBB' } }],
+      },
+    ]);
+    // llama.rn takes the media from the parts; no file is written for them.
+    expect(params.media_paths).toBeUndefined();
+  });
+
+  it('drops images for a model without a projector', () => {
+    const params = paramsOf(imageRequest, {
+      path: '/m/a.gguf',
+      contextWindow: 4096,
+      tools: false,
+      projector: undefined,
+    });
+    expect(params.messages).toEqual([{ role: 'user', content: 'What is this?' }]);
+  });
+});
+
+describe('the native result', () => {
+  it('reads the counts, the stop and the answer out of the shape llama.rn really sends', () => {
+    const outcome = readCompletion({
+      text: 'Hello',
+      tokens_evaluated: 12,
+      tokens_predicted: 3,
+      interrupted: false,
+      context_full: false,
+      stopped_eos: true,
+      stopped_word: false,
+      stopped_limit: false,
+    });
+    expect(outcome.ok).toBe(true);
+    if (!outcome.ok) {
+      throw new Error('a plain result must be readable');
+    }
+    expect(outcome.value.tokens_evaluated).toBe(12);
+    expect(stopOf(outcome.value)).toBe('end');
+    expect(answerOf(outcome.value)).toBe('Hello');
+  });
+
+  it('prefers the parsed content and reports tools and a full context', () => {
+    const outcome = readCompletion({
+      text: '{"name":"time"}',
+      content: '',
+      accumulated_text: '{"name":"time"}',
+      tool_calls: [{ id: 'call-9', function: { name: 'time', arguments: '{}' } }],
+      tokens_evaluated: 1,
+      tokens_predicted: 1,
+      stopped_limit: true,
+    });
+    expect(outcome.ok && stopOf(outcome.value)).toBe('tools');
+    expect(answerOf(outcome.ok ? outcome.value : (undefined as never))).toBe('');
+    expect(readCompletion({ text: 'x', tokens_evaluated: 1, tokens_predicted: 1 }).ok).toBe(true);
+    expect(readCompletion('not a result').ok).toBe(false);
+  });
+});
+
+describe('reading what llama.rn resolves with', () => {
+  const full = {
+    text: 'Hello',
+    tokens_evaluated: 12,
+    tokens_predicted: 3,
+    stopped_eos: true,
+  };
+
+  it('reads null where the native object uses null', () => {
+    // A null `accumulated_text` must not read as "the parser ran": that would
+    // take the answer from `content`, which is absent for a plain answer.
+    const read = readCompletion({
+      ...full,
+      content: null,
+      accumulated_text: null,
+      tool_calls: null,
+      stopped_word: null,
+      stopped_limit: null,
+      context_full: null,
+      interrupted: null,
+    });
+
+    expect(read.ok && read.value.text).toBe('Hello');
+    expect(read.ok && read.value.tool_calls).toEqual([]);
+    expect(read.ok && read.value.accumulated_text).toBeUndefined();
+    expect(read.ok && answerOf(read.value)).toBe('Hello');
+  });
+
+  it('reads a tool call the model left unfinished', () => {
+    const read = readCompletion({
+      ...full,
+      tool_calls: [{ id: null, function: { name: 'weather', arguments: null } }],
+    });
+
+    expect(read.ok && read.value.tool_calls).toEqual([
+      { id: undefined, function: { name: 'weather', arguments: '' } },
+    ]);
+  });
+
+  it('answers from a shape the full read refuses, without inventing counts', () => {
+    // The string in a numeric field is what the full read rejects; the text is real.
+    const read = readCompletion({ ...full, tokens_evaluated: 'twelve' });
+
+    expect(read.ok && read.value.text).toBe('Hello');
+    expect(read.ok && read.value.tokens_evaluated).toBe(0);
+    expect(read.ok && read.value.tokens_predicted).toBe(0);
+  });
+
+  it('refuses a result that carries no text at all', () => {
+    expect(readCompletion({ timing: {} }).ok).toBe(false);
+    expect(readCompletion(null).ok).toBe(false);
+  });
+});

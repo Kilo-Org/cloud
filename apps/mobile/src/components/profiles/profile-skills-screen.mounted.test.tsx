@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import '@/i18n';
 import {
   changeText,
-  confirmAlert,
+  confirmRequest,
   findAll,
   findField,
   findOne,
@@ -12,7 +12,7 @@ import {
   pressPressable,
   pressSheetDone,
   rerenderScreen,
-  type TestAlertMock,
+  type TestConfirmMock,
   testProfile,
   testSkill,
 } from '@/components/profiles/profile-skills-screen.test-helpers';
@@ -20,7 +20,7 @@ import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 
 const h = vi.hoisted(() => ({
-  alert: vi.fn(),
+  confirm: vi.fn(),
   error: vi.fn(),
   query: {
     data: undefined as unknown,
@@ -37,17 +37,23 @@ const h = vi.hoisted(() => ({
   },
 }));
 
+const permissionState = vi.hoisted(() => ({ canManage: true }));
+
+vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
+  useCanManageOrganizationProfiles: () => permissionState.canManage,
+}));
+
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfile: () => h.query,
   useAgentProfileMutations: () => h.mutations,
 }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
   Switch: 'Switch',
-  Alert: { alert: h.alert },
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -59,11 +65,15 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
     primaryForeground: '#000000',
   }),
 }));
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: h.confirm, dialog: null }),
+}));
 vi.mock('@/components/agents/session-page-sheet', () => ({
   SessionPageSheet: 'SessionPageSheet',
 }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -125,7 +135,7 @@ describe('ProfileSkillsScreen', () => {
     unmount();
   });
 
-  it('happy: a row shows the name, source type, and status; the switch toggles', async () => {
+  it('happy: a row shows the name and source type; the switch toggles', async () => {
     h.query.data = testProfile([testSkill()]);
     h.query.isPending = false;
 
@@ -133,11 +143,11 @@ describe('ProfileSkillsScreen', () => {
 
     const texts = findAll(renderer.root, 'Text').map(node => node.props.children);
     expect(texts).toContain('code-review');
-    expect(texts).toContain('custom');
-    expect(texts).toContain('Enabled');
+    expect(texts).toContain('Custom');
 
     const toggle = findOne(renderer.root, 'Switch');
     expect(toggle.props.accessibilityLabel).toBe('code-review');
+    expect(toggle.props.value).toBe(true);
     act(() => {
       (toggle.props as { onValueChange: (v: boolean) => void }).onValueChange(false);
     });
@@ -146,6 +156,22 @@ describe('ProfileSkillsScreen', () => {
       skillId: 'skill-1',
       enabled: false,
     });
+
+    unmount();
+  });
+
+  it('hides the edit control for skills.sh references but keeps the toggle and delete', async () => {
+    h.query.data = testProfile([testSkill({ sourceType: 'skills-sh', rawMarkdown: '' })]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    const pressableLabels = findAll(renderer.root, 'Pressable').map(
+      node => node.props.accessibilityLabel
+    );
+    expect(pressableLabels).not.toContain('Edit skill');
+    expect(pressableLabels).toContain('Delete');
+    expect(findOne(renderer.root, 'Switch').props.accessibilityLabel).toBe('code-review');
 
     unmount();
   });
@@ -265,7 +291,7 @@ describe('ProfileSkillsScreen', () => {
     const { renderer, unmount } = await mountScreen();
     pressPressable(renderer.root, 'Delete');
     await act(async () => {
-      confirmAlert(h.alert as TestAlertMock);
+      confirmRequest(h.confirm as TestConfirmMock);
       await Promise.resolve();
     });
 

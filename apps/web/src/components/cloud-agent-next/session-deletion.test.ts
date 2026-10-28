@@ -6,7 +6,11 @@ import { createTRPCOptionsProxy } from '@trpc/tanstack-react-query';
 import { createStore } from 'jotai/vanilla';
 import type { RootRouter } from '@/routers/root-router';
 import { apiSessionToDbSession, dbSessionsAtom } from './store/db-session-atoms';
-import { invalidateSessionQueries, removeDeletedSession } from './session-deletion';
+import {
+  getWorktreeDeletionRedirect,
+  invalidateSessionQueries,
+  removeDeletedSession,
+} from './session-deletion';
 
 type ApiSession = inferRouterOutputs<RootRouter>['cliSessionsV2']['list']['cliSessions'][number];
 
@@ -26,6 +30,9 @@ function makeSession(session_id: string): ApiSession {
     version: 2,
     status: 'busy',
     status_updated_at: null,
+    latest_run_status: null,
+    latest_run_failure_kind: null,
+    latest_run_terminal_at: null,
     associatedPr: null,
     total_cost_microdollars: null,
   };
@@ -86,6 +93,10 @@ function createFixture() {
           sessionId: session.session_id,
           sessionStatus: session.status,
           sessionStatusUpdatedAt: session.status_updated_at,
+          latest_run_status: session.latest_run_status,
+          latest_run_failure_kind: session.latest_run_failure_kind,
+          latest_run_terminal_at: session.latest_run_terminal_at,
+          updatedAt: session.updated_at,
         })),
       },
     },
@@ -145,6 +156,40 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
+describe('worktree deletion navigation', () => {
+  it.each([
+    ['/cloud/chat?worktreeId=worktree_a', undefined, '/cloud'],
+    ['/cloud/chat?sessionId=ses_a', undefined, '/cloud'],
+    ['/cloud/chat?worktreeId=worktree_b', undefined, null],
+    ['/cloud/chat?sessionId=ses_b', undefined, null],
+    ['/cloud/chat?sessionId=ses_b&worktreeId=worktree_a', undefined, null],
+    ['/cloud/chat', undefined, null],
+    ['/cloud', undefined, null],
+    ['/settings?sessionId=ses_a', undefined, null],
+    [
+      '/organizations/org_a/cloud/chat?worktreeId=worktree_a',
+      'org_a',
+      '/organizations/org_a/cloud',
+    ],
+    ['/organizations/org_a/cloud/chat?sessionId=ses_a', 'org_a', '/organizations/org_a/cloud'],
+    ['/organizations/org_b/cloud/chat?sessionId=ses_a', 'org_a', null],
+    ['/cloud/chat?sessionId=ses_a', 'org_a', null],
+    ['/organizations/org_a/cloud/chat?sessionId=ses_a', undefined, null],
+  ] as const)(
+    'checks the current URL %s in scope %s before redirecting',
+    (path, organizationId, expected) => {
+      expect(
+        getWorktreeDeletionRedirect(
+          new URL(path, 'https://app.kilo.ai'),
+          'worktree_a',
+          ['ses_a'],
+          organizationId
+        )
+      ).toBe(expected);
+    }
+  );
+});
+
 describe('session deletion', () => {
   it('removes confirmed rows from all caches before persistence finishes, preserving metadata and unrelated data', async () => {
     const { context, persisted, listKeys, searchKeys } = fixture;
@@ -188,7 +233,7 @@ describe('session deletion', () => {
     const requests = keys.map(queryKey => {
       const staleData = context.queryClient.getQueryData(queryKey);
       return context.queryClient
-        .fetchQuery({
+        .query({
           queryKey,
           queryFn: async () => {
             await response.promise;

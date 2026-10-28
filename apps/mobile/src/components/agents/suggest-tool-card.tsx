@@ -1,22 +1,27 @@
-import { useAtomValue } from 'jotai';
+import { atom, useAtomValue } from 'jotai';
 import { View } from 'react-native';
 import { Sparkles } from '@/components/ui/icons';
-import { type ToolPart } from '@kilocode/cloud-agent-sdk';
+import { type StandaloneSuggestion, type ToolPart } from '@kilocode/cloud-agent-sdk';
 import { useTranslation } from 'react-i18next';
 
-import { useSessionManager } from '@/components/agents/session-provider';
 import { SelectableText } from '@/components/ui/selectable-text';
 
 import { FixedPartRow } from './fixed-part-row';
 import { MonoScrollBlock } from './mono-scroll-block';
 import { useOpenPartDetail } from './open-part-detail-context';
+import { useOptionalSessionManager } from './session-manager-context';
 import { resolveSuggestionPresentation, suggestionToolInputSchema } from './suggestion-card-state';
 import { getToolDisplay, toolPartHasDetails } from './tool-card-display';
+import { toolStatusLabel } from './tool-status-label';
 import { GenericToolCardBody } from './tool-cards/generic-tool-card';
 
+// The session preview renders transcript rows without a live session, so it
+// has no active suggestion to show.
+const noActiveSuggestionAtom = atom<StandaloneSuggestion | null>(null);
+
 function useActiveToolSuggestion(part: ToolPart) {
-  const manager = useSessionManager();
-  const activeSuggestion = useAtomValue(manager.atoms.activeSuggestion);
+  const manager = useOptionalSessionManager();
+  const activeSuggestion = useAtomValue(manager?.atoms.activeSuggestion ?? noActiveSuggestionAtom);
   const matches =
     resolveSuggestionPresentation(part.state.status, part.callID, activeSuggestion) ===
     'interactive';
@@ -39,7 +44,7 @@ export function SuggestToolCard({ part }: Readonly<{ part: ToolPart }>) {
       status={part.state.status}
       accessibilityLabel={t('agentChat.toolCard.accessibility', {
         label,
-        status: part.state.status,
+        status: toolStatusLabel(t, part.state.status),
       })}
       onPress={
         hasDetails && openPartDetail

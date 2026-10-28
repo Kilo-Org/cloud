@@ -186,7 +186,7 @@ export function BeadsPageClient({ townId }: BeadsPageClientProps) {
       <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.06] bg-[oklch(0.1_0_0)] px-6 py-3">
         <div className="flex items-center gap-2">
           <SidebarTrigger className="-ml-3" />
-          <Hexagon className="size-4 text-[color:oklch(95%_0.15_108_/_0.6)]" />
+          <Hexagon className="size-4 text-primary/60" />
           <h1 className="text-lg font-semibold tracking-tight text-white/90">Beads</h1>
           <span className="ml-1 font-mono text-xs text-white/30">{allBeads.length}</span>
         </div>
@@ -302,7 +302,7 @@ export function BeadsPageClient({ townId }: BeadsPageClientProps) {
               type="checkbox"
               checked={allFilteredSelected}
               onChange={toggleSelectAll}
-              className="size-3.5 cursor-pointer accent-[oklch(95%_0.15_108)]"
+              className="size-3.5 cursor-pointer accent-primary"
               aria-label="Select all beads"
             />
             <span className="text-[10px] text-white/20">Select all ({filteredBeads.length})</span>
@@ -327,7 +327,7 @@ export function BeadsPageClient({ townId }: BeadsPageClientProps) {
                 checked={selectedIds.has(bead.bead_id)}
                 onChange={() => toggleSelect(bead.bead_id)}
                 onClick={e => e.stopPropagation()}
-                className="size-3.5 shrink-0 cursor-pointer accent-[oklch(95%_0.15_108)]"
+                className="size-3.5 shrink-0 cursor-pointer accent-primary"
                 aria-label={`Select bead ${bead.bead_id}`}
               />
               <span

@@ -13,9 +13,14 @@ import {
   type QuestionRequest,
   type SessionCommandResponse,
   type SessionPromptResponse,
+  type SessionMessagesResponse2,
+  type SnapshotFileDiff,
+  type SuggestionRequest,
+  type Todo,
 } from '@kilocode/sdk/v2';
 import { z } from 'zod';
 import { logToFile } from './utils.js';
+import { kiloClientConfig, type KiloServer } from './kilo-server-auth.js';
 import {
   boundSlashCommandCatalog,
   toSlashCommandInfo,
@@ -23,6 +28,8 @@ import {
   type SlashCommandInfo,
 } from '../../src/shared/slash-commands.js';
 import { KILO_CLI_VERSION } from '../../src/shared/kilo-cli-version.js';
+import { sessionChildSchema } from './control/session-child-schema.js';
+import type { ControlPlaneSessionCredentialsPayload } from '../../src/shared/control-plane-protocol.js';
 
 const sessionStatusesSchema = z.record(
   z.string().min(1),
@@ -211,6 +218,10 @@ export type WrapperPtySize = {
   rows: number;
 };
 
+export type KiloSessionMetadata = { id: string; directory: string; parentID?: string };
+export const KILO_ACTIVITY_MESSAGE_LIMIT = 32;
+export const KILO_ACTIVITY_DISCOVERY_LIMIT = 1_000;
+
 /**
  * Shape of an event yielded by `subscribeEvents().stream`. The wrapper unwraps
  * the SDK global event envelope before handing events to `connection.ts`, which
@@ -242,13 +253,32 @@ type PromptOptions = {
  * All wrapper modules depend on this type rather than the raw SDK client.
  */
 export type WrapperKiloClient = {
+  updateCloudAgentMcp: (
+    grant: NonNullable<ControlPlaneSessionCredentialsPayload['cloudAgentMcp']>,
+    signal?: AbortSignal
+  ) => Promise<void>;
   createSession: (opts?: { title?: string }) => Promise<{ id: string }>;
   getSession: (sessionId: string) => Promise<{ id: string }>;
   getSessionDetails: (
     sessionId: string,
     directory: string,
     signal?: AbortSignal
-  ) => Promise<{ id: string; directory: string }>;
+  ) => Promise<KiloSessionMetadata>;
+  /** Process-wide metadata discovery; no default directory filter. Fails on truncation. */
+  listSessionMetadata: (signal: AbortSignal) => Promise<KiloSessionMetadata[]>;
+  /** Bounded recent window; callers must not interpret a partial window as all execution. */
+  getRecentSessionMessages: (
+    sessionId: string,
+    directory: string,
+    signal: AbortSignal
+  ) => Promise<SessionMessagesResponse2>;
+  getSessionMessage: (
+    sessionId: string,
+    directory: string,
+    messageId: string,
+    signal: AbortSignal
+  ) => Promise<SessionMessagesResponse2[number]>;
+  getSuggestions: (directory: string, signal: AbortSignal) => Promise<SuggestionRequest[]>;
   /** Metadata only; never return tool input or output to diagnostics. */
   probeMessagePart?: (
     sessionId: string,
@@ -265,6 +295,27 @@ export type WrapperKiloClient = {
     directory?: string;
     signal?: AbortSignal;
   }) => Promise<boolean>;
+  /** Direct child sessions forked from one session, for release tree cleanup. */
+  children: (opts: {
+    sessionId: string;
+    directory: string;
+    signal?: AbortSignal;
+  }) => Promise<Array<{ id: string; directory: string }>>;
+  /**
+   * Abort a session during release cleanup. A 404 is success: the session is
+   * already gone, so there is nothing left to abort.
+   */
+  abortSessionForCleanup: (opts: {
+    sessionId: string;
+    directory: string;
+    signal?: AbortSignal;
+  }) => Promise<void>;
+  /** Stops and forgets every background process owned by one session. */
+  stopSessionProcesses: (opts: {
+    sessionId: string;
+    directory: string;
+    signal?: AbortSignal;
+  }) => Promise<void>;
   summarizeSession: (opts: {
     sessionId: string;
     model: { providerID?: string; modelID: string };
@@ -314,6 +365,12 @@ export type WrapperKiloClient = {
   ) => Promise<Record<string, { type: string; [key: string]: unknown }>>;
   getQuestions: (directory?: string, signal?: AbortSignal) => Promise<QuestionRequest[]>;
   getPermissions: (directory?: string, signal?: AbortSignal) => Promise<PermissionRequest[]>;
+  getSessionTodos: (sessionID: string, directory?: string, signal?: AbortSignal) => Promise<Todo[]>;
+  getSessionDiff: (
+    sessionID: string,
+    directory?: string,
+    signal?: AbortSignal
+  ) => Promise<SnapshotFileDiff[]>;
   getNetworkWaits: () => Promise<NetworkWait[]>;
   resumeNetworkWait: (requestID: string) => Promise<boolean>;
   listEffectiveModels: (providerID: string) => Promise<string[]>;
@@ -338,15 +395,19 @@ export type WrapperKiloClient = {
   }>;
   /** The in-process server URL — for diagnostics */
   readonly serverUrl: string;
+  /** The server and its credential; raw requests and sockets must use both. */
+  readonly server: KiloServer;
 };
 
 export function createWrapperKiloClient(
   sdkClient: SDKClient,
-  serverUrl: string,
+  server: KiloServer,
   workspacePath: string
 ): WrapperKiloClient {
+  const serverUrl = server.url;
   logToFile(`creating wrapper kilo client for ${serverUrl}`);
-  const v2Client = createV2Client({ baseUrl: serverUrl, directory: workspacePath });
+  const v2Client = createV2Client(kiloClientConfig(server, workspacePath));
+  const globalClient = createV2Client(kiloClientConfig(server));
 
   function promptParameters(opts: PromptOptions) {
     const rawParts =
@@ -377,6 +438,31 @@ export function createWrapperKiloClient(
 
   return {
     serverUrl,
+    server,
+    updateCloudAgentMcp: async (grant, signal) => {
+      for (let attempt = 0; attempt < 2; attempt++) {
+        signal?.throwIfAborted();
+        try {
+          const result = await v2Client.mcp.add(
+            {
+              directory: workspacePath,
+              name: 'kilo-cloud-agent',
+              config: {
+                type: 'remote',
+                url: grant.url,
+                oauth: false,
+                headers: { Authorization: `Bearer ${grant.token}` },
+              },
+            },
+            { signal }
+          );
+          if (!result.error && result.data?.['kilo-cloud-agent']?.status === 'connected') return;
+        } catch {
+          signal?.throwIfAborted();
+        }
+      }
+      throw new Error('Cloud Agent MCP credential refresh failed');
+    },
 
     subscribeEvents: async opts => {
       const result = await v2Client.global.event({ signal: opts.signal });
@@ -409,7 +495,50 @@ export function createWrapperKiloClient(
       if (data.id !== sessionId || data.directory !== directory) {
         throw new Error('Session cleanup lookup returned an invalid session');
       }
-      return { id: data.id, directory: data.directory };
+      return {
+        id: data.id,
+        directory: data.directory,
+        ...(data.parentID ? { parentID: data.parentID } : {}),
+      };
+    },
+
+    listSessionMetadata: async signal => {
+      // The timestamp-only pagination cursor can skip equal-timestamp rows. Require
+      // a complete bounded page rather than silently missing an execution directory.
+      const result = await globalClient.experimental.session.list(
+        { limit: KILO_ACTIVITY_DISCOVERY_LIMIT, archived: true },
+        { signal }
+      );
+      const sessions = requireSdkData(result, 'Activity session discovery');
+      if (result.response?.headers.has('x-next-cursor')) {
+        throw new Error('Activity session discovery exceeded its bounded complete window');
+      }
+      return sessions.map(({ id, directory, parentID }) => ({
+        id,
+        directory,
+        ...(parentID ? { parentID } : {}),
+      }));
+    },
+
+    getRecentSessionMessages: async (sessionId, directory, signal) => {
+      const result = await v2Client.session.messages(
+        { sessionID: sessionId, directory, limit: KILO_ACTIVITY_MESSAGE_LIMIT },
+        { signal }
+      );
+      return requireSdkData(result, 'Activity session messages');
+    },
+
+    getSessionMessage: async (sessionId, directory, messageId, signal) => {
+      const result = await v2Client.session.message(
+        { sessionID: sessionId, directory, messageID: messageId },
+        { signal }
+      );
+      return requireSdkData(result, 'Activity session message');
+    },
+
+    getSuggestions: async (directory, signal) => {
+      const result = await v2Client.suggestion.list({ directory }, { signal });
+      return requireSdkData(result, 'Activity suggestions');
     },
 
     probeMessagePart: async (sessionId, directory, messageId, partId, signal) => {
@@ -492,7 +621,7 @@ export function createWrapperKiloClient(
 
     abortSession: async opts => {
       const result = await v2Client.session.abort(
-        { sessionID: opts.sessionId, directory: opts.directory ?? workspacePath },
+        { sessionID: opts.sessionId, directory: opts.directory ?? workspacePath, scope: 'tree' },
         { signal: opts.signal }
       );
       const operation = `Session abort for ${opts.sessionId}`;
@@ -501,6 +630,41 @@ export function createWrapperKiloClient(
         throw new Error(`${operation} returned no boolean result`);
       }
       return data;
+    },
+
+    children: async opts => {
+      const result = await v2Client.session.children(
+        { sessionID: opts.sessionId, directory: opts.directory },
+        { signal: opts.signal }
+      );
+      const data = requireSdkData(result, `Session children for ${opts.sessionId}`);
+      return z.array(sessionChildSchema).parse(data);
+    },
+
+    abortSessionForCleanup: async opts => {
+      const result = await v2Client.session.abort(
+        { sessionID: opts.sessionId, directory: opts.directory },
+        { signal: opts.signal }
+      );
+      // A missing session is already aborted; do not retry a 404.
+      if (result.response?.status === 404) return;
+      const operation = `Cleanup abort for ${opts.sessionId}`;
+      const data = requireSdkData<unknown>(result, operation);
+      if (data !== true) {
+        throw new Error(`${operation} returned no boolean result`);
+      }
+    },
+
+    stopSessionProcesses: async opts => {
+      const result = await v2Client.backgroundProcess.stopSession(
+        { sessionID: opts.sessionId, directory: opts.directory },
+        { signal: opts.signal }
+      );
+      const operation = `Stop session processes for ${opts.sessionId}`;
+      const data = requireSdkData<unknown>(result, operation);
+      if (data !== true) {
+        throw new Error(`${operation} returned no boolean result`);
+      }
     },
 
     summarizeSession: async opts => {
@@ -614,6 +778,16 @@ export function createWrapperKiloClient(
     getPermissions: async (directory = workspacePath, signal) => {
       const result = await v2Client.permission.list({ directory }, { signal });
       return requireSdkData(result, 'Permission list');
+    },
+
+    getSessionTodos: async (sessionID, directory = workspacePath, signal) => {
+      const result = await v2Client.session.todo({ sessionID, directory }, { signal });
+      return requireSdkData(result, `Session todo ${sessionID}`);
+    },
+
+    getSessionDiff: async (sessionID, directory = workspacePath, signal) => {
+      const result = await v2Client.session.diff({ sessionID, directory }, { signal });
+      return requireSdkData(result, `Session diff ${sessionID}`);
     },
 
     getNetworkWaits: async () => {

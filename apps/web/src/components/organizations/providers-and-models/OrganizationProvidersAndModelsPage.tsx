@@ -3,11 +3,15 @@
 import { useCallback, useEffect, useMemo } from 'react';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
+  useOrganizationAvailableModels,
   useOrganizationWithMembers,
   useUpdateOrganizationSettings,
 } from '@/app/api/organizations/hooks';
 import { useOpenRouterModelsAndProviders } from '@/lib/hooks/use-openrouter-models';
-import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import {
+  getSnapshotModelVariantId,
+  normalizeModelId,
+} from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { OrganizationContextProvider } from '../OrganizationContext';
 import { OrganizationPageHeader } from '../OrganizationPageHeader';
@@ -30,12 +34,14 @@ import {
   type ProviderPolicyFilter,
 } from '@/components/organizations/providers-and-models/useProvidersAndModelsAllowListsState';
 import { usePreferredModels } from '@/components/shared/usePreferredModels';
+import { CustomRoutersCard } from '@/components/auto-routing/CustomRoutersCard';
 import { AutoRoutingModeCard } from '@/components/auto-routing/AutoRoutingModeCard';
 import {
   modelRetainsPrompts,
   modelTrains,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/model-data-policy';
-import { getModelDisplayPricing } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
+import { getOfferingPricing } from '@/components/organizations/providers-and-models/offeringPricing';
+import { useCustomPricingConfig } from '@/components/organizations/providers-and-models/useCustomPricingConfig';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 
 type Props = {
@@ -106,6 +112,9 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
   const updateOrganizationSettings = useUpdateOrganizationSettings();
 
   const { data: organizationData } = useOrganizationWithMembers(organizationId);
+  const availableModels = useOrganizationAvailableModels(organizationId, {
+    enabled: organizationData?.plan === 'enterprise',
+  });
   const {
     models: openRouterModels,
     providers: openRouterProviders,
@@ -118,6 +127,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
   });
 
   const preferredModels = usePreferredModels();
+  const customPricingConfig = useCustomPricingConfig();
   const preferredIndexByModelId = useMemo(() => {
     const index = new Map<string, number>();
     for (let i = 0; i < preferredModels.length; i++) {
@@ -275,7 +285,6 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         m => m.endpoint && normalizeModelId(m.slug) === infoModel.modelId
       );
       if (!model || !model.endpoint) continue;
-      const pricing = getModelDisplayPricing(model.endpoint.pricing) ?? model.endpoint.pricing;
 
       offerings.push({
         providerSlug: provider.slug,
@@ -283,14 +292,17 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         providerIconUrl: provider.icon?.url ? normalizeProviderIconUrl(provider.icon.url) : null,
         trains: modelTrains(model, provider.dataPolicy.training),
         retainsPrompts: modelRetainsPrompts(model, provider.dataPolicy.retainsPrompts),
-        promptPrice: pricing.prompt,
-        completionPrice: pricing.completion,
+        ...getOfferingPricing(
+          customPricingConfig,
+          getSnapshotModelVariantId(model),
+          model.endpoint.pricing
+        ),
       });
     }
 
     offerings.sort((a, b) => a.providerDisplayName.localeCompare(b.providerDisplayName));
     return offerings;
-  }, [infoModel, openRouterProviders]);
+  }, [customPricingConfig, infoModel, openRouterProviders]);
 
   const enabledModelCountByProviderSlug = useMemo(() => {
     const map = new Map<string, number>();
@@ -420,14 +432,16 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
       if (!model.endpoint) continue;
       const normalizedModelId = normalizeModelId(model.slug);
       const sourceIndex = rows.length;
-      const pricing = getModelDisplayPricing(model.endpoint.pricing) ?? model.endpoint.pricing;
       rows.push({
         modelId: normalizedModelId,
         modelName: model.name,
         preferredIndex: preferredIndexByModelId.get(normalizedModelId),
         sourceIndex,
-        promptPrice: pricing.prompt,
-        completionPrice: pricing.completion,
+        ...getOfferingPricing(
+          customPricingConfig,
+          getSnapshotModelVariantId(model),
+          model.endpoint.pricing
+        ),
         trains: modelTrains(model, provider.dataPolicy.training),
         retainsPrompts: modelRetainsPrompts(model, provider.dataPolicy.retainsPrompts),
       });
@@ -436,7 +450,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     rows.sort(compareRecommendedThenSourceIndex);
 
     return rows;
-  }, [infoProvider, openRouterProviders, preferredIndexByModelId]);
+  }, [customPricingConfig, infoProvider, openRouterProviders, preferredIndexByModelId]);
 
   // NOTE: returns must happen after all hooks above, otherwise React will error
   // with "Rendered more hooks than during the previous render" as data loads.
@@ -487,6 +501,9 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
               onSearchChange={actions.setModelSearch}
               onSelectedOnlyChange={actions.setModelSelectedOnly}
               allowedModelIds={allowedModelIds}
+              availableModelCount={
+                availableModels.isError ? undefined : (availableModels.data?.data.length ?? null)
+              }
               enabledProviderSlugs={enabledProviderSlugs}
               filteredModelRows={filteredModelRows}
               onToggleModelAllowed={handleToggleModelAllowed}
@@ -520,9 +537,10 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
           <TabsContent
             value="auto-routing"
             forceMount
-            className="mt-6 data-[state=inactive]:hidden"
+            className="mt-6 space-y-6 data-[state=inactive]:hidden"
           >
             <AutoRoutingModeCard organizationId={organizationId} readonly={!canEditAutoRouting} />
+            <CustomRoutersCard organizationId={organizationId} readonly={!canEditAutoRouting} />
           </TabsContent>
         </Tabs>
 

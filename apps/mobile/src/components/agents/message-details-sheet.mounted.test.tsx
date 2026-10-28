@@ -6,10 +6,12 @@ import {
   type UserMessage,
 } from '@kilocode/cloud-agent-sdk';
 import { type ComponentProps, createElement, type ReactElement } from 'react';
-import { Alert, Modal, ScrollView } from 'react-native';
+import { ScrollView } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { i18n } from '@/i18n';
 
 import { SheetHeader } from '@/components/sheet-header';
 import { SelectableText } from '@/components/ui/selectable-text';
@@ -24,8 +26,6 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 vi.mock('react-native', () => ({
   AccessibilityInfo: { announceForAccessibility: native.announce },
   ActivityIndicator: 'ActivityIndicator',
-  Alert: { alert: vi.fn() },
-  Modal: 'Modal',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
   View: 'View',
@@ -53,6 +53,12 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0 }),
+}));
+// The Report confirm renders through this surface; the stub keeps the
+// destructive variant out of this suite's react-native stub while still letting
+// the test read the request and run its confirm.
+vi.mock('@/components/destructive-confirm-dialog', () => ({
+  DestructiveConfirmDialog: 'DestructiveConfirmDialog',
 }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'View' }));
 vi.mock('@/components/ui/activity-indicator', () => ({
@@ -91,7 +97,6 @@ beforeEach(() => {
   native.clipboard = '';
   native.copyFails = false;
   native.announce.mockClear();
-  vi.mocked(Alert.alert).mockClear();
 });
 
 function userInfo(overrides: Partial<UserMessage> = {}): UserMessage {
@@ -372,11 +377,18 @@ describe('MessageDetailsSheet mounted', () => {
       press(findByTestID(renderer.root, 'message-details-report')[0]);
     });
     expect(findByTestID(renderer.root, 'message-details-report')).toHaveLength(1);
-    const confirm = vi
-      .mocked(Alert.alert)
-      .mock.calls.at(-1)?.[2]
-      ?.find(button => button.style === 'destructive');
-    act(() => confirm?.onPress?.());
+    const confirmation = renderer.root.findAllByType('DestructiveConfirmDialog')[0];
+    if (!confirmation) {
+      throw new Error('missing report confirmation');
+    }
+    expect(confirmation.props).toMatchObject({
+      title: i18n.t('agentChat.messageDetails.reportAiResponse'),
+      message: i18n.t('agentChat.messageDetails.reportAiResponseConfirm'),
+      confirmLabel: i18n.t('agentChat.messageDetails.report'),
+    });
+    act(() => {
+      (confirmation.props.onConfirm as () => void)();
+    });
     expect(findByTestID(renderer.root, 'message-details-report')).toHaveLength(0);
     act(() => {
       renderer.update(
@@ -573,17 +585,17 @@ describe('MessageDetailsSheet mounted', () => {
     await unmount(renderer);
   });
 
-  it('swaps the details Modal content to the select view when Select text is pressed', async () => {
+  it('swaps the details sheet content to the select view when Select text is pressed', async () => {
     const renderer = await mountSheet(storedMessage(userInfo(), [textPart('selectable body')]));
 
-    const modals = () => renderer.root.findAll(node => node.type === Modal);
+    const sheets = () => renderer.root.findAll(node => (node.type as string) === 'BottomSheet');
     const sheetHeaderTitles = () =>
       renderer.root
         .findAll(node => node.type === SheetHeader)
         .map(node => node.props.title as string | undefined);
 
-    // Before press: a single Modal shows the details content.
-    expect(modals()).toHaveLength(1);
+    // Before press: a single sheet shows the details content.
+    expect(sheets()).toHaveLength(1);
     expect(sheetHeaderTitles()).toContain('Message details');
 
     await act(async () => {
@@ -591,8 +603,8 @@ describe('MessageDetailsSheet mounted', () => {
       press(findByTestID(renderer.root, 'message-details-select-text')[0]);
     });
 
-    // After press: the same single Modal swaps to the Select text view.
-    expect(modals()).toHaveLength(1);
+    // After press: the same single sheet swaps to the Select text view.
+    expect(sheets()).toHaveLength(1);
     expect(sheetHeaderTitles()).toContain('Select text');
     expect(sheetHeaderTitles()).not.toContain('Message details');
 
@@ -603,13 +615,13 @@ describe('MessageDetailsSheet mounted', () => {
     await unmount(renderer);
   });
 
-  it('returns to the details view when Android back is pressed in the Select text view', async () => {
+  it('returns to the details view when the sheet is dismissed in the Select text view', async () => {
     const renderer = await mountSheet(storedMessage(userInfo(), [textPart('selectable body')]));
 
-    const modal = () => {
-      const found = renderer.root.findAll(node => node.type === Modal);
+    const sheet = () => {
+      const found = renderer.root.findAll(node => (node.type as string) === 'BottomSheet');
       if (!found[0]) {
-        throw new Error('Modal not found');
+        throw new Error('BottomSheet not found');
       }
       return found[0];
     };
@@ -619,12 +631,12 @@ describe('MessageDetailsSheet mounted', () => {
       press(findByTestID(renderer.root, 'message-details-select-text')[0]);
     });
 
-    const onRequestClose = modal().props.onRequestClose as (() => void) | undefined;
-    expect(typeof onRequestClose).toBe('function');
+    const onClose = sheet().props.onClose as (() => void) | undefined;
+    expect(typeof onClose).toBe('function');
 
     await act(async () => {
       await Promise.resolve();
-      onRequestClose?.();
+      onClose?.();
     });
 
     const sheetHeaderTitles = () =>

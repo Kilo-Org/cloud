@@ -1,4 +1,10 @@
-import { describe, expect, test } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, test } from '@jest/globals';
+import {
+  customLlmDefinition,
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+  publicCustomLlmDefinition,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import {
   createAllowPredicateFromProviderAllowList,
   createAllowPredicateFromRestrictions,
@@ -6,11 +12,23 @@ import {
 } from '@kilocode/web-shared/lib/model-allow.server';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@kilocode/web-shared/lib/ai-gateway/latest-model-aliases';
 
+const RESTRICTED_PUBLIC_MODEL = 'test/restricted-public';
+
 function lookup(map: Record<string, string[]>): ProviderLookup {
   return async modelId => new Set(map[modelId] ?? []);
 }
 
 describe('model access predicates', () => {
+  beforeAll(async () => {
+    await insertCustomLlmForTest('acme/public-model', publicCustomLlmDefinition(['acme']));
+    await insertCustomLlmForTest(RESTRICTED_PUBLIC_MODEL, publicCustomLlmDefinition(['stepfun']));
+  });
+
+  afterAll(async () => {
+    await deleteCustomLlmForTest('acme/public-model');
+    await deleteCustomLlmForTest(RESTRICTED_PUBLIC_MODEL);
+  });
+
   test('undefined provider allow list only applies model deny list', async () => {
     const isAllowed = createAllowPredicateFromProviderAllowList(
       ['openai/gpt-4o'],
@@ -112,7 +130,73 @@ describe('model access predicates', () => {
     await expect(missingFromSnapshot(CLAUDE_SONNET_LATEST_MODEL_ALIAS)).resolves.toBe(false);
   });
 
-  test.each(['kilo-auto/balanced', 'kilo-internal/private-model', 'kimi-coding/kimi-for-coding'])(
+  describe('custom LLMs', () => {
+    const ORG_ID = '00000000-0000-4000-8000-0000000000a1';
+    const GROUP_ID = '00000000-0000-4000-8000-0000000000b1';
+    const restrictions = {
+      requireModelInCurrentSnapshot: true,
+      providerAllowList: [],
+      modelDenyList: ['acme/org-model', 'acme/group-model'],
+    };
+
+    beforeAll(async () => {
+      await insertCustomLlmForTest(
+        'acme/org-model',
+        customLlmDefinition({ organization_ids: [ORG_ID] })
+      );
+      await insertCustomLlmForTest(
+        'acme/group-model',
+        customLlmDefinition({ organization_ids: [], group_ids: [GROUP_ID] })
+      );
+    });
+
+    afterAll(async () => {
+      await deleteCustomLlmForTest('acme/org-model');
+      await deleteCustomLlmForTest('acme/group-model');
+    });
+
+    test.each([
+      ['an allowlisted organization', 'acme/org-model', { organizationId: ORG_ID, groupIds: [] }],
+      [
+        'an allowlisted group',
+        'acme/group-model',
+        { organizationId: '00000000-0000-4000-8000-0000000000a2', groupIds: [GROUP_ID] },
+      ],
+    ])('exempts a custom LLM granted to %s', async (_grant, modelId, customLlmGrantee) => {
+      const isAllowed = createAllowPredicateFromRestrictions(
+        { ...restrictions, customLlmGrantee },
+        lookup({})
+      );
+
+      await expect(isAllowed(modelId)).resolves.toBe(true);
+    });
+
+    test.each([
+      [
+        'another organization',
+        { organizationId: '00000000-0000-4000-8000-0000000000a2', groupIds: [] },
+      ],
+      ['no grantee', undefined],
+    ])('applies restrictions to a custom LLM for %s', async (_grant, customLlmGrantee) => {
+      const isAllowed = createAllowPredicateFromRestrictions(
+        { ...restrictions, customLlmGrantee },
+        lookup({})
+      );
+
+      await expect(isAllowed('acme/org-model')).resolves.toBe(false);
+    });
+
+    test('does not exempt a kilo-internal/ id without a custom LLM', async () => {
+      const isAllowed = createAllowPredicateFromRestrictions(
+        { requireModelInCurrentSnapshot: true, providerAllowList: [], modelDenyList: [] },
+        lookup({})
+      );
+
+      await expect(isAllowed('kilo-internal/missing-model')).resolves.toBe(false);
+    });
+  });
+
+  test.each(['kilo-auto/balanced', 'kimi-coding/kimi-for-coding'])(
     'keeps %s exempt from Enterprise model restrictions',
     async modelId => {
       const isAllowed = createAllowPredicateFromRestrictions(
@@ -127,6 +211,31 @@ describe('model access predicates', () => {
       await expect(isAllowed(modelId)).resolves.toBe(true);
     }
   );
+
+  test('applies provider allow lists to the providers of a public custom LLM', async () => {
+    const restrictions = { requireModelInCurrentSnapshot: true, modelDenyList: [] };
+    const allowsAcme = createAllowPredicateFromRestrictions(
+      { ...restrictions, providerAllowList: ['acme'] },
+      lookup({})
+    );
+    const allowsOpenAi = createAllowPredicateFromRestrictions(
+      { ...restrictions, providerAllowList: ['openai'] },
+      lookup({ 'acme/public-model': ['openai'] })
+    );
+    const deniesModel = createAllowPredicateFromRestrictions(
+      {
+        ...restrictions,
+        providerAllowList: ['acme'],
+        modelDenyList: ['acme/public-model'],
+        customLlmGrantee: { organizationId: '00000000-0000-4000-8000-0000000000a1', groupIds: [] },
+      },
+      lookup({})
+    );
+
+    await expect(allowsAcme('acme/public-model')).resolves.toBe(true);
+    await expect(allowsOpenAi('acme/public-model')).resolves.toBe(false);
+    await expect(deniesModel('acme/public-model')).resolves.toBe(false);
+  });
 
   test('provider allow list still applies model deny list', async () => {
     const isAllowed = createAllowPredicateFromProviderAllowList(
@@ -152,31 +261,31 @@ describe('model access predicates', () => {
     await expect(isAllowed('openai/gpt-4.1')).resolves.toBe(true);
   });
 
-  test('provider allow list hides restricted exclusive models when every restricted provider is disabled', async () => {
+  test('provider allow list hides restricted public custom LLMs when every restricted provider is disabled', async () => {
     const isAllowed = createAllowPredicateFromProviderAllowList(
       undefined,
       ['deepseek', 'fireworks'],
-      lookup({ 'stepfun/step-3.7-flash': ['fireworks', 'stepfun'] })
+      lookup({ 'stepfun/step-5-preview': ['fireworks', 'stepfun'] })
     );
 
-    await expect(isAllowed('stepfun/step-3.7-flash:free')).resolves.toBe(false);
-    await expect(isAllowed('stepfun/step-3.7-flash')).resolves.toBe(true);
+    await expect(isAllowed(RESTRICTED_PUBLIC_MODEL)).resolves.toBe(false);
+    await expect(isAllowed('stepfun/step-5-preview')).resolves.toBe(true);
   });
 
-  test('provider allow list keeps restricted exclusive models when a restricted provider remains enabled', async () => {
+  test('provider allow list keeps restricted public custom LLMs when a restricted provider remains enabled', async () => {
     const isAllowed = createAllowPredicateFromProviderAllowList(
       undefined,
       ['stepfun', 'fireworks'],
-      lookup({ 'stepfun/step-3.7-flash': ['fireworks'] })
+      lookup({ 'stepfun/step-5-preview': ['fireworks'] })
     );
 
-    await expect(isAllowed('stepfun/step-3.7-flash:free')).resolves.toBe(true);
+    await expect(isAllowed(RESTRICTED_PUBLIC_MODEL)).resolves.toBe(true);
   });
 
-  test('provider allow list still evaluates restricted exclusive models missing from the snapshot', async () => {
+  test('provider allow list still evaluates restricted public custom LLMs missing from the snapshot', async () => {
     const isAllowed = createAllowPredicateFromProviderAllowList(undefined, ['stepfun'], lookup({}));
 
-    await expect(isAllowed('stepfun/step-3.7-flash:free')).resolves.toBe(true);
+    await expect(isAllowed(RESTRICTED_PUBLIC_MODEL)).resolves.toBe(true);
     await expect(isAllowed('unknown/model')).resolves.toBe(false);
   });
 });

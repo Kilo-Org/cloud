@@ -94,9 +94,8 @@ export function getLocalFakeLlmProvider(): Provider | null {
     {
       base_url: `${baseUrl}/api/openrouter`,
       internal_id: LOCAL_FAKE_DETERMINISTIC_MODEL_ID,
-      api_key: LOCAL_FAKE_LLM_API_KEY,
     },
-    null
+    { type: 'api_key', apiKey: LOCAL_FAKE_LLM_API_KEY, apiKeyHeader: null }
   );
 }
 

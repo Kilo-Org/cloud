@@ -8,22 +8,30 @@ import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib
 import { getEmbeddingProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+import {
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
+import { countAndStoreEmbeddingUsage } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { decide, type DecideResponse } from '@kilocode/web-shared/lib/bouncer/client';
 
 jest.mock('next/server', () => ({
   ...(jest.requireActual('next/server') as Record<string, unknown>),
   after: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/bouncer/client') as Record<string, unknown>),
+  decide: jest.fn(),
+  releaseDecideLease: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage');
 jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
   resolveOrganizationMemberModelDecision: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/get-provider', () => ({
   getEmbeddingProvider: jest.fn(),
-}));
-jest.mock('@kilocode/web-shared/lib/ai-gateway/is-free-model', () => ({
-  isFreeModel: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel', () => ({
   mapModelIdToVercel: jest.fn(),
@@ -52,6 +60,7 @@ const allowedModelDecision = {
     organizationModelDenyList: [],
     memberGrant: { mode: 'unrestricted' },
     policyRevision: 1,
+    customLlmGrantee: { organizationId: 'org-1', groupIds: [] },
   },
   decision: { allowed: true },
 } satisfies Awaited<ReturnType<typeof resolveOrganizationMemberModelDecision>>;
@@ -90,7 +99,11 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     globalThis.fetch = mockedFetch;
     setUserAuth();
     mockedResolveModelDecision.mockResolvedValue(allowedModelDecision);
-    mockedGetEmbeddingProvider.mockResolvedValue({ provider: OPENROUTER, userByok: null });
+    mockedGetEmbeddingProvider.mockResolvedValue({
+      provider: OPENROUTER,
+      userByok: null,
+      isFree: false,
+    });
     mockedMapModelIdToVercel.mockResolvedValue(model);
     mockedFetch.mockResolvedValue(
       new Response(JSON.stringify({ object: 'list', data: [] }), {
@@ -104,6 +117,78 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     globalThis.fetch = originalFetch;
   });
 
+  it('never forwards a custom LLM id to an embeddings upstream', async () => {
+    await insertCustomLlmForTest('acme/embedding-custom-model');
+    try {
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(
+        makeRequest({ model: 'acme/embedding-custom-model' })
+      );
+
+      expect(response.status).toBe(404);
+      expect(mockedFetch).not.toHaveBeenCalled();
+    } finally {
+      await deleteCustomLlmForTest('acme/embedding-custom-model');
+    }
+  });
+
+  it('answers anonymous callers the same for a custom LLM as for an unknown id', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: new Response('unauthorized', { status: 401 }),
+      organizationId: undefined,
+    } as unknown as Awaited<ReturnType<typeof getUserFromAuth>>);
+    await insertCustomLlmForTest('acme/embedding-custom-model');
+    try {
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const customResponse = await handleEmbeddingsRequest(
+        makeRequest({ model: 'acme/embedding-custom-model' })
+      );
+      const unknownResponse = await handleEmbeddingsRequest(
+        makeRequest({ model: 'acme/embedding-unknown-model' })
+      );
+
+      expect(customResponse.status).toBe(401);
+      expect(unknownResponse.status).toBe(401);
+      expect(await customResponse.json()).toEqual(await unknownResponse.json());
+      expect(mockedFetch).not.toHaveBeenCalled();
+    } finally {
+      await deleteCustomLlmForTest('acme/embedding-custom-model');
+    }
+  });
+
+  it('answers anonymous callers the same for a free model id a custom LLM uses', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: null,
+      authFailedResponse: new Response('unauthorized', { status: 401 }),
+      organizationId: undefined,
+    } as unknown as Awaited<ReturnType<typeof getUserFromAuth>>);
+    mockedFetch.mockImplementation(
+      async () =>
+        new Response(JSON.stringify({ error: { message: 'model not found' } }), {
+          status: 400,
+          headers: { 'content-type': 'application/json' },
+        })
+    );
+    // Rows created before free model ids were rejected can still use one.
+    await insertCustomLlmForTest('stealth/legacy-alpha');
+    try {
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const customResponse = await handleEmbeddingsRequest(
+        makeRequest({ model: 'stealth/legacy-alpha' })
+      );
+      const unknownResponse = await handleEmbeddingsRequest(
+        makeRequest({ model: 'stealth/unknown-alpha' })
+      );
+
+      expect(customResponse.status).toBe(unknownResponse.status);
+      expect(await customResponse.json()).toEqual(await unknownResponse.json());
+      expect(mockedFetch).toHaveBeenCalledTimes(2);
+    } finally {
+      await deleteCustomLlmForTest('stealth/legacy-alpha');
+    }
+  });
+
   it('forwards personal request privacy with other provider fields', async () => {
     const provider = { data_collection: 'deny', zdr: true, only: ['openai'], sort: 'latency' };
     const { handleEmbeddingsRequest } = await import('./embeddings');
@@ -111,6 +196,10 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
 
     expect(response.status).toBe(200);
     expect(getUpstreamBody().provider).toEqual(provider);
+    expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1]).toMatchObject({
+      is_free: false,
+      user_byok: false,
+    });
   });
 
   it.each([undefined, { only: ['openai'] }])(
@@ -201,6 +290,7 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     mockedGetEmbeddingProvider.mockResolvedValue({
       provider: VERCEL_AI_GATEWAY,
       userByok: [{ providerId: 'openai', decryptedAPIKey: 'test-byok-key' }],
+      isFree: false,
     });
     const { handleEmbeddingsRequest } = await import('./embeddings');
     const response = await handleEmbeddingsRequest(makeRequest({ provider: testCase.privacy }));
@@ -212,6 +302,50 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
         byok: { openai: [{ apiKey: 'test-byok-key' }] },
         ...testCase.translated,
       },
+    });
+    expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1]).toMatchObject({
+      is_free: false,
+      user_byok: true,
+    });
+  });
+
+  describe('bouncer wiring', () => {
+    function verdict(fields: Partial<DecideResponse>): DecideResponse {
+      return { enforced: false, flags: [], spendWatch: false, ...fields } as DecideResponse;
+    }
+
+    it('rejects an enforced verdict before the upstream call', async () => {
+      jest.mocked(decide).mockResolvedValue(verdict({ enforced: true, code: 'restricted' }));
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(403);
+      expect(mockedFetch).not.toHaveBeenCalled();
+      expect(decide).toHaveBeenCalledTimes(1);
+    });
+
+    it('shares the decide id with usage and does not attribute the billing fallback feature', async () => {
+      jest.mocked(decide).mockResolvedValue(verdict({ spendWatch: true }));
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(decide).toHaveBeenCalledTimes(1);
+      const decided = jest.mocked(decide).mock.calls[0]?.[0];
+      expect(decided).toMatchObject({ tier: 'paid', accountId: 'user:user-123', ip: '127.0.0.1' });
+      expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1].bouncer).toEqual({
+        requestId: decided?.requestId,
+        occurredAt: expect.any(Date),
+        accountId: 'user:user-123',
+        clientIp: '127.0.0.1',
+        clientAttributed: false,
+        requestedLogprobs: false,
+        samples: null,
+        promptSimHash: null,
+        spendWatch: true,
+      });
     });
   });
 });

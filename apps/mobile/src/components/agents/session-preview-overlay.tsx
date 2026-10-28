@@ -11,6 +11,7 @@ import {
   useColorScheme,
   useWindowDimensions,
   View,
+  type ViewInstance,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, { useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
@@ -19,7 +20,7 @@ import { scheduleOnRN } from 'react-native-worklets';
 
 import { RenameModal } from '@/components/rename-modal';
 import { Text } from '@/components/ui/text';
-import { moveA11yFocus } from '@/lib/a11y/announce';
+import { requestA11yFocus } from '@/lib/a11y/announce';
 import { SESSION_TRANSCRIPT_STALE_TIME_MS } from '@/lib/agent-session-cache';
 import { useTRPC } from '@/lib/trpc';
 import { readTrpcErrorField } from '@/lib/trpc-error';
@@ -37,10 +38,11 @@ import {
   type SessionPreviewTranscriptState,
 } from './session-preview-transcript';
 import { SESSION_TITLE_MAX_LENGTH } from './session-detail-rename-state';
+import { sessionTranscriptQueryOptions } from './session-transcript-page';
 import {
   buildSessionActionMenuItems,
-  showDeleteConfirm,
   showRenamePrompt,
+  useSessionDeleteConfirm,
 } from './session-row-actions';
 
 const OPEN_DURATION_MS = 180;
@@ -88,7 +90,7 @@ function SessionPreviewContent({
   const { sessionId, live } = target;
 
   const transcriptQuery = useQuery({
-    ...trpc.cliSessionsV2.getSessionMessages.queryOptions({ session_id: sessionId }),
+    ...sessionTranscriptQueryOptions(sessionId),
     // Shared with the gesture-start prefetch, so a reopen paints from cache.
     staleTime: SESSION_TRANSCRIPT_STALE_TIME_MS,
     // A failed read shows its error state; it is never retried without bound.
@@ -104,10 +106,8 @@ function SessionPreviewContent({
   });
   const liveRow = live ? liveRowQuery.data : undefined;
 
-  // SAFETY: `getSessionMessages` answers with the raw ingest snapshot, whose
-  // `messages` are the SDK's `StoredMessage` shape (`info` + `parts`); the rows
-  // are only handed to `MessageBubble`, which reads exactly those two fields.
-  const messages = (transcriptQuery.data?.messages ?? EMPTY_MESSAGES) as readonly StoredMessage[];
+  // The paged read returns the same `StoredMessage` rows the full snapshot did.
+  const messages = transcriptQuery.data ?? EMPTY_MESSAGES;
   const transcriptState: SessionPreviewTranscriptState = {
     sessionId,
     messages,
@@ -121,7 +121,7 @@ function SessionPreviewContent({
 
   const progress = useSharedValue(0);
   const dragY = useSharedValue(0);
-  const menuFirstItemRef = useRef<View>(null);
+  const menuFirstItemRef = useRef<ViewInstance>(null);
   // Read by the first row's ref callback so the callback can keep a stable
   // identity across renders (a new identity would re-fire it on every commit).
   const visibleRef = useRef(visible);
@@ -129,16 +129,35 @@ function SessionPreviewContent({
   const [renameVisible, setRenameVisible] = useState(false);
   const renameVisibleRef = useRef(false);
   const closeCompletedRef = useRef(false);
+  const { confirmDelete, deleteDialog } = useSessionDeleteConfirm();
+  // The delete confirm is a native `Modal`: it stays on screen after the
+  // preview's exit animation, so the release waits for it the same way it
+  // waits for the rename modal. Read during render like `visibleRef` above,
+  // because the animation callback runs outside React.
+  const deleteDialogOpenRef = useRef(false);
+  deleteDialogOpenRef.current = deleteDialog !== null;
 
   const releaseAfterClose = useCallback(() => {
     closeCompletedRef.current = true;
-    if (renameVisibleRef.current) {
-      // The Android rename dialog is still on screen and owns the tree; its
-      // close handler releases the preview instead.
+    if (renameVisibleRef.current || deleteDialogOpenRef.current) {
+      // The Android rename dialog — or the delete confirm — is still on
+      // screen and owns the tree; its close handler releases the preview
+      // instead.
       return;
     }
     releaseSessionPreviewStore();
   }, []);
+
+  // The delete confirm can outlive the preview's exit animation; once it
+  // closes, the deferred release runs.
+  useEffect(() => {
+    if (deleteDialog !== null) {
+      return;
+    }
+    if (closeCompletedRef.current && !renameVisibleRef.current) {
+      releaseSessionPreviewStore();
+    }
+  }, [deleteDialog]);
 
   const closePreview = useCallback(closeSessionPreviewStore, []);
 
@@ -167,10 +186,10 @@ function SessionPreviewContent({
   // still null. The row's own ref callback fires exactly when the portal has
   // attached a node; the `visibleRef` guard keeps a later re-render from
   // stealing focus back after the user has moved on.
-  const setMenuFirstItem = useCallback((node: View | null) => {
+  const setMenuFirstItem = useCallback((node: ViewInstance | null) => {
     menuFirstItemRef.current = node;
     if (node && visibleRef.current) {
-      moveA11yFocus(menuFirstItemRef);
+      requestA11yFocus(menuFirstItemRef);
     }
   }, []);
 
@@ -180,7 +199,7 @@ function SessionPreviewContent({
   // mounted yet — the ref callback above owns that case.
   useEffect(() => {
     if (visible && menuFirstItemRef.current) {
-      moveA11yFocus(menuFirstItemRef);
+      requestA11yFocus(menuFirstItemRef);
     }
   }, [visible]);
 
@@ -223,32 +242,24 @@ function SessionPreviewContent({
     }
   }, []);
 
-  const onDelete = target.onDelete;
+  const { onOpen, onCopySessionId, onViewPr, onRename, onExit, onDelete } = target;
   // One source for the panel's rows: the same builder the action sheet uses, so
   // order, copy and the destructive row cannot diverge.
   const menu = useMemo(
     () =>
       buildSessionActionMenuItems({
-        onOpen: target.onOpen,
-        onCopySessionId: target.onCopySessionId,
-        onViewPr: target.onViewPr,
-        onRename: target.onRename ? handleRename : undefined,
-        onExit: target.onExit,
+        onOpen,
+        onCopySessionId,
+        onViewPr,
+        onRename: onRename ? handleRename : undefined,
+        onExit,
         onDelete: onDelete
           ? () => {
-              showDeleteConfirm(onDelete);
+              confirmDelete(onDelete);
             }
           : undefined,
       }),
-    [
-      target.onOpen,
-      target.onCopySessionId,
-      target.onViewPr,
-      target.onRename,
-      target.onExit,
-      onDelete,
-      handleRename,
-    ]
+    [onOpen, onCopySessionId, onViewPr, onRename, onExit, onDelete, handleRename, confirmDelete]
   );
 
   // The header strip alone owns the pan, so the transcript keeps its own scroll.
@@ -379,6 +390,7 @@ function SessionPreviewContent({
           }}
         />
       ) : null}
+      {deleteDialog}
     </Portal>
   );
 }

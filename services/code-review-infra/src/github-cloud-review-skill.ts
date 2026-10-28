@@ -1,5 +1,5 @@
 export const GITHUB_CLOUD_REVIEW_SKILL_NAME = 'github-cloud-review';
-export const GITHUB_CLOUD_REVIEW_SKILL_VERSION = '2';
+export const GITHUB_CLOUD_REVIEW_SKILL_VERSION = '3';
 
 const rawMarkdown = `---
 name: github-cloud-review
@@ -58,6 +58,7 @@ gh api repos/<OWNER>/<REPO>/pulls/<PR>/reviews --input -
 The body must include current commit_id, event: "COMMENT", and one comments array.
 
 - Never use gh pr review, gh pr comment, or individual inline-comment writes.
+- If that call fails for any reason other than a locked issue, including a call rejected for invalid or empty arguments, do not resend it unchanged. Publish the summary next. Then re-read reviews, drop comments that already posted, and retry the rest once as batches of at most 3 comments, each with the same reviews --input form. Stop inline writes after a failed batch; the summary already lists every Code Review Finding.
 ## Publish The Summary
 
 - If a tool named code_review_publish_review_summary is listed, publish the summary by calling it with the final summary wording only. The tool owns the comment target, marker, history, footer, idempotency, and verification, so do not build those yourself.

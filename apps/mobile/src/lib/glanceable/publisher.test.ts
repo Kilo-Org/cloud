@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- one cohesive publisher state-machine suite sharing the fake-sink harness */
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
   buildGlanceableSnapshot,
@@ -11,6 +11,12 @@ import {
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { getTerminalBlankEpoch, writeSignedOutSnapshotAndEnd } from './cleanup';
+import { setFollowedSessionsSource } from './followed-sessions';
+import {
+  _resetHomeWidgetDataForTests,
+  getHomeWidgetDataForSnapshot,
+  rememberHomeWidgetData,
+} from './home-widget-data';
 import {
   GLANCEABLE_RENEW_MARGIN_MS,
   GLANCEABLE_RENEW_RETRY_MAX_MS,
@@ -564,28 +570,32 @@ describe('GlanceablePublisher', () => {
     const { sink, calls } = makeSink();
     const publisher = new GlanceablePublisher({ sinks: [sink], now: () => now });
     publisher.handleSessions(
-      [{ status: 'busy' }, { status: 'question' }, { status: 'idle' }],
+      [{ status: 'busy' }, { status: 'question' }, { status: 'permission' }, { status: 'idle' }],
       PUB_CTX
     );
     const successful = lastSnapshot(calls, 'publish');
+    expect(successful.needsApproval).toBe(1);
     const failures = [
-      [60_000, 'stale', 1],
-      [GLANCEABLE_SNAPSHOT_EXPIRY_MS - 1, 'stale', 1],
-      [GLANCEABLE_SNAPSHOT_EXPIRY_MS, 'expired', 0],
-      [GLANCEABLE_SNAPSHOT_EXPIRY_MS + 60_000, 'expired', 0],
+      [60_000, 'stale'],
+      [GLANCEABLE_SNAPSHOT_EXPIRY_MS - 1, 'stale'],
+      [GLANCEABLE_SNAPSHOT_EXPIRY_MS, 'expired'],
+      [GLANCEABLE_SNAPSHOT_EXPIRY_MS + 60_000, 'expired'],
     ] as const;
-    for (const [index, [elapsed, status, expectedCount]] of failures.entries()) {
+    for (const [index, [elapsed, status]] of failures.entries()) {
       now = NOW + elapsed;
       publisher.handleFetchError(PUB_CTX);
+      const lapsed = status === 'expired';
       expect(lastSnapshot(calls, 'publish')).toMatchObject({
         revision: index + 2,
         updatedAt: successful.updatedAt,
         expiresAt: successful.expiresAt,
         scopeKey: successful.scopeKey,
         status,
-        running: expectedCount,
-        needsInput: expectedCount,
-        idle: expectedCount,
+        running: lapsed ? 0 : 1,
+        needsInput: lapsed ? 0 : 2,
+        idle: lapsed ? 0 : 1,
+        // The approval count lapses with the wait it belongs to.
+        needsApproval: lapsed ? 0 : 1,
       });
     }
     expect(lastSnapshot(calls, 'publish').needsInputSince).toBeNull();
@@ -933,6 +943,32 @@ describe('GlanceablePublisher waiting ask', () => {
     publisher.dispose();
   });
 
+  it('never records a followed session as the aggregate ask', () => {
+    setFollowedSessionsSource({
+      ids: () => ['followed'],
+      counts: () => ({ running: 0, needsInput: 1, needsApproval: 1, idle: 0, scheduled: 0 }),
+    });
+    const { publisher, asks } = makePublisher();
+    publisher.handleSessions(
+      [
+        {
+          id: 'followed',
+          status: 'permission',
+          statusUpdatedAt: new Date(NOW - 60_000).toISOString(),
+        },
+        { id: 'other', status: 'permission', statusUpdatedAt: new Date(NOW - 1000).toISOString() },
+      ],
+      PUB_CTX
+    );
+    // The followed session has its own card and Approve.
+    expect(asks.at(-1)).toMatchObject({ kiloSessionId: 'other' });
+
+    publisher.handleSessions([{ id: 'followed', status: 'permission' }], PUB_CTX);
+    expect(asks.at(-1)).toBeNull();
+    publisher.dispose();
+    setFollowedSessionsSource(null);
+  });
+
   it('clears the ask on a fetch error', () => {
     const { publisher, asks } = makePublisher();
     publisher.handleSessions([{ id: 'waiting', status: 'permission' }], PUB_CTX);
@@ -960,6 +996,163 @@ describe('GlanceablePublisher waiting ask', () => {
     const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
     publisher.handleSessions([{ id: 'waiting', status: 'permission' }], PUB_CTX);
     expect(count(calls, 'startOrUpdate')).toBe(1);
+    publisher.dispose();
+  });
+});
+
+describe('GlanceablePublisher ask redraw', () => {
+  it('writes the frame it already emitted when a fact read at draw time settles', () => {
+    const { sink, calls } = makeSink();
+    const listeners: (() => void)[] = [];
+    let unsubscribed = false;
+    const publisher = new GlanceablePublisher({
+      sinks: [sink],
+      now: () => NOW,
+      subscribeAskBound: listener => {
+        listeners.push(listener);
+        return () => {
+          unsubscribed = true;
+        };
+      },
+    });
+    publisher.handleSessions([{ id: 'waiting', status: 'permission' }], PUB_CTX);
+    expect(count(calls, 'startOrUpdate')).toBe(1);
+    const frame = lastSnapshot(calls, 'startOrUpdate');
+
+    for (const listener of listeners) {
+      listener();
+    }
+
+    // The sinks read the recorded ask when they draw, so the same content is
+    // enough for Approve to appear without waiting for the next heartbeat; the
+    // revision moves so the surfaces accept the frame.
+    expect(count(calls, 'startOrUpdate')).toBe(2);
+    expect(lastSnapshot(calls, 'startOrUpdate')).toEqual({
+      ...frame,
+      revision: frame.revision + 1,
+    });
+
+    publisher.dispose();
+    expect(unsubscribed).toBe(true);
+  });
+
+  it('writes nothing before a frame was emitted', () => {
+    const { sink, calls } = makeSink();
+    const listeners: (() => void)[] = [];
+    const publisher = new GlanceablePublisher({
+      sinks: [sink],
+      now: () => NOW,
+      subscribeAskBound: listener => {
+        listeners.push(listener);
+        return () => undefined;
+      },
+    });
+
+    for (const listener of listeners) {
+      listener();
+    }
+
+    expect(calls).toHaveLength(0);
+    publisher.dispose();
+  });
+});
+
+describe('Home widget approval key retention', () => {
+  const KEY = 'b'.repeat(64);
+
+  beforeEach(() => {
+    _resetHomeWidgetDataForTests();
+  });
+
+  it('keeps a server-minted approval key while the visible ask is unchanged', () => {
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
+    rememberHomeWidgetData({
+      snapshot: snapshotFor([{ status: 'permission' }], NOW - 1000),
+      details: {
+        primaryTitle: 'Migrate billing',
+        waitingAgents: [{ title: 'Migrate billing', kind: 'permission' }],
+        scheduledAgents: [],
+        approvalKey: KEY,
+      },
+    });
+    publisher.handleSessions([{ status: 'permission', title: 'Migrate billing' }], PUB_CTX);
+    const published = lastSnapshot(calls, 'startOrUpdate');
+    expect(getHomeWidgetDataForSnapshot(published).details.approvalKey).toBe(KEY);
+    publisher.dispose();
+  });
+
+  it('drops the key when a different ask becomes the visible one', () => {
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
+    rememberHomeWidgetData({
+      snapshot: snapshotFor([{ status: 'permission' }], NOW - 1000),
+      details: {
+        primaryTitle: 'Migrate billing',
+        waitingAgents: [{ title: 'Migrate billing', kind: 'permission' }],
+        scheduledAgents: [],
+        approvalKey: KEY,
+      },
+    });
+    publisher.handleSessions([{ status: 'permission', title: 'Rotate the signing key' }], PUB_CTX);
+    const published = lastSnapshot(calls, 'startOrUpdate');
+    expect(getHomeWidgetDataForSnapshot(published).details.approvalKey).toBeNull();
+    publisher.dispose();
+  });
+
+  it('keeps the key when only the session behind the same visible ask changes', () => {
+    // The client sees titles and kinds, not session ids, so two waiting sessions
+    // with the same title are indistinguishable here. Keeping the key is
+    // deliberate: the press re-checks the digest, so a key that no longer matches
+    // the visible request answers nothing and reports the stale outcome.
+    const { sink, calls } = makeSink();
+    let now = NOW;
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => now });
+    rememberHomeWidgetData({
+      snapshot: snapshotFor([{ status: 'permission' }], NOW - 1000),
+      details: {
+        primaryTitle: 'Migrate billing',
+        waitingAgents: [{ title: 'Migrate billing', kind: 'permission' }],
+        scheduledAgents: [],
+        approvalKey: KEY,
+      },
+    });
+    publisher.handleSessions(
+      [{ id: 'ses_first', status: 'permission', title: 'Migrate billing' }],
+      PUB_CTX
+    );
+    const first = lastSnapshot(calls, 'startOrUpdate');
+    expect(getHomeWidgetDataForSnapshot(first).details.approvalKey).toBe(KEY);
+    // A different session with the same visible title replaces the first one.
+    // The visible content is unchanged, so only a due renewal writes a frame:
+    // step past the margin so the second call really reaches the sink.
+    now += GLANCEABLE_RENEW_MARGIN_MS;
+    publisher.handleSessions(
+      [{ id: 'ses_second', status: 'permission', title: 'Migrate billing' }],
+      PUB_CTX
+    );
+    expect(count(calls, 'startOrUpdate')).toBe(2);
+    const published = lastSnapshot(calls, 'startOrUpdate');
+    expect(published.revision).toBeGreaterThan(first.revision);
+    expect(getHomeWidgetDataForSnapshot(published).details.approvalKey).toBe(KEY);
+    publisher.dispose();
+  });
+
+  it('drops the key once no permission is waiting', () => {
+    const { sink, calls } = makeSink();
+    const publisher = new GlanceablePublisher({ sinks: [sink], now: () => NOW });
+    rememberHomeWidgetData({
+      snapshot: snapshotFor([{ status: 'permission' }], NOW - 1000),
+      details: {
+        primaryTitle: 'Migrate billing',
+        waitingAgents: [{ title: 'Migrate billing', kind: 'permission' }],
+        scheduledAgents: [],
+        approvalKey: KEY,
+      },
+    });
+    publisher.handleSessions([{ status: 'busy', title: 'Migrate billing' }], PUB_CTX);
+    const published = lastSnapshot(calls, 'startOrUpdate');
+    expect(getHomeWidgetDataForSnapshot(published).details.approvalKey).toBeNull();
     publisher.dispose();
   });
 });

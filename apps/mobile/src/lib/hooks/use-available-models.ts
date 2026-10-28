@@ -1,3 +1,8 @@
+import {
+  type OrganizationModelAudience,
+  organizationModelsPath,
+} from '@kilocode/app-shared/organizations';
+import { type Effort } from '@kilocode/harness-sdk';
 import { useQuery } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import * as z from 'zod';
@@ -7,6 +12,7 @@ import { getAuthTokenForRequest } from '@/lib/auth/token-owner';
 import { i18n } from '@/i18n';
 import { collator } from '@/lib/intl-cache';
 import { formatShortModelDisplayName } from '@/lib/model-display-name';
+import { catalogVariantEfforts } from '@/lib/chat/effort';
 
 const THINKING_EFFORT_KEYS = {
   none: 'models.thinkingEffort.none',
@@ -16,6 +22,8 @@ const THINKING_EFFORT_KEYS = {
   high: 'models.thinkingEffort.high',
   xhigh: 'models.thinkingEffort.xhigh',
   max: 'models.thinkingEffort.max',
+  off: 'common.off',
+  on: 'securityAgent.settingsOverview.on',
 } satisfies Record<string, string>;
 
 /** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
@@ -25,16 +33,28 @@ function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | un
 
 // ── Types ─────────────────────────────────────────────────────────────
 
+/** US dollars per token, as decimal strings, the way the catalog sends them. */
+export type ModelPricing = {
+  prompt?: string;
+  completion?: string;
+  input_cache_read?: string;
+  input_cache_write?: string;
+};
+
 export type ModelOption = {
   id: string;
   name: string;
   variants: string[];
+  /** The effort each variant asks for, as the catalog's variant settings say. */
+  variantEfforts?: Record<string, Effort>;
   isPreferred: boolean;
   isFree?: boolean;
   mayTrainOnYourPrompts?: boolean;
   hasUserByokAvailable?: boolean;
   context_length?: number | null;
-  pricing?: { prompt?: string; completion?: string };
+  pricing?: ModelPricing;
+  /** The catalog lists image input for this model. */
+  supportsImages?: boolean;
 };
 
 type ModelResponse = {
@@ -46,7 +66,8 @@ type ModelResponse = {
     hasUserByokAvailable?: boolean;
     context_length?: number | null;
     preferredIndex?: number;
-    pricing?: { prompt?: string; completion?: string };
+    pricing?: ModelPricing;
+    architecture?: { input_modalities?: string[] };
     opencode?: {
       variants?: Record<string, unknown>;
     };
@@ -68,8 +89,10 @@ export function toModelOptions(data: ModelResponse | undefined): ModelOption[] {
     hasUserByokAvailable: model.hasUserByokAvailable,
     pricing: model.pricing,
     variants: Object.keys(model.opencode?.variants ?? {}),
+    variantEfforts: catalogVariantEfforts(model.opencode?.variants ?? {}),
     preferredIndex: model.preferredIndex,
     context_length: model.context_length ?? null,
+    supportsImages: model.architecture?.input_modalities?.includes('image') === true,
   }));
 
   items.sort((a, b) => {
@@ -92,12 +115,14 @@ export function toModelOptions(data: ModelResponse | undefined): ModelOption[] {
     id: item.id,
     name: item.name,
     variants: item.variants,
+    variantEfforts: item.variantEfforts,
     isPreferred: item.preferredIndex !== undefined,
     isFree: item.isFree,
     mayTrainOnYourPrompts: item.mayTrainOnYourPrompts,
     hasUserByokAvailable: item.hasUserByokAvailable,
     pricing: item.pricing,
     context_length: item.context_length,
+    supportsImages: item.supportsImages,
   }));
 }
 
@@ -123,9 +148,15 @@ export const OpenRouterModelsResponseSchema = z.object({
       context_length: z.number().nullable().optional(),
       preferredIndex: z.number().optional(),
       pricing: z
-        .object({ prompt: z.string().optional(), completion: z.string().optional() })
+        .object({
+          prompt: z.string().optional(),
+          completion: z.string().optional(),
+          input_cache_read: z.string().optional(),
+          input_cache_write: z.string().optional(),
+        })
         .optional(),
       opencode: z.object({ variants: z.record(z.string(), z.unknown()).optional() }).optional(),
+      architecture: z.object({ input_modalities: z.array(z.string()).optional() }).optional(),
     })
   ),
 });
@@ -143,10 +174,13 @@ export const OrganizationDefaultsResponseSchema = z.object({ defaultModel: z.str
  * refused or reset connection still rejects and surfaces the error + Retry,
  * while a stalled response resolves when the backend answers.
  */
-async function fetchModels(organizationId: string | undefined): Promise<ModelResponse> {
+async function fetchModels(
+  organizationId: string | undefined,
+  audience: OrganizationModelAudience
+): Promise<ModelResponse> {
   const token = await getAuthTokenForRequest();
   const url = organizationId
-    ? `${API_BASE_URL}/api/organizations/${organizationId}/models`
+    ? `${API_BASE_URL}${organizationModelsPath(organizationId, audience)}`
     : `${API_BASE_URL}/api/openrouter/models`;
   const response = await fetch(url, {
     headers: {
@@ -193,10 +227,18 @@ export function useOrgDefaultModel(organizationId: string | undefined) {
   return { defaultModel: data?.defaultModel, isLoading };
 }
 
-export function useAvailableModels(organizationId: string | undefined) {
+/**
+ * `audience` is `shared_services` for a picker whose model a platform service
+ * runs for the organization, such as the Code Reviewer: its BYOK badge then
+ * counts only keys that run can use.
+ */
+export function useAvailableModels(
+  organizationId: string | undefined,
+  audience: OrganizationModelAudience = 'member'
+) {
   const { data, isLoading, isError, isFetching, isFetched, error, refetch } = useQuery({
-    queryKey: ['available-models', organizationId] as const,
-    queryFn: fetchModels.bind(null, organizationId),
+    queryKey: ['available-models', organizationId, audience] as const,
+    queryFn: fetchModels.bind(null, organizationId, audience),
     staleTime: 60_000,
   });
 

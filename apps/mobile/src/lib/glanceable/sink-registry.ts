@@ -2,6 +2,8 @@ import type * as SentryReactNative from '@sentry/react-native';
 import { type GlanceableAgentsSnapshot } from '@kilocode/app-shared/glanceable-agents-snapshot';
 import { type LiveActivity } from 'expo-widgets';
 
+import { rememberHomeWidgetSnapshot } from './home-widget-data';
+
 /**
  * One sink consumes the glanceable snapshot for one native surface (persist,
  * iOS Live Activity/widgets, Android widget/ongoing). Platform sinks register
@@ -17,7 +19,12 @@ export type GlanceableSinkContext = {
 };
 
 export type GlanceableSink = {
-  publish(snapshot: GlanceableAgentsSnapshot): void;
+  /**
+   * Re-render from a snapshot the publisher already wrote. A sink that can
+   * raise a card may take `ctx` and use it for the token registration of that
+   * card; omit it when the caller must never raise a card.
+   */
+  publish(snapshot: GlanceableAgentsSnapshot, ctx?: GlanceableSinkContext): void;
   /** Owns native terminal dismissal; await submission, never schedule a later JS end. */
   waitForNativeTerminal?(): Promise<void>;
   /**
@@ -105,6 +112,7 @@ export function writeGlanceableFrame(
   snapshot: GlanceableAgentsSnapshot,
   ctx: GlanceableSinkContext | null
 ): boolean {
+  rememberHomeWidgetSnapshot(snapshot);
   let ok = true;
   for (const sink of targets) {
     const writePublish = () => {
@@ -121,12 +129,16 @@ export function writeGlanceableFrame(
   return ok;
 }
 
-/**
- * Activity-token registrar, set by a later token slice. No-op by default.
- * `unregisterTokens` reports only the tokens whose unregister failed, so
- * logout can tombstone the failed tokens and retry them later.
- */
+/** The LiveActivity token access a surface uses: read its push token and
+ *  listen for token updates. */
 export type GlanceableActivity = Pick<LiveActivity, 'getPushToken' | 'addPushTokenListener'>;
+
+/**
+ * `scope` retires every token of the signed-in scope, followed session cards
+ * included. `activity` retires the aggregate card's token. `session` retires
+ * only the one session card token the caller passes.
+ */
+export type ActivityTokenLifetime = 'scope' | 'activity' | 'session';
 
 export type GlanceableDelivery = {
   registerScopeTokens(organizationId: string | null, userId: string | null): void;
@@ -137,9 +149,13 @@ export type GlanceableDelivery = {
     activity?: GlanceableActivity
   ): void;
   /** Retire a lifetime and tombstone failures. The optional lookup starts before native end. */
-  cleanupTokens(lifetime: 'scope' | 'activity', activityToken?: Promise<string | null>): void;
+  cleanupTokens(lifetime: ActivityTokenLifetime, activityToken?: Promise<string | null>): void;
+  /**
+   * Reports only the tokens whose unregister failed, so logout can tombstone
+   * the failed tokens and retry them later.
+   */
   unregisterTokens(
-    lifetime?: 'scope' | 'activity',
+    lifetime?: ActivityTokenLifetime,
     activityToken?: Promise<string | null>
   ): Promise<{ ok: boolean; tokens: string[] }>;
 };
@@ -161,6 +177,7 @@ const noopDelivery: GlanceableDelivery = {
   },
 };
 
+/** Activity-token registrar, set by a later token slice. No-op by default. */
 let delivery: GlanceableDelivery = noopDelivery;
 
 export function setGlanceableDelivery(next: GlanceableDelivery): void {

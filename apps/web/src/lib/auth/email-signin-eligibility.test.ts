@@ -1,23 +1,82 @@
+import { checkRateLimit } from '@vercel/firewall';
+import { captureMessage } from '@sentry/nextjs';
+import type { NextRequest } from 'next/server';
 import {
   isEmailBlacklistedByDomainAsync,
   isBlockedTLD,
 } from '@kilocode/web-shared/lib/user/server';
+import { findUserByNormalizedEmail } from '@/lib/user';
+import { resolveSsoAuthorityForDomain } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
 
+jest.mock('@vercel/firewall', () => ({
+  checkRateLimit: jest.fn(),
+}));
+jest.mock('@sentry/nextjs', () => ({
+  captureMessage: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/user/server', () => ({
   isEmailBlacklistedByDomainAsync: jest.fn(),
   isBlockedTLD: jest.fn(),
 }));
+jest.mock('@/lib/user', () => ({
+  findUserByNormalizedEmail: jest.fn(),
+  getWorkOSOrganization: jest.fn(),
+}));
+jest.mock('@kilocode/web-shared/lib/organizations/organization-sso-policy', () => ({
+  resolveSsoAuthorityForDomain: jest.fn(),
+}));
 
-import { isNewAccountEligibleForMagicLink } from './email-signin-eligibility';
+import {
+  checkDomainSignInEligibility,
+  isNewAccountEligibleForMagicLink,
+  checkEmailSignInEligibility,
+} from './email-signin-eligibility';
 
+const mockCheckRateLimit = jest.mocked(checkRateLimit);
+const mockCaptureMessage = jest.mocked(captureMessage);
 const mockIsEmailBlacklistedByDomainAsync = jest.mocked(isEmailBlacklistedByDomainAsync);
 const mockIsBlockedTLD = jest.mocked(isBlockedTLD);
+const mockFindUserByNormalizedEmail = jest.mocked(findUserByNormalizedEmail);
+const mockResolveSsoAuthorityForDomain = jest.mocked(resolveSsoAuthorityForDomain);
+
+const request = (headers: Record<string, string> = {}) =>
+  ({
+    headers: new Headers(headers),
+    url: 'http://localhost:3000/api/auth/native/otp',
+  }) as unknown as NextRequest;
+
+describe('checkDomainSignInEligibility', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockIsEmailBlacklistedByDomainAsync.mockResolvedValue(false);
+    mockIsBlockedTLD.mockResolvedValue(false);
+    mockFindUserByNormalizedEmail.mockResolvedValue(undefined);
+    mockResolveSsoAuthorityForDomain.mockResolvedValue({
+      status: 'not_required',
+      domain: 'example.com',
+    });
+  });
+
+  it('does not resolve SSO authority for an address without a domain', async () => {
+    await expect(checkDomainSignInEligibility('no-domain')).resolves.toEqual({
+      ok: true,
+      existingUser: false,
+    });
+    expect(mockResolveSsoAuthorityForDomain).not.toHaveBeenCalled();
+  });
+
+  it('resolves SSO authority for the lowercased domain', async () => {
+    await checkDomainSignInEligibility('new@Acme.Example');
+
+    expect(mockResolveSsoAuthorityForDomain).toHaveBeenCalledWith('acme.example');
+  });
+});
 
 describe('isNewAccountEligibleForMagicLink', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockIsEmailBlacklistedByDomainAsync.mockResolvedValue(false);
-    mockIsBlockedTLD.mockReturnValue(false);
+    mockIsBlockedTLD.mockResolvedValue(false);
   });
 
   it('accepts an eligible unknown email', async () => {
@@ -32,8 +91,132 @@ describe('isNewAccountEligibleForMagicLink', () => {
   });
 
   it('rejects a blocked TLD', async () => {
-    mockIsBlockedTLD.mockReturnValue(true);
+    mockIsBlockedTLD.mockResolvedValue(true);
 
     await expect(isNewAccountEligibleForMagicLink('new@example.top')).resolves.toBe(false);
+  });
+
+  it('rejects a malformed address before any domain lookup', async () => {
+    await expect(isNewAccountEligibleForMagicLink('not-an-email')).resolves.toBe(false);
+    expect(mockIsEmailBlacklistedByDomainAsync).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, '', 'false', 'TRUE'])(
+    'rejects every new address unless EMAIL_SIGNUPS_ENABLED is exactly true: %s',
+    async value => {
+      if (value === undefined) delete process.env.EMAIL_SIGNUPS_ENABLED;
+      else process.env.EMAIL_SIGNUPS_ENABLED = value;
+      try {
+        await expect(isNewAccountEligibleForMagicLink('new@example.com')).resolves.toBe(false);
+      } finally {
+        process.env.EMAIL_SIGNUPS_ENABLED = 'true';
+      }
+    }
+  );
+});
+
+describe('checkEmailSignInEligibility send budgets', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCheckRateLimit.mockResolvedValue({ rateLimited: false });
+    mockIsEmailBlacklistedByDomainAsync.mockResolvedValue(false);
+    mockIsBlockedTLD.mockResolvedValue(false);
+    mockFindUserByNormalizedEmail.mockResolvedValue(undefined);
+    mockResolveSsoAuthorityForDomain.mockImplementation(async domain => ({
+      status: 'not_required',
+      domain,
+    }));
+  });
+
+  it('counts a send against the per-address rule first, then the caller rule', async () => {
+    await checkEmailSignInEligibility('user@example.com', request());
+
+    expect(mockCheckRateLimit).toHaveBeenCalledTimes(2);
+    expect(mockCheckRateLimit).toHaveBeenNthCalledWith(1, 'magic-link-email', {
+      request: request(),
+      rateLimitKey: expect.stringMatching(/^magic-link-email:[A-Za-z0-9_-]+$/),
+    });
+    expect(mockCheckRateLimit).toHaveBeenNthCalledWith(2, 'sign-in-code-email-ip', {
+      request: request(),
+      rateLimitKey: 'sign-in-code-email-ip:unknown',
+    });
+  });
+
+  it('keys the per-caller rule on the edge-provided forwarded header', async () => {
+    await checkEmailSignInEligibility(
+      'user@example.com',
+      request({ 'x-vercel-forwarded-for': '203.0.113.7, 70.41.3.18' })
+    );
+
+    expect(mockCheckRateLimit).toHaveBeenNthCalledWith(2, 'sign-in-code-email-ip', {
+      request: request({ 'x-vercel-forwarded-for': '203.0.113.7, 70.41.3.18' }),
+      rateLimitKey: 'sign-in-code-email-ip:203.0.113.7',
+    });
+  });
+
+  it('falls back to the real address when the forwarded header is absent', async () => {
+    await checkEmailSignInEligibility('user@example.com', request({ 'x-real-ip': '198.51.100.4' }));
+
+    expect(mockCheckRateLimit).toHaveBeenNthCalledWith(2, 'sign-in-code-email-ip', {
+      request: request({ 'x-real-ip': '198.51.100.4' }),
+      rateLimitKey: 'sign-in-code-email-ip:198.51.100.4',
+    });
+  });
+
+  it('returns 429 SIGNUP-RATE-LIMITED when the per-caller rule is exhausted', async () => {
+    mockCheckRateLimit.mockImplementation(async id => {
+      if (id === 'sign-in-code-email-ip') return { rateLimited: true };
+      return { rateLimited: false };
+    });
+
+    await expect(checkEmailSignInEligibility('user@example.com', request())).resolves.toEqual({
+      ok: false,
+      status: 429,
+      errorCode: 'SIGNUP-RATE-LIMITED',
+      body: { success: false, error: 'Rate limit exceeded. Please try again later.' },
+    });
+  });
+
+  it('reports a rule that is not configured once per interval and continues', async () => {
+    mockCheckRateLimit.mockImplementation(async id => {
+      if (id === 'sign-in-code-email-ip') return { rateLimited: false, error: 'not-found' };
+      return { rateLimited: false };
+    });
+
+    await expect(checkEmailSignInEligibility('user@example.com', request())).resolves.toEqual({
+      ok: true,
+    });
+    await checkEmailSignInEligibility('user@example.com', request());
+
+    expect(mockCaptureMessage).toHaveBeenCalledTimes(1);
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      "Firewall rate limit 'sign-in-code-email-ip' is not configured",
+      expect.objectContaining({ level: 'error' })
+    );
+  });
+
+  it('continues when the per-address rule is not configured and still applies the caller rule', async () => {
+    mockCheckRateLimit.mockImplementation(async id => {
+      if (id === 'magic-link-email') return { rateLimited: false, error: 'not-found' };
+      return { rateLimited: false };
+    });
+
+    await expect(checkEmailSignInEligibility('user@example.com', request())).resolves.toEqual({
+      ok: true,
+    });
+
+    expect(mockCheckRateLimit).toHaveBeenCalledTimes(2);
+    expect(mockCaptureMessage).toHaveBeenCalledWith(
+      "Firewall rate limit 'magic-link-email' is not configured",
+      expect.objectContaining({ level: 'error' })
+    );
+  });
+
+  it('checks caller budgets before the domain rules', async () => {
+    mockIsEmailBlacklistedByDomainAsync.mockResolvedValue(true);
+
+    await checkEmailSignInEligibility('user@example.com', request());
+
+    expect(mockCheckRateLimit).toHaveBeenCalled();
   });
 });

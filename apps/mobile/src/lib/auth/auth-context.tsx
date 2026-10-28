@@ -18,6 +18,9 @@ import {
   flushLastPostHogEvent,
   LOGOUT_EVENT,
 } from '@/lib/analytics/posthog';
+import { clearChatsForSignOut, releaseChatsForAccountSwitch } from '@/lib/chat/sign-out';
+import { forgetRemoteMcp } from '@/lib/chat/remote-mcp';
+import { clearRemoteMcpServers } from '@/lib/chat/remote-mcp-store';
 import { clearPendingConsentOutcome } from '@/lib/consent';
 import { resetAppsFlyerState, trackEvent } from '@/lib/appsflyer';
 import { clearAccountBoundPendingDeepLink, setCurrentDeepLinkUserId } from '@/lib/deep-link-launch';
@@ -49,12 +52,14 @@ import {
 } from '@/lib/auth/secure-store-value';
 import { type AuthSignOutCause, reportAuthBranch } from '@/lib/auth/sign-out-telemetry';
 import { chainSave } from '@/lib/hooks/save-chain';
+import { isProtectedDataAvailable, whenProtectedDataAvailable } from '@/lib/protected-data';
 import { clearAgentModelPreference } from '@/lib/hooks/use-persisted-agent-model';
 import { clearCollapsedConnectCtasPreference } from '@/lib/hooks/use-collapsed-connect-ctas-preference';
 import { clearCondenseToolCallsPreference } from '@/lib/hooks/use-condense-tool-calls-preference';
 import { clearRunOnDestinationPreference } from '@/lib/hooks/use-persisted-run-on-destination';
 import { clearKeepScreenOnPreference } from '@/lib/hooks/use-keep-screen-on-preference';
 import { clearLiveActivityPreference } from '@/lib/hooks/use-live-activity-preference';
+import { clearTrackingPromptDismissed } from '@/lib/hooks/use-tracking-permission-prompt';
 import { clearPrReviewFooterPreference } from '@/lib/hooks/use-pr-review-footer-preference';
 import { clearReasoningPreference } from '@/lib/hooks/use-reasoning-preference';
 import { clearHideThinkingPreference } from '@/lib/hooks/use-hide-thinking-preference';
@@ -64,9 +69,11 @@ import {
 } from '@/lib/auth/session-scoped-state';
 import { clearKiloClawOwned, gateKiloClawOwned } from '@/lib/kiloclaw-tab-ownership';
 import { clearLastActiveInstance } from '@/lib/last-active-instance';
+import { clearLastRoute } from '@/lib/last-route';
 import { clearLastOpenedSession } from '@/lib/last-opened-session';
+import { clearLoginDrafts } from '@/lib/login-draft';
 import { clearLauncherSurfaces } from '@/lib/native-launcher-surfaces';
-import { resetPurchaseErrorToastDedup } from '@/lib/kilo-pass/use-store-kilo-pass-purchase';
+import { resetPurchaseErrorToastDedup } from '@/lib/credits/use-store-credit-purchase';
 import {
   isSignOutActive,
   setSignOutActive,
@@ -81,6 +88,7 @@ import { clearViewedFiles } from '@/lib/pr-review/viewed-files';
 import {
   ACTIVE_USER_ID_KEY,
   AUTH_TOKEN_KEY,
+  CHAT_BACKENDS_KEY,
   LEGACY_EXCHANGE_DONE_KEY,
   LIVE_SESSION_FILTERS_KEY,
   NOTIFICATION_PROMPT_SEEN_KEY,
@@ -88,6 +96,7 @@ import {
   ORGANIZATION_STORAGE_KEY,
   PENDING_DEEP_LINK_KEY,
   PICKER_LAUNCH_CONTEXT_KEY,
+  PICKER_RESTORE_RECORD_KEY,
   REFRESH_TOKEN_KEY,
   SESSION_FILTERS_KEY,
   TOKEN_EXPIRES_AT_KEY,
@@ -105,6 +114,7 @@ import { beginAuthenticatedOwner, markRestoredAuthenticatedOwner } from '@/lib/c
 // warning level with the stable read fingerprint).
 export const preloadedAuthToken = readStoredValue(AUTH_TOKEN_KEY);
 const preloadedRefreshToken = readStoredValue(REFRESH_TOKEN_KEY);
+let authPreloadAvailable = true;
 // A keychain failure at process start rejects these before any consumer can
 // await them, and the runtime would report that as an unhandled rejection
 // before AuthProvider even mounts. Observe it here; the bootstrap read below
@@ -214,17 +224,31 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
       readonly token: Promise<string | null>;
       readonly refresh: Promise<string | null>;
     }) => {
+      // A push or a background task can launch the app while the device is
+      // locked, and the keychain then refuses every read. That is not an
+      // unreadable session: hold the loading state until unlock, and read
+      // afresh instead of awaiting the preloads the lock refused.
+      let firstAttempt = preload;
+      if (!isProtectedDataAvailable()) {
+        await whenProtectedDataAvailable();
+        firstAttempt = undefined;
+      }
       // Capture the epoch before any asynchronous read: every later check —
       // including the catch below — fences against this moment, so a sign-out
       // or newer sign-in during bootstrap can never be followed by the
       // preloaded token being restored into React state or the token owner.
       const epoch = currentAuthEpoch();
+      let lockedDuringRead = false;
       try {
-        const stored = await readStoredValueWithRetry(AUTH_TOKEN_KEY, undefined, preload?.token);
+        const stored = await readStoredValueWithRetry(
+          AUTH_TOKEN_KEY,
+          undefined,
+          firstAttempt?.token
+        );
         const storedRefresh = await readStoredValueWithRetry(
           REFRESH_TOKEN_KEY,
           undefined,
-          preload?.refresh
+          firstAttempt?.refresh
         );
         // The credential state is now known — a stored session restores below,
         // or genuinely none exists and login is the correct destination. Clear
@@ -241,7 +265,12 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             // began while the exchange was in flight has not bumped the epoch
             // yet, so the exchange's own epoch checks pass — the sign-out flag
             // must stop this publish, exactly like the one below.
-            if (pair && isCurrentAuthEpoch(epoch) && !isSignedOutReference.current) {
+            if (
+              pair &&
+              isCurrentAuthEpoch(epoch) &&
+              !isSignedOutReference.current &&
+              !isSignOutActive()
+            ) {
               markRestoredAuthenticatedOwner();
               setToken(pair.token);
               setCurrentDeepLinkUserId(readUserIdFromToken(pair.token));
@@ -270,7 +299,11 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // without it a success landing mid-teardown republishes the stored
           // credentials (owner, React state, deep-link binding) that sign-out
           // is tearing down.
-          if (!isCurrentAuthEpoch(epoch) || isSignedOutReference.current) {
+          // The sign-out flag is module-scoped, so a provider remount starts
+          // with a fresh ref while the teardown is still before its own fence:
+          // both must stop this publish, or the remounted tree stays signed in
+          // after the teardown finishes.
+          if (!isCurrentAuthEpoch(epoch) || isSignedOutReference.current || isSignOutActive()) {
             return;
           }
           // A same-session refresh replaced the stored pair while the reads
@@ -309,27 +342,44 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           setCurrentDeepLinkUserId(null);
         }
       } catch {
-        // Every read exhausted its retries. The session is not known to be
-        // gone, so NEVER fall through to the signed-out path and never set a
-        // token here: surface a retryable error and let the person retry or
-        // sign out explicitly.
-        // But never resurrect the surface over a transition that began while
-        // this load was in flight. A sign-out's escape hatch already cleared
-        // it synchronously (and the dedupe makes a second sign-out a no-op,
-        // so a resurrected flag would dead-end the hatch on the login route);
-        // a newer sign-in moved the epoch and owns the tree.
-        if (!isSignedOutReference.current && isCurrentAuthEpoch(epoch)) {
-          setRestoreFailed(true);
+        if (isProtectedDataAvailable()) {
+          // Every read exhausted its retries. The session is not known to be
+          // gone, so NEVER fall through to the signed-out path and never set a
+          // token here: surface a retryable error and let the person retry or
+          // sign out explicitly.
+          // But never resurrect the surface over a transition that began while
+          // this load was in flight. A sign-out's escape hatch already cleared
+          // it synchronously (and the dedupe makes a second sign-out a no-op,
+          // so a resurrected flag would dead-end the hatch on the login route);
+          // a newer sign-in moved the epoch and owns the tree.
+          if (!isSignedOutReference.current && isCurrentAuthEpoch(epoch)) {
+            setRestoreFailed(true);
+          }
+        } else {
+          // The device locked while the reads ran: read again after unlock.
+          lockedDuringRead = true;
         }
       } finally {
-        setIsLoading(false);
+        if (!lockedDuringRead) {
+          setIsLoading(false);
+        }
+      }
+      if (lockedDuringRead) {
+        await load();
       }
     },
     []
   );
 
   useEffect(() => {
-    void load({ token: preloadedAuthToken, refresh: preloadedRefreshToken });
+    // Android can recreate the activity without restarting JavaScript. Later provider mounts
+    // and root-boundary Retry remounts must read current credentials rather than the snapshot
+    // from before sign-in or a credential change.
+    const preload = authPreloadAvailable
+      ? { token: preloadedAuthToken, refresh: preloadedRefreshToken }
+      : undefined;
+    authPreloadAvailable = false;
+    void load(preload);
   }, [load]);
 
   const retryRestore = useCallback(() => {
@@ -376,6 +426,9 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         // run, so the provider's restore can never read the prior account's
         // marker.
         await deleteAccountMetadata(ORGANIZATION_PERSONAL_STORAGE_KEY);
+        // Clear backend credentials durably before publishing another account.
+        // A terminated sign-in must not restore B with A's backend credentials.
+        await deleteAccountMetadata(CHAT_BACKENDS_KEY);
         // Bind the pending deep-link slot to the new user id at the same
         // place the auth epoch advances, so a destination captured while this
         // account is signed in restores only for this account.
@@ -406,11 +459,19 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
         // A direct account switch must not keep the prior account's query
         // cache: the org list is keyed account-independently, so a stale list
         // would otherwise drive a false lost-org blank in the org fence.
+        // A direct account switch must not keep the prior account's running
+        // chats, which outlive any screen. A release that fails can never hold
+        // up the account signing in.
+        await Promise.allSettled([releaseChatsForAccountSwitch()]);
         queryClient.clear();
         setToken(tokenValue);
         // A direct account switch must not keep the prior account's session
         // state: trusted hosts, image confirms, media caches, temp copies.
         clearSessionScopedState();
+        // The sign-in form's drafts belong to the attempt that just succeeded,
+        // whatever provider finished it; a later signed-out screen must not
+        // prefill the previous attempt's address or SSO banner.
+        clearLoginDrafts();
       });
     },
     []
@@ -526,6 +587,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
               await deleteStoredValue(LEGACY_EXCHANGE_DONE_KEY);
             }),
             deleteAccountMetadata(ACTIVE_USER_ID_KEY),
+            deleteAccountMetadata(CHAT_BACKENDS_KEY),
             deleteAccountMetadata(ORGANIZATION_STORAGE_KEY),
             // The Personal-choice marker is account-scoped selection state
             // beside the organization key. Clearing it here (and never on the
@@ -539,6 +601,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             deleteAccountMetadata(NOTIFICATION_PROMPT_SEEN_KEY),
             deleteAccountMetadata(PENDING_DEEP_LINK_KEY),
             deleteAccountMetadata(PICKER_LAUNCH_CONTEXT_KEY),
+            deleteAccountMetadata(PICKER_RESTORE_RECORD_KEY),
             // Phase 4b read-cache cleanup: capture the authoritative user
             // id from the getMe cache while it is still present (the batch
             // expression runs before queryClient.clear()), then remove that
@@ -546,6 +609,10 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
             // unknown — privacy wins). Best effort: a failed cleanup can
             // never abort sign-out.
             clearCacheScopeForSignOut(readCachedUserId(queryClient)),
+            // The chats on the device are read from the same cached user id,
+            // and an unknown one takes every chat rather than leaving one
+            // account's conversations for the next person to sign in.
+            clearChatsForSignOut(readCachedUserId(queryClient)),
             clearLastActiveInstance(),
             clearKiloClawOwned(),
             clearRecentPrs(),
@@ -578,7 +645,14 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           clearHideThinkingPreference();
           clearKeepScreenOnPreference();
           clearLiveActivityPreference();
+          clearTrackingPromptDismissed();
           clearSessionScopedState();
+          // The remote MCP connection and the servers stored behind it (which
+          // hold bearer tokens) belong to the account that is leaving. The
+          // settings-tools group switch is account-scoped and cleared by
+          // `clearSessionScopedState` above, on this path and the switch alike.
+          forgetRemoteMcp();
+          clearRemoteMcpServers();
           clearPrReviewFooterPreference();
           clearCondenseToolCallsPreference();
           clearCollapsedConnectCtasPreference();
@@ -589,6 +663,7 @@ export function AuthProvider({ children }: { readonly children: ReactNode }) {
           // throw into sign-out.
           runBestEffortTeardown(clearLauncherSurfaces);
           runBestEffortTeardown(clearLastOpenedSession);
+          runBestEffortTeardown(clearLastRoute);
         } finally {
           queryClient.clear();
           setSessionEnded(ended);

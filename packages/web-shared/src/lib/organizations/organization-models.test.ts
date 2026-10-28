@@ -9,6 +9,7 @@ import type {
 import type * as Producer from './organization-models';
 import type * as Cache from '@kilocode/web-shared/lib/model-stats/model-stats-cache';
 import type * as Enkrypt from '@kilocode/web-shared/lib/model-stats/enkrypt';
+import type { OrganizationModelAudience } from '@kilocode/app-shared/organizations';
 import { fingerprintEnkryptScore } from '@kilocode/web-shared/lib/model-stats/enkrypt-fingerprint';
 
 let mockPublicationEnabled = true;
@@ -24,17 +25,34 @@ const mockGetContext = jest.fn(
 );
 const mockPolicy = { policyRevision: 7 };
 const mockEvaluatePolicy = jest.fn((_context: OrganizationGroupPolicyContext) => mockPolicy);
+const ALLOWED_MODEL_ROUTES: ReadonlySet<string> = new Set(['groq']);
 const mockDecision = jest.fn(async (_policy: unknown, id: string) => ({
   allowed: id !== 'provider/blocked',
+  ...(id === 'provider/allowed' && { eligibleProviderRoutes: ALLOWED_MODEL_ROUTES }),
 }));
 const mockByok = jest.fn<Promise<OpenRouterModel[]>, [string]>();
-const mockCustom = jest.fn<Promise<OpenRouterModel[]>, [string, readonly string[]]>();
+const mockCustom = jest.fn<
+  Promise<OpenRouterModel[]>,
+  [string, readonly string[], string | null]
+>();
 const mockProviderIds = jest.fn(async (_db: unknown, _organizationId: string) => ['openai']);
-const mockAvailability = jest.fn(async (models: OpenRouterModel[], _providers: string[]) =>
-  models.map(model => ({ ...model, hasUserByokAvailable: model.id === 'provider/allowed' }))
+const mockCatalogModelIds = new Set(['provider/allowed']);
+const mockDirectByokCatalogModelIds = jest.fn(async (_owner: unknown) => mockCatalogModelIds);
+const mockCatalogAvailability = jest.fn(
+  (models: OpenRouterModel[], _catalogModelIds: ReadonlySet<string>) => models
+);
+const mockAvailability = jest.fn(
+  async (
+    models: OpenRouterModel[],
+    _providers: string[],
+    _getAllowedProviders?: (modelId: string) => ReadonlySet<string> | undefined
+  ) => models.map(model => ({ ...model, hasUserByokAvailable: model.id === 'provider/allowed' }))
 );
 const mockTagChatGpt = jest.fn(async (_owner: unknown, models: OpenRouterModel[]) => models);
 
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
+  requireCustomLlmsById: async () => new Map(),
+}));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   get ENKRYPT_PUBLICATION_ENABLED() {
     return mockPublicationEnabled;
@@ -67,6 +85,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlm
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModelsForOrganization: mockByok,
+  getDirectByokCatalogModelIds: mockDirectByokCatalogModelIds,
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model', () => ({
   ORG_AUTO_MODEL: { id: 'kilo-auto/org' },
@@ -75,11 +94,18 @@ jest.mock('@kilocode/web-shared/lib/organizations/organization-auto-model', () =
   isOrganizationAutoEnabled: () => mockAutoEnabled,
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
+  addDirectByokCatalogAvailability: mockCatalogAvailability,
   addUserByokAvailability: mockAvailability,
   getOrganizationByokProviderIds: mockProviderIds,
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing', () => ({
   tagOpenAiChatGptByokModels: mockTagChatGpt,
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store', () => ({
+  openAiChatGptSharedServicesOwner: (organizationId: string) => ({
+    organizationId,
+    scope: 'shared_services',
+  }),
 }));
 
 const checkedAt = '2026-09-01T00:00:00.000Z';
@@ -242,8 +268,13 @@ function pauseAt(stage: 'byok' | 'custom') {
   return { entered: entered.promise, release: release.resolve };
 }
 
-async function resultFor(policySubject = subject) {
-  const result = await producer.getAvailableModelsForOrganization('fixture-org', policySubject);
+async function resultFor(policySubject = subject, audience: OrganizationModelAudience = 'member') {
+  const result = await producer.getAvailableModelsForOrganization(
+    'fixture-org',
+    policySubject,
+    audience,
+    { countryCode: null }
+  );
   if (!result) throw new Error('Expected organization catalog');
   expect(result).toHaveProperty('fixtureCatalogMarker', 'preserved');
   const serialized = JSON.stringify(result);
@@ -323,19 +354,29 @@ describe('organization model producer publication', () => {
     mockAutoEnabled = true;
     const defaultSubject: OrganizationPolicySubject = { type: 'defaultAccess' };
     const results = await Promise.all([resultFor(), resultFor(defaultSubject), resultFor()]);
-    expect(mockGetContext).toHaveBeenCalledWith({ organizationId: 'fixture-org', subject });
-    expect(mockGetContext).toHaveBeenCalledWith({
-      organizationId: 'fixture-org',
-      subject: defaultSubject,
-    });
+    expect(mockGetContext).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: 'fixture-org', subject })
+    );
+    expect(mockGetContext).toHaveBeenCalledWith(
+      expect.objectContaining({ organizationId: 'fixture-org', subject: defaultSubject })
+    );
     expect(mockEvaluatePolicy).toHaveBeenCalledWith(mockContext);
-    expect(mockCustom).toHaveBeenCalledWith('fixture-org', ['fixture-group']);
+    expect(mockCustom).toHaveBeenCalledWith('fixture-org', ['fixture-group'], null);
     expect(mockByok).toHaveBeenCalledWith('fixture-org');
     expect(mockProviderIds).toHaveBeenCalledWith(expect.anything(), 'fixture-org');
+    expect(mockDirectByokCatalogModelIds).toHaveBeenCalledWith({
+      type: 'organization',
+      id: 'fixture-org',
+    });
     expect(mockAvailability).toHaveBeenCalledWith(
       [mockCatalog.data[0], mockCatalog.data[2]],
-      ['openai']
+      ['openai'],
+      expect.any(Function)
     );
+    expect(mockCatalogAvailability).toHaveBeenCalledWith(expect.any(Array), mockCatalogModelIds);
+    const getAllowedProviders = mockAvailability.mock.calls[0][2];
+    expect(getAllowedProviders?.('provider/allowed')).toEqual(ALLOWED_MODEL_ROUTES);
+    expect(getAllowedProviders?.('provider/training')).toBeUndefined();
     expect(mockDecision.mock.calls.map(([policy, id]) => ({ policy, id }))).toEqual(
       expect.arrayContaining(mockCatalog.data.map(model => ({ policy: mockPolicy, id: model.id })))
     );
@@ -385,6 +426,18 @@ describe('organization model producer publication', () => {
     }
   );
 
+  it('builds the public and private custom LLM lists for the requester country', async () => {
+    await producer.getAvailableModelsForOrganization('fixture-org', subject, 'member', {
+      countryCode: 'CU',
+    });
+
+    const { getEnhancedOpenRouterModels } = jest.requireMock<{
+      getEnhancedOpenRouterModels: jest.Mock;
+    }>('@kilocode/web-shared/lib/ai-gateway/providers/openrouter');
+    expect(getEnhancedOpenRouterModels).toHaveBeenCalledWith({ countryCode: 'CU' });
+    expect(mockCustom).toHaveBeenCalledWith('fixture-org', ['fixture-group'], 'CU');
+  });
+
   it('does not freshen new score content with an old mismatched verification', async () => {
     await primeAnnotatedCatalog();
     cache.invalidateModelStatsCache();
@@ -422,5 +475,41 @@ describe('organization model producer publication', () => {
     expect(
       defaultResult.data.find(model => model.id === 'provider/training')?.hasUserByokAvailable
     ).toBe(false);
+  });
+
+  it('marks a shared-services list only from the shared-services ChatGPT connection', async () => {
+    const connected = { member: true, sharedServices: false };
+    mockTagChatGpt.mockImplementation(async (owner, models: OpenRouterModel[]) => {
+      const isShared =
+        typeof owner === 'object' &&
+        owner !== null &&
+        'scope' in owner &&
+        owner.scope === 'shared_services';
+      if (!(isShared ? connected.sharedServices : connected.member)) return models;
+      return models.map(model =>
+        model.id === 'provider/training' ? { ...model, hasUserByokAvailable: true } : model
+      );
+    });
+    async function byokFor(audience: OrganizationModelAudience) {
+      const result = await resultFor(subject, audience);
+      return result.data.find(model => model.id === 'provider/training')?.hasUserByokAvailable;
+    }
+
+    // Only the viewing member has a connection: a service run cannot use it.
+    await expect(byokFor('member')).resolves.toBe(true);
+    await expect(byokFor('shared_services')).resolves.toBe(false);
+    expect(mockTagChatGpt).toHaveBeenLastCalledWith(
+      { organizationId: 'fixture-org', scope: 'shared_services' },
+      expect.any(Array)
+    );
+
+    connected.sharedServices = true;
+    await expect(byokFor('shared_services')).resolves.toBe(true);
+
+    // The organization BYOK key path marks a shared-services list as before.
+    const result = await resultFor({ type: 'defaultAccess' }, 'shared_services');
+    expect(result.data.find(model => model.id === 'provider/allowed')?.hasUserByokAvailable).toBe(
+      true
+    );
   });
 });

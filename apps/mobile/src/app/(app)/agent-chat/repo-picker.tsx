@@ -16,7 +16,7 @@ import { filterRepoPickerOptions } from '@/lib/repo-picker-filter';
 
 type PickerListItem =
   | { key: string; kind: 'header'; titleKey: string }
-  | { key: string; kind: 'repo'; repo: RepoOption };
+  | { key: string; kind: 'repo'; repo: RepoOption; showPlatform: boolean };
 
 export default function RepoPickerScreen() {
   const router = useRouter();
@@ -42,10 +42,9 @@ export default function RepoPickerScreen() {
       setBridge(nextBridge);
       setSearch('');
 
-      return () => {
-        repoPickerSlot.clear(UNFENCED_ROUTE_KEY);
-        bridgeRef.current = undefined;
-      };
+      // The bridge outlives a blur: `useRouteRegistry` clears this route's
+      // slots when the route unmounts, so a return to a sheet that is still on
+      // screen shows its options again instead of the "options expired" shell.
     }, [])
   );
 
@@ -64,6 +63,9 @@ export default function RepoPickerScreen() {
         key: `${repo.platform}:${repo.fullName}`,
         kind: 'repo',
         repo,
+        // A flat search result has no section header, so the row names its
+        // provider itself.
+        showPlatform: true,
       }));
     }
     const sections = bridge?.sections ?? [];
@@ -72,7 +74,16 @@ export default function RepoPickerScreen() {
       if (section.repos.length > 0) {
         items.push({ key: `header:${section.key}`, kind: 'header', titleKey: section.titleKey });
         for (const repo of section.repos) {
-          items.push({ key: `${repo.platform}:${repo.fullName}`, kind: 'repo', repo });
+          items.push({
+            key: `${repo.platform}:${repo.fullName}`,
+            kind: 'repo',
+            repo,
+            // A provider section header already carries the provider, so
+            // repeating it on every row only steals width from the repository
+            // name. "Recently used" mixes providers under a header that names
+            // none of them, so those rows keep their provider cell.
+            showPlatform: section.key === 'recents',
+          });
         }
       }
     }
@@ -111,13 +122,13 @@ export default function RepoPickerScreen() {
           {/* The placeholder is a single-line Text overlay, not the input's own
               placeholder: Android lays the native hint out at the field's width
               with no line cap, so copy wider than a narrow field wraps onto a
-              second line that the field's fixed height clips against its
-              border. A tail-ellipsized Text truncates the copy at any width
-              instead. Both texts share leading-[normal] and a centred text rect
-              so the overlay sits exactly where the typed text will. The
-              overlay box is a row, so the copy starts at the field's start
-              edge — the physical right in RTL — and the hugging Text cannot
-              drift to the other side of the field. */}
+              second line inside the one-line field. A tail-ellipsized Text
+              truncates the copy at any width instead. Both texts share
+              leading-[normal] and a centred text rect so the overlay sits
+              exactly where the typed text will. The overlay box is a row, so
+              the copy starts at the field's start edge — the physical right in
+              RTL — and the hugging Text cannot drift to the other side of the
+              field. */}
           <View className="relative flex-1">
             <Input
               accessibilityLabel={t('agentChat.repoPicker.searchLabel')}
@@ -126,7 +137,7 @@ export default function RepoPickerScreen() {
               clearButtonMode="while-editing"
               returnKeyType="search"
               textAlignVertical="center"
-              className="h-8 p-0 text-base leading-[normal] text-foreground"
+              className="p-0 text-base leading-[normal] text-foreground"
               style={{ color: colors.foreground }}
               onChangeText={setSearch}
             />
@@ -200,15 +211,28 @@ export default function RepoPickerScreen() {
                 ) : (
                   <Unlock size={14} color={colors.mutedForeground} />
                 )}
-                <Text
-                  className="w-16 shrink-0 text-xs font-medium text-muted-foreground"
-                  numberOfLines={1}
-                >
-                  {platformName}
-                </Text>
-                <Text className="flex-1 text-base text-foreground" numberOfLines={1}>
-                  {repo.fullName}
-                </Text>
+                {item.showPlatform ? (
+                  <Text
+                    className="w-16 shrink-0 text-xs font-medium text-muted-foreground"
+                    numberOfLines={1}
+                  >
+                    {platformName}
+                  </Text>
+                ) : null}
+                {/* Middle ellipsis keeps both ends of the name: long names in a
+                    large organization share a prefix, so a tail cut made every
+                    row look identical and hid the distinguishing suffix. The
+                    min-w-0 box truncates inside the row, so the name can never
+                    run into the trailing check. */}
+                <View className="min-w-0 flex-1">
+                  <Text
+                    className="text-base text-foreground"
+                    numberOfLines={1}
+                    ellipsizeMode="middle"
+                  >
+                    {repo.fullName}
+                  </Text>
+                </View>
                 {isSelected ? <Check size={18} color={colors.primary} /> : null}
               </Pressable>
             );

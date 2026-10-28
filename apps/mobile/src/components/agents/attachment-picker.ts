@@ -11,17 +11,26 @@ import { mimeForExtension, normalizeAttachmentExtension } from '@/lib/agent-atta
 import { IMAGE_PICKER_OPTIONS, launchImagePicker } from '@/lib/agent-attachments/image-picker';
 import {
   type AttachmentSurface,
+  clearPickerRestoreRecord,
   writePickerLaunchContext,
+  writePickerRestoreRecord,
 } from '@/lib/agent-attachments/picker-launch-context';
 import { type AgentAttachmentCandidate } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import { waitForActionSheetDismissal } from '@/lib/action-sheet-dismissal';
 import { type ThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { registerTempFile } from '@/lib/temp-file-registry';
 
 function showPermissionSettingsAlert({ message, title }: { message: string; title: string }) {
-  Alert.alert(title, message, [
-    { text: i18n.t('common.cancel'), style: 'cancel' },
-    { text: i18n.t('common.openSettings'), onPress: () => void Linking.openSettings() },
-  ]);
+  Alert.alert(
+    title,
+    message,
+    [
+      { text: i18n.t('common.cancel'), style: 'cancel' },
+      { text: i18n.t('common.openSettings'), onPress: () => void Linking.openSettings() },
+    ],
+    // Android back dismisses, which equals the no-op Cancel.
+    { cancelable: true }
+  );
 }
 
 export function normalizeImageAsset(asset: {
@@ -168,6 +177,12 @@ type AttachmentPickerContext = {
   userId: string | undefined;
   surface: AttachmentSurface;
   sessionId: string | null;
+  /**
+   * The organization the launching composer belongs to. Only the new-session
+   * composer passes one, so a launch it loses to an Activity recreation can be
+   * reopened in the same organization scope.
+   */
+  organizationId?: string | null;
 };
 
 type AttachmentSourceSheet = {
@@ -199,20 +214,28 @@ function showAttachmentSourceSheet(
       }
     };
     const handle = async (source: AttachmentSource) => {
+      // Present the picker only after the sheet's modal is gone; otherwise
+      // iOS dismisses the picker with the modal (KILO-APP-3BF).
+      await waitForActionSheetDismissal();
       // Record the launching composer + account before the camera/library
       // launch so the recovery hook can match a pending result after an
-      // Activity recreation. NOT before the Files branch, which uses
+      // Activity recreation, and so the app can reopen the composer when the
+      // picker never comes back to it. NOT before the Files branch, which uses
       // `startActivityForResult` and is unaffected by that bug. Only record
       // the launch when a real user id is present; an empty id would store a
       // context the recovery hook can never match.
-      if ((source === 'camera' || source === 'library') && context.userId) {
+      const launchUserId = source === 'camera' || source === 'library' ? context.userId : undefined;
+      if (launchUserId !== undefined) {
+        const launchContext = {
+          userId: launchUserId,
+          surface: context.surface,
+          sessionId: context.sessionId,
+          organizationId: context.organizationId ?? null,
+          launchedAt: Date.now(),
+        };
         try {
-          await writePickerLaunchContext({
-            userId: context.userId,
-            surface: context.surface,
-            sessionId: context.sessionId,
-            launchedAt: Date.now(),
-          });
+          await writePickerLaunchContext(launchContext);
+          await writePickerRestoreRecord(launchContext);
         } catch (error) {
           // A store write failure must not block the picker launch; the
           // recovery hook simply finds no context and nothing is attached.
@@ -242,6 +265,16 @@ function showAttachmentSourceSheet(
           extra: { source, surface: context.surface, hasSession: context.sessionId !== null },
         });
         settle([]);
+      } finally {
+        if (launchUserId !== undefined) {
+          // The picker came back to this composer, so no start needs to
+          // reopen it. A clear that fails leaves a record the TTL retires.
+          try {
+            await clearPickerRestoreRecord();
+          } catch {
+            // Best effort: the record only reopens a composer at a start.
+          }
+        }
       }
     };
     const options = buildAttachmentSourceOptions(sources);
@@ -295,6 +328,22 @@ export function pickAgentPicture(
   return showAttachmentSourceSheet(showActionSheetWithOptions, context, {
     sources: ['camera', 'library'],
     libraryMultipleSelection: false,
+    themedSheet,
+  });
+}
+
+/**
+ * Image entry point: Camera and the multi-select Photo Library, with no Files
+ * source, for a composer that accepts images only.
+ */
+export function pickAgentImages(
+  showActionSheetWithOptions: ActionSheetProps['showActionSheetWithOptions'],
+  context: AttachmentPickerContext,
+  themedSheet: ThemedActionSheetOptions
+): Promise<AgentAttachmentCandidate[]> {
+  return showAttachmentSourceSheet(showActionSheetWithOptions, context, {
+    sources: ['camera', 'library'],
+    libraryMultipleSelection: true,
     themedSheet,
   });
 }

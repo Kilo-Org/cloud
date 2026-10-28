@@ -1,7 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { heartbeatReasonFrom } from './sandbox-control-protocol.js';
 import {
-  classifyRetirementCause,
   controlLogBatchSchema,
   controlUploadFailureStartsEpisode,
   createControlDiagnosticProjector,
@@ -42,6 +40,13 @@ describe('control diagnostic schema compatibility', () => {
         toolCpuUsageUsec: 800,
         serverCpuUsageUsec: 100,
         toolIoReadBytes: 120,
+        toolOomKills: 3,
+        serverOomKills: 0,
+        toolCurrentBytes: 9_000,
+        toolFileBytes: 3_500,
+        toolShmemBytes: 1_200,
+        serverCurrentBytes: 2_000,
+        serverAnonBytes: 1_700,
       },
       21
     );
@@ -58,8 +63,83 @@ describe('control diagnostic schema compatibility', () => {
       toolCpuUsageUsec: 800,
       serverCpuUsageUsec: 100,
       toolIoReadBytes: 120,
+      toolOomKills: 3,
+      serverOomKills: 0,
+      toolCurrentBytes: 9_000,
+      toolFileBytes: 3_500,
+      toolShmemBytes: 1_200,
+      serverCurrentBytes: 2_000,
+      serverAnonBytes: 1_700,
     });
     expect(JSON.stringify(records)).not.toContain('secret');
+  });
+
+  it('keeps memory protection and hold records whole and projects them to native logs', () => {
+    const records = [
+      createControlDiagnosticRecord(
+        'control.workload',
+        {
+          phase: 'failed',
+          workloadPhase: 'protection',
+          workloadFailure: 'oom_score_write_failed',
+          scopeId: 'scope_1',
+        },
+        1
+      ),
+      createControlDiagnosticRecord(
+        'control.workload',
+        { phase: 'completed', workloadPhase: 'protection', serverMinBytes: 1_073_741_824 },
+        2
+      ),
+      createControlDiagnosticRecord(
+        'wrapper.lifecycle',
+        {
+          phase: 'kilo_memory_hold_started',
+          currentBytes: 11_810_496_512,
+          aggregateMaxBytes: 11_811_160_064,
+          memoryMaxEvents: 42,
+        },
+        3
+      ),
+      createControlDiagnosticRecord(
+        'wrapper.lifecycle',
+        {
+          phase: 'kilo_memory_hold_ended',
+          memoryHoldOutcome: 'expired',
+          elapsedMs: 600_000,
+          currentBytes: 11_810_496_512,
+          aggregateMaxBytes: 11_811_160_064,
+          memoryMaxEvents: 90,
+        },
+        4
+      ),
+    ];
+    expect(records.map(record => record?.fields)).toEqual([
+      {
+        phase: 'failed',
+        workloadPhase: 'protection',
+        workloadFailure: 'oom_score_write_failed',
+        scopeId: 'scope_1',
+      },
+      { phase: 'completed', workloadPhase: 'protection', serverMinBytes: 1_073_741_824 },
+      {
+        phase: 'kilo_memory_hold_started',
+        currentBytes: 11_810_496_512,
+        aggregateMaxBytes: 11_811_160_064,
+        memoryMaxEvents: 42,
+      },
+      {
+        phase: 'kilo_memory_hold_ended',
+        memoryHoldOutcome: 'expired',
+        elapsedMs: 600_000,
+        currentBytes: 11_810_496_512,
+        aggregateMaxBytes: 11_811_160_064,
+        memoryMaxEvents: 90,
+      },
+    ]);
+    expect(
+      records.map(record => isProjectableControlDiagnostic(record!.event, record!.fields))
+    ).toEqual([true, false, true, true]);
   });
 
   it('accepts records written before publication diagnostics were extended', () => {
@@ -232,43 +312,6 @@ describe('control diagnostic schema compatibility', () => {
   });
 });
 
-describe('classifyRetirementCause', () => {
-  it('maps feed machine reasons that previously became unknown', () => {
-    expect(classifyRetirementCause('feed_failed')).toBe('event_feed_unhealthy');
-    expect(classifyRetirementCause('feed_stale')).toBe('event_feed_unhealthy');
-    expect(classifyRetirementCause('feed_ended')).toBe('event_feed_unhealthy');
-  });
-
-  it('keeps process exit distinct from unknown', () => {
-    expect(classifyRetirementCause('process_exited')).toBe('process_exited');
-  });
-
-  it('classifies session event delivery failures', () => {
-    expect(classifyRetirementCause('Session event delivery failed')).toBe(
-      'outcome_delivery_failed'
-    );
-    expect(classifyRetirementCause('Session event delivery unconfirmed')).toBe(
-      'outcome_delivery_failed'
-    );
-  });
-
-  it('falls back through later reasons', () => {
-    expect(classifyRetirementCause('mystery', 'control_disconnected')).toBe('control_disconnected');
-    expect(classifyRetirementCause('mystery')).toBe('unknown');
-  });
-});
-
-describe('heartbeatReasonFrom', () => {
-  it('passes feed and process codes through to the worker heartbeat', () => {
-    expect(heartbeatReasonFrom('feed_failed')).toBe('feed_failed');
-    expect(heartbeatReasonFrom('process_exited')).toBe('process_exited');
-  });
-
-  it('does not invent a machine code for human shutdown strings', () => {
-    expect(heartbeatReasonFrom('Wrapper received SIGTERM')).toBe('shutdown');
-  });
-});
-
 describe('diagnosticDetail', () => {
   it('keeps a bounded reason on lifecycle records', () => {
     expect(diagnosticDetail('feed_failed')).toBe('feed_failed');
@@ -397,6 +440,7 @@ describe('native diagnostic projector', () => {
       workloadPhase: 'applied',
       containerLimitBytes: 4_000,
       aggregateMaxBytes: 3_000,
+      toolsMaxBytes: 1_500,
       reserveBytes: 1_000,
       appliedMaxBytes: 3_000,
       readbackMaxBytes: 3_000,
@@ -427,6 +471,7 @@ describe('native diagnostic projector', () => {
     });
     expect(lines).toHaveLength(2);
     expect(lines[0]).toContain('"workloadPhase":"applied"');
+    expect(lines[0]).toContain('"toolsMaxBytes":1500');
     expect(lines[1]).toContain('"workloadFailure":"flag_off"');
     expect(lines.join('\n')).not.toContain('oomKills');
   });

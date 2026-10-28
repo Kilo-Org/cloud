@@ -4,6 +4,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { PrReviewChecksSection } from './pr-review-checks-section';
 
+import { ProviderPrWebUrlProvider } from '@/lib/pr-review/provider-pr-ref';
+
 type Run = {
   name: string;
   status: string;
@@ -22,6 +24,7 @@ const query = vi.hoisted(() => ({
       detailsUrl: string | null;
     }[],
     rollup: { total: 0, success: 0, failure: 0, pending: 0, skipped: 0 },
+    truncated: undefined as boolean | undefined,
   },
   isLoading: false,
   isError: false,
@@ -99,15 +102,20 @@ function run(name: string, status: string, conclusion: string | null): Run {
 
 let mounted: TestRenderer.ReactTestRenderer | undefined = undefined;
 
-function mount() {
+/** The URL the review screen publishes for this PR (the GitHub arm's host). */
+const PR_WEB_URL = 'https://github.com/kilo/cloud/pull/7';
+
+function mount(serverWebUrl: string | null = PR_WEB_URL) {
   act(() => {
     mounted = TestRenderer.create(
-      createElement(PrReviewChecksSection, {
-        owner: 'kilo',
-        repo: 'cloud',
-        number: 7,
-        headSha: 'abc123',
-      })
+      <ProviderPrWebUrlProvider value={serverWebUrl}>
+        {createElement(PrReviewChecksSection, {
+          owner: 'kilo',
+          repo: 'cloud',
+          number: 7,
+          headSha: 'abc123',
+        })}
+      </ProviderPrWebUrlProvider>
     );
   });
   const renderer = mounted;
@@ -131,6 +139,7 @@ function setRuns(runs: Run[]) {
   query.data = {
     checkRuns: runs,
     rollup: { total: runs.length, success: 0, failure: 0, pending: 0, skipped: 0 },
+    truncated: undefined,
   };
 }
 
@@ -245,6 +254,24 @@ describe('PrReviewChecksSection status groups', () => {
 
     expect(textNodes(renderer, 'prReview.checks.checksCount=1/1')).toHaveLength(1);
   });
+
+  it('marks the header total as a lower bound when the server cut the listing', () => {
+    // The server read the listing up to its page ceiling and said so, so the
+    // rows are the entries it read rather than every entry the ref has; the
+    // header count must not read as a total.
+    setRuns([run('passed', 'completed', 'success'), run('failed', 'completed', 'failure')]);
+    query.data = { ...query.data, truncated: true };
+    const renderer = mount();
+
+    expect(textNodes(renderer, 'prReview.checks.checksCount=2+/2')).toHaveLength(1);
+  });
+
+  it('leaves the header total unmarked when the listing was read in full', () => {
+    setRuns([run('passed', 'completed', 'success'), run('failed', 'completed', 'failure')]);
+    const renderer = mount();
+
+    expect(textNodes(renderer, 'prReview.checks.checksCount=2/2')).toHaveLength(1);
+  });
 });
 
 describe('PrReviewChecksSection empty state', () => {
@@ -255,6 +282,14 @@ describe('PrReviewChecksSection empty state', () => {
     expect(textNodes(renderer, 'prReview.checks.noChecksReported')).toHaveLength(1);
     expect(statusRows(renderer)).toHaveLength(0);
     expect(renderer.root.findAll(node => String(node.type) === 'Button')).toHaveLength(1);
+  });
+
+  it('offers no link until the screen publishes the loaded PR URL', () => {
+    setRuns([]);
+    const renderer = mount(null);
+
+    expect(textNodes(renderer, 'prReview.checks.noChecksReported')).toHaveLength(1);
+    expect(renderer.root.findAll(node => String(node.type) === 'Button')).toHaveLength(0);
   });
 });
 

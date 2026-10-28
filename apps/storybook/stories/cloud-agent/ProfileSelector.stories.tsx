@@ -250,6 +250,7 @@ export const ManyProfiles: Story = {
       skillCount: Math.floor(Math.random() * 3),
       agentCount: Math.floor(Math.random() * 2),
       kiloCommandCount: 0,
+      instructionCount: 0,
     }));
     return <ProfileSelectorWrapper profiles={manyProfiles} />;
   },

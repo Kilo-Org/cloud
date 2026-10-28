@@ -14,6 +14,7 @@ import { LanguagePickerSheet } from '@/components/language-picker-sheet';
 const reloadAppAsync = vi.hoisted(() => vi.fn());
 const setLanguagePreferenceAsync = vi.hoisted(() => vi.fn());
 const writeLanguageReturnTarget = vi.hoisted(() => vi.fn());
+const writeDirectionAttemptAsync = vi.hoisted(() => vi.fn(() => Promise.resolve(true)));
 const renameAndroidNotificationChannels = vi.hoisted(() => vi.fn());
 const registerNeedsInputCategories = vi.hoisted(() => vi.fn());
 const insets = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
@@ -22,10 +23,10 @@ const i18nManager = vi.hoisted(() => ({
   isRTL: false,
   forceRTL: vi.fn(),
 }));
-const navigation = vi.hoisted(() => ({ dispatch: vi.fn() }));
-// FlatList renders through a callback, so a host-string mock would drop every
+const prevention = vi.hoisted(() => ({ enabled: false, disable: vi.fn() }));
+// FlashList renders through a callback, so a host-string mock would drop every
 // row. This mock calls the render props so the row assertions still see rows.
-const flatListMock = vi.hoisted(
+const flashListMock = vi.hoisted(
   () =>
     ({
       data,
@@ -44,9 +45,10 @@ const flatListMock = vi.hoisted(
         createElement(Fragment, { key: keyExtractor(item) }, renderItem({ item, index }))
       );
       const empty = data.length === 0 ? ListEmptyComponent : null;
-      return createElement('FlatList', null, ListHeaderComponent, ...rows, empty);
+      return createElement('FlashList', null, ListHeaderComponent, ...rows, empty);
     }
 );
+vi.mock('@shopify/flash-list', () => ({ FlashList: flashListMock }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 // The sheet clears its uncontrolled search field through the ref (it must not
 // remount the input), so the mock exposes the imperative `clear` the real
@@ -65,7 +67,6 @@ vi.mock('react-native', async () => {
   MockTextInput.displayName = 'MockTextInput';
   return {
     ActivityIndicator: 'ActivityIndicator',
-    FlatList: flatListMock,
     I18nManager: i18nManager,
     TextInput: MockTextInput,
     View: 'View',
@@ -74,7 +75,10 @@ vi.mock('react-native', async () => {
 vi.mock('expo-router', async () => {
   const { useEffect } = await import('react');
   return {
-    useNavigation: () => navigation,
+    usePreventRemove: (enabled: boolean) => {
+      prevention.enabled = enabled;
+      return prevention.disable;
+    },
     // Run the focus effect once on mount, like react-navigation's first focus.
     useFocusEffect: (effect: () => void) => {
       // eslint-disable-next-line react-hooks/exhaustive-deps -- run the focus effect once on mount, like react-navigation's first focus
@@ -87,9 +91,7 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('expo', () => ({ reloadAppAsync }));
-vi.mock('@/lib/navigation/prevent-remove', () => ({
-  usePreventRemove: () => undefined,
-}));
+
 vi.mock('@/i18n/apply-language', async importOriginal => {
   const actual = await importOriginal<typeof ApplyLanguageModule>();
   return {
@@ -99,6 +101,9 @@ vi.mock('@/i18n/apply-language', async importOriginal => {
     applyLanguagePreference: vi.fn(actual.applyLanguagePreference),
   };
 });
+// The apply path records the direction relaunch; the record itself is covered
+// by the apply-language suite, and its real store pulls in the native keychain.
+vi.mock('@/i18n/direction-attempt', () => ({ writeDirectionAttemptAsync }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/picker-sheet', () => ({
   PickerSheet: (props: { headerContent?: ReactNode; children?: ReactNode }) =>
@@ -109,7 +114,7 @@ vi.mock('@/components/ui/choice-row', () => ({ ChoiceRow: 'ChoiceRow' }));
 vi.mock('@/components/ui/icons', () => ({ Search: 'Search', SearchX: 'SearchX' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#6b7280' }),
+  useThemeColors: () => ({ background: '#ffffff', mutedForeground: '#6b7280' }),
 }));
 vi.mock('@/lib/hooks/use-language-preference', () => ({
   getLanguagePreference: () => 'device',
@@ -136,20 +141,6 @@ function findByType(
   type: string
 ): TestRenderer.ReactTestInstance[] {
   return root.findAll(node => typeof node.type === 'string' && node.type === type);
-}
-
-// The TextInput mock forwards its ref through a wrapper component, so a found
-// `TextInput` node's immediate test-instance parent is that wrapper, which
-// carries the input's own props. Walk up to the pill View that hosts the field.
-function findFieldContainer(input: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
-  let node: TestRenderer.ReactTestInstance | null = input.parent;
-  while (node) {
-    if (typeof node.props.className === 'string' && node.props.className.includes('rounded-full')) {
-      return node;
-    }
-    node = node.parent;
-  }
-  throw new Error('language search field container not found');
 }
 
 function findChoiceRow(
@@ -222,9 +213,13 @@ describe('LanguagePickerSheet apply', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     clearSearch.mockReset();
+    prevention.enabled = false;
+    prevention.disable.mockReset();
     setLanguagePreferenceAsync.mockReset();
     setLanguagePreferenceAsync.mockResolvedValue(true);
     reloadAppAsync.mockReset();
+    writeDirectionAttemptAsync.mockReset();
+    writeDirectionAttemptAsync.mockResolvedValue(true);
     writeLanguageReturnTarget.mockReset();
     renameAndroidNotificationChannels.mockReset();
     registerNeedsInputCategories.mockReset();
@@ -257,7 +252,7 @@ describe('LanguagePickerSheet apply', () => {
       description: 'Try a different search term.',
     });
     expect(findByType(renderer.root, 'ChoiceRow')).toHaveLength(0);
-    expect(findByType(renderer.root, 'FlatList')).toHaveLength(0);
+    expect(findByType(renderer.root, 'FlashList')).toHaveLength(0);
     expect(findByType(renderer.root, 'TextInput')[0]).toBe(input);
     expect(emptyState?.props.placement).toBeUndefined();
 
@@ -272,7 +267,7 @@ describe('LanguagePickerSheet apply', () => {
   it('keeps the same item array identity when the sheet re-renders without a query change', async () => {
     const onClose = vi.fn<() => void>();
     const renderer = await mountSheet(onClose);
-    const listData = renderer.root.findByType(flatListMock).props.data;
+    const listData = renderer.root.findByType(flashListMock).props.data;
 
     await act(async () => {
       renderer.update(createElement(LanguagePickerSheet, { onClose, returnTarget: 'login' }));
@@ -282,7 +277,43 @@ describe('LanguagePickerSheet apply', () => {
     // The derived list is only rebuilt on a query or applied-language change, so
     // an unrelated re-render hands the list the same `data` identity and no
     // mounted row re-renders.
-    expect(renderer.root.findByType(flatListMock).props.data).toBe(listData);
+    expect(renderer.root.findByType(flashListMock).props.data).toBe(listData);
+
+    renderer.unmount();
+  });
+
+  it('marks the tapped row selected and applies that language on Done', async () => {
+    const onClose = vi.fn<() => void>();
+    const renderer = await mountSheet(onClose);
+    expect(findChoiceRow(renderer.root, 'Español').props.selected).toBe(false);
+
+    act(() => {
+      (findChoiceRow(renderer.root, 'Español').props.onPress as () => void)();
+    });
+
+    // FlashList's memoized cells only repaint when `data` or `extraData`
+    // changes identity, so the selection has to travel through `extraData`.
+    // Without it the tap leaves `selected` unreadable and the picker inert.
+    expect(renderer.root.findByType(flashListMock).props.extraData).toEqual({
+      selected: 'es',
+      disabled: false,
+    });
+    expect(findChoiceRow(renderer.root, 'Español').props.selected).toBe(true);
+    expect(findChoiceRow(renderer.root, 'Français').props.selected).toBe(false);
+
+    const sheet = findByType(renderer.root, 'PickerSheet')[0];
+    if (!sheet) {
+      throw new Error('PickerSheet not found');
+    }
+    await act(async () => {
+      (sheet.props.onDone as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('es', 'en');
+    expect(onClose).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
   });
@@ -311,18 +342,6 @@ describe('LanguagePickerSheet apply', () => {
     renderer.unmount();
   });
 
-  it('preserves horizontal padding and the safe-area inset', async () => {
-    insets.bottom = 24;
-    const renderer = await mountSheet(vi.fn<() => void>());
-    const list = renderer.root.findByType(flatListMock);
-
-    expect(list.props.contentContainerClassName).toBe('px-4 pb-4');
-    expect(list.props.contentContainerStyle).toBeUndefined();
-    expect(list.props.ListFooterComponent).toMatchObject({ props: { style: { height: 24 } } });
-
-    renderer.unmount();
-  });
-
   it('applies an LTR language on Done without reloading the app', async () => {
     const onClose = vi.fn<() => void>();
     const renderer = await applySelection(onClose, 'Español');
@@ -335,6 +354,8 @@ describe('LanguagePickerSheet apply', () => {
     // default; the apply must re-register them in the new language.
     expect(registerNeedsInputCategories).toHaveBeenCalledTimes(1);
     expect(onClose).toHaveBeenCalledTimes(1);
+    expect(prevention.enabled).toBe(false);
+    expect(prevention.disable).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
   });
@@ -440,6 +461,8 @@ describe('LanguagePickerSheet apply', () => {
     expect(setLanguagePreferenceAsync).toHaveBeenCalledWith('ar');
     expect(reloadAppAsync).toHaveBeenCalledTimes(1);
     expect(onClose).not.toHaveBeenCalled();
+    expect(prevention.enabled).toBe(true);
+    expect(prevention.disable).not.toHaveBeenCalled();
 
     const failedSheet = findByType(renderer.root, 'PickerSheet')[0];
     if (!failedSheet) {
@@ -453,11 +476,52 @@ describe('LanguagePickerSheet apply', () => {
       await Promise.resolve();
     });
     expect(reloadAppAsync).toHaveBeenCalledTimes(2);
+    expect(prevention.enabled).toBe(true);
 
     renderer.unmount();
   });
 
-  it('keeps Retry as the only action when the reload fails', async () => {
+  it('shows Could not restart without reloading when the relaunch cannot be recorded', async () => {
+    writeDirectionAttemptAsync.mockResolvedValue(false);
+    const onClose = vi.fn<() => void>();
+    const renderer = await applySelection(onClose, 'العربية');
+
+    expect(writeDirectionAttemptAsync).toHaveBeenCalledWith('ar');
+    // Without the record a relaunch that did not take the direction would
+    // repeat on every launch, so the sheet refuses it and offers Retry.
+    expect(reloadAppAsync).not.toHaveBeenCalled();
+    expect(i18nManager.forceRTL).not.toHaveBeenCalled();
+    expect(onClose).not.toHaveBeenCalled();
+
+    const failedSheet = findByType(renderer.root, 'PickerSheet')[0];
+    if (!failedSheet) {
+      throw new Error('PickerSheet not found');
+    }
+    expect(failedSheet.props.title).toBe('Could not restart');
+    expect(failedSheet.props.doneLabel).toBe('Retry');
+
+    // Retry has to resume the step that failed: this outcome never forced the
+    // direction, so reloading alone would relaunch into the previous one with
+    // still no record. The apply path runs again, retries the record write and
+    // only then relaunches.
+    writeDirectionAttemptAsync.mockResolvedValue(true);
+    await act(async () => {
+      (failedSheet.props.onDone as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(writeDirectionAttemptAsync).toHaveBeenCalledTimes(2);
+    expect(i18nManager.forceRTL).toHaveBeenCalledWith(true);
+    expect(reloadAppAsync).toHaveBeenCalledTimes(1);
+    // The retry re-runs the same apply path, so the idempotent preference write
+    // runs again before the relaunch.
+    expect(setLanguagePreferenceAsync).toHaveBeenLastCalledWith('ar');
+
+    renderer.unmount();
+  });
+
+  it('offers Continue beside Retry so a saved language is not trapped behind the reload', async () => {
     reloadAppAsync.mockRejectedValue(new Error('reload failed'));
     const onClose = vi.fn<() => void>();
     const renderer = await applySelection(onClose, 'العربية');
@@ -466,7 +530,28 @@ describe('LanguagePickerSheet apply', () => {
     if (!failedSheet) {
       throw new Error('PickerSheet not found');
     }
-    expect(failedSheet.props.onCancel).toBeUndefined();
+    expect(failedSheet.props.cancelLabel).toBe('Continue');
+    expect(failedSheet.props.onCancel).toEqual(expect.any(Function));
+    expect(failedSheet.props.doneLabel).toBe('Retry');
+    // The failed state holds the guard while Retry is on screen.
+    expect(prevention.enabled).toBe(true);
+    expect(prevention.disable).not.toHaveBeenCalled();
+
+    act(() => {
+      (failedSheet.props.onCancel as () => void)();
+    });
+
+    // Continue leaves the failed state without another reload: the preference
+    // was persisted before the reload attempt, so the sheet closes into the
+    // normal picker instead of asking for a retry that may never succeed.
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(reloadAppAsync).toHaveBeenCalledTimes(1);
+    expect(findByType(renderer.root, 'PickerSheet')[0]?.props.doneLabel).toBe('Done');
+
+    // Closing releases the guard the failed state held, so the sheet's own
+    // close is the one navigation it lets through.
+    expect(prevention.disable).toHaveBeenCalledTimes(1);
+    expect(prevention.enabled).toBe(false);
 
     renderer.unmount();
   });
@@ -535,90 +620,6 @@ describe('LanguagePickerSheet apply', () => {
     expect(i18n.language).toBe('en');
     expect(reloadAppAsync).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
-
-    renderer.unmount();
-  });
-});
-
-describe('LanguagePickerSheet row alignment', () => {
-  beforeEach(() => {
-    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-    i18nManager.isRTL = false;
-  });
-
-  function rowLineClassNames(row: TestRenderer.ReactTestInstance): string[] {
-    return findByType(row, 'Text').map(line => line.props.className ?? '');
-  }
-
-  it('pins both lines of a row to the interface start edge in an LTR interface', async () => {
-    i18nManager.isRTL = false;
-    const renderer = await mountSheet(vi.fn<() => void>());
-
-    // `العربية` is the row whose endonym right-aligned itself under LTR; the
-    // device row carries the same two-line shape.
-    for (const label of ['العربية', 'Device language']) {
-      const lines = rowLineClassNames(findChoiceRow(renderer.root, label));
-      expect(lines).toHaveLength(2);
-      for (const className of lines) {
-        expect(className).toContain('text-left');
-      }
-    }
-
-    renderer.unmount();
-  });
-
-  it('leaves an RTL row to the paragraph direction, never a physical edge', async () => {
-    i18nManager.isRTL = true;
-    const renderer = await mountSheet(vi.fn<() => void>());
-
-    for (const label of ['العربية', 'Device language']) {
-      const lines = rowLineClassNames(findChoiceRow(renderer.root, label));
-      expect(lines).toHaveLength(2);
-      for (const className of lines) {
-        expect(className).not.toContain('text-left');
-      }
-    }
-
-    renderer.unmount();
-  });
-});
-
-describe('LanguagePickerSheet search field', () => {
-  beforeEach(() => {
-    (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
-  });
-
-  // The language and repository pickers render the same "search a list"
-  // control. The repository picker's field is a filled rounded pill with a
-  // leading magnifier; the language field used to be a thin outlined box with
-  // no icon, so the same control read as two different controls.
-  it('uses the shared filled search pill with a leading magnifier', async () => {
-    const renderer = await mountSheet(vi.fn<() => void>());
-    const input = findByType(renderer.root, 'TextInput')[0];
-    if (!input) {
-      throw new Error('language search input not found');
-    }
-    // The field is the shared single-line `Input`, which renders the TextInput
-    // itself, so the pill is the input's wrapper row: walk up to it rather than
-    // stopping at the input's own node. The shared box is what keeps the
-    // placeholder and the value in one box.
-    const field = findFieldContainer(input);
-
-    expect((field.props.className as string).split(/\s+/)).toEqual(
-      expect.arrayContaining([
-        'flex-row',
-        'items-center',
-        'gap-2',
-        'rounded-full',
-        'bg-secondary',
-        'px-3',
-        'py-2',
-      ])
-    );
-    expect(field.props.className as string).not.toContain('border-input');
-    expect(findByType(renderer.root, 'Search')).toHaveLength(1);
-    expect(input.props.className as string).not.toContain('border');
-    expect(input.props.className as string).toContain('flex-1');
 
     renderer.unmount();
   });

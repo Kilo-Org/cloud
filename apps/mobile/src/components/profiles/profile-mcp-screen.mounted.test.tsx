@@ -1,9 +1,10 @@
+/* eslint-disable max-lines -- one mounted case per MCP screen state: loading, error, empty, row toggle, edit, add, validation, failure fallbacks, and delete */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import {
   changeText,
-  confirmAlert,
+  confirmRequest,
   findAll,
   findField,
   findOne,
@@ -19,7 +20,7 @@ import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
 
 const h = vi.hoisted(() => ({
-  alert: vi.fn(),
+  confirm: vi.fn(),
   error: vi.fn(),
   query: {
     data: undefined as unknown,
@@ -36,17 +37,23 @@ const h = vi.hoisted(() => ({
   },
 }));
 
+const permissionState = vi.hoisted(() => ({ canManage: true }));
+
+vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
+  useCanManageOrganizationProfiles: () => permissionState.canManage,
+}));
+
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfile: () => h.query,
   useAgentProfileSectionMutations: () => h.mutations,
 }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
   Switch: 'Switch',
-  Alert: { alert: h.alert },
 }));
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
@@ -54,11 +61,15 @@ vi.mock('react-native-safe-area-context', () => ({
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#000000', destructive: '#FF0000' }),
 }));
+vi.mock('@/components/ui/dialog', () => ({
+  useConfirmDialog: () => ({ confirm: h.confirm, dialog: null }),
+}));
 vi.mock('@/components/agents/session-page-sheet', () => ({
   SessionPageSheet: 'SessionPageSheet',
 }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
@@ -238,6 +249,24 @@ describe('ProfileMcpScreen', () => {
     unmount();
   });
 
+  it('non-retryable: the name message names ASCII for a non-Latin name', async () => {
+    h.query.data = testProfile();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    changeText(renderer.root, 'Server name', 'خادم الفريق');
+    changeText(renderer.root, 'Command line', 'npx some-mcp');
+    pressSheetDone(renderer.root);
+
+    expect(h.mutations.createMcp.mutateAsync).not.toHaveBeenCalled();
+    expect(findField(renderer.root, 'Server name').props.error).toBe(
+      'Name can use only ASCII letters, numbers, underscores, and dashes, up to 100 characters'
+    );
+
+    unmount();
+  });
+
   it('non-retryable: an invalid URL is refused for a remote server', async () => {
     h.query.data = testProfile();
     h.query.isPending = false;
@@ -278,6 +307,25 @@ describe('ProfileMcpScreen', () => {
     unmount();
   });
 
+  it('a11y: the secret badge is one counted node and the lock glyph is hidden', async () => {
+    h.query.data = testProfile([testServer()]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    const badge = findAll(renderer.root, 'View').find(node =>
+      String(node.props.accessibilityLabel ?? '').startsWith('Secret count:')
+    );
+    expect(badge?.props.accessibilityLabel).toBe('Secret count: 1');
+    expect(badge?.props.accessible).toBe(true);
+    expect(findOne(renderer.root, 'Lock').parent?.props).toMatchObject({
+      accessibilityElementsHidden: true,
+      importantForAccessibility: 'no-hide-descendants',
+    });
+
+    unmount();
+  });
+
   it('happy: confirming delete calls deleteMcp', async () => {
     h.query.data = testProfile([testServer()]);
     h.query.isPending = false;
@@ -286,7 +334,7 @@ describe('ProfileMcpScreen', () => {
     const { renderer, unmount } = await mountScreen();
     pressPressable(renderer.root, 'Delete');
     await act(async () => {
-      confirmAlert(h.alert);
+      confirmRequest(h.confirm);
       await Promise.resolve();
     });
 
@@ -295,6 +343,47 @@ describe('ProfileMcpScreen', () => {
       profileId: 'profile-1',
       mcpServerId: 'mcp-1',
     });
+
+    unmount();
+  });
+
+  it('retryable: a delete with no usable message names the delete operation', async () => {
+    h.query.data = testProfile([testServer()]);
+    h.query.isPending = false;
+    h.mutations.deleteMcp.mutateAsync.mockRejectedValue(new Error(' '));
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'Delete');
+    await act(async () => {
+      confirmRequest(h.confirm);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => h.error.mock.calls.length > 0);
+    expect(h.error).toHaveBeenCalledWith("Couldn't delete MCP server");
+
+    unmount();
+  });
+
+  it('retryable: a refused toggle names the update, not a save', async () => {
+    h.query.data = testProfile([testServer()]);
+    h.query.isPending = false;
+    h.mutations.setMcpEnabled.mutate.mockImplementation(
+      (_input: unknown, options: { onError: (error: Error) => void }) => {
+        options.onError(new Error(' '));
+      }
+    );
+
+    const { renderer, unmount } = await mountScreen();
+    // The test renderer exposes host props untyped; the screen passes this handler.
+    const toggleProps = findOne(renderer.root, 'Switch').props as {
+      onValueChange: (value: boolean) => void;
+    };
+    act(() => {
+      toggleProps.onValueChange(false);
+    });
+
+    expect(h.error).toHaveBeenCalledWith("Couldn't update MCP server");
 
     unmount();
   });

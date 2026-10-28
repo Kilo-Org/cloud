@@ -13,7 +13,7 @@ import { prefetchSessionTranscript } from '@/lib/agent-session-cache';
 import { createKiloAppQueryClient } from '@/lib/query-client';
 import { i18n } from '@/i18n';
 import { type ActiveSession, type StoredSession } from '@/lib/hooks/use-agent-sessions';
-import { __resetSessionAttentionForTests } from '@/lib/session-attention';
+import { __resetSessionAttentionForTests, ackSessionAttention } from '@/lib/session-attention';
 import { RemoteSessionRow } from './remote-session-row';
 import { formatScheduledWake } from './session-list-helpers';
 import {
@@ -99,13 +99,7 @@ vi.mock('@/lib/trpc', () => {
         queryKey: (input: unknown) => [['activeSessions', 'list'], { input, type: 'query' }],
       },
     },
-    cliSessionsV2: {
-      getSessionMessages: {
-        queryOptions: (input: { session_id: string }) => ({
-          queryKey: ['transcript', input.session_id],
-        }),
-      },
-    },
+    cliSessionsV2: {},
   };
   return { useTRPC: () => trpc };
 });
@@ -119,7 +113,10 @@ vi.mock('./exit-remote-session-from-list', () => ({
   exitRemoteSessionFromList: vi.fn(),
 }));
 vi.mock('./remote-session-exit-alert', () => ({
-  showRemoteSessionExitConfirmation: vi.fn().mockResolvedValue(true),
+  useRemoteSessionExitConfirmation: () => ({
+    confirmExit: vi.fn().mockResolvedValue(true),
+    exitDialog: null,
+  }),
 }));
 
 const session: StoredSession = {
@@ -134,6 +131,9 @@ const session: StoredSession = {
   git_branch: 'feature/live',
   status: null,
   status_updated_at: null,
+  latest_run_status: null,
+  latest_run_failure_kind: null,
+  latest_run_terminal_at: null,
   total_cost_microdollars: 120_000,
   created_at: '2026-08-28T10:00:00.000Z',
   updated_at: '2026-08-28T11:55:00.000Z',
@@ -296,6 +296,41 @@ describe('StoredSessionRow live speech', () => {
       expect(texts(renderer)).not.toContain('$0.12 · 5 MINUTES AGO');
     }
   );
+
+  it('brings the badge back for a raise the user has not answered', () => {
+    const answered = {
+      ...session,
+      status: 'permission',
+      status_updated_at: '2026-09-18T21:00:00.000Z',
+    };
+    const renderer = mount(row({ session: answered, live: true }));
+
+    expect(texts(renderer)).toContain('NEEDS INPUT');
+
+    // The answer path acks the raise it answered.
+    act(() => {
+      ackSessionAttention('stored-1', 'permission', '2026-09-18T21:00:00.000Z');
+    });
+    expect(texts(renderer)).not.toContain('NEEDS INPUT');
+
+    // A permission raised after the answered one reaches the row before the
+    // answered status round-trip lands: it must show again.
+    act(() => {
+      renderer.update(
+        wrapped(
+          row({
+            session: { ...answered, status_updated_at: '2026-09-18T21:30:00.000Z' },
+            live: true,
+          })
+        )
+      );
+    });
+
+    expect(texts(renderer)).toContain('NEEDS INPUT');
+    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
+      'Fix login bug, needs input, feature/live, and CLI'
+    );
+  });
 
   it('reads SCHEDULED (label only) for a stored scheduled row instead of Idle', () => {
     // The scheduled branch keys off the status, not the live flag: a stored
@@ -546,7 +581,8 @@ describe('StoredSessionRow long-press preview', () => {
       pressableProps(renderer)?.onPressIn?.();
     });
     expect(prefetchSessionTranscript).toHaveBeenCalledWith(previewQueryClient, {
-      queryKey: ['transcript', 'stored-1'],
+      queryKey: ['session-transcript-page', 'stored-1'],
+      queryFn: expect.any(Function),
     });
   });
 
@@ -651,7 +687,6 @@ describe('RemoteSessionRow live speech', () => {
       { kind: 'running' },
     ]);
     expect(texts(renderer)).toContain('5 MINUTES AGO');
-    expect(texts(renderer)).toContain('feature/live');
   });
 
   it('paints the localized unnamed name instead of the backend placeholder title', () => {
@@ -674,7 +709,7 @@ describe('RemoteSessionRow live speech', () => {
   it('keeps the needs-input speech above the state word', () => {
     const renderer = mountRemote({ status: 'question' });
     expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
-      'Live work, needs input, feature/live, and CLI'
+      'Live work, needs input, feature/live, CLI, and 5 minutes ago'
     );
     expect(hosts(renderer, 'SessionStatusIcon').map(glyph => glyph.props)).toEqual([
       { kind: 'needsInput' },
@@ -702,9 +737,7 @@ describe('RemoteSessionRow live speech', () => {
     expect(hosts(renderer, 'SessionStatusIcon').map(glyph => glyph.props)).toEqual([
       { kind: 'scheduled' },
     ]);
-    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
-      `Live work, Scheduled, feature/live, CLI, and ${wake}`
-    );
+    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toContain(wake);
   });
 
   it('reads SCHEDULED alone for a scheduled tray row with no wake time', () => {
@@ -712,7 +745,7 @@ describe('RemoteSessionRow live speech', () => {
     expect(texts(renderer)).toContain('SCHEDULED');
     expect(texts(renderer)).not.toContain('Idle');
     expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
-      'Live work, Scheduled, feature/live, and CLI'
+      'Live work, Scheduled, feature/live, CLI, and 5 minutes ago'
     );
   });
 

@@ -3,6 +3,7 @@ import {
   CodeReviewCouncilConfigSchema,
   ModelsSchema,
   OpenRouterPricing,
+  OpenRouterProvider,
   OrganizationSettingsSchema,
   StoredModelSchema,
 } from './schema-types';
@@ -30,6 +31,30 @@ describe('CodeReviewCouncilConfigSchema', () => {
       specialists: [specialist('security'), specialist('security')],
     });
     expect(result.success).toBe(false);
+  });
+});
+
+describe('OpenRouterProvider', () => {
+  it('keeps terms and privacy links from the OpenRouter provider catalog', () => {
+    const parsed = OpenRouterProvider.parse({
+      name: 'Anthropic',
+      displayName: 'Anthropic',
+      slug: 'anthropic',
+      headquarters: 'US',
+      dataPolicy: {
+        training: false,
+        retainsPrompts: true,
+        canPublish: false,
+        termsOfServiceURL: 'https://www.anthropic.com/legal/commercial-terms',
+        privacyPolicyURL: 'https://www.anthropic.com/legal/privacy',
+      },
+    });
+
+    expect(parsed.dataPolicy.termsOfServiceURL).toBe(
+      'https://www.anthropic.com/legal/commercial-terms'
+    );
+    expect(parsed.dataPolicy.privacyPolicyURL).toBe('https://www.anthropic.com/legal/privacy');
+    expect(parsed.headquarters).toBe('US');
   });
 });
 

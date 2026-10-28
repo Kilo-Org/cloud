@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, Switch, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
@@ -16,7 +16,10 @@ import {
 import { SheetHeader } from '@/components/sheet-header';
 import { FormField } from '@/components/ui/form-field';
 import { SegmentedControl } from '@/components/ui/segmented-control';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
+import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
+import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
 
 /** Catalog key for each refused field, so the message lands under the input at fault. */
 const ERROR_KEYS = {
@@ -31,6 +34,20 @@ const ERROR_KEYS = {
   'json-invalid': 'profiles.mcp.jsonInvalid',
   'record-too-large': 'profiles.mcp.jsonTooLarge',
 } satisfies Record<McpFormError, string>;
+
+/** The field each refused input belongs to, so Save can scroll it into view. */
+const FIELD_FOR_ERROR = {
+  'name-required': 'name',
+  'name-invalid': 'name',
+  'command-required': 'command',
+  'command-too-long': 'command',
+  'url-required': 'url',
+  'url-invalid': 'url',
+  'url-too-long': 'url',
+  'timeout-invalid': 'timeout',
+  'json-invalid': 'config',
+  'record-too-large': 'config',
+} satisfies Record<McpFormError, 'name' | 'command' | 'url' | 'config' | 'timeout'>;
 
 function errorKeyFor(
   t: (key: string) => string,
@@ -56,11 +73,6 @@ type McpFormSheetProps = Readonly<{
  * The add/edit MCP server sheet. Mounted only while open, so every open seeds
  * fresh fields from the server it edits. Text fields are uncontrolled (refs),
  * per the app's iOS text-input rule; the type and enabled controls are state.
- *
- * Save validates through `validateMcpForm`; a refused input shows the matching
- * `profiles.mcp.*` message under the field at fault and persists nothing. A
- * local server's env values arrive masked, so the untouched keys round-trip and
- * only retyped values rotate.
  */
 export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<McpFormSheetProps>) {
   const { t } = useTranslation();
@@ -74,6 +86,21 @@ export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<Mcp
   const [type, setType] = useState<McpFormType>(initial.type);
   const [enabled, setEnabled] = useState(initial.enabled);
   const [error, setError] = useState<McpFormError | null>(null);
+  const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<
+    'name' | 'command' | 'url' | 'config' | 'timeout'
+  >();
+
+  const { requestClose, requestDismiss, dialog } = useSheetDismissGuard({
+    isDirty: () =>
+      nameRef.current !== initial.name ||
+      commandRef.current !== initial.command ||
+      urlRef.current !== initial.url ||
+      configRef.current !== initial.configJson ||
+      timeoutRef.current !== initial.timeout ||
+      type !== initial.type ||
+      enabled !== initial.enabled,
+    onDiscard: onClose,
+  });
 
   const submit = () => {
     const state = {
@@ -88,6 +115,7 @@ export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<Mcp
     const problem = validateMcpForm(state);
     if (problem !== null) {
       setError(problem);
+      scrollToField(FIELD_FOR_ERROR[problem]);
       return;
     }
     setError(null);
@@ -100,16 +128,17 @@ export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<Mcp
   ];
 
   return (
-    <SessionPageSheet visible onClose={onClose}>
+    <SessionPageSheet visible onClose={onClose} onRequestDismiss={requestDismiss}>
       <SheetHeader
         title={server === null ? t('profiles.mcp.add') : server.name}
         onDone={submit}
-        onCancel={onClose}
+        onCancel={requestClose}
         doneLabel={t('common.save')}
-        disabled={isSaving}
+        doneDisabled={isSaving}
         topInset="ios-page-sheet"
       />
       <ScrollView
+        ref={scrollRef}
         className="flex-1"
         contentContainerClassName="gap-4 px-6 pt-4 pb-8"
         keyboardShouldPersistTaps="handled"
@@ -137,6 +166,7 @@ export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<Mcp
           autoCapitalize="none"
           autoCorrect={false}
           placeholder={t('profiles.mcp.namePlaceholder')}
+          containerOnLayout={fieldLayout('name')}
           onChangeText={value => {
             nameRef.current = value;
             setError(null);
@@ -153,6 +183,7 @@ export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<Mcp
             autoCapitalize="none"
             autoCorrect={false}
             placeholder={t('profiles.mcp.commandPlaceholder')}
+            containerOnLayout={fieldLayout('command')}
             onChangeText={value => {
               commandRef.current = value;
               setError(null);
@@ -169,6 +200,7 @@ export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<Mcp
             autoCorrect={false}
             keyboardType="url"
             placeholder="https://example.com/mcp"
+            containerOnLayout={fieldLayout('url')}
             onChangeText={value => {
               urlRef.current = value;
               setError(null);
@@ -176,22 +208,29 @@ export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<Mcp
           />
         )}
 
-        <FormField
-          label={type === 'local' ? t('profiles.mcp.environment') : t('profiles.mcp.headers')}
-          defaultValue={initial.configJson}
-          error={errorKeyFor(t, error, ['json-invalid', 'record-too-large'])}
-          disabled={isSaving}
-          multiline
-          textAlignVertical="top"
-          className="min-h-28 leading-5"
-          autoCapitalize="none"
-          autoCorrect={false}
-          placeholder={t('profiles.mcp.jsonPlaceholder')}
-          onChangeText={value => {
-            configRef.current = value;
-            setError(null);
-          }}
-        />
+        <View className="gap-1.5" onLayout={fieldLayout('config')}>
+          <FormField
+            label={type === 'local' ? t('profiles.mcp.environment') : t('profiles.mcp.headers')}
+            defaultValue={initial.configJson}
+            error={errorKeyFor(t, error, ['json-invalid', 'record-too-large'])}
+            disabled={isSaving}
+            multiline
+            textAlignVertical="top"
+            className="min-h-28 max-h-52 leading-[1.25rem]"
+            autoCapitalize="none"
+            autoCorrect={false}
+            placeholder={t('profiles.mcp.jsonPlaceholder')}
+            onChangeText={value => {
+              configRef.current = value;
+              setError(null);
+            }}
+          />
+          {server !== null ? (
+            <Text className="text-xs text-muted-foreground">
+              {type === 'local' ? t('profiles.mcp.environmentHint') : t('profiles.mcp.headersHint')}
+            </Text>
+          ) : null}
+        </View>
 
         <FormField
           label={t('profiles.mcp.timeout')}
@@ -200,6 +239,7 @@ export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<Mcp
           disabled={isSaving}
           keyboardType="number-pad"
           placeholder="30000"
+          containerOnLayout={fieldLayout('timeout')}
           onChangeText={value => {
             timeoutRef.current = value;
             setError(null);
@@ -217,6 +257,7 @@ export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<Mcp
         </View>
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />
+      {dialog}
     </SessionPageSheet>
   );
 }

@@ -4,6 +4,10 @@ import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
 import {
+  decryptedEnvValues,
+  integrationSlugs,
+  listEnvRecords,
+  readVaultValues,
   redeployLatest,
   resolveVault,
   resolveVercelContexts,
@@ -77,11 +81,6 @@ if (args[0] === 'account' && args[1] === 'list') {
 }
 `;
 
-const FAKE_PNPM_VERCEL_AUTH_FAILURE = `#!/usr/bin/env node
-process.stderr.write('Error: No existing credentials found. Run vercel login.\\n');
-process.exitCode = 1;
-`;
-
 const FAKE_OP_AUTH_FAILURE = `#!/usr/bin/env node
 process.stderr.write('You are not currently signed in to a 1Password account.\\n');
 process.exitCode = 1;
@@ -103,6 +102,11 @@ if (args[2] === 'list') {
 } else {
   process.exitCode = 1;
 }
+`;
+
+const FAKE_PNPM_WORKSPACE_WITHOUT_VERCEL = `#!/usr/bin/env node
+process.stderr.write('[ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL] Command "vercel" not found\\n');
+process.exitCode = 1;
 `;
 
 async function captureOpInvocations(
@@ -172,32 +176,61 @@ void test('redeployLatest redeploys the latest ready deployment for the target e
       .trim()
       .split('\n')
       .map(line => JSON.parse(line) as string[]);
-    assert.deepEqual(invocations[0]?.slice(0, 10), [
-      'dlx',
-      'vercel@53.3.1',
-      'list',
-      'kilocode-app',
-      '--environment',
-      'staging',
-      '--status',
-      'READY',
-      '--format=json',
-      '--scope',
-    ]);
-    assert.deepEqual(invocations[1]?.slice(0, 7), [
-      'dlx',
-      'vercel@53.3.1',
-      'redeploy',
-      'latest-staging.example.vercel.app',
-      '--target',
-      'staging',
-      '--scope',
-    ]);
+    assert.equal(invocations[0]?.[2], 'list');
+    assert.equal(invocations[0]?.[3], 'kilocode-app');
+    assert.equal(invocations[0]?.[5], 'staging');
+    assert.equal(invocations[0]?.[7], 'READY');
+    assert.equal(invocations[1]?.[2], 'redeploy');
+    assert.equal(invocations[1]?.[3], 'latest-staging.example.vercel.app');
+    assert.equal(invocations[1]?.[5], 'staging');
   } finally {
     if (originalPath === undefined) delete process.env.PATH;
     else process.env.PATH = originalPath;
     if (originalLog === undefined) delete process.env.FAKE_VERCEL_LOG;
     else process.env.FAKE_VERCEL_LOG = originalLog;
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+void test('resolveVercelContexts names the workspace install when the CLI is missing locally', () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'web-env-vercel-test-'));
+  writeFileSync(path.join(directory, 'pnpm'), FAKE_PNPM_WORKSPACE_WITHOUT_VERCEL, { mode: 0o700 });
+  const originalPath = process.env.PATH;
+  process.env.PATH = `${directory}:${originalPath ?? ''}`;
+
+  try {
+    assert.throws(
+      () => resolveVercelContexts(directory),
+      error =>
+        error instanceof Error &&
+        error.message.includes('pnpm install --frozen-lockfile') &&
+        error.message.includes('pnpm exec vercel whoami --scope kilocode --format=json') &&
+        !error.message.includes('ERR_PNPM')
+    );
+  } finally {
+    if (originalPath === undefined) delete process.env.PATH;
+    else process.env.PATH = originalPath;
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+void test('redeployLatest names the workspace install when the CLI is missing locally', async () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'web-env-vercel-test-'));
+  writeFileSync(path.join(directory, 'pnpm'), FAKE_PNPM_WORKSPACE_WITHOUT_VERCEL, { mode: 0o700 });
+  const originalPath = process.env.PATH;
+  process.env.PATH = `${directory}:${originalPath ?? ''}`;
+
+  try {
+    await assert.rejects(
+      redeployLatest({ project: 'kilocode-app', orgId: 'org-id', cwd: directory }, 'staging'),
+      error =>
+        error instanceof Error &&
+        error.message.includes('pnpm install --frozen-lockfile') &&
+        !error.message.includes('ERR_PNPM')
+    );
+  } finally {
+    if (originalPath === undefined) delete process.env.PATH;
+    else process.env.PATH = originalPath;
     rmSync(directory, { recursive: true, force: true });
   }
 });
@@ -369,50 +402,6 @@ void test(
   }
 );
 
-void test('resolveVercelContexts explains how to install and verify pnpm for Vercel checks', () => {
-  const directory = mkdtempSync(path.join(os.tmpdir(), 'web-env-vercel-test-'));
-  const originalPath = process.env.PATH;
-  process.env.PATH = '';
-
-  try {
-    assert.throws(
-      () => resolveVercelContexts(directory),
-      error =>
-        error instanceof Error &&
-        error.message.includes('Vercel access checks require pnpm') &&
-        error.message.includes('corepack enable') &&
-        error.message.includes('pnpm dlx vercel@53.3.1 whoami --scope kilocode --format=json')
-    );
-  } finally {
-    if (originalPath === undefined) delete process.env.PATH;
-    else process.env.PATH = originalPath;
-    rmSync(directory, { recursive: true, force: true });
-  }
-});
-
-void test('resolveVercelContexts explains how to fix Vercel authentication failures', () => {
-  const directory = mkdtempSync(path.join(os.tmpdir(), 'web-env-vercel-test-'));
-  writeFileSync(path.join(directory, 'pnpm'), FAKE_PNPM_VERCEL_AUTH_FAILURE, { mode: 0o700 });
-  const originalPath = process.env.PATH;
-  process.env.PATH = `${directory}:${originalPath ?? ''}`;
-
-  try {
-    assert.throws(
-      () => resolveVercelContexts(directory),
-      error =>
-        error instanceof Error &&
-        error.message.includes('Could not verify Vercel access for the kilocode team') &&
-        error.message.includes('pnpm dlx vercel@53.3.1 login') &&
-        error.message.includes('pnpm dlx vercel@53.3.1 whoami --scope kilocode --format=json') &&
-        error.message.includes('No existing credentials found')
-    );
-  } finally {
-    if (originalPath === undefined) delete process.env.PATH;
-    else process.env.PATH = originalPath;
-    rmSync(directory, { recursive: true, force: true });
-  }
-});
-
 void test(
   'resolveVault explains how to fix 1Password authentication or vault access failures',
   { skip: process.platform !== 'darwin' && process.platform !== 'linux' },
@@ -444,3 +433,230 @@ void test(
     }
   }
 );
+
+const FAKE_PNPM_VERCEL_API = `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+fs.appendFileSync(process.env.FAKE_VERCEL_LOG, JSON.stringify(args) + '\\n');
+const command = args[2];
+const endpoint = args[3] ?? '';
+const respond = body => process.stdout.write(JSON.stringify(body));
+if (command === 'whoami') {
+  respond({ username: 'tester', team: { id: 'team-id', slug: 'kilocode' } });
+} else if (command === 'api' && endpoint.startsWith('/v9/projects/kilocode-ai-gateway?')) {
+  process.stderr.write('Error: Project not found. (404)\\n');
+  process.exitCode = 1;
+} else if (command === 'api' && /^\\/v9\\/projects\\/[a-z-]+\\?/.test(endpoint)) {
+  respond({ id: 'project-id' });
+} else if (command === 'api' && endpoint.startsWith('/v10/projects/kilocode-app/env?')) {
+  respond({
+    envs: [
+      { id: 'env-1', key: 'PLAIN_VALUE', type: 'plain', value: 'visible', target: ['production'] },
+      { id: 'env-3', key: 'apiUrl', type: 'encrypted', target: 'development' },
+      {
+        id: 'env-4',
+        key: 'SENTRY_ORG',
+        type: 'encrypted',
+        target: ['production'],
+        configurationId: 'icfg_sentry'
+      },
+      {
+        id: 'env-2',
+        key: 'SECRET_TOKEN',
+        type: 'sensitive',
+        target: ['production'],
+        customEnvironmentIds: ['staging-id'],
+        gitBranch: null
+      }
+    ],
+    pagination: { count: 2, next: null, prev: null }
+  });
+} else if (command === 'api' && endpoint.startsWith('/v1/projects/kilocode-app/env/env-1?')) {
+  respond({ id: 'env-1', type: 'encrypted', decrypted: true, value: 'decrypted-value' });
+} else if (command === 'api' && endpoint.startsWith('/v1/projects/kilocode-app/env/env-2?')) {
+  respond({ id: 'env-2', type: 'sensitive', decrypted: false });
+} else if (command === 'api' && endpoint.startsWith('/v1/projects/kilocode-app/env/env-3?')) {
+  respond({ id: 'env-3', type: 'encrypted', decrypted: true, value: '' });
+} else if (command === 'api' && endpoint.startsWith('/v1/integrations/configuration/icfg_sentry?')) {
+  respond({ id: 'icfg_sentry', slug: 'sentry' });
+} else if (command === 'api' && endpoint.startsWith('/v1/integrations/configuration/icfg_removed?')) {
+  process.stderr.write('Error: Integration configuration not found. (404)\\n');
+  process.exitCode = 1;
+} else if (command === 'list') {
+  respond({ deployments: [] });
+} else {
+  process.exitCode = 1;
+}
+`;
+
+async function withFakeVercel<T>(
+  run: (directory: string, logFile: string) => T | Promise<T>
+): Promise<T> {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'web-env-vercel-api-test-'));
+  const logFile = path.join(directory, 'vercel.jsonl');
+  writeFileSync(path.join(directory, 'pnpm'), FAKE_PNPM_VERCEL_API, { mode: 0o700 });
+  const originalPath = process.env.PATH;
+  const originalLog = process.env.FAKE_VERCEL_LOG;
+  process.env.PATH = `${directory}:${originalPath ?? ''}`;
+  process.env.FAKE_VERCEL_LOG = logFile;
+  try {
+    return await run(directory, logFile);
+  } finally {
+    if (originalPath === undefined) delete process.env.PATH;
+    else process.env.PATH = originalPath;
+    if (originalLog === undefined) delete process.env.FAKE_VERCEL_LOG;
+    else process.env.FAKE_VERCEL_LOG = originalLog;
+    rmSync(directory, { recursive: true, force: true });
+  }
+}
+
+void test('resolveVercelContexts skips projects that do not exist in Vercel yet', async () => {
+  await withFakeVercel((directory, logFile) => {
+    const { contexts, missingProjects } = resolveVercelContexts(directory);
+    assert.deepEqual(
+      contexts.map(context => context.project),
+      ['kilocode-app']
+    );
+    assert.deepEqual(missingProjects, ['kilocode-ai-gateway']);
+    const apiCalls = readFileSync(logFile, 'utf8')
+      .trim()
+      .split('\n')
+      .map(line => JSON.parse(line) as string[])
+      .filter(args => args[2] === 'api');
+    assert.deepEqual(
+      apiCalls.map(args => args[3]),
+      [
+        '/v9/projects/kilocode-app?teamId=team-id',
+        '/v9/projects/kilocode-ai-gateway?teamId=team-id',
+      ]
+    );
+  });
+});
+
+void test('listEnvRecords keeps only plain values and normalizes string and array targets', async () => {
+  await withFakeVercel(directory => {
+    assert.deepEqual(
+      listEnvRecords({ project: 'kilocode-app', orgId: 'team-id', cwd: directory }),
+      [
+        {
+          id: 'env-1',
+          key: 'PLAIN_VALUE',
+          type: 'plain',
+          target: ['production'],
+          customEnvironmentIds: [],
+          gitBranch: undefined,
+          configurationId: undefined,
+          value: 'visible',
+        },
+        {
+          id: 'env-3',
+          key: 'apiUrl',
+          type: 'encrypted',
+          target: ['development'],
+          customEnvironmentIds: [],
+          gitBranch: undefined,
+          configurationId: undefined,
+          value: undefined,
+        },
+        {
+          id: 'env-4',
+          key: 'SENTRY_ORG',
+          type: 'encrypted',
+          target: ['production'],
+          customEnvironmentIds: [],
+          gitBranch: undefined,
+          configurationId: 'icfg_sentry',
+          value: undefined,
+        },
+        {
+          id: 'env-2',
+          key: 'SECRET_TOKEN',
+          type: 'sensitive',
+          target: ['production'],
+          customEnvironmentIds: ['staging-id'],
+          gitBranch: undefined,
+          configurationId: undefined,
+          value: undefined,
+        },
+      ]
+    );
+  });
+});
+
+void test('decryptedEnvValues returns only values Vercel decrypted', async () => {
+  await withFakeVercel(async directory => {
+    assert.deepEqual(
+      await decryptedEnvValues({ project: 'kilocode-app', orgId: 'team-id', cwd: directory }, [
+        'env-1',
+        'env-2',
+        'env-3',
+        'env-1',
+      ]),
+      new Map([
+        ['env-1', 'decrypted-value'],
+        ['env-3', ''],
+      ])
+    );
+  });
+});
+
+void test('integrationSlugs names configurations and keeps the ID of a deleted one', async () => {
+  await withFakeVercel(directory => {
+    assert.deepEqual(
+      integrationSlugs({ project: 'kilocode-app', orgId: 'team-id', cwd: directory }, [
+        'icfg_sentry',
+        'icfg_removed',
+        'icfg_sentry',
+      ]),
+      new Map([
+        ['icfg_sentry', 'sentry'],
+        ['icfg_removed', 'icfg_removed'],
+      ])
+    );
+  });
+});
+
+void test('redeployLatest skips a project without a ready deployment', async () => {
+  await withFakeVercel(async directory => {
+    assert.equal(
+      await redeployLatest(
+        { project: 'kilocode-ai-gateway', orgId: 'team-id', cwd: directory },
+        'production'
+      ),
+      undefined
+    );
+  });
+});
+
+void test('readVaultValues reads the production and staging fields of each item', () => {
+  const directory = mkdtempSync(path.join(os.tmpdir(), 'web-env-op-test-'));
+  writeFileSync(path.join(directory, 'op'), FAKE_OP, { mode: 0o700 });
+  const originalPath = process.env.PATH;
+  const originalLog = process.env.FAKE_OP_LOG;
+  const originalExisting = process.env.FAKE_OP_EXISTING;
+  process.env.PATH = `${directory}:${originalPath ?? ''}`;
+  process.env.FAKE_OP_LOG = path.join(directory, 'op.jsonl');
+  const context = { accountId: 'account-id', vaultId: 'vault-id' };
+
+  try {
+    process.env.FAKE_OP_EXISTING = 'production';
+    assert.deepEqual(
+      readVaultValues(context, ['TEST_SECRET', 'NOT_IN_VAULT']),
+      new Map([['TEST_SECRET', { production: 'old-production-value' }]])
+    );
+
+    process.env.FAKE_OP_EXISTING = 'staging';
+    assert.deepEqual(
+      readVaultValues(context, ['TEST_SECRET']),
+      new Map([['TEST_SECRET', { staging: 'old-staging-value' }]])
+    );
+  } finally {
+    if (originalPath === undefined) delete process.env.PATH;
+    else process.env.PATH = originalPath;
+    if (originalLog === undefined) delete process.env.FAKE_OP_LOG;
+    else process.env.FAKE_OP_LOG = originalLog;
+    if (originalExisting === undefined) delete process.env.FAKE_OP_EXISTING;
+    else process.env.FAKE_OP_EXISTING = originalExisting;
+    rmSync(directory, { recursive: true, force: true });
+  }
+});

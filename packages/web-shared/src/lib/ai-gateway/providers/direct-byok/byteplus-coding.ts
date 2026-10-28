@@ -1,16 +1,19 @@
-import { isReasoningExplicitlyDisabled } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
-import type {
-  DirectByokModel,
-  DirectByokProvider,
+import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import {
+  isReasoningExplicitlyDisabled,
+  replaceReasoningObjectWithReasoningEffort,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
+import {
+  apiKeyUpstream,
+  type DirectByokModel,
+  type DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import {
-  REASONING_VARIANTS_BINARY,
-  REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/variants';
+  effortOptions,
+  REASONING_TOGGLE,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/reasoning-options';
 
 export const BYTEPLUS_CODING_PROVIDER_ID = 'byteplus-coding';
-
-type BytePlusCodingModel = DirectByokModel & { description: string };
 
 export const BYTEPLUS_CODING_MODELS = [
   {
@@ -21,7 +24,7 @@ export const BYTEPLUS_CODING_MODELS = [
     flags: ['recommended', 'vision', 'reasoning'],
     context_length: 262144,
     max_completion_tokens: 32768,
-    variants: REASONING_VARIANTS_BINARY,
+    reasoning_options: REASONING_TOGGLE,
   },
   {
     id: 'kimi-k2.5',
@@ -31,7 +34,7 @@ export const BYTEPLUS_CODING_MODELS = [
     flags: ['reasoning'],
     context_length: 262144,
     max_completion_tokens: 32768,
-    variants: REASONING_VARIANTS_BINARY,
+    reasoning_options: REASONING_TOGGLE,
   },
   {
     id: 'glm-5.1',
@@ -41,7 +44,7 @@ export const BYTEPLUS_CODING_MODELS = [
     flags: ['reasoning'],
     context_length: 204800,
     max_completion_tokens: 131072,
-    variants: REASONING_VARIANTS_BINARY,
+    reasoning_options: REASONING_TOGGLE,
   },
   {
     id: 'glm-5.2',
@@ -50,7 +53,7 @@ export const BYTEPLUS_CODING_MODELS = [
     flags: ['reasoning'],
     context_length: 204800,
     max_completion_tokens: 131072,
-    variants: REASONING_VARIANTS_BINARY,
+    reasoning_options: REASONING_TOGGLE,
   },
   {
     id: 'deepseek-v4-flash',
@@ -59,7 +62,7 @@ export const BYTEPLUS_CODING_MODELS = [
     flags: ['reasoning'],
     context_length: 128000,
     max_completion_tokens: 65536,
-    variants: REASONING_VARIANTS_BINARY,
+    reasoning_options: REASONING_TOGGLE,
   },
   {
     id: 'deepseek-v4-pro',
@@ -68,7 +71,7 @@ export const BYTEPLUS_CODING_MODELS = [
     flags: ['reasoning'],
     context_length: 128000,
     max_completion_tokens: 65536,
-    variants: REASONING_VARIANTS_BINARY,
+    reasoning_options: REASONING_TOGGLE,
   },
   {
     id: 'gpt-oss-120b',
@@ -86,7 +89,7 @@ export const BYTEPLUS_CODING_MODELS = [
     flags: ['vision', 'reasoning'],
     context_length: 262144,
     max_completion_tokens: 131072,
-    variants: REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
+    reasoning_options: effortOptions('minimal', 'low', 'medium', 'high'),
   },
   {
     id: 'dola-seed-2.0-pro',
@@ -96,7 +99,7 @@ export const BYTEPLUS_CODING_MODELS = [
     flags: ['vision', 'reasoning'],
     context_length: 262144,
     max_completion_tokens: 131072,
-    variants: REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
+    reasoning_options: effortOptions('minimal', 'low', 'medium', 'high'),
   },
   {
     id: 'dola-seed-2.0-lite',
@@ -106,9 +109,9 @@ export const BYTEPLUS_CODING_MODELS = [
     flags: ['vision', 'reasoning'],
     context_length: 262144,
     max_completion_tokens: 131072,
-    variants: REASONING_VARIANTS_MINIMAL_LOW_MEDIUM_HIGH,
+    reasoning_options: effortOptions('minimal', 'low', 'medium', 'high'),
   },
-] as const satisfies ReadonlyArray<BytePlusCodingModel>;
+] as const satisfies ReadonlyArray<DirectByokModel>;
 
 export const BYTEPLUS_CODING_MODEL_IDS = BYTEPLUS_CODING_MODELS.map(
   model => `${BYTEPLUS_CODING_PROVIDER_ID}/${model.id}`
@@ -116,14 +119,16 @@ export const BYTEPLUS_CODING_MODEL_IDS = BYTEPLUS_CODING_MODELS.map(
 
 export default {
   id: BYTEPLUS_CODING_PROVIDER_ID,
-  base_url: 'https://ark.ap-southeast.bytepluses.com/api/coding/v3',
-  base_url_overrides: {},
-  supported_chat_apis: ['chat_completions'],
-  default_ai_sdk_provider: 'openai-compatible',
+  resolveUpstream: apiKeyUpstream({
+    apiUrl: 'https://ark.ap-southeast.bytepluses.com/api/coding/v3',
+    supportedChatApis: ['chat_completions'],
+    responseTransforms: ReasoningDetailsTransform.ReasoningContent,
+  }),
   transformRequest(context) {
     context.request.body.thinking = {
       type: isReasoningExplicitlyDisabled(context.request) ? 'disabled' : 'enabled',
     };
+    replaceReasoningObjectWithReasoningEffort(context.request);
   },
   models: () => Promise.resolve(BYTEPLUS_CODING_MODELS),
 } satisfies DirectByokProvider;

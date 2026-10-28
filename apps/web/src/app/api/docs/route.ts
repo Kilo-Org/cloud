@@ -17,7 +17,7 @@ function swaggerUiHtml(nonce: string) {
         --kilo-surface: #222222;
         --kilo-foreground: #fafafa;
         --kilo-muted: #b4b4b4;
-        --kilo-primary: #edff00;
+        --kilo-primary: #ffdd00;
       }
 
       body {

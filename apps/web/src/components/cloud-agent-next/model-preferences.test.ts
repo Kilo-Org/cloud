@@ -1,14 +1,11 @@
 import { describe, expect, it } from '@jest/globals';
 import {
-  getDevcontainerEnabledStorageKey,
   getLastUsedModelStorageKey,
   getLastUsedRepoStorageKey,
-  getLastUsedSandboxAllocationStorageKey,
   getLastUsedVariantsStorageKey,
   getPreferredInitialModel,
   getPreferredInitialRepo,
   getPreferredInitialVariant,
-  parseDevcontainerEnabled,
   parseLastUsedRepo,
 } from './model-preferences';
 import type { ModelOption } from '@/components/shared/ModelCombobox';
@@ -75,17 +72,6 @@ describe('getLastUsedVariantsStorageKey', () => {
     expect(getLastUsedVariantsStorageKey()).toBe('cloud-agent:last-used-variants:personal');
     expect(getLastUsedVariantsStorageKey('org_123')).toBe(
       'cloud-agent:last-used-variants:organization:org_123'
-    );
-  });
-});
-
-describe('getLastUsedSandboxAllocationStorageKey', () => {
-  it('uses separate keys for personal and organization contexts', () => {
-    expect(getLastUsedSandboxAllocationStorageKey()).toBe(
-      'cloud-agent:last-used-sandbox-allocation:personal'
-    );
-    expect(getLastUsedSandboxAllocationStorageKey('org_123')).toBe(
-      'cloud-agent:last-used-sandbox-allocation:organization:org_123'
     );
   });
 });
@@ -210,19 +196,6 @@ describe('repository preference', () => {
         isLoadingBitbucketRepos: true,
       })
     ).toBeUndefined();
-  });
-});
-
-describe('devcontainer preference helpers', () => {
-  it('uses a stable storage key for the devcontainer preference', () => {
-    expect(getDevcontainerEnabledStorageKey()).toBe('cloud-agent:devcontainer-enabled');
-  });
-
-  it('parses only true as enabled', () => {
-    expect(parseDevcontainerEnabled('true')).toBe(true);
-    expect(parseDevcontainerEnabled('false')).toBe(false);
-    expect(parseDevcontainerEnabled('1')).toBe(false);
-    expect(parseDevcontainerEnabled(null)).toBe(false);
   });
 });
 

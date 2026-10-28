@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { SUPPORT_EMAIL } from '@kilocode/app-shared/support';
 import { AlertTriangle, Volume2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useClawGatewayReady } from '../hooks/useClawHooks';
@@ -164,8 +165,8 @@ export function ProvisioningErrorView({
         <p className="text-muted-foreground max-w-md text-sm leading-relaxed">
           Something went wrong while setting up your instance. Please try again by restarting the
           setup process. If the problem persists, contact{' '}
-          <a href="mailto:hi@kilo.ai" className="text-blue-500 underline">
-            hi@kilo.ai
+          <a href={`mailto:${SUPPORT_EMAIL}`} className="text-blue-500 underline">
+            {SUPPORT_EMAIL}
           </a>
           .
         </p>

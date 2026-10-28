@@ -269,7 +269,7 @@ export function BeadPanel({
       {/* Title area */}
       <div className="border-b border-white/[0.06] px-5 pt-4 pb-4">
         <div className="flex items-center gap-2">
-          <Hexagon className="size-4 shrink-0 text-[color:oklch(95%_0.15_108_/_0.7)]" />
+          <Hexagon className="size-4 shrink-0 text-primary/70" />
           {editing ? (
             <Input
               value={editState.title}
@@ -459,7 +459,7 @@ export function BeadPanel({
                 <User className="size-3" />
                 Assignee
               </div>
-              <div className="mt-0.5 flex items-center gap-1 text-sm text-[color:oklch(95%_0.15_108)]">
+              <div className="mt-0.5 flex items-center gap-1 text-sm text-primary">
                 <Bot className="size-3" />
                 <span className="truncate">
                   {assigneeName ?? bead.assignee_agent_bead_id.slice(0, 8)}
@@ -487,7 +487,7 @@ export function BeadPanel({
                 <GitBranch className="size-3" />
                 Parent Bead
               </div>
-              <div className="mt-0.5 flex items-center gap-1 font-mono text-xs text-[color:oklch(95%_0.15_108)]">
+              <div className="mt-0.5 flex items-center gap-1 font-mono text-xs text-primary">
                 <span>{bead.parent_bead_id.slice(0, 8)}</span>
                 <ChevronRight className="size-3 shrink-0 text-white/15 transition-colors group-hover/link:text-white/30" />
               </div>
@@ -522,7 +522,7 @@ export function BeadPanel({
             href={prUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-[color:oklch(95%_0.15_108)] transition-colors hover:bg-white/[0.06]"
+            className="inline-flex items-center gap-1.5 rounded-md border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 text-xs font-medium text-primary transition-colors hover:bg-white/[0.06]"
           >
             <ExternalLink className="size-3" />
             {isGitHubUrl(prUrl) ? 'View Pull Request' : 'View Merge Request'}
@@ -583,7 +583,7 @@ export function BeadPanel({
               Description
             </span>
           </div>
-          <div className="prose prose-sm prose-invert prose-headings:text-white/80 prose-p:text-white/65 prose-a:text-[color:oklch(95%_0.15_108)] prose-strong:text-white/80 prose-code:rounded prose-code:bg-white/[0.06] prose-code:px-1 prose-code:py-0.5 prose-code:text-[11px] prose-code:text-white/70 prose-pre:bg-white/[0.04] prose-pre:border prose-pre:border-white/[0.06] prose-li:text-white/65 max-w-none">
+          <div className="prose prose-sm prose-invert prose-headings:text-white/80 prose-p:text-white/65 prose-a:text-primary prose-strong:text-white/80 prose-code:rounded prose-code:bg-white/[0.06] prose-code:px-1 prose-code:py-0.5 prose-code:text-[11px] prose-code:text-white/70 prose-pre:bg-white/[0.04] prose-pre:border prose-pre:border-white/[0.06] prose-li:text-white/65 max-w-none">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{bead.body}</ReactMarkdown>
           </div>
         </div>
@@ -615,7 +615,7 @@ export function BeadPanel({
                     </span>
                   </div>
                   {msg.body ? (
-                    <div className="prose prose-sm prose-invert prose-headings:text-white/80 prose-p:text-white/65 prose-a:text-[color:oklch(95%_0.15_108)] prose-strong:text-white/80 prose-code:rounded prose-code:bg-white/[0.06] prose-code:px-1 prose-code:py-0.5 prose-code:text-[11px] prose-code:text-white/70 prose-li:text-white/65 max-w-none">
+                    <div className="prose prose-sm prose-invert prose-headings:text-white/80 prose-p:text-white/65 prose-a:text-primary prose-strong:text-white/80 prose-code:rounded prose-code:bg-white/[0.06] prose-code:px-1 prose-code:py-0.5 prose-code:text-[11px] prose-code:text-white/70 prose-li:text-white/65 max-w-none">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.body}</ReactMarkdown>
                     </div>
                   ) : (

@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import { ProtectedDataUnavailableError } from '@/lib/protected-data';
+
 import { E2eInjectedFaultError } from './e2e-fault';
 import { beforeSendScrubbedEvent } from './sentry-before-send';
 
@@ -15,6 +17,12 @@ describe('beforeSendScrubbedEvent', () => {
 
   it('drops the fault even when the error reached the hint as a plain error carrying the marker', () => {
     const error = Object.assign(new Error('read rejected'), { name: 'E2eInjectedFaultError' });
+
+    expect(beforeSendScrubbedEvent({ event_id: 'abc' }, { originalException: error })).toBeNull();
+  });
+
+  it('drops a keychain call skipped on a locked device', () => {
+    const error = new ProtectedDataUnavailableError();
 
     expect(beforeSendScrubbedEvent({ event_id: 'abc' }, { originalException: error })).toBeNull();
   });

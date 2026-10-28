@@ -10,7 +10,7 @@ import {
 import { sortRemoteModelCatalogProviders } from '@kilocode/cloud-agent-sdk/remote-model-order';
 
 import { i18n } from '@/i18n';
-import { type ModelOption } from '@/lib/hooks/use-available-models';
+import { type ModelOption, type ModelPricing } from '@/lib/hooks/use-available-models';
 import { formatShortModelDisplayName } from '@/lib/model-display-name';
 
 type SessionModelSource =
@@ -28,13 +28,18 @@ export type SessionModelOption = {
   isFree?: boolean;
   mayTrainOnYourPrompts?: boolean;
   hasUserByokAvailable?: boolean;
-  pricing?: { prompt?: string; completion?: string };
+  pricing?: ModelPricing;
   contextWindow?: number;
   provider?: { id: string; name: string };
   modelRef?: ModelRef;
   overrideSource?: RemoteModelOverride['source'];
   showGatewayMetadata: boolean;
   unavailable?: boolean;
+  /**
+   * What a custom or on-device chat model receives. Absent for Kilo models: all
+   * of them receive tools, and the attach control shows which read images.
+   */
+  capabilities?: { tools: boolean; images: boolean };
 };
 
 type BuildSessionModelOptionsInput = {

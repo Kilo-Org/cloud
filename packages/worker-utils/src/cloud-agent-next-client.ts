@@ -12,6 +12,7 @@ import {
   CODE_REVIEW_TERMINAL_REASONS,
   type CodeReviewTerminalReason as CloudAgentTerminalReason,
 } from '@kilocode/db/schema-types';
+import type { EgressMode } from './egress-allowlist.js';
 
 // ---------------------------------------------------------------------------
 // Types — aligned with cloud-agent-next tRPC router contracts
@@ -66,6 +67,8 @@ export type CloudAgentPrepareSessionInput = {
   createdOnPlatform?: string;
   gateThreshold?: 'off' | 'all' | 'warning' | 'critical';
   sandboxAllocation?: 'isolated-standard';
+  egressMode?: EgressMode;
+  egressAllowlist?: string[];
   runtimeSkills?: Array<{
     name: string;
     rawMarkdown: string;
@@ -200,13 +203,6 @@ export const CLOUD_AGENT_NEXT_BILLING_ERROR_PATTERNS = [
   'insufficient funds',
   'payment required',
 ] as const;
-
-/**
- * User-facing message for auto-fix billing failures.
- * Shared by the web app and auto-fix-infra so the copy stays in sync.
- */
-export const AUTO_FIX_INSUFFICIENT_CREDITS_MESSAGE =
-  'Insufficient credits. Auto-fix requires at least $1 in available credits. Add credits, then retry.';
 
 export function isCloudAgentNextBillingErrorBody(body: string): boolean {
   const normalizedBody = body.toLowerCase();

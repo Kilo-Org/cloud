@@ -38,7 +38,6 @@ import { logExceptInTest, errorExceptInTest } from '@kilocode/web-shared/lib/uti
 import {
   addReactionToPR,
   createPRComment,
-  hasPRCommentWithMarker,
   findKiloReviewComment,
   updateKiloReviewComment,
   updateCheckRun,
@@ -47,7 +46,6 @@ import type { CheckRunConclusion } from '@/lib/integrations/platforms/github/ada
 import {
   addReactionToMR,
   createMRNote,
-  hasMRNoteWithMarker,
   findKiloReviewNote,
   updateKiloReviewNote,
   setCommitStatus,
@@ -55,7 +53,7 @@ import {
 import type { GitLabCommitStatusState } from '@/lib/integrations/platforms/gitlab/adapter';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { CALLBACK_TOKEN_SECRET } from '@kilocode/web-shared/lib/config.server';
+import { CALLBACK_TOKEN_SECRET } from '@/lib/web-config.server';
 import { verifyCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 import { appendPreviousReviewSummaryHistory } from '@/lib/code-reviews/summary/history';
@@ -70,6 +68,7 @@ import {
 } from '@/lib/code-reviews/platform/gitlab-access';
 import { terminalReasonFromCloudAgentFailure } from '@/lib/code-reviews/terminal-reason-from-failure';
 import { getCodeReviewTerminalReasonCopy } from '@/lib/code-reviews/terminal-reason-copy';
+import { postCodeReviewBillingNotice } from '@/lib/code-reviews/billing';
 import {
   appendReviewSummaryFooter,
   buildReviewSummaryFooter,
@@ -483,6 +482,19 @@ function getActionRequiredTerminalReason(
 const MAX_FAILED_SESSION_TOKENS_FOR_AUTO_RETRY = 100_000;
 const MAX_FAILED_SESSION_COST_MUSD_FOR_AUTO_RETRY = 200_000;
 
+// Pre-dispatch codes that only mean the session never reached the agent: the
+// sandbox never connected, the workspace never finished, the runtime or the
+// Kilo server never came up, or preparation timed out. None of them can have
+// spent model usage, so an unmeasurable usage read must not forfeit the single
+// infra retry. Codes that describe a request the platform rejected, missing
+// metadata, or a missing model stay out: a retry would repeat the same answer.
+const SESSIONLESS_PRE_DISPATCH_FAILURE_CODES: ReadonlySet<string> = new Set([
+  'sandbox_connect_failed',
+  'workspace_setup_failed',
+  'kilo_server_failed',
+  'wrapper_start_failed',
+]);
+
 function hasKnownUnretryableTerminalReason(terminalReason?: CodeReviewTerminalReason): boolean {
   return (
     terminalReason === 'billing' ||
@@ -498,6 +510,7 @@ function hasKnownUnretryableTerminalReason(terminalReason?: CodeReviewTerminalRe
     // sees it. That check has therefore never fired; the structured reason makes
     // the existing intent actually work.
     terminalReason === 'assistant_rate_limited_byok' ||
+    terminalReason === 'assistant_invalid_request_byok' ||
     isCodeReviewActionRequiredReason(terminalReason)
   );
 }
@@ -546,10 +559,6 @@ function isInfraRetryAttempt(attempt: CloudAgentCodeReviewAttempt): boolean {
   return attempt.retry_reason === 'infra_failure' || attempt.retry_of_attempt_id !== null;
 }
 
-function isPreDispatchSandboxConnectFailure(failure?: CloudAgentSafeFailure): boolean {
-  return failure?.stage === 'pre_dispatch' && failure.code === 'sandbox_connect_failed';
-}
-
 type FailedSessionUsage = NonNullable<Awaited<ReturnType<typeof getSessionUsageFromBilling>>>;
 
 function failedSessionTokenCount(usage: FailedSessionUsage): number {
@@ -581,7 +590,14 @@ async function shouldSkipAutoRetryForFailedSessionUsage(params: {
 
   const usage = await getSessionUsageFromBilling(params.failedCliSessionId, params.reviewCreatedAt);
   if (!usage) {
-    const allowUnavailableUsage = isPreDispatchSandboxConnectFailure(params.failure);
+    // A pre-dispatch failure means the agent never ran, so an unmeasurable
+    // attempt cannot have spent model usage and the spend guard must not block
+    // the single infra retry.
+    const failureCode = params.failure?.code;
+    const allowUnavailableUsage =
+      params.failure?.stage === 'pre_dispatch' &&
+      !!failureCode &&
+      SESSIONLESS_PRE_DISPATCH_FAILURE_CODES.has(failureCode);
     logExceptInTest('[code-review-status] Auto-retry token guard could not measure usage', {
       reviewId: params.reviewId,
       failedAttemptId: params.failedAttemptId,
@@ -682,7 +698,6 @@ async function resolveTerminalOwner(
 }
 
 const GITHUB_COMMENT_MAX_CHARACTERS = 65_536;
-const BILLING_NOTICE_MARKER = '<!-- kilo-billing-notice -->';
 const MODEL_NOT_FOUND_SUMMARY_URL = 'https://app.kilo.ai/code-reviews';
 const MODEL_NOT_FOUND_CHECK_TITLE = 'Selected model is no longer available';
 const MODEL_NOT_FOUND_STATUS_SUMMARY = `The review did not run because the selected model is no longer available. Choose another model in Kilo Code review settings: ${MODEL_NOT_FOUND_SUMMARY_URL}`;
@@ -694,11 +709,6 @@ const MODEL_NOT_FOUND_SUMMARY_BODY = `<!-- kilo-review -->
 The review did not run because the selected model is no longer available.
 
 Choose another model in Kilo Code review settings: ${MODEL_NOT_FOUND_SUMMARY_URL}`;
-
-const BILLING_NOTICE_BODY = `${BILLING_NOTICE_MARKER}
-**Kilo Code Review could not run — your account is out of credits.**
-
-[Add credits](https://app.kilo.ai/) or [switch to a free model](https://app.kilo.ai/code-reviews) to enable reviews on this change.`;
 
 /**
  * Read a review's usage data.
@@ -1862,27 +1872,7 @@ export async function POST(
                 status === 'failed' &&
                 isBillingCodeReviewTerminalReason(terminalReason, errorMessage)
               ) {
-                const alreadyPosted = await hasPRCommentWithMarker(
-                  integration.platform_installation_id,
-                  repoOwner,
-                  repoName,
-                  review.pr_number,
-                  BILLING_NOTICE_MARKER,
-                  appType
-                );
-                if (!alreadyPosted) {
-                  await createPRComment(
-                    integration.platform_installation_id,
-                    repoOwner,
-                    repoName,
-                    review.pr_number,
-                    BILLING_NOTICE_BODY,
-                    appType
-                  );
-                  logExceptInTest(
-                    `[code-review-status] Posted billing notice on ${review.repo_full_name}#${review.pr_number}`
-                  );
-                }
+                await postCodeReviewBillingNotice(review, integration);
               }
 
               // Summary history and footer (completed only)
@@ -1960,25 +1950,7 @@ export async function POST(
                 status === 'failed' &&
                 isBillingCodeReviewTerminalReason(terminalReason, errorMessage)
               ) {
-                const alreadyPosted = await hasMRNoteWithMarker(
-                  accessToken,
-                  review.repo_full_name,
-                  review.pr_number,
-                  BILLING_NOTICE_MARKER,
-                  instanceUrl
-                );
-                if (!alreadyPosted) {
-                  await createMRNote(
-                    accessToken,
-                    review.repo_full_name,
-                    review.pr_number,
-                    BILLING_NOTICE_BODY,
-                    instanceUrl
-                  );
-                  logExceptInTest(
-                    `[code-review-status] Posted billing notice on GitLab MR ${review.repo_full_name}!${review.pr_number}`
-                  );
-                }
+                await postCodeReviewBillingNotice(review, integration, { gitlabAccessToken });
               }
 
               // Summary history and footer (completed only)

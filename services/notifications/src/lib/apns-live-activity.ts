@@ -81,10 +81,18 @@ export async function signApnsJwt(
 }
 
 /**
+ * APNs priority for a Live Activity push. 10 is delivered at once and counts
+ * toward the iOS update budget; 5 is delivered opportunistically and does not.
+ */
+export type LiveActivityPriority = 5 | 10;
+
+/**
  * Build the HTTP request shape for one Live Activity APNs push. Live Activity
- * pushes use `apns-push-type: liveactivity`, `apns-priority: 10`, and the
- * `.push-type.liveactivity` topic suffix. The `timestamp` (Unix seconds) is
- * what lets iOS discard an older revision that arrives late.
+ * pushes use `apns-push-type: liveactivity`, `apns-priority` 10 unless the
+ * caller asks for 5, and the `.push-type.liveactivity` topic suffix. The
+ * `timestamp` (Unix seconds) is what lets iOS discard an older revision that
+ * arrives late. `relevance-score` orders this app's cards on the Lock Screen
+ * and picks the one the Dynamic Island shows.
  */
 export function buildLiveActivityApnsRequest(
   params: {
@@ -98,6 +106,8 @@ export function buildLiveActivityApnsRequest(
      * card must read as unknown once its updates stop, never as current.
      */
     staleDateSeconds?: number;
+    priority?: LiveActivityPriority;
+    relevanceScore?: number;
   } & (
     | { event: 'start'; startAlert: LiveActivityAlert }
     | { event: 'update' }
@@ -110,7 +120,7 @@ export function buildLiveActivityApnsRequest(
       authorization: `bearer ${params.authorizationJwt}`,
       'apns-topic': `${params.credentials.topic}.push-type.liveactivity`,
       'apns-push-type': 'liveactivity',
-      'apns-priority': '10',
+      'apns-priority': String(params.priority ?? 10),
       'apns-expiration': '0',
       'content-type': 'application/json',
     },
@@ -132,6 +142,9 @@ export function buildLiveActivityApnsRequest(
           ? { 'stale-date': params.staleDateSeconds }
           : {}),
         ...(params.event === 'end' ? { 'dismissal-date': params.dismissalDateSeconds } : {}),
+        ...(params.relevanceScore !== undefined
+          ? { 'relevance-score': params.relevanceScore }
+          : {}),
       },
     }),
   };
@@ -148,13 +161,18 @@ export async function sendLiveActivityApns(params: {
   credentials: ApnsCredentials;
   tokens: readonly { token: string; event: LiveActivityEvent }[];
   contentState: Record<string, unknown>;
-  /** Required by APNs on a start; resolved by the caller in the user's locale. */
-  startAlert: LiveActivityAlert;
+  /** Required by APNs on a start; resolved by the caller in the user's locale. Only starts need it. */
+  startAlert?: LiveActivityAlert;
   nowSeconds: number;
   /** Snapshot ordering time, independent of the provider token's signing time. */
   timestampSeconds?: number;
   /** Unix seconds after which iOS dims a start or update as out of date. */
   staleDateSeconds?: number;
+  /** APNs priority for every push of this call; 10 when absent. */
+  priority?: LiveActivityPriority;
+  relevanceScore?: number;
+  /** Unix seconds when an ended card leaves the Lock Screen; a few seconds from now when absent. */
+  dismissalDateSeconds?: number;
   /** Recheck the durable generation after signing, before each request. */
   isCurrent?: () => Promise<boolean>;
   /** Persist terminal intent after signing, before the end can reach ActivityKit. */
@@ -183,18 +201,29 @@ export async function sendLiveActivityApns(params: {
     params.tokens.map(async ({ token, event }) => {
       if (params.isCurrent && !(await params.isCurrent())) return false;
       if (event === 'end' && params.beforeEnd && !(await params.beforeEnd(token))) return false;
+      const eventParams =
+        event === 'end'
+          ? {
+              event,
+              dismissalDateSeconds:
+                params.dismissalDateSeconds ?? Math.floor(Date.now() / 1000) + TERMINAL_SECONDS,
+            }
+          : event === 'update'
+            ? { event }
+            : params.startAlert === undefined
+              ? null
+              : { event, startAlert: params.startAlert };
+      if (eventParams === null) throw new Error('A push-to-start needs an alert');
       const request = buildLiveActivityApnsRequest({
         token,
-        ...(event === 'end'
-          ? { event, dismissalDateSeconds: Math.floor(Date.now() / 1000) + TERMINAL_SECONDS }
-          : event === 'start'
-            ? { event, startAlert: params.startAlert }
-            : { event }),
+        ...eventParams,
         contentState: params.contentState,
         credentials: params.credentials,
         authorizationJwt,
         timestampSeconds: params.timestampSeconds ?? params.nowSeconds,
         staleDateSeconds: params.staleDateSeconds,
+        priority: params.priority,
+        relevanceScore: params.relevanceScore,
       });
       const response = await fetchFn(request.url, {
         method: 'POST',

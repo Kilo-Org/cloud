@@ -56,6 +56,7 @@ vi.mock('expo-haptics', () => ({
   NotificationFeedbackType: { Success: 'success' },
 }));
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   Switch: 'Switch',
@@ -90,19 +91,27 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 }));
 // Everything the validators need from the formatter, in the en-US shape the
 // tests write values in.
-vi.mock('@/lib/format', () => ({
-  formatMoney: (amount: number) => `$${amount}`,
-  formatNumber: String,
-  formatList: (values: readonly string[]) => values.join(' and '),
-  parseLocalizedNumber: (value: string) => {
+vi.mock('@/lib/format', () => {
+  const normalizeLocalizedNumber = (value: string) => {
     const normalized = value.trim().replaceAll(',', '');
-    if (normalized === '') {
-      return null;
-    }
-    const parsed = Number(normalized);
-    return Number.isFinite(parsed) ? parsed : null;
-  },
-}));
+    return /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)$/.test(normalized) ? normalized : null;
+  };
+  return {
+    formatMoney: (amount: number) => `$${amount}`,
+    formatCurrency: (amount: number) => `$${amount}`,
+    formatNumber: String,
+    formatList: (values: readonly string[]) => values.join(' and '),
+    normalizeLocalizedNumber,
+    parseLocalizedNumber: (value: string) => {
+      const normalized = normalizeLocalizedNumber(value);
+      if (normalized === null) {
+        return null;
+      }
+      const parsed = Number(normalized);
+      return Number.isFinite(parsed) ? parsed : null;
+    },
+  };
+});
 
 type RuleFixture = {
   kind: 'threshold' | 'anomaly';
@@ -288,7 +297,7 @@ describe('SpendAlertsScreen happy state', () => {
     expect(fieldByLabel(renderer, LIMIT).props.defaultValue).toBe('25');
     expect(fieldByLabel(renderer, MULTIPLIER).props.defaultValue).toBe('2');
     expect(kvRowByLabel(renderer, i18n.t('spendAlerts.spend24h'))?.props.value).toBe('$1.5');
-    expect(switchByLabel(renderer, i18n.t('spendAlerts.enable'))?.props.value).toBe(true);
+    expect(switchByLabel(renderer, i18n.t('notifications.channel.spend'))?.props.value).toBe(true);
     expect(switchByLabel(renderer, i18n.t('spendAlerts.thresholdTitle'))?.props.value).toBe(true);
     expect(byType(renderer, 'SegmentedControl')[0]?.props.value).toBe('24');
 
@@ -604,7 +613,7 @@ describe('SpendAlertsScreen empty state', () => {
     expect(byType(renderer, 'FormField')).toHaveLength(0);
     expect(byType(renderer, 'Switch')).toHaveLength(1);
 
-    toggle(switchByLabel(renderer, i18n.t('spendAlerts.enable')), true);
+    toggle(switchByLabel(renderer, i18n.t('notifications.channel.spend')), true);
 
     expect(texts(renderer)).not.toContain(i18n.t('spendAlerts.empty'));
     expect(byType(renderer, 'FormField')).toHaveLength(2);
@@ -614,7 +623,7 @@ describe('SpendAlertsScreen empty state', () => {
   it('keeps Save with the switch when it is turned off, so the disable can be posted', async () => {
     const { renderer } = await mountLoaded();
 
-    toggle(switchByLabel(renderer, i18n.t('spendAlerts.enable')), false);
+    toggle(switchByLabel(renderer, i18n.t('notifications.channel.spend')), false);
 
     expect(texts(renderer)).toContain(i18n.t('spendAlerts.empty'));
     expect(byType(renderer, 'FormField')).toHaveLength(0);
@@ -630,7 +639,7 @@ describe('SpendAlertsScreen empty state', () => {
   it('keeps the saved confirmation after a disable save lands', async () => {
     const { renderer, queryClient } = await mountLoaded();
 
-    toggle(switchByLabel(renderer, i18n.t('spendAlerts.enable')), false);
+    toggle(switchByLabel(renderer, i18n.t('notifications.channel.spend')), false);
     press(buttonByVariant(renderer));
 
     await waitFor(() => saveMutationFn.mock.calls.length === 1);
@@ -653,7 +662,7 @@ describe('SpendAlertsScreen empty state', () => {
     expect(byType(renderer, 'Button')).toHaveLength(1);
 
     // A draft edit clears it again, so the message never outlives its values.
-    toggle(switchByLabel(renderer, i18n.t('spendAlerts.enable')), true);
+    toggle(switchByLabel(renderer, i18n.t('notifications.channel.spend')), true);
     expect(byType(renderer, 'AccessibleStatus')[0]?.props.message).toBeNull();
   });
 });
@@ -666,7 +675,7 @@ describe('SpendAlertsScreen master switch over an invalid hidden field', () => {
     type(renderer, LIMIT, '');
     expect(buttonByVariant(renderer).props.disabled).toBe(true);
 
-    toggle(switchByLabel(renderer, i18n.t('spendAlerts.enable')), false);
+    toggle(switchByLabel(renderer, i18n.t('notifications.channel.spend')), false);
 
     // The rule cards are gone, so no hidden field can gate Save any more.
     expect(byType(renderer, 'FormField')).toHaveLength(0);
@@ -715,7 +724,7 @@ describe('SpendAlertsScreen push agreement', () => {
 
     press(byType(renderer, 'Pressable')[0]);
 
-    expect(router.push).toHaveBeenCalledWith('/(app)/(tabs)/(3_profile)/notifications');
+    expect(router.push).toHaveBeenCalledWith('/(app)/notifications');
   });
 
   it('points the push row at Notifications when the viewer has no device', async () => {

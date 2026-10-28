@@ -8,7 +8,6 @@ import {
   createPurchase,
   creditCatalog,
   flushPromises,
-  kiloPassCatalog,
   mockedAuth,
   mockedIap,
   mockedLifecycle,
@@ -30,7 +29,6 @@ beforeEach(() => {
   mockedIap.initConnection.mockResolvedValue(undefined);
   mockedQuery.catalogs = {
     'credits.getMobileStoreProducts': creditCatalog,
-    'kiloPass.getMobileStoreProducts': kiloPassCatalog,
   };
   mockedQuery.completions = [];
   mockedQuery.invalidateQueries.mockResolvedValue(undefined);
@@ -138,6 +136,7 @@ describe('StorePurchaseRecoveryMount connection lifecycle', () => {
     const purchase = createPurchase({
       productId: 'credits_usd10',
       store: 'google',
+      storeId: 'play',
       purchaseToken: 'play-token',
     });
     mockedIap.getAvailablePurchases.mockImplementation(async () => {

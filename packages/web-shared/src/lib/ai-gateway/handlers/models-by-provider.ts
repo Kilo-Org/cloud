@@ -1,19 +1,19 @@
 import { connection, NextResponse } from 'next/server';
 import { MODELS_BY_PROVIDER_ADMIN_URL, modelsByProvider } from '@kilocode/db/schema';
 import { desc } from 'drizzle-orm';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { getSnapshotModelVariantId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import { getSnapshotModelVariantId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import {
-  getEffectiveModelDecision,
+  isModelRouteAllowed,
   resolveOrganizationMemberModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 
 export async function handleModelsByProviderRequest() {
   await connection();
 
-  const result = await db
+  const result = await readDb
     .select()
     .from(modelsByProvider)
     .orderBy(desc(modelsByProvider.id))
@@ -38,6 +38,7 @@ export async function handleModelsByProviderRequest() {
     const policy = await resolveOrganizationMemberModelPolicy({
       organizationId: auth.organizationId,
       kiloUserId: auth.user.id,
+      fromDb: readDb,
     });
     const providers = [];
     for (const provider of result[0].data.providers) {
@@ -46,11 +47,7 @@ export async function handleModelsByProviderRequest() {
         // Evaluate the variant this provider actually serves (e.g. `x/y:free`),
         // not the collapsed slug, so a provider that only offers the free
         // variant is judged on that variant's routes.
-        const decision = await getEffectiveModelDecision(policy, getSnapshotModelVariantId(model));
-        if (
-          decision.allowed &&
-          (!decision.eligibleProviderRoutes || decision.eligibleProviderRoutes.has(provider.slug))
-        ) {
+        if (await isModelRouteAllowed(policy, getSnapshotModelVariantId(model), provider.slug)) {
           models.push(model);
         }
       }

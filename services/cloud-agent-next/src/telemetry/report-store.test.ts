@@ -5,7 +5,7 @@ import { cloud_agent_session_runs, cloud_agent_sessions } from '@kilocode/db/sch
 import type { CloudAgentRunStateReport } from '@kilocode/worker-utils/cloud-agent-queue-report';
 import { createCloudAgentReportStore } from './report-store.js';
 
-const cloudAgentSessionId = 'agent_12345678-1234-4234-8234-123456789abc';
+const cloudAgentSessionId = 'workspace_12345678-1234-4234-8234-123456789abc';
 const occurredAt = '2026-05-25T12:00:00.000Z';
 const diagnostic = {
   errorMessageRedacted: 'The model provider is unavailable',
@@ -29,6 +29,7 @@ const failedReport = {
   },
 } satisfies CloudAgentRunStateReport;
 const storedFailedRun = {
+  container: null,
   status: 'failed',
   wrapperRunId: 'wr_first',
   queuedAt: occurredAt,
@@ -181,6 +182,68 @@ function makeDb(
 }
 
 describe('cloud agent reporting store', () => {
+  const container = {
+    provider: 'vercel',
+    sandboxId: 'ses-sandbox',
+    allocationId: 'allocation-1',
+    instanceId: 'instance-1',
+    instanceType: 'large',
+    region: 'iad1',
+    snapshotId: 'snapshot-1',
+    runtimeBuildId: 'build-1',
+    startSource: 'snapshot',
+  } as const;
+
+  const storedContainer = { container };
+
+  const containerColumns = { container };
+
+  it('inserts the observed container snapshot alongside run facts', async () => {
+    const fake = makeDb([[{ createdAt: occurredAt }], []]);
+    const store = createCloudAgentReportStore(fake.db as never);
+    await store.saveReport(
+      { ...failedReport, run: { ...failedReport.run, container } },
+      occurredAt
+    );
+    expect(fake.inserts[0]?.values).toMatchObject(containerColumns);
+  });
+
+  it('fills a missing container snapshot on a terminal replay', async () => {
+    const fake = makeDb([[{ createdAt: occurredAt }], [storedFailedRun]]);
+    const store = createCloudAgentReportStore(fake.db as never);
+    await store.saveReport(
+      { ...failedReport, run: { ...failedReport.run, container } },
+      occurredAt
+    );
+    expect(fake.updates[0]?.values).toMatchObject(containerColumns);
+  });
+
+  it.each([
+    undefined,
+    container,
+    { ...container, allocationId: 'allocation-2', instanceId: 'instance-2', region: 'fra1' },
+    { provider: 'cloudflare', sandboxId: 'ses-other', instanceId: 'instance-3' } as const,
+  ])(
+    'retains the established container snapshot across duplicate or late reports: %j',
+    async incoming => {
+      const fake = makeDb([
+        [{ createdAt: occurredAt }],
+        [{ ...storedFailedRun, ...storedContainer }],
+      ]);
+      const store = createCloudAgentReportStore(fake.db as never);
+      await store.saveReport(
+        {
+          ...failedReport,
+          run: { ...failedReport.run, ...(incoming ? { container: incoming } : {}) },
+        },
+        occurredAt
+      );
+      for (const column of Object.keys(containerColumns)) {
+        expect(fake.updates[0]?.values).not.toHaveProperty(column);
+      }
+    }
+  );
+
   it('creates a natural-key session report before setup proceeds', async () => {
     const fake = makeDb();
     const store = createCloudAgentReportStore(fake.db as never);

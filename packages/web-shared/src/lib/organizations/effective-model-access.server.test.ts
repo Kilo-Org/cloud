@@ -1,4 +1,10 @@
-import { describe, expect, it } from '@jest/globals';
+import { afterAll, beforeAll, describe, expect, it } from '@jest/globals';
+import {
+  customLlmDefinition,
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+  publicCustomLlmDefinition,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import type { OrganizationGroupPolicyContext } from './organization-group-policy-context.server';
 import {
   evaluateEffectiveModelAccessPolicy,
@@ -6,6 +12,8 @@ import {
 } from './effective-model-access.server';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@kilocode/web-shared/lib/ai-gateway/latest-model-aliases';
 import { VIRTUAL_PROVIDER } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
+
+const RESTRICTED_PUBLIC_MODEL = 'test/restricted-public';
 
 function context(
   overrides: Partial<OrganizationGroupPolicyContext> = {}
@@ -51,6 +59,14 @@ const currentSnapshotLookup = async (modelId: string) =>
   );
 
 describe('effective organization model access', () => {
+  beforeAll(async () => {
+    await insertCustomLlmForTest(RESTRICTED_PUBLIC_MODEL, publicCustomLlmDefinition(['stepfun']));
+  });
+
+  afterAll(async () => {
+    await deleteCustomLlmForTest(RESTRICTED_PUBLIC_MODEL);
+  });
+
   it('preserves current organization access outside Enterprise', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({
@@ -135,7 +151,93 @@ describe('effective organization model access', () => {
     ).resolves.toEqual({ allowed: false, denialSource: 'organization_model' });
   });
 
-  it.each(['kilo-auto/balanced', 'kilo-internal/private-model', 'kimi-coding/kimi-for-coding'])(
+  describe('custom LLMs', () => {
+    const ORG_ID = '00000000-0000-4000-8000-0000000000a1';
+    const GROUP_ID = '00000000-0000-4000-8000-0000000000b1';
+    const organization = { ...context().organization, id: ORG_ID };
+
+    beforeAll(async () => {
+      await insertCustomLlmForTest(
+        'acme/org-model',
+        customLlmDefinition({ organization_ids: [ORG_ID] })
+      );
+      await insertCustomLlmForTest(
+        'acme/group-model',
+        customLlmDefinition({ organization_ids: [], group_ids: [GROUP_ID] })
+      );
+      await insertCustomLlmForTest(
+        'acme/other-org-model',
+        customLlmDefinition({ organization_ids: ['00000000-0000-4000-8000-0000000000a2'] })
+      );
+      await insertCustomLlmForTest('acme/public-model', publicCustomLlmDefinition(['acme']));
+    });
+
+    afterAll(async () => {
+      await deleteCustomLlmForTest('acme/org-model');
+      await deleteCustomLlmForTest('acme/group-model');
+      await deleteCustomLlmForTest('acme/other-org-model');
+      await deleteCustomLlmForTest('acme/public-model');
+    });
+
+    it('exempts a custom LLM granted to the organization', async () => {
+      const policy = evaluateEffectiveModelAccessPolicy(context({ organization }));
+
+      await expect(
+        getEffectiveModelDecision(policy, 'acme/org-model', async () => new Set())
+      ).resolves.toEqual({ allowed: true });
+    });
+
+    it('exempts a custom LLM granted to one of the member groups', async () => {
+      const policy = evaluateEffectiveModelAccessPolicy(
+        context({ organization, groupIds: [GROUP_ID] })
+      );
+
+      await expect(
+        getEffectiveModelDecision(policy, 'acme/group-model', async () => new Set())
+      ).resolves.toEqual({ allowed: true });
+    });
+
+    it.each(['acme/other-org-model', 'acme/group-model'])(
+      'applies organization policy to %s when it is not granted',
+      async modelId => {
+        const policy = evaluateEffectiveModelAccessPolicy(context({ organization }));
+
+        await expect(
+          getEffectiveModelDecision(policy, modelId, async () => new Set())
+        ).resolves.toEqual({ allowed: false, denialSource: 'organization_model' });
+      }
+    );
+
+    it('routes a public custom LLM only to its allowed inference providers', async () => {
+      const withProviderAllowList = (provider_allow_list: string[]) =>
+        evaluateEffectiveModelAccessPolicy(
+          context({
+            organization: {
+              ...organization,
+              settings: { model_deny_list: [], provider_allow_list },
+            },
+            defaultPolicies: [{ type: 'model_access', data: { mode: 'all' } }],
+          })
+        );
+
+      await expect(
+        getEffectiveModelDecision(
+          withProviderAllowList(['acme', 'openai']),
+          'acme/public-model',
+          async () => new Set()
+        )
+      ).resolves.toEqual({ allowed: true, eligibleProviderRoutes: new Set(['acme']) });
+      await expect(
+        getEffectiveModelDecision(
+          withProviderAllowList(['openai']),
+          'acme/public-model',
+          async () => new Set()
+        )
+      ).resolves.toEqual({ allowed: false, denialSource: 'organization_provider' });
+    });
+  });
+
+  it.each(['kilo-auto/balanced', 'kimi-coding/kimi-for-coding'])(
     'keeps %s exempt from effective Enterprise restrictions',
     async modelId => {
       const policy = evaluateEffectiveModelAccessPolicy(context());
@@ -367,7 +469,7 @@ describe('effective organization model access', () => {
     ).resolves.toEqual({ allowed: true });
   });
 
-  it('hides restricted exclusive models when every restricted provider is disabled', async () => {
+  it('hides restricted public custom LLMs when every restricted provider is disabled', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({
         organization: {
@@ -379,12 +481,12 @@ describe('effective organization model access', () => {
     );
     const catalogLookup = async () => new Set(['fireworks', 'stepfun']);
 
-    expect(
-      await getEffectiveModelDecision(policy, 'stepfun/step-3.7-flash:free', catalogLookup)
-    ).toEqual({ allowed: false, denialSource: 'organization_provider' });
+    expect(await getEffectiveModelDecision(policy, RESTRICTED_PUBLIC_MODEL, catalogLookup)).toEqual(
+      { allowed: false, denialSource: 'organization_provider' }
+    );
   });
 
-  it('keeps restricted exclusive models when a restricted provider remains enabled', async () => {
+  it('keeps restricted public custom LLMs when a restricted provider remains enabled', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({
         organization: {
@@ -396,7 +498,7 @@ describe('effective organization model access', () => {
     );
     const decision = await getEffectiveModelDecision(
       policy,
-      'stepfun/step-3.7-flash:free',
+      RESTRICTED_PUBLIC_MODEL,
       async () => new Set(['fireworks'])
     );
 
@@ -404,7 +506,7 @@ describe('effective organization model access', () => {
     expect([...decision.eligibleProviderRoutes!]).toEqual(['stepfun']);
   });
 
-  it('does not apply exclusive restrictions to the unsuffixed catalog model', async () => {
+  it('does not apply public custom LLM restrictions to other catalog models', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({
         organization: {
@@ -418,12 +520,12 @@ describe('effective organization model access', () => {
 
     const exclusive = await getEffectiveModelDecision(
       policy,
-      'stepfun/step-3.7-flash:free',
+      RESTRICTED_PUBLIC_MODEL,
       catalogLookup
     );
     const catalogModel = await getEffectiveModelDecision(
       policy,
-      'stepfun/step-3.7-flash',
+      'stepfun/step-5-preview',
       catalogLookup
     );
 
@@ -432,7 +534,7 @@ describe('effective organization model access', () => {
     expect([...catalogModel.eligibleProviderRoutes!]).toEqual(['fireworks']);
   });
 
-  it('still evaluates restricted exclusive models missing from the snapshot', async () => {
+  it('still evaluates restricted public custom LLMs missing from the snapshot', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({
         organization: {
@@ -446,7 +548,7 @@ describe('effective organization model access', () => {
 
     const restricted = await getEffectiveModelDecision(
       policy,
-      'stepfun/step-3.7-flash:free',
+      RESTRICTED_PUBLIC_MODEL,
       emptySnapshot
     );
     const unrestricted = await getEffectiveModelDecision(policy, 'unknown/model', emptySnapshot);

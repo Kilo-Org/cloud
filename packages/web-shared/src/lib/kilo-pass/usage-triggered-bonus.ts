@@ -4,7 +4,6 @@ import {
   credit_transactions,
   kilo_pass_issuance_items,
   kilo_pass_issuances,
-  kilo_pass_subscriptions,
   kilocode_users,
 } from '@kilocode/db/schema';
 import { db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
@@ -33,11 +32,10 @@ import {
 } from '@kilocode/web-shared/lib/kilo-pass/state';
 import { getEffectiveKiloPassThreshold } from '@kilocode/web-shared/lib/kilo-pass/threshold';
 import {
-  getInitialWelcomePromoContextForSubscription,
-  getKiloPassWelcomePromoPolicy,
+  getMonthlyWelcomePromoAccountContext,
   type KiloPassWelcomePromoPolicy,
 } from '@kilocode/web-shared/lib/kilo-pass/welcome-promo-context';
-import { and, desc, eq, inArray, like, ne } from 'drizzle-orm';
+import { and, desc, eq, inArray, like } from 'drizzle-orm';
 
 type Db = typeof defaultDb;
 type Tx = Parameters<Db['transaction']>[0] extends (tx: infer T) => unknown ? T : never;
@@ -196,10 +194,9 @@ async function maybeIssueBonusFromUsageThreshold(
   params: {
     subscription: KiloPassSubscriptionState;
     kiloUserId: string;
-    monthlyBaseAmountUsd: number;
   }
 ): Promise<void> {
-  const { subscription, kiloUserId, monthlyBaseAmountUsd } = params;
+  const { subscription, kiloUserId } = params;
 
   const issuance =
     subscription.cadence === KiloPassCadence.Monthly
@@ -218,7 +215,7 @@ async function maybeIssueBonusFromUsageThreshold(
   }
 
   const baseItem = await tx.query.kilo_pass_issuance_items.findFirst({
-    columns: { id: true, credit_transaction_id: true },
+    columns: { id: true, credit_transaction_id: true, amount_usd: true },
     where: and(
       eq(kilo_pass_issuance_items.kilo_pass_issuance_id, issuance.issuanceId),
       eq(kilo_pass_issuance_items.kind, KiloPassIssuanceItemKind.Base)
@@ -228,6 +225,13 @@ async function maybeIssueBonusFromUsageThreshold(
     await clearKiloPassThreshold(tx, { kiloUserId });
     return;
   }
+
+  // The bonus follows the base this issuance credited. A store plan switch can move the
+  // subscription tier above it before the new price is paid.
+  const baseAmountUsd = Math.min(
+    KILO_PASS_TIER_CONFIG[subscription.tier].monthlyPriceUsd,
+    baseItem.amount_usd
+  );
 
   if (subscription.paymentProvider === KiloPassPaymentProvider.GooglePlay) {
     const refund = await tx.query.credit_transactions.findFirst({
@@ -266,35 +270,16 @@ async function maybeIssueBonusFromUsageThreshold(
       };
     }
 
-    const otherSubscription = await tx
-      .select({ id: kilo_pass_subscriptions.id })
-      .from(kilo_pass_subscriptions)
-      .where(
-        and(
-          eq(kilo_pass_subscriptions.kilo_user_id, kiloUserId),
-          ne(kilo_pass_subscriptions.id, subscription.subscriptionId)
-        )
-      )
-      .limit(1);
-
-    const isFirstTimeSubscriberEver = otherSubscription.length === 0;
-    const initialWelcomePromoContext =
-      subscription.paymentProvider === KiloPassPaymentProvider.Stripe
-        ? await getInitialWelcomePromoContextForSubscription(tx, {
-            subscriptionId: subscription.subscriptionId,
-          })
-        : null;
-    const welcomePromoPolicy = getKiloPassWelcomePromoPolicy({
+    const welcomePromoAccountContext = await getMonthlyWelcomePromoAccountContext(tx, {
+      kiloUserId,
+      subscriptionId: subscription.subscriptionId,
       paymentProvider: subscription.paymentProvider,
-      initialIssuanceCreatedAt: initialWelcomePromoContext?.createdAt ?? null,
     });
     const monthlyDecision = computeUsageTriggeredMonthlyBonusDecision({
       tier: subscription.tier,
       startedAtIso: subscription.startedAt,
       currentStreakMonths: subscription.currentStreakMonths,
-      isFirstTimeSubscriberEver,
-      welcomePromoPolicy,
-      welcomePromoEligibilityReason: initialWelcomePromoContext?.eligibilityReason ?? null,
+      ...welcomePromoAccountContext,
       issueMonth: issuance.issueMonth,
     });
 
@@ -310,7 +295,7 @@ async function maybeIssueBonusFromUsageThreshold(
     issuanceId: issuance.issuanceId,
     subscriptionId: subscription.subscriptionId,
     kiloUserId,
-    baseAmountUsd: monthlyBaseAmountUsd,
+    baseAmountUsd,
     bonusPercentApplied: decision.bonusPercentApplied,
     stripeInvoiceId: issuance.stripeInvoiceId,
     description: decision.description,
@@ -352,13 +337,9 @@ export async function maybeIssueKiloPassBonusFromUsageThreshold(params: {
       return;
     }
 
-    const tierConfig = KILO_PASS_TIER_CONFIG[subscriptionState.tier];
-    const monthlyBaseAmountUsd = tierConfig.monthlyPriceUsd;
-
     await maybeIssueBonusFromUsageThreshold(tx, {
       subscription: subscriptionState,
       kiloUserId,
-      monthlyBaseAmountUsd,
     });
   });
 }

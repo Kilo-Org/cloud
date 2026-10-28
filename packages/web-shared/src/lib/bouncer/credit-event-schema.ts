@@ -41,6 +41,7 @@ const chargeBodySchema = z
     flow: z.string().optional(),
     amountCents: z.number().optional(),
     accountCreatedAt: z.string().optional(),
+    accountUsedMicrodollars: z.number().optional(),
     ipCountry: z.string().optional(),
     cardCountry: z.string().optional(),
     disputeId: z.string().optional(),

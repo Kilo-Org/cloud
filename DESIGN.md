@@ -1,12 +1,12 @@
 ---
 version: 0.2.0
 name: Kilo Cloud
-description: Dark-first, utilitarian developer surface for Kilo Code. Near-black layered surfaces and low-alpha white borders carry hierarchy. Kilo yellow-green is both brand and primary action color. Blue is reserved for links and the Cloud status domain.
+description: Dark-first, utilitarian developer surface for Kilo Code. Near-black layered surfaces and low-alpha white borders carry hierarchy. Kilo yellow is both brand and primary action color. Blue is reserved for links and the Cloud status domain.
 color:
   brand:
-    primary: '#F7F586'
-    primaryHover: '#E6E475'
-    primaryRing: '#F7F58659'
+    primary: '#FFDD00'
+    primaryHover: '#EDCD00'
+    primaryRing: '#FFDD0059'
     foreground: '#1F1F1F'
 
   status:
@@ -300,7 +300,7 @@ Never use color alone to communicate state. Pair status color with labels, icons
 
 ### Brand and actions
 
-`brand.primary` (`#F7F586`) is scarce and load-bearing. Reserve it for the logo, one primary CTA per surface, and deliberate brand moments. Use `brand.foreground` (`#1F1F1F`) on primary fills. Hover darkens to `brand.primaryHover` (`#E6E475`). Keyboard focus uses `brand.primaryRing` (`#F7F58659`) or the semantic focus-ring token supplied by the implementation.
+`brand.primary` (`#FFDD00`) is scarce and load-bearing. Reserve it for the logo, one primary CTA per surface, and deliberate brand moments. Use `brand.foreground` (`#1F1F1F`) on primary fills. Hover darkens to `brand.primaryHover` (`#EDCD00`). Keyboard focus uses `brand.primaryRing` (`#FFDD0059`) or the semantic focus-ring token supplied by the implementation.
 
 Secondary actions use neutral surfaces and `foreground.onSecondary`. Ghost actions have no fill at rest and use `surface.hover` on hover. Destructive actions use red only when semantics are destructive; prefer reversible undo flows over confirmation dialogs when possible.
 
@@ -412,7 +412,7 @@ Kilo voice is clear, technical, calm, and direct. Use concrete verbs and specifi
 
 - Use semantic implementation tokens that map to this contract before raw hex values.
 - Build hierarchy with the six-role surface ladder and low-alpha borders.
-- Keep brand yellow-green scarce and reserve it for primary action and brand roles.
+- Keep brand yellow scarce and reserve it for primary action and brand roles.
 - Use fixed domain mappings for statuses.
 - Use syntax and diff colors only on code-oriented surfaces.
 - Use Inter for UI, Roboto Mono for code and aligned technical data.

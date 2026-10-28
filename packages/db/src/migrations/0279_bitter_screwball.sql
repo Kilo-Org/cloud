@@ -1,0 +1,1 @@
+ALTER TABLE "cloud_agent_session_runs" ADD COLUMN "container" jsonb;

@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- spawn-input, navigation, and admission suites share the hook harness. */
 import * as React from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { type KiloSessionId, type ModelSelection } from '@kilocode/cloud-agent-sdk';
 import { CommandDeliveredError } from '@kilocode/cloud-agent-sdk/user-web-connection';
 
@@ -18,7 +18,10 @@ import {
 import { remoteSpawnFilesNotSupportedToast } from '@/lib/remote-spawn-admission';
 import { remoteSpawnRetryableToast } from '@/lib/remote-submit-outcome';
 
-import { useRemoteSpawnDispatch } from './use-remote-spawn-dispatch';
+import {
+  REMOTE_SPAWN_START_DEADLINE_MS,
+  useRemoteSpawnDispatch,
+} from './use-remote-spawn-dispatch';
 
 const spawnMock = vi.hoisted(() =>
   vi.fn(async (): Promise<CreateSessionOutcome> => {
@@ -68,7 +71,7 @@ const expoFileSystemMock = vi.hoisted(() => {
       get exists() {
         return files.has(uri);
       },
-      write(content: string) {
+      writeSync(content: string) {
         files.set(uri, content);
       },
       textSync() {
@@ -122,6 +125,32 @@ const INSTANCE: InstancePickerInstance = {
   gitBranch: null,
 };
 
+/** Stub spawned session id for the watchdog's late-success case. */
+const SESSION_ID = 'ses_12345678901234567890123456' as KiloSessionId;
+
+/**
+ * A spawn promise the test resolves by hand, for the watchdog's
+ * still-in-flight-at-deadline case.
+ */
+function withDeferredOutcome(): {
+  promise: Promise<CreateSessionOutcome>;
+  resolve: (outcome: CreateSessionOutcome) => void;
+} {
+  const settle = { resolve: undefined as ((outcome: CreateSessionOutcome) => void) | undefined };
+  const promise = new Promise<CreateSessionOutcome>(resolve => {
+    settle.resolve = resolve;
+  });
+  return {
+    promise,
+    resolve: outcome => {
+      const resolve = settle.resolve;
+      if (resolve !== undefined) {
+        resolve(outcome);
+      }
+    },
+  };
+}
+
 /** Stub payload for the ready-path-with-payload case. */
 const samplePayload: SharePayload = { text: 'hello', files: [], failedFiles: [] };
 const filesPayload: SharePayload = {
@@ -162,6 +191,12 @@ async function runStartAndWaitForReplace(onStart: () => void) {
  * `use-interaction-handlers.test.ts` so we can exercise
  * `useRemoteSpawnDispatch` without pulling react-native into vitest.
  */
+/**
+ * The render closure of the most recent `runHook` mount, so
+ * `rerenderLastHook` can re-run it for fresh state.
+ */
+let lastRunResult: (() => ReturnType<typeof useRemoteSpawnDispatch>) | null = null;
+
 function runHook(args: {
   organizationId: string | undefined;
   mode?: string;
@@ -170,8 +205,11 @@ function runHook(args: {
   onSpawnAdmitted?: () => void;
   onSpawnFailed?: () => void;
   cloneFromKiloSessionId?: string | null;
+  cloneUpToMessageId?: string | null;
+  forkPrefillText?: string | null;
   onCloneImportFailure?: (key: string) => void;
   onSpawnReady?: () => void;
+  onSpawnSucceeded?: (sessionId: string) => void;
   runOnInstance?: InstancePickerInstance | null;
   setRunOnInstance?: (next: InstancePickerInstance | null) => void;
   refetchInstances?: () => Promise<{ data: { instances: InstancePickerInstance[] } | undefined }>;
@@ -257,8 +295,11 @@ function runHook(args: {
         onSpawnAdmitted: args.onSpawnAdmitted,
         onSpawnFailed: args.onSpawnFailed,
         cloneFromKiloSessionId: args.cloneFromKiloSessionId,
+        cloneUpToMessageId: args.cloneUpToMessageId,
+        forkPrefillText: args.forkPrefillText,
         onCloneImportFailure: args.onCloneImportFailure,
         onSpawnReady: args.onSpawnReady,
+        onSpawnSucceeded: args.onSpawnSucceeded,
       });
     } finally {
       reactInternals.__CLIENT_INTERNALS_DO_NOT_USE_OR_WARN_USERS_THEY_CANNOT_UPGRADE.H =
@@ -266,7 +307,21 @@ function runHook(args: {
     }
   };
 
-  return render();
+  const result = render();
+  lastRunResult = () => render();
+  return result;
+}
+
+/**
+ * Re-renders the most recent `runHook` mount and returns the fresh hook
+ * result, so a test can read state that an async tail updated after its
+ * first render.
+ */
+function rerenderLastHook() {
+  if (lastRunResult === null) {
+    throw new Error('rerenderLastHook called before any runHook');
+  }
+  return lastRunResult();
 }
 
 describe('useRemoteSpawnDispatch spawn input chain', () => {
@@ -484,7 +539,10 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     onStart();
     expect(onSpawnAdmitted).not.toHaveBeenCalled();
     expect(spawnMock).not.toHaveBeenCalled();
-    expect(toastErrorMock).toHaveBeenCalledWith(remoteSpawnFilesNotSupportedToast());
+    expect(rerenderLastHook().remoteSpawnFailure).toEqual({
+      retryable: false,
+      message: remoteSpawnFilesNotSupportedToast(),
+    });
   });
 
   it('admits files when the instance capability is unknown (optimistic default)', async () => {
@@ -582,7 +640,10 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
 
     onStart();
     await vi.waitFor(() => {
-      expect(toastErrorMock).toHaveBeenCalledWith(remoteSpawnFilesNotSupportedToast());
+      expect(rerenderLastHook().remoteSpawnFailure).toEqual({
+        retryable: false,
+        message: remoteSpawnFilesNotSupportedToast(),
+      });
     });
     // The press-time row admitted the file payload because its capability was
     // unknown, so the refreshed row's explicit refusal has to stop the spawn
@@ -654,7 +715,7 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
 
     const calledWith = routerReplace.mock.calls[0]?.[0] as string | undefined;
     expect(typeof calledWith).toBe('string');
-    expect(calledWith).toContain('spawned=1');
+    expect(calledWith).toContain('spawned=1&cloned=1');
     expect(calledWith).toContain('ses_12345678901234567890123456');
     expect(calledWith).not.toContain('shareId=');
     expect(calledWith).not.toContain('autoSend=');
@@ -684,7 +745,7 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
     expect(toastErrorMock).not.toHaveBeenCalled();
   });
 
-  it('a retryable clone error toasts cloneFailedRetry and keeps the form enabled for a retry', async () => {
+  it('a retryable clone error renders the inline retryable failure and keeps the form enabled for a retry', async () => {
     spawnMock.mockResolvedValueOnce({
       status: 'retryable',
       reason: 'transport failure',
@@ -706,12 +767,149 @@ describe('useRemoteSpawnDispatch spawn input chain', () => {
 
     onStart();
     await vi.waitFor(() => {
-      expect(toastErrorMock).toHaveBeenCalledWith(i18n.t('agentChat.session.cloneFailedRetry'));
+      expect(rerenderLastHook().remoteSpawnFailure).toEqual({
+        retryable: true,
+        message: i18n.t('agentChat.session.cloneFailedRetry'),
+      });
     });
     // The clone retry surfaces no inline reason and never resets the selection
     // to Cloud Agent, so Start stays enabled for the retry.
     expect(onCloneImportFailure).not.toHaveBeenCalled();
     expect(setRunOnInstance).not.toHaveBeenCalled();
+  });
+
+  describe('fork cut', () => {
+    const CUT = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
+    const FORK_CAPABLE: InstancePickerInstance = {
+      ...INSTANCE,
+      capabilities: { sessionClone: true, sessionCloneAtMessage: true },
+    };
+    // eslint-disable-next-line promise-function-async, prefer-await-to-then -- tension between lint rules
+    const refetchCapable = () => Promise.resolve({ data: { instances: [FORK_CAPABLE] } });
+
+    it('sends the cut on create_session when the CLI advertises sessionCloneAtMessage', async () => {
+      const { onStart } = runHook({
+        organizationId: 'org-xyz',
+        cloneFromKiloSessionId: 'ses_source',
+        cloneUpToMessageId: CUT,
+        runOnInstance: FORK_CAPABLE,
+        refetchInstances: refetchCapable,
+      });
+
+      expect(await captureSpawnCall(onStart)).toEqual([
+        'conn-abc',
+        { orgId: 'org-xyz', cloneFromKiloSessionId: 'ses_source', cloneUpToMessageId: CUT },
+        { operationKey: expect.any(String) },
+      ]);
+    });
+
+    it.each([
+      { name: 'unknown', capabilities: undefined },
+      { name: 'clone-only', capabilities: { sessionClone: true } },
+      {
+        name: 'explicitly refused',
+        capabilities: { sessionClone: true, sessionCloneAtMessage: false },
+      },
+    ])('fails closed on a $name cut capability without spawning', ({ capabilities }) => {
+      const onCloneImportFailure = vi.fn();
+      const onSpawnAdmitted = vi.fn();
+      const { onStart } = runHook({
+        organizationId: 'org-xyz',
+        cloneFromKiloSessionId: 'ses_source',
+        cloneUpToMessageId: CUT,
+        runOnInstance: { ...INSTANCE, ...(capabilities ? { capabilities } : {}) },
+        onSpawnAdmitted: () => {
+          onSpawnAdmitted();
+        },
+        onCloneImportFailure: key => {
+          onCloneImportFailure(key);
+        },
+      });
+
+      onStart();
+      expect(onCloneImportFailure).toHaveBeenCalledWith('agentChat.newSession.cliCannotFork');
+      expect(onSpawnAdmitted).not.toHaveBeenCalled();
+      expect(spawnMock).not.toHaveBeenCalled();
+    });
+
+    it('fails closed when the refreshed instance no longer advertises the cut capability', async () => {
+      const onCloneImportFailure = vi.fn();
+      const onSpawnFailed = vi.fn();
+      const { onStart } = runHook({
+        organizationId: 'org-xyz',
+        cloneFromKiloSessionId: 'ses_source',
+        cloneUpToMessageId: CUT,
+        runOnInstance: FORK_CAPABLE,
+        onCloneImportFailure: key => {
+          onCloneImportFailure(key);
+        },
+        onSpawnFailed: () => {
+          onSpawnFailed();
+        },
+      });
+
+      onStart();
+      await vi.waitFor(() => {
+        expect(onCloneImportFailure).toHaveBeenCalledWith('agentChat.newSession.cliCannotFork');
+      });
+      expect(onSpawnFailed).toHaveBeenCalledTimes(1);
+      expect(spawnMock).not.toHaveBeenCalled();
+    });
+
+    it('prefills the forked user message in the new composer without auto-send', async () => {
+      const onSpawnSucceeded = vi.fn(() => {
+        expect(routerReplace).not.toHaveBeenCalled();
+      });
+      const { onStart } = runHook({
+        organizationId: 'org-xyz',
+        mode: 'code',
+        cloneFromKiloSessionId: 'ses_source',
+        cloneUpToMessageId: CUT,
+        forkPrefillText: 'Second question',
+        runOnInstance: FORK_CAPABLE,
+        refetchInstances: refetchCapable,
+        getSubmitPayload: () => null,
+        onSpawnSucceeded,
+      });
+
+      await runStartAndWaitForReplace(onStart);
+      expect(onSpawnSucceeded).toHaveBeenCalledExactlyOnceWith('ses_12345678901234567890123456');
+
+      const calledWith = routerReplace.mock.calls[0]?.[0] as string;
+      expect(calledWith).toContain('spawned=1');
+      expect(calledWith).toContain('shareId=share-id-fixed');
+      expect(calledWith).not.toContain('autoSend=');
+      expect(peekSharePayload('share-id-fixed')).toEqual({
+        text: 'Second question',
+        files: [],
+        failedFiles: [],
+      });
+    });
+
+    it('maps a delivered cut-not-found to the retryable not-saved-yet reason', async () => {
+      spawnMock.mockResolvedValueOnce({
+        status: 'nonRetryable',
+        reason: 'cloud session cut not found',
+        cause: new CommandDeliveredError('cloud session cut not found'),
+      });
+      const onCloneImportFailure = vi.fn();
+      const { onStart } = runHook({
+        organizationId: 'org-xyz',
+        cloneFromKiloSessionId: 'ses_source',
+        cloneUpToMessageId: CUT,
+        runOnInstance: FORK_CAPABLE,
+        refetchInstances: refetchCapable,
+        onCloneImportFailure: key => {
+          onCloneImportFailure(key);
+        },
+      });
+
+      onStart();
+      await vi.waitFor(() => {
+        expect(onCloneImportFailure).toHaveBeenCalledWith('agentChat.newSession.forkCutNotSynced');
+      });
+      expect(toastErrorMock).not.toHaveBeenCalled();
+    });
   });
 });
 
@@ -821,7 +1019,7 @@ describe('useRemoteSpawnDispatch live-instance remap', () => {
     expect(setRunOnInstanceMock).not.toHaveBeenCalledWith(null);
   });
 
-  it('toasts the retryable copy and calls onSpawnFailed when no live instance resolves', async () => {
+  it('renders the retryable failure and calls onSpawnFailed when no live instance resolves', async () => {
     const onSpawnFailedMock = vi.fn();
     const setRunOnInstanceMock = vi.fn();
     const { onStart } = runHook({
@@ -840,8 +1038,113 @@ describe('useRemoteSpawnDispatch live-instance remap', () => {
     await vi.waitFor(() => {
       expect(onSpawnFailedMock).toHaveBeenCalledTimes(1);
     });
-    expect(toastErrorMock).toHaveBeenCalledWith(remoteSpawnRetryableToast());
+    expect(rerenderLastHook().remoteSpawnFailure).toEqual({
+      retryable: true,
+      message: remoteSpawnRetryableToast(),
+    });
     expect(spawnMock).not.toHaveBeenCalled();
     expect(setRunOnInstanceMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('useRemoteSpawnDispatch stall watchdog', () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+    spawnMock.mockClear();
+    useRemoteInstanceSpawnMock.mockClear();
+    routerReplace.mockClear();
+    toastErrorMock.mockClear();
+    __resetSharePayloadStoreForTests();
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('releases the busy button and renders the retryable failure when the spawn outlives the budget', async () => {
+    const deferred = withDeferredOutcome();
+    // eslint-disable-next-line promise-function-async -- passthrough of an existing deferred promise, not a new async procedure
+    spawnMock.mockImplementationOnce(() => deferred.promise);
+    const { onStart } = runHook({ organizationId: 'org-xyz' });
+
+    onStart();
+    expect(rerenderLastHook().isSpawningRemote).toBe(true);
+    await vi.advanceTimersByTimeAsync(REMOTE_SPAWN_START_DEADLINE_MS);
+    const fresh = rerenderLastHook();
+    expect(fresh.isSpawningRemote).toBe(false);
+    expect(fresh.remoteSpawnFailure).toEqual({
+      retryable: true,
+      message: remoteSpawnRetryableToast(),
+    });
+
+    // A late success still navigates.
+    deferred.resolve({ status: 'ready', sessionID: SESSION_ID });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(routerReplace).toHaveBeenCalledTimes(1);
+  });
+
+  it('a settled failure releases the busy button before the watchdog fires', async () => {
+    spawnMock.mockResolvedValueOnce({
+      status: 'retryable',
+      reason: 'transport failure',
+      cause: new Error('socket gone'),
+    });
+    const { onStart } = runHook({ organizationId: 'org-xyz' });
+
+    onStart();
+    expect(rerenderLastHook().isSpawningRemote).toBe(true);
+    await vi.advanceTimersByTimeAsync(0);
+    const fresh = rerenderLastHook();
+    expect(fresh.isSpawningRemote).toBe(false);
+    expect(fresh.remoteSpawnFailure).toEqual({
+      retryable: true,
+      message: remoteSpawnRetryableToast(),
+    });
+    // The deadline never fires: no double report.
+    await vi.advanceTimersByTimeAsync(REMOTE_SPAWN_START_DEADLINE_MS + 1);
+    expect(rerenderLastHook().remoteSpawnFailure).toEqual({
+      retryable: true,
+      message: remoteSpawnRetryableToast(),
+    });
+  });
+
+  it('a stalled attempt late tail cannot disarm a retry watchdog or busy window', async () => {
+    const stalled = withDeferredOutcome();
+    // eslint-disable-next-line promise-function-async -- passthrough of an existing deferred promise, not a new async procedure
+    spawnMock.mockImplementationOnce(() => stalled.promise);
+    const { onStart } = runHook({ organizationId: 'org-xyz' });
+
+    onStart();
+    await vi.advanceTimersByTimeAsync(REMOTE_SPAWN_START_DEADLINE_MS);
+    expect(rerenderLastHook().isSpawningRemote).toBe(false);
+
+    // Retry while the first attempt is still hanging: the new attempt arms
+    // its own watchdog.
+    const retried = withDeferredOutcome();
+    // eslint-disable-next-line promise-function-async -- passthrough of an existing deferred promise, not a new async procedure
+    spawnMock.mockImplementationOnce(() => retried.promise);
+    onStart();
+    expect(rerenderLastHook().isSpawningRemote).toBe(true);
+
+    // The first attempt finally fails. Its tail must not reset the busy
+    // window or publish its failure over the retry's in-flight state.
+    stalled.resolve({
+      status: 'retryable',
+      reason: 'transport failure',
+      cause: new Error('socket gone'),
+    });
+    await vi.advanceTimersByTimeAsync(0);
+    expect(rerenderLastHook().isSpawningRemote).toBe(true);
+    expect(rerenderLastHook().remoteSpawnFailure).toBeNull();
+
+    // The retried attempt still holds its watchdog: past the budget it
+    // releases the button (no indefinite busy).
+    await vi.advanceTimersByTimeAsync(REMOTE_SPAWN_START_DEADLINE_MS);
+    const fresh = rerenderLastHook();
+    expect(fresh.isSpawningRemote).toBe(false);
+    expect(fresh.remoteSpawnFailure).toEqual({
+      retryable: true,
+      message: remoteSpawnRetryableToast(),
+    });
   });
 });

@@ -16,6 +16,8 @@ export type ControlPlaneTimers = {
     acceptedBackstopMs: number;
     sandboxRpcDeadlineMs: number;
     transportRecoveryMs: number;
+    /** Total bound on serving one scope handle through a surviving member. */
+    scopeResolutionMs: number;
   };
   sandbox: {
     providerCreateMs: number;
@@ -26,10 +28,13 @@ export type ControlPlaneTimers = {
     reconnectMs: number;
     routePreparationMs: number;
     idleMs: number;
+    unattendedIdleMs: number;
     sessionNotifyDeadlineMs: number;
     providerLeaseMs: number;
     credentialGrantMs: number;
     credentialGrantReissueBelowMs: number;
+    /** Bounds one member's backing renewal during scope-handle resolution. */
+    scopeBackingTokenMs: number;
     providerStopAttemptMs: number;
     providerStopLadderMs: readonly number[];
   };
@@ -37,7 +42,12 @@ export type ControlPlaneTimers = {
     heartbeatIntervalMs: number;
     heartbeatAckTimeoutMs: number;
     heartbeatNegotiationMs: number;
+    handshakeMs: number;
     cloneMs: number;
+    /** Budget to adopt a repository snapshot before falling back to a clone. */
+    restoreMs: number;
+    /** Backstop over the Sandbox DO's own capture timeout. */
+    captureMs: number;
     kiloRuntimeStartMs: number;
     kiloSessionMs: number;
     sseSilenceMs: number;
@@ -46,6 +56,11 @@ export type ControlPlaneTimers = {
     sseReconnectWindowMs: number;
     kiloRestartLimit: number;
     kiloRestartWindowMs: number;
+    /**
+     * Longest a silent Kilo is left running, instead of a hang restart, while the workload
+     * reclaims at its memory cap. The no-progress clock is paused for that time.
+     */
+    kiloMemoryHoldMs: number;
     noProgressMs: number;
     turnHardCapMs: number;
     reconnectBackoffMinMs: number;
@@ -57,29 +72,62 @@ export type ControlPlaneTimers = {
   };
 };
 
+// External-work bounds for one preparation attempt. They stay real (never
+// scaled) because they bound provider and container work.
+const PROVIDER_CREATE_MS = 2 * MINUTE_MS;
+const PROVIDER_CREATE_RETRY_MS = 10_000;
+// Environment snapshot starts use `DEADLINE_MS.repositoryStartup`; this module
+// also ships in the wrapper without the worker sources.
+const PREPARATION_CREATE_MS = 5 * MINUTE_MS;
+const WRAPPER_FIRST_CONNECT_MS = 5 * MINUTE_MS;
+const WRAPPER_HELLO_MS = 30_000;
+const RESTORE_MS = 2 * MINUTE_MS;
+const CLONE_MS = 6 * MINUTE_MS;
+const CAPTURE_MS = 5 * MINUTE_MS + 10_000;
+const KILO_RUNTIME_START_MS = 2 * MINUTE_MS;
+const KILO_SESSION_MS = 2 * MINUTE_MS;
+
+// Fixed preparation work includes one create retry and one retry each for
+// runtime start and session import. Setup retains its per-command bounds;
+// the attempt deadline is its aggregate stop.
+const ROUTE_PREPARATION_MS =
+  PREPARATION_CREATE_MS +
+  PROVIDER_CREATE_RETRY_MS +
+  PREPARATION_CREATE_MS +
+  WRAPPER_FIRST_CONNECT_MS +
+  WRAPPER_HELLO_MS +
+  RESTORE_MS +
+  CLONE_MS +
+  2 * KILO_RUNTIME_START_MS +
+  2 * KILO_SESSION_MS;
+
 // The divisor shortens only internal deadlines whose partner also scales, so
 // their orderings hold (the 90-s reconnect window stays longer than the 30-s
 // max backoff). Timers that bound external work stay real: provider create and
-// container boot, the 12-min prep attempt that must outlast clone+runtime+
-// session, the pause before a failed create is retried, clone/runtime/session
-// bounds, SSE silence (Kilo heartbeats every 10-15 s), health request, the
-// real-SSE reconnect window, credential grants and the provider stop ladder.
+// container boot, the preparation attempt, the pause before a failed create is retried,
+// restore/clone/save/runtime/session bounds, SSE silence (Kilo heartbeats every
+// 10-15 s), health request, the real-SSE reconnect window, credential grants
+// and the provider stop ladder.
 function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
   const ms = (value: number): number => Math.max(1, Math.round(value / divisor));
   const sandbox = {
-    providerCreateMs: 2 * MINUTE_MS,
-    providerCreateRetryMs: 10_000,
-    wrapperFirstConnectMs: 5 * MINUTE_MS,
-    wrapperHelloMs: 30_000,
+    providerCreateMs: PROVIDER_CREATE_MS,
+    providerCreateRetryMs: PROVIDER_CREATE_RETRY_MS,
+    wrapperFirstConnectMs: WRAPPER_FIRST_CONNECT_MS,
+    wrapperHelloMs: WRAPPER_HELLO_MS,
     heartbeatMs: ms(45_000),
     reconnectMs: ms(90_000),
-    routePreparationMs: 12 * MINUTE_MS,
+    routePreparationMs: ROUTE_PREPARATION_MS,
     idleMs: ms(10 * MINUTE_MS),
+    unattendedIdleMs: ms(MINUTE_MS),
     // Bounds one Sandbox -> Session notification; real (not scaled) like the
     // other bounds on external work.
     sessionNotifyDeadlineMs: 2_000,
     credentialGrantMs: 4 * HOUR_MS,
     credentialGrantReissueBelowMs: HOUR_MS,
+    // Bounds external token renewal, so it stays real and short enough for the
+    // Session DO's total scope-resolution bound.
+    scopeBackingTokenMs: 3_000,
     providerStopAttemptMs: 30_000,
     providerStopLadderMs: [5_000, 10_000, 10_000, 10_000, 10_000],
   };
@@ -87,16 +135,22 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
     heartbeatIntervalMs: ms(5_000),
     heartbeatAckTimeoutMs: ms(15_000),
     heartbeatNegotiationMs: ms(1_000),
-    cloneMs: 6 * MINUTE_MS,
-    kiloRuntimeStartMs: 2 * MINUTE_MS,
-    kiloSessionMs: 2 * MINUTE_MS,
+    // Scales with the reconnect window it must stay inside.
+    handshakeMs: ms(30_000),
+    cloneMs: CLONE_MS,
+    restoreMs: RESTORE_MS,
+    captureMs: CAPTURE_MS,
+    kiloRuntimeStartMs: KILO_RUNTIME_START_MS,
+    kiloSessionMs: KILO_SESSION_MS,
     sseSilenceMs: 30_000,
     healthRequestMs: 5_000,
     sseReconnectLimit: 6,
     sseReconnectWindowMs: 2 * MINUTE_MS,
     kiloRestartLimit: 3,
     kiloRestartWindowMs: ms(10 * MINUTE_MS),
-    noProgressMs: ms(7 * MINUTE_MS),
+    // Allow transient reclaim to clear while bounding a sustained memory stall.
+    kiloMemoryHoldMs: ms(2 * MINUTE_MS),
+    noProgressMs: ms(20 * MINUTE_MS),
     turnHardCapMs: ms(120 * MINUTE_MS),
     reconnectBackoffMinMs: ms(1_000),
     reconnectBackoffMaxMs: ms(30_000),
@@ -113,6 +167,10 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
   return {
     session: {
       sandboxRpcDeadlineMs: 2_000,
+      // Bounds external work (member token renewal), so it stays real. Well
+      // under the facade's retry budget: a handle that cannot be served in this
+      // window fails as `unavailable` rather than hanging the proxy response.
+      scopeResolutionMs: 6_000,
       transportRecoveryMs: ms(15_000),
       queuedBackstopMs:
         sandbox.reconnectMs + sandbox.routePreparationMs + QUEUED_BACKSTOP_MARGIN_MS,
@@ -128,6 +186,23 @@ function buildControlPlaneTimers(divisor: number): ControlPlaneTimers {
 }
 
 export const CONTROL_PLANE_TIMERS: ControlPlaneTimers = buildControlPlaneTimers(1);
+
+export type SandboxIdlePolicy = 'interactive' | 'unattended';
+
+/**
+ * The idle policy for a sandbox from its routes' session origins. A sandbox
+ * without routes keeps the interactive window so a released route (session
+ * deletion, runtime-authorization refresh) does not stop a sandbox the next
+ * prepare could reuse.
+ */
+export function sandboxIdlePolicyForOrigins(origins: readonly unknown[]): SandboxIdlePolicy {
+  return origins.length === 0 ||
+    origins.some(
+      origin => origin === 'cloud-agent-web' || origin === 'desktop' || origin === 'agent-manager'
+    )
+    ? 'interactive'
+    : 'unattended';
+}
 
 // Positive integer divisor that shortens internal deadline timers for local E2E. Pass `env` on the Worker/DO side or `process.env` in the wrapper. Development-only by absence from production config; do not add it to wrangler.jsonc.
 export function resolveControlPlaneTimers(

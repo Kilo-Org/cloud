@@ -1,4 +1,82 @@
 import { z } from 'zod';
+import type { StoredSession } from './types';
+
+export function getWorkspaceControlSession(
+  worktreeId: string | null,
+  chats: readonly StoredSession[],
+  deletingSessionIds: readonly string[]
+): StoredSession | null {
+  return (
+    chats.find(
+      chat =>
+        worktreeId !== null &&
+        chat.worktreeId === worktreeId &&
+        Boolean(chat.cloudAgentSessionId) &&
+        !deletingSessionIds.includes(chat.sessionId)
+    ) ?? null
+  );
+}
+
+/** The chats of a worktree share its branch, so any chat that stored it names it. */
+export function getWorktreeBranch(
+  worktreeId: string | null,
+  chats: readonly StoredSession[]
+): string | null {
+  if (worktreeId === null) return null;
+  return chats.find(chat => chat.worktreeId === worktreeId && chat.branch)?.branch ?? null;
+}
+
+/**
+ * The requested chat's stored row, which drives the worktree controls while its
+ * session loads, so the controls stay in place across chat switches.
+ */
+export function getLoadingChatControlSession(
+  sessionId: string,
+  chats: readonly StoredSession[],
+  deletingSessionIds: readonly string[]
+): StoredSession | null {
+  return (
+    chats.find(
+      chat =>
+        chat.sessionId === sessionId &&
+        Boolean(chat.cloudAgentSessionId) &&
+        !deletingSessionIds.includes(chat.sessionId)
+    ) ?? null
+  );
+}
+
+/**
+ * The chat whose cloud session drives the worktree controls. A loaded chat
+ * drives them itself (null). While the requested chat loads, its stored row
+ * does. A chat created here has no cloud session yet, so its source chat, or
+ * else the worktree's control chat, stands in until it loads.
+ */
+export function resolveWorkspaceControlSession({
+  requestedSessionId,
+  requestedSessionLoaded,
+  local,
+  worktreeId,
+  chats,
+  deletingSessionIds,
+}: {
+  requestedSessionId: string | null;
+  requestedSessionLoaded: boolean;
+  /** Set when the requested chat was created here. */
+  local: { sourceSessionId: string | null } | null;
+  worktreeId: string | null;
+  chats: readonly StoredSession[];
+  deletingSessionIds: readonly string[];
+}): StoredSession | null {
+  if (!requestedSessionId) return getWorkspaceControlSession(worktreeId, chats, deletingSessionIds);
+  if (requestedSessionLoaded) return null;
+  const stored = getLoadingChatControlSession(requestedSessionId, chats, deletingSessionIds);
+  if (stored || !local) return stored;
+  return (
+    (local.sourceSessionId &&
+      getLoadingChatControlSession(local.sourceSessionId, chats, deletingSessionIds)) ||
+    getWorkspaceControlSession(worktreeId, chats, deletingSessionIds)
+  );
+}
 
 const CLOSED_WORKTREE_CHAT_TABS_STORAGE_KEY_PREFIX = 'cloud-agent:closed-worktree-chat-tabs';
 

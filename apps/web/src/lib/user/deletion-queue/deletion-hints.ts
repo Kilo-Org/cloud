@@ -146,6 +146,46 @@ const KNOWN_HINTS: Record<string, DeletionAttentionHint> = {
     title: 'Substack credential expired',
     action: 'Replace the Substack session credential, then Retry.',
   },
+  substack_forbidden: {
+    title: 'Substack denied access (HTTP 403)',
+    action:
+      'This is a publication permission or access problem, not proof the session expired. Confirm the service account can access the publication, then Retry.',
+  },
+  substack_totp_invalid: {
+    title: 'Stored Substack TOTP secret is invalid',
+    action:
+      'Store a new Substack credential with a valid base32 TOTP secret, or leave TOTP blank for cookie-only, then Retry.',
+  },
+  substack_reauth_required: {
+    title: 'Substack requires reauthentication',
+    action:
+      'Configure the service account TOTP secret, or sign in manually and store a fresh cookie, then Retry. If reauthentication still fails, confirm the service account settings.',
+  },
+  substack_reauth_method_unsupported: {
+    title: 'Substack did not offer TOTP reauthentication',
+    action:
+      'Substack returned an unsupported reauthentication method. Sign in to the service account manually, store a fresh cookie, then Retry.',
+  },
+  substack_reauth_rejected: {
+    title: 'Substack rejected the reauthentication code',
+    action:
+      'Check the service account TOTP secret and clock, store a corrected credential, then Retry.',
+  },
+  substack_reauth_incomplete: {
+    title: 'Substack did not confirm reauthentication',
+    action:
+      'Retry. If the service account requires manual verification, sign in manually, store a fresh cookie, then Retry.',
+  },
+  substack_cookie_persist_failed: {
+    title: 'Refreshed Substack cookie was not saved',
+    action:
+      'Test the credential again to persist the refreshed cookie, or store a fresh cookie, then Retry.',
+  },
+  substack_credential_changed: {
+    title: 'Substack credential changed during test',
+    action:
+      'Another admin replaced the credential while it was tested. Test the current credential again before Retry.',
+  },
   posthog_checkpoint_invalid: {
     title: 'PostHog deletion checkpoint is invalid',
     action:
@@ -345,24 +385,6 @@ const KNOWN_HINTS: Record<string, DeletionAttentionHint> = {
   usage_prefix_progress_invalid: {
     title: 'Usage prompt cleanup progress is invalid',
     action: 'Inspect the task progress and repair it before retrying the cleanup.',
-  },
-  csa_unauthorized: {
-    title: 'CSA rejected the support-DB scrub',
-    action:
-      'Confirm SUPPORT_API_SECRET matches CSA KILO_SUPPORT_API_SECRET and CSA_VERCEL_PROTECTION_BYPASS matches CSA Vercel automation bypass, then Retry.',
-  },
-  csa_blocked_email: {
-    title: 'CSA refused this email as a relay or internal target',
-    action:
-      'This should have been blocked at intake. Confirm the target email, then cancel or Retry.',
-  },
-  csa_response_unparsed: {
-    title: 'CSA scrub response could not be parsed',
-    action: 'Retry. If it keeps failing, check CSA logs for this request id.',
-  },
-  csa_base_url_missing: {
-    title: 'CSA base URL is not configured',
-    action: 'Set CSA_APP_BASE_URL, then Retry.',
   },
 };
 

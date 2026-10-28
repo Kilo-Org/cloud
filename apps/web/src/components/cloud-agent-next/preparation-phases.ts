@@ -10,6 +10,22 @@ export function humanizePhaseLabel(step: Pick<PreparationStepSnapshot, 'label'>)
     .replace(/^./, firstCharacter => firstCharacter.toUpperCase());
 }
 
+export function commandsForPhase(
+  phase: PreparationStepSnapshot,
+  steps: readonly PreparationStepSnapshot[]
+): PreparationStepSnapshot[] {
+  if (phase.key !== 'setup_commands') return [];
+  const firstSetupPhase = steps.find(
+    step => step.kind === 'phase' && step.key === 'setup_commands'
+  );
+  return steps.filter(
+    step =>
+      step.kind === 'setup_command' &&
+      (step.parentStepId === phase.id ||
+        (step.parentStepId === undefined && firstSetupPhase?.id === phase.id))
+  );
+}
+
 /**
  * A phase step's display status. The setup_commands phase owns the command
  * steps, so its status aggregates theirs instead of trusting its own — a
@@ -28,12 +44,13 @@ export function phaseStatus(
   return step.status;
 }
 
-/** Compact "12s" / "2m 5s" duration for a finished attempt, or undefined. */
 export function formatAttemptDuration(
-  attempt: Pick<PreparationAttempt, 'startedAt' | 'completedAt'>
+  attempt: Pick<PreparationAttempt, 'startedAt' | 'completedAt'>,
+  now?: number
 ): string | undefined {
-  if (attempt.completedAt === undefined) return undefined;
-  const seconds = Math.max(0, Math.round((attempt.completedAt - attempt.startedAt) / 1000));
+  const end = attempt.completedAt ?? now;
+  if (end === undefined) return undefined;
+  const seconds = Math.max(0, Math.round((end - attempt.startedAt) / 1000));
   if (seconds < 60) return `${seconds}s`;
   return `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
 }

@@ -18,12 +18,20 @@ import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Text } from '@/components/ui/text';
 import { VoiceInputButton } from '@/components/voice-input-control';
 import { useMotionPolicy } from '@/lib/a11y/motion';
-import { COMPOSER_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
+import {
+  COMPOSER_CONTROL_HIT_SLOP_DP,
+  COMPOSER_VOICE_SEND_GAP_CLASS,
+  composerFacingHitSlop,
+  VOICE_INPUT_LG_HIT_SLOP_DP,
+} from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 import { type VoiceInputStatus } from '@/lib/voice-input/voice-input-state';
 
-const PAPERCLIP_HIT_SLOP = { top: 8, bottom: 8, left: 8, right: 8 } as const;
+// The paperclip's 28pt frame (h-8 at NativeWind's 14pt rem) carries 10pt of
+// hit slop per side, so its effective target is 28 + 20 = 48dp — Android's
+// minimum (WCAG 2.5.8 AA) — without growing the visual or the row.
+const PAPERCLIP_HIT_SLOP = { top: 10, bottom: 10, left: 10, right: 10 } as const;
 /** Minimum pressable size: 44pt on iOS, 48dp on Android (WCAG 2.5.8 AA). */
 const CONTROL_HIT_TARGET = Platform.OS === 'android' ? 48 : 44;
 /**
@@ -42,7 +50,9 @@ const CONTROL_HIT_TARGET = Platform.OS === 'android' ? 48 : 44;
  * class — the paperclip only ever meets the input, whose own start margin is
  * the gap after it — so the input and each trailing control sit one gap apart
  * and a trailing control added without it cannot sit flush against its
- * neighbour again.
+ * neighbour again. The one exception is the send/stop control after the voice
+ * toggle: that pair sits `COMPOSER_VOICE_SEND_GAP_CLASS` apart and zeroes the
+ * slop on the sides they face each other on.
  */
 export const COMPOSER_CONTROL_GAP_CLASS = 'ms-3';
 
@@ -94,7 +104,6 @@ type ChatComposerInputRowProps = {
   sendDisabledReason?: string | null;
   textInputStyle: TextStyle;
   voiceDisabled: boolean;
-  voiceInputAvailable: boolean;
   voiceInputStatus: VoiceInputStatus;
 };
 
@@ -135,7 +144,6 @@ export function ChatComposerInputRow({
   sendDisabledReason,
   textInputStyle,
   voiceDisabled,
-  voiceInputAvailable,
   voiceInputStatus,
 }: Readonly<ChatComposerInputRowProps>) {
   const colors = useThemeColors();
@@ -157,6 +165,10 @@ export function ChatComposerInputRow({
     includeFontPadding: false,
     lineHeight: textInputStyle.lineHeight,
   };
+  // The microphone is always present, so the send control keeps the facing gap
+  // and the slop it shares with it.
+  const sendGapClass = COMPOSER_VOICE_SEND_GAP_CLASS;
+  const sendHitSlop = composerFacingHitSlop(COMPOSER_CONTROL_HIT_SLOP_DP, 'start');
 
   return (
     <View className="p-2.5 px-3">
@@ -259,18 +271,20 @@ export function ChatComposerInputRow({
           </View>
         ) : null}
 
-        {voiceInputAvailable ? (
-          <View className={COMPOSER_CONTROL_GAP_CLASS}>
-            <VoiceInputButton
-              disabled={voiceDisabled}
-              size="lg"
-              status={voiceInputStatus}
-              onPress={onToggleVoice}
-            />
-          </View>
-        ) : null}
-
+        {/* The toggle stays in the row whether or not the OS recognizer answers
+            available: a tap re-probes it and either starts a session or says why
+            it cannot, so the control never disappears without a word. */}
         <View className={COMPOSER_CONTROL_GAP_CLASS}>
+          <VoiceInputButton
+            disabled={voiceDisabled}
+            hitSlop={composerFacingHitSlop(VOICE_INPUT_LG_HIT_SLOP_DP, 'end')}
+            size="lg"
+            status={voiceInputStatus}
+            onPress={onToggleVoice}
+          />
+        </View>
+
+        <View className={sendGapClass}>
           {isStreaming && !hasSendableContent && !isSending ? (
             <Animated.View
               key="stop"
@@ -280,7 +294,7 @@ export function ChatComposerInputRow({
               <Pressable
                 onPress={onStop}
                 disabled={disabled}
-                hitSlop={COMPOSER_CONTROL_HIT_SLOP_DP}
+                hitSlop={sendHitSlop}
                 accessibilityRole="button"
                 accessibilityLabel={t('agentChat.composer.stopGenerating')}
                 accessibilityState={{ disabled }}
@@ -302,7 +316,7 @@ export function ChatComposerInputRow({
               <Pressable
                 onPress={onSubmit}
                 disabled={!canSend}
-                hitSlop={COMPOSER_CONTROL_HIT_SLOP_DP}
+                hitSlop={sendHitSlop}
                 accessibilityRole="button"
                 accessibilityLabel={t('common.sendMessage')}
                 accessibilityHint={sendDisabledReason ?? undefined}

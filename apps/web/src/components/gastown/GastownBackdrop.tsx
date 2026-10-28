@@ -17,7 +17,7 @@ export function GastownBackdrop({ children, className, contentClassName }: Gasto
     >
       <div
         aria-hidden
-        className="pointer-events-none absolute inset-0 opacity-90 [background:radial-gradient(circle_at_18%_0%,rgba(237,255,0,0.14),transparent_48%),radial-gradient(circle_at_84%_22%,rgba(56,189,248,0.12),transparent_44%),radial-gradient(circle_at_60%_120%,rgba(34,197,94,0.10),transparent_46%),linear-gradient(to_bottom,rgba(255,255,255,0.06),transparent_35%)]"
+        className="pointer-events-none absolute inset-0 opacity-90 [background:radial-gradient(circle_at_18%_0%,color-mix(in_srgb,var(--primary)_14%,transparent),transparent_48%),radial-gradient(circle_at_84%_22%,rgba(56,189,248,0.12),transparent_44%),radial-gradient(circle_at_60%_120%,rgba(34,197,94,0.10),transparent_46%),linear-gradient(to_bottom,rgba(255,255,255,0.06),transparent_35%)]"
       />
       <div
         aria-hidden

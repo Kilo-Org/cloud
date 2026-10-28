@@ -13,7 +13,7 @@ type ExitRemoteSessionFromListInput = {
 
 /**
  * Exit a running session from the Active now list. Keeps history and never
- * opens the session. The row passes `showRemoteSessionExitConfirmation` as
+ * opens the session. The row passes the exit confirm's `confirmExit` as
  * `confirm`; this helper wraps `confirmRemoteSessionExit` once and owns the
  * send/refresh/toast lifecycle. `inFlight` is a shared ref flag that blocks
  * a second exit while one is in flight.

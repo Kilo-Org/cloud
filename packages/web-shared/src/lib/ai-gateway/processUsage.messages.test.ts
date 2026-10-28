@@ -1,4 +1,5 @@
-import { test, describe, expect } from '@jest/globals';
+import { test, describe, expect, afterEach } from '@jest/globals';
+import { captureException } from '@sentry/nextjs';
 import {
   parseMessagesMicrodollarUsageFromStream,
   parseMessagesMicrodollarUsageFromString,
@@ -9,6 +10,11 @@ import { join } from 'node:path';
 import { createReadStream } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { Readable } from 'node:stream';
+
+jest.mock('@sentry/nextjs', () => ({
+  ...jest.requireActual<object>('@sentry/nextjs'),
+  captureException: jest.fn(),
+}));
 
 const sampleDir = join(process.cwd(), 'src/tests/sample');
 
@@ -51,7 +57,7 @@ describe('processMessagesApiUsage', () => {
       cost_details: { upstream_inference_cost: 0.7 },
     };
 
-    const result = processMessagesApiUsage(usage, null, coreProps);
+    const result = processMessagesApiUsage(usage, null, coreProps, 'openrouter');
 
     expect(result.cost_mUsd).toBe(1000);
     expect(result.is_byok).toBe(false);
@@ -74,7 +80,7 @@ describe('processMessagesApiUsage', () => {
       cost_details: { upstream_inference_cost: 0.02 },
     };
 
-    const result = processMessagesApiUsage(usage, null, coreProps);
+    const result = processMessagesApiUsage(usage, null, coreProps, 'openrouter');
 
     expect(result.cost_mUsd).toBe(20000);
     expect(result.is_byok).toBe(true);
@@ -93,7 +99,7 @@ describe('processMessagesApiUsage', () => {
       gateway: { routing: { finalProvider: 'anthropic' }, cost: '0', marketCost: '0.000375' },
     };
 
-    const result = processMessagesApiUsage(usage, providerMetadata, coreProps);
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'vercel');
 
     expect(result.cost_mUsd).toBe(375); // toMicrodollars(0.000375)
     expect(result.is_byok).toBeNull();
@@ -128,7 +134,7 @@ describe('processMessagesApiUsage', () => {
       },
     };
 
-    const result = processMessagesApiUsage(usage, providerMetadata, coreProps);
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'vercel');
 
     expect(result.is_byok).toBe(true);
     expect(result.cost_mUsd).toBe(402);
@@ -159,7 +165,7 @@ describe('processMessagesApiUsage', () => {
       },
     };
 
-    const result = processMessagesApiUsage(usage, providerMetadata, coreProps);
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'vercel');
 
     expect(result.is_byok).toBe(false);
   });
@@ -192,13 +198,79 @@ describe('processMessagesApiUsage', () => {
       },
     };
 
-    const result = processMessagesApiUsage(usage, providerMetadata, coreProps);
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'vercel');
 
     expect(result.is_byok).toBe(false);
   });
 
+  test('prefers OpenRouter zero cost over Vercel metadata and adds cache tokens to input', () => {
+    const usage = {
+      input_tokens: 20,
+      output_tokens: 4,
+      cache_read_input_tokens: 7,
+      cache_creation_input_tokens: 3,
+      server_tool_use: null,
+      output_tokens_details: null,
+      cost: 0,
+      is_byok: false,
+    };
+    const providerMetadata = {
+      gateway: { routing: { finalProvider: 'anthropic' }, marketCost: '0.5' },
+    };
+
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'openrouter');
+
+    expect(result).toEqual({
+      inputTokens: 30,
+      outputTokens: 4,
+      cacheHitTokens: 7,
+      cacheWriteTokens: 3,
+      cost_mUsd: 0,
+      is_byok: false,
+    });
+  });
+
+  test.each([
+    // Real Vercel responses: Perplexity searches billed to gateway credits, and a
+    // native Anthropic web search billed to the BYOK key within marketCost.
+    { cost: '0.025', marketCost: '0.041388', nonInference: 25000 },
+    { cost: '0', marketCost: '0.020541', nonInference: 0 },
+  ])('charges Vercel BYOK non-inference costs from gateway cost $cost', input => {
+    const usage = {
+      input_tokens: 10,
+      output_tokens: 5,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 0,
+      server_tool_use: { input_tokens: 0, web_fetch_requests: 0, web_search_requests: 0 },
+      output_tokens_details: null,
+    };
+    const providerMetadata = {
+      gateway: {
+        routing: {
+          finalProvider: 'xai',
+          modelAttempts: [
+            {
+              success: true,
+              providerAttempts: [{ provider: 'xai', credentialType: 'byok', success: true }],
+            },
+          ],
+        },
+        cost: input.cost,
+        marketCost: input.marketCost,
+      },
+    };
+
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'vercel');
+
+    expect(result.is_byok).toBe(true);
+    expect(result.nonInferenceCost_mUsd).toBe(input.nonInference);
+    expect(result.cost_mUsd).toBe(
+      Math.round(parseFloat(input.marketCost) * 1_000_000) + input.nonInference
+    );
+  });
+
   test('returns zero cost when no usage or metadata is provided', () => {
-    const result = processMessagesApiUsage(null, null, coreProps);
+    const result = processMessagesApiUsage(null, null, coreProps, 'openrouter');
 
     expect(result.cost_mUsd).toBe(0);
     expect(result.is_byok).toBeNull();
@@ -208,6 +280,15 @@ describe('processMessagesApiUsage', () => {
 });
 
 describe('parseMessagesMicrodollarUsageFromStream approval tests', () => {
+  // Usage processing times the response chunks; a fixed clock keeps the approved output stable.
+  let performanceNow: jest.SpiedFunction<typeof performance.now>;
+  beforeEach(() => {
+    performanceNow = jest.spyOn(performance, 'now').mockReturnValue(0);
+  });
+  afterEach(() => {
+    performanceNow.mockRestore();
+  });
+
   const vercelMessages = 'vercel-messages.log.resp.sse';
   test(vercelMessages, async () => {
     const inputFile = join(sampleDir, vercelMessages);
@@ -218,7 +299,8 @@ describe('parseMessagesMicrodollarUsageFromStream approval tests', () => {
       'fake-user-id',
       undefined,
       'vercel',
-      200
+      200,
+      false
     );
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
@@ -227,6 +309,53 @@ describe('parseMessagesMicrodollarUsageFromStream approval tests', () => {
 });
 
 describe('parseMessagesMicrodollarUsageFromStream', () => {
+  test.each([false, true])(
+    'retains Vercel start-frame cost and routing metadata with a final delta=%s',
+    async hasDelta => {
+      const events = [
+        {
+          type: 'message_start',
+          message: {
+            id: 'generation-id',
+            model: 'upstream-model',
+            usage: { input_tokens: 3, output_tokens: 1 },
+            provider_metadata: {
+              gateway: {
+                marketCost: '0.12',
+                routing: { canonicalSlug: 'resolved-model', finalProvider: 'anthropic' },
+              },
+            },
+          },
+        },
+        ...(hasDelta
+          ? [
+              {
+                type: 'message_delta',
+                usage: { output_tokens: 2 },
+                delta: { stop_reason: 'end_turn' },
+              },
+            ]
+          : []),
+      ];
+      const result = await parseMessagesMicrodollarUsageFromStream(
+        streamFromText(events.map(event => `data: ${JSON.stringify(event)}\n\n`).join('')),
+        'fake-user-id',
+        undefined,
+        'vercel',
+        200,
+        false
+      );
+
+      expect(result).toMatchObject({
+        cost_mUsd: 120_000,
+        model: 'resolved-model',
+        inference_provider: 'anthropic',
+        inputTokens: 3,
+        outputTokens: hasDelta ? 2 : 1,
+      });
+    }
+  );
+
   test('records the successful Vercel routed model instead of the message start model', async () => {
     const stream = streamFromText(
       'event: message_start\n' +
@@ -242,10 +371,83 @@ describe('parseMessagesMicrodollarUsageFromStream', () => {
       'fake-user-id',
       undefined,
       'vercel',
-      200
+      200,
+      false
     );
 
     expect(result.model).toBe('anthropic/claude-opus-4.8');
+  });
+
+  test('records message_start input tokens when the stream ends before message_delta', async () => {
+    const stream = streamFromText(
+      'event: message_start\n' +
+        'data: {"type":"message_start","message":{"id":"generation-id","type":"message","role":"assistant","content":[],"model":"anthropic/claude-sonnet-4-6","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":1200,"cache_creation_input_tokens":300,"cache_read_input_tokens":500,"output_tokens":1}}}\n\n' +
+        'event: content_block_delta\n' +
+        'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}\n\n' +
+        'event: content_block_stop\n' +
+        'data: {"type":"content_block_stop","index":0}\n\n'
+    );
+
+    const result = await parseMessagesMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'martian',
+      200,
+      false
+    );
+
+    expect(result).toMatchObject({
+      inputTokens: 2000,
+      cacheHitTokens: 500,
+      cacheWriteTokens: 300,
+      outputTokens: 1,
+    });
+  });
+
+  test('keeps message_start input tokens that message_delta omits', async () => {
+    const stream = streamFromText(
+      'event: message_start\n' +
+        'data: {"type":"message_start","message":{"id":"generation-id","type":"message","role":"assistant","content":[],"model":"claude-sonnet-4-6","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":1200,"cache_creation_input_tokens":300,"cache_read_input_tokens":500,"output_tokens":1}}}\n\n' +
+        'event: message_delta\n' +
+        'data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"input_tokens":null,"cache_creation_input_tokens":null,"cache_read_input_tokens":null,"output_tokens":42}}\n\n'
+    );
+
+    const result = await parseMessagesMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'martian',
+      200,
+      false
+    );
+
+    expect(result).toMatchObject({
+      inputTokens: 2000,
+      cacheHitTokens: 500,
+      cacheWriteTokens: 300,
+      outputTokens: 42,
+    });
+  });
+
+  test('prefers message_delta input tokens over message_start', async () => {
+    const stream = streamFromText(
+      'event: message_start\n' +
+        'data: {"type":"message_start","message":{"id":"generation-id","type":"message","role":"assistant","content":[],"model":"claude-sonnet-4-6","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":0,"output_tokens":0}}}\n\n' +
+        'event: message_delta\n' +
+        'data: {"type":"message_delta","delta":{"stop_reason":"end_turn","stop_sequence":null},"usage":{"input_tokens":25,"output_tokens":724}}\n\n'
+    );
+
+    const result = await parseMessagesMicrodollarUsageFromStream(
+      stream,
+      'fake-user-id',
+      undefined,
+      'martian',
+      200,
+      false
+    );
+
+    expect(result).toMatchObject({ inputTokens: 25, outputTokens: 724 });
   });
 
   test('records stream error events as errored timeout usage', async () => {
@@ -259,7 +461,8 @@ describe('parseMessagesMicrodollarUsageFromStream', () => {
       'fake-user-id',
       undefined,
       'openrouter',
-      200
+      200,
+      false
     );
 
     expect(result.hasError).toBe(true);
@@ -278,11 +481,73 @@ describe('parseMessagesMicrodollarUsageFromStream', () => {
       'fake-user-id',
       undefined,
       'openrouter',
-      200
+      200,
+      false
     );
 
     expect(result.hasError).toBe(true);
     expect(result.finish_reason).toBe('error');
+  });
+
+  describe('upstream error reporting', () => {
+    afterEach(() => {
+      jest.mocked(captureException).mockClear();
+      jest.restoreAllMocks();
+    });
+
+    const parseError = (error: object, usesUserCredentials: boolean) =>
+      parseMessagesMicrodollarUsageFromStream(
+        streamFromText(`event: error\ndata: ${JSON.stringify({ type: 'error', error })}\n\n`),
+        'fake-user-id',
+        undefined,
+        'openrouter',
+        200,
+        usesUserCredentials
+      );
+
+    test('logs transient stream errors without reporting to Sentry', async () => {
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      await parseError(
+        {
+          type: 'api_error',
+          error_type: 'provider_unavailable',
+          message: 'JSON error injected into SSE stream',
+        },
+        false
+      );
+
+      expect(captureException).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledWith(
+        'Messages API stream error: JSON error injected into SSE stream',
+        expect.objectContaining({
+          source: 'messages_sse_processing',
+          error_type: 'provider_unavailable',
+          provider: 'openrouter',
+        })
+      );
+    });
+
+    test('reports authentication errors on Kilo credentials to Sentry', async () => {
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      await parseError({ type: 'authentication_error', message: 'invalid x-api-key' }, false);
+
+      expect(warn).not.toHaveBeenCalled();
+      expect(captureException).toHaveBeenCalledWith(
+        new Error('Messages API stream error: invalid x-api-key'),
+        expect.objectContaining({ tags: { source: 'messages_sse_processing' } })
+      );
+    });
+
+    test('only logs authentication errors on user credentials', async () => {
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+
+      await parseError({ type: 'authentication_error', message: 'invalid x-api-key' }, true);
+
+      expect(captureException).not.toHaveBeenCalled();
+      expect(warn).toHaveBeenCalledTimes(1);
+    });
   });
 });
 
@@ -291,7 +556,7 @@ describe('parseMessagesMicrodollarUsageFromString approval tests', () => {
   test(vercelMessagesJson, async () => {
     const inputFile = join(sampleDir, vercelMessagesJson);
     const jsonString = await readFile(inputFile, 'utf-8');
-    const result = parseMessagesMicrodollarUsageFromString(jsonString, 200);
+    const result = parseMessagesMicrodollarUsageFromString(jsonString, 200, 'vercel');
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
     await verifyApproval(resultString, approvalFilePath);

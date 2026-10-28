@@ -1,44 +1,49 @@
-import { describe, expect, it, jest } from '@jest/globals';
-import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
-import { CLAUDE_OPUS_FALLBACK_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import { describe, expect, it } from '@jest/globals';
 import {
-  applyGatewayModelsFallback,
+  createUserVercelAiGatewayProvider,
+  VERCEL_AI_GATEWAY,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+import { applyVercelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
+import {
   applyPreferredProvider,
   applyProviderSpecificLogic,
   applyReasoningDetailsTransform,
+  getIgnoredProviders,
+  removeModelsFallback,
   removeUnsupportedRequestServiceTier,
+  withIgnoredProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import {
   ReasoningDetailsTransform,
+  type BYOKResult,
   type Provider,
-  type ProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
+import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
+import { EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
+import type { PreferredProviderOrderConfig } from '@kilocode/db/schema-types';
+import { getCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
 
-const nonFlexExclusiveModel: KiloExclusiveModel = {
-  public_id: 'test/non-flex-exclusive',
-  internal_id: 'test/non-flex',
-  display_name: 'Non-Flex test model',
-  description: 'Test model',
-  status: 'public',
-  context_length: 8_192,
-  max_completion_tokens: 4_096,
-  provider: OPENROUTER,
-  flags: [],
-  pricing: null,
-  inference_provider_restriction: [],
-};
+function customPricingFor(model: string) {
+  return getCustomPricing(TEST_CUSTOM_PRICING_CONFIG, model);
+}
 
-const flexExclusiveModel: KiloExclusiveModel = {
-  ...nonFlexExclusiveModel,
-  public_id: 'test/flex-exclusive',
-  internal_id: 'test/flex',
-  display_name: 'Flex test model',
-  flags: ['flex'],
-};
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
+  applyVercelSettings: jest.fn(),
+}));
+
+const USER_GATEWAY_TEST_MODEL = 'vendor/user-gateway-test-model';
+const USER_GATEWAY_TEST_ORDER = ['google-vertex', 'amazon-bedrock'];
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config', () => ({
+  getPreferredProviderOrderConfig: jest.fn(async () => ({
+    rules: [
+      { includes: ['user-gateway-test-model'], providers: ['google-vertex', 'amazon-bedrock'] },
+    ],
+  })),
+}));
 
 function makeRequest(
   model: string,
@@ -82,23 +87,61 @@ function makeMessagesRequest(model: string): Extract<GatewayRequest, { kind: 'me
 describe('removeUnsupportedRequestServiceTier', () => {
   it.each([
     {
-      model: GEMINI_FLASH_CURRENT_MODEL_ID,
-      kiloExclusiveModel: null,
+      model: 'google/gemini-3.8-flash',
       reason: 'non-fallback custom pricing',
     },
     {
-      model: nonFlexExclusiveModel.public_id,
-      kiloExclusiveModel: nonFlexExclusiveModel,
-      reason: 'non-Flex Kilo-exclusive model',
+      model: gemma_4_26b_a4b_it_free_model.public_id,
+      reason: 'Kilo-exclusive model',
     },
-  ])(
-    'removes and logs the request-level tier for $reason',
-    ({ model, kiloExclusiveModel, reason }) => {
+  ])('removes and logs the request-level tier for $reason', ({ model, reason }) => {
+    const request = makeRequest(model);
+    request.body.service_tier = 'priority';
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    removeUnsupportedRequestServiceTier(model, request, customPricingFor(model));
+
+    expect(request.body.service_tier).toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(
+      '[applyProviderSpecificLogic] Removed unsupported request-level service tier',
+      {
+        model,
+        requestKind: 'chat_completions',
+        serviceTier: 'priority',
+        reason,
+      }
+    );
+    warn.mockRestore();
+  });
+
+  it.each(['auto', 'default', 'flex', 'priority', 'scale'] as const)(
+    'records the recognized tier verbatim (%s)',
+    tier => {
+      const model = 'google/gemini-3.8-flash';
       const request = makeRequest(model);
-      request.body.service_tier = 'priority';
+      request.body.service_tier = tier;
       const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-      removeUnsupportedRequestServiceTier(model, request, kiloExclusiveModel);
+      removeUnsupportedRequestServiceTier(model, request, customPricingFor(model));
+
+      expect(request.body.service_tier).toBeUndefined();
+      expect(warn).toHaveBeenCalledWith(
+        '[applyProviderSpecificLogic] Removed unsupported request-level service tier',
+        expect.objectContaining({ serviceTier: tier })
+      );
+      warn.mockRestore();
+    }
+  );
+
+  it.each(['unrecognized-tier', 'constructor', '__proto__', 42, null] as const)(
+    'records only a recognized tier value (%s)',
+    tier => {
+      const model = 'google/gemini-3.8-flash';
+      const request = makeRequest(model);
+      request.body.service_tier = tier as unknown as typeof request.body.service_tier;
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      removeUnsupportedRequestServiceTier(model, request, customPricingFor(model));
 
       expect(request.body.service_tier).toBeUndefined();
       expect(warn).toHaveBeenCalledWith(
@@ -106,26 +149,25 @@ describe('removeUnsupportedRequestServiceTier', () => {
         {
           model,
           requestKind: 'chat_completions',
-          serviceTier: 'priority',
-          reason,
+          serviceTier: 'unrecognized',
+          reason: 'non-fallback custom pricing',
         }
       );
       warn.mockRestore();
     }
   );
 
-  it.each([
-    ['moonshotai/kimi-k3', null],
-    [flexExclusiveModel.public_id, flexExclusiveModel],
-    ['vendor/standard-model', null],
-  ] as const)('preserves the request-level tier for %s', (model, kiloExclusiveModel) => {
-    const request = makeRequest(model);
-    request.body.service_tier = 'priority';
+  it.each(['moonshotai/kimi-k3', 'vendor/standard-model'])(
+    'preserves the request-level tier for %s',
+    model => {
+      const request = makeRequest(model);
+      request.body.service_tier = 'priority';
 
-    removeUnsupportedRequestServiceTier(model, request, kiloExclusiveModel);
+      removeUnsupportedRequestServiceTier(model, request, customPricingFor(model));
 
-    expect(request.body.service_tier).toBe('priority');
-  });
+      expect(request.body.service_tier).toBe('priority');
+    }
+  );
 });
 
 describe('applyProviderSpecificLogic JSON ref field sanitization', () => {
@@ -156,7 +198,8 @@ describe('applyProviderSpecificLogic JSON ref field sanitization', () => {
       'user-1',
       null,
       null,
-      null
+      null,
+      false
     );
 
     return request.body.messages.find(message => message.role === 'tool')?.content;
@@ -175,6 +218,125 @@ describe('applyProviderSpecificLogic JSON ref field sanitization', () => {
     const content = await applyToToolResult('vendor/model:free', '{"$ref":"#/$defs/result"}');
 
     expect(content).toBe('{"$ref":"#/$defs/result"}');
+  });
+});
+
+describe('applyProviderSpecificLogic recursive tool schemas', () => {
+  async function applyToToolParameters(model: string) {
+    const request: Extract<GatewayRequest, { kind: 'responses' }> = {
+      kind: 'responses',
+      body: {
+        model,
+        input: 'hello',
+        tools: [
+          {
+            type: 'function',
+            name: 'filter',
+            strict: false,
+            parameters: {
+              type: 'object',
+              properties: { filters: { $ref: '#/$defs/filters' } },
+              $defs: {
+                filters: { type: 'array', items: { $ref: '#/$defs/filters' } },
+              },
+            },
+          },
+        ],
+      },
+    };
+
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      model,
+      request,
+      {},
+      null,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      false
+    );
+
+    const tool = request.body.tools?.[0];
+    return tool?.type === 'function' ? tool.parameters : undefined;
+  }
+
+  it('removes recursive refs for Muse models', async () => {
+    const parameters = await applyToToolParameters('meta/muse-spark-1.3');
+
+    expect(parameters?.$defs).toEqual({ filters: { type: 'array', items: { type: 'array' } } });
+  });
+
+  it('preserves recursive refs for other models', async () => {
+    const parameters = await applyToToolParameters('vendor/model');
+
+    expect(parameters?.$defs).toEqual({
+      filters: { type: 'array', items: { $ref: '#/$defs/filters' } },
+    });
+  });
+});
+
+describe('applyProviderSpecificLogic top-level tool schema combinators', () => {
+  async function applyToTool(model: string) {
+    const request = makeMessagesRequest(model);
+    request.body.tools = [
+      {
+        name: 'nteract_create_cell',
+        description: 'Create a cell.',
+        input_schema: {
+          type: 'object',
+          properties: { notebook_id: { type: ['string', 'null'] } },
+          oneOf: [{ required: ['notebook_id'] }],
+        },
+      },
+    ];
+
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      model,
+      request,
+      {},
+      null,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      false
+    );
+
+    return request.body.tools[0];
+  }
+
+  it('removes top-level combinators for Claude models', async () => {
+    const tool = await applyToTool('anthropic/claude-opus-5.5');
+
+    expect(tool).toEqual({
+      name: 'nteract_create_cell',
+      description:
+        'Create a cell.\n\nThe input must also match exactly one of these JSON schemas: [{"required":["notebook_id"]}]',
+      input_schema: {
+        type: 'object',
+        properties: { notebook_id: { type: ['string', 'null'] } },
+        required: ['notebook_id'],
+      },
+    });
+  });
+
+  it('preserves top-level combinators for other models', async () => {
+    const tool = await applyToTool('vendor/model');
+
+    expect(tool).toEqual({
+      name: 'nteract_create_cell',
+      description: 'Create a cell.',
+      input_schema: {
+        type: 'object',
+        properties: { notebook_id: { type: ['string', 'null'] } },
+        oneOf: [{ required: ['notebook_id'] }],
+      },
+    });
   });
 });
 
@@ -213,6 +375,111 @@ describe('applyReasoningDetailsTransform', () => {
     expect(assistant.reasoning_content).toBe('thinking hard');
   });
 
+  it('replaces the reasoning object with reasoning_effort for reasoning-content upstreams', () => {
+    const request = makeReasoningRequest();
+    request.body.reasoning = { effort: 'high', enabled: true };
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(request.body).not.toHaveProperty('reasoning');
+    expect(request.body.reasoning_effort).toBe('high');
+  });
+
+  it('folds reasoning_details into a reasoning string for reasoning upstreams', () => {
+    const request = makeReasoningRequest();
+    request.body.reasoning = { effort: 'high', enabled: true };
+
+    applyReasoningDetailsTransform(makeProvider(ReasoningDetailsTransform.Reasoning), request);
+
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    expect('reasoning_details' in assistant).toBe(false);
+    expect(assistant).not.toHaveProperty('reasoning_content');
+    expect(assistant.reasoning).toBe('thinking hard');
+    expect(request.body).not.toHaveProperty('reasoning');
+    expect(request.body.reasoning_effort).toBe('high');
+  });
+
+  it('keeps a legacy reasoning string for reasoning upstreams without reasoning_details', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    delete assistant.reasoning_details;
+    assistant.reasoning = 'legacy thinking';
+
+    applyReasoningDetailsTransform(makeProvider(ReasoningDetailsTransform.Reasoning), request);
+
+    expect(assistant.reasoning).toBe('legacy thinking');
+    expect(assistant).not.toHaveProperty('reasoning_content');
+  });
+
+  it('keeps the reasoning object without a transform', () => {
+    const request = makeReasoningRequest();
+    request.body.reasoning = { effort: 'high' };
+
+    applyReasoningDetailsTransform(makeProvider(null), request);
+
+    expect(request.body.reasoning).toEqual({ effort: 'high' });
+    expect(request.body).not.toHaveProperty('reasoning_effort');
+  });
+
+  it('drops the legacy reasoning string next to reasoning_details', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning = 'thinking hard';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant).not.toHaveProperty('reasoning');
+    expect(assistant.reasoning_content).toBe('thinking hard');
+  });
+
+  it('folds a legacy reasoning string into reasoning_content without reasoning_details', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    delete assistant.reasoning_details;
+    assistant.reasoning = 'legacy thinking';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant).not.toHaveProperty('reasoning');
+    expect(assistant.reasoning_content).toBe('legacy thinking');
+  });
+
+  it('keeps existing reasoning_content over a legacy reasoning string', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    delete assistant.reasoning_details;
+    assistant.reasoning = 'legacy thinking';
+    assistant.reasoning_content = 'upstream thinking';
+
+    applyReasoningDetailsTransform(
+      makeProvider(ReasoningDetailsTransform.ReasoningContent),
+      request
+    );
+
+    expect(assistant).not.toHaveProperty('reasoning');
+    expect(assistant.reasoning_content).toBe('upstream thinking');
+  });
+
+  it('drops the legacy reasoning string for Gemini', () => {
+    const request = makeReasoningRequest();
+    const assistant = request.body.messages[1] as unknown as Record<string, unknown>;
+    assistant.reasoning = 'thinking hard';
+
+    applyReasoningDetailsTransform(makeProvider(ReasoningDetailsTransform.GeminiThought), request);
+
+    expect(assistant).not.toHaveProperty('reasoning');
+    expect(assistant).not.toHaveProperty('reasoning_details');
+  });
+
   it('leaves reasoning_details untouched without a transform', () => {
     const request = makeReasoningRequest();
 
@@ -222,6 +489,29 @@ describe('applyReasoningDetailsTransform', () => {
     expect(assistant.reasoning_details).toBeDefined();
     expect(assistant.reasoning_content).toBeUndefined();
   });
+
+  it.each([
+    [false, { thought_tag_marker: 'think' }],
+    [undefined, { thought_tag_marker: 'think' }],
+    [true, {}],
+  ])(
+    'asks Gemini for thought tags only without streaming (stream: %s)',
+    (stream, expectedMarker) => {
+      const request = makeReasoningRequest();
+      request.body.stream = stream;
+      request.body.reasoning_effort = 'high';
+
+      applyReasoningDetailsTransform(
+        makeProvider(ReasoningDetailsTransform.GeminiThought),
+        request
+      );
+
+      expect((request.body as { google?: unknown }).google).toEqual({
+        thinking_config: { thinking_level: 'high', include_thoughts: true },
+        ...expectedMarker,
+      });
+    }
+  );
 
   it('maps Gemini encrypted details to matching tool-call signatures', () => {
     const request: Extract<GatewayRequest, { kind: 'chat_completions' }> = {
@@ -331,133 +621,471 @@ describe('applyReasoningDetailsTransform', () => {
   });
 });
 
-describe('applyGatewayModelsFallback', () => {
+describe('removeModelsFallback', () => {
+  it.each(['anthropic/claude-fable-5', 'anthropic/claude-opus-5', 'openai/gpt-4o'])(
+    'removes and logs caller-provided fallbacks for %s',
+    requestedModel => {
+      const request = makeRequest(requestedModel, ['caller/fallback']);
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      removeModelsFallback(requestedModel, request);
+
+      expect(request.body.models).toBeUndefined();
+      expect(warn).toHaveBeenCalledWith(
+        '[applyProviderSpecificLogic] Removed caller-provided fallback models',
+        {
+          model: requestedModel,
+          requestKind: 'chat_completions',
+          modelsPresent: true,
+          modelsCount: 1,
+          fallbacksPresent: false,
+          fallbacksCount: null,
+        }
+      );
+      warn.mockRestore();
+    }
+  );
+
+  it.each([[[{ model: 'anthropic/claude-opus-4.6' }]], ['default']])(
+    'removes and logs caller-provided Messages API fallbacks %j',
+    fallbacks => {
+      const model = 'thinkingmachines/inkling-small:free';
+      const request = makeMessagesRequest(model);
+      request.body.fallbacks = fallbacks;
+      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+      removeModelsFallback(model, request);
+
+      expect(request.body).not.toHaveProperty('fallbacks');
+      expect(warn).toHaveBeenCalledWith(
+        '[applyProviderSpecificLogic] Removed caller-provided fallback models',
+        {
+          model,
+          requestKind: 'messages',
+          modelsPresent: false,
+          modelsCount: null,
+          fallbacksPresent: true,
+          fallbacksCount: Array.isArray(fallbacks) ? fallbacks.length : null,
+        }
+      );
+      warn.mockRestore();
+    }
+  );
+
   it.each([
-    ['openrouter', 'anthropic/claude-fable-5'],
-    ['vercel', 'anthropic/claude-fable-5'],
-    ['openrouter', 'anthropic/claude-opus-5'],
-    ['vercel', 'anthropic/claude-opus-5'],
-  ] satisfies [ProviderId, string][])(
-    'sets Opus 4.8 as the fallback for %s requests to %s',
-    async (providerId, requestedModel) => {
-      const request = makeRequest(requestedModel, ['caller/fallback']);
+    ['no fallback fields', {}],
+    ['empty models', { models: [] }],
+    ['null fallbacks', { fallbacks: null }],
+    ['empty fallbacks', { fallbacks: [] }],
+  ])('does not log when there is nothing to remove (%s)', (_, fields) => {
+    const model = 'anthropic/claude-opus-5';
+    const request = makeMessagesRequest(model);
+    Object.assign(request.body, fields);
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-      await applyGatewayModelsFallback(providerId, requestedModel, request);
+    removeModelsFallback(model, request);
 
-      expect(request.body.models).toEqual([requestedModel, CLAUDE_OPUS_FALLBACK_MODEL_ID]);
+    expect(request.body).not.toHaveProperty('models');
+    expect(request.body).not.toHaveProperty('fallbacks');
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('removes Messages API fallbacks before a free model request is sent upstream', async () => {
+    const model = 'thinkingmachines/inkling-small:free';
+    const request = makeMessagesRequest(model);
+    request.body.fallbacks = [{ model: 'anthropic/claude-opus-4.6' }];
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      model,
+      request,
+      {},
+      null,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      false
+    );
+
+    expect(request.body).not.toHaveProperty('fallbacks');
+    expect(warn).toHaveBeenCalledWith(
+      '[applyProviderSpecificLogic] Removed caller-provided fallback models',
+      expect.objectContaining({
+        model,
+        requestKind: 'messages',
+        fallbacksPresent: true,
+        fallbacksCount: 1,
+      })
+    );
+    warn.mockRestore();
+  });
+});
+
+describe('applyProviderSpecificLogic with a user gateway key', () => {
+  const requestedModel = USER_GATEWAY_TEST_MODEL;
+
+  async function apply(userByok: BYOKResult[] | null, provider = makeProvider(null)) {
+    const request = makeRequest(requestedModel, ['caller/fallback']);
+    await applyProviderSpecificLogic(
+      provider,
+      requestedModel,
+      request,
+      {},
+      userByok,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      true
+    );
+    return request;
+  }
+
+  it('shapes a user Vercel AI Gateway key request like a managed Vercel request', async () => {
+    const request = await apply(
+      [{ providerId: 'vercel-ai-gateway', decryptedAPIKey: 'user-key' }],
+      createUserVercelAiGatewayProvider('user-key')
+    );
+
+    expect(applyVercelSettings).toHaveBeenCalledWith(requestedModel, request, null);
+  });
+
+  it('passes inference provider keys to the Vercel settings', async () => {
+    const userByok: BYOKResult[] = [{ providerId: 'anthropic', decryptedAPIKey: 'user-key' }];
+
+    const request = await apply(userByok, VERCEL_AI_GATEWAY);
+
+    expect(applyVercelSettings).toHaveBeenCalledWith(requestedModel, request, userByok);
+  });
+
+  it.each(['openrouter', 'vercel-ai-gateway'] as const)(
+    'skips Kilo provider order for a %s key',
+    async providerId => {
+      const request = await apply([{ providerId, decryptedAPIKey: 'user-key' }]);
+
+      expect(request.body.provider).toBeUndefined();
     }
   );
 
-  it.each(['anthropic/claude-fable-5', 'anthropic/claude-opus-5'])(
-    'removes caller-provided fallbacks for %s on other providers',
-    async requestedModel => {
-      const request = makeRequest(requestedModel, ['caller/fallback']);
+  it('keeps Kilo provider order on Kilo keys', async () => {
+    const request = await apply(null);
 
-      await applyGatewayModelsFallback('martian', requestedModel, request);
+    expect(request.body.provider).toEqual({ order: USER_GATEWAY_TEST_ORDER });
+  });
 
-      expect(request.body.models).toBeUndefined();
-    }
-  );
+  it.each([
+    { providerId: 'openrouter', provider: makeProvider(null), tool: 'openrouter:web_search' },
+    {
+      providerId: 'vercel-ai-gateway',
+      provider: createUserVercelAiGatewayProvider('user-key'),
+      tool: 'vercel:perplexity_search',
+    },
+  ] as const)(
+    'keeps paid server features for a $providerId key, which bills the user account',
+    async ({ providerId, provider, tool }) => {
+      const request = makeRequest(requestedModel);
+      const serverFeatures = { plugins: [{ id: 'web' }], tools: [{ type: tool }] };
+      Object.assign(request.body, structuredClone(serverFeatures));
 
-  it.each(['anthropic/claude-opus-4.8', 'anthropic/claude-opus-6', 'openai/gpt-4o'])(
-    'removes caller-provided fallbacks for other model %s',
-    async requestedModel => {
-      const request = makeRequest(requestedModel, ['caller/fallback']);
+      await applyProviderSpecificLogic(
+        provider,
+        requestedModel,
+        request,
+        {},
+        [{ providerId, decryptedAPIKey: 'user-key' }],
+        EmptyFraudDetectionHeaders,
+        'user-1',
+        null,
+        null,
+        null,
+        true
+      );
 
-      await applyGatewayModelsFallback('openrouter', requestedModel, request);
-
-      expect(request.body.models).toBeUndefined();
+      expect(request.body).toMatchObject(serverFeatures);
     }
   );
 });
 
+describe('applyProviderSpecificLogic paid server features', () => {
+  const fields = {
+    plugins: [{ id: 'web' }],
+    tools: [
+      { type: 'openrouter:web_search' },
+      { type: 'function', function: { name: 'lookup', parameters: { type: 'object' } } },
+    ],
+  };
+
+  const userByok: BYOKResult[] = [{ providerId: 'anthropic', decryptedAPIKey: 'key' }];
+
+  async function applyTo(model: string, byok: BYOKResult[] | null = null) {
+    const request = makeRequest(model);
+    Object.assign(request.body, structuredClone(fields));
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      model,
+      request,
+      {},
+      byok,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      false
+    );
+    return request.body;
+  }
+
+  it('removes them from free model requests', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const body = await applyTo('vendor/model:free');
+
+    expect(body.plugins).toEqual([{ id: 'file-parser', pdf: { engine: 'cloudflare-ai' } }]);
+    expect(body.tools).toEqual([fields.tools[1]]);
+    warn.mockRestore();
+  });
+
+  it('keeps them for paid model requests without BYOK', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const body = await applyTo('vendor/model');
+
+    expect(body).toMatchObject(fields);
+    expect(warn).not.toHaveBeenCalled();
+    warn.mockRestore();
+  });
+
+  it('removes them from paid model requests with user BYOK', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+
+    const body = await applyTo('vendor/model', userByok);
+
+    expect(body.plugins).toEqual([{ id: 'file-parser', pdf: { engine: 'cloudflare-ai' } }]);
+    expect(body.tools).toEqual([fields.tools[1]]);
+    warn.mockRestore();
+  });
+
+  it('removes Vercel server tools from user BYOK requests routed through Vercel', async () => {
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const model = 'anthropic/claude-sonnet-4.5';
+    const request = makeRequest(model);
+    Object.assign(request.body, {
+      tools: [{ type: 'vercel:perplexity_search' }, structuredClone(fields.tools[1])],
+      tool_choice: { type: 'vercel:perplexity_search' },
+    });
+
+    await applyProviderSpecificLogic(
+      VERCEL_AI_GATEWAY,
+      model,
+      request,
+      {},
+      userByok,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      false
+    );
+
+    expect(request.body.tools).toEqual([fields.tools[1]]);
+    expect(request.body).not.toHaveProperty('tool_choice');
+    expect(request.body).not.toHaveProperty('plugins');
+    expect(warn).toHaveBeenCalledWith(
+      '[applyProviderSpecificLogic] Removed paid server features from free or BYOK request',
+      expect.objectContaining({ model, removedToolTypes: ['vercel:perplexity_search'] })
+    );
+    warn.mockRestore();
+  });
+});
+
 describe('applyPreferredProvider', () => {
+  const config: PreferredProviderOrderConfig = {
+    rules: [
+      { includes: ['openai', 'gpt'], excludes: ['gpt-oss'], providers: ['openai'] },
+      { includes: ['claude'], providers: ['google-vertex', 'amazon-bedrock'] },
+      { includes: ['kimi'], providers: ['amazon-bedrock', 'alibaba'] },
+    ],
+  };
+
   it.each(['openai/gpt-5.6-terra', 'openai/o3', 'gpt-5.5'])(
-    'prefers OpenAI for OpenAI model %s',
+    'applies the order of the first matching rule to %s',
     model => {
       const request = makeRequest(model);
 
-      applyPreferredProvider(model, request.body);
+      applyPreferredProvider(config, model, request.body, false);
 
       expect(request.body.provider).toEqual({ order: ['openai'] });
     }
   );
 
-  it('does not set a provider order for GPT-OSS', () => {
+  it('does not set a provider order when an exclude skips the rule', () => {
     const model = 'openai/gpt-oss-120b';
     const request = makeRequest(model);
 
-    applyPreferredProvider(model, request.body);
+    applyPreferredProvider(config, model, request.body, false);
 
     expect(request.body.provider).toBeUndefined();
   });
 
-  it('applies the Claude provider order to Fable', () => {
+  it('does not set a provider order without a stored config', () => {
+    const model = 'openai/gpt-5.5';
+    const request = makeRequest(model);
+
+    applyPreferredProvider(EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG, model, request.body, false);
+
+    expect(request.body.provider).toBeUndefined();
+  });
+
+  it('still ignores Anthropic for Claude without a stored config', () => {
+    const model = 'anthropic/claude-sonnet-4.5';
+    const request = makeRequest(model);
+
+    applyPreferredProvider(EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG, model, request.body, false);
+
+    expect(request.body.provider).toEqual({ ignore: ['anthropic'] });
+  });
+
+  it('prefers Vertex then Bedrock and ignores Anthropic for Fable', () => {
     const request = makeRequest('anthropic/claude-fable-5');
 
-    applyPreferredProvider('anthropic/claude-fable-5', request.body);
+    applyPreferredProvider(config, 'anthropic/claude-fable-5', request.body, false);
 
     expect(request.body.provider).toEqual({
-      order: ['amazon-bedrock', 'anthropic', 'google-vertex'],
+      order: ['google-vertex', 'amazon-bedrock'],
+      ignore: ['anthropic'],
     });
+  });
+
+  it('does not ignore Anthropic for Claude when Anthropic is allowed', () => {
+    const request = makeRequest('anthropic/claude-sonnet-4.5');
+
+    applyPreferredProvider(config, 'anthropic/claude-sonnet-4.5', request.body, true);
+
+    expect(request.body.provider).toEqual({ order: ['google-vertex', 'amazon-bedrock'] });
+  });
+
+  it('ignores Anthropic for Claude even when the caller set an order', () => {
+    const request = makeRequest('anthropic/claude-sonnet-4.5');
+    request.body.provider = { order: ['anthropic'], ignore: ['azure', 'anthropic'] };
+
+    applyPreferredProvider(config, 'anthropic/claude-sonnet-4.5', request.body, false);
+
+    expect(request.body.provider).toEqual({
+      order: ['anthropic'],
+      ignore: ['azure', 'anthropic'],
+    });
+  });
+
+  it('does not ignore Anthropic for non-Claude models', () => {
+    const request = makeRequest('openai/gpt-5.5');
+
+    applyPreferredProvider(config, 'openai/gpt-5.5', request.body, false);
+
+    expect(request.body.provider).toEqual({ order: ['openai'] });
   });
 
   it('preserves valid provider options when adding order', () => {
     const request = makeRequest('anthropic/claude-sonnet-4.5');
     request.body.provider = { zdr: true };
 
-    applyPreferredProvider('anthropic/claude-sonnet-4.5', request.body);
+    applyPreferredProvider(config, 'anthropic/claude-sonnet-4.5', request.body, false);
 
     expect(request.body.provider).toEqual({
       zdr: true,
-      order: ['amazon-bedrock', 'anthropic', 'google-vertex'],
+      order: ['google-vertex', 'amazon-bedrock'],
+      ignore: ['anthropic'],
     });
   });
 
-  it('prefers Novita for DeepSeek models', () => {
-    const request = makeRequest('deepseek/deepseek-v4-pro');
-
-    applyPreferredProvider('deepseek/deepseek-v4-pro', request.body);
-
-    expect(request.body.provider).toEqual({ order: ['novita'] });
-  });
-
-  it.each(['moonshotai/kimi-k3', 'moonshotai/kimi-k3-fast', 'kimi-k3', 'moonshotai/kimi-k2.5'])(
-    'prefers Bedrock then Alibaba for Kimi model %s',
-    model => {
-      const request = makeRequest(model);
-
-      applyPreferredProvider(model, request.body);
-
-      expect(request.body.provider).toEqual({ order: ['amazon-bedrock', 'alibaba'] });
-    }
-  );
-
-  it('preserves explicit Kimi provider order and allowed providers', () => {
+  it('preserves an explicit provider order and allowed providers', () => {
     const request = makeRequest('moonshotai/kimi-k3');
     request.body.provider = { only: ['alibaba'], order: ['alibaba'] };
 
-    applyPreferredProvider('moonshotai/kimi-k3', request.body);
+    applyPreferredProvider(config, 'moonshotai/kimi-k3', request.body, false);
 
     expect(request.body.provider).toEqual({ only: ['alibaba'], order: ['alibaba'] });
-  });
-
-  it('prefers Friendli then Novita for GLM models', () => {
-    const request = makeRequest('z-ai/glm-5.2');
-
-    applyPreferredProvider('z-ai/glm-5.2', request.body);
-
-    expect(request.body.provider).toEqual({ order: ['friendli', 'novita'] });
   });
 
   it('overwrites a malformed provider value', () => {
     const request = makeRequest('anthropic/claude-sonnet-4.5');
     Object.assign(request.body, { provider: 'lmstudio' });
 
-    applyPreferredProvider('anthropic/claude-sonnet-4.5', request.body);
+    applyPreferredProvider(config, 'anthropic/claude-sonnet-4.5', request.body, false);
 
     expect(request.body.provider).toEqual({
-      order: ['amazon-bedrock', 'anthropic', 'google-vertex'],
+      order: ['google-vertex', 'amazon-bedrock'],
+      ignore: ['anthropic'],
     });
+  });
+});
+
+describe('applyProviderSpecificLogic Anthropic provider ignore', () => {
+  async function applyToClaude(isNonTrialEnterprise: boolean, userByok: BYOKResult[] | null) {
+    const model = 'anthropic/claude-sonnet-4.5';
+    const request = makeRequest(model);
+
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      model,
+      request,
+      {},
+      userByok,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      'org-1',
+      null,
+      null,
+      isNonTrialEnterprise
+    );
+
+    return request.body.provider;
+  }
+
+  it('ignores Anthropic outside non-trial enterprise organizations', async () => {
+    expect((await applyToClaude(false, null))?.ignore).toEqual(['anthropic']);
+  });
+
+  it('does not ignore Anthropic for non-trial enterprise organizations', async () => {
+    expect((await applyToClaude(true, null))?.ignore).toBeUndefined();
+  });
+
+  it('does not ignore Anthropic for BYOK requests', async () => {
+    expect(
+      (await applyToClaude(false, [{ providerId: 'anthropic', decryptedAPIKey: 'key' }]))?.ignore
+    ).toBeUndefined();
+  });
+});
+
+describe('withIgnoredProviders', () => {
+  it('returns the provider unchanged when nothing is ignored', () => {
+    const provider = { order: ['openai'] };
+
+    expect(withIgnoredProviders(provider, [])).toBe(provider);
+    expect(withIgnoredProviders(undefined, [])).toBeUndefined();
+  });
+
+  it('merges ignored providers without duplicates', () => {
+    expect(withIgnoredProviders({ zdr: true, ignore: ['anthropic'] }, ['anthropic'])).toEqual({
+      zdr: true,
+      ignore: ['anthropic'],
+    });
+    expect(withIgnoredProviders(undefined, ['anthropic'])).toEqual({ ignore: ['anthropic'] });
+  });
+});
+
+describe('getIgnoredProviders', () => {
+  it.each([
+    ['anthropic/claude-opus-5', false, ['anthropic']],
+    ['anthropic/claude-opus-5', true, []],
+    ['openai/gpt-5.5', false, []],
+  ] as const)('for %s with Anthropic allowed=%s returns %j', (model, allowed, expected) => {
+    expect(getIgnoredProviders(model, allowed)).toEqual(expected);
   });
 });

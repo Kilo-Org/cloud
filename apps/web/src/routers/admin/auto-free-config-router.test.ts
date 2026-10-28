@@ -1,10 +1,15 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
-import { ai_gateway_config, type User } from '@kilocode/db/schema';
+import { ai_gateway_config, custom_llm2, type User } from '@kilocode/db/schema';
 import { AutoFreeConfigSchema, type AutoFreeConfig } from '@kilocode/db/schema-types';
 import { AUTO_FREE_FALLBACK_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
+import {
+  customLlmDefinition,
+  publicCustomLlmDefinition,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
+import { getCustomLlmsById } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 
 let admin: User;
 let nonAdmin: User;
@@ -92,7 +97,7 @@ describe('adminAutoFreeConfigRouter', () => {
   });
 
   it('stores, updates, and clears the config without touching routing config', async () => {
-    await db.insert(ai_gateway_config).values({ config: { vercel_routing_percentage: 10 } });
+    await db.insert(ai_gateway_config).values({ config: { vercel_routing_enabled: false } });
     const caller = await createCallerForUser(admin.id);
 
     await caller.admin.autoFreeConfig.set({ config });
@@ -106,7 +111,7 @@ describe('adminAutoFreeConfigRouter', () => {
     expect((await caller.admin.autoFreeConfig.get()).config).toBeNull();
 
     const [row] = await db.select().from(ai_gateway_config);
-    expect(row.config).toEqual({ vercel_routing_percentage: 10 });
+    expect(row.config).toEqual({ vercel_routing_enabled: false });
   });
 
   it('creates the singleton row when none exists', async () => {
@@ -114,7 +119,18 @@ describe('adminAutoFreeConfigRouter', () => {
     await caller.admin.autoFreeConfig.set({ config });
 
     const rows = await db.select().from(ai_gateway_config);
-    expect(rows).toEqual([{ id: 1, config: {}, auto_free: config }]);
+    expect(rows).toEqual([
+      {
+        id: 1,
+        config: {},
+        auto_free: config,
+        preferred_models: null,
+        unavailable_models: null,
+        vercel_model_id_overrides: null,
+        preferred_provider_order: null,
+        custom_pricing: null,
+      },
+    ]);
   });
 
   it('rejects invalid config', async () => {
@@ -138,4 +154,20 @@ describe('adminAutoFreeConfigRouter', () => {
       expect(await db.select().from(ai_gateway_config)).toEqual([]);
     }
   );
+  it('accepts a public custom LLM saved moments ago and rejects a private one', async () => {
+    const caller = await createCallerForUser(admin.id);
+    await getCustomLlmsById();
+    await db.insert(custom_llm2).values([
+      { public_id: 'acme/public-free', definition: publicCustomLlmDefinition(['acme']) },
+      { public_id: 'acme/private-free', definition: customLlmDefinition() },
+    ]);
+    const model = (id: string) => ({ model: id, weight: 1, reasoning: {} });
+
+    await expect(
+      caller.admin.autoFreeConfig.set({ config: { models: [model('acme/public-free')] } })
+    ).resolves.toMatchObject({ config: { models: [model('acme/public-free')] } });
+    await expect(
+      caller.admin.autoFreeConfig.set({ config: { models: [model('acme/private-free')] } })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+  });
 });

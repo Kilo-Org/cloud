@@ -34,6 +34,7 @@ vi.mock('@kilocode/db/client', () => ({
 
 import { SessionIngestDO, ingestOrderCursor } from './SessionIngestDO';
 import { ingestItems, ingestMeta } from '../db/sqlite-schema';
+import { INACTIVITY_TIMEOUT_MS, POST_CLOSE_DRAIN_MS } from './session-metrics';
 
 describe('SessionIngestDO ingest ordering', () => {
   it('uses ingested_at with id only as a tie-breaker for cursor progression', () => {
@@ -64,6 +65,7 @@ describe('SessionIngestDO ingest ordering', () => {
       delete: vi.fn(() => ({
         where: vi.fn(() => ({
           run: vi.fn(() => operations.push('delete:closeReason')),
+          returning: vi.fn(() => ({ all: vi.fn(() => []) })),
         })),
       })),
     };
@@ -130,7 +132,10 @@ describe('SessionIngestDO ingest ordering', () => {
         })),
       })),
       delete: vi.fn(() => ({
-        where: vi.fn(() => ({ run: vi.fn() })),
+        where: vi.fn(() => ({
+          run: vi.fn(),
+          returning: vi.fn(() => ({ all: vi.fn(() => []) })),
+        })),
       })),
     };
     drizzleMocks.db = db;
@@ -198,7 +203,10 @@ describe('SessionIngestDO ingest ordering', () => {
         })),
       })),
       delete: vi.fn(() => ({
-        where: vi.fn(() => ({ run: vi.fn() })),
+        where: vi.fn(() => ({
+          run: vi.fn(),
+          returning: vi.fn(() => ({ all: vi.fn(() => []) })),
+        })),
       })),
     };
     drizzleMocks.db = db;
@@ -244,7 +252,12 @@ describe('SessionIngestDO ingest ordering', () => {
           onConflictDoUpdate: vi.fn(() => ({ run: vi.fn() })),
         })),
       })),
-      delete: vi.fn(() => ({ where: vi.fn(() => ({ run: vi.fn() })) })),
+      delete: vi.fn(() => ({
+        where: vi.fn(() => ({
+          run: vi.fn(),
+          returning: vi.fn(() => ({ all: vi.fn(() => []) })),
+        })),
+      })),
     };
     drizzleMocks.db = db;
 
@@ -328,7 +341,12 @@ describe('SessionIngestDO session-ready push', () => {
           })),
         })),
       })),
-      delete: vi.fn(() => ({ where: vi.fn(() => ({ run: vi.fn() })) })),
+      delete: vi.fn(() => ({
+        where: vi.fn(() => ({
+          run: vi.fn(),
+          returning: vi.fn(() => ({ all: vi.fn(() => []) })),
+        })),
+      })),
     };
     drizzleMocks.db = db;
 
@@ -561,7 +579,12 @@ describe('SessionIngestDO emitSessionMetrics cost persist ordering', () => {
           })),
         })),
       })),
-      delete: vi.fn(() => ({ where: vi.fn(() => ({ run: vi.fn() })) })),
+      delete: vi.fn(() => ({
+        where: vi.fn(() => ({
+          run: vi.fn(),
+          returning: vi.fn(() => ({ all: vi.fn(() => []) })),
+        })),
+      })),
     };
     drizzleMocks.db = db;
 
@@ -682,13 +705,23 @@ describe('SessionIngestDO emitSessionMetrics cost persist ordering', () => {
   });
 });
 
-/** Walk nested drizzle queryChunks and collect bound Param values (string | number). */
+/** Collect Drizzle scalar interpolations and explicitly bound parameters. */
 function collectBoundParams(
   condition: unknown,
   out: Array<string | number> = []
 ): Array<string | number> {
-  const chunks = (condition as { queryChunks?: unknown[] } | undefined)?.queryChunks ?? [];
+  const chunks = Array.isArray(condition)
+    ? condition
+    : ((condition as { queryChunks?: unknown[] } | undefined)?.queryChunks ?? []);
   for (const chunk of chunks) {
+    if (typeof chunk === 'string' || typeof chunk === 'number') {
+      out.push(chunk);
+      continue;
+    }
+    if (Array.isArray(chunk)) {
+      collectBoundParams(chunk, out);
+      continue;
+    }
     if (chunk == null || typeof chunk !== 'object') continue;
     const value = (chunk as { value?: unknown }).value;
     if (typeof value === 'string' || typeof value === 'number') {
@@ -744,33 +777,66 @@ describe('SessionIngestDO live activity + cost persist', () => {
     seedMessageRows?: Array<{ item_data: string }>;
     /** If set, Postgres update rejects with this error. */
     persistError?: Error;
+    r2Objects?: Record<string, string>;
   };
 
   function makeLiveHarness(options: LiveHarnessOptions = {}) {
     const meta = new Map<string, string | null>(Object.entries(options.seedMeta ?? {}));
     const messageRows = options.seedMessageRows ?? [];
+    const metricsSeedRows = messageRows.map(row => ({
+      item_type: 'message',
+      item_data: row.item_data,
+    }));
     // item rows keyed by item_id for stale-guard lookups during ingest loop
     const itemRows = new Map<
       string,
-      { ingested_at: number | null; item_data_r2_key: string | null }
+      {
+        id: number;
+        item_id: string;
+        item_type: string;
+        item_data: string;
+        ingested_at: number | null;
+        item_data_r2_key: string | null;
+      }
     >();
     let costScanCount = 0;
 
-    type SelectKind = 'meta_get' | 'item_guard' | 'message_cost' | 'other';
+    type SelectKind =
+      | 'meta_get'
+      | 'item_guard'
+      | 'message_cost'
+      | 'metrics_items'
+      | 'meta_rows'
+      | 'parent_message'
+      | 'part_excerpt'
+      | 'other';
     let selectKind: SelectKind = 'other';
     let eqKey: string | undefined;
+    let boundKeys: string[] = [];
+    let selectLimit = Infinity;
+    let partRowsRead = 0;
 
     const selectQuery = {
-      from: vi.fn(() => selectQuery),
+      from: vi.fn((table: unknown) => {
+        if (table === ingestMeta && selectKind === 'other') selectKind = 'meta_rows';
+        return selectQuery;
+      }),
       where: vi.fn((condition: unknown) => {
         const params = collectBoundParams(condition);
         eqKey = params.find((p): p is string => typeof p === 'string');
+        boundKeys = params.filter((p): p is string => typeof p === 'string');
         return selectQuery;
       }),
       orderBy: vi.fn(() => selectQuery),
-      limit: vi.fn(() => selectQuery),
+      limit: vi.fn((limit: number) => {
+        selectLimit = limit;
+        return selectQuery;
+      }),
       get: vi.fn(() => {
-        if (selectKind === 'item_guard' && eqKey !== undefined) {
+        if (
+          (selectKind === 'item_guard' || selectKind === 'parent_message') &&
+          eqKey !== undefined
+        ) {
           return itemRows.get(eqKey);
         }
         if (eqKey !== undefined && meta.has(eqKey)) {
@@ -783,6 +849,26 @@ describe('SessionIngestDO live activity + cost persist', () => {
         return undefined;
       }),
       all: vi.fn(() => {
+        if (selectKind === 'meta_rows') {
+          return boundKeys
+            .filter(key => meta.has(key))
+            .map(key => ({ key, value: meta.get(key) ?? null }));
+        }
+        if (selectKind === 'part_excerpt') {
+          const [, start, end] = boundKeys;
+          const rows = [...itemRows.values()]
+            .filter(row => row.item_type === 'part' && row.item_id >= start && row.item_id < end)
+            .sort((left, right) => left.id - right.id)
+            .slice(0, selectLimit);
+          partRowsRead += rows.length;
+          return rows;
+        }
+        if (selectKind === 'metrics_items') {
+          return [
+            ...metricsSeedRows,
+            ...[...itemRows.values()].filter(row => row.item_type !== 'session_diff'),
+          ];
+        }
         if (selectKind === 'message_cost') {
           costScanCount += 1;
           return messageRows;
@@ -793,8 +879,16 @@ describe('SessionIngestDO live activity + cost persist', () => {
 
     const db = {
       select: vi.fn((columns?: unknown) => {
+        selectLimit = Infinity;
         const cols = columns as Record<string, unknown> | undefined;
-        if (cols && 'item_data' in cols && !('item_type' in cols) && !('value' in cols)) {
+        boundKeys = [];
+        if (cols && 'item_type' in cols && !('item_id' in cols)) {
+          selectKind = 'metrics_items';
+        } else if (cols && 'id' in cols && 'item_data' in cols) {
+          selectKind = 'part_excerpt';
+        } else if (cols && 'item_data' in cols && 'item_data_r2_key' in cols) {
+          selectKind = 'parent_message';
+        } else if (cols && 'item_data' in cols && !('item_type' in cols) && !('value' in cols)) {
           // Cost compute: select({ item_data }) ... all()
           // OR item guard: select({ ingested_at, item_data_r2_key }) — has ingested_at
           if ('ingested_at' in cols) {
@@ -828,6 +922,10 @@ describe('SessionIngestDO live activity + cost persist', () => {
                   meta.set(values.key, values.value ?? null);
                 } else if (values.item_id !== undefined) {
                   itemRows.set(values.item_id, {
+                    id: itemRows.get(values.item_id)?.id ?? itemRows.size + 1,
+                    item_id: values.item_id,
+                    item_type: values.item_type ?? 'message',
+                    item_data: values.item_data ?? '{}',
                     ingested_at: values.ingested_at ?? null,
                     item_data_r2_key: values.item_data_r2_key ?? null,
                   });
@@ -838,6 +936,10 @@ describe('SessionIngestDO live activity + cost persist', () => {
               }),
             })),
             onConflictDoNothing: vi.fn(() => ({
+              run: vi.fn(() => {
+                if (values.key !== undefined && !meta.has(values.key))
+                  meta.set(values.key, values.value ?? null);
+              }),
               returning: vi.fn(() => ({
                 get: vi.fn(() => ({ state: 'pending' })),
               })),
@@ -845,7 +947,15 @@ describe('SessionIngestDO live activity + cost persist', () => {
           })
         ),
       })),
-      delete: vi.fn(() => ({ where: vi.fn(() => ({ run: vi.fn() })) })),
+      delete: vi.fn(() => ({
+        where: vi.fn((condition: unknown) => ({
+          run: vi.fn(() => {
+            for (const key of collectBoundParams(condition))
+              if (typeof key === 'string') meta.delete(key);
+          }),
+          returning: vi.fn(() => ({ all: vi.fn(() => []) })),
+        })),
+      })),
     };
     drizzleMocks.db = db;
 
@@ -853,8 +963,18 @@ describe('SessionIngestDO live activity + cost persist', () => {
     const waitUntil = vi.fn((promise: Promise<unknown>) => {
       waitUntilPromises.push(promise);
     });
+    let alarmAt: number | null = null;
+    const storage = {
+      setAlarm: vi.fn(async (at: number) => {
+        alarmAt = at;
+      }),
+      getAlarm: vi.fn(async () => alarmAt),
+      deleteAlarm: vi.fn(async () => {
+        alarmAt = null;
+      }),
+    };
     const state = {
-      storage: { setAlarm: vi.fn() },
+      storage,
       waitUntil,
       blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
     } as unknown as DurableObjectState;
@@ -883,10 +1003,19 @@ describe('SessionIngestDO live activity + cost persist', () => {
     dbClientMocks.getWorkerDb.mockReset();
     dbClientMocks.getWorkerDb.mockReturnValue({ update: pgUpdate });
 
+    const ingestSessionMetrics = vi.fn(async () => undefined);
+    const r2Get = vi.fn(async (key: string) => {
+      const text = options.r2Objects?.[key];
+      return text === undefined ? null : { text: async () => text };
+    });
     const env = {
-      SESSION_INGEST_R2: { delete: vi.fn() },
+      SESSION_INGEST_R2: {
+        delete: vi.fn(),
+        get: r2Get,
+      },
       HYPERDRIVE: { connectionString: 'postgres://test' },
       NOTIFICATIONS: { sendSessionReadyNotification: vi.fn(async () => ({ dispatched: true })) },
+      O11Y: { ingestSessionMetrics },
     } as never;
 
     return {
@@ -895,6 +1024,15 @@ describe('SessionIngestDO live activity + cost persist', () => {
       itemRows,
       messageRows,
       waitUntil,
+      ingestSessionMetrics,
+      storage,
+      r2Get,
+      get partRowsRead() {
+        return partRowsRead;
+      },
+      get alarmAt() {
+        return alarmAt;
+      },
       settle: () => Promise.all(waitUntilPromises),
       get lastPgSet() {
         return lastPgSet;
@@ -934,6 +1072,690 @@ describe('SessionIngestDO live activity + cost persist', () => {
       },
     };
   }
+
+  function toolPart(id: string, status: 'running' | 'completed', filePath: string) {
+    return {
+      type: 'part' as const,
+      data: {
+        id,
+        messageID: 'm1',
+        type: 'tool',
+        tool: 'edit',
+        state: { status, input: { filePath } },
+      },
+    };
+  }
+
+  function persistedBriefingExcerpt(harness: { lastPgSet: Record<string, unknown> | undefined }) {
+    const serialized = collectBoundParams(harness.lastPgSet?.briefing_excerpt).find(
+      value => typeof value === 'string' && value.startsWith('{')
+    );
+    return typeof serialized === 'string' ? JSON.parse(serialized) : undefined;
+  }
+
+  function warmLiveMeta() {
+    const now = Date.now();
+    return {
+      lastActivityPersistedAtMs: String(now),
+      lastActivityPersistedValueMs: String(now),
+      lastCostPersistedAtMs: String(now),
+      lastCostPersistedMicrodollars: '100000',
+    };
+  }
+
+  it('does not add a database write or eligibility read for streaming text and reasoning batches', async () => {
+    const harness = makeLiveHarness({ seedMeta: warmLiveMeta() });
+    for (let index = 0; index < 3; index += 1) {
+      await harness.durableObject.ingest(
+        [
+          assistantItem('streaming', 0.1),
+          {
+            type: 'part',
+            data: {
+              id: 'stream',
+              messageID: 'streaming',
+              type: index === 1 ? 'reasoning' : 'text',
+              text: 'Not a completed final response',
+              time: { start: 1000 },
+            },
+          },
+        ],
+        'usr_live',
+        'ses_live',
+        1,
+        10_000 + index
+      );
+    }
+    await harness.settle();
+    expect(harness.getWorkerDb).not.toHaveBeenCalled();
+    expect(harness.pgCallCount).toBe(0);
+  });
+
+  it('persists completed final text even while the existing live-column throttle is closed', async () => {
+    const harness = makeLiveHarness({ seedMeta: warmLiveMeta() });
+    await harness.durableObject.ingest(
+      [
+        {
+          type: 'part',
+          data: {
+            id: 'final-text',
+            messageID: 'final',
+            type: 'text',
+            text: 'Final response.',
+            time: { start: 1000, end: 3000 },
+          },
+        },
+        {
+          type: 'message',
+          data: {
+            ...assistantItem('final', 0.1).data,
+            finish: 'stop',
+            time: { created: 1000, completed: 3000 },
+          },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      10_000
+    );
+    await harness.settle();
+    expect(harness.pgCallCount).toBe(1);
+    expect(Object.keys(harness.lastPgSet ?? {})).toEqual(['briefing_excerpt']);
+    expect(persistedBriefingExcerpt(harness)).toEqual({
+      messageId: 'final',
+      completedAt: new Date(3000).toISOString(),
+      text: 'Final response.',
+    });
+  });
+
+  it('selects the latest completed source in a reverse-ordered batch and skips a stale envelope', async () => {
+    const harness = makeLiveHarness({ seedMeta: warmLiveMeta() });
+    await harness.durableObject.ingest(
+      [
+        {
+          type: 'message',
+          data: {
+            id: 'z-final',
+            role: 'assistant',
+            finish: 'stop',
+            text: 'Latest',
+            time: { completed: 3000 },
+          },
+        },
+        {
+          type: 'message',
+          data: {
+            id: 'a-older',
+            role: 'assistant',
+            finish: 'stop',
+            text: 'Older',
+            time: { completed: 2000 },
+          },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      20_000
+    );
+    await harness.settle();
+    expect(persistedBriefingExcerpt(harness)?.messageId).toBe('z-final');
+    const writes = harness.pgCallCount;
+    await harness.durableObject.ingest(
+      [
+        {
+          type: 'message',
+          data: {
+            id: 'z-final',
+            role: 'assistant',
+            finish: 'stop',
+            text: 'Stale replacement',
+            time: { completed: 3000 },
+          },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      10_000
+    );
+    await harness.settle();
+    expect(harness.pgCallCount).toBe(writes);
+  });
+
+  it('omits offloaded final text without fetching an R2 body', async () => {
+    const part = {
+      id: 'large-text',
+      messageID: 'final',
+      type: 'text',
+      text: 'Done for person@example.com. ' + '界'.repeat(1000),
+      time: { start: 1000, end: 3000 },
+    };
+    const harness = makeLiveHarness({
+      seedMeta: warmLiveMeta(),
+      r2Objects: { 'test/final-part': JSON.stringify(part) },
+    });
+    await harness.durableObject.ingest(
+      [{ type: 'part', data: part }],
+      'usr_live',
+      'ses_live',
+      1,
+      10_000,
+      { 'part/final/large-text': 'test/final-part' }
+    );
+    await harness.settle();
+    expect(harness.pgCallCount).toBe(0);
+    await harness.durableObject.ingest(
+      [
+        {
+          type: 'message',
+          data: { id: 'final', role: 'assistant', finish: 'stop', time: { completed: 3000 } },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      20_000
+    );
+    await harness.settle();
+    expect(harness.r2Get).not.toHaveBeenCalled();
+    expect(harness.pgCallCount).toBe(0);
+  });
+
+  it('omits an offloaded completed message without reading its body', async () => {
+    const harness = makeLiveHarness({ seedMeta: warmLiveMeta() });
+    await harness.durableObject.ingest(
+      [
+        {
+          type: 'message',
+          data: {
+            id: 'final',
+            role: 'assistant',
+            finish: 'stop',
+            text: 'Offloaded response',
+            time: { completed: 3000 },
+          },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      10_000,
+      { 'message/final': 'test/final-message' }
+    );
+    await harness.settle();
+    expect(harness.r2Get).not.toHaveBeenCalled();
+    expect(harness.pgCallCount).toBe(0);
+  });
+
+  it('uses inline final text without reading offloaded tool or reasoning bodies', async () => {
+    const harness = makeLiveHarness({ seedMeta: warmLiveMeta() });
+    await harness.durableObject.ingest(
+      [
+        {
+          type: 'part',
+          data: { id: 'tool', messageID: 'final', type: 'tool', state: { output: 'Tool secret' } },
+        },
+        {
+          type: 'part',
+          data: {
+            id: 'reasoning',
+            messageID: 'final',
+            type: 'reasoning',
+            text: 'Reasoning secret',
+          },
+        },
+        {
+          type: 'part',
+          data: {
+            id: 'text',
+            messageID: 'final',
+            type: 'text',
+            text: 'Final response.',
+            time: { start: 1000, end: 3000 },
+          },
+        },
+        {
+          type: 'message',
+          data: { id: 'final', role: 'assistant', finish: 'stop', time: { completed: 3000 } },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      10_000,
+      { 'part/final/tool': 'test/tool', 'part/final/reasoning': 'test/reasoning' }
+    );
+    await harness.settle();
+    expect(persistedBriefingExcerpt(harness)?.text).toBe('Final response.');
+    expect(harness.r2Get).not.toHaveBeenCalled();
+    expect(harness.pgCallCount).toBe(1);
+  });
+
+  it('reads only the source-row sentinel and omits an over-budget response', async () => {
+    const harness = makeLiveHarness({ seedMeta: warmLiveMeta() });
+    await harness.durableObject.ingest(
+      [
+        ...Array.from({ length: 40 }, (_, index) => ({
+          type: 'part' as const,
+          data: {
+            id: `text-${index}`,
+            messageID: 'final',
+            type: 'text',
+            text: 'Response text.',
+            time: { start: 1000, end: 3000 },
+          },
+        })),
+        {
+          type: 'message',
+          data: { id: 'final', role: 'assistant', finish: 'stop', time: { completed: 3000 } },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      10_000
+    );
+    await harness.settle();
+    expect(harness.partRowsRead).toBe(33);
+    expect(harness.pgCallCount).toBe(0);
+    expect(harness.r2Get).not.toHaveBeenCalled();
+  });
+
+  it('omits oversized inline response evidence without persisting a truncated prefix', async () => {
+    const harness = makeLiveHarness({ seedMeta: warmLiveMeta() });
+    await harness.durableObject.ingest(
+      [
+        {
+          type: 'part',
+          data: {
+            id: 'oversized-text',
+            messageID: 'final',
+            type: 'text',
+            text: 'token=' + 'x'.repeat(8192),
+            time: { start: 1000, end: 3000 },
+          },
+        },
+        {
+          type: 'message',
+          data: { id: 'final', role: 'assistant', finish: 'stop', time: { completed: 3000 } },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      10_000
+    );
+    await harness.settle();
+    expect(harness.pgCallCount).toBe(0);
+    expect(harness.r2Get).not.toHaveBeenCalled();
+  });
+
+  it('does not reuse a prior producer timestamp for a legacy status transition', async () => {
+    const harness = makeLiveHarness({
+      seedMeta: {
+        status: 'busy',
+        statusOccurredAt: '2026-07-24T07:59:00.000Z',
+      },
+    });
+    const result = await harness.durableObject.ingest(
+      [{ type: 'session_status', data: { status: 'question' } }],
+      'usr_live',
+      'ses_live',
+      1,
+      10_000
+    );
+    expect(result.changes).toEqual(
+      expect.arrayContaining([
+        { name: 'status', value: 'question' },
+        { name: 'statusOccurredAt', value: null },
+      ])
+    );
+    await harness.settle();
+  });
+  it('delivers delayed historical status without regressing current local or live state', async () => {
+    const harness = makeLiveHarness({
+      seedMeta: {
+        status: 'idle',
+        statusOccurredAt: '2026-07-24T08:05:00.000Z',
+      },
+    });
+    const result = await harness.durableObject.ingest(
+      [
+        {
+          type: 'session_status',
+          data: { status: 'question', occurredAt: '2026-07-24T07:59:00.000Z' },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      20_000
+    );
+    expect(harness.meta.get('status')).toBe('idle');
+    expect(harness.meta.get('statusOccurredAt')).toBe('2026-07-24T08:05:00.000Z');
+    expect(result.changes).toEqual(
+      expect.arrayContaining([
+        { name: 'status', value: 'question' },
+        { name: 'statusOccurredAt', value: '2026-07-24T07:59:00.000Z' },
+      ])
+    );
+    if (result.accepted) expect(result.attentionSignals).toEqual([]);
+    await harness.settle();
+    expect(harness.pgCallCount).toBe(0);
+  });
+  it('delivers source time when an identical untimestamped snapshot was already committed', async () => {
+    const harness = makeLiveHarness({ seedMeta: { status: 'question' } });
+    const result = await harness.durableObject.ingest(
+      [
+        {
+          type: 'session_status',
+          data: {
+            status: 'question',
+            previousStatus: 'busy',
+            occurredAt: '2026-07-24T07:59:00.000Z',
+          },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      20_000
+    );
+    expect(result.changes).toEqual(
+      expect.arrayContaining([
+        { name: 'status', value: 'question' },
+        { name: 'statusOccurredAt', value: '2026-07-24T07:59:00.000Z' },
+      ])
+    );
+    if (result.accepted) expect(result.attentionSignals).toEqual([]);
+    await harness.settle();
+  });
+
+  it('does not regress local status when an old envelope is skipped', async () => {
+    const harness = makeLiveHarness();
+    await harness.durableObject.ingest(
+      [
+        {
+          type: 'session_status',
+          data: {
+            status: 'idle',
+            previousStatus: 'question',
+            occurredAt: '2026-07-24T08:05:00.000Z',
+          },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      20_000
+    );
+    await harness.settle();
+    const result = await harness.durableObject.ingest(
+      [
+        {
+          type: 'session_status',
+          data: {
+            status: 'question',
+            previousStatus: 'busy',
+            occurredAt: '2026-07-24T07:59:00.000Z',
+          },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      10_000
+    );
+    await harness.settle();
+    expect(result.changes).toEqual([]);
+    expect(harness.meta.get('status')).toBe('idle');
+  });
+
+  it('projects the newest transition identity when same-millisecond statuses arrive out of order', async () => {
+    const harness = makeLiveHarness();
+    const occurredAt = '2026-07-24T07:59:00.000Z';
+    const latest = '01ARZ3NDEKTSV4RRFFQ69G5FAW';
+    await harness.durableObject.ingest(
+      [
+        {
+          type: 'session_status',
+          data: { status: 'busy', previousStatus: 'question', occurredAt, transitionId: latest },
+        },
+        {
+          type: 'session_status',
+          data: {
+            status: 'question',
+            previousStatus: 'busy',
+            occurredAt,
+            transitionId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+          },
+        },
+        {
+          type: 'session_status',
+          data: {
+            status: 'busy',
+            previousStatus: 'idle',
+            occurredAt,
+            transitionId: '01ARZ3NDEKTSV4RRFFQ69G5FAT',
+          },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      20_000
+    );
+    await harness.settle();
+    expect(harness.meta.get('status')).toBe('busy');
+    expect(harness.meta.get('statusTransitionId')).toBe(latest);
+  });
+  it('keeps the newer equal-millisecond status when an older identity arrives later', async () => {
+    const harness = makeLiveHarness();
+    const occurredAt = '2026-07-24T07:59:00.000Z';
+    await harness.durableObject.ingest(
+      [
+        {
+          type: 'session_status',
+          data: {
+            status: 'busy',
+            previousStatus: 'question',
+            occurredAt,
+            transitionId: '01ARZ3NDEKTSV4RRFFQ69G5FAW',
+          },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      20_000
+    );
+    await harness.settle();
+    const result = await harness.durableObject.ingest(
+      [
+        {
+          type: 'session_status',
+          data: {
+            status: 'question',
+            previousStatus: 'busy',
+            occurredAt,
+            transitionId: '01ARZ3NDEKTSV4RRFFQ69G5FAV',
+          },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      30_000
+    );
+    await harness.settle();
+    expect(harness.meta.get('status')).toBe('busy');
+    expect(harness.meta.get('statusTransitionId')).toBe('01ARZ3NDEKTSV4RRFFQ69G5FAW');
+    expect(result.changes).toEqual(
+      expect.arrayContaining([
+        { name: 'status', value: 'question' },
+        { name: 'statusTransitionId', value: '01ARZ3NDEKTSV4RRFFQ69G5FAV' },
+      ])
+    );
+    if (result.accepted) expect(result.attentionSignals).toEqual([]);
+  });
+  describe('metrics alarm lifecycle', () => {
+    it('retains the close drain alarm across final-response and straggler ingests', async () => {
+      const harness = makeLiveHarness();
+      const before = Date.now();
+      await harness.durableObject.ingest(
+        [{ type: 'session_open', data: {} }],
+        'usr_live',
+        'ses_live',
+        1
+      );
+      expect(harness.alarmAt).toBeGreaterThanOrEqual(before + INACTIVITY_TIMEOUT_MS);
+      await harness.durableObject.ingest(
+        [{ type: 'session_close', data: { reason: 'completed' } }],
+        'usr_live',
+        'ses_live',
+        1
+      );
+      const closeAlarm = harness.alarmAt;
+      expect(closeAlarm).toBeLessThanOrEqual(Date.now() + POST_CLOSE_DRAIN_MS);
+      await harness.durableObject.ingest(
+        [
+          {
+            type: 'message',
+            data: {
+              ...assistantItem('final', 0.1).data,
+              finish: 'stop',
+              text: 'Completed the change.',
+              time: { completed: 20_000 },
+            },
+          },
+        ],
+        'usr_live',
+        'ses_live',
+        1,
+        20_000
+      );
+      await harness.settle();
+      expect(harness.lastPgSet).toHaveProperty('briefing_excerpt');
+      expect(harness.alarmAt).toBe(closeAlarm);
+      expect(harness.meta.get('metricsAlarmAt')).toBe(String(closeAlarm));
+      expect(harness.ingestSessionMetrics).not.toHaveBeenCalled();
+    });
+
+    it('re-arms an early alarm and emits due metrics once without scheduling another job', async () => {
+      const harness = makeLiveHarness();
+      await harness.durableObject.ingest(
+        [{ type: 'session_open', data: {} }],
+        'usr_live',
+        'ses_live',
+        1
+      );
+      const scheduled = harness.alarmAt;
+      await harness.durableObject.alarm();
+      expect(harness.alarmAt).toBe(scheduled);
+      expect(harness.ingestSessionMetrics).not.toHaveBeenCalled();
+      harness.meta.set('metricsAlarmAt', String(Date.now() - 1));
+      await harness.durableObject.alarm();
+      expect(harness.ingestSessionMetrics).toHaveBeenCalledTimes(1);
+      expect(harness.meta.get('metricsEmitted')).toBe('true');
+      expect(harness.meta.has('metricsAlarmAt')).toBe(false);
+      expect(harness.alarmAt).toBeNull();
+      await harness.durableObject.alarm();
+      expect(harness.ingestSessionMetrics).toHaveBeenCalledTimes(1);
+      expect(harness.alarmAt).toBeNull();
+    });
+
+    it('keeps a newer open alarm that interleaves with metrics emission', async () => {
+      const harness = makeLiveHarness({
+        seedMeta: {
+          kiloUserId: 'usr_live',
+          sessionId: 'ses_live',
+          metricsAlarmAt: String(Date.now() - 1),
+        },
+        seedMessageRows: [{ item_data: JSON.stringify(assistantItem('existing-turn', 0.1).data) }],
+      });
+      const entered = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      harness.ingestSessionMetrics.mockImplementationOnce(async () => {
+        entered.resolve();
+        await release.promise;
+      });
+      const emission = harness.durableObject.alarm();
+      await entered.promise;
+      await harness.durableObject.ingest(
+        [{ type: 'session_open', data: {} }],
+        'usr_live',
+        'ses_live',
+        1
+      );
+      const newerAlarm = harness.alarmAt;
+      release.resolve();
+      await emission;
+      expect(harness.alarmAt).toBe(newerAlarm);
+      expect(harness.meta.get('metricsAlarmAt')).toBe(String(newerAlarm));
+    });
+
+    it('does not emit metrics or re-arm a deleted session', async () => {
+      const harness = makeLiveHarness({ seedMeta: { deleted: 'true' } });
+      await harness.durableObject.alarm();
+      expect(harness.ingestSessionMetrics).not.toHaveBeenCalled();
+      expect(harness.storage.setAlarm).not.toHaveBeenCalled();
+    });
+  });
+
+  it('guards the live summary by the activity time it rides with', async () => {
+    const harness = makeLiveHarness();
+    const ingestedAt = 1_700_000_000_000;
+
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.15), toolPart('p1', 'running', 'src/auth.ts')],
+      'usr_live',
+      'ses_live',
+      1,
+      ingestedAt
+    );
+    await harness.settle();
+
+    const set = harness.lastPgSet!;
+    expect(set).toHaveProperty('live_summary');
+    // A slower in-flight write of an older batch must not replace a newer
+    // summary, so the write is a CASE on the stored activity, like its siblings.
+    expect(sqlContainsCase(set.live_summary)).toBe(true);
+    const summarySql = sqlFragmentText(set.live_summary);
+    expect(summarySql).toContain(new Date(ingestedAt).toISOString());
+    expect(summarySql).toContain('auth.ts');
+  });
+
+  it('folds only the items the timestamp guard stored into the live summary', async () => {
+    const harness = makeLiveHarness();
+    const newer = 1_700_000_100_000;
+    const older = 1_700_000_000_000;
+
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.15), toolPart('p1', 'running', 'src/auth.ts')],
+      'usr_live',
+      'ses_live',
+      1,
+      newer
+    );
+    await harness.settle();
+    expect(harness.meta.get('liveSummaryState')).toContain('auth.ts');
+
+    // A replay of an older version of a part the DO already holds newer is
+    // skipped by the guard, so it must not move the step either.
+    await harness.durableObject.ingest(
+      [toolPart('p1', 'running', 'src/stale.ts')],
+      'usr_live',
+      'ses_live',
+      1,
+      older
+    );
+    await harness.settle();
+    const state = harness.meta.get('liveSummaryState') ?? '';
+    expect(state).toContain('auth.ts');
+    expect(state).not.toContain('stale.ts');
+  });
 
   it('persists activity + cost on first assistant message batch', async () => {
     const harness = makeLiveHarness();
@@ -984,6 +1806,10 @@ describe('SessionIngestDO live activity + cost persist', () => {
   it('does not persist when message is stale-skipped by ingested_at guard', async () => {
     const harness = makeLiveHarness();
     harness.itemRows.set('message/m1', {
+      id: 1,
+      item_id: 'message/m1',
+      item_type: 'message',
+      item_data: '{}',
       ingested_at: 5000,
       item_data_r2_key: null,
     });
@@ -1058,7 +1884,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
     expect(harness.pgCallCount).toBe(0);
   });
 
-  it('swallows persist failure and leaves meta un-advanced for retry', async () => {
+  it('handles a persist failure', async () => {
     const harness = makeLiveHarness({
       persistError: new Error('postgres down'),
     });
@@ -1143,7 +1969,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
     expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('100000');
   });
 
-  it('idle transition still scans and persists cost inside closed 30s window (D17)', async () => {
+  it('persists cost during an idle transition', async () => {
     const priorCost = JSON.stringify({
       role: 'assistant',
       time: { created: 1000 },
@@ -1323,12 +2149,21 @@ describe('SessionIngestDO live activity + cost persist', () => {
               }),
             })),
             onConflictDoNothing: vi.fn(() => ({
+              run: vi.fn(() => {
+                if (values.key !== undefined && !meta.has(values.key))
+                  meta.set(values.key, values.value ?? null);
+              }),
               returning: vi.fn(() => ({ get: vi.fn(() => ({ state: 'pending' })) })),
             })),
           })
         ),
       })),
-      delete: vi.fn(() => ({ where: vi.fn(() => ({ run: vi.fn() })) })),
+      delete: vi.fn(() => ({
+        where: vi.fn(() => ({
+          run: vi.fn(),
+          returning: vi.fn(() => ({ all: vi.fn(() => []) })),
+        })),
+      })),
     };
     drizzleMocks.db = db;
 
@@ -1337,7 +2172,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
       waitUntilPromises.push(promise);
     });
     const state = {
-      storage: { setAlarm: vi.fn() },
+      storage: { setAlarm: vi.fn(), getAlarm: vi.fn(async () => null), deleteAlarm: vi.fn() },
       waitUntil,
       blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
     } as unknown as DurableObjectState;
@@ -1579,12 +2414,31 @@ describe('SessionIngestDO clone primitives', () => {
           if (table === ingestItems) items.length = 0;
           if (table === ingestMeta) meta.clear();
         },
-        where: () => ({
+        where: (condition: unknown) => ({
           run: () => {
-            if (table === ingestMeta) {
-              for (const key of meta.keys()) if (key !== 'deleted') meta.delete(key);
+            if (table !== ingestMeta) return;
+            // `ne(key, 'deleted')` wipes all but the tombstone; `eq(key, k)` deletes one key.
+            const key = collectBoundParams(condition).find(
+              (p): p is string => typeof p === 'string'
+            );
+            if (key === 'deleted') {
+              for (const k of meta.keys()) if (k !== 'deleted') meta.delete(k);
+            } else if (key !== undefined) {
+              meta.delete(key);
             }
           },
+          returning: () => ({
+            all: () => {
+              if (table !== ingestItems) return [];
+              const [itemId, itemType] = collectBoundParams(condition);
+              if (typeof itemId !== 'string' || itemType !== 'part') return [];
+              const removed = items.filter(
+                row => row.item_id === itemId && row.item_type === 'part'
+              );
+              for (const row of removed) items.splice(items.indexOf(row), 1);
+              return removed.map(row => ({ item_data_r2_key: row.item_data_r2_key }));
+            },
+          }),
         }),
       })),
     };
@@ -2055,6 +2909,101 @@ describe('SessionIngestDO clone primitives', () => {
         destinationSessionId: 'dst',
       })
     ).toEqual({ status: 'empty' });
+  });
+
+  it('treats a stage built for another message cut as a different clone', () => {
+    const harness = makeCloneHarness();
+    const cutIdentity = {
+      sourceSessionId: 'src',
+      destinationSessionId: 'dst',
+      upToMessageId: 'msg_02',
+    };
+
+    expect(
+      harness.durableObject.stageCloneBatch({
+        ...cutIdentity,
+        rows: [
+          {
+            itemId: 'message/msg_01',
+            itemType: 'message' as const,
+            itemData: '{}',
+            itemDataR2Key: null,
+            ingestedAt: 1,
+          },
+        ],
+        nextCursor: { ingestedAt: 1, id: 1 },
+        rollingDigest: 'digest-cut',
+        copiedItemCount: 1,
+      }).status
+    ).toBe('staged');
+    expect(harness.meta.get('cloneUpToMessageId')).toBe('msg_02');
+
+    expect(harness.durableObject.inspectCloneStage(cutIdentity)).toMatchObject({
+      status: 'in_progress',
+      copiedItemCount: 1,
+    });
+    for (const other of [
+      { sourceSessionId: 'src', destinationSessionId: 'dst' },
+      { ...cutIdentity, upToMessageId: 'msg_03' },
+    ]) {
+      expect(harness.durableObject.inspectCloneStage(other)).toMatchObject({
+        status: 'mismatch',
+        storedStage: 'in_progress',
+      });
+      expect(
+        harness.durableObject.stageCloneBatch({
+          ...other,
+          rows: [],
+          nextCursor: null,
+          rollingDigest: 'digest-other',
+          copiedItemCount: 0,
+        }).status
+      ).toBe('mismatch');
+      expect(
+        harness.durableObject.finalizeCloneStage({
+          ...other,
+          finalDigest: 'digest-cut',
+          finalItemCount: 1,
+        }).status
+      ).toBe('mismatch');
+    }
+
+    expect(
+      harness.durableObject.finalizeCloneStage({
+        ...cutIdentity,
+        finalDigest: 'digest-cut',
+        finalItemCount: 1,
+      }).status
+    ).toBe('complete');
+    expect(harness.durableObject.inspectCloneStage(cutIdentity)).toMatchObject({
+      status: 'complete',
+    });
+    expect(
+      harness.durableObject.inspectCloneStage({ ...cutIdentity, upToMessageId: 'msg_01' })
+    ).toMatchObject({ status: 'mismatch', storedStage: 'complete' });
+  });
+
+  it('records no message cut for a full clone stage and clears a stale one', () => {
+    const harness = makeCloneHarness();
+    // A leftover cut with no stage identity reads as an empty stage.
+    harness.meta.set('cloneUpToMessageId', 'msg_stale');
+    harness.durableObject.stageCloneBatch({
+      sourceSessionId: 'src',
+      destinationSessionId: 'dst',
+      rows: [],
+      nextCursor: null,
+      rollingDigest: 'digest',
+      copiedItemCount: 0,
+    });
+
+    expect(harness.meta.has('cloneUpToMessageId')).toBe(false);
+    expect(
+      harness.durableObject.inspectCloneStage({
+        sourceSessionId: 'src',
+        destinationSessionId: 'dst',
+        upToMessageId: 'msg_01',
+      })
+    ).toMatchObject({ status: 'mismatch' });
   });
 
   it('swallows an R2 delete failure so resetCloneStage still returns a typed reject', async () => {

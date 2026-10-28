@@ -1,12 +1,16 @@
-import type { SandboxBillingInput } from '../container-usage-context.js';
-import type { VercelSandboxNetworkPolicy } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
+import type { SandboxBillingInput, SandboxClassName } from '../container-usage-context.js';
+import type { CloudAgentRunContainer } from '@kilocode/worker-utils/cloud-agent-queue-report';
+import type { SessionCredentialGrant } from './session-credentials.js';
 import {
   CLOUDFLARE_CONTAINERS_INSTANCES,
   vercelSandboxResourcesSchema,
 } from '@kilocode/worker-utils/sandbox-allocation';
+import { CODE_REVIEW_CONTAINERS_INSTANCE } from '../sandbox-containers/instance-size.js';
 import { z } from 'zod';
 import { AgentSandboxUnavailableError } from '../agent-sandbox/protocol.js';
+import type { RuntimeStartupConfig } from '../shared/runtime-startup-config.js';
 import type { CredentialContainmentRequirements } from './credential-containment.js';
+import type { BillingContext } from '@kilocode/container-usage';
 
 export type ProviderCreationCause =
   | 'insufficient_credits'
@@ -42,24 +46,6 @@ export class ProviderCreationError extends AgentSandboxUnavailableError {
   }
 }
 
-export const vercelAllocationConfigSchema = z
-  .object({
-    projectId: z.string().min(1).optional(),
-    snapshotId: z.string().min(1).optional(),
-    runtimeBuildId: z.string().min(1).optional(),
-    runtime: z.string().min(1).optional(),
-    resources: z
-      .object({
-        vcpus: z.number().int().positive(),
-        memory: z.number().int().positive(),
-      })
-      .strict()
-      .optional(),
-  })
-  .strict();
-
-export type VercelAllocationConfig = z.infer<typeof vercelAllocationConfigSchema>;
-
 export const sandboxProviderConfigurationSchema = z.discriminatedUnion('provider', [
   z.object({ provider: z.literal('cloudflare') }).strict(),
   z
@@ -68,7 +54,9 @@ export const sandboxProviderConfigurationSchema = z.discriminatedUnion('provider
   z
     .object({
       provider: z.literal('cloudflare-containers'),
-      instance: z.enum(CLOUDFLARE_CONTAINERS_INSTANCES).optional(),
+      instance: z
+        .enum([...CLOUDFLARE_CONTAINERS_INSTANCES, CODE_REVIEW_CONTAINERS_INSTANCE] as const)
+        .optional(),
     })
     .strict(),
 ]);
@@ -92,13 +80,11 @@ export type ProviderAllocationIntent = {
   intentId: string;
   createdAt: number;
   allocationName?: string;
-  vercel?: VercelAllocationConfig;
   containment?: CredentialContainmentRequirements;
 };
 
 export type ProviderCreateIntent = ProviderAllocationIntent & {
   billing?: SandboxBillingInput;
-  networkPolicy?: VercelSandboxNetworkPolicy;
 };
 
 export type ProviderObservation = {
@@ -106,15 +92,70 @@ export type ProviderObservation = {
   providerRef?: string;
 };
 
+/** What a physical start used: the image, or an environment snapshot of it. */
+export type ProviderStartSource = 'image' | 'repository';
+
+/**
+ * A published environment snapshot the Sandbox DO selected for this allocation.
+ * Only the environment coordinator produces one; no public API accepts it.
+ */
+export type ProviderSnapshotStart = {
+  snapshotId: string;
+  /** The image the snapshot was captured from. */
+  baseImage: string;
+};
+
+export type ProviderLaunchOptions = {
+  /** Start from this snapshot; a provider without snapshot support ignores it. */
+  snapshot?: ProviderSnapshotStart;
+  deadlineAt?: number;
+  nativeImage?: RuntimeStartupConfig['image'];
+};
+
+export type ProviderLaunchResult = {
+  startSource: ProviderStartSource;
+  snapshotFailed?: true;
+};
+
+/**
+ * Read-only billing state of one allocation. It is projected from stored
+ * sandbox state; producing or reading it never admits work, starts a container
+ * or opens a billing interval.
+ */
+export type ProviderBillingProjection = {
+  sandboxClassName: SandboxClassName;
+  blocked: boolean;
+  context?: BillingContext;
+};
+
+/** The first process that a provider runs in a new or restored sandbox. */
+export type ProviderStartupCommand = {
+  argv: readonly string[];
+  /** Trusted bootstrap needs to install runtime files outside the workspace. */
+  user?: 'root';
+};
+
 export type ProviderAdapter = {
-  readonly resumable: boolean;
-  /** The workspace survives a stop; a persistent provider is never destroyed. */
-  readonly persistentWorkspace: boolean;
-  /** `stop` destroys the container rather than only stopping it. */
-  readonly destroysOnStop: boolean;
+  describeRuntime?(ref: string): CloudAgentRunContainer | undefined;
   ensureBillingAdmission(ref: string, billing?: SandboxBillingInput): Promise<void>;
+  /**
+   * Read the stored compute-billing block without admitting or waking anything.
+   * A provider that keeps the state outside the sandbox omits this; the caller
+   * then keeps its own check.
+   */
+  isBillingBlocked?(ref: string | null): Promise<boolean>;
+  /**
+   * Read the stored billing projection for one allocation without admitting
+   * work or starting a container. A provider without readable billing state
+   * omits this; callers then report no rate instead of inventing one.
+   */
+  getBillingProjection?(): Promise<ProviderBillingProjection | undefined>;
   create(intent: ProviderCreateIntent): Promise<{ providerRef: string } | { unresolved: true }>;
-  launch(ref: string, env: Record<string, string>): Promise<void>;
+  launch(
+    ref: string,
+    startup: { command: ProviderStartupCommand; env: Record<string, string> },
+    options?: ProviderLaunchOptions
+  ): Promise<ProviderLaunchResult>;
   observe(
     ref: string | null,
     intent?: ProviderAllocationIntent | null
@@ -122,63 +163,13 @@ export type ProviderAdapter = {
   stop(ref: string | null, intent?: ProviderAllocationIntent | null): Promise<StopResult>;
   ensureLeaseAtLeast(ref: string, ms: number): Promise<void>;
   logs(ref: string): Promise<string>;
-  updateNetworkPolicy?(
-    providerRef: string,
-    networkPolicy: VercelSandboxNetworkPolicy
-  ): Promise<void>;
+  /** Present on a provider that can start a session from an environment snapshot. */
+  readonly environmentSnapshots?: true;
+  /**
+   * Replace the live sandbox's contained-credential network policy with one
+   * built from the authoritative grants. Only a provider whose network policy
+   * carries contained credentials implements it; a missing hook on a live
+   * provider is a failure the caller treats as fail-closed.
+   */
+  applyContainedCredentials?(ref: string, grants: readonly SessionCredentialGrant[]): Promise<void>;
 };
-
-export type MemoryProviderAdapter = ProviderAdapter & {
-  lastLeaseMs: number | null;
-};
-
-export function createMemoryProviderAdapter(options?: {
-  resumable?: boolean;
-  unresolved?: boolean;
-  stopRetryable?: boolean;
-}): MemoryProviderAdapter {
-  const instances = new Map<string, { stopped: boolean }>();
-  let lastLeaseMs: number | null = null;
-
-  return {
-    resumable: options?.resumable ?? false,
-    persistentWorkspace: false,
-    destroysOnStop: false,
-    get lastLeaseMs() {
-      return lastLeaseMs;
-    },
-    async ensureBillingAdmission() {},
-    async create(intent) {
-      if (options?.unresolved) return { unresolved: true };
-      const providerRef = `mem_${intent.intentId}`;
-      if (!instances.has(providerRef)) {
-        instances.set(providerRef, { stopped: false });
-      }
-      return { providerRef };
-    },
-    async launch() {},
-    async observe(ref, intent) {
-      const providerRef = ref ?? (intent ? `mem_${intent.intentId}` : undefined);
-      if (!providerRef) return { status: 'terminal' };
-      const instance = instances.get(providerRef);
-      return { status: !instance || instance.stopped ? 'terminal' : 'active', providerRef };
-    },
-    async stop(ref, intent) {
-      if (options?.stopRetryable) return 'retryable';
-      const providerRef = ref ?? (intent ? `mem_${intent.intentId}` : undefined);
-      if (providerRef) {
-        const instance = instances.get(providerRef);
-        if (instance) instance.stopped = true;
-      }
-      return 'terminal';
-    },
-    async ensureLeaseAtLeast(_ref, ms) {
-      lastLeaseMs = ms;
-    },
-    async logs(ref) {
-      const instance = instances.get(ref);
-      if (!instance) return `memory ${ref} absent`;
-      return `memory ${ref} ${instance.stopped ? 'terminal' : 'active'}`;
-    },
-  };
-}

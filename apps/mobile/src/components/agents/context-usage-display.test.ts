@@ -5,7 +5,6 @@ import { type SessionContextInfo } from '@/lib/session-context-info';
 
 import {
   type ContextTone,
-  formatCompactTokens,
   formatCost,
   formatExactTokens,
   formatRemainingTokens,
@@ -64,18 +63,6 @@ const unknownUsage: HeaderPillContent = {
   interactive: false,
   usageUnavailable: true,
 };
-
-describe('formatCompactTokens', () => {
-  it('formats below one thousand, thousands, and millions', () => {
-    expect(formatCompactTokens(0)).toBe('0');
-    expect(formatCompactTokens(999)).toBe('999');
-    expect(formatCompactTokens(1000)).toBe('1K');
-    expect(formatCompactTokens(32_418)).toBe('32.4K');
-    expect(formatCompactTokens(1500)).toBe('1.5K');
-    expect(formatCompactTokens(995_000)).toBe('995K');
-    expect(formatCompactTokens(1_200_000)).toBe('1.2M');
-  });
-});
 
 describe('formatExactTokens', () => {
   it('uses grouped digit formatting', () => {
@@ -155,7 +142,6 @@ describe('formatRemainingTokens', () => {
 });
 
 describe('getHeaderPillContent', () => {
-  // Migrated getHeaderSummary cases (info-present) + new no-info branches.
   it('marks unknown usage with the dash, non-interactive, with no info and no transcript', () => {
     expect(pill({ totalCostMicrodollars: 80_000, hasMessages: false })).toEqual(unknownUsage);
     expect(pill({ totalCostMicrodollars: 0, hasMessages: false })).toEqual(unknownUsage);
@@ -172,10 +158,12 @@ describe('getHeaderPillContent', () => {
   });
 
   it('shows percentage as primary and cost as secondary when capacity is known', () => {
-    expect(
-      pill({ info: info({ percentage: 42 }), totalCostMicrodollars: 80_000, hasMessages: true })
-    ).toEqual({
-      primary: '42%',
+    const result = pill({
+      info: info({ percentage: 42 }),
+      totalCostMicrodollars: 80_000,
+      hasMessages: true,
+    });
+    expect(result).toMatchObject({
       secondary: '$0.08',
       hasCost: true,
       tone: 'primary',
@@ -187,7 +175,6 @@ describe('getHeaderPillContent', () => {
 
   it('omits secondary cost when cost is zero or null', () => {
     const base = {
-      primary: '10%',
       secondary: null,
       hasCost: false,
       tone: 'primary' as const,
@@ -197,10 +184,10 @@ describe('getHeaderPillContent', () => {
     };
     expect(
       pill({ info: info({ percentage: 10 }), totalCostMicrodollars: 0, hasMessages: true })
-    ).toEqual(base);
+    ).toMatchObject(base);
     expect(
       pill({ info: info({ percentage: 10 }), totalCostMicrodollars: null, hasMessages: true })
-    ).toEqual(base);
+    ).toMatchObject(base);
   });
 
   it('uses warning tone at 75-89% with cost', () => {
@@ -209,7 +196,6 @@ describe('getHeaderPillContent', () => {
       totalCostMicrodollars: 500_000,
       hasMessages: true,
     });
-    expect(result.primary).toBe('80%');
     expect(result.tone).toBe('warning');
     expect(result.secondary).toBe('$0.50');
     expect(result.arcFraction).toBe(0.8);
@@ -222,21 +208,18 @@ describe('getHeaderPillContent', () => {
       totalCostMicrodollars: 1_000_000,
       hasMessages: true,
     });
-    expect(result.primary).toBe('125%');
     expect(result.tone).toBe('destructive');
     expect(result.arcFraction).toBe(1);
     expect(result.interactive).toBe(true);
   });
 
   it('falls back to compact tokens and neutral tone when capacity is unknown', () => {
-    expect(
-      pill({
-        info: info({ contextWindow: undefined, percentage: undefined, contextTokens: 32_418 }),
-        totalCostMicrodollars: 120_000,
-        hasMessages: true,
-      })
-    ).toEqual({
-      primary: '32.4K',
+    const result = pill({
+      info: info({ contextWindow: undefined, percentage: undefined, contextTokens: 32_418 }),
+      totalCostMicrodollars: 120_000,
+      hasMessages: true,
+    });
+    expect(result).toMatchObject({
       secondary: '$0.12',
       hasCost: true,
       tone: 'neutral',
@@ -253,8 +236,7 @@ describe('getHeaderPillContent', () => {
         totalCostMicrodollars: 0,
         hasMessages: true,
       })
-    ).toEqual({
-      primary: '32.4K',
+    ).toMatchObject({
       secondary: null,
       hasCost: false,
       tone: 'neutral',

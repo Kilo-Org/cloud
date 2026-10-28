@@ -11,9 +11,11 @@ import {
   ManualCodeReviewConfigSchema,
   CodeReviewTypeSchema,
   CodeReviewTriggerSourceSchema,
+  CODE_REVIEW_TERMINAL_REASONS,
 } from '@kilocode/db/schema-types';
 import { CODE_REVIEW_STATUSES } from '@kilocode/app-shared/code-review';
 import { CodeReviewAgentConfigSchema } from '@/lib/agent-config/core/types';
+import { OwnerSchema, type Owner } from '@/lib/agent-config/core/owner';
 
 // ============================================================================
 // Status and Ownership Schemas
@@ -25,20 +27,10 @@ import { CodeReviewAgentConfigSchema } from '@/lib/agent-config/core/types';
 export const CodeReviewStatusSchema = z.enum(CODE_REVIEW_STATUSES);
 
 /**
- * Owner schema - discriminated union
+ * Code review terminal reason enum, for narrowing a persisted
+ * `cloud_agent_code_reviews.terminal_reason` back to the shared union.
  */
-export const OwnerSchema = z.discriminatedUnion('type', [
-  z.object({
-    type: z.literal('org'),
-    id: z.string().uuid(),
-    userId: z.string(),
-  }),
-  z.object({
-    type: z.literal('user'),
-    id: z.string(),
-    userId: z.string(),
-  }),
-]);
+export const CodeReviewTerminalReasonSchema = z.enum(CODE_REVIEW_TERMINAL_REASONS);
 
 // ============================================================================
 // GitHub Webhook Schemas
@@ -229,7 +221,7 @@ export const TriggerReviewParamsSchema = z.object({
  * These provide type safety while keeping schemas as the single source of truth.
  */
 export type CodeReviewStatus = z.infer<typeof CodeReviewStatusSchema>;
-export type Owner = z.infer<typeof OwnerSchema>;
+export { OwnerSchema, type Owner };
 export type CreateReviewParams = z.infer<typeof CreateReviewParamsSchema>;
 export type UpdateReviewStatusParams = z.infer<typeof UpdateReviewStatusParamsSchema>;
 export type ListReviewsParams = z.infer<typeof ListReviewsParamsSchema>;

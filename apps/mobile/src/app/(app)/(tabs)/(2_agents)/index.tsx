@@ -1,10 +1,12 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import * as WebBrowser from 'expo-web-browser';
 import { useFocusEffect } from 'expo-router';
 import { Alert, AppState, Platform } from 'react-native';
 
 import { i18n } from '@/i18n';
 import { AgentSessionListScreen } from '@/components/agents/session-list-screen';
+import { type AgentsView, AgentsViewSegment } from '@/components/todos/agents-view-segment';
+import { TodoListsScreen } from '@/components/todos/todo-lists-screen';
 import { runPendingWidgetActions } from '@/glanceable-ios/widget-actions';
 import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
@@ -117,19 +119,24 @@ async function retryGitHubInstall(organizationId?: string): Promise<void> {
     Alert.alert(
       i18n.t('agents.githubInstall.couldNotOpenTitle'),
       i18n.t('agents.githubInstall.couldNotOpenMessage'),
-      [{ text: i18n.t('common.tryAgain'), onPress: () => void retryGitHubInstall(organizationId) }]
+      [{ text: i18n.t('common.tryAgain'), onPress: () => void retryGitHubInstall(organizationId) }],
+      // Android back dismisses; reopening the flow retries the same way.
+      { cancelable: true }
     );
   }
 }
 
 export default function AgentSessionList() {
+  const [view, setView] = useState<AgentsView>('sessions');
   const consumeReturnOutcome = useCallback(() => {
     const result = getGitHubInstallReturnOutcome();
     const alert = buildGitHubInstallOutcomeAlert(result, () => {
       void retryGitHubInstall(result?.organizationId);
     });
     if (alert) {
-      Alert.alert(alert.title, alert.message, alert.buttons);
+      // Android back dismisses; the outcome alerts are informational and the
+      // retry flow re-arms from the tab.
+      Alert.alert(alert.title, alert.message, alert.buttons, { cancelable: true });
     }
   }, []);
 
@@ -161,5 +168,10 @@ export default function AgentSessionList() {
     }, [])
   );
 
-  return <AgentSessionListScreen />;
+  const tabHeader = <AgentsViewSegment value={view} onChange={setView} />;
+  return view === 'sessions' ? (
+    <AgentSessionListScreen tabHeader={tabHeader} />
+  ) : (
+    <TodoListsScreen tabHeader={tabHeader} />
+  );
 }

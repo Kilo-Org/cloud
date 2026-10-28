@@ -4,7 +4,7 @@ import {
 } from '@kilocode/app-shared/security-agent';
 import { useRouter } from 'expo-router';
 import { Brain, Search, Wrench } from '@/components/ui/icons';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -18,6 +18,7 @@ import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { modelLabelFromCatalogue } from '@/lib/auto-model-name';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import {
   useSecurityAgentSettingsRedirect,
@@ -43,7 +44,7 @@ function AnalysisSettingsSkeleton() {
   const { t } = useTranslation();
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('securityAgent.analysisSettings.title')} />
+      <ScreenHeader className="px-6" title={t('securityAgent.analysisSettings.title')} />
       <View className="gap-3 px-6 pt-4">
         <Skeleton className="h-11 w-full rounded-lg" />
         <Skeleton className="h-12 w-full rounded-lg" />
@@ -71,25 +72,24 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   const [analysisModelSlug, setAnalysisModelSlug] = useState('');
   const [remediationModelSlug, setRemediationModelSlug] = useState('');
   const [analysisMode, setAnalysisMode] = useState<AnalysisMode>('auto');
-  const hydratedRef = useRef(false);
-  const initialConfigRef = useRef<Partial<FlattenedSecurityAgentConfig>>({});
+  // The saved baseline the draft is compared against. State rather than a ref:
+  // a successful save must re-render, so `dirty` (and the back guard that
+  // reads it) reflects the saved values by the time the header action leaves.
+  const [baseline, setBaseline] = useState<Partial<FlattenedSecurityAgentConfig> | null>(null);
 
   // Local state initialized from the loaded config exactly once — later
   // config refetches (e.g. after this screen's own save) shouldn't clobber
   // in-progress edits.
   useEffect(() => {
-    if (hydratedRef.current || !config.data) {
+    if (baseline !== null || !config.data) {
       return;
     }
-    hydratedRef.current = true;
-    initialConfigRef.current = config.data;
+    setBaseline(config.data);
     setTriageModelSlug(config.data.triageModelSlug);
     setAnalysisModelSlug(config.data.analysisModelSlug);
     setRemediationModelSlug(config.data.remediationModelSlug);
     setAnalysisMode(config.data.analysisMode);
-  }, [config.data]);
-
-  useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled);
+  }, [baseline, config.data]);
 
   // Every field here is a model slug or a fixed enum option — there is no
   // invalid combination once hydrated, unlike the repository or SLA screens.
@@ -100,16 +100,19 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
     remediationModelSlug,
     analysisMode,
   };
-  const dirty =
-    hydratedRef.current &&
-    getSettingsDirtyState(initialConfigRef.current, patch, valid) !== 'clean';
+  const dirty = baseline !== null && getSettingsDirtyState(baseline, patch, valid) !== 'clean';
+  useSecurityAgentSettingsRedirect(scope, config.data?.isEnabled, { dirty });
 
   const handleSave = async () => {
     await save.mutateAsync(patch);
-    initialConfigRef.current = { ...initialConfigRef.current, ...patch };
+    setBaseline(previous => ({ ...previous, ...patch }));
   };
 
-  const { onBack, skipNextGuardRef } = useSettingsBackGuard({ dirty, valid, onSave: handleSave });
+  const { onBack, skipNextGuardRef, dialog } = useSettingsBackGuard({
+    dirty,
+    valid,
+    onSave: handleSave,
+  });
 
   if (config.isError && !config.data) {
     return (
@@ -124,11 +127,12 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   if (config.isLoading || !config.data) {
     return <AnalysisSettingsSkeleton />;
   }
-  if (!config.data.isEnabled) {
-    return null;
+  if (!config.data.isEnabled && !dirty) {
+    // Keep a dirty draft and its controls usable if the redirect is cancelled.
+    return <>{dialog}</>;
   }
 
-  const modelName = (slug: string) => models.find(model => model.id === slug)?.name ?? slug;
+  const modelName = (slug: string) => modelLabelFromCatalogue(models, slug);
   const modelRowOnPress = (value: string, onSelect: (modelSlug: string) => void) =>
     canManage && !modelsLoading && models.length > 0
       ? () => {
@@ -139,6 +143,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader
+        className="px-6"
         title={t('securityAgent.analysisSettings.title')}
         onBack={onBack}
         headerRight={
@@ -241,6 +246,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
           </View>
         )}
       </TabScreenScrollView>
+      {dialog}
     </View>
   );
 }

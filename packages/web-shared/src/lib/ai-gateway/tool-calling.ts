@@ -27,20 +27,78 @@ export function dropToolStrictProperties(requestToMutate: OpenRouterChatCompleti
 }
 
 export function normalizeToolCallIds(
-  requestToMutate: OpenRouterChatCompletionRequest,
+  requestToMutate: GatewayRequest,
   filter: (toolCallId: string) => boolean,
   maxIdLength: number | undefined
 ) {
-  for (const msg of requestToMutate.messages) {
+  const normalizedIds = new Set<string>();
+  const normalize = (toolCallId: string) => {
+    if (!filter(toolCallId)) return toolCallId;
+    normalizedIds.add(toolCallId);
+    return normalizeToolCallId(toolCallId, maxIdLength);
+  };
+
+  if (requestToMutate.kind === 'chat_completions') {
+    normalizeChatCompletionsToolCallIds(requestToMutate.body, normalize);
+  } else if (requestToMutate.kind === 'responses') {
+    normalizeResponsesToolCallIds(requestToMutate.body, normalize);
+  } else {
+    normalizeMessagesToolCallIds(requestToMutate.body, normalize);
+  }
+
+  // One line per request, not per id: histories are resent every turn.
+  const [exampleId] = normalizedIds;
+  if (exampleId !== undefined) {
+    console.warn('[normalizeToolCallIds] normalized tool call ids', {
+      kind: requestToMutate.kind,
+      model: requestToMutate.body.model,
+      normalizedIdCount: normalizedIds.size,
+      exampleId: exampleId.slice(0, 64),
+    });
+  }
+}
+
+function normalizeChatCompletionsToolCallIds(
+  body: OpenRouterChatCompletionRequest,
+  normalize: (toolCallId: string) => string
+) {
+  for (const msg of body.messages) {
     if (msg.role === 'assistant') {
       for (const toolCall of msg.tool_calls ?? []) {
-        if (filter(toolCall.id)) {
-          toolCall.id = normalizeToolCallId(toolCall.id, maxIdLength);
-        }
+        toolCall.id = normalize(toolCall.id);
       }
     }
-    if (msg.role === 'tool' && filter(msg.tool_call_id)) {
-      msg.tool_call_id = normalizeToolCallId(msg.tool_call_id, maxIdLength);
+    if (msg.role === 'tool') {
+      msg.tool_call_id = normalize(msg.tool_call_id);
+    }
+  }
+}
+
+function normalizeResponsesToolCallIds(
+  body: GatewayResponsesRequest,
+  normalize: (toolCallId: string) => string
+) {
+  if (!Array.isArray(body.input)) return;
+  for (const item of body.input) {
+    if ('call_id' in item && typeof item.call_id === 'string') {
+      item.call_id = normalize(item.call_id);
+    }
+  }
+}
+
+function normalizeMessagesToolCallIds(
+  body: GatewayMessagesRequest,
+  normalize: (toolCallId: string) => string
+) {
+  for (const msg of body.messages) {
+    if (!Array.isArray(msg.content)) continue;
+    for (const block of msg.content) {
+      if (block.type === 'tool_use' || block.type === 'server_tool_use') {
+        block.id = normalize(block.id);
+      }
+      if ('tool_use_id' in block && typeof block.tool_use_id === 'string') {
+        block.tool_use_id = normalize(block.tool_use_id);
+      }
     }
   }
 }

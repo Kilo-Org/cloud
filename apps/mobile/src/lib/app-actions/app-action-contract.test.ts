@@ -5,7 +5,6 @@ import {
   APP_ACTION_SLUGS,
   appActionHref,
   type AppActionRequest,
-  type AppActionResult,
   appActionUrl,
   parseActionRepository,
   parseAppActionPayload,
@@ -26,28 +25,6 @@ describe('APP_ACTION_SLUGS', () => {
     for (const id of APP_ACTION_IDS) {
       expect(APP_ACTION_SLUGS[id]).toMatch(/^[a-z][a-z-]*$/);
     }
-  });
-});
-
-describe('AppActionResult', () => {
-  it('carries the success and failure shapes the callers report', () => {
-    const success: AppActionResult = {
-      ok: true,
-      action: 'StartAgent',
-      sessionId: 'ses_1',
-      href: '/(app)/agent-chat/ses_1',
-      message: 'started',
-    };
-    const failure: AppActionResult = {
-      ok: false,
-      action: 'OpenSession',
-      retryable: false,
-      code: 'unknown-session',
-      message: 'session not found',
-    };
-    expect(success.ok).toBe(true);
-    expect(failure.ok).toBe(false);
-    expect(failure.retryable).toBe(false);
   });
 });
 
@@ -261,6 +238,24 @@ describe('parseActionRepository', () => {
       kind: 'unsupported',
       fullName: 'w/r',
     });
+  });
+
+  it('keeps a dotted project name', () => {
+    expect(parseActionRepository('o/.github')).toEqual({ kind: 'github', fullName: 'o/.github' });
+    expect(parseActionRepository('https://gitlab.com/g/.config.schema')).toEqual({
+      kind: 'gitlab',
+      fullName: 'g/.config.schema',
+    });
+  });
+
+  it('returns null for a path segment the providers never name a project with', () => {
+    expect(parseActionRepository('../r')).toBeNull();
+    expect(parseActionRepository('./r')).toBeNull();
+    expect(parseActionRepository('o/..')).toBeNull();
+    expect(parseActionRepository('https://github.com/o/..')).toBeNull();
+    expect(parseActionRepository('https://gitlab.com/g/../r')).toBeNull();
+    expect(parseActionRepository('git@gitlab.com:g/./r.git')).toBeNull();
+    expect(parseActionRepository('https://bitbucket.org/w/../r')).toBeNull();
   });
 
   it('returns null for an unknown host, a blank value and an unusable path', () => {

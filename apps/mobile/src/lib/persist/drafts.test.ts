@@ -334,7 +334,6 @@ describe('debounce', () => {
     vi.useFakeTimers();
     saveDraft('u1', 'A', 'va');
     saveDraft('u1', 'B', 'vb');
-    // Flushing only A writes A's value under A's key; B stays pending.
     await flushDraft('u1', 'A');
     expect(kvMock.setItem).toHaveBeenCalledWith('draft:u1', 'A', '"va"');
     expect(kvMock.setItem).not.toHaveBeenCalledWith('draft:u1', 'B', expect.anything());
@@ -449,28 +448,32 @@ describe('size cap', () => {
 });
 
 describe('unsupported serialization boundary', () => {
-  it('does not throw and reports Sentry for a circular value without scheduling a write', async () => {
+  it('does not throw on a circular value, reports Sentry when the debounce fires, and writes nothing', async () => {
     vi.useFakeTimers();
     const circular: Record<string, unknown> = {};
     circular.self = circular;
     expect(() => {
       saveDraft('u1', 'k', circular);
     }).not.toThrow();
+    // Serialization is the debounced write's own work, so the report lands
+    // when that write would have: the keystroke that scheduled it pays nothing.
+    expect(Sentry.captureException).not.toHaveBeenCalled();
+    await vi.advanceTimersByTimeAsync(DRAFT_DEBOUNCE_MS * 2);
     expect(Sentry.captureException).toHaveBeenCalledWith(
       expect.any(Error),
       expect.objectContaining({
         tags: { 'error.subsystem': 'drafts', 'error.operation': 'write' },
       })
     );
-    await vi.advanceTimersByTimeAsync(DRAFT_DEBOUNCE_MS * 2);
     expect(kvMock.setItem).not.toHaveBeenCalled();
   });
 
-  it('does not throw and reports Sentry for an undefined value without scheduling a write', async () => {
+  it('does not throw on an undefined value, reports Sentry when the debounce fires, and writes nothing', async () => {
     vi.useFakeTimers();
     expect(() => {
       saveDraft('u1', 'k', undefined);
     }).not.toThrow();
+    await vi.advanceTimersByTimeAsync(DRAFT_DEBOUNCE_MS * 2);
     expect(Sentry.captureException).toHaveBeenCalledWith(
       expect.any(Error),
       expect.objectContaining({
@@ -478,7 +481,6 @@ describe('unsupported serialization boundary', () => {
         fingerprint: ['draft-write-unsupported-value'],
       })
     );
-    await vi.advanceTimersByTimeAsync(DRAFT_DEBOUNCE_MS * 2);
     expect(kvMock.setItem).not.toHaveBeenCalled();
   });
 
@@ -602,7 +604,6 @@ describe('eviction at the entry cap', () => {
 
     const entries = await kvMock.listEntries('draft:u1');
     expect(entries).toHaveLength(DRAFT_MAX_ENTRIES);
-    // The two oldest seeds were evicted; the newest key survived.
     expect(entries.some(entry => entry.k === 'old-0')).toBe(false);
     expect(entries.some(entry => entry.k === 'old-1')).toBe(false);
     expect(entries.some(entry => entry.k === 'newest')).toBe(true);

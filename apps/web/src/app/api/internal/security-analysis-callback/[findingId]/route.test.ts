@@ -1,11 +1,14 @@
 import { beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { deriveCallbackToken } from '@kilocode/worker-utils/callback-token';
 import { NextRequest } from 'next/server';
+import { CONTROL_PLANE_UPSTREAM_BUDGET_MS } from '@/lib/bounded-service-fetch';
 import type * as routeModule from './route';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
-  CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
   SECURITY_AUTO_ANALYSIS_WORKER_URL: 'https://security-auto-analysis.test',
+}));
+jest.mock('@/lib/web-config.server', () => ({
+  CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
 }));
 
 let POST: typeof routeModule.POST;
@@ -101,5 +104,33 @@ describe('security analysis callback rollback ingress', () => {
 
     expect(response.status).toBe(503);
     await expect(response.json()).resolves.toEqual({ error: 'Queue unavailable' });
+  });
+
+  it('answers 504 when the Worker never responds, instead of holding the request open', async () => {
+    const request = await callbackRequest();
+    jest.useFakeTimers();
+    try {
+      let fetchStarted!: () => void;
+      const started = new Promise<void>(resolve => {
+        fetchStarted = resolve;
+      });
+      mockFetch.mockImplementation(() => {
+        // Resolves once the bounded fetch armed its budget timer.
+        fetchStarted();
+        return new Promise<Response>(() => {});
+      });
+
+      const pending = POST(request, { params: Promise.resolve({ findingId }) });
+      await started;
+      await jest.advanceTimersByTimeAsync(CONTROL_PLANE_UPSTREAM_BUDGET_MS);
+
+      const response = await pending;
+      expect(response.status).toBe(504);
+      await expect(response.json()).resolves.toEqual({
+        error: 'Security analysis Worker did not respond in time',
+      });
+    } finally {
+      jest.useRealTimers();
+    }
   });
 });

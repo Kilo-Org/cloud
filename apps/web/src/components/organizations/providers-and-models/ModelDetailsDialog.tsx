@@ -16,6 +16,7 @@ import {
 } from '@/components/ui/table';
 import { MarkdownProse } from '@/components/security-agent/MarkdownProse';
 import { PolicyPill } from '@/components/organizations/providers-and-models/PolicyPills';
+import { DiscountedPrice } from '@/components/organizations/providers-and-models/DiscountedPrice';
 import type {
   ModelRow,
   ProviderOffering,
@@ -148,8 +149,20 @@ export function ModelDetailsDialog({
                         <span>{offering.providerDisplayName}</span>
                       </div>
                     </TableCell>
-                    <TableCell>{formatPriceCompact(offering.promptPrice)}</TableCell>
-                    <TableCell>{formatPriceCompact(offering.completionPrice)}</TableCell>
+                    <TableCell>
+                      <DiscountedPrice
+                        price={offering.promptPrice}
+                        originalPrice={offering.originalPromptPrice}
+                        formatPrice={formatPriceCompact}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <DiscountedPrice
+                        price={offering.completionPrice}
+                        originalPrice={offering.originalCompletionPrice}
+                        formatPrice={formatPriceCompact}
+                      />
+                    </TableCell>
                     <TableCell>
                       <PolicyPill value={offering.trains} variant="trains" />
                     </TableCell>

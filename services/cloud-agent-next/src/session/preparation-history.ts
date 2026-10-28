@@ -6,7 +6,6 @@ import type {
 } from '../shared/protocol.js';
 import type { EventQueries } from './queries/index.js';
 import type { StoredEvent } from '../websocket/types.js';
-import type { EventId } from '../types/ids.js';
 import { logger } from '../logger.js';
 
 const OUTPUT_TAIL_MAX_BYTES = 65_536;
@@ -258,10 +257,12 @@ export function materializePreparationEvent(
       label: data.label,
       status: 'running',
       startedAt: data.timestamp,
+      startedRevision: data.revision,
       revision: data.revision,
       ...(data.command === undefined ? {} : { command: data.command }),
       ...(data.commandIndex === undefined ? {} : { commandIndex: data.commandIndex }),
       ...(data.commandCount === undefined ? {} : { commandCount: data.commandCount }),
+      ...(data.parentStepId === undefined ? {} : { parentStepId: data.parentStepId }),
     };
   } else {
     if (!step || data.revision <= step.revision || isTerminal(step.status)) return false;
@@ -331,7 +332,34 @@ export function readPreparationSteps(
     const snapshot = parseSnapshot(row.payload);
     if (snapshot?.action === 'step_snapshot') steps.push(snapshot.stepSnapshot);
   }
-  return steps;
+  return steps.sort((a, b) => {
+    if ((a.startedRevision === undefined) !== (b.startedRevision === undefined)) {
+      return a.startedRevision === undefined ? -1 : 1;
+    }
+    return (
+      (a.startedRevision ?? 0) - (b.startedRevision ?? 0) ||
+      a.startedAt - b.startedAt ||
+      a.id.localeCompare(b.id)
+    );
+  });
+}
+
+/**
+ * Every materialized attempt with its steps, in the order a client that
+ * replays the snapshots builds them, so a page can show them before the stream.
+ * Step output is left out: only an opened step shows it, and the stream sends it.
+ */
+export function listPreparationAttempts(eventQueries: EventQueries): PreparationAttempt[] {
+  const attempts: PreparationAttempt[] = [];
+  for (const row of eventQueries.findByEntityPrefix('preparation/attempt/')) {
+    const snapshot = parseSnapshot(row.payload);
+    if (snapshot?.action !== 'attempt_snapshot') continue;
+    const steps = readPreparationSteps(eventQueries, snapshot.attempt.id).map(
+      ({ outputTail: _outputTail, outputTruncated: _outputTruncated, ...step }) => step
+    );
+    attempts.push({ ...snapshot.attempt, steps });
+  }
+  return attempts.sort((a, b) => a.startedAt - b.startedAt);
 }
 
 export type PreparationOutcome = { status: 'completed' } | { status: 'failed'; safeError: string };
@@ -357,7 +385,7 @@ export function finalizePreparationAttempt(
   const events: StoredEvent[] = [];
   const emit = (data: PreparingEventDataV2): void => {
     const stored: StoredEvent = {
-      id: 0 as EventId,
+      id: 0,
       execution_id: row.execution_id,
       session_id: row.session_id,
       stream_event_type: 'preparing',

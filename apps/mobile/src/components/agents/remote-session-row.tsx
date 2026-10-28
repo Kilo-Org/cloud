@@ -7,7 +7,7 @@ import { buildActiveSessionsTrayInput } from '@/lib/active-sessions-live';
 import { currentAuthEpoch, isCurrentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { isSignOutActive } from '@/lib/auth/sign-out-state';
 import { useOrganization } from '@/lib/organization-context';
-import { resolveSessionPrPressTarget } from '@/lib/session-pr-navigation';
+import { resolveSessionPrTapTarget } from '@/lib/session-pr-navigation';
 import { type AccessibilityActionEvent, Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
@@ -26,7 +26,7 @@ import {
 } from '@/lib/session-attention';
 import { useTRPC } from '@/lib/trpc';
 import { exitRemoteSessionFromList } from './exit-remote-session-from-list';
-import { showRemoteSessionExitConfirmation } from './remote-session-exit-alert';
+import { useRemoteSessionExitConfirmation } from './remote-session-exit-alert';
 import { namedSessionTitle, useUserSessionTitlesRevision } from './session-detail-rename-state';
 import {
   activeSessionMetaTimestamp,
@@ -39,6 +39,7 @@ import {
   remoteSessionEyebrowLabel,
   selectRemoteRowSpokenMeta,
 } from './session-list-helpers';
+import { sessionTranscriptQueryOptions } from './session-transcript-page';
 import { selectRowPlatformPresentation, SessionPlatformIcon } from './session-platform-icon';
 import { openSessionPreviewStore } from './session-preview-state';
 import { type RowVariant } from './session-row';
@@ -59,13 +60,13 @@ type RemoteSessionRowProps = {
 };
 
 /**
- * Opens a session's associated PR through the provider-aware, flag-aware route.
+ * Opens a session's associated PR through the provider-aware route.
  * The native router and browser imports are lazy: they cannot load under the
  * mounted row tests' node environment, and only the long-press entry reaches
  * them.
  */
 async function openSessionPr(url: string | null | undefined, label: string): Promise<void> {
-  const target = await resolveSessionPrPressTarget({ url });
+  const target = resolveSessionPrTapTarget({ url });
   if (target.kind === 'in-app') {
     const { router } = await import('expo-router');
     router.push(target.href);
@@ -87,6 +88,7 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
   const queryClient = useQueryClient();
   const trpc = useTRPC();
   const connection = useUserWebConnection();
+  const { confirmExit, exitDialog } = useRemoteSessionExitConfirmation();
   const { organizationId, isLoaded } = useOrganization();
   const authEpoch = currentAuthEpoch();
   const refreshScope = useMemo(
@@ -136,12 +138,14 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
   // bumps the shared revision, so the flag re-derives when it ticks. A parent
   // re-render with an unchanged payload and no ack reuses this result.
   const needsInput = useMemo(
-    () =>
-      shouldShowNeedsInput({
+    () => {
+      const raiseId = session.statusUpdatedAt ?? session.status;
+      return shouldShowNeedsInput({
         status: session.status,
-        raiseId: session.status,
-        isAcked: isAttentionAcked(session.id, session.status),
-      }),
+        raiseId,
+        isAcked: isAttentionAcked(session.id, { raiseId, status: session.status }),
+      });
+    },
     // eslint-disable-next-line react/exhaustive-deps -- the revision is a real input: `isAttentionAcked` reads the ack store, so the flag must re-derive when that store ticks.
     [session, revision]
   );
@@ -149,22 +153,9 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
     reconcileSessionAttention(session.id, session.status, null);
   }, [session.id, session.status, revision]);
 
-  const {
-    title,
-    agentLabel,
-    canExit,
-    statusKind,
-    subtitle,
-    spokenPrNumber,
-    scheduledWake,
-    spokenMeta,
-  } = useMemo(() => {
-    // Spoken meta mirrors the visible meta the row renders. When `needsInput`
-    // wins, the right eyebrow shows `NEEDS INPUT` and meta is NOT rendered,
-    // so the label omits it. A scheduled row renders `SCHEDULED · <wake>`, so
-    // the label speaks the wake beside `Scheduled` instead of a timestamp.
-    // Otherwise announce the same timestamp as `remoteMeta` (prefer
-    // lastActivityAt, fall back to updatedAt).
+  const canExit = canExitSessionFromList(session);
+  const statusKind = glanceableStatusKind(session.status);
+  const { title, agentLabel, subtitle, spokenPrNumber, scheduledWake, spokenMeta } = useMemo(() => {
     const isScheduled = session.status === 'scheduled';
     const scheduledWakeValue =
       isScheduled && session.scheduledAt ? formatScheduledWake(session.scheduledAt) : null;
@@ -173,8 +164,6 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
     return {
       title: namedSessionTitle(session.title, session.id) ?? t('agents.sessionRow.untitled'),
       agentLabel: remoteSessionEyebrowLabel(session),
-      canExit: canExitSessionFromList(session),
-      statusKind: glanceableStatusKind(session.status),
       // Provenance subtitle: list rows show "branch · #N", card rows keep the
       // branch-only subtitle. The spoken label mirrors this, with the PR phrase
       // only on the list variant.
@@ -187,13 +176,14 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
             }),
       spokenPrNumber: variant === 'card' ? null : (session.associatedPr?.number ?? null),
       scheduledWake: scheduledWakeValue,
-      spokenMeta: isScheduled
-        ? scheduledWakeValue
-        : selectRemoteRowSpokenMeta({
-            needsInput,
-            costSpoken: formatSpokenCost(session.totalCostMicrodollars),
-            timeSpoken,
-          }),
+      spokenMeta: selectRemoteRowSpokenMeta({
+        variant,
+        scheduled: isScheduled,
+        scheduledWake: scheduledWakeValue,
+        needsInput,
+        costSpoken: formatSpokenCost(session.totalCostMicrodollars),
+        timeSpoken,
+      }),
     };
     // eslint-disable-next-line react/exhaustive-deps -- the titles revision and the sampled clock are real inputs: `namedSessionTitle` reads the recorded-titles store, and `formatSpokenTimeAgo` reads the clock, so both must re-derive when they tick.
   }, [session, variant, needsInput, t, titlesRevision, now]);
@@ -248,7 +238,7 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
 
   const handleExit = () => {
     void exitRemoteSessionFromList({
-      confirm: showRemoteSessionExitConfirmation,
+      confirm: confirmExit,
       sendExit: async () => {
         await connection.sendCommand(
           session.id,
@@ -305,10 +295,7 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
 
   const handlePressIn = canManage
     ? () => {
-        void prefetchSessionTranscript(
-          queryClient,
-          trpc.cliSessionsV2.getSessionMessages.queryOptions({ session_id: session.id })
-        );
+        void prefetchSessionTranscript(queryClient, sessionTranscriptQueryOptions(session.id));
       }
     : undefined;
 
@@ -357,6 +344,7 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
         last={variant === 'card' ? true : undefined}
         className={variant === 'card' ? undefined : 'pl-[22px] pr-[22px]'}
       />
+      {exitDialog}
     </Pressable>
   );
 });

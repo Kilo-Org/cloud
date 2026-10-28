@@ -41,8 +41,6 @@ export type {
   MyPullEntry,
 } from './branch-ops-inner';
 
-// ── Context resolution ───────────────────────────────────────────────────
-
 /**
  * The inner context plus the WastelandDO stub that the worker-bound
  * wrappers need to refresh the wanted-board cache and meter billing.
@@ -116,8 +114,6 @@ async function loadContext(
     token,
   };
 }
-
-// ── Worker-bound public ops ─────────────────────────────────────────────
 
 export async function listMyForkBranches(
   env: Env,

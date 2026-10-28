@@ -4,11 +4,12 @@ import path from 'node:path';
 import { parse } from 'jsonc-parser';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import jwt from 'jsonwebtoken';
-import { VERCEL_SANDBOX_UNAVAILABLE_MESSAGE } from './agent-sandbox/vercel/vercel-agent-sandbox.js';
+import { TRPCError } from '@trpc/server';
 import type { Env } from './types.js';
-import { mintWrapperDispatchTicket, type WrapperDispatchTicketClaims } from './auth.js';
 import { mintControlLogUploadGrant } from './sandbox-control/log-upload-grant.js';
 import { mintSandboxLaunchCredential } from './sandbox-control/credential.js';
+import { previewLabel } from './preview/host.js';
+import { PREVIEW_SESSION_MISSING_TEXT } from './preview/container-port-fetch.js';
 import {
   createRuntimeProxyGrant,
   issueRuntimeCredentialProxyHandle,
@@ -75,6 +76,14 @@ vi.mock('cloudflare:workers', () => ({
   },
 }));
 
+vi.mock('./byoc/vercel-runtime-identity.js', () => ({
+  getVercelRuntimeIdentity: vi.fn().mockResolvedValue({
+    wrapperVersion: 'test-wrapper',
+    releasedAt: '2026-10-24',
+    digest: 'test-runtime-digest',
+  }),
+}));
+
 vi.mock('./router.js', () => ({
   appRouter: {},
 }));
@@ -122,10 +131,6 @@ vi.mock('./session-access.js', () => ({
     ),
 }));
 
-vi.mock('./persistence/CloudAgentSession.js', () => ({
-  CloudAgentSession: class CloudAgentSession {},
-}));
-
 vi.mock('./db/pg.js', () => ({
   getPgDb: getPgDbMock,
 }));
@@ -152,16 +157,14 @@ const {
 const secret = 'test-secret';
 
 type MockEnv = {
+  BYOC_VERCEL_IDS?: string;
+  VERCEL_SNAPSHOT_BUILD: { getByName: ReturnType<typeof vi.fn> };
   NEXTAUTH_SECRET: string;
   Sandbox: unknown;
   SandboxSmall: unknown;
   WS_ALLOWED_ORIGINS?: string;
   HYPERDRIVE: { connectionString: string };
   INTERNAL_API_SECRET?: string;
-  CLOUD_AGENT_SESSION: {
-    idFromName: ReturnType<typeof vi.fn>;
-    get: ReturnType<typeof vi.fn>;
-  };
   USER_KILO_FACADE: {
     idFromName: ReturnType<typeof vi.fn>;
     get: ReturnType<typeof vi.fn>;
@@ -182,14 +185,11 @@ type MockEnv = {
 function createEnv(): MockEnv {
   return {
     NEXTAUTH_SECRET: secret,
+    VERCEL_SNAPSHOT_BUILD: { getByName: vi.fn() },
     Sandbox: {},
     SandboxSmall: {},
     HYPERDRIVE: { connectionString: 'postgres://test' },
     INTERNAL_API_SECRET: 'test-internal-secret',
-    CLOUD_AGENT_SESSION: {
-      idFromName: vi.fn(),
-      get: vi.fn(() => ({ getRuntimeAuthorizationStatus: vi.fn().mockResolvedValue('legacy') })),
-    },
     USER_KILO_FACADE: {
       idFromName: vi.fn(),
       get: vi.fn(),
@@ -234,22 +234,6 @@ function signKiloTokenWithAudience(audience: string | string[], userId = 'usr_1'
     },
     secret,
     { algorithm: 'HS256' }
-  );
-}
-
-function signWrapperDispatchTicket(overrides: Partial<WrapperDispatchTicketClaims> = {}): string {
-  return mintWrapperDispatchTicket(
-    {
-      type: 'wrapper_dispatch_ticket',
-      userId: 'usr_feed',
-      cloudAgentSessionId: 'agent_live',
-      kiloSessionId: 'ses_12345678901234567890123456',
-      wrapperRunId: 'wr_1',
-      wrapperGeneration: 2,
-      wrapperConnectionId: 'conn_1',
-      ...overrides,
-    },
-    secret
   );
 }
 
@@ -300,14 +284,14 @@ describe('server /stream', () => {
       {
         type: 'stream_ticket',
         userId: 'user-1',
-        cloudAgentSessionId: 'session-1',
+        cloudAgentSessionId: 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
       },
       secret,
       { algorithm: 'HS256', expiresIn: -1 }
     );
     const env = createEnv();
     const request = new Request(
-      `http://worker.test/stream?cloudAgentSessionId=session-1&ticket=${encodeURIComponent(ticket)}`,
+      `http://worker.test/stream?cloudAgentSessionId=workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa&ticket=${encodeURIComponent(ticket)}`,
       {
         headers: { Upgrade: 'websocket' },
       }
@@ -317,8 +301,8 @@ describe('server /stream', () => {
 
     expect(response.status).toBe(401);
     await expect(response.text()).resolves.toBe('Ticket expired');
-    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
-    expect(env.CLOUD_AGENT_SESSION.get).not.toHaveBeenCalled();
+    expect(env.SANDBOX_SESSION.idFromName).not.toHaveBeenCalled();
+    expect(env.SANDBOX_SESSION.get).not.toHaveBeenCalled();
   });
 
   it('rejects a valid ticket when current session access has been removed', async () => {
@@ -327,7 +311,7 @@ describe('server /stream', () => {
         type: 'stream_ticket',
         userId: 'user-1',
         kiloSessionId: 'ses_12345678901234567890123456',
-        cloudAgentSessionId: 'session-1',
+        cloudAgentSessionId: 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
       },
       secret,
       { algorithm: 'HS256', expiresIn: 60, audience: 'cloud-agent-stream' }
@@ -337,7 +321,7 @@ describe('server /stream', () => {
       Object.assign(new Error('Session access denied'), { code: 'FORBIDDEN' })
     );
     const request = new Request(
-      `http://worker.test/stream?cloudAgentSessionId=session-1&ticket=${encodeURIComponent(ticket)}`,
+      `http://worker.test/stream?cloudAgentSessionId=workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa&ticket=${encodeURIComponent(ticket)}`,
       { headers: { Upgrade: 'websocket' } }
     );
 
@@ -345,8 +329,8 @@ describe('server /stream', () => {
 
     expect(response.status).toBe(403);
     await expect(response.text()).resolves.toBe('Session access denied');
-    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
-    expect(env.CLOUD_AGENT_SESSION.get).not.toHaveBeenCalled();
+    expect(env.SANDBOX_SESSION.idFromName).not.toHaveBeenCalled();
+    expect(env.SANDBOX_SESSION.get).not.toHaveBeenCalled();
   });
 });
 
@@ -500,7 +484,6 @@ describe('server /terminal', () => {
     await expect(response.text()).resolves.toBe('Invalid ticket signature');
     expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
     expect(env.STREAM_TICKET_NONCE_DO.idFromName).not.toHaveBeenCalled();
-    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
     expect(env.SANDBOX_SESSION.idFromName).not.toHaveBeenCalled();
   });
 
@@ -552,7 +535,6 @@ describe('server /terminal', () => {
     });
     expect(consume).toHaveBeenCalledOnce();
     expect(env.SANDBOX_SESSION.idFromName).toHaveBeenCalledWith(`user-1:${sessionId}`);
-    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
     expect(getRunningTerminalClientMock).not.toHaveBeenCalled();
     expect(sessionFetch).toHaveBeenCalledOnce();
 
@@ -619,85 +601,13 @@ describe('server /terminal', () => {
     }
   );
 
-  it('proxies valid terminal tickets directly to the wrapper container', async () => {
-    const ticket = jwt.sign(
-      {
-        type: 'stream_ticket',
-        purpose: 'terminal',
-        userId: 'user-1',
-        cloudAgentSessionId: 'session-1',
-        ptyId: 'pty_123',
-        nonce: 'nonce-1',
-      },
-      secret,
-      { algorithm: 'HS256', expiresIn: 60, audience: 'cloud-agent-terminal' }
-    );
-    const env = createEnv();
-    env.STREAM_TICKET_NONCE_DO.idFromName.mockReturnValue('nonce-do-id');
-    env.STREAM_TICKET_NONCE_DO.get.mockReturnValue({
-      consume: vi.fn().mockResolvedValue(true),
-    });
-    const metadata = {
-      metadataSchemaVersion: 2,
-      identity: {
-        sessionId: 'session-1',
-        userId: 'user-1',
-        createdOnPlatform: 'cloud-agent-web',
-      },
-      auth: {},
-      workspace: {
-        sandboxId: `usr-${'a'.repeat(48)}`,
-        workspacePath: '/workspace/user/repo',
-      },
-      lifecycle: {
-        version: 1,
-        timestamp: Date.now(),
-        preparedAt: Date.now(),
-      },
-    };
-    const terminalResponse = new Response('proxied', { status: 200 });
-    const connectTerminal = vi.fn().mockResolvedValueOnce(terminalResponse);
-    getRunningTerminalClientMock.mockResolvedValue({
-      status: 'ready',
-      client: { connectTerminal },
-    });
-    const getMetadata = vi.fn().mockResolvedValue(metadata);
-    const fetch = vi.fn();
-    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('do-id');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
-      fetch,
-      getMetadata,
-      isRuntimeAuthorizationRecoveryInProgress: vi.fn().mockResolvedValue(false),
-    });
-
-    const request = new Request(
-      `http://worker.test/terminal?cloudAgentSessionId=session-1&ptyId=pty_123&ticket=${encodeURIComponent(ticket)}`,
-      {
-        headers: { Upgrade: 'websocket' },
-      }
-    );
-
-    const response = await fetchWorker(request, env);
-
-    expect(response).toBe(terminalResponse);
-    expect(env.CLOUD_AGENT_SESSION.idFromName).toHaveBeenCalledWith('user-1:session-1');
-    expect(getMetadata).toHaveBeenCalledTimes(1);
-    expect(fetch).not.toHaveBeenCalled();
-    expect(getRunningTerminalClientMock).toHaveBeenCalledOnce();
-    expect(connectTerminal).toHaveBeenCalledTimes(1);
-    const connectRequest = connectTerminal.mock.calls[0]?.[1];
-    expect(connectRequest).toBeInstanceOf(Request);
-    expect(new URL((connectRequest as Request).url).pathname).toBe('/terminal');
-    expect(connectTerminal).toHaveBeenCalledWith('pty_123', request);
-  });
-
   it('rejects removed session access before Durable Object lookup', async () => {
     const ticket = jwt.sign(
       {
         type: 'stream_ticket',
         purpose: 'terminal',
         userId: 'user-1',
-        cloudAgentSessionId: 'session-1',
+        cloudAgentSessionId: 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
         ptyId: 'pty_123',
       },
       secret,
@@ -708,64 +618,16 @@ describe('server /terminal', () => {
     );
     const env = createEnv();
     const request = new Request(
-      `http://worker.test/terminal?cloudAgentSessionId=session-1&ptyId=pty_123&ticket=${encodeURIComponent(ticket)}`,
+      `http://worker.test/terminal?cloudAgentSessionId=workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa&ptyId=pty_123&ticket=${encodeURIComponent(ticket)}`,
       { headers: { Upgrade: 'websocket' } }
     );
 
     const response = await fetchWorker(request, env);
 
     expect(response.status).toBe(403);
-    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
-    expect(env.CLOUD_AGENT_SESSION.get).not.toHaveBeenCalled();
+    expect(env.SANDBOX_SESSION.idFromName).not.toHaveBeenCalled();
+    expect(env.SANDBOX_SESSION.get).not.toHaveBeenCalled();
     expect(getRunningTerminalClientMock).not.toHaveBeenCalled();
-  });
-
-  it('returns the explicit provider capability error for Vercel terminal transport', async () => {
-    const ticket = jwt.sign(
-      {
-        type: 'stream_ticket',
-        purpose: 'terminal',
-        userId: 'user-1',
-        cloudAgentSessionId: 'session-1',
-        ptyId: 'pty_123',
-        nonce: 'nonce-1',
-      },
-      secret,
-      { algorithm: 'HS256', expiresIn: 60, audience: 'cloud-agent-terminal' }
-    );
-    const env = createEnv();
-    env.STREAM_TICKET_NONCE_DO.idFromName.mockReturnValue('nonce-do-id');
-    env.STREAM_TICKET_NONCE_DO.get.mockReturnValue({
-      consume: vi.fn().mockResolvedValue(true),
-    });
-    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('do-id');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
-      isRuntimeAuthorizationRecoveryInProgress: vi.fn().mockResolvedValue(false),
-      getMetadata: vi.fn().mockResolvedValue({
-        metadataSchemaVersion: 2,
-        identity: {
-          sessionId: 'session-1',
-          userId: 'user-1',
-          createdOnPlatform: 'cloud-agent-web',
-        },
-        auth: {},
-        workspace: { sandboxId: 'ses-vercel', sandboxProvider: 'vercel', workspacePath: '/repo' },
-        lifecycle: { version: 1, timestamp: 1, preparedAt: 1 },
-      }),
-    });
-    getRunningTerminalClientMock.mockResolvedValue({
-      status: 'capability-unavailable',
-      message: VERCEL_SANDBOX_UNAVAILABLE_MESSAGE,
-    });
-    const request = new Request(
-      `http://worker.test/terminal?cloudAgentSessionId=session-1&ptyId=pty_123&ticket=${encodeURIComponent(ticket)}`,
-      { headers: { Upgrade: 'websocket' } }
-    );
-
-    const response = await fetchWorker(request, env);
-
-    expect(response.status).toBe(503);
-    await expect(response.text()).resolves.toBe(VERCEL_SANDBOX_UNAVAILABLE_MESSAGE);
   });
 
   it('rejects stream-purpose tickets', async () => {
@@ -774,14 +636,14 @@ describe('server /terminal', () => {
         type: 'stream_ticket',
         purpose: 'stream',
         userId: 'user-1',
-        cloudAgentSessionId: 'session-1',
+        cloudAgentSessionId: 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
       },
       secret,
       { algorithm: 'HS256', expiresIn: 60, audience: 'cloud-agent-terminal' }
     );
     const env = createEnv();
     const request = new Request(
-      `http://worker.test/terminal?cloudAgentSessionId=session-1&ptyId=pty_123&ticket=${encodeURIComponent(ticket)}`,
+      `http://worker.test/terminal?cloudAgentSessionId=workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa&ptyId=pty_123&ticket=${encodeURIComponent(ticket)}`,
       {
         headers: { Upgrade: 'websocket' },
       }
@@ -791,7 +653,7 @@ describe('server /terminal', () => {
 
     expect(response.status).toBe(403);
     await expect(response.text()).resolves.toBe('Invalid ticket purpose');
-    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
+    expect(env.SANDBOX_SESSION.idFromName).not.toHaveBeenCalled();
   });
 
   it('rejects terminal tickets scoped to a different PTY', async () => {
@@ -800,7 +662,7 @@ describe('server /terminal', () => {
         type: 'stream_ticket',
         purpose: 'terminal',
         userId: 'user-1',
-        cloudAgentSessionId: 'session-1',
+        cloudAgentSessionId: 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
         ptyId: 'pty_other',
       },
       secret,
@@ -808,7 +670,7 @@ describe('server /terminal', () => {
     );
     const env = createEnv();
     const request = new Request(
-      `http://worker.test/terminal?cloudAgentSessionId=session-1&ptyId=pty_123&ticket=${encodeURIComponent(ticket)}`,
+      `http://worker.test/terminal?cloudAgentSessionId=workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa&ptyId=pty_123&ticket=${encodeURIComponent(ticket)}`,
       {
         headers: { Upgrade: 'websocket' },
       }
@@ -818,7 +680,7 @@ describe('server /terminal', () => {
 
     expect(response.status).toBe(403);
     await expect(response.text()).resolves.toBe('PTY mismatch');
-    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
+    expect(env.SANDBOX_SESSION.idFromName).not.toHaveBeenCalled();
   });
 
   it('rejects disallowed WebSocket origins before looking up the session', async () => {
@@ -827,7 +689,7 @@ describe('server /terminal', () => {
         type: 'stream_ticket',
         purpose: 'terminal',
         userId: 'user-1',
-        cloudAgentSessionId: 'session-1',
+        cloudAgentSessionId: 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
         ptyId: 'pty_123',
       },
       secret,
@@ -836,7 +698,7 @@ describe('server /terminal', () => {
     const env = createEnv();
     env.WS_ALLOWED_ORIGINS = 'https://app.example.com';
     const request = new Request(
-      `http://worker.test/terminal?cloudAgentSessionId=session-1&ptyId=pty_123&ticket=${encodeURIComponent(ticket)}`,
+      `http://worker.test/terminal?cloudAgentSessionId=workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa&ptyId=pty_123&ticket=${encodeURIComponent(ticket)}`,
       {
         headers: {
           Upgrade: 'websocket',
@@ -849,18 +711,40 @@ describe('server /terminal', () => {
 
     expect(response.status).toBe(403);
     await expect(response.text()).resolves.toBe('Origin not allowed');
-    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
+    expect(env.SANDBOX_SESSION.idFromName).not.toHaveBeenCalled();
+  });
+  it('rejects agent_ sessions before resolving the control-plane Durable Object', async () => {
+    const sessionId = 'agent_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    const ticket = signTerminalTicket(sessionId);
+    const env = createEnv();
+    const consume = installTerminalNonceConsumer(env);
+
+    const response = await fetchWorker(
+      new Request(
+        `http://worker.test/terminal?cloudAgentSessionId=${sessionId}&ptyId=pty_123&ticket=${encodeURIComponent(ticket)}`,
+        { headers: { Upgrade: 'websocket' } }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(404);
+    await expect(response.text()).resolves.toBe('Not found');
+    expect(env.SANDBOX_SESSION.idFromName).not.toHaveBeenCalled();
+    expect(consume).not.toHaveBeenCalled();
   });
 });
 
 describe('server runtime credential proxy', () => {
-  async function handle(kiloSessionId = 'kilo_proxy'): Promise<string> {
+  async function handle(
+    kiloSessionId = 'kilo_proxy',
+    sessionId = 'workspace_proxy'
+  ): Promise<string> {
     return issueRuntimeCredentialProxyHandle(
       { NEXTAUTH_SECRET: secret } as never,
       createRuntimeProxyGrant({
         plane: 'legacy',
         authorizationId: '11111111-1111-4111-8111-111111111111',
-        sessionId: 'agent_proxy',
+        sessionId,
         kiloSessionId,
         userId: 'usr_proxy',
         orgId: 'org_proxy',
@@ -884,9 +768,28 @@ describe('server runtime credential proxy', () => {
       env
     );
     expect(response.status).toBe(401);
-    expect(env.CLOUD_AGENT_SESSION.get).not.toHaveBeenCalled();
+    expect(env.SANDBOX_SESSION.get).not.toHaveBeenCalled();
     expect(upstream).not.toHaveBeenCalled();
     vi.unstubAllGlobals();
+  });
+
+  it('denies retired agent session handles before resolving a session', async () => {
+    const env = createEnv();
+    const upstream = vi.fn();
+    vi.stubGlobal('fetch', upstream);
+    try {
+      const response = await fetchWorker(
+        new Request('https://worker.test/api/runtime-credential-proxy/provider/models', {
+          headers: { Authorization: `Bearer ${await handle('kilo_proxy', 'agent_proxy')}` },
+        }),
+        env
+      );
+      expect(response.status).toBe(401);
+      expect(env.SANDBOX_SESSION.get).not.toHaveBeenCalled();
+      expect(upstream).not.toHaveBeenCalled();
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it('routes verified facade requests and leaves non-handles to ordinary routing', async () => {
@@ -897,10 +800,10 @@ describe('server runtime credential proxy', () => {
       runtimeAuthorization: {
         userId: 'usr_proxy',
         authorizationId: '11111111-1111-4111-8111-111111111111',
-        resourceId: 'agent_proxy',
+        resourceId: 'workspace_proxy',
       },
     });
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
+    env.SANDBOX_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
     const upstream = vi.fn().mockResolvedValue(new Response('ok'));
     vi.stubGlobal('fetch', upstream);
     try {
@@ -980,7 +883,7 @@ describe('server runtime credential proxy', () => {
       createRuntimeProxyGrant({
         plane: 'control',
         authorizationId: '22222222-2222-4222-8222-222222222222',
-        sessionId: 'agent_sibling',
+        sessionId: 'workspace_sibling',
         kiloSessionId: 'kilo_sibling',
         userId: 'usr_proxy',
         mode: 'contained',
@@ -997,7 +900,7 @@ describe('server runtime credential proxy', () => {
       runtimeAuthorization: {
         userId: 'usr_proxy',
         authorizationId: '11111111-1111-4111-8111-111111111111',
-        resourceId: 'agent_proxy',
+        resourceId: 'workspace_proxy',
       },
     });
     const secondResolve = vi.fn().mockResolvedValue({
@@ -1005,12 +908,12 @@ describe('server runtime credential proxy', () => {
       runtimeAuthorization: {
         userId: 'usr_proxy',
         authorizationId: '22222222-2222-4222-8222-222222222222',
-        resourceId: 'agent_sibling',
+        resourceId: 'workspace_sibling',
       },
     });
-    env.CLOUD_AGENT_SESSION.idFromName.mockImplementation((name: string) => name);
-    env.CLOUD_AGENT_SESSION.get.mockImplementation((id: string) =>
-      id === 'usr_proxy:agent_proxy'
+    env.SANDBOX_SESSION.idFromName.mockImplementation((name: string) => name);
+    env.SANDBOX_SESSION.get.mockImplementation((id: string) =>
+      id === 'usr_proxy:workspace_proxy'
         ? { resolveRuntimeCredentialProxyGrant: firstResolve }
         : { resolveRuntimeCredentialProxyGrant: secondResolve }
     );
@@ -1054,13 +957,13 @@ describe('server runtime credential proxy', () => {
 
   it('recognizes only paths under a safe configured facade prefix', async () => {
     const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test/runtime' });
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+    env.SANDBOX_SESSION.get.mockReturnValue({
       resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
         token: 'https://api.kilo.ai:backing-token',
         runtimeAuthorization: {
           userId: 'usr_proxy',
           authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'agent_proxy',
+          resourceId: 'workspace_proxy',
         },
       }),
     });
@@ -1102,10 +1005,10 @@ describe('server runtime credential proxy', () => {
       runtimeAuthorization: {
         userId: 'usr_proxy',
         authorizationId: '11111111-1111-4111-8111-111111111111',
-        resourceId: 'agent_proxy',
+        resourceId: 'workspace_proxy',
       },
     });
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
+    env.SANDBOX_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
     const upstream = vi.fn(async (request: Request) => {
       expect(request.method).toBe('POST');
       expect(new URL(request.url).pathname).toBe('/api/openrouter/chat/completions');
@@ -1124,7 +1027,7 @@ describe('server runtime credential proxy', () => {
           audience: 'kilo-gateway',
           userId: 'usr_proxy',
           authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'agent_proxy',
+          resourceId: 'workspace_proxy',
           bearer: 'https://provider.example.test/api/openrouter:backing-token',
         })
       ).resolves.toBe(true);
@@ -1160,14 +1063,14 @@ describe('server runtime credential proxy', () => {
 
   it('removes every adjacent prohibited header before injecting runtime credentials', async () => {
     const env = createEnv();
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+    env.SANDBOX_SESSION.get.mockReturnValue({
       resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
         token: 'https://provider.example.test/api/openrouter:backing-token',
         organizationId: 'org_proxy',
         runtimeAuthorization: {
           userId: 'usr_proxy',
           authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'agent_proxy',
+          resourceId: 'workspace_proxy',
         },
       }),
     });
@@ -1219,14 +1122,14 @@ describe('server runtime credential proxy', () => {
 
   it('forwards gateway attribution headers while still replacing the organization header', async () => {
     const env = createEnv();
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+    env.SANDBOX_SESSION.get.mockReturnValue({
       resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
         token: 'https://provider.example.test/api/openrouter:backing-token',
         organizationId: 'org_proxy',
         runtimeAuthorization: {
           userId: 'usr_proxy',
           authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'agent_proxy',
+          resourceId: 'workspace_proxy',
         },
       }),
     });
@@ -1274,13 +1177,13 @@ describe('server runtime credential proxy', () => {
 
   it('removes generic caller credential headers before injecting runtime credentials', async () => {
     const env = createEnv();
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+    env.SANDBOX_SESSION.get.mockReturnValue({
       resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
         token: 'https://provider.example.test/api/openrouter:backing-token',
         runtimeAuthorization: {
           userId: 'usr_proxy',
           authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'agent_proxy',
+          resourceId: 'workspace_proxy',
         },
       }),
     });
@@ -1313,13 +1216,13 @@ describe('server runtime credential proxy', () => {
 
   it('removes unsafe upstream response headers while preserving redirects and streaming', async () => {
     const env = createEnv();
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+    env.SANDBOX_SESSION.get.mockReturnValue({
       resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
         token: 'https://provider.example.test/api/openrouter:backing-token',
         runtimeAuthorization: {
           userId: 'usr_proxy',
           authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'agent_proxy',
+          resourceId: 'workspace_proxy',
         },
       }),
     });
@@ -1384,10 +1287,10 @@ describe('server runtime credential proxy', () => {
       runtimeAuthorization: {
         userId: 'usr_proxy',
         authorizationId: '11111111-1111-4111-8111-111111111111',
-        resourceId: 'agent_proxy',
+        resourceId: 'workspace_proxy',
       },
     });
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
+    env.SANDBOX_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
     const upstream = vi.fn(async (request: Request) => {
       expect(request.method).toBe('POST');
       expect(request.url).toBe('https://api.kilo.ai/api/gateway/chat/completions?stream=true');
@@ -1411,14 +1314,14 @@ describe('server runtime credential proxy', () => {
   it('forwards allowlisted Exa requests with a kilo-gateway attestation', async () => {
     const env = createEnv();
     const backingToken = jwt.sign({ exp: 4_000_000_000 }, secret);
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+    env.SANDBOX_SESSION.get.mockReturnValue({
       resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
         token: backingToken,
         organizationId: 'org_proxy',
         runtimeAuthorization: {
           userId: 'usr_proxy',
           authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'agent_proxy',
+          resourceId: 'workspace_proxy',
         },
       }),
     });
@@ -1434,7 +1337,7 @@ describe('server runtime credential proxy', () => {
           audience: 'kilo-gateway',
           userId: 'usr_proxy',
           authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'agent_proxy',
+          resourceId: 'workspace_proxy',
           bearer: backingToken,
         })
       ).resolves.toBe(true);
@@ -1467,10 +1370,10 @@ describe('server runtime credential proxy', () => {
       runtimeAuthorization: {
         userId: 'usr_proxy',
         authorizationId: '11111111-1111-4111-8111-111111111111',
-        resourceId: 'agent_proxy',
+        resourceId: 'workspace_proxy',
       },
     });
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
+    env.SANDBOX_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
     const upstream = vi.fn();
     vi.stubGlobal('fetch', upstream);
     const response = await fetchWorker(
@@ -1496,7 +1399,7 @@ describe('server runtime credential proxy', () => {
       const binding = vi.fn(async (request: Request) => {
         expect(request.headers.get('Authorization')).toBe(`Bearer ${token}`);
         expect(request.headers.get('X-Internal-Secret')).toBe('internal-secret');
-        expect(request.headers.get('X-Kilo-Cloud-Agent-Session')).toBe('agent_proxy');
+        expect(request.headers.get('X-Kilo-Cloud-Agent-Session')).toBe('workspace_proxy');
         expect(request.headers.get('X-Kilo-Root-Session')).toBe(root);
         expect(request.headers.get('X-Kilo-Session-Scope-Protocol')).toBe('1');
         expect(request.headers.get('X-Kilo-Trusted-Session-Lineage')).toBeNull();
@@ -1510,7 +1413,7 @@ describe('server runtime credential proxy', () => {
             audience: 'session-ingest',
             userId: 'usr_proxy',
             authorizationId: '11111111-1111-4111-8111-111111111111',
-            resourceId: 'agent_proxy',
+            resourceId: 'workspace_proxy',
             bearer: token,
           })
         ).toBe(true);
@@ -1521,13 +1424,13 @@ describe('server runtime credential proxy', () => {
         INTERNAL_API_SECRET_PROD: { get: async () => 'internal-secret' },
         SESSION_INGEST: { fetch: binding },
       });
-      env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+      env.SANDBOX_SESSION.get.mockReturnValue({
         resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
           token,
           runtimeAuthorization: {
             userId: 'usr_proxy',
             authorizationId: '11111111-1111-4111-8111-111111111111',
-            resourceId: 'agent_proxy',
+            resourceId: 'workspace_proxy',
           },
         }),
       });
@@ -1551,7 +1454,7 @@ describe('server runtime credential proxy', () => {
                 'Content-Type': 'application/json',
                 'X-Internal-Secret': 'forged-secret',
                 'X-Kilo-Root-Session': grandchild,
-                'X-Kilo-Cloud-Agent-Session': 'agent_unrelated',
+                'X-Kilo-Cloud-Agent-Session': 'workspace_unrelated',
                 'X-Kilo-Session-Scope-Protocol': '999',
                 'X-Kilo-Trusted-Session-Lineage': '1',
                 [RUNTIME_PROXY_ATTESTATION_HEADER]: 'forged-proof',
@@ -1589,13 +1492,13 @@ describe('server runtime credential proxy', () => {
       INTERNAL_API_SECRET_PROD: { get: async () => null },
       SESSION_INGEST: { fetch: binding },
     });
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+    env.SANDBOX_SESSION.get.mockReturnValue({
       resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
         token: jwt.sign({ exp: 4_000_000_000 }, secret),
         runtimeAuthorization: {
           userId: 'usr_proxy',
           authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'agent_proxy',
+          resourceId: 'workspace_proxy',
         },
       }),
     });
@@ -1630,13 +1533,13 @@ describe('server runtime credential proxy', () => {
       INTERNAL_API_SECRET_PROD: { get: async () => 'internal-secret' },
       SESSION_INGEST: { fetch: binding },
     });
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+    env.SANDBOX_SESSION.get.mockReturnValue({
       resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
         token: jwt.sign({ exp: 4_000_000_000 }, secret),
         runtimeAuthorization: {
           userId: 'usr_proxy',
           authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'agent_proxy',
+          resourceId: 'workspace_proxy',
         },
       }),
     });
@@ -1697,11 +1600,21 @@ describe('server runtime credential proxy', () => {
       runtimeAuthorization: {
         userId: 'usr_proxy',
         authorizationId: '11111111-1111-4111-8111-111111111111',
-        resourceId: 'agent_proxy',
+        resourceId: 'workspace_proxy',
       },
     });
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
-    const upstream = vi.fn().mockResolvedValue(new Response('Unauthorized', { status: 401 }));
+    env.SANDBOX_SESSION.get.mockReturnValue({ resolveRuntimeCredentialProxyGrant: resolve });
+    const upstream = vi.fn().mockResolvedValue(
+      new Response('<html><head><title>403 Forbidden</title></head></html>', {
+        status: 403,
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          Server: 'Vercel',
+          'X-Vercel-Id': 'fra1::abc-123',
+          'X-Vercel-Mitigated': 'deny',
+        },
+      })
+    );
     vi.stubGlobal('fetch', upstream);
     try {
       const response = await fetchWorker(
@@ -1718,15 +1631,22 @@ describe('server runtime credential proxy', () => {
         ),
         env
       );
-      expect(response.status).toBe(401);
-      await expect(response.text()).resolves.toBe('Unauthorized');
+      expect(response.status).toBe(403);
+      await expect(response.text()).resolves.toBe(
+        '<html><head><title>403 Forbidden</title></head></html>'
+      );
       expect(upstream).toHaveBeenCalledOnce();
       expect(loggerWithFieldsMock).toHaveBeenCalledTimes(1);
       expect(loggerWithFieldsMock).toHaveBeenCalledWith({
         logTag: 'runtime_proxy_request_failed',
         upstreamAttempted: true,
-        upstreamStatus: 401,
-        sessionId: 'agent_proxy',
+        upstreamStatus: 403,
+        upstreamServer: 'Vercel',
+        upstreamContentType: 'text/html; charset=utf-8',
+        upstreamVercelId: 'fra1::abc-123',
+        upstreamVercelMitigated: 'deny',
+        upstreamErrorExcerpt: '403 Forbidden',
+        sessionId: 'workspace_proxy',
         kiloSessionId: 'kilo_proxy',
       });
     } finally {
@@ -1736,13 +1656,13 @@ describe('server runtime credential proxy', () => {
 
   it('emits no diagnostic for a successful model-proxy request', async () => {
     const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test' });
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+    env.SANDBOX_SESSION.get.mockReturnValue({
       resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue({
         token: 'https://api.kilo.ai:backing-token',
         runtimeAuthorization: {
           userId: 'usr_proxy',
           authorizationId: '11111111-1111-4111-8111-111111111111',
-          resourceId: 'agent_proxy',
+          resourceId: 'workspace_proxy',
         },
       }),
     });
@@ -1772,7 +1692,7 @@ describe('server runtime credential proxy', () => {
 
   it('attempts no upstream and emits no upstream diagnostic when credential resolution rejects', async () => {
     const env = Object.assign(createEnv(), { WORKER_URL: 'https://worker.test' });
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
+    env.SANDBOX_SESSION.get.mockReturnValue({
       resolveRuntimeCredentialProxyGrant: vi.fn().mockResolvedValue(null),
     });
     const upstream = vi.fn();
@@ -1803,7 +1723,7 @@ describe('server runtime credential proxy', () => {
 });
 
 describe('server /kilo facade route', () => {
-  for (const path of ['/kilo', '/kilo/event']) {
+  for (const path of ['/kilo', '/kilo/event', '/kilo/cloud-agent/event']) {
     it(`returns 401 before facade dispatch when auth is missing for ${path}`, async () => {
       const env = createEnv();
 
@@ -1917,668 +1837,6 @@ describe('server /kilo facade route', () => {
   });
 });
 
-describe('server raw global feed route', () => {
-  it.each([
-    ['a different audience', 'another-resource'],
-    ['the Cloud Agent Next audience string', 'cloud-agent-next'],
-    ['an audience array containing Cloud Agent Next', ['another-resource', 'cloud-agent-next']],
-  ])(
-    'rejects a raw Kilo JWT with $0 before session access or facade dispatch',
-    async (_name, audience) => {
-      const env = createEnv();
-      const token = signKiloTokenWithAudience(audience, 'usr_feed');
-
-      const response = await fetchWorker(
-        new Request(
-          'http://worker.test/sessions/usr_feed/agent_live/kilo-global-ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperGeneration=2&wrapperConnectionId=conn_1',
-          { headers: { Upgrade: 'websocket', Authorization: `Bearer ${token}` } }
-        ),
-        env
-      );
-
-      expect(response.status).toBe(401);
-      expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
-      expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
-      expect(env.USER_KILO_FACADE.idFromName).not.toHaveBeenCalled();
-    }
-  );
-
-  it('rejects a raw Kilo JWT with a malformed explicit audience before session access', async () => {
-    const env = createEnv();
-    const token = signKiloTokenWithAudience([], 'usr_feed');
-
-    const response = await fetchWorker(
-      new Request(
-        'http://worker.test/sessions/usr_feed/agent_live/kilo-global-ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperGeneration=2&wrapperConnectionId=conn_1',
-        { headers: { Upgrade: 'websocket', Authorization: `Bearer ${token}` } }
-      ),
-      env
-    );
-
-    expect(response.status).toBe(401);
-    expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
-    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
-  });
-
-  it('accepts an audience-less legacy raw Kilo JWT through producer fencing', async () => {
-    const env = createEnv();
-    const validateKiloGlobalFeedProducer = vi.fn(async () => ({ success: true as const }));
-    const facadeFetch = vi.fn().mockResolvedValue(new Response('accepted', { status: 200 }));
-    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
-      validateKiloGlobalFeedProducer,
-    });
-    env.USER_KILO_FACADE.idFromName.mockReturnValue('facade-id');
-    env.USER_KILO_FACADE.get.mockReturnValue({ fetch: facadeFetch });
-    const token = signKiloToken('usr_feed');
-
-    const response = await fetchWorker(
-      new Request(
-        'http://worker.test/sessions/usr_feed/agent_live/kilo-global-ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperGeneration=2&wrapperConnectionId=conn_1',
-        { headers: { Upgrade: 'websocket', Authorization: `Bearer ${token}` } }
-      ),
-      env
-    );
-
-    expect(response.status).toBe(200);
-    expect(requireCurrentSessionAccessMock).toHaveBeenCalledOnce();
-    expect(validateKiloGlobalFeedProducer).toHaveBeenCalledOnce();
-    expect(facadeFetch).toHaveBeenCalledOnce();
-  });
-
-  it('validates producer fencing and forwards accepted producer WebSockets to the user facade', async () => {
-    const env = createEnv();
-    const validateKiloGlobalFeedProducer = vi.fn(async () => ({ success: true as const }));
-    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
-      validateKiloGlobalFeedProducer,
-    });
-    const facadeFetch = vi.fn<(request: Request) => Promise<Response>>(
-      async () => new Response('accepted', { status: 200 })
-    );
-    env.USER_KILO_FACADE.idFromName.mockReturnValue('facade-id');
-    env.USER_KILO_FACADE.get.mockReturnValue({ fetch: facadeFetch });
-    const ticket = signWrapperDispatchTicket();
-
-    const response = await fetchWorker(
-      new Request(
-        'http://worker.test/sessions/usr_feed/agent_live/kilo-global-ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperGeneration=2&wrapperConnectionId=conn_1',
-        {
-          headers: {
-            Upgrade: 'websocket',
-            Authorization: `Bearer ${ticket}`,
-            Cookie: 'session=secret',
-            'x-kilo-facade-user-id': 'usr_attacker',
-            'x-kilo-facade-auth-token': 'attacker-token',
-          },
-        }
-      ),
-      env
-    );
-
-    expect(response.status).toBe(200);
-    expect(env.CLOUD_AGENT_SESSION.idFromName).toHaveBeenCalledWith('usr_feed:agent_live');
-    expect(validateKiloGlobalFeedProducer).toHaveBeenCalledWith({
-      kiloSessionId: 'ses_12345678901234567890123456',
-      wrapperRunId: 'wr_1',
-      wrapperGeneration: 2,
-      wrapperConnectionId: 'conn_1',
-    });
-
-    const forwarded = facadeFetch.mock.calls[0][0];
-    const forwardedUrl = new URL(forwarded.url);
-    expect(forwardedUrl.pathname).toBe('/internal/kilo/global-feed');
-    expect(forwardedUrl.searchParams.get('userId')).toBe('usr_feed');
-    expect(forwardedUrl.searchParams.get('cloudAgentSessionId')).toBe('agent_live');
-    expect(forwardedUrl.searchParams.get('kiloSessionId')).toBe('ses_12345678901234567890123456');
-    expect(forwarded.headers.get('upgrade')).toBe('websocket');
-    expect(forwarded.headers.get('authorization')).toBeNull();
-    expect(forwarded.headers.get('cookie')).toBeNull();
-    expect(forwarded.headers.get('x-kilo-facade-user-id')).toBeNull();
-    expect(forwarded.headers.get('x-kilo-facade-auth-token')).toBeNull();
-  });
-
-  it('rejects stale producer fencing before facade dispatch', async () => {
-    const env = createEnv();
-    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
-      validateKiloGlobalFeedProducer: vi.fn(async () => ({
-        success: false as const,
-        status: 409,
-        message: 'Stale wrapper connection',
-      })),
-    });
-    const facadeFetch = vi.fn();
-    env.USER_KILO_FACADE.get.mockReturnValue({ fetch: facadeFetch });
-    const ticket = signWrapperDispatchTicket();
-
-    const response = await fetchWorker(
-      new Request(
-        'http://worker.test/sessions/usr_feed/agent_live/kilo-global-ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperGeneration=2&wrapperConnectionId=conn_1',
-        {
-          headers: {
-            Upgrade: 'websocket',
-            Authorization: `Bearer ${ticket}`,
-          },
-        }
-      ),
-      env
-    );
-
-    expect(response.status).toBe(409);
-    expect(facadeFetch).not.toHaveBeenCalled();
-  });
-
-  it('rejects repeated producer identity parameters before session validation', async () => {
-    const env = createEnv();
-    const ticket = signWrapperDispatchTicket();
-
-    const response = await fetchWorker(
-      new Request(
-        'http://worker.test/sessions/usr_feed/agent_live/kilo-global-ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperRunId=wr_2&wrapperGeneration=2&wrapperConnectionId=conn_1',
-        {
-          headers: {
-            Upgrade: 'websocket',
-            Authorization: `Bearer ${ticket}`,
-          },
-        }
-      ),
-      env
-    );
-
-    expect(response.status).toBe(400);
-    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
-  });
-
-  it('rejects malformed producer generation before session validation', async () => {
-    const env = createEnv();
-    const ticket = signWrapperDispatchTicket();
-
-    const response = await fetchWorker(
-      new Request(
-        'http://worker.test/sessions/usr_feed/agent_live/kilo-global-ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperGeneration=2abc&wrapperConnectionId=conn_1',
-        {
-          headers: {
-            Upgrade: 'websocket',
-            Authorization: `Bearer ${ticket}`,
-          },
-        }
-      ),
-      env
-    );
-
-    expect(response.status).toBe(400);
-    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
-  });
-
-  it('accepts a legacy raw Kilo JWT for wrapper processes bound before dispatch tickets shipped', async () => {
-    const env = createEnv();
-    const validateKiloGlobalFeedProducer = vi.fn(async () => ({ success: true as const }));
-    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ validateKiloGlobalFeedProducer });
-    const facadeFetch = vi.fn<(request: Request) => Promise<Response>>(
-      async () => new Response('accepted', { status: 200 })
-    );
-    env.USER_KILO_FACADE.idFromName.mockReturnValue('facade-id');
-    env.USER_KILO_FACADE.get.mockReturnValue({ fetch: facadeFetch });
-    const token = signKiloToken('usr_feed');
-
-    const response = await fetchWorker(
-      new Request(
-        'http://worker.test/sessions/usr_feed/agent_live/kilo-global-ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperGeneration=2&wrapperConnectionId=conn_1',
-        {
-          headers: {
-            Upgrade: 'websocket',
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      ),
-      env
-    );
-
-    expect(response.status).toBe(200);
-    expect(env.CLOUD_AGENT_SESSION.idFromName).toHaveBeenCalledWith('usr_feed:agent_live');
-    expect(validateKiloGlobalFeedProducer).toHaveBeenCalledWith({
-      kiloSessionId: 'ses_12345678901234567890123456',
-      wrapperRunId: 'wr_1',
-      wrapperGeneration: 2,
-      wrapperConnectionId: 'conn_1',
-    });
-  });
-
-  it('rejects a ticket whose fence claims disagree with the request query', async () => {
-    const env = createEnv();
-    const ticket = signWrapperDispatchTicket({ wrapperRunId: 'wr_stale' });
-
-    const response = await fetchWorker(
-      new Request(
-        'http://worker.test/sessions/usr_feed/agent_live/kilo-global-ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperGeneration=2&wrapperConnectionId=conn_1',
-        {
-          headers: {
-            Upgrade: 'websocket',
-            Authorization: `Bearer ${ticket}`,
-          },
-        }
-      ),
-      env
-    );
-
-    expect(response.status).toBe(403);
-    await expect(response.text()).resolves.toBe('Ticket does not match dispatch fence');
-    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
-  });
-});
-
-describe('server wrapper ingest route', () => {
-  it.each([
-    ['a different audience', 'another-resource'],
-    ['the Cloud Agent Next audience string', 'cloud-agent-next'],
-    ['an audience array containing Cloud Agent Next', ['another-resource', 'cloud-agent-next']],
-    ['a malformed explicit audience', []],
-  ])(
-    'rejects a raw Kilo JWT with $0 before session access or Durable Object dispatch',
-    async (_name, audience) => {
-      const env = createEnv();
-      const token = signKiloTokenWithAudience(audience, 'usr_feed');
-
-      const response = await fetchWorker(
-        new Request('http://worker.test/sessions/usr_feed/agent_live/ingest', {
-          headers: { Upgrade: 'websocket', Authorization: `Bearer ${token}` },
-        }),
-        env
-      );
-
-      expect(response.status).toBe(401);
-      expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
-      expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
-    }
-  );
-
-  it('rejects an audience-less legacy raw Kilo JWT for a different session user before session access', async () => {
-    const env = createEnv();
-    const token = signKiloToken('usr_feed');
-
-    const response = await fetchWorker(
-      new Request('http://worker.test/sessions/usr_other/agent_live/ingest', {
-        headers: { Upgrade: 'websocket', Authorization: `Bearer ${token}` },
-      }),
-      env
-    );
-
-    expect(response.status).toBe(403);
-    await expect(response.text()).resolves.toBe('Token does not match session user');
-    expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
-    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
-  });
-
-  it('keeps current session ownership enforcement for an audience-less legacy raw Kilo JWT', async () => {
-    const env = createEnv();
-    const doFetch = vi.fn();
-    const getRuntimeAuthorizationStatus = vi.fn().mockResolvedValue('legacy');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ getRuntimeAuthorizationStatus, fetch: doFetch });
-    const token = signKiloToken('usr_feed');
-    requireCurrentSessionAccessMock.mockRejectedValue(
-      Object.assign(new Error('Session access denied'), { code: 'FORBIDDEN' })
-    );
-
-    const response = await fetchWorker(
-      new Request('http://worker.test/sessions/usr_feed/agent_live/ingest', {
-        headers: { Upgrade: 'websocket', Authorization: `Bearer ${token}` },
-      }),
-      env
-    );
-
-    expect(response.status).toBe(403);
-    expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith({
-      env,
-      kiloUserId: 'usr_feed',
-      cloudAgentSessionId: 'agent_live',
-    });
-    expect(getRuntimeAuthorizationStatus).toHaveBeenCalledOnce();
-    expect(doFetch).not.toHaveBeenCalled();
-  });
-
-  it('accepts a valid wrapper dispatch ticket and forwards to the session Durable Object', async () => {
-    const env = createEnv();
-    const doFetch = vi.fn().mockResolvedValue(new Response('ok', { status: 200 }));
-    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
-      getRuntimeAuthorizationStatus: vi.fn().mockResolvedValue('legacy'),
-      fetch: doFetch,
-    });
-    const ticket = signWrapperDispatchTicket();
-
-    const response = await fetchWorker(
-      new Request(
-        'http://worker.test/sessions/usr_feed/agent_live/ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperGeneration=2&wrapperConnectionId=conn_1',
-        {
-          headers: { Upgrade: 'websocket', Authorization: `Bearer ${ticket}` },
-        }
-      ),
-      env
-    );
-
-    expect(response.status).toBe(200);
-    expect(env.CLOUD_AGENT_SESSION.idFromName).toHaveBeenCalledWith('usr_feed:agent_live');
-    expect(doFetch).toHaveBeenCalledOnce();
-    expect(new URL(doFetch.mock.calls[0][0].url).pathname).toBe('/ingest');
-  });
-
-  it('accepts a legacy raw Kilo JWT for wrapper processes bound before dispatch tickets shipped', async () => {
-    const env = createEnv();
-    const doFetch = vi.fn().mockResolvedValue(new Response('ok', { status: 200 }));
-    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
-      getRuntimeAuthorizationStatus: vi.fn().mockResolvedValue('legacy'),
-      fetch: doFetch,
-    });
-    const token = signKiloToken('usr_feed');
-
-    const response = await fetchWorker(
-      new Request('http://worker.test/sessions/usr_feed/agent_live/ingest', {
-        headers: { Upgrade: 'websocket', Authorization: `Bearer ${token}` },
-      }),
-      env
-    );
-
-    expect(response.status).toBe(200);
-    expect(env.CLOUD_AGENT_SESSION.idFromName).toHaveBeenCalledWith('usr_feed:agent_live');
-    expect(doFetch).toHaveBeenCalledOnce();
-  });
-
-  it('rejects a ticket minted for a different user', async () => {
-    const env = createEnv();
-    const ticket = signWrapperDispatchTicket();
-
-    const response = await fetchWorker(
-      new Request('http://worker.test/sessions/usr_other/agent_live/ingest', {
-        headers: { Upgrade: 'websocket', Authorization: `Bearer ${ticket}` },
-      }),
-      env
-    );
-
-    expect(response.status).toBe(403);
-    await expect(response.text()).resolves.toBe('Token does not match session user');
-    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
-  });
-
-  it('rejects a ticket whose fence claims disagree with the request query', async () => {
-    const env = createEnv();
-    const ticket = signWrapperDispatchTicket();
-
-    const response = await fetchWorker(
-      new Request(
-        'http://worker.test/sessions/usr_feed/agent_live/ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperGeneration=99&wrapperConnectionId=conn_1',
-        {
-          headers: { Upgrade: 'websocket', Authorization: `Bearer ${ticket}` },
-        }
-      ),
-      env
-    );
-
-    expect(response.status).toBe(403);
-    await expect(response.text()).resolves.toBe('Ticket does not match dispatch fence');
-    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
-  });
-});
-
-describe('server wrapper log upload route', () => {
-  it('rejects a legacy wrapper token before ingest reaches a runtime-authorized session', async () => {
-    const env = createEnv();
-    const fetch = vi.fn();
-    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
-      getRuntimeAuthorizationStatus: vi.fn().mockResolvedValue('active'),
-      fetch,
-    });
-
-    const response = await fetchWorker(
-      new Request('http://worker.test/sessions/usr_feed/agent_live/ingest', {
-        headers: {
-          Upgrade: 'websocket',
-          Authorization: `Bearer ${signKiloToken('usr_feed')}`,
-        },
-      }),
-      env
-    );
-
-    expect(response.status).toBe(401);
-    expect(fetch).not.toHaveBeenCalled();
-    expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
-  });
-
-  it('keeps legacy wrapper tokens working for fenced global feed dispatch', async () => {
-    const env = createEnv();
-    const validateKiloGlobalFeedProducer = vi.fn().mockResolvedValue({ success: true });
-    const facadeFetch = vi.fn().mockResolvedValue(new Response(null, { status: 200 }));
-    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
-      validateKiloGlobalFeedProducer,
-    });
-    env.USER_KILO_FACADE.idFromName.mockReturnValue('facade-id');
-    env.USER_KILO_FACADE.get.mockReturnValue({ fetch: facadeFetch });
-
-    const response = await fetchWorker(
-      new Request(
-        'http://worker.test/sessions/usr_feed/agent_live/kilo-global-ingest?kiloSessionId=ses_12345678901234567890123456&wrapperRunId=wr_1&wrapperGeneration=2&wrapperConnectionId=conn_1',
-        {
-          headers: {
-            Upgrade: 'websocket',
-            Authorization: `Bearer ${signKiloToken('usr_feed')}`,
-          },
-        }
-      ),
-      env
-    );
-
-    expect(response.status).toBe(200);
-    expect(validateKiloGlobalFeedProducer).toHaveBeenCalledOnce();
-    expect(facadeFetch).toHaveBeenCalledOnce();
-  });
-
-  it('rejects a legacy wrapper token before writing a runtime-authorized log archive', async () => {
-    const env = Object.assign(createEnv(), { R2_BUCKET: { put: vi.fn() } });
-    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('session-do-id');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({
-      getRuntimeAuthorizationStatus: vi.fn().mockResolvedValue('revoked'),
-    });
-
-    const response = await fetchWorker(
-      new Request('http://worker.test/sessions/usr_feed/agent_live/logs/session/logs.tar.gz', {
-        method: 'PUT',
-        headers: { Authorization: `Bearer ${signKiloToken('usr_feed')}` },
-        body: 'archive',
-      }),
-      env
-    );
-
-    expect(response.status).toBe(401);
-    expect(env.R2_BUCKET.put).not.toHaveBeenCalled();
-    expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
-  });
-
-  it('does not accept legacy raw archives for control-plane sessions', async () => {
-    const env = Object.assign(createEnv(), { R2_BUCKET: { put: vi.fn() } });
-    const response = await fetchWorker(
-      new Request('http://worker.test/sessions/usr_feed/workspace_test/logs/session/logs.tar.gz', {
-        method: 'PUT',
-        headers: { Authorization: `Bearer ${signKiloToken('usr_feed')}` },
-        body: 'raw archive',
-      }),
-      env
-    );
-    expect(response.status).toBe(404);
-    expect(env.R2_BUCKET.put).not.toHaveBeenCalled();
-  });
-
-  function createLogEnv() {
-    const env = createEnv();
-    return Object.assign(env, {
-      R2_BUCKET: { put: vi.fn().mockResolvedValue(undefined) },
-    });
-  }
-
-  it.each([
-    ['a different audience', 'another-resource'],
-    ['the Cloud Agent Next audience string', 'cloud-agent-next'],
-    ['an audience array containing Cloud Agent Next', ['another-resource', 'cloud-agent-next']],
-    ['a malformed explicit audience', []],
-  ])(
-    'rejects a raw Kilo JWT with $0 before session access or R2 upload',
-    async (_name, audience) => {
-      const env = createLogEnv();
-      const token = signKiloTokenWithAudience(audience, 'usr_feed');
-
-      const response = await fetchWorker(
-        new Request(
-          'http://worker.test/sessions/usr_feed/agent_live/logs/session/logs.tar.gz?kiloSessionId=ses_12345678901234567890123456',
-          {
-            method: 'PUT',
-            headers: { Authorization: `Bearer ${token}` },
-            body: new Uint8Array([1, 2, 3]),
-          }
-        ),
-        env
-      );
-
-      expect(response.status).toBe(401);
-      expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
-      expect(env.R2_BUCKET.put).not.toHaveBeenCalled();
-    }
-  );
-
-  it('keeps current session ownership enforcement for an audience-less legacy raw Kilo JWT', async () => {
-    const env = createLogEnv();
-    const token = signKiloToken('usr_feed');
-    requireCurrentSessionAccessMock.mockRejectedValue(
-      Object.assign(new Error('Session access denied'), { code: 'FORBIDDEN' })
-    );
-
-    const response = await fetchWorker(
-      new Request(
-        'http://worker.test/sessions/usr_feed/agent_live/logs/session/logs.tar.gz?kiloSessionId=ses_12345678901234567890123456',
-        {
-          method: 'PUT',
-          headers: { Authorization: `Bearer ${token}` },
-          body: new Uint8Array([1, 2, 3]),
-        }
-      ),
-      env
-    );
-
-    expect(response.status).toBe(403);
-    expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith({
-      env,
-      kiloUserId: 'usr_feed',
-      cloudAgentSessionId: 'agent_live',
-      expectedKiloSessionId: 'ses_12345678901234567890123456',
-    });
-    expect(env.R2_BUCKET.put).not.toHaveBeenCalled();
-  });
-
-  it('accepts a valid wrapper dispatch ticket and stores the upload in R2', async () => {
-    const env = createLogEnv();
-    const ticket = signWrapperDispatchTicket();
-
-    const response = await fetchWorker(
-      new Request(
-        'http://worker.test/sessions/usr_feed/agent_live/logs/session/logs.tar.gz?kiloSessionId=ses_12345678901234567890123456',
-        {
-          method: 'PUT',
-          headers: { Authorization: `Bearer ${ticket}` },
-          body: new Uint8Array([1, 2, 3]),
-        }
-      ),
-      env
-    );
-
-    expect(response.status).toBe(204);
-    expect(env.R2_BUCKET.put).toHaveBeenCalledOnce();
-    expect(env.R2_BUCKET.put.mock.calls[0][0]).toBe('logs/usr_feed/agent_live/session/logs.tar.gz');
-  });
-
-  it('accepts a legacy raw Kilo JWT for wrapper processes bound before dispatch tickets shipped', async () => {
-    const env = createLogEnv();
-    const token = signKiloToken('usr_feed');
-
-    const response = await fetchWorker(
-      new Request(
-        'http://worker.test/sessions/usr_feed/agent_live/logs/session/logs.tar.gz?kiloSessionId=ses_12345678901234567890123456',
-        {
-          method: 'PUT',
-          headers: { Authorization: `Bearer ${token}` },
-          body: new Uint8Array([1, 2, 3]),
-        }
-      ),
-      env
-    );
-
-    expect(response.status).toBe(204);
-    expect(env.R2_BUCKET.put).toHaveBeenCalledOnce();
-  });
-
-  it('accepts the old legacy log upload URL without a kiloSessionId query parameter', async () => {
-    const env = createLogEnv();
-    const token = signKiloToken('usr_feed');
-
-    const response = await fetchWorker(
-      new Request('http://worker.test/sessions/usr_feed/agent_live/logs/session/logs.tar.gz', {
-        method: 'PUT',
-        headers: { Authorization: `Bearer ${token}` },
-        body: new Uint8Array([1, 2, 3]),
-      }),
-      env
-    );
-
-    expect(response.status).toBe(204);
-    expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith({
-      env,
-      kiloUserId: 'usr_feed',
-      cloudAgentSessionId: 'agent_live',
-    });
-    expect(env.R2_BUCKET.put).toHaveBeenCalledOnce();
-    expect(env.R2_BUCKET.put.mock.calls[0][0]).toBe('logs/usr_feed/agent_live/session/logs.tar.gz');
-  });
-
-  it('rejects an upload missing the kiloSessionId parameter', async () => {
-    const env = createLogEnv();
-    const ticket = signWrapperDispatchTicket();
-
-    const response = await fetchWorker(
-      new Request('http://worker.test/sessions/usr_feed/agent_live/logs/session/logs.tar.gz', {
-        method: 'PUT',
-        headers: { Authorization: `Bearer ${ticket}` },
-        body: new Uint8Array([1, 2, 3]),
-      }),
-      env
-    );
-
-    expect(response.status).toBe(400);
-    expect(env.R2_BUCKET.put).not.toHaveBeenCalled();
-  });
-
-  it('rejects a ticket whose kiloSessionId disagrees with the request query', async () => {
-    const env = createLogEnv();
-    const ticket = signWrapperDispatchTicket({ kiloSessionId: 'ses_other0000000000000000000' });
-
-    const response = await fetchWorker(
-      new Request(
-        'http://worker.test/sessions/usr_feed/agent_live/logs/session/logs.tar.gz?kiloSessionId=ses_12345678901234567890123456',
-        {
-          method: 'PUT',
-          headers: { Authorization: `Bearer ${ticket}` },
-          body: new Uint8Array([1, 2, 3]),
-        }
-      ),
-      env
-    );
-
-    expect(response.status).toBe(403);
-    await expect(response.text()).resolves.toBe('Ticket does not match dispatch fence');
-    expect(env.R2_BUCKET.put).not.toHaveBeenCalled();
-  });
-});
-
 describe('server /internal/streams/close', () => {
   it('rejects without the internal API key', async () => {
     const env = createEnv();
@@ -2634,15 +1892,17 @@ describe('server /internal/streams/close', () => {
   it('closes org stream sockets for every matching session', async () => {
     const env = createEnv();
     const closeOrgStreams = vi.fn().mockResolvedValue(1);
-    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('do-id');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ closeOrgStreams });
+    env.SANDBOX_SESSION.idFromName.mockReturnValue('do-id');
+    env.SANDBOX_SESSION.get.mockReturnValue({ closeOrgStreams });
+    const firstSessionId = 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+    const secondSessionId = 'workspace_bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb';
 
     getPgDbMock.mockReturnValue({
       select: vi.fn(() => ({
         from: vi.fn(() => ({
           where: vi.fn(async () => [
-            { cloudAgentSessionId: 'agent_1' },
-            { cloudAgentSessionId: 'agent_2' },
+            { cloudAgentSessionId: firstSessionId },
+            { cloudAgentSessionId: secondSessionId },
           ]),
         })),
       })),
@@ -2661,9 +1921,9 @@ describe('server /internal/streams/close', () => {
     );
 
     expect(response.status).toBe(204);
-    expect(env.CLOUD_AGENT_SESSION.idFromName).toHaveBeenCalledWith('usr_removed:agent_1');
-    expect(env.CLOUD_AGENT_SESSION.idFromName).toHaveBeenCalledWith('usr_removed:agent_2');
-    expect(env.CLOUD_AGENT_SESSION.get).toHaveBeenCalledTimes(2);
+    expect(env.SANDBOX_SESSION.idFromName).toHaveBeenCalledWith(`usr_removed:${firstSessionId}`);
+    expect(env.SANDBOX_SESSION.idFromName).toHaveBeenCalledWith(`usr_removed:${secondSessionId}`);
+    expect(env.SANDBOX_SESSION.get).toHaveBeenCalledTimes(2);
     expect(closeOrgStreams).toHaveBeenCalledTimes(2);
     expect(closeOrgStreams).toHaveBeenCalledWith('org_1');
   });
@@ -2700,20 +1960,23 @@ describe('server /internal/streams/close', () => {
     expect(env.SANDBOX_SESSION.idFromName).toHaveBeenCalledWith(
       'usr_removed:workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa'
     );
-    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
     expect(closeOrgStreams).toHaveBeenCalledWith('org_1');
   });
 
-  it('skips rows without a cloud agent session id', async () => {
+  it('skips rows that do not name a control session', async () => {
     const env = createEnv();
     const closeOrgStreams = vi.fn().mockResolvedValue(0);
-    env.CLOUD_AGENT_SESSION.idFromName.mockReturnValue('do-id');
-    env.CLOUD_AGENT_SESSION.get.mockReturnValue({ closeOrgStreams });
+    env.SANDBOX_SESSION.idFromName.mockReturnValue('do-id');
+    env.SANDBOX_SESSION.get.mockReturnValue({ closeOrgStreams });
 
     getPgDbMock.mockReturnValue({
       select: vi.fn(() => ({
         from: vi.fn(() => ({
-          where: vi.fn(async () => [{ cloudAgentSessionId: null }]),
+          where: vi.fn(async () => [
+            { cloudAgentSessionId: null },
+            { cloudAgentSessionId: 'agent_1' },
+            { cloudAgentSessionId: 'agent_2' },
+          ]),
         })),
       })),
     });
@@ -2731,8 +1994,162 @@ describe('server /internal/streams/close', () => {
     );
 
     expect(response.status).toBe(204);
-    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
+    expect(env.SANDBOX_SESSION.idFromName).not.toHaveBeenCalled();
     expect(closeOrgStreams).not.toHaveBeenCalled();
+  });
+});
+
+describe('server /internal/widgets/approval-key', () => {
+  const cloudAgentSessionId = 'workspace_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa';
+  const kiloSessionId = 'ses_0123456789abcdefghijklmnop';
+  // sha256(JSON.stringify([kiloSessionId, permissionId])), computed with node:crypto.
+  const KEY_PER_WIDGET_1 = '5af2c75e8f72c8f988b4dddda11194e70bc8bab08c4b6abb9f9c6a5f8f34e099';
+  const KEY_PER_WIDGET_2 = '841791022542364fd7f7a8c347f13bd075c52134170cb9dc5d6c81e8c7c1a485';
+
+  function approvalKeyRequest(body: unknown, internalKey: string | null = 'test-internal-secret') {
+    return new Request('http://worker.test/internal/widgets/approval-key', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        ...(internalKey === null ? {} : { 'x-internal-api-key': internalKey }),
+      },
+      body: JSON.stringify(body),
+    });
+  }
+
+  function envWithPending(permissions: unknown[]) {
+    const env = createEnv();
+    const getPendingInteractions = vi.fn().mockResolvedValue({ questions: [], permissions });
+    env.SANDBOX_SESSION.idFromName.mockReturnValue('control-do-id');
+    env.SANDBOX_SESSION.get.mockReturnValue({ getPendingInteractions });
+    return { env, getPendingInteractions };
+  }
+
+  const body = { userId: 'usr_1', organizationId: 'org_1', kiloSessionId, cloudAgentSessionId };
+
+  beforeEach(() => {
+    requireCurrentSessionAccessMock.mockReset();
+    requireCurrentSessionAccessMock.mockResolvedValue({ kiloSessionId, organizationId: 'org_1' });
+  });
+
+  it.each([null, 'wrong-key'])('rejects internal key %s before any session read', async key => {
+    const { env, getPendingInteractions } = envWithPending([{ id: 'per_widget_1' }]);
+    const response = await fetchWorker(approvalKeyRequest(body, key), env);
+
+    expect(response.status).toBe(401);
+    expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
+    expect(getPendingInteractions).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { ...body, organizationId: undefined },
+    { ...body, kiloSessionId: 'not-a-kilo-session' },
+    { ...body, extra: 'mutation-authority' },
+  ])('rejects a malformed body', async invalid => {
+    const { env, getPendingInteractions } = envWithPending([{ id: 'per_widget_1' }]);
+    const response = await fetchWorker(approvalKeyRequest(invalid), env);
+
+    expect(response.status).toBe(400);
+    expect(getPendingInteractions).not.toHaveBeenCalled();
+  });
+
+  it('binds the oldest pending permission of an owned control-plane session', async () => {
+    const { env, getPendingInteractions } = envWithPending([
+      { id: '' },
+      {
+        id: 'per_widget_1',
+        permission: 'bash',
+        patterns: ['private/path'],
+        metadata: { command: 'rm -rf build' },
+      },
+      { id: 'per_widget_2' },
+    ]);
+    const response = await fetchWorker(approvalKeyRequest(body), env);
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('cache-control')).toBe('no-store');
+    const text = await response.text();
+    expect(JSON.parse(text)).toEqual({ approvalKey: KEY_PER_WIDGET_1, command: 'rm -rf build' });
+    expect(text).not.toContain('per_widget');
+    expect(text).not.toContain('private/path');
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith({
+      env,
+      kiloUserId: 'usr_1',
+      cloudAgentSessionId,
+      expectedOrganizationId: 'org_1',
+      expectedKiloSessionId: kiloSessionId,
+    });
+    expect(env.SANDBOX_SESSION.idFromName).toHaveBeenCalledWith(`usr_1:${cloudAgentSessionId}`);
+    expect(getPendingInteractions).toHaveBeenCalledTimes(1);
+  });
+
+  it('produces a different key for a different permission id', async () => {
+    const { env } = envWithPending([{ id: 'per_widget_2' }]);
+    const response = await fetchWorker(approvalKeyRequest(body), env);
+
+    await expect(response.json()).resolves.toEqual({
+      approvalKey: KEY_PER_WIDGET_2,
+      command: null,
+    });
+    expect(KEY_PER_WIDGET_2).not.toBe(KEY_PER_WIDGET_1);
+  });
+
+  it('returns a null key and command when nothing is pending', async () => {
+    const { env } = envWithPending([]);
+    const response = await fetchWorker(approvalKeyRequest(body), env);
+
+    await expect(response.json()).resolves.toEqual({ approvalKey: null, command: null });
+  });
+
+  it('returns a null command when the permission carries none', async () => {
+    const { env } = envWithPending([{ id: 'per_widget_1', metadata: { command: 42 } }]);
+    const response = await fetchWorker(approvalKeyRequest(body), env);
+
+    await expect(response.json()).resolves.toEqual({
+      approvalKey: KEY_PER_WIDGET_1,
+      command: null,
+    });
+  });
+
+  it('trims the command to the session card limit', async () => {
+    const { env } = envWithPending([
+      { id: 'per_widget_1', metadata: { command: `${'a'.repeat(80)}\nsecond line` } },
+    ]);
+    const response = await fetchWorker(approvalKeyRequest(body), env);
+
+    const parsed = (await response.json()) as { command: string | null };
+    expect(parsed.command?.length).toBeLessThanOrEqual(60);
+    expect(parsed.command?.endsWith('…')).toBe(true);
+  });
+
+  it('refuses a session outside the exact user, organization, and session pairing', async () => {
+    requireCurrentSessionAccessMock.mockRejectedValue(
+      new TRPCError({ code: 'FORBIDDEN', message: 'Session access denied' })
+    );
+    const { env, getPendingInteractions } = envWithPending([{ id: 'per_widget_1' }]);
+    const response = await fetchWorker(approvalKeyRequest({ ...body, organizationId: null }), env);
+
+    expect(response.status).toBe(403);
+    expect(requireCurrentSessionAccessMock).toHaveBeenCalledWith(
+      expect.objectContaining({ expectedOrganizationId: null })
+    );
+    expect(getPendingInteractions).not.toHaveBeenCalled();
+  });
+
+  it('rejects a retired session ID before reading session state', async () => {
+    const { env, getPendingInteractions } = envWithPending([{ id: 'per_widget_1' }]);
+    const response = await fetchWorker(
+      approvalKeyRequest({
+        ...body,
+        cloudAgentSessionId: 'agent_aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',
+      }),
+      env
+    );
+
+    expect(response.status).toBe(400);
+    expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
+    expect(getPendingInteractions).not.toHaveBeenCalled();
+    expect(env.SANDBOX_SESSION.get).not.toHaveBeenCalled();
   });
 });
 
@@ -2851,7 +2268,6 @@ describe('server /sandbox-terminal', () => {
 
     expect(response).toBe(sessionResponse);
     expect(env.SANDBOX_SESSION.idFromName).toHaveBeenCalledWith(`${ownerId}:${sessionId}`);
-    expect(env.CLOUD_AGENT_SESSION.idFromName).not.toHaveBeenCalled();
     expect(requireCurrentSessionAccessMock).not.toHaveBeenCalled();
     expect(sessionFetch).toHaveBeenCalledOnce();
 
@@ -3000,5 +2416,391 @@ describe('server /sandbox-control', () => {
     expect(env.SANDBOX_CONTROL.getByName).toHaveBeenCalledWith('sbx_test');
     expect(fetch).toHaveBeenCalledOnce();
     expect(response).toBe(stubResponse);
+  });
+});
+
+describe('server preview host dispatch', () => {
+  const PREVIEW_SESSION_ID = 'workspace_aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+  const LABEL = previewLabel(PREVIEW_SESSION_ID, 5173) as string;
+  const HOST = `${LABEL}.preview.test`;
+
+  function previewEnv(suffix?: string): MockEnv {
+    const env = createEnv();
+    if (suffix !== undefined) (env as Record<string, unknown>).PREVIEW_HOST_SUFFIX = suffix;
+    return env;
+  }
+
+  it('routes a preview hostname away from /health, /trpc and /terminal', async () => {
+    const env = previewEnv('preview.test');
+    for (const path of ['/health', '/trpc/anything', '/terminal']) {
+      const response = await fetchWorker(new Request(`http://${HOST}${path}`), env);
+      expect(response.status).toBe(401);
+    }
+  });
+
+  it('serves a preview-host /terminal WebSocket upgrade from the preview path', async () => {
+    const env = previewEnv('preview.test');
+    const response = await fetchWorker(
+      new Request(`http://${HOST}/terminal`, {
+        headers: { Upgrade: 'websocket', Connection: 'Upgrade' },
+      }),
+      env
+    );
+    expect(response.status).toBe(403);
+    await expect(response.text()).resolves.toBe('Cross-origin preview request rejected');
+  });
+
+  it('serves a preview-host /stream request from the preview path', async () => {
+    const env = previewEnv('preview.test');
+    const response = await fetchWorker(
+      new Request(`http://${HOST}/stream?cloudAgentSessionId=${PREVIEW_SESSION_ID}`),
+      env
+    );
+    expect(response.status).toBe(401);
+    await expect(response.text()).resolves.toBe(PREVIEW_SESSION_MISSING_TEXT);
+  });
+
+  it('serves the preview reserved path from the preview route', async () => {
+    const env = previewEnv('preview.test');
+    const response = await fetchWorker(new Request(`http://${HOST}/.kilo-preview/other`), env);
+    expect(response.status).toBe(404);
+  });
+
+  it('keeps the worker host on its own handlers', async () => {
+    const env = previewEnv('preview.test');
+    const response = await fetchWorker(new Request('http://worker.test/health'), env);
+    expect(response.status).toBe(200);
+  });
+
+  it('matches nothing when the preview suffix is unset', async () => {
+    const env = previewEnv();
+    const response = await fetchWorker(new Request(`http://${HOST}/health`), env);
+    expect(response.status).toBe(200);
+  });
+
+  it('serves the open hop on the worker host and proxies the same path on a preview host', async () => {
+    const env = previewEnv('preview.test');
+    const workerHost = await fetchWorker(new Request('http://worker.test/preview/open'), env);
+    expect(workerHost.status).toBe(401);
+    expect(workerHost.headers.get('cache-control')).toBe('no-store');
+
+    const previewHost = await fetchWorker(new Request(`http://${HOST}/preview/open`), env);
+    expect(previewHost.status).toBe(401);
+    expect(previewHost.headers.get('cache-control')).toBeNull();
+  });
+});
+
+describe('server /internal/byoc/vercel-enrollment/:organizationId', () => {
+  const organizationId = '11111111-1111-4111-8111-111111111111';
+
+  it('rejects enrollment requests without the internal API key', async () => {
+    const env = createEnv();
+
+    const response = await fetchWorker(
+      new Request(`http://worker.test/internal/byoc/vercel-enrollment/${organizationId}`),
+      env
+    );
+
+    expect(response.status).toBe(401);
+  });
+
+  it('rejects invalid organization IDs', async () => {
+    const env = createEnv();
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/byoc/vercel-enrollment/not-an-organization-id', {
+        headers: { 'x-internal-api-key': 'test-internal-secret' },
+      }),
+      env
+    );
+
+    expect(response.status).toBe(400);
+  });
+
+  it.each([
+    { enrolledOrganizations: undefined, enrolled: false },
+    { enrolledOrganizations: '22222222-2222-4222-8222-222222222222', enrolled: false },
+    { enrolledOrganizations: organizationId, enrolled: true },
+    { enrolledOrganizations: '*', enrolled: true },
+  ])('returns Worker-configured enrollment for $enrolledOrganizations', async value => {
+    const env = createEnv();
+    env.BYOC_VERCEL_IDS = value.enrolledOrganizations;
+
+    const response = await fetchWorker(
+      new Request(`http://worker.test/internal/byoc/vercel-enrollment/${organizationId}`, {
+        headers: { 'x-internal-api-key': 'test-internal-secret' },
+      }),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    await expect(response.json()).resolves.toEqual({ enrolled: value.enrolled });
+  });
+});
+
+describe('server /internal/byoc/vercel-snapshot-build/start', () => {
+  const buildInput = {
+    organizationId: '11111111-1111-4111-8111-111111111111',
+    credentialId: '22222222-2222-4222-8222-222222222222',
+    buildGeneration: '33333333-3333-4333-8333-333333333333',
+  };
+
+  function buildRequest(): Request {
+    return new Request('http://worker.test/internal/byoc/vercel-snapshot-build/start', {
+      method: 'POST',
+      headers: {
+        'content-type': 'application/json',
+        'x-internal-api-key': 'test-internal-secret',
+      },
+      body: JSON.stringify(buildInput),
+    });
+  }
+
+  it('rejects snapshot builds for organizations outside the Worker enrollment list', async () => {
+    const env = createEnv();
+
+    const response = await fetchWorker(buildRequest(), env);
+
+    expect(response.status).toBe(403);
+    expect(env.VERCEL_SNAPSHOT_BUILD.getByName).not.toHaveBeenCalled();
+  });
+
+  it('starts snapshot builds for enrolled organizations', async () => {
+    const env = createEnv();
+    env.BYOC_VERCEL_IDS = buildInput.organizationId;
+    const start = vi.fn().mockResolvedValue(undefined);
+    env.VERCEL_SNAPSHOT_BUILD.getByName.mockReturnValue({ start });
+
+    const response = await fetchWorker(buildRequest(), env);
+
+    expect(response.status).toBe(202);
+    expect(start).toHaveBeenCalledWith(buildInput);
+  });
+
+  it('starts snapshot builds for an enrolled personal owner without inferring UUID ownership', async () => {
+    const env = createEnv();
+    const input = {
+      userId: 'oauth/vercel-user',
+      credentialId: buildInput.credentialId,
+      buildGeneration: buildInput.buildGeneration,
+    };
+    env.BYOC_VERCEL_IDS = input.userId;
+    const start = vi.fn().mockResolvedValue(undefined);
+    env.VERCEL_SNAPSHOT_BUILD.getByName.mockReturnValue({ start });
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/byoc/vercel-snapshot-build/start', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-internal-secret',
+        },
+        body: JSON.stringify(input),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(202);
+    expect(env.VERCEL_SNAPSHOT_BUILD.getByName).toHaveBeenCalledWith('user:oauth/vercel-user');
+    expect(start).toHaveBeenCalledWith(input);
+  });
+
+  it('rejects snapshot starts that provide both owner identities', async () => {
+    const env = createEnv();
+    const input = {
+      ...buildInput,
+      userId: 'oauth/vercel-user',
+    };
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/byoc/vercel-snapshot-build/start', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-internal-secret',
+        },
+        body: JSON.stringify(input),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(400);
+    expect(env.VERCEL_SNAPSHOT_BUILD.getByName).not.toHaveBeenCalled();
+  });
+});
+
+describe('server /internal/byoc/vercel-snapshot-build/cleanup', () => {
+  const cleanupInput = {
+    organizationId: '11111111-1111-4111-8111-111111111111',
+    credentialId: '22222222-2222-4222-8222-222222222222',
+    buildGeneration: '33333333-3333-4333-8333-333333333333',
+    snapshotId: 'snap_persisted',
+  };
+
+  it('rejects cleanup requests without the internal API key', async () => {
+    const env = createEnv();
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/byoc/vercel-snapshot-build/cleanup', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(cleanupInput),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(401);
+    expect(env.VERCEL_SNAPSHOT_BUILD.getByName).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid cleanup identity before calling the Durable Object', async () => {
+    const env = createEnv();
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/byoc/vercel-snapshot-build/cleanup', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-internal-secret',
+        },
+        body: JSON.stringify({ ...cleanupInput, credentialId: 'invalid' }),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(400);
+    expect(env.VERCEL_SNAPSHOT_BUILD.getByName).not.toHaveBeenCalled();
+  });
+
+  it('passes the persisted runtime snapshot to the organization Durable Object', async () => {
+    const env = createEnv();
+    const cleanup = vi.fn().mockResolvedValue(undefined);
+    env.VERCEL_SNAPSHOT_BUILD.getByName.mockReturnValue({ cleanup });
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/byoc/vercel-snapshot-build/cleanup', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-internal-secret',
+        },
+        body: JSON.stringify(cleanupInput),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(204);
+    expect(env.VERCEL_SNAPSHOT_BUILD.getByName).toHaveBeenCalledWith(cleanupInput.organizationId);
+    expect(cleanup).toHaveBeenCalledWith(cleanupInput);
+  });
+
+  it('passes personal cleanup to the user-keyed Durable Object', async () => {
+    const env = createEnv();
+    const input = {
+      userId: 'oauth/vercel-user',
+      credentialId: cleanupInput.credentialId,
+      buildGeneration: cleanupInput.buildGeneration,
+      snapshotId: cleanupInput.snapshotId,
+    };
+    const cleanup = vi.fn().mockResolvedValue(undefined);
+    env.VERCEL_SNAPSHOT_BUILD.getByName.mockReturnValue({ cleanup });
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/byoc/vercel-snapshot-build/cleanup', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-internal-secret',
+        },
+        body: JSON.stringify(input),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(204);
+    expect(env.VERCEL_SNAPSHOT_BUILD.getByName).toHaveBeenCalledWith('user:oauth/vercel-user');
+    expect(cleanup).toHaveBeenCalledWith(input);
+  });
+
+  it('rejects snapshot cleanup that provides both owner identities', async () => {
+    const env = createEnv();
+    const input = {
+      ...cleanupInput,
+      userId: 'oauth/vercel-user',
+    };
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/byoc/vercel-snapshot-build/cleanup', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-internal-secret',
+        },
+        body: JSON.stringify(input),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(400);
+    expect(env.VERCEL_SNAPSHOT_BUILD.getByName).not.toHaveBeenCalled();
+  });
+
+  it('returns a safe error when cleanup cannot be completed', async () => {
+    const env = createEnv();
+    env.VERCEL_SNAPSHOT_BUILD.getByName.mockReturnValue({
+      cleanup: vi.fn().mockRejectedValue(new Error('provider request details')),
+    });
+
+    const response = await fetchWorker(
+      new Request('http://worker.test/internal/byoc/vercel-snapshot-build/cleanup', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          'x-internal-api-key': 'test-internal-secret',
+        },
+        body: JSON.stringify(cleanupInput),
+      }),
+      env
+    );
+
+    expect(response.status).toBe(502);
+    await expect(response.text()).resolves.toBe('Snapshot build resources could not be cleaned up');
+  });
+});
+
+describe('server /internal/byoc/vercel-enrollment/user/:userId', () => {
+  const userId = 'oauth/vercel-user';
+
+  it('returns Worker-configured enrollment for an encoded personal user id', async () => {
+    const env = createEnv();
+    env.BYOC_VERCEL_IDS = userId;
+
+    const response = await fetchWorker(
+      new Request(
+        `http://worker.test/internal/byoc/vercel-enrollment/user/${encodeURIComponent(userId)}`,
+        { headers: { 'x-internal-api-key': 'test-internal-secret' } }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('Cache-Control')).toBe('no-store');
+    await expect(response.json()).resolves.toEqual({ enrolled: true });
+  });
+
+  it('keeps an empty personal enrollment list disabled', async () => {
+    const env = createEnv();
+
+    const response = await fetchWorker(
+      new Request(
+        `http://worker.test/internal/byoc/vercel-enrollment/user/${encodeURIComponent(userId)}`,
+        { headers: { 'x-internal-api-key': 'test-internal-secret' } }
+      ),
+      env
+    );
+
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({ enrolled: false });
   });
 });

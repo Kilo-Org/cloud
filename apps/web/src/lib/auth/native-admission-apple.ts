@@ -216,7 +216,6 @@ export async function verifyAppleAttestation(
   // The challenge is base64url ASCII, so the string is the wire form.
   const clientDataHash = appAttestClientDataHash(challenge);
 
-  // Apple nonce = SHA256(authData || clientDataHash)
   const expectedNonce = createHash('sha256')
     .update(Buffer.concat([authData, clientDataHash]))
     .digest('hex');
@@ -363,11 +362,17 @@ export async function verifyAppleAssertion(
   }
   const signCount = authenticatorData.readUInt32BE(33);
 
-  // Verify: signature over (authenticatorData || clientDataHash)
+  // Apple: nonce = SHA256(authenticatorData || clientDataHash), and the
+  // signature must be valid for nonce. The Secure Enclave signs nonce as the
+  // message with ECDSA-SHA256, so the verifier hashes nonce once more. Feeding
+  // the unhashed concatenation drops one hash and rejects every real assertion.
+  const nonce = createHash('sha256')
+    .update(Buffer.concat([authenticatorData, clientDataHash]))
+    .digest();
   try {
     const publicKeyDer = Buffer.from(publicKeySpkiBase64, 'base64');
     const verify = createVerify('sha256');
-    verify.update(Buffer.concat([authenticatorData, clientDataHash]));
+    verify.update(nonce);
     verify.end();
     if (!verify.verify({ key: publicKeyDer, format: 'der', type: 'spki' }, signature)) {
       return { ok: false, error: 'INVALID_ASSERTION' };

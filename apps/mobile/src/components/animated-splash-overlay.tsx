@@ -199,7 +199,7 @@ export function AnimatedSplashOverlay() {
           <StatusBar style="dark" />
           <Animated.View
             pointerEvents="none"
-            className="absolute inset-0 items-center justify-center bg-[#FAF74F]"
+            className="absolute inset-0 items-center justify-center bg-[#FFDD00]"
             style={overlayStyle}
           >
             <Animated.View

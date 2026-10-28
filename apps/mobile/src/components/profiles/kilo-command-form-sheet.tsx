@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ScrollView, Switch, View } from 'react-native';
+import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SessionPageSheet } from '@/components/agents/session-page-sheet';
@@ -18,7 +18,10 @@ import {
 } from '@/components/profiles/profile-kilo-commands-model';
 import { SheetHeader } from '@/components/sheet-header';
 import { FormField } from '@/components/ui/form-field';
+import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
+import { useSheetDismissGuard } from '@/components/ui/use-sheet-dismiss-guard';
+import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
 
 /** Catalog key for each refused field, so the message lands under the input at fault. */
 const ERROR_KEYS = {
@@ -27,6 +30,14 @@ const ERROR_KEYS = {
   'name-conflict': 'profiles.slashCommands.nameConflict',
   'template-required': 'profiles.slashCommands.templateRequired',
 } satisfies Record<KiloCommandFormError, string>;
+
+/** The form field each refused input belongs to, so Save can scroll it into view. */
+const FIELD_FOR_ERROR = {
+  'name-required': 'name',
+  'name-invalid': 'name',
+  'name-conflict': 'name',
+  'template-required': 'template',
+} satisfies Record<KiloCommandFormError, 'name' | 'template'>;
 
 /** The create payload the form hands back for a new command. */
 export type KiloCommandSubmission = ReturnType<typeof buildKiloCommandCreatePayload>;
@@ -66,6 +77,18 @@ export function KiloCommandFormSheet({
   const modelRef = useRef(initial.model);
   const [subtask, setSubtask] = useState(initial.subtask);
   const [error, setError] = useState<KiloCommandFormError | null>(null);
+  const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<'name' | 'template'>();
+
+  const { requestClose, requestDismiss, dialog } = useSheetDismissGuard({
+    isDirty: () =>
+      nameRef.current !== initial.name ||
+      descriptionRef.current !== initial.description ||
+      templateRef.current !== initial.template ||
+      agentRef.current !== initial.agent ||
+      modelRef.current !== initial.model ||
+      subtask !== initial.subtask,
+    onDiscard: onClose,
+  });
 
   const submit = () => {
     const state: KiloCommandFormState = {
@@ -79,6 +102,7 @@ export function KiloCommandFormSheet({
     const problem = validateKiloCommandForm(state);
     if (problem !== null) {
       setError(problem);
+      scrollToField(FIELD_FOR_ERROR[problem]);
       return;
     }
     setError(null);
@@ -90,16 +114,17 @@ export function KiloCommandFormSheet({
   };
 
   return (
-    <SessionPageSheet visible onClose={onClose}>
+    <SessionPageSheet visible onClose={onClose} onRequestDismiss={requestDismiss}>
       <SheetHeader
         title={command === null ? t('profiles.slashCommands.add') : command.name}
         onDone={submit}
-        onCancel={onClose}
+        onCancel={requestClose}
         doneLabel={t('common.save')}
-        disabled={isSaving}
+        doneDisabled={isSaving}
         topInset="ios-page-sheet"
       />
       <ScrollView
+        ref={scrollRef}
         className="flex-1"
         contentContainerClassName="gap-4 px-6 pt-4 pb-8"
         keyboardShouldPersistTaps="handled"
@@ -120,6 +145,7 @@ export function KiloCommandFormSheet({
           autoCorrect={false}
           maxLength={MAX_KILO_COMMAND_NAME_LENGTH}
           placeholder={t('profiles.slashCommands.namePlaceholder')}
+          containerOnLayout={fieldLayout('name')}
           onChangeText={value => {
             nameRef.current = value.toLowerCase().replaceAll(/[^a-z0-9-]/g, '');
             setError(null);
@@ -144,22 +170,23 @@ export function KiloCommandFormSheet({
           multiline
           textAlignVertical="top"
           maxLength={MAX_KILO_COMMAND_TEMPLATE_LENGTH}
-          className="min-h-32 leading-5"
+          className="min-h-32 max-h-52 leading-[1.25rem]"
           autoCapitalize="none"
           autoCorrect={false}
           placeholder={t('profiles.slashCommands.templatePlaceholder')}
+          containerOnLayout={fieldLayout('template')}
           onChangeText={value => {
             templateRef.current = value;
             setError(null);
           }}
         />
         <FormField
-          label={t('profiles.slashCommands.agent')}
+          label={t('common.agent')}
           defaultValue={initial.agent}
           disabled={isSaving}
           autoCapitalize="none"
           autoCorrect={false}
-          placeholder={t('agentChat.modeOptions.code')}
+          placeholder={t('profiles.slashCommands.agentPlaceholder')}
           onChangeText={value => {
             agentRef.current = value;
           }}
@@ -188,6 +215,7 @@ export function KiloCommandFormSheet({
         </View>
       </ScrollView>
       <View style={{ height: insets.bottom }} className="bg-background" />
+      {dialog}
     </SessionPageSheet>
   );
 }

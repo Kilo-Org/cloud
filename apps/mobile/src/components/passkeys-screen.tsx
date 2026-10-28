@@ -1,7 +1,7 @@
 import { hashKey, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, ScrollView, View } from 'react-native';
+import { ScrollView, useWindowDimensions, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -15,11 +15,13 @@ import { RenameModal } from '@/components/rename-modal';
 import { ScreenHeader } from '@/components/screen-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { KeyRound, Plus } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
 import { passkeysSupported, registerPasskey } from '@/lib/auth/passkey-client';
+import { isShortViewport } from '@/lib/centered-state-layout';
 import {
   isLatestMutationGeneration,
   nextMutationGeneration,
@@ -88,11 +90,17 @@ function InlineFailure({
  */
 export function PasskeysScreen() {
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const colors = useThemeColors();
   const { token } = useAuth();
   const tabBarBottomPadding = useTabBarBottomPadding();
+  // The body sits between the header and a footer that already reserves the
+  // tab bar, so in a phone held sideways its band is only a few dozen points
+  // tall and the full stack starts below the fold. Centered states learn this
+  // from their measured band; this plain body asks the window instead.
+  const windowSize = useWindowDimensions();
 
   const listKey = trpc.user.getPasskeys.queryKey();
   // Stable per-cache key for the removal generations: overlapping removals must
@@ -182,20 +190,18 @@ export function PasskeysScreen() {
   );
 
   const confirmRemove = (passkey: PasskeyRow) => {
-    Alert.alert(t('profile.removePasskeyTitle'), t('profile.removePasskeyMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        // The destructive action names itself, the same pair every other
-        // confirmation in the app uses (`profile.deleteAccountTitle` /
-        // `profile.deleteAccountConfirm`): a bare "Remove" would not say what
-        // the row is about to lose.
-        text: t('profile.removePasskey'),
-        style: 'destructive',
-        onPress: () => {
-          remove.mutate({ id: passkey.id });
-        },
+    confirm({
+      title: t('profile.removePasskeyTitle'),
+      message: t('profile.removePasskeyMessage'),
+      // The destructive action names itself, the same pair every other
+      // confirmation in the app uses (`profile.deleteAccountTitle` /
+      // `profile.deleteAccountConfirm`): a bare "Remove" would not say what
+      // the row is about to lose.
+      confirmLabel: t('profile.removePasskey'),
+      onConfirm: () => {
+        remove.mutate({ id: passkey.id });
       },
-    ]);
+    });
   };
 
   const handleAdd = async () => {
@@ -353,6 +359,7 @@ export function PasskeysScreen() {
         {failureNotice}
         <EmptyState
           placement="top"
+          compact={isShortViewport(windowSize.width, windowSize.height)}
           icon={KeyRound}
           title={t('profile.passkeysEmpty')}
           description={canCreatePasskeys ? t('profile.passkeysEmptyHint') : addFailureNotice}
@@ -413,6 +420,8 @@ export function PasskeysScreen() {
           }}
         />
       )}
+
+      {dialog}
     </View>
   );
 }

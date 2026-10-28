@@ -1,4 +1,6 @@
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
+import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
+import type { PaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy';
 import { captureException } from '@sentry/nextjs';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
@@ -36,6 +38,7 @@ import {
   ipCountryFromHeaders,
   ja4FromHeaders,
 } from '@kilocode/web-shared/lib/bouncer/credit-events';
+import { assertChargeAllowed } from '@kilocode/web-shared/lib/bouncer/charge-gate';
 import { KILO_PASS_REFERRER_REWARD_CAP } from '@/lib/impact/kilo-pass-referrals';
 import { TRPCError } from '@trpc/server';
 import {
@@ -87,10 +90,7 @@ import {
   KILO_PASS_BONUS_LIKE_ITEM_KINDS,
   appendKiloPassAuditLog,
 } from '@kilocode/web-shared/lib/kilo-pass/issuance';
-import {
-  KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF,
-  KILO_PASS_TIER_CONFIG,
-} from '@kilocode/web-shared/lib/kilo-pass/constants';
+import { KILO_PASS_TIER_CONFIG } from '@kilocode/web-shared/lib/kilo-pass/constants';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { timedUsageQuery } from '@/lib/usage-query';
 import {
@@ -102,15 +102,8 @@ import { dayjs } from '@kilocode/web-shared/lib/kilo-pass/dayjs';
 import { computeChurnkeyAuthHash } from '@/lib/churnkey/auth';
 import { closePauseEvent } from '@kilocode/web-shared/lib/kilo-pass/pause-events';
 import { abandonCollectibleInvoicesForStripeSubscription } from '@/lib/kilo-pass/abandon-collectible-invoices';
-import {
-  getAllMobileStoreKiloPassProducts,
-  getMobileStoreKiloPassProductByAppleProductId,
-  getMobileStoreKiloPassProductByGoogleProductId,
-} from '@/lib/kilo-pass/mobile-store-products';
-import {
-  buildPurchasePresentation,
-  getPurchasePresentationForUser,
-} from '@/lib/kilo-pass/purchase-presentation';
+import { getAllMobileStoreKiloPassProducts } from '@/lib/kilo-pass/mobile-store-products';
+import { getPurchasePresentationForUser } from '@/lib/kilo-pass/purchase-presentation';
 import {
   PURCHASE_PLATFORMS,
   PURCHASE_PRESENTATION_KINDS,
@@ -149,6 +142,7 @@ const KiloPassCreditHistoryEntrySchema = z.object({
   id: z.string(),
   date: z.string(),
   amountUsd: z.number(),
+  expiryDate: z.string().nullable(),
   kind: z.enum([
     KiloPassIssuanceItemKind.Base,
     KiloPassIssuanceItemKind.Bonus,
@@ -176,16 +170,9 @@ const KiloPassTierSchema = z.enum(KiloPassTier);
 const KiloPassCadenceSchema = z.enum(KiloPassCadence);
 const KiloPassPaymentProviderSchema = z.enum(KiloPassPaymentProvider);
 
-const KiloPassSubscriptionStatusSchema = z.union([
-  z.literal('active'),
-  z.literal('canceled'),
-  z.literal('incomplete'),
-  z.literal('incomplete_expired'),
-  z.literal('past_due'),
-  z.literal('paused'),
-  z.literal('trialing'),
-  z.literal('unpaid'),
-]);
+// The provider reports subscription statuses as an open set, so the response
+// carries the stored value unchanged.
+const KiloPassSubscriptionStatusSchema = z.string();
 
 type KiloPassBonusKind =
   | KiloPassIssuanceItemKind.Bonus
@@ -293,6 +280,7 @@ type KiloPassCreditHistoryRow = {
   amountUsd: number;
   createdAt: string;
   description: string | null;
+  expiryDate: string | null;
 };
 
 type StripeManagedKiloPassSubscription = KiloPassSubscriptionState & {
@@ -403,10 +391,6 @@ function mapPlayCompletionError(error: unknown, userId: string): TRPCError {
     code: 'INTERNAL_SERVER_ERROR',
     message: 'We could not finish this Google Play purchase. Please try again.',
   });
-}
-
-function isTwoMonthPromoOfferActive(): boolean {
-  return dayjs().utc().isBefore(KILO_PASS_MONTHLY_FIRST_2_MONTHS_PROMO_CUTOFF);
 }
 
 function roundToCents(usd: number): number {
@@ -650,6 +634,7 @@ async function getKiloPassIssuanceCreditHistoryRows(
       amountUsd: kilo_pass_issuance_items.amount_usd,
       createdAt: credit_transactions.created_at,
       description: credit_transactions.description,
+      expiryDate: credit_transactions.expiry_date,
     })
     .from(kilo_pass_issuance_items)
     .innerJoin(
@@ -681,6 +666,7 @@ async function getStoreUpgradeCreditHistoryRows(params: {
         amountMicrodollars: credit_transactions.amount_microdollars,
         createdAt: credit_transactions.created_at,
         description: credit_transactions.description,
+        expiryDate: credit_transactions.expiry_date,
       })
       .from(credit_transactions)
       .innerJoin(
@@ -717,6 +703,7 @@ async function getStoreUpgradeCreditHistoryRows(params: {
         amountMicrodollars: credit_transactions.amount_microdollars,
         createdAt: credit_transactions.created_at,
         description: credit_transactions.description,
+        expiryDate: credit_transactions.expiry_date,
       })
       .from(credit_transactions)
       .innerJoin(
@@ -743,6 +730,7 @@ async function getStoreUpgradeCreditHistoryRows(params: {
     amountUsd: roundToCents(fromMicrodollars(row.amountMicrodollars)),
     createdAt: row.createdAt,
     description: row.description,
+    expiryDate: row.expiryDate,
   }));
 }
 
@@ -1090,31 +1078,6 @@ const GetPurchasePresentationInputSchema = z.object({
   storefront: PurchaseStorefrontSchema.nullable().optional(),
   product: PurchaseProductSchema,
   program: z.string().max(64).nullable().optional(),
-  /**
-   * Old clients omit it. Omit or false keeps today's Android presentation.
-   * Remove when every Android client mounts Play IAP.
-   */
-  supportsNativePlayKiloPass: z.boolean().optional(),
-});
-
-const PreflightPurchaseInputSchema = z.object({
-  platform: PurchasePlatformSchema,
-  storefront: PurchaseStorefrontSchema,
-  product: PurchaseProductSchema,
-  program: z.string().max(64).nullable().optional(),
-  supportsNativePlayKiloPass: z.boolean().optional(),
-  googleProductId: z.string().min(1).optional(),
-  /**
-   * Play purchase token this device already owns. Untrusted: it can only deny
-   * a purchase. Old clients omit it.
-   */
-  googlePurchaseToken: z.string().min(1).max(256).nullable().optional(),
-  appleProductId: z.string().min(1),
-  /**
-   * Original transaction ID of a Kilo Pass this device already owns, when StoreKit
-   * reports one. Untrusted: it can only deny a purchase, never grant one.
-   */
-  appleOriginalTransactionId: z.string().min(1).max(64).nullable().optional(),
 });
 
 const PurchasePresentationCtaOutputSchema = z.object({
@@ -1126,30 +1089,11 @@ const GetPurchasePresentationOutputSchema = z.object({
   kind: z.enum(PURCHASE_PRESENTATION_KINDS),
   statusClass: z.enum(PURCHASE_STATUS_CLASSES),
   reason: z
-    .enum([
-      'credits_not_sold_on_ios',
-      'kilo_pass_not_available_on_android',
-      'unsupported_combination',
-    ])
+    .enum(['credits_not_sold_on_ios', 'kilo_pass_not_sold_in_app', 'unsupported_combination'])
     .nullable(),
   cta: PurchasePresentationCtaOutputSchema,
   webUrl: z.string().nullable(),
   program: z.string().nullable(),
-});
-
-const PreflightPurchaseOutputSchema = z.object({
-  allowed: z.boolean(),
-  statusClass: z.enum(PURCHASE_STATUS_CLASSES),
-  reason: z
-    .enum([
-      'credits_not_sold_on_ios',
-      'kilo_pass_not_available_on_android',
-      'unsupported_combination',
-      'unknown_product',
-      'already_subscribed',
-      'owned_by_another_account',
-    ])
-    .nullable(),
 });
 
 const CreateCheckoutSessionInputSchema = z.object({
@@ -1309,7 +1253,9 @@ export async function createPersonalKiloPassCheckoutSession(params: {
   affiliateTrackingId: string;
   priceId: string;
   deps?: PersonalKiloPassCheckoutDependencies;
+  paidCreditTerms?: PaidCreditTerms;
 }): Promise<CheckoutSessionLike & { amountCents: number }> {
+  const paidCreditTerms = params.paidCreditTerms ?? getPaidCreditTerms('pass', params.deps?.now);
   const deps = {
     ...createDefaultPersonalKiloPassCheckoutDependencies(),
     ...params.deps,
@@ -1335,6 +1281,7 @@ export async function createPersonalKiloPassCheckoutSession(params: {
     tier: params.tier,
     cadence: params.cadence,
     affiliateTrackingId: params.affiliateTrackingId,
+    paid_credit_policy: paidCreditTerms,
   };
   const sessionMetadata = mergeServiceFeeCommercialMetadata(
     productMetadata,
@@ -1347,6 +1294,14 @@ export async function createPersonalKiloPassCheckoutSession(params: {
     prepared,
     buildSessionParams: feeLine => ({
       mode: 'subscription',
+      ...(paidCreditTerms === 'one_year' && {
+        custom_text: {
+          submit: {
+            message:
+              'Each monthly base-credit allotment expires one year after issuance. Bonus-credit deadlines are unchanged.',
+          },
+        },
+      }),
       customer: params.stripeCustomerId,
       allow_promotion_codes: true,
       billing_address_collection: 'required',
@@ -1393,93 +1348,7 @@ export const kiloPassRouter = createTRPCRouter({
         storefront: input.storefront,
         product: input.product,
         program: input.program,
-        supportsNativePlayKiloPass: input.supportsNativePlayKiloPass,
       });
-    }),
-
-  preflightPurchase: baseProcedure
-    .input(PreflightPurchaseInputSchema)
-    .output(PreflightPurchaseOutputSchema)
-    .mutation(async ({ ctx, input }) => {
-      const subscription = await getKiloPassStateForUser(db, ctx.user.id);
-      const presentation = buildPurchasePresentation({
-        subscription,
-        input: {
-          platform: input.platform,
-          storefront: input.storefront,
-          product: input.product,
-          program: input.program,
-          supportsNativePlayKiloPass: input.supportsNativePlayKiloPass,
-        },
-      });
-
-      if (presentation.kind !== 'native_iap') {
-        return {
-          allowed: false,
-          statusClass: presentation.statusClass,
-          reason: presentation.reason,
-        };
-      }
-
-      if (input.storefront === 'play') {
-        if (
-          !input.googleProductId ||
-          !getMobileStoreKiloPassProductByGoogleProductId(input.googleProductId)
-        ) {
-          return { allowed: false, statusClass: 'terminal', reason: 'unknown_product' };
-        }
-      } else if (!getMobileStoreKiloPassProductByAppleProductId(input.appleProductId)) {
-        return { allowed: false, statusClass: 'terminal', reason: 'unknown_product' };
-      }
-
-      // Refuse before StoreKit is invoked when this device's subscription belongs to
-      // another Kilo account. The client-side check races the StoreKit purchase list,
-      // and losing that race charges the user for a purchase the server then rejects.
-      if (input.appleOriginalTransactionId) {
-        const devicePurchase = await readDb.query.kilo_pass_store_purchases.findFirst({
-          columns: { kilo_user_id: true },
-          where: and(
-            eq(kilo_pass_store_purchases.payment_provider, KiloPassPaymentProvider.AppStore),
-            eq(kilo_pass_store_purchases.provider_subscription_id, input.appleOriginalTransactionId)
-          ),
-        });
-        if (devicePurchase && devicePurchase.kilo_user_id !== ctx.user.id) {
-          return { allowed: false, statusClass: 'terminal', reason: 'owned_by_another_account' };
-        }
-      }
-
-      // Same ownership guard for a Play purchase this device already owns.
-      if (input.googlePurchaseToken) {
-        const devicePurchase = await readDb.query.kilo_pass_store_purchases.findFirst({
-          columns: { kilo_user_id: true },
-          where: and(
-            eq(kilo_pass_store_purchases.payment_provider, KiloPassPaymentProvider.GooglePlay),
-            eq(kilo_pass_store_purchases.provider_subscription_id, input.googlePurchaseToken)
-          ),
-        });
-        if (devicePurchase && devicePurchase.kilo_user_id !== ctx.user.id) {
-          return { allowed: false, statusClass: 'terminal', reason: 'owned_by_another_account' };
-        }
-      }
-
-      // Exclude the native provider for this storefront. Old iOS excluded App Store
-      // only. Play storefront excludes GooglePlay so a Play-owned pass is not treated
-      // as another provider. A live Stripe sub still returns `already_subscribed`.
-      const nativeStoreProvider =
-        input.storefront === 'play'
-          ? KiloPassPaymentProvider.GooglePlay
-          : KiloPassPaymentProvider.AppStore;
-
-      const hasLiveOtherProviderSub =
-        subscription != null &&
-        !isStripeSubscriptionEnded(subscription.status) &&
-        subscription.paymentProvider !== nativeStoreProvider;
-
-      if (hasLiveOtherProviderSub) {
-        return { allowed: false, statusClass: 'terminal', reason: 'already_subscribed' };
-      }
-
-      return { allowed: true, statusClass: 'healthy', reason: null };
     }),
 
   completeAppStorePurchase: baseProcedure
@@ -1737,7 +1606,7 @@ export const kiloPassRouter = createTRPCRouter({
     if (!subscriptionBase) {
       return {
         subscription: null,
-        isEligibleForFirstMonthPromo: isTwoMonthPromoOfferActive(),
+        isEligibleForFirstMonthPromo: true,
       };
     }
 
@@ -2599,6 +2468,16 @@ export const kiloPassRouter = createTRPCRouter({
         });
       }
 
+      // A subscription set to cancel at period end ends instead of switching plans, so the
+      // user has to resume it before changing plans.
+      if (subscription.cancelAtPeriodEnd) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message:
+            'Your Kilo Pass is set to cancel. Resume your subscription before changing plans.',
+        });
+      }
+
       const fromTier = subscription.tier;
       const fromCadence = subscription.cadence;
       const toTier = input.targetTier;
@@ -2890,6 +2769,7 @@ export const kiloPassRouter = createTRPCRouter({
         amountUsd: row.amountUsd,
         kind: row.kind,
         description: row.description ?? `${row.kind} credits`,
+        expiryDate: row.expiryDate,
       }));
 
       return {
@@ -2922,13 +2802,22 @@ export const kiloPassRouter = createTRPCRouter({
 
       const priceId = getStripePriceIdForKiloPass({ tier, cadence });
       const attribution = await getAffiliateAttribution(ctx.user.id, 'impact');
+      const paidCreditTerms = getPaidCreditTerms('pass');
       const sessionMetadata = {
         type: 'kilo-pass',
         kiloUserId: ctx.user.id,
         tier,
         cadence,
         affiliateTrackingId: attribution?.tracking_id ?? '',
+        paid_credit_policy: paidCreditTerms,
       };
+
+      await assertChargeAllowed({
+        userId: ctx.user.id,
+        flow: 'kilo_pass',
+        ip: ctx.ip,
+        ja4: ja4FromHeaders(ctx.headersList),
+      });
 
       return createOrReuseKiloPassCheckoutSession({
         userId: ctx.user.id,
@@ -2942,6 +2831,7 @@ export const kiloPassRouter = createTRPCRouter({
             cadence,
             affiliateTrackingId: attribution?.tracking_id ?? '',
             priceId,
+            paidCreditTerms,
           }),
         // Enqueue inside the checkout transaction for the charged session, created or reused. The
         // stable id derived from the session id makes a retry or reuse idempotent.
@@ -2952,6 +2842,7 @@ export const kiloPassRouter = createTRPCRouter({
             userId: ctx.user.id,
             amountCents: session.amountCents ?? session.amount_total ?? 0,
             accountCreatedAt: ctx.user.created_at,
+            accountUsedMicrodollars: ctx.user.microdollars_used,
             ip: ctx.ip,
             ipCountry: ipCountryFromHeaders(ctx.headersList),
             ja4: ja4FromHeaders(ctx.headersList),

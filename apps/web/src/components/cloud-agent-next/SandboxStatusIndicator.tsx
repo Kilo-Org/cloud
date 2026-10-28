@@ -1,7 +1,8 @@
 'use client';
 
 import { useEffect, useId, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { skipToken, useQuery, useQueryClient } from '@tanstack/react-query';
+import { z } from 'zod';
 import {
   Box,
   ChevronRight,
@@ -17,14 +18,10 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { useRawTRPCClient, useTRPC } from '@/lib/trpc/utils';
+import { CLOUD_AGENT_NEXT_WS_URL } from '@kilocode/web-shared/lib/constants';
+import { subscribeSandboxStatus } from './sandbox-status-stream';
 import { cn } from '@/lib/utils';
-import {
-  SANDBOX_STATUS_POLL_INTERVAL_MS,
-  observeSandboxStatus,
-  sandboxStatusPresentation,
-  type SandboxStatusPresentation,
-} from './sandbox-status';
+import { sandboxStatusPresentation, type SandboxStatusPresentation } from './sandbox-status';
 
 const statusBadgeIcons = {
   active: Circle,
@@ -116,16 +113,22 @@ function SandboxStatusDetails({ view }: { view: SandboxStatusPresentation }) {
 }
 
 export function SandboxStatusIndicator({
+  scopeId,
   cloudAgentSessionId,
   organizationId,
   sessionActive,
 }: {
+  /** Chats of one worktree share its sandbox, so one observation serves all of them. */
+  scopeId: string;
   cloudAgentSessionId: string;
   organizationId?: string;
   sessionActive: boolean;
 }) {
-  const trpc = useTRPC();
-  const trpcClient = useRawTRPCClient();
+  const queryClient = useQueryClient();
+  // Read when a subscription starts: a chat switch in the same sandbox keeps it.
+  const cloudAgentSessionIdRef = useRef(cloudAgentSessionId);
+  cloudAgentSessionIdRef.current = cloudAgentSessionId;
+  const [streamHealthy, setStreamHealthy] = useState(false);
   const [observation, setObservation] = useState({
     enabled: false,
     initialized: false,
@@ -186,65 +189,83 @@ export function SandboxStatusIndicator({
     document.addEventListener('visibilitychange', update);
     window.addEventListener('offline', update);
     window.addEventListener('online', update);
+    window.addEventListener('focus', update);
     return () => {
       document.removeEventListener('visibilitychange', update);
       window.removeEventListener('offline', update);
       window.removeEventListener('online', update);
+      window.removeEventListener('focus', update);
     };
   }, []);
 
-  const queryKey = organizationId
-    ? trpc.organizations.cloudAgentNext.getSandboxStatus.queryKey({
-        organizationId,
-        cloudAgentSessionId,
-      })
-    : trpc.cloudAgentNext.getSandboxStatus.queryKey({ cloudAgentSessionId });
-  const query = useQuery({
-    queryKey: [...queryKey, 'observation'],
-    queryFn: ({ signal }) =>
-      observeSandboxStatus(() =>
-        organizationId
-          ? trpcClient.organizations.cloudAgentNext.getSandboxStatus.query(
-              { organizationId, cloudAgentSessionId },
-              { signal }
-            )
-          : trpcClient.cloudAgentNext.getSandboxStatus.query({ cloudAgentSessionId }, { signal })
-      ),
-    enabled: observation.enabled,
-    refetchInterval: observation.enabled ? SANDBOX_STATUS_POLL_INTERVAL_MS : false,
-    refetchIntervalInBackground: false,
-    refetchOnWindowFocus: 'always',
-    refetchOnReconnect: 'always',
-    refetchOnMount: 'always',
-    staleTime: 0,
+  const observationKey = ['cloud-agent-sandbox-observation', organizationId ?? null, scopeId];
+  // Filled only by the status stream below, never fetched.
+  const query = useQuery<{ snapshot: unknown; requestedAt: number; receivedAt: number }>({
+    queryKey: observationKey,
+    queryFn: skipToken,
     gcTime: 0,
-    retry: false,
-    throwOnError: false,
-    placeholderData: undefined,
   });
 
   useEffect(() => {
-    const refresh = () => {
-      if (document.visibilityState === 'visible' && navigator.onLine) {
-        void query.refetch({ cancelRefetch: false });
-      }
+    setStreamHealthy(false);
+    if (!observation.enabled) return;
+    const controller = new AbortController();
+    const cloudAgentSessionId = cloudAgentSessionIdRef.current;
+    const key = ['cloud-agent-sandbox-observation', organizationId ?? null, scopeId];
+    const getTicket = () =>
+      queryClient.query({
+        queryKey: [...key, cloudAgentSessionId, 'stream-ticket', observation.freshAfter],
+        staleTime: 0,
+        gcTime: 0,
+        retry: 2,
+        retryDelay: 500,
+        queryFn: async () => {
+          const response = await fetch('/api/cloud-agent-next/sessions/stream-ticket', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ cloudAgentSessionId, organizationId }),
+            signal: controller.signal,
+          });
+          if (!response.ok) throw new Error('Sandbox status authorization failed');
+          return z
+            .object({ ticket: z.string(), expiresAt: z.number() })
+            .parse(await response.json());
+        },
+      });
+    const unsubscribe = subscribeSandboxStatus({
+      baseUrl: CLOUD_AGENT_NEXT_WS_URL,
+      sessionId: cloudAgentSessionId,
+      getTicket,
+      onDisconnected: () => setStreamHealthy(false),
+      onSnapshot: snapshot => {
+        const receivedAt = Date.now();
+        queryClient.setQueryData(key, {
+          snapshot,
+          requestedAt: receivedAt,
+          receivedAt,
+        });
+        setStreamHealthy(true);
+      },
+    });
+    return () => {
+      unsubscribe();
+      controller.abort();
     };
-    window.addEventListener('focus', refresh);
-    return () => window.removeEventListener('focus', refresh);
-  }, [query.refetch]);
+  }, [scopeId, organizationId, observation.enabled, observation.freshAfter, queryClient]);
 
   const now = Math.max(clock, Date.now());
   const view = sandboxStatusPresentation({
     data: query.data?.snapshot,
     observation: !observation.initialized
       ? 'checking'
-      : !observation.enabled || query.fetchStatus === 'paused'
+      : !observation.enabled
         ? 'paused'
-        : query.isError
-          ? 'unavailable'
-          : !query.isFetchedAfterMount || query.isPending
-            ? 'checking'
-            : 'observing',
+        : !streamHealthy
+          ? query.data
+            ? 'unavailable'
+            : 'checking'
+          : 'observing',
+    live: streamHealthy && observation.enabled,
     requestedAt: query.data?.requestedAt ?? 0,
     receivedAt: query.data?.receivedAt ?? 0,
     freshAfter: observation.freshAfter,

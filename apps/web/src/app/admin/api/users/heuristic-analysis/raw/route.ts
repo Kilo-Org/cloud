@@ -5,7 +5,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { microdollar_usage_view } from '@kilocode/db/schema';
 import { eq, desc, and, gt, gte, sql } from 'drizzle-orm';
 import type { HeuristicAnalysisResponse } from '../types';
-import { ABUSE_CLASSIFICATION } from '@/types/AbuseClassification';
+import { ABUSE_CLASSIFICATION } from '@kilocode/usage-contracts';
 import { parseTimeWindow, timeWindowToInterval } from '../timeWindow';
 
 export async function GET(request: NextRequest): Promise<NextResponse<HeuristicAnalysisResponse>> {

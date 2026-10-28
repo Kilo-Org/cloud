@@ -2,7 +2,6 @@
 // eslint-disable-next-line import/no-nodejs-modules -- The compiler's CommonJS export is the only way to load it under vitest.
 import { createRequire } from 'node:module';
 import tailwindcss from '@tailwindcss/postcss';
-import { type Href } from 'expo-router';
 import postcss from 'postcss';
 import { type ComponentProps, createElement } from 'react';
 import type * as NativeCSSCompiler from 'react-native-css/compiler';
@@ -10,7 +9,8 @@ import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { OFFLINE_BANNER_HEIGHT } from '@/lib/offline-banner-state';
-import { SESSION_HEADER_TITLE_LINES } from '@/components/agents/session-header';
+import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
 import { ScreenHeader, shouldStackHeaderActions } from './screen-header';
 import { OfflineBannerSpaceProvider } from './offline-banner-space';
 
@@ -18,6 +18,9 @@ const routerState = vi.hoisted(() => ({
   routes: ['previous-screen', 'session-detail'],
   back: vi.fn(),
   replace: vi.fn<(href: string) => void>(),
+  // POP_TO semantics: find the destination at or below the current index and
+  // truncate everything above it; with no match, replace the current route.
+  dismissTo: vi.fn<(href: string) => void>(),
   canGoBack: vi.fn(() => true),
 }));
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
@@ -233,6 +236,10 @@ describe('ScreenHeader mounted', () => {
     routerState.replace.mockReset().mockImplementation(href => {
       routerState.routes.splice(-1, 1, href);
     });
+    routerState.dismissTo.mockReset().mockImplementation(href => {
+      const index = routerState.routes.lastIndexOf(href.split('?')[0] ?? href);
+      routerState.routes = index === -1 ? [href] : routerState.routes.slice(0, index + 1);
+    });
     routerState.canGoBack.mockReset().mockImplementation(() => routerState.routes.length > 1);
     i18nManager.isRTL = false;
     platform.OS = 'ios';
@@ -240,13 +247,11 @@ describe('ScreenHeader mounted', () => {
     Object.assign(layout, { width: 390, fontScale: 1 });
   });
 
-  it('gives the back control a 44-point target and no hit slop', () => {
+  it('gives the back control the 48dp icon target and no hit slop', () => {
     const renderer = renderHeader({ title: 'Sessions' });
 
     const back = findBackPressable(renderer.root);
-    expect(back.props.className).toContain('h-11 w-11');
-    expect(back.props.className).toContain('items-center');
-    expect(back.props.className).toContain('justify-center');
+    expect(back.props.className).toContain(ICON_TARGET_BOX_CLASS);
     expect(back.props.className).toContain('-ms-4');
     expect(back.props.className).toContain('shrink-0');
     expect(back.props.className).toContain('active:opacity-70');
@@ -388,6 +393,49 @@ describe('ScreenHeader mounted', () => {
     ).toHaveLength(0);
   });
 
+  it("keeps a mark-only heading's inlineActions on the row when the caller forbids a reflow", () => {
+    // The shared-row check reserves 120dp of readable title per font-scale
+    // unit: at a 3x accessibility scale on a 390dp phone that reserve is 360dp
+    // against 334dp free, so the picker reflowed under the mark although both
+    // fit. The home header turns the check off for its picker.
+    Object.assign(layout, { width: 390, fontScale: 3 });
+
+    const reflowed = renderHeader({
+      title: 'Kilo',
+      titleContent: 'MARK',
+      size: 'large',
+      inlineActions: 'ACTIONS',
+    });
+    expect(reflowed.root.findAll(isStackedActionsRow)).toHaveLength(1);
+
+    const pinned = renderHeader({
+      title: 'Kilo',
+      titleContent: 'MARK',
+      size: 'large',
+      inlineActions: 'ACTIONS',
+      allowInlineActionsStacking: false,
+    });
+    expect(pinned.root.findAll(isStackedActionsRow)).toHaveLength(0);
+    const inline = findInlineActionsWrapper(pinned.root);
+    expect(inline.children).toEqual(['ACTIONS']);
+    expect(inline.parent?.props.className).toContain('flex-row');
+    // Turning the reflow off must cap the slot instead: the heading sits on a
+    // zero flex basis, so an unbounded cluster would keep all negative free
+    // space and leave the heading at zero width, with a fixed-size mark
+    // painting under the cluster.
+    expect(inline.props.className).toContain('max-w-[50%]');
+
+    // A caller that keeps the reflow keeps the uncapped slot.
+    Object.assign(layout, { width: 390, fontScale: 1 });
+    const uncapped = renderHeader({
+      title: 'Kilo',
+      titleContent: 'MARK',
+      size: 'large',
+      inlineActions: 'ACTIONS',
+    });
+    expect(findInlineActionsWrapper(uncapped.root).props.className).not.toContain('max-w-[50%]');
+  });
+
   it('keeps the title hit slop asymmetric so it never overlaps the back target', () => {
     const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
 
@@ -454,7 +502,7 @@ describe('ScreenHeader mounted', () => {
 
   it.each([
     { history: ['previous-screen', 'session-detail'], destination: 'previous-screen' },
-    { history: ['session-detail'], destination: '/(app)/(tabs)/(2_agents)' },
+    { history: ['session-detail'], destination: '/(app)/(tabs)/(2_agents)/' },
   ])(
     'returns from $history without retaining the session or opening its title',
     ({ history, destination }) => {
@@ -462,7 +510,7 @@ describe('ScreenHeader mounted', () => {
       let titleOpened = false;
       const renderer = renderHeader({
         title: 'Session',
-        backFallback: '/(app)/(tabs)/(2_agents)' as Href,
+        backFallback: AGENTS_SESSIONS_HREF,
         onTitlePress: () => {
           titleOpened = true;
         },
@@ -482,8 +530,8 @@ describe('ScreenHeader mounted', () => {
 
   it.each([
     { history: true, backFallback: undefined },
-    { history: true, backFallback: '/(app)/(tabs)/(2_agents)' as Href },
-    { history: false, backFallback: '/(app)/(tabs)/(2_agents)' as Href },
+    { history: true, backFallback: AGENTS_SESSIONS_HREF },
+    { history: false, backFallback: AGENTS_SESSIONS_HREF },
   ] as const)(
     'preserves custom onBack precedence for history=$history, fallback=$backFallback',
     ({ history, backFallback }) => {
@@ -505,18 +553,20 @@ describe('ScreenHeader mounted', () => {
     }
   );
 
-  it('labels the title with the override or the default open-menu label', () => {
+  it('labels the title with its own text and hints at the action', () => {
     const renderer = renderHeader({ title: 'Sessions', onTitlePress: () => undefined });
-    expect(findTitlePressable(renderer.root).props.accessibilityLabel).toBe(
-      'Open menu for Sessions'
-    );
+    const title = findTitlePressable(renderer.root);
+    expect(title.props.accessibilityLabel).toBe('Sessions');
+    expect(title.props.accessibilityHint).toBe('Open menu for Sessions');
 
     const customRenderer = renderHeader({
       title: 'Sessions',
       onTitlePress: () => undefined,
-      onTitlePressAccessibilityLabel: 'Rename session',
+      onTitlePressAccessibilityHint: 'Rename session',
     });
-    expect(findTitlePressable(customRenderer.root).props.accessibilityLabel).toBe('Rename session');
+    const custom = findTitlePressable(customRenderer.root);
+    expect(custom.props.accessibilityLabel).toBe('Sessions');
+    expect(custom.props.accessibilityHint).toBe('Rename session');
   });
 
   it('renders the close icon and label for backIcon="close"', () => {
@@ -552,7 +602,7 @@ describe('ScreenHeader mounted', () => {
     const explicitlyHidden = renderHeader({
       title: 'Sessions',
       showBackButton: false,
-      backFallback: '/(app)/(tabs)/(2_agents)' as Href,
+      backFallback: AGENTS_SESSIONS_HREF,
     });
     expect(backPressableCount(explicitlyHidden.root)).toBe(0);
   });
@@ -561,8 +611,7 @@ describe('ScreenHeader mounted', () => {
     const renderer = renderHeader({});
 
     const back = findBackPressable(renderer.root);
-    expect(back.props.className).toContain('h-11 w-11');
-    expect(back.props.className).toContain('items-center justify-center');
+    expect(back.props.className).toContain(ICON_TARGET_BOX_CLASS);
     expect(back.props.hitSlop).toBeUndefined();
   });
 
@@ -571,7 +620,6 @@ describe('ScreenHeader mounted', () => {
     const variants: ScreenHeaderProps[] = [
       { title: 'Sessions' },
       { title: 'Agents', size: 'large' },
-      { title: 'Quick Chat', size: 'large', context: 'ACCOUNT' },
       { title: 'Sessions', modal: true },
       { title: 'A long sheet title', centerTitle: true },
       { title: 'Sessions', eyebrow: 'Agents' },
@@ -580,6 +628,15 @@ describe('ScreenHeader mounted', () => {
       { title: longTitle, titleNumberOfLines: 1, onTitlePress: () => undefined },
       { title: longTitle, titleNumberOfLines: 3, headerRight: 'METRICS', reserveTitleSpace: true },
       { title: longTitle, titleNumberOfLines: 9, reserveTitleSpace: true },
+      { title: 'Agents', size: 'large', reserveTitleSpace: true },
+      { title: longTitle, size: 'large', titleNumberOfLines: 2, reserveTitleSpace: true },
+      {
+        title: longTitle,
+        size: 'large',
+        titleNumberOfLines: 3,
+        headerRight: 'METRICS',
+        reserveTitleSpace: true,
+      },
     ];
 
     for (const props of variants) {
@@ -587,18 +644,12 @@ describe('ScreenHeader mounted', () => {
       const back = findBackPressable(renderer.root);
       const title = renderer.root.findByProps({ accessibilityRole: 'header' });
       // The cap is clamped to the three lines the reserved box covers, so a
-      // title can never paint a line the reserve does not hold.
-      const cappedLines = Math.min(props.titleNumberOfLines ?? 2, 3);
+      // title can never paint a line the reserve does not hold. The default
+      // is one line: CJK titles ellipsize instead of orphaning characters.
+      const cappedLines = Math.min(props.titleNumberOfLines ?? 1, 3);
       expect(title.props.numberOfLines).toBe(cappedLines);
       expect(title.props.ellipsizeMode).toBe('tail');
       expect(title.children).toEqual([props.title]);
-      if (props.reserveTitleSpace) {
-        expect(title.parent?.props.className).toContain(cappedLines > 2 ? 'min-h-21' : 'min-h-14');
-        expect(title.parent?.props.className).toContain('justify-center');
-      }
-      if (props.context) {
-        expect(title.parent?.children).toEqual([title, props.context]);
-      }
       if (props.modal || props.centerTitle) {
         expect(title.props.className).toContain('text-center');
         // The centered title shares one row with the leading control, so the
@@ -606,25 +657,6 @@ describe('ScreenHeader mounted', () => {
         expect(title.parent?.parent?.parent).toBe(back.parent);
       }
     }
-  });
-
-  it('gives the session header three title lines so a real session name is not cut mid-word', () => {
-    // 15-session-working: the session header's primary heading was capped at
-    // two lines, so a name like "Tax export formatter test" truncated mid-word
-    // beside the back control and the metrics/copy cluster on a narrow window.
-    const renderer = renderHeader({
-      title: 'Tax export formatter test',
-      titleNumberOfLines: SESSION_HEADER_TITLE_LINES,
-      reserveTitleSpace: true,
-      headerRight: 'METRICS',
-    });
-
-    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
-    expect(title.props.numberOfLines).toBe(SESSION_HEADER_TITLE_LINES);
-    // The reserved box holds the same three lines (3 x the `text-lg` 1.75rem
-    // line height), so the rendered title cannot move the body below it.
-    expect(title.parent?.props.className).toContain('min-h-21');
-    expect(title.parent?.props.className).toContain('justify-center');
   });
 
   it('keeps the close control on the title row when the sheet skips the safe-area inset', () => {
@@ -642,6 +674,43 @@ describe('ScreenHeader mounted', () => {
     expect(title.parent?.parent).toBe(back.parent);
     expect(renderer.root.props.style).toBeUndefined();
     expect(renderer.root.props.className).toContain('pt-3');
+  });
+
+  it('keeps the modal close control on the centered title row with a mirroring spacer', () => {
+    const renderer = renderHeader({ title: 'Kilo Pass', modal: true });
+
+    const back = findBackPressable(renderer.root);
+    const row = back.parent;
+    if (!row || typeof row.props.className !== 'string') {
+      throw new Error('back control row not found');
+    }
+    expect(row.props.className).toContain('flex-row items-center');
+    expect(row.props.className).toContain('min-h-11');
+
+    const title = renderer.root.findByProps({ accessibilityRole: 'header' });
+    expect(title.props.className).toContain('text-center');
+    expect(title.parent?.parent?.parent).toBe(back.parent);
+
+    const spacer = row.find(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        node.props.className === 'h-[48px] w-[48px] shrink-0'
+    );
+    expect(spacer).toBeDefined();
+  });
+
+  it('omits the mirroring spacer when the centered header has no back control', () => {
+    routerState.canGoBack.mockReturnValue(false);
+    const renderer = renderHeader({ title: 'Kilo Pass', modal: true });
+
+    const spacers = renderer.root.findAll(
+      node =>
+        typeof node.type === 'string' &&
+        (node.type as string) === 'View' &&
+        node.props.className === 'h-[48px] w-[48px] shrink-0'
+    );
+    expect(spacers).toHaveLength(0);
   });
 
   it.each([false, true])('keeps repository eyebrows on one line with RTL=%s', isRTL => {
@@ -664,7 +733,7 @@ describe('ScreenHeader mounted', () => {
         renderer.update(createElement(ScreenHeader, { title: '#6054', eyebrow }));
       });
       expect(renderer.root.findByType('Eyebrow').props.numberOfLines).toBe(1);
-      expect(findBackPressable(renderer.root).props.className).toContain('h-11 w-11');
+      expect(findBackPressable(renderer.root).props.className).toContain(ICON_TARGET_BOX_CLASS);
       renderer.unmount();
     }
   });

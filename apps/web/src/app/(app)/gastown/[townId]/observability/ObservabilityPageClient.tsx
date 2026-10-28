@@ -91,7 +91,7 @@ export function ObservabilityPageClient({ townId }: { townId: string }) {
       <div className="sticky top-0 z-10 flex items-center justify-between border-b border-white/[0.06] bg-[oklch(0.1_0_0)] px-6 py-3">
         <div className="flex items-center gap-2">
           <SidebarTrigger className="-ml-3" />
-          <Activity className="size-4 text-[color:oklch(95%_0.15_108_/_0.6)]" />
+          <Activity className="size-4 text-primary/60" />
           <h1 className="text-lg font-semibold tracking-tight text-white/90">Observability</h1>
           <span className="ml-1 font-mono text-xs text-white/30">{events.length} events</span>
         </div>
@@ -112,8 +112,8 @@ export function ObservabilityPageClient({ townId }: { townId: string }) {
                 <AreaChart data={hourlyData}>
                   <defs>
                     <linearGradient id="obsGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="oklch(95% 0.15 108)" stopOpacity={0.25} />
-                      <stop offset="100%" stopColor="oklch(95% 0.15 108)" stopOpacity={0} />
+                      <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.25} />
+                      <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid stroke="oklch(1 0 0 / 0.04)" strokeDasharray="3 3" />
@@ -134,7 +134,7 @@ export function ObservabilityPageClient({ townId }: { townId: string }) {
                   <Area
                     type="monotone"
                     dataKey="count"
-                    stroke="oklch(95% 0.15 108)"
+                    stroke="var(--primary)"
                     strokeWidth={1.5}
                     fill="url(#obsGrad)"
                   />
@@ -170,7 +170,12 @@ export function ObservabilityPageClient({ townId }: { townId: string }) {
                     width={90}
                   />
                   <Tooltip {...tooltipStyles} />
-                  <Bar dataKey="count" fill="oklch(95% 0.15 108 / 0.5)" radius={[0, 3, 3, 0]} />
+                  <Bar
+                    dataKey="count"
+                    fill="var(--primary)"
+                    fillOpacity={0.5}
+                    radius={[0, 3, 3, 0]}
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -190,7 +195,7 @@ export function ObservabilityPageClient({ townId }: { townId: string }) {
                   <span className="truncate text-xs text-white/60">{rig}</span>
                   <div className="flex items-center gap-2">
                     <div
-                      className="h-1.5 rounded-full bg-[color:oklch(95%_0.15_108_/_0.4)]"
+                      className="h-1.5 rounded-full bg-primary/40"
                       style={{
                         width: `${Math.max(
                           (count / Math.max(rigEventCounts[0]?.count ?? 1, 1)) * 100,

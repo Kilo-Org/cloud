@@ -692,6 +692,36 @@ export class MeteredBillingLifecycle {
     });
   }
 
+  /** The account and instance the next container start is attributed to, if known. */
+  async getStartAttribution(): Promise<
+    | {
+        subject: BillingContext['subject'];
+        actor: BillingContext['actor'];
+        instanceId: string;
+        billingOrigin?: string;
+      }
+    | undefined
+  > {
+    const pending = await this.getPendingAttribution();
+    if (pending) {
+      return {
+        subject: pending.subject,
+        actor: pending.actor,
+        instanceId: pending.sandboxId,
+        billingOrigin: pending.metadata?.origin,
+      };
+    }
+    const context = await getBillingContext(this.host.storage);
+    return context
+      ? {
+          subject: context.subject,
+          actor: context.actor,
+          instanceId: context.instanceId,
+          billingOrigin: context.metadata?.origin,
+        }
+      : undefined;
+  }
+
   private async getPendingAttribution(): Promise<SandboxBillingInput | undefined> {
     const stored = await this.host.storage.get(PENDING_ATTRIBUTION_STORAGE_KEY);
     return stored === undefined ? undefined : parseSandboxBillingInput(stored);

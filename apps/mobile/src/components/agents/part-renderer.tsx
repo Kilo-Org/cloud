@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { cloudAgentFileLabel } from '@kilocode/app-shared/cloud-agent';
 import { formatNumber } from '@/lib/format';
 
 import { type SessionModelOption } from '@/lib/hooks/use-session-model-options';
@@ -26,23 +27,6 @@ import { TextPartRenderer } from './text-part-renderer';
 import { ToolPartRenderer } from './tool-part-renderer';
 import { type OpenChildSession } from './child-session-section';
 
-/**
- * The absolute cloud-agent workspace prefixes a patch path can carry:
- * `/workspace/<userId>/sessions/<sessionId>/` for a session workspace and
- * `/workspace/<userId>/worktrees/<worktreeId>/` for a worktree-backed session
- * (either optionally with an organization segment before the user id) — the
- * repo is cloned at that root, so dropping it leaves the repo-relative path a
- * reader wants instead of the workspace ids.
- *
- * services/cloud-agent-next/src/workspace.ts:202,211,371
- */
-const CLOUD_AGENT_WORKSPACE_PREFIX =
-  /^\/workspace\/(?:[^/]+\/)?[^/]+\/(?:sessions|worktrees)\/[^/]+\//;
-
-export function patchPartFileLabel(path: string): string {
-  return path.replace(CLOUD_AGENT_WORKSPACE_PREFIX, '');
-}
-
 type PartRendererProps = {
   part: Part;
   isStreaming?: boolean;
@@ -50,18 +34,6 @@ type PartRendererProps = {
   defaultReasoningExpanded?: boolean;
   onOpenChildSession?: OpenChildSession;
   modelOptions?: SessionModelOption[];
-  /**
-   * Render-cache scope for the markdown text parts, so identical markdown in
-   * different messages never shares the cached elements whose handlers close
-   * over a specific message. Omitted outside a message bubble.
-   */
-  renderScope?: string;
-  /**
-   * Long-press handler forwarded into rendered code fences' copy trigger. The
-   * message bubble supplies its details long-press so a press-and-hold on a
-   * fence still opens message details. Omitted outside a bubble.
-   */
-  onLongPressCode?: () => void;
 };
 
 export function PartRenderer({
@@ -71,8 +43,6 @@ export function PartRenderer({
   defaultReasoningExpanded,
   onOpenChildSession,
   modelOptions,
-  renderScope,
-  onLongPressCode,
 }: Readonly<PartRendererProps>) {
   const { t } = useTranslation();
   if (!partRendersContent(part)) {
@@ -81,11 +51,7 @@ export function PartRenderer({
   if (isTextPart(part)) {
     return (
       <MessageErrorBoundary>
-        <TextPartRenderer
-          text={part.text}
-          renderScope={renderScope}
-          onLongPressCode={onLongPressCode}
-        />
+        <TextPartRenderer text={part.text} />
       </MessageErrorBoundary>
     );
   }
@@ -95,9 +61,7 @@ export function PartRenderer({
         <ToolPartRenderer
           part={part}
           getChildMessages={getChildMessages}
-          renderPart={props => (
-            <PartRenderer {...props} renderScope={renderScope} onLongPressCode={onLongPressCode} />
-          )}
+          renderPart={props => <PartRenderer {...props} />}
           onOpenChildSession={onOpenChildSession}
           modelOptions={modelOptions}
         />
@@ -147,7 +111,7 @@ export function PartRenderer({
               numberOfLines={1}
               ellipsizeMode="middle"
             >
-              {patchPartFileLabel(file)}
+              {cloudAgentFileLabel(file)}
             </Text>
           ))}
         </View>

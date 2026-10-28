@@ -244,6 +244,7 @@ export function createCloudAgentReportStore(db: WorkerDb) {
       .select({
         status: cloud_agent_session_runs.status,
         wrapperRunId: cloud_agent_session_runs.wrapper_run_id,
+        container: cloud_agent_session_runs.container,
         queuedAt: cloud_agent_session_runs.queued_at,
         dispatchAcceptedAt: cloud_agent_session_runs.dispatch_accepted_at,
         agentActivityObservedAt: cloud_agent_session_runs.agent_activity_observed_at,
@@ -266,12 +267,14 @@ export function createCloudAgentReportStore(db: WorkerDb) {
     const existing = rows[0];
     const incoming = report.run;
     const diagnostic = validDiagnostic(incoming, now);
+    const container = incoming.container ?? null;
 
     if (!existing) {
       await tx.insert(cloud_agent_session_runs).values({
         cloud_agent_session_id: cloudAgentSessionId,
         message_id: incoming.messageId,
         wrapper_run_id: incoming.wrapperRunId ?? null,
+        container,
         status: incoming.status,
         queued_at: incoming.queuedAt ?? null,
         dispatch_accepted_at: incoming.dispatchAcceptedAt ?? null,
@@ -287,6 +290,16 @@ export function createCloudAgentReportStore(db: WorkerDb) {
     }
 
     const establishedTerminal = isTerminalStatus(existing.status);
+    if (
+      existing.container != null &&
+      incoming.container !== undefined &&
+      (existing.container.provider !== incoming.container.provider ||
+        existing.container.sandboxId !== incoming.container.sandboxId ||
+        (existing.container.allocationId ?? null) !== (incoming.container.allocationId ?? null) ||
+        (existing.container.instanceId ?? null) !== (incoming.container.instanceId ?? null))
+    ) {
+      console.error('Conflicting Cloud Agent container identity ignored');
+    }
     const incomingTerminal = isTerminalStatus(incoming.status);
     if (establishedTerminal && incomingTerminal && existing.status !== incoming.status) {
       console.error('Conflicting Cloud Agent terminal report ignored', {
@@ -373,6 +386,7 @@ export function createCloudAgentReportStore(db: WorkerDb) {
       .set({
         status,
         wrapper_run_id: existing.wrapperRunId ?? incoming.wrapperRunId ?? null,
+        ...(existing.container == null ? { container } : {}),
         queued_at: earliestTimestamp(existing.queuedAt, incoming.queuedAt),
         dispatch_accepted_at: earliestTimestamp(
           existing.dispatchAcceptedAt,

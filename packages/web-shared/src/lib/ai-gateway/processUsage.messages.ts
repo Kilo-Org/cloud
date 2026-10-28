@@ -1,4 +1,4 @@
-import { createParser, type EventSourceMessage } from 'eventsource-parser';
+import type { EventSourceMessage } from 'eventsource-parser';
 import { captureException, captureMessage, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
 import { sentryRootSpan } from '../getRootSpan';
@@ -12,11 +12,10 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import type { GatewayMessagesRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
-  computeOpenRouterCostFields,
-  computeVercelCostMicrodollars,
   drainSseStream,
-  extractVercelIsByok,
   extractVercelUpstreamId,
+  reportUpstreamStreamError,
+  selectUsageCostFields,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 import type Anthropic from '@anthropic-ai/sdk';
@@ -50,6 +49,25 @@ type MessagesApiUsage = Anthropic.Messages.MessageDeltaUsage & {
   cost_details?: { upstream_inference_cost: number };
 };
 
+// message_start already reports the input and cache tokens, so a stream that
+// stops before message_delta still records the prompt it consumed. Providers
+// that repeat these fields in message_delta, or send them as null, keep the
+// message_delta value only when it is present.
+function mergeMessageDeltaUsage(
+  startUsage: MessagesApiUsage | null,
+  deltaUsage: MessagesApiUsage
+): MessagesApiUsage {
+  if (!startUsage) return deltaUsage;
+  return {
+    ...deltaUsage,
+    input_tokens: deltaUsage.input_tokens ?? startUsage.input_tokens,
+    cache_creation_input_tokens:
+      deltaUsage.cache_creation_input_tokens ?? startUsage.cache_creation_input_tokens,
+    cache_read_input_tokens:
+      deltaUsage.cache_read_input_tokens ?? startUsage.cache_read_input_tokens,
+  };
+}
+
 function getVercelResolvedModel(
   providerMetadata: VercelProviderMetaData | null | undefined
 ): string | undefined {
@@ -63,54 +81,32 @@ function getVercelResolvedModel(
 export function processMessagesApiUsage(
   usage: MessagesApiUsage | null | undefined,
   providerMetadata: VercelProviderMetaData | null | undefined,
-  coreProps: NotYetCostedUsageStats
+  coreProps: NotYetCostedUsageStats,
+  provider: ProviderId
 ): JustTheCostsUsageStats {
   const cacheHitTokens = usage?.cache_read_input_tokens ?? 0;
   const cacheWriteTokens = usage?.cache_creation_input_tokens ?? 0;
   const inputTokens = (usage?.input_tokens ?? 0) + cacheHitTokens + cacheWriteTokens;
   const outputTokens = usage?.output_tokens ?? 0;
 
-  // OpenRouter path: cost fields are present directly in usage
-  if (usage?.cost != null || usage?.is_byok != null) {
-    const { cost_mUsd, is_byok } = computeOpenRouterCostFields(
-      usage,
-      coreProps,
-      'messages_sse_processing'
-    );
-    return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens, cost_mUsd, is_byok };
-  }
-
-  // Vercel path: cost is in provider_metadata.gateway
-  const vercelGateway = providerMetadata?.gateway;
-  if (vercelGateway?.marketCost != null || vercelGateway?.cost != null) {
-    const cost_mUsd = computeVercelCostMicrodollars(vercelGateway);
-    return {
-      inputTokens,
-      outputTokens,
-      cacheHitTokens,
-      cacheWriteTokens,
-      cost_mUsd,
-      is_byok: extractVercelIsByok(vercelGateway),
-    };
-  }
-
-  // No cost info available
-  return {
-    inputTokens,
-    outputTokens,
-    cacheHitTokens,
-    cacheWriteTokens,
-    cost_mUsd: 0,
-    is_byok: null,
-  };
+  const costs = selectUsageCostFields(
+    usage,
+    providerMetadata,
+    coreProps,
+    'messages_sse_processing',
+    provider
+  );
+  return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens, ...costs };
 }
 
 export async function parseMessagesMicrodollarUsageFromStream(
-  stream: ReadableStream,
+  stream: ReadableStream<Uint8Array>,
   kiloUserId: string,
   openrouterRequestSpan: Span | undefined,
   provider: ProviderId,
-  statusCode: number
+  statusCode: number,
+  usesUserCredentials: boolean,
+  requestStartedAt?: number
 ): Promise<MicrodollarUsageStats> {
   openrouterRequestSpan?.end();
   const streamProcessingSpan = startInactiveSpan({
@@ -128,87 +124,95 @@ export async function parseMessagesMicrodollarUsageFromStream(
   let reportedError = statusCode >= 400;
   const startedAt = performance.now();
   let firstTokenReceived = false;
-  let usage: MessagesApiUsage | null = null;
+  let startUsage: MessagesApiUsage | null = null;
+  let deltaUsage: MessagesApiUsage | null = null;
   let finish_reason: string | null = null;
   let providerMetadata: VercelProviderMetaData | null = null;
   let inference_provider: string | null = null;
 
-  const sseStreamParser = createParser({
-    onEvent(event: EventSourceMessage) {
-      if (!firstTokenReceived) {
-        sentryRootSpan()?.setAttribute(
-          'messages.time_to_first_token_ms',
-          performance.now() - startedAt
-        );
-        firstTokenReceived = true;
-        timeToFirstTokenSpan.end();
+  const onEvent = (event: EventSourceMessage) => {
+    if (!firstTokenReceived) {
+      sentryRootSpan()?.setAttribute(
+        'messages.time_to_first_token_ms',
+        performance.now() - startedAt
+      );
+      firstTokenReceived = true;
+      timeToFirstTokenSpan.end();
+    }
+
+    if (event.data === '[DONE]') {
+      return;
+    }
+
+    const json = JSON.parse(event.data) as
+      | Anthropic.Messages.MessageStreamEvent
+      | MessagesApiStreamErrorEvent;
+
+    if (!json) {
+      captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
+        extra: { event },
+      });
+      return;
+    }
+
+    if (json.type === 'error') {
+      reportedError = true;
+      finish_reason = json.error?.error_type ?? json.error?.type ?? 'error';
+      reportUpstreamStreamError({
+        label: 'Messages API stream error',
+        source: 'messages_sse_processing',
+        error: json.error ?? {},
+        usesUserCredentials,
+        logContext: { provider, inference_provider, messageId, model },
+        sentryExtra: { json, event },
+      });
+      return;
+    }
+
+    if (json.type === 'message_start') {
+      messageId = json.message.id;
+      model = json.message.model;
+      startUsage = json.message.usage ?? startUsage;
+      const openRouterProvider = (json.message as MaybeHasOpenRouterProvider).provider;
+      if (openRouterProvider) {
+        inference_provider = openRouterProvider;
       }
-
-      if (event.data === '[DONE]') {
-        return;
+      const meta = (json.message as MaybeHasVercelProviderMetadata).provider_metadata;
+      if (meta) {
+        providerMetadata = meta;
+        model = getVercelResolvedModel(meta) ?? model;
+        inference_provider = meta.gateway?.routing?.finalProvider ?? inference_provider;
       }
+    }
 
-      const json = JSON.parse(event.data) as
-        | Anthropic.Messages.MessageStreamEvent
-        | MessagesApiStreamErrorEvent;
+    if (
+      json.type === 'content_block_delta' &&
+      json.delta.type === 'text_delta' &&
+      json.delta.text
+    ) {
+      responseContent += json.delta.text;
+    }
 
-      if (!json) {
-        captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
-          extra: { event },
-        });
-        return;
+    if (json.type === 'message_delta') {
+      finish_reason = json.delta.stop_reason;
+      deltaUsage = json.usage ?? deltaUsage;
+      const meta = (json as MaybeHasVercelProviderMetadata).provider_metadata;
+      if (meta) {
+        providerMetadata = meta;
+        model = getVercelResolvedModel(meta) ?? model;
+        inference_provider = meta.gateway?.routing?.finalProvider ?? inference_provider;
       }
+    }
+  };
 
-      if (json.type === 'error') {
-        reportedError = true;
-        finish_reason = json.error?.error_type ?? json.error?.type ?? 'error';
-        captureException(
-          new Error(`Messages API stream error: ${json.error?.message ?? 'unknown'}`),
-          {
-            tags: { source: 'messages_sse_processing' },
-            extra: { json, event },
-          }
-        );
-        return;
-      }
-
-      if (json.type === 'message_start') {
-        messageId = json.message.id;
-        model = json.message.model;
-        const openRouterProvider = (json.message as MaybeHasOpenRouterProvider).provider;
-        if (openRouterProvider) {
-          inference_provider = openRouterProvider;
-        }
-      }
-
-      if (
-        json.type === 'content_block_delta' &&
-        json.delta.type === 'text_delta' &&
-        json.delta.text
-      ) {
-        responseContent += json.delta.text;
-      }
-
-      if (json.type === 'message_delta') {
-        finish_reason = json.delta.stop_reason;
-        usage = json.usage ?? usage;
-        const meta = (json as MaybeHasVercelProviderMetadata).provider_metadata;
-        if (meta) {
-          providerMetadata = meta;
-          model = getVercelResolvedModel(meta) ?? model;
-          inference_provider = meta.gateway?.routing?.finalProvider ?? inference_provider;
-        }
-      }
-    },
-  });
-
-  const wasAborted = await drainSseStream(
+  const { wasAborted, timing } = await drainSseStream(
     stream,
-    chunk => sseStreamParser.feed(chunk),
-    streamProcessingSpan
+    onEvent,
+    streamProcessingSpan,
+    requestStartedAt
   );
 
-  if (!reportedError && !usage) {
+  if (!reportedError && !deltaUsage) {
     captureMessage('SUSPICIOUS: No usage in Messages API stream', {
       level: 'warning',
       tags: { source: 'messages_usage_processing' },
@@ -224,21 +228,23 @@ export async function parseMessagesMicrodollarUsageFromStream(
     inference_provider,
     finish_reason,
     upstream_id: extractVercelUpstreamId(providerMetadata),
-    latency: null,
+    latency: timing.latency,
     moderation_latency: null,
-    generation_time: null,
+    generation_time: timing.generation_time,
     streamed: true,
     cancelled: null,
     status_code: statusCode,
   } satisfies NotYetCostedUsageStats;
 
-  const costs = processMessagesApiUsage(usage, providerMetadata, coreProps);
+  const usage = deltaUsage ? mergeMessageDeltaUsage(startUsage, deltaUsage) : startUsage;
+  const costs = processMessagesApiUsage(usage, providerMetadata, coreProps, provider);
   return { ...coreProps, ...costs };
 }
 
 export function parseMessagesMicrodollarUsageFromString(
   fullResponse: string,
-  statusCode: number
+  statusCode: number,
+  provider: ProviderId
 ): MicrodollarUsageStats {
   const responseJson = JSON.parse(fullResponse) as
     | (Anthropic.Messages.Message & MaybeHasVercelProviderMetadata & MaybeHasOpenRouterProvider)
@@ -271,7 +277,7 @@ export function parseMessagesMicrodollarUsageFromString(
     status_code: statusCode,
   } satisfies NotYetCostedUsageStats;
 
-  const costs = processMessagesApiUsage(usage, providerMetadata, coreProps);
+  const costs = processMessagesApiUsage(usage, providerMetadata, coreProps, provider);
   return { ...coreProps, ...costs };
 }
 

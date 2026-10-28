@@ -76,9 +76,13 @@ vi.mock('@/components/agents/session-platform-icon', () => ({
 }));
 vi.mock('@/components/agents/session-row-actions', () => ({
   showRenamePrompt: vi.fn(),
+  useSessionDeleteConfirm: () => ({ confirmDelete: vi.fn(), deleteDialog: null }),
 }));
 vi.mock('@/components/agents/remote-session-exit-alert', () => ({
-  showRemoteSessionExitConfirmation: vi.fn().mockResolvedValue(true),
+  useRemoteSessionExitConfirmation: () => ({
+    confirmExit: vi.fn().mockResolvedValue(true),
+    exitDialog: null,
+  }),
 }));
 // The exit helper pulls `sonner-native` (and its native toast adapter), which
 // the node mounted project cannot load. This suite never exits a session.

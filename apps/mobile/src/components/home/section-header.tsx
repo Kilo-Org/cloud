@@ -2,6 +2,7 @@ import { type ReactNode } from 'react';
 import { I18nManager, Pressable, View } from 'react-native';
 
 import { EYEBROW_LATIN_DISPLAY, Text } from '@/components/ui/text';
+import { textActionTargetClass } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 type SectionHeaderProps = {
@@ -14,13 +15,17 @@ type SectionHeaderProps = {
   onActionPress?: () => void;
   /**
    * Keeps the action's box but makes it invisible, inert and hidden from
-   * screen readers, so hiding it cannot change the header's size.
+   * screen readers, so hiding it cannot change the header's size. Beside a
+   * notice the hidden box is dropped instead: it would hold the notice off the
+   * row edge, over empty space.
    */
   actionHidden?: boolean;
   /**
-   * Optional one-line status between the label and the action. It takes only
-   * the free space on the label's line (zero basis), so it can never wrap the
-   * row or change the header's height when it appears.
+   * Optional status between the label and the action. It takes only the free
+   * space on the label's line (zero basis), so it never pushes the action off
+   * the row; a long message wraps inside the slot instead of clipping, which
+   * grows the header by the wrapped line. A divider separates it from a
+   * visible action. Pass null while there is nothing to report.
    */
   notice?: ReactNode;
 };
@@ -32,6 +37,7 @@ export function SectionHeader({
   actionHidden = false,
   notice,
 }: Readonly<SectionHeaderProps>) {
+  const hasAction = Boolean(actionLabel && onActionPress) && !(actionHidden && notice);
   return (
     <View className="flex-row flex-wrap items-center justify-end gap-2 px-4 pb-2 pt-2">
       {/* With a notice the label keeps its own width, so the notice takes all
@@ -44,11 +50,11 @@ export function SectionHeader({
           {notice}
         </View>
       ) : null}
-      {actionLabel && onActionPress ? (
+      {notice && hasAction ? <View className="h-3 w-px bg-border" /> : null}
+      {hasAction ? (
         <Pressable
           onPress={onActionPress}
           disabled={actionHidden}
-          hitSlop={8}
           accessibilityRole={actionHidden ? undefined : 'button'}
           accessibilityLabel={actionHidden ? undefined : actionLabel}
           accessibilityElementsHidden={actionHidden}
@@ -66,8 +72,15 @@ export function SectionHeader({
           // `text-left`/`text-right`: React Native swaps those two under RTL
           // (Android maps `textAlign: 'left'` to `Gravity.RIGHT` when the layout
           // is RTL).
+          // The frame is the box, not the 11px label line: a control-size audit
+          // reads the node's own rect and `hitSlop` never widens it. The row
+          // grows to hold the frame — RN stops delivering touches outside the
+          // parent, so a shrunk layout box would leave part of the target dead
+          // (`textActionTargetClass`, `comment-row.tsx`). The hidden action keeps
+          // the same box, so hiding it still cannot resize the header.
           className={cn(
-            'max-w-full shrink-0 flex-row active:opacity-70',
+            textActionTargetClass(),
+            'max-w-full shrink-0 flex-row items-center justify-center active:opacity-70',
             actionHidden && 'opacity-0'
           )}
         >

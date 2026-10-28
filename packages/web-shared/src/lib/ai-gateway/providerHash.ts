@@ -5,13 +5,6 @@ import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
-/**
- * Generates a service-specific SHA256 hash.
- *
- * @param payload - The string to hash
- * @param provider - The provider to generate the hash for
- * @returns Base64-encoded SHA256 hash
- */
 export function generateProviderSpecificHash(payload: string, provider: Provider): string {
   const salt = 'd20250815';
   const pepper =
@@ -56,6 +49,9 @@ export function generateOpenRouterUpstreamSafetyIdentifier(userId: string): stri
     .digest('hex');
 }
 
+// OpenAI rejects longer keys with `string_above_max_length`.
+const MAX_PROMPT_CACHE_KEY_LENGTH = 64;
+
 export function applyTrackingIds(
   request: GatewayRequest,
   provider: Provider,
@@ -66,15 +62,25 @@ export function applyTrackingIds(
   const taskHash = taskId ? generateProviderSpecificSessionHash(userId, taskId, provider) : '';
   if (request.kind === 'messages') {
     request.body.metadata = { ...request.body.metadata, user_id: userHash };
-    if (provider.id === 'openrouter') {
+    if (provider.id === 'openrouter' || provider.id === 'vercel') {
       request.body.user = userHash;
       if (taskHash) {
         request.body.session_id = taskHash;
       }
     }
   } else {
+    const clientCacheKey = request.body.prompt_cache_key;
     if (taskHash) {
       request.body.prompt_cache_key = taskHash;
+    } else if (
+      typeof clientCacheKey === 'string' &&
+      clientCacheKey.length > MAX_PROMPT_CACHE_KEY_LENGTH
+    ) {
+      request.body.prompt_cache_key = generateProviderSpecificSessionHash(
+        userId,
+        clientCacheKey,
+        provider
+      );
     }
     request.body.safety_identifier = userHash;
     request.body.user = userHash; // deprecated, but this is what OpenRouter uses

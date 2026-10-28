@@ -22,15 +22,19 @@ import {
   createOrGetIssuanceHeader,
   issueBaseCreditsForIssuance,
 } from '@kilocode/web-shared/lib/kilo-pass/issuance';
+import { computeMonthlyKiloPassBonusDecision } from '@kilocode/web-shared/lib/kilo-pass/bonus-decision';
+import { getMonthlyWelcomePromoAccountContext } from '@kilocode/web-shared/lib/kilo-pass/welcome-promo-context';
 import { forceImmediateExpirationRecomputation } from '@kilocode/web-shared/lib/balanceCache';
 import {
   getKiloPassMetadataFromStripeMetadata,
   getKiloPassPriceMetadataFromInvoice,
   getKiloPassSubscriptionMetadata,
 } from '@kilocode/web-shared/lib/kilo-pass/stripe-handlers-metadata';
+import { getKiloPassPriceMetadataForId } from '@kilocode/web-shared/lib/kilo-pass/stripe-price-ids.server';
 import { invoiceLooksLikeKiloPassByPriceId } from '@/lib/kilo-pass/stripe-invoice-classifier.server';
 import {
   getInvoiceIssueMonth,
+  getSubscriptionLineItemPeriodStart,
   getInvoiceSubscription,
   resolveSettledInvoicePayment,
   getStripeEndedAtIso,
@@ -47,6 +51,7 @@ import {
   KiloPassWelcomePromoEligibilityReason,
 } from '@kilocode/web-shared/lib/kilo-pass/enums';
 import { isStripeSubscriptionEnded } from '@kilocode/web-shared/lib/kilo-pass/stripe-subscription-status';
+import { closePauseEvent } from '@kilocode/web-shared/lib/kilo-pass/pause-events';
 import { captureException } from '@sentry/nextjs';
 import {
   acquireDuplicateCardSubscriptionLock,
@@ -59,9 +64,9 @@ import {
   type PaymentFingerprintClaimResult,
 } from '@/lib/kilo-pass/card-fingerprint-gate';
 import { processTopUp } from '@kilocode/web-shared/lib/credits';
+import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
 import { randomUUID } from 'node:crypto';
 import { releaseScheduledChangeForSubscription } from '@/lib/kilo-pass/scheduled-change-release';
-import { revokeGatewayGrantsForBlockedUser } from '@/lib/mcp-gateway/blocking-service';
 import {
   computeMonthlyKiloPassStreak,
   updateKiloPassThresholdAfterBaseCredits,
@@ -298,33 +303,46 @@ async function maybeIssueYearlyRemainingCredits(params: {
     status: 'paid',
   });
 
-  // Find the invoice that started the current yearly billing cycle: the most recent
-  // paid invoice whose line item has a yearly interval and whose period contains
-  // the effective date.
+  // Invoice fees and prorations do not identify the paid yearly product service period.
   let yearlyBillingCycleStartSeconds: number | null = null;
+  let yearlyPaidCreditTerms: 'legacy' | 'one_year' = 'legacy';
   for (const inv of recentInvoices.data) {
     // Skip the invoice that triggered this handler — we want the *previous*
     // yearly invoice that started the billing cycle, not the upgrade invoice.
     if (inv.id === stripeInvoiceId) continue;
 
-    const lineItem = inv.lines?.data?.[0];
-    if (!lineItem) continue;
+    const lineItems = inv.lines?.has_more
+      ? stripe.invoices.listLineItems(inv.id, { limit: 100 })
+      : (inv.lines?.data ?? []);
+    for await (const lineItem of lineItems) {
+      const priceMetadata = getKiloPassPriceMetadataForId(lineItem.pricing?.price_details?.price);
+      const subscriptionDetails = lineItem.parent?.subscription_item_details;
+      if (
+        isServiceFeeInvoiceLine(lineItem) ||
+        priceMetadata?.cadence !== KiloPassCadence.Yearly ||
+        priceMetadata.tier !== row.from_tier ||
+        !subscriptionDetails ||
+        subscriptionDetails.proration
+      ) {
+        continue;
+      }
 
-    const periodStart = lineItem.period?.start;
-    const periodEnd = lineItem.period?.end;
-    if (typeof periodStart !== 'number' || typeof periodEnd !== 'number') continue;
+      const periodStart = lineItem.period?.start;
+      const periodEnd = lineItem.period?.end;
+      if (typeof periodStart !== 'number' || typeof periodEnd !== 'number') continue;
+      if ((periodEnd - periodStart) / 86400 < 340) continue;
 
-    // Skip non-yearly invoices: yearly periods span ~365 days (340 allows
-    // for leap-year and Stripe timestamp rounding while staying well above
-    // the longest monthly period of ~31 days).
-    const periodDays = (periodEnd - periodStart) / 86400;
-    if (periodDays < 340) continue;
-
-    // The yearly invoice whose period contains the effective date
-    if (effectiveAtUtc.unix() >= periodStart && effectiveAtUtc.unix() <= periodEnd) {
-      yearlyBillingCycleStartSeconds = periodStart;
-      break;
+      if (effectiveAtUtc.unix() >= periodStart && effectiveAtUtc.unix() <= periodEnd) {
+        yearlyBillingCycleStartSeconds = periodStart;
+        const credit = await tx.query.credit_transactions.findFirst({
+          where: eq(credit_transactions.stripe_payment_id, inv.id),
+          columns: { paid_credit_policy: true },
+        });
+        yearlyPaidCreditTerms = credit?.paid_credit_policy === 'one_year' ? 'one_year' : 'legacy';
+        break;
+      }
     }
+    if (yearlyBillingCycleStartSeconds !== null) break;
   }
 
   if (yearlyBillingCycleStartSeconds === null) {
@@ -366,6 +384,12 @@ async function maybeIssueYearlyRemainingCredits(params: {
       creditTransactionId: attemptedCreditTransactionId,
       creditDescription: `Kilo Pass yearly remaining base credits (${row.from_tier}, remaining_months=${remainingMonths})`,
       skipPostTopUpFreeStuff: true,
+      paidCredit: {
+        source: 'pass',
+        purchasedAt: cycleStartUtc.toDate(),
+        issuedAt: effectiveAtUtc.toDate(),
+        terms: yearlyPaidCreditTerms,
+      },
     }
   );
 
@@ -656,6 +680,12 @@ export async function handleKiloPassInvoicePaid(params: {
 
       const kiloPassSubscriptionId = row.id;
       const priorStatus = existingSubscription?.status ?? null;
+      if (derivedEndedAt) {
+        await closePauseEvent(tx, {
+          kiloPassSubscriptionId,
+          resumedAt: dayjs().utc().toISOString(),
+        });
+      }
 
       let settledPaymentResolutionPromise: Promise<SettledInvoicePaymentResolution> | null = null;
       const getSettledPaymentResolution = (): Promise<SettledInvoicePaymentResolution> => {
@@ -711,10 +741,12 @@ export async function handleKiloPassInvoicePaid(params: {
           },
         });
 
+        const duplicateCardEndedAt = dayjs().utc().toISOString();
         await tx
           .update(kilo_pass_subscriptions)
-          .set({ status: 'canceled', ended_at: dayjs().utc().toISOString() })
+          .set({ status: 'canceled', ended_at: duplicateCardEndedAt })
           .where(eq(kilo_pass_subscriptions.id, kiloPassSubscriptionId));
+        await closePauseEvent(tx, { kiloPassSubscriptionId, resumedAt: duplicateCardEndedAt });
 
         await blockUser({
           kiloUserId,
@@ -823,6 +855,8 @@ export async function handleKiloPassInvoicePaid(params: {
       // For yearly cadence, we still bill yearly, but issue base credits monthly.
       const tierConfig = KILO_PASS_TIER_CONFIG[tier];
       const baseAmountUsd = tierConfig.monthlyPriceUsd;
+      const paidTermStart = getSubscriptionLineItemPeriodStart(invoice) ?? invoice.created;
+      const purchasedAt = new Date(Math.min(invoice.created, paidTermStart) * 1000);
 
       const baseCreditsResult = await issueBaseCreditsForIssuance(tx, {
         issuanceId: issuanceHeader.issuanceId,
@@ -831,16 +865,51 @@ export async function handleKiloPassInvoicePaid(params: {
         amountUsd: baseAmountUsd,
         stripeInvoiceId: invoice.id,
         description: `Kilo Pass base credits (${tier}, ${cadence})`,
+        paidCredit: {
+          source: 'pass',
+          purchasedAt,
+          issuedAt: new Date((invoice.status_transitions?.paid_at ?? paidTermStart) * 1000),
+          terms:
+            invoice.billing_reason === 'subscription_create'
+              ? invoice.parent?.subscription_details?.metadata?.paid_credit_policy === 'one_year'
+                ? 'one_year'
+                : 'legacy'
+              : getPaidCreditTerms('pass', purchasedAt),
+        },
       });
       didMutateBalance ||= baseCreditsResult.wasIssued;
 
       let referralBonusBlocksNormalBonus = false;
+      let monthlyStreakMonths = 1;
       if (cadence === KiloPassCadence.Monthly) {
+        const wasInactivePreviously =
+          priorStatus !== null && isStripeSubscriptionEnded(priorStatus);
+        const computedStreak = await computeMonthlyKiloPassStreak(tx, {
+          subscriptionId: kiloPassSubscriptionId,
+          issueMonth,
+        });
+        monthlyStreakMonths = wasInactivePreviously ? 1 : Math.max(1, computedStreak);
+
+        // A referral bonus fills the issuance bonus slot. Keep the slot free for the welcome promo.
+        const welcomePromoAccountContext = await getMonthlyWelcomePromoAccountContext(tx, {
+          kiloUserId,
+          subscriptionId: kiloPassSubscriptionId,
+          paymentProvider: KiloPassPaymentProvider.Stripe,
+        });
+        const isWelcomePromoIssuance = computeMonthlyKiloPassBonusDecision({
+          tier,
+          startedAtIso: dayjs.unix(subscription.start_date).utc().toISOString(),
+          streakMonths: monthlyStreakMonths,
+          ...welcomePromoAccountContext,
+          issueMonth,
+        }).shouldIssueFirstMonthPromo;
+
         const referralBonusResult = await applyPendingKiloPassReferralBonusForIssuance(tx, {
           issuanceId: issuanceHeader.issuanceId,
           subscriptionId: kiloPassSubscriptionId,
           kiloUserId,
           stripeInvoiceId: invoice.id,
+          deferForWelcomePromo: isWelcomePromoIssuance,
         });
         referralBonusBlocksNormalBonus =
           referralBonusResult.wasIssued || referralBonusResult.issuanceItemId !== null;
@@ -883,17 +952,9 @@ export async function handleKiloPassInvoicePaid(params: {
         return null;
       }
 
-      const wasInactivePreviously = priorStatus !== null && isStripeSubscriptionEnded(priorStatus);
-
-      const computedStreak = await computeMonthlyKiloPassStreak(tx, {
-        subscriptionId: kiloPassSubscriptionId,
-        issueMonth,
-      });
-      const newStreakMonths = wasInactivePreviously ? 1 : Math.max(1, computedStreak);
-
       await tx
         .update(kilo_pass_subscriptions)
-        .set({ current_streak_months: newStreakMonths, next_yearly_issue_at: null })
+        .set({ current_streak_months: monthlyStreakMonths, next_yearly_issue_at: null })
         .where(eq(kilo_pass_subscriptions.id, kiloPassSubscriptionId));
 
       return null;
@@ -975,7 +1036,6 @@ export async function handleKiloPassInvoicePaid(params: {
   }
 
   if (duplicateCardEnforcement) {
-    await revokeGatewayGrantsForBlockedUser(duplicateCardEnforcement.kiloUserId);
     await enforceDuplicateCardBlock({
       enforcement: duplicateCardEnforcement,
       eventId,

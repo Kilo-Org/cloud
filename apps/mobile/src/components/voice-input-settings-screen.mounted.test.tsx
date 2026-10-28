@@ -3,8 +3,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import {
+  expectGatewaySwitchState,
   findConfigureRow,
-  findGatewaySwitch,
   findQueryErrors,
   findTexts,
   mountVoiceInputSettingsScreen,
@@ -46,7 +46,9 @@ const organization = vi.hoisted(() => ({ organizationId: 'org-1' as string | nul
 const voiceLanguage = vi.hoisted(() => ({ chosen: null as string | null, loaded: true }));
 
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   Switch: 'Switch',
+  Pressable: 'Pressable',
   View: 'View',
   ActivityIndicator: 'ActivityIndicator',
 }));
@@ -126,7 +128,7 @@ describe('VoiceInputSettingsScreen', () => {
   it('renders the gateway transcription switch and its title and subtitle', async () => {
     const renderer = await mountVoiceInputSettingsScreen();
 
-    expect(findGatewaySwitch(renderer).props).toMatchObject({ value: false, disabled: false });
+    expectGatewaySwitchState(renderer, { checked: false, disabled: false });
 
     const texts = findTexts(renderer);
     expect(texts).toContain('Gateway transcription');
@@ -230,7 +232,7 @@ describe('VoiceInputSettingsScreen', () => {
       subtitle: '—',
       disabled: true,
     });
-    expect(findGatewaySwitch(renderer).props.disabled).toBe(false);
+    expectGatewaySwitchState(renderer, { disabled: false });
 
     const [errorState] = findQueryErrors(renderer);
     if (!errorState) {
@@ -259,7 +261,7 @@ describe('VoiceInputSettingsScreen', () => {
       subtitle: '—',
       disabled: true,
     });
-    expect(findGatewaySwitch(renderer).props.disabled).toBe(false);
+    expectGatewaySwitchState(renderer, { disabled: false });
 
     const [emptyState] = findQueryErrors(renderer);
     if (!emptyState) {
@@ -291,7 +293,7 @@ describe('VoiceInputSettingsScreen', () => {
     gatewayTranscription.hasLoaded = false;
     const renderer = await mountVoiceInputSettingsScreen();
 
-    expect(findGatewaySwitch(renderer).props.disabled).toBe(true);
+    expectGatewaySwitchState(renderer, { disabled: true });
   });
 
   it('shows the automatic language and opens the picker when no choice is stored', async () => {

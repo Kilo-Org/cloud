@@ -13,12 +13,11 @@ import { type Href, useRouter } from 'expo-router';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Alert,
-  InteractionManager,
   Keyboard,
   Platform,
   Pressable,
   ScrollView,
+  type ScrollViewInstance,
   type TextInput,
   View,
 } from 'react-native';
@@ -37,6 +36,7 @@ import { Button } from '@/components/ui/button';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import {
   focusAfterPendingCommentRemoval,
   PendingQueueHint,
@@ -171,8 +171,9 @@ type PrReviewSubmitProps = Readonly<{
    */
   prRef?: ProviderPrRef;
   /**
-   * The review events the server capability list accepts (provider arms).
-   * Absent on GitHub, which keeps the fixed three-option chip row.
+   * The review events to offer: the server capability list on provider arms,
+   * or comment only on the viewer's own GitHub pull request. Absent on any
+   * other GitHub pull request, which keeps the fixed three-option chip row.
    */
   reviewEvents?: readonly ProviderReviewEventOption[];
   onDismiss: () => void;
@@ -183,6 +184,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   const router = useRouter();
   const pending = usePendingReview();
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   const submitReview = useSubmitReviewMutation(prRef ?? { owner, repo, number });
   const { userId } = useCurrentUserId();
   // The post-submit prompt's surface is platform-specific
@@ -206,7 +208,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
 
   const bodyRef = useRef<string>('');
   const bodyInputRef = useRef<TextInput | null>(null);
-  const scrollRef = useRef<ScrollView | null>(null);
+  const scrollRef = useRef<ScrollViewInstance | null>(null);
 
   // Seed the summary refs from the default-on footer preference once it
   // resolves, before the summary field mounts, so a prefilled footer survives
@@ -266,6 +268,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
       const display = mutationErrorDisplay('submit', classification, {
         rawError: submitReview.error,
         term: providerPlatform ? i18n.t(providerPrNounKey(providerPlatform)) : undefined,
+        platform: providerPlatform,
       });
       setInlineError(display.message);
       setInlineErrorKind(display.kind);
@@ -338,8 +341,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
         );
       } else {
         onDismiss();
-        // eslint-disable-next-line typescript-eslint/no-deprecated -- InteractionManager.runAfterInteractions is the documented API for deferring work past the current interaction frame.
-        InteractionManager.runAfterInteractions(() => {
+        requestIdleCallback(() => {
           void maybeAskAfterSuccessfulOutcome(userId, requestFeedbackPrompt);
         });
       }
@@ -380,25 +382,19 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
   }
 
   function confirmDelete(item: PendingReviewItem) {
-    Alert.alert(
-      t('prReview.submit.deletePendingTitle'),
-      t('prReview.submit.deletePendingMessage'),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.delete'),
-          style: 'destructive',
-          onPress: () => {
-            // Announce/focus only when the remove is confirmed synchronous:
-            // the provider's removeComment filters by id and returns nothing,
-            // so the item must still be queued at delete-confirm time.
-            const removed = pending.items.some(queued => queued.id === item.id);
-            pending.removeComment(item.id);
-            focusAfterPendingCommentRemoval(bodyInputRef, removed);
-          },
-        },
-      ]
-    );
+    confirm({
+      title: t('prReview.submit.deletePendingTitle'),
+      message: t('prReview.submit.deletePendingMessage'),
+      confirmLabel: t('common.delete'),
+      onConfirm: () => {
+        // Announce/focus only when the remove is confirmed synchronous:
+        // the provider's removeComment filters by id and returns nothing,
+        // so the item must still be queued at delete-confirm time.
+        const removed = pending.items.some(queued => queued.id === item.id);
+        pending.removeComment(item.id);
+        focusAfterPendingCommentRemoval(bodyInputRef, removed);
+      },
+    });
   }
 
   const submitDisabled =
@@ -550,6 +546,7 @@ export function PrReviewSubmit(props: PrReviewSubmitProps) {
           </Button>
         </PrFormSheetFooter>
       </ScrollView>
+      {dialog}
     </>
   );
 }

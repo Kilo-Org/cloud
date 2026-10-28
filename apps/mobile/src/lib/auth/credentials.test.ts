@@ -54,6 +54,12 @@ vi.mock('@/lib/auth/logout-cleanup', () => ({
 vi.mock('@/lib/query-client', () => ({
   queryClient: { clear: vi.fn(), invalidateQueries: vi.fn() },
 }));
+vi.mock('@/lib/chat/sign-out', () => ({
+  clearChatsForSignOut: vi.fn(),
+  releaseChatsForAccountSwitch: vi.fn(),
+}));
+// Session-scoped cleanup clears backend profiles; the store reaches native crypto.
+vi.mock('@/lib/chat/backend-store', () => ({ clearChatBackends: vi.fn() }));
 vi.mock('@/lib/auth/trpc-unauthorized', () => ({ setTrpcUnauthorizedHandler: vi.fn() }));
 vi.mock('@/lib/hooks/use-persisted-agent-model', () => ({ clearAgentModelPreference: vi.fn() }));
 vi.mock('@/lib/hooks/use-persisted-run-on-destination', () => ({
@@ -64,6 +70,9 @@ vi.mock('@/lib/hooks/use-keep-screen-on-preference', () => ({
 }));
 vi.mock('@/lib/hooks/use-live-activity-preference', () => ({
   clearLiveActivityPreference: vi.fn(),
+}));
+vi.mock('@/lib/hooks/use-tracking-permission-prompt', () => ({
+  clearTrackingPromptDismissed: vi.fn(),
 }));
 vi.mock('@/lib/hooks/use-pr-review-footer-preference', () => ({
   clearPrReviewFooterPreference: vi.fn(),
@@ -90,7 +99,7 @@ vi.mock('@/lib/last-active-instance', () => ({
 // `expo`, which needs `__DEV__` and cannot load in the node test environment.
 vi.mock('@/lib/last-opened-session', () => ({ clearLastOpenedSession: vi.fn() }));
 vi.mock('@/lib/native-launcher-surfaces', () => ({ clearLauncherSurfaces: vi.fn() }));
-vi.mock('@/lib/kilo-pass/use-store-kilo-pass-purchase', () => ({
+vi.mock('@/lib/credits/use-store-credit-purchase', () => ({
   resetPurchaseErrorToastDedup: vi.fn(),
 }));
 vi.mock('@/lib/persist/read-cache', () => ({
@@ -110,11 +119,37 @@ vi.mock('@/lib/pr-review/viewed-files', () => ({
   clearViewedFiles: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('@/lib/telemetry/controller', () => ({ clearTelemetryDecision: vi.fn() }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  getCommittedConnectivityStatus: () => 'online',
+}));
 vi.mock('@/lib/telemetry/posthog-storage', () => ({
   purgePostHogPersistence: vi.fn().mockResolvedValue(undefined),
 }));
 vi.mock('react-native', () => ({
   AppState: { addEventListener: vi.fn(() => ({ remove: vi.fn() })) },
+}));
+// sonner-native is imported by secure-store-preference, which the remote MCP
+// store and the settings-tools switch warm at module scope. It resolves
+// react-native through its own dependency path, so the `react-native` mock
+// above does not cover it: mock the package itself, as the sibling preference
+// suites do, or Node's parser hits react-native's Flow-only `import typeof`.
+vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
+
+// The auth graph imports `exchange-legacy-token`, which now builds the app
+// `User-Agent` through `client-metadata` -> `expo-application`; that module's
+// expo root needs `__DEV__` and cannot load in the node test environment.
+vi.mock('expo-application', () => ({ nativeApplicationVersion: '1.0.0' }));
+
+// The same graph builds an admission proof for the legacy exchange, which
+// reaches `@expo/app-integrity`; that module's expo root needs `__DEV__` too.
+vi.mock('@/lib/auth/admission', () => ({
+  getAdmission: vi.fn().mockResolvedValue({
+    platform: 'android',
+    kind: 'assertion',
+    challenge: 'challenge',
+    payload: 'proof',
+  }),
+  clearAttestKeyOnRefusal: vi.fn(),
 }));
 
 // These imported session-clear modules pull in native bindings that crash the
@@ -180,6 +215,7 @@ import * as SecureStore from 'expo-secure-store';
 import { performRefresh, persistSignInCredentialsAtEpoch } from '@/lib/auth/credentials';
 import { bumpAuthEpoch, currentAuthEpoch } from '@/lib/auth/auth-epoch';
 import { clearActiveToken, setSignOutTeardownActive } from '@/lib/auth/token-owner';
+import { setProtectedDataAvailable } from '@/lib/protected-data';
 import {
   AUTH_TOKEN_KEY,
   LEGACY_EXCHANGE_DONE_KEY,
@@ -394,6 +430,43 @@ describe('refresh rotation', () => {
       expect(store.get(AUTH_TOKEN_KEY)).toBe('stored-token');
       expect(store.has(REFRESH_TOKEN_KEY)).toBe(false);
     } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('retries later, never unreadable, when the device is locked', async () => {
+    store.set(AUTH_TOKEN_KEY, 'stored-token');
+    store.set(REFRESH_TOKEN_KEY, 'r1');
+    setProtectedDataAvailable(false);
+    const fetchMock = vi.fn().mockRejectedValue(new Error('fetch must not be called'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      await expect(performRefresh()).resolves.toEqual({ ok: false, refused: false });
+      expect(SecureStore.getItemAsync).not.toHaveBeenCalled();
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      setProtectedDataAvailable(true);
+      vi.unstubAllGlobals();
+    }
+  });
+
+  it('retries later, never unreadable, when the device locks during the refresh-token read', async () => {
+    store.set(AUTH_TOKEN_KEY, 'stored-token');
+    vi.mocked(SecureStore.getItemAsync).mockImplementation(async () => {
+      await Promise.resolve();
+      // A locked keychain can answer null for a WHEN_UNLOCKED item.
+      setProtectedDataAvailable(false);
+      return null;
+    });
+    const fetchMock = vi.fn().mockRejectedValue(new Error('fetch must not be called'));
+    vi.stubGlobal('fetch', fetchMock);
+
+    try {
+      await expect(performRefresh()).resolves.toEqual({ ok: false, refused: false });
+      expect(fetchMock).not.toHaveBeenCalled();
+    } finally {
+      setProtectedDataAvailable(true);
       vi.unstubAllGlobals();
     }
   });

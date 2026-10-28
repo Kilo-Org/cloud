@@ -28,6 +28,28 @@ import { captureTelemetry } from '@/lib/telemetry/error-sink';
  */
 const STORED_CREDENTIAL_ROUTE = '/api/auth/native/refresh';
 
+/**
+ * Every route whose terminal refusal {@link reportAuthTerminalFailure} reports:
+ * the native auth POSTs (`postAuth`) and the refresh rotation. The
+ * network-error fetch wrapper reads this list so it does not file a second
+ * event for the same refusal (KILO-APP-2N2 duplicated KILO-APP-2VV). Typing
+ * the callers' `route` with it keeps the list complete.
+ */
+const AUTH_TERMINAL_ROUTES = [
+  '/api/auth/native/otp',
+  '/api/auth/native/token',
+  STORED_CREDENTIAL_ROUTE,
+  '/api/auth/passkey/authenticate',
+  '/api/auth/passkey/register',
+] as const;
+
+export type AuthTerminalRoute = (typeof AUTH_TERMINAL_ROUTES)[number];
+
+/** True when the auth layer reports this route's terminal refusals itself. */
+export function isAuthTerminalRoute(path: string): path is AuthTerminalRoute {
+  return AUTH_TERMINAL_ROUTES.some(route => route === path);
+}
+
 export type AuthResponseClass =
   /** 2xx: the route answered. */
   | { readonly kind: 'success' }
@@ -114,8 +136,15 @@ export function resetAuthTerminalReports(): void {
   reportedTerminalFailures.clear();
 }
 
-/** True when this exact terminal failure has not been reported yet. */
-export function shouldReportAuthTerminalFailure(route: string, status: number): boolean {
+/**
+ * Claim the one report this process may file for this route and status: true
+ * on the first call, false on every repeat.
+ *
+ * The call itself marks the failure as reported, so it is not a question to ask
+ * out of curiosity: a claim spends the process's single report for that
+ * failure, and a `reportAuthTerminalFailure` after it files nothing.
+ */
+export function claimAuthTerminalFailureReport(route: string, status: number): boolean {
   const key = `${route}:${status}`;
   if (reportedTerminalFailures.has(key)) {
     return false;
@@ -129,8 +158,8 @@ export function shouldReportAuthTerminalFailure(route: string, status: number): 
  * stable fingerprint above. Never throws; a no-op until a telemetry sink is
  * installed.
  */
-export function reportAuthTerminalFailure(route: string, status: number): void {
-  if (!shouldReportAuthTerminalFailure(route, status)) {
+export function reportAuthTerminalFailure(route: AuthTerminalRoute, status: number): void {
+  if (!claimAuthTerminalFailureReport(route, status)) {
     return;
   }
   captureTelemetry({

@@ -1,39 +1,40 @@
+import {
+  WORKSPACE_CONFIGURATION_HEADER,
+  WORKSPACE_CONFIGURATION_VERSION,
+  WORKTREE_RUNTIME_HEADER,
+  WORKTREE_RUNTIME_VERSION,
+} from '../../shared/control-plane-runtime-contract.js';
+import {
+  acceptRuntimeContract,
+  canShareLegacyRepositoryCredentials,
+  readRuntimeContract,
+  resetRuntimeContract,
+  runtimeSpecForContract,
+} from './runtime-contract.js';
 import { DurableObject } from 'cloudflare:workers';
-import { getSandbox } from '@cloudflare/sandbox';
+import { getSandbox, type Sandbox } from '@cloudflare/sandbox';
 import { z } from 'zod';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
-import {
-  clearBillingContext,
-  ContainerUsageAdmissionError,
-  createContainerUsageClient,
-  DEFAULT_BILLING_HEARTBEAT_SECONDS,
-  getBillingContext,
-  installBillingHeartbeat,
-  type BillingHeartbeatController,
-} from '@kilocode/container-usage';
-import type { VercelSandboxResources } from '@kilocode/worker-utils/sandbox-allocation';
-import { eq } from 'drizzle-orm';
+import { egressPolicySchema, type EgressMode } from '@kilocode/worker-utils/egress-allowlist';
+import { CloudAgentRunContainerSchema } from '@kilocode/worker-utils/cloud-agent-queue-report';
+import { eq, sql } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import {
   forceDestroyControlPlaneSandbox,
-  assertSandboxBillingAllocation,
   parseSandboxBillingInput,
-  vercelBillingIdentity,
+  SANDBOX_USAGE_SKUS,
   type SandboxBillingInput,
-  type VercelBillingIdentity,
 } from '../../container-usage-context.js';
 import { resolveSecret } from '../../auth.js';
-import { MeteredBillingLifecycle, type BillingIdentity } from '../../metered-billing-lifecycle.js';
-import { isCloudAgentContainerBillingEnabled } from '../../container-billing-rollout.js';
-import { BillingScheduleTable } from '../../sandbox-control/billing-schedule.js';
 import {
-  VercelBilling,
-  VERCEL_BILLING_SETTLEMENT_CALLBACK,
-  deleteVercelBillingBinding,
-  loadVercelBillingBinding,
-  saveVercelBillingBinding,
-} from '../../sandbox-control/vercel-billing.js';
+  workspaceMcpAnchorSessionId,
+  type WorkspaceMcpBinding,
+} from '../../cloud-agent-authority.js';
+import {
+  assertContainerCapacity,
+  getContainerCapacityFailureReason,
+} from '../../container-concurrency.js';
 import {
   generateSandboxCredential,
   hashSandboxCredential,
@@ -43,6 +44,7 @@ import {
   verifySandboxLaunchCredential,
 } from '../../sandbox-control/credential.js';
 import { rejectSandboxWrapperUpgrade } from '../../sandbox-control/socket-admission.js';
+import { DEADLINE_MS } from '../../sandbox-control/deadlines.js';
 import { createCloudflareContainersProviderAdapter } from '../../sandbox-control/cloudflare-containers-provider.js';
 import {
   createCloudflareProviderAdapter,
@@ -55,32 +57,38 @@ import {
   type ProviderAdapter,
   type ProviderAllocationIntent,
   type ProviderCreateIntent,
+  type ProviderStartSource,
   type SandboxProviderConfiguration,
 } from '../../sandbox-control/provider.js';
 import {
-  createVercelProviderAdapter,
-  decodeVercelProviderRef,
   vercelProviderLocatorSchema,
   type VercelProviderLocator,
 } from '../../sandbox-control/vercel-provider.js';
 import { buildControlWrapperLaunchEnv } from '../../sandbox-control/wrapper-launch-env.js';
+import { downloadedStartup } from '../../sandbox-control/downloaded-startup.js';
+import { selectStartup } from '../../sandbox-control/startup-selection.js';
 import {
-  buildControlNetworkPolicy,
-  kiloTokenHasRuntimeAuthorization,
+  STARTUP_FAILURES,
+  type StartupFailureCode,
+} from '../../sandbox-control/startup-failure.js';
+import { preinstalledStartup } from '../../sandbox-control/preinstalled-startup.js';
+import type { GrantDiagnostic } from '../../sandbox-control/grant-diagnostic.js';
+import {
+  hasRuntimeCredentialProxy,
   prepareCredentialGrant,
   resolveSessionCredential,
+  SessionCredentialUpgradeRequiredError,
   sessionCredentialsPayloadFromGrant,
   type SessionCredentialGrant,
 } from '../../sandbox-control/session-credentials.js';
 import { providerUsesOutboundCredentialProxy } from '../../agent-sandbox/capabilities.js';
-import { resolveVercelSandboxRuntimeConfig } from '../../agent-sandbox/vercel/vercel-runtime-config.js';
-import type { VercelSandboxNetworkPolicy } from '../../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
+import { getManagedOutboundContainerId } from '../../sandbox-id.js';
 import {
-  getManagedOutboundContainerId,
-  getOutboundContainerId,
-  getSandboxNamespace,
-} from '../../sandbox-id.js';
-import { sessionDoName } from '../../session-plane.js';
+  resolveSandboxNamespace,
+  sandboxKindMatchesKey,
+  type SandboxKind,
+} from '../../sandbox-placement.js';
+import { sessionDoName } from '../../session-identity.js';
 import { logger } from '../../logger.js';
 import {
   diagnosticCause,
@@ -95,7 +103,56 @@ import {
   runtimeProxyHandleGrantId,
   sameRuntimeProxyControlBinding,
   verifyRuntimeCredentialProxyHandle,
+  verifyRuntimeCredentialProxyHandleExpiresAt,
 } from '../../runtime-credential-proxy.js';
+import {
+  ACCEPTED_HANDLES_MAX,
+  acceptedHandleIssuerLocator,
+  addAcceptedHandleSync,
+  constantTimeEqual,
+  digestRuntimeProxyHandle,
+  hasAcceptedScopeHandle,
+  listAcceptedHandleStringsByScopeId,
+  listAcceptedHandlesForScope,
+  listAcceptedHandlesForScopeIncludingExpired,
+  lookupAcceptedHandle,
+  retireAcceptedHandlesSync,
+  type ScopeBackingToken,
+  type ScopeHandleResolution,
+} from './accepted-handles.js';
+import { markLastSentHandle, readLastSentHandleDigest } from './scope-handle-delivery.js';
+import {
+  memberHandleForSession,
+  selectHandoffCandidate,
+  setAllMemberHandles,
+  sharedCanonicalHandleSurvivesRelease,
+  type HandoffMemberState,
+} from './scope-handle-rotation.js';
+import { isActiveScopeMember } from './scope-view.js';
+import {
+  admissionFailureStage,
+  canonicalMintKey,
+  CanonicalHandleMinter,
+  clearRuntimeProxyMembers,
+  decideCanonicalHandle,
+  isAdoptableWorktreeScope,
+  isWorkspaceProxyScope,
+  MAX_SCOPE_MEMBERS,
+  MixedCredentialClassError,
+  ScopeHandleConflictError,
+  ScopeMemberLimitError,
+  scopeMemberCount,
+  withMemberHandle,
+  type CanonicalHandleMint,
+} from './scope-handle-adoption.js';
+import {
+  decideRenewedScopeCandidate,
+  expectedScopeForCandidate,
+  scopeBackingMatchesGrant,
+  selectScopeHandleCandidates,
+} from './scope-handle-resolution.js';
+import { buildScopeGrantView, type ScopeGrantView } from './scope-view.js';
+import { readScopeGrantView } from './scope-view-store.js';
 import {
   SANDBOX_CONTROL_ATTACH_TIMEOUT_MS,
   worktreeDeleteResultSchema,
@@ -113,18 +170,25 @@ import {
   type CliMcpServer,
 } from '../../mcp-config.js';
 import {
+  attachmentSpecFromRouteSpec,
+  workspaceConfigFromSpec,
+} from '../../shared/workspace-config.js';
+import {
   CONTROL_PLANE_ALLOCATION_ID_ENV,
   CONTROL_PLANE_PROTOCOL_VERSION,
   CONTROL_PLANE_REQUEST_TIMEOUT_MS,
   controlPlaneAnswerPayloadSchema,
   controlPlaneDeliverPayloadSchema,
+  controlPlaneKiloRequestInputSchema,
   controlPlanePrepareInputSchema,
+  controlPlaneRouteSpecSchema,
   controlPlaneSessionCredentialsPayloadSchema,
   controlPlaneSessionRefPayloadSchema,
   controlPlaneTerminalInputSchema,
   controlPlaneWorktreeCaptureInputSchema,
   controlPlaneWorktreeDeletionPayloadSchema,
   controlPlaneWrapperFrameSchema,
+  type AttachmentSpec,
   type ControlPlaneAnswerPayload,
   type ControlPlaneControlResult,
   type ControlPlaneCredentialSource,
@@ -133,6 +197,7 @@ import {
   type ControlPlaneDispatchResult,
   type ControlPlaneEventsNotification,
   type ControlPlaneFailureReason,
+  type ControlPlaneKiloRequestInput,
   type ControlPlaneOutcome,
   type ControlPlaneRouteSpec,
   type ControlPlaneRouteUpdate,
@@ -143,8 +208,13 @@ import {
   type ControlPlaneTerminalInput,
   type ControlPlaneWorktreeCaptureInput,
   type ControlPlaneWrapperFrame,
+  type WorkspaceConfig,
 } from '../../shared/control-plane-protocol.js';
-import { resolveControlPlaneTimers } from '../../shared/control-plane-timers.js';
+import {
+  CONTROL_PLANE_TIMERS,
+  resolveControlPlaneTimers,
+  sandboxIdlePolicyForOrigins,
+} from '../../shared/control-plane-timers.js';
 import {
   controlPlaneSandboxSelectionSchema,
   type ControlPlanePrepareInputWithSelection,
@@ -173,6 +243,7 @@ import {
   failRoute,
   failCurrentAttempt,
   failExpiredRoutes,
+  failReadyRoutesForScope,
   isCurrentPreparingAttempt,
   listRoutes,
   notifyPreparingRoutes,
@@ -198,12 +269,33 @@ import {
   scopeGrantId,
   writeScopeGrant,
 } from './scope-grants.js';
+import { buildFrameEnv } from './frame-env.js';
+import {
+  beginRepositoryLaunch,
+  confirmRepositoryLaunch,
+  readRepositoryLaunch,
+  recordRepositoryLaunch,
+  type RepositoryPreparationFailure,
+} from './repository-launch.js';
+import {
+  environmentLaunchCandidate,
+  environmentStartDetail,
+  lookupEnvironmentSnapshot,
+  previousSnapshotStartFailed,
+  snapshotStart,
+} from './environment-snapshot-launch.js';
+import {
+  environmentReferenceSchema,
+  type SessionEnvironmentReference,
+} from '../../environment-build/reference.js';
+import type { ProviderLaunchOptions } from '../../sandbox-control/provider.js';
 import {
   beginWorktreeDeletion,
   controlPlaneWorktreeDeletionInputSchema,
   finishWorktreeDeletion,
   loadWorktreeDeletionJournal,
   persistWorktreeDeletionManifest,
+  WORKTREE_DELETION_PREFIX,
   WorktreeDeletionIncompleteError,
   worktreeOwnedRoutes,
   type ControlPlaneWorktreeDeletionInput,
@@ -211,33 +303,69 @@ import {
 } from './worktree-deletion.js';
 import { projectAllocationStatusSnapshot } from './status-snapshot.js';
 import { createSandboxNotificationDispatcher, type SandboxNotification } from './notifications.js';
+import { resolvePreviewTarget, type PreviewTargetResult } from './preview-target.js';
 import type { SandboxStatusSnapshot } from '../../shared/sandbox-status.js';
+import type { WorkspaceBillingProjection } from '../../shared/workspace-runtime-status.js';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
+import {
+  createSharedWorktreeChanges,
+  worktreeSubscriberKey,
+  type SharedWorktreeChangesInput,
+} from './worktree-changes.js';
+import type {
+  GetWorktreeChangesOutput,
+  GetWorktreeFileOutput,
+  RefreshWorktreeChangesOutput,
+} from '@kilocode/worker-utils/cloud-agent-worktree-changes';
+import type { WorktreeRecovery } from '../../shared/worktree-changes-wire.js';
+import type { WorktreeChangesReady } from '../worktree-changes-ready.js';
+import type { WorktreeChangesContext } from '../../sandbox-session/worktree-changes.js';
+import { buildNativeEgressAllowlist } from '../../sandbox-control/egress-policy.js';
+import { nativeEgressAllowlistSchema } from '../../sandbox-containers/egress-policy.js';
+import {
+  createByocVercelProviderAdapter,
+  unavailableVercelProviderAdapter,
+  ByocVercelProviderError,
+  type ByocVercelSource,
+} from '../../byoc/vercel-provider.js';
+import {
+  SNAPSHOT_VALIDATOR_REF_KEY,
+  snapshotValidatorAllocation,
+  snapshotValidatorInputSchema,
+  type SnapshotValidatorInput,
+} from './snapshot-validator.js';
 
 const GENERATION_KEY = 'control_plane_generation';
 const GENERATION = 2;
 const CREDENTIAL_HASH_KEY = 'wrapper_credential_hash';
 const OWNER_KEY = 'control_plane_owner';
-const ALLOCATION_ROW_ID = 'current';
-const VERCEL_BILLING_FORCE_STOP_CALLBACK = 'billingForceStop';
-const VERCEL_BILLING_DELIVERY_RETRY_MS = 5_000;
 
-type StoredProviderPin = {
+const ALLOCATION_ROW_ID = 'current';
+
+export type StoredProviderPin = {
+  byoc?: ByocVercelSource;
   provider: AgentSandboxProvider;
   allocationName: string | null;
   configuration: SandboxProviderConfiguration | null;
   locator: VercelProviderLocator | null;
   billing: SandboxBillingInput | null;
   containment: CredentialContainmentRequirements | null;
+  /** Stored kind of a placed key. Legacy prefixed keys have none. */
+  sandboxKind?: SandboxKind;
+  egressAllowlist?: string[];
 };
 
 export type EnsureAllocationInput = {
+  byoc?: ByocVercelSource;
   provider?: AgentSandboxProvider;
   allocationName?: string;
   configuration?: SandboxProviderConfiguration;
   locator?: VercelProviderLocator;
   billing?: SandboxBillingInput;
   containment?: CredentialContainmentRequirements;
+  sandboxKind?: SandboxKind;
+  egressMode?: EgressMode;
+  egressAllowlist?: string[];
 };
 
 const wrapperSocketAttachmentSchema = z.object({
@@ -247,8 +375,45 @@ const wrapperSocketAttachmentSchema = z.object({
   connectionId: z.string().optional(),
   wrapperId: z.string().optional(),
   heartbeatAck: z.literal(true).optional(),
+  redactsNamedSecrets: z.literal(true).optional(),
+  installsSkillsSh: z.literal(true).optional(),
+  workspaceConfiguration: z.literal(true).optional(),
+  runtimeCapability: z.literal('worktree').optional(),
+  billingCheckedAt: z.number().finite().nonnegative().optional(),
 });
 type WrapperSocketAttachment = z.infer<typeof wrapperSocketAttachmentSchema>;
+
+const WRAPPER_BILLING_CHECK_MS = 30_000;
+
+/** Separates an old wrapper from a decrypt/parse failure; both fail the attempt. */
+type PrepareFrameMaterializationStage =
+  | 'wrapper_redaction_unsupported'
+  | 'wrapper_skills_sh_unsupported'
+  | 'frame_materialization_failed';
+
+class PrepareFrameMaterializationError extends Error {
+  constructor(
+    readonly stage: PrepareFrameMaterializationStage,
+    readonly sourceErrorName?: string
+  ) {
+    super('session.prepare frame materialization failed');
+    this.name = 'PrepareFrameMaterializationError';
+  }
+}
+
+type MaterializedPrepareFrame =
+  | { type: 'session.prepare'; spec: ControlPlaneRouteSpec }
+  | { type: 'session.attach'; spec: AttachmentSpec; workspace: WorkspaceConfig };
+
+function errorClassName(error: unknown): string {
+  return error instanceof Error ? error.name : 'unknown';
+}
+
+function materializationStage(error: unknown): PrepareFrameMaterializationStage {
+  return error instanceof PrepareFrameMaterializationError
+    ? error.stage
+    : 'frame_materialization_failed';
+}
 
 /**
  * The Sandbox DO -> Session DO notification surface (spec §10). The V2 Session
@@ -256,9 +421,14 @@ type WrapperSocketAttachment = z.infer<typeof wrapperSocketAttachmentSchema>;
  * binding exists; tests inject a fake peer instead.
  */
 export type ControlPlaneSessionPeer = {
+  issueCloudAgentMcpGrant?(
+    workspace?: WorkspaceMcpBinding
+  ): Promise<{ url: string; token: string; expiresAt: number } | undefined>;
   onRoute(update: ControlPlaneRouteUpdate): Promise<void>;
   onEvents(notification: ControlPlaneEventsNotification): Promise<void>;
   onOutcome(outcome: ControlPlaneOutcome): Promise<void>;
+  /** False when the session no longer reads the worktree, so it is not notified again. */
+  onWorktreeChangesReady(notification: WorktreeChangesReady): Promise<boolean>;
   /**
    * R1: the Session DO owns the grant and mints the runtime credential proxy
    * handle. The Sandbox DO passes its own allocation fence so the Session DO
@@ -267,6 +437,27 @@ export type ControlPlaneSessionPeer = {
   issueRuntimeCredentialProxyGrant(
     fence: ControlRuntimeCredentialProxyFence
   ): Promise<string | null>;
+  /**
+   * Renews this member's own backing token without matching the caller's handle
+   * against its stored grant; the Sandbox DO has already authorized the scope.
+   * The member self-validates the expected scope and returns null on mismatch.
+   */
+  issueRuntimeProxyBackingToken(input: {
+    sandboxId: string;
+    directory: string;
+    kiloSessionId: string;
+  }): Promise<ScopeBackingToken | null>;
+  /**
+   * The member's live delegation expiry in milliseconds, or null when this
+   * Session DO cannot serve the scope. Used to pick a proactive handoff issuer
+   * whose delegation outlives the canonical handle; only reads durable state, it
+   * does not renew or mint.
+   */
+  getRuntimeProxyDelegationExpiresAt(input: {
+    sandboxId: string;
+    directory: string;
+    kiloSessionId: string;
+  }): Promise<number | null>;
 };
 
 /** Spec §10: the runtime credential proxy fence returned to the Worker. */
@@ -277,6 +468,26 @@ export type ControlRuntimeCredentialProxyFence = {
   connectionId: string;
   wrapperInstanceId: string;
 };
+
+/** The fence plus, for an adopted handle, the current scope view or the reason it is unavailable. */
+export type ControlRuntimeCredentialProxyFenceScope = ControlRuntimeCredentialProxyFence & {
+  scopeView?: ScopeGrantView;
+  scopeViewUnavailable?: string;
+};
+
+/** The adopted-handle state a scope is already serving, if any. */
+type CanonicalHandleState = CanonicalHandleMint & {
+  /** The requesting member can be served this handle, by holding or by binding it. */
+  usable: boolean;
+};
+
+/** The serialized outcome of claiming a canonical handle for a preparing route. */
+type ScopeHandleClaim =
+  | { kind: 'handle'; handle: string }
+  | { kind: 'stale' }
+  | { kind: 'remint' }
+  | { kind: 'per-session' }
+  | { kind: 'fail' };
 
 type LegacyCutover = {
   provider: AgentSandboxProvider;
@@ -381,6 +592,27 @@ function controlRequestFailure(
   return { ok: false, error: { code, message, retryable } };
 }
 
+/**
+ * The wrapper result frames that answer a correlated control request. Kept as
+ * one list so a new request kind cannot be registered without its reply being
+ * resolvable (spec §10).
+ */
+const CORRELATED_RESULT_FRAME_TYPES = new Set<string>([
+  'worktree.result',
+  'terminal.result',
+  'kilo.result',
+]);
+
+type CorrelatedResultFrame = Extract<
+  ControlPlaneWrapperFrame,
+  { type: 'worktree.result' | 'terminal.result' | 'kilo.result' }
+>;
+
+function isCorrelatedResultFrame(frame: unknown): frame is CorrelatedResultFrame {
+  if (!isRecord(frame)) return false;
+  return typeof frame.type === 'string' && CORRELATED_RESULT_FRAME_TYPES.has(frame.type);
+}
+
 /** Maps one terminal request to its wrapper frame, preserving the operation. */
 function terminalRequestFrame(
   requestId: string,
@@ -429,17 +661,24 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private provider: ProviderAdapter;
   private providerPin: StoredProviderPin | null = null;
   private createInFlight = false;
-  private readonly billingSchedule: BillingScheduleTable;
-  private vercelBilling:
-    | {
-        identity: BillingIdentity | undefined;
-        lifecycle: MeteredBillingLifecycle;
-        heartbeat: BillingHeartbeatController;
-        billing: VercelBilling;
-      }
-    | undefined;
-  private vercelBillingBuild: Promise<void> | undefined;
-  private readonly vercelDeliveriesInFlight = new Set<string>();
+  private readonly worktreeChanges = createSharedWorktreeChanges({
+    storage: this.ctx.storage,
+    capture: input => this.worktreeCapture(input),
+    onSnapshot: (context, revision) =>
+      this.ctx.waitUntil(this.notifyWorktreeChangesReady(context, revision)),
+  });
+  /**
+   * Single-flight canonical handle mints, keyed by scope and current fence. Two
+   * concurrent preparers of the same scope wait on one Session DO mint so only
+   * the winner issues a handle; the loser adopts the winner's string.
+   */
+  private readonly canonicalHandleMints = new CanonicalHandleMinter<
+    ControlPlaneSessionPeer,
+    ControlRuntimeCredentialProxyFence
+  >(
+    (peer, fence) => this.mintRuntimeProxyGrant(peer, fence),
+    handle => this.runtimeProxyHandleClaims(handle)
+  );
   /**
    * Outstanding worktree-change requests forwarded to the wrapper, keyed by
    * request id (spec §10). The wrapper answers with one result frame; the reply
@@ -468,7 +707,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   ) => this.resolveSessionPeer(ownerId, sessionId);
 
   private readonly notifications = createSandboxNotificationDispatcher({
-    budgetMs: () => this.sandboxTimers().sessionNotifyDeadlineMs,
+    budgetMs: () => CONTROL_PLANE_TIMERS.sandbox.sessionNotifyDeadlineMs,
     send: (sessionId, notification, deadlineAt, signal) =>
       this.notifySession(sessionId, notification, deadlineAt, signal),
     waitUntil: work => this.ctx.waitUntil(work),
@@ -480,15 +719,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
     super(ctx, env);
     this.sandboxId = ctx.id.name ?? ctx.id.toString();
     this.db = drizzle(ctx.storage, { logger: false });
-    this.billingSchedule = new BillingScheduleTable({
-      storage: ctx.storage,
-      recompose: async () => this.armAlarm(await this.readAllocation()),
-    });
     this.provider = this.createProviderAdapter(this.defaultPin('cloudflare'));
     this.initialized = ctx.blockConcurrencyWhile(() => this.initializeStorage());
   }
-
-  // --- lifecycle entry points -------------------------------------------------
 
   /**
    * Establishes the provider pin and starts the allocation. `prepare` starts an
@@ -513,6 +746,73 @@ export class SandboxControlV2 extends DurableObject<Env> {
     });
   }
 
+  async initializeSnapshotValidator(input: SnapshotValidatorInput): Promise<void> {
+    await this.initialized;
+    const parsed = snapshotValidatorInputSchema.parse(input);
+    await this.enqueue(async () => {
+      const adopted = snapshotValidatorAllocation(this.sandboxId, parsed, Date.now());
+      const registered = await this.ctx.storage.get<string>(SNAPSHOT_VALIDATOR_REF_KEY);
+      const state = await this.readAllocation();
+      if (registered !== undefined) {
+        if (
+          registered !== parsed.allocation.providerRef ||
+          state.providerRef !== registered ||
+          JSON.stringify(this.providerPin) !== JSON.stringify(adopted.pin)
+        ) {
+          throw new Error('Snapshot validator allocation changed');
+        }
+        if ((await this.ctx.storage.get(CREDENTIAL_HASH_KEY)) === parsed.credentialHash) return;
+        if (this.ctx.getWebSockets().length > 0)
+          throw new Error('Snapshot validator already connected');
+        await this.ctx.storage.put(CREDENTIAL_HASH_KEY, parsed.credentialHash);
+        return;
+      }
+      if (
+        state.kind !== 'stopped' ||
+        state.unconfirmedProviderRef !== null ||
+        this.providerPin?.byoc !== undefined ||
+        (await this.requireOwner()) !== null
+      ) {
+        throw new Error('Snapshot validator control is unavailable');
+      }
+      await this.ctx.storage.transaction(async () => {
+        await this.writeProviderPin(adopted.pin);
+        await this.writeAllocation(adopted.state);
+        await this.ctx.storage.put({
+          [SNAPSHOT_VALIDATOR_REF_KEY]: parsed.allocation.providerRef,
+          [CREDENTIAL_HASH_KEY]: parsed.credentialHash,
+        });
+      });
+      this.providerPin = adopted.pin;
+      this.provider = this.createProviderAdapter(adopted.pin);
+      await this.armAlarm(adopted.state);
+    });
+  }
+
+  async getSnapshotValidatorStatus(): Promise<{ physical: string; connection: string }> {
+    await this.initialized;
+    if (!(await this.ctx.storage.get(SNAPSHOT_VALIDATOR_REF_KEY)))
+      throw new Error('Snapshot validator is not registered');
+    const state = await this.readAllocation();
+    return {
+      physical: state.kind === 'stopped' ? 'stopped' : 'running',
+      connection: state.kind === 'connected' ? 'ready' : 'connecting',
+    };
+  }
+
+  async confirmSnapshotValidatorStopped(providerRef: string): Promise<void> {
+    await this.initialized;
+    await this.enqueue(async () => {
+      if (!/^ses-byoc-validator-[0-9a-f]{32}$/i.test(this.sandboxId))
+        throw new Error('Snapshot validator identity mismatch');
+      const registered = await this.ctx.storage.get<string>(SNAPSHOT_VALIDATOR_REF_KEY);
+      const state = await this.readAllocation();
+      if (registered === undefined && state.kind === 'stopped') return;
+      if (registered !== providerRef) throw new Error('Snapshot validator allocation changed');
+      await this.applyEvent({ type: 'provider-gone', at: Date.now() });
+    });
+  }
+
   /** B3/D3 reports the provider no longer has the sandbox (spec §6 "any → stopped"). */
   async reportProviderGone(): Promise<void> {
     await this.initialized;
@@ -522,7 +822,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
   /** Passive read for tests and B3's `status`/B10's badge. */
   async getAllocationState(): Promise<AllocationView> {
     await this.initialized;
-    return { ...(await this.readAllocation()), provider: this.currentProvider() };
+    return {
+      ...(await this.readAllocation()),
+      provider: this.currentProvider(),
+      configuration: this.providerPin?.configuration ?? null,
+    };
   }
 
   /**
@@ -537,13 +841,40 @@ export class SandboxControlV2 extends DurableObject<Env> {
       const allocation = owner === null ? null : await this.getAllocationState();
       return projectAllocationStatusSnapshot({
         allocation,
-        containersInstance:
-          this.providerPin?.configuration?.provider === 'cloudflare-containers'
-            ? this.providerPin.configuration.instance
-            : undefined,
         observedAt: Date.now(),
-        inactivityTimeoutMs: this.sandboxTimers().idleMs,
+        inactivityTimeoutMs: this.sandboxIdleTimeoutMs(allocation),
       });
+    });
+  }
+
+  /**
+   * Passive workspace billing projection (workspace status). Reads the stored
+   * provider pin and the provider's read-only billing runtime status. It never
+   * admits work, starts the container or opens a metered interval.
+   */
+  async getWorkspaceBillingProjection(): Promise<WorkspaceBillingProjection | null> {
+    await this.initialized;
+    return this.enqueue(async () => {
+      const pin = this.providerPin;
+      if (pin === null) return null;
+      let projection: Awaited<ReturnType<NonNullable<ProviderAdapter['getBillingProjection']>>>;
+      try {
+        projection = await this.provider.getBillingProjection?.();
+      } catch {
+        projection = undefined;
+      }
+      const context = projection?.context;
+      const enforcementRequested = pin.billing?.enforcementRequested === true;
+      return {
+        payer: context?.subject ?? pin.billing?.subject ?? null,
+        actor: context?.actor ?? pin.billing?.actor ?? null,
+        onBehalfOf: context?.onBehalfOf ?? pin.billing?.onBehalfOf ?? null,
+        sku: projection === undefined ? null : SANDBOX_USAGE_SKUS[projection.sandboxClassName],
+        blocked: projection?.blocked ?? (enforcementRequested ? null : false),
+        enforcementRequested,
+        intervalStartedAt: context?.startEpochMs ?? null,
+        meterInstanceId: pin.billing?.sandboxId ?? null,
+      };
     });
   }
 
@@ -558,8 +889,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       allocationName: this.providerPin?.allocationName ?? this.sandboxId,
     };
   }
-
-  // --- routes (B3) ------------------------------------------------------------
 
   /**
    * Session DO -> Sandbox DO (spec §10). Returns the route view at once and
@@ -582,7 +911,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
       spec: input.spec,
       credentials: input.credentials,
     });
-    return this.enqueue(() => this.runPrepare(parsed.spec, parsed.credentials, sandboxSelection));
+    const environment =
+      input.environment === undefined
+        ? undefined
+        : environmentReferenceSchema.parse(input.environment);
+    return this.enqueue(() =>
+      this.runPrepare(parsed.spec, parsed.credentials, sandboxSelection, environment)
+    );
   }
 
   async deliver(payload: ControlPlaneDeliverPayload): Promise<ControlPlaneDeliverResult> {
@@ -616,10 +951,22 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const parsed = controlPlaneSessionRefPayloadSchema.parse(payload);
     await this.enqueue(async () => {
       this.notifications.retire(parsed.sessionId);
-      await deleteRoute(this.db, parsed.sessionId);
-      // Rebuild the policy inside the queue; if it cannot apply, stop the
-      // sandbox as a platform failure so the alias is not left injected.
-      await this.applyVercelNetworkPolicyOrStop('sandbox_lost');
+      const released = await readRoute(this.db, parsed.sessionId);
+      // A shared canonical handle survives on the other members, so removing
+      // this route's path rules is not worth a policy rebuild: a transient
+      // provider failure there would stop the sandbox and kill the survivor. The
+      // facade already denies the released root. Last-member release, a real
+      // alias retirement and wrapper replacement still rebuild fail-closed.
+      const sharedHandleSurvives = sharedCanonicalHandleSurvivesRelease(
+        released?.grant ?? null,
+        parsed.sessionId
+      );
+      await deleteRoute(this.db, this.ctx.storage.kv, parsed.sessionId);
+      if (!sharedHandleSurvives) {
+        // Rebuild the policy inside the queue; if it cannot apply, stop the
+        // sandbox as a platform failure so the alias is not left injected.
+        await this.applyVercelNetworkPolicyOrStop('sandbox_lost');
+      }
       const state = await this.readAllocation();
       await this.armAlarm(state);
       const socket = this.boundWrapperSocket(state);
@@ -637,7 +984,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
       const route = await readRoute(this.db, parsed.sessionId);
       return {
         sessionId: parsed.sessionId,
-        view: routeView(route, state.kind === 'connected', sandboxPreparationProgress(state)),
+        view: await this.withContainer(
+          routeView(route, state.kind === 'connected', sandboxPreparationProgress(state)),
+          state
+        ),
       };
     });
   }
@@ -654,8 +1004,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       return state.kind === 'connected' ? state.wrapperId : null;
     });
   }
-
-  // --- worktree deletion (B10) ------------------------------------------------
 
   /**
    * Worker -> Sandbox DO (spec §6 "Billing, credentials and deletion"). Port of
@@ -723,6 +1071,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           throw new WorktreeDeletionIncompleteError('Shared worktree cleanup is not confirmed');
         }
         await this.revokeWorktreeRoutes(handoff.targetSessionIds);
+        this.worktreeChanges.purge(parsed.worktreeId);
         const journal = await finishWorktreeDeletion(
           this.ctx.storage,
           parsed.worktreeId,
@@ -748,6 +1097,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       // Revoke the worktree's routes/grants even for a confirmed stop, so a
       // failed route cannot keep the sandbox looking shared forever.
       await this.revokeWorktreeRoutes(handoff.targetSessionIds);
+      this.worktreeChanges.purge(parsed.worktreeId);
       if (handoff.plan.action === 'stop') {
         // Fence by allocation identity: a sibling prepare may have created a new
         // allocation while the provider stop ran off-queue.
@@ -847,12 +1197,82 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return (await this.observeWorktreeRuntime(plan.providerRef)).status === 'terminal';
   }
 
-  // --- worktree changes (B10) -------------------------------------------------
+  private async notifyWorktreeChangesReady(
+    context: WorktreeChangesContext,
+    revision: number
+  ): Promise<void> {
+    const worktreeId = context.worktreeId;
+    if (!worktreeId) return;
+    const sessionIds = new Set([context.session.sessionId]);
+    for (const [, sessionId] of this.ctx.storage.kv.list({
+      prefix: worktreeSubscriberKey(worktreeId, ''),
+    })) {
+      sessionIds.add(z.string().parse(sessionId));
+    }
+    for (const route of await listRoutes(this.db)) {
+      if (
+        route.credentialSource?.scopeId === worktreeId ||
+        route.spec.directory === context.session.directory
+      ) {
+        sessionIds.add(route.sessionId);
+      }
+    }
+    for (const sessionId of sessionIds) {
+      this.notifications.enqueue(sessionId, {
+        kind: 'worktree_changes',
+        payload: { worktreeId, revision },
+      });
+    }
+  }
+
+  private subscribeToWorktreeChanges(context: WorktreeChangesContext): void {
+    const { worktreeId, session } = context;
+    if (
+      !worktreeId ||
+      this.ctx.storage.kv.get(`${WORKTREE_DELETION_PREFIX}${worktreeId}`) !== undefined
+    ) {
+      return;
+    }
+    const key = worktreeSubscriberKey(worktreeId, session.sessionId);
+    if (this.ctx.storage.kv.get(key) === undefined) {
+      this.ctx.storage.kv.put(key, session.sessionId);
+    }
+  }
+
+  async getWorktreeChanges(input: SharedWorktreeChangesInput): Promise<GetWorktreeChangesOutput> {
+    await this.initialized;
+    this.subscribeToWorktreeChanges(input.context);
+    return this.worktreeChanges.get(input);
+  }
+
+  async getWorktreeFile(
+    input: SharedWorktreeChangesInput,
+    query: unknown
+  ): Promise<GetWorktreeFileOutput> {
+    await this.initialized;
+    this.subscribeToWorktreeChanges(input.context);
+    return this.worktreeChanges.getFile(input, query);
+  }
+
+  async refreshWorktreeChanges(
+    input: SharedWorktreeChangesInput
+  ): Promise<RefreshWorktreeChangesOutput> {
+    await this.initialized;
+    this.subscribeToWorktreeChanges(input.context);
+    return this.worktreeChanges.refresh(input);
+  }
+
+  async getWorktreeRecovery(
+    input: SharedWorktreeChangesInput
+  ): Promise<WorktreeRecovery | undefined> {
+    await this.initialized;
+    this.subscribeToWorktreeChanges(input.context);
+    return this.worktreeChanges.recovery(input);
+  }
 
   /**
    * Session DO -> Sandbox DO (spec §10). Forwards one worktree-change request
-   * to the wrapper and returns its result. The Sandbox DO owns no snapshot
-   * state; the Session DO validates ownership and persists the capture.
+   * to the wrapper and returns its result.
    */
   async worktreeCapture(
     input: ControlPlaneWorktreeCaptureInput
@@ -878,8 +1298,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return this.beginWrapperControlRequest(frame);
   }
 
-  // --- terminals (B10) --------------------------------------------------------
-
   /**
    * Session DO -> Sandbox DO (spec §10). Forwards exactly one terminal
    * create/resize/close/connect request to the wrapper and returns its result.
@@ -897,6 +1315,55 @@ export class SandboxControlV2 extends DurableObject<Env> {
     input: ControlPlaneTerminalInput
   ): Promise<ControlRequestHandoff> {
     return this.beginWrapperControlRequest(terminalRequestFrame(crypto.randomUUID(), input));
+  }
+
+  /**
+   * Session DO -> Sandbox DO (spec §10). Forwards one allowlisted native Kilo
+   * read to the live wrapper. It never starts or wakes an allocation: only a
+   * bound wrapper socket answers, so a stopped session returns `not_ready`
+   * without any provider call. The socket binding is the allocation and
+   * connection fence, so a superseded wrapper cannot answer for its successor.
+   */
+  async kiloRequest(input: ControlPlaneKiloRequestInput): Promise<ControlPlaneControlResult> {
+    await this.initialized;
+    const parsed = controlPlaneKiloRequestInputSchema.parse(input);
+    const handoff = await this.enqueue(() => this.beginKiloRequest(parsed));
+    return 'error' in handoff ? handoff.error : handoff.promise;
+  }
+
+  private async beginKiloRequest(
+    input: ControlPlaneKiloRequestInput
+  ): Promise<ControlRequestHandoff> {
+    const frame: ControlPlaneWrapperFrame = {
+      type: 'kilo.request',
+      requestId: crypto.randomUUID(),
+      session: input.session,
+      operation: input.operation,
+    };
+    return this.beginWrapperControlRequest(frame);
+  }
+
+  /**
+   * Off-queue read the Session DO uses to resolve one preview's provider
+   * coordinates. It never enqueues, so a preview never waits behind the control
+   * operation queue. The allocation and route are two separate reads, not one
+   * snapshot. A target that changes before the upstream fetch is fenced
+   * downstream: SandboxContainers checks `allocationRef` and state, and the
+   * remaining race is an accepted residual (control-plane.md, Preview).
+   */
+  async previewTarget(sessionId: string): Promise<PreviewTargetResult> {
+    await this.initialized;
+    const allocation = await this.readAllocation();
+    const route = await readRoute(this.db, sessionId);
+    return resolvePreviewTarget({
+      routeState: route?.state ?? null,
+      allocationKind: allocation.kind,
+      providerRef: allocation.providerRef,
+      provider: this.currentProvider(),
+      pinnedAllocationName: this.providerPin?.allocationName ?? this.sandboxId,
+      sandboxKind: this.providerPin?.sandboxKind,
+      logicalSandboxId: this.sandboxId,
+    });
   }
 
   /**
@@ -977,17 +1444,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
     } catch {
       return;
     }
-    if (
-      !isRecord(parsed) ||
-      (parsed.type !== 'worktree.result' && parsed.type !== 'terminal.result')
-    ) {
+    if (!isCorrelatedResultFrame(parsed)) {
       return;
     }
     const result = controlPlaneWrapperFrameSchema.safeParse(parsed);
-    if (
-      !result.success ||
-      (result.data.type !== 'worktree.result' && result.data.type !== 'terminal.result')
-    ) {
+    if (!result.success || !isCorrelatedResultFrame(result.data)) {
       return;
     }
     const frame = result.data;
@@ -997,8 +1458,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       frame.ok ? { ok: true, result: frame.result } : { ok: false, error: frame.error }
     );
   }
-
-  // --- credentials (B3) -------------------------------------------------------
 
   /**
    * Contained outbound credential lookup (spec §6/§10), same request shape as
@@ -1058,7 +1517,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
     sessionId: string;
     kiloSessionId: string;
     directory: string;
-  }): Promise<ControlRuntimeCredentialProxyFence | null> {
+    handle?: string;
+  }): Promise<ControlRuntimeCredentialProxyFenceScope | null> {
     await this.initialized;
     if (
       typeof input.ownerId !== 'string' ||
@@ -1093,7 +1553,27 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ) {
         return null;
       }
-      return fence;
+      if (typeof input.handle !== 'string' || input.handle.length === 0) return fence;
+      const match = await lookupAcceptedHandle(this.ctx.storage, input.handle, fence);
+      if (match === undefined) return fence;
+      // `provisioned` already checked the route grant's directory and the caller's
+      // membership; tying it to the accepted entry makes the canonical view grant
+      // the caller's own grant, so a handle accepted under another scope cannot
+      // attach that scope's view.
+      if (scopeGrantId(grant) !== match.scopeGrantId) {
+        return {
+          ...fence,
+          scopeViewUnavailable: 'Accepted scope handle does not belong to the caller grant',
+        };
+      }
+      const scopeGrant = readScopeGrant(this.db, match.scopeGrantId);
+      if (scopeGrant === null) {
+        return {
+          ...fence,
+          scopeViewUnavailable: 'Accepted scope handle has no canonical grant',
+        };
+      }
+      return { ...fence, scopeView: readScopeGrantView(this.db, scopeGrant) };
     });
   }
 
@@ -1173,14 +1653,135 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   /**
+   * Serves a runtime credential proxy handle on behalf of a surviving member of
+   * the canonical scope. The exact handle string is supplied and its signature
+   * is re-verified here. `unavailable` means a candidate failed on transport and
+   * none served (the facade returns a retryable 503); `denied` is a known denial
+   * on every candidate (including a handle not in the accepted set).
+   */
+  async resolveScopeHandle(input: { handle: string }): Promise<ScopeHandleResolution> {
+    await this.initialized;
+    if (
+      typeof input?.handle !== 'string' ||
+      input.handle.length === 0 ||
+      input.handle.length > 4096
+    ) {
+      return { type: 'denied' };
+    }
+    const claims = await verifyRuntimeCredentialProxyHandle(this.env, input.handle);
+    if (!claims) return { type: 'denied' };
+    const owner = await this.requireOwner();
+    if (owner === null || owner !== claims.userId) return { type: 'denied' };
+    const fence = this.runtimeProxyFenceFor(await this.readAllocation());
+    if (fence === null) return { type: 'denied' };
+    const match = await lookupAcceptedHandle(this.ctx.storage, input.handle, fence);
+    if (match === undefined) return { type: 'denied' };
+
+    const grant = readScopeGrant(this.db, match.scopeGrantId);
+    if (grant === null || grant.userId !== claims.userId) {
+      return this.denyScopeHandle(match.scopeGrantId);
+    }
+    const candidates = selectScopeHandleCandidates({
+      grant,
+      routes: await listRoutes(this.db),
+      issuerSessionId: claims.sessionId,
+    });
+    if (candidates.length === 0) return this.denyScopeHandle(match.scopeGrantId);
+
+    let sawUnavailable = false;
+    for (const candidate of candidates) {
+      const peer = this.sessionPeerFor(owner, candidate.member.sessionId);
+      if (peer === null) {
+        sawUnavailable = true;
+        continue;
+      }
+      let backing: ScopeBackingToken | null;
+      try {
+        backing = await withTimeout(
+          peer.issueRuntimeProxyBackingToken({
+            sandboxId: this.sandboxId,
+            ...expectedScopeForCandidate(candidate.member, grant),
+          }),
+          this.scopeBackingTokenMs(),
+          'Scope backing token timed out'
+        );
+      } catch {
+        sawUnavailable = true;
+        continue;
+      }
+      if (backing === null) continue;
+
+      // The renewal awaited external I/O. A superseded physical binding or a
+      // vanished grant makes the handle stale, not the member's fault: deny
+      // without failing routes. A member that left the grant, or whose route
+      // directory/root drifts while renewing, is a member-level denial and the
+      // next candidate is tried.
+      const latestFence = this.runtimeProxyFenceFor(await this.readAllocation());
+      const latestGrant = readScopeGrant(this.db, match.scopeGrantId);
+      const latestRoutes = await listRoutes(this.db);
+      const latestRoute = latestRoutes.find(
+        route => route.sessionId === candidate.member.sessionId
+      );
+      const decision = decideRenewedScopeCandidate({
+        bindingMatches: latestFence !== null && sameRuntimeProxyControlBinding(fence, latestFence),
+        grant: latestGrant,
+        member: candidate.member,
+        route: latestRoute,
+      });
+      if (decision === 'deny') return { type: 'denied' };
+      if (decision === 'skip') continue;
+      if (latestGrant === null) return { type: 'denied' };
+      if (!scopeBackingMatchesGrant(backing, candidate.member, latestGrant)) continue;
+      return {
+        type: 'served',
+        scopeView: buildScopeGrantView(latestGrant, latestRoutes),
+        ...backing,
+      };
+    }
+    if (sawUnavailable) return { type: 'unavailable' };
+    return this.denyScopeHandle(match.scopeGrantId);
+  }
+
+  /** Locator for a deleted issuer that still has accepted handles, or null. */
+  async getAcceptedHandleIssuerLocator(issuerSessionId: string): Promise<{
+    scopeId: string;
+    allocationId: string;
+    wrapperInstanceId: string;
+    expiresAt: number;
+  } | null> {
+    await this.initialized;
+    if (typeof issuerSessionId !== 'string' || issuerSessionId.length === 0) return null;
+    return acceptedHandleIssuerLocator(this.ctx.storage, issuerSessionId);
+  }
+
+  /**
+   * Fails every ready route in the scope in the background, then denies the
+   * handle immediately so the facade response is not held behind the queue.
+   */
+  private denyScopeHandle(scopeGrantId: string): ScopeHandleResolution {
+    this.ctx.waitUntil(
+      this.enqueue(async () => {
+        const state = await this.readAllocation();
+        await failReadyRoutesForScope(
+          this.routeContext(state),
+          scopeGrantId,
+          'scope_handle_denied'
+        );
+      })
+    );
+    return { type: 'denied' };
+  }
+
+  /**
    * Vercel network policy entry point (spec §10 runtime credential proxy). The
-   * caller-supplied `networkPolicy` is accepted for RPC compatibility but not
-   * applied: the policy is rebuilt from the stored grants so this cannot become
-   * a second source of truth, and the caller must own the sandbox (B3 review 5).
+   * caller-supplied `networkPolicy` is accepted for RPC compatibility but its
+   * value is ignored: the policy is rebuilt from the stored grants so this
+   * cannot become a second source of truth, and the caller must own the sandbox
+   * (B3 review 5).
    */
   async updateNetworkPolicy(input: {
     ownerId: string;
-    networkPolicy: VercelSandboxNetworkPolicy;
+    networkPolicy?: unknown;
     requiredContainment: CredentialContainmentRequirements;
   }): Promise<void> {
     await this.initialized;
@@ -1211,10 +1812,53 @@ export class SandboxControlV2 extends DurableObject<Env> {
     });
   }
 
+  async reportStartupFailure(input: {
+    allocationId: string;
+    credential: string;
+    code: StartupFailureCode;
+  }): Promise<boolean> {
+    await this.initialized;
+    return this.enqueue(async () => {
+      const state = await this.readAllocation();
+      if (
+        (state.kind !== 'creating' && state.kind !== 'starting') ||
+        !(await this.validateAllocationCredential(input.allocationId, input.credential))
+      )
+        return false;
+      logControlDiagnostic('runtime_startup_failed', {
+        allocationId: input.allocationId,
+        code: input.code,
+      });
+      await this.applyEvent({
+        type: 'startup-failed',
+        at: Date.now(),
+        allocationId: input.allocationId,
+        code: input.code,
+      });
+      return true;
+    });
+  }
+
   async fetch(request: Request): Promise<Response> {
     await this.initialized;
     if (request.headers.get('Upgrade')?.toLowerCase() !== 'websocket') {
       return new Response('Expected WebSocket upgrade', { status: 426 });
+    }
+    const url = new URL(request.url);
+    // Only the authorized Session DO forwards this internal path, using stored ownership.
+    if (url.pathname === '/status-stream') {
+      return this.enqueue(async () => {
+        const owner = await this.requireOwner();
+        const sessionId = url.searchParams.get('sessionId');
+        if (owner === null || owner !== url.searchParams.get('ownerId') || !sessionId)
+          return new Response('Sandbox owner mismatch', { status: 403 });
+        const allocation = await this.readAllocation();
+        const pair = new WebSocketPair();
+        this.ctx.acceptWebSocket(pair[1], ['sandbox-status']);
+        pair[1].serializeAttachment({ kind: 'sandbox-status', sessionId });
+        this.sendStatusSnapshot(pair[1], sessionId, allocation);
+        return new Response(null, { status: 101, webSocket: pair[0] });
+      });
     }
     const token = parseSandboxLaunchBearer(request.headers.get('Authorization'));
     if (token === null)
@@ -1250,6 +1894,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
       pair[1].serializeAttachment({
         credential: launch.credential,
         allocationId: launch.allocationId,
+        ...(request.headers.get(WORKTREE_RUNTIME_HEADER) === WORKTREE_RUNTIME_VERSION
+          ? { runtimeCapability: 'worktree' as const }
+          : {}),
+        ...(request.headers.get(WORKSPACE_CONFIGURATION_HEADER) === WORKSPACE_CONFIGURATION_VERSION
+          ? { workspaceConfiguration: true as const }
+          : {}),
         helloDeadlineAt: Date.now() + this.sandboxTimers().wrapperHelloMs,
       } satisfies WrapperSocketAttachment);
       await this.armAlarm(await this.readAllocation());
@@ -1259,6 +1909,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   async webSocketMessage(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
     await this.initialized;
+    if (this.isStatusSocket(ws)) return;
     // Resolve an outstanding control request before the serial queue so the
     // queued request that awaits it cannot block its own reply.
     this.resolvePendingControlResult(ws, message);
@@ -1267,6 +1918,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   async webSocketClose(ws: WebSocket): Promise<void> {
     await this.initialized;
+    if (this.isStatusSocket(ws)) {
+      ws.close();
+      return;
+    }
     // Fail every request bound to this socket at once; do not wait the timeout.
     this.settlePendingForSocket(
       ws,
@@ -1297,22 +1952,29 @@ export class SandboxControlV2 extends DurableObject<Env> {
     await this.initialized;
     await this.enqueue(async () => {
       this.expireUnboundSockets(Date.now());
-      const state = await this.readAllocation();
+      await this.recoverRepositoryPreparationFailures();
+      let state = await this.readAllocation();
       await failExpiredRoutes(this.routeContext(state));
+      if (
+        state.kind === 'stopped' &&
+        !this.createInFlight &&
+        (await routeRetryAllowed(this.routeContext(state)))
+      ) {
+        await this.applyEvent({
+          type: 'ensure',
+          at: Date.now(),
+          allocationId: crypto.randomUUID(),
+        });
+        state = await this.readAllocation();
+      }
       if (state.kind === 'creating' && this.createInFlight) {
         // N2: the in-flight attempt owns the create deadline. Keep a backstop;
         // it will dispatch its own result and re-arm.
-        for (const entry of await this.billingSchedule.dueEntries()) {
-          if (typeof entry.payload === 'string') {
-            await this.deferVercelBilling(entry.payload, entry.callback);
-          }
-        }
         await this.ctx.storage.setAlarm(
           Math.min(
             Date.now() + this.sandboxTimers().providerCreateMs,
             (await earliestRouteDeadlineAt(this.db)) ?? Infinity,
-            this.earliestHelloDeadlineAt() ?? Infinity,
-            this.billingSchedule.snapshotEarliestDue() ?? Infinity
+            this.earliestHelloDeadlineAt() ?? Infinity
           )
         );
         return;
@@ -1323,25 +1985,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
         nextAllocationId: crypto.randomUUID(),
         retryAllowed: await this.retryAllowed(),
       });
-      try {
-        await withTimeout(
-          this.runBillingAlarm(),
-          this.sandboxTimers().providerStopAttemptMs,
-          'Sandbox billing alarm timed out'
-        );
-      } catch {
-        for (const entry of await this.billingSchedule.dueEntries()) {
-          if (typeof entry.payload === 'string') {
-            await this.deferVercelBilling(entry.payload, entry.callback);
-          }
-        }
-        logger.withFields({ sandboxId: this.sandboxId }).warn('Vercel billing alarm deferred');
-      }
       await this.armAlarm(await this.readAllocation());
     });
   }
-
-  // --- init and storage cutover ----------------------------------------------
 
   private async initializeStorage(): Promise<void> {
     const generation = await this.ctx.storage.get<unknown>(GENERATION_KEY);
@@ -1357,7 +2003,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       await this.ctx.storage.put(GENERATION_KEY, GENERATION);
       await migrate(this.db, migrations);
       for (const [key, value] of retainedBilling) await this.ctx.storage.put(key, value);
-      await this.billingSchedule.load();
       const pin = this.cutoverPin(cutover);
       this.providerPin = pin;
       this.provider = this.createProviderAdapter(pin);
@@ -1379,7 +2024,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       return;
     }
     await migrate(this.db, migrations);
-    await this.billingSchedule.load();
     const row = await this.readAllocationRow();
     if (row === null) return;
     const pin = (await this.readProviderPin()) ?? this.defaultPin('cloudflare');
@@ -1408,7 +2052,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           ? { ...stopped, stopPending: true, stopAt: now }
           : stopped;
       this.db.transaction(tx => {
-        retireScopeGrants(tx);
+        retireScopeGrants(tx, this.ctx.storage.kv);
         for (const route of routes) {
           tx.update(routesTable)
             .set({
@@ -1465,16 +2109,62 @@ export class SandboxControlV2 extends DurableObject<Env> {
     };
   }
 
-  private pinFromInput(input: EnsureAllocationInput): StoredProviderPin {
+  private pinFromInput(
+    input: EnsureAllocationInput,
+    repositoryUrl?: string,
+    kiloToken?: string
+  ): StoredProviderPin {
+    const policy = egressPolicySchema.safeParse(input);
+    if (!policy.success) throw new ProviderCreationError('invalid_configuration');
+    if (!sandboxKindMatchesKey(this.sandboxId, input.sandboxKind)) {
+      throw new Error('Sandbox selection kind does not match the sandbox key');
+    }
     const provider = input.provider ?? 'cloudflare';
+    if (
+      policy.data.egressMode === 'allowlist' &&
+      (provider !== 'cloudflare-containers' ||
+        (input.sandboxKind === undefined
+          ? !this.sandboxId.startsWith('ses-')
+          : input.sandboxKind !== 'isolated'))
+    ) {
+      throw new ProviderCreationError('invalid_configuration');
+    }
+    if (input.byoc && provider !== 'vercel') throw new Error('BYOC requires Vercel');
+    if (provider === 'vercel' && !input.byoc)
+      throw new ByocVercelProviderError('byoc_credential_missing');
     return {
       provider,
       allocationName: input.allocationName ?? this.sandboxId,
       configuration: input.configuration ?? { provider },
       locator: input.locator ?? null,
-      billing: input.billing ?? null,
+      billing: input.byoc ? null : (input.billing ?? null),
       containment: input.containment ?? null,
+      ...(input.sandboxKind ? { sandboxKind: input.sandboxKind } : {}),
+      ...(policy.data.egressMode !== 'allowlist'
+        ? {}
+        : {
+            egressAllowlist: buildNativeEgressAllowlist({
+              allowlist: policy.data.egressAllowlist ?? [],
+              env: this.env,
+              repositoryUrl,
+              kiloToken,
+            }),
+          }),
+      ...(input.byoc ? { byoc: input.byoc } : {}),
     };
+  }
+
+  /** The Cloudflare Sandbox namespace for a physical sandbox: the pinned kind, else the legacy prefix. */
+  private sandboxNamespace(
+    pin: StoredProviderPin | null,
+    physicalSandboxId: string,
+    contained: boolean
+  ): DurableObjectNamespace<Sandbox> {
+    return resolveSandboxNamespace(this.env, {
+      sandboxId: physicalSandboxId,
+      sandboxKind: pin?.sandboxKind,
+      contained,
+    });
   }
 
   private async readLegacyCutover(): Promise<LegacyCutover> {
@@ -1523,12 +2213,40 @@ export class SandboxControlV2 extends DurableObject<Env> {
     };
   }
 
-  // --- allocation events and effects -----------------------------------------
-
   private async applyEvent(event: AllocationEvent): Promise<void> {
     const previous = await this.readAllocation();
-    const { state, effects, stopReason } = reduceAllocation(previous, event, this.sandboxTimers());
-    await this.writeAllocation(state);
+    const timers = { ...this.sandboxTimers() };
+    if (
+      this.currentProvider() === 'cloudflare-containers' &&
+      (event.type === 'ensure' || event.type === 'tick')
+    ) {
+      // A start that may restore an environment snapshot gets the snapshot
+      // startup budget; selection itself happens in the create.
+      if (
+        'candidate' in environmentLaunchCandidate(await listRoutes(this.db)) &&
+        !previousSnapshotStartFailed(await readRepositoryLaunch(this.ctx.storage))
+      ) {
+        timers.providerCreateMs = DEADLINE_MS.repositoryStartup;
+      }
+    }
+    const { state, effects, stopReason } = reduceAllocation(previous, event, timers);
+    if (
+      state.kind === 'creating' &&
+      state.allocationId !== null &&
+      state.allocationId !== previous.allocationId &&
+      this.providerPin?.provider === 'vercel'
+    ) {
+      // Vercel retains stopped names. Pin a unique physical name before create,
+      // so retries and reconstruction address this allocation's exact resource.
+      const pin = {
+        ...this.providerPin,
+        allocationName: `sbx-${state.allocationId.replaceAll('-', '')}`,
+      };
+      await this.writeProviderPin(pin);
+      this.providerPin = pin;
+      this.provider = this.createProviderAdapter(pin);
+    }
+    await this.writeAllocation(state, previous);
     if (
       previous.kind !== state.kind ||
       previous.stopAttempt !== state.stopAttempt ||
@@ -1548,7 +2266,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       });
     }
     await this.armAlarm(state);
-    await this.afterVercelBillingTransition(event);
     await this.applyRouteEffects(previous, state, event, stopReason);
     for (const effect of effects) {
       await this.runEffect(effect, state);
@@ -1565,22 +2282,31 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return this.sandboxTimers().providerStopAttemptMs;
   }
 
+  /** Bounds one member's scope backing renewal; the Session DO bounds the total. */
+  private scopeBackingTokenMs(): number {
+    return this.sandboxTimers().scopeBackingTokenMs;
+  }
+
   /** Route transitions need storage, the bound socket and the bounded notify. */
   private routeContext(state: AllocationState): RouteContext {
     return {
       db: this.db,
+      acceptedHandles: this.ctx.storage.kv,
       now: () => Date.now(),
       routePreparationMs: this.sandboxTimers().routePreparationMs,
       sendPrepare: route => this.sendSessionPrepare(state, route),
-      notify: (sessionId, update) => {
-        this.notifications.enqueue(sessionId, { kind: 'route', payload: update });
-        return Promise.resolve();
+      notify: async (sessionId, update) => {
+        this.notifications.enqueue(sessionId, {
+          kind: 'route',
+          payload: await this.withContainer(update, state),
+        });
       },
-      issueGrant: (spec, source) =>
+      issueGrant: (spec, source, diagnostic) =>
         withTimeout(
-          this.issueRouteGrant(spec, source),
+          this.issueRouteGrant(spec, source, diagnostic),
           this.grantIssueTimeoutMs(),
-          'Credential grant issuance timed out'
+          'Credential grant issuance timed out',
+          diagnostic?.markTimeout
         ),
       applyPolicy: candidate =>
         candidate === undefined
@@ -1590,17 +2316,22 @@ export class SandboxControlV2 extends DurableObject<Env> {
     };
   }
 
-  // --- route execution and notifications (B3) ---------------------------------
-
   private async runPrepare(
     spec: ControlPlaneRouteSpec,
     source: ControlPlaneCredentialSource,
-    sandboxSelection?: ControlPlaneSandboxSelection
+    sandboxSelection?: ControlPlaneSandboxSelection,
+    environment?: SessionEnvironmentReference
   ): Promise<ControlPlaneRouteView> {
     // Sandbox owner admission (B3 review 5): the first prepare names the owner;
     // a later prepare for a different owner is rejected, not silently accepted.
     await this.initializeOwner(source.userId);
     let state = await this.readAllocation();
+    if (
+      (sandboxSelection?.provider ?? this.currentProvider()) === 'vercel' &&
+      (sandboxSelection?.byoc ?? this.providerPin?.byoc) === undefined
+    ) {
+      return { state: 'failed', attemptId: crypto.randomUUID(), reason: 'byoc_credential_missing' };
+    }
     // A worktree mid-deletion must never be re-prepared: a send in the Worker's
     // begin->finish window would otherwise start a fresh allocation and recreate
     // the checkout that deleteWorktreeResources just removed (spec §6, Shared
@@ -1613,82 +2344,63 @@ export class SandboxControlV2 extends DurableObject<Env> {
     );
     if (deletionJournal !== undefined && !deletionJournal.completed) {
       this.notifications.retire(spec.sessionId);
-      await deleteRoute(this.db, spec.sessionId);
+      await deleteRoute(this.db, this.ctx.storage.kv, spec.sessionId);
       return {
         state: 'failed',
         attemptId: crypto.randomUUID(),
         reason: 'workspace_setup_failed',
       };
     }
+    let selectedPin: StoredProviderPin | undefined;
+    try {
+      if (
+        sandboxSelection !== undefined &&
+        (state.kind === 'stopped' ||
+          sandboxSelection.egressMode === 'allowlist' ||
+          this.providerPin?.egressAllowlist !== undefined)
+      ) {
+        const repository = source.repository;
+        selectedPin = this.pinFromInput(
+          sandboxSelection,
+          repository && repository.type !== 'github' ? repository.url : undefined,
+          source.kiloToken
+        );
+      }
+      if (
+        state.kind !== 'stopped' &&
+        (selectedPin?.egressAllowlist !== undefined ||
+          this.providerPin?.egressAllowlist !== undefined) &&
+        JSON.stringify(selectedPin?.egressAllowlist) !==
+          JSON.stringify(this.providerPin?.egressAllowlist)
+      ) {
+        throw new ProviderCreationError('invalid_configuration');
+      }
+    } catch (error) {
+      if (!(error instanceof ProviderCreationError)) throw error;
+      const attemptId = crypto.randomUUID();
+      const route = await failRoute(
+        this.routeContext(state),
+        { ...spec, attemptId },
+        attemptId,
+        'invalid_configuration'
+      );
+      return routeView(route, state.kind === 'connected');
+    }
     // H1: apply the Worker-selected provider pin before the first attempt. The
     // pin is only mutable while stopped; once an allocation exists its provider
     // is fixed and a repeated prepare must not re-decide it.
-    if (sandboxSelection !== undefined && state.kind === 'stopped') {
-      const pin = this.pinFromInput(sandboxSelection);
+    if (selectedPin !== undefined && state.kind === 'stopped') {
+      const pin = selectedPin;
       await this.writeProviderPin(pin);
       this.providerPin = pin;
       this.provider = this.createProviderAdapter(pin);
     }
-    if (
-      state.kind !== 'stopped' &&
-      state.kind !== 'creating' &&
-      this.currentProvider() === 'vercel' &&
-      (this.providerPin?.billing?.enforcementRequested ||
-        isCloudAgentContainerBillingEnabled(this.env, {
-          userId: source.userId,
-          ...(this.providerPin?.billing?.subject.type === 'org'
-            ? { orgId: this.providerPin.billing.subject.id }
-            : {}),
-        }))
-    ) {
-      const context = await getBillingContext(this.ctx.storage);
-      const runtime = await this.ensureVercelBillingRuntime();
-      const lostBillingGeneration = context === undefined || context.pendingStop !== undefined;
-      const billingReason: ControlPlaneFailureReason =
-        runtime !== undefined && (await runtime.lifecycle.isBillingBlocked())
-          ? 'billing_blocked'
-          : lostBillingGeneration
-            ? 'sandbox_lost'
-            : 'billing_unavailable';
-      let cannotContinue =
-        context === undefined ||
-        runtime === undefined ||
-        context.pendingStop !== undefined ||
-        billingReason === 'billing_blocked';
-      if (!cannotContinue && runtime !== undefined && context !== undefined) {
-        try {
-          await withTimeout(
-            runtime.lifecycle.ensureStartAcknowledged(context),
-            this.sandboxTimers().providerStopAttemptMs,
-            'Sandbox billing admission timed out'
-          );
-        } catch {
-          cannotContinue = true;
-        }
-      }
-      if (cannotContinue) {
-        if (state.kind !== 'stopping') {
-          await this.applyEvent({
-            type: 'stop-requested',
-            at: Date.now(),
-            reason: billingReason,
-          });
-          state = await this.readAllocation();
-        }
-        if (billingReason === 'billing_blocked') {
-          const attemptId = crypto.randomUUID();
-          const route = await failRoute(
-            this.routeContext(state),
-            { ...spec, attemptId },
-            attemptId,
-            billingReason,
-            'billing_admission'
-          );
-          return { state: 'failed', attemptId: route.attemptId, reason: billingReason };
-        }
-      }
-    }
-    const { route, started } = await ensureRoute(this.routeContext(state), spec, source);
+    const { route, started } = await ensureRoute(
+      this.routeContext(state),
+      spec,
+      source,
+      environment ?? null
+    );
     if (route.state !== 'failed') {
       if (started) await this.armAlarm(state);
       if (state.kind === 'stopped') {
@@ -1700,7 +2412,42 @@ export class SandboxControlV2 extends DurableObject<Env> {
         state = await this.readAllocation();
       }
     }
-    return routeView(route, state.kind === 'connected', sandboxPreparationProgress(state));
+    return this.withContainer(
+      routeView(route, state.kind === 'connected', sandboxPreparationProgress(state)),
+      state
+    );
+  }
+
+  private async withContainer<T extends ControlPlaneRouteUpdate>(
+    view: T,
+    state: AllocationState
+  ): Promise<T> {
+    if (view.state === 'unknown' || state.providerRef === null || state.allocationId === null) {
+      return view;
+    }
+    try {
+      const runtime = this.provider.describeRuntime?.(state.providerRef);
+      if (runtime === undefined) return view;
+      const launch = await readRepositoryLaunch(this.ctx.storage);
+      const startSource =
+        runtime.startSource ??
+        (launch?.allocationId === state.allocationId && launch.startSource !== undefined
+          ? launch.startSource === 'repository'
+            ? 'snapshot'
+            : 'image'
+          : undefined);
+      const container = CloudAgentRunContainerSchema.safeParse({
+        ...runtime,
+        allocationId: state.allocationId,
+        ...(startSource === undefined ? {} : { startSource }),
+      });
+      return container.success ? { ...view, container: container.data } : view;
+    } catch {
+      logger
+        .withFields({ sandboxId: this.sandboxId })
+        .warn('Sandbox runtime metadata could not be projected; the route is unaffected');
+      return view;
+    }
   }
 
   /** Stores the sandbox owner on first use and rejects a different one. */
@@ -1722,11 +2469,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   private async issueRouteGrant(
     spec: ControlPlaneRouteSpec,
-    source: ControlPlaneCredentialSource
+    source: ControlPlaneCredentialSource,
+    diagnostic?: GrantDiagnostic
   ): Promise<RouteGrantIssue> {
     const provider = this.currentProvider();
-    const outboundContainerId =
-      this.outboundContainerIdFor(await this.readAllocation()) ?? undefined;
+    const allocation = await this.readAllocation();
+    diagnostic?.fact({
+      provider,
+      containment: this.credentialContainmentEnabled() ? 'enabled' : 'disabled',
+    });
+    const runtimeContract = readRuntimeContract(this.ctx.storage.kv, allocation.allocationId);
+    const outboundContainerId = this.outboundContainerIdFor(allocation, diagnostic) ?? undefined;
     const base: SessionAttachPayload = {
       directory: spec.directory,
       ...(spec.branch ? { branch: spec.branch } : {}),
@@ -1737,46 +2490,95 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ...(spec.git ? { git: spec.git } : {}),
     };
     const scopeId = source.scopeId ?? spec.sessionId;
-    const modern = kiloTokenHasRuntimeAuthorization(source.kiloToken);
     const scopes = listScopeGrants(this.db);
     const existing = scopes.find(
-      grant => grant.scopeId === scopeId && (grant.kilo.runtimeProxy !== undefined) === modern
+      grant => grant.scopeId === scopeId && hasRuntimeCredentialProxy(grant)
     );
-    const { grant, payload } = await prepareCredentialGrant({
-      env: this.env,
-      source,
-      sessionId: spec.sessionId,
-      sandboxId: this.sandboxId,
-      provider,
-      containmentEnabled: this.credentialContainmentEnabled(),
-      directory: spec.directory,
-      scopeId,
-      payload: base,
-      leaseMs: this.sandboxTimers().credentialGrantMs,
-      ...(existing === undefined ? {} : { existing }),
-      refreshBacking: existing !== undefined && this.grantNeedsReissue(existing),
-      ...(outboundContainerId === undefined ? {} : { outboundContainerId }),
-    });
+    if (
+      runtimeContract !== 'legacy' &&
+      !scopes.some(
+        grant =>
+          grant.scopeId === scopeId &&
+          grant.members.some(member => member.sessionId === spec.sessionId)
+      ) &&
+      scopeMemberCount(scopes, scopeId) >= MAX_SCOPE_MEMBERS
+    ) {
+      diagnostic?.record({ grantPhase: 'compatibility', grantFailureReason: 'scope_member_limit' });
+      throw new ScopeMemberLimitError();
+    }
+    const { grant, payload } = await prepareCredentialGrant(
+      {
+        env: this.env,
+        source,
+        sessionId: spec.sessionId,
+        sandboxId: this.sandboxId,
+        provider,
+        containmentEnabled: this.credentialContainmentEnabled(),
+        directory: spec.directory,
+        scopeId,
+        payload: base,
+        leaseMs: this.sandboxTimers().credentialGrantMs,
+        ...(existing === undefined ? {} : { existing }),
+        refreshBacking: existing !== undefined && this.grantNeedsReissue(existing),
+        ...(outboundContainerId === undefined ? {} : { outboundContainerId }),
+      },
+      diagnostic
+    );
+    // A worktree scope may adopt one canonical handle only when it already has
+    // an accepted entry under the current fence. Rows on this fence are written
+    // in the same transaction as an accepted entry, so once ANY entry exists
+    // (including an expired adoption marker) the incumbents are trusted even if
+    // pruning has since dropped the exact string one row still holds. A scope
+    // with stored rows but no accepted entry at all is the pre-deploy shape
+    // (per-session handles this Sandbox never accepted): admitting a joiner
+    // would let two different handles share one directory process after the
+    // flip, so it is refused. The requesting member is excluded, so an
+    // incumbent's own re-issue is never refused.
+    if (runtimeContract !== 'legacy' && isWorkspaceProxyScope(grant)) {
+      const incumbents = (grant.kilo.runtimeProxy?.members ?? []).filter(
+        member =>
+          member.sessionId !== spec.sessionId && member.kiloSessionId !== source.kiloSessionId
+      );
+      if (incumbents.length > 0) {
+        const fence = this.runtimeProxyFenceFor(await this.readAllocation());
+        if (fence !== null) {
+          const accepted = await listAcceptedHandlesForScopeIncludingExpired(
+            this.ctx.storage,
+            scopeGrantId(grant),
+            fence
+          );
+          if (accepted.length === 0) {
+            diagnostic?.record({
+              grantPhase: 'compatibility',
+              grantFailureReason: 'scope_handle_conflict',
+            });
+            throw new ScopeHandleConflictError();
+          }
+        }
+      }
+    }
     for (const otherGrant of scopes) {
       if (scopeGrantId(otherGrant) === scopeGrantId(grant)) continue;
       if (
-        otherGrant.scopeId === grant.scopeId &&
-        otherGrant.repository?.type === 'git' &&
-        grant.repository?.type === 'git' &&
-        otherGrant.userId === grant.userId &&
-        otherGrant.orgId === grant.orgId &&
-        otherGrant.directory === grant.directory &&
-        otherGrant.provider === grant.provider &&
-        otherGrant.outboundContainerId === grant.outboundContainerId &&
-        otherGrant.containmentEnabled === grant.containmentEnabled &&
-        JSON.stringify(otherGrant.repository) === JSON.stringify(grant.repository) &&
-        JSON.stringify(otherGrant.kilo.targets) === JSON.stringify(grant.kilo.targets) &&
-        !otherGrant.members.some(
-          member =>
-            member.sessionId === spec.sessionId || member.kiloSessionId === source.kiloSessionId
-        )
+        runtimeContract === 'legacy' &&
+        canShareLegacyRepositoryCredentials(otherGrant, grant, {
+          sessionId: spec.sessionId,
+          kiloSessionId: source.kiloSessionId,
+        })
       )
         continue;
+      // Shared runtimes hold one credential class per directory.
+      if (
+        runtimeContract !== 'legacy' &&
+        otherGrant.directory === grant.directory &&
+        (otherGrant.kilo.runtimeProxy !== undefined) !== (grant.kilo.runtimeProxy !== undefined)
+      ) {
+        diagnostic?.record({
+          grantPhase: 'compatibility',
+          grantFailureReason: 'mixed_credential_class',
+        });
+        throw new MixedCredentialClassError();
+      }
       if (
         otherGrant.scopeId === scopeId ||
         otherGrant.directory === grant.directory ||
@@ -1785,6 +2587,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
             member.sessionId === spec.sessionId || member.kiloSessionId === source.kiloSessionId
         )
       ) {
+        diagnostic?.record({ grantPhase: 'compatibility', grantFailureReason: 'scope_mismatch' });
         throw new Error('Worktree credential scope mismatch');
       }
     }
@@ -1802,7 +2605,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const now = Date.now();
     return this.refreshVercelNetworkPolicy([
       ...listScopeGrants(this.db).filter(
-        grant => scopeGrantId(grant) !== scopeGrantId(candidate) && grant.expiresAt > now
+        grant =>
+          hasRuntimeCredentialProxy(grant) &&
+          scopeGrantId(grant) !== scopeGrantId(candidate) &&
+          grant.expiresAt > now
       ),
       candidate,
     ]);
@@ -1816,6 +2622,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       setupCommands?: string[] | undefined;
       git?: SessionAttachPayload['git'];
       kilo: NonNullable<SessionAttachPayload['kilo']>;
+      githubReviewTarget?: ControlPlaneRouteSpec['githubReviewTarget'];
     }
   ): ControlPlaneRouteSpec {
     // Explicit projection: token-bearing fields come only from the issued grant,
@@ -1828,9 +2635,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
       directory: payload.directory ?? spec.directory,
       ...(spec.branch === undefined ? {} : { branch: spec.branch }),
       ...(spec.branchMode === undefined ? {} : { branchMode: spec.branchMode }),
+      ...(spec.worktreeRecovery === undefined ? {} : { worktreeRecovery: spec.worktreeRecovery }),
+      ...(spec.runtimeSkills === undefined ? {} : { runtimeSkills: spec.runtimeSkills }),
+      ...(spec.runtimeAgents === undefined ? {} : { runtimeAgents: spec.runtimeAgents }),
+      ...(spec.kiloCommands === undefined ? {} : { kiloCommands: spec.kiloCommands }),
+      ...(spec.permission === undefined ? {} : { permission: spec.permission }),
+      ...(spec.runtimeIsolation === undefined ? {} : { runtimeIsolation: spec.runtimeIsolation }),
+      ...(payload.githubReviewTarget === undefined
+        ? {}
+        : { githubReviewTarget: payload.githubReviewTarget }),
       env: payload.env ?? {},
       ...(payload.setupCommands === undefined ? {} : { setupCommands: payload.setupCommands }),
-      ...(spec.runtimeIsolation === undefined ? {} : { runtimeIsolation: spec.runtimeIsolation }),
       ...(payload.git === undefined ? {} : { git: payload.git }),
       kilo: payload.kilo,
     };
@@ -1840,12 +2655,39 @@ export class SandboxControlV2 extends DurableObject<Env> {
     payload: ControlPlaneDeliverPayload
   ): Promise<ControlPlaneDeliverResult> {
     const state = await this.readAllocation();
-    const route = await readRoute(this.db, payload.sessionId);
+    let route = await readRoute(this.db, payload.sessionId);
     if (state.kind !== 'connected' || route === null || route.state !== 'ready') {
+      return 'not_ready';
+    }
+    if (payload.allocationId !== undefined && payload.allocationId !== state.allocationId) {
       return 'not_ready';
     }
     const socket = this.boundWrapperSocket(state);
     if (socket === null) return 'not_ready';
+    if (route.grant === null || !hasRuntimeCredentialProxy(route.grant)) {
+      await onRouteFailed(
+        this.routeContext(state),
+        payload.sessionId,
+        'credential_upgrade_required',
+        undefined,
+        true
+      );
+      return 'not_ready';
+    }
+
+    // Proactive maintenance runs whenever the shared canonical handle is within
+    // the threshold, independent of the grant re-issue clock: it converges every
+    // member row onto the canonical and hands off through a survivor before the
+    // canonical ends. Only a worktree proxy scope has a canonical to maintain.
+    // It runs before the re-issue so a rotated canonical is what the fresh grant
+    // preserves.
+    let adopted = false;
+    if (route.grant !== null && isWorkspaceProxyScope(route.grant)) {
+      const maintained = await this.maintainAdoptedScopeHandle(route.grant, state);
+      route = { ...route, grant: maintained.grant };
+      adopted = maintained.adopted;
+    }
+
     if (route.grant !== null && this.grantNeedsReissue(route.grant)) {
       // Credentials half of B3: re-issue below one hour remaining with freshly
       // selected material and send `session.credentials` before the prompts. A
@@ -1855,11 +2697,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       // re-issue outcome, so the route fails now with the real reason.
       const outcome = await this.reissueRouteGrant(route, state);
       if (outcome !== 'issued' && Date.now() >= route.grant.expiresAt) {
-        // No usable grant: fail the route as the prepare path does, so the
-        // Session DO starts a fresh attempt or releases the queued messages with
-        // the real reason, instead of leaving them for the queued backstop.
-        // If the route stayed `ready`, `prepare` would return the same ready
-        // view and deliver would keep returning `not_ready`.
         await onRouteFailed(
           this.routeContext(state),
           payload.sessionId,
@@ -1869,7 +2706,32 @@ export class SandboxControlV2 extends DurableObject<Env> {
         );
         return 'not_ready';
       }
+      route = (await readRoute(this.db, payload.sessionId)) ?? route;
     }
+
+    // One verified-expiry check immediately before the prompts, for adopted
+    // handles only. A per-session scope keeps its historical behavior: the
+    // expired handle reaches Kilo and the upstream 401 surfaces it.
+    if (
+      adopted &&
+      route.grant !== null &&
+      (await this.routeRuntimeProxyExpired(route.grant, payload.sessionId))
+    ) {
+      await onRouteFailed(
+        this.routeContext(state),
+        payload.sessionId,
+        'workspace_setup_failed',
+        undefined,
+        true
+      );
+      return 'not_ready';
+    }
+
+    // A ready route may have missed a fanout while its socket was down; resend
+    // the current canonical before the prompt so it never runs on a superseded
+    // handle.
+    if (adopted) await this.ensureRouteCredentialsCurrent(payload.sessionId, state);
+
     for (const message of payload.messages) {
       const sent = this.trySendFrame(socket, {
         type: 'session.prompt',
@@ -1915,20 +2777,312 @@ export class SandboxControlV2 extends DurableObject<Env> {
     } catch {
       return 'failed';
     }
+    const cloudAgentMcp = await this.tryIssueCloudAgentMcpGrant(route);
     if (!(await this.applyCandidateGrantPolicy(issued.grant))) return 'policy_failed';
     const next: RouteRecord = { ...route, grant: issued.grant, spec: issued.spec };
     this.publishRouteGrant(next);
-    const payload: ControlPlaneSessionCredentialsPayload = {
+    // Git/alias material is independent of the runtime-proxy handle, so a
+    // re-issue still sends the frame even when the handle string did not change.
+    // The canonical handoff runs separately in `runDeliver` maintenance.
+    const payload = controlPlaneSessionCredentialsPayloadSchema.parse({
       ...sessionCredentialsPayloadFromGrant(issued.grant, route.sessionId),
-    };
-    this.trySendFrame(socket, { type: 'session.credentials', ...payload });
+      ...(cloudAgentMcp ? { cloudAgentMcp } : {}),
+    });
+    if (this.trySendFrame(socket, { type: 'session.credentials', ...payload })) {
+      await this.markRouteCredentialsSent(route.sessionId, issued.grant);
+    }
     return 'issued';
   }
 
-  // --- contained credential helpers (B3) --------------------------------------
+  /**
+   * Keeps a worktree scope's shared canonical handle healthy and every member
+   * row converged on it. Convergence does not mint: when rows disagree it
+   * rewrites them all to the current canonical and fans out, so a claim that
+   * replaced the canonical on one row cannot strand another member. A canonical
+   * within the threshold is handed off to an active member whose live delegation
+   * outlives it; a canonical that has already ended is recovered through any
+   * member whose delegation is still live. A failed mint, a full accepted set,
+   * or no live member leaves the grant unchanged, and the caller fails only on
+   * verified expiry. Never evicts an unexpired handle.
+   *
+   * The delegation reads, the mint and the policy update run on the serial
+   * queue. Their count is bounded by the scope member cap, each read is bounded
+   * by the grant-issue timeout, and no read or mint starts until the canonical is
+   * within the threshold or has ended.
+   */
+  private async maintainAdoptedScopeHandle(
+    grant: SessionCredentialGrant,
+    state: AllocationState
+  ): Promise<{ grant: SessionCredentialGrant; adopted: boolean }> {
+    const proxy = grant.kilo.runtimeProxy;
+    if (proxy === undefined || proxy.members.length === 0) return { grant, adopted: false };
+    const fence = this.runtimeProxyFenceFor(state);
+    if (fence === null || !(await this.isAdoptedScopeAtFence(grant, fence))) {
+      return { grant, adopted: false };
+    }
+    const now = Date.now();
+    const scopeKey = scopeGrantId(grant);
+    const canonical = await this.selectCanonicalForScope(grant, fence, null);
+    const entries = await listAcceptedHandlesForScope(this.ctx.storage, scopeKey, fence, now);
+
+    if (canonical !== null && proxy.members.some(member => member.handle !== canonical.handle)) {
+      // Only converge onto a canonical a current member can still serve; a
+      // canonical whose issuer left the scope is left to the members that hold
+      // it, as admission already decided for the requestor that could not.
+      const converged = canonical.usable ? setAllMemberHandles(grant, canonical.handle) : grant;
+      if (converged !== grant && (await this.applyCandidateGrantPolicy(converged))) {
+        this.ctx.storage.transactionSync(() => writeScopeGrant(this.db, converged));
+        await this.fanoutCanonicalCredentials(converged, state);
+        this.logScopeHandleMaintenance(grant.scopeId, 'converged');
+        return { grant: converged, adopted: true };
+      }
+    }
+
+    const nearExpiry =
+      canonical !== null &&
+      canonical.exp - now < this.sandboxTimers().credentialGrantReissueBelowMs;
+    if (canonical !== null && !nearExpiry) return { grant, adopted: true };
+
+    const ownerId = await this.requireOwner();
+    if (ownerId === null) return { grant, adopted: true };
+    const canonicalIssuerSessionId = canonical?.issuerSessionId ?? null;
+    const routes = await listRoutes(this.db);
+    const members: HandoffMemberState[] = await Promise.all(
+      proxy.members.map(async member => {
+        const route = routes.find(candidate => candidate.sessionId === member.sessionId);
+        const active = isActiveScopeMember(member, route, grant);
+        let delegationExpiresAt: number | null = null;
+        if (active) {
+          const peer = this.sessionPeerFor(ownerId, member.sessionId);
+          if (peer !== null) {
+            try {
+              delegationExpiresAt = await withTimeout(
+                peer.getRuntimeProxyDelegationExpiresAt({
+                  sandboxId: this.sandboxId,
+                  directory: grant.directory,
+                  kiloSessionId: member.kiloSessionId,
+                }),
+                this.scopeBackingTokenMs(),
+                'Delegation expiry read timed out'
+              );
+            } catch {
+              delegationExpiresAt = null;
+            }
+          }
+        }
+        return { ...member, delegationExpiresAt, active };
+      })
+    );
+    const candidate = selectHandoffCandidate({
+      canonicalExp: canonical === null ? now : canonical.exp,
+      members,
+    });
+    if (candidate === null) {
+      this.logScopeHandleMaintenance(
+        grant.scopeId,
+        canonical === null ? 'no_live_member' : 'no_extending_member'
+      );
+      return { grant, adopted: true };
+    }
+    // A same-issuer mint returns the same handle/exp, so never claim an
+    // extension that did not happen. Recovery has no issuer to compare against.
+    if (canonicalIssuerSessionId !== null && candidate.sessionId === canonicalIssuerSessionId) {
+      this.logScopeHandleMaintenance(grant.scopeId, 'not_needed');
+      return { grant, adopted: true };
+    }
+    const peer = this.sessionPeerFor(ownerId, candidate.sessionId);
+    if (peer === null) {
+      this.logScopeHandleMaintenance(grant.scopeId, 'mint_failed');
+      return { grant, adopted: true };
+    }
+    const minted = await this.canonicalHandleMints.direct(peer, fence);
+    if (minted === null || minted.exp <= now || minted.issuerSessionId !== candidate.sessionId) {
+      this.logScopeHandleMaintenance(grant.scopeId, 'mint_failed');
+      return { grant, adopted: true };
+    }
+    if (canonical !== null && minted.exp <= canonical.exp) {
+      this.logScopeHandleMaintenance(grant.scopeId, 'mint_failed');
+      return { grant, adopted: true };
+    }
+    const mintedClaims = await verifyRuntimeCredentialProxyHandle(this.env, minted.handle);
+    if (mintedClaims === null || mintedClaims.userId !== ownerId) {
+      this.logScopeHandleMaintenance(grant.scopeId, 'mint_failed');
+      return { grant, adopted: true };
+    }
+
+    const updated = setAllMemberHandles(grant, minted.handle);
+    const candidateDigest = await digestRuntimeProxyHandle(minted.handle);
+    const alreadyAccepted = entries.some(entry =>
+      constantTimeEqual(entry.handleDigest, candidateDigest)
+    );
+    // A same-fence mint through a member that already holds the handle returns
+    // the same string, so the rows do not change; the handle must still be
+    // accepted or the scope keeps looking adopted without a servable entry.
+    if (updated === grant && alreadyAccepted) return { grant, adopted: true };
+    if (!alreadyAccepted && entries.length >= ACCEPTED_HANDLES_MAX) {
+      this.logScopeHandleMaintenance(grant.scopeId, 'set_full');
+      return { grant, adopted: true };
+    }
+    if (updated !== grant && !(await this.applyCandidateGrantPolicy(updated))) {
+      this.logScopeHandleMaintenance(grant.scopeId, 'mint_failed');
+      return { grant, adopted: true };
+    }
+    const entry = {
+      handleDigest: candidateDigest,
+      handle: minted.handle,
+      issuerSessionId: minted.issuerSessionId,
+      scopeId: grant.scopeId,
+      exp: minted.exp,
+      fence,
+    };
+    let committed = true;
+    this.ctx.storage.transactionSync(() => {
+      const added = addAcceptedHandleSync(this.ctx.storage.kv, scopeKey, entry, now);
+      if (added !== 'added' && added !== 'present') {
+        committed = false;
+        return;
+      }
+      if (updated !== grant) writeScopeGrant(this.db, updated);
+    });
+    if (!committed) {
+      this.logScopeHandleMaintenance(grant.scopeId, 'set_full');
+      return { grant, adopted: true };
+    }
+    await this.fanoutCanonicalCredentials(updated, state);
+    this.logScopeHandleMaintenance(
+      updated.scopeId,
+      canonical === null ? 'expired_recovered' : 'rotated'
+    );
+    return { grant: updated, adopted: true };
+  }
+
+  private logScopeHandleMaintenance(
+    scopeId: string,
+    outcome:
+      | 'converged'
+      | 'not_needed'
+      | 'no_extending_member'
+      | 'no_live_member'
+      | 'set_full'
+      | 'mint_failed'
+      | 'rotated'
+      | 'expired_recovered'
+  ): void {
+    logger.withFields({ scopeId, outcome }).info('Control-plane scope handle maintenance');
+  }
+
+  /**
+   * Sends the current canonical credentials to every ready or preparing member
+   * of the scope whose last-sent handle differs. A preparing member is sent but
+   * not marked delivered: it may be running an older wrapper that drops the
+   * frame, and `session.ready` reconciles that. Frames whose handle is not the
+   * current canonical are never sent.
+   */
+  private async fanoutCanonicalCredentials(
+    grant: SessionCredentialGrant,
+    state: AllocationState
+  ): Promise<void> {
+    if (grant.kilo.runtimeProxy === undefined) return;
+    const socket = this.boundWrapperSocket(state);
+    if (socket === null) return;
+    const scopeKey = scopeGrantId(grant);
+    for (const route of await listRoutes(this.db)) {
+      if (route.state !== 'ready' && route.state !== 'preparing') continue;
+      if (route.grant === null || scopeGrantId(route.grant) !== scopeKey) continue;
+      const handle = memberHandleForSession(grant, route.sessionId);
+      if (handle === null) continue;
+      const digest = await digestRuntimeProxyHandle(handle);
+      const lastSent = await readLastSentHandleDigest(this.ctx.storage, route.sessionId);
+      if (lastSent !== null && constantTimeEqual(lastSent, digest)) continue;
+      const sent = this.trySendFrame(socket, {
+        type: 'session.credentials',
+        ...sessionCredentialsPayloadFromGrant(grant, route.sessionId),
+      });
+      if (sent && route.state === 'ready') {
+        await markLastSentHandle(this.ctx.storage, route.sessionId, digest);
+      }
+    }
+  }
+
+  /** Records the handle a `session.prepare`/`session.credentials` frame carried. */
+  private async markRouteCredentialsSent(
+    sessionId: string,
+    grant: SessionCredentialGrant
+  ): Promise<void> {
+    const handle = memberHandleForSession(grant, sessionId);
+    if (handle === null) return;
+    await markLastSentHandle(this.ctx.storage, sessionId, await digestRuntimeProxyHandle(handle));
+  }
+
+  /**
+   * Reconciliation for an adopted route: send the current canonical when the
+   * route's last-sent marker no longer matches its row. It covers a preparing
+   * route that missed a fanout (an older wrapper drops credentials frames before
+   * it is prepared) and a ready route whose socket was down when a fanout was
+   * attempted. A no-op when the strings already agree, so a normal prepare sends
+   * nothing extra.
+   */
+  private async ensureRouteCredentialsCurrent(
+    sessionId: string,
+    state: AllocationState
+  ): Promise<void> {
+    const route = await readRoute(this.db, sessionId);
+    const grant = route?.grant ?? null;
+    if (route === null || grant === null) return;
+    const fence = this.runtimeProxyFenceFor(state);
+    if (!(await this.isAdoptedScopeAtFence(grant, fence))) return;
+    const handle = memberHandleForSession(grant, sessionId);
+    if (handle === null) return;
+    const digest = await digestRuntimeProxyHandle(handle);
+    const lastSent = await readLastSentHandleDigest(this.ctx.storage, sessionId);
+    if (lastSent !== null && constantTimeEqual(lastSent, digest)) return;
+    const socket = this.boundWrapperSocket(state);
+    if (socket === null) return;
+    if (
+      this.trySendFrame(socket, {
+        type: 'session.credentials',
+        ...sessionCredentialsPayloadFromGrant(grant, sessionId),
+      })
+    ) {
+      await markLastSentHandle(this.ctx.storage, sessionId, digest);
+    }
+  }
+
+  /** Whether this route's runtime-proxy handle has verifiably expired. */
+  private async routeRuntimeProxyExpired(
+    grant: SessionCredentialGrant,
+    sessionId: string
+  ): Promise<boolean> {
+    const handle = memberHandleForSession(grant, sessionId);
+    if (handle === null) return false;
+    const expiresAt = await verifyRuntimeCredentialProxyHandleExpiresAt(this.env, handle);
+    return expiresAt !== null && expiresAt <= Date.now();
+  }
+
+  /**
+   * The one owner of "is this scope adopted?": a worktree proxy scope with at
+   * least one accepted entry under `fence`, including an expired-but-still-stored
+   * entry (the adoption marker). Existing allocations retain per-session handles,
+   * even when a newer wrapper reconnects or their last scope member leaves.
+   */
+  private async isAdoptedScopeAtFence(
+    grant: SessionCredentialGrant,
+    fence: ControlRuntimeCredentialProxyFence | null
+  ): Promise<boolean> {
+    if (
+      fence === null ||
+      readRuntimeContract(this.ctx.storage.kv, fence.allocationId) !== 'worktree'
+    )
+      return false;
+    const marker = await hasAcceptedScopeHandle(this.ctx.storage, scopeGrantId(grant), fence);
+    return isAdoptableWorktreeScope({ grant, acceptedMarker: marker });
+  }
 
   /** The managed outbound container id for the current provider/allocation. */
-  private outboundContainerIdFor(state: AllocationState): string | null {
+  private outboundContainerIdFor(
+    state: AllocationState,
+    diagnostic?: GrantDiagnostic
+  ): string | null {
     // The container is the containment boundary. When containment is off there
     // is no proxy container to name, and the environment may not even bind the
     // containment namespaces (the e2e Worker strips them).
@@ -1951,12 +3105,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
       decodeCloudflareProviderRef(state.providerRef)?.sandboxId ??
       this.providerPin?.allocationName ??
       this.sandboxId;
-    return (
-      getManagedOutboundContainerId(provider, this.env, {
-        logicalSandboxId: this.sandboxId,
-        physicalSandboxId,
-      }) ?? null
+    const selected: DurableObjectNamespace<Sandbox> | null | undefined = this.sandboxNamespace(
+      this.providerPin,
+      physicalSandboxId,
+      true
     );
+    if (selected === null || selected === undefined) {
+      diagnostic?.record({ grantPhase: 'configuration', grantFailureReason: 'namespace_unbound' });
+    }
+    return selected.idFromName(physicalSandboxId).toString();
   }
 
   private sandboxCanResolveCredentials(state: AllocationState): boolean {
@@ -2015,15 +3172,19 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   private async activeGrants(now: number): Promise<SessionCredentialGrant[]> {
-    return listScopeGrants(this.db).filter(grant => grant.expiresAt > now);
+    return listScopeGrants(this.db).filter(
+      grant => hasRuntimeCredentialProxy(grant) && grant.expiresAt > now
+    );
   }
 
   /**
    * Rebuilds the Vercel network policy from the stored grants (or a caller's
-   * candidate set). Runs inside the operation queue and does not stop the
-   * sandbox: it returns `false` on failure so callers can decide (retry vs.
-   * fail closed). Transient failures keep the route alive so a later send can
-   * retry (N2).
+   * candidate set) through the provider's contained-credential hook. Runs inside
+   * the operation queue and does not stop the sandbox: it returns `false` on
+   * failure so callers can decide (retry vs. fail closed). Transient failures
+   * keep the route alive so a later send can retry (N2). A live Vercel sandbox
+   * whose adapter lacks the hook cannot apply the policy, so it fails closed
+   * exactly like a throwing hook.
    */
   private async refreshVercelNetworkPolicy(
     grantsOverride?: readonly SessionCredentialGrant[]
@@ -2034,12 +3195,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
       const providerRef = state.providerRef;
       const provider = this.provider;
       if (state.kind === 'stopping' || state.kind === 'stopped') return true;
-      if (providerRef === null || !provider.updateNetworkPolicy) return true;
-      const policy = buildControlNetworkPolicy(
-        grantsOverride ?? (await this.activeGrants(Date.now()))
-      );
+      if (providerRef === null) return true;
+      if (!provider.applyContainedCredentials) return false;
+      const grants = grantsOverride ?? (await this.activeGrants(Date.now()));
       await withTimeout(
-        provider.updateNetworkPolicy(providerRef, policy),
+        provider.applyContainedCredentials(providerRef, grants),
         this.sandboxTimers().providerStopAttemptMs,
         'Sandbox network policy update timed out'
       );
@@ -2078,7 +3238,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const state = await this.readAllocation();
     if (state.kind !== 'connected') return;
     const next: AllocationState = { ...state, lastActivityAt: at };
-    await this.writeAllocation(next);
+    await this.writeAllocation(next, state);
     await this.armAlarm(next);
   }
 
@@ -2089,7 +3249,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     stopReason: ControlPlaneFailureReason | undefined
   ): Promise<void> {
     if (previous.allocationId !== null && previous.allocationId !== next.allocationId) {
-      retireScopeGrants(this.db);
+      this.db.transaction(tx => retireScopeGrants(tx, this.ctx.storage.kv));
     }
     // Until the wrapper connects, the allocation is the preparation progress:
     // show creating, retrying and starting rather than one silent step.
@@ -2108,6 +3268,20 @@ export class SandboxControlV2 extends DurableObject<Env> {
       }
     }
     if (event.type === 'hello-accepted' && next.kind === 'connected') {
+      const restarted = previous.wrapperId !== null && previous.wrapperId !== next.wrapperId;
+      if (restarted) {
+        // A new wrapper instance supersedes the previous fence's accepted
+        // handles and every member's stored handle string. Retire both before
+        // the bind/adoption scan so a handle minted for the new fence during the
+        // scan is not deleted by this.
+        this.ctx.storage.transactionSync(() => {
+          retireAcceptedHandlesSync(this.ctx.storage.kv);
+          for (const grant of listScopeGrants(this.db)) {
+            const cleared = clearRuntimeProxyMembers(grant);
+            if (cleared !== grant) writeScopeGrant(this.db, cleared);
+          }
+        });
+      }
       for (const route of await listRoutes(this.db)) {
         if (route.state !== 'preparing' || route.grant !== null) continue;
         if (route.credentialSource === null) continue;
@@ -2120,23 +3294,44 @@ export class SandboxControlV2 extends DurableObject<Env> {
           if (!(await this.applyCandidateGrantPolicy(issued.grant)))
             throw new Error('Credential policy unavailable');
           this.publishRouteGrant({ ...route, ...issued });
-        } catch {
+        } catch (error) {
+          const upgradeRequired = error instanceof SessionCredentialUpgradeRequiredError;
           await failCurrentAttempt(
             this.routeContext(next),
             route.sessionId,
             route.attemptId,
-            'workspace_setup_failed',
-            'runtime_proxy_bind_failed'
+            upgradeRequired ? 'credential_upgrade_required' : 'workspace_setup_failed',
+            upgradeRequired
+              ? 'credential_upgrade_required'
+              : admissionFailureStage(error, 'runtime_proxy_bind_failed')
           );
         }
       }
-      const restarted = previous.wrapperId !== null && previous.wrapperId !== next.wrapperId;
       await onWrapperConnected(this.routeContext(next), restarted);
       return;
     }
     if (previous.kind === 'connected' && next.kind === 'disconnected') {
       await notifyReadyRoutes(this.routeContext(next));
       return;
+    }
+    if (
+      event.type === 'startup-failed' &&
+      previous.kind !== 'stopping' &&
+      next.kind === 'stopping'
+    ) {
+      const reason = STARTUP_FAILURES[event.code].reason;
+      if (reason !== null) {
+        for (const route of await listRoutes(this.db)) {
+          if (route.state === 'preparing')
+            await failCurrentAttempt(
+              this.routeContext(next),
+              route.sessionId,
+              route.attemptId,
+              reason,
+              'runtime_startup_failed'
+            );
+        }
+      }
     }
     if (previous.kind !== 'stopping' && next.kind === 'stopping') {
       // The reducer owns the cause; ready routes must not re-derive it.
@@ -2157,7 +3352,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     next: AllocationState
   ): Promise<void> {
     const ctx = this.routeContext(next);
-    retireScopeGrants(this.db);
+    this.db.transaction(tx => retireScopeGrants(tx, this.ctx.storage.kv));
     // `create-failed` with no retry, a confirmed stop and `provider-gone` can
     // all reach `stopped` without arming an alarm, so sweep expired routes now.
     await failExpiredRoutes(ctx);
@@ -2167,6 +3362,26 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
     // A preparing route with attempt time left keeps its deadline across the
     // reallocation (spec §6).
+    const launch = await readRepositoryLaunch(this.ctx.storage);
+    if (
+      next.unconfirmedProviderRef !== null &&
+      launch?.allocationId === previous.allocationId &&
+      launch.preparationFailures !== undefined
+    ) {
+      for (const route of await listRoutes(this.db)) {
+        if (route.state !== 'preparing') continue;
+        await onRouteFailed(
+          ctx,
+          route.sessionId,
+          'workspace_setup_failed',
+          launch.preparationFailures.find(
+            failure =>
+              failure.sessionId === route.sessionId && failure.attemptId === route.attemptId
+          )?.subtype,
+          true
+        );
+      }
+    }
     const retry = await routeRetryAllowed(ctx);
     const routes = await listRoutes(this.db);
     logControlDiagnostic('allocation_stopped', {
@@ -2179,7 +3394,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       otherRoutes: routes.filter(route => route.state !== 'preparing' && route.state !== 'ready')
         .length,
     });
-    if (retry) {
+    if (retry && !this.createInFlight) {
       await this.applyEvent({ type: 'ensure', at: ctx.now(), allocationId: crypto.randomUUID() });
     } else {
       await this.armAlarm(next);
@@ -2249,52 +3464,136 @@ export class SandboxControlV2 extends DurableObject<Env> {
     // A route without a grant never reaches `preparing` (issuance failure marks
     // it `failed`), so never send a spec that could carry raw issuer material.
     if (route.grant === null) return;
-    let mcp: ControlPlaneRouteSpec['mcp'];
-    try {
-      mcp = this.materializeRouteMcp(route);
-    } catch (error) {
-      // Preserve the sanitized, bounded MCP reason for diagnosis; the route
-      // contract has no MCP-specific reason, so the attempt fails immediately as
-      // `workspace_setup_failed` rather than waiting out its deadline.
-      logger
-        .withFields({
-          sandboxId: this.sandboxId,
-          reason: error instanceof McpAttachValidationError ? error.reason : 'unknown',
-        })
-        .warn('MCP materialization failed before session.prepare');
+    if (!hasRuntimeCredentialProxy(route.grant)) {
       this.ctx.waitUntil(
-        this.failPrepareAttempt(route.sessionId, route.attemptId).catch(() => {
+        this.failPrepareAttempt(
+          route.sessionId,
+          route.attemptId,
+          'credential_upgrade_required',
+          'credential_upgrade_required'
+        ).catch(() => {
           logger
             .withFields({
               sandboxId: this.sandboxId,
               sessionId: route.sessionId,
               attemptId: route.attemptId,
             })
-            .warn('Could not persist MCP preparation failure');
+            .warn('Could not persist credential upgrade failure');
         })
       );
       return;
     }
-    if (route.grant.kilo.runtimeProxy !== undefined) {
-      // R1: minting the runtime credential proxy handle is a Session DO call that
-      // must stay off this DO's serial queue; the frame is sent once the handle
-      // is minted and bound. A mint failure fails the attempt closed.
-      this.ctx.waitUntil(
-        this.sendSessionPrepareWithRuntimeProxy(route.sessionId, route.attemptId, mcp)
-      );
-      return;
+    // Minting calls the Session DO and must stay outside this serial queue.
+    this.ctx.waitUntil(this.sendSessionPrepareWithRuntimeProxy(route.sessionId, route.attemptId));
+  }
+
+  /** Whether the bound wrapper advertised that it redacts named secret keys. */
+  private wrapperRedactsNamedSecrets(socket: WebSocket): boolean {
+    return this.readAttachment(socket)?.redactsNamedSecrets === true;
+  }
+
+  private wrapperInstallsSkillsSh(socket: WebSocket): boolean {
+    return this.readAttachment(socket)?.installsSkillsSh === true;
+  }
+
+  private wrapperAcceptsWorkspaceConfiguration(socket: WebSocket): boolean {
+    return this.readAttachment(socket)?.workspaceConfiguration === true;
+  }
+
+  /**
+   * A failure throws rather than sending a frame the wrapper would drop while the
+   * route waits out its preparation deadline.
+   */
+  private materializePrepareFrame(route: RouteRecord, socket: WebSocket): MaterializedPrepareFrame {
+    const wireSpec = runtimeSpecForContract(
+      route.spec,
+      readRuntimeContract(this.ctx.storage.kv, this.readAttachment(socket)?.allocationId ?? null)
+    );
+    if (
+      route.spec.runtimeSkills?.some(skill => 'source' in skill) &&
+      !this.wrapperInstallsSkillsSh(socket)
+    ) {
+      throw new PrepareFrameMaterializationError('wrapper_skills_sh_unsupported');
     }
-    // The frame carries the wrapper-safe spec plus the issued credential
-    // material only; the credential source stays DO-private.
-    this.trySendFrame(socket, {
-      type: 'session.prepare',
-      spec: {
-        ...route.spec,
+    const encryptedSecrets = route.credentialSource?.encryptedSecrets;
+    try {
+      const frameEnv = buildFrameEnv({
+        specEnv: route.spec.env,
+        encryptedSecrets,
+        privateKey: this.env.AGENT_ENV_VARS_PRIVATE_KEY,
+      });
+      // Fail closed only when a secret value would actually reach the frame and
+      // the wrapper cannot redact it by name; a snapshot whose keys are all
+      // restored or dropped sends nothing and needs no redaction.
+      if (frameEnv.secretEnvKeys.length > 0 && !this.wrapperRedactsNamedSecrets(socket)) {
+        throw new PrepareFrameMaterializationError('wrapper_redaction_unsupported');
+      }
+      if (frameEnv.secretEnvKeys.length > 0) {
+        logger
+          .withFields({
+            sandboxId: this.sandboxId,
+            sessionId: route.sessionId,
+            secretCount: frameEnv.secretEnvKeys.length,
+          })
+          .info('Materialized session.prepare secrets');
+      }
+      const frameSpec = controlPlaneRouteSpecSchema.parse({
+        ...wireSpec,
         createdOnPlatform: route.credentialSource?.createdOnPlatform,
-        ...(mcp === undefined ? {} : { mcp }),
-      },
-      credentials: this.prepareCredentials(route.grant, route.sessionId),
-    });
+        ...(frameEnv.env === undefined ? {} : { env: frameEnv.env }),
+        ...(frameEnv.secretEnvKeys.length === 0 ? {} : { secretEnvKeys: frameEnv.secretEnvKeys }),
+      });
+      if (!this.wrapperAcceptsWorkspaceConfiguration(socket)) {
+        const mcp = this.materializeRouteMcp(route);
+        return {
+          type: 'session.prepare',
+          spec: controlPlaneRouteSpecSchema.parse({
+            ...frameSpec,
+            ...(mcp === undefined ? {} : { mcp }),
+          }),
+        };
+      }
+
+      return {
+        type: 'session.attach',
+        spec: attachmentSpecFromRouteSpec(frameSpec),
+        workspace: workspaceConfigFromSpec(frameSpec, this.materializeRouteMcp(route)),
+      };
+    } catch (error) {
+      if (error instanceof PrepareFrameMaterializationError) throw error;
+      // Preserve the sanitized, bounded MCP reason for diagnosis.
+      if (error instanceof McpAttachValidationError) {
+        logger
+          .withFields({
+            sandboxId: this.sandboxId,
+            sessionId: route.sessionId,
+            reason: error.reason,
+          })
+          .warn('MCP materialization failed before session.prepare');
+      }
+      throw new PrepareFrameMaterializationError(
+        'frame_materialization_failed',
+        errorClassName(error)
+      );
+    }
+  }
+
+  /** One sanitized failure line: stage, error class and secret count only. */
+  private logPrepareFrameMaterializationFailure(route: RouteRecord, error: unknown): void {
+    const encrypted = route.credentialSource?.encryptedSecrets;
+    logger
+      .withFields({
+        sandboxId: this.sandboxId,
+        sessionId: route.sessionId,
+        attemptId: route.attemptId,
+        stage: materializationStage(error),
+        secretCount: encrypted === undefined ? 0 : Object.keys(encrypted).length,
+        errorClass:
+          error instanceof PrepareFrameMaterializationError
+            ? (error.sourceErrorName ?? error.name)
+            : errorClassName(error),
+      })
+      .warn('session.prepare frame materialization failed');
   }
 
   private prepareCredentials(
@@ -2307,101 +3606,45 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   /**
-   * R1 runtime credential proxy: mint the handle through the Session DO (bounded
-   * by the grant bound, fence passed in), bind it for Vercel, then send
+   * Runtime credential proxy: mint the handle through the Session DO (bounded by
+   * the grant bound, fence passed in), bind it for Vercel, then send
    * `session.prepare`. Runs off the serial queue; a mint or bind failure fails
-   * the fenced attempt as `workspace_setup_failed`.
+   * the fenced attempt as `workspace_setup_failed`. An adopted worktree scope
+   * routes through the canonical-handle path instead.
    */
   private async sendSessionPrepareWithRuntimeProxy(
     sessionId: string,
-    attemptId: string,
-    mcp: ControlPlaneRouteSpec['mcp']
+    attemptId: string
   ): Promise<void> {
     try {
-      let route = await readRoute(this.db, sessionId);
+      const route = await readRoute(this.db, sessionId);
       if (!isCurrentPreparingAttempt(route, attemptId)) return;
       if (route.grant === null || route.grant.kilo.runtimeProxy === undefined) return;
-      const member = route.grant.kilo.runtimeProxy.members.find(
-        candidate => candidate.sessionId === sessionId
-      );
       // One owner per sandbox (B3 review 5), stored on first prepare/registration;
       // the Session DO name is `ownerId:sessionId`.
       const ownerId = await this.requireOwner();
       const peer = ownerId === null ? null : this.sessionPeerFor(ownerId, sessionId);
       const fence = this.runtimeProxyFenceFor(await this.readAllocation());
-      // The fence the handle in the frame belongs to; null when we send an
-      // already-bound member without a fresh mint.
-      let mintedFence: ControlRuntimeCredentialProxyFence | null = null;
 
-      if (fence === null || ownerId === null || peer === null) {
-        // No allocation to mint against (or no Session peer): an existing member
-        // is the only handle we have; without one the preparation cannot proceed.
-        if (member === undefined) {
-          await this.failPrepareAttempt(sessionId, attemptId);
-          return;
-        }
-      } else {
-        // Fence-keyed and idempotent: the same allocation/wrapper returns the same
-        // persisted grant, a restart or reallocation returns a new one.
-        const handle = await this.mintRuntimeProxyGrant(peer, fence);
-        if (handle === null) {
-          await this.failPrepareAttempt(sessionId, attemptId);
-          return;
-        }
-        // A wrapper restart or reallocation during the mint means another task
-        // owns the current fence; drop out without failing the attempt it is
-        // preparing.
-        const afterMint = this.runtimeProxyFenceFor(await this.readAllocation());
-        if (afterMint === null || !sameRuntimeProxyControlBinding(fence, afterMint)) return;
-        // A member minted under the current fence is already bound; a member from
-        // a superseded fence (wrapper restart or reallocation while the route is
-        // still preparing) must be replaced, or the wrapper receives a stale
-        // handle the proxy cannot resolve.
-        if (
-          member === undefined ||
-          runtimeProxyHandleGrantId(member.handle) !== runtimeProxyHandleGrantId(handle)
-        ) {
-          try {
-            await this.bindRuntimeCredentialProxyHandle({
-              ownerId,
-              sessionId,
-              kiloSessionId: route.spec.kiloSessionId,
-              directory: route.spec.directory,
-              handle,
-            });
-          } catch {
-            await this.failPrepareAttempt(sessionId, attemptId);
-            return;
-          }
-          // A restart during the bind supersedes this task too: do not send.
-          const afterBind = this.runtimeProxyFenceFor(await this.readAllocation());
-          if (afterBind === null || !sameRuntimeProxyControlBinding(fence, afterBind)) return;
-          route = await readRoute(this.db, sessionId);
-          if (!isCurrentPreparingAttempt(route, attemptId)) return;
-          if (route.grant === null || route.grant.kilo.runtimeProxy === undefined) return;
-        }
-        mintedFence = fence;
+      if (fence !== null && (await this.isAdoptedScopeAtFence(route.grant, fence))) {
+        const outcome = await this.sendSessionPrepareWithAdoptedScope({
+          route,
+          sessionId,
+          attemptId,
+          ownerId,
+          peer,
+          fence,
+        });
+        if (outcome === 'done') return;
       }
 
-      // Select the socket and re-check the fence from the same allocation read, so
-      // a restart between the (bind and) send cannot deliver a stale handle.
-      const state = await this.readAllocation();
-      const socket = this.boundWrapperSocket(state);
-      if (socket === null) return;
-      if (mintedFence !== null) {
-        const sendFence = this.runtimeProxyFenceFor(state);
-        if (sendFence === null || !sameRuntimeProxyControlBinding(mintedFence, sendFence)) return;
-      }
-      // The frame carries the wrapper-safe spec plus the issued credential
-      // material only; the credential source stays DO-private.
-      this.trySendFrame(socket, {
-        type: 'session.prepare',
-        spec: {
-          ...route.spec,
-          createdOnPlatform: route.credentialSource?.createdOnPlatform,
-          ...(mcp === undefined ? {} : { mcp }),
-        },
-        credentials: this.prepareCredentials(route.grant, sessionId),
+      await this.sendSessionPrepareWithPerSessionHandle({
+        route,
+        sessionId,
+        attemptId,
+        ownerId,
+        peer,
+        fence,
       });
     } catch {
       // A throw here (read/parse/bind) must still fail the fenced attempt; the
@@ -2411,6 +3654,416 @@ export class SandboxControlV2 extends DurableObject<Env> {
       } catch {
         // Best effort only.
       }
+    }
+  }
+
+  /**
+   * The per-session path: mint through the requesting member, bind when the
+   * stored handle is stale, then send. Used for legacy grants, non-worktree
+   * scopes, migration scopes, and an adopted scope the claim re-check rejects.
+   */
+  private async sendSessionPrepareWithPerSessionHandle(input: {
+    route: RouteRecord;
+    sessionId: string;
+    attemptId: string;
+    ownerId: string | null;
+    peer: ControlPlaneSessionPeer | null;
+    fence: ControlRuntimeCredentialProxyFence | null;
+  }): Promise<void> {
+    const { sessionId, attemptId, ownerId, peer, fence } = input;
+    let route = input.route;
+    const member = route.grant?.kilo.runtimeProxy?.members.find(
+      candidate => candidate.sessionId === sessionId
+    );
+    // The fence the handle in the frame belongs to; null when we send an
+    // already-bound member without a fresh mint.
+    let mintedFence: ControlRuntimeCredentialProxyFence | null = null;
+
+    if (fence === null || ownerId === null || peer === null) {
+      // No allocation to mint against (or no Session peer): an existing member
+      // is the only handle we have; without one the preparation cannot proceed.
+      if (member === undefined) {
+        await this.failPrepareAttempt(sessionId, attemptId);
+        return;
+      }
+    } else {
+      // Fence-keyed and idempotent: the same allocation/wrapper returns the same
+      // persisted grant, a restart or reallocation returns a new one.
+      const handle = await this.mintRuntimeProxyGrant(peer, fence);
+      if (handle === null) {
+        await this.failPrepareAttempt(sessionId, attemptId);
+        return;
+      }
+      // A wrapper restart or reallocation during the mint means another task
+      // owns the current fence; drop out without failing the attempt it is
+      // preparing.
+      const afterMint = this.runtimeProxyFenceFor(await this.readAllocation());
+      if (afterMint === null || !sameRuntimeProxyControlBinding(fence, afterMint)) return;
+      // A member minted under the current fence is already bound; a member from
+      // a superseded fence (wrapper restart or reallocation while the route is
+      // still preparing) must be replaced, or the wrapper receives a stale
+      // handle the proxy cannot resolve.
+      if (
+        member === undefined ||
+        runtimeProxyHandleGrantId(member.handle) !== runtimeProxyHandleGrantId(handle)
+      ) {
+        try {
+          await this.bindRuntimeCredentialProxyHandle({
+            ownerId,
+            sessionId,
+            kiloSessionId: route.spec.kiloSessionId,
+            directory: route.spec.directory,
+            handle,
+          });
+        } catch {
+          await this.failPrepareAttempt(sessionId, attemptId);
+          return;
+        }
+        // A restart during the bind supersedes this task too: do not send.
+        const afterBind = this.runtimeProxyFenceFor(await this.readAllocation());
+        if (afterBind === null || !sameRuntimeProxyControlBinding(fence, afterBind)) return;
+        const refreshed = await readRoute(this.db, sessionId);
+        if (!isCurrentPreparingAttempt(refreshed, attemptId)) return;
+        if (refreshed.grant === null || refreshed.grant.kilo.runtimeProxy === undefined) return;
+        route = refreshed;
+      }
+      mintedFence = fence;
+    }
+
+    await this.sendPreparedRouteFrame(sessionId, attemptId, mintedFence);
+  }
+
+  /**
+   * Canonical adoption: one accepted handle per worktree scope. The first
+   * prepare mints through its requesting member (single-flight so concurrent
+   * preparers share one mint); a joiner copies the canonical string; a candidate
+   * only replaces a canonical when it can be served and expires later. The mint
+   * stays off the serial queue; claim/adopt runs on it. Returns `per-session`
+   * when the scope must fall back to the legacy path.
+   */
+  private async sendSessionPrepareWithAdoptedScope(input: {
+    route: RouteRecord;
+    sessionId: string;
+    attemptId: string;
+    ownerId: string | null;
+    peer: ControlPlaneSessionPeer | null;
+    fence: ControlRuntimeCredentialProxyFence | null;
+  }): Promise<'done' | 'per-session'> {
+    const { route, sessionId, attemptId, ownerId, peer, fence } = input;
+    const grant = route.grant;
+    if (grant === null || grant.kilo.runtimeProxy === undefined) return 'done';
+    if (fence === null || ownerId === null || peer === null) return 'per-session';
+    const now = Date.now();
+    const threshold = this.sandboxTimers().credentialGrantReissueBelowMs;
+    const canonical = await this.selectCanonicalForScope(grant, fence, sessionId);
+    const needsMint = canonical === null || !canonical.usable || canonical.exp - now < threshold;
+    const mintKey = canonicalMintKey(scopeGrantId(grant), fence);
+    let candidate = needsMint ? await this.canonicalHandleMints.shared(mintKey, peer, fence) : null;
+    if (needsMint && candidate === null) {
+      candidate = await this.canonicalHandleMints.direct(peer, fence);
+    }
+    let claim = await this.claimAdoptedScopeHandle({
+      sessionId,
+      attemptId,
+      ownerId,
+      kiloSessionId: route.spec.kiloSessionId,
+      candidate,
+      mintFence: fence,
+    });
+    if (claim.kind === 'per-session') return 'per-session';
+    if (claim.kind === 'remint') {
+      const own = await this.canonicalHandleMints.direct(peer, fence);
+      claim = await this.claimAdoptedScopeHandle({
+        sessionId,
+        attemptId,
+        ownerId,
+        kiloSessionId: route.spec.kiloSessionId,
+        candidate: own,
+        mintFence: fence,
+      });
+      if (claim.kind === 'per-session') return 'per-session';
+      // A remint that still cannot mint leaves no handle to serve.
+      if (claim.kind === 'remint') claim = { kind: 'fail' };
+    }
+    if (claim.kind === 'stale') return 'done';
+    if (claim.kind === 'fail') {
+      await this.failPrepareAttempt(sessionId, attemptId);
+      return 'done';
+    }
+    await this.sendPreparedRouteFrame(sessionId, attemptId, fence);
+    return 'done';
+  }
+
+  /**
+   * Sends `session.prepare` for a preparing route, re-reading the route and the
+   * allocation from one read so a restart between adoption and send cannot
+   * deliver a stale handle.
+   */
+  private async sendPreparedRouteFrame(
+    sessionId: string,
+    attemptId: string,
+    expectedFence: ControlRuntimeCredentialProxyFence | null
+  ): Promise<void> {
+    const state = await this.readAllocation();
+    const socket = this.boundWrapperSocket(state);
+    if (socket === null) return;
+    const latest = await readRoute(this.db, sessionId);
+    if (!isCurrentPreparingAttempt(latest, attemptId)) return;
+    if (latest.grant === null || latest.grant.kilo.runtimeProxy === undefined) return;
+    if (expectedFence !== null) {
+      const sendFence = this.runtimeProxyFenceFor(state);
+      if (sendFence === null || !sameRuntimeProxyControlBinding(expectedFence, sendFence)) return;
+    }
+    const cloudAgentMcp = await this.tryIssueCloudAgentMcpGrant(latest);
+    let frame: MaterializedPrepareFrame;
+    try {
+      frame = this.materializePrepareFrame(latest, socket);
+    } catch (error) {
+      this.logPrepareFrameMaterializationFailure(latest, error);
+      await this.failPrepareAttempt(sessionId, attemptId, materializationStage(error));
+      return;
+    }
+
+    const sendState = await this.readAllocation();
+    if (this.boundWrapperSocket(sendState) !== socket) return;
+    const sendRoute = await readRoute(this.db, sessionId);
+    if (!isCurrentPreparingAttempt(sendRoute, attemptId)) return;
+    if (sendRoute.grant === null || sendRoute.grant.kilo.runtimeProxy === undefined) return;
+    if (expectedFence !== null) {
+      const sendFence = this.runtimeProxyFenceFor(sendState);
+      if (sendFence === null || !sameRuntimeProxyControlBinding(expectedFence, sendFence)) return;
+    }
+
+    const credentials = controlPlaneSessionCredentialsPayloadSchema.parse({
+      ...this.prepareCredentials(sendRoute.grant, sessionId),
+      ...(cloudAgentMcp ? { cloudAgentMcp } : {}),
+    });
+    const sent = this.trySendFrame(socket, { ...frame, credentials });
+    if (sent) await this.markRouteCredentialsSent(sessionId, sendRoute.grant);
+  }
+
+  /**
+   * Claims and commits the handle for one preparing route on the serial queue.
+   * Every authorization and policy check runs before the accepted entry and the
+   * requesting member's row commit together in one `transactionSync`, so a
+   * failed check leaves no orphan. Returns `per-session` when the scope must
+   * fall back, `remint` when a shared mint cannot bind for this requestor.
+   */
+  private claimAdoptedScopeHandle(input: {
+    sessionId: string;
+    attemptId: string;
+    ownerId: string;
+    kiloSessionId: string;
+    candidate: CanonicalHandleMint | null;
+    mintFence: ControlRuntimeCredentialProxyFence;
+  }): Promise<ScopeHandleClaim> {
+    return this.enqueue(async () => {
+      const route = await readRoute(this.db, input.sessionId);
+      if (!isCurrentPreparingAttempt(route, input.attemptId)) return { kind: 'stale' };
+      const grant = route.grant;
+      if (grant === null || grant.kilo.runtimeProxy === undefined) return { kind: 'stale' };
+      const allocation = await this.readAllocation();
+      const fence = this.runtimeProxyFenceFor(allocation);
+      if (fence === null) return { kind: 'stale' };
+      const scopeKey = scopeGrantId(grant);
+      const now = Date.now();
+      if (grant.expiresAt <= now) return { kind: 'fail' };
+
+      const entries = await listAcceptedHandlesForScope(this.ctx.storage, scopeKey, fence, now);
+      const acceptedDigests = new Set(entries.map(entry => entry.handleDigest));
+      const marker = await hasAcceptedScopeHandle(this.ctx.storage, scopeKey, fence);
+      if (
+        readRuntimeContract(this.ctx.storage.kv, fence.allocationId) !== 'worktree' ||
+        !isAdoptableWorktreeScope({ grant, acceptedMarker: marker })
+      ) {
+        return { kind: 'per-session' };
+      }
+
+      let candidate = input.candidate;
+      const staleFence =
+        candidate !== null && !sameRuntimeProxyControlBinding(input.mintFence, fence);
+      if (staleFence) candidate = null;
+      const canonical = await this.selectCanonicalForScope(grant, fence, input.sessionId);
+      const choice = decideCanonicalHandle({
+        canonical: canonical === null ? null : { handle: canonical.handle, exp: canonical.exp },
+        canonicalUsable: canonical?.usable ?? false,
+        candidate,
+        now,
+        thresholdMs: this.sandboxTimers().credentialGrantReissueBelowMs,
+      });
+
+      let finalHandle: string | null = null;
+      let adoptCandidate = false;
+      let candidateDigest: string | null = null;
+      if (choice.action === 'keep-canonical') {
+        finalHandle = choice.handle;
+      } else if (choice.action === 'adopt-candidate' && candidate !== null) {
+        candidateDigest = await digestRuntimeProxyHandle(candidate.handle);
+        const present = acceptedDigests.has(candidateDigest);
+        if (!present && entries.length >= ACCEPTED_HANDLES_MAX) {
+          // The set is full: keep serving a valid canonical if there is one.
+          if (canonical !== null && canonical.usable && canonical.exp > now) {
+            finalHandle = canonical.handle;
+          }
+        } else {
+          finalHandle = candidate.handle;
+          adoptCandidate = true;
+        }
+      }
+      if (finalHandle === null) {
+        if (staleFence) return { kind: 'stale' };
+        // The canonical became unusable between the off-queue mint decision and
+        // this queued claim (a release of its issuer won the queue). Remint
+        // through the requestor rather than failing on a transient condition.
+        if (candidate === null) return { kind: 'remint' };
+        return { kind: 'fail' };
+      }
+
+      // Adopting a candidate that outlives the canonical replaces the scope's
+      // canonical string; an already-adopted scope whose canonical has ended
+      // (marker present, no live canonical) has no canonical to keep either. In
+      // both cases every member row converges on the new handle. A first mint in
+      // a scope that was never adopted, or a candidate minted only because this
+      // requestor cannot be served by a still-valid canonical, writes only the
+      // requestor's row.
+      const replacingCanonical =
+        adoptCandidate &&
+        (canonical !== null ? candidate !== null && candidate.exp > canonical.exp : marker);
+      const seeded = withMemberHandle(grant, finalHandle, {
+        sessionId: input.sessionId,
+        kiloSessionId: input.kiloSessionId,
+      });
+      const updated =
+        adoptCandidate && replacingCanonical ? setAllMemberHandles(seeded, finalHandle) : seeded;
+      if (updated === grant) return { kind: 'handle', handle: finalHandle };
+
+      const claims = await verifyRuntimeCredentialProxyHandle(this.env, finalHandle);
+      if (!claims || claims.userId !== input.ownerId) return { kind: 'fail' };
+      const issuerIsMember = grant.members.some(member => member.sessionId === claims.sessionId);
+      if (claims.sessionId !== input.sessionId && !issuerIsMember) {
+        return adoptCandidate ? { kind: 'remint' } : { kind: 'fail' };
+      }
+      if (!adoptCandidate) {
+        const match = await lookupAcceptedHandle(this.ctx.storage, finalHandle, fence, now);
+        if (match === undefined || match.scopeGrantId !== scopeKey) return { kind: 'fail' };
+      }
+      if (!(await this.applyCandidateGrantPolicy(updated))) return { kind: 'fail' };
+
+      const entry =
+        adoptCandidate && candidate !== null && candidateDigest !== null
+          ? {
+              handleDigest: candidateDigest,
+              handle: finalHandle,
+              issuerSessionId: candidate.issuerSessionId,
+              scopeId: grant.scopeId,
+              exp: candidate.exp,
+              fence,
+            }
+          : null;
+      let committed = true;
+      this.ctx.storage.transactionSync(() => {
+        if (entry !== null) {
+          const added = addAcceptedHandleSync(this.ctx.storage.kv, scopeKey, entry, now);
+          if (added !== 'added' && added !== 'present') {
+            committed = false;
+            return;
+          }
+        }
+        writeScopeGrant(this.db, updated);
+      });
+      if (!committed) return { kind: 'fail' };
+      // The candidate replaced an existing canonical for every member: push it
+      // to the members already serving the previous string.
+      if (adoptCandidate && replacingCanonical) {
+        await this.fanoutCanonicalCredentials(updated, allocation);
+      }
+      return { kind: 'handle', handle: finalHandle };
+    });
+  }
+
+  /**
+   * The adopted handle a scope is already serving for the current fence, matched
+   * by the digest of a current member's stored string. This is the single
+   * canonical selector for both prepare and maintenance. Prefer the max-exp entry
+   * a current member can actually serve (its issuer is still a member, or the
+   * requestor already holds it); only when none is usable fall back to the
+   * max-exp entry. A departed issuer's long-lived handle therefore does not force
+   * every joiner to mint another requestor-only handle.
+   */
+  private async selectCanonicalForScope(
+    grant: SessionCredentialGrant,
+    fence: ControlRuntimeCredentialProxyFence,
+    requestorSessionId: string | null
+  ): Promise<CanonicalHandleState | null> {
+    const members = grant.kilo.runtimeProxy?.members ?? [];
+    if (members.length === 0) return null;
+    const entries = await listAcceptedHandlesForScope(this.ctx.storage, scopeGrantId(grant), fence);
+    if (entries.length === 0) return null;
+    const handlesByDigest = new Map<string, string>();
+    for (const member of members) {
+      handlesByDigest.set(await digestRuntimeProxyHandle(member.handle), member.handle);
+    }
+    let bestUsable: CanonicalHandleState | null = null;
+    let bestAny: CanonicalHandleState | null = null;
+    for (const entry of entries) {
+      const handle = handlesByDigest.get(entry.handleDigest);
+      if (handle === undefined) continue;
+      const claims = await verifyRuntimeCredentialProxyHandle(this.env, handle);
+      if (claims === null) continue;
+      const requestorHolds =
+        requestorSessionId !== null &&
+        members.some(member => member.sessionId === requestorSessionId && member.handle === handle);
+      const issuerIsMember = grant.members.some(member => member.sessionId === claims.sessionId);
+      const state: CanonicalHandleState = {
+        handle,
+        exp: entry.exp,
+        issuerSessionId: claims.sessionId,
+        usable: requestorHolds || issuerIsMember,
+      };
+      if (bestAny === null || state.exp > bestAny.exp) bestAny = state;
+      if (state.usable && (bestUsable === null || state.exp > bestUsable.exp)) bestUsable = state;
+    }
+    return bestUsable ?? bestAny;
+  }
+
+  private async runtimeProxyHandleClaims(
+    handle: string
+  ): Promise<{ exp: number; sessionId: string } | null> {
+    const claims = await verifyRuntimeCredentialProxyHandle(this.env, handle);
+    return claims === null ? null : { exp: claims.exp, sessionId: claims.sessionId };
+  }
+
+  private async tryIssueCloudAgentMcpGrant(
+    route: RouteRecord
+  ): Promise<{ url: string; token: string; expiresAt: number } | undefined> {
+    const anchor = workspaceMcpAnchorSessionId(route.credentialSource?.scopeId, route.sessionId);
+    if (anchor === undefined) return undefined;
+    try {
+      const ownerId = await this.requireOwner();
+      const peer = ownerId === null ? null : this.sessionPeerFor(ownerId, anchor);
+      if (peer?.issueCloudAgentMcpGrant === undefined) return undefined;
+      return await withTimeout(
+        peer.issueCloudAgentMcpGrant(
+          route.credentialSource?.scopeId?.startsWith('worktree_')
+            ? {
+                worktreeId: route.credentialSource.scopeId,
+                ownerId: route.credentialSource.userId,
+                organizationId: route.credentialSource.orgId ?? null,
+              }
+            : undefined
+        ),
+        this.grantIssueTimeoutMs(),
+        'Cloud Agent MCP grant issuance timed out'
+      );
+    } catch {
+      logger
+        .withFields({
+          sandboxId: this.sandboxId,
+          sessionId: route.sessionId,
+          anchorSessionId: anchor,
+        })
+        .warn('Optional Cloud Agent MCP grant unavailable; continuing without it');
+      return undefined;
     }
   }
 
@@ -2452,16 +4105,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   /** Fail one preparation attempt, fenced by attempt id (late mint failure). */
-  private async failPrepareAttempt(sessionId: string, attemptId: string): Promise<void> {
+  private async failPrepareAttempt(
+    sessionId: string,
+    attemptId: string,
+    stage = 'prepare_dispatch_failed',
+    reason: ControlPlaneFailureReason = 'workspace_setup_failed'
+  ): Promise<void> {
     await this.enqueue(async () => {
       const state = await this.readAllocation();
-      await failCurrentAttempt(
-        this.routeContext(state),
-        sessionId,
-        attemptId,
-        'workspace_setup_failed',
-        'prepare_dispatch_failed'
-      );
+      await failCurrentAttempt(this.routeContext(state), sessionId, attemptId, reason, stage);
     });
   }
 
@@ -2489,6 +4141,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
             return target.onRoute(notification.payload);
           case 'outcome':
             return target.onOutcome(notification.payload);
+          case 'worktree_changes':
+            return target.onWorktreeChangesReady(notification.payload).then(subscribed => {
+              // A deleted or moved session leaves; a later read subscribes it again.
+              if (subscribed === false) {
+                this.ctx.storage.kv.delete(
+                  worktreeSubscriberKey(notification.payload.worktreeId, sessionId)
+                );
+              }
+            });
         }
       },
       `notification.${notification.kind}`,
@@ -2558,62 +4219,50 @@ export class SandboxControlV2 extends DurableObject<Env> {
       try {
         const credential = generateSandboxCredential();
         await this.ctx.storage.put(CREDENTIAL_HASH_KEY, await hashSandboxCredential(credential));
-        const launchEnv = await this.wrapperLaunchEnv(credential, allocationId);
         const pin = this.providerPin ?? this.defaultPin('cloudflare');
+        const selection = selectStartup(this.env, pin.provider, {
+          preparingRoutes: (await listRoutes(this.db))
+            .filter(route => route.state === 'preparing')
+            .map(route => ({
+              createdOnPlatform: route.credentialSource?.createdOnPlatform,
+              orgId: route.credentialSource?.orgId,
+            })),
+          sandboxKind: pin.sandboxKind,
+          sandboxId: this.sandboxId,
+        });
         const createDeadline =
           state.createDeadlineAt ?? Date.now() + this.sandboxTimers().providerCreateMs;
-        if (pin.provider === 'vercel') {
-          let admission: 'admitted' | 'blocked' | 'unavailable' | 'retry' = 'retry';
-          let admissionRejected = false;
-          let priorGeneration: string | undefined;
-          let admissionStarted = false;
-          try {
-            priorGeneration = (await getBillingContext(this.ctx.storage))?.generation;
-            admissionStarted = true;
-            admission = await withTimeout(
-              this.admitVercelCreate(pin).catch((error: unknown) => {
-                admissionRejected = true;
-                throw error;
-              }),
-              Math.min(remainingMs(createDeadline), this.sandboxTimers().providerStopAttemptMs),
-              'Vercel billing admission timed out'
-            );
-          } catch {
-            let safeShadow = false;
-            if (priorGeneration === undefined) {
-              try {
-                safeShadow = await this.admitShadowAfterVercelBillingException(pin);
-              } catch {
-                safeShadow = false;
-              }
-            }
-            admission = safeShadow
-              ? 'admitted'
-              : admissionStarted && !admissionRejected
-                ? 'retry'
-                : 'unavailable';
-            logger
-              .withFields({ sandboxId: this.sandboxId })
-              .warn('Vercel billing admission failed');
-          }
-          if (admission !== 'admitted') {
-            await this.failCreationRoutes(
-              allocationId,
-              admission === 'retry',
-              admission === 'blocked' ? 'billing_blocked' : 'billing_unavailable'
-            );
-            return;
-          }
+        const startupCommand =
+          selection.mode === 'preinstalled'
+            ? preinstalledStartup()
+            : await withTimeout(
+                downloadedStartup({
+                  env: this.env,
+                  descriptor: selection.descriptor,
+                  sandboxId: this.sandboxId,
+                  allocationId,
+                  deadlineAt: createDeadline + this.sandboxTimers().wrapperFirstConnectMs,
+                }),
+                remainingMs(createDeadline),
+                'Runtime preflight timed out'
+              );
+        const launchEnv = await this.wrapperLaunchEnv(credential, allocationId, pin.provider);
+        if (pin.billing) {
+          await assertContainerCapacity(this.env, {
+            subject: pin.billing.subject,
+            actor: pin.billing.actor,
+            instanceId: pin.billing.sandboxId,
+            checkpoint: 'control-plane-create',
+            billingOrigin: pin.billing.metadata?.origin,
+          });
         }
+
         const intent: ProviderCreateIntent = {
           intentId: allocationId,
           createdAt: Date.now(),
           allocationName: pin.allocationName ?? this.sandboxId,
           containment: this.resolvedContainment(),
           ...(pin.billing === null ? {} : { billing: pin.billing }),
-          ...(pin.provider === 'vercel'
-            ? { networkPolicy: buildControlNetworkPolicy(await this.activeGrants(Date.now())) }
-            : {}),
         };
         // N2: create and launch share one bound (the create deadline).
         const created = await withTimeout(
@@ -2632,9 +4281,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
             const containerInstanceId =
               pin.provider === 'cloudflare-containers'
                 ? this.env.SANDBOX_CONTAINERS.idFromName(this.sandboxId).toString()
-                : getOutboundContainerId(this.env, intent.allocationName ?? this.sandboxId, {
-                    managedScmContainment: this.credentialContainmentEnabled(),
-                  });
+                : this.sandboxNamespace(
+                    pin,
+                    intent.allocationName ?? this.sandboxId,
+                    this.credentialContainmentEnabled()
+                  )
+                    .idFromName(intent.allocationName ?? this.sandboxId)
+                    .toString();
             logControlDiagnostic('container_launch_identity', {
               sandboxId: this.sandboxId,
               allocationId,
@@ -2654,17 +4307,91 @@ export class SandboxControlV2 extends DurableObject<Env> {
         });
         const current = await this.readAllocation();
         if (current.kind !== 'creating' || current.allocationId !== allocationId) {
-          const confirmed = await this.stopRef(createdRef, allocationId);
-          if (pin.provider === 'vercel')
-            await this.settleStoppedCreatedVercelRef(createdRef, confirmed);
+          await this.stopRef(createdRef, allocationId);
           return;
         }
         const launchDeadline = current.createDeadlineAt ?? createDeadline;
-        await withTimeout(
-          this.provider.launch(createdRef, launchEnv),
+        const launch = await this.environmentSnapshotLaunch(current, allocationId, launchDeadline);
+        // Persist a placeholder before the launch so a `hello` accepted while it
+        // runs confirms this allocation, and that confirmation outlives the
+        // allocation stopping before the launch resolves.
+        await beginRepositoryLaunch(this.ctx.storage, allocationId, launch.skipped, selection.mode);
+        if (Date.now() >= launchDeadline) throw new Error('Sandbox launch timed out');
+        const launchOptions: ProviderLaunchOptions = {
+          ...launch.options,
+          ...(pin.provider === 'cloudflare-containers'
+            ? { deadlineAt: launchDeadline, nativeImage: selection.image }
+            : {}),
+        };
+        let launched = await withTimeout(
+          this.provider.launch(
+            createdRef,
+            { command: startupCommand, env: launchEnv },
+            launchOptions
+          ),
           remainingMs(launchDeadline),
           'Sandbox launch timed out'
         );
+        if (launched.snapshotFailed) {
+          const imageCredential = generateSandboxCredential();
+          const imageLaunchEnv = await this.wrapperLaunchEnv(
+            imageCredential,
+            allocationId,
+            pin.provider
+          );
+          const imageCredentialHash = await hashSandboxCredential(imageCredential);
+          const ownsCleanup = await this.enqueue(async () => {
+            const latest = await this.readAllocation();
+            if (latest.kind !== 'creating' || latest.allocationId !== allocationId) return false;
+            if (Date.now() >= launchDeadline) throw new Error('Sandbox launch timed out');
+            await this.ctx.storage.put(CREDENTIAL_HASH_KEY, imageCredentialHash);
+            return true;
+          });
+          if (!ownsCleanup) {
+            await this.recordLaunch(allocationId, launched.startSource);
+            return;
+          }
+          if (Date.now() >= launchDeadline) throw new Error('Sandbox launch timed out');
+          const confirmed = await withTimeout(
+            this.stopRef(createdRef, allocationId),
+            remainingMs(launchDeadline),
+            'Sandbox cleanup stop timed out'
+          );
+          if (!confirmed) throw new Error('Sandbox snapshot cleanup failed');
+          const afterCleanup = await this.readAllocation();
+          if (afterCleanup.kind !== 'creating' || afterCleanup.allocationId !== allocationId)
+            return;
+          if (Date.now() >= launchDeadline) throw new Error('Sandbox launch timed out');
+          logControlDiagnostic('snapshot_fallback', {
+            sandboxId: this.sandboxId,
+            allocationId,
+            reason: 'repository_start_failed',
+          });
+          await notifyPreparingRoutes(this.routeContext(afterCleanup), {
+            step: 'snapshot_fallback',
+            detail: 'Snapshot startup failed. Retrying without a snapshot.',
+          });
+          await notifyPreparingRoutes(this.routeContext(afterCleanup), {
+            step: 'sandbox_start',
+            detail: 'Starting sandbox without a snapshot',
+          });
+          launched = await withTimeout(
+            this.provider.launch(
+              createdRef,
+              { command: startupCommand, env: imageLaunchEnv },
+              {
+                deadlineAt: launchDeadline,
+                ...(pin.provider === 'cloudflare-containers'
+                  ? { nativeImage: selection.image }
+                  : {}),
+              }
+            ),
+            remainingMs(launchDeadline),
+            'Sandbox launch timed out'
+          );
+          if (launched.snapshotFailed) throw new Error('Sandbox image launch failed');
+        }
+        await this.recordLaunch(allocationId, launched.startSource);
         await this.dispatchResult({
           type: 'created',
           at: Date.now(),
@@ -2672,6 +4399,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
           providerRef: createdRef,
         });
       } catch (error) {
+        if (error instanceof ByocVercelProviderError) {
+          await this.failCreationRoutes(allocationId, false, error.reason);
+          return;
+        }
         logControlDiagnostic(
           'create_failed',
           {
@@ -2684,6 +4415,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
           },
           'warn'
         );
+        const capacityFailure = getContainerCapacityFailureReason(error);
+        if (capacityFailure) {
+          await this.failCreationRoutes(allocationId, false, capacityFailure);
+          return;
+        }
         if (error instanceof ProviderCreationError && error.permanentReason !== null) {
           await this.failCreationRoutes(allocationId, false, error.permanentReason);
           return;
@@ -2694,16 +4430,195 @@ export class SandboxControlV2 extends DurableObject<Env> {
         if (createdRef !== null) {
           const latest = await this.readAllocation();
           if (latest.kind === 'creating' && latest.allocationId === allocationId) {
-            const confirmed = await this.stopRef(createdRef, allocationId);
-            if (this.currentProvider() === 'vercel')
-              await this.settleStoppedCreatedVercelRef(createdRef, confirmed);
+            await this.stopRef(createdRef, allocationId);
           }
         }
         await this.dispatchCreateFailed(allocationId);
       }
     } finally {
       this.createInFlight = false;
+      await this.enqueue(async () => {
+        await this.recoverRepositoryPreparationFailures();
+        const pending = await this.readAllocation();
+        // Stop may finish before this launch returns. Start again only after
+        // recordLaunch settles, without changing transient create retry pauses.
+        if (pending.kind === 'stopped' && (await routeRetryAllowed(this.routeContext(pending)))) {
+          await this.applyEvent({
+            type: 'ensure',
+            at: Date.now(),
+            allocationId: crypto.randomUUID(),
+          });
+        }
+      });
     }
+  }
+
+  /**
+   * Environment snapshot selection for one new allocation (plan "Session
+   * launch"). It runs off the serial queue inside the create, bounded at 15
+   * seconds and by the launch deadline. It may admit a background build but
+   * never waits for one; any miss is an ordinary start from the image. The
+   * previous start of this sandbox failing from a snapshot makes this one
+   * fresh, once.
+   */
+  private async environmentSnapshotLaunch(
+    state: AllocationState,
+    allocationId: string,
+    launchDeadlineAt: number
+  ): Promise<{ options: ProviderLaunchOptions; skipped: boolean }> {
+    const routes = await listRoutes(this.db);
+    const selected = environmentLaunchCandidate(routes);
+    const log = (fields: Record<string, string | number | boolean | undefined>) =>
+      logControlDiagnostic('snapshot_launch', {
+        sandboxId: this.sandboxId,
+        allocationId,
+        ...fields,
+      });
+    if (this.provider.environmentSnapshots !== true) {
+      log({ reason: 'provider_no_snapshots' });
+      return { options: {}, skipped: false };
+    }
+    if (!('candidate' in selected)) {
+      log({ reason: selected.reason });
+      return { options: {}, skipped: false };
+    }
+    const { candidate } = selected;
+    if (previousSnapshotStartFailed(await readRepositoryLaunch(this.ctx.storage))) {
+      log({ reason: 'previous_snapshot_start_failed', skip: true });
+      await notifyPreparingRoutes(this.routeContext(state), {
+        step: 'snapshot_fallback',
+        detail: 'Previous snapshot startup failed. Retrying without a snapshot.',
+      });
+      return { options: {}, skipped: true };
+    }
+    const lookup = await lookupEnvironmentSnapshot({
+      namespace: this.env.ENVIRONMENT_BUILD,
+      candidate,
+      launchDeadlineAt,
+    });
+    const snapshot = lookup.kind === 'resolved' ? snapshotStart(lookup.resolution) : undefined;
+    log({
+      reason: lookup.kind === 'resolved' ? lookup.resolution.reason : lookup.kind,
+      admission: lookup.kind === 'resolved' ? lookup.resolution.admission.status : undefined,
+      sessionRevision: candidate.reference.configurationRevision,
+      snapshotRevision:
+        lookup.kind === 'resolved'
+          ? (lookup.resolution.snapshot?.revision ?? undefined)
+          : undefined,
+      stale:
+        lookup.kind === 'resolved' ? (lookup.resolution.snapshot?.stale ?? undefined) : undefined,
+    });
+    // Its own step: the later `sandbox_start` progress would replace this
+    // detail, and the completed timeline keeps each step's last detail.
+    await notifyPreparingRoutes(this.routeContext(state), {
+      step: 'environment_snapshot',
+      detail: environmentStartDetail(candidate.reference, lookup),
+    });
+    return { options: snapshot === undefined ? {} : { snapshot }, skipped: false };
+  }
+
+  /**
+   * Remember how this allocation's container started. A wrapper that connected
+   * while a slow launch was still returning has already confirmed the start
+   * through the placeholder `beginRepositoryLaunch` wrote, so keep that
+   * confirmation even if the allocation has since stopped.
+   *
+   * Emits one `snapshot_start` diagnostic per allocation so `image` vs
+   * `repository` is durable evidence of whether a snapshot was actually used.
+   */
+  private async recordLaunch(
+    allocationId: string,
+    startSource: ProviderStartSource
+  ): Promise<void> {
+    await this.enqueue(async () => {
+      const state = await this.readAllocation();
+      const connected =
+        state.allocationId === allocationId &&
+        (state.kind === 'connected' || state.kind === 'disconnected');
+      const existing = await readRepositoryLaunch(this.ctx.storage);
+      if (existing?.allocationId !== allocationId) return;
+      const confirmed = connected || existing.confirmed;
+      await recordRepositoryLaunch(this.ctx.storage, {
+        allocationId,
+        startSource,
+        startupMode: existing.startupMode ?? 'preinstalled',
+        confirmed,
+        ...(existing.preparationFailures === undefined
+          ? {}
+          : { preparationFailures: existing.preparationFailures }),
+      });
+      logControlDiagnostic('snapshot_start', {
+        sandboxId: this.sandboxId,
+        allocationId,
+        source: startSource,
+        confirmed,
+      });
+    });
+  }
+
+  private async recoverRepositoryPreparationFailures(): Promise<void> {
+    if (this.createInFlight) return;
+    const state = await this.readAllocation();
+    if (state.kind !== 'connected' && state.kind !== 'disconnected') return;
+    const launch = await readRepositoryLaunch(this.ctx.storage);
+    if (launch?.allocationId !== state.allocationId) return;
+    for (const failure of launch.preparationFailures ?? []) {
+      const route = await readRoute(this.db, failure.sessionId);
+      if (!isCurrentPreparingAttempt(route, failure.attemptId)) continue;
+      if (await this.retryRepositoryPreparation(state, failure)) return;
+      await onRouteFailed(
+        this.routeContext(state),
+        failure.sessionId,
+        'workspace_setup_failed',
+        failure.subtype,
+        true
+      );
+    }
+  }
+
+  private async retryRepositoryPreparation(
+    state: AllocationState,
+    failure: RepositoryPreparationFailure
+  ): Promise<boolean> {
+    const launch = await readRepositoryLaunch(this.ctx.storage);
+    if (launch === undefined || launch.allocationId !== state.allocationId) return false;
+    if (launch.startSource === 'image' || launch.skipRepository === true) return false;
+    const routes = await listRoutes(this.db);
+    const route = routes.find(candidate => candidate.sessionId === failure.sessionId);
+    if (
+      route === undefined ||
+      !isCurrentPreparingAttempt(route, failure.attemptId) ||
+      route.environment === null ||
+      route.attemptDeadlineAt <= Date.now() ||
+      routes.some(candidate => candidate.state === 'ready')
+    )
+      return false;
+    const preparationFailures = launch.preparationFailures ?? [];
+    if (
+      !preparationFailures.some(
+        candidate =>
+          candidate.sessionId === failure.sessionId && candidate.attemptId === failure.attemptId
+      )
+    ) {
+      await recordRepositoryLaunch(this.ctx.storage, {
+        ...launch,
+        preparationFailures: [...preparationFailures, failure],
+      });
+    }
+    if (this.createInFlight) return true;
+    logControlDiagnostic('snapshot_fallback', {
+      sandboxId: this.sandboxId,
+      allocationId: state.allocationId,
+      sessionId: failure.sessionId,
+      reason: 'repository_preparation_failed',
+      subtype: failure.subtype,
+    });
+    await this.applyEvent({
+      type: 'stop-requested',
+      at: Date.now(),
+      reason: 'workspace_setup_failed',
+    });
+    return true;
   }
 
   private async dispatchCreateFailed(allocationId: string): Promise<void> {
@@ -2729,34 +4644,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       result,
     });
     return result === 'terminal';
-  }
-
-  private async settleStoppedCreatedVercelRef(ref: string, confirmed: boolean): Promise<void> {
-    const context = await getBillingContext(this.ctx.storage);
-    if (context === undefined) return;
-    const binding = await loadVercelBillingBinding(this.ctx.storage, context.generation);
-    if (binding?.providerRef !== ref) return;
-    if (!confirmed && binding.terminalAtMs === undefined) {
-      const allocation = await this.readAllocation();
-      await this.billingSchedule.schedule(
-        VERCEL_BILLING_SETTLEMENT_CALLBACK,
-        Date.now() +
-          (allocation.kind === 'stopped'
-            ? DEFAULT_BILLING_HEARTBEAT_SECONDS * 1_000
-            : VERCEL_BILLING_DELIVERY_RETRY_MS),
-        context.generation
-      );
-      return;
-    }
-    const terminalAtMs =
-      binding.terminalAtMs ?? Math.max(binding.createdAtMs, context.usageMeasuredAtMs);
-    if (binding.terminalAtMs === undefined) {
-      await saveVercelBillingBinding(this.ctx.storage, { ...binding, terminalAtMs });
-    }
-    await (
-      await this.ensureVercelBillingRuntime()
-    )?.heartbeat.persistStop({ reason: 'runtime_signal' }, terminalAtMs);
-    await this.prepareVercelSettlement(context.generation);
   }
 
   private async runStop(stopAttempt: number): Promise<void> {
@@ -2825,7 +4712,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private async revokeWorktreeRoutes(sessionIds: readonly string[]): Promise<void> {
     for (const sessionId of sessionIds) {
       this.notifications.retire(sessionId);
-      await deleteRoute(this.db, sessionId);
+      await deleteRoute(this.db, this.ctx.storage.kv, sessionId);
     }
   }
 
@@ -2900,8 +4787,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
     await this.enqueue(() => this.applyEvent(event));
   }
 
-  // --- wrapper socket ---------------------------------------------------------
-
   private readAttachment(ws: WebSocket): WrapperSocketAttachment | null {
     const parsed = wrapperSocketAttachmentSchema.safeParse(ws.deserializeAttachment());
     return parsed.success ? parsed.data : null;
@@ -2926,6 +4811,10 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ws.close(1008, 'Hello timeout');
       }
     }
+  }
+
+  private async readWrapperBillingBlock(state: AllocationState): Promise<boolean> {
+    return (await this.provider.isBillingBlocked?.(state.providerRef)) ?? false;
   }
 
   private async handleFrame(ws: WebSocket, message: string | ArrayBuffer): Promise<void> {
@@ -2970,6 +4859,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ws.close(1008, 'shutdown');
         return;
       }
+      if (
+        !acceptRuntimeContract(
+          this.ctx.storage.kv,
+          frame.allocationId,
+          attachment?.runtimeCapability
+        )
+      ) {
+        this.sendFrame(ws, { type: 'shutdown', reason: 'hello_rejected' });
+        ws.close(1008, 'Runtime contract mismatch');
+        return;
+      }
       const connectionId = crypto.randomUUID();
       this.releaseBoundSockets(ws, frame.allocationId);
       ws.serializeAttachment({
@@ -2977,7 +4877,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
         allocationId: frame.allocationId,
         connectionId,
         wrapperId: frame.wrapperId,
+        ...(attachment?.runtimeCapability
+          ? { runtimeCapability: attachment.runtimeCapability }
+          : {}),
         ...(frame.heartbeatAck ? { heartbeatAck: true } : {}),
+        ...(frame.redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
+        ...(frame.installsSkillsSh ? { installsSkillsSh: true } : {}),
+        ...(attachment?.workspaceConfiguration ? { workspaceConfiguration: true } : {}),
       });
       // Welcome first, then route effects: a re-prepared route resends
       // `session.prepare`, which must not arrive before the welcome.
@@ -2993,6 +4899,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         connectionId,
         wrapperId: frame.wrapperId,
       });
+      await confirmRepositoryLaunch(this.ctx.storage, frame.allocationId);
       return;
     }
 
@@ -3007,22 +4914,49 @@ export class SandboxControlV2 extends DurableObject<Env> {
       return;
     }
 
-    if (frame.type === 'heartbeat') {
-      if (
-        !connectionMatches(
-          await this.readAllocation(),
-          attachment.allocationId,
-          attachment.connectionId
-        )
-      )
+    const currentState = await this.readAllocation();
+    const current = connectionMatches(
+      currentState,
+      attachment.allocationId,
+      attachment.connectionId
+    );
+    const now = Date.now();
+    if (current && now - (attachment.billingCheckedAt ?? 0) >= WRAPPER_BILLING_CHECK_MS) {
+      const blocked = await withTimeout(
+        this.readWrapperBillingBlock(currentState),
+        this.billingReadTimeoutMs(),
+        'Sandbox billing state read timed out'
+      ).catch(() => false);
+      if (blocked) {
+        await this.applyEvent({ type: 'stop-requested', at: now, reason: 'billing_blocked' });
+        this.settlePendingForSocket(
+          ws,
+          controlRequestFailure('not_ready', 'Wrapper disconnected', true)
+        );
+        ws.close(4402, 'Container billing blocked');
         return;
+      }
+      ws.serializeAttachment({ ...attachment, billingCheckedAt: now });
+    }
+
+    if (frame.type === 'heartbeat') {
+      const state = currentState;
+      if (!connectionMatches(state, attachment.allocationId, attachment.connectionId)) return;
+      const at = Date.now();
       await this.applyEvent({
         type: 'heartbeat',
-        at: Date.now(),
+        at,
         allocationId: attachment.allocationId,
         connectionId: attachment.connectionId,
         active: frame.active,
       });
+      if (
+        !frame.active &&
+        state.lastActivityAt !== null &&
+        at >= state.lastActivityAt + this.sandboxIdleTimeoutMs(state)
+      ) {
+        await this.applyEvent({ type: 'stop-requested', at, reason: 'sandbox_stopped' });
+      }
       if (
         attachment.heartbeatAck &&
         connectionMatches(
@@ -3043,12 +4977,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
     // to the session.
     // A superseded socket can stay open (the DO does not close it on
     // `stopping`), so only the current connection may move a route or forward.
-    const currentState = await this.readAllocation();
-    const current = connectionMatches(
-      currentState,
-      attachment.allocationId,
-      attachment.connectionId
-    );
     const ctx = this.routeContext(currentState);
     switch (frame.type) {
       case 'session.progress':
@@ -3063,7 +4991,30 @@ export class SandboxControlV2 extends DurableObject<Env> {
         );
         return;
       case 'session.ready':
+        if (frame.workspace !== undefined) {
+          logger
+            .withFields({ sessionId: frame.sessionId, workspace: frame.workspace })
+            .info('Control-plane workspace ready');
+        }
+        // Reconcile credentials for an adopted route that missed a fanout before
+        // it is published ready. This handler already runs on the serial queue,
+        // so a rotation cannot land between the resend and the transition.
+        if (current) {
+          await this.ensureRouteCredentialsCurrent(frame.sessionId, currentState);
+        }
         await onRouteReady(ctx, frame.sessionId, current);
+        return;
+      case 'workspace.capture':
+        // Sessions never capture. A wrapper started before this change may
+        // still ask; it gets an immediate answer instead of waiting out its
+        // backstop.
+        if (current) {
+          this.trySendFrame(ws, {
+            type: 'workspace.captured',
+            sessionId: frame.sessionId,
+            ok: false,
+          });
+        }
         return;
       case 'session.failed':
         logger
@@ -3074,6 +5025,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
             ...(frame.subtype === undefined ? {} : { subtype: frame.subtype }),
           })
           .warn('Control-plane prepare failed');
+        if (current && frame.reason === 'workspace_setup_failed') {
+          const route = await readRoute(this.db, frame.sessionId);
+          if (
+            route?.state === 'preparing' &&
+            (await this.retryRepositoryPreparation(currentState, {
+              sessionId: frame.sessionId,
+              attemptId: route.attemptId,
+              ...(frame.subtype === undefined ? {} : { subtype: frame.subtype }),
+            }))
+          )
+            return;
+        }
         await onRouteFailed(ctx, frame.sessionId, frame.reason, frame.subtype, current);
         return;
       case 'session.events':
@@ -3128,6 +5091,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
       logControlDiagnostic('hello_admission', { ...admission, accepted: false, reason, ...extra });
       return false;
     };
+    if (this.currentProvider() === 'vercel' && this.providerPin?.byoc === undefined)
+      return reject('byoc_credential_missing');
     if (state.kind === 'stopped' || state.kind === 'stopping') {
       return reject(`allocation_${state.kind}`);
     }
@@ -3152,7 +5117,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   private async wrapperLaunchEnv(
     credential: string,
-    allocationId: string
+    allocationId: string,
+    provider: AgentSandboxProvider
   ): Promise<Record<string, string>> {
     const signingSecret = await withTimeout(
       resolveSecret(this.env.NEXTAUTH_SECRET),
@@ -3170,128 +5136,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ...buildControlWrapperLaunchEnv({
         workerUrl: this.env.WORKER_URL,
         sandboxId: this.sandboxId,
+        provider,
         credential: launchCredential,
         diagnostics: { allocationId, signingSecret },
         ...(typeof workloadCgroup === 'string' ? { workloadCgroup } : {}),
       }),
       [CONTROL_PLANE_ALLOCATION_ID_ENV]: allocationId,
     };
-  }
-
-  private async admitVercelCreate(
-    pin: StoredProviderPin
-  ): Promise<'admitted' | 'blocked' | 'unavailable' | 'retry'> {
-    const existing = await getBillingContext(this.ctx.storage);
-    if (existing !== undefined) {
-      await this.billingSchedule.ensure(
-        VERCEL_BILLING_SETTLEMENT_CALLBACK,
-        Date.now() + DEFAULT_BILLING_HEARTBEAT_SECONDS * 1_000,
-        existing.generation
-      );
-      await this.prepareVercelSettlement(existing.generation);
-      return 'retry';
-    }
-    const billing = pin.billing;
-    const owner = await this.requireOwner();
-    if (billing === null) {
-      return owner !== null && !isCloudAgentContainerBillingEnabled(this.env, { userId: owner })
-        ? 'admitted'
-        : 'unavailable';
-    }
-    if (billing.sandboxId !== this.sandboxId) return 'unavailable';
-    if (
-      owner === null ||
-      (billing.subject.type === 'user' && billing.subject.id !== owner) ||
-      (billing.actor.type === 'user' && billing.actor.id !== owner)
-    )
-      return 'unavailable';
-    const enforced =
-      billing.enforcementRequested === true ||
-      isCloudAgentContainerBillingEnabled(this.env, {
-        userId: owner,
-        ...(billing.subject.type === 'org' ? { orgId: billing.subject.id } : {}),
-      });
-    const runtime = await this.ensureVercelBillingRuntime();
-    if (runtime?.identity === undefined) return 'unavailable';
-    try {
-      assertSandboxBillingAllocation(runtime.identity.sandboxClassName, billing);
-    } catch {
-      return 'unavailable';
-    }
-    const outcome = await runtime.lifecycle.openIntervalBeforeCreate(runtime.identity, {
-      ...billing,
-      enforcementRequested: enforced,
-    });
-    await this.billingSchedule.ensure(
-      VERCEL_BILLING_SETTLEMENT_CALLBACK,
-      Date.now() + DEFAULT_BILLING_HEARTBEAT_SECONDS * 1_000,
-      outcome.generation
-    );
-    if (outcome.kind === 'acked') return 'admitted';
-    if (outcome.kind === 'definite_rejection') {
-      await clearBillingContext(this.ctx.storage);
-      await deleteVercelBillingBinding(this.ctx.storage, outcome.generation);
-      await this.billingSchedule.remove(VERCEL_BILLING_SETTLEMENT_CALLBACK, outcome.generation);
-      return enforced &&
-        outcome.error instanceof ContainerUsageAdmissionError &&
-        outcome.error.code === 'insufficient_credits'
-        ? 'blocked'
-        : enforced
-          ? 'unavailable'
-          : 'admitted';
-    }
-    if (!enforced) return 'admitted';
-    await this.prepareVercelSettlement(outcome.generation);
-    return 'retry';
-  }
-
-  private async admitShadowAfterVercelBillingException(pin: StoredProviderPin): Promise<boolean> {
-    const billing = pin.billing;
-    const owner = await this.requireOwner();
-    const resources =
-      pin.configuration?.provider === 'vercel' ? pin.configuration.resources : undefined;
-    if (
-      billing === null ||
-      owner === null ||
-      resources === undefined ||
-      billing.enforcementRequested ||
-      billing.sandboxId !== this.sandboxId ||
-      (billing.subject.type === 'user' && billing.subject.id !== owner) ||
-      (billing.actor.type === 'user' && billing.actor.id !== owner) ||
-      isCloudAgentContainerBillingEnabled(this.env, {
-        userId: owner,
-        ...(billing.subject.type === 'org' ? { orgId: billing.subject.id } : {}),
-      })
-    )
-      return false;
-    let identity: VercelBillingIdentity;
-    try {
-      identity = vercelBillingIdentity(resources);
-      assertSandboxBillingAllocation(identity.className, billing);
-    } catch {
-      return false;
-    }
-    const context = await getBillingContext(this.ctx.storage);
-    if (
-      context === undefined ||
-      context.pendingStop !== undefined ||
-      context.measurementStarted ||
-      context.instanceId !== this.sandboxId ||
-      context.service !== identity.service ||
-      context.sku !== identity.sku ||
-      context.subject.type !== billing.subject.type ||
-      context.subject.id !== billing.subject.id ||
-      context.actor.type !== billing.actor.type ||
-      context.actor.id !== billing.actor.id ||
-      (await loadVercelBillingBinding(this.ctx.storage, context.generation)) !== undefined
-    )
-      return false;
-    await this.billingSchedule.ensure(
-      VERCEL_BILLING_SETTLEMENT_CALLBACK,
-      Date.now() + DEFAULT_BILLING_HEARTBEAT_SECONDS * 1_000,
-      context.generation
-    );
-    return true;
   }
 
   private async failCreationRoutes(
@@ -3329,408 +5180,58 @@ export class SandboxControlV2 extends DurableObject<Env> {
     });
   }
 
-  private async recordVercelBillingLifetime(evidence: {
-    providerRef: string;
-    createdAtMs?: number;
-    terminalAtMs?: number;
-  }): Promise<void> {
-    const context = await getBillingContext(this.ctx.storage);
-    if (context === undefined) return;
-    const existing = await loadVercelBillingBinding(this.ctx.storage, context.generation);
-    if (existing !== undefined && existing.providerRef !== evidence.providerRef) return;
-    const allocation = await this.readAllocation();
-    if (allocation.providerRef !== null) {
-      if (allocation.providerRef !== evidence.providerRef) return;
-    } else {
-      if (
-        allocation.kind === 'stopped' ||
-        existing !== undefined ||
-        evidence.createdAtMs === undefined
-      )
-        return;
-      const decoded = decodeVercelProviderRef(evidence.providerRef);
-      if (decoded?.sandboxName !== (this.providerPin?.allocationName ?? this.sandboxId)) return;
-    }
-    const createdAtMs = evidence.createdAtMs ?? existing?.createdAtMs;
-    if (createdAtMs === undefined) return;
-    const terminalAtMs = evidence.terminalAtMs ?? existing?.terminalAtMs;
-    if (existing?.createdAtMs === createdAtMs && existing.terminalAtMs === terminalAtMs) return;
-    await saveVercelBillingBinding(this.ctx.storage, {
-      generation: context.generation,
-      providerRef: evidence.providerRef,
-      createdAtMs,
-      ...(terminalAtMs === undefined ? {} : { terminalAtMs }),
-    });
-    if (terminalAtMs !== undefined) await this.prepareVercelSettlement(context.generation);
-  }
-
-  private async afterVercelBillingTransition(event: AllocationEvent): Promise<void> {
-    const context = await getBillingContext(this.ctx.storage);
-    if (context === undefined) return;
-    const binding = await loadVercelBillingBinding(this.ctx.storage, context.generation);
-    const state = await this.readAllocation();
-    if (
-      state.kind === 'stopped' &&
-      binding !== undefined &&
-      binding.terminalAtMs === undefined &&
-      !context.pendingStop &&
-      event.type !== 'provider-gone' &&
-      !(event.type === 'stop-result' && event.confirmed)
-    ) {
-      await this.billingSchedule.schedule(
-        VERCEL_BILLING_SETTLEMENT_CALLBACK,
-        Date.now() + VERCEL_BILLING_DELIVERY_RETRY_MS,
-        context.generation
-      );
-      return;
-    }
-    if (state.kind === 'stopped' && !context.pendingStop) {
-      await (
-        await this.ensureVercelBillingRuntime()
-      )?.heartbeat.persistStop(
-        { reason: 'runtime_signal' },
-        binding?.terminalAtMs ?? context.usageMeasuredAtMs
-      );
-    }
-    if (context.pendingStop || binding?.terminalAtMs !== undefined || state.kind === 'stopped') {
-      await this.prepareVercelSettlement(context.generation);
-    } else if (
-      binding !== undefined &&
-      !context.measurementStarted &&
-      (state.kind === 'starting' || state.kind === 'connected' || state.kind === 'disconnected')
-    ) {
-      await (
-        await this.ensureVercelBillingRuntime()
-      )?.lifecycle.pinMeasurementCursor(context.generation, binding.createdAtMs);
-    }
-  }
-
-  private async prepareVercelSettlement(generation: string): Promise<void> {
-    const runtime = await this.ensureVercelBillingRuntime();
-    if (runtime === undefined) return;
-    await runtime.billing.prepareSettlement({ generation });
-  }
-
-  private async runBillingAlarm(): Promise<void> {
-    for (const entry of await this.billingSchedule.dueEntries()) {
-      const generation = typeof entry.payload === 'string' ? entry.payload : null;
-      if (generation === null) {
-        await this.billingSchedule.completeDue(entry);
-        continue;
-      }
-      const context = await getBillingContext(this.ctx.storage);
-      if (context?.generation !== generation) {
-        await this.billingSchedule.completeDue(entry);
-        await deleteVercelBillingBinding(this.ctx.storage, generation);
-        continue;
-      }
-      const runtime = await this.ensureVercelBillingRuntime();
-      if (runtime === undefined) {
-        await this.deferVercelBilling(generation, entry.callback);
-        continue;
-      }
-      if (entry.callback === VERCEL_BILLING_FORCE_STOP_CALLBACK) {
-        if (runtime.identity === undefined) {
-          await this.deferVercelBilling(generation, entry.callback);
-          continue;
-        }
-        try {
-          await runtime.lifecycle.billingForceStop(runtime.identity, generation);
-          if ((await this.readAllocation()).kind === 'stopped') {
-            await this.billingSchedule.completeDue(entry);
-          } else {
-            await this.deferVercelBilling(generation, entry.callback);
-          }
-        } catch {
-          await this.deferVercelBilling(generation, entry.callback);
-        }
-        continue;
-      }
-      if (entry.callback !== VERCEL_BILLING_SETTLEMENT_CALLBACK) {
-        await this.billingSchedule.completeDue(entry);
-        continue;
-      }
-      const binding = await loadVercelBillingBinding(this.ctx.storage, generation);
-      const state = await this.readAllocation();
-      if (
-        (state.kind === 'stopped' || (state.kind === 'creating' && !this.createInFlight)) &&
-        binding !== undefined &&
-        binding.terminalAtMs === undefined &&
-        !context.pendingStop
-      ) {
-        const observation = await withTimeout(
-          this.provider.observe(binding.providerRef),
-          this.sandboxTimers().providerStopAttemptMs,
-          'Sandbox billing cleanup observation timed out'
-        ).catch(() => ({ status: 'unknown' as const }));
-        const confirmed =
-          observation.status === 'terminal' ||
-          (await this.stopRef(binding.providerRef, state.allocationId));
-        await this.settleStoppedCreatedVercelRef(binding.providerRef, confirmed);
-        if (
-          !confirmed &&
-          Date.now() >= context.startEpochMs + this.sandboxTimers().providerCreateMs
-        ) {
-          for (const route of await listRoutes(this.db)) {
-            if (route.state === 'preparing') {
-              await failCurrentAttempt(
-                this.routeContext(state),
-                route.sessionId,
-                route.attemptId,
-                'sandbox_lost',
-                'cleanup_unconfirmed'
-              );
-            }
-          }
-          if (state.kind === 'creating' && state.allocationId !== null) {
-            await this.applyEvent({
-              type: 'create-failed',
-              at: Date.now(),
-              allocationId: state.allocationId,
-              nextAllocationId: crypto.randomUUID(),
-              retryAllowed: false,
-            });
-          }
-        }
-        continue;
-      }
-      if (
-        context.pendingStop ||
-        binding?.terminalAtMs !== undefined ||
-        state.kind === 'stopped' ||
-        (state.kind === 'creating' &&
-          !this.createInFlight &&
-          binding === undefined &&
-          !context.measurementStarted)
-      ) {
-        if (this.vercelDeliveriesInFlight.has(generation)) {
-          await this.deferVercelBilling(generation, entry.callback);
-          continue;
-        }
-        this.vercelDeliveriesInFlight.add(generation);
-        await this.deferVercelBilling(generation, entry.callback);
-        this.ctx.waitUntil(
-          runtime.billing
-            .deliverSettlement(generation)
-            .catch(() => this.deferVercelBilling(generation, entry.callback))
-            .finally(() => this.vercelDeliveriesInFlight.delete(generation))
-        );
-      } else if (!context.measurementStarted) {
-        await this.billingSchedule.schedule(
-          entry.callback,
-          Date.now() + DEFAULT_BILLING_HEARTBEAT_SECONDS * 1_000,
-          generation
-        );
-      } else {
-        try {
-          await runtime.heartbeat.billingHeartbeatTick(generation);
-        } catch {
-          await this.deferVercelBilling(generation, entry.callback);
-        }
-      }
-    }
-  }
-
-  private async deferVercelBilling(generation: string, callback: string): Promise<void> {
-    await this.billingSchedule.deferRetry(
-      callback,
-      generation,
-      Date.now() + VERCEL_BILLING_DELIVERY_RETRY_MS
-    );
-  }
-
-  private async ensureVercelBillingRuntime(): Promise<typeof this.vercelBilling> {
-    if (
-      this.vercelBilling !== undefined &&
-      (await getBillingContext(this.ctx.storage)) === undefined
-    ) {
-      const resources =
-        this.providerPin?.configuration?.provider === 'vercel'
-          ? this.providerPin.configuration.resources
-          : undefined;
-      const className =
-        resources === undefined ? undefined : vercelBillingIdentity(resources).className;
-      if (this.vercelBilling.identity?.sandboxClassName !== className)
-        this.vercelBilling = undefined;
-    }
-    if (this.vercelBilling !== undefined) return this.vercelBilling;
-    if (this.vercelBillingBuild !== undefined) {
-      await this.vercelBillingBuild;
-      return this.vercelBilling;
-    }
-    const build = this.buildVercelBillingRuntime();
-    this.vercelBillingBuild = build;
-    try {
-      await build;
-    } finally {
-      if (this.vercelBillingBuild === build) this.vercelBillingBuild = undefined;
-    }
-    return this.vercelBilling;
-  }
-
-  private async buildVercelBillingRuntime(): Promise<void> {
-    const resources =
-      this.providerPin?.configuration?.provider === 'vercel'
-        ? this.providerPin.configuration.resources
-        : undefined;
-    const vercelIdentity = resources === undefined ? undefined : vercelBillingIdentity(resources);
-    const service = vercelIdentity?.service ?? (await getBillingContext(this.ctx.storage))?.service;
-    if (service === undefined) return;
-    const identity: BillingIdentity | undefined =
-      vercelIdentity === undefined ? undefined : { sandboxClassName: vercelIdentity.className };
-    const usageClient = createContainerUsageClient(this.env.CONTAINER_USAGE_METER, { service });
-    const schedule = (delaySeconds: number, callback: string, payload?: unknown) =>
-      this.billingSchedule.schedule(callback, Date.now() + delaySeconds * 1_000, payload);
-    const deleteSchedules = (callback: string) => {
-      if (callback !== VERCEL_BILLING_SETTLEMENT_CALLBACK)
-        void this.billingSchedule.remove(callback).catch(() => undefined);
-    };
-    const getState = () => this.vercelBillingContainerState();
-    const stopContainer = async () => {
-      const generation = (await getBillingContext(this.ctx.storage))?.generation;
-      this.ctx.waitUntil(
-        this.dispatchResult({
-          type: 'stop-requested',
-          at: Date.now(),
-          reason: 'billing_blocked',
-        }).catch(async () => {
-          if (generation !== undefined) {
-            await this.billingSchedule.schedule(
-              VERCEL_BILLING_FORCE_STOP_CALLBACK,
-              Date.now() + VERCEL_BILLING_DELIVERY_RETRY_MS,
-              generation
-            );
-          }
-        })
-      );
-    };
-    const lifecycle = new MeteredBillingLifecycle({
-      storage: this.ctx.storage,
-      usageClient,
-      schedule,
-      deleteSchedules,
-      getState,
-      isContainerRunning: () => false,
-      stopContainer,
-      destroyContainer: stopContainer,
-      durableObjectId: this.sandboxId,
-      waitUntil: promise => this.ctx.waitUntil(promise),
-    });
-    const heartbeat = installBillingHeartbeat(
-      { schedule, deleteSchedules, getState } as unknown as Parameters<
-        typeof installBillingHeartbeat
-      >[0],
-      {
-        client: usageClient,
-        storage: this.ctx.storage,
-        stopOnStoppedState: false,
-        deferBudgetStopFinalSettlement: true,
-        beforeHeartbeatDelivery: context => lifecycle.ensureStartAcknowledged(context),
-        beforeStopDelivery: context => lifecycle.ensureStartAcknowledged(context),
-        onGenerationClosed: context => this.vercelBilling?.billing.onGenerationClosed(context),
-        enforceBudgetStop: async (budget, expected) => {
-          if (identity === undefined) throw new Error('Vercel billing identity is unavailable');
-          await lifecycle.enforceBudgetStop(identity, budget, expected);
-        },
-        onBudgetWarning: async budget => {
-          if (identity !== undefined) await lifecycle.onBudgetWarning(identity, budget);
-        },
-      }
-    );
-    lifecycle.attachHeartbeat(heartbeat);
-    this.vercelBilling = {
-      identity,
-      lifecycle,
-      heartbeat,
-      billing: new VercelBilling({
-        storage: this.ctx.storage,
-        lifecycle,
-        heartbeat,
-        schedule: this.billingSchedule,
-      }),
-    };
-  }
-
-  private async vercelBillingContainerState(): Promise<{ status: string; lastChange?: number }> {
-    const context = await getBillingContext(this.ctx.storage);
-    if (context === undefined) return { status: 'running' };
-    const binding = await loadVercelBillingBinding(this.ctx.storage, context.generation);
-    if (binding?.terminalAtMs !== undefined)
-      return { status: 'stopped', lastChange: binding.terminalAtMs };
-    if (binding === undefined || this.currentProvider() !== 'vercel') return { status: 'running' };
-    try {
-      const observed = await this.provider.observe(binding.providerRef);
-      if (observed.status !== 'terminal') return { status: 'running' };
-      const refreshed = await loadVercelBillingBinding(this.ctx.storage, context.generation);
-      return {
-        status: 'stopped',
-        lastChange: refreshed?.terminalAtMs ?? context.usageMeasuredAtMs ?? binding.createdAtMs,
-      };
-    } catch {
-      return { status: 'running' };
-    }
-  }
-
-  // --- provider selection -----------------------------------------------------
-
   private createProviderAdapter(pin: StoredProviderPin): ProviderAdapter {
     const allocationName = pin.allocationName ?? this.sandboxId;
-    if (pin.provider === 'vercel') {
-      const resources =
-        pin.configuration?.provider === 'vercel' ? pin.configuration.resources : undefined;
-      const config = this.vercelConfig(pin.locator, resources);
-      return createVercelProviderAdapter({
-        sandboxName: allocationName,
-        config,
-        billingLifetimeSink: evidence => this.recordVercelBillingLifetime(evidence),
-      });
+    switch (pin.provider) {
+      case 'vercel': {
+        const resources =
+          pin.configuration?.provider === 'vercel' ? pin.configuration.resources : undefined;
+        if (pin.byoc) {
+          return createByocVercelProviderAdapter({
+            env: this.env,
+            source: pin.byoc,
+            sandboxName: allocationName,
+            resources,
+            locator: pin.locator,
+            // Authoritative live grants: read at create and on every credential
+            // refresh, never frozen into the adapter at construction.
+            readContainedGrants: () => this.activeGrants(Date.now()),
+            readAcceptedRuntimeProxyHandles: () =>
+              listAcceptedHandleStringsByScopeId(this.ctx.storage, Date.now()),
+          });
+        }
+        return unavailableVercelProviderAdapter();
+      }
+      case 'cloudflare-containers': {
+        const instance =
+          pin.configuration?.provider === 'cloudflare-containers'
+            ? pin.configuration.instance
+            : undefined;
+        return createCloudflareContainersProviderAdapter({
+          logicalSandboxId: this.sandboxId,
+          allocationName,
+          ...(instance === undefined ? {} : { instance }),
+          ...(pin.egressAllowlist === undefined ? {} : { egressAllowlist: pin.egressAllowlist }),
+          getContainer: id => this.env.SANDBOX_CONTAINERS.getByName(id),
+        });
+      }
+      case 'cloudflare':
+        return createCloudflareProviderAdapter({
+          sandboxId: allocationName,
+          billingContainment: this.credentialContainmentEnabled(),
+          getSandbox: (id, options) =>
+            getSandbox(this.sandboxNamespace(pin, id, options.containment), id),
+          destroy: (id, options) =>
+            forceDestroyControlPlaneSandbox(
+              this.sandboxNamespace(pin, id, options.containment).getByName(id)
+            ),
+        });
+      default: {
+        void (pin.provider satisfies never);
+        throw new ProviderCreationError('invalid_configuration');
+      }
     }
-    if (pin.provider === 'cloudflare-containers') {
-      const instance =
-        pin.configuration?.provider === 'cloudflare-containers'
-          ? pin.configuration.instance
-          : undefined;
-      return createCloudflareContainersProviderAdapter({
-        logicalSandboxId: this.sandboxId,
-        allocationName,
-        ...(instance === undefined ? {} : { instance }),
-        getContainer: id => this.env.SANDBOX_CONTAINERS.getByName(id),
-      });
-    }
-    return createCloudflareProviderAdapter({
-      sandboxId: allocationName,
-      getSandbox: (id, options) =>
-        getSandbox(
-          getSandboxNamespace(this.env, id, { managedScmContainment: options.containment }),
-          id
-        ),
-      destroy: (id, options) =>
-        forceDestroyControlPlaneSandbox(
-          getSandboxNamespace(this.env, id, {
-            managedScmContainment: options.containment,
-          }).getByName(id)
-        ),
-    });
   }
-
-  private vercelConfig(
-    locator: VercelProviderLocator | null,
-    resources: VercelSandboxResources | undefined
-  ) {
-    if (locator === null) {
-      return resolveVercelSandboxRuntimeConfig(this.env, { resources });
-    }
-    const resolved = resolveVercelSandboxRuntimeConfig(this.env, {
-      projectId: locator.projectId,
-      snapshotId: locator.snapshotId,
-      runtimeBuildId: locator.runtimeBuildId,
-      runtime: locator.runtime,
-      ...(resources === undefined ? {} : { resources }),
-    });
-    return resolved === undefined ? undefined : { ...resolved, teamId: locator.teamId };
-  }
-
-  // --- storage ----------------------------------------------------------------
 
   private async retryAllowed(): Promise<boolean> {
     return routeRetryAllowed(this.routeContext(await this.readAllocation()));
@@ -3749,12 +5250,69 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return rows[0] ?? null;
   }
 
-  private async writeAllocation(state: AllocationState): Promise<void> {
+  private async writeAllocation(state: AllocationState, previous?: AllocationState): Promise<void> {
     const row = stateToRow(state);
-    await this.db
-      .insert(allocationTable)
-      .values(row)
-      .onConflictDoUpdate({ target: allocationTable.id, set: row });
+    this.db.transaction(tx => {
+      tx.insert(allocationTable)
+        .values(row)
+        .onConflictDoUpdate({ target: allocationTable.id, set: row })
+        .run();
+      if (previous !== undefined && previous.allocationId !== state.allocationId) {
+        resetRuntimeContract(this.ctx.storage.kv, state.allocationId);
+      }
+    });
+    if (
+      previous?.kind === state.kind &&
+      previous.lastActivityAt === state.lastActivityAt &&
+      previous.unconfirmedProviderRef === state.unconfirmedProviderRef
+    )
+      return;
+    for (const socket of this.ctx.getWebSockets('sandbox-status')) {
+      const attachment: unknown = socket.deserializeAttachment();
+      if (
+        typeof attachment === 'object' &&
+        attachment !== null &&
+        'sessionId' in attachment &&
+        typeof attachment.sessionId === 'string'
+      )
+        this.sendStatusSnapshot(socket, attachment.sessionId, state);
+    }
+  }
+
+  private sendStatusSnapshot(socket: WebSocket, sessionId: string, state: AllocationState): void {
+    const snapshot = projectAllocationStatusSnapshot({
+      allocation: {
+        ...state,
+        provider: this.currentProvider(),
+        configuration: this.providerPin?.configuration ?? null,
+      },
+      observedAt: Date.now(),
+      inactivityTimeoutMs: this.sandboxIdleTimeoutMs(state),
+    });
+    try {
+      socket.send(
+        JSON.stringify({
+          eventId: 0,
+          executionId: '',
+          sessionId,
+          streamEventType: 'cloud.sandbox.status',
+          timestamp: new Date(snapshot.observedAt).toISOString(),
+          data: snapshot,
+        })
+      );
+    } catch {
+      socket.close(1011, 'Status delivery failed');
+    }
+  }
+
+  private isStatusSocket(socket: WebSocket): boolean {
+    const attachment: unknown = socket.deserializeAttachment();
+    return (
+      typeof attachment === 'object' &&
+      attachment !== null &&
+      'kind' in attachment &&
+      attachment.kind === 'sandbox-status'
+    );
   }
 
   private async readProviderPin(): Promise<StoredProviderPin | null> {
@@ -3764,11 +5322,24 @@ export class SandboxControlV2 extends DurableObject<Env> {
       .where(eq(allocationTable.id, ALLOCATION_ROW_ID));
     const raw = rows[0]?.pin;
     if (typeof raw !== 'string') return null;
+    let pin: StoredProviderPin;
     try {
-      return JSON.parse(raw) as StoredProviderPin;
+      pin = JSON.parse(raw) as StoredProviderPin;
     } catch {
       return null;
     }
+    if (pin.egressAllowlist !== undefined) {
+      pin.egressAllowlist = nativeEgressAllowlistSchema.parse(pin.egressAllowlist);
+      if (
+        pin.provider !== 'cloudflare-containers' ||
+        (pin.sandboxKind === undefined
+          ? !this.sandboxId.startsWith('ses-')
+          : pin.sandboxKind !== 'isolated')
+      ) {
+        throw new ProviderCreationError('invalid_configuration');
+      }
+    }
+    return pin;
   }
 
   private async writeProviderPin(pin: StoredProviderPin): Promise<void> {
@@ -3781,12 +5352,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private async armAlarm(state: AllocationState): Promise<void> {
     // The one alarm is the earliest of the allocation timers and the route
     // preparation deadlines, so a hung wrapper's route cannot outlive its
-    // 12-minute attempt.
+    // preparation attempt.
     const allocationAt = nextAllocationAlarmAt(state, this.sandboxTimers());
     const routeAt = await earliestRouteDeadlineAt(this.db);
-    if (this.billingSchedule.snapshotEarliestDue() === undefined) await this.billingSchedule.load();
-    const billingAt = this.billingSchedule.snapshotEarliestDue() ?? null;
-    const candidates = [allocationAt, routeAt, billingAt, this.earliestHelloDeadlineAt()].filter(
+    // Pending work must survive loss of the in-memory launch continuation.
+    const retryAt =
+      state.kind === 'stopped' &&
+      routeAt !== null &&
+      (await routeRetryAllowed(this.routeContext(state)))
+        ? Date.now() + this.sandboxTimers().providerCreateRetryMs
+        : null;
+    const candidates = [allocationAt, routeAt, retryAt, this.earliestHelloDeadlineAt()].filter(
       (at): at is number => at !== null
     );
     if (candidates.length === 0) {
@@ -3799,6 +5375,50 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private sandboxTimers(): SandboxTimers {
     return resolveControlPlaneTimers(this.env as unknown as Record<string, string | undefined>)
       .sandbox;
+  }
+
+  /**
+   * Bounds the stored-policy read inside the wrapper's heartbeat
+   * acknowledgement deadline. The read runs on the serial queue, so a read that
+   * outlived the deadline would hold back the acknowledgement the wrapper
+   * watchdog waits for and reconnect a healthy socket. Half the deadline leaves
+   * room for the queued acknowledgement itself; a timed-out read stays
+   * non-enforcing and is retried on the next cadence.
+   */
+  private billingReadTimeoutMs(): number {
+    const timers = resolveControlPlaneTimers(
+      this.env as unknown as Record<string, string | undefined>
+    );
+    return Math.max(
+      1,
+      Math.min(
+        timers.sandbox.providerStopAttemptMs,
+        Math.floor(timers.wrapper.heartbeatAckTimeoutMs / 2)
+      )
+    );
+  }
+
+  /**
+   * Derived from the routes table on every lookup, so no route write can leave
+   * it stale. SQLite extracts only the origin; an unreadable credential source
+   * keeps the longer interactive window.
+   */
+  private sandboxIdleTimeoutMs(state: AllocationState | null): number {
+    const timers = this.sandboxTimers();
+    if (state?.kind !== 'connected') return timers.idleMs;
+    const source = routesTable.credential_source;
+    const routes = this.db
+      .select({
+        state: routesTable.state,
+        readable: sql<number>`coalesce(json_valid(${source}), 1)`,
+        origin: sql<unknown>`case when json_valid(${source}) then json_extract(${source}, '$.createdOnPlatform') end`,
+      })
+      .from(routesTable)
+      .all();
+    return routes.some(route => route.state === 'preparing' || route.readable === 0) ||
+      sandboxIdlePolicyForOrigins(routes.map(route => route.origin)) === 'interactive'
+      ? timers.idleMs
+      : timers.unattendedIdleMs;
   }
 
   private enqueue<T>(task: () => Promise<T>): Promise<T> {

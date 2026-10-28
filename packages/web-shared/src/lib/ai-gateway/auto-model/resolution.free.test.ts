@@ -1,17 +1,16 @@
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { getAutoFreeCandidates } from './resolution';
 import { getOpenRouterModelsFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
-import {
-  findKiloExclusiveModel,
-  gemma_4_26b_a4b_it_free_model,
-  kiloExclusiveModels,
-  stepfun_37_flash_free_model,
-} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { getConfiguredAutoFreeModels } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
 import type * as AutoFreeConfigModule from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
-import type * as ExclusiveModelsModule from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import {
+  customLlmDefinition,
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+  publicCustomLlmDefinition,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config', () => ({
   ...jest.requireActual<typeof AutoFreeConfigModule>(
@@ -27,16 +26,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
   getOpenRouterModelsFromDatabase: jest.fn(),
 }));
 
-jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
-  const actual = jest.requireActual<typeof ExclusiveModelsModule>(
-    '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models'
-  );
-  return {
-    ...actual,
-    findKiloExclusiveModel: jest.fn(actual.findKiloExclusiveModel),
-  };
-});
-
 function configure(models: string[]) {
   jest
     .mocked(getConfiguredAutoFreeModels)
@@ -46,45 +35,17 @@ function configure(models: string[]) {
 describe('getAutoFreeCandidates', () => {
   beforeEach(() => {
     jest.mocked(getOpenRouterModelsFromDatabase).mockResolvedValue(new Set(['test/present:free']));
-    configure([
-      ...kiloExclusiveModels.map(model => model.public_id),
-      'test/present:free',
-      'test/absent:free',
-    ]);
+    configure([gemma_4_26b_a4b_it_free_model.public_id, 'test/present:free', 'test/absent:free']);
   });
 
   it.each(['chat_completions', 'messages', 'responses', null] as const)(
     'includes hidden and public free models for %s without requiring catalog presence',
     async apiKind => {
       expect(await getAutoFreeCandidates(apiKind)).toEqual(
-        [
-          gemma_4_26b_a4b_it_free_model.public_id,
-          stepfun_37_flash_free_model.public_id,
-          'test/present:free',
-        ].toSorted()
+        [gemma_4_26b_a4b_it_free_model.public_id, 'test/present:free'].toSorted()
       );
     }
   );
-
-  it('filters using the model provider capabilities', async () => {
-    jest.mocked(findKiloExclusiveModel).mockReturnValueOnce({
-      ...gemma_4_26b_a4b_it_free_model,
-      provider: { ...OPENROUTER, supportedChatApis: ['chat_completions'] },
-    });
-
-    expect(await getAutoFreeCandidates('messages')).toEqual(
-      [stepfun_37_flash_free_model.public_id, 'test/present:free'].toSorted()
-    );
-  });
-
-  it('does not filter provider capabilities when the API kind is null', async () => {
-    jest.mocked(findKiloExclusiveModel).mockReturnValueOnce({
-      ...gemma_4_26b_a4b_it_free_model,
-      provider: { ...OPENROUTER, supportedChatApis: ['chat_completions'] },
-    });
-
-    expect(await getAutoFreeCandidates(null)).toContain(gemma_4_26b_a4b_it_free_model.public_id);
-  });
 
   it('skips configured models that are not free or need a non-default AI SDK provider', async () => {
     jest
@@ -95,6 +56,46 @@ describe('getAutoFreeCandidates', () => {
     configure(['test/present:free', 'test/paid', 'anthropic/claude-free:free', 'kilo-auto/free']);
 
     expect(await getAutoFreeCandidates('chat_completions')).toEqual(['test/present:free']);
+  });
+
+  describe('custom LLMs', () => {
+    const customLlmIds = ['acme/chat-free', 'acme/multi-free', 'acme/private-free'];
+
+    beforeEach(async () => {
+      await insertCustomLlmForTest('acme/chat-free', publicCustomLlmDefinition(['acme']));
+      await insertCustomLlmForTest(
+        'acme/multi-free',
+        publicCustomLlmDefinition(['acme'], { api_kinds: ['chat_completions', 'messages'] })
+      );
+      await insertCustomLlmForTest('acme/private-free', customLlmDefinition());
+      configure(customLlmIds);
+    });
+
+    afterEach(async () => {
+      for (const id of customLlmIds) await deleteCustomLlmForTest(id);
+      await deleteCustomLlmForTest(gemma_4_26b_a4b_it_free_model.public_id);
+    });
+
+    it.each([
+      ['chat_completions', ['acme/chat-free', 'acme/multi-free']],
+      ['messages', ['acme/multi-free']],
+      ['responses', ['openrouter/free']],
+      [null, ['acme/chat-free', 'acme/multi-free']],
+    ] as const)('includes public custom LLMs that serve %s', async (apiKind, expected) => {
+      expect(await getAutoFreeCandidates(apiKind)).toEqual(expected);
+    });
+
+    it('keeps the Kilo-exclusive model in charge of an id a custom LLM claims', async () => {
+      await insertCustomLlmForTest(
+        gemma_4_26b_a4b_it_free_model.public_id,
+        publicCustomLlmDefinition(['acme'])
+      );
+      configure([gemma_4_26b_a4b_it_free_model.public_id]);
+
+      expect(await getAutoFreeCandidates('responses')).toEqual([
+        gemma_4_26b_a4b_it_free_model.public_id,
+      ]);
+    });
   });
 
   it('falls back to openrouter/free when nothing is configured or the config is invalid', async () => {

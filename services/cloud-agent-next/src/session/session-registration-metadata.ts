@@ -1,13 +1,4 @@
-/**
- * Plane-neutral session-metadata construction for session registration.
- *
- * The JSON shape here is the one both planes persist: the legacy
- * `CloudAgentSession` DO builds its stored metadata through
- * `buildSessionMetadataFromRegistration`, and the control-plane Worker builds
- * the `createSessionWithInitialAdmission`/`registerSessionFromMetadata` input
- * through the same function. One owner means a registration field can never
- * mean two different things depending on the plane.
- */
+/** Builds the grouped metadata used by control-plane session registration. */
 import { generateBranchSlug } from '@kilocode/worker-utils/deployment-slug';
 import { serializeSessionMetadata, type SessionMetadata } from '../persistence/session-metadata.js';
 import { deriveSharedSandboxId } from '../sandbox-id.js';
@@ -21,6 +12,8 @@ import type {
 import type { SessionRepositoryRequest } from './session-requests.js';
 
 export type GroupedRegisterSessionInput = {
+  allowSubagentSessions?: boolean;
+  parentCloudAgentSessionId?: string;
   identity: SessionMetadata['identity'];
   auth: SessionMetadata['auth'];
   runtimeAuthorizationSeal?: string;
@@ -35,17 +28,22 @@ export type GroupedRegisterSessionInput = {
   };
   repository?: SessionRepositoryRequest;
   profile?: SessionProfileBundle;
+  environment?: SessionMetadata['environment'];
   finalization?: SessionFinalization;
   callback?: SessionMetadata['callback'];
   workspace?: Pick<
     NonNullable<SessionMetadata['workspace']>,
     | 'sandboxId'
     | 'sandboxRoute'
+    | 'sandboxKind'
     | 'sandboxProvider'
+    | 'sandboxProviderBinding'
     | 'shallow'
     | 'credentialContainment'
     | 'devcontainerRequested'
     | 'sandboxAllocation'
+    | 'egressMode'
+    | 'egressAllowlist'
   >;
 };
 
@@ -64,6 +62,9 @@ function repositoryMetadataFromRegistrationInput(
         type: 'github',
         repo: repository.repo,
         githubAccessPurpose: repository.githubAccessPurpose ?? 'workflow',
+        ...(repository.allowUserAuthorization === undefined
+          ? {}
+          : { allowUserAuthorization: repository.allowUserAuthorization }),
         ...(repository.githubIntegrationId
           ? { githubIntegrationId: repository.githubIntegrationId }
           : {}),
@@ -186,6 +187,8 @@ export async function buildSessionMetadataFromRegistration(
   const initialMessage = initialMessageFromRegistration(input.message);
   const metadata: SessionMetadata = {
     metadataSchemaVersion: 2,
+    allowSubagentSessions: input.allowSubagentSessions ?? false,
+    parentCloudAgentSessionId: input.parentCloudAgentSessionId,
     identity: input.identity,
     auth: input.auth,
     // Metadata without clone remains an empty-session bootstrap; remove
@@ -201,6 +204,7 @@ export async function buildSessionMetadataFromRegistration(
     },
     finalization: input.finalization,
     profile: input.profile,
+    ...(input.environment ? { environment: input.environment } : {}),
     callback: input.callback,
     workspace: {
       ...input.workspace,

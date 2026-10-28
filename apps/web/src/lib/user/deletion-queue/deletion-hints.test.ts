@@ -46,10 +46,6 @@ describe('deletionAttentionHint', () => {
     expect(deletionAttentionHint('already_active')?.title).toMatch(/already in the queue/);
     expect(deletionAttentionHint('usage_prefix_progress_invalid')?.action).not.toMatch(/Mark done/);
     expect(deletionAttentionHint('delete_ready_missing')?.action).toMatch(/delete-ready/);
-    expect(deletionAttentionHint('csa_unauthorized')?.title).toMatch(/CSA/);
-    expect(deletionAttentionHint('csa_unauthorized')?.action).toMatch(
-      /CSA_VERCEL_PROTECTION_BYPASS/
-    );
     expect(deletionAttentionHint('completion_email_unavailable')).toEqual({
       title: 'Completion email provider is not configured',
       action: 'Repair the Mailgun configuration, then use Retry to send the completion email.',
@@ -58,6 +54,18 @@ describe('deletionAttentionHint', () => {
     expect(deletionAttentionHint('completion_email_ambiguous')?.action).toMatch(
       /without resending/
     );
+  });
+
+  it('distinguishes 403 permission from expiration and explains TOTP reauth', () => {
+    expect(deletionAttentionHint('substack_forbidden')?.action).toMatch(/permission/);
+    expect(deletionAttentionHint('substack_forbidden')?.title).not.toMatch(/expired/i);
+    expect(deletionAttentionHint('substack_totp_invalid')?.action).toMatch(/base32/);
+    expect(deletionAttentionHint('substack_reauth_required')?.action).toMatch(/TOTP secret/);
+    expect(deletionAttentionHint('substack_reauth_method_unsupported')?.title).toMatch(/TOTP/);
+    expect(deletionAttentionHint('substack_reauth_rejected')?.action).toMatch(/TOTP secret/);
+    expect(deletionAttentionHint('substack_reauth_incomplete')?.action).toMatch(/Retry/);
+    expect(deletionAttentionHint('substack_cookie_persist_failed')?.action).toMatch(/fresh cookie/);
+    expect(deletionAttentionHint('substack_credential_changed')?.action).toMatch(/replaced/);
   });
 
   it('falls back for other HTTP statuses', () => {

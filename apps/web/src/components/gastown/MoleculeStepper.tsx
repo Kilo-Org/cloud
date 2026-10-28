@@ -62,8 +62,8 @@ export function MoleculeStepper({ steps, moleculeName }: MoleculeStepperProps) {
                   </motion.div>
                 ) : step.status === 'current' ? (
                   <div className="relative">
-                    <Loader2 className="size-[22px] animate-spin text-[color:oklch(95%_0.15_108)]" />
-                    <span className="absolute -inset-1 animate-ping rounded-full bg-[color:oklch(95%_0.15_108_/_0.2)]" />
+                    <Loader2 className="size-[22px] animate-spin text-primary" />
+                    <span className="absolute -inset-1 animate-ping rounded-full bg-primary/20" />
                   </div>
                 ) : (
                   <Circle className="size-[22px] text-white/15" />

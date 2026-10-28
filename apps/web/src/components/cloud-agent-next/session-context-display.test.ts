@@ -1,82 +1,67 @@
-import { resolveSessionBranchDisplay } from './session-context-display';
+import { resolveSessionBranch } from './session-context-display';
 
-describe('resolveSessionBranchDisplay', () => {
-  it('keeps the assigned branch visible while the session is still preparing', () => {
+describe('resolveSessionBranch', () => {
+  it('shows the assigned branch as soon as metadata is available', () => {
     expect(
-      resolveSessionBranchDisplay({
+      resolveSessionBranch({
         scope: { displayedKiloSessionId: 'ses_a', displayedWorktreeId: null },
         metadata: { kiloSessionId: 'ses_a', branch: 'kilo/assigned' },
-        isPreparing: true,
       })
-    ).toEqual({ kind: 'branch', branch: 'kilo/assigned' });
+    ).toBe('kilo/assigned');
   });
 
   it('ignores metadata that belongs to a different displayed chat', () => {
     const scope = { displayedKiloSessionId: 'ses_b', displayedWorktreeId: null };
     const metadata = { kiloSessionId: 'ses_a', branch: 'kilo/other' };
 
-    expect(resolveSessionBranchDisplay({ scope, metadata, isPreparing: false })).toEqual({
-      kind: 'unavailable',
-    });
-    expect(resolveSessionBranchDisplay({ scope, metadata, isPreparing: true })).toEqual({
-      kind: 'assigning',
-    });
+    expect(resolveSessionBranch({ scope, metadata })).toBeNull();
   });
 
   it('ignores branch metadata scoped to a different worktree', () => {
     expect(
-      resolveSessionBranchDisplay({
+      resolveSessionBranch({
         scope: { displayedKiloSessionId: null, displayedWorktreeId: 'wt_1' },
         metadata: { kiloSessionId: 'ses_a', worktreeId: 'wt_2', branch: 'kilo/other' },
-        isPreparing: false,
       })
-    ).toEqual({ kind: 'unavailable' });
+    ).toBeNull();
   });
 
   it('matches worktree scope when no chat is selected', () => {
     expect(
-      resolveSessionBranchDisplay({
+      resolveSessionBranch({
         scope: { displayedKiloSessionId: null, displayedWorktreeId: 'wt_1' },
         metadata: { kiloSessionId: 'ses_a', worktreeId: 'wt_1', branch: 'kilo/assigned' },
-        isPreparing: true,
       })
-    ).toEqual({ kind: 'branch', branch: 'kilo/assigned' });
+    ).toBe('kilo/assigned');
   });
 
-  it('shows an honest assigning state while recovery metadata is still missing', () => {
+  it('shows no branch while metadata is missing', () => {
     const scope = { displayedKiloSessionId: 'ses_a', displayedWorktreeId: null };
 
-    expect(resolveSessionBranchDisplay({ scope, metadata: null, isPreparing: true })).toEqual({
-      kind: 'assigning',
-    });
+    expect(resolveSessionBranch({ scope, metadata: null })).toBeNull();
     expect(
-      resolveSessionBranchDisplay({
+      resolveSessionBranch({
         scope,
         metadata: { kiloSessionId: 'ses_a', branch: null },
-        isPreparing: true,
       })
-    ).toEqual({ kind: 'assigning' });
+    ).toBeNull();
   });
 
   it('never fabricates a default branch when no assignment is known', () => {
     const scope = { displayedKiloSessionId: 'ses_a', displayedWorktreeId: null };
 
-    expect(resolveSessionBranchDisplay({ scope, metadata: null, isPreparing: false })).toEqual({
-      kind: 'unavailable',
-    });
+    expect(resolveSessionBranch({ scope, metadata: null })).toBeNull();
     expect(
-      resolveSessionBranchDisplay({
+      resolveSessionBranch({
         scope,
         metadata: { kiloSessionId: 'ses_a', branch: '   ' },
-        isPreparing: false,
       })
-    ).toEqual({ kind: 'unavailable' });
+    ).toBeNull();
     expect(
-      resolveSessionBranchDisplay({
+      resolveSessionBranch({
         scope: { displayedKiloSessionId: null, displayedWorktreeId: null },
         metadata: null,
-        isPreparing: true,
       })
-    ).toEqual({ kind: 'unavailable' });
+    ).toBeNull();
   });
 });

@@ -46,7 +46,6 @@ const scrollMock = vi.hoisted(() => ({
   scrollToEnd: vi.fn<(params?: { animated?: boolean }) => void>(),
 }));
 vi.mock('react-native', () => ({
-  Modal: 'Modal',
   ScrollView: (props: { children?: ReactNode; ref?: Ref<typeof scrollMock> }) => {
     useImperativeHandle(props.ref, () => scrollMock, []);
     return createElement('ScrollView', { ...props, ref: undefined });
@@ -250,19 +249,22 @@ function radio(
   root: TestRenderer.ReactTestInstance,
   label: string
 ): TestRenderer.ReactTestInstance | undefined {
+  // This suite mounts iOS, where `radioItemA11y` renders each choice as a
+  // button whose state rides the selected trait.
   return findByType(root, 'Pressable').find(
     node =>
-      propOf(node, 'accessibilityRole') === 'radio' && propOf(node, 'accessibilityLabel') === label
+      propOf(node, 'accessibilityRole') === 'button' &&
+      propOf(node, 'accessibilityState') !== undefined &&
+      propOf(node, 'accessibilityLabel') === label
   );
 }
 
-// A React Native radio reports its current choice through `checked`, not
-// `selected` — see `radioItemA11y` in @/components/ui/radio-group.
+/** Whether the radio row for `label` is the current choice. */
 function radioSelected(root: TestRenderer.ReactTestInstance, label: string): boolean {
   const state = propOf(radio(root, label), 'accessibilityState') as
-    | { checked: boolean }
+    | { selected: boolean }
     | undefined;
-  return state?.checked === true;
+  return state?.selected === true;
 }
 
 function pressRadio(root: TestRenderer.ReactTestInstance, label: string): void {
@@ -399,15 +401,15 @@ describe('PartDetailSheet mounted', () => {
     act(() => {
       openers.get('main')?.('write-1');
     });
-    expect(findByType(renderer.root, 'Modal').filter(node => propOf(node, 'visible'))).toHaveLength(
-      1
-    );
+    expect(
+      findByType(renderer.root, 'BottomSheet').filter(node => propOf(node, 'index') === 0)
+    ).toHaveLength(1);
     act(() => {
       openers.get('subagent')?.('write-1');
     });
-    expect(findByType(renderer.root, 'Modal').filter(node => propOf(node, 'visible'))).toHaveLength(
-      2
-    );
+    expect(
+      findByType(renderer.root, 'BottomSheet').filter(node => propOf(node, 'index') === 0)
+    ).toHaveLength(2);
     expect(findByType(renderer.root, 'CenteredState')).toHaveLength(2);
     expect(findByType(renderer.root, 'ScrollView')).toHaveLength(0);
     act(() => {

@@ -1,6 +1,7 @@
 import { describe, test, expect, afterEach } from '@jest/globals';
 import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import {
+  agent_briefing_context_preferences,
   organizations,
   organization_invitations,
   organization_memberships,
@@ -19,9 +20,17 @@ import {
   addSsoUserToOrganization,
   updateUserRoleInOrganization,
   inviteUserToOrganization,
+  CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER,
+  CHILD_ORGANIZATION_ACCEPT_REQUIRES_PARENT_MEMBER,
   getOrganizationMembers,
   acceptOrganizationInvite,
+  updateOrganizationSettings,
+  mutateOrganizationSettings,
+  markOrganizationAsDeleted,
 } from './organizations';
+import { getOrganizationGroupPolicyContext } from './organization-group-policy-context.server';
+import { bumpOrganizationGroupPolicyRevision } from './organization-groups';
+import { isOrganizationMember } from '@kilocode/worker-utils/account-access';
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { DEFAULT_MEMBER_DAILY_LIMIT_USD } from '@kilocode/web-shared/lib/organizations/constants';
 
@@ -62,6 +71,62 @@ describe('Organizations', () => {
 
       expect(enterprise.settings.recommendations_digest_enabled).toBe(true);
       expect(teams.settings.recommendations_digest_enabled).toBeUndefined();
+    });
+  });
+
+  describe('isOrganizationMember', () => {
+    test('returns true for a member of an active organization', async () => {
+      const user = await insertTestUser();
+      const organization = await createOrganization('Active membership', user.id);
+
+      await expect(isOrganizationMember(db, organization.id, user.id)).resolves.toBe(true);
+    });
+
+    test('returns false for a member of a soft-deleted organization', async () => {
+      const user = await insertTestUser();
+      const organization = await createOrganization('Deleted membership', user.id);
+      await markOrganizationAsDeleted(organization.id);
+
+      await expect(isOrganizationMember(db, organization.id, user.id)).resolves.toBe(false);
+    });
+
+    test('returns false for a user who is not a member', async () => {
+      const user = await insertTestUser();
+      const nonMember = await insertTestUser();
+      const organization = await createOrganization('Membership of another user', user.id);
+
+      await expect(isOrganizationMember(db, organization.id, nonMember.id)).resolves.toBe(false);
+    });
+  });
+
+  describe('markOrganizationAsDeleted', () => {
+    test('disables only the deleted organization briefing context', async () => {
+      const user = await insertTestUser();
+      const organization = await createOrganization('Deleted briefing context', user.id);
+      await db.insert(agent_briefing_context_preferences).values([
+        { kilo_user_id: user.id, context_key: 'personal', enabled: true, model: 'test/model' },
+        {
+          kilo_user_id: user.id,
+          context_key: organization.id,
+          organization_id: organization.id,
+          enabled: true,
+          model: 'test/model',
+        },
+      ]);
+
+      await markOrganizationAsDeleted(organization.id);
+
+      const contexts = await db
+        .select({
+          key: agent_briefing_context_preferences.context_key,
+          enabled: agent_briefing_context_preferences.enabled,
+        })
+        .from(agent_briefing_context_preferences)
+        .where(eq(agent_briefing_context_preferences.kilo_user_id, user.id));
+      expect(Object.fromEntries(contexts.map(context => [context.key, context.enabled]))).toEqual({
+        personal: true,
+        [organization.id]: false,
+      });
     });
   });
 
@@ -991,7 +1056,7 @@ describe('Organizations', () => {
       ).rejects.toThrow('User must join this organization through SSO');
     });
 
-    test('rejects invitations into a child organization', async () => {
+    test('rejects inviting someone who is not a parent organization member', async () => {
       const owner = await insertTestUser();
       const parent = await createOrganization('Parent Org', owner.id);
       const child = await createOrganization('Child Org', owner.id);
@@ -1002,7 +1067,89 @@ describe('Organizations', () => {
 
       await expect(
         inviteUserToOrganization(child.id, owner.id, 'member@example.com', 'member')
-      ).rejects.toThrow('Child organizations cannot invite members');
+      ).rejects.toThrow(CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER);
+    });
+
+    test('invites a parent organization member into a child organization', async () => {
+      const owner = await insertTestUser();
+      const parentMember = await insertTestUser({
+        google_user_email: 'Parent.Member@example.com',
+      });
+      const parent = await createOrganization('Parent Org', owner.id);
+      const child = await createOrganization('Child Org', owner.id);
+      await addUserToOrganization(parent.id, parentMember.id, 'member');
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+
+      const invitation = await inviteUserToOrganization(
+        child.id,
+        owner.id,
+        'parent.member@example.com',
+        'member'
+      );
+
+      expect(invitation.organization_id).toBe(child.id);
+      expect(invitation.email).toBe('parent.member@example.com');
+    });
+
+    test('matches a parent member by normalized email when the invite uses an alias', async () => {
+      const owner = await insertTestUser();
+      const parentMember = await insertTestUser({
+        google_user_email: 'user@gmail.com',
+        normalized_email: 'user@gmail.com',
+      });
+      const parent = await createOrganization('Parent Org', owner.id);
+      const child = await createOrganization('Child Org', owner.id);
+      await addUserToOrganization(parent.id, parentMember.id, 'member');
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+
+      const invitation = await inviteUserToOrganization(
+        child.id,
+        owner.id,
+        'user+team@gmail.com',
+        'member'
+      );
+
+      expect(invitation.email).toBe('user+team@gmail.com');
+    });
+
+    test('does not treat a pending parent invitation as parent membership', async () => {
+      const owner = await insertTestUser();
+      const parent = await createOrganization('Parent Org', owner.id);
+      const child = await createOrganization('Child Org', owner.id);
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+      await inviteUserToOrganization(parent.id, owner.id, 'pending-parent@example.com', 'member');
+
+      await expect(
+        inviteUserToOrganization(child.id, owner.id, 'pending-parent@example.com', 'member')
+      ).rejects.toThrow(CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER);
+    });
+
+    test('does not invite a parent organization service account', async () => {
+      const owner = await insertTestUser();
+      const bot = await insertTestUser({
+        is_bot: true,
+        google_user_email: 'child-invite-bot@example.com',
+      });
+      const parent = await createOrganization('Parent Org', owner.id);
+      const child = await createOrganization('Child Org', owner.id);
+      await addUserToOrganization(parent.id, bot.id, 'member');
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+
+      await expect(
+        inviteUserToOrganization(child.id, owner.id, bot.google_user_email, 'member')
+      ).rejects.toThrow(CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER);
     });
   });
 
@@ -1471,13 +1618,11 @@ describe('Organizations', () => {
         expect(updatedInvitee?.customer_source).toBe('GitHub');
       });
 
-      test('rejects accepting a pre-existing invitation into a child organization', async () => {
+      test('rejects accepting a child invitation when the user is not a parent member', async () => {
         const owner = await insertTestUser();
         const invitee = await insertTestUser({ google_user_email: 'legacy@example.com' });
         const parent = await createOrganization('Parent Org', owner.id);
         const child = await createOrganization('Child Org', owner.id);
-        // Invites can no longer be created for child orgs through the normal flow,
-        // so insert a pending invite directly, then reparent the org afterwards.
         const token = 'legacy-child-invitation';
         await db.insert(organization_invitations).values({
           organization_id: child.id,
@@ -1496,11 +1641,96 @@ describe('Organizations', () => {
 
         expect(result).toEqual({
           success: false,
-          error: 'Child organizations cannot accept invitations',
+          error: CHILD_ORGANIZATION_ACCEPT_REQUIRES_PARENT_MEMBER,
         });
 
         const userOrgs = await getUserOrganizationsWithSeats(invitee.id);
         expect(userOrgs).toHaveLength(0);
+      });
+
+      test('accepts a child invitation for a current parent member', async () => {
+        const owner = await insertTestUser();
+        const invitee = await insertTestUser({ google_user_email: 'child-join@example.com' });
+        const parent = await createOrganization('Parent Org', owner.id);
+        const child = await createOrganization('Child Org', owner.id);
+        await addUserToOrganization(parent.id, invitee.id, 'member');
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: parent.id })
+          .where(eq(organizations.id, child.id));
+
+        const invitation = await inviteUserToOrganization(
+          child.id,
+          owner.id,
+          invitee.google_user_email,
+          'member'
+        );
+        const result = await acceptOrganizationInvite(invitee.id, invitation.token);
+
+        expect(result.success).toBe(true);
+        const userOrgs = await getUserOrganizationsWithSeats(invitee.id);
+        expect(userOrgs.map(org => org.organizationId).sort()).toEqual(
+          [parent.id, child.id].sort()
+        );
+      });
+
+      test('rejects a child invitation after the invitee leaves the parent', async () => {
+        const owner = await insertTestUser();
+        const invitee = await insertTestUser({ google_user_email: 'left-parent@example.com' });
+        const parent = await createOrganization('Parent Org', owner.id);
+        const child = await createOrganization('Child Org', owner.id);
+        await addUserToOrganization(parent.id, invitee.id, 'member');
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: parent.id })
+          .where(eq(organizations.id, child.id));
+        const invitation = await inviteUserToOrganization(
+          child.id,
+          owner.id,
+          invitee.google_user_email,
+          'member'
+        );
+        await db
+          .delete(organization_memberships)
+          .where(
+            and(
+              eq(organization_memberships.organization_id, parent.id),
+              eq(organization_memberships.kilo_user_id, invitee.id)
+            )
+          );
+
+        const result = await acceptOrganizationInvite(invitee.id, invitation.token);
+
+        expect(result).toEqual({
+          success: false,
+          error: CHILD_ORGANIZATION_ACCEPT_REQUIRES_PARENT_MEMBER,
+        });
+      });
+
+      test('rejects a child invitation after the parent organization is deleted', async () => {
+        const owner = await insertTestUser();
+        const invitee = await insertTestUser({ google_user_email: 'deleted-parent@example.com' });
+        const parent = await createOrganization('Parent Org', owner.id);
+        const child = await createOrganization('Child Org', owner.id);
+        await addUserToOrganization(parent.id, invitee.id, 'member');
+        await db
+          .update(organizations)
+          .set({ parent_organization_id: parent.id })
+          .where(eq(organizations.id, child.id));
+        const invitation = await inviteUserToOrganization(
+          child.id,
+          owner.id,
+          invitee.google_user_email,
+          'member'
+        );
+        await markOrganizationAsDeleted(parent.id);
+
+        const result = await acceptOrganizationInvite(invitee.id, invitation.token);
+
+        expect(result).toEqual({
+          success: false,
+          error: CHILD_ORGANIZATION_ACCEPT_REQUIRES_PARENT_MEMBER,
+        });
       });
 
       test('should accept invitation with owner role', async () => {
@@ -1705,6 +1935,161 @@ describe('Organizations', () => {
 
         expect(membership?.invited_by).toBe(admin.id);
       });
+
+      test('should advance the group-policy revision for the accepted membership', async () => {
+        const owner = await insertTestUser();
+        const invitee = await insertTestUser();
+        const organization = await createOrganization('Test Org', owner.id);
+
+        const before = await getOrganizationGroupPolicyContext({
+          organizationId: organization.id,
+          subject: { type: 'defaultAccess' },
+        });
+        expect(before.policyRevision).toBe(0);
+
+        const invitation = await inviteUserToOrganization(
+          organization.id,
+          owner.id,
+          invitee.google_user_email,
+          'member'
+        );
+
+        const result = await acceptOrganizationInvite(invitee.id, invitation.token);
+        expect(result.success).toBe(true);
+
+        const after = await getOrganizationGroupPolicyContext({
+          organizationId: organization.id,
+          subject: { type: 'member', kiloUserId: invitee.id },
+        });
+        expect(after.policyRevision).toBe(1);
+      });
+
+      test('should increment an existing group-policy revision for the accepted membership', async () => {
+        const owner = await insertTestUser();
+        const invitee = await insertTestUser();
+        const organization = await createOrganization('Test Org', owner.id);
+
+        const seededRevision = await db.transaction(tx =>
+          bumpOrganizationGroupPolicyRevision(tx, organization.id, owner.id)
+        );
+        expect(seededRevision).toBe(1);
+
+        const invitation = await inviteUserToOrganization(
+          organization.id,
+          owner.id,
+          invitee.google_user_email,
+          'member'
+        );
+
+        const result = await acceptOrganizationInvite(invitee.id, invitation.token);
+        expect(result.success).toBe(true);
+
+        const after = await getOrganizationGroupPolicyContext({
+          organizationId: organization.id,
+          subject: { type: 'member', kiloUserId: invitee.id },
+        });
+        expect(after.policyRevision).toBe(2);
+      });
+
+      test('should not advance the group-policy revision when the invitee is already a member', async () => {
+        const owner = await insertTestUser();
+        const invitee = await insertTestUser();
+        const organization = await createOrganization('Test Org', owner.id);
+
+        const invitation = await inviteUserToOrganization(
+          organization.id,
+          owner.id,
+          invitee.google_user_email,
+          'member'
+        );
+        // Membership arrives after the invitation, so acceptance takes the
+        // already-a-member branch and inserts no row.
+        await addUserToOrganization(organization.id, invitee.id, 'member');
+
+        const result = await acceptOrganizationInvite(invitee.id, invitation.token);
+        expect(result.success).toBe(true);
+
+        // The already-a-member branch inserts nothing: the membership keeps the
+        // row addUserToOrganization created (no invited_by from the invite).
+        const memberships = await db
+          .select({
+            invitedBy: organization_memberships.invited_by,
+            role: organization_memberships.role,
+          })
+          .from(organization_memberships)
+          .where(
+            and(
+              eq(organization_memberships.organization_id, organization.id),
+              eq(organization_memberships.kilo_user_id, invitee.id)
+            )
+          );
+        expect(memberships).toEqual([{ invitedBy: null, role: 'member' }]);
+
+        const after = await getOrganizationGroupPolicyContext({
+          organizationId: organization.id,
+          subject: { type: 'member', kiloUserId: invitee.id },
+        });
+        expect(after.policyRevision).toBe(1);
+      });
+      test('does not deadlock concurrent invite acceptance and settings mutation', async () => {
+        const owner = await insertTestUser();
+        const invitee = await insertTestUser();
+        const organization = await createOrganization('Concurrent organization update', owner.id);
+        // Create the policy settings row first: its insert holds a key-share lock
+        // on the organization row, which would hide the ordering under test.
+        await db.transaction(tx =>
+          bumpOrganizationGroupPolicyRevision(tx, organization.id, owner.id)
+        );
+        const invitation = await inviteUserToOrganization(
+          organization.id,
+          owner.id,
+          invitee.google_user_email,
+          'member'
+        );
+
+        const { promise: settingsLockHeld, resolve: signalSettingsLockHeld } =
+          Promise.withResolvers<number>();
+        const { promise: settingsMayProceed, resolve: allowSettingsMutation } =
+          Promise.withResolvers<void>();
+
+        const settingsMutation = db.transaction(async tx => {
+          await bumpOrganizationGroupPolicyRevision(tx, organization.id, owner.id);
+          const backend = await tx.execute<{ pid: number }>(
+            sql`SELECT pg_backend_pid()::int AS pid`
+          );
+          const pid = backend.rows[0]?.pid;
+          if (pid === undefined) throw new Error('PostgreSQL backend pid unavailable');
+          signalSettingsLockHeld(pid);
+          await settingsMayProceed;
+          return await mutateOrganizationSettings(organization.id, current => current.settings, tx);
+        });
+
+        const holderPid = await settingsLockHeld;
+        const acceptance = acceptOrganizationInvite(invitee.id, invitation.token);
+        let acceptanceBlocked = false;
+        try {
+          for (let attempt = 0; attempt < 2000 && !acceptanceBlocked; attempt += 1) {
+            const waiting = await db.execute(sql`
+              SELECT 1
+              FROM pg_stat_activity
+              WHERE datname = current_database()
+                AND wait_event_type = 'Lock'
+                AND ${holderPid} = ANY(pg_blocking_pids(pid))
+            `);
+            acceptanceBlocked = waiting.rows.length > 0;
+          }
+          expect(acceptanceBlocked).toBe(true);
+        } finally {
+          allowSettingsMutation();
+        }
+
+        const [settingsResult, acceptanceResult] = await Promise.all([
+          settingsMutation,
+          acceptance,
+        ]);
+        expect(settingsResult).toEqual(organization.settings);
+        expect(acceptanceResult.success).toBe(true);
+      }, 20000);
 
       test('should update invitation timestamps correctly', async () => {
         const owner = await insertTestUser();
@@ -2108,6 +2493,45 @@ describe('Organizations', () => {
 
         expect(userLimit).toBeTruthy();
         expect(fromMicrodollars(userLimit!.microdollar_limit)).toBe(DEFAULT_MEMBER_DAILY_LIMIT_USD);
+      });
+    });
+
+    describe('updateOrganizationSettings', () => {
+      test('rejects an invalid settings object and leaves the stored settings unchanged', async () => {
+        const owner = await insertTestUser();
+        const organization = await createOrganization('Test Org', owner.id);
+
+        await expect(
+          updateOrganizationSettings(organization.id, {
+            // @ts-expect-error testing runtime validation with an unsupported data_collection value
+            data_collection: 'maybe',
+          })
+        ).rejects.toThrow();
+
+        const [stored] = await db
+          .select({ settings: organizations.settings })
+          .from(organizations)
+          .where(eq(organizations.id, organization.id));
+        expect(stored?.settings).toEqual(organization.settings);
+      });
+
+      test('persists only the keys the settings schema declares', async () => {
+        const owner = await insertTestUser();
+        const organization = await createOrganization('Test Org', owner.id);
+
+        const updated = await updateOrganizationSettings(organization.id, {
+          data_collection: 'deny',
+          // @ts-expect-error testing that keys outside the settings schema are dropped
+          unknown_setting: true,
+        });
+
+        expect(updated).toEqual({ data_collection: 'deny' });
+
+        const [stored] = await db
+          .select({ settings: organizations.settings })
+          .from(organizations)
+          .where(eq(organizations.id, organization.id));
+        expect(stored?.settings).toEqual({ data_collection: 'deny' });
       });
     });
   });

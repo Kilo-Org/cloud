@@ -35,9 +35,10 @@ vi.mock('@/lib/a11y/motion', () => ({
 }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
-  Modal: 'Modal',
   View: 'View',
   Pressable: 'Pressable',
+  // Sheet registers the app-level Android Back listener while it is visible.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   ActivityIndicator: 'ActivityIndicator',
   AccessibilityInfo: { announceForAccessibility: vi.fn() },
   ...reactNativeMock,
@@ -243,7 +244,6 @@ export async function createRecoverySource(
       variant: null,
       repository: null,
       isInitiated: true,
-      needsLegacyPrepare: false,
       isPreparingAsync: false,
       prompt: null,
       initialMessageId: null,
@@ -313,8 +313,8 @@ export function findByTestID(root: TestRenderer.ReactTestInstance, testID: strin
   return root.findAll(node => node.props.testID === testID);
 }
 
-export function modal(root: TestRenderer.ReactTestInstance) {
-  return host(root, 'Modal');
+export function sheet(root: TestRenderer.ReactTestInstance) {
+  return host(root, 'BottomSheet');
 }
 
 beforeEach(() => {

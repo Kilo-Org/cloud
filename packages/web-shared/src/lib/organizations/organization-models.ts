@@ -8,16 +8,25 @@ import {
   evaluateEffectiveModelAccessPolicy,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { listAvailableCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlms';
-import { getDirectByokModelsForOrganization } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
+  getDirectByokCatalogModelIds,
+  getDirectByokModelsForOrganization,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { isOrganizationAutoEnabled } from '@kilocode/web-shared/lib/organizations/organization-auto-model';
 import {
+  addDirectByokCatalogAvailability,
   addUserByokAvailability,
   getOrganizationByokProviderIds,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 import { tagOpenAiChatGptByokModels } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import {
+  openAiChatGptSharedServicesOwner,
+  type OpenAiChatGptOwner,
+} from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
+import type { OrganizationModelAudience } from '@kilocode/app-shared/organizations';
+import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
   getEnkryptBenchmarks,
   publishEnkryptModels,
@@ -27,27 +36,64 @@ import {
   type OrganizationPolicySubject,
 } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
 
+/**
+ * The ChatGPT connection whose models the list marks BYOK-available. A
+ * shared-services run is served only from the organization's shared-services
+ * connection, never from a member's own, so a member's connection marks models
+ * only in that member's own list.
+ */
+function chatGptByokOwner(
+  organizationId: string,
+  subject: OrganizationPolicySubject,
+  audience: OrganizationModelAudience
+): OpenAiChatGptOwner | null {
+  if (audience === 'shared_services') return openAiChatGptSharedServicesOwner(organizationId);
+  if (subject.type === 'member') return { kiloUserId: subject.kiloUserId, organizationId };
+  return null;
+}
+
 export async function getAvailableModelsForOrganization(
   organizationId: string,
-  subject: OrganizationPolicySubject
+  subject: OrganizationPolicySubject,
+  audience: OrganizationModelAudience = 'member',
+  {
+    fromDb = db,
+    countryCode,
+  }: {
+    fromDb?: typeof db;
+    /** The requester's Vercel IP country; custom LLMs denied there are left out.
+     * Null lists every custom LLM, for callers that do not serve a request. */
+    countryCode: string | null;
+  }
 ): Promise<OpenRouterModelsResponse | null> {
-  const context = await getOrganizationGroupPolicyContext({ organizationId, subject });
+  const context = await getOrganizationGroupPolicyContext({ organizationId, subject, fromDb });
   const organization = context.organization;
   const policy = evaluateEffectiveModelAccessPolicy(context);
 
-  const responseData = await getEnhancedOpenRouterModels();
+  const responseData = await getEnhancedOpenRouterModels({ countryCode });
   const restrictionCandidates = [...responseData.data];
 
   const filteredModels = [];
+  const allowedProvidersByModel = new Map<string, ReadonlySet<string>>();
   for (const model of restrictionCandidates) {
-    if ((await getEffectiveModelDecision(policy, model.id)).allowed) {
+    const decision = await getEffectiveModelDecision(policy, model.id);
+    if (decision.allowed) {
       filteredModels.push(model);
+      if (decision.eligibleProviderRoutes) {
+        allowedProvidersByModel.set(model.id, decision.eligibleProviderRoutes);
+      }
     }
   }
 
-  let availableModels = await addUserByokAvailability(
-    filteredModels,
-    await getOrganizationByokProviderIds(readDb, organizationId)
+  const [byokProviderIds, directByokCatalogModelIds] = await Promise.all([
+    getOrganizationByokProviderIds(readDb, organizationId),
+    getDirectByokCatalogModelIds({ type: 'organization', id: organizationId }),
+  ]);
+  let availableModels = addDirectByokCatalogAvailability(
+    await addUserByokAvailability(filteredModels, byokProviderIds, modelId =>
+      allowedProvidersByModel.get(modelId)
+    ),
+    directByokCatalogModelIds
   );
 
   if (organization.plan === 'teams' && organization.settings.data_collection === 'deny') {
@@ -59,15 +105,13 @@ export async function getAvailableModelsForOrganization(
   }
 
   availableModels.push(...(await getDirectByokModelsForOrganization(organizationId)));
-  availableModels.push(...(await listAvailableCustomLlms(organizationId, context.groupIds)));
+  availableModels.push(
+    ...(await listAvailableCustomLlms(organizationId, context.groupIds, countryCode))
+  );
 
-  // The ChatGPT connection is personal, so it marks models only for the member
-  // whose connection applies to this organization.
-  if (subject.type === 'member') {
-    availableModels = await tagOpenAiChatGptByokModels(
-      { kiloUserId: subject.kiloUserId, organizationId },
-      availableModels
-    );
+  const chatGptOwner = chatGptByokOwner(organizationId, subject, audience);
+  if (chatGptOwner) {
+    availableModels = await tagOpenAiChatGptByokModels(chatGptOwner, availableModels);
   }
 
   const snapshot = await getEnkryptBenchmarks();

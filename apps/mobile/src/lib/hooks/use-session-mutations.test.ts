@@ -116,12 +116,12 @@ describe('useSessionMutations account publication', () => {
 
   it('retitles and rolls back both caches without accepting manual writes or clearing a fetch failure', async () => {
     const query = client.getQueryCache().find({ queryKey: QUERY_KEY, exact: true });
-    await client.fetchQuery({
+    await client.query({
       queryKey: QUERY_KEY,
       queryFn: () => ({ sessions: [makeCached({ id: 's1', title: 'Old' })] }),
     });
     await expect(
-      client.fetchQuery({
+      client.query({
         queryKey: QUERY_KEY,
         queryFn: () => {
           throw new Error('offline');
@@ -147,26 +147,6 @@ describe('useSessionMutations account publication', () => {
     expect(getActiveSessionsQueryMetadata(query)).toBe(metadata);
     expect(messages).toEqual(['rename failed']);
     expect(rpc.rename.mock.calls[0]?.[0]).toEqual({ session_id: 's1', title: 'New' });
-  });
-
-  it('deletes only stored rows and moves focus after server confirmation', async () => {
-    const request = deferred<undefined>();
-    rpc.delete.mockReturnValue(request.promise);
-    let focused = 'row';
-    useSessionMutations().deleteSession('s1', () => {
-      focused = 'list';
-    });
-    await vi.waitFor(() => {
-      expect(titles(client, listKey)).toEqual(['Other']);
-    });
-    expect(activeTitle(client)).toBe('Old');
-    expect(focused).toBe('row');
-    request.resolve(undefined);
-    await vi.waitFor(() => {
-      expect(focused).toBe('list');
-    });
-    expect(messages).toEqual(['Session deleted']);
-    expect(rpc.delete.mock.calls[0]?.[0]).toEqual({ session_id: 's1' });
   });
 
   it.each([

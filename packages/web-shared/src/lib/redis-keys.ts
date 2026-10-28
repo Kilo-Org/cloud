@@ -5,6 +5,11 @@
  * collisions when adding new features.
  */
 
+import {
+  BLACKLISTED_DOMAINS_REDIS_KEY,
+  BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY,
+} from '@kilocode/worker-utils/account-access';
+
 declare const redisKeyBrand: unique symbol;
 
 export type RedisKey = string & {
@@ -13,7 +18,10 @@ export type RedisKey = string & {
 
 const redisKey = <const Key extends string>(key: Key): Key & RedisKey => key as Key & RedisKey;
 
-export const BLACKLIST_DOMAINS_REDIS_KEY = redisKey('admin:blacklisted-domains');
+export const BLACKLIST_DOMAINS_REDIS_KEY = redisKey(BLACKLISTED_DOMAINS_REDIS_KEY);
+export const BLACKLIST_DOMAINS_UPDATED_AT_REDIS_KEY = redisKey(
+  BLACKLISTED_DOMAINS_UPDATED_AT_REDIS_KEY
+);
 
 export const posthogQueryRedisKey = (name: string) => redisKey(`posthog-query:${name}`);
 
@@ -34,8 +42,14 @@ export const LEADERBOARD_MODEL_PROVIDER_USAGE_REDIS_KEY = redisKey(
 export const LEADERBOARD_MODEL_USAGE_REDIS_KEY = redisKey('public-api:leaderboard-model-usage');
 export const LEADERBOARD_PROVIDER_RACE_REDIS_KEY = redisKey('public-api:leaderboard-provider-race');
 
+export const nonTrialEnterpriseRedisKey = (organizationId: string) =>
+  redisKey(`organization:non-trial-enterprise:${organizationId}`);
+
 export const botIdentityRedisKey = (platform: string, teamId: string, userId: string) =>
   redisKey(`identity:${platform}:${teamId}:${userId}`);
+
+export const discordGatewayMessageRedisKey = (botUserId: string, messageId: string) =>
+  redisKey(`discord:gateway-message:${botUserId}:${messageId}`);
 
 export const gitLabOAuthCredentialsRedisKey = (credentialRef: string) =>
   redisKey(`auth-credentials:gitlab:${credentialRef}`);

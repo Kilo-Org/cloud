@@ -26,6 +26,19 @@ afterEach(async () => {
 });
 
 describe('local email outbox', () => {
+  it('shows support as the default Reply-To', async () => {
+    const filePath = await writeEmailToLocalOutbox(
+      {
+        to: 'developer@example.com',
+        subject: 'Local test',
+        html: '<p>Body</p>',
+      },
+      temporaryDirectory
+    );
+
+    expect(await readFile(filePath, 'utf8')).toContain('Reply-To: hi@kilo.ai');
+  });
+
   it('writes a self-contained HTML message with visible delivery metadata', async () => {
     const filePath = await writeEmailToLocalOutbox(
       {

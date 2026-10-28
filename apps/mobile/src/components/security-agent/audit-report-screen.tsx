@@ -1,6 +1,7 @@
 import { isPersonalSecurityScope } from '@kilocode/app-shared/security-agent';
 import { type inferRouterOutputs, type MobileRouter } from '@kilocode/trpc/mobile';
 import { useQuery } from '@tanstack/react-query';
+import { type TFunction } from 'i18next';
 import { FileText, ShieldOff } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -9,11 +10,16 @@ import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
+import {
+  eventEvidenceLines,
+  SEVERITY_LABEL_KEYS,
+} from '@/components/security-agent/audit-report-copy';
+import { ReportSummary } from '@/components/security-agent/audit-report-summary';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
-import { formatDate, formatNumber } from '@/lib/format';
+import { formatCalendarDate, formatDate } from '@/lib/format';
 import { useTRPC } from '@/lib/trpc';
 import { parseTimestamp } from '@/lib/utils';
 
@@ -21,20 +27,75 @@ type RouterOutputs = inferRouterOutputs<MobileRouter>;
 type AuditReportResponse = RouterOutputs['securityAgent']['getAuditReport'];
 type SecurityAgentAuditReport = Extract<AuditReportResponse, { status: 'ok' }>['report'];
 type SecurityFindingAuditSection = SecurityAgentAuditReport['findings'][number];
+type SecurityAgentAuditReportActor = SecurityFindingAuditSection['events'][number]['actor'];
 
-const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low'] as const;
+const MASKED_ACTOR_LABEL_KEYS = {
+  kilo_admin: 'securityAgent.auditReport.actorMaskedKiloAdmin',
+  user: 'securityAgent.auditReport.actorMaskedUser',
+} as const;
+
+// The period line is labelled UTC, so every timestamp inside the report carries
+// the same zone: a reader west of UTC must never see a generated date their own
+// calendar has not reached yet. `formatDate` renders the date and clock in the
+// language's own order and 12/24-hour cycle; the zone marker stays invariant,
+// like `periodUtc`'s.
+function formatUtcTimestamp(value: string): string {
+  const formatOptions: Intl.DateTimeFormatOptions = {
+    timeZone: 'UTC',
+    year: 'numeric',
+    month: 'numeric',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  };
+  return `${formatDate(parseTimestamp(value), i18n.language, formatOptions)} UTC`;
+}
+
+// A masked actor's displayName is a server-side English label; the localized
+// label is chosen from the mask the server reports, never from that string.
+function actorLabel(actor: SecurityAgentAuditReportActor, t: TFunction): string {
+  if (actor.type === 'system') {
+    return t('securityAgent.auditReport.actorSystem');
+  }
+  if (!actor.masked) {
+    return actor.displayName;
+  }
+  return t(MASKED_ACTOR_LABEL_KEYS[actor.maskedKind ?? 'user']);
+}
 
 // Literal keys, never a template: the catalog check scans the source for the
-// keys a lookup passes on, and a computed key is invisible to it.
-const SEVERITY_LABEL_KEYS = {
-  critical: 'common.critical',
-  high: 'securityAgent.sla.high',
-  medium: 'securityAgent.sla.medium',
-  low: 'securityAgent.sla.low',
-  // A finding whose severity the scanner never reported. The SLA policy has no
-  // row for it, so reuse the finding-details word.
-  unknown: 'common.unknown',
-} as const;
+// keys a lookup passes on, and a computed key is invisible to it. An action
+// the server adds before this app learns it falls back to the server label.
+const EVENT_ACTION_LABEL_KEYS: Record<string, string> = Object.freeze({
+  'security.finding.created': 'securityAgent.auditReport.eventActions.findingCreated',
+  'security.finding.severity_changed':
+    'securityAgent.auditReport.eventActions.findingSeverityChanged',
+  'security.finding.status_change': 'securityAgent.auditReport.eventActions.findingStatusChange',
+  'security.finding.dismissed': 'securityAgent.auditReport.eventActions.findingDismissed',
+  'security.finding.auto_dismissed': 'securityAgent.auditReport.eventActions.findingAutoDismissed',
+  'security.finding.superseded': 'securityAgent.auditReport.eventActions.findingSuperseded',
+  'security.finding.analysis_completed':
+    'securityAgent.auditReport.eventActions.findingAnalysisCompleted',
+  'security.finding.analysis_failed':
+    'securityAgent.auditReport.eventActions.findingAnalysisFailed',
+  'security.remediation.queued': 'securityAgent.auditReport.eventActions.remediationQueued',
+  'security.remediation.pr_opened': 'securityAgent.auditReport.eventActions.remediationPrOpened',
+  'security.remediation.failed': 'securityAgent.auditReport.eventActions.remediationFailed',
+  'security.remediation.blocked': 'securityAgent.auditReport.eventActions.remediationBlocked',
+  'security.remediation.no_changes_needed':
+    'securityAgent.auditReport.eventActions.remediationNoChangesNeeded',
+  'security.remediation.cancelled': 'securityAgent.auditReport.eventActions.remediationCancelled',
+  'security.finding.deleted': 'securityAgent.auditReport.eventActions.findingDeleted',
+});
+
+function eventLabel(action: string, serverLabel: string): string {
+  // Object.hasOwn: a bare index would return inherited members like
+  // `constructor` or `toString` instead of undefined for an unknown action.
+  const key = Object.hasOwn(EVENT_ACTION_LABEL_KEYS, action)
+    ? EVENT_ACTION_LABEL_KEYS[action]
+    : undefined;
+  return key === undefined ? serverLabel : i18n.t(key);
+}
 
 // Personal and org procedures resolve to nominally distinct tRPC option
 // types even when structurally identical, so we always call both hooks (one
@@ -70,12 +131,10 @@ function ReportHeader({ report }: Readonly<{ report: SecurityAgentAuditReport }>
   const start = formatDate(parseTimestamp(report.period.start), i18n.language, {
     timeZone: 'UTC',
   });
-  const end = formatDate(parseTimestamp(report.period.displayEnd), i18n.language, {
-    timeZone: 'UTC',
-  });
-  const generatedAt = formatDate(parseTimestamp(report.generatedAt), i18n.language, {
-    timeZone: 'UTC',
-  });
+  // `displayEnd` is a date-only calendar day, not an instant: format its
+  // calendar components so its rendered day matches the backend value.
+  const end = formatCalendarDate(report.period.displayEnd, i18n.language);
+  const generatedAt = formatUtcTimestamp(report.generatedAt);
 
   return (
     <View className="gap-1">
@@ -86,42 +145,6 @@ function ReportHeader({ report }: Readonly<{ report: SecurityAgentAuditReport }>
       <Text variant="muted" className="text-xs">
         {t('securityAgent.auditReport.generated', { generatedAt })}
       </Text>
-    </View>
-  );
-}
-
-function SummaryCount({ label, value }: Readonly<{ label: string; value: number }>) {
-  return (
-    <View className="min-w-16">
-      <Text className="text-lg font-semibold tabular-nums">
-        {formatNumber(value, i18n.language)}
-      </Text>
-      <Text variant="muted" className="text-xs">
-        {label}
-      </Text>
-    </View>
-  );
-}
-
-function ReportSummary({ report }: Readonly<{ report: SecurityAgentAuditReport }>) {
-  const { t } = useTranslation();
-  return (
-    <View className="gap-3 rounded-lg bg-secondary p-3">
-      <Text className="text-sm font-medium">{t('securityAgent.auditReport.summary')}</Text>
-      <View className="flex-row flex-wrap gap-x-6 gap-y-2">
-        <SummaryCount label={t('common.findings')} value={report.summary.findingCount} />
-        <SummaryCount
-          label={t('securityAgent.auditReport.events')}
-          value={report.summary.activityCount}
-        />
-        {SEVERITY_ORDER.map(severity => (
-          <SummaryCount
-            key={severity}
-            label={t(SEVERITY_LABEL_KEYS[severity])}
-            value={report.summary.bySeverity[severity]}
-          />
-        ))}
-      </View>
     </View>
   );
 }
@@ -141,10 +164,14 @@ function FindingSection({ finding }: Readonly<{ finding: SecurityFindingAuditSec
       <View className="gap-3">
         {finding.events.map(event => (
           <View key={event.id} className="gap-0.5">
-            <Text className="text-sm">{event.label}</Text>
+            <Text className="text-sm">{eventLabel(event.action, event.label)}</Text>
+            {eventEvidenceLines(event, t).map(line => (
+              <Text key={line} variant="muted" className="text-xs">
+                {line}
+              </Text>
+            ))}
             <Text variant="muted" className="text-xs">
-              {formatDate(parseTimestamp(event.occurredAt), i18n.language, { timeZone: 'UTC' })} ·{' '}
-              {event.actor.displayName}
+              {formatUtcTimestamp(event.occurredAt)} · {actorLabel(event.actor, t)}
             </Text>
           </View>
         ))}
@@ -162,9 +189,7 @@ function AuditReportView({
     const start = formatDate(parseTimestamp(report.period.start), i18n.language, {
       timeZone: 'UTC',
     });
-    const end = formatDate(parseTimestamp(report.period.displayEnd), i18n.language, {
-      timeZone: 'UTC',
-    });
+    const end = formatCalendarDate(report.period.displayEnd, i18n.language);
     // Explorer security-audit finding 3: CenteredState's measured path painted
     // the icon bubble but collapsed the copy, so the screen owns the layout and
     // EmptyState renders its plain content (`placement="static"`).
@@ -190,7 +215,7 @@ function AuditReportView({
         />
       ) : null}
       <ReportHeader report={report} />
-      <ReportSummary report={report} />
+      <ReportSummary summary={report.summary} />
       {report.findings.map(finding => (
         <FindingSection key={finding.findingId} finding={finding} />
       ))}
@@ -213,7 +238,7 @@ export function AuditReportScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('securityAgent.auditReport.title')} showBackButton />
+      <ScreenHeader className="px-6" title={t('securityAgent.auditReport.title')} showBackButton />
 
       {query.isLoading && <AuditReportSkeleton />}
 

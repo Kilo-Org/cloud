@@ -66,7 +66,7 @@ export function SettingsScrollspyNav({
                   {isActive && (
                     <motion.div
                       layoutId={layoutId}
-                      className="ml-auto size-1 rounded-full bg-[color:oklch(95%_0.15_108)]"
+                      className="ml-auto size-1 rounded-full bg-primary"
                       transition={{ type: 'spring', stiffness: 350, damping: 30 }}
                     />
                   )}

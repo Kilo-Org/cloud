@@ -9,8 +9,19 @@ import {
   isStartableGlanceableWork,
   shouldDiscardGlanceableRevision,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import {
+  buildHomeWidgetDetails,
+  EMPTY_HOME_WIDGET_DETAILS,
+  type HomeWidgetDetails,
+} from '@kilocode/app-shared/home-widget';
 
 import { isGlanceableFixtureHeld } from './fixture-hold';
+import { getFollowedSessionIds, rememberSnapshotRows } from './followed-sessions';
+import {
+  getLastHomeWidgetData,
+  hasSameHomeWidgetDetails,
+  setHomeWidgetDetails,
+} from './home-widget-data';
 import { type NewestSessionRow, newestSessionTitle } from './newest-session';
 import { hasSameGlanceableContent, withStatus } from './snapshot-transforms';
 import {
@@ -75,6 +86,14 @@ export type GlanceablePublisherOptions = {
    * and the retry has to answer that same session.
    */
   skipWaitingAskSessionId?: string;
+  /**
+   * Subscribe to the events that change a fact a sink reads at draw time rather
+   * than from the frame (the recorded ask's request binding). The publisher
+   * redraws the frame it already emits on each one, so a surface can offer
+   * Approve the moment the ask is bound instead of on the next heartbeat.
+   * Returns the unsubscribe, run from `dispose()`.
+   */
+  subscribeAskBound?: (listener: () => void) => () => void;
 };
 
 type TimerHandle = ReturnType<typeof setTimeout>;
@@ -120,8 +139,13 @@ export class GlanceablePublisher {
   private readonly orgLost: () => boolean;
   private readonly onWaitingAskChange?: (ask: WaitingAsk | null) => void;
   private readonly skipWaitingAskSessionId?: string;
+  private readonly unsubscribeAskBound: (() => void) | null;
+  /** The context of the last emit, so `redraw` can write the frame again. */
+  private lastEmitContext: GlanceableSinkContext | null = null;
   private current: GlanceableAgentsSnapshot | null;
   private activityStarted: boolean;
+  /** Home-only details from this publisher's previous tray read. */
+  private homeDetails: HomeWidgetDetails | null = null;
   /**
    * `updatedAt` of the frame the native surface accepted, i.e. the one its stale
    * deadline keys off. A heartbeat whose visible content did not change leaves
@@ -160,8 +184,28 @@ export class GlanceablePublisher {
     this.orgLost = options.orgLost ?? (() => false);
     this.onWaitingAskChange = options.onWaitingAskChange;
     this.skipWaitingAskSessionId = options.skipWaitingAskSessionId;
+    this.unsubscribeAskBound =
+      options.subscribeAskBound?.(() => {
+        this.redraw();
+      }) ?? null;
     this.current = options.initial ?? null;
     this.activityStarted = false;
+  }
+
+  /**
+   * Write the frame the sinks already hold once more. A sink reads some facts at
+   * draw time instead of from the frame — the recorded ask's request binding,
+   * which decides whether Approve is offered — and those can settle after the
+   * frame that recorded the ask. The content is unchanged, but the revision moves
+   * on: every sink drops a frame at or below the revision it last applied, so a
+   * redraw that kept it would never reach the surface.
+   */
+  redraw(): void {
+    if (this.current === null || this.lastEmitContext === null || this.isGated()) {
+      return;
+    }
+    this.current = { ...this.current, revision: this.current.revision + 1 };
+    this.emit(this.current, this.lastEmitContext);
   }
 
   /**
@@ -171,7 +215,8 @@ export class GlanceablePublisher {
    */
   handleSessions(
     sessions: readonly (NewestSessionRow & WaitingAskRow)[],
-    ctx: GlanceablePublisherContext
+    ctx: GlanceablePublisherContext,
+    checkedAt: number = this.now()
   ): void {
     // A dev fixture owns the surfaces and the ask it recorded: stay silent
     // without clearing that ask.
@@ -184,10 +229,25 @@ export class GlanceablePublisher {
       this.noteWaitingAsk(null);
       return;
     }
-    // The newest session's title never enters the snapshot (privacy contract):
-    // it rides in the surface extras every widget reads on redraw.
     const previousTitle = getSurfaceExtras().newestSessionTitle;
     const nextTitle = newestSessionTitle(sessions);
+    const derivedHomeDetails = buildHomeWidgetDetails(sessions);
+    // The approval key is minted server-side from the session and permission ids
+    // and cannot be recomputed here. Keep the key already held while the ask it
+    // was minted for is still the visible one; a press re-checks the digest, so a
+    // stale key can never approve a different request.
+    const heldHomeDetails = getLastHomeWidgetData()?.details ?? this.homeDetails;
+    const nextHomeDetails =
+      derivedHomeDetails.approvalKey === null &&
+      heldHomeDetails !== null &&
+      heldHomeDetails.approvalKey !== null &&
+      hasSameHomeWidgetDetails(heldHomeDetails, derivedHomeDetails)
+        ? { ...derivedHomeDetails, approvalKey: heldHomeDetails.approvalKey }
+        : derivedHomeDetails;
+    const sameHomeDetails =
+      this.homeDetails !== null && hasSameHomeWidgetDetails(this.homeDetails, nextHomeDetails);
+    this.homeDetails = nextHomeDetails;
+    setHomeWidgetDetails(nextHomeDetails, checkedAt);
     setSurfaceExtras({ ...getSurfaceExtras(), newestSessionTitle: nextTitle });
     getGlanceableDelivery().registerScopeTokens(ctx.organizationId, ctx.userId);
     const now = this.now();
@@ -200,6 +260,7 @@ export class GlanceablePublisher {
       now,
       previousRevision: this.current?.revision ?? 0,
     });
+    rememberSnapshotRows(snapshot.scopeKey, sessions);
 
     // The rows are the only place the session id exists, so the ask is selected
     // here, on every heartbeat, before the unchanged-content gate below: that
@@ -241,6 +302,7 @@ export class GlanceablePublisher {
     if (
       this.lastWriteAttemptAt !== null &&
       this.current !== null &&
+      sameHomeDetails &&
       hasSameGlanceableContent(
         { snapshot: this.current, newestSessionTitle: previousTitle },
         { snapshot, newestSessionTitle: nextTitle }
@@ -260,7 +322,6 @@ export class GlanceablePublisher {
       return;
     }
 
-    // `needsApproval` is optional, so normalize it for the coalesce decision.
     const previousNeedsApproval = this.current?.needsApproval ?? 0;
 
     if (isEligibleGlanceableWork(snapshot)) {
@@ -271,7 +332,7 @@ export class GlanceablePublisher {
         this.activityStarted = true;
       } else if (
         snapshot.needsInput !== this.current?.needsInput ||
-        (snapshot.needsApproval ?? 0) !== previousNeedsApproval
+        snapshot.needsApproval !== previousNeedsApproval
       ) {
         // Actionable needs-input/approval changes must reach the launcher
         // immediately: `needsApproval` gates the Approve control on every
@@ -364,6 +425,7 @@ export class GlanceablePublisher {
     if (incoming.status !== 'signed_out' && incoming.status !== 'privacy') {
       getGlanceableDelivery().registerScopeTokens(ctx.organizationId, ctx.userId);
     }
+    setHomeWidgetDetails(EMPTY_HOME_WIDGET_DETAILS);
     // A late background delivery supersedes a pending coalesced emit and any
     // pending 8 s terminal, so neither can fire after the newer snapshot.
     this.cancelCoalesce();
@@ -381,6 +443,7 @@ export class GlanceablePublisher {
   dispose(): void {
     this.cancelCoalesce();
     this.cancelTerminal();
+    this.unsubscribeAskBound?.();
   }
 
   private isGated(): boolean {
@@ -399,13 +462,21 @@ export class GlanceablePublisher {
 
   /**
    * The rows the ask selection may name: every row except the session whose ask
-   * was already actioned. That row still counts in the snapshot.
+   * was already actioned, and every session this device follows. A followed
+   * session has its own card and its own Approve, so the aggregate card's
+   * Approve must never answer its request. Both still count in the snapshot.
    */
   private askRows(
     sessions: readonly (NewestSessionRow & WaitingAskRow)[]
   ): readonly (NewestSessionRow & WaitingAskRow)[] {
     const skip = this.skipWaitingAskSessionId;
-    return skip === undefined ? sessions : sessions.filter(row => row.id !== skip);
+    const followed = getFollowedSessionIds();
+    if (skip === undefined && followed.size === 0) {
+      return sessions;
+    }
+    return sessions.filter(
+      row => row.id !== skip && (row.id === undefined || !followed.has(row.id))
+    );
   }
 
   /**
@@ -453,6 +524,9 @@ export class GlanceablePublisher {
    */
   private writeFrame(snapshot: GlanceableAgentsSnapshot, ctx: GlanceableSinkContext | null): void {
     this.lastWriteAttemptAt = this.now();
+    if (ctx !== null) {
+      this.lastEmitContext = ctx;
+    }
     if (writeGlanceableFrame(this.sinks, snapshot, ctx)) {
       this.lastPublishedAt = Date.parse(snapshot.updatedAt);
       this.writeFailures = 0;

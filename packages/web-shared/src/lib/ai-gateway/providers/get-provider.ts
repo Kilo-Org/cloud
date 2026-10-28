@@ -2,33 +2,67 @@ import type {
   GatewayRequest,
   OpenRouterProviderConfig,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import { shouldRouteToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
-  findKiloExclusiveModel,
-  isKiloExclusiveModel,
-} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { CUSTOM_LLM_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+  canRouteToVercel,
+  shouldRouteToVercel,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
+  GatewayUserByokProviderIdSchema,
+  isGatewayUserByokProviderId,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { withIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
+import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import {
+  byokOwner,
   getBYOKforOrganization,
   getBYOKforUser,
-  getModelUserByokProviders,
+  getByokCredentials,
+  getModelGatewayUserByokProviders,
+  getModelInferenceUserByokProviders,
+  isGatewayUserByokEligibleModel,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
-import { custom_llm2, type User } from '@kilocode/db/schema';
+import type { User } from '@kilocode/db/schema';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { eq } from 'drizzle-orm';
 import type { AnonymousUserContext } from '@kilocode/web-shared/lib/anonymous';
 import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import type { BYOKResult, Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
-import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
-import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
+  createUserOpenRouterProvider,
+  OPENROUTER,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import {
+  createUserVercelAiGatewayProvider,
+  VERCEL_AI_GATEWAY,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+import {
+  findDirectByokCatalogModels,
+  getDirectByokCatalogModelId,
+  getDirectByokModel,
+  supportsCatalogMode,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import type {
+  DirectByokModel,
+  DirectByokProvider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import { checkOpenAiChatGptByok } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
-import { CustomLlmCredentialsSchema, CustomLlmDefinitionSchema } from '@kilocode/db/schema-types';
-import { buildDirectProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/build-direct-provider';
+import { CustomLlmCredentialsSchema, type CustomLlmCredentials } from '@kilocode/db/schema-types';
+import {
+  findCustomLlm,
+  isPublicCustomLlm,
+  type CustomLlm,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { getCustomLlmApiKinds } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/api-kinds';
+import {
+  buildDirectProvider,
+  type DirectUpstreamAuth,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/build-direct-provider';
 import { getGoogleServiceAccountAccessToken } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/google-service-account';
 import { userHasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
+import { isCustomLlmDeniedInCountry } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { removePaidServerFeatures } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-paid-server-features';
 import {
   getLocalFakeLlmProvider,
   getLocalFakeTranscriptionProvider,
@@ -40,9 +74,10 @@ export type GetProviderProviderResult = {
   kind: 'provider';
   provider: Provider;
   userByok: BYOKResult[] | null;
+  readonly isFree: boolean;
   /** Skip balance, paid-auth, and organization policy checks entirely. Used
-   *  by direct-byok and custom_llm2 because both already require explicit
-   *  admin opt-in. */
+   *  by bespoke direct-byok ids and non-public custom_llm2 because both already
+   *  require explicit admin opt-in. */
   bypassAccessCheck: boolean;
   /** Skip only the zero-balance paid-model block. Set when a user credential
    *  outside Kilo credits pays for the request, such as the ChatGPT
@@ -50,131 +85,302 @@ export type GetProviderProviderResult = {
   skipBalanceCheck?: boolean;
 };
 
+/** A bespoke direct BYOK id whose key serves only catalog ids. */
+export type DirectByokCatalogOnlyResult = {
+  kind: 'direct-byok-catalog-only';
+  providerId: DirectByokProvider['id'];
+  /** The catalog id that serves the same model through the key, when one exists. */
+  catalogModelId: string | null;
+};
+
 export type GetProviderResult =
   | GetProviderProviderResult
-  | { kind: 'chatgpt-reconnect'; message: string };
+  | { kind: 'chatgpt-reconnect'; message: string }
+  /** The id is a custom LLM the caller may not use, or its stored credentials are unusable. */
+  | { kind: 'custom-llm-unavailable' }
+  | DirectByokCatalogOnlyResult;
 
-async function checkDirectBYOK(
-  user: User | AnonymousUserContext,
+async function directByokProviderResult(
+  directByok: DirectByokProvider,
+  directByokModel: DirectByokModel,
+  credential: BYOKResult,
   requestedModel: string,
-  organizationId: string | undefined
-): Promise<GetProviderProviderResult | null> {
-  const { provider: directByok, model: directByokModel } = await getDirectByokModel(requestedModel);
-  if (!directByok || !directByokModel) {
-    return null;
-  }
-  const userByok = organizationId
-    ? await getBYOKforOrganization(readDb, organizationId, [directByok.id])
-    : await getBYOKforUser(readDb, user.id, [directByok.id]);
-  if (!userByok || userByok.length === 0) {
-    return null;
-  }
+  request: GatewayRequest,
+  servesCatalogId: boolean
+): Promise<GetProviderProviderResult> {
+  const upstream = await directByok.resolveUpstream({
+    credential: credential.decryptedAPIKey,
+    model: directByokModel,
+    stream: request.body.stream === true,
+  });
+
   return {
     kind: 'provider',
     provider: {
       id: 'direct-byok',
-      apiUrl: directByok.base_url,
-      apiUrlOverrides: directByok.base_url_overrides,
-      disableUrlSuffix: false,
-      apiKey: userByok[0].decryptedAPIKey,
-      apiKeyHeader: null,
-      supportedChatApis: directByok.supported_chat_apis,
-      responseTransforms: null,
+      ...upstream,
       async transformRequest(context) {
         context.request.body.model = directByokModel.id;
         delete context.request.body.provider;
         directByok.transformRequest(context);
       },
     } satisfies Provider,
-    userByok,
-    bypassAccessCheck: true,
+    userByok: [{ decryptedAPIKey: credential.decryptedAPIKey, providerId: credential.providerId }],
+    isFree: isFreeModelExcludingCustomLlms(requestedModel),
+    // Organization model policies cover catalog ids. A bespoke id is only served by a key outside
+    // catalog mode, which stays exempt as before.
+    bypassAccessCheck: !servesCatalogId,
   };
 }
 
-async function checkCustomLlm(
+/**
+ * The caller's catalog-mode keys serve the catalog id, but none over the request's API kind. The
+ * caller's other BYOK routes may still serve it; otherwise `result` fails the request with the
+ * unsupported-API error.
+ */
+type DirectByokUnsupportedApiKind = {
+  kind: 'direct-byok-unsupported-api-kind';
+  result: GetProviderProviderResult;
+};
+
+/**
+ * Direct BYOK model IDs name their provider, such as `neuralwatt/...`, and the
+ * request goes straight to that provider with the stored key, bypassing Kilo's
+ * gateways. A key in catalog mode instead serves the catalog ids its provider maps.
+ */
+async function resolveDirectByokProvider(
+  user: User | AnonymousUserContext,
   requestedModel: string,
-  organizationId: string,
-  kiloUserId: string
-): Promise<GetProviderProviderResult | null> {
-  const [row] = await readDb
-    .select()
-    .from(custom_llm2)
-    .where(eq(custom_llm2.public_id, requestedModel));
-  const parsedCustomLlm = CustomLlmDefinitionSchema.safeParse(row?.definition);
-  if (row && !parsedCustomLlm.success) {
-    console.log('Failed to parse custom llm definition', parsedCustomLlm.error);
-  }
-  const customLlm = parsedCustomLlm.data;
-  if (!customLlm || !(await userHasCustomLlmAccess(customLlm, organizationId, kiloUserId))) {
-    return null;
+  request: GatewayRequest,
+  organizationId: string | undefined
+): Promise<
+  GetProviderProviderResult | DirectByokCatalogOnlyResult | DirectByokUnsupportedApiKind | null
+> {
+  const owner = byokOwner(user.id, organizationId);
+  const { provider: directByok, model: directByokModel } = await getDirectByokModel(requestedModel);
+  if (directByok && directByokModel) {
+    const [credential] = await getByokCredentials(readDb, owner, [directByok.id]);
+    if (!credential) return null;
+    if (credential.serveCatalogModels && supportsCatalogMode(directByok.id)) {
+      return {
+        kind: 'direct-byok-catalog-only',
+        providerId: directByok.id,
+        catalogModelId: await getDirectByokCatalogModelId(directByokModel),
+      };
+    }
+    return directByokProviderResult(
+      directByok,
+      directByokModel,
+      credential,
+      requestedModel,
+      request,
+      false
+    );
   }
 
-  if (!row?.encrypted_api_key) {
-    return null;
+  if (isAnonymousContext(user)) return null;
+  const catalogModels = await findDirectByokCatalogModels(requestedModel);
+  if (catalogModels.length === 0) return null;
+  const credentials = await getByokCredentials(
+    readDb,
+    owner,
+    catalogModels.map(({ provider }) => provider.id),
+    { catalogModeOnly: true }
+  );
+  let unsupportedApiKind: GetProviderProviderResult | null = null;
+  for (const { provider, model } of catalogModels) {
+    const credential = credentials.find(
+      candidate => candidate.providerId === provider.id && candidate.serveCatalogModels
+    );
+    if (!credential) continue;
+    const result = await directByokProviderResult(
+      provider,
+      model,
+      credential,
+      requestedModel,
+      request,
+      true
+    );
+    if (result.provider.supportedChatApis.includes(request.kind)) return result;
+    unsupportedApiKind ??= result;
   }
+  return (
+    unsupportedApiKind && { kind: 'direct-byok-unsupported-api-kind', result: unsupportedApiKind }
+  );
+}
 
-  const decrypted = decryptApiKey(row.encrypted_api_key, BYOK_ENCRYPTION_KEY);
+async function isEligibleForCustomLlm(
+  customLlm: CustomLlm,
+  user: User | AnonymousUserContext,
+  organizationId: string | undefined
+) {
+  if (isPublicCustomLlm(customLlm.definition)) return true;
+  if (isAnonymousContext(user) || !organizationId) return false;
+  return await userHasCustomLlmAccess(customLlm.definition, organizationId, user.id);
+}
+
+function readCustomLlmCredentials(customLlm: CustomLlm): CustomLlmCredentials | null {
+  if (!customLlm.encrypted_api_key) return null;
+  const decrypted = decryptApiKey(customLlm.encrypted_api_key, BYOK_ENCRYPTION_KEY);
   let parsedJson: unknown;
   try {
     parsedJson = JSON.parse(decrypted);
   } catch {
     return null;
   }
-  const parsedCredentials = CustomLlmCredentialsSchema.safeParse(parsedJson);
-  if (!parsedCredentials.success) {
-    return null;
+  return CustomLlmCredentialsSchema.safeParse(parsedJson).data ?? null;
+}
+
+async function resolveCustomLlmAuth(
+  credentials: CustomLlmCredentials
+): Promise<DirectUpstreamAuth> {
+  switch (credentials.type) {
+    case 'api_key':
+      return { type: 'api_key', apiKey: credentials.api_key, apiKeyHeader: null };
+    case 'x-api-key':
+      return { type: 'api_key', apiKey: credentials.api_key, apiKeyHeader: 'x-api-key' };
+    case 'service_account':
+      return {
+        type: 'api_key',
+        apiKey: await getGoogleServiceAccountAccessToken(credentials),
+        apiKeyHeader: null,
+      };
+    case 'secure_proxy':
+      return { type: 'secure_proxy', credentials };
+    case 'aws_bedrock':
+      return { type: 'aws_bedrock', credentials };
+  }
+}
+
+/**
+ * A custom LLM owns its id: a caller without access, including one from a
+ * denied country, or a definition with unusable credentials, must not fall back
+ * to another upstream for the same id.
+ */
+async function resolveCustomLlmProvider(
+  customLlm: CustomLlm,
+  user: User | AnonymousUserContext,
+  organizationId: string | undefined,
+  countryCode: string | null
+): Promise<GetProviderResult> {
+  if (isCustomLlmDeniedInCountry(customLlm.definition, countryCode)) {
+    return { kind: 'custom-llm-unavailable' };
+  }
+  if (!(await isEligibleForCustomLlm(customLlm, user, organizationId))) {
+    return { kind: 'custom-llm-unavailable' };
+  }
+  const credentials = readCustomLlmCredentials(customLlm);
+  if (!credentials) {
+    console.error('Custom LLM credentials are missing or invalid', customLlm.public_id);
+    return { kind: 'custom-llm-unavailable' };
   }
 
-  let apiKey: string;
-  let apiKeyHeader: 'x-api-key' | null = null;
-  if (parsedCredentials.data.type === 'api_key' || parsedCredentials.data.type === 'x-api-key') {
-    apiKey = parsedCredentials.data.api_key;
-    apiKeyHeader = parsedCredentials.data.type === 'x-api-key' ? 'x-api-key' : null;
-  } else {
-    apiKey = await getGoogleServiceAccountAccessToken(parsedCredentials.data);
-  }
-
-  const resolvedCustomLlm = {
-    ...customLlm,
-    api_key: apiKey,
-  };
+  const { definition } = customLlm;
+  const provider = buildDirectProvider(
+    'custom',
+    getCustomLlmApiKinds(definition),
+    definition,
+    await resolveCustomLlmAuth(credentials)
+  );
+  const isPublic = isPublicCustomLlm(definition);
   return {
     kind: 'provider',
-    provider: buildDirectProvider(
-      'custom',
-      [
-        customLlm.opencode_settings?.ai_sdk_provider === 'anthropic'
-          ? 'messages'
-          : customLlm.opencode_settings?.ai_sdk_provider === 'openai'
-            ? 'responses'
-            : 'chat_completions',
-      ],
-      resolvedCustomLlm,
-      apiKeyHeader
-    ),
+    provider: isPublic ? withoutPaidServerFeatures(provider) : provider,
     userByok: null,
-    bypassAccessCheck: true,
+    isFree: true,
+    bypassAccessCheck: !isPublic,
   };
 }
 
-async function checkVercelBYOK(
+/**
+ * A public custom LLM serves anyone for free on Kilo's credential, so like other
+ * free models it drops paid server features before the definition's own
+ * `extra_body` applies. Private custom LLMs keep them.
+ */
+function withoutPaidServerFeatures(provider: Provider): Provider {
+  return {
+    ...provider,
+    async transformRequest(context) {
+      removePaidServerFeatures(provider, context.model, context.request, context.kilo_user_id);
+      await provider.transformRequest(context);
+    },
+  };
+}
+
+type GatewayRoutedByok = {
+  /** Inference provider keys, sent through Kilo's Vercel AI Gateway account. */
+  inference: BYOKResult[];
+  /** Whole-gateway keys that replace Kilo's own gateway key. */
+  gateway: BYOKResult[];
+};
+
+/**
+ * Stored keys that can serve a catalog model through a gateway, unlike direct
+ * BYOK, where the model ID itself names the provider.
+ */
+async function getGatewayRoutedByok(
   user: User | AnonymousUserContext,
   requestedModel: string,
-  organizationId: string | undefined
-): Promise<BYOKResult[] | null> {
-  if (isAnonymousContext(user)) return null;
-  // Kilo-exclusive models are not routable through Vercel BYOK. Reasoning in particular
-  // breaks: the Vercel AI Gateway normalizes reasoning to each provider's upstream-native
-  // shape, whereas our Kilo-exclusive models are served through generic OpenAI-compatible
-  // endpoints (Martian, direct Alibaba, etc.) where that normalization doesn't apply and the
-  // response ends up corrupted. Skip the Vercel BYOK lookup entirely and let the caller fall
-  // through to the model's declared gateway.
-  if (isKiloExclusiveModel(requestedModel)) return null;
-  const modelProviders = await getModelUserByokProviders(requestedModel);
-  if (modelProviders.length === 0) return null;
-  return organizationId
-    ? getBYOKforOrganization(readDb, organizationId, modelProviders)
-    : getBYOKforUser(readDb, user.id, modelProviders);
+  organizationId: string | undefined,
+  { includeGatewayKeys }: { includeGatewayKeys: boolean }
+): Promise<GatewayRoutedByok> {
+  const none: GatewayRoutedByok = { inference: [], gateway: [] };
+  if (isAnonymousContext(user)) return none;
+  // Kilo-exclusive models stay on Kilo's own accounts, like in `getModelGatewayUserByokProviders`.
+  if (isKiloExclusiveModel(requestedModel)) return none;
+  const candidateProviders = [
+    ...(await getModelInferenceUserByokProviders(requestedModel)),
+    ...(includeGatewayKeys && isGatewayUserByokEligibleModel(requestedModel)
+      ? GatewayUserByokProviderIdSchema.options
+      : []),
+  ];
+  if (candidateProviders.length === 0) return none;
+  const userByok =
+    (organizationId
+      ? await getBYOKforOrganization(readDb, organizationId, candidateProviders)
+      : await getBYOKforUser(readDb, user.id, candidateProviders)) ?? [];
+  const inference = userByok.filter(byok => !isGatewayUserByokProviderId(byok.providerId));
+  const gatewayKeys = userByok.filter(byok => isGatewayUserByokProviderId(byok.providerId));
+  // Inference provider keys take priority, so gateway keys then go unused.
+  if (inference.length > 0 || gatewayKeys.length === 0) return { inference, gateway: [] };
+  const gatewayProviders: readonly string[] =
+    await getModelGatewayUserByokProviders(requestedModel);
+  return {
+    inference,
+    gateway: gatewayKeys.filter(byok => gatewayProviders.includes(byok.providerId)),
+  };
+}
+
+/**
+ * Prefers the Vercel AI Gateway key when Vercel can serve the model under the
+ * provider routing settings, and the OpenRouter key otherwise.
+ */
+async function checkGatewayBYOK(
+  gatewayByok: BYOKResult[],
+  requestedModel: string,
+  getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>
+): Promise<GetProviderProviderResult | null> {
+  const vercelKey = gatewayByok.find(byok => byok.providerId === 'vercel-ai-gateway');
+  if (vercelKey && (await canRouteToVercel(requestedModel, getRoutingProviderConfig))) {
+    return {
+      kind: 'provider',
+      provider: createUserVercelAiGatewayProvider(vercelKey.decryptedAPIKey),
+      userByok: [vercelKey],
+      isFree: isFreeModelExcludingCustomLlms(requestedModel),
+      bypassAccessCheck: false,
+    };
+  }
+  const openRouterKey = gatewayByok.find(byok => byok.providerId === 'openrouter');
+  if (openRouterKey) {
+    return {
+      kind: 'provider',
+      provider: createUserOpenRouterProvider(openRouterKey.decryptedAPIKey),
+      userByok: [openRouterKey],
+      isFree: isFreeModelExcludingCustomLlms(requestedModel),
+      bypassAccessCheck: false,
+    };
+  }
+  return null;
 }
 
 export type GetProviderInput = {
@@ -184,15 +390,31 @@ export type GetProviderInput = {
   organizationId: string | undefined;
   /** The platform caller for a service run; see `OpenAiChatGptRoutingInput`. */
   botId?: string | undefined;
-  taskId: string | undefined;
   /** Resolves organization/group provider policy only when selecting a managed
-   * gateway. Direct BYOK and custom LLM routes remain exempt. */
+   * gateway. Direct BYOK and custom LLM routes do not use it. */
   getRoutingProviderConfig?: () => Promise<OpenRouterProviderConfig | undefined>;
+  /** Kilo's own provider exclusions for the model (see `getIgnoredProviders`).
+   * They apply to routes Kilo pays for, never to a user's own gateway key. */
+  kiloIgnoredProviders?: string[];
+  /** The request carries a spend ceiling. Only a provider that can cap the
+   * price of the route it serves may take it. */
+  boundedSpending?: boolean;
+  /** The caller's Vercel IP country, for custom LLM country deny lists. */
+  countryCode?: string | null;
 };
 
 export async function getProvider(input: GetProviderInput): Promise<GetProviderResult> {
-  const { requestedModel, request, user, organizationId, botId, taskId, getRoutingProviderConfig } =
-    input;
+  const {
+    requestedModel,
+    request,
+    user,
+    organizationId,
+    botId,
+    getRoutingProviderConfig,
+    kiloIgnoredProviders = [],
+    boundedSpending = false,
+    countryCode = null,
+  } = input;
 
   if (isLocalFakeLlmEnabled() && isLocalFakeDeterministicModel(requestedModel)) {
     const localFakeProvider = getLocalFakeLlmProvider();
@@ -201,14 +423,28 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
         kind: 'provider',
         provider: localFakeProvider,
         userByok: null,
+        isFree: true,
         bypassAccessCheck: true,
       };
     }
   }
 
-  const directByokByok = await checkDirectBYOK(user, requestedModel, organizationId);
-  if (directByokByok) {
-    return directByokByok;
+  const customLlm = await findCustomLlm(requestedModel);
+  if (customLlm) {
+    return await resolveCustomLlmProvider(customLlm, user, organizationId, countryCode);
+  }
+
+  const directByokProvider = await resolveDirectByokProvider(
+    user,
+    requestedModel,
+    request,
+    organizationId
+  );
+  let directByokUnsupportedApiKind: DirectByokUnsupportedApiKind | null = null;
+  if (directByokProvider?.kind === 'direct-byok-unsupported-api-kind') {
+    directByokUnsupportedApiKind = directByokProvider;
+  } else if (directByokProvider) {
+    return directByokProvider;
   }
 
   // An enabled "Sign in with ChatGPT" connection wins for an eligible OpenAI
@@ -227,54 +463,63 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     return { kind: 'chatgpt-reconnect', message: openAiChatGptByok.message };
   }
   if (openAiChatGptByok) {
-    return openAiChatGptByok;
+    return {
+      ...openAiChatGptByok,
+      isFree: isFreeModelExcludingCustomLlms(requestedModel),
+    };
   }
 
-  const vercelByok = await checkVercelBYOK(user, requestedModel, organizationId);
-  if (vercelByok) {
+  const gatewayRoutedByok = await getGatewayRoutedByok(user, requestedModel, organizationId, {
+    includeGatewayKeys: true,
+  });
+  if (gatewayRoutedByok.inference.length > 0) {
     return {
       kind: 'provider',
       provider: VERCEL_AI_GATEWAY,
-      userByok: vercelByok,
+      userByok: gatewayRoutedByok.inference,
+      isFree: isFreeModelExcludingCustomLlms(requestedModel),
       bypassAccessCheck: false,
     };
   }
 
-  const kiloExclusiveModel = findKiloExclusiveModel(requestedModel);
-
-  if (requestedModel.startsWith(CUSTOM_LLM_PREFIX) && organizationId && !isAnonymousContext(user)) {
-    const customLlmResult = await checkCustomLlm(requestedModel, organizationId, user.id);
-    if (customLlmResult) {
-      return customLlmResult;
-    }
-  }
-
-  const eligibleForVercelRouting =
-    !kiloExclusiveModel || kiloExclusiveModel.flags.includes('vercel-routing');
   const resolveRoutingProviderConfig = async () =>
     (await getRoutingProviderConfig?.()) ?? request.body.provider;
 
+  const gatewayByok = await checkGatewayBYOK(
+    gatewayRoutedByok.gateway,
+    requestedModel,
+    resolveRoutingProviderConfig
+  );
+  if (gatewayByok) {
+    return gatewayByok;
+  }
+
+  // BYOK requests are never billed to Kilo, so a catalog id the caller's keys serve, but not over
+  // this API kind, fails with the unsupported-API error instead of taking a Kilo route.
+  if (directByokUnsupportedApiKind) {
+    return directByokUnsupportedApiKind.result;
+  }
+
   if (
-    eligibleForVercelRouting &&
-    (await shouldRouteToVercel(
-      requestedModel,
-      request,
-      taskId || user.id,
-      resolveRoutingProviderConfig
+    !boundedSpending &&
+    (await shouldRouteToVercel(requestedModel, request, async () =>
+      withIgnoredProviders(await resolveRoutingProviderConfig(), kiloIgnoredProviders)
     ))
   ) {
     return {
       kind: 'provider',
       provider: VERCEL_AI_GATEWAY,
       userByok: null,
+      isFree: isFreeModelExcludingCustomLlms(requestedModel),
       bypassAccessCheck: false,
     };
   }
 
   return {
     kind: 'provider',
-    provider: kiloExclusiveModel?.provider ?? OPENROUTER,
+    provider: OPENROUTER,
     userByok: null,
+    isFree: isFreeModelExcludingCustomLlms(requestedModel),
     bypassAccessCheck: false,
   };
 }
@@ -283,15 +528,18 @@ export async function getEmbeddingProvider(
   requestedModel: string,
   user: User | AnonymousUserContext,
   organizationId: string | undefined
-): Promise<{ provider: Provider; userByok: BYOKResult[] | null }> {
+): Promise<{ provider: Provider; userByok: BYOKResult[] | null; isFree: boolean }> {
+  const isFree = isFreeModelExcludingCustomLlms(requestedModel);
   // 1. BYOK check — route through Vercel AI Gateway when user has their own key
-  const userByok = await checkVercelBYOK(user, requestedModel, organizationId);
-  if (userByok) {
-    return { provider: VERCEL_AI_GATEWAY, userByok };
+  const { inference } = await getGatewayRoutedByok(user, requestedModel, organizationId, {
+    includeGatewayKeys: false,
+  });
+  if (inference.length > 0) {
+    return { provider: VERCEL_AI_GATEWAY, userByok: inference, isFree };
   }
 
   // 2. All non-BYOK embedding requests go through OpenRouter
-  return { provider: OPENROUTER, userByok: null };
+  return { provider: OPENROUTER, userByok: null, isFree };
 }
 
 export async function getTranscriptionProvider(): Promise<{

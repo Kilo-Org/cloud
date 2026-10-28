@@ -35,6 +35,7 @@ export type StreamEventType =
   | 'preparing' // Lazy workspace preparation step progress
   // DO -> /stream clients (cloud infrastructure lifecycle)
   | 'cloud.status' // Cloud infrastructure status (preparing/ready/finalizing/error)
+  | 'cloud.sandbox.status'
   | 'cloud.worktree.changes.ready'
   // DO -> /stream clients (session message queue)
   | 'cloud.message.queued' // User message accepted into the pending queue
@@ -42,6 +43,7 @@ export type StreamEventType =
   | 'cloud.message.completed' // Accepted user message completed execution
   | 'cloud.message.failed' // User message delivery failed or was canceled before completion
   | 'connected' // Sent on WebSocket connect with current service state
+  | 'bootstrap.complete'
   // Wrapper -> DO -> /stream clients (slash command catalog)
   | 'commands.available'; // Catalog of kilo slash commands available in this session
 
@@ -137,7 +139,9 @@ export type PreparingStep =
   | 'workspace_restore'
   | 'workspace_backup'
   | 'sandbox_provision'
+  | 'environment_snapshot'
   | 'sandbox_boot'
+  | 'snapshot_fallback'
   | 'kilo_server'
   | 'kilo_session'
   | 'restore_incomplete'
@@ -155,6 +159,7 @@ export type PreparationStepSnapshot = {
   label: string;
   status: PreparationStepStatus;
   startedAt: number;
+  startedRevision?: number;
   completedAt?: number;
   revision: number;
   latestDetail?: string;
@@ -162,6 +167,7 @@ export type PreparationStepSnapshot = {
   command?: string;
   commandIndex?: number;
   commandCount?: number;
+  parentStepId?: string;
   outputTail?: string;
   outputTruncated?: boolean;
   exitCode?: number;
@@ -199,6 +205,7 @@ export type PreparingEventDataV2 = PreparingEventDataV2Base &
         command?: string;
         commandIndex?: number;
         commandCount?: number;
+        parentStepId?: string;
       }
     | { action: 'step_progress'; stepId: string; detail: string }
     | { action: 'step_output'; stepId: string; output: string }
@@ -243,6 +250,7 @@ export type SessionStatus =
 
 /** Data included in 'connected' events. */
 export type ConnectedEventData = {
+  bootstrapPending?: boolean;
   sessionStatus?: SessionStatus;
   cloudStatus?: { type: CloudStatusType; step?: string; message?: string };
   activeMessageId?: string | null;
@@ -265,8 +273,8 @@ export type CommandsAvailableData = {
 };
 
 /**
- * Regex for validating session IDs (`agent_<uuid>` legacy, `workspace_<uuid>` control plane).
+ * Regex for validating session IDs (`workspace_<uuid>`).
  * Shared between worker (zod schema) and wrapper (defense-in-depth validation).
  */
 export const SESSION_ID_RE =
-  /^(agent|workspace)_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+  /^workspace_[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;

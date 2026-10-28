@@ -7,7 +7,8 @@ description: Looks up Kilo Sentry issues, events, and traces using MCP without r
 
 ## Known Defaults
 
-- Organization slug: **`kilo-code`**, not `kilocode`. Do not infer it from an issue prefix.
+- Organization slug: **`anaconda-nq`**. Do not use `kilo-code` or `kilocode`, and do not infer the org from an issue prefix.
+- Old `kilo-code.sentry.io` links and `--org=kilo-code` references in the repo point to the retired org; those issues do not exist in `anaconda-nq`.
 - Common web project: **`kilocode-web`**. Prefer the user's project/URL; do not apply this filter to unrelated services.
 - Use the supplied URL or connection's region; pass `regionUrl` only when known, never guessed.
 - Skip `whoami`, organization listing, and repo greps to rediscover these defaults. A forbidden org list does **not** establish that a targeted issue lookup is forbidden.
@@ -20,7 +21,7 @@ Tool names below may have a `sentry_` prefix in the connected client.
 2. Given an issue short ID or numeric ID, use the explicit organization:
 
 ```json
-{ "resourceType": "issue", "organizationSlug": "kilo-code", "resourceId": "<issue-id>" }
+{ "resourceType": "issue", "organizationSlug": "anaconda-nq", "resourceId": "<issue-id>" }
 ```
 
 3. Do not search only unresolved issues to retrieve a supplied ID; direct lookup also covers resolved issues.

@@ -52,6 +52,50 @@ describe('CustomLlmCredentialsSchema and CustomLlmDefinitionSchema', () => {
     expect(CustomLlmCredentialsSchema.safeParse(serviceAccount('private-key')).success).toBe(true);
   });
 
+  it('accepts secure proxy credentials', () => {
+    expect(
+      CustomLlmCredentialsSchema.safeParse({
+        type: 'secure_proxy',
+        proxy_secret: 'proxy-secret',
+        config: {
+          url: 'https://llm.example.com/v1',
+          extra_headers: { Authorization: 'Bearer partner-token' },
+        },
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects secure proxy credentials with a non-HTTPS upstream', () => {
+    expect(
+      CustomLlmCredentialsSchema.safeParse({
+        type: 'secure_proxy',
+        proxy_secret: 'proxy-secret',
+        config: { url: 'http://llm.example.com/v1' },
+      }).success
+    ).toBe(false);
+  });
+
+  it('accepts Amazon Bedrock IAM access key credentials', () => {
+    expect(
+      CustomLlmCredentialsSchema.safeParse({
+        type: 'aws_bedrock',
+        region: 'us-east-1',
+        access_key_id: 'AKIDEXAMPLE',
+        secret_access_key: 'secret-access-key',
+      }).success
+    ).toBe(true);
+  });
+
+  it('rejects Amazon Bedrock credentials without a region', () => {
+    expect(
+      CustomLlmCredentialsSchema.safeParse({
+        type: 'aws_bedrock',
+        access_key_id: 'AKIDEXAMPLE',
+        secret_access_key: 'secret-access-key',
+      }).success
+    ).toBe(false);
+  });
+
   it('validates custom LLM definition without credentials', () => {
     expect(CustomLlmDefinitionSchema.safeParse(baseDefinition).success).toBe(true);
   });
@@ -75,6 +119,21 @@ describe('getGoogleServiceAccountAccessToken', () => {
     const getAccessToken = jest.fn(async () => 'gcp-token');
     mockGoogleAuth.mockImplementation(() => ({ getAccessToken }) as unknown as GoogleAuth);
     const credentials = serviceAccount('private-key-one');
+
+    await expect(getGoogleServiceAccountAccessToken(credentials)).resolves.toBe('gcp-token');
+    expect(mockGoogleAuth).toHaveBeenCalledWith({
+      credentials,
+      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+    });
+  });
+
+  it('accepts a key with only the fields needed to sign token requests', async () => {
+    const getAccessToken = jest.fn(async () => 'gcp-token');
+    mockGoogleAuth.mockImplementation(() => ({ getAccessToken }) as unknown as GoogleAuth);
+    const credentials = {
+      client_email: 'direct-byok@example-project.iam.gserviceaccount.com',
+      private_key: 'private-key-four',
+    };
 
     await expect(getGoogleServiceAccountAccessToken(credentials)).resolves.toBe('gcp-token');
     expect(mockGoogleAuth).toHaveBeenCalledWith({

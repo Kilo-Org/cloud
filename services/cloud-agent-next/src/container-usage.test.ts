@@ -5,6 +5,9 @@ import {
   updateBillingContext,
   type ContainerUsageRpcMethods,
 } from '@kilocode/container-usage';
+import type * as ContainerConcurrencyExports from './container-concurrency.js';
+
+type ContainerConcurrencyModule = typeof ContainerConcurrencyExports;
 
 // oxlint-disable-next-line no-empty-object-type -- Matches the mocked Sandbox constructor.
 type SandboxDurableObjectState = DurableObjectState<{}>;
@@ -20,11 +23,27 @@ const sdk = vi.hoisted(() => {
     superActivityExpired = false;
     superStopCalled = false;
     superDestroyCalled = false;
+    superFetchCalls = 0;
+    renewActivityTimeoutCalls = 0;
+    setInactivityTimeoutCalls: Array<number | bigint> = [];
     destroyBarrier?: Promise<void>;
 
     constructor(ctx: SandboxDurableObjectState, env: unknown) {
       this.ctx = ctx;
       this.env = env;
+    }
+
+    async fetch(_request: Request): Promise<Response> {
+      this.superFetchCalls += 1;
+      return new Response('super');
+    }
+
+    renewActivityTimeout(): void {
+      this.renewActivityTimeoutCalls += 1;
+    }
+
+    setInactivityTimeout(ms: number | bigint): void {
+      this.setInactivityTimeoutCalls.push(ms);
     }
 
     deleteSchedules(callback: string): void {
@@ -58,6 +77,16 @@ const sdk = vi.hoisted(() => {
       this.superActivityExpired = true;
     }
 
+    startCalls = 0;
+
+    async start(): Promise<void> {
+      this.startCalls += 1;
+    }
+
+    async startAndWaitForPorts(): Promise<void> {
+      this.startCalls += 1;
+    }
+
     async stop(): Promise<void> {
       this.superStopCalled = true;
     }
@@ -74,7 +103,26 @@ const sdk = vi.hoisted(() => {
 
 vi.mock('@cloudflare/sandbox', () => ({ Sandbox: sdk.StockSandbox }));
 
+const capacity = vi.hoisted(() => ({
+  assertContainerCapacity: vi.fn<(env: unknown, request: unknown) => Promise<void>>(
+    async () => undefined
+  ),
+}));
+
+vi.mock('./container-concurrency.js', async importOriginal => ({
+  ...(await importOriginal<ContainerConcurrencyModule>()),
+  assertContainerCapacity: capacity.assertContainerCapacity,
+}));
+
 import { billingHeartbeatSeconds, MeteredSandbox } from './container-usage.js';
+import {
+  ContainerCapacityUnavailableError,
+  ContainerConcurrencyLimitError,
+} from './container-concurrency.js';
+import {
+  PREVIEW_MARKER_ALLOCATION_HEADER,
+  PREVIEW_MARKER_PORT_HEADER,
+} from './shared/preview-headers.js';
 
 class MemoryStorage {
   private readonly values = new Map<string, unknown>();
@@ -135,6 +183,10 @@ type TestRuntime = MeteredSandbox & {
   superActivityExpired: boolean;
   superStopCalled: boolean;
   superDestroyCalled: boolean;
+  startCalls: number;
+  superFetchCalls: number;
+  renewActivityTimeoutCalls: number;
+  setInactivityTimeoutCalls: Array<number | bigint>;
   destroyBarrier?: Promise<void>;
   setPhysicalRunning(running: boolean): void;
   billingHeartbeatTick(generation?: string): Promise<void>;
@@ -146,7 +198,9 @@ function createSandbox(
   sandboxClassName:
     | 'Sandbox'
     | 'SandboxContainment'
+    | 'SandboxSmall'
     | 'SandboxSmallContainment'
+    | 'SandboxCodeReview'
     | 'SandboxDIND' = 'SandboxSmallContainment',
   heartbeatSeconds?: string
 ) {
@@ -200,6 +254,67 @@ const billingInput = {
 };
 
 describe('MeteredSandbox', () => {
+  it.each([
+    ['ses-abcdef', 'SandboxSmall', 'cloud-agent-next-sandbox-small'],
+    ['crv-abcdef', 'SandboxCodeReview', 'cloud-agent-next-sandbox-code-review'],
+  ] as const)(
+    'preserves billing admission for persisted %s',
+    async (sandboxId, className, service) => {
+      const { sandbox, rpc, storage, flushShadowTasks } = createSandbox(
+        createRpc(),
+        false,
+        className
+      );
+      await expect(
+        sandbox.ensureBillingAdmission({
+          ...billingInput,
+          sandboxId,
+          enforcementRequested: true,
+        })
+      ).resolves.toEqual({ success: true });
+      await sandbox.onStart();
+      await flushShadowTasks();
+      expect(await getBillingContext(storage)).toMatchObject({ measurementStarted: true });
+      expect(rpc.recordStart).toHaveBeenCalledWith(
+        expect.objectContaining({
+          service,
+          instanceId: sandboxId,
+          sessionId: 'agent_1',
+        })
+      );
+    }
+  );
+
+  it.each(['istd-abcdef', 'ses-abcdef', 'crv-abcdef'] as const)(
+    'admits and meters non-contained isolated identity %s through the concrete Sandbox runtime',
+    async sandboxId => {
+      const { rpc, sandbox, storage, flushShadowTasks } = createSandbox(
+        createRpc(),
+        false,
+        'Sandbox'
+      );
+      await expect(
+        sandbox.ensureBillingAdmission({
+          ...billingInput,
+          sandboxId,
+          enforcementRequested: true,
+          metadata: { origin: sandboxId.startsWith('crv-') ? 'code-review' : 'cloud-agent' },
+        })
+      ).resolves.toEqual({ success: true });
+      await sandbox.onStart();
+      await flushShadowTasks();
+      expect(await getBillingContext(storage)).toMatchObject({ measurementStarted: true });
+      expect(rpc.recordStart).toHaveBeenCalledWith(
+        expect.objectContaining({
+          service: 'cloud-agent-next-sandbox',
+          instanceId: sandboxId,
+          sessionId: 'agent_1',
+          metadata: expect.objectContaining({ container_class: 'Sandbox', vcpu: '4' }),
+        })
+      );
+    }
+  );
+
   it('uses a configurable positive heartbeat interval with the production default as fallback', () => {
     expect(billingHeartbeatSeconds('60')).toBe(60);
     expect(billingHeartbeatSeconds(undefined)).toBe(300);
@@ -813,7 +928,7 @@ describe('MeteredSandbox', () => {
           durable_object_id: 'do-id',
           vcpu: '2',
           memory_mib: '6144',
-          disk_mb: '10000',
+          disk_mb: '20000',
         },
       })
     );
@@ -1430,5 +1545,138 @@ describe('MeteredSandbox', () => {
     expect(await getBillingContext(storage)).toBeUndefined();
     expect(sandbox.schedules).toEqual([]);
     expect(await storage.get('container-usage:pending-attribution:v1')).toBeUndefined();
+  });
+});
+
+describe('MeteredSandbox container capacity', () => {
+  beforeEach(() => {
+    capacity.assertContainerCapacity.mockReset();
+    capacity.assertContainerCapacity.mockResolvedValue(undefined);
+  });
+
+  it.each(['start', 'startAndWaitForPorts'] as const)(
+    'checks the attributed account before a cold %s',
+    async method => {
+      const { sandbox } = createSandbox();
+      await sandbox.configureBilling(billingInput);
+
+      await sandbox[method]();
+
+      expect(capacity.assertContainerCapacity).toHaveBeenCalledWith(expect.anything(), {
+        subject: billingInput.subject,
+        actor: billingInput.actor,
+        instanceId: billingInput.sandboxId,
+        checkpoint: 'sandbox-start',
+        billingOrigin: billingInput.metadata.origin,
+      });
+      expect(sandbox.startCalls).toBe(1);
+    }
+  );
+
+  it.each([
+    new ContainerConcurrencyLimitError('organization', 50),
+    new ContainerCapacityUnavailableError(),
+  ])('refuses the physical start after capacity denial: %s', async denial => {
+    const { sandbox } = createSandbox();
+    await sandbox.configureBilling(billingInput);
+    capacity.assertContainerCapacity.mockRejectedValue(denial);
+
+    await expect(sandbox.start()).rejects.toBe(denial);
+    expect(sandbox.startCalls).toBe(0);
+  });
+
+  it('does not check a container that is already running', async () => {
+    const { sandbox } = createSandbox(createRpc(), true);
+    await sandbox.configureBilling(billingInput);
+
+    await sandbox.startAndWaitForPorts();
+
+    expect(capacity.assertContainerCapacity).not.toHaveBeenCalled();
+    expect(sandbox.startCalls).toBe(1);
+  });
+
+  it('does not check code review sandboxes', async () => {
+    const { sandbox } = createSandbox(createRpc(), false, 'SandboxCodeReview');
+
+    await sandbox.start();
+
+    expect(capacity.assertContainerCapacity).not.toHaveBeenCalled();
+  });
+
+  it('admits a start without attribution', async () => {
+    const { sandbox } = createSandbox();
+
+    await sandbox.start();
+
+    expect(capacity.assertContainerCapacity).not.toHaveBeenCalled();
+    expect(sandbox.startCalls).toBe(1);
+  });
+});
+
+describe('MeteredSandbox preview fetch boundary', () => {
+  it('handles a marked request itself and passes an unmarked request to super.fetch', async () => {
+    const { sandbox, container } = createSandbox(undefined, true);
+    const tcpFetch = vi.fn(
+      async (_url: string, _request: Request) => new Response('preview', { status: 200 })
+    );
+    Object.assign(container, { getTcpPort: vi.fn(() => ({ fetch: tcpFetch })) });
+
+    const marked = new Request('http://localhost:5173/x', {
+      headers: {
+        [PREVIEW_MARKER_PORT_HEADER]: '5173',
+        [PREVIEW_MARKER_ALLOCATION_HEADER]: 'ref',
+      },
+    });
+    const response = await sandbox.fetch(marked);
+    expect(response.status).toBe(200);
+    expect(tcpFetch).toHaveBeenCalledTimes(1);
+    const [url, forwarded] = tcpFetch.mock.calls[0] ?? [];
+    expect(url).toBe('http://localhost:5173/x');
+    expect(forwarded.headers.get(PREVIEW_MARKER_PORT_HEADER)).toBeNull();
+    expect(forwarded.headers.get(PREVIEW_MARKER_ALLOCATION_HEADER)).toBeNull();
+    expect(sandbox.superFetchCalls).toBe(0);
+
+    const plain = new Request('http://localhost/x');
+    const superResponse = await sandbox.fetch(plain);
+    expect(await superResponse.text()).toBe('super');
+    expect(sandbox.superFetchCalls).toBe(1);
+  });
+
+  it('refuses the SDK control port before the container port is opened', async () => {
+    const { sandbox, container } = createSandbox(undefined, true);
+    const getTcpPort = vi.fn();
+    Object.assign(container, { getTcpPort });
+
+    const response = await sandbox.fetch(
+      new Request('http://localhost:3000/', { headers: { [PREVIEW_MARKER_PORT_HEADER]: '3000' } })
+    );
+    expect(response.status).toBe(403);
+    await expect(response.text()).resolves.toBe('That port is reserved');
+    expect(getTcpPort).not.toHaveBeenCalled();
+    expect(sandbox.superFetchCalls).toBe(0);
+  });
+
+  it('returns a fixed 503 for a marked request when the container is absent', async () => {
+    const { sandbox, ctx } = createSandbox(undefined, true);
+    Object.defineProperty(ctx, 'container', { value: undefined });
+    const response = await sandbox.fetch(
+      new Request('http://localhost/x', {
+        headers: { [PREVIEW_MARKER_PORT_HEADER]: '5173' },
+      })
+    );
+    expect(response.status).toBe(503);
+    expect(await response.text()).toBe('The sandbox is not running');
+  });
+
+  it('never calls its own sleep or activity timers on a marked request', async () => {
+    const { sandbox, container } = createSandbox(undefined, true);
+    Object.assign(container, {
+      getTcpPort: vi.fn(() => ({ fetch: async () => new Response('ok') })),
+    });
+    await sandbox.fetch(
+      new Request('http://localhost/x', { headers: { [PREVIEW_MARKER_PORT_HEADER]: '5173' } })
+    );
+    expect(sandbox.renewActivityTimeoutCalls).toBe(0);
+    expect(sandbox.setInactivityTimeoutCalls).toEqual([]);
   });
 });

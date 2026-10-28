@@ -36,12 +36,11 @@ const config: Config = {
     '^@/(.*)$': '<rootDir>/src/$1',
     '^server-only$': '<rootDir>/src/tests/setup/__mocks__/server-only.js',
   },
-  roots: ['<rootDir>', '<rootDir>/../../packages/web-shared'],
+  roots: ['<rootDir>', '<rootDir>/../../packages/web-shared', '<rootDir>/../ai-gateway'],
   testMatch: ['**/src/**/*.test.ts', '<rootDir>/../../packages/db/src/**/*.test.ts'],
   testPathIgnorePatterns: [
     '<rootDir>/../../.kilocode/',
     '<rootDir>/../../services/cloud-agent-next/',
-    '<rootDir>/../../services/app-builder/',
     '<rootDir>/../../services/webhook-agent-ingest/',
     '<rootDir>/../../services/session-ingest/',
     '<rootDir>/../../services/gastown/',
@@ -57,7 +56,7 @@ const config: Config = {
   ],
   modulePathIgnorePatterns: ['<rootDir>/../../.worktrees/'],
   transformIgnorePatterns: [
-    'node_modules/.pnpm/(?!(@octokit|universal-user-agent|universal-github-app-jwt|before-after-hook|bottleneck|p-limit|yocto-queue|jose@|ai@|@ai-sdk|@standard-schema|@workflow|eventsource-parser|cbor2|@cto\\.af))',
+    'node_modules/.pnpm/(?!(@octokit|universal-user-agent|universal-github-app-jwt|before-after-hook|bottleneck|p-limit|yocto-queue|jose@|ai@|@ai-sdk|@standard-schema|@workflow|eventsource-parser|cbor2|@cto\\.af|htmlparser2@|domhandler@|domutils@|dom-serializer@|domelementtype@|entities@))',
   ],
 
   // Parallel execution configuration

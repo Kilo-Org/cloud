@@ -1,11 +1,12 @@
 import { connection, type NextRequest } from 'next/server';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { api_request_log } from '@kilocode/db/schema';
-import { and, gte, lte, eq, asc, gt, count, or, isNotNull, type SQL } from 'drizzle-orm';
+import { api_request_log, kilocode_users } from '@kilocode/db/schema';
+import { and, gte, lte, eq, asc, gt, count, or, isNotNull, like, type SQL } from 'drizzle-orm';
 import archiver from 'archiver';
 import { Readable } from 'node:stream';
 import { getApiRequestLogBlob } from '@kilocode/web-shared/lib/r2/api-request-log';
+import { findUserByEmailCaseInsensitive } from '@/lib/user';
 
 // Downloading all logs for a heavy user can take a while. Without a raised
 // maxDuration the Vercel function was killed mid-stream, producing a ZIP
@@ -132,17 +133,67 @@ function jsonError(message: string, status: number) {
   });
 }
 
-function buildFilter(
-  userId: string | null,
-  parsedStart: Date | null,
-  parsedEnd: Date | null,
-  model: string | null,
-  sessionId: string | null,
-  errorsOnly: boolean
-) {
+type ResolvedUser = { ok: true; userId: string } | { ok: false; error: string; status: number };
+
+async function resolveUserId(userIdOrEmail: string): Promise<ResolvedUser> {
+  const users = await db
+    .select({ id: kilocode_users.id })
+    .from(kilocode_users)
+    .where(
+      or(eq(kilocode_users.id, userIdOrEmail), eq(kilocode_users.google_user_email, userIdOrEmail))
+    )
+    .limit(2);
+  const user = users.find(({ id }) => id === userIdOrEmail) ?? users[0];
+  if (user) return { ok: true, userId: user.id };
+  // Logs can outlive their user row, so an unknown non-email value is still a valid user ID filter.
+  if (!userIdOrEmail.includes('@')) return { ok: true, userId: userIdOrEmail };
+
+  const caseInsensitiveMatches = await findUserByEmailCaseInsensitive(userIdOrEmail);
+  if (caseInsensitiveMatches.length === 1) {
+    return { ok: true, userId: caseInsensitiveMatches[0].id };
+  }
+  if (caseInsensitiveMatches.length > 1) {
+    return {
+      ok: false,
+      error: `Multiple users match email ${userIdOrEmail} case-insensitively. Use the exact email or user ID.`,
+      status: 400,
+    };
+  }
+  return { ok: false, error: `No user found with email ${userIdOrEmail}`, status: 404 };
+}
+
+function escapeLikePattern(value: string) {
+  return value.replace(/[%_\\]/g, '\\$&');
+}
+
+function buildFilter({
+  id,
+  userId,
+  organizationId,
+  parsedStart,
+  parsedEnd,
+  modelPrefix,
+  sessionId,
+  errorsOnly,
+}: {
+  id: bigint | null;
+  userId: string | null;
+  organizationId: string | null;
+  parsedStart: Date | null;
+  parsedEnd: Date | null;
+  modelPrefix: string | null;
+  sessionId: string | null;
+  errorsOnly: boolean;
+}) {
   const conditions: SQL[] = [];
+  if (id !== null) {
+    conditions.push(eq(api_request_log.id, id));
+  }
   if (userId) {
     conditions.push(eq(api_request_log.kilo_user_id, userId));
+  }
+  if (organizationId) {
+    conditions.push(eq(api_request_log.organization_id, organizationId));
   }
   if (parsedStart) {
     conditions.push(gte(api_request_log.created_at, parsedStart.toISOString()));
@@ -150,8 +201,8 @@ function buildFilter(
   if (parsedEnd) {
     conditions.push(lte(api_request_log.created_at, parsedEnd.toISOString()));
   }
-  if (model) {
-    conditions.push(eq(api_request_log.model, model));
+  if (modelPrefix) {
+    conditions.push(like(api_request_log.model, `${escapeLikePattern(modelPrefix)}%`));
   }
   if (sessionId) {
     conditions.push(eq(api_request_log.session_id, sessionId));
@@ -178,7 +229,9 @@ export async function GET(request: NextRequest) {
   }
 
   const searchParams = request.nextUrl.searchParams;
+  const id = searchParams.get('id');
   const userId = searchParams.get('userId');
+  const organizationId = searchParams.get('organizationId');
   const startDate = searchParams.get('startDate');
   const startTime = searchParams.get('startTime');
   const endDate = searchParams.get('endDate');
@@ -186,6 +239,11 @@ export async function GET(request: NextRequest) {
   const model = searchParams.get('model');
   const sessionId = searchParams.get('sessionId') || searchParams.get('session_id');
   const errorsOnly = searchParams.get('errorsOnly') === 'true';
+
+  if (id !== null && (!/^[1-9]\d{0,18}$/.test(id) || BigInt(id) > BigInt('9223372036854775807'))) {
+    return jsonError('Invalid log ID. Use an integer between 1 and 9223372036854775807.', 400);
+  }
+  const parsedId = id === null ? null : BigInt(id);
 
   const parsedStart = parseBoundary(startDate, startTime, 'start');
   const parsedEnd = parseBoundary(endDate, endTime, 'end');
@@ -199,14 +257,22 @@ export async function GET(request: NextRequest) {
     return jsonError('Start must be before end.', 400);
   }
 
-  const filter = buildFilter(
-    userId,
-    parsedStart.value,
-    parsedEnd.value,
-    model,
+  const resolvedUser = userId ? await resolveUserId(userId) : null;
+  if (resolvedUser && !resolvedUser.ok) {
+    return jsonError(resolvedUser.error, resolvedUser.status);
+  }
+  const resolvedUserId = resolvedUser?.userId ?? null;
+
+  const filter = buildFilter({
+    id: parsedId,
+    userId: resolvedUserId,
+    organizationId,
+    parsedStart: parsedStart.value,
+    parsedEnd: parsedEnd.value,
+    modelPrefix: model,
     sessionId,
-    errorsOnly
-  );
+    errorsOnly,
+  });
 
   const [result] = await db.select({ total: count() }).from(api_request_log).where(filter);
   if (result.total === 0) {
@@ -361,12 +427,14 @@ export async function GET(request: NextRequest) {
 
   const sanitize = (value: string) => value.replaceAll(/[^a-zA-Z0-9._-]/g, '-');
   const safeUserId = userId ? sanitize(userId) : 'all-users';
+  const safeOrganizationId = organizationId ? `_org-${sanitize(organizationId)}` : '';
   const safeModel = model ? `_${sanitize(model)}` : '';
   const safeSessionId = sessionId ? `_${sanitize(sessionId)}` : '';
+  const safeId = parsedId !== null ? `_id-${parsedId}` : '';
   const safeErrorsOnly = errorsOnly ? '_errors-only' : '';
   const safeStart = formatBoundaryForFilename(startDate, startTime, 'any-start');
   const safeEnd = formatBoundaryForFilename(endDate, endTime, 'any-end');
-  const filename = `api-request-log_${safeUserId}_${safeStart}_${safeEnd}${safeModel}${safeSessionId}${safeErrorsOnly}.zip`;
+  const filename = `api-request-log_${safeUserId}${safeOrganizationId}_${safeStart}_${safeEnd}${safeModel}${safeSessionId}${safeErrorsOnly}${safeId}.zip`;
 
   return new Response(webStream, {
     headers: {

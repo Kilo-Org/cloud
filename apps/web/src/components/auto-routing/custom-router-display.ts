@@ -1,0 +1,145 @@
+import {
+  AUTO_ROUTING_CUSTOM_ROUTERS_PATH,
+  AUTO_ROUTING_PLATFORM_MEASUREMENTS_PATH,
+  PlatformMeasurementsResponseSchema,
+  CustomRouterErrorResponseSchema,
+  CustomRouterListResponseSchema,
+  CustomRouterResponseSchema,
+  customRouterPath,
+  type AutoRouter,
+  type AutoRoutingMode,
+  type CustomRouterEntryRef,
+  type CustomRouterListEntry,
+  type CustomRouterListResponse,
+  type OwnerType,
+  type CustomRouterSummary,
+} from '@kilocode/auto-routing-contracts';
+
+export const BASE_ROUTER_OPTIONS: Array<{ value: AutoRouter; label: string }> = [
+  { value: 'efficient', label: 'Efficient' },
+  { value: 'frontier', label: 'Frontier' },
+];
+
+export const MODE_OPTIONS: Array<{ value: AutoRoutingMode; label: string }> = [
+  { value: 'cost_per_accuracy', label: 'Best accuracy per dollar' },
+  { value: 'best_accuracy', label: 'Best accuracy' },
+];
+
+export const CUSTOM_ROUTERS_POLL_INTERVAL_MS = 15_000;
+
+function withOrganization(path: string, organizationId: string | undefined): string {
+  return organizationId ? `${path}?${new URLSearchParams({ organizationId })}` : path;
+}
+
+export function customRoutersEndpoint(organizationId: string | undefined): string {
+  return withOrganization(AUTO_ROUTING_CUSTOM_ROUTERS_PATH, organizationId);
+}
+
+export function customRouterItemEndpoint(
+  scope: OwnerType,
+  slug: string,
+  organizationId: string | undefined
+): string {
+  return withOrganization(customRouterPath(scope, slug), organizationId);
+}
+
+export async function fetchPlatformMeasurements(
+  baseRouter: AutoRouter,
+  organizationId: string | undefined
+) {
+  const params = new URLSearchParams({ router: baseRouter });
+  if (organizationId) params.set('organizationId', organizationId);
+  const response = await fetch(`${AUTO_ROUTING_PLATFORM_MEASUREMENTS_PATH}?${params}`);
+  if (!response.ok) throw new Error(await errorMessage(response));
+  return PlatformMeasurementsResponseSchema.parse(await response.json());
+}
+
+export function entryLabel(entry: CustomRouterEntryRef): string {
+  return entry.kind === 'gateway' ? entry.model : `${entry.provider}/${entry.model}`;
+}
+
+async function errorMessage(response: Response): Promise<string> {
+  const body: unknown = await response.json().catch(() => null);
+  const parsed = CustomRouterErrorResponseSchema.safeParse(body);
+  return parsed.success ? parsed.data.error.message : `Request failed (HTTP ${response.status})`;
+}
+
+export async function fetchCustomRouters(
+  organizationId: string | undefined
+): Promise<CustomRouterListResponse> {
+  const response = await fetch(customRoutersEndpoint(organizationId));
+  if (!response.ok) throw new Error(await errorMessage(response));
+  return CustomRouterListResponseSchema.parse(await response.json());
+}
+
+export async function readCustomRouterResponse(response: Response): Promise<CustomRouterSummary> {
+  if (!response.ok) throw new Error(await errorMessage(response));
+  return CustomRouterResponseSchema.parse(await response.json()).router;
+}
+
+export async function deleteCustomRouter(
+  router: Pick<CustomRouterSummary, 'scope' | 'slug'>,
+  organizationId: string | undefined
+): Promise<void> {
+  const response = await fetch(
+    customRouterItemEndpoint(router.scope, router.slug, organizationId),
+    {
+      method: 'DELETE',
+    }
+  );
+  if (!response.ok) throw new Error(await errorMessage(response));
+}
+
+export type EntryDisplayStatus = {
+  kind: 'ready' | 'stale' | 'pending' | 'failed' | 'needs_eval' | 'missing' | 'unknown';
+  label: string;
+  detail: string | null;
+};
+
+export function entryDisplayStatus(entry: CustomRouterListEntry): EntryDisplayStatus {
+  const { variants } = entry;
+  if (variants.length === 0) {
+    return { kind: 'unknown', label: 'Status unavailable', detail: null };
+  }
+  const failed = variants.find(variant => variant.status === 'failed');
+  if (failed) {
+    return { kind: 'failed', label: 'Failed', detail: failed.failureReason };
+  }
+  if (variants.some(variant => variant.status === 'pending' || variant.status === 'running')) {
+    return {
+      kind: 'pending',
+      label: entry.entry.kind === 'client' ? 'Evaluating' : 'Benchmarking',
+      detail: null,
+    };
+  }
+  if (entry.needsClientEval) {
+    return {
+      kind: 'needs_eval',
+      label: 'Needs client eval',
+      detail: 'Run the client eval from the CLI to measure this model.',
+    };
+  }
+  if (variants.some(variant => variant.status === 'missing')) {
+    return { kind: 'missing', label: 'Not benchmarked yet', detail: null };
+  }
+  if (variants.some(variant => variant.status === 'stale')) {
+    return {
+      kind: 'stale',
+      label: 'Stale',
+      detail:
+        entry.entry.measuredAs &&
+        variants.some(variant => variant.linked && variant.status === 'stale')
+          ? 'Linked platform measurements are stale. Routing still uses them.'
+          : 'Measured with an older benchmark. Routing still uses it.',
+    };
+  }
+  return { kind: 'ready', label: 'Ready', detail: null };
+}
+
+export function hasPendingEntries(routers: CustomRouterSummary[]): boolean {
+  return routers.some(router =>
+    router.entries.some(entry =>
+      entry.variants.some(variant => variant.status === 'pending' || variant.status === 'running')
+    )
+  );
+}

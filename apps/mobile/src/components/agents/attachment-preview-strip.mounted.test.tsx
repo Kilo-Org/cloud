@@ -74,15 +74,16 @@ const gestureHandlerMock = vi.hoisted(() => {
 
 const a11yMock = vi.hoisted(() => ({
   announceForA11y: vi.fn(),
-  moveA11yFocus: vi.fn(),
+  requestA11yFocus: vi.fn(),
 }));
 
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'View' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
 vi.mock('react-native', () => ({
+  // Sheet registers the app-level Android Back listener while it is visible.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   ActivityIndicator: 'ActivityIndicator',
-  Modal: 'Modal',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   View: 'View',
@@ -113,7 +114,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
     mutedForeground: '#6b7280',
   }),
 }));
-vi.mock('@/components/image-viewer-modal', () => ({ ImageViewerModal: 'ImageViewerModal' }));
+vi.mock('@/components/ui/image-viewer', () => ({ ImageViewer: 'ImageViewer' }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/agents/markdown-text', () => ({ MarkdownText: 'MarkdownText' }));
 vi.mock('@/components/ui/selectable-text', () => ({ SelectableText: 'SelectableText' }));
@@ -309,7 +310,7 @@ function markdownAttachment(): AgentAttachment {
 beforeEach(() => {
   vi.clearAllMocks();
   gestureHandlerMock.reset();
-  a11yMock.moveA11yFocus.mockReset();
+  a11yMock.requestA11yFocus.mockReset();
   fileText.mockResolvedValue('# Hello');
   reactNativeMock.Platform.OS = 'ios';
   reactNativeMock.useWindowDimensions.mockReturnValue({ width: 390, height: 844 });
@@ -325,6 +326,23 @@ describe('AttachmentPreviewStrip — mounted accessibility contract', () => {
     expect(body.props.accessibilityValue).toEqual({ min: 0, max: 100, now: 42 });
     expect(body.props.accessibilityState).toBeUndefined();
     expect(body.props.accessibilityLabel).toBe('doc.pdf, 42%');
+
+    renderer.unmount();
+  });
+
+  it('announces and draws a file this device keeps as no upload at all', async () => {
+    const renderer = await mount([
+      makeAttachment({ kind: 'image', filename: 'photo.png', status: 'local', progress: null }),
+    ]);
+
+    const body = chipBody(renderer.root);
+    expect(body.props.accessibilityLabel).toBe('photo.png, 1 kB');
+    expect(body.props.accessibilityRole).toBe('button');
+    expect(body.props.accessibilityState).toBeUndefined();
+    expect(body.props.accessibilityValue).toBeUndefined();
+    // No upload is under way, so the chip draws no spinner.
+    expect(nodesByType(renderer.root, 'ActivityIndicator')).toHaveLength(0);
+    expect(renderer.root.findAllByProps({ accessibilityState: { busy: true } })).toHaveLength(0);
 
     renderer.unmount();
   });
@@ -493,7 +511,7 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
 
     await pressBody(renderer.root);
 
-    const viewers = nodesByType(renderer.root, 'ImageViewerModal');
+    const viewers = nodesByType(renderer.root, 'ImageViewer');
     expect(viewers).toHaveLength(1);
     expect(viewers[0]?.props.visible).toBe(true);
     expect(viewers[0]?.props.uri).toBe('file:///cache/photo.png');
@@ -523,7 +541,7 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
     expect(headers[0]?.props.title).toBe('notes.md');
 
     expect(shareLocalFile).not.toHaveBeenCalled();
-    expect(nodesByType(renderer.root, 'ImageViewerModal')).toHaveLength(0);
+    expect(nodesByType(renderer.root, 'ImageViewer')).toHaveLength(0);
     expect(nodesByType(renderer.root, 'SelectableText')).toHaveLength(0);
 
     renderer.unmount();
@@ -576,7 +594,7 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
       expect.any(Function)
     );
     expect(shareLocalFile).not.toHaveBeenCalled();
-    expect(nodesByType(renderer.root, 'ImageViewerModal')).toHaveLength(0);
+    expect(nodesByType(renderer.root, 'ImageViewer')).toHaveLength(0);
     expect(nodesByType(renderer.root, 'MarkdownText')).toHaveLength(0);
     expect(nodesByType(renderer.root, 'SelectableText')).toHaveLength(0);
 
@@ -620,7 +638,7 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
     expect(shareLocalFile).not.toHaveBeenCalled();
     expect(nodesByType(renderer.root, 'SelectableText')).toHaveLength(0);
     expect(nodesByType(renderer.root, 'MarkdownText')).toHaveLength(0);
-    expect(nodesByType(renderer.root, 'ImageViewerModal')).toHaveLength(0);
+    expect(nodesByType(renderer.root, 'ImageViewer')).toHaveLength(0);
 
     renderer.unmount();
   });
@@ -645,7 +663,7 @@ describe('AttachmentPreviewStrip — tappable unsent chips', () => {
     expect(onRetry).toHaveBeenCalledTimes(1);
     expect(shareLocalFile).not.toHaveBeenCalled();
     expect(showActionSheetWithOptions).not.toHaveBeenCalled();
-    expect(nodesByType(renderer.root, 'ImageViewerModal')).toHaveLength(0);
+    expect(nodesByType(renderer.root, 'ImageViewer')).toHaveLength(0);
 
     await act(async () => {
       await Promise.resolve();
@@ -734,17 +752,18 @@ describe('AttachmentPreviewStrip — text preview sheet surface', () => {
     return renderer;
   }
 
-  it('renders the native pageSheet Modal on iOS', async () => {
+  it('renders the native full-window sheet on iOS', async () => {
     const renderer = await openMarkdownPreview();
 
-    const modals = nodesByType(renderer.root, 'Modal');
-    expect(modals).toHaveLength(1);
-    expect(modals[0]?.props.animationType).toBe('slide');
-    expect(modals[0]?.props.presentationStyle).toBe('pageSheet');
-    expect(modals[0]?.props.transparent).toBeUndefined();
+    const sheets = nodesByType(renderer.root, 'BottomSheet');
+    expect(sheets).toHaveLength(1);
+    expect(sheets[0]?.props.snapPoints).toEqual(['100%']);
+    expect(sheets[0]?.props.handleComponent).toBeNull();
+    expect(sheets[0]?.props.index).toBe(0);
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
     expect(surface).toHaveLength(1);
-    expect(surface[0]?.props.style).toBeUndefined();
+    // iOS presents the sheet below the status bar, so the surface pads nothing.
+    expect(surface[0]?.props.style).toEqual({ paddingTop: 0 });
 
     renderer.unmount();
   });
@@ -752,13 +771,13 @@ describe('AttachmentPreviewStrip — text preview sheet surface', () => {
   it('centers an empty preview outside the content scroller', async () => {
     fileText.mockResolvedValueOnce('');
     const renderer = await openMarkdownPreview();
-    const modal = nodesByType(renderer.root, 'Modal')[0];
-    if (!modal) {
-      throw new Error('Modal not found');
+    const sheet = nodesByType(renderer.root, 'BottomSheet')[0];
+    if (!sheet) {
+      throw new Error('BottomSheet not found');
     }
-    expect(nodesByType(modal, 'CenteredState')).toHaveLength(1);
-    expect(nodesByType(modal, 'ScrollView')).toHaveLength(0);
-    expect(nodesByType(modal, 'SheetHeader')).toHaveLength(1);
+    expect(nodesByType(sheet, 'CenteredState')).toHaveLength(1);
+    expect(nodesByType(sheet, 'ScrollView')).toHaveLength(0);
+    expect(nodesByType(sheet, 'SheetHeader')).toHaveLength(1);
     act(() => {
       renderer.unmount();
     });
@@ -775,15 +794,16 @@ describe('AttachmentPreviewStrip — text preview sheet surface', () => {
     renderer.unmount();
   });
 
-  it('renders an opaque full-window Modal padded by the top inset on Android', async () => {
+  it('renders an opaque full-window sheet padded by the top inset on Android', async () => {
     reactNativeMock.Platform.OS = 'android';
     safeAreaMock.useSafeAreaInsets.mockReturnValue({ top: 24, bottom: 34 });
 
     const renderer = await openMarkdownPreview();
 
-    const modals = nodesByType(renderer.root, 'Modal');
-    expect(modals).toHaveLength(1);
-    expect(modals[0]?.props.transparent).toBeUndefined();
+    const sheets = nodesByType(renderer.root, 'BottomSheet');
+    expect(sheets).toHaveLength(1);
+    expect(sheets[0]?.props.snapPoints).toEqual(['100%']);
+    expect(sheets[0]?.props.index).toBe(0);
 
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
     expect(surface).toHaveLength(1);
@@ -804,20 +824,20 @@ describe('AttachmentPreviewStrip — text preview sheet surface', () => {
     renderer.unmount();
   });
 
-  it('closes the preview when Android Back fires onRequestClose', async () => {
+  it('closes the preview when the sheet is dismissed', async () => {
     reactNativeMock.Platform.OS = 'android';
     const renderer = await openMarkdownPreview();
 
-    const modal = nodesByType(renderer.root, 'Modal')[0];
-    if (!modal) {
-      throw new Error('Modal not found');
+    const sheet = nodesByType(renderer.root, 'BottomSheet')[0];
+    if (!sheet) {
+      throw new Error('BottomSheet not found');
     }
     await act(async () => {
       await Promise.resolve();
-      (modal.props.onRequestClose as () => void)();
+      (sheet.props.onClose as () => void)();
     });
 
-    expect(nodesByType(renderer.root, 'Modal')).toHaveLength(0);
+    expect(nodesByType(renderer.root, 'BottomSheet')).toHaveLength(0);
 
     renderer.unmount();
   });
@@ -835,7 +855,7 @@ describe('AttachmentPreviewStrip — text preview sheet surface', () => {
       (header.props.onDone as () => void)();
     });
 
-    expect(nodesByType(renderer.root, 'Modal')).toHaveLength(0);
+    expect(nodesByType(renderer.root, 'BottomSheet')).toHaveLength(0);
 
     renderer.unmount();
   });
@@ -979,7 +999,7 @@ describe('AttachmentPreviewStrip — accessible move actions', () => {
       await Promise.resolve();
     });
     expect(onMove).toHaveBeenCalledWith('a1', 'right');
-    expect(a11yMock.moveA11yFocus).toHaveBeenCalledTimes(1);
+    expect(a11yMock.requestA11yFocus).toHaveBeenCalledTimes(1);
 
     const middleBody = bodies[1];
     if (!middleBody) {
@@ -997,7 +1017,7 @@ describe('AttachmentPreviewStrip — accessible move actions', () => {
       await Promise.resolve();
     });
     expect(onMove).toHaveBeenLastCalledWith('a2', 'left');
-    expect(a11yMock.moveA11yFocus).toHaveBeenCalledTimes(2);
+    expect(a11yMock.requestA11yFocus).toHaveBeenCalledTimes(2);
 
     renderer.unmount();
   });
@@ -1048,7 +1068,7 @@ describe('AttachmentPreviewStrip — drag reorder', () => {
 
     expect(onReorder).toHaveBeenCalledTimes(1);
     expect(onReorder).toHaveBeenCalledWith(0, 1);
-    expect(a11yMock.moveA11yFocus).toHaveBeenCalledTimes(1);
+    expect(a11yMock.requestA11yFocus).toHaveBeenCalledTimes(1);
 
     renderer.unmount();
   });
@@ -1078,7 +1098,7 @@ describe('AttachmentPreviewStrip — drag reorder', () => {
     });
 
     expect(onReorder).not.toHaveBeenCalled();
-    expect(a11yMock.moveA11yFocus).not.toHaveBeenCalled();
+    expect(a11yMock.requestA11yFocus).not.toHaveBeenCalled();
 
     renderer.unmount();
   });

@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
 import { execFileSync, spawnSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import test from 'node:test';
+import { runInNewContext } from 'node:vm';
 
 import { load } from 'js-yaml';
 
@@ -16,6 +18,362 @@ const staging = workflow('deploy-staging');
 const gate = workflow('check-deployment-changes');
 const workers = workflow('deploy-workers');
 const ci = workflow('ci');
+
+test('both Worker deployment paths prepare usage queues before direct consumer deployment', () => {
+  for (const [job, selector] of [
+    ['deploy-manual', 'inputs.worker'],
+    ['deploy-changed', 'matrix.worker'],
+  ]) {
+    const steps = workers.jobs[job].steps;
+    const checkIndex = steps.findIndex(step => step.id === 'usage_queues');
+    const consumerIndex = steps.findIndex(step => step.name === 'Deploy to Cloudflare Workers');
+    assert.ok(checkIndex > steps.findIndex(step => step.name === 'Install dependencies'));
+    const prepareIndex = steps.findIndex(step => step.name === 'Prepare usage queues');
+    assert.ok(checkIndex < prepareIndex && prepareIndex < consumerIndex);
+    assert.equal(steps[prepareIndex].if, "steps.usage_queues.outputs.prepare_required == 'true'");
+    assert.equal(
+      steps[prepareIndex].env.CLOUDFLARE_API_TOKEN,
+      '${{ secrets.CLOUDFLARE_API_TOKEN }}'
+    );
+    assert.equal(steps[prepareIndex].env.TARGET_ENVIRONMENT, '${{ inputs.target_environment }}');
+    assert.equal(steps[checkIndex].env.TARGET_ENVIRONMENT, '${{ inputs.target_environment }}');
+    assert.equal(
+      steps[prepareIndex].run,
+      'node scripts/provision-queues.mjs "$TARGET_ENVIRONMENT"'
+    );
+    assert.equal(
+      steps[checkIndex].if,
+      `${selector} == 'services/usage-ingest' && (inputs.target_environment == 'staging' || inputs.target_environment == 'production')`
+    );
+    assert.equal(steps[checkIndex]['working-directory'], 'services/usage-ingest');
+    assert.equal(steps[checkIndex]['continue-on-error'], undefined);
+    for (const [worker, environment, expected] of [
+      ['services/usage-ingest', 'staging', true],
+      ['services/usage-ingest', 'production', true],
+      ['services/other-worker', 'staging', false],
+      ['services/other-worker', 'production', false],
+      ['services/usage-ingest', 'preview', false],
+    ]) {
+      assert.equal(
+        runInNewContext(steps[checkIndex].if, {
+          inputs: { worker, target_environment: environment },
+          matrix: { worker },
+        }),
+        expected
+      );
+    }
+    assert.equal(
+      steps.some(step => step.with?.command?.includes('wrangler.writer-relay.jsonc')),
+      false
+    );
+    assert.doesNotMatch(steps[consumerIndex].if, /always\(|failure\(/);
+    assert.equal(
+      steps[consumerIndex].with.command,
+      "${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} " +
+        "${{ steps.usage_queues.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}"
+    );
+  }
+});
+
+test('both upload attempts disable native provisioning only when EU preparation is required', () => {
+  for (const job of ['deploy-manual', 'deploy-changed']) {
+    const uploads = workers.jobs[job].steps.filter(step =>
+      step.name?.startsWith('Deploy to Cloudflare Workers')
+    );
+    assert.equal(uploads.length, 2);
+    for (const step of uploads) {
+      const expression = step.with.command.match(/\$\{\{ (steps\.usage_queues.*?) \}\}$/)[1];
+      for (const required of ['true', 'false', undefined]) {
+        assert.equal(
+          runInNewContext(expression, {
+            steps: { usage_queues: { outputs: { queues_required: required } } },
+          }),
+          required === 'true' ? '--experimental-provision=false' : ''
+        );
+      }
+    }
+  }
+});
+
+test('selected source prepares queues and rejects retired relay sources before deployment', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'usage-queues-selected-source-'));
+  try {
+    // The selected source has no new helper script. Resolve only its pre-existing
+    // Wrangler dependency, just as the workflow does after installing dependencies.
+    symlinkSync(
+      fileURLToPath(new URL('../services/usage-ingest/node_modules', import.meta.url)),
+      join(directory, 'node_modules')
+    );
+    mkdirSync(join(directory, 'scripts'));
+    const output = join(directory, 'output');
+    const calls = join(directory, 'calls');
+    for (const job of ['deploy-manual', 'deploy-changed']) {
+      const check = workers.jobs[job].steps.find(step => step.id === 'usage_queues');
+      const prepare = workers.jobs[job].steps.find(step => step.name === 'Prepare usage queues');
+      for (const scenario of [
+        'historical-direct',
+        'direct-unused-file',
+        'historical-relay',
+        'historical-relay-with-file',
+        'eu',
+        'eu-failure',
+        'eu-missing-helper',
+        'global',
+        'global-failure',
+        'renamed-failure',
+      ]) {
+        const eu = scenario.startsWith('eu');
+        const prepared = eu || scenario.startsWith('global') || scenario === 'renamed-failure';
+        const historicalRelay = scenario.startsWith('historical-relay');
+        writeFileSync(
+          join(directory, 'wrangler.jsonc'),
+          JSON.stringify({
+            name: 'usage-ingest',
+            compatibility_date: '2026-09-18',
+            env: {
+              staging: {
+                name: 'usage-ingest-staging',
+                ...(prepared
+                  ? {
+                      queues: {
+                        producers: [
+                          {
+                            binding: 'QUEUE',
+                            queue: eu
+                              ? 'test-eu'
+                              : scenario === 'renamed-failure'
+                                ? 'usage-ingest-renamed'
+                                : 'usage-ingest-processing-staging',
+                          },
+                        ],
+                      },
+                    }
+                  : {}),
+                ...(historicalRelay
+                  ? {
+                      services: [
+                        { binding: 'USAGE_WRITER_RELAY', service: 'usage-writer-relay-staging' },
+                      ],
+                    }
+                  : {}),
+              },
+            },
+          })
+        );
+        rmSync(join(directory, 'wrangler.writer-relay.jsonc'), { force: true });
+        if (scenario === 'historical-relay-with-file' || scenario === 'direct-unused-file') {
+          writeFileSync(join(directory, 'wrangler.writer-relay.jsonc'), '{}');
+        }
+        for (const path of ['scripts/provision-queues.mjs'])
+          rmSync(join(directory, path), { force: true });
+        if (prepared && scenario !== 'eu-missing-helper')
+          writeFileSync(
+            join(directory, 'scripts/provision-queues.mjs'),
+            `
+          import { appendFileSync } from 'node:fs';
+          appendFileSync(process.env.DEPLOY_CALLS, 'prepare\\n');
+        `
+          );
+        if (['eu-failure', 'global-failure', 'renamed-failure'].includes(scenario))
+          writeFileSync(
+            join(directory, 'scripts/provision-queues.mjs'),
+            readFileSync(
+              new URL('../services/usage-ingest/scripts/provision-queues.mjs', import.meta.url)
+            )
+          );
+        writeFileSync(output, '');
+        writeFileSync(calls, '');
+        // Commands are local stand-ins for the pinned action's Wrangler calls.
+        // Execute the workflow's actual check, preserving fail-fast sequencing.
+        const result = spawnSync(
+          'bash',
+          [
+            '-e',
+            '-c',
+            `
+          wrangler() {
+            printf '%s\\n' "$*" >> "$DEPLOY_CALLS"
+          }
+          ${check.run}
+          if grep -q '^prepare_required=true$' "$GITHUB_OUTPUT"; then ${prepare.run}; fi
+          wrangler deploy --env staging
+        `,
+          ],
+          {
+            cwd: directory,
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              GITHUB_OUTPUT: output,
+              TARGET_ENVIRONMENT: 'staging',
+              DEPLOY_CALLS: calls,
+              WRANGLER_SEND_METRICS: 'false',
+              WRANGLER_LOG_PATH: join(directory, 'wrangler.log'),
+            },
+          }
+        );
+        const deployed = readFileSync(calls, 'utf8').trim().split('\n').filter(Boolean);
+        if (
+          ['eu-failure', 'eu-missing-helper', 'global-failure', 'renamed-failure'].includes(
+            scenario
+          )
+        ) {
+          assert.notEqual(result.status, 0, `${job} ${scenario}: preparation must stop upload`);
+          assert.deepEqual(deployed, []);
+        } else if (historicalRelay) {
+          assert.notEqual(result.status, 0, `${job}: retired relay source must fail`);
+          assert.match(result.stderr, /requires the retired usage writer relay/);
+          assert.deepEqual(deployed, []);
+        } else {
+          assert.equal(result.status, 0, `${job} ${scenario}: ${result.stderr}`);
+          assert.deepEqual(deployed, [...(prepared ? ['prepare'] : []), 'deploy --env staging']);
+        }
+      }
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
+
+test('production EU preparation, rollback and historical source use the selected helper capability', () => {
+  const directory = mkdtempSync(join(tmpdir(), 'usage-production-selected-source-'));
+  try {
+    symlinkSync(
+      fileURLToPath(new URL('../services/usage-ingest/node_modules', import.meta.url)),
+      join(directory, 'node_modules')
+    );
+    mkdirSync(join(directory, 'scripts'));
+    const output = join(directory, 'output');
+    const calls = join(directory, 'calls');
+    const helper = join(directory, 'scripts/provision-queues.mjs');
+    for (const job of ['deploy-manual', 'deploy-changed']) {
+      const check = workers.jobs[job].steps.find(step => step.id === 'usage_queues');
+      const prepare = workers.jobs[job].steps.find(step => step.name === 'Prepare usage queues');
+      for (const scenario of [
+        'legacy-missing',
+        'legacy-staging-only',
+        'legacy-retired-relay',
+        'eu',
+        'global-rollback',
+        'eu-missing',
+        'eu-staging-only',
+        'eu-invalid',
+        'renamed-invalid',
+      ]) {
+        const eu = scenario.startsWith('eu');
+        const current = ['eu', 'global-rollback', 'eu-invalid', 'renamed-invalid'].includes(
+          scenario
+        );
+        writeFileSync(
+          join(directory, 'wrangler.jsonc'),
+          JSON.stringify({
+            name: 'usage-ingest',
+            compatibility_date: '2026-09-18',
+            ...(scenario === 'legacy-retired-relay'
+              ? {
+                  services: [
+                    { binding: 'USAGE_WRITER_RELAY', service: 'usage-writer-relay-staging' },
+                  ],
+                }
+              : {}),
+            queues: {
+              producers: [
+                {
+                  binding: 'USAGE_INGEST_QUEUE',
+                  queue: eu
+                    ? 'usage-ingest-processing-eu'
+                    : scenario === 'renamed-invalid'
+                      ? 'usage-ingest-renamed'
+                      : 'usage-ingest-processing',
+                },
+              ],
+            },
+          })
+        );
+        rmSync(helper, { force: true });
+        if (current)
+          writeFileSync(
+            helper,
+            `
+          import { appendFileSync } from 'node:fs';
+          export const supportedEnvironments = ['staging', 'production'];
+          if (process.argv[1]) appendFileSync(process.env.DEPLOY_CALLS, 'prepare production\\n');
+        `
+          );
+        if (scenario.endsWith('staging-only'))
+          writeFileSync(
+            helper,
+            `
+          export async function prepareQueues() {}
+          if (process.argv[1]) throw new Error('Historical helper supports staging only');
+        `
+          );
+        if (scenario.endsWith('invalid'))
+          writeFileSync(
+            helper,
+            readFileSync(
+              new URL('../services/usage-ingest/scripts/provision-queues.mjs', import.meta.url)
+            )
+          );
+        writeFileSync(output, '');
+        writeFileSync(calls, '');
+        const result = spawnSync(
+          'bash',
+          [
+            '-e',
+            '-c',
+            `
+          wrangler() { printf '%s\\n' "$*" >> "$DEPLOY_CALLS"; }
+          ${check.run}
+          if grep -q '^prepare_required=true$' "$GITHUB_OUTPUT"; then ${prepare.run}; fi
+          flag=''
+          if grep -q '^queues_required=true$' "$GITHUB_OUTPUT"; then flag='--experimental-provision=false'; fi
+          wrangler deploy $flag
+        `,
+          ],
+          {
+            cwd: directory,
+            encoding: 'utf8',
+            env: {
+              ...process.env,
+              TARGET_ENVIRONMENT: 'production',
+              GITHUB_OUTPUT: output,
+              DEPLOY_CALLS: calls,
+              WRANGLER_SEND_METRICS: 'false',
+              WRANGLER_LOG_PATH: join(directory, 'wrangler.log'),
+            },
+          }
+        );
+        const deployed = readFileSync(calls, 'utf8').trim().split('\n').filter(Boolean);
+        if (
+          [
+            'eu-missing',
+            'eu-staging-only',
+            'eu-invalid',
+            'renamed-invalid',
+            'legacy-retired-relay',
+          ].includes(scenario)
+        ) {
+          assert.notEqual(result.status, 0, `${job} ${scenario}: must fail before upload`);
+          assert.deepEqual(deployed, []);
+        } else {
+          assert.equal(result.status, 0, `${job} ${scenario}: ${result.stderr}`);
+          assert.deepEqual(deployed, [
+            ...(current ? ['prepare production'] : []),
+            `deploy${eu ? ' --experimental-provision=false' : ''}`,
+          ]);
+          assert.doesNotMatch(
+            readFileSync(output, 'utf8'),
+            /^required=/m,
+            'retired relay output is absent'
+          );
+        }
+      }
+    }
+  } finally {
+    rmSync(directory, { recursive: true, force: true });
+  }
+});
 
 test('production and staging schedule independently on main every 20 minutes', () => {
   for (const [name, deployment] of [
@@ -66,12 +424,7 @@ test('successful main CI selects the tested deployment SHA', () => {
   );
   assert.equal(ci.concurrency['cancel-in-progress'], "${{ github.event_name == 'pull_request' }}");
 
-  for (const job of [
-    'check-production-db-startup',
-    'run-migrations',
-    'stage-app',
-    'stage-global-app',
-  ]) {
+  for (const job of ['check-production-db-startup', 'run-migrations', 'stage-app']) {
     assert.equal(production.jobs[job].needs, 'check-changes');
     assert.match(production.jobs[job].if, /should_deploy == 'true'/);
   }
@@ -79,7 +432,6 @@ test('successful main CI selects the tested deployment SHA', () => {
     'check-staging-db-startup',
     'run-migrations',
     'deploy-app',
-    'deploy-global-app',
     'deploy-workers',
   ]) {
     assert.match(staging.jobs[job].if, /should_deploy == 'true'/);
@@ -87,45 +439,65 @@ test('successful main CI selects the tested deployment SHA', () => {
   }
 });
 
-test('ai-gateway deploys only on demand, from the last completed release', () => {
-  const gateway = workflow('deploy-ai-gateway');
-  assert.deepEqual(Object.keys(gateway.on), ['workflow_dispatch']);
-  assert.deepEqual(gateway.on.workflow_dispatch.inputs.target_environment.options, [
-    'production',
-    'staging',
+test('ai-gateway deploys with each scheduled release after migrations', () => {
+  const stageAiGateway = production.jobs['stage-ai-gateway'];
+  assert.equal(stageAiGateway.needs, 'check-changes');
+  assert.match(stageAiGateway.if, /should_deploy == 'true'/);
+  assert.equal(stageAiGateway.with.target_environment, 'production');
+  assert.equal(stageAiGateway.with.vercel_project_id_var, 'VERCEL_PROJECT_ID_AI_GATEWAY');
+  assert.equal(stageAiGateway.with.source_sha, '${{ needs.check-changes.outputs.target_sha }}');
+  assert.equal(
+    stageAiGateway.secrets.VERCEL_PROJECT_TOKEN,
+    '${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}'
+  );
+
+  const promoteAiGateway = production.jobs['promote-ai-gateway'];
+  assert.deepEqual(promoteAiGateway.needs, [
+    'stage-ai-gateway',
+    'check-production-db-startup',
+    'run-migrations',
   ]);
-  assert.equal(gateway.concurrency.group, 'deploy-${{ inputs.target_environment }}');
-  assert.equal(production.concurrency.group, 'deploy-production');
-  assert.equal(staging.concurrency.group, 'deploy-staging');
-  assert.equal(gateway.concurrency['cancel-in-progress'], false);
-
-  const release = gateway.jobs['resolve-release'].steps.find(step => step.id === 'release');
-  assert.match(release.run, /environment=scheduled-deploy-\$TARGET_ENVIRONMENT/);
-  assert.match(release.run, /\[ "\$state" = success \]/);
-
-  const stage = gateway.jobs.stage;
-  assert.equal(stage.needs, 'resolve-release');
-  assert.equal(stage.with.vercel_project_id_var, 'VERCEL_PROJECT_ID_AI_GATEWAY');
-  assert.equal(stage.with.source_sha, '${{ needs.resolve-release.outputs.source_sha }}');
-  assert.equal(stage.secrets.VERCEL_PROJECT_TOKEN, '${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}');
-  assert.equal(gateway.jobs.promote.needs, 'stage');
-  assert.equal(gateway.jobs.promote.if, "inputs.target_environment == 'production'");
-  assert.deepEqual(gateway.jobs.promote.with, {
-    deployment_url: '${{ needs.stage.outputs.deployment_url }}',
+  assert.deepEqual(promoteAiGateway.with, {
+    deployment_url: '${{ needs.stage-ai-gateway.outputs.deployment_url }}',
     axiom_annotation_dataset: 'vercel',
     axiom_expected_project: 'kilocode-ai-gateway',
   });
   assert.equal(
-    gateway.jobs.promote.secrets.AXIOM_ANNOTATION_TOKEN,
+    promoteAiGateway.secrets.AXIOM_ANNOTATION_TOKEN,
     '${{ secrets.AXIOM_ANNOTATION_TOKEN }}'
   );
 
-  for (const name of ['deploy-production', 'deploy-staging', 'redeploy-web']) {
-    assert.doesNotMatch(
-      readFileSync(new URL(`../.github/workflows/${name}.yml`, import.meta.url), 'utf8'),
-      /AI_GATEWAY/,
-      `${name} must not deploy the ai-gateway`
-    );
+  const deployAiGateway = staging.jobs['deploy-ai-gateway'];
+  assert.deepEqual(deployAiGateway.needs, [
+    'check-changes',
+    'check-staging-db-startup',
+    'run-migrations',
+  ]);
+  assert.equal(deployAiGateway.with.target_environment, 'staging');
+  assert.equal(deployAiGateway.with.vercel_project_id_var, 'VERCEL_PROJECT_ID_AI_GATEWAY');
+  assert.equal(deployAiGateway.with.source_sha, '${{ needs.check-changes.outputs.target_sha }}');
+  assert.equal(
+    deployAiGateway.secrets.VERCEL_PROJECT_TOKEN,
+    '${{ secrets.VERCEL_TOKEN_AI_GATEWAY }}'
+  );
+
+  for (const job of ['deploy-workers', 'deploy-gastown-wasteland']) {
+    for (const dependency of ['stage-ai-gateway', 'promote-ai-gateway']) {
+      assert.ok(production.jobs[job].needs.includes(dependency), `${job} needs ${dependency}`);
+      assert.match(production.jobs[job].if, new RegExp(`needs\\.${dependency}\\.result`));
+    }
+  }
+  assert.ok(staging.jobs['deploy-workers'].needs.includes('deploy-ai-gateway'));
+
+  for (const [deployment, jobs] of [
+    [production, ['stage-ai-gateway', 'promote-ai-gateway']],
+    [staging, ['deploy-ai-gateway']],
+  ]) {
+    const record = deployment.jobs['record-deployment'];
+    for (const job of jobs) {
+      assert.ok(record.needs.includes(job));
+      assert.match(record.if, new RegExp(`needs\\.${job}\\.result == 'success'`));
+    }
   }
 });
 
@@ -147,14 +519,22 @@ test('staging and production Worker changes use independent deployment baselines
   assert.match(workers.jobs['detect-changes'].if, /inputs.base_sha != ''/);
   const detect = workers.jobs['detect-changes'].steps.find(step => step.id === 'set-matrix');
   assert.match(detect.run, /has_named_environment "\$dir\/wrangler\.jsonc"/);
-  assert.match(
-    detect.run,
-    /git diff --quiet "\$BASE_SHA" HEAD -- "\$dir\/" packages pnpm-lock\.yaml/
-  );
   assert.equal(
-    production.jobs['deploy-kiloclaw'].if,
-    "needs.check-changes.outputs.deploy_kiloclaw == 'true'"
+    production.jobs['deploy-kiloclaw'],
+    undefined,
+    'production must not run deploy-kiloclaw on the schedule: dispatch it manually'
   );
+  assert.doesNotMatch(
+    production.jobs['record-deployment'].if,
+    /deploy-kiloclaw/,
+    'production record-deployment must not wait on the manual kiloclaw deploy'
+  );
+  const kiloclaw = workflow('deploy-kiloclaw');
+  assert.ok(
+    Object.hasOwn(kiloclaw.on, 'workflow_dispatch'),
+    'deploy-kiloclaw must be dispatchable manually'
+  );
+  assert.ok(Object.hasOwn(kiloclaw.on.workflow_dispatch.inputs, 'source_sha'));
   for (const [name, deployment] of [
     ['production', production],
     ['staging', staging],
@@ -402,4 +782,43 @@ test('deployment gate only deploys changes since the last complete run', () => {
   } finally {
     rmSync(directory, { recursive: true, force: true });
   }
+});
+
+test('both Worker deployment paths retry a deploy once', () => {
+  // Cloudflare's upload validation rejected a script that it accepted with a
+  // byte-identical bundle a moment earlier, so one retry stands between that
+  // noise and a failed release.
+  for (const name of ['deploy-manual', 'deploy-changed']) {
+    const steps = workers.jobs[name].steps;
+    const first = steps.findIndex(step => step.name === 'Deploy to Cloudflare Workers');
+    assert.ok(first >= 0, `${name} must deploy the Worker`);
+    assert.equal(steps[first].id, 'deploy');
+    assert.equal(steps[first]['continue-on-error'], true);
+    const retry = steps[first + 1];
+    assert.equal(retry.name, 'Deploy to Cloudflare Workers (retry)');
+    assert.equal(retry.if, "steps.deploy.outcome == 'failure'");
+    assert.equal(retry.with.command, steps[first].with.command);
+    assert.equal(retry.with.workingDirectory, steps[first].with.workingDirectory);
+  }
+});
+
+test('production deploys cloud-agent-next after a changed session-ingest contract', () => {
+  const detect = workers.jobs['detect-changes'];
+  assert.equal(
+    detect.outputs['deploy-cloud-agent-after-session-ingest'],
+    '${{ steps.set-matrix.outputs.deploy-cloud-agent-after-session-ingest }}'
+  );
+  const ordered = workers.jobs['deploy-cloud-agent-after-session-ingest'];
+  assert.equal(ordered.needs, 'detect-changes');
+  assert.match(ordered.if, /deploy-cloud-agent-after-session-ingest == 'true'/);
+  const wait = ordered.steps.find(step => step.name === 'Wait for session-ingest deployment');
+  assert.match(wait.run, /Deploy services\/session-ingest/);
+  assert.match(wait.run, /seq 1 360/);
+  assert.match(wait.run, /queued/);
+  assert.match(wait.run, /in_progress/);
+  const prepare = ordered.steps.findIndex(step => step.id === 'runtime');
+  const deploy = ordered.steps.findIndex(step => step.name === 'Deploy cloud-agent-next');
+  assert.ok(prepare >= 0 && prepare < deploy);
+  assert.equal(ordered.steps[deploy].with.preCommands, 'pnpm run predeploy');
+  assert.equal(ordered.steps[deploy + 1].with.preCommands, 'pnpm run predeploy');
 });

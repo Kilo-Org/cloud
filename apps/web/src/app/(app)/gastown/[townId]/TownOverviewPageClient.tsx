@@ -330,8 +330,8 @@ export function TownOverviewPageClient({
                   <AreaChart data={activityData}>
                     <defs>
                       <linearGradient id="activityGrad" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor="oklch(95% 0.15 108)" stopOpacity={0.3} />
-                        <stop offset="100%" stopColor="oklch(95% 0.15 108)" stopOpacity={0} />
+                        <stop offset="0%" stopColor="var(--primary)" stopOpacity={0.3} />
+                        <stop offset="100%" stopColor="var(--primary)" stopOpacity={0} />
                       </linearGradient>
                     </defs>
                     <XAxis dataKey="time" hide />
@@ -353,7 +353,7 @@ export function TownOverviewPageClient({
                     <Area
                       type="monotone"
                       dataKey="count"
-                      stroke="oklch(95% 0.15 108)"
+                      stroke="var(--primary)"
                       strokeWidth={1.5}
                       fill="url(#activityGrad)"
                     />

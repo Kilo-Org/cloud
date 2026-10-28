@@ -18,10 +18,11 @@ import {
   Sparkles,
   Trash2,
 } from '@/components/ui/icons';
-import { Alert, type LayoutChangeEvent, type ScrollView, View } from 'react-native';
+import { type LayoutChangeEvent, type ScrollViewInstance, View } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
 
-import { DestructiveConfirmDialog } from '@/components/destructive-confirm-dialog';
+import { useConfirmDialog } from '@/components/ui/dialog';
+import { useContextPicker } from '@/components/context-control';
 import { ActionTile } from '@/components/profile-action-tile';
 import { CreditsCard } from '@/components/profile-credits-card';
 import { QueryError } from '@/components/query-error';
@@ -34,13 +35,12 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useDeleteAccount } from '@/components/use-delete-account';
 import { useFeedbackPrompt } from '@/components/use-feedback-prompt';
-import { useSignOutConfirmation } from '@/components/use-sign-out-confirmation';
 import { i18n } from '@/i18n';
-import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
 import { useAuth } from '@/lib/auth/auth-context';
 import { openExternalUrl } from '@/lib/external-link';
-import { useAfterInteractions } from '@/lib/hooks/use-after-interactions';
+import { useAfterIdle } from '@/lib/hooks/use-after-idle';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
+import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
 import { useOrganization } from '@/lib/organization-context';
 import {
   getCodeReviewerProfilePath,
@@ -48,7 +48,6 @@ import {
   getProfilesPath,
   getPrReviewEntryPath,
 } from '@/lib/profile-agent-navigation';
-import { useScreenSideInsets } from '@/lib/screen-insets';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { useTRPC } from '@/lib/trpc';
 
@@ -80,29 +79,19 @@ function providerLabel(provider: string) {
 }
 
 export function ProfileScreen() {
-  const { left, right } = useScreenSideInsets();
-  const scrollStyle = { marginLeft: left, marginRight: right };
   const { signOut, token } = useAuth();
   const router = useRouter();
   const trpc = useTRPC();
-  const deleteScrollRef = useRef<ScrollView>(null);
+  const deleteScrollRef = useRef<ScrollViewInstance>(null);
   const [deleteKeyboardOcclusion, setDeleteKeyboardOcclusion] = useState(0);
   const [deleteScrollFrameHeight, setDeleteScrollFrameHeight] = useState(0);
   const { organizationId, isLoaded: organizationContextLoaded } = useOrganization();
   const isAuthenticated = token != null;
-  // The account queries wait for the tab transition to settle, but the hook
-  // bounds that wait: an interaction queue that never reports idle (an
-  // automated UI session holds one open) must not hide the Linked accounts row,
-  // the only place the signed-in address renders.
-  const afterInteractions = useAfterInteractions();
-  const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
-  // One destructive confirm for both platforms: the in-app dialog carries the
-  // destructive (red) affordance on iOS and Android alike, so the sign-out
-  // path never branches on the platform. The confirmation itself, and its
-  // rationale, live in `useSignOutConfirmation`.
-  const { confirmVisible, requestSignOut, dismissConfirm, confirmSignOut } = useSignOutConfirmation(
-    () => void signOut()
-  );
+  const afterIdle = useAfterIdle();
+  // Both destructive confirms on this screen go through the app's dialog: it
+  // carries the destructive (red) affordance on iOS and Android alike, because
+  // Android's native `AlertDialog` paints every button with the theme accent.
+  const { confirm, dialog: confirmDialog } = useConfirmDialog();
   const {
     data,
     isLoading,
@@ -111,7 +100,17 @@ export function ProfileScreen() {
     refetch: refetchProviders,
   } = useQuery({
     ...trpc.user.getAuthProviders.queryOptions(),
-    enabled: isAuthenticated && afterInteractions,
+    enabled: isAuthenticated && afterIdle,
+    // The Linked accounts row must settle while the online manager reports
+    // offline: a paused read is pending without fetching, so `isLoading` is
+    // false and the section neither paints a row nor an error. This one either
+    // answers or fails once the control-plane deadline lands, and the error
+    // surface below then offers Retry.
+    networkMode: 'always',
+    // `networkMode: 'always'` also disables the derived reconnect refetch
+    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
+    // 'always'` when it is undefined), so ask for it explicitly.
+    refetchOnReconnect: true,
   });
   const {
     data: orgs,
@@ -120,14 +119,32 @@ export function ProfileScreen() {
     refetch: refetchOrganizations,
   } = useQuery({
     ...trpc.organizations.list.queryOptions(),
-    enabled: isAuthenticated && afterInteractions,
+    enabled: isAuthenticated && afterIdle,
+    // The Agents section resolves its scope from this list, so the read must
+    // settle the same way the linked-accounts one does: a read paused by the
+    // online manager is pending without fetching, and the inline error surface
+    // below never paints, leaving the organization section and the agent rows
+    // waiting on a request that never starts. Answer, or fail into Retry.
+    networkMode: 'always',
+    // `networkMode: 'always'` also disables the derived reconnect refetch
+    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
+    // 'always'` when it is undefined), so ask for it explicitly.
+    refetchOnReconnect: true,
   });
   const agentScope = organizationContextLoaded
-    ? getProfileAgentScope(organizationId, orgs, organizationsFetching || !afterInteractions)
+    ? getProfileAgentScope(organizationId, orgs)
     : undefined;
+  const { openPicker, picker } = useContextPicker(orgs);
   const selectedOrg = orgs?.find(org => org.organizationId === organizationId);
   const orgRole = selectedOrg?.role;
   const orgName = selectedOrg?.organizationName;
+  // The Organization section stays on Profile in every credit-account context:
+  // a Personal context still offers the account picker when the account has
+  // memberships, so organization management is not gated behind the credits
+  // account control. The restore decides the context first, so the chooser never
+  // paints for a frame before the active organization's row replaces it.
+  const showOrganizationSection =
+    organizationId != null || (organizationContextLoaded && (orgs?.length ?? 0) > 0);
 
   const { userId } = useCurrentUserId({ enabled: isAuthenticated });
   // The prompt's surface is platform-specific (`feedback-prompt-platform.ts`);
@@ -135,11 +152,57 @@ export function ProfileScreen() {
   const feedbackPrompt = useFeedbackPrompt();
 
   const { t } = useTranslation();
+  // Reactive: a connectivity commit re-renders the error-variant selection, so
+  // a read that settled by failing while the device is confirmed offline says
+  // so instead of presenting itself as a server fault.
+  const committedConnectivity = useCommittedConnectivityStatus();
+
+  // Personal context has no selected organization to label, so its row opens
+  // the account picker; otherwise the row names the destination for the active
+  // organization's role.
+  const organizationRow =
+    organizationId == null ? (
+      <ConfigureRow
+        icon={Building2}
+        title={t('organization.boundary.selectOrganization')}
+        hue="lime"
+        className="rounded-lg bg-secondary px-3"
+        last
+        onPress={openPicker}
+      />
+    ) : (
+      <ConfigureRow
+        icon={Building2}
+        title={
+          orgRole === 'member' ? t('profile.viewOrganization') : t('profile.manageOrganization')
+        }
+        subtitle={orgName}
+        hue="lime"
+        className="rounded-lg bg-secondary px-3"
+        disabled={!orgRole}
+        last
+        onPress={() => {
+          router.push('/(app)/(tabs)/(3_profile)/organization' as Href);
+        }}
+      />
+    );
+
+  const requestSignOut = () => {
+    confirm({
+      title: t('profile.signOutTitle'),
+      message: t('profile.signOutMessage'),
+      confirmLabel: t('common.signOut'),
+      onConfirm: () => {
+        void signOut();
+      },
+    });
+  };
 
   const {
     phase: deletePhase,
     isPending: deletePending,
     devCode,
+    canSubmitCode,
     beginDelete,
     submitCode,
     setCode,
@@ -175,15 +238,18 @@ export function ProfileScreen() {
     setDeleteScrollFrameHeight(current => (current === height ? current : height));
   }, []);
 
+  // The confirmation is the app's own dialog, not the native alert: Android's
+  // `AlertDialog` paints every button with the theme accent, so
+  // `style: 'destructive'` never reaches the screen there. The Profile screen
+  // is a tab, so nothing can be presented over it and the portal dialog is
+  // always visible.
   const confirmDeleteAccount = () => {
-    Alert.alert(t('profile.deleteAccountTitle'), t('profile.deleteAccountMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('profile.deleteAccountConfirm'),
-        style: 'destructive',
-        onPress: beginDelete,
-      },
-    ]);
+    confirm({
+      title: t('profile.deleteAccountTitle'),
+      message: t('profile.deleteAccountMessage'),
+      confirmLabel: t('profile.deleteAccountConfirm'),
+      onConfirm: beginDelete,
+    });
   };
 
   const showPrivacyChoices = () => {
@@ -196,7 +262,6 @@ export function ProfileScreen() {
       <TabScreenScrollView
         ref={deleteScrollRef}
         className="flex-1"
-        style={scrollStyle}
         contentContainerClassName="px-4 pt-4"
         showsVerticalScrollIndicator={false}
         onKeyboardOcclusionChange={setDeleteKeyboardOcclusion}
@@ -253,34 +318,32 @@ export function ProfileScreen() {
         </View>
 
         {/* PR Review */}
-        {prReviewEnabled && (
-          <View className="mt-6 gap-3">
-            <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
-              {t('profile.reviews')}
-            </Text>
-            <ConfigureRow
-              icon={GitMerge}
-              title={t('common.prReview')}
-              subtitle={t('profile.prReviewSubtitle')}
-              hue="gold"
-              className="rounded-lg bg-secondary px-3"
-              last
-              onPress={() => {
-                router.push(getPrReviewEntryPath());
-              }}
-            />
-          </View>
-        )}
+        <View className="mt-6 gap-3">
+          <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
+            {t('profile.reviews')}
+          </Text>
+          <ConfigureRow
+            icon={GitMerge}
+            title={t('common.prReview')}
+            subtitle={t('profile.prReviewSubtitle')}
+            hue="gold"
+            className="rounded-lg bg-secondary px-3"
+            last
+            onPress={() => {
+              router.push(getPrReviewEntryPath());
+            }}
+          />
+        </View>
 
         {/* Organization */}
-        {organizationId != null && (
+        {showOrganizationSection && (
           <View className="mt-6 gap-3">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
               {t('common.organization')}
             </Text>
             {organizationsError ? (
               <QueryError
-                variant="server"
+                variant={committedConnectivity === 'offline' ? 'offline' : 'server'}
                 placement="top"
                 title={t('profile.couldNotLoadOrganization')}
                 message={t('profile.couldNotLoadOrganizationDescription')}
@@ -288,23 +351,9 @@ export function ProfileScreen() {
                 isRetrying={organizationsFetching}
               />
             ) : (
-              <ConfigureRow
-                icon={Building2}
-                title={
-                  orgRole === 'member'
-                    ? t('profile.viewOrganization')
-                    : t('profile.manageOrganization')
-                }
-                subtitle={orgName}
-                hue="lime"
-                className="rounded-lg bg-secondary px-3"
-                disabled={!orgRole}
-                last
-                onPress={() => {
-                  router.push('/(app)/(tabs)/(3_profile)/organization' as Href);
-                }}
-              />
+              organizationRow
             )}
+            {picker}
           </View>
         )}
 
@@ -321,6 +370,16 @@ export function ProfileScreen() {
             className="rounded-lg bg-secondary px-3"
             onPress={() => {
               router.push('/(app)/(tabs)/(3_profile)/preferences' as Href);
+            }}
+          />
+          <ConfigureRow
+            icon={BookOpenCheck}
+            title={t('agentBriefing.title')}
+            subtitle={t('agentBriefing.historyHint')}
+            hue="sage"
+            className="rounded-lg bg-secondary px-3"
+            onPress={() => {
+              router.push('/(app)/agent-briefing' as Href);
             }}
           />
           {/* Permanent replay entry: opens the tour at any time, including
@@ -363,13 +422,13 @@ export function ProfileScreen() {
         {(providersError ||
           (data?.providers.length ?? 0) > 0 ||
           isLoading ||
-          (!afterInteractions && !data)) && (
+          (!afterIdle && !data)) && (
           <View className="mt-6 gap-3">
             <Text variant="small" className="uppercase tracking-wide text-muted-foreground">
               {t('profile.linkedAccounts')}
             </Text>
 
-            {(isLoading || !afterInteractions) && !data && !providersError && (
+            {(isLoading || !afterIdle) && !data && !providersError && (
               <Animated.View exiting={FadeOut.duration(150)}>
                 {/* Content-shaped skeleton (icon tile + two text bars in the
                     row's own bg-secondary card): a plain block read as an
@@ -391,7 +450,7 @@ export function ProfileScreen() {
 
             {providersError && (
               <QueryError
-                variant="server"
+                variant={committedConnectivity === 'offline' ? 'offline' : 'server'}
                 placement="top"
                 title={t('profile.couldNotLoadAccounts')}
                 onRetry={() => void refetchProviders()}
@@ -467,7 +526,7 @@ export function ProfileScreen() {
               <Button
                 variant="destructive"
                 loading={deletePhase === 'executing'}
-                disabled={deletePhase === 'executing'}
+                disabled={deletePhase === 'executing' || !canSubmitCode}
                 onPress={submitCode}
               >
                 <Text>{t('profile.confirmDeletion')}</Text>
@@ -481,15 +540,7 @@ export function ProfileScreen() {
         </View>
       </TabScreenScrollView>
 
-      {confirmVisible && (
-        <DestructiveConfirmDialog
-          title={t('profile.signOutTitle')}
-          message={t('profile.signOutMessage')}
-          confirmLabel={t('common.signOut')}
-          onCancel={dismissConfirm}
-          onConfirm={confirmSignOut}
-        />
-      )}
+      {confirmDialog}
 
       {feedbackPrompt.promptDialog}
     </View>

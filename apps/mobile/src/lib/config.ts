@@ -37,11 +37,31 @@ export const EVENT_SERVICE_URL: string = required('eventServiceUrl');
 export const NOTIFICATIONS_URL: string = required('notificationsUrl');
 export const POSTHOG_API_KEY: string = required('posthogApiKey');
 
+// The Kilo MCP server a production build reaches with the signed-in session's
+// own token (lib/chat/kilo-mcp.ts). It is resolved here, at the runtime config
+// boundary every screen already reads, and not in app.config.ts (the native
+// config that registers plugins): it is a plain URL value, identical on iOS and
+// Android, and both platforms read it through this module. A build given
+// KILO_MCP_URL (the device build points at the local stack) overrides it; one
+// that is neither production nor given a value leaves the key undefined, which
+// hides the whole feature.
+const KILO_MCP_URL_PRODUCTION = 'https://mcp.kiloapps.io';
+
+export const KILO_MCP_URL: string | undefined =
+  optional('kiloMcpUrl') ??
+  (extra?.isProductionBuild === true ? KILO_MCP_URL_PRODUCTION : undefined);
 export const GOOGLE_WEB_CLIENT_ID: string | undefined = optional('googleWebClientId');
 export const GOOGLE_IOS_CLIENT_ID: string | undefined = optional('googleIosClientId');
 export const PLAY_INTEGRITY_PROJECT_NUMBER: string | undefined = optional(
   'playIntegrityProjectNumber'
 );
+
+// Non-production builds send the fixed admission sentinel when the device
+// cannot attest (simulator, emulator without Play Services). The server accepts
+// it only when it also runs outside production, so a production app build with
+// this flag baked in still cannot use it.
+export const NATIVE_ADMISSION_DEV_SENTINEL: boolean =
+  optional('nativeAdmissionDevSentinel') === 'true' && extra?.isProductionBuild !== true;
 export const SENTRY_ENVIRONMENT: string | undefined = optional('sentryEnvironment');
 
 /** Client-observed latency ingest endpoint. The optional `LATENCY_INGEST_URL`

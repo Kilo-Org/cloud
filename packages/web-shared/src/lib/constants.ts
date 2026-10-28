@@ -1,5 +1,3 @@
-import { requireEnv } from '@kilocode/web-shared/lib/dotenvx';
-
 export const FIRST_TOPUP_BONUS_AMOUNT: number = 0;
 
 export const REFERRAL_BONUS_AMOUNT = 10;
@@ -16,7 +14,7 @@ export const allow_fake_login =
 
 export const MINIMUM_TOP_UP_AMOUNT = 10;
 export const MAXIMUM_TOP_UP_AMOUNT = 10_000;
-export const ORGANIZATION_ID_HEADER = 'x-kilocode-organizationid'; // We pass X-KiloCode-OrganizationId header to identify the organization in API requests
+export const ORGANIZATION_ID_HEADER = 'x-kilocode-organizationid';
 
 export const LANDING_URL =
   process.env.NODE_ENV === 'production' ? 'https://kilo.ai' : 'http://localhost:3001';
@@ -65,43 +63,7 @@ export const CLOUD_AGENT_NEXT_WS_URL = process.env.NEXT_PUBLIC_CLOUD_AGENT_NEXT_
 // Used by the CLI live transport for real-time event streaming
 export const SESSION_INGEST_WS_URL = process.env.NEXT_PUBLIC_SESSION_INGEST_WS_URL ?? '';
 
-// Gastown worker URL (client-side, inlined at build time)
-// The browser talks directly to the gastown Cloudflare Worker for tRPC + WS.
-// Must use NEXT_PUBLIC_ prefix so Next.js exposes it to the browser bundle.
-export const GASTOWN_URL = requireEnv(
-  'NEXT_PUBLIC_GASTOWN_URL',
-  process.env.NEXT_PUBLIC_GASTOWN_URL
-);
-
-// Kilo Chat worker URL (client-side, inlined at build time)
-export const KILO_CHAT_URL = requireEnv(
-  'NEXT_PUBLIC_KILO_CHAT_URL',
-  process.env.NEXT_PUBLIC_KILO_CHAT_URL
-);
-
-// Event Service WebSocket URL (client-side, inlined at build time)
-export const EVENT_SERVICE_URL = requireEnv(
-  'NEXT_PUBLIC_EVENT_SERVICE_URL',
-  process.env.NEXT_PUBLIC_EVENT_SERVICE_URL
-);
-
-// Wasteland worker URL (client-side, inlined at build time)
-// The browser talks directly to the Wasteland Cloudflare Worker for tRPC.
-// Must use NEXT_PUBLIC_ prefix so Next.js exposes it to the browser bundle.
-export const WASTELAND_URL = requireEnv(
-  'NEXT_PUBLIC_WASTELAND_URL',
-  process.env.NEXT_PUBLIC_WASTELAND_URL
-);
-
-// Free model rate limits: per-IP for client-side products, per-user for server-side products
-export const FREE_MODEL_RATE_LIMIT_WINDOW_HOURS = 1;
-export const FREE_MODEL_MAX_REQUESTS_PER_WINDOW = 200;
-export const ADMIN_RATE_LIMIT_TEST_MODEL = 'admin-rate-limit-test';
-
 // Stripe publishable key (client-side, inlined at build time)
 export const STRIPE_PUBLISHABLE_KEY = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '';
-
-export const PROMOTION_MAX_REQUESTS = 10000;
-export const PROMOTION_WINDOW_HOURS = 24;
 
 export const EXA_MONTHLY_ALLOWANCE_MICRODOLLARS = 10_000_000;

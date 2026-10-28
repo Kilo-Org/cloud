@@ -3,17 +3,10 @@ import { z } from 'zod';
 import {
   instanceLifecycleEventSchema,
   scheduledActionEventSchema,
-  type InstanceLifecycleEvent,
-  type ScheduledActionEvent,
+  securityLifecycleEventSchema,
 } from './notification-events';
+import { NEEDS_INPUT_ATTENTION_KINDS } from './needs-input-actions';
 import { pushDataSchema, cloudAgentSessionCategorySchema } from './push-data';
-
-export {
-  instanceLifecycleEventSchema,
-  scheduledActionEventSchema,
-  type InstanceLifecycleEvent,
-  type ScheduledActionEvent,
-};
 
 // ── sendPushForConversation ─────────────────────────────────────────
 
@@ -36,6 +29,8 @@ export const perRecipientOutcomeSchema = z.enum([
   'suppressed_presence',
   'suppressed_preference',
   'no_tokens',
+  'suppressed_expired',
+  'suppressed_access',
   'duplicate',
   'failed',
 ]);
@@ -44,6 +39,10 @@ export type PerRecipientOutcome = z.infer<typeof perRecipientOutcomeSchema>;
 export const perRecipientResultSchema = z.object({
   userId: z.string(),
   outcome: perRecipientOutcomeSchema,
+  // Stable, content-free failure classification (e.g. 'expo_ticket_rejected'),
+  // populated by the internal dispatch path for `failed` outcomes. Optional:
+  // older workers and the conversation push path omit it.
+  reason: z.string().optional(),
 });
 export type PerRecipientResult = z.infer<typeof perRecipientResultSchema>;
 
@@ -154,8 +153,8 @@ export const sendCloudAgentSessionNotificationInputSchema = z.object({
   category: cloudAgentSessionCategorySchema.optional(),
   // Needs-input raise detail: which answer the waiting agent wants, and the PR
   // that can be opened from the notification. Absent on status pushes.
-  attentionKind: z.enum(['question', 'permission']).optional(),
-  prUrl: z.string().optional(),
+  attentionKind: z.enum(NEEDS_INPUT_ATTENTION_KINDS).optional(),
+  prUrl: z.string().min(1).optional(),
   // Old producers omit these; remove the optionals when every producer sends keys.
   i18nKey: z.string().min(1).optional(),
   i18nParams: z.record(z.string(), z.string()).optional(),
@@ -187,6 +186,15 @@ export const refreshGlanceableSessionsInputSchema = z.object({
    * had no approval change.
    */
   approvalChangedSessionIds: z.array(z.string().min(1)).optional(),
+  /**
+   * Sessions in `cliSessionIds` whose refresh must not happen unless a session
+   * card follows them. The ingest service refreshes the card content after it
+   * persists a new summary; a session nobody follows would otherwise pay for a
+   * whole snapshot build. The notifications side checks the follow with one
+   * indexed read and skips this call when none of the named sessions is
+   * followed. Omitting the field keeps the previous behavior.
+   */
+  cardFollowSessionIds: z.array(z.string().min(1)).optional(),
 });
 export type RefreshGlanceableSessionsParams = z.infer<typeof refreshGlanceableSessionsInputSchema>;
 
@@ -261,10 +269,16 @@ export type SendAgentSessionNotificationResult = z.infer<
 
 // ── dispatchPush (internal DO RPC) ──────────────────────────────────
 
+export const agentBriefingDispatchWindowSchema = z.object({
+  localDate: z.string().date(),
+  expiresAt: z.string().datetime(),
+});
+
 export const dispatchPushInputSchema = z.object({
   userId: z.string().min(1),
   presenceContext: z.string().min(1).nullable(),
   idempotencyKey: z.string().min(1),
+  agentBriefing: agentBriefingDispatchWindowSchema.optional(),
   badge: z
     .object({
       badgeBucket: z.string().min(1),
@@ -299,6 +313,9 @@ export const dispatchPushOutcomeSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('delivered'), tokenCount: z.number().int().nonnegative() }),
   z.object({ kind: z.literal('suppressed_presence') }),
   z.object({ kind: z.literal('suppressed_rate_limit') }),
+  z.object({ kind: z.literal('suppressed_preference') }),
+  z.object({ kind: z.literal('suppressed_expired') }),
+  z.object({ kind: z.literal('suppressed_access') }),
   z.object({ kind: z.literal('no_tokens') }),
   z.object({ kind: z.literal('duplicate') }),
   z.object({ kind: z.literal('failed'), error: z.string() }),
@@ -321,22 +338,42 @@ export type InternalDispatchLowBalanceRequest = z.infer<
 /**
  * Spend-alert dispatch. `organizationId` is present only for an
  * `organization` scope; a `personal` scope carries the user's own spend and
- * nothing else. `dedupeKey` is the outbox row's identity, which carries the
- * firing episode: it joins the idempotency key alongside the alert kind and
- * threshold, so a condition that clears and crosses again inside the channel's
- * idempotency window is a new alert rather than a collapsed duplicate.
+ * nothing else. The dispatcher builds the push destination from these two
+ * fields, so a scope and an id that disagree would route the tap to the wrong
+ * spend view; the refinement refuses that before a push exists. `dedupeKey` is
+ * the outbox row's identity, which carries the firing episode: it joins the
+ * idempotency key alongside the alert kind and threshold, so a condition that
+ * clears and crosses again inside the channel's idempotency window is a new
+ * alert rather than a collapsed duplicate.
  */
-export const internalDispatchSpendAlertRequestSchema = z.object({
-  kind: z.literal('spend_alert'),
-  recipientUserIds: z.array(z.string().min(1)).min(1),
-  scope: z.enum(['personal', 'organization']),
-  organizationId: z.string().min(1).optional(),
-  alertKind: z.enum(['threshold', 'anomaly']),
-  scopeName: z.string().min(1),
-  amountUsd: z.number().nonnegative(),
-  thresholdUsd: z.number().nonnegative(),
-  dedupeKey: z.string().min(1),
-});
+export const internalDispatchSpendAlertRequestSchema = z
+  .object({
+    kind: z.literal('spend_alert'),
+    recipientUserIds: z.array(z.string().min(1)).min(1),
+    scope: z.enum(['personal', 'organization']),
+    organizationId: z.string().min(1).optional(),
+    alertKind: z.enum(['threshold', 'anomaly']),
+    scopeName: z.string().min(1),
+    amountUsd: z.number().nonnegative(),
+    thresholdUsd: z.number().nonnegative(),
+    dedupeKey: z.string().min(1),
+  })
+  .superRefine((data, ctx) => {
+    if (data.scope === 'organization' && data.organizationId === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['organizationId'],
+        message: 'an organization-scope alert names its organization',
+      });
+    }
+    if (data.scope === 'personal' && data.organizationId !== undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['organizationId'],
+        message: 'a personal-scope alert carries no organization id',
+      });
+    }
+  });
 export type InternalDispatchSpendAlertRequest = z.infer<
   typeof internalDispatchSpendAlertRequestSchema
 >;
@@ -357,21 +394,9 @@ export type InternalDispatchSecurityFindingRequest = z.infer<
   typeof internalDispatchSecurityFindingRequestSchema
 >;
 
-// 1:1 map to the `security_lifecycle` event enum in `push-data.ts` (which in
-// turn maps to SecurityAuditLogAction). Kept as a standalone enum here because
-// the push-data variant declares the enum inline and this package must not
-// import it back.
-export const securityLifecycleEventSchema = z.enum([
-  'analysis_completed',
-  'analysis_failed',
-  'remediation_queued',
-  'remediation_pr_opened',
-  'remediation_failed',
-  'remediation_blocked',
-  'remediation_no_changes_needed',
-  'remediation_cancelled',
-]);
-export type SecurityLifecycleEvent = z.infer<typeof securityLifecycleEventSchema>;
+// The event vocabulary is the shared schema from `notification-events.ts`
+// (the same one the `security_lifecycle` push variant in `push-data.ts`
+// uses); it is exported to package consumers from `notification-events`.
 
 export const internalDispatchSecurityLifecycleRequestSchema = z.object({
   kind: z.literal('security_lifecycle'),
@@ -386,10 +411,19 @@ export type InternalDispatchSecurityLifecycleRequest = z.infer<
   typeof internalDispatchSecurityLifecycleRequestSchema
 >;
 
+export const internalDispatchAgentBriefingRequestSchema = agentBriefingDispatchWindowSchema.extend({
+  kind: z.literal('agent_briefing'),
+  userId: z.string().min(1),
+});
+export type InternalDispatchAgentBriefingRequest = z.infer<
+  typeof internalDispatchAgentBriefingRequestSchema
+>;
+
 export const internalDispatchRequestSchema = z.discriminatedUnion('kind', [
   internalDispatchLowBalanceRequestSchema,
   internalDispatchSpendAlertRequestSchema,
   internalDispatchSecurityFindingRequestSchema,
   internalDispatchSecurityLifecycleRequestSchema,
+  internalDispatchAgentBriefingRequestSchema,
 ]);
 export type InternalDispatchRequest = z.infer<typeof internalDispatchRequestSchema>;

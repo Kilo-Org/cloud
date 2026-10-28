@@ -20,12 +20,8 @@ import {
 import { parseCanonicalBitbucketCloneUrl } from '../types.js';
 
 const validMessageId = 'msg_018f1e2d3c4bAbCdEfGhIjKlMn';
-const validSessionId = 'agent_12345678-1234-1234-1234-123456789012';
+const validSessionId = 'workspace_12345678-1234-1234-1234-123456789012';
 const validKiloSessionId = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
-const validImages = {
-  path: '123e4567-e89b-12d3-a456-426614174000',
-  files: ['123e4567-e89b-12d3-a456-426614174001.png'],
-};
 const validAttachments = {
   path: '123e4567-e89b-12d3-a456-426614174000',
   files: ['123e4567-e89b-12d3-a456-426614174001.csv'],
@@ -52,11 +48,161 @@ const baseStartInput = {
 };
 
 describe('grouped unified session input contracts', () => {
+  it('accepts an optional operation key on start for any client origin', () => {
+    const valid = {
+      ...baseStartInput,
+      operationKey: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
+      options: {
+        kilocodeOrganizationId: '123e4567-e89b-12d3-a456-426614174011',
+        createdOnPlatform: 'desktop',
+      },
+    };
+    expect(StartSessionInput.parse(valid)).toEqual(valid);
+    expect(StartSessionInput.parse(baseStartInput)).toEqual(baseStartInput);
+    for (const input of [
+      { ...valid, operationKey: 'not-a-uuid' },
+      { ...valid, operationKey: null },
+      { ...valid, options: { ...valid.options, clientProvenance: 'browser' } },
+      { ...valid, options: { ...valid.options, skipBalanceCheck: true } },
+    ]) {
+      expect(StartSessionInput.safeParse(input).success).toBe(false);
+    }
+  });
+
+  it('accepts replay metadata and preserves the existing start response contract', () => {
+    const output = {
+      cloudAgentSessionId: validSessionId,
+      kiloSessionId: validKiloSessionId,
+      messageId: validMessageId,
+      delivery: 'queued',
+    };
+    expect(StartSessionOutput.safeParse(output).success).toBe(true);
+    expect(
+      StartSessionOutput.safeParse({
+        ...output,
+        replayed: true,
+      }).success
+    ).toBe(true);
+    expect(
+      StartSessionOutput.safeParse({
+        ...output,
+        replayed: 'true',
+      }).success
+    ).toBe(false);
+  });
+
+  it.each(
+    [[], ['Z.Example.COM.', 'example.com', 'EXAMPLE.COM']].map(egressAllowlist => ({
+      egressAllowlist,
+    }))
+  )('normalizes grouped and legacy egress allowlists: %j', ({ egressAllowlist }) => {
+    const expected = egressAllowlist.length === 0 ? [] : ['example.com', 'z.example.com'];
+    expect(
+      StartSessionInput.parse({
+        ...baseStartInput,
+        runtime: { egressMode: 'allowlist', egressAllowlist },
+      }).runtime
+    ).toEqual({ egressMode: 'allowlist', egressAllowlist: expected });
+    expect(
+      PrepareSessionInput.parse({
+        ...basePromptInput,
+        githubRepo: 'acme/repo',
+        egressMode: 'allowlist',
+        egressAllowlist,
+      }).egressAllowlist
+    ).toEqual(expected);
+  });
+
+  it.each([{}, { egressMode: 'unrestricted' }, { egressMode: 'allowlist' }])(
+    'preserves omitted lists and explicit modes at both boundaries: %j',
+    policy => {
+      expect(StartSessionInput.parse({ ...baseStartInput, runtime: policy }).runtime).toEqual(
+        policy
+      );
+      const parsed = PrepareSessionInput.parse({
+        ...basePromptInput,
+        githubRepo: 'acme/repo',
+        ...policy,
+      });
+      expect(parsed.egressMode).toBe('egressMode' in policy ? policy.egressMode : undefined);
+      expect(parsed.egressAllowlist).toBeUndefined();
+      expect(StartSessionInput.parse(baseStartInput).runtime).toBeUndefined();
+    }
+  );
+
+  it.each([
+    { egressAllowlist: [] },
+    { egressAllowlist: ['example.com'] },
+    { egressMode: 'unrestricted', egressAllowlist: [] },
+    { egressMode: 'unrestricted', egressAllowlist: ['example.com'] },
+    { egressMode: 'deny-all' },
+    { egressMode: null },
+  ])('rejects ambiguous or unsupported egress policies: %j', policy => {
+    const grouped = StartSessionInput.safeParse({ ...baseStartInput, runtime: policy });
+    const legacy = PrepareSessionInput.safeParse({
+      ...basePromptInput,
+      githubRepo: 'acme/repo',
+      ...policy,
+    });
+    expect(grouped.success).toBe(false);
+    expect(legacy.success).toBe(false);
+    if ('egressAllowlist' in policy) {
+      if (!grouped.success) {
+        expect(grouped.error.issues).toContainEqual(
+          expect.objectContaining({ path: ['runtime', 'egressAllowlist'] })
+        );
+      }
+      if (!legacy.success) {
+        expect(legacy.error.issues).toContainEqual(
+          expect.objectContaining({ path: ['egressAllowlist'] })
+        );
+      }
+    }
+  });
+
+  it('rejects invalid egress policies at both public boundaries', () => {
+    for (const egressAllowlist of [null, ['*'], ['127.1'], ['https://example.com']]) {
+      expect(
+        StartSessionInput.safeParse({
+          ...baseStartInput,
+          runtime: { egressMode: 'allowlist', egressAllowlist },
+        }).success
+      ).toBe(false);
+      expect(
+        PrepareSessionInput.safeParse({
+          ...basePromptInput,
+          githubRepo: 'acme/repo',
+          egressMode: 'allowlist',
+          egressAllowlist,
+        }).success
+      ).toBe(false);
+    }
+  });
+
+  it('rejects retired devcontainer requests at the legacy API boundary', () => {
+    const input = {
+      ...basePromptInput,
+      githubRepo: 'acme/repo',
+      autoInitiate: true,
+      devcontainer: true,
+    };
+    const result = PrepareSessionInput.safeParse(input);
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toContainEqual(
+        expect.objectContaining({
+          path: ['devcontainer'],
+          message: 'Devcontainer support has been retired',
+        })
+      );
+    }
+    expect(PrepareSessionInput.safeParse({ ...input, devcontainer: false }).success).toBe(true);
+  });
+
   it('preserves the full grouped start payload shape', () => {
     const input = {
       message: {
         prompt: 'Create the first turn',
-        images: validImages,
         id: validMessageId,
       },
       agent: {
@@ -128,27 +274,6 @@ describe('grouped unified session input contracts', () => {
         message: { prompt: 'Read this document', attachments: validAttachments },
       }).message.attachments
     ).toEqual(validAttachments);
-  });
-
-  it('continues accepting legacy images and rejects ambiguous grouped attachment payloads', () => {
-    expect(
-      SendMessageInput.safeParse({
-        cloudAgentSessionId: validSessionId,
-        message: { prompt: 'Read the image', images: validImages },
-      }).success
-    ).toBe(true);
-    expect(
-      StartSessionInput.safeParse({
-        ...baseStartInput,
-        message: { prompt: 'ambiguous', images: validImages, attachments: validAttachments },
-      }).success
-    ).toBe(false);
-    expect(
-      SendMessageInput.safeParse({
-        cloudAgentSessionId: validSessionId,
-        message: { prompt: 'ambiguous', images: validImages, attachments: validAttachments },
-      }).success
-    ).toBe(false);
   });
 
   it('preserves the grouped send payload shape', () => {
@@ -248,15 +373,15 @@ describe('sandbox preset input boundaries', () => {
   );
 
   it.each(['small', 'large'] as const)(
-    'rejects unsupported BYOC %s rather than allocating Kilo compute',
+    'rejects retired Kilo-paid Vercel %s requests',
     instanceType => {
-      const sandboxAllocation = { provider: { id: 'vercel', account: 'byoc' }, instanceType };
+      const sandboxAllocation = { provider: { id: 'vercel', account: 'kilo' }, instanceType };
       for (const result of [
         PrepareSessionInput.safeParse({ ...prepare, sandboxAllocation }),
         StartSessionInput.safeParse({ ...baseStartInput, runtime: { sandboxAllocation } }),
       ]) {
         expect(result.success).toBe(false);
-        if (!result.success) expect(result.error.message).toContain('BYOC');
+        if (!result.success) expect(result.error.message).toContain('byoc');
       }
     }
   );
@@ -494,7 +619,7 @@ describe('legacy live attachment input compatibility', () => {
     ).toBe(false);
   });
 
-  it('accepts document attachments on prepareSession while retaining images', () => {
+  it('accepts document attachments on prepareSession', () => {
     const basePrepareInput = {
       prompt: 'Summarize this document',
       mode: 'code',
@@ -505,16 +630,6 @@ describe('legacy live attachment input compatibility', () => {
     expect(
       PrepareSessionInput.safeParse({ ...basePrepareInput, attachments: validAttachments }).success
     ).toBe(true);
-    expect(
-      PrepareSessionInput.safeParse({ ...basePrepareInput, images: validImages }).success
-    ).toBe(true);
-    expect(
-      PrepareSessionInput.safeParse({
-        ...basePrepareInput,
-        attachments: validAttachments,
-        images: validImages,
-      }).success
-    ).toBe(false);
   });
 });
 
@@ -526,6 +641,21 @@ describe('prepareSession clone-only variant', () => {
     autoInitiate: true,
     operationKey: 'aaaaaaaa-bbbb-4ccc-8ddd-eeeeeeeeeeee',
   };
+
+  it('enforces explicit egress mode on clone-only inputs', () => {
+    const input = { ...baseCloneInput, cloneFromKiloSessionId: validKiloSessionId };
+    const parsed = PrepareSessionInput.parse({ ...input, egressMode: 'allowlist' });
+    expect(parsed.egressMode).toBe('allowlist');
+    expect(parsed.egressAllowlist).toBeUndefined();
+    expect(PrepareSessionInput.safeParse({ ...input, egressAllowlist: [] }).success).toBe(false);
+    expect(
+      PrepareSessionInput.safeParse({
+        ...input,
+        egressMode: 'unrestricted',
+        egressAllowlist: [],
+      }).success
+    ).toBe(false);
+  });
 
   it('accepts a clone-only prepare without a prompt', () => {
     expect(
@@ -560,16 +690,48 @@ describe('prepareSession clone-only variant', () => {
     expect(
       PrepareSessionInput.safeParse({
         ...baseCloneInput,
-        cloneFromKiloSessionId: 'agent_invalid',
+        cloneFromKiloSessionId: 'workspace_invalid',
       }).success
     ).toBe(false);
   });
 
-  it('rejects an agent_ UUID cloneFromKiloSessionId', () => {
+  it('rejects an workspace_ UUID cloneFromKiloSessionId', () => {
     expect(
       PrepareSessionInput.safeParse({
         ...baseCloneInput,
         cloneFromKiloSessionId: validSessionId,
+      }).success
+    ).toBe(false);
+  });
+
+  it('accepts a clone cut message ID', () => {
+    const result = PrepareSessionInput.safeParse({
+      ...baseCloneInput,
+      cloneFromKiloSessionId: validKiloSessionId,
+      cloneUpToMessageId: validMessageId,
+    });
+    expect(result.success).toBe(true);
+    if (result.success) expect(result.data.cloneUpToMessageId).toBe(validMessageId);
+  });
+
+  it('rejects a malformed clone cut message ID', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        ...baseCloneInput,
+        cloneFromKiloSessionId: validKiloSessionId,
+        cloneUpToMessageId: 'not-a-message',
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects a clone cut without a clone source', () => {
+    expect(
+      PrepareSessionInput.safeParse({
+        mode: 'code',
+        model: 'claude-sonnet-4-5-20250929',
+        githubRepo: 'acme/repo',
+        prompt: 'Continue',
+        cloneUpToMessageId: validMessageId,
       }).success
     ).toBe(false);
   });
@@ -613,26 +775,8 @@ describe('sendMessageV2 input compatibility', () => {
     });
   });
 
-  it('continues accepting legacy images and rejects ambiguous prompt attachments', () => {
-    expect(
-      SendMessageV2Input.safeParse({
-        cloudAgentSessionId: validSessionId,
-        payload: { type: 'prompt', ...basePromptInput },
-        images: validImages,
-      }).success
-    ).toBe(true);
-    expect(
-      SendMessageV2Input.safeParse({
-        cloudAgentSessionId: validSessionId,
-        payload: { type: 'prompt', ...basePromptInput },
-        attachments: validAttachments,
-        images: validImages,
-      }).success
-    ).toBe(false);
-  });
-
   it('rejects attachment descriptors on nested command payloads', () => {
-    for (const descriptor of [{ images: validImages }, { attachments: validAttachments }]) {
+    for (const descriptor of [{ attachments: validAttachments }]) {
       expect(
         SendMessageV2Input.safeParse({
           cloudAgentSessionId: validSessionId,
@@ -842,9 +986,9 @@ describe('getMessageResult contract', () => {
         messageId: validMessageId,
       }).success
     ).toBe(true);
-    expect(GetMessageResultInput.safeParse({ cloudAgentSessionId: 'agent_invalid' }).success).toBe(
-      false
-    );
+    expect(
+      GetMessageResultInput.safeParse({ cloudAgentSessionId: 'workspace_invalid' }).success
+    ).toBe(false);
     expect(
       GetMessageResultInput.safeParse({ cloudAgentSessionId: validSessionId, messageId: 'msg_bad' })
         .success

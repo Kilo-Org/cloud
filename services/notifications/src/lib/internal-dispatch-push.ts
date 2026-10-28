@@ -1,9 +1,3 @@
-/**
- * Pure core for internal dispatch of low-balance, spend-alert,
- * security-finding, and security-lifecycle pushes. IO is injected via deps so
- * unit tests can substitute in-memory fakes.
- */
-
 import type {
   DispatchPushInput,
   DispatchPushOutcome,
@@ -59,6 +53,21 @@ function securityFindingI18nKey(
 
 function buildDispatchInput(userId: string, input: InternalDispatchRequest): DispatchPushInput {
   switch (input.kind) {
+    case 'agent_briefing':
+      return {
+        userId,
+        presenceContext: null,
+        idempotencyKey: `agent-briefing:${input.localDate}`,
+        agentBriefing: { localDate: input.localDate, expiresAt: input.expiresAt },
+        badge: null,
+        push: {
+          title: 'Kilo',
+          body: 'Active agents have an update',
+          data: { type: 'agent_briefing', url: '/agent-briefing' },
+          sound: 'default',
+          priority: 'default',
+        },
+      } satisfies DispatchPushInput;
     case 'low_balance':
       return {
         userId,
@@ -172,7 +181,7 @@ function buildDispatchInput(userId: string, input: InternalDispatchRequest): Dis
 
 function categoryEnabled(
   prefs: UserNotificationPreferences,
-  kind: InternalDispatchRequest['kind']
+  kind: Exclude<InternalDispatchRequest['kind'], 'agent_briefing'>
 ): boolean {
   switch (kind) {
     case 'low_balance':
@@ -194,6 +203,22 @@ function mapOutcome(kind: DispatchPushOutcome['kind']): PerRecipientResult['outc
 }
 
 /**
+ * Reduce a DO failure message to a stable, content-free classification. The
+ * raw message can carry upstream detail (an Expo response excerpt, a database
+ * error string) that must not cross into client logs or Sentry; the token is
+ * what the dispatch client aggregates and alerts on.
+ */
+function classifyDispatchError(error: string): string {
+  if (error.startsWith('Expo rejected')) return 'expo_ticket_rejected';
+  if (error === 'Briefing eligibility read failed') return 'eligibility_read_failed';
+  if (error.startsWith('Accepted push bookkeeping failed')) return 'delivery_bookkeeping_failed';
+  if (error === 'Expo returned no classified push ticket outcomes') {
+    return 'unclassified_ticket_outcome';
+  }
+  return 'send_failed';
+}
+
+/**
  * Dispatch a low-balance, spend-alert, or security push to one or more
  * recipients. Per-recipient preference gate runs before any DO call;
  * preference-read throws fail closed without calling dispatchPush.
@@ -204,6 +229,27 @@ export async function dispatchInternalPushCore(
 ): Promise<{ perRecipient: PerRecipientResult[] }> {
   const recipients: string[] = [];
   const seen = new Set<string>();
+
+  if (input.kind === 'agent_briefing') {
+    try {
+      const outcome = await deps
+        .getRecipientDOStub(input.userId)
+        .dispatchPush(buildDispatchInput(input.userId, input));
+      return {
+        perRecipient: [
+          {
+            userId: input.userId,
+            outcome: mapOutcome(outcome.kind),
+            ...(outcome.kind === 'failed' ? { reason: classifyDispatchError(outcome.error) } : {}),
+          },
+        ],
+      };
+    } catch {
+      return {
+        perRecipient: [{ userId: input.userId, outcome: 'failed', reason: 'dispatch_rejected' }],
+      };
+    }
+  }
 
   if (
     input.kind === 'low_balance' ||
@@ -220,32 +266,40 @@ export async function dispatchInternalPushCore(
   }
 
   const results = await Promise.allSettled(
-    recipients.map(async userId => {
+    recipients.map(async (userId): Promise<Omit<PerRecipientResult, 'userId'>> => {
       let prefs: UserNotificationPreferences;
       try {
         const row = await deps.readPreferences(userId);
         prefs = row ?? DEFAULT_USER_NOTIFICATION_PREFERENCES;
       } catch {
-        return 'failed' as const;
+        return { outcome: 'failed', reason: 'preference_read_failed' };
       }
 
       if (!categoryEnabled(prefs, input.kind)) {
-        return 'suppressed_preference' as const;
+        return { outcome: 'suppressed_preference' };
       }
 
       const stub = deps.getRecipientDOStub(userId);
       const dispatchInput = buildDispatchInput(userId, input);
       const outcome = await stub.dispatchPush(dispatchInput);
-      return mapOutcome(outcome.kind);
+      if (outcome.kind === 'failed') {
+        const reason = classifyDispatchError(outcome.error);
+        console.warn('Internal dispatch push delivery failed', {
+          kind: input.kind,
+          reason,
+          error: outcome.error,
+        });
+        return { outcome: 'failed', reason };
+      }
+      return { outcome: mapOutcome(outcome.kind) };
     })
   );
 
   const perRecipient: PerRecipientResult[] = recipients.map((userId, index) => {
     const result = results[index];
-    return {
-      userId,
-      outcome: result?.status === 'fulfilled' ? result.value : 'failed',
-    };
+    return result?.status === 'fulfilled'
+      ? { userId, ...result.value }
+      : { userId, outcome: 'failed', reason: 'dispatch_rejected' };
   });
 
   return { perRecipient };

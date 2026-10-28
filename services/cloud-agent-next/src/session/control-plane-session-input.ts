@@ -1,3 +1,4 @@
+import { byocVercelOwnerFields, VERCEL_BYOC_REQUIRED_MESSAGE } from '../byoc/vercel-owner.js';
 /**
  * Worker-side projections from the public grouped create/send inputs onto the
  * control-plane V2 Durable Object RPCs.
@@ -26,6 +27,7 @@ import { buildSandboxBillingInput } from '../container-usage-context.js';
 import { isCloudAgentContainerBillingEnabled } from '../container-billing-rollout.js';
 import { buildSignedPromptAttachments } from '../execution/attachment-prompt-parts.js';
 import { dispatchedKilocodeModelId } from '../persistence/model-utils.js';
+import { CODE_REVIEW_CONTAINERS_INSTANCE } from '../sandbox-containers/instance-size.js';
 import { createMessageId } from './message-id.js';
 import {
   buildSessionMetadataFromRegistration,
@@ -166,28 +168,56 @@ export function buildControlPlaneSandboxSelection(
 ): ControlPlaneSandboxSelection {
   const provider = metadata.workspace?.sandboxProvider ?? 'cloudflare';
   const allocation = metadata.workspace?.sandboxAllocation;
+  const sandboxKind = metadata.workspace?.sandboxKind;
+  const binding = metadata.workspace?.sandboxProviderBinding;
+  const byoc =
+    binding?.kind === 'vercel' && binding.source.kind === 'byoc'
+      ? { ...byocVercelOwnerFields(binding.source), credentialId: binding.source.credentialId }
+      : undefined;
+  if (provider === 'vercel') {
+    if (!byoc) throw new ControlPlaneRegistrationError(VERCEL_BYOC_REQUIRED_MESSAGE);
+    const resources = getSandboxAllocationResources(allocation ?? 'vercel-small');
+    return {
+      provider,
+      configuration: resources === undefined ? { provider } : { provider, resources },
+      byoc,
+      ...(sandboxKind ? { sandboxKind } : {}),
+    };
+  }
   const enforcementRequested = isCloudAgentContainerBillingEnabled(env, metadata.identity);
   const billing = {
     ...buildSandboxBillingInput(metadata, sandboxId, enforcementRequested),
     enforcementRequested,
   };
-  if (provider === 'vercel') {
-    const resources = getSandboxAllocationResources(allocation ?? 'vercel-small');
-    return {
-      provider,
-      configuration: resources === undefined ? { provider } : { provider, resources },
-      billing,
-    };
+  const pinned = {
+    billing,
+    ...(sandboxKind ? { sandboxKind } : {}),
+    ...(metadata.workspace?.egressMode === undefined
+      ? {}
+      : { egressMode: metadata.workspace.egressMode }),
+    ...(metadata.workspace?.egressAllowlist === undefined
+      ? {}
+      : { egressAllowlist: metadata.workspace.egressAllowlist }),
+  };
+  switch (provider) {
+    case 'cloudflare-containers': {
+      const instance =
+        sandboxKind === 'code-review'
+          ? CODE_REVIEW_CONTAINERS_INSTANCE
+          : getSandboxAllocationInstance(allocation);
+      return {
+        provider,
+        configuration: instance === undefined ? { provider } : { provider, instance },
+        ...pinned,
+      };
+    }
+    case 'cloudflare':
+      return { provider, configuration: { provider }, ...pinned };
+    default: {
+      const exhaustive: never = provider;
+      throw new ControlPlaneRegistrationError(`Unsupported sandbox provider ${String(exhaustive)}`);
+    }
   }
-  if (provider === 'cloudflare-containers') {
-    const instance = getSandboxAllocationInstance(allocation);
-    return {
-      provider,
-      configuration: instance === undefined ? { provider } : { provider, instance },
-      billing,
-    };
-  }
-  return { provider, configuration: { provider }, billing };
 }
 
 async function buildMetadata(
@@ -201,7 +231,7 @@ async function buildMetadata(
   if (sandboxId === undefined || sandboxId.length === 0) {
     throw new ControlPlaneRegistrationError('Session metadata requires a sandboxId');
   }
-  return { metadata: built.metadata, sandboxId: sandboxId as SandboxId };
+  return { metadata: built.metadata, sandboxId: sandboxId };
 }
 
 /**

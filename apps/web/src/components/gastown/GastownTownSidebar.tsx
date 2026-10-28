@@ -100,8 +100,8 @@ export function GastownTownSidebar({
 
           {/* Town identity */}
           <div className="flex items-center gap-2.5 px-1">
-            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[color:oklch(95%_0.15_108_/_0.15)] ring-1 ring-[color:oklch(95%_0.15_108_/_0.25)]">
-              <Crown className="size-4 text-[color:oklch(95%_0.15_108)]" />
+            <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-primary/15 ring-1 ring-primary/25">
+              <Crown className="size-4 text-primary" />
             </div>
             <div className="min-w-0">
               <div className="truncate text-sm font-semibold text-white/90">{townName}</div>

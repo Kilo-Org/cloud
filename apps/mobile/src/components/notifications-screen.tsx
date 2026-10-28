@@ -12,7 +12,6 @@ import {
   Bell,
   BellOff,
   Bot,
-  CircleCheck,
   KeyRound,
   ListTodo,
   MessageSquare,
@@ -24,11 +23,13 @@ import {
 } from '@/components/ui/icons';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Linking, Platform, Pressable, Switch, View } from 'react-native';
+import { Alert, Linking, Platform, Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { toast } from 'sonner-native';
 
 import { deriveMasterGateLeadingPresentation } from '@/components/notifications-master-gate';
+import { BriefingNotificationCategoryRow } from '@/components/agent-briefing/briefing-notification-toggle';
+import { Switch } from '@/components/ui/switch';
 import { liveActivitiesAllowedBySystem } from '@/glanceable-ios/system-switch';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -558,10 +559,16 @@ export function NotificationsScreen() {
   const handleEnableNotifications = useCallback(async () => {
     const currentStatus = await getNotificationPermissionStatus();
     if (currentStatus === 'denied') {
-      Alert.alert(t('notifications.disabledTitle'), t('notifications.disabledMessage'), [
-        { text: t('common.cancel'), style: 'cancel' },
-        { text: t('common.openSettings'), onPress: () => void Linking.openSettings() },
-      ]);
+      Alert.alert(
+        t('notifications.disabledTitle'),
+        t('notifications.disabledMessage'),
+        [
+          { text: t('common.cancel'), style: 'cancel' },
+          { text: t('common.openSettings'), onPress: () => void Linking.openSettings() },
+        ],
+        // Android back dismisses, which equals the no-op Cancel.
+        { cancelable: true }
+      );
       return;
     }
     setIsTogglingPermission(true);
@@ -615,10 +622,16 @@ export function NotificationsScreen() {
   }, [queryClient, registerToken, t]);
 
   const handleDisableNotifications = useCallback(() => {
-    Alert.alert(t('notifications.disableTitle'), t('notifications.disableMessage'), [
-      { text: t('common.cancel'), style: 'cancel' },
-      { text: t('common.openSettings'), onPress: () => void Linking.openSettings() },
-    ]);
+    Alert.alert(
+      t('notifications.disableTitle'),
+      t('notifications.disableMessage'),
+      [
+        { text: t('common.cancel'), style: 'cancel' },
+        { text: t('common.openSettings'), onPress: () => void Linking.openSettings() },
+      ],
+      // Android back dismisses, which equals the no-op Cancel.
+      { cancelable: true }
+    );
   }, [t]);
 
   const isMasterBusy = isTogglingPermission || isRegisteringToken;
@@ -714,7 +727,7 @@ export function NotificationsScreen() {
             {masterLeading === 'on' && <Bell size={18} color={colors.secondaryForeground} />}
             {masterLeading === 'off' && <BellOff size={18} color={colors.secondaryForeground} />}
             <View className="flex-1">
-              <Text className="text-sm font-medium">{t('notifications.enabled')}</Text>
+              <Text className="text-sm font-medium">{t('common.notifications')}</Text>
               {masterLeading === 'neutral' && <Skeleton className="mt-0.5 h-4 w-52" />}
               {masterLeading === 'on' && (
                 <Text variant="muted" className="mt-0.5 text-xs">
@@ -749,7 +762,7 @@ export function NotificationsScreen() {
                 <Switch
                   value={notificationsEnabled}
                   disabled={isMasterBusy}
-                  accessibilityLabel={t('notifications.enabled')}
+                  accessibilityLabel={t('common.notifications')}
                   accessibilityState={{ disabled: isMasterBusy, busy: isMasterBusy }}
                   onValueChange={value => {
                     if (value) {
@@ -771,15 +784,9 @@ export function NotificationsScreen() {
               so a non-retryable CTA is structurally absent. */}
           {!permissionLoading && !permissionError && gateSettled && showEnableCta && (
             <View className="rounded-lg border border-border bg-card p-4">
-              <View className="flex-row items-start gap-3">
-                <CircleCheck size={18} color={colors.foreground} />
-                <View className="flex-1 gap-1">
-                  <Text className="text-sm font-medium">{t('notifications.enable')}</Text>
-                  <Text variant="muted" className="text-xs">
-                    {t('notifications.enableDescription')}
-                  </Text>
-                </View>
-              </View>
+              <Text variant="muted" className="text-xs">
+                {t('notifications.enableDescription')}
+              </Text>
               <Pressable
                 onPress={() => void handleEnableNotifications()}
                 disabled={isMasterBusy}
@@ -858,6 +865,7 @@ export function NotificationsScreen() {
               ))}
             </>
           )}
+          <BriefingNotificationCategoryRow disabled={!notificationsEnabled} />
         </View>
 
         {/* Message previews */}

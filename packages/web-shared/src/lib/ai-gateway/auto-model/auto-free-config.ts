@@ -1,7 +1,12 @@
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
-import { db } from '@kilocode/web-shared/lib/drizzle';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isKiloAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
-import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import {
+  isPublicCustomLlm,
+  type CustomLlm,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import { getCustomLlmApiKinds } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/api-kinds';
 import type { AutoFreeModel } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { getAiSdkProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
 import { ai_gateway_config } from '@kilocode/db/schema';
@@ -19,21 +24,42 @@ export const AUTO_FREE_FALLBACK_CONFIG: AutoFreeConfig = { models: [AUTO_FREE_FA
 /**
  * `kilo-auto/free` has no OpenCode settings, so clients talk to it with the
  * default AI SDK provider. Candidates must be free, concrete models that use
- * that same provider.
+ * that same provider. It serves anonymous callers, so a custom LLM is a
+ * candidate only when it is public, unrestricted by country, and serves Chat
+ * Completions.
  */
-export function isAutoFreeEligibleModelId(model: string): boolean {
-  return (
-    isFreeModel(model) && !isKiloAutoModel(model) && getAiSdkProvider(model, null) === undefined
-  );
+export function isAutoFreeEligibleModelId(
+  model: string,
+  customLlm: CustomLlm | undefined
+): boolean {
+  if (isKiloAutoModel(model)) {
+    return false;
+  }
+  if (customLlm) {
+    return (
+      isPublicCustomLlm(customLlm.definition) &&
+      !customLlm.definition.country_deny_list?.length &&
+      getCustomLlmApiKinds(customLlm.definition).includes('chat_completions')
+    );
+  }
+  return isFreeModelExcludingCustomLlms(model) && getAiSdkProvider(model, null) === undefined;
 }
 
-export function getIneligibleAutoFreeModelIds(config: AutoFreeConfig): string[] {
-  return config.models.map(({ model }) => model).filter(model => !isAutoFreeEligibleModelId(model));
+export function getIneligibleAutoFreeModelIds(
+  config: AutoFreeConfig,
+  customLlms: ReadonlyArray<CustomLlm>
+): string[] {
+  const customLlmsById = new Map(
+    customLlms.map(customLlm => [customLlm.public_id.toLowerCase(), customLlm])
+  );
+  return config.models
+    .map(({ model }) => model)
+    .filter(model => !isAutoFreeEligibleModelId(model, customLlmsById.get(model.toLowerCase())));
 }
 
 /** Returns the configured auto-free models, or null when none are stored or the stored value is invalid. */
 export async function readConfiguredAutoFreeModels(): Promise<ReadonlyArray<AutoFreeModel> | null> {
-  const [row] = await db
+  const [row] = await readDb
     .select({ auto_free: ai_gateway_config.auto_free })
     .from(ai_gateway_config)
     .where(eq(ai_gateway_config.id, 1))

@@ -1,4 +1,6 @@
+import { refundCreditTransaction } from '@kilocode/web-shared/lib/creditAdjustments';
 import { and, eq, inArray, or, sql } from 'drizzle-orm';
+import { closePauseEvent } from '@kilocode/web-shared/lib/kilo-pass/pause-events';
 import { captureException } from '@sentry/nextjs';
 
 import {
@@ -236,22 +238,27 @@ async function markGooglePlayStoreEventProcessed(
 }
 
 async function markGooglePlaySubscriptionEnded(
-  dbOrTx: DbOrTx,
+  tx: DrizzleTransaction,
   purchaseToken: string
 ): Promise<void> {
-  await dbOrTx
+  const endedAt = new Date().toISOString();
+  const endedRows = await tx
     .update(kilo_pass_subscriptions)
     .set({
       status: 'canceled',
       cancel_at_period_end: false,
-      ended_at: new Date().toISOString(),
+      ended_at: endedAt,
     })
     .where(
       and(
         eq(kilo_pass_subscriptions.payment_provider, KiloPassPaymentProvider.GooglePlay),
         eq(kilo_pass_subscriptions.provider_subscription_id, purchaseToken)
       )
-    );
+    )
+    .returning({ id: kilo_pass_subscriptions.id });
+  for (const row of endedRows) {
+    await closePauseEvent(tx, { kiloPassSubscriptionId: row.id, resumedAt: endedAt });
+  }
 }
 
 async function getUserForGooglePlayRenewal(params: {
@@ -294,56 +301,6 @@ type CreditReversalResult = {
   totalReversalMicrodollars: number;
   reversedItemKinds: KiloPassIssuanceItemKind[];
 };
-
-async function insertCreditReversal(
-  tx: DrizzleTransaction,
-  params: {
-    kiloUserId: string;
-    amountMicrodollars: number;
-    isFree: boolean;
-    description: string;
-    creditCategory: string;
-    originalBaselineMicrodollarsUsed: number;
-  }
-): Promise<{ wasInserted: boolean; creditTransactionId: string | null }> {
-  const creditTransactionId = crypto.randomUUID();
-  const insertResult = await tx
-    .insert(credit_transactions)
-    .values({
-      id: creditTransactionId,
-      kilo_user_id: params.kiloUserId,
-      amount_microdollars: -params.amountMicrodollars,
-      is_free: params.isFree,
-      description: params.description,
-      credit_category: params.creditCategory,
-      check_category_uniqueness: true,
-      original_baseline_microdollars_used: params.originalBaselineMicrodollarsUsed,
-    })
-    .onConflictDoNothing();
-
-  if ((insertResult.rowCount ?? 0) === 0) {
-    const existingRows = await tx
-      .select({ id: credit_transactions.id })
-      .from(credit_transactions)
-      .where(
-        and(
-          eq(credit_transactions.kilo_user_id, params.kiloUserId),
-          eq(credit_transactions.credit_category, params.creditCategory)
-        )
-      )
-      .limit(1);
-    return { wasInserted: false, creditTransactionId: existingRows[0]?.id ?? null };
-  }
-
-  await tx
-    .update(kilocode_users)
-    .set({
-      total_microdollars_acquired: sql`${kilocode_users.total_microdollars_acquired} - ${params.amountMicrodollars}`,
-    })
-    .where(eq(kilocode_users.id, params.kiloUserId));
-
-  return { wasInserted: true, creditTransactionId };
-}
 
 function getGooglePlayRefundReversalDescription(kind: KiloPassIssuanceItemKind): string {
   if (kind === KiloPassIssuanceItemKind.Base) {
@@ -403,7 +360,6 @@ async function reverseGooglePlayRefundCredits(
     .select({
       creditTransactionId: credit_transactions.id,
       amountMicrodollars: credit_transactions.amount_microdollars,
-      isFree: credit_transactions.is_free,
     })
     .from(credit_transactions)
     .where(
@@ -435,17 +391,17 @@ async function reverseGooglePlayRefundCredits(
 
   const issuedItems: {
     itemId: string;
+    creditTransactionId: string;
     kind: KiloPassIssuanceItemKind;
     amountMicrodollars: number;
-    isFree: boolean;
   }[] = [];
 
   if (ownedBaseCredit) {
     issuedItems.push({
       itemId: ownedBaseCredit.creditTransactionId,
+      creditTransactionId: ownedBaseCredit.creditTransactionId,
       kind: KiloPassIssuanceItemKind.Base,
       amountMicrodollars: ownedBaseCredit.amountMicrodollars,
-      isFree: ownedBaseCredit.isFree,
     });
   }
 
@@ -479,9 +435,9 @@ async function reverseGooglePlayRefundCredits(
       const bonusItems = await tx
         .select({
           itemId: kilo_pass_issuance_items.id,
+          creditTransactionId: credit_transactions.id,
           kind: kilo_pass_issuance_items.kind,
           amountMicrodollars: credit_transactions.amount_microdollars,
-          isFree: credit_transactions.is_free,
         })
         .from(kilo_pass_issuance_items)
         .innerJoin(
@@ -515,19 +471,18 @@ async function reverseGooglePlayRefundCredits(
       continue;
     }
 
-    const reversal = await insertCreditReversal(tx, {
-      kiloUserId: storePurchase.kilo_user_id,
+    const reversal = await refundCreditTransaction(tx, {
+      owner: { type: 'user', id: storePurchase.kilo_user_id },
+      sourceTransactionId: item.creditTransactionId,
       amountMicrodollars: reversalAmountMicrodollars,
-      isFree: item.isFree,
       description: getGooglePlayRefundReversalDescription(item.kind),
       creditCategory: `kilo-pass-store-refund:${KiloPassPaymentProvider.GooglePlay}:${providerTransactionId}:${item.kind}:${item.itemId}`,
-      originalBaselineMicrodollarsUsed: user.microdollarsUsed,
     });
     if (reversal.creditTransactionId) {
       creditTransactionIds.push(reversal.creditTransactionId);
     }
     if (reversal.wasInserted) {
-      totalReversalMicrodollars += reversalAmountMicrodollars;
+      totalReversalMicrodollars += reversal.amountMicrodollars;
       reversedItemKinds.push(item.kind);
     }
   }
@@ -1146,7 +1101,7 @@ export async function processGooglePlayKiloPassNotification(params: {
       await markGooglePlayStoreEventProcessed(eventId);
       return { processed: true };
     }
-    await markGooglePlaySubscriptionEnded(db, purchaseToken);
+    await db.transaction(tx => markGooglePlaySubscriptionEnded(tx, purchaseToken));
     await appendKiloPassAuditLog(db, {
       action: KiloPassAuditLogAction.StoreSubscriptionExpired,
       result: KiloPassAuditLogResult.Success,

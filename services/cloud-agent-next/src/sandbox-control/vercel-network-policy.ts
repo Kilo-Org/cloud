@@ -16,6 +16,13 @@ export type VercelCredentialPolicyInput = {
     organizationId?: string;
     runtimeProxy?: {
       members?: Array<{ sessionId: string; kiloSessionId: string; handle: string }>;
+      /**
+       * Adopted handle strings still valid until their JWT `exp`. An adopted
+       * handle is shared by every member root; their rules stay in force so a
+       * wrapper that has not yet applied a rotation can still reach the facade.
+       * A handle that is not listed keeps only its own member root.
+       */
+      handles?: readonly string[];
       targets: { backendBaseUrl: string; providerBaseUrl: string; sessionIngestBaseUrl: string };
     };
   };
@@ -250,8 +257,22 @@ function runtimeProxyInjectionRules(
         injectedAuthorization: authorization,
       })
     );
-  for (const member of input.members ?? []) {
-    const authorization = `Bearer ${member.handle}`;
+  const members = input.members ?? [];
+  // A handle that has been adopted is shared by the whole scope, so its rules
+  // cover every member root. A per-session handle is not shared and must keep
+  // exactly its own member root, as before adoption existed.
+  const adoptedHandles = new Set(input.handles ?? []);
+  const handles = [...new Set([...members.map(member => member.handle), ...adoptedHandles])];
+  const allRoots = [...new Set(kilo.rootSessionIds ?? [])];
+  for (const handle of handles) {
+    const authorization = `Bearer ${handle}`;
+    const roots = adoptedHandles.has(handle)
+      ? allRoots
+      : [
+          ...new Set(
+            members.filter(member => member.handle === handle).map(member => member.kiloSessionId)
+          ),
+        ];
     for (const path of [
       '/api/user',
       '/api/profile',
@@ -302,18 +323,21 @@ function runtimeProxyInjectionRules(
         injectedAuthorization: authorization,
       })
     );
-    const sessionId = member.kiloSessionId;
-    for (const [suffix, methods] of [
-      ['export', ['GET']],
-      ['ingest', ['POST']],
-      ['title', ['POST']],
-    ] as const) {
-      add(
-        ingest,
-        `${basePath(ingest)}/api/session/${sessionId}/${suffix}`,
-        [...methods],
-        authorization
-      );
+    // Every member root is served by the shared handle, so each root's
+    // ingestion/export/title paths are emitted once per handle.
+    for (const sessionId of roots) {
+      for (const [suffix, methods] of [
+        ['export', ['GET']],
+        ['ingest', ['POST']],
+        ['title', ['POST']],
+      ] as const) {
+        add(
+          ingest,
+          `${basePath(ingest)}/api/session/${sessionId}/${suffix}`,
+          [...methods],
+          authorization
+        );
+      }
     }
     for (const path of EXA_PROXY_PATHS) {
       add(backend, `${basePath(backend)}${path}`, ['POST'], authorization);

@@ -2,7 +2,7 @@ import { useMutation, useQuery } from '@tanstack/react-query';
 import { useRouter } from 'expo-router';
 import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { DetailScreenScrollView } from '@/components/detail-screen';
@@ -11,9 +11,12 @@ import { LogOut, Smartphone } from '@/components/ui/icons';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useAuth } from '@/lib/auth/auth-context';
+import { isolateBidiText } from '@/lib/bidi';
 import {
   classifyDeviceSessionsState,
   type DeviceSession,
@@ -34,6 +37,8 @@ type SessionRowProps = {
 function SessionRow({ session, disabled, onPress }: SessionRowProps) {
   const colors = useThemeColors();
   const { t, i18n } = useTranslation();
+  const device = deviceSessionLabel(session.user_agent);
+  const signedIn = formatDate(parseTimestamp(session.created_at), i18n.language);
 
   return (
     <View className="flex-row items-start gap-3 rounded-lg bg-secondary p-3">
@@ -41,7 +46,7 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
       <View className="min-w-0 flex-1">
         <View className="flex-row flex-wrap items-center gap-2">
           <Text className="text-sm font-medium" numberOfLines={1}>
-            {deviceSessionLabel(session.user_agent)}
+            {device}
           </Text>
           {session.isCurrent && (
             <View className="rounded-full bg-primary px-2 py-0.5">
@@ -53,7 +58,7 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
         </View>
         <Text variant="muted" className="mt-0.5 text-xs">
           {t('deviceSessions.signedIn', {
-            signedIn: formatDate(parseTimestamp(session.created_at), i18n.language),
+            signedIn,
             lastSeen: formatDate(parseTimestamp(session.last_seen_at), i18n.language),
           })}
         </Text>
@@ -68,7 +73,10 @@ function SessionRow({ session, disabled, onPress }: SessionRowProps) {
         accessibilityLabel={
           session.isCurrent
             ? t('deviceSessions.signOutThisDevice')
-            : t('deviceSessions.signOutThisSession')
+            : t('deviceSessions.signOutSessionLabel', {
+                device: isolateBidiText(device),
+                signedIn,
+              })
         }
         className="min-h-[44px] min-w-[44px] shrink-0 items-center justify-center active:opacity-70"
       >
@@ -83,6 +91,7 @@ export function DeviceSessionsScreen() {
   const { signOut, token } = useAuth();
   const trpc = useTRPC();
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
 
   const { data, isPending, isError, isFetching, refetch } = useQuery({
     ...trpc.user.listDeviceSessions.queryOptions(),
@@ -115,34 +124,26 @@ export function DeviceSessionsScreen() {
     if (session.isCurrent) {
       // The current device signs out through the normal signOut() flow so the
       // full local teardown (tokens, metadata, cache) stays truthful.
-      Alert.alert(t('deviceSessions.signOutThisDeviceTitle'), t('profile.signOutMessage'), [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.signOut'),
-          style: 'destructive',
-          onPress: () => {
-            void signOut();
-          },
+      confirm({
+        title: t('deviceSessions.signOutThisDeviceTitle'),
+        message: t('profile.signOutMessage'),
+        confirmLabel: t('common.signOut'),
+        onConfirm: () => {
+          void signOut();
         },
-      ]);
+      });
       return;
     }
-    Alert.alert(
-      t('deviceSessions.signOutThisSessionTitle'),
-      t('deviceSessions.signOutThisSessionMessage', {
-        device: deviceSessionLabel(session.user_agent),
+    confirm({
+      title: t('deviceSessions.signOutThisSessionTitle'),
+      message: t('deviceSessions.signOutThisSessionMessage', {
+        device: isolateBidiText(deviceSessionLabel(session.user_agent)),
       }),
-      [
-        { text: t('common.cancel'), style: 'cancel' },
-        {
-          text: t('common.signOut'),
-          style: 'destructive',
-          onPress: () => {
-            revokeSession.mutate({ sessionId: session.id });
-          },
-        },
-      ]
-    );
+      confirmLabel: t('common.signOut'),
+      onConfirm: () => {
+        revokeSession.mutate({ sessionId: session.id });
+      },
+    });
   };
 
   let body: ReactNode = null;
@@ -165,6 +166,7 @@ export function DeviceSessionsScreen() {
         action={
           <Button
             variant="outline"
+            className={STATE_ACTION_CLASS}
             onPress={() => {
               router.back();
             }}
@@ -177,8 +179,8 @@ export function DeviceSessionsScreen() {
   } else {
     body = (
       <DetailScreenScrollView
-        className="flex-1 px-6"
-        contentContainerClassName="gap-6 pt-4"
+        className="flex-1"
+        contentContainerClassName="gap-6 px-6 pt-4"
         showsVerticalScrollIndicator={false}
       >
         {state === 'loading' ? (
@@ -227,6 +229,7 @@ export function DeviceSessionsScreen() {
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('common.deviceSessions')} />
       {body}
+      {dialog}
     </View>
   );
 }

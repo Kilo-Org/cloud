@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react';
-import { type TextInput, type TextInputProps, View } from 'react-native';
+import { useLayoutEffect, useRef, useState } from 'react';
+import { type LayoutChangeEvent, type TextInput, type TextInputProps, View } from 'react-native';
 
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
@@ -21,9 +21,17 @@ type FormFieldProps = Omit<TextInputProps, 'value'> &
      */
     required?: boolean;
     /**
+     * Layout of the field's whole block: its label, input and message. A form
+     * that scrolls a refused Save to the field at fault records this offset;
+     * the input's own `onLayout` stays with the native text view.
+     */
+    containerOnLayout?: (event: LayoutChangeEvent) => void;
+    /**
      * Owns blur-validation: runs on blur, and re-runs live once an error is
      * showing so it clears the moment the value becomes valid again. When
-     * set, this replaces `error` as the source of the displayed message.
+     * set, its message replaces `error` while it reports one; an `error`
+     * passed alongside shows whenever the field's own rule has nothing to say,
+     * which is how a rejected submit is reported without a blur.
      */
     validate?: (value: string) => string | null;
   };
@@ -42,6 +50,7 @@ function FormField({
   reserveErrorMessages,
   disabled,
   required,
+  containerOnLayout,
   className,
   ref,
   validate,
@@ -53,13 +62,37 @@ function FormField({
 }: Readonly<FormFieldProps>) {
   const [validationError, setValidationError] = useState<string | null>(null);
   const valueRef = useRef(defaultValue ?? '');
-  const displayedError = validate ? validationError : error;
+  const nativeInput = useRef<TextInput>(null);
+  // `validate` owns what this field's own rule reports; `error` carries an
+  // error known from elsewhere (a rejected submit). Either one marks the field
+  // invalid; the field's own rule wins while it has something to say.
+  const displayedError = (validate ? validationError : null) ?? error;
+
+  // Write the default only on attach; later prop changes must not move the caret
+  // while the person edits an uncontrolled field.
+  useLayoutEffect(() => {
+    const next = defaultValue ?? '';
+    valueRef.current = next;
+    nativeInput.current?.setNativeProps({ text: next });
+    // defaultValue is initial content, not a controlled value.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
-    <View className="gap-1.5">
+    <View className="gap-1.5" onLayout={containerOnLayout}>
       <Text className="text-sm font-medium text-foreground">{label}</Text>
       <Input
-        ref={ref}
+        ref={instance => {
+          nativeInput.current = instance;
+          if (ref == null) {
+            return;
+          }
+          if ('current' in ref) {
+            ref.current = instance;
+          } else {
+            ref(instance);
+          }
+        }}
         {...props}
         defaultValue={defaultValue}
         editable={!disabled}
@@ -84,7 +117,7 @@ function FormField({
           }
         }}
         className={cn(
-          // The box (min-h-[44px] px-3 leading-[normal]) lives in
+          // The box (min-h-[44px] pl-3 pr-3 leading-[normal]) lives in
           // `@/components/ui/input`, so every single-line field shares it and
           // the class cannot be copied back wrong. No vertical padding: iOS
           // insets the already-centered text rect by it, drawing the value and

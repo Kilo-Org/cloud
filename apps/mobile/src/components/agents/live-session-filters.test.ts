@@ -42,6 +42,10 @@ describe('liveSessionPlatformBucket', () => {
     expect(liveSessionPlatformBucket('cli')).toBe('cli');
   });
 
+  it('gives desktop its own bucket instead of other', () => {
+    expect(liveSessionPlatformBucket('desktop')).toBe('desktop');
+  });
+
   it('buckets an unlisted platform as other and an unknown origin as null', () => {
     expect(liveSessionPlatformBucket('jetbrains')).toBe('other');
     expect(liveSessionPlatformBucket('unknown')).toBeNull();

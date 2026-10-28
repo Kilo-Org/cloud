@@ -1,20 +1,25 @@
-import { createHash } from 'node:crypto';
+import { runSetupScript } from '../setup-script.js';
+import {
+  createRuntimeProfileMaterializer,
+  RuntimeProfileMismatchError,
+  withRuntimeProfileEnvironment,
+} from './runtime-profile.js';
 import fs from 'node:fs/promises';
-import os from 'node:os';
 import path from 'node:path';
 import {
-  CONTROL_PLANE_SETUP_EVENTS,
+  CONTROL_PLANE_PREPARATION_DETAIL_MAX_LENGTH,
+  type AttachmentSpec,
   type ControlPlanePreparationStep,
   type ControlPlaneRouteSpec,
   type ControlPlaneSessionCredentialsPayload,
-  type ControlPlaneSetupEvent,
+  type ControlPlaneWorkspaceOutcome,
   type ControlPlaneWrapperFrame,
+  type WorkspaceConfig,
 } from '../../../src/shared/control-plane-protocol.js';
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
 import type { ControlDiagnosticReporter } from '../../../src/shared/control-diagnostics.js';
-import { parseControlPlaneCredential } from '../../../src/shared/control-plane-credential.js';
-import type { WorkspaceFailureSubtype } from '../../../src/shared/wrapper-bootstrap.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
+import { fetchKiloServer } from '../kilo-server-auth.js';
 import {
   git,
   runProcess,
@@ -22,79 +27,58 @@ import {
   type ExecResult,
   type ProcessOptions,
   type ProcessOutputStream,
+  type ProcessSpawn,
 } from '../utils.js';
 import { WrapperBootstrapError } from '../bootstrap-error.js';
+import { formatGitResultFailure, gitOperationError, type GitRouteClass } from '../git-errors.js';
 import {
-  cleanTerminalOutput,
-  formatGitResultFailure,
-  gitOperationError,
-  type GitRouteClass,
-} from '../git-errors.js';
-import { authenticatedGitUrl } from '../control/git-url.js';
+  credentialFreeGitUrl,
+  normalizeOriginCredential,
+  writeGitCredentialRecord,
+} from '../control/git-credentials.js';
 import { checkoutSyntheticReviewRef, isSyntheticReviewRef } from '../git-review-ref.js';
 import {
   buildWorktreeKiloEnvironment,
   type WorktreeKiloAuth,
 } from '../control/worktree-runtime.js';
-import { createOutputRedactor, createSecretRedactor } from '../redact-output.js';
-import { KiloWorktreeMcpMismatchError } from './kilo-runtime.js';
+import { createSecretRedactor, redactSecrets } from '../redact-output.js';
+import {
+  KiloWorktreeCredentialClassMismatchError,
+  KiloWorktreeMcpMismatchError,
+} from './kilo-runtime.js';
 import { configureWorkspaceGitAuthor, createGitProgressReporter } from '../session-bootstrap.js';
 import { restoreSession, seedSessionIngestRegistration } from '../restore-session.js';
 import { reportRestoreIncomplete } from '../restore-incomplete.js';
+import { restoreWorktreeRecovery } from './worktree-recovery.js';
 import type { ControlWorkload } from '../control/workload-cgroup.js';
+import { emptyWorkspaceDirectory, refreshAdoptedRepository } from './workspace-adoption.js';
+import {
+  classifyWorkspace,
+  readWorkspaceStamp,
+  writeWorkspaceStamp,
+  type WorkspaceInspection,
+  type WorkspaceStamp,
+} from './workspace-stamp.js';
+import {
+  SETUP_COMMAND_HARD_TIMEOUT_MS,
+  SETUP_COMMAND_INACTIVITY_TIMEOUT_MS,
+  createRepositoryPreparation,
+  managedGitHubPreparationGitArgs,
+} from './repository-preparation.js';
+import { defaultHomeRoots, routeHome, type HomeRoots } from './workspace-home.js';
+import { workspaceConfigRuntimeKey } from '../../../src/shared/workspace-config.js';
 
-const BOOTSTRAP_MARKER = 'kilo-bootstrap-complete';
-/** Spec §7 "Setup commands": current per-command limits. */
-const SETUP_COMMAND_INACTIVITY_TIMEOUT_MS = 5 * 60_000;
-const SETUP_COMMAND_HARD_TIMEOUT_MS = 8 * 60_000;
-/** Spec §7 "Clone or fetch": network errors get 3 attempts with backoff. */
-const CLONE_RETRY_ATTEMPTS = 3;
-const CLONE_RETRY_BACKOFF_MS = [1_000, 2_000];
 /** Spec §7: Kilo runtime start and Kilo session each get one retry. */
 const STEP_RETRY_ATTEMPTS = 2;
-/** Upper bound on one setup-output event so a chatty command cannot flood the wire. */
-const SETUP_OUTPUT_EVENT_LIMIT = 8_192;
-
 /**
- * Spec §7: eligible managed GitHub HTTPS preparation clone/fetch opts into the
- * two invocation-scoped native Git options together. `proactiveAuth=basic`
- * makes the first request carry the existing URL-bound control alias so
- * contained resolution, repository-authorized redemption and the bounded
- * Retry-After handler run instead of an anonymous first request;
- * `followRedirects=false` fails every redirect (including a same-origin one)
- * rather than letting Git reattach the alias to a redirected request. Never one
- * option without the other, and never on an ineligible command.
+ * Release cleanup bounds. Aborting a released route's Kilo session tree is best
+ * effort: it must terminate and never block the route release, so the walk is
+ * capped by depth, node count and a shared deadline, with one retry per step.
  */
-const MANAGED_GITHUB_PREPARATION_GIT_CONFIG = [
-  '-c',
-  'http.https://github.com/.proactiveAuth=basic',
-  '-c',
-  'http.https://github.com/.followRedirects=false',
-] as const;
-
-/**
- * The single eligibility decision for the two invocation-scoped options. Both
- * options or neither: the command must be preparation clone/fetch, the platform
- * must be managed GitHub, the token must parse as a `github` control alias, and
- * the URL must be the direct HTTPS default-port github.com URL. Callers judge
- * `spec.git.url`, never the password parsed back out of the authenticated URL.
- */
-function managedGitHubPreparationGitArgs(spec: ControlPlaneRouteSpec, command: string): string[] {
-  if (command !== 'clone' && command !== 'fetch') return [];
-  const git = spec.git;
-  if (!git || git.platform !== 'github') return [];
-  if (!git.token || parseControlPlaneCredential(git.token)?.purpose !== 'github') return [];
-  let url: URL;
-  try {
-    url = new URL(git.url);
-  } catch {
-    return [];
-  }
-  // WHATWG `URL.port` is '' for both `https://github.com/...` and an explicit
-  // `:443`, so explicit 443 is eligible and only a non-empty port is excluded.
-  if (url.protocol !== 'https:' || url.hostname !== 'github.com' || url.port !== '') return [];
-  return [...MANAGED_GITHUB_PREPARATION_GIT_CONFIG];
-}
+const RELEASE_CLEANUP_MAX_DEPTH = 8;
+const RELEASE_CLEANUP_MAX_NODES = 64;
+const RELEASE_CLEANUP_DEADLINE_MS = 10_000;
+const RELEASE_CLEANUP_ATTEMPTS = 2;
 
 export type PrepareRuntimePort = {
   ensure(input: {
@@ -103,9 +87,18 @@ export type PrepareRuntimePort = {
     env: Record<string, string>;
     workload?: ControlWorkload;
   }): Promise<WrapperKiloClient>;
-  installCredentials(key: string, env: Record<string, string>): Promise<void>;
+  installCredentials(
+    key: string,
+    env: Record<string, string>,
+    cloudAgentMcp?: ControlPlaneSessionCredentialsPayload['cloudAgentMcp']
+  ): Promise<void>;
   /** True when the runtime is gone or has spent its restart budget. */
   isUnavailable(key: string): boolean;
+  /**
+   * The runtime's client only while it is live; undefined during a restart, when
+   * unavailable, or after shutdown. Never throws.
+   */
+  getLiveClient(key: string): WrapperKiloClient | undefined;
   remove(key: string): void;
   release(key: string): void;
 };
@@ -114,6 +107,8 @@ export type PrepareDeps = {
   timers: ControlPlaneTimers;
   emit: (frame: ControlPlaneWrapperFrame) => void;
   runtimes: PrepareRuntimePort;
+  /** This wrapper's allocation; a workspace stamped by another one came from a snapshot. */
+  allocationId: string;
   log?: (message: string) => void;
   onNativeDiagnostic?: ControlDiagnosticReporter;
   runGit?: (args: string[], options?: ProcessOptions) => Promise<ExecResult>;
@@ -124,7 +119,11 @@ export type PrepareDeps = {
     onOutput?: (stream: ProcessOutputStream, output: string) => void,
     signal?: AbortSignal
   ) => Promise<ExecResult>;
+  runSkillInstall?: typeof runProcess;
+  /** Starts the default setup command, e.g. inside the setup cgroup. */
+  spawnSetup?: ProcessSpawn;
   restore?: typeof restoreSession;
+  recoverWorktree?: typeof restoreWorktreeRecovery;
   seedRegistration?: typeof seedSessionIngestRegistration;
   configureGitAuthor?: typeof configureWorkspaceGitAuthor;
   sessionExists?: (
@@ -135,14 +134,18 @@ export type PrepareDeps = {
   ) => Promise<boolean>;
   mkdir?: (directory: string) => Promise<void>;
   hasGit?: (directory: string) => Promise<boolean>;
-  hasBootstrapMarker?: (directory: string) => Promise<boolean>;
-  writeBootstrapMarker?: (directory: string) => Promise<void>;
+  readStamp?: (directory: string) => Promise<WorkspaceStamp | null>;
+  writeStamp?: (directory: string, stamp: WorkspaceStamp) => Promise<void>;
+  emptyDirectory?: (directory: string) => Promise<void>;
   sleep?: (ms: number, signal: AbortSignal) => Promise<void>;
   inheritedEnv?: NodeJS.ProcessEnv;
-  homeRoot?: string;
+  homeRoots?: HomeRoots;
+  /** Bounds release cleanup; defaults to `RELEASE_CLEANUP_DEADLINE_MS`. */
+  releaseCleanupDeadlineMs?: number;
 };
 
 type PreparedRoute = {
+  cloudAgentMcp?: ControlPlaneSessionCredentialsPayload['cloudAgentMcp'];
   key: string;
   spec: ControlPlaneRouteSpec;
   directory: string;
@@ -151,13 +154,34 @@ type PreparedRoute = {
   env: Record<string, string>;
 };
 
+type PreparingRoute = {
+  promise: Promise<void>;
+  released: boolean;
+  skillInstallController?: AbortController;
+  /** `runtimeKey(spec)` captured before the first await, for last-route release. */
+  runtimeKey: string;
+  /** A credentials frame that arrived before the route was prepared. */
+  pendingCredentials?: ControlPlaneSessionCredentialsPayload;
+};
+
 export type PreparationManager = {
   prepare(
     spec: ControlPlaneRouteSpec,
     credentials?: ControlPlaneSessionCredentialsPayload
   ): Promise<void>;
+  /**
+   * The configuration the route's runtime uses: the retained one while another
+   * route holds the runtime key, otherwise `offered`, which becomes retained.
+   */
+  workspaceConfiguration(spec: AttachmentSpec, offered: WorkspaceConfig): WorkspaceConfig;
   release(sessionId: string): void;
   isPrepared(sessionId: string): boolean;
+  /**
+   * The prepared route's runtime identity, or null while the route is not yet
+   * attached. Live native reads use it to reach the exact runtime and directory
+   * the route was prepared for (spec §10).
+   */
+  preparedRoute(sessionId: string): { runtimeKey: string; directory: string } | null;
   isPreparing(): boolean;
   /** In-flight prepares, for the native status line. */
   preparingCount(): number;
@@ -191,12 +215,6 @@ async function defaultHasGit(directory: string): Promise<boolean> {
   }
 }
 
-function markerPath(directory: string, hasGit: boolean): string {
-  return hasGit
-    ? path.join(directory, '.git', BOOTSTRAP_MARKER)
-    : `${path.resolve(directory)}.${BOOTSTRAP_MARKER}`;
-}
-
 async function defaultSessionExists(
   client: WrapperKiloClient,
   kiloSessionId: string,
@@ -205,7 +223,7 @@ async function defaultSessionExists(
 ): Promise<boolean> {
   const url = new URL(`/session/${encodeURIComponent(kiloSessionId)}`, client.serverUrl);
   url.searchParams.set('directory', directory);
-  const response = await fetch(url, { signal });
+  const response = await fetchKiloServer(client.server, url, { signal });
   if (response.status === 404) return false;
   if (!response.ok) throw new Error('Kilo session probe failed');
   const data: unknown = await response.json();
@@ -215,46 +233,148 @@ async function defaultSessionExists(
   return true;
 }
 
+/** Keep existing allocations on their original runtime and HOME identities. */
 export function runtimeKey(spec: ControlPlaneRouteSpec): string {
-  return spec.runtimeIsolation === 'per-session' ? spec.sessionId : spec.directory;
+  return workspaceConfigRuntimeKey(spec);
 }
 
 /**
- * Spec §7: a per-session runtime gets its own HOME keyed by the session (legacy
- * `worktree-runtime.ts` hashes the runtime key under per-session isolation);
- * a shared runtime keys HOME by the worktree scope so every session sees one.
+ * The scoped Cloud Agent MCP grant carries a session-specific token. Only a
+ * per-session runtime may receive it; a runtime shared by a worktree must keep
+ * one MCP configuration for every member.
  */
-function homeKey(spec: ControlPlaneRouteSpec): string {
-  return spec.runtimeIsolation === 'per-session'
-    ? spec.sessionId
-    : (spec.kilo?.scopeId ?? spec.sessionId);
-}
-
-function homeFor(key: string, directory: string, homeRoot: string): string {
-  const id = createHash('sha256').update(key).update('\0').update(directory).digest('hex');
-  return path.join(homeRoot, id);
-}
-
-function isNetworkFailure(subtype: WorkspaceFailureSubtype | undefined): boolean {
-  return subtype === 'git_network_failed' || subtype === 'git_rate_limited';
+function scopedCloudAgentMcp(
+  spec: ControlPlaneRouteSpec,
+  cloudAgentMcp: ControlPlaneSessionCredentialsPayload['cloudAgentMcp'] | undefined
+): ControlPlaneSessionCredentialsPayload['cloudAgentMcp'] | undefined {
+  return spec.runtimeIsolation === 'per-session' ? cloudAgentMcp : undefined;
 }
 
 function isTimeoutMessage(step: ControlPlanePreparationStep, error: unknown): boolean {
   return error instanceof Error && error.message === `${step} timed out`;
 }
 
+type ReleaseCleanupResult = {
+  ok: boolean;
+  sessions: number;
+  failures: number;
+  elapsedMs: number;
+};
+
+type InflightCleanup = {
+  promise: Promise<void>;
+  controller: AbortController;
+};
+
+/**
+ * Best-effort abort of a released route's Kilo session tree. Walks children from
+ * the root with a visited set and shared depth/node/deadline bounds; each step
+ * retries once. It must terminate on a cyclic or unbounded tree, never throw,
+ * and never block the route release that called it. `externalSignal` lets a
+ * re-prepare stop the walk before it can abort the new session under the same
+ * kiloSessionId.
+ */
+async function cleanupKiloSessionTree(
+  client: WrapperKiloClient,
+  directory: string,
+  rootSessionId: string,
+  deadlineMs: number,
+  externalSignal: AbortSignal
+): Promise<ReleaseCleanupResult> {
+  const startedAt = Date.now();
+  const controller = new AbortController();
+  const signal = controller.signal;
+  const onExternalAbort = (): void => controller.abort();
+  externalSignal.addEventListener('abort', onExternalAbort, { once: true });
+  if (externalSignal.aborted) controller.abort();
+  const timer = setTimeout(() => controller.abort(), deadlineMs);
+  const abortedError = new Error('release cleanup deadline exceeded');
+  const deadline = new Promise<never>((_, reject) => {
+    signal.addEventListener('abort', () => reject(abortedError), { once: true });
+  });
+  void deadline.catch(() => undefined);
+  const visited = new Set<string>();
+  const queue: Array<{ id: string; depth: number }> = [{ id: rootSessionId, depth: 0 }];
+  let sessions = 0;
+  let failures = 0;
+
+  const attempt = async (operation: () => Promise<void>): Promise<boolean> => {
+    for (let attemptNumber = 1; attemptNumber <= RELEASE_CLEANUP_ATTEMPTS; attemptNumber += 1) {
+      if (signal.aborted) return false;
+      try {
+        await Promise.race([operation(), deadline]);
+        return true;
+      } catch {
+        if (attemptNumber === RELEASE_CLEANUP_ATTEMPTS) return false;
+      }
+    }
+    return false;
+  };
+
+  try {
+    while (queue.length > 0 && sessions < RELEASE_CLEANUP_MAX_NODES && !signal.aborted) {
+      const next = queue.shift();
+      if (next === undefined) break;
+      if (visited.has(next.id)) continue;
+      visited.add(next.id);
+      sessions += 1;
+      if (
+        !(await attempt(async () => {
+          await client.abortSessionForCleanup({ sessionId: next.id, directory, signal });
+        }))
+      ) {
+        failures += 1;
+      }
+      if (
+        !(await attempt(async () => {
+          await client.stopSessionProcesses({ sessionId: next.id, directory, signal });
+        }))
+      ) {
+        failures += 1;
+      }
+      if (next.depth >= RELEASE_CLEANUP_MAX_DEPTH) continue;
+      let children: Array<{ id: string; directory: string }> = [];
+      if (
+        !(await attempt(async () => {
+          children = await client.children({ sessionId: next.id, directory, signal });
+        }))
+      ) {
+        failures += 1;
+        continue;
+      }
+      for (const child of children) {
+        if (child.directory !== directory) continue;
+        if (!visited.has(child.id)) queue.push({ id: child.id, depth: next.depth + 1 });
+      }
+    }
+
+    return {
+      ok: failures === 0 && !signal.aborted,
+      sessions,
+      failures,
+      elapsedMs: Date.now() - startedAt,
+    };
+  } finally {
+    clearTimeout(timer);
+    externalSignal.removeEventListener('abort', onExternalAbort);
+  }
+}
+
 export function createPreparationManager(deps: PrepareDeps): PreparationManager {
   const timers = deps.timers.wrapper;
   const log = deps.log ?? ((): void => undefined);
   const inheritedEnv = deps.inheritedEnv ?? process.env;
+  const profileMaterializer = createRuntimeProfileMaterializer();
+  const workspaceConfigurations = new Map<string, WorkspaceConfig>();
   const runGit = deps.runGit ?? ((args, options) => git(args, options));
   const runSetup =
     deps.runSetup ??
     ((command, directory, env, onOutput, signal) =>
-      runProcess('sh', ['-c', command], {
+      runSetupScript(command, {
         cwd: directory,
         env,
         inheritEnv: false,
+        ...(deps.spawnSetup ? { spawn: deps.spawnSetup } : {}),
         ...(signal ? { signal } : {}),
         inactivityTimeoutMs: SETUP_COMMAND_INACTIVITY_TIMEOUT_MS,
         hardTimeoutMs: SETUP_COMMAND_HARD_TIMEOUT_MS,
@@ -265,31 +385,28 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   const configureGitAuthor = deps.configureGitAuthor ?? configureWorkspaceGitAuthor;
   const sessionExists = deps.sessionExists ?? defaultSessionExists;
   const sleep = deps.sleep ?? defaultSleep;
-  const homeRoot = deps.homeRoot ?? path.join(os.tmpdir(), 'kilo-worktrees');
+  const homeRoots = deps.homeRoots ?? defaultHomeRoots();
   const prepared = new Map<string, PreparedRoute>();
-  const preparing = new Map<string, { promise: Promise<void>; released: boolean }>();
+  const preparing = new Map<string, PreparingRoute>();
+  const releaseCleanups = new Map<string, InflightCleanup>();
+  const releaseCleanupDeadlineMs = deps.releaseCleanupDeadlineMs ?? RELEASE_CLEANUP_DEADLINE_MS;
   // Spec §7: clone/checkout/setup mutate one shared worktree, so they must not
   // run concurrently for two sessions on the same directory. The lock is keyed
   // by directory, mirroring legacy `serializeWorkspacePreparation`.
   const workspacePreparations = new Map<string, Promise<void>>();
 
   const hasGit = deps.hasGit ?? defaultHasGit;
-  const hasBootstrapMarker =
-    deps.hasBootstrapMarker ??
-    (async (directory: string) => {
-      try {
-        await fs.access(markerPath(directory, await hasGit(directory)));
-        return true;
-      } catch {
-        return false;
-      }
-    });
-  const writeBootstrapMarker =
-    deps.writeBootstrapMarker ??
-    (async (directory: string) => {
-      await fs.writeFile(markerPath(directory, await hasGit(directory)), 'ready\n');
-    });
+  const readStamp =
+    deps.readStamp ??
+    (async (directory: string) => readWorkspaceStamp(directory, await hasGit(directory)));
+  const writeStamp =
+    deps.writeStamp ??
+    (async (directory: string, stamp: WorkspaceStamp) =>
+      writeWorkspaceStamp(directory, await hasGit(directory), stamp));
+  const emptyDirectory = deps.emptyDirectory ?? emptyWorkspaceDirectory;
   const mkdir = deps.mkdir ?? (dir => fs.mkdir(dir, { recursive: true }).then(() => undefined));
+  const repository = createRepositoryPreparation({ runGit, runSetup, sleep, mkdir, hasGit, log });
+  const { runNetworkGit, headCommit } = repository;
 
   function emitProgress(
     sessionId: string,
@@ -300,7 +417,14 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       type: 'session.progress',
       sessionId,
       step,
-      ...(detail === undefined ? {} : { detail }),
+      ...(detail === undefined
+        ? {}
+        : {
+            detail:
+              detail.length > CONTROL_PLANE_PREPARATION_DETAIL_MAX_LENGTH
+                ? `${detail.slice(0, CONTROL_PLANE_PREPARATION_DETAIL_MAX_LENGTH - 1)}…`
+                : detail,
+          }),
     });
   }
 
@@ -317,7 +441,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     deps.emit({
       type: 'session.failed',
       sessionId,
-      reason: 'workspace_setup_failed',
+      reason:
+        error instanceof RuntimeProfileMismatchError
+          ? 'invalid_configuration'
+          : 'workspace_setup_failed',
       step,
       ...(subtype === undefined ? {} : { subtype }),
     });
@@ -402,50 +529,44 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     signal: AbortSignal,
     onCheckout: () => void
   ): Promise<void> {
-    emitProgress(spec.sessionId, 'clone');
-    await mkdir(directory);
+    await repository.cloneRepository({
+      git: spec.git,
+      sessionId: spec.sessionId,
+      createdOnPlatform: spec.createdOnPlatform,
+      branch: spec.branch,
+      branchMode: spec.branchMode,
+      directory,
+      env,
+      redact,
+      signal,
+      onProgress: detail => emitProgress(spec.sessionId, 'clone', detail),
+    });
     if (!spec.git) return;
-    // Diagnostic route class only: a managed credential was injected into the
-    // clone URL, otherwise the plain (direct) URL is used. Never log the URL.
-    const gitRoute: GitRouteClass = spec.git.token ? 'managed' : 'direct';
-    if (!(await hasGit(directory))) {
-      const cloneUrl = authenticatedGitUrl(spec.git.url, spec.git.token, spec.git.platform);
-      const gitConfigArgs = managedGitHubPreparationGitArgs(spec, 'clone');
-      let lastError: WrapperBootstrapError | undefined;
-      for (let attempt = 1; attempt <= CLONE_RETRY_ATTEMPTS; attempt += 1) {
-        signal.throwIfAborted();
-        if (attempt > 1) {
-          emitProgress(
-            spec.sessionId,
-            'clone',
-            `Retrying clone (attempt ${attempt} of ${CLONE_RETRY_ATTEMPTS})`
-          );
-        }
-        const cloned = await runGit(
-          [...gitConfigArgs, 'clone', '--progress', cloneUrl, directory],
-          {
-            env,
-            inheritEnv: false,
-            signal,
-            onOutput: createGitProgressReporter(progressText =>
-              emitProgress(spec.sessionId, 'clone', `Cloning repository... ${progressText}`)
-            ),
-          }
-        );
-        if (cloned.exitCode === 0) {
-          lastError = undefined;
-          break;
-        }
-        lastError = gitOperationError(cloned, 'clone', redact, gitRoute);
-        if (!isNetworkFailure(lastError.subtype) || attempt === CLONE_RETRY_ATTEMPTS) break;
-        await sleep(CLONE_RETRY_BACKOFF_MS[attempt - 1] ?? 0, signal);
-      }
-      if (lastError) throw lastError;
-    }
     onCheckout();
+    await checkoutWorkspace(spec, directory, env, redact, signal);
+  }
+
+  /**
+   * Spec §7 "Checkout, branch restore" (legacy apply-attach branch logic), then the
+   * git author. Shared by a fresh clone and an adopted snapshot.
+   */
+  async function checkoutWorkspace(
+    spec: ControlPlaneRouteSpec,
+    directory: string,
+    env: Record<string, string>,
+    redact: (text: string) => string,
+    signal: AbortSignal
+  ): Promise<void> {
     emitProgress(spec.sessionId, 'checkout');
+    const gitRoute: GitRouteClass = spec.git?.token ? 'managed' : 'direct';
     const runBranchGit = (args: string[], options?: ProcessOptions): Promise<ExecResult> =>
-      runGit(args, { ...options, cwd: directory, env, inheritEnv: false, signal });
+      runGit([...managedGitHubPreparationGitArgs(spec, args[0]), ...args], {
+        ...options,
+        cwd: directory,
+        env,
+        inheritEnv: false,
+        signal,
+      });
     // Spec §7 "Checkout, branch restore" (legacy apply-attach branch logic):
     // `-B <branch> origin/<branch>` breaks a working branch or a `session/*`
     // branch that has no upstream, so resolve the refs first.
@@ -453,8 +574,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     if (isSyntheticReviewRef(branch) && spec.branchMode !== 'working') {
       await checkoutSyntheticReviewRef({
         runGit: (args, options) => {
-          const gitConfigArgs =
-            args[0] === 'fetch' ? managedGitHubPreparationGitArgs(spec, 'fetch') : [];
+          const gitConfigArgs = managedGitHubPreparationGitArgs(spec, args[0]);
           return runGit([...gitConfigArgs, ...args], {
             ...options,
             cwd: directory,
@@ -527,9 +647,153 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     await configureGitAuthor(
       directory,
       (args, options) => runGit(args, { ...options, cwd: directory, env, inheritEnv: false }),
-      spec.git.author,
+      spec.git?.author,
       signal
     );
+  }
+
+  /**
+   * Reconcile a workspace restored from a repository snapshot with this route:
+   * refresh the repository, then the ordinary branch logic. Returns false, leaving
+   * the caller to clone, on any failure; an adopt never fails the preparation.
+   */
+  async function adoptWorkspace(
+    spec: ControlPlaneRouteSpec,
+    directory: string,
+    env: Record<string, string>,
+    redact: (text: string) => string,
+    setStep: (step: ControlPlanePreparationStep) => void
+  ): Promise<boolean> {
+    const git = spec.git;
+    if (!git) return false;
+    setStep('restore');
+    try {
+      await withinStep('restore', timers.restoreMs, async signal => {
+        emitProgress(spec.sessionId, 'restore');
+        await refreshAdoptedRepository({
+          remoteUrl: credentialFreeGitUrl(git.url),
+          redact,
+          git: (args, options) =>
+            options?.network
+              ? runNetworkGit(
+                  args,
+                  { cwd: directory, env, inheritEnv: false, signal },
+                  redact,
+                  signal
+                )
+              : runGit(args, { cwd: directory, env, inheritEnv: false, signal }),
+        });
+        setStep('checkout');
+        await checkoutWorkspace(spec, directory, env, redact, signal);
+      });
+      return true;
+    } catch (error) {
+      log(
+        `control-plane adopt failed, cloning session=${spec.sessionId} error=${
+          error instanceof Error ? redact(error.message) : 'unknown'
+        }`
+      );
+      return false;
+    }
+  }
+
+  async function inspectWorkspace(
+    directory: string
+  ): Promise<{ inspection: WorkspaceInspection; stamp: WorkspaceStamp | null }> {
+    const stamp = await readStamp(directory);
+    const inspection = classifyWorkspace({
+      hasGit: await hasGit(directory),
+      stamp,
+      allocationId: deps.allocationId,
+    });
+    return { inspection, stamp };
+  }
+
+  /**
+   * Bring the route's directory to a prepared workspace and report how. The
+   * filesystem alone decides (spec: workspace stamp): a stamp from this allocation
+   * needs nothing, one from another allocation is a restored environment snapshot
+   * to adopt, and anything else is cloned. Setup always runs after a clone or an
+   * adopt, with this session's admitted configuration. A session never captures.
+   */
+  async function prepareWorkspace(
+    spec: ControlPlaneRouteSpec,
+    directory: string,
+    home: string,
+    env: Record<string, string>,
+    redact: (text: string) => string,
+    setStep: (step: ControlPlanePreparationStep) => void,
+    onReplacementWorkspace?: () => Promise<boolean>
+  ): Promise<{
+    outcome: ControlPlaneWorkspaceOutcome;
+    deferredStamp: { commit: string } | null;
+  }> {
+    const workspaceStartedAt = Date.now();
+    // Git authenticates through the pinned helper's per-session record, never
+    // through `origin`. A reused workspace is refreshed here too, so a renewed
+    // grant reaches the next `git push` without touching the remote.
+    if (spec.git) {
+      try {
+        await writeGitCredentialRecord({
+          home,
+          url: credentialFreeGitUrl(spec.git.url),
+          token: spec.git.token,
+          platform: spec.git.platform,
+        });
+      } catch {
+        setStep('clone');
+        throw new WrapperBootstrapError({
+          code: 'WORKSPACE_SETUP_FAILED',
+          message: 'Git credential setup failed',
+          retryable: true,
+        });
+      }
+    }
+    const inspectStartedAt = Date.now();
+    const { inspection } = await inspectWorkspace(directory);
+    log(
+      `control-plane workspace inspect session=${spec.sessionId} inspection=${inspection} elapsedMs=${Date.now() - inspectStartedAt}`
+    );
+    if (inspection === 'same') return { outcome: 'same', deferredStamp: null };
+    let adopted = false;
+    if (inspection === 'foreign') {
+      const adoptStartedAt = Date.now();
+      adopted = await adoptWorkspace(spec, directory, env, redact, setStep);
+      log(
+        `control-plane workspace adopt done session=${spec.sessionId} adopted=${adopted} elapsedMs=${Date.now() - adoptStartedAt}`
+      );
+      if (!adopted) await emptyDirectory(directory);
+    }
+    // A clone happens only when there is no repository yet; a partly prepared
+    // workspace is reused, as before.
+    const cloning = !adopted && Boolean(spec.git) && !(await hasGit(directory));
+    if (!adopted) {
+      setStep('clone');
+      await withinStep('clone', timers.cloneMs, signal =>
+        cloneWorkspace(spec, directory, env, redact, signal, () => setStep('checkout'))
+      );
+    }
+    setStep('setup');
+    await runSetupCommands(spec, directory, env, redact, new AbortController().signal);
+    // The callback reports whether the recovery steps actually applied. A clone
+    // with no `.git` yet, or a surviving workspace, never runs it.
+    const recoveryApplied =
+      cloning || adopted ? ((await onReplacementWorkspace?.()) ?? false) : false;
+    const commit = await headCommit(directory, env);
+    // Recovery requested but not applied: defer the current-allocation stamp until
+    // after the deferred import, so a crash in between cannot leave a stamp that
+    // makes the next preparation look like a surviving workspace.
+    if (spec.worktreeRecovery !== undefined && !recoveryApplied) {
+      log(
+        `control-plane workspace stamp deferred session=${spec.sessionId} elapsedMs=${Date.now() - workspaceStartedAt}`
+      );
+      return { outcome: adopted ? 'adopted' : 'cloned', deferredStamp: { commit } };
+    }
+    await writeStamp(directory, { allocationId: deps.allocationId, commit });
+    log(
+      `control-plane workspace prepared session=${spec.sessionId} outcome=${adopted ? 'adopted' : 'cloned'} elapsedMs=${Date.now() - workspaceStartedAt}`
+    );
+    return { outcome: adopted ? 'adopted' : 'cloned', deferredStamp: null };
   }
 
   async function runSetupCommands(
@@ -542,64 +806,17 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     const commands = spec.setupCommands ?? [];
     if (commands.length === 0) return;
     emitProgress(spec.sessionId, 'setup');
-    // Spec §9: a setup failure must show the command output, so each command's
-    // start, output and end go on the wire, not only to the wrapper log. The
-    // Session renders them as per-command preparation steps.
-    const emitSetupEvent = (event: ControlPlaneSetupEvent): void => {
-      deps.emit({
-        type: 'session.events',
-        sessionId: spec.sessionId,
-        events: [event],
-      });
-    };
-    for (const [index, command] of commands.entries()) {
-      signal.throwIfAborted();
-      const commandNumber = index + 1;
-      emitSetupEvent({
-        type: CONTROL_PLANE_SETUP_EVENTS.started,
-        properties: { command: commandNumber, commandCount: commands.length },
-      });
-      const output = createOutputRedactor(
-        text => redact(cleanTerminalOutput(text)),
-        text => {
-          if (signal.aborted) return;
-          const cleaned = text.trim();
-          if (!cleaned) return;
-          log(`control-plane setup command ${commandNumber} produced output`);
-          emitSetupEvent({
-            type: CONTROL_PLANE_SETUP_EVENTS.output,
-            properties: {
-              command: commandNumber,
-              output: `${cleaned.slice(0, SETUP_OUTPUT_EVENT_LIMIT - 1)}\n`,
-            },
-          });
-        }
-      );
-      const startedAt = Date.now();
-      const result = await runSetup(command, directory, env, output.onOutput, signal);
-      output.flush();
-      if (result.exitCode !== 0) {
-        const timedOut = result.terminationReason !== undefined;
-        log(
-          `control-plane setup command failed sessionId=${spec.sessionId} kiloSessionId=${spec.kiloSessionId} attemptId=${spec.attemptId} index=${index + 1} count=${commands.length} exitCode=${result.exitCode} terminationReason=${result.terminationReason ?? 'nonzero'} elapsedMs=${Date.now() - startedAt} inactivityTimeoutMs=${SETUP_COMMAND_INACTIVITY_TIMEOUT_MS} hardTimeoutMs=${SETUP_COMMAND_HARD_TIMEOUT_MS}`
-        );
-        const message = `Setup command ${commandNumber} ${timedOut ? 'timed out' : 'failed'}`;
-        emitSetupEvent({
-          type: CONTROL_PLANE_SETUP_EVENTS.finished,
-          properties: { command: commandNumber, exitCode: result.exitCode, safeError: message },
-        });
-        throw new WrapperBootstrapError({
-          code: 'WORKSPACE_SETUP_FAILED',
-          subtype: timedOut ? 'setup_command_timeout' : 'setup_command_failed',
-          message,
-          retryable: true,
-        });
-      }
-      emitSetupEvent({
-        type: CONTROL_PLANE_SETUP_EVENTS.finished,
-        properties: { command: commandNumber, exitCode: 0 },
-      });
-    }
+    // The Session renders the setup events as per-command preparation steps.
+    await repository.runSetupCommands({
+      commands,
+      directory,
+      env,
+      redact,
+      signal,
+      onEvent: event =>
+        deps.emit({ type: 'session.events', sessionId: spec.sessionId, events: [event] }),
+      logContext: `sessionId=${spec.sessionId} kiloSessionId=${spec.kiloSessionId} attemptId=${spec.attemptId}`,
+    });
   }
 
   async function resolveKiloSession(
@@ -607,12 +824,17 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     directory: string,
     env: Record<string, string>,
     client: WrapperKiloClient,
-    signal: AbortSignal
+    signal: AbortSignal,
+    restoreFiles: boolean
   ): Promise<void> {
     await seedRegistration(spec.kiloSessionId, env, signal);
     if (await sessionExists(client, spec.kiloSessionId, directory, signal)) return;
     emitProgress(spec.sessionId, 'kilo_session', 'Loading session history');
-    const restored = await restore(spec.kiloSessionId, directory, undefined, { env, signal });
+    const restored = await restore(spec.kiloSessionId, directory, undefined, {
+      env,
+      signal,
+      restoreFiles,
+    });
     if (restored.ok) {
       if (restored.diffs.skipped > 0) {
         await reportRestoreIncomplete({
@@ -644,9 +866,15 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       try {
         return await operation();
       } catch (error) {
-        // A per-session MCP drift is permanent for this key; retrying would drop
-        // the existing runtime and accept the changed servers.
-        if (!isCurrent() || error instanceof KiloWorktreeMcpMismatchError) throw error;
+        // An MCP or credential-class drift against the shared runtime is permanent for this key;
+        // retrying would drop the existing runtime and accept the changed configuration.
+        if (
+          !isCurrent() ||
+          error instanceof KiloWorktreeMcpMismatchError ||
+          error instanceof KiloWorktreeCredentialClassMismatchError
+        ) {
+          throw error;
+        }
         lastError = error;
         // M1: a hung spawn leaves `ensure` returning the same pending promise,
         // so drop the runtime before the retry starts a fresh one.
@@ -656,17 +884,131 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     throw lastError;
   }
 
+  /**
+   * Whether any route other than `excludeSessionId` still holds `key`. Counts
+   * prepared routes and in-flight prepares that are not themselves released, so
+   * a route releasing while a sibling prepare is still running is not the last.
+   */
+  function hasRoutesForKey(key: string, excludeSessionId: string): boolean {
+    for (const [sessionId, route] of prepared) {
+      if (sessionId !== excludeSessionId && route.key === key) return true;
+    }
+    for (const [sessionId, record] of preparing) {
+      if (sessionId === excludeSessionId || record.released) continue;
+      if (record.runtimeKey === key) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Whether `prepare` for `sessionId` reuses its current runtime and ignores a
+   * newly offered configuration: an unreleased in-flight prepare, or a prepared
+   * route whose runtime is still available.
+   */
+  function callerKeepsRuntime(sessionId: string, key: string): boolean {
+    const record = preparing.get(sessionId);
+    if (record && !record.released && record.runtimeKey === key) return true;
+    const route = prepared.get(sessionId);
+    return route?.key === key && !deps.runtimes.isUnavailable(key);
+  }
+
+  /**
+   * Finish a route that left `prepared`, or never reached it. When it was the
+   * last holder of its runtime key the process is released: the runtime's owned
+   * process scope reaps the background processes it started, so walking a dying
+   * client would only emit false unreaped-process diagnostics. When a sibling
+   * still holds the key, the route's Kilo session tree is aborted instead.
+   */
+  function finishReleasedRoute(input: {
+    key: string;
+    sessionId: string;
+    spec: ControlPlaneRouteSpec;
+  }): void {
+    if (!hasRoutesForKey(input.key, input.sessionId)) {
+      deps.runtimes.release(input.key);
+      profileMaterializer.release(routeHome(input.spec, homeRoots));
+      workspaceConfigurations.delete(input.key);
+      return;
+    }
+    // Resolve the CURRENT live client: a restart replaces the runtime on a new
+    // port, and reading `.client` during a restart throws. When no client is
+    // live the old process is gone, so its sessions are dead and cleanup is a
+    // no-op rather than an error.
+    const client = deps.runtimes.getLiveClient(input.key);
+    if (!client) return;
+    const entry: InflightCleanup = {
+      controller: new AbortController(),
+      promise: Promise.resolve(),
+    };
+    entry.promise = cleanupKiloSessionTree(
+      client,
+      input.spec.directory,
+      input.spec.kiloSessionId,
+      releaseCleanupDeadlineMs,
+      entry.controller.signal
+    )
+      .then(result => {
+        if (!result.ok) {
+          log(
+            `control-plane release cleanup incomplete session=${input.sessionId} sessions=${result.sessions} failures=${result.failures}`
+          );
+        }
+        // Closed native record: counts only, never a handle or session body.
+        deps.onNativeDiagnostic?.('session.task', {
+          phase: result.ok ? 'finished' : 'failed',
+          stage: 'process_cleanup',
+          ok: result.ok,
+          sessionCount: result.sessions,
+          failureCount: result.failures,
+          elapsedMs: result.elapsedMs,
+          sessionId: input.sessionId,
+        });
+      })
+      .catch(() => undefined);
+    releaseCleanups.set(input.sessionId, entry);
+    void entry.promise.finally(() => {
+      if (releaseCleanups.get(input.sessionId) === entry) releaseCleanups.delete(input.sessionId);
+    });
+  }
+
+  /**
+   * Stop any release cleanup still walking `sessionId` before a re-prepare
+   * resolves the same Kilo session. Bounded by the cleanup's own deadline.
+   */
+  async function settleReleaseCleanup(sessionId: string): Promise<void> {
+    const entry = releaseCleanups.get(sessionId);
+    if (!entry) return;
+    entry.controller.abort();
+    await entry.promise;
+  }
+
+  /**
+   * The single finalizer for a preparing record: run it exactly when this owner
+   * is the active record leaving `preparing` and its session never made it into
+   * `prepared`.
+   */
+  function finalizePreparingOwner(owner: PreparingRoute, spec: ControlPlaneRouteSpec): void {
+    if (preparing.get(spec.sessionId) !== owner) return;
+    preparing.delete(spec.sessionId);
+    if (prepared.has(spec.sessionId)) return;
+    finishReleasedRoute({
+      key: owner.runtimeKey,
+      sessionId: spec.sessionId,
+      spec,
+    });
+  }
+
   async function runPrepare(
     spec: ControlPlaneRouteSpec,
     credentials: ControlPlaneSessionCredentialsPayload | undefined,
-    owner: { released: boolean }
+    owner: PreparingRoute
   ): Promise<void> {
     const sessionId = spec.sessionId;
     let currentStep: ControlPlanePreparationStep = 'kilo_runtime';
     const kiloConfig = spec.kilo;
     // Spec §6: behind the runtime credential proxy the wrapper talks to the
-    // Worker facade with the per-session handle; otherwise it uses the spec's
-    // alias and targets.
+    // Worker facade with the scope's runtime-proxy handle; otherwise it uses the
+    // spec's alias and targets.
     const kiloToken = credentials?.proxy?.handle ?? credentials?.kilo.token ?? kiloConfig?.token;
     if (!kiloConfig || !kiloToken) {
       log(`control-plane prepare is missing the Kilo context session=${sessionId}`);
@@ -686,80 +1028,207 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         : { organizationId: kiloConfig.organizationId }),
       targets: credentials?.proxy?.targets ?? kiloConfig.targets,
     };
-    const home = homeFor(homeKey(spec), directory, homeRoot);
+    const home = routeHome(spec, homeRoots);
+    log(`control-plane prepare received session=${sessionId} directory=${directory}`);
 
     try {
       // Built inside the failure scope: an over-limit CLI config must surface as
       // `session.failed`, not reject the prepare promise (which the caller
       // swallows while the route waits out its timeout).
-      const env = buildWorktreeKiloEnvironment(
-        directory,
-        home,
-        kiloAuth,
-        spec.env ?? {},
-        inheritedEnv,
-        spec.mcp
+      const cloudAgentMcp = scopedCloudAgentMcp(spec, credentials?.cloudAgentMcp);
+      const builtEnv = withRuntimeProfileEnvironment(
+        buildWorktreeKiloEnvironment(
+          directory,
+          home,
+          kiloAuth,
+          spec.env ?? {},
+          inheritedEnv,
+          spec.mcp,
+          { ...spec, ...(cloudAgentMcp === undefined ? {} : { cloudAgentMcp }) }
+        ),
+        spec
       );
-      const redact = createSecretRedactor(inheritedEnv, spec.env ?? {}, {
-        ...env,
-        ...(credentials?.git?.token ? { GIT_TOKEN: credentials.git.token } : {}),
-      });
+      const redact = createSecretRedactor(
+        inheritedEnv,
+        [
+          spec.env ?? {},
+          {
+            ...builtEnv,
+            ...(credentials?.git?.token ? { GIT_TOKEN: credentials.git.token } : {}),
+            ...(cloudAgentMcp ? { CLOUD_AGENT_MCP_TOKEN: cloudAgentMcp.token } : {}),
+          },
+        ],
+        spec.secretEnvKeys ?? []
+      );
       const needsWorkspace = Boolean(spec.git) || (spec.setupCommands?.length ?? 0) > 0;
       // M3: clone/checkout/setup mutate a shared worktree. Serialize per
-      // directory and re-check the marker so a waiting session skips the work.
-      await withWorkspaceLock(directory, async () => {
-        if (!needsWorkspace || (await hasBootstrapMarker(directory))) return;
-        currentStep = 'clone';
-        await withinStep('clone', timers.cloneMs, signal =>
-          cloneWorkspace(spec, directory, env, redact, signal, () => {
-            currentStep = 'checkout';
-          })
+      // directory and inspect the stamp inside the lock, so a waiting session
+      // sees the finished workspace and skips the work.
+      let workspace: ControlPlaneWorkspaceOutcome | undefined;
+      let replacementWorkspace = false;
+      let localRecoveryApplied = false;
+      let deferredRuntimeStarted = false;
+      const recovery = spec.worktreeRecovery;
+      // Older ingest restoration must not overwrite newer local recovery. That is
+      // proven for a replacement workspace whose recovery applied, and for a
+      // surviving workspace this allocation already stamped (a wrapper restart
+      // after the stamp but before import). An unstamped repository is a partial
+      // preparation, not proof of recovery, so it keeps ingest restoration.
+      const restoreFilesFor = (): boolean =>
+        !(replacementWorkspace && localRecoveryApplied) &&
+        !(recovery !== undefined && workspace === 'same');
+      // One owner for runtime profile, runtime start and session resolution, shared
+      // by the normal path after the lock and the deferred path inside it.
+      const ensureRuntimeAndSession = async (restoreFiles: boolean): Promise<void> => {
+        const installsSkills = spec.runtimeSkills?.some(skill => skill.source !== undefined);
+        currentStep = installsSkills ? 'setup' : 'kilo_runtime';
+        owner.skillInstallController = new AbortController();
+        await profileMaterializer.materialize(home, spec, {
+          run: (command, args, options) =>
+            (deps.runSkillInstall ?? runProcess)(command, args, {
+              ...options,
+              spawn: deps.spawnSetup,
+            }),
+          signal: owner.skillInstallController.signal,
+          onProgress: detail => {
+            if (!owner.released) emitProgress(sessionId, 'setup', detail);
+          },
+        });
+        if (owner.released) return;
+        currentStep = 'kilo_runtime';
+        emitProgress(sessionId, 'kilo_runtime');
+        const client = await withRuntimeStartRetry(
+          key,
+          () =>
+            withinStep('kilo_runtime', timers.kiloRuntimeStartMs, () =>
+              deps.runtimes.ensure({ key, directory, env: builtEnv })
+            ),
+          () => !owner.released
         );
-        currentStep = 'setup';
-        await runSetupCommands(spec, directory, env, redact, new AbortController().signal);
-        await writeBootstrapMarker(directory);
+        if (owner.released) return;
+        currentStep = 'kilo_session';
+        emitProgress(sessionId, 'kilo_session');
+        await settleReleaseCleanup(sessionId);
+        await withOneRetry(
+          () =>
+            withinStep('kilo_session', timers.kiloSessionMs, signal =>
+              resolveKiloSession(spec, directory, builtEnv, client, signal, restoreFiles)
+            ),
+          () => !owner.released
+        );
+      };
+      await withWorkspaceLock(directory, async () => {
+        if (!needsWorkspace) return;
+        const preparedWorkspace = await prepareWorkspace(
+          spec,
+          directory,
+          home,
+          builtEnv,
+          redact,
+          step => {
+            currentStep = step;
+          },
+          async () => {
+            replacementWorkspace = true;
+            if (!recovery || owner.released) return false;
+            currentStep = 'restore';
+            try {
+              emitProgress(sessionId, 'restore', 'Restoring saved worktree changes');
+              const diffs = await (deps.recoverWorktree ?? restoreWorktreeRecovery)(
+                directory,
+                recovery,
+                builtEnv,
+                AbortSignal.timeout(30_000)
+              );
+              log(
+                `local worktree recovery session=${sessionId} applied=${diffs.applied} skipped=${diffs.skipped} total=${diffs.total}`
+              );
+              localRecoveryApplied = diffs.applied > 0 || diffs.total === 0;
+              const incomplete = await reportRestoreIncomplete({
+                diffs,
+                identity: `kiloSessionId=${spec.kiloSessionId}`,
+                log,
+              });
+              if (incomplete) emitProgress(sessionId, 'restore', incomplete.message);
+              return localRecoveryApplied;
+            } catch {
+              log(`local worktree recovery session=${sessionId} failed; continuing`);
+              emitProgress(
+                sessionId,
+                'restore',
+                'Saved worktree changes could not be restored; continuing'
+              );
+              return false;
+            }
+          }
+        );
+        workspace = preparedWorkspace.outcome;
+        if (spec.git) {
+          const origin = await normalizeOriginCredential({
+            git: args => runGit(args, { cwd: directory, env: builtEnv, inheritEnv: false }),
+            directory,
+          });
+          if (origin === 'failed') {
+            log(`control-plane Git origin normalization failed session=${sessionId}`);
+          }
+        }
+        if (preparedWorkspace.deferredStamp === null || owner.released) return;
+        // Recovery import completes under the workspace lock before stamping.
+        deferredRuntimeStarted = true;
+        await ensureRuntimeAndSession(restoreFilesFor());
+        if (!owner.released) {
+          await writeStamp(directory, {
+            allocationId: deps.allocationId,
+            commit: preparedWorkspace.deferredStamp.commit,
+          });
+        }
       });
+      if (owner.released) {
+        return;
+      }
+      if (recovery && !replacementWorkspace) {
+        log(`local worktree recovery session=${sessionId} skipped reason=surviving_workspace`);
+      }
+      if (!deferredRuntimeStarted) {
+        await ensureRuntimeAndSession(restoreFilesFor());
+      }
       if (owner.released) return;
-      currentStep = 'kilo_runtime';
-      emitProgress(sessionId, 'kilo_runtime');
-      const client = await withRuntimeStartRetry(
+      prepared.set(sessionId, {
         key,
-        () =>
-          withinStep('kilo_runtime', timers.kiloRuntimeStartMs, () =>
-            deps.runtimes.ensure({ key, directory, env })
-          ),
-        () => !owner.released
-      );
-      if (owner.released) {
-        if (spec.runtimeIsolation === 'per-session') deps.runtimes.release(key);
-        return;
+        spec,
+        directory,
+        home,
+        kilo: kiloAuth,
+        env: builtEnv,
+        cloudAgentMcp,
+      });
+      // A credentials frame that arrived while this route was preparing is
+      // applied before the route reports ready; a release during the apply
+      // suppresses ready and leaves the already-released route torn down.
+      const pending = owner.pendingCredentials;
+      owner.pendingCredentials = undefined;
+      if (pending) {
+        try {
+          await installCredentialsFor(pending);
+        } catch (error) {
+          log(
+            `control-plane buffered credential apply failed session=${sessionId} error=${
+              error instanceof Error ? error.message : String(error)
+            }`
+          );
+        }
       }
-      currentStep = 'kilo_session';
-      emitProgress(sessionId, 'kilo_session');
-      await withOneRetry(
-        () =>
-          withinStep('kilo_session', timers.kiloSessionMs, signal =>
-            resolveKiloSession(spec, directory, env, client, signal)
-          ),
-        () => !owner.released
-      );
-      if (owner.released) {
-        if (spec.runtimeIsolation === 'per-session') deps.runtimes.release(key);
-        return;
-      }
-      prepared.set(sessionId, { key, spec, directory, home, kilo: kiloAuth, env });
-      deps.emit({ type: 'session.ready', sessionId });
+      if (owner.released) return;
       emitSessionReadyNative(sessionId);
+      deps.emit({ type: 'session.ready', sessionId, ...(workspace ? { workspace } : {}) });
       log(`control-plane prepare ready session=${sessionId} directory=${directory}`);
     } catch (error) {
-      if (owner.released) {
-        if (spec.runtimeIsolation === 'per-session') deps.runtimes.release(key);
-        return;
-      }
+      if (owner.released) return;
       log(
-        `control-plane prepare failed session=${sessionId} step=${currentStep} error=${
-          error instanceof Error ? error.message : String(error)
-        }${
+        `control-plane prepare failed session=${sessionId} step=${currentStep} error=${redactSecrets(
+          error instanceof Error ? error.message : String(error),
+          credentials?.cloudAgentMcp ? [credentials.cloudAgentMcp.token] : []
+        )}${
           error instanceof WrapperBootstrapError && error.gitFailure ? ` ${error.gitFailure}` : ''
         }`
       );
@@ -771,57 +1240,93 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     credentials: ControlPlaneSessionCredentialsPayload
   ): Promise<void> {
     const route = prepared.get(credentials.sessionId);
-    if (!route) return;
-    const nextEnv = buildWorktreeKiloEnvironment(
-      route.directory,
-      route.home,
-      {
-        ...route.kilo,
-        token: credentials.proxy?.handle ?? credentials.kilo.token,
-        targets: credentials.proxy?.targets ?? route.kilo.targets,
-      },
-      route.spec.env ?? {},
-      inheritedEnv,
-      route.spec.mcp
+    if (!route) {
+      const preparation = preparing.get(credentials.sessionId);
+      if (preparation && !preparation.released) preparation.pendingCredentials = credentials;
+      return;
+    }
+    const cloudAgentMcp = scopedCloudAgentMcp(
+      route.spec,
+      credentials.cloudAgentMcp ?? route.cloudAgentMcp
+    );
+    route.cloudAgentMcp = cloudAgentMcp;
+    const nextEnv = withRuntimeProfileEnvironment(
+      buildWorktreeKiloEnvironment(
+        route.directory,
+        route.home,
+        {
+          ...route.kilo,
+          token: credentials.proxy?.handle ?? credentials.kilo.token,
+          targets: credentials.proxy?.targets ?? route.kilo.targets,
+        },
+        route.spec.env ?? {},
+        inheritedEnv,
+        route.spec.mcp,
+        { ...route.spec, ...(cloudAgentMcp === undefined ? {} : { cloudAgentMcp }) }
+      ),
+      route.spec
     );
     route.env = nextEnv;
-    await deps.runtimes.installCredentials(route.key, nextEnv);
+    await deps.runtimes.installCredentials(route.key, nextEnv, cloudAgentMcp);
     if (credentials.git?.token && route.spec.git) {
-      const url = authenticatedGitUrl(
-        route.spec.git.url,
-        credentials.git.token,
-        credentials.git.platform ?? route.spec.git.platform
-      );
-      const result = await runGit(['remote', 'set-url', 'origin', url], {
-        cwd: route.directory,
-        env: route.env,
-        inheritEnv: false,
-      });
-      if (result.exitCode !== 0) {
-        log(`control-plane Git credential refresh failed session=${credentials.sessionId}`);
+      // The helper re-reads the record on the next git command, so the agent's
+      // push/fetch picks up the renewed token while `origin` stays credential-free.
+      try {
+        await writeGitCredentialRecord({
+          home: route.home,
+          url: credentialFreeGitUrl(route.spec.git.url),
+          token: credentials.git.token,
+          platform: credentials.git.platform ?? route.spec.git.platform,
+        });
+      } catch {
+        log(`control-plane Git credential record refresh failed session=${credentials.sessionId}`);
       }
     }
   }
 
   return {
+    workspaceConfiguration(spec, offered) {
+      const key = workspaceConfigRuntimeKey(spec);
+      const retained =
+        callerKeepsRuntime(spec.sessionId, key) || hasRoutesForKey(key, spec.sessionId)
+          ? workspaceConfigurations.get(key)
+          : undefined;
+      if (retained !== undefined) return retained;
+      workspaceConfigurations.set(key, offered);
+      return offered;
+    },
     prepare: function prepare(spec, credentials) {
       const existing = preparing.get(spec.sessionId);
       if (existing && !existing.released) return existing.promise;
       if (existing) {
-        const owner = { promise: Promise.resolve(), released: false };
+        const owner: PreparingRoute = {
+          promise: Promise.resolve(),
+          released: false,
+          runtimeKey: runtimeKey(spec),
+        };
         owner.promise = existing.promise
           .then(() => {
             if (owner.released) return;
             preparing.delete(spec.sessionId);
-            return prepare(spec, credentials);
+            // A frame buffered on this owner would be lost when the re-entrant
+            // prepare creates a fresh owner for the same session.
+            const pending = owner.pendingCredentials;
+            const next = prepare(spec, credentials);
+            if (pending) {
+              const created = preparing.get(spec.sessionId);
+              if (created) created.pendingCredentials = pending;
+            }
+            return next;
           })
-          .finally(() => {
-            if (preparing.get(spec.sessionId) === owner) preparing.delete(spec.sessionId);
-          });
+          .finally(() => finalizePreparingOwner(owner, spec));
         preparing.set(spec.sessionId, owner);
         return owner.promise;
       }
-      const owner = { promise: Promise.resolve(), released: false };
+      const owner: PreparingRoute = {
+        promise: Promise.resolve(),
+        released: false,
+        runtimeKey: runtimeKey(spec),
+      };
       const route = prepared.get(spec.sessionId);
       if (route) {
         // M2: a failed route (spent restart budget / dead runtime) must start
@@ -842,33 +1347,47 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
               }
             }
             if (!owner.released) {
-              deps.emit({ type: 'session.ready', sessionId: spec.sessionId });
               emitSessionReadyNative(spec.sessionId);
+              deps.emit({ type: 'session.ready', sessionId: spec.sessionId, workspace: 'same' });
             }
-          })().finally(() => {
-            if (preparing.get(spec.sessionId) === owner) preparing.delete(spec.sessionId);
-          });
+          })().finally(() => finalizePreparingOwner(owner, spec));
           owner.promise = running;
           preparing.set(spec.sessionId, owner);
           return running;
         }
       }
-      const running = runPrepare(spec, credentials, owner).finally(() => {
-        if (preparing.get(spec.sessionId) === owner) preparing.delete(spec.sessionId);
-      });
+      const running = runPrepare(spec, credentials, owner).finally(() =>
+        finalizePreparingOwner(owner, spec)
+      );
       owner.promise = running;
       preparing.set(spec.sessionId, owner);
       return running;
     },
     release(sessionId) {
       const preparation = preparing.get(sessionId);
-      if (preparation) preparation.released = true;
+      if (preparation) {
+        preparation.released = true;
+        preparation.skillInstallController?.abort();
+      }
       const route = prepared.get(sessionId);
       if (!route) return;
       prepared.delete(sessionId);
-      if (route.spec.runtimeIsolation === 'per-session') deps.runtimes.release(route.key);
+      const owner = preparing.get(sessionId);
+      if (owner) {
+        // The in-flight prepare's finalizer owns the decision.
+        return;
+      }
+      finishReleasedRoute({
+        key: route.key,
+        sessionId,
+        spec: route.spec,
+      });
     },
     isPrepared: sessionId => prepared.has(sessionId),
+    preparedRoute: sessionId => {
+      const route = prepared.get(sessionId);
+      return route === undefined ? null : { runtimeKey: route.key, directory: route.directory };
+    },
     isPreparing: () => preparing.size > 0,
     preparingCount: () => preparing.size,
     sessionCount: () => prepared.size,

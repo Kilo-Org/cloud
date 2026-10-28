@@ -1,4 +1,11 @@
+import { existsSync } from 'node:fs';
+import fs from 'node:fs/promises';
+import os from 'node:os';
+import path from 'node:path';
+import { spawn } from 'node:child_process';
+import { profileConfigPath } from './runtime-profile.js';
 import { describe, expect, it, spyOn } from 'bun:test';
+import { createHash } from 'node:crypto';
 import {
   CONTROL_PLANE_TIMERS,
   type ControlPlaneTimers,
@@ -11,10 +18,554 @@ import type {
 import { controlPlaneWrapperFrameSchema } from '../../../src/shared/control-plane-protocol.js';
 import type { ControlDiagnosticFields } from '../../../src/shared/control-diagnostics.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
-import type { ExecResult, ProcessOptions, ProcessOutputStream } from '../utils.js';
+import type { ExecResult, ProcessOptions, ProcessOutputStream, ProcessSpawn } from '../utils.js';
 import * as processUtils from '../utils.js';
 import { createPreparationManager, type PrepareRuntimePort } from './prepare.js';
-import { KiloWorktreeMcpMismatchError } from './kilo-runtime.js';
+import type { WorkspaceStamp } from './workspace-stamp.js';
+import { directoryHome } from './workspace-home.js';
+
+const NOW = 1_800_000_000_000;
+import {
+  createKiloRuntimes,
+  KiloWorktreeCredentialClassMismatchError,
+  KiloWorktreeMcpMismatchError,
+  liveRuntimeClient,
+  type KiloRuntime,
+} from './kilo-runtime.js';
+import type { restoreWorktreeRecovery } from './worktree-recovery.js';
+import { restoreSession } from '../restore-session.js';
+
+describe('replacement workspace local recovery', () => {
+  const recovery = {
+    files: [{ path: 'lost.txt', status: 'added' as const, patch: 'saved patch' }],
+  };
+
+  it('recovers a new clone with no ingest diffs before reporting ready', async () => {
+    let calls = 0;
+    const harness = createHarness(FAST_TIMERS, {
+      recoverWorktree: async (_directory, saved) => {
+        expect(saved).toEqual(recovery);
+        expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(false);
+        calls++;
+        return { applied: 1, skipped: 0, total: 1, skippedDiffs: [] };
+      },
+    });
+    harness.setSessionExists(false);
+    await harness.manager.prepare(
+      routeSpec({ git: { url: 'https://github.com/acme/repo.git' }, worktreeRecovery: recovery })
+    );
+    expect(calls).toBe(1);
+    expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+  });
+
+  it.each(['surviving', 'ingest', 'existing_session'])(
+    'restores local patches for replacement workspaces with %s state only',
+    async kind => {
+      let calls = 0;
+      const harness = createHarness(FAST_TIMERS, {
+        hasGit: kind === 'surviving',
+        recoverWorktree: async () => {
+          calls++;
+          return { applied: 1, skipped: 0, total: 1, skippedDiffs: [] };
+        },
+      });
+      harness.setSessionExists(kind === 'existing_session');
+      if (kind === 'ingest')
+        harness.setRestore(async () => ({
+          ok: true,
+          downloaded: true,
+          imported: true,
+          diffs: { applied: 1, skipped: 0, total: 1 },
+        }));
+      await harness.manager.prepare(
+        routeSpec({ git: { url: 'https://github.com/acme/repo.git' }, worktreeRecovery: recovery })
+      );
+      expect(calls).toBe(kind === 'surviving' ? 0 : 1);
+      if (kind === 'ingest') expect(harness.restoreOptions()[0]?.restoreFiles).toBe(false);
+      if (kind === 'surviving') expect(harness.restoreOptions()[0]?.restoreFiles).toBe(true);
+      expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+    }
+  );
+
+  it('imports nonempty ingest history but recovers the newer local file before snapshot upload', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-local-precedence-'));
+    const directory = path.join(root, 'workspace');
+    const imported = path.join(root, 'imported.json');
+    const bin = path.join(root, 'bin');
+    const snapshot = {
+      info: { id: routeSpec().kiloSessionId, version: '2' },
+      messages: [],
+      sessionDiff: [{ file: 'lost.txt', status: 'modified', after: 'older ingest\n' }],
+    };
+    const fetchSpy = spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(snapshot), { status: 200 })
+    );
+    try {
+      await fs.mkdir(directory);
+      await fs.mkdir(bin);
+      expect(Bun.spawnSync(['git', 'init', directory]).exitCode).toBe(0);
+      await fs.writeFile(path.join(directory, 'lost.txt'), 'base\n');
+      await fs.writeFile(path.join(bin, 'kilo'), `#!/bin/sh\ncp "$2" "${imported}"\n`, {
+        mode: 0o755,
+      });
+      const newer = {
+        files: [
+          {
+            path: 'lost.txt',
+            status: 'modified' as const,
+            patch:
+              'diff --git a/lost.txt b/lost.txt\n--- a/lost.txt\n+++ b/lost.txt\n@@ -1 +1 @@\n-base\n+newer local\n',
+          },
+        ],
+      };
+      const harness = createHarness(FAST_TIMERS);
+      harness.setSessionExists(false);
+      harness.setRestore(async () =>
+        restoreSession(routeSpec().kiloSessionId, directory, undefined, {
+          restoreFiles: harness.restoreOptions()[0]?.restoreFiles !== false,
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH}`,
+            KILO_SESSION_INGEST_URL: 'https://ingest.test',
+            KILOCODE_TOKEN: 'test-token',
+          },
+        })
+      );
+      await harness.manager.prepare(
+        routeSpec({
+          directory,
+          git: { url: 'https://github.com/acme/repo.git' },
+          worktreeRecovery: newer,
+        })
+      );
+      expect(await fs.readFile(path.join(directory, 'lost.txt'), 'utf8')).toBe('newer local\n');
+      expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+    } finally {
+      fetchSpy.mockRestore();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps recovered tracked and added bytes on a stamped same-allocation restart with older ingest', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-restart-recovery-'));
+    const directory = path.join(root, 'workspace');
+    const imported = path.join(root, 'imported.json');
+    const bin = path.join(root, 'bin');
+    const snapshot = {
+      info: { id: routeSpec().kiloSessionId, version: '2' },
+      messages: [],
+      sessionDiff: [
+        { file: 'tracked.txt', status: 'modified', after: 'older tracked\n' },
+        { file: 'added.txt', status: 'added', after: 'older added\n' },
+      ],
+    };
+    const fetchSpy = spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(snapshot), { status: 200 })
+    );
+    try {
+      await fs.mkdir(directory);
+      await fs.mkdir(bin);
+      expect(Bun.spawnSync(['git', 'init', directory]).exitCode).toBe(0);
+      await fs.writeFile(path.join(directory, 'tracked.txt'), 'recovered tracked\n');
+      await fs.writeFile(path.join(directory, 'added.txt'), 'recovered added\n');
+      await fs.writeFile(path.join(bin, 'kilo'), `#!/bin/sh\ncp "$2" "${imported}"\n`, {
+        mode: 0o755,
+      });
+      const harness = createHarness(FAST_TIMERS, { hasGit: true });
+      harness.setStamp({
+        allocationId: 'alloc-current',
+        commit: 'c',
+        capturedAt: NOW,
+        generation: 0,
+      });
+      harness.setSessionExists(false);
+      harness.setRestore(async () =>
+        restoreSession(routeSpec().kiloSessionId, directory, undefined, {
+          restoreFiles: harness.restoreOptions()[0]?.restoreFiles !== false,
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH}`,
+            KILO_RUNTIME_CLI_PATH: path.join(bin, 'kilo'),
+            KILO_SESSION_INGEST_URL: 'https://ingest.test',
+            KILOCODE_TOKEN: 'test-token',
+          },
+        })
+      );
+      await harness.manager.prepare(
+        routeSpec({
+          directory,
+          git: { url: 'https://github.com/acme/repo.git' },
+          worktreeRecovery: {
+            files: [
+              { path: 'tracked.txt', status: 'modified', patch: 'saved' },
+              { path: 'added.txt', status: 'added', patch: 'saved' },
+            ],
+          },
+        })
+      );
+      expect(harness.restoreOptions()[0]?.restoreFiles).toBe(false);
+      expect(await fs.readFile(path.join(directory, 'tracked.txt'), 'utf8')).toBe(
+        'recovered tracked\n'
+      );
+      expect(await fs.readFile(path.join(directory, 'added.txt'), 'utf8')).toBe(
+        'recovered added\n'
+      );
+      expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+    } finally {
+      fetchSpy.mockRestore();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('imports ingest files for a prepare with no recovery', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-no-recovery-'));
+    const directory = path.join(root, 'workspace');
+    const bin = path.join(root, 'bin');
+    const snapshot = {
+      info: { id: routeSpec().kiloSessionId, version: '2' },
+      messages: [],
+      sessionDiff: [{ file: 'lost.txt', status: 'modified', after: 'older ingest\n' }],
+    };
+    const fetchSpy = spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(snapshot), { status: 200 })
+    );
+    try {
+      await fs.mkdir(directory);
+      await fs.mkdir(bin);
+      expect(Bun.spawnSync(['git', 'init', directory]).exitCode).toBe(0);
+      await fs.writeFile(path.join(directory, 'lost.txt'), 'base\n');
+      await fs.writeFile(
+        path.join(bin, 'kilo'),
+        `#!/bin/sh\ncp "$2" "${path.join(root, 'imported.json')}"\n`,
+        {
+          mode: 0o755,
+        }
+      );
+      const harness = createHarness(FAST_TIMERS);
+      harness.setSessionExists(false);
+      harness.setRestore(async () =>
+        restoreSession(routeSpec().kiloSessionId, directory, undefined, {
+          restoreFiles: harness.restoreOptions()[0]?.restoreFiles !== false,
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH}`,
+            KILO_RUNTIME_CLI_PATH: path.join(bin, 'kilo'),
+            KILO_SESSION_INGEST_URL: 'https://ingest.test',
+            KILOCODE_TOKEN: 'test-token',
+          },
+        })
+      );
+      await harness.manager.prepare(
+        routeSpec({
+          directory,
+          git: { url: 'https://github.com/acme/repo.git' },
+        })
+      );
+      expect(harness.restoreOptions()[0]?.restoreFiles).toBe(true);
+      expect(await fs.readFile(path.join(directory, 'lost.txt'), 'utf8')).toBe('older ingest\n');
+      expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+    } finally {
+      fetchSpy.mockRestore();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('does not fail preparation when local recovery fails', async () => {
+    const harness = createHarness(FAST_TIMERS, {
+      recoverWorktree: async () => {
+        throw new Error('conflicting patch');
+      },
+    });
+    harness.setSessionExists(false);
+    await harness.manager.prepare(
+      routeSpec({ git: { url: 'https://github.com/acme/repo.git' }, worktreeRecovery: recovery })
+    );
+    expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+    expect(harness.logs.some(line => line.includes('failed; continuing'))).toBe(true);
+    expect(harness.restoreOptions()[0]?.restoreFiles).toBe(true);
+  });
+
+  it('reports skipped files without failing session readiness', async () => {
+    const skippedDiffs = Array.from({ length: 20 }, (_, index) => ({
+      file: `src/some/deeply/nested/lost-${index}.txt`,
+      reason: 'patch_apply_failed' as const,
+    }));
+    const harness = createHarness(FAST_TIMERS, {
+      recoverWorktree: async () => ({
+        applied: 0,
+        skipped: skippedDiffs.length,
+        total: skippedDiffs.length,
+        skippedDiffs,
+      }),
+    });
+    harness.setSessionExists(false);
+    await harness.manager.prepare(
+      routeSpec({ git: { url: 'https://github.com/acme/repo.git' }, worktreeRecovery: recovery })
+    );
+    expect(
+      harness.logs.some(line => line.includes('restore incomplete') && line.includes('lost-0.txt'))
+    ).toBe(true);
+    const detail = harness.frames.find(
+      frame => frame.type === 'session.progress' && frame.detail?.includes('incomplete')
+    );
+    expect(detail).toBeDefined();
+    expect(controlPlaneWrapperFrameSchema.safeParse(detail).success).toBe(true);
+    expect(harness.restoreOptions()[0]?.restoreFiles).toBe(true);
+    expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+    expect(harness.frames.some(frame => frame.type === 'session.failed')).toBe(false);
+  });
+
+  it('keeps two repeated unstamped crashes unstamped before the fallback import', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-deferred-crash-'));
+    const directory = path.join(root, 'workspace');
+    const bin = path.join(root, 'bin');
+    const imported = path.join(root, 'imported.json');
+    const snapshot = {
+      info: { id: routeSpec().kiloSessionId, version: '2' },
+      messages: [],
+      sessionDiff: [
+        { file: 'tracked.txt', status: 'modified', after: 'older tracked\n' },
+        { file: 'added.txt', status: 'added', after: 'older added\n' },
+      ],
+    };
+    const fetchSpy = spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify(snapshot), { status: 200 })
+    );
+    try {
+      await fs.mkdir(directory);
+      await fs.mkdir(bin);
+      expect(Bun.spawnSync(['git', 'init', directory]).exitCode).toBe(0);
+      await fs.writeFile(path.join(directory, 'tracked.txt'), 'local base\n');
+      await fs.writeFile(path.join(bin, 'kilo'), `#!/bin/sh\ncp "$2" "${imported}"\n`, {
+        mode: 0o755,
+      });
+      const harness = createHarness(FAST_TIMERS, {
+        recoverWorktree: async () => {
+          throw new Error('conflicting patch');
+        },
+      });
+      harness.setSessionExists(false);
+      // First and second prepares crash before the deferred import returns.
+      harness.setRestore(async () => {
+        throw new Error('import failed');
+      });
+      const crashed = routeSpec({
+        directory,
+        git: { url: 'https://github.com/acme/repo.git' },
+        worktreeRecovery: recovery,
+      });
+      await harness.manager.prepare(crashed);
+      expect(harness.stamp()).toBeNull();
+      await harness.manager.prepare(crashed);
+      expect(harness.stamp()).toBeNull();
+      // The third prepare imports the older tracked and added bytes, then stamps.
+      harness.setRestore(async () =>
+        restoreSession(routeSpec().kiloSessionId, directory, undefined, {
+          restoreFiles: harness.restoreOptions().at(-1)?.restoreFiles !== false,
+          env: {
+            ...process.env,
+            PATH: `${bin}:${process.env.PATH}`,
+            KILO_RUNTIME_CLI_PATH: path.join(bin, 'kilo'),
+            KILO_SESSION_INGEST_URL: 'https://ingest.test',
+            KILOCODE_TOKEN: 'test-token',
+          },
+        })
+      );
+      await harness.manager.prepare(crashed);
+      expect(harness.restoreOptions().at(-1)?.restoreFiles).toBe(true);
+      expect(await fs.readFile(path.join(directory, 'tracked.txt'), 'utf8')).toBe(
+        'older tracked\n'
+      );
+      expect(await fs.readFile(path.join(directory, 'added.txt'), 'utf8')).toBe('older added\n');
+      expect(harness.stamp()).not.toBeNull();
+      expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+    } finally {
+      fetchSpy.mockRestore();
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it.each(['throw', 'zero-applied'])(
+    'leaves no current-allocation stamp before the deferred import for %s',
+    async kind => {
+      const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-deferred-gate-'));
+      const directory = path.join(root, 'workspace');
+      const bin = path.join(root, 'bin');
+      const snapshot = {
+        info: { id: routeSpec().kiloSessionId, version: '2' },
+        messages: [],
+        sessionDiff: [
+          { file: 'tracked.txt', status: 'modified', after: 'older tracked\n' },
+          { file: 'added.txt', status: 'added', after: 'older added\n' },
+        ],
+      };
+      const fetchSpy = spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(JSON.stringify(snapshot), { status: 200 })
+      );
+      let releaseImport: () => void = () => undefined;
+      const importGate = new Promise<void>(resolve => {
+        releaseImport = resolve;
+      });
+      try {
+        await fs.mkdir(directory);
+        await fs.mkdir(bin);
+        expect(Bun.spawnSync(['git', 'init', directory]).exitCode).toBe(0);
+        await fs.writeFile(path.join(directory, 'tracked.txt'), 'local base\n');
+        await fs.writeFile(path.join(bin, 'kilo'), `#!/bin/sh\ncp "$2" "${root}/imported.json"\n`, {
+          mode: 0o755,
+        });
+        const harness = createHarness(FAST_TIMERS, {
+          recoverWorktree:
+            kind === 'throw'
+              ? async () => {
+                  throw new Error('conflicting patch');
+                }
+              : async () => ({
+                  applied: 0,
+                  total: 1,
+                  skipped: 1,
+                  skippedDiffs: [{ file: 'lost.txt', reason: 'patch_apply_failed' as const }],
+                }),
+          beforeEnsure: async () => {
+            await importGate;
+          },
+        });
+        harness.setSessionExists(false);
+        harness.setRestore(async () =>
+          restoreSession(routeSpec().kiloSessionId, directory, undefined, {
+            restoreFiles: harness.restoreOptions().at(-1)?.restoreFiles !== false,
+            env: {
+              ...process.env,
+              PATH: `${bin}:${process.env.PATH}`,
+              KILO_RUNTIME_CLI_PATH: path.join(bin, 'kilo'),
+              KILO_SESSION_INGEST_URL: 'https://ingest.test',
+              KILOCODE_TOKEN: 'test-token',
+            },
+          })
+        );
+        const run = harness.manager.prepare(
+          routeSpec({
+            directory,
+            git: { url: 'https://github.com/acme/repo.git' },
+            worktreeRecovery: recovery,
+          })
+        );
+        for (let attempt = 0; attempt < 200 && harness.ensureCalls() === 0; attempt += 1) {
+          await new Promise(resolve => setTimeout(resolve, 5));
+        }
+        expect(harness.ensureCalls()).toBeGreaterThan(0);
+        // Held inside the deferred import: the current-allocation stamp is absent.
+        expect(harness.stamp()).toBeNull();
+        releaseImport();
+        await run;
+        expect(await fs.readFile(path.join(directory, 'tracked.txt'), 'utf8')).toBe(
+          'older tracked\n'
+        );
+        expect(await fs.readFile(path.join(directory, 'added.txt'), 'utf8')).toBe('older added\n');
+        expect(harness.stamp()).not.toBeNull();
+      } finally {
+        fetchSpy.mockRestore();
+        await fs.rm(root, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it('keeps a sibling from adopting or emptying the directory during a held deferred import', async () => {
+    let releaseImport: () => void = () => undefined;
+    const importGate = new Promise<void>(resolve => {
+      releaseImport = resolve;
+    });
+    let importStarted = false;
+    const harness = createHarness(FAST_TIMERS, {
+      recoverWorktree: async () => ({
+        applied: 0,
+        total: 1,
+        skipped: 1,
+        skippedDiffs: [{ file: 'lost.txt', reason: 'patch_apply_failed' as const }],
+      }),
+    });
+    harness.setSessionExists(false);
+    harness.setRestore(async () => {
+      importStarted = true;
+      await importGate;
+      return {
+        ok: true,
+        downloaded: true,
+        imported: true,
+        diffs: { applied: 1, skipped: 0, total: 1 },
+      };
+    });
+    const directory = '/tmp/prepare-sibling';
+    const spec = (sessionId: string) =>
+      routeSpec({
+        sessionId,
+        directory,
+        git: { url: 'https://github.com/acme/repo.git' },
+        worktreeRecovery: recovery,
+      });
+    const first = harness.manager.prepare(spec('ses_first_sibling'));
+    for (let attempt = 0; attempt < 200 && !importStarted; attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 5));
+    }
+    expect(importStarted).toBe(true);
+    const ensureDuringHold = harness.ensureCalls();
+    const restoreDuringHold = harness.restoreCalls();
+    const second = harness.manager.prepare(spec('ses_second_sibling'));
+    await new Promise(resolve => setTimeout(resolve, 20));
+    // The sibling is queued behind the held lock: no adoption, no emptying, and
+    // no second import started.
+    expect(harness.emptyCalls).toHaveLength(0);
+    expect(harness.ensureCalls()).toBe(ensureDuringHold);
+    expect(harness.restoreCalls()).toBe(restoreDuringHold);
+    releaseImport();
+    await Promise.all([first, second]);
+    // After the first prepare stamps, the sibling sees the same allocation.
+    expect(harness.logs.some(line => line.includes('inspection=same'))).toBe(true);
+  });
+
+  it('releases a deferred per-session runtime when released during the deferred import', async () => {
+    let releasePreparation: () => void = () => undefined;
+    const gate = new Promise<void>(resolve => {
+      releasePreparation = resolve;
+    });
+    const harness = createHarness(FAST_TIMERS, {
+      recoverWorktree: async () => {
+        throw new Error('conflicting patch');
+      },
+      beforeEnsure: async () => {
+        await gate;
+      },
+    });
+    harness.setSessionExists(false);
+    harness.setRestore(async () => ({
+      ok: true,
+      downloaded: true,
+      imported: true,
+      diffs: { applied: 1, skipped: 0, total: 1 },
+    }));
+    const sessionId = 'ses_00000000000000000000000000';
+    const run = harness.manager.prepare(
+      routeSpec({
+        sessionId,
+        directory: '/tmp/prepare-deferred-release',
+        git: { url: 'https://github.com/acme/repo.git' },
+        runtimeIsolation: 'per-session',
+        worktreeRecovery: recovery,
+      })
+    );
+    for (let attempt = 0; attempt < 200 && harness.ensureCalls() === 0; attempt += 1) {
+      await new Promise(resolve => setTimeout(resolve, 5));
+    }
+    expect(harness.ensureCalls()).toBeGreaterThan(0);
+    // Stop/supersede while the deferred import holds the lock.
+    harness.manager.release(sessionId);
+    releasePreparation();
+    await run;
+    expect(harness.stamp()).toBeNull();
+    expect(harness.releaseCalls).toHaveLength(1);
+    expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(false);
+  });
+});
 
 function timers(overrides: Partial<ControlPlaneTimers['wrapper']> = {}): ControlPlaneTimers {
   return {
@@ -61,9 +612,21 @@ type Harness = {
   authorCalls: Array<{ name: string; email: string } | undefined>;
   ensureCalls: () => number;
   ensureInputs: EnsureInput[];
-  installCalls: Array<{ key: string; env: Record<string, string> }>;
+  installCalls: Array<{
+    key: string;
+    env: Record<string, string>;
+    cloudAgentMcp?: ControlPlaneSessionCredentialsPayload['cloudAgentMcp'];
+  }>;
   releaseCalls: string[];
   removeCalls: string[];
+  abortCalls: string[];
+  stopProcessCalls: string[];
+  childrenCalls: string[];
+  setChildren: (sessionId: string, children: Array<{ id: string; directory: string }>) => void;
+  setChildrenHung: (sessionId: string) => void;
+  setAbortHung: (sessionId: string) => void;
+  setCleanupFailure: (value: boolean) => void;
+  setEnsureSessionError: (value: unknown) => void;
   ensureSessionCalls: () => number;
   cloneParallelism: () => number;
   setClone: (value: ExecResult | (() => Promise<ExecResult>)) => void;
@@ -79,19 +642,34 @@ type Harness = {
   setEnsureError: (value: unknown) => void;
   setEnsureHung: (value: boolean) => void;
   setUnavailable: (key: string, value: boolean) => void;
-  setBootstrapMarker: (value: boolean) => void;
+  setStamp: (value: WorkspaceStamp | null) => void;
+  stamp: () => WorkspaceStamp | null;
+  setHasGit: (value: boolean) => void;
+  emptyCalls: string[];
   setSetupResult: (value: ExecResult) => void;
   setSetupOutput: (
     value: (onOutput: (stream: ProcessOutputStream, output: string) => void) => void
   ) => void;
 };
 
+/** Both home roots under one test directory, as the wrapper keeps them apart in production. */
+function homeRootsFor(root: string) {
+  return { directory: path.join(root, 'home'), legacy: path.join(root, 'kilo-worktrees') };
+}
+
 function createHarness(
   activeTimers: ControlPlaneTimers = FAST_TIMERS,
   options: {
     hasGit?: boolean;
     beforeEnsure?: () => Promise<void>;
+    homeRoot?: string;
     beforeInstall?: () => Promise<void>;
+    recoverWorktree?: typeof restoreWorktreeRecovery;
+    beforeWorkspace?: () => Promise<void>;
+    releaseCleanupDeadlineMs?: number;
+    runtimes?: PrepareRuntimePort;
+    runSkillInstall?: typeof processUtils.runProcess;
+    spawnSetup?: ProcessSpawn;
   } = {}
 ): Harness {
   const frames: ControlPlaneWrapperFrame[] = [];
@@ -100,9 +678,17 @@ function createHarness(
   const gitCalls: string[][] = [];
   const authorCalls: Array<{ name: string; email: string } | undefined> = [];
   const ensureInputs: EnsureInput[] = [];
-  const installCalls: Array<{ key: string; env: Record<string, string> }> = [];
+  const installCalls: Harness['installCalls'] = [];
   const releaseCalls: string[] = [];
   const removeCalls: string[] = [];
+  const abortCalls: string[] = [];
+  const stopProcessCalls: string[] = [];
+  const childrenCalls: string[] = [];
+  const childrenBySession = new Map<string, Array<{ id: string; directory: string }>>();
+  const childrenHung = new Set<string>();
+  const abortHung = new Set<string>();
+  let cleanupFailure = false;
+  let ensureSessionError: unknown;
   let clone: ExecResult | (() => Promise<ExecResult>) = result(0);
   let customGit:
     | ((args: string[], options?: ProcessOptions) => ExecResult | Promise<ExecResult>)
@@ -125,12 +711,15 @@ function createHarness(
   let setupOutput:
     | ((onOutput: (stream: ProcessOutputStream, output: string) => void) => void)
     | undefined;
-  let bootstrapMarker = false;
+  let stamp: WorkspaceStamp | null = null;
+  let hasGitState = options.hasGit ?? false;
+  const emptyCalls: string[] = [];
   const unavailableKeys = new Set<string>();
   let activeClones = 0;
   let maxActiveClones = 0;
+  let currentClient: WrapperKiloClient | undefined;
 
-  const runtimes: PrepareRuntimePort = {
+  const defaultRuntimes: PrepareRuntimePort = {
     ensure: async input => {
       ensureCalls += 1;
       ensureInputs.push({ key: input.key, directory: input.directory, env: input.env });
@@ -138,18 +727,68 @@ function createHarness(
       if (ensureHung) return new Promise<WrapperKiloClient>(() => undefined);
       if (ensureError !== undefined) throw ensureError;
       if (ensureRejects) throw new Error('kilo server failed to start');
-      return {
+      const client = {
         serverUrl: 'http://127.0.0.1:1',
         ensureSession: async () => {
           ensureSessionCalls += 1;
+          if (ensureSessionError !== undefined) throw ensureSessionError;
+        },
+        abortSessionForCleanup: async (opts: {
+          sessionId: string;
+          directory: string;
+          signal?: AbortSignal;
+        }) => {
+          abortCalls.push(opts.sessionId);
+          if (cleanupFailure) throw new Error('abort failed');
+          if (abortHung.has(opts.sessionId)) {
+            await new Promise<void>((_resolve, reject) => {
+              opts.signal?.addEventListener('abort', () => reject(new Error('aborted')), {
+                once: true,
+              });
+            });
+          }
+        },
+        abortSession: async (opts: {
+          sessionId: string;
+          directory?: string;
+          signal?: AbortSignal;
+        }) => {
+          abortCalls.push(opts.sessionId);
+          if (cleanupFailure) throw new Error('abort failed');
+          return true;
+        },
+        children: async (opts: { sessionId: string; directory: string; signal?: AbortSignal }) => {
+          childrenCalls.push(opts.sessionId);
+          if (childrenHung.has(opts.sessionId)) {
+            return await new Promise<Array<{ id: string; directory: string }>>(
+              (_resolve, reject) => {
+                opts.signal?.addEventListener('abort', () => reject(new Error('aborted')), {
+                  once: true,
+                });
+              }
+            );
+          }
+          if (cleanupFailure) throw new Error('children failed');
+          return childrenBySession.get(opts.sessionId) ?? [];
+        },
+        stopSessionProcesses: async (opts: {
+          sessionId: string;
+          directory: string;
+          signal?: AbortSignal;
+        }) => {
+          stopProcessCalls.push(opts.sessionId);
+          if (cleanupFailure) throw new Error('stop failed');
         },
       } as unknown as WrapperKiloClient;
+      currentClient = client;
+      return client;
     },
-    installCredentials: async (key, env) => {
-      installCalls.push({ key, env });
+    installCredentials: async (key, env, cloudAgentMcp) => {
+      installCalls.push({ key, env, cloudAgentMcp });
       await options.beforeInstall?.();
     },
     isUnavailable: key => unavailableKeys.has(key),
+    getLiveClient: () => currentClient,
     remove: key => {
       removeCalls.push(key);
     },
@@ -157,6 +796,7 @@ function createHarness(
       releaseCalls.push(key);
     },
   };
+  const runtimes = options.runtimes ?? defaultRuntimes;
 
   const manager = createPreparationManager({
     timers: activeTimers,
@@ -164,12 +804,23 @@ function createHarness(
     log: message => logs.push(message),
     onNativeDiagnostic: (event, fields) => nativeDiagnostics.push({ event, fields }),
     runtimes,
+    runSkillInstall: options.runSkillInstall,
+    spawnSetup: options.spawnSetup,
     inheritedEnv: {},
-    homeRoot: '/tmp/prepare-test-homes',
-    hasGit: async () => options.hasGit ?? false,
-    hasBootstrapMarker: async () => bootstrapMarker,
-    writeBootstrapMarker: async () => {
-      bootstrapMarker = true;
+    homeRoots: homeRootsFor(options.homeRoot ?? '/tmp/prepare-test-homes'),
+    allocationId: 'alloc-current',
+    ...(options.releaseCleanupDeadlineMs === undefined
+      ? {}
+      : { releaseCleanupDeadlineMs: options.releaseCleanupDeadlineMs }),
+    hasGit: async () => hasGitState,
+    readStamp: async () => stamp,
+    writeStamp: async (_directory, value) => {
+      stamp = value;
+    },
+    emptyDirectory: async directory => {
+      emptyCalls.push(directory);
+      hasGitState = false;
+      stamp = null;
     },
     mkdir: async () => undefined,
     configureGitAuthor: async (_directory, _runGit, author) => {
@@ -179,6 +830,7 @@ function createHarness(
       gitCalls.push(args);
       if (customGit) return customGit(args, options);
       if (args[0] === 'clone') {
+        hasGitState = true;
         activeClones += 1;
         maxActiveClones = Math.max(maxActiveClones, activeClones);
         try {
@@ -190,6 +842,7 @@ function createHarness(
       return result(0);
     },
     runSetup: async (_command, _directory, _env, onOutput) => {
+      await options.beforeWorkspace?.();
       setupOutput?.(onOutput ?? (() => undefined));
       return setupResult;
     },
@@ -198,6 +851,7 @@ function createHarness(
       return restore();
     }) as never,
     seedRegistration: async () => undefined,
+    recoverWorktree: options.recoverWorktree,
     sessionExists: async () => {
       if (sessionExistsHung) return new Promise<boolean>(() => undefined);
       return sessionExists;
@@ -217,6 +871,24 @@ function createHarness(
     installCalls,
     releaseCalls,
     removeCalls,
+    abortCalls,
+    stopProcessCalls,
+    childrenCalls,
+    setChildren: (sessionId, children) => {
+      childrenBySession.set(sessionId, children);
+    },
+    setChildrenHung: sessionId => {
+      childrenHung.add(sessionId);
+    },
+    setAbortHung: sessionId => {
+      abortHung.add(sessionId);
+    },
+    setCleanupFailure: value => {
+      cleanupFailure = value;
+    },
+    setEnsureSessionError: value => {
+      ensureSessionError = value;
+    },
     ensureSessionCalls: () => ensureSessionCalls,
     cloneParallelism: () => maxActiveClones,
     setClone: value => {
@@ -250,9 +922,14 @@ function createHarness(
       if (value) unavailableKeys.add(key);
       else unavailableKeys.delete(key);
     },
-    setBootstrapMarker: value => {
-      bootstrapMarker = value;
+    setStamp: value => {
+      stamp = value;
     },
+    stamp: () => stamp,
+    setHasGit: value => {
+      hasGitState = value;
+    },
+    emptyCalls,
     setSetupResult: value => {
       setupResult = value;
     },
@@ -275,6 +952,96 @@ function lastFrame(frames: ControlPlaneWrapperFrame[]): ControlPlaneWrapperFrame
   return frames.at(-1);
 }
 
+async function waitFor(predicate: () => boolean, timeoutMs = 2_000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate()) {
+    if (Date.now() > deadline) throw new Error('waitFor timed out');
+    await new Promise(resolve => setTimeout(resolve, 5));
+  }
+}
+
+/** A locally-decodable runtime-credential-proxy handle, matching the Worker JWT shape. */
+function proxyHandle(expSeconds: number, extra: Record<string, unknown> = {}): string {
+  const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'JWT' })).toString('base64url');
+  const payload = Buffer.from(
+    JSON.stringify({
+      aud: 'cloud-agent-next:runtime-credential-proxy',
+      exp: expSeconds,
+      iat: expSeconds - 3_600,
+      ...extra,
+    })
+  ).toString('base64url');
+  return `${header}.${payload}.test-signature`;
+}
+
+function credentialsFor(
+  spec: ControlPlaneRouteSpec,
+  handle: string
+): ControlPlaneSessionCredentialsPayload {
+  return {
+    sessionId: spec.sessionId,
+    kilo: { token: spec.kilo?.token ?? 'alias' },
+    proxy: { handle, targets: specTargets(spec) },
+  };
+}
+
+function specTargets(
+  spec: ControlPlaneRouteSpec
+): NonNullable<ControlPlaneRouteSpec['kilo']>['targets'] {
+  const targets = spec.kilo?.targets;
+  if (!targets) throw new Error('route spec is missing kilo targets');
+  return targets;
+}
+
+const EXP_NOW = Math.floor(NOW / 1_000) + 3_600;
+
+/**
+ * A real `createKiloRuntimes` registry with an injected fake runtime, so prepare
+ * tests observe key reuse and the pre-`ensure` class guard without spawning.
+ */
+function createRegistryRuntimes(): {
+  port: PrepareRuntimePort;
+  registry: ReturnType<typeof createKiloRuntimes>;
+  created: () => number;
+} {
+  let created = 0;
+  const registry = createKiloRuntimes({
+    timers: FAST_TIMERS,
+    pidfileDirectory: '/tmp/prepare-registry-pids',
+    createRuntime: options => {
+      created += 1;
+      let env = options.env;
+      return {
+        directory: options.directory,
+        get env() {
+          return env;
+        },
+        client: {} as WrapperKiloClient,
+        ensure: async () => ({}) as WrapperKiloClient,
+        installCredentials: async (next: Record<string, string>) => {
+          env = next;
+        },
+        applyPendingCredentials: async () => false,
+        isSuspected: () => false,
+        isRestarting: () => false,
+        isUnavailable: () => false,
+        shutdown: async () => undefined,
+      } as unknown as KiloRuntime;
+    },
+  });
+  const port: PrepareRuntimePort = {
+    ensure: input => registry.ensure(input),
+    installCredentials: async (key, env) => {
+      await registry.get(key)?.installCredentials(env);
+    },
+    isUnavailable: key => registry.get(key)?.isUnavailable() ?? false,
+    getLiveClient: key => liveRuntimeClient(registry.get(key)),
+    remove: key => registry.remove(key),
+    release: key => registry.remove(key),
+  };
+  return { port, registry, created: () => created };
+}
+
 describe('createPreparationManager', () => {
   it('starts a fresh preparation requested before the released owner finishes', async () => {
     const entered = Promise.withResolvers<void>();
@@ -293,7 +1060,9 @@ describe('createPreparationManager', () => {
     resume.resolve();
     await Promise.all([running, next]);
     expect(harness.ensureCalls()).toBe(2);
-    expect(harness.releaseCalls).toEqual([spec.sessionId]);
+    // The re-prepare superseded the release, so the runtime is kept for the
+    // fresh route instead of being torn down.
+    expect(harness.releaseCalls).toEqual([]);
     expect(harness.manager.isPrepared(spec.sessionId)).toBe(true);
     expect(harness.frames.filter(frame => frame.type === 'session.ready')).toEqual([
       { type: 'session.ready', sessionId: spec.sessionId },
@@ -323,7 +1092,7 @@ describe('createPreparationManager', () => {
     expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(false);
   });
 
-  it('invalidates an in-flight runtime preparation without releasing a shared sibling runtime', async () => {
+  it('releases the key of an in-flight preparation invalidated by release', async () => {
     for (const runtimeIsolation of ['per-session', undefined] as const) {
       const entered = Promise.withResolvers<void>();
       const resume = Promise.withResolvers<void>();
@@ -345,9 +1114,9 @@ describe('createPreparationManager', () => {
           frame => frame.type === 'session.ready' || frame.type === 'session.failed'
         )
       ).toBe(false);
-      expect(harness.releaseCalls).toEqual(
-        runtimeIsolation === 'per-session' ? [spec.sessionId] : []
-      );
+      expect(harness.releaseCalls).toEqual([
+        runtimeIsolation === 'per-session' ? spec.sessionId : spec.directory,
+      ]);
       expect(harness.removeCalls).toEqual([]);
       await harness.manager.prepare(spec);
       expect(harness.manager.isPrepared(spec.sessionId)).toBe(true);
@@ -388,10 +1157,10 @@ describe('createPreparationManager', () => {
     expect(setupOutput).toBeDefined();
   });
 
-  it('fails a per-session route without retrying when the warm runtime MCP config drifted', async () => {
+  it('fails a shared-runtime route without retrying when the warm runtime MCP config drifted', async () => {
     const harness = createHarness();
     harness.setEnsureError(new KiloWorktreeMcpMismatchError());
-    const spec = routeSpec({ runtimeIsolation: 'per-session' });
+    const spec = routeSpec();
 
     await harness.manager.prepare(spec);
 
@@ -399,6 +1168,18 @@ describe('createPreparationManager', () => {
     expect(harness.manager.isPrepared(spec.sessionId)).toBe(false);
     const failed = harness.frames.find(frame => frame.type === 'session.failed');
     expect(failed).toBeDefined();
+  });
+
+  it('fails a shared-runtime route without retrying on a credential-class mismatch', async () => {
+    const harness = createHarness();
+    harness.setEnsureError(new KiloWorktreeCredentialClassMismatchError());
+    const spec = routeSpec();
+
+    await harness.manager.prepare(spec);
+
+    expect(harness.ensureCalls()).toBe(1);
+    expect(harness.manager.isPrepared(spec.sessionId)).toBe(false);
+    expect(harness.frames.find(frame => frame.type === 'session.failed')).toBeDefined();
   });
 
   it('suppresses failed and runtime retries after release during a rejected startup', async () => {
@@ -488,7 +1269,11 @@ describe('createPreparationManager', () => {
       'kilo_runtime',
       'kilo_session',
     ]);
-    expect(lastFrame(harness.frames)).toEqual({ type: 'session.ready', sessionId: spec.sessionId });
+    expect(lastFrame(harness.frames)).toEqual({
+      type: 'session.ready',
+      sessionId: spec.sessionId,
+      workspace: 'cloned',
+    });
     expect(harness.gitCalls.some(args => args[0] === 'clone')).toBe(true);
     expect(harness.gitCalls.some(args => args[0] === 'checkout')).toBe(true);
     expect(harness.manager.isPrepared(spec.sessionId)).toBe(true);
@@ -496,7 +1281,11 @@ describe('createPreparationManager', () => {
     const before = harness.frames.length;
     await harness.manager.prepare(spec);
     expect(harness.frames.length).toBe(before + 1);
-    expect(lastFrame(harness.frames)).toEqual({ type: 'session.ready', sessionId: spec.sessionId });
+    expect(lastFrame(harness.frames)).toEqual({
+      type: 'session.ready',
+      sessionId: spec.sessionId,
+      workspace: 'same',
+    });
     expect(harness.ensureCalls()).toBe(1);
   });
 
@@ -514,15 +1303,242 @@ describe('createPreparationManager', () => {
     const frame = controlPlaneWrapperFrameSchema.parse({ type: 'session.prepare', spec });
     if (frame.type !== 'session.prepare') throw new Error('Wrong frame type');
     await harness.manager.prepare(frame.spec);
-    expect(lastFrame(harness.frames)).toEqual({ type: 'session.ready', sessionId: spec.sessionId });
     expect(harness.gitCalls).toContainEqual([
       'clone',
       '--progress',
       expect.any(String),
       spec.directory,
     ]);
+    expect(lastFrame(harness.frames)).toEqual({
+      type: 'session.ready',
+      sessionId: spec.sessionId,
+      workspace: 'cloned',
+    });
     expect(harness.gitCalls.some(args => args[0] === 'checkout')).toBe(true);
     expect(harness.authorCalls).toEqual([author]);
+  });
+
+  describe('Code Review clones', () => {
+    it.each(['github', 'gitlab'] as const)(
+      'uses a blobless clone and checks out the synthetic %s review ref directly',
+      async platform => {
+        const harness = createHarness();
+        const branch = platform === 'github' ? 'refs/pull/12/head' : 'refs/merge-requests/12/head';
+        const spec = routeSpec({
+          createdOnPlatform: 'code-review',
+          git: { url: `https://${platform}.com/acme/repo.git`, platform },
+          branch,
+        });
+        harness.setGit(args =>
+          args[0] === 'config' ? { ...result(0), stdout: 'true\n' } : result(0)
+        );
+
+        await harness.manager.prepare(spec);
+
+        expect(harness.gitCalls[0]).toEqual([
+          'clone',
+          '--progress',
+          '--filter=blob:none',
+          '--no-checkout',
+          `https://${platform}.com/acme/repo.git`,
+          spec.directory,
+        ]);
+        expect(harness.gitCalls).toContainEqual(['config', '--get', 'remote.origin.promisor']);
+        expect(harness.gitCalls).toContainEqual(['fetch', '--progress', 'origin', branch]);
+        expect(harness.gitCalls.filter(args => args[0] === 'checkout')).toEqual([
+          ['checkout', '--progress', '-B', branch, 'FETCH_HEAD'],
+        ]);
+        expect(harness.logs.some(line => line.includes('mode=blobless attempts=1'))).toBe(true);
+        expect(lastFrame(harness.frames)?.type).toBe('session.ready');
+      }
+    );
+
+    it.each([
+      ['code-review', 'bitbucket', 'plain-token', false],
+      ['code-review', 'bitbucket', undefined, false],
+      ['code-review', 'bitbucket', 'kbb1.capability', true],
+      ['code-review', 'bitbucket', `kcp1.c2FuZGJveA.bitbucket.${'ab12'.repeat(16)}`, true],
+      ['code-review', 'bitbucket', `kcp1.c2FuZGJveA.github.${'ab12'.repeat(16)}`, false],
+      ['code-review', undefined, 'token', false],
+      ['cloud-agent', 'github', 'token', false],
+      [undefined, 'github', 'token', false],
+    ] as const)(
+      'gates blobless clone for origin=%s platform=%s token=%s',
+      async (createdOnPlatform, platform, token, blobless) => {
+        const harness = createHarness();
+        await harness.manager.prepare(
+          routeSpec({
+            createdOnPlatform,
+            git: { url: 'https://example.com/acme/repo.git', platform, token },
+          })
+        );
+
+        const clone = harness.gitCalls.find(args => args[0] === 'clone');
+        expect(clone?.includes('--filter=blob:none')).toBe(blobless);
+        expect(clone).not.toContain('--no-checkout');
+        expect(clone).not.toContain('--depth');
+        expect(clone).not.toContain('--single-branch');
+        expect(lastFrame(harness.frames)?.type).toBe('session.ready');
+      }
+    );
+
+    it('keeps non-review synthetic-ref clones unchanged', async () => {
+      const harness = createHarness();
+      const spec = routeSpec({
+        git: { url: 'https://github.com/acme/repo.git', platform: 'github' },
+        branch: 'refs/pull/12/head',
+      });
+      await harness.manager.prepare(spec);
+      expect(harness.gitCalls[0]).toEqual([
+        'clone',
+        '--progress',
+        'https://github.com/acme/repo.git',
+        spec.directory,
+      ]);
+    });
+
+    it('retries a rejected filter once without it', async () => {
+      const harness = createHarness();
+      const spec = routeSpec({
+        createdOnPlatform: 'code-review',
+        git: { url: 'https://github.com/acme/repo.git', platform: 'github' },
+        branch: 'refs/pull/12/head',
+      });
+      let clones = 0;
+      harness.setGit(args => {
+        if (args[0] !== 'clone') return result(0);
+        clones++;
+        if (clones === 1) return result(128, 'fatal: server does not support filter');
+        expect(harness.emptyCalls).toEqual([]);
+        return result(0);
+      });
+
+      await harness.manager.prepare(spec);
+
+      const cloneCalls = harness.gitCalls.filter(args => args[0] === 'clone');
+      expect(cloneCalls).toHaveLength(2);
+      expect(cloneCalls[0]).toContain('--filter=blob:none');
+      expect(cloneCalls[1]).not.toContain('--filter=blob:none');
+      expect(cloneCalls[1]).toContain('--no-checkout');
+      expect(harness.gitCalls).not.toContainEqual(['config', '--get', 'remote.origin.promisor']);
+      expect(harness.logs.some(line => line.includes('mode=blobless_fallback attempts=2'))).toBe(
+        true
+      );
+      expect(lastFrame(harness.frames)?.type).toBe('session.ready');
+    });
+
+    it('does not repeat the filter fallback when the full clone also rejects it', async () => {
+      const harness = createHarness();
+      harness.setClone(result(128, 'fatal: server does not support filter'));
+      await harness.manager.prepare(
+        routeSpec({
+          createdOnPlatform: 'code-review',
+          git: { url: 'https://github.com/acme/repo.git', platform: 'github' },
+        })
+      );
+      expect(harness.gitCalls.filter(args => args[0] === 'clone')).toHaveLength(2);
+      expect(lastFrame(harness.frames)?.type).toBe('session.failed');
+    });
+
+    it('keeps the full-clone fallback on later network retries', async () => {
+      const harness = createHarness();
+      let clones = 0;
+      harness.setGit(args => {
+        if (args[0] !== 'clone') return result(0);
+        clones++;
+        if (clones === 1) return result(128, 'fatal: server does not support filter');
+        if (clones === 2) return result(128, 'fatal: unable to access: Connection reset by peer');
+        return result(0);
+      });
+      await harness.manager.prepare(
+        routeSpec({
+          createdOnPlatform: 'code-review',
+          git: { url: 'https://github.com/acme/repo.git', platform: 'github' },
+        })
+      );
+      const cloneCalls = harness.gitCalls.filter(args => args[0] === 'clone');
+      expect(cloneCalls).toHaveLength(3);
+      expect(cloneCalls[0]).toContain('--filter=blob:none');
+      for (const args of cloneCalls.slice(1)) expect(args).not.toContain('--filter=blob:none');
+      expect(harness.logs.some(line => line.includes('mode=blobless_fallback attempts=3'))).toBe(
+        true
+      );
+      expect(lastFrame(harness.frames)?.type).toBe('session.ready');
+    });
+
+    it('does not restart the clone budget for a filter fallback', async () => {
+      const harness = createHarness(TIMEOUT_TIMERS);
+      let clones = 0;
+      let signal: AbortSignal | undefined;
+      harness.setGit(async (args, options) => {
+        if (args[0] !== 'clone') return result(0);
+        clones++;
+        signal = options?.signal;
+        if (clones === 1) return result(128, 'fatal: server does not support filter');
+        return new Promise<ExecResult>(resolve => {
+          options?.signal?.addEventListener(
+            'abort',
+            () => resolve(result(128, 'filter rejected')),
+            {
+              once: true,
+            }
+          );
+        });
+      });
+      await harness.manager.prepare(
+        routeSpec({
+          createdOnPlatform: 'code-review',
+          git: { url: 'https://github.com/acme/repo.git', platform: 'github' },
+        })
+      );
+      expect(signal?.aborted).toBe(true);
+      expect(clones).toBe(2);
+      expect(lastFrame(harness.frames)).toMatchObject({
+        type: 'session.failed',
+        subtype: 'git_clone_timeout',
+      });
+    });
+
+    it.each([
+      result(
+        128,
+        "fatal: destination path '/workspace/filter-repo' already exists and is not an empty directory."
+      ),
+      { ...result(1, 'filter not supported'), terminationReason: 'hard_timeout' as const },
+    ])(
+      'does not fallback or remove files for an unrelated or terminated failure',
+      async failure => {
+        const harness = createHarness();
+        harness.setClone(failure);
+        await harness.manager.prepare(
+          routeSpec({
+            createdOnPlatform: 'code-review',
+            git: { url: 'https://github.com/acme/repo.git', platform: 'github' },
+          })
+        );
+        expect(harness.gitCalls.filter(args => args[0] === 'clone')).toHaveLength(1);
+        expect(harness.emptyCalls).toEqual([]);
+        expect(lastFrame(harness.frames)?.type).toBe('session.failed');
+      }
+    );
+
+    it.each([
+      result(1),
+      { ...result(0), stdout: 'false\n' },
+      result(0, 'warning: filtering not recognized by server, ignoring'),
+    ])('reports a full clone when promisor is not true', async promisor => {
+      const harness = createHarness();
+      harness.setGit(args => (args[0] === 'config' ? promisor : result(0)));
+      await harness.manager.prepare(
+        routeSpec({
+          createdOnPlatform: 'code-review',
+          git: { url: 'https://github.com/acme/repo.git', platform: 'github' },
+        })
+      );
+      expect(harness.logs.some(line => line.includes('mode=full attempts=1'))).toBe(true);
+      expect(harness.gitCalls.filter(args => args[0] === 'clone')).toHaveLength(1);
+      expect(lastFrame(harness.frames)?.type).toBe('session.ready');
+    });
   });
 
   it('reports live clone progress and clone retries as step details', async () => {
@@ -549,7 +1565,11 @@ describe('createPreparationManager', () => {
       { step: 'clone', detail: 'Cloning repository... Receiving objects: 45%' },
     ]);
     for (const frame of harness.frames) controlPlaneWrapperFrameSchema.parse(frame);
-    expect(lastFrame(harness.frames)).toEqual({ type: 'session.ready', sessionId: spec.sessionId });
+    expect(lastFrame(harness.frames)).toEqual({
+      type: 'session.ready',
+      sessionId: spec.sessionId,
+      workspace: 'cloned',
+    });
   });
 
   it('fails the clone step with the classified git subtype', async () => {
@@ -632,8 +1652,12 @@ describe('createPreparationManager', () => {
 
     await harness.manager.prepare(spec);
 
-    expect(lastFrame(harness.frames)).toEqual({ type: 'session.ready', sessionId: spec.sessionId });
     expect(harness.gitCalls).toContainEqual(['checkout', '--progress', '-b', 'session/scope-1']);
+    expect(lastFrame(harness.frames)).toEqual({
+      type: 'session.ready',
+      sessionId: spec.sessionId,
+      workspace: 'cloned',
+    });
     expect(harness.gitCalls).not.toContainEqual([
       'checkout',
       '--progress',
@@ -827,6 +1851,7 @@ describe('createPreparationManager', () => {
     try {
       const manager = createPreparationManager({
         timers: FAST_TIMERS,
+        allocationId: 'allocation-test',
         emit: () => undefined,
         runtimes: {
           ensure: async () =>
@@ -836,14 +1861,15 @@ describe('createPreparationManager', () => {
             }) as unknown as WrapperKiloClient,
           installCredentials: async () => undefined,
           isUnavailable: () => false,
+          getLiveClient: () => undefined,
           remove: () => undefined,
           release: () => undefined,
         },
         inheritedEnv: {},
-        homeRoot: '/tmp/prepare-test-homes',
+        homeRoots: homeRootsFor('/tmp/prepare-test-homes'),
         hasGit: async () => false,
-        hasBootstrapMarker: async () => false,
-        writeBootstrapMarker: async () => undefined,
+        readStamp: async () => null,
+        writeStamp: async () => undefined,
         mkdir: async () => undefined,
         configureGitAuthor: async () => undefined,
         seedRegistration: async () => undefined,
@@ -853,8 +1879,8 @@ describe('createPreparationManager', () => {
       await manager.prepare(routeSpec({ setupCommands: ['pnpm install'] }));
 
       expect(runProcess).toHaveBeenCalledWith(
-        'sh',
-        ['-c', 'pnpm install'],
+        'bash',
+        ['-e', '-o', 'pipefail', '-c', 'pnpm install'],
         expect.objectContaining({
           inactivityTimeoutMs: 300_000,
           hardTimeoutMs: 480_000,
@@ -1073,24 +2099,50 @@ describe('createPreparationManager', () => {
     ).toBe(true);
   });
 
-  it('gives per-session runtimes distinct HOMEs', async () => {
+  it('keys a worktree runtime HOME by directory alone and keeps per-session homes', async () => {
     const harness = createHarness();
-    const specA = routeSpec({
+    const directory = '/tmp/home-scope-one';
+    const worktree = routeSpec({
       sessionId: 'ses_a',
       kiloSessionId: 'kilo_a',
-      runtimeIsolation: 'per-session',
+      directory,
     });
-    const specB = routeSpec({
+    // A sibling in the same directory with another scope shares the same HOME.
+    const sibling = routeSpec({
       sessionId: 'ses_b',
       kiloSessionId: 'kilo_b',
+      directory,
+      kilo: { ...routeSpec().kilo!, scopeId: 'ses_b' },
+    });
+    // An existing allocation keeps its per-session runtime and HOME.
+    const perSession = routeSpec({
+      sessionId: 'ses_c',
+      kiloSessionId: 'kilo_c',
+      directory: '/tmp/home-per-session',
       runtimeIsolation: 'per-session',
     });
 
-    await harness.manager.prepare(specA);
-    await harness.manager.prepare(specB);
+    await harness.manager.prepare(worktree);
+    await harness.manager.prepare(sibling);
+    await harness.manager.prepare(perSession);
 
-    expect(harness.ensureInputs).toHaveLength(2);
-    expect(harness.ensureInputs[0]!.env.HOME).not.toBe(harness.ensureInputs[1]!.env.HOME);
+    const roots = homeRootsFor('/tmp/prepare-test-homes');
+    expect(harness.ensureInputs[0]!.env.HOME).toBe(directoryHome(directory, roots.directory));
+    expect(harness.ensureInputs[1]!.env.HOME).toBe(directoryHome(directory, roots.directory));
+    expect(harness.ensureInputs[2]!.env.HOME).toBe(
+      path.join(
+        roots.legacy,
+        createHash('sha256')
+          .update('ses_c')
+          .update('\0')
+          .update('/tmp/home-per-session')
+          .digest('hex')
+      )
+    );
+    // The builder computes the same fixed home for the isolated workspace.
+    expect(directoryHome('/workspace/app')).toBe(
+      path.join('/home', createHash('sha256').update('/workspace/app').digest('hex'))
+    );
   });
 
   it('re-prepares a prepared route whose runtime is unavailable', async () => {
@@ -1121,11 +2173,14 @@ describe('createPreparationManager', () => {
     await harness.manager.prepare(spec, credentials);
 
     expect(harness.ensureCalls()).toBe(1);
-    const remote = harness.gitCalls.find(args => args[0] === 'remote');
-    expect(remote?.[3]).toContain('git-2');
+    expect(harness.gitCalls).toEqual([]);
     expect(harness.installCalls).toHaveLength(1);
     expect(harness.installCalls[0]!.env.KILOCODE_TOKEN).toBe('kilo-token-2');
-    expect(lastFrame(harness.frames)).toEqual({ type: 'session.ready', sessionId: spec.sessionId });
+    expect(lastFrame(harness.frames)).toEqual({
+      type: 'session.ready',
+      sessionId: spec.sessionId,
+      workspace: 'same',
+    });
   });
 
   it('installs refreshed Git and Kilo credentials into the running route and runtime', async () => {
@@ -1144,10 +2199,7 @@ describe('createPreparationManager', () => {
     };
     await harness.manager.installCredentials(credentials);
 
-    const remote = harness.gitCalls.find(args => args[0] === 'remote');
-    expect(remote?.[1]).toBe('set-url');
-    expect(remote?.[3]).toContain('git-2');
-    expect(remote?.[3]).not.toContain('git-1');
+    expect(harness.gitCalls).toEqual([]);
     expect(harness.installCalls).toHaveLength(1);
     expect(harness.installCalls[0]!.key).toBe(spec.sessionId);
     expect(harness.installCalls[0]!.env.KILOCODE_TOKEN).toBe('kilo-token-2');
@@ -1157,25 +2209,18 @@ describe('createPreparationManager', () => {
     expect(harness.manager.isPrepared(spec.sessionId)).toBe(false);
   });
 
-  it('records refreshed Kilo environment before awaiting Git credential maintenance', async () => {
+  it('records refreshed Kilo environment before writing the renewed Git record', async () => {
     const harness = createHarness();
     const spec = routeSpec({ git: { url: 'https://github.com/acme/repo.git', token: 'git-1' } });
     await harness.manager.prepare(spec);
-    const gitStarted = Promise.withResolvers<void>();
-    const finishGit = Promise.withResolvers<ExecResult>();
-    harness.setGit(async () => {
-      gitStarted.resolve();
-      return finishGit.promise;
-    });
-    const installing = harness.manager.installCredentials({
+    harness.gitCalls.length = 0;
+    await harness.manager.installCredentials({
       sessionId: spec.sessionId,
       kilo: { token: 'kilo-token-2' },
       git: { token: 'git-2' },
     });
-    await gitStarted.promise;
     expect(harness.installCalls[0]?.env.KILOCODE_TOKEN).toBe('kilo-token-2');
-    finishGit.resolve(result(0));
-    await installing;
+    expect(harness.gitCalls).toEqual([]);
   });
 
   it('prefers the runtime-proxy handle and facade targets over the spec alias', async () => {
@@ -1204,6 +2249,106 @@ describe('createPreparationManager', () => {
     expect(env?.KILOCODE_BACKEND_BASE_URL).toBe('https://facade.test');
   });
 
+  it('installs scoped MCP authority only in the parent per-session config, separately from model credentials', async () => {
+    const harness = createHarness();
+    const spec = routeSpec({ runtimeIsolation: 'per-session' });
+    const cloudAgentMcp = {
+      url: 'https://mcp.kiloapps.io/mcp' as const,
+      token: 'scoped-parent-mcp-token',
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+    };
+    await harness.manager.prepare(spec, {
+      sessionId: spec.sessionId,
+      kilo: { token: 'model-runtime-alias' },
+      cloudAgentMcp,
+    });
+    const env = harness.ensureInputs[0]?.env;
+    const config = JSON.parse(env?.KILO_CONFIG_CONTENT ?? '{}');
+    expect(config.mcp['kilo-cloud-agent']).toEqual({
+      type: 'remote',
+      url: cloudAgentMcp.url,
+      oauth: false,
+      headers: { Authorization: `Bearer ${cloudAgentMcp.token}` },
+    });
+    expect(env?.KILOCODE_TOKEN).toBe('model-runtime-alias');
+    expect(config.provider.kilo.options.apiKey).toBe('model-runtime-alias');
+    expect(env?.KILO_AUTH_CONTENT).not.toContain(cloudAgentMcp.token);
+    expect(JSON.stringify(spec)).not.toContain(cloudAgentMcp.token);
+    expect(JSON.stringify(harness.frames)).not.toContain(cloudAgentMcp.token);
+    await harness.manager.installCredentials({
+      sessionId: spec.sessionId,
+      kilo: { token: 'renewed-model-alias' },
+    });
+    const renewed = JSON.parse(harness.installCalls[0]?.env.KILO_CONFIG_CONTENT ?? '{}');
+    expect(renewed.mcp['kilo-cloud-agent']).toEqual(config.mcp['kilo-cloud-agent']);
+    expect(harness.installCalls[0]?.env.KILOCODE_TOKEN).toBe('renewed-model-alias');
+    const recoveredGrant = {
+      ...cloudAgentMcp,
+      token: 'recovered-mcp-token',
+      expiresAt: cloudAgentMcp.expiresAt + 24 * 3600,
+    };
+    await harness.manager.installCredentials({
+      sessionId: spec.sessionId,
+      kilo: { token: 'renewed-model-alias' },
+      cloudAgentMcp: recoveredGrant,
+    });
+    expect(harness.installCalls[1]?.cloudAgentMcp).toEqual(recoveredGrant);
+    expect(
+      JSON.parse(harness.installCalls[1]?.env.KILO_CONFIG_CONTENT ?? '{}').mcp['kilo-cloud-agent']
+        .headers.Authorization
+    ).toBe(`Bearer ${recoveredGrant.token}`);
+    const preparedGrant = { ...recoveredGrant, token: 'reprepared-mcp-token' };
+    await harness.manager.prepare(spec, {
+      sessionId: spec.sessionId,
+      kilo: { token: 'renewed-model-alias' },
+      cloudAgentMcp: preparedGrant,
+    });
+    expect(harness.installCalls[2]?.cloudAgentMcp).toEqual(preparedGrant);
+    expect(JSON.stringify(harness.frames)).not.toContain(recoveredGrant.token);
+    const child = routeSpec({
+      sessionId: 'workspace_child',
+      kiloSessionId: 'ses_22222222222222222222222222',
+      runtimeIsolation: 'per-session',
+    });
+    await harness.manager.prepare(child);
+    const childConfig = JSON.parse(harness.ensureInputs[1]?.env.KILO_CONFIG_CONTENT ?? '{}');
+    expect(childConfig.mcp?.['kilo-cloud-agent']).toBeUndefined();
+    expect(harness.ensureInputs[1]?.env.KILO_CONFIG_CONTENT).not.toContain(cloudAgentMcp.token);
+  });
+
+  it('does not inject a Cloud Agent MCP entry for opt-out sessions', async () => {
+    const harness = createHarness();
+    await harness.manager.prepare(routeSpec({ runtimeIsolation: 'per-session' }));
+    const config = JSON.parse(harness.ensureInputs[0]?.env.KILO_CONFIG_CONTENT ?? '{}');
+    expect(config.mcp?.['kilo-cloud-agent']).toBeUndefined();
+  });
+
+  it('does not inject a session-scoped MCP grant into a shared worktree runtime', async () => {
+    const harness = createHarness();
+    const spec = routeSpec();
+    const cloudAgentMcp = {
+      url: 'https://mcp.kiloapps.io/mcp' as const,
+      token: 'shared-worktree-token',
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+    };
+    await harness.manager.prepare(spec, {
+      sessionId: spec.sessionId,
+      kilo: { token: 'model-runtime-alias' },
+      cloudAgentMcp,
+    });
+    const env = harness.ensureInputs[0]?.env;
+    const config = JSON.parse(env?.KILO_CONFIG_CONTENT ?? '{}');
+    expect(config.mcp?.['kilo-cloud-agent']).toBeUndefined();
+    expect(env?.KILO_CONFIG_CONTENT).not.toContain(cloudAgentMcp.token);
+    await harness.manager.installCredentials({
+      sessionId: spec.sessionId,
+      kilo: { token: 'renewed-model-alias' },
+      cloudAgentMcp,
+    });
+    expect(harness.installCalls[0]?.cloudAgentMcp).toBeUndefined();
+    expect(harness.installCalls[0]?.env.KILO_CONFIG_CONTENT).not.toContain(cloudAgentMcp.token);
+  });
+
   it('surfaces setup-command output on the wire', async () => {
     const harness = createHarness();
     const manager = createPreparationManager({
@@ -1213,14 +2358,16 @@ describe('createPreparationManager', () => {
         ensure: async () => ({ serverUrl: 'http://127.0.0.1:1' }) as unknown as WrapperKiloClient,
         installCredentials: async () => undefined,
         isUnavailable: () => false,
+        getLiveClient: () => undefined,
         remove: () => undefined,
         release: () => undefined,
       },
       inheritedEnv: {},
-      homeRoot: '/tmp/prepare-test-homes',
+      homeRoots: homeRootsFor('/tmp/prepare-test-homes'),
+      allocationId: 'alloc-current',
       hasGit: async () => true,
-      hasBootstrapMarker: async () => false,
-      writeBootstrapMarker: async () => undefined,
+      readStamp: async () => null,
+      writeStamp: async () => undefined,
       mkdir: async () => undefined,
       configureGitAuthor: async () => undefined,
       runGit: async () => result(0),
@@ -1281,6 +2428,32 @@ describe('createPreparationManager', () => {
       type: 'session.setup.finished',
       properties: { command: 1, exitCode: 0 },
     });
+  });
+
+  it('redacts a named non-heuristic secret from setup output', async () => {
+    const secret = 'postgres://user:pass@localhost:5432/prod';
+    const harness = createHarness();
+    const splitAt = Math.floor(secret.length / 2);
+    harness.setSetupOutput(onOutput => {
+      onOutput('stdout', `connecting ${secret.slice(0, splitAt)}`);
+      onOutput('stdout', `${secret.slice(splitAt)}\n`);
+      onOutput('stderr', `warning: ${secret}\n`);
+    });
+    const spec = routeSpec({
+      setupCommands: ['pnpm install'],
+      env: { DATABASE_URL: secret },
+      secretEnvKeys: ['DATABASE_URL'],
+    });
+
+    await harness.manager.prepare(spec);
+
+    const outputs = harness.frames
+      .flatMap(frame => (frame.type === 'session.events' ? frame.events : []))
+      .filter(event => event.type === 'session.setup.output')
+      .map(event => event.properties.output);
+    expect(outputs).toContain('connecting [REDACTED]\n');
+    expect(outputs).toContain('warning: [REDACTED]\n');
+    expect(outputs.join('')).not.toContain('localhost');
   });
 
   describe('managed GitHub invocation options', () => {
@@ -1364,5 +2537,1378 @@ describe('createPreparationManager', () => {
         }
       }
     );
+  });
+});
+
+const FOREIGN_STAMP = { allocationId: 'alloc-builder', commit: 'old-commit' };
+const REPO = 'https://github.com/acme/repo.git';
+
+function gitKinds(calls: string[][]): string[] {
+  return calls.map(args => args.slice(0, args[0] === 'remote' ? 2 : 1).join(' '));
+}
+
+describe('adopting an environment snapshot', () => {
+  function adoptHarness() {
+    const harness = createHarness(FAST_TIMERS, { hasGit: true });
+    harness.setStamp(FOREIGN_STAMP);
+    harness.setGit(args => {
+      if (args[0] === 'show-ref') return result(1);
+      if (args[0] === 'for-each-ref')
+        return { stdout: 'main\nsession/old\n', stderr: '', exitCode: 0 };
+      if (args[0] === 'rev-parse') return { stdout: 'new-commit\n', stderr: '', exitCode: 0 };
+      return result(0);
+    });
+    return harness;
+  }
+
+  it('reconciles the snapshot with this route instead of cloning, for a new session branch', async () => {
+    const harness = adoptHarness();
+    const spec = routeSpec({
+      git: { url: REPO, token: 'git-1', platform: 'github', author: { name: 'A', email: 'a@b.c' } },
+      setupCommands: ['npm install'],
+    });
+
+    await harness.manager.prepare(spec);
+
+    expect(harness.gitCalls.some(args => args[0] === 'clone')).toBe(false);
+    const setUrl = harness.gitCalls.find(args => args[0] === 'remote' && args[1] === 'set-url');
+    expect(setUrl?.[3]).toBe(REPO);
+    expect(gitKinds(harness.gitCalls).slice(0, 7)).toEqual([
+      'remote set-url',
+      'fetch',
+      'remote set-head',
+      'checkout',
+      'for-each-ref',
+      'branch',
+      'show-ref',
+    ]);
+    expect(harness.gitCalls).toContainEqual(['fetch', '--prune', 'origin']);
+    expect(harness.gitCalls).toContainEqual(['checkout', '--detach', 'origin/HEAD']);
+    expect(harness.gitCalls).toContainEqual(['branch', '-D', 'main', 'session/old']);
+    expect(harness.gitCalls).toContainEqual(['checkout', '--progress', '-b', 'session/scope-1']);
+    expect(harness.authorCalls).toEqual([{ name: 'A', email: 'a@b.c' }]);
+    expect(progressSteps(harness.frames)).toEqual([
+      'restore',
+      'checkout',
+      'setup',
+      'kilo_runtime',
+      'kilo_session',
+    ]);
+    expect(harness.stamp()).toEqual({ allocationId: 'alloc-current', commit: 'new-commit' });
+    expect(lastFrame(harness.frames)).toEqual({
+      type: 'session.ready',
+      sessionId: spec.sessionId,
+      workspace: 'adopted',
+    });
+    expect(harness.emptyCalls).toEqual([]);
+  });
+
+  it('adopts a stamp written by a snapshot-capturing wrapper', async () => {
+    const harness = adoptHarness();
+    harness.setStamp({ ...FOREIGN_STAMP, capturedAt: NOW - 60_000, generation: 4 });
+
+    await harness.manager.prepare(routeSpec({ git: { url: REPO } }));
+
+    expect(harness.gitCalls.some(args => args[0] === 'clone')).toBe(false);
+    expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'adopted' });
+    expect(harness.stamp()).toEqual({ allocationId: 'alloc-current', commit: 'new-commit' });
+  });
+
+  it('checks out an explicit branch with the ordinary branch logic', async () => {
+    const harness = adoptHarness();
+    const spec = routeSpec({ git: { url: REPO }, branch: 'feature/x' });
+
+    await harness.manager.prepare(spec);
+
+    expect(harness.gitCalls).toContainEqual([
+      'checkout',
+      '--progress',
+      '-B',
+      'feature/x',
+      'origin/feature/x',
+    ]);
+    expect(lastFrame(harness.frames)).toMatchObject({
+      type: 'session.ready',
+      workspace: 'adopted',
+    });
+  });
+
+  it("tracks an existing session's own working branch from origin", async () => {
+    const harness = adoptHarness();
+    harness.setGit(args => {
+      if (args[0] === 'show-ref' && args[3]?.startsWith('refs/heads/')) return result(1);
+      if (args[0] === 'show-ref' && args[3]?.startsWith('refs/remotes/')) return result(0);
+      if (args[0] === 'for-each-ref') return { stdout: '', stderr: '', exitCode: 0 };
+      return result(0);
+    });
+    const spec = routeSpec({
+      git: { url: REPO },
+      branch: 'session/scope-1',
+      branchMode: 'working',
+    });
+
+    await harness.manager.prepare(spec);
+
+    expect(harness.gitCalls).toContainEqual([
+      'checkout',
+      '--progress',
+      '-b',
+      'session/scope-1',
+      '--track',
+      'origin/session/scope-1',
+    ]);
+    expect(harness.gitCalls.some(args => args[0] === 'branch')).toBe(false);
+    expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'adopted' });
+  });
+
+  it('fetches a review ref through the review-ref path after the refresh', async () => {
+    const harness = adoptHarness();
+    const spec = routeSpec({ git: { url: REPO }, branch: 'refs/pull/12/head' });
+
+    await harness.manager.prepare(spec);
+
+    expect(
+      harness.gitCalls.some(args => args[0] === 'fetch' && args[3] === 'refs/pull/12/head')
+    ).toBe(true);
+    expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'adopted' });
+  });
+
+  it('runs the setup commands after an adopt and fails the route when one fails', async () => {
+    const harness = adoptHarness();
+    harness.setSetupResult(result(1, 'install failed'));
+    const spec = routeSpec({ git: { url: REPO }, setupCommands: ['npm install'] });
+
+    await harness.manager.prepare(spec);
+
+    expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.failed', step: 'setup' });
+    expect(harness.stamp()).toEqual(FOREIGN_STAMP);
+  });
+
+  it('falls back to a clone when the fetch fails', async () => {
+    const harness = adoptHarness();
+    harness.setGit(args => {
+      if (args[0] === 'fetch') return result(1, 'fatal: repository not found');
+      if (args[0] === 'show-ref') return result(1);
+      return result(0);
+    });
+    const spec = routeSpec({ git: { url: REPO } });
+
+    await harness.manager.prepare(spec);
+
+    expect(harness.emptyCalls).toEqual([spec.directory]);
+    expect(harness.gitCalls.filter(args => args[0] === 'clone')).toHaveLength(1);
+    expect(progressSteps(harness.frames)).toEqual([
+      'restore',
+      'clone',
+      'checkout',
+      'kilo_runtime',
+      'kilo_session',
+    ]);
+    expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.ready', workspace: 'cloned' });
+    expect(harness.stamp()?.allocationId).toBe('alloc-current');
+  });
+
+  it('retries a network failure of the fetch before it falls back', async () => {
+    const harness = adoptHarness();
+    let fetches = 0;
+    harness.setGit(args => {
+      if (args[0] === 'fetch') {
+        fetches += 1;
+        return fetches < 3 ? result(128, 'fatal: Could not resolve host: github.com') : result(0);
+      }
+      if (args[0] === 'show-ref') return result(1);
+      return result(0);
+    });
+
+    await harness.manager.prepare(routeSpec({ git: { url: REPO } }));
+
+    expect(fetches).toBe(3);
+    expect(harness.emptyCalls).toEqual([]);
+    expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'adopted' });
+  });
+
+  it('falls back to a clone when the branch cannot be checked out', async () => {
+    const harness = adoptHarness();
+    let checkouts = 0;
+    harness.setGit(args => {
+      if (args[0] === 'checkout' && args.includes('-B')) {
+        checkouts += 1;
+        return checkouts === 1
+          ? result(128, 'error: local changes would be overwritten')
+          : result(0);
+      }
+      return result(0);
+    });
+    const spec = routeSpec({ git: { url: REPO }, branch: 'feature' });
+
+    await harness.manager.prepare(spec);
+
+    expect(harness.emptyCalls).toEqual([spec.directory]);
+    expect(harness.gitCalls.filter(args => args[0] === 'clone')).toHaveLength(1);
+    expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'cloned' });
+  });
+
+  it('falls back to a clone when the adopt exceeds its budget', async () => {
+    const harness = createHarness(timers({ restoreMs: 30, cloneMs: 2_000 }), { hasGit: true });
+    harness.setStamp(FOREIGN_STAMP);
+    harness.setGit(args => {
+      if (args[0] === 'fetch') return new Promise<ExecResult>(() => undefined);
+      return result(args[0] === 'show-ref' ? 1 : 0);
+    });
+
+    await harness.manager.prepare(routeSpec({ git: { url: REPO } }));
+
+    expect(harness.emptyCalls).toHaveLength(1);
+    expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'cloned' });
+  });
+
+  it('reuses a prepared workspace without network or setup work', async () => {
+    const harness = createHarness(FAST_TIMERS, { hasGit: true });
+    const prepared = { allocationId: 'alloc-current', commit: 'abc' };
+    harness.setStamp(prepared);
+    const spec = routeSpec({ git: { url: REPO }, setupCommands: ['npm install'] });
+
+    await harness.manager.prepare(spec);
+
+    expect(harness.gitCalls.some(args => ['clone', 'fetch', 'checkout'].includes(args[0]!))).toBe(
+      false
+    );
+    expect(progressSteps(harness.frames)).toEqual(['kilo_runtime', 'kilo_session']);
+    expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'same' });
+    expect(harness.stamp()).toEqual(prepared);
+  });
+
+  it('reuses a repository without a stamp, never captures it, and stamps it', async () => {
+    const harness = createHarness(FAST_TIMERS, { hasGit: true });
+    const spec = routeSpec({ git: { url: REPO } });
+
+    await harness.manager.prepare(spec);
+
+    expect(harness.gitCalls.some(args => args[0] === 'clone')).toBe(false);
+    expect(harness.gitCalls.some(args => args[0] === 'checkout')).toBe(true);
+    expect(harness.stamp()?.allocationId).toBe('alloc-current');
+    expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'cloned' });
+  });
+});
+
+function recordPath(root: string, spec: ControlPlaneRouteSpec): string {
+  const home = directoryHome(spec.directory, homeRootsFor(root).directory);
+  return path.join(home, '.local/share/kilo/cloud-agent/git-credentials');
+}
+
+describe('workspace origin normalization', () => {
+  it.each(['unstamped', 'same'] as const)('prepares the canonical origin: %s', async stamp => {
+    const harness = createHarness(FAST_TIMERS, { hasGit: true });
+    if (stamp === 'same') harness.setStamp({ allocationId: 'alloc-current', commit: 'abc' });
+    harness.setGit(args => {
+      if (args[0] === 'remote' && args[1] === 'get-url') {
+        return {
+          stdout: 'https://x-access-token:stale@github.com/acme/repo.git\n',
+          stderr: '',
+          exitCode: 0,
+        };
+      }
+      return result(0);
+    });
+
+    await harness.manager.prepare(
+      routeSpec({ git: { url: REPO, token: 'git-1', platform: 'github' } })
+    );
+
+    expect(harness.gitCalls).toContainEqual(['remote', 'set-url', 'origin', REPO]);
+    for (const args of harness.gitCalls) {
+      if (args[0] !== 'remote') continue;
+      expect(args.join(' ')).not.toContain('@');
+    }
+    expect(lastFrame(harness.frames)).toMatchObject({ type: 'session.ready' });
+  });
+});
+
+describe('workspace Git credentials', () => {
+  it('clones with the credential-free URL and records the token for the helper', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-git-credentials-'));
+    try {
+      const harness = createHarness(FAST_TIMERS, { homeRoot: root });
+      const spec = routeSpec({
+        git: { url: 'https://github.com/acme/repo.git', token: 'git-1', platform: 'github' },
+      });
+
+      await harness.manager.prepare(spec);
+
+      const clone = harness.gitCalls.find(args => args[0] === 'clone');
+      expect(clone).toContain('https://github.com/acme/repo.git');
+      for (const args of harness.gitCalls) expect(args.join(' ')).not.toContain('git-1');
+      const recordPathForSpec = recordPath(root, spec);
+      expect(await fs.readFile(recordPathForSpec, 'utf8')).toBe(
+        'protocol=https\nhost=github.com\nusername=x-access-token\npassword=git-1\n'
+      );
+      expect((await fs.stat(recordPathForSpec)).mode & 0o777).toBe(0o600);
+      expect(harness.ensureInputs[0]?.env.GIT_CONFIG_COUNT).toBe('2');
+      expect(harness.ensureInputs[0]?.env.GIT_CONFIG_KEY_0).toBe('credential.helper');
+      expect(harness.ensureInputs[0]?.env.GIT_CONFIG_VALUE_0).toBe(
+        '/opt/kilo-cloud/kilo-git-credential'
+      );
+      expect(harness.ensureInputs[0]?.env.GIT_TERMINAL_PROMPT).toBe('0');
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rewrites the record on a credential renewal without touching origin', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-git-credentials-'));
+    try {
+      const harness = createHarness(FAST_TIMERS, { homeRoot: root });
+      const spec = routeSpec({
+        git: { url: 'https://github.com/acme/repo.git', token: 'git-1', platform: 'github' },
+      });
+      await harness.manager.prepare(spec);
+      harness.gitCalls.length = 0;
+
+      await harness.manager.installCredentials({
+        sessionId: spec.sessionId,
+        git: { token: 'git-2', platform: 'github' },
+        kilo: { token: 'kilo-token-2' },
+      });
+
+      expect(harness.gitCalls).toEqual([]);
+      expect(await fs.readFile(recordPath(root, spec), 'utf8')).toBe(
+        'protocol=https\nhost=github.com\nusername=x-access-token\npassword=git-2\n'
+      );
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('control-plane runtime profiles', () => {
+  it('installs the trusted GitHub publisher and retains its target and denies on credential refresh', async () => {
+    const harness = createHarness(FAST_TIMERS);
+    const githubReviewTarget = {
+      repo: 'acme/widgets',
+      pullRequestNumber: 42,
+      appType: 'standard' as const,
+      botUserId: '123',
+    };
+    const spec = routeSpec({
+      createdOnPlatform: 'code-review',
+      githubReviewTarget,
+      runtimeIsolation: 'per-session',
+      permission: { bash: { 'gh api repos/*/issues/*/comments --input*': 'allow' } },
+      env: {
+        KILO_GITHUB_REVIEW_TARGET: '{"forged":true}',
+        KILO_GITHUB_REVIEW_API_BASE: 'https://evil.test',
+      },
+      mcp: { code_review: { type: 'local', command: ['fake-publisher'] } },
+    });
+    await harness.manager.prepare(spec);
+    expect(harness.frames.at(-1)?.type).toBe('session.ready');
+    const assertEnvironment = (env: Record<string, string>) => {
+      expect(JSON.parse(env.KILO_GITHUB_REVIEW_TARGET)).toEqual(githubReviewTarget);
+      expect(env.KILO_GITHUB_REVIEW_API_BASE).toBeUndefined();
+      const config = JSON.parse(env.KILO_CONFIG_CONTENT);
+      expect(config.mcp.code_review.command).toEqual(['github-review-publish-mcp']);
+      expect(config.permission.code_review_publish_review_summary).toBe('allow');
+      expect(config.permission.bash['gh api repos/*/issues/*/comments* --input*']).toBe('deny');
+      expect(config.permission.bash['gh pr comment']).toBe('deny');
+    };
+    assertEnvironment(harness.ensureInputs[0].env);
+    await harness.manager.installCredentials({
+      sessionId: spec.sessionId,
+      kilo: { token: 'rotated-token' },
+    });
+    assertEnvironment(harness.installCalls[0].env);
+  });
+
+  it('retains worker-owned permissions through preparation and credential refresh', async () => {
+    const harness = createHarness(FAST_TIMERS);
+    const permission = {
+      question: 'deny' as const,
+      edit: 'allow' as const,
+      bash: { 'git push': 'allow' as const, curl: 'deny' as const },
+      webfetch: 'deny' as const,
+    };
+    const spec = routeSpec({
+      permission,
+      runtimeIsolation: 'per-session',
+      env: { KILO_CONFIG_CONTENT: '{"permission":{"bash":"allow"}}' },
+    });
+    await harness.manager.prepare(spec);
+    expect(harness.frames.at(-1)?.type).toBe('session.ready');
+    expect(JSON.parse(harness.ensureInputs[0].env.KILO_CONFIG_CONTENT).permission).toMatchObject(
+      permission
+    );
+    await harness.manager.installCredentials({
+      sessionId: spec.sessionId,
+      kilo: { token: 'rotated-token' },
+    });
+    expect(JSON.parse(harness.installCalls[0].env.KILO_CONFIG_CONTENT).permission).toMatchObject(
+      permission
+    );
+  });
+
+  it('runs skills.sh installation through the setup process spawn', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'control-skills-spawn-'));
+    let spawns = 0;
+    try {
+      const harness = createHarness(FAST_TIMERS, {
+        homeRoot: root,
+        spawnSetup: (command, args, options) => {
+          spawns++;
+          expect(command).toBe('pnpm');
+          expect(args).toContain('skills@1.7.4');
+          expect(options.detached).toBe(true);
+          expect(options.env?.KILOCODE_TOKEN).toBeUndefined();
+          return spawn(
+            process.execPath,
+            [
+              '-e',
+              `const fs = require('node:fs');
+               const path = require('node:path');
+               const dir = path.join(process.env.HOME, '.agents/skills/find-skills');
+               fs.mkdirSync(dir, { recursive: true });
+               fs.writeFileSync(path.join(dir, 'SKILL.md'), '# Find skills');`,
+            ],
+            options
+          );
+        },
+      });
+      await harness.manager.prepare(
+        routeSpec({ runtimeSkills: [{ name: 'find-skills', source: 'vercel-labs/skills' }] })
+      );
+      expect(spawns).toBe(1);
+      expect(harness.frames.at(-1)?.type).toBe('session.ready');
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('installs skills.sh references before Kilo starts and reports progress', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'control-skills-sh-'));
+    try {
+      const harness = createHarness(FAST_TIMERS, {
+        homeRoot: root,
+        runSkillInstall: async (_command, args, options) => {
+          expect(args).toContain('vercel-labs/skills');
+          const installed = path.join(String(options?.env?.HOME), '.agents/skills/find-skills');
+          await fs.mkdir(installed, { recursive: true });
+          await fs.writeFile(path.join(installed, 'SKILL.md'), '# Find skills');
+          return result(0);
+        },
+        beforeEnsure: async () => {
+          const home = harness.ensureInputs[0].env.HOME;
+          expect(
+            await fs.readFile(path.join(home, '.kilocode/skills/find-skills/SKILL.md'), 'utf8')
+          ).toBe('# Find skills');
+        },
+      });
+      await harness.manager.prepare(
+        routeSpec({ runtimeSkills: [{ name: 'find-skills', source: 'vercel-labs/skills' }] })
+      );
+      expect(
+        harness.frames.some(
+          frame =>
+            frame.type === 'session.progress' &&
+            frame.detail?.includes('Installing skills.sh skill')
+        )
+      ).toBe(true);
+      expect(harness.frames.at(-1)?.type).toBe('session.ready');
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('fails setup after bounded skill installation attempts without starting Kilo', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'control-skills-sh-'));
+    let attempts = 0;
+    try {
+      const harness = createHarness(FAST_TIMERS, {
+        homeRoot: root,
+        runSkillInstall: async () => {
+          attempts++;
+          return result(1);
+        },
+      });
+      await harness.manager.prepare(
+        routeSpec({ runtimeSkills: [{ name: 'missing', source: 'owner/repo' }] })
+      );
+      expect(attempts).toBe(2);
+      expect(harness.ensureCalls()).toBe(0);
+      expect(harness.frames.at(-1)).toMatchObject({
+        type: 'session.failed',
+        step: 'setup',
+        subtype: 'setup_command_failed',
+      });
+      expect(
+        harness.frames.some(
+          frame =>
+            frame.type === 'session.progress' &&
+            frame.detail?.includes('Failed to install skills.sh skill owner/repo@missing')
+        )
+      ).toBe(true);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('aborts skill installation on release without retrying or starting Kilo', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'control-skills-sh-'));
+    const started = Promise.withResolvers<void>();
+    let attempts = 0;
+    try {
+      const harness = createHarness(FAST_TIMERS, {
+        homeRoot: root,
+        runSkillInstall: async (_command, _args, options) => {
+          attempts++;
+          started.resolve();
+          await new Promise<void>(resolve =>
+            options?.signal?.addEventListener('abort', () => resolve(), { once: true })
+          );
+          return result(124);
+        },
+      });
+      const spec = routeSpec({
+        runtimeSkills: [{ name: 'find-skills', source: 'vercel-labs/skills' }],
+      });
+      const preparing = harness.manager.prepare(spec);
+      await started.promise;
+      harness.manager.release(spec.sessionId);
+      await preparing;
+      expect(attempts).toBe(1);
+      expect(harness.ensureCalls()).toBe(0);
+      expect(
+        harness.frames.some(
+          frame => frame.type === 'session.failed' || frame.type === 'session.ready'
+        )
+      ).toBe(false);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('materializes skills, agents and commands before Kilo starts and retains them through credential refresh', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'control-profile-'));
+    const profile = {
+      runtimeSkills: [
+        {
+          name: 'review',
+          rawMarkdown: '---\nname: review\ndescription: Review\n---\nReview changes',
+          files: { 'scripts/check.sh': 'echo checked' },
+        },
+      ],
+      runtimeAgents: [
+        {
+          slug: 'reviewer',
+          name: 'Reviewer',
+          config: {
+            prompt: 'Review carefully',
+            model: 'test-model',
+            variant: 'high',
+            permission: { bash: 'deny' },
+          },
+        },
+      ],
+      kiloCommands: [
+        {
+          name: 'review-now',
+          template: 'Review $ARGUMENTS',
+          agent: 'reviewer',
+          model: 'command-model',
+          subtask: true,
+        },
+      ],
+    };
+    const harness = createHarness(FAST_TIMERS, {
+      homeRoot: root,
+      beforeEnsure: async () => {
+        const env = harness.ensureInputs.at(-1)!.env;
+        if (!env.KILO_CONFIG) return;
+        expect(
+          await fs.readFile(path.join(env.HOME, '.kilocode/skills/review/SKILL.md'), 'utf8')
+        ).toBe(profile.runtimeSkills[0].rawMarkdown);
+        expect(
+          await fs.readFile(path.join(env.HOME, '.kilocode/skills/review/scripts/check.sh'), 'utf8')
+        ).toBe('echo checked');
+        expect(JSON.parse(await fs.readFile(env.KILO_CONFIG, 'utf8'))).toMatchObject({
+          agent: {
+            reviewer: {
+              mode: 'primary',
+              prompt: 'Review carefully',
+              model: 'kilo/test-model',
+              variant: 'high',
+              permission: { bash: 'deny' },
+            },
+          },
+          command: {
+            'review-now': {
+              template: 'Review $ARGUMENTS',
+              agent: 'reviewer',
+              model: 'kilo/command-model',
+              subtask: true,
+            },
+          },
+        });
+      },
+    });
+    try {
+      const spec = routeSpec(profile);
+      await harness.manager.prepare(spec);
+      expect(harness.frames.at(-1)?.type).toBe('session.ready');
+      const env = harness.ensureInputs[0].env;
+      expect(env.KILO_CONFIG).toBe(profileConfigPath(env.HOME));
+      await harness.manager.installCredentials({
+        sessionId: spec.sessionId,
+        kilo: { token: 'rotated-token' },
+      });
+      expect(harness.installCalls[0].env.KILO_CONFIG).toBe(env.KILO_CONFIG);
+      expect(harness.installCalls[0].env.KILOCODE_TOKEN).toBe('rotated-token');
+      expect(
+        JSON.parse(await fs.readFile(env.KILO_CONFIG, 'utf8')).command['review-now'].agent
+      ).toBe('reviewer');
+      const sibling = routeSpec({
+        ...spec,
+        sessionId: 'ses_22222222222222222222222222',
+        kiloSessionId: 'ses_22222222222222222222222222',
+      });
+      await harness.manager.prepare(sibling);
+      const siblingEnv = harness.ensureInputs[1].env;
+      expect(harness.ensureInputs[0].key).toBe(spec.directory);
+      expect(harness.ensureInputs[1].key).toBe(spec.directory);
+      expect(siblingEnv.HOME).toBe(env.HOME);
+      expect(siblingEnv.KILO_CONFIG).toBe(env.KILO_CONFIG);
+
+      await harness.manager.prepare(
+        routeSpec({
+          sessionId: 'ses_33333333333333333333333333',
+          kiloSessionId: 'ses_33333333333333333333333333',
+          directory: `${spec.directory}/other-worktree`,
+        })
+      );
+      const otherEnv = harness.ensureInputs[2].env;
+      expect(otherEnv.HOME).not.toBe(env.HOME);
+      expect(otherEnv.KILO_CONFIG).toBeUndefined();
+      expect(existsSync(path.join(otherEnv.HOME, '.kilocode/skills/review/SKILL.md'))).toBe(false);
+      expect(
+        await fs.readFile(path.join(env.HOME, '.kilocode/skills/review/SKILL.md'), 'utf8')
+      ).toBe(profile.runtimeSkills[0].rawMarkdown);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('installs a workspace profile once across sibling sessions', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'control-profile-shared-'));
+    let installs = 0;
+    const harness = createHarness(FAST_TIMERS, {
+      homeRoot: root,
+      runSkillInstall: async (_command, args, options) => {
+        installs += 1;
+        const name = args[args.indexOf('--skill') + 1]!;
+        const installed = path.join(String(options?.env?.HOME), '.agents/skills', name);
+        await fs.mkdir(installed, { recursive: true });
+        await fs.writeFile(path.join(installed, 'SKILL.md'), '# Find skills');
+        return result(0);
+      },
+    });
+    try {
+      const spec = routeSpec({
+        runtimeSkills: [{ name: 'find-skills', source: 'vercel-labs/skills' }],
+      });
+      await harness.manager.prepare(spec);
+      const sibling = routeSpec({
+        ...spec,
+        sessionId: 'ses_22222222222222222222222222',
+        kiloSessionId: 'ses_22222222222222222222222222',
+      });
+      await harness.manager.prepare(sibling);
+
+      expect(installs).toBe(1);
+      expect(harness.frames.filter(frame => frame.type === 'session.ready')).toHaveLength(2);
+      expect(harness.ensureInputs[1]?.env.HOME).toBe(harness.ensureInputs[0]?.env.HOME);
+      expect(
+        await fs.readFile(
+          path.join(harness.ensureInputs[1]!.env.HOME, '.kilocode/skills/find-skills/SKILL.md'),
+          'utf8'
+        )
+      ).toBe('# Find skills');
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects profile drift before mutating the shared runtime', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'control-profile-drift-'));
+    const harness = createHarness(FAST_TIMERS, { homeRoot: root });
+    try {
+      const spec = routeSpec({
+        runtimeSkills: [{ name: 'first', rawMarkdown: 'First' }],
+      });
+      await harness.manager.prepare(spec);
+      expect(harness.frames.at(-1)?.type).toBe('session.ready');
+      expect(harness.ensureCalls()).toBe(1);
+
+      const drifted = routeSpec({
+        ...spec,
+        sessionId: 'ses_22222222222222222222222222',
+        kiloSessionId: 'ses_22222222222222222222222222',
+        runtimeSkills: [{ name: 'second', rawMarkdown: 'Second' }],
+      });
+      await harness.manager.prepare(drifted);
+
+      expect(lastFrame(harness.frames)).toMatchObject({
+        type: 'session.failed',
+        sessionId: drifted.sessionId,
+        reason: 'invalid_configuration',
+        step: 'kilo_runtime',
+      });
+      expect(harness.ensureCalls()).toBe(1);
+      expect(harness.ensureInputs).toHaveLength(1);
+      const home = harness.ensureInputs[0]!.env.HOME;
+      expect(await fs.readFile(path.join(home, '.kilocode/skills/first/SKILL.md'), 'utf8')).toBe(
+        'First'
+      );
+      expect(existsSync(path.join(home, '.kilocode/skills/second'))).toBe(false);
+      expect(harness.manager.isPrepared(drifted.sessionId)).toBe(false);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('allows a changed profile after every route releases', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'control-profile-released-'));
+    const harness = createHarness(FAST_TIMERS, { homeRoot: root });
+    try {
+      const first = routeSpec({
+        runtimeSkills: [{ name: 'first', rawMarkdown: 'First' }],
+      });
+      await harness.manager.prepare(first);
+      expect(harness.frames.at(-1)?.type).toBe('session.ready');
+      harness.manager.release(first.sessionId);
+      expect(harness.releaseCalls).toEqual([first.directory]);
+
+      const second = routeSpec({
+        ...first,
+        sessionId: 'ses_22222222222222222222222222',
+        kiloSessionId: 'ses_22222222222222222222222222',
+        runtimeSkills: [{ name: 'second', rawMarkdown: 'Second' }],
+      });
+      await harness.manager.prepare(second);
+
+      expect(lastFrame(harness.frames)).toMatchObject({
+        type: 'session.ready',
+        sessionId: second.sessionId,
+      });
+      expect(harness.ensureCalls()).toBe(2);
+      const home = harness.ensureInputs[1]!.env.HOME;
+      expect(await fs.readFile(path.join(home, '.kilocode/skills/second/SKILL.md'), 'utf8')).toBe(
+        'Second'
+      );
+      expect(existsSync(path.join(home, '.kilocode/skills/first'))).toBe(false);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('workspace configuration ownership', () => {
+  const first = { setupCommands: ['echo first'], env: { WORKSPACE_FLAG: 'first' } };
+  const second = { setupCommands: ['echo second'], env: { WORKSPACE_FLAG: 'second' } };
+
+  it('gives a sibling the retained configuration while a route holds the runtime', async () => {
+    const harness = createHarness();
+    const spec = routeSpec();
+    expect(harness.manager.workspaceConfiguration(spec, first)).toBe(first);
+    await harness.manager.prepare({ ...spec, ...first });
+    const sibling = routeSpec({
+      sessionId: 'ses_22222222222222222222222222',
+      kiloSessionId: 'ses_22222222222222222222222222',
+    });
+    expect(harness.manager.workspaceConfiguration(sibling, second)).toBe(first);
+  });
+
+  it('keeps the retained configuration when a prepared route re-attaches', async () => {
+    const harness = createHarness();
+    const spec = routeSpec();
+    harness.manager.workspaceConfiguration(spec, first);
+    await harness.manager.prepare({ ...spec, ...first });
+    expect(harness.manager.workspaceConfiguration(spec, second)).toBe(first);
+    const sibling = routeSpec({
+      sessionId: 'ses_22222222222222222222222222',
+      kiloSessionId: 'ses_22222222222222222222222222',
+    });
+    expect(harness.manager.workspaceConfiguration(sibling, second)).toBe(first);
+  });
+
+  it('applies a new configuration after every route releases the runtime', async () => {
+    const harness = createHarness();
+    const spec = routeSpec();
+    harness.manager.workspaceConfiguration(spec, first);
+    await harness.manager.prepare({ ...spec, ...first });
+    harness.manager.release(spec.sessionId);
+    const next = routeSpec({
+      sessionId: 'ses_22222222222222222222222222',
+      kiloSessionId: 'ses_22222222222222222222222222',
+    });
+    expect(harness.manager.workspaceConfiguration(next, second)).toBe(second);
+  });
+
+  it('replaces configuration retained by a route that never prepared', () => {
+    const harness = createHarness();
+    harness.manager.workspaceConfiguration(routeSpec(), first);
+    const next = routeSpec({
+      sessionId: 'ses_22222222222222222222222222',
+      kiloSessionId: 'ses_22222222222222222222222222',
+    });
+    expect(harness.manager.workspaceConfiguration(next, second)).toBe(second);
+  });
+});
+
+describe('release cleanup and last-route accounting', () => {
+  const directory = '/tmp/prepare-release-shared';
+  const exp = EXP_NOW;
+  // Cleanup validates child rows as real 30-char Kilo session ids.
+  const rootA = 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
+  const rootB = 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
+  const childA = 'ses_cccccccccccccccccccccccccc';
+
+  function sharedSpec(sessionId: string, kiloSessionId: string): ControlPlaneRouteSpec {
+    return routeSpec({ sessionId, kiloSessionId, directory });
+  }
+
+  it('aborts a released route tree without releasing the shared runtime or touching MCP env', async () => {
+    const harness = createHarness();
+    const specA = sharedSpec('ses_a', rootA);
+    const specB = sharedSpec('ses_b', rootB);
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    await harness.manager.prepare(specB, credentialsFor(specB, proxyHandle(exp)));
+    const config = harness.ensureInputs[0]?.env.KILO_CONFIG_CONTENT;
+    harness.setChildren(rootA, [{ id: childA, directory }]);
+
+    harness.manager.release('ses_a');
+    await waitFor(() => harness.abortCalls.includes(childA));
+
+    expect(harness.abortCalls).toEqual(expect.arrayContaining([rootA, childA]));
+    expect(harness.stopProcessCalls).toEqual(expect.arrayContaining([rootA, childA]));
+    expect(harness.releaseCalls).toEqual([]);
+    expect(harness.removeCalls).toEqual([]);
+    expect(harness.installCalls).toEqual([]);
+    expect(harness.manager.isPrepared('ses_b')).toBe(true);
+    expect(harness.ensureInputs[0]?.env.KILO_CONFIG_CONTENT).toBe(config);
+    // The walk runs only because a sibling keeps the key.
+    expect(
+      harness.nativeDiagnostics.some(
+        diagnostic =>
+          diagnostic.event === 'session.task' && diagnostic.fields.stage === 'process_cleanup'
+      )
+    ).toBe(true);
+  });
+
+  it('releases the shared runtime only on the last prepared route', async () => {
+    const harness = createHarness();
+    const specA = sharedSpec('ses_a', 'kilo_a');
+    const specB = sharedSpec('ses_b', 'kilo_b');
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    await harness.manager.prepare(specB, credentialsFor(specB, proxyHandle(exp)));
+
+    harness.manager.release('ses_a');
+    expect(harness.releaseCalls).toEqual([]);
+    harness.manager.release('ses_b');
+    expect(harness.releaseCalls).toEqual([directory]);
+  });
+
+  it('counts a sibling that is only preparing as a holder', async () => {
+    const bEntered = Promise.withResolvers<void>();
+    const bResume = Promise.withResolvers<void>();
+    let ensureCount = 0;
+    const harness = createHarness(FAST_TIMERS, {
+      beforeEnsure: async () => {
+        ensureCount += 1;
+        if (ensureCount === 2) {
+          bEntered.resolve();
+          await bResume.promise;
+        }
+      },
+    });
+    const specA = sharedSpec('ses_a', 'kilo_a');
+    const specB = sharedSpec('ses_b', 'kilo_b');
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    const runningB = harness.manager.prepare(specB, credentialsFor(specB, proxyHandle(exp)));
+    await bEntered.promise;
+
+    harness.manager.release('ses_a');
+    expect(harness.releaseCalls).toEqual([]);
+
+    // Releasing the route while it is still preparing takes effect when its
+    // prepare settles; then it is the last route and releases the key.
+    harness.manager.release('ses_b');
+    expect(harness.releaseCalls).toEqual([]);
+    bResume.resolve();
+    await runningB;
+    await waitFor(() => harness.releaseCalls.length === 1);
+    expect(harness.releaseCalls).toEqual([directory]);
+    expect(harness.manager.isPrepared('ses_b')).toBe(false);
+  });
+
+  it('does not kill a survivor when a release races its prepare', async () => {
+    const bEntered = Promise.withResolvers<void>();
+    const bResume = Promise.withResolvers<void>();
+    let ensureCount = 0;
+    const harness = createHarness(FAST_TIMERS, {
+      beforeEnsure: async () => {
+        ensureCount += 1;
+        if (ensureCount === 2) {
+          bEntered.resolve();
+          await bResume.promise;
+        }
+      },
+    });
+    const specA = sharedSpec('ses_a', 'kilo_a');
+    const specB = sharedSpec('ses_b', 'kilo_b');
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    const runningB = harness.manager.prepare(specB, credentialsFor(specB, proxyHandle(exp)));
+    await bEntered.promise;
+
+    harness.manager.release('ses_a');
+    bResume.resolve();
+    await runningB;
+
+    expect(harness.releaseCalls).toEqual([]);
+    expect(harness.manager.isPrepared('ses_b')).toBe(true);
+  });
+
+  it('releases the process and skips the session walk for the last route', async () => {
+    const harness = createHarness();
+    const spec = routeSpec({ runtimeIsolation: 'per-session', kiloSessionId: rootA });
+    await harness.manager.prepare(spec, credentialsFor(spec, proxyHandle(exp)));
+    harness.setChildren(rootA, [{ id: childA, directory: spec.directory }]);
+
+    harness.manager.release(spec.sessionId);
+    expect(harness.releaseCalls).toEqual([spec.sessionId]);
+    // Process stop reaps owned processes; a walk on a dying client would emit
+    // false unreaped-process diagnostics, so none may run.
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(harness.abortCalls).toEqual([]);
+    expect(harness.stopProcessCalls).toEqual([]);
+    expect(
+      harness.nativeDiagnostics.some(
+        diagnostic =>
+          diagnostic.event === 'session.task' && diagnostic.fields.stage === 'process_cleanup'
+      )
+    ).toBe(false);
+  });
+
+  it('bounds a cyclic session tree while a sibling keeps the key', async () => {
+    const harness = createHarness();
+    const specA = sharedSpec('ses_a', rootA);
+    const specB = sharedSpec('ses_b', rootB);
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    await harness.manager.prepare(specB, credentialsFor(specB, proxyHandle(exp)));
+    harness.setChildren(rootA, [{ id: childA, directory }]);
+    harness.setChildren(childA, [{ id: rootA, directory }]);
+
+    harness.manager.release(specA.sessionId);
+    await waitFor(() => harness.abortCalls.length >= 2);
+    expect([...harness.abortCalls].sort()).toEqual([rootA, childA].sort());
+  });
+
+  it('bounds session-tree depth and node count while a sibling keeps the key', async () => {
+    const chain = (index: number): string => `ses_${String(index).padStart(27, '0')}`;
+
+    const depthHarness = createHarness();
+    const depthA = sharedSpec('ses_a', rootA);
+    const depthB = sharedSpec('ses_b', rootB);
+    await depthHarness.manager.prepare(depthA, credentialsFor(depthA, proxyHandle(exp)));
+    await depthHarness.manager.prepare(depthB, credentialsFor(depthB, proxyHandle(exp)));
+    depthHarness.setChildren(rootA, [{ id: chain(0), directory }]);
+    for (let index = 0; index < 12; index += 1) {
+      depthHarness.setChildren(chain(index), [{ id: chain(index + 1), directory }]);
+    }
+    depthHarness.manager.release(depthA.sessionId);
+    // Depth ≤ 8: rootA is depth 0, so chain(7) is the deepest aborted node.
+    await waitFor(() => depthHarness.abortCalls.includes(chain(7)));
+    expect(depthHarness.abortCalls).not.toContain(chain(8));
+
+    const nodeHarness = createHarness();
+    const nodeA = sharedSpec('ses_a', rootA);
+    const nodeB = sharedSpec('ses_b', rootB);
+    await nodeHarness.manager.prepare(nodeA, credentialsFor(nodeA, proxyHandle(exp)));
+    await nodeHarness.manager.prepare(nodeB, credentialsFor(nodeB, proxyHandle(exp)));
+    nodeHarness.setChildren(
+      rootA,
+      Array.from({ length: 80 }, (_, index) => ({ id: chain(index), directory }))
+    );
+    nodeHarness.manager.release(nodeA.sessionId);
+    await waitFor(() => nodeHarness.abortCalls.length >= 64);
+    expect(nodeHarness.abortCalls).toHaveLength(64);
+  });
+
+  it('ends cleanup at the deadline while a sibling keeps the key', async () => {
+    const harness = createHarness(FAST_TIMERS, { releaseCleanupDeadlineMs: 30 });
+    const specA = sharedSpec('ses_a', rootA);
+    const specB = sharedSpec('ses_b', rootB);
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    await harness.manager.prepare(specB, credentialsFor(specB, proxyHandle(exp)));
+    harness.setChildrenHung(rootA);
+
+    harness.manager.release(specA.sessionId);
+    expect(harness.releaseCalls).toEqual([]);
+    await waitFor(() =>
+      harness.nativeDiagnostics.some(
+        diagnostic =>
+          diagnostic.event === 'session.task' && diagnostic.fields.stage === 'process_cleanup'
+      )
+    );
+    expect(harness.abortCalls).toEqual([rootA]);
+  });
+
+  it('does not block the route release on cleanup failure', async () => {
+    const harness = createHarness();
+    const specA = sharedSpec('ses_a', rootA);
+    const specB = sharedSpec('ses_b', rootB);
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    await harness.manager.prepare(specB, credentialsFor(specB, proxyHandle(exp)));
+    harness.setCleanupFailure(true);
+
+    harness.manager.release(specA.sessionId);
+    // The route is gone even though the walk fails; the runtime stays for B.
+    expect(harness.manager.isPrepared(specA.sessionId)).toBe(false);
+    expect(harness.releaseCalls).toEqual([]);
+    await waitFor(() =>
+      harness.nativeDiagnostics.some(
+        diagnostic =>
+          diagnostic.event === 'session.task' &&
+          diagnostic.fields.stage === 'process_cleanup' &&
+          diagnostic.fields.ok === false
+      )
+    );
+  });
+
+  it('defers a held sibling release to its finalizer and then releases the key', async () => {
+    const bHeld = Promise.withResolvers<void>();
+    const bResume = Promise.withResolvers<void>();
+    const harness = createHarness(FAST_TIMERS, {
+      beforeWorkspace: async () => {
+        bHeld.resolve();
+        await bResume.promise;
+      },
+    });
+    const specA = sharedSpec('ses_a', rootA);
+    const specB = routeSpec({
+      sessionId: 'ses_b',
+      kiloSessionId: rootB,
+      directory,
+      setupCommands: ['echo hi'],
+    });
+    await harness.manager.prepare(specA);
+    const runningB = harness.manager.prepare(specB);
+    await bHeld.promise;
+
+    harness.manager.release(specA.sessionId);
+    expect(harness.releaseCalls).toEqual([]); // B still holds the key
+    harness.manager.release(specB.sessionId);
+    expect(harness.releaseCalls).toEqual([]); // deferred to B's finalizer
+    bResume.resolve();
+    await runningB;
+    await waitFor(() => harness.releaseCalls.length === 1);
+    expect(harness.releaseCalls).toEqual([directory]);
+    expect(harness.manager.isPrepared(specB.sessionId)).toBe(false);
+  });
+
+  it('releases the key when a prepare fails after ensure and was never released', async () => {
+    const bHeld = Promise.withResolvers<void>();
+    const bResume = Promise.withResolvers<void>();
+    const harness = createHarness(FAST_TIMERS, {
+      beforeWorkspace: async () => {
+        bHeld.resolve();
+        await bResume.promise;
+      },
+    });
+    const specA = sharedSpec('ses_a', rootA);
+    const specB = routeSpec({
+      sessionId: 'ses_b',
+      kiloSessionId: rootB,
+      directory,
+      setupCommands: ['echo hi'],
+    });
+    await harness.manager.prepare(specA);
+    const runningB = harness.manager.prepare(specB);
+    await bHeld.promise;
+
+    harness.manager.release(specA.sessionId);
+    expect(harness.releaseCalls).toEqual([]); // B is still preparing
+    harness.setSessionExists(false);
+    harness.setEnsureSessionError(new Error('kilo session failed'));
+    bResume.resolve();
+    await runningB;
+
+    // B failed after ensure without being released; as the last holder its
+    // runtime must not be left behind.
+    await waitFor(() => harness.releaseCalls.length === 1);
+    expect(harness.releaseCalls).toEqual([directory]);
+    expect(harness.frames.some(frame => frame.type === 'session.failed')).toBe(true);
+  });
+
+  it('does not abort a re-prepared session while a previous cleanup still walks', async () => {
+    const harness = createHarness();
+    const specA = sharedSpec('ses_a', rootA);
+    const specB = sharedSpec('ses_b', rootB);
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    await harness.manager.prepare(specB, credentialsFor(specB, proxyHandle(exp)));
+    harness.setAbortHung(rootA);
+
+    harness.manager.release(specA.sessionId);
+    await waitFor(() => harness.abortCalls.includes(rootA));
+
+    const running = harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    await running;
+    expect(
+      harness.frames.some(
+        frame => frame.type === 'session.ready' && frame.sessionId === specA.sessionId
+      )
+    ).toBe(true);
+    const started = harness.abortCalls.length + harness.stopProcessCalls.length;
+    await new Promise(resolve => setTimeout(resolve, 20));
+    expect(harness.abortCalls.length + harness.stopProcessCalls.length).toBe(started);
+  });
+
+  it('releases a legacy shared key so a later modern route gets a fresh runtime', async () => {
+    const harness = createHarness();
+    const legacy = sharedSpec('ses_legacy', rootA);
+    await harness.manager.prepare(legacy);
+    harness.manager.release(legacy.sessionId);
+    expect(harness.releaseCalls).toEqual([directory]);
+
+    const modern = sharedSpec('ses_modern', rootB);
+    await harness.manager.prepare(modern, credentialsFor(modern, proxyHandle(exp)));
+    expect(harness.manager.isPrepared(modern.sessionId)).toBe(true);
+    expect(harness.ensureCalls()).toBe(2);
+    expect(harness.frames.some(frame => frame.type === 'session.failed')).toBe(false);
+  });
+
+  it('reuses one registry runtime for two specs on one directory', async () => {
+    const registry = createRegistryRuntimes();
+    const harness = createHarness(FAST_TIMERS, { runtimes: registry.port });
+    const specA = sharedSpec('ses_a', rootA);
+    const specB = sharedSpec('ses_b', rootB);
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    await harness.manager.prepare(specB, credentialsFor(specB, proxyHandle(exp)));
+    expect(registry.created()).toBe(1);
+    expect(harness.manager.isPrepared(specA.sessionId)).toBe(true);
+    expect(harness.manager.isPrepared(specB.sessionId)).toBe(true);
+  });
+
+  it('reuses after the runtime env moved to a newer proxy handle mid-prepare', async () => {
+    const registry = createRegistryRuntimes();
+    const harness = createHarness(FAST_TIMERS, { runtimes: registry.port });
+    const specA = sharedSpec('ses_a', rootA);
+    await harness.manager.prepare(specA, credentialsFor(specA, proxyHandle(exp)));
+    // A concurrent credential refresh moves the runtime's env to a newer handle
+    // while another route is still preparing; the rest of the env is preserved.
+    const runtime = registry.registry.get(directory);
+    await runtime?.installCredentials({
+      ...(runtime.env ?? {}),
+      KILOCODE_TOKEN: proxyHandle(exp + 3_600),
+    });
+    const specB = sharedSpec('ses_b', rootB);
+    await harness.manager.prepare(specB, credentialsFor(specB, proxyHandle(exp + 7_200)));
+    expect(registry.created()).toBe(1);
+    expect(harness.manager.isPrepared(specB.sessionId)).toBe(true);
+  });
+});
+
+describe('credentials buffered during prepare', () => {
+  it('applies a frame received during prepare before session.ready', async () => {
+    const entered = Promise.withResolvers<void>();
+    const resume = Promise.withResolvers<void>();
+    let readyAtInstall: boolean | undefined;
+    let framesRef: ControlPlaneWrapperFrame[] = [];
+    const harness = createHarness(FAST_TIMERS, {
+      beforeEnsure: async () => {
+        entered.resolve();
+        await resume.promise;
+      },
+      beforeInstall: async () => {
+        readyAtInstall = framesRef.some(frame => frame.type === 'session.ready');
+      },
+    });
+    framesRef = harness.frames;
+    const spec = routeSpec({ runtimeIsolation: 'per-session' });
+    const running = harness.manager.prepare(spec, {
+      sessionId: spec.sessionId,
+      kilo: { token: 'alias' },
+    });
+    await entered.promise;
+    const handle = proxyHandle(EXP_NOW);
+    await harness.manager.installCredentials({
+      sessionId: spec.sessionId,
+      kilo: { token: 'alias' },
+      proxy: { handle, targets: specTargets(spec) },
+    });
+    resume.resolve();
+    await running;
+
+    expect(harness.installCalls).toHaveLength(1);
+    expect(harness.installCalls[0]?.env.KILOCODE_TOKEN).toBe(handle);
+    expect(readyAtInstall).toBe(false);
+    expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(true);
+  });
+
+  it('applies only the latest frame received during prepare', async () => {
+    const entered = Promise.withResolvers<void>();
+    const resume = Promise.withResolvers<void>();
+    const harness = createHarness(FAST_TIMERS, {
+      beforeEnsure: async () => {
+        entered.resolve();
+        await resume.promise;
+      },
+    });
+    const spec = routeSpec({ runtimeIsolation: 'per-session' });
+    const running = harness.manager.prepare(spec, {
+      sessionId: spec.sessionId,
+      kilo: { token: 'alias' },
+    });
+    await entered.promise;
+    const first = proxyHandle(EXP_NOW);
+    const second = proxyHandle(EXP_NOW + 3_600);
+    const base = credentialsFor(spec, first);
+    await harness.manager.installCredentials(base);
+    await harness.manager.installCredentials({
+      ...base,
+      proxy: { handle: second, targets: specTargets(spec) },
+    });
+    resume.resolve();
+    await running;
+
+    expect(harness.installCalls).toHaveLength(1);
+    expect(harness.installCalls[0]?.env.KILOCODE_TOKEN).toBe(second);
+  });
+
+  it('drops a buffered frame when the route was released', async () => {
+    const entered = Promise.withResolvers<void>();
+    const resume = Promise.withResolvers<void>();
+    const harness = createHarness(FAST_TIMERS, {
+      beforeEnsure: async () => {
+        entered.resolve();
+        await resume.promise;
+      },
+    });
+    const spec = routeSpec({ runtimeIsolation: 'per-session' });
+    const running = harness.manager.prepare(spec, {
+      sessionId: spec.sessionId,
+      kilo: { token: 'alias' },
+    });
+    await entered.promise;
+    await harness.manager.installCredentials(credentialsFor(spec, proxyHandle(EXP_NOW)));
+    harness.manager.release(spec.sessionId);
+    resume.resolve();
+    await running;
+
+    expect(harness.installCalls).toHaveLength(0);
+    expect(harness.frames.some(frame => frame.type === 'session.ready')).toBe(false);
+  });
+
+  it('carries a buffered frame across a chained re-prepare', async () => {
+    const entered = Promise.withResolvers<void>();
+    const resume = Promise.withResolvers<void>();
+    const harness = createHarness(FAST_TIMERS, {
+      beforeEnsure: async () => {
+        entered.resolve();
+        await resume.promise;
+      },
+    });
+    const spec = routeSpec({ runtimeIsolation: 'per-session' });
+    const running = harness.manager.prepare(spec);
+    await entered.promise;
+    harness.manager.release(spec.sessionId);
+    const next = harness.manager.prepare({ ...spec, attemptId: 'attempt-2' });
+    const handle = proxyHandle(EXP_NOW);
+    await harness.manager.installCredentials(credentialsFor(spec, handle));
+    resume.resolve();
+    await Promise.all([running, next]);
+
+    // The frame was buffered on the chained owner and must survive the fresh
+    // owner the chain creates.
+    expect(harness.installCalls.some(call => call.env.KILOCODE_TOKEN === handle)).toBe(true);
+    expect(
+      harness.frames.some(
+        frame => frame.type === 'session.ready' && frame.sessionId === spec.sessionId
+      )
+    ).toBe(true);
+  });
+
+  it('refreshes the Git record when the proxy handle is unchanged, leaving origin alone', async () => {
+    // Regression guard for the prepare-side effect: an unchanged handle must
+    // still reach the runtime and refresh the Git credential. The "no restart
+    // marker" half of the contract is covered by the real-runtime test
+    // `does not roll for a repeated or stale proxy handle but latches a pending one`.
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-git-renewal-'));
+    try {
+      const harness = createHarness(FAST_TIMERS, { homeRoot: root });
+      const spec = routeSpec({
+        git: { url: 'https://github.com/acme/repo.git', token: 'git-1', platform: 'github' },
+      });
+      const handle = proxyHandle(EXP_NOW);
+      await harness.manager.prepare(spec, credentialsFor(spec, handle));
+      harness.gitCalls.length = 0;
+
+      await harness.manager.installCredentials({
+        sessionId: spec.sessionId,
+        git: { token: 'git-2', platform: 'github' },
+        kilo: { token: 'alias' },
+        proxy: { handle, targets: specTargets(spec) },
+      });
+
+      expect(harness.installCalls).toHaveLength(1);
+      expect(harness.installCalls[0]?.env.KILOCODE_TOKEN).toBe(handle);
+      expect(harness.gitCalls).toEqual([]);
+      expect(await fs.readFile(recordPath(root, spec), 'utf8')).toBe(
+        'protocol=https\nhost=github.com\nusername=x-access-token\npassword=git-2\n'
+      );
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('release cleanup with no live runtime client', () => {
+  it('skips cleanup without throwing when the shared runtime has no live client', async () => {
+    const abortCalls: string[] = [];
+    const manager = createPreparationManager({
+      timers: FAST_TIMERS,
+      allocationId: 'alloc-current',
+      emit: () => undefined,
+      runtimes: {
+        ensure: async () =>
+          ({
+            serverUrl: 'http://127.0.0.1:1',
+            ensureSession: async () => undefined,
+            abortSessionForCleanup: async (opts: { sessionId: string }) => {
+              abortCalls.push(opts.sessionId);
+            },
+          }) as unknown as WrapperKiloClient,
+        installCredentials: async () => undefined,
+        isUnavailable: () => false,
+        // The runtime is restarting: the real adapter reports no live client.
+        getLiveClient: () => undefined,
+        remove: () => undefined,
+        release: () => undefined,
+      },
+      inheritedEnv: {},
+      homeRoots: homeRootsFor('/tmp/prepare-test-homes'),
+      hasGit: async () => false,
+      readStamp: async () => null,
+      writeStamp: async () => undefined,
+      mkdir: async () => undefined,
+      configureGitAuthor: async () => undefined,
+      seedRegistration: async () => undefined,
+      sessionExists: async () => true,
+    });
+    const directory = '/tmp/release-no-client';
+    await manager.prepare(routeSpec({ sessionId: 'ses_a', directory }));
+    await manager.prepare(routeSpec({ sessionId: 'ses_b', directory }));
+
+    // A throwing `.client` getter must not escape the release path.
+    expect(() => manager.release('ses_a')).not.toThrow();
+    await new Promise(resolve => setTimeout(resolve, 10));
+    expect(abortCalls).toHaveLength(0);
   });
 });

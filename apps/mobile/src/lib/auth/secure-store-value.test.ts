@@ -9,6 +9,7 @@ import {
   writeStoredValue,
   writeStoredValueSafe,
 } from '@/lib/auth/secure-store-value';
+import { ProtectedDataUnavailableError, setProtectedDataAvailable } from '@/lib/protected-data';
 import { setTelemetrySink, type TelemetryEvent } from '@/lib/telemetry/error-sink';
 
 const getItemAsync = vi.hoisted(() =>
@@ -39,6 +40,7 @@ beforeEach(() => {
 
 afterEach(() => {
   setTelemetrySink(null);
+  setProtectedDataAvailable(true);
 });
 
 /** The native failure shape under test: a rejecting call. Throwing inside the
@@ -189,5 +191,46 @@ describe('writeStoredValue and deleteStoredValue', () => {
 
     expect(events).toHaveLength(1);
     expect(events[0]?.fingerprint).toEqual(['secure-store-failure', 'delete']);
+  });
+});
+
+describe('while the device is locked', () => {
+  beforeEach(() => {
+    setProtectedDataAvailable(false);
+  });
+
+  it('never calls the keychain and reports nothing', async () => {
+    await expect(readStoredValue('auth-token')).rejects.toBeInstanceOf(
+      ProtectedDataUnavailableError
+    );
+    await expect(writeStoredValue('auth-token', 'credential')).rejects.toBeInstanceOf(
+      ProtectedDataUnavailableError
+    );
+    await expect(deleteStoredValue('auth-token')).rejects.toBeInstanceOf(
+      ProtectedDataUnavailableError
+    );
+    await expect(readStoredValueSafe('scope-hint')).resolves.toBeNull();
+    await expect(readStoredValueForUpdate('scope-hint')).resolves.toEqual({
+      status: 'unreadable',
+    });
+    await expect(writeStoredValueSafe('scope-hint', 'value')).resolves.toBe(false);
+    await expect(deleteStoredValueSafe('scope-hint')).resolves.toBe(false);
+
+    expect(getItemAsync).not.toHaveBeenCalled();
+    expect(setItemAsync).not.toHaveBeenCalled();
+    expect(deleteItemAsync).not.toHaveBeenCalled();
+    expect(events).toEqual([]);
+  });
+
+  it('does not report a call the keychain refused because the device locked during it', async () => {
+    setProtectedDataAvailable(true);
+    getItemAsync.mockImplementation(() => {
+      setProtectedDataAvailable(false);
+      return rejectedCall('User interaction is not allowed.');
+    });
+
+    await expect(readStoredValueSafe('scope-hint')).resolves.toBeNull();
+
+    expect(events).toEqual([]);
   });
 });

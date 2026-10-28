@@ -55,10 +55,12 @@ vi.mock('expo-secure-store', () => ({
 }));
 
 // Mock dependencies of use-native-auth.ts so we can import production helpers.
+const appleMock = vi.hoisted(() => ({ isAvailableAsync: vi.fn() }));
 vi.mock('expo-apple-authentication', () => ({
   AppleAuthenticationScope: { FULL_NAME: 0, EMAIL: 1 },
   formatFullName: vi.fn(),
   signInAsync: vi.fn(),
+  isAvailableAsync: appleMock.isAvailableAsync,
 }));
 
 vi.mock('@react-native-google-signin/google-signin', () => ({
@@ -118,7 +120,7 @@ vi.mock('@/lib/auth/auth-fetch', async importOriginal => {
 
 // ── Imports (all after vi.mock hoisting) ───────────────────────────────
 
-const { defaultErrorMessage, mapError, retryableAdmissionError } =
+const { defaultErrorMessage, mapError, mapErrorKey, retryableAdmissionError } =
   await import('@/lib/auth/auth-error-messages');
 
 const { resolveAdmission } = await import('@/lib/auth/resolve-admission');
@@ -126,6 +128,7 @@ const { resolveAdmission } = await import('@/lib/auth/resolve-admission');
 const { GOOGLE_WEB_CLIENT_ID } = await import('@/lib/config');
 const { toast } = await import('sonner-native');
 const { announcingToast } = await import('@/lib/a11y/announcing-toast');
+const { i18n } = await import('@/i18n');
 
 const mockGetAdmission = vi.mocked(getAdmission);
 
@@ -223,6 +226,7 @@ describe('use-native-auth error mapping', () => {
   it.each([
     ['INVALID_CODE', 'That code is incorrect. Please try again.'],
     ['TOO_MANY_ATTEMPTS', 'Too many attempts. Please request a new code.'],
+    ['RATE_LIMITED', 'Too many sign-in attempts. Please wait and try again.'],
     ['CODE_IN_PROGRESS', 'Your code is being processed. Wait a moment and try again.'],
     ['INVALID_EMAIL', 'Unable to deliver email to this address. Please use a different email.'],
     ['EMAIL_DELIVERY_FAILED', 'Email delivery is temporarily unavailable. Please try again later.'],
@@ -237,6 +241,10 @@ describe('use-native-auth error mapping', () => {
 
   it('returns the default error message for an undefined code', () => {
     expect(mapError(undefined)).toBe(defaultErrorMessage());
+  });
+
+  it('returns the default error message for an empty-string code', () => {
+    expect(mapError('')).toBe(defaultErrorMessage());
   });
 
   it('returns the default error message for an unknown code', () => {
@@ -415,14 +423,49 @@ describe('useNativeAuth email validation feedback', () => {
       const resultRef = await mountNativeAuth();
 
       await act(async () => {
-        await resultRef.current?.requestEmailCode('http://localhost:3000/device-auth?code=test');
+        await resultRef.current?.requestEmailCode('user@example.com');
       });
 
       expect(toast.error).not.toHaveBeenCalled();
-      expect(resultRef.current?.emailError).toBe(mapError(errorCode));
+      expect(resultRef.current?.emailErrorKey).toBe(mapErrorKey(errorCode));
       expect(resultRef.current?.busy).toBeUndefined();
     }
   );
+
+  it.each(['http://localhost:3000/device-auth?code=test', 'user@example', 'user'])(
+    'keeps malformed address %s inline as INVALID_REQUEST without sending a request',
+    async address => {
+      const resultRef = await mountNativeAuth();
+      await act(async () => {
+        expect(await resultRef.current?.requestEmailCode(address)).toBe(false);
+      });
+      expect(resultRef.current?.emailErrorKey).toBe(mapErrorKey('INVALID_REQUEST'));
+      expect(mockPostAuth).not.toHaveBeenCalled();
+      expect(toast.error).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([255, 3508])('rejects an address of %i characters before delivery', async length => {
+    const address = `${'a'.repeat(length - 12)}@example.com`;
+    mockPostAuth.mockResolvedValue({ ok: true, data: { success: true } });
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      expect(await resultRef.current?.requestEmailCode(address)).toBe(false);
+    });
+    expect(resultRef.current?.emailErrorKey).toBe(mapErrorKey('INVALID_REQUEST'));
+    expect(mockPostAuth).not.toHaveBeenCalled();
+  });
+
+  it('allows the 254-character boundary after normalization', async () => {
+    const address = `${'a'.repeat(64)}@${'b'.repeat(63)}.${'c'.repeat(63)}.${'d'.repeat(61)}`;
+    mockPostAuth.mockResolvedValue({ ok: true, data: { success: true } });
+    const resultRef = await mountNativeAuth();
+    await act(async () => {
+      expect(await resultRef.current?.requestEmailCode(` ${address.toUpperCase()} `)).toBe(true);
+    });
+    expect(mockPostAuth).toHaveBeenCalledWith('/api/auth/native/otp', { email: address });
+    expect(resultRef.current?.emailErrorKey).toBeUndefined();
+  });
 
   it('keeps an empty-email error inline without sending a request', async () => {
     const resultRef = await mountNativeAuth();
@@ -432,7 +475,7 @@ describe('useNativeAuth email validation feedback', () => {
 
     expect(toast.error).not.toHaveBeenCalled();
     expect(mockPostAuth).not.toHaveBeenCalled();
-    expect(resultRef.current?.emailError).toBe('Please enter your email address.');
+    expect(resultRef.current?.emailErrorKey).toBe('login.pleaseEnterEmail');
   });
 
   it('clears validation on edit and allows a corrected address to request a code', async () => {
@@ -443,7 +486,7 @@ describe('useNativeAuth email validation feedback', () => {
     act(() => {
       resultRef.current?.clearEmailError();
     });
-    expect(resultRef.current?.emailError).toBeUndefined();
+    expect(resultRef.current?.emailErrorKey).toBeUndefined();
 
     mockPostAuth.mockResolvedValue({ ok: true, data: { success: true } });
     await act(async () => {
@@ -452,7 +495,7 @@ describe('useNativeAuth email validation feedback', () => {
     expect(mockPostAuth).toHaveBeenCalledWith('/api/auth/native/otp', {
       email: 'user@example.com',
     });
-    expect(resultRef.current?.emailError).toBeUndefined();
+    expect(resultRef.current?.emailErrorKey).toBeUndefined();
     expect(toast.error).not.toHaveBeenCalled();
   });
 
@@ -471,7 +514,7 @@ describe('useNativeAuth email validation feedback', () => {
       void resultRef.current?.requestEmailCode('user@example.com');
     });
     expect(resultRef.current?.busy).toBe('otp-send');
-    expect(resultRef.current?.emailError).toBeUndefined();
+    expect(resultRef.current?.emailErrorKey).toBeUndefined();
     await act(async () => {
       finish?.({ ok: false, errorCode: 'EMAIL_DELIVERY_FAILED', ssoOrganizationId: undefined });
       await Promise.resolve();
@@ -596,6 +639,48 @@ describe('useNativeAuth created-account announcement', () => {
 
     expect(announcingToast.success).not.toHaveBeenCalled();
   });
+});
+
+// ── Signup step-up ──────────────────────────────────────────────────────
+
+describe('useNativeAuth signup step-up', () => {
+  beforeEach(() => {
+    mockGetAdmission.mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // This harness runs as iOS with Google configured; Apple shows when Apple says it is available.
+  it.each([
+    [['google', 'apple'], true, 'authErrors.signupStepUpApple'],
+    [['google', 'apple'], false, 'authErrors.signupStepUpGoogle'],
+    [['apple'], false, 'authErrors.signupStepUp'],
+    [['apple', 'passkey'], true, 'authErrors.signupStepUpApple'],
+    [undefined, true, 'authErrors.signupStepUp'],
+  ] as const)(
+    'names only an allowed button on this screen: methods %j, Apple shown %s',
+    async (signupMethods, appleShown, key) => {
+      appleMock.isAvailableAsync.mockResolvedValue(appleShown);
+      mockPostAuth.mockResolvedValue({
+        ok: false,
+        errorCode: 'SIGNUP-STEP-UP',
+        ssoOrganizationId: undefined,
+        signupMethods: signupMethods && [...signupMethods],
+        httpStatus: 403,
+      });
+      const resultRef = await mountNativeAuth();
+
+      await act(async () => {
+        const outcome = await resultRef.current?.verifyEmailCode('user@example.com', '123456');
+        expect(outcome).toEqual({ ok: false, message: i18n.t(key) });
+      });
+
+      expect(toast.error).not.toHaveBeenCalled();
+      expect(authMock.signIn).not.toHaveBeenCalled();
+    }
+  );
 });
 
 // ── Passkey sign-in (hook wiring) ───────────────────────────────────────

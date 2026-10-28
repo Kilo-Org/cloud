@@ -5,15 +5,15 @@ import {
   createAllowPredicateFromRestrictions,
   hasActiveModelRestrictions,
 } from '@kilocode/web-shared/lib/model-allow.server';
-import {
-  CUSTOM_LLM_PREFIX,
-  normalizeModelId,
-} from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
   formatDirectByokModelId,
+  getDirectByokCatalogModelId,
   getDirectByokModel,
+  supportsCatalogMode,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
-import { getBYOKforOrganization } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { getByokCredentials } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { readDb, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import {
   KILO_AUTO_BALANCED_MODEL,
@@ -32,6 +32,12 @@ import {
   isOrganizationAutoTargetModel,
   ORGANIZATION_AUTO_MODEL_FLAG,
 } from '@kilocode/web-shared/lib/organizations/organization-auto-model-shared';
+import {
+  isCustomRouterModelId,
+  ORG_CUSTOM_ROUTER_MODEL_PREFIX,
+  parseCustomRouterModelId,
+} from '@kilocode/auto-routing-contracts';
+import { findCustomRouter } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 
 type OrganizationAutoPolicyOrganization = Pick<Organization, 'id' | 'plan' | 'settings'>;
 
@@ -113,32 +119,72 @@ export async function validateOrganizationAutoTarget(
     return { kind: 'error', message: 'Organization Auto cannot target itself.' };
   }
 
-  if (rawModelId.startsWith(CUSTOM_LLM_PREFIX)) {
+  if (await isCustomLlm(rawModelId)) {
     return {
       kind: 'error',
       message: `Organization Auto route target '${targetModelId}' must be a Kilo-hosted model, supported auto tier, or organization-owned BYOK model.`,
     };
   }
 
+  if (isCustomRouterModelId(rawModelId)) {
+    const reference = parseCustomRouterModelId(rawModelId);
+    if (reference?.scope !== 'org') {
+      return {
+        kind: 'error',
+        message: `Organization Auto route target '${targetModelId}' must be one of this organization's custom routers (${ORG_CUSTOM_ROUTER_MODEL_PREFIX}<slug>).`,
+      };
+    }
+    const router = await findCustomRouter(
+      { type: 'org', id: organization.id },
+      reference.slug,
+      options.dbClient ?? readDb
+    );
+    if (!router) {
+      return {
+        kind: 'error',
+        message: `Organization Auto route target '${targetModelId}' is not a custom router of this organization.`,
+      };
+    }
+    return { kind: 'ok', modelId: rawModelId };
+  }
+
   const directByokTarget = await getDirectByokModel(rawModelId);
   if (directByokTarget.provider && directByokTarget.model) {
-    const byok = await getBYOKforOrganization(options.dbClient ?? readDb, organization.id, [
-      directByokTarget.provider.id,
-    ]);
-    if (!byok || byok.length === 0) {
+    const [credential] = await getByokCredentials(
+      options.dbClient ?? readDb,
+      { type: 'organization', id: organization.id },
+      [directByokTarget.provider.id]
+    );
+    if (!credential) {
       return {
         kind: 'error',
         message: `Organization Auto route target '${targetModelId}' is unavailable because this organization does not have an enabled BYOK credential for ${directByokTarget.provider.id}.`,
       };
     }
-    if (
-      options.apiKind &&
-      !directByokTarget.provider.supported_chat_apis.includes(options.apiKind)
-    ) {
+    const upstream = options.apiKind
+      ? await directByokTarget.provider.resolveUpstream({
+          credential: credential.decryptedAPIKey,
+          model: directByokTarget.model,
+          stream: false,
+        })
+      : null;
+    if (options.apiKind && !upstream?.supportedChatApis.includes(options.apiKind)) {
       return {
         kind: 'error',
         message: `Organization Auto route target '${targetModelId}' does not support the ${options.apiKind} API.`,
       };
+    }
+    // A catalog-mode key serves the model only under its catalog id, which organization model
+    // policies cover, so a stored bespoke target resolves to that id.
+    if (credential.serveCatalogModels && supportsCatalogMode(directByokTarget.provider.id)) {
+      const catalogModelId = await getDirectByokCatalogModelId(directByokTarget.model);
+      if (!catalogModelId) {
+        return {
+          kind: 'error',
+          message: `Organization Auto route target '${targetModelId}' is unavailable because this organization's ${directByokTarget.provider.id} key uses Kilo catalog model IDs and this model has no catalog ID.`,
+        };
+      }
+      return validateOrganizationAutoTarget(organization, catalogModelId, options);
     }
     return {
       kind: 'ok',
@@ -174,7 +220,7 @@ export async function validateOrganizationAutoTarget(
 
   let models;
   try {
-    models = await getEnhancedOpenRouterModels();
+    models = await getEnhancedOpenRouterModels({ countryCode: null });
   } catch {
     return {
       kind: 'error',

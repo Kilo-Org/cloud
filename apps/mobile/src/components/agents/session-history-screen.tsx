@@ -1,20 +1,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, KeyboardAvoidingView, Platform, View } from 'react-native';
+import { AppState, Keyboard, View } from 'react-native';
+import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useTranslation } from 'react-i18next';
 import { useFocusEffect, useNavigation } from 'expo-router';
 
 import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
-import { getSessionKeyboardContainerKind } from '@/components/agents/session-keyboard-container-state';
 import { AgentSessionListContent } from '@/components/agents/session-list-content';
-import { SessionListHeaderActions } from '@/components/agents/session-list-header-actions';
+import { SessionListHeader } from '@/components/agents/session-list-header';
 import { selectSessionListIsLoading } from '@/components/agents/session-list-loading';
 import { selectShowSearchBusy } from '@/components/agents/session-list-search-busy';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
 import { useAgentSessionListData } from '@/components/agents/use-agent-session-list-data';
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
+import { useNewSessionNavigator } from '@/components/agents/use-new-session-navigator';
 import { useSessionSearchInput } from '@/components/agents/use-session-search-input';
-import { AppAwareKeyboardPaddingView } from '@/components/kilo-chat/app-aware-keyboard-padding';
-import { ScreenHeader } from '@/components/screen-header';
 import { shouldLoadMoreSessions } from '@/lib/agent-session-pages';
 import { usePersistedAgentSessionFilters } from '@/lib/hooks/use-persisted-agent-session-filters';
 import { SESSION_FILTERS_KEY } from '@/lib/storage-keys';
@@ -22,10 +21,6 @@ import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useFencedDraftLoad } from '@/lib/persist/use-draft-load';
 import { SESSION_SEARCH_DRAFT_KEY } from '@/lib/persist/drafts';
 import { useOrganization } from '@/lib/organization-context';
-
-const noopCreateSession = () => {
-  // History owns no creation flow: the empty-state CTA is intentionally inert.
-};
 
 /**
  * Pushed sibling of the live Agents tab. Owns the stored session history with
@@ -35,7 +30,6 @@ const noopCreateSession = () => {
 export function SessionHistoryScreen() {
   const { t } = useTranslation();
   const navigation = useNavigation();
-  const keyboardContainerKind = getSessionKeyboardContainerKind(Platform.OS);
 
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
   const {
@@ -83,7 +77,7 @@ export function SessionHistoryScreen() {
     storedIsPending,
     storedFetchedSinceMount,
     paging,
-    handleRetry,
+    handleRetry: retryHistory,
     handleRefetch,
     isSearching,
     search,
@@ -97,6 +91,20 @@ export function SessionHistoryScreen() {
     ready,
     searchQuery,
   });
+
+  const [isRetrying, setIsRetrying] = useState(false);
+  const handleRetry = useCallback(() => {
+    setIsRetrying(true);
+    void (async () => {
+      try {
+        await retryHistory();
+      } catch {
+        setIsRetrying(false);
+        return;
+      }
+      setIsRetrying(false);
+    })();
+  }, [retryHistory]);
 
   const showSearchBusy = selectShowSearchBusy({
     awaitingCommit,
@@ -143,6 +151,14 @@ export function SessionHistoryScreen() {
   }, [navigation, refetchOutsidePull]);
 
   const navigateToSession = useAgentSessionNavigator();
+  const { openNewSession } = useNewSessionNavigator();
+
+  // The empty history's next step is a real session, in the current
+  // organization: the same destination the Agents tab's "New session" action
+  // opens, so history never dead-ends at a message.
+  const handleCreateSession = useCallback(() => {
+    openNewSession(organizationId);
+  }, [openNewSession, organizationId]);
 
   const handleEndReached = useCallback(() => {
     if (shouldLoadMoreSessions(paging)) {
@@ -174,13 +190,6 @@ export function SessionHistoryScreen() {
     storedIsPending,
   });
 
-  // Reserve the search header through the initial load too: the cold-open
-  // skeletons must sit in the same space the rows will land in, so the header
-  // (and the search input) cannot appear above the list only when the first
-  // rows arrive — that shifts the whole reserved area mid-swap. A genuinely
-  // empty account still drops the header once loading settles.
-  const showSearchHeader = hasAnySessions || isLoading;
-
   // One permanently mounted body inside one keyboard container: the empty-state
   // subtitle, the rows, the skeletons and the reserved refresh band all lift
   // with the keyboard, so the no-match copy is never drawn half-behind it. The
@@ -205,59 +214,51 @@ export function SessionHistoryScreen() {
       hasActiveQuery={hasActiveQuery}
       isSearching={isSearching}
       searchQuery={searchQuery}
+      isRetrying={isRetrying}
       onClearQuery={handleClearQuery}
-      onCreateSession={noopCreateSession}
+      onCreateSession={handleCreateSession}
     />
   );
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={t('common.agents')}
-        className="pb-2"
+      <SessionListHeader
+        title={t('agents.sessionList.pastSessions')}
         showBackButton
-        headerRight={
-          <SessionListHeaderActions
-            activeFilterCount={activeFilterCount}
-            showNewSession={false}
-            onNewSession={noopCreateSession}
-            onOpenFilters={() => {
-              setShowFilterModal(true);
-            }}
+        backFallback="/(app)/(tabs)/(2_agents)"
+        searchOpen
+        activeFilterCount={activeFilterCount}
+        onOpenFilters={() => {
+          Keyboard.dismiss();
+          setShowFilterModal(true);
+        }}
+        search={
+          <SessionListSearchHeader
+            inputRef={searchInputRef}
+            hasText={hasText}
+            showSearchBusy={showSearchBusy}
+            onChangeText={handleSearchInputChange}
+            onClearSearch={handleClearSearchInput}
+            defaultValue={searchDefaultValue}
+            inputKey={searchInputKey}
+            compact
+            inline
           />
         }
       />
-      {showSearchHeader ? (
-        <SessionListSearchHeader
-          inputRef={searchInputRef}
-          hasText={hasText}
-          showSearchBusy={showSearchBusy}
-          onChangeText={handleSearchInputChange}
-          onClearSearch={handleClearSearchInput}
-          defaultValue={searchDefaultValue}
-          inputKey={searchInputKey}
-        />
-      ) : null}
-      {keyboardContainerKind === 'app-aware-padding' ? (
-        <AppAwareKeyboardPaddingView className="flex-1">
-          {sessionListBody}
-        </AppAwareKeyboardPaddingView>
-      ) : (
-        <KeyboardAvoidingView className="flex-1" behavior="padding">
-          {sessionListBody}
-        </KeyboardAvoidingView>
-      )}
-      {showFilterModal && (
-        <SessionFilterModal
-          selectedPlatforms={platformFilter}
-          selectedProjects={projectFilter}
-          projectOptions={projectOptions}
-          onClose={() => {
-            setShowFilterModal(false);
-          }}
-          onApply={setFilters}
-        />
-      )}
+      <KeyboardAvoidingView className="flex-1" behavior="padding">
+        {sessionListBody}
+      </KeyboardAvoidingView>
+      <SessionFilterModal
+        visible={showFilterModal}
+        selectedPlatforms={platformFilter}
+        selectedProjects={projectFilter}
+        projectOptions={projectOptions}
+        onClose={() => {
+          setShowFilterModal(false);
+        }}
+        onApply={setFilters}
+      />
     </View>
   );
 }

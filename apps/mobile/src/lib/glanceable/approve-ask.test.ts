@@ -55,17 +55,15 @@ const buildActiveSessionsTrayInput = vi.fn((organizationId: string | null) => ({
 vi.mock('@/lib/active-sessions-live', () => ({ buildActiveSessionsTrayInput }));
 const readWaitingAsk = vi.fn();
 const recordWaitingAsk = vi.fn();
-vi.mock('./waiting-ask', () => ({ readWaitingAsk, recordWaitingAsk }));
+const getWaitingAsk = vi.fn(() => null);
+vi.mock('./waiting-ask', () => ({ readWaitingAsk, recordWaitingAsk, getWaitingAsk }));
 const createGlanceablePublisher = vi.fn();
 vi.mock('./create-publisher', () => ({ createGlanceablePublisher }));
 
 const { trpcClient } = await import('@/lib/trpc');
-const {
-  answerSessionPermission,
-  NotApprovableError,
-  refreshGlanceableSnapshot,
-  runGlanceableApprove,
-} = await import('@/lib/glanceable/approve-ask');
+const { answerSessionPermission, refreshGlanceableSnapshot, runGlanceableApprove } =
+  await import('@/lib/glanceable/approve-ask');
+const { NotApprovableError } = await import('@/lib/glanceable/cloud-agent-session');
 // The pending-permission read is its own module; this suite owns its cases too.
 const { PendingPermissionTimeoutError, resolvePendingPermissionId } =
   await import('@/lib/glanceable/pending-permission');
@@ -120,6 +118,8 @@ const PERMISSION_ASK = {
   organizationId: null,
   userId: 'user_1',
   recordedAt: 1,
+  statusUpdatedAt: '2026-01-01T00:00:00.000Z',
+  boundPermissionId: 'perm_1',
 };
 
 function withCode(code: string): Error {
@@ -325,6 +325,30 @@ describe('runGlanceableApprove', () => {
     expect(recordWaitingAsk).toHaveBeenCalledWith(null);
   });
 
+  it('is gone, and answers nothing, when the live request is not the bound one', async () => {
+    // The ask names `perm_1`; the live projection names `perm_2`. Only the
+    // request the ask names is answered, so this tap answers nothing.
+    readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
+    createConnection.mockImplementation(fakeStream([connectedFrame(['perm_2'])]).open);
+    await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'gone', replaced: true });
+    expect(answerPermissionMutate).not.toHaveBeenCalled();
+    expect(recordWaitingAsk).not.toHaveBeenCalled();
+    // The session still waits on the live request, so its raise is not acked.
+    expect(isAttentionAcked('ses_1', { raiseId: 'permission' })).toBe(false);
+  });
+
+  it('is retryable, with no request read, while the ask names no request', async () => {
+    // A record with no binding cannot name a request, so the tap resolves
+    // nothing and answers nothing.
+    readWaitingAsk.mockResolvedValue({ ...PERMISSION_ASK, boundPermissionId: null });
+    await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'retryable' });
+    expect(getSessionQuery).not.toHaveBeenCalled();
+    expect(fetchCloudAgentStreamTicket).not.toHaveBeenCalled();
+    expect(answerPermissionMutate).not.toHaveBeenCalled();
+    expect(recordWaitingAsk).not.toHaveBeenCalled();
+    expect(isAttentionAcked('ses_1', { raiseId: 'permission' })).toBe(false);
+  });
+
   it('acks the answered raise so the republish counts it as answered', async () => {
     // The tray row keeps reading permission until the control plane's status
     // sync lands, and the caller republishes immediately after this resolves.
@@ -334,7 +358,21 @@ describe('runGlanceableApprove', () => {
     readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
     answerPermissionMutate.mockResolvedValue(undefined);
     await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'approved' });
-    expect(isAttentionAcked('ses_1', null)).toBe(true);
+    expect(isAttentionAcked('ses_1', { raiseId: 'permission' })).toBe(true);
+  });
+
+  it('acks the raise its ask recorded, not whatever raise is observed next', async () => {
+    readWaitingAsk.mockResolvedValue({
+      ...PERMISSION_ASK,
+      statusUpdatedAt: '2026-09-18T21:00:00.000Z',
+    });
+    answerPermissionMutate.mockResolvedValue(undefined);
+
+    await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'approved' });
+
+    expect(isAttentionAcked('ses_1', { raiseId: '2026-09-18T21:00:00.000Z' })).toBe(true);
+    // A permission raised after the answered one is not suppressed.
+    expect(isAttentionAcked('ses_1', { raiseId: '2026-09-18T21:30:00.000Z' })).toBe(false);
   });
 
   it('acks a raise proven gone, and never acks a retryable failure', async () => {
@@ -343,20 +381,20 @@ describe('runGlanceableApprove', () => {
     readWaitingAsk.mockResolvedValue(PERMISSION_ASK);
     answerPermissionMutate.mockRejectedValue(withCode('NOT_FOUND'));
     await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'gone' });
-    expect(isAttentionAcked('ses_1', null)).toBe(true);
+    expect(isAttentionAcked('ses_1', { raiseId: 'permission' })).toBe(true);
 
     // Retryable keeps the ask live: the next tap has to answer that same
     // session, so an ack here would hide the raise the user must retry.
     __resetSessionAttentionForTests();
     answerPermissionMutate.mockRejectedValue(new Error('network down'));
     await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'retryable' });
-    expect(isAttentionAcked('ses_1', null)).toBe(false);
+    expect(isAttentionAcked('ses_1', { raiseId: 'permission' })).toBe(false);
   });
 
   it('does not ack an ask it never answered', async () => {
     readWaitingAsk.mockResolvedValue({ ...PERMISSION_ASK, isCloudAgent: false });
     await expect(runGlanceableApprove()).resolves.toEqual({ kind: 'none' });
-    expect(isAttentionAcked('ses_1', null)).toBe(false);
+    expect(isAttentionAcked('ses_1', { raiseId: 'permission' })).toBe(false);
   });
 
   it.each([
@@ -506,7 +544,7 @@ describe('refreshGlanceableSnapshot', () => {
   const ctx = { userId: 'user_1', organizationId: null };
 
   function makePublisher() {
-    return { handleSessions: vi.fn() };
+    return { handleSessions: vi.fn(), redraw: vi.fn() };
   }
 
   beforeEach(() => {
@@ -525,6 +563,10 @@ describe('refreshGlanceableSnapshot', () => {
     expect(fetchRows).toHaveBeenCalledTimes(1);
     expect(publisher.handleSessions).toHaveBeenCalledTimes(1);
     expect(publisher.handleSessions).toHaveBeenCalledWith(rows, ctx);
+    // The frame is written again after the ask's request binding settles, so
+    // the card the headless process leaves behind offers Approve for the ask it
+    // names.
+    expect(publisher.redraw).toHaveBeenCalledTimes(1);
   });
 
   it('counts a raise the answer acked as answered while its tray row still trails', async () => {
@@ -533,7 +575,7 @@ describe('refreshGlanceableSnapshot', () => {
     // row would republish the pre-action snapshot — the answered session still
     // waiting — on the ongoing card and the widget, which is what the ack is
     // for. The poll still reads the raw row: that is what proves the sync.
-    ackSessionAttention('ses_1');
+    ackSessionAttention('ses_1', 'permission');
     const publisher = makePublisher();
     const rows = [{ id: 'ses_1', status: 'permission' }];
     const fetchRows = vi.fn(async () => rows);
@@ -653,6 +695,9 @@ describe('refreshGlanceableSnapshot', () => {
     // discarding it after selection left a second waiting session unrecorded.
     expect(createGlanceablePublisher).toHaveBeenCalledWith({
       skipWaitingAskSessionId: 'ses_1',
+      // The refresh awaits the binding itself and redraws; its publisher is
+      // thrown away, so it must not leave a listener behind.
+      redrawOnAskBound: false,
     });
     expect(publisher.handleSessions).toHaveBeenCalledTimes(1);
   });
@@ -673,6 +718,7 @@ describe('refreshGlanceableSnapshot', () => {
     // the same session, so the refresh passes no skip at all.
     expect(createGlanceablePublisher).toHaveBeenCalledWith({
       skipWaitingAskSessionId: undefined,
+      redrawOnAskBound: false,
     });
     expect(publisher.handleSessions).toHaveBeenCalledTimes(1);
   });

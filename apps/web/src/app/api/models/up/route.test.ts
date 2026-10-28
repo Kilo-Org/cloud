@@ -8,14 +8,16 @@ jest.mock('@kilocode/web-shared/lib/dotenvx', () => ({
   getEnvVariable: (name: string) => `test-${name}`,
 }));
 
+let mockMonitoredModelsError: Error | null = null;
+
 jest.mock('@kilocode/web-shared/lib/ai-gateway/preferred-models', () => ({
-  getMonitoredModels: async () => [
-    'poolside/laguna-s-2.1:free',
-    'minimax/minimax-m3',
-    'minimax/minimax-m3:free',
-  ],
+  getMonitoredModels: async () => {
+    if (mockMonitoredModelsError) throw mockMonitoredModelsError;
+    return ['poolside/laguna-s-2.1:free', 'minimax/minimax-m3', 'minimax/minimax-m3:free'];
+  },
 }));
 
+import { captureException } from '@sentry/nextjs';
 import { GET } from './route';
 
 function makeRequest() {
@@ -35,6 +37,7 @@ describe('GET /api/models/up', () => {
   let fetchSpy: jest.SpyInstance;
 
   beforeEach(() => {
+    mockMonitoredModelsError = null;
     fetchSpy = jest.spyOn(global, 'fetch').mockResolvedValue(
       analyticsEngineResponse([
         {
@@ -75,6 +78,20 @@ describe('GET /api/models/up', () => {
       healthy: true,
       currentRequests: 80,
     });
+  });
+
+  it('fails closed without querying when the monitored model list is unavailable', async () => {
+    const error = new Error('No monitored models');
+    mockMonitoredModelsError = error;
+    const consoleError = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    const response = await GET(makeRequest());
+
+    expect(response.status).toBe(500);
+    expect(await response.json()).toEqual({ healthy: false, error: 'No monitored models' });
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(captureException).toHaveBeenCalledWith(error, expect.anything());
+    consoleError.mockRestore();
   });
 
   it('queries each normalized model ID once', async () => {

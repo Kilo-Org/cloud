@@ -1,11 +1,14 @@
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { GitPullRequest } from '@/components/ui/icons';
+import { FlashList } from '@shopify/flash-list';
 import { type ReactNode, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { FlatList, Pressable, View } from 'react-native';
+import { Pressable, View, type ViewStyle } from 'react-native';
 import Animated, { FadeOut } from 'react-native-reanimated';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { type CodeReviewStatus, isCodeReviewStatus } from '@kilocode/app-shared/code-review';
+import { useSinglePushRoute } from '@/components/code-reviewer/use-single-push-route';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -14,11 +17,19 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useGitHubStatus, useGitLabStatus } from '@/lib/hooks/use-code-reviewer';
 import { useReviewList } from '@/lib/hooks/use-code-reviews';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 import { dedupeById } from '@/lib/query/dedupe-by-id';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
+
+const listStyle = { flex: 1 } satisfies ViewStyle;
+
+// The gutter each row keeps inside the safe-area side insets. In landscape those
+// insets are what clear the sensor housing, so a title never starts under it;
+// portrait insets are zero and this gutter is the whole margin.
+const LIST_CONTENT_GUTTER = 24;
 
 // Tone classes stay mobile-local; the label is the translated catalog key
 // for the same stable status code web reads, so it can't drift from web.
@@ -35,8 +46,8 @@ const STATUS_CLASSNAME = {
 const STATUS_KEY = {
   pending: 'common.pending',
   queued: 'common.queued',
-  running: 'codeReviewer.status.running',
-  completed: 'codeReviewer.status.completed',
+  running: 'common.running',
+  completed: 'common.completed',
   failed: 'common.failed',
   cancelled: 'common.cancelled',
   interrupted: 'codeReviewer.status.interrupted',
@@ -83,9 +94,20 @@ function ReviewListFooter({
 }
 
 export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const paddingBottom = useTabBarBottomPadding();
+  const insets = useSafeAreaInsets();
+  // One style for the whole content container: every row starts at the same
+  // offset, including the recycled ones, and a rotation re-derives it once.
+  const listContentContainerStyle = useMemo<ViewStyle>(
+    () => ({
+      paddingTop: 16,
+      paddingLeft: insets.left + LIST_CONTENT_GUTTER,
+      paddingRight: insets.right + LIST_CONTENT_GUTTER,
+    }),
+    [insets.left, insets.right]
+  );
   const {
     data,
     isLoading,
@@ -133,11 +155,12 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
         description={t('codeReviewer.reviewList.noReviewsDescription')}
         action={
           <Button
+            className={STATE_ACTION_CLASS}
             onPress={() => {
-              router.push(
+              pushOnce(
                 (hasConnectedProvider
-                  ? `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/manual-review`
-                  : `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}`) as Href
+                  ? `/(app)/code-reviewer/${scope}/manual-review`
+                  : `/(app)/code-reviewer/${scope}`) as Href
               );
             }}
           >
@@ -171,7 +194,8 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
     );
   } else {
     body = (
-      <FlatList
+      <FlashList
+        style={listStyle}
         data={reviews}
         keyExtractor={review => review.id}
         renderItem={({ item: review, index }) => {
@@ -184,9 +208,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
                 index < reviews.length - 1 && 'border-b-[0.5px] border-hair-soft'
               )}
               onPress={() => {
-                router.push(
-                  `/(app)/(tabs)/(3_profile)/code-reviewer/${scope}/reviews/${review.id}` as Href
-                );
+                pushOnce(`/(app)/code-reviewer/${scope}/reviews/${review.id}` as Href);
               }}
             >
               <Text className="text-sm font-medium" numberOfLines={1}>
@@ -204,7 +226,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
             </Pressable>
           );
         }}
-        contentContainerClassName="px-6 pt-4"
+        contentContainerStyle={listContentContainerStyle}
         onEndReached={() => {
           // Once the next page has failed, auto-loading re-fires on every
           // content-size change (the footer grows/shrinks as the fetch

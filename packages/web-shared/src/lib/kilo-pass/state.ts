@@ -1,10 +1,10 @@
 import 'server-only';
 
 import { kilo_pass_store_purchases, kilo_pass_subscriptions } from '@kilocode/db/schema';
+import type { StripeSubscriptionStatus } from '@kilocode/db/schema-types';
 
 import type { DrizzleTransaction, db as defaultDb } from '@kilocode/web-shared/lib/drizzle';
 import { and, desc, eq } from 'drizzle-orm';
-import type Stripe from 'stripe';
 import {
   type KiloPassPaymentProvider,
   KiloPassPaymentProvider as KiloPassPaymentProviderValue,
@@ -25,7 +25,7 @@ export type KiloPassSubscriptionState = {
   providerSubscriptionId: string | null;
   tier: KiloPassTier;
   cadence: KiloPassCadence;
-  status: Stripe.Subscription.Status;
+  status: StripeSubscriptionStatus;
   cancelAtPeriodEnd: boolean;
   currentStreakMonths: number;
   nextYearlyIssueAt: string | null;
@@ -40,7 +40,7 @@ type KiloPassSubscriptionRowForState = {
   providerSubscriptionId: string | null;
   tier: KiloPassTier;
   cadence: KiloPassCadence;
-  status: Stripe.Subscription.Status;
+  status: StripeSubscriptionStatus;
   cancelAtPeriodEnd: boolean;
   currentStreakMonths: number;
   nextYearlyIssueAt: string | null;
@@ -87,15 +87,12 @@ function isExpiredAtOrBeforeNow(expiresAt: string | null, nowIso: string): boole
  * Active subscriptions are preferred, then pending cancellation, then ended.
  */
 function getStatusPriority(row: KiloPassSubscriptionRowForState): number {
-  // Active and not pending cancellation is highest priority
   if (row.status === 'active' && !row.cancelAtPeriodEnd) return 0;
-  // Active but pending cancellation
   if (row.status === 'active' && row.cancelAtPeriodEnd) return 1;
   // Trialing is also considered active-ish
   if (row.status === 'trialing') return 2;
   // Past due - still has access but payment issues
   if (row.status === 'past_due') return 3;
-  // Paused
   if (row.status === 'paused') return 4;
   // Incomplete - initial payment pending
   if (row.status === 'incomplete') return 5;
@@ -184,9 +181,9 @@ export async function getKiloPassStateForUser(
   // Check for an open pause event. Stripe keeps status 'active' when pause_collection
   // is first set (the status changes to 'paused' only at the next billing cycle), so we
   // derive the paused state from the pause event table rather than the DB status.
-  const openPause = await getOpenPauseEvent(db, {
-    kiloPassSubscriptionId: selected.subscriptionId,
-  });
+  const openPause = isStripeSubscriptionEnded(selected.status)
+    ? null
+    : await getOpenPauseEvent(db, { kiloPassSubscriptionId: selected.subscriptionId });
   const isPaused = openPause != null;
   const resumesAt =
     isPaused && openPause.resumes_at ? normalizeTimestampToIso(openPause.resumes_at) : null;

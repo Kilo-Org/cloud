@@ -10,9 +10,9 @@ import {
 
 import { t } from '../auth.js';
 import { parseSessionMetadata, type SessionMetadata } from '../../persistence/session-metadata.js';
-import type * as SessionPlane from '../../session-plane.js';
+import type * as SessionPlane from '../../session-identity.js';
 import type { TRPCContext } from '../../types.js';
-import { sha256Hex } from '../../utils/sha256.js';
+import { sha256Hex } from '@kilocode/worker-utils/sha256';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
 import { CreateWorktreeChatInput, createSessionWorktreeHandlers } from './session-worktree.js';
 
@@ -61,11 +61,11 @@ vi.mock('./organization-membership.js', () => ({
   assertOrganizationMembership: assertOrganizationMembershipMock,
 }));
 
-vi.mock('../../session-plane.js', async importOriginal => {
+vi.mock('../../session-identity.js', async importOriginal => {
   const original = await importOriginal<typeof SessionPlane>();
   return {
     ...original,
-    generateSessionId: (plane: string) => generateSessionIdMock(plane),
+    generateSessionId: () => generateSessionIdMock(),
   };
 });
 
@@ -106,6 +106,14 @@ const LEDGER_ROW_ID = 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee';
 const SHARED_SANDBOX_ID = 'usr-aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
 const INTERNAL_SECRET = 'test-internal-secret';
 const CURRENT_AUTH_TOKEN = 'current-customer-token';
+const BYOC_PROVIDER_BINDING = {
+  kind: 'vercel',
+  source: {
+    kind: 'byoc',
+    organizationId: ORGANIZATION_ID,
+    credentialId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+  },
+} as const;
 
 const router = t.router(createSessionWorktreeHandlers());
 
@@ -119,6 +127,7 @@ type OwnershipFixture = {
   parentSessionId: string | null;
   cloudAgentSessionScopeId: string | null;
   gitUrl: string | null;
+  profileId?: string | null;
 };
 
 function sourceMetadata(options?: {
@@ -179,6 +188,7 @@ function sourceMetadataWithPreset(sandboxAllocation: SandboxAllocation): Session
       ...metadata.workspace,
       sandboxId,
       sandboxProvider,
+      ...(sandboxProvider === 'vercel' ? { sandboxProviderBinding: BYOC_PROVIDER_BINDING } : {}),
       sandboxAllocation,
       sandboxRoute:
         sandboxAllocation === 'cloudflare-shared'
@@ -271,7 +281,6 @@ function fixture(options?: {
   metadata?: SessionMetadata;
   ownershipResults?: OwnershipFixture[][];
   internalSecret?: string;
-  controlPlaneIds?: string;
   runtimeIsolationEnabled?: string;
   botId?: string;
   authToken?: string;
@@ -285,6 +294,7 @@ function fixture(options?: {
     cloudAgentSessionId: metadata.identity.sessionId,
     cloudAgentSessionScopeId: metadata.identity.sessionId,
     kiloSessionId: metadata.auth.kiloSessionId ?? SOURCE_KILO_SESSION_ID,
+    profileId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   });
   const db = makeDb(options?.ownershipResults ?? [[source]]);
   getPgDbMock.mockReturnValue(db);
@@ -316,8 +326,6 @@ function fixture(options?: {
     env: {
       INTERNAL_API_SECRET: INTERNAL_SECRET,
       NEXTAUTH_SECRET: 'runtime-authorization-test-secret',
-      CONTROL_PLANE_IDS: options?.controlPlaneIds ?? '*',
-      WORKTREE_CREATION_ENABLED_IDS: '',
       RUNTIME_ISOLATION_ENABLED: options?.runtimeIsolationEnabled ?? 'true',
       HYPERDRIVE: { connectionString: 'postgres://worktree-handler-test' },
       SANDBOX_SESSION: sandboxSessionNamespace,
@@ -445,6 +453,27 @@ describe('createWorktreeChat request validation and authorization', () => {
       CreateWorktreeChatInput.safeParse({ ...input, clientProvenance: 'mobile' }).success
     ).toBe(false);
     expect(CreateWorktreeChatInput.safeParse({ ...input, unexpected: true }).success).toBe(false);
+  });
+
+  it('creates the chat under a client-proposed session id and rejects a malformed one', async () => {
+    const { caller, input } = fixture();
+    const proposed = 'ses_0123456789abABCDEFGHIJKLMN';
+    createSessionForCloudAgentMock.mockResolvedValueOnce({
+      status: 'ready',
+      clone: { sessionId: proposed, copiedItemCount: 0 },
+    });
+
+    expect(
+      CreateWorktreeChatInput.safeParse({ ...input, kiloSessionId: `${proposed.slice(0, -1)}-` })
+        .success
+    ).toBe(false);
+    await expect(
+      caller.createWorktreeChat({ ...input, kiloSessionId: proposed })
+    ).resolves.toMatchObject({ kiloSessionId: proposed });
+    expect(generateKiloSessionIdMock).not.toHaveBeenCalled();
+    expect(createSessionForCloudAgentMock).toHaveBeenCalledWith(
+      expect.objectContaining({ sessionId: proposed })
+    );
   });
 
   it('requires a user token before loading source ownership', async () => {
@@ -584,19 +613,77 @@ describe('createWorktreeChat request validation and authorization', () => {
     expect(admitOperationMock).not.toHaveBeenCalled();
   });
 
-  it('creates a sibling for a grouped owner no longer enrolled in the control plane', async () => {
-    const { caller, input } = fixture({ controlPlaneIds: 'another-owner' });
+  it('creates a sibling for a grouped owner', async () => {
+    const { caller, input } = fixture();
 
     await expect(caller.createWorktreeChat(input)).resolves.toEqual({
       cloudAgentSessionId: DESTINATION_WORKSPACE_ID,
       kiloSessionId: DESTINATION_KILO_SESSION_ID,
       worktreeId: WORKTREE_ID,
     });
-    expect(generateSessionIdMock).toHaveBeenCalledWith('control');
+    expect(generateSessionIdMock).toHaveBeenCalledWith();
   });
 });
 
 describe('createWorktreeChat sandbox preset inheritance', () => {
+  it.each([undefined, [], ['example.com']].map(egressAllowlist => ({ egressAllowlist })))(
+    'inherits the native allocation policy %j',
+    async ({ egressAllowlist }) => {
+      const metadata = sourceMetadataWithPreset('cloudflare-containers-standard-3');
+      metadata.workspace = {
+        ...metadata.workspace,
+        egressMode: 'allowlist',
+        egressAllowlist,
+      };
+      const { caller, input, destinationStub } = fixture({
+        metadata,
+        organizationId: ORGANIZATION_ID,
+      });
+      await caller.createWorktreeChat(input);
+      expect(destinationStub.registerSessionFromMetadata).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            workspace: expect.objectContaining({ egressMode: 'allowlist', egressAllowlist }),
+          }),
+          sandboxSelection: expect.objectContaining({ egressMode: 'allowlist' }),
+        })
+      );
+      const registered = destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0];
+      expect(registered?.sandboxSelection.egressAllowlist).toEqual(egressAllowlist);
+    }
+  );
+
+  it('rejects a changed inherited policy on same-key replay', async () => {
+    const metadata = sourceMetadataWithPreset('cloudflare-containers-standard-3');
+    metadata.workspace = {
+      ...metadata.workspace,
+      egressMode: 'allowlist',
+      egressAllowlist: [],
+    };
+    const source = ownershipRow({ organizationId: ORGANIZATION_ID });
+    const { caller, input, destinationStub } = fixture({
+      metadata,
+      organizationId: ORGANIZATION_ID,
+      ownershipResults: [[source], [source]],
+    });
+    await caller.createWorktreeChat(input);
+    const progress = recordOperationProgressMock.mock.calls[0]?.[2] as Record<string, unknown>;
+    metadata.workspace = { ...metadata.workspace, egressAllowlist: ['example.com'] };
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: ledgerRow({
+        organization_id: ORGANIZATION_ID,
+        status: 'completed',
+        canonical_result: progress,
+      }),
+    });
+    await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'operation_key_reuse_mismatch',
+    });
+    expect(destinationStub.registerSessionFromMetadata).toHaveBeenCalledTimes(1);
+  });
+
   it.each(SELECTABLE_SANDBOX_ALLOCATIONS)(
     'inherits %s after control-plane and selection rollouts are disabled',
     async sandboxAllocation => {
@@ -606,10 +693,11 @@ describe('createWorktreeChat sandbox preset inheritance', () => {
         organizationId: ORGANIZATION_ID,
       });
       context.env.SANDBOX_SELECTION_IDS = '';
-      context.env.CONTROL_PLANE_IDS = '';
       context.env.PER_SESSION_SANDBOX_ORG_IDS =
         sandboxAllocation === 'cloudflare-shared' ? '*' : '';
-      context.env.VERCEL_SANDBOX_ORG_IDS = sandboxAllocation.startsWith('vercel-') ? '' : '*';
+      Object.assign(context.env, {
+        VERCEL_SANDBOX_ORG_IDS: sandboxAllocation.startsWith('vercel-') ? '' : '*',
+      });
       context.env.CREDENTIAL_CONTAINMENT_ENABLED = 'true';
       await caller.createWorktreeChat(input);
       const registration = destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0];
@@ -773,8 +861,7 @@ describe('createWorktreeChat sandbox preset inheritance', () => {
     await caller.createWorktreeChat(input);
     const progress = recordOperationProgressMock.mock.calls[0]?.[2] as Record<string, unknown>;
     context.env.SANDBOX_SELECTION_IDS = '';
-    context.env.CONTROL_PLANE_IDS = '';
-    context.env.VERCEL_TOKEN = '';
+    Object.assign(context.env, { VERCEL_TOKEN: '' });
     admitOperationMock.mockResolvedValueOnce({
       admission: 'duplicate_settled',
       row: ledgerRow({
@@ -950,6 +1037,7 @@ describe('createWorktreeChat ownership, metadata, and control-plane routing', ()
       },
       organizationId: undefined,
       createdOnPlatform: 'cloud-agent-web',
+      profileId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       title: expect.stringMatching(/^New session - /),
       gitUrl: 'https://github.com/acme/repo',
     });
@@ -981,7 +1069,7 @@ describe('createWorktreeChat ownership, metadata, and control-plane routing', ()
     expect(legacySessionNamespace.get).not.toHaveBeenCalled();
     expect(sandboxControlNamespace.get).not.toHaveBeenCalled();
     expect(destinationStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
-    expect(generateSessionIdMock).toHaveBeenCalledWith('control');
+    expect(generateSessionIdMock).toHaveBeenCalledWith();
   });
 
   it('does not create ownership when canonical operation progress cannot be recorded', async () => {
@@ -993,45 +1081,94 @@ describe('createWorktreeChat ownership, metadata, and control-plane routing', ()
     expect(destinationStub.registerSessionFromMetadata).not.toHaveBeenCalled();
   });
 
-  it('preserves an organization-scoped isolated Vercel route without copying provider runtime', async () => {
-    const metadata = sourceMetadata({ organizationId: ORGANIZATION_ID });
-    metadata.workspace = {
-      ...metadata.workspace,
-      sandboxId: 'ses-0123456789abcdef',
-      sandboxProvider: 'vercel',
-      sandboxRoute: undefined,
-      providerRuntime: { provider: 'vercel', sessionId: 'vercel-instance' },
-    };
-    const { caller, input, destinationStub } = fixture({
-      organizationId: ORGANIZATION_ID,
-      metadata,
-    });
+  it.each([undefined, { kind: 'vercel', source: { kind: 'platform' } }] as const)(
+    'rejects a retired Vercel sibling binding %j without creating customer compute',
+    async sandboxProviderBinding => {
+      const metadata = sourceMetadata({ organizationId: ORGANIZATION_ID });
+      metadata.workspace = {
+        ...metadata.workspace,
+        sandboxId: 'ses-0123456789abcdef',
+        sandboxProvider: 'vercel',
+        sandboxProviderBinding,
+        sandboxRoute: undefined,
+      };
+      const { caller, input, destinationStub } = fixture({
+        organizationId: ORGANIZATION_ID,
+        metadata,
+      });
+      await expect(caller.createWorktreeChat(input)).rejects.toThrow(
+        'Kilo-paid Vercel compute is retired'
+      );
+      expect(destinationStub.registerSessionFromMetadata).not.toHaveBeenCalled();
+      expect(createSessionForCloudAgentMock).not.toHaveBeenCalled();
+      expect(admitOperationMock).not.toHaveBeenCalled();
+    }
+  );
 
-    await caller.createWorktreeChat(input);
+  it.each([BYOC_PROVIDER_BINDING] as const)(
+    'inherits the isolated Vercel provider binding %j without copying provider runtime',
+    async sandboxProviderBinding => {
+      const metadata = sourceMetadata({ organizationId: ORGANIZATION_ID });
+      metadata.workspace = {
+        ...metadata.workspace,
+        sandboxId: 'ses-0123456789abcdef',
+        sandboxProvider: 'vercel',
+        sandboxProviderBinding,
+        sandboxRoute: undefined,
+        providerRuntime: { provider: 'vercel', sessionId: 'vercel-instance' },
+      };
+      const { caller, input, destinationStub } = fixture({
+        organizationId: ORGANIZATION_ID,
+        metadata,
+      });
 
-    expect(assertOrganizationMembershipMock).toHaveBeenCalledWith(
-      expect.anything(),
-      USER_ID,
-      ORGANIZATION_ID
-    );
-    expect(destinationStub.registerSessionFromMetadata).toHaveBeenCalledWith(
-      expect.objectContaining({
-        metadata: expect.objectContaining({
-          identity: expect.objectContaining({ orgId: ORGANIZATION_ID }),
-          workspace: expect.objectContaining({
-            sandboxId: 'ses-0123456789abcdef',
-            sandboxProvider: 'vercel',
-            worktreeId: WORKTREE_ID,
-            workspacePath: getWorktreeWorkspacePath(ORGANIZATION_ID, USER_ID, WORKTREE_ID),
+      await caller.createWorktreeChat(input);
+
+      expect(assertOrganizationMembershipMock).toHaveBeenCalledWith(
+        expect.anything(),
+        USER_ID,
+        ORGANIZATION_ID
+      );
+      expect(destinationStub.registerSessionFromMetadata).toHaveBeenCalledWith(
+        expect.objectContaining({
+          metadata: expect.objectContaining({
+            identity: expect.objectContaining({ orgId: ORGANIZATION_ID }),
+            workspace: expect.objectContaining({
+              sandboxId: 'ses-0123456789abcdef',
+              sandboxProvider: 'vercel',
+              sandboxProviderBinding,
+              worktreeId: WORKTREE_ID,
+              workspacePath: getWorktreeWorkspacePath(ORGANIZATION_ID, USER_ID, WORKTREE_ID),
+            }),
           }),
-        }),
-      })
-    );
-    const registration = destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0];
-    expect(registration?.metadata.workspace).not.toHaveProperty('providerRuntime');
-    expect(registration?.metadata.repository).not.toHaveProperty('token');
-    expect(registration?.metadata.auth.kilocodeToken).toBe(CURRENT_AUTH_TOKEN);
-  });
+        })
+      );
+      const registration = destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0];
+      expect(registration?.metadata.workspace).not.toHaveProperty('providerRuntime');
+      expect(registration?.metadata.repository).not.toHaveProperty('token');
+      expect(registration?.metadata.auth.kilocodeToken).toBe(CURRENT_AUTH_TOKEN);
+    }
+  );
+
+  it.each(['kilo/generated-assigned-branch', 'feature/assigned-branch'])(
+    'inherits the assigned workspace branch %s instead of the upstream branch',
+    async branchName => {
+      const metadata = sourceMetadata();
+      if (!metadata.workspace || !metadata.repository) throw new Error('Missing source metadata');
+      metadata.workspace.branchName = branchName;
+      metadata.repository.upstreamBranch = 'main';
+      const { caller, input, destinationStub, sandboxControlNamespace } = fixture({ metadata });
+
+      await caller.createWorktreeChat(input);
+
+      const registered = destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0]?.metadata;
+      expect(registered?.workspace?.branchName).toBe(branchName);
+      expect(registered?.repository?.upstreamBranch).toBe('main');
+      expect(registered?.lifecycle.preparedAt).toBeUndefined();
+      expect(destinationStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+      expect(sandboxControlNamespace.get).not.toHaveBeenCalled();
+    }
+  );
 
   it('preserves the legacy branch fallback for branchless source metadata', async () => {
     const metadata = sourceMetadata();
@@ -1049,6 +1186,35 @@ describe('createWorktreeChat ownership, metadata, and control-plane routing', ()
         }),
       })
     );
+  });
+
+  it('derives sibling spawn permission from the interactive origin and never copies delegated lineage', async () => {
+    for (const scope of [
+      { allowSubagentSessions: true },
+      { parentCloudAgentSessionId: SOURCE_WORKSPACE_ID },
+    ]) {
+      const metadata = { ...sourceMetadata(), ...scope };
+      const { caller, input, destinationStub } = fixture({ metadata });
+      await caller.createWorktreeChat(input);
+      const registration = destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0];
+      expect(registration?.metadata.profile?.envVars).toEqual(metadata.profile?.envVars);
+      expect(registration?.metadata.allowSubagentSessions).toBe(false);
+      expect(registration?.metadata.parentCloudAgentSessionId).toBeUndefined();
+    }
+  });
+
+  it('grants sibling spawn permission when the interactive source is isolated', async () => {
+    verifyKiloTokenForPolicyMock.mockResolvedValue({
+      claims: { aud: 'cloud-agent-next', runtimeAdmission: {} },
+    });
+    const metadata = sourceMetadataWithPreset('cloudflare-containers-standard-3');
+    const { caller, input, destinationStub } = fixture({
+      metadata,
+      organizationId: ORGANIZATION_ID,
+    });
+    await caller.createWorktreeChat(input);
+    const registration = destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0];
+    expect(registration?.metadata.allowSubagentSessions).toBe(true);
   });
 });
 
@@ -1136,6 +1302,19 @@ describe('createWorktreeChat operation-ledger replay and conflict handling', () 
       expect(createSessionForCloudAgentMock).not.toHaveBeenCalled();
     }
   );
+
+  it('rejects a same-key retry that proposes a different session id', async () => {
+    const { caller, input } = fixture();
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_settled',
+      row: ledgerRow({ status: 'completed', canonical_result: await progressFor(input) }),
+    });
+
+    await expect(
+      caller.createWorktreeChat({ ...input, kiloSessionId: 'ses_0123456789abABCDEFGHIJKLMN' })
+    ).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect(createSessionForCloudAgentMock).not.toHaveBeenCalled();
+  });
 
   it('does not replay IDs from a failed settled operation', async () => {
     const { caller, input } = fixture();
@@ -1349,6 +1528,57 @@ describe('createWorktreeChat registration rollback and unknown-outcome reconcili
     expect(destinationStub.registerSessionFromMetadata).not.toHaveBeenCalled();
   });
 
+  function placedSourceMetadata(): SessionMetadata {
+    const metadata = sourceMetadata();
+    return {
+      ...metadata,
+      workspace: {
+        ...metadata.workspace,
+        sandboxId: `sbx-${'c'.repeat(48)}`,
+        sandboxRoute: undefined,
+        sandboxKind: 'shared',
+      },
+    };
+  }
+
+  it('copies the placed key and its kind into the sibling pin', async () => {
+    const metadata = placedSourceMetadata();
+    const { caller, input, destinationStub } = fixture({ metadata });
+
+    await caller.createWorktreeChat(input);
+
+    const registration = destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0];
+    expect(registration?.metadata.workspace).toMatchObject({
+      sandboxId: metadata.workspace?.sandboxId,
+      sandboxKind: 'shared',
+    });
+    expect(registration?.sandboxSelection).toMatchObject({
+      sandboxKind: 'shared',
+      billing: { sandboxKind: 'shared' },
+    });
+  });
+
+  it('rejects destination metadata with a different kind for the same key', async () => {
+    const metadata = placedSourceMetadata();
+    const { caller, input, destinationStub } = fixture({ metadata });
+    const destination = destinationMetadata(metadata);
+    destination.workspace = {
+      ...destination.workspace,
+      sandboxKind: 'isolated',
+    };
+    destinationStub.getMetadata.mockResolvedValueOnce(destination);
+    admitOperationMock.mockResolvedValueOnce({
+      admission: 'duplicate_reconcile_pending',
+      row: ledgerRow({
+        status: 'reconcile_pending',
+        canonical_result: await progressFor(input),
+      }),
+    });
+
+    await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({ code: 'CONFLICT' });
+    expect(destinationStub.registerSessionFromMetadata).not.toHaveBeenCalled();
+  });
+
   it('rejects destination metadata that points at a different physical route', async () => {
     const { caller, input, metadata, destinationStub } = fixture();
     const destination = destinationMetadata(metadata);
@@ -1369,6 +1599,62 @@ describe('createWorktreeChat registration rollback and unknown-outcome reconcili
     await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({ code: 'CONFLICT' });
     expect(destinationStub.registerSessionFromMetadata).not.toHaveBeenCalled();
     expect(createSessionForCloudAgentMock).not.toHaveBeenCalled();
+  });
+
+  describe.each(['transport retry', 'reconciliation'] as const)('%s BYOC inheritance', path => {
+    it.each([
+      undefined,
+      { kind: 'vercel', source: { kind: 'platform' } },
+      {
+        ...BYOC_PROVIDER_BINDING,
+        source: { ...BYOC_PROVIDER_BINDING.source, organizationId: OTHER_ORGANIZATION_ID },
+      },
+      {
+        ...BYOC_PROVIDER_BINDING,
+        source: { ...BYOC_PROVIDER_BINDING.source, credentialId: OPERATION_KEY },
+      },
+    ] as const)('rejects a lost or changed provider binding %j', async sandboxProviderBinding => {
+      const metadata = sourceMetadata({ organizationId: ORGANIZATION_ID });
+      metadata.workspace = {
+        ...metadata.workspace,
+        sandboxId: 'ses-0123456789abcdef',
+        sandboxProvider: 'vercel',
+        sandboxProviderBinding: BYOC_PROVIDER_BINDING,
+        sandboxRoute: undefined,
+      };
+      const { caller, input, destinationStub } = fixture({
+        organizationId: ORGANIZATION_ID,
+        metadata,
+      });
+      const destination = destinationMetadata(metadata);
+      destination.workspace = { ...destination.workspace, sandboxProviderBinding };
+      destinationStub.getMetadata.mockResolvedValueOnce(destination);
+      if (path === 'transport retry') {
+        destinationStub.registerSessionFromMetadata.mockRejectedValueOnce(
+          Object.assign(new Error('registration outcome unknown'), { retryable: true })
+        );
+      } else {
+        admitOperationMock.mockResolvedValueOnce({
+          admission: 'duplicate_reconcile_pending',
+          row: ledgerRow({
+            organization_id: ORGANIZATION_ID,
+            status: 'reconcile_pending',
+            canonical_result: await progressFor(input),
+          }),
+        });
+      }
+
+      await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({ code: 'CONFLICT' });
+
+      expect(destinationStub.registerSessionFromMetadata).toHaveBeenCalledTimes(
+        path === 'transport retry' ? 1 : 0
+      );
+      expect(createSessionForCloudAgentMock).toHaveBeenCalledTimes(
+        path === 'transport retry' ? 1 : 0
+      );
+      expect(deleteSessionForCloudAgentMock).not.toHaveBeenCalled();
+      expect(settleOperationMock).not.toHaveBeenCalled();
+    });
   });
 
   it('does not report success when the completed ledger settlement is not recorded', async () => {

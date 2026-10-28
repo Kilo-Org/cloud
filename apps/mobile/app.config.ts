@@ -91,6 +91,16 @@ if (isProductionBuild && !process.env.SENTRY_AUTH_TOKEN) {
   );
 }
 
+// Admission gate: the server issues native credentials only to a device that
+// proves Play Integrity or App Attest. A production build without the project
+// number ships an Android app that cannot attest, so the app would be unable
+// to sign in.
+if (isProductionBuild && !process.env[OPTIONAL_ENV_KEYS.playIntegrityProjectNumber]) {
+  throw new Error(
+    'Missing GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER: a production build requires it, or the Android app cannot attest and native sign-in is refused.'
+  );
+}
+
 // Google OAuth client IDs are public identifiers (committed .env, all EAS
 // environments). The conditional below tolerates their absence so the app still builds when a
 // checkout lacks them; the native Google button hides itself when undefined.
@@ -127,7 +137,7 @@ const config: ExpoConfig = {
   // Keep in lockstep with AGENT_CHANNEL_SPLIT_APP_VERSION in
   // @kilocode/notifications: this is the first build that creates the split
   // agent channels, so older tokens stay on the legacy `agent` channel.
-  version: '1.0.13',
+  version: '1.0.15',
   // Rotation is supported on iOS and Android: `default` resolves to portrait +
   // both landscapes in UISupportedInterfaceOrientations on iOS and all
   // orientations in the Android manifest, satisfying WCAG 1.3.4 (Orientation)
@@ -203,9 +213,27 @@ const config: ExpoConfig = {
       // be enabled on the App ID (`com.kilocode.kiloapp`) in the Apple
       // Developer portal for a provisioning profile to include it.
       'com.apple.developer.usernotifications.time-sensitive': true,
+      // A GGUF context for on-device llama.rn inference needs the raised memory
+      // ceiling. These stay on for every build profile: EAS syncs App ID
+      // capabilities from the entitlements of whichever build or `eas
+      // credentials` run touches `com.kilocode.kiloapp`, so a run without them
+      // disables both capabilities and the App Store profile loses them.
+      'com.apple.developer.kernel.extended-virtual-addressing': true,
+      'com.apple.developer.kernel.increased-memory-limit': true,
+      // Dev-only: the process that registers the artifacts File Provider domain
+      // and sets its automatically-enabled testing mode is the app itself, and
+      // iOS checks the calling process's entitlements. Apple does not grant
+      // this capability on distribution profiles, so production builds must
+      // not carry it (with the paired extension entitlement in
+      // plugins/withArtifactFileProvider.js).
+      ...(isProductionBuild ? {} : { 'com.apple.developer.fileprovider.testing-mode': true }),
     },
     infoPlist: {
       ITSAppUsesNonExemptEncryption: false,
+      // Custom LAN backends require an app-level approval before each endpoint
+      // can use HTTP. ATS stays enabled for public HTTPS endpoints.
+      NSAppTransportSecurity: { NSAllowsLocalNetworking: true },
+      NSLocalNetworkUsageDescription: permissionLocales.en.ios.NSLocalNetworkUsageDescription,
       // iOS reads this list, not the JS catalog. Without it the system treats
       // the app as English-only, so OS-drawn text we cannot translate — the
       // native Sign in with Apple button above all — stays English on a
@@ -222,13 +250,20 @@ const config: ExpoConfig = {
       // composer) can be opened in place.
       UIFileSharingEnabled: true,
       LSSupportsOpeningDocumentsInPlace: true,
+      // Dev-only signal paired with the testing-mode entitlement above: the
+      // artifacts provider module reads it from the app bundle's Info.plist
+      // to decide whether to register the domain with the automatically-
+      // enabled testing mode. `#if DEBUG` is the wrong gate — EAS builds
+      // non-production profiles with the Release configuration — so the
+      // profile is the signal on both sides.
+      ...(isProductionBuild ? {} : { KiloArtifactsFileProviderTesting: true }),
     },
   },
   android: {
     googleServicesFile: './google-services.json',
     package: 'com.kilocode.kiloapp',
     adaptiveIcon: {
-      backgroundColor: '#FAF74F',
+      backgroundColor: '#FFDD00',
       foregroundImage: './assets/images/android-icon-foreground.png',
       backgroundImage: './assets/images/android-icon-background.png',
       monochromeImage: './assets/images/android-icon-foreground.png',
@@ -279,7 +314,9 @@ const config: ExpoConfig = {
         android: {
           enableMinifyInReleaseBuilds: true,
           // Keep expo-task-manager's reflectively-loaded headless app loader.
-          extraProguardRules: ANDROID_HEADLESS_APP_LOADER_PROGUARD_RULES,
+          // R8 runs on release builds and llama.rn's JSI bindings are reached
+          // only through JNI, so every com.rnllama class has to be kept too.
+          extraProguardRules: `${ANDROID_HEADLESS_APP_LOADER_PROGUARD_RULES}\n-keep class com.rnllama.** { *; }`,
           // Old release AABs shipped without resource shrinking. Keep this on so
           // the unused zz_unused_shrink_sentinel raw resource is stripped and
           // the inspector contract can catch a shrink regression before it lands.
@@ -292,12 +329,7 @@ const config: ExpoConfig = {
           // over RCTComponentViewFactory.mm would never compile into the app.
           // The Expo Podfile maps this to ENV['RCT_USE_PREBUILT_RNCORE'] = '0'
           // (KILO-APP-6H; react/react-native#58299).
-          // Compile React Native from the patched source instead of linking the
-          // prebuilt core. The App Store core ships with assertions enabled
-          // (react/react-native#57454), so the Fabric unmount assert must carry
-          // the bounds guard from react/react-native#57865 or a stale child
-          // index SIGABRTs release builds (Kilo-Org/kilocode#14065; see
-          // patches/react-native@0.86.3.patch).
+          // Compile the registration and mounting guards in patches/react-native@0.88.0.patch.
           buildReactNativeFromSource: true,
           // GoogleSignIn is a Swift static lib that imports GoogleUtilities/RecaptchaInterop
           // (pulled transitively alongside expo-iap's AppCheckCore); those pods don't define
@@ -310,6 +342,20 @@ const config: ExpoConfig = {
         },
       },
     ],
+    // llama.cpp for on-device GGUF inference. Each option below turns off a
+    // plugin behavior that is on by default. The podspec already compiles
+    // itself as C++20, and the app offloads nothing to Android GPUs, so neither
+    // global Podfile flags nor Qualcomm native libraries belong in the
+    // manifest. The plugin adds the iOS memory entitlements only under the
+    // production profile, so ios.entitlements declares them for every profile.
+    [
+      'llama.rn',
+      {
+        enableEntitlements: false,
+        forceCxx20: false,
+        enableOpenCLAndHexagon: false,
+      },
+    ],
     [
       'expo-speech-recognition',
       {
@@ -320,6 +366,15 @@ const config: ExpoConfig = {
     ],
     'expo-router',
     'expo-image',
+    // Inline video file parts in the session transcript (file-part-renderer).
+    'expo-video',
+    [
+      'expo-image-picker',
+      {
+        cameraPermission: PERMISSION_PROMPT_COPY.en.NSCameraUsageDescription,
+        photosPermission: PERMISSION_PROMPT_COPY.en.NSPhotoLibraryUsageDescription,
+      },
+    ],
     'expo-font',
     // The app owns its Android backup rules (plugins/withAndroidManifestFix.js
     // writes the union of the SecureStore and AppsFlyer exclusions). Disable the
@@ -339,7 +394,7 @@ const config: ExpoConfig = {
       'expo-notifications',
       {
         icon: './assets/images/android-notification-icon.png',
-        color: '#FAF74F',
+        color: '#FFDD00',
         // Name the channel Firebase falls back to when a message omits
         // `channel_id`. Without it FirebaseMessaging logs "Missing Default
         // Notification Channel metadata in AndroidManifest" on every message.
@@ -350,6 +405,10 @@ const config: ExpoConfig = {
         enableBackgroundRemoteNotifications: true,
       },
     ],
+    // Registers the BGTaskScheduler identifier and the `processing` background
+    // mode for the periodic glanceable refresh, the fallback for a dropped push
+    // (src/lib/glanceable-refresh-task.ts).
+    'expo-background-task',
     'expo-web-browser',
     // Must stay before '@sentry/react-native/expo': it edits the RNSentrySDK.start() line that plugin writes.
     './plugins/withReactMountLogBreadcrumbs',
@@ -361,6 +420,10 @@ const config: ExpoConfig = {
         organization: 'anaconda-nq',
         useNativeInit: true,
         options: SENTRY_NATIVE_OPTIONS,
+        // Android release builds upload NDK debug symbols and the R8 mapping, so
+        // native tombstones (libhermes, libreactnative, Expo modules) and Java
+        // frames symbolicate. The default sentry.gradle.kts uploads only JS source maps.
+        experimental_android: { enableAndroidGradlePlugin: true },
       },
     ],
     // One native splash configuration and shared AnimatedSplashOverlay lifecycle
@@ -370,7 +433,7 @@ const config: ExpoConfig = {
       './plugins/withBrandedSplash',
       {
         image: './assets/images/logo-mark.png',
-        backgroundColor: '#FAF74F',
+        backgroundColor: '#FFDD00',
         imageWidth: 100,
       },
     ],
@@ -379,17 +442,24 @@ const config: ExpoConfig = {
       {
         locationWhenInUsePermission:
           'Allow $(PRODUCT_NAME) to use your location to set up local weather.',
+        // The app requests only foreground location for weather setup.
+        locationAlwaysAndWhenInUsePermission: false,
+        locationAlwaysPermission: false,
+        // Apple requires this key for the library's linked motion APIs, even though Kilo never calls them.
+        motionUsagePermission: PERMISSION_PROMPT_COPY.en.NSMotionUsageDescription,
         isIosBackgroundLocationEnabled: false,
         isAndroidBackgroundLocationEnabled: false,
         isAndroidForegroundServiceEnabled: false,
       },
     ],
     'expo-apple-authentication',
-    // Play flavor (the defaults the plugin already applies). The plugin strips
-    // and re-adds the `missingDimensionStrategy "platform", ...` line on every
-    // prebuild, so its "Added missingDimensionStrategy for play flavor" log line
-    // is expected output, not a misconfiguration.
-    ['expo-iap', { isHorizonEnabled: false, isFireOsEnabled: false }],
+    // Play store, pinned: `modules.horizon` and `modules.amazon.fireOS` are the
+    // flags the plugin reads, so pinning both false keeps a stray
+    // EXPO_IAP_HORIZON or EXPO_IAP_FIREOS from selecting another store. With no
+    // store pinned the plugin logs "No store pin; Gradle picks the store from
+    // the task flavor or the connected debug device", which is expected output,
+    // not a misconfiguration.
+    ['expo-iap', { modules: { horizon: false, amazon: { fireOS: false } } }],
     [
       'expo-tracking-transparency',
       {
@@ -418,9 +488,18 @@ const config: ExpoConfig = {
       },
     ],
     './plugins/withAndroidManifestFix',
+    // Font size, display size, language and direction changes are handled in
+    // place by the running activity, like rotation and dark mode. Without them
+    // Android recreates MainActivity and the app restarts at its first route.
+    './plugins/withAndroidConfigChanges',
     // Window background follows the app theme (values-night aware) so the
     // rotation surface resize never paints a foreign blank frame.
     './plugins/withAndroidRotationSurface',
+    // Android 15+ draws text from glyph bounds while React Native measures it
+    // from advances, which clips words in a script the fallback font supplies.
+    // Android-only by capability: iOS has one text layout for both jobs, so its
+    // half is nothing. See the plugin's doc comment.
+    './plugins/withAndroidTextViewBounds',
     // One implementation for iOS and Android: the discard confirm is the same
     // shared `Alert.alert` call on both platforms, and iOS's `UIAlertController`
     // already draws that copy as given (it exposes no casing transform to
@@ -434,6 +513,11 @@ const config: ExpoConfig = {
     // by capability — iOS's UIAlertController already follows the system
     // appearance and takes no app-token override (see the plugin's doc comment).
     './plugins/withAndroidAlertDialogTheme',
+    // Overrides androidx.compose.ui's `close_sheet` accessibility string — the
+    // label Material3 gives the dismiss scrim of every native sheet — with the
+    // app's own `common.close` for all 87 languages. Android-only: the resource
+    // exists only in the androidx compose artifacts.
+    './plugins/withAndroidSheetCloseLabel',
     './plugins/withAndroidExpoModuleRepos',
     // Writes the app target's single `Localizable.strings` per language: the
     // four App Intent actions and their parameters resolve their
@@ -459,6 +543,8 @@ const config: ExpoConfig = {
     // Aggregate "Active Agents" glanceable surfaces: one Live Activity plus Home
     // Screen and Lock Screen widgets, rendered by src/glanceable-ios. The widget
     // target reuses the existing app group; no second group is created.
+    // Native Home refresh runs after expo-widgets' source generation (mods run in reverse).
+    './plugins/withHomeWidgetRefresh',
     [
       'expo-widgets',
       {

@@ -29,10 +29,35 @@ const OTHER_REF = { owner: 'octocat', repo: 'other-repo', number: 7 };
 const SHA1 = 'sha-1';
 const SHA2 = 'sha-2';
 
-/** Let the store's in-flight read resolve and publish. */
-async function settle(): Promise<void> {
-  await Promise.resolve();
-  await Promise.resolve();
+/**
+ * Flush one macrotask turn: every pending microtask chain (any await depth)
+ * settles before the timeout fires. Tests that assert a publish HAS happened
+ * poll an observable condition with `waitFor`; tests that assert nothing
+ * published yet use one `flushTurn()` so the assertion is not coupled to the
+ * read chain's await count.
+ */
+async function flushTurn(): Promise<void> {
+  const { promise, resolve } = Promise.withResolvers<undefined>();
+  setTimeout(resolve, undefined);
+  await promise;
+}
+
+/**
+ * Bounded poll for an observable store condition. Each attempt flushes a
+ * macrotask turn before re-checking, so it observes any settled publish
+ * regardless of how many awaits the read chain contains.
+ */
+async function waitFor(predicate: () => boolean, attempts = 50): Promise<void> {
+  for (let index = 0; index < attempts; index += 1) {
+    if (predicate()) {
+      return;
+    }
+    // eslint-disable-next-line no-await-in-loop -- polling must flush and re-check sequentially between turns
+    await flushTurn();
+  }
+  if (!predicate()) {
+    throw new Error('waitFor: condition not met after 50 attempts');
+  }
 }
 
 /** A `() => void` listener stub (typed so a void-returning parameter accepts it). */
@@ -57,7 +82,7 @@ describe('viewed-files-store', () => {
     expect(listener).not.toHaveBeenCalled();
     expect(getViewedFilesSnapshot(REF, SHA1)).toEqual({ paths: [], isLoading: true });
 
-    await settle();
+    await waitFor(() => listener.mock.calls.length > 0);
     expect(storeMocks.getViewedFiles).toHaveBeenCalledWith(REF, SHA1);
     expect(getViewedFilesSnapshot(REF, SHA1)).toEqual({ paths: ['a.ts'], isLoading: false });
     expect(listener).toHaveBeenCalledTimes(1);
@@ -69,7 +94,7 @@ describe('viewed-files-store', () => {
     storeMocks.getViewedFiles.mockRejectedValue(new Error('read failed'));
     subscribeViewedFiles(REF, SHA1, listenerStub());
 
-    await settle();
+    await waitFor(() => !getViewedFilesSnapshot(REF, SHA1).isLoading);
     expect(getViewedFilesSnapshot(REF, SHA1)).toEqual({ paths: [], isLoading: false });
   });
 
@@ -78,7 +103,7 @@ describe('viewed-files-store', () => {
     subscribeViewedFiles(REF, SHA1, listenerStub());
     expect(getViewedFilesSnapshot(REF, SHA1)).toBe(getViewedFilesSnapshot(REF, SHA1));
 
-    await settle();
+    await waitFor(() => !getViewedFilesSnapshot(REF, SHA1).isLoading);
     const loaded = getViewedFilesSnapshot(REF, SHA1);
     expect(loaded).toBe(getViewedFilesSnapshot(REF, SHA1));
 
@@ -97,7 +122,7 @@ describe('viewed-files-store', () => {
     subscribeViewedFiles(REF, SHA1, first);
     subscribeViewedFiles(REF, SHA1, second);
 
-    await settle();
+    await waitFor(() => second.mock.calls.length > 0);
     expect(storeMocks.getViewedFiles).toHaveBeenCalledTimes(1);
     expect(first).toHaveBeenCalledTimes(1);
     expect(second).toHaveBeenCalledTimes(1);
@@ -108,7 +133,7 @@ describe('viewed-files-store', () => {
     storeMocks.getViewedFiles.mockResolvedValue(['a.ts']);
     const unsubscribeFirst = subscribeViewedFiles(REF, SHA1, listenerStub());
     const unsubscribeSecond = subscribeViewedFiles(REF, SHA1, listenerStub());
-    await settle();
+    await waitFor(() => !getViewedFilesSnapshot(REF, SHA1).isLoading);
 
     // One listener leaving keeps the entry (and its loaded snapshot) alive.
     unsubscribeFirst();
@@ -119,7 +144,7 @@ describe('viewed-files-store', () => {
 
     storeMocks.getViewedFiles.mockResolvedValue(['b.ts']);
     subscribeViewedFiles(REF, SHA1, listenerStub());
-    await settle();
+    await waitFor(() => getViewedFilesSnapshot(REF, SHA1).paths.includes('b.ts'));
     expect(storeMocks.getViewedFiles).toHaveBeenCalledTimes(2);
     expect(getViewedFilesSnapshot(REF, SHA1).paths).toEqual(['b.ts']);
   });
@@ -132,7 +157,7 @@ describe('viewed-files-store', () => {
     subscribeViewedFiles(REF, SHA1, own);
     subscribeViewedFiles(OTHER_REF, SHA1, otherRef);
     subscribeViewedFiles(REF, SHA2, otherSha);
-    await settle();
+    await waitFor(() => !getViewedFilesSnapshot(REF, SHA2).isLoading);
 
     own.mockClear();
     otherRef.mockClear();
@@ -153,13 +178,10 @@ describe('viewed-files-store', () => {
     const other = listenerStub();
     subscribeViewedFiles(REF, SHA1, own);
     subscribeViewedFiles(OTHER_REF, SHA1, other);
-    await settle();
+    await waitFor(() => !getViewedFilesSnapshot(OTHER_REF, SHA1).isLoading);
 
-    let releaseWrite: () => void = undefined as unknown as () => void;
-    const writeGate = new Promise<void>(resolve => {
-      releaseWrite = resolve;
-    });
-    storeMocks.toggleViewedFile.mockReturnValue(writeGate);
+    const writeGate = Promise.withResolvers<undefined>();
+    storeMocks.toggleViewedFile.mockReturnValue(writeGate.promise);
     storeMocks.getViewedFiles.mockClear();
     own.mockClear();
     other.mockClear();
@@ -170,9 +192,9 @@ describe('viewed-files-store', () => {
     expect(own).toHaveBeenCalledTimes(1);
     expect(other).not.toHaveBeenCalled();
 
-    releaseWrite();
+    writeGate.resolve(undefined);
     await toggling;
-    await settle();
+    await waitFor(() => other.mock.calls.length > 0);
 
     expect(storeMocks.toggleViewedFile).toHaveBeenCalledWith({
       ...REF,
@@ -202,51 +224,55 @@ describe('viewed-files-store', () => {
       }
     });
     subscribeViewedFiles(REF, SHA1, listenerStub());
-    await settle();
+    await waitFor(() => !getViewedFilesSnapshot(REF, SHA1).isLoading);
 
     await applyViewedFilesToggle(REF, SHA1, 'a.ts');
-    await settle();
+    await waitFor(
+      () =>
+        !getViewedFilesSnapshot(REF, SHA1).isLoading &&
+        !getViewedFilesSnapshot(REF, SHA1).paths.includes('a.ts')
+    );
     expect(getViewedFilesSnapshot(REF, SHA1).paths).toEqual([]);
   });
 
   it('revalidateAllViewedFiles re-reads every open key', async () => {
-    const durable = new Map<string, string[]>();
+    const durable: Record<string, string[]> = {};
     storeMocks.getViewedFiles.mockImplementation(async (ref: { owner: string; repo: string }) => {
       await Promise.resolve();
-      return durable.get(`${ref.owner}/${ref.repo}`) ?? [];
+      return durable[`${ref.owner}/${ref.repo}`] ?? [];
     });
     subscribeViewedFiles(REF, SHA1, listenerStub());
     subscribeViewedFiles(OTHER_REF, SHA1, listenerStub());
-    await settle();
+    await waitFor(() => !getViewedFilesSnapshot(REF, SHA1).isLoading);
 
-    durable.set('octocat/hello-world', ['a.ts']);
-    durable.set('octocat/other-repo', ['b.ts']);
+    durable['octocat/hello-world'] = ['a.ts'];
+    durable['octocat/other-repo'] = ['b.ts'];
     revalidateAllViewedFiles();
-    await settle();
+    await waitFor(
+      () =>
+        getViewedFilesSnapshot(REF, SHA1).paths.includes('a.ts') &&
+        getViewedFilesSnapshot(OTHER_REF, SHA1).paths.includes('b.ts')
+    );
 
     expect(getViewedFilesSnapshot(REF, SHA1).paths).toEqual(['a.ts']);
     expect(getViewedFilesSnapshot(OTHER_REF, SHA1).paths).toEqual(['b.ts']);
   });
 
   it('does not resurrect an entry whose read resolves after the last unsubscribe', async () => {
-    let releaseRead: (paths: string[]) => void = undefined as unknown as (paths: string[]) => void;
-    const readGate = new Promise<string[]>(resolve => {
-      releaseRead = resolve;
-    });
-    storeMocks.getViewedFiles.mockReturnValue(readGate);
+    const readGate = Promise.withResolvers<string[]>();
+    storeMocks.getViewedFiles.mockReturnValue(readGate.promise);
 
     const unsubscribe = subscribeViewedFiles(REF, SHA1, listenerStub());
     unsubscribe();
-    releaseRead(['a.ts']);
-    await settle();
-
+    readGate.resolve(['a.ts']);
+    await flushTurn();
     expect(getViewedFilesSnapshot(REF, SHA1)).toEqual({ paths: [], isLoading: true });
   });
 
   it('resetViewedFilesStoreForTests clears every entry', async () => {
     storeMocks.getViewedFiles.mockResolvedValue(['a.ts']);
     subscribeViewedFiles(REF, SHA1, listenerStub());
-    await settle();
+    await waitFor(() => !getViewedFilesSnapshot(REF, SHA1).isLoading);
     expect(getViewedFilesSnapshot(REF, SHA1).isLoading).toBe(false);
 
     resetViewedFilesStoreForTests();

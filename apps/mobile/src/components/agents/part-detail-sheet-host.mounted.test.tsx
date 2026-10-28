@@ -19,7 +19,6 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ background: '#000' }),
 }));
 vi.mock('react-native', () => ({
-  Modal: 'Modal',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
   View: 'View',
@@ -167,9 +166,13 @@ function radio(
   root: TestRenderer.ReactTestInstance,
   label: string
 ): TestRenderer.ReactTestInstance | undefined {
+  // This suite mounts iOS, where `radioItemA11y` renders each choice as a
+  // button whose state rides the selected trait.
   return findByType(root, 'Pressable').find(
     node =>
-      propOf(node, 'accessibilityRole') === 'radio' && propOf(node, 'accessibilityLabel') === label
+      propOf(node, 'accessibilityRole') === 'button' &&
+      propOf(node, 'accessibilityState') !== undefined &&
+      propOf(node, 'accessibilityLabel') === label
   );
 }
 
@@ -208,8 +211,8 @@ describe('PartDetailSheetHost mounted', () => {
       capturedOpener?.('bash-1');
     });
 
-    expect(propOf(findByType(renderer.root, 'Modal')[0], 'visible')).toBe(true);
-    expect(propOf(findByType(renderer.root, 'Modal')[0], 'presentationStyle')).toBe('pageSheet');
+    expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(0);
+    expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'snapPoints')).toEqual(['100%']);
     expect(sheetTitle(renderer)).toBe('bash: echo one');
     const openedPart = propOf(findByType(renderer.root, 'ToolPartDetailBody')[0], 'part');
     expect((openedPart as ToolPart).id).toBe('bash-1');
@@ -222,7 +225,7 @@ describe('PartDetailSheetHost mounted', () => {
     });
 
     // Still open, no close/reopen: the sheet reflects the refreshed part.
-    expect(propOf(findByType(renderer.root, 'Modal')[0], 'visible')).toBe(true);
+    expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(0);
     expect(sheetTitle(renderer)).toBe('bash: echo two');
     const refreshedPart = propOf(findByType(renderer.root, 'ToolPartDetailBody')[0], 'part');
     expect((refreshedPart as ToolPart).state.status).toBe('completed');
@@ -319,16 +322,15 @@ describe('PartDetailSheetHost mounted', () => {
       capturedOpener?.('bash-1');
     });
 
-    // Opens wrapped by default. A React Native radio reports its current
-    // choice through `checked`, not `selected` — see `radioItemA11y` in
-    // @/components/ui/radio-group.
+    // Opens wrapped by default. On iOS `radioItemA11y` reports the current
+    // choice through the selected trait.
     expect(propOf(radio(renderer.root, 'Wrap'), 'accessibilityState')).toEqual({
-      checked: true,
+      selected: true,
       disabled: false,
       busy: false,
     });
     expect(propOf(radio(renderer.root, 'Scroll'), 'accessibilityState')).toEqual({
-      checked: false,
+      selected: false,
       disabled: false,
       busy: false,
     });
@@ -338,7 +340,7 @@ describe('PartDetailSheetHost mounted', () => {
       pressRadio(renderer.root, 'Scroll');
     });
     expect(propOf(radio(renderer.root, 'Scroll'), 'accessibilityState')).toEqual({
-      checked: true,
+      selected: true,
       disabled: false,
       busy: false,
     });
@@ -349,7 +351,7 @@ describe('PartDetailSheetHost mounted', () => {
       await Promise.resolve();
       (propOf(findByType(renderer.root, 'SheetHeader')[0], 'onDone') as () => void)();
     });
-    expect(propOf(findByType(renderer.root, 'Modal')[0], 'visible')).toBe(false);
+    expect(propOf(findByType(renderer.root, 'BottomSheet')[0], 'index')).toBe(-1);
 
     // Reopen the same part: the sheet resets to Wrap.
     await act(async () => {
@@ -357,7 +359,7 @@ describe('PartDetailSheetHost mounted', () => {
       capturedOpener?.('bash-1');
     });
     expect(propOf(radio(renderer.root, 'Wrap'), 'accessibilityState')).toEqual({
-      checked: true,
+      selected: true,
       disabled: false,
       busy: false,
     });

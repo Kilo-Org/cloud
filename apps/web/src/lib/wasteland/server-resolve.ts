@@ -2,7 +2,7 @@ import 'server-only';
 import type { User } from '@kilocode/db/schema';
 import { createTRPCClient, httpLink } from '@trpc/client';
 import type { WrappedWastelandRouter } from '@/lib/wasteland/types/router';
-import { WASTELAND_URL } from '@kilocode/web-shared/lib/constants';
+import { WASTELAND_URL } from '@/lib/service-urls';
 import { generateApiToken } from '@kilocode/web-shared/lib/tokens';
 import { getUserOrgMemberships } from '@kilocode/web-shared/lib/organizations/organizations';
 import {
@@ -38,6 +38,9 @@ export async function resolveWastelandUpstreamForUser(
         user,
         reason: 'service_token_mint',
         target: serviceTarget('wasteland'),
+        // Reached from server-component pages that redirect a legacy
+        // `/wasteland/by-id/<id>` URL, not from a route handler.
+        surface: 'server-component',
       });
     }
     const orgMemberships = await getUserOrgMemberships(user.id);

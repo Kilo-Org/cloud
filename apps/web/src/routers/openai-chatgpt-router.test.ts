@@ -72,11 +72,15 @@ describe('openAiChatGpt.status', () => {
 
   it('reports the recorded plan limit for a live connection', async () => {
     getConnection.mockResolvedValue(connectedConnection());
-    usageLimitRead.mockResolvedValue({ reachedAt: '2026-09-16T13:00:00.000Z', resetsAt: null });
+    usageLimitRead.mockResolvedValue({
+      reachedAt: '2026-09-16T13:00:00.000Z',
+      resetsAt: null,
+      code: null,
+    });
 
     await expect(callerFor({ id: USER_ID }).openAiChatGpt.status({})).resolves.toMatchObject({
       state: 'connected',
-      usageLimit: { reachedAt: '2026-09-16T13:00:00.000Z', resetsAt: null },
+      usageLimit: { reachedAt: '2026-09-16T13:00:00.000Z', resetsAt: null, code: null },
     });
   });
 

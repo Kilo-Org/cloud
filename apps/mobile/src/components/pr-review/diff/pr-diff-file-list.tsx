@@ -30,23 +30,22 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import { RefreshControl } from '@/components/ui/refresh-control';
 
-import { QueryError } from '@/components/query-error';
 import {
   DiffFontMetricsContext,
   useBoundedDiffFontMetrics,
 } from '@/components/pr-review/diff/diff-font-metrics';
-import { PrReviewReconnectNotice } from '@/components/pr-review/pr-review-reconnect-notice';
 import {
   PrDiffFileListHeader,
   useDiffViewMode,
 } from '@/components/pr-review/diff/pr-diff-file-list-header';
+import { PrDiffFileListState } from '@/components/pr-review/diff/pr-diff-file-list-state';
 import { PrDiffFileListLoading } from '@/components/pr-review/diff/pr-diff-file-list-loading';
 import { PrDiffFloatingActions } from '@/components/pr-review/diff/pr-diff-floating-actions';
 import { usePrDiffStateCopy } from '@/components/pr-review/diff/pr-diff-state-copy';
 import { providerPrRefKey, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
 import { useDiffRenderItem } from '@/components/pr-review/diff/pr-diff-file-list-render';
 import { useDiffSelection } from '@/components/pr-review/diff/use-diff-selection';
-import { EmptyFilesView, TabStateMessage } from '@/components/pr-review/diff/pr-diff-rows';
+import { EmptyFilesView } from '@/components/pr-review/diff/pr-diff-rows';
 import { buildFileItems, buildPaginationItem } from '@/lib/pr-review/diff/pr-diff-list-builder';
 import { itemTypeFor, type ListItem } from '@/lib/pr-review/diff/pr-diff-list-items';
 import { stickyFileHeaderIndices } from '@/lib/pr-review/diff/sticky-file-headers';
@@ -60,7 +59,6 @@ import { usePrDiffListScroll } from '@/lib/pr-review/diff/use-pr-diff-list-scrol
 import { usePrDiffListContentPadding } from '@/lib/pr-review/diff/use-pr-diff-list-content-padding';
 import { usePrDiffPageGate } from '@/lib/pr-review/diff/use-pr-diff-page-gate';
 import { clearDiffSelection } from '@/lib/pr-review/diff-selection-bridge';
-import { CenteredState } from '@/components/centered-state';
 import { useIsTablet } from '@/lib/hooks/use-is-tablet';
 
 type PrReviewFileListProps = {
@@ -115,6 +113,7 @@ export function PrReviewFileList({
     owner,
     repo,
     number,
+    ref: scope.ref,
     viewMode,
     isTablet,
   });
@@ -122,12 +121,13 @@ export function PrReviewFileList({
   // When the component unmounts (user navigates away from the PR or
   // pops the PR screen off the stack), drop the bridge so a stale
   // selection can never leak into the next mount. Re-mounting this
-  // list always starts with no selection.
+  // list always starts with no selection. The identity rule 17 ref
+  // keeps the clear under the same provider-scoped key the writes use.
   useEffect(
     () => () => {
-      clearDiffSelection({ owner, repo, number });
+      clearDiffSelection({ owner, repo, number, ref: scope.ref });
     },
-    [owner, repo, number]
+    [owner, repo, number, scope.ref]
   );
 
   // The write bar renders on every provider (s6): its two routes — the
@@ -159,22 +159,17 @@ export function PrReviewFileList({
       buildFileItems({
         files,
         expanded,
-        expandedContext,
-        viewed: viewed.isViewed,
-        headSha,
-        owner,
-        repo,
-        number,
         changedFiles,
         viewMode: effectiveViewMode,
-        // Pagination fields — required by BuildItemsArgs but unused by buildFileItems.
-        isLoading: false,
-        isFetchingNextPage: false,
-        hasNextPage: false,
-        laterPageError: false,
-        fetchToCompletionRunning: false,
-        fetchToCompletionLoaded: 0,
-        totalFiles: null,
+        source: {
+          kind: 'pr',
+          owner,
+          repo,
+          number,
+          headSha,
+          expandedContext,
+          viewed: viewed.isViewed,
+        },
       }),
     [
       files,
@@ -249,6 +244,7 @@ export function PrReviewFileList({
     owner,
     repo,
     number,
+    ref: scope.ref,
     items,
     listRef,
     setExpanded,
@@ -262,6 +258,7 @@ export function PrReviewFileList({
   }, [fetchToCompletion.run]);
 
   const renderItem = useDiffRenderItem({
+    source: 'pr',
     viewed,
     onRetryPage: useCallback(() => {
       void query.fetchNextPage();
@@ -276,33 +273,18 @@ export function PrReviewFileList({
     selection: selectionView,
   });
 
-  if (files.length === 0) {
-    if (firstPageErrorState?.kind === 'not-found') {
-      return <TabStateMessage title={copy.unavailableTitle} message={copy.unavailableMessage} />;
-    }
-    if (firstPageErrorState?.kind === 'permission') {
-      return (
-        <TabStateMessage title={t('common.accessDenied')} message={copy.accessDeniedMessage} />
-      );
-    }
-    if (firstPageErrorState?.kind === 'reconnect') {
-      return (
-        <CenteredState className="px-6">
-          <PrReviewReconnectNotice />
-        </CenteredState>
-      );
-    }
-    if (firstPageErrorState?.kind === 'retryable') {
-      return (
-        <QueryError
-          variant="server"
-          onRetry={() => {
-            void query.refetch();
-          }}
-          isRetrying={query.isFetching}
-        />
-      );
-    }
+  if (files.length === 0 && firstPageErrorState !== null) {
+    return (
+      <PrDiffFileListState
+        state={firstPageErrorState}
+        copy={copy}
+        isProviderScope={scope.ref.platform !== 'github'}
+        isRetrying={query.isFetching}
+        onRetry={() => {
+          void query.refetch();
+        }}
+      />
+    );
   }
 
   if (!query.isLoading && files.length === 0) {

@@ -11,14 +11,44 @@
  * query and form inputs.
  */
 import { z } from 'zod';
-import { MAX_SEARCH_LIMIT } from './search';
+import { MAX_SEARCH_LIMIT, MAX_SEARCH_QUERY_LENGTH } from './search';
 
 /** Maximum length of a forwarded client header value (defends the upstream trust boundary). */
 export const MAX_CLIENT_HEADER_LENGTH = 1024;
 
-/** A caller-supplied string that must carry at least one non-whitespace character. */
-const nonWhitespaceString = (field: string): z.ZodType<string> =>
-  z.string().refine(value => value.trim().length > 0, `${field} must be a non-empty string`);
+/**
+ * Whether `value` is longer than `maxLength` Unicode code points. JSON Schema's
+ * `maxLength` counts code points, while `String.length` counts UTF-16 code
+ * units, so the published schema and this check agree for non-BMP input. The
+ * walk stops one code point past the bound instead of materializing the whole
+ * string as an array.
+ */
+function exceedsCodePoints(value: string, maxLength: number): boolean {
+  let count = 0;
+  for (const _codePoint of value) {
+    count += 1;
+    if (count > maxLength) return true;
+  }
+  return false;
+}
+
+/**
+ * A caller-supplied string that must carry at least one non-whitespace
+ * character, optionally bounded in Unicode code points (the unit the published
+ * JSON Schema `maxLength` uses).
+ */
+const nonWhitespaceString = (field: string, maxLength?: number): z.ZodType<string> => {
+  const base =
+    maxLength === undefined
+      ? z.string()
+      : z
+          .string()
+          .refine(
+            value => !exceedsCodePoints(value, maxLength),
+            `${field} must be at most ${maxLength} characters`
+          );
+  return base.refine(value => value.trim().length > 0, `${field} must be a non-empty string`);
+};
 
 /**
  * The JSON-RPC 2.0 request envelope. Arrays (batch requests) and `null` are
@@ -57,10 +87,13 @@ export const toolsCallParamsSchema = z
   })
   .passthrough();
 
-/** The `search` tool arguments: a non-empty query and an optional bounded limit. */
+/**
+ * The `search` tool arguments: a non-empty query, bounded in length, and an
+ * optional bounded limit.
+ */
 export const searchArgsSchema = z
   .object({
-    query: nonWhitespaceString('query'),
+    query: nonWhitespaceString('query', MAX_SEARCH_QUERY_LENGTH),
     limit: z.number().int().min(1).max(MAX_SEARCH_LIMIT).optional(),
   })
   .passthrough();

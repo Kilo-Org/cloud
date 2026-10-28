@@ -1,9 +1,6 @@
 import type { AgentSandboxProvider } from '../types.js';
-import { isControlSession } from '../session-plane.js';
 
 export type ProviderCapabilities = {
-  terminal: boolean;
-  devcontainer: boolean;
   outboundCredentialProxy: boolean;
 };
 
@@ -12,18 +9,11 @@ export type ProviderCapabilities = {
  * feature gates read this table instead of hard-coding provider names.
  */
 export const PROVIDER_CAPABILITIES: Record<AgentSandboxProvider, ProviderCapabilities> = {
-  cloudflare: { terminal: true, devcontainer: true, outboundCredentialProxy: true },
-  vercel: { terminal: false, devcontainer: false, outboundCredentialProxy: false },
-  'cloudflare-containers': { terminal: false, devcontainer: false, outboundCredentialProxy: true },
+  cloudflare: { outboundCredentialProxy: true },
+  vercel: { outboundCredentialProxy: false },
+  'cloudflare-containers': { outboundCredentialProxy: true },
 };
 
 export function providerUsesOutboundCredentialProxy(provider: AgentSandboxProvider): boolean {
   return PROVIDER_CAPABILITIES[provider].outboundCredentialProxy;
-}
-
-export function sessionHasTerminal(
-  sessionId: string,
-  provider: AgentSandboxProvider = 'cloudflare'
-): boolean {
-  return isControlSession(sessionId) || PROVIDER_CAPABILITIES[provider].terminal;
 }

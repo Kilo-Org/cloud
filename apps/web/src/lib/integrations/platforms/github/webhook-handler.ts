@@ -12,7 +12,6 @@ import {
   InstallationRepositoriesPayloadSchema,
   PushEventPayloadSchema,
   PullRequestPayloadSchema,
-  IssuePayloadSchema,
   PullRequestReviewCommentPayloadSchema,
   PullRequestReviewPayloadSchema,
   GitHubAppAuthorizationRevokedPayloadSchema,
@@ -29,10 +28,7 @@ import {
   handleInstallationUnsuspend,
   handleInstallationTargetRenamed,
   handleInstallationRepositories,
-  handlePushEvent,
   handlePullRequest,
-  handleIssue,
-  handlePRReviewComment,
   upsertCliSessionPullRequestsFromWebhook,
   upsertCliSessionPullRequestReviewFromWebhook,
 } from '@/lib/integrations/platforms/github/webhook-handlers';
@@ -96,6 +92,29 @@ async function isAvailableForDeferredGitHubDispatch(integration: {
   }
 }
 
+const UNCONFIGURED_SECRET_REPORT_INTERVAL_MS = 60_000;
+const unconfiguredSecretReportedAt: Record<GitHubAppType, number> = { standard: 0, lite: 0 };
+
+/**
+ * A deployment without the app's webhook secret refuses every delivery, and an
+ * anonymous caller can retry at will, and GitHub retries every delivery it
+ * considers failed. Reporting each request would flood Sentry at exactly the
+ * moment operators need the alarm, so one report a minute per app raises it.
+ */
+function reportUnconfiguredWebhookSecret(appType: GitHubAppType): void {
+  const now = Date.now();
+  if (now - unconfiguredSecretReportedAt[appType] < UNCONFIGURED_SECRET_REPORT_INTERVAL_MS) {
+    return;
+  }
+  unconfiguredSecretReportedAt[appType] = now;
+  captureException(new Error(`GitHub ${appType} app webhook secret is not configured`), {
+    tags: {
+      source: appType === 'lite' ? 'github_lite_webhook_signature' : 'github_webhook_signature',
+      app: appType,
+    },
+  });
+}
+
 export async function handleGitHubWebhook(
   request: NextRequest,
   appType: GitHubAppType
@@ -115,8 +134,14 @@ export async function handleGitHubWebhook(
     const rawBody = await request.text();
     const signature = request.headers.get('x-hub-signature-256') || '';
 
-    if (!verifyGitHubWebhookSignature(rawBody, signature, appType)) {
-      logExceptInTest(`Invalid webhook signature${logSuffix}`);
+    const signatureStatus = verifyGitHubWebhookSignature(rawBody, signature, appType);
+    if (signatureStatus !== 'valid') {
+      if (signatureStatus === 'unconfigured') {
+        logExceptInTest(`GitHub ${appType} app webhook secret is not configured${logSuffix}`);
+        reportUnconfiguredWebhookSecret(appType);
+      } else {
+        logExceptInTest(`Invalid webhook signature${logSuffix}`);
+      }
       return new NextResponse('Unauthorized', { status: 401 });
     }
 
@@ -605,12 +630,6 @@ export async function handleGitHubWebhook(
         return NextResponse.json({ error: 'Invalid push event payload' }, { status: 400 });
       }
 
-      if (!parseResult.data.deleted) {
-        after(async () => {
-          if (!(await isAvailableForDeferredGitHubDispatch(integration))) return;
-          await handlePushEvent(parseResult.data, integration);
-        });
-      }
       return NextResponse.json({ message: 'Event received' }, { status: 200 });
     }
 
@@ -810,10 +829,9 @@ export async function handleGitHubWebhook(
 
       // Process asynchronously to return 200 within GitHub's timeout
       after(async () => {
-        const handlersTriggered = ['pr_review_comment_fix'];
+        const handlersTriggered: string[] = [];
         try {
           if (!(await isAvailableForDeferredGitHubDispatch(integration))) return;
-          await handlePRReviewComment(parseResult.data, integration);
           try {
             const reviewMemoryResult = await handleGitHubReviewCommentReply({
               payload: parseResult.data,
@@ -849,7 +867,7 @@ export async function handleGitHubWebhook(
                 errors: [
                   {
                     message: error instanceof Error ? error.message : String(error),
-                    handler: 'pr_review_comment_fix',
+                    handler: 'review_memory_feedback',
                     stack: error instanceof Error ? error.stack : undefined,
                   },
                 ],
@@ -862,46 +880,6 @@ export async function handleGitHubWebhook(
       });
 
       return NextResponse.json({ message: 'Event received' }, { status: 200 });
-    }
-
-    // Handle issues events
-    if (eventType === GITHUB_EVENT.ISSUES) {
-      const parseResult = IssuePayloadSchema.safeParse(payload);
-      if (!parseResult.success) {
-        logExceptInTest(`Invalid issues payload${logSuffix}:`, parseResult.error);
-        captureMessage('Invalid GitHub webhook payload structure', {
-          level: 'error',
-          tags: { source: `${sentryPrefix}webhook_validation`, event: 'issues' },
-          extra: { errors: parseResult.error.issues },
-        });
-        return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
-      }
-
-      const action = parseResult.data.action;
-
-      // Log webhook event for both user and organization-owned integrations
-      const logResult = await logWebhook(integration, action);
-      if (logResult.isDuplicate) {
-        return NextResponse.json({ message: 'Duplicate event' }, { status: 200 });
-      }
-
-      const result = await handleIssue(parseResult.data, integration);
-
-      // Mark webhook event as processed
-      if (logResult.webhookEventId) {
-        try {
-          await updateWebhookEvent(logResult.webhookEventId, {
-            processed: true,
-            processed_at: new Date().toISOString(),
-            handlers_triggered: ['auto_triage'],
-            errors: null,
-          });
-        } catch (error) {
-          logExceptInTest(`Error updating webhook event${logSuffix}:`, error);
-        }
-      }
-
-      return result;
     }
 
     // Default: acknowledge receipt

@@ -6,7 +6,8 @@
 //
 // Every failure path returns false/undefined so the caller falls back to
 // the local build — the failure path stays today's path. Set
-// KILO_REMOTE_NATIVE=off to skip remote fetching entirely.
+// KILO_REMOTE_NATIVE=off to skip remote fetching entirely, or
+// KILO_REMOTE_NATIVE=required to fail the build instead of compiling locally.
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -22,6 +23,10 @@ const DOWNLOAD_MAX_BUFFER = 2 * 1024 * 1024 * 1024;
 
 export function remoteNativeDisabled(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.KILO_REMOTE_NATIVE === 'off';
+}
+
+export function remoteNativeRequired(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.KILO_REMOTE_NATIVE === 'required';
 }
 
 export function artifactName(platform: 'ios' | 'android', nativeHash: string): string {
@@ -52,14 +57,143 @@ function git(args: string[]): string | undefined {
   }
 }
 
-type ArtifactRecord = { id: number; expired: boolean };
+export type NativeArtifact = {
+  id: number;
+  name: string;
+  created_at: string;
+  expires_at: string;
+};
 
-function findArtifact(name: string): ArtifactRecord | undefined {
-  // `gh api` resolves {owner}/{repo} from the current repository. Name
-  // lookup returns newest first across all workflow runs.
-  const raw = gh(['api', `repos/{owner}/{repo}/actions/artifacts?name=${name}&per_page=10`]);
-  const parsed = JSON.parse(raw) as { artifacts?: Array<{ id: number; expired: boolean }> };
-  return parsed.artifacts?.find(artifact => !artifact.expired);
+type ArtifactMetadata = Partial<NativeArtifact> & {
+  expired?: boolean;
+  workflow_run?: {
+    id?: number;
+    repository_id?: number;
+    head_repository_id?: number;
+    head_sha?: string;
+  };
+};
+
+type RepositoryMetadata = { id?: number; default_branch?: string };
+type WorkflowMetadata = { id?: number; path?: string; state?: string };
+type RunMetadata = {
+  id?: number;
+  workflow_id?: number;
+  path?: string;
+  event?: string;
+  status?: string;
+  conclusion?: string;
+  head_sha?: string;
+  head_branch?: string;
+  repository?: { id?: number };
+  head_repository?: { id?: number };
+  pull_requests?: {
+    number?: number;
+    head?: { repo?: { id?: number } };
+    base?: { repo?: { id?: number } };
+  }[];
+};
+
+export function findNativeArtifacts(
+  name: string,
+  repository = '{owner}/{repo}',
+  expectedHeadSha: string | undefined = git(['rev-parse', 'HEAD']),
+  validationScope?: { pullRequestNumber: number; headRepositoryId: number }
+): NativeArtifact[] {
+  const base = `repos/${repository}`;
+  const repo = JSON.parse(gh(['api', base])) as RepositoryMetadata | null;
+  const workflowPath = `.github/workflows/${WORKFLOW_FILE}`;
+  const workflow = JSON.parse(
+    gh(['api', `${base}/actions/workflows/${WORKFLOW_FILE}`])
+  ) as WorkflowMetadata | null;
+  if (
+    typeof repo?.id !== 'number' ||
+    !Number.isSafeInteger(repo.id) ||
+    repo.id <= 0 ||
+    typeof repo.default_branch !== 'string' ||
+    repo.default_branch.length === 0 ||
+    typeof workflow?.id !== 'number' ||
+    !Number.isSafeInteger(workflow.id) ||
+    workflow.id <= 0 ||
+    workflow.path !== workflowPath ||
+    workflow.state !== 'active'
+  ) {
+    throw new Error('Native artifact source could not be verified');
+  }
+  const listing = JSON.parse(
+    gh(['api', `${base}/actions/artifacts?name=${encodeURIComponent(name)}&per_page=100`])
+  ) as { artifacts?: (ArtifactMetadata | null)[] } | null;
+  if (!Array.isArray(listing?.artifacts)) throw new Error('Invalid native artifact listing');
+  const trusted: NativeArtifact[] = [];
+  for (const artifact of listing.artifacts) {
+    if (
+      typeof artifact?.id !== 'number' ||
+      !Number.isSafeInteger(artifact.id) ||
+      artifact.id <= 0 ||
+      artifact.name !== name ||
+      artifact.expired !== false ||
+      typeof artifact.created_at !== 'string' ||
+      !Number.isFinite(Date.parse(artifact.created_at)) ||
+      typeof artifact.expires_at !== 'string' ||
+      Date.parse(artifact.expires_at) <= Date.now() ||
+      !Number.isFinite(Date.parse(artifact.expires_at))
+    ) {
+      continue;
+    }
+    const source = artifact.workflow_run;
+    if (
+      typeof source?.id !== 'number' ||
+      !Number.isSafeInteger(source.id) ||
+      source.id <= 0 ||
+      source.repository_id !== repo.id ||
+      typeof source.head_repository_id !== 'number' ||
+      !Number.isSafeInteger(source.head_repository_id) ||
+      source.head_repository_id <= 0 ||
+      (source.head_repository_id !== repo.id &&
+        source.head_repository_id !== validationScope?.headRepositoryId) ||
+      typeof source.head_sha !== 'string' ||
+      !/^[a-f0-9]{40}$/.test(source.head_sha)
+    ) {
+      continue;
+    }
+    const run = JSON.parse(gh(['api', `${base}/actions/runs/${source.id}`])) as RunMetadata | null;
+    if (
+      run?.id !== source.id ||
+      run.workflow_id !== workflow.id ||
+      run.path !== workflowPath ||
+      run.repository?.id !== repo.id ||
+      run.head_repository?.id !== source.head_repository_id ||
+      run.head_sha !== source.head_sha ||
+      run.status !== 'completed' ||
+      run.conclusion !== 'success' ||
+      typeof run.head_branch !== 'string' ||
+      run.head_branch.length === 0 ||
+      !(
+        (source.head_repository_id === repo.id &&
+          ((run.event === 'workflow_dispatch' && run.head_sha === expectedHeadSha) ||
+            (run.event === 'push' && run.head_branch === repo.default_branch))) ||
+        (validationScope !== undefined &&
+          run.event === 'pull_request' &&
+          source.head_repository_id === validationScope.headRepositoryId &&
+          Array.isArray(run.pull_requests) &&
+          run.pull_requests.some(
+            request =>
+              request?.number === validationScope.pullRequestNumber &&
+              request.head?.repo?.id === validationScope.headRepositoryId &&
+              request.base?.repo?.id === repo.id
+          ))
+      )
+    ) {
+      continue;
+    }
+    trusted.push({
+      id: artifact.id,
+      name,
+      created_at: artifact.created_at,
+      expires_at: artifact.expires_at,
+    });
+  }
+  return trusted;
 }
 
 // Download an artifact zip and hand the caller its unpacked directory.
@@ -72,9 +206,9 @@ function withArtifact(
 ): boolean {
   if (remoteNativeDisabled()) return false;
   const name = artifactName(platform, nativeHash);
-  let artifact: ArtifactRecord | undefined;
+  let artifact: NativeArtifact | undefined;
   try {
-    artifact = findArtifact(name);
+    artifact = findNativeArtifacts(name)[0];
   } catch (error) {
     // No gh, no auth, or no network: local build is the fallback.
     log(`artifact lookup failed (${message(error)})`);
@@ -84,7 +218,7 @@ function withArtifact(
     log(`no artifact ${name}; trying a remote build dispatch`);
     if (!dispatchAndWatch(platform)) return false;
     try {
-      artifact = findArtifact(name);
+      artifact = findNativeArtifacts(name)[0];
     } catch (error) {
       log(`artifact lookup failed after dispatch (${message(error)})`);
       return false;
@@ -218,23 +352,36 @@ function waited(since: number): string {
   return `${((Date.now() - since) / 60000).toFixed(1)}m`;
 }
 
-export type IosToolchain = { xcodeBuildVersion: string; simulatorSdkVersion: string };
+function versionParts(version: unknown): number[] | undefined {
+  if (typeof version !== 'string' || !/^\d+(\.\d+)*$/.test(version)) return undefined;
+  return version.split('.').map(Number);
+}
 
-// The artifact name keys on nativeHash alone, but the local cache key also
-// keys on the Xcode and simulator SDK that produced the binary. Without this
-// check a host publishes a runner-built .app under its own toolchain's key;
-// when the runner's simulator SDK is newer than the host's runtime the app
-// never launches, and the entry sticks under a key the host keeps
-// recomputing. Throwing here drops us onto the local build instead.
-export function assertToolchainMatches(actual: unknown, expected: IosToolchain): void {
-  const found = actual as Partial<IosToolchain> | null;
-  if (
-    !found ||
-    found.xcodeBuildVersion !== expected.xcodeBuildVersion ||
-    found.simulatorSdkVersion !== expected.simulatorSdkVersion
-  ) {
+function compareVersions(left: number[], right: number[]): number {
+  for (let index = 0; index < Math.max(left.length, right.length); index++) {
+    const difference = (left[index] ?? 0) - (right[index] ?? 0);
+    if (difference !== 0) return difference;
+  }
+  return 0;
+}
+
+// The artifact name keys on nativeHash alone, so the runner's Xcode can differ
+// from the host's. A simulator app built against an SDK newer than the target
+// simulator's runtime never launches; an equal or newer runtime runs it.
+// Throwing here drops us onto the local build instead.
+export function assertSimulatorRuntimeSupports(
+  toolchain: unknown,
+  simulatorRuntimeVersion: string
+): void {
+  const sdkVersion =
+    typeof toolchain === 'object' && toolchain !== null && 'simulatorSdkVersion' in toolchain
+      ? toolchain.simulatorSdkVersion
+      : undefined;
+  const sdk = versionParts(sdkVersion);
+  const runtime = versionParts(simulatorRuntimeVersion);
+  if (!sdk || !runtime || compareVersions(sdk, runtime) > 0) {
     throw new Error(
-      `artifact toolchain ${found?.xcodeBuildVersion}/${found?.simulatorSdkVersion} does not match local ${expected.xcodeBuildVersion}/${expected.simulatorSdkVersion}`
+      `artifact simulator SDK ${String(sdkVersion)} cannot run on simulator runtime ${simulatorRuntimeVersion}`
     );
   }
 }
@@ -245,7 +392,7 @@ export function assertToolchainMatches(actual: unknown, expected: IosToolchain):
 export function fetchIosApp(args: {
   nativeHash: string;
   productsDir: string;
-  toolchain: IosToolchain;
+  simulatorRuntimeVersion: string;
 }): boolean {
   return withArtifact('ios', args.nativeHash, unpacked => {
     const tarball = path.join(unpacked, `ios-${args.nativeHash}.tar.gz`);
@@ -255,9 +402,9 @@ export function fetchIosApp(args: {
     // receives Kilo.app. An artifact built before toolchain.json existed
     // fails this extract, which is the same fall-back-to-local path.
     execFileSync('tar', ['-xzf', tarball, '-C', unpacked, 'toolchain.json'], { stdio: 'ignore' });
-    assertToolchainMatches(
+    assertSimulatorRuntimeSupports(
       JSON.parse(fs.readFileSync(path.join(unpacked, 'toolchain.json'), 'utf8')),
-      args.toolchain
+      args.simulatorRuntimeVersion
     );
     execFileSync('tar', ['-xzf', tarball, '-C', args.productsDir, 'Kilo.app'], { stdio: 'ignore' });
     if (!fs.existsSync(path.join(args.productsDir, 'Kilo.app'))) {

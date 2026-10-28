@@ -5,7 +5,11 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { setConfig } from '@/lib/tool-summary-translation/tool-summary-translation-runtime';
+import {
+  clearToolSummaryTranslationMemory,
+  setConfig,
+} from '@/lib/tool-summary-translation/tool-summary-translation-runtime';
+import { TOOL_SUMMARY_TRANSLATION_RETRY_MS } from '@/lib/tool-summary-translation/use-translated-tool-summary';
 
 import { FixedPartRow } from './fixed-part-row';
 import {
@@ -43,9 +47,7 @@ vi.mock('@/components/ui/icons', () => ({
   ChevronRight: 'ChevronRight',
   XCircle: 'XCircle',
   Eye: 'Eye',
-}));
-vi.mock('@/components/ui/eyebrow', () => ({
-  Eyebrow: 'Eyebrow',
+  AlertTriangle: 'AlertTriangle',
 }));
 vi.mock('@/components/ui/text', () => ({
   Text: 'Text',
@@ -203,7 +205,6 @@ describe('FixedPartRow mounted', () => {
     const renderer = await renderRow(
       {
         label: 'Thinking',
-        labelKind: 'eyebrow',
         variant: 'dashed',
         onPress,
         accessibilityLabel: 'Thinking',
@@ -228,7 +229,6 @@ describe('FixedPartRow mounted', () => {
     const onPress = vi.fn(() => undefined);
     const renderer = await renderRow({
       label: 'Thinking',
-      labelKind: 'eyebrow',
       variant: 'dashed',
       onPress,
       accessibilityLabel: 'Thinking',
@@ -254,27 +254,9 @@ describe('FixedPartRow mounted', () => {
     expect(findHost(renderer.root, 'Eye')).toHaveLength(0);
   });
 
-  it('keeps the eyebrow label on a single line', async () => {
-    const renderer = await renderRow({
-      label: 'Thought',
-      labelKind: 'eyebrow',
-      accessibilityLabel: 'Thought',
-    });
-
-    const eyebrows = findHost(renderer.root, 'Eyebrow');
-    expect(eyebrows).toHaveLength(1);
-    const eyebrow = eyebrows[0];
-    if (!eyebrow) {
-      throw new Error('eyebrow not found');
-    }
-    expect(eyebrow.props.numberOfLines).toBe(1);
-    expect(eyebrow.props.className).toContain('shrink');
-  });
-
   it('matches the dashed outer box to the solid outer box', async () => {
     const renderer = await renderRow({
       label: 'Thought',
-      labelKind: 'eyebrow',
       variant: 'dashed',
       accessibilityLabel: 'Thought',
     });
@@ -343,6 +325,9 @@ async function settleTranslation(): Promise<void> {
   });
 }
 
+/** Longer than the runtime's 40 ms batch window under fake timers. */
+const BATCH_WINDOW_SETTLE_MS = 60;
+
 describe('FixedPartRow tool-summary translation', () => {
   beforeEach(() => {
     requestMock.mockReset();
@@ -351,6 +336,10 @@ describe('FixedPartRow tool-summary translation', () => {
     readMock.mockResolvedValue([]);
     writeMock.mockResolvedValue(undefined);
     setConfig({ enabled: false, model: MODEL });
+    // Drop the previous test's retry memory, failure budgets and shared retry
+    // timer: the runtime is module-scoped, so a mounted row left re-asking
+    // would otherwise re-queue its summary into the next test.
+    clearToolSummaryTranslationMemory();
   });
 
   it('translates the visible label and the spoken summary inside the scope', async () => {
@@ -454,6 +443,96 @@ describe('FixedPartRow tool-summary translation', () => {
       renderer.unmount();
     });
   });
+
+  it('shows the localized failure badge once the retry budget is spent and clears it on resolution', async () => {
+    // Every batch fails: three consecutive outcomes exhaust the budget. The
+    // row's own path to a second and third batch is the shared backed-off
+    // retry, so this case drives the fake clock like the hook suite does.
+    vi.useFakeTimers();
+    try {
+      requestMock.mockRejectedValue(new Error('gateway down'));
+      setConfig({ enabled: true, model: MODEL });
+      const renderer = renderScopedRowSync({
+        icon: Eye,
+        label: 'Exhausted summary',
+        status: 'completed',
+        accessibilityLabel: 'Exhausted summary tool, completed',
+      });
+
+      const advanceClock = async (ms: number): Promise<void> => {
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(ms);
+          await vi.dynamicImportSettled();
+        });
+      };
+
+      // First batch (40 ms window), then two shared-retry replays at the 10 s
+      // base and the doubled 20 s wait: three failed outcomes in total.
+      await advanceClock(BATCH_WINDOW_SETTLE_MS);
+      await advanceClock(TOOL_SUMMARY_TRANSLATION_RETRY_MS + BATCH_WINDOW_SETTLE_MS);
+      expect(rowLabel(renderer)).toBe('Exhausted summary');
+      expect(requestMock).toHaveBeenCalledTimes(2);
+      await advanceClock(2 * TOOL_SUMMARY_TRANSLATION_RETRY_MS + BATCH_WINDOW_SETTLE_MS);
+      expect(requestMock).toHaveBeenCalledTimes(3);
+      expect(rowLabel(renderer)).toBe('Exhausted summary');
+      expect(textWithContent(renderer.root, 'Translation failed')).toHaveLength(1);
+      expect(rowAccessibilityLabel(renderer)).toBe(
+        'Exhausted summary tool, completed, Translation failed'
+      );
+
+      // The gateway recovers: the next resolution clears the badge.
+      requestMock.mockResolvedValue(['Résumé épuisé']);
+      await advanceClock(4 * TOOL_SUMMARY_TRANSLATION_RETRY_MS + BATCH_WINDOW_SETTLE_MS);
+      expect(rowLabel(renderer)).toBe('Résumé épuisé');
+      expect(textWithContent(renderer.root, 'Translation failed')).toHaveLength(0);
+      expect(rowAccessibilityLabel(renderer)).toBe('Résumé épuisé tool, completed');
+      act(() => {
+        renderer.unmount();
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('renders the icon-only failure variant for assembled labels', async () => {
+    vi.useFakeTimers();
+    try {
+      requestMock.mockRejectedValue(new Error('gateway down'));
+      setConfig({ enabled: true, model: MODEL });
+      const renderer = renderScopedRowSync({
+        icon: Eye,
+        label: 'Icon row summary',
+        status: 'completed',
+        failureIcon: true,
+        accessibilityLabel: 'Icon row summary tool, completed',
+      });
+
+      const advanceClock = async (ms: number): Promise<void> => {
+        await act(async () => {
+          await vi.advanceTimersByTimeAsync(ms);
+          await vi.dynamicImportSettled();
+        });
+      };
+
+      await advanceClock(BATCH_WINDOW_SETTLE_MS);
+      await advanceClock(TOOL_SUMMARY_TRANSLATION_RETRY_MS + BATCH_WINDOW_SETTLE_MS);
+      await advanceClock(2 * TOOL_SUMMARY_TRANSLATION_RETRY_MS + BATCH_WINDOW_SETTLE_MS);
+      expect(requestMock).toHaveBeenCalledTimes(3);
+      expect(rowLabel(renderer)).toBe('Icon row summary');
+      expect(textWithContent(renderer.root, 'Translation failed')).toHaveLength(0);
+      expect(findHost(renderer.root, 'AlertTriangle')).toHaveLength(1);
+      // The spoken failure state rides the row's accessible label: descendants
+      // of an accessible container are not exposed on iOS.
+      expect(rowAccessibilityLabel(renderer)).toBe(
+        'Icon row summary tool, completed, Translation failed'
+      );
+      act(() => {
+        renderer.unmount();
+      });
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe('FixedPartRow label and detail alignment', () => {
@@ -506,17 +585,5 @@ describe('FixedPartRow label and detail alignment', () => {
     const content = findContentRow(renderer.root);
     expect(content.props.className).toContain('items-baseline');
     expect(textWithContent(renderer.root, 'fleet.py')).toHaveLength(1);
-  });
-
-  it('keeps the alignment for an eyebrow label', async () => {
-    const renderer = await renderRow({
-      label: 'Thought',
-      labelKind: 'eyebrow',
-      badge: '3',
-      accessibilityLabel: 'Thought',
-    });
-
-    const content = findContentRow(renderer.root);
-    expect(content.props.className).toContain('items-baseline');
   });
 });

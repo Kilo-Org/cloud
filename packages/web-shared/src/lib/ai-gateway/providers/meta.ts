@@ -1,3 +1,3 @@
 export function isMuseModel(model: string) {
-  return model.startsWith('meta/muse-');
+  return model.includes('muse-');
 }

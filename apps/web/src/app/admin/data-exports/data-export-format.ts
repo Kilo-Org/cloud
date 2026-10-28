@@ -1,15 +1,7 @@
 import type { DataExportHealth } from './data-export-types';
 
 export { formatTimestamp, formatAge, humanizeToken } from '@/lib/admin/queue-format';
-
-export function formatBytes(value: number | null): string {
-  if (value === null || !Number.isFinite(value) || value < 0) return 'Not available';
-  if (value === 0) return '0 B';
-  const units = ['B', 'KB', 'MB', 'GB', 'TB'];
-  const index = Math.min(Math.floor(Math.log(value) / Math.log(1024)), units.length - 1);
-  const scaled = value / 1024 ** index;
-  return `${scaled.toFixed(index === 0 ? 0 : 1)} ${units[index]}`;
-}
+export { formatBytes } from '@/lib/utils';
 
 export function formatCount(value: number): string {
   return value.toLocaleString();

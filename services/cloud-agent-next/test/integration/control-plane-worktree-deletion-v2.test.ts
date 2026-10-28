@@ -1,3 +1,4 @@
+import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { env, reset, runInDurableObject } from 'cloudflare:test';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
@@ -13,7 +14,7 @@ import {
   WorktreeDeletionIncompleteError,
 } from '../../src/control-plane/sandbox/worktree-deletion.js';
 import { generateSandboxId } from '../../src/sandbox-id.js';
-import { sessionDoName } from '../../src/session-plane.js';
+import { sessionDoName } from '../../src/session-identity.js';
 import { getWorktreeWorkspacePath } from '../../src/workspace.js';
 import { parseSessionMetadata } from '../../src/persistence/session-metadata.js';
 import type {
@@ -21,11 +22,13 @@ import type {
   ProviderCreateIntent,
   StopResult,
 } from '../../src/sandbox-control/provider.js';
-import type {
-  ControlPlanePromptPayload,
-  ControlPlaneWrapperFrame,
+import {
+  CONTROL_PLANE_PROTOCOL_VERSION,
+  type ControlPlanePromptPayload,
+  type ControlPlaneWrapperFrame,
 } from '../../src/shared/control-plane-protocol.js';
 import {
+  FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
   createFakeCredentialBroker,
   FAKE_SANDBOX_CONTAINMENT_NAMESPACE,
   installFakeCredentialEnv,
@@ -80,7 +83,7 @@ function metadata(input: {
       orgId: ORG_ID,
       createdOnPlatform: 'cloud-agent-web',
     },
-    auth: { kiloSessionId: input.kiloSessionId, kilocodeToken: 'native-token' },
+    auth: { kiloSessionId: input.kiloSessionId, kilocodeToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN },
     agent: { mode: 'code', model: 'test/model' },
     repository: { type: 'github', repo: 'acme/widgets', upstreamBranch: 'main' },
     workspace: {
@@ -118,15 +121,13 @@ function createFakeProvider(): FakeProvider {
     observeStatus: 'active',
   };
   provider.adapter = {
-    resumable: false,
-    persistentWorkspace: false,
-    destroysOnStop: true,
     async ensureBillingAdmission() {},
     async create(intent: ProviderCreateIntent) {
       return { providerRef: `mem_${intent.intentId}` };
     },
-    async launch(_ref, launchEnv) {
+    async launch(_ref, { env: launchEnv }) {
       provider.launchEnvs.push({ ...launchEnv });
+      return { startSource: 'image' as const };
     },
     async observe(ref) {
       return { status: provider.observeStatus, ...(ref === null ? {} : { providerRef: ref }) };
@@ -158,6 +159,7 @@ async function injectProvider(
       KILO_OPENROUTER_BASE: 'https://control.test',
       KILO_SESSION_INGEST_URL: 'https://control.test',
     });
+    installFakeRuntimeProxyPeer(instance);
     Object.assign(instance, {
       createProviderAdapter: () => provider.adapter,
       provider: provider.adapter,
@@ -179,7 +181,7 @@ async function connectAndHello(provider: FakeProvider, sandboxId: string): Promi
   const { credential, allocationId } = launchIdentity(provider);
   const wrapper = await FakeWrapper.connect({ sandboxId, credential });
   const reply = await wrapper.hello({ wrapperId: WRAPPER_ID, allocationId });
-  expect(reply).toEqual({ type: 'welcome', protocolVersion: 2 });
+  expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
   return wrapper;
 }
 
@@ -258,7 +260,9 @@ async function startSharedConnectedSandbox(): Promise<{
   kiloA: string;
   kiloB: string;
 }> {
-  const sandboxId = await generateSandboxId('*', ORG_ID, USER_ID, newSessionId());
+  const sandboxId = await generateSandboxId(undefined, ORG_ID, USER_ID, newSessionId(), undefined, {
+    sandboxAllocation: 'cloudflare-shared',
+  });
   const provider = createFakeProvider();
   const sandbox = await injectProvider(sandboxId, provider);
   const worktreeA = worktreeId();
@@ -350,6 +354,16 @@ describe('worktree deletion on the V2 Sandbox DO (B10)', () => {
       kiloSessionId: kilo,
     } = await startConnectedSandbox();
 
+    await runInDurableObject(sandbox, (_instance, state) => {
+      state.storage.kv.put(`worktree_changes/${worktree}/worktree_changes`, { sentinel: true });
+      state.storage.kv.put(`worktree_changes/${worktree}/worktree_file:changed.txt`, {
+        sentinel: true,
+      });
+      state.storage.kv.put('worktree_changes/another-worktree/worktree_changes', {
+        sentinel: true,
+      });
+    });
+
     const result = await sandbox.deleteWorktreeResources(
       deletionInput({ sandboxId, worktreeId: worktree, sessionIds: [kilo] })
     );
@@ -357,6 +371,14 @@ describe('worktree deletion on the V2 Sandbox DO (B10)', () => {
     expect(result).toEqual({ deleted: true, sessionIds: [kilo] });
     expect(provider.stopCalls).toHaveLength(1);
     expect((await sandbox.getAllocationState()).kind).toBe('stopped');
+    await runInDurableObject(sandbox, (_instance, state) => {
+      expect(
+        Array.from(state.storage.kv.list({ prefix: `worktree_changes/${worktree}/` }))
+      ).toEqual([]);
+      expect(state.storage.kv.get('worktree_changes/another-worktree/worktree_changes')).toEqual({
+        sentinel: true,
+      });
+    });
     await expect(sandbox.status({ sessionId })).resolves.toMatchObject({
       view: { state: 'unknown' },
     });
@@ -551,8 +573,13 @@ describe('worktree deletion on the V2 Sandbox DO (B10)', () => {
     await expect(sandbox.status({ sessionId: sessionA })).resolves.toMatchObject({
       view: { state: 'unknown' },
     });
-    await expect(sandbox.status({ sessionId: sessionB })).resolves.not.toMatchObject({
-      view: { state: 'unknown' },
+    // Worktree B really prepared on its own per-session directory: an isolated
+    // sandbox id would place both worktrees at /workspace/app and fail B's grant
+    // with a credential scope mismatch.
+    await waitFor(async () => {
+      await expect(sandbox.status({ sessionId: sessionB })).resolves.toMatchObject({
+        view: { state: 'preparing' },
+      });
     });
     wrapper.close();
   });

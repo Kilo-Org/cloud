@@ -7,6 +7,7 @@ import {
 
 type ModelBadgeOption = ModelDataDisclosure & {
   showGatewayMetadata: boolean;
+  capabilities?: { tools: boolean; images: boolean };
 };
 
 /**
@@ -18,7 +19,8 @@ type ModelBadgeOption = ModelDataDisclosure & {
  * backend's hasUserByokAvailable through the v1 wire catalog, so the badge
  * must render for CLI-catalog options too. Free/data-collection stay gated
  * on showGatewayMetadata because CLI-catalog options do not carry Kilo
- * gateway pricing or data-policy semantics.
+ * gateway pricing or data-policy semantics. Tools and images show only for
+ * the custom and on-device chat models that state their capabilities.
  */
 export function modelSelectorBadges(option: ModelBadgeOption | undefined) {
   const showGatewayMetadata = option?.showGatewayMetadata === true;
@@ -26,5 +28,7 @@ export function modelSelectorBadges(option: ModelBadgeOption | undefined) {
     byok: hasUserByokAvailable(option),
     free: showGatewayMetadata && isFreeModelOption(option),
     collectsData: showGatewayMetadata && mayTrainOnYourPrompts(option),
+    tools: option?.capabilities?.tools === true,
+    images: option?.capabilities?.images === true,
   };
 }

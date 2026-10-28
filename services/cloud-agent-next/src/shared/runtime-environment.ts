@@ -1,3 +1,5 @@
+import { GIT_CREDENTIAL_HELPER } from './runtime-distribution.js';
+
 export const PNPM_STORE_DIR = '/var/cache/kilo/pnpm-store';
 export const PNPM_STORE_ENV_VAR = 'pnpm_config_store_dir';
 
@@ -8,14 +10,14 @@ export const PNPM_STORE_ENV_VAR = 'pnpm_config_store_dir';
  * Spread *after* user-supplied env vars in the runtime environment so these
  * values always win.
  *
- * `GIT_CONFIG_VALUE_0` must match the `COPY` destination in `Dockerfile`,
- * `Dockerfile.dind`, and `Dockerfile.dev`; nothing at build or test time ties
- * the two together, and a mismatch only surfaces as a runtime helper warning.
+ * `GIT_CONFIG_VALUE_0` is the helper's real install path from
+ * `runtime-distribution.ts`, the single owner of the image layout; Dockerfiles
+ * copy the helper there and symlink `GIT_CREDENTIAL_HELPER.linkPath`.
  */
 export const SYSTEM_GIT_CONFIG_ENV = {
   GIT_CONFIG_COUNT: '2',
   GIT_CONFIG_KEY_0: 'credential.helper',
-  GIT_CONFIG_VALUE_0: '/opt/kilo-cloud/kilo-git-credential',
+  GIT_CONFIG_VALUE_0: GIT_CREDENTIAL_HELPER.realPath,
   GIT_CONFIG_KEY_1: 'credential.useHttpPath',
   GIT_CONFIG_VALUE_1: 'false',
 } as const;
@@ -40,6 +42,7 @@ export function isStrippedGitConfigEnvVar(key: string): boolean {
 }
 
 export const CONTROL_RUNTIME_RESERVED_ENV_VARS = [
+  'KILO_RUNTIME_CLI_PATH',
   'SANDBOX_CONTROL_CREDENTIAL',
   'SANDBOX_CONTROL_URL',
   'PROVIDER_INSTANCE_ID',
@@ -47,3 +50,26 @@ export const CONTROL_RUNTIME_RESERVED_ENV_VARS = [
   'CONTROL_LOG_UPLOAD_GRANT',
   'CONTROL_WRAPPER_INSTANCE_ID',
 ] as const;
+
+/**
+ * Prefixes the sandbox runtime owns. `buildWorktreeKiloEnvironment` drops them
+ * from what reaches the Kilo process, and the profile package mirrors them for
+ * write-time rejection because it cannot import from this service.
+ */
+export const RESERVED_ENV_VAR_PREFIXES = ['XDG_', 'KILO', 'OPENCODE'] as const;
+
+/**
+ * Root of the directory-keyed homes (plan "Builder and session home"). A
+ * `worktree` runtime allocation keys HOME by directory alone under this root,
+ * so an environment builder and every session of an isolated sandbox share the
+ * one home of `/workspace/app`, and caches its setup wrote there are reused.
+ * `/tmp` is not used: setup scripts clear it and `TMPDIR` would move it.
+ */
+export const CONTROL_HOME_ROOT = '/home';
+
+/**
+ * Directory name, under the OS temporary directory, of the per-scope homes of
+ * allocations that predate directory-keyed homes. Those allocations keep it for
+ * their lifetime; the log uploader reads both roots while they exist.
+ */
+export const LEGACY_CONTROL_HOME_DIR_NAME = 'kilo-worktrees';

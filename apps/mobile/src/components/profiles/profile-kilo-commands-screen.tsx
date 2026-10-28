@@ -1,6 +1,6 @@
 import { type ReactNode, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Alert, ScrollView, View } from 'react-native';
+import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
@@ -17,7 +17,9 @@ import {
 } from '@/components/profiles/profile-kilo-commands-model';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
+import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { Terminal } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -26,6 +28,8 @@ import {
   useAgentProfile,
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_COMMANDS: AgentProfileDetail['kiloCommands'] = [];
@@ -51,6 +55,7 @@ export function ProfileKiloCommandsScreen({
   organizationId,
 }: Readonly<{ profileId: string; organizationId?: string }>) {
   const { t } = useTranslation();
+  const { confirm, dialog } = useConfirmDialog();
   const profileQuery = useAgentProfile(profileId, organizationId);
   const {
     createKiloCommand,
@@ -59,6 +64,8 @@ export function ProfileKiloCommandsScreen({
     setKiloCommandEnabled,
     reorderKiloCommands,
   } = useAgentProfileSectionMutations(organizationId);
+
+  const canManage = useCanManageOrganizationProfiles(organizationId);
 
   const commands = profileQuery.data?.kiloCommands ?? NO_COMMANDS;
   const rows = kiloCommandRows(commands);
@@ -102,22 +109,20 @@ export function ProfileKiloCommandsScreen({
       await deleteKiloCommand.mutateAsync({ profileId, commandId });
     } catch (error) {
       if (!hasUsableMessage(error)) {
-        toast.error(t('profiles.slashCommands.saveFailed'));
+        toast.error(t('profiles.slashCommands.deleteFailed'));
       }
     }
   };
 
   const confirmDelete = (source: KiloCommandSource) => {
-    Alert.alert(t('common.delete'), source.name, [
-      { text: t('common.cancel'), style: 'cancel' },
-      {
-        text: t('common.delete'),
-        style: 'destructive',
-        onPress: () => {
-          void runDelete(source.id);
-        },
+    confirm({
+      title: t('common.delete'),
+      message: source.name,
+      confirmLabel: t('common.delete'),
+      onConfirm: () => {
+        void runDelete(source.id);
       },
-    ]);
+    });
   };
 
   const move = (index: number, delta: number) => {
@@ -159,9 +164,11 @@ export function ProfileKiloCommandsScreen({
         description={null}
         placement="top"
         action={
-          <Button onPress={startAdd}>
-            <Text>{t('profiles.slashCommands.add')}</Text>
-          </Button>
+          canManage ? (
+            <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
+              <Text>{t('profiles.slashCommands.add')}</Text>
+            </Button>
+          ) : null
         }
       />
     );
@@ -185,36 +192,58 @@ export function ProfileKiloCommandsScreen({
               enabled={row.enabled}
               isFirst={index === 0}
               isLast={index === rows.length - 1}
-              onToggle={enabled => {
-                setKiloCommandEnabled.mutate(
-                  { profileId, commandId: source.id, enabled },
-                  {
-                    onError: error => {
-                      if (!hasUsableMessage(error)) {
-                        toast.error(t('profiles.slashCommands.saveFailed'));
-                      }
-                    },
-                  }
-                );
-              }}
-              onMoveUp={() => {
-                move(index, -1);
-              }}
-              onMoveDown={() => {
-                move(index, 1);
-              }}
-              onEdit={() => {
-                setForm({ source });
-              }}
-              onDelete={() => {
-                confirmDelete(source);
-              }}
+              onToggle={
+                canManage
+                  ? enabled => {
+                      setKiloCommandEnabled.mutate(
+                        { profileId, commandId: source.id, enabled },
+                        {
+                          onError: error => {
+                            if (!hasUsableMessage(error)) {
+                              toast.error(t('profiles.slashCommands.saveFailed'));
+                            }
+                          },
+                        }
+                      );
+                    }
+                  : undefined
+              }
+              onMoveUp={
+                canManage
+                  ? () => {
+                      move(index, -1);
+                    }
+                  : undefined
+              }
+              onMoveDown={
+                canManage
+                  ? () => {
+                      move(index, 1);
+                    }
+                  : undefined
+              }
+              onEdit={
+                canManage
+                  ? () => {
+                      setForm({ source });
+                    }
+                  : undefined
+              }
+              onDelete={
+                canManage
+                  ? () => {
+                      confirmDelete(source);
+                    }
+                  : undefined
+              }
             />
           );
         })}
-        <Button onPress={startAdd}>
-          <Text>{t('profiles.slashCommands.add')}</Text>
-        </Button>
+        {canManage ? (
+          <Button onPress={startAdd}>
+            <Text>{t('profiles.slashCommands.add')}</Text>
+          </Button>
+        ) : null}
       </>
     );
   }
@@ -222,7 +251,7 @@ export function ProfileKiloCommandsScreen({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('profiles.slashCommands.title')} />
-      <ScrollView
+      <TabScreenScrollView
         className="flex-1"
         contentContainerClassName="gap-3 px-6 pt-4 pb-8"
         keyboardShouldPersistTaps="handled"
@@ -230,7 +259,7 @@ export function ProfileKiloCommandsScreen({
         showsVerticalScrollIndicator={false}
       >
         {content}
-      </ScrollView>
+      </TabScreenScrollView>
 
       {form !== null ? (
         <KiloCommandFormSheet
@@ -247,6 +276,8 @@ export function ProfileKiloCommandsScreen({
           }}
         />
       ) : null}
+
+      {dialog}
     </View>
   );
 }

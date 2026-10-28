@@ -105,6 +105,9 @@ function createFakeDb(options: FakeDbOptions = {}) {
   const db = {
     select: () => ({
       from: () => ({
+        leftJoin: () => ({
+          where: () => selection,
+        }),
         where: () => selection,
       }),
     }),

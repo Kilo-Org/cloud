@@ -46,7 +46,7 @@ describe('sticky DB title across WS merges', () => {
       ],
     });
     expect(result[0]?.title).toBe('db-title');
-    // Status change still applies (sticky attention keeps question).
+    // Sticky attention keeps the cached question status through the busy heartbeat.
     expect(result[0]?.status).toBe('question');
     // Capabilities upgrade/downgrade unaffected.
     expect(result[0]?.capabilities).toEqual({ attachments: false });

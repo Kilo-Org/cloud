@@ -11,12 +11,14 @@ import { createCallerFactory } from '@kilocode/web-shared/lib/trpc/init';
 import type { User, OperationLedgerRow } from '@kilocode/db/schema';
 import { providerPrRefKey } from '@kilocode/app-shared/provider-review';
 import { GitLabReviewError } from '@/lib/provider-review/gitlab-authorization';
+import { BitbucketReviewError } from '@/lib/provider-review/bitbucket-authorization';
 import { GITLAB_STALE_HEAD_REASON } from '@/lib/provider-review/gitlab-write';
 import {
   BITBUCKET_AUTO_MERGE_UNSUPPORTED_REASON,
   BITBUCKET_PR_REVIEW_CAPABILITIES,
 } from '@/lib/provider-review/bitbucket-write';
 import { GITLAB_MR_REVIEW_CAPABILITIES } from '@/lib/provider-review/gitlab-write';
+import { createSignedToken } from '@/lib/signed-token';
 import { providerLedgerResourceKey, providerReviewRouter } from './provider-review-router';
 
 const ORG_ID = '2b1d4c8e-9f3a-4e5d-8c7b-6a5948372615';
@@ -74,7 +76,6 @@ jest.mock('@/lib/provider-review/gitlab-read', () => ({
   listChecks: (...a: unknown[]) => gitlabRead.listChecks(...a),
   listInbox: (...a: unknown[]) => gitlabRead.listInbox(...a),
   getMergeState: (...a: unknown[]) => gitlabRead.getMergeState(...a),
-  requestGitLabJson: jest.fn(),
 }));
 
 const bitbucketRead = {
@@ -276,6 +277,33 @@ describe('providerReviewRouter inputs', () => {
       undefined
     );
   });
+  it('round-trips a maximum-size signed inbox cursor through the router', async () => {
+    const base = {
+      kind: 'bitbucket-inbox-cursor',
+      identity: 'bitbucket-inbox:acme',
+      ceiling: '2026-09-02T00:00:00.000000+00:00',
+      served: [],
+      pages: [],
+    };
+    let cursor = createSignedToken({ ...base, padding: '' });
+    for (let length = 0; length < 2048; length += 1) {
+      const candidate = createSignedToken({ ...base, padding: 'x'.repeat(length) });
+      if (candidate.length > 2048) break;
+      cursor = candidate;
+    }
+    expect(cursor.length).toBeLessThanOrEqual(2048);
+    bitbucketRead.listInbox.mockResolvedValueOnce({ items: [], nextCursor: cursor });
+    await caller.listInbox({ platform: 'bitbucket', organizationId: ORG_ID });
+    bitbucketRead.listInbox.mockResolvedValueOnce({ items: [], nextCursor: null });
+
+    await caller.listInbox({ platform: 'bitbucket', organizationId: ORG_ID, cursor });
+    expect(cursor.length).toBeGreaterThan(2000);
+
+    expect(bitbucketRead.listInbox).toHaveBeenLastCalledWith(
+      { type: 'organization', organizationId: ORG_ID, userId: USER_ID },
+      cursor
+    );
+  });
 });
 
 // ----- identity is server-derived ----------------------------------------------
@@ -370,7 +398,87 @@ describe('providerReviewRouter identity derivation', () => {
   });
 });
 
+// ----- provider connection failures -------------------------------------------------
+
+// A connection that must be re-established is the mobile reconnect state
+// (PRECONDITION_FAILED), never FORBIDDEN: the reader's Kilo access is intact.
+describe('providerReviewRouter connection failures', () => {
+  it('maps a reconnect-classified read failure to PRECONDITION_FAILED', async () => {
+    gitlabRead.getMergeRequest.mockRejectedValueOnce(
+      new GitLabReviewError('reconnect', 'reconnect this connection')
+    );
+
+    await expect(caller.getPullRequest({ ...gitlabBase })).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'reconnect this connection',
+    });
+  });
+
+  it('still maps a real permission refusal to FORBIDDEN', async () => {
+    gitlabRead.getMergeRequest.mockRejectedValueOnce(new GitLabReviewError('forbidden', 'denied'));
+
+    await expect(caller.getPullRequest({ ...gitlabBase })).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+    });
+  });
+});
+
+// The inbox reads every enabled provider, so each provider's connection
+// failure has to reach the same mobile state; a refusal of the reader's own
+// role stays FORBIDDEN.
+describe('providerReviewRouter inbox connection failures', () => {
+  it('maps a reconnect-classified GitLab inbox failure to PRECONDITION_FAILED', async () => {
+    gitlabRead.listInbox.mockRejectedValueOnce(new GitLabReviewError('reconnect', 'reconnect it'));
+
+    await expect(
+      caller.listInbox({ platform: 'gitlab', organizationId: ORG_ID })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', message: 'reconnect it' });
+  });
+
+  it('maps a reconnect-classified Bitbucket inbox failure to PRECONDITION_FAILED', async () => {
+    bitbucketRead.listInbox.mockRejectedValueOnce(
+      new BitbucketReviewError('reconnect', 'reconnect it')
+    );
+
+    await expect(
+      caller.listInbox({ platform: 'bitbucket', organizationId: ORG_ID })
+    ).rejects.toMatchObject({ code: 'PRECONDITION_FAILED', message: 'reconnect it' });
+  });
+
+  it('still maps a genuine permission refusal to FORBIDDEN', async () => {
+    gitlabRead.listInbox.mockRejectedValueOnce(new GitLabReviewError('forbidden', 'denied'));
+
+    await expect(
+      caller.listInbox({ platform: 'gitlab', organizationId: ORG_ID })
+    ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  });
+});
+
 // ----- the shared operation ledger ------------------------------------------------
+
+describe('providerReviewRouter file line reads', () => {
+  const fileLines = { ref: 'abc123', path: 'src/app.ts', startLine: 1, endLine: 5 };
+
+  it('surfaces an oversized file as PAYLOAD_TOO_LARGE on the GitLab arm', async () => {
+    gitlabRead.getFileLines.mockRejectedValueOnce(
+      new GitLabReviewError('too_large', 'The file exceeds the review read limit.')
+    );
+
+    await expect(caller.getFileLines({ ...gitlabBase, ...fileLines })).rejects.toMatchObject({
+      code: 'PAYLOAD_TOO_LARGE',
+    });
+  });
+
+  it('surfaces an oversized file as PAYLOAD_TOO_LARGE on the Bitbucket arm', async () => {
+    bitbucketRead.getFileLines.mockRejectedValueOnce(
+      new BitbucketReviewError('too_large', 'The file exceeds the review read limit.')
+    );
+
+    await expect(caller.getFileLines({ ...bitbucketBase, ...fileLines })).rejects.toMatchObject({
+      code: 'PAYLOAD_TOO_LARGE',
+    });
+  });
+});
 
 describe('providerReviewRouter ledger', () => {
   it('admits provider writes into the shared pr domain with a provider-tagged resource key', async () => {
@@ -568,6 +676,44 @@ describe('providerReviewRouter ledger', () => {
     await caller.addComment({ ...gitlabBase, body: 'hello' });
     expect(mockAdmitOperation).not.toHaveBeenCalled();
     expect(gitlabWrite.addComment).toHaveBeenCalledTimes(1);
+  });
+});
+
+// ----- failed-row ledger outcomes --------------------------------------------------
+
+describe('providerReviewRouter failed-row outcome codes', () => {
+  it('records an unclassified write failure as internal_error, never a client rejection', async () => {
+    gitlabWrite.addComment.mockRejectedValueOnce(new Error('unexpected provider-layer failure'));
+    await expect(
+      caller.addComment({
+        ...gitlabBase,
+        body: 'hello',
+        operationKey: 'key-internal',
+      })
+    ).rejects.toMatchObject({ code: 'INTERNAL_SERVER_ERROR' });
+    expect(mockSettleOperation).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({ rowId: 'row-1', status: 'failed', outcomeCode: 'internal_error' })
+    );
+    // A server failure is deterministic, not ambiguous: the row settles.
+    expect(mockMarkReconcilePending).not.toHaveBeenCalled();
+  });
+
+  it('keeps bad_request reserved for a BAD_REQUEST rejection', async () => {
+    gitlabWrite.addComment.mockRejectedValueOnce(
+      new GitLabReviewError('bad_request', 'GitLab rejected this request.')
+    );
+    await expect(
+      caller.addComment({
+        ...gitlabBase,
+        body: 'hello',
+        operationKey: 'key-rejected',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(mockSettleOperation).toHaveBeenCalledWith(
+      {},
+      expect.objectContaining({ status: 'failed', outcomeCode: 'bad_request' })
+    );
   });
 });
 

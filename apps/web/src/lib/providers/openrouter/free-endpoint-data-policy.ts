@@ -1,8 +1,4 @@
-import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
-import {
-  familyHasUnavailableFreeModel,
-  isUnavailableModel,
-} from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
+import { familyHasUnavailableFreeModel } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { normalizeInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
@@ -18,13 +14,17 @@ export type OpenRouterFreeEndpoint = {
 };
 
 export function getOpenRouterFreeEndpoints(
-  providerModelData: ProviderModels
+  providerModelData: ProviderModels,
+  unavailableModelIds: ReadonlySet<string>
 ): OpenRouterFreeEndpoint[] {
   const endpoints: OpenRouterFreeEndpoint[] = [];
   for (const { provider, models } of providerModelData) {
     const providerId = normalizeInferenceProviderId(provider.slug);
     for (const model of models) {
-      if (model.endpoint?.is_free && !familyHasUnavailableFreeModel(model.slug)) {
+      if (
+        model.endpoint?.is_free &&
+        !familyHasUnavailableFreeModel(unavailableModelIds, model.slug)
+      ) {
         endpoints.push({ modelId: normalizeModelId(model.slug), providerId });
       }
     }
@@ -32,43 +32,22 @@ export function getOpenRouterFreeEndpoints(
   return endpoints;
 }
 
-function dataCollectingKiloExclusiveModels(
-  kiloExclusiveModels: ReadonlyArray<KiloExclusiveModel>
-): Map<string, ReadonlySet<string> | null> {
-  const models = new Map<string, ReadonlySet<string> | null>();
-  for (const model of kiloExclusiveModels) {
-    const collectsData = model.pricing === null || model.flags.includes('requires-data-collection');
-    if (model.status !== 'public' || !collectsData || isUnavailableModel(model.public_id)) continue;
-    const modelId = normalizeModelId(model.public_id);
-    if (model.inference_provider_restriction.length === 0) {
-      models.set(modelId, null);
-      continue;
-    }
-    const existing = models.get(modelId);
-    if (existing === null) continue;
-    models.set(
-      modelId,
-      new Set([
-        ...(existing ?? []),
-        ...model.inference_provider_restriction.map(providerId =>
-          normalizeInferenceProviderId(providerId)
-        ),
-      ])
-    );
-  }
-  return models;
-}
-
 export function applyFreeEndpointDataPolicy({
   providerModelData,
   openRouterFreeEndpoints,
-  kiloExclusiveModels,
+  kiloExclusiveModelIds,
+  unavailableModelIds,
 }: {
   providerModelData: ProviderModels;
   openRouterFreeEndpoints: ReadonlyArray<OpenRouterFreeEndpoint>;
-  kiloExclusiveModels: ReadonlyArray<KiloExclusiveModel>;
+  kiloExclusiveModelIds: ReadonlyArray<string>;
+  unavailableModelIds: ReadonlySet<string>;
 }): void {
-  const exclusiveModels = dataCollectingKiloExclusiveModels(kiloExclusiveModels);
+  const exclusiveModelIds = new Set(
+    kiloExclusiveModelIds
+      .filter(modelId => !unavailableModelIds.has(modelId))
+      .map(modelId => normalizeModelId(modelId))
+  );
 
   for (const { provider, models } of providerModelData) {
     const providerId = normalizeInferenceProviderId(provider.slug);
@@ -76,13 +55,10 @@ export function applyFreeEndpointDataPolicy({
       if (!model.endpoint) continue;
 
       const modelId = normalizeModelId(model.slug);
-      const restrictions = exclusiveModels.get(modelId);
-      const hasFreeExclusiveEndpoint =
-        exclusiveModels.has(modelId) && (restrictions === null || restrictions?.has(providerId));
       const hasFreeOpenRouterEndpoint = openRouterFreeEndpoints.some(
         endpoint => endpoint.modelId === modelId && endpoint.providerId === providerId
       );
-      if (!hasFreeExclusiveEndpoint && !hasFreeOpenRouterEndpoint) continue;
+      if (!exclusiveModelIds.has(modelId) && !hasFreeOpenRouterEndpoint) continue;
 
       model.endpoint.data_policy = {
         ...model.endpoint.data_policy,

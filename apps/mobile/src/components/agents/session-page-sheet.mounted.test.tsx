@@ -17,7 +17,8 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ background: '#000' }),
 }));
 vi.mock('react-native', () => ({
-  Modal: 'Modal',
+  // Sheet registers the app-level Android Back listener while it is visible.
+  BackHandler: { addEventListener: vi.fn(() => ({ remove: () => undefined })) },
   View: 'View',
   Platform: reactNativeMock.Platform,
 }));
@@ -30,19 +31,33 @@ vi.mock('@/components/sheet-header', () => ({
 }));
 
 function sheetElement(
-  props: { onClose?: () => void; onDismiss?: () => void; children?: ReactElement | null } = {}
+  props: {
+    onClose?: () => void;
+    onDismiss?: () => void;
+    onRequestDismiss?: () => boolean;
+    dismissible?: boolean;
+    children?: ReactElement | null;
+  } = {}
 ): ReactElement {
   return createElement(SessionPageSheet, {
     visible: true,
     onClose: props.onClose ?? vi.fn<() => void>(),
     onDismiss: props.onDismiss,
+    onRequestDismiss: props.onRequestDismiss,
+    dismissible: props.dismissible,
     // eslint-disable-next-line react/no-children-prop -- tsgo requires `children` in the props object, not the third argument.
     children: props.children ?? null,
   });
 }
 
 async function mountSheet(
-  props: { onClose?: () => void; onDismiss?: () => void; children?: ReactElement | null } = {}
+  props: {
+    onClose?: () => void;
+    onDismiss?: () => void;
+    onRequestDismiss?: () => boolean;
+    dismissible?: boolean;
+    children?: ReactElement | null;
+  } = {}
 ): Promise<TestRenderer.ReactTestRenderer> {
   const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
   await act(async () => {
@@ -54,6 +69,22 @@ async function mountSheet(
     throw new Error('renderer was not created');
   }
   return renderer;
+}
+
+/** The sheet's dismissal request answers whether it may close. */
+function booleanHandler(value: unknown): () => boolean {
+  if (typeof value !== 'function') {
+    throw new TypeError('expected a handler prop');
+  }
+  return value as () => boolean;
+}
+
+/** A host stub keeps the component's own props untyped; these suites call one handler each. */
+function voidHandler(value: unknown): () => void {
+  if (typeof value !== 'function') {
+    throw new TypeError('expected a handler prop');
+  }
+  return value as () => void;
 }
 
 function findByType(
@@ -70,20 +101,19 @@ function findByTestID(
   return root.findAll(node => node.props.testID === testID);
 }
 
-function modal(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
-  const found = findByType(root, 'Modal');
+function sheet(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance {
+  const found = findByType(root, 'BottomSheet');
   if (!found[0]) {
-    throw new Error('Modal not found');
+    throw new Error('BottomSheet not found');
   }
   return found[0];
 }
 
 function press(instance: TestRenderer.ReactTestInstance, key: string): void {
-  const handler = instance.props[key] as (() => void) | undefined;
-  if (typeof handler !== 'function') {
-    throw new TypeError(`target has no ${key}`);
-  }
-  handler();
+  const handler = voidHandler(instance.props[key]);
+  act(() => {
+    handler();
+  });
 }
 
 beforeEach(() => {
@@ -92,33 +122,39 @@ beforeEach(() => {
 });
 
 describe('SessionPageSheet mounted', () => {
-  it('renders the native pageSheet Modal on iOS and preserves onDismiss', async () => {
+  it('renders the native full-window sheet on iOS and preserves onDismiss', async () => {
     const onClose = vi.fn<() => void>();
     const onDismiss = vi.fn<() => void>();
     const renderer = await mountSheet({ onClose, onDismiss });
 
-    const modalNode = modal(renderer.root);
-    expect(modalNode.props.animationType).toBe('slide');
-    expect(modalNode.props.presentationStyle).toBe('pageSheet');
-    expect(modalNode.props.transparent).toBeUndefined();
-    expect(modalNode.props.onRequestClose).toBe(onClose);
-    expect(modalNode.props.onDismiss).toBe(onDismiss);
+    const sheetNode = sheet(renderer.root);
+    // One detent, the whole window, and no drag indicator: the surface owns the
+    // top of its own window with the caller's SheetHeader.
+    expect(sheetNode.props.snapPoints).toEqual(['100%']);
+    expect(sheetNode.props.handleComponent).toBeNull();
+    expect(sheetNode.props.index).toBe(0);
+    expect(sheetNode.props.backgroundStyle).toEqual({ backgroundColor: '#000' });
+    act(() => {
+      (sheetNode.props.onClose as () => void)();
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
 
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
     expect(surface).toHaveLength(1);
-    expect(surface[0]?.props.style).toBeUndefined();
+    // iOS presents the sheet below the status bar, so the surface pads nothing.
+    expect(surface[0]?.props.style).toEqual({ paddingTop: 0 });
 
     renderer.unmount();
   });
 
-  it.each(['ios', 'android'])('uses a StateSurface as the %s Modal root', async platform => {
+  it.each(['ios', 'android'])('uses a StateSurface as the %s sheet root', async platform => {
     reactNativeMock.Platform.OS = platform;
     const renderer = await mountSheet({
       children: createElement('SheetHeader', { title: 'Details' }),
     });
     const surfaces = findByType(renderer.root, 'StateSurface');
     expect(surfaces).toHaveLength(1);
-    expect(surfaces[0]?.parent).toBe(modal(renderer.root));
+    expect(surfaces[0]?.parent).toBe(sheet(renderer.root));
     expect(surfaces[0]?.props.className).toBe('flex-1 bg-background');
     expect(findByType(renderer.root, 'SheetHeader')[0]?.parent).toBe(surfaces[0]);
     expect(findByType(renderer.root, 'View')).toHaveLength(0);
@@ -127,15 +163,17 @@ describe('SessionPageSheet mounted', () => {
     });
   });
 
-  it('renders an opaque full-window Modal on Android', async () => {
+  it('renders an opaque full-window sheet on Android', async () => {
     reactNativeMock.Platform.OS = 'android';
     const onClose = vi.fn<() => void>();
     const renderer = await mountSheet({ onClose });
 
-    const modalNode = modal(renderer.root);
-    expect(modalNode.props.transparent).toBeUndefined();
-    expect(modalNode.props.animationType).toBe('slide');
-    expect(modalNode.props.onRequestClose).toBe(onClose);
+    const sheetNode = sheet(renderer.root);
+    expect(sheetNode.props.snapPoints).toEqual(['100%']);
+    act(() => {
+      (sheetNode.props.onClose as () => void)();
+    });
+    expect(onClose).toHaveBeenCalledTimes(1);
 
     const surface = findByTestID(renderer.root, 'session-page-sheet-surface');
     expect(surface).toHaveLength(1);
@@ -157,14 +195,44 @@ describe('SessionPageSheet mounted', () => {
     renderer.unmount();
   });
 
-  it('closes when Android Back fires onRequestClose', async () => {
+  it('never lets a drag dismiss the sheet, and forwards the requested dismissal', async () => {
+    const onRequestDismiss = vi.fn(() => false);
+    const renderer = await mountSheet({ onRequestDismiss });
+
+    const sheetNode = sheet(renderer.root);
+    // A full-window sheet owns a form's scroll view: on iOS the native sheet
+    // claims every downward drag that starts over it, so the gesture is off.
+    expect(sheetNode.props.dismissGestures).toBe(false);
+    // Back (and the Android scrim) stay, so the sheet is never a dead end.
+    expect(sheetNode.props.enablePanDownToClose).toBe(true);
+    // The form decides whether that requested dismissal really closes it.
+    const requestDismiss = booleanHandler(sheetNode.props.onRequestDismiss);
+    expect(requestDismiss()).toBe(false);
+    expect(onRequestDismiss).toHaveBeenCalledTimes(1);
+
+    renderer.unmount();
+  });
+
+  it('lets a read-only surface dismiss on a drag', async () => {
+    const renderer = await mountSheet({ dismissible: true });
+
+    const sheetNode = sheet(renderer.root);
+    expect(sheetNode.props.dismissGestures).toBe(true);
+    expect(sheetNode.props.enablePanDownToClose).toBe(true);
+
+    renderer.unmount();
+  });
+
+  it('closes when the sheet dismisses', async () => {
     reactNativeMock.Platform.OS = 'android';
     const onClose = vi.fn<() => void>();
     const renderer = await mountSheet({ onClose });
 
+    // Android Back, a swipe down and a backdrop tap all route through the
+    // native sheet's one close path.
     await act(async () => {
       await Promise.resolve();
-      press(modal(renderer.root), 'onRequestClose');
+      press(sheet(renderer.root), 'onClose');
     });
     expect(onClose).toHaveBeenCalledTimes(1);
 

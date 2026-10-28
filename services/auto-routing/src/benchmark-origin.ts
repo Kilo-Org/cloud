@@ -1,31 +1,21 @@
 import {
-  BenchmarkProfileQuotaErrorSchema,
-  BenchmarkProfileStatusesRequestSchema,
-  BenchmarkProfileStatusesResponseSchema,
   BenchmarkRoutingTableResponseSchema,
   ClassifierWinnerResponseSchema,
-  CustomRoutingTableRequestSchema,
+  CustomRouterBenchmarkContextSchema,
   CustomRoutingTableResponseSchema,
-  RegisterBenchmarkProfilesRequestSchema,
-  type BenchmarkProfileStatusesResponse,
+  CUSTOM_ROUTER_TABLE_PATH,
+  DEFAULT_AUTO_ROUTER,
+  customRouterEntryKey,
+  type AutoRouter,
   type ClassifierWinner,
+  type CustomRouterBenchmarkContext,
+  type CustomRouterDefinition,
   type CustomRoutingTable,
-  type EfficientModelPool,
-  type RegisterBenchmarkProfilesRequest,
   type RoutingTable,
 } from '@kilocode/auto-routing-contracts';
+import { isDirectByokModelId } from '@kilocode/worker-utils/direct-byok-model';
 
 type BenchmarkEnv = Pick<Env, 'BENCHMARK_SERVICE' | 'INTERNAL_API_SECRET_PROD'>;
-
-export class BenchmarkProfileQuotaError extends Error {
-  readonly retryAt: string;
-
-  constructor(message: string, retryAt: string) {
-    super(message);
-    this.name = 'BenchmarkProfileQuotaError';
-    this.retryAt = retryAt;
-  }
-}
 
 async function fetchBenchmark(
   env: BenchmarkEnv,
@@ -51,8 +41,15 @@ async function fetchBenchmarkJson(env: BenchmarkEnv, path: string): Promise<unkn
   return res.json();
 }
 
-export async function fetchRoutingTableFromOrigin(env: BenchmarkEnv): Promise<RoutingTable | null> {
-  const body = await fetchBenchmarkJson(env, '/admin/routing-table');
+export async function fetchRoutingTableFromOrigin(
+  env: BenchmarkEnv,
+  router: AutoRouter = DEFAULT_AUTO_ROUTER
+): Promise<RoutingTable | null> {
+  const path =
+    router === DEFAULT_AUTO_ROUTER
+      ? '/admin/routing-table'
+      : `/admin/routing-table?router=${router}`;
+  const body = await fetchBenchmarkJson(env, path);
   const parsed = BenchmarkRoutingTableResponseSchema.safeParse(body);
   if (!parsed.success) {
     throw new Error(
@@ -75,87 +72,59 @@ export async function fetchClassifierWinnerFromOrigin(
   return parsed.data.winner;
 }
 
-export async function registerBenchmarkProfiles(
-  env: BenchmarkEnv,
-  request: RegisterBenchmarkProfilesRequest
-): Promise<BenchmarkProfileStatusesResponse> {
-  const body = RegisterBenchmarkProfilesRequestSchema.parse(request);
-  const res = await fetchBenchmark(env, '/admin/profiles/register', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
+// The platform key serves gateway models except Kilo-stored direct-BYOK IDs; the owner's CLI
+// measures those and every client entry (ADR 0005).
+export function customRouterBenchmarkContext(
+  router: CustomRouterDefinition
+): CustomRouterBenchmarkContext {
+  return CustomRouterBenchmarkContextSchema.parse({
+    ownerType: router.ownerType,
+    ownerId: router.ownerId,
+    baseRouter: router.baseRouter,
+    entries: router.entries,
+    clientEvalEntryKeys: router.entries
+      .filter(entry => entry.kind === 'client' || isDirectByokModelId(entry.model))
+      .map(customRouterEntryKey),
   });
-
-  if (res.status === 429) {
-    const raw: unknown = await res.json().catch(() => null);
-    const quota = BenchmarkProfileQuotaErrorSchema.safeParse(raw);
-    if (quota.success) {
-      throw new BenchmarkProfileQuotaError(quota.data.error, quota.data.retryAt);
-    }
-    throw new Error('benchmark profile register responded 429 with invalid body');
-  }
-
-  if (!res.ok) {
-    const detail = (await res.text().catch(() => '')).slice(0, 200);
-    throw new Error(`benchmark origin /admin/profiles/register responded ${res.status} ${detail}`);
-  }
-
-  const raw: unknown = await res.json();
-  const parsed = BenchmarkProfileStatusesResponseSchema.safeParse(raw);
-  if (!parsed.success) {
-    throw new Error(
-      `benchmark profile register response invalid: ${parsed.error.issues[0]?.message ?? 'unknown'}`
-    );
-  }
-  return parsed.data;
 }
 
-export async function fetchBenchmarkProfileStatuses(
+export async function fetchCustomRouterTable(
   env: BenchmarkEnv,
-  entries: EfficientModelPool
-): Promise<BenchmarkProfileStatusesResponse> {
-  const body = BenchmarkProfileStatusesRequestSchema.parse({ entries });
-  const res = await fetchBenchmark(env, '/admin/profiles/status', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!res.ok) {
-    const detail = (await res.text().catch(() => '')).slice(0, 200);
-    throw new Error(`benchmark origin /admin/profiles/status responded ${res.status} ${detail}`);
-  }
-  const raw: unknown = await res.json();
-  const parsed = BenchmarkProfileStatusesResponseSchema.safeParse(raw);
-  if (!parsed.success) {
-    throw new Error(
-      `benchmark profile statuses response invalid: ${parsed.error.issues[0]?.message ?? 'unknown'}`
-    );
-  }
-  return parsed.data;
-}
-
-export async function fetchCustomRoutingTable(
-  env: BenchmarkEnv,
-  entries: EfficientModelPool
+  context: CustomRouterBenchmarkContext
 ): Promise<CustomRoutingTable | null> {
-  const body = CustomRoutingTableRequestSchema.parse({ entries });
-  const res = await fetchBenchmark(env, '/admin/custom-routing-table', {
+  const res = await fetchBenchmark(env, CUSTOM_ROUTER_TABLE_PATH, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify(body),
+    body: JSON.stringify(context),
   });
   if (!res.ok) {
     const detail = (await res.text().catch(() => '')).slice(0, 200);
     throw new Error(
-      `benchmark origin /admin/custom-routing-table responded ${res.status} ${detail}`
+      `benchmark origin ${CUSTOM_ROUTER_TABLE_PATH} responded ${res.status} ${detail}`
     );
   }
-  const raw: unknown = await res.json();
-  const parsed = CustomRoutingTableResponseSchema.safeParse(raw);
+  const parsed = CustomRoutingTableResponseSchema.safeParse(await res.json());
   if (!parsed.success) {
     throw new Error(
-      `benchmark custom routing-table response invalid: ${parsed.error.issues[0]?.message ?? 'unknown'}`
+      `benchmark custom router table response invalid: ${parsed.error.issues[0]?.message ?? 'unknown'}`
     );
   }
   return parsed.data.table;
+}
+
+// The benchmark worker owns eval validation and error codes; its status and body pass through.
+export async function forwardClientEval(
+  env: BenchmarkEnv,
+  path: string,
+  body: unknown
+): Promise<Response> {
+  const res = await fetchBenchmark(env, path, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  return new Response(res.body, {
+    status: res.status,
+    headers: { 'content-type': res.headers.get('content-type') ?? 'application/json' },
+  });
 }

@@ -4,6 +4,7 @@ import { withTimeout } from '@kilocode/worker-utils';
 import {
   configureSandboxBillingInput,
   ensureSandboxBillingAdmissionInput,
+  getSandboxBillingRuntimeStatus,
   isSandboxBillingBlocked,
   isSandboxContainerRunning,
   parseSandboxBillingInput,
@@ -18,8 +19,10 @@ import type {
   ProviderCreateIntent,
 } from './provider.js';
 import { ProviderCreationError } from './provider.js';
-import { CONTROL_SUPERVISOR_PATH, CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
+import { CONTROL_WRAPPER_LOG_PATH } from './container-paths.js';
+import { shellQuote } from '../kilo/utils.js';
 import { parseWrapperProcScanOutput, WRAPPER_PROC_SCAN_COMMAND } from './wrapper-proc-scan.js';
+import { withDORetry } from '../utils/do-retry.js';
 
 export const WRAPPER_PROC_PROBE_TIMEOUT_MS = 5_000;
 
@@ -70,6 +73,7 @@ type SandboxOptions = { containment: boolean };
 
 export function createCloudflareProviderAdapter(deps: {
   sandboxId: string;
+  billingContainment?: boolean;
   getSandbox: (id: string, options: SandboxOptions) => CloudflareSandboxHandle;
   destroy: (allocationId: string, options: SandboxOptions) => Promise<void>;
 }): CloudflareProviderAdapter {
@@ -115,15 +119,36 @@ export function createCloudflareProviderAdapter(deps: {
         throw new ProviderCreationError(admission.code);
       }
     } else {
-      await configureSandboxBillingInput(sandbox, input).catch(() => undefined);
+      await withDORetry(
+        () => deps.getSandbox(parsed.sandboxId, { containment: parsed.containment }),
+        sandbox => configureSandboxBillingInput(sandbox, input),
+        'configureSandboxBilling'
+      );
     }
   };
 
   return {
-    resumable: false,
-    persistentWorkspace: false,
-    destroysOnStop: true,
     ensureBillingAdmission,
+    async isBillingBlocked(ref) {
+      const parsed = ref === null ? null : decodeCloudflareProviderRef(ref);
+      if (parsed?.sandboxId !== deps.sandboxId) return false;
+      return isSandboxBillingBlocked(deps.getSandbox(parsed.sandboxId, parsed));
+    },
+    async getBillingProjection() {
+      return getSandboxBillingRuntimeStatus(
+        deps.getSandbox(deps.sandboxId, { containment: deps.billingContainment ?? false })
+      );
+    },
+    describeRuntime(ref) {
+      const parsed = decodeCloudflareProviderRef(ref);
+      if (parsed?.sandboxId !== deps.sandboxId) return undefined;
+      return {
+        provider: 'cloudflare',
+        sandboxId: parsed.sandboxId,
+        instanceId: parsed.instanceId,
+        startSource: 'image',
+      };
+    },
     async probeWrapperProcesses(ref) {
       const parsed = decodeOwnedProviderRef(ref);
       if (!parsed) return { outcome: 'invalid_reference' };
@@ -162,14 +187,14 @@ export function createCloudflareProviderAdapter(deps: {
       await ensureBillingAdmission(providerRef, intent.billing);
       return { providerRef };
     },
-    async launch(ref, env) {
+    async launch(ref, { command, env }) {
       const parsed = decodeCloudflareProviderRef(ref);
       if (!parsed || parsed.sandboxId !== deps.sandboxId) {
         throw new ProviderCreationError('invalid_configuration');
       }
       const sandbox = deps.getSandbox(parsed.sandboxId, { containment: parsed.containment });
       if (parsed.containment) await sandbox.setOutboundHandler(MANAGED_SCM_OUTBOUND_HANDLER);
-      await sandbox.startProcess(CONTROL_SUPERVISOR_PATH, {
+      await sandbox.startProcess(command.argv.map(shellQuote).join(' '), {
         cwd: '/',
         env: {
           ...env,
@@ -177,6 +202,7 @@ export function createCloudflareProviderAdapter(deps: {
           WRAPPER_LOG_PATH: CONTROL_WRAPPER_LOG_PATH,
         },
       });
+      return { startSource: 'image' };
     },
     async observe(ref, intent) {
       const providerRef = resolveProviderRef(ref, intent);

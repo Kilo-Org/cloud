@@ -1,4 +1,5 @@
 import type { SandboxAllocation } from '@kilocode/worker-utils/sandbox-allocation';
+import type { EgressMode } from '@kilocode/worker-utils/egress-allowlist';
 import type { CallbackTarget } from '../callbacks/index.js';
 import type {
   AgentSelection,
@@ -6,6 +7,7 @@ import type {
   SessionFinalization,
 } from '../execution/types.js';
 import type { SessionProfileBundle } from '../session-profile.js';
+import type { SessionEnvironmentReference } from '../environment-build/reference.js';
 
 export type ProfileOverrides = {
   envVars?: Record<string, string>;
@@ -23,6 +25,7 @@ export type SessionRepositoryRequest =
       repo: string;
       githubIntegrationId?: string;
       githubAccessPurpose?: 'workflow' | 'agent';
+      allowUserAuthorization?: boolean;
       pullRequestNumber?: number;
       branch?: string;
     }
@@ -48,18 +51,41 @@ export type SessionRepositoryRequest =
 
 export type SessionRuntimeIntent = {
   sandboxAllocation?: SandboxAllocation;
-  devcontainer?: boolean;
+  egressMode?: EgressMode;
+  egressAllowlist?: string[];
 };
 
 export type SessionCreateRequest = {
+  parentCloudAgentSessionId?: string;
   /** Omitted for a clone-only create: the copied transcript is the session state. */
   initialTurn?: ExecutionTurnSubmission;
   agent: AgentSelection;
   repository: SessionRepositoryRequest;
   runtime?: SessionRuntimeIntent;
+  /**
+   * The allocation that the owner's saved settings resolved for this create,
+   * set only by the Worker and never by a client. `null` means the settings were
+   * read and none applied, so a retry does not read them again.
+   */
+  savedSandboxAllocation?: SandboxAllocation | null;
   clone?: {
     cloneFromKiloSessionId: string;
+    /** Inclusive cut: copy source messages up to and including this ID. */
+    cloneUpToMessageId?: string;
   };
+  /**
+   * The authorized reference of the repository's environment, set only by
+   * preflight after it resolved the environment from the owner and the
+   * repository. Persisted on session metadata and carried DO-private to the
+   * Sandbox DO for snapshot selection.
+   */
+  environment?: SessionEnvironmentReference;
+  /**
+   * The environment's saved allocation key, set only by preflight and never by
+   * a client. It is the first saved candidate; eligibility is checked when the
+   * saved allocation is resolved.
+   */
+  environmentSandboxAllocation?: string;
   profile?: {
     id?: string;
     overrides?: ProfileOverrides;
@@ -77,9 +103,11 @@ export type SessionCreateRequest = {
     callbackTarget?: CallbackTarget;
     kilocodeOrganizationId?: string;
     createdOnPlatform?: string;
-    clientProvenance?: 'browser' | 'mobile';
+    clientProvenance?: 'browser' | 'mobile' | 'agent-manager';
     shallow?: boolean;
     /** Stable per-user-intent UUID; the handler admits it only with `autoInitiate` true. */
     operationKey?: string;
+    /** Client-proposed Kilo session ID; the Worker generates one when absent. */
+    kiloSessionId?: string;
   };
 };

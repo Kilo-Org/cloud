@@ -671,7 +671,7 @@ function TabBar({
               >
                 {isMayor && (
                   <Crown
-                    className={`shrink-0 text-[color:oklch(95%_0.15_108_/_0.6)] ${horizontal ? 'size-3' : 'size-3.5'}`}
+                    className={`shrink-0 text-primary/60 ${horizontal ? 'size-3' : 'size-3.5'}`}
                   />
                 )}
                 {tab.kind === 'status' && (

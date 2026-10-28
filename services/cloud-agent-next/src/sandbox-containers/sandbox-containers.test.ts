@@ -1,3 +1,4 @@
+import { preinstalledStartup } from '../sandbox-control/preinstalled-startup.js';
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -20,29 +21,41 @@ vi.mock('@cloudflare/sandbox', () => ({ Sandbox: class {} }));
 import {
   CONTROL_SUPERVISOR_PATH,
   CONTROL_WRAPPER_LOG_PATH,
+  ENVIRONMENT_BUILDER_PATH,
 } from '../sandbox-control/container-paths.js';
+import { RUNTIME_BUN_PATH } from '../shared/runtime-distribution.js';
+import { logger } from '../logger.js';
 import {
-  ContainersAllocationConflictError,
   SandboxContainers,
   type ContainerInstanceSize,
   type ContainersObservation,
 } from './SandboxContainers.js';
+import {
+  PREVIEW_MARKER_ALLOCATION_HEADER,
+  PREVIEW_MARKER_PORT_HEADER,
+} from '../shared/preview-headers.js';
 import type { Env } from '../types.js';
+import type { ContainersOutboundProps } from './containers-outbound.js';
 
 // The fake proves coordinator ordering only. It does not prove that exec behaves as assumed, and it
 // fails any attempt to snapshot the container so a stop that snapshots cannot pass silently.
 const RECORD_KEY = 'containers:record:v1';
+const SNAPSHOT_SIZE = 1_234_567;
 const REF_A = 'ref-a';
 const REF_B = 'ref-b';
 
 type StoredRecord = {
   state: 'idle' | 'launching' | 'running' | 'stopping';
   allocationRef: string | null;
-  stopOpId: string | null;
-  lastSnapshot: { id: string; sourceAllocation: string } | null;
+  stopOpId?: string | null;
+  lastSnapshot?: { id: string; sourceAllocation: string } | null;
+  startSource?: 'image' | 'repository';
+  startImage?: string;
   instance?: ContainerInstanceSize;
   billingConfigured?: true;
   wrapperAttempt?: string;
+  repositoryStartFailures?: { snapshotId: string; attempts: number };
+  egressPolicy?: { allocationRef: string; allowlist: string[] };
 };
 
 const idleRecord: StoredRecord = {
@@ -89,13 +102,24 @@ type DestroyBehavior = 'ok' | 'reject' | 'deferred' | 'hang';
 
 class FakeContainer {
   running = false;
-  images: Record<string, string> = { app: 'registry.example/kilo/app:test' };
+  images: Record<string, string> = {
+    app: 'registry.example/kilo/app:test',
+    'runtime-free': 'registry.example/kilo/runtime-free:test',
+  };
   calls: string[] = [];
   startCalls: ContainerStartupOptions[] = [];
   execCalls: { cmd: string[]; options?: ContainerExecOptions }[] = [];
   httpsIntercepts: string[] = [];
   httpIntercepts: string[] = [];
   snapshotCalls = 0;
+  snapshotBehavior:
+    | { kind: 'resolve'; id: string }
+    | { kind: 'reject'; error?: Error }
+    | { kind: 'deferred' } = { kind: 'resolve', id: 'snap-1' };
+  deferredSnapshots: Array<{
+    resolve: (id: string) => void;
+    reject: (error: Error) => void;
+  }> = [];
   destroyCalls = 0;
   monitorCalls = 0;
   inspectCalls = 0;
@@ -104,7 +128,11 @@ class FakeContainer {
   // PID 1 as seen through `/proc/1/cmdline`. A manual `running = true` models the
   // deployed `sleep infinity` main process; `start()` with the native entrypoint
   // models the supervisor main process.
-  mainProcess: 'sleep' | 'supervisor' | 'ambiguous' = 'sleep';
+  mainProcess: 'sleep' | 'supervisor' | 'environment-builder' | 'ambiguous' = 'sleep';
+  // A runtime installer start (`/bin/sh -c <launch>`): hand off to the entry point
+  // named in the launch, or exit with this code so `monitor()` rejects.
+  runtimeOutcome: { kind: 'handoff' } | { kind: 'exit'; code: number } = { kind: 'handoff' };
+  private exitError: Error | undefined;
   // What native `start()` leaves as PID 1. A lucky start normally leaves the
   // supervisor; tests override this to model a start whose main process is wrong.
   identityAfterStart: 'sleep' | 'supervisor' | 'ambiguous' = 'supervisor';
@@ -123,8 +151,23 @@ class FakeContainer {
     this.startCalls.push(options as ContainerStartupOptions);
     if (this.startBehavior === 'reject') throw new Error('container start failed');
     this.running = true;
-    if (options?.entrypoint?.includes(CONTROL_SUPERVISOR_PATH)) {
+    this.exitError = undefined;
+    const entrypoint = options?.entrypoint ?? [];
+    if (entrypoint.includes(CONTROL_SUPERVISOR_PATH)) {
       this.mainProcess = this.identityAfterStart;
+    } else if (entrypoint.includes(ENVIRONMENT_BUILDER_PATH)) {
+      this.mainProcess = 'environment-builder';
+    } else if (entrypoint[1] === '-c') {
+      if (this.runtimeOutcome.kind === 'exit') {
+        this.running = false;
+        this.exitError = new Error(
+          `Container exited with unexpected exit code: ${this.runtimeOutcome.code}`
+        );
+      } else {
+        this.mainProcess = entrypoint[2]?.includes('kilocode-environment-builder.js')
+          ? 'environment-builder'
+          : this.identityAfterStart;
+      }
     }
     if (this.stopAfterStart) this.running = false;
     if (this.startBehavior === 'effect-then-reject') {
@@ -144,7 +187,9 @@ class FakeContainer {
         stdout:
           this.mainProcess === 'supervisor'
             ? `/bin/sh\0${CONTROL_SUPERVISOR_PATH}`
-            : 'sleep\0infinity',
+            : this.mainProcess === 'environment-builder'
+              ? `${RUNTIME_BUN_PATH}\0${ENVIRONMENT_BUILDER_PATH}`
+              : 'sleep\0infinity',
       });
     }
     return this.execHandler(cmd);
@@ -152,7 +197,16 @@ class FakeContainer {
 
   async snapshotContainer(_options: ContainerSnapshotOptions): Promise<ContainerSnapshot> {
     this.snapshotCalls += 1;
-    throw new Error('container snapshot is disabled');
+    if (this.snapshotBehavior.kind === 'reject')
+      throw this.snapshotBehavior.error ?? new Error('snapshot failed');
+    if (this.snapshotBehavior.kind === 'resolve')
+      return { id: this.snapshotBehavior.id, size: SNAPSHOT_SIZE };
+    return new Promise((resolve, reject) =>
+      this.deferredSnapshots.push({
+        resolve: id => resolve({ id, size: SNAPSHOT_SIZE }),
+        reject,
+      })
+    );
   }
 
   async destroy(): Promise<void> {
@@ -184,8 +238,17 @@ class FakeContainer {
     this.leaseCalls.push(Number(ms));
   }
 
+  tcpPortCalls = 0;
+
+  getTcpPort(_port: number): { fetch: (url: string, request: Request) => Promise<Response> } {
+    this.tcpPortCalls += 1;
+    return { fetch: async () => new Response('preview', { status: 200 }) };
+  }
+
   async monitor(): Promise<void> {
     this.monitorCalls += 1;
+    if (this.exitError) throw this.exitError;
+    if (!this.stopAfterStart) await new Promise<void>(() => {});
   }
 
   async inspect(): Promise<ContainerInfo> {
@@ -215,7 +278,13 @@ function setup(
     async get<T>(key: string): Promise<T | undefined> {
       return storage.map.get(key) as T | undefined;
     },
-    async put(key: string, value: unknown): Promise<void> {
+    async put(key: string | Record<string, unknown>, value?: unknown): Promise<void> {
+      if (typeof key !== 'string') {
+        for (const [entryKey, entryValue] of Object.entries(key)) {
+          await storage.put(entryKey, entryValue);
+        }
+        return;
+      }
       const decision = putGate?.(value) ?? 'pass';
       if (decision === 'fail') {
         putGate = undefined;
@@ -233,7 +302,8 @@ function setup(
       }
       storage.map.set(key, value);
     },
-    async delete(key: string): Promise<boolean> {
+    async delete(key: string | string[]): Promise<boolean | number> {
+      if (Array.isArray(key)) return key.filter(entry => storage.map.delete(entry)).length;
       return storage.map.delete(key);
     },
     async setAlarm(scheduledTime: number): Promise<void> {
@@ -282,18 +352,121 @@ function launch(
   allocationRef: string,
   env: Record<string, string> = {}
 ) {
-  return instance.launchWrapper({ allocationRef, env, instance: 'standard-2' });
+  return instance.launchWrapper({
+    command: preinstalledStartup(),
+    allocationRef,
+    env,
+    instance: 'standard-4',
+  });
 }
 
 afterEach(() => {
   vi.useRealTimers();
+  vi.restoreAllMocks();
 });
 
-function attachOutbound(instance: SandboxContainers): void {
-  const outbound = vi.fn((options: { props: { containerId: string } }) => options.props);
+describe('supplied startup command', () => {
+  const command = { argv: ['/bin/sh', '-c', 'exec /opt/selected/start "two words"'] };
+
+  it.each(['image', 'repository'] as const)('starts the supplied command from %s', async source => {
+    const { instance, container, readRecord } = setup();
+    container.cmdlineRaw = `${command.argv.join('\0')}\0`;
+
+    await expect(
+      source === 'repository'
+        ? launchFromSnapshot(instance, REF_A, { command })
+        : instance.launchWrapper({ allocationRef: REF_A, command, env: {}, instance: 'standard-4' })
+    ).resolves.toEqual({
+      started: true,
+      startSource: source,
+    });
+    expect(container.startCalls[0]?.entrypoint).toEqual(command.argv);
+    if (source === 'repository')
+      expect(container.startCalls[0]?.containerSnapshot).toEqual({ id: 'snap-env' });
+    expect(container.execCalls.map(call => call.cmd)).toEqual([['cat', '/proc/1/cmdline']]);
+    expect(readRecord().state).toBe('running');
+  });
+
+  it('starts the code-review instance at the legacy code-review capacity', async () => {
+    const { instance, container } = setup();
+    container.cmdlineRaw = `${preinstalledStartup().argv.join('\0')}\0`;
+
+    await expect(
+      instance.launchWrapper({
+        allocationRef: REF_A,
+        command: preinstalledStartup(),
+        env: {},
+        instance: 'code-review',
+      })
+    ).resolves.toMatchObject({ started: true });
+
+    expect(container.startCalls[0]?.instance).toEqual({
+      vcpu: 1,
+      memoryMib: 4_096,
+      diskMb: 8_000,
+    });
+  });
+
+  it('accepts the stable supervisor after the supplied command execs it', async () => {
+    const { instance, container } = setup();
+    container.cmdlineRaw = `/bin/sh\0${CONTROL_SUPERVISOR_PATH}\0`;
+    await expect(
+      instance.launchWrapper({ allocationRef: REF_A, command, env: {}, instance: 'standard-3' })
+    ).resolves.toMatchObject({ started: true });
+    expect(container.startCalls[0]?.entrypoint).toEqual(command.argv);
+  });
+
+  it('execs the supplied command when a pre-exec launch still has sleep as PID 1', async () => {
+    const { instance, container, readRecord } = setup({
+      running: true,
+      record: {
+        ...idleRecord,
+        state: 'launching',
+        allocationRef: REF_A,
+        wrapperAttempt: 'not_started',
+      },
+    });
+    container.execHandler = cmd =>
+      makeExecProcess({ pid: 42, exitCode: cmd[0] === 'pgrep' ? 1 : 0 });
+    await expect(
+      instance.launchWrapper({
+        allocationRef: REF_A,
+        command,
+        env: { CALLER: 'test' },
+        instance: 'standard-3',
+      })
+    ).resolves.toMatchObject({ started: true });
+    expect(container.startCalls).toEqual([]);
+    expect(container.execCalls.at(-1)).toMatchObject({
+      cmd: command.argv,
+      options: { env: { CALLER: 'test' } },
+    });
+    expect(readRecord().state).toBe('running');
+  });
+});
+
+type LogLine = { level: string; fields: Record<string, unknown>; message: string };
+
+/** Record every structured log line; `diagnostics(event)` narrows to one control diagnostic. */
+function captureLogs() {
+  const lines: LogLine[] = [];
+  vi.spyOn(logger, 'withFields').mockImplementation(((fields: Record<string, unknown>) => ({
+    info: (message: string) => lines.push({ level: 'info', fields, message }),
+    warn: (message: string) => lines.push({ level: 'warn', fields, message }),
+    error: (message: string) => lines.push({ level: 'error', fields, message }),
+  })) as unknown as typeof logger.withFields);
+  return {
+    lines,
+    diagnostics: (event: string) => lines.filter(line => line.fields.diagnosticEvent === event),
+  };
+}
+
+function attachOutbound(instance: SandboxContainers) {
+  const outbound = vi.fn((options: { props: ContainersOutboundProps }) => options.props);
   (
     instance as unknown as { ctx: { exports: { ContainersOutbound: typeof outbound } } }
   ).ctx.exports = { ContainersOutbound: outbound };
+  return outbound;
 }
 
 const NATIVE_GATE_ENV = { CONTROL_PLANE_NATIVE_LOGS: '1' };
@@ -328,21 +501,307 @@ function sleepPreExec(record?: StoredRecord) {
   return state;
 }
 
+describe('SandboxContainers egress enforcement', () => {
+  it.each([{ egressAllowlist: [] }, { egressAllowlist: ['Example.COM.', 'example.com'] }])(
+    'restricts a native image start independently of credential containment: %j',
+    async ({ egressAllowlist }) => {
+      const { instance, container, readRecord } = setup();
+      const outbound = attachOutbound(instance);
+      await instance.launchWrapper({
+        command: preinstalledStartup(),
+        allocationRef: REF_A,
+        env: { EGRESS_ALLOWLIST: '*' },
+        instance: 'standard-3',
+        egressAllowlist,
+      });
+
+      const expectedPolicy = egressAllowlist.length === 0 ? [] : ['example.com'];
+      expect(container.calls).toEqual(['https-intercept', 'http-intercept', 'start', 'exec:cat']);
+      expect(container.startCalls[0]).toMatchObject({
+        enableInternet: false,
+        env: {
+          SANDBOX_INTERCEPT_HTTPS: '1',
+          NODE_EXTRA_CA_CERTS: '/etc/cloudflare/certs/cloudflare-containers-ca.crt',
+        },
+      });
+      expect(outbound).toHaveBeenCalledWith({
+        props: { containerId: 'do-id', egressAllowlist: expectedPolicy },
+      });
+      expect(readRecord().egressPolicy).toEqual({
+        allocationRef: REF_A,
+        allowlist: expectedPolicy,
+      });
+    }
+  );
+
+  it('retains unrestricted starts when no policy or containment is supplied', async () => {
+    const { instance, container } = setup();
+    await launch(instance, REF_A);
+    expect(container.calls).toEqual(['start', 'exec:cat']);
+    expect(container.startCalls[0]?.enableInternet).toBe(true);
+  });
+
+  it.each(['interceptOutboundHttps', 'interceptAllOutboundHttp'] as const)(
+    'never starts a restricted container when %s fails',
+    async method => {
+      const { instance, container } = setup();
+      attachOutbound(instance);
+      vi.spyOn(container, method).mockRejectedValue(new Error('interceptor unavailable'));
+      await expect(
+        instance.launchWrapper({
+          command: preinstalledStartup(),
+          allocationRef: REF_A,
+          env: {},
+          instance: 'standard-3',
+          egressAllowlist: [],
+        })
+      ).rejects.toThrow('interceptor unavailable');
+      expect(container.startCalls).toHaveLength(0);
+    }
+  );
+
+  it('reinstalls trusted props on same-allocation retries after Durable Object reconstruction', async () => {
+    const initial = setup();
+    attachOutbound(initial.instance);
+    await initial.instance.launchWrapper({
+      command: preinstalledStartup(),
+      allocationRef: REF_A,
+      env: {},
+      instance: 'standard-3',
+      egressAllowlist: ['example.com'],
+    });
+    const restored = setup({ record: initial.readRecord(), running: true });
+    const outbound = attachOutbound(restored.instance);
+    await restored.instance.launchWrapper({
+      command: preinstalledStartup(),
+      allocationRef: REF_A,
+      env: {},
+      instance: 'standard-3',
+      egressAllowlist: ['EXAMPLE.COM.'],
+    });
+    expect(restored.container.calls).toEqual(['https-intercept', 'http-intercept']);
+    expect(outbound).toHaveBeenCalledWith({
+      props: { containerId: 'do-id', egressAllowlist: ['example.com'] },
+    });
+    expect(restored.readRecord().egressPolicy?.allowlist).toEqual(['example.com']);
+  });
+
+  it.each(
+    [undefined, [], ['other.test'], ['example.com', 'other.test']].map(egressAllowlist => ({
+      egressAllowlist,
+    }))
+  )(
+    'rejects policy changes on a restricted running allocation: %j',
+    async ({ egressAllowlist }) => {
+      const { instance, container, readRecord } = setup({
+        record: {
+          ...idleRecord,
+          allocationRef: REF_A,
+          state: 'running',
+          egressPolicy: { allocationRef: REF_A, allowlist: ['example.com'] },
+        },
+        running: true,
+      });
+      await expect(
+        instance.launchWrapper({
+          command: preinstalledStartup(),
+          allocationRef: REF_A,
+          env: {},
+          instance: 'standard-3',
+          egressAllowlist,
+        })
+      ).rejects.toThrow('egress policy cannot change');
+      expect(container.calls).toEqual([]);
+      expect(readRecord().egressPolicy?.allowlist).toEqual(['example.com']);
+    }
+  );
+
+  it('rejects attempts to retrofit runtime network isolation onto an unrestricted allocation', async () => {
+    const { instance, container } = setup({
+      record: { ...idleRecord, allocationRef: REF_A, state: 'running' },
+      running: true,
+    });
+    await expect(
+      instance.launchWrapper({
+        command: preinstalledStartup(),
+        allocationRef: REF_A,
+        env: {},
+        instance: 'standard-3',
+        egressAllowlist: [],
+      })
+    ).rejects.toThrow('egress policy cannot change');
+    expect(container.calls).toEqual([]);
+  });
+
+  it('rejects restricted fresh launches when an unowned physical container is already running', async () => {
+    const { instance, container } = setup({ running: true });
+    await expect(
+      instance.launchWrapper({
+        command: preinstalledStartup(),
+        allocationRef: REF_A,
+        env: {},
+        instance: 'standard-3',
+        egressAllowlist: [],
+      })
+    ).rejects.toThrow('unowned running container');
+    expect(container.calls).toEqual([]);
+  });
+
+  it.each(
+    [null, '*', ['*.example.com'], ['127.0.0.1']].map(egressAllowlist => ({ egressAllowlist }))
+  )('fails closed before start for invalid policy %j', async ({ egressAllowlist }) => {
+    const { instance, container } = setup();
+    await expect(
+      instance.launchWrapper({
+        command: preinstalledStartup(),
+        allocationRef: REF_A,
+        env: {},
+        instance: 'standard-3',
+        egressAllowlist,
+      } as never)
+    ).rejects.toThrow();
+    expect(container.calls).toEqual([]);
+  });
+
+  it('fails closed for invalid persisted policy instead of re-registering unrestricted props', async () => {
+    const { instance, container } = setup({
+      record: {
+        ...idleRecord,
+        allocationRef: REF_A,
+        state: 'running',
+        egressPolicy: { allocationRef: REF_A, allowlist: ['*'] },
+      },
+      running: true,
+    });
+    await expect(launch(instance, REF_A)).rejects.toThrow();
+    expect(container.calls).toEqual([]);
+  });
+
+  it('retains policy after an ambiguous native start and rejects removal before adoption', async () => {
+    const { instance, container, readRecord } = setup();
+    attachOutbound(instance);
+    container.startBehavior = 'effect-then-reject';
+    const input = {
+      command: preinstalledStartup(),
+      allocationRef: REF_A,
+      env: {},
+      instance: 'standard-3' as const,
+      egressAllowlist: ['example.com'],
+    };
+    await expect(instance.launchWrapper(input)).rejects.toThrow('start failed');
+    expect(readRecord()).toMatchObject({
+      egressPolicy: { allocationRef: REF_A, allowlist: ['example.com'] },
+      wrapperAttempt: 'exec_pending',
+    });
+    await expect(launch(instance, REF_A)).rejects.toThrow('egress policy cannot change');
+    await expect(instance.launchWrapper(input)).resolves.toMatchObject({ started: true });
+    expect(container.startCalls).toHaveLength(1);
+    expect(container.startCalls[0]?.enableInternet).toBe(false);
+  });
+
+  it('retains enforcement on stopped pre-exec resume', async () => {
+    const { instance, container } = setup({
+      record: {
+        ...idleRecord,
+        allocationRef: REF_A,
+        state: 'launching',
+        wrapperAttempt: 'not_started',
+        egressPolicy: { allocationRef: REF_A, allowlist: [] },
+      },
+    });
+    attachOutbound(instance);
+    await instance.launchWrapper({
+      command: preinstalledStartup(),
+      allocationRef: REF_A,
+      env: {},
+      instance: 'standard-3',
+      egressAllowlist: [],
+    });
+    expect(container.calls).toEqual(['https-intercept', 'http-intercept', 'start', 'exec:cat']);
+    expect(container.startCalls[0]?.enableInternet).toBe(false);
+  });
+
+  it('retains trust and props on a running pre-exec resume', async () => {
+    const { instance, container } = sleepPreExec({
+      ...idleRecord,
+      allocationRef: REF_A,
+      state: 'launching',
+      wrapperAttempt: 'not_started',
+      egressPolicy: { allocationRef: REF_A, allowlist: ['example.com'] },
+    });
+    const outbound = attachOutbound(instance);
+    container.execHandler = cmd => makeExecProcess({ exitCode: cmd[0] === 'pgrep' ? 1 : 0 });
+    await instance.launchWrapper({
+      command: preinstalledStartup(),
+      allocationRef: REF_A,
+      env: {},
+      instance: 'standard-3',
+      egressAllowlist: ['example.com'],
+    });
+    expect(container.startCalls).toHaveLength(0);
+    expect(container.execCalls.at(-1)?.options?.env).toMatchObject({
+      SANDBOX_INTERCEPT_HTTPS: '1',
+    });
+    expect(outbound).toHaveBeenCalledWith({
+      props: { containerId: 'do-id', egressAllowlist: ['example.com'] },
+    });
+  });
+
+  it('allows policy replacement only after destroying the previous allocation', async () => {
+    const { instance, container, readRecord } = setup();
+    attachOutbound(instance);
+    await instance.launchWrapper({
+      command: preinstalledStartup(),
+      allocationRef: REF_A,
+      env: {},
+      instance: 'standard-3',
+      egressAllowlist: [],
+    });
+    await launch(instance, REF_B);
+    expect(container.destroyCalls).toBe(1);
+    expect(container.startCalls.map(options => options.enableInternet)).toEqual([false, true]);
+    expect(readRecord().egressPolicy).toBeUndefined();
+  });
+
+  it('rejects policy removal after stop when retrying the same allocation reference', async () => {
+    const { instance, container, readRecord } = setup();
+    attachOutbound(instance);
+    const input = {
+      command: preinstalledStartup(),
+      allocationRef: REF_A,
+      env: {},
+      instance: 'standard-3' as const,
+      egressAllowlist: [],
+    };
+    await instance.launchWrapper(input);
+    await expect(instance.stop(REF_A)).resolves.toBe('terminal');
+    expect(readRecord()).toMatchObject({
+      state: 'idle',
+      allocationRef: null,
+      egressPolicy: { allocationRef: REF_A, allowlist: [] },
+    });
+    await expect(launch(instance, REF_A)).rejects.toThrow('egress policy cannot change');
+    await expect(instance.launchWrapper(input)).resolves.toMatchObject({ started: true });
+    expect(container.startCalls.map(options => options.enableInternet)).toEqual([false, false]);
+  });
+});
+
 describe('SandboxContainers launch', () => {
   it('fresh idle+missing starts natively with the supervisor entrypoint, gate and CA, and never execs the supervisor', async () => {
     const { instance, container, readRecord } = setup();
     attachOutbound(instance);
 
     const result = await instance.launchWrapper({
+      command: preinstalledStartup(),
       allocationRef: REF_A,
       env: { FOO: 'bar' },
-      instance: 'standard-2',
+      instance: 'standard-4',
       containment: true,
     });
 
-    expect(result).toEqual({ started: true });
+    expect(result).toEqual({ started: true, startSource: 'image' });
     expect(container.startCalls).toEqual([
-      nativeStartOptions('standard-2', {
+      nativeStartOptions('standard-4', {
         FOO: 'bar',
         SANDBOX_INTERCEPT_HTTPS: '1',
         NODE_EXTRA_CA_CERTS: '/etc/cloudflare/certs/cloudflare-containers-ca.crt',
@@ -350,12 +809,12 @@ describe('SandboxContainers launch', () => {
     ]);
     // The only exec is the PID 1 identity read; there is no supervisor exec.
     expect(container.execCalls.map(call => call.cmd[0])).toEqual(['cat']);
-    expect(container.monitorCalls).toBe(0);
+    expect(container.monitorCalls).toBe(1);
     expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
     expect(readRecord().wrapperAttempt).toBeUndefined();
 
     const again = await launch(instance, REF_A, { FOO: 'bar' });
-    expect(again).toEqual({ started: false });
+    expect(again).toEqual({ started: false, startSource: 'image' });
     expect(container.startCalls).toHaveLength(1);
     expect(container.execCalls).toHaveLength(1);
   });
@@ -370,10 +829,15 @@ describe('SandboxContainers launch', () => {
       },
     });
 
-    await instance.launchWrapper({ allocationRef: REF_B, env: {}, instance: 'lite' });
+    await instance.launchWrapper({
+      command: preinstalledStartup(),
+      allocationRef: REF_B,
+      env: {},
+      instance: 'standard-3',
+    });
 
     const options = container.startCalls[0] as Record<string, unknown>;
-    expect(options).toEqual(nativeStartOptions('lite'));
+    expect(options).toEqual(nativeStartOptions('standard-3'));
     expect('containerSnapshot' in options).toBe(false);
     expect(container.inspectCalls).toBe(0);
   });
@@ -383,9 +847,10 @@ describe('SandboxContainers launch', () => {
     attachOutbound(instance);
 
     await instance.launchWrapper({
+      command: preinstalledStartup(),
       allocationRef: REF_A,
       env: { FOO: 'bar' },
-      instance: 'standard-2',
+      instance: 'standard-4',
       containment: true,
     });
 
@@ -404,12 +869,13 @@ describe('SandboxContainers launch', () => {
 
     await expect(
       instance.launchWrapper({
+        command: preinstalledStartup(),
         allocationRef: REF_A,
         env: { FOO: 'bar' },
-        instance: 'standard-2',
+        instance: 'standard-4',
         containment: true,
       })
-    ).resolves.toEqual({ started: true });
+    ).resolves.toEqual({ started: true, startSource: 'image' });
 
     expect(container.execCalls.map(call => call.cmd[0])).toEqual(['cat', 'pgrep', '/bin/sh']);
     expect(container.calls).toEqual([
@@ -470,7 +936,7 @@ describe('SandboxContainers launch', () => {
     });
 
     await vi.advanceTimersByTimeAsync(5_000);
-    await expect(pending).resolves.toEqual({ started: true });
+    await expect(pending).resolves.toEqual({ started: true, startSource: 'image' });
     expect(maxActiveProbes).toBe(1);
     expect(container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(1);
     expect(container.execCalls.at(-1)?.cmd[0]).toBe('pgrep');
@@ -503,7 +969,7 @@ describe('SandboxContainers launch', () => {
     await vi.advanceTimersByTimeAsync(999);
     expect(buns).toBe(1);
     await vi.advanceTimersByTimeAsync(1);
-    await expect(pending).resolves.toEqual({ started: true });
+    await expect(pending).resolves.toEqual({ started: true, startSource: 'image' });
     expect(buns).toBe(2);
     expect(container.execCalls.at(-1)?.cmd[0]).toBe('/bin/sh');
     expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
@@ -530,7 +996,7 @@ describe('SandboxContainers launch', () => {
     await vi.advanceTimersByTimeAsync(999);
     expect(buns).toBe(1);
     await vi.advanceTimersByTimeAsync(1);
-    await expect(pending).resolves.toEqual({ started: true });
+    await expect(pending).resolves.toEqual({ started: true, startSource: 'image' });
 
     expect(buns).toBe(2);
     expect(bunStarts[1]).toBeGreaterThanOrEqual((bunStarts[0] ?? 0) + 1_000);
@@ -912,12 +1378,13 @@ describe('SandboxContainers launch', () => {
     });
 
     const resumed = await instance.launchWrapper({
+      command: preinstalledStartup(),
       allocationRef: REF_A,
       env: {},
       instance: 'standard-3',
     });
 
-    expect(resumed).toEqual({ started: true });
+    expect(resumed).toEqual({ started: true, startSource: 'image' });
     expect(container.startCalls).toEqual([nativeStartOptions('standard-3')]);
     expect(container.execCalls.map(call => call.cmd[0])).toEqual(['cat']);
     expect(container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(0);
@@ -1001,23 +1468,65 @@ describe('SandboxContainers launch', () => {
     expect(container.startCalls).toHaveLength(2);
   });
 
-  it('serialises concurrent launches so one allocation wins without executing the loser', async () => {
+  it('serialises concurrent launches so the later allocation replaces the earlier one', async () => {
     const { instance, container, readRecord } = setup();
 
-    const results = await Promise.allSettled([launch(instance, REF_A), launch(instance, REF_B)]);
+    await expect(Promise.all([launch(instance, REF_A), launch(instance, REF_B)])).resolves.toEqual([
+      { started: true, startSource: 'image' },
+      { started: true, startSource: 'image' },
+    ]);
 
-    expect(results.filter(result => result.status === 'fulfilled')).toHaveLength(1);
-    const rejected = results.filter(
-      (result): result is PromiseRejectedResult => result.status === 'rejected'
-    );
-    expect(rejected).toHaveLength(1);
-    expect(rejected[0].reason).toBeInstanceOf(ContainersAllocationConflictError);
-    expect((rejected[0].reason as ContainersAllocationConflictError).code).toBe(
-      'allocation_conflict'
-    );
-    expect(container.startCalls).toHaveLength(1);
+    expect(container.calls).toEqual(['start', 'exec:cat', 'start', 'exec:cat']);
+    expect(container.runningAtDestroy).toEqual([true]);
     expect(container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(0);
-    expect([REF_A, REF_B]).toContain(readRecord().allocationRef);
+    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_B });
+  });
+
+  it('replaces a launch left behind by an abandoned allocation instead of refusing every later one', async () => {
+    const { instance, container, readRecord } = setup({
+      record: {
+        ...idleRecord,
+        state: 'launching',
+        allocationRef: REF_A,
+        wrapperAttempt: 'exec_pending',
+        startSource: 'repository',
+        instance: 'standard-4',
+      },
+      running: true,
+    });
+
+    await expect(launch(instance, REF_B)).resolves.toEqual({
+      started: true,
+      startSource: 'image',
+    });
+
+    expect(container.runningAtDestroy).toEqual([true]);
+    expect(container.startCalls).toEqual([nativeStartOptions('standard-4')]);
+    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_B });
+    expect(readRecord().wrapperAttempt).toBeUndefined();
+    await expect(instance.stop(REF_A)).resolves.toBe('terminal');
+    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_B });
+  });
+
+  it('fails a superseding launch without starting when the leftover cannot be destroyed, and recovers on the next launch', async () => {
+    const { instance, container, readRecord } = setup({
+      record: { ...idleRecord, state: 'running', allocationRef: REF_A },
+      running: true,
+    });
+    container.destroyBehavior = 'reject';
+
+    await expect(launch(instance, REF_B)).rejects.toThrow(
+      'Container from a superseded allocation could not be destroyed'
+    );
+    expect(container.startCalls).toHaveLength(0);
+    expect(readRecord()).toMatchObject({ state: 'stopping', allocationRef: REF_A });
+
+    container.destroyBehavior = 'ok';
+    await expect(launch(instance, 'ref-c')).resolves.toEqual({
+      started: true,
+      startSource: 'image',
+    });
+    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: 'ref-c' });
   });
 });
 
@@ -1059,20 +1568,23 @@ describe('SandboxContainers wrapper attempt gate', () => {
         ...idleRecord,
         state: 'running',
         allocationRef: REF_A,
-        instance: 'standard-1',
+        instance: 'standard-3',
         wrapperAttempt: 'exec_pending',
       },
     });
     container.running = true;
 
-    await expect(launch(instance, REF_A)).resolves.toEqual({ started: false });
+    await expect(launch(instance, REF_A)).resolves.toEqual({
+      started: false,
+      startSource: 'image',
+    });
 
     expect(container.startCalls).toHaveLength(0);
     expect(container.execCalls).toHaveLength(0);
     expect(readRecord()).toMatchObject({
       state: 'running',
       allocationRef: REF_A,
-      instance: 'standard-1',
+      instance: 'standard-3',
       wrapperAttempt: 'exec_pending',
     });
   });
@@ -1084,7 +1596,7 @@ describe('SandboxContainers wrapper attempt gate', () => {
           ...idleRecord,
           state: 'launching',
           allocationRef: REF_A,
-          instance: 'standard-1',
+          instance: 'standard-3',
           ...(wrapperAttempt === undefined ? {} : { wrapperAttempt }),
         },
       });
@@ -1094,12 +1606,13 @@ describe('SandboxContainers wrapper attempt gate', () => {
 
       await expect(
         instance.launchWrapper({
+          command: preinstalledStartup(),
           allocationRef: REF_A,
           env: {},
-          instance: 'standard-2',
+          instance: 'standard-4',
           containment: true,
         })
-      ).resolves.toEqual({ started: true });
+      ).resolves.toEqual({ started: true, startSource: 'image' });
 
       expect(container.execCalls.map(call => call.cmd[0])).toEqual(['cat', 'pgrep']);
       expect(container.calls).toEqual([
@@ -1112,7 +1625,7 @@ describe('SandboxContainers wrapper attempt gate', () => {
       expect(readRecord()).toMatchObject({
         state: 'running',
         allocationRef: REF_A,
-        instance: 'standard-1',
+        instance: 'standard-3',
         wrapperAttempt: 'exec_pending',
       });
     }
@@ -1159,9 +1672,10 @@ describe('SandboxContainers wrapper attempt gate', () => {
       attachOutbound(instance);
       await expect(
         instance.launchWrapper({
+          command: preinstalledStartup(),
           allocationRef: REF_A,
           env: {},
-          instance: 'standard-2',
+          instance: 'standard-4',
           containment: true,
         })
       ).rejects.toThrow('pending and the container is not running');
@@ -1188,9 +1702,10 @@ describe('SandboxContainers wrapper attempt gate', () => {
     attachOutbound(instance);
 
     await instance.launchWrapper({
+      command: preinstalledStartup(),
       allocationRef: REF_A,
       env: {},
-      instance: 'standard-2',
+      instance: 'standard-4',
       containment: true,
     });
 
@@ -1261,13 +1776,36 @@ describe('SandboxContainers readiness deadline', () => {
 });
 
 describe('SandboxContainers native start and main-process identity', () => {
+  it('consumes the PID probe output without waiting separately for exitCode', async () => {
+    const { instance, container, readRecord } = setup();
+    const exec = container.exec.bind(container);
+    vi.spyOn(container, 'exec').mockImplementation((cmd, options) => {
+      if (cmd[0] !== 'cat') return exec(cmd, options);
+      return Promise.resolve(
+        makeExecProcess({
+          exitCodePromise: new Promise<number>(() => {}),
+          stdout: `/bin/sh\0${CONTROL_SUPERVISOR_PATH}\0`,
+        })
+      );
+    });
+
+    await expect(launch(instance, REF_A)).resolves.toEqual({
+      started: true,
+      startSource: 'image',
+    });
+    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
+  });
+
   it('treats a same-ref running record as a no-op and does not read identity', async () => {
     const { instance, container, readRecord } = setup({
-      record: { ...idleRecord, state: 'running', allocationRef: REF_A, instance: 'standard-1' },
+      record: { ...idleRecord, state: 'running', allocationRef: REF_A, instance: 'standard-3' },
     });
     container.running = true;
 
-    await expect(launch(instance, REF_A)).resolves.toEqual({ started: false });
+    await expect(launch(instance, REF_A)).resolves.toEqual({
+      started: false,
+      startSource: 'image',
+    });
 
     expect(container.startCalls).toHaveLength(0);
     expect(container.execCalls).toHaveLength(0);
@@ -1290,7 +1828,10 @@ describe('SandboxContainers main-process identity decision table', () => {
       container.running = true;
       container.mainProcess = 'supervisor';
 
-      await expect(launch(instance, REF_A)).resolves.toEqual({ started: true });
+      await expect(launch(instance, REF_A)).resolves.toEqual({
+        started: true,
+        startSource: 'image',
+      });
 
       expect(container.startCalls).toHaveLength(0);
       expect(container.execCalls.map(call => call.cmd[0])).toEqual(['cat']);
@@ -1357,7 +1898,10 @@ describe('SandboxContainers main-process identity decision table', () => {
       container.execHandler = () => makeExecProcess({ exitCode: 0 });
 
       if (testCase.known) {
-        await expect(launch(instance, REF_A), testCase.label).resolves.toEqual({ started: true });
+        await expect(launch(instance, REF_A), testCase.label).resolves.toEqual({
+          started: true,
+          startSource: 'image',
+        });
       } else {
         await expect(launch(instance, REF_A), testCase.label).rejects.toThrow();
       }
@@ -1395,6 +1939,65 @@ describe('SandboxContainers native start confirmation', () => {
     });
   });
 
+  it('logs the time to ready and the number of checks once PID 1 is the supervisor', async () => {
+    vi.useFakeTimers();
+    const { diagnostics } = captureLogs();
+    const { instance, container } = setup();
+    container.identityAfterStart = 'sleep';
+
+    const pending = launch(instance, REF_A);
+    await vi.advanceTimersByTimeAsync(1_500);
+    container.mainProcess = 'supervisor';
+    await vi.advanceTimersByTimeAsync(500);
+    await expect(pending).resolves.toEqual({ started: true, startSource: 'image' });
+
+    const lines = diagnostics('supervisor_confirm');
+    expect(lines.map(line => [line.level, line.fields])).toEqual([
+      [
+        'info',
+        expect.objectContaining({ result: 'ready', source: 'image', elapsedMs: 2_000, checks: 3 }),
+      ],
+    ]);
+    expect(lines[0]?.fields).not.toHaveProperty('lastSeen');
+  });
+
+  it('logs the last PID 1 reading that completed when confirmation times out', async () => {
+    vi.useFakeTimers();
+    const { diagnostics } = captureLogs();
+    const { instance, container } = setup();
+    container.identityAfterStart = 'sleep';
+    // The first read sees `sleep infinity`; every later read hangs, so the read in
+    // flight at the deadline is cut off and must not hide what was last seen.
+    const exec = container.exec.bind(container);
+    let reads = 0;
+    vi.spyOn(container, 'exec').mockImplementation((cmd, options) => {
+      if (cmd[0] === 'cat' && (reads += 1) > 1) return new Promise<ExecProcess>(() => {});
+      return exec(cmd, options);
+    });
+
+    const failed = expect(launch(instance, REF_A)).rejects.toThrow('wrapper exec timed out');
+    await vi.advanceTimersByTimeAsync(90_000);
+    await failed;
+
+    const lines = diagnostics('supervisor_confirm');
+    expect(lines.map(line => [line.level, line.fields])).toEqual([
+      [
+        'warn',
+        expect.objectContaining({
+          result: 'timeout',
+          source: 'image',
+          elapsedMs: 90_000,
+          checks: 2,
+          finalCutOff: true,
+          lastSeen: 'cmdline',
+          lastIdentity: 'sleep',
+          lastCmdline: 'sleep_infinity',
+          lastCmdlineBytes: 14,
+        }),
+      ],
+    ]);
+  });
+
   it('fences a failed running-record write after native startup and never starts or execs on retry', async () => {
     const { instance, container, readRecord, setPutGate } = setup();
     setPutGate(value => {
@@ -1417,19 +2020,124 @@ describe('SandboxContainers native start confirmation', () => {
     });
 
     setPutGate(() => 'pass');
-    await expect(launch(instance, REF_A)).resolves.toEqual({ started: true });
+    await expect(launch(instance, REF_A)).resolves.toEqual({ started: true, startSource: 'image' });
     expect(container.startCalls).toHaveLength(1);
     expect(container.execCalls.filter(call => call.cmd[0] === '/bin/sh')).toHaveLength(0);
     expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
   });
 
+  it('lets the native PID 1 read wait for a start that is still pending', async () => {
+    const { instance, container, readRecord } = setup();
+    const start = container.start.bind(container);
+    vi.spyOn(container, 'start').mockImplementation(options => {
+      start(options);
+      container.running = false;
+    });
+    const exec = container.exec.bind(container);
+    vi.spyOn(container, 'exec').mockImplementation(async (cmd, options) => {
+      // Native exec waits for an issued start. The running flag alone does not
+      // distinguish this pending start from a stopped container.
+      await Promise.resolve();
+      container.running = true;
+      return exec(cmd, options);
+    });
+
+    await expect(launch(instance, REF_A)).resolves.toEqual({ started: true, startSource: 'image' });
+    expect(container.startCalls).toHaveLength(1);
+    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['cat']);
+    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
+  });
+
+  it('keeps the launch deadline while native startup remains pending', async () => {
+    vi.useFakeTimers();
+    const { instance, container, readRecord } = setup();
+    const start = container.start.bind(container);
+    vi.spyOn(container, 'start').mockImplementation(options => {
+      start(options);
+      container.running = false;
+    });
+    vi.spyOn(container, 'exec').mockImplementation(() => new Promise<ExecProcess>(() => {}));
+
+    const failed = expect(
+      instance.launchWrapper({
+        command: preinstalledStartup(),
+        allocationRef: REF_A,
+        env: {},
+        instance: 'standard-4',
+        deadlineAt: Date.now() + 5_000,
+      })
+    ).rejects.toThrow('wrapper exec timed out');
+    await vi.advanceTimersByTimeAsync(5_000);
+    await failed;
+    expect(container.startCalls).toHaveLength(1);
+    expect(readRecord()).toMatchObject({ state: 'launching', wrapperAttempt: 'exec_pending' });
+  });
+
+  it('retries a not-started read while the native lifecycle remains pending', async () => {
+    vi.useFakeTimers();
+    const { instance, container, readRecord } = setup();
+    const start = container.start.bind(container);
+    vi.spyOn(container, 'start').mockImplementation(options => {
+      start(options);
+      container.running = false;
+    });
+    const exec = container.exec.bind(container);
+    let reads = 0;
+    vi.spyOn(container, 'exec').mockImplementation((cmd, options) => {
+      if (++reads < 3) return Promise.reject(new Error('The container has not been started'));
+      container.running = true;
+      return exec(cmd, options);
+    });
+
+    const completed = launch(instance, REF_A);
+    await vi.advanceTimersByTimeAsync(2_000);
+    await expect(completed).resolves.toEqual({ started: true, startSource: 'image' });
+    expect(container.startCalls).toHaveLength(1);
+    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_A });
+    expect(container.execCalls.map(call => call.cmd[0])).toEqual(['cat']);
+  });
+
+  it('fails promptly when native monitoring fails during a stalled PID 1 read', async () => {
+    vi.useFakeTimers();
+    const { instance, container, readRecord } = setup();
+    vi.spyOn(container, 'exec').mockImplementation(() => new Promise<ExecProcess>(() => {}));
+    vi.spyOn(container, 'monitor').mockImplementation(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          setTimeout(() => reject(new Error('native image unavailable')), 100);
+        })
+    );
+
+    const failed = expect(launch(instance, REF_A)).rejects.toThrow(
+      'stopped before the main process was confirmed'
+    );
+    await vi.advanceTimersByTimeAsync(100);
+    await failed;
+    expect(container.startCalls).toHaveLength(1);
+    expect(readRecord()).toMatchObject({ state: 'launching', wrapperAttempt: 'exec_pending' });
+  });
+
   it('fences the native start when the container stops before PID 1 is confirmed', async () => {
+    const { diagnostics } = captureLogs();
     const { instance, container, readRecord } = setup();
     container.stopAfterStart = true;
+    vi.spyOn(container, 'monitor').mockRejectedValue(new Error('native image unavailable'));
+    vi.spyOn(container, 'exec').mockRejectedValue(new Error('Container is not running'));
 
     await expect(launch(instance, REF_A)).rejects.toThrow(
-      'stopped before the supervisor main process was confirmed'
+      'stopped before the main process was confirmed'
     );
+    expect(diagnostics('supervisor_confirm')).toMatchObject([
+      {
+        level: 'warn',
+        fields: {
+          result: 'stopped',
+          lastSeen: 'error',
+          lastErrorName: 'Error',
+          lastCause: 'native_image_unavailable',
+        },
+      },
+    ]);
 
     expect(container.startCalls).toHaveLength(1);
     expect(container.execCalls).toHaveLength(0);
@@ -1482,7 +2190,7 @@ describe('SandboxContainers observe', () => {
       { record: { ...idleRecord, state: 'launching', allocationRef: REF_A }, running: true },
       { record: { ...idleRecord, state: 'running', allocationRef: REF_A }, running: true },
       {
-        record: { ...idleRecord, state: 'stopping', allocationRef: REF_A, stopOpId: 'op-1' },
+        record: { ...idleRecord, state: 'stopping', allocationRef: REF_A },
         running: true,
       },
       { record: { ...idleRecord, state: 'launching', allocationRef: REF_A }, running: false },
@@ -1589,8 +2297,6 @@ describe('SandboxContainers stop', () => {
 
     await vi.advanceTimersByTimeAsync(0);
     expect(container.destroyCalls).toBe(1);
-    const opId = readRecord().stopOpId;
-    expect(opId).toEqual(expect.any(String));
     expect(settled).toBeUndefined();
 
     await vi.advanceTimersByTimeAsync(30_000);
@@ -1600,14 +2306,14 @@ describe('SandboxContainers stop', () => {
     expect(readRecord()).toEqual({
       state: 'stopping',
       allocationRef: REF_A,
-      stopOpId: opId,
+      stopOpId: expect.any(String),
       lastSnapshot: null,
     });
   });
 
   it('returns retryable for a stale stop while another allocation is stopping, then terminal after its destroy confirms', async () => {
     const { instance, container, readRecord } = setup({
-      record: { ...idleRecord, state: 'stopping', allocationRef: REF_A, stopOpId: 'op-a' },
+      record: { ...idleRecord, state: 'stopping', allocationRef: REF_A },
     });
     container.running = true;
 
@@ -1642,7 +2348,6 @@ describe('SandboxContainers stop', () => {
     expect(first).toBeUndefined();
     expect(second).toBeUndefined();
     expect(readRecord()).toMatchObject({ state: 'stopping', allocationRef: REF_A });
-    expect(readRecord().stopOpId).toEqual(expect.any(String));
 
     container.deferredDestroy?.resolve();
     await Promise.all([firstStop, secondStop]);
@@ -1752,9 +2457,9 @@ describe('SandboxContainers force destroy', () => {
       state: 'idle',
       currentAllocationRef: null,
     });
-    expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null, stopOpId: null });
+    expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null });
 
-    await expect(launch(instance, REF_A)).resolves.toEqual({ started: true });
+    await expect(launch(instance, REF_A)).resolves.toEqual({ started: true, startSource: 'image' });
     expect(container.startCalls).toHaveLength(1);
   });
 });
@@ -1838,6 +2543,621 @@ describe('SandboxContainers lease and log', () => {
   });
 });
 
+const IMAGE = 'registry.example/kilo/app:test';
+const SNAPSHOT = { snapshotId: 'snap-env', baseImage: IMAGE };
+
+function launchFromSnapshot(instance: SandboxContainers, ref: string, extra = {}) {
+  return instance.launchWrapper({
+    command: preinstalledStartup(),
+    allocationRef: ref,
+    env: {},
+    instance: 'standard-4',
+    snapshot: SNAPSHOT,
+    ...extra,
+  });
+}
+
+describe('SandboxContainers environment snapshot starts', () => {
+  it('stops retrying a repeatedly failing snapshot but permits a replacement', async () => {
+    const { instance, container } = setup();
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      container.startBehavior = 'effect-then-reject';
+      expect(await launchFromSnapshot(instance, REF_A)).toMatchObject({ snapshotFailed: true });
+      await instance.stop(REF_A);
+    }
+    container.startBehavior = 'ok';
+    expect(await launchFromSnapshot(instance, REF_A)).toMatchObject({ startSource: 'image' });
+    expect(container.startCalls.at(-1)).toHaveProperty('image', IMAGE);
+    await instance.stop(REF_A);
+    expect(
+      await launchFromSnapshot(instance, REF_A, {
+        snapshot: { ...SNAPSHOT, snapshotId: 'replacement' },
+      })
+    ).toMatchObject({ startSource: 'repository' });
+  });
+
+  it('starts from the offered snapshot captured from the current image', async () => {
+    const { diagnostics } = captureLogs();
+    const { instance, container, readRecord } = setup();
+
+    const result = await launchFromSnapshot(instance, REF_A);
+
+    expect(result).toEqual({ started: true, startSource: 'repository' });
+    const options = container.startCalls[0] as Record<string, unknown>;
+    expect(options).toEqual({
+      containerSnapshot: { id: 'snap-env' },
+      instance: 'standard-4',
+      enableInternet: true,
+      entrypoint: ['/bin/sh', CONTROL_SUPERVISOR_PATH],
+      env: NATIVE_GATE_ENV,
+    });
+    expect('image' in options).toBe(false);
+    expect(readRecord()).toMatchObject({ state: 'running', startSource: 'repository' });
+    expect(diagnostics('snapshot_lookup')[0].fields).toMatchObject({
+      source: 'repository',
+      reason: 'snapshot',
+    });
+    await expect(launchFromSnapshot(instance, REF_A)).resolves.toEqual({
+      started: false,
+      startSource: 'repository',
+    });
+  });
+
+  it('starts from the image when the snapshot belongs to another image or none is offered', async () => {
+    const { diagnostics } = captureLogs();
+    const first = setup();
+    await expect(
+      launchFromSnapshot(first.instance, REF_A, {
+        snapshot: { snapshotId: 'snap-old', baseImage: 'registry.example/kilo/app:previous' },
+      })
+    ).resolves.toEqual({ started: true, startSource: 'image' });
+    expect(first.container.startCalls[0]).toEqual(nativeStartOptions('standard-4'));
+
+    const second = setup();
+    await expect(launch(second.instance, REF_A)).resolves.toEqual({
+      started: true,
+      startSource: 'image',
+    });
+    expect(diagnostics('snapshot_lookup').map(line => line.fields.reason)).toEqual([
+      'image_mismatch',
+      'no_snapshot',
+    ]);
+  });
+
+  it('applies the same egress policy to a snapshot start and its image retry', async () => {
+    vi.useFakeTimers();
+    const { instance, container, readRecord } = setup();
+    const outbound = attachOutbound(instance);
+    container.identityAfterStart = 'ambiguous';
+    const policy = { egressAllowlist: ['example.com'] };
+    const pending = launchFromSnapshot(instance, REF_A, policy);
+    await vi.waitFor(() => expect(container.startCalls).toHaveLength(1));
+    await vi.advanceTimersByTimeAsync(300_000);
+    expect((await pending).snapshotFailed).toBe(true);
+    expect(readRecord().egressPolicy?.allowlist).toEqual(['example.com']);
+    await expect(instance.stop(REF_A)).resolves.toBe('terminal');
+    container.identityAfterStart = 'supervisor';
+    await instance.launchWrapper({
+      command: preinstalledStartup(),
+      allocationRef: REF_A,
+      env: {},
+      instance: 'standard-4',
+      ...policy,
+    });
+
+    expect(container.startCalls.map(options => options.enableInternet)).toEqual([false, false]);
+    expect(container.startCalls[0]).toMatchObject({ containerSnapshot: { id: 'snap-env' } });
+    expect(container.startCalls[1]).toMatchObject({ image: IMAGE });
+    expect(outbound.mock.calls.map(call => call[0].props.egressAllowlist)).toEqual([
+      ['example.com'],
+      ['example.com'],
+    ]);
+  });
+
+  it('reports a failed snapshot start without destroying the container or counting it', async () => {
+    const { instance, container, readRecord } = setup();
+    container.startBehavior = 'effect-then-reject';
+
+    await expect(launchFromSnapshot(instance, REF_A)).resolves.toEqual({
+      started: false,
+      startSource: 'repository',
+      snapshotFailed: true,
+    });
+    expect(container.startCalls).toHaveLength(1);
+    expect(container.destroyCalls).toBe(0);
+    expect(readRecord()).toMatchObject({
+      state: 'launching',
+      allocationRef: REF_A,
+      wrapperAttempt: 'exec_pending',
+    });
+    expect(readRecord()).not.toHaveProperty('repositoryStartFailures');
+  });
+
+  it('propagates an image start failure instead of reporting a snapshot failure', async () => {
+    const { instance, container } = setup();
+    container.startBehavior = 'reject';
+
+    await expect(launch(instance, REF_A)).rejects.toThrow('container start failed');
+  });
+
+  it.each(['repository', 'image'] as const)(
+    'bounds %s confirmation by its start-source timeout',
+    async source => {
+      vi.useFakeTimers();
+      vi.setSystemTime(10_000);
+      const { diagnostics } = captureLogs();
+      const { instance, container } = setup();
+      container.identityAfterStart = 'ambiguous';
+      const started =
+        source === 'repository' ? launchFromSnapshot(instance, REF_A) : launch(instance, REF_A);
+      const failed =
+        source === 'repository'
+          ? expect(started).resolves.toMatchObject({ snapshotFailed: true })
+          : expect(started).rejects.toThrow('wrapper exec timed out');
+      await vi.waitFor(() => expect(container.startCalls).toHaveLength(1));
+      const budget = source === 'repository' ? 300_000 : 90_000;
+      await vi.advanceTimersByTimeAsync(budget - 1_000);
+      expect(container.startCalls).toHaveLength(1);
+      await vi.advanceTimersByTimeAsync(1_000);
+      await failed;
+      expect(diagnostics('supervisor_confirm')[0].fields.elapsedMs).toBe(budget);
+    }
+  );
+
+  it('bounds snapshot confirmation by the supplied creation deadline', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    const { diagnostics } = captureLogs();
+    const { instance, container } = setup();
+    container.identityAfterStart = 'ambiguous';
+
+    const failed = expect(
+      launchFromSnapshot(instance, REF_A, { deadlineAt: 15_000 })
+    ).resolves.toMatchObject({ snapshotFailed: true });
+    await vi.waitFor(() => expect(container.startCalls).toHaveLength(1));
+    await vi.advanceTimersByTimeAsync(5_000);
+    await failed;
+    expect(diagnostics('supervisor_confirm')[0].fields.elapsedMs).toBeGreaterThan(4_000);
+    expect(diagnostics('supervisor_confirm')[0].fields.elapsedMs).toBeLessThanOrEqual(5_000);
+    expect(container.destroyCalls).toBe(0);
+  });
+
+  it('does not issue an image start after its supplied deadline', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    const { instance, container } = setup();
+
+    await expect(
+      instance.launchWrapper({
+        command: preinstalledStartup(),
+        allocationRef: REF_A,
+        env: {},
+        instance: 'standard-4',
+        deadlineAt: 10_000,
+      })
+    ).rejects.toThrow('wrapper exec timed out');
+    expect(container.startCalls).toEqual([]);
+  });
+
+  it('uses the recorded source when it resumes a launch that never started the wrapper', async () => {
+    const { instance, container, readRecord } = setup({
+      record: {
+        ...idleRecord,
+        state: 'launching',
+        allocationRef: REF_A,
+        instance: 'standard-4',
+        startSource: 'repository',
+        wrapperAttempt: 'not_started',
+      },
+    });
+
+    await expect(launchFromSnapshot(instance, REF_A)).resolves.toEqual({
+      started: true,
+      startSource: 'repository',
+    });
+    expect(container.startCalls[0]).toMatchObject({ containerSnapshot: { id: 'snap-env' } });
+    expect(readRecord().startSource).toBe('repository');
+  });
+
+  it('resumes an interrupted image launch from the image even when a snapshot is offered', async () => {
+    const { instance, container, readRecord } = setup({
+      record: {
+        ...idleRecord,
+        state: 'launching',
+        allocationRef: REF_A,
+        instance: 'standard-4',
+        startSource: 'image',
+        wrapperAttempt: 'not_started',
+      },
+    });
+
+    await expect(launchFromSnapshot(instance, REF_A)).resolves.toEqual({
+      started: true,
+      startSource: 'image',
+    });
+    expect(container.startCalls[0]).toMatchObject({ image: IMAGE });
+    expect(readRecord().startSource).toBe('image');
+  });
+
+  it('ignores a session snapshot left in a pre-change record and never takes one on stop', async () => {
+    const { instance, container, readRecord } = setup({
+      record: {
+        ...idleRecord,
+        state: 'running',
+        allocationRef: REF_A,
+        lastSnapshot: { id: 'legacy-snap', sourceAllocation: 'old' },
+      },
+      running: true,
+    });
+
+    await expect(instance.stop(REF_A)).resolves.toBe('terminal');
+    expect(container.snapshotCalls).toBe(0);
+    expect(readRecord().lastSnapshot).toEqual({ id: 'legacy-snap', sourceAllocation: 'old' });
+  });
+});
+
+const RUNTIME_COMMAND = {
+  argv: ['/bin/sh', '-c', 'exec /bin/sh /usr/local/bin/kilocode-control-plane-supervisor.sh'],
+};
+
+describe('SandboxContainers runtime release start', () => {
+  it('runs the installer as PID 1 and confirms the supervisor after its handoff', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(10_000);
+    const { instance, container, readRecord } = setup();
+
+    await expect(
+      instance.launchWrapper({
+        allocationRef: REF_A,
+        env: {},
+        instance: 'standard-4',
+        command: RUNTIME_COMMAND,
+      })
+    ).resolves.toEqual({ started: true, startSource: 'image' });
+
+    const options = container.startCalls[0];
+    expect(options?.entrypoint?.slice(0, 2)).toEqual(['/bin/sh', '-c']);
+    expect(options?.entrypoint).toEqual(RUNTIME_COMMAND.argv);
+
+    expect(options?.env).toMatchObject(NATIVE_GATE_ENV);
+    expect(readRecord().state).toBe('running');
+  });
+
+  it('installs the selected runtime on a snapshot start too', async () => {
+    const { instance, container } = setup();
+
+    await expect(
+      launchFromSnapshot(instance, REF_A, { command: RUNTIME_COMMAND })
+    ).resolves.toEqual({
+      started: true,
+      startSource: 'repository',
+    });
+    expect(container.startCalls[0]).toMatchObject({ containerSnapshot: { id: 'snap-env' } });
+    expect(container.startCalls[0]?.entrypoint).toEqual(RUNTIME_COMMAND.argv);
+  });
+
+  it('reports a failed snapshot start when the startup command exits', async () => {
+    const { instance, container } = setup();
+    container.runtimeOutcome = { kind: 'exit', code: 72 };
+
+    await expect(
+      launchFromSnapshot(instance, REF_A, { command: RUNTIME_COMMAND })
+    ).resolves.toEqual({
+      started: false,
+      startSource: 'repository',
+      snapshotFailed: true,
+    });
+  });
+
+  it('throws when the installer exits with a code it does not own', async () => {
+    const { instance, container } = setup();
+    container.runtimeOutcome = { kind: 'exit', code: 1 };
+
+    await expect(
+      instance.launchWrapper({
+        allocationRef: REF_A,
+        env: {},
+        instance: 'standard-4',
+        command: RUNTIME_COMMAND,
+      })
+    ).rejects.toThrow('Container stopped before the main process was confirmed');
+  });
+});
+
+const BUILDER_RUNNER = { url: 'https://worker.example/b', credential: 'builder-credential' };
+
+function launchBuilder(instance: SandboxContainers, ref: string, extra = {}) {
+  return instance.launchBuilder({
+    command: { argv: [RUNTIME_BUN_PATH, ENVIRONMENT_BUILDER_PATH] },
+    allocationRef: ref,
+    runner: BUILDER_RUNNER,
+    instance: 'standard-4',
+    deadlineAt: Date.now() + 600_000,
+    ...extra,
+  });
+}
+
+describe('SandboxContainers environment builder', () => {
+  it('starts the builder from runtime-free with internet egress', async () => {
+    const { instance, container, readRecord } = setup();
+    const outbound = attachOutbound(instance);
+
+    await expect(launchBuilder(instance, REF_A)).resolves.toEqual({
+      started: true,
+      startSource: 'image',
+    });
+    expect(container.startCalls[0]).toEqual({
+      image: 'registry.example/kilo/runtime-free:test',
+      instance: 'standard-4',
+      enableInternet: true,
+      entrypoint: [RUNTIME_BUN_PATH, ENVIRONMENT_BUILDER_PATH],
+      // A snapshot keeps the start env, so the runner never travels in it.
+      env: { ...NATIVE_GATE_ENV },
+    });
+    const delivery = container.execCalls.at(-1);
+    expect(delivery?.cmd.slice(0, 2)).toEqual(['/bin/sh', '-c']);
+    expect(delivery?.cmd[2]).toContain('umask 077');
+    expect(delivery?.cmd[2]).toContain('/run/kilocode-environment-build/runner.json');
+    expect(delivery?.cmd[2]).not.toContain(BUILDER_RUNNER.credential);
+    expect(delivery?.options?.env).toEqual({
+      KILO_BUILDER_RUNNER: JSON.stringify(BUILDER_RUNNER),
+    });
+    expect(outbound).not.toHaveBeenCalled();
+    expect(readRecord()).toMatchObject({
+      state: 'running',
+      allocationRef: REF_A,
+      instance: 'standard-4',
+      startImage: 'registry.example/kilo/runtime-free:test',
+    });
+    const execs = container.execCalls.length;
+    await expect(launchBuilder(instance, REF_A)).resolves.toEqual({
+      started: false,
+      startSource: 'image',
+    });
+    expect(container.startCalls).toHaveLength(1);
+    // The delivery script checks whether the runner was already consumed.
+    expect(container.execCalls).toHaveLength(execs + 1);
+  });
+
+  it('does not fall back to app when runtime-free is unavailable', async () => {
+    const { instance, container } = setup();
+    delete container.images['runtime-free'];
+    await expect(launchBuilder(instance, REF_A)).rejects.toThrow(
+      'Container image "runtime-free" is unavailable'
+    );
+    expect(container.startCalls).toEqual([]);
+  });
+
+  it('captures the split base and restores it with a new session command', async () => {
+    const builder = setup();
+    const image = builder.container.images['runtime-free'];
+    expect(await builder.instance.currentImage('runtime-free')).toBe(image);
+    await launchBuilder(builder.instance, REF_A);
+    builder.container.images['runtime-free'] = 'registry.example/kilo/runtime-free:next';
+    const capture = await builder.instance.captureSnapshot(REF_A, 'split-build');
+    expect(capture).toMatchObject({ status: 'stored', baseImage: image });
+    if (capture.status !== 'stored') throw new Error('Expected a stored builder snapshot');
+
+    const session = setup();
+    await expect(
+      launchFromSnapshot(session.instance, REF_B, {
+        nativeImage: 'runtime-free',
+        snapshot: { snapshotId: capture.snapshotId, baseImage: capture.baseImage },
+      })
+    ).resolves.toMatchObject({ started: true, startSource: 'repository' });
+    expect(session.container.startCalls[0]).toMatchObject({
+      containerSnapshot: { id: capture.snapshotId },
+      entrypoint: [...preinstalledStartup().argv],
+    });
+    expect(session.readRecord().startImage).toBe(image);
+  });
+
+  it('fails the launch when the runner cannot be delivered', async () => {
+    const { instance, container } = setup();
+    container.execHandler = cmd => makeExecProcess({ exitCode: cmd[0] === '/bin/sh' ? 1 : 0 });
+
+    await expect(launchBuilder(instance, REF_A)).rejects.toThrow('Builder runner delivery failed');
+    container.execHandler = () => makeExecProcess({ exitCode: 0 });
+    await expect(launchBuilder(instance, REF_A)).resolves.toMatchObject({ started: false });
+    expect(container.startCalls).toHaveLength(1);
+    expect(container.execCalls.at(-1)?.cmd[2]).toContain('runner.json.consumed');
+  });
+
+  it('runs the builder through the runtime installer when a release is selected', async () => {
+    const { instance, container } = setup();
+
+    await expect(
+      launchBuilder(instance, REF_A, {
+        command: {
+          argv: ['/bin/sh', '-c', `exec ${RUNTIME_BUN_PATH} ${ENVIRONMENT_BUILDER_PATH}`],
+        },
+      })
+    ).resolves.toMatchObject({
+      started: true,
+    });
+    const script = container.startCalls[0]?.entrypoint?.[2] ?? '';
+    expect(script).toContain('kilocode-environment-builder.js');
+    expect(script).toContain(`exec ${RUNTIME_BUN_PATH} ${ENVIRONMENT_BUILDER_PATH}`);
+  });
+
+  it('destroys a previous builder allocation before starting the next', async () => {
+    const { instance, container, readRecord } = setup({
+      record: { ...idleRecord, state: 'running', allocationRef: REF_A, instance: 'standard-4' },
+      running: true,
+    });
+
+    await expect(launchBuilder(instance, REF_B)).resolves.toMatchObject({ started: true });
+    expect(container.destroyCalls).toBe(1);
+    expect(readRecord()).toMatchObject({ state: 'running', allocationRef: REF_B });
+  });
+
+  it('confirms a builder whose start was in flight when the DO restarted', async () => {
+    const { instance, container, readRecord } = setup({
+      record: {
+        ...idleRecord,
+        state: 'launching',
+        allocationRef: REF_A,
+        instance: 'standard-4',
+        wrapperAttempt: 'exec_pending',
+      },
+      running: true,
+    });
+    container.mainProcess = 'environment-builder';
+
+    await expect(launchBuilder(instance, REF_A)).resolves.toEqual({
+      started: true,
+      startSource: 'image',
+    });
+    expect(container.startCalls).toEqual([]);
+    expect(readRecord().state).toBe('running');
+  });
+
+  it('fails closed when an in-flight builder start shows another main process', async () => {
+    const { instance, container } = setup({
+      record: {
+        ...idleRecord,
+        state: 'launching',
+        allocationRef: REF_A,
+        instance: 'standard-4',
+        wrapperAttempt: 'exec_pending',
+      },
+      running: true,
+    });
+    container.mainProcess = 'supervisor';
+
+    await expect(launchBuilder(instance, REF_A)).rejects.toThrow(
+      'Main process identity is ambiguous'
+    );
+  });
+});
+
+function runningForCapture() {
+  return setup({
+    record: { ...idleRecord, state: 'running', allocationRef: REF_A },
+    running: true,
+  });
+}
+
+describe('SandboxContainers capture by id', () => {
+  it('pins capture compatibility to the running allocation image across a rollout', async () => {
+    const { instance, container } = setup();
+    await launch(instance, REF_A);
+    container.images.app = 'registry.example/kilo/app:next';
+    expect(await instance.captureSnapshot(REF_A, 'image-pin')).toMatchObject({
+      status: 'stored',
+      baseImage: IMAGE,
+    });
+  });
+
+  it('stores the snapshot under its capture id before it replies', async () => {
+    const { instance, container, storage } = runningForCapture();
+    container.snapshotBehavior = { kind: 'resolve', id: 'snap-captured' };
+
+    const result = await instance.captureSnapshot(REF_A, 'capture-1');
+
+    expect(result).toMatchObject({
+      status: 'stored',
+      snapshotId: 'snap-captured',
+      size: SNAPSHOT_SIZE,
+      baseImage: IMAGE,
+    });
+    expect(storage.map.get('containers:capture:v1:capture-1')).toMatchObject({
+      state: 'stored',
+      snapshotId: 'snap-captured',
+    });
+    await expect(instance.readCapture('capture-1')).resolves.toEqual(result);
+    await expect(instance.captureSnapshot(REF_A, 'capture-1')).resolves.toEqual(result);
+    expect(container.snapshotCalls).toBe(1);
+  });
+
+  it('joins a capture that is still running in this isolate', async () => {
+    const { instance, container } = runningForCapture();
+    container.snapshotBehavior = { kind: 'deferred' };
+
+    const first = instance.captureSnapshot(REF_A, 'capture-1');
+    await vi.waitFor(() => expect(container.deferredSnapshots).toHaveLength(1));
+    await expect(instance.readCapture('capture-1')).resolves.toEqual({ status: 'in_progress' });
+    const second = instance.captureSnapshot(REF_A, 'capture-1');
+    container.deferredSnapshots[0]?.resolve('snap-late');
+
+    await expect(first).resolves.toMatchObject({ status: 'stored', snapshotId: 'snap-late' });
+    await expect(second).resolves.toMatchObject({ status: 'stored', snapshotId: 'snap-late' });
+    expect(container.snapshotCalls).toBe(1);
+  });
+
+  it('reports an issued capture whose call was lost as uncertain and never snapshots again', async () => {
+    const { instance, container, storage } = runningForCapture();
+    storage.map.set('containers:capture:v1:capture-1', {
+      state: 'issued',
+      allocationRef: REF_A,
+      issuedAt: 1,
+    });
+
+    await expect(instance.readCapture('capture-1')).resolves.toEqual({
+      status: 'failed',
+      reason: 'uncertain',
+    });
+    await expect(instance.captureSnapshot(REF_A, 'capture-1')).resolves.toEqual({
+      status: 'failed',
+      reason: 'uncertain',
+    });
+    expect(container.snapshotCalls).toBe(0);
+  });
+
+  it('refuses a capture for an allocation that is not the running one', async () => {
+    const { instance, container } = runningForCapture();
+
+    await expect(instance.captureSnapshot(REF_B, 'capture-1')).resolves.toEqual({
+      status: 'failed',
+      reason: 'not_running',
+    });
+    expect(container.snapshotCalls).toBe(0);
+    await expect(instance.readCapture('missing')).resolves.toBeNull();
+  });
+
+  it('stores a failed snapshot call and a capture abandoned by a stop', async () => {
+    const failed = runningForCapture();
+    failed.container.snapshotBehavior = { kind: 'reject' };
+    await expect(failed.instance.captureSnapshot(REF_A, 'capture-1')).resolves.toEqual({
+      status: 'failed',
+      reason: 'snapshot_failed',
+    });
+
+    const abandoned = runningForCapture();
+    abandoned.container.snapshotBehavior = { kind: 'deferred' };
+    const capture = abandoned.instance.captureSnapshot(REF_A, 'capture-2');
+    await vi.waitFor(() => expect(abandoned.container.deferredSnapshots).toHaveLength(1));
+    await expect(abandoned.instance.stop(REF_A)).resolves.toBe('terminal');
+    abandoned.container.deferredSnapshots[0]?.resolve('snap-after-stop');
+    await expect(capture).resolves.toEqual({ status: 'failed', reason: 'abandoned' });
+  });
+
+  it('gives up on a capture that never finishes and does not block a stop', async () => {
+    vi.useFakeTimers();
+    const { instance, container } = runningForCapture();
+    container.snapshotBehavior = { kind: 'deferred' };
+
+    const capture = instance.captureSnapshot(REF_A, 'capture-1');
+    await vi.waitFor(() => expect(container.deferredSnapshots).toHaveLength(1));
+    await expect(instance.stop(REF_A)).resolves.toBe('terminal');
+    await vi.advanceTimersByTimeAsync(5 * 60_000);
+    await expect(capture).resolves.toEqual({ status: 'failed', reason: 'snapshot_failed' });
+  });
+
+  it('retains a bounded number of capture records', async () => {
+    const { instance, storage } = runningForCapture();
+    for (let index = 0; index < 10; index += 1) {
+      await instance.captureSnapshot(REF_A, `capture-${index}`);
+    }
+    const kept = [...storage.map.keys()].filter(key => key.startsWith('containers:capture:v1:'));
+    expect(kept).toHaveLength(8);
+    expect(kept).not.toContain('containers:capture:v1:capture-0');
+    expect(storage.map.get('containers:captures:v1')).toEqual(
+      Array.from({ length: 8 }, (_, index) => `capture-${9 - index}`)
+    );
+  });
+});
+
 describe('containment trust ownership', () => {
   const sandboxContainersSource = readFileSync(
     fileURLToPath(new URL('./SandboxContainers.ts', import.meta.url).href),
@@ -1857,5 +3177,160 @@ describe('containment trust ownership', () => {
   it('keeps the container entrypoint to PID 1 only', () => {
     expect(dockerfileSource).not.toContain('update-ca-certificates');
     expect(dockerfileSource).toContain('exec sleep infinity');
+  });
+});
+
+describe('SandboxContainers preview fetch boundary', () => {
+  const runningRecord = (): StoredRecord => ({
+    ...idleRecord,
+    state: 'running',
+    allocationRef: REF_A,
+  });
+
+  function markedRequest(headers: Record<string, string>): Request {
+    return new Request('http://localhost:5173/page', { headers });
+  }
+
+  it('answers 404 for an unmarked request without touching the container', async () => {
+    const { instance, container } = setup({ record: runningRecord(), running: true });
+    const response = await instance.fetch(new Request('http://localhost:5173/page'));
+    expect(response.status).toBe(404);
+    expect(container.tcpPortCalls).toBe(0);
+  });
+
+  it('refuses a missing allocation header with a fixed 503 before getTcpPort', async () => {
+    const { instance, container } = setup({ record: runningRecord(), running: true });
+    const response = await instance.fetch(markedRequest({ [PREVIEW_MARKER_PORT_HEADER]: '5173' }));
+    expect(response.status).toBe(503);
+    expect(await response.text()).toBe('The sandbox is not running');
+    expect(container.tcpPortCalls).toBe(0);
+  });
+
+  it('refuses a replacement allocation ref with 503 before getTcpPort', async () => {
+    const { instance, container } = setup({ record: runningRecord(), running: true });
+    const response = await instance.fetch(
+      markedRequest({
+        [PREVIEW_MARKER_PORT_HEADER]: '5173',
+        [PREVIEW_MARKER_ALLOCATION_HEADER]: REF_B,
+      })
+    );
+    expect(response.status).toBe(503);
+    expect(container.tcpPortCalls).toBe(0);
+  });
+
+  it('refuses a stopping record with 503 before getTcpPort', async () => {
+    const { instance, container } = setup({
+      record: { ...runningRecord(), state: 'stopping' },
+      running: true,
+    });
+    const response = await instance.fetch(
+      markedRequest({
+        [PREVIEW_MARKER_PORT_HEADER]: '5173',
+        [PREVIEW_MARKER_ALLOCATION_HEADER]: REF_A,
+      })
+    );
+    expect(response.status).toBe(503);
+    expect(container.tcpPortCalls).toBe(0);
+  });
+
+  it('refuses with 503 when ctx.container is absent', async () => {
+    const { instance } = setup({ record: runningRecord(), attachContainer: false });
+    const response = await instance.fetch(
+      markedRequest({
+        [PREVIEW_MARKER_PORT_HEADER]: '5173',
+        [PREVIEW_MARKER_ALLOCATION_HEADER]: REF_A,
+      })
+    );
+    expect(response.status).toBe(503);
+  });
+
+  it('serves a running allocation and never calls the DO lease or container activity timer', async () => {
+    const { instance, container } = setup({ record: runningRecord(), running: true });
+    const lease = vi.spyOn(instance, 'ensureLeaseAtLeast');
+    const leaseCallsBeforeFetch = container.leaseCalls.length;
+    const response = await instance.fetch(
+      markedRequest({
+        [PREVIEW_MARKER_PORT_HEADER]: '5173',
+        [PREVIEW_MARKER_ALLOCATION_HEADER]: REF_A,
+      })
+    );
+    expect(response.status).toBe(200);
+    expect(container.tcpPortCalls).toBe(1);
+    expect(container.leaseCalls).toHaveLength(leaseCallsBeforeFetch);
+    expect(lease).not.toHaveBeenCalled();
+  });
+});
+
+describe('SandboxContainers native image selection', () => {
+  const RUNTIME_FREE_IMAGE = 'registry.example/kilo/runtime-free:test';
+
+  it('starts the baseline app image when no image is selected', async () => {
+    const { instance, container, readRecord } = setup();
+
+    await launch(instance, REF_A);
+
+    expect(container.startCalls[0]?.image).toBe(IMAGE);
+    expect(readRecord().startImage).toBe(IMAGE);
+  });
+
+  it('starts the runtime-free image when it is selected', async () => {
+    const { instance, container, readRecord } = setup();
+    container.images['runtime-free'] = RUNTIME_FREE_IMAGE;
+
+    await instance.launchWrapper({
+      command: preinstalledStartup(),
+      allocationRef: REF_A,
+      env: {},
+      instance: 'standard-4',
+      nativeImage: 'runtime-free',
+    });
+
+    expect(container.startCalls[0]?.image).toBe(RUNTIME_FREE_IMAGE);
+    expect(readRecord()).toMatchObject({
+      state: 'running',
+      startSource: 'image',
+      startImage: RUNTIME_FREE_IMAGE,
+    });
+  });
+
+  it('fails before any physical start when the selected image is unavailable', async () => {
+    const { instance, container, readRecord } = setup();
+    delete container.images['runtime-free'];
+
+    await expect(
+      instance.launchWrapper({
+        command: preinstalledStartup(),
+        allocationRef: REF_A,
+        env: {},
+        instance: 'standard-4',
+        nativeImage: 'runtime-free',
+      })
+    ).rejects.toThrow('Container image "runtime-free" is unavailable');
+
+    expect(container.startCalls).toEqual([]);
+    expect(container.execCalls).toEqual([]);
+    expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null });
+  });
+
+  it('restores only environment snapshots captured from the selected image', async () => {
+    const baselineSnapshot = setup();
+    baselineSnapshot.container.images['runtime-free'] = RUNTIME_FREE_IMAGE;
+    await expect(
+      launchFromSnapshot(baselineSnapshot.instance, REF_A, { nativeImage: 'runtime-free' })
+    ).resolves.toEqual({ started: true, startSource: 'image' });
+    expect(baselineSnapshot.container.startCalls[0]).toMatchObject({ image: RUNTIME_FREE_IMAGE });
+
+    const runtimeFreeSnapshot = setup();
+    runtimeFreeSnapshot.container.images['runtime-free'] = RUNTIME_FREE_IMAGE;
+    await expect(
+      launchFromSnapshot(runtimeFreeSnapshot.instance, REF_A, {
+        nativeImage: 'runtime-free',
+        snapshot: { snapshotId: 'snap-runtime-free', baseImage: RUNTIME_FREE_IMAGE },
+      })
+    ).resolves.toEqual({ started: true, startSource: 'repository' });
+    expect(runtimeFreeSnapshot.container.startCalls[0]).toMatchObject({
+      containerSnapshot: { id: 'snap-runtime-free' },
+    });
+    expect(runtimeFreeSnapshot.readRecord().startImage).toBe(RUNTIME_FREE_IMAGE);
   });
 });

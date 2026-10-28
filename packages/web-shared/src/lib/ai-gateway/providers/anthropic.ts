@@ -2,6 +2,8 @@ import { addCacheBreakpoints } from '@kilocode/web-shared/lib/ai-gateway/provide
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { normalizeToolCallIds } from '@kilocode/web-shared/lib/ai-gateway/tool-calling';
 
+const ANTHROPIC_TOOL_CALL_ID_PATTERN = /^[a-zA-Z0-9_-]{1,128}$/;
+
 function appendAnthropicBetaHeader(extraHeaders: Record<string, string>, betaFlag: string) {
   for (const header of ['anthropic-beta', 'x-anthropic-beta']) {
     extraHeaders[header] = [extraHeaders[header], betaFlag].filter(Boolean).join(',');
@@ -19,9 +21,9 @@ export function applyAnthropicModelSettings(
   // we may want to gate this for Kilo-clients at some point
   addCacheBreakpoints(requestToMutate);
 
-  // anthropic doesn't allow '.' in tool call ids
-  if (requestToMutate.kind === 'chat_completions') {
-    // we can fix this later for the responses api if it's still a problem
-    normalizeToolCallIds(requestToMutate.body, toolCallId => toolCallId.includes('.'), undefined);
-  }
+  normalizeToolCallIds(
+    requestToMutate,
+    toolCallId => !ANTHROPIC_TOOL_CALL_ID_PATTERN.test(toolCallId),
+    undefined
+  );
 }

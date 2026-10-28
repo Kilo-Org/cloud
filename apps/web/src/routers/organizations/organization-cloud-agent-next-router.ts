@@ -4,21 +4,23 @@ import { sandboxSelectionCapabilitiesSchema } from '@kilocode/worker-utils/sandb
 import {
   createCloudAgentNextClient,
   createCloudAgentNextClientForModel,
-  rethrowAsPaymentRequired,
+  rethrowCloudAgentError,
 } from '@/lib/cloud-agent-next/cloud-agent-client';
 import { computeCloudAgentNextBalanceCheckEligibility } from '@/lib/cloud-agent-next/balance-check-eligibility';
+import { isPublicRepoUrlEnabled } from '@/lib/cloud-agent-next/public-repo-url';
+import { releaseRefusedSend } from '@/lib/cloud-agent-next/release-refused-send';
 import { rethrowAsTerminalError } from '@/lib/cloud-agent-next/terminal-errors';
 import { createWorktreeChat } from '@/lib/cloud-agent-next/worktree-chat';
 import { assertSessionWorktree } from '@/lib/cloud-agent-next/worktree-review-access';
 import { createControlTokenForRequest } from '@/lib/auth/resource-delegation';
 import type { User } from '@kilocode/db/schema';
-import { isFeatureFlagEnabledOrDevelopment } from '@kilocode/web-shared/lib/posthog-feature-flags';
 import {
   ensureOrganizationAccess,
   organizationMemberProcedure,
   organizationMemberMutationProcedure,
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { fetchAllGitHubRepositoriesForOrganization } from '@/lib/cloud-agent/github-integration-helpers';
+import { resolveGitHubIntegrationIdForRepository } from '@/lib/cloud-agent/github-integration-resolution';
 import {
   BitbucketOrganizationRepositoryListResultSchema,
   fetchBitbucketRepositoriesForOrganization,
@@ -27,7 +29,9 @@ import {
   getGitLabInstanceUrlForOrganization,
   buildGitLabCloneUrl,
   fetchGitLabRepositoriesForOrganization,
+  validateGitLabRepoAccessForOrganization,
 } from '@/lib/cloud-agent/gitlab-integration-helpers';
+import { captureException } from '@sentry/nextjs';
 import { orderRepositoriesByUsage } from '@/lib/cloud-agent/order-repositories';
 import {
   listProviderRepositoryBranches,
@@ -65,16 +69,16 @@ import {
   baseResizeTerminalNextOutputSchema,
   baseCloseTerminalNextSchema,
   baseCloseTerminalNextOutputSchema,
+  baseCreatePreviewNextSchema,
+  baseCreatePreviewNextOutputSchema,
   cloudAgentGetAttachmentUploadUrlSchema,
-  cloudAgentGetImageUploadUrlSchema,
-  cloudAgentLinkPendingUploadsSchema,
   cloudAgentReleasePendingUploadsSchema,
 } from '../cloud-agent-next-schemas';
+import { generateCloudAgentAttachmentUploadUrl } from '@/lib/r2/cloud-agent-attachments';
 import {
-  generateCloudAgentAttachmentUploadUrl,
-  generateImageUploadUrl,
-} from '@/lib/r2/cloud-agent-attachments';
-import { linkPendingUploads, releasePendingUploads } from '@/lib/r2/cloud-agent-pending-uploads';
+  linkAttachmentsForDispatch,
+  releasePendingUploads,
+} from '@/lib/r2/cloud-agent-pending-uploads';
 import * as z from 'zod';
 import { PLATFORM } from '@/lib/integrations/core/constants';
 
@@ -91,11 +95,11 @@ async function createCloudAgentControlToken(
     })
   ).token;
 }
-import { signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
+import { signPreviewTicket, signStreamTicket } from '@/lib/cloud-agent/stream-ticket';
+import { buildPreviewOpenUrl } from '@/lib/cloud-agent/preview-open-url';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { verifyOrgOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import { TRPCError } from '@trpc/server';
-import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 import { getBalanceForOrganizationUser } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { isMobileClient } from '@kilocode/web-shared/lib/trpc/min-version';
 import { buildCloudAgentNextEligibility } from '../cloud-agent-next-eligibility';
@@ -192,15 +196,7 @@ const CancelQueuedMessageInput = baseCancelQueuedMessageNextSchema.extend({
   organizationId: z.uuid(),
 });
 
-const ImageUploadUrlInput = cloudAgentGetImageUploadUrlSchema.extend({
-  organizationId: z.uuid(),
-});
-
 const AttachmentUploadUrlInput = cloudAgentGetAttachmentUploadUrlSchema.extend({
-  organizationId: z.uuid(),
-});
-
-const LinkPendingUploadsInput = cloudAgentLinkPendingUploadsSchema.extend({
   organizationId: z.uuid(),
 });
 
@@ -229,6 +225,10 @@ const WorktreeFileInput = baseWorktreeFileNextSchema.extend({
 });
 
 const CreateTerminalInput = baseCreateTerminalNextSchema.extend({
+  organizationId: z.uuid(),
+});
+
+const CreatePreviewInput = baseCreatePreviewNextSchema.extend({
   organizationId: z.uuid(),
 });
 
@@ -284,7 +284,13 @@ const ListBitbucketRepositoriesInput = z.object({
  */
 export const organizationCloudAgentNextRouter = createTRPCRouter({
   getSandboxSelectionOptions: organizationMemberProcedure
-    .input(z.object({ devcontainer: z.boolean().optional() }))
+    .input(
+      z.object({
+        devcontainer: z.boolean().optional(),
+        repositoryType: z.enum(['github', 'gitlab', 'bitbucket', 'git']).optional(),
+        repositoryFullName: z.string().min(1).max(500).optional(),
+      })
+    )
     .output(sandboxSelectionCapabilitiesSchema)
     .query(async ({ ctx, input }) => {
       const authToken = await createCloudAgentControlToken(
@@ -294,7 +300,8 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       );
       return await createCloudAgentNextClient(authToken).getSandboxSelectionOptions({
         kilocodeOrganizationId: input.organizationId,
-        ...(input.devcontainer !== undefined ? { devcontainer: input.devcontainer } : {}),
+        ...(input.repositoryType ? { repositoryType: input.repositoryType } : {}),
+        ...(input.repositoryFullName ? { repositoryFullName: input.repositoryFullName } : {}),
       });
     }),
 
@@ -309,16 +316,6 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     .input(organizationPrepareSessionNextSchema)
     .output(basePrepareSessionNextOutputSchema)
     .mutation(async ({ ctx, input }) => {
-      if (
-        input.devcontainer &&
-        !(await isFeatureFlagEnabledOrDevelopment('cloud-agent-devcontainer', input.organizationId))
-      ) {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Dev container sessions are not available',
-        });
-      }
-
       const authToken = await createCloudAgentControlToken(
         ctx.user,
         ctx.headersList,
@@ -337,9 +334,9 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         githubRepo,
         githubIntegrationId,
         bitbucketRepo,
+        publicRepoUrl,
         organizationId,
         attachments,
-        images,
         ...restInput
       } = input;
 
@@ -356,6 +353,34 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       };
 
       if (gitlabProject) {
+        let projectAvailable: boolean;
+        try {
+          projectAvailable = await validateGitLabRepoAccessForOrganization(
+            organizationId,
+            ctx.user.id,
+            gitlabProject
+          );
+        } catch (error) {
+          captureException(error, {
+            tags: {
+              component: 'cloud-agent-next-router',
+              op: 'organization-gitlab-project-resolution',
+            },
+          });
+          throw new TRPCError({
+            code: 'SERVICE_UNAVAILABLE',
+            message:
+              "Could not verify access to that GitLab project. Check this organization's GitLab connection and try again.",
+          });
+        }
+        if (!projectAvailable) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message:
+              "That GitLab project is not available through this organization's GitLab integration.",
+          });
+        }
+
         const instanceUrl = await getGitLabInstanceUrlForOrganization(organizationId);
         const gitUrl = buildGitLabCloneUrl(gitlabProject, instanceUrl);
         gitParams = { gitUrl, platform: PLATFORM.GITLAB };
@@ -366,38 +391,53 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           bitbucketWorkspaceUuid: bitbucketRepo.workspaceUuid,
           bitbucketRepositoryUuid: bitbucketRepo.repositoryUuid,
         };
+      } else if (publicRepoUrl) {
+        if (!isPublicRepoUrlEnabled()) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Public repository URLs are only available in local development',
+          });
+        }
+        gitParams = { gitUrl: publicRepoUrl };
       } else {
-        gitParams = { githubRepo, githubIntegrationId, platform: PLATFORM.GITHUB };
+        // The runtime's repository preflight runs only when the request names
+        // the integration that owns the repository, so resolve it for the
+        // caller's organization here. An explicitly supplied id wins, and an
+        // unresolvable repository stays unqualified (the previous behaviour)
+        // rather than refusing a request the runtime can still serve.
+        const resolvedIntegrationId =
+          githubIntegrationId ??
+          (githubRepo === undefined
+            ? null
+            : await resolveGitHubIntegrationIdForRepository(
+                { type: 'org', id: organizationId },
+                githubRepo
+              ));
+        gitParams = {
+          githubRepo,
+          githubIntegrationId: resolvedIntegrationId ?? undefined,
+          platform: PLATFORM.GITHUB,
+        };
       }
 
       try {
-        const result = await client.prepareSession({
+        // New-session flows call prepareSession without a follow-up
+        // sendMessage, so the attachment rows must be linked before prepare
+        // can accept the session; otherwise the reaper deletes new-session
+        // objects.
+        await linkAttachmentsForDispatch(ctx.user.id, attachments);
+
+        return await client.prepareSession({
           ...restInput,
           ...gitParams,
-          attachments: attachments ?? images,
+          attachments,
           createdOnPlatform: 'cloud-agent-web',
           githubAccessPurpose: 'agent',
           kilocodeOrganizationId: organizationId,
           clientProvenance: isMobileClient(ctx.headersList) ? 'mobile' : 'browser',
         });
-
-        // New-session flows call prepareSession without a follow-up
-        // sendMessage, so the server must link the admitted attachment rows
-        // here too; otherwise the reaper deletes new-session objects. Only
-        // ATTACHMENT rows are admitted (images are never admitted; only
-        // generateCloudAgentAttachmentUploadUrl admits).
-        if (attachments && attachments.files.length > 0) {
-          await linkPendingUploads(
-            ctx.user.id,
-            attachments.path,
-            attachments.files.map(file => `${ctx.user.id}/cloud-agent/${attachments.path}/${file}`)
-          );
-        }
-
-        return result;
       } catch (error) {
-        rethrowAsPaymentRequired(error);
-        throw error;
+        rethrowCloudAgentError(error);
       }
     }),
 
@@ -410,6 +450,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         headersList: ctx.headersList,
         sourceKiloSessionId: input.sourceKiloSessionId,
         operationKey: input.operationKey,
+        kiloSessionId: input.kiloSessionId,
         organizationId: input.organizationId,
       })
     ),
@@ -444,8 +485,7 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           cloudAgentSessionId: input.cloudAgentSessionId,
         });
       } catch (error) {
-        rethrowAsPaymentRequired(error);
-        throw error;
+        rethrowCloudAgentError(error);
       }
     }),
 
@@ -503,34 +543,37 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       // Tokens are refreshed inside cloud-agent-next (GitHub App installation
       // for GitHub, GIT_TOKEN_SERVICE for managed GitLab). organizationId is
       // consumed by the membership middleware; it is not forwarded.
+      const attachments = input.attachments;
+      let linkedObjectKeys: string[] = [];
       try {
-        const result = await client.sendMessage({
+        // Link the attachment rows before the worker can accept the turn: the
+        // link is what keeps their objects out of the abandoned-upload reaper,
+        // and once the worker has answered there is no ledger work left that
+        // could report an accepted send as failed.
+        linkedObjectKeys = await linkAttachmentsForDispatch(ctx.user.id, attachments);
+      } catch (error) {
+        rethrowCloudAgentError(error);
+      }
+
+      try {
+        return await client.sendMessage({
           cloudAgentSessionId: input.cloudAgentSessionId,
           payload: input.payload,
           autoCommit: input.autoCommit,
-          messageId: input.messageId ?? generateMessageId(),
-          attachments: input.attachments ?? input.images,
+          messageId: input.messageId,
+          attachments,
         });
-
-        // Compatibility: the server links authoritatively so any client whose
-        // send goes through sendMessage keeps its objects (mobile, old tabs).
-        // The client does not link pre-send, so a failed or abandoned send
-        // leaves rows 'pending' for the reaper. Only ATTACHMENT rows are
-        // admitted (images are never admitted; only
-        // generateCloudAgentAttachmentUploadUrl admits).
-        const attachments = input.attachments;
-        if (attachments && attachments.files.length > 0) {
-          await linkPendingUploads(
-            ctx.user.id,
-            attachments.path,
-            attachments.files.map(file => `${ctx.user.id}/cloud-agent/${attachments.path}/${file}`)
-          );
-        }
-
-        return result;
       } catch (error) {
-        rethrowAsPaymentRequired(error);
-        throw error;
+        // A send can fail after the worker accepted the turn, so only the rows
+        // this dispatch linked are handed back, and only when the worker itself
+        // refused the turn.
+        await releaseRefusedSend({
+          attachments,
+          error,
+          kiloUserId: ctx.user.id,
+          linkedObjectKeys,
+        });
+        rethrowCloudAgentError(error);
       }
     }),
 
@@ -650,6 +693,25 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       }
     }),
 
+  createPreview: organizationMemberMutationProcedure
+    .input(CreatePreviewInput)
+    .output(baseCreatePreviewNextOutputSchema)
+    .mutation(async ({ ctx, input }) => {
+      await assertOrganizationOwnsSession({
+        organizationId: input.organizationId,
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+      });
+
+      const { ticket, expiresAt } = signPreviewTicket({
+        userId: ctx.user.id,
+        cloudAgentSessionId: input.cloudAgentSessionId,
+        port: input.port,
+        organizationId: input.organizationId,
+      });
+      return { url: buildPreviewOpenUrl(ticket, input.path), expiresAt };
+    }),
+
   refreshTerminalTicket: organizationMemberMutationProcedure
     .input(RefreshTerminalTicketInput)
     .output(baseRefreshTerminalTicketNextOutputSchema)
@@ -723,22 +785,6 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
     }),
 
   /**
-   * Generate a presigned URL for uploading an image attachment.
-   */
-  getImageUploadUrl: organizationMemberMutationProcedure
-    .input(ImageUploadUrlInput)
-    .mutation(async ({ ctx, input }) => {
-      return generateImageUploadUrl({
-        service: 'cloud-agent',
-        userId: ctx.user.id,
-        messageUuid: input.messageUuid,
-        imageId: input.imageId,
-        contentType: input.contentType,
-        contentLength: input.contentLength,
-      });
-    }),
-
-  /**
    * Generate a presigned URL for uploading a canonical Cloud Agent attachment.
    */
   getAttachmentUploadUrl: organizationMemberMutationProcedure
@@ -752,19 +798,6 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         contentLength: input.contentLength,
         ...(input.extension ? { extension: input.extension } : {}),
       });
-    }),
-
-  /**
-   * Finalize send-time attachment ledger rows in the organization context.
-   * The pending rows are keyed by the uploading member's user id, so the link
-   * is still scoped to ctx.user.id; organizationId only gates membership.
-   */
-  linkPendingUploads: organizationMemberMutationProcedure
-    .input(LinkPendingUploadsInput)
-    .output(z.object({ success: z.boolean() }))
-    .mutation(async ({ ctx, input }) => {
-      await linkPendingUploads(ctx.user.id, input.messageUuid, input.objectKeys);
-      return { success: true };
     }),
 
   /**
@@ -971,19 +1004,6 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
       ).getSandboxStatus(input.cloudAgentSessionId);
     }),
 
-  getComputeBillingStatus: organizationMemberProcedure
-    .input(GetSessionInput)
-    .query(async ({ ctx, input }) => {
-      await assertOrganizationOwnsSession({
-        organizationId: input.organizationId,
-        userId: ctx.user.id,
-        cloudAgentSessionId: input.cloudAgentSessionId,
-      });
-      return await createCloudAgentNextClient(
-        await createCloudAgentControlToken(ctx.user, ctx.headersList, input.organizationId)
-      ).getComputeBillingStatus(input.cloudAgentSessionId);
-    }),
-
   checkEligibility: organizationMemberProcedure
     .input(z.object({ organizationId: z.uuid() }))
     .query(async ({ ctx, input }) => {
@@ -1013,6 +1033,10 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         integrationInstalled: z.boolean(),
         syncedAt: z.string().nullish(),
         errorMessage: z.string().optional(),
+        unavailableReason: z
+          .enum(['suspended', 'disconnected', 'reauth_required', 'not_configured'])
+          .optional(),
+        partial: z.boolean().optional(),
       })
     )
     .query(async ({ ctx, input }) => {
@@ -1031,6 +1055,8 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         integrationInstalled: result.integrationInstalled,
         syncedAt: result.syncedAt,
         errorMessage: result.errorMessage,
+        unavailableReason: result.unavailableReason,
+        partial: result.partial,
       };
     }),
 

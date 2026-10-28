@@ -1,14 +1,15 @@
 import type { NextRequest } from 'next/server';
-import { createHash } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { captureException, captureMessage } from '@sentry/nextjs';
 import { APP_URL } from '@kilocode/web-shared/lib/constants';
 import type { Owner } from '@/lib/integrations/core/types';
+import { PLATFORM } from '@/lib/integrations/core/constants';
 import {
   appendIntegrationOAuthRedirectQuery,
   parseOAuthStateOwner,
 } from '@/lib/integrations/oauth/common';
 import { verifyOAuthState } from '@/lib/integrations/oauth-state';
+import { safeCallbackContext, validOAuthCode } from '@/lib/integrations/oauth/callback-safety';
 import {
   exchangeBitbucketOAuthCode,
   fetchBitbucketUser,
@@ -49,21 +50,6 @@ function redirectWithStatus(
   return NextResponse.redirect(new URL(path, APP_URL));
 }
 
-function safeCallbackContext(searchParams: URLSearchParams) {
-  const state = searchParams.get('state');
-  return {
-    hasCode: Boolean(searchParams.get('code')),
-    hasState: Boolean(state),
-    stateHash: state ? createHash('sha256').update(state).digest('hex').slice(0, 8) : null,
-    hasProviderError: Boolean(searchParams.get('error')),
-  };
-}
-
-function validOAuthCode(code: string | null): string | null {
-  if (!code || code.length > 2048 || !/^[A-Za-z0-9._~+/-]+$/.test(code)) return null;
-  return code;
-}
-
 async function authorizeOwner(owner: Owner, user: AuthenticatedOAuthUser): Promise<void> {
   if (owner.type === 'user') {
     if (owner.id !== user.id) throw new Error('OAuth owner mismatch');
@@ -93,6 +79,14 @@ export async function handleBitbucketOAuthCallback(request: NextRequest): Promis
     }
 
     const owner = parseOAuthStateOwner(verifiedState.owner);
+    if (verifiedState.provider !== PLATFORM.BITBUCKET) {
+      captureMessage('Bitbucket OAuth callback state minted for another flow', {
+        level: 'warning',
+        tags: { endpoint: 'bitbucket/callback', source: 'bitbucket_oauth' },
+        extra: safeCallbackContext(searchParams),
+      });
+      return redirectWithStatus(null, 'error', 'invalid_state');
+    }
     if (verifiedState.userId !== user.id || !owner) {
       return redirectWithStatus(verifiedState, 'error', 'unauthorized');
     }

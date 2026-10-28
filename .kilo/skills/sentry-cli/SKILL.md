@@ -7,6 +7,12 @@ description: Guide for using the Sentry CLI to interact with Sentry from the com
 
 Help users interact with Sentry from the command line using the `sentry` CLI.
 
+## Kilo Defaults
+
+- Organization slug: **`anaconda-nq`**. Do not use `kilo-code` or `kilocode`; old `kilo-code.sentry.io` links and `--org=kilo-code` references in the repo point to the retired org.
+- Common web project: `kilocode-web`. Prefer the project from the user's URL or request.
+- Pass the org explicitly, e.g. `sentry issue list anaconda-nq/kilocode-web` or `sentry issue view anaconda-nq/KILOCODE-WEB-ABC`.
+
 ## Prerequisites
 
 The CLI must be installed and authenticated before use.

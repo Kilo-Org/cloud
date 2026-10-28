@@ -295,7 +295,43 @@ describe('CloudAgentWorkspaceTabs', () => {
     expect(attentionTab).toContain('flex h-4 w-4 shrink-0 items-center justify-center"><span');
   });
 
-  it('overlays current-chat progress without changing a chat tab title anchor or status slot', () => {
+  it.each(['Loading session…', 'Refreshing session…'])(
+    'shows %s in the selected chat icon slot without changing the tab title',
+    label => {
+      const first = makeSession('ses_first', 'First chat');
+      const second = makeSession('ses_second', 'Second chat');
+      const html = renderWorkspaceTabs({
+        chatSessions: [first, second],
+        currentSessionId: first.sessionId,
+        currentChatLoadingLabel: label,
+      });
+      const firstTab = findButtonMarkup(html, first.prompt);
+      expect(firstTab).toContain(`role="status" aria-label="${label}"`);
+      expect(firstTab).toContain('flex h-4 w-4 shrink-0 items-center justify-center');
+      expect(firstTab).toContain('motion-reduce:animate-none');
+      expect(findButtonMarkup(html, second.prompt)).not.toContain(label);
+    }
+  );
+
+  it('does not show chat loading when another workspace tab is selected', () => {
+    const html = renderWorkspaceTabs({
+      activeTabId: terminalTabId('terminal_first'),
+      currentChatLoadingLabel: 'Loading session…',
+    });
+    expect(html).not.toContain('Loading session…');
+  });
+
+  it('shows loading in the standalone Chat tab icon slot', () => {
+    const html = renderWorkspaceTabs({
+      worktreeId: null,
+      currentChatLoadingLabel: 'Loading session…',
+    });
+    const tab = findButtonMarkup(html, '>Chat</span>');
+    expect(tab).toContain('role="status" aria-label="Loading session…"');
+    expect(tab).toContain('flex h-4 w-4 shrink-0 items-center justify-center');
+  });
+
+  it('keeps chat titles visible while progress updates the status slot', () => {
     const first = makeSession('ses_first', 'Short title');
     const second = makeSession('ses_second', 'Neighboring chat title');
     const progress =
@@ -309,17 +345,16 @@ describe('CloudAgentWorkspaceTabs', () => {
       chatSessions: [first, second],
       currentSessionId: first.sessionId,
     });
-    const busyFirstTab = findButtonMarkup(busyHtml, progress);
+    const busyFirstTab = findButtonMarkup(busyHtml, first.prompt);
     const busySecondTab = findButtonMarkup(busyHtml, second.prompt);
     const idleFirstTab = findButtonMarkup(idleHtml, first.prompt);
 
-    expect(busyFirstTab).toContain('relative min-w-0 max-w-36');
-    expect(busyFirstTab).toContain('block truncate text-transparent');
-    expect(busyFirstTab).toContain('absolute inset-0 block truncate');
-    expect(busyFirstTab).toContain(progress);
+    expect(busyFirstTab).toContain(first.prompt);
+    expect(busyFirstTab).not.toContain('text-transparent');
+    expect(busyFirstTab).not.toContain(progress);
     expect(busyFirstTab).toContain('flex h-4 w-4 shrink-0 items-center justify-center');
     expect(busySecondTab).not.toContain(progress);
-    expect(idleFirstTab).toContain('block truncate');
+    expect(idleFirstTab).toContain('min-w-0 max-w-36 truncate');
     expect(idleFirstTab).not.toContain('text-transparent');
     expect(idleFirstTab).not.toContain('absolute inset-0 block truncate');
     expect(idleFirstTab).toContain('flex h-4 w-4 shrink-0 items-center justify-center');
@@ -423,19 +458,15 @@ describe('CloudAgentWorkspaceTabs', () => {
     }
   });
 
-  it('keeps the split chat action busy and disables only chat creation while pending', () => {
-    const html = renderWorkspaceTabs({ isCreatingChat: true, canCreateTerminal: true }, true);
+  it('keeps an unavailable new-chat action in place as a disabled plus, not a spinner', () => {
+    const html = renderWorkspaceTabs({ canCreateChat: false, canCreateTerminal: true }, true);
     const action = findButtonMarkup(html, 'aria-label="New chat"');
-    const options = findButtonMarkup(html, 'aria-label="Tab options"');
 
     expect(action).toContain('disabled=""');
-    expect(action).toContain('aria-busy="true"');
-    expect(action).toContain('animate-spin');
-    expect(action).not.toContain('role="tab"');
-    expect(options).toContain('aria-haspopup="menu"');
-    expect(options).not.toContain('disabled=""');
+    expect(action).toContain('lucide-plus');
+    expect(action).not.toContain('animate-spin');
+    expect(action).not.toContain('aria-busy');
     expect(findMenuItemMarkup(html, 'New chat')).toContain('aria-disabled="true"');
-    expect(findMenuItemMarkup(html, 'New terminal')).not.toContain('aria-disabled="true"');
   });
 
   it('creates chat from the labeled plus action and exposes terminal creation only in the menu', () => {
@@ -461,11 +492,40 @@ describe('CloudAgentWorkspaceTabs', () => {
     expect(html).not.toContain('New terminal');
   });
 
-  it('offers eligible terminal creation and history in the caret without chat creation', () => {
+  it('offers preview as a toolbar button instead of a caret menu item', () => {
     const html = renderWorkspaceTabs(
-      { onCreateChat: undefined, canCreateTerminal: true, isCreatingChat: true },
+      { canCreateTerminal: true, canOpenPreview: true, onOpenPreview: () => undefined },
       true
     );
+
+    expect(findButtonMarkup(html, 'aria-label="Open preview"')).toContain('lucide-globe');
+    expect(html).not.toContain('Open preview…');
+  });
+
+  it('does not expose preview creation without the preview capability', () => {
+    const html = renderWorkspaceTabs({ canCreateTerminal: true }, true);
+
+    expect(html).not.toContain('Open preview');
+  });
+
+  it('opens preview from the toolbar action with or without a worktree', () => {
+    let opened = 0;
+    const html = renderWorkspaceTabs({
+      chatSessions: [],
+      currentSessionId: null,
+      worktreeId: null,
+      canCreateTerminal: true,
+      canOpenPreview: true,
+      onOpenPreview: () => opened++,
+    });
+
+    expect(findButtonMarkup(html, 'aria-label="New terminal"')).toContain('lucide-terminal');
+    getButtonProps('Open preview').onClick?.({} as React.MouseEvent<HTMLButtonElement>);
+    expect(opened).toBe(1);
+  });
+
+  it('offers eligible terminal creation and history in the caret without chat creation', () => {
+    const html = renderWorkspaceTabs({ onCreateChat: undefined, canCreateTerminal: true }, true);
 
     expect(findButtonMarkup(html, 'aria-label="Tab options"')).not.toContain('disabled=""');
     expect(findMenuItemMarkup(html, 'New terminal')).not.toContain('aria-disabled="true"');

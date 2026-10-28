@@ -667,6 +667,8 @@ function SubstackCredentialDialog({
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const [material, setMaterial] = useState('');
+  const [totpSecret, setTotpSecret] = useState('');
+  const testVersionRef = useRef(0);
   const metaQuery = useQuery({
     ...trpc.admin.userDeletionQueue.substackCredential.queryOptions(),
     enabled: open,
@@ -681,20 +683,39 @@ function SubstackCredentialDialog({
     trpc.admin.userDeletionQueue.deleteSubstackCredential.mutationOptions()
   );
   const meta = metaQuery.data;
-  const testResult = testMutation.data;
+  const testResult = testMutation.data?.result;
   const busy = storeMutation.isPending || testMutation.isPending || deleteMutation.isPending;
+  const totpWithoutCookie = Boolean(totpSecret.trim()) && !material.trim();
 
   const invalidate = () =>
     queryClient.invalidateQueries(trpc.admin.userDeletionQueue.substackCredential.queryFilter());
+
+  const invalidateTest = () => {
+    testVersionRef.current += 1;
+    testMutation.reset();
+  };
+
+  const resetForm = () => {
+    invalidateTest();
+    setMaterial('');
+    setTotpSecret('');
+  };
+
+  const onMaterialChange = (value: string) => {
+    invalidateTest();
+    setMaterial(value);
+  };
+
+  const onTotpChange = (value: string) => {
+    invalidateTest();
+    setTotpSecret(value);
+  };
 
   return (
     <Dialog
       open={open}
       onOpenChange={next => {
-        if (!next) {
-          setMaterial('');
-          testMutation.reset();
-        }
+        if (!next) resetForm();
         onOpenChange(next);
       }}
     >
@@ -702,20 +723,24 @@ function SubstackCredentialDialog({
         <DialogHeader>
           <DialogTitle>Substack credential</DialogTitle>
           <DialogDescription>
-            Encrypted session cookie used by the Substack task. Test before storing. The value is
-            not logged.
+            Encrypted service-account session cookie used by the Substack task. Test before storing.
+            Values are not logged.
           </DialogDescription>
         </DialogHeader>
         <div className="flex flex-col gap-3">
           <p className="text-sm">
             {meta?.configured
-              ? `Stored ${meta.updatedAt ? formatTimestamp(meta.updatedAt) : '—'}`
+              ? `Updated ${meta.updatedAt ? formatTimestamp(meta.updatedAt) : '—'}${meta.totpConfigured ? ' · TOTP configured' : ' · cookie only'}`
               : 'No credential stored'}
           </p>
           {testResult ? (
             <p className="text-sm">
               {testResult.status === 'healthy'
-                ? `Healthy${testResult.name || testResult.handle ? ` · ${testResult.name ?? testResult.handle}` : ''}`
+                ? `Healthy${testResult.name || testResult.handle ? ` · ${testResult.name ?? testResult.handle}` : ''}${
+                    testResult.totpVerified
+                      ? ' · TOTP reauth verified (does not prove delete permission)'
+                      : ''
+                  }`
                 : testResult.status === 'expired'
                   ? 'Session expired. Paste a fresh cookie.'
                   : testResult.status === 'missing'
@@ -728,29 +753,67 @@ function SubstackCredentialDialog({
             <Textarea
               id="substack-material"
               value={material}
-              onChange={event => setMaterial(event.target.value)}
+              onChange={event => onMaterialChange(event.target.value)}
+              disabled={busy}
               className="min-h-28 font-mono"
               placeholder="connect.sid=…"
             />
             <p className="text-muted-foreground text-xs">
-              Paste the full <span className="font-mono">connect.sid=…</span> cookie string from a
-              logged-in Substack session.
+              Paste the full <span className="font-mono">connect.sid=…</span> cookie string from the
+              service account session.
             </p>
+          </div>
+          <div className="flex flex-col gap-2">
+            <Label htmlFor="substack-totp">TOTP secret</Label>
+            <Input
+              id="substack-totp"
+              type="password"
+              autoComplete="new-password"
+              value={totpSecret}
+              onChange={event => onTotpChange(event.target.value)}
+              disabled={busy}
+              className="font-mono"
+              placeholder="Base32 secret"
+            />
+            <p className="text-muted-foreground text-xs">
+              The service account&apos;s base32 authenticator secret, not a 6-digit code. Leave
+              blank to store cookie-only; a full replace with a blank TOTP secret clears any stored
+              secret.
+            </p>
+            {totpWithoutCookie ? (
+              <p className="text-status-warning text-xs">
+                Paste a session cookie to test a TOTP secret; testing stored uses its own secret.
+              </p>
+            ) : null}
           </div>
         </div>
         <DialogFooter className="flex-wrap">
           <Button
             variant="secondary"
-            disabled={busy || (!material.trim() && !meta?.configured)}
+            disabled={busy || totpWithoutCookie || (!material.trim() && !meta?.configured)}
             onClick={async () => {
+              const version = testVersionRef.current;
               try {
-                const result = await testMutation.mutateAsync(
-                  material.trim() ? { material: material.trim() } : {}
+                const outcome = await testMutation.mutateAsync(
+                  material.trim()
+                    ? { material: material.trim(), totpSecret: totpSecret.trim() }
+                    : {}
                 );
-                if (result.status === 'healthy') toast.success('Substack session is healthy');
-                else if (result.status === 'expired') toast.error('Substack session expired');
-                else toast.error('Substack test failed');
+                if (version !== testVersionRef.current) return;
+                if (outcome.refreshedCookie) setMaterial(outcome.refreshedCookie);
+                if (outcome.result.status === 'healthy') {
+                  toast.success(
+                    outcome.result.totpVerified
+                      ? 'Substack session and TOTP reauthentication are healthy'
+                      : 'Substack session is healthy'
+                  );
+                } else if (outcome.result.status === 'expired') {
+                  toast.error('Substack session expired');
+                } else if (outcome.result.status !== 'missing') {
+                  toast.error(`Substack test failed · ${outcome.result.errorCode}`);
+                }
               } catch (error) {
+                if (version !== testVersionRef.current) return;
                 toast.error(error instanceof Error ? error.message : 'Test failed');
               }
             }}
@@ -765,6 +828,7 @@ function SubstackCredentialDialog({
                 try {
                   await deleteMutation.mutateAsync();
                   toast.success('Substack credential removed');
+                  resetForm();
                   await invalidate();
                 } catch (error) {
                   toast.error(error instanceof Error ? error.message : 'Disconnect failed');
@@ -778,9 +842,12 @@ function SubstackCredentialDialog({
             disabled={!material.trim() || busy}
             onClick={async () => {
               try {
-                await storeMutation.mutateAsync({ material: material.trim() });
+                await storeMutation.mutateAsync({
+                  material: material.trim(),
+                  totpSecret: totpSecret.trim(),
+                });
                 toast.success('Substack credential stored');
-                setMaterial('');
+                resetForm();
                 await invalidate();
               } catch (error) {
                 toast.error(error instanceof Error ? error.message : 'Could not store credential');

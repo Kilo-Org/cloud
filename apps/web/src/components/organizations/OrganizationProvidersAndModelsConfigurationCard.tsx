@@ -12,6 +12,7 @@ import { DefaultModelDialog } from './providers-and-models/DefaultModelDialog';
 import { AvailableModelsDialog } from './providers-and-models/AvailableModelsDialog';
 import { useOrganizationConfiguration } from './providers-and-models/useOrganizationConfiguration';
 import { useOpenRouterModelsAndProviders } from '@/lib/hooks/use-openrouter-models';
+import { useOrganizationAvailableModels } from '@/app/api/organizations/hooks';
 import type { ProviderSelection } from '@/components/models/util';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 
@@ -28,18 +29,32 @@ type ProviderForSummaryCard = {
   }>;
 };
 
+function hasModelAccessRestrictions(
+  providerAllowList: string[] | undefined,
+  modelDenyList: string[] | undefined
+): boolean {
+  return providerAllowList !== undefined || (modelDenyList?.length ?? 0) > 0;
+}
+
+/**
+ * Groups the organization's available models by the enabled providers that
+ * serve them. Availability comes from `listAvailableModels`, not from the
+ * provider snapshot: the snapshot also lists models Kilo does not offer, such
+ * as speech, video, and reranking models.
+ */
 export function computeProviderSelectionsForSummaryCard(params: {
   openRouterProviders: ProviderForSummaryCard[];
   providerAllowList: string[] | undefined;
   modelDenyList: string[] | undefined;
+  availableModelIds: ReadonlyArray<string>;
 }): ProviderSelection[] | null {
-  const { openRouterProviders, providerAllowList, modelDenyList } = params;
-  if (providerAllowList === undefined && (!modelDenyList || modelDenyList.length === 0)) {
+  const { openRouterProviders, providerAllowList, modelDenyList, availableModelIds } = params;
+  if (!hasModelAccessRestrictions(providerAllowList, modelDenyList)) {
     return null;
   }
 
   const providerAllowSet = providerAllowList ? new Set(providerAllowList) : null;
-  const modelDenySet = new Set(modelDenyList?.map(id => normalizeModelId(id)) ?? []);
+  const availableModelIdSet = new Set(availableModelIds.map(id => normalizeModelId(id)));
 
   const selections: ProviderSelection[] = [];
 
@@ -47,7 +62,7 @@ export function computeProviderSelectionsForSummaryCard(params: {
     if (providerAllowSet && !providerAllowSet.has(provider.slug)) continue;
 
     const availableModels = provider.models
-      .filter(model => model.endpoint && !modelDenySet.has(normalizeModelId(model.slug)))
+      .filter(model => model.endpoint && availableModelIdSet.has(normalizeModelId(model.slug)))
       .map(model => model.slug);
 
     if (availableModels.length > 0) {
@@ -58,8 +73,7 @@ export function computeProviderSelectionsForSummaryCard(params: {
     }
   }
 
-  // Empty array means configured selections exist but nothing survived the current snapshot.
-  return selections.length > 0 ? selections : [];
+  return selections;
 }
 
 export function OrganizationProvidersAndModelsConfigurationCard({
@@ -71,22 +85,27 @@ export function OrganizationProvidersAndModelsConfigurationCard({
   const { isLoading, organizationData, configurationData } =
     useOrganizationConfiguration(organizationId);
   const { providers: openRouterProviders } = useOpenRouterModelsAndProviders();
+  const availableModels = useOrganizationAvailableModels(organizationId, {
+    enabled: hasModelAccessRestrictions(
+      organizationData?.settings?.provider_allow_list,
+      organizationData?.settings?.model_deny_list
+    ),
+  });
 
-  // Convert configuration data to ProviderSelection[] format
   const providerSelections = useMemo((): ProviderSelection[] | null => {
-    if (!configurationData || !organizationData || !openRouterProviders) {
+    if (!configurationData || !organizationData) {
       return null;
     }
 
     const settings = organizationData.settings;
-    const providerAllowList = settings?.provider_allow_list;
 
     return computeProviderSelectionsForSummaryCard({
       openRouterProviders,
-      providerAllowList,
+      providerAllowList: settings?.provider_allow_list,
       modelDenyList: settings?.model_deny_list,
+      availableModelIds: availableModels.data?.data.map(model => model.id) ?? [],
     });
-  }, [configurationData, organizationData, openRouterProviders]);
+  }, [configurationData, organizationData, openRouterProviders, availableModels.data]);
 
   if (isLoading) {
     return <LoadingCard title="" description="Loading providers and models..." rowCount={3} />;
@@ -114,6 +133,8 @@ export function OrganizationProvidersAndModelsConfigurationCard({
     );
   }
 
+  const modelCount = availableModels.data?.data.length;
+
   return (
     <Card className="flex flex-col">
       <CardHeader className="mb-2">
@@ -125,27 +146,27 @@ export function OrganizationProvidersAndModelsConfigurationCard({
       <CardDescription className="mb-6 px-6">
         {providerSelections === null
           ? 'All providers and models'
-          : (() => {
-              const providerCount = providerSelections.length;
-              const modelCount = providerSelections.reduce(
-                (total, provider) => total + provider.models.length,
-                0
-              );
-              const providerText = providerCount === 1 ? 'provider' : 'providers';
-              const modelText = modelCount === 1 ? 'model' : 'models';
-              return (
-                <>
-                  {providerCount} {providerText} and{' '}
-                  <button
-                    onClick={() => setIsAvailableModelsDialogOpen(true)}
-                    className="cursor-pointer text-yellow-400 underline hover:text-yellow-300"
-                  >
-                    {modelCount} {modelText}
-                  </button>{' '}
-                  allowed
-                </>
-              );
-            })()}
+          : modelCount === undefined
+            ? availableModels.isError
+              ? 'Could not load allowed models'
+              : 'Loading allowed models…'
+            : (() => {
+                const providerCount = providerSelections.length;
+                const providerText = providerCount === 1 ? 'provider' : 'providers';
+                const modelText = modelCount === 1 ? 'model' : 'models';
+                return (
+                  <>
+                    {providerCount} {providerText} and{' '}
+                    <button
+                      onClick={() => setIsAvailableModelsDialogOpen(true)}
+                      className="cursor-pointer text-primary underline hover:text-primary-hover"
+                    >
+                      {modelCount} {modelText}
+                    </button>{' '}
+                    allowed
+                  </>
+                );
+              })()}
       </CardDescription>
       <CardContent className="flex-1 overflow-hidden">
         <div className="h-72 overflow-y-auto">

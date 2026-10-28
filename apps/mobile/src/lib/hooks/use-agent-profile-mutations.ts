@@ -1,4 +1,4 @@
-import { type QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
+import { matchQuery, type QueryKey, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner-native';
 
 import { withOrganization } from '@/lib/hooks/agent-profile-mutation-helpers';
@@ -6,6 +6,7 @@ import {
   type AgentProfileDetail,
   type AgentProfileListCombined,
   type AgentProfileListItem,
+  type AgentProfileOverview,
 } from '@/lib/hooks/agent-profile-types';
 import {
   isLatestMutationGeneration,
@@ -71,6 +72,7 @@ export function useAgentProfileMutations(organizationId?: string) {
   const detailFilter = trpc.agentProfiles.get.pathFilter();
   const defaultListKey = trpc.agentProfiles.list.queryKey({ organizationId });
   const defaultDetailKey = trpc.agentProfiles.get.queryKey({ organizationId });
+  const defaultOverviewKey = trpc.agentProfiles.overview.queryKey({ organizationId });
   const defaultCombinedKey = organizationId
     ? trpc.agentProfiles.listCombined.queryKey({ organizationId })
     : combinedFilter.queryKey;
@@ -81,7 +83,12 @@ export function useAgentProfileMutations(organizationId?: string) {
   const toastError = (error: { message: string }) => {
     toast.error(error.message);
   };
+  // `networkMode: 'always'` keeps a save settling while the online manager is
+  // offline (NetInfo can misreport while the backend is reachable): the request
+  // either succeeds or fails fast, so `isPending` can never stick and the save
+  // button always returns to idle.
   const callbacks = {
+    networkMode: 'always' as const,
     onSuccess: invalidateProfiles,
     onError: (error: { message: string }) => {
       toastError(error);
@@ -116,18 +123,27 @@ export function useAgentProfileMutations(organizationId?: string) {
     queryClient.setQueriesData<AgentProfileDetail>({ queryKey: defaultDetailKey }, old =>
       old ? withDefaultDetail(old, profileId, setDefault) : old
     );
+    // The Overview renders `isDefault` from the counts read; without this the
+    // switch would only move after the invalidation refetch lands.
+    queryClient.setQueriesData<AgentProfileOverview>(
+      { queryKey: defaultOverviewKey },
+      (old: AgentProfileOverview | undefined) =>
+        old ? withDefaultDetail(old, profileId, setDefault) : old
+    );
   };
 
   const snapshotProfiles = async () => {
     await queryClient.cancelQueries({ queryKey: defaultListKey });
     await queryClient.cancelQueries({ queryKey: defaultCombinedKey });
     await queryClient.cancelQueries({ queryKey: defaultDetailKey });
+    await queryClient.cancelQueries({ queryKey: defaultOverviewKey });
     const previous: [QueryKey, unknown][] = [
       ...queryClient.getQueriesData<AgentProfileListItem[]>({ queryKey: defaultListKey }),
       ...queryClient.getQueriesData<AgentProfileListCombined>({
         queryKey: defaultCombinedKey,
       }),
       ...queryClient.getQueriesData<AgentProfileDetail>({ queryKey: defaultDetailKey }),
+      ...queryClient.getQueriesData<AgentProfileOverview>({ queryKey: defaultOverviewKey }),
     ];
     return { generation: nextMutationGeneration(DEFAULT_MUTATION_KEY), previous };
   };
@@ -150,7 +166,27 @@ export function useAgentProfileMutations(organizationId?: string) {
     withOrganization(trpc.agentProfiles.update.mutationOptions(callbacks), organizationId)
   );
   const deleteProfile = useMutation(
-    withOrganization(trpc.agentProfiles.delete.mutationOptions(callbacks), organizationId)
+    withOrganization(
+      trpc.agentProfiles.delete.mutationOptions({
+        ...callbacks,
+        // The deleted profile's screens stay mounted until navigation ends.
+        // Refetching its detail, its Overview, or its agent list can only fail
+        // with NOT_FOUND, so skip all three.
+        onSuccess: (_data, { profileId }) => {
+          const deletedDetail = trpc.agentProfiles.get.queryFilter({ profileId });
+          const deletedOverview = trpc.agentProfiles.overview.queryFilter({ profileId });
+          const deletedAgents = trpc.agentProfiles.agents.queryFilter({ profileId });
+          void queryClient.invalidateQueries({
+            ...profilesFilter,
+            predicate: query =>
+              !matchQuery(deletedDetail, query) &&
+              !matchQuery(deletedOverview, query) &&
+              !matchQuery(deletedAgents, query),
+          });
+        },
+      }),
+      organizationId
+    )
   );
   const setVar = useMutation(
     withOrganization(trpc.agentProfiles.setVar.mutationOptions(callbacks), organizationId)
@@ -222,8 +258,9 @@ export function useAgentProfileMutations(organizationId?: string) {
           const previous = queryClient.getQueriesData<AgentProfileDetail>({
             queryKey: detailFilter.queryKey,
           });
-          queryClient.setQueriesData<AgentProfileDetail>({ queryKey: detailFilter.queryKey }, old =>
-            old ? withSkillEnabled(old, variables.skillId, variables.enabled) : old
+          queryClient.setQueriesData<AgentProfileDetail>(
+            { queryKey: detailFilter.queryKey },
+            old => (old ? withSkillEnabled(old, variables.skillId, variables.enabled) : old)
           );
           return { generation, previous };
         },

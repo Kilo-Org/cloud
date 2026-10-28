@@ -4,10 +4,11 @@ import { getWorkerDb } from '@kilocode/db/client';
 import {
   cli_sessions_v2,
   organization_memberships,
+  user_activity_tokens,
   user_notification_preferences,
   user_push_tokens,
 } from '@kilocode/db/schema';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, isNull } from 'drizzle-orm';
 import { Hono } from 'hono';
 import type { MiddlewareHandler } from 'hono';
 import { cors } from 'hono/cors';
@@ -55,6 +56,10 @@ import type { TicketTokenPair } from './lib/expo-push';
 import { sendPushNotifications } from './lib/expo-push';
 import { dispatchInstanceLifecyclePush } from './lib/instance-lifecycle-push';
 import { dispatchInternalPushCore } from './lib/internal-dispatch-push';
+import {
+  NOTIFICATION_HISTORY_PRUNE_CRON,
+  pruneNotificationHistory,
+} from './lib/notification-history-prune';
 import {
   dispatchScheduledActionPush,
   type SendScheduledActionNoticeParams,
@@ -149,11 +154,19 @@ app.post('/internal/v1/dispatch', async c => {
   const db = getWorkerDb(c.env.HYPERDRIVE.connectionString);
   const result = await dispatchInternalPushCore(parsed.data, {
     getRecipientDOStub: (userId: string) =>
-      c.env.NOTIFICATION_CHANNEL_DO.get(
-        c.env.NOTIFICATION_CHANNEL_DO.idFromName(userId)
-      ) as unknown as RecipientDOStub,
+      c.env.NOTIFICATION_CHANNEL_DO.get(c.env.NOTIFICATION_CHANNEL_DO.idFromName(userId)),
     readPreferences: async userId => readPreferencesRow(db, userId),
   });
+  const failedRecipients = result.perRecipient.filter(r => r.outcome === 'failed').length;
+  if (failedRecipients > 0) {
+    // Counts and the caller-supplied dispatch id only — never recipient ids.
+    console.warn('Internal dispatch completed with failed recipients', {
+      dispatchId: c.req.header('X-Dispatch-Id') ?? null,
+      kind: parsed.data.kind,
+      failedRecipients,
+      totalRecipients: result.perRecipient.length,
+    });
+  }
   return c.json(result);
 });
 
@@ -286,15 +299,27 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
     return queue(batch as Parameters<typeof queue>[0], this.env);
   }
 
+  /**
+   * Retention sweep for the notification history this worker writes. Any other
+   * cron warns rather than running a sweep the trigger did not ask for.
+   */
+  async scheduled(controller: ScheduledController): Promise<void> {
+    if (controller.cron !== NOTIFICATION_HISTORY_PRUNE_CRON) {
+      console.warn('notifications_worker_unrecognized_cron', { cron: controller.cron });
+      return;
+    }
+    const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+    const { deleted, hasMore } = await pruneNotificationHistory(db);
+    console.log('notification_history_prune_complete', { deleted, hasMore });
+  }
+
   async sendPushForConversation(
     input: SendPushForConversationInput
   ): Promise<SendPushForConversationOutput> {
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
     return sendPushForConversationCore(input, {
       getRecipientDOStub: (userId: string) =>
-        this.env.NOTIFICATION_CHANNEL_DO.get(
-          this.env.NOTIFICATION_CHANNEL_DO.idFromName(userId)
-        ) as unknown as RecipientDOStub,
+        this.env.NOTIFICATION_CHANNEL_DO.get(this.env.NOTIFICATION_CHANNEL_DO.idFromName(userId)),
       readPreferences: async userId => readPreferencesRow(db, userId),
     });
   }
@@ -352,9 +377,29 @@ export class NotificationsService extends WorkerEntrypoint<Env> {
 
   /** Refresh each affected scope without notification preferences or viewer-presence gates. */
   async refreshGlanceableSessions(params: RefreshGlanceableSessionsParams): Promise<void> {
-    const { userId, cliSessionIds, approvalChangedSessionIds } =
+    const { userId, cliSessionIds, approvalChangedSessionIds, cardFollowSessionIds } =
       refreshGlanceableSessionsInputSchema.parse(params);
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString);
+    // A caller that only refreshes the session card names the sessions whose
+    // new content must reach a card. One indexed read decides whether any of
+    // them is followed; when none is, the whole build and device wake is
+    // pointless, so skip this call. The notifications refresh stays rate
+    // limited per scope, which coalesces the callers that do pass the gate.
+    if (cardFollowSessionIds !== undefined && cardFollowSessionIds.length > 0) {
+      const followed = await db
+        .select({ sessionId: user_activity_tokens.session_id })
+        .from(user_activity_tokens)
+        .where(
+          and(
+            eq(user_activity_tokens.user_id, userId),
+            inArray(user_activity_tokens.session_id, cardFollowSessionIds),
+            isNull(user_activity_tokens.superseded_at),
+            inArray(user_activity_tokens.kind, ['ios_session_activity', 'android_session_ongoing'])
+          )
+        )
+        .limit(1);
+      if (followed.length === 0) return;
+    }
     // Read ownership too: an absent row is personal, but a foreign row is not authorized.
     const rows = await db
       .select({

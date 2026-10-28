@@ -12,6 +12,7 @@
 import { generateMessageId } from '@kilocode/cloud-agent-sdk/message-id';
 
 import { type AgentMode } from '@/components/agents/mode-normalize';
+import { cloudPrepareFailureMessage } from '@/components/agents/cloud-prepare-error-display';
 import { isCloudPrepareRetryableError } from '@/components/agents/mobile-session-manager';
 import {
   getSelectedBranchOverride,
@@ -29,7 +30,7 @@ import { trpcClient } from '@/lib/trpc';
 /**
  * One intent to prepare: the new-session form's draft, or the Continue
  * control's clone. `organizationId` scopes the create to the screen's
- * organization; the action path never carries one.
+ * organization; an OS-surface run never carries one.
  */
 export type PrepareAgentSessionInput =
   | {
@@ -54,6 +55,8 @@ export type PrepareAgentSessionInput =
   | {
       kind: 'continue';
       cloneFromKiloSessionId: string;
+      /** Inclusive fork cut ("Fork from here"); absent clones the whole session. */
+      cloneUpToMessageId?: string;
       repository?: NewSessionRepository | null;
       mode: AgentMode;
       model: string;
@@ -200,10 +203,18 @@ export async function prepareAgentSession(
         })
       : await trpcClient.cloudAgentNext.prepareSession.mutate(body);
 
-    // Rotate before the post-success work so a UI failure cannot keep the
-    // successful key for a retry.
-    deps.rotateKey();
-    await deps.removeOutboxRow(fingerprint);
+    // The session exists from here on, so no post-success work may report the
+    // create as failed. Rotate before the cleanup so a cleanup failure cannot
+    // keep the successful key for a retry; the local outbox delete is
+    // best-effort like the invalidation below. A row left behind is harmless:
+    // a relaunch reuses its stored operation key, and the server dedupes that
+    // key to this same session.
+    try {
+      deps.rotateKey();
+      await deps.removeOutboxRow(fingerprint);
+    } catch {
+      // Cosmetic; the caller still signals success.
+    }
 
     // The cloud session already exists, so a post-success invalidation failure
     // is cosmetic and must not report the create as failed or invite a
@@ -216,14 +227,17 @@ export async function prepareAgentSession(
     return { ok: true, sessionId: result.kiloSessionId };
   } catch (error) {
     const retryable = isCloudPrepareRetryableError(error);
-    const message =
-      error instanceof Error && error.message
-        ? error.message
-        : i18n.t('agentChat.newSession.failedToCreate');
+    const message = cloudPrepareFailureMessage(error);
     // A typed terminal rejection ends the intent; a retryable one keeps the key.
     if (!retryable) {
-      deps.rotateKey();
-      await deps.removeOutboxRow(fingerprint);
+      // The handler must never reject: a cleanup failure here cannot change
+      // the classified create failure it is reporting.
+      try {
+        deps.rotateKey();
+        await deps.removeOutboxRow(fingerprint);
+      } catch {
+        // The intent is already over; the rejection changes nothing it reports.
+      }
     }
     return {
       ok: false,
@@ -261,7 +275,7 @@ type PrepareSessionSharedFields = PrepareSessionRepositoryFields & {
  */
 type PrepareSessionBody =
   | (PrepareSessionSharedFields & { prompt: string; initialMessageId: string })
-  | (PrepareSessionSharedFields & { cloneFromKiloSessionId: string });
+  | (PrepareSessionSharedFields & { cloneFromKiloSessionId: string; cloneUpToMessageId?: string });
 
 /**
  * The retry fingerprint of an intent. Kept byte-identical to the shape the
@@ -277,6 +291,9 @@ function intentFingerprint(input: PrepareAgentSessionInput): string {
       variant: variantOrUndefined(input.variant),
       mode: input.mode,
       organizationId: input.organizationId ?? null,
+      // Present only for a fork, so a full Continue keeps its stored fingerprint
+      // while a different cut is a different intent.
+      ...(input.cloneUpToMessageId ? { cloneUpToMessageId: input.cloneUpToMessageId } : {}),
     });
   }
   return newIntentFingerprint(input, resolveRepoFingerprint(input.repository ?? null));
@@ -352,6 +369,7 @@ function prepareSessionBody(
       autoInitiate: true,
       operationKey,
       cloneFromKiloSessionId: input.cloneFromKiloSessionId,
+      ...(input.cloneUpToMessageId ? { cloneUpToMessageId: input.cloneUpToMessageId } : {}),
     };
     // The clone variant has no branch: the Continue control clones a session,
     // not a checkout, so no `upstreamBranch` is written.

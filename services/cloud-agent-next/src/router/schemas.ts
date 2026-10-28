@@ -1,9 +1,13 @@
 import * as z from 'zod';
+import { egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 import {
-  getKiloSandboxAllocation,
+  getSandboxAllocation,
   sandboxAllocationInputSchema,
 } from '@kilocode/worker-utils/sandbox-allocation';
-import { sessionIdSchema as kiloSessionIdSchema } from '@kilocode/session-ingest-contracts';
+import {
+  clientKiloSessionIdSchema,
+  sessionIdSchema as kiloSessionIdSchema,
+} from '@kilocode/session-ingest-contracts';
 import { worktreeFileQuerySchema } from '@kilocode/worker-utils/cloud-agent-worktree-changes';
 import {
   sessionIdSchema,
@@ -22,7 +26,6 @@ import {
   CallbackTargetSchema,
   AttachmentsSchema,
   CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS,
-  ImagesSchema,
   RuntimeSkillSchema,
   RuntimeSkillsSchema,
   RuntimeAgentSchema,
@@ -48,7 +51,6 @@ export {
   CallbackTargetSchema,
   AttachmentsSchema,
   CLOUD_AGENT_ATTACHMENT_DENIED_EXTENSIONS,
-  ImagesSchema,
   RuntimeSkillSchema,
   RuntimeSkillsSchema,
   RuntimeAgentSchema,
@@ -58,9 +60,9 @@ export {
 export const MessageIdSchema = z.string().regex(MESSAGE_ID_PATTERN, MESSAGE_ID_FORMAT_DESCRIPTION);
 
 const ManagedSandboxAllocationInput = sandboxAllocationInputSchema.transform((request, ctx) => {
-  const allocation = getKiloSandboxAllocation(request);
+  const allocation = getSandboxAllocation(request);
   if (allocation === undefined) {
-    ctx.addIssue({ code: 'custom', message: 'BYOC sandbox allocation is not available' });
+    ctx.addIssue({ code: 'custom', message: 'Sandbox allocation is not available' });
     return z.NEVER;
   }
   return allocation;
@@ -91,49 +93,29 @@ export function isBuiltinMode(slug: string): boolean {
 }
 
 export type Attachments = z.infer<typeof AttachmentsSchema>;
-export type Images = z.infer<typeof ImagesSchema>;
 
 const AttachmentFieldsSchema = {
   attachments: AttachmentsSchema.optional().describe(
     'Optional file attachments to download from R2 to the sandbox'
   ),
-  images: ImagesSchema.optional().describe(
-    'Legacy optional image attachments to download from R2 to the sandbox'
-  ),
 };
-
-function rejectAmbiguousAttachments(
-  data: { attachments?: unknown; images?: unknown },
-  ctx: z.RefinementCtx
-): void {
-  if (data.attachments !== undefined && data.images !== undefined) {
-    ctx.addIssue({
-      code: 'custom',
-      path: ['attachments'],
-      message: 'Provide attachments or legacy images, not both',
-    });
-  }
-}
 
 /**
  * Reject a prompt that is empty or whitespace-only when there are no
- * `attachments.files` and no `images.files`. Command turns have no prompt and
- * must skip this rule at the call site.
+ * `attachments.files`. Command turns have no prompt and must skip this rule at
+ * the call site.
  */
 function rejectEmptyPromptWithoutAttachments(
   data: {
     prompt?: unknown;
     attachments?: { files?: unknown[] } | undefined;
-    images?: { files?: unknown[] } | undefined;
   },
   ctx: z.RefinementCtx,
   path: (string | number)[] = ['prompt']
 ): void {
   const prompt = typeof data.prompt === 'string' ? data.prompt : '';
   if (prompt.trim().length > 0) return;
-  const hasFiles =
-    (data.attachments?.files?.length ?? 0) > 0 || (data.images?.files?.length ?? 0) > 0;
-  if (hasFiles) return;
+  if ((data.attachments?.files?.length ?? 0) > 0) return;
   ctx.addIssue({ code: 'custom', path, message: 'Prompt is required' });
 }
 
@@ -333,10 +315,9 @@ export const SendMessageV2Input = z
     SendMessageV2CommandPayloadInput,
   ])
   .superRefine((input, ctx) => {
-    rejectAmbiguousAttachments(input, ctx);
     if ('payload' in input) {
       if (input.payload.type === 'command') {
-        if (input.attachments !== undefined || input.images !== undefined) {
+        if (input.attachments !== undefined) {
           ctx.addIssue({
             code: 'custom',
             path: ['attachments'],
@@ -346,14 +327,14 @@ export const SendMessageV2Input = z
         return;
       }
       rejectEmptyPromptWithoutAttachments(
-        { prompt: input.payload.prompt, attachments: input.attachments, images: input.images },
+        { prompt: input.payload.prompt, attachments: input.attachments },
         ctx,
         ['payload', 'prompt']
       );
       return;
     }
     rejectEmptyPromptWithoutAttachments(
-      { prompt: input.prompt, attachments: input.attachments, images: input.images },
+      { prompt: input.prompt, attachments: input.attachments },
       ctx,
       ['prompt']
     );
@@ -447,6 +428,12 @@ export const CloseTerminalOutput = z.object({
  */
 const PrepareSessionSharedFields = {
   githubAccessPurpose: z.enum(['workflow', 'agent']).optional(),
+  allowUserAuthorization: z
+    .boolean()
+    .optional()
+    .describe(
+      'Allow resolving GitHub credentials with the session user’s own authorization when available'
+    ),
   mode: ModeSlugSchema.describe(
     'Kilo Code execution mode (built-in or custom slug from runtimeAgents)'
   ),
@@ -568,14 +555,13 @@ const PrepareSessionSharedFields = {
     .uuid()
     .optional()
     .describe('Profile ID to resolve (repo binding + default still apply on top)'),
-
   ...AttachmentFieldsSchema,
   createdOnPlatform: z
     .string()
     .max(100)
     .optional()
-    .describe('Platform that created this session (e.g. slack, app-builder)'),
-  clientProvenance: z.enum(['browser', 'mobile']).optional(),
+    .describe('Platform that created this session (e.g. slack, code-review)'),
+  clientProvenance: z.enum(['browser', 'mobile', 'agent-manager']).optional(),
   shallow: z
     .boolean()
     .optional()
@@ -591,11 +577,10 @@ const PrepareSessionSharedFields = {
     ),
   devcontainer: z
     .boolean()
+    .refine(value => !value, { message: 'Devcontainer support has been retired' })
     .optional()
     .default(false)
-    .describe(
-      'When true, route the session to a Docker-in-Docker sandbox that supports devcontainer runtimes'
-    ),
+    .describe('Deprecated; devcontainer requests are no longer supported'),
   sandboxAllocation: ManagedSandboxAllocationInput.optional().describe(
     'Select a provider account and instance type instead of default routing'
   ),
@@ -603,6 +588,11 @@ const PrepareSessionSharedFields = {
 
 const PrepareSessionNonCloneVariant = z.object({
   prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH).describe('The task prompt for Kilo Code'),
+  kiloSessionId: clientKiloSessionIdSchema
+    .optional()
+    .describe(
+      'Client-proposed Kilo session ID, so the client can show the session before prepare returns'
+    ),
   initialMessageId: MessageIdSchema.optional().describe(
     'Initial message ID for correlation with external systems'
   ),
@@ -611,6 +601,7 @@ const PrepareSessionNonCloneVariant = z.object({
    * the fallback only after old clients and prepared sessions expire.
    */
   cloneFromKiloSessionId: z.undefined().optional(),
+  cloneUpToMessageId: z.undefined().optional(),
   /**
    * When `true`, `prepareSession` also enqueues the initial user message
    * (mirroring the unified `start` endpoint) so callers that navigate
@@ -652,6 +643,9 @@ const PrepareSessionCloneVariant = z.object({
   cloneFromKiloSessionId: kiloSessionIdSchema.describe(
     'Source Kilo session ID to clone into this Cloud Agent session'
   ),
+  cloneUpToMessageId: MessageIdSchema.optional().describe(
+    'Inclusive cut: copy source messages up to and including this message ID; omit to copy the whole session'
+  ),
   autoInitiate: z.literal(true),
   operationKey: z
     .string()
@@ -664,6 +658,7 @@ const PrepareSessionCloneVariant = z.object({
 
 export const PrepareSessionInput = z
   .union([PrepareSessionNonCloneVariant, PrepareSessionCloneVariant])
+  .and(egressPolicySchema)
   .refine(validateGitSource, {
     message: 'Must provide either githubRepo or gitUrl, but not both',
     path: ['githubRepo'],
@@ -689,6 +684,14 @@ export const PrepareSessionInput = z
         code: 'custom',
         path: ['githubIntegrationId'],
         message: 'GitHub integration identity is only valid for GitHub repositories',
+      });
+    }
+
+    if (data.allowUserAuthorization === true && data.githubRepo === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['allowUserAuthorization'],
+        message: 'GitHub user authorization is only valid for GitHub repositories',
       });
     }
 
@@ -773,7 +776,6 @@ export const PrepareSessionInput = z
       });
     }
   })
-  .superRefine(rejectAmbiguousAttachments)
   .refine(requiresAppendSystemPrompt, {
     message: 'appendSystemPrompt is required when mode is custom',
     path: ['appendSystemPrompt'],
@@ -897,13 +899,12 @@ export type ProfileInput = z.infer<typeof ProfileInputSchema>;
  */
 export const StartSessionInput = z
   .object({
-    message: z
-      .object({
-        prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH),
-        ...AttachmentFieldsSchema,
-        id: MessageIdSchema.optional(),
-      })
-      .superRefine(rejectAmbiguousAttachments),
+    operationKey: z.string().uuid().optional(),
+    message: z.object({
+      prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH),
+      ...AttachmentFieldsSchema,
+      id: MessageIdSchema.optional(),
+    }),
     agent: z.object({
       mode: ModeSlugSchema,
       model: modelIdSchema,
@@ -922,8 +923,10 @@ export const StartSessionInput = z
       .optional(),
     repository: RepositoryInputSchema,
     profile: ProfileInputSchema,
-    runtime: z
-      .object({ sandboxAllocation: ManagedSandboxAllocationInput.optional() })
+    runtime: egressPolicySchema
+      .safeExtend({
+        sandboxAllocation: ManagedSandboxAllocationInput.optional(),
+      })
       .strict()
       .optional(),
     options: z
@@ -946,6 +949,7 @@ export const StartSessionOutput = z.object({
   kiloSessionId: z.string(),
   messageId: MessageIdSchema,
   delivery: z.enum(['sent', 'queued']),
+  replayed: z.boolean().optional(),
   wrapperRunId: z.string().optional(),
 });
 
@@ -965,10 +969,9 @@ export const SendMessageInput = z
         ...AttachmentFieldsSchema,
         id: MessageIdSchema.nullish(),
       })
-      .superRefine(rejectAmbiguousAttachments)
       .superRefine((message, ctx) =>
         rejectEmptyPromptWithoutAttachments(
-          { prompt: message.prompt, attachments: message.attachments, images: message.images },
+          { prompt: message.prompt, attachments: message.attachments },
           ctx
         )
       ),
@@ -1156,6 +1159,7 @@ export const GetSessionOutput = z.object({
   variant: z.string().optional().describe('Thinking effort variant'),
   autoCommit: z.boolean().optional().describe('Auto-commit setting'),
   upstreamBranch: z.string().optional().describe('Upstream branch name'),
+  branchName: z.string().optional().describe('Assigned workspace branch name'),
 
   runtimeAgents: z
     .array(
@@ -1178,6 +1182,15 @@ export const GetSessionOutput = z.object({
   // Lifecycle timestamps (critical for idempotency)
   preparedAt: z.number().optional().describe('Timestamp when session was prepared'),
   initiatedAt: z.number().optional().describe('Timestamp when session was initiated'),
+
+  // Route readiness for terminal ownership: control-plane sessions report
+  // whether their route view is `ready`; legacy sessions report whether they
+  // have been prepared. Consumers must not infer readiness from `preparedAt` or
+  // `initiatedAt`, which persist across route loss.
+  routeReady: z
+    .boolean()
+    .optional()
+    .describe('Whether the session currently has a ready route that can own a terminal'),
 
   // Callback configuration is intentionally NOT exposed here. The stored
   // `callbackTarget` may carry service-to-service auth headers (e.g. an

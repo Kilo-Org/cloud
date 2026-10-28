@@ -4,6 +4,31 @@ import { type MessageFailure, selectMessageFailure } from './message-failure-sta
 import { firstHumanText } from './part-types';
 import { transcriptRendersMessage } from './session-transcript';
 
+export function restoreCanceledQueuedMessages(
+  messages: StoredMessage[],
+  canceled: ReadonlyMap<string, StoredMessage>
+): StoredMessage[] {
+  const ids = new Set(messages.map(message => message.info.id));
+  let result = messages;
+  for (const message of canceled.values()) {
+    if (!ids.has(message.info.id)) {
+      if (result === messages) {
+        result = [...messages];
+      }
+      const index = result.findIndex(
+        candidate =>
+          candidate.info.id > message.info.id ||
+          (candidate.info.role === 'assistant' &&
+            candidate.info.parentID === message.info.id &&
+            candidate.info.sessionID === message.info.sessionID)
+      );
+      result.splice(index === -1 ? result.length : index, 0, message);
+      ids.add(message.info.id);
+    }
+  }
+  return result;
+}
+
 /**
  * Counts pending messages that are still in flight. A terminal delivery
  * failure must not count: after `status === 'failed'` the working spinner and
@@ -89,6 +114,9 @@ type LastVisibleFailureInput = {
   pendingMessages: ReadonlyMap<string, MessageDeliveryState>;
   /** Canceled rows kept locally, keyed by message id. */
   canceledQueuedMessages: ReadonlyMap<string, StoredMessage>;
+  /** The same transcript rule the screen merged the rows with, so the walk
+   * below cannot count a row that was dropped from the list. */
+  dropUnrenderableUserRows?: boolean;
 };
 
 /**
@@ -106,14 +134,14 @@ export function lastVisibleMessageFailure({
   messages,
   pendingMessages,
   canceledQueuedMessages,
+  dropUnrenderableUserRows,
 }: LastVisibleFailureInput): MessageFailure | null {
-  // The transcript drops a message whose parts render nothing (unless its
-  // delivery failed and its typed footer is the row's surface), so such a
-  // message owns no row and cannot state a failure. Walk back to the last row
-  // `mergeSessionTranscript` actually renders: reading `displayedMessages.at(-1)`
-  // let a dropped failure suppress the footer's own line and leave the failure
-  // with no surface at all.
-  const last = lastRenderedMessage(displayedMessages, pendingMessages);
+  // Only a rendered row can own the failure statement. Contentless assistant
+  // errors render their failure footer; other invisible messages are skipped.
+  // Walk back to the last row `mergeSessionTranscript` actually renders: reading
+  // `displayedMessages.at(-1)` let a dropped failure suppress the footer's own
+  // line and leave the failure with no surface at all.
+  const last = lastRenderedMessage(displayedMessages, pendingMessages, dropUnrenderableUserRows);
   if (last === undefined) {
     return null;
   }
@@ -135,11 +163,15 @@ export function lastVisibleMessageFailure({
  */
 function lastRenderedMessage(
   displayedMessages: readonly StoredMessage[],
-  pendingMessages: ReadonlyMap<string, MessageDeliveryState>
+  pendingMessages: ReadonlyMap<string, MessageDeliveryState>,
+  dropUnrenderableUserRows: boolean | undefined
 ): StoredMessage | undefined {
   for (let i = displayedMessages.length - 1; i >= 0; i -= 1) {
     const message = displayedMessages[i];
-    if (message !== undefined && transcriptRendersMessage(message, pendingMessages)) {
+    if (
+      message !== undefined &&
+      transcriptRendersMessage(message, pendingMessages, dropUnrenderableUserRows)
+    ) {
       return message;
     }
   }

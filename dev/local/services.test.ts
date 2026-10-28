@@ -9,8 +9,10 @@ import {
   candidatePortOffsets,
   clearDevLogs,
   computePortOffset,
+  excludeServices,
   getAlwaysOnGroupIds,
   getService,
+  parseServiceList,
   portOffset,
   readPersistedPortOffset,
   resolveGroups,
@@ -199,27 +201,81 @@ test('keeps auto routing workers in their own opt-in group', () => {
   assert.ok(!alwaysOn.includes('auto-routing-benchmark'));
 });
 
-test('keeps the AI gateway app in its own opt-in group', () => {
+test('runs the AI gateway app with the core services', () => {
   const service = getService('ai-gateway');
 
-  assert.equal(service.group, 'ai-gateway');
+  assert.equal(service.group, 'core');
   assert.equal(service.type, 'nextjs');
   assert.equal(service.dir, 'apps/ai-gateway');
   assert.equal(service.port, 3010 + portOffset);
   assert.deepEqual(service.command, [
     'env',
     `AI_GATEWAY_PORT=${3010 + portOffset}`,
+    `AI_GATEWAY_WEB_PORT=${getService('nextjs').port}`,
     'pnpm',
     'run',
     'dev',
   ]);
-  assert.deepEqual(resolveTargets(['ai-gateway']), [
-    'redis',
-    'postgres',
-    'redis-http',
-    'ai-gateway',
+  assert.deepEqual(service.dependsOn, ['postgres', 'redis', 'redis-http']);
+  assert.ok(resolveGroups(getAlwaysOnGroupIds()).includes('ai-gateway'));
+});
+
+test('starts the BYOK KMS service on its own port before the web app', () => {
+  const kms = getService('local-kms');
+  const service = getService('byok-kms');
+
+  assert.equal(kms.type, 'infra');
+  assert.equal(kms.port, 8900 + portOffset);
+  assert.equal(service.group, 'core');
+  assert.equal(service.type, 'process');
+  assert.equal(service.port, 8901 + portOffset);
+  assert.deepEqual(service.dependsOn, ['local-kms']);
+  assert.deepEqual(service.command, [
+    'env',
+    `BYOK_KMS_SERVICE_PORT=${8901 + portOffset}`,
+    `BYOK_KMS_ENDPOINT=http://127.0.0.1:${8900 + portOffset}`,
+    'pnpm',
+    'exec',
+    'tsx',
+    'dev/byok-kms/server.ts',
   ]);
-  assert.ok(!resolveGroups(getAlwaysOnGroupIds()).includes('ai-gateway'));
+  assert.ok(getService('nextjs').dependsOn.includes('byok-kms'));
+});
+
+test('starts the AI gateway app before the web app that rewrites to it', () => {
+  const web = getService('nextjs');
+  const gateway = getService('ai-gateway');
+
+  assert.ok(web.dependsOn.includes('ai-gateway'));
+  assert.deepEqual(web.command, [
+    'env',
+    `AI_GATEWAY_URL=http://localhost:${gateway.port}`,
+    'pnpm',
+    'run',
+    'dev',
+  ]);
+
+  const appTargets = resolveTargets(['app']);
+  assert.ok(appTargets.includes('ai-gateway'));
+  assert.ok(appTargets.indexOf('ai-gateway') < appTargets.indexOf('nextjs'));
+});
+
+test('moves the web app and gateway cross-references with the port offset', () => {
+  const originalOffset = portOffset;
+  const originalPort = process.env.PORT;
+  try {
+    delete process.env.PORT;
+    applyPortOffset(4200);
+    assert.deepEqual(getService('nextjs').command.slice(0, 2), [
+      'env',
+      'AI_GATEWAY_URL=http://localhost:7210',
+    ]);
+    assert.ok(getService('ai-gateway').command.includes('AI_GATEWAY_WEB_PORT=7200'));
+  } finally {
+    if (originalPort === undefined) delete process.env.PORT;
+    else process.env.PORT = originalPort;
+    applyPortOffset(originalOffset);
+  }
 });
 
 test('registers user data export with worktree-aware ports and dependencies', () => {
@@ -231,11 +287,15 @@ test('registers user data export with worktree-aware ports and dependencies', ()
   assert.equal(service.port, 8818 + portOffset);
   assert.deepEqual(service.dependsOn, ['postgres', 'nextjs']);
   assert.deepEqual(resolveTargets(['data-export']), [
+    'local-kms',
     'postgres',
-    'stripe',
     'redis',
+    'stripe',
+    'byok-kms',
+    'cloudflare-git-token-service',
     'cloudflare-session-ingest',
     'redis-http',
+    'ai-gateway',
     'nextjs',
     'user-data-export',
   ]);
@@ -258,6 +318,41 @@ test('starts the session-ingest worker whenever the web app starts', () => {
   assert.equal(worker.type, 'worker');
   assert.equal(worker.dir, 'services/session-ingest');
   assert.equal(worker.port, 8800 + portOffset);
+});
+
+test('starts the git-token worker whenever the web app starts', () => {
+  // Every code-review read and write resolves the caller's provider credential
+  // through git-token-service, so starting the web stack must pull the worker in
+  // transitively — otherwise the fetch hits a dead GIT_TOKEN_SERVICE_API_URL and
+  // a connected provider renders as a service outage with no rows.
+  const appTargets = resolveTargets(['app']);
+
+  assert.ok(
+    appTargets.includes('cloudflare-git-token-service'),
+    `expected cloudflare-git-token-service in app start targets, got: ${appTargets.join(', ')}`
+  );
+  assert.ok(
+    appTargets.indexOf('cloudflare-git-token-service') < appTargets.indexOf('nextjs'),
+    `expected cloudflare-git-token-service before nextjs, got: ${appTargets.join(', ')}`
+  );
+
+  const worker = getService('cloudflare-git-token-service');
+  assert.equal(worker.type, 'worker');
+  assert.equal(worker.dir, 'services/git-token-service');
+  assert.equal(worker.port, 8802 + portOffset);
+});
+
+test('runs kilo-mcp with the cloud-agent group on its wrangler port', () => {
+  const targets = resolveTargets(['cloud-agent']);
+  assert.ok(
+    targets.includes('kilo-mcp'),
+    `expected kilo-mcp in cloud-agent start targets, got: ${targets.join(', ')}`
+  );
+
+  const worker = getService('kilo-mcp');
+  assert.equal(worker.type, 'worker');
+  assert.equal(worker.dir, 'services/kilo-mcp');
+  assert.equal(worker.port, 8815 + portOffset);
 });
 
 test('points both user data export Hyperdrive bindings at the offset database', () => {
@@ -393,7 +488,6 @@ test('injects deletion-mock host overrides only when the service is selected', (
     PYLON_HOST: 'http://127.0.0.1:5210',
     SUBSTACK_PUBLICATION_URL: 'http://127.0.0.1:5210',
     CUSTOMERIO_TRACK_BASE: 'http://127.0.0.1:5210',
-    CSA_APP_BASE_URL: 'http://127.0.0.1:5210',
     PYLON_API_KEY: 'deletion-mock',
     POSTHOG_PERSONAL_API_KEY: 'deletion-mock',
     POSTHOG_ENVIRONMENT_ID: 'deletion-mock',
@@ -576,4 +670,34 @@ test('a tunnels restart keeps the live selection and reloads the HTTP worker', (
     'cloud-agent-next'
   );
   assert.equal(planTunnelRestart(['cloud-agent-public-tunnels']).reloadTarget, undefined);
+});
+
+test('excludes unwanted services and reports dependents that lose them', () => {
+  const selection = resolveTargets(['agents', 'fake-llm']);
+  const exclusion = excludeServices(selection, ['notifications', 'event-service']);
+
+  assert.ok(!exclusion.serviceNames.includes('notifications'));
+  assert.ok(!exclusion.serviceNames.includes('event-service'));
+  assert.ok(exclusion.serviceNames.includes('cloud-agent-next'));
+  assert.deepEqual(exclusion.skipped.toSorted(), ['event-service', 'notifications']);
+  assert.deepEqual(exclusion.dependents.get('cloud-agent-next'), ['notifications']);
+});
+
+test('ignores excluded services that are not selected', () => {
+  const exclusion = excludeServices(['postgres', 'nextjs'], ['notifications']);
+
+  assert.deepEqual(exclusion.serviceNames, ['postgres', 'nextjs']);
+  assert.deepEqual(exclusion.skipped, []);
+});
+
+test('rejects unknown excluded services instead of starting everything', () => {
+  assert.throws(() => excludeServices(['postgres'], ['notifcations']), /Unknown service/);
+});
+
+test('parses comma-separated service lists', () => {
+  assert.deepEqual(parseServiceList(' notifications, event-service ,,'), [
+    'notifications',
+    'event-service',
+  ]);
+  assert.deepEqual(parseServiceList(undefined), []);
 });

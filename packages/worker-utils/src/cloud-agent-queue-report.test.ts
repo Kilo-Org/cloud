@@ -20,6 +20,52 @@ function reportWithRun(run: Record<string, unknown>) {
 }
 
 describe('CloudAgentQueueReportSchema', () => {
+  it.each(['cloudflare', 'vercel', 'cloudflare-containers'])(
+    'accepts bounded runtime metadata for %s containers',
+    provider => {
+      const container = {
+        provider,
+        sandboxId: 'ses-sandbox',
+        allocationId: 'allocation-1',
+        instanceId: 'instance-1',
+        instanceType: 'large',
+        region: 'iad1',
+        imageRef: 'registry.example.com/cloud-agent@sha256:abcdef',
+        snapshotId: 'snapshot-1',
+        runtimeBuildId: 'build-1',
+        startSource: 'snapshot',
+      };
+      const report = CloudAgentQueueReportSchema.parse(
+        reportWithRun({ status: 'completed', terminalAt, container })
+      );
+      expect(report.run.container).toEqual(container);
+    }
+  );
+
+  it.each([
+    { provider: 'unknown', sandboxId: 'sandbox' },
+    { provider: 'vercel' },
+    { provider: 'vercel', sandboxId: '' },
+    { provider: 'vercel', sandboxId: 'sandbox', instanceId: 'x'.repeat(129) },
+    { provider: 'vercel', sandboxId: 'sandbox', imageRef: 'x'.repeat(1025) },
+    { provider: 'vercel', sandboxId: 'sandbox', startSource: 'unknown' },
+    { provider: 'vercel', sandboxId: 'sandbox', accessToken: 'private-fixture' },
+    { provider: 'vercel', sandboxId: 'sandbox', env: { SECRET: 'private-fixture' } },
+  ])('rejects invalid or unapproved container metadata: %j', container => {
+    expect(
+      CloudAgentQueueReportSchema.safeParse(
+        reportWithRun({ status: 'completed', terminalAt, container })
+      ).success
+    ).toBe(false);
+  });
+
+  it('accepts reports without container metadata', () => {
+    const report = CloudAgentQueueReportSchema.parse(
+      reportWithRun({ status: 'completed', terminalAt })
+    );
+    expect(report.run.container).toBeUndefined();
+  });
+
   it('accepts observed milestone and reduced diagnostic fields on failed runs', () => {
     expect(
       CloudAgentQueueReportSchema.safeParse(

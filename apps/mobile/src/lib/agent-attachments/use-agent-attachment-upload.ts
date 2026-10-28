@@ -1,4 +1,4 @@
-/* eslint-disable max-lines -- the upload hook owns the candidate classification, metadata strip, deferred upload, send-admission state machine, and cancel-handle registration in one cohesive module */
+/* eslint-disable max-lines -- the upload hook owns the candidate classification, metadata strip, deferred upload or local read, send-admission state machine, and cancel-handle registration in one cohesive module */
 import * as Crypto from 'expo-crypto';
 import * as Sentry from '@sentry/react-native';
 import { File, Paths } from 'expo-file-system';
@@ -10,13 +10,17 @@ import { formatNumber } from '@/lib/format';
 import { announceForA11y } from '@/lib/a11y/announce';
 import { announcingToast } from '@/lib/a11y/announcing-toast';
 import { createFrameCoalescer } from '@/lib/coalesce-frame';
-import { AGENT_ATTACHMENT_MAX_FILES } from '@/lib/agent-attachments/constants';
+import {
+  AGENT_ATTACHMENT_MAX_FILES,
+  type AgentAttachmentExtension,
+} from '@/lib/agent-attachments/constants';
 import {
   canAddAttachments,
   classifyAttachment,
   describeClassificationFailure,
   mimeForExtension,
   normalizeAttachmentExtension,
+  sanitizeAttachmentFilename,
 } from '@/lib/agent-attachments/validate';
 import {
   type AgentAttachment,
@@ -29,10 +33,7 @@ import {
   hasAnyUnclaimedAttachment,
   isAnyAttachmentUploading,
 } from '@/lib/agent-attachments/agent-attachment-types';
-import {
-  stripImageMetadata,
-  strippedExtension,
-} from '@/lib/agent-attachments/strip-image-metadata';
+import { stripImageMetadata } from '@/lib/agent-attachments/strip-image-metadata';
 import {
   describeTerminalReason,
   measureLocalSize,
@@ -40,6 +41,11 @@ import {
   releasePendingUploads,
   uploadOne,
 } from '@/lib/agent-attachments/upload-task';
+import {
+  encodeLocalImage,
+  type LocalImage,
+  LocalImageError,
+} from '@/lib/agent-attachments/local-image';
 import { registerTempFile } from '@/lib/temp-file-registry';
 
 // Re-export only the types consumers import from this module.
@@ -92,6 +98,30 @@ async function runBestEffort(task: () => Promise<void>): Promise<void> {
   } catch {
     // Best-effort operation: a failure leaves the 24-hour reaper to recover.
   }
+}
+
+/**
+ * Compose the name stored on a chip (display, accessibility copy, and the
+ * submission's `originalName`) from a picker- or part-supplied name.
+ *
+ * The raw name is sanitized before the normalized extension is applied, so a
+ * standalone dot segment resolves to `file.bin` instead of a dotted variant,
+ * and the composed value is sanitized once more so appending the extension
+ * cannot push it past the sanitizer's byte budget.
+ */
+function storedAttachmentFilename(raw: string, extension: AgentAttachmentExtension): string {
+  return sanitizeAttachmentFilename(normalizeFilename(sanitizeAttachmentFilename(raw), extension));
+}
+
+/** Announce that the composer holds its full complement of attachments. */
+function announceComposerFull(): void {
+  toast.error(
+    // i18n-dup-ok: 'agentChat.attachmentPicker.maxFilesAllowed_other' is this message's plural other category — the bare key carries that copy by i18next convention, so the family is one message, not two keys for the same copy.
+    i18n.t('agentChat.attachmentPicker.maxFilesAllowed', {
+      count: AGENT_ATTACHMENT_MAX_FILES,
+      displayCount: formatNumber(AGENT_ATTACHMENT_MAX_FILES, i18n.language),
+    })
+  );
 }
 
 // A cloud-agent sandbox URL encodes the R2 key of a stored attachment:
@@ -175,15 +205,19 @@ function resolveRestoredAttachmentReference(input: {
     }
   }
   const basename = /[^/]+$/.exec(withoutQueryHash)?.[0];
-  const extension = normalizeAttachmentExtension(basename ?? input.filename ?? 'file');
-  const remoteFilename = basename
-    ? normalizeFilename(basename, extension)
-    : normalizeFilename(input.filename ?? 'file', extension);
-  return { remoteKey: input.url, remoteFilename };
+  const rawName = basename ?? input.filename ?? 'file';
+  const extension = normalizeAttachmentExtension(rawName);
+  return { remoteKey: input.url, remoteFilename: storedAttachmentFilename(rawName, extension) };
 }
 
 type UseAgentAttachmentUploadOptions = {
   organizationId?: string;
+  /**
+   * `upload` sends each file to Cloud Agent storage. `local` accepts images
+   * only, never leaves the device, and reads them at send time as bounded
+   * base64 for a model the app talks to directly.
+   */
+  delivery?: 'upload' | 'local';
 };
 
 export type UploadPendingResult =
@@ -191,6 +225,8 @@ export type UploadPendingResult =
       ok: true;
       wire: AgentAttachmentWire | undefined;
       submission: AgentAttachmentSubmissionPayload | undefined;
+      /** The images read for `local` delivery, in chip order. */
+      images?: readonly LocalImage[];
     }
   | { ok: false };
 
@@ -228,11 +264,16 @@ type UploadRunResult =
 export function useAgentAttachmentUpload(
   options: UseAgentAttachmentUploadOptions = {}
 ): UseAgentAttachmentUploadReturn {
-  const { organizationId } = options;
+  const { organizationId, delivery = 'upload' } = options;
   const [attachments, setAttachments] = useState<AgentAttachment[]>([]);
   // Live mirror of `attachments` so `uploadPending` reads the current chip list
   // without waiting on a render. Written in every commit below.
   const attachmentsRef = useRef<AgentAttachment[]>([]);
+  // Capacity claimed by `addCandidates` calls that have not committed yet. Read
+  // together with `attachmentsRef.current` before the first await, so two
+  // selections that overlap cannot both claim the same room. A generation bump
+  // retires every claim of the previous generation at once.
+  const addSlotsRef = useRef(0);
   const pathRef = useRef<string>(Crypto.randomUUID());
   const messageUuidRef = useRef<string>(Crypto.randomUUID());
   const isMountedRef = useRef<boolean>(true);
@@ -272,21 +313,24 @@ export function useAgentAttachmentUpload(
       // rejection in `uploadOne` is suppressed by the catch's `liveIdsRef`
       // guard: unmount must emit no toast and flip no state.
       liveIds.clear();
-      // Cancel every in-flight upload on unmount.
       for (const id of handles.keys()) {
         cancelUpload(id);
       }
     };
   }, [cancelUpload]);
 
-  // Single commit point: writes state AND the live ref mirror in one pass.
+  // Single commit point and the synchronous source of truth: the ref advances
+  // here, before React renders, so a caller that reads the live list and then
+  // commits does both against the same value. Every mutation in this hook goes
+  // through this function, which keeps the ref and the state in one order.
   const commitAttachments = useCallback(
     (updater: (current: AgentAttachment[]) => AgentAttachment[]) => {
-      setAttachments(current => {
-        const next = updater(current);
-        attachmentsRef.current = next;
-        return next;
-      });
+      const next = updater(attachmentsRef.current);
+      if (next === attachmentsRef.current) {
+        return;
+      }
+      attachmentsRef.current = next;
+      setAttachments(next);
     },
     []
   );
@@ -403,11 +447,7 @@ export function useAgentAttachmentUpload(
           });
           // Single announced toast per failed chip (D19). Terminal surfaces
           // its own chip copy so the toast only needs to echo the same intent.
-          announcingToast.error(
-            retryable
-              ? i18n.t('chat.attachment.failedToUploadFile', { reason })
-              : describeTerminalReason(reason)
-          );
+          announcingToast.error(retryable ? reason : describeTerminalReason(reason));
           return { id: attachment.id, failed: true };
         } finally {
           // The upload settled (success or failure): drop the cancel handle so
@@ -420,41 +460,15 @@ export function useAgentAttachmentUpload(
     [organizationId, updateAttachment]
   );
 
-  const addCandidates = useCallback(
-    async (candidates: AgentAttachmentCandidate[]) => {
-      if (candidates.length === 0) {
-        return;
-      }
-      const generation = generationRef.current;
-      const limit = canAddAttachments(attachments.length, candidates.length);
-      if (!limit.ok) {
-        toast.error(
-          // i18n-dup-ok: 'agentChat.attachmentPicker.maxFilesAllowed_other' is this message's plural other category — the bare key carries that copy by i18next convention, so the family is one message, not two keys for the same copy.
-          i18n.t('agentChat.attachmentPicker.maxFilesAllowed', {
-            count: AGENT_ATTACHMENT_MAX_FILES,
-            displayCount: formatNumber(AGENT_ATTACHMENT_MAX_FILES, i18n.language),
-          })
-        );
-        return;
-      }
-      const accepted = candidates.slice(0, limit.acceptedCount);
-      if (limit.truncated) {
-        // The admitted count selects the plural category, because that is the
-        // numeral a catalog's own grammar inflects the warning's noun on
-        // ("1 of 2 files", French "Ajout de 1 fichier …"). The total the user
-        // selected is interpolated beside it, and English carries the plural
-        // noun in every category, so the sentence still reads "1 of 2 files".
-        // i18n-dup-ok: 'agentChat.attachmentPicker.onlyAddingFiles_one' and 'agentChat.attachmentPicker.onlyAddingFiles_other' are this counted message's plural categories, not two keys for one string — English reads the same at every count, but fr and zu inflect the one-form, so the family stays.
-        toast.warning(
-          i18n.t('agentChat.attachmentPicker.onlyAddingFiles', {
-            count: limit.acceptedCount,
-            accepted: formatNumber(limit.acceptedCount, i18n.language),
-            total: formatNumber(candidates.length, i18n.language),
-            max: formatNumber(AGENT_ATTACHMENT_MAX_FILES, i18n.language),
-          })
-        );
-      }
-
+  // Adds the candidates whose capacity the caller already claimed. Split from
+  // `addCandidates` so the claim is released in one place whatever this work
+  // does: rejected candidates, a stale generation, or a committed selection.
+  const commitClaimedCandidates = useCallback(
+    async (
+      accepted: AgentAttachmentCandidate[],
+      generation: number,
+      selection: { selectedTotal: number; capacityTruncated: boolean }
+    ): Promise<void> => {
       // We pre-classify synchronously; the *measured* size comes from
       // `getInfoAsync`. Candidates that the picker reports as zero-size
       // (common on iOS) are re-measured before the size/empty rule fires.
@@ -478,6 +492,8 @@ export function useAgentAttachmentUpload(
         const classified = classifyAttachment({ name: candidate.name, size });
         if (!classified.ok) {
           toast.error(describeClassificationFailure(classified.reason));
+        } else if (delivery === 'local' && classified.kind !== 'image') {
+          toast.error(i18n.t('agentChat.composer.imagesOnly'));
         } else {
           let ext = classified.extension;
           let localUri = candidate.uri;
@@ -486,22 +502,21 @@ export function useAgentAttachmentUpload(
           let metadataStripFailed = false;
           if (classified.kind === 'image') {
             // Strip EXIF/GPS/maker notes before measuring so `size` reflects
-            // the stripped file. A failure keeps the original URI and marks
-            // the chip so the composer can warn.
+            // the stripped file. A failure marks the chip so the composer can
+            // warn; the original URI is never used as an attachment.
             // eslint-disable-next-line no-await-in-loop -- each candidate's strip must complete before its size is measured
-            const strippedUri = await stripImageMetadata(candidate.uri, ext);
-            if (strippedUri !== candidate.uri) {
-              const newExt = strippedExtension(ext);
-              ext = newExt;
-              localUri = strippedUri;
+            const stripped = await stripImageMetadata(candidate.uri, ext);
+            if (stripped.ok) {
+              ext = stripped.extension;
+              localUri = stripped.uri;
               localFileOwned = true;
               // The stripped copy is a new app-owned cache file the picker did
               // not register. Register it so logout's reapTempFiles({ all:
               // true }) deletes it; the original candidate.uri stays registered
               // separately and is also reaped (or left for the picker).
-              registerTempFile(strippedUri);
+              registerTempFile(stripped.uri);
               // eslint-disable-next-line no-await-in-loop -- measure the stripped file before the next candidate
-              const strippedSize = await measureLocalSize(strippedUri);
+              const strippedSize = await measureLocalSize(stripped.uri);
               finalSize = strippedSize !== null && strippedSize > 0 ? strippedSize : finalSize;
             } else {
               metadataStripFailed = true;
@@ -510,7 +525,17 @@ export function useAgentAttachmentUpload(
             // Documents come from `copyToCacheDirectory`, so the app owns the file.
             localFileOwned = true;
           }
-          const filename = normalizeFilename(candidate.name, ext);
+          const filename = storedAttachmentFilename(candidate.name, ext);
+          // A strip-failed image is a terminal error chip: it never uploads,
+          // hides Retry, and blocks Send/Start. A local image never uploads
+          // either, so its chip is 'local' rather than 'pending': it reports no
+          // progress and no upload affordance.
+          let status: AgentAttachment['status'] = 'pending';
+          if (metadataStripFailed) {
+            status = 'error';
+          } else if (delivery === 'local') {
+            status = 'local';
+          }
           additions.push({
             id: Crypto.randomUUID(),
             filename,
@@ -521,12 +546,11 @@ export function useAgentAttachmentUpload(
             localUri,
             localFileOwned,
             metadataStripFailed: metadataStripFailed || undefined,
-            // A strip-failed image is a terminal error chip: it never uploads,
-            // hides Retry, and blocks Send/Start.
-            status: metadataStripFailed ? 'error' : 'pending',
+            status,
             error: metadataStripFailed ? i18n.t('chat.attachment.metadataStripFailed') : undefined,
             terminal: metadataStripFailed ? true : undefined,
-            progress: metadataStripFailed ? null : 0,
+            // A local image never uploads, so its chip shows no upload progress.
+            progress: metadataStripFailed || delivery === 'local' ? null : 0,
           });
         }
       }
@@ -539,19 +563,96 @@ export function useAgentAttachmentUpload(
       if (generationRef.current !== generation || !isMountedRef.current) {
         return;
       }
-      commitAttachments(current => [...current, ...additions]);
+      // The room is recomputed against the live list, because a removal, a
+      // restore, or a reset during the awaited work moved it. The following
+      // commit runs synchronously against that same list, so only the kept
+      // chips are registered and uploaded: an excess candidate never presigns.
+      const room = Math.max(0, AGENT_ATTACHMENT_MAX_FILES - attachmentsRef.current.length);
+      const kept = additions.slice(0, room);
+      for (const dropped of additions.slice(kept.length)) {
+        // A chip that never reaches the composer must not keep an app-owned
+        // cache file (a copied document or a stripped image) alive.
+        if (dropped.localFileOwned) {
+          deleteCacheOwnedFile(dropped.localUri);
+        }
+      }
+      if (kept.length === 0) {
+        // The strip filled while this selection was measuring, so nothing
+        // fits. Say so with the full-composer message instead of dropping the
+        // selection silently.
+        announceComposerFull();
+        return;
+      }
+      commitAttachments(current => [...current, ...kept]);
+      // Capacity, not classification, is what this warning reports: it fires
+      // only when the selection did not fit, and names the count that did.
+      // The admitted count selects the plural category, because that is the
+      // numeral a catalog's own grammar inflects the warning's noun on
+      // ("1 of 2 files", French "Ajout de 1 fichier …"). The total the user
+      // selected is interpolated beside it, and English carries the plural
+      // noun in every category, so the sentence still reads "1 of 2 files".
+      // i18n-dup-ok: 'agentChat.attachmentPicker.onlyAddingFiles_one' and 'agentChat.attachmentPicker.onlyAddingFiles_other' are this counted message's plural categories, not two keys for one string — English reads the same at every count, but fr and zu inflect the one-form, so the family stays.
+      if (selection.capacityTruncated || kept.length < additions.length) {
+        toast.warning(
+          i18n.t('agentChat.attachmentPicker.onlyAddingFiles', {
+            count: kept.length,
+            accepted: formatNumber(kept.length, i18n.language),
+            total: formatNumber(selection.selectedTotal, i18n.language),
+            max: formatNumber(AGENT_ATTACHMENT_MAX_FILES, i18n.language),
+          })
+        );
+      }
       // Images and documents both upload at selection time. The upload is
       // fire-and-forget: the chip flips to `uploading` synchronously in
       // `startUpload`, and success/error states already exist in that path.
       // A strip-failed image stays a terminal error chip and never uploads.
-      for (const addition of additions) {
+      for (const addition of kept) {
         liveIdsRef.current.add(addition.id);
-        if (addition.metadataStripFailed !== true) {
+        // A local image is read at send time and never uploads.
+        if (addition.metadataStripFailed !== true && delivery === 'upload') {
           void startUpload(addition, pathRef.current);
         }
       }
     },
-    [attachments.length, commitAttachments, startUpload]
+    [commitAttachments, delivery, startUpload]
+  );
+
+  const addCandidates = useCallback(
+    async (candidates: AgentAttachmentCandidate[]) => {
+      if (candidates.length === 0) {
+        return;
+      }
+      const generation = generationRef.current;
+      // Claim capacity against the live list plus the slots adds that have not
+      // committed yet still hold. The claim happens before the first await, so
+      // an overlapping selection sees it; `canAddAttachments` both rejects a
+      // full composer and reports how many of this selection fit.
+      const limit = canAddAttachments(
+        attachmentsRef.current.length + addSlotsRef.current,
+        candidates.length
+      );
+      if (!limit.ok) {
+        announceComposerFull();
+        return;
+      }
+      const accepted = candidates.slice(0, limit.acceptedCount);
+      addSlotsRef.current += accepted.length;
+      try {
+        // The commit reports the truncation once it knows which chips actually
+        // fit, so the user never sees a count the strip does not hold.
+        await commitClaimedCandidates(accepted, generation, {
+          selectedTotal: candidates.length,
+          capacityTruncated: limit.truncated === true,
+        });
+      } finally {
+        // Release only this add's own claim: a generation bump already retired
+        // every older claim, and a newer add's claim must stay untouched.
+        if (generationRef.current === generation) {
+          addSlotsRef.current -= accepted.length;
+        }
+      }
+    },
+    [commitClaimedCandidates]
   );
 
   const removeAttachment = useCallback(
@@ -666,6 +767,9 @@ export function useAgentAttachmentUpload(
     // candidate-measurement continuation observes the new generation
     // and drops its candidates instead of adding them post-reset.
     generationRef.current += 1;
+    // Every claim taken before the bump belongs to a retired add, so the
+    // composer starts a new message with its full capacity.
+    addSlotsRef.current = 0;
     for (const id of liveIdsRef.current) {
       cancelUpload(id);
     }
@@ -696,7 +800,45 @@ export function useAgentAttachmentUpload(
     });
   }, [organizationId]);
 
+  /**
+   * Reads every chip as a bounded image. A chip that cannot be read, or stays
+   * too large after scaling, becomes a terminal error chip and blocks the send.
+   */
+  const readLocalImages = useCallback(async (): Promise<UploadPendingResult> => {
+    const chips = attachmentsRef.current;
+    if (chips.some(chip => chip.status === 'error')) {
+      return { ok: false };
+    }
+    const read = await Promise.all(
+      chips.map(async chip => {
+        try {
+          return await encodeLocalImage(chip.localUri);
+        } catch (error) {
+          const key =
+            error instanceof LocalImageError && error.reason === 'tooLarge'
+              ? 'agentChat.composer.imageTooLarge'
+              : 'agentChat.composer.imageUnreadable';
+          updateAttachment(chip.id, {
+            status: 'error',
+            error: i18n.t(key),
+            terminal: true,
+            progress: null,
+          });
+          announcingToast.error(i18n.t(key));
+          return null;
+        }
+      })
+    );
+    const images = read.filter(image => image !== null);
+    return images.length === chips.length
+      ? { ok: true, wire: undefined, submission: undefined, images }
+      : { ok: false };
+  }, [updateAttachment]);
+
   const uploadPending = useCallback(async (): Promise<UploadPendingResult> => {
+    if (delivery === 'local') {
+      return readLocalImages();
+    }
     const chips = attachmentsRef.current;
     // A failed chip (retryable or terminal) blocks the send: the user must
     // retry or remove it through the chip affordance, never re-upload at send.
@@ -748,7 +890,7 @@ export function useAgentAttachmentUpload(
     const wire = buildWirePayload(uploaded, pathRef.current);
     const submission = buildSubmissionPayload(uploaded, pathRef.current, messageUuidRef.current);
     return { ok: true, wire, submission };
-  }, [startUpload]);
+  }, [delivery, readLocalImages, startUpload]);
 
   const isUploading = isAnyAttachmentUploading(attachments);
   const hasFailedAttachments = hasAnyFailedAttachment(attachments);
@@ -777,8 +919,9 @@ export function useAgentAttachmentUpload(
         messageUuidRef.current = firstReference.messageUuid;
       }
       const additions: AgentAttachment[] = recoverable.map(part => {
-        const extension = normalizeAttachmentExtension(part.filename ?? 'file');
-        const filename = normalizeFilename(part.filename ?? 'file', extension);
+        const rawName = part.filename ?? 'file';
+        const extension = normalizeAttachmentExtension(rawName);
+        const filename = storedAttachmentFilename(rawName, extension);
         const kind = part.mime.startsWith('image/') ? 'image' : 'document';
         const { remoteKey, remoteFilename } = resolveRestoredAttachmentReference(part);
         return {
@@ -807,6 +950,8 @@ export function useAgentAttachmentUpload(
       // like `reset`/`clearOptimistic`: a stale async completion must not
       // announce/toast or re-append a chip the user no longer sees.
       generationRef.current += 1;
+      // The replaced chips retire every claim taken before the bump.
+      addSlotsRef.current = 0;
       for (const id of liveIdsRef.current) {
         cancelUpload(id);
       }
@@ -824,6 +969,8 @@ export function useAgentAttachmentUpload(
   // message starts only on `reset`.
   const clearOptimistic = useCallback(() => {
     generationRef.current += 1;
+    // The cleared chips retire every claim taken before the bump.
+    addSlotsRef.current = 0;
     for (const id of liveIdsRef.current) {
       cancelUpload(id);
     }
@@ -832,12 +979,20 @@ export function useAgentAttachmentUpload(
   }, [cancelUpload, commitAttachments]);
 
   // Re-add chips after a failed optimistic send (restore recoverable attachments).
+  // Clamped to the composer's capacity like `addCandidates`: the restored set
+  // normally lands in the list `clearOptimistic` just emptied, and any excess is
+  // dropped rather than overfilling the strip.
   const restoreChips = useCallback(
     (chips: readonly AgentAttachment[]) => {
       if (chips.length === 0) {
         return;
       }
-      commitAttachments(current => [...current, ...chips]);
+      const room = Math.max(0, AGENT_ATTACHMENT_MAX_FILES - attachmentsRef.current.length);
+      const kept = chips.slice(0, room);
+      if (kept.length === 0) {
+        return;
+      }
+      commitAttachments(current => [...current, ...kept]);
     },
     [commitAttachments]
   );

@@ -9,7 +9,7 @@
   "upstream_id": null,
   "latency": null,
   "moderation_latency": null,
-  "generation_time": null,
+  "generation_time": 0,
   "streamed": true,
   "cancelled": null,
   "status_code": 402,

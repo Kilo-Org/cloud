@@ -34,6 +34,7 @@ jest.mock('@/lib/integrations/gitlab-service', () => ({
 }));
 
 jest.mock('@/lib/integrations/platforms/gitlab/adapter', () => ({
+  ...jest.requireActual('@/lib/integrations/platforms/gitlab/adapter'),
   createMRNote: (...args: unknown[]) => mockCreateMRNote(...args),
   fetchGitLabMergeRequest: (params: unknown) => mockFetchGitLabMergeRequest(params),
   fetchGitLabUser: jest.fn(),
@@ -71,6 +72,12 @@ async function captureRejection(promise: Promise<unknown>): Promise<GitLabReview
   throw new Error('Expected the call to reject.');
 }
 const TARGET = { owner: OWNER, projectPath: PROJECT_PATH, mrIid: 12 };
+
+const ORG_OWNER: { type: 'organization'; organizationId: string; userId: string } = {
+  type: 'organization',
+  organizationId: 'org_1',
+  userId: 'user_1',
+};
 
 const integrationRow = {
   id: 'intg_1',
@@ -557,6 +564,65 @@ describe('resolveThread / unresolveThread', () => {
     };
   }
 
+  it.each([
+    { resolved: true, desired: true, replayed: true },
+    { resolved: false, desired: true, replayed: false },
+    { resolved: undefined, desired: true, replayed: false },
+    { resolved: true, desired: false, replayed: false },
+    { resolved: false, desired: false, replayed: true },
+    { resolved: undefined, desired: false, replayed: true },
+  ])(
+    'uses the first resolvable note ($resolved) for desired state $desired',
+    async ({ resolved, desired, replayed }) => {
+      const discussion = discussionFixture(false);
+      const note = discussion.notes[0];
+      fetchMock
+        .mockResolvedValueOnce(
+          jsonResponse({
+            ...discussion,
+            notes: [
+              { ...note, id: 10, resolvable: false, resolved: !resolved },
+              { ...note, resolved },
+              { ...note, id: 12, resolved: !resolved },
+            ],
+          })
+        )
+        .mockResolvedValueOnce(jsonResponse(discussionFixture(desired)));
+
+      const mutate = desired ? resolveThread : unresolveThread;
+      const result = await mutate({ ...TARGET, discussionId: 'disc-1' });
+
+      expect(result).toEqual({ done: true, replayed });
+      expect(fetchMock).toHaveBeenCalledTimes(replayed ? 1 : 2);
+      if (!replayed) {
+        expect(lastRequest().init.method).toBe('PUT');
+        expect(lastRequest().url.searchParams.get('resolved')).toBe(String(desired));
+      }
+    }
+  );
+
+  it.each([
+    { name: 'empty notes', flags: [] },
+    {
+      name: 'non-resolvable notes with a resolved flag',
+      flags: [{ resolvable: false, resolved: true }],
+    },
+  ])('rejects $name without a write', async ({ flags }) => {
+    const discussion = discussionFixture(false);
+    fetchMock.mockResolvedValue(
+      jsonResponse({
+        ...discussion,
+        notes: flags.map(flag => ({ ...discussion.notes[0], ...flag })),
+      })
+    );
+
+    await expect(resolveThread({ ...TARGET, discussionId: 'disc-1' })).rejects.toMatchObject({
+      kind: 'bad_request',
+      retryable: false,
+    });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it('PUTs the discussion resolved flag', async () => {
     fetchMock
       .mockResolvedValueOnce(jsonResponse(discussionFixture(false)))
@@ -941,6 +1007,36 @@ describe('mutation failures reach the four mobile states', () => {
     expect(error.retryable).toBe(false);
     expect(error.message).not.toContain('glpat-secret');
     expect(error.message).not.toContain('gitlab.example.com');
+  });
+
+  // A 403 on an action is the action's: GitLab refuses self-approval, a
+  // protected branch or a role the connected identity lacks, and reconnecting
+  // cannot fix any of them. Only a refused credential (401) is the
+  // connection's on a write.
+  it('keeps an organization connection action 403 forbidden', async () => {
+    mockGetIntegrationForOwner.mockResolvedValue(integrationRow);
+    mockGetValidGitLabToken.mockResolvedValue('glpat-mock-token');
+    fetchMock.mockResolvedValue(jsonResponse({ message: '403 Forbidden' }, 403));
+
+    const error = await captureRejection(
+      submitReview({ ...TARGET, owner: ORG_OWNER, event: 'approve' })
+    );
+
+    expect(error.kind).toBe('forbidden');
+    expect(error.retryable).toBe(false);
+  });
+
+  it('classifies an organization connection write 401 as reconnect', async () => {
+    mockGetIntegrationForOwner.mockResolvedValue(integrationRow);
+    mockGetValidGitLabToken.mockResolvedValue('glpat-mock-token');
+    fetchMock.mockResolvedValue(jsonResponse({ message: '401 Unauthorized' }, 401));
+
+    const error = await captureRejection(
+      submitReview({ ...TARGET, owner: ORG_OWNER, event: 'approve' })
+    );
+
+    expect(error.kind).toBe('reconnect');
+    expect(error.retryable).toBe(false);
   });
 
   it('classifies a 5xx as retryable', async () => {

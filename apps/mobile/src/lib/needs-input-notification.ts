@@ -29,7 +29,7 @@
  */
 
 import * as Notifications from 'expo-notifications';
-import { type AppStateStatus } from 'react-native';
+import { type AppState } from 'react-native';
 
 import {
   androidChannelIdForPushData,
@@ -98,7 +98,7 @@ export type NeedsInputPlanInput = {
   /** Route from `usePathname()`; null when the router is not mounted. */
   pathname: string | null;
   /** `AppState.currentState` at plan time. */
-  appState: AppStateStatus;
+  appState: typeof AppState.currentState;
   /**
    * The user's `agentAttention` preference, from the same server-resolved row
    * the Notifications screen edits. The server withholds the attention push
@@ -176,7 +176,7 @@ export function shouldPublishForSession({
   pathname,
   sessionId,
 }: {
-  appState: AppStateStatus;
+  appState: typeof AppState.currentState;
   pathname: string | null;
   sessionId: string;
 }): boolean {
@@ -338,10 +338,26 @@ function reportFailure(operation: 'publish' | 'dismiss', error: unknown): void {
 }
 
 /**
- * Post one raise. A rejected schedule (the permission was revoked after login)
- * is reported and swallowed: the app-owned carrier must never crash the mount
- * that owns it. Returns whether the post reached the OS, so the caller does not
- * remember a raise that never appeared.
+ * Whether the OS lets the app post a notification now. The user can turn
+ * notifications off in Settings at any time, and iOS then rejects every local
+ * schedule (`UNErrorDomain` 2003, "Source is not authorized"). That is the
+ * user's choice, not a failure, so the caller skips the post without a report.
+ * A failed permission read is reported and also skips the post.
+ */
+async function canPostNotifications(): Promise<boolean> {
+  try {
+    const { status } = await Notifications.getPermissionsAsync();
+    return status === Notifications.PermissionStatus.GRANTED;
+  } catch (error) {
+    reportFailure('publish', error);
+    return false;
+  }
+}
+
+/**
+ * Post one raise. A rejected schedule is reported and swallowed: the app-owned
+ * carrier must never crash the mount that owns it. Returns whether the post
+ * reached the OS, so the caller does not remember a raise that never appeared.
  *
  * `replacesPosted` marks a post that replaces a notification already on screen
  * (the plan's `updates`). It carries `sound: false`, and
@@ -424,6 +440,11 @@ export async function applyNeedsInputNotifications(
     }
   }
   const published: NeedsInputNotificationRow[] = [];
+  // A skipped post is not remembered, so the next plan posts it once the user
+  // allows notifications again.
+  if (plan.publish.length === 0 || !(await canPostNotifications())) {
+    return { published, dismissed };
+  }
   const updates = new Set(plan.updates);
   for (const row of plan.publish) {
     // eslint-disable-next-line no-await-in-loop -- ordered so a dismiss/publish pair for one identifier ends posted

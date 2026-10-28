@@ -125,7 +125,7 @@ jest.mock('next/server', () => {
   };
 });
 
-jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+jest.mock('@/lib/web-config.server', () => ({
   CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
 }));
 
@@ -1420,6 +1420,107 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       );
     });
 
+    it.each(['byok', 'managed', 'unknown', undefined] as const)(
+      'handles invalid-request callback ownership %s without disabling reviews',
+      async providerOwnership => {
+        const retryFlow = mockCreatedInfraRetryFlow();
+        mockGetCodeReviewById.mockResolvedValue(makeReview({ session_id: retryFlow.sessionId }));
+        const byok = providerOwnership === 'byok';
+        const errorMessage = byok
+          ? 'Your provider rejected the request. Check your provider account and settings.'
+          : 'Assistant request was invalid';
+        const terminalReason = byok
+          ? 'assistant_invalid_request_byok'
+          : 'assistant_invalid_request';
+
+        const response = await POST(
+          makeRequest({
+            status: 'failed',
+            cloudAgentSessionId: retryFlow.sessionId,
+            errorMessage,
+            failure: {
+              code: 'assistant_error',
+              assistantReason: 'invalid_request',
+              providerOwnership,
+              message: errorMessage,
+            },
+          }),
+          makeParams(REVIEW_ID)
+        );
+
+        expect(response.status).toBe(200);
+        expect(mockUpdateCodeReviewAttemptForCallback).toHaveBeenCalledWith(
+          expect.objectContaining({ status: 'failed', terminalReason })
+        );
+        expect(mockDisableCodeReviewForActionRequiredFailure).not.toHaveBeenCalled();
+        if (byok) {
+          expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+          expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+          expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+            REVIEW_ID,
+            'failed',
+            expect.objectContaining({ terminalReason })
+          );
+          expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+            'inst-1',
+            'owner',
+            'repo',
+            12345,
+            expect.objectContaining({
+              conclusion: 'failure',
+              output: expect.objectContaining({
+                title: 'Kilo Code Review request rejected by your provider',
+                summary: errorMessage,
+              }),
+            }),
+            'standard'
+          );
+          expect(mockUpdateKiloReviewComment).toHaveBeenCalledWith(
+            'inst-1',
+            'owner',
+            'repo',
+            99,
+            expect.stringContaining('Your provider rejected the request.'),
+            'standard'
+          );
+        } else {
+          await expect(response.json()).resolves.toMatchObject({ success: true, retried: true });
+          expect(mockCreateInfraRetryAttemptIfMissing).toHaveBeenCalledWith({
+            codeReviewId: REVIEW_ID,
+            retryOfAttemptId: retryFlow.failedAttemptId,
+          });
+          expect(mockRetryReviewFresh).toHaveBeenCalledWith(REVIEW_ID, {
+            sessionId: retryFlow.sessionId,
+            reason: errorMessage,
+            failedAttemptId: retryFlow.failedAttemptId,
+            retryAttemptId: retryFlow.retryAttemptId,
+          });
+          expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+        }
+      }
+    );
+
+    it('accepts explicit assistant_invalid_request_byok without a fresh retry or action-required disable', async () => {
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          terminalReason: 'assistant_invalid_request_byok',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ terminalReason: 'assistant_invalid_request_byok' })
+      );
+      expect(mockCreateInfraRetryAttemptIfMissing).not.toHaveBeenCalled();
+      expect(mockRetryReviewFresh).not.toHaveBeenCalled();
+      expect(mockDisableCodeReviewForActionRequiredFailure).not.toHaveBeenCalled();
+    });
+
     // cloud-agent-next projects the raw provider body down to 'Assistant request
     // was not authorized' before the callback, so the message-based BYOK
     // detection can never fire. Ownership on the structured failure is the only
@@ -1912,6 +2013,109 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
       expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
     });
 
+    it('allows one fresh retry for a pre-dispatch workspace setup failure when usage is unavailable', async () => {
+      const retryFlow = mockCreatedInfraRetryFlow({
+        sessionId: 'agent-workspace-setup-failed',
+        cliSessionId: 'ses_workspace_setup_failed',
+      });
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ status: 'running', session_id: retryFlow.sessionId })
+      );
+      mockGetSessionUsageFromBilling.mockResolvedValue(null);
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          cloudAgentSessionId: retryFlow.sessionId,
+          kiloSessionId: retryFlow.cliSessionId,
+          errorMessage: 'Workspace setup failed',
+          terminalReason: 'sandbox_error',
+          failure: {
+            stage: 'pre_dispatch',
+            code: 'workspace_setup_failed',
+            message: 'Workspace setup failed',
+          },
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toMatchObject({ success: true, retried: true });
+      expect(mockGetSessionUsageFromBilling).toHaveBeenCalledWith(
+        'ses_workspace_setup_failed',
+        '2025-01-01T00:00:00Z'
+      );
+      expect(mockCreateInfraRetryAttemptIfMissing).toHaveBeenCalledWith({
+        codeReviewId: REVIEW_ID,
+        retryOfAttemptId: retryFlow.failedAttemptId,
+      });
+      expect(mockRetryReviewFresh).toHaveBeenCalledWith(REVIEW_ID, {
+        sessionId: retryFlow.sessionId,
+        reason: 'Workspace setup failed',
+        failedAttemptId: retryFlow.failedAttemptId,
+        retryAttemptId: retryFlow.retryAttemptId,
+      });
+      expect(mockUpdateCheckRun).not.toHaveBeenCalled();
+      expect(mockTryDispatchPendingReviews).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      {
+        name: 'runtime start failure',
+        code: 'wrapper_start_failed',
+        message: 'Environment preparation timed out',
+      },
+      {
+        name: 'Kilo server failure',
+        code: 'kilo_server_failed',
+        message: 'Kilo server failed to start',
+      },
+    ])(
+      'allows one fresh retry for a pre-dispatch $name when usage is unavailable',
+      async ({ code, message }) => {
+        // Both codes classify before the agent runs, so an unusable usage read
+        // must not forfeit the retry.
+        const retryFlow = mockCreatedInfraRetryFlow({
+          sessionId: `agent-pre-dispatch-${code}`,
+          cliSessionId: `ses_pre_dispatch_${code}`,
+        });
+        mockGetCodeReviewById.mockResolvedValue(
+          makeReview({ status: 'running', session_id: retryFlow.sessionId })
+        );
+        mockGetSessionUsageFromBilling.mockResolvedValue(null);
+
+        const response = await POST(
+          makeRequest({
+            status: 'failed',
+            cloudAgentSessionId: retryFlow.sessionId,
+            kiloSessionId: retryFlow.cliSessionId,
+            errorMessage: message,
+            terminalReason: 'sandbox_error',
+            failure: {
+              stage: 'pre_dispatch',
+              code,
+              message,
+            },
+          }),
+          makeParams(REVIEW_ID)
+        );
+
+        expect(response.status).toBe(200);
+        await expect(response.json()).resolves.toMatchObject({ success: true, retried: true });
+        expect(mockCreateInfraRetryAttemptIfMissing).toHaveBeenCalledWith({
+          codeReviewId: REVIEW_ID,
+          retryOfAttemptId: retryFlow.failedAttemptId,
+        });
+        expect(mockRetryReviewFresh).toHaveBeenCalledWith(REVIEW_ID, {
+          sessionId: retryFlow.sessionId,
+          reason: message,
+          failedAttemptId: retryFlow.failedAttemptId,
+          retryAttemptId: retryFlow.retryAttemptId,
+        });
+        expect(mockUpdateCodeReviewStatus).not.toHaveBeenCalled();
+      }
+    );
+
     it('does not infer the unavailable-usage exception from sandbox connection error text', async () => {
       const retryFlow = mockCreatedInfraRetryFlow({
         sessionId: 'agent-sandbox-connect-text-only',
@@ -1953,8 +2157,8 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
         failure: { stage: 'agent_activity', code: 'sandbox_connect_failed' },
       },
       {
-        name: 'different pre-dispatch failure code',
-        failure: { stage: 'pre_dispatch', code: 'workspace_setup_failed' },
+        name: 'workspace setup failure after dispatch',
+        failure: { stage: 'post_dispatch_no_activity', code: 'workspace_setup_failed' },
       },
       {
         name: 'incomplete failure data',
@@ -2639,7 +2843,7 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           output: expect.objectContaining({
             title: 'Code Reviewer disabled: clone timeouts',
             summary:
-              'Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilocode.ai for help, then enable Code Reviewer again.',
+              'Code Reviewer was disabled after three repository clone timeouts today. Contact hi@kilo.ai for help, then enable Code Reviewer again.',
           }),
         }),
         'standard'

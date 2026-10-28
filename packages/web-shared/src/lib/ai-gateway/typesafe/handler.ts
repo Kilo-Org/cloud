@@ -2,8 +2,10 @@ import { randomUUID } from 'crypto';
 import { after, NextResponse, type NextRequest } from 'next/server';
 import { z } from 'zod';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import {
   gatewayRateLimitKey,
@@ -21,6 +23,7 @@ import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/defini
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { generateProviderSpecificHash } from '@kilocode/web-shared/lib/ai-gateway/providerHash';
 import { logMicrodollarUsageAndReportToBouncer } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { emitGatewayApiMetrics } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
 import {
@@ -35,16 +38,20 @@ import { getEffectiveProviderPrivacy } from '../provider-privacy';
 import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import {
+  getOpenRouterModelsMetadataFromDatabase,
   getOpenRouterSystemOneModelsFromDatabase,
   resolveOpenRouterModelAlias,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { systemOneRequestCostBound } from '@kilocode/web-shared/lib/ai-gateway/request-cost-limit';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { bouncerAccountId, normalizeJa4 } from '@kilocode/web-shared/lib/bouncer/client';
 import {
   bareIpLiteral,
   bouncerDecideTier,
+  bouncerRejectionResponse,
   payerSharingIp,
   rawClientIp,
-  scheduleBouncerDecide,
+  startBouncerDecide,
 } from '@kilocode/web-shared/lib/bouncer/inference';
 
 function errorResponse(message: string, error_type: ProxyErrorType, status: number) {
@@ -86,6 +93,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
     return errorResponse(z.prettifyError(parsed.error), 'invalid_request', 400);
   }
   const { model: requestedModel } = parsed.data;
+  const isFree = isFreeModelExcludingCustomLlms(requestedModel);
   if (!(await isSystemOneModel(requestedModel))) {
     return errorResponse(
       `The requested model '${requestedModel}' is not a System One model`,
@@ -93,13 +101,38 @@ export async function handleSystemOneRequest(request: NextRequest) {
       404
     );
   }
+  const resolvedModel = await resolveOpenRouterModelAlias(requestedModel);
 
-  const { balance, settings, plan, balanceLimitedByUserAllowance } = await getBalanceAndOrgSettings(
-    organizationId,
-    user
-  );
-  if (balance <= 0) {
+  const { balance, settings, plan, balanceLimitedByUserAllowance, payer } =
+    await getBalanceAndOrgSettings(organizationId, user, readDb, 'usage');
+  if (!canSpendPaidUsage(balance)) {
     return creditsBlockedResponse({ user, balance, organizationId, balanceLimitedByUserAllowance });
+  }
+
+  // Admit the request when the balance covers the cost bound: the schema bounds the bytes it can
+  // carry, and the bound prices those bytes plus the answer generation at the model's current
+  // rates.
+  const [catalog, customPricingConfig] = await Promise.all([
+    getOpenRouterModelsMetadataFromDatabase(),
+    getCustomPricingConfig(),
+  ]);
+  const metadata = catalog[resolvedModel] ?? catalog[requestedModel];
+  const estimatedMaxCostMicrodollars = metadata
+    ? systemOneRequestCostBound(metadata, parsed.data, customPricingConfig)
+    : null;
+  if (estimatedMaxCostMicrodollars === null) {
+    errorExceptInTest(
+      'System One request cost unavailable',
+      metadata ? `unusable pricing for '${resolvedModel}'` : `no metadata for '${resolvedModel}'`
+    );
+    return errorResponse('Service temporarily unavailable', 'temporarily_unavailable', 503);
+  }
+  if (estimatedMaxCostMicrodollars > Math.floor(balance * 1_000_000)) {
+    return errorResponse(
+      'This request can cost more than the available balance covers. Add credits or send a smaller request.',
+      'insufficient_credits',
+      402
+    );
   }
 
   const providerConfig = getOrganizationProviderPrivacy(settings);
@@ -115,8 +148,9 @@ export async function handleSystemOneRequest(request: NextRequest) {
     const { decision } = await resolveOrganizationMemberModelDecision({
       organizationId,
       kiloUserId: user.id,
-      modelId: await resolveOpenRouterModelAlias(requestedModel),
+      modelId: resolvedModel,
       providerLookup: getProviderSlugsForModel,
+      fromDb: readDb,
     });
     if (!decision.allowed) return modelNotAllowedResponse();
     if (decision.eligibleProviderRoutes) {
@@ -134,15 +168,17 @@ export async function handleSystemOneRequest(request: NextRequest) {
   const bouncerIp = bareIpLiteral(ipAddress);
   const bouncerRequestId = randomUUID();
 
-  // Report-only verdict: registered with after() and never awaited, so it cannot
-  // hold up the upstream call and survives an early return.
-  scheduleBouncerDecide({
+  // The one decide for this request, awaited just before the upstream call within its 500 ms
+  // budget. Only an enforced verdict rejects; every other outcome sends the request.
+  const bouncerVerdictPromise = startBouncerDecide({
     requestId: bouncerRequestId,
     ip: bouncerIp,
     ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
     account: {
       accountId: bouncerAccountId(user.id, organizationId),
+      userId: user.id,
       tier: bouncerDecideTier(organizationId, plan, balance),
+      payer,
     },
   });
 
@@ -167,6 +203,10 @@ export async function handleSystemOneRequest(request: NextRequest) {
       statusCode,
     });
   }
+
+  const bouncerVerdict = await bouncerVerdictPromise;
+  const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
+  if (bouncerRejection) return bouncerRejection;
 
   let response: Response;
   let responseBody: unknown;
@@ -228,7 +268,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
         streamed: false,
         cancelled: false,
         status_code: response.status,
-        cost_mUsd: cost,
+        cost_mUsd: isFree ? 0 : cost,
         market_cost: cost,
         inputTokens: usage.input_tokens,
         outputTokens: usage.output_tokens,
@@ -241,9 +281,11 @@ export async function handleSystemOneRequest(request: NextRequest) {
         kiloUserId: user.id,
         provider: 'openrouter',
         requested_model: requestedModel,
+        is_free: isFree,
         promptInfo: { system_prompt_prefix: '', system_prompt_length: 0, user_prompt_prefix: '' },
         max_tokens: null,
         has_middle_out_transform: null,
+        reasoning_setting: null,
         fraudHeaders,
         isStreaming: false,
         organizationId,
@@ -273,6 +315,7 @@ export async function handleSystemOneRequest(request: NextRequest) {
           // System One input is a typed classification payload, not a conversation,
           // so there is no prompt text to hash (and no raw state leaves the gateway).
           promptSimHash: null,
+          spendWatch: bouncerVerdict?.spendWatch === true,
         },
       }
     );

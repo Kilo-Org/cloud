@@ -2,10 +2,20 @@
 // chrome, footer actions). Kept separate so the main composer stays
 // under the line cap.
 
-import { type ReactNode, type RefObject } from 'react';
+import { LinearGradient } from 'expo-linear-gradient';
+import { type ReactNode, type RefObject, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { TextInput, View } from 'react-native';
 
+import {
+  BODY_LINE_HEIGHT,
+  BODY_MAX_LINES_CLOSED,
+  BODY_MAX_LINES_OPEN,
+  BODY_VERTICAL_PADDING,
+  resolveCommentBodyFade,
+  resolveCommentBodyMaxHeight,
+  resolveFadeColor,
+} from '@/components/pr-review/comment-body-geometry';
 import {
   PrFormSheetFooter,
   useFormSheetKeyboardVisible,
@@ -15,6 +25,23 @@ import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type DiffSelection } from '@/lib/pr-review/diff-selection-bridge';
 import { cn } from '@/lib/utils';
+
+// Body field geometry (line box, whole-line caps) lives in
+// comment-body-geometry.ts, kept separate so it stays testable without the
+// component import chain.
+
+const BOTTOM_FADE_RADIUS = 6;
+
+// Inset 1 and the radius match the field's border so the fade never draws
+// past the rounded corners. LinearGradient is not NativeWind-mapped; the
+// physical style object follows the skeleton.tsx overlay pattern.
+const BOTTOM_FADE_STYLE = {
+  position: 'absolute',
+  left: 1,
+  right: 1,
+  bottom: 1,
+  borderRadius: BOTTOM_FADE_RADIUS,
+} as const;
 
 export function CommentBodyField({
   inputRef,
@@ -30,26 +57,64 @@ export function CommentBodyField({
   const colors = useThemeColors();
   const keyboardVisible = useFormSheetKeyboardVisible();
   const { t } = useTranslation();
+  const maxHeight = keyboardVisible
+    ? resolveCommentBodyMaxHeight(BODY_MAX_LINES_OPEN)
+    : resolveCommentBodyMaxHeight(BODY_MAX_LINES_CLOSED);
+  const inset = BODY_VERTICAL_PADDING / 2;
+  // Content and frame heights come from the same scroll view, so their
+  // comparison is scrollability regardless of padding conventions.
+  const [contentHeight, setContentHeight] = useState<number | null>(null);
+  const [frameHeight, setFrameHeight] = useState<number | null>(null);
+  const overflowing = resolveCommentBodyFade({ contentHeight, frameHeight });
+
   return (
-    <TextInput
-      ref={inputRef}
-      defaultValue={defaultValue}
-      editable={!isDisabled}
-      placeholder={t('prReview.composer.commentBodyPlaceholder')}
-      placeholderTextColor={colors.mutedForeground}
-      accessibilityLabel={t('prReview.composer.commentBody')}
-      onChangeText={onChangeText}
-      multiline
-      textAlignVertical="top"
-      // Explicit line-height (no `text-center` per the repo's iOS rule).
-      // Compact min-height so half-detent + keyboard-open both keep footer
-      // CTAs on-screen at scroll offset 0; multiline still grows on type.
-      className={cn(
-        'rounded-md border border-input bg-background px-3 py-1.5 text-sm leading-5 text-foreground',
-        'focus:border-ring',
-        keyboardVisible ? 'max-h-16 min-h-12' : 'min-h-14 max-h-28'
-      )}
-    />
+    <View>
+      <TextInput
+        ref={inputRef}
+        defaultValue={defaultValue}
+        editable={!isDisabled}
+        placeholder={t('prReview.composer.commentBodyPlaceholder')}
+        placeholderTextColor={colors.mutedForeground}
+        accessibilityLabel={t('prReview.composer.commentBody')}
+        onChangeText={onChangeText}
+        onContentSizeChange={event => {
+          setContentHeight(event.nativeEvent.contentSize.height);
+        }}
+        onLayout={event => {
+          setFrameHeight(event.nativeEvent.layout.height);
+        }}
+        multiline
+        textAlignVertical="top"
+        // Geometry is set here, not through utility classes, so the rendered
+        // box and the cap arithmetic share one source: the 20pt line box and
+        // the 6pt-per-side inset. The cap ends on a whole line, so the bottom
+        // line is never clipped mid-glyph; multiline still grows on type until
+        // the cap, then scrolls.
+        className={cn(
+          'rounded-md border border-input bg-background pl-3 pr-3 text-sm text-foreground',
+          'focus:border-ring',
+          keyboardVisible ? 'min-h-12' : 'min-h-14'
+        )}
+        style={{
+          maxHeight,
+          lineHeight: BODY_LINE_HEIGHT,
+          paddingTop: inset,
+          paddingBottom: inset,
+        }}
+      />
+      {overflowing ? (
+        <LinearGradient
+          pointerEvents="none"
+          colors={[
+            resolveFadeColor(colors.foreground, 0),
+            resolveFadeColor(colors.foreground, 0.06),
+          ]}
+          start={{ x: 0.5, y: 0 }}
+          end={{ x: 0.5, y: 1 }}
+          style={[BOTTOM_FADE_STYLE, { height: BODY_LINE_HEIGHT }]}
+        />
+      ) : null}
+    </View>
   );
 }
 
@@ -142,7 +207,10 @@ export function ContextPreview({
         {path} {side} {lineLabel}
       </Text>
       {previewText.length > 0 ? (
-        <Text className="font-mono-medium text-[12px] leading-4 text-foreground" numberOfLines={1}>
+        <Text
+          className="font-mono-medium text-[12px] leading-[1rem] text-foreground"
+          numberOfLines={1}
+        >
           {previewText}
         </Text>
       ) : null}

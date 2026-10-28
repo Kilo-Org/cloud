@@ -10,7 +10,7 @@ import { __resetToolCardImageCacheForTests, cacheToolAttachment } from './tool-c
 type FileInstance = {
   exists: boolean;
   uri: string;
-  write: ReturnType<typeof vi.fn>;
+  writeSync: (content: string) => void;
   filename: string;
 };
 
@@ -28,7 +28,7 @@ const expoFileSystemMock = vi.hoisted(() => {
     const instance = {
       exists: false,
       uri: `file:///cache/tool-card-images/${filename}`,
-      write: vi.fn(),
+      writeSync: vi.fn(),
       filename,
       directory,
     };
@@ -56,7 +56,7 @@ vi.mock('@/lib/share-remote-file', () => ({
 
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
 vi.mock('@/components/ui/icons', () => ({ AlertCircle: 'AlertCircle', ImageOff: 'ImageOff' }));
-vi.mock('@/components/image-viewer-modal', () => ({ ImageViewerModal: 'ImageViewerModal' }));
+vi.mock('@/components/ui/image-viewer', () => ({ ImageViewer: 'ImageViewer' }));
 vi.mock('@/components/ui/image', () => ({ Image: 'Image' }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -138,7 +138,7 @@ function previewButtons(root: TestRenderer.ReactTestInstance): TestRenderer.Reac
 
 function viewers(root: TestRenderer.ReactTestInstance): TestRenderer.ReactTestInstance[] {
   return root.findAll(
-    node => typeof node.type === 'string' && (node.type as string) === 'ImageViewerModal'
+    node => typeof node.type === 'string' && (node.type as string) === 'ImageViewer'
   );
 }
 

@@ -146,8 +146,8 @@ export function SystemTopology({
             </feMerge>
           </filter>
           <radialGradient id="centerGlow">
-            <stop offset="0%" stopColor="oklch(95% 0.15 108)" stopOpacity="0.15" />
-            <stop offset="100%" stopColor="oklch(95% 0.15 108)" stopOpacity="0" />
+            <stop offset="0%" stopColor="var(--primary)" stopOpacity="0.15" />
+            <stop offset="100%" stopColor="var(--primary)" stopOpacity="0" />
           </radialGradient>
         </defs>
 
@@ -265,16 +265,12 @@ export function SystemTopology({
           cy={cy}
           r={28}
           fill="oklch(0.12 0 0)"
-          stroke="oklch(95% 0.15 108 / 0.4)"
+          stroke="var(--primary)"
+          strokeOpacity="0.4"
           strokeWidth="2"
           filter="url(#glow)"
         />
-        <text
-          x={cx}
-          y={cy - 4}
-          textAnchor="middle"
-          className="fill-[color:oklch(95%_0.15_108)] text-[10px] font-bold"
-        >
+        <text x={cx} y={cy - 4} textAnchor="middle" className="fill-primary text-[10px] font-bold">
           MAYOR
         </text>
         <text x={cx} y={cy + 8} textAnchor="middle" className="fill-white/40 text-[7px]">

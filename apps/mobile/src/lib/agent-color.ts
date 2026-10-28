@@ -131,8 +131,8 @@ export function agentColor(name: string): Tint {
  * or hash of a string: the same row renders the same hue in every language.
  *
  * The rule: six steps walk the logo yellow's own warm band (50deg -> 105deg,
- * an 11deg step) at one fixed chroma/value per theme, straddling the brand hue
- * (`--primary` olive `#4f5a10`, h~71, and the yellow `#e8f27a`). The status
+ * an 11deg step) at one fixed chroma/value per theme, around the light primary
+ * olive (`#4f5a10`, h~71). The status
  * hues sit outside the band (danger 8deg, warn 37deg, good 150deg, info
  * 220deg), so no curated step can be mistaken for a status colour.
  *

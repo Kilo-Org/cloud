@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- Use the repository's DOM-free mounted renderer; one shared harness mocks every native module the five layouts reach. */
-import { createElement, type ElementType, type ReactElement, useState } from 'react';
+import { createElement, type ElementType, type ReactElement, useEffect, useState } from 'react';
 import { type AppStateStatus } from 'react-native';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { expect, vi } from 'vitest';
@@ -31,7 +31,12 @@ export function rerender(ui: ReactElement) {
   );
 }
 export function retry() {
-  return unlockRoot().findAllByType('Pressable' as ElementType)[0];
+  /* The unlock overlay is not the only Pressable in the tree: a scene can hold
+     settings rows whose label is pressable too. The overlay's Retry is the one
+     that names itself, so the label is what tells them apart. */
+  return unlockRoot()
+    .findAllByType('Pressable' as ElementType)
+    .find(node => node.props.accessibilityLabel === i18n.t('common.retry'));
 }
 export async function unmountUnlock() {
   view?.unmount();
@@ -115,7 +120,7 @@ const keyboard = vi.hoisted(() => {
     },
   };
 });
-export { announcements, catalogs, keyboard, lifecycle, native, platform, route, storage };
+export { announcements, catalogs, lifecycle, native, platform, route, storage };
 vi.mock('@/i18n/catalogs', () => ({ CATALOG_LOADERS: catalogs }));
 vi.mock('expo-local-authentication', () => native);
 vi.mock('expo-secure-store', () => storage);
@@ -131,6 +136,9 @@ vi.mock('react-native', () => ({
   Switch: 'Switch',
   ActivityIndicator: 'ActivityIndicator',
   Platform: platform,
+  BackHandler: {
+    addEventListener: vi.fn(() => ({ remove: vi.fn() })),
+  },
   useWindowDimensions: () => ({ fontScale: 1, width: 390, height: 844, scale: 3 }),
   StatusBar: { currentHeight: 0 },
   I18nManager: { isRTL: false },
@@ -163,6 +171,13 @@ vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }
 vi.mock('@/components/centered-state-surface', () => ({
   NativeStateSurface: ({ children }: { children: ReactElement }) => children,
   StateSurface: 'StateSurface',
+}));
+// The (app) layout's screenLayout is the covered-screen gate; the fake Scene
+// the Stack mock below mounts passes the scene straight through, so the unlock
+// wrapper stays the only hidden/visible surface under test.
+vi.mock('@/components/app-screen-layout', () => ({
+  // Same call shape as production: the layout receives the scene props object.
+  appScreenLayout: (props: { children: ReactElement }) => unlockScene(props.children),
 }));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/icons', () => ({
@@ -198,9 +213,15 @@ vi.mock('expo-router', () => ({
     { Screen: 'StackScreen' }
   ),
   useRouter: () => ({ push: vi.fn() }),
+  useNavigation: () => ({ isFocused: () => true, addListener: () => () => undefined }),
   usePathname: () => route.pathname,
   useLocalSearchParams: () => ({ owner: 'owner', repo: 'repo', number: '1', scope: 'personal' }),
   useSegments: () => route.segments,
+  // The General settings screen retires its attempt feedback on blur; the
+  // announcement suites keep it focused, so the cleanup never runs here.
+  useFocusEffect: (effect: Parameters<typeof useEffect>[0]) => {
+    useEffect(effect, [effect]);
+  },
 }));
 vi.mock('@expo/react-native-action-sheet', () => ({ ActionSheetProvider: 'ActionSheetProvider' }));
 vi.mock('@rn-primitives/portal', () => ({ PortalHost: 'PortalHost' }));
@@ -227,6 +248,12 @@ vi.mock('@/lib/glanceable/mount', () => ({ GlanceablePublisherMount: () => null 
 // like the glanceable mount — and the stub keeps its `expo` root import (which
 // needs `__DEV__` and a native binding) out of this DOM-free harness.
 vi.mock('@/components/launcher-surfaces-mount', () => ({ LauncherSurfacesMount: () => null }));
+// The briefing mount reads tRPC and the native SQLCipher dismissal journal
+// (expo-crypto needs `__DEV__` and a native binding), so it is a null mount in
+// this DOM-free harness.
+vi.mock('@/components/agent-briefing/briefing-sync-mount', () => ({
+  BriefingSyncMount: () => null,
+}));
 vi.mock('@/lib/organization-context', () => ({ OrganizationProvider: 'OrganizationProvider' }));
 vi.mock('@/components/offline-banner', () => ({ OfflineBanner: 'OfflineBanner' }));
 vi.mock('@/lib/query-client-lifecycle', () => ({

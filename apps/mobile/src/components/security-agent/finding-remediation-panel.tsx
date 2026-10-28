@@ -3,24 +3,23 @@ import { getRemediationStatusPresentation } from '@kilocode/app-shared/security-
 import { Wrench } from '@/components/ui/icons';
 import { useRouter } from 'expo-router';
 import { type TFunction } from 'i18next';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { useTranslation } from 'react-i18next';
 
 import { CenteredState } from '@/components/centered-state';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { AnalysisRerunAction } from '@/components/security-agent/analysis-rerun-action';
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
+import { useConfirmDialog } from '@/components/ui/dialog';
 import { KvRow } from '@/components/ui/kv-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
-import { FEATURE_FLAG_PR_REVIEW, useFeatureFlag } from '@/lib/analytics/posthog';
-import { resolveCodeReviewerOpenPrDestination } from '@/lib/code-reviewer-open-pr-destination';
-import { openExternalUrl } from '@/lib/external-link';
 import { formatNumber } from '@/lib/format';
 import {
   useCancelSecurityRemediation,
@@ -28,8 +27,9 @@ import {
   useStartSecurityRemediation,
 } from '@/lib/hooks/use-security-remediation';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { type SecurityAnalysis } from '@/lib/security-agent';
+import { remediationNeedsAnalysisRefresh, type SecurityAnalysis } from '@/lib/security-agent';
 import { getRemediationUnavailableKey } from '@/lib/security-agent-copy';
+import { openFindingLink } from '@/lib/security-agent-link';
 import { firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';
 
 type FindingRemediationPanelProps = {
@@ -171,18 +171,13 @@ export function FindingRemediationPanel({
   const colors = useThemeColors();
   const router = useRouter();
   const { t } = useTranslation();
-  const prReviewEnabled = useFeatureFlag(FEATURE_FLAG_PR_REVIEW, true);
+  const { confirm, dialog } = useConfirmDialog();
   const startRemediation = useStartSecurityRemediation(scope);
   const retryRemediation = useRetrySecurityRemediation(scope);
   const cancelRemediation = useCancelSecurityRemediation(scope);
 
   const openPullRequest = (url: string) => {
-    const destination = resolveCodeReviewerOpenPrDestination(url, prReviewEnabled);
-    if (destination.kind === 'in-app') {
-      router.push(destination.href);
-      return;
-    }
-    void openExternalUrl(url, { label: t('common.pullRequest') });
+    openFindingLink(router, url, t('common.pullRequest'));
   };
 
   if (isLoading && !analysis) {
@@ -190,21 +185,30 @@ export function FindingRemediationPanel({
       <View className="gap-3 px-6 pt-2">
         <Skeleton className="h-16 w-full rounded-lg" />
         <Skeleton className="h-32 w-full rounded-lg" />
+        {dialog}
       </View>
     );
   }
 
   if (isError && !analysis) {
-    return <QueryError message={t('securityAgent.remediation.couldNotLoad')} onRetry={onRetry} />;
+    return (
+      <>
+        <QueryError message={t('securityAgent.remediation.couldNotLoad')} onRetry={onRetry} />
+        {dialog}
+      </>
+    );
   }
 
   if (!analysis) {
     return (
-      <EmptyState
-        icon={Wrench}
-        title={t('securityAgent.analysis.noAnalysisYet')}
-        description={t('securityAgent.analysis.noAnalysisYetDescription')}
-      />
+      <>
+        <EmptyState
+          icon={Wrench}
+          title={t('securityAgent.analysis.noAnalysisYet')}
+          description={t('securityAgent.analysis.noAnalysisYetDescription')}
+        />
+        {dialog}
+      </>
     );
   }
 
@@ -236,6 +240,9 @@ export function FindingRemediationPanel({
     remediationCapability.retryReason !== remediationCapability.startReason
       ? getRemediationUnavailableKey(remediationCapability.retryReason)
       : null;
+  // The blocker copy tells the admin to rerun the analysis; the action that
+  // does it belongs next to that copy, not on another tab.
+  const needsAnalysisRefresh = remediationNeedsAnalysisRefresh(analysis);
 
   const hasContent =
     Boolean(remediationSummary) || remediationAttempts.length > 0 || remediationTimeline.length > 0;
@@ -266,6 +273,8 @@ export function FindingRemediationPanel({
           </Text>
         ) : null}
       </View>
+
+      {needsAnalysisRefresh ? <AnalysisRerunAction scope={scope} findingId={findingId} /> : null}
 
       {remediationCapability.canStart ? (
         <Button
@@ -305,20 +314,15 @@ export function FindingRemediationPanel({
             if (!attemptId) {
               return;
             }
-            Alert.alert(
-              t('securityAgent.remediation.cancelTitle'),
-              t('securityAgent.remediation.cancelMessage'),
-              [
-                { text: t('common.keepRunning'), style: 'cancel' },
-                {
-                  text: t('securityAgent.remediation.cancelRemediation'),
-                  style: 'destructive',
-                  onPress: () => {
-                    cancelRemediation.mutate({ attemptId, findingId });
-                  },
-                },
-              ]
-            );
+            confirm({
+              title: t('securityAgent.remediation.cancelTitle'),
+              message: t('securityAgent.remediation.cancelMessage'),
+              confirmLabel: t('securityAgent.remediation.cancelRemediation'),
+              cancelLabel: t('common.keepRunning'),
+              onConfirm: () => {
+                cancelRemediation.mutate({ attemptId, findingId });
+              },
+            });
           }}
         >
           {cancelRemediation.isPending ? (
@@ -477,5 +481,10 @@ export function FindingRemediationPanel({
     </View>
   );
 
-  return <Body className="flex-1">{content}</Body>;
+  return (
+    <>
+      <Body className="flex-1">{content}</Body>
+      {dialog}
+    </>
+  );
 }

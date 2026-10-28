@@ -2,16 +2,17 @@ import {
   fitCallbackJobToQueueLimit,
   type CallbackJobQueueFitResult,
 } from '../../callbacks/queue-payload.js';
+import { PARENT_SESSION_CALLBACK_URL } from '@kilocode/worker-utils/cloud-agent-authority';
+import { createMessageId, isCanonicalMessageId } from '../../session/message-id.js';
 import type { CallbackJob, CallbackTarget } from '../../callbacks/types.js';
+import { renderRecentActivity } from '../../callbacks/recent-activity.js';
 import { logger } from '../../logger.js';
 import type { SessionMetadata } from '../../persistence/session-metadata.js';
 import { projectTerminalClientError } from '../../session/terminal-error-projector.js';
 import type { LatestAssistantMessage } from '../../session/types.js';
-import {
-  CONTROL_PLANE_FAILURE_REASON_VALUES,
-  type ControlPlaneFailureReason,
-} from '../../shared/control-plane-protocol.js';
+import { messageFailureText } from './failure-messages.js';
 import type { SessionMessage } from './messages.js';
+import { projectSettledMessageFailure, type ControlPlaneReportFacts } from './reports.js';
 
 export const CALLBACK_OUTBOX_PREFIX = 'callback_outbox:';
 export const CALLBACK_ENQUEUE_MAX_ATTEMPTS = 5;
@@ -27,10 +28,8 @@ export type PendingCallbackJob = {
 };
 
 /**
- * Terminal callback outbox for the new plane (plan B5). Adapted from the legacy
- * `message-callbacks.ts`: it reads the new `SessionMessage` row and never
- * imports the legacy message model. One job per drained batch, keyed by the
- * representative terminal message id.
+ * Terminal callback outbox. One job per drained batch, keyed by the
+ * representative terminal message ID.
  */
 export type MessageCallbacksDependencies = {
   storage: CallbackStorage;
@@ -41,39 +40,24 @@ export type MessageCallbacksDependencies = {
     kiloSessionId: string,
     parentMessageId: string
   ) => LatestAssistantMessage | null;
+  getRecentAssistantMessagesForUserMessage: (
+    sessionId: string,
+    kiloSessionId: string,
+    parentMessageId: string
+  ) => LatestAssistantMessage[];
 };
 
 export type MessageCallbacks = {
   persistDrainedBatchCallback(
     messages: readonly SessionMessage[],
     newlyTerminalMessageIds: ReadonlySet<string>,
-    metadata?: SessionMetadata | null
+    metadata?: SessionMetadata | null,
+    facts?: ControlPlaneReportFacts
   ): boolean;
   pendingCallbackCount(): number;
   nextCallbackDueAt(): number | undefined;
   repair(now?: number): Promise<void>;
 };
-
-const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
-  preparation_timeout: 'Environment preparation timed out',
-  workspace_setup_failed: 'Workspace setup failed',
-  agent_unavailable: 'The agent became unavailable',
-  billing_blocked: 'Sandbox billing requires additional credits',
-  billing_unavailable: 'Sandbox billing is unavailable',
-  invalid_configuration: 'Sandbox configuration is invalid or unsupported',
-  connection_lost: 'The sandbox connection was lost',
-  sandbox_lost: 'The sandbox was lost',
-  agent_restarted: 'The agent restarted',
-  no_progress: 'The turn made no progress',
-  no_outcome: 'The turn did not complete',
-  prompt_failed: 'Prompt delivery failed',
-  sandbox_stopped: 'The sandbox stopped while waiting for an answer',
-  execution_limit: 'The turn exceeded its time limit',
-};
-
-function isControlPlaneFailureReason(value: string): value is ControlPlaneFailureReason {
-  return (CONTROL_PLANE_FAILURE_REASON_VALUES as readonly string[]).includes(value);
-}
 
 const callbackTargetSchema = {
   url: (value: unknown): value is string => typeof value === 'string' && value.length > 0,
@@ -105,6 +89,12 @@ function isCallbackJob(value: unknown): value is CallbackJob {
   }
   const payload = value.payload;
   return (
+    (value.target.url !== PARENT_SESSION_CALLBACK_URL ||
+      (isRecord(value.parentSession) &&
+        typeof value.parentSession.userId === 'string' &&
+        value.parentSession.userId.length > 0 &&
+        typeof value.parentSession.messageId === 'string' &&
+        isCanonicalMessageId(value.parentSession.messageId))) &&
     typeof payload.sessionId === 'string' &&
     typeof payload.cloudAgentSessionId === 'string' &&
     (payload.executionId === undefined || typeof payload.executionId === 'string') &&
@@ -162,10 +152,7 @@ function callbackStatus(message: SessionMessage): CallbackJob['payload']['status
 function callbackErrorMessage(message: SessionMessage): string | undefined {
   if (message.state === 'completed') return undefined;
   if (message.state === 'cancelled') return 'The message was interrupted';
-  const reason = message.reason;
-  if (reason !== null && isControlPlaneFailureReason(reason))
-    return CONTROL_REASON_MESSAGES[reason];
-  return reason ?? 'Environment failed';
+  return message.reason === null ? 'Environment failed' : messageFailureText(message.reason);
 }
 
 function redactCallbackTargetUrl(callbackUrl: string): string {
@@ -180,14 +167,20 @@ function redactCallbackTargetUrl(callbackUrl: string): string {
 export function createMessageCallbacks(
   dependencies: MessageCallbacksDependencies
 ): MessageCallbacks {
-  const { storage, getMetadata, getCallbackQueue, getAssistantMessageForUserMessage } =
-    dependencies;
+  const {
+    storage,
+    getMetadata,
+    getCallbackQueue,
+    getAssistantMessageForUserMessage,
+    getRecentAssistantMessagesForUserMessage,
+  } = dependencies;
   let repairInFlight: Promise<void> | undefined;
 
   function buildJob(
     message: SessionMessage,
     metadata: SessionMetadata,
-    target: CallbackTarget
+    target: CallbackTarget,
+    facts?: ControlPlaneReportFacts
   ): CallbackJob | undefined {
     const status = callbackStatus(message);
     if (!status) return undefined;
@@ -195,6 +188,7 @@ export function createMessageCallbacks(
     const sessionId = metadata.identity.sessionId;
     const kiloSessionId = metadata.auth.kiloSessionId;
     let lastAssistantMessageText: string | undefined;
+    let recentActivity: string | undefined;
     if (status === 'completed' && kiloSessionId) {
       try {
         const assistantMessage = getAssistantMessageForUserMessage(
@@ -211,11 +205,34 @@ export function createMessageCallbacks(
           .withFields({ sessionId, messageId: message.messageId })
           .warn('Unable to include the assistant answer in the callback snapshot');
       }
+      try {
+        recentActivity = renderRecentActivity(
+          getRecentAssistantMessagesForUserMessage(sessionId, kiloSessionId, message.messageId)
+        );
+      } catch {
+        logger
+          .withFields({ sessionId, messageId: message.messageId })
+          .warn('Unable to include recent activity in the callback snapshot');
+      }
     }
-    const errorMessage = callbackErrorMessage(message);
+    // The classification is derived from the message alone; settlement facts
+    // only enrich it (workspace subtype, assistant reason, provider ownership).
+    // Every terminal callback carries the structured failure, matching the
+    // shared safe-failure projection.
+    const failure = projectSettledMessageFailure(message, facts ?? {});
+    // A workspace subtype carries a specific cause ("Repository clone timed
+    // out"); the generic control reason would hide it from receivers that match
+    // on error text. Non-workspace failures keep the friendlier control copy.
+    const errorMessage =
+      facts?.workspaceSubtype !== undefined && failure?.message
+        ? failure.message
+        : callbackErrorMessage(message);
 
     return {
       target: structuredClone(target),
+      ...(target.url === PARENT_SESSION_CALLBACK_URL
+        ? { parentSession: { userId: metadata.identity.userId, messageId: createMessageId() } }
+        : {}),
       payload: {
         sessionId,
         cloudAgentSessionId: sessionId,
@@ -223,20 +240,34 @@ export function createMessageCallbacks(
         messageId: message.messageId,
         status,
         ...(errorMessage ? { errorMessage } : {}),
+        ...(failure === undefined ? {} : { failure, failureStage: failure.stage }),
         ...(status === 'completed'
           ? {}
           : {
-              clientError: projectTerminalClientError({ status, error: errorMessage }),
+              clientError: projectTerminalClientError({
+                status,
+                error: errorMessage,
+                failureCode: failure?.code,
+                failureStage: failure?.stage,
+              }),
             }),
         lastSeenBranch: metadata.repository?.upstreamBranch ?? metadata.workspace?.branchName,
         kiloSessionId,
         lastAssistantMessageText,
+        recentActivity,
+        ...(status === 'completed' && facts?.gateResult !== undefined
+          ? { gateResult: facts.gateResult }
+          : {}),
         idempotencyKey: message.messageId,
       },
     };
   }
 
-  function persistTerminalCallback(message: SessionMessage, metadata = getMetadata()): boolean {
+  function persistTerminalCallback(
+    message: SessionMessage,
+    metadata = getMetadata(),
+    facts?: ControlPlaneReportFacts
+  ): boolean {
     const target = metadata?.callback?.target;
     if (!target || callbackStatus(message) === undefined) return false;
 
@@ -245,7 +276,7 @@ export function createMessageCallbacks(
 
     let fittedJob: CallbackJobQueueFitResult;
     try {
-      const job = buildJob(message, metadata, target);
+      const job = buildJob(message, metadata, target, facts);
       if (!job) return false;
       fittedJob = fitCallbackJobToQueueLimit(job);
       if (fittedJob.status === 'too-large') {
@@ -277,7 +308,8 @@ export function createMessageCallbacks(
   function persistDrainedBatchCallback(
     messages: readonly SessionMessage[],
     newlyTerminalMessageIds: ReadonlySet<string>,
-    metadata = getMetadata()
+    metadata = getMetadata(),
+    facts?: ControlPlaneReportFacts
   ): boolean {
     if (newlyTerminalMessageIds.size === 0) return false;
     if (messages.some(message => message.state === 'queued' || message.state === 'accepted')) {
@@ -288,7 +320,13 @@ export function createMessageCallbacks(
       if (callbackStatus(message) !== undefined) representative = message;
     }
     if (!representative) return false;
-    return persistTerminalCallback(representative, metadata);
+    // The facts belong to this settlement; only apply them when the
+    // representative is the message that settlement terminalized.
+    const representativeFacts =
+      facts !== undefined && newlyTerminalMessageIds.has(representative.messageId)
+        ? facts
+        : undefined;
+    return persistTerminalCallback(representative, metadata, representativeFacts);
   }
 
   function pendingEntries(): Array<[string, PendingCallbackJob | undefined]> {

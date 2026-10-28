@@ -3,7 +3,8 @@ export const CHAT_TAB_ID = 'chat' as const;
 export type TerminalTabId = `terminal:${string}`;
 export type FileTabId = `file:${string}`;
 export type WorkspaceTabId = typeof CHAT_TAB_ID | TerminalTabId | FileTabId;
-export type WorktreeFileViewMode = 'diff' | 'expanded' | 'preview';
+export const WORKTREE_FILE_VIEW_MODES = ['diff', 'expanded', 'preview'] as const;
+export type WorktreeFileViewMode = (typeof WORKTREE_FILE_VIEW_MODES)[number];
 
 export type TerminalWorkspaceTab = {
   id: string;
@@ -56,15 +57,6 @@ export function createWorkspaceTabsState(): WorkspaceTabsState {
 
 export function resetWorkspaceTabs(_state: WorkspaceTabsState): WorkspaceTabsState {
   return createWorkspaceTabsState();
-}
-
-export function clearFileTabs(state: WorkspaceTabsState): WorkspaceTabsState {
-  if (state.files.length === 0) return state;
-  return {
-    ...state,
-    files: [],
-    activeTabId: state.activeTabId.startsWith('file:') ? CHAT_TAB_ID : state.activeTabId,
-  };
 }
 
 export function addTerminalTab(

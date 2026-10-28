@@ -11,6 +11,7 @@ const mockHeaders = jest.fn();
 const mockFindUser = jest.fn();
 const mockMembership = jest.fn();
 const mockBalance = jest.fn();
+const mockDeviceSession = jest.fn();
 jest.mock('next/headers', () => ({ headers: () => mockHeaders(), cookies: jest.fn() }));
 jest.mock('next-auth', () => ({
   __esModule: true,
@@ -21,11 +22,15 @@ jest.mock('@/lib/user', () => ({}));
 jest.mock('@kilocode/web-shared/lib/user/find-user-by-id', () => ({
   findUserById: (...args: unknown[]) => mockFindUser(...args),
 }));
-jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
-  db: { query: { kilocode_users: { findFirst: (...args: unknown[]) => mockFindUser(...args) } } },
-  readDb: {},
-}));
-jest.mock('@kilocode/web-shared/lib/organizations/organizations', () => ({
+jest.mock('@kilocode/web-shared/lib/drizzle', () => {
+  const query = {
+    kilocode_users: { findFirst: (...args: unknown[]) => mockFindUser(...args) },
+    device_sessions: { findFirst: (...args: unknown[]) => mockDeviceSession(...args) },
+  };
+  return { db: { query }, readDb: { query } };
+});
+jest.mock('@kilocode/worker-utils/account-access', () => ({
+  ...jest.requireActual('@kilocode/worker-utils/account-access'),
   isOrganizationMember: (...args: unknown[]) => mockMembership(...args),
 }));
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
@@ -33,7 +38,6 @@ jest.mock('@kilocode/web-shared/lib/organizations/organization-usage', () => ({
 }));
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   NEXTAUTH_SECRET: 'balance-test-secret',
-  BLACKLIST_TLDS: [],
   isResourceTokenIssuanceEnabled: () => true,
 }));
 jest.mock('@kilocode/web-shared/lib/constants', () => ({
@@ -56,11 +60,19 @@ jest.mock('@/lib/organizations/organization-seats', () => ({}));
 jest.mock('@/lib/organizations/sales-demo', () => ({}));
 jest.mock('@kilocode/web-shared/lib/organizations/organization-sso-policy', () => ({}));
 jest.mock('@/lib/account-linking-session', () => ({}));
-jest.mock('@kilocode/web-shared/lib/admin/admin-access-log', () => ({}));
+jest.mock('@kilocode/web-shared/lib/admin/admin-access-log', () => ({
+  // `getUserFromAuth`'s resolver calls this predicate to pick the bearer path,
+  // so the stub has to answer the same way the real header check does.
+  authViaTokenFromHeaders: (headers: Headers) => Boolean(headers.get('Authorization')),
+  clientIpFromHeaders: () => null,
+  routeFromHeaders: () => null,
+  emitAdminAccessEvent: jest.fn(),
+}));
 jest.mock('@/lib/user/sso', () => ({}));
 jest.mock('@kilocode/web-shared/lib/web-session-revocation', () => ({}));
 
 const organizationId = '11111111-1111-4111-8111-111111111111';
+const deviceSessionId = '22222222-2222-4222-8222-222222222222';
 const user = {
   id: 'user_123',
   api_token_pepper: 'current-pepper',
@@ -97,6 +109,7 @@ beforeEach(() => {
   mockFindUser.mockResolvedValue(user);
   mockMembership.mockResolvedValue(true);
   mockBalance.mockResolvedValue({ balance: 12 });
+  mockDeviceSession.mockResolvedValue({ id: deviceSessionId });
   jest.spyOn(console, 'warn').mockImplementation(() => {});
 });
 afterEach(() => jest.restoreAllMocks());
@@ -111,11 +124,11 @@ it.each(['human-api', 'device-access'])(
     requestWith(
       controlToken({
         tokenPurpose,
-        ...(tokenPurpose === 'device-access' ? { deviceSessionId: 'device_123' } : {}),
+        ...(tokenPurpose === 'device-access' ? { deviceSessionId } : {}),
       })
     );
     expect((await GET()).status).toBe(200);
-    expect(mockMembership).toHaveBeenCalledWith(organizationId, user.id, expect.anything());
+    expect(mockMembership).toHaveBeenCalledWith(expect.anything(), organizationId, user.id);
     expect(mockBalance).toHaveBeenCalledWith(organizationId, user);
     mockBalance.mockClear();
     expect((await getGenericBalance()).status).toBe(401);

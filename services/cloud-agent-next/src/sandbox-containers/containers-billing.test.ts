@@ -1,3 +1,4 @@
+import { preinstalledStartup } from '../sandbox-control/preinstalled-startup.js';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const { DurableObjectMock } = vi.hoisted(() => ({
@@ -25,11 +26,7 @@ import type {
 import type { Env } from '../types.js';
 import { ContainersBillingScheduler } from './containers-billing.js';
 import { CONTROL_SUPERVISOR_PATH } from '../sandbox-control/container-paths.js';
-import {
-  ContainersAllocationConflictError,
-  SandboxContainers,
-  type ContainerInstanceSize,
-} from './SandboxContainers.js';
+import { SandboxContainers, type ContainerInstanceSize } from './SandboxContainers.js';
 
 const RECORD_KEY = 'containers:record:v1';
 const BILLING_CONTEXT_KEY = 'container-usage:billing-context:v1';
@@ -48,6 +45,9 @@ const BILLING_INPUT = {
   enforcementRequested: true,
 };
 
+const LEGACY_NON_BILLABLE_INSTANCE = 'standard-2' as ContainerInstanceSize;
+const LEGACY_NON_BILLABLE_INSTANCE_ALT = 'lite' as ContainerInstanceSize;
+
 type MeterRecordStartInput = Parameters<ContainerUsageRpcMethods['recordStart']>[0];
 type MeterRecordHeartbeatInput = Parameters<ContainerUsageRpcMethods['recordHeartbeat']>[0];
 type MeterRecordStopInput = Parameters<ContainerUsageRpcMethods['recordStop']>[0];
@@ -55,8 +55,8 @@ type MeterRecordStopInput = Parameters<ContainerUsageRpcMethods['recordStop']>[0
 type StoredRecord = {
   state: string;
   allocationRef: string | null;
-  stopOpId: string | null;
-  lastSnapshot: { id: string; sourceAllocation: string } | null;
+  stopOpId?: string | null;
+  lastSnapshot?: { id: string; sourceAllocation: string } | null;
   instance?: string;
   billingConfigured?: true;
   wrapperAttempt?: string;
@@ -238,6 +238,10 @@ class FakeContainer {
     if (this.destroyBehavior === 'reject') throw new Error('container destroy failed');
     this.running = false;
   }
+
+  async monitor(): Promise<void> {
+    if (!this.stopAfterStart) await new Promise<void>(() => {});
+  }
 }
 
 function execProcess(exitCode: number): ExecProcess {
@@ -251,7 +255,7 @@ function cmdlineProcess(text: string): ExecProcess {
   return {
     pid: 1,
     exitCode: Promise.resolve(0),
-    output: () => Promise.resolve({ stdout: buffer, stderr: new ArrayBuffer(0) }),
+    output: () => Promise.resolve({ stdout: buffer, stderr: new ArrayBuffer(0), exitCode: 0 }),
   } as unknown as ExecProcess;
 }
 
@@ -273,8 +277,6 @@ function setup(
     storage.map.set(RECORD_KEY, {
       state: 'idle',
       allocationRef: null,
-      stopOpId: null,
-      lastSnapshot: null,
     });
   }
   const ctx = {
@@ -330,7 +332,12 @@ async function launch(
   allocationRef: string,
   instanceSize: ContainerInstanceSize
 ) {
-  return instance.launchWrapper({ allocationRef, env: {}, instance: instanceSize });
+  return instance.launchWrapper({
+    command: preinstalledStartup(),
+    allocationRef,
+    env: {},
+    instance: instanceSize,
+  });
 }
 
 beforeEach(() => {
@@ -441,6 +448,35 @@ describe('ContainersBilling identity and admission', () => {
 });
 
 describe('ContainersBilling physical lifecycle', () => {
+  it('activates metering when an issued start becomes running during PID 1 confirmation', async () => {
+    const { instance, container, storage, meter, pendingTasks } = setup();
+    await admit(instance, 'standard-3');
+    const generation = readGeneration(storage);
+    const start = container.start.bind(container);
+    vi.spyOn(container, 'start').mockImplementation(options => {
+      start(options);
+      container.running = false;
+    });
+    const exec = container.exec.bind(container);
+    vi.spyOn(container, 'exec').mockImplementation(async cmd => {
+      await Promise.resolve();
+      container.running = true;
+      return exec(cmd);
+    });
+
+    await expect(launch(instance, REF_A, 'standard-3')).resolves.toEqual({
+      started: true,
+      startSource: 'image',
+    });
+    await flushPending(pendingTasks);
+
+    expect(readGeneration(storage)).toBe(generation);
+    expect(readMeasurementStarted(storage)).toBe(true);
+    expect(readSchedules(storage)?.billingHeartbeatTick).toMatchObject({ payload: generation });
+    expect(meter.recordStartInputs).toHaveLength(1);
+    expect(container.startCalls).toHaveLength(1);
+  });
+
   it('activates metering when a resumed sleep container execs and the wrapper exec throws', async () => {
     const { instance, container, storage, meter, pendingTasks } = setup({
       record: {
@@ -496,7 +532,12 @@ describe('ContainersBilling physical lifecycle', () => {
   it('budget stop blocks, schedules force-stop, destroys, settles, and a fresh admission succeeds', async () => {
     const { instance, container, storage, meter, pendingTasks } = setup();
     await admit(instance, 'standard-4');
-    await instance.launchWrapper({ allocationRef: REF_A, env: {}, instance: 'standard-4' });
+    await instance.launchWrapper({
+      command: preinstalledStartup(),
+      allocationRef: REF_A,
+      env: {},
+      instance: 'standard-4',
+    });
     await flushPending(pendingTasks);
 
     const heartbeatDue = readSchedules(storage)?.billingHeartbeatTick?.dueAtMs;
@@ -536,7 +577,12 @@ describe('ContainersBilling physical lifecycle', () => {
   it('keeps the block and re-arms billingForceStop when destroy stays retryable', async () => {
     const { instance, container, storage, meter, pendingTasks } = setup();
     await admit(instance, 'standard-4');
-    await instance.launchWrapper({ allocationRef: REF_A, env: {}, instance: 'standard-4' });
+    await instance.launchWrapper({
+      command: preinstalledStartup(),
+      allocationRef: REF_A,
+      env: {},
+      instance: 'standard-4',
+    });
     await flushPending(pendingTasks);
 
     container.destroyBehavior = 'reject';
@@ -693,13 +739,21 @@ describe('ContainersBilling force destroy', () => {
 });
 
 describe('ContainersBilling inert without persisted attribution', () => {
-  it('keeps launch, same-ref reuse, stop, and pre-change records unchanged for standard-2 and lite', async () => {
-    for (const instanceSize of ['standard-2', 'lite'] as const) {
+  it('keeps launch, same-ref reuse, stop, and pre-change records unchanged for legacy non-billable instances', async () => {
+    for (const instanceSize of [
+      LEGACY_NON_BILLABLE_INSTANCE,
+      LEGACY_NON_BILLABLE_INSTANCE_ALT,
+    ] as const) {
       const { instance, container, storage, meter } = setup();
 
       await expect(
-        instance.launchWrapper({ allocationRef: REF_A, env: {}, instance: instanceSize })
-      ).resolves.toEqual({ started: true });
+        instance.launchWrapper({
+          command: preinstalledStartup(),
+          allocationRef: REF_A,
+          env: {},
+          instance: instanceSize,
+        })
+      ).resolves.toEqual({ started: true, startSource: 'image' });
       expect(readRecord(storage).instance).toBe(instanceSize);
       expect(readRecord(storage).billingConfigured).toBeUndefined();
       expect(storage.map.get(SCHEDULES_KEY)).toBeUndefined();
@@ -707,8 +761,13 @@ describe('ContainersBilling inert without persisted attribution', () => {
       expect(meter.recordStartInputs).toHaveLength(0);
 
       await expect(
-        instance.launchWrapper({ allocationRef: REF_A, env: {}, instance: instanceSize })
-      ).resolves.toEqual({ started: false });
+        instance.launchWrapper({
+          command: preinstalledStartup(),
+          allocationRef: REF_A,
+          env: {},
+          instance: instanceSize,
+        })
+      ).resolves.toEqual({ started: false, startSource: 'image' });
       expect(container.startCalls).toHaveLength(1);
 
       await expect(instance.getBillingRuntimeStatus()).resolves.toBeUndefined();
@@ -730,7 +789,12 @@ describe('ContainersBilling inert without persisted attribution', () => {
   it('stays inert for a billable instance that was never admitted', async () => {
     const { instance, container, storage, meter, pendingTasks } = setup();
 
-    await instance.launchWrapper({ allocationRef: REF_A, env: {}, instance: 'standard-4' });
+    await instance.launchWrapper({
+      command: preinstalledStartup(),
+      allocationRef: REF_A,
+      env: {},
+      instance: 'standard-4',
+    });
 
     expect(container.startCalls[0]).toMatchObject({ instance: 'standard-4' });
     expect(readRecord(storage).billingConfigured).toBeUndefined();
@@ -744,7 +808,7 @@ describe('ContainersBilling inert without persisted attribution', () => {
 
   it('reconstructs a pre-change record without inventing billing identity', async () => {
     const { instance, storage } = setup({
-      record: { state: 'running', allocationRef: REF_A, stopOpId: null, lastSnapshot: null },
+      record: { state: 'running', allocationRef: REF_A },
     });
 
     await expect(instance.stop(REF_A)).resolves.toBe('terminal');
@@ -920,6 +984,7 @@ describe('ContainersBilling resumed launch activation', () => {
       if (probeExitCode === 0) {
         await expect(launch(resumed.instance, REF_A, 'standard-4')).resolves.toEqual({
           started: true,
+          startSource: 'image',
         });
         await flushPending(resumed.pendingTasks);
         expect(readRecord(first.storage)).toMatchObject({
@@ -951,8 +1016,6 @@ describe('ContainersBilling resumed launch activation', () => {
       record: {
         state: 'launching',
         allocationRef: REF_A,
-        stopOpId: null,
-        lastSnapshot: null,
         wrapperAttempt: 'exec_pending',
       },
     });
@@ -971,8 +1034,9 @@ describe('ContainersBilling resumed launch activation', () => {
       return execProcess(0);
     };
 
-    await expect(launch(reconstructed.instance, REF_A, 'standard-2')).resolves.toEqual({
+    await expect(launch(reconstructed.instance, REF_A, 'standard-3')).resolves.toEqual({
       started: true,
+      startSource: 'image',
     });
 
     expect(probes).toBe(1);
@@ -985,13 +1049,16 @@ describe('ContainersBilling resumed launch activation', () => {
     expect(first.meter.recordStartInputs).toHaveLength(0);
   });
 
-  it('does not activate for a resumed launch with a different allocation ref', async () => {
+  it('settles a superseded allocation before metering the launch that replaces it', async () => {
     const first = setup();
     await admit(first.instance, 'standard-4');
+    await launch(first.instance, REF_A, 'standard-4');
+    await flushPending(first.pendingTasks);
+    const supersededGeneration = readGeneration(first.storage);
     first.storage.map.set(RECORD_KEY, {
       ...readRecord(first.storage),
       state: 'launching',
-      allocationRef: REF_A,
+      wrapperAttempt: 'exec_pending',
     });
 
     const resumed = setup({
@@ -1001,20 +1068,27 @@ describe('ContainersBilling resumed launch activation', () => {
     });
 
     await expect(
-      resumed.instance.launchWrapper({ allocationRef: 'ref-b', env: {}, instance: 'standard-4' })
-    ).rejects.toBeInstanceOf(ContainersAllocationConflictError);
+      resumed.instance.launchWrapper({
+        command: preinstalledStartup(),
+        allocationRef: 'ref-b',
+        env: {},
+        instance: 'standard-4',
+      })
+    ).resolves.toEqual({ started: true, startSource: 'image' });
     await flushPending(resumed.pendingTasks);
 
-    expect(readMeasurementStarted(first.storage)).toBe(false);
-    expect(readSchedules(first.storage)).toBeUndefined();
-    expect(readRecord(first.storage).allocationRef).toBe(REF_A);
+    expect(first.container.destroyCalls).toBe(1);
+    expect(first.meter.recordStopInputs).toHaveLength(1);
+    expect(readGeneration(first.storage)).not.toBe(supersededGeneration);
+    expect(readMeasurementStarted(first.storage)).toBe(true);
+    expect(readRecord(first.storage)).toMatchObject({ state: 'running', allocationRef: 'ref-b' });
   });
 });
 
 describe('ContainersBilling launch instance persistence', () => {
   it('persists the supplied instance when a pre-change running record is reused', async () => {
     const first = setup({
-      record: { state: 'running', allocationRef: REF_A, stopOpId: null, lastSnapshot: null },
+      record: { state: 'running', allocationRef: REF_A },
     });
     first.container.running = true;
     const reused = setup({
@@ -1023,7 +1097,10 @@ describe('ContainersBilling launch instance persistence', () => {
       meter: first.meter,
     });
 
-    await expect(launch(reused.instance, REF_A, 'standard-4')).resolves.toEqual({ started: false });
+    await expect(launch(reused.instance, REF_A, 'standard-4')).resolves.toEqual({
+      started: false,
+      startSource: 'image',
+    });
 
     expect(readRecord(first.storage)).toMatchObject({ state: 'running', instance: 'standard-4' });
     expect(readRecord(first.storage).billingConfigured).toBeUndefined();
@@ -1034,8 +1111,6 @@ describe('ContainersBilling launch instance persistence', () => {
       record: {
         state: 'launching',
         allocationRef: REF_A,
-        stopOpId: null,
-        lastSnapshot: null,
         wrapperAttempt: 'not_started',
       },
     });
@@ -1064,16 +1139,14 @@ describe('ContainersBilling launch instance persistence', () => {
       record: {
         state: 'idle',
         allocationRef: null,
-        stopOpId: null,
-        lastSnapshot: null,
         instance: 'standard-4',
         billingConfigured: true,
       },
     });
 
-    await launch(instance, REF_A, 'standard-2');
+    await launch(instance, REF_A, LEGACY_NON_BILLABLE_INSTANCE);
 
-    expect(readRecord(storage)).toMatchObject({ instance: 'standard-2' });
+    expect(readRecord(storage)).toMatchObject({ instance: LEGACY_NON_BILLABLE_INSTANCE });
     expect(readRecord(storage).billingConfigured).toBeUndefined();
   });
 
@@ -1082,9 +1155,7 @@ describe('ContainersBilling launch instance persistence', () => {
       record: {
         state: 'idle',
         allocationRef: null,
-        stopOpId: null,
-        lastSnapshot: null,
-        instance: 'standard-2',
+        instance: LEGACY_NON_BILLABLE_INSTANCE,
       },
     });
 
@@ -1361,14 +1432,14 @@ describe('ContainersBilling identity replacement', () => {
     await admit(instance, 'standard-4');
 
     // The switch is refused until the old generation settles, so retry after it lands.
-    await expect(instance.configureBilling(BILLING_INPUT, 'standard-2')).rejects.toThrow(
-      'Container billing identity change refused'
-    );
+    await expect(
+      instance.configureBilling(BILLING_INPUT, LEGACY_NON_BILLABLE_INSTANCE)
+    ).rejects.toThrow('Container billing identity change refused');
     await flushPending(pendingTasks);
 
-    await instance.configureBilling(BILLING_INPUT, 'standard-2');
+    await instance.configureBilling(BILLING_INPUT, LEGACY_NON_BILLABLE_INSTANCE);
 
-    expect(readRecord(storage).instance).toBe('standard-2');
+    expect(readRecord(storage).instance).toBe(LEGACY_NON_BILLABLE_INSTANCE);
     expect(readRecord(storage).billingConfigured).toBeUndefined();
   });
 });
@@ -1467,21 +1538,27 @@ describe('ContainersBilling schedule cancellation', () => {
 describe('ContainersBilling inert pre-change records', () => {
   it('stays inert for pre-change running reuse and resumed launch records', async () => {
     const reuse = setup({
-      record: { state: 'running', allocationRef: REF_A, stopOpId: null, lastSnapshot: null },
+      record: { state: 'running', allocationRef: REF_A },
     });
     reuse.container.running = true;
-    await expect(launch(reuse.instance, REF_A, 'standard-2')).resolves.toEqual({ started: false });
+    await expect(launch(reuse.instance, REF_A, 'standard-3')).resolves.toEqual({
+      started: false,
+      startSource: 'image',
+    });
     expect(readRecord(reuse.storage).billingConfigured).toBeUndefined();
     expect(reuse.storage.map.get(SCHEDULES_KEY)).toBeUndefined();
     expect(reuse.storage.map.get(BILLING_CONTEXT_KEY)).toBeUndefined();
     expect(reuse.meter.recordStartInputs).toHaveLength(0);
 
     const resumed = setup({
-      record: { state: 'launching', allocationRef: REF_A, stopOpId: null, lastSnapshot: null },
+      record: { state: 'launching', allocationRef: REF_A },
     });
     resumed.container.running = true;
     resumed.container.execHandler = () => execProcess(0);
-    await expect(launch(resumed.instance, REF_A, 'standard-2')).resolves.toEqual({ started: true });
+    await expect(launch(resumed.instance, REF_A, 'standard-3')).resolves.toEqual({
+      started: true,
+      startSource: 'image',
+    });
     expect(readRecord(resumed.storage).state).toBe('running');
     expect(readRecord(resumed.storage).wrapperAttempt).toBe('exec_pending');
     expect(readRecord(resumed.storage).instance).toBeUndefined();

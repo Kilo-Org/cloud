@@ -16,8 +16,8 @@ import type {
   PreparationStepSnapshot,
 } from './types';
 import {
-  cloudAgentEventSchema,
   cloudWorktreeChangesReadyDataSchema,
+  isValidCloudAgentEvent,
   kilocodePayloadSchema,
   messageUpdatedDataSchema,
   messagePartUpdatedDataSchema,
@@ -35,6 +35,7 @@ import {
   questionRepliedDataSchema,
   questionRejectedDataSchema,
   permissionAskedDataSchema,
+  permissionAskedIdentitySchema,
   permissionRepliedDataSchema,
   suggestionShownDataSchema,
   suggestionAcceptedDataSchema,
@@ -102,6 +103,16 @@ export type ServiceEvent =
       metadata: Record<string, unknown>;
       always: string[];
     }
+  | {
+      /**
+       * A permission request is waiting that this app cannot read: its scope
+       * did not parse, so no consent card can be offered for it. The request is
+       * still pending for the CLI, so the user is told it exists rather than
+       * seeing it vanish.
+       */
+      type: 'permission.unreadable';
+      requestId: string;
+    }
   | { type: 'permission.replied'; requestId: string }
   | {
       type: 'suggestion.shown';
@@ -136,6 +147,7 @@ export type ServiceEvent =
       timestamp?: number | undefined;
       action?: string | undefined;
       stepId?: string | undefined;
+      parentStepId?: string | undefined;
       kind?: 'phase' | 'setup_command' | undefined;
       label?: string | undefined;
       command?: string | undefined;
@@ -174,8 +186,10 @@ export type ServiceEvent =
       timestamp?: string | undefined;
     }
   | { type: 'cloud.status'; cloudStatus: CloudStatus }
+  | { type: 'bootstrap.complete' }
   | {
       type: 'connected';
+      bootstrapPending?: boolean | undefined;
       cloudSessionId?: string;
       sessionStatus?: SessionStatus | undefined;
       cloudStatus?: CloudStatus | undefined;
@@ -447,7 +461,7 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
       return {
         type: 'question.asked',
         requestId: r.data.id,
-        questions: r.data.questions as QuestionInfo[] | undefined,
+        questions: r.data.questions,
       };
     }
 
@@ -465,15 +479,23 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
 
     case 'permission.asked': {
       const r = permissionAskedDataSchema.safeParse(data);
-      if (!r.success) return null;
-      return {
-        type: 'permission.asked',
-        requestId: r.data.id,
-        permission: r.data.permission,
-        patterns: r.data.patterns,
-        metadata: r.data.metadata,
-        always: r.data.always,
-      };
+      if (r.success) {
+        return {
+          type: 'permission.asked',
+          requestId: r.data.id,
+          permission: r.data.permission,
+          patterns: r.data.patterns,
+          metadata: r.data.metadata,
+          always: r.data.always,
+        };
+      }
+      // A request whose scope does not parse cannot be offered as a decision:
+      // forwarding an empty scope would describe settings the app never read.
+      // It is not dropped either, because the CLI keeps waiting for an answer
+      // the app would otherwise never mention.
+      const identity = permissionAskedIdentitySchema.safeParse(data);
+      if (!identity.success) return null;
+      return { type: 'permission.unreadable', requestId: identity.data.id };
     }
 
     case 'permission.replied': {
@@ -554,6 +576,7 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
               timestamp: r.data.timestamp,
               action: r.data.action,
               ...(r.data.stepId === undefined ? {} : { stepId: r.data.stepId }),
+              ...(r.data.parentStepId === undefined ? {} : { parentStepId: r.data.parentStepId }),
               ...(r.data.kind === undefined ? {} : { kind: r.data.kind }),
               ...(r.data.label === undefined ? {} : { label: r.data.label }),
               ...(r.data.command === undefined ? {} : { command: r.data.command }),
@@ -605,11 +628,15 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
       if (!r.success) return null;
       return {
         type: 'connected',
+        ...(r.data.bootstrapPending !== undefined && { bootstrapPending: r.data.bootstrapPending }),
         ...(r.data.sessionStatus !== undefined && { sessionStatus: r.data.sessionStatus }),
         ...(r.data.cloudStatus !== undefined && { cloudStatus: r.data.cloudStatus }),
         ...(r.data.activeMessageId !== undefined && { activeMessageId: r.data.activeMessageId }),
       };
     }
+
+    case 'bootstrap.complete':
+      return z.object({}).safeParse(data).success ? { type: 'bootstrap.complete' } : null;
 
     case 'commands.available': {
       const r = commandsAvailableDataSchema.safeParse(data);
@@ -700,7 +727,7 @@ function normalizeInnerEvent(eventType: string, data: unknown): NormalizedEvent 
  * Returns null for invalid or unrecognized events.
  */
 export function normalize(raw: CloudAgentEvent): NormalizedEvent | null {
-  if (!cloudAgentEventSchema.safeParse(raw).success) return null;
+  if (!isValidCloudAgentEvent(raw)) return null;
 
   if (raw.streamEventType === 'cloud.worktree.changes.ready') {
     const r = cloudWorktreeChangesReadyDataSchema.safeParse(raw.data);
@@ -725,9 +752,10 @@ export function normalize(raw: CloudAgentEvent): NormalizedEvent | null {
   if (raw.streamEventType === 'connected' && event?.type === 'connected') {
     return { ...event, cloudSessionId: raw.sessionId };
   }
-  return event?.type === 'autocommit_completed' &&
-    event.commitHash &&
-    /^(?:[0-9a-f]{40}|[0-9a-f]{64})$/.test(event.commitHash)
+  // Only a completion that carries a storable commit hash gets the envelope
+  // timestamp the commit record is anchored to. The schema already dropped a
+  // hash that could not be stored, so its presence is the whole test.
+  return event?.type === 'autocommit_completed' && event.commitHash !== undefined
     ? { ...event, timestamp: raw.timestamp }
     : event;
 }

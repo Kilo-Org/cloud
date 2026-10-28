@@ -126,9 +126,7 @@ export function RepoPickerSheet({
       <EmptyState
         icon={isSearching ? SearchX : GitBranch}
         title={
-          isSearching
-            ? t('codeReviewer.repos.noRepositoriesFound')
-            : t('agentChat.repoPicker.noRepositories')
+          isSearching ? t('common.noRepositoriesFound') : t('agentChat.repoPicker.noRepositories')
         }
         description={
           isSearching
@@ -170,7 +168,7 @@ export function RepoPickerSheet({
           clearButtonMode="while-editing"
           returnKeyType="search"
           accessibilityLabel={t('profiles.repoBindings.search')}
-          className="flex-1 px-0 text-base text-foreground"
+          className="flex-1 pl-0 pr-0 text-base text-foreground"
           onChangeText={setSearch}
         />
       </View>

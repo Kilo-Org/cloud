@@ -25,7 +25,6 @@ export async function run(orgIdOrEmail: string, daysOrNow: string = '7'): Promis
   console.log('🗑️  Starting garbage collection for code indexing...');
   console.log('');
 
-  // Determine if this is an organization ID or user email
   let organizationId: string | null = null;
   let userId: string | null = null;
 
@@ -33,7 +32,6 @@ export async function run(orgIdOrEmail: string, daysOrNow: string = '7'): Promis
     organizationId = orgIdOrEmail;
     console.log(`   Target: Organization ${organizationId}`);
   } else {
-    // Look up user by email
     const user = await db
       .select()
       .from(kilocode_users)
@@ -48,7 +46,6 @@ export async function run(orgIdOrEmail: string, daysOrNow: string = '7'): Promis
     console.log(`   Target: User ${orgIdOrEmail} (${userId})`);
   }
 
-  // Calculate the cutoff date
   let beforeDate: Date;
   if (daysOrNow.toLowerCase() === 'now') {
     beforeDate = new Date();
@@ -94,7 +91,6 @@ export async function run(orgIdOrEmail: string, daysOrNow: string = '7'): Promis
     user: contextUser,
   });
 
-  // Call the deleteBeforeDate procedure
   console.log('🗑️  Deleting old index data...');
   const result = await caller.codeIndexing.deleteBeforeDate({
     organizationId: organizationId || undefined,

@@ -2,14 +2,7 @@ import { FlashList, type ListRenderItem } from '@shopify/flash-list';
 import { type OlderMessagesError } from '@kilocode/cloud-agent-sdk';
 import { ChevronDown } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import {
-  AccessibilityInfo,
-  Keyboard,
-  Platform,
-  Pressable,
-  View,
-  type ViewStyle,
-} from 'react-native';
+import { AccessibilityInfo, Pressable, View, type ViewStyle } from 'react-native';
 import { useTranslation } from 'react-i18next';
 import Animated, { FadeIn, FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -151,7 +144,6 @@ export function SessionMessageList<T>({
     sendTakeoverRef,
     followTailFromSend,
     handleContentSizeChange,
-    handleKeyboardShow,
     handleListLayout,
     handleScroll,
     handleScrollBeginDrag,
@@ -251,26 +243,13 @@ export function SessionMessageList<T>({
     resumeAt,
   });
 
-  // Keep the newest message visible when the keyboard opens, but only while
-  // the follow guard is true (the user is still at the bottom). On iOS,
-  // `keyboardWillShow` fires before the animation and `keyboardDidShow` fires
-  // after it: the first starts the scroll immediately and the second lands it
-  // once the viewport has actually shrunk. Android has no will-show event, so
-  // `keyboardDidShow` is the only show signal there.
-  useEffect(() => {
-    if (Platform.OS === 'ios') {
-      const willShow = Keyboard.addListener('keyboardWillShow', handleKeyboardShow);
-      const didShow = Keyboard.addListener('keyboardDidShow', handleKeyboardShow);
-      return () => {
-        willShow.remove();
-        didShow.remove();
-      };
-    }
-    const didShow = Keyboard.addListener('keyboardDidShow', handleKeyboardShow);
-    return () => {
-      didShow.remove();
-    };
-  }, [handleKeyboardShow]);
+  // The newest message is kept visible when the viewport shrinks by the follow
+  // itself: `handleListLayout` re-pins the tail on a viewport resize, and
+  // FlashList's `startRenderingFromBottom` holds the bottom while the layout
+  // changes. A keyboard listener here added a second, independent correction —
+  // the message stack jumped on its own timetable while the composer was still
+  // moving (video V1 ~19.0s), and no surface beside the provider may read the
+  // keyboard.
 
   // Fire `onReachedBottom` only on the false→true transition of
   // `isAtBottom`. The previous-value ref prevents a fire on mount (the list

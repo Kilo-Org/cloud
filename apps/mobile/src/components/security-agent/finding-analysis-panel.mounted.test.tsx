@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- the completion-copy gate and the stale-analysis action share one analysis fixture. */
+
 // Finding-analysis completion-copy gate: sandbox/triage evidence is
 // authoritative only once the analysis reached a terminal sandbox/triage
 // state. A stale result left behind by a failed retry must not read as
@@ -13,10 +15,12 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { MarkdownText } from '@/components/agents/markdown-text';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Text } from '@/components/ui/text';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { FindingAnalysisPanel } from './finding-analysis-panel';
+import { i18n } from '@/i18n';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 
 const capacity = vi.hoisted(() => ({
@@ -24,6 +28,7 @@ const capacity = vi.hoisted(() => ({
   concurrencyLimit: 3,
   isLoading: false,
   isError: false,
+  state: 'available' as 'loading' | 'error' | 'available' | 'full',
   refetch: vi.fn(),
 }));
 const startAnalysis = vi.hoisted(() => ({
@@ -156,6 +161,7 @@ describe('FindingAnalysisPanel completion-copy gate', () => {
     capacity.concurrencyLimit = 3;
     capacity.isLoading = false;
     capacity.isError = false;
+    capacity.state = 'available';
     startAnalysis.isPending = false;
     startAnalysis.mutate.mockClear();
   });
@@ -215,11 +221,16 @@ describe('FindingAnalysisPanel completion-copy gate', () => {
   it.each(['loading', 'error', 'full'] as const)(
     'keeps analysis disabled when capacity is %s',
     state => {
-      capacity.isLoading = state === 'loading';
-      capacity.isError = state === 'error';
-      capacity.runningCount = state === 'full' ? 3 : undefined;
+      capacity.state = state;
       const tree = renderPanel(analysisFixture({ status: null }));
-      expect(tree.root.findByType(Button).props.disabled).toBe(true);
+      const button = tree.root.findByType(Button);
+      expect(button.props.disabled).toBe(true);
+      const hints = {
+        full: i18n.t('securityAgent.analysis.capacityFull'),
+        error: i18n.t('securityAgent.analysis.couldNotCheckCapacity'),
+        loading: undefined,
+      };
+      expect(button.props.accessibilityHint).toBe(hints[state]);
       expect(tree.root.findAllByType(CenteredState)).toHaveLength(1);
     }
   );
@@ -233,6 +244,38 @@ describe('FindingAnalysisPanel completion-copy gate', () => {
       findingId: 'finding-1',
       retrySandboxOnly: false,
     });
+  });
+
+  it('explains a full capacity under the disabled action', () => {
+    capacity.state = 'full';
+    const tree = renderPanel(analysisFixture({ status: null }));
+    const rendered = tree.root.findAllByType(Text);
+    expect(
+      rendered.filter(node => node.props.children === i18n.t('securityAgent.analysis.capacityFull'))
+    ).toHaveLength(1);
+  });
+
+  it('keeps the capacity explanation off an already analyzed finding', () => {
+    capacity.state = 'full';
+    const tree = renderPanel(analysisFixture({ status: 'completed' }));
+    const rendered = tree.root.findAllByType(Text);
+    expect(
+      rendered.filter(node => node.props.children === i18n.t('securityAgent.analysis.capacityFull'))
+    ).toHaveLength(0);
+  });
+
+  it('retries a failed capacity read from the explanation', () => {
+    capacity.state = 'error';
+    const tree = renderPanel(analysisFixture({ status: null }));
+    const [retry] = tree.root.findAll(
+      node =>
+        typeof node.type === 'string' && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    expect(retry).toBeDefined();
+    const onRetry: unknown = retry?.props.onPress;
+    expect(typeof onRetry).toBe('function');
+    act(onRetry as () => void);
+    expect(capacity.refetch).toHaveBeenCalledOnce();
   });
 
   it('hides stale sandbox and triage evidence while the analysis is running', () => {
@@ -276,5 +319,104 @@ describe('FindingAnalysisPanel completion-copy gate', () => {
     );
 
     expect(kvRows.labels).toContain('Triage confidence');
+  });
+});
+
+describe('FindingAnalysisPanel stale analysis action', () => {
+  const staleCapability = {
+    canStart: false,
+    startReason: 'stale_analysis',
+    canRetry: false,
+    retryReason: 'stale_analysis',
+    canCancel: false,
+    cancelAttemptId: null,
+  };
+
+  function rerunButtons(tree: R) {
+    return tree.root.findAll(
+      node =>
+        node.type === Button &&
+        node.props.children === i18n.t('securityAgent.analysis.rerunAnalysis')
+    );
+  }
+
+  beforeEach(() => {
+    kvRows.labels = [];
+    capacity.runningCount = 0;
+    capacity.concurrencyLimit = 3;
+    capacity.isLoading = false;
+    capacity.isError = false;
+    capacity.state = 'available';
+    capacity.refetch.mockClear();
+    startAnalysis.isPending = false;
+    startAnalysis.mutate.mockClear();
+  });
+
+  it('offers the rerun action a completed analysis cannot', () => {
+    const tree = renderPanel(
+      analysisFixture({
+        status: 'completed',
+        analysis: { sandboxAnalysis: staleAnalysis().sandboxAnalysis },
+        remediationCapability: staleCapability,
+      })
+    );
+
+    const [rerun] = rerunButtons(tree);
+    expect(rerun).toBeDefined();
+    act(rerun?.props.onPress as () => void);
+    expect(startAnalysis.mutate).toHaveBeenCalledWith({ findingId: 'finding-1' });
+  });
+
+  it('keeps the action off a finding that already ran remediation', () => {
+    const tree = renderPanel(
+      analysisFixture({
+        status: 'completed',
+        remediationCapability: staleCapability,
+        remediationAttempts: [
+          {
+            id: 'attempt-1',
+            status: 'failed',
+            origin: 'manual',
+            updatedAt: '2026-04-29T02:00:00Z',
+          },
+        ],
+      })
+    );
+
+    expect(rerunButtons(tree)).toHaveLength(0);
+  });
+
+  it('disables the rerun action at full capacity and explains it', () => {
+    capacity.state = 'full';
+    const tree = renderPanel(
+      analysisFixture({
+        status: 'completed',
+        remediationCapability: staleCapability,
+      })
+    );
+
+    const [rerun] = rerunButtons(tree);
+    expect(rerun?.props.disabled).toBe(true);
+    const rendered = tree.root.findAllByType(Text);
+    expect(
+      rendered.filter(node => node.props.children === i18n.t('securityAgent.analysis.capacityFull'))
+    ).toHaveLength(1);
+  });
+
+  it('retries a failed capacity read under the rerun action', () => {
+    capacity.state = 'error';
+    const tree = renderPanel(
+      analysisFixture({
+        status: 'completed',
+        remediationCapability: staleCapability,
+      })
+    );
+
+    const retry = tree.root.findAll(
+      node =>
+        typeof node.type === 'string' && node.props.accessibilityLabel === i18n.t('common.retry')
+    )[0];
+    act(retry?.props.onPress as () => void);
+    expect(capacity.refetch).toHaveBeenCalledOnce();
   });
 });

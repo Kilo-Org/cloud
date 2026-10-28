@@ -23,13 +23,14 @@ import {
   organization_groups,
   organization_group_memberships,
   organization_group_policy_settings,
+  byoc_connections,
   organization_invitations,
   organization_recommendation_dismissals,
   security_audit_log,
-  free_model_usage,
   organizations,
   user_feedback,
   cloud_agent_feedback,
+  cloud_agent_webhook_triggers,
   user_admin_notes,
   magic_link_tokens,
   device_sessions,
@@ -59,12 +60,18 @@ import {
   bot_requests,
   bot_request_cloud_agent_sessions,
   kiloclaw_admin_audit_logs,
+  admin_action_audit_logs,
   kiloclaw_scheduled_actions,
   kiloclaw_scheduled_action_stages,
   kiloclaw_scheduled_action_targets,
   user_push_tokens,
   user_activity_tokens,
   user_notification_preferences,
+  user_notification_history,
+  agent_briefing_snapshots,
+  agent_briefing_context_preferences,
+  agent_briefing_preferences,
+  cli_sessions_v2,
   spend_alert_settings,
   spend_alert_rules,
   spend_alert_rule_state,
@@ -76,6 +83,8 @@ import {
   agent_environment_profiles,
   agent_environment_profile_mcp_servers,
   agent_environment_profile_skills,
+  cloud_agent_sandbox_allocation_settings,
+  cloud_agent_environments,
   deleted_user_email_tombstones,
   impact_attribution_touches,
   impact_advocate_participants,
@@ -88,6 +97,7 @@ import {
   impact_advocate_reward_redemptions,
   impact_conversion_reports,
   github_branch_pull_requests,
+  auto_routing_custom_routers,
   github_install_states,
   code_review_feedback_events,
   code_review_memory_proposals,
@@ -109,20 +119,10 @@ import {
   coding_plan_subscriptions,
   byok_api_keys,
   openai_chatgpt_connections,
-  mcp_gateway_configs,
-  mcp_gateway_authorization_codes,
-  mcp_gateway_authorization_requests,
-  mcp_gateway_config_secrets,
-  mcp_gateway_connect_resources,
-  mcp_gateway_connection_instances,
-  mcp_gateway_provider_grants,
-  mcp_gateway_pending_provider_authorizations,
-  mcp_gateway_oauth_clients,
-  mcp_gateway_oauth_grants,
-  deployments_ephemeral,
   operation_ledgers,
   analytics_event_outbox,
   bouncer_credit_event_outbox,
+  bouncer_usage_event_outbox,
   external_side_effect_outbox,
   user_data_exports,
   user_data_export_parts,
@@ -131,13 +131,13 @@ import {
   user_moderation_blocks,
   user_moderation_mutes,
   user_terms_acceptances,
-  quick_chat_threads,
-  quick_chat_messages,
   user_deletion_requests,
   user_deletion_steps,
   cloud_agent_pending_uploads,
   cloud_agent_workspace_folders,
   cloud_agent_worktrees,
+  todo_items,
+  todo_lists,
   passkey_credentials,
   passkey_challenges,
   passkey_sign_in_tickets,
@@ -185,14 +185,39 @@ import {
   SecurityFindingNotificationStatus,
   UserDeletionCloudSubjectResolution,
   UserDeletionRequestStatus,
+  type VercelComputeCredentialEnvelope,
 } from '@kilocode/db/schema-types';
 
+import type * as StripeClient from '@kilocode/web-shared/lib/stripe-client';
+import type * as BouncerClient from '@kilocode/web-shared/lib/bouncer/client';
+
+jest.mock('@kilocode/web-shared/lib/config.server', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/config.server'),
+  BOUNCER_URL: 'https://bouncer.example.com',
+  INTERNAL_API_SECRET: 'test-internal-secret',
+}));
+
+jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
+  ...jest.requireActual<typeof BouncerClient>('@kilocode/web-shared/lib/bouncer/client'),
+  signupDecide: jest.fn(async () => null),
+}));
+
+const mockSignupDecide = jest.mocked(
+  jest.requireMock<typeof BouncerClient>('@kilocode/web-shared/lib/bouncer/client').signupDecide
+);
+const actualSignupDecide = jest.requireActual<typeof BouncerClient>(
+  '@kilocode/web-shared/lib/bouncer/client'
+).signupDecide;
 jest.mock('@kilocode/web-shared/lib/stripe-client', () => ({
   createStripeCustomer: jest.fn(async ({ metadata }: { metadata: { kiloUserId: string } }) => ({
     id: `cus_${metadata.kiloUserId}`,
   })),
   deleteStripeCustomer: jest.fn(async () => {}),
 }));
+
+const { createStripeCustomer, deleteStripeCustomer } = jest.requireMock<typeof StripeClient>(
+  '@kilocode/web-shared/lib/stripe-client'
+);
 
 jest.mock('@/lib/impact/affiliate-events', () => ({
   recordAffiliateAttributionAndQueueParentEvent: jest.fn(async () => null),
@@ -218,9 +243,9 @@ describe('User', () => {
   afterEach(async () => {
     await db.delete(cloud_agent_worktrees);
     await db.delete(cloud_agent_workspace_folders);
+    await db.delete(todo_lists);
     await db.delete(user_deletion_steps);
     await db.delete(user_deletion_requests);
-    await db.delete(deployments_ephemeral);
     await db.delete(operation_ledgers);
     await db.delete(analytics_event_outbox);
     await db.delete(user_data_export_parts);
@@ -258,6 +283,7 @@ describe('User', () => {
     await db.delete(organization_recommendation_dismissals);
     await db.delete(security_audit_log);
     await db.delete(kiloclaw_admin_audit_logs);
+    await db.delete(admin_action_audit_logs);
     await db.delete(model_eval_ingestions);
     await db.delete(kiloclaw_scheduled_action_targets);
     await db.delete(kiloclaw_scheduled_action_stages);
@@ -277,7 +303,6 @@ describe('User', () => {
     await db.delete(organization_user_usage);
     await db.delete(organization_user_limits);
     await db.delete(organization_memberships);
-    await db.delete(free_model_usage);
     await db.delete(microdollar_usage_metadata);
     await db.delete(microdollar_usage);
     await db.delete(user_feedback);
@@ -302,16 +327,9 @@ describe('User', () => {
     await db.delete(kiloclaw_instances);
     await db.delete(agent_environment_profile_skills);
     await db.delete(agent_environment_profile_mcp_servers);
+    await db.delete(cloud_agent_webhook_triggers);
+    await db.delete(cloud_agent_environments);
     await db.delete(agent_environment_profiles);
-    await db.delete(mcp_gateway_pending_provider_authorizations);
-    await db.delete(mcp_gateway_authorization_codes);
-    await db.delete(mcp_gateway_authorization_requests);
-    await db.delete(mcp_gateway_oauth_grants);
-    await db.delete(mcp_gateway_oauth_clients);
-    await db.delete(mcp_gateway_provider_grants);
-    await db.delete(mcp_gateway_connection_instances);
-    await db.delete(mcp_gateway_connect_resources);
-    await db.delete(mcp_gateway_configs);
     await db.delete(github_branch_pull_requests);
     await db.delete(code_review_memory_proposals);
     await db.delete(code_review_feedback_events);
@@ -320,9 +338,9 @@ describe('User', () => {
     await db.delete(platform_access_token_credentials);
     await db.delete(platform_integrations);
     await db.delete(github_app_installations);
-    await db.delete(quick_chat_messages);
-    await db.delete(quick_chat_threads);
+    await db.delete(byoc_connections);
     await db.delete(organizations);
+    await db.delete(cli_sessions_v2);
     await db.delete(kilocode_users);
   });
 
@@ -837,7 +855,676 @@ describe('User', () => {
   describe('createOrUpdateUser', () => {
     beforeEach(() => {
       mockRecordAffiliateAttributionAndQueueParentEvent.mockResolvedValue(null);
+      mockSignupDecide.mockReset().mockResolvedValue({ enforced: false, flags: [] });
+      jest.mocked(createStripeCustomer).mockClear();
+      jest.mocked(deleteStripeCustomer).mockClear();
     });
+
+    afterEach(() => {
+      jest.restoreAllMocks();
+    });
+
+    it('refuses a native signup without verified admission before creating a Stripe customer or user', async () => {
+      const email = 'native-admission-refused@example.com';
+      const verifyAdmission = jest.fn().mockResolvedValue(false);
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: email,
+          google_user_name: 'Unverified',
+          google_user_image_url: '',
+          hosted_domain: null,
+          provider: 'email',
+          provider_account_id: email,
+        },
+        undefined,
+        true,
+        new Headers({ 'x-forwarded-for': '203.0.113.68' }),
+        undefined,
+        undefined,
+        true,
+        verifyAdmission
+      );
+
+      expect(result).toEqual({ success: false, error: 'ADMISSION_REQUIRED' });
+      expect(verifyAdmission).toHaveBeenCalledTimes(1);
+      expect(createStripeCustomer).not.toHaveBeenCalled();
+      expect(
+        await db.query.kilocode_users.findFirst({
+          where: eq(kilocode_users.google_user_email, email),
+        })
+      ).toBeUndefined();
+      expect(
+        await db.query.user_auth_provider.findFirst({
+          where: eq(user_auth_provider.provider_account_id, email),
+        })
+      ).toBeUndefined();
+    });
+
+    it('refuses missing native admission before calling the signup bouncer', async () => {
+      const email = 'native-admission-before-bouncer@example.com';
+      mockSignupDecide.mockResolvedValue(null);
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: email,
+          google_user_name: 'Unverified',
+          google_user_image_url: '',
+          hosted_domain: null,
+          provider: 'email',
+          provider_account_id: email,
+        },
+        undefined,
+        true,
+        new Headers({ 'x-forwarded-for': '203.0.113.70' }),
+        undefined,
+        undefined,
+        true,
+        async () => false
+      );
+
+      expect(result).toEqual({ success: false, error: 'ADMISSION_REQUIRED' });
+      expect(mockSignupDecide).not.toHaveBeenCalled();
+      expect(createStripeCustomer).not.toHaveBeenCalled();
+    });
+
+    it('does not require native signup admission for an existing account', async () => {
+      const email = 'native-admission-existing@example.com';
+      const args = {
+        google_user_email: email,
+        google_user_name: 'Existing',
+        google_user_image_url: '',
+        hosted_domain: null,
+        provider: 'email' as const,
+        provider_account_id: email,
+      };
+      const headers = new Headers({ 'x-forwarded-for': '203.0.113.69' });
+      const created = await createOrUpdateUser(args, undefined, true, headers);
+      expect(created.success).toBe(true);
+      const verifyAdmission = jest.fn().mockResolvedValue(false);
+
+      const signedIn = await createOrUpdateUser(
+        args,
+        undefined,
+        true,
+        headers,
+        undefined,
+        undefined,
+        true,
+        verifyAdmission
+      );
+
+      expect(signedIn.success).toBe(true);
+      if (!signedIn.success) return;
+      expect(signedIn.isNew).toBe(false);
+      expect(verifyAdmission).not.toHaveBeenCalled();
+    });
+
+    describe('while email signups are disabled', () => {
+      const emailArgs = (email: string) => ({
+        google_user_email: email,
+        google_user_name: 'Email User',
+        google_user_image_url: '',
+        hosted_domain: null,
+        provider: 'email' as const,
+        provider_account_id: email,
+      });
+      const headers = () => new Headers({ 'x-forwarded-for': '203.0.113.90' });
+
+      afterEach(() => {
+        process.env.EMAIL_SIGNUPS_ENABLED = 'true';
+      });
+
+      it('refuses a new email account before Bouncer, Stripe, or user creation', async () => {
+        const email = 'email-signup-disabled-new@example.com';
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const result = await createOrUpdateUser(emailArgs(email), undefined, true, headers());
+
+        expect(result).toEqual({ success: false, error: 'EMAIL-SIGNUP-DISABLED' });
+        expect(mockSignupDecide).not.toHaveBeenCalled();
+        expect(createStripeCustomer).not.toHaveBeenCalled();
+        expect(
+          await db.query.kilocode_users.findFirst({
+            where: eq(kilocode_users.google_user_email, email),
+          })
+        ).toBeUndefined();
+      });
+
+      it('signs in an existing email user', async () => {
+        const email = 'email-signup-disabled-existing@example.com';
+        const created = await createOrUpdateUser(emailArgs(email), undefined, true, headers());
+        expect(created.success).toBe(true);
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const signedIn = await createOrUpdateUser(emailArgs(email), undefined, true, headers());
+
+        expect(signedIn.success).toBe(true);
+        if (!signedIn.success) return;
+        expect(signedIn.isNew).toBe(false);
+      });
+
+      it('links email to an existing OAuth user on their first magic link', async () => {
+        const email = 'email-signup-disabled-oauth@example.com';
+        const created = await createOrUpdateUser(
+          {
+            ...emailArgs(email),
+            provider: 'google',
+            provider_account_id: 'google-email-signup-disabled',
+          },
+          undefined,
+          false,
+          headers()
+        );
+        expect(created.success).toBe(true);
+        if (!created.success) return;
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const signedIn = await createOrUpdateUser(emailArgs(email), undefined, true, headers());
+
+        expect(signedIn.success).toBe(true);
+        if (!signedIn.success) return;
+        expect(signedIn.user.id).toBe(created.user.id);
+        expect(signedIn.isNew).toBe(false);
+      });
+
+      it('keeps EMAIL-ALREADY-USED for a normalized match of an existing account', async () => {
+        const created = await createOrUpdateUser(
+          emailArgs('emailsignupdisabledalias@gmail.com'),
+          undefined,
+          true,
+          headers()
+        );
+        expect(created.success).toBe(true);
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const result = await createOrUpdateUser(
+          emailArgs('email.signup.disabled.alias@gmail.com'),
+          undefined,
+          true,
+          headers()
+        );
+
+        expect(result).toEqual({ success: false, error: 'EMAIL-ALREADY-USED' });
+      });
+
+      it('refuses a case variant of a legacy account without a normalized email', async () => {
+        await insertTestUser({
+          id: 'email-signup-disabled-legacy',
+          google_user_email: 'Legacy.Case@Example.com',
+          normalized_email: null,
+        });
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const result = await createOrUpdateUser(
+          emailArgs('legacy.case@example.com'),
+          undefined,
+          true,
+          headers()
+        );
+
+        expect(result).toEqual({ success: false, error: 'EMAIL-ALREADY-USED' });
+        expect(createStripeCustomer).not.toHaveBeenCalled();
+        expect(
+          await db.query.kilocode_users.findFirst({
+            where: eq(kilocode_users.google_user_email, 'legacy.case@example.com'),
+          })
+        ).toBeUndefined();
+      });
+
+      it('still creates a new OAuth account', async () => {
+        process.env.EMAIL_SIGNUPS_ENABLED = 'false';
+
+        const result = await createOrUpdateUser(
+          {
+            ...emailArgs('email-signup-disabled-google-new@example.com'),
+            provider: 'google',
+            provider_account_id: 'google-email-signup-disabled-new',
+          },
+          undefined,
+          false,
+          headers()
+        );
+
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.isNew).toBe(true);
+      });
+    });
+
+    it.each([
+      { name: 'IP rejection', flags: [{ name: 'signup:burst', source: 'ip' }] },
+      { name: 'JA4 rejection', flags: [{ name: 'signup:ja4', source: 'ja4' }] },
+      {
+        name: 'merged five-flag rejection',
+        flags: [
+          { name: 'signup:burst', source: 'ip' },
+          { name: 'signup:sustained', source: 'ip' },
+          { name: 'signup:saturated', source: 'ip' },
+          { name: 'signup:ja4', source: 'ja4' },
+          { name: 'signup:saturated', source: 'ja4' },
+        ],
+      },
+    ])('prevents Stripe and user creation on validated $name', async ({ flags }) => {
+      const email = 'bouncer-rejected@example.com';
+      mockSignupDecide.mockImplementation(actualSignupDecide);
+      jest.spyOn(global, 'fetch').mockResolvedValue(
+        Response.json({
+          enforced: true,
+          code: 'signup_rate_limited',
+          retryAfterMs: 1_000,
+          flags: flags.map(flag => ({
+            ...flag,
+            decision: 'throttle',
+            enforced: flag.source === flags.at(-1)?.source,
+            until: Date.now() + 1_000,
+          })),
+        })
+      );
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: email,
+          google_user_name: 'Bouncer Rejected',
+          google_user_image_url: '',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: 'google-bouncer-rejected',
+        },
+        undefined,
+        false,
+        new Headers({
+          'x-forwarded-for': '203.0.113.60, 10.0.0.1',
+          'x-vercel-ja4-digest': '  T13D1516H2_8DAAF6  ',
+        })
+      );
+
+      expect(result).toEqual({ success: false, error: 'SIGNUP-RATE-LIMITED' });
+      expect(createStripeCustomer).not.toHaveBeenCalled();
+      expect(deleteStripeCustomer).not.toHaveBeenCalled();
+      expect(
+        await db.query.kilocode_users.findFirst({
+          where: eq(kilocode_users.google_user_email, email),
+        })
+      ).toBeUndefined();
+      expect(
+        await db.query.user_auth_provider.findFirst({
+          where: eq(user_auth_provider.provider_account_id, 'google-bouncer-rejected'),
+        })
+      ).toBeUndefined();
+    });
+
+    it.each([
+      { name: 'allow', verdict: { enforced: false, flags: [] } },
+      {
+        name: 'shadow review',
+        verdict: {
+          enforced: false,
+          flags: [{ name: 'signup:burst', decision: 'review', enforced: false, until: null }],
+        },
+      },
+      {
+        name: 'JA4 shadow review',
+        verdict: {
+          enforced: false,
+          flags: [
+            { name: 'signup:ja4', source: 'ja4', decision: 'review', enforced: false, until: null },
+          ],
+        },
+      },
+    ])('creates the user after Bouncer $name', async ({ verdict }) => {
+      mockSignupDecide.mockImplementation(actualSignupDecide);
+      jest.spyOn(global, 'fetch').mockResolvedValue(Response.json(verdict));
+      const email = 'bouncer-allowed@example.com';
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: email,
+          google_user_name: 'Bouncer Allowed',
+          google_user_image_url: '',
+          hosted_domain: null,
+          provider: 'google',
+          provider_account_id: 'google-bouncer-allowed',
+        },
+        undefined,
+        false,
+        new Headers({ 'x-forwarded-for': '[2001:db8::1]:443' })
+      );
+
+      expect(result.success).toBe(true);
+      if (!result.success) return;
+      expect(result.isNew).toBe(true);
+      expect(createStripeCustomer).toHaveBeenCalledTimes(1);
+      expect(
+        await db.query.kilocode_users.findFirst({ where: eq(kilocode_users.id, result.user.id) })
+      ).toBeDefined();
+    });
+    it.each([
+      'unknown response',
+      'invalid nine-flag rejection',
+      'transport failure',
+      'HTTP failure',
+      'invalid JSON',
+      'timeout',
+    ])('prevents Stripe and user creation after Bouncer %s', async mode => {
+      mockSignupDecide.mockImplementation(request =>
+        actualSignupDecide(request, { timeoutMs: 30 })
+      );
+      const fetchMock = jest.spyOn(global, 'fetch');
+      switch (mode) {
+        case 'unknown response':
+          fetchMock.mockResolvedValue(Response.json(null));
+          break;
+        case 'invalid nine-flag rejection':
+          fetchMock.mockResolvedValue(
+            Response.json({
+              enforced: true,
+              code: 'signup_rate_limited',
+              retryAfterMs: 1_000,
+              flags: Array.from({ length: 9 }, () => ({
+                name: 'signup:ja4',
+                source: 'ja4',
+                decision: 'throttle',
+                enforced: true,
+                until: null,
+              })),
+            })
+          );
+          break;
+        case 'transport failure':
+          fetchMock.mockRejectedValue(new TypeError('fetch failed'));
+          break;
+        case 'HTTP failure':
+          fetchMock.mockResolvedValue(new Response(null, { status: 503 }));
+          break;
+        case 'invalid JSON':
+          fetchMock.mockResolvedValue(new Response('not-json'));
+          break;
+        case 'timeout':
+          fetchMock.mockImplementation(
+            (_url, init) =>
+              new Promise<Response>((_resolve, reject) => {
+                init?.signal?.addEventListener('abort', () => reject(init.signal?.reason));
+              })
+          );
+          break;
+      }
+      const email = 'bouncer-unavailable@example.com';
+      const args = {
+        google_user_email: email,
+        google_user_name: 'Bouncer Unavailable',
+        google_user_image_url: '',
+        hosted_domain: null,
+        provider: 'google' as const,
+        provider_account_id: 'google-bouncer-unavailable',
+      };
+      const headers = new Headers({ 'x-forwarded-for': '203.0.113.63' });
+      const result = await createOrUpdateUser(args, undefined, false, headers);
+
+      expect(result).toEqual({ success: false, error: 'SIGNUP-UNAVAILABLE' });
+      expect(createStripeCustomer).not.toHaveBeenCalled();
+      expect(deleteStripeCustomer).not.toHaveBeenCalled();
+      expect(
+        await db.query.kilocode_users.findFirst({
+          where: eq(kilocode_users.google_user_email, email),
+        })
+      ).toBeUndefined();
+      expect(
+        await db.query.user_auth_provider.findFirst({
+          where: eq(user_auth_provider.provider_account_id, args.provider_account_id),
+        })
+      ).toBeUndefined();
+
+      // Retrying after admission recovers must create one account, not a partial duplicate.
+      fetchMock.mockResolvedValue(Response.json({ enforced: false, flags: [] }));
+      const retry = await createOrUpdateUser(args, undefined, false, headers);
+      expect(retry.success).toBe(true);
+      if (!retry.success) return;
+      expect(retry.isNew).toBe(true);
+      expect(createStripeCustomer).toHaveBeenCalledTimes(1);
+      expect(
+        await db.query.kilocode_users.findFirst({ where: eq(kilocode_users.id, retry.user.id) })
+      ).toBeDefined();
+    });
+
+    it.each([undefined, '', 'not-a-digest', 'has space', 'a'.repeat(129)])(
+      'still enforces IP admission with missing or invalid JA4: %s',
+      async ja4 => {
+        const email = 'bouncer-ip-only@example.com';
+        mockSignupDecide.mockImplementation(actualSignupDecide);
+        const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(
+          Response.json({
+            enforced: true,
+            code: 'signup_rate_limited',
+            retryAfterMs: 1_000,
+            flags: [
+              {
+                name: 'signup:burst',
+                source: 'ip',
+                decision: 'throttle',
+                enforced: true,
+                until: null,
+              },
+            ],
+          })
+        );
+        const headers = new Headers({ 'x-forwarded-for': '203.0.113.61' });
+        if (ja4 !== undefined) headers.set('x-vercel-ja4-digest', ja4);
+        const result = await createOrUpdateUser(
+          {
+            google_user_email: email,
+            google_user_name: 'IP Only Rejected',
+            google_user_image_url: '',
+            hosted_domain: null,
+            provider: 'google',
+            provider_account_id: 'google-bouncer-ip-only',
+          },
+          undefined,
+          false,
+          headers
+        );
+        expect(result).toEqual({ success: false, error: 'SIGNUP-RATE-LIMITED' });
+        expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).not.toHaveProperty('ja4');
+        expect(createStripeCustomer).not.toHaveBeenCalled();
+        expect(
+          await db.query.kilocode_users.findFirst({
+            where: eq(kilocode_users.google_user_email, email),
+          })
+        ).toBeUndefined();
+      }
+    );
+
+    it.each(['email', 'github', 'google'] as const)(
+      'returns SIGNUP-STEP-UP for a %s signup without Stripe or user rows',
+      async provider => {
+        const email = `bouncer-step-up-${provider}@example.test`;
+        const providerAccountId = `${provider}-bouncer-step-up`;
+        mockSignupDecide.mockImplementation(actualSignupDecide);
+        const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(
+          Response.json({
+            enforced: true,
+            code: 'signup_step_up',
+            methods: ['apple', 'passkey', 'google'],
+            flags: [
+              {
+                name: 'signup:domain',
+                source: 'domain',
+                decision: 'throttle',
+                enforced: true,
+                until: null,
+              },
+            ],
+          })
+        );
+        const result = await createOrUpdateUser(
+          {
+            google_user_email: email,
+            google_user_name: 'Step Up',
+            google_user_image_url: '',
+            hosted_domain: null,
+            provider,
+            provider_account_id: providerAccountId,
+          },
+          undefined,
+          false,
+          new Headers({ 'x-forwarded-for': '203.0.113.64' })
+        );
+
+        expect(result).toEqual({
+          success: false,
+          error: 'SIGNUP-STEP-UP',
+          methods: ['google', 'apple'],
+        });
+        expect(JSON.parse(String(fetchMock.mock.calls[0]?.[1]?.body))).toEqual({
+          operationId: expect.stringMatching(/^signup:[a-f0-9]{64}$/),
+          ip: '203.0.113.64',
+          method: provider,
+          emailDomain: 'example.test',
+        });
+        expect(createStripeCustomer).not.toHaveBeenCalled();
+        expect(deleteStripeCustomer).not.toHaveBeenCalled();
+        expect(
+          await db.query.kilocode_users.findFirst({
+            where: eq(kilocode_users.google_user_email, email),
+          })
+        ).toBeUndefined();
+        expect(
+          await db.query.user_auth_provider.findFirst({
+            where: eq(user_auth_provider.provider_account_id, providerAccountId),
+          })
+        ).toBeUndefined();
+      }
+    );
+
+    it.each([
+      ['mail.team.example.test', 'example.test'],
+      ['x.my.id', 'x.my.id'],
+    ])('sends the registrable domain of %s as %s', async (host, emailDomain) => {
+      const result = await createOrUpdateUser(
+        {
+          google_user_email: `bouncer-domain@${host}`,
+          google_user_name: 'Bouncer Domain',
+          google_user_image_url: '',
+          hosted_domain: null,
+          provider: 'email',
+          provider_account_id: `bouncer-domain@${host}`,
+        },
+        undefined,
+        false,
+        new Headers({ 'x-forwarded-for': '203.0.113.65' })
+      );
+
+      expect(result.success).toBe(true);
+      expect(mockSignupDecide).toHaveBeenCalledWith(
+        expect.objectContaining({ method: 'email', emailDomain })
+      );
+    });
+
+    it('propagates a Stripe failure without creating a user', async () => {
+      const email = 'bouncer-stripe-failure@example.com';
+      const stripeError = new Error('Stripe unavailable');
+      mockSignupDecide.mockResolvedValue({ enforced: false, flags: [] });
+      jest.mocked(createStripeCustomer).mockRejectedValueOnce(stripeError);
+
+      await expect(
+        createOrUpdateUser(
+          {
+            google_user_email: email,
+            google_user_name: 'Stripe Failure',
+            google_user_image_url: '',
+            hosted_domain: null,
+            provider: 'google',
+            provider_account_id: 'google-bouncer-stripe-failure',
+          },
+          undefined,
+          false,
+          new Headers({ 'x-forwarded-for': '203.0.113.62' })
+        )
+      ).rejects.toBe(stripeError);
+      expect(
+        await db.query.kilocode_users.findFirst({
+          where: eq(kilocode_users.google_user_email, email),
+        })
+      ).toBeUndefined();
+    });
+
+    it.each([undefined, 'not-an-ip', 'fe80::1%eth0'])(
+      'rejects signup without a usable signup IP: %s',
+      async ip => {
+        const result = await createOrUpdateUser(
+          {
+            google_user_email: 'bouncer-missing-ip@example.com',
+            google_user_name: 'Missing IP',
+            google_user_image_url: '',
+            hosted_domain: null,
+            provider: 'google',
+            provider_account_id: 'google-bouncer-missing-ip',
+          },
+          undefined,
+          false,
+          ip ? new Headers({ 'x-forwarded-for': ip }) : undefined
+        );
+        expect(result).toEqual({ success: false, error: 'SIGNUP-UNAVAILABLE' });
+        expect(createStripeCustomer).not.toHaveBeenCalled();
+        expect(mockSignupDecide).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each(['sign-in', 'provider linking'])(
+      'keeps existing %s outside signup quotas',
+      async mode => {
+        const existing = await insertTestUser({
+          google_user_email: 'bouncer-link@example.com',
+          google_user_name: 'Existing Link',
+        });
+        if (mode === 'sign-in') {
+          await db.insert(user_auth_provider).values({
+            kilo_user_id: existing.id,
+            provider: 'google',
+            provider_account_id: 'google-bouncer-link',
+            email: existing.google_user_email,
+            avatar_url: '',
+            hosted_domain: null,
+          });
+        }
+        mockSignupDecide.mockImplementation(actualSignupDecide);
+        const fetchMock = jest.spyOn(global, 'fetch').mockResolvedValue(
+          Response.json({
+            enforced: true,
+            code: 'signup_rate_limited',
+            retryAfterMs: 1_000,
+            flags: [
+              {
+                name: 'signup:ja4',
+                source: 'ja4',
+                decision: 'throttle',
+                enforced: true,
+                until: null,
+              },
+            ],
+          })
+        );
+        const result = await createOrUpdateUser(
+          {
+            google_user_email: existing.google_user_email,
+            google_user_name: existing.google_user_name,
+            google_user_image_url: '',
+            hosted_domain: null,
+            provider: 'google',
+            provider_account_id: 'google-bouncer-link',
+          },
+          undefined,
+          mode === 'provider linking',
+          new Headers({
+            'x-forwarded-for': '203.0.113.60',
+            'x-vercel-ja4-digest': 't13d1516h2_8daaf6',
+          })
+        );
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.isNew).toBe(false);
+        expect(result.user.id).toBe(existing.id);
+        expect(mockSignupDecide).not.toHaveBeenCalled();
+        expect(fetchMock).not.toHaveBeenCalled();
+        expect(createStripeCustomer).not.toHaveBeenCalled();
+      }
+    );
 
     it('stores the signup IP for new users', async () => {
       const headers = new Headers({ 'x-forwarded-for': '203.0.113.25, 10.0.0.1' });
@@ -875,129 +1562,13 @@ describe('User', () => {
           provider_account_id: 'google-new-admin-candidate',
         },
         undefined,
-        false
+        false,
+        new Headers({ 'x-forwarded-for': '203.0.113.64' })
       );
 
       expect(result.success).toBe(true);
       if (!result.success) return;
       expect(result.user.is_admin).toBe(false);
-    });
-
-    it('rejects new signups after the per-IP burst threshold (100/24h)', async () => {
-      const signupIp = '203.0.113.50';
-      for (let i = 1; i <= 100; i++) {
-        await insertTestUser({ id: `ip-burst-${i}`, signup_ip: signupIp });
-      }
-
-      const result = await createOrUpdateUser(
-        {
-          google_user_email: 'limited@example.com',
-          google_user_name: 'Limited User',
-          google_user_image_url: 'https://example.com/avatar.png',
-          hosted_domain: null,
-          provider: 'google',
-          provider_account_id: 'google-limited',
-        },
-        undefined,
-        false,
-        new Headers({ 'x-forwarded-for': signupIp })
-      );
-
-      expect(result.success).toBe(false);
-      if (result.success) return;
-      expect(result.error).toBe('SIGNUP-RATE-LIMITED');
-    });
-
-    it('allows up to 99 signups in 24h from a single IP (burst below threshold)', async () => {
-      const signupIp = '203.0.113.51';
-      for (let i = 1; i <= 99; i++) {
-        await insertTestUser({ id: `ip-burst-ok-${i}`, signup_ip: signupIp });
-      }
-
-      const result = await createOrUpdateUser(
-        {
-          google_user_email: 'burst-ok@example.com',
-          google_user_name: 'Burst OK',
-          google_user_image_url: 'https://example.com/avatar.png',
-          hosted_domain: null,
-          provider: 'google',
-          provider_account_id: 'google-burst-ok',
-        },
-        undefined,
-        false,
-        new Headers({ 'x-forwarded-for': signupIp })
-      );
-
-      expect(result.success).toBe(true);
-    });
-
-    it('rejects new signups after the per-IP sustained threshold (150/30d)', async () => {
-      const signupIp = '203.0.113.52';
-      const now = Date.now();
-      // 99 signups yesterday — under the 24h burst threshold.
-      const yesterday = new Date(now - 2 * 60 * 60 * 1000).toISOString();
-      for (let i = 1; i <= 99; i++) {
-        await insertTestUser({
-          id: `ip-sustained-recent-${i}`,
-          signup_ip: signupIp,
-          created_at: yesterday,
-        });
-      }
-      // 51 more signups 10 days ago — outside the 24h window, inside 30d.
-      const tenDaysAgo = new Date(now - 10 * 24 * 60 * 60 * 1000).toISOString();
-      for (let i = 1; i <= 51; i++) {
-        await insertTestUser({
-          id: `ip-sustained-old-${i}`,
-          signup_ip: signupIp,
-          created_at: tenDaysAgo,
-        });
-      }
-
-      const result = await createOrUpdateUser(
-        {
-          google_user_email: 'sustained-limited@example.com',
-          google_user_name: 'Sustained Limited',
-          google_user_image_url: 'https://example.com/avatar.png',
-          hosted_domain: null,
-          provider: 'google',
-          provider_account_id: 'google-sustained-limited',
-        },
-        undefined,
-        false,
-        new Headers({ 'x-forwarded-for': signupIp })
-      );
-
-      expect(result.success).toBe(false);
-      if (result.success) return;
-      expect(result.error).toBe('SIGNUP-RATE-LIMITED');
-    });
-
-    it('ignores signups older than 30 days when evaluating the sustained limit', async () => {
-      const signupIp = '203.0.113.53';
-      const longAgo = new Date(Date.now() - 40 * 24 * 60 * 60 * 1000).toISOString();
-      for (let i = 1; i <= 200; i++) {
-        await insertTestUser({
-          id: `ip-sustained-expired-${i}`,
-          signup_ip: signupIp,
-          created_at: longAgo,
-        });
-      }
-
-      const result = await createOrUpdateUser(
-        {
-          google_user_email: 'sustained-expired@example.com',
-          google_user_name: 'Sustained Expired',
-          google_user_image_url: 'https://example.com/avatar.png',
-          hosted_domain: null,
-          provider: 'google',
-          provider_account_id: 'google-sustained-expired',
-        },
-        undefined,
-        false,
-        new Headers({ 'x-forwarded-for': signupIp })
-      );
-
-      expect(result.success).toBe(true);
     });
 
     it('rejects new signups whose normalized_email is already in use', async () => {
@@ -1019,7 +1590,8 @@ describe('User', () => {
           provider_account_id: 'github-dedup',
         },
         undefined,
-        false
+        false,
+        new Headers({ 'x-forwarded-for': '203.0.113.65' })
       );
 
       expect(result.success).toBe(false);
@@ -1047,7 +1619,7 @@ describe('User', () => {
         },
         undefined,
         false,
-        undefined,
+        new Headers({ 'x-forwarded-for': '203.0.113.66' }),
         'impact-click-123'
       );
 
@@ -1629,6 +2201,226 @@ describe('User', () => {
       expect(rows[0].kilo_user_id).toBeNull();
       expect(rows[0].created_by).toBe(connector.id);
     });
+
+    it('detaches deleted personal profiles while retaining organization webhooks and unrelated profile references', async () => {
+      const user = await insertTestUser({
+        google_user_email: `webhook-profile-delete-${randomUUID()}@example.com`,
+      });
+      const owner = await insertTestUser({
+        google_user_email: `webhook-profile-owner-${randomUUID()}@example.com`,
+      });
+      const organization = await createTestOrganization(
+        `Webhook profile cleanup ${randomUUID()}`,
+        owner.id,
+        0
+      );
+      await db
+        .insert(organization_memberships)
+        .values({ organization_id: organization.id, kilo_user_id: user.id, role: 'member' });
+      const [deletedProfile, otherProfile, organizationProfile] = await db
+        .insert(agent_environment_profiles)
+        .values([
+          { owned_by_user_id: user.id, name: 'Deleted personal profile' },
+          { owned_by_user_id: owner.id, name: 'Other personal profile' },
+          { owned_by_organization_id: organization.id, name: 'Organization profile' },
+        ])
+        .returning();
+      const [creatorTrigger, otherCreatorTrigger, botTrigger, personalTrigger] = await db
+        .insert(cloud_agent_webhook_triggers)
+        .values([
+          {
+            trigger_id: 'deleted-creator-profile',
+            organization_id: organization.id,
+            github_repo: 'owner/repo',
+            profile_id: deletedProfile.id,
+          },
+          {
+            trigger_id: 'other-creator-profile',
+            organization_id: organization.id,
+            github_repo: 'owner/repo',
+            profile_id: otherProfile.id,
+          },
+          {
+            trigger_id: 'organization-profile',
+            organization_id: organization.id,
+            github_repo: 'owner/repo',
+            profile_id: organizationProfile.id,
+          },
+          {
+            trigger_id: 'deleted-personal-trigger',
+            user_id: user.id,
+            github_repo: 'owner/repo',
+            profile_id: deletedProfile.id,
+          },
+        ])
+        .returning();
+
+      await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
+
+      expect(
+        await db
+          .select({
+            id: cloud_agent_webhook_triggers.id,
+            profileId: cloud_agent_webhook_triggers.profile_id,
+          })
+          .from(cloud_agent_webhook_triggers)
+          .where(eq(cloud_agent_webhook_triggers.organization_id, organization.id))
+      ).toEqual(
+        expect.arrayContaining([
+          { id: creatorTrigger.id, profileId: null },
+          { id: otherCreatorTrigger.id, profileId: otherProfile.id },
+          { id: botTrigger.id, profileId: organizationProfile.id },
+        ])
+      );
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_webhook_triggers)
+          .where(eq(cloud_agent_webhook_triggers.id, personalTrigger.id))
+      ).toEqual([]);
+      expect(
+        await db
+          .select()
+          .from(agent_environment_profiles)
+          .where(eq(agent_environment_profiles.id, deletedProfile.id))
+      ).toEqual([]);
+      expect(
+        await db
+          .select({ id: agent_environment_profiles.id })
+          .from(agent_environment_profiles)
+          .where(inArray(agent_environment_profiles.id, [otherProfile.id, organizationProfile.id]))
+      ).toEqual(expect.arrayContaining([{ id: otherProfile.id }, { id: organizationProfile.id }]));
+    });
+
+    it('removes personal sandbox allocation settings while keeping the organization rows', async () => {
+      const user = await insertTestUser({
+        google_user_email: `sandbox-settings-cleanup-${randomUUID()}@example.com`,
+      });
+      const organization = await createTestOrganization(
+        `Sandbox settings cleanup ${randomUUID()}`,
+        user.id,
+        0
+      );
+      await db.insert(cloud_agent_sandbox_allocation_settings).values([
+        { owned_by_user_id: user.id, allocation: 'cloudflare-single' },
+        {
+          owned_by_user_id: user.id,
+          repository_full_name: 'acme/web',
+          repository_platform: 'github',
+          allocation: 'vercel-small',
+        },
+        {
+          owned_by_organization_id: organization.id,
+          repository_full_name: 'acme/web',
+          repository_platform: 'github',
+          allocation: 'vercel-small',
+        },
+      ]);
+
+      await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
+
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_sandbox_allocation_settings)
+          .where(eq(cloud_agent_sandbox_allocation_settings.owned_by_user_id, user.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(cloud_agent_sandbox_allocation_settings)
+          .where(
+            eq(cloud_agent_sandbox_allocation_settings.owned_by_organization_id, organization.id)
+          )
+      ).toHaveLength(1);
+    });
+
+    it('deletes all personal BYOC connections while preserving organization connections', async () => {
+      const user = await insertTestUser({ id: 'oauth/google/vercel-credential-owner' });
+      const organizationOwner = await insertTestUser();
+      const organization = await createTestOrganization(
+        'Vercel Credential Cleanup Org',
+        organizationOwner.id,
+        0
+      );
+      await db.insert(organization_memberships).values({
+        organization_id: organization.id,
+        kilo_user_id: user.id,
+        role: 'member',
+      });
+
+      const tokenEncrypted = {
+        scheme: 'byoc-vercel-credential-rsa-aes-256-gcm',
+        version: 1,
+        keyId: 'test-key',
+        ciphertext: {
+          encryptedData: 'encrypted-data',
+          encryptedDEK: 'encrypted-dek',
+          algorithm: 'rsa-aes-256-gcm',
+          version: 1,
+        },
+      } satisfies VercelComputeCredentialEnvelope;
+      const personalCredentialId = randomUUID();
+      const organizationCredentialId = randomUUID();
+      const otherPersonalId = randomUUID();
+      await db.insert(byoc_connections).values([
+        {
+          id: personalCredentialId,
+          organization_id: null,
+          user_id: user.id,
+          provider: 'vercel',
+          credentials_encrypted: tokenEncrypted,
+          config: { token_scope: 'team', team_id: 'team_personal', project_id: 'prj_personal' },
+        },
+        {
+          id: organizationCredentialId,
+          organization_id: organization.id,
+          user_id: null,
+          provider: 'vercel',
+          credentials_encrypted: tokenEncrypted,
+          config: {
+            token_scope: 'team',
+            team_id: 'team_organization',
+            project_id: 'prj_organization',
+          },
+        },
+        {
+          id: otherPersonalId,
+          user_id: user.id,
+          provider: 'another-provider',
+          credentials_encrypted: tokenEncrypted,
+          config: { region: 'test-region' },
+        },
+      ]);
+
+      await db.transaction(tx => anonymizeCloudUserData(tx, user.id));
+
+      expect(
+        await db
+          .select()
+          .from(byoc_connections)
+          .where(eq(byoc_connections.id, personalCredentialId))
+      ).toHaveLength(0);
+      expect(
+        await db.query.byoc_connections.findFirst({
+          where: eq(byoc_connections.id, otherPersonalId),
+        })
+      ).toBeUndefined();
+      expect(
+        await db
+          .select()
+          .from(byoc_connections)
+          .where(eq(byoc_connections.id, organizationCredentialId))
+      ).toEqual([
+        expect.objectContaining({
+          id: organizationCredentialId,
+          organization_id: organization.id,
+          user_id: null,
+          provider: 'vercel',
+          credentials_encrypted: tokenEncrypted,
+        }),
+      ]);
+    });
   });
 
   describe('softDeleteUser', () => {
@@ -1756,6 +2548,61 @@ describe('User', () => {
         .where(eq(cloud_agent_worktrees.worktree_id, otherWorktreeId));
       expect(otherWorktreeAfter).toEqual(otherWorktreeBefore);
       expect(await findUserById(user.id)).toMatchObject({ google_user_name: 'Deleted User' });
+    });
+
+    it('deletes to-do lists and their to-dos in every scope without touching another owner', async () => {
+      const user = await insertTestUser({ id: `oauth/github|todo-privacy-${randomUUID()}` });
+      const otherUser = await insertTestUser();
+      const organization = await createTestOrganization(
+        'To-do privacy organization',
+        otherUser.id,
+        0
+      );
+      const [personalList, organizationList, otherList] = await db
+        .insert(todo_lists)
+        .values([
+          { kilo_user_id: user.id, name: 'Private plans', position: 'i' },
+          {
+            kilo_user_id: user.id,
+            organization_id: organization.id,
+            name: 'Private organization plans',
+            position: 'i',
+          },
+          {
+            kilo_user_id: otherUser.id,
+            organization_id: organization.id,
+            name: 'Keep these plans',
+            position: 'i',
+          },
+        ])
+        .returning();
+      if (!personalList || !organizationList || !otherList) {
+        throw new Error('To-do list fixtures were not inserted');
+      }
+      const [, , otherItem] = await db
+        .insert(todo_items)
+        .values([
+          {
+            list_id: personalList.id,
+            kilo_user_id: user.id,
+            title: 'Private to-do',
+            notes: 'Private notes',
+            position: 'i',
+          },
+          {
+            list_id: organizationList.id,
+            kilo_user_id: user.id,
+            title: 'Private organization to-do',
+            position: 'i',
+          },
+          { list_id: otherList.id, kilo_user_id: otherUser.id, title: 'Keep me', position: 'i' },
+        ])
+        .returning();
+
+      await softDeleteUser(user.id);
+
+      expect(await db.select().from(todo_lists)).toEqual([otherList]);
+      expect(await db.select().from(todo_items)).toEqual([otherItem]);
     });
 
     it('deletes operation ledger rows by user id and analytics outbox rows by either identity', async () => {
@@ -1935,53 +2782,44 @@ describe('User', () => {
       ).toHaveLength(1);
     });
 
-    it('deletes quick chat threads and messages for the user and leaves other users intact', async () => {
-      const user = await insertTestUser({ google_user_email: 'quick-chat-user@example.com' });
-      const otherUser = await insertTestUser();
-
-      const [thread] = await db
-        .insert(quick_chat_threads)
-        .values({ user_id: user.id, organization_id: null })
-        .returning();
-      const [otherThread] = await db
-        .insert(quick_chat_threads)
-        .values({ user_id: otherUser.id, organization_id: null })
-        .returning();
-      if (!thread || !otherThread) throw new Error('Failed to seed quick chat threads');
-
-      const [message] = await db
-        .insert(quick_chat_messages)
-        .values({ thread_id: thread.id, role: 'user', content: 'hello' })
-        .returning();
-      const [otherMessage] = await db
-        .insert(quick_chat_messages)
-        .values({ thread_id: otherThread.id, role: 'user', content: 'keep me' })
-        .returning();
-      if (!message || !otherMessage) throw new Error('Failed to seed quick chat messages');
+    it('preserves attachment cleanup work until completion', async () => {
+      const user = await insertTestUser();
+      const id = crypto.randomUUID();
+      await db.insert(cloud_agent_pending_uploads).values({
+        id,
+        kilo_user_id: user.id,
+        object_key: `${user.id}/cloud-agent/${crypto.randomUUID()}.bin`,
+        message_uuid: crypto.randomUUID(),
+        attachment_id: crypto.randomUUID(),
+        byte_size: 42,
+        status: 'linked',
+        expires_at: new Date(Date.now() + 60_000).toISOString(),
+      });
+      mockR2Send.mockRejectedValue(new Error('R2 unavailable'));
+      try {
+        await expect(softDeleteUser(user.id)).rejects.toThrow(
+          'Cloud Agent attachment cleanup incomplete'
+        );
+        expect(
+          await db
+            .select({
+              id: cloud_agent_pending_uploads.id,
+              status: cloud_agent_pending_uploads.status,
+            })
+            .from(cloud_agent_pending_uploads)
+            .where(eq(cloud_agent_pending_uploads.id, id))
+        ).toEqual([{ id, status: 'pending' }]);
+      } finally {
+        mockR2Send.mockResolvedValue({});
+      }
 
       await softDeleteUser(user.id);
-
       expect(
         await db
-          .select()
-          .from(quick_chat_messages)
-          .where(eq(quick_chat_messages.thread_id, thread.id))
-      ).toHaveLength(0);
-      expect(
-        await db.select().from(quick_chat_threads).where(eq(quick_chat_threads.user_id, user.id))
-      ).toHaveLength(0);
-      expect(
-        await db
-          .select()
-          .from(quick_chat_threads)
-          .where(eq(quick_chat_threads.user_id, otherUser.id))
-      ).toHaveLength(1);
-      expect(
-        await db
-          .select()
-          .from(quick_chat_messages)
-          .where(eq(quick_chat_messages.thread_id, otherThread.id))
-      ).toHaveLength(1);
+          .select({ id: cloud_agent_pending_uploads.id })
+          .from(cloud_agent_pending_uploads)
+          .where(eq(cloud_agent_pending_uploads.id, id))
+      ).toEqual([]);
     });
 
     it('deletes user data export state and dependent multipart and outbox rows', async () => {
@@ -2541,178 +3379,6 @@ describe('User', () => {
       expect(findingRows[0]?.owned_by_organization_id).toBe(organization.id);
     });
 
-    it('deletes gateway provider grants and pending provider state', async () => {
-      const user = await insertTestUser();
-      const [config] = await db
-        .insert(mcp_gateway_configs)
-        .values({
-          owner_scope: 'personal',
-          owner_id: user.id,
-          name: 'Gateway config',
-          remote_url: 'https://example.com/mcp',
-          auth_mode: 'oauth_static',
-          sharing_mode: 'single_user',
-        })
-        .returning();
-      await db.insert(mcp_gateway_config_secrets).values({
-        config_id: config.config_id,
-        secret_kind: 'static_headers',
-        encrypted_secret: 'encrypted-config-secret',
-      });
-      const [route] = await db
-        .insert(mcp_gateway_connect_resources)
-        .values({
-          config_id: config.config_id,
-          owner_scope: 'personal',
-          owner_id: user.id,
-          route_key: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_',
-          canonical_url: 'https://mcp.kilosessions.ai/mcp-connect/user/test/config/key',
-          route_status: 'active',
-        })
-        .returning();
-      const [instance] = await db
-        .insert(mcp_gateway_connection_instances)
-        .values({
-          config_id: config.config_id,
-          owner_scope: 'personal',
-          owner_id: user.id,
-          kilo_user_id: user.id,
-          instance_status: 'active',
-        })
-        .returning();
-      await db.insert(mcp_gateway_provider_grants).values({
-        instance_id: instance.instance_id,
-        encrypted_grant: 'encrypted-provider-token',
-        provider_subject: 'provider-user',
-        grant_status: 'active',
-      });
-      const [oauthClient] = await db
-        .insert(mcp_gateway_oauth_clients)
-        .values({
-          client_id: 'mcp:test-client',
-          registration_token_hash: 'registration-token-hash',
-          token_endpoint_auth_method: 'none',
-          redirect_uris: ['https://client.example/callback'],
-          grant_types: ['authorization_code'],
-          response_types: ['code'],
-          declared_scopes: ['mcp:access'],
-        })
-        .returning();
-      const [oauthGrant] = await db
-        .insert(mcp_gateway_oauth_grants)
-        .values({
-          oauth_client_id: oauthClient.oauth_client_id,
-          kilo_user_id: user.id,
-          owner_scope: 'personal',
-          owner_id: user.id,
-          config_id: config.config_id,
-          connect_resource_id: route.connect_resource_id,
-          instance_id: instance.instance_id,
-          redirect_uri: 'https://client.example/callback',
-          granted_scopes: ['mcp:access'],
-          execution_context: { type: 'personal' },
-          config_version: 1,
-        })
-        .returning();
-      const [authorizationRequest] = await db
-        .insert(mcp_gateway_authorization_requests)
-        .values({
-          request_state_hash: 'request-state-hash',
-          oauth_client_id: oauthClient.oauth_client_id,
-          oauth_grant_id: oauthGrant.oauth_grant_id,
-          client_id: 'mcp:test-client',
-          owner_scope: 'personal',
-          owner_id: user.id,
-          config_id: config.config_id,
-          route_key: route.route_key,
-          canonical_resource_url: route.canonical_url,
-          redirect_uri: 'https://client.example/callback',
-          requested_scopes: ['mcp:access'],
-          granted_scopes: ['mcp:access'],
-          code_challenge: 'challenge',
-          code_challenge_method: 'S256',
-          execution_context: { type: 'personal' },
-          kilo_user_id: user.id,
-          instance_id: instance.instance_id,
-          request_status: 'pending',
-          expires_at: new Date(Date.now() + 60_000).toISOString(),
-        })
-        .returning();
-      await db.insert(mcp_gateway_authorization_codes).values({
-        code_hash: 'authorization-code-hash',
-        authorization_request_id: authorizationRequest.authorization_request_id,
-        oauth_client_id: authorizationRequest.oauth_client_id,
-        oauth_grant_id: oauthGrant.oauth_grant_id,
-        client_id: authorizationRequest.client_id,
-        owner_scope: 'personal',
-        owner_id: user.id,
-        config_id: config.config_id,
-        route_key: route.route_key,
-        canonical_resource_url: route.canonical_url,
-        redirect_uri: authorizationRequest.redirect_uri,
-        granted_scopes: ['mcp:access'],
-        code_challenge: 'challenge',
-        code_challenge_method: 'S256',
-        execution_context: { type: 'personal' },
-        kilo_user_id: user.id,
-        instance_id: instance.instance_id,
-        expires_at: new Date(Date.now() + 60_000).toISOString(),
-      });
-      await db.insert(mcp_gateway_pending_provider_authorizations).values({
-        state_hash: 'pending-state-hash',
-        oauth_grant_id: oauthGrant.oauth_grant_id,
-        config_id: config.config_id,
-        instance_id: instance.instance_id,
-        owner_scope: 'personal',
-        owner_id: user.id,
-        kilo_user_id: user.id,
-        route_key: route.route_key,
-        canonical_resource_url: route.canonical_url,
-        remote_url: config.remote_url,
-        auth_mode: 'oauth_static',
-        provider_authorization_endpoint: 'https://example.com/authorize',
-        provider_token_endpoint: 'https://example.com/token',
-        encrypted_state: 'encrypted-provider-state',
-        execution_context: { type: 'personal' },
-        config_version: 1,
-        pending_status: 'pending',
-        expires_at: new Date(Date.now() + 60_000).toISOString(),
-      });
-
-      await softDeleteUser(user.id);
-
-      const grants = await db
-        .select()
-        .from(mcp_gateway_provider_grants)
-        .where(eq(mcp_gateway_provider_grants.instance_id, instance.instance_id));
-      const configSecrets = await db
-        .select()
-        .from(mcp_gateway_config_secrets)
-        .where(eq(mcp_gateway_config_secrets.config_id, config.config_id));
-      const pending = await db
-        .select()
-        .from(mcp_gateway_pending_provider_authorizations)
-        .where(eq(mcp_gateway_pending_provider_authorizations.kilo_user_id, user.id));
-      const authorizationCodes = await db
-        .select()
-        .from(mcp_gateway_authorization_codes)
-        .where(eq(mcp_gateway_authorization_codes.kilo_user_id, user.id));
-      const authorizationRequests = await db
-        .select()
-        .from(mcp_gateway_authorization_requests)
-        .where(eq(mcp_gateway_authorization_requests.kilo_user_id, user.id));
-      const oauthGrants = await db
-        .select()
-        .from(mcp_gateway_oauth_grants)
-        .where(eq(mcp_gateway_oauth_grants.kilo_user_id, user.id));
-      expect(grants).toHaveLength(0);
-      expect(configSecrets).toHaveLength(0);
-      expect(pending).toHaveLength(0);
-      expect(authorizationCodes).toHaveLength(0);
-      expect(authorizationRequests).toHaveLength(0);
-      expect(oauthGrants).toHaveLength(0);
-    });
-
     it('should anonymize the user row and preserve it', async () => {
       const user = await insertTestUser({
         google_user_email: 'real-email@example.com',
@@ -2840,87 +3506,6 @@ describe('User', () => {
       expect(userFeedbackCount?.value).toBe(0);
       expect(userProposalCount?.value).toBe(0);
       expect(orgProposalCount?.value).toBe(1);
-    });
-
-    it('should scrub ephemeral deployment ownership and schedule immediate cleanup', async () => {
-      const user = await insertTestUser({
-        google_user_email: 'ephemeral-deployment-delete@example.com',
-      });
-      const otherUser = await insertTestUser({
-        google_user_email: 'ephemeral-deployment-delete-other@example.com',
-      });
-      const cleanupClaimToken = randomUUID();
-      const claimedUntil = '2026-06-03T18:00:00.000Z';
-      const originalCleanupAt = '2026-06-04T18:00:00.000Z';
-      const originalUpdatedAt = '2026-06-02T18:00:00.000Z';
-
-      await db.insert(deployments_ephemeral).values([
-        {
-          owned_by_user_id: user.id,
-          source_type: 'html',
-          internal_worker_name: `qdpl-${randomUUID()}`,
-          deployment_slug: 'soft-delete-ephemeral',
-          status: 'active',
-          expires_at: originalCleanupAt,
-          next_cleanup_at: originalCleanupAt,
-          cleanup_claim_token: cleanupClaimToken,
-          cleanup_claimed_until: claimedUntil,
-          updated_at: originalUpdatedAt,
-        },
-        {
-          owned_by_user_id: otherUser.id,
-          source_type: 'html',
-          internal_worker_name: `qdpl-${randomUUID()}`,
-          deployment_slug: 'soft-delete-ephemeral-other',
-          status: 'active',
-          expires_at: originalCleanupAt,
-          next_cleanup_at: originalCleanupAt,
-          cleanup_claim_token: cleanupClaimToken,
-          cleanup_claimed_until: claimedUntil,
-          updated_at: originalUpdatedAt,
-        },
-      ]);
-
-      await softDeleteUser(user.id);
-      const afterSoftDelete = Date.now();
-
-      const rows = await db
-        .select()
-        .from(deployments_ephemeral)
-        .orderBy(deployments_ephemeral.deployment_slug);
-      const otherDeployment = rows.find(row => row.owned_by_user_id === otherUser.id);
-      const scrubbedDeployment = rows.find(row => row.deployment_slug === 'soft-delete-ephemeral');
-
-      expect(scrubbedDeployment).toEqual(
-        expect.objectContaining({
-          owned_by_user_id: null,
-          status: 'cleanup_retry',
-          cleanup_claim_token: null,
-          cleanup_claimed_until: null,
-        })
-      );
-      if (!scrubbedDeployment) throw new Error('Expected scrubbed ephemeral deployment');
-      const nextCleanupAt = new Date(scrubbedDeployment.next_cleanup_at).getTime();
-      expect(nextCleanupAt).toBeGreaterThan(afterSoftDelete - 5_000);
-      expect(nextCleanupAt).toBeLessThanOrEqual(afterSoftDelete);
-      expect(new Date(scrubbedDeployment.updated_at).getTime()).toBe(nextCleanupAt);
-      expect(otherDeployment).toEqual(
-        expect.objectContaining({
-          owned_by_user_id: otherUser.id,
-          status: 'active',
-          cleanup_claim_token: cleanupClaimToken,
-        })
-      );
-      if (!otherDeployment) throw new Error('Expected untouched ephemeral deployment');
-      expect(new Date(otherDeployment.next_cleanup_at).getTime()).toBe(
-        new Date(originalCleanupAt).getTime()
-      );
-      expect(new Date(otherDeployment.cleanup_claimed_until ?? '').getTime()).toBe(
-        new Date(claimedUntil).getTime()
-      );
-      expect(new Date(otherDeployment.updated_at).getTime()).toBe(
-        new Date(originalUpdatedAt).getTime()
-      );
     });
 
     it('should rotate and scrub App Store account-linked Kilo Pass data', async () => {
@@ -3910,6 +4495,38 @@ describe('User', () => {
       expect(remainingForOtherUser).toHaveLength(1);
     });
 
+    it('deletes the bouncer usage-event outbox rows for the deleted user', async () => {
+      const user1 = await insertTestUser();
+      const user2 = await insertTestUser();
+
+      await db.insert(bouncer_usage_event_outbox).values([
+        {
+          request_id: randomUUID(),
+          user_id: user1.id,
+          payload: { requestId: 'r1', accountId: `user:${user1.id}`, ip: '203.0.113.9' },
+        },
+        {
+          request_id: randomUUID(),
+          user_id: user2.id,
+          payload: { requestId: 'r2', accountId: `user:${user2.id}` },
+        },
+      ]);
+
+      await softDeleteUser(user1.id);
+
+      const remainingForDeletedUser = await db
+        .select()
+        .from(bouncer_usage_event_outbox)
+        .where(eq(bouncer_usage_event_outbox.user_id, user1.id));
+      expect(remainingForDeletedUser).toHaveLength(0);
+
+      const remainingForOtherUser = await db
+        .select()
+        .from(bouncer_usage_event_outbox)
+        .where(eq(bouncer_usage_event_outbox.user_id, user2.id));
+      expect(remainingForOtherUser).toHaveLength(1);
+    });
+
     it('should anonymize organization audit logs', async () => {
       const user = await insertTestUser();
       const orgId = randomUUID();
@@ -4215,6 +4832,70 @@ describe('User', () => {
       expect(logs).toHaveLength(1);
       expect(logs[0].target_user_id).toBe('deleted-user');
       expect(logs[0].actor_email).toBe(adminUser.google_user_email); // admin not anonymized
+    });
+
+    it('should anonymize admin action audit logs where user is actor', async () => {
+      const adminUser = await insertTestUser();
+
+      await db.insert(admin_action_audit_logs).values({
+        action: 'user.api_key.reset',
+        actor_id: adminUser.id,
+        actor_email: adminUser.google_user_email,
+        actor_name: adminUser.google_user_name,
+        target_type: 'user',
+        target_id: 'some-other-user',
+        message: 'API key reset',
+      });
+
+      await softDeleteUser(adminUser.id);
+
+      const logs = await db
+        .select()
+        .from(admin_action_audit_logs)
+        .where(eq(admin_action_audit_logs.actor_id, adminUser.id));
+      expect(logs).toHaveLength(1);
+      expect(logs[0].actor_email).toBeNull();
+      expect(logs[0].actor_name).toBeNull();
+      expect(logs[0].target_id).toBe('some-other-user');
+    });
+
+    it('should anonymize admin action audit logs where user is the target', async () => {
+      const targetUser = await insertTestUser();
+      const adminUser = await insertTestUser();
+
+      await db.insert(admin_action_audit_logs).values([
+        {
+          action: 'user.api_key.reset',
+          actor_id: adminUser.id,
+          actor_email: adminUser.google_user_email,
+          actor_name: adminUser.google_user_name,
+          target_type: 'user',
+          target_id: targetUser.id,
+          message: 'API key reset',
+        },
+        {
+          action: 'organization.create',
+          actor_id: adminUser.id,
+          actor_email: adminUser.google_user_email,
+          actor_name: adminUser.google_user_name,
+          target_type: 'organization',
+          target_id: targetUser.id,
+          message: 'Organization created',
+        },
+      ]);
+
+      await softDeleteUser(targetUser.id);
+
+      const logs = await db
+        .select()
+        .from(admin_action_audit_logs)
+        .where(eq(admin_action_audit_logs.actor_id, adminUser.id));
+      expect(logs).toHaveLength(2);
+      const userTargeted = logs.find(log => log.target_type === 'user');
+      const orgTargeted = logs.find(log => log.target_type === 'organization');
+      expect(userTargeted?.target_id).toBe('deleted-user');
+      expect(userTargeted?.actor_email).toBe(adminUser.google_user_email);
+      expect(orgTargeted?.target_id).toBe(targetUser.id);
     });
 
     it('should retain kiloclaw_scheduled_action_targets after soft-delete (anonymized FK)', async () => {
@@ -4911,6 +5592,40 @@ describe('User', () => {
       expect(skills).toHaveLength(0);
     });
 
+    it('deletes user-owned repository environments without touching another owner', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+
+      await db.insert(cloud_agent_environments).values([
+        {
+          owned_by_user_id: user.id,
+          name: 'mine',
+          platform: 'github',
+          repo_full_name: 'acme/widgets',
+        },
+        {
+          owned_by_user_id: otherUser.id,
+          name: 'theirs',
+          platform: 'github',
+          repo_full_name: 'acme/widgets',
+        },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      const environments = await db
+        .select()
+        .from(cloud_agent_environments)
+        .where(eq(cloud_agent_environments.owned_by_user_id, otherUser.id));
+      expect(environments.map(environment => environment.name)).toEqual(['theirs']);
+
+      const deletedUserEnvironments = await db
+        .select()
+        .from(cloud_agent_environments)
+        .where(eq(cloud_agent_environments.owned_by_user_id, user.id));
+      expect(deletedUserEnvironments).toHaveLength(0);
+    });
+
     it('should nullify user_feedback FK', async () => {
       const user = await insertTestUser();
       await db.insert(user_feedback).values({
@@ -5121,6 +5836,30 @@ describe('User', () => {
       expect(tokens).toHaveLength(0);
     });
 
+    it('should delete user_notification_history rows', async () => {
+      const user = await insertTestUser();
+      const other = await insertTestUser();
+      const historyRow = {
+        category: 'chatMessages',
+        push_type: 'chat.message',
+        payload: { type: 'chat.message' },
+        i18n_key: 'chat.message',
+        i18n_params: { conversationTitle: 'Hello' },
+        fallback_title: 'Kilo',
+        fallback_body: 'New message',
+        dedupe_bucket: Math.floor(Date.now() / 3_600_000),
+      };
+      await db.insert(user_notification_history).values([
+        { ...historyRow, user_id: user.id, idempotency_key: 'history-user' },
+        { ...historyRow, user_id: other.id, idempotency_key: 'history-other' },
+      ]);
+
+      await softDeleteUser(user.id);
+
+      const remaining = await db.select().from(user_notification_history);
+      expect(remaining.map(row => row.idempotency_key)).toEqual(['history-other']);
+    });
+
     it('should delete user_notification_preferences', async () => {
       const user = await insertTestUser();
       await db.insert(user_notification_preferences).values({
@@ -5135,6 +5874,75 @@ describe('User', () => {
         .from(user_notification_preferences)
         .where(eq(user_notification_preferences.user_id, user.id));
       expect(rows).toHaveLength(0);
+    });
+
+    it('removes owned briefing reports, excerpts, consent and schedule without touching another user', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+      const now = new Date().toISOString();
+      for (const account of [user, otherUser]) {
+        const sessionId = `ses_briefing_delete_${crypto.randomUUID()}`;
+        await db.insert(cli_sessions_v2).values({
+          session_id: sessionId,
+          kilo_user_id: account.id,
+          created_on_platform: 'cli',
+          briefing_excerpt: {
+            messageId: 'final',
+            completedAt: now,
+            text: 'Private selected outcome',
+          },
+        });
+        await db
+          .insert(agent_briefing_preferences)
+          .values({ kilo_user_id: account.id, timezone: 'UTC', next_run_at: now });
+        await db.insert(agent_briefing_context_preferences).values({
+          kilo_user_id: account.id,
+          context_key: 'personal',
+          model: 'test/model',
+          enabled: true,
+        });
+        await db.insert(agent_briefing_snapshots).values({
+          kilo_user_id: account.id,
+          context_key: 'personal',
+          local_date: now.slice(0, 10),
+          timezone: 'UTC',
+          language: 'en',
+          captured_at: now,
+          expires_at: new Date(Date.now() + 86_400_000).toISOString(),
+          night_start_at: now,
+          cutoff_at: now,
+          morning_end_at: now,
+          facts: { sessionTitle: 'Private work' },
+          summary: { text: 'Private briefing' },
+        });
+      }
+      await softDeleteUser(user.id);
+      const excerpts = await db
+        .select({ userId: cli_sessions_v2.kilo_user_id, excerpt: cli_sessions_v2.briefing_excerpt })
+        .from(cli_sessions_v2)
+        .where(inArray(cli_sessions_v2.kilo_user_id, [user.id, otherUser.id]));
+      expect(excerpts.find(row => row.userId === user.id)?.excerpt).toBeNull();
+      expect(excerpts.find(row => row.userId === otherUser.id)?.excerpt?.text).toBe(
+        'Private selected outcome'
+      );
+      for (const table of [
+        agent_briefing_snapshots,
+        agent_briefing_context_preferences,
+        agent_briefing_preferences,
+      ]) {
+        expect(
+          await db
+            .select({ userId: table.kilo_user_id })
+            .from(table)
+            .where(eq(table.kilo_user_id, user.id))
+        ).toHaveLength(0);
+        expect(
+          await db
+            .select({ userId: table.kilo_user_id })
+            .from(table)
+            .where(eq(table.kilo_user_id, otherUser.id))
+        ).toHaveLength(1);
+      }
     });
 
     it('should delete personal spend alert settings, rules, counters, and deliveries', async () => {
@@ -5235,6 +6043,38 @@ describe('User', () => {
         .from(coding_plan_availability_intents)
         .where(eq(coding_plan_availability_intents.user_id, user.id));
       expect(intents).toHaveLength(0);
+    });
+
+    it('should delete user-owned custom auto routers and keep another owner’s', async () => {
+      const user = await insertTestUser();
+      const otherUser = await insertTestUser();
+      const router = (ownerId: string, slug: string) => ({
+        owned_by_user_id: ownerId,
+        slug,
+        name: slug,
+        base_router: 'efficient' as const,
+        mode: 'cost_per_accuracy' as const,
+        entries: [{ kind: 'gateway' as const, model: 'anthropic/claude-sonnet-4' }],
+        default_entry_key: 'gateway:anthropic/claude-sonnet-4',
+      });
+      await db
+        .insert(auto_routing_custom_routers)
+        .values([router(user.id, 'mine'), router(otherUser.id, 'theirs')]);
+
+      await softDeleteUser(user.id);
+
+      expect(
+        await db
+          .select()
+          .from(auto_routing_custom_routers)
+          .where(eq(auto_routing_custom_routers.owned_by_user_id, user.id))
+      ).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(auto_routing_custom_routers)
+          .where(eq(auto_routing_custom_routers.owned_by_user_id, otherUser.id))
+      ).toHaveLength(1);
     });
 
     it('should delete github_branch_pull_requests owned by user', async () => {
@@ -5420,22 +6260,6 @@ describe('User', () => {
       await softDeleteUser(user.id);
       const retained = await db.select().from(github_app_installations);
       expect(retained.map(row => row.id)).toEqual([canonicals[1]?.id]);
-    });
-
-    it('should nullify free_model_usage FK', async () => {
-      const user = await insertTestUser();
-
-      await db.insert(free_model_usage).values([
-        { ip_address: '1.2.3.4', model: 'test-model', kilo_user_id: user.id },
-        { ip_address: '1.2.3.4', model: 'test-model', kilo_user_id: null },
-      ]);
-
-      await softDeleteUser(user.id);
-
-      // User's free model usage should have kilo_user_id nulled, anonymous record untouched
-      const usages = await db.select().from(free_model_usage);
-      expect(usages).toHaveLength(2);
-      expect(usages.every(u => u.kilo_user_id === null)).toBe(true);
     });
 
     it('should anonymize security_advisor_scans and null public_ip', async () => {

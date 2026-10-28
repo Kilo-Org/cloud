@@ -393,6 +393,7 @@ describe('restoreSession', () => {
       KILOCODE_TOKEN_FILE: process.env.KILOCODE_TOKEN_FILE,
       SANDBOX_CONTROL_CREDENTIAL: process.env.SANDBOX_CONTROL_CREDENTIAL,
       RESTORE_PROCESS_ONLY: process.env.RESTORE_PROCESS_ONLY,
+      KILO_RUNTIME_CLI_PATH: process.env.KILO_RUNTIME_CLI_PATH,
       PATH: process.env.PATH,
       TMPDIR: process.env.TMPDIR,
     };
@@ -400,6 +401,7 @@ describe('restoreSession', () => {
     process.env.KILO_SESSION_INGEST_URL = 'http://localhost:9999';
     process.env.KILOCODE_TOKEN = 'test-token';
     delete process.env.KILOCODE_TOKEN_FILE;
+    delete process.env.KILO_RUNTIME_CLI_PATH;
     process.env.PATH = `${binDir}:${process.env.PATH}`;
     process.env.TMPDIR = tmpDir;
 
@@ -444,6 +446,39 @@ describe('restoreSession', () => {
       expect(result.error).toContain('KILOCODE_TOKEN');
       expect(result.code).toBeNull();
       expect(result.step).toBe('download');
+    }
+  });
+
+  it('imports history with the selected runtime CLI when the global CLI cannot run', async () => {
+    const selected = '/opt/kilo-cloud/cli/' + 'a'.repeat(64) + '/kilo';
+    const selectedBin = path.join(tmpDir, 'selected-bin');
+    const capturedSnapshot = path.join(tmpDir, 'selected-import.json');
+    fs.mkdirSync(selectedBin);
+    writeCapturingMockKilo(selectedBin, capturedSnapshot);
+    writeMockKilo(binDir, 42);
+    process.env.KILO_RUNTIME_CLI_PATH = selected;
+    mockFetchStatus(200, makeSnapshot([]));
+    const runProcess = processUtils.runProcess;
+    const processSpy = spyOn(processUtils, 'runProcess').mockImplementation(
+      (command, args, options) =>
+        runProcess(command === selected ? path.join(selectedBin, 'kilo') : command, args, options)
+    );
+    try {
+      const env = buildWorktreeKiloEnvironment(workspace, path.join(tmpDir, 'home'), {
+        scopeId: 'selected_runtime_restore',
+        token: 'synthetic-guest-token',
+        targets: {
+          backendBaseUrl: 'https://backend.example.test',
+          providerBaseUrl: 'https://provider.example.test',
+          sessionIngestBaseUrl: 'https://ingest.example.test',
+        },
+      });
+      expect(env.KILO_RUNTIME_CLI_PATH).toBeUndefined();
+      const result = await restoreSession(SESSION_ID, workspace, undefined, { env });
+      expect(result.ok).toBe(true);
+      expect(JSON.parse(fs.readFileSync(capturedSnapshot, 'utf8')).info.id).toBe(SESSION_ID);
+    } finally {
+      processSpy.mockRestore();
     }
   });
 
@@ -1826,6 +1861,115 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
     expect(fs.existsSync(descendantMarker)).toBe(false);
   });
 
+  it('cleans up a CLI that hangs after confirming the requested session import', async () => {
+    mockFetchOk(makeSnapshot([]));
+    const importProcess = spyOn(processUtils, 'runProcess').mockImplementation(
+      async (_command, _args, options) => {
+        options?.onOutput?.('stderr', 'unrelated diagnostic');
+        options?.onOutput?.('stdout', 'Imported ses');
+        options?.onOutput?.('stdout', `sion: ${SESSION_ID}\n`);
+        await new Promise<void>(resolve => {
+          options?.signal?.addEventListener('abort', () => resolve(), { once: true });
+        });
+        return { exitCode: 124, stdout: '', stderr: '', terminationReason: 'abort' };
+      }
+    );
+    try {
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        restoreFiles: false,
+      });
+      expect(result.ok).toBe(true);
+      expect(importProcess).toHaveBeenCalledTimes(1);
+    } finally {
+      importProcess.mockRestore();
+    }
+  });
+
+  it.each(['other_session', `${SESSION_ID}_suffix`])(
+    'does not accept an import confirmation for %s instead of the requested session',
+    async reportedSession => {
+      mockFetchOk(makeSnapshot([]));
+      const importProcess = spyOn(processUtils, 'runProcess').mockImplementation(
+        async (_command, _args, options) => {
+          options?.onOutput?.('stdout', `Imported session: ${reportedSession}\n`);
+          return { exitCode: 124, stdout: '', stderr: '', terminationReason: 'timeout' };
+        }
+      );
+      try {
+        const result = await restoreSession(SESSION_ID, workspace);
+        expect(result.ok).toBe(false);
+        if (!result.ok) expect(result.subtype).toBe('kilo_import_timeout');
+      } finally {
+        importProcess.mockRestore();
+      }
+    }
+  );
+
+  it('terminates a real import child that stays alive after its committed-session marker', async () => {
+    mockFetchOk(makeSnapshot([]));
+    fs.writeFileSync(
+      path.join(binDir, 'kilo'),
+      `#!/bin/sh\nprintf 'Imported session: ${SESSION_ID}\\n'\nexec sleep 30\n`,
+      { mode: 0o755 }
+    );
+    const runProcess = processUtils.runProcess;
+    const importProcess = spyOn(processUtils, 'runProcess').mockImplementation(
+      (command, args, options) =>
+        command === 'kilo'
+          ? runProcess('/bin/sh', [path.join(binDir, 'kilo'), ...args], options)
+          : runProcess(command, args, options)
+    );
+    try {
+      const startedAt = Date.now();
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        restoreFiles: false,
+        importTimeoutMs: 10_000,
+        importTerminationGraceMs: 50,
+      });
+      expect(result.ok).toBe(true);
+      expect(Date.now() - startedAt).toBeLessThan(3_000);
+    } finally {
+      importProcess.mockRestore();
+    }
+  });
+
+  it('does not treat a process cleanup error as a completed import', async () => {
+    mockFetchOk(makeSnapshot([]));
+    const importProcess = spyOn(processUtils, 'runProcess').mockImplementation(
+      async (_command, _args, options) => {
+        options?.onOutput?.('stdout', `Imported session: ${SESSION_ID}\n`);
+        throw new Error('cleanup failed');
+      }
+    );
+    try {
+      const error = await restoreSession(SESSION_ID, workspace).catch((error: unknown) => error);
+      expect(error).toBeInstanceOf(Error);
+      expect(String(error)).toContain('cleanup failed');
+    } finally {
+      importProcess.mockRestore();
+    }
+  });
+
+  it('does not turn caller cancellation into success after an import confirmation', async () => {
+    mockFetchOk(makeSnapshot([]));
+    const controller = new AbortController();
+    const importProcess = spyOn(processUtils, 'runProcess').mockImplementation(
+      async (_command, _args, options) => {
+        options?.onOutput?.('stdout', `Imported session: ${SESSION_ID}\n`);
+        controller.abort();
+        return { exitCode: 124, stdout: '', stderr: '', terminationReason: 'abort' };
+      }
+    );
+    try {
+      const result = await restoreSession(SESSION_ID, workspace, undefined, {
+        signal: controller.signal,
+      });
+      expect(result.ok).toBe(false);
+    } finally {
+      importProcess.mockRestore();
+    }
+  });
+
   it('strips transient lifecycle parts from the snapshot before kilo import', async () => {
     const capturePath = path.join(tmpDir, 'import-input.json');
     writeCapturingMockKilo(binDir, capturePath);
@@ -2138,6 +2282,36 @@ await Bun.write(process.env.RESTORE_CAPTURE_PATH, JSON.stringify({
     expect(fs.readFileSync(path.join(workspace, 'src/index.ts'), 'utf-8')).toBe(
       'restored from after\n'
     );
+  });
+
+  it('imports history without applying ingest diffs when file restoration is delegated', async () => {
+    const imported = path.join(tmpDir, 'history-import.json');
+    writeCapturingMockKilo(binDir, imported);
+    const snapshot = JSON.stringify({
+      info: snapshotInfo(),
+      messages: [{ info: { id: 'message-history' } }],
+      sessionDiff: [
+        { file: 'existing.txt', after: 'older ingest', status: 'modified' },
+        { file: 'deleted.txt', status: 'deleted' },
+        { file: 'added.txt', after: 'ingest addition', status: 'added' },
+      ],
+    });
+    fs.writeFileSync(path.join(workspace, 'existing.txt'), 'fresh checkout');
+    fs.writeFileSync(path.join(workspace, 'deleted.txt'), 'still present');
+    mockFetchOk(snapshot);
+    const result = await restoreSession(SESSION_ID, workspace, undefined, { restoreFiles: false });
+    expect(result).toEqual({
+      ok: true,
+      downloaded: true,
+      imported: true,
+      diffs: { applied: 0, skipped: 0, total: 0 },
+    });
+    expect(JSON.parse(fs.readFileSync(imported, 'utf8')).messages).toEqual([
+      { info: { id: 'message-history' } },
+    ]);
+    expect(fs.readFileSync(path.join(workspace, 'existing.txt'), 'utf8')).toBe('fresh checkout');
+    expect(fs.readFileSync(path.join(workspace, 'deleted.txt'), 'utf8')).toBe('still present');
+    expect(fs.existsSync(path.join(workspace, 'added.txt'))).toBe(false);
   });
 
   it('continues with a partial restore when a patch cannot be applied', async () => {

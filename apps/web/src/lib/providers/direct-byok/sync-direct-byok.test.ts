@@ -1,11 +1,13 @@
 import { DirectUserByokInferenceProviderIdSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { direct_byok_model_lists } from '@kilocode/db/schema';
+import { ai_gateway_sync_providers_state, direct_byok_model_lists } from '@kilocode/db/schema';
 import { eq, inArray } from 'drizzle-orm';
 import type { DirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import {
+  indexCatalogModelIdsByCanonicalId,
   parseModelsDevProviderModels,
   parseOpenAICompatibleProviderModels,
+  syncAndStoreDirectByokProviders,
   syncDirectByokModels,
 } from './sync-direct-byok';
 
@@ -129,11 +131,10 @@ describe('parseModelsDevProviderModels', () => {
         max_completion_tokens: 32_000,
         input_modalities: ['text', 'image'],
         flags: ['reasoning'],
-        variants: {
-          none: { reasoning: { enabled: false, effort: 'none' } },
-          high: { reasoning: { enabled: true, effort: 'high' } },
-          max: { reasoning: { enabled: true, effort: 'max' } },
-        },
+        reasoning_options: [
+          { type: 'toggle' },
+          { type: 'effort', values: ['high', 'max', 'default', null] },
+        ],
       },
       {
         id: 'alpha',
@@ -142,10 +143,7 @@ describe('parseModelsDevProviderModels', () => {
         max_completion_tokens: undefined,
         input_modalities: undefined,
         flags: ['reasoning'],
-        variants: {
-          instant: { reasoning: { enabled: false, effort: 'none' } },
-          thinking: { reasoning: { enabled: true, effort: 'high' } },
-        },
+        reasoning_options: [{ type: 'toggle' }],
       },
       {
         id: 'claude-beta',
@@ -154,7 +152,7 @@ describe('parseModelsDevProviderModels', () => {
         max_completion_tokens: undefined,
         input_modalities: undefined,
         flags: undefined,
-        variants: undefined,
+        reasoning_options: undefined,
       },
       {
         id: 'unknown-status',
@@ -163,7 +161,7 @@ describe('parseModelsDevProviderModels', () => {
         max_completion_tokens: undefined,
         input_modalities: undefined,
         flags: undefined,
-        variants: undefined,
+        reasoning_options: undefined,
       },
     ]);
   });
@@ -186,51 +184,26 @@ describe('parseModelsDevProviderModels', () => {
       id: 'future-control',
       flags: ['reasoning'],
     });
-    expect(models[0].variants).toBeUndefined();
+    expect(models[0].reasoning_options).toBeUndefined();
   });
 
-  test('sets verbosity from effort for Anthropic-backed models', () => {
+  test('leaves reasoning options without sendable controls to the model-name fallback', () => {
     const models = parseModelsDevProviderModels(
       {
         models: {
-          qwen: {
-            id: 'qwen-test',
+          alwaysOn: { id: 'always-on', reasoning: true, reasoning_options: [] },
+          defaultOnly: {
+            id: 'default-only',
             reasoning: true,
-            reasoning_options: [{ type: 'toggle' }, { type: 'effort', values: ['low', 'high'] }],
+            reasoning_options: [{ type: 'effort', values: ['default', null] }],
           },
         },
       },
-      'opencode-go'
+      'alibaba-token-plan'
     );
 
-    expect(models[0].variants).toEqual({
-      none: { reasoning: { enabled: false, effort: 'none' } },
-      low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
-      high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
-    });
-  });
-
-  test('sets verbosity on fallback variants for Anthropic-backed models', () => {
-    const models = parseModelsDevProviderModels(
-      {
-        models: {
-          qwen: {
-            id: 'qwen-test',
-            reasoning: true,
-            reasoning_options: [{ type: 'toggle' }, { type: 'budget_tokens', max: 32_000 }],
-          },
-        },
-      },
-      'opencode-go'
-    );
-
-    expect(models[0].variants).toEqual({
-      minimal: { reasoning: { enabled: true, effort: 'minimal' } },
-      low: { reasoning: { enabled: true, effort: 'low' }, verbosity: 'low' },
-      medium: { reasoning: { enabled: true, effort: 'medium' }, verbosity: 'medium' },
-      high: { reasoning: { enabled: true, effort: 'high' }, verbosity: 'high' },
-      xhigh: { reasoning: { enabled: true, effort: 'xhigh' }, verbosity: 'xhigh' },
-    });
+    expect(models.map(model => model.reasoning_options)).toEqual([undefined, undefined]);
+    expect(models.map(model => model.flags)).toEqual([['reasoning'], ['reasoning']]);
   });
 
   test('excludes models missing from the provider model list', () => {
@@ -291,11 +264,7 @@ describe('parseModelsDevProviderModels', () => {
         id: 'nvidia/chat',
         context_length: 128000,
         flags: ['reasoning'],
-        variants: {
-          none: { reasoning: { enabled: false, effort: 'none' } },
-          high: { reasoning: { enabled: true, effort: 'high' } },
-          max: { reasoning: { enabled: true, effort: 'max' } },
-        },
+        reasoning_options: [{ type: 'effort', values: ['none', 'high', 'max'] }],
       }),
       expect.objectContaining({
         id: 'nvidia/vision',
@@ -303,6 +272,110 @@ describe('parseModelsDevProviderModels', () => {
       }),
       expect.objectContaining({ id: 'nvidia/unknown' }),
     ]);
+  });
+
+  test('excludes models served only over the native Gemini API', () => {
+    const models = parseModelsDevProviderModels(
+      {
+        models: {
+          'glm-5.3': {
+            id: 'glm-5.3',
+            provider: { api: 'https://opencode.ai/inference/go/openai/v1' },
+          },
+          'qwen3.7-plus': {
+            id: 'qwen3.7-plus',
+            provider: {
+              npm: '@ai-sdk/anthropic',
+              api: 'https://opencode.ai/inference/go/anthropic/v1',
+            },
+          },
+          'gpt-6-luna': {
+            id: 'gpt-6-luna',
+            provider: { npm: '@ai-sdk/openai', api: 'https://opencode.ai/inference/go/openai/v1' },
+          },
+          'compatible-model': {
+            id: 'compatible-model',
+            provider: { npm: '@ai-sdk/openai-compatible' },
+          },
+          'gemini-4-argon-contributor': {
+            id: 'gemini-4-argon-contributor',
+            provider: {
+              npm: '@ai-sdk/google',
+              api: 'https://opencode.ai/inference/go/google/v1beta',
+            },
+          },
+          'vertex-gemini': {
+            id: 'vertex-gemini',
+            provider: { npm: '@ai-sdk/google-vertex' },
+          },
+          'mistral-alias': {
+            id: 'mistral-alias',
+            provider: { npm: '@ai-sdk/mistral', api: 'https://opencode.ai/inference/openai/v1' },
+          },
+          'openrouter-alias': {
+            id: 'openrouter-alias',
+            provider: { npm: '@openrouter/ai-sdk-provider' },
+          },
+        },
+      },
+      'opencode-go',
+      new Set([
+        'glm-5.3',
+        'qwen3.7-plus',
+        'gpt-6-luna',
+        'compatible-model',
+        'gemini-4-argon-contributor',
+        'vertex-gemini',
+        'mistral-alias',
+        'openrouter-alias',
+      ])
+    );
+
+    expect(models.map(model => model.id)).toEqual([
+      'glm-5.3',
+      'qwen3.7-plus',
+      'gpt-6-luna',
+      'compatible-model',
+      'mistral-alias',
+      'openrouter-alias',
+    ]);
+  });
+});
+
+describe('indexCatalogModelIdsByCanonicalId', () => {
+  test('maps canonical IDs to OpenRouter IDs, preferring the canonical ID and then the shortest', () => {
+    const index = indexCatalogModelIdsByCanonicalId({
+      openrouter: {
+        models: {
+          'deepseek/deepseek-v4.1-flash-1017': {
+            id: 'deepseek/deepseek-v4.1-flash-1017',
+            canonical_model_id: 'deepseek/deepseek-v4.1-flash',
+          },
+          'deepseek/deepseek-v4.1-flash': {
+            id: 'deepseek/deepseek-v4.1-flash',
+            canonical_model_id: 'deepseek/deepseek-v4.1-flash',
+          },
+          'z-ai/glm-5.2-0901': { id: 'z-ai/glm-5.2-0901', canonical_model_id: 'zhipuai/glm-5.2' },
+          'z-ai/glm-5.2': { id: 'z-ai/glm-5.2', canonical_model_id: 'zhipuai/glm-5.2' },
+          'minimax/minimax-m3.1-flash:free': {
+            id: 'minimax/minimax-m3.1-flash:free',
+            canonical_model_id: 'minimax/MiniMax-M3.1-Flash',
+          },
+          'openrouter/auto': { id: 'openrouter/auto' },
+        },
+      },
+    });
+
+    expect(Object.fromEntries(index)).toEqual({
+      'deepseek/deepseek-v4.1-flash': 'deepseek/deepseek-v4.1-flash',
+      'zhipuai/glm-5.2': 'z-ai/glm-5.2',
+    });
+  });
+
+  test('returns an empty index when models.dev lacks the openrouter provider', () => {
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+    expect(indexCatalogModelIdsByCanonicalId({}).size).toBe(0);
+    jest.restoreAllMocks();
   });
 });
 
@@ -329,11 +402,7 @@ describe('syncDirectByokModels database snapshots', () => {
       flags: ['reasoning', 'vision'],
       context_length: 16_000,
       max_completion_tokens: 16_000,
-      variants: {
-        none: { reasoning: { enabled: false, effort: 'none' } },
-        high: { reasoning: { enabled: true, effort: 'high' } },
-        max: { reasoning: { enabled: true, effort: 'max' } },
-      },
+      reasoning_options: [{ type: 'toggle' }, { type: 'effort', values: ['high', 'max'] }],
     },
     {
       id: 'nvidia/defaults',
@@ -343,6 +412,10 @@ describe('syncDirectByokModels database snapshots', () => {
     },
   ];
   let providerModels: Record<string, { id: string } & Record<string, unknown>>;
+  let openCodeGoModels: Record<string, { id: string } & Record<string, unknown>>;
+  let openRouterModels: Record<string, { id: string } & Record<string, unknown>>;
+  let chutesModelsDevModels: Record<string, { id: string } & Record<string, unknown>>;
+  let chutesModels: Array<{ id: string }>;
   let fetchAvailableModels: () => Promise<Response>;
 
   beforeEach(async () => {
@@ -355,23 +428,37 @@ describe('syncDirectByokModels database snapshots', () => {
         )
       );
     providerModels = downloadedModels;
+    openCodeGoModels = {};
+    openRouterModels = {};
+    chutesModelsDevModels = {};
+    chutesModels = [];
     fetchAvailableModels = async () =>
       Response.json({ data: Object.values(providerModels).map(({ id }) => ({ id })) });
     jest.spyOn(globalThis, 'fetch').mockImplementation(async input => {
       if (input === 'https://models.dev/api.json') {
         return Response.json({
+          openrouter: { models: openRouterModels },
+          chutes: { models: chutesModelsDevModels },
           nvidia: { models: providerModels },
           'alibaba-token-plan': { models: {} },
           edenai: { models: {} },
           'zai-coding-plan': { models: {} },
           'ollama-cloud': { models: {} },
-          'opencode-go': { models: {} },
+          'opencode-go': { models: openCodeGoModels },
           'xiaomi-token-plan-ams': { models: {} },
           'xiaomi-token-plan-sgp': { models: {} },
+          'amazon-bedrock': { models: {} },
+          'google-vertex': { models: {} },
         });
       }
       if (input === 'https://integrate.api.nvidia.com/v1/models') {
         return fetchAvailableModels();
+      }
+      if (input === 'https://opencode.ai/zen/go/v1/models') {
+        return Response.json({ data: Object.values(openCodeGoModels).map(({ id }) => ({ id })) });
+      }
+      if (input === 'https://llm.chutes.ai/v1/models') {
+        return Response.json({ data: chutesModels });
       }
       return Response.json({ data: [] });
     });
@@ -397,7 +484,7 @@ describe('syncDirectByokModels database snapshots', () => {
       .where(eq(direct_byok_model_lists.provider_id, providerId));
   }
 
-  test('persists the normalized download, defaults, and nested variants in PostgreSQL', async () => {
+  test('persists the normalized download, defaults, and reasoning options in PostgreSQL', async () => {
     const startedAt = Date.now();
     const counts = await syncDirectByokModels();
     const snapshot = await readSnapshot();
@@ -416,6 +503,48 @@ describe('syncDirectByokModels database snapshots', () => {
         .filter(id => id !== providerId)
         .map(() => [])
     );
+  });
+
+  test('persists the OpenRouter catalog model ID that models.dev identifies', async () => {
+    openRouterModels = {
+      'nvidia/reasoner-catalog': {
+        id: 'nvidia/reasoner-catalog',
+        canonical_model_id: 'nvidia/reasoner-canonical',
+      },
+      'moonshotai/kimi-k2.6': {
+        id: 'moonshotai/kimi-k2.6',
+        canonical_model_id: 'moonshotai/kimi-k2.6',
+      },
+    };
+    providerModels = {
+      reasoner: { id: 'nvidia/reasoner', canonical_model_id: 'nvidia/reasoner-canonical' },
+      unknown: { id: 'nvidia/unknown', canonical_model_id: 'nvidia/not-on-openrouter' },
+    };
+    chutesModelsDevModels = {
+      'moonshotai/Kimi-K2.6-TEE': {
+        id: 'moonshotai/Kimi-K2.6-TEE',
+        canonical_model_id: 'moonshotai/kimi-k2.6',
+      },
+    };
+    chutesModels = [{ id: 'moonshotai/Kimi-K2.6-TEE' }, { id: 'chutes-only-model' }];
+
+    await syncDirectByokModels();
+
+    const catalogModelIds = async (providerId: 'nvidia-byok' | 'chutes-byok') => {
+      const [row] = await db
+        .select()
+        .from(direct_byok_model_lists)
+        .where(eq(direct_byok_model_lists.provider_id, providerId));
+      return Object.fromEntries(row.models.map(model => [model.id, model.catalog_model_id]));
+    };
+    expect(await catalogModelIds('nvidia-byok')).toEqual({
+      'nvidia/reasoner': 'nvidia/reasoner-catalog',
+      'nvidia/unknown': undefined,
+    });
+    expect(await catalogModelIds('chutes-byok')).toEqual({
+      'moonshotai/Kimi-K2.6-TEE': 'moonshotai/kimi-k2.6',
+      'chutes-only-model': undefined,
+    });
   });
 
   test('re-sync replaces models and metadata, removes stale models, and refreshes synced_at', async () => {
@@ -460,6 +589,40 @@ describe('syncDirectByokModels database snapshots', () => {
     expect(counts[providerId]).toBe(0);
   });
 
+  test('re-sync removes previously synced OpenCode Go models served only over the Gemini API', async () => {
+    await db.insert(direct_byok_model_lists).values({
+      provider_id: 'opencode-go',
+      models: [
+        {
+          id: 'gemini-4-argon-contributor',
+          name: 'Gemini 4 Argon Contributor',
+          context_length: 1_048_576,
+          max_completion_tokens: 65_536,
+        },
+      ],
+      synced_at: oldSyncedAt,
+    });
+    openCodeGoModels = {
+      'glm-5.3': { id: 'glm-5.3', name: 'GLM-5.3' },
+      'gemini-4-argon-contributor': {
+        id: 'gemini-4-argon-contributor',
+        name: 'Gemini 4 Argon Contributor',
+        provider: { npm: '@ai-sdk/google', api: 'https://opencode.ai/inference/go/google/v1beta' },
+      },
+    };
+
+    const counts = await syncDirectByokModels();
+    const [snapshot] = await db
+      .select()
+      .from(direct_byok_model_lists)
+      .where(eq(direct_byok_model_lists.provider_id, 'opencode-go'));
+
+    expect(snapshot.models).toStrictEqual([
+      { id: 'glm-5.3', name: 'GLM-5.3', context_length: 200_000, max_completion_tokens: 32_000 },
+    ]);
+    expect(counts['opencode-go']).toBe(1);
+  });
+
   test('rejects an upstream failure without replacing the last successful snapshot', async () => {
     await syncDirectByokModels();
     await backdateSnapshot();
@@ -473,5 +636,50 @@ describe('syncDirectByokModels database snapshots', () => {
     );
 
     expect(await readSnapshot()).toStrictEqual(previousSnapshot);
+  });
+
+  describe('syncAndStoreDirectByokProviders', () => {
+    const providersCompletedAt = '2020-01-01T00:00:00.000Z';
+
+    beforeEach(async () => {
+      await db
+        .delete(ai_gateway_sync_providers_state)
+        .where(eq(ai_gateway_sync_providers_state.id, 1));
+      await db
+        .insert(ai_gateway_sync_providers_state)
+        .values({ id: 1, last_completed_at: providersCompletedAt });
+    });
+
+    async function readSyncState() {
+      const [row] = await db.select().from(ai_gateway_sync_providers_state);
+      return row;
+    }
+
+    test('records direct BYOK completion separately from the full provider sync', async () => {
+      const startedAt = Date.now();
+      const summary = await syncAndStoreDirectByokProviders();
+      const state = await readSyncState();
+
+      expect(summary.direct_byok_model_counts[providerId]).toBe(normalizedModels.length);
+      expect(summary.total_providers).toBe(Object.keys(summary.direct_byok_model_counts).length);
+      expect(summary.total_models).toBe(normalizedModels.length);
+      expect(state.direct_byok_last_completed_at).not.toBeNull();
+      expect(new Date(state.direct_byok_last_completed_at ?? '').toISOString()).toBe(
+        summary.completed_at
+      );
+      expect(Date.parse(summary.completed_at)).toBeGreaterThanOrEqual(startedAt);
+      expect(new Date(state.last_completed_at ?? '').toISOString()).toBe(providersCompletedAt);
+    });
+
+    test('does not record completion when a provider fetch fails', async () => {
+      fetchAvailableModels = async () =>
+        new Response(null, { status: 503, statusText: 'Service Unavailable' });
+
+      await expect(syncAndStoreDirectByokProviders()).rejects.toThrow(
+        'Failed to fetch nvidia-byok available models: 503 Service Unavailable'
+      );
+
+      expect((await readSyncState()).direct_byok_last_completed_at).toBeNull();
+    });
   });
 });

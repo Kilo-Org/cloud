@@ -35,6 +35,8 @@ const BASE_EXCLUDE_ENTRIES = [
   'openclaw',
 ] as const;
 
+const CLOUDFLARE_SANDBOX_EXACT_EXCLUDE_ENTRIES = ['@cloudflare/sandbox@0.12.12'] as const;
+
 // The DO-managed Cloudflare containers runtime needs wrangler 4.134.0+, and
 // 4.135.0 exact-pins its own workerd/miniflare runtime, so each is exempted by
 // exact version. Approved early-access exception; remove this group when 4.135.0
@@ -50,6 +52,19 @@ const CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES = [
   '@cloudflare/workerd-windows-64@1.20260918.1',
 ] as const;
 
+// Two mobile pins must move without waiting out the gate: FlashList 2.3.3
+// carries the EngagedIndicesTracker scroll-window fix the agent transcript list
+// depends on, and react-native-reanimated 4.7.1 carries the stability fixes the
+// app needs. One exact package@version each.
+const MOBILE_EXACT_EXCLUDE_ENTRIES = [
+  '@shopify/flash-list@2.3.3',
+  'react-native-reanimated@4.7.1',
+] as const;
+
+// Bun 1.4.4 rejects the compromised eMudhra chains, and the wrapper dev types
+// must equal the runtime the image-version contract test pins, so the types
+// pair moves with it. Types only: no runtime code and no install scripts.
+const BUN_TYPES_EXACT_EXCLUDE_ENTRIES = ['@types/bun@1.4.4', 'bun-types@1.4.4'] as const;
 // Exact pnpm syntax for one pinned package version: bare or @scoped name, then
 // @ and a version starting with a digit. Rejects name-only entries, ranges,
 // wildcards, and future-version placeholders alike.
@@ -93,19 +108,25 @@ describe('minimum release age policy contract', () => {
     expect(Number(match?.[1])).toBe(EXPECTED_MINIMUM_RELEASE_AGE_MINUTES);
   });
 
-  it('excludes exactly the base list plus the container-runtime exact versions', () => {
-    // Order as written: tsx, the container-runtime exemptions, then the
-    // remaining base entries — the base list with nothing dropped or changed.
+  it('excludes exactly the base list plus the container-runtime, mobile and Bun-types exact versions', () => {
     const expected = [
       BASE_EXCLUDE_ENTRIES[0],
+      ...CLOUDFLARE_SANDBOX_EXACT_EXCLUDE_ENTRIES,
       ...CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES,
       ...BASE_EXCLUDE_ENTRIES.slice(1),
+      ...MOBILE_EXACT_EXCLUDE_ENTRIES,
+      ...BUN_TYPES_EXACT_EXCLUDE_ENTRIES,
     ];
     expect(excludeEntries).toEqual(expected);
   });
 
   it('scopes every new exclusion to one exact package@version', () => {
-    expect(newExclusions).toEqual([...CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES]);
+    expect(newExclusions).toEqual([
+      ...CLOUDFLARE_SANDBOX_EXACT_EXCLUDE_ENTRIES,
+      ...CLOUDFLARE_CONTAINER_RUNTIME_EXACT_EXCLUDE_ENTRIES,
+      ...MOBILE_EXACT_EXCLUDE_ENTRIES,
+      ...BUN_TYPES_EXACT_EXCLUDE_ENTRIES,
+    ]);
     for (const entry of newExclusions) {
       expect(entry).toMatch(EXACT_VERSION_PATTERN);
     }

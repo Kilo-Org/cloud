@@ -19,6 +19,7 @@ export type SessionSection = {
 export const PLATFORM_FILTERS = [
   'cloud-agent',
   'extension',
+  'desktop',
   'cli',
   'slack',
   'github',
@@ -135,8 +136,11 @@ export function projectOptionKey(gitUrl: string): string {
  * reading `Date.now()` behind the memo (see `useNowTicker`); omitted, the
  * formatter reads the current time.
  */
-export function formatMeta(timestamp: string, nowMs?: number): string {
-  return timeAgo(parseTimestamp(timestamp), undefined, nowMs).toLocaleUpperCase(i18n.language);
+export function formatMeta(timestamp: string | null | undefined, nowMs?: number): string {
+  const date = parseTimestamp(timestamp);
+  return Number.isNaN(date.getTime())
+    ? ''
+    : timeAgo(date, undefined, nowMs).toLocaleUpperCase(i18n.language);
 }
 
 /**
@@ -216,7 +220,7 @@ export function selectSessionCostInputs(
  * in-progress, old, or zero-cost sessions).
  */
 export function composeStoredSessionVisibleMeta(cost: string | null, timeMeta: string): string {
-  return cost ? `${cost} · ${timeMeta}` : timeMeta;
+  return composeActiveSessionVisibleMeta(cost, timeMeta) ?? '';
 }
 
 /**
@@ -226,7 +230,7 @@ export function composeStoredSessionVisibleMeta(cost: string | null, timeMeta: s
  * the visible "$0.12 · 5M AGO" order.
  */
 export function composeStoredSessionSpokenMeta(cost: string | null, timeSpoken: string): string {
-  return cost ? `cost ${cost}, ${timeSpoken}` : timeSpoken;
+  return composeActiveSessionSpokenMeta(cost, timeSpoken) ?? '';
 }
 
 /**
@@ -284,17 +288,25 @@ export function composeActiveSessionSpokenMeta(
   return null;
 }
 
-/**
- * Selector for the spoken meta of a remote session row. When `needsInput`
- * is true, spoken cost/time are suppressed entirely (`null`) — the spoken
- * label announces "needs input" instead via `sessionRowAccessibilityLabel`.
- * Otherwise delegates to `composeActiveSessionSpokenMeta`.
- */
 export function selectRemoteRowSpokenMeta(params: {
+  variant: 'card' | 'list';
+  scheduled: boolean;
+  scheduledWake: string | null;
   needsInput: boolean;
   costSpoken: string | null;
   timeSpoken: string | null;
 }): string | null {
+  if (params.variant === 'list') {
+    const parts = [
+      params.scheduledWake,
+      composeActiveSessionSpokenMeta(params.costSpoken, params.timeSpoken),
+    ].filter(Boolean);
+    // Intl unit lists still add a conjunction in Arabic; the outer label owns its connector.
+    return parts.join(', ') || null;
+  }
+  if (params.scheduled) {
+    return params.scheduledWake;
+  }
   if (params.needsInput) {
     return null;
   }

@@ -1,5 +1,6 @@
 import { createTRPCRouter, baseProcedure } from '@kilocode/web-shared/lib/trpc/init';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
+import { ORGANIZATION_MANAGE_ROLES } from '@kilocode/app-shared/organizations';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import * as profileService from '@kilocode/cloud-agent-profile';
@@ -9,19 +10,34 @@ import * as profileMcpService from '@kilocode/cloud-agent-profile';
 import * as profileSkillsService from '@kilocode/cloud-agent-profile';
 import * as profileAgentsService from '@kilocode/cloud-agent-profile';
 import * as profileKiloCommandsService from '@kilocode/cloud-agent-profile';
+import * as profileInstructionsService from '@kilocode/cloud-agent-profile';
 import * as repoBindingService from '@kilocode/cloud-agent-profile';
+import * as profileImportService from '@kilocode/cloud-agent-profile';
+import {
+  IMPORT_CATEGORIES,
+  parseLocalConfigArchive,
+  isImportEncodedWithinLimit,
+  MAX_IMPORT_ARCHIVE_ENTRIES,
+  MAX_IMPORT_ENCODED_LENGTH,
+  selectImportItems,
+} from '@kilocode/cloud-agent-profile/import';
 import { AgentConfigSchema } from '@kilocode/db/schema-types';
 import type { ProfileOwner } from '@kilocode/cloud-agent-profile';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { AGENT_ENV_VARS_PUBLIC_KEY } from '@kilocode/web-shared/lib/config.server';
+import { getPostgresErrorCode, isUniqueViolation } from '@/lib/db-errors';
 
-function isForeignKeyViolation(error: unknown): boolean {
-  return (
-    error !== null &&
-    typeof error === 'object' &&
-    'code' in error &&
-    (error as { code: string }).code === '23503'
-  );
+/**
+ * Mutating anything on an organization-owned profile — its content, its MCP
+ * servers, its default flag, or the profile itself — is reserved for
+ * organization owners and admins. Plain members keep read access through
+ * `list`, `listCombined`, and `get`.
+ */
+async function ensureOrganizationManageAccess(
+  ctx: Parameters<typeof ensureOrganizationAccess>[0],
+  organizationId: string
+): Promise<void> {
+  await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_MANAGE_ROLES);
 }
 
 // Input schemas
@@ -61,6 +77,7 @@ const ProfileSummarySchema = z.object({
   skillCount: z.number(),
   agentCount: z.number(),
   kiloCommandCount: z.number(),
+  instructionCount: z.number(),
 });
 
 const ProfileSummaryWithOwnerSchema = ProfileSummarySchema.extend({
@@ -106,7 +123,7 @@ const ProfileSkillResponseSchema = z.object({
   id: z.uuid(),
   name: z.string(),
   description: z.string().nullable(),
-  sourceType: z.enum(['marketplace', 'custom']),
+  sourceType: z.enum(['marketplace', 'custom', 'skills-sh']),
   sourceUrl: z.string().nullable(),
   rawMarkdown: z.string(),
   files: z.record(z.string(), z.string()),
@@ -138,6 +155,15 @@ const ProfileKiloCommandResponseSchema = z.object({
   updatedAt: z.string(),
 });
 
+const ProfileInstructionResponseSchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  content: z.string(),
+  enabled: z.boolean(),
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+
 const ProfileResponseSchema = z.object({
   id: z.uuid(),
   name: z.string(),
@@ -151,6 +177,87 @@ const ProfileResponseSchema = z.object({
   skills: z.array(ProfileSkillResponseSchema),
   agents: z.array(ProfileAgentResponseSchema),
   kiloCommands: z.array(ProfileKiloCommandResponseSchema),
+  instructions: z.array(ProfileInstructionResponseSchema),
+});
+
+const ImportFieldChangeSchema = z.object({
+  field: z.string(),
+  before: z.unknown(),
+  after: z.unknown(),
+});
+
+const PreviewAgentSchema = z.object({
+  slug: z.string(),
+  name: z.string(),
+  config: AgentConfigSchema,
+});
+
+const PreviewKiloCommandSchema = z.object({
+  name: z.string(),
+  description: z.string().nullable(),
+  template: z.string(),
+  agent: z.string().nullable(),
+  model: z.string().nullable(),
+  subtask: z.boolean(),
+  enabled: z.boolean(),
+});
+
+const PreviewSkillSchema = z.object({
+  name: z.string(),
+  description: z.string().nullable(),
+  rawMarkdown: z.string(),
+  files: z.record(z.string(), z.string()),
+  enabled: z.boolean(),
+  sourceType: z.enum(['marketplace', 'custom', 'skills-sh']),
+  sourceUrl: z.string().nullable(),
+});
+
+const PreviewInstructionSchema = z.object({
+  name: z.string(),
+  content: z.string(),
+  enabled: z.boolean(),
+});
+
+const ImportIssueSchema = z.object({
+  severity: z.enum(['error', 'warning']),
+  code: z.string(),
+  category: z.string(),
+  path: z.string().nullable(),
+  field: z.string().nullable(),
+  message: z.string(),
+});
+
+function importCategoryPreviewSchema<T extends z.ZodTypeAny>(item: T) {
+  return z.object({
+    added: z.array(z.object({ id: z.string(), item })),
+    changed: z.array(
+      z.object({
+        id: z.string(),
+        before: item,
+        after: item,
+        changes: z.array(ImportFieldChangeSchema),
+      })
+    ),
+  });
+}
+
+const ConfigImportPreviewSchema = z.object({
+  agents: importCategoryPreviewSchema(PreviewAgentSchema),
+  commands: importCategoryPreviewSchema(PreviewKiloCommandSchema),
+  skills: importCategoryPreviewSchema(PreviewSkillSchema),
+  instructions: importCategoryPreviewSchema(PreviewInstructionSchema),
+  issues: z.array(ImportIssueSchema),
+});
+
+const importSelectionIdsSchema = z
+  .array(z.string().min(1).max(200))
+  .max(MAX_IMPORT_ARCHIVE_ENTRIES);
+
+const ImportSelectionSchema = z.object({
+  agents: importSelectionIdsSchema,
+  commands: importSelectionIdsSchema,
+  skills: importSelectionIdsSchema,
+  instructions: importSelectionIdsSchema,
 });
 
 /**
@@ -162,6 +269,21 @@ function getOwner(organizationId: string | undefined, userId: string): ProfileOw
     return { type: 'organization', id: organizationId };
   }
   return { type: 'user', id: userId };
+}
+
+/**
+ * Decode the base64 archive supplied by the client. The encoded-length budget
+ * is enforced on the raw string before any base64 decoding or archive work, so
+ * an over-budget request never allocates the decoded payload.
+ */
+function decodeImportArchive(encoded: string): Uint8Array {
+  if (!isImportEncodedWithinLimit(encoded)) {
+    throw new TRPCError({
+      code: 'PAYLOAD_TOO_LARGE',
+      message: `Import archive exceeds ${MAX_IMPORT_ENCODED_LENGTH} encoded bytes`,
+    });
+  }
+  return new Uint8Array(Buffer.from(encoded, 'base64'));
 }
 
 /**
@@ -215,7 +337,6 @@ export const agentProfilesRouter = createTRPCRouter({
         profileService.listProfiles(db, { type: 'user', id: ctx.user.id }),
       ]);
 
-      // Effective default: personal default takes precedence over org default
       const effectiveDefault =
         personalProfiles.find(p => p.isDefault) ?? orgProfiles.find(p => p.isDefault);
 
@@ -241,6 +362,43 @@ export const agentProfilesRouter = createTRPCRouter({
     }),
 
   /**
+   * Get a single profile's metadata and collection counts.
+   *
+   * The profile editor's Overview renders metadata and six counts, so it reads
+   * this rather than `get`: a profile may carry every skill's markdown and
+   * companion files, and transferring those to render counts alone spends the
+   * client's request budget on bytes the screen never reads.
+   */
+  overview: baseProcedure
+    .input(ProfileIdSchema.extend({ organizationId: z.uuid().optional() }))
+    .output(ProfileSummarySchema)
+    .query(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      return profileService.getProfileOverview(db, input.profileId, owner);
+    }),
+
+  /**
+   * List a single profile's agents.
+   *
+   * The session's role picker maps custom modes from these agents, so it reads
+   * this rather than `get`: the rest of the profile (every skill's markdown and
+   * companion files) is not part of that decision.
+   */
+  agents: baseProcedure
+    .input(ProfileIdSchema.extend({ organizationId: z.uuid().optional() }))
+    .output(z.array(ProfileAgentResponseSchema))
+    .query(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      return profileAgentsService.getProfileAgents(db, input.profileId, owner);
+    }),
+
+  /**
    * Create a new profile.
    */
   create: baseProcedure
@@ -248,7 +406,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       return profileService.createProfile(db, owner, ctx.user.id, input.name, input.description);
@@ -268,7 +426,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileService.updateProfile(db, input.profileId, owner, {
@@ -286,16 +444,19 @@ export const agentProfilesRouter = createTRPCRouter({
     .input(ProfileIdSchema.extend({ organizationId: z.uuid().optional() }))
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
-      if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
-      }
       const owner = getOwner(input.organizationId, ctx.user.id);
+      if (input.organizationId) {
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
+      }
       try {
         await profileService.deleteProfile(db, input.profileId, owner);
         return { success: true };
       } catch (error) {
-        // Check for FK violation (profile referenced by webhook triggers)
-        if (isForeignKeyViolation(error)) {
+        // The profile FK is `ON DELETE RESTRICT`, and Drizzle wraps the driver
+        // error, so read the wrapped SQLSTATE: PostgreSQL raises 23001
+        // (restrict_violation) for RESTRICT and 23503 for NO ACTION.
+        const sqlState = getPostgresErrorCode(error);
+        if (sqlState === '23001' || sqlState === '23503') {
           throw new TRPCError({
             code: 'PRECONDITION_FAILED',
             message:
@@ -314,7 +475,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileService.setDefaultProfile(db, input.profileId, owner);
@@ -329,7 +490,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileService.clearDefaultProfile(db, input.profileId, owner);
@@ -349,7 +510,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileVarsService.setVar(
@@ -377,7 +538,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileVarsService.deleteVar(db, input.profileId, input.key, owner);
@@ -396,7 +557,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileCommandsService.setCommands(db, input.profileId, input.commands, owner);
@@ -417,7 +578,7 @@ export const agentProfilesRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await repoBindingService.bindProfileToRepo(
@@ -442,7 +603,7 @@ export const agentProfilesRouter = createTRPCRouter({
     )
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await repoBindingService.unbindRepo(db, owner, input.repoFullName, input.platform);
@@ -482,7 +643,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       return profileMcpService.createMcpServer(db, publicKey, input.profileId, input.server, owner);
@@ -503,7 +664,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileMcpService.updateMcpServer(
@@ -530,7 +691,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileMcpService.deleteMcpServer(db, input.profileId, input.mcpServerId, owner);
@@ -551,7 +712,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileMcpService.setMcpEnabled(
@@ -579,7 +740,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       return profileSkillsService.createCustomSkill(
@@ -597,6 +758,40 @@ export const agentProfilesRouter = createTRPCRouter({
     }),
 
   /**
+   * Add a skills.sh reference by qualified `owner/repo@skill` or URL. The
+   * reference is installed at container setup instead of storing content.
+   */
+  createSkillsShSkill: baseProcedure
+    .input(
+      ProfileIdSchema.extend({
+        organizationId: z.uuid().optional(),
+      }).merge(profileSkillsService.skillsShInputSchema)
+    )
+    .output(z.object({ id: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      try {
+        return await profileSkillsService.createSkillsShSkill(
+          db,
+          input.profileId,
+          { source: input.source, enabled: input.enabled },
+          owner
+        );
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: `A skill named '${input.source.skill}' already exists in this profile`,
+          });
+        }
+        throw error;
+      }
+    }),
+
+  /**
    * Update a skill's fields (name, description, rawMarkdown, files, enabled).
    */
   updateSkill: baseProcedure
@@ -609,7 +804,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileSkillsService.updateSkill(
@@ -641,7 +836,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileSkillsService.deleteSkill(db, input.profileId, input.skillId, owner);
@@ -662,7 +857,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileSkillsService.setSkillEnabled(
@@ -690,19 +885,29 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
-      return profileAgentsService.createAgent(
-        db,
-        input.profileId,
-        {
-          slug: input.slug,
-          name: input.name,
-          config: input.config,
-        },
-        owner
-      );
+      try {
+        return await profileAgentsService.createAgent(
+          db,
+          input.profileId,
+          {
+            slug: input.slug,
+            name: input.name,
+            config: input.config,
+          },
+          owner
+        );
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'An agent with this slug already exists in this profile',
+          });
+        }
+        throw error;
+      }
     }),
 
   /**
@@ -718,20 +923,30 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
-      await profileAgentsService.updateAgent(
-        db,
-        input.profileId,
-        input.agentId,
-        {
-          slug: input.slug,
-          name: input.name,
-          config: input.config,
-        },
-        owner
-      );
+      try {
+        await profileAgentsService.updateAgent(
+          db,
+          input.profileId,
+          input.agentId,
+          {
+            slug: input.slug,
+            name: input.name,
+            config: input.config,
+          },
+          owner
+        );
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'An agent with this slug already exists in this profile',
+          });
+        }
+        throw error;
+      }
       return { success: true };
     }),
 
@@ -748,7 +963,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileAgentsService.deleteAgent(db, input.profileId, input.agentId, owner);
@@ -766,7 +981,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ id: z.uuid() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       return profileKiloCommandsService.createKiloCommand(
@@ -794,7 +1009,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileKiloCommandsService.updateKiloCommand(
@@ -824,7 +1039,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileKiloCommandsService.deleteKiloCommand(
@@ -847,7 +1062,7 @@ export const agentProfilesRouter = createTRPCRouter({
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileKiloCommandsService.setKiloCommandEnabled(
@@ -864,13 +1079,13 @@ export const agentProfilesRouter = createTRPCRouter({
     .input(
       ProfileIdSchema.extend({
         organizationId: z.uuid().optional(),
-        orderedIds: z.array(z.uuid()),
+        orderedIds: profileKiloCommandsService.kiloCommandReorderIdsSchema,
       })
     )
     .output(z.object({ success: z.boolean() }))
     .mutation(async ({ ctx, input }) => {
       if (input.organizationId) {
-        await ensureOrganizationAccess(ctx, input.organizationId);
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
       await profileKiloCommandsService.reorderKiloCommands(
@@ -879,6 +1094,171 @@ export const agentProfilesRouter = createTRPCRouter({
         input.orderedIds,
         owner
       );
+      return { success: true };
+    }),
+
+  // ============ INSTRUCTIONS ============
+
+  /**
+   * Create an instruction file on a profile. Each enabled instruction is
+   * materialized as `.kilocode/rules/<name>.md` at session preparation time.
+   */
+  createInstruction: baseProcedure
+    .input(
+      ProfileIdSchema.extend({
+        organizationId: z.uuid().optional(),
+      }).merge(profileInstructionsService.instructionCreateInputSchema)
+    )
+    .output(z.object({ id: z.uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      return profileInstructionsService.createInstruction(
+        db,
+        input.profileId,
+        { name: input.name, content: input.content },
+        owner
+      );
+    }),
+
+  /**
+   * Update an instruction's fields (name, content).
+   */
+  updateInstruction: baseProcedure
+    .input(
+      ProfileIdSchema.extend({
+        organizationId: z.uuid().optional(),
+        instructionId: z.uuid(),
+      }).merge(profileInstructionsService.instructionUpdateInputSchema)
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      await profileInstructionsService.updateInstruction(
+        db,
+        input.profileId,
+        input.instructionId,
+        { name: input.name, content: input.content },
+        owner
+      );
+      return { success: true };
+    }),
+
+  /**
+   * Delete an instruction from a profile.
+   */
+  deleteInstruction: baseProcedure
+    .input(
+      ProfileIdSchema.extend({
+        organizationId: z.uuid().optional(),
+        instructionId: z.uuid(),
+      })
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      await profileInstructionsService.deleteInstruction(
+        db,
+        input.profileId,
+        input.instructionId,
+        owner
+      );
+      return { success: true };
+    }),
+
+  /**
+   * Toggle an instruction's enabled flag.
+   */
+  setInstructionEnabled: baseProcedure
+    .input(
+      ProfileIdSchema.extend({
+        organizationId: z.uuid().optional(),
+        instructionId: z.uuid(),
+        enabled: z.boolean(),
+      })
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      await profileInstructionsService.setInstructionEnabled(
+        db,
+        input.profileId,
+        input.instructionId,
+        input.enabled,
+        owner
+      );
+      return { success: true };
+    }),
+
+  // ============ CONFIG IMPORT ============
+
+  /**
+   * Decode and map an uploaded local config archive and diff it against the
+   * profile's current contents. Writes nothing. The server owns the archive
+   * decoding and validation; the client only supplies the raw base64 ZIP.
+   */
+  previewConfigImport: baseProcedure
+    .input(
+      ProfileIdSchema.extend({
+        organizationId: z.uuid().optional(),
+        archive: z.string().min(1),
+      })
+    )
+    .output(ConfigImportPreviewSchema)
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      const parsed = parseLocalConfigArchive(decodeImportArchive(input.archive));
+      return profileImportService.buildImportPreview(db, input.profileId, parsed, owner);
+    }),
+
+  /**
+   * Import the selected definitions from an uploaded archive. The server
+   * re-parses the archive and rejects any selected identity it cannot import,
+   * so apply cannot bypass the preview's validation.
+   */
+  applyConfigImport: baseProcedure
+    .input(
+      ProfileIdSchema.extend({
+        organizationId: z.uuid().optional(),
+        archive: z.string().min(1),
+        selection: ImportSelectionSchema,
+      })
+    )
+    .output(z.object({ success: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationManageAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      if (IMPORT_CATEGORIES.every(category => input.selection[category].length === 0)) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Select at least one definition to import',
+        });
+      }
+      const parsed = parseLocalConfigArchive(decodeImportArchive(input.archive));
+      const selected = selectImportItems(parsed.config, input.selection);
+      if (!selected.ok) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Selected ${selected.category.slice(0, -1)} "${selected.id}" cannot be imported from this archive`,
+        });
+      }
+      await profileImportService.applyImport(db, input.profileId, selected.config, owner);
       return { success: true };
     }),
 });

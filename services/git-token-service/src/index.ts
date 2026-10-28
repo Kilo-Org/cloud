@@ -30,10 +30,12 @@ import {
   type GetGitLabTokenResult,
 } from './gitlab-runtime-token-resolver.js';
 import { DEFAULT_GITLAB_INSTANCE_URL } from './gitlab-constants.js';
+import { readBoundedJsonBody } from './lib/bounded-read.js';
 import {
   GitLabSessionCapabilityCodec,
   GitLabSessionCapabilityError,
   sha256Digest,
+  validateGitLabSessionCapabilityPath,
   type GitLabAuthType,
   type GitLabCapabilityCredentialSource,
   type GitLabSessionCapabilityFailureReason,
@@ -125,6 +127,15 @@ export type GetTokenForRepoFailure = {
 };
 
 export type GetTokenForRepoResult = GetTokenForRepoSuccess | GetTokenForRepoFailure;
+
+const GetTokenForIntegrationParamsSchema = z.object({
+  integrationId: z.string().uuid(),
+  userId: z.string().min(1),
+  orgId: z.string().uuid().optional(),
+});
+
+export type GetTokenForIntegrationParams = z.infer<typeof GetTokenForIntegrationParamsSchema>;
+
 export type {
   GetGitLabTokenParams,
   GetGitLabTokenSuccess,
@@ -182,7 +193,8 @@ export type RedeemGitHubSessionCapabilityParams = {
 };
 export type RedeemGitHubSessionCapabilitySuccess = {
   success: true;
-  authorization: string;
+  /** Null means the request is forwarded anonymously. */
+  authorization: string | null;
   installationId: string;
   source: 'user' | 'installation';
   appType: GitHubAppType;
@@ -370,7 +382,8 @@ async function resolveSecret(secret: SecretsStoreSecret | string): Promise<strin
 
 async function readBoundedInternalJsonRequest(request: Request): Promise<unknown> {
   const contentType = request.headers.get('Content-Type')?.split(';', 1)[0].trim().toLowerCase();
-  if (contentType !== 'application/json' || !request.body) throw new Error('invalid_request');
+  const stream = request.body;
+  if (contentType !== 'application/json' || !stream) throw new Error('invalid_request');
 
   const contentLength = request.headers.get('Content-Length');
   if (contentLength) {
@@ -379,62 +392,201 @@ async function readBoundedInternalJsonRequest(request: Request): Promise<unknown
     }
   }
 
-  const reader = request.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let totalBytes = 0;
   try {
-    while (true) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      if (!(chunk.value instanceof Uint8Array)) throw new Error('invalid_request');
-      totalBytes += chunk.value.byteLength;
-      if (totalBytes > INTERNAL_REQUEST_MAX_BYTES) {
-        try {
-          await reader.cancel();
-        } catch {
-          // The request remains rejected when cancellation itself fails.
-        }
-        throw new Error('invalid_request');
-      }
-      chunks.push(chunk.value);
-    }
-  } finally {
-    reader.releaseLock();
-  }
-
-  const body = new Uint8Array(totalBytes);
-  let offset = 0;
-  for (const chunk of chunks) {
-    body.set(chunk, offset);
-    offset += chunk.byteLength;
-  }
-  try {
-    return JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(body));
+    return await readBoundedJsonBody(stream, INTERNAL_REQUEST_MAX_BYTES);
   } catch {
     throw new Error('invalid_request');
   }
 }
 
-function validateGitHubCapabilityUpstream(
+type GitHubCapabilityCredential = 'pinned' | 'none';
+
+type GitHubCapabilityUpstream =
+  | { failure: RedeemGitHubSessionCapabilityFailureReason; credential?: never }
+  | { failure: null; credential: GitHubCapabilityCredential };
+
+// Methods that may reach the recorded repository's REST surface. Everything here is
+// repository-confined before the credential is minted, so the list covers the write
+// operations agent sessions perform (pull requests, reviews, comments, releases).
+const GITHUB_REPOSITORY_API_METHODS = ['GET', 'HEAD', 'POST', 'PATCH', 'PUT', 'DELETE'];
+const GITHUB_UPLOAD_METHODS = ['GET', 'HEAD', 'POST', 'DELETE'];
+const GITHUB_IDENTITY_METHODS = ['GET', 'HEAD'];
+const GITHUB_REGISTRY_METHODS = ['GET', 'HEAD'];
+
+function repositoryApiPath(repository: { owner: string; repo: string }): string {
+  return `/repos/${repository.owner}/${repository.repo}`;
+}
+
+function isRepositoryApiPath(path: string, repository: { owner: string; repo: string }): boolean {
+  const prefix = repositoryApiPath(repository);
+  return path === prefix || path.startsWith(`${prefix}/`);
+}
+
+function isRepositoryRootPath(path: string, repository: { owner: string; repo: string }): boolean {
+  const root = `/${repository.owner}/${repository.repo}`;
+  return (
+    path === root ||
+    path.startsWith(`${root}/`) ||
+    path === `${root}.git` ||
+    path.startsWith(`${root}.git/`)
+  );
+}
+
+/**
+ * Matches a Git smart-HTTP or LFS endpoint by the path after the repository
+ * root, for example `/info/refs` or `/git-receive-pack`.
+ */
+function matchesGitRequestSuffix(method: string, url: URL, suffix: string): boolean {
+  if (method === 'GET' && suffix === '/info/refs') {
+    const entries = [...url.searchParams.entries()];
+    const service = url.searchParams.get('service');
+    return (
+      entries.length === 1 && (service === 'git-upload-pack' || service === 'git-receive-pack')
+    );
+  }
+  if (method === 'GET' && suffix === '/info/lfs/locks') return true;
+  if (method !== 'POST' || url.search !== '') return false;
+  return (
+    suffix === '/git-upload-pack' ||
+    suffix === '/git-receive-pack' ||
+    suffix === '/info/lfs/objects/batch' ||
+    suffix === '/info/lfs/locks' ||
+    suffix === '/info/lfs/locks/verify' ||
+    /^\/info\/lfs\/locks\/[^/]+\/unlock$/.test(suffix)
+  );
+}
+
+function matchesGitHubGitRequest(
+  method: string,
+  url: URL,
+  path: string,
+  repositoryPath: string
+): boolean {
+  if (!path.startsWith(repositoryPath)) return false;
+  return matchesGitRequestSuffix(method, url, path.slice(repositoryPath.length));
+}
+
+/**
+ * A clone URL may omit the `.git` suffix, and GitHub answers it with a redirect to
+ * the suffixed form, so both spellings belong to the same repository.
+ */
+function matchesRepositoryGitRequest(
+  method: string,
+  url: URL,
+  path: string,
+  repository: { owner: string; repo: string }
+): boolean {
+  const root = `/${repository.owner}/${repository.repo}`;
+  return (
+    matchesGitHubGitRequest(method, url, path, `${root}.git`) ||
+    matchesGitHubGitRequest(method, url, path, root)
+  );
+}
+
+/**
+ * Matches the Git endpoints that need no authorization header, such as a public
+ * repository's clone and LFS requests.
+ */
+function matchesAnonymousGitHubGitRequest(method: string, url: URL, path: string): boolean {
+  const segments = path.split('/');
+  if (segments.length < 3) return false;
+  return matchesGitRequestSuffix(method, url, `/${segments.slice(3).join('/')}`);
+}
+
+/**
+ * GitHub Packages publishes a repository owner's packages under its own scope, so
+ * registry reads are confined to `@<owner>` (metadata, tarball, and download paths).
+ */
+function isOwnerPackageScopePath(path: string, owner: string): boolean {
+  const scope = `@${owner}`;
+  const segments = path.split('/');
+  return (
+    (segments[1] === scope && segments.length >= 3) ||
+    (segments[1] === 'download' && segments[2] === scope && segments.length >= 4)
+  );
+}
+
+function parseGitHubCapabilityRequest(
+  requestMethod: string,
   requestUrl: string
-): RedeemGitHubSessionCapabilityFailureReason | null {
+):
+  | { failure: RedeemGitHubSessionCapabilityFailureReason; request?: never }
+  | {
+      failure: null;
+      request: { url: URL; method: string; path: string };
+    } {
   let url: URL;
   try {
     url = new URL(requestUrl);
   } catch {
-    return 'invalid_upstream_url';
+    return { failure: 'invalid_upstream_url' };
   }
-  if (url.protocol !== 'https:') return 'invalid_upstream_url';
-  if (url.username || url.password || url.hash) return 'invalid_upstream_url';
-  if (url.port !== '') return 'upstream_host_not_allowed';
-  if (
-    !['api.github.com', 'uploads.github.com', 'github.com', 'npm.pkg.github.com'].includes(
-      url.hostname
-    )
-  ) {
-    return 'upstream_host_not_allowed';
+  if (url.protocol !== 'https:') return { failure: 'invalid_upstream_url' };
+  if (url.username || url.password || url.hash) return { failure: 'invalid_upstream_url' };
+  if (url.port !== '') return { failure: 'upstream_host_not_allowed' };
+  const path = decodePathnameIteratively(url.pathname);
+  if (path === null || path.includes('\\') || /(?:^|\/)\.{1,2}(?:\/|$)/.test(path)) {
+    return { failure: 'invalid_upstream_url' };
   }
-  return null;
+  return {
+    failure: null,
+    request: { url, method: requestMethod.toUpperCase(), path: path.toLowerCase() },
+  };
+}
+
+function validateGitHubCapabilityUpstream(
+  requestMethod: string,
+  requestUrl: string,
+  repository: { owner: string; repo: string }
+): GitHubCapabilityUpstream {
+  const parsed = parseGitHubCapabilityRequest(requestMethod, requestUrl);
+  if (parsed.failure) return { failure: parsed.failure };
+  const { url, method, path } = parsed.request;
+
+  if (url.hostname === 'api.github.com') {
+    if (path === '/user') {
+      return GITHUB_IDENTITY_METHODS.includes(method)
+        ? { failure: null, credential: 'pinned' }
+        : { failure: 'invalid_upstream_request' };
+    }
+    if (path === '/graphql') {
+      // gh resolves pull-request views and mutations through GraphQL. The endpoint is
+      // not addressed by repository path, so the capability's own credential answers it:
+      // the recorded user's token for a user source, the repository-scoped installation
+      // token for an installation source.
+      return method === 'POST'
+        ? { failure: null, credential: 'pinned' }
+        : { failure: 'invalid_upstream_request' };
+    }
+    if (!isRepositoryApiPath(path, repository)) return { failure: 'repository_mismatch' };
+    return GITHUB_REPOSITORY_API_METHODS.includes(method)
+      ? { failure: null, credential: 'pinned' }
+      : { failure: 'invalid_upstream_request' };
+  }
+  if (url.hostname === 'uploads.github.com') {
+    if (!isRepositoryApiPath(path, repository)) return { failure: 'repository_mismatch' };
+    return GITHUB_UPLOAD_METHODS.includes(method)
+      ? { failure: null, credential: 'pinned' }
+      : { failure: 'invalid_upstream_request' };
+  }
+  if (url.hostname === 'npm.pkg.github.com') {
+    if (!GITHUB_REGISTRY_METHODS.includes(method)) return { failure: 'invalid_upstream_request' };
+    return isOwnerPackageScopePath(path, repository.owner)
+      ? { failure: null, credential: 'pinned' }
+      : { failure: 'repository_mismatch' };
+  }
+  if (url.hostname === 'github.com') {
+    if (matchesRepositoryGitRequest(method, url, path, repository)) {
+      return { failure: null, credential: 'pinned' };
+    }
+    if (matchesAnonymousGitHubGitRequest(method, url, path)) {
+      return { failure: null, credential: 'none' };
+    }
+    return isRepositoryRootPath(path, repository)
+      ? { failure: 'invalid_upstream_request' }
+      : { failure: 'repository_mismatch' };
+  }
+  return { failure: 'upstream_host_not_allowed' };
 }
 
 function validateLegacyGitHubCapabilityUpstream(
@@ -445,25 +597,19 @@ function validateLegacyGitHubCapabilityUpstream(
   if (/%2f|%5c/i.test(requestUrl) || /\/(?:(?:\.|%2e){1,2})(?:\/|$)/i.test(requestUrl)) {
     return 'invalid_upstream_url';
   }
-  let url: URL;
-  try {
-    url = new URL(requestUrl);
-  } catch {
-    return 'invalid_upstream_url';
-  }
-  if (url.protocol !== 'https:') return 'invalid_upstream_url';
-  if (url.username || url.password || url.hash) return 'invalid_upstream_url';
-  const method = requestMethod.toUpperCase();
-  if (url.hostname === 'api.github.com' && url.port === '') {
+  const parsed = parseGitHubCapabilityRequest(requestMethod, requestUrl);
+  if (parsed.failure) return parsed.failure;
+  const { url, method, path } = parsed.request;
+
+  if (url.hostname === 'api.github.com') {
     if (!['GET', 'POST', 'PATCH', 'HEAD'].includes(method)) {
       return 'invalid_upstream_request';
     }
-    const repositoryApiPath = `/repos/${repository.owner}/${repository.repo}`;
-    const path = url.pathname.toLowerCase();
-    if (path !== repositoryApiPath && !path.startsWith(`${repositoryApiPath}/`)) {
+    const repositoryApiPrefix = repositoryApiPath(repository);
+    if (!isRepositoryApiPath(path, repository)) {
       return 'repository_mismatch';
     }
-    const relativePath = path.slice(repositoryApiPath.length);
+    const relativePath = path.slice(repositoryApiPrefix.length);
     if (
       ['GET', 'HEAD'].includes(method) &&
       (/^\/pulls\/[1-9]\d*$/.test(relativePath) ||
@@ -477,36 +623,11 @@ function validateLegacyGitHubCapabilityUpstream(
     if (method === 'POST' && /^\/pulls\/[1-9]\d*\/reviews$/.test(relativePath)) return null;
     return 'invalid_upstream_request';
   }
-  if (url.hostname !== 'github.com' || url.port !== '') return 'upstream_host_not_allowed';
-
-  const repositoryPath = `/${repository.owner}/${repository.repo}.git`;
-  const path = url.pathname.toLowerCase();
-  if (!path.startsWith(`/${repository.owner}/${repository.repo}`)) return 'repository_mismatch';
-
-  if (method === 'GET' && path === `${repositoryPath}/info/refs`) {
-    const entries = [...url.searchParams.entries()];
-    const service = url.searchParams.get('service');
-    if (entries.length === 1 && (service === 'git-upload-pack' || service === 'git-receive-pack')) {
-      return null;
-    }
-  }
-  if (
-    method === 'POST' &&
-    url.search === '' &&
-    (path === `${repositoryPath}/git-upload-pack` ||
-      path === `${repositoryPath}/git-receive-pack` ||
-      path === `${repositoryPath}/info/lfs/objects/batch` ||
-      path === `${repositoryPath}/info/lfs/locks/verify`)
-  ) {
-    return null;
-  }
-  return 'invalid_upstream_request';
-}
-
-function isGitLabGitAuthPath(pathname: string): boolean {
-  return /\.git\/(?:info\/refs|git-upload-pack|git-receive-pack|info\/lfs\/(?:objects\/batch|locks(?:\/verify|\/[^/]+\/unlock)?))$/.test(
-    pathname
-  );
+  if (url.hostname !== 'github.com') return 'upstream_host_not_allowed';
+  if (!isRepositoryRootPath(path, repository)) return 'repository_mismatch';
+  return matchesRepositoryGitRequest(method, url, path, repository)
+    ? null
+    : 'invalid_upstream_request';
 }
 
 function decodePathnameIteratively(pathname: string): string | null {
@@ -526,12 +647,16 @@ function decodePathnameIteratively(pathname: string): string | null {
 
 function validateGitLabCapabilityUpstream(
   requestUrl: string,
-  instanceOrigin: string
+  session: {
+    instanceOrigin: string;
+    projectPath: string;
+    source: GitLabCapabilityCredentialSource;
+  }
 ): { failure: RedeemGitLabSessionCapabilityFailureReason | null; authSurface: 'git' | 'api' } {
   if (/%5c/i.test(requestUrl) || /\/(?:(?:\.|%2e){1,2})(?:\/|$)/i.test(requestUrl)) {
     return { failure: 'invalid_upstream_url', authSurface: 'git' };
   }
-  const base = parseGitLabBaseUrl(instanceOrigin);
+  const base = parseGitLabBaseUrl(session.instanceOrigin);
   if (!base) return { failure: 'invalid_upstream_url', authSurface: 'git' };
   let url: URL;
   try {
@@ -560,15 +685,7 @@ function validateGitLabCapabilityUpstream(
   ) {
     return { failure: 'upstream_origin_not_allowed', authSurface: 'git' };
   }
-  const apiV4Prefix = `${base.basePath}/api/v4`;
-  const authSurface =
-    !isGitLabGitAuthPath(url.pathname) &&
-    (url.pathname === apiV4Prefix ||
-      url.pathname.startsWith(`${apiV4Prefix}/`) ||
-      url.pathname === `${base.basePath}/api/graphql`)
-      ? 'api'
-      : 'git';
-  return { failure: null, authSurface };
+  return validateGitLabSessionCapabilityPath(url.pathname, session, base.basePath);
 }
 
 function validateBitbucketCapabilityUpstream(
@@ -1033,11 +1150,18 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       return { success: false, reason: 'container_mismatch' };
     }
 
-    const upstreamFailure =
+    const upstream =
       claims.version === 2
-        ? validateGitHubCapabilityUpstream(params.requestUrl)
-        : validateLegacyGitHubCapabilityUpstream(params.requestMethod, params.requestUrl, claims);
-    if (upstreamFailure) return { success: false, reason: upstreamFailure };
+        ? validateGitHubCapabilityUpstream(params.requestMethod, params.requestUrl, claims)
+        : {
+            failure: validateLegacyGitHubCapabilityUpstream(
+              params.requestMethod,
+              params.requestUrl,
+              claims
+            ),
+            credential: 'pinned' as const,
+          };
+    if (upstream.failure) return { success: false, reason: upstream.failure };
 
     const authParams = {
       userId: claims.userId,
@@ -1048,6 +1172,16 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
         : {}),
       githubRepo: `${claims.owner}/${claims.repo}`,
     };
+    if (upstream.credential === 'none') {
+      return {
+        success: true,
+        authorization: null,
+        installationId: claims.identity.installationId,
+        source: claims.source,
+        appType: claims.identity.appType,
+      };
+    }
+
     let auth: GetCloudAgentAuthForRepoResult | null;
     if (claims.source === 'user') {
       auth = await this.redeemPinnedUserAuthorization(authParams);
@@ -1170,11 +1304,21 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     return this.githubService.getToken(installationId, appType);
   }
 
+  /**
+   * Mint a token for a stored integration on behalf of its owner. Callers pass
+   * the owning user (and org, for org-owned resources); an integration that
+   * belongs to anyone else is reported as unavailable.
+   */
   async getTokenForIntegration(
-    integrationId: string
+    params: GetTokenForIntegrationParams
   ): Promise<{ success: true; token: string } | { success: false; reason: 'unavailable' }> {
-    const association =
-      await this.installationLookupService.findActiveAssociationById(integrationId);
+    const parsed = GetTokenForIntegrationParamsSchema.safeParse(params);
+    if (!parsed.success) return { success: false, reason: 'unavailable' };
+    const { integrationId, userId, orgId } = parsed.data;
+    const association = await this.installationLookupService.findActiveAssociationById(
+      integrationId,
+      orgId === undefined ? { userId } : { userId, orgId }
+    );
     if (!association.success) return { success: false, reason: 'unavailable' };
     const token = await this.githubService.getToken(
       association.installationId,
@@ -1384,7 +1528,7 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
 
     const upstream =
       claims.version === 2
-        ? validateGitLabCapabilityUpstream(params.requestUrl, claims.instanceOrigin)
+        ? validateGitLabCapabilityUpstream(params.requestUrl, claims)
         : validateLegacyGitLabCapabilityUpstream(params.requestMethod, params.requestUrl, claims);
     if (upstream.failure) return { success: false, reason: upstream.failure };
     const context = {

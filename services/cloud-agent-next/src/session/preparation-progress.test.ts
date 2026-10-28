@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createPreparationProgressRecorder } from './preparation-progress.js';
-import { materializePreparationEvent } from './preparation-history.js';
+import { materializePreparationEvent, readPreparationSteps } from './preparation-history.js';
 import {
   createMemoryEventQueries,
   readAttempt,
@@ -85,6 +85,51 @@ describe('createPreparationProgressRecorder', () => {
     ]);
   });
 
+  it('preserves phase occurrences in causal order through a snapshot fallback', () => {
+    const eventQueries = createMemoryEventQueries();
+    const recorder = createRecorder(eventQueries, []);
+    const progress = [
+      ['sandbox_provision', 'Creating sandbox'],
+      ['sandbox_boot', 'Starting sandbox'],
+      ['workspace_restore', 'Updating repository'],
+      ['sandbox_provision', 'Creating sandbox'],
+      ['snapshot_fallback', 'Previous snapshot startup failed. Retrying without a snapshot.'],
+      ['sandbox_boot', 'Starting sandbox without a snapshot'],
+      ['cloning', 'Cloning repository'],
+    ];
+    for (const [key, detail] of progress) recorder.onProgress(key, detail);
+    recorder.finalize({ status: 'completed' });
+
+    const steps = readPreparationSteps(eventQueries, 'attempt-1');
+    expect(steps.map(step => [step.key, step.latestDetail])).toEqual(progress);
+    expect(new Set(steps.map(step => step.id)).size).toBe(progress.length);
+    expect(steps.every(step => step.status === 'completed')).toBe(true);
+    expect(steps.map(step => step.startedRevision)).toEqual([2, 5, 8, 11, 14, 17, 20]);
+  });
+
+  it('resumes a retried phase after eviction without restarting it', () => {
+    const eventQueries = createMemoryEventQueries();
+    const first = createRecorder(eventQueries, []);
+    first.onProgress('sandbox_provision', 'Creating sandbox');
+    first.onProgress('snapshot_fallback', 'Retrying without a snapshot');
+    first.onProgress('sandbox_provision', 'Creating replacement sandbox');
+    const retry = readPreparationSteps(eventQueries, 'attempt-1').at(-1);
+
+    const broadcasts: StoredEvent[] = [];
+    const resumed = createRecorder(eventQueries, broadcasts);
+    resumed.onProgress('sandbox_provision', 'Creating replacement sandbox');
+    expect(broadcasts).toEqual([]);
+    resumed.onProgress('sandbox_provision', 'Replacement sandbox created');
+
+    expect(readPreparationSteps(eventQueries, 'attempt-1')).toHaveLength(3);
+    expect(readPreparationSteps(eventQueries, 'attempt-1').at(-1)).toMatchObject({
+      id: retry?.id,
+      startedAt: retry?.startedAt,
+      startedRevision: retry?.startedRevision,
+      latestDetail: 'Replacement sandbox created',
+    });
+  });
+
   it('a fresh recorder for an open attempt closes the step its evicted predecessor left running', () => {
     const eventQueries = createMemoryEventQueries();
     createRecorder(eventQueries, []).onProgress('cloning', 'Cloning repository');
@@ -138,6 +183,10 @@ describe('createPreparationProgressRecorder', () => {
 
     expect(readStep(eventQueries, 'attempt-1', 'phase:sandbox_provision').status).toBe('completed');
     expect(readStep(eventQueries, 'attempt-1', 'phase:workspace_setup').status).toBe('running');
+    broadcasts.length = 0;
+    recorder.onProgress('sandbox_provision', 'Provisioning sandbox\u2026');
+    expect(broadcasts).toEqual([]);
+    expect(readPreparationSteps(eventQueries, 'attempt-1')).toHaveLength(2);
   });
 
   it('finalize completes the running attempt and broadcasts the terminal events', () => {

@@ -377,6 +377,35 @@ describe('handleManagedScmOutbound', () => {
     expect(logs).not.toContain('upstream-token');
   });
 
+  it('forwards a request that needs no credential', async () => {
+    const redeemGitHubSessionCapability = vi.fn().mockResolvedValue({
+      success: true,
+      authorization: null,
+      installationId: 'installation-123',
+      source: 'user',
+      appType: 'standard',
+    });
+    const fetchMock = vi.fn().mockResolvedValue(new Response('Not Found', { status: 404 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    const response = await handleOutbound(
+      new Request('https://github.com/other/project.git/info/refs?service=git-upload-pack', {
+        headers: {
+          Authorization: basicCredential(CAPABILITY),
+          'User-Agent': 'git/2.43.0',
+        },
+      }),
+      createEnv(redeemGitHubSessionCapability)
+    );
+
+    expect(response.status).toBe(404);
+    expect(redeemGitHubSessionCapability).toHaveBeenCalledOnce();
+    const forwarded = fetchMock.mock.calls[0]?.[0];
+    if (!(forwarded instanceof Request)) throw new Error('Expected a forwarded request');
+    expect(forwarded.headers.get('Authorization')).toBeNull();
+    expect(forwarded.headers.get('User-Agent')).toBe('git/2.43.0');
+  });
+
   it('keeps forwarding and logs null correlation fields for an older redemption response', async () => {
     const redeemGitHubSessionCapability = vi.fn().mockResolvedValue({
       success: true,
@@ -662,6 +691,26 @@ describe('handleManagedScmOutbound', () => {
 
     expect(redeemGitHubSessionCapability).not.toHaveBeenCalled();
     expect(forward).toHaveBeenCalledWith(request);
+  });
+
+  it('preserves native interceptor manual redirects through generic credential-free forwarding', async () => {
+    const forward = vi.fn().mockResolvedValue(
+      new Response(null, {
+        status: 302,
+        headers: { Location: 'https://disallowed.test/' },
+      })
+    );
+    vi.stubGlobal('fetch', forward);
+    const request = new Request('https://example.com/resource', { redirect: 'manual' });
+
+    const response = await handleOutbound(request, createEnv());
+
+    expect(forward).toHaveBeenCalledTimes(1);
+    expect(forward).toHaveBeenCalledWith(request);
+    const forwarded = forward.mock.calls[0]?.[0] as Request | undefined;
+    expect(forwarded?.redirect).toBe('manual');
+    expect(response.status).toBe(302);
+    expect(response.headers.get('Location')).toBe('https://disallowed.test/');
   });
 
   it.each([

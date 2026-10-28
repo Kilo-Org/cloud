@@ -184,6 +184,11 @@ describe('review outcome assembly', () => {
     expect(classifyReviewReason('superseded')).toBe('benign');
     expect(classifyReviewReason('sandbox_error')).toBe('system');
   });
+
+  it('treats only explicitly BYOK invalid requests as benign', () => {
+    expect(classifyReviewReason('assistant_invalid_request_byok')).toBe('benign');
+    expect(classifyReviewReason('assistant_invalid_request')).toBe('system');
+  });
 });
 
 describe('review window', () => {

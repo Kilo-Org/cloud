@@ -10,6 +10,7 @@ const session = {
   directory: '/workspace/terminal',
 };
 const ptyId = 'pty_1';
+const KILO_AUTHORIZATION = 'Basic a2lsbzp0ZXN0';
 
 async function waitFor(assertion: () => boolean): Promise<void> {
   const deadline = Date.now() + 2_000;
@@ -23,6 +24,7 @@ async function waitFor(assertion: () => boolean): Promise<void> {
 function fakeClient(serverUrl: string): WrapperKiloClient {
   return {
     serverUrl,
+    server: { url: serverUrl, authorization: KILO_AUTHORIZATION },
     createPty: async (input: { cwd: string }): Promise<WrapperPty> => ({
       id: ptyId,
       title: 'Terminal',
@@ -57,6 +59,9 @@ function fakeRuntime(client: WrapperKiloClient): KiloRuntime {
     ensure: async () => client,
     installCredentials: async () => undefined,
     applyPendingCredentials: async () => false,
+    sessionState: () => undefined,
+    refreshActivity: async () => undefined,
+    needsCompute: () => false,
     isRetiredClient: () => false,
     phase: () => 'running',
     isSuspected: () => false,
@@ -73,6 +78,7 @@ function fakeRuntimes(runtime: KiloRuntime | undefined): KiloRuntimes {
     },
     get: () => runtime,
     remove: () => undefined,
+    needsCompute: () => false,
     suspected: () => false,
     unavailable: () => false,
     summary: () => ({
@@ -90,12 +96,15 @@ function fakeRuntimes(runtime: KiloRuntime | undefined): KiloRuntimes {
 let server: Bun.Server<{ path: string }>;
 let serverUrl: string;
 const sockets: { reverse?: Bun.ServerWebSocket<{ path: string }> } = {};
+/** The `Authorization` header of each PTY upgrade that reached the fake Kilo. */
+const ptyAuthorizations: Array<string | null> = [];
 
 beforeAll(() => {
   server = Bun.serve<{ path: string }>({
     port: 0,
     fetch(request, instance) {
       const path = new URL(request.url).pathname;
+      if (path.startsWith('/pty/')) ptyAuthorizations.push(request.headers.get('Authorization'));
       if (instance.upgrade(request, { data: { path } })) return undefined;
       return new Response('upgrade failed', { status: 400 });
     },
@@ -218,6 +227,7 @@ describe('control-plane terminal adapter (B10)', () => {
 
   it('routes create, resize, close and connect to their own runtime operation', async () => {
     sockets.reverse = undefined;
+    ptyAuthorizations.length = 0;
     const terminals = attachedTerminals(fakeClient(serverUrl));
 
     const created = await terminals.handle({
@@ -265,6 +275,8 @@ describe('control-plane terminal adapter (B10)', () => {
       ok: true,
       result: { connected: true },
     });
+    // The local PTY socket authenticates to Kilo, which requires a password.
+    expect(ptyAuthorizations).toEqual([KILO_AUTHORIZATION]);
 
     const closed = await terminals.handle({
       type: 'terminal.close',
@@ -282,10 +294,9 @@ describe('control-plane terminal adapter (B10)', () => {
     terminals.shutdown();
   });
 
-  it('reports heartbeat activity only for recent browser→PTY input', async () => {
+  it('tracks recent browser-to-PTY input for diagnostics', async () => {
     sockets.reverse = undefined;
     const terminals = attachedTerminals(fakeClient(serverUrl));
-    expect(terminals.hasRecentInput()).toBe(false);
     expect(terminals.recentInputCount()).toBe(0);
 
     await terminals.handle({
@@ -308,17 +319,14 @@ describe('control-plane terminal adapter (B10)', () => {
     await waitFor(() => sockets.reverse !== undefined);
     await connected;
 
-    // An open, idle PTY is not activity.
-    expect(terminals.hasRecentInput()).toBe(false);
     expect(terminals.recentInputCount()).toBe(0);
     const reverse = sockets.reverse as Bun.ServerWebSocket<{ path: string }> | undefined;
     if (!reverse) throw new Error('reverse socket was not opened');
     reverse.send('keystroke');
-    await waitFor(() => terminals.hasRecentInput());
+    await waitFor(() => terminals.recentInputCount() === 1);
     expect(terminals.recentInputCount()).toBe(1);
 
     await terminals.forgetSession(session.sessionId);
-    expect(terminals.hasRecentInput()).toBe(false);
     expect(terminals.recentInputCount()).toBe(0);
     terminals.shutdown();
   });
@@ -349,12 +357,10 @@ describe('control-plane terminal adapter (B10)', () => {
     if (!reverse) throw new Error('reverse socket was not opened');
     reverse.send('keystroke');
     await waitFor(() => terminals.recentInputCount() === 1);
-    expect(terminals.hasRecentInput()).toBe(true);
 
     try {
       setSystemTime(new Date(Date.now() + 31_000));
       expect(terminals.recentInputCount()).toBe(0);
-      expect(terminals.hasRecentInput()).toBe(false);
     } finally {
       setSystemTime();
     }

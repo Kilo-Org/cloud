@@ -49,6 +49,10 @@ export function keepPreviousDataForQueryKey<TQueryData>(
  * is `isPending && isFetching`, which is false while a paused (offline) first
  * fetch is unsettled. `isPending` stays true until the query settles, so the
  * screen cannot mistake an unloaded list for an empty one.
+ *
+ * `error` is the active query's error, so a screen can name the cause (an
+ * access denial is not a server fault) instead of reporting every failure the
+ * same way.
  */
 export function useAgentProfileList(organizationId?: string) {
   const trpc = useTRPC();
@@ -63,11 +67,20 @@ export function useAgentProfileList(organizationId?: string) {
     ...personalOptions,
     enabled: !isOrganization,
     placeholderData: keepPreviousDataForQueryKey(personalOptions.queryKey),
+    networkMode: 'always',
+    // `networkMode: 'always'` also disables the derived reconnect refetch
+    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
+    // 'always'` when the option is undefined), so re-enable it unconditionally:
+    // a connectivity blip must recover the list without waiting for the
+    // freshness window, and a served refetch keeps the cached rows.
+    refetchOnReconnect: 'always',
   });
   const combined = useQuery({
     ...combinedOptions,
     enabled: isOrganization,
     placeholderData: keepPreviousDataForQueryKey(combinedOptions.queryKey),
+    networkMode: 'always',
+    refetchOnReconnect: 'always',
   });
 
   const query = isOrganization ? combined : personal;
@@ -93,13 +106,72 @@ export function useAgentProfileList(organizationId?: string) {
       : (personal.data?.find(profile => profile.isDefault)?.id ?? null),
     isLoading: query.isPending,
     isError: query.isError,
+    error: query.error,
     isRefetching: query.isRefetching,
     refetch: query.refetch,
   };
 }
 
+/**
+ * Options every profile read shares.
+ *
+ * The read must settle even when the online manager is committed offline
+ * (NetInfo can misreport while the backend is reachable); a paused read would
+ * hold the load-failure banner with a Retry that refetches into another pause
+ * and never settles.
+ *
+ * `networkMode: 'always'` also disables the derived reconnect refetch
+ * (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !== 'always'`
+ * when the option is undefined), so re-enable it unconditionally: a
+ * connectivity blip must recover the profile without waiting for the freshness
+ * window, instead of needing a manual Retry.
+ */
+const PROFILE_READ_OPTIONS = {
+  networkMode: 'always',
+  refetchOnReconnect: 'always',
+} as const;
+
 /** A single profile with its variables, commands, MCP servers, skills and agents. */
 export function useAgentProfile(profileId: string, organizationId?: string) {
   const trpc = useTRPC();
-  return useQuery(trpc.agentProfiles.get.queryOptions({ profileId, organizationId }));
+  return useQuery({
+    ...trpc.agentProfiles.get.queryOptions({ profileId, organizationId }),
+    ...PROFILE_READ_OPTIONS,
+  });
+}
+
+/**
+ * A single profile's metadata and collection counts.
+ *
+ * The Overview screen renders metadata and six counts and nothing else, so it
+ * reads this instead of `useAgentProfile`: a profile may carry every skill's
+ * markdown and companion files, and the caps allow those to dwarf the response
+ * that renders six numbers.
+ */
+export function useAgentProfileOverview(profileId: string, organizationId?: string) {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.agentProfiles.overview.queryOptions({ profileId, organizationId }),
+    ...PROFILE_READ_OPTIONS,
+  });
+}
+
+/**
+ * A single profile's agents, for the role picker's custom modes. Reading the
+ * agents alone keeps every skill's markdown and companion files out of that
+ * decision's request.
+ */
+export function useAgentProfileAgents(
+  profileId: string,
+  organizationId: string | undefined,
+  enabled: boolean
+) {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.agentProfiles.agents.queryOptions(
+      { profileId, organizationId },
+      { enabled: enabled && Boolean(profileId) }
+    ),
+    ...PROFILE_READ_OPTIONS,
+  });
 }

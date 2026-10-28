@@ -1,9 +1,10 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 import { NextResponse, type NextRequest } from 'next/server';
+import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
 import { INTERNAL_API_SECRET } from '@kilocode/web-shared/lib/config.server';
-import { buildGlanceableSnapshotForUser } from '@/lib/glanceable-agents-snapshot-server';
+import { buildGlanceableDeliveryForUser } from '@/lib/glanceable-agents-snapshot-server';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import type { TRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 
@@ -51,11 +52,35 @@ export async function POST(req: NextRequest) {
         { user: { id: userId, is_admin: false } } as unknown as TRPCContext,
         organizationId
       );
-    } catch {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+    } catch (error) {
+      // The worker reads 403 as a lost scope and ends every session card in
+      // it, so only a real access denial may answer 403. A database failure is
+      // a 500: the worker keeps the cards and retries.
+      if (
+        error instanceof TRPCError &&
+        (error.code === 'UNAUTHORIZED' || error.code === 'FORBIDDEN')
+      ) {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
+      }
+      return NextResponse.json({ error: 'Organization access check failed' }, { status: 500 });
     }
   }
 
-  const snapshot = await buildGlanceableSnapshotForUser({ userId, organizationId });
-  return NextResponse.json(snapshot, { status: 200 });
+  const { response, liveActivitySnapshot, sessionCards } = await buildGlanceableDeliveryForUser({
+    userId,
+    organizationId,
+  });
+  // Separate server-only envelope fields; the snapshot itself stays
+  // privacy-minimal. `liveActivitySnapshot` holds the aggregate card counts
+  // without the followed sessions, and `sessionCards` holds the facts of each
+  // followed session card. The worker never copies either into a data-only wake.
+  return NextResponse.json(
+    {
+      ...response.snapshot,
+      homeWidgetDetails: response.details,
+      liveActivitySnapshot,
+      sessionCards,
+    },
+    { status: 200 }
+  );
 }

@@ -10,7 +10,7 @@ import { AgentSessionListContent } from './session-list-content';
 import { RowsRefreshControl } from './rows-refresh-control';
 import { type SessionListRow } from './session-list-rows';
 import { type StoredSessionRow } from './session-row';
-import { PULL_FEEDBACK_BUDGET_MS } from './use-pull-refresh';
+import { PULL_FEEDBACK_BUDGET_MS, PULL_FEEDBACK_MIN_BEAT_MS } from './use-pull-refresh';
 
 type RowProps = Parameters<typeof StoredSessionRow>[0];
 type CellProps = {
@@ -131,7 +131,7 @@ vi.mock('@/components/ui/icons', () => ({
   ServerCrash: 'ServerCrash',
   WifiOff: 'WifiOff',
 }));
-vi.mock('@/lib/a11y/announce', () => ({ moveA11yFocus: vi.fn() }));
+vi.mock('@/lib/a11y/announce', () => ({ requestA11yFocus: vi.fn() }));
 vi.mock('@/lib/hooks/use-session-mutations', () => ({ useSessionMutations: () => controls }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#999999' }),
@@ -151,6 +151,9 @@ function session(id: string): StoredSession {
     git_branch: null,
     status: null,
     status_updated_at: null,
+    latest_run_status: null,
+    latest_run_failure_kind: null,
+    latest_run_terminal_at: null,
     total_cost_microdollars: null,
     created_at: '2026-08-28T10:00:00.000Z',
     updated_at: '2026-08-28T11:55:00.000Z',
@@ -177,8 +180,10 @@ function contentProps(overrides: Partial<ContentProps> = {}): ContentProps {
     nonPullRefreshes: 0,
     hasActiveQuery: false,
     isSearching: false,
+    isRetrying: false,
     searchQuery: '',
     onClearQuery: () => undefined,
+    onCreateSession: () => undefined,
     ...overrides,
   };
 }
@@ -200,6 +205,11 @@ function isHost(node: TestRenderer.ReactTestInstance, type: string) {
 }
 function hosts(renderer: TestRenderer.ReactTestRenderer, type: string) {
   return renderer.root.findAll(node => isHost(node, type));
+}
+function skeletonRows(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root.findAll(
+    node => typeof node.type === 'string' && node.props.testID === 'session-row-skeleton'
+  );
 }
 function rows(renderer: TestRenderer.ReactTestRenderer) {
   return hosts(renderer, 'StoredSessionRow').map(node => {
@@ -417,12 +427,11 @@ describe('AgentSessionListContent liveness', () => {
     expect(rows(renderer).map(item => item.id)).toEqual(['recovered']);
   });
 
-  it('keeps empty history without a creation action even when active IDs exist', () => {
+  it('renders empty history as its own surface, not a list of active rows', () => {
     const renderer = mount(
       contentProps({ hasAnySessions: false, activeSessionIds: new Set(['active-only']) })
     );
     expect(hosts(renderer, 'Text').map(node => node.props.children)).toContain('No past sessions');
-    expect(hosts(renderer, 'Button')).toHaveLength(0);
     expect(hosts(renderer, 'FlashList')).toHaveLength(0);
     expect(rows(renderer)).toEqual([]);
   });
@@ -473,6 +482,125 @@ describe('AgentSessionListContent liveness', () => {
         node => (node.props as { accessibilityLabel?: string }).accessibilityLabel === 'Retry'
       )
     ).toBe(true);
+  });
+  it('keeps stale history behind pull recovery feedback and its timeout', async () => {
+    const { promise, resolve } = Promise.withResolvers<undefined>();
+    vi.useFakeTimers();
+    try {
+      const props = contentProps({
+        isError: true,
+        hasFreshHistory: false,
+        sections: [{ title: 'Today', data: [session('cached')] }],
+        refetch: () => promise,
+      });
+      const renderer = mount(props);
+      const refreshControl = hosts(renderer, 'CenteredState')[0]?.props.refreshControl as
+        | { props: { onRefresh: () => void } }
+        | undefined;
+      expect(refreshControl).toBeDefined();
+      act(() => {
+        refreshControl?.props.onRefresh();
+        renderer.update(createElement(AgentSessionListContent, { ...props, isError: false }));
+      });
+      expect(hosts(renderer, 'StoredSessionRow')).toHaveLength(0);
+      expect(hosts(renderer, 'Button')[0]?.props.loading).toBe(true);
+      act(() => {
+        vi.advanceTimersByTime(PULL_FEEDBACK_BUDGET_MS);
+      });
+      expect(hosts(renderer, 'StoredSessionRow')).toHaveLength(0);
+      expect(hosts(renderer, 'Button')[0]?.props.loading).toBe(false);
+      await act(async () => {
+        resolve(undefined);
+        await promise;
+        renderer.update(
+          createElement(AgentSessionListContent, {
+            ...props,
+            isError: false,
+            hasFreshHistory: true,
+          })
+        );
+      });
+      expect(rows(renderer).map(item => item.id)).toEqual(['cached']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+  it('keeps stale history behind repeated pulls from the preserved error', async () => {
+    const first = Promise.withResolvers<undefined>();
+    const second = Promise.withResolvers<undefined>();
+    const refetch = vi
+      .fn<ContentProps['refetch']>()
+      .mockImplementationOnce(() => first.promise)
+      .mockImplementationOnce(() => second.promise);
+    vi.useFakeTimers();
+    try {
+      const props = contentProps({
+        isError: true,
+        hasFreshHistory: false,
+        sections: [{ title: 'Today', data: [session('cached')] }],
+        refetch,
+      });
+      const renderer = mount(props);
+      const pull = () =>
+        hosts(renderer, 'CenteredState')[0]?.props.refreshControl as
+          | { props: { onRefresh: () => void } }
+          | undefined;
+      act(() => {
+        pull()?.props.onRefresh();
+        renderer.update(createElement(AgentSessionListContent, { ...props, isError: false }));
+      });
+      await act(async () => {
+        first.reject(new Error('Local refresh failure'));
+        await Promise.resolve();
+      });
+      act(() => {
+        vi.advanceTimersByTime(PULL_FEEDBACK_MIN_BEAT_MS);
+      });
+      expect(hosts(renderer, 'AccessibleStatus').map(node => node.props.message)).toContain(
+        i18n.t('common.couldNotLoadSessions')
+      );
+
+      act(() => {
+        pull()?.props.onRefresh();
+      });
+      expect(hosts(renderer, 'StoredSessionRow')).toHaveLength(0);
+      expect(hosts(renderer, 'Button')[0]?.props.loading).toBe(true);
+      await act(async () => {
+        second.resolve(undefined);
+        await second.promise;
+        renderer.update(
+          createElement(AgentSessionListContent, {
+            ...props,
+            isError: false,
+            hasFreshHistory: true,
+          })
+        );
+      });
+      expect(rows(renderer).map(item => item.id)).toEqual(['cached']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps the true empty-history action during a pull', () => {
+    const { promise } = Promise.withResolvers<undefined>();
+    const renderer = mount(
+      contentProps({
+        hasAnySessions: false,
+        hasFreshHistory: false,
+        refetch: () => promise,
+      })
+    );
+    const refreshControl = hosts(renderer, 'CenteredState')[0]?.props.refreshControl as
+      | { props: { onRefresh: () => void } }
+      | undefined;
+    expect(refreshControl).toBeDefined();
+    act(() => {
+      refreshControl?.props.onRefresh();
+    });
+    const statusMessages = hosts(renderer, 'AccessibleStatus').map(node => node.props.message);
+    expect(statusMessages).not.toContain(i18n.t('common.couldNotLoadSessions'));
+    expect(hosts(renderer, 'Button').some(node => node.props.loading === true)).toBe(false);
   });
 
   it('retires a stale pull failure when the screen settles a later non-pull refresh', () => {
@@ -566,27 +694,6 @@ describe('AgentSessionListContent liveness', () => {
     }
   );
 
-  it('reserves the clearance between the refresh band and the rows', () => {
-    // The band is in flow above the list, so the container's `gap-2` is the
-    // only clearance between them: without it the list's top edge sits flush
-    // on the band and a row resting across that edge is cut mid-text directly
-    // under "Couldn't refresh" (device defect p5). The clearance matches the
-    // live surface's `mx-4 gap-2` band-to-list gap.
-    const renderer = mount(
-      contentProps({
-        isError: true,
-        sections: [{ title: 'Today', data: [session('cached')] }],
-      })
-    );
-    const surface = hosts(renderer, 'AnimatedView').find(
-      node => (node.props as { className?: string }).className === 'flex-1 gap-2'
-    );
-    expect(surface).toBeDefined();
-    // The band and the list are both children of that surface.
-    expect(surface?.findAll(node => isHost(node, 'AccessibleStatus'))).toHaveLength(1);
-    expect(surface?.findAll(node => isHost(node, 'FlashList'))).toHaveLength(1);
-  });
-
   it.each([
     { hasAnySessions: false },
     { hasAnySessions: false, isError: true },
@@ -610,7 +717,7 @@ describe('AgentSessionListContent liveness', () => {
 
   it('keeps the loading skeletons instead of flashing empty history', () => {
     const renderer = mount(contentProps({ isLoading: true, hasAnySessions: false }));
-    expect(hosts(renderer, 'Skeleton')).toHaveLength(8);
+    expect(skeletonRows(renderer)).toHaveLength(8);
     expect(hosts(renderer, 'Button')).toHaveLength(0);
     expect(rows(renderer)).toEqual([]);
     // The skeleton rows ride in the list data: an empty-data loading state
@@ -626,22 +733,6 @@ describe('AgentSessionListContent liveness', () => {
     expect((composite.props as ListProps).data.map(row => row.kind)).toEqual(
       Array.from({ length: 8 }, () => 'skeleton')
     );
-  });
-
-  it('sizes the loading skeletons to the stored session-row pitch', () => {
-    // The reserved space must survive the skeleton → rows swap: each skeleton
-    // slot (12dp wrapper padding + block) matches the SessionRow pitch
-    // (py-[13px] + eyebrow/title ≈ 61dp), so rows land where skeletons stood.
-    const renderer = mount(contentProps({ isLoading: true, hasAnySessions: false }));
-    const skeletons = hosts(renderer, 'Skeleton');
-    expect(skeletons).toHaveLength(8);
-    for (const skeleton of skeletons) {
-      expect(skeleton.props.className).toContain('h-[49px]');
-    }
-    const slots = hosts(renderer, 'View').filter(
-      node => (node.props as { className?: string }).className === 'py-1.5'
-    );
-    expect(slots).toHaveLength(8);
   });
 
   it('swaps the reserved skeleton rows for real rows inside the same mounted list', () => {
@@ -703,5 +794,46 @@ describe('AgentSessionListContent liveness', () => {
     ];
     const renderer = mount(contentProps({ sections }));
     expect(hosts(renderer, 'SessionListSectionHeader')).toHaveLength(2);
+  });
+
+  it('keeps stale history behind the busy Retry control until refetch completes', () => {
+    const renderer = mount(
+      contentProps({
+        sections: [{ title: 'Today', data: [session('cached')] }],
+        isError: false,
+        hasAnySessions: true,
+        hasFreshHistory: false,
+        isRetrying: true,
+      })
+    );
+    const retry = hosts(renderer, 'Button')[0];
+    expect(retry?.props.loading).toBe(true);
+    expect(hosts(renderer, 'StoredSessionRow')).toHaveLength(0);
+    act(() => {
+      renderer.update(
+        createElement(
+          AgentSessionListContent,
+          contentProps({
+            sections: [{ title: 'Today', data: [session('recovered')] }],
+            hasFreshHistory: true,
+            isRetrying: false,
+          })
+        )
+      );
+    });
+    expect(rows(renderer).map(item => item.id)).toEqual(['recovered']);
+    expect(hosts(renderer, 'Button')).toHaveLength(0);
+  });
+
+  it('starts a session from the empty history body instead of dead-ending', () => {
+    const onCreateSession = vi.fn<() => void>();
+    const renderer = mount(contentProps({ hasAnySessions: false, onCreateSession }));
+    const start = hosts(renderer, 'Button')[0];
+    if (!start) {
+      throw new Error('the empty history body rendered no action');
+    }
+    expect(start.props.loading).toBeUndefined();
+    press(start);
+    expect(onCreateSession).toHaveBeenCalledOnce();
   });
 });

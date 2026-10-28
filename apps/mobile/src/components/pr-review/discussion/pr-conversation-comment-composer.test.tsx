@@ -1,7 +1,8 @@
+/* eslint-disable max-lines -- the draft/confirm suite and the inline-error contract share one module mock harness */
 // Clear-rule and state coverage for the conversation (issue) comment
 // composer's durable draft: cleared on a successful post and on a confirmed
 // discard, kept on every failure path and on a keep-editing discard.
-// `Alert.alert` is captured so the test can press the gate's buttons.
+// The confirm request is captured so the test can drive the gate's confirm.
 //
 // The module mocks, fixtures, and element-query helpers live in
 // pr-conversation-comment-composer.test-helpers. That import MUST stay first:
@@ -13,11 +14,11 @@
 import type * as React from 'react';
 import {
   addCommentMocks,
-  alertCalls,
   ambiguous,
   backHandler,
   baseProps,
   buttonByLabel,
+  confirmRequests,
   connectivity,
   dismissTriggers,
   DRAFT_KEY,
@@ -26,12 +27,10 @@ import {
   footerCancelTrigger,
   hookState,
   type InlineErrorProps,
-  lastAlert,
+  lastConfirm,
   persistenceFailed,
   platformMock,
   pressButton,
-  pressDiscard,
-  pressKeepEditing,
   requireByType,
   termsGateMock,
   typeBody,
@@ -56,7 +55,7 @@ describe('PrConversationCommentComposer', () => {
   beforeEach(() => {
     hookState.boxes = [];
     hookState.cursor = 0;
-    alertCalls.length = 0;
+    confirmRequests.length = 0;
     backHandler.current = null;
     // The arming no longer depends on the platform; the iOS case (where RN
     // no-ops the event) has its own test below.
@@ -307,9 +306,12 @@ describe('PrConversationCommentComposer', () => {
       let element = mountComposer();
       typeBody(element, 'hello');
       trigger(element);
-      expect(lastAlert().buttons.map(button => button.text)).toEqual(['Keep editing', 'Discard']);
+      expect(lastConfirm()).toMatchObject({
+        confirmLabel: 'Discard',
+        cancelLabel: 'Keep editing',
+      });
 
-      pressKeepEditing(lastAlert());
+      // Keeping editing (never confirming) keeps the draft and the sheet open.
       expect(clearDraft).not.toHaveBeenCalled();
       expect(baseProps.onDismiss).not.toHaveBeenCalled();
 
@@ -318,7 +320,7 @@ describe('PrConversationCommentComposer', () => {
       element = mountComposer();
       typeBody(element, 'hello again');
       trigger(element);
-      pressDiscard(lastAlert());
+      lastConfirm().onConfirm();
       expect(clearDraft).toHaveBeenCalledWith('u1', DRAFT_KEY);
       await flushMicrotasks();
       expect(baseProps.onDismiss).toHaveBeenCalledTimes(1);
@@ -331,7 +333,7 @@ describe('PrConversationCommentComposer', () => {
       const element = mountComposer();
       trigger(element);
 
-      expect(alertCalls).toHaveLength(0);
+      expect(confirmRequests).toHaveLength(0);
       expect(clearDraft).not.toHaveBeenCalled();
       expect(baseProps.onDismiss).toHaveBeenCalledTimes(1);
     }
@@ -352,7 +354,7 @@ describe('PrConversationCommentComposer', () => {
     let element = mountComposer();
     typeBody(element, 'hello');
     footerCancelTrigger(element);
-    pressDiscard(lastAlert());
+    lastConfirm().onConfirm();
     await flushMicrotasks();
 
     expect(clearDraft).toHaveBeenCalledWith('u1', DRAFT_KEY);
@@ -376,4 +378,30 @@ describe('PrConversationCommentComposer', () => {
     const field = requireByType(element, 'CommentBodyField');
     expect((field.props as { defaultValue?: string }).defaultValue).toBe('saved comment');
   });
+
+  it('shows the acceptance-required copy after the gate resolves dismissed', async () => {
+    // The error mirror runs the gate; the dismissed outcome must surface the
+    // acceptance requirement, not the age-posture copy the dialog shows.
+    const termsRequired = new Error('terms_required');
+    Object.assign(termsRequired, { data: { code: 'PRECONDITION_FAILED' } });
+    addCommentMocks.error = termsRequired;
+    termsGateMock.mockResolvedValue({ kind: 'dismissed' });
+    mountComposer();
+    await flushMicrotasks();
+    const element = mountComposer();
+
+    const props = inlineProps(element);
+    expect(props.inlineError).toBe('You must accept the Terms of Service to post.');
+    expect(props.inlineError).not.toBe('You must be 13 or older to post.');
+    expect(props.inlineErrorKind).toBe(null);
+    // The dismissed copy is a local rejection: it announces through the
+    // inline box, matching the inline-error surface's dismissed branch.
+    expect(props.inlineErrorIsLocal).toBe(true);
+  });
 });
+
+/** The stubbed inline-error element's props, read once with a typed alias. */
+function inlineProps(element: React.ReactElement): InlineErrorProps {
+  const inline = requireByType(element, 'ComposerInlineError');
+  return inline.props as InlineErrorProps;
+}

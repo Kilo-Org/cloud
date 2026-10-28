@@ -54,8 +54,10 @@ jest.mock('@/lib/security-agent/db/security-analysis', () => ({
 }));
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
-  CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
   isResourceTokenIssuanceEnabled: () => false,
+}));
+jest.mock('@/lib/web-config.server', () => ({
+  CALLBACK_TOKEN_SECRET: 'test-callback-token-secret',
 }));
 
 jest.mock('./triage-service', () => ({

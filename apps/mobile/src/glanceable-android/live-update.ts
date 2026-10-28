@@ -18,25 +18,35 @@ import { launcherSessionUrl } from '@/lib/launcher-surfaces';
  * importance, and Do Not Disturb override.
  */
 
+/**
+ * One card: the system-template content plus its actions. A single record keeps
+ * both native entry points within Expo's eight-argument `Function` limit.
+ * `approveLabel` and `newAgentLabel` are null when the card omits that action.
+ */
+export type LiveUpdateCard = {
+  title: string;
+  text: string;
+  textIsError: boolean;
+  subText: string | null;
+  compactText: string | null;
+  openLabel: string;
+  openUrl: string;
+  approveLabel: string | null;
+  newAgentLabel: string | null;
+  newAgentUrl: string;
+};
+
 type LiveUpdateNativeModule = {
   isPromotionCapable(): boolean;
   isDndAccessGranted(): boolean;
   start(
-    title: string,
-    text: string,
-    openAction: { label: string; url: string },
-    approveLabel: string | null,
-    compactText: string | null,
+    card: LiveUpdateCard,
     channelId: AndroidNotificationChannelId,
     alerting: boolean,
     promotion: boolean
   ): void;
   update(
-    title: string,
-    text: string,
-    openAction: { label: string; url: string },
-    approveLabel: string | null,
-    compactText: string | null,
+    card: LiveUpdateCard,
     channelId: AndroidNotificationChannelId,
     alerting: boolean,
     timeoutMs: number
@@ -85,15 +95,17 @@ type NotificationActions = {
 };
 
 /**
- * Only a cloud-agent permission ask can be answered headlessly, and only while
- * it is still the recorded ask. The session id goes into the Open intent and
- * nowhere else: never the title, the text, the compact text, or the label.
+ * Only a cloud-agent permission ask that names its pending request offers
+ * Approve; the action answers that request by id, so a surface with no request
+ * named keeps Open alone. The session id goes into the Open intent and nowhere
+ * else: never the title, the text, the compact text, or the label.
  */
 export function buildNotificationActions(
   ask: WaitingAsk | null,
   translate: (key: string) => string
 ): NotificationActions {
-  const canApprove = ask?.status === 'permission' && ask.isCloudAgent;
+  const canApprove =
+    ask?.status === 'permission' && ask.isCloudAgent && ask.boundPermissionId !== null;
   return {
     openLabel: translate(OPEN_SESSION_LABEL_KEY),
     openUrl: ask === null ? OPEN_AGENTS_URL : launcherSessionUrl(ask.kiloSessionId),
@@ -102,60 +114,28 @@ export function buildNotificationActions(
 }
 
 /**
- * Open action and content intent. `openUrl` is the recorded waiting session's
- * deep link, or the Agents tab when nothing waits; `approveLabel` is non-null
- * only while a cloud-agent permission ask can be answered, and adds the
- * Approve action the receiver answers headlessly. The Open fields share one
- * native argument to keep both entry points within Expo's eight-argument limit.
+ * Post the card. `openUrl` is the recorded waiting session's deep link, or the
+ * Agents tab when nothing waits; a non-null `approveLabel` adds the Approve
+ * action the receiver answers headlessly, and `newAgentLabel` the New agent one.
  */
-// eslint-disable-next-line max-params -- mirrors the native presentation fields
 export function start(
-  title: string,
-  text: string,
-  openLabel: string,
-  openUrl: string,
-  approveLabel: string | null,
-  compactText: string | null,
+  card: LiveUpdateCard,
   channelId: AndroidNotificationChannelId,
   alerting: boolean
 ): void {
-  nativeModule?.start(
-    title,
-    text,
-    { label: openLabel, url: openUrl },
-    approveLabel,
-    compactText,
-    channelId,
-    alerting,
-    isPromotionCapable()
-  );
+  nativeModule?.start(card, channelId, alerting, isPromotionCapable());
 }
 
-// eslint-disable-next-line max-params -- translated bridge fields plus the native terminal timeout
+// eslint-disable-next-line max-params -- the card, its kind's channel and alert, plus the native terminal timeout
 export function update(
-  title: string,
-  text: string,
-  openLabel: string,
-  openUrl: string,
-  approveLabel: string | null,
-  compactText: string | null,
+  card: LiveUpdateCard,
   channelId: AndroidNotificationChannelId,
   alerting: boolean,
   timeoutMs = 0
 ): void {
-  // The native `update` spends its eighth bridge slot on the terminal timeout,
-  // which is Expo's argument limit for a native `Function`, so it reads the
-  // promotion gate from its own `isPromotionCapable()` instead of a JS flag.
-  nativeModule?.update(
-    title,
-    text,
-    { label: openLabel, url: openUrl },
-    approveLabel,
-    compactText,
-    channelId,
-    alerting,
-    timeoutMs
-  );
+  // The native `update` carries the terminal timeout instead of the promotion
+  // flag; it reads the promotion gate from its own `isPromotionCapable()`.
+  nativeModule?.update(card, channelId, alerting, timeoutMs);
 }
 
 export function end(): void {

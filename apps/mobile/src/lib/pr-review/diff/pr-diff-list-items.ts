@@ -23,21 +23,29 @@ type TruncationBannerItem = {
   text: string;
 };
 
+/**
+ * `viewed` is `null` when the diff source does not track viewed files (a
+ * session diff): the row then renders no mark-viewed toggle.
+ */
 type FileHeaderItem = {
   kind: 'file-header';
   key: string;
   file: PrReviewFile;
   expanded: boolean;
   hasDiff: boolean;
-  viewed: boolean;
+  viewed: boolean | null;
 };
 
+/**
+ * `githubUrl` is `null` when the diff has no web page to fall back to (a
+ * session diff): the row then says there is no preview instead of linking out.
+ */
 type FilePatchMissingItem = {
   kind: 'file-patch-missing';
   key: string;
   file: PrReviewFile;
-  viewed: boolean;
-  githubUrl: string;
+  viewed: boolean | null;
+  githubUrl: string | null;
 };
 
 type HunkHeaderItem = {
@@ -266,6 +274,33 @@ export function setContextLines(args: {
   } satisfies Record<string, Record<number, ExpandSeparatorState>>;
 }
 
+/**
+ * Where the listed files come from. A PR diff tracks viewed files, links a
+ * missing patch to GitHub, and offers gap expansion read at `headSha`. A
+ * session diff is a read-only snapshot with none of those.
+ */
+export type DiffFileSource =
+  | {
+      kind: 'pr';
+      owner: string;
+      repo: string;
+      number: number;
+      headSha: string;
+      expandedContext: Record<string, Record<number, ExpandSeparatorState>>;
+      viewed: (path: string) => boolean;
+    }
+  | { kind: 'session' };
+
+export type DiffFileItemsArgs = {
+  files: PrReviewFile[];
+  expanded: Record<string, boolean>;
+  changedFiles: number;
+  /** Unified (default) or side-by-side (tablet only). */
+  viewMode?: DiffViewMode;
+  source: DiffFileSource;
+};
+
+/** The PR review list: its file rows plus the pagination row. */
 export type BuildItemsArgs = {
   files: PrReviewFile[];
   expanded: Record<string, boolean>;

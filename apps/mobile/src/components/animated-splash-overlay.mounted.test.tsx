@@ -98,7 +98,7 @@ describe.each(['ios', 'android'])('AnimatedSplashOverlay on %s', os => {
     expect(SplashScreen.hideAsync).not.toHaveBeenCalled();
     expect(logoImages[0]?.props.className).toBe('h-[100px] w-[100px]');
     expect(findByType(renderer.root, 'Animated.View')[0]?.props.className).toBe(
-      'absolute inset-0 items-center justify-center bg-[#FAF74F]'
+      'absolute inset-0 items-center justify-center bg-[#FFDD00]'
     );
 
     // The yellow frame forces dark status bar icons in either theme.
@@ -144,7 +144,7 @@ describe.each(['ios', 'android'])('AnimatedSplashOverlay on %s', os => {
     expect(SplashScreen.hideAsync).not.toHaveBeenCalled();
     expect(findByType(renderer.root, 'Image')).toHaveLength(1);
     expect(findByType(renderer.root, 'Animated.View')[0]?.props.className).toBe(
-      'absolute inset-0 items-center justify-center bg-[#FAF74F]'
+      'absolute inset-0 items-center justify-center bg-[#FFDD00]'
     );
 
     act(() => {

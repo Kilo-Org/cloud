@@ -16,17 +16,53 @@ This document lists all environment variables used in the Kilo Code cloud monore
 
 ## App (apps/web)
 
-Manage shared web env var additions and rotations with `pnpm web:env set <VARIABLE>`. The helper coordinates tracked root and `apps/web` dotenv defaults, the `kilocode-app` and `kilocode-global-app` Vercel deployments, and 1Password storage for sensitive Production values. See `DEVELOPMENT.md` for the full workflow.
+Manage shared web env var additions and rotations with `pnpm web:env set <VARIABLE>`. The helper coordinates tracked root and `apps/web` dotenv defaults, the `kilocode-app` and `kilocode-ai-gateway` Vercel deployments, and 1Password storage for sensitive Production values. `pnpm web:env copy` fills a new project from an existing one. See `DEVELOPMENT.md` for the full workflow.
+
+### Code review health monitor
+
+`CODE_REVIEW_HEALTH_SECRET` is a dedicated server-only monitor credential. `[SECRET]`
+The monitor must send `Authorization: Bearer <configured value>`. An unset or empty
+value disables access. Each running instance shares its cached health response
+across authorized callers for 60 seconds; simultaneous refreshes share one evaluation.
+
+Apply `packages/db/src/migrations/0307_review_window_index.sql` before deploying
+the application.
+For initial deployment or rotation, the owner runs
+`pnpm web:env set CODE_REVIEW_HEALTH_SECRET`, supplies a newly generated secret, and
+coordinates the application deployment with the external monitor's header update.
+Verify the monitor after the deployment and header update. Only one configured
+secret is accepted; deployment and monitor configuration must agree.
+Keep credentials out of tracked defaults. For local monitor development, generate
+a separate value with `openssl rand -base64 32` and set it in the local environment;
+ordinary local startup does not require this credential.
+
+### Cloud agent dispatch health monitor
+
+`CLOUD_AGENT_DISPATCH_HEALTH_SECRET` is a dedicated server-only monitor credential for
+`GET /api/cloud-agent/dispatch-health`. `[SECRET]` The monitor must send
+`Authorization: Bearer <configured value>`. An unset or empty value disables access, and the
+endpoint accepts no other credential, including request parameters.
+
+For initial deployment or rotation, the owner runs
+`pnpm web:env set CLOUD_AGENT_DISPATCH_HEALTH_SECRET`, supplies a newly generated secret, and
+coordinates the application deployment with the external monitor's header update.
+Verify the monitor after the deployment and header update. Only one configured
+secret is accepted; deployment and monitor configuration must agree.
+Keep credentials out of tracked defaults. For local monitor development, generate
+a separate value with `openssl rand -base64 32` and set it in the local environment;
+ordinary local startup does not require this credential.
 
 ### Configuration & Constant URLs
 
 - `APP_URL_OVERRIDE` - Optional base application URL override in any environment; used in `packages/web-shared/src/lib/constants.ts` and `next.config.mjs`. When unset, Vercel's `staging` target uses `https://staging-app.kilo.ai`, production uses `https://app.kilo.ai`, and local development uses `PORT`. [SERVER]
+- `AI_GATEWAY_URL` - Optional origin of the `apps/ai-gateway` app that `apps/web` rewrites its AI gateway routes to; read at build time in `apps/web/ai-gateway-rewrites.mjs`. When unset, Vercel's `production` target uses `https://ai-gateway.kilo.ai`, its `staging` target uses `https://staging-ai-gateway.kilo.ai`, other Vercel targets fail the build, and outside Vercel it defaults to `http://localhost:<3010 + KILO_PORT_OFFSET>`. `apps/web` has no gateway routes of its own. `pnpm dev:start` sets it to the local ai-gateway app. [SERVER]
 - `KILOCLAW_INSTANCE_URL_TEMPLATE` - URL template for KiloClaw instances; used in `packages/web-shared/src/lib/config.server.ts`. [SERVER]
 - `NEXTAUTH_URL` - Base URL for NextAuth.js; used across many auth-related files. [SERVER]
 - `NEXTAUTH_SECRET` - Secret key for NextAuth.js session encryption and five-minute, audience-bound user assertions verified by internal Workers such as user data export. `[SECRET]`
 - `DEBUG_SHOW_DEV_UI` - Enables dev-only UI elements (debug panels, admin buttons); checked in `packages/web-shared/src/lib/constants.ts` and `apps/web/src/app/(app)/profile/page.tsx`. [SERVER]
 - `TRPC_TIMING_LOGGING` - Enables tRPC timing logs in development; checked in `packages/web-shared/src/lib/trpc/init.ts`. [SERVER]
 - `TRPC_TIMING_SAMPLE_RATE` - Sample rate (`0`-`1`) for non-mobile request timing lines; mobile clients are always logged. Defaults to `0.01` when unset or malformed; read in `packages/web-shared/src/lib/observability/request-timing.ts`. [SERVER]
+- `USAGE_RECORD_COMPLETION_SAMPLE_RATE` - Production success sample rate (`0`-`1`) for shared gateway/HTTP writer `usage_record_completion` logs; defaults to `1` (100%) when unset, blank, malformed or out of range. `0` disables recorded/duplicate completion logs; `1` logs every success. Not-recorded/errors and nonproduction completions always log. Set consistently on gateway and HTTP writer apps and redeploy to change it; read in `packages/web-shared/src/lib/ai-gateway/usage-record-diagnostics.ts`. [SERVER]
 - `JEST_MAX_WORKERS` - Limits max worker threads for Jest; read in `apps/web/jest.config.ts`. [SERVER]
 - `JEST_SILENT` - When `false`, shows verbose Jest output; read in `apps/web/jest.config.ts` and `apps/web/.env.test`. [SERVER]
 - `JEST_WORKER_ID` - Set by Jest to identify the current worker thread; used by db connection pooling and libraries to handle worker-specific state. [SERVER]
@@ -45,8 +81,6 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `PYLON_FINAL_EMAIL_AUTHOR_USER_ID` - Optional Pylon staff user id used to match an already-posted deletion reply. [SERVER]
 - `CUSTOMERIO_TRACK_BASE` - Optional Customer.io Track API base override for local user-deletion cleanup; defaults to `https://track.customer.io`. [SERVER]
 - `SUBSTACK_PUBLICATION_URL` - Substack publication origin used by user-deletion subscriber cleanup; defaults to `https://blog.kilo.ai`. Must be `blog.kilo.ai` or a `*.substack.com` host. The Substack admin search URL is hardcoded to `https://kilocode.substack.com/publish/subscribers`, not this publication. [SERVER]
-- `CSA_APP_BASE_URL` - CSA origin used by the Cloud deletion worker to call `POST /api/internal/cloud/users/gdpr-scrub`. Example: the production CSA app URL. [SERVER]
-- `CSA_VERCEL_PROTECTION_BYPASS` - CSA Vercel Deployment Protection automation bypass. Cloud sends it as the `x-vercel-protection-bypass` header on Cloud → CSA `POST /api/internal/cloud/users/gdpr-scrub`, never as a query parameter. Required when CSA has Vercel Authentication enabled; without it Vercel returns 401 before the CSA route. Distinct from `SUPPORT_API_SECRET`. `[SECRET]`
 - `SENTRY_ORG` - Sentry organization slug for source map uploads; used in `apps/web/next.config.mjs` and `apps/ai-gateway/next.config.mjs`. `[SECRET]`
 - `SENTRY_PROJECT` - Sentry project slug for source map uploads; used in `apps/web/next.config.mjs` and `apps/ai-gateway/next.config.mjs`. `[SECRET]`
 - `SENTRY_AUTH_TOKEN` - Sentry auth token for source map uploads; used in `apps/web/next.config.mjs` and `apps/ai-gateway/next.config.mjs`. `[SECRET]`
@@ -60,7 +94,7 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 ### Vercel & Build Info
 
 - `VERCEL_ENV` - Vercel environment (`development`, `preview`, `production`); used in `apps/web/next.config.mjs`, `packages/web-shared/src/lib/constants.ts`, and `apps/web/.env.test`. [SERVER]
-- `VERCEL_TARGET_ENV` - Vercel system or custom deployment environment (`development`, `preview`, `production`, `staging`, etc.); used in `apps/web/src/app/layout.tsx` to identify staging UI. [SERVER]
+- `VERCEL_TARGET_ENV` - Vercel system or custom deployment environment (`development`, `preview`, `production`, `staging`, etc.); used in `apps/web/src/app/layout.tsx` to identify staging UI and in `apps/web/ai-gateway-rewrites.mjs` to pick the AI gateway origin. [SERVER]
 - `VERCEL_URL` - Auto-injected by Vercel; current deployment URL. Used in `apps/web/src/lib/buildInfo.ts`. [SERVER]
 - `VERCEL_GIT_COMMIT_SHA` - Auto-injected by Vercel; Git commit SHA of the current deployment. Used in `apps/web/src/lib/buildInfo.ts`. [SERVER]
 - `NEXT_PUBLIC_VERCEL_URL` - Client-exposed Vercel deployment URL from build info. [PUBLIC]
@@ -74,13 +108,23 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 
 - `NEXT_PUBLIC_TURNSTILE_SITE_KEY` - Cloudflare Turnstile public site key; used in `apps/web/src/components/auth/sign-in/TurnstileView.tsx`. [PUBLIC]
 - `TURNSTILE_SECRET_KEY` - Cloudflare Turnstile secret key; used in test files. `[SECRET]`
+- `EMAIL_SIGNUPS_ENABLED` - Set to exact `true` to allow new accounts via email (web magic link and mobile email code). Unset or any other value refuses them. Existing users keep email sign-in either way, and OAuth, passkey, and SSO sign-ups are unaffected. Jest's global setup (`apps/web/src/tests/setup/globalSetup.ts`) defaults it to `true`; keep it out of tracked dotenv files so `pnpm web:env set` can set it. Takes effect on redeploy. [SERVER]
 - `NEXT_PUBLIC_STYTCH_PROJECT_ENV` - Stytch public project environment identifier; used in `apps/web/src/components/auth/StytchClient.tsx`. [PUBLIC]
 - `NEXT_PUBLIC_STYTCH_PUBLIC_TOKEN` - Stytch public token for client SDKs; used in `apps/web/src/components/auth/StytchClient.tsx`. [PUBLIC]
 - `STYTCH_PROJECT_ID` - Stytch project ID for secret-side SDK calls. `[SECRET]`
 - `STYTCH_PROJECT_SECRET` - Stytch project secret. `[SECRET]`
 - `STYTCH_PUBLIC_TOKEN` - Stytch legacy public token alias used in some test fixtures. [PUBLIC]
 - `INTERNAL_API_SECRET` - Shared secret for internal API calls between services; used in `apps/web/src/lib/kiloclaw/cli-runs.test.ts`, `kiloclaw-router.test.ts`, dev seed scripts, and other service routers. `[SECRET]`
-- `SUPPORT_API_SECRET` - Shared bearer token for Customer Support Automation (CSA) internal API calls. Cloud uses it to authorize CSA → Cloud `apps/web/src/app/api/internal/support/` and Cloud → CSA `POST /api/internal/cloud/users/gdpr-scrub`. A CSA compromise can also call Cloud deletion and Cloud can scrub CSA-local PII. Leak can look up any email and enqueue deletion for non-admin, non-bot, non-live-subscription customers; access disable is deferred to worker preflight and pending requests can be cancelled. Keep production values off preview deployments; rotate Cloud and CSA together. `[SECRET]`
+- `BOT_TOKEN_MINT_SECRET` - Dedicated bearer secret for `POST /api/internal/bot-token`, which mints one-hour tokens for `bot-internal-*` users. It authenticates only the mint and is never a Kilo credential; unset or empty disables the endpoint. Separate from `INTERNAL_API_SECRET`. `[SECRET]`
+- `USAGE_QUEUE_ONLY_ENABLED` - Master queue-only accounting launch switch; default off, requires exactly `true`. Launch and SFO exposure are independent: the master alone selects no production traffic. These server environment controls are read at startup; launch, exposure and allowlist changes require a gateway redeployment. There are no per-event remote feature-flag requests. Staging retains the existing experiment in both function regions when `VERCEL_TARGET_ENV=staging` and `VERCEL_ENV` is not `production`. Production requires both environment labels exactly `production`, trusted function `VERCEL_REGION=sfo1`, and the SFO cohort controls below. FRA and unselected SFO keep direct accounting / the existing primary-region handoff. Selected events await one finalized event publication within the accounting lifetime. HTTP 202 skips the direct usage write and returns a queued identity, not a committed row; spend-watched Bouncer events are delivered by the writer after its outbox commits, with cron retry on failure. Missing or unparseable publisher configuration publishes nothing, so each selected event is written through the direct accounting path (including the SFO primary-region handoff), logs `publisher_not_configured` with its usage ID, and raises at most one Sentry error per instance per minute. A lifetime registration failure (no request scope or `waitUntil`) also publishes nothing and uses the same direct fallback. Any other unavailable publication or unexpected rejection logs the finalized usage ID and a failure category and returns a null accounting result without a direct write, because the queue may already hold the event. Apart from those two fallbacks, no gateway billing writer is called on acceptance or failure. Failed accounting retains best-effort Bouncer reporting, which does not persist billing. Events not accepted by the queue have no durable recovery in this path and may be lost; a timeout may also hide an accepted event that the consumer later records. Opts into up to three publication attempts for transient failures, with a fresh two-second timeout per attempt and jittered 200–400 ms then 400–600 ms backoffs. Publication occurs only for selected queue-only accounting. The obsolete background shadow publisher has been removed; historical shadow events already accepted by the queue must still be reconciled and drained before enabling a processing consumer. This code does not remove queued messages. Ambiguous retries may enqueue duplicates with the same usage ID; the writer deduplicates billing. Publisher logs carry `duplicate_possible: true` once any attempt timed out, lost its response or received a 5xx. Requires an independently verified processing consumer and authenticated writer; this flag does not establish readiness or a durable production publication guarantee. [SERVER]
+- `USAGE_QUEUE_SFO_EXPOSURE` - Production SFO payer exposure from `0` to `1`, default `0` (off): `0.01` selects 1%, `0.1` selects 10%, and `1` selects 100%. Missing, malformed, nonfinite or out-of-range values select nobody. The retired percentage variable is ignored; existing settings do not activate this control. Stable versioned SHA-256 buckets use the organization ID for organization usage, otherwise the user ID (including arbitrary non-UUID strings). The cohort grows monotonically as exposure increases. This is a percentage of payers, not an exact fraction of requests; active payers can dominate volume. Selection controls accounting transport only: Bouncer availability/watch state, account classification, free/BYOK usage, and classifier rows do not cause selected events to fall back to direct accounting. Existing Bouncer reporting/outbox behavior is retained, including attached usage events travelling with queued accounting. At `1` with the master enabled and no allowlist restriction, SFO usage uses the queue; FRA retains its current path. [SERVER]
+- `USAGE_QUEUE_SFO_USER_IDS` - Optional JSON array of exact personal user-ID strings restricting the production SFO cohort by acting user. Unset/empty means no additional restriction; `[]`, malformed JSON, non-array values, non-string or empty IDs select nobody. The list never bypasses the master, exposure, or region checks. For a bounded internal trial, use a small funded-payer list with exposure `1`; for progressive expansion, clear the list then use exposure `0.01`, `0.05`, etc. Master off or exposure `0` stops new production selection on the next gateway deployment; already accepted work must continue processing/draining. Do not purge or switch the consumer to receipt as rollback. Enabling this selector requires separate verified consumer processing, authenticated FRA writer, full canary correlation and historical-shadow reconciliation; these variables alone do not establish readiness. Configure shared web env changes through the user-run `pnpm web:env set <VARIABLE>` workflow. That workflow manages shared projects: the operator must confirm which production projects receive the master/exposure/allowlist and publisher URL/secret. Any project executing these handlers in `sfo1` with production labels and publisher configuration would select the same cohort; the intended rollout project is `kilocode-ai-gateway`. [SERVER]
+- `USAGE_INGEST_URL` - Optional complete usage-ingest HTTP endpoint (for example, ending in `/usage`) for the gateway usage publisher helper. No default; a missing URL or secret, or a URL that is not an absolute `http`/`https` URL (including scheme-less values such as `localhost:3000/usage`), makes the helper report `publisher_not_configured` without a network call. Accepts only HTTP 202. Selected queue-only publication makes at most three attempts on timeout, transport failure, HTTP 408/429 or 5xx, reusing the same serialized event and ID. Missing/malformed configuration and other HTTP outcomes are not retried. Redirects are terminal 3xx outcomes and are never followed. Three timed-out attempts and backoffs budget up to seven seconds of publisher waiting, plus runtime scheduling overhead; this excludes subsequent Bouncer reporting. Exhaustion returns failure without direct billing. For isolated local tests, use `http://127.0.0.1:<fixture-port>/usage` with the real usage-ingest Worker and a local queue. Configuring it alone does not activate gateway publication. [SERVER]
+- `USAGE_QUEUE_TRANSPORT` - Single-switch staging Vercel opt-in. Exact `vercel` selects both Vercel publication and queue-only accounting when `VERCEL_TARGET_ENV=staging` and `VERCEL_ENV` is not `production`; `USAGE_QUEUE_ONLY_ENABLED=true` is not additionally required. All other values restore the existing Cloudflare/direct choice, including the existing production SFO cohort controls. To disable Vercel, remove/change this selector and redeploy; setting the legacy queue-only flag false alone does not override it. Production cannot select Vercel and its build omits the queue callback/trigger. See [staging runbook](packages/usage-queue/README.md) for acknowledgment, timeout, recovery, and deployment prerequisites. [SERVER]
+- `USAGE_WRITER_URL` - Complete existing staging usage-writer endpoint for the private Vercel Queues consumer. No default. [SERVER]
+- `USAGE_WRITER_SECRET` - Must match that writer's `INTERNAL_API_SECRET`; the staging Vercel publisher and consumer also use it with a queue-specific HMAC purpose to authenticate the complete usage envelope before writer I/O. No additional signing credential is required. `[SECRET]`
+- `USAGE_WRITER_PROTECTION_BYPASS` - Optional staging writer deployment-protection automation bypass for the Vercel queue handler. `[SECRET]`
+- `USAGE_INGEST_PUBLISH_SECRET` - Optional dedicated Bearer secret for the gateway usage publisher helper; must match the usage-ingest Worker's setting of the same name. Separate from `INTERNAL_API_SECRET` and user credentials. Use only a synthetic matching value in local fixtures. `[SECRET]`
 - `BOUNDED_INTERNAL_SERVICE_TOKENS_ENABLED` - Set to exact `true` to enable modern, purpose-labelled internal assertions at the Phase 5.1 bounded Git broker, export, deletion, and Session Ingest callsites. Unset or any other value retains their existing legacy token formats. Enable only after compatible readers, including the dedicated GitHub disconnect audience, are deployed; generic human/control/runtime signers are not affected. [SERVER]
 - `NATIVE_RESOURCE_TOKENS_ENABLED` - Set to exact `true` to permit fresh native adoption of separate one-hour API/gateway access tokens only for clients explicitly requesting `api-gateway-v1`, provided `SHARED_RESOURCE_TOKENS_ENABLED` is also exact `true`. Default-off. Unsupported clients keep legacy responses. Turning this flag off affects subsequent native issuance/refreshes only; active modern device credentials can continue receiving bounded control tokens while their owned device session and current user pepper remain valid. [SERVER]
 - `SHARED_RESOURCE_TOKENS_ENABLED` - Master default-off readiness gate. Fresh modern producer issuance requires both this flag and its family flag below to be exact `true`; unset or any other value disables adoption. Native adoption separately requires `NATIVE_RESOURCE_TOKENS_ENABLED` and this master, independent of producer families; old CLI negotiation is unchanged. These flags do not revoke existing credentials. Valid modern device access credentials retain bounded control issuance after rollback, with current owned-session, pepper, and requested organization membership validation and a one-hour/parent-expiry cap. Chat likewise retains bounded three-audience issuance for validated modern devices; modern credentials never fall back to broad legacy tokens. Persisted modern workload renewal does not use adoption gates. Separately deployed readers/producers must be verified before activation. [SERVER]
@@ -88,12 +132,14 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `GASTOWN_RESOURCE_TOKENS_ENABLED` - Default-off family gate for Gastown control tokens; requires the master and exact `true`. This is not a safe-activation declaration: known ingest-audience and live-token-transport blockers remain deferred. [SERVER]
 - `WASTELAND_RESOURCE_TOKENS_ENABLED` - Default-off family gate for Wasteland control tokens; requires the master and exact `true`. [SERVER]
 - `CHAT_RESOURCE_TOKENS_ENABLED` - Default-off family gate for fresh chat resource issuance; requires the master and exact `true`. Validated modern devices retain chat/event-service/notifications issuance after rollback, capped by one hour and parent expiry. [SERVER]
-- `DELEGATED_RESOURCE_TOKENS_ENABLED` - Default-off family gate for explicit API, gateway, attribution, and HTML-deploy delegation, including the organization user-token resource route; requires the master and exact `true`. Disabled explicit delegation remains unavailable. [SERVER]
+- `DELEGATED_RESOURCE_TOKENS_ENABLED` - Default-off family gate for explicit API, gateway, and attribution delegation, including the organization user-token resource route; requires the master and exact `true`. Disabled explicit delegation remains unavailable. [SERVER]
 - `WORKFLOW_GATEWAY_RESOURCE_TOKENS_ENABLED` - Default-off family gate for server workflow gateway tokens; requires the master and exact `true`. [SERVER]
-- `BENCHMARK_RESOURCE_TOKENS_ENABLED` - Default-off family gate for benchmark resource tokens; requires the master and exact `true`. [SERVER]
+- `INTERNAL_BOT_RESOURCE_TOKENS_ENABLED` - Default-off family gate for internal bot tokens from `POST /api/internal/bot-token`; requires the master and exact `true`. [SERVER]
+- `CODE_REVIEW_CONTAINERS_ORG_IDS` - Comma-separated user or org IDs whose Code Reviewer sessions use DO-managed Cloudflare Containers. Empty is off; `*` includes personal accounts. Enrolled sessions use 1 vCPU, 4 GiB memory, and 8 GB disk. Billing remains `cloud-agent-code-review-2026-07`. Every session uses the control plane. [SERVER]
 - `RUNTIME_ISOLATION_ENABLED` - Cloud Agent Worker rollout control for new modern control-plane sessions and worktree destinations. Production and dev Worker configs set this to `true`; exact `true` permits adoption, while unset/other values reject it before durable work. Legacy attachments keep directory-shared Kilo runtimes. Persisted modern runtime authorization continues selecting per-session isolation after rollback, and the connected wrapper must advertise the isolation capability. Actual web issuance remains off behind its separate issuance gates. Outstanding smoke failures must be resolved before merge; enabling this Worker admission gate does not remove that merge prerequisite. Foreground expiry recovery retains the same session identity and requires acknowledged idle transport retirement; this flag does not establish complete real-provider smoke coverage. See `docs/token-issuance-policy.md`, Phase 5.2 merge, automatic deployment, and activation. [SERVER]
 - `CALLBACK_TOKEN_SECRET` - Secret for signing callback tokens. Required for local development. `[SECRET]`
 - `INTERNAL_SECRET` - Alias/fallback for `INTERNAL_API_SECRET`; used in KiloClaw E2E scripts (`services/kiloclaw/e2e/`). `[SECRET]`
+- Sign-in code email rate limits are Vercel Firewall rules configured in the project's firewall configuration, not environment variables. `magic-link-email` counts sends per normalized address; `sign-in-code-email-ip` counts sends per caller address. `apps/web/src/lib/auth/email-signin-eligibility.ts` reports a rule that is not configured to Sentry at most once a minute, so both rules belong in that configuration.
 
 ### Social OAuth Clients
 
@@ -112,6 +158,8 @@ Manage shared web env var additions and rotations with `pnpm web:env set <VARIAB
 - `GITHUB_LITE_APP_ID` - Lighter/secondary GitHub App ID for select integrations. `[SECRET]`
 - `GITHUB_LITE_APP_PRIVATE_KEY` - Private key for the lite GitHub App. `[SECRET]`
 - `GITHUB_LITE_APP_CLIENT_ID` - OAuth Client ID for the lite GitHub App install/login flow. [PUBLIC]
+- `GITHUB_APP_WEBHOOK_SECRET` - Webhook signing secret of the standard GitHub App; `apps/web/src/lib/integrations/platforms/github/app-selector.ts` reads it for `/api/webhooks/github`, which refuses every delivery (401) while it is empty. `[SECRET]`
+- `GITHUB_LITE_APP_WEBHOOK_SECRET` - Webhook signing secret of the lite GitHub App; read for `/api/webhooks/github-lite`, which refuses every delivery (401) while it is empty. `[SECRET]`
 - `GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS` - Comma-separated Kilo organization UUIDs allowed to connect multiple GitHub App installations. Unset or empty disables multiple installations for all organizations. [SERVER]
 - `GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS` - Comma-separated destination Kilo organization UUIDs allowed to create an association to a GitHub App installation already associated elsewhere. Unset or empty disables new shared associations without revoking existing ones. [SERVER]
 
@@ -197,8 +245,10 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `GOOGLE_PLAY_RTDN_PUSH_AUDIENCE` - Expected OIDC audience for Play Real-time Developer Notification Pub/Sub push (the HTTPS URL of POST /api/kilo-pass/play/notifications). `[SERVER]`
 - `GOOGLE_PLAY_RTDN_PUSH_SERVICE_ACCOUNT_EMAIL` - Expected service-account email for the Play RTDN Pub/Sub push OIDC token; the token `email` claim must match it. [SERVER]
 - `APPLE_APP_BUNDLE_ID` - iOS app bundle ID for Apple App Attest and Sign In verification. [SERVER]
-- `NATIVE_ADMISSION_MODE` - Native admission enforcement mode: `off` (default), `report`, or `enforce`. [SERVER]
-- `NATIVE_ADMISSION_SIMULATOR_BYPASS` - When `true` in non-production, bypasses Play Integrity API verification. [SERVER]
+- `APPLE_JWKS_URL_OVERRIDE` - Apple JWKS endpoint override for local verification runs; applies only outside production deployments. [SERVER]
+- `NATIVE_APPLE_NONCE_REQUIRED_SINCE` - ISO 8601 instant; the native Apple sign-in nonce requirement applies from this instant onward. Before it, requests are accepted without the field while the `native-apple-signin-nonce-relaxed-path` release toggle is enabled. Unset, invalid, or past ⇒ the requirement applies unconditionally. [SERVER]
+- `NATIVE_APPLE_NONCE_TRANSITION_LOCAL` - When `true` in a development environment outside Vercel, the transition window opens without the release toggle, for local verification runs without PostHog credentials. [SERVER]
+- `NATIVE_ADMISSION_DEV_SENTINEL` - When `true`, non-production accepts the fixed device-attestation sentinel from devices that cannot attest (simulator, emulator without Play Services). Ignored when `NODE_ENV=production`. The mobile build reads the same name. [SERVER]
 - `GOOGLE_PLAY_INTEGRITY_PROJECT_NUMBER` - Google Cloud project number for Play Integrity API. Also read by the mobile build, where it ships in the bundle; it is an identifier, not a secret. [SERVER]
 - `GOOGLE_PLAY_INTEGRITY_SERVICE_ACCOUNT_KEY` - Service account JSON key for Play Integrity API. `[SECRET]`
 - `GOOGLE_PLAY_INTEGRITY_PACKAGE_NAME` - Expected Android package name (e.g., `com.kilocode.app`), verified against the Play Integrity verdict. [SERVER]
@@ -206,18 +256,19 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 
 ### Ablation / Experimentation
 
-- `GLOBAL_KILO_BACKEND` - Override to select the global backend region/endpoint; used in `next.config.mjs`. [SERVER]
 - `ANALYZE` - Next.js bundle analyzer switch; enables `@next/bundle-analyzer` in `next.config.mjs`. [SERVER]
 
 ### Database
 
 - `POSTGRES_URL` - Primary Postgres connection string. `[SECRET]`
+- `POSTGRES_REPLICA_US_URL` - US read replica used by `readDb` in US Vercel regions (`sfo1`); see `packages/web-shared/src/lib/drizzle.ts`. When unset, `readDb` falls back to the primary, so it must be set on every project that runs in `sfo1`, including `kilocode-ai-gateway`. `[SECRET]`
+- `POSTGRES_REPLICA_EU_URL`, `POSTGRES_REPLICA_EU_URL_2` - EU read replicas; `readDb` picks one at random in EU regions and falls back to the primary when neither is set. `[SECRET]`
 - `POSTGRES_SCRIPT_URL` - Alternate Postgres URL used by one-off scripts/backfills in `src/scripts/` and tests. `[SECRET]`
 - `POSTGRES_URL_PRODUCTION` - Production Postgres connection string override; used by `packages/db/src/database-url.ts`. `[SECRET]`
-- `POSTGRES_CONNECT_TIMEOUT` - Postgres connect timeout in ms (default/typical: 10000). [SERVER]
+- `POSTGRES_CONNECT_TIMEOUT` - Postgres connect timeout in ms (required; typical: 10000). [SERVER]
 - `POSTGRES_MAX_QUERY_TIME` - Max allowed query time in ms. [SERVER]
 - `USE_PRODUCTION_DB` - Forces use of the production DB URL in non-production contexts; used by `packages/db/src/database-url.ts`. [SERVER]
-- `DATABASE_CA` - CA certificate content (PEM) for TLS connections to Postgres; used by `packages/db/src/database-url.ts` in tests and scripts. [SERVER]
+- `DATABASE_CA` - CA certificate content (PEM) for TLS connections to Postgres; used by `packages/db/src/database-url.ts` in tests and scripts. When unset, the connection string's `sslmode` parameter decides: `require`/`prefer`/`no-verify` encrypt, `verify-ca`/`verify-full` also verify the server certificate against the system trust store, `disable` or no `sslmode` keeps TLS off for local development. [SERVER]
 - `DATABASE_URL` - Generic/alternate Postgres URL used by E2E tests and some services (`cloud-agent-next`, `kiloclaw`). `[SECRET]`
 - `DATA_EXPORT_POSTGRES_URL` - Connection string for the separate, read-only data export database, loaded out of band and read by `apps/web/src/lib/data-export/db.ts`. Optional: when unset, data export reads are disabled and the application still starts. `[SECRET]`
 - `DATA_EXPORT_DATABASE_CA` - Optional CA certificate content (PEM) for the data export database, for when it does not share the primary's CA. Falls back to `DATABASE_CA`; remote connections require TLS either way. [SERVER]
@@ -225,10 +276,24 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 ### Redis & Queue
 
 - `REDIS_URL` - Redis connection URL; used by `packages/web-shared/src/lib/redis.ts` and bot state. `[SECRET]`
+- `UPSTASH_REDIS_REST_URL` - Shared Redis REST endpoint, including Discord message admission. Locally provided by `redis-http`. [SERVER]
+- `UPSTASH_REDIS_REST_TOKEN` - Redis REST credential used by the shared client. `[SECRET]`
+
+Discord message admission requires the shared Redis REST service. Accepted message
+claims are scoped to the bot and message, expire after 15 minutes, and remain
+accepted through background processing completion or failure. The gateway uses
+eight forwarding slots, a 10-second request deadline, and primary-database
+ownership checks with bounded retries. Listener availability is retained while
+ownership reads recover. Capacity drops are counted in listener logs.
+Forwarding slots cover the HTTP request lifecycle; background bot execution has a
+separate lifecycle. HTTP recovery uses at most three attempts for temporary
+admission responses within the same slot and deadline.
 
 ### Encryption & Secrets
 
 - `BYOK_ENCRYPTION_KEY` - Base64 encryption key for Bring-Your-Own-Key encryption of sensitive app data. `[SECRET]`
+- `BYOK_KMS_SERVICE_URL` - Base URL of the BYOK KMS envelope service. Unset disables envelope writes and reads fall back to the legacy column. `[SERVER]`
+- `BYOK_KMS_SERVICE_TOKEN` - Bearer token for the BYOK KMS service; required when `BYOK_KMS_SERVICE_URL` is set. `[SECRET]`
 - `USER_DELETION_AUDIT_HMAC_KEY` - Base64 32-byte HMAC key for user-deletion email hashes and audit subjects. `[SECRET]`
 - `USER_DELETION_ENCRYPTION_KEY` - Base64 32-byte AES key for user-deletion effect checkpoints and provider credentials. `[SECRET]`
 - `BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID` - Server-only BytePlus access key ID for Coding Plan seat resolution and quota usage APIs. Optional at startup; install with `pnpm web:env set BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID`. `[SECRET]`
@@ -244,24 +309,13 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `MODEL_EVAL_INGEST_URL` - URL for model evaluation ingest worker. [SERVER]
 - `SESSION_INGEST_WORKER_URL` - URL for the session ingest worker. [SERVER]
 - `NOTIFICATIONS_WORKER_URL` - URL for the push-notifications worker internal dispatch endpoint. [SERVER]
+- `AUTO_ROUTING_DECISION_SECRET` - HMAC secret the AI gateway uses to verify `x-kilo-auto-decision` custom router decisions signed by the auto-routing worker (ADR 0005). Must match the worker's `AUTO_ROUTING_DECISION_SECRET` Secrets Store binding. When unset, the gateway answers requests that carry the header with HTTP 503. `[SECRET]`
 - `USER_DATA_EXPORT_WORKER_URL` - Internal user data export Worker URL. Production: `https://user-data-export.kilosessions.ai`; local development is generated by `dev:env`. [SERVER]
 - `NEXT_PUBLIC_SESSION_INGEST_WS_URL` - WebSocket URL for session ingest from the browser. [PUBLIC]
 - `CODE_REVIEW_WORKER_URL` - URL for the code review worker. [SERVER]
 - `CODE_REVIEW_WORKER_AUTH_TOKEN` - Auth token for the code review worker. `[SECRET]`
-- `AUTO_TRIAGE_URL` - URL for the auto-triage worker. [SERVER]
-- `AUTO_TRIAGE_AUTH_TOKEN` - Auth token for the auto-triage worker. `[SECRET]`
-- `AUTO_FIX_URL` - URL for the auto-fix worker. [SERVER]
-- `AUTO_FIX_AUTH_TOKEN` - Auth token for the auto-fix worker. `[SECRET]`
-- `APP_BUILDER_URL` - URL for the App Builder worker. [SERVER]
-- `APP_BUILDER_AUTH_TOKEN` - Auth token for the App Builder worker. `[SECRET]`
 - `KILOCLAW_API_URL` - Base URL for KiloClaw API; used heavily by `apps/web/src/routers/kiloclaw-router.ts` and tests. [SERVER]
-- `USER_DEPLOYMENTS_API_BASE_URL` - Base URL for the user deployments builder. [SERVER]
-- `USER_DEPLOYMENTS_API_AUTH_KEY` - Auth key for the user deployments builder. `[SECRET]`
-- `USER_DEPLOYMENTS_DISPATCHER_URL` - URL for the deployments dispatcher (local dev). [SERVER]
-- `USER_DEPLOYMENTS_DISPATCHER_AUTH_KEY` - Auth key for the deployments dispatcher. `[SECRET]`
-- `USER_DEPLOYMENTS_ENV_VARS_PUBLIC_KEY` - Public key for encrypting user deployment env vars. [SERVER]
-- `USER_DEPLOYMENTS_ENV_VARS_PRIVATE_KEY` - Private key counterpart for decrypting user deployment env vars. `[SECRET]`
-- `CLOUD_AGENT_NEXT_API_URL` - URL for the Cloud Agent Next API; used by App Builder chat and other clients. [SERVER]
+- `CLOUD_AGENT_NEXT_API_URL` - URL for the Cloud Agent Next API. [SERVER]
 - `NEXT_PUBLIC_CLOUD_AGENT_NEXT_WS_URL` - WebSocket URL for Cloud Agent Next from the browser. [PUBLIC]
 - `CLOUD_AGENT_R2_ATTACHMENTS_BUCKET_NAME` - R2 bucket for cloud agent file attachments. [SERVER]
 - `GASTOWN_SERVICE_URL` - URL for the Gastown service. [SERVER]
@@ -270,17 +324,59 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `NEXT_PUBLIC_GASTOWN_URL` - Client-side base URL for Gastown. [PUBLIC]
 - `O11Y_SERVICE_URL` - URL for the observability (O11Y) service. [SERVER]
 - `O11Y_KILO_GATEWAY_CLIENT_SECRET` - Client secret for the O11Y Kilo Gateway. `[SECRET]`
-- `BOUNCER_URL` - Bouncer Worker URL. Defaults to `https://bouncer.kiloapps.io` in production. Inference reports remain report-only and never gate the provider request. [SERVER]
-  - Usage and decide requests have 30-second transport budgets. Every inference endpoint reports its API kind.
+- `BOUNCER_URL` - Bouncer Worker URL. Defaults to `https://bouncer.kiloapps.io` in production. Every inference endpoint awaits one decide immediately before its provider request. [SERVER]
+  - Decide has a 1,000 ms budget. Only a verdict with `enforced: true` rejects: `rate_limited` and `spend_limited` return 429 `rate_limit_exceeded` with `retry-after` and `retry-after-ms`, `restricted` returns 403 `account_restricted`. A timeout, error, non-2xx, unknown shape, or any other verdict sends the request. Verdict flags are logged server-side and never returned to the client.
+  - Signup calls `/api/v1/signup-decide` only for new users, after account resolution and before Stripe customer creation. Existing sign-in and provider linking never consume signup quotas. The call uses `INTERNAL_API_SECRET` and a 3,000 ms budget.
+  - Development skips admission. In other environments, signup requires a usable IP and a validated Bouncer verdict. Missing configuration, timeouts, transport errors, HTTP errors, invalid JSON, and unknown response shapes fail closed with `SIGNUP-UNAVAILABLE`.
+  - An unavailable verdict creates no Stripe customer, user, or auth provider. Web signup shows a retry message. Native token exchange returns HTTP 503 and releases the email-code reservation so the same code can be retried.
+  - A validated enforced `signup_rate_limited` response returns `SIGNUP-RATE-LIMITED`. Cloud accepts at most eight merged IP, domain, and JA4 flags, including `signup:busy`, `signup:domain`, and `signup:ja4`, and never exposes internal flags to the user.
+  - A validated enforced `signup_step_up` response returns `SIGNUP-STEP-UP` with its `methods` (1 to 8 values of `^[a-z0-9-]{1,32}$`). It creates no Stripe customer, user, or auth provider. Cloud shows only `google` and `apple`, in that order, and ignores other values. Web signup redirects to sign-in with `error=SIGNUP-STEP-UP&methods=<comma-separated>` and asks the user to continue with those methods; the copy never names a signal. Native token exchange returns HTTP 403 `{ error: "SIGNUP-STEP-UP", methods }`; the mobile app names the allowed Apple or Google button when that button is on its screen, and otherwise points to its browser sign-in options.
+  - Signup sends `{ operationId, ip, ja4?, method?, emailDomain? }`. JA4 comes only from the original request's `x-vercel-ja4-digest` header, not the Cloud-to-Bouncer TLS fingerprint. It is trimmed, lowercased, and bounded to `^[a-z0-9_]{1,128}$`; missing or invalid values are omitted whole, never truncated, and IP admission still runs. `signupOperationId` hashes the existing normalized email with SHA-256 and prefixes the digest with `signup:`.
+  - `method` is the signup's auth provider ID. `emailDomain` is the registrable domain (`tldts` `getDomain`, private suffixes included) of the normalized email's host, or the full host when it has none, so subdomains of one domain share a counter. It is sent for every method; Bouncer counts it only for email signups. Each field is omitted whole when invalid. Without `method`, Bouncer applies its method-less policy, as for an old Cloud build.
+  - With `enforcement.signupStepUp` on, Bouncer steps up a risky signup instead of rejecting it: it asks for Google or Apple, and admits Apple and WorkOS on a shared IP. Deploy Bouncer with `enforcement.signupStepUp=false` before this Cloud change, measure the shadow `stepUp` audit field, and only then let Igor turn it on.
+  - The identity helper lives in `packages/web-shared/src/lib/bouncer/signup.ts`. Live admission and historical import must use the same helper.
+  - Cloud validates the forwarded first-hop IP. Bouncer canonicalizes addresses and groups IPv6 by /64.
+  - Bouncer defaults to 3 admissions per canonical IP per rolling 30 days. The shorter 24-hour limit is also 3.
+  - JA4 defaults to 10 admissions per fingerprint per rolling 720 hours (30 days), independently of the IP limits. A shared TLS/HTTP fingerprint can cover unrelated people behind proxies or common clients: JA4 throttling risks false positives and must be evaluated separately from IP enforcement.
+  - The Bouncer Exemptions tab accepts user IDs and IPs. Exempt requests bypass all Bouncer rules, not Cloud authentication or billing.
+  - The Bouncer Bans tab bans an IP or an exact JA4 digest from signup. A ban returns an enforced `signup_rate_limited` verdict with one `signup:banned` flag and `until: null`. Cloud maps it to `SIGNUP-RATE-LIMITED`.
+  - Signed-in decisions carry the actual actor's `userId` separately from the payer's `accountId`, including organization-paid requests.
+  - IP exemptions cover signup and inference; IPv6 covers the whole /64. An exempt signup IP bypasses both IP and JA4 counters. Signup has no user ID before account creation; no JA4 exemption or user fingerprint field is added.
+  - Admission and creation logs share the operation ID. They exclude raw email and distinguish completed creation, rejection, and Stripe or transaction failure.
+  - Bouncer owns signup admission. Cloud keeps `signup_ip` as evidence and retains all authentication and identity guards.
+  - Deploy Bouncer first with `enforcement.signup=false` and `enforcement.signupJa4=false`; all signup enforcement ships off. The existing `enforcement.signup` switch governs IP rejection, and `enforcement.signupJa4` independently governs JA4 rejection. The global `enforcement.enabled` switch gates both; no production switch is changed by deployment.
+  - Bouncer evaluates IP first and skips JA4 if IP rejects. It counts admissions, including failed creations: an IP admission remains counted if JA4 later rejects, just as it remains counted after a later Cloud transaction or Stripe failure. There are no refunds. Stable operation IDs deduplicate each bucket independently. Limits and window lengths are configurable in the Bouncer admin panel.
+  - Historical import counts completed accounts for IP only; never reconstruct historical signup JA4 from usage or payment fingerprints. JA4 coverage starts with live signup reports.
+  - If the IP is valid, missing or invalid JA4 does not skip IP admission. JA4 enforcement requires a valid fingerprint.
+  - Deploy the first integration PR fully before this ownership cutover. Its existing Cloud limiter protects the historical import.
+  - From this checked-out cutover branch, run `pnpm --filter web script:run db import-signup-history` with the production script environment.
+  - The importer reads completed accounts from the last 30 days through a fixed time bound in 100-row pages. It changes no Cloud users.
+  - Each page requires a full Bouncer acknowledgement. Duplicate admissions are safe. Missing or empty IPs match the old limiter's exclusions.
+  - Invalid nonempty IPs, partial acknowledgement, HTTP errors, and saturation stop the import with a nonzero exit.
+  - Run the importer again after all first-PR instances deploy. For an incremental catch-up, append the previous run's `through` timestamp.
+  - After full acknowledgement and catch-up, only Igor enables IP signup enforcement and the global switch. Check shadow flags before independently enabling JA4 enforcement.
+  - Verify allowed and rejected signups with live configuration before merging and deploying the ownership cutover PR.
+  - After the cutover, Bouncer failure deliberately fails open. Revert the cutover PR to restore the old Cloud limiter.
+  - Signed-in decide requests carry the payer's `created_at`, `microdollars_used`, and `total_microdollars_acquired` (the organization's for an org request); `charge.attempted` carries the payer's `microdollars_used`.
+  - Usage reports have a 30-second transport budget and carry the request's charged `costMicrodollars`. Every inference endpoint reports its API kind, with the same request id as its decide.
+  - When the decide verdict says `spendWatch`, the usage event enters the durable `bouncer_usage_event_outbox` in the usage-write transaction, is delivered immediately after commit, and is retried by the cron drainer (eight attempts; delivered rows kept 1 day, failed rows 7 days).
+  - For a spend-watched signed-in request, the gateway calls `/api/v1/release` with the request id and account once the response has closed, on every path, so Bouncer frees the request's concurrency lease. Release is best-effort and idempotent.
   - Anonymous usage uses the client IP, without a payer. Signed-in usage excludes shared infrastructure addresses for server-side Kilo features.
   - Usage, decide, and request-initiated `charge.attempted` events carry the Vercel `x-vercel-ja4-digest` client fingerprint when the request has a valid one, lowercased and bounded to `^[a-z0-9_]{1,128}$`; a missing or invalid header is omitted whole, never truncated. It describes the client TLS/HTTP characteristics of the peer that reached Kilo's edge (often shared proxy infrastructure), not a person or device, and is correlation evidence only — see https://vercel.com/docs/vercel-firewall/firewall-concepts.
   - Financial events enter the durable `bouncer_credit_event_outbox` before acknowledgment. The dispatcher sends `/api/v2/credit-event` with a 5-second transport budget.
   - Delivery retries use the same event ID and type. Eight failed attempts produce a visible terminal failure; terminal rows remain for 30 days.
   - Apple `originalTransactionId` identifies a subscription chain, not an Apple ID. Refund requests and declined requests use distinct event types.
+  - Checkout calls `/api/v1/charge-decide` with `stage: "checkout"` before Stripe creates or reuses a Checkout session or updates a subscription: personal Kilo Pass and the KiloClaw upsell, KiloClaw subscription checkout, top-up, organization Kilo Pass, seat checkout, a seat-count increase, and personal or organization auto-top-up setup and payment-method change. Off-session background auto top-up is not gated. The call has a 1,500 ms budget.
+  - Only an enforced charge verdict refuses the checkout: tRPC procedures return `FORBIDDEN` with "We could not start this payment. Contact support.", and the top-up route returns HTTP 403 with the same copy in `{ error }`. Flags are logged server-side and never returned to a client. A timeout, error, non-2xx (including an older Bouncer's 404), or unknown shape fails open and the checkout proceeds.
+  - After a declined charge commits to `bouncer_credit_event_outbox`, the webhook delivers that row immediately, then calls `charge-decide` with `stage: "failure"` and the charge id as `requestId`. An enforced verdict expires every open Checkout session of the declined charge's Stripe customer, in payment or subscription mode; a charge without a customer falls back to the open session behind its payment intent. A failed immediate delivery leaves the sessions alone and the cron drainer retries it. These steps are bounded and never fail the webhook; a redelivered second Stripe event for the same charge finds the row already delivered and changes nothing.
+  - Bouncer enforces no charge block until `enforcement.enabled` is on and a reason is listed in `enforcement.chargeBlockReasons`, which ships empty; user and IP exemptions still apply.
   - Deploy Bouncer v2 before this cloud change. Bouncer retains v1 for the current cloud deployment; the new outbox sends only v2.
 - `CRON_SECRET` - Shared secret for authenticated cron endpoints; used in `dev/discord-gateway-cron.ts` and `.env.test`. `[SECRET]`
 - `dispatch-invite-email-outbox` - Vercel cron path (`/api/cron/dispatch-invite-email-outbox`) that drains the organization invite-email outbox; reuses `CRON_SECRET` for auth. [SERVER]
 - `dispatch-bouncer-credit-event-outbox` - Vercel cron path (`/api/cron/dispatch-bouncer-credit-event-outbox`) that drains the Bouncer credit-event outbox every minute; reuses `CRON_SECRET` for auth. [SERVER]
+- `dispatch-bouncer-usage-event-outbox` - Vercel cron path (`/api/cron/dispatch-bouncer-usage-event-outbox`) that retries the Bouncer usage-event outbox every minute; reuses `CRON_SECRET` for auth. [SERVER]
+- `expire-credits` - Vercel cron path (`/api/cron/expire-credits`) that expires due personal and organization credit grants every 5 minutes; reuses `CRON_SECRET` for auth. It never triggers auto-top-up. [SERVER]
+- `PAID_CREDIT_EXPIRATION_EFFECTIVE_AT` - ISO-8601 instant when new paid credits start receiving a one-calendar-year expiry. Unset or invalid keeps every new purchase non-expiring. Terms are captured at checkout or term start, so pending purchases and annual terms paid earlier keep legacy terms. Apple in-app purchases never expire. Create the `_1year_v2` Google Play credit products before setting it. [SERVER]
 - `WORKOS_API_KEY` - WorkOS API key for enterprise SSO. `[SECRET]`
 - `WORKOS_CLIENT_ID` - WorkOS client ID for enterprise SSO. [PUBLIC]
 
@@ -289,11 +385,11 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `OPENROUTER_API_KEY` - Primary OpenRouter API key for model inference through the AI gateway; provider definition in `packages/web-shared/src/lib/ai-gateway/providers/definitions/openrouter.ts` pointing to `https://openrouter.ai/api/v1`. `[SECRET]`
 - `OPENAI_API_KEY` - OpenAI API key supplied as a managed BYOK credential when managed inference requests route through the Vercel AI Gateway and permit the OpenAI provider. `[SECRET]`
 - `OPENAI_CHATGPT_API_KEY` - Partner project key for the delegated "Sign in with ChatGPT" route (`packages/web-shared/src/lib/ai-gateway/openai-chatgpt/routing.ts`); sent as `Authorization: Bearer` alongside the user's `OpenAI-On-Behalf-Of-Token`. OpenAI requires this key to come from the project that owns the OAuth client (`oaiapp_Abz1xcqSQAvvIwtxyemZbXBJ`); a key from another project makes every delegated call fail with an opaque `400 Bad Request`. `[SECRET]`
-- `MISTRAL_API_KEY` - Mistral API key; used in `apps/web/src/lib/embeddings/embedding-providers.ts` for `codestral-embed-2505` and `mistral-embed` embeddings, in the FIM completions proxy at `packages/web-shared/src/lib/ai-gateway/handlers/fim-completions.ts` (routes Mistral Codestral vs. La Plateforme keys), and as a provider config in `packages/web-shared/src/lib/config.server.ts`. `[SECRET]`
+- `MISTRAL_API_KEY` - Mistral API key; used in `apps/web/src/lib/embeddings/embedding-providers.ts` for `codestral-embed-2505` embeddings, in the FIM completions proxy at `packages/web-shared/src/lib/ai-gateway/handlers/fim-completions.ts` (routes Mistral Codestral vs. La Plateforme keys), and as a provider config in `packages/web-shared/src/lib/config.server.ts`. `[SECRET]`
 - `INCEPTION_API_KEY` - Inception Labs API key; used in `packages/web-shared/src/lib/ai-gateway/handlers/fim-completions.ts` and `packages/web-shared/src/lib/ai-gateway/handlers/edit-completions.ts` as a fill-in-the-middle (FIM) provider, with endpoint `https://api.inceptionlabs.ai/v1/fim/completions`. Defined in `packages/web-shared/src/lib/config.server.ts`. `[SECRET]`
 - `AI_ATTRIBUTION_ADMIN_SECRET` - Admin secret for the AI Attribution service (`apps/web/src/lib/ai-attribution-service.ts`); sent as `X-Admin-Secret` header. `[SECRET]`
 - `ARTIFICIAL_ANALYSIS_API_KEY` - API key for Artificial Analysis (`apps/web/src/lib/model-stats/sync-artificial-analysis.ts`); sent as `x-api-key` header for model benchmarking data sync. `[SECRET]`
-- `ENKRYPT_API_KEY` - API key for the Enkrypt scores endpoint; sent only in the server-side `apikey` header. Required when Enkrypt ingestion is enabled, but optional at application startup. See [Enkrypt operations](docs/enkrypt-sync-operations.md) for release gates, monitoring, and independent shutdown controls. `[SECRET]`
+- `ENKRYPT_API_KEY` - Kilo-owned Enkrypt API key; sent only in the server-side `apikey` header. Used by Enkrypt score ingestion and by the opt-in organization input guardrail (`enkrypt.input_guardrail` in organization settings), which calls `POST /guardrails/detect` from the AI gateway chat endpoints. Required when Enkrypt ingestion is enabled or any organization enables the guardrail, but optional at application startup; when unset, guardrail-enabled organizations have every scanned request rejected as if Enkrypt were unavailable. Set it on `kilocode-ai-gateway` as well as the web app before enabling the guardrail. See [Enkrypt operations](docs/enkrypt-sync-operations.md) for release gates, monitoring, and independent shutdown controls. `[SECRET]`
 - `FAKE_LLM_URL` - Local-only URL for the fake-llm service. Next.js uses it in development to list and route `fake-deterministic` through the real gateway (`apps/web/.env.development.local.example`, `packages/web-shared/src/lib/ai-gateway/local-fake-llm.ts`). The cloud-agent-next E2E driver uses the same var for `/test/*` side channels (`test/e2e/client.ts`, `test/e2e/fake-llm-server.ts`, `test/e2e/README.md`). Defaults to `http://localhost:8811`. Ignored on Vercel. [SERVER]
 
 ### Vector DBs
@@ -302,6 +398,7 @@ The connection-role migration preserves a sole eligible connection, prefers an u
 - `QDRANT_API_KEY` - Qdrant API key. `[SECRET]`
 - `MILVUS_ADDRESS` - Milvus vector DB address. [SERVER]
 - `MILVUS_TOKEN` - Milvus auth token. `[SECRET]`
+- `CODE_INDEXING_ENABLED` - Set to `true` to enable cloud managed code indexing. Disabled by default; unset, empty, or any other value keeps the feature off. [SERVER]
 
 ### Email & Notifications
 
@@ -322,7 +419,6 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `SLACK_CREDENTIAL_KEYSET_JSON` - RSA keyset for encrypting Slack bot credentials at rest, as JSON or base64-encoded JSON: `{"active":{"keyId":"...","publicKeyPem":"..."},"decrypt":[{"keyId":"...","privateKeyPem":"..."}]}`. Web holds the private half because the Slack webhook decrypts in-process; the active key ID must also appear in `decrypt` with a private key. `[SECRET]`
 - `SLACK_ADMIN_NOTIFICATIONS_WEBHOOK_URL` - Slack incoming webhook used by server-side Admin UI code to send events, summaries, reminders, and actions. `[SECRET]`
 - `SLACK_USER_FEEDBACK_WEBHOOK_URL` - Slack incoming webhook for user feedback. [SERVER]
-- `SLACK_DEPLOY_THREAT_WEBHOOK_URL` - Slack incoming webhook for deploy threat alerts. [SERVER]
 
 ### Feature Flags
 
@@ -347,6 +443,7 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `IMPACT_ADVOCATE_TENANT_ALIAS` - Impact.com Advocate tenant alias. [SERVER]
 - `IMPACT_ADVOCATE_API_BASE_URL` - Impact.com Advocate API base URL. Defaults to `https://app.referralsaasquatch.com`. [SERVER]
 - `IMPACT_CAMPAIGN_ID` - Impact.com campaign ID for event tracking. [SERVER]
+
 ### Cloudflare Analytics
 
 - `CLOUDFLARE_ACCOUNT_ID` - Cloudflare account ID used as the GraphQL `accountTag` for Containers Analytics queries and admin dashboard deep links; used in `packages/web-shared/src/lib/config.server.ts` and `apps/web/src/lib/cloudflare/container-usage-analytics.ts`. [SERVER]
@@ -361,6 +458,12 @@ When `VERCEL_TARGET_ENV` is absent in local development or a script process, tra
 - `R2_API_REQUEST_LOG_BUCKET_NAME` - R2 bucket for `api_request_log` request and response bodies. [SERVER]
 - `R2_API_REQUEST_LOG_ACCESS_KEY_ID` - R2 access key ID used only for the `api_request_log` bucket; uses the `R2_ACCOUNT_ID` account. `[SECRET]`
 - `R2_API_REQUEST_LOG_SECRET_ACCESS_KEY` - R2 secret access key paired with `R2_API_REQUEST_LOG_ACCESS_KEY_ID`. `[SECRET]`
+
+## AI Gateway Secure Proxy (apps/ai-gateway-secure-proxy)
+
+Set manually on the `kilocode-ai-gateway-secure-proxy` Vercel project; not managed by `pnpm web:env`.
+
+- `KILO_AI_GATEWAY_SECURE_PROXY_SECRET` - Shared secret the gateway sends as `Authorization: Bearer <secret>`; read in `apps/ai-gateway-secure-proxy/src/lib/secure-proxy.ts`. Admins store the same value as `proxy_secret` in `secure_proxy` custom LLM credentials. When unset, the proxy rejects every request. `[SECRET]`
 
 ## Services
 
@@ -415,10 +518,12 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 - `KILO_BIN_PATH` - Path or name of the `kilo` CLI binary; used by `services/cloud-agent-next/scripts/update-default-slash-commands.mjs`. [SERVER]
 - `WORKSPACE_PATH` - Filesystem path of the agent workspace. [SERVER]
 - `SESSION_ID` - Reserved session identifier for the `cloud-agent-next` runtime; reserved in `RESERVED_ENV_VARS`. [SERVER]
-- `CONTROL_PLANE_IDS` - Comma-separated user or org IDs admitted to the call-home control plane at interactive web (`cloud-agent-web`) session creation. Empty admits nobody. `*` includes personal accounts. Omitted from production `wrangler.jsonc` so the Cloudflare dashboard value survives deploy; unset admits nobody. Wrangler `dev` and `.dev.vars.example` default to `*`. Non-interactive origins (Slack, scheduled, code review, and similar) keep legacy `agent_` sessions even when enrolled. Does not enable new worktree creation by itself; that also requires `WORKTREE_CREATION_ENABLED_IDS` enrollment. [SERVER]
-- `WORKTREE_CREATION_ENABLED_IDS` - Comma-separated user or org IDs allowed to create new worktrees, or `*` for all, including personal accounts. Omitted from production `wrangler.jsonc` so the Cloudflare dashboard value survives deploy; unset is off. Wrangler `dev` and `.dev.vars.example` default to `*`. Also requires enrollment in `CONTROL_PLANE_IDS`. Disabling it does not block existing worktrees or sibling chats in them. [SERVER]
-- `SANDBOX_SELECTION_IDS` - Comma-separated user or org IDs allowed to pick a Cloud Agent sandbox destination on the new-session page. Empty admits nobody. `*` includes personal accounts. Omitted from production `wrangler.jsonc` so the Cloudflare dashboard value survives deploy; unset admits nobody. Wrangler `dev` and `.dev.vars.example` default to `*`. [SERVER]
-- `VERCEL_SANDBOX_ORG_IDS` - Comma-separated org IDs routed to Vercel sandboxes. Empty is off. `*` includes personal accounts. [SERVER]
+- `SANDBOX_SELECTION_IDS` - Comma-separated user or org IDs allowed to pick a Cloud Agent sandbox destination on the new-session page. Empty admits nobody. `*` includes personal accounts. Production `wrangler.jsonc` sets the allowlist, so a deploy overwrites the Cloudflare dashboard value. Wrangler `dev` and `.dev.vars.example` default to `*`. [SERVER]
+- `CLOUDFLARE_CONTAINERS_ORG_IDS` - Comma-separated org IDs enrolled for the DO-managed Cloudflare Containers runtime, which is also the default sandbox destination for isolated control-plane sessions. Empty is off. `*` includes every organization and personal account. Production `wrangler.jsonc` sets `*` so a deploy overwrites the Cloudflare dashboard value; wrangler `dev` also sets `*`. [SERVER]
+- `ENVIRONMENT_SNAPSHOT_ORG_IDS` - Comma-separated organization IDs allowed to build and restore environment snapshots. Empty or unset disables snapshots. Personal accounts and `*` are excluded. Native-container enrollment is also required. Removing an organization stops its active builds and prevents restore of its existing snapshots. [SERVER]
+- `PREVIEW_HOST_SUFFIX` - Hostname suffix the Cloud Agent Next Worker dispatches preview hosts under; a preview host is `p<port>-<workspace-uuid-hex>.<suffix>`. Unset or empty disables preview dispatch and the `/preview/open` hop, and the web app hides the preview button (it reads availability from the Worker's `getPreviewOptions`). The web app needs no preview setting. Production `wrangler.jsonc` sets `cloud-agent.kiloapps.ai`. `services/cloud-agent-next/.dev.vars.example` sets `localhost`. [SERVER]
+- `PREVIEW_ENABLED_IDS` - Comma-separated user or org IDs that the Cloud Agent Next Worker shows the preview button and preview links to. `*` includes personal accounts. Unset or empty shows nobody. A UI gate only: `getPreviewOptions` answers `enabled: false` for other owners, but the `/preview/open` hop and the preview host do not check it. The org ID comes from the web route and is not verified. Production `wrangler.jsonc` sets `*`, so a deploy overwrites the Cloudflare dashboard value. Wrangler `dev` and `.dev.vars.example` default to `*`. [SERVER]
+- `BYOC_VERCEL_IDS` - Comma-separated user or organization IDs enrolled in customer-paid Vercel compute. Empty is off; `*` enrolls both personal accounts and organizations. An enrolled owner fails closed when its ready credential is absent. [SERVER]
 - `HOME` - Reserved in `RESERVED_ENV_VARS` for cloud-agent-next session home management. [SYSTEM]
 
 ### Gastown
@@ -436,11 +541,12 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 - `AGENT_IDLE_TIMEOUT_MS` - Timeout in ms before an idle Gastown agent is terminated; used in `services/gastown/container/src/process-manager.ts`. [SERVER]
 - `REFINERY_IDLE_TIMEOUT_MS` - Timeout in ms before an idle Refinery sub-process is killed; used in `services/gastown/container/src/process-manager.ts`. [SERVER]
 
-### Deploy Infra (Dispatcher)
+### Auto Routing Worker
 
-- `LOCAL_AUTH_TOKEN` - Auth token for the local deployment dispatcher env. `[SECRET]`
-- `STAGING_AUTH_TOKEN` - Auth token for the staging deployment dispatcher env. `[SECRET]`
-- `PROD_AUTH_TOKEN` - Auth token for the production deployment dispatcher env. `[SECRET]`
+- `KILO_AI_GATEWAY_BASE_URL` - Origin of the AI gateway that `services/auto-routing` asks which custom router gateway entries the organization model policy denies (`/api/v1/internal/auto-routing/denied-models`). A `wrangler.jsonc` var for production; `pnpm dev:env` writes the local gateway port to `.dev.vars`. [SERVER]
+- `AUTO_ROUTING_DECISION_SECRET` - HMAC secret that signs custom router decision IDs; the AI gateway verifies them with the same value. Production Secrets Store name `AUTO_ROUTING_DECISION_SECRET_PROD`; locally `pnpm dev:env` seeds it from `.env.local`. `[SECRET]`
+- `AUTO_ROUTING_UPSTASH_REDIS_REST_URL` - Upstash REST URL of the web app's Redis, read by `services/auto-routing` for the blocked email domains. Production Secrets Store name `AUTO_ROUTING_UPSTASH_REDIS_REST_URL_PROD`; locally the dev `redis-http` container. `[SECRET]`
+- `AUTO_ROUTING_UPSTASH_REDIS_REST_READONLY_TOKEN` - Read-only Upstash REST token for that database. Production Secrets Store name `AUTO_ROUTING_UPSTASH_REDIS_REST_READONLY_TOKEN_PROD`; locally `example_token`. `[SECRET]`
 
 ### Other Services
 
@@ -471,7 +577,6 @@ The key is team-scoped for all topics and valid in both the sandbox and producti
 ## Tests / Dev
 
 - `IS_IN_AUTOMATED_TEST` - Set to `1` to put the app in automated-test mode (e.g. skip Turnstile challenges). [SERVER]
-- `AUTH_TOKEN` - Generic auth token used in `services/app-builder/src/_integration_tests/git-test-helpers.ts` to authenticate integration tests against local services. `[SECRET]`
 - `CANDIDATE_TAG` - Tag string used by `scripts/test-rollout-bucket.mjs` to test rollout bucket assignment. [SERVER]
 - `PERCENT` - Percentage value (0-100) used by `scripts/test-rollout-bucket.mjs` when testing rollout bucket logic. [SERVER]
 - `SNOWFLAKE_MAX_POLL_ATTEMPTS` - Max poll attempts for Snowflake job completion in `services/kiloclaw-billing/src/snowflake.ts`. [SERVER]

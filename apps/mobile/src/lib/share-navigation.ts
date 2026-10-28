@@ -1,7 +1,9 @@
 import {
   getSharePersistUserId,
+  putSharePayload,
   SHARE_PAYLOAD_MAX_ENTRIES,
   type ShareId,
+  type SharePayload,
 } from '@/lib/share-payload';
 import type * as DraftsModule from '@/lib/persist/drafts';
 
@@ -106,6 +108,26 @@ export function appendShareParams(
   const autoSend = options.autoSend === true ? '&autoSend=1' : '';
   const mode = options.mode ? `&mode=${encodeURIComponent(options.mode)}` : '';
   return `${base}${separator}shareId=${encodeURIComponent(shareId)}${autoSend}${mode}`;
+}
+
+/**
+ * The destination route for a session just created from a form, with the
+ * composer handoff staged. A composer payload is auto-sent once; a forked user
+ * message's text only prefills the new composer, for the user to edit and send.
+ */
+export function withComposerHandoff(
+  sessionPath: string,
+  handoff: { submitPayload?: SharePayload | null; forkPrefillText?: string | null; mode?: string }
+): string {
+  if (handoff.submitPayload) {
+    const shareId = putSharePayload(handoff.submitPayload);
+    return appendShareParams(sessionPath, shareId, { autoSend: true, mode: handoff.mode });
+  }
+  if (handoff.forkPrefillText) {
+    const shareId = putSharePayload({ text: handoff.forkPrefillText, files: [], failedFiles: [] });
+    return appendShareParams(sessionPath, shareId, { mode: handoff.mode });
+  }
+  return sessionPath;
 }
 
 /** Parse the destination params a focused delivery must set from a pending href. */

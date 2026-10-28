@@ -116,6 +116,53 @@ describe('native egress policy forwarding', () => {
   );
 });
 
+describe('native image forwarding', () => {
+  it.each(['all-in-one', 'runtime-free'] as const)(
+    'forwards the %s image selection to the container start',
+    async nativeImage => {
+      const launchWrapper = vi.fn().mockResolvedValue({ started: true, startSource: 'image' });
+      const container = {
+        launchWrapper,
+        ensureLeaseAtLeast: vi.fn().mockResolvedValue(undefined),
+      };
+      const provider = createCloudflareContainersProviderAdapter({
+        logicalSandboxId: SANDBOX_ID,
+        allocationName: SANDBOX_ID,
+        getContainer: () => container as unknown as DurableObjectStub<SandboxContainers>,
+      });
+      const created = await provider.create({ intentId: 'image-attempt', createdAt: 0 });
+      if ('unresolved' in created) throw new Error('Expected provider reference');
+
+      await provider.launch(
+        created.providerRef,
+        { command: preinstalledStartup(), env: {} },
+        { nativeImage }
+      );
+
+      expect(launchWrapper).toHaveBeenCalledWith(expect.objectContaining({ nativeImage }));
+    }
+  );
+
+  it('omits the image selection when none is supplied', async () => {
+    const launchWrapper = vi.fn().mockResolvedValue({ started: true, startSource: 'image' });
+    const container = {
+      launchWrapper,
+      ensureLeaseAtLeast: vi.fn().mockResolvedValue(undefined),
+    };
+    const provider = createCloudflareContainersProviderAdapter({
+      logicalSandboxId: SANDBOX_ID,
+      allocationName: SANDBOX_ID,
+      getContainer: () => container as unknown as DurableObjectStub<SandboxContainers>,
+    });
+    const created = await provider.create({ intentId: 'image-attempt', createdAt: 0 });
+    if ('unresolved' in created) throw new Error('Expected provider reference');
+
+    await provider.launch(created.providerRef, { command: preinstalledStartup(), env: {} });
+
+    expect(launchWrapper.mock.calls[0]?.[0]).not.toHaveProperty('nativeImage');
+  });
+});
+
 describe.each(['cloudflare', 'cloudflare-containers'] as const)('%s creation causes', kind => {
   it('retries shadow billing configuration with a fresh handle and unchanged attribution', async () => {
     const error = Object.assign(new Error('Durable Object reset'), { retryable: true });

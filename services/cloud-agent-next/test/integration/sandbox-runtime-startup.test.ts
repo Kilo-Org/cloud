@@ -36,6 +36,17 @@ const namespace = (env as unknown as { SANDBOX_CONTROL: DurableObjectNamespace<S
   .SANDBOX_CONTROL;
 const workerSecret = (env as unknown as { NEXTAUTH_SECRET: string }).NEXTAUTH_SECRET;
 const SESSION = 'workspace_11111111-1111-1111-1111-111111111111';
+const TARGET_ORG = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
+const OTHER_ORG = '11111111-1111-4111-8111-111111111111';
+const scopedEnv = {
+  RUNTIME_INTERACTIVE_ORG_IDS: TARGET_ORG,
+  NATIVE_RUNTIME_IMAGE: 'runtime-free',
+};
+const SCOPED_SANDBOX = `sbx-${'1'.repeat(48)}`;
+const SCOPED_FALLBACK_SANDBOX = `sbx-${'2'.repeat(48)}`;
+const EXCLUDED_SANDBOX = `sbx-${'3'.repeat(48)}`;
+const NON_WEB_SANDBOX = `sbx-${'4'.repeat(48)}`;
+const ABSENT_PLATFORM_SANDBOX = `sbx-${'5'.repeat(48)}`;
 const descriptor = JSON.stringify({
   format: 1,
   bootstrap: 1,
@@ -134,7 +145,8 @@ function fakeProvider(
 function configureHarness(
   instance: SandboxControlV2,
   provider: ReturnType<typeof fakeProvider>,
-  peer: FakeSessionPeer
+  peer: FakeSessionPeer,
+  envOverrides: Record<string, unknown> = {}
 ) {
   installFakeCredentialEnv(instance.env, createFakeCredentialBroker(), {
     NEXTAUTH_SECRET: workerSecret,
@@ -148,6 +160,7 @@ function configureHarness(
         return { size: 1 };
       },
     },
+    ...envOverrides,
   });
   peer.runtimeProxyForSession = createRuntimeProxyMintingPeer(instance.env, () => ({
     userId: 'user_123',
@@ -161,17 +174,26 @@ function configureHarness(
 }
 
 type Harness = Awaited<ReturnType<typeof setup>>;
-async function setup(id: string, options: Parameters<typeof fakeProvider>[0] = {}) {
+async function setup(
+  id: string,
+  options: Parameters<typeof fakeProvider>[0] = {},
+  envOverrides: Record<string, unknown> = {}
+) {
   const provider = fakeProvider(options);
   const peer = new FakeSessionPeer();
   const stub = namespace.getByName(id);
   await runInDurableObject(stub, async instance => {
     await instance.getAllocationState();
-    configureHarness(instance, provider, peer);
+    configureHarness(instance, provider, peer, envOverrides);
   });
   return { id, stub, peer, provider };
 }
-async function prepare(h: Harness) {
+type PrepareOptions = {
+  orgId?: string;
+  createdOnPlatform?: string;
+  sandboxKind?: 'isolated' | 'isolated-standard' | 'code-review' | 'shared';
+};
+async function prepare(h: Harness, options: PrepareOptions = {}) {
   await h.stub.prepare({
     spec: {
       sessionId: SESSION,
@@ -184,11 +206,17 @@ async function prepare(h: Harness) {
       userId: 'user_123',
       kiloSessionId: 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa',
       kiloToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
-      orgId: 'org_123',
+      orgId: options.orgId ?? 'org_123',
+      ...(options.createdOnPlatform === undefined
+        ? {}
+        : { createdOnPlatform: options.createdOnPlatform }),
       repository: { type: 'github', repo: 'acme/widgets' },
       scopeId: SESSION,
     },
-    sandboxSelection: { provider: 'cloudflare-containers' },
+    sandboxSelection: {
+      provider: 'cloudflare-containers',
+      ...(options.sandboxKind === undefined ? {} : { sandboxKind: options.sandboxKind }),
+    },
   });
   await waitFor(() => expect(h.provider.launches.length > 0).toBe(true));
 }
@@ -360,6 +388,73 @@ describe('downloaded startup in the allocation owner', () => {
     ).toBe(false);
     expect(await h.stub.getAllocationState()).toEqual(state);
   });
+  it('passes the scoped native image and downloaded command to the target cohort', async () => {
+    const h = await setup(SCOPED_SANDBOX, {}, scopedEnv);
+    await prepare(h, {
+      orgId: TARGET_ORG,
+      createdOnPlatform: 'cloud-agent-web',
+      sandboxKind: 'isolated',
+    });
+    await waitFor(async () => expect((await record(h))?.startupMode).toBe('downloaded'));
+    const startup = h.provider.launches[0]!;
+    expect(startup.options?.nativeImage).toBe('runtime-free');
+    expect(startup.command.argv.some(value => value.includes('https://worker.test'))).toBe(true);
+  });
+  it('keeps an excluded cohort on the baseline without reading the descriptor or artifacts', async () => {
+    let artifactReads = 0;
+    const h = await setup(
+      EXCLUDED_SANDBOX,
+      {},
+      {
+        ...scopedEnv,
+        RUNTIME_RELEASE_BUCKET: {
+          async head() {
+            artifactReads++;
+            return { size: 1 };
+          },
+        },
+      }
+    );
+    await prepare(h, {
+      orgId: OTHER_ORG,
+      createdOnPlatform: 'cloud-agent-web',
+      sandboxKind: 'isolated',
+    });
+    await waitFor(async () => expect((await record(h))?.startupMode).toBe('preinstalled'));
+    const startup = h.provider.launches[0]!;
+    expect(startup.options?.nativeImage).toBe('all-in-one');
+    expect(startup.command.argv.some(value => value.includes('https://worker.test'))).toBe(false);
+    expect(artifactReads).toBe(0);
+  });
+  it.each([
+    { label: 'non-web', createdOnPlatform: 'cloud-agent', sandboxId: NON_WEB_SANDBOX },
+    { label: 'absent', createdOnPlatform: undefined, sandboxId: ABSENT_PLATFORM_SANDBOX },
+  ])('keeps a $label platform on the baseline', async ({ createdOnPlatform, sandboxId }) => {
+    const h = await setup(sandboxId, {}, scopedEnv);
+    await prepare(h, {
+      orgId: TARGET_ORG,
+      ...(createdOnPlatform === undefined ? {} : { createdOnPlatform }),
+      sandboxKind: 'isolated',
+    });
+    await waitFor(async () => expect((await record(h))?.startupMode).toBe('preinstalled'));
+    const startup = h.provider.launches[0]!;
+    expect(startup.options?.nativeImage).toBe('all-in-one');
+  });
+  it('retains the scoped selection through the snapshot-to-image fallback', async () => {
+    const h = await setup(SCOPED_FALLBACK_SANDBOX, { snapshotFailed: true }, scopedEnv);
+    await prepare(h, {
+      orgId: TARGET_ORG,
+      createdOnPlatform: 'cloud-agent-web',
+      sandboxKind: 'isolated',
+    });
+    await waitFor(() => expect(h.provider.launches.length).toBe(2));
+    const [first, fallback] = h.provider.launches;
+    expect(first?.options?.nativeImage).toBe('runtime-free');
+    expect(fallback?.options?.nativeImage).toBe('runtime-free');
+    expect(fallback?.options?.snapshot).toBeUndefined();
+    expect(fallback?.command).toEqual(first?.command);
+    expect((await record(h))?.startupMode).toBe('downloaded');
+  });
   it('keeps a live allocation mode and deadlines across deployment configuration changes and reconstruction', async () => {
     const h = await setup('sbx__runtime_existing');
     await runInDurableObject(h.stub, instance => {
@@ -371,6 +466,8 @@ describe('downloaded startup in the allocation owner', () => {
     expect((await record(h))?.startupMode).toBe('preinstalled');
     await runInDurableObject(h.stub, instance => {
       instance.env.RUNTIME_STARTUP_MODE = 'downloaded';
+      instance.env.NATIVE_RUNTIME_IMAGE = 'runtime-free';
+      instance.env.RUNTIME_INTERACTIVE_ORG_IDS = TARGET_ORG;
     });
     const calls = { ...h.provider.calls };
     await evictAllDurableObjects();

@@ -825,6 +825,47 @@ describe('SessionIngestDO integration', () => {
       ]);
     });
 
+    it('keeps briefing text beside an oversized inline reasoning part but omits oversized text', async () => {
+      const sessionId = 'ses_briefing_oversized_part_01';
+      const stub = getStub(kiloUserId, sessionId);
+      const completed = {
+        id: 'msg_final',
+        role: 'assistant',
+        finish: 'stop',
+        time: { completed: 3000 },
+      };
+      const textPart = (id: string, text: string) => ({
+        id,
+        messageID: 'msg_final',
+        type: 'text',
+        text,
+        time: { start: 1000, end: 3000 },
+      });
+      const excerpts = await runInDurableObject(stub, (instance, state) => {
+        const insert = (itemId: string, itemType: string, data: unknown) =>
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+            itemId,
+            itemType,
+            JSON.stringify(data),
+            1000
+          );
+        insert('message/msg_final', 'message', completed);
+        insert('part/msg_final/prt_reasoning', 'part', {
+          id: 'prt_reasoning',
+          messageID: 'msg_final',
+          type: 'reasoning',
+          text: 'x'.repeat(16 * 1024),
+        });
+        insert('part/msg_final/prt_text', 'part', textPart('prt_text', 'Final response.'));
+        const batch = [{ type: 'message' as const, data: completed }];
+        const withReasoning = instance['latestBriefingExcerpt'](batch);
+        insert('part/msg_final/prt_large', 'part', textPart('prt_large', 'y'.repeat(16 * 1024)));
+        return [withReasoning?.text, instance['latestBriefingExcerpt'](batch)];
+      });
+      expect(excerpts).toEqual(['Final response.', undefined]);
+    });
+
     it('returns an older-layout part row with its message', async () => {
       const sessionId = 'ses_part_layout_previous_0001';
       const stub = getStub(kiloUserId, sessionId);

@@ -23,6 +23,7 @@ import {
   isNotNull,
   like,
   sql,
+  type SQL,
 } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
@@ -88,11 +89,14 @@ import {
 import type { SessionDiffRead } from '@kilocode/session-ingest-contracts';
 import { precedesStatusTransition, resetAttentionStatusOnCliDisconnect } from '../ingest/metadata';
 import {
-  activityEvidence,
-  statusEvidence,
-  persistBriefingEvidence,
-  type BriefingIngestEvent,
-} from '../ingest/briefing-evidence';
+  BRIEFING_MAX_INLINE_BYTES,
+  BRIEFING_MAX_EXCERPT_SOURCE_ROWS,
+  briefingExcerptUpdate,
+  buildBriefingExcerpt,
+  completedBriefingResponse,
+  isFinalizedBriefingText,
+  type BriefingExcerpt,
+} from '../ingest/briefing-excerpt';
 import {
   SHARE_INFO_KEY_PREFIX,
   shareInfoKey,
@@ -109,10 +113,7 @@ type LiveThrottleMetaKey =
   | 'lastCostPersistedMicrodollars'
   | 'lastLiveSummaryPersistedAtMs';
 
-type AlarmMetaKey = 'metricsAlarmAt' | 'briefingEvidenceRetryAt' | 'briefingEvidenceRetryAttempt';
-
-const BRIEFING_EVIDENCE_RETRY_BASE_MS = 30_000;
-const BRIEFING_EVIDENCE_RETRY_MAX_MS = 60 * 60_000;
+type AlarmMetaKey = 'metricsAlarmAt';
 
 type IngestMetaKey =
   | ExtractableMetaKey
@@ -125,7 +126,6 @@ type IngestMetaKey =
   | 'sessionReadyNotified'
   | 'liveSummaryState'
   | 'lastLiveSummaryPersisted'
-  | 'briefingEvidencePending'
   | LiveThrottleMetaKey
   | AlarmMetaKey
   | ShareInfoMetaKey;
@@ -169,18 +169,6 @@ function writeIngestMetaIfChanged(
     .run();
 
   return { changed: true, value: params.incomingValue };
-}
-function stageBriefingEvidence(db: DrizzleSqliteDODatabase, events: BriefingIngestEvent[]): void {
-  for (const event of events) {
-    writeIngestMetaIfChanged(db, { key: 'briefingEvidencePending', incomingValue: 'true' });
-    db.insert(ingestMeta)
-      .values({
-        key: `briefingEvidence:${event.identity}`,
-        value: JSON.stringify(event),
-      })
-      .onConflictDoNothing()
-      .run();
-  }
 }
 
 function hasIngestMeta(db: DrizzleSqliteDODatabase, key: IngestMetaKey): boolean {
@@ -295,12 +283,14 @@ export async function persistLiveSessionColumns(
     costMicrodollars?: number;
     lastActivityAtIso?: string;
     liveSummary?: { summary: SessionLiveSummary; atIso: string };
+    briefingExcerpt?: { excerpt: BriefingExcerpt; receivedAtIso: string };
   }
 ): Promise<void> {
   const set: {
-    total_cost_microdollars?: ReturnType<typeof sql>;
-    last_activity_at?: ReturnType<typeof sql>;
-    live_summary?: ReturnType<typeof sql>;
+    total_cost_microdollars?: SQL;
+    last_activity_at?: SQL;
+    live_summary?: SQL;
+    briefing_excerpt?: SQL;
   } = {};
 
   if (columns.costMicrodollars !== undefined) {
@@ -333,6 +323,11 @@ export async function persistLiveSessionColumns(
       THEN ${JSON.stringify(summary)}::jsonb
       ELSE ${cli_sessions_v2.live_summary}
     END`;
+  }
+
+  if (columns.briefingExcerpt !== undefined) {
+    const { excerpt, receivedAtIso } = columns.briefingExcerpt;
+    set.briefing_excerpt = briefingExcerptUpdate(excerpt, receivedAtIso);
   }
 
   if (Object.keys(set).length === 0) return;
@@ -622,15 +617,9 @@ export class SessionIngestDO extends DurableObject<Env> {
     // holds a newer one of, and folding it would move the summary back (an
     // old running state of a tool that already finished would revive its step).
     const storedItems: IngestBatch[number][] = [];
-    const assistantMessageIds = new Set(
-      payload.flatMap(item =>
-        item.type === 'message' && item.data.role === 'assistant' ? [item.data.id] : []
-      )
-    );
 
     for (const item of payload) {
       const { item_id, item_type } = getItemIdentity(item);
-      stageBriefingEvidence(this.db, statusEvidence([item]));
 
       // Check timestamp guard: skip if existing row has a newer ingested_at.
       // Also read the existing R2 key so we can clean up orphaned blobs.
@@ -727,29 +716,6 @@ export class SessionIngestDO extends DurableObject<Env> {
           if (row.item_data_r2_key) orphanedR2Keys.push(row.item_data_r2_key);
         }
       }
-      if (
-        item.type === 'part' &&
-        (item.data.type === 'text' || item.data.type === 'tool') &&
-        !assistantMessageIds.has(item.data.messageID)
-      ) {
-        const parent = this.db
-          .select({ item_data: ingestItems.item_data })
-          .from(ingestItems)
-          .where(eq(ingestItems.item_id, `message/${item.data.messageID}`))
-          .get();
-        if (typeof parent?.item_data === 'string') {
-          const message: unknown = JSON.parse(parent.item_data);
-          if (
-            typeof message === 'object' &&
-            message !== null &&
-            'role' in message &&
-            message.role === 'assistant'
-          ) {
-            assistantMessageIds.add(item.data.messageID);
-          }
-        }
-      }
-      stageBriefingEvidence(this.db, activityEvidence([item], assistantMessageIds));
       storedItems.push(item);
 
       if (item.type === 'message' || item.type === 'part') {
@@ -925,10 +891,6 @@ export class SessionIngestDO extends DurableObject<Env> {
         });
       }
     }
-    // Incoming metadata is committed; only now start the external evidence flush.
-    if (readIngestMetaValue(this.db, 'briefingEvidencePending') === 'true') {
-      this.ctx.waitUntil(this.flushBriefingEvidence(kiloUserId, sessionId));
-    }
 
     // Clean up orphaned R2 blobs after metadata is persisted. R2 is external I/O,
     // so awaiting it before metadata writes can let another DO request interleave
@@ -1020,11 +982,17 @@ export class SessionIngestDO extends DurableObject<Env> {
       lastCostPersistedMicrodollars: readIngestMetaNumber(this.db, 'lastCostPersistedMicrodollars'),
     });
 
-    if (decision.persistActivity || decision.persistCost) {
+    const briefingResponseChanged = storedItems.some(
+      item =>
+        (item.type === 'message' && completedBriefingResponse(item.data) !== undefined) ||
+        (item.type === 'part' && isFinalizedBriefingText(item.data))
+    );
+    if (decision.persistActivity || decision.persistCost || briefingResponseChanged) {
       const columns: {
         costMicrodollars?: number;
         lastActivityAtIso?: string;
         liveSummary?: { summary: SessionLiveSummary; atIso: string };
+        briefingExcerpt?: { excerpt: BriefingExcerpt; receivedAtIso: string };
       } = {};
       if (decision.persistCost && currentCostMicrodollars !== null) {
         columns.costMicrodollars = currentCostMicrodollars;
@@ -1048,6 +1016,24 @@ export class SessionIngestDO extends DurableObject<Env> {
       this.ctx.waitUntil(
         (async () => {
           try {
+            if (briefingResponseChanged) {
+              try {
+                const excerpt = this.latestBriefingExcerpt(storedItems);
+                if (excerpt) {
+                  columns.briefingExcerpt = {
+                    excerpt,
+                    receivedAtIso: new Date(ingestedAt ?? nowMsLive).toISOString(),
+                  };
+                }
+              } catch (error) {
+                console.error('SessionIngestDO failed to read completed briefing response', {
+                  kiloUserId,
+                  sessionId,
+                  error: error instanceof Error ? error.message : String(error),
+                });
+              }
+            }
+            if (this.isDeleted()) return;
             await persistLiveSessionColumns(connectionString, kiloUserId, sessionId, columns);
             if (this.isDeleted()) return;
             if (summaryToPersist !== undefined) {
@@ -1221,6 +1207,111 @@ export class SessionIngestDO extends DurableObject<Env> {
    */
   async resetAttentionStatusOnCliDisconnect(kiloUserId: string, sessionId: string): Promise<void> {
     await resetAttentionStatusOnCliDisconnect(this.env, kiloUserId, sessionId, this.ctx);
+  }
+
+  private latestBriefingExcerpt(items: IngestBatch): BriefingExcerpt | undefined {
+    const messageIds = new Set<string>();
+    for (const item of items) {
+      if (item.type === 'message' && completedBriefingResponse(item.data)) {
+        messageIds.add(item.data.id);
+      } else if (item.type === 'part' && isFinalizedBriefingText(item.data)) {
+        messageIds.add(item.data.messageID);
+      }
+      if (messageIds.size > BRIEFING_MAX_EXCERPT_SOURCE_ROWS) return undefined;
+    }
+    const encoder = new TextEncoder();
+    let latestMessage: unknown;
+    let latestMessageId = '';
+    let latestCompletedAt = -Infinity;
+    let messageBytes = 0;
+    for (const messageId of messageIds) {
+      const row = this.db
+        .select({
+          item_data: ingestItems.item_data,
+          item_data_r2_key: ingestItems.item_data_r2_key,
+        })
+        .from(ingestItems)
+        .where(
+          and(
+            eq(ingestItems.item_id, `message/${messageId}`),
+            isNull(ingestItems.item_data_r2_key),
+            sql`length(${ingestItems.item_data}) <= ${BRIEFING_MAX_INLINE_BYTES}`
+          )
+        )
+        .get();
+      if (!row || row.item_data_r2_key || row.item_data.length > BRIEFING_MAX_INLINE_BYTES)
+        continue;
+      const bytes = encoder.encode(row.item_data).byteLength;
+      if (bytes > BRIEFING_MAX_INLINE_BYTES) continue;
+      const message = completedBriefingResponse(JSON.parse(row.item_data));
+      if (
+        message &&
+        (message.time.completed > latestCompletedAt ||
+          (message.time.completed === latestCompletedAt && message.id > latestMessageId))
+      ) {
+        latestMessage = message;
+        latestMessageId = message.id;
+        latestCompletedAt = message.time.completed;
+        messageBytes = bytes;
+      }
+    }
+    if (latestMessage === undefined) return undefined;
+    let fetchedRows = 0;
+    let inlineBytes = messageBytes;
+    const parts: unknown[] = [];
+    for (const row of streamMessagePartRows<PartExportRow & { oversized_inline: number }>({
+      messageId: latestMessageId,
+      order: 'row-id',
+      batchSize: BRIEFING_MAX_EXCERPT_SOURCE_ROWS + 1,
+      fetchPage: (range, after, limit) => {
+        const remaining = BRIEFING_MAX_EXCERPT_SOURCE_ROWS + 1 - fetchedRows;
+        if (remaining <= 0) return [];
+        const rows = this.db
+          .select({
+            id: ingestItems.id,
+            ingested_at: ingestItems.ingested_at,
+            item_id: ingestItems.item_id,
+            item_data: sql<string>`CASE
+              WHEN ${ingestItems.item_data_r2_key} IS NOT NULL
+                OR length(${ingestItems.item_data}) > ${BRIEFING_MAX_INLINE_BYTES} THEN ''
+              WHEN json_extract(${ingestItems.item_data}, '$.type') = 'text'
+                THEN ${ingestItems.item_data}
+              ELSE ''
+            END`,
+            item_data_r2_key: ingestItems.item_data_r2_key,
+            oversized_inline: sql<number>`CASE
+              WHEN ${ingestItems.item_data_r2_key} IS NULL
+                AND length(${ingestItems.item_data}) > ${BRIEFING_MAX_INLINE_BYTES}
+                THEN json_extract(${ingestItems.item_data}, '$.type') = 'text'
+              ELSE 0
+            END`,
+          })
+          .from(ingestItems)
+          .where(
+            and(
+              eq(ingestItems.item_type, 'part'),
+              gte(ingestItems.item_id, range.start),
+              lt(ingestItems.item_id, range.end),
+              after ? gt(ingestItems.id, after.id) : undefined
+            )
+          )
+          .orderBy(ingestItems.id)
+          .limit(Math.min(limit, remaining))
+          .all();
+        fetchedRows += rows.length;
+        return rows;
+      },
+    })) {
+      if (fetchedRows > BRIEFING_MAX_EXCERPT_SOURCE_ROWS || row.oversized_inline === 1) {
+        return undefined;
+      }
+      if (row.item_data_r2_key || !row.item_data) continue;
+      if (row.item_data.length > BRIEFING_MAX_INLINE_BYTES) return undefined;
+      inlineBytes += encoder.encode(row.item_data).byteLength;
+      if (inlineBytes > BRIEFING_MAX_INLINE_BYTES) return undefined;
+      parts.push(JSON.parse(row.item_data));
+    }
+    return buildBriefingExcerpt(latestMessage, parts);
   }
 
   /** Builds a text excerpt for a completed assistant message from its already-ingested text parts. */
@@ -1655,173 +1746,16 @@ export class SessionIngestDO extends DurableObject<Env> {
     return true;
   }
 
-  /**
-   * The single DO alarm serves two schedules: session metrics (metricsAlarmAt) and
-   * briefing evidence retries (briefingEvidenceRetryAt). Arms it for whichever is
-   * due first, or clears it when neither is pending. Passing metricsAlarmAt records it.
-   */
   private async scheduleAlarm(metricsAlarmAt?: number): Promise<void> {
     if (metricsAlarmAt !== undefined) {
       writeIngestMetaNumber(this.db, 'metricsAlarmAt', metricsAlarmAt);
     }
-    const dueTimes = [
-      metricsAlarmAt ?? readIngestMetaNumber(this.db, 'metricsAlarmAt'),
-      readIngestMetaNumber(this.db, 'briefingEvidenceRetryAt'),
-    ].filter((at): at is number => at !== null);
-    if (dueTimes.length === 0) await this.ctx.storage.deleteAlarm();
-    else await this.ctx.storage.setAlarm(Math.min(...dueTimes));
+    const dueAt = metricsAlarmAt ?? readIngestMetaNumber(this.db, 'metricsAlarmAt');
+    if (dueAt === null) await this.ctx.storage.deleteAlarm();
+    else await this.ctx.storage.setAlarm(dueAt);
   }
 
-  /**
-   * Delivers the durable briefing evidence outbox. The backoff retry is recorded and
-   * armed before the external write, so a failure or eviction mid-flush still retries.
-   * Never throws: it runs under waitUntil and ahead of alarm metrics.
-   */
-  private async flushBriefingEvidence(kiloUserId: string, sessionId: string): Promise<void> {
-    try {
-      if (this.isDeleted()) return;
-      const pendingEvidence = this.db
-        .select()
-        .from(ingestMeta)
-        .where(sql`${ingestMeta.key} LIKE 'briefingEvidence:%'`)
-        .all();
-      if (pendingEvidence.length === 0) {
-        const retryArmed = readIngestMetaNumber(this.db, 'briefingEvidenceRetryAt') !== null;
-        this.db
-          .delete(ingestMeta)
-          .where(
-            inArray(ingestMeta.key, [
-              'briefingEvidencePending',
-              'briefingEvidenceRetryAt',
-              'briefingEvidenceRetryAttempt',
-            ])
-          )
-          .run();
-        if (retryArmed) await this.scheduleAlarm();
-        return;
-      }
-      const retryAt = readIngestMetaNumber(this.db, 'briefingEvidenceRetryAt');
-      if (retryAt !== null && retryAt > Date.now()) return;
-      if (
-        readIngestMetaNumber(this.db, 'metricsAlarmAt') === null &&
-        readIngestMetaNumber(this.db, 'briefingEvidenceRetryAt') === null
-      ) {
-        // An alarm armed before metricsAlarmAt was recorded is a pending metrics alarm.
-        const legacyMetricsAlarmAt = await this.ctx.storage.getAlarm();
-        if (this.isDeleted()) return;
-        if (legacyMetricsAlarmAt !== null) {
-          writeIngestMetaNumber(this.db, 'metricsAlarmAt', legacyMetricsAlarmAt);
-        }
-      }
-      const attempt = readIngestMetaNumber(this.db, 'briefingEvidenceRetryAttempt') ?? 0;
-      writeIngestMetaNumber(this.db, 'briefingEvidenceRetryAttempt', attempt + 1);
-      writeIngestMetaNumber(
-        this.db,
-        'briefingEvidenceRetryAt',
-        Date.now() +
-          Math.min(BRIEFING_EVIDENCE_RETRY_BASE_MS * 2 ** attempt, BRIEFING_EVIDENCE_RETRY_MAX_MS)
-      );
-      await this.scheduleAlarm();
-      if (this.isDeleted()) return;
-
-      const evidenceEvents = pendingEvidence.map<BriefingIngestEvent>(row => {
-        if (row.value === null) throw new Error('Invalid persisted briefing evidence');
-        const event: unknown = JSON.parse(row.value);
-        if (
-          typeof event !== 'object' ||
-          event === null ||
-          !('identity' in event) ||
-          typeof event.identity !== 'string' ||
-          !('occurredAt' in event) ||
-          typeof event.occurredAt !== 'string' ||
-          !Number.isFinite(Date.parse(event.occurredAt))
-        ) {
-          throw new Error('Invalid persisted briefing evidence');
-        }
-        if ('kind' in event && event.kind === 'status') {
-          if (
-            !('status' in event) ||
-            typeof event.status !== 'string' ||
-            !('previousStatus' in event) ||
-            (event.previousStatus !== null && typeof event.previousStatus !== 'string') ||
-            ('transitionId' in event &&
-              (typeof event.transitionId !== 'string' ||
-                !/^[0-7][0-9A-HJKMNP-TV-Z]{25}$/.test(event.transitionId)))
-          ) {
-            throw new Error('Invalid persisted briefing status');
-          }
-          return {
-            kind: 'status',
-            identity: event.identity,
-            occurredAt: event.occurredAt,
-            status: event.status,
-            previousStatus: event.previousStatus,
-            previousStatusKnown:
-              'previousStatusKnown' in event && event.previousStatusKnown === true,
-            ...('transitionId' in event && typeof event.transitionId === 'string'
-              ? { transitionId: event.transitionId }
-              : {}),
-          };
-        }
-        return {
-          identity: event.identity,
-          occurredAt: event.occurredAt,
-          ...('excerpt' in event && typeof event.excerpt === 'string'
-            ? { excerpt: event.excerpt }
-            : {}),
-        };
-      });
-      await persistBriefingEvidence(
-        this.env.HYPERDRIVE.connectionString,
-        kiloUserId,
-        sessionId,
-        evidenceEvents
-      );
-      if (this.isDeleted()) return;
-      this.db
-        .delete(ingestMeta)
-        .where(
-          inArray(
-            ingestMeta.key,
-            pendingEvidence.map(row => row.key)
-          )
-        )
-        .run();
-      const remaining = this.db
-        .select({ key: ingestMeta.key })
-        .from(ingestMeta)
-        .where(sql`${ingestMeta.key} LIKE 'briefingEvidence:%'`)
-        .limit(1)
-        .all();
-      const drained = remaining.length === 0;
-      this.db
-        .delete(ingestMeta)
-        .where(
-          inArray(ingestMeta.key, [
-            'briefingEvidenceRetryAt',
-            'briefingEvidenceRetryAttempt',
-            ...(drained ? (['briefingEvidencePending'] as const) : []),
-          ])
-        )
-        .run();
-      await this.scheduleAlarm();
-      if (!drained) await this.flushBriefingEvidence(kiloUserId, sessionId);
-    } catch (error) {
-      console.error('SessionIngestDO failed to flush briefing evidence', {
-        kiloUserId,
-        sessionId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-    }
-  }
-
-  /**
-   * Flushes pending briefing evidence first, then emits session metrics only once
-   * their own time is due: POST_CLOSE_DRAIN_MS after close or INACTIVITY_TIMEOUT_MS
-   * without activity. An evidence retry never emits metrics early, and metrics
-   * completion re-arms any pending retry. Reads the close reason from ingest_meta
-   * if present, otherwise falls back to 'abandoned'.
-   */
+  /** Emits session metrics after close drain or inactivity, once per turn. */
   async alarm(): Promise<void> {
     const metaRows = this.db
       .select()
@@ -1834,8 +1768,6 @@ export class SessionIngestDO extends DurableObject<Env> {
           'ingestVersion',
           'deleted',
           'metricsEmitted',
-          'briefingEvidencePending',
-          'briefingEvidenceRetryAt',
         ])
       )
       .all();
@@ -1849,18 +1781,11 @@ export class SessionIngestDO extends DurableObject<Env> {
 
     if (!kiloUserId || !sessionId) return;
 
-    if (meta['briefingEvidencePending'] === 'true') {
-      await this.flushBriefingEvidence(kiloUserId, sessionId);
-      if (this.isDeleted()) return;
-    }
-
     const metricsAlarmAt = readIngestMetaValue(this.db, 'metricsAlarmAt');
-    // Without metricsAlarmAt, only an alarm armed before it was recorded (and not an
-    // evidence retry) is a metrics alarm.
     const metricsDue =
       metricsAlarmAt !== null
         ? Number(metricsAlarmAt) <= Date.now()
-        : meta['briefingEvidenceRetryAt'] == null && meta['metricsEmitted'] !== 'true';
+        : meta['metricsEmitted'] !== 'true';
     if (!metricsDue) {
       await this.scheduleAlarm();
       return;

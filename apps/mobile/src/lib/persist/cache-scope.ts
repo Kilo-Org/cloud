@@ -5,7 +5,7 @@
  */
 
 /** Bump on any breaking change to a persisted query shape. */
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 export const READ_CACHE_SCOPE_PREFIX = 'cache:';
 

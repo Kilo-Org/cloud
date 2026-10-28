@@ -17,7 +17,6 @@ import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import { briefingSummaryStatusKey, visibleHomeBriefing } from '@/lib/agent-briefing-state';
-import { briefingMoney } from '@/lib/agent-briefing-format';
 import { cn } from '@/lib/utils';
 import { formatCalendarDate, formatNumber } from '@/lib/format';
 
@@ -25,50 +24,30 @@ export function BriefingScorecard({ report }: { readonly report: BriefingReport 
   const { t, i18n } = useTranslation();
   const rows = [
     {
-      label: t(
-        report.kind === 'one_off' ? 'agentBriefing.periodSessions' : 'agentBriefing.sessions'
-      ),
+      label: t('agentBriefing.selectedSessions'),
       amount: report.scorecard.sessions,
-      coverage: report.coverage.activity,
     },
     {
-      label: t('agentBriefing.pullRequests'),
+      label: t('agentBriefing.snapshotPullRequests'),
       amount: report.scorecard.pullRequests,
-      coverage: report.coverage.pullRequests,
     },
     {
-      label: t('agentBriefing.blockers'),
+      label: t('agentBriefing.snapshotBlockers'),
       amount: report.scorecard.blockers,
-      coverage: report.coverage.blockers,
-    },
-    {
-      label: t(report.kind === 'one_off' ? 'agentBriefing.periodSpend' : 'agentBriefing.spend'),
-      amount: report.scorecard.spendMicrodollars,
-      coverage: report.coverage.spend,
-      money: true,
     },
   ];
   return (
     <View className="gap-2 px-4 py-3">
-      {rows.map(row => {
-        const lowerBound =
-          row.coverage !== 'complete' && row.amount > 0 && row.coverage !== 'unavailable';
-        let value = t('common.unknown');
-        if (row.coverage !== 'unavailable' && (row.coverage === 'complete' || row.amount > 0)) {
-          value = row.money
-            ? briefingMoney(row.amount, i18n.language, { lowerBound })
-            : formatNumber(row.amount, i18n.language);
-        }
-        const displayValue = lowerBound ? t('agentBriefing.atLeast', { value }) : value;
-        return (
-          <View key={row.label} className="min-h-6 flex-row items-center gap-2">
-            <Text className="text-sm font-semibold text-foreground">{displayValue}</Text>
-            <Text numberOfLines={1} className="min-w-0 shrink text-sm text-muted-foreground">
-              {row.label}
-            </Text>
-          </View>
-        );
-      })}
+      {rows.map(row => (
+        <View key={row.label} className="min-h-6 flex-row items-center gap-2">
+          <Text className="text-sm font-semibold text-foreground">
+            {formatNumber(row.amount, i18n.language)}
+          </Text>
+          <Text numberOfLines={1} className="min-w-0 shrink text-sm text-muted-foreground">
+            {row.label}
+          </Text>
+        </View>
+      ))}
     </View>
   );
 }
@@ -86,7 +65,7 @@ export function useHomeBriefing() {
             now,
           })
         : undefined,
-    frameReport: isLoaded ? query.reports.find(report => report.kind !== 'one_off') : undefined,
+    frameReport: isLoaded ? query.reports[0] : undefined,
   };
 }
 
@@ -109,7 +88,6 @@ export function BriefingCard({
   const hasAiPreview = report.summary.status !== 'disabled';
   const preview = [
     offline ? t('agentBriefing.offline') : null,
-    report.revised ? t('agentBriefing.revised', { revision: report.revision }) : null,
     hasAiPreview ? aiPreview : t('agentBriefing.view'),
     hasAiPreview ? null : formatCalendarDate(report.localDate, i18n.language),
   ]

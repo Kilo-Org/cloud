@@ -75,6 +75,7 @@ describe('organization guardrails router', () => {
       enabled: false,
       scan_tool_results: false,
       detectors: createKiloDefaultEnkryptInputDetectors(),
+      invalid_saved_detectors: false,
     });
   });
 
@@ -87,15 +88,28 @@ describe('organization guardrails router', () => {
       ...config,
     });
 
-    expect(saved).toEqual(config);
+    expect(saved).toEqual({ ...config, invalid_saved_detectors: false });
     await expect(
       caller.organizations.guardrails.get({ organizationId: organization.id })
-    ).resolves.toEqual(config);
+    ).resolves.toEqual(saved);
 
     const updated = await getOrganizationById(organization.id);
     expect(updated?.settings).toEqual(
       expect.objectContaining({ data_collection: 'deny', enkrypt: { input_guardrail: config } })
     );
+  });
+
+  it('returns trimmed policy text so the saved form matches what was stored', async () => {
+    const caller = await createCallerForUser(owner.id);
+    const config = savedConfig();
+    config.detectors.policy_violation.policy_text = '  Never share customer records.  ';
+
+    const saved = await caller.organizations.guardrails.update({
+      organizationId: organization.id,
+      ...config,
+    });
+
+    expect(saved.detectors.policy_violation.policy_text).toBe('Never share customer records.');
   });
 
   it('writes a content-free audit entry', async () => {
@@ -163,7 +177,7 @@ describe('organization guardrails router', () => {
     expect(mockedIsFeatureFlagEnabled).toHaveBeenCalledWith('enkrypt-guardrails', organization.id);
   });
 
-  it('contains invalid saved detectors to the guardrail', async () => {
+  it('reports invalid saved detectors and keeps them from breaking other settings', async () => {
     const invalidOrganization = await createTestOrganization(
       'Invalid Guardrails Org',
       owner.id,
@@ -179,6 +193,7 @@ describe('organization guardrails router', () => {
       enabled: true,
       scan_tool_results: true,
       detectors: createKiloDefaultEnkryptInputDetectors(),
+      invalid_saved_detectors: true,
     });
     await expect(
       mutateOrganizationSettings(invalidOrganization.id, current => ({

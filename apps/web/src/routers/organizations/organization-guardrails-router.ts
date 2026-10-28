@@ -31,6 +31,15 @@ const OrganizationGuardrailsConfigSchema = z.object({
 
 export type OrganizationGuardrailsConfig = z.infer<typeof OrganizationGuardrailsConfigSchema>;
 
+/**
+ * `invalid_saved_detectors`: the saved detectors no longer validate, so the gateway rejects every
+ * scanned request while the guardrail is enabled. `detectors` then holds Kilo Default as a
+ * starting point for the admin to review and save.
+ */
+const OrganizationGuardrailsResponseSchema = OrganizationGuardrailsConfigSchema.extend({
+  invalid_saved_detectors: z.boolean(),
+});
+
 async function requireGuardrailsFeature(organizationId: string) {
   if (!(await isEnkryptGuardrailsFeatureEnabled(organizationId))) {
     throw new TRPCError({
@@ -71,7 +80,7 @@ export function describeGuardrailsConfig(config: OrganizationGuardrailsConfig): 
 
 export const organizationGuardrailsRouter = createTRPCRouter({
   get: organizationAdminProcedure
-    .output(OrganizationGuardrailsConfigSchema)
+    .output(OrganizationGuardrailsResponseSchema)
     .query(async ({ input }) => {
       await requireGuardrailsFeature(input.organizationId);
       const organization = await getOrganizationById(input.organizationId);
@@ -86,6 +95,7 @@ export const organizationGuardrailsRouter = createTRPCRouter({
           enabled: false,
           scan_tool_results: false,
           detectors: createKiloDefaultEnkryptInputDetectors(),
+          invalid_saved_detectors: false,
         };
       }
       const stored = readStoredEnkryptDetectors(input.organizationId, settings.data.detectors);
@@ -94,12 +104,13 @@ export const organizationGuardrailsRouter = createTRPCRouter({
         scan_tool_results: settings.data.scan_tool_results ?? true,
         detectors:
           stored.status === 'found' ? stored.detectors : createKiloDefaultEnkryptInputDetectors(),
+        invalid_saved_detectors: stored.status === 'invalid',
       };
     }),
 
   update: organizationAdminMutationProcedure
     .input(OrganizationIdInputSchema.extend(OrganizationGuardrailsConfigSchema.shape))
-    .output(OrganizationGuardrailsConfigSchema)
+    .output(OrganizationGuardrailsResponseSchema)
     .mutation(async ({ input, ctx }) => {
       const { organizationId, ...config } = input;
       await requireGuardrailsFeature(organizationId);
@@ -125,6 +136,6 @@ export const organizationGuardrailsRouter = createTRPCRouter({
           tx,
         });
       });
-      return config;
+      return { ...config, invalid_saved_detectors: false };
     }),
 });

@@ -2,10 +2,14 @@
 
 import { useId, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, ChevronDown } from 'lucide-react';
+import { AlertCircle, ChevronDown, Info } from 'lucide-react';
 import { toast } from 'sonner';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
-import { buildEnkryptDetectRequestDetectors } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
+import {
+  blockingEnkryptDetectorIds,
+  buildEnkryptDetectRequestDetectors,
+  enabledEnkryptDetectorIds,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -108,13 +112,12 @@ function GuardrailsLoader({ organizationId }: { organizationId: string }) {
       </Alert>
     );
   }
-  // Remounting on new saved content resets the form after a save or a change by another admin,
-  // but not when a background refetch returns the same configuration.
+  const { invalid_saved_detectors, ...saved } = configQuery.data;
   return (
     <GuardrailsForm
-      key={configKey(configQuery.data)}
       organizationId={organizationId}
-      saved={configQuery.data}
+      saved={saved}
+      invalidSavedDetectors={invalid_saved_detectors}
     />
   );
 }
@@ -122,22 +125,51 @@ function GuardrailsLoader({ organizationId }: { organizationId: string }) {
 function GuardrailsForm({
   organizationId,
   saved,
+  invalidSavedDetectors,
 }: {
   organizationId: string;
   saved: EnkryptGuardrailsConfig;
+  invalidSavedDetectors: boolean;
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
-  const [savedDraft] = useState(() => toDraft(saved));
+  const [savedDraft, setSavedDraft] = useState(() => toDraft(saved));
   const [draft, setDraft] = useState(savedDraft);
+  const [syncedKey, setSyncedKey] = useState(() => configKey(saved));
+  const [changedElsewhere, setChangedElsewhere] = useState(false);
   const issues = getEnkryptGuardrailsIssues(draft);
   const isDirty = !draftsEqual(draft, savedDraft);
+  const canSave = (isDirty || invalidSavedDetectors) && issues.size === 0;
   const configurationError = issues.get('detectors') ?? issues.get('');
   const firstIssue = issues.values().next().value;
+
+  // A refetch that brings a configuration saved elsewhere moves the baseline; unsaved edits are
+  // kept and flagged instead of being replaced.
+  const savedKey = configKey(saved);
+  if (savedKey !== syncedKey) {
+    const next = toDraft(saved);
+    setSyncedKey(savedKey);
+    setSavedDraft(next);
+    if (isDirty) {
+      setChangedElsewhere(true);
+    } else {
+      setDraft(next);
+    }
+  }
+
+  const resetTo = (config: EnkryptGuardrailsConfig) => {
+    const next = toDraft(config);
+    setSyncedKey(configKey(config));
+    setSavedDraft(next);
+    setDraft(next);
+    setChangedElsewhere(false);
+  };
 
   const saveMutation = useMutation(
     trpc.organizations.guardrails.update.mutationOptions({
       onSuccess: result => {
+        const { invalid_saved_detectors: _invalid, ...savedConfig } = result;
+        resetTo(savedConfig);
         queryClient.setQueryData(
           trpc.organizations.guardrails.get.queryKey({ organizationId }),
           result
@@ -161,66 +193,91 @@ function GuardrailsForm({
       className="flex max-w-4xl flex-col gap-6"
       onSubmit={event => {
         event.preventDefault();
-        if (!isDirty || issues.size > 0) return;
+        if (!canSave) return;
         saveMutation.mutate({ organizationId, ...fromDraft(draft) });
       }}
     >
-      <GuardrailsSettingsCard draft={draft} onChange={setDraft} />
-
-      {draft.enabled && (
-        <>
-          <Card>
-            <CardHeader>
-              <div className="flex flex-wrap items-start justify-between gap-4">
-                <div className="grid gap-1.5">
-                  <CardTitle>Input detectors</CardTitle>
-                  <CardDescription>
-                    Enkrypt runs the detectors you turn on against each checked input. Kilo Default
-                    blocks prompt injection and logs secrets.
-                  </CardDescription>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() =>
-                    setDraft(current => ({
-                      ...current,
-                      detectors: applyKiloDefaultPreset(current.detectors),
-                    }))
-                  }
-                >
-                  Apply Kilo Default
-                </Button>
-              </div>
-            </CardHeader>
-            <CardContent className="grid gap-4">
-              {configurationError && (
-                <p className="text-destructive text-sm" role="status">
-                  {configurationError}
-                </p>
-              )}
-              <EnkryptDetectorList
-                detectors={draft.detectors}
-                issues={issues}
-                onUpdate={updateDetector}
-              />
-            </CardContent>
-          </Card>
-
-          {isDevelopment && <RequestPreviewCard draft={draft} />}
-        </>
+      {invalidSavedDetectors && (
+        <Alert variant="destructive">
+          <AlertCircle />
+          <AlertTitle>Saved detector settings can&apos;t be read</AlertTitle>
+          <AlertDescription>
+            {saved.enabled ? 'Requests are blocked until the detectors are saved again. ' : ''}
+            Review the detectors below, which start from Kilo Default, then save.
+          </AlertDescription>
+        </Alert>
+      )}
+      {changedElsewhere && (
+        <Alert>
+          <Info />
+          <AlertTitle>These settings changed since you started editing</AlertTitle>
+          <AlertDescription>
+            Saving replaces the newer settings with yours. Discard your changes to load them.
+          </AlertDescription>
+        </Alert>
       )}
 
+      <fieldset disabled={saveMutation.isPending} className="flex flex-col gap-6">
+        <GuardrailsSettingsCard draft={draft} onChange={setDraft} />
+
+        {draft.enabled && (
+          <>
+            <Card>
+              <CardHeader>
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="grid gap-1.5">
+                    <CardTitle>Input detectors</CardTitle>
+                    <CardDescription>
+                      Enkrypt runs the detectors you turn on against each checked input. Kilo
+                      Default blocks prompt injection and logs secrets.
+                    </CardDescription>
+                  </div>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      setDraft(current => ({
+                        ...current,
+                        detectors: applyKiloDefaultPreset(current.detectors),
+                      }))
+                    }
+                  >
+                    Apply Kilo Default
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardContent className="grid gap-4">
+                {configurationError && (
+                  <p className="text-destructive text-sm" role="status">
+                    {configurationError}
+                  </p>
+                )}
+                <EnkryptDetectorList
+                  detectors={draft.detectors}
+                  issues={issues}
+                  onUpdate={updateDetector}
+                />
+              </CardContent>
+            </Card>
+
+            {isDevelopment && <RequestPreviewCard draft={draft} />}
+          </>
+        )}
+      </fieldset>
+
       <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" disabled={!isDirty || issues.size > 0 || saveMutation.isPending}>
+        <Button type="submit" disabled={!canSave || saveMutation.isPending}>
           {saveMutation.isPending ? 'Saving…' : 'Save changes'}
         </Button>
         <Button
           type="button"
           variant="outline"
           disabled={!isDirty || saveMutation.isPending}
-          onClick={() => setDraft(savedDraft)}
+          onClick={() => {
+            setDraft(savedDraft);
+            setChangedElsewhere(false);
+          }}
         >
           Discard changes
         </Button>
@@ -292,11 +349,21 @@ function GuardrailsSettingsCard({
 
 function RequestPreviewCard({ draft }: { draft: EnkryptGuardrailsDraft }) {
   const [open, setOpen] = useState(false);
+  const detectors = fromDraftDetectors(draft.detectors);
   const requestBody = JSON.stringify(
     {
       text: '<checked input>',
-      detectors: buildEnkryptDetectRequestDetectors(fromDraftDetectors(draft.detectors)),
+      detectors: buildEnkryptDetectRequestDetectors(detectors),
       user_metadata: { organization_id: '<organization ID>' },
+    },
+    null,
+    2
+  );
+  const blocking = blockingEnkryptDetectorIds(detectors);
+  const gatewayDecision = JSON.stringify(
+    {
+      blocks_when_detected: blocking,
+      logs_when_detected: enabledEnkryptDetectorIds(detectors).filter(id => !blocking.includes(id)),
     },
     null,
     2
@@ -310,7 +377,9 @@ function RequestPreviewCard({ draft }: { draft: EnkryptGuardrailsDraft }) {
             <div className="grid gap-1.5">
               <CardTitle>Request preview</CardTitle>
               <CardDescription>
-                The request the gateway sends to Enkrypt for each checked input with these settings.
+                The request the gateway sends to Enkrypt for each checked input with these settings,
+                and what the gateway does with each detection. Block or log is decided by the
+                gateway from Enkrypt&apos;s verdict, so it never appears in the Enkrypt request.
                 Shown only in development.
               </CardDescription>
             </div>
@@ -329,6 +398,10 @@ function RequestPreviewCard({ draft }: { draft: EnkryptGuardrailsDraft }) {
             </code>
             <pre className="bg-muted overflow-x-auto rounded-md p-3 font-mono text-xs">
               {requestBody}
+            </pre>
+            <code className="text-muted-foreground mt-2 font-mono text-xs">Gateway decision</code>
+            <pre className="bg-muted overflow-x-auto rounded-md p-3 font-mono text-xs">
+              {gatewayDecision}
             </pre>
           </CardContent>
         </CollapsibleContent>

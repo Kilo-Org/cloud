@@ -131,6 +131,7 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
   });
 
   it('returns hasUserByokAvailable: false for a non-Kilo-exclusive paid model with no resolvable providers', async () => {
+    mockGetUserByokProviderIds.mockResolvedValueOnce(['anthropic']);
     mockGetModelUserByokProviders.mockResolvedValueOnce([]);
 
     const result = await computeCloudAgentNextBalanceCheckEligibility({
@@ -140,7 +141,22 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
     });
 
     expect(result).toEqual({ isFree: false, hasUserByokAvailable: false });
-    expect(mockGetUserByokProviderIds).not.toHaveBeenCalled();
+    expect(mockGetModelUserByokProviders).toHaveBeenCalledWith(
+      NON_EXCLUSIVE_MODEL,
+      new Set(['anthropic'])
+    );
+  });
+
+  it('skips model provider discovery when the owner has no enabled keys', async () => {
+    const result = await computeCloudAgentNextBalanceCheckEligibility({
+      fromDb: fakeDb,
+      user: fakeUser,
+      modelId: NON_EXCLUSIVE_MODEL,
+    });
+
+    expect(result).toEqual({ isFree: false, hasUserByokAvailable: false });
+    expect(mockGetUserByokProviderIds).toHaveBeenCalledWith(fakeDb, fakeUser.id);
+    expect(mockGetModelUserByokProviders).not.toHaveBeenCalled();
   });
 
   it('uses organization BYOK providers for a non-Kilo-exclusive paid model when organizationId is provided', async () => {

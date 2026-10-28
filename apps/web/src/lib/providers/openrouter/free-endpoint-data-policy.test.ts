@@ -40,7 +40,6 @@ function freeExclusiveModel(
     max_completion_tokens: 1,
     flags: [],
     provider: OPENROUTER,
-    pricing: null,
     inference_providers,
   };
 }
@@ -50,19 +49,6 @@ function dataCollectionExclusiveModel(
   inference_providers: KiloExclusiveModel['inference_providers']
 ): KiloExclusiveModel {
   const model = freeExclusiveModel(public_id, inference_providers);
-  model.pricing = {
-    tiers: [
-      {
-        start_context_length: 0,
-        pricing: {
-          prompt_per_million: 1,
-          completion_per_million: 1,
-          input_cache_read_per_million: null,
-          input_cache_write_per_million: null,
-        },
-      },
-    ],
-  };
   model.flags = ['requires-data-collection'];
   return model;
 }
@@ -184,33 +170,6 @@ describe('applyFreeEndpointDataPolicy', () => {
 
     expect(first.endpoint?.data_policy).toEqual({ training: true, retainsPrompts: true });
     expect(second.endpoint?.data_policy).toEqual({ training: true, retainsPrompts: true });
-  });
-
-  test('ignores paid exclusive models without data collection', () => {
-    const model = offering('example/model');
-    const paid = freeExclusiveModel('example/model:discounted', []);
-    paid.pricing = {
-      tiers: [
-        {
-          start_context_length: 0,
-          pricing: {
-            prompt_per_million: 1,
-            completion_per_million: 1,
-            input_cache_read_per_million: null,
-            input_cache_write_per_million: null,
-          },
-        },
-      ],
-    };
-
-    applyFreeEndpointDataPolicy({
-      providerModelData: [{ provider: { slug: 'novita' }, models: [model] }],
-      openRouterFreeEndpoints: [],
-      kiloExclusiveModels: [paid],
-      unavailableModelIds: noUnavailableModels,
-    });
-
-    expect(model.endpoint?.data_policy).toEqual({ training: false, retainsPrompts: false });
   });
 
   test('ignores unavailable OpenRouter and exclusive free models', () => {

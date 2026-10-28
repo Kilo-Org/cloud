@@ -7,7 +7,7 @@ import {
   readVercelModelIdOverrides,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import {
-  paidStealthModelFixture,
+  kiloExclusiveModelFixture,
   useKiloExclusiveModel,
 } from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 
@@ -127,8 +127,8 @@ describe('mapModelIdToVercel', () => {
     });
 
     it('does not use internal_id for exclusives that are not vercel-routed', async () => {
-      await expect(mapModelIdToVercel(paidStealthModelFixture.public_id)).resolves.toBe(
-        paidStealthModelFixture.public_id
+      await expect(mapModelIdToVercel(kiloExclusiveModelFixture.public_id)).resolves.toBe(
+        kiloExclusiveModelFixture.public_id
       );
     });
   });

@@ -3,7 +3,7 @@ import type { StoredModel } from '@kilocode/db';
 import type { StoredModelMap } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
-  paidStealthModelFixture,
+  kiloExclusiveModelFixture,
   useKiloExclusiveModel,
 } from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 
@@ -27,7 +27,7 @@ import {
   getModelUserByokProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 
-const EXCLUSIVE_MODEL_ID = paidStealthModelFixture.public_id;
+const EXCLUSIVE_MODEL_ID = kiloExclusiveModelFixture.public_id;
 
 useKiloExclusiveModel();
 

@@ -44,7 +44,7 @@ import {
 import { getTerminalBenchSummaries } from '@kilocode/web-shared/lib/model-stats/terminal-bench';
 import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
-  paidStealthModelFixture,
+  kiloExclusiveModelFixture,
   useKiloExclusiveModel,
 } from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 import { AUTO_MODELS } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
@@ -277,8 +277,8 @@ describe('GET /api/v1/models', () => {
     '%s never serializes exclusive provider credentials',
     async (path, handler) => {
       mockAuth = { user: null, organizationId: null };
-      jest.replaceProperty(paidStealthModelFixture, 'provider', {
-        ...paidStealthModelFixture.provider,
+      jest.replaceProperty(kiloExclusiveModelFixture, 'provider', {
+        ...kiloExclusiveModelFixture.provider,
         apiKey: 'exclusive-catalog-secret',
         apiUrl: 'https://private-exclusive-provider.example/v1',
       });
@@ -288,7 +288,7 @@ describe('GET /api/v1/models', () => {
 
       const catalog = await getEnhancedOpenRouterModels({ countryCode: null });
       const publicModel = catalog.data.find(
-        model => model.id === paidStealthModelFixture.public_id
+        model => model.id === kiloExclusiveModelFixture.public_id
       );
       expect(publicModel).toBeDefined();
       expect(publicModel).not.toHaveProperty('provider');
@@ -298,7 +298,7 @@ describe('GET /api/v1/models', () => {
       const response = await handler(createTestRequest(path));
       expect(response.status).toBe(200);
       const rawBody = await response.text();
-      expect(rawBody).toContain(paidStealthModelFixture.public_id);
+      expect(rawBody).toContain(kiloExclusiveModelFixture.public_id);
       expect(rawBody).not.toContain('exclusive-catalog-secret');
       expect(rawBody).not.toContain('private-exclusive-provider.example');
       expect(rawBody).not.toContain('"apiKey"');
@@ -462,7 +462,7 @@ describe('GET /api/v1/models', () => {
   });
 
   test('enriches listed Kilo-exclusive models but not virtual catalog entries', async () => {
-    const exclusiveModel = paidStealthModelFixture;
+    const exclusiveModel = kiloExclusiveModelFixture;
     const exclusiveBenchmark = { ...enkryptBenchmark, model_name: exclusiveModel.display_name };
     jest
       .mocked(mockRows)

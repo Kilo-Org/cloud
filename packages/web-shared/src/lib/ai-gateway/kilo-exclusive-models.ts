@@ -21,7 +21,6 @@ export const gemma_4_26b_a4b_it_free_model: KiloExclusiveModel = {
   flags: ['vision', 'vercel-routing'],
   provider: OPENROUTER,
   internal_id: GEMMA_4_26B_A4B_IT_ID,
-  pricing: null,
   inference_providers: [],
 };
 
@@ -29,11 +28,6 @@ export const kiloExclusiveModels = [gemma_4_26b_a4b_it_free_model] as KiloExclus
 
 export function findKiloExclusiveModel(model: string): KiloExclusiveModel | null {
   return kiloExclusiveModels.find(m => m.public_id === model) ?? null;
-}
-
-export function isKiloExclusiveFreeModel(model: string): boolean {
-  const exclusive = findKiloExclusiveModel(model);
-  return exclusive !== null && !exclusive.pricing;
 }
 
 export function isKiloExclusiveModel(model: string): boolean {

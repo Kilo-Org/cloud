@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
 import { getCachedRoutingTable } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-table-cache';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import {
@@ -10,9 +10,15 @@ import {
   type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import {
+  getOrganizationByokProviderIds,
+  hasInferenceProviderByokForModel,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { getDirectByokCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
   candidateModelIdsFromTable,
   collectDataCollectionRequiredAutoRoutingModelIds,
   collectDeniedAutoRoutingModelIds,
+  deniedAutoRoutingCandidates,
   deniedAutoRoutingModelIdsForMember,
   deniedModelIdsForCandidates,
   policyNeedsCandidateEvaluation,
@@ -28,6 +34,15 @@ jest.mock(
     getProviderSlugsForModel: jest.fn(),
   })
 );
+jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
+  ...jest.requireActual<object>('@kilocode/web-shared/lib/ai-gateway/byok'),
+  getOrganizationByokProviderIds: jest.fn(async () => []),
+  hasInferenceProviderByokForModel: jest.fn(async () => false),
+}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
+  ...jest.requireActual<object>('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'),
+  getDirectByokCatalogModelIds: jest.fn(async () => new Set()),
+}));
 jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
   ...jest.requireActual<object>(
     '@kilocode/web-shared/lib/organizations/effective-model-access.server'
@@ -169,6 +184,72 @@ describe('collectDeniedAutoRoutingModelIds', () => {
       ).resolves.toEqual([]);
       expect(getCachedRoutingTable).toHaveBeenCalledWith('efficient');
     });
+  });
+});
+
+describe('deniedAutoRoutingCandidates with organization inference provider keys', () => {
+  const catalogModelIds: ReadonlySet<string> = new Set(['moonshotai/kimi-k2.6']);
+
+  beforeEach(() => {
+    jest.mocked(getOrganizationByokProviderIds).mockClear().mockResolvedValue(['openai']);
+    jest.mocked(getDirectByokCatalogModelIds).mockClear().mockResolvedValue(catalogModelIds);
+    jest
+      .mocked(hasInferenceProviderByokForModel)
+      .mockClear()
+      .mockImplementation(async modelId => modelId !== 'deepseek/deepseek-v4');
+    jest
+      .mocked(getProviderSlugsForModel)
+      .mockImplementation(async modelId =>
+        modelId.startsWith('anthropic/') ? new Set(['anthropic']) : new Set(['other'])
+      );
+  });
+
+  afterEach(() => {
+    jest.mocked(getOrganizationByokProviderIds).mockResolvedValue([]);
+    jest.mocked(getDirectByokCatalogModelIds).mockResolvedValue(new Set());
+    jest.mocked(hasInferenceProviderByokForModel).mockResolvedValue(false);
+  });
+
+  it('admits models outside the provider allow-list that an inference provider key serves', async () => {
+    const denied = await deniedAutoRoutingCandidates(
+      policy({
+        memberGrant: { mode: 'organization_baseline' },
+        organizationProviderCeiling: ['anthropic'],
+        organizationModelDenyList: ['openai/o3'],
+      }),
+      ['anthropic/claude', 'openai/gpt-5', 'openai/o3', 'deepseek/deepseek-v4']
+    );
+
+    expect(denied.sort()).toEqual(['deepseek/deepseek-v4', 'openai/o3']);
+    expect(jest.mocked(getOrganizationByokProviderIds).mock.calls).toEqual([[readDb, 'org-1']]);
+    expect(getDirectByokCatalogModelIds).toHaveBeenCalledWith({
+      type: 'organization',
+      id: 'org-1',
+    });
+    expect(
+      jest
+        .mocked(hasInferenceProviderByokForModel)
+        .mock.calls.map(([id]) => id)
+        .sort()
+    ).toEqual(['deepseek/deepseek-v4', 'openai/gpt-5']);
+  });
+
+  it('keeps denying models outside the member grant', async () => {
+    const denied = await deniedAutoRoutingCandidates(
+      policy({
+        memberGrant: {
+          mode: 'selected',
+          includeOrganizationBaseline: false,
+          modelAllowList: ['anthropic/claude'],
+          providerAllowList: [],
+        },
+        organizationProviderCeiling: ['anthropic'],
+      }),
+      ['anthropic/claude', 'openai/gpt-5']
+    );
+
+    expect(denied).toEqual(['openai/gpt-5']);
+    expect(getOrganizationByokProviderIds).not.toHaveBeenCalled();
   });
 });
 

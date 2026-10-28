@@ -11,10 +11,16 @@ import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway
 import { getDataCollectionRequiredModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
 import { isDataCollectionExplicitlyDisallowed } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
+  allowsInferenceProviderByok,
   getEffectiveModelDecision,
   resolveOrganizationMemberModelPolicy,
   type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import {
+  getOrganizationByokProviderIds,
+  hasInferenceProviderByokForModel,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { getDirectByokCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 
 export function policyNeedsCandidateEvaluation(policy: EffectiveOrganizationModelPolicy): boolean {
   return (
@@ -73,14 +79,40 @@ export async function deniedAutoRoutingCandidates(
 
   const uniqueCandidates = [...new Set(candidateIds.filter(id => !isVirtualAutoModelId(id)))];
   const allowed = new Set<string>();
+  const allowedForInferenceProviderByok: string[] = [];
   await Promise.all(
     uniqueCandidates.map(async modelId => {
-      if ((await getEffectiveModelDecision(policy, modelId)).allowed) {
+      const decision = await getEffectiveModelDecision(policy, modelId);
+      if (decision.allowed) {
         allowed.add(modelId);
+      } else if (allowsInferenceProviderByok(decision)) {
+        allowedForInferenceProviderByok.push(modelId);
       }
     })
   );
+  for (const modelId of await modelsServedByOrganizationInferenceProviderByok(
+    policy.customLlmGrantee.organizationId,
+    allowedForInferenceProviderByok
+  )) {
+    allowed.add(modelId);
+  }
   return deniedModelIdsForCandidates(policy, uniqueCandidates, modelId => allowed.has(modelId));
+}
+
+/** Like the organization model list, admits models the organization's inference provider keys serve. */
+async function modelsServedByOrganizationInferenceProviderByok(
+  organizationId: string,
+  modelIds: string[]
+): Promise<string[]> {
+  if (modelIds.length === 0) return [];
+  const [providerIds, catalogModelIds] = await Promise.all([
+    getOrganizationByokProviderIds(readDb, organizationId),
+    getDirectByokCatalogModelIds({ type: 'organization', id: organizationId }),
+  ]);
+  const served = await Promise.all(
+    modelIds.map(modelId => hasInferenceProviderByokForModel(modelId, providerIds, catalogModelIds))
+  );
+  return modelIds.filter((_modelId, index) => served[index]);
 }
 
 async function dataCollectionRequiredCandidates(

@@ -227,7 +227,6 @@
     "hideBalance": "Fihla ibhalansi",
     "showBalance": "Bonisa ibhalansi",
     "balanceHidden": "Ibhalansi ifihliwe",
-    "bonusCreditsExpiring": "Amakhredithi angu-{{amount}} aphelelwa yisikhathi ngo-{{date}}.",
     "signOutTitle": "Uyafuna ukuphuma ngemvume?",
     "signOutMessage": "Uzodinga ukungena futhi ukuze ufinyelele indawo yakho yokusebenza.",
     "deleteAccountTitle": "Uyafuna ukususa i-akhawunti?",
@@ -876,6 +875,18 @@
       "securityFindingsUnavailable": "Nika amandla i-ejenti yezokuphepha ye-Kilo kububanzi ukuze uthole okutholakele kwezokuphepha.",
       "spendAlertsSubtitle": "ukweqa imingcele nokukhuphuka ngehora",
       "spendAlertsToggle": "Isigaba sezexwayiso zokusebenzisa imali"
+    },
+    "history": {
+      "title": "Umlando wezaziso",
+      "subtitle": "Izaziso ezitholwe yile akhawunti",
+      "bannerBody": "Izaziso zokupush zivaliwe kule divayisi, ngakho ezintsha ngeke zifike lapha.",
+      "bannerAction": "Izilungiselelo zezaziso",
+      "emptyTitle": "Akukho izaziso okwamanje",
+      "emptyCategoryTitle": "Akukho izaziso kulesi sigaba",
+      "emptyBody": "Izaziso ezitholwa yile akhawunti zibonakala lapha. Zigcinwa izinsuku ezingama-{{days}}.",
+      "capped": "Kuboniswa izaziso zakamuva.",
+      "loadError": "Asikwazanga ukulayisha umlando wezaziso.",
+      "openFailed": "Lesi saziso asisavuleki ndawo."
     },
     "action": {
       "openSession": "Vula iseshini"
@@ -2178,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Asikwazanga ukufinyelela ikhophi — kungenzeka ukuxhumana kwayo kunqamukile.",
     "remoteSpawnNonRetryable": "Ikhophi yehlulekile ukuqala iseshini — hlola umshini noma ubuyekeze i-CLI.",
-    "remoteSpawnInstanceDisconnected": "Ukuxhumana kwekhophi ekhethiwe kunqamukile. Qala iseshini ku-Cloud Agent noma ukhethe enye ikhophi.",
-    "liveCount_one": "{{count}} BUKHOMA",
-    "liveCount_other": "{{count}} BUKHOMA"
+    "remoteSpawnInstanceDisconnected": "Ukuxhumana kwekhophi ekhethiwe kunqamukile. Qala iseshini ku-Cloud Agent noma ukhethe enye ikhophi."
   },
   "agentChat": {
     "session": {
@@ -2592,7 +2601,9 @@
       "retrying": "Kuzanywa futhi…",
       "retryDeny": "Zama ukwenqaba futhi",
       "retryAllowOnce": "Zama ukuvumela kanye futhi",
-      "retryAlwaysAllow": "Zama ukuvumela njalo futhi"
+      "retryAlwaysAllow": "Zama ukuvumela njalo futhi",
+      "unreadableTitle": "Isicelo semvume asikwazile ukufundwa",
+      "unreadableBody": "I-agent ilinde isinqumo semvume esingakwazi ukusibonisa kule app. Buyekeza i-app noma i-CLI, noma uphendule isicelo ku-CLI ukuze uqhubeke."
     },
     "questionCard": {
       "title": "Umenzeli udinga impendulo",
@@ -2984,8 +2995,9 @@
     "unavailableDevice": "Ukufaka ngezwi akutholakali kule divayisi.",
     "unavailableLanguage": "Ukufaka ngezwi akutholakali kulolu limi lwedivayisi.",
     "languageNotInstalledTitle": "Ukufaka ngezwi kwe-{{language}} akalungile okwamanje",
-    "languageNotInstalledMessage": "Amafayela okukhuluma e-offline e-{{language}} awafakwanga kule foni. Landa la mafayela, bese uzame futhi ukufaka ngezwi.",
+    "languageNotInstalledMessage": "Amafayela okukhuluma e-offline e-{{language}} awafakiwe, futhi ukuguqulwa kwezwi libe umbhalo nge-inthanethi kucishiwe. Faka lamafayela noma uvule kabusha ukuguqulwa nge-inthanethi ukuze ukwazi ukusebenzisa ukufaka ngezwi.",
     "downloadOfflineModel": "Landa",
+    "useOnlineTranscription": "Vumela ukucutshungulwa nge-inthanethi",
     "offlineModelDownloadScheduled": "Amafayela okukhuluma e-offline azolandwa ngemuva. Zama futhi ukufaka ngezwi kamuva.",
     "listeningStopped": "Ukulalela kumisiwe.",
     "transcribing": "Kuguqulwa ibe umbhalo...",
@@ -3159,7 +3171,7 @@
     "creditActivity": {
       "emptyDescription": "Ukuthengwa, ukusetshenziswa nokulungiswa kwamakhredithi ale nhlangano kuzovela lapha njengoba kwenzeka.",
       "emptyTitle": "Akukho mnyakazo wamakhredithi",
-      "expires": "Aphelelwa yisikhathi: {{date}}",
+      "expiresUtc": "Aphelelwa yisikhathi: {{date}} (UTC)",
       "title": "Umnyakazo wamakhredithi",
       "transactionFallback": "Ukuthengiselana ngamakhredithi",
       "category": {
@@ -3840,6 +3852,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Amanani aboniswa njenge-•••• agcina imfihlo yawo egciniwe; shintsha inani ukuze imfihlo ishintshwe. Ukushintsha umugqa womyalo kudinga wonke amanani kabusha",
+      "headersHint": "Amanani aboniswa njenge-•••• agcina imfihlo yawo egciniwe; shintsha inani ukuze imfihlo ishintshwe. Ukushintsha i-URL kudinga wonke amanani kabusha",
       "nameRequired": "Faka igama leseva",
       "nameInvalid": "Igama lingasebenzisa kuphela izinhlamvu ze-ASCII, izinombolo, ama-underscore, namadeshi, kufike ezinhlamvini ezingu-100",
       "commandRequired": "Faka umyalo",
@@ -3938,6 +3952,10 @@
   "credits": {
     "title": "Thenga amakhredithi",
     "description": "Amakhredithi ukuthenga kwesikhathi esisodwa okwengezwa kubhalansi yakho ye-Kilo ukuze usebenzise amaseshini okubhala ikhodi e-AI ku-Kilo App. Isitolo sikhokhisa i-akhawunti yakho futhi amakhredithi engezwa ngemva kokuba isitolo siqinisekise inkokhelo.",
+    "nextExpiry": "Amakhredithi angu-{{amount}} aphelelwa yisikhathi ngo-{{date}} (UTC). Amakhredithi aphelelwa yisikhathi kuqala asetshenziswa kuqala.",
+    "appStoreExpiry": "Amakhredithi athengwe nge-App Store awaphelelwa yisikhathi.",
+    "playOneYearExpiry": "La makhredithi aphelelwa yisikhathi ngemuva konyaka owodwa wekhalenda kusukela ekuthengeni.",
+    "playNonexpiring": "La makhredithi awaphelelwa yisikhathi.",
     "packLabel": "Engeza amakhredithi angu-{{amount}}",
     "priceUnavailable": "Intengo ayitholakali",
     "purchased": "Amakhredithi engeziwe kubhalansi yakho.",
@@ -4076,6 +4094,10 @@
     "generate": "Khiqiza isifinyezo",
     "retrySummary": "Zama futhi isifinyezo esikhokhelwayo",
     "sources": "Ubufakazi nemikhiqizo",
+    "sessionsShown_one": "Kuboniswa {{shown}} eseshinini engu-{{total}}",
+    "sessionsShown_other": "Kuboniswa {{shown}} emaseshinini angu-{{total}}",
+    "itemsShown_one": "Kuboniswa {{shown}} entweni engu-{{total}}",
+    "itemsShown_other": "Kuboniswa {{shown}} ezintweni ezingu-{{total}}",
     "timezone": "Izoni yesikhathi yombiko",
     "deviceTimezone": "Sebenzisa izoni yesikhathi yedivayisi",
     "timezoneHint": "Izoni yesikhathi ye-IANA, isibonelo Europe/Berlin. Izinguquko zohlelo zisebenza emibikweni ezayo.",

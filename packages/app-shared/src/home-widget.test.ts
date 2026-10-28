@@ -165,6 +165,21 @@ describe('Home-only widget policy', () => {
     }
   });
 
+  it('preserves a joined emoji at the title limit', () => {
+    const family = '👨‍👩‍👧';
+    const fits = 'a'.repeat(HOME_WIDGET_TITLE_LIMIT - 8);
+    const overflows = 'a'.repeat(HOME_WIDGET_TITLE_LIMIT - 7);
+    const fitting = buildHomeWidgetDetails([
+      { status: 'permission', title: `${fits}${family}next` },
+    ]);
+    expect(fitting.primaryTitle).toBe(`${fits}${family}`);
+    const overflowing = buildHomeWidgetDetails([
+      { status: 'permission', title: `${overflows}${family}next` },
+    ]);
+    expect(overflowing.primaryTitle).toBe(overflows);
+    expect(overflowing.waitingAgents[0]?.title).toBe(overflows);
+  });
+
   it('uses one priority and excludes every zero-count secondary row', () => {
     const data = buildHomeWidgetData({
       ...scope,

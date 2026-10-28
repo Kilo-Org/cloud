@@ -227,7 +227,6 @@
     "hideBalance": "Dölj saldo",
     "showBalance": "Visa saldo",
     "balanceHidden": "Saldo dolt",
-    "bonusCreditsExpiring": "{{amount}} i krediter går ut {{date}}.",
     "signOutTitle": "Logga ut?",
     "signOutMessage": "Du måste logga in igen för att komma åt din arbetsyta.",
     "deleteAccountTitle": "Ta bort konto?",
@@ -876,6 +875,18 @@
       "securityFindingsUnavailable": "Aktivera Kilo-säkerhetsagenten i en omfattning för att få säkerhetsfynd.",
       "spendAlertsSubtitle": "gränsöverskridanden och toppar per timme",
       "spendAlertsToggle": "Kategorin utgiftsvarningar"
+    },
+    "history": {
+      "title": "Aviseringshistorik",
+      "subtitle": "Aviseringar som det här kontot har tagit emot",
+      "bannerBody": "Push-aviseringar är avstängda för den här enheten, så nya aviseringar kommer inte fram hit.",
+      "bannerAction": "Aviseringsinställningar",
+      "emptyTitle": "Inga aviseringar än",
+      "emptyCategoryTitle": "Inga aviseringar i den här kategorin",
+      "emptyBody": "Aviseringar som det här kontot tar emot visas här. De sparas i {{days}} dagar.",
+      "capped": "Visar de senaste aviseringarna.",
+      "loadError": "Kunde inte läsa in aviseringshistoriken.",
+      "openFailed": "Den här aviseringen öppnas inte längre någonstans."
     },
     "action": {
       "openSession": "Öppna session"
@@ -2178,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Kunde inte nå instansen – den kan ha kopplats från.",
     "remoteSpawnNonRetryable": "Instansen kunde inte starta sessionen. Kontrollera datorn eller uppdatera CLI-verktyget.",
-    "remoteSpawnInstanceDisconnected": "Den valda instansen kopplades från. Starta en session med Cloud Agent eller välj en annan instans.",
-    "liveCount_one": "{{count}} I REALTID",
-    "liveCount_other": "{{count}} I REALTID"
+    "remoteSpawnInstanceDisconnected": "Den valda instansen kopplades från. Starta en session med Cloud Agent eller välj en annan instans."
   },
   "agentChat": {
     "session": {
@@ -2592,7 +2601,9 @@
       "retrying": "Försöker igen…",
       "retryDeny": "Försök neka igen",
       "retryAllowOnce": "Försök tillåta en gång igen",
-      "retryAlwaysAllow": "Försök tillåta alltid igen"
+      "retryAlwaysAllow": "Försök tillåta alltid igen",
+      "unreadableTitle": "Behörighetsförfrågan kunde inte läsas",
+      "unreadableBody": "Agenten väntar på ett beslut om behörighet som den här appen inte kan visa. Uppdatera appen eller CLI, eller svara på förfrågan i CLI för att fortsätta."
     },
     "questionCard": {
       "title": "Agenten behöver inmatning",
@@ -2984,8 +2995,9 @@
     "unavailableDevice": "Röstinmatning är inte tillgänglig på den här enheten.",
     "unavailableLanguage": "Röstinmatning stöds inte för det språk som är valt på den enheten. Installera språkets inbyggda talfiler eller använd ett annat app-språk.",
     "languageNotInstalledTitle": "Röstinmatning för {{language}} är inte klar ännu",
-    "languageNotInstalledMessage": "De offlinebaserade talfilerna för {{language}} är inte installerade på den här telefonen. Ladda ned dem och prova röstinmatning igen.",
+    "languageNotInstalledMessage": "De offlinebaserade talfilerna för {{language}} är inte installerade och onlinetranskribering är avstängd. Ladda ned filerna eller slå på onlinetranskribering igen för att kunna använda röstinmatning.",
     "downloadOfflineModel": "Ladda ned",
+    "useOnlineTranscription": "Tillåt onlinetranskribering",
     "offlineModelDownloadScheduled": "De offlinebaserade talfilerna laddas ned i bakgrunden. Prova röstinmatning igen senare.",
     "listeningStopped": "Lyssningen stoppades.",
     "transcribing": "Transkriberar…",
@@ -3158,9 +3170,9 @@
     },
     "creditActivity": {
       "emptyDescription": "Här visas organisationens köp, användning och kreditjusteringar efter hand.",
-      "emptyTitle": "Ingen kreditaktivitet",
-      "expires": "Går ut {{date}}",
-      "title": "Kreditaktivitet",
+      "emptyTitle": "Inga kredittransaktioner",
+      "expiresUtc": "Går ut {{date}} (UTC)",
+      "title": "Kredithistorik",
       "transactionFallback": "Kredittransaktion",
       "category": {
         "organization_custom": "Organisationsanpassad",
@@ -3840,6 +3852,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Värden som visas som •••• behåller sin lagrade hemlighet; ersätt ett värde för att rotera det. Om kommandoraden ändras krävs alla värden igen",
+      "headersHint": "Värden som visas som •••• behåller sin lagrade hemlighet; ersätt ett värde för att rotera det. Om URL:en ändras krävs alla värden igen",
       "nameRequired": "Ange ett servernamn",
       "nameInvalid": "Namn kan endast använda ASCII-bokstäver, siffror, understreck och bindestreck, upp till 100 tecken",
       "commandRequired": "Ange ett kommando",
@@ -3938,6 +3952,10 @@
   "credits": {
     "title": "Köp krediter",
     "description": "Krediter är ett engångsköp som läggs till på ditt Kilo-saldo för att köra AI-kodningssessioner i Kilo-appen. Butiken debiterar ditt konto och krediterna läggs till efter att butiken bekräftar betalningen.",
+    "nextExpiry": "{{amount}} i krediter går ut {{date}} (UTC). Krediter som går ut först används först.",
+    "appStoreExpiry": "Krediter som köpts via App Store går inte ut.",
+    "playOneYearExpiry": "Dessa krediter går ut ett kalenderår efter köpet.",
+    "playNonexpiring": "Dessa krediter går inte ut.",
     "packLabel": "Lägg till {{amount}} i krediter",
     "priceUnavailable": "Priset är inte tillgängligt",
     "purchased": "Krediter har lagts till på ditt saldo.",
@@ -4076,6 +4094,10 @@
     "generate": "Skapa sammanfattning",
     "retrySummary": "Försök igen med betald sammanfattning",
     "sources": "Underlag och artefakter",
+    "sessionsShown_one": "Visar {{shown}} av {{total}} session",
+    "sessionsShown_other": "Visar {{shown}} av {{total}} sessioner",
+    "itemsShown_one": "Visar {{shown}} av {{total}} post",
+    "itemsShown_other": "Visar {{shown}} av {{total}} poster",
     "timezone": "Tidszon för rapport",
     "deviceTimezone": "Använd enhetens tidszon",
     "timezoneHint": "IANA-tidszon, till exempel Europe/Berlin. Schemaändringar gäller kommande rapporter.",

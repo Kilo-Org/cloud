@@ -227,7 +227,6 @@
     "hideBalance": "Skrýt zůstatek",
     "showBalance": "Zobrazit zůstatek",
     "balanceHidden": "Zůstatek je skrytý",
-    "bonusCreditsExpiring": "Platnost kreditů v hodnotě {{amount}} vyprší {{date}}.",
     "signOutTitle": "Odhlásit se?",
     "signOutMessage": "Pro přístup do pracovního prostoru se budeš muset znovu přihlásit.",
     "deleteAccountTitle": "Smazat účet?",
@@ -914,6 +913,18 @@
       "securityFindingsUnavailable": "Zapněte Bezpečnostního agenta Kilo v rozsahu, abyste získali bezpečnostní nálezy.",
       "spendAlertsSubtitle": "překročení prahů a hodinové špičky",
       "spendAlertsToggle": "Kategorie upozornění na útratu"
+    },
+    "history": {
+      "title": "Historie oznámení",
+      "subtitle": "Oznámení, která tento účet obdržel",
+      "bannerBody": "Push oznámení jsou pro toto zařízení vypnutá, takže nová sem nebudou přicházet.",
+      "bannerAction": "Nastavení oznámení",
+      "emptyTitle": "Zatím žádná oznámení",
+      "emptyCategoryTitle": "V této kategorii nejsou žádná oznámení",
+      "emptyBody": "Oznámení, která tento účet obdrží, se zobrazují zde. Uchovávají se {{days}} dní.",
+      "capped": "Zobrazují se nejnovější oznámení.",
+      "loadError": "Historii oznámení se nepodařilo načíst.",
+      "openFailed": "Toto oznámení se už nikde neotevře."
     },
     "action": {
       "openSession": "Otevřít relaci"
@@ -2240,11 +2251,7 @@
     },
     "remoteSpawnRetryable": "K instanci se nepodařilo připojit. Možná se odpojila.",
     "remoteSpawnNonRetryable": "Instance nedokázala spustit relaci. Zkontroluj počítač nebo aktualizuj CLI.",
-    "remoteSpawnInstanceDisconnected": "Vybraná instance se odpojila. Spusť relaci ve službě Cloud Agent nebo vyber jinou instanci.",
-    "liveCount_one": "{{count}} ŽIVĚ",
-    "liveCount_other": "{{count}} ŽIVĚ",
-    "liveCount_few": "BĚŽÍ: {{count}}",
-    "liveCount_many": "BĚŽÍ: {{count}}"
+    "remoteSpawnInstanceDisconnected": "Vybraná instance se odpojila. Spusť relaci ve službě Cloud Agent nebo vyber jinou instanci."
   },
   "agentChat": {
     "session": {
@@ -2664,7 +2671,9 @@
       "retrying": "Opakování…",
       "retryDeny": "Zamítnout znovu",
       "retryAllowOnce": "Povolit jen tentokrát znovu",
-      "retryAlwaysAllow": "Vždy povolit znovu"
+      "retryAlwaysAllow": "Vždy povolit znovu",
+      "unreadableTitle": "Požadavek na oprávnění nelze načíst",
+      "unreadableBody": "Agent čeká na rozhodnutí o oprávnění, které tato aplikace nedokáže zobrazit. Aktualizujte aplikaci nebo CLI, případně odpovězte na žádost v CLI a pokračujte."
     },
     "questionCard": {
       "title": "Agent potřebuje odpověď",
@@ -3070,8 +3079,9 @@
     "unavailableDevice": "Diktování není na tomto zařízení k dispozici.",
     "unavailableLanguage": "Diktování není pro aktuální jazyk zařízení k dispozici.",
     "languageNotInstalledTitle": "Diktování pro jazyk {{language}} zatím není připraveno",
-    "languageNotInstalledMessage": "Offline soubory řeči pro {{language}} nejsou v tomto telefonu nainstalovány. Stáhněte je a poté zkuste diktování znovu.",
+    "languageNotInstalledMessage": "Offline soubory řeči pro {{language}} nejsou nainstalované a online přepis je vypnutý. Stáhněte si soubory nebo online přepis znovu zapněte, aby fungovalo hlasové zadávání.",
     "downloadOfflineModel": "Stáhnout",
+    "useOnlineTranscription": "Povolit online přepis",
     "offlineModelDownloadScheduled": "Offline soubory řeči se stáhnou na pozadí. Zkuste diktování znovu později.",
     "listeningStopped": "Poslech zastaven.",
     "transcribing": "Přepisuji…",
@@ -3247,7 +3257,7 @@
     "creditActivity": {
       "emptyDescription": "Zde se budou průběžně zobrazovat nákupy, čerpání a úpravy kreditů této organizace.",
       "emptyTitle": "Žádné pohyby kreditů",
-      "expires": "Platnost do {{date}}",
+      "expiresUtc": "Platnost do {{date}} (UTC)",
       "title": "Pohyby kreditů",
       "transactionFallback": "Transakce s kredity",
       "category": {
@@ -3942,6 +3952,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Hodnoty zobrazené jako •••• si ponechávají své uložené tajemství; nahrazením hodnoty ji obměníte. Změna příkazového řádku vyžaduje znovu všechny hodnoty",
+      "headersHint": "Hodnoty zobrazené jako •••• si ponechávají své uložené tajemství; nahrazením hodnoty ji obměníte. Změna URL vyžaduje znovu všechny hodnoty",
       "nameRequired": "Zadejte název serveru",
       "nameInvalid": "Název může používat pouze písmena ASCII, číslice, podtržítka a pomlčky, maximálně 100 znaků",
       "commandRequired": "Zadejte příkaz",
@@ -4040,6 +4052,10 @@
   "credits": {
     "title": "Koupit kredity",
     "description": "Kredity jsou jednorázový nákup přidaný do vašeho zůstatku Kilo pro spouštění AI programovacích relací v aplikaci Kilo. Obchod vám strhne platbu z účtu a kredity se přidají po potvrzení platby obchodem.",
+    "nextExpiry": "Platnost kreditů v hodnotě {{amount}} vyprší {{date}} (UTC). Nejdříve se čerpají kredity s nejbližším datem vypršení.",
+    "appStoreExpiry": "Kredity zakoupené přes App Store nevyprší.",
+    "playOneYearExpiry": "Platnost těchto kreditů vyprší jeden kalendářní rok po nákupu.",
+    "playNonexpiring": "Platnost těchto kreditů nevyprší.",
     "packLabel": "Přidat {{amount}} v kreditech",
     "priceUnavailable": "Cena není k dispozici",
     "purchased": "Kredity byly přidány do vašeho zůstatku.",
@@ -4186,6 +4202,14 @@
     "generate": "Vytvořit shrnutí",
     "retrySummary": "Zopakovat placené shrnutí",
     "sources": "Důkazy a artefakty",
+    "sessionsShown_one": "Zobrazeno {{shown}} z {{total}} relace",
+    "sessionsShown_few": "Zobrazeno {{shown}} z {{total}} relací",
+    "sessionsShown_many": "Zobrazeno {{shown}} z {{total}} relace",
+    "sessionsShown_other": "Zobrazeno {{shown}} z {{total}} relací",
+    "itemsShown_one": "Zobrazeno {{shown}} z {{total}} položky",
+    "itemsShown_few": "Zobrazeno {{shown}} z {{total}} položek",
+    "itemsShown_many": "Zobrazeno {{shown}} z {{total}} položky",
+    "itemsShown_other": "Zobrazeno {{shown}} z {{total}} položek",
     "timezone": "Časové pásmo přehledu",
     "deviceTimezone": "Použít časové pásmo zařízení",
     "timezoneHint": "Časové pásmo IANA, například Europe/Berlin. Změny plánu platí pro další přehledy.",

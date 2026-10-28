@@ -227,7 +227,6 @@
     "hideBalance": "Ascunde soldul",
     "showBalance": "Afișează soldul",
     "balanceHidden": "Sold ascuns",
-    "bonusCreditsExpiring": "Creditele în valoare de {{amount}} expiră la {{date}}.",
     "signOutTitle": "Te deconectezi?",
     "signOutMessage": "Va trebui să te autentifici din nou pentru a accesa spațiul tău de lucru.",
     "deleteAccountTitle": "Ștergi contul?",
@@ -895,6 +894,18 @@
       "securityFindingsUnavailable": "Activează Agentul de securitate Kilo într-un domeniu pentru a primi constatări de securitate.",
       "spendAlertsSubtitle": "depășiri de praguri și vârfuri orare",
       "spendAlertsToggle": "Categoria alerte de cheltuieli"
+    },
+    "history": {
+      "title": "Istoric notificări",
+      "subtitle": "Notificările primite de acest cont",
+      "bannerBody": "Notificările push sunt dezactivate pentru acest dispozitiv, așa că cele noi nu vor ajunge aici.",
+      "bannerAction": "Setări notificări",
+      "emptyTitle": "Nicio notificare încă",
+      "emptyCategoryTitle": "Nicio notificare în această categorie",
+      "emptyBody": "Notificările primite de acest cont apar aici. Acestea se păstrează pentru {{days}} zile.",
+      "capped": "Se afișează cele mai recente notificări.",
+      "loadError": "Nu s-a putut încărca istoricul notificărilor.",
+      "openFailed": "Această notificare nu se mai deschide nicăieri."
     },
     "action": {
       "openSession": "Deschide sesiunea"
@@ -2209,10 +2220,7 @@
     },
     "remoteSpawnRetryable": "Nu s-a putut stabili conexiunea cu instanța — este posibil să se fi deconectat.",
     "remoteSpawnNonRetryable": "Instanța nu a reușit să pornească sesiunea — verifică sistemul sau actualizează CLI-ul.",
-    "remoteSpawnInstanceDisconnected": "Instanța selectată s-a deconectat. Pornește o sesiune pe Cloud Agent sau alege altă instanță.",
-    "liveCount_one": "{{count}} ÎN TIMP REAL",
-    "liveCount_other": "{{count}} ÎN TIMP REAL",
-    "liveCount_few": "{{count}} ACTIVE"
+    "remoteSpawnInstanceDisconnected": "Instanța selectată s-a deconectat. Pornește o sesiune pe Cloud Agent sau alege altă instanță."
   },
   "agentChat": {
     "session": {
@@ -2628,7 +2636,9 @@
       "retrying": "Se reîncearcă…",
       "retryDeny": "Încearcă din nou să refuzi",
       "retryAllowOnce": "Încearcă din nou să permiți o singură dată",
-      "retryAlwaysAllow": "Încearcă din nou să permiți întotdeauna"
+      "retryAlwaysAllow": "Încearcă din nou să permiți întotdeauna",
+      "unreadableTitle": "Cererea de permisiune nu a putut fi citită",
+      "unreadableBody": "Agentul așteaptă o decizie de permisiune pe care această aplicație nu o poate afișa. Actualizează aplicația sau CLI-ul, ori răspunde la cerere în CLI pentru a continua."
     },
     "questionCard": {
       "title": "Răspuns necesar pentru agent",
@@ -3027,8 +3037,9 @@
     "unavailableDevice": "Dictarea nu este disponibilă pe acest dispozitiv.",
     "unavailableLanguage": "Dictarea nu este disponibilă pentru limba dispozitivului.",
     "languageNotInstalledTitle": "Dictarea pentru {{language}} nu este încă gata",
-    "languageNotInstalledMessage": "Fișierele vocale offline pentru {{language}} nu sunt instalate pe acest telefon. Descarcă-le, apoi încearcă dictarea din nou.",
+    "languageNotInstalledMessage": "Fișierele vocale offline pentru {{language}} nu sunt instalate, iar transcrierea online este dezactivată. Pentru a folosi introducerea vocală, descarcă fișierele sau activează din nou transcrierea online.",
     "downloadOfflineModel": "Descarcă",
+    "useOnlineTranscription": "Permite transcrierea online",
     "offlineModelDownloadScheduled": "Fișierele vocale offline se vor descărca în fundal. Încearcă dictarea din nou mai târziu.",
     "listeningStopped": "Ascultarea s-a oprit.",
     "transcribing": "Se transcrie…",
@@ -3203,7 +3214,7 @@
     "creditActivity": {
       "emptyDescription": "Achizițiile, consumul și ajustările de credite ale acestei organizații vor apărea aici pe măsură ce au loc.",
       "emptyTitle": "Nicio operațiune cu credite",
-      "expires": "Expiră la {{date}}",
+      "expiresUtc": "Expiră la {{date}} (UTC)",
       "title": "Istoricul creditelor",
       "transactionFallback": "Tranzacție cu credite",
       "category": {
@@ -3891,6 +3902,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Valorile afișate ca •••• își păstrează secretul stocat; înlocuiți o valoare pentru a o rota. Modificarea liniei de comandă necesită din nou toate valorile",
+      "headersHint": "Valorile afișate ca •••• își păstrează secretul stocat; înlocuiți o valoare pentru a o rota. Modificarea URL-ului necesită din nou toate valorile",
       "nameRequired": "Introduceți un nume de server",
       "nameInvalid": "Numele poate folosi numai litere ASCII, cifre, litere de subliniere și liniuțe, până la 100 de caractere",
       "commandRequired": "Introduceți o comandă",
@@ -3989,6 +4002,10 @@
   "credits": {
     "title": "Cumpără credite",
     "description": "Creditele sunt o achiziție unică adăugată la soldul tău Kilo pentru rularea sesiunilor de codare AI în Kilo App. Magazinul îți debitează contul, iar creditele sunt adăugate după ce magazinul confirmă plata.",
+    "nextExpiry": "Creditele în valoare de {{amount}} expiră la {{date}} (UTC). Creditele cu cea mai apropiată dată de expirare sunt folosite primele.",
+    "appStoreExpiry": "Creditele cumpărate prin App Store nu expiră.",
+    "playOneYearExpiry": "Aceste credite expiră la un an calendaristic după achiziție.",
+    "playNonexpiring": "Aceste credite nu expiră.",
     "packLabel": "Adaugă {{amount}} în credite",
     "priceUnavailable": "Preț indisponibil",
     "purchased": "Creditele au fost adăugate la soldul tău.",
@@ -4131,6 +4148,12 @@
     "generate": "Generează rezumatul",
     "retrySummary": "Reîncearcă rezumatul plătit",
     "sources": "Dovezi și artefacte",
+    "sessionsShown_one": "Se afișează {{shown}} din {{total}} sesiune",
+    "sessionsShown_few": "Se afișează {{shown}} din {{total}} sesiuni",
+    "sessionsShown_other": "Se afișează {{shown}} din {{total}} de sesiuni",
+    "itemsShown_one": "Se afișează {{shown}} din {{total}} element",
+    "itemsShown_few": "Se afișează {{shown}} din {{total}} elemente",
+    "itemsShown_other": "Se afișează {{shown}} din {{total}} de elemente",
     "timezone": "Fusul orar al raportului",
     "deviceTimezone": "Folosește fusul orar al dispozitivului",
     "timezoneHint": "Fus orar IANA, de exemplu Europe/Berlin. Modificările programului se aplică rapoartelor viitoare.",

@@ -83,6 +83,7 @@ import { organizationKiloPassRouter } from '@/routers/organizations/organization
 import { organizationGroupsRouter } from '@/routers/organizations/organization-groups-router';
 import { organizationSubOrganizationsRouter } from '@/routers/organizations/organization-sub-organizations-router';
 import { organizationSalesDemoRouter } from '@/routers/organizations/organization-sales-demo-router';
+import { organizationGuardrailsRouter } from '@/routers/organizations/organization-guardrails-router';
 import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
 import { createChildOrganization } from '@/lib/organizations/organization-hierarchy';
 
@@ -157,6 +158,7 @@ export const organizationsRouter = createTRPCRouter({
   groups: organizationGroupsRouter,
   subOrganizations: organizationSubOrganizationsRouter,
   salesDemo: organizationSalesDemoRouter,
+  guardrails: organizationGuardrailsRouter,
 
   list: baseProcedure.query(async opts => {
     const { user } = opts.ctx;
@@ -265,18 +267,8 @@ export const organizationsRouter = createTRPCRouter({
         organization.next_credit_expiration_at &&
         new Date() >= new Date(organization.next_credit_expiration_at)
       ) {
-        const expiryResult = await processOrganizationExpirations(
-          {
-            id: input.organizationId,
-            microdollars_used: organization.microdollars_used,
-            next_credit_expiration_at: organization.next_credit_expiration_at,
-            total_microdollars_acquired: organization.total_microdollars_acquired,
-          },
-          new Date()
-        );
-        if (expiryResult) {
-          organization = (await getOrganizationById(input.organizationId)) ?? organization;
-        }
+        const expiryResult = await processOrganizationExpirations(input.organizationId, new Date());
+        organization = { ...organization, ...expiryResult };
       }
 
       return {
@@ -320,18 +312,12 @@ export const organizationsRouter = createTRPCRouter({
         organization.next_credit_expiration_at &&
         new Date() >= new Date(organization.next_credit_expiration_at)
       ) {
-        const expiryResult = await processOrganizationExpirations(
-          {
-            id: organizationId,
-            microdollars_used: organization.microdollars_used,
-            next_credit_expiration_at: organization.next_credit_expiration_at,
-            total_microdollars_acquired: organization.total_microdollars_acquired,
-          },
-          new Date()
-        );
-        if (expiryResult) {
-          organization = (await getOrganizationById(organizationId)) ?? organization;
+        await processOrganizationExpirations(organizationId, new Date());
+        const refreshedOrganization = await getOrganizationById(organizationId);
+        if (!refreshedOrganization) {
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
         }
+        organization = refreshedOrganization;
       }
 
       const [members, ssoPolicy, childOrganizations] = await Promise.all([

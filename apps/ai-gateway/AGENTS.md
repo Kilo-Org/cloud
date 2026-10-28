@@ -2,7 +2,7 @@
 
 Next.js app that serves the AI gateway API on its own. It deploys to the
 `kilocode-ai-gateway` Vercel project, whose functions run in `fra1` and `sfo1`
-(`vercel.json`), at `ai-gateway.kilo.ai` and `staging-ai-gateway.kilo.ai`.
+(`vercel.mjs`), at `ai-gateway.kilo.ai` and `staging-ai-gateway.kilo.ai`.
 
 This app is the only server of the gateway API. `apps/web` has no gateway routes;
 it rewrites its legacy gateway paths here (`apps/web/ai-gateway-rewrites.mjs`) in
@@ -34,7 +34,7 @@ through those paths and that no `apps/web` route is shadowed by a rewrite.
   app with the web apps, from the same CI-green commit, after migrations. A
   release is only recorded as complete once the gateway is live too.
   `redeploy-web.yml` does not touch this app. Crons stay on the web app; do not
-  add them to this app's `vercel.json`.
+  add them to this app's `vercel.mjs`.
 - Server-side Sentry and OpenTelemetry come from
   `packages/web-shared/src/lib/observability`, registered in
   `src/instrumentation.ts` with the `kilocode-ai-gateway` service name. The app

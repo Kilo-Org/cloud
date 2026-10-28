@@ -3,10 +3,16 @@ import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/org
 import { getOpenRouterModelsMetadataFromDatabase } from './providers/gateway-models-cache';
 import { getRawOpenRouterModels, pickerModelPricing } from './providers/openrouter';
 import { getPreferredProviderOrderConfig } from './providers/preferred-provider-order-config';
-import { enforceRequestCostLimit as enforceRequestCostLimitDecision } from './request-cost-limit';
+import {
+  enforceRequestCostLimit as enforceRequestCostLimitDecision,
+  SYSTEM_ONE_MAX_OUTPUT_TOKENS,
+  systemOneRequestCostBound,
+} from './request-cost-limit';
+import { SYSTEM_ONE_MAX_QUESTIONS, SYSTEM_ONE_MAX_STATE_BYTES } from './typesafe/schemas';
 import { addCacheBreakpoints } from './providers/openrouter/request-helpers';
 import type { GatewayRequest } from './providers/openrouter/types';
 import { getVercelModelIdOverrides } from './providers/vercel/mapModelIdToVercel';
+import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
 
 jest.mock('./providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(),
@@ -173,13 +179,27 @@ describe('request cost admission', () => {
   it('admits a free model on a managed provider without a route price cap', async () => {
     const decision = await enforceRequestCostLimitDecision(
       '2000000',
-      'stealth/glyph-cluster',
+      'google/gemma-4-26b-a4b-it:free',
       body,
       2_000_000,
       { id: 'vercel', userFunded: false }
     );
 
     expect(decision).toEqual({ refusal: null, providerConfig: null });
+  });
+  it('caps a free OpenRouter-served model at zero route prices', async () => {
+    const decision = await enforceRequestCostLimitDecision(
+      '2000000',
+      'google/gemma-4-26b-a4b-it:free',
+      body,
+      2_000_000,
+      { id: 'openrouter', userFunded: false }
+    );
+
+    expect(decision).toEqual({
+      refusal: null,
+      providerConfig: { max_price: { prompt: 0, completion: 0, request: 0 } },
+    });
   });
   it('caps provider prices while preserving provider exclusions and organization allow-lists', async () => {
     const provider = {
@@ -500,5 +520,141 @@ describe('request cost admission', () => {
   });
   it('does not alter ordinary gateway requests without a spending safeguard', async () => {
     await expect(enforceRequestCostLimit(null, model.id, {}, 0)).resolves.toBeNull();
+  });
+});
+
+describe('System One request cost bound', () => {
+  const jev: StoredModel = {
+    id: 'typesafe/jev-1.13',
+    name: 'TypeSafe: Jev 1.13',
+    endpoints: [{ pricing: { prompt: '0.000000042', completion: '0' } }],
+  };
+  const questions = { relevant: { type: 'noul' as const } };
+
+  function boundOf(
+    metadata: StoredModel,
+    state: unknown,
+    askedQuestions: Record<string, unknown> = questions
+  ): number {
+    const bound = systemOneRequestCostBound(
+      metadata,
+      { state, questions: askedQuestions },
+      TEST_CUSTOM_PRICING_CONFIG
+    );
+    if (bound === null) throw new Error('Expected a cost bound');
+    return bound;
+  }
+
+  it('prices additional state bytes only at the input ceiling', () => {
+    expect(
+      boundOf(model, { text: 'x'.repeat(11_000) }) - boundOf(model, { text: 'x'.repeat(1000) })
+    ).toBe(40_000);
+  });
+
+  it('prices additional questions bytes at the input and output ceilings', () => {
+    const question = (parts: number) => ({
+      q: { type: 'noul' as const, instructions: { text: 'x'.repeat(parts) } },
+    });
+    const questionBytes = (value: object) => Buffer.byteLength(JSON.stringify(value), 'utf8');
+    const delta = questionBytes(question(2000)) - questionBytes(question(1000));
+
+    expect(boundOf(model, null, question(2000)) - boundOf(model, null, question(1000))).toBe(
+      delta * 10
+    );
+  });
+
+  it('includes the per-request fee for a request with no measurable tokens', () => {
+    const flat: StoredModel = {
+      id: 'typesafe/flat',
+      name: 'Flat',
+      endpoints: [{ pricing: { prompt: '0', completion: '0', request: '0.02' } }],
+    };
+
+    expect(boundOf(flat, null, { q: { type: 'noul' } })).toBe(20_000);
+  });
+
+  it('reserves the output allowance on a model that bills completion', () => {
+    const completionPriced: StoredModel = {
+      id: 'typesafe/completion-priced',
+      name: 'Completion priced',
+      endpoints: [{ pricing: { prompt: '0', completion: '0.000001' } }],
+    };
+    const zeroCompletion: StoredModel = {
+      ...completionPriced,
+      endpoints: [{ pricing: { prompt: '0', completion: '0' } }],
+    };
+
+    const allowance =
+      boundOf(completionPriced, null, { q: { type: 'noul' } }) -
+      boundOf(zeroCompletion, null, { q: { type: 'noul' } });
+
+    expect(allowance).toBeGreaterThanOrEqual(SYSTEM_ONE_MAX_OUTPUT_TOKENS);
+    expect(allowance).toBeLessThan(SYSTEM_ONE_MAX_OUTPUT_TOKENS + 100);
+  });
+
+  it('bounds a maximum-size request at the fixture input rate', () => {
+    const state = 'x'.repeat(SYSTEM_ONE_MAX_STATE_BYTES - 2);
+    const maxQuestions = Object.fromEntries(
+      Array.from({ length: SYSTEM_ONE_MAX_QUESTIONS }, (_, index) => [
+        `q${index}`,
+        { type: 'noul', instructions: 'x'.repeat(1800) },
+      ])
+    );
+    const inputBytes =
+      Buffer.byteLength(JSON.stringify(state), 'utf8') +
+      Buffer.byteLength(JSON.stringify(maxQuestions), 'utf8');
+
+    // 42 nanodollars per input token and no completion price.
+    expect(boundOf(jev, state, maxQuestions)).toBe(
+      Math.ceil((inputBytes + 1024) * 0.000000042 * 1_000_000)
+    );
+  });
+
+  it('bounds a discounted route at its undiscounted price', () => {
+    const discounted: StoredModel = {
+      id: 'typesafe/discounted',
+      name: 'Discounted',
+      endpoints: [{ pricing: { prompt: '0.0000005', completion: '0', discount: 0.5 } }],
+    };
+    const full: StoredModel = {
+      id: 'typesafe/full',
+      name: 'Full',
+      endpoints: [{ pricing: { prompt: '0.000001', completion: '0' } }],
+    };
+
+    expect(boundOf(discounted, { text: 'x'.repeat(1000) })).toBe(
+      boundOf(full, { text: 'x'.repeat(1000) })
+    );
+  });
+
+  it('returns null for a model without usable pricing', () => {
+    expect(
+      systemOneRequestCostBound(
+        { ...model, endpoints: [] },
+        { state: null, questions },
+        TEST_CUSTOM_PRICING_CONFIG
+      )
+    ).toBeNull();
+    expect(
+      systemOneRequestCostBound(
+        { ...model, endpoints: [{}] },
+        { state: null, questions },
+        TEST_CUSTOM_PRICING_CONFIG
+      )
+    ).toBeNull();
+  });
+
+  it('propagates failures that are not about catalog pricing', () => {
+    const broken = {
+      id: 'typesafe/broken',
+      name: 'Broken',
+      get endpoints(): never {
+        throw new TypeError('unexpected');
+      },
+    } as unknown as StoredModel;
+
+    expect(() =>
+      systemOneRequestCostBound(broken, { state: null, questions }, TEST_CUSTOM_PRICING_CONFIG)
+    ).toThrow(TypeError);
   });
 });

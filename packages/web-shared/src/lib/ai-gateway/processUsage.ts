@@ -5,9 +5,10 @@ import { recordUsageInPrimaryRegion } from './usage-record-client';
 import { after } from 'next/server';
 import {
   USAGE_QUEUE_ONLY_ENABLED,
-  USAGE_SHADOW_PUBLISH_ENABLED,
+  USAGE_QUEUE_SFO_CONFIG,
 } from '@kilocode/web-shared/lib/config.server';
 import { enqueueUsage, type UsageEnqueueOutcome } from './usage-publisher';
+import { isSfoUsageQueueSelected } from './usage-queue-policy';
 import {
   describeDatabaseError,
   isUsageRowConflict,
@@ -19,7 +20,7 @@ import type { MicrodollarUsage } from '@kilocode/db/schema';
 import { microdollar_usage } from '@kilocode/db/schema';
 import { createTimer } from '@kilocode/web-shared/lib/timer';
 import type { OpenAI } from 'openai';
-import { createParser, type EventSourceMessage } from 'eventsource-parser';
+import type { EventSourceMessage } from 'eventsource-parser';
 import type {
   OpenRouterChatCompletionRequest,
   OpenRouterGeneration,
@@ -38,6 +39,7 @@ import { sentryRootSpan } from '../getRootSpan';
 import {
   mutateOrganizationUsage,
   scheduleOrganizationLowBalanceAlert,
+  scheduleOrganizationUsageAutoTopUp,
 } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import type { OrganizationUsageMutationResult } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
@@ -86,18 +88,22 @@ import {
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@kilocode/web-shared/lib/ai-gateway/processUsage.constants';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 import {
+  byokNonInferenceCost_mUsd,
   computeOpenRouterCostFields,
   providerReportsIsByok,
   drainSseStream,
-  extractVercelGenerationTime,
   extractVercelIsByok,
   extractVercelUpstreamId,
   isResponseInterruptedError,
   reportUpstreamStreamError,
+  readResponseText,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { applyUsagePricing } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { enqueueDailyUsageRollupRepair } from './usage-daily-rollup-repairs';
 import { recordOrganizationConsumption } from '@kilocode/web-shared/lib/kilo-pass-org/consumption';
+import { maybePerformAutoTopUp } from '@kilocode/web-shared/lib/autoTopUp';
+import type { UserForBalance } from '@kilocode/web-shared/lib/user/balance-types';
 import {
   normalizeJa4,
   reportUsageEvent,
@@ -258,6 +264,7 @@ export async function toInsertableDbUsageRecord(
     streamed: usageStats.streamed,
     cancelled: usageStats.cancelled,
     market_cost: usageStats.market_cost ?? null,
+    non_inference_cost: usageStats.nonInferenceCost_mUsd ?? null,
     abuse_delay: metadataFromContext.abuse_delay,
     abuse_downgraded_from: metadataFromContext.abuse_downgraded_from,
   };
@@ -291,19 +298,20 @@ export async function toInsertableDbUsageRecord(
   return { core, metadata };
 }
 
-function scheduleUsageEnqueue(payload: UsageRecordRequest): void {
-  if (!USAGE_SHADOW_PUBLISH_ENABLED) return;
+const PUBLISHER_NOT_CONFIGURED_REPORT_INTERVAL_MS = 60_000;
+let lastPublisherNotConfiguredReportAt = Number.NEGATIVE_INFINITY;
 
-  void enqueueUsageWithinLifetime(payload).then(outcome => {
-    if (outcome.kind === 'accepted') {
-      console.info('usage enqueue accepted', { usageId: payload.core.id });
-    } else if (
-      outcome.kind === 'unavailable' &&
-      (outcome.reason === 'registration_failed' || outcome.reason === 'unexpected_rejection')
-    ) {
-      // Transport failures are already reported by the publisher.
-      console.warn('usage enqueue unavailable', { usageId: payload.core.id, ...outcome });
-    }
+/** Every selected event fails the same way, so report once per interval per instance. */
+function reportPublisherNotConfigured(usageId: string): void {
+  const now = Date.now();
+  if (now - lastPublisherNotConfiguredReportAt < PUBLISHER_NOT_CONFIGURED_REPORT_INTERVAL_MS) {
+    return;
+  }
+  lastPublisherNotConfiguredReportAt = now;
+  captureMessage('usage accounting queue publisher is not configured', {
+    level: 'error',
+    tags: { source: 'logMicrodollarUsage' },
+    extra: { usageId },
   });
 }
 
@@ -314,7 +322,7 @@ async function enqueueUsageWithinLifetime(
   const publication = start.promise.then(async (registered): Promise<UsageEnqueueOutcome> => {
     if (!registered) return { kind: 'unavailable', reason: 'registration_failed' };
     try {
-      return await enqueueUsage(payload, { retryTransientFailures: USAGE_QUEUE_ONLY_ENABLED });
+      return await enqueueUsage(payload, { retryTransientFailures: true });
     } catch {
       return { kind: 'unavailable', reason: 'unexpected_rejection' };
     }
@@ -330,10 +338,32 @@ async function enqueueUsageWithinLifetime(
   return publication;
 }
 
+type UsageAccountingTransport = 'queue' | 'direct';
+
+function usageAccountingTransport(usageContext: MicrodollarUsageContext): UsageAccountingTransport {
+  return USAGE_QUEUE_ONLY_ENABLED || isSfoUsageQueueSelected(USAGE_QUEUE_SFO_CONFIG, usageContext)
+    ? 'queue'
+    : 'direct';
+}
+
 export async function logMicrodollarUsage(
   usageStats: MicrodollarUsageStats,
   usageContext: MicrodollarUsageContext,
   bouncerUsageEvent: BouncerUsageEventEnqueue | null = null
+): Promise<UsageAccountingResult | null> {
+  return logMicrodollarUsageWithTransport(
+    usageStats,
+    usageContext,
+    bouncerUsageEvent,
+    usageAccountingTransport(usageContext)
+  );
+}
+
+async function logMicrodollarUsageWithTransport(
+  usageStats: MicrodollarUsageStats,
+  usageContext: MicrodollarUsageContext,
+  bouncerUsageEvent: BouncerUsageEventEnqueue | null,
+  transport: UsageAccountingTransport
 ): Promise<UsageAccountingResult | null> {
   usageContext.status_code = usageStats.status_code;
   const contextInfo = extractUsageContextInfo(usageContext);
@@ -347,21 +377,47 @@ export async function logMicrodollarUsage(
     bouncer_usage_event: bouncerUsageEvent,
   };
 
-  if (USAGE_QUEUE_ONLY_ENABLED) {
+  if (transport === 'queue') {
     const outcome = await enqueueUsageWithinLifetime(payload);
     if (outcome.kind === 'accepted') {
       console.info('usage accounting queued', { usageId: core.id });
       return { status: 'queued', usageId: core.id, createdAt: core.created_at };
     }
+    if (outcome.reason === 'publisher_not_configured') {
+      // Nothing was attempted, so a direct write cannot duplicate the event.
+      reportPublisherNotConfigured(core.id);
+      console.warn('usage accounting queue publisher not configured', {
+        usageId: core.id,
+        fallback: 'direct',
+      });
+      return recordUsageDirectly(core, metadata, usageContext, bouncerUsageEvent);
+    }
+    if (outcome.reason === 'registration_failed') {
+      // No request scope or `waitUntil`, so `after()` could not track the publication.
+      // Nothing was published, so the direct write cannot duplicate it.
+      console.warn('usage accounting queue unavailable without a request lifetime', {
+        usageId: core.id,
+        reason: outcome.reason,
+        fallback: 'direct',
+      });
+      return recordUsageDirectly(core, metadata, usageContext, bouncerUsageEvent);
+    }
     console.error('usage accounting publication failed', {
       usageId: core.id,
-      reason: outcome.kind === 'disabled' ? 'publisher_disabled' : outcome.reason,
+      reason: outcome.reason,
     });
     return null;
   }
 
-  scheduleUsageEnqueue(payload);
+  return recordUsageDirectly(core, metadata, usageContext, bouncerUsageEvent);
+}
 
+async function recordUsageDirectly(
+  core: MicrodollarUsage,
+  metadata: UsageMetaData,
+  usageContext: MicrodollarUsageContext,
+  bouncerUsageEvent: BouncerUsageEventEnqueue | null
+): Promise<UsageAccountingResult | null> {
   const inserted = await saveUsageRelatedData(
     core,
     metadata,
@@ -579,6 +635,7 @@ type UsageStatementExecutor = Pick<DrizzleTransaction, 'execute'>;
 type UsageStatementResult = UsageRecordInsertResult & {
   kiloPassThreshold: number | null;
   organizationUsage?: OrganizationUsageMutationResult;
+  autoTopUpUser?: UserForBalance | null;
 };
 
 type UsageTransactionResult = {
@@ -693,6 +750,23 @@ function organizationUsageMutationTask(
   };
 }
 
+function scheduleUsageAutoTopUp(usage: MicrodollarUsage, result: UsageStatementResult): void {
+  if (usage.cost <= 0) return;
+  try {
+    if (result.organizationUsage) {
+      scheduleOrganizationUsageAutoTopUp(result.organizationUsage);
+    } else if (result.autoTopUpUser) {
+      const user = result.autoTopUpUser;
+      after(() => maybePerformAutoTopUp(user));
+    }
+  } catch {
+    console.warn('usage auto-top-up unavailable', {
+      usageId: usage.id,
+      reason: 'registration_failed',
+    });
+  }
+}
+
 async function runPostCommitUsageWork(
   usage: MicrodollarUsage,
   result: UsageStatementResult,
@@ -715,6 +789,7 @@ async function runPostCommitUsageWork(
     });
   }
   await runBestEffortPostCommitTasks(tasks);
+  scheduleUsageAutoTopUp(usage, result);
 }
 
 function scheduleKiloPassBonusIfNeeded(
@@ -888,6 +963,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
     usage_created_at: string;
     new_microdollars_used: string | null;
     kilo_pass_threshold: string | null;
+    auto_top_up_user: UserForBalance | null;
   }>(sql`
           WITH microdollar_usage_ins AS (
             INSERT INTO microdollar_usage (
@@ -953,6 +1029,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               machine_id,
               session_id,
               market_cost,
+              non_inference_cost,
               is_free,
               abuse_delay,
               abuse_downgraded_from,
@@ -994,6 +1071,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               ${metadataFields.machine_id},
               ${metadataFields.session_id},
               ${metadataFields.market_cost},
+              ${metadataFields.non_inference_cost},
               ${metadataFields.is_free},
               ${metadataFields.abuse_delay},
               ${metadataFields.abuse_downgraded_from},
@@ -1018,13 +1096,22 @@ async function insertUsageAndMetadataWithBalanceUpdate(
             WHERE id = ${coreUsageFields.kilo_user_id}
               AND ${coreUsageFields.organization_id}::uuid IS NULL
               AND ${coreUsageFields.cost} > 0
-            RETURNING microdollars_used AS new_microdollars_used, kilo_pass_threshold
+            RETURNING microdollars_used AS new_microdollars_used, kilo_pass_threshold,
+              CASE WHEN auto_top_up_enabled THEN jsonb_build_object(
+                'id', id,
+                'total_microdollars_acquired', total_microdollars_acquired,
+                'microdollars_used', microdollars_used,
+                'next_credit_expiration_at', next_credit_expiration_at,
+                'updated_at', updated_at,
+                'auto_top_up_enabled', auto_top_up_enabled
+              ) END AS auto_top_up_user
           )
           SELECT
             microdollar_usage_ins.id AS usage_id,
             microdollar_usage_ins.created_at AS usage_created_at,
             balance_update.new_microdollars_used,
-            balance_update.kilo_pass_threshold
+            balance_update.kilo_pass_threshold,
+            balance_update.auto_top_up_user
           FROM microdollar_usage_ins
           LEFT JOIN balance_update ON true
         `);
@@ -1059,6 +1146,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
     createdAt: inserted.usage_created_at,
     newMicrodollarsUsed,
     kiloPassThreshold,
+    autoTopUpUser: inserted.auto_top_up_user,
   };
 }
 
@@ -1068,12 +1156,15 @@ export function countAndStoreUsage(
   openrouterRequestSpan: Span | undefined
 ) {
   let usageStatsPromise: Promise<MicrodollarUsageStats | null> = Promise.resolve(null);
+  const { requestStartedAt } = usageContext;
 
   const parseResponseText = async (
+    body: ReadableStream<Uint8Array>,
     parse: (content: string) => MicrodollarUsageStats
   ): Promise<MicrodollarUsageStats | null> => {
     try {
-      return parse(await clonedReponse.text());
+      const { text, timing } = await readResponseText(body, requestStartedAt);
+      return { ...parse(text), ...timing };
     } catch (error) {
       if (isResponseInterruptedError(error)) return null;
       throw error;
@@ -1092,9 +1183,10 @@ export function countAndStoreUsage(
             openrouterRequestSpan,
             usageContext.provider,
             clonedReponse.status,
-            usesUserCredentials
+            usesUserCredentials,
+            requestStartedAt
           )
-        : parseResponseText(content =>
+        : parseResponseText(clonedReponse.body, content =>
             parseResponsesMicrodollarUsageFromString(
               content,
               clonedReponse.status,
@@ -1110,9 +1202,10 @@ export function countAndStoreUsage(
             openrouterRequestSpan,
             usageContext.provider,
             clonedReponse.status,
-            usesUserCredentials
+            usesUserCredentials,
+            requestStartedAt
           )
-        : parseResponseText(content =>
+        : parseResponseText(clonedReponse.body, content =>
             parseMicrodollarUsageFromString(
               content,
               usageContext.kiloUserId,
@@ -1129,9 +1222,10 @@ export function countAndStoreUsage(
             openrouterRequestSpan,
             usageContext.provider,
             clonedReponse.status,
-            usesUserCredentials
+            usesUserCredentials,
+            requestStartedAt
           )
-        : parseResponseText(content =>
+        : parseResponseText(clonedReponse.body, content =>
             parseMessagesMicrodollarUsageFromString(
               content,
               clonedReponse.status,
@@ -1151,11 +1245,12 @@ export function processOpenRouterUsage(
   vercelProviderMetadata?: VercelProviderMetaData | null
 ): JustTheCostsUsageStats {
   // usage may be null when there's no response (e.g. error), so default to empty object
-  const { cost_mUsd, is_byok } = computeOpenRouterCostFields(
+  const { cost_mUsd, nonInferenceCost_mUsd, is_byok } = computeOpenRouterCostFields(
     usage ?? {},
     coreProps,
     'sse_processing',
-    providerReportsIsByok(provider)
+    providerReportsIsByok(provider),
+    provider
   );
 
   return {
@@ -1167,6 +1262,7 @@ export function processOpenRouterUsage(
       0,
     outputTokens: usage?.completion_tokens ?? 0,
     cost_mUsd,
+    nonInferenceCost_mUsd,
     is_byok: is_byok ?? extractVercelIsByok(vercelProviderMetadata?.gateway),
   };
 }
@@ -1177,7 +1273,8 @@ export async function parseMicrodollarUsageFromStream(
   openrouterRequestSpan: Span | undefined,
   provider: ProviderId,
   statusCode: number,
-  usesUserCredentials: boolean
+  usesUserCredentials: boolean,
+  requestStartedAt?: number
 ): Promise<MicrodollarUsageStats> {
   // End the request span immediately as this function starts
   openrouterRequestSpan?.end();
@@ -1202,76 +1299,73 @@ export async function parseMicrodollarUsageFromStream(
   let finish_reason: string | null = null;
   let vercelProviderMetadata: VercelProviderMetaData | null = null;
 
-  const sseStreamParser = createParser({
-    onEvent(event: EventSourceMessage) {
-      if (!firstTokenReceived) {
-        sentryRootSpan()?.setAttribute(
-          'openrouter.time_to_first_token_ms',
-          performance.now() - startedAt
-        );
-        firstTokenReceived = true;
-        timeToFirstTokenSpan.end();
+  const onEvent = (event: EventSourceMessage) => {
+    if (!firstTokenReceived) {
+      sentryRootSpan()?.setAttribute(
+        'openrouter.time_to_first_token_ms',
+        performance.now() - startedAt
+      );
+      firstTokenReceived = true;
+      timeToFirstTokenSpan.end();
+    }
+
+    if (event.data === '[DONE]') {
+      return;
+    }
+
+    const json = JSON.parse(event.data) as ChatCompletionChunk;
+
+    if (!json) {
+      captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
+        extra: { event },
+      });
+      return;
+    }
+
+    if ('error' in json) {
+      const error = json.error as OpenRouterError;
+      reportedError = true;
+      if (typeof error.code === 'number') {
+        effectiveStatusCode = error.code;
       }
+      reportUpstreamStreamError({
+        label: 'OpenRouter error',
+        source: 'sse_processing',
+        error,
+        usesUserCredentials,
+        logContext: {
+          provider,
+          inference_provider: json.provider ?? inference_provider,
+          messageId: json.id ?? messageId,
+          model: json.model ?? model,
+        },
+        sentryExtra: { json, event },
+      });
+    }
 
-      if (event.data === '[DONE]') {
-        return;
-      }
+    model = json.model ?? model;
+    messageId = json.id ?? messageId;
+    usage = json.usage ?? usage;
+    const choice = json.choices?.[0];
+    const chunkProviderMetadata = choice?.delta?.provider_metadata;
+    if (chunkProviderMetadata) {
+      vercelProviderMetadata = chunkProviderMetadata;
+    }
+    inference_provider =
+      json.provider ?? chunkProviderMetadata?.gateway?.routing?.finalProvider ?? inference_provider;
+    finish_reason = choice?.finish_reason ?? finish_reason;
 
-      const json = JSON.parse(event.data) as ChatCompletionChunk;
+    const contentDelta = choice?.delta?.content;
+    if (contentDelta) {
+      responseContent += contentDelta;
+    }
+  };
 
-      if (!json) {
-        captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
-          extra: { event },
-        });
-        return;
-      }
-
-      if ('error' in json) {
-        const error = json.error as OpenRouterError;
-        reportedError = true;
-        if (typeof error.code === 'number') {
-          effectiveStatusCode = error.code;
-        }
-        reportUpstreamStreamError({
-          label: 'OpenRouter error',
-          source: 'sse_processing',
-          error,
-          usesUserCredentials,
-          logContext: {
-            provider,
-            inference_provider: json.provider ?? inference_provider,
-            messageId: json.id ?? messageId,
-            model: json.model ?? model,
-          },
-          sentryExtra: { json, event },
-        });
-      }
-
-      model = json.model ?? model;
-      messageId = json.id ?? messageId;
-      usage = json.usage ?? usage;
-      const choice = json.choices?.[0];
-      const chunkProviderMetadata = choice?.delta?.provider_metadata;
-      if (chunkProviderMetadata) {
-        vercelProviderMetadata = chunkProviderMetadata;
-      }
-      inference_provider =
-        json.provider ??
-        chunkProviderMetadata?.gateway?.routing?.finalProvider ??
-        inference_provider;
-      finish_reason = choice?.finish_reason ?? finish_reason;
-
-      const contentDelta = choice?.delta?.content;
-      if (contentDelta) {
-        responseContent += contentDelta;
-      }
-    },
-  });
-
-  const wasAborted = await drainSseStream(
+  const { wasAborted, timing } = await drainSseStream(
     stream,
-    chunk => sseStreamParser.feed(chunk),
-    streamProcessingSpan
+    onEvent,
+    streamProcessingSpan,
+    requestStartedAt
   );
 
   if (!reportedError && !usage) {
@@ -1291,9 +1385,9 @@ export async function parseMicrodollarUsageFromStream(
     inference_provider,
     finish_reason,
     upstream_id: extractVercelUpstreamId(vercelProviderMetadata),
-    latency: null,
+    latency: timing.latency,
     moderation_latency: null,
-    generation_time: extractVercelGenerationTime(vercelProviderMetadata),
+    generation_time: timing.generation_time,
     streamed: true,
     cancelled: null,
     status_code: effectiveStatusCode,
@@ -1341,7 +1435,7 @@ export function parseMicrodollarUsageFromString(
     finish_reason,
     latency: null,
     moderation_latency: null,
-    generation_time: extractVercelGenerationTime(vercelProviderMetadata),
+    generation_time: null,
     streamed: false,
     cancelled: null,
     status_code: statusCode,
@@ -1399,12 +1493,16 @@ export async function processTokenData(
 
     genStats.model = usageStats.model; // openrouter bug?
     genStats.upstream_id ??= usageStats.upstream_id; // keep the id the response already reported
-    genStats.generation_time ??= usageStats.generation_time;
+    genStats.latency = usageStats.latency;
+    genStats.generation_time = usageStats.generation_time;
     genStats.finish_reason ??= usageStats.finish_reason;
     genStats.hasError = usageStats.hasError; // retain by choice
     genStats.status_code = usageStats.status_code; // retain by choice
     genStats.streamed ??= usageContext.isStreaming;
-    if (genStats.cost_mUsd !== usageStats.cost_mUsd) {
+    // OpenRouter BYOK transcriptions report neither is_byok nor the upstream cost,
+    // so their response cost is only the BYOK fee and is expected to differ.
+    const responseCostIsOnlyByokFee = usageStats.is_byok == null && genStats.is_byok === true;
+    if (genStats.cost_mUsd !== usageStats.cost_mUsd && !responseCostIsOnlyByokFee) {
       // The provider's generation lookup and the response's own usage payload should
       // yield the same cost. A mismatch means inconsistent token or pricing data from
       // the provider; the generation lookup values win (see assignment below).
@@ -1452,7 +1550,7 @@ export async function processTokenData(
     usageStats.model = usageContext.requested_model;
   }
 
-  applyUsagePricing(usageStats, usageContext);
+  applyUsagePricing(usageStats, usageContext, await getCustomPricingConfig());
 
   return logMicrodollarUsageAndReportToBouncer(usageStats, usageContext);
 }
@@ -1465,23 +1563,33 @@ export async function processTokenData(
  * When the request's decide verdict said `spendWatch`, the writer enqueues the usage event in its
  * transaction and attempts delivery right after commit; the cron drainer retries a failure.
  * Queued and recorded outcomes leave delivery with that writer/outbox. Failed accounting
- * keeps the best-effort send; bouncer dedupes on `requestId`. Every other request also keeps the
+ * retains the existing best-effort fallback. Every other request also keeps the
  * independent best-effort send, which never rejects.
+ * Ordinary queued reporting starts alongside publication and both are awaited by the caller's
+ * existing lifetime. Its queue payload has no Bouncer event, so the writer cannot send it again.
  */
 export async function logMicrodollarUsageAndReportToBouncer(
   usageStats: MicrodollarUsageStats,
   usageContext: MicrodollarUsageContext
 ): Promise<UsageAccountingResult | null> {
   const event = bouncerUsageEvent(usageStats, usageContext);
+  const transport = usageAccountingTransport(usageContext);
   if (!event || usageContext.bouncer?.spendWatch !== true) {
-    const record = await logMicrodollarUsage(usageStats, usageContext);
+    const accounting = logMicrodollarUsageWithTransport(usageStats, usageContext, null, transport);
+    if (event && transport === 'queue') {
+      const [record] = await Promise.all([accounting, reportUsageEvent(event)]);
+      return record;
+    }
+    const record = await accounting;
     if (event) await reportUsageEvent(event);
     return record;
   }
-  const record = await logMicrodollarUsage(usageStats, usageContext, {
-    request_id: event.requestId,
-    payload: usageEventWireBody(event),
-  });
+  const record = await logMicrodollarUsageWithTransport(
+    usageStats,
+    usageContext,
+    { request_id: event.requestId, payload: usageEventWireBody(event) },
+    transport
+  );
   if (!record) await reportUsageEvent(event);
   return record;
 }
@@ -1570,6 +1678,7 @@ export const mapToUsageStats = (
   provider: ProviderId
 ): MicrodollarUsageStats => {
   let llmCostUsd;
+  let nonInferenceCost_mUsd: number | undefined;
   if (!data.is_byok) {
     llmCostUsd = data.total_cost;
   } else if (data.upstream_inference_cost == undefined) {
@@ -1582,6 +1691,11 @@ export const mapToUsageStats = (
     // openrouter bug, see
   } else {
     llmCostUsd = data.upstream_inference_cost;
+    nonInferenceCost_mUsd = byokNonInferenceCost_mUsd(
+      provider,
+      data.total_cost,
+      data.upstream_inference_cost
+    );
   }
 
   return {
@@ -1601,16 +1715,18 @@ export const mapToUsageStats = (
       provider === 'vercel'
         ? (data.native_tokens_completion ?? 0) + (data.native_tokens_reasoning ?? 0)
         : (data.native_tokens_completion ?? 0),
-    cost_mUsd: toMicrodollars(llmCostUsd),
+    cost_mUsd: toMicrodollars(llmCostUsd) + (nonInferenceCost_mUsd ?? 0),
+    nonInferenceCost_mUsd,
     is_byok: data.is_byok ?? null,
     cacheDiscount_mUsd:
       data.cache_discount == undefined ? undefined : toMicrodollars(data.cache_discount),
     inference_provider: data.provider_name ?? null,
     upstream_id: data.upstream_id ?? null,
     finish_reason: data.finish_reason ?? null,
-    latency: data.latency ?? null,
+    // The gateway measures latency and generation_time itself; see drainSseStream and readResponseText.
+    latency: null,
     moderation_latency: data.moderation_latency ?? null,
-    generation_time: data.generation_time ?? null,
+    generation_time: null,
     streamed: data.streamed ?? null,
     cancelled: data.cancelled ?? null,
     status_code: 200,

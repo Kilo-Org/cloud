@@ -45,11 +45,13 @@ import {
   NVIDIA_TRIAL_TOS,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/nvidia';
 import { applyCustomPricingToModel } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import {
   getCustomLlmsById,
   isPublicCustomLlm,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { convertCustomLlmToCatalogModel } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/listAvailableCustomLlms';
+import { isCustomLlmDeniedInCountry } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import { addMonths } from 'date-fns';
 import { getModelDisplayPricing } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/display-pricing';
 
@@ -165,7 +167,7 @@ export function pickerExtraModel(modelId: string): OpenRouterModel | undefined {
     : buildAutoModels().find(model => model.id === modelId);
 }
 
-async function enhancedModelList(models: OpenRouterModel[]) {
+async function enhancedModelList(models: OpenRouterModel[], countryCode: string | null) {
   const autoModels = buildAutoModels();
   const [
     endpointsMetadata,
@@ -174,6 +176,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
     unavailableModelIds,
     preferredProviderOrderConfig,
     customLlmsById,
+    customPricingConfig,
   ] = await Promise.all([
     getOpenRouterModelsMetadataFromDatabase(),
     getDataCollectionRequiredModelIds(),
@@ -181,10 +184,12 @@ async function enhancedModelList(models: OpenRouterModel[]) {
     getUnavailableModelIds(),
     getPreferredProviderOrderConfig(),
     getCustomLlmsById(),
+    getCustomPricingConfig(),
   ]);
   const publicCustomLlms = [...customLlmsById.values()].flatMap(customLlm =>
     isPublicCustomLlm(customLlm.definition) &&
-    !unavailableModelIds.has(customLlm.public_id.toLowerCase())
+    !unavailableModelIds.has(customLlm.public_id.toLowerCase()) &&
+    !isCustomLlmDeniedInCountry(customLlm.definition, countryCode)
       ? [{ ...customLlm, definition: customLlm.definition }]
       : []
   );
@@ -229,7 +234,7 @@ async function enhancedModelList(models: OpenRouterModel[]) {
         .map(model => convertFromKiloExclusiveModel(model))
     )
     .concat(autoModels)
-    .map(applyCustomPricingToModel)
+    .map(model => applyCustomPricingToModel(customPricingConfig, model))
     // Public custom LLMs are complete as defined; id-based pricing, PDF, and
     // protocol guesses below would describe a model routing does not serve.
     .concat(publicCustomLlmModels);
@@ -373,7 +378,13 @@ export async function getRawOpenRouterModels(): Promise<OpenRouterModelsResponse
  * Fetch enhanced models from OpenRouter API with filtering and UI enhancements
  * Use this for user-facing model selection where you want filtered, sorted models
  */
-export async function getEnhancedOpenRouterModels(): Promise<OpenRouterModelsResponse> {
+export async function getEnhancedOpenRouterModels({
+  countryCode,
+}: {
+  /** The requester's Vercel IP country; custom LLMs denied there are left out.
+   * Null lists every custom LLM, for callers that do not serve a request. */
+  countryCode: string | null;
+}): Promise<OpenRouterModelsResponse> {
   const rawResponse = await getRawOpenRouterModels();
 
   // If data is not in expected format (e.g., validation failed), return as-is
@@ -381,7 +392,7 @@ export async function getEnhancedOpenRouterModels(): Promise<OpenRouterModelsRes
     return rawResponse;
   }
 
-  const models = await enhancedModelList(rawResponse.data);
+  const models = await enhancedModelList(rawResponse.data, countryCode);
   const snapshot = await getEnkryptBenchmarks();
   return { data: publishEnkryptModels(models, snapshot) };
 }

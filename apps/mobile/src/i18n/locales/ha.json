@@ -227,7 +227,6 @@
     "hideBalance": "Ɓoye ragowar kuɗi",
     "showBalance": "Nuna ragowar kuɗi",
     "balanceHidden": "An ɓoye ragowar kuɗi",
-    "bonusCreditsExpiring": "Kuɗin amfani {{amount}} za su ƙare {{date}}.",
     "signOutTitle": "Fita?",
     "signOutMessage": "Za ka buƙaci sake shiga don samun damar wurin aikinka.",
     "deleteAccountTitle": "Share asusu?",
@@ -876,6 +875,18 @@
       "securityFindingsUnavailable": "Kunna Wakilin tsaro na Kilo a kan wani iyaka don samun sakamakon binciken tsaro.",
       "spendAlertsSubtitle": "wucewar iyaka da hauhawar sa'a",
       "spendAlertsToggle": "Rukunin faɗakarwar kashe kuɗi"
+    },
+    "history": {
+      "title": "Tarihin sanarwa",
+      "subtitle": "Sanarwar da wannan asusu ya karɓa",
+      "bannerBody": "An kashe sanarwar turawa a wannan na'urar, don haka sabbin ba za su isa nan ba.",
+      "bannerAction": "Saitunan sanarwa",
+      "emptyTitle": "Babu sanarwa tukuna",
+      "emptyCategoryTitle": "Babu sanarwa a wannan rukunin",
+      "emptyBody": "Sanarwar da wannan asusu ke karɓa suna bayyana a nan. Ana ajiye su na kwanaki {{days}}.",
+      "capped": "Ana nuna sanarwar baya-bayan nan.",
+      "loadError": "An kasa loda tarihin sanarwa.",
+      "openFailed": "Wannan sanarwa ba ta ƙara buɗewa a ko'ina ba."
     },
     "action": {
       "openSession": "Buɗe zaman"
@@ -2178,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Ba a iya tuntuɓar muhallin aiki ba — wataƙila haɗinsa ya katse.",
     "remoteSpawnNonRetryable": "Muhallin aiki ya kasa fara zaman — duba na'urar ko sabunta CLI.",
-    "remoteSpawnInstanceDisconnected": "Haɗin muhallin aikin da aka zaɓa ya katse. Fara zama a Cloud Agent ko zaɓi wani muhallin aiki.",
-    "liveCount_one": "KAI TSAYE: {{count}}",
-    "liveCount_other": "KAI TSAYE: {{count}}"
+    "remoteSpawnInstanceDisconnected": "Haɗin muhallin aikin da aka zaɓa ya katse. Fara zama a Cloud Agent ko zaɓi wani muhallin aiki."
   },
   "agentChat": {
     "session": {
@@ -2592,7 +2601,9 @@
       "retrying": "Ana sake gwadawa…",
       "retryDeny": "Sake gwada ƙi",
       "retryAllowOnce": "Sake gwada ba da izini sau ɗaya",
-      "retryAlwaysAllow": "Sake gwada ba da izini koyaushe"
+      "retryAlwaysAllow": "Sake gwada ba da izini koyaushe",
+      "unreadableTitle": "Ba a iya karanta buƙatar izini",
+      "unreadableBody": "Wakilin yana jiran shawarar izini da wannan manhajar ba za ta iya nunawa ba. Sabunta manhajar ko CLI, ko kuma amsa buƙatar a cikin CLI domin ci gaba."
     },
     "questionCard": {
       "title": "Wakili yana buƙatar bayani",
@@ -2984,8 +2995,9 @@
     "unavailableDevice": "Ba a iya shigar da rubutu ta murya a wannan na'urar.",
     "unavailableLanguage": "Ba a iya shigar da rubutu ta murya da harshen wannan na'urar.",
     "languageNotInstalledTitle": "Shigar da rubutu ta murya na {{language}} ba ta shirya ba tukuna",
-    "languageNotInstalledMessage": "Fayilolin magana na offline na {{language}} ba a shigar da su a wayar ba. Sauke su, sannan sake gwada shigar da rubutu ta murya.",
+    "languageNotInstalledMessage": "Fayilolin magana na offline na {{language}} ba a saka su ba, kuma an kashe rubutu ta intanet. Ka sauke fayilolin ko ka sake kunna rubutu ta intanet, don ka iya amfani da shigar da rubutu ta murya.",
     "downloadOfflineModel": "Sauke",
+    "useOnlineTranscription": "Ƙaddamar da rubutun intanet",
     "offlineModelDownloadScheduled": "Za a sauke fayilolin magana na offline a bango. Gwada shigar da rubutu ta murya daga baya.",
     "listeningStopped": "An dakatar da sauraro.",
     "transcribing": "Ana mayar da magana rubutu...",
@@ -3159,7 +3171,7 @@
     "creditActivity": {
       "emptyDescription": "Sayayya, amfani da kuɗi, da gyaran kuɗin amfani na wannan ƙungiyar za su bayyana a nan yayin da suke faruwa.",
       "emptyTitle": "Babu ma'amalar kuɗin amfani",
-      "expires": "Zai ƙare {{date}}",
+      "expiresUtc": "Zai ƙare {{date}} (UTC)",
       "title": "Ma'amalolin kuɗin amfani",
       "transactionFallback": "Ma'amalar kuɗin amfani",
       "category": {
@@ -3840,6 +3852,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Ƙimomin da aka nuna a matsayin •••• suna riƙe sirrin da aka adana; maye gurbin ƙima don canza sirrin. Canza layin umarni yana buƙatar sake shigar da kowane ƙima",
+      "headersHint": "Ƙimomin da aka nuna a matsayin •••• suna riƙe sirrin da aka adana; maye gurbin ƙima don canza sirrin. Canza URL yana buƙatar sake shigar da kowane ƙima",
       "nameRequired": "Shigar da sunan uwar garke",
       "nameInvalid": "Sunan zai iya amfani da haruffan ASCII kawai, lambobi, ƙararraki, da dashes, har zuwa haruffa 100",
       "commandRequired": "Shigar da umarni",
@@ -3938,6 +3952,10 @@
   "credits": {
     "title": "Sayi kuɗin amfani",
     "description": "Kuɗin amfani saye ne na lokaci ɗaya da ake ƙarawa a ma'aunin Kilo naka don gudanar da zaman shirye-shiryen AI a cikin Kilo App. Shagon yana cajin asusunka kuma ana ƙara kuɗin amfani bayan shagon ya tabbatar da biyan kuɗi.",
+    "nextExpiry": "Kuɗin amfani {{amount}} za su ƙare {{date}} (UTC). Ana fara amfani da kuɗin amfani da za su fi saurin ƙarewa.",
+    "appStoreExpiry": "Kuɗin amfani da aka saya ta App Store ba sa ƙarewa.",
+    "playOneYearExpiry": "Waɗannan kuɗin amfani za su ƙare shekara ɗaya ta kalanda bayan saya.",
+    "playNonexpiring": "Waɗannan kuɗin amfani ba sa ƙarewa.",
     "packLabel": "Ƙara kuɗin amfani na {{amount}}",
     "priceUnavailable": "Farashi ba ya nan",
     "purchased": "An ƙara kuɗin amfani a ma'auninka.",
@@ -4076,6 +4094,10 @@
     "generate": "Ƙirƙiri taƙaitawa",
     "retrySummary": "Sake gwada taƙaitawa ta biya",
     "sources": "Shaidu da kayayyaki",
+    "sessionsShown_one": "Ana nuna {{shown}} daga cikin zaman aiki {{total}}",
+    "sessionsShown_other": "Ana nuna {{shown}} daga cikin zaman aiki {{total}}",
+    "itemsShown_one": "Ana nuna {{shown}} daga cikin abu {{total}}",
+    "itemsShown_other": "Ana nuna {{shown}} daga cikin abubuwa {{total}}",
     "timezone": "Yankin lokaci na rahoto",
     "deviceTimezone": "Yi amfani da yankin lokaci na na'ura",
     "timezoneHint": "Yankin lokaci na IANA, misali Europe/Berlin. Canje-canjen jadawali za su shafi rahotanni masu zuwa.",

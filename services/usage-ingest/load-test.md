@@ -13,16 +13,23 @@ With the gateway queue-selection change installed, configure the intended stagin
 gateway deployment as follows. Keep the Worker in processing mode with the same
 writer endpoint and queue policy for both runs.
 
+For both Cloudflare/direct runs, keep `USAGE_QUEUE_TRANSPORT` unset or set to
+`cloudflare`. Setting `USAGE_QUEUE_ONLY_ENABLED=false` alone does not disable the
+[staging Vercel queue prototype](../../packages/usage-queue/README.md).
+
 | Gateway setting | Direct baseline | Queued run |
 |---|---|---|
 | `USAGE_QUEUE_ONLY_ENABLED` | `false` | `true` |
-| `USAGE_SHADOW_PUBLISH_ENABLED` | `false` | `false` |
 
 Apply server environment settings through the gateway deployment. Queue-only is
-staging-restricted; this recipe does not activate production. Disabling queue-only
-while retaining shadow publishing sends events to both writers and contaminates
-the direct baseline with duplicate database attempts. Queue-only never falls back
-to a gateway billing writer. Count `usage accounting publication failed` errors
+enabled by the existing staging controls for this recipe; production SFO selection
+uses separate `USAGE_QUEUE_SFO_EXPOSURE` (`0`–`1`) and optional
+`USAGE_QUEUE_SFO_USER_IDS` controls and [rollout gates](eu-queues.md#production-merge-gate),
+and is not activated here. Disabling queue-only
+keeps new events on direct accounting. Background shadow publication has been
+removed; reconcile and drain any historically accepted shadow events before
+switching a consumer to processing. Queue-only never falls back to a gateway billing writer. Count
+`usage accounting publication failed` errors
 and report their usage IDs and categories with the run. These return null
 accounting results after the bounded retries, not queued or recorded success.
 `usage enqueue retrying` counts failed attempts, not distinct events: retries
@@ -44,8 +51,10 @@ report unfinished events and DLQ arrivals rather than dropping them from totals.
 In staging, every invocation of the shared `saveUsageRelatedDataLocally`
 persistence boundary attempts to emit `usage_record_completion`. Both Frankfurt
 gateway direct writes and the HTTP writer called by the consumer use this boundary.
-Production samples recorded/duplicate completions uniformly at 1%, while null/error
-completions remain at 100%. See the [deployment sampling rules](README.md#observability),
+Production logs recorded/duplicate completions at 100% by default,
+configurable with the server-only `USAGE_RECORD_COMPLETION_SAMPLE_RATE` (`0`–`1`)
+and a redeploy of the gateway and HTTP writer apps. Null/error completions remain
+at 100%. See the [deployment sampling rules](README.md#observability),
 and confirm hosted log retention, ingestion and sampling cover the test window.
 
 | Field | Meaning |
@@ -53,12 +62,12 @@ and confirm hosted log retention, ingestion and sampling cover the test window.
 | `usage_id` | Correlates a delivery with consumer/gateway logs; repeated attempts share the ID |
 | `outcome` | `recorded`, `duplicate`, `not_recorded` (null result), or `error` (thrown exception) |
 | `level` | `info` for recorded/duplicate; `warn` for null/exception |
-| `sample_rate` | Application selection probability: `1` for full logging, `0.01` for production recorded/duplicate completions |
+| `sample_rate` | Application selection probability: `1` for full logging; configured production recorded/duplicate probability, default `1` |
 | `duration_ms` | Rounded monotonic elapsed time around the shared persistence operation, including first-usage checks, the write and awaited follow-up work; excludes caller HTTP/queue waiting |
 | `event_age_ms` | Age of the event at operation completion, clamped at zero; omitted if timestamp cannot be parsed |
 | `execution_region` | Function region from `VERCEL_REGION`, restricted to `fra1`, `sfo1`, or `unknown` |
 | `entrypoint` | `gateway`, `writer_endpoint`, or `unknown` |
-| `writer_caller` | `queue`, `region_handoff`, or `unknown`; authenticated route allowlists the HTTP client's diagnostic header |
+| `writer_caller` | `queue`, `queue_vercel`, `region_handoff`, or `unknown`; authenticated route allowlists the HTTP client's diagnostic header |
 
 `execution_region` identifies where persistence ran, not the originating gateway.
 SFO gateway direct writes handed to the Frankfurt HTTP writer therefore log `fra1`;
@@ -69,7 +78,8 @@ and persistence regions, grouping by `entrypoint` and `writer_caller` and separa
 recorded and duplicate outcomes. In a full staging run, count attempts by outcome
 and completed **distinct** usage IDs with recorded/duplicate outcomes; count null
 and exception outcomes separately. For sampled production data, estimate attempt
-counts with `sum(1 / sample_rate)` per outcome; do not scale distinct-ID counts
+counts with `sum(1 / sample_rate)` per outcome when the rate is nonzero; no success
+estimate is available with success sampling disabled. Do not scale distinct-ID counts
 or treat estimates as exact accounting. This weight covers application sampling
 only, not platform sampling or missing logs. Keep success latency percentiles
 within comparable groups with the same sampling rate; mixing fully logged failures
@@ -94,8 +104,10 @@ Consumer `usage_ingest_processing` events additionally expose:
   Staging uses batch size 2 and parallelism 2, allowing two messages to start
   concurrently. `USAGE_INGEST_PARALLELISM=1` keeps batch size 2 but processes it
   serially, so the second message's value includes waiting for the first message
-  to settle. Production keeps batch size 1 and receipt mode by default; receipt
-  logs are not processing/persistence completions.
+  to settle. Production uses batch size 2, two writer slots
+  and invocation cap 200 (up to 400 concurrent writer calls). Its deployment and activation are subject to the
+  [production readiness gates](eu-queues.md#production-merge-gate); this staging recipe
+  does not activate it. An ACK follows a matching recorded/duplicate writer response only.
 - `event_age_ms`: creation through consumer outcome logging, including writer wait.
 - `delivery_attempts`, categorical `reason`, and `queue_action`: diagnose retries;
   `retry` does not confirm DLQ storage.
@@ -111,7 +123,7 @@ message's own processing start; keep those boundaries separate.
 
 Use the queue's backlog and DLQ monitoring to observe growth, exhaustion and drain
 time. A quiet database alongside an increasing backlog is not equivalent throughput.
-Do not count publisher acceptance or receipt-mode discard as completed persistence.
+Do not count publisher acceptance as completed persistence.
 
 ## Collect database impact over the same windows
 

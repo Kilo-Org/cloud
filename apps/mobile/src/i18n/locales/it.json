@@ -227,7 +227,6 @@
     "hideBalance": "Nascondi saldo",
     "showBalance": "Mostra saldo",
     "balanceHidden": "Saldo nascosto",
-    "bonusCreditsExpiring": "{{amount}} di crediti scadono il {{date}}.",
     "signOutTitle": "Uscire?",
     "signOutMessage": "Per tornare al tuo spazio di lavoro, dovrai effettuare di nuovo l'accesso.",
     "deleteAccountTitle": "Eliminare l'account?",
@@ -293,6 +292,18 @@
       "securityFindingsUnavailable": "Attiva l'Agente di sicurezza Kilo su un ambito per ricevere segnalazioni di sicurezza.",
       "spendAlertsSubtitle": "superamenti di soglia e picchi orari",
       "spendAlertsToggle": "Categoria avvisi di spesa"
+    },
+    "history": {
+      "title": "Cronologia notifiche",
+      "subtitle": "Notifiche ricevute da questo account",
+      "bannerBody": "Le notifiche push sono disattivate per questo dispositivo, quindi le nuove non arriveranno qui.",
+      "bannerAction": "Impostazioni notifiche",
+      "emptyTitle": "Nessuna notifica per ora",
+      "emptyCategoryTitle": "Nessuna notifica in questa categoria",
+      "emptyBody": "Le notifiche ricevute da questo account compaiono qui. Vengono conservate per {{days}} giorni.",
+      "capped": "Vengono mostrate le notifiche più recenti.",
+      "loadError": "Impossibile caricare la cronologia delle notifiche.",
+      "openFailed": "Questa notifica non si apre più da nessuna parte."
     },
     "liveActivities": "Attività in tempo reale",
     "liveActivitySubtitle": "Mostra gli agenti attivi nella schermata di blocco",
@@ -1634,10 +1645,7 @@
     },
     "remoteSpawnRetryable": "Impossibile raggiungere l'istanza: potrebbe essersi disconnessa.",
     "remoteSpawnNonRetryable": "L'istanza non è riuscita ad avviare la sessione: controlla la macchina o aggiorna la CLI.",
-    "remoteSpawnInstanceDisconnected": "L'istanza selezionata si è disconnessa. Avvia una sessione su Cloud Agent oppure scegli un'altra istanza.",
-    "liveCount_one": "{{count}} IN TEMPO REALE",
-    "liveCount_other": "{{count}} IN TEMPO REALE",
-    "liveCount_many": "{{count}} ATTIVI"
+    "remoteSpawnInstanceDisconnected": "L'istanza selezionata si è disconnessa. Avvia una sessione su Cloud Agent oppure scegli un'altra istanza."
   },
   "agentChat": {
     "session": {
@@ -2053,7 +2061,9 @@
       "retrying": "Nuovo tentativo…",
       "retryDeny": "Riprova a negare",
       "retryAllowOnce": "Riprova a consentire una volta",
-      "retryAlwaysAllow": "Riprova a consentire sempre"
+      "retryAlwaysAllow": "Riprova a consentire sempre",
+      "unreadableTitle": "Impossibile leggere la richiesta di autorizzazione",
+      "unreadableBody": "L'agente è in attesa di una decisione di autorizzazione che questa app non può mostrare. Aggiorna l'app o la CLI, oppure rispondi alla richiesta nella CLI per continuare."
     },
     "questionCard": {
       "title": "Richiesta dell'agente",
@@ -2484,8 +2494,9 @@
     "unavailableDevice": "La dettatura non è disponibile su questo dispositivo.",
     "unavailableLanguage": "La dettatura non è disponibile per la lingua del dispositivo.",
     "languageNotInstalledTitle": "La dettatura per {{language}} non è ancora pronta",
-    "languageNotInstalledMessage": "I file vocali offline per {{language}} non sono installati su questo telefono. Scaricali, poi riprova con la dettatura.",
+    "languageNotInstalledMessage": "I file vocali offline per {{language}} non sono installati e la trascrizione online è disattivata. Scarica i file o riattiva la trascrizione online per usare la dettatura.",
     "downloadOfflineModel": "Scarica",
+    "useOnlineTranscription": "Consenti trascrizione online",
     "offlineModelDownloadScheduled": "I file vocali offline verranno scaricati in background. Riprova con la dettatura più tardi.",
     "listeningStopped": "Ascolto interrotto.",
     "transcribing": "Trascrizione in corso…",
@@ -3195,7 +3206,7 @@
     "creditActivity": {
       "emptyDescription": "Qui vedrai gli acquisti, i consumi e le rettifiche dei crediti dell'organizzazione man mano che avvengono.",
       "emptyTitle": "Nessun movimento dei crediti",
-      "expires": "Scade il {{date}}",
+      "expiresUtc": "Scade il {{date}} (UTC)",
       "title": "Movimenti dei crediti",
       "transactionFallback": "Movimento dei crediti",
       "category": {
@@ -3891,6 +3902,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "I valori mostrati come •••• conservano il segreto archiviato; sostituisci un valore per ruotarlo. Modificare la riga di comando richiede nuovamente tutti i valori",
+      "headersHint": "I valori mostrati come •••• conservano il segreto archiviato; sostituisci un valore per ruotarlo. Modificare l'URL richiede nuovamente tutti i valori",
       "nameRequired": "Immettere un nome server",
       "nameInvalid": "Il nome può contenere solo lettere ASCII, numeri, trattini bassi e trattini, fino a 100 caratteri",
       "commandRequired": "Inserisci un comando",
@@ -3989,6 +4002,10 @@
   "credits": {
     "title": "Acquista crediti",
     "description": "I crediti sono un acquisto una tantum che viene aggiunto al tuo saldo Kilo per eseguire sessioni di coding AI in Kilo App. Lo store addebita il tuo account e i crediti vengono aggiunti dopo che lo store conferma il pagamento.",
+    "nextExpiry": "{{amount}} di crediti scadono il {{date}} (UTC). I crediti con la scadenza più vicina vengono usati per primi.",
+    "appStoreExpiry": "I crediti acquistati tramite l'App Store non scadono.",
+    "playOneYearExpiry": "Questi crediti scadono un anno solare dopo l'acquisto.",
+    "playNonexpiring": "Questi crediti non scadono.",
     "packLabel": "Aggiungi {{amount}} in crediti",
     "priceUnavailable": "Prezzo non disponibile",
     "purchased": "I crediti sono stati aggiunti al tuo saldo.",
@@ -4131,6 +4148,12 @@
     "generate": "Genera riepilogo",
     "retrySummary": "Riprova riepilogo a pagamento",
     "sources": "Prove e artefatti",
+    "sessionsShown_one": "Sessioni mostrate: {{shown}} di {{total}}",
+    "sessionsShown_many": "Sessioni mostrate: {{shown}} di {{total}}",
+    "sessionsShown_other": "Sessioni mostrate: {{shown}} di {{total}}",
+    "itemsShown_one": "Elementi mostrati: {{shown}} di {{total}}",
+    "itemsShown_many": "Elementi mostrati: {{shown}} di {{total}}",
+    "itemsShown_other": "Elementi mostrati: {{shown}} di {{total}}",
     "timezone": "Fuso orario briefing",
     "deviceTimezone": "Usa fuso orario del dispositivo",
     "timezoneHint": "Fuso orario IANA, ad esempio Europe/Berlin. Le modifiche agli orari valgono per i briefing futuri.",

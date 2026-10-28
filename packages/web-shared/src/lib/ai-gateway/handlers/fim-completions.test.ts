@@ -11,6 +11,12 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import {
+  decide,
+  releaseDecideLease,
+  type DecideResponse,
+} from '@kilocode/web-shared/lib/bouncer/client';
+import { after } from 'next/server';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INCEPTION_API_KEY: 'system-inception-key',
@@ -20,6 +26,11 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => (
   emitApiMetricsForResponse: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/bouncer/client') as Record<string, unknown>),
+  decide: jest.fn(),
+  releaseDecideLease: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage');
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok');
 jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
@@ -68,10 +79,12 @@ const mockedGetBYOKforUser = jest.mocked(getBYOKforUser);
 const mockedResolveOrganizationMemberModelDecision = jest.mocked(
   resolveOrganizationMemberModelDecision
 );
+const mockedDecide = jest.mocked(decide);
+const mockedReleaseDecideLease = jest.mocked(releaseDecideLease);
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
 const originalFetch = globalThis.fetch;
 
-function makeRequest(model = 'inception/mercury-edit-2') {
+function makeRequest(model = 'inception/mercury-edit-2', stream = false) {
   return new Request('http://localhost:3000/api/fim/completions', {
     method: 'POST',
     headers: {
@@ -83,6 +96,7 @@ function makeRequest(model = 'inception/mercury-edit-2') {
       prompt: 'const value =',
       suffix: ';',
       max_tokens: 100,
+      ...(stream ? { stream: true } : {}),
     }),
   });
 }
@@ -137,6 +151,8 @@ describe('POST /api/fim/completions', () => {
     jest.resetAllMocks();
     globalThis.fetch = mockedFetch;
     mockedLogMicrodollarUsage.mockResolvedValue(null);
+    mockedDecide.mockResolvedValue(null);
+    mockedReleaseDecideLease.mockResolvedValue(undefined);
     mockedResolveOrganizationMemberModelDecision.mockResolvedValue({
       policy: {} as never,
       decision: { allowed: true },
@@ -290,6 +306,55 @@ describe('POST /api/fim/completions', () => {
     expect(headers.Authorization).toBe('Bearer org-inception-key');
   });
 
+  it('asks Inception to report usage in a stream and bills it', async () => {
+    setOrganizationAuth();
+    const chunk = (fields: object) =>
+      `data: ${JSON.stringify({ id: 'cmpl-1', model: 'mercury-edit-2', created: 1, ...fields })}\n\n`;
+    mockedFetch.mockResolvedValue(
+      new Response(
+        chunk({ choices: [{ index: 0, text: ' compl', finish_reason: null }] }) +
+          chunk({ choices: [{ index: 0, text: 'etion', finish_reason: 'stop' }] }) +
+          chunk({
+            choices: [],
+            usage: { prompt_tokens: 1_000, completion_tokens: 100, total_tokens: 1_100 },
+          }) +
+          'data: [DONE]\n\n',
+        { status: 200, headers: { 'content-type': 'text/event-stream' } }
+      )
+    );
+
+    const { handleFimCompletionsRequest } = await import('./fim-completions');
+    const response = await handleFimCompletionsRequest(makeRequest(undefined, true) as never);
+    await response.text();
+
+    const [, init] = mockedFetch.mock.calls[0];
+    expect(JSON.parse(init?.body as string).stream_options).toEqual({ include_usage: true });
+    await flushAfter();
+    const [stats] = mockedLogMicrodollarUsage.mock.calls[0];
+    expect(stats).toMatchObject({
+      responseContent: ' completion',
+      inputTokens: 1_000,
+      outputTokens: 100,
+      cost_mUsd: 325,
+    });
+  });
+
+  it.each([
+    ['inception/mercury-edit-2', true, { include_usage: true }],
+    ['mistralai/codestral-2508', true, { include_usage: true }],
+    ['inception/mercury-edit-2', false, undefined],
+    ['mistralai/codestral-2508', false, undefined],
+  ])('sets stream_options for %s with stream %s', async (model, stream, expected) => {
+    setOrganizationAuth();
+    mockedFetch.mockResolvedValue(makeUpstreamResponse());
+
+    const { handleFimCompletionsRequest } = await import('./fim-completions');
+    await handleFimCompletionsRequest(makeRequest(model, stream) as never);
+
+    const [, init] = mockedFetch.mock.calls[0];
+    expect(JSON.parse(init?.body as string).stream_options).toEqual(expected);
+  });
+
   it.each<OrganizationSettings | undefined>([
     { data_collection: 'allow' },
     { data_collection: null },
@@ -303,5 +368,84 @@ describe('POST /api/fim/completions', () => {
 
     expect(response.status).toBe(200);
     expect(mockedFetch).toHaveBeenCalledTimes(1);
+  });
+
+  describe('bouncer wiring', () => {
+    function verdict(fields: Partial<DecideResponse>): DecideResponse {
+      return { enforced: false, flags: [], spendWatch: false, ...fields } as DecideResponse;
+    }
+
+    beforeEach(() => {
+      jest.mocked(after).mockImplementation(work => {
+        void (typeof work === 'function' ? work() : work);
+      });
+    });
+
+    it('rejects an enforced verdict before the upstream call', async () => {
+      setOrganizationAuth();
+      mockedDecide.mockResolvedValue(verdict({ enforced: true, code: 'rate_limited' }));
+
+      const { handleFimCompletionsRequest } = await import('./fim-completions');
+      const response = await handleFimCompletionsRequest(makeRequest() as never);
+
+      expect(response.status).toBe(429);
+      expect(mockedFetch).not.toHaveBeenCalled();
+      expect(mockedDecide).toHaveBeenCalledTimes(1);
+    });
+
+    it('sends a shadow verdict and carries its identity and spend watch into usage', async () => {
+      setOrganizationAuth();
+      mockedDecide.mockResolvedValue(
+        verdict({ enforced: false, code: 'restricted', spendWatch: true })
+      );
+      mockedFetch.mockResolvedValue(makeUpstreamResponse());
+
+      const { handleFimCompletionsRequest } = await import('./fim-completions');
+      const response = await handleFimCompletionsRequest(makeRequest() as never);
+
+      expect(response.status).toBe(200);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+      expect(mockedDecide).toHaveBeenCalledTimes(1);
+      const decided = mockedDecide.mock.calls[0]?.[0];
+      expect(decided).toMatchObject({
+        tier: 'team',
+        accountId: 'org:org-123',
+        userId: 'user-123',
+        ip: '127.0.0.1',
+      });
+
+      await flushAfter();
+      const [, usageContext] = mockedLogMicrodollarUsage.mock.calls[0];
+      expect(usageContext.bouncer).toEqual({
+        requestId: decided?.requestId,
+        occurredAt: expect.any(Date),
+        accountId: 'org:org-123',
+        clientIp: '127.0.0.1',
+        clientAttributed: false,
+        requestedLogprobs: false,
+        samples: null,
+        promptSimHash: null,
+        spendWatch: true,
+      });
+      expect(mockedReleaseDecideLease).toHaveBeenCalledTimes(1);
+      expect(mockedReleaseDecideLease).toHaveBeenCalledWith({
+        requestId: decided?.requestId,
+        accountId: 'org:org-123',
+      });
+    });
+
+    it('sends the request when decide fails', async () => {
+      setOrganizationAuth();
+      mockedDecide.mockRejectedValue(new Error('bouncer unreachable'));
+      mockedFetch.mockResolvedValue(makeUpstreamResponse());
+
+      const { handleFimCompletionsRequest } = await import('./fim-completions');
+      const response = await handleFimCompletionsRequest(makeRequest() as never);
+
+      expect(response.status).toBe(200);
+      await flushAfter();
+      expect(mockedLogMicrodollarUsage.mock.calls[0]?.[1].bouncer?.spendWatch).toBe(false);
+      expect(mockedReleaseDecideLease).not.toHaveBeenCalled();
+    });
   });
 });

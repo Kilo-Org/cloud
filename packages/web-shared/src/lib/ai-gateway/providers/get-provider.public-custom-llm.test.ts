@@ -8,6 +8,8 @@ import { createAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import { resetCustomLlmCacheForTest } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { User } from '@kilocode/db/schema';
+import { qwen36_plus_stealth_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { MARTIAN } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/martian';
 import {
   customLlmDefinition,
   deleteCustomLlmForTest,
@@ -52,8 +54,28 @@ describe('getProvider with public custom LLMs', () => {
       encryptedApiKey
     );
     await insertCustomLlmForTest(
+      'acme/multi-api-model',
+      publicCustomLlmDefinition(['acme'], { api_kinds: ['chat_completions', 'responses'] }),
+      encryptedApiKey
+    );
+    await insertCustomLlmForTest(
+      qwen36_plus_stealth_model.public_id,
+      publicCustomLlmDefinition(['acme']),
+      encryptedApiKey
+    );
+    await insertCustomLlmForTest(
       'acme/private-model',
       customLlmDefinition({ organization_ids: [ORG_ID] }),
+      encryptedApiKey
+    );
+    await insertCustomLlmForTest(
+      'acme/country-denied-public-model',
+      publicCustomLlmDefinition(['acme'], { country_deny_list: ['CU', 'KP'] }),
+      encryptedApiKey
+    );
+    await insertCustomLlmForTest(
+      'acme/country-denied-private-model',
+      customLlmDefinition({ organization_ids: [ORG_ID], country_deny_list: ['CU'] }),
       encryptedApiKey
     );
   });
@@ -62,6 +84,33 @@ describe('getProvider with public custom LLMs', () => {
     await deleteCustomLlmForTest('acme/public-model');
     await deleteCustomLlmForTest('acme/public-web-model');
     await deleteCustomLlmForTest('acme/private-model');
+    await deleteCustomLlmForTest('acme/multi-api-model');
+    await deleteCustomLlmForTest(qwen36_plus_stealth_model.public_id);
+    await deleteCustomLlmForTest('acme/country-denied-public-model');
+    await deleteCustomLlmForTest('acme/country-denied-private-model');
+  });
+
+  test.each([
+    ['acme/country-denied-public-model', createAnonymousContext('127.0.0.1'), undefined],
+    ['acme/country-denied-private-model', user, ORG_ID],
+  ])('refuses %s for a caller from a denied country', async (model, caller, organizationId) => {
+    await expect(
+      getProvider({ ...providerInput(model, caller, organizationId), countryCode: 'CU' })
+    ).resolves.toEqual({ kind: 'custom-llm-unavailable' });
+  });
+
+  test.each([
+    ['another country', 'US'],
+    ['an unknown country', null],
+  ])('serves a country-restricted custom LLM to %s', async (_name, countryCode) => {
+    for (const [model, caller, organizationId] of [
+      ['acme/country-denied-public-model', createAnonymousContext('127.0.0.1'), undefined],
+      ['acme/country-denied-private-model', user, ORG_ID],
+    ] as const) {
+      await expect(
+        getProvider({ ...providerInput(model, caller, organizationId), countryCode })
+      ).resolves.toMatchObject({ kind: 'provider', provider: { id: 'custom' } });
+    }
   });
 
   afterEach(() => {
@@ -79,6 +128,24 @@ describe('getProvider with public custom LLMs', () => {
       provider: { id: 'custom', apiUrl: 'https://upstream.example.com/v1', apiKey: 'sk-upstream' },
       bypassAccessCheck: false,
     });
+  });
+
+  test('serves the APIs a custom LLM lists, or the one its AI SDK provider implies', async () => {
+    const multi = await getProvider(providerInput('acme/multi-api-model', user, undefined));
+    const single = await getProvider(providerInput('acme/public-model', user, undefined));
+
+    expect(multi).toMatchObject({
+      provider: { supportedChatApis: ['chat_completions', 'responses'] },
+    });
+    expect(single).toMatchObject({ provider: { supportedChatApis: ['chat_completions'] } });
+  });
+
+  test('routes a Kilo-exclusive id to the Kilo-exclusive model while it exists', async () => {
+    const result = await getProvider(
+      providerInput(qwen36_plus_stealth_model.public_id, user, undefined)
+    );
+
+    expect(result).toMatchObject({ kind: 'provider', provider: { id: MARTIAN.id } });
   });
 
   test('keeps a private custom LLM to its grantees, exempt from policy checks', async () => {

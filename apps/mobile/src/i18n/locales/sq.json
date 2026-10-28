@@ -227,7 +227,6 @@
     "hideBalance": "Fshih gjendjen",
     "showBalance": "Shfaq gjendjen",
     "balanceHidden": "Gjendja është e fshehur",
-    "bonusCreditsExpiring": "Kredite në vlerën {{amount}} skadojnë më {{date}}.",
     "signOutTitle": "Do të dalësh nga llogaria?",
     "signOutMessage": "Do të duhet të hysh përsëri për të pasur qasje në hapësirën tënde të punës.",
     "deleteAccountTitle": "Të fshihet llogaria?",
@@ -876,6 +875,18 @@
       "securityFindingsUnavailable": "Aktivizo Agjentin e sigurisë Kilo në një fushëveprim për të marrë gjetje sigurie.",
       "spendAlertsSubtitle": "tejkalime pragjesh dhe rritje për orë",
       "spendAlertsToggle": "Kategoria e njoftimeve për shpenzimet"
+    },
+    "history": {
+      "title": "Historiku i njoftimeve",
+      "subtitle": "Njoftimet që ka marrë kjo llogari",
+      "bannerBody": "Njoftimet push janë të çaktivizuara për këtë pajisje, kështu që të rejat nuk do të mbërrijnë këtu.",
+      "bannerAction": "Cilësimet e njoftimeve",
+      "emptyTitle": "Nuk ka ende njoftime",
+      "emptyCategoryTitle": "Nuk ka njoftime në këtë kategori",
+      "emptyBody": "Njoftimet që merr kjo llogari shfaqen këtu. Ato ruhen për {{days}} ditë.",
+      "capped": "Po shfaqen njoftimet më të fundit.",
+      "loadError": "Nuk u arrit të ngarkohej historiku i njoftimeve.",
+      "openFailed": "Ky njoftim nuk hapet më askund."
     },
     "action": {
       "openSession": "Hap seancën"
@@ -2178,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Nuk u arrit lidhja me instancën. Ajo mund të jetë shkëputur.",
     "remoteSpawnNonRetryable": "Instanca nuk arriti të niste seancën. Kontrollo kompjuterin ose përditëso CLI-në.",
-    "remoteSpawnInstanceDisconnected": "Instanca e zgjedhur u shkëput. Nis një seancë në Cloud Agent ose zgjidh një instancë tjetër.",
-    "liveCount_one": "{{count}} DREJTPËRDREJT",
-    "liveCount_other": "{{count}} DREJTPËRDREJT"
+    "remoteSpawnInstanceDisconnected": "Instanca e zgjedhur u shkëput. Nis një seancë në Cloud Agent ose zgjidh një instancë tjetër."
   },
   "agentChat": {
     "session": {
@@ -2592,7 +2601,9 @@
       "retrying": "Duke u provuar përsëri…",
       "retryDeny": "Provo ta refuzosh përsëri",
       "retryAllowOnce": "Provo ta lejosh një herë përsëri",
-      "retryAlwaysAllow": "Provo ta lejosh gjithmonë përsëri"
+      "retryAlwaysAllow": "Provo ta lejosh gjithmonë përsëri",
+      "unreadableTitle": "Kërkesa për leje nuk mund të lexohej",
+      "unreadableBody": "Agjenti po pret një vendim për leje që ky aplikacion nuk mund ta shfaqë. Përditëso aplikacionin ose CLI, ose përgjigju kërkesës në CLI për të vazhduar."
     },
     "questionCard": {
       "title": "Agjenti kërkon përgjigjen tënde",
@@ -2984,8 +2995,9 @@
     "unavailableDevice": "Diktimi nuk është i disponueshëm në këtë pajisje.",
     "unavailableLanguage": "Diktimi nuk është i disponueshëm për gjuhën e caktuar në këtë pajisje.",
     "languageNotInstalledTitle": "Diktimi për {{language}} nuk është gati ende",
-    "languageNotInstalledMessage": "Skedarët e të folurit jashtë interneti për {{language}} nuk janë të instaluar në këtë telefon. Shkarkoji dhe pastaj provo diktimin përsëri.",
+    "languageNotInstalledMessage": "Skedarët e të folurit jashtë internetit për {{language}} nuk janë instaluar dhe transkriptimi në internet është i fikur. Shkarko skedarët ose aktivizo përsëri transkriptimin në internet, që të përdorësh futjen me zë.",
     "downloadOfflineModel": "Shkarko",
+    "useOnlineTranscription": "Lejo transkriptimin në internet",
     "offlineModelDownloadScheduled": "Skedarët e të folurit jashtë interneti do të shkarkohen në sfond. Provo diktimin përsëri më vonë.",
     "listeningStopped": "Dëgjimi u ndal.",
     "transcribing": "Duke transkriptuar...",
@@ -3159,7 +3171,7 @@
     "creditActivity": {
       "emptyDescription": "Blerjet, përdorimi dhe rregullimet e krediteve të kësaj organizate do të shfaqen këtu sapo të ndodhin.",
       "emptyTitle": "Nuk ka aktivitet kreditesh",
-      "expires": "Skadon më {{date}}",
+      "expiresUtc": "Skadon më {{date}} (UTC)",
       "title": "Aktiviteti i krediteve",
       "transactionFallback": "Transaksion kreditesh",
       "category": {
@@ -3840,6 +3852,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Vlerat e shfaqura si •••• mbajnë sekretin e tyre të ruajtur; zëvendëso një vlerë për ta rrotulluar. Ndryshimi i linjës së komandës kërkon përsëri të gjitha vlerat",
+      "headersHint": "Vlerat e shfaqura si •••• mbajnë sekretin e tyre të ruajtur; zëvendëso një vlerë për ta rrotulluar. Ndryshimi i URL-së kërkon përsëri të gjitha vlerat",
       "nameRequired": "Futni një emër serveri",
       "nameInvalid": "Emri mund të përdorë vetëm shkronja ASCII, numra, nënvizime dhe viza, deri në 100 karaktere",
       "commandRequired": "Futni një komandë",
@@ -3938,6 +3952,10 @@
   "credits": {
     "title": "Bli kredite",
     "description": "Kreditet janë një blerje e njëhershme që shtohet në bilancin tuaj Kilo për të drejtuar seanca kodimi me AI në Kilo App. Dyqani të faturova llogarinë dhe kreditet shtohen pasi dyqani konfirmon pagesën.",
+    "nextExpiry": "Kredite në vlerën {{amount}} skadojnë më {{date}} (UTC). Kreditet që skadojnë më herët përdoren të parat.",
+    "appStoreExpiry": "Kreditet e blera përmes App Store nuk skadojnë.",
+    "playOneYearExpiry": "Këto kredite skadojnë një vit kalendarik pas blerjes.",
+    "playNonexpiring": "Këto kredite nuk skadojnë.",
     "packLabel": "Shto {{amount}} në kredite",
     "priceUnavailable": "Çmimi nuk disponohet",
     "purchased": "Kreditet u shtuan në bilancin tuaj.",
@@ -4076,6 +4094,10 @@
     "generate": "Gjenero përmbledhjen",
     "retrySummary": "Riprovo përmbledhjen me pagesë",
     "sources": "Prova dhe artefakte",
+    "sessionsShown_one": "Po shfaqen {{shown}} nga {{total}} seancë",
+    "sessionsShown_other": "Po shfaqen {{shown}} nga {{total}} seanca",
+    "itemsShown_one": "Po shfaqen {{shown}} nga {{total}} element",
+    "itemsShown_other": "Po shfaqen {{shown}} nga {{total}} elemente",
     "timezone": "Zona kohore e raportit",
     "deviceTimezone": "Përdor zonën kohore të pajisjes",
     "timezoneHint": "Zonë kohore IANA, p.sh. Europe/Berlin. Ndryshimet e orarit zbatohen për raportet e ardhshme.",

@@ -1,5 +1,5 @@
 import type { OpenAI } from 'openai';
-import { createParser, type EventSourceMessage } from 'eventsource-parser';
+import type { EventSourceMessage } from 'eventsource-parser';
 import { captureException, captureMessage, startInactiveSpan } from '@sentry/nextjs';
 import type { Span } from '@sentry/nextjs';
 import { sentryRootSpan } from '../getRootSpan';
@@ -13,14 +13,10 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import type { GatewayResponsesRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
-  computeOpenRouterCostFields,
-  providerReportsIsByok,
-  computeVercelCostMicrodollars,
   drainSseStream,
-  extractVercelGenerationTime,
-  extractVercelIsByok,
   extractVercelUpstreamId,
   reportUpstreamStreamError,
+  selectUsageCostFields,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 
@@ -61,40 +57,14 @@ export function processResponsesApiUsage(
   const cacheHitTokens = usage?.input_tokens_details?.cached_tokens ?? 0;
   const cacheWriteTokens = usage?.input_tokens_details?.cache_write_tokens ?? 0;
 
-  // OpenRouter path: cost fields are present directly in usage
-  if (usage?.cost != null || usage?.is_byok != null) {
-    const { cost_mUsd, is_byok } = computeOpenRouterCostFields(
-      usage,
-      coreProps,
-      'responses_sse_processing',
-      providerReportsIsByok(provider)
-    );
-    return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens, cost_mUsd, is_byok };
-  }
-
-  // Vercel path: cost is in provider_metadata.gateway
-  const vercelGateway = providerMetadata?.gateway;
-  if (vercelGateway?.marketCost != null || vercelGateway?.cost != null) {
-    const cost_mUsd = computeVercelCostMicrodollars(vercelGateway);
-    return {
-      inputTokens,
-      outputTokens,
-      cacheHitTokens,
-      cacheWriteTokens,
-      cost_mUsd,
-      is_byok: extractVercelIsByok(vercelGateway),
-    };
-  }
-
-  // No cost info available
-  return {
-    inputTokens,
-    outputTokens,
-    cacheHitTokens,
-    cacheWriteTokens,
-    cost_mUsd: 0,
-    is_byok: null,
-  };
+  const costs = selectUsageCostFields(
+    usage,
+    providerMetadata,
+    coreProps,
+    'responses_sse_processing',
+    provider
+  );
+  return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens, ...costs };
 }
 
 function extractResponseContent(output: OpenAI.Responses.ResponseOutputItem[]): string {
@@ -115,7 +85,8 @@ export async function parseResponsesMicrodollarUsageFromStream(
   openrouterRequestSpan: Span | undefined,
   provider: ProviderId,
   statusCode: number,
-  usesUserCredentials: boolean
+  usesUserCredentials: boolean,
+  requestStartedAt?: number
 ): Promise<MicrodollarUsageStats> {
   openrouterRequestSpan?.end();
   const streamProcessingSpan = startInactiveSpan({
@@ -138,74 +109,73 @@ export async function parseResponsesMicrodollarUsageFromStream(
   let inference_provider: string | null = null;
   let finish_reason: string | null = null;
 
-  const sseStreamParser = createParser({
-    onEvent(event: EventSourceMessage) {
-      if (!firstTokenReceived) {
-        sentryRootSpan()?.setAttribute(
-          'responses.time_to_first_token_ms',
-          performance.now() - startedAt
-        );
-        firstTokenReceived = true;
-        timeToFirstTokenSpan.end();
+  const onEvent = (event: EventSourceMessage) => {
+    if (!firstTokenReceived) {
+      sentryRootSpan()?.setAttribute(
+        'responses.time_to_first_token_ms',
+        performance.now() - startedAt
+      );
+      firstTokenReceived = true;
+      timeToFirstTokenSpan.end();
+    }
+
+    if (event.data === '[DONE]') {
+      return;
+    }
+
+    const json = JSON.parse(event.data) as ResponsesApiStreamEvent;
+
+    if (!json) {
+      captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
+        extra: { event },
+      });
+      return;
+    }
+
+    if ('error' in json && json.error) {
+      reportedError = true;
+      reportUpstreamStreamError({
+        label: 'Responses API error',
+        source: 'responses_sse_processing',
+        error: json.error,
+        usesUserCredentials,
+        logContext: { provider, inference_provider, messageId, model },
+        sentryExtra: { json, event },
+      });
+    }
+
+    if (json.type === 'response.output_text.delta' && json.delta) {
+      responseContent += json.delta;
+    }
+
+    // Extract metadata whenever json.response is present so that aborted
+    // streams still capture messageId/model/usage from early events like
+    // response.created and response.in_progress.
+    if (json.response) {
+      const response = json.response;
+      messageId = response.id ?? messageId;
+      model = response.model ?? model;
+      if (response.usage) {
+        usage = response.usage as ResponsesApiUsage;
       }
-
-      if (event.data === '[DONE]') {
-        return;
+      const meta = response.provider_metadata;
+      if (meta) {
+        providerMetadata = meta;
+        inference_provider = meta.gateway?.routing?.finalProvider ?? inference_provider;
       }
+      finish_reason = response.status ?? finish_reason;
+    }
 
-      const json = JSON.parse(event.data) as ResponsesApiStreamEvent;
+    if (json.type === 'response.failed' || json.type === 'response.incomplete') {
+      reportedError = true;
+    }
+  };
 
-      if (!json) {
-        captureException(new Error('SUSPICIOUS: No JSON in SSE event'), {
-          extra: { event },
-        });
-        return;
-      }
-
-      if ('error' in json && json.error) {
-        reportedError = true;
-        reportUpstreamStreamError({
-          label: 'Responses API error',
-          source: 'responses_sse_processing',
-          error: json.error,
-          usesUserCredentials,
-          logContext: { provider, inference_provider, messageId, model },
-          sentryExtra: { json, event },
-        });
-      }
-
-      if (json.type === 'response.output_text.delta' && json.delta) {
-        responseContent += json.delta;
-      }
-
-      // Extract metadata whenever json.response is present so that aborted
-      // streams still capture messageId/model/usage from early events like
-      // response.created and response.in_progress.
-      if (json.response) {
-        const response = json.response;
-        messageId = response.id ?? messageId;
-        model = response.model ?? model;
-        if (response.usage) {
-          usage = response.usage as ResponsesApiUsage;
-        }
-        const meta = response.provider_metadata;
-        if (meta) {
-          providerMetadata = meta;
-          inference_provider = meta.gateway?.routing?.finalProvider ?? inference_provider;
-        }
-        finish_reason = response.status ?? finish_reason;
-      }
-
-      if (json.type === 'response.failed' || json.type === 'response.incomplete') {
-        reportedError = true;
-      }
-    },
-  });
-
-  const wasAborted = await drainSseStream(
+  const { wasAborted, timing } = await drainSseStream(
     stream,
-    chunk => sseStreamParser.feed(chunk),
-    streamProcessingSpan
+    onEvent,
+    streamProcessingSpan,
+    requestStartedAt
   );
 
   if (!reportedError && !usage) {
@@ -224,9 +194,9 @@ export async function parseResponsesMicrodollarUsageFromStream(
     inference_provider,
     finish_reason,
     upstream_id: extractVercelUpstreamId(providerMetadata),
-    latency: null,
+    latency: timing.latency,
     moderation_latency: null,
-    generation_time: extractVercelGenerationTime(providerMetadata),
+    generation_time: timing.generation_time,
     streamed: true,
     cancelled: null,
     status_code: statusCode,
@@ -258,7 +228,7 @@ export function parseResponsesMicrodollarUsageFromString(
     finish_reason: responseJson?.status ?? null,
     latency: null,
     moderation_latency: null,
-    generation_time: extractVercelGenerationTime(providerMetadata),
+    generation_time: null,
     streamed: false,
     cancelled: null,
     status_code: statusCode,

@@ -44,6 +44,10 @@ import {
   createDeviceSessionWithAttestedKey,
   revokeDeviceSession,
 } from '@/lib/auth/device-sessions';
+import {
+  isNativeTokenAddressRateLimited,
+  isNativeTokenUserRateLimited,
+} from '@/lib/auth/native-token-rate-limit';
 import { captureMessage } from '@sentry/nextjs';
 import PostHogClient from '@kilocode/web-shared/lib/posthog';
 import { withRestTiming } from '@kilocode/web-shared/lib/observability/request-timing';
@@ -89,6 +93,18 @@ function settlementFailureResponse(failure: Extract<CreateOrUpdateUserResult, { 
     { error: failure.error },
     { status: failure.error === 'SIGNUP-UNAVAILABLE' ? 503 : 403 }
   );
+}
+
+/**
+ * A rate-limited account. Counted once the sign-in has resolved its account and
+ * before any device session or refresh token is written, so a caller that
+ * outruns the firewall rule leaves no credential rows behind.
+ */
+async function userRateLimitResponse(request: Request, kiloUserId: string) {
+  if (await isNativeTokenUserRateLimited(request, kiloUserId)) {
+    return NextResponse.json({ error: 'RATE_LIMITED' }, { status: 429 });
+  }
+  return undefined;
 }
 
 async function checkExistingProviderAccount(
@@ -180,6 +196,7 @@ const requestSchema = z.discriminatedUnion('provider', [
  *   401 { error: 'INVALID_TICKET' }
  *   425 { error: 'CODE_IN_PROGRESS' }
  *   429 { error: 'TOO_MANY_ATTEMPTS' }
+ *   429 { error: 'RATE_LIMITED' }
  *   503 { error: 'NONCE_STORE_UNAVAILABLE' }
  *   403/503 { error: 'BLOCKED' | 'SSO_ERROR', ssoOrganizationId? }
  *   403 { error: AuthErrorType }
@@ -196,6 +213,14 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
   }
 
   const data = validation.data;
+
+  // ── Step 0: Client-address rate limit ────────────────────────────────────
+  // Counted before the admission gate so one address cannot spend the provider
+  // calls that admission and identity verification make. A firewall rule that
+  // is not configured fails open and is reported; it never refuses a sign-in.
+  if (await isNativeTokenAddressRateLimited(request)) {
+    return NextResponse.json({ error: 'RATE_LIMITED' }, { status: 429 });
+  }
 
   // ── Step 1: Admission gate ───────────────────────────────────────────────
   // Credentials are issued only to an attested device. A missing or malformed
@@ -258,6 +283,11 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
 
     // Fall into the same device-session issuance the other providers use.
     // `created` is always false: a passkey belongs to an existing user.
+    const rateLimited = await userRateLimitResponse(request, user.id);
+    if (rateLimited) {
+      return rateLimited;
+    }
+
     if (data.supportsRefresh) {
       const sid = await createDeviceSession({
         userId: user.id,
@@ -337,6 +367,9 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         return NextResponse.json({ error: 'INVALID_REQUEST' }, { status: 400 });
       }
     } catch (error) {
+      if (error instanceof NonceStoreUnavailableError) {
+        return NextResponse.json({ error: 'NONCE_STORE_UNAVAILABLE' }, { status: 503 });
+      }
       if (!isInvalidNativeTokenError(error)) {
         throw error;
       }
@@ -455,6 +488,15 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
         captureMessage('native_attested_key_ownership_mismatch');
         phase = 'release';
         return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
+      }
+
+      // ── Step 4.6: Account rate limit BEFORE code commit ───────────────
+      // A refusal releases the reservation, so the code stays usable once the
+      // caller is under the rate limit again.
+      const rateLimited = await userRateLimitResponse(request, result.user.id);
+      if (rateLimited) {
+        phase = 'release';
+        return rateLimited;
       }
 
       // ── Step 5: Persist attested key after settlement ─────────────────
@@ -598,6 +640,11 @@ export const POST = withRestTiming('/api/auth/native/token', async (request: Req
   ) {
     captureMessage('native_attested_key_ownership_mismatch');
     return NextResponse.json({ error: 'ADMISSION_REQUIRED' }, { status: 403 });
+  }
+
+  const rateLimited = await userRateLimitResponse(request, result.user.id);
+  if (rateLimited) {
+    return rateLimited;
   }
 
   if (data.supportsRefresh) {

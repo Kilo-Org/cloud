@@ -15,7 +15,7 @@ import {
   kilo_pass_org_term_versions,
   cli_sessions_v2,
 } from '@kilocode/db/schema';
-import { eq, and, inArray, sql } from 'drizzle-orm';
+import { eq, and, inArray, lt, sql } from 'drizzle-orm';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import {
@@ -623,6 +623,26 @@ describe('organization admin router', () => {
         .where(eq(credit_transactions.organization_id, testOrganization.id));
     });
 
+    it('marks explicitly paid grants as principal and ignores promotional expiry overrides', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+      await caller.organizations.admin.grantCredit({
+        organizationId: testOrganization.id,
+        amount_usd: 10,
+        creditKind: 'paid',
+        expiry_date: '2030-01-01T00:00:00.000Z',
+        expiry_hours: 1,
+      });
+      const credit = await db.query.credit_transactions.findFirst({
+        where: eq(credit_transactions.organization_id, testOrganization.id),
+      });
+      expect(credit).toMatchObject({
+        is_free: false,
+        credit_source: 'admin',
+        paid_credit_policy: 'legacy',
+        expiry_date: null,
+      });
+    });
+
     it('should successfully grant positive credits', async () => {
       const caller = await createCallerForUser(adminUser.id);
       const amount = 10;
@@ -682,7 +702,34 @@ describe('organization admin router', () => {
 
       expect(creditTransaction).toBeDefined();
       expect(creditTransaction.description).toBe(description);
+      expect(creditTransaction.credit_category).toBe('organization_custom');
       expect(creditTransaction.created_by_kilo_user_id).toBe(adminUser.id);
+    });
+
+    it('records repeated negative grants under the stable organization_custom category', async () => {
+      const caller = await createCallerForUser(adminUser.id);
+
+      for (const description of ['First correction', 'Second correction']) {
+        await caller.organizations.admin.grantCredit({
+          organizationId: testOrganization.id,
+          amount_usd: -2,
+          description,
+        });
+      }
+
+      const debits = await db
+        .select()
+        .from(credit_transactions)
+        .where(
+          and(
+            eq(credit_transactions.organization_id, testOrganization.id),
+            lt(credit_transactions.amount_microdollars, 0)
+          )
+        );
+      expect(debits.map(debit => debit.credit_category)).toEqual([
+        'organization_custom',
+        'organization_custom',
+      ]);
     });
 
     it('should fail to grant negative credits without description', async () => {
@@ -810,14 +857,14 @@ describe('organization admin router', () => {
       await caller.organizations.admin.grantCredit({
         organizationId: testOrganization.id,
         amount_usd: 5,
-        expiry_date: '2024-02-01T00:00:00.000Z',
+        expiry_date: '2030-02-01T00:00:00.000Z',
       });
 
       // Second grant with later expiry
       await caller.organizations.admin.grantCredit({
         organizationId: testOrganization.id,
         amount_usd: 5,
-        expiry_date: '2024-06-01T00:00:00.000Z',
+        expiry_date: '2030-06-01T00:00:00.000Z',
       });
 
       const [updatedOrg] = await db
@@ -827,7 +874,7 @@ describe('organization admin router', () => {
 
       // Should still be the earlier date
       expect(new Date(updatedOrg.next_credit_expiration_at!).toISOString()).toBe(
-        '2024-02-01T00:00:00.000Z'
+        '2030-02-01T00:00:00.000Z'
       );
     });
 
@@ -1114,7 +1161,7 @@ describe('organization admin router', () => {
       expect(creditBlocks.totalBalance_mUsd).toBe(40_000_000);
     });
 
-    it('closes out multiple still-open grants on nullification', async () => {
+    it('retires multiple still-open grants on nullification', async () => {
       const caller = await createCallerForUser(adminUser.id);
 
       await caller.organizations.admin.grantCredit({
@@ -1133,7 +1180,15 @@ describe('organization admin router', () => {
       });
 
       const expiring = await fetchExpiringTransactionsForOrganization(testOrganization.id);
-      expect(expiring).toHaveLength(0);
+      expect(
+        expiring.every(
+          lot =>
+            lot.amount_microdollars -
+              (lot.retired_microdollars ?? 0) -
+              (lot.consumed_microdollars ?? 0) ===
+            0
+        )
+      ).toBe(true);
 
       const creditBlocks = await caller.organizations.getCreditBlocks({
         organizationId: testOrganization.id,
@@ -2508,6 +2563,139 @@ describe('organization admin router', () => {
           .where(inArray(organization_memberships.organization_id, [parent.id, child.id]));
         await db.delete(organizations).where(inArray(organizations.id, [parent.id, child.id]));
       }
+    });
+  });
+
+  describe('addMember', () => {
+    it('rejects adding someone who is not a parent organization member to a child organization', async () => {
+      const parent = await createTestOrganization(
+        `Add child parent ${crypto.randomUUID()}`,
+        adminUser.id,
+        0
+      );
+      const child = await createTestOrganization(
+        `Add child org ${crypto.randomUUID()}`,
+        adminUser.id,
+        0
+      );
+      const outsider = await insertTestUser();
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+      const caller = await createCallerForUser(adminUser.id);
+
+      await expect(
+        caller.organizations.admin.addMember({
+          organizationId: child.id,
+          userId: outsider.id,
+          role: 'member',
+        })
+      ).rejects.toThrow(
+        'Child organizations can only add people who are already members of the parent organization.'
+      );
+    });
+
+    it('adds a parent organization member to a child organization', async () => {
+      const parent = await createTestOrganization(
+        `Add parent member ${crypto.randomUUID()}`,
+        adminUser.id,
+        0
+      );
+      const child = await createTestOrganization(
+        `Add parent member child ${crypto.randomUUID()}`,
+        adminUser.id,
+        0
+      );
+      const parentMember = await insertTestUser();
+      await addUserToOrganization(parent.id, parentMember.id, 'member');
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+      const caller = await createCallerForUser(adminUser.id);
+
+      await caller.organizations.admin.addMember({
+        organizationId: child.id,
+        userId: parentMember.id,
+        role: 'member',
+      });
+
+      const [membership] = await db
+        .select({ role: organization_memberships.role })
+        .from(organization_memberships)
+        .where(
+          and(
+            eq(organization_memberships.organization_id, child.id),
+            eq(organization_memberships.kilo_user_id, parentMember.id)
+          )
+        );
+      expect(membership?.role).toBe('member');
+    });
+
+    it('rejects adding a parent member after the parent organization is deleted', async () => {
+      const parent = await createTestOrganization(
+        `Deleted parent ${crypto.randomUUID()}`,
+        adminUser.id,
+        0
+      );
+      const child = await createTestOrganization(
+        `Deleted parent child ${crypto.randomUUID()}`,
+        adminUser.id,
+        0
+      );
+      const parentMember = await insertTestUser();
+      await addUserToOrganization(parent.id, parentMember.id, 'member');
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+      await markOrganizationAsDeleted(parent.id);
+      const caller = await createCallerForUser(adminUser.id);
+
+      await expect(
+        caller.organizations.admin.addMember({
+          organizationId: child.id,
+          userId: parentMember.id,
+          role: 'member',
+        })
+      ).rejects.toThrow(
+        'Child organizations can only add people who are already members of the parent organization.'
+      );
+    });
+
+    it('searches only live parent members who are not already in the child organization', async () => {
+      const suffix = crypto.randomUUID();
+      const parent = await createTestOrganization(`Search parent ${suffix}`, adminUser.id, 0);
+      const child = await createTestOrganization(`Search child ${suffix}`, adminUser.id, 0);
+      const match = await insertTestUser({
+        google_user_email: `match-${suffix}@example.com`,
+        google_user_name: `Match ${suffix}`,
+      });
+      const alreadyChild = await insertTestUser({
+        google_user_email: `already-${suffix}@example.com`,
+        google_user_name: `Already ${suffix}`,
+      });
+      const outsider = await insertTestUser({
+        google_user_email: `outsider-${suffix}@example.com`,
+        google_user_name: `Outsider ${suffix}`,
+      });
+      await addUserToOrganization(parent.id, match.id, 'member');
+      await addUserToOrganization(parent.id, alreadyChild.id, 'member');
+      await addUserToOrganization(child.id, alreadyChild.id, 'member');
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+      const caller = await createCallerForUser(adminUser.id);
+
+      const result = await caller.organizations.admin.searchParentMembers({
+        organizationId: child.id,
+        search: suffix,
+      });
+
+      expect(result.users.map(user => user.id)).toEqual([match.id]);
+      expect(result.users.map(user => user.id)).not.toContain(outsider.id);
     });
   });
 });

@@ -61,8 +61,10 @@ import { adminAutoFreeConfigRouter } from '@/routers/admin/auto-free-config-rout
 import { adminGatewayModelListsRouter } from '@/routers/admin/gateway-model-lists-router';
 import { adminVercelModelIdOverridesRouter } from '@/routers/admin/vercel-model-id-overrides-router';
 import { adminPreferredProviderOrderRouter } from '@/routers/admin/preferred-provider-order-router';
+import { adminCustomPricingRouter } from '@/routers/admin/custom-pricing-router';
 import { adminBlacklistDomainsRouter } from '@/routers/admin/blacklist-domains-router';
 import { adminRequestLoggingOptInsRouter } from '@/routers/admin/request-logging-opt-ins-router';
+import { adminEnkryptGuardrailChargesRouter } from '@/routers/admin/enkrypt-guardrail-charges-router';
 import { adminBulkBlockRouter } from '@/routers/admin/bulk-block-router';
 import { adminKiloPassRouter } from '@/routers/admin/kilo-pass-router';
 import { adminImpactReferralsRouter } from '@/routers/admin/impact-referrals-router';
@@ -2753,8 +2755,10 @@ export const adminRouter = createTRPCRouter({
   gatewayModelLists: adminGatewayModelListsRouter,
   vercelModelIdOverrides: adminVercelModelIdOverridesRouter,
   preferredProviderOrder: adminPreferredProviderOrderRouter,
+  customPricing: adminCustomPricingRouter,
   blacklistDomains: adminBlacklistDomainsRouter,
   requestLoggingOptIns: adminRequestLoggingOptInsRouter,
+  enkryptGuardrailCharges: adminEnkryptGuardrailChargesRouter,
   bulkBlock: adminBulkBlockRouter,
   kiloPass: adminKiloPassRouter,
   disputes: adminStripeDisputesRouter,

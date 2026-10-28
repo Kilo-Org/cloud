@@ -114,7 +114,7 @@ terminal. Nothing else.
 | Outcome (status, reason, `lastMessageId`) | Every `accepted` message up to and including `lastMessageId` takes the status. If `lastMessageId` is unknown, every `accepted` message does. |
 | Stop | All `queued` and `accepted` → `cancelled`; send `abort` (best effort). |
 | Cancel one queued message | That message → `cancelled`. |
-| Backstop alarm | `queued` older than 16.5 minutes → `failed` (`preparation_timeout`). `accepted` older than 125 minutes → `failed` (`no_outcome`). |
+| Backstop alarm | `queued` older than its queued backstop → `failed` (`preparation_timeout`). `accepted` older than its accepted backstop → `failed` (`no_outcome`). |
 
 Stop still forwards a best-effort abort to an existing ready Kilo route when no
 message is queued or accepted and the wrapper has no active turn. It does not
@@ -123,7 +123,7 @@ rewrite terminal message outcomes or prepare/wake a stopped sandbox.
 Late outcomes and notifications for terminal messages are ignored. The backstop exists only for
 lost notifications; the Sandbox DO and the wrapper settle every normal case earlier. Both values
 are derived from the owners' timers so the backstop does not end work within its owner's bound:
-queued = reconnect window (90 s) + one preparation attempt (12 min) + 3 min, which covers the
+queued = reconnect window (90 s) + one preparation attempt (the sum of its step bounds, below) + 3 min, which covers the
 longest normal wait (a message sent while the socket is down, then a fresh attempt on a new
 sandbox); accepted = turn hard cap (120 min) + 5 min. The hard cap bounds one native execution, not
 an accepted message, so a batch whose follow-up waits behind a serialized command spans several
@@ -312,10 +312,16 @@ so a later report changes nothing.
 
 ### Route state (per session)
 
-`preparing` → `ready` → `failed`. Each preparation attempt has a 12-minute deadline. An attempt
+`preparing` → `ready` → `failed`. Each preparation attempt has a deadline that outlasts its
+own steps in sequence (sandbox create, wrapper first connect and hello, snapshot restore with
+the clone fallback, Kilo runtime start, session import), including one create retry and one
+retry each of the last two steps. Environment snapshot builds run separately. An attempt
 starts when a route enters `preparing`: the first `prepare`, a `prepare` after `failed`, or a
 re-prepare after a wrapper restart. A repeated `prepare`, a reconnect or a new allocation inside the
-attempt keeps its deadline.
+attempt keeps its deadline. Setup commands keep their own per-command limits, and how many run is
+configuration, so the attempt deadline is their aggregate stop: a preparation whose setup work
+together outlasts the attempt fails as `preparation_timeout`.
+Environment-build status reports this same timer as `sessionPreparationBudgetMs` for setup warnings.
 
 `prepare` returns the route view that the Sandbox DO would notify: `ready` only when the route is
 ready and the wrapper is connected, `reconnecting` when the route is ready but the socket is down,
@@ -610,14 +616,27 @@ text, not route state. A route already prepared in this process (checkout presen
 open) returns `session.ready` at once. A `session.prepare` for a failed route starts fresh,
 including a new Kilo restart budget.
 
+Every in-sandbox git process authenticates through the platform's read-only credential helper
+(`scripts/kilo-git-credential`, pinned by `SYSTEM_GIT_CONFIG_ENV`), which reads the per-session
+credential record in the runtime home. That covers the wrapper's own clone and fetch, the Kilo CLI
+and the workspace terminal, including a token a route is given without a platform. `origin` is
+therefore always the canonical credential-free URL: a copy of a worktree never carries the
+credential, and a credential-bearing `origin` (from an older workspace or chosen by the agent) is
+rewritten to the same URL without userinfo. A credential refresh rewrites the record; the next git
+command picks it up.
+
+Environment builds use the same pinned helper and a record in their fixed HOME during clone and
+setup. Pre-capture cleanup verifies removal of that record before the build can report ready;
+caches and toolchains remain available to sessions restored from the environment.
+
 Eligible managed GitHub HTTPS preparation clone and fetch, and only those invocations, pass two
 invocation-scoped options together: `proactiveAuth=basic` so the first request carries the existing
-URL-bound control alias, and `followRedirects=false` so every redirect fails instead of letting Git
-reattach the alias to a redirected request. The credential remains the existing control alias; the
-only credential flow is contained resolution, repository-authorized redemption, and the bounded
-Retry-After handler. Every redirect fails the operation, including a same-origin redirect from a
-renamed or transferred repository, so the caller must use the current direct repository URL. The
-options are command arguments, not Git config.
+control alias from the helper, and `followRedirects=false` so every redirect fails instead of
+letting Git reattach the alias to a redirected request. The credential remains the existing control
+alias; the only credential flow is contained resolution, repository-authorized redemption, and the
+bounded Retry-After handler. Every redirect fails the operation, including a same-origin redirect
+from a renamed or transferred repository, so the caller must use the current direct repository URL.
+The options are command arguments, not Git config.
 
 #### Workspace stamp
 
@@ -634,7 +653,7 @@ directory when there is no repository). The reader also accepts the older `captu
 
 Adopt makes the snapshot equal to a fresh clone, then runs the ordinary steps:
 
-1. Point `origin` at this route's credential.
+1. Point `origin` at this route's canonical, credential-free URL.
 2. `fetch --prune`, then refresh the remote default branch.
 3. Detach at the remote default branch, so a new branch starts from its tip.
 4. Delete every local branch. The builder's default branch would otherwise shadow a newer
@@ -859,7 +878,7 @@ them through one development-only override.
 
 | Owner | Timer | Value | On expiry |
 |---|---|---|---|
-| Session DO | Queued backstop | 16.5 min from send (reconnect + attempt + 3 min) | `failed` (`preparation_timeout`) |
+| Session DO | Queued backstop | From send: reconnect window + one preparation attempt + 3 min | `failed` (`preparation_timeout`) |
 | Session DO | Accepted backstop | 125 min from accept | `failed` (`no_outcome`) |
 | Session DO | Sandbox transport pass / best-effort abort | 2 s including RPC retries, not scaled | Retain queued intent / return from abort |
 | Session DO | Queued transport recovery | 15 s after exhaustion; development-only scaling | Consume once; passive status then bounded prepare/deliver, no self-rearm |
@@ -869,7 +888,7 @@ them through one development-only override.
 | Sandbox DO | Unbound wrapper hello | 30 s from socket admission, not scaled | Close candidate only; attachment deadline survives hibernation and participates in the existing alarm even while stopped |
 | Sandbox DO | Heartbeat | 45 s | Treat the socket as lost |
 | Sandbox DO | Reconnect | 90 s from the last frame received | Stop the sandbox |
-| Sandbox DO | Route preparation | 12 min per preparation attempt | Route `failed` (`preparation_timeout`) |
+| Sandbox DO | Route preparation | Sum of one preparation attempt's step bounds (see Preparation) | Route `failed` (`preparation_timeout`) |
 | Sandbox DO | Session notification | 2 s from enqueue including queue wait and RPC retries, not scaled | Drop expired queued work before RPC; bounded best-effort loss, existing Session backstop |
 | Sandbox DO | Idle | 10 min without activity | Stop the sandbox |
 | Sandbox DO | Provider lease | Existing lease length, renewed while active | Provider may stop an inactive sandbox |
@@ -918,7 +937,7 @@ them through one development-only override.
 | Native execution over 120 min | Native session supervisor | Bounded tree abort | Accepted fail (`execution_limit`), or routed error without a current turn |
 | Idle 10 min, question pending | Sandbox DO | Stop the sandbox | Accepted fail (`sandbox_stopped`); a later answer is a new message |
 | Sandbox gone | Provider via Sandbox DO | New allocation on next `prepare` | Accepted fail (`sandbox_lost`); queued re-prepare |
-| Notification lost | Session DO backstop | — | Fail at 16.5 or 125 min |
+| Notification lost | Session DO backstop | — | Fail at the queued or accepted backstop |
 | User Stop | Session DO | Abort the Kilo session only | Queued and accepted `cancelled` |
 | Auto-commit or condense fails | Wrapper | None | Warning event; turn `completed` |
 | Provider stop not confirmed | Sandbox DO | Logged; next `prepare` may create again | None; worktree deletion reports incomplete |
@@ -938,6 +957,23 @@ Sandbox DO → Session DO (RPC notifications): `onRoute(update)` where the updat
 
 Other callers of the Sandbox DO keep their current RPC: contained outbound credential lookup
 (`resolveCredential`), runtime credential proxy, worktree deletion, sandbox status.
+
+### Hosted workspace status and deletion
+
+The Worker exposes workspace-keyed `listHostedWorkspaces`, `getHostedWorkspace` and
+`getHostedWorkspaceStatus` reads plus the `deleteWorktree` mutation. The reads are passive: they
+project stored catalog and journal rows, the Sandbox DO's allocation snapshot, stored per-provider
+billing state and the immutable billing-SKU rate. They allocate no compute, prepare no runtime,
+admit no work and open no billing interval, so a sleeping workspace keeps its stored state and a
+later prompt still wakes it through the normal Cloud path. A workspace reports one compute rate
+from its sandbox SKU, never one per hosted session.
+
+Whole-workspace deletion is idempotent and runs over the existing journal; a retry resumes from the
+recorded manifest. It fences new prompts and session creation, interrupts active child work and
+removes every hosted root and descendant route, transcript and workspace file, including the last
+root, before recording a content-free tombstone. `getHostedWorkspaceStatus` reports journal progress
+while a deletion is in flight. Removing a workspace from one IDE's Agent Manager is a client-local
+action: it performs no Cloud mutation, and only `deleteWorktree` destroys Cloud state.
 
 Bootstrap → Worker (HTTPS on the `WORKER_URL` host, `downloaded` mode only): `GET` one payload with
 the artifact grant, and `POST` one startup-failure report with the wrapper launch credential. The
@@ -1370,7 +1406,7 @@ counts.
     overflow drops newest, loss diagnostics stay bounded/internal and expired queue heads make no RPC.
     Heartbeats, alarms, stop and reconnect continue while notifications are held. Release retires
     references; reconstruction replays no notification backlog. Public events, reports, callbacks
-    and the 16.5/125-minute lost-notification backstops are unchanged.
+    and the queued and accepted lost-notification backstops are unchanged.
 22. **Permanent versus transient creation failure.** Balance lost after send preflight fails queued
     work promptly with `billing_blocked`, not preparation timeout. Proven local invalid configuration
     fails promptly with `invalid_configuration`. The safe stream reason, durable route/message,

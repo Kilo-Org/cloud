@@ -15,6 +15,7 @@ import {
   insertCustomLlmForTest,
   publicCustomLlmDefinition,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
+import { qwen36_plus_stealth_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 
 describe('custom LLM catalog', () => {
   beforeAll(async () => {
@@ -39,6 +40,31 @@ describe('custom LLM catalog', () => {
     await expect(isCustomLlm('ACME/PRIVATE-MODEL')).resolves.toBe(true);
     await expect(isCustomLlm('kilo-internal/unknown')).resolves.toBe(false);
   });
+
+  test('ignores a custom LLM whose id is still a Kilo-exclusive model', async () => {
+    const exclusiveId = qwen36_plus_stealth_model.public_id;
+    await insertCustomLlmForTest(exclusiveId, publicCustomLlmDefinition(['acme']));
+    try {
+      await expect(findCustomLlm(exclusiveId)).resolves.toBeNull();
+      await expect(getPublicCustomLlmInferenceProviders(exclusiveId)).resolves.toBeNull();
+      expect((await requireCustomLlmsById()).has(exclusiveId)).toBe(false);
+    } finally {
+      await deleteCustomLlmForTest(exclusiveId);
+    }
+  });
+
+  test.each(['stealth/glyph-cluster', 'reflection/beam-free'])(
+    'serves a custom LLM with the id of the removed Kilo-exclusive model %s',
+    async id => {
+      await insertCustomLlmForTest(id, publicCustomLlmDefinition(['acme']));
+      try {
+        await expect(findCustomLlm(id)).resolves.toMatchObject({ public_id: id });
+        await expect(isFreeModel(id)).resolves.toBe(true);
+      } finally {
+        await deleteCustomLlmForTest(id);
+      }
+    }
+  );
 
   test('picks up new rows only after the cache expires', async () => {
     const now = Date.now();

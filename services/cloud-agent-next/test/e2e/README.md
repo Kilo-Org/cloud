@@ -348,6 +348,7 @@ for any other offset, compute the real ports from `pnpm dev:status --json`
 | `WORKER_URL` | `http://localhost:8794` |
 | `FAKE_LLM_URL` | `http://localhost:8811` (host-side view) |
 | `E2E_GIT_URL` | `https://github.com/octocat/Hello-World.git` |
+| `E2E_SECOND_GIT_URL` | `https://github.com/octocat/Spoon-Knife.git`. Second public HTTPS repository used by `hosted-workspace-contract` to prove a separate workspace sandbox; must differ from `E2E_GIT_URL`. |
 | `E2E_GITHUB_REPO` | unset. When set (`owner/repo`), start uses GitHub-app clone instead of `gitUrl`. Pair with `E2E_USER_EMAIL` for the seeded installation. |
 | `E2E_USER_EMAIL` | unset (ephemeral `usr_e2e_*`). Set to the cloud-worktree-setup email to reuse that user and its GitHub integration. |
 | `E2E_BRANCH` | unset. Optional checkout ref (`upstreamBranch` / `repository.branch`). |
@@ -383,6 +384,42 @@ tunnel-restart path reloads `cloud-agent-next` rather than the HTTP variant. Sto
 the HTTP group and start a fresh launcher session with
 `E2E_INTERNAL_API_SECRET` exported (the same value the driver uses), and never
 type the secret into a logged pane command.
+
+## Local Kilo Integration
+
+`e2e:local-kilo` tests the complete path through a separate local `kilo serve`:
+
+```text
+test driver -> local Kilo -> local Cloud Agent stack -> sandbox runtime
+```
+
+Start the `cloud-agent` group first. Use an existing funded local account and a
+Kilo source checkout with its locked dependencies installed. Select the Bun
+version in that checkout's `packageManager` field.
+
+```bash
+pnpm --filter cloud-agent-next run e2e:local-kilo \
+  --kilo-repo /path/to/kilocode \
+  --bun /path/to/pinned/bun \
+  --email your-local-test-account@example.com
+```
+
+The driver discovers ports with `dev:status`, validates local database ownership,
+and creates an owned profile and workspace. It launches Kilo with a separate
+`HOME`, all XDG directories, local-only service origins, and an in-memory local
+credential. It does not change normal Kilo authentication or load project config.
+
+Coverage includes workspace listing, creation and idempotent replay, workspace
+detail, a second session in that workspace, preparation and sandbox status SSE,
+native snapshot/fence/live delivery, and two follow-up turns with persisted
+transcript checks. Every acceptance operation goes through local Kilo. Direct
+stack access is limited to fixture setup, health, fake-model gates, and cleanup.
+
+The model is `kilo/fake-deterministic`; the sandbox, wrapper, Kilo processes,
+Durable Objects, and database are real. The public Git fixture needs network access.
+Reports and redacted traces are stored under `dev/logs/local-kilo-*`; `--out`
+selects a new evidence directory. Cleanup removes only this run's workspace,
+profile, attachments, and local Kilo process.
 
 ## Deployed profile (`E2E_PROFILE=deployed`)
 
@@ -794,6 +831,7 @@ reusable catalog of planned and existing scenarios, see
 | `cold-hot` | One cold turn plus `echo:hot`, `slow:3:50`, and `echo:followup` hot turns on the same session/sandbox. |
 | `worktree-chat` | Creates a worktree chat through the public tRPC surface; verifies workspace/worktree identity, idempotent same-key replay, a cold echo boot, and one hot echo turn with stable allocation references. |
 | `worktree-multi-chat` | Boots a root chat, lazily creates a sibling in the same worktree/sandbox, and proves: shared uncommitted file write→read→overwrite (parsed echo equals an independent writer nonce), sequential question ownership/replay/answer isolation (asked in the root while the sibling is idle), targeted interrupt of the sibling while the root holds a paced turn (root nonterminal then completing, allocation unchanged), and targeted delete of the sibling leaving the root accepting another turn. The runtime serializes streaming model turns, so it does not claim two chats streaming at one instant. |
+| `hosted-workspace-contract` | Proves the complete workspace-first Cloud contract on the real Worker, Durable Objects, Docker sandbox and fake LLM: owner/current-org authorization and non-leakage, same-key replay plus changed-intent conflict for workspace and sibling creation, three roots on one shared sandbox, independent turn abort, middle-child deletion and final-root rejection, passive catalog/get/status and durable transcript reads while idle-stopped (no new provider container, no allocation, unchanged billing interval), automatic idle shutdown plus wake-on-input, a second-repository workspace on its own sandbox, and journaled `deleteWorktree` with a completed tombstone, replay and post-delete rejection. Needs `sessionSandbox` + `sandbox` + `database`; budget ~50 minutes. |
 | `long-conversation` | One cold `echo:cold` turn plus twelve hot turns — nine `echo:<token>`, one paced `slow:2:50`, and a real `file:write`/`file:read` pair whose parsed echo body equals the writer nonce. Every hot turn completes with no re-preparation and a stable allocation reference. |
 | `leave-and-return` | Boots, completes a boot echo turn, then leaves the session unattended; requires the allocation to disappear, then a resume turn on a distinct non-null allocation with the boot content replayed from a fresh stream. |
 | `large-stream` | Stages a real file and asks the model to read it; requires a correlated completed read whose persisted output meets the byte floor, plus a paced follow-up on the same session. |

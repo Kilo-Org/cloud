@@ -1,7 +1,9 @@
 /* eslint-disable max-lines -- one harness covers the dispatcher's action branches, the StartAgent confirmation order, and the native replay */
+import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { i18n } from '@/i18n';
+import { REPO_PLATFORM_LABEL_KEYS } from '@/lib/picker-bridge';
 
 import { type AppActionRequest, type AppActionResult } from './app-action-contract';
 import {
@@ -19,6 +21,7 @@ const mocks = vi.hoisted(() => ({
   registerNativeAppActionDispatcher: vi.fn(),
   captureException: vi.fn(),
   confirmStart: vi.fn(),
+  resolveRepository: vi.fn(),
   startAgent: vi.fn(),
 }));
 
@@ -30,7 +33,10 @@ vi.mock('./native-bridge', () => ({
 // real action path and the confirmation lazily. This suite stubs both so a run
 // loads neither the create graph nor the native alert; the real classification
 // is `start-agent.test.ts`'s.
-vi.mock('./start-agent', () => ({ startAgent: mocks.startAgent }));
+vi.mock('./start-agent', () => ({
+  resolveStartAgentRepository: mocks.resolveRepository,
+  startAgent: mocks.startAgent,
+}));
 
 vi.mock('./confirm-app-action-start', () => ({ confirmAppActionStart: mocks.confirmStart }));
 
@@ -42,6 +48,12 @@ const CONFIRMED = Promise.resolve(true);
 beforeEach(() => {
   vi.resetAllMocks();
   mocks.confirmStart.mockReturnValue(CONFIRMED);
+  mocks.resolveRepository.mockImplementation(({ repository }: { repository?: string }) =>
+    Promise.resolve({
+      ok: true,
+      repository: { platform: 'github', fullName: repository ?? 'owner/recent', isPrivate: false },
+    })
+  );
   takePendingAppAction();
 });
 
@@ -82,6 +94,95 @@ describe('dispatchAppActionRequest', () => {
     );
     expect(confirmStart).toHaveBeenCalledExactlyOnceWith({ prompt: 'fix the build' });
     expect(startAgent).toHaveBeenCalledOnce();
+  });
+
+  it('uses the resolved repository throughout the action', async () => {
+    const repository = {
+      platform: 'gitlab',
+      fullName: 'group/sub/project',
+      isPrivate: true,
+    } as const;
+    const order: string[] = [];
+    const resolveRepository = vi.fn(() => {
+      order.push('resolve');
+      return Promise.resolve({ ok: true as const, repository });
+    });
+    const confirmStart = vi.fn(() => {
+      order.push('confirm');
+      return Promise.resolve(true);
+    });
+    const startAgent = vi.fn(() => {
+      order.push('start');
+      return Promise.resolve({
+        ok: true as const,
+        action: 'StartAgent' as const,
+        sessionId: 'ses_11',
+        message: '',
+      });
+    });
+    await dispatchAppActionRequest(
+      {
+        action: 'StartAgent',
+        prompt: 'inspect this project',
+        repository: 'https://gitlab.com/group/sub/project',
+      },
+      { resolveRepository, confirmStart, startAgent }
+    );
+    expect(confirmStart).toHaveBeenCalledExactlyOnceWith({
+      prompt: 'inspect this project',
+      repository: `${i18n.t(REPO_PLATFORM_LABEL_KEYS.gitlab)}: group/sub/project`,
+    });
+    expect(startAgent).toHaveBeenCalledExactlyOnceWith({
+      prompt: 'inspect this project',
+      repository: 'https://gitlab.com/group/sub/project',
+      resolvedRepository: repository,
+    });
+    expect(order).toEqual(['resolve', 'confirm', 'start']);
+  });
+
+  it('uses the localized repository provider label', async () => {
+    const repository = {
+      platform: 'bitbucket',
+      fullName: 'workspace/project',
+      isPrivate: false,
+    } as const;
+    const confirmStart = vi.fn().mockResolvedValue(false);
+    await dispatchAppActionRequest(
+      { action: 'StartAgent', prompt: 'inspect this project' },
+      {
+        resolveRepository: () => Promise.resolve({ ok: true, repository }),
+        confirmStart,
+        startAgent: vi.fn(),
+      }
+    );
+    expect(confirmStart).toHaveBeenCalledExactlyOnceWith({
+      prompt: 'inspect this project',
+      repository: `${i18n.t(REPO_PLATFORM_LABEL_KEYS.bitbucket)}: workspace/project`,
+    });
+  });
+
+  it('returns repository resolution refusals', async () => {
+    const confirmStart = vi.fn();
+    const startAgent = vi.fn();
+    const refusal: AppActionResult = {
+      ok: false,
+      action: 'StartAgent',
+      retryable: false,
+      code: 'no-repository',
+      message: 'No repository',
+    };
+    await expect(
+      dispatchAppActionRequest(
+        { action: 'StartAgent', prompt: 'inspect this project' },
+        {
+          resolveRepository: () => Promise.resolve({ ok: false, result: refusal }),
+          confirmStart,
+          startAgent,
+        }
+      )
+    ).resolves.toEqual(refusal);
+    expect(confirmStart).not.toHaveBeenCalled();
+    expect(startAgent).not.toHaveBeenCalled();
   });
 
   it('does not run StartAgent before the confirmation answers', async () => {
@@ -172,6 +273,7 @@ describe('dispatchAppActionRequest', () => {
 
   it.each([
     { prompt: '   ', code: 'empty-prompt' },
+    { prompt: 'x'.repeat(CLOUD_AGENT_PROMPT_MAX_LENGTH + 1), code: 'prompt-too-long' },
     {
       prompt: 'Review the build',
       repository: 'https://git.example.com/owner/repo',

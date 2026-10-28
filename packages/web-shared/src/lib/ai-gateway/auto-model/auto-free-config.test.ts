@@ -1,8 +1,17 @@
 import { beforeEach, describe, expect, it } from '@jest/globals';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config } from '@kilocode/db/schema';
-import type { AutoFreeConfig } from '@kilocode/db/schema-types';
-import { isAutoFreeEligibleModelId, readConfiguredAutoFreeModels } from './auto-free-config';
+import type { AutoFreeConfig, CustomLlmDefinition } from '@kilocode/db/schema-types';
+import type { CustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
+import {
+  customLlmDefinition,
+  publicCustomLlmDefinition,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
+import {
+  getIneligibleAutoFreeModelIds,
+  isAutoFreeEligibleModelId,
+  readConfiguredAutoFreeModels,
+} from './auto-free-config';
 
 beforeEach(async () => {
   await cleanupDbForTest();
@@ -47,6 +56,75 @@ describe('isAutoFreeEligibleModelId', () => {
     ['openai/gpt-oss-120b:free', true],
     ['openai/gpt-5:free', false],
   ])('%s -> %s', (model, expected) => {
-    expect(isAutoFreeEligibleModelId(model)).toBe(expected);
+    expect(isAutoFreeEligibleModelId(model, undefined)).toBe(expected);
+  });
+
+  function customLlm(definition: CustomLlmDefinition): CustomLlm {
+    return { public_id: 'acme/model', definition, encrypted_api_key: null };
+  }
+
+  it.each([
+    ['a public custom LLM', publicCustomLlmDefinition(['acme']), true],
+    [
+      'a public custom LLM that lists Chat Completions',
+      publicCustomLlmDefinition(['acme'], { api_kinds: ['messages', 'chat_completions'] }),
+      true,
+    ],
+    [
+      'a public custom LLM without Chat Completions',
+      publicCustomLlmDefinition(['acme'], {
+        api_kinds: ['messages'],
+        opencode_settings: { ai_sdk_provider: 'anthropic' },
+      }),
+      false,
+    ],
+    [
+      'a public custom LLM that speaks Responses by default',
+      publicCustomLlmDefinition(['acme'], { opencode_settings: { ai_sdk_provider: 'openai' } }),
+      false,
+    ],
+    ['a private custom LLM', customLlmDefinition(), false],
+    [
+      'a public custom LLM with a country deny list',
+      publicCustomLlmDefinition(['acme'], { country_deny_list: ['CU'] }),
+      false,
+    ],
+    [
+      'a public custom LLM with an empty country deny list',
+      publicCustomLlmDefinition(['acme'], { country_deny_list: [] }),
+      true,
+    ],
+  ])('%s', (_name, definition, expected) => {
+    expect(isAutoFreeEligibleModelId('acme/model', customLlm(definition))).toBe(expected);
+  });
+});
+
+describe('getIneligibleAutoFreeModelIds', () => {
+  it('accepts public custom LLMs and rejects private ones', () => {
+    const customLlms: CustomLlm[] = [
+      {
+        public_id: 'Acme/Public-Free',
+        definition: publicCustomLlmDefinition(['acme']),
+        encrypted_api_key: null,
+      },
+      {
+        public_id: 'acme/private-free',
+        definition: customLlmDefinition(),
+        encrypted_api_key: null,
+      },
+    ];
+
+    expect(
+      getIneligibleAutoFreeModelIds(
+        {
+          models: ['acme/public-free', 'acme/private-free', 'provider/paid-model'].map(model => ({
+            model,
+            weight: 1,
+            reasoning: {},
+          })),
+        },
+        customLlms
+      )
+    ).toEqual(['acme/private-free', 'provider/paid-model']);
   });
 });

@@ -51,7 +51,16 @@ type GitHubOverviewDto = RouterOutputs['githubPrReview']['getPullRequest'];
  * omitted on those providers and the chip is not drawn.
  */
 type PrOverviewCounts = Omit<GitHubOverviewDto['counts'], 'commits'> & { commits: number | null };
-export type PrOverviewModel = Omit<GitHubOverviewDto, 'counts'> & { counts: PrOverviewCounts };
+/**
+ * GitHub's DTO plus the one field only a provider read layer reports. The
+ * `webUrl` is the provider's own canonical URL for the loaded PR/MR,
+ * resolved by the server. It is absent (undefined at runtime, null through
+ * the selector below) on the GitHub arm, whose host is fixed by the ref.
+ */
+export type PrOverviewModel = Omit<GitHubOverviewDto, 'counts'> & {
+  counts: PrOverviewCounts;
+  webUrl: string;
+};
 export type PrChecksModel = RouterOutputs['githubPrReview']['listChecks'];
 export type PrThreadsPageModel = RouterOutputs['githubPrReview']['listReviewThreads'];
 
@@ -282,6 +291,7 @@ export function normalizeProviderOverview(summary: ProviderPrSummary): PrOvervie
     assignees: [],
     reviewers: [],
     linkedIssues: [],
+    webUrl: summary.webUrl,
     createdAt: summary.createdAt,
     updatedAt: summary.updatedAt,
     closedAt: null,
@@ -470,6 +480,22 @@ export function selectProviderCapabilitiesData(
   data: unknown
 ): ProviderReviewCapabilities | undefined {
   return data as ProviderReviewCapabilities | undefined;
+}
+
+/**
+ * The provider's own web URL for the loaded PR/MR, or null when the read
+ * model carries none — a GitHub answer (its host comes from the ref) or an
+ * overview that has not loaded. Read back through a selector for the same
+ * reason as the capability data above: the overview option type is the
+ * GitHub one, which has no `webUrl` field.
+ */
+export function selectOverviewWebUrl(data: unknown): string | null {
+  // SAFETY: the overview option type is GitHub's DTO, which has no `webUrl`,
+  // so the checker cannot see the field the provider arm's read model sets.
+  // The only shapes reaching here are that read model and GitHub's answer;
+  // an absent or empty one means "no URL", which every caller handles.
+  const model = data as { webUrl?: string | null } | undefined;
+  return model?.webUrl ?? null;
 }
 
 /**

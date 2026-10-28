@@ -1,13 +1,20 @@
 import { UsageRecordRequestSchema } from '@kilocode/usage-contracts';
 import { recordUsage, type UsageWriteOutcome } from '@kilocode/worker-utils/usage-writer-client';
 import type { Env } from './publish-usage';
-import { handleQueue as handleReceiptQueue } from './receipt-usage';
 import { logSafely, queueMetrics } from './diagnostics';
 
-export function handleQueue(batch: MessageBatch<unknown>, env: Env): void | Promise<void> {
-  if (env.USAGE_INGEST_MODE === undefined || env.USAGE_INGEST_MODE === 'receipt') {
-    return handleReceiptQueue(batch);
-  }
+type Diagnostics = { batch_size: number; handler_entry_at_ms: number };
+
+function diagnosticFields(
+  env: Env,
+  entryAtMs: number,
+  batch: MessageBatch<unknown>
+): Diagnostics | undefined {
+  if (env.USAGE_INGEST_DIAGNOSTICS !== 'all') return undefined;
+  return { batch_size: batch.messages.length, handler_entry_at_ms: entryAtMs };
+}
+
+export function handleQueue(batch: MessageBatch<unknown>, env: Env): Promise<void> {
   return processQueue(batch, env, Date.now());
 }
 
@@ -16,8 +23,8 @@ async function processQueue(
   env: Env,
   entryAtMs: number
 ): Promise<void> {
-  const diagnostic = env.USAGE_INGEST_DIAGNOSTICS === 'all';
-  const batchId = diagnostic ? crypto.randomUUID() : undefined;
+  const diagnostics = diagnosticFields(env, entryAtMs, batch);
+  const batchId = diagnostics === undefined ? undefined : crypto.randomUUID();
   const parallelism = env.USAGE_INGEST_PARALLELISM === '2' ? 2 : 1;
   let nextIndex = 0;
   let writerOverloaded = false;
@@ -27,7 +34,7 @@ async function processQueue(
       const message = batch.messages[nextIndex++];
       let acknowledged = false;
       try {
-        const result = await processMessage(message, env, batch, entryAtMs, batchId);
+        const result = await processMessage(message, env, batch, diagnostics, batchId);
         acknowledged = result.acknowledged;
         writerOverloaded ||= result.overloaded;
       } catch (error) {
@@ -60,19 +67,17 @@ async function processMessage(
   message: Message<unknown>,
   env: Env,
   batch: MessageBatch<unknown>,
-  entryAtMs: number,
+  diagnostics: Diagnostics | undefined,
   batchId: string | undefined
 ) {
-  const diagnostic = env.USAGE_INGEST_DIAGNOSTICS === 'all';
   const queueWaitMs = Math.max(0, Date.now() - message.timestamp.getTime());
   const parsed = UsageRecordRequestSchema.safeParse(message.body);
-  if (diagnostic)
+  if (diagnostics !== undefined)
     logSafely('info', () => ({
       event: 'usage_ingest_handler_entry',
       queue: batch.queue,
       batch_id: batchId,
-      batch_size: batch.messages.length,
-      handler_entry_at_ms: entryAtMs,
+      ...diagnostics,
       message_start_at_ms: Date.now(),
       queue_message_id: message.id,
       message_timestamp_ms: message.timestamp.getTime(),
@@ -85,34 +90,18 @@ async function processMessage(
         : {}),
       ...queueMetrics(batch),
     }));
-  let outcome:
-    | UsageWriteOutcome
-    | { kind: 'unavailable'; reason: 'invalid_mode' | 'invalid_event' };
+  let outcome: UsageWriteOutcome | { kind: 'unavailable'; reason: 'invalid_event' };
   let writerDurationMs: number | undefined;
-  if (env.USAGE_INGEST_MODE !== 'processing') {
-    outcome = { kind: 'unavailable', reason: 'invalid_mode' };
-  } else if (!parsed.success) {
+  if (!parsed.success) {
     outcome = { kind: 'unavailable', reason: 'invalid_event' };
   } else {
     const writerStartedAt = performance.now();
-    const relay = env.USAGE_WRITER_RELAY;
-    outcome = await recordUsage(
-      parsed.data,
-      {
-        url: env.USAGE_WRITER_URL,
-        secret: env.USAGE_WRITER_SECRET,
-        protectionBypass: env.USAGE_WRITER_PROTECTION_BYPASS,
-        source: 'queue',
-      },
-      relay
-        ? (input, init) => {
-            if (!diagnostic) return relay.fetch(input, init);
-            const headers = new Headers(init?.headers);
-            headers.set('x-usage-id', parsed.data.core.id);
-            return relay.fetch(input, { ...init, headers });
-          }
-        : undefined
-    );
+    outcome = await recordUsage(parsed.data, {
+      url: env.USAGE_WRITER_URL,
+      secret: env.USAGE_WRITER_SECRET,
+      protectionBypass: env.USAGE_WRITER_PROTECTION_BYPASS,
+      source: 'queue',
+    });
     if (outcome.kind !== 'unavailable' || outcome.reason !== 'missing_config') {
       writerDurationMs = Math.round(performance.now() - writerStartedAt);
     }
@@ -126,9 +115,7 @@ async function processMessage(
   logSafely(level, () => ({
     event: 'usage_ingest_processing',
     queue: batch.queue,
-    ...(diagnostic
-      ? { batch_id: batchId, batch_size: batch.messages.length, handler_entry_at_ms: entryAtMs }
-      : {}),
+    ...(diagnostics === undefined ? {} : { batch_id: batchId, ...diagnostics }),
     outcome: outcome.kind,
     ...('reason' in outcome ? { reason: outcome.reason } : {}),
     queue_action: acknowledged ? 'ack' : 'retry',

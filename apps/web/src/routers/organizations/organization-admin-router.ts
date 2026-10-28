@@ -1,6 +1,11 @@
 import { creditManagerProcedure } from '@/lib/trpc/admin-procedures';
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import { reconcileCreditExpirationsInTransaction } from '@kilocode/db/credit-expiration';
+import { resolvePaidCreditPolicy } from '@kilocode/web-shared/lib/paidCreditPolicy';
+import { getPaidCreditTerms } from '@kilocode/web-shared/lib/paidCreditPolicy.server';
+import { retireCreditBalance } from '@kilocode/web-shared/lib/creditAdjustments';
+import { recordRefundDebtRepayment } from '@kilocode/db/credit-refund-repayments';
 import {
   organizations,
   organization_memberships,
@@ -41,6 +46,7 @@ import {
   getOrganizationById,
   addUserToOrganization,
   markOrganizationAsDeleted,
+  mutateOrganizationSettings,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import { OrganizationRoleSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
@@ -61,7 +67,6 @@ import {
   fetchExpiringTransactionsForOrganization,
   computeNextExpirationAmount,
   processOrganizationExpirations,
-  closeOutExpiringOrganizationCredits,
 } from '@kilocode/web-shared/lib/creditExpiration';
 import {
   ORGANIZATION_TRIAL_ACTIVE_MIN_DAYS_REMAINING,
@@ -158,6 +163,11 @@ const UpdateSuppressTrialMessagingInputSchema = z.object({
   suppress_trial_messaging: z.boolean(),
 });
 
+const UpdateKiloEncryptInputSchema = z.object({
+  organizationId: z.uuid(),
+  kilo_encrypt: z.boolean(),
+});
+
 const AdminOrganizationDetailsSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -245,6 +255,7 @@ const GrantCreditInputSchema = z
     organizationId: z.uuid(),
     amount_usd: z.number().refine(n => n !== 0, 'Amount cannot be zero'),
     description: z.string().optional(),
+    creditKind: z.enum(['paid', 'promotional']).default('promotional'),
     expiry_date: z.string().datetime().nullable().optional(),
     expiry_hours: z.number().positive().nullable().optional(),
   })
@@ -284,6 +295,11 @@ const AddMemberInputSchema = z.object({
   organizationId: z.uuid(),
   userId: z.string(),
   role: OrganizationRoleSchema,
+});
+
+const SearchParentMembersInputSchema = z.object({
+  organizationId: z.uuid(),
+  search: z.string().trim().min(1).max(200),
 });
 
 export const organizationAdminRouter = createTRPCRouter({
@@ -492,6 +508,35 @@ export const organizationAdminRouter = createTRPCRouter({
         metadata: {
           previousSuppressTrialMessaging: organization.settings.suppress_trial_messaging ?? null,
           suppressTrialMessaging: suppress_trial_messaging,
+        },
+      });
+
+      return successResult();
+    }),
+
+  updateKiloEncrypt: adminProcedure
+    .input(UpdateKiloEncryptInputSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, kilo_encrypt } = input;
+      const organization = await db.query.organizations.findFirst({
+        where: eq(organizations.id, organizationId),
+      });
+      if (!organization) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+
+      await mutateOrganizationSettings(organizationId, current => ({
+        ...current.settings,
+        kilo_encrypt,
+      }));
+
+      await recordAdminAction(ctx, {
+        action: 'organization.kilo_encrypt.set',
+        target: organizationActionTarget(organizationId),
+        message: kilo_encrypt ? 'Enabled AI Guardrails' : 'Disabled AI Guardrails',
+        metadata: {
+          previousKiloEncrypt: organization.settings.kilo_encrypt ?? null,
+          kiloEncrypt: kilo_encrypt,
         },
       });
 
@@ -784,16 +829,8 @@ export const organizationAdminRouter = createTRPCRouter({
         organization.next_credit_expiration_at &&
         new Date() >= new Date(organization.next_credit_expiration_at)
       ) {
-        await processOrganizationExpirations(
-          {
-            id: organizationId,
-            microdollars_used: organization.microdollars_used,
-            next_credit_expiration_at: organization.next_credit_expiration_at,
-            total_microdollars_acquired: organization.total_microdollars_acquired,
-          },
-          new Date()
-        );
-        organization = (await getOrganizationById(organizationId)) ?? organization;
+        const expiryResult = await processOrganizationExpirations(organizationId, new Date());
+        organization = { ...organization, ...expiryResult };
       }
 
       const next_credit_expiration_at = organization.next_credit_expiration_at
@@ -831,6 +868,15 @@ export const organizationAdminRouter = createTRPCRouter({
       }
 
       const amountMicrodollars = toMicrodollars(amount_usd);
+      const issuedAt = new Date();
+      const paidPolicy =
+        input.creditKind === 'paid' && amount_usd > 0
+          ? resolvePaidCreditPolicy({
+              source: 'admin',
+              purchasedAt: issuedAt,
+              terms: getPaidCreditTerms('admin', issuedAt),
+            })
+          : null;
 
       const explicit_expiry_date = input.expiry_date ? new Date(input.expiry_date) : null;
       const expiryFromHours = input.expiry_hours
@@ -838,34 +884,60 @@ export const organizationAdminRouter = createTRPCRouter({
         : null;
       // Negative grants must not expire (expiring a negative would mint credits)
       const credit_expiry_date =
-        amount_usd < 0
+        amount_usd < 0 || paidPolicy
           ? null
           : explicit_expiry_date && expiryFromHours
             ? explicit_expiry_date < expiryFromHours
               ? explicit_expiry_date
               : expiryFromHours
             : (explicit_expiry_date ?? expiryFromHours);
+      const expiresAt = paidPolicy?.expiry_date ?? credit_expiry_date?.toISOString() ?? null;
 
       await db.transaction(async tx => {
-        const [org] = await tx
-          .select({ microdollars_used: organizations.microdollars_used })
-          .from(organizations)
-          .where(eq(organizations.id, organizationId))
-          .for('update');
+        if (amountMicrodollars < 0) {
+          await retireCreditBalance(tx, {
+            owner: { type: 'organization', id: organizationId },
+            actorId: user.id,
+            creditCategory: 'organization_custom',
+            description: description?.trim() || 'Admin credit debit',
+            amountMicrodollars: -amountMicrodollars,
+            now: issuedAt,
+          });
+          return;
+        }
+        const org = await reconcileCreditExpirationsInTransaction(
+          { type: 'organization', id: organizationId },
+          tx,
+          issuedAt
+        );
 
-        await tx.insert(credit_transactions).values({
-          kilo_user_id: user.id,
-          created_by_kilo_user_id: user.id,
-          is_free: true,
-          amount_microdollars: amountMicrodollars,
-          description: description?.trim() || 'Admin credit grant',
-          credit_category: 'organization_custom',
-          expiry_date: credit_expiry_date?.toISOString() ?? null,
-          organization_id: organizationId,
-          original_baseline_microdollars_used: org?.microdollars_used ?? 0,
-          expiration_baseline_microdollars_used: credit_expiry_date
-            ? (org?.microdollars_used ?? 0)
-            : null,
+        const [grant] = await tx
+          .insert(credit_transactions)
+          .values({
+            kilo_user_id: user.id,
+            created_by_kilo_user_id: user.id,
+            is_free: input.creditKind !== 'paid',
+            amount_microdollars: amountMicrodollars,
+            description: description?.trim() || 'Admin credit grant',
+            credit_category: 'organization_custom',
+            ...(paidPolicy ?? {}),
+            credit_source: paidPolicy?.credit_source ?? 'promotion',
+            expiry_date: expiresAt,
+            organization_id: organizationId,
+            original_baseline_microdollars_used: org.microdollars_used,
+            expiration_baseline_microdollars_used: Math.min(
+              org.microdollars_used,
+              org.total_microdollars_acquired
+            ),
+          })
+          .returning({ id: credit_transactions.id });
+        if (!grant) throw new Error('Organization grant insertion failed');
+        await recordRefundDebtRepayment(tx, {
+          owner: { type: 'organization', id: organizationId },
+          transactionId: grant.id,
+          priorAcquired: org.total_microdollars_acquired,
+          priorUsed: org.microdollars_used,
+          amountMicrodollars,
         });
 
         await tx
@@ -873,8 +945,8 @@ export const organizationAdminRouter = createTRPCRouter({
           .set({
             total_microdollars_acquired: sql`${organizations.total_microdollars_acquired} + ${amountMicrodollars}`,
             microdollars_balance: sql`${organizations.microdollars_balance} + ${amountMicrodollars}`,
-            ...(credit_expiry_date && {
-              next_credit_expiration_at: sql`COALESCE(LEAST(${organizations.next_credit_expiration_at}, ${credit_expiry_date.toISOString()}), ${credit_expiry_date.toISOString()})`,
+            ...(expiresAt && {
+              next_credit_expiration_at: sql`COALESCE(LEAST(${organizations.next_credit_expiration_at}, ${expiresAt}), ${expiresAt})`,
             }),
           })
           .where(eq(organizations.id, organizationId));
@@ -911,52 +983,22 @@ export const organizationAdminRouter = createTRPCRouter({
           });
         }
 
-        const currentBalance = lockedOrg.total_microdollars_acquired - lockedOrg.microdollars_used;
-
-        if (currentBalance <= 0) {
+        const retired = await retireCreditBalance(tx, {
+          owner: { type: 'organization', id: organizationId },
+          actorId: user.id,
+          creditCategory: 'organization_custom',
+          description: description?.trim() || 'Admin credit nullification',
+        });
+        if (retired <= 0) {
           throw new TRPCError({
             code: 'BAD_REQUEST',
             message: 'Organization has no credits to nullify',
           });
         }
 
-        // Close out any still-open expiring grants first, so their expiry claim
-        // can never be counted again (e.g. by the Balance page's "credits
-        // expiring soon" total) once this organization's credits are re-granted
-        // later with a different expiration date.
-        const closedOutExpiring = await closeOutExpiringOrganizationCredits(
-          organizationId,
-          lockedOrg.microdollars_used,
-          tx
-        );
-        const remainingToOffset = Math.max(0, currentBalance + closedOutExpiring);
-
-        if (remainingToOffset > 0) {
-          await tx.insert(credit_transactions).values({
-            kilo_user_id: user.id,
-            created_by_kilo_user_id: user.id,
-            is_free: true,
-            amount_microdollars: -remainingToOffset,
-            description: description?.trim() || 'Admin credit nullification',
-            credit_category: 'organization_custom',
-            expiry_date: null,
-            organization_id: organizationId,
-            original_baseline_microdollars_used: lockedOrg.microdollars_used,
-          });
-        }
-
-        await tx
-          .update(organizations)
-          .set({
-            total_microdollars_acquired: sql`${organizations.microdollars_used}`,
-            microdollars_balance: 0,
-            next_credit_expiration_at: null,
-          })
-          .where(eq(organizations.id, organizationId));
-
         return {
           orgName: lockedOrg.name,
-          amountUsdNullified: currentBalance / 1_000_000,
+          amountUsdNullified: retired / 1_000_000,
         };
       });
 
@@ -1004,6 +1046,53 @@ export const organizationAdminRouter = createTRPCRouter({
     };
   }),
 
+  searchParentMembers: adminProcedure
+    .input(SearchParentMembersInputSchema)
+    .query(async ({ input }) => {
+      const organization = await getOrganizationById(input.organizationId);
+      if (!organization?.parent_organization_id) {
+        return { users: [] };
+      }
+
+      const childMemberships = alias(organization_memberships, 'child_memberships');
+      const pattern = `%${input.search}%`;
+      const users = await db
+        .select({
+          id: kilocode_users.id,
+          google_user_email: kilocode_users.google_user_email,
+          google_user_name: kilocode_users.google_user_name,
+        })
+        .from(organization_memberships)
+        .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+        .innerJoin(
+          organizations,
+          and(
+            eq(organizations.id, organization_memberships.organization_id),
+            isNull(organizations.deleted_at)
+          )
+        )
+        .leftJoin(
+          childMemberships,
+          and(
+            eq(childMemberships.organization_id, organization.id),
+            eq(childMemberships.kilo_user_id, kilocode_users.id)
+          )
+        )
+        .where(
+          and(
+            eq(organization_memberships.organization_id, organization.parent_organization_id),
+            eq(kilocode_users.is_bot, false),
+            isNull(childMemberships.id),
+            or(
+              ilike(kilocode_users.google_user_email, pattern),
+              ilike(kilocode_users.google_user_name, pattern)
+            )
+          )
+        )
+        .limit(10);
+
+      return { users };
+    }),
   addMember: adminProcedure.input(AddMemberInputSchema).mutation(async ({ input, ctx }) => {
     const { organizationId, userId, role } = input;
 
@@ -1021,6 +1110,35 @@ export const organizationAdminRouter = createTRPCRouter({
         code: 'NOT_FOUND',
         message: 'User not found',
       });
+    }
+
+    if (organization.parent_organization_id) {
+      const [parentMembership] = await db
+        .select({ id: organization_memberships.id })
+        .from(organization_memberships)
+        .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+        .innerJoin(
+          organizations,
+          and(
+            eq(organizations.id, organization_memberships.organization_id),
+            isNull(organizations.deleted_at)
+          )
+        )
+        .where(
+          and(
+            eq(organization_memberships.organization_id, organization.parent_organization_id),
+            eq(organization_memberships.kilo_user_id, userId),
+            eq(kilocode_users.is_bot, false)
+          )
+        )
+        .limit(1);
+      if (!parentMembership || existingUser.is_bot) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message:
+            'Child organizations can only add people who are already members of the parent organization.',
+        });
+      }
     }
 
     const ssoPolicy = await resolveEffectiveOrganizationSsoPolicy(organizationId);

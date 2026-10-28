@@ -227,7 +227,6 @@
     "hideBalance": "残高を非表示",
     "showBalance": "残高を表示",
     "balanceHidden": "残高は非表示です",
-    "bonusCreditsExpiring": "{{amount}}のクレジットが{{date}}に失効します。",
     "signOutTitle": "サインアウトしますか？",
     "signOutMessage": "ワークスペースにアクセスするには、もう一度サインインする必要があります。",
     "deleteAccountTitle": "アカウントを削除しますか？",
@@ -352,6 +351,18 @@
       "securityFindingsUnavailable": "セキュリティの検出結果を受け取るには、スコープでKiloセキュリティエージェントを有効にしてください。",
       "spendAlertsSubtitle": "しきい値の超過と毎時の急増",
       "spendAlertsToggle": "支出アラートのカテゴリ"
+    },
+    "history": {
+      "title": "通知履歴",
+      "subtitle": "このアカウントが受け取った通知",
+      "bannerBody": "このデバイスではプッシュ通知がオフになっているため、新しい通知はここに届きません。",
+      "bannerAction": "通知設定",
+      "emptyTitle": "通知はまだありません",
+      "emptyCategoryTitle": "このカテゴリの通知はありません",
+      "emptyBody": "このアカウントが受け取った通知はここに表示されます。{{days}}日間保存されます。",
+      "capped": "最新の通知を表示しています。",
+      "loadError": "通知履歴を読み込めませんでした。",
+      "openFailed": "この通知はもうどこからも開けません。"
     },
     "action": {
       "openSession": "セッションを開く"
@@ -1654,9 +1665,7 @@
     },
     "remoteSpawnRetryable": "インスタンスと通信できませんでした。接続が切れた可能性があります。",
     "remoteSpawnNonRetryable": "インスタンスでセッションを開始できませんでした。マシンの状態を確認するか、CLIを更新してください。",
-    "remoteSpawnInstanceDisconnected": "選択したインスタンスとの接続が切れました。Cloud Agentでセッションを開始するか、別のインスタンスを選択してください。",
-    "liveCount_one": "ライブ：{{count}}件",
-    "liveCount_other": "ライブ：{{count}}件"
+    "remoteSpawnInstanceDisconnected": "選択したインスタンスとの接続が切れました。Cloud Agentでセッションを開始するか、別のインスタンスを選択してください。"
   },
   "agentChat": {
     "session": {
@@ -2068,7 +2077,9 @@
       "retrying": "再試行中…",
       "retryDeny": "拒否を再試行",
       "retryAllowOnce": "1回だけ許可を再試行",
-      "retryAlwaysAllow": "常に許可を再試行"
+      "retryAlwaysAllow": "常に許可を再試行",
+      "unreadableTitle": "許可のリクエストを読み取れませんでした",
+      "unreadableBody": "エージェントは許可の判断を待っていますが、このアプリではそのリクエストを表示できません。アプリまたはCLIを更新するか、CLIでリクエストに回答して続行してください。"
     },
     "questionCard": {
       "title": "エージェントからの質問",
@@ -2460,8 +2471,9 @@
     "unavailableDevice": "このデバイスでは音声入力は利用できません。",
     "unavailableLanguage": "このデバイスの言語では音声入力は利用できません。",
     "languageNotInstalledTitle": "{{language}}の音声入力の準備がまだできていません",
-    "languageNotInstalledMessage": "{{language}}のオフライン音声ファイルがこのスマートフォンにインストールされていません。ダウンロードしてから、音声入力をもう一度お試しください。",
+    "languageNotInstalledMessage": "{{language}}のオフライン音声ファイルがインストールされておらず、オンラインでの文字起こしもオフになっています。ファイルをダウンロードするか、オンラインでの文字起こしをオンに戻すと、音声入力をご利用いただけます。",
     "downloadOfflineModel": "ダウンロード",
+    "useOnlineTranscription": "オンライン文字起こしを許可",
     "offlineModelDownloadScheduled": "オフライン音声ファイルはバックグラウンドでダウンロードされます。しばらくしてから、音声入力をもう一度お試しください。",
     "listeningStopped": "聞き取りを停止しました。",
     "transcribing": "文字起こし中…",
@@ -3151,7 +3163,7 @@
     "creditActivity": {
       "emptyDescription": "この組織でクレジットの購入、利用、残高調整があると、ここに表示されます。",
       "emptyTitle": "クレジットの履歴はありません",
-      "expires": "有効期限：{{date}}",
+      "expiresUtc": "有効期限：{{date}}（UTC）",
       "title": "クレジットの履歴",
       "transactionFallback": "クレジット取引",
       "category": {
@@ -3840,6 +3852,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "••••と表示されている値は保存されているシークレットのままです。値を置き換えるとシークレットがローテーションされます。コマンドラインを変更すると、すべての値が再度必要になります",
+      "headersHint": "••••と表示されている値は保存されているシークレットのままです。値を置き換えるとシークレットがローテーションされます。URLを変更すると、すべての値が再度必要になります",
       "nameRequired": "サーバー名を入力してください",
       "nameInvalid": "名前にはASCII文字、数字、アンダースコア、ダッシュのみを使用し、100文字以内で入力してください",
       "commandRequired": "コマンドを入力してください",
@@ -3938,6 +3952,10 @@
   "credits": {
     "title": "クレジットを購入",
     "description": "クレジットは、Kilo AppでAIコーディングセッションを実行するためにKilo残高に追加される買い切りの購入です。ストアがアカウントに請求し、ストアが支払いを確認した後にクレジットが追加されます。",
+    "nextExpiry": "{{amount}}のクレジットが{{date}}（UTC）に失効します。有効期限が早いクレジットから先に使用されます。",
+    "appStoreExpiry": "App Storeで購入したクレジットは失効しません。",
+    "playOneYearExpiry": "これらのクレジットは購入から1暦年後に失効します。",
+    "playNonexpiring": "これらのクレジットは失効しません。",
     "packLabel": "{{amount}}分のクレジットを追加",
     "priceUnavailable": "価格を取得できません",
     "purchased": "クレジットを残高に追加しました。",
@@ -4076,6 +4094,10 @@
     "generate": "要約を生成",
     "retrySummary": "有料要約を再試行",
     "sources": "根拠と成果物",
+    "sessionsShown_one": "{{total}}件中{{shown}}件のセッションを表示",
+    "sessionsShown_other": "{{total}}件中{{shown}}件のセッションを表示",
+    "itemsShown_one": "{{total}}件中{{shown}}件の項目を表示",
+    "itemsShown_other": "{{total}}件中{{shown}}件の項目を表示",
     "timezone": "ブリーフィングのタイムゾーン",
     "deviceTimezone": "デバイスのタイムゾーンを使用",
     "timezoneHint": "IANAタイムゾーン(例: Europe/Berlin)。スケジュールの変更は今後のブリーフに適用されます。",

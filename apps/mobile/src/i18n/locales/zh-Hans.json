@@ -227,7 +227,6 @@
     "hideBalance": "隐藏余额",
     "showBalance": "显示余额",
     "balanceHidden": "余额已隐藏",
-    "bonusCreditsExpiring": "{{amount}} 的额度将于 {{date}} 到期。",
     "signOutTitle": "退出登录？",
     "signOutMessage": "退出后，需要重新登录才能访问工作区。",
     "deleteAccountTitle": "删除账户？",
@@ -352,6 +351,18 @@
       "securityFindingsUnavailable": "在某个范围启用 Kilo 安全智能体以接收安全问题。",
       "spendAlertsSubtitle": "阈值突破与每小时激增",
       "spendAlertsToggle": "支出提醒类别"
+    },
+    "history": {
+      "title": "通知历史",
+      "subtitle": "此账户收到的通知",
+      "bannerBody": "此设备的推送通知已关闭，因此新通知不会在此处送达。",
+      "bannerAction": "通知设置",
+      "emptyTitle": "暂无通知",
+      "emptyCategoryTitle": "此类别中暂无通知",
+      "emptyBody": "此账户收到的通知会显示在这里。通知会保留 {{days}} 天。",
+      "capped": "仅显示最近的通知。",
+      "loadError": "无法加载通知历史。",
+      "openFailed": "此通知已无法在任何位置打开。"
     },
     "action": {
       "openSession": "打开会话"
@@ -1654,9 +1665,7 @@
     },
     "remoteSpawnRetryable": "无法连接到实例，实例可能已断开连接。",
     "remoteSpawnNonRetryable": "实例未能启动会话。请检查主机或更新 CLI。",
-    "remoteSpawnInstanceDisconnected": "所选实例已断开连接。请在 Cloud Agent 上启动会话，或选择其他实例。",
-    "liveCount_one": "{{count}} 个实时会话",
-    "liveCount_other": "{{count}} 个实时会话"
+    "remoteSpawnInstanceDisconnected": "所选实例已断开连接。请在 Cloud Agent 上启动会话，或选择其他实例。"
   },
   "agentChat": {
     "session": {
@@ -2068,7 +2077,9 @@
       "retrying": "正在重试……",
       "retryDeny": "再次尝试拒绝",
       "retryAllowOnce": "再次尝试仅允许一次",
-      "retryAlwaysAllow": "再次尝试始终允许"
+      "retryAlwaysAllow": "再次尝试始终允许",
+      "unreadableTitle": "无法读取授权请求",
+      "unreadableBody": "Agent 正在等待一项此应用无法显示的授权决定。请更新应用或 CLI，或在 CLI 中回应此请求以继续。"
     },
     "questionCard": {
       "title": "智能体需要你的输入",
@@ -2460,8 +2471,9 @@
     "unavailableDevice": "此设备不支持语音输入。",
     "unavailableLanguage": "语音输入不支持此设备的语言。请安装该语言的离线语音文件，或改用其他应用语言。",
     "languageNotInstalledTitle": "{{language}} 的语音输入尚未就绪",
-    "languageNotInstalledMessage": "此手机尚未安装 {{language}} 的离线语音文件。请下载这些文件，然后重试语音输入。",
+    "languageNotInstalledMessage": "尚未安装 {{language}} 的离线语音文件，且在线转写已关闭。下载该文件或重新开启在线转写，即可使用语音输入。",
     "downloadOfflineModel": "下载",
+    "useOnlineTranscription": "允许在线转写",
     "offlineModelDownloadScheduled": "离线语音文件将在后台下载。稍后请重试语音输入。",
     "listeningStopped": "已停止收听。",
     "transcribing": "正在转写…",
@@ -3151,7 +3163,7 @@
     "creditActivity": {
       "emptyDescription": "此组织的充值、用量和额度调整记录将在这里显示。",
       "emptyTitle": "暂无额度变动记录",
-      "expires": "{{date}} 到期",
+      "expiresUtc": "{{date}}（UTC） 到期",
       "title": "额度明细",
       "transactionFallback": "额度交易",
       "category": {
@@ -3840,6 +3852,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "显示为 •••• 的值会保留其已存储的密钥；替换某个值即可轮换。更改命令行后，所有值都需重新填写",
+      "headersHint": "显示为 •••• 的值会保留其已存储的密钥；替换某个值即可轮换。更改网址后，所有值都需重新填写",
       "nameRequired": "输入服务器名称",
       "nameInvalid": "名称只能使用 ASCII 字母、数字、下划线和连字符，最多 100 个字符",
       "commandRequired": "输入命令",
@@ -3938,6 +3952,10 @@
   "credits": {
     "title": "购买额度",
     "description": "额度是一次性购买，会添加到你的 Kilo 余额中，用于在 Kilo App 中运行 AI 编程会话。商店会向你的账户收费，商店确认付款后额度才会到账。",
+    "nextExpiry": "{{amount}} 的额度将于 {{date}}（UTC）到期。最早到期的额度会优先使用。",
+    "appStoreExpiry": "通过 App Store 购买的额度不会过期。",
+    "playOneYearExpiry": "这些额度将在购买一个日历年后过期。",
+    "playNonexpiring": "这些额度不会过期。",
     "packLabel": "添加 {{amount}} 额度",
     "priceUnavailable": "价格不可用",
     "purchased": "额度已添加到你的余额。",
@@ -4076,6 +4094,10 @@
     "generate": "生成摘要",
     "retrySummary": "重试付费摘要",
     "sources": "证据与产物",
+    "sessionsShown_one": "显示 {{total}} 个会话中的 {{shown}} 个",
+    "sessionsShown_other": "显示 {{total}} 个会话中的 {{shown}} 个",
+    "itemsShown_one": "显示 {{total}} 个条目中的 {{shown}} 个",
+    "itemsShown_other": "显示 {{total}} 个条目中的 {{shown}} 个",
     "timezone": "简报时区",
     "deviceTimezone": "使用设备时区",
     "timezoneHint": "IANA 时区，例如 Europe/Berlin。日程更改将从之后的简报生效。",

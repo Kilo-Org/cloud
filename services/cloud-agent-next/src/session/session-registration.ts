@@ -1,4 +1,4 @@
-import { enrolledByocVercelOwner, byocVercelOwnerFields } from '../byoc/vercel-owner.js';
+import { byocVercelOwnerFields } from '../byoc/vercel-owner.js';
 /**
  * Session creation helpers for the grouped `start` path and retained split
  * `prepareSession` path.
@@ -28,9 +28,6 @@ import {
 import {
   assertSandboxAllocationAvailable,
   getSandboxSelectionCapabilities,
-  isByocIncompatibleAllocation,
-  sandboxAllocationRepositoryUnavailableReason,
-  sandboxAllocationProviderCapabilityReason,
   isSandboxAllocationAvailable,
 } from '../sandbox-selection.js';
 import { assertOrganizationMembership } from '../router/handlers/organization-membership.js';
@@ -125,13 +122,44 @@ import {
   withSavedSandboxAllocation,
 } from './sandbox-allocation-resolution.js';
 import type { SessionCreateRequest, SessionRepositoryRequest } from './session-requests.js';
+import { isInteractiveSessionOrigin } from '../shared/control-plane-permission.js';
 import { egressAllowlistSchema, egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 
 export type SessionRegistrationInput = SessionCreateRequest;
 
+/**
+ * Whether a create may launch child Cloud Agent sessions. The capability is not
+ * caller-controlled: a session gets it when a person created it through an
+ * interactive client, it is not itself a spawned child, and it does not run on
+ * a shared sandbox.
+ */
+export function allowsSubagentSessions(
+  input: Pick<
+    SessionRegistrationInput,
+    'options' | 'parentCloudAgentSessionId' | 'runtime' | 'savedSandboxAllocation'
+  >
+): boolean {
+  return (
+    input.parentCloudAgentSessionId === undefined &&
+    isInteractiveSessionOrigin(input.options?.createdOnPlatform) &&
+    requestedSandboxAllocation(input) !== 'cloudflare-shared'
+  );
+}
+
+function resolvedAllowsSubagentSessions(
+  input: SessionRegistrationInput,
+  sandboxAllocation: SandboxAllocation | undefined,
+  sandboxKind?: SandboxKind
+): boolean {
+  return (
+    allowsSubagentSessions(input) &&
+    sandboxAllocation !== 'cloudflare-shared' &&
+    sandboxKind !== 'shared'
+  );
+}
+
 function assertSupportedSandboxAllocation(
   input: SessionRegistrationInput,
-  ctx: SessionRegistrationContext,
   options?: { billingOrigin?: string }
 ): void {
   if (!egressPolicySchema.safeParse(input.runtime ?? {}).success) {
@@ -140,40 +168,10 @@ function assertSupportedSandboxAllocation(
   if (input.runtime && 'devcontainer' in input.runtime && input.runtime.devcontainer === true) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: DEVCONTAINER_RETIRED_MESSAGE });
   }
-  if (
-    options?.billingOrigin !== 'code-review' &&
-    enrolledByocVercelOwner(ctx.env, {
-      userId: ctx.userId,
-      orgId: input.options?.kilocodeOrganizationId,
-    }) !== undefined
-  ) {
-    const unavailableReason =
-      sandboxAllocationRepositoryUnavailableReason('vercel-small', input.repository.type) ??
-      sandboxAllocationProviderCapabilityReason(
-        'vercel-small',
-        allocationCapabilityFor(input, options?.billingOrigin)
-      );
-    if (unavailableReason) {
-      throw new TRPCError({ code: 'BAD_REQUEST', message: unavailableReason });
-    }
-  }
   const allocation = input.runtime?.sandboxAllocation;
   if (allocation === undefined) return;
   if (!sandboxAllocationSchema.safeParse(allocation).success) {
     throw new TRPCError({ code: 'BAD_REQUEST', message: 'Invalid sandbox allocation' });
-  }
-  if (
-    options?.billingOrigin !== 'code-review' &&
-    isByocIncompatibleAllocation(
-      ctx.env,
-      { userId: ctx.userId, orgId: input.options?.kilocodeOrganizationId },
-      allocation
-    )
-  ) {
-    throw new TRPCError({
-      code: 'BAD_REQUEST',
-      message: 'Sandbox allocation is not supported for BYOC Vercel accounts',
-    });
   }
   if (
     options?.billingOrigin === 'code-review' ||
@@ -330,7 +328,11 @@ export function assertSessionOperationIdentity(
   row: OperationLedgerRow,
   expected: {
     userId: string;
-    intent: 'create_cloud' | 'create_worktree_chat';
+    intent:
+      | 'create_cloud'
+      | 'create_worktree_chat'
+      | 'create_workspace_session'
+      | 'delete_workspace_session';
     organizationId?: string | null;
     resourceKey?: string | null;
   }
@@ -575,14 +577,36 @@ function computeCredentialContainment(
   };
 }
 
+/**
+ * Client provenance values trusted to create the first hosted session of a
+ * workspace. Each provenance is only accepted with the origin its owning
+ * endpoint sets server-side; a caller cannot select a trusted pair through a
+ * public input field.
+ */
+const TRUSTED_WORKTREE_CREATE_ORIGINS: Readonly<Record<string, string>> = {
+  browser: 'cloud-agent-web',
+  'agent-manager': 'agent-manager',
+};
+
+export function isTrustedWorktreeCreateOrigin(
+  provenance: string | undefined,
+  createdOnPlatform: string | undefined
+): boolean {
+  return (
+    provenance !== undefined && TRUSTED_WORKTREE_CREATE_ORIGINS[provenance] === createdOnPlatform
+  );
+}
+
 function isEligibleFirstWorktreeSession(
   input: SessionRegistrationInput,
   ctx: SessionRegistrationContext
 ): boolean {
   return (
-    input.options?.clientProvenance === 'browser' &&
-    input.options.createdOnPlatform === 'cloud-agent-web' &&
-    input.options.operationKey !== undefined &&
+    isTrustedWorktreeCreateOrigin(
+      input.options?.clientProvenance,
+      input.options?.createdOnPlatform
+    ) &&
+    input.options?.operationKey !== undefined &&
     input.initialTurn !== undefined &&
     input.clone === undefined &&
     ctx.botId === undefined
@@ -647,10 +671,7 @@ async function issueSessionRuntimeAuthorization(
   initialTurn: AcceptedExecutionTurn | undefined
 ): Promise<NewSessionAllocation['runtimeAuthorization']> {
   const orgId = input.options?.kilocodeOrganizationId;
-  if (
-    (input.allowSubagentSessions === true || input.parentCloudAgentSessionId !== undefined) &&
-    !isPolicyBearingAuthToken(ctx.authToken)
-  ) {
+  if (input.parentCloudAgentSessionId !== undefined && !isPolicyBearingAuthToken(ctx.authToken)) {
     throw new TRPCError({
       code: 'PRECONDITION_FAILED',
       message: 'Cloud Agent spawn requires modern workspace authorization',
@@ -763,30 +784,21 @@ async function allocateNewSession(
     );
   }
   const initialTurn = input.initialTurn ? acceptInitialTurn(input.initialTurn) : undefined;
-  const isCodeReviewSession = options?.billingOrigin === 'code-review';
-  const byocOwner = isCodeReviewSession
-    ? undefined
-    : enrolledByocVercelOwner(ctx.env, { userId: ctx.userId, orgId });
-  const byocEnrolled = byocOwner !== undefined;
   const cloudAgentSessionId = generateSessionId();
-  const sandboxAllocation = byocEnrolled
-    ? requestedAllocation
-    : resolveNewSessionSandboxAllocation({
-        env: ctx.env,
-        orgId,
-        userId: ctx.userId,
-        sessionId: cloudAgentSessionId,
-        requestedAllocation,
-        contained: hasCredentialContainment(
-          computeCredentialContainment(cloudAgentSessionId, input, ctx.env)
-        ),
-        createdOnPlatform: input.options?.createdOnPlatform,
-        billingOrigin: options?.billingOrigin,
-      });
-  assertCloudAgentIsolatedAllocation(
-    input.allowSubagentSessions === true || input.parentCloudAgentSessionId !== undefined,
-    sandboxAllocation
-  );
+  const sandboxAllocation = resolveNewSessionSandboxAllocation({
+    env: ctx.env,
+    orgId,
+    userId: ctx.userId,
+    sessionId: cloudAgentSessionId,
+    requestedAllocation,
+    contained: hasCredentialContainment(
+      computeCredentialContainment(cloudAgentSessionId, input, ctx.env)
+    ),
+    createdOnPlatform: input.options?.createdOnPlatform,
+    billingOrigin: options?.billingOrigin,
+  });
+  const childSession = input.parentCloudAgentSessionId !== undefined;
+  assertCloudAgentIsolatedAllocation(childSession, sandboxAllocation);
   const kiloSessionId = input.options?.kiloSessionId ?? generateKiloSessionId();
   const worktreeId = ledger?.worktreeEnabled
     ? cloudAgentWorktreeIdSchema.parse(`worktree_${cloudAgentSessionId.slice('workspace_'.length)}`)
@@ -840,24 +852,7 @@ async function allocateNewSession(
   let sandboxKind: SandboxKind | undefined;
   let sandboxProvider: SandboxSelection['provider'] = 'cloudflare';
   let sandboxProviderBinding: SandboxProviderBinding = { kind: 'cloudflare' };
-  let byocEnrollment: Awaited<ReturnType<typeof fetchByocVercelEnrollment>> | undefined;
   try {
-    if (byocOwner) {
-      try {
-        byocEnrollment =
-          byocOwner.organizationId !== undefined
-            ? await fetchByocVercelEnrollment(ctx.env, byocOwner.organizationId)
-            : await fetchByocVercelEnrollmentForUser(ctx.env, byocOwner.userId);
-      } catch (error) {
-        if (error instanceof ByocCredentialMissingError) {
-          throw new TRPCError({ code: 'BAD_REQUEST', message: 'byoc_vercel_not_ready' });
-        }
-        throw error;
-      }
-      if (byocEnrollment.setupStatus !== 'ready') {
-        throw new TRPCError({ code: 'BAD_REQUEST', message: 'byoc_vercel_not_ready' });
-      }
-    }
     const decision = await selectControlPlaneSandbox({
       env: ctx.env,
       sessionId: cloudAgentSessionId,
@@ -870,14 +865,28 @@ async function allocateNewSession(
     sandboxId = decision.sandboxId;
     sandboxKind = decision.sandboxKind;
     sandboxProvider = decision.provider;
-    if (byocEnrollment) {
-      sandboxProvider = 'vercel';
+    if (sandboxProvider === 'vercel') {
+      let enrollment: Awaited<ReturnType<typeof fetchByocVercelEnrollment>>;
+      try {
+        enrollment =
+          orgId !== undefined
+            ? await fetchByocVercelEnrollment(ctx.env, orgId)
+            : await fetchByocVercelEnrollmentForUser(ctx.env, ctx.userId);
+      } catch (error) {
+        if (error instanceof ByocCredentialMissingError) {
+          throw new TRPCError({ code: 'BAD_REQUEST', message: 'byoc_vercel_not_ready' });
+        }
+        throw error;
+      }
+      if (enrollment.setupStatus !== 'ready') {
+        throw new TRPCError({ code: 'BAD_REQUEST', message: 'byoc_vercel_not_ready' });
+      }
       sandboxProviderBinding = {
         kind: 'vercel',
         source: {
           kind: 'byoc',
-          ...byocVercelOwnerFields(byocEnrollment),
-          credentialId: byocEnrollment.credentialId,
+          ...byocVercelOwnerFields(enrollment),
+          credentialId: enrollment.credentialId,
         },
       };
     } else {
@@ -1199,17 +1208,19 @@ function buildSessionRegistrationCommand(
   allocation: NewSessionAllocation,
   options?: { billingOrigin?: string }
 ) {
-  const scoped =
-    input.allowSubagentSessions === true || input.parentCloudAgentSessionId !== undefined;
-  assertCloudAgentIsolatedAllocation(scoped, allocation.sandboxAllocation);
-  if (scoped && allocation.sandboxKind === 'shared') {
+  const childSession = input.parentCloudAgentSessionId !== undefined;
+  assertCloudAgentIsolatedAllocation(childSession, allocation.sandboxAllocation);
+  if (childSession && allocation.sandboxKind === 'shared') {
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: 'Cloud Agent spawn authority requires an isolated sandbox',
     });
   }
   return {
-    allowSubagentSessions: input.allowSubagentSessions ?? false,
+    allowSubagentSessions:
+      resolvedAllowsSubagentSessions(input, allocation.sandboxAllocation, allocation.sandboxKind) &&
+      isPolicyBearingAuthToken(ctx.authToken) &&
+      ctx.botId === undefined,
     parentCloudAgentSessionId: input.parentCloudAgentSessionId,
     identity: {
       sessionId: allocation.cloudAgentSessionId,
@@ -1322,7 +1333,7 @@ export async function registerNewSession(
   ctx: SessionRegistrationContext,
   options?: { billingOrigin?: string }
 ): Promise<SessionRegistrationResult> {
-  assertSupportedSandboxAllocation(rawInput, ctx, options);
+  assertSupportedSandboxAllocation(rawInput, options);
   const input = rawInput;
   const allocation = await allocateNewSession(input, ctx, options);
   let registerResult: { success: boolean; error?: string };
@@ -1614,7 +1625,7 @@ export async function startNewSession(
   options?: { billingOrigin?: string },
   ledger?: SessionCreationLedgerHooks
 ): Promise<StartedSessionResult> {
-  assertSupportedSandboxAllocation(rawInput, ctx, options);
+  assertSupportedSandboxAllocation(rawInput, options);
   // A ledger create has resolved the saved allocation already; this is a no-op then.
   const input = await withSavedSandboxAllocation(rawInput, savedAllocationArgs(ctx, options));
   const allocation = await allocateSessionForCreate(input, ctx, options, ledger);
@@ -1705,6 +1716,7 @@ function repositoryCreateIntent(repository: SessionRepositoryRequest): Record<st
         repo: repository.repo,
         githubIntegrationId: repository.githubIntegrationId,
         githubAccessPurpose: repository.githubAccessPurpose === 'agent' ? 'agent' : undefined,
+        allowUserAuthorization: repository.allowUserAuthorization === true ? true : undefined,
         pullRequestNumber: repository.pullRequestNumber,
         branch: repository.branch,
       };
@@ -1797,7 +1809,6 @@ export async function sessionCreateIntentFingerprint(
           };
   return sha256Hex(
     canonicalJson({
-      allowSubagentSessions: input.allowSubagentSessions === true ? true : undefined,
       parentCloudAgentSessionId: input.parentCloudAgentSessionId,
       initialTurn,
       // Undefined for creates without a proposed ID, so their fingerprint is unchanged.
@@ -1842,7 +1853,11 @@ export async function sessionCreateIntentFingerprint(
         ? {
             kilocodeOrganizationId: input.options.kilocodeOrganizationId || undefined,
             createdOnPlatform: input.options.createdOnPlatform || undefined,
-            clientProvenance: input.options.clientProvenance === 'browser' ? 'browser' : undefined,
+            clientProvenance:
+              input.options.clientProvenance === 'browser' ||
+              input.options.clientProvenance === 'agent-manager'
+                ? input.options.clientProvenance
+                : undefined,
             shallow: input.options.shallow === true ? true : undefined,
           }
         : undefined,
@@ -1907,7 +1922,7 @@ export async function createSessionWithLedger(
   ctx: SessionRegistrationContext,
   options: SessionLedgerCreateOptions
 ): Promise<LedgerSessionCreateResult> {
-  assertSupportedSandboxAllocation(rawInput, ctx, { billingOrigin: options.billingOrigin });
+  assertSupportedSandboxAllocation(rawInput, { billingOrigin: options.billingOrigin });
   await assertSandboxAllocationMembership(rawInput, ctx);
   const db = getPgDb(ctx.env);
   const input = options.resolveSavedAllocationBeforeAdmission

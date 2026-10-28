@@ -220,7 +220,8 @@ describe('cloud-agent model validation through real web authentication', () => {
       expect(getAvailableModelsForOrganization).toHaveBeenCalledWith(
         org.id,
         { type: 'member', kiloUserId: user.id, allowNonMember: true },
-        'member'
+        'member',
+        { countryCode: null }
       );
     }
   );

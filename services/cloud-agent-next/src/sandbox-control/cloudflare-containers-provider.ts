@@ -126,6 +126,9 @@ export function createCloudflareContainersProviderAdapter(deps: {
       if (ref === null || decodeOwnedProviderRef(ref) === null) return false;
       return deps.getContainer(deps.logicalSandboxId).isBillingBlocked();
     },
+    async getBillingProjection() {
+      return deps.getContainer(deps.logicalSandboxId).getBillingRuntimeStatus();
+    },
     describeRuntime(ref) {
       const parsed = decodeOwnedProviderRef(ref);
       if (parsed === null) return undefined;
@@ -161,6 +164,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
         ...(deps.egressAllowlist === undefined ? {} : { egressAllowlist: deps.egressAllowlist }),
         ...(options?.snapshot === undefined ? {} : { snapshot: options.snapshot }),
         ...(options?.deadlineAt === undefined ? {} : { deadlineAt: options.deadlineAt }),
+        ...(options?.nativeImage === undefined ? {} : { nativeImage: options.nativeImage }),
         env: {
           ...env,
           CONTROL_WORKLOAD_LIMIT_MB: workloadLimitMb,

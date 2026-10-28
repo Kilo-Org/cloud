@@ -227,7 +227,6 @@
     "hideBalance": "إخفاء الرصيد",
     "showBalance": "إظهار الرصيد",
     "balanceHidden": "الرصيد مخفي",
-    "bonusCreditsExpiring": "تنتهي صلاحية رصيد بقيمة {{amount}} في {{date}}.",
     "signOutTitle": "تسجيل الخروج؟",
     "signOutMessage": "ستحتاج إلى تسجيل الدخول مرة أخرى للوصول إلى مساحة عملك.",
     "deleteAccountTitle": "حذف الحساب؟",
@@ -352,6 +351,18 @@
       "securityFindingsUnavailable": "فعِّل وكيل الأمان من Kilo على نطاق للحصول على النتائج الأمنية.",
       "spendAlertsSubtitle": "تجاوزات الحدود والارتفاعات الساعية",
       "spendAlertsToggle": "فئة تنبيهات الإنفاق"
+    },
+    "history": {
+      "title": "سجل الإشعارات",
+      "subtitle": "الإشعارات التي تلقّاها هذا الحساب",
+      "bannerBody": "الإشعارات الفورية معطّلة على هذا الجهاز، لذلك لن تصل الإشعارات الجديدة هنا.",
+      "bannerAction": "إعدادات الإشعارات",
+      "emptyTitle": "لا توجد إشعارات بعد",
+      "emptyCategoryTitle": "لا توجد إشعارات في هذا التصنيف",
+      "emptyBody": "تظهر هنا الإشعارات التي يتلقّاها هذا الحساب. يتم الاحتفاظ بها لمدة {{days}} يوم.",
+      "capped": "يتم عرض أحدث الإشعارات.",
+      "loadError": "تعذّر تحميل سجل الإشعارات.",
+      "openFailed": "لم يعد هذا الإشعار يفتح في أي مكان."
     },
     "action": {
       "openSession": "فتح الجلسة"
@@ -1702,13 +1713,7 @@
     },
     "remoteSpawnRetryable": "تعذّر الوصول إلى المثيل — ربما انقطع الاتصال.",
     "remoteSpawnNonRetryable": "فشل المثيل في بدء الجلسة — تحقق من الجهاز أو حدّث CLI.",
-    "remoteSpawnInstanceDisconnected": "انقطع الاتصال بالمثيل المحدد. ابدأ جلسة على Cloud Agent أو اختر مثيلًا آخر.",
-    "liveCount_one": "{{count}} على المباشر",
-    "liveCount_other": "{{count}} على المباشر",
-    "liveCount_zero": "الجلسات النشطة: {{count}}",
-    "liveCount_two": "جلستان نشطتان ({{count}})",
-    "liveCount_few": "{{count}} جلسات نشطة",
-    "liveCount_many": "{{count}} جلسة نشطة"
+    "remoteSpawnInstanceDisconnected": "انقطع الاتصال بالمثيل المحدد. ابدأ جلسة على Cloud Agent أو اختر مثيلًا آخر."
   },
   "agentChat": {
     "session": {
@@ -2136,7 +2141,9 @@
       "retrying": "جارٍ إعادة المحاولة…",
       "retryDeny": "إعادة محاولة الرفض",
       "retryAllowOnce": "إعادة محاولة السماح لمرة واحدة",
-      "retryAlwaysAllow": "إعادة محاولة السماح دائمًا"
+      "retryAlwaysAllow": "إعادة محاولة السماح دائمًا",
+      "unreadableTitle": "تعذّرت قراءة طلب الإذن",
+      "unreadableBody": "الوكيل في انتظار قرار إذن لا يستطيع هذا التطبيق عرضه. حدّث التطبيق أو CLI، أو أجب عن الطلب في CLI للمتابعة."
     },
     "questionCard": {
       "title": "الوكيل بحاجة إلى إجابتك",
@@ -2556,8 +2563,9 @@
     "unavailableDevice": "الإدخال الصوتي غير متاح على هذا الجهاز.",
     "unavailableLanguage": "الإدخال الصوتي غير متاح باللغة المحددة للجهاز.",
     "languageNotInstalledTitle": "الإدخال الصوتي للغة {{language}} غير جاهز",
-    "languageNotInstalledMessage": "ملفات الكلام دون اتصال للغة {{language}} غير مثبّتة على هذا الهاتف. نزّلها، ثم حاول استخدام الإدخال الصوتي مرة أخرى.",
+    "languageNotInstalledMessage": "ملفات الكلام دون اتصال للغة {{language}} غير مثبتة، وتحويل الكلام إلى نص عبر الإنترنت متوقف. نزِّل الملفات أو أعد تشغيل تحويل الكلام إلى نص عبر الإنترنت لتتمكن من استخدام الإدخال الصوتي.",
     "downloadOfflineModel": "تنزيل",
+    "useOnlineTranscription": "السماح بالتحويل عبر الإنترنت",
     "offlineModelDownloadScheduled": "ستُنزَّل ملفات الكلام دون اتصال في الخلفية. حاول استخدام الإدخال الصوتي مرة أخرى لاحقًا.",
     "listeningStopped": "توقف الاستماع.",
     "transcribing": "جارٍ التفريغ...",
@@ -3327,7 +3335,7 @@
     "creditActivity": {
       "emptyDescription": "ستظهر هنا عمليات الشراء والاستخدام وتعديلات رصيد المؤسسة فور حدوثها.",
       "emptyTitle": "لا توجد عمليات على الرصيد",
-      "expires": "تنتهي الصلاحية في {{date}}",
+      "expiresUtc": "تنتهي الصلاحية في {{date}} (UTC)",
       "title": "سجل الرصيد",
       "transactionFallback": "عملية على الرصيد",
       "category": {
@@ -4044,6 +4052,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "القيم المعروضة كـ •••• تحتفظ بسرها المخزن؛ استبدل قيمة لتدوير السر. يتطلب تغيير سطر الأوامر إعادة إدخال كل القيم",
+      "headersHint": "القيم المعروضة كـ •••• تحتفظ بسرها المخزن؛ استبدل قيمة لتدوير السر. يتطلب تغيير عنوان URL إعادة إدخال كل القيم",
       "nameRequired": "أدخل اسم الخادم",
       "nameInvalid": "يمكن أن يستخدم الاسم حروف ASCII والأرقام والشرطات السفلية والشرطات فقط، بحد أقصى 100 حرف",
       "commandRequired": "أدخل أمرًا",
@@ -4142,6 +4152,10 @@
   "credits": {
     "title": "شراء الرصيد",
     "description": "الرصيد عملية شراء لمرة واحدة تُضاف إلى رصيدك في Kilo لتشغيل جلسات البرمجة بالذكاء الاصطناعي في تطبيق Kilo. يتقاضى المتجر المبلغ من حسابك وتُضاف الأرصدة بعد تأكيد المتجر للدفع.",
+    "nextExpiry": "تنتهي صلاحية رصيد بقيمة {{amount}} في {{date}} (UTC). يُستخدم الرصيد الأقرب انتهاءً أولاً.",
+    "appStoreExpiry": "الرصيد الذي تم شراؤه عبر App Store لا تنتهي صلاحيته.",
+    "playOneYearExpiry": "تنتهي صلاحية هذا الرصيد بعد سنة تقويمية واحدة من الشراء.",
+    "playNonexpiring": "لا تنتهي صلاحية هذا الرصيد.",
     "packLabel": "إضافة {{amount}} من الرصيد",
     "priceUnavailable": "السعر غير متاح",
     "purchased": "تمت إضافة الرصيد إلى رصيدك.",
@@ -4296,6 +4310,18 @@
     "generate": "إنشاء ملخص",
     "retrySummary": "إعادة محاولة الملخص المدفوع",
     "sources": "الأدلة والمخرجات",
+    "sessionsShown_zero": "عرض {{shown}} من أصل {{total}} جلسات",
+    "sessionsShown_one": "عرض {{shown}} من أصل {{total}} جلسة",
+    "sessionsShown_two": "عرض {{shown}} من أصل {{total}} جلستين",
+    "sessionsShown_few": "عرض {{shown}} من أصل {{total}} جلسات",
+    "sessionsShown_many": "عرض {{shown}} من أصل {{total}} جلسة",
+    "sessionsShown_other": "عرض {{shown}} من أصل {{total}} جلسة",
+    "itemsShown_zero": "عرض {{shown}} من أصل {{total}} عناصر",
+    "itemsShown_one": "عرض {{shown}} من أصل {{total}} عنصر",
+    "itemsShown_two": "عرض {{shown}} من أصل {{total}} عنصرين",
+    "itemsShown_few": "عرض {{shown}} من أصل {{total}} عناصر",
+    "itemsShown_many": "عرض {{shown}} من أصل {{total}} عنصرًا",
+    "itemsShown_other": "عرض {{shown}} من أصل {{total}} عنصر",
     "timezone": "المنطقة الزمنية للتقرير",
     "deviceTimezone": "استخدام المنطقة الزمنية للجهاز",
     "timezoneHint": "منطقة زمنية وفق IANA، مثل Europe/Berlin. تُطبّق تغييرات الجدول على التقارير القادمة.",

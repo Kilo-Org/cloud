@@ -6,6 +6,7 @@ import type {
   ProviderId,
   ProviderResponseTransforms,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { getDynamicRequestLoggingMode } from '@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
@@ -33,6 +34,8 @@ export type LogUnrewrittenResponseParams = {
   model: string;
   providerId: ProviderId;
   logging: RequestLoggingParams;
+  /** Merged into the row's `error`, e.g. to mark a response the gateway produced itself. */
+  error: Record<string, string> | null;
 };
 
 export type RewriteModelResponseParams = {
@@ -76,7 +79,8 @@ async function createRequestLogCapture(
   response: Response,
   model: string,
   provider: string,
-  logging: RequestLoggingParams
+  logging: RequestLoggingParams,
+  extraError: Record<string, string> | null
 ): Promise<RequestLogCapture | null> {
   const { user, organization_id, session_id, vercel_request_id, request } = logging;
   const loggingMode = await getDynamicRequestLoggingMode({
@@ -113,7 +117,7 @@ async function createRequestLogCapture(
       );
     }
     try {
-      const detectedError =
+      const responseError =
         responseText !== undefined
           ? responseReadError !== undefined
             ? {
@@ -122,6 +126,8 @@ async function createRequestLogCapture(
               }
             : detectToolCallArgumentErrors(responseText, request)
           : { response_body_read_error: responseReadError };
+      const detectedError =
+        extraError === null ? responseError : { ...(responseError ?? {}), ...extraError };
       if (loggingMode === 'errors_only' && status < 400 && detectedError === null) {
         return;
       }
@@ -182,8 +188,9 @@ export async function logUnrewrittenResponse({
   model,
   providerId,
   logging,
+  error,
 }: LogUnrewrittenResponseParams): Promise<void> {
-  const capture = await createRequestLogCapture(response, model, providerId, logging);
+  const capture = await createRequestLogCapture(response, model, providerId, logging, error);
   if (!capture) {
     return;
   }
@@ -204,13 +211,14 @@ export async function rewriteModelResponse({
   logging,
   responseTransforms,
 }: RewriteModelResponseParams): Promise<NextResponse> {
-  const capture = await createRequestLogCapture(response, model, providerId, logging);
+  const capture = await createRequestLogCapture(response, model, providerId, logging, null);
   const usageContext: ResponseUsageContext = {
     requested_model: model,
     provider: providerId,
     api_kind: kind,
     is_free: isFree,
     user_byok: userByok,
+    custom_pricing_config: await getCustomPricingConfig(),
   };
 
   console.debug('[rewriteModelResponse] rewriting response for %s', model);

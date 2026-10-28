@@ -227,7 +227,6 @@
     "hideBalance": "Bakiyeyi gizle",
     "showBalance": "Bakiyeyi göster",
     "balanceHidden": "Bakiye gizli",
-    "bonusCreditsExpiring": "{{amount}} tutarındaki kredinin süresi {{date}} tarihinde dolacak.",
     "signOutTitle": "Oturum kapatılsın mı?",
     "signOutMessage": "Çalışma alanına erişmek için tekrar oturum açman gerekecek.",
     "deleteAccountTitle": "Hesap silinsin mi?",
@@ -352,6 +351,18 @@
       "securityFindingsUnavailable": "Güvenlik bulguları almak için bir kapsamda Kilo Güvenlik ajanını etkinleştir.",
       "spendAlertsSubtitle": "eşik aşımları ve saatlik artışlar",
       "spendAlertsToggle": "Harcama uyarıları kategorisi"
+    },
+    "history": {
+      "title": "Bildirim geçmişi",
+      "subtitle": "Bu hesabın aldığı bildirimler",
+      "bannerBody": "Bu cihazda anlık bildirimler kapalı, bu nedenle yenileri buraya gelmez.",
+      "bannerAction": "Bildirim ayarları",
+      "emptyTitle": "Henüz bildirim yok",
+      "emptyCategoryTitle": "Bu kategoride bildirim yok",
+      "emptyBody": "Bu hesabın aldığı bildirimler burada görünür. {{days}} gün boyunca saklanır.",
+      "capped": "En son bildirimler gösteriliyor.",
+      "loadError": "Bildirim geçmişi yüklenemedi.",
+      "openFailed": "Bu bildirim artık hiçbir yerde açılmıyor."
     },
     "action": {
       "openSession": "Oturumu aç"
@@ -1654,9 +1665,7 @@
     },
     "remoteSpawnRetryable": "Örneğe ulaşılamadı — bağlantısı kesilmiş olabilir.",
     "remoteSpawnNonRetryable": "Örnek oturumu başlatamadı. Makineyi kontrol et veya CLI'yi güncelle.",
-    "remoteSpawnInstanceDisconnected": "Seçili örneğin bağlantısı kesildi. Cloud Agent üzerinde bir oturum başlat veya başka bir örnek seç.",
-    "liveCount_one": "{{count}} CANLI",
-    "liveCount_other": "{{count}} CANLI"
+    "remoteSpawnInstanceDisconnected": "Seçili örneğin bağlantısı kesildi. Cloud Agent üzerinde bir oturum başlat veya başka bir örnek seç."
   },
   "agentChat": {
     "session": {
@@ -2068,7 +2077,9 @@
       "retrying": "Tekrar deneniyor…",
       "retryDeny": "Reddetmeyi tekrar dene",
       "retryAllowOnce": "Bir kez izin vermeyi tekrar dene",
-      "retryAlwaysAllow": "Her zaman izin vermeyi tekrar dene"
+      "retryAlwaysAllow": "Her zaman izin vermeyi tekrar dene",
+      "unreadableTitle": "İzin isteği okunamadı",
+      "unreadableBody": "Aracı, bu uygulamanın gösteremediği bir izin kararını bekliyor. Devam etmek için uygulamayı veya CLI'yi güncelle ya da isteği CLI'de yanıtla."
     },
     "questionCard": {
       "title": "Ajan yanıt bekliyor",
@@ -2460,8 +2471,9 @@
     "unavailableDevice": "Sesli giriş bu cihazda kullanılamıyor.",
     "unavailableLanguage": "Cihazın seçili dilinde sesli giriş kullanılamıyor.",
     "languageNotInstalledTitle": "{{language}} için sesli giriş henüz hazır değil",
-    "languageNotInstalledMessage": "{{language}} dilinin çevrimdışı konuşma dosyaları bu telefonda yüklü değil. Dosyaları indir, ardından sesli girişi tekrar dene.",
+    "languageNotInstalledMessage": "{{language}} için çevrimdışı konuşma dosyaları yüklü değil ve çevrimiçi transkripsiyon kapalı. Sesli girişi kullanmak için dosyaları indirmen ya da çevrimiçi transkripsiyonu yeniden açman gerekiyor.",
     "downloadOfflineModel": "İndir",
+    "useOnlineTranscription": "Çevrimiçi transkripsiyona izin ver",
     "offlineModelDownloadScheduled": "Çevrimdışı konuşma dosyaları arka planda indirilecek. Sesli girişi daha sonra tekrar dene.",
     "listeningStopped": "Dinleme durdu.",
     "transcribing": "Metne dönüştürülüyor...",
@@ -3151,7 +3163,7 @@
     "creditActivity": {
       "emptyDescription": "Bu kuruluşun satın alımları, kullanımı ve kredi düzeltmeleri gerçekleştikçe burada görünür.",
       "emptyTitle": "Kredi hareketi yok",
-      "expires": "Son kullanma tarihi: {{date}}",
+      "expiresUtc": "Son kullanma tarihi: {{date}} (UTC)",
       "title": "Kredi hareketleri",
       "transactionFallback": "Kredi işlemi",
       "category": {
@@ -3840,6 +3852,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "•••• olarak gösterilen değerler kayıtlı gizliliklerini korur; döndürmek için bir değeri değiştirin. Komut satırını değiştirmek tüm değerlerin yeniden girilmesini gerektirir",
+      "headersHint": "•••• olarak gösterilen değerler kayıtlı gizliliklerini korur; döndürmek için bir değeri değiştirin. URL'yi değiştirmek tüm değerlerin yeniden girilmesini gerektirir",
       "nameRequired": "Bir sunucu adı girin",
       "nameInvalid": "Adda yalnızca ASCII harfleri, rakamlar, alt çizgi ve kısa çizgi kullanılabilir, en fazla 100 karakter",
       "commandRequired": "Bir komut girin",
@@ -3938,6 +3952,10 @@
   "credits": {
     "title": "Kredi satın al",
     "description": "Krediler, Kilo App'te AI kodlama oturumları yürütmek için Kilo bakiyenize eklenen tek seferlik bir satın alımdır. Mağaza hesabınızdan ücret alır ve mağaza ödemeyi onayladıktan sonra krediler eklenir.",
+    "nextExpiry": "{{amount}} tutarındaki kredinin süresi {{date}} (UTC) tarihinde dolacak. Süresi en erken dolan krediler önce kullanılır.",
+    "appStoreExpiry": "App Store üzerinden satın alınan kredilerin süresi dolmaz.",
+    "playOneYearExpiry": "Bu kredilerin süresi satın alma tarihinden bir takvim yılı sonra dolar.",
+    "playNonexpiring": "Bu kredilerin süresi dolmaz.",
     "packLabel": "{{amount}} değerinde kredi ekle",
     "priceUnavailable": "Fiyat kullanılamıyor",
     "purchased": "Krediler bakiyenize eklendi.",
@@ -4076,6 +4094,10 @@
     "generate": "Özet oluştur",
     "retrySummary": "Ücretli özeti tekrar dene",
     "sources": "Kanıtlar ve çıktılar",
+    "sessionsShown_one": "{{total}} oturumdan {{shown}} tanesi gösteriliyor",
+    "sessionsShown_other": "{{total}} oturumdan {{shown}} tanesi gösteriliyor",
+    "itemsShown_one": "{{total}} öğeden {{shown}} tanesi gösteriliyor",
+    "itemsShown_other": "{{total}} öğeden {{shown}} tanesi gösteriliyor",
     "timezone": "Rapor saat dilimi",
     "deviceTimezone": "Cihaz saat dilimini kullan",
     "timezoneHint": "IANA saat dilimi, örneğin Europe/Berlin. Program değişiklikleri sonraki raporlar için geçerlidir.",

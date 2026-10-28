@@ -227,7 +227,6 @@
     "hideBalance": "Haftee dhoksi",
     "showBalance": "Haftee agarsiisi",
     "balanceHidden": "Hafteen dhokateera",
-    "bonusCreditsExpiring": "Kiriiditiin {{amount}} gaafa {{date}} yeroon isaa darba.",
     "signOutTitle": "Keessaa baataa?",
     "signOutMessage": "Iddoo hojii keetti deebi'uuf ammas seenuu qabda.",
     "deleteAccountTitle": "Herrega haqxaa?",
@@ -876,6 +875,18 @@
       "securityFindingsUnavailable": "Argannoowwan nageenyaa argachuuf Kilo eejentii nageenyaa daangaa irratti dandeessisi.",
       "spendAlertsSubtitle": "daarbii daangaa fi olka'iinsa sa'aatii",
       "spendAlertsToggle": "Ramaddii akeekkachiisa baasii"
+    },
+    "history": {
+      "title": "Seenaa beeksisaa",
+      "subtitle": "Beeksisoota herregni kun argate",
+      "bannerBody": "Beeksisoonni push meeshaa kanaaf cufamaniiru, kanaaf haaraan asitti hin dhufan.",
+      "bannerAction": "Qindaa'ina beeksisaa",
+      "emptyTitle": "Ammatti beeksisoonni hin jiran",
+      "emptyCategoryTitle": "Beeksisoonni rammii kana keessatti hin jiran",
+      "emptyBody": "Beeksisoonni herregni kun fudhatu asitti mul'atu. Guyyaa {{days}}f ni eegamu.",
+      "capped": "Beeksisoonni haaraan agarsiifamaa jiran.",
+      "loadError": "Seenaa beeksisaa fiduu hin dandeenye.",
+      "openFailed": "Beeksisni kun amma bakka tokkollee hin banamu."
     },
     "action": {
       "openSession": "Turtii bani"
@@ -2178,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Naannoo hojii bira ga'uun hin danda'amne — walqunnamtiin isaa citeera ta'a.",
     "remoteSpawnNonRetryable": "Naannoon hojii turtii jalqabuu hin dandeenye — kompiitara ilaali ykn CLI haaromsi.",
-    "remoteSpawnInstanceDisconnected": "Walqunnamtiin naannoo hojii filatamee citeera. Cloud Agent irratti turtii jalqabi ykn naannoo hojii biraa filadhu.",
-    "liveCount_one": "{{count}} KALLATTIIN",
-    "liveCount_other": "{{count}} KALLATTIIN"
+    "remoteSpawnInstanceDisconnected": "Walqunnamtiin naannoo hojii filatamee citeera. Cloud Agent irratti turtii jalqabi ykn naannoo hojii biraa filadhu."
   },
   "agentChat": {
     "session": {
@@ -2592,7 +2601,9 @@
       "retrying": "Deebi'ee yaalaa jira…",
       "retryDeny": "Diduuf deebi'ii yaali",
       "retryAllowOnce": "Al tokko hayyamuuf deebi'ii yaali",
-      "retryAlwaysAllow": "Yeroo hunda hayyamuuf deebi'ii yaali"
+      "retryAlwaysAllow": "Yeroo hunda hayyamuuf deebi'ii yaali",
+      "unreadableTitle": "Gaaffiin hayyamaa dubbifamuu hin dandeenye",
+      "unreadableBody": "Ajentiin murtii hayyamaa eeggachaa jira; appiin kun sana agarsiisuu hin danda'u. Appii ykn CLI haaromsi, ykn itti fufuuf gaaffii CLI keessatti deebisi."
     },
     "questionCard": {
       "title": "Ergamaan deebii barbaada",
@@ -2984,8 +2995,9 @@
     "unavailableDevice": "Meeshaa kana irratti sagaleen galchuun hin danda'amu.",
     "unavailableLanguage": "Afaan meeshaa kanaatiin sagaleen galchuun hin danda'amu.",
     "languageNotInstalledTitle": "Sagaleen galchuu afaan {{language}} tiif hin qophaa'i",
-    "languageNotInstalledMessage": "Faayiloota sagalee offlaayinii afaan {{language}} tiif bilbilaa kana irratti hin dhaabbatamin. Isaan buufadhu, ergasii sagaleen galchuu irra deebi'ii yaali.",
+    "languageNotInstalledMessage": "Faayiloonni sagalee offlaayinii afaan {{language}} hin buufamne, warraabbi intarneetii amma cufameera. Faayiloota buufachuun ykn warraabbi intarneetii deebisuun sagalee galchuu akka hojjete taasisa.",
     "downloadOfflineModel": "Buufadhu",
+    "useOnlineTranscription": "Warraabbi intarneetii hayyami",
     "offlineModelDownloadScheduled": "Faayiloota sagalee offlaayinii duubatti buufamu. Sagaleen galchuu booda irra deebi'ii yaali.",
     "listeningStopped": "Dhaggeeffachuun dhaabbateera.",
     "transcribing": "Barreeffamatti jijjiiraa jira...",
@@ -3159,7 +3171,7 @@
     "creditActivity": {
       "emptyDescription": "Bittaan, fayyadamni fi sirreeffamni kiriiditii dhaabbata kanaa yeroo raawwataman asitti mul'atu.",
       "emptyTitle": "Sochii kiriiditii hin jiru",
-      "expires": "{{date}} irratti yeroon isaa darba",
+      "expiresUtc": "{{date}} (UTC) irratti yeroon isaa darba",
       "title": "Sochii kiriiditii",
       "transactionFallback": "Daddabarsa kiriiditii",
       "category": {
@@ -3840,6 +3852,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Gatiwwan akka •••• agarsiifaman icciita isaanii kuufame qabu; isa jijjiiruuf gatii tokko bakka buusi. Yeroo sarara ajaja jijjiiramu, gatiin hundi barbaachisaadha",
+      "headersHint": "Gatiwwan akka •••• agarsiifaman icciita isaanii kuufame qabu; isa jijjiiruuf gatii tokko bakka buusi. Yeroo URL jijjiiramu, gatiin hundi barbaachisaadha",
       "nameRequired": "Maqaa sarvarii galchi",
       "nameInvalid": "Maqaan qubee ASCII, lakkoofsota, sarara jalaa fi daash qofa fayyadamuu danda'a, arfiilee 100 ykn isaa gadi",
       "commandRequired": "Ajaja galchi",
@@ -3938,6 +3952,10 @@
   "credits": {
     "title": "Kireedita bituu",
     "description": "Kireeditiin bittaa yeroo tokkoo kan baalansii Kilo kee irratti dabalame ta'ee, shumarra code AI Kilo App keessatti hojjechuuf oola. Suuqii ammaataa kee irraa kaffaltii fudhata, suuqiin kaffaltii erga mirkaneesse booda kireeditiin dabalama.",
+    "nextExpiry": "Kireeditiin {{amount}} gaafa {{date}} (UTC) yeroon isaa darba. Kireeditiin dursee yeroon isaa darbu dursa itti fayyadamama.",
+    "appStoreExpiry": "Kireeditiin App Store irraa bitame yeroon isaa hin darbu.",
+    "playOneYearExpiry": "Kireeditiin kun bittaa irraa eegalee waggaa kaalaandarii tokko booda yeroon isaa darba.",
+    "playNonexpiring": "Kireeditiin kun yeroon isaa hin darbu.",
     "packLabel": "Kireedita {{amount}} dabali",
     "priceUnavailable": "Gatii hin argamu",
     "purchased": "Kireeditiin baalansii kee irratti dabalameera.",
@@ -4076,6 +4094,10 @@
     "generate": "Cuunfaa uumi",
     "retrySummary": "Cuunfaa kaffaltii irra deebi'ii yaali",
     "sources": "Ragaalee fi meeshaalee",
+    "sessionsShown_one": "Seeshinii {{total}} keessaa {{shown}} agarsiifamaa jira",
+    "sessionsShown_other": "Seeshinii {{total}} keessaa {{shown}} agarsiifamaa jira",
+    "itemsShown_one": "Ragaa {{total}} keessaa {{shown}} agarsiifamaa jira",
+    "itemsShown_other": "Ragaa {{total}} keessaa {{shown}} agarsiifamaa jira",
     "timezone": "Zoonii yeroo gabaasaa",
     "deviceTimezone": "Zoonii yeroo meeshaa fayyadami",
     "timezoneHint": "Zoonii yeroo IANA, fakkeenyaaf Europe/Berlin. Jijjiiramni sagantaa gabaasota dhufaniif hojjeta.",

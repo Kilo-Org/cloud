@@ -227,7 +227,6 @@
     "hideBalance": "Ficha salio",
     "showBalance": "Onyesha salio",
     "balanceHidden": "Salio limefichwa",
-    "bonusCreditsExpiring": "Muda wa salio la {{amount}} unaisha {{date}}.",
     "signOutTitle": "Ungependa kutoka kwenye akaunti?",
     "signOutMessage": "Utahitaji kuingia tena ili kufikia eneo lako la kazi.",
     "deleteAccountTitle": "Ungependa kufuta akaunti?",
@@ -876,6 +875,18 @@
       "securityFindingsUnavailable": "Washa Wakala wa usalama wa Kilo kwenye wigo ili kupata matokeo ya usalama.",
       "spendAlertsSubtitle": "kuvuka vizingiti na kuongezeka kwa saa",
       "spendAlertsToggle": "Aina ya tahadhari za matumizi"
+    },
+    "history": {
+      "title": "Historia ya arifa",
+      "subtitle": "Arifa ambazo akaunti hii imepokea",
+      "bannerBody": "Arifa za push zimezimwa kwenye kifaa hiki, kwa hivyo mpya hazitafika hapa.",
+      "bannerAction": "Mipangilio ya arifa",
+      "emptyTitle": "Hakuna arifa bado",
+      "emptyCategoryTitle": "Hakuna arifa katika kundi hili",
+      "emptyBody": "Arifa ambazo akaunti hii inapokea zinaonekana hapa. Zinahifadhiwa kwa siku {{days}}.",
+      "capped": "Inaonyesha arifa za hivi karibuni.",
+      "loadError": "Imeshindikana kupakia historia ya arifa.",
+      "openFailed": "Arifa hii haifunguki tena popote."
     },
     "action": {
       "openSession": "Fungua kikao"
@@ -2178,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Hatukuweza kufikia kizio — huenda muunganisho wake umekatika.",
     "remoteSpawnNonRetryable": "Kizio kimeshindwa kuanzisha kikao — angalia mashine au sasisha CLI.",
-    "remoteSpawnInstanceDisconnected": "Muunganisho wa kizio ulichochagua umekatika. Anzisha kikao kwenye Cloud Agent au chagua kizio kingine.",
-    "liveCount_one": "{{count}} MOJA KWA MOJA",
-    "liveCount_other": "{{count}} MOJA KWA MOJA"
+    "remoteSpawnInstanceDisconnected": "Muunganisho wa kizio ulichochagua umekatika. Anzisha kikao kwenye Cloud Agent au chagua kizio kingine."
   },
   "agentChat": {
     "session": {
@@ -2592,7 +2601,9 @@
       "retrying": "Inajaribu tena…",
       "retryDeny": "Jaribu tena kukataa",
       "retryAllowOnce": "Jaribu tena kuruhusu mara moja",
-      "retryAlwaysAllow": "Jaribu tena kuruhusu daima"
+      "retryAlwaysAllow": "Jaribu tena kuruhusu daima",
+      "unreadableTitle": "Ombi la ruhusa halikuweza kusomwa",
+      "unreadableBody": "Wakala anasubiri uamuzi wa ruhusa ambao programu hii haiwezi kuonyesha. Sasisha programu au CLI, au jibu ombi hilo kwenye CLI ili kuendelea."
     },
     "questionCard": {
       "title": "Wakala anahitaji jibu",
@@ -2984,8 +2995,9 @@
     "unavailableDevice": "Uingizaji kwa sauti haupatikani kwenye kifaa hiki.",
     "unavailableLanguage": "Uingizaji kwa sauti haupatikani kwa lugha ya kifaa hiki.",
     "languageNotInstalledTitle": "Uingizaji kwa sauti kwa {{language}} hauko tayari bado",
-    "languageNotInstalledMessage": "Mafaili ya sauti ya nje ya mtandao ya {{language}} hayajasakinishwa kwenye simu hii. Pakua mafaili hayo, kisha ujaribu tena uingizaji kwa sauti.",
+    "languageNotInstalledMessage": "Mafaili ya sauti ya nje ya mtandao ya {{language}} hayajawekwa, na uchakataji mtandaoni umezimwa. Kwa kupakua mafaili hayo au kuwasha uchakataji mtandaoni tena, utaweza kutumia uingizaji kwa sauti.",
     "downloadOfflineModel": "Pakua",
+    "useOnlineTranscription": "Ruhusu uchakataji mtandaoni",
     "offlineModelDownloadScheduled": "Mafaili ya sauti ya nje ya mtandao yatapakuliwa nyuma ya pazia. Jaribu tena uingizaji kwa sauti baadaye.",
     "listeningStopped": "Usikilizaji umesimama.",
     "transcribing": "Inanukuuza...",
@@ -3159,7 +3171,7 @@
     "creditActivity": {
       "emptyDescription": "Ununuzi, matumizi, na marekebisho ya salio kwa shirika hili yataonekana hapa yanapotokea.",
       "emptyTitle": "Hakuna shughuli za salio",
-      "expires": "Muda unaisha {{date}}",
+      "expiresUtc": "Muda unaisha {{date}} (UTC)",
       "title": "Shughuli za salio",
       "transactionFallback": "Muamala wa salio",
       "category": {
@@ -3840,6 +3852,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Thamani zinazoonyeshwa kama •••• huhifadhi siri zake zilizohifadhiwa; badilisha thamani ili kuizungusha. Kubadilisha mstari wa amri kunahitaji kila thamani tena",
+      "headersHint": "Thamani zinazoonyeshwa kama •••• huhifadhi siri zake zilizohifadhiwa; badilisha thamani ili kuizungusha. Kubadilisha URL kunahitaji kila thamani tena",
       "nameRequired": "Ingiza jina la seva",
       "nameInvalid": "Jina linaweza kutumia herufi za ASCII, nambari, mistari chini na deshi pekee, hadi vibambo 100",
       "commandRequired": "Ingiza amri",
@@ -3938,6 +3952,10 @@
   "credits": {
     "title": "Nunua salio",
     "description": "Salio ni ununuzi wa mara moja unaoongezwa kwenye usawa wako wa Kilo kwa kuendesha vikao vya kuandika msimbo kwa AI katika Kilo App. Duka hukutoza akaunti yako na salio huongezwa baada ya duka kuthibitisha malipo.",
+    "nextExpiry": "Muda wa salio la {{amount}} unaisha {{date}} (UTC). Salio linaloisha muda mapema zaidi hutumika kwanza.",
+    "appStoreExpiry": "Salio lililonunuliwa kupitia App Store halina muda wa kuisha.",
+    "playOneYearExpiry": "Muda wa salio hili unaisha mwaka mmoja wa kalenda baada ya ununuzi.",
+    "playNonexpiring": "Salio hili halina muda wa kuisha.",
     "packLabel": "Ongeza salio la {{amount}}",
     "priceUnavailable": "Bei haipatikani",
     "purchased": "Salio limeongezwa kwenye usawa wako.",
@@ -4076,6 +4094,10 @@
     "generate": "Tengeneza muhtasari",
     "retrySummary": "Jaribu tena muhtasari wa kulipia",
     "sources": "Ushahidi na vielelezo",
+    "sessionsShown_one": "Inaonyesha {{shown}} kati ya kipindi {{total}}",
+    "sessionsShown_other": "Inaonyesha {{shown}} kati ya vipindi {{total}}",
+    "itemsShown_one": "Inaonyesha {{shown}} kati ya kipengee {{total}}",
+    "itemsShown_other": "Inaonyesha {{shown}} kati ya vipengee {{total}}",
     "timezone": "Saa za eneo za ripoti",
     "deviceTimezone": "Tumia saa za eneo za kifaa",
     "timezoneHint": "Saa za eneo za IANA, kwa mfano Europe/Berlin. Mabadiliko ya ratiba yanatumika kwa ripoti zijazo.",

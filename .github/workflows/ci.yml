@@ -100,6 +100,7 @@ jobs:
               - 'packages/trpc/**'
               - 'packages/web-shared/**'
               - 'packages/worker-utils/**'
+              - 'services/session-ingest/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
             cloud_agent_next:
@@ -143,6 +144,7 @@ jobs:
               - 'packages/trpc/**'
               - 'packages/web-shared/**'
               - 'packages/worker-utils/**'
+              - 'services/session-ingest/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
             cloud_agent_next:
@@ -690,6 +692,9 @@ jobs:
       - name: Run Session Ingest Durable Object regressions
         run: pnpm --filter cloudflare-session-ingest run test:integration
 
+      - name: Run Session Ingest Postgres tests
+        run: NODE_ENV=development pnpm --filter cloudflare-session-ingest test:postgres
+
   # In its own job, madge runs beside the script tests instead of before them.
   dependency-cycle-check:
     needs: changes
@@ -835,6 +840,9 @@ jobs:
         run: |
           cp ../web/.env .env
           cp ../web/.env.test .env.production.local
+
+      - name: Check ai-gateway usage queue targets
+        run: pnpm --filter ai-gateway run test:usage-queue
 
       - name: Build ai-gateway
         env:

@@ -25,7 +25,9 @@ describe('getRedirectUrl', () => {
         makeTransaction({ organizationId: '66333c77-6ac2-4a14-9278-3d45d67e87ec' }),
         null
       )
-    ).toBe('/organizations/66333c77-6ac2-4a14-9278-3d45d67e87ec?topup-amount-usd=20');
+    ).toBe(
+      '/organizations/66333c77-6ac2-4a14-9278-3d45d67e87ec?topup-amount-usd=20&topup-transaction-id=9a89e8e5-7c15-4d43-9fc1-24a97970f989'
+    );
   });
 
   it('shows pending status when the ledger transaction is delayed', () => {

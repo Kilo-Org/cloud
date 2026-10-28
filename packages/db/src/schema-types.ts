@@ -875,6 +875,7 @@ export const AdminActionAuditAction = z.enum([
   'organization.created_by.set',
   'organization.free_trial_end.set',
   'organization.trial_messaging.set',
+  'organization.kilo_encrypt.set',
   'organization.sso.config.create',
   'organization.sso.config.delete',
   'organization.sso.admin_portal_link.generate',
@@ -1051,6 +1052,261 @@ export const OrganizationAutoModelSettingsSchema = z.object({
 
 export type OrganizationAutoModelSettings = z.infer<typeof OrganizationAutoModelSettingsSchema>;
 
+export const ENKRYPT_PII_ENTITIES = ['pii', 'secrets', 'ip_address', 'url'] as const;
+
+export const EnkryptPiiEntitySchema = z.enum(ENKRYPT_PII_ENTITIES);
+
+export type EnkryptPiiEntity = z.infer<typeof EnkryptPiiEntitySchema>;
+
+export const ENKRYPT_RULE_RISK_CATEGORIES = [
+  'security_fraud',
+  'safety_harm',
+  'privacy_data_protection',
+  'brand_reputation_trust',
+  'bias_fairness_ethical',
+  'legal_ip_liability',
+  'product_misuse_abuse',
+  'performance_reliability_quality',
+] as const;
+
+/** Only rules that apply to user input matter while the guardrail scans inputs alone. */
+export const ENKRYPT_RULE_APPLICABILITIES = ['user', 'user_assistant'] as const;
+
+export const ENKRYPT_RULE_SEVERITIES = ['critical', 'high', 'medium', 'low'] as const;
+
+export const ENKRYPT_RULE_FRAMEWORKS = [
+  'hipaa',
+  'finra',
+  'gdpr',
+  'ccpa',
+  'owasp_llm_2025',
+  'nist_ai_rmf',
+  'eu_ai_act',
+  'iso_42001',
+] as const;
+
+export const ENKRYPT_POLICY_FORMATS = ['policy_text', 'rules'] as const;
+
+/**
+ * What a revise-type detector does when it fires. Enkrypt answers these detectors with rewritten
+ * text instead of a block message, so the organization chooses whether a detection blocks.
+ */
+export const ENKRYPT_REVISE_DETECTOR_ACTIONS = ['log', 'block'] as const;
+
+export const ENKRYPT_DETECTOR_LIMITS = {
+  topics: 50,
+  topicLength: 100,
+  keywords: 200,
+  keywordLength: 100,
+  policyTextLength: 10_000,
+  rules: 50,
+  ruleIdLength: 64,
+  ruleDisplayTextLength: 120,
+  ruleTextLength: 1_000,
+  serializedLength: 64_000,
+} as const;
+
+const enkryptLimits = ENKRYPT_DETECTOR_LIMITS;
+
+const EnkryptToggleDetectorSchema = z.strictObject({ enabled: z.boolean() });
+
+const EnkryptReviseDetectorActionSchema = z.enum(ENKRYPT_REVISE_DETECTOR_ACTIONS);
+
+function enkryptListItemSchema(noun: string, maxLength: number) {
+  return z
+    .string()
+    .trim()
+    .min(1, `Remove empty ${noun}s.`)
+    .max(maxLength, `Each ${noun} can be up to ${maxLength} characters.`);
+}
+
+export const EnkryptPolicyRuleSchema = z.strictObject({
+  id: z
+    .string()
+    .trim()
+    .min(1, 'Enter a rule ID.')
+    .max(
+      enkryptLimits.ruleIdLength,
+      `Rule IDs can be up to ${enkryptLimits.ruleIdLength} characters.`
+    )
+    .regex(
+      /^[A-Za-z0-9._-]+$/,
+      'Rule IDs can only contain letters, numbers, dots, dashes, and underscores.'
+    ),
+  display_text: z
+    .string()
+    .trim()
+    .max(
+      enkryptLimits.ruleDisplayTextLength,
+      `Rule names can be up to ${enkryptLimits.ruleDisplayTextLength} characters.`
+    ),
+  text: z
+    .string()
+    .trim()
+    .min(1, 'Describe what the rule forbids or requires.')
+    .max(
+      enkryptLimits.ruleTextLength,
+      `Rules can be up to ${enkryptLimits.ruleTextLength} characters.`
+    ),
+  risk_category: z.enum(ENKRYPT_RULE_RISK_CATEGORIES),
+  applicability: z.enum(ENKRYPT_RULE_APPLICABILITIES),
+  severity: z.enum(ENKRYPT_RULE_SEVERITIES),
+  frameworks: z.array(z.enum(ENKRYPT_RULE_FRAMEWORKS)).max(ENKRYPT_RULE_FRAMEWORKS.length),
+});
+
+export type EnkryptPolicyRule = z.infer<typeof EnkryptPolicyRuleSchema>;
+
+/**
+ * An organization's Enkrypt input detectors, stored in `settings.enkrypt.input_guardrail.detectors`
+ * and turned into the `detectors` object of `POST /guardrails/detect` by the gateway. Disabled detectors keep
+ * their settings so admins can toggle them without losing work. Block messages, explanations, and
+ * saved Code of Conduct policy names are deliberately absent: Kilo owns the user-facing message.
+ */
+export const EnkryptInputDetectorsSchema = z
+  .strictObject({
+    injection_attack: EnkryptToggleDetectorSchema,
+    pii: z.strictObject({
+      enabled: z.boolean(),
+      action: EnkryptReviseDetectorActionSchema,
+      entities: z.array(EnkryptPiiEntitySchema).max(ENKRYPT_PII_ENTITIES.length),
+    }),
+    keyword_detector: z.strictObject({
+      enabled: z.boolean(),
+      action: EnkryptReviseDetectorActionSchema,
+      banned_keywords: z
+        .array(enkryptListItemSchema('keyword', enkryptLimits.keywordLength))
+        .max(enkryptLimits.keywords, `Add up to ${enkryptLimits.keywords} keywords.`),
+    }),
+    topic_detector: z.strictObject({
+      enabled: z.boolean(),
+      topic: z
+        .array(enkryptListItemSchema('topic', enkryptLimits.topicLength))
+        .max(enkryptLimits.topics, `Add up to ${enkryptLimits.topics} topics.`),
+    }),
+    policy_violation: z.strictObject({
+      enabled: z.boolean(),
+      format: z.enum(ENKRYPT_POLICY_FORMATS),
+      policy_text: z
+        .string()
+        .trim()
+        .max(
+          enkryptLimits.policyTextLength,
+          `Policy text can be up to ${enkryptLimits.policyTextLength.toLocaleString('en-US')} characters.`
+        ),
+      rules: z
+        .array(EnkryptPolicyRuleSchema)
+        .max(enkryptLimits.rules, `Add up to ${enkryptLimits.rules} rules.`),
+    }),
+    toxicity: EnkryptToggleDetectorSchema,
+    nsfw: EnkryptToggleDetectorSchema,
+    bias: z.strictObject({ enabled: z.boolean(), action: EnkryptReviseDetectorActionSchema }),
+    sponge_attack: EnkryptToggleDetectorSchema,
+  })
+  .superRefine((detectors, ctx) => {
+    const { pii, keyword_detector, topic_detector, policy_violation } = detectors;
+    if (pii.enabled && pii.entities.length === 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['pii', 'entities'],
+        message: 'Select at least one type of data to detect.',
+      });
+    }
+    if (new Set(pii.entities).size !== pii.entities.length) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['pii', 'entities'],
+        message: 'Select each type of data once.',
+      });
+    }
+    if (keyword_detector.enabled && keyword_detector.banned_keywords.length === 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['keyword_detector', 'banned_keywords'],
+        message: 'Add at least one keyword.',
+      });
+    }
+    if (topic_detector.enabled && topic_detector.topic.length === 0) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['topic_detector', 'topic'],
+        message: 'Add at least one topic.',
+      });
+    }
+    if (policy_violation.enabled) {
+      if (policy_violation.format === 'policy_text' && !policy_violation.policy_text) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['policy_violation', 'policy_text'],
+          message: 'Enter the policy text.',
+        });
+      }
+      if (policy_violation.format === 'rules' && policy_violation.rules.length === 0) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['policy_violation', 'rules'],
+          message: 'Add at least one rule.',
+        });
+      }
+    }
+    const seenRuleIds = new Set<string>();
+    policy_violation.rules.forEach((rule, index) => {
+      if (seenRuleIds.has(rule.id)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['policy_violation', 'rules', index, 'id'],
+          message: 'Rule IDs must be unique.',
+        });
+      }
+      seenRuleIds.add(rule.id);
+    });
+    if (JSON.stringify(detectors).length > enkryptLimits.serializedLength) {
+      ctx.addIssue({
+        code: 'custom',
+        path: [],
+        message:
+          'This detector configuration is too large. Remove some keywords, topics, or rules.',
+      });
+    }
+  });
+
+export type EnkryptInputDetectors = z.infer<typeof EnkryptInputDetectorsSchema>;
+
+export type EnkryptDetectorId = keyof EnkryptInputDetectors;
+
+export const ENKRYPT_DETECTOR_IDS = [
+  'injection_attack',
+  'pii',
+  'keyword_detector',
+  'topic_detector',
+  'policy_violation',
+  'toxicity',
+  'nsfw',
+  'bias',
+  'sponge_attack',
+] as const satisfies readonly EnkryptDetectorId[];
+
+/**
+ * Blocking Enkrypt AI input scan of each gateway chat turn. Flagged turns are always blocked, and
+ * so is every turn while Enkrypt is unavailable. Without `detectors` the gateway applies Kilo
+ * Default. `scan_tool_results` defaults to true so organizations enabled before it existed keep
+ * scanning tool results.
+ *
+ * `detectors` is validated with `EnkryptInputDetectorsSchema` where it is written and read, not
+ * here: organization settings are parsed on every settings write and on some reads, and a stored
+ * detector configuration that no longer matches the schema must only affect the guardrail.
+ */
+export const EnkryptInputGuardrailSettingsSchema = z.object({
+  enabled: z.boolean(),
+  scan_tool_results: z.boolean().optional(),
+  detectors: z.unknown().optional(),
+});
+
+export type EnkryptInputGuardrailSettings = z.infer<typeof EnkryptInputGuardrailSettingsSchema>;
+
+export const OrganizationEnkryptSettingsSchema = z.object({
+  input_guardrail: EnkryptInputGuardrailSettingsSchema.optional(),
+});
+
 const OrganizationSettingsSchema = z.object({
   provider_allow_list: z.array(z.string()).optional(),
 
@@ -1091,6 +1347,9 @@ const OrganizationSettingsSchema = z.object({
   // Seeded usage microdollars written by the sales demo populate step. Used to
   // separate seeded usage from real spend when computing the ledger entry.
   sales_demo_seeded_microdollars: z.number().optional(),
+  // Set by Kilo admins: lets the organization configure Enkrypt AI guardrails in Kilo Cloud
+  kilo_encrypt: z.boolean().optional(),
+  enkrypt: OrganizationEnkryptSettingsSchema.optional(),
 });
 
 export type OrganizationSettings = z.infer<typeof OrganizationSettingsSchema>;
@@ -2120,6 +2379,10 @@ export const EnkryptVerificationsSchema = z.record(z.string().min(1), EnkryptVer
 
 export type EnkryptVerifications = z.infer<typeof EnkryptVerificationsSchema>;
 
+export type EnkryptGuardrailApiKind = 'chat_completions' | 'messages' | 'responses';
+
+export type EnkryptGuardrailDecision = 'allowed' | 'blocked' | 'error';
+
 export const ENKRYPT_STALE_AFTER_MS = 26 * 60 * 60 * 1000;
 
 export const EnkryptPublishedBenchmarkSchema = EnkryptBenchmarkSchema.extend({
@@ -2222,6 +2485,17 @@ export const ReasoningOptionSchema = z.discriminatedUnion('type', [
 
 export type ReasoningOption = z.infer<typeof ReasoningOptionSchema>;
 
+/**
+ * Per-key BYOK settings. Every field is optional so new settings need no backfill.
+ * `serve_catalog_models` (catalog mode): a direct BYOK key that serves only Kilo catalog model
+ * ids, so organization model policies apply to it.
+ */
+export const ByokApiKeySettingsSchema = z.object({
+  serve_catalog_models: z.boolean().optional(),
+});
+
+export type ByokApiKeySettings = z.infer<typeof ByokApiKeySettingsSchema>;
+
 export const DirectByokModelFlagSchema = z.enum(['recommended', 'vision', 'reasoning']);
 
 export type DirectByokModelFlag = z.infer<typeof DirectByokModelFlagSchema>;
@@ -2281,8 +2555,28 @@ export const ReasoningDetailsTransformSchema = z.enum(ReasoningDetailsTransform)
 
 export type ReasoningDetailsTransform = z.infer<typeof ReasoningDetailsTransformSchema>;
 
+export const CustomLlmApiKindSchema = z.enum(['chat_completions', 'messages', 'responses']);
+
+export type CustomLlmApiKind = z.infer<typeof CustomLlmApiKindSchema>;
+
+/** The API that clients use for a custom LLM, given its `opencode_settings.ai_sdk_provider`. */
+export function getCustomLlmClientApiKind(
+  aiSdkProvider: CustomLlmProvider | undefined
+): CustomLlmApiKind {
+  switch (aiSdkProvider) {
+    case 'anthropic':
+      return 'messages';
+    case 'openai':
+      return 'responses';
+    default:
+      return 'chat_completions';
+  }
+}
+
 export const CustomLlmApiConfigSchema = z.object({
   internal_id: z.string().min(1).optional(),
+  /** Gateway APIs the upstream serves, including the one clients use. Without it, only that one. */
+  api_kinds: z.array(CustomLlmApiKindSchema).min(1).optional(),
   base_url: z.url(),
   disable_url_suffix: z.boolean().optional(),
   add_cache_breakpoints: z.boolean().optional(),
@@ -2310,6 +2604,13 @@ export const GoogleServiceAccountKeySchema = z.object({
 });
 
 export type GoogleServiceAccountKey = z.infer<typeof GoogleServiceAccountKeySchema>;
+
+export const GoogleServiceAccountSigningKeySchema = GoogleServiceAccountKeySchema.pick({
+  client_email: true,
+  private_key: true,
+});
+
+export type GoogleServiceAccountSigningKey = z.infer<typeof GoogleServiceAccountSigningKeySchema>;
 
 export const CustomLlmApiKeyCredentialsSchema = z.object({
   type: z.literal('api_key'),
@@ -2402,6 +2703,11 @@ export const CustomLlmPublicSchema = z.object({
 
 export type CustomLlmPublic = z.infer<typeof CustomLlmPublicSchema>;
 
+/** An ISO 3166-1 alpha-2 code as sent in Vercel's `x-vercel-ip-country` header. */
+export const VercelCountryCodeSchema = z
+  .string()
+  .regex(/^[A-Z]{2}$/, 'must be an uppercase two-letter country code such as "US"');
+
 export const CustomLlmDefinitionSchema = z
   .object({
     ...CustomLlmMetadataSchema.shape,
@@ -2411,8 +2717,19 @@ export const CustomLlmDefinitionSchema = z
     organization_ids: z.array(z.uuid()).optional(),
     group_ids: z.array(z.uuid()).optional(),
     public: CustomLlmPublicSchema.optional(),
+    /** Hidden from model lists and refused by the gateway for requests from these countries.
+     * A request without a known country is not restricted. */
+    country_deny_list: z.array(VercelCountryCodeSchema).optional(),
   })
   .superRefine((definition, ctx) => {
+    const clientApiKind = getCustomLlmClientApiKind(definition.opencode_settings?.ai_sdk_provider);
+    if (definition.api_kinds && !definition.api_kinds.includes(clientApiKind)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['api_kinds'],
+        message: `api_kinds must include ${clientApiKind}, the API clients use for this ai_sdk_provider`,
+      });
+    }
     if (!definition.public) return;
     for (const key of ['organization_ids', 'group_ids'] as const) {
       if (definition[key] !== undefined) {
@@ -2573,6 +2890,72 @@ export const PreferredProviderOrderConfigSchema = z.object({
 
 export type PreferredProviderOrderConfig = z.infer<typeof PreferredProviderOrderConfigSchema>;
 
+export const CUSTOM_PRICING_MAX_MODELS = 500;
+
+const PricePerMillionSchema = z.number().finite().nonnegative();
+
+const CustomPricingTierSchema = z.object({
+  start_context_length: z.number().int().nonnegative(),
+  pricing: z.object({
+    prompt_per_million: PricePerMillionSchema,
+    completion_per_million: PricePerMillionSchema,
+    input_cache_read_per_million: PricePerMillionSchema.nullable(),
+    input_cache_write_per_million: PricePerMillionSchema.nullable(),
+  }),
+});
+
+export const CustomPricingSchema = z.object({
+  model: GatewayModelIdSchema,
+  pricing: z.tuple([CustomPricingTierSchema], CustomPricingTierSchema).superRefine((tiers, ctx) => {
+    if (tiers[0].start_context_length !== 0) {
+      ctx.addIssue({
+        code: 'custom',
+        message: 'The first pricing tier must start at context length 0',
+        path: [0, 'start_context_length'],
+      });
+    }
+    let previousStart = tiers[0].start_context_length;
+    for (const [index, { start_context_length }] of tiers.entries()) {
+      if (index > 0 && start_context_length <= previousStart) {
+        ctx.addIssue({
+          code: 'custom',
+          message: 'Pricing tiers must be ordered by ascending start context length',
+          path: [index, 'start_context_length'],
+        });
+      }
+      previousStart = start_context_length;
+    }
+  }),
+  /** Human-readable discount shown in the model name; never used in calculations. */
+  discountPercentage: z.number().gt(0).lte(100).optional(),
+  /** Only use this pricing when the upstream response does not report a market cost. */
+  fallbackOnly: z.boolean().optional(),
+});
+
+export type CustomPricing = z.infer<typeof CustomPricingSchema>;
+
+/** Stored as an array because jsonb does not keep object key order. */
+export const CustomPricingConfigSchema = z.object({
+  models: z
+    .array(CustomPricingSchema)
+    .max(CUSTOM_PRICING_MAX_MODELS)
+    .superRefine((models, ctx) => {
+      const seen = new Set<string>();
+      for (const [index, { model }] of models.entries()) {
+        if (seen.has(model)) {
+          ctx.addIssue({
+            code: 'custom',
+            message: `Duplicate model "${model}"`,
+            path: [index, 'model'],
+          });
+        }
+        seen.add(model);
+      }
+    }),
+});
+
+export type CustomPricingConfig = z.infer<typeof CustomPricingConfigSchema>;
+
 // --- StoredModel ---
 
 export const ModelSchema = z.object({
@@ -2656,6 +3039,10 @@ export type StoredModel = z.infer<typeof StoredModelSchema>;
 // C. Stripe type (inline)
 // =============================================================================
 
+// Stripe treats subscription statuses as an open set: the SDK types every
+// generated enum as its documented values plus an arbitrary string, because the
+// provider can return a value a pinned SDK version does not list. The column
+// stores the provider's value unchanged, so the domain type mirrors that.
 export type StripeSubscriptionStatus =
   | 'incomplete'
   | 'incomplete_expired'
@@ -2664,7 +3051,8 @@ export type StripeSubscriptionStatus =
   | 'past_due'
   | 'canceled'
   | 'unpaid'
-  | 'paused';
+  | 'paused'
+  | (string & {});
 
 // --- Code review terminal reasons ---
 

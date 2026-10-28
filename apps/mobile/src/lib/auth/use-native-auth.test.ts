@@ -226,6 +226,7 @@ describe('use-native-auth error mapping', () => {
   it.each([
     ['INVALID_CODE', 'That code is incorrect. Please try again.'],
     ['TOO_MANY_ATTEMPTS', 'Too many attempts. Please request a new code.'],
+    ['RATE_LIMITED', 'Too many sign-in attempts. Please wait and try again.'],
     ['CODE_IN_PROGRESS', 'Your code is being processed. Wait a moment and try again.'],
     ['INVALID_EMAIL', 'Unable to deliver email to this address. Please use a different email.'],
     ['EMAIL_DELIVERY_FAILED', 'Email delivery is temporarily unavailable. Please try again later.'],

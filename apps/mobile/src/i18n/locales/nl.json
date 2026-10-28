@@ -227,7 +227,6 @@
     "hideBalance": "Saldo verbergen",
     "showBalance": "Saldo tonen",
     "balanceHidden": "Saldo verborgen",
-    "bonusCreditsExpiring": "{{amount}} aan tegoed verloopt op {{date}}.",
     "signOutTitle": "Afmelden?",
     "signOutMessage": "Je moet je opnieuw aanmelden om toegang te krijgen tot je werkruimte.",
     "deleteAccountTitle": "Account verwijderen?",
@@ -325,6 +324,18 @@
       "securityFindingsUnavailable": "Schakel de Kilo-beveiligingsagent in op een bereik om beveiligingsbevindingen te ontvangen.",
       "spendAlertsSubtitle": "drempeloverschrijdingen en uurlijkse pieken",
       "spendAlertsToggle": "Categorie bestedingswaarschuwingen"
+    },
+    "history": {
+      "title": "Meldingsgeschiedenis",
+      "subtitle": "Meldingen die dit account heeft ontvangen",
+      "bannerBody": "Pushmeldingen staan uit voor dit apparaat, dus nieuwe meldingen komen hier niet binnen.",
+      "bannerAction": "Meldingsinstellingen",
+      "emptyTitle": "Nog geen meldingen",
+      "emptyCategoryTitle": "Nog geen meldingen in deze categorie",
+      "emptyBody": "Meldingen die dit account ontvangt, verschijnen hier. Ze worden {{days}} dagen bewaard.",
+      "capped": "De meest recente meldingen worden weergegeven.",
+      "loadError": "Meldingsgeschiedenis kon niet worden geladen.",
+      "openFailed": "Deze melding opent nergens meer."
     },
     "liveActivities": "Liveactiviteiten",
     "liveActivitySubtitle": "Actieve agents op het toegangsscherm tonen",
@@ -1654,9 +1665,7 @@
     },
     "remoteSpawnRetryable": "De instantie kon niet worden bereikt. De verbinding is mogelijk verbroken.",
     "remoteSpawnNonRetryable": "De instantie kon de sessie niet starten — controleer de machine of werk de CLI bij.",
-    "remoteSpawnInstanceDisconnected": "De verbinding met de geselecteerde instantie is verbroken. Start een sessie op Cloud Agent of kies een andere instantie.",
-    "liveCount_one": "{{count}} ACTIEF",
-    "liveCount_other": "{{count}} ACTIEF"
+    "remoteSpawnInstanceDisconnected": "De verbinding met de geselecteerde instantie is verbroken. Start een sessie op Cloud Agent of kies een andere instantie."
   },
   "agentChat": {
     "session": {
@@ -2068,7 +2077,9 @@
       "retrying": "Opnieuw proberen…",
       "retryDeny": "Opnieuw weigeren",
       "retryAllowOnce": "Opnieuw eenmalig toestaan",
-      "retryAlwaysAllow": "Opnieuw altijd toestaan"
+      "retryAlwaysAllow": "Opnieuw altijd toestaan",
+      "unreadableTitle": "Toestemmingsverzoek kon niet worden gelezen",
+      "unreadableBody": "De agent wacht op een toestemmingsbeslissing die deze app niet kan tonen. Werk de app of de CLI bij, of beantwoord het verzoek in de CLI om door te gaan."
     },
     "questionCard": {
       "title": "Invoer voor de agent nodig",
@@ -2460,8 +2471,9 @@
     "unavailableDevice": "Spraakinvoer is niet beschikbaar op dit apparaat.",
     "unavailableLanguage": "Spraakinvoer is niet beschikbaar voor de taal van dit apparaat.",
     "languageNotInstalledTitle": "Spraakinvoer voor {{language}} is nog niet gereed",
-    "languageNotInstalledMessage": "De offline spraakbestanden voor {{language}} zijn niet op deze telefoon geïnstalleerd. Download ze en probeer spraakinvoer opnieuw.",
+    "languageNotInstalledMessage": "De offline spraakbestanden voor {{language}} zijn niet geïnstalleerd en online transcriptie staat uit. Download de bestanden of zet online transcriptie weer aan om spraakinvoer te gebruiken.",
     "downloadOfflineModel": "Downloaden",
+    "useOnlineTranscription": "Online transcriptie toestaan",
     "offlineModelDownloadScheduled": "De offline spraakbestanden worden op de achtergrond gedownload. Probeer spraakinvoer later opnieuw.",
     "listeningStopped": "Het luisteren is gestopt.",
     "transcribing": "Transcriberen...",
@@ -3151,7 +3163,7 @@
     "creditActivity": {
       "emptyDescription": "Hier verschijnen aankopen, verbruik en aanpassingen van het tegoed van deze organisatie zodra ze plaatsvinden.",
       "emptyTitle": "Geen tegoedtransacties",
-      "expires": "Verloopt op {{date}}",
+      "expiresUtc": "Verloopt op {{date}} (UTC)",
       "title": "Tegoedtransacties",
       "transactionFallback": "Tegoedtransactie",
       "category": {
@@ -3840,6 +3852,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Waarden weergegeven als •••• behouden hun opgeslagen geheim; vervang een waarde om deze te roteren. Het wijzigen van de opdrachtregel vereist opnieuw elke waarde",
+      "headersHint": "Waarden weergegeven als •••• behouden hun opgeslagen geheim; vervang een waarde om deze te roteren. Het wijzigen van de URL vereist opnieuw elke waarde",
       "nameRequired": "Voer een servernaam in",
       "nameInvalid": "De naam mag alleen ASCII-letters, cijfers, onderstrepingstekens en streepjes bevatten, tot maximaal 100 tekens",
       "commandRequired": "Voer een opdracht in",
@@ -3938,6 +3952,10 @@
   "credits": {
     "title": "Credits kopen",
     "description": "Credits zijn een eenmalige aankoop die aan je Kilo-saldo wordt toegevoegd voor AI-coderingssessies in Kilo App. De store belast je account en de credits worden toegevoegd nadat de store de betaling bevestigt.",
+    "nextExpiry": "{{amount}} aan credits verloopt op {{date}} (UTC). Credits die het eerst verlopen, worden eerst gebruikt.",
+    "appStoreExpiry": "Credits die via de App Store zijn gekocht, verlopen niet.",
+    "playOneYearExpiry": "Deze credits verlopen één kalenderjaar na aankoop.",
+    "playNonexpiring": "Deze credits verlopen niet.",
     "packLabel": "{{amount}} aan credits toevoegen",
     "priceUnavailable": "Prijs niet beschikbaar",
     "purchased": "Er zijn credits aan je saldo toegevoegd.",
@@ -4076,6 +4094,10 @@
     "generate": "Samenvatting genereren",
     "retrySummary": "Betaalde samenvatting opnieuw proberen",
     "sources": "Bewijs en artefacten",
+    "sessionsShown_one": "{{shown}} van {{total}} sessie weergegeven",
+    "sessionsShown_other": "{{shown}} van {{total}} sessies weergegeven",
+    "itemsShown_one": "{{shown}} van {{total}} item weergegeven",
+    "itemsShown_other": "{{shown}} van {{total}} items weergegeven",
     "timezone": "Tijdzone briefing",
     "deviceTimezone": "Tijdzone van apparaat gebruiken",
     "timezoneHint": "IANA-tijdzone, bijvoorbeeld Europe/Berlin. Schemawijzigingen gelden voor toekomstige briefings.",

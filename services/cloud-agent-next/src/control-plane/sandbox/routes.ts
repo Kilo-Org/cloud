@@ -514,7 +514,7 @@ export async function failReadyRoutesForScope(
   }
 }
 
-/** Fail preparing routes whose 12-minute attempt deadline has passed. */
+/** Fail preparing routes whose preparation attempt deadline has passed. */
 export async function failExpiredRoutes(ctx: RouteContext): Promise<void> {
   const now = ctx.now();
   for (const route of await listRoutes(ctx.db)) {

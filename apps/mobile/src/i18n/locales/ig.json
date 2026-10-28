@@ -227,7 +227,6 @@
     "hideBalance": "Zoo ego fọdụrụ",
     "showBalance": "Gosi ego fọdụrụ",
     "balanceHidden": "Ezoro ego fọdụrụ",
-    "bonusCreditsExpiring": "Ego ojiji {{amount}} ga-agwụ na {{date}}.",
     "signOutTitle": "Pụọ?",
     "signOutMessage": "Ị ga-abanyerịrị ọzọ iji nweta ebe ọrụ gị.",
     "deleteAccountTitle": "Hichapụ akaụntụ?",
@@ -876,6 +875,18 @@
       "securityFindingsUnavailable": "Gbanye Onye enyemaka nchebe Kilo n'oke iji nweta nchọpụta nchebe.",
       "spendAlertsSubtitle": "ịgafe oke na mmụba kwa awa",
       "spendAlertsToggle": "Otu ọkwa gbasara mmefu"
+    },
+    "history": {
+      "title": "Akụkọ ọkwa",
+      "subtitle": "Ọkwa akaụntụ a nwetara",
+      "bannerBody": "Agbanyụla ọkwa push maka ngwaọrụ a, yabụ ndị ọhụrụ agaghị abịa ebe a.",
+      "bannerAction": "Ntọala ọkwa",
+      "emptyTitle": "Ọnwebeghị ọkwa",
+      "emptyCategoryTitle": "Ọnwebeghị ọkwa n'ụdị a",
+      "emptyBody": "Ọkwa akaụntụ a na-anweta na-apụta ebe a. A na-edebe ha maka ụbọchị {{days}}.",
+      "capped": "Na-egosi ọkwa ndị kachasị ọhụrụ.",
+      "loadError": "Enweghị ike ịbute akụkọ ọkwa.",
+      "openFailed": "Ọkwa a anaghịzi emeghe ebe ọ bụla."
     },
     "action": {
       "openSession": "Mepee nnọkọ"
@@ -2178,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Enweghị ike ịkpọtụrụ igwe ahụ — o nwere ike ịbụ na njikọ ya akwụsịla.",
     "remoteSpawnNonRetryable": "Igwe ahụ enweghị ike ịmalite nnọkọ — lelee igwe ahụ ma ọ bụ melite CLI.",
-    "remoteSpawnInstanceDisconnected": "Njikọ igwe ahọpụtara akwụsịla. Malite nnọkọ na Cloud Agent ma ọ bụ họrọ igwe ọzọ.",
-    "liveCount_one": "{{count}} NA-AGA UGBU A",
-    "liveCount_other": "{{count}} NA-AGA UGBU A"
+    "remoteSpawnInstanceDisconnected": "Njikọ igwe ahọpụtara akwụsịla. Malite nnọkọ na Cloud Agent ma ọ bụ họrọ igwe ọzọ."
   },
   "agentChat": {
     "session": {
@@ -2592,7 +2601,9 @@
       "retrying": "Na-anwa ọzọ…",
       "retryDeny": "Nwaa ịjụ ọzọ",
       "retryAllowOnce": "Nwaa ikwe naanị otu ugboro ọzọ",
-      "retryAlwaysAllow": "Nwaa ikwe mgbe niile ọzọ"
+      "retryAlwaysAllow": "Nwaa ikwe mgbe niile ọzọ",
+      "unreadableTitle": "Enweghị ike ịgụ arịrịọ ikike",
+      "unreadableBody": "Onye nnọchite na-eche mkpebi ikike nke ngwa a enweghị ike igosi. Melite ngwa ma ọ bụ CLI ahụ, ma ọ bụ zaa arịrịọ ahụ na CLI ka ị gaa n'ihu."
     },
     "questionCard": {
       "title": "Onye nnọchi anya chọrọ azịza",
@@ -2984,8 +2995,9 @@
     "unavailableDevice": "Ntinye olu adịghị na ngwaọrụ a.",
     "unavailableLanguage": "Ntinye olu adịghị maka asụsụ ngwaọrụ a.",
     "languageNotInstalledTitle": "Ntinye olu maka {{language}} adịghị njikere ugbu a",
-    "languageNotInstalledMessage": "Faịlụ okwu offline maka {{language}} etinyeghị na ekwentị a. Budata ha, mgbe ahụ nwaa ntinye olu ọzọ.",
+    "languageNotInstalledMessage": "A wụnyebeghị faịlụ okwu offline maka {{language}}, a gbanyekwara ntụgharị okwu n'ịntanetị. Budata faịlụ ndị ahụ ma ọ bụ gbanye ntụgharị okwu n'ịntanetị ọzọ ka ị wee jiri ntinye olu.",
     "downloadOfflineModel": "Budata",
+    "useOnlineTranscription": "Kwe ka ntụgharị ịntanetị",
     "offlineModelDownloadScheduled": "A ga-ebudata faịlụ okwu offline na ndabere. Nwaa ntinye olu ọzọ ma e mesịa.",
     "listeningStopped": "Ịge ntị kwụsịrị.",
     "transcribing": "Na-atụgharị ka ọ bụrụ ederede...",
@@ -3159,7 +3171,7 @@
     "creditActivity": {
       "emptyDescription": "Ịzụta ego ojiji, iji ya eme ihe, na mgbanwe e mere na ya maka ụlọ ọrụ a ga-apụta ebe a.",
       "emptyTitle": "Enweghị ihe mere na ego ojiji",
-      "expires": "Oge ya ga-agwụ na {{date}}",
+      "expiresUtc": "Oge ya ga-agwụ na {{date}} (UTC)",
       "title": "Ndekọ ego ojiji",
       "transactionFallback": "Azụmahịa ego ojiji",
       "category": {
@@ -3840,6 +3852,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Uru ndị egosiri dị ka •••• na-edebe nzuzo ha echekwara; dochie uru iji tụgharịa ya. Ịgbanwe ahịrị iwu na-achọ uru ọ bụla ọzọ",
+      "headersHint": "Uru ndị egosiri dị ka •••• na-edebe nzuzo ha echekwara; dochie uru iji tụgharịa ya. Ịgbanwe URL na-achọ uru ọ bụla ọzọ",
       "nameRequired": "Tinye aha nkesa",
       "nameInvalid": "Aha nwere ike iji naanị mkpụrụedemede ASCII, ọnụọgụ, akara akara, na dashes, ruru mkpụrụedemede 100",
       "commandRequired": "Tinye iwu",
@@ -3938,6 +3952,10 @@
   "credits": {
     "title": "Zụta ego ojiji",
     "description": "Ego ojiji bụ azụmahịa otu oge nke a na-agbakwunye na nguzozi Kilo gị maka ịgba nnọkọ ịde koodu AI na Kilo App. Ụlọ ahịa na-akwụ ụgwọ na akaụntụ gị, a na-agbakwunye ego ojiji mgbe ụlọ ahịa kwadoro ịkwụ ụgwọ ahụ.",
+    "nextExpiry": "Ego ojiji ruru {{amount}} ga-agwụ na {{date}} (UTC). A na-ebu ụzọ jiri ego ojiji nke ga-akacha agwụ ngwa ngwa.",
+    "appStoreExpiry": "Ego ojiji e ji App Store zụta anaghị agwụ.",
+    "playOneYearExpiry": "Ego ojiji ndị a ga-agwụ otu afọ kalenda mgbe ịzụrụ ha.",
+    "playNonexpiring": "Ego ojiji ndị a anaghị agwụ.",
     "packLabel": "Tinye ego ojiji ruru {{amount}}",
     "priceUnavailable": "Ọnụ ahịa adịghị",
     "purchased": "E tinyela ego ojiji na nguzozi gị.",
@@ -4076,6 +4094,10 @@
     "generate": "Mepụta nchịkọta",
     "retrySummary": "Nwaa nchịkọta akwụ ụgwọ ọzọ",
     "sources": "Ihe akaebe na ihe ndị e mepụtara",
+    "sessionsShown_one": "Na-egosi oge ọrụ {{shown}} n'ime {{total}}",
+    "sessionsShown_other": "Na-egosi oge ọrụ {{shown}} n'ime {{total}}",
+    "itemsShown_one": "Na-egosi ihe {{shown}} n'ime {{total}}",
+    "itemsShown_other": "Na-egosi ihe {{shown}} n'ime {{total}}",
     "timezone": "Mpaghara oge akụkọ",
     "deviceTimezone": "Jiri mpaghara oge ngwaọrụ",
     "timezoneHint": "Mpaghara oge IANA, dịka Europe/Berlin. Mgbanwe usoro na-emetụta akụkọ ndị na-abịa.",

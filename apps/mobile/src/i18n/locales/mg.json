@@ -227,7 +227,6 @@
     "hideBalance": "Afeno ny ambim-bola",
     "showBalance": "Aseho ny ambim-bola",
     "balanceHidden": "Voafeno ny ambim-bola",
-    "bonusCreditsExpiring": "Kireditra {{amount}} ho lany daty amin'ny {{date}}.",
     "signOutTitle": "Hivoaka ve?",
     "signOutMessage": "Mila miditra indray ianao vao afaka mampiasa ny sehatra fiasanao.",
     "deleteAccountTitle": "Hofafana ve ny kaonty?",
@@ -876,6 +875,18 @@
       "securityFindingsUnavailable": "Ampio ny mpanampy amin'ny fiarovana Kilo ao amin'ny faritra iray mba hahazoana ny olana ara-piarovana hita.",
       "spendAlertsSubtitle": "fihoaram-bidy sy fitsambikinana isan'ora",
       "spendAlertsToggle": "Sokajin'ny fampitandremana momba ny fandaniana"
+    },
+    "history": {
+      "title": "Tantaran'ny fampandrenesana",
+      "subtitle": "Fampandrenesana voarain'ity kaonty ity",
+      "bannerBody": "Tsy mandeha ny fampandrenesana push amin'ity fitaovana ity, ka tsy hisy vaovao tonga eto.",
+      "bannerAction": "Fandrindran'ny fampandrenesana",
+      "emptyTitle": "Mbola tsy misy fampandrenesana",
+      "emptyCategoryTitle": "Tsy misy fampandrenesana ao amin'ity sokajy ity",
+      "emptyBody": "Miseho eto ny fampandrenesana azon'ity kaonty ity. Tehirizina mandritra ny {{days}} andro izy ireo.",
+      "capped": "Aseho ny fampandrenesana farany indrindra.",
+      "loadError": "Tsy nahomby ny fampakarana ny tantaran'ny fampandrenesana.",
+      "openFailed": "Tsy misokatra na aiza na aiza intsony io fampandrenesana io."
     },
     "action": {
       "openSession": "Sokafy ny fotoam-piasana"
@@ -2178,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Tsy tratra ny milina — mety tapaka ny fifandraisana.",
     "remoteSpawnNonRetryable": "Tsy vitan'ny milina ny nanomboka ny fotoam-piasana — jereo ny milina na havaozy ny CLI.",
-    "remoteSpawnInstanceDisconnected": "Tapaka ny fifandraisana amin'ny milina voafidy. Manomboha fotoam-piasana ao amin'ny Cloud Agent na mifidiana milina hafa.",
-    "liveCount_one": "{{count}} MIVANTANA",
-    "liveCount_other": "{{count}} MIVANTANA"
+    "remoteSpawnInstanceDisconnected": "Tapaka ny fifandraisana amin'ny milina voafidy. Manomboha fotoam-piasana ao amin'ny Cloud Agent na mifidiana milina hafa."
   },
   "agentChat": {
     "session": {
@@ -2592,7 +2601,9 @@
       "retrying": "Manandrana indray…",
       "retryDeny": "Andramo lavino indray",
       "retryAllowOnce": "Andramo avelao indray mandeha indray",
-      "retryAlwaysAllow": "Andramo avelao foana indray"
+      "retryAlwaysAllow": "Andramo avelao foana indray",
+      "unreadableTitle": "Tsy afaka novakiana ny fangatahana alalana",
+      "unreadableBody": "Miandry fanapahan-kevitra momba ny alalana ny agent fa tsy afaka asehon'ity rindrankajy ity io fangatahana io. Havaozy ny rindrankajy na ny CLI, na valio ao amin'ny CLI ny fangatahana mba hahafahana manohy."
     },
     "questionCard": {
       "title": "Mila valiny ny mpanampy",
@@ -2984,8 +2995,9 @@
     "unavailableDevice": "Tsy azo ampiasaina amin'ity fitaovana ity ny fampidirana amin'ny feo.",
     "unavailableLanguage": "Tsy azo ampiasaina amin'ny fitenin'ity fitaovana ity ny fampidirana amin'ny feo.",
     "languageNotInstalledTitle": "Mbola tsy vonona ny fampidirana amin'ny feo ho an'ny {{language}}",
-    "languageNotInstalledMessage": "Tsy napetraka amin'ity finday ity ny rakitra feo offline ho an'ny {{language}}. Sintomy aloha izy ireo, avy eo andramo indray ny fampidirana amin'ny feo.",
+    "languageNotInstalledMessage": "Tsy voapetraka ny rakitra feo offline ho an'ny {{language}}, ary efa voatsipy ny famadihana feo ho soratra an-tserasera. Alaivo ireo rakitra, na alefaso indray ny famadihana feo ho soratra an-tserasera, mba hampiasa ny fampidirana amin'ny feo.",
     "downloadOfflineModel": "Sintomy",
+    "useOnlineTranscription": "Avelao ny famadihana an-tserasera",
     "offlineModelDownloadScheduled": "Ho sintomy ao amin'ny background ny rakitra feo offline. Andramo indray ny fampidirana amin'ny feo raha vao ela.",
     "listeningStopped": "Nijanona ny fihainoana.",
     "transcribing": "Manova feo ho soratra...",
@@ -3159,7 +3171,7 @@
     "creditActivity": {
       "emptyDescription": "Hiseho eto ny fividianana, ny fampiasana ary ny fanitsiana kireditra ho an'ity fikambanana ity rehefa mitranga.",
       "emptyTitle": "Tsy misy hetsika momba ny kireditra",
-      "expires": "Lany daty amin'ny {{date}}",
+      "expiresUtc": "Lany daty amin'ny {{date}} (UTC)",
       "title": "Hetsika momba ny kireditra",
       "transactionFallback": "Fifanakalozana kireditra",
       "category": {
@@ -3840,6 +3852,8 @@
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",
+      "environmentHint": "Ny sanda aseho ho •••• dia mitazona ny tsiambaratelo voatahiry; soloy ny sanda iray raha tianao havaozina. Ilaina ny sanda rehetra rehefa miova ny andalana baiko",
+      "headersHint": "Ny sanda aseho ho •••• dia mitazona ny tsiambaratelo voatahiry; soloy ny sanda iray raha tianao havaozina. Ilaina ny sanda rehetra rehefa miova ny URL",
       "nameRequired": "Ampidiro anarana mpizara",
       "nameInvalid": "Ny anarana dia tsy afaka mampiasa afa-tsy litera ASCII, isa, tsipiho ambany ary tsipiho, hatramin'ny 100 tarehintsoratra",
       "commandRequired": "Ampidiro baiko",
@@ -3938,6 +3952,10 @@
   "credits": {
     "title": "Hividy kireditra",
     "description": "Ny kireditra dia fividianana indray mandeha ampiana amin'ny balan Kilo anao hanaovana session coding AI ao amin'ny Kilo App. Ny fivarotana no maka vola amin'ny kaontinao ary ampiana ny kireditra rehefa manamarina ny fandoavam-bola ny fivarotana.",
+    "nextExpiry": "Kireditra {{amount}} ho lany daty amin'ny {{date}} (UTC). Ny kireditra ho lany daty voalohany no ampiasaina aloha.",
+    "appStoreExpiry": "Tsy lany daty ny kireditra novidiana tamin'ny App Store.",
+    "playOneYearExpiry": "Lany daty herintaona ara-kalandrie aorian'ny fividianana ireo kireditra ireo.",
+    "playNonexpiring": "Tsy lany daty ireo kireditra ireo.",
     "packLabel": "Ampio kireditra {{amount}}",
     "priceUnavailable": "Tsy misy ny vidiny",
     "purchased": "Nampiana tao amin'ny balananao ny kireditra.",
@@ -4076,6 +4094,10 @@
     "generate": "Mamorona famintinana",
     "retrySummary": "Andramo indray ny famintinana andoavana",
     "sources": "Porofo sy vokatra",
+    "sessionsShown_one": "Aseho ny {{shown}} amin'ny fotoam-piasana {{total}}",
+    "sessionsShown_other": "Aseho ny {{shown}} amin'ny fotoam-piasana {{total}}",
+    "itemsShown_one": "Aseho ny {{shown}} amin'ny singa {{total}}",
+    "itemsShown_other": "Aseho ny {{shown}} amin'ny singa {{total}}",
     "timezone": "Faritra ora amin'ny tatitra",
     "deviceTimezone": "Ampiasao ny faritra ora amin'ny fitaovana",
     "timezoneHint": "Faritra ora IANA, ohatra Europe/Berlin. Ho an'ny tatitra ho avy ny fanovana fandaharana.",

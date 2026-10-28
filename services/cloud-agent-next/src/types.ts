@@ -269,7 +269,8 @@ type IssueGitHubSessionCapabilityResult =
 type RedeemGitHubSessionCapabilityResult =
   | {
       success: true;
-      authorization: string;
+      /** Null means the request is forwarded anonymously. */
+      authorization: string | null;
       installationId?: string;
       source?: 'user' | 'installation';
       appType?: 'standard' | 'lite';
@@ -568,6 +569,8 @@ export type Env = {
   RUNTIME_RELEASE_BUCKET?: R2Bucket;
   RUNTIME_STARTUP_MODE?: string;
   NATIVE_RUNTIME_IMAGE?: string;
+  /** Comma-separated org UUIDs whose interactive web routes use the scoped startup target. */
+  RUNTIME_INTERACTIVE_ORG_IDS?: string;
   /** SHA-256 of the private R2 descriptor; existing allocations can retain inline JSON. */
   RUNTIME_RELEASE_DESCRIPTOR?: string;
   /** Queue for callback messages (optional - supports incremental rollout) */

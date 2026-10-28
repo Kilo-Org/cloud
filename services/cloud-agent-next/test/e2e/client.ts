@@ -15,6 +15,11 @@ import {
   getSandboxAllocationRequest,
   type SandboxAllocation,
 } from '@kilocode/worker-utils/sandbox-allocation';
+import type {
+  CloudAgentWorkspaceSummary,
+  CloudAgentWorkspacesPage,
+  GetCloudAgentWorkspaceResult,
+} from '@kilocode/session-ingest-contracts';
 import { mintApiToken, mintStreamTicket } from './auth.js';
 import { resolveFakeAdminToken } from './fake-llm-admin.js';
 import { FAKE_SCOPE_MARKER_PREFIX, isFakeScopeToken } from './fake-llm-core.js';
@@ -42,7 +47,7 @@ export type CallbackTarget = {
  * (which also carries `api_token_pepper`) satisfies it; the deployed profile
  * supplies identity only and authenticates with a bearer token.
  */
-export type DriverUser = { id: string; email?: string; api_token_pepper?: string };
+export type DriverUser = { id: string; email?: string; api_token_pepper?: string | null };
 
 export type DriverConfig = {
   /**
@@ -180,7 +185,10 @@ export async function trpcCall<T>(
   const url = new URL(`/trpc/${procedure}`, config.workerUrl);
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    Authorization: `Bearer ${config.bearerToken ?? mintApiToken(config.user, config.nextAuthSecret)}`,
+    Authorization: `Bearer ${
+      config.bearerToken ??
+      mintApiToken(config.user, config.nextAuthSecret, 60 * 60, config.kilocodeOrganizationId)
+    }`,
   };
   if (config.skipBalanceCheck !== false) {
     // cloud-agent-client.ts sends this for skipped-balance callers; it cleanly
@@ -210,6 +218,104 @@ export async function trpcCall<T>(
   const parsed: unknown = JSON.parse(text);
   const envelope = z.object({ result: z.object({ data: z.unknown() }) }).parse(parsed);
   return envelope.result.data as T;
+}
+
+export function listHostedWorkspaces(
+  config: DriverConfig,
+  input: { repositoryUrl?: string; limit?: number; sessionLimit?: number },
+  signal?: AbortSignal
+): Promise<CloudAgentWorkspacesPage> {
+  return trpcCall<CloudAgentWorkspacesPage>(config, 'listHostedWorkspaces', input, {
+    method: 'GET',
+    signal,
+  });
+}
+
+export function getHostedWorkspace(
+  config: DriverConfig,
+  workspaceId: string,
+  signal?: AbortSignal
+): Promise<GetCloudAgentWorkspaceResult> {
+  return trpcCall<GetCloudAgentWorkspaceResult>(
+    config,
+    'getHostedWorkspace',
+    { workspaceId, sessionLimit: 100 },
+    { method: 'GET', signal }
+  );
+}
+
+export type { CloudAgentWorkspaceSummary };
+
+/**
+ * Passive, workspace-keyed status projection. Mirrors the fields the proof
+ * asserts; the full output schema is owned by
+ * `src/router/handlers/hosted-workspace-status.ts`.
+ */
+export type HostedWorkspaceStatus = {
+  workspaceId: string;
+  userId: string;
+  organizationId: string | null;
+  deletionState: 'active' | 'deleting' | 'deleted';
+  observedAt: number;
+  compute: {
+    status: string;
+    detailCode: string;
+    provider: string;
+    observedAt: number;
+    estimatedSleepAt: number | null;
+  };
+  activity: { activeSessionCount: number; hasActiveTurn: boolean };
+  wakeOnInput: {
+    available: boolean;
+    blockedReason: 'deleting' | 'deleted' | 'billing_blocked' | 'billing_status_unavailable' | null;
+  };
+  billing: {
+    payer: { type: 'user' | 'org'; id: string } | null;
+    actor: { type: 'user' | 'bot'; id: string } | null;
+    onBehalfOf: { type: 'user' | 'org'; id: string } | null;
+    sku: string | null;
+    blocked: boolean | null;
+    enforcementRequested: boolean;
+    intervalStartedAt: number | null;
+    rate: { rateCentsPerSecond: string; estimatedHourlyMicrodollars: number } | null;
+  };
+  deletion: {
+    started: boolean;
+    completed: boolean;
+    startedAt: number | null;
+    phase: 'not_started' | 'runtime_cleanup' | 'finalizing' | 'completed';
+    sessionCount: number;
+    runtimeLocationCount: number;
+    completedRuntimeLocationCount: number;
+    remainingRuntimeLocationCount: number;
+    deletedSessionIds: string[];
+  };
+};
+
+export function getHostedWorkspaceStatus(
+  config: DriverConfig,
+  input: { workspaceId: string; kilocodeOrganizationId?: string },
+  signal?: AbortSignal
+): Promise<HostedWorkspaceStatus> {
+  return trpcCall<HostedWorkspaceStatus>(config, 'getHostedWorkspaceStatus', input, {
+    method: 'GET',
+    signal,
+  });
+}
+
+/**
+ * Destroy one Cloud workspace and every remaining root through the journaled
+ * `deleteWorktree` operation. A completed workspace replays its tombstone.
+ */
+export function deleteWorktree(
+  config: DriverConfig,
+  input: { worktreeId: string; kilocodeOrganizationId?: string },
+  signal?: AbortSignal
+): Promise<{ success: true; deletedSessionIds: string[] }> {
+  return trpcCall<{ success: true; deletedSessionIds: string[] }>(config, 'deleteWorktree', input, {
+    internalApiSecret: config.internalApiSecret,
+    ...(signal ? { signal } : {}),
+  });
 }
 
 export type StartSessionResult = {
@@ -478,6 +584,106 @@ export async function createWorktreeChat(
   // Success only, matching the legacy/unified start pattern.
   config.onSessionCreated?.(created.cloudAgentSessionId, created.kiloSessionId);
   return created;
+}
+
+export type HostedWorkspaceCreateResult = {
+  workspaceId: string;
+  cloudAgentSessionId: string;
+  kiloSessionId: string;
+  messageId: string;
+  replayed?: boolean;
+};
+
+export type HostedWorkspaceRepository =
+  | { type: 'github'; repo: string }
+  | { type: 'git'; url: string };
+
+/**
+ * Create a hosted workspace and its first root session through the
+ * `agent-manager` mutation. Requires an explicit, authorized Cloud profile.
+ *
+ * `repository` overrides the driver's repository so the proof can create a
+ * workspace for a second repository; omitted keeps the driver's repo.
+ */
+export async function createHostedWorkspace(
+  config: DriverConfig,
+  input: {
+    operationKey?: string;
+    profileId: string;
+    prompt: string;
+    repository?: HostedWorkspaceRepository;
+  },
+  signal?: AbortSignal
+): Promise<HostedWorkspaceCreateResult> {
+  const created = await trpcCall<HostedWorkspaceCreateResult>(
+    config,
+    'createHostedWorkspace',
+    {
+      operationKey: input.operationKey ?? randomUUID(),
+      clientProvenance: 'agent-manager',
+      repository:
+        input.repository ??
+        (config.githubRepo
+          ? { type: 'github', repo: config.githubRepo }
+          : { type: 'git', url: config.gitUrl }),
+      profile: { id: input.profileId },
+      message: { prompt: input.prompt },
+      agent: { mode: 'code', model: config.model },
+      ...(config.kilocodeOrganizationId
+        ? { options: { kilocodeOrganizationId: config.kilocodeOrganizationId } }
+        : {}),
+    },
+    { internalApiSecret: config.internalApiSecret, signal }
+  );
+  config.onSessionCreated?.(created.cloudAgentSessionId, created.kiloSessionId);
+  return created;
+}
+
+/**
+ * Add a root session to an existing hosted workspace by workspace id only.
+ * The workspace supplies repository, ref, profile, environment, sandbox and
+ * clone; the caller supplies only session-scoped agent/model/prompt.
+ */
+export async function createHostedWorkspaceSession(
+  config: DriverConfig,
+  input: { workspaceId: string; operationKey?: string; prompt: string },
+  signal?: AbortSignal
+): Promise<HostedWorkspaceCreateResult> {
+  const created = await trpcCall<HostedWorkspaceCreateResult>(
+    config,
+    'createHostedWorkspaceSession',
+    {
+      workspaceId: input.workspaceId,
+      operationKey: input.operationKey ?? randomUUID(),
+      clientProvenance: 'agent-manager',
+      message: { prompt: input.prompt },
+      agent: { mode: 'code', model: config.model },
+      ...(config.kilocodeOrganizationId
+        ? { kilocodeOrganizationId: config.kilocodeOrganizationId }
+        : {}),
+    },
+    { internalApiSecret: config.internalApiSecret, signal }
+  );
+  config.onSessionCreated?.(created.cloudAgentSessionId, created.kiloSessionId);
+  return created;
+}
+
+/** Delete one hosted root session while preserving its workspace and siblings. */
+export async function deleteHostedWorkspaceSession(
+  config: DriverConfig,
+  input: { workspaceId: string; sessionId: string; operationKey?: string },
+  signal?: AbortSignal
+): Promise<{ success: true; workspaceId: string; sessionId: string }> {
+  return trpcCall<{ success: true; workspaceId: string; sessionId: string }>(
+    config,
+    'deleteHostedWorkspaceSession',
+    {
+      workspaceId: input.workspaceId,
+      sessionId: input.sessionId,
+      operationKey: input.operationKey ?? randomUUID(),
+    },
+    { internalApiSecret: config.internalApiSecret, ...(signal ? { signal } : {}) }
+  );
 }
 
 /**

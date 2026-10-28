@@ -2,6 +2,7 @@ import 'server-only';
 import { custom_llm2, type CustomLlm2 } from '@kilocode/db/schema';
 import { CustomLlmDefinitionSchema, type CustomLlmDefinition } from '@kilocode/db/schema-types';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { captureException } from '@sentry/nextjs';
 
 export type CustomLlm = {
@@ -20,8 +21,16 @@ export function isPublicCustomLlm(
   return definition.public !== undefined;
 }
 
+/**
+ * A custom LLM may be created with a Kilo-exclusive model's id ahead of that
+ * model's removal. Until then the Kilo-exclusive model takes precedence, so the
+ * custom LLM stays out of routing, model lists, and every other lookup.
+ */
 export function parseCustomLlmRows(rows: readonly CustomLlm2[]): CustomLlm[] {
   return rows.flatMap(row => {
+    if (isKiloExclusiveModel(row.public_id.toLowerCase())) {
+      return [];
+    }
     const parsed = CustomLlmDefinitionSchema.safeParse(row.definition);
     if (!parsed.success) {
       console.log('Failed to parse custom llm definition', row.public_id, parsed.error);

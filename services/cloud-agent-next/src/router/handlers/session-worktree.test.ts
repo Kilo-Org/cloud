@@ -127,6 +127,7 @@ type OwnershipFixture = {
   parentSessionId: string | null;
   cloudAgentSessionScopeId: string | null;
   gitUrl: string | null;
+  profileId?: string | null;
 };
 
 function sourceMetadata(options?: {
@@ -293,6 +294,7 @@ function fixture(options?: {
     cloudAgentSessionId: metadata.identity.sessionId,
     cloudAgentSessionScopeId: metadata.identity.sessionId,
     kiloSessionId: metadata.auth.kiloSessionId ?? SOURCE_KILO_SESSION_ID,
+    profileId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
   });
   const db = makeDb(options?.ownershipResults ?? [[source]]);
   getPgDbMock.mockReturnValue(db);
@@ -1035,6 +1037,7 @@ describe('createWorktreeChat ownership, metadata, and control-plane routing', ()
       },
       organizationId: undefined,
       createdOnPlatform: 'cloud-agent-web',
+      profileId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       title: expect.stringMatching(/^New session - /),
       gitUrl: 'https://github.com/acme/repo',
     });
@@ -1185,26 +1188,33 @@ describe('createWorktreeChat ownership, metadata, and control-plane routing', ()
     );
   });
 
-  it('never copies parent opt-in or delegated lineage when copying a session profile to a sibling', async () => {
+  it('derives sibling spawn permission from the interactive origin and never copies delegated lineage', async () => {
     for (const scope of [
       { allowSubagentSessions: true },
       { parentCloudAgentSessionId: SOURCE_WORKSPACE_ID },
     ]) {
       const metadata = { ...sourceMetadata(), ...scope };
       const { caller, input, destinationStub } = fixture({ metadata });
-      if (scope.allowSubagentSessions === true) {
-        await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({
-          code: 'BAD_REQUEST',
-        });
-        expect(destinationStub.registerSessionFromMetadata).not.toHaveBeenCalled();
-        continue;
-      }
       await caller.createWorktreeChat(input);
       const registration = destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0];
       expect(registration?.metadata.profile?.envVars).toEqual(metadata.profile?.envVars);
-      expect(registration?.metadata.allowSubagentSessions).not.toBe(true);
+      expect(registration?.metadata.allowSubagentSessions).toBe(false);
       expect(registration?.metadata.parentCloudAgentSessionId).toBeUndefined();
     }
+  });
+
+  it('grants sibling spawn permission when the interactive source is isolated', async () => {
+    verifyKiloTokenForPolicyMock.mockResolvedValue({
+      claims: { aud: 'cloud-agent-next', runtimeAdmission: {} },
+    });
+    const metadata = sourceMetadataWithPreset('cloudflare-containers-standard-3');
+    const { caller, input, destinationStub } = fixture({
+      metadata,
+      organizationId: ORGANIZATION_ID,
+    });
+    await caller.createWorktreeChat(input);
+    const registration = destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0];
+    expect(registration?.metadata.allowSubagentSessions).toBe(true);
   });
 });
 

@@ -16,6 +16,7 @@ import type { WrapperKiloClient } from '../kilo-api.js';
 import { fetchKiloServer } from '../kilo-server-auth.js';
 import {
   git,
+  runProcess,
   withTimeoutAndAbort,
   type ExecResult,
   type ProcessOptions,
@@ -24,7 +25,11 @@ import {
 } from '../utils.js';
 import { WrapperBootstrapError } from '../bootstrap-error.js';
 import { formatGitResultFailure, gitOperationError, type GitRouteClass } from '../git-errors.js';
-import { authenticatedGitUrl } from '../control/git-url.js';
+import {
+  credentialFreeGitUrl,
+  normalizeOriginCredential,
+  writeGitCredentialRecord,
+} from '../control/git-credentials.js';
 import { checkoutSyntheticReviewRef, isSyntheticReviewRef } from '../git-review-ref.js';
 import {
   buildWorktreeKiloEnvironment,
@@ -107,6 +112,7 @@ export type PrepareDeps = {
     onOutput?: (stream: ProcessOutputStream, output: string) => void,
     signal?: AbortSignal
   ) => Promise<ExecResult>;
+  runSkillInstall?: typeof runProcess;
   /** Starts the default setup command, e.g. inside the setup cgroup. */
   spawnSetup?: ProcessSpawn;
   restore?: typeof restoreSession;
@@ -144,6 +150,7 @@ type PreparedRoute = {
 type PreparingRoute = {
   promise: Promise<void>;
   released: boolean;
+  skillInstallController?: AbortController;
   /** `runtimeKey(spec)` captured before the first await, for last-route release. */
   runtimeKey: string;
   /** A credentials frame that arrived before the route was prepared. */
@@ -217,6 +224,18 @@ async function defaultSessionExists(
 /** Keep existing allocations on their original runtime and HOME identities. */
 export function runtimeKey(spec: ControlPlaneRouteSpec): string {
   return spec.runtimeIsolation === 'per-session' ? spec.sessionId : spec.directory;
+}
+
+/**
+ * The scoped Cloud Agent MCP grant carries a session-specific token. Only a
+ * per-session runtime may receive it; a runtime shared by a worktree must keep
+ * one MCP configuration for every member.
+ */
+function scopedCloudAgentMcp(
+  spec: ControlPlaneRouteSpec,
+  cloudAgentMcp: ControlPlaneSessionCredentialsPayload['cloudAgentMcp'] | undefined
+): ControlPlaneSessionCredentialsPayload['cloudAgentMcp'] | undefined {
+  return spec.runtimeIsolation === 'per-session' ? cloudAgentMcp : undefined;
 }
 
 function isTimeoutMessage(step: ControlPlanePreparationStep, error: unknown): boolean {
@@ -635,7 +654,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       await withinStep('restore', timers.restoreMs, async signal => {
         emitProgress(spec.sessionId, 'restore');
         await refreshAdoptedRepository({
-          remoteUrl: authenticatedGitUrl(git.url, git.token, git.platform),
+          remoteUrl: credentialFreeGitUrl(git.url),
           redact,
           git: (args, options) =>
             options?.network
@@ -683,6 +702,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   async function prepareWorkspace(
     spec: ControlPlaneRouteSpec,
     directory: string,
+    home: string,
     env: Record<string, string>,
     redact: (text: string) => string,
     setStep: (step: ControlPlanePreparationStep) => void,
@@ -692,6 +712,26 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     deferredStamp: { commit: string } | null;
   }> {
     const workspaceStartedAt = Date.now();
+    // Git authenticates through the pinned helper's per-session record, never
+    // through `origin`. A reused workspace is refreshed here too, so a renewed
+    // grant reaches the next `git push` without touching the remote.
+    if (spec.git) {
+      try {
+        await writeGitCredentialRecord({
+          home,
+          url: credentialFreeGitUrl(spec.git.url),
+          token: spec.git.token,
+          platform: spec.git.platform,
+        });
+      } catch {
+        setStep('clone');
+        throw new WrapperBootstrapError({
+          code: 'WORKSPACE_SETUP_FAILED',
+          message: 'Git credential setup failed',
+          retryable: true,
+        });
+      }
+    }
     const inspectStartedAt = Date.now();
     const { inspection } = await inspectWorkspace(directory);
     log(
@@ -964,6 +1004,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       // Built inside the failure scope: an over-limit CLI config must surface as
       // `session.failed`, not reject the prepare promise (which the caller
       // swallows while the route waits out its timeout).
+      const cloudAgentMcp = scopedCloudAgentMcp(spec, credentials?.cloudAgentMcp);
       const builtEnv = withRuntimeProfileEnvironment(
         buildWorktreeKiloEnvironment(
           directory,
@@ -972,7 +1013,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           spec.env ?? {},
           inheritedEnv,
           spec.mcp,
-          { ...spec, cloudAgentMcp: credentials?.cloudAgentMcp }
+          { ...spec, ...(cloudAgentMcp === undefined ? {} : { cloudAgentMcp }) }
         ),
         spec
       );
@@ -983,9 +1024,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           {
             ...builtEnv,
             ...(credentials?.git?.token ? { GIT_TOKEN: credentials.git.token } : {}),
-            ...(credentials?.cloudAgentMcp
-              ? { CLOUD_AGENT_MCP_TOKEN: credentials.cloudAgentMcp.token }
-              : {}),
+            ...(cloudAgentMcp ? { CLOUD_AGENT_MCP_TOKEN: cloudAgentMcp.token } : {}),
           },
         ],
         spec.secretEnvKeys ?? []
@@ -1010,9 +1049,23 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       // One owner for runtime profile, runtime start and session resolution, shared
       // by the normal path after the lock and the deferred path inside it.
       const ensureRuntimeAndSession = async (restoreFiles: boolean): Promise<void> => {
+        const installsSkills = spec.runtimeSkills?.some(skill => skill.source !== undefined);
+        currentStep = installsSkills ? 'setup' : 'kilo_runtime';
+        owner.skillInstallController = new AbortController();
+        await materializeRuntimeProfile(home, spec, {
+          run: (command, args, options) =>
+            (deps.runSkillInstall ?? runProcess)(command, args, {
+              ...options,
+              spawn: deps.spawnSetup,
+            }),
+          signal: owner.skillInstallController.signal,
+          onProgress: detail => {
+            if (!owner.released) emitProgress(sessionId, 'setup', detail);
+          },
+        });
+        if (owner.released) return;
         currentStep = 'kilo_runtime';
         emitProgress(sessionId, 'kilo_runtime');
-        await materializeRuntimeProfile(home, spec);
         const client = await withRuntimeStartRetry(
           key,
           () =>
@@ -1038,6 +1091,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         const preparedWorkspace = await prepareWorkspace(
           spec,
           directory,
+          home,
           builtEnv,
           redact,
           step => {
@@ -1078,11 +1132,17 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           }
         );
         workspace = preparedWorkspace.outcome;
+        if (spec.git) {
+          const origin = await normalizeOriginCredential({
+            git: args => runGit(args, { cwd: directory, env: builtEnv, inheritEnv: false }),
+            directory,
+          });
+          if (origin === 'failed') {
+            log(`control-plane Git origin normalization failed session=${sessionId}`);
+          }
+        }
         if (preparedWorkspace.deferredStamp === null || owner.released) return;
-        // Recovery was requested but did not apply. Import the older ingest while
-        // the tree is unstamped, then write the same `planStamp` result only after
-        // the import returns, so a crash in between leaves the tree unstamped. The
-        // lock keeps siblings from adopting or emptying the directory meanwhile.
+        // Recovery import completes under the workspace lock before stamping.
         deferredRuntimeStarted = true;
         await ensureRuntimeAndSession(restoreFilesFor());
         if (!owner.released) {
@@ -1109,7 +1169,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         home,
         kilo: kiloAuth,
         env: builtEnv,
-        cloudAgentMcp: credentials?.cloudAgentMcp,
+        cloudAgentMcp,
       });
       // A credentials frame that arrived while this route was preparing is
       // applied before the route reports ready; a release during the apply
@@ -1154,7 +1214,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       if (preparation && !preparation.released) preparation.pendingCredentials = credentials;
       return;
     }
-    route.cloudAgentMcp = credentials.cloudAgentMcp ?? route.cloudAgentMcp;
+    const cloudAgentMcp = scopedCloudAgentMcp(
+      route.spec,
+      credentials.cloudAgentMcp ?? route.cloudAgentMcp
+    );
+    route.cloudAgentMcp = cloudAgentMcp;
     const nextEnv = withRuntimeProfileEnvironment(
       buildWorktreeKiloEnvironment(
         route.directory,
@@ -1167,25 +1231,24 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         route.spec.env ?? {},
         inheritedEnv,
         route.spec.mcp,
-        { ...route.spec, cloudAgentMcp: route.cloudAgentMcp }
+        { ...route.spec, ...(cloudAgentMcp === undefined ? {} : { cloudAgentMcp }) }
       ),
       route.spec
     );
     route.env = nextEnv;
-    await deps.runtimes.installCredentials(route.key, nextEnv, route.cloudAgentMcp);
+    await deps.runtimes.installCredentials(route.key, nextEnv, cloudAgentMcp);
     if (credentials.git?.token && route.spec.git) {
-      const url = authenticatedGitUrl(
-        route.spec.git.url,
-        credentials.git.token,
-        credentials.git.platform ?? route.spec.git.platform
-      );
-      const result = await runGit(['remote', 'set-url', 'origin', url], {
-        cwd: route.directory,
-        env: route.env,
-        inheritEnv: false,
-      });
-      if (result.exitCode !== 0) {
-        log(`control-plane Git credential refresh failed session=${credentials.sessionId}`);
+      // The helper re-reads the record on the next git command, so the agent's
+      // push/fetch picks up the renewed token while `origin` stays credential-free.
+      try {
+        await writeGitCredentialRecord({
+          home: route.home,
+          url: credentialFreeGitUrl(route.spec.git.url),
+          token: credentials.git.token,
+          platform: credentials.git.platform ?? route.spec.git.platform,
+        });
+      } catch {
+        log(`control-plane Git credential record refresh failed session=${credentials.sessionId}`);
       }
     }
   }
@@ -1261,7 +1324,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     },
     release(sessionId) {
       const preparation = preparing.get(sessionId);
-      if (preparation) preparation.released = true;
+      if (preparation) {
+        preparation.released = true;
+        preparation.skillInstallController?.abort();
+      }
       const route = prepared.get(sessionId);
       if (!route) return;
       prepared.delete(sessionId);

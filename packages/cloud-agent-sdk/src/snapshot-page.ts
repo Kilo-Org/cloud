@@ -1,4 +1,5 @@
 import type { ChatEvent } from './normalizer';
+import { messageUpdatedDataSchema } from './schemas';
 import type { SessionSnapshot, SessionSnapshotPage, SessionSnapshotPageOutcome } from './types';
 import { partSettledAt } from './part-utils';
 import type { TransportSink } from './transport';
@@ -23,12 +24,21 @@ export function snapshotPageFromSnapshot(snapshot: SessionSnapshot): SessionSnap
  * Emit a stored transcript's messages in render order. A settled tool part
  * carries the `time.end` its lifecycle merge orders it by; nothing else
  * carries an event time.
+ *
+ * Replay is the counterpart of the per-event boundary: the transports hand a
+ * stored page straight to the sink, so no event schema runs on it. Each row is
+ * therefore checked against the same message contract the live wire uses, and a
+ * row the transcript cannot describe — no readable `time` for its timestamp and
+ * streaming state, no `role` for its branch — is skipped together with its
+ * parts instead of being handed to readers. One bad row must not cost the rest
+ * of the page.
  */
 export function replayStoredMessages(
   messages: SessionSnapshot['messages'],
   emit: (event: ChatEvent) => void
 ): void {
   for (const msg of messages) {
+    if (!messageUpdatedDataSchema.safeParse({ info: msg.info }).success) continue;
     emit({ type: 'message.updated', info: msg.info });
 
     for (const part of msg.parts) {

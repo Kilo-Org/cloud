@@ -510,6 +510,7 @@ describe('handleKiloFacadeRequest', () => {
         {
           kiloSessionId,
           cloudAgentSessionId: firstWorkspaceSessionId,
+          workspaceId: 'worktree_11111111-1111-4111-8111-111111111111',
           userId: 'usr_1',
           organizationId: null,
           title: 'Mapped session',
@@ -777,6 +778,118 @@ describe('handleKiloFacadeRequest', () => {
 
     expect(response.status).toBe(404);
     expect(openPublicSessionEventStream).not.toHaveBeenCalled();
+  });
+
+  it('requires a directory selector for the system event feed', async () => {
+    const response = await handleKiloFacadeRequest({
+      request: new Request('http://worker.test/kilo/cloud-agent/event'),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: { systemFeed: vi.fn() },
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'KILO_EVENT_DIRECTORY_REQUIRED',
+    });
+  });
+
+  it('opens the system event feed for an owned root without waking the runtime', async () => {
+    const env = envStub();
+    const systemFeed = vi.fn(
+      () => new Response('stream', { headers: { 'Content-Type': 'text/event-stream' } })
+    );
+
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/cloud-agent/event?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}`
+      ),
+      env,
+      userId: 'usr_1',
+      deps: {
+        resolveRootSessionForKiloSession: vi.fn(async () => ({
+          cloudAgentSessionId: firstWorkspaceSessionId,
+        })),
+        systemFeed,
+      },
+    });
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get('content-type')).toContain('text/event-stream');
+    expect(systemFeed).toHaveBeenCalledWith({
+      env,
+      userId: 'usr_1',
+      cloudAgentSessionId: firstWorkspaceSessionId,
+      kiloSessionId,
+    });
+  });
+
+  it('rejects unsupported system event selectors before ownership lookup', async () => {
+    const resolveRootSessionForKiloSession = vi.fn();
+    const response = await handleKiloFacadeRequest({
+      request: new Request('http://worker.test/kilo/cloud-agent/event?workspace=private'),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: { resolveRootSessionForKiloSession, systemFeed: vi.fn() },
+    });
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toMatchObject({
+      error: 'KILO_EVENT_SELECTOR_UNSUPPORTED',
+    });
+    expect(resolveRootSessionForKiloSession).not.toHaveBeenCalled();
+  });
+
+  it('hides a foreign system event selector as not found', async () => {
+    const systemFeed = vi.fn();
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/cloud-agent/event?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}`
+      ),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: { resolveRootSessionForKiloSession: vi.fn(async () => null), systemFeed },
+    });
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ error: 'KILO_SESSION_NOT_FOUND' });
+    expect(systemFeed).not.toHaveBeenCalled();
+  });
+
+  it('hides a malformed system event session id as not found', async () => {
+    const resolveRootSessionForKiloSession = vi.fn();
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        'http://worker.test/kilo/cloud-agent/event?directory=%2Fcloud-agent%2Fsessions%2Fbad-id'
+      ),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: { resolveRootSessionForKiloSession, systemFeed: vi.fn() },
+    });
+
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toMatchObject({ error: 'KILO_SESSION_NOT_FOUND' });
+    expect(resolveRootSessionForKiloSession).not.toHaveBeenCalled();
+  });
+
+  it('hides a non-control root system event selector as not found', async () => {
+    const systemFeed = vi.fn();
+    const response = await handleKiloFacadeRequest({
+      request: new Request(
+        `http://worker.test/kilo/cloud-agent/event?directory=${encodeURIComponent(publicCloudAgentDirectory(kiloSessionId))}`
+      ),
+      env: envStub(),
+      userId: 'usr_1',
+      deps: {
+        resolveRootSessionForKiloSession: vi.fn(async () => ({
+          cloudAgentSessionId: 'agent_legacy',
+        })),
+        systemFeed,
+      },
+    });
+
+    expect(response.status).toBe(404);
+    expect(systemFeed).not.toHaveBeenCalled();
   });
 
   it('returns 404 for unresolved root Kilo sessions before live wrapper lookup', async () => {
@@ -2434,6 +2547,7 @@ describe('hosted global native events', () => {
     return {
       kiloSessionId: id,
       cloudAgentSessionId,
+      workspaceId: 'worktree_11111111-1111-4111-8111-111111111111',
       userId: groupedOwnerId,
       organizationId: null,
       title: 'Owned root',

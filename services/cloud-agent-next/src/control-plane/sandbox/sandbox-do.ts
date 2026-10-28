@@ -21,6 +21,7 @@ import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import {
   forceDestroyControlPlaneSandbox,
   parseSandboxBillingInput,
+  SANDBOX_USAGE_SKUS,
   type SandboxBillingInput,
 } from '../../container-usage-context.js';
 import { resolveSecret } from '../../auth.js';
@@ -292,6 +293,7 @@ import { projectAllocationStatusSnapshot } from './status-snapshot.js';
 import { createSandboxNotificationDispatcher, type SandboxNotification } from './notifications.js';
 import { resolvePreviewTarget, type PreviewTargetResult } from './preview-target.js';
 import type { SandboxStatusSnapshot } from '../../shared/sandbox-status.js';
+import type { WorkspaceBillingProjection } from '../../shared/workspace-runtime-status.js';
 import { getWorktreeWorkspacePath } from '../../workspace.js';
 import {
   createSharedWorktreeChanges,
@@ -362,6 +364,7 @@ const wrapperSocketAttachmentSchema = z.object({
   wrapperId: z.string().optional(),
   heartbeatAck: z.literal(true).optional(),
   redactsNamedSecrets: z.literal(true).optional(),
+  installsSkillsSh: z.literal(true).optional(),
   runtimeCapability: z.literal('worktree').optional(),
   billingCheckedAt: z.number().finite().nonnegative().optional(),
 });
@@ -372,6 +375,7 @@ const WRAPPER_BILLING_CHECK_MS = 30_000;
 /** Separates an old wrapper from a decrypt/parse failure; both fail the attempt. */
 type PrepareFrameMaterializationStage =
   | 'wrapper_redaction_unsupported'
+  | 'wrapper_skills_sh_unsupported'
   | 'frame_materialization_failed';
 
 class PrepareFrameMaterializationError extends Error {
@@ -823,6 +827,37 @@ export class SandboxControlV2 extends DurableObject<Env> {
         observedAt: Date.now(),
         inactivityTimeoutMs: this.sandboxIdleTimeoutMs(allocation),
       });
+    });
+  }
+
+  /**
+   * Passive workspace billing projection (workspace status). Reads the stored
+   * provider pin and the provider's read-only billing runtime status. It never
+   * admits work, starts the container or opens a metered interval.
+   */
+  async getWorkspaceBillingProjection(): Promise<WorkspaceBillingProjection | null> {
+    await this.initialized;
+    return this.enqueue(async () => {
+      const pin = this.providerPin;
+      if (pin === null) return null;
+      let projection: Awaited<ReturnType<NonNullable<ProviderAdapter['getBillingProjection']>>>;
+      try {
+        projection = await this.provider.getBillingProjection?.();
+      } catch {
+        projection = undefined;
+      }
+      const context = projection?.context;
+      const enforcementRequested = pin.billing?.enforcementRequested === true;
+      return {
+        payer: context?.subject ?? pin.billing?.subject ?? null,
+        actor: context?.actor ?? pin.billing?.actor ?? null,
+        onBehalfOf: context?.onBehalfOf ?? pin.billing?.onBehalfOf ?? null,
+        sku: projection === undefined ? null : SANDBOX_USAGE_SKUS[projection.sandboxClassName],
+        blocked: projection?.blocked ?? (enforcementRequested ? null : false),
+        enforcementRequested,
+        intervalStartedAt: context?.startEpochMs ?? null,
+        meterInstanceId: pin.billing?.sandboxId ?? null,
+      };
     });
   }
 
@@ -3437,11 +3472,21 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return this.readAttachment(socket)?.redactsNamedSecrets === true;
   }
 
+  private wrapperInstallsSkillsSh(socket: WebSocket): boolean {
+    return this.readAttachment(socket)?.installsSkillsSh === true;
+  }
+
   /**
    * A failure throws rather than sending a frame the wrapper would drop while the
    * route waits out its preparation deadline.
    */
   private materializePrepareFrame(route: RouteRecord, socket: WebSocket): ControlPlaneRouteSpec {
+    if (
+      route.spec.runtimeSkills?.some(skill => 'source' in skill) &&
+      !this.wrapperInstallsSkillsSh(socket)
+    ) {
+      throw new PrepareFrameMaterializationError('wrapper_skills_sh_unsupported');
+    }
     const encryptedSecrets = route.credentialSource?.encryptedSecrets;
     try {
       const frameEnv = buildFrameEnv({
@@ -4115,7 +4160,16 @@ export class SandboxControlV2 extends DurableObject<Env> {
         const credential = generateSandboxCredential();
         await this.ctx.storage.put(CREDENTIAL_HASH_KEY, await hashSandboxCredential(credential));
         const pin = this.providerPin ?? this.defaultPin('cloudflare');
-        const selection = selectStartup(this.env, pin.provider);
+        const selection = selectStartup(this.env, pin.provider, {
+          preparingRoutes: (await listRoutes(this.db))
+            .filter(route => route.state === 'preparing')
+            .map(route => ({
+              createdOnPlatform: route.credentialSource?.createdOnPlatform,
+              orgId: route.credentialSource?.orgId,
+            })),
+          sandboxKind: pin.sandboxKind,
+          sandboxId: this.sandboxId,
+        });
         const createDeadline =
           state.createDeadlineAt ?? Date.now() + this.sandboxTimers().providerCreateMs;
         const startupCommand =
@@ -4205,7 +4259,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
         if (Date.now() >= launchDeadline) throw new Error('Sandbox launch timed out');
         const launchOptions: ProviderLaunchOptions = {
           ...launch.options,
-          ...(pin.provider === 'cloudflare-containers' ? { deadlineAt: launchDeadline } : {}),
+          ...(pin.provider === 'cloudflare-containers'
+            ? { deadlineAt: launchDeadline, nativeImage: selection.image }
+            : {}),
         };
         let launched = await withTimeout(
           this.provider.launch(
@@ -4265,6 +4321,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
               { command: startupCommand, env: imageLaunchEnv },
               {
                 deadlineAt: launchDeadline,
+                ...(pin.provider === 'cloudflare-containers'
+                  ? { nativeImage: selection.image }
+                  : {}),
               }
             ),
             remainingMs(launchDeadline),
@@ -4763,6 +4822,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           : {}),
         ...(frame.heartbeatAck ? { heartbeatAck: true } : {}),
         ...(frame.redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
+        ...(frame.installsSkillsSh ? { installsSkillsSh: true } : {}),
       });
       // Welcome first, then route effects: a re-prepared route resends
       // `session.prepare`, which must not arrive before the welcome.
@@ -5097,6 +5157,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       case 'cloudflare':
         return createCloudflareProviderAdapter({
           sandboxId: allocationName,
+          billingContainment: this.credentialContainmentEnabled(),
           getSandbox: (id, options) =>
             getSandbox(this.sandboxNamespace(pin, id, options.containment), id),
           destroy: (id, options) =>
@@ -5230,7 +5291,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private async armAlarm(state: AllocationState): Promise<void> {
     // The one alarm is the earliest of the allocation timers and the route
     // preparation deadlines, so a hung wrapper's route cannot outlive its
-    // 12-minute attempt.
+    // preparation attempt.
     const allocationAt = nextAllocationAlarmAt(state, this.sandboxTimers());
     const routeAt = await earliestRouteDeadlineAt(this.db);
     // Pending work must survive loss of the in-memory launch continuation.

@@ -7,14 +7,19 @@ import type { UsageRecordWriteOutcome } from './processUsage.types';
 
 export type UsageRecordObservationContext = {
   entrypoint: 'gateway' | 'writer_endpoint' | 'unknown';
-  writer_caller: 'queue' | 'region_handoff' | 'unknown';
+  writer_caller: 'queue' | 'queue_vercel' | 'region_handoff' | 'unknown';
 };
 
-function completionSuccessSampleRate(): 1 | 0.01 {
+function completionSuccessSampleRate(): number {
   const vercelEnv = process.env.VERCEL_ENV;
-  if (vercelEnv === 'production') return 0.01;
-  if (process.env.VERCEL_TARGET_ENV === 'staging' || vercelEnv) return 1;
-  return process.env.NODE_ENV === 'production' ? 0.01 : 1;
+  if (vercelEnv !== 'production') {
+    if (process.env.VERCEL_TARGET_ENV === 'staging' || vercelEnv) return 1;
+    if (process.env.NODE_ENV !== 'production') return 1;
+  }
+  const raw = process.env.USAGE_RECORD_COMPLETION_SAMPLE_RATE;
+  if (raw === undefined || raw.trim() === '') return 1;
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed >= 0 && parsed <= 1 ? parsed : 1;
 }
 
 /** Persistence completion signals shared by direct gateway writes and the HTTP writer. */

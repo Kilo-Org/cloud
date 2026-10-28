@@ -22,6 +22,9 @@ suite('pinned Kilo profile discovery', () => {
             '---\nname: profile-review\ndescription: Review a profile fixture\n---\nRead scripts/check.sh before reviewing.',
           files: { 'scripts/check.sh': 'echo profile-skill' },
         },
+        ...(process.env.RUN_SKILLS_SH_INSTALL_TEST === '1'
+          ? [{ name: 'find-skills', source: 'vercel-labs/skills' }]
+          : []),
       ],
       runtimeAgents: [
         {
@@ -89,7 +92,8 @@ suite('pinned Kilo profile discovery', () => {
         expect(response.ok).toBe(true);
         return response.json();
       };
-      expect(await read('/skill')).toEqual(
+      const skills = await read('/skill');
+      expect(skills).toEqual(
         expect.arrayContaining([
           expect.objectContaining({
             name: 'profile-review',
@@ -97,6 +101,11 @@ suite('pinned Kilo profile discovery', () => {
           }),
         ])
       );
+      if (process.env.RUN_SKILLS_SH_INSTALL_TEST === '1') {
+        expect(skills).toEqual(
+          expect.arrayContaining([expect.objectContaining({ name: 'find-skills' })])
+        );
+      }
       expect(await read('/agent')).toEqual(
         expect.arrayContaining([
           expect.objectContaining({ name: 'profile-reviewer', mode: 'primary' }),

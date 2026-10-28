@@ -33,6 +33,10 @@ import type { MessageResultRPCResponse } from '../../session/message-result.js';
 import { requireCurrentSessionAccess } from '../../session-access.js';
 import { getPgDb } from '../../db/pg.js';
 import { cli_sessions_v2 } from '@kilocode/db/schema';
+import {
+  WORKSPACE_DELETING,
+  WORKSPACE_REQUIRES_ROOT_SESSION,
+} from '@kilocode/session-ingest-contracts';
 import { and, eq } from 'drizzle-orm';
 import type { SandboxLifecycleStatus } from '../../shared/sandbox-status.js';
 import type { PreparationAttempt } from '../../shared/protocol.js';
@@ -100,6 +104,43 @@ async function findWorktreeOwnership(
   return row ?? null;
 }
 
+function deletionErrorCode(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+/**
+ * Rejects a destructive session delete that would remove the final hosted root
+ * of an active workspace before any runtime teardown. The authoritative delete
+ * still re-checks the invariant inside the row-deletion transaction.
+ */
+async function assertHostedRootSessionDeletable(
+  env: TRPCContext['env'],
+  userId: string,
+  cloudAgentSessionId: SessionId,
+  kiloSessionId: string | undefined
+): Promise<void> {
+  if (!kiloSessionId) return;
+  try {
+    await env.SESSION_INGEST.assertHostedWorkspaceSessionDeletable({
+      kiloUserId: userId,
+      sessionId: kiloSessionId,
+      cloudAgentSessionId,
+    });
+  } catch (error) {
+    const code = deletionErrorCode(error);
+    if (code.includes(WORKSPACE_REQUIRES_ROOT_SESSION)) {
+      throw new TRPCError({ code: 'CONFLICT', message: WORKSPACE_REQUIRES_ROOT_SESSION });
+    }
+    if (code.includes(WORKSPACE_DELETING)) {
+      throw new TRPCError({ code: 'CONFLICT', message: WORKSPACE_DELETING });
+    }
+    throw new TRPCError({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'session_deletion_unavailable',
+    });
+  }
+}
+
 async function deleteSessionResources(
   sessionId: SessionId,
   userId: string,
@@ -119,6 +160,10 @@ async function deleteSessionResources(
     }
 
     await authorizeExistingSession?.();
+
+    if (authorizeExistingSession && metadata.workspace?.worktreeId) {
+      await assertHostedRootSessionDeletable(env, userId, sessionId, metadata.auth.kiloSessionId);
+    }
 
     try {
       await withDORetry(getStub, stub => stub.deleteSession(), 'deleteSession');

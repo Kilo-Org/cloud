@@ -225,10 +225,11 @@ internal object SessionNotifications {
     }
 
     // Approve first, then Open. Approve is omitted, not disabled, when the card
-    // carries no approval key.
+    // carries no approval key, and it is the one action that changes the
+    // agent's work, so it carries the presence gate.
     card.approveLabel?.let { label ->
       if (card.approvalKey != null) {
-        builder.addAction(action(context, icon, label, approveIntent(context, card)))
+        builder.addAction(ApprovalGate.action(context, icon, label, approveIntent(context, card)))
       }
     }
     builder.addAction(action(context, icon, card.openLabel, openIntent))
@@ -263,19 +264,14 @@ internal object SessionNotifications {
   ): Notification.Action =
     Notification.Action.Builder(Icon.createWithResource(context, icon), label, intent).build()
 
-  /** Answer the exact request this card shows. */
+  /** Answer the exact request this card shows, through the presence gate. */
   private fun approveIntent(context: Context, card: SessionNotificationCard): PendingIntent {
     val approvalKey = card.approvalKey ?: return deleteIntent(context, card.sessionId)
-    val intent = Intent(context, ActiveAgentsActionReceiver::class.java)
-      .setAction(ActiveAgentsActionReceiver.ACTION_APPROVE)
-      .putExtra(ActiveAgentsApproveWorker.KEY_SESSION_ID, card.sessionId)
-      .putExtra(ActiveAgentsApproveWorker.KEY_APPROVAL_KEY, approvalKey)
-      .putExtra(ActiveAgentsApproveWorker.KEY_ORGANIZATION_ID, card.organizationId)
-    return PendingIntent.getBroadcast(
+    return ApprovalGate.pendingIntent(
       context,
       requestCode(card.sessionId, APPROVE_OFFSET),
-      intent,
-      PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+      card.sessionId,
+      approvalKey
     )
   }
 
@@ -320,6 +316,7 @@ internal object SessionNotifications {
 /** One followed session's notification, as the JS side maps it. */
 class SessionNotificationCard : Record {
   @Field var sessionId: String = ""
+  @Field var userId: String? = null
   @Field var organizationId: String? = null
   @Field var title: String = ""
   @Field var text: String = ""
@@ -340,6 +337,9 @@ class SessionNotificationCard : Record {
 
   fun toJson(): JSONObject = JSONObject().apply {
     put("sessionId", sessionId)
+    // Kept so a restore can place the card in the account it was followed in;
+    // never drawn (spec "Android: privacy").
+    put("userId", userId ?: "")
     put("organizationId", organizationId ?: "")
     put("title", title)
     put("text", text)
@@ -361,6 +361,7 @@ class SessionNotificationCard : Record {
 
   /** Read the shape `toJson` writes; the readable half of the persisted pair. */
   fun fillFromJson(json: JSONObject) {
+    userId = optionalString(json, "userId")
     organizationId = optionalString(json, "organizationId")
     subText = optionalString(json, "subText")
     expandedText = optionalString(json, "expandedText")

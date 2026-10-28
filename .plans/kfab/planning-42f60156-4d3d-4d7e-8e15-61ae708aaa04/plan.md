@@ -42,6 +42,7 @@ When Google Play definitively rejects a purchase token (an HTTP 4xx verdict on t
 - consumeGooglePlayProductPurchase, the acknowledge and revoke fallbacks, and the Play RTDN notification handlers keep their current error behaviour. Only the completion-time token lookup is reclassified.
 - No support or remediation for the 2026-10-17 Android user. Whether that token was a real purchase is an open operational question (triage mi-provenance) and does not change this fix.
 - No change to the edge Sentry config. The Play calls run only in the Node runtime.
+- No manual or post-deploy verification criterion (removed at operator request). Every acceptance criterion is checked by code review of the change and its unit tests.
 
 ## Approach
 
@@ -51,7 +52,7 @@ When Google Play definitively rejects a purchase token (an HTTP 4xx verdict on t
 - 4. credits-router.ts: in mapCreditCompletionError, before captureException, return TRPCError BAD_REQUEST with the existing verification message when the error is a GooglePlayPurchaseTokenRejectedError. Update the doc comment to list the provider token rejection among terminal outcomes that are expected, not incidents.
 - 5. kilo-pass-router.ts: in mapPlayCompletionError, add the same typed early return (BAD_REQUEST, existing Google Play verification message, no captureException) right after the TRPCError branch.
 - 6. sentry-server.ts: add beforeBreadcrumb(breadcrumb) that, for http/fetch breadcrumbs whose data.url (or message) contains androidpublisher.googleapis.com, replaces the segment after '/tokens/' with '[redacted]'. Keep it a pure exported function so it can be unit-tested like sanitizeSentryRequestData. It must never return null, so breadcrumbs are not silently dropped.
-- 7. Tests: extend apps/web/src/routers/credits-router.test.ts and kilo-pass-router.test.ts, add or extend store-verifier and google-play-verifier tests with a fake error object shaped like a gaxios 400 ({ status: 400, response: { status: 400 }, message: 'Invalid Value' }), and extend packages/web-shared sentry-server.test.ts for the breadcrumb scrubber. Follow the repository-verification skill for narrow jest runs.
+- 7. Tests: extend apps/web/src/routers/credits-router.test.ts and kilo-pass-router.test.ts, add or extend store-verifier and google-play-verifier tests with a fake error object shaped like a gaxios 400 ({ status: 400, response: { status: 400 }, message: 'Invalid Value' }), and extend packages/web-shared sentry-server.test.ts for the breadcrumb scrubber. Follow the repository-verification skill for narrow jest runs. As the AGENTS.md Failure UX section asks, the PR description states both effects: the spurious retry loop and the duplicate reports stop, and a genuinely invalid receipt now fails fast with a specific terminal refusal.
 
 ## Affected areas
 
@@ -85,16 +86,13 @@ When Google Play definitively rejects a purchase token (an HTTP 4xx verdict on t
 
 **Verification:** Code review
 
-### ac-6: The change's verification notes state both effects that the AGENTS.md Failure UX section requires. First, the spurious retryable 500 and replay loop, and the duplicate 288A/2889 reports, stop for receipts Google rejects. Second, a genuinely invalid receipt now fails fast with a specific terminal refusal, and no transient or credential failure is newly made terminal. After deploy, Sentry shows no new KILOCODE-WEB-288A, KILOCODE-WEB-2889 or KILOCODE-WEB-27WC events caused by a Play 400.
-
-**Verification:** Manual: after deployment, confirm in Sentry (anaconda-nq/kilocode-web) that no new 288A/2889/27WC events from a Play 400 appear, and that the PR description states both Failure UX effects
-
 ## Risks
 
 - Misclassifying a transient or our-side Google failure as terminal would make the mobile client stop recovering a paid purchase for the rest of the process. Mitigation: only 400, 404 and 410 count as terminal. 403 (which also covers a service-account permission or linkage problem) and 401 stay retryable and reported. Mobile memory is in-memory only, so the next app launch retries once.
 - If a real paid purchase is ever answered 400 (e.g. an app-variant or package mismatch), it is no longer a Sentry incident. Mitigation (optional): emit a low-severity log or metric on the terminal path with the productId and status only, never the token, so volume stays observable.
 - gaxios error shape can change across versions (status vs response.status). Mitigation: check both properties, and cover both in tests.
 - beforeBreadcrumb lives in shared web-shared code that ai-gateway also uses. The redaction is scoped to androidpublisher URLs, so other breadcrumbs are untouched.
+- With the post-deploy check removed, whether 288A, 2889 and 27WC actually stop in production is not part of this plan's acceptance. The unit tests show the mapping and the suppression only in isolation.
 
 ## Assumptions
 
@@ -119,5 +117,11 @@ When Google Play definitively rejects a purchase token (an HTTP 4xx verdict on t
 ### d-3: How do the routers recognise the new outcome?
 
 **Answer:** By a dedicated error type thrown in the verifiers (subclass of StoreVerificationError), following store-purchase-errors.ts's rule of classifying by type, not message text.
+
+**Blocking:** no
+
+### d-4: Should the plan include a manual or post-deploy verification criterion?
+
+**Answer:** No, at operator request. The manual Sentry post-deploy criterion was removed. All remaining criteria are verified by code review of the change and its unit tests.
 
 **Blocking:** no

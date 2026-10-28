@@ -2987,6 +2987,52 @@ describe('SandboxControlV2 cold grant rejection diagnostics', () => {
     expect(JSON.stringify(events)).not.toContain('https://secret.example/leak');
   });
 
+  it('allows GitHub user authorization for an explicitly authorized webhook repository', async () => {
+    const provider = createFakeProvider();
+    const broker = createGrantBroker();
+    const authCalls: Record<string, unknown>[] = [];
+    broker.service.getCloudAgentAuthForRepo = async params => {
+      authCalls.push(params);
+      return { success: false, reason: 'repository_not_installed' };
+    };
+    const stub = await setup(provider, createFakeCredentialBroker(), {
+      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
+    });
+    await installGrantBroker(stub, broker.service);
+    const source: ControlPlaneCredentialSource = {
+      ...credentialsSource(SESSION, {
+        repository: {
+          type: 'github',
+          repo: 'acme/widgets',
+          allowUserAuthorization: true,
+        },
+      }),
+      createdOnPlatform: 'webhook',
+    };
+
+    const capture = captureRouteFailed();
+    const view = await stub.prepare({
+      ...prepareInput(SESSION, source),
+      sandboxSelection: { provider: 'cloudflare', containment: { kilocode: false, github: false } },
+    });
+    capture.forAttempt(failedAttemptId(view));
+    capture.restore();
+
+    expect(view).toEqual({
+      state: 'failed',
+      attemptId: expect.any(String),
+      reason: 'workspace_setup_failed',
+    });
+    expect(authCalls).toHaveLength(1);
+    expect(authCalls[0]).toMatchObject({
+      allowUserAuthorization: true,
+      accessPurpose: 'workflow',
+      orgId: 'org_123',
+      userId: 'user_123',
+      githubRepo: 'acme/widgets',
+    });
+  });
+
   it('maps a contained-off GitHub configuration reason to the configuration phase', async () => {
     const provider = createFakeProvider();
     const broker = createGrantBroker();

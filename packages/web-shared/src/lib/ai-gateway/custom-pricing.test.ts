@@ -11,7 +11,7 @@ import {
   applyCustomPricingToModel,
   calculateCustomCost_mUsd,
 } from './custom-pricing';
-import { CUSTOM_PRICING_FALLBACK_CONFIG } from './custom-pricing.constants';
+import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
 
 jest.mock('@sentry/nextjs', () => ({ captureMessage: jest.fn() }));
 
@@ -47,7 +47,7 @@ const makeUsage = (overrides: Partial<Parameters<typeof calculateCustomCost_mUsd
   ...overrides,
 });
 
-const config = CUSTOM_PRICING_FALLBACK_CONFIG;
+const config = TEST_CUSTOM_PRICING_CONFIG;
 
 describe('custom model pricing', () => {
   test('replaces upstream Gemini 3.8 Flash pricing with the promotional rates', () => {

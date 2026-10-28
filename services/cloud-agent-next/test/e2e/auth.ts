@@ -84,7 +84,7 @@ export function loadRepoEnvFiles(servicePackageDir: string): void {
 export type TestUser = {
   id: string;
   email: string;
-  api_token_pepper: string;
+  api_token_pepper: string | null;
 };
 
 /**
@@ -181,7 +181,7 @@ export async function loadExistingUserByEmail(
     return {
       id: row.id,
       email: row.email ?? email,
-      api_token_pepper: row.api_token_pepper ?? '',
+      api_token_pepper: row.api_token_pepper,
     };
   } finally {
     await driver.pool.end().catch(() => {});
@@ -194,7 +194,7 @@ export type MintedTokens = {
 
 /** Mint the Cloud Agent control token that authorizes local E2E runtime creation. */
 export function mintApiToken(
-  user: { id: string; api_token_pepper?: string },
+  user: { id: string; api_token_pepper?: string | null },
   nextAuthSecret: string | undefined,
   expiresInSeconds = 60 * 60,
   organizationId?: string
@@ -202,7 +202,7 @@ export function mintApiToken(
   if (!nextAuthSecret) {
     throw new Error('mintApiToken requires NEXTAUTH_SECRET for local JWT minting');
   }
-  const pepper = user.api_token_pepper || null;
+  const pepper = user.api_token_pepper ?? null;
   return jwt.sign(
     {
       env: 'development',

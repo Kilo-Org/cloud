@@ -8,6 +8,7 @@ import {
 import { CODE_REVIEW_CONTAINERS_INSTANCE } from '../sandbox-containers/instance-size.js';
 import { z } from 'zod';
 import { AgentSandboxUnavailableError } from '../agent-sandbox/protocol.js';
+import type { RuntimeStartupConfig } from '../shared/runtime-startup-config.js';
 import type { CredentialContainmentRequirements } from './credential-containment.js';
 import type { BillingContext } from '@kilocode/container-usage';
 
@@ -108,6 +109,7 @@ export type ProviderLaunchOptions = {
   /** Start from this snapshot; a provider without snapshot support ignores it. */
   snapshot?: ProviderSnapshotStart;
   deadlineAt?: number;
+  nativeImage?: RuntimeStartupConfig['image'];
 };
 
 export type ProviderLaunchResult = {

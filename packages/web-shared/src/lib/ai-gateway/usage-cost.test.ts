@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from '@jest/globals';
 import { captureMessage } from '@sentry/nextjs';
 import type { CustomPricing, CustomPricingConfig } from '@kilocode/db/schema-types';
-import { CUSTOM_PRICING_FALLBACK_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
 import {
   claude_opus_4_7_stealth_model,
   findKiloExclusiveModel,
@@ -90,7 +90,7 @@ describe('applyUsagePricing', () => {
   test('preserves paid upstream cost and cache discount while recording market cost', () => {
     const usage = makeUsage({ cacheDiscount_mUsd: 12_345 });
 
-    applyUsagePricing(usage, makeContext(), CUSTOM_PRICING_FALLBACK_CONFIG);
+    applyUsagePricing(usage, makeContext(), TEST_CUSTOM_PRICING_CONFIG);
 
     expect(usage).toEqual(makeUsage({ market_cost: 900_000, cacheDiscount_mUsd: 12_345 }));
   });
@@ -98,7 +98,7 @@ describe('applyUsagePricing', () => {
   test('preserves an existing market cost when upstream pricing is unchanged', () => {
     const usage = makeUsage({ market_cost: 1_200_000 });
 
-    applyUsagePricing(usage, makeContext(), CUSTOM_PRICING_FALLBACK_CONFIG);
+    applyUsagePricing(usage, makeContext(), TEST_CUSTOM_PRICING_CONFIG);
 
     expect(usage.market_cost).toBe(1_200_000);
     expect(usage.cost_mUsd).toBe(900_000);
@@ -107,7 +107,7 @@ describe('applyUsagePricing', () => {
   test('does not treat upstream system BYOK as user BYOK', () => {
     const usage = makeUsage({ is_byok: true, cacheDiscount_mUsd: 12_345 });
 
-    applyUsagePricing(usage, makeContext(), CUSTOM_PRICING_FALLBACK_CONFIG);
+    applyUsagePricing(usage, makeContext(), TEST_CUSTOM_PRICING_CONFIG);
 
     expect(usage.cost_mUsd).toBe(900_000);
     expect(usage.cacheDiscount_mUsd).toBe(12_345);
@@ -125,7 +125,7 @@ describe('applyUsagePricing', () => {
     applyUsagePricing(
       usage,
       makeContext({ requested_model: GEMINI_FLASH_CURRENT_MODEL_ID }),
-      CUSTOM_PRICING_FALLBACK_CONFIG
+      TEST_CUSTOM_PRICING_CONFIG
     );
 
     expect(usage.cost_mUsd).toBe(2_419_167);
@@ -144,7 +144,7 @@ describe('applyUsagePricing', () => {
       applyUsagePricing(
         usage,
         makeContext({ requested_model: qwen36_plus_stealth_model.public_id }),
-        CUSTOM_PRICING_FALLBACK_CONFIG
+        TEST_CUSTOM_PRICING_CONFIG
       );
 
       expect(usage.cost_mUsd).toBe(expected);
@@ -159,7 +159,7 @@ describe('applyUsagePricing', () => {
     applyUsagePricing(
       usage,
       makeContext({ requested_model: GEMINI_FLASH_CURRENT_MODEL_ID }),
-      CUSTOM_PRICING_FALLBACK_CONFIG
+      TEST_CUSTOM_PRICING_CONFIG
     );
 
     expect(usage.cost_mUsd).toBe(112_500);
@@ -178,7 +178,7 @@ describe('applyUsagePricing', () => {
       applyUsagePricing(
         usage,
         makeContext({ requested_model: fallbackOnlyModel.public_id }),
-        CUSTOM_PRICING_FALLBACK_CONFIG
+        TEST_CUSTOM_PRICING_CONFIG
       );
 
       expect(usage.cost_mUsd).toBe(expected);
@@ -200,6 +200,32 @@ describe('applyUsagePricing', () => {
       expect(usage.market_cost).toBe(upstreamCost);
     }
   );
+
+  test('charges BYOK non-inference costs on top of exclusive pricing', () => {
+    const usage = makeUsage({ cost_mUsd: 907_000, nonInferenceCost_mUsd: 7000 });
+
+    applyUsagePricing(
+      usage,
+      makeContext({ requested_model: claude_opus_4_7_stealth_model.public_id }),
+      TEST_CUSTOM_PRICING_CONFIG
+    );
+
+    expect(usage.cost_mUsd).toBe(600_000 + 7000);
+    expect(usage.market_cost).toBe(907_000);
+  });
+
+  test('applies fallback-only pricing when only non-inference costs were reported', () => {
+    jest.mocked(findKiloExclusiveModel).mockReturnValueOnce(fallbackOnlyModel);
+    const usage = makeUsage({ cost_mUsd: 7000, nonInferenceCost_mUsd: 7000 });
+
+    applyUsagePricing(
+      usage,
+      makeContext({ requested_model: fallbackOnlyModel.public_id }),
+      TEST_CUSTOM_PRICING_CONFIG
+    );
+
+    expect(usage.cost_mUsd).toBe(600_000 + 7000);
+  });
 
   test('does not apply custom fallback pricing over a positive exclusive price', () => {
     const usage = makeUsage({ cost_mUsd: 0 });
@@ -223,7 +249,7 @@ describe('applyUsagePricing', () => {
     ({ context }) => {
       const usage = makeUsage({ cacheDiscount_mUsd: 12_345 });
 
-      applyUsagePricing(usage, context, CUSTOM_PRICING_FALLBACK_CONFIG);
+      applyUsagePricing(usage, context, TEST_CUSTOM_PRICING_CONFIG);
 
       expect(usage.cost_mUsd).toBe(0);
       expect(usage.cacheDiscount_mUsd).toBe(0);
@@ -237,7 +263,7 @@ describe('applyUsagePricing', () => {
     applyUsagePricing(
       usage,
       makeContext({ requested_model: GEMINI_FLASH_CURRENT_MODEL_ID, is_free: true }),
-      CUSTOM_PRICING_FALLBACK_CONFIG
+      TEST_CUSTOM_PRICING_CONFIG
     );
 
     expect(usage.cost_mUsd).toBe(0);

@@ -2565,4 +2565,137 @@ describe('organization admin router', () => {
       }
     });
   });
+
+  describe('addMember', () => {
+    it('rejects adding someone who is not a parent organization member to a child organization', async () => {
+      const parent = await createTestOrganization(
+        `Add child parent ${crypto.randomUUID()}`,
+        adminUser.id,
+        0
+      );
+      const child = await createTestOrganization(
+        `Add child org ${crypto.randomUUID()}`,
+        adminUser.id,
+        0
+      );
+      const outsider = await insertTestUser();
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+      const caller = await createCallerForUser(adminUser.id);
+
+      await expect(
+        caller.organizations.admin.addMember({
+          organizationId: child.id,
+          userId: outsider.id,
+          role: 'member',
+        })
+      ).rejects.toThrow(
+        'Child organizations can only add people who are already members of the parent organization.'
+      );
+    });
+
+    it('adds a parent organization member to a child organization', async () => {
+      const parent = await createTestOrganization(
+        `Add parent member ${crypto.randomUUID()}`,
+        adminUser.id,
+        0
+      );
+      const child = await createTestOrganization(
+        `Add parent member child ${crypto.randomUUID()}`,
+        adminUser.id,
+        0
+      );
+      const parentMember = await insertTestUser();
+      await addUserToOrganization(parent.id, parentMember.id, 'member');
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+      const caller = await createCallerForUser(adminUser.id);
+
+      await caller.organizations.admin.addMember({
+        organizationId: child.id,
+        userId: parentMember.id,
+        role: 'member',
+      });
+
+      const [membership] = await db
+        .select({ role: organization_memberships.role })
+        .from(organization_memberships)
+        .where(
+          and(
+            eq(organization_memberships.organization_id, child.id),
+            eq(organization_memberships.kilo_user_id, parentMember.id)
+          )
+        );
+      expect(membership?.role).toBe('member');
+    });
+
+    it('rejects adding a parent member after the parent organization is deleted', async () => {
+      const parent = await createTestOrganization(
+        `Deleted parent ${crypto.randomUUID()}`,
+        adminUser.id,
+        0
+      );
+      const child = await createTestOrganization(
+        `Deleted parent child ${crypto.randomUUID()}`,
+        adminUser.id,
+        0
+      );
+      const parentMember = await insertTestUser();
+      await addUserToOrganization(parent.id, parentMember.id, 'member');
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+      await markOrganizationAsDeleted(parent.id);
+      const caller = await createCallerForUser(adminUser.id);
+
+      await expect(
+        caller.organizations.admin.addMember({
+          organizationId: child.id,
+          userId: parentMember.id,
+          role: 'member',
+        })
+      ).rejects.toThrow(
+        'Child organizations can only add people who are already members of the parent organization.'
+      );
+    });
+
+    it('searches only live parent members who are not already in the child organization', async () => {
+      const suffix = crypto.randomUUID();
+      const parent = await createTestOrganization(`Search parent ${suffix}`, adminUser.id, 0);
+      const child = await createTestOrganization(`Search child ${suffix}`, adminUser.id, 0);
+      const match = await insertTestUser({
+        google_user_email: `match-${suffix}@example.com`,
+        google_user_name: `Match ${suffix}`,
+      });
+      const alreadyChild = await insertTestUser({
+        google_user_email: `already-${suffix}@example.com`,
+        google_user_name: `Already ${suffix}`,
+      });
+      const outsider = await insertTestUser({
+        google_user_email: `outsider-${suffix}@example.com`,
+        google_user_name: `Outsider ${suffix}`,
+      });
+      await addUserToOrganization(parent.id, match.id, 'member');
+      await addUserToOrganization(parent.id, alreadyChild.id, 'member');
+      await addUserToOrganization(child.id, alreadyChild.id, 'member');
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: parent.id })
+        .where(eq(organizations.id, child.id));
+      const caller = await createCallerForUser(adminUser.id);
+
+      const result = await caller.organizations.admin.searchParentMembers({
+        organizationId: child.id,
+        search: suffix,
+      });
+
+      expect(result.users.map(user => user.id)).toEqual([match.id]);
+      expect(result.users.map(user => user.id)).not.toContain(outsider.id);
+    });
+  });
 });

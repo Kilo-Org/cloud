@@ -280,7 +280,14 @@ to keep selecting a platform routing mode.
 
 ### Operator commands
 
-Run the migration from the repository root with the approved production credentials available.
+#### Historical pool conversion (before tooling retirement)
+
+The conversion script and its worker endpoint are removed at this revision. The commands below
+document the pre-retirement procedure and require the #7808 cutover revision on `main`
+(`c03b06b1cae03f5f400119133469813bba27ef62`), not this checkout. Do not deploy the retired
+conversion endpoint again after cutover.
+
+From that revision, run from the repository root with approved production credentials.
 The default is read-only; `--apply` is required for conversion.
 
 ```sh
@@ -289,15 +296,20 @@ pnpm --filter auto-routing exec tsx scripts/convert-owner-pools.ts --apply
 pnpm --filter auto-routing exec tsx scripts/convert-owner-pools.ts --dry-run
 ```
 
-The scanner requires `CLOUDFLARE_API_TOKEN` and `INTERNAL_API_SECRET`.
+The historical scanner requires `CLOUDFLARE_API_TOKEN` and `INTERNAL_API_SECRET`.
 Retain every report. Resolve unreadable, invalid, unmatched, missing-owner, collision, and
 router-cap findings before declaring the cohort complete. Interrupted writes retain a recovery
-fence; retry the conversion rather than clearing the fence manually.
+fence; retry the conversion on the pre-retirement deployment rather than clearing the fence manually.
 If a scan response is lost, recover owner keys from the structured
 `auto_routing_owner_pool_conversion_scan` event's `readFailedOwners`, `invalidPoolOwners`,
 `invalidModeOwners`, `needsAttentionOwners`, and `notPostedOwners` arrays before declaring the
 run clean; a retry can skip owners already marked converted.
 `--limit` controls the page size, not the total number of owners.
+
+#### Advance notice (before graduation)
+
+These commands belong to rollout step 4, not tooling retirement. Do not resend the advance
+notice after cutover.
 
 Set `CUTOVER_AT` to a future timestamp with an explicit timezone.
 Set `STATE_DIR` to a private, durable campaign directory outside the checkout.

@@ -3,13 +3,13 @@
 The catalog at runtime-targets.json owns startup mode and native image selection. Its default is
 preinstalled on all-in-one. Named environments inherit that default unless the catalog names them.
 Keep startup variables out of checked-in Wrangler vars. Deployment renders the Worker vars and native
-image from the catalog. Manual mode, descriptor or image drift fails before Wrangler or its custom build.
+images from the catalog. Manual mode, descriptor, cohort or image drift fails before Wrangler or its custom build.
 
 | Mode | Native image | Deployment reference |
 |---|---|---|
 | preinstalled | all-in-one | Existing Dockerfile and pinned build variables |
 | downloaded | all-in-one | Existing Dockerfile, exact-SHA runtime descriptor |
-| downloaded | runtime-free | Verified immutable base digest, exact-SHA runtime descriptor |
+| downloaded | runtime-free | Separate `runtime-free` named image with verified immutable base digest, exact-SHA runtime descriptor |
 
 The runtime-free/preinstalled pair is invalid in the shared configuration schema and the Worker.
 Downloaded startup supports native Cloudflare Containers and BYOC Vercel. SDK pins keep preinstalled startup.
@@ -22,10 +22,31 @@ their installed release until a new allocation starts. Base dependency changes s
 upgrade. Upgrade older BYOC snapshots once before enabling downloaded mode, so they have the required
 fixed Node path. Native image selection does not change the Vercel snapshot.
 
+A downloaded target can scope its startup to an `interactiveOrgIds` list. No committed target uses it yet.
+Deployment renders this list as `RUNTIME_INTERACTIVE_ORG_IDS`.
+A new allocation selects it only when all its preparing routes belong to one listed organization and have
+`createdOnPlatform: cloud-agent-web`. Native allocations must also be isolated; Vercel allocations use
+the same organization rule. Other organizations, personal sessions, non-web sessions, code reviews and
+shared native sandboxes retain preinstalled startup on the unchanged `app` image. SDK pins always stay
+preinstalled. A missing or mixed route identity stays on the baseline. These identity values are rollout
+metadata, not an authorization boundary.
+
+The renderer retains `app` alongside `runtime-free`; the allocation's selected startup mode and image
+are used together, including snapshot fallback. Existing allocations keep their running image and mode.
+An absent `interactiveOrgIds` means deployment-wide startup selection; an empty catalog list is
+rejected. For a complete rollback, remove the production override so it inherits the preinstalled default.
+
+Known limitation: the environment builder always starts the `app` image, so its snapshots never match
+a `runtime-free` allocation. Enrolled organizations cold-start from the image instead of restoring
+builder-produced environment snapshots. Repository snapshots captured by a `runtime-free` container
+still restore. The `Stable base` row covers repository snapshots only.
+
 ## Approval and rollout order
 
-No real target changes in this PR. Publication credentials, trigger enablement and real-provider
-qualification need explicit approval. Use an isolated named environment first. Record its account,
+All committed targets use preinstalled startup on all-in-one. A downloaded catalog entry requires
+`CLOUD_AGENT_RUNTIME_PUBLICATION_ENABLED=true` and a published handoff for the deployed SHA: downloaded
+deployment fails promptly when publication is disabled. Real-provider
+qualification remains required. Use an isolated named environment first. Record its account,
 Worker name, exact source SHA, bucket and instance type before deployment.
 
 1. Provision and enable publication through the process in [runtime-publication.md](runtime-publication.md).
@@ -37,8 +58,8 @@ Worker name, exact source SHA, bucket and instance type before deployment.
    container captures under its start image. B1 is merged into main, and its regression test runs
    in CI.
 4. Approve runtime-free on the same isolated target. Change its catalog image only. Repeat qualification.
-5. Request production approval only after the isolated evidence passes. Production remains preinstalled
-   until that approval and a reviewed catalog change.
+5. Enroll production organizations through `interactiveOrgIds` in a separate reviewed catalog change.
+   Expanding the list or removing the cohort restriction requires qualification evidence.
 
 For a clean checkout, preview deployment preparation without running Wrangler:
 

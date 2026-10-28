@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Չհաջողվեց կապվել օրինակի հետ։ Հնարավոր է՝ այն անջատվել է։",
     "remoteSpawnNonRetryable": "Օրինակը չկարողացավ սկսել նիստը։ Ստուգիր համակարգիչը կամ թարմացրու CLI-ն։",
-    "remoteSpawnInstanceDisconnected": "Ընտրված օրինակն անջատվել է։ Սկսիր նիստ Cloud Agent-ում կամ ընտրիր այլ օրինակ։",
-    "liveCount_one": "{{count}} ԱԿՏԻՎ",
-    "liveCount_other": "{{count}} ԱԿՏԻՎ"
+    "remoteSpawnInstanceDisconnected": "Ընտրված օրինակն անջատվել է։ Սկսիր նիստ Cloud Agent-ում կամ ընտրիր այլ օրինակ։"
   },
   "agentChat": {
     "session": {

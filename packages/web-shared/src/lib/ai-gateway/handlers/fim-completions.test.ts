@@ -11,6 +11,12 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
+import {
+  decide,
+  releaseDecideLease,
+  type DecideResponse,
+} from '@kilocode/web-shared/lib/bouncer/client';
+import { after } from 'next/server';
 
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   INCEPTION_API_KEY: 'system-inception-key',
@@ -20,6 +26,11 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => (
   emitApiMetricsForResponse: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/bouncer/client') as Record<string, unknown>),
+  decide: jest.fn(),
+  releaseDecideLease: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage');
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok');
 jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
@@ -68,6 +79,8 @@ const mockedGetBYOKforUser = jest.mocked(getBYOKforUser);
 const mockedResolveOrganizationMemberModelDecision = jest.mocked(
   resolveOrganizationMemberModelDecision
 );
+const mockedDecide = jest.mocked(decide);
+const mockedReleaseDecideLease = jest.mocked(releaseDecideLease);
 const mockedFetch = jest.fn() as jest.MockedFunction<typeof globalThis.fetch>;
 const originalFetch = globalThis.fetch;
 
@@ -138,6 +151,8 @@ describe('POST /api/fim/completions', () => {
     jest.resetAllMocks();
     globalThis.fetch = mockedFetch;
     mockedLogMicrodollarUsage.mockResolvedValue(null);
+    mockedDecide.mockResolvedValue(null);
+    mockedReleaseDecideLease.mockResolvedValue(undefined);
     mockedResolveOrganizationMemberModelDecision.mockResolvedValue({
       policy: {} as never,
       decision: { allowed: true },
@@ -353,5 +368,84 @@ describe('POST /api/fim/completions', () => {
 
     expect(response.status).toBe(200);
     expect(mockedFetch).toHaveBeenCalledTimes(1);
+  });
+
+  describe('bouncer wiring', () => {
+    function verdict(fields: Partial<DecideResponse>): DecideResponse {
+      return { enforced: false, flags: [], spendWatch: false, ...fields } as DecideResponse;
+    }
+
+    beforeEach(() => {
+      jest.mocked(after).mockImplementation(work => {
+        void (typeof work === 'function' ? work() : work);
+      });
+    });
+
+    it('rejects an enforced verdict before the upstream call', async () => {
+      setOrganizationAuth();
+      mockedDecide.mockResolvedValue(verdict({ enforced: true, code: 'rate_limited' }));
+
+      const { handleFimCompletionsRequest } = await import('./fim-completions');
+      const response = await handleFimCompletionsRequest(makeRequest() as never);
+
+      expect(response.status).toBe(429);
+      expect(mockedFetch).not.toHaveBeenCalled();
+      expect(mockedDecide).toHaveBeenCalledTimes(1);
+    });
+
+    it('sends a shadow verdict and carries its identity and spend watch into usage', async () => {
+      setOrganizationAuth();
+      mockedDecide.mockResolvedValue(
+        verdict({ enforced: false, code: 'restricted', spendWatch: true })
+      );
+      mockedFetch.mockResolvedValue(makeUpstreamResponse());
+
+      const { handleFimCompletionsRequest } = await import('./fim-completions');
+      const response = await handleFimCompletionsRequest(makeRequest() as never);
+
+      expect(response.status).toBe(200);
+      expect(mockedFetch).toHaveBeenCalledTimes(1);
+      expect(mockedDecide).toHaveBeenCalledTimes(1);
+      const decided = mockedDecide.mock.calls[0]?.[0];
+      expect(decided).toMatchObject({
+        tier: 'team',
+        accountId: 'org:org-123',
+        userId: 'user-123',
+        ip: '127.0.0.1',
+      });
+
+      await flushAfter();
+      const [, usageContext] = mockedLogMicrodollarUsage.mock.calls[0];
+      expect(usageContext.bouncer).toEqual({
+        requestId: decided?.requestId,
+        occurredAt: expect.any(Date),
+        accountId: 'org:org-123',
+        clientIp: '127.0.0.1',
+        clientAttributed: false,
+        requestedLogprobs: false,
+        samples: null,
+        promptSimHash: null,
+        spendWatch: true,
+      });
+      expect(mockedReleaseDecideLease).toHaveBeenCalledTimes(1);
+      expect(mockedReleaseDecideLease).toHaveBeenCalledWith({
+        requestId: decided?.requestId,
+        accountId: 'org:org-123',
+      });
+    });
+
+    it('sends the request when decide fails', async () => {
+      setOrganizationAuth();
+      mockedDecide.mockRejectedValue(new Error('bouncer unreachable'));
+      mockedFetch.mockResolvedValue(makeUpstreamResponse());
+
+      const { handleFimCompletionsRequest } = await import('./fim-completions');
+      const response = await handleFimCompletionsRequest(makeRequest() as never);
+
+      expect(response.status).toBe(200);
+      await flushAfter();
+      expect(mockedLogMicrodollarUsage.mock.calls[0]?.[1].bouncer?.spendWatch).toBe(false);
+      expect(mockedReleaseDecideLease).not.toHaveBeenCalled();
+    });
   });
 });

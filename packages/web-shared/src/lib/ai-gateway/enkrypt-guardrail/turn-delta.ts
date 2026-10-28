@@ -29,22 +29,46 @@ function contentTexts(content: unknown): string[] {
   return partTexts(content);
 }
 
+/** `user` text was written or attached by the person; `tool` text came back from a tool. */
+type TurnText = { source: 'user' | 'tool'; text: string };
+
+function userTexts(content: unknown): TurnText[] {
+  return contentTexts(content).map(text => ({ source: 'user', text }));
+}
+
+function toolTexts(content: unknown): TurnText[] {
+  return contentTexts(content).map(text => ({ source: 'tool', text }));
+}
+
 /**
  * `assistant` items end the scanned turn. Their `texts` are results of tools the provider ran
  * inside that assistant turn, which the request replays as input but no earlier request carried.
  */
 type TurnItem =
-  | { kind: 'assistant'; texts: string[] }
-  | { kind: 'input'; texts: string[] }
+  | { kind: 'assistant'; texts: TurnText[] }
+  | { kind: 'input'; texts: TurnText[] }
   | { kind: 'other' };
 
 function chatCompletionsItem(message: unknown): TurnItem {
   if (!isRecord(message)) return { kind: 'other' };
   if (message.role === 'assistant') return { kind: 'assistant', texts: [] };
-  if (message.role === 'user' || message.role === 'tool' || message.role === 'function') {
-    return { kind: 'input', texts: contentTexts(message.content) };
+  if (message.role === 'user') return { kind: 'input', texts: userTexts(message.content) };
+  if (message.role === 'tool' || message.role === 'function') {
+    return { kind: 'input', texts: toolTexts(message.content) };
   }
   return { kind: 'other' };
+}
+
+const ANTHROPIC_TOOL_BLOCK_TYPES = new Set(['tool_result', 'search_result']);
+
+function anthropicUserTexts(content: unknown): TurnText[] {
+  if (!Array.isArray(content)) return userTexts(content);
+  const blocks: unknown[] = content;
+  return blocks.flatMap(block =>
+    isRecord(block) && typeof block.type === 'string' && ANTHROPIC_TOOL_BLOCK_TYPES.has(block.type)
+      ? toolTexts(block)
+      : userTexts(block)
+  );
 }
 
 function messagesItem(message: unknown): TurnItem {
@@ -55,21 +79,21 @@ function messagesItem(message: unknown): TurnItem {
       kind: 'assistant',
       texts: blocks.flatMap(block =>
         isRecord(block) && typeof block.type === 'string' && block.type.endsWith('_tool_result')
-          ? partTexts(block)
+          ? toolTexts(block)
           : []
       ),
     };
   }
-  if (message.role === 'user') return { kind: 'input', texts: contentTexts(message.content) };
+  if (message.role === 'user') return { kind: 'input', texts: anthropicUserTexts(message.content) };
   return { kind: 'other' };
 }
 
-function responsesServerToolTexts(item: Record<string, unknown>): string[] {
-  if (item.type === 'mcp_call' && typeof item.output === 'string') return [item.output];
+function responsesServerToolTexts(item: Record<string, unknown>): TurnText[] {
+  if (item.type === 'mcp_call' && typeof item.output === 'string') return toolTexts(item.output);
   if (item.type === 'file_search_call' && Array.isArray(item.results)) {
     const results: unknown[] = item.results;
     return results.flatMap(result =>
-      isRecord(result) && typeof result.text === 'string' ? [result.text] : []
+      isRecord(result) && typeof result.text === 'string' ? toolTexts(result.text) : []
     );
   }
   return [];
@@ -81,8 +105,8 @@ function responsesItem(item: unknown): TurnItem {
   if (item.role === 'assistant' || type === 'reasoning' || type?.endsWith('_call')) {
     return { kind: 'assistant', texts: responsesServerToolTexts(item) };
   }
-  if (item.role === 'user') return { kind: 'input', texts: contentTexts(item.content) };
-  if (type?.endsWith('_call_output')) return { kind: 'input', texts: contentTexts(item.output) };
+  if (item.role === 'user') return { kind: 'input', texts: userTexts(item.content) };
+  if (type?.endsWith('_call_output')) return { kind: 'input', texts: toolTexts(item.output) };
   return { kind: 'other' };
 }
 
@@ -91,8 +115,11 @@ function responsesItem(item: unknown): TurnItem {
  * oldest first. Assistant items at the very end (an Anthropic prefill) are skipped so they do not
  * hide the user turn that precedes them.
  */
-function textsSinceLastAssistantTurn(items: unknown[], classify: (item: unknown) => TurnItem) {
-  const collected: string[][] = [];
+function textsSinceLastAssistantTurn(
+  items: unknown[],
+  classify: (item: unknown) => TurnItem
+): TurnText[] {
+  const collected: TurnText[][] = [];
   let sawInput = false;
   let inAssistantTurn = false;
   for (let index = items.length - 1; index >= 0; index--) {
@@ -113,11 +140,11 @@ function textsSinceLastAssistantTurn(items: unknown[], classify: (item: unknown)
   return collected.reverse().flat();
 }
 
-function turnDeltaTexts(request: GatewayRequest): string[] {
+function turnDeltaTexts(request: GatewayRequest): TurnText[] {
   const body: unknown = request.body;
   if (!isRecord(body)) return [];
   if (request.kind === 'responses') {
-    if (typeof body.input === 'string') return [body.input];
+    if (typeof body.input === 'string') return userTexts(body.input);
     return Array.isArray(body.input) ? textsSinceLastAssistantTurn(body.input, responsesItem) : [];
   }
   if (!Array.isArray(body.messages)) return [];
@@ -128,12 +155,18 @@ function turnDeltaTexts(request: GatewayRequest): string[] {
 }
 
 /**
- * The new part of the conversation for this turn: the latest user message and the tool results
- * since the last assistant turn, never earlier history or system prompts.
+ * The new part of the conversation for this turn, never earlier history or system prompts: the
+ * latest user message, plus the tool results since the last assistant turn when
+ * `includeToolResults` is set. Without tool results, an agent step that only returns tool output
+ * yields no text and is not scanned.
  */
-export function extractTurnDeltaText(request: GatewayRequest): string {
+export function extractTurnDeltaText(
+  request: GatewayRequest,
+  { includeToolResults }: { includeToolResults: boolean }
+): string {
   return turnDeltaTexts(request)
-    .map(text => text.trim())
+    .filter(({ source }) => includeToolResults || source === 'user')
+    .map(({ text }) => text.trim())
     .filter(text => text.length > 0)
     .join('\n\n');
 }

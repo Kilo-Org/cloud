@@ -2,7 +2,6 @@ import { beforeEach, describe, expect, it } from '@jest/globals';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config, type User } from '@kilocode/db/schema';
 import type { CustomPricingConfig } from '@kilocode/db/schema-types';
-import { CUSTOM_PRICING_FALLBACK_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createCallerForUser } from '@/routers/test-utils';
 
@@ -49,11 +48,10 @@ describe('adminCustomPricingRouter', () => {
     });
   });
 
-  it('returns the in-code fallback when unset', async () => {
+  it('returns null when unset', async () => {
     const caller = await createCallerForUser(admin.id);
     await expect(caller.admin.customPricing.get()).resolves.toEqual({
       config: null,
-      fallback: CUSTOM_PRICING_FALLBACK_CONFIG,
     });
   });
 

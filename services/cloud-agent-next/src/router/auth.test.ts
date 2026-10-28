@@ -163,13 +163,12 @@ describe('scoped Cloud Agent Worker authorization', () => {
       });
     }
   });
-  it('accepts other repositories and models with explicit child opt-in', async () => {
+  it('accepts other repositories and models at the internal boundary', async () => {
     await expect(
       scopedRouter.createCaller(context('internal-fixture')).prepareSession({
         ...input,
         model: 'kilo/other',
         githubRepo: 'acme/other',
-        allowSubagentSessions: true,
       })
     ).resolves.toEqual({ owner: 'owner' });
   });

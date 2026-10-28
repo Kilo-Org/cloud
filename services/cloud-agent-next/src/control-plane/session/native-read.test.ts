@@ -167,7 +167,7 @@ describe('native durable attachment', () => {
   it('reports stopped for a missing registration or a mismatched Kilo session id', async () => {
     const missing = attachmentUnit();
     Object.assign(missing, { registration: null });
-    await expect(missing.nativeSnapshot({})).resolves.toEqual({
+    await expect(missing.nativeSnapshot({ kiloSessionId: KILO_SESSION_ID })).resolves.toEqual({
       oversized: false,
       fence: null,
       events: [],
@@ -210,7 +210,7 @@ describe('native durable attachment', () => {
           if (filters.materialized === undefined && (filters.fromId ?? 0) < 1) yield row;
         },
       };
-      const page = await session.nativeSnapshot({});
+      const page = await session.nativeSnapshot({ kiloSessionId: KILO_SESSION_ID });
       expect(page.oversized).toBe(false);
       expect(page.continuation).toBeUndefined();
       expect(page.events).toHaveLength(1);
@@ -259,7 +259,7 @@ describe('native durable attachment', () => {
         if (filters.materialized === undefined) yield row;
       },
     };
-    const page = await session.nativeSnapshot({});
+    const page = await session.nativeSnapshot({ kiloSessionId: KILO_SESSION_ID });
     expect(page.oversized).toBe(false);
     expect(page.events).toHaveLength(1);
     expect(new TextEncoder().encode(JSON.stringify(page.events[0])).byteLength).toBeGreaterThan(
@@ -272,7 +272,7 @@ describe('native durable attachment', () => {
       ...payload,
       properties: { text: payload.properties.text + 'x' },
     });
-    await expect(session.nativeSnapshot({})).resolves.toEqual({
+    await expect(session.nativeSnapshot({ kiloSessionId: KILO_SESSION_ID })).resolves.toEqual({
       oversized: true,
       fence: 1,
       events: [],
@@ -298,7 +298,7 @@ describe('native durable attachment', () => {
         yield row;
       },
     };
-    await expect(session.nativeSnapshot({})).resolves.toEqual({
+    await expect(session.nativeSnapshot({ kiloSessionId: KILO_SESSION_ID })).resolves.toEqual({
       oversized: true,
       fence: 1,
       events: [],
@@ -319,12 +319,16 @@ describe('native durable attachment', () => {
         { messageId: 'msg_newer', state: 'accepted' },
       ],
     });
-    await expect(session.nativeSnapshot({})).resolves.toMatchObject({ sessionStatus: undefined });
+    await expect(session.nativeSnapshot({ kiloSessionId: KILO_SESSION_ID })).resolves.toMatchObject(
+      { sessionStatus: undefined }
+    );
 
     Object.assign(session, { messages: [{ messageId: 'msg_completed', state: 'completed' }] });
-    await expect(session.nativeSnapshot({})).resolves.toMatchObject({
-      sessionStatus: { type: 'idle' },
-    });
+    await expect(session.nativeSnapshot({ kiloSessionId: KILO_SESSION_ID })).resolves.toMatchObject(
+      {
+        sessionStatus: { type: 'idle' },
+      }
+    );
   });
 
   it('paginates UTF-8 bytes through log, updates and removals with independent exclusive positions', async () => {
@@ -360,7 +364,11 @@ describe('native durable attachment', () => {
     const ids: number[] = [];
     let pages = 0;
     do {
-      const page = await session.nativeSnapshot({ fromId: 3, continuation });
+      const page = await session.nativeSnapshot({
+        fromId: 3,
+        kiloSessionId: KILO_SESSION_ID,
+        continuation,
+      });
       expect(page.oversized).toBe(false);
       expect(page.fence).toBe(6);
       expect(new TextEncoder().encode(JSON.stringify(page)).byteLength).toBeLessThanOrEqual(
@@ -414,7 +422,7 @@ describe('native durable attachment', () => {
     let pages = 0;
     try {
       do {
-        const page = await session.nativeSnapshot({ continuation });
+        const page = await session.nativeSnapshot({ kiloSessionId: KILO_SESSION_ID, continuation });
         expect(page.oversized).toBe(false);
         expect(new TextEncoder().encode(stringify(page)).byteLength).toBeLessThanOrEqual(
           CONTROL_PLANE_NATIVE_SNAPSHOT_MAX_BYTES
@@ -479,7 +487,7 @@ describe('native durable attachment', () => {
             yield* rows.filter(row => row.id > (filters.fromId ?? 0));
         },
       };
-      const page = await session.nativeSnapshot({});
+      const page = await session.nativeSnapshot({ kiloSessionId: KILO_SESSION_ID });
       expect(page.oversized).toBe(false);
       expect(page.events.map(event => event.eventId)).toEqual(rows.slice(0, 2).map(row => row.id));
       expect(page.continuation).toMatchObject({ fromId: rows[1].id });
@@ -487,9 +495,11 @@ describe('native durable attachment', () => {
         new TextEncoder().encode(JSON.stringify({ ...boundary, events: page.events })).byteLength
       ).toBe(CONTROL_PLANE_NATIVE_SNAPSHOT_MAX_BYTES);
       rows[1].payload = rows[1].payload.replace('"text":"', '"text":"x');
-      expect((await session.nativeSnapshot({})).events.map(event => event.eventId)).toEqual([
-        rows[0].id,
-      ]);
+      expect(
+        (await session.nativeSnapshot({ kiloSessionId: KILO_SESSION_ID })).events.map(
+          event => event.eventId
+        )
+      ).toEqual([rows[0].id]);
     }
   );
 });

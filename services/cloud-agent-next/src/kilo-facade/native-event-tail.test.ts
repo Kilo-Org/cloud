@@ -244,6 +244,36 @@ describe('native event tail', () => {
     expect(h.closed()).toBe(true);
   });
 
+  it('counts an in-flight batch against the retained-byte bound', async () => {
+    const h = harness();
+    const result = await openWith(h, async () => ({ kind: 'page', fence: 0, events: [] }));
+    if (result.kind !== 'open') throw new Error('expected an open tail');
+    const blocked = deferred<void>();
+    const frames: string[] = [];
+    const finishes: Array<string | undefined> = [];
+    await result.tail.run({
+      send: async event => {
+        frames.push(event.type);
+        if (event.type !== 'kilo.native.fence') await blocked.promise;
+      },
+      finish: reason => {
+        finishes.push(reason);
+      },
+    });
+    const large = (id: string) =>
+      kilocode('message.part.updated', { part: { id, text: 'x'.repeat(200 * 1024) } });
+
+    h.send(ev(1, 'kilocode', large('prt_in_flight')));
+    await settle();
+    expect(frames).toEqual(['kilo.native.fence', 'message.part.updated']);
+    h.send(ev(2, 'kilocode', large('prt_over_bound')));
+    blocked.resolve();
+    await settle();
+
+    expect(finishes).toEqual(['continuity_unproven']);
+    expect(h.closed()).toBe(true);
+  });
+
   it('stops delivering and closes the socket when cancelled', async () => {
     const h = harness();
     const result = await openWith(h, async () => ({ kind: 'page', fence: 0, events: [] }));

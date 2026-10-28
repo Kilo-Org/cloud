@@ -262,7 +262,9 @@ async function startPreparationFailureSession(): Promise<ActiveSession> {
 }
 
 async function durableSnapshot(stub: DurableObjectStub<SandboxSessionV2>) {
-  return runInDurableObject(stub, instance => instance.nativeSnapshot({}));
+  return runInDurableObject(stub, instance =>
+    instance.nativeSnapshot({ kiloSessionId: qualifiedKiloSessionId })
+  );
 }
 
 async function messageStatus(

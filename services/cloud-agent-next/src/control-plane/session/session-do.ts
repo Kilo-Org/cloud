@@ -1531,16 +1531,11 @@ export class SandboxSessionV2 extends DurableObject<Env> {
    */
   async nativeSnapshot(input: {
     fromId?: number;
-    kiloSessionId?: string;
+    kiloSessionId: string;
     continuation?: NativeSnapshotCursor;
   }): Promise<NativeSnapshot> {
     await this.initialized;
-    if (this.registration === null)
-      return { oversized: false, fence: null, events: [], stopped: true };
-    if (
-      input.kiloSessionId !== undefined &&
-      this.registration.spec.kiloSessionId !== input.kiloSessionId
-    )
+    if (this.registration === null || this.registration.spec.kiloSessionId !== input.kiloSessionId)
       return { oversized: false, fence: null, events: [], stopped: true };
     const kiloSessionId = this.registration.spec.kiloSessionId;
     const fence =

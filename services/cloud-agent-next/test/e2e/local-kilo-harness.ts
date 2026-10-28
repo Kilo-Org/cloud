@@ -142,16 +142,28 @@ export async function createHarness(args: {
   const extraKilos: LocalKilo[] = [];
   const gateTags = new Set<string>();
 
-  const profile = (await createProfile(db.db, { type: 'user', id: user.id }, user.id, run)).id;
-  const server = await startLocalKilo({
-    repo: stack.kiloRepo,
-    bun: stack.bun,
-    home: path.join(out, 'home'),
-    token,
-    web: stack.web,
-    worker: stack.worker,
-    gateway: stack.gateway,
-  });
+  const profile = await createProfile(db.db, { type: 'user', id: user.id }, user.id, run)
+    .then(created => created.id)
+    .catch(async (error: unknown) => {
+      await db.pool.end().catch(() => undefined);
+      throw error;
+    });
+  let server: LocalKilo;
+  try {
+    server = await startLocalKilo({
+      repo: stack.kiloRepo,
+      bun: stack.bun,
+      home: path.join(out, 'home'),
+      token,
+      web: stack.web,
+      worker: stack.worker,
+      gateway: stack.gateway,
+    });
+  } catch (error) {
+    await deleteProfile(db.db, profile, { type: 'user', id: user.id }).catch(() => undefined);
+    await db.pool.end().catch(() => undefined);
+    throw error;
+  }
 
   const client: KiloClient = createKiloClient({
     server,
@@ -313,6 +325,14 @@ export async function createHarness(args: {
     const allDeleted = await deleteOwnedWorkspaces();
     if (allDeleted) {
       await deleteProfile(db.db, profile, { type: 'user', id: user.id }).catch(() => undefined);
+    } else {
+      results.push({
+        name: 'cleanup',
+        status: 'fail',
+        optIn: false,
+        durationMs: 0,
+        detail: `workspaces left behind: ${[...ownedWorkspaces].join(', ')}`,
+      });
     }
     for (const kilo of extraKilos) await kilo.close().catch(() => undefined);
     await server.close().catch(() => undefined);

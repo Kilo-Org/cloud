@@ -11,6 +11,8 @@ import {
 } from './local-kilo-stack.js';
 import { type Scenario } from './local-kilo-scenarios.js';
 
+const ABORT_IDLE_MS = 10_000;
+
 export const turnsScenarios: Scenario[] = [
   {
     name: 'turns.queued',
@@ -49,7 +51,7 @@ export const turnsScenarios: Scenario[] = [
       const started = await h.prompt(
         fixture.session,
         fixture.attachment,
-        '__fake__:slow:20:700',
+        '__fake__:slow:40:700',
         hanging
       );
       assert.equal(started.status, 204);
@@ -64,7 +66,8 @@ export const turnsScenarios: Scenario[] = [
         { method: 'POST' }
       );
       assert.equal(aborted.status, 200);
-      await h.waitIdle(fixture.session, fixture.attachment);
+      // The slow turn streams for about 28 s; idle well before that proves the abort took effect.
+      await h.waitIdle(fixture.session, fixture.attachment, ABORT_IDLE_MS);
       const follow = newMessageId();
       const after = await h.prompt(
         fixture.session,

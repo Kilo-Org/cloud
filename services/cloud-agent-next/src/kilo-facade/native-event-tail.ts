@@ -159,7 +159,9 @@ export async function openNativeEventTail(params: {
   let fenceReady = false;
   let cursor: number | null = null;
   const queue: BufferedFrame[] = [];
-  let queuedBytes = 0;
+  /** Counts queued and in-flight frames, so the retained bound covers a batch awaiting send. */
+  let retainedCount = 0;
+  let retainedBytes = 0;
   let burstRunning = false;
   let opening = true;
   let endBeforeRun = false;
@@ -172,7 +174,8 @@ export async function openNativeEventTail(params: {
     socket?.close();
     socket = null;
     queue.length = 0;
-    queuedBytes = 0;
+    retainedCount = 0;
+    retainedBytes = 0;
   };
 
   const fail = (reason: NativeTailResnapshotReason): void => {
@@ -182,13 +185,19 @@ export async function openNativeEventTail(params: {
   };
 
   const admit = (frame: BufferedFrame): boolean => {
-    if (!canRetainNativeEvent(queue.length, queuedBytes, frame.bytes)) {
+    if (!canRetainNativeEvent(retainedCount, retainedBytes, frame.bytes)) {
       fail('continuity_unproven');
       return false;
     }
     queue.push(frame);
-    queuedBytes += frame.bytes;
+    retainedCount += 1;
+    retainedBytes += frame.bytes;
     return true;
+  };
+
+  const release = (frame: BufferedFrame): void => {
+    retainedCount -= 1;
+    retainedBytes -= frame.bytes;
   };
 
   let identityVerifiedAt: number | null = null;
@@ -220,7 +229,6 @@ export async function openNativeEventTail(params: {
       await delay(NATIVE_DELIVERY_LIMITS.coalesceMs);
       while (!done && queue.length > 0) {
         const batch = queue.splice(0);
-        queuedBytes = 0;
         if (batch.length === 0) break;
         if (!(await revalidateIdentity())) {
           fail('continuity_unproven');
@@ -233,9 +241,13 @@ export async function openNativeEventTail(params: {
             cursor !== null &&
             frame.eventId <= cursor &&
             !frame.materialized
-          )
+          ) {
+            release(frame);
             continue;
+          }
           await sink.send(frame.event);
+          if (done) return;
+          release(frame);
           if (frame.eventId > 0)
             cursor = cursor === null ? frame.eventId : Math.max(cursor, frame.eventId);
         }

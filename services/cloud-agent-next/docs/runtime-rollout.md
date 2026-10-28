@@ -67,9 +67,8 @@ For a clean checkout, preview deployment preparation without running Wrangler:
 
 The generated wrangler.runtime-generated.json stays ignored. Preinstalled preparation requires no runtime
 bucket or registry credentials. Downloaded preparation needs the approved read credentials and exact-SHA
-handoff. Inspect the
-generated image reference and vars before an approved deployment. The existing Worker workflow
-consumes that exact generated config.
+handoff. Inspect the generated image reference and vars before an approved deployment. The existing
+Worker workflow consumes that exact generated config.
 
 ## Required provider evidence
 

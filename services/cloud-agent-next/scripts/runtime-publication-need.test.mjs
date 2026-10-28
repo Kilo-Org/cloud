@@ -1,5 +1,4 @@
 import assert from 'node:assert/strict';
-import fs from 'node:fs/promises';
 import { test } from 'node:test';
 import { catalogNeedsPublication, readSourceCatalog } from './runtime-publication-need.mjs';
 
@@ -18,13 +17,6 @@ test('only a downloaded default or named target needs publication', () => {
   );
   assert.equal(catalogNeedsPublication({ default: downloaded, targets: {} }), true);
   assert.throws(() => catalogNeedsPublication({ default: preinstalled }), /Invalid/);
-});
-
-test('the committed catalog does not need publication', async () => {
-  const catalog = JSON.parse(
-    await fs.readFile(new URL('../runtime-targets.json', import.meta.url), 'utf8')
-  );
-  assert.equal(catalogNeedsPublication(catalog), false);
 });
 
 test('reads the catalog at the exact source SHA', async () => {

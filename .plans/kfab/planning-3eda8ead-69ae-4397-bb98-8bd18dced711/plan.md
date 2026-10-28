@@ -34,6 +34,7 @@ When Google Play definitively rejects the purchase token (HTTP 400, 404 or 410 o
 - Reclassifying the transient 'timeout exceeded when trying to connect' DB class. It intentionally stays a retryable, reported 500.
 - Mobile client retry/terminal-refusal changes. No first-party caller of kiloPass.completePlayPurchase exists in the pinned mobile/web trees.
 - App Store (mapStoreCompletionError) behavior.
+- Manual post-deploy Sentry monitoring as an acceptance criterion (removed at operator request).
 
 ## Approach
 
@@ -68,15 +69,12 @@ When Google Play definitively rejects the purchase token (HTTP 400, 404 or 410 o
 
 **Verification:** Source review
 
-### ac-5: After deploy, KILOCODE-WEB-27WB and KILOCODE-WEB-27WC receive no new events for Google token rejections. Any remaining 27WB events come only from transient or internal classes.
-
-**Verification:** Manual: Review Sentry issues KILOCODE-WEB-27WB and KILOCODE-WEB-27WC in anaconda-nq/kilocode-web for one to two weeks after release
-
 ## Risks
 
 - Classifying a status too broadly could turn a misconfiguration (403 permission denied on the service account) into a silent terminal refusal. This is mitigated by limiting the helper to 400/404/410 and testing 403 explicitly.
 - This change and #9050 can collide if both are implemented separately. This is mitigated by reusing one helper name and checking #9050's state first.
 - The deployed release (e009d438…) differs from the pinned commit. The relevant code matches the pinned file, but the line numbers may drift.
+- With no post-deploy criterion, the plan does not confirm in production that the Sentry noise stops; that confirmation rests on the unit tests alone.
 
 ## Assumptions
 
@@ -95,5 +93,11 @@ When Google Play definitively rejects the purchase token (HTTP 400, 404 or 410 o
 ### d-2: Re-plan independently or align with #9047/#9050?
 
 **Answer:** Align with it. This plan is the kiloPass-only slice of #9050. If #9050 lands first, the work reduces to confirming these criteria and filling any test gaps.
+
+**Blocking:** no
+
+### d-3: Should the plan include manual verification criteria?
+
+**Answer:** No. At operator request, the manual post-deploy Sentry monitoring criterion is removed; all remaining criteria are verified by code or source review.
 
 **Blocking:** no

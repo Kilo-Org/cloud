@@ -1,4 +1,6 @@
 import {
+  WORKSPACE_CONFIGURATION_HEADER,
+  WORKSPACE_CONFIGURATION_VERSION,
   WORKTREE_RUNTIME_HEADER,
   WORKTREE_RUNTIME_VERSION,
 } from '../../../src/shared/control-plane-runtime-contract.js';
@@ -14,6 +16,7 @@ export type FakeWrapperConnectInput = {
   credential: string;
   path?: string;
   runtimeContract?: 'legacy' | 'worktree';
+  workspaceConfiguration?: boolean;
 };
 
 export type FakeWrapperHelloInput = {
@@ -80,6 +83,9 @@ export class FakeWrapper {
         ...(input.runtimeContract === 'legacy'
           ? {}
           : { [WORKTREE_RUNTIME_HEADER]: WORKTREE_RUNTIME_VERSION }),
+        ...(input.workspaceConfiguration
+          ? { [WORKSPACE_CONFIGURATION_HEADER]: WORKSPACE_CONFIGURATION_VERSION }
+          : {}),
       },
     });
     if (response.status !== 101 || !response.webSocket) {

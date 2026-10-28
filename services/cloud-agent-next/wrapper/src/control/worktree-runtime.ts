@@ -30,6 +30,13 @@ import { type WrapperKiloClient } from '../kilo-api.js';
 export type WorktreeKiloAuth = NonNullable<SessionAttachPayload['kilo']>;
 type RuntimeIsolation = 'directory-shared' | 'per-session';
 
+/**
+ * Reserved name of the workspace-owned built-in Cloud Agent MCP server. It
+ * carries a rotating workspace credential, not user configuration, so it is
+ * excluded from workspace-profile MCP sets and from MCP drift comparison.
+ */
+export const WORKSPACE_MCP_SERVER_NAME = 'kilo-cloud-agent';
+
 export type WorktreeKiloRuntime = {
   readonly identity?: SessionRequestIdentity;
   readonly isolation?: RuntimeIsolation;
@@ -126,12 +133,13 @@ export function buildWorktreeKiloEnvironment(
           mcp: {
             ...Object.fromEntries(
               Object.entries(mcp ?? {}).filter(
-                ([name]) => name !== GITHUB_REVIEW_MCP_SERVER_NAME && name !== 'kilo-cloud-agent'
+                ([name]) =>
+                  name !== GITHUB_REVIEW_MCP_SERVER_NAME && name !== WORKSPACE_MCP_SERVER_NAME
               )
             ),
             ...(runtimeConfig?.cloudAgentMcp
               ? {
-                  'kilo-cloud-agent': {
+                  [WORKSPACE_MCP_SERVER_NAME]: {
                     type: 'remote',
                     url: runtimeConfig.cloudAgentMcp.url,
                     oauth: false,

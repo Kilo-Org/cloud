@@ -34,6 +34,53 @@ export function assertCloudAgentIsolatedAllocation(
 
 export const CLOUD_AGENT_MCP_URL = 'https://mcp.kiloapps.io/mcp';
 
+export type WorkspaceMcpBinding = {
+  worktreeId: string;
+  ownerId: string;
+  organizationId: string | null;
+};
+
+const WORKTREE_ID_PREFIX = 'worktree_';
+const WORKSPACE_SESSION_ID_PREFIX = 'workspace_';
+const workspaceSessionIdSchema = z.templateLiteral([WORKSPACE_SESSION_ID_PREFIX, z.uuid()]);
+
+// Worktree creation uses the initial root's UUID. Never elect a replacement sibling.
+export function workspaceMcpAnchorSessionId(
+  scopeId: string | null | undefined,
+  sessionId: string
+): string | undefined {
+  if (scopeId === null || scopeId === undefined || !scopeId.startsWith(WORKTREE_ID_PREFIX)) {
+    return sessionId;
+  }
+  const parsed = workspaceSessionIdSchema.safeParse(
+    `${WORKSPACE_SESSION_ID_PREFIX}${scopeId.slice(WORKTREE_ID_PREFIX.length)}`
+  );
+  return parsed.success ? parsed.data : undefined;
+}
+
+export function isWorkspaceAnchorMetadata(metadata: SessionMetadata | null): boolean {
+  if (metadata === null) return false;
+  const worktreeId = metadata.workspace?.worktreeId;
+  if (worktreeId === undefined) return true;
+  return (
+    worktreeId ===
+    `${WORKTREE_ID_PREFIX}${metadata.identity.sessionId.slice(WORKSPACE_SESSION_ID_PREFIX.length)}`
+  );
+}
+
+function matchesWorkspaceMcpBinding(
+  metadata: SessionMetadata | null,
+  workspace: WorkspaceMcpBinding | undefined
+): boolean {
+  return (
+    workspace === undefined ||
+    (metadata !== null &&
+      metadata.workspace?.worktreeId === workspace.worktreeId &&
+      metadata.identity.userId === workspace.ownerId &&
+      (metadata.identity.orgId ?? null) === workspace.organizationId)
+  );
+}
+
 export function resolveCloudAgentMcpUrl(override?: string): string {
   if (!override) return CLOUD_AGENT_MCP_URL;
   try {
@@ -106,10 +153,12 @@ type ParentAuthorityContext = {
 };
 
 export async function issueCloudAgentMcpGrant(
-  input: ParentAuthorityContext
+  input: ParentAuthorityContext & { workspace?: WorkspaceMcpBinding }
 ): Promise<{ url: string; token: string; expiresAt: number } | undefined> {
   const metadata = await input.metadata();
   if (metadata?.allowSubagentSessions !== true) return undefined;
+  if (!isWorkspaceAnchorMetadata(metadata)) return undefined;
+  if (!matchesWorkspaceMcpBinding(metadata, input.workspace)) return undefined;
   const authorization = RuntimeAuthorizationSchema.parse(await input.authorization());
   const now = Math.floor(Date.now() / 1000);
   const scope: CloudAgentAuthority = {
@@ -131,7 +180,9 @@ export async function issueCloudAgentMcpGrant(
     mode: 'required',
   });
   const current = RuntimeAuthorizationSchema.parse(await input.authorization());
-  assertCloudAgentParentAuthority(await input.metadata(), current, scope);
+  const currentMetadata = await input.metadata();
+  assertCloudAgentParentAuthority(currentMetadata, current, scope);
+  if (!matchesWorkspaceMcpBinding(currentMetadata, input.workspace)) return undefined;
   const { token } = await signModernKiloToken({
     userId: scope.ownerId,
     pepper: verified.claims.apiTokenPepper ?? null,

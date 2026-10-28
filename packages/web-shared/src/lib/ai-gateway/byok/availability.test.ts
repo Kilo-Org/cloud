@@ -2,6 +2,10 @@ import { beforeEach, describe, expect, test } from '@jest/globals';
 import type { StoredModel } from '@kilocode/db';
 import type { StoredModelMap } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import {
+  paidStealthModelFixture,
+  useKiloExclusiveModel,
+} from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getVercelModelsMetadataFromDatabase: jest.fn(),
@@ -16,6 +20,10 @@ import {
   addUserByokAvailability,
   getModelUserByokProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
+
+const EXCLUSIVE_MODEL_ID = paidStealthModelFixture.public_id;
+
+useKiloExclusiveModel();
 
 const mockedGetVercelModelsMetadata = jest.mocked(getVercelModelsMetadataFromDatabase);
 const mockedMapModelIdToVercel = jest.mocked(mapModelIdToVercel);
@@ -45,7 +53,7 @@ const metadata: StoredModelMap = {
   'anthropic/claude-fixture': storedModel('anthropic/claude-fixture', ['anthropic', 'bedrock']),
   'openai/gpt-fixture': storedModel('openai/gpt-fixture', ['openai']),
   'mistral/codestral-fixture': storedModel('mistral/codestral-fixture', ['mistral']),
-  'stealth/qwen3.6-plus': storedModel('stealth/qwen3.6-plus', ['anthropic']),
+  [EXCLUSIVE_MODEL_ID]: storedModel(EXCLUSIVE_MODEL_ID, ['anthropic']),
 };
 
 beforeEach(() => {
@@ -60,7 +68,7 @@ describe('addUserByokAvailability', () => {
       makeModel('anthropic/claude-fixture'),
       makeModel('openai/gpt-fixture'),
       makeModel('mistral/codestral-fixture'),
-      makeModel('stealth/qwen3.6-plus'),
+      makeModel(EXCLUSIVE_MODEL_ID),
       makeModel('absent/model'),
     ];
 
@@ -71,7 +79,7 @@ describe('addUserByokAvailability', () => {
       ['anthropic/claude-fixture', true],
       ['openai/gpt-fixture', false],
       ['mistral/codestral-fixture', true],
-      ['stealth/qwen3.6-plus', false],
+      [EXCLUSIVE_MODEL_ID, false],
       ['absent/model', false],
     ]);
     expect(result.map(model => model.name)).toEqual(models.map(model => model.name));
@@ -80,7 +88,7 @@ describe('addUserByokAvailability', () => {
 
   test('reports no availability when the Vercel metadata is empty', async () => {
     mockedGetVercelModelsMetadata.mockResolvedValue({});
-    const models = [makeModel('anthropic/claude-fixture'), makeModel('stealth/qwen3.6-plus')];
+    const models = [makeModel('anthropic/claude-fixture'), makeModel(EXCLUSIVE_MODEL_ID)];
 
     const result = await addUserByokAvailability(models, ['anthropic']);
 

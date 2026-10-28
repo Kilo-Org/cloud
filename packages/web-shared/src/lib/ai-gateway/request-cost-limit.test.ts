@@ -13,6 +13,10 @@ import { addCacheBreakpoints } from './providers/openrouter/request-helpers';
 import type { GatewayRequest } from './providers/openrouter/types';
 import { getVercelModelIdOverrides } from './providers/vercel/mapModelIdToVercel';
 import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
+import {
+  tieredStealthModelFixture,
+  useKiloExclusiveModel,
+} from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 
 jest.mock('./providers/gateway-models-cache', () => ({
   getOpenRouterModelsMetadataFromDatabase: jest.fn(),
@@ -103,6 +107,8 @@ function mockModels(models: StoredModel[]) {
   });
 }
 describe('request cost admission', () => {
+  useKiloExclusiveModel(tieredStealthModelFixture);
+
   it('fails closed for unknown or incompletely priced routes', async () => {
     await expect(
       enforceRequestCostLimit('2000000', 'missing/model', body, 2_000_000)
@@ -257,7 +263,7 @@ describe('request cost admission', () => {
     };
     const decision = await enforceRequestCostLimitDecision(
       '500000',
-      'stealth/qwen3.6-plus',
+      tieredStealthModelFixture.public_id,
       longRequest,
       2_000_000,
       { id: 'openrouter', userFunded: false }

@@ -12,13 +12,15 @@ import {
   isFreeModelExcludingCustomLlms,
 } from './is-free-model';
 import { getInferenceProviders } from './providers/kilo-exclusive-model';
-import {
-  claude_opus_4_7_stealth_model,
-  claude_sonnet_4_6_stealth_model,
-  claude_opus_4_6_stealth_model,
-} from './kilo-exclusive-models';
 import { gemma_4_26b_a4b_it_free_model } from './kilo-exclusive-models';
 import { getRandomNumber } from './getRandomNumber';
+import {
+  addKiloExclusiveModel,
+  paidStealthModelFixture,
+  useKiloExclusiveModel,
+} from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
+
+useKiloExclusiveModel();
 
 describe('isFreeModelExcludingCustomLlms', () => {
   test('returns a boolean synchronously', () => {
@@ -41,8 +43,7 @@ describe('isFreeModelExcludingCustomLlms', () => {
     test('should return true for OpenRouter stealth alpha models', async () => {
       expect(isFreeModelExcludingCustomLlms('stealth/ox-alpha')).toBe(true);
       expect(isFreeModelExcludingCustomLlms('stealth/other-alpha')).toBe(true);
-      expect(isFreeModelExcludingCustomLlms('stealth/claude-opus-4.7')).toBe(false);
-      expect(isFreeModelExcludingCustomLlms('stealth/qwen3.6-plus')).toBe(false);
+      expect(isFreeModelExcludingCustomLlms(paidStealthModelFixture.public_id)).toBe(false);
       expect(isFreeModelExcludingCustomLlms('openrouter/model-alpha')).toBe(false);
       expect(isFreeModelExcludingCustomLlms('stealth/model-beta')).toBe(false);
     });
@@ -62,15 +63,11 @@ describe('isFreeModelExcludingCustomLlms', () => {
     test.each(['vendor/priced-exclusive:free', 'stealth/priced-exclusive-alpha'])(
       'returns false for priced Kilo exclusive model %s even when its id matches a free pattern',
       modelId => {
-        const pricedModel = {
-          ...claude_opus_4_7_stealth_model,
-          public_id: modelId,
-        };
-        kiloExclusiveModels.push(pricedModel);
+        const remove = addKiloExclusiveModel({ ...paidStealthModelFixture, public_id: modelId });
         try {
           expect(isFreeModelExcludingCustomLlms(modelId)).toBe(false);
         } finally {
-          kiloExclusiveModels.splice(kiloExclusiveModels.indexOf(pricedModel), 1);
+          remove();
         }
       }
     );
@@ -109,15 +106,6 @@ describe('isFreeModelExcludingCustomLlms', () => {
         expect(isFreeModelExcludingCustomLlms(model)).toBe(true);
       }
     );
-
-    test('routes the discounted Claude Opus offering through the stealth provider identity', () => {
-      expect(claude_opus_4_7_stealth_model.inference_providers).toEqual(['stealth']);
-      expect(claude_opus_4_7_stealth_model.public_id).toBe('stealth/claude-opus-4.7');
-      expect(claude_sonnet_4_6_stealth_model.inference_providers).toEqual(['stealth']);
-      expect(claude_sonnet_4_6_stealth_model.public_id).toBe('stealth/claude-sonnet-4.6');
-      expect(claude_opus_4_6_stealth_model.inference_providers).toEqual(['stealth']);
-      expect(claude_opus_4_6_stealth_model.public_id).toBe('stealth/claude-opus-4.6');
-    });
 
     test('all Kilo exclusive models should have either no pricing or valid ordered pricing tiers', () => {
       for (const model of kiloExclusiveModels) {
@@ -210,13 +198,7 @@ describe('isFreeModelExcludingCustomLlms', () => {
 describe('hasBestEffortGuessDataCollectionRequirement', () => {
   test('requires data collection for paid training-enabled offerings', async () => {
     expect(
-      await hasBestEffortGuessDataCollectionRequirement(claude_opus_4_7_stealth_model.public_id)
-    ).toBe(true);
-    expect(
-      await hasBestEffortGuessDataCollectionRequirement(claude_sonnet_4_6_stealth_model.public_id)
-    ).toBe(true);
-    expect(
-      await hasBestEffortGuessDataCollectionRequirement(claude_opus_4_6_stealth_model.public_id)
+      await hasBestEffortGuessDataCollectionRequirement(paidStealthModelFixture.public_id)
     ).toBe(true);
   });
 
@@ -237,9 +219,7 @@ describe('shouldRedactErrorResponse', () => {
   });
 
   test('redacts errors for stealth models regardless of provider', () => {
-    expect(shouldRedactErrorResponse('openrouter', claude_opus_4_7_stealth_model.public_id)).toBe(
-      true
-    );
+    expect(shouldRedactErrorResponse('openrouter', paidStealthModelFixture.public_id)).toBe(true);
   });
 
   test('does not redact errors for regular models and providers', () => {
@@ -257,7 +237,7 @@ describe('shouldRedactModelNameInMicrodollarUsage', () => {
 
   test('redacts model name for stealth models', () => {
     expect(
-      shouldRedactModelNameInMicrodollarUsage('openrouter', claude_opus_4_7_stealth_model.public_id)
+      shouldRedactModelNameInMicrodollarUsage('openrouter', paidStealthModelFixture.public_id)
     ).toBe(true);
   });
 });
@@ -265,7 +245,7 @@ describe('shouldRedactModelNameInMicrodollarUsage', () => {
 describe('getKiloExclusiveInferenceProviders', () => {
   test('returns the stealth provider for stealth exclusives', () => {
     expect([
-      ...(getKiloExclusiveInferenceProviders(claude_opus_4_7_stealth_model.public_id) ?? []),
+      ...(getKiloExclusiveInferenceProviders(paidStealthModelFixture.public_id) ?? []),
     ]).toEqual(['stealth']);
   });
 

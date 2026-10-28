@@ -4,7 +4,6 @@ import {
   getTranscriptionProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
-import { MARTIAN } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/martian';
 import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import { shouldRouteToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
@@ -28,6 +27,10 @@ import {
 import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import type { OpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/types';
 import type { User } from '@kilocode/db/schema';
+import {
+  addKiloExclusiveModel,
+  paidStealthModelFixture,
+} from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModel: jest.fn().mockResolvedValue({ provider: null, model: null }),
@@ -228,19 +231,21 @@ describe('getProvider exclusive model routing', () => {
     expect(result.bypassAccessCheck).toBe(false);
   });
 
-  test.each(kiloExclusiveModels.filter(({ provider }) => provider === MARTIAN))(
-    'does not divert $public_id to Vercel or BYOK',
-    async model => {
+  test('does not divert an exclusive without Vercel routing to Vercel or BYOK', async () => {
+    const removeModel = addKiloExclusiveModel(paidStealthModelFixture);
+    try {
       jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
       jest.mocked(getModelUserByokProviders).mockResolvedValue(['anthropic']);
 
-      const result = await getProvider(providerInput(model.public_id));
+      const result = await getProvider(providerInput(paidStealthModelFixture.public_id));
 
-      expect(result.kind === 'provider' && result.provider).toBe(MARTIAN);
+      expect(result.kind === 'provider' && result.provider).toBe(paidStealthModelFixture.provider);
       expect(shouldRouteToVercel).not.toHaveBeenCalled();
       expect(getModelUserByokProviders).not.toHaveBeenCalled();
+    } finally {
+      removeModel();
     }
-  );
+  });
 
   test.each(kiloExclusiveModels.filter(model => model.flags.includes('vercel-routing')))(
     'preserves Vercel routing eligibility for $public_id',

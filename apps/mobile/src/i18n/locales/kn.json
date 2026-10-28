@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "ಇನ್‌ಸ್ಟನ್ಸ್‌ಗೆ ಸಂಪರ್ಕಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ — ಅದರ ಸಂಪರ್ಕ ಕಡಿತಗೊಂಡಿರಬಹುದು.",
     "remoteSpawnNonRetryable": "ಇನ್‌ಸ್ಟನ್ಸ್‌ಗೆ ಸೆಶನ್ ಪ್ರಾರಂಭಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ — ಯಂತ್ರವನ್ನು ಪರಿಶೀಲಿಸಿ ಅಥವಾ CLI ನವೀಕರಿಸಿ.",
-    "remoteSpawnInstanceDisconnected": "ಆಯ್ಕೆಮಾಡಿದ ಇನ್‌ಸ್ಟನ್ಸ್‌ನ ಸಂಪರ್ಕ ಕಡಿತಗೊಂಡಿದೆ. Cloud Agentನಲ್ಲಿ ಸೆಶನ್ ಪ್ರಾರಂಭಿಸಿ ಅಥವಾ ಮತ್ತೊಂದು ಇನ್‌ಸ್ಟನ್ಸ್ ಆಯ್ಕೆಮಾಡಿ.",
-    "liveCount_one": "{{count}} ನೇರ",
-    "liveCount_other": "{{count}} ನೇರ"
+    "remoteSpawnInstanceDisconnected": "ಆಯ್ಕೆಮಾಡಿದ ಇನ್‌ಸ್ಟನ್ಸ್‌ನ ಸಂಪರ್ಕ ಕಡಿತಗೊಂಡಿದೆ. Cloud Agentನಲ್ಲಿ ಸೆಶನ್ ಪ್ರಾರಂಭಿಸಿ ಅಥವಾ ಮತ್ತೊಂದು ಇನ್‌ಸ್ಟನ್ಸ್ ಆಯ್ಕೆಮಾಡಿ."
   },
   "agentChat": {
     "session": {

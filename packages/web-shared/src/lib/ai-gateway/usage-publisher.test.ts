@@ -68,6 +68,7 @@ const payload: UsageRecordRequest = {
     auto_model: null,
     reasoning_setting: 'medium',
     market_cost: null,
+    non_inference_cost: null,
     is_free: null,
     abuse_delay: null,
     abuse_downgraded_from: null,
@@ -97,13 +98,28 @@ afterEach(() => {
   jest.useRealTimers();
 });
 
-function expectUnavailableWarning(reason: string) {
+function expectUnavailableWarning(
+  reason: string,
+  duplicatePossible = false,
+  configured: { url?: string; secret?: string } = {
+    url: config.USAGE_INGEST_URL,
+    secret: config.USAGE_INGEST_PUBLISH_SECRET,
+  }
+) {
   expect(warn.mock.calls).toEqual([
-    ['usage enqueue unavailable', { usageId: payload.core.id, kind: 'unavailable', reason }],
+    [
+      'usage enqueue unavailable',
+      {
+        usageId: payload.core.id,
+        kind: 'unavailable',
+        reason,
+        ...(duplicatePossible && { duplicate_possible: true }),
+      },
+    ],
   ]);
   const logged = JSON.stringify(warn.mock.calls);
-  expect(logged).not.toContain(config.USAGE_INGEST_URL);
-  expect(logged).not.toContain(config.USAGE_INGEST_PUBLISH_SECRET);
+  if (configured.url) expect(logged).not.toContain(configured.url);
+  if (configured.secret) expect(logged).not.toContain(configured.secret);
   expect(logged).not.toMatch(/Bearer|sensitive|prompt|metadata/);
 }
 
@@ -137,20 +153,33 @@ describe('enqueueUsage', () => {
   });
 
   test.each(['USAGE_INGEST_URL', 'USAGE_INGEST_PUBLISH_SECRET'] as const)(
-    'is disabled without %s and makes no network call',
+    'reports publisher_not_configured without %s and makes no network call',
     async key => {
       config[key] = '';
-      expect(await enqueueUsage(payload)).toEqual({ kind: 'disabled' });
+      expect(await enqueueUsage(payload)).toEqual({
+        kind: 'unavailable',
+        reason: 'publisher_not_configured',
+      });
       expect(mockFetch).not.toHaveBeenCalled();
-      expect(warn).not.toHaveBeenCalled();
+      expectUnavailableWarning('publisher_not_configured');
     }
   );
 
-  test('contains a malformed configured URL through the request failure path', async () => {
-    config.USAGE_INGEST_URL = 'malformed-sensitive-url';
-    expect(await enqueueUsage(payload)).toEqual({ kind: 'unavailable', reason: 'request_failed' });
+  test.each([
+    'malformed-sensitive-url',
+    // `new URL` accepts these as non-http schemes, so only the protocol check rejects them.
+    'localhost:3000/usage',
+    'usage.example.test:8080/usage',
+    'ftp://usage.example.test/usage',
+    'unix:/tmp/usage.sock',
+  ])('treats a non-http publisher URL as an unstarted publication: %s', async value => {
+    config.USAGE_INGEST_URL = value;
+    expect(await enqueueUsage(payload, { retryTransientFailures: true })).toEqual({
+      kind: 'unavailable',
+      reason: 'publisher_not_configured',
+    });
     expect(mockFetch).not.toHaveBeenCalled();
-    expectUnavailableWarning('request_failed');
+    expectUnavailableWarning('publisher_not_configured');
   });
 
   test('uses the configured URL without an additional path, query or fragment policy', async () => {
@@ -187,7 +216,7 @@ describe('enqueueUsage', () => {
       expect(mockFetch).toHaveBeenCalledTimes(1);
       expect(read).not.toHaveBeenCalled();
       if (cancel) expect(cancel).toHaveBeenCalledTimes(1);
-      expectUnavailableWarning(outcome.reason);
+      expectUnavailableWarning(outcome.reason, status >= 500);
     }
   );
 
@@ -209,7 +238,7 @@ describe('enqueueUsage', () => {
       expect(elapsed).toBeLessThan(USAGE_ENQUEUE_TIMEOUT_MS + 1_000);
       expect(requests).toBe(1);
       expect(mockFetch).toHaveBeenCalledTimes(1);
-      expectUnavailableWarning('timeout');
+      expectUnavailableWarning('timeout', true);
     } finally {
       server.closeAllConnections();
       await new Promise<void>((resolve, reject) =>
@@ -228,7 +257,7 @@ describe('enqueueUsage', () => {
       reason: 'request_failed',
     });
     expect(mockFetch).toHaveBeenCalledTimes(1);
-    expectUnavailableWarning('request_failed');
+    expectUnavailableWarning('request_failed', true);
   });
 });
 
@@ -260,6 +289,7 @@ describe('enqueueUsage transient retries', () => {
             usageId: payload.core.id,
             reason: failure === 'network' ? 'request_failed' : `http_${failure}`,
             attempt: 1,
+            ...(failure !== 408 && failure !== 429 && { duplicate_possible: true }),
           },
         ],
       ]);
@@ -284,24 +314,23 @@ describe('enqueueUsage transient retries', () => {
   test.each(['USAGE_INGEST_URL', 'USAGE_INGEST_PUBLISH_SECRET'] as const)(
     'does not attempt or retry missing %s',
     async key => {
+      const configured = { ...config };
       config[key] = '';
       expect(await enqueueUsage(payload, { retryTransientFailures: true })).toEqual({
-        kind: 'disabled',
+        kind: 'unavailable',
+        reason: 'publisher_not_configured',
       });
       expect(mockFetch).not.toHaveBeenCalled();
-      expect(warn).not.toHaveBeenCalled();
+      // Check the value that is still set; the emptied one would match any string.
+      expectUnavailableWarning('publisher_not_configured', false, {
+        url: key === 'USAGE_INGEST_URL' ? undefined : configured.USAGE_INGEST_URL,
+        secret:
+          key === 'USAGE_INGEST_PUBLISH_SECRET'
+            ? undefined
+            : configured.USAGE_INGEST_PUBLISH_SECRET,
+      });
     }
   );
-
-  test('does not retry a malformed URL', async () => {
-    config.USAGE_INGEST_URL = 'sensitive-malformed-url';
-    expect(await enqueueUsage(payload, { retryTransientFailures: true })).toEqual({
-      kind: 'unavailable',
-      reason: 'request_failed',
-    });
-    expect(mockFetch).not.toHaveBeenCalled();
-    expectUnavailableWarning('request_failed');
-  });
 
   test('waits for each backoff boundary before issuing the next fetch', async () => {
     jest.useFakeTimers();
@@ -416,15 +445,30 @@ describe('enqueueUsage transient retries', () => {
     expect(warn.mock.calls).toEqual([
       [
         'usage enqueue retrying',
-        { usageId: payload.core.id, reason: 'request_failed', attempt: 1 },
+        {
+          usageId: payload.core.id,
+          reason: 'request_failed',
+          attempt: 1,
+          duplicate_possible: true,
+        },
       ],
       [
         'usage enqueue retrying',
-        { usageId: payload.core.id, reason: 'request_failed', attempt: 2 },
+        {
+          usageId: payload.core.id,
+          reason: 'request_failed',
+          attempt: 2,
+          duplicate_possible: true,
+        },
       ],
       [
         'usage enqueue unavailable',
-        { usageId: payload.core.id, kind: 'unavailable', reason: 'request_failed' },
+        {
+          usageId: payload.core.id,
+          kind: 'unavailable',
+          reason: 'request_failed',
+          duplicate_possible: true,
+        },
       ],
     ]);
     expect(JSON.stringify(warn.mock.calls)).not.toMatch(/secret|sensitive|prompt|metadata|https/);
@@ -442,7 +486,28 @@ describe('enqueueUsage transient retries', () => {
       usageId: payload.core.id,
       kind: 'unavailable',
       reason: 'http_401',
+      duplicate_possible: true,
     });
+  });
+
+  test('never marks exhausted 408/429 refusals as possible duplicates', async () => {
+    jest.useFakeTimers();
+    mockFetch
+      .mockResolvedValueOnce(new Response(null, { status: 408 }))
+      .mockResolvedValueOnce(new Response(null, { status: 429 }))
+      .mockResolvedValueOnce(new Response(null, { status: 408 }));
+    const result = enqueueUsage(payload, { retryTransientFailures: true });
+    await jest.runAllTimersAsync();
+    expect(await result).toEqual({ kind: 'unavailable', reason: 'http_408' });
+    expect(mockFetch).toHaveBeenCalledTimes(USAGE_ENQUEUE_MAX_ATTEMPTS);
+    expect(warn.mock.calls).toEqual([
+      ['usage enqueue retrying', { usageId: payload.core.id, reason: 'http_408', attempt: 1 }],
+      ['usage enqueue retrying', { usageId: payload.core.id, reason: 'http_429', attempt: 2 }],
+      [
+        'usage enqueue unavailable',
+        { usageId: payload.core.id, kind: 'unavailable', reason: 'http_408' },
+      ],
+    ]);
   });
 
   test.each(['drop', 'timeout'])(
@@ -480,6 +545,7 @@ describe('enqueueUsage transient retries', () => {
           usageId: payload.core.id,
           reason: failure === 'timeout' ? 'timeout' : 'request_failed',
           attempt: 1,
+          duplicate_possible: true,
         });
       } finally {
         server.closeAllConnections();
@@ -518,6 +584,7 @@ describe('enqueueUsage transient retries', () => {
         usageId: payload.core.id,
         kind: 'unavailable',
         reason: 'timeout',
+        duplicate_possible: true,
       });
     } finally {
       server.closeAllConnections();

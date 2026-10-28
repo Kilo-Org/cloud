@@ -17,41 +17,8 @@ import {
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
 } from './kilo-exclusive-models';
-import {
-  gemma_4_26b_a4b_it_free_model,
-  glyph_cluster_stealth_free_model,
-  reflection_beam_free_model,
-} from './kilo-exclusive-models';
+import { gemma_4_26b_a4b_it_free_model } from './kilo-exclusive-models';
 import { getRandomNumber } from './getRandomNumber';
-
-describe('Glyph Cluster', () => {
-  test('is free, stealth, and requires data collection', async () => {
-    const model = glyph_cluster_stealth_free_model;
-    expect(isFreeModelExcludingCustomLlms(model.public_id)).toBe(true);
-    expect(await hasBestEffortGuessDataCollectionRequirement(model.public_id)).toBe(true);
-    expect(shouldRedactModelNameInMicrodollarUsage('vercel', model.public_id)).toBe(true);
-    expect(shouldRedactErrorResponse('vercel', model.public_id)).toBe(true);
-    expect(getInferenceProviders(model)).toEqual([
-      { slug: 'stealth', name: 'Stealth', training: true, retainsPrompts: true },
-    ]);
-  });
-});
-
-describe('Reflection Beam (free)', () => {
-  test('is free, not stealth, requires data collection, and routes only to Reflection', async () => {
-    const model = reflection_beam_free_model;
-    expect(isFreeModelExcludingCustomLlms(model.public_id)).toBe(true);
-    expect(await hasBestEffortGuessDataCollectionRequirement(model.public_id)).toBe(true);
-    expect(shouldRedactModelNameInMicrodollarUsage('vercel', model.public_id)).toBe(false);
-    expect(shouldRedactErrorResponse('vercel', model.public_id)).toBe(false);
-    expect(getInferenceProviders(model)).toEqual([
-      { slug: 'reflection', name: 'REFLECTION', training: true, retainsPrompts: true },
-    ]);
-    expect([...(getKiloExclusiveInferenceProviders(model.public_id) ?? [])]).toEqual([
-      'reflection',
-    ]);
-  });
-});
 
 describe('isFreeModelExcludingCustomLlms', () => {
   test('returns a boolean synchronously', () => {
@@ -126,6 +93,8 @@ describe('isFreeModelExcludingCustomLlms', () => {
       'nex-agi/nex-n2.5-pro:free',
       'stepfun/step-5-preview-free',
       'stealth/cat-jam',
+      'stealth/glyph-cluster',
+      'reflection/beam-free',
     ])('removes %s from exclusive models', modelId => {
       expect(kiloExclusiveModels.some(model => model.public_id === modelId)).toBe(false);
       expect(findKiloExclusiveModel(modelId)).toBeNull();
@@ -295,9 +264,6 @@ describe('shouldRedactModelNameInMicrodollarUsage', () => {
 
 describe('getKiloExclusiveInferenceProviders', () => {
   test('returns the stealth provider for stealth exclusives', () => {
-    expect([
-      ...(getKiloExclusiveInferenceProviders(glyph_cluster_stealth_free_model.public_id) ?? []),
-    ]).toEqual(['stealth']);
     expect([
       ...(getKiloExclusiveInferenceProviders(claude_opus_4_7_stealth_model.public_id) ?? []),
     ]).toEqual(['stealth']);

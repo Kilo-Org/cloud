@@ -26,6 +26,7 @@ import { OrganizationProvidersAndModelsConfigurationCard } from '@/components/or
 import { OrganizationChildOrganizationsCard } from '@/components/organizations/OrganizationChildOrganizationsCard';
 import { OrganizationEmailPreferencesCard } from '@/components/organizations/OrganizationEmailPreferencesCard';
 import { OrgActiveKiloclawsCard } from '@/components/organizations/OrgActiveKiloclawsCard';
+import { OrganizationGuardrailsCard } from '@/components/organizations/guardrails/OrganizationGuardrailsCard';
 import { SupportCard } from '@/components/support/SupportCard';
 
 const DISMISSED_BANNERS_KEY = 'org-welcome-banner-dismissed';
@@ -57,6 +58,7 @@ type Props = {
   role: OrganizationRole;
   topupAmount: number;
   isAutoTopUpEnabled: boolean;
+  isGuardrailsEnabled: boolean;
 };
 
 export function OrganizationDashboard({
@@ -64,6 +66,7 @@ export function OrganizationDashboard({
   role,
   topupAmount,
   isAutoTopUpEnabled,
+  isGuardrailsEnabled,
 }: Props) {
   const [showWelcomeMessage, setShowWelcomeMessage] = useState(false);
   const [showNewOrgWelcome, setShowNewOrgWelcome] = useState(false);
@@ -177,6 +180,9 @@ export function OrganizationDashboard({
                   />
                 )}
               </>
+            )}
+            {isGuardrailsEnabled && (canManageOrganization(currentRole) || isKiloAdmin) && (
+              <OrganizationGuardrailsCard organizationId={organizationId} />
             )}
           </div>
           <div className="space-y-8 lg:col-span-2">

@@ -570,9 +570,10 @@ function repositoryFromSource(
         : {}),
       ...(repository.githubAccessPurpose ? { accessPurpose: repository.githubAccessPurpose } : {}),
       allowUserAuthorization:
-        context.createdOnPlatform === 'cloud-agent-web' ||
-        context.createdOnPlatform === 'agent-manager' ||
-        context.createdOnPlatform === 'slack',
+        repository.allowUserAuthorization ??
+        (context.createdOnPlatform === 'cloud-agent-web' ||
+          context.createdOnPlatform === 'agent-manager' ||
+          context.createdOnPlatform === 'slack'),
     };
   }
   const url = canonicalRepositoryUrl(repository.url, repository.type !== 'git', diagnostic);
@@ -1370,6 +1371,9 @@ function credentialRepositoryFromMetadata(
         ...(repository.githubAccessPurpose
           ? { githubAccessPurpose: repository.githubAccessPurpose }
           : {}),
+        ...(repository.allowUserAuthorization === undefined
+          ? {}
+          : { allowUserAuthorization: repository.allowUserAuthorization }),
       };
     case 'gitlab':
       return {

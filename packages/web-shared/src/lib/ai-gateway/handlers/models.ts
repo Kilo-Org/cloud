@@ -18,6 +18,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-models';
 import { listUsableCustomRouters } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
+import { requestCountryCode } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import {
   getEnkryptBenchmarks,
   publishEnkryptModels,
@@ -59,10 +60,11 @@ async function tryGetUserFromAuth() {
  * Test using:
  * curl -vvv 'http://localhost:3000/api/openrouter/models'
  */
-export async function handleModelsRequest(): Promise<
-  NextResponse<{ error: string; message?: string } | OpenRouterModelsResponse>
-> {
+export async function handleModelsRequest(
+  request: Request
+): Promise<NextResponse<{ error: string; message?: string } | OpenRouterModelsResponse>> {
   const auth = await tryGetUserFromAuth();
+  const countryCode = requestCountryCode(request.headers);
   try {
     const result =
       auth?.organizationId && auth.user
@@ -70,7 +72,7 @@ export async function handleModelsRequest(): Promise<
             auth.organizationId,
             { type: 'member', kiloUserId: auth.user.id },
             'member',
-            readDb
+            { fromDb: readDb, countryCode }
           )
         : null;
     if (result && auth.user && auth.organizationId) {
@@ -84,7 +86,7 @@ export async function handleModelsRequest(): Promise<
       });
     }
 
-    const data = await getEnhancedOpenRouterModels();
+    const data = await getEnhancedOpenRouterModels({ countryCode });
     if (!Array.isArray(data.data)) {
       return NextResponse.json(data);
     }

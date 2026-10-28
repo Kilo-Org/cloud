@@ -429,4 +429,25 @@ describe('custom router tables and statuses (real SQLite)', () => {
     const denied = await app.request(`https://bench.test${PLATFORM_MEASUREMENTS_PATH}`, {}, env);
     expect(denied.status).toBe(401);
   });
+
+  it('omits a ready virtual auto model that a linked entry cannot name', async () => {
+    platformProfile({ engine: ENGINE, status: 'ready', runId: 'platform-ready' });
+    sqlite.exec(`INSERT INTO benchmark_profiles (router, model, variant, engine_identity, repetitions,
+      status, run_id, requested_at, updated_at)
+      VALUES ('efficient', 'kilo-auto/free', '', 'older', 1, 'ready', 'virtual-ready', 'a', 'a')`);
+    const env = {
+      BENCH_DB: db,
+      INTERNAL_API_SECRET_PROD: { get: async () => 'test-secret' },
+    } as unknown as Env;
+    const response = await app.request(
+      `https://bench.test${PLATFORM_MEASUREMENTS_PATH}?router=efficient`,
+      { headers: { authorization: 'Bearer test-secret' } },
+      env
+    );
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({
+      baseRouter: 'efficient',
+      models: [{ model: 'vendor/gw', variants: [null] }],
+    });
+  });
 });

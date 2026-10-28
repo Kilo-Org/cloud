@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "انسٹنس سے رابطہ نہیں ہو سکا — ممکن ہے وہ منقطع ہو گئی ہو۔",
     "remoteSpawnNonRetryable": "انسٹنس سیشن شروع نہیں کر سکی — مشین چیک کریں یا CLI اپ ڈیٹ کریں۔",
-    "remoteSpawnInstanceDisconnected": "منتخب انسٹنس منقطع ہو گئی۔ Cloud Agent پر سیشن شروع کریں یا کوئی دوسری انسٹنس منتخب کریں۔",
-    "liveCount_one": "{{count}} لائیو",
-    "liveCount_other": "{{count}} لائیو"
+    "remoteSpawnInstanceDisconnected": "منتخب انسٹنس منقطع ہو گئی۔ Cloud Agent پر سیشن شروع کریں یا کوئی دوسری انسٹنس منتخب کریں۔"
   },
   "agentChat": {
     "session": {

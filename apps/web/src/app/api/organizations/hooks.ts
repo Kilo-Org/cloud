@@ -372,6 +372,20 @@ export function useUpdateSuppressTrialMessaging() {
   );
 }
 
+export function useUpdateKiloEncrypt() {
+  const trpc = useTRPC();
+  const invalidate = useInvalidateAllOrganizationData();
+  const queryClient = useQueryClient();
+  return useMutation(
+    trpc.organizations.admin.updateKiloEncrypt.mutationOptions({
+      onSuccess: () => {
+        void queryClient.invalidateQueries({ queryKey: ['admin-organizations'] });
+        void invalidate();
+      },
+    })
+  );
+}
+
 export function useUpdateMinimumBalanceAlert() {
   const trpc = useTRPC();
   const queryClient = useQueryClient();

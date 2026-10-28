@@ -76,8 +76,6 @@ describe('Cloud Agent MCP authority', () => {
 
   it.each([
     { githubRepo: 'Other-Owner/Another_Repo', model: 'other-provider/another-model' },
-    { allowSubagentSessions: true },
-    { allowSubagentSessions: false },
     { callbackTarget: { url: 'session:parent' } },
     {
       variant: 'high',
@@ -115,7 +113,7 @@ describe('Cloud Agent MCP authority', () => {
     await callCatalogEndpoint({
       catalog,
       path: cloudAgentAuthorityProcedure(organizationScope),
-      input: { ...launch, organizationId, allowSubagentSessions: true },
+      input: { ...launch, organizationId },
       auth: organizationAuth,
       webBaseUrl: 'https://fixture.invalid',
       fetchImpl,
@@ -149,7 +147,8 @@ describe('Cloud Agent MCP authority', () => {
     },
     { path: 'cloudAgentNext.prepareSession', input: { ...launch, autoInitiate: false } },
     { path: 'cloudAgentNext.prepareSession', input: { ...launch, organizationId: 'other-org' } },
-    { path: 'cloudAgentNext.prepareSession', input: { ...launch, allowSubagentSessions: 'true' } },
+    { path: 'cloudAgentNext.prepareSession', input: { ...launch, allowSubagentSessions: true } },
+    { path: 'cloudAgentNext.prepareSession', input: { ...launch, allowSubagentSessions: false } },
     { path: 'cloudAgentNext.prepareSession', input: { ...launch, profileId: 'profile' } },
     { path: 'cloudAgentNext.prepareSession', input: { ...launch, mcpServers: {} } },
     { path: 'cloudAgentNext.prepareSession', input: { ...launch, cloudAgentSpawn: scope } },
@@ -269,7 +268,6 @@ describe('Cloud Agent MCP authority', () => {
       properties: {
         githubRepo: { type: 'string' },
         model: { type: 'string' },
-        allowSubagentSessions: { type: 'boolean' },
       },
       required: expect.arrayContaining(['githubRepo', 'model', 'autoInitiate']),
       additionalProperties: false,
@@ -277,6 +275,7 @@ describe('Cloud Agent MCP authority', () => {
     expect(outcome.results[0].inputSchema).not.toHaveProperty(
       'properties.parentCloudAgentSessionId'
     );
+    expect(outcome.results[0].inputSchema).not.toHaveProperty('properties.allowSubagentSessions');
     expect(outcome.results[0].inputSchema).not.toHaveProperty('properties.githubRepo.enum');
     expect(outcome.results[0].inputSchema).not.toHaveProperty('properties.model.enum');
   });

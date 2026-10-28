@@ -235,8 +235,13 @@ async function waitForAfterTask() {
 }
 
 describe('handleGitHubWebhook', () => {
+  let now = Date.UTC(2026, 0, 1);
+
   beforeEach(() => {
     jest.clearAllMocks();
+    // Each test starts a fresh alarm window for the missing-secret report.
+    now += 60_000;
+    jest.spyOn(Date, 'now').mockImplementation(() => now);
     mockGetIntegrationForOrganization.mockResolvedValue(integration);
     mockVerifyGitHubWebhookSignature.mockReturnValue('valid');
     mockFindIntegrationByInstallationId.mockResolvedValue(integration);
@@ -530,6 +535,50 @@ describe('handleGitHubWebhook', () => {
 
     expect(unconfigured.status).toBe(invalid.status);
     expect(await unconfigured.text()).toBe(await invalid.text());
+  });
+
+  it('reports the absent app secret once a minute while refusing every delivery', async () => {
+    mockVerifyGitHubWebhookSignature.mockReturnValue('unconfigured');
+
+    const first = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', pullRequestPayload()),
+      'standard'
+    );
+    const second = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', pullRequestPayload()),
+      'standard'
+    );
+
+    expect(first.status).toBe(401);
+    expect(second.status).toBe(401);
+    expect(captureException).toHaveBeenCalledTimes(1);
+
+    now += 60_000;
+    const third = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', pullRequestPayload()),
+      'standard'
+    );
+
+    expect(third.status).toBe(401);
+    expect(captureException).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps a separate alarm window per app type', async () => {
+    mockVerifyGitHubWebhookSignature.mockReturnValue('unconfigured');
+
+    await handleGitHubWebhook(signedGitHubRequest('pull_request', pullRequestPayload()), 'lite');
+    await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', pullRequestPayload()),
+      'standard'
+    );
+
+    expect(captureException).toHaveBeenCalledTimes(2);
+    expect(captureException).toHaveBeenNthCalledWith(1, expect.any(Error), {
+      tags: { source: 'github_lite_webhook_signature', app: 'lite' },
+    });
+    expect(captureException).toHaveBeenNthCalledWith(2, expect.any(Error), {
+      tags: { source: 'github_webhook_signature', app: 'standard' },
+    });
   });
 
   it('routes pull_request_review_comment created events to review memory feedback', async () => {

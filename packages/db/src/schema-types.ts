@@ -2473,6 +2473,11 @@ export const CustomLlmPublicSchema = z.object({
 
 export type CustomLlmPublic = z.infer<typeof CustomLlmPublicSchema>;
 
+/** An ISO 3166-1 alpha-2 code as sent in Vercel's `x-vercel-ip-country` header. */
+export const VercelCountryCodeSchema = z
+  .string()
+  .regex(/^[A-Z]{2}$/, 'must be an uppercase two-letter country code such as "US"');
+
 export const CustomLlmDefinitionSchema = z
   .object({
     ...CustomLlmMetadataSchema.shape,
@@ -2482,6 +2487,9 @@ export const CustomLlmDefinitionSchema = z
     organization_ids: z.array(z.uuid()).optional(),
     group_ids: z.array(z.uuid()).optional(),
     public: CustomLlmPublicSchema.optional(),
+    /** Hidden from model lists and refused by the gateway for requests from these countries.
+     * A request without a known country is not restricted. */
+    country_deny_list: z.array(VercelCountryCodeSchema).optional(),
   })
   .superRefine((definition, ctx) => {
     const clientApiKind = getCustomLlmClientApiKind(definition.opencode_settings?.ai_sdk_provider);

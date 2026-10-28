@@ -36,6 +36,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/build-direct-provider';
 import { getGoogleServiceAccountAccessToken } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/google-service-account';
 import { userHasCustomLlmAccess } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/access';
+import { isCustomLlmDeniedInCountry } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
@@ -152,14 +153,19 @@ async function resolveCustomLlmAuth(
 }
 
 /**
- * A custom LLM owns its id: a caller without access, or a definition with
- * unusable credentials, must not fall back to another upstream for the same id.
+ * A custom LLM owns its id: a caller without access, including one from a
+ * denied country, or a definition with unusable credentials, must not fall back
+ * to another upstream for the same id.
  */
 async function resolveCustomLlmProvider(
   customLlm: CustomLlm,
   user: User | AnonymousUserContext,
-  organizationId: string | undefined
+  organizationId: string | undefined,
+  countryCode: string | null
 ): Promise<GetProviderResult> {
+  if (isCustomLlmDeniedInCountry(customLlm.definition, countryCode)) {
+    return { kind: 'custom-llm-unavailable' };
+  }
   if (!(await isEligibleForCustomLlm(customLlm, user, organizationId))) {
     return { kind: 'custom-llm-unavailable' };
   }
@@ -234,6 +240,8 @@ export type GetProviderInput = {
   /** The request carries a spend ceiling. Only a provider that can cap the
    * price of the route it serves may take it. */
   boundedSpending?: boolean;
+  /** The caller's Vercel IP country, for custom LLM country deny lists. */
+  countryCode?: string | null;
 };
 
 export async function getProvider(input: GetProviderInput): Promise<GetProviderResult> {
@@ -245,6 +253,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     botId,
     getRoutingProviderConfig,
     boundedSpending = false,
+    countryCode = null,
   } = input;
 
   if (isLocalFakeLlmEnabled() && isLocalFakeDeterministicModel(requestedModel)) {
@@ -262,7 +271,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
 
   const customLlm = await findCustomLlm(requestedModel);
   if (customLlm) {
-    return await resolveCustomLlmProvider(customLlm, user, organizationId);
+    return await resolveCustomLlmProvider(customLlm, user, organizationId, countryCode);
   }
 
   const directByokByok = await checkDirectBYOK(user, requestedModel, request, organizationId);

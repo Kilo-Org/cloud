@@ -3,6 +3,7 @@ import { withLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/provider
 import { orderOpenCodeSettings } from './order-opencode-variants';
 import { hasCustomLlmAccess } from './access';
 import { fetchCustomLlmsFromDatabase, isPublicCustomLlm } from './custom-llm-catalog';
+import { isCustomLlmDeniedInCountry } from './country-deny-list';
 
 const PRIVATE_CUSTOM_LLM_DESCRIPTION =
   'Access to this model was granted by a Kilo admin. This model has no availability or data retention guarantees. Do not use for mission critical workloads. Existence of the model may be confidential.';
@@ -51,12 +52,17 @@ export function convertCustomLlmToCatalogModel(publicId: string, model: CustomLl
 
 /** Non-public custom LLMs granted to the organization or one of the groups.
  * Public custom LLMs are part of the regular gateway catalog. */
-export async function listAvailableCustomLlms(organizationId: string, groupIds: readonly string[]) {
+export async function listAvailableCustomLlms(
+  organizationId: string,
+  groupIds: readonly string[],
+  countryCode: string | null
+) {
   return (await fetchCustomLlmsFromDatabase())
     .filter(
       row =>
         !isPublicCustomLlm(row.definition) &&
-        hasCustomLlmAccess(row.definition, organizationId, groupIds)
+        hasCustomLlmAccess(row.definition, organizationId, groupIds) &&
+        !isCustomLlmDeniedInCountry(row.definition, countryCode)
     )
     .map(row => convertCustomLlmToCatalogModel(row.public_id, row.definition));
 }

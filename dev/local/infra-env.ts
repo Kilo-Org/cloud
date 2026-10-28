@@ -90,6 +90,9 @@ export function buildAppEnv(ports: Record<string, number>): Record<string, strin
 
 const DEV_BYOK_KMS_SERVICE_TOKEN = 'dev-byok-kms-token';
 
+/** Keys whose blank placeholder in `.env.local.example` is filled in rather than treated as an override. */
+const FILL_WHEN_EMPTY = new Set(['BYOK_KMS_SERVICE_URL']);
+
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
 /** True when both values already name the same host and port. */
@@ -136,7 +139,7 @@ export function applyAppEnv(
     }
     const current = match[1].trim().replace(/^["']|["']$/g, '');
     if (sameEndpoint(current, value)) continue;
-    if (current !== '' && !isLocalHostUrl(current)) {
+    if (!isLocalHostUrl(current) && !(current === '' && FILL_WHEN_EMPTY.has(key))) {
       kept.push(key);
       continue;
     }

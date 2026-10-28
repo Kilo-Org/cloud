@@ -50,6 +50,43 @@ async function sendToKms(config: ByokKmsClientConfig, url: string, init: Request
   return response.json();
 }
 
+export type ByokDataKey = z.infer<typeof CreatedDataKeySchema>;
+
+/**
+ * Requests a data key bound to `context`. The request carries identifiers only, never
+ * the plaintext, so callers can issue it before the secret is available (for example
+ * ahead of a database transaction) and encrypt later with `encryptByokWithDataKey`.
+ */
+export async function createByokDataKey({
+  context,
+  actorUserId,
+}: {
+  context: ByokKmsContext;
+  actorUserId: string;
+}): Promise<ByokDataKey | null> {
+  const config = getByokKmsClientConfig();
+  if (!config) return null;
+
+  return CreatedDataKeySchema.parse(
+    await sendToKms(config, `${config.url}/data-key`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ ...context, actor_user_id: actorUserId }),
+    })
+  );
+}
+
+export function encryptByokWithDataKey(apiKey: string, dataKey: ByokDataKey): BYOKApiKeyEnvelope {
+  return {
+    encrypted_data: encryptApiKey(apiKey, dataKey.data_key),
+    wrapped_dek: dataKey.wrapped_dek,
+    kms_key_id: dataKey.kms_key_id,
+    kms_key_version: dataKey.kms_key_version,
+    algorithm: 'aes-256-gcm',
+    envelope_version: 1,
+  };
+}
+
 export async function encryptByokForStorage({
   apiKey,
   context,
@@ -59,25 +96,8 @@ export async function encryptByokForStorage({
   context: ByokKmsContext;
   actorUserId: string;
 }): Promise<BYOKApiKeyEnvelope | null> {
-  const config = getByokKmsClientConfig();
-  if (!config) return null;
-
-  const created = CreatedDataKeySchema.parse(
-    await sendToKms(config, `${config.url}/data-key`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ...context, actor_user_id: actorUserId }),
-    })
-  );
-
-  return {
-    encrypted_data: encryptApiKey(apiKey, created.data_key),
-    wrapped_dek: created.wrapped_dek,
-    kms_key_id: created.kms_key_id,
-    kms_key_version: created.kms_key_version,
-    algorithm: 'aes-256-gcm',
-    envelope_version: 1,
-  };
+  const dataKey = await createByokDataKey({ context, actorUserId });
+  return dataKey ? encryptByokWithDataKey(apiKey, dataKey) : null;
 }
 
 export async function decryptByokEnvelope(

@@ -1,6 +1,7 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
+import { randomBytes } from 'node:crypto';
 import { generateText } from 'ai';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { decryptApiKey, encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
@@ -76,6 +77,61 @@ async function insertInventory(
     .returning();
   return row;
 }
+
+function mockKms() {
+  const originalUrl = process.env.BYOK_KMS_SERVICE_URL;
+  const originalToken = process.env.BYOK_KMS_SERVICE_TOKEN;
+  const originalFetch = global.fetch;
+  const dataKeys: string[] = [];
+  const probe: { onRequest?: () => Promise<void> } = {};
+  process.env.BYOK_KMS_SERVICE_URL = 'http://kms.test';
+  process.env.BYOK_KMS_SERVICE_TOKEN = 'token';
+  const fetchMock = jest.fn(async () => {
+    await probe.onRequest?.();
+    const data_key = randomBytes(32).toString('base64');
+    dataKeys.push(data_key);
+    return Response.json({
+      data_key,
+      wrapped_dek: 'wrapped',
+      kms_key_id: 'alias/test',
+      kms_key_version: '1',
+    });
+  });
+  global.fetch = fetchMock as unknown as typeof fetch;
+  return {
+    fetchMock,
+    dataKeys,
+    probe,
+    restore() {
+      if (originalUrl === undefined) delete process.env.BYOK_KMS_SERVICE_URL;
+      else process.env.BYOK_KMS_SERVICE_URL = originalUrl;
+      if (originalToken === undefined) delete process.env.BYOK_KMS_SERVICE_TOKEN;
+      else process.env.BYOK_KMS_SERVICE_TOKEN = originalToken;
+      global.fetch = originalFetch;
+    },
+  };
+}
+
+async function isRowLocked(
+  table: 'coding_plan_key_inventory' | 'coding_plan_subscriptions',
+  id: string
+) {
+  try {
+    await db.execute(sql`SELECT id FROM ${sql.identifier(table)} WHERE id = ${id} FOR UPDATE NOWAIT`);
+    return false;
+  } catch {
+    return true;
+  }
+}
+
+const STALE_ENVELOPE = {
+  encrypted_data: encryptApiKey('stale-secret', randomBytes(32).toString('base64')),
+  wrapped_dek: 'stale-wrapped',
+  kms_key_id: 'alias/stale',
+  kms_key_version: '0',
+  algorithm: 'aes-256-gcm' as const,
+  envelope_version: 1 as const,
+};
 
 function emptyInsightPlan(planId: string) {
   return {
@@ -1702,6 +1758,214 @@ describe('coding plans router', () => {
       status: 'available',
       credential_fingerprint: codingPlanCredentialFingerprint('already-present-key'),
     });
+  });
+
+  it('writes a fresh envelope alongside the legacy key when replacing an assigned credential', async () => {
+    const kms = mockKms();
+    try {
+      const admin = await insertTestUser({ is_admin: true });
+      const user = await insertTestUser();
+      const assigned = await insertInventory({
+        encrypted_api_key: encryptApiKey('assigned-old-secret', BYOK_ENCRYPTION_KEY),
+        credential_fingerprint: codingPlanCredentialFingerprint('assigned-old-secret'),
+        status: 'assigned',
+        assigned_to_user_id: user.id,
+      });
+      const [installedByok] = await db
+        .insert(byok_api_keys)
+        .values({
+          kilo_user_id: user.id,
+          organization_id: null,
+          provider_id: 'minimax',
+          encrypted_api_key: encryptApiKey('assigned-old-secret', BYOK_ENCRYPTION_KEY),
+          encrypted_api_key_envelope: STALE_ENVELOPE,
+          management_source: 'coding_plan',
+          created_by: user.id,
+        })
+        .returning();
+      await db.insert(coding_plan_subscriptions).values(
+        subscriptionValues(user.id, {
+          key_inventory_id: assigned.id,
+          installed_byok_key_id: installedByok.id,
+          status: 'active',
+        })
+      );
+      const caller = await createCallerForUser(admin.id);
+      const lockedDuringKms: boolean[] = [];
+      kms.probe.onRequest = async () => {
+        lockedDuringKms.push(await isRowLocked('coding_plan_key_inventory', assigned.id));
+      };
+
+      mockedGenerateText.mockResolvedValueOnce({ finishReason: 'stop' } as never);
+      await caller.codingPlans.adminReplaceInventoryCredential({
+        inventoryKeyId: assigned.id,
+        apiKey: 'assigned-replacement-key',
+      });
+
+      expect(lockedDuringKms).toEqual([false]);
+
+      const [replacedByok] = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.id, installedByok.id));
+      expect(decryptApiKey(replacedByok.encrypted_api_key, BYOK_ENCRYPTION_KEY)).toBe(
+        'assigned-replacement-key'
+      );
+      expect(replacedByok.encrypted_api_key_envelope).toMatchObject({
+        wrapped_dek: 'wrapped',
+        kms_key_id: 'alias/test',
+      });
+      expect(
+        decryptApiKey(replacedByok.encrypted_api_key_envelope!.encrypted_data, kms.dataKeys[0])
+      ).toBe('assigned-replacement-key');
+      expect(kms.fetchMock).toHaveBeenCalledTimes(1);
+      const [, init] = kms.fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+      expect(JSON.parse(String(init.body))).toEqual({
+        key_id: installedByok.id,
+        actor_user_id: admin.id,
+        owner_type: 'user',
+        owner_id: user.id,
+        provider_id: 'minimax',
+      });
+    } finally {
+      kms.restore();
+    }
+  });
+
+  it('writes a fresh envelope alongside the legacy key when reassigning a subscription credential', async () => {
+    const kms = mockKms();
+    try {
+      const admin = await insertTestUser({ is_admin: true });
+      const user = await insertTestUser();
+      const previous = await insertInventory({
+        encrypted_api_key: encryptApiKey('previous-secret', BYOK_ENCRYPTION_KEY),
+        credential_fingerprint: codingPlanCredentialFingerprint('previous-secret'),
+        status: 'assigned',
+        assigned_to_user_id: user.id,
+      });
+      await insertInventory({
+        encrypted_api_key: encryptApiKey('pooled-secret', BYOK_ENCRYPTION_KEY),
+        credential_fingerprint: codingPlanCredentialFingerprint('pooled-secret'),
+      });
+      const [installedByok] = await db
+        .insert(byok_api_keys)
+        .values({
+          kilo_user_id: user.id,
+          organization_id: null,
+          provider_id: 'minimax',
+          encrypted_api_key: encryptApiKey('previous-secret', BYOK_ENCRYPTION_KEY),
+          encrypted_api_key_envelope: STALE_ENVELOPE,
+          management_source: 'coding_plan',
+          created_by: user.id,
+        })
+        .returning();
+      const [subscription] = await db
+        .insert(coding_plan_subscriptions)
+        .values(
+          subscriptionValues(user.id, {
+            key_inventory_id: previous.id,
+            installed_byok_key_id: installedByok.id,
+            status: 'active',
+          })
+        )
+        .returning();
+      const caller = await createCallerForUser(admin.id);
+      const lockedDuringKms: boolean[] = [];
+      kms.probe.onRequest = async () => {
+        lockedDuringKms.push(
+          (await isRowLocked('coding_plan_subscriptions', subscription.id)) ||
+            (await isRowLocked('coding_plan_key_inventory', previous.id))
+        );
+      };
+
+      await caller.codingPlans.adminReassignSubscriptionCredential({
+        subscriptionId: subscription.id,
+      });
+
+      expect(lockedDuringKms).toEqual([false]);
+
+      const [reassignedByok] = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.id, installedByok.id));
+      expect(decryptApiKey(reassignedByok.encrypted_api_key, BYOK_ENCRYPTION_KEY)).toBe(
+        'pooled-secret'
+      );
+      expect(reassignedByok.encrypted_api_key_envelope).toMatchObject({
+        wrapped_dek: 'wrapped',
+        kms_key_id: 'alias/test',
+      });
+      expect(
+        decryptApiKey(reassignedByok.encrypted_api_key_envelope!.encrypted_data, kms.dataKeys[0])
+      ).toBe('pooled-secret');
+      const [, init] = kms.fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+      expect(JSON.parse(String(init.body))).toEqual({
+        key_id: installedByok.id,
+        actor_user_id: admin.id,
+        owner_type: 'user',
+        owner_id: user.id,
+        provider_id: 'minimax',
+      });
+    } finally {
+      kms.restore();
+    }
+  });
+
+  it('clears a stale envelope when reassigning without the KMS service configured', async () => {
+    const originalUrl = process.env.BYOK_KMS_SERVICE_URL;
+    delete process.env.BYOK_KMS_SERVICE_URL;
+    try {
+      const admin = await insertTestUser({ is_admin: true });
+      const user = await insertTestUser();
+      const previous = await insertInventory({
+        encrypted_api_key: encryptApiKey('previous-secret', BYOK_ENCRYPTION_KEY),
+        credential_fingerprint: codingPlanCredentialFingerprint('previous-secret'),
+        status: 'assigned',
+        assigned_to_user_id: user.id,
+      });
+      await insertInventory({
+        encrypted_api_key: encryptApiKey('pooled-secret', BYOK_ENCRYPTION_KEY),
+        credential_fingerprint: codingPlanCredentialFingerprint('pooled-secret'),
+      });
+      const [installedByok] = await db
+        .insert(byok_api_keys)
+        .values({
+          kilo_user_id: user.id,
+          organization_id: null,
+          provider_id: 'minimax',
+          encrypted_api_key: encryptApiKey('previous-secret', BYOK_ENCRYPTION_KEY),
+          encrypted_api_key_envelope: STALE_ENVELOPE,
+          management_source: 'coding_plan',
+          created_by: user.id,
+        })
+        .returning();
+      const [subscription] = await db
+        .insert(coding_plan_subscriptions)
+        .values(
+          subscriptionValues(user.id, {
+            key_inventory_id: previous.id,
+            installed_byok_key_id: installedByok.id,
+            status: 'active',
+          })
+        )
+        .returning();
+      const caller = await createCallerForUser(admin.id);
+
+      await caller.codingPlans.adminReassignSubscriptionCredential({
+        subscriptionId: subscription.id,
+      });
+
+      const [reassignedByok] = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.id, installedByok.id));
+      expect(decryptApiKey(reassignedByok.encrypted_api_key, BYOK_ENCRYPTION_KEY)).toBe(
+        'pooled-secret'
+      );
+      expect(reassignedByok.encrypted_api_key_envelope).toBeNull();
+    } finally {
+      if (originalUrl !== undefined) process.env.BYOK_KMS_SERVICE_URL = originalUrl;
+    }
   });
 
   it('rejects inventory replacement after the stored credential identity changes', async () => {

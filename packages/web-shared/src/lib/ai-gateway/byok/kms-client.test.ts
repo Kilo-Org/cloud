@@ -1,8 +1,10 @@
 import { afterEach, beforeEach, describe, expect, jest, test } from '@jest/globals';
 import { randomBytes } from 'crypto';
 import {
+  createByokDataKey,
   decryptByokEnvelope,
   encryptByokForStorage,
+  encryptByokWithDataKey,
   getByokKmsClientConfig,
   type ByokKmsContext,
 } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
@@ -119,6 +121,31 @@ describe('byok kms client', () => {
       envelope_version: 1,
     });
     expect(JSON.stringify(envelope)).not.toContain('sk-secret');
+  });
+
+  test('creates a data key before the secret is known and encrypts with it later', async () => {
+    const { calls } = installFakeKms();
+
+    const dataKey = await createByokDataKey({ context, actorUserId });
+    if (!dataKey) throw new Error('expected data key');
+    expect(calls).toHaveLength(1);
+    expect(JSON.parse(String(calls[0].init.body))).toEqual({
+      ...context,
+      actor_user_id: 'user-1',
+    });
+
+    const envelope = encryptByokWithDataKey('sk-later', dataKey);
+    expect(calls).toHaveLength(1);
+    expect(envelope.wrapped_dek).toBe(dataKey.wrapped_dek);
+    await expect(decryptByokEnvelope(envelope, context)).resolves.toBe('sk-later');
+  });
+
+  test('does not create a data key when the service is not configured', async () => {
+    delete process.env.BYOK_KMS_SERVICE_URL;
+    const { fakeFetch } = installFakeKms();
+
+    await expect(createByokDataKey({ context, actorUserId })).resolves.toBeNull();
+    expect(fakeFetch).not.toHaveBeenCalled();
   });
 
   test('retrieves the data key with the full context and decrypts locally', async () => {

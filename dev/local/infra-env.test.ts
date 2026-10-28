@@ -61,6 +61,16 @@ test('points the web app at the offset BYOK KMS service and fills a blank value'
   assert.equal(buildComposeEnv('p', ports).KILO_KMS_PORT, '8932');
 });
 
+test('keeps a blank value for keys other than the BYOK KMS URL', () => {
+  const before = ['POSTGRES_URL=', 'BYOK_KMS_SERVICE_URL=', ''].join('\n');
+
+  const { content, kept } = applyAppEnv(before, buildAppEnv({ ...PORTS, 'byok-kms': 8933 }));
+
+  assert.match(content, /^POSTGRES_URL=$/m);
+  assert.match(content, /^BYOK_KMS_SERVICE_URL=http:\/\/127\.0\.0\.1:8933$/m);
+  assert.ok(kept.includes('POSTGRES_URL'));
+});
+
 test('keeps a value that names another host', () => {
   // No credentials in the fixture: a connection string with them trips secret scanning.
   const before = 'POSTGRES_URL=postgres://db.example.com:5432/prod\n';

@@ -7,6 +7,12 @@ import pLimit from 'p-limit';
 
 import { decryptApiKey, encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
+import { getByokKmsContext } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import {
+  createByokDataKey,
+  encryptByokWithDataKey,
+  type ByokDataKey,
+} from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
 import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
 import {
   getCodingPlanValidationResult,
@@ -194,6 +200,19 @@ export async function subscribeToCodingPlan(
   }
 
   const requestKey = idempotencyFingerprint(idempotencyKey);
+  // The data key request carries no plaintext, so it is issued before the transaction to
+  // keep the network call from holding the user's kilocode_users row lock. A purchase that
+  // later fails or replays an idempotent request leaves this data key unused.
+  const installedByokKeyId = crypto.randomUUID();
+  const byokDataKey = await createByokDataKey({
+    context: {
+      key_id: installedByokKeyId,
+      owner_type: 'user',
+      owner_id: userId,
+      provider_id: plan.providerId,
+    },
+    actorUserId: userId,
+  });
   const outcome = await db.transaction(async tx => {
     await reconcileCreditExpirationsInTransaction({ type: 'user', id: userId }, tx);
     const { rows: lockedUsers } = await tx.execute<{
@@ -315,13 +334,16 @@ export async function subscribeToCodingPlan(
     }
 
     const plaintext = decryptApiKey(inventoryKey.encrypted_api_key, BYOK_ENCRYPTION_KEY);
+    const envelope = byokDataKey ? encryptByokWithDataKey(plaintext, byokDataKey) : null;
     const [installedByok] = await tx
       .insert(byok_api_keys)
       .values({
+        id: installedByokKeyId,
         kilo_user_id: userId,
         organization_id: null,
         provider_id: plan.providerId,
         encrypted_api_key: encryptApiKey(plaintext, BYOK_ENCRYPTION_KEY),
+        encrypted_api_key_envelope: envelope,
         management_source: 'coding_plan',
         created_by: userId,
       })
@@ -482,6 +504,41 @@ export async function reassignSubscriptionCredential(
     throw credentialReassignmentError('BYOK encryption is not configured');
   }
 
+  // The data key request carries no plaintext, so it is issued before the transaction to
+  // keep the network call from holding the subscription and inventory row locks. The
+  // identifiers it binds to are re-checked under the lock.
+  const [preview] = await db
+    .select({
+      userId: coding_plan_subscriptions.user_id,
+      providerId: coding_plan_subscriptions.provider_id,
+      installedByokKeyId: coding_plan_subscriptions.installed_byok_key_id,
+    })
+    .from(coding_plan_subscriptions)
+    .where(eq(coding_plan_subscriptions.id, subscriptionId))
+    .limit(1);
+  let byokDataKey: ByokDataKey | null = null;
+  if (preview?.installedByokKeyId) {
+    try {
+      byokDataKey = await createByokDataKey({
+        context: {
+          key_id: preview.installedByokKeyId,
+          owner_type: 'user',
+          owner_id: preview.userId,
+          provider_id: preview.providerId,
+        },
+        actorUserId: adminUserId,
+      });
+    } catch (error) {
+      logError('Coding plan credential reassignment could not create a data key', {
+        subscriptionId,
+        message: error instanceof Error ? error.message : undefined,
+      });
+      throw credentialReassignmentError(
+        'Unable to create an encryption key for the credential. Try again.'
+      );
+    }
+  }
+
   try {
     const { newInventoryId, previousInventoryId } = await db.transaction(async tx => {
       // Lock the subscription row before reading it so a concurrent
@@ -512,6 +569,15 @@ export async function reassignSubscriptionCredential(
       const installedByokKeyId = subscription.installedByokKeyId;
       if (!previousInventoryId || !installedByokKeyId) {
         throw credentialReassignmentError('Subscription has no assigned credential to reassign.');
+      }
+      if (
+        installedByokKeyId !== preview?.installedByokKeyId ||
+        subscription.userId !== preview.userId ||
+        subscription.providerId !== preview.providerId
+      ) {
+        throw credentialReassignmentError(
+          'Subscription changed during reassignment. Refresh and try again.'
+        );
       }
 
       const { rows: lockedRows } = await tx.execute<{ id: string; status: string }>(sql`
@@ -551,11 +617,12 @@ export async function reassignSubscriptionCredential(
       }
 
       const plaintext = decryptApiKey(claimed.encrypted_api_key, BYOK_ENCRYPTION_KEY);
+      const envelope = byokDataKey ? encryptByokWithDataKey(plaintext, byokDataKey) : null;
       const byokUpdateResult = await tx
         .update(byok_api_keys)
         .set({
           encrypted_api_key: encryptApiKey(plaintext, BYOK_ENCRYPTION_KEY),
-          encrypted_api_key_envelope: null,
+          encrypted_api_key_envelope: envelope,
         })
         .where(
           and(
@@ -993,6 +1060,7 @@ type InventoryReplacementOptions = {
 export async function replaceInventoryCredential(
   inventoryKeyId: string,
   apiKey: string,
+  adminUserId: string,
   options: InventoryReplacementOptions = {}
 ): Promise<void> {
   if (!BYOK_ENCRYPTION_KEY) {
@@ -1077,6 +1145,53 @@ export async function replaceInventoryCredential(
       ? validationResult.upstreamUsageId
       : credential.upstreamUsageId;
 
+  // Each installed key binds its data key to its own row id. The requests carry no
+  // plaintext, so they are issued before the transaction to keep the network calls from
+  // holding the inventory row lock. The set of installed keys is re-checked under the lock.
+  const previewKeys = await db
+    .select({
+      id: byok_api_keys.id,
+      organization_id: byok_api_keys.organization_id,
+      kilo_user_id: byok_api_keys.kilo_user_id,
+      provider_id: byok_api_keys.provider_id,
+    })
+    .from(coding_plan_subscriptions)
+    .innerJoin(
+      byok_api_keys,
+      and(
+        eq(byok_api_keys.id, coding_plan_subscriptions.installed_byok_key_id),
+        eq(byok_api_keys.management_source, 'coding_plan')
+      )
+    )
+    .where(
+      and(
+        eq(coding_plan_subscriptions.key_inventory_id, inventoryKeyId),
+        inArray(coding_plan_subscriptions.status, ['active', 'past_due'])
+      )
+    );
+  const dataKeys = new Map<string, ByokDataKey | null>();
+  try {
+    await Promise.all(
+      previewKeys.map(async installedKey => {
+        dataKeys.set(
+          installedKey.id,
+          await createByokDataKey({
+            context: getByokKmsContext(installedKey),
+            actorUserId: adminUserId,
+          })
+        );
+      })
+    );
+  } catch (error) {
+    logError('Coding plan credential replacement could not create data keys', {
+      inventoryKeyId,
+      message: error instanceof Error ? error.message : undefined,
+    });
+    throw inventoryReplacementError(
+      'Unable to create encryption keys for the installed credentials. Try again.'
+    );
+  }
+
   try {
     await db.transaction(async tx => {
       const { rows: lockedRows } = await tx.execute<{
@@ -1140,15 +1255,35 @@ export async function replaceInventoryCredential(
           );
         const installedKeyIds = liveInstalledKeys.flatMap(row => (row.id ? [row.id] : []));
         if (installedKeyIds.length > 0) {
-          await tx
-            .update(byok_api_keys)
-            .set({ encrypted_api_key: encryptedApiKey, encrypted_api_key_envelope: null })
+          const installedKeys = await tx
+            .select({
+              id: byok_api_keys.id,
+              organization_id: byok_api_keys.organization_id,
+              kilo_user_id: byok_api_keys.kilo_user_id,
+              provider_id: byok_api_keys.provider_id,
+            })
+            .from(byok_api_keys)
             .where(
               and(
                 eq(byok_api_keys.management_source, 'coding_plan'),
                 inArray(byok_api_keys.id, installedKeyIds)
               )
             );
+          // The envelope's KMS context binds to each row's id, so every installed
+          // key needs its own envelope rather than one shared value.
+          for (const installedKey of installedKeys) {
+            const dataKey = dataKeys.get(installedKey.id);
+            if (dataKey === undefined) {
+              throw inventoryReplacementError(
+                'Assigned subscriptions changed during replacement. Refresh and try again.'
+              );
+            }
+            const envelope = dataKey ? encryptByokWithDataKey(normalizedApiKey, dataKey) : null;
+            await tx
+              .update(byok_api_keys)
+              .set({ encrypted_api_key: encryptedApiKey, encrypted_api_key_envelope: envelope })
+              .where(eq(byok_api_keys.id, installedKey.id));
+          }
         }
       }
     });

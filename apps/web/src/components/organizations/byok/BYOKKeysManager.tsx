@@ -506,7 +506,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
       serve_catalog_models
         ? {
             title: `Use Kilo catalog model IDs for the ${apiKeyObjectLabel(providerName)}?`,
-            description: `The key will serve catalog models such as moonshotai/kimi-k2.6, and model IDs that start with ${prefix} stop working with it. Models without a catalog ID are no longer available through this key.${organizationId ? ' Organization model restrictions apply to every request through this key.' : ''}`,
+            description: `The key will serve catalog models such as moonshotai/kimi-k2.6, and model IDs that start with ${prefix} stop working with it. Models without a catalog ID are no longer available through this key. For the catalog models it serves, this key is used, and pays, ahead of a ChatGPT connection and other BYOK keys.${organizationId ? ' Organization model restrictions apply to every request through this key.' : ''}`,
             confirmLabel: 'Use catalog model IDs',
           }
         : {

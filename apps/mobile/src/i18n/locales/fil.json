@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Hindi maabot ang instance — maaaring nadiskonekta ito.",
     "remoteSpawnNonRetryable": "Hindi masimulan ng instance ang session — suriin ang computer o i-update ang CLI.",
-    "remoteSpawnInstanceDisconnected": "Nadiskonekta ang napiling instance. Magsimula ng session sa Cloud Agent o pumili ng ibang instance.",
-    "liveCount_one": "{{count}} NA AKTIBO",
-    "liveCount_other": "{{count}} NA AKTIBO"
+    "remoteSpawnInstanceDisconnected": "Nadiskonekta ang napiling instance. Magsimula ng session sa Cloud Agent o pumili ng ibang instance."
   },
   "agentChat": {
     "session": {
@@ -3955,6 +3953,8 @@
     "title": "Bumili ng kredito",
     "description": "Ang kredito ay isang besesang pagbili na idinaragdag sa iyong Kilo balance para sa pagpapatakbo ng mga AI coding session sa Kilo App. Sinisingil ng store ang iyong account at idinaragdag ang kredito pagkatapos kumpirmahin ng store ang bayad.",
     "nextExpiry": "Mawawalan ng bisa sa {{date}} (UTC) ang {{amount}} na kredito. Unang ginagamit ang mga kreditong pinakamaagang mawawalan ng bisa.",
+    "noExpiringCredits": "Walang kreditong mawawalan ng bisa.",
+    "expiryUnavailable": "Hindi available ang mga detalye ng pagkawala ng bisa ng kredito.",
     "appStoreExpiry": "Hindi nawawalan ng bisa ang mga kreditong binili sa App Store.",
     "playOneYearExpiry": "Mawawalan ng bisa ang mga kreditong ito isang taon ng kalendaryo pagkatapos ng pagbili.",
     "playNonexpiring": "Hindi nawawalan ng bisa ang mga kreditong ito.",

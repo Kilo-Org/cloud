@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "İnstansa qoşulmaq mümkün olmadı — bağlantısı kəsilmiş ola bilər.",
     "remoteSpawnNonRetryable": "İnstans sessiyanı başlada bilmədi — kompüteri yoxla və ya CLI-ni yenilə.",
-    "remoteSpawnInstanceDisconnected": "Seçilmiş instansın bağlantısı kəsildi. Cloud Agent-də sessiya başlat və ya başqa instans seç.",
-    "liveCount_one": "{{count}} CANLI",
-    "liveCount_other": "{{count}} CANLI"
+    "remoteSpawnInstanceDisconnected": "Seçilmiş instansın bağlantısı kəsildi. Cloud Agent-də sessiya başlat və ya başqa instans seç."
   },
   "agentChat": {
     "session": {
@@ -3955,6 +3953,8 @@
     "title": "Kredit al",
     "description": "Kredit Kilo App-də AI kodlaşdırma sessiyalarını işə salmaq üçün Kilo balansına əlavə olunan birdəfəlik alışdır. Mağaza hesabından ödəniş alır və mağaza ödənişi təsdiqlədikdən sonra kredit əlavə olunur.",
     "nextExpiry": "{{amount}} məbləğində kreditin müddəti {{date}} (UTC) tarixində bitir. Müddəti ən tez bitən kreditlər ilk istifadə olunur.",
+    "noExpiringCredits": "Müddəti bitəcək kredit yoxdur.",
+    "expiryUnavailable": "Kreditin müddətinin bitməsi barədə məlumat mövcud deyil.",
     "appStoreExpiry": "App Store vasitəsilə alınan kreditlərin müddəti bitmir.",
     "playOneYearExpiry": "Bu kreditlərin müddəti alışdan bir təqvim ili sonra bitir.",
     "playNonexpiring": "Bu kreditlərin müddəti bitmir.",

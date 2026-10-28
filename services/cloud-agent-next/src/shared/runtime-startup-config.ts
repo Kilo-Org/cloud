@@ -4,7 +4,11 @@ import { z } from 'zod';
 export const runtimeStartupConfigSchema = z.discriminatedUnion('mode', [
   z.object({ mode: z.literal('preinstalled'), image: z.literal('all-in-one') }).strict(),
   z
-    .object({ mode: z.literal('downloaded'), image: z.enum(['all-in-one', 'runtime-free']) })
+    .object({
+      mode: z.literal('downloaded'),
+      image: z.enum(['all-in-one', 'runtime-free']),
+      interactiveOrgIds: z.array(z.uuid()).min(1).optional(),
+    })
     .strict(),
 ]);
 export type RuntimeStartupConfig = z.infer<typeof runtimeStartupConfigSchema>;

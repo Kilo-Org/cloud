@@ -15,6 +15,7 @@ import {
 import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import { isOrganizationAutoEnabled } from '@kilocode/web-shared/lib/organizations/organization-auto-model';
 import {
+  addDirectByokCatalogAvailability,
   addUserByokAvailability,
   getOrganizationByokProviderIds,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
@@ -73,9 +74,14 @@ export async function getAvailableModelsForOrganization(
   const restrictionCandidates = [...responseData.data];
 
   const filteredModels = [];
+  const allowedProvidersByModel = new Map<string, ReadonlySet<string>>();
   for (const model of restrictionCandidates) {
-    if ((await getEffectiveModelDecision(policy, model.id)).allowed) {
+    const decision = await getEffectiveModelDecision(policy, model.id);
+    if (decision.allowed) {
       filteredModels.push(model);
+      if (decision.eligibleProviderRoutes) {
+        allowedProvidersByModel.set(model.id, decision.eligibleProviderRoutes);
+      }
     }
   }
 
@@ -83,9 +89,10 @@ export async function getAvailableModelsForOrganization(
     getOrganizationByokProviderIds(readDb, organizationId),
     getDirectByokCatalogModelIds({ type: 'organization', id: organizationId }),
   ]);
-  let availableModels = await addUserByokAvailability(
-    filteredModels,
-    byokProviderIds,
+  let availableModels = addDirectByokCatalogAvailability(
+    await addUserByokAvailability(filteredModels, byokProviderIds, modelId =>
+      allowedProvidersByModel.get(modelId)
+    ),
     directByokCatalogModelIds
   );
 

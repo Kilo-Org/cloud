@@ -1,6 +1,10 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { describe, expect, it } from '@jest/globals';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
-import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+import {
+  createUserVercelAiGatewayProvider,
+  VERCEL_AI_GATEWAY,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+import { applyVercelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
   applyPreferredProvider,
   applyProviderSpecificLogic,
@@ -11,7 +15,6 @@ import {
   withIgnoredProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import {
   ReasoningDetailsTransform,
   type BYOKResult,
@@ -27,6 +30,21 @@ import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/c
 function customPricingFor(model: string) {
   return getCustomPricing(TEST_CUSTOM_PRICING_CONFIG, model);
 }
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
+  applyVercelSettings: jest.fn(),
+}));
+
+const USER_GATEWAY_TEST_MODEL = 'vendor/user-gateway-test-model';
+const USER_GATEWAY_TEST_ORDER = ['google-vertex', 'amazon-bedrock'];
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config', () => ({
+  getPreferredProviderOrderConfig: jest.fn(async () => ({
+    rules: [
+      { includes: ['user-gateway-test-model'], providers: ['google-vertex', 'amazon-bedrock'] },
+    ],
+  })),
+}));
 
 const nonFlexExclusiveModel: KiloExclusiveModel = {
   public_id: 'test/non-flex-exclusive',
@@ -91,7 +109,7 @@ function makeMessagesRequest(model: string): Extract<GatewayRequest, { kind: 'me
 describe('removeUnsupportedRequestServiceTier', () => {
   it.each([
     {
-      model: GEMINI_FLASH_CURRENT_MODEL_ID,
+      model: 'google/gemini-3.8-flash',
       kiloExclusiveModel: null,
       reason: 'non-fallback custom pricing',
     },
@@ -131,7 +149,7 @@ describe('removeUnsupportedRequestServiceTier', () => {
   it.each(['auto', 'default', 'flex', 'priority', 'scale'] as const)(
     'records the recognized tier verbatim (%s)',
     tier => {
-      const model = GEMINI_FLASH_CURRENT_MODEL_ID;
+      const model = 'google/gemini-3.8-flash';
       const request = makeRequest(model);
       request.body.service_tier = tier;
       const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
@@ -150,7 +168,7 @@ describe('removeUnsupportedRequestServiceTier', () => {
   it.each(['unrecognized-tier', 'constructor', '__proto__', 42, null] as const)(
     'records only a recognized tier value (%s)',
     tier => {
-      const model = GEMINI_FLASH_CURRENT_MODEL_ID;
+      const model = 'google/gemini-3.8-flash';
       const request = makeRequest(model);
       request.body.service_tier = tier as unknown as typeof request.body.service_tier;
       const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
@@ -743,6 +761,92 @@ describe('removeModelsFallback', () => {
     );
     warn.mockRestore();
   });
+});
+
+describe('applyProviderSpecificLogic with a user gateway key', () => {
+  const requestedModel = USER_GATEWAY_TEST_MODEL;
+
+  async function apply(userByok: BYOKResult[] | null, provider = makeProvider(null)) {
+    const request = makeRequest(requestedModel, ['caller/fallback']);
+    await applyProviderSpecificLogic(
+      provider,
+      requestedModel,
+      request,
+      {},
+      userByok,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      true
+    );
+    return request;
+  }
+
+  it('shapes a user Vercel AI Gateway key request like a managed Vercel request', async () => {
+    const request = await apply(
+      [{ providerId: 'vercel-ai-gateway', decryptedAPIKey: 'user-key' }],
+      createUserVercelAiGatewayProvider('user-key')
+    );
+
+    expect(applyVercelSettings).toHaveBeenCalledWith(requestedModel, request, null);
+  });
+
+  it('passes inference provider keys to the Vercel settings', async () => {
+    const userByok: BYOKResult[] = [{ providerId: 'anthropic', decryptedAPIKey: 'user-key' }];
+
+    const request = await apply(userByok, VERCEL_AI_GATEWAY);
+
+    expect(applyVercelSettings).toHaveBeenCalledWith(requestedModel, request, userByok);
+  });
+
+  it.each(['openrouter', 'vercel-ai-gateway'] as const)(
+    'skips Kilo provider order for a %s key',
+    async providerId => {
+      const request = await apply([{ providerId, decryptedAPIKey: 'user-key' }]);
+
+      expect(request.body.provider).toBeUndefined();
+    }
+  );
+
+  it('keeps Kilo provider order on Kilo keys', async () => {
+    const request = await apply(null);
+
+    expect(request.body.provider).toEqual({ order: USER_GATEWAY_TEST_ORDER });
+  });
+
+  it.each([
+    { providerId: 'openrouter', provider: makeProvider(null), tool: 'openrouter:web_search' },
+    {
+      providerId: 'vercel-ai-gateway',
+      provider: createUserVercelAiGatewayProvider('user-key'),
+      tool: 'vercel:perplexity_search',
+    },
+  ] as const)(
+    'keeps paid server features for a $providerId key, which bills the user account',
+    async ({ providerId, provider, tool }) => {
+      const request = makeRequest(requestedModel);
+      const serverFeatures = { plugins: [{ id: 'web' }], tools: [{ type: tool }] };
+      Object.assign(request.body, structuredClone(serverFeatures));
+
+      await applyProviderSpecificLogic(
+        provider,
+        requestedModel,
+        request,
+        {},
+        [{ providerId, decryptedAPIKey: 'user-key' }],
+        EmptyFraudDetectionHeaders,
+        'user-1',
+        null,
+        null,
+        null,
+        true
+      );
+
+      expect(request.body).toMatchObject(serverFeatures);
+    }
+  );
 });
 
 describe('applyProviderSpecificLogic paid server features', () => {

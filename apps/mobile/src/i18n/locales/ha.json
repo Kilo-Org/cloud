@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Ba a iya tuntuɓar muhallin aiki ba — wataƙila haɗinsa ya katse.",
     "remoteSpawnNonRetryable": "Muhallin aiki ya kasa fara zaman — duba na'urar ko sabunta CLI.",
-    "remoteSpawnInstanceDisconnected": "Haɗin muhallin aikin da aka zaɓa ya katse. Fara zama a Cloud Agent ko zaɓi wani muhallin aiki.",
-    "liveCount_one": "KAI TSAYE: {{count}}",
-    "liveCount_other": "KAI TSAYE: {{count}}"
+    "remoteSpawnInstanceDisconnected": "Haɗin muhallin aikin da aka zaɓa ya katse. Fara zama a Cloud Agent ko zaɓi wani muhallin aiki."
   },
   "agentChat": {
     "session": {
@@ -3955,6 +3953,8 @@
     "title": "Sayi kuɗin amfani",
     "description": "Kuɗin amfani saye ne na lokaci ɗaya da ake ƙarawa a ma'aunin Kilo naka don gudanar da zaman shirye-shiryen AI a cikin Kilo App. Shagon yana cajin asusunka kuma ana ƙara kuɗin amfani bayan shagon ya tabbatar da biyan kuɗi.",
     "nextExpiry": "Kuɗin amfani {{amount}} za su ƙare {{date}} (UTC). Ana fara amfani da kuɗin amfani da za su fi saurin ƙarewa.",
+    "noExpiringCredits": "Babu kuɗin amfani da za su ƙare.",
+    "expiryUnavailable": "Bayanin ƙarewar kuɗin amfani ba ya nan.",
     "appStoreExpiry": "Kuɗin amfani da aka saya ta App Store ba sa ƙarewa.",
     "playOneYearExpiry": "Waɗannan kuɗin amfani za su ƙare shekara ɗaya ta kalanda bayan saya.",
     "playNonexpiring": "Waɗannan kuɗin amfani ba sa ƙarewa.",

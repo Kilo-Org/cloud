@@ -7,14 +7,10 @@ import { useTranslation } from 'react-i18next';
 
 import { Input } from '@/components/ui/input';
 import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
-// The row's `gap-2` compiles to 7pt, not 8pt: NativeWind v5 fixes 1rem at
-// 14pt. The clear control's left slop is capped at that gap, so its touch
-// region meets the input's instead of covering it — the same cap
-// `session-list-header-actions.tsx` applies to the two header controls facing
-// each other. 38 + 8 + 7 = 53pt across and 38 + 8 + 8 = 54pt down both clear
-// the 44pt target.
+// NativeWind's gap-2 is 7pt; cap the clear target's facing slop at that gap.
 const CLEAR_HIT_SLOP = {
   top: COMPACT_CONTROL_HIT_SLOP_DP,
   bottom: COMPACT_CONTROL_HIT_SLOP_DP,
@@ -30,6 +26,10 @@ type SessionListSearchHeaderProps = {
   showSearchBusy: boolean;
   onChangeText: (text: string) => void;
   onClearSearch: () => void;
+  onFocus?: () => void;
+  onBlur?: () => void;
+  compact?: boolean;
+  inline?: boolean;
   /** Initial content for the uncontrolled input, applied on a restore remount. */
   defaultValue?: string;
   /** Remount key: changes once when a stored non-empty draft is restored. */
@@ -42,6 +42,10 @@ export function SessionListSearchHeader({
   showSearchBusy,
   onChangeText,
   onClearSearch,
+  onFocus,
+  onBlur,
+  compact = false,
+  inline = false,
   defaultValue,
   inputKey,
 }: Readonly<SessionListSearchHeaderProps>) {
@@ -56,22 +60,14 @@ export function SessionListSearchHeader({
     [left, right]
   );
   return (
-    <View>
-      {/* The row's height comes from the shared field box, not from this row:
-          the field's 44pt floor plus this row's 10.5pt vertical padding
-          (`py-1.5` is 0.375rem at the app's 14pt rem) and its 2pt vertical
-          `border` (1pt a side, inside the border box React Native lays out) is
-          56.5pt, the same whether the clear control is showing or not, so the
-          first keystroke cannot grow the row and shift the list below. The
-          row's own `min-h-[51px]` (the clear control's 38pt box plus that same
-          padding and border, 50.5pt) stays as a lower bound the field's floor
-          dominates, so the row never shrinks below the control's own box. A
-          second `min-h-*` class would set the same property, leaving which
-          floor wins to the order Tailwind emits its rules rather than to this
-          intent. */}
+    <View className={inline ? 'min-w-0 flex-1' : undefined}>
       <View
-        style={fieldMargins}
-        className="my-2 min-h-[51px] flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5"
+        style={inline ? undefined : fieldMargins}
+        className={cn(
+          'flex-row items-center gap-2 rounded-[10px] border border-border',
+          !inline && 'my-2',
+          compact ? 'min-h-[44px] px-2' : 'min-h-[51px] bg-card px-4 py-1.5'
+        )}
       >
         {/* Fixed-size slot: the spinner swaps in for the icon, so the row never reflows. */}
         <View className="h-[18px] w-[18px] items-center justify-center">
@@ -100,18 +96,11 @@ export function SessionListSearchHeader({
           placeholder={t('agents.search.searchSessionsPlaceholder')}
           placeholderTextColor={colors.mutedForeground}
           onChangeText={onChangeText}
+          onFocus={onFocus}
+          onBlur={onBlur}
           defaultValue={defaultValue}
           returnKeyType="search"
-          // Android's IME, with little room left in a landscape window, swaps
-          // the app for its own full-screen extract editor: the capture that
-          // filed this defect (e9-land-ime-up.png) shows the IME's editor —
-          // the query, a SEARCH action button and the keyboard — where the
-          // screen's own no-match body belongs. `disableFullscreenUI` maps to
-          // `EditorInfo.IME_FLAG_NO_FULLSCREEN` (ReactEditText.updateImeOptions),
-          // the flag the IME's fullscreen decision reads, so the input is
-          // edited in place and the screen's own body and the tab bar stay on
-          // screen. The screen's insets then reserve the IME's occlusion (see
-          // `useAgentsBottomBands`).
+          // Keep Android landscape searches in the app instead of the IME's fullscreen editor.
           disableFullscreenUI
           autoCapitalize="none"
           autoCorrect={false}

@@ -45,7 +45,11 @@ import {
   VercelUserByokInferenceProviderIdSchema,
   AzureCredentialsSchema,
   BedrockCredentialsSchema,
+  DirectVertexCredentialsSchema,
   VertexCredentialsSchema,
+  isExperimentalByokProviderId,
+  isGatewayUserByokProviderId,
+  type GatewayUserByokProviderId,
   type VercelUserByokInferenceProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
@@ -92,9 +96,20 @@ const DIRECT_BYOK_PROVIDERS_LIST = Object.entries(DIRECT_BYOK_PROVIDERS_META).ma
   name,
 }));
 
-const BYOK_PROVIDERS = [...DIRECT_BYOK_PROVIDERS_LIST, ...VERCEL_BYOK_PROVIDERS].toSorted((a, b) =>
-  a.name.localeCompare(b.name)
+const GATEWAY_BYOK_PROVIDER_NAMES = {
+  'vercel-ai-gateway': 'Vercel AI Gateway',
+  openrouter: 'OpenRouter',
+} satisfies Record<GatewayUserByokProviderId, string>;
+
+const GATEWAY_BYOK_PROVIDERS_LIST = Object.entries(GATEWAY_BYOK_PROVIDER_NAMES).map(
+  ([id, name]) => ({ id, name })
 );
+
+const BYOK_PROVIDERS = [
+  ...DIRECT_BYOK_PROVIDERS_LIST,
+  ...VERCEL_BYOK_PROVIDERS,
+  ...GATEWAY_BYOK_PROVIDERS_LIST,
+].toSorted((a, b) => a.name.localeCompare(b.name));
 const ADD_BYOK_PROVIDERS = BYOK_PROVIDERS.filter(
   provider => provider.id !== DirectUserByokInferenceProviderIdSchema.enum.codestral
 );
@@ -112,8 +127,10 @@ export function getStructuredCredentialKind(providerId: string): StructuredCrede
     case VercelUserByokInferenceProviderIdSchema.enum.azure:
       return 'azure';
     case VercelUserByokInferenceProviderIdSchema.enum.bedrock:
+    case DirectUserByokInferenceProviderIdSchema.enum['bedrock-byok']:
       return 'bedrock';
     case VercelUserByokInferenceProviderIdSchema.enum.vertex:
+    case DirectUserByokInferenceProviderIdSchema.enum['vertex-byok']:
       return 'vertex';
     default:
       return null;
@@ -276,6 +293,12 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   );
 
   const { data: supportedModels } = useQuery(trpc.byok.listSupportedModels.queryOptions());
+  const { data: experimentalByokEnabled = false } = useQuery(
+    trpc.byok.experimentalByokEnabled.queryOptions(listQueryInput)
+  );
+  const addableProviders = ADD_BYOK_PROVIDERS.filter(
+    provider => experimentalByokEnabled || !isExperimentalByokProviderId(provider.id)
+  );
   const showsCodingPlanKey =
     !organizationId && (keys?.some(key => key.management_source === 'coding_plan') ?? false);
 
@@ -384,7 +407,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
         : kind === 'bedrock'
           ? BedrockCredentialsSchema
           : kind === 'vertex'
-            ? VertexCredentialsSchema
+            ? providerId === DirectUserByokInferenceProviderIdSchema.enum['vertex-byok']
+              ? DirectVertexCredentialsSchema
+              : VertexCredentialsSchema
             : null;
     if (!schema) return null;
     let parsed: unknown;
@@ -531,6 +556,8 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   };
   const structuredCredentialKind = getStructuredCredentialKind(selectedProvider);
   const usesStructuredCredentials = structuredCredentialKind !== null;
+  const isDirectVertex =
+    selectedProvider === DirectUserByokInferenceProviderIdSchema.enum['vertex-byok'];
   return (
     <div className="space-y-4">
       <BYOKDescription showsCodingPlanKey={showsCodingPlanKey} />
@@ -700,7 +727,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                     <SelectValue placeholder="Select provider" />
                   </SelectTrigger>
                   <SelectContent>
-                    {(editingKeyId ? BYOK_PROVIDERS : ADD_BYOK_PROVIDERS).map(provider => {
+                    {(editingKeyId ? BYOK_PROVIDERS : addableProviders).map(provider => {
                       const isDisabled = !editingKeyId && hasExistingKey(provider.id);
                       return (
                         <SelectItem
@@ -762,7 +789,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                             ? '{"apiKey": "...", "resourceName": "..."}'
                             : structuredCredentialKind === 'bedrock'
                               ? '{"accessKeyId": "...", "secretAccessKey": "...", "region": "us-east-1"}'
-                              : '{"project": "...", "location": "global", "googleCredentials": {"clientEmail": "...", "privateKey": "..."}}'
+                              : isDirectVertex
+                                ? '{"type": "service_account", "project_id": "...", "client_email": "...", "private_key": "..."}'
+                                : '{"project": "...", "location": "global", "googleCredentials": {"clientEmail": "...", "privateKey": "..."}}'
                         }
                         className={cn(
                           'border-input bg-background placeholder:text-muted-foreground focus-visible:ring-ring flex min-h-20 w-full rounded-md border px-3 py-2 pr-10 text-sm focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50',
@@ -868,11 +897,52 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                         Your IAM user needs <code className="text-xs">bedrock:InvokeModel</code> and{' '}
                         <code className="text-xs">bedrock:InvokeModelWithResponseStream</code>{' '}
                         permissions.
+                        {selectedProvider ===
+                        DirectUserByokInferenceProviderIdSchema.enum['bedrock-byok'] ? (
+                          <>
+                            {' '}
+                            Models served by the <code className="text-xs">
+                              bedrock-mantle
+                            </code>{' '}
+                            endpoint also need the matching{' '}
+                            <code className="text-xs">bedrock-mantle</code> permissions.
+                          </>
+                        ) : null}
                       </p>
                     </AlertDescription>
                   </Alert>
                 )}
-                {structuredCredentialKind === 'vertex' && (
+                {isDirectVertex && (
+                  <Alert>
+                    <Info className="size-4" />
+                    <AlertDescription>
+                      <p>Paste a service account key file as JSON:</p>
+                      <code className="mt-1 block text-xs break-all">
+                        {
+                          '{"type": "service_account", "project_id": "...", "client_email": "...", "private_key": "...", "location": "global"}'
+                        }
+                      </code>
+                      <p className="mt-1">
+                        <code className="text-xs">location</code> is optional and defaults to{' '}
+                        <code className="text-xs">global</code>. JSON with{' '}
+                        <code className="text-xs">project</code>,{' '}
+                        <code className="text-xs">location</code>, and{' '}
+                        <code className="text-xs">googleCredentials</code> also works.
+                      </p>
+                      <p className="mt-1">
+                        Enable the Vertex AI API and grant the service account the Vertex AI User
+                        role. Claude and partner models must also be enabled in Model Garden.
+                      </p>
+                      <p className="mt-1">
+                        Mistral models only run in <code className="text-xs">us-central1</code> and{' '}
+                        <code className="text-xs">europe-west4</code>; requests use{' '}
+                        <code className="text-xs">europe-west4</code> when the location is in
+                        Europe.
+                      </p>
+                    </AlertDescription>
+                  </Alert>
+                )}
+                {structuredCredentialKind === 'vertex' && !isDirectVertex && (
                   <Alert>
                     <Info className="size-4" />
                     <AlertDescription>
@@ -971,6 +1041,26 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                             <p className="mt-2">
                               This provider is considered trusted in the context of organization
                               restrictions.
+                            </p>
+                          ) : null}
+                        </AlertDescription>
+                      </Alert>
+                    );
+                  }
+                  if (isGatewayUserByokProviderId(selectedProvider)) {
+                    return (
+                      <Alert>
+                        <Info className="size-4" />
+                        <AlertDescription>
+                          <p>
+                            Once saved, this key is used for the supported models above that none of
+                            your provider keys cover. If you add both a Vercel AI Gateway key and an
+                            OpenRouter key, the Vercel AI Gateway key is used for models it serves.
+                          </p>
+                          {organizationId ? (
+                            <p className="mt-2">
+                              Organization model and provider restrictions apply to requests that
+                              use this key.
                             </p>
                           ) : null}
                         </AlertDescription>

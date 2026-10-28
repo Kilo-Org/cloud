@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Asikwazanga ukufinyelela ikhophi — kungenzeka ukuxhumana kwayo kunqamukile.",
     "remoteSpawnNonRetryable": "Ikhophi yehlulekile ukuqala iseshini — hlola umshini noma ubuyekeze i-CLI.",
-    "remoteSpawnInstanceDisconnected": "Ukuxhumana kwekhophi ekhethiwe kunqamukile. Qala iseshini ku-Cloud Agent noma ukhethe enye ikhophi.",
-    "liveCount_one": "{{count}} BUKHOMA",
-    "liveCount_other": "{{count}} BUKHOMA"
+    "remoteSpawnInstanceDisconnected": "Ukuxhumana kwekhophi ekhethiwe kunqamukile. Qala iseshini ku-Cloud Agent noma ukhethe enye ikhophi."
   },
   "agentChat": {
     "session": {
@@ -3955,6 +3953,8 @@
     "title": "Thenga amakhredithi",
     "description": "Amakhredithi ukuthenga kwesikhathi esisodwa okwengezwa kubhalansi yakho ye-Kilo ukuze usebenzise amaseshini okubhala ikhodi e-AI ku-Kilo App. Isitolo sikhokhisa i-akhawunti yakho futhi amakhredithi engezwa ngemva kokuba isitolo siqinisekise inkokhelo.",
     "nextExpiry": "Amakhredithi angu-{{amount}} aphelelwa yisikhathi ngo-{{date}} (UTC). Amakhredithi aphelelwa yisikhathi kuqala asetshenziswa kuqala.",
+    "noExpiringCredits": "Awekho amakhredithi azophelelwa yisikhathi.",
+    "expiryUnavailable": "Imininingwane yokuphelelwa yisikhathi kwamakhredithi ayitholakali.",
     "appStoreExpiry": "Amakhredithi athengwe nge-App Store awaphelelwa yisikhathi.",
     "playOneYearExpiry": "La makhredithi aphelelwa yisikhathi ngemuva konyaka owodwa wekhalenda kusukela ekuthengeni.",
     "playNonexpiring": "La makhredithi awaphelelwa yisikhathi.",

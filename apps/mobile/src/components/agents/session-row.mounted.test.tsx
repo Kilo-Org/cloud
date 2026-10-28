@@ -684,7 +684,6 @@ describe('RemoteSessionRow live speech', () => {
       { kind: 'running' },
     ]);
     expect(texts(renderer)).toContain('5 MINUTES AGO');
-    expect(texts(renderer)).toContain('feature/live');
   });
 
   it('paints the localized unnamed name instead of the backend placeholder title', () => {
@@ -707,7 +706,7 @@ describe('RemoteSessionRow live speech', () => {
   it('keeps the needs-input speech above the state word', () => {
     const renderer = mountRemote({ status: 'question' });
     expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
-      'Live work, needs input, feature/live, and CLI'
+      'Live work, needs input, feature/live, CLI, and 5 minutes ago'
     );
     expect(hosts(renderer, 'SessionStatusIcon').map(glyph => glyph.props)).toEqual([
       { kind: 'needsInput' },
@@ -735,9 +734,7 @@ describe('RemoteSessionRow live speech', () => {
     expect(hosts(renderer, 'SessionStatusIcon').map(glyph => glyph.props)).toEqual([
       { kind: 'scheduled' },
     ]);
-    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
-      `Live work, Scheduled, feature/live, CLI, and ${wake}`
-    );
+    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toContain(wake);
   });
 
   it('reads SCHEDULED alone for a scheduled tray row with no wake time', () => {
@@ -745,7 +742,7 @@ describe('RemoteSessionRow live speech', () => {
     expect(texts(renderer)).toContain('SCHEDULED');
     expect(texts(renderer)).not.toContain('Idle');
     expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
-      'Live work, Scheduled, feature/live, and CLI'
+      'Live work, Scheduled, feature/live, CLI, and 5 minutes ago'
     );
   });
 

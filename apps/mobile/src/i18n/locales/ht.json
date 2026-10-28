@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Pa t ka konekte ak enstans lan — petèt li dekonekte.",
     "remoteSpawnNonRetryable": "Enstans lan pa t ka kòmanse sesyon an — tcheke machin nan oswa mete CLI a ajou.",
-    "remoteSpawnInstanceDisconnected": "Enstans ou chwazi a dekonekte. Kòmanse yon sesyon sou Cloud Agent oswa chwazi yon lòt enstans.",
-    "liveCount_one": "{{count}} AN DIRÈK",
-    "liveCount_other": "{{count}} AN DIRÈK"
+    "remoteSpawnInstanceDisconnected": "Enstans ou chwazi a dekonekte. Kòmanse yon sesyon sou Cloud Agent oswa chwazi yon lòt enstans."
   },
   "agentChat": {
     "session": {
@@ -3955,6 +3953,8 @@
     "title": "Achte kredi",
     "description": "Kredi se yon acha yon sèl fwa ki ajoute nan balans Kilo ou pou kouri sesyon kodaj AI nan Kilo App. Magazen an chaje kont ou epi kredi yo ajoute apre magazen an konfime peman an.",
     "nextExpiry": "{{amount}} nan kredi ap ekspire {{date}} (UTC). Kredi ki ekspire pi bonè yo itilize an premye.",
+    "noExpiringCredits": "Pa gen kredi k ap ekspire.",
+    "expiryUnavailable": "Enfòmasyon sou ekspirasyon kredi yo pa disponib.",
     "appStoreExpiry": "Kredi ou achte nan App Store pa ekspire.",
     "playOneYearExpiry": "Kredi sa yo ekspire yon ane kalandriye apre acha a.",
     "playNonexpiring": "Kredi sa yo pa ekspire.",

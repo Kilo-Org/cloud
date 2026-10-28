@@ -2,10 +2,7 @@ import { describe, expect, test } from '@jest/globals';
 import { captureMessage } from '@sentry/nextjs';
 import type { CustomPricingConfig } from '@kilocode/db/schema-types';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
-import {
-  GEMINI_4_ARGON_MODEL_ID,
-  GEMINI_FLASH_CURRENT_MODEL_ID,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+import { GEMINI_4_ARGON_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import {
   applyCustomPricingToPricing,
   applyCustomPricingToModel,
@@ -52,7 +49,7 @@ const config = TEST_CUSTOM_PRICING_CONFIG;
 describe('custom model pricing', () => {
   test('replaces upstream Gemini 3.8 Flash pricing with the promotional rates', () => {
     const model = applyCustomPricingToModel(config, {
-      ...makeModel(GEMINI_FLASH_CURRENT_MODEL_ID),
+      ...makeModel('google/gemini-3.8-flash'),
       name: 'Google: Gemini 3.8 Flash',
     });
 
@@ -66,7 +63,7 @@ describe('custom model pricing', () => {
     expect(
       calculateCustomCost_mUsd(
         config,
-        GEMINI_FLASH_CURRENT_MODEL_ID,
+        'google/gemini-3.8-flash',
         makeUsage({ inputTokens: 100, cost_mUsd: 999 })
       )
     ).toBe(Math.round(100 * 0.75));
@@ -137,7 +134,7 @@ describe('custom model pricing', () => {
 
     const cost_mUsd = calculateCustomCost_mUsd(
       config,
-      GEMINI_FLASH_CURRENT_MODEL_ID,
+      'google/gemini-3.8-flash',
       makeUsage({ inputTokens: 10, cacheHitTokens: 20 })
     );
 
@@ -146,7 +143,7 @@ describe('custom model pricing', () => {
       'SUSPICIOUS: negative uncached input tokens for custom pricing',
       expect.objectContaining({
         level: 'error',
-        extra: expect.objectContaining({ model: GEMINI_FLASH_CURRENT_MODEL_ID }),
+        extra: expect.objectContaining({ model: 'google/gemini-3.8-flash' }),
       })
     );
   });
@@ -205,7 +202,7 @@ describe('custom model pricing', () => {
       )
     ).toBe(10_000 + 200);
     expect(
-      calculateCustomCost_mUsd(tieredConfig, GEMINI_FLASH_CURRENT_MODEL_ID, makeUsage())
+      calculateCustomCost_mUsd(tieredConfig, 'google/gemini-3.8-flash', makeUsage())
     ).toBeUndefined();
   });
 });

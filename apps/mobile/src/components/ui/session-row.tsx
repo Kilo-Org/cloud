@@ -174,7 +174,6 @@ export function SessionRow({
 
   let eyebrowRight: React.ReactNode = null;
   if (eyebrowDecision.kind === 'needs-input') {
-    // Icon suppressed — render exactly as today.
     eyebrowRight = branchContent;
   } else if (eyebrowDecision.showPlatformIcon && platformIcon != null) {
     // `none` kind: icon alone, no extra wrapper. Otherwise wrap icon + branch.
@@ -190,6 +189,12 @@ export function SessionRow({
   } else {
     eyebrowRight = branchContent;
   }
+
+  const titleNode = (
+    <Text className="font-medium text-sm tracking-tight text-foreground" numberOfLines={2}>
+      {title}
+    </Text>
+  );
 
   const row = (
     <View
@@ -216,14 +221,6 @@ export function SessionRow({
       )}
       <View className="min-w-0 flex-1">
         <View className="mb-[3px] flex-row items-center justify-between">
-          {/* flex-1 basis 0: the right cluster is sized first at its full
-              natural width, so a long agent label truncates instead of
-              crowding the status glyph and relative time out of the row.
-              The label is the repo identifier, so it ellipsizes in the middle
-              rather than at the tail: a tail ellipsis hides the distinguishing
-              suffix ("TAX-REPORT-GENERA…"), while middle keeps both ends legible
-              (the long-identifier convention in `KvRow` and `SheetHeader`). The
-              one-line clamp still bounds the eyebrow. */}
           <Eyebrow
             className={cn('min-w-0 flex-1', color.hueTextClass)}
             numberOfLines={1}
@@ -233,9 +230,7 @@ export function SessionRow({
           </Eyebrow>
           {eyebrowRight}
         </View>
-        <Text className="text-sm font-medium tracking-tight text-foreground" numberOfLines={2}>
-          {title}
-        </Text>
+        {titleNode}
         {subtitle ? (
           <Text
             variant={subtitleVariant}

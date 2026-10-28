@@ -1,4 +1,4 @@
-import { describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it } from '@jest/globals';
 import {
   ENKRYPT_DETECT_URL,
   ENKRYPT_MAX_SCAN_CHARACTERS,
@@ -7,6 +7,12 @@ import {
   type EnkryptDetectDependencies,
   type EnkryptGuardrailScan,
 } from './detect';
+
+const mockedWarnExceptInTest = jest.fn();
+
+jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
+  warnExceptInTest: (...args: unknown[]) => mockedWarnExceptInTest(...args),
+}));
 
 const config = {
   scanToolResults: true,
@@ -34,7 +40,11 @@ function makeScan(overrides: Partial<EnkryptGuardrailScan> = {}): EnkryptGuardra
 }
 
 function detectResponse(
-  body: { summary: Record<string, unknown>; result_message?: string | null },
+  body: {
+    summary: Record<string, unknown>;
+    details?: Record<string, unknown>;
+    result_message?: string | null;
+  },
   init: { status?: number; credits?: string } = {}
 ) {
   return new Response(JSON.stringify(body), {
@@ -63,6 +73,10 @@ function fetchCalls(dependencies: EnkryptDetectDependencies) {
 }
 
 describe('scanTurnDelta', () => {
+  beforeEach(() => {
+    mockedWarnExceptInTest.mockClear();
+  });
+
   it('sends the turn text, inline detectors, and only opaque ids to Enkrypt', async () => {
     const dependencies = deps(async () =>
       detectResponse({ summary: { injection_attack: 0, pii: 0 }, result_message: null })
@@ -176,6 +190,92 @@ describe('scanTurnDelta', () => {
         "Your organization's Enkrypt AI guardrail blocked this request (detected: keyword_detector). The request was flagged by your organization policy. Review it and retry.",
     });
     expect(result.charges).toEqual([expect.objectContaining({ decision: 'blocked' })]);
+  });
+
+  it.each([
+    ['zero', 0],
+    ['an empty list', []],
+    ['false', false],
+  ])('allows a turn when a detector reports %s', async (_name, value) => {
+    const result = await scanTurnDelta(
+      makeScan(),
+      deps(async () => detectResponse({ summary: { injection_attack: value, toxicity: value } }))
+    );
+
+    expect(result.verdict).toEqual({ action: 'allow' });
+    expect(result.charges).toEqual([expect.objectContaining({ decision: 'allowed' })]);
+  });
+
+  describe('when Enkrypt reports a detector error with HTTP 200', () => {
+    const explanation =
+      "Error: Client error '400 Bad Request' for url 'https://enkrypt-internal.example/policy' prompt-derived text";
+    const policyConfig = {
+      ...config,
+      detectors: {
+        ...config.detectors,
+        topic_detector: { enabled: true, topic: ['finance'] },
+        policy_violation: {
+          enabled: true,
+          need_explanation: false,
+          policy_text: 'Never share credentials.',
+        },
+      },
+      blockingDetectors: [...config.blockingDetectors, 'topic_detector', 'policy_violation'],
+    } satisfies EnkryptGuardrailScan['config'];
+
+    it.each([
+      ['alone', { policy_violation: -1 }, 'detector_error:policy_violation'],
+      [
+        'next to detectors that did not fire',
+        { injection_attack: 0, pii: 0, policy_violation: -1 },
+        'detector_error:policy_violation',
+      ],
+      [
+        'for several detectors',
+        { injection_attack: 0, on_topic: -1, policy_violation: -1 },
+        'detector_error:topic_detector,policy_violation',
+      ],
+    ])(
+      'fails closed without retrying when it is reported %s',
+      async (_name, summary, expectedError) => {
+        const dependencies = deps(async () =>
+          detectResponse(
+            {
+              summary,
+              details: {
+                policy_violation: {
+                  violating_policy: 'Error',
+                  explanation,
+                  most_unsafe_content: '',
+                },
+              },
+              result_message: null,
+            },
+            { credits: '4' }
+          )
+        );
+
+        const result = await scanTurnDelta(makeScan({ config: policyConfig }), dependencies);
+
+        expect(dependencies.fetch).toHaveBeenCalledTimes(1);
+        expect(result.verdict).toEqual({ action: 'unavailable' });
+        expect(result.charges).toEqual([
+          expect.objectContaining({ decision: 'error', creditsCost: 4 }),
+        ]);
+        expect(mockedWarnExceptInTest).toHaveBeenCalledWith(
+          '[enkrypt-guardrail] decision',
+          expect.objectContaining({
+            decision: 'error_fail_closed',
+            error: expectedError,
+            attempts: 1,
+            credits_cost: 4,
+          })
+        );
+        const logged = JSON.stringify(mockedWarnExceptInTest.mock.calls);
+        expect(logged).not.toContain('enkrypt-internal.example');
+        expect(logged).not.toContain('prompt-derived text');
+      }
+    );
   });
 
   it('ignores detections from detectors it does not know', async () => {

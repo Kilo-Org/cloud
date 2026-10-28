@@ -6,25 +6,32 @@ import type { EncryptedData } from '@kilocode/web-shared/lib/ai-gateway/byok/enc
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import {
+  GatewayUserByokProviderIdSchema,
   UserByokProviderIdSchema,
   getVercelUserByokProviderIdForEndpoint,
+  isGatewayUserByokProviderId,
+  type GatewayUserByokProviderId,
   type UserByokProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { isCodestralModel } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
+  getVercelModelsFromDatabase,
   getVercelModelsMetadataFromDatabase,
+  isValidOpenRouterModelId,
   type StoredModelMap,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { hasEnabledUserByokForModel } from '@kilocode/web-shared/lib/ai-gateway/byok/availability';
 
 // A BYOK key belongs to exactly one owner, either a user or an organization.
 type ByokOwnerColumn = typeof byok_api_keys.kilo_user_id | typeof byok_api_keys.organization_id;
 type ByokSourceDb = typeof db | DrizzleTransaction;
 
-async function deriveModelUserByokProviders(
+async function deriveModelInferenceUserByokProviders(
   modelId: string,
   vercelModelMetadata: StoredModelMap
 ): Promise<UserByokProviderId[]> {
@@ -45,13 +52,71 @@ async function deriveModelUserByokProviders(
   return providers;
 }
 
-export async function getModelUserByokProviders(modelId: string): Promise<UserByokProviderId[]> {
-  const vercelModelMetadata = await getVercelModelsMetadataFromDatabase();
-  if (Object.keys(vercelModelMetadata).length === 0) {
-    console.error('[getModelUserByokProviders] no Vercel model metadata for model %s', modelId);
+/**
+ * Kilo-exclusive and free models stay on Kilo's own accounts: they are served
+ * through Kilo-specific routes or paid for by Kilo, so a gateway key must not
+ * take them over. Custom LLMs are never in the gateway catalogs, so the
+ * built-in free rules suffice.
+ */
+export function isGatewayUserByokEligibleModel(modelId: string): boolean {
+  return !isKiloExclusiveModel(modelId) && !isFreeModelExcludingCustomLlms(modelId);
+}
+
+export async function getModelGatewayUserByokProviders(
+  modelId: string
+): Promise<GatewayUserByokProviderId[]> {
+  if (!isGatewayUserByokEligibleModel(modelId)) {
     return [];
   }
-  return deriveModelUserByokProviders(modelId, vercelModelMetadata);
+  const [vercelModels, vercelModelId, isOpenRouterModel] = await Promise.all([
+    getVercelModelsFromDatabase(),
+    mapModelIdToVercel(modelId),
+    isValidOpenRouterModelId(modelId),
+  ]);
+  return GatewayUserByokProviderIdSchema.options.filter(providerId =>
+    providerId === 'vercel-ai-gateway' ? vercelModels.has(vercelModelId) : isOpenRouterModel
+  );
+}
+
+async function getVercelModelMetadata(caller: string): Promise<StoredModelMap | null> {
+  const vercelModelMetadata = await getVercelModelsMetadataFromDatabase();
+  if (Object.keys(vercelModelMetadata).length === 0) {
+    console.error('[%s] no Vercel model metadata', caller);
+    return null;
+  }
+  return vercelModelMetadata;
+}
+
+/** The inference providers routed through Vercel whose key can serve `modelId`. */
+export async function getModelInferenceUserByokProviders(
+  modelId: string
+): Promise<UserByokProviderId[]> {
+  const vercelModelMetadata = await getVercelModelMetadata('getModelInferenceUserByokProviders');
+  return vercelModelMetadata
+    ? deriveModelInferenceUserByokProviders(modelId, vercelModelMetadata)
+    : [];
+}
+
+/**
+ * Returns every user BYOK provider whose key can serve `modelId`: first the
+ * inference providers routed through Vercel, then the gateway keys in order of
+ * preference. With `enabledProviderIds`, skips the catalog lookups that cannot
+ * match an enabled key.
+ */
+export async function getModelUserByokProviders(
+  modelId: string,
+  enabledProviderIds?: ReadonlySet<UserByokProviderId>
+): Promise<UserByokProviderId[]> {
+  const enabled = enabledProviderIds ? [...enabledProviderIds] : undefined;
+  const [inferenceProviders, gatewayProviders] = await Promise.all([
+    !enabled || enabled.some(id => !isGatewayUserByokProviderId(id))
+      ? getModelInferenceUserByokProviders(modelId)
+      : [],
+    !enabled || enabled.some(isGatewayUserByokProviderId)
+      ? getModelGatewayUserByokProviders(modelId)
+      : [],
+  ]);
+  return [...inferenceProviders, ...gatewayProviders];
 }
 
 export type ByokOwner = { type: 'user'; id: string } | { type: 'organization'; id: string };
@@ -118,31 +183,53 @@ export async function getOrganizationByokProviderIds(
 }
 
 /**
- * Marks catalog models the caller's own keys can serve: through a Vercel BYOK provider, or
- * through a direct BYOK key in catalog mode (`directByokCatalogModelIds`).
+ * `getAllowedProviders` returns the organization's allowed providers for a
+ * model, or undefined when every provider is allowed.
  */
 export async function addUserByokAvailability(
   models: OpenRouterModel[],
   enabledProviderIds: UserByokProviderId[],
-  directByokCatalogModelIds: ReadonlySet<string> = new Set()
+  getAllowedProviders: (modelId: string) => ReadonlySet<string> | undefined = () => undefined
 ): Promise<OpenRouterModel[]> {
   const enabledProviders = new Set(enabledProviderIds);
-  const vercelModelMetadata = await getVercelModelsMetadataFromDatabase();
-  const hasMetadata = Object.keys(vercelModelMetadata).length > 0;
-  if (!hasMetadata) {
-    console.error('[addUserByokAvailability] no Vercel model metadata');
-  }
+  const enabled = [...enabledProviders];
+  const vercelModelMetadata = enabled.some(id => !isGatewayUserByokProviderId(id))
+    ? await getVercelModelMetadata('addUserByokAvailability')
+    : null;
+  const hasGatewayKey = enabled.some(isGatewayUserByokProviderId);
   return Promise.all(
     models.map(async model => {
-      const hasUserByokAvailable =
-        directByokCatalogModelIds.has(model.id) ||
-        (hasMetadata &&
-          !isKiloExclusiveModel(model.id) &&
-          (await deriveModelUserByokProviders(model.id, vercelModelMetadata)).some(provider =>
-            enabledProviders.has(provider)
-          ));
+      if (enabledProviders.size === 0 || isKiloExclusiveModel(model.id)) {
+        return { ...model, hasUserByokAvailable: false };
+      }
+      const modelProviders = [
+        ...(vercelModelMetadata
+          ? await deriveModelInferenceUserByokProviders(model.id, vercelModelMetadata)
+          : []),
+        ...(hasGatewayKey ? await getModelGatewayUserByokProviders(model.id) : []),
+      ];
+      const hasUserByokAvailable = await hasEnabledUserByokForModel({
+        modelId: model.id,
+        modelProviders,
+        enabledProviderIds: enabledProviders,
+        allowedProviders: getAllowedProviders(model.id),
+      });
       return { ...model, hasUserByokAvailable };
     })
+  );
+}
+
+/**
+ * Marks catalog models the caller's direct BYOK keys in catalog mode serve
+ * (`getDirectByokCatalogModelIds`), alongside the gateway and Vercel BYOK availability.
+ */
+export function addDirectByokCatalogAvailability(
+  models: OpenRouterModel[],
+  directByokCatalogModelIds: ReadonlySet<string>
+): OpenRouterModel[] {
+  if (directByokCatalogModelIds.size === 0) return models;
+  return models.map(model =>
+    directByokCatalogModelIds.has(model.id) ? { ...model, hasUserByokAvailable: true } : model
   );
 }
 

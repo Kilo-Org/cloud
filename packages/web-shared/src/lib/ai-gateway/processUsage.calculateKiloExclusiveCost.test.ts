@@ -1,7 +1,7 @@
 import { test, describe, expect } from '@jest/globals';
 import { calculateKiloExclusiveCost_mUsd } from './processUsage';
 import type { JustTheCostsUsageStats } from './processUsage.types';
-import { claude_opus_4_7_stealth_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { paidStealthModelFixture } from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 
 const makeUsage = (overrides: Partial<JustTheCostsUsageStats> = {}): JustTheCostsUsageStats => ({
   cost_mUsd: 0,
@@ -14,25 +14,25 @@ const makeUsage = (overrides: Partial<JustTheCostsUsageStats> = {}): JustTheCost
 });
 
 const fallbackOnlyModel = {
-  ...claude_opus_4_7_stealth_model,
-  pricing: claude_opus_4_7_stealth_model.pricing && {
-    ...claude_opus_4_7_stealth_model.pricing,
+  ...paidStealthModelFixture,
+  pricing: paidStealthModelFixture.pricing && {
+    ...paidStealthModelFixture.pricing,
     fallbackOnly: true,
   },
 };
 
-describe('calculateKiloExclusiveCost_mUsd with stealth Claude Opus 4.7', () => {
-  test('uses the 20% lower flat price for uncached tokens', () => {
+describe('calculateKiloExclusiveCost_mUsd with a paid stealth model', () => {
+  test('uses the flat price for uncached tokens', () => {
     const result = calculateKiloExclusiveCost_mUsd(
-      claude_opus_4_7_stealth_model,
+      paidStealthModelFixture,
       makeUsage({ inputTokens: 100_000, outputTokens: 10_000, cost_mUsd: 999_000 })
     );
     expect(result).toBe(600_000);
   });
 
-  test('uses the discounted Anthropic-compatible cache prices', () => {
+  test('uses the cache prices', () => {
     const result = calculateKiloExclusiveCost_mUsd(
-      claude_opus_4_7_stealth_model,
+      paidStealthModelFixture,
       makeUsage({
         inputTokens: 150_000,
         outputTokens: 10_000,

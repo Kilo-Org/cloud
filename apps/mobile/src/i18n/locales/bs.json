@@ -2220,10 +2220,7 @@
     },
     "remoteSpawnRetryable": "Nije moguće uspostaviti vezu s instancom — možda je odspojena.",
     "remoteSpawnNonRetryable": "Instanca nije uspjela pokrenuti sesiju — provjeri računar ili ažuriraj CLI.",
-    "remoteSpawnInstanceDisconnected": "Odabrana instanca se odspojila. Pokreni sesiju na Cloud Agentu ili odaberi drugu instancu.",
-    "liveCount_one": "{{count}} UŽIVO",
-    "liveCount_other": "{{count}} UŽIVO",
-    "liveCount_few": "{{count}} UŽIVO"
+    "remoteSpawnInstanceDisconnected": "Odabrana instanca se odspojila. Pokreni sesiju na Cloud Agentu ili odaberi drugu instancu."
   },
   "agentChat": {
     "session": {
@@ -4006,6 +4003,8 @@
     "title": "Kupi kredite",
     "description": "Krediti su jednokratna kupovina koja se dodaje na tvoj Kilo saldo za pokretanje AI sesija kodiranja u Kilo App. Trgovina naplaćuje tvoj račun, a krediti se dodaju nakon što trgovina potvrdi plaćanje.",
     "nextExpiry": "Krediti u iznosu od {{amount}} istječu {{date}} (UTC). Prvo se koriste krediti s najranijim rokom isteka.",
+    "noExpiringCredits": "Nema kredita s rokom isteka.",
+    "expiryUnavailable": "Podaci o isteku kredita nisu dostupni.",
     "appStoreExpiry": "Krediti kupljeni putem App Storea ne istječu.",
     "playOneYearExpiry": "Ovi krediti istječu jednu kalendarsku godinu nakon kupovine.",
     "playNonexpiring": "Ovi krediti ne istječu.",

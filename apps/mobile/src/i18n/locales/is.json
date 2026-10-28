@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Ekki náðist samband við tilvikið — það gæti hafa aftengst.",
     "remoteSpawnNonRetryable": "Tilvikinu tókst ekki að ræsa lotuna — athugaðu vélina eða uppfærðu CLI.",
-    "remoteSpawnInstanceDisconnected": "Valda tilvikið aftengdist. Byrjaðu lotu á Cloud Agent eða veldu annað tilvik.",
-    "liveCount_one": "{{count}} Í RAUNTÍMA",
-    "liveCount_other": "{{count}} Í RAUNTÍMA"
+    "remoteSpawnInstanceDisconnected": "Valda tilvikið aftengdist. Byrjaðu lotu á Cloud Agent eða veldu annað tilvik."
   },
   "agentChat": {
     "session": {
@@ -3955,6 +3953,8 @@
     "title": "Kaupa inneign",
     "description": "Inneign er einstakt kaup sem bætist við Kilo-stöðuna þína til að keyra AI-forritunarlotur í Kilo App. Verslunin rukkar reikninginn þinn og inneign bætist við eftir að verslunin staðfestir greiðsluna.",
     "nextExpiry": "Inneign að upphæð {{amount}} rennur út {{date}} (UTC). Inneign sem rennur fyrst út er notuð fyrst.",
+    "noExpiringCredits": "Engin inneign sem rennur út.",
+    "expiryUnavailable": "Upplýsingar um gildistíma inneignar eru ekki tiltækar.",
     "appStoreExpiry": "Inneign sem keypt er í App Store rennur ekki út.",
     "playOneYearExpiry": "Þessi inneign rennur út einu almanaksári eftir kaup.",
     "playNonexpiring": "Þessi inneign rennur ekki út.",

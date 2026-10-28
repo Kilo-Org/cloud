@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Enweghị ike ịkpọtụrụ igwe ahụ — o nwere ike ịbụ na njikọ ya akwụsịla.",
     "remoteSpawnNonRetryable": "Igwe ahụ enweghị ike ịmalite nnọkọ — lelee igwe ahụ ma ọ bụ melite CLI.",
-    "remoteSpawnInstanceDisconnected": "Njikọ igwe ahọpụtara akwụsịla. Malite nnọkọ na Cloud Agent ma ọ bụ họrọ igwe ọzọ.",
-    "liveCount_one": "{{count}} NA-AGA UGBU A",
-    "liveCount_other": "{{count}} NA-AGA UGBU A"
+    "remoteSpawnInstanceDisconnected": "Njikọ igwe ahọpụtara akwụsịla. Malite nnọkọ na Cloud Agent ma ọ bụ họrọ igwe ọzọ."
   },
   "agentChat": {
     "session": {
@@ -3955,6 +3953,8 @@
     "title": "Zụta ego ojiji",
     "description": "Ego ojiji bụ azụmahịa otu oge nke a na-agbakwunye na nguzozi Kilo gị maka ịgba nnọkọ ịde koodu AI na Kilo App. Ụlọ ahịa na-akwụ ụgwọ na akaụntụ gị, a na-agbakwunye ego ojiji mgbe ụlọ ahịa kwadoro ịkwụ ụgwọ ahụ.",
     "nextExpiry": "Ego ojiji ruru {{amount}} ga-agwụ na {{date}} (UTC). A na-ebu ụzọ jiri ego ojiji nke ga-akacha agwụ ngwa ngwa.",
+    "noExpiringCredits": "Enweghị ego ojiji nke ga-agwụ.",
+    "expiryUnavailable": "Nkọwa oge ego ojiji ga-agwụ adịghị.",
     "appStoreExpiry": "Ego ojiji e ji App Store zụta anaghị agwụ.",
     "playOneYearExpiry": "Ego ojiji ndị a ga-agwụ otu afọ kalenda mgbe ịzụrụ ha.",
     "playNonexpiring": "Ego ojiji ndị a anaghị agwụ.",

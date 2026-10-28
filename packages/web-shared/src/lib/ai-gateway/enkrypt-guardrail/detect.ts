@@ -89,12 +89,23 @@ function hasFired(value: unknown): boolean {
   return value === true;
 }
 
-function firedDetectors(summary: Record<string, unknown>): EnkryptDetectorId[] {
+/**
+ * A detector that fails inside Enkrypt, for example on a very large policy rule set, still gets an
+ * HTTP 200 response, with -1 as its summary value.
+ */
+function hasErrored(value: unknown): boolean {
+  return typeof value === 'number' && value < 0;
+}
+
+function matchingDetectors(
+  summary: Record<string, unknown>,
+  matches: (value: unknown) => boolean
+): EnkryptDetectorId[] {
   return Object.entries(summary).flatMap(([name, value]) => {
     const detector = Object.hasOwn(ENKRYPT_SUMMARY_DETECTORS, name)
       ? ENKRYPT_SUMMARY_DETECTORS[name]
       : undefined;
-    return detector && hasFired(value) ? [detector] : [];
+    return detector && matches(value) ? [detector] : [];
   });
 }
 
@@ -169,9 +180,19 @@ async function detectOnce(
   if (!parsed.success) {
     return { kind: 'failed', error: 'invalid_response', retryable: false, creditsCost };
   }
+  const erroredDetectors = matchingDetectors(parsed.data.summary, hasErrored);
+  if (erroredDetectors.length > 0) {
+    return {
+      kind: 'failed',
+      error: `detector_error:${erroredDetectors.join(',')}`,
+      // The known cause is deterministic, so an immediate retry would fail again and be charged again.
+      retryable: false,
+      creditsCost,
+    };
+  }
   return {
     kind: 'detected',
-    firedDetectors: firedDetectors(parsed.data.summary),
+    firedDetectors: matchingDetectors(parsed.data.summary, hasFired),
     resultMessage: parsed.data.result_message ?? null,
     creditsCost,
   };

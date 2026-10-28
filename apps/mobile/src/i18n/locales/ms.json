@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Tidak dapat menghubungi tika — sambungannya mungkin telah terputus.",
     "remoteSpawnNonRetryable": "Tika gagal memulakan sesi — semak mesin atau kemas kini CLI.",
-    "remoteSpawnInstanceDisconnected": "Sambungan tika yang dipilih telah terputus. Mulakan sesi pada Cloud Agent atau pilih tika lain.",
-    "liveCount_one": "{{count}} LANGSUNG",
-    "liveCount_other": "{{count}} LANGSUNG"
+    "remoteSpawnInstanceDisconnected": "Sambungan tika yang dipilih telah terputus. Mulakan sesi pada Cloud Agent atau pilih tika lain."
   },
   "agentChat": {
     "session": {
@@ -3955,6 +3953,8 @@
     "title": "Beli kredit",
     "description": "Kredit ialah pembelian sekali sahaja yang ditambah pada baki Kilo anda untuk menjalankan sesi pengekodan AI dalam Apl Kilo. Kedai mengenakan caj pada akaun anda dan kredit ditambah selepas kedai mengesahkan pembayaran.",
     "nextExpiry": "Kredit sebanyak {{amount}} akan tamat tempoh pada {{date}} (UTC). Kredit yang paling awal tamat tempoh digunakan dahulu.",
+    "noExpiringCredits": "Tiada kredit yang akan tamat tempoh.",
+    "expiryUnavailable": "Maklumat tamat tempoh kredit tidak tersedia.",
     "appStoreExpiry": "Kredit yang dibeli melalui App Store tidak tamat tempoh.",
     "playOneYearExpiry": "Kredit ini tamat tempoh satu tahun kalendar selepas pembelian.",
     "playNonexpiring": "Kredit ini tidak tamat tempoh.",

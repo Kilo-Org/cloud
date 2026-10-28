@@ -24,7 +24,6 @@ import type { OpenRouterGeneration } from '@kilocode/web-shared/lib/ai-gateway/p
 import { calculateCustomCost_mUsd } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
-import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { verifyApproval } from '@kilocode/web-shared/tests/helpers/approval.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
@@ -61,6 +60,11 @@ import {
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { extractReasoningSetting } from './llm-proxy-helpers';
 import { fetchGeneration } from './providers/upstream-request';
+import {
+  createUserOpenRouterProvider,
+  OPENROUTER,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { createUserVercelAiGatewayProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 
 jest.mock('@sentry/nextjs', () => ({
   ...jest.requireActual<object>('@sentry/nextjs'),
@@ -1663,6 +1667,47 @@ describe('logMicrodollarUsage', () => {
       jest.mocked(console.warn).mockRestore();
     });
 
+    test.each([
+      {
+        case: 'the serving provider with a user gateway key',
+        userSuffix: 'user-key',
+        servingProvider: createUserOpenRouterProvider('user-openrouter-key'),
+        expectedApiKey: 'user-openrouter-key',
+      },
+      {
+        case: 'Kilo OpenRouter without a serving provider',
+        userSuffix: 'kilo-key',
+        expectedApiKey: OPENROUTER.apiKey,
+      },
+      {
+        case: 'Kilo OpenRouter when the serving provider is another gateway',
+        userSuffix: 'other-gateway',
+        servingProvider: createUserVercelAiGatewayProvider('user-vercel-key'),
+        expectedApiKey: OPENROUTER.apiKey,
+      },
+    ])(
+      'looks up the generation with $case',
+      async ({ userSuffix, servingProvider, expectedApiKey }) => {
+        const user = await insertTestUser({
+          id: `test-generation-lookup-${userSuffix}`,
+          microdollars_used: 0,
+          google_user_email: `generation-lookup-${userSuffix}@example.com`,
+        });
+        jest.mocked(fetchGeneration).mockResolvedValue(undefined);
+
+        await processTokenData(
+          { ...transcriptionStats },
+          { ...createBaseUsageContext(user), api_kind: 'audio_transcriptions', user_byok: true },
+          servingProvider
+        );
+
+        expect(fetchGeneration).toHaveBeenCalledWith(
+          'gen-stt-123',
+          expect.objectContaining({ id: 'openrouter', apiKey: expectedApiKey })
+        );
+      }
+    );
+
     test('reports the unresolved cost when the generation lookup fails', async () => {
       const user = await insertTestUser({
         id: 'test-generation-lookup-failure-user',
@@ -2044,7 +2089,7 @@ describe('logMicrodollarUsage', () => {
     const usageStats = { ...BASE_USAGE_STATS, messageId: null, cost_mUsd: 12_316 };
     const customInferenceCost_mUsd = calculateCustomCost_mUsd(
       TEST_CUSTOM_PRICING_CONFIG,
-      GEMINI_FLASH_CURRENT_MODEL_ID,
+      'google/gemini-3.8-flash',
       { ...usageStats, cost_mUsd: 5316 }
     );
     assert(customInferenceCost_mUsd !== undefined);
@@ -2052,7 +2097,7 @@ describe('logMicrodollarUsage', () => {
 
     const result = await processTokenData(
       { ...usageStats, nonInferenceCost_mUsd: 7000 },
-      { ...createBaseUsageContext(user), requested_model: GEMINI_FLASH_CURRENT_MODEL_ID }
+      { ...createBaseUsageContext(user), requested_model: 'google/gemini-3.8-flash' }
     );
 
     assert(result);

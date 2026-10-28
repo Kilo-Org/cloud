@@ -62,6 +62,16 @@ export function computeProviderSelectionsForSummaryCard(params: {
   return selections.length > 0 ? selections : [];
 }
 
+export function countDistinctAllowedModels(selections: ProviderSelection[]): number {
+  const modelIds = new Set<string>();
+  for (const selection of selections) {
+    for (const modelId of selection.models) {
+      modelIds.add(normalizeModelId(modelId));
+    }
+  }
+  return modelIds.size;
+}
+
 export function OrganizationProvidersAndModelsConfigurationCard({
   organizationId,
   readonly,
@@ -127,10 +137,7 @@ export function OrganizationProvidersAndModelsConfigurationCard({
           ? 'All providers and models'
           : (() => {
               const providerCount = providerSelections.length;
-              const modelCount = providerSelections.reduce(
-                (total, provider) => total + provider.models.length,
-                0
-              );
+              const modelCount = countDistinctAllowedModels(providerSelections);
               const providerText = providerCount === 1 ? 'provider' : 'providers';
               const modelText = modelCount === 1 ? 'model' : 'models';
               return (

@@ -10,6 +10,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
 import {
+  addDirectByokCatalogAvailability,
   addUserByokAvailability,
   getUserByokProviderIds,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
@@ -109,7 +110,10 @@ export async function handleModelsRequest(
       ]);
     const modelsWithByokAvailability = await tagOpenAiChatGptByokModels(
       { kiloUserId: auth.user.id, organizationId: null },
-      await addUserByokAvailability(models, enabledByokProviderIds, directByokCatalogModelIds)
+      addDirectByokCatalogAvailability(
+        await addUserByokAvailability(models, enabledByokProviderIds),
+        directByokCatalogModelIds
+      )
     );
     return await modelResponse({
       data: appendLocalFakeDeterministicCatalogModels(

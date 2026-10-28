@@ -44,6 +44,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import type {
   GatewayChatApiKind,
+  Provider,
   ProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
@@ -315,6 +316,16 @@ const BYOK_MODEL_PERMISSION_DENIED_MESSAGE =
 const OPENCODE_GO_BYOK_MODEL_PERMISSION_DENIED_MESSAGE =
   '[BYOK] Your API key does not have permission to access this model. Some OpenCode Go models require opting in to data collection or region-specific inference in OpenCode Go.';
 
+// Vercel's explanation for a rejected key tells developers to set the
+// AI_GATEWAY_API_KEY environment variable, which does not apply to a key saved
+// in Kilo, so it is not appended.
+const VERCEL_AI_GATEWAY_BYOK_KEY_REJECTED_MESSAGE =
+  '[BYOK] Vercel AI Gateway rejected your API key. Check that the key is correct and has not been revoked.';
+
+function isRejectedVercelAiGatewayKey(status: number, userByokProviderIds: UserByokProviderId[]) {
+  return status === 401 && userByokProviderIds.includes('vercel-ai-gateway');
+}
+
 const byokErrorMessages: Record<number, string> = {
   401: '[BYOK] Your API key is invalid or has been revoked. Please check your API key configuration.',
   402: '[BYOK] Your API account has insufficient funds. Please check your billing details with your API provider.',
@@ -350,6 +361,9 @@ function specificByokErrorMessage(
   if (status === 403 && userByokProviderIds.includes('opencode-go')) {
     return OPENCODE_GO_BYOK_MODEL_PERMISSION_DENIED_MESSAGE;
   }
+  if (isRejectedVercelAiGatewayKey(status, userByokProviderIds)) {
+    return VERCEL_AI_GATEWAY_BYOK_KEY_REJECTED_MESSAGE;
+  }
   return byokErrorMessages[status];
 }
 
@@ -359,6 +373,9 @@ async function byokErrorMessage(
 ): Promise<string | undefined> {
   const specificMessage = specificByokErrorMessage(response.status, userByokProviderIds);
   if (!specificMessage && (response.status < 400 || response.status >= 500)) return undefined;
+  if (isRejectedVercelAiGatewayKey(response.status, userByokProviderIds)) {
+    return VERCEL_AI_GATEWAY_BYOK_KEY_REJECTED_MESSAGE;
+  }
 
   // The provider's own explanation (for example an expired rather than revoked
   // key) is often more actionable than our status-based summary.
@@ -716,11 +733,17 @@ export function wrapInSafeNextResponse(response: Response) {
 export function accountForMicrodollarUsage(
   clonedReponse: Response,
   usageContext: MicrodollarUsageContext,
-  openrouterRequestSpan: Span | undefined
+  openrouterRequestSpan: Span | undefined,
+  servingProvider: Provider
 ) {
   const logFileExtension = usageContext.isStreaming ? '.log.resp.sse' : '.log.resp.json';
   debugSaveProxyResponseStream(clonedReponse, logFileExtension);
-  const accounting = countAndStoreUsage(clonedReponse, usageContext, openrouterRequestSpan);
+  const accounting = countAndStoreUsage(
+    clonedReponse,
+    usageContext,
+    openrouterRequestSpan,
+    servingProvider
+  );
   after(accounting);
   return accounting;
 }

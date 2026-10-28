@@ -36,6 +36,22 @@ Keep credentials out of tracked defaults. For local monitor development, generat
 a separate value with `openssl rand -base64 32` and set it in the local environment;
 ordinary local startup does not require this credential.
 
+### Cloud agent dispatch health monitor
+
+`CLOUD_AGENT_DISPATCH_HEALTH_SECRET` is a dedicated server-only monitor credential for
+`GET /api/cloud-agent/dispatch-health`. `[SECRET]` The monitor must send
+`Authorization: Bearer <configured value>`. An unset or empty value disables access, and the
+endpoint accepts no other credential, including request parameters.
+
+For initial deployment or rotation, the owner runs
+`pnpm web:env set CLOUD_AGENT_DISPATCH_HEALTH_SECRET`, supplies a newly generated secret, and
+coordinates the application deployment with the external monitor's header update.
+Verify the monitor after the deployment and header update. Only one configured
+secret is accepted; deployment and monitor configuration must agree.
+Keep credentials out of tracked defaults. For local monitor development, generate
+a separate value with `openssl rand -base64 32` and set it in the local environment;
+ordinary local startup does not require this credential.
+
 ### Configuration & Constant URLs
 
 - `APP_URL_OVERRIDE` - Optional base application URL override in any environment; used in `packages/web-shared/src/lib/constants.ts` and `next.config.mjs`. When unset, Vercel's `staging` target uses `https://staging-app.kilo.ai`, production uses `https://app.kilo.ai`, and local development uses `PORT`. [SERVER]

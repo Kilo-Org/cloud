@@ -26,6 +26,7 @@ import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
+import { canConnectProvider } from '@/lib/code-reviewer-status';
 import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
 import { useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
 import {
@@ -141,11 +142,15 @@ export function PlatformOverviewScreen({
 
   const handleConnected = status.refetch;
   if (!isLoading && !connected) {
+    // The connect card installs the provider's app for the scope, which is a
+    // narrower capability than editing the reviewer settings (see
+    // `canConnectProvider`): the card must follow the install rule, not `canEdit`.
+    const canConnect = canConnectProvider(platform, permission);
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
         <CenteredState contentContainerClassName="px-6">
-          {canEdit ? (
+          {canConnect ? (
             <ProviderConnectCard scope={scope} platform={platform} onConnected={handleConnected} />
           ) : (
             <Text className="text-center text-xs text-muted-foreground">

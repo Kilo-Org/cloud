@@ -96,6 +96,21 @@ export type PermissionState =
   | { status: 'ready'; canEdit: boolean; canManage: boolean };
 
 /**
+ * Whether a screen may offer this platform's connect action for the scope.
+ *
+ * GitHub's connect card mints an app-install state, which the server restricts
+ * to an organization-manage role, so the billing-level edit capability is too
+ * wide for it. GitLab connects an account token, which the billing roles may
+ * also connect. A personal scope carries both capabilities.
+ */
+export function canConnectProvider(
+  platform: 'github' | 'gitlab',
+  capabilities: { canEdit: boolean; canManage: boolean }
+): boolean {
+  return platform === 'gitlab' ? capabilities.canEdit : capabilities.canManage;
+}
+
+/**
  * Discriminated status for a reviewer config read's body, so a screen always
  * has exactly one surface to paint. The overview screens used to compose the
  * body from separate `isLoading` / `isError` / `paused` tests, and a config

@@ -20,7 +20,7 @@ import { Input } from '@/components/ui/input';
 import { Text } from '@/components/ui/text';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { PLATFORM_CAPABILITIES } from '@/lib/code-reviewer-config';
-import { classifyProviderErrorCode } from '@/lib/code-reviewer-status';
+import { canConnectProvider, classifyProviderErrorCode } from '@/lib/code-reviewer-status';
 import {
   useGitHubStatus,
   useGitLabStatus,
@@ -221,7 +221,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
     // own. An unresolved permission keeps the button — `review-memory-screen`
     // treats an unsettled permission the same way, and the provider procedures
     // stay server-authorized.
-    const canConnect = permission.status !== 'ready' || permission.canManage;
+    const canConnect = permission.status !== 'ready' || canConnectProvider('github', permission);
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader

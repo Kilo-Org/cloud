@@ -7,6 +7,7 @@ import {
   shouldRouteToVercel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import { isGatewayUserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import { withIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import {
   findKiloExclusiveModel,
   isKiloExclusiveModel,
@@ -300,6 +301,9 @@ export type GetProviderInput = {
   /** Resolves organization/group provider policy only when selecting a managed
    * gateway. Direct BYOK and custom LLM routes do not use it. */
   getRoutingProviderConfig?: () => Promise<OpenRouterProviderConfig | undefined>;
+  /** Kilo's own provider exclusions for the model (see `getIgnoredProviders`).
+   * They apply to routes Kilo pays for, never to a user's own gateway key. */
+  kiloIgnoredProviders?: string[];
   /** The request carries a spend ceiling. Only a provider that can cap the
    * price of the route it serves may take it. */
   boundedSpending?: boolean;
@@ -315,6 +319,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     organizationId,
     botId,
     getRoutingProviderConfig,
+    kiloIgnoredProviders = [],
     boundedSpending = false,
     countryCode = null,
   } = input;
@@ -400,7 +405,9 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
   if (
     eligibleForVercelRouting &&
     !boundedSpending &&
-    (await shouldRouteToVercel(requestedModel, request, resolveRoutingProviderConfig))
+    (await shouldRouteToVercel(requestedModel, request, async () =>
+      withIgnoredProviders(await resolveRoutingProviderConfig(), kiloIgnoredProviders)
+    ))
   ) {
     return {
       kind: 'provider',

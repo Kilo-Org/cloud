@@ -541,6 +541,37 @@ describe('getProvider gateway BYOK routing', () => {
     });
   });
 
+  test('checks the Vercel AI Gateway key without Kilo provider exclusions', async () => {
+    jest.mocked(getBYOKforUser).mockResolvedValue([vercelKey]);
+    const callerProvider = { only: ['anthropic'] };
+
+    const result = await resolve({
+      ...providerInput(model),
+      getRoutingProviderConfig: async () => callerProvider,
+      kiloIgnoredProviders: ['anthropic'],
+    });
+
+    expect(result.provider).toMatchObject({ id: 'vercel', apiKey: 'user-vercel-gateway-key' });
+    const getRoutingProviderConfig = jest.mocked(canRouteToVercel).mock.calls[0][1];
+    await expect(getRoutingProviderConfig()).resolves.toEqual(callerProvider);
+  });
+
+  test('applies Kilo provider exclusions to managed Vercel routing', async () => {
+    jest.mocked(getModelUserByokProviders).mockResolvedValue([]);
+
+    await resolve({
+      ...providerInput(model),
+      getRoutingProviderConfig: async () => ({ only: ['amazon-bedrock', 'anthropic'] }),
+      kiloIgnoredProviders: ['anthropic'],
+    });
+
+    const getRoutingProviderConfig = jest.mocked(shouldRouteToVercel).mock.calls[0][2];
+    await expect(getRoutingProviderConfig()).resolves.toEqual({
+      only: ['amazon-bedrock', 'anthropic'],
+      ignore: ['anthropic'],
+    });
+  });
+
   test('uses organization keys for organization requests', async () => {
     jest.mocked(getBYOKforOrganization).mockResolvedValue([openRouterKey]);
 

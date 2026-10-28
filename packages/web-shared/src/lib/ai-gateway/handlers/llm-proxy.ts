@@ -21,10 +21,7 @@ import {
   providerPrivacySchema,
 } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
-import {
-  getIgnoredProviders,
-  withIgnoredProviders,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
+import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { sendUpstreamAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-attempt';
@@ -877,10 +874,8 @@ export async function handleLlmProxyRequest(
     boundedSpending: requestCostLimit !== null,
     countryCode,
     getRoutingProviderConfig: async () =>
-      withIgnoredProviders(
-        (await accessCheckResolver.getRoutingProviderConfig?.()) ?? requestBodyParsed.body.provider,
-        ignoredProviders
-      ),
+      (await accessCheckResolver.getRoutingProviderConfig?.()) ?? requestBodyParsed.body.provider,
+    kiloIgnoredProviders: ignoredProviders,
   });
   if (providerResult.kind === 'chatgpt-reconnect') {
     // The person's enabled ChatGPT connection is terminally dead. Fail readably

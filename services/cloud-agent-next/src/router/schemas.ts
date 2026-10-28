@@ -429,6 +429,12 @@ export const CloseTerminalOutput = z.object({
 const PrepareSessionSharedFields = {
   allowSubagentSessions: z.boolean().optional(),
   githubAccessPurpose: z.enum(['workflow', 'agent']).optional(),
+  allowUserAuthorization: z
+    .boolean()
+    .optional()
+    .describe(
+      'Allow resolving GitHub credentials with the session user’s own authorization when available'
+    ),
   mode: ModeSlugSchema.describe(
     'Kilo Code execution mode (built-in or custom slug from runtimeAgents)'
   ),
@@ -679,6 +685,14 @@ export const PrepareSessionInput = z
         code: 'custom',
         path: ['githubIntegrationId'],
         message: 'GitHub integration identity is only valid for GitHub repositories',
+      });
+    }
+
+    if (data.allowUserAuthorization === true && data.githubRepo === undefined) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['allowUserAuthorization'],
+        message: 'GitHub user authorization is only valid for GitHub repositories',
       });
     }
 

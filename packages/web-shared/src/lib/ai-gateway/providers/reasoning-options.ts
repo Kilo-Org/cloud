@@ -65,11 +65,5 @@ export function getFallbackReasoningOptions(model: string): ReasoningOption[] | 
   if (isStepModel(model)) {
     return effortOptions('low', 'medium', 'high');
   }
-  if (model === 'stealth/glyph-cluster') {
-    return effortOptions('low', 'medium', 'high', 'xhigh');
-  }
-  if (model.startsWith('reflection/beam')) {
-    return effortOptions('low', 'medium', 'high', 'xhigh', 'max');
-  }
   return undefined;
 }

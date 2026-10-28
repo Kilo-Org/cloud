@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Der kunne ikke oprettes forbindelse til instansen. Den har muligvis mistet forbindelsen.",
     "remoteSpawnNonRetryable": "Instansen kunne ikke starte sessionen — kontrollér maskinen eller opdater CLI'en.",
-    "remoteSpawnInstanceDisconnected": "Den valgte instans har mistet forbindelsen. Start en session på Cloud Agent, eller vælg en anden instans.",
-    "liveCount_one": "{{count}} I REALTID",
-    "liveCount_other": "{{count}} I REALTID"
+    "remoteSpawnInstanceDisconnected": "Den valgte instans har mistet forbindelsen. Start en session på Cloud Agent, eller vælg en anden instans."
   },
   "agentChat": {
     "session": {

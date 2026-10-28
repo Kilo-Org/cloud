@@ -49,6 +49,7 @@ function charge(
     apiKind: 'messages',
     decision: 'blocked',
     creditsCost: 7,
+    addedLatencyMs: 212,
     ...overrides,
   };
 }
@@ -82,6 +83,7 @@ describe('recordEnkryptGuardrailCharge', () => {
         decision: 'blocked',
         enkrypt_credits_cost: 7,
         charged_microdollars: 7 * MICRODOLLARS_PER_ENKRYPT_CREDIT,
+        added_latency_ms: 212,
       }),
     ]);
     expect(await organizationBalance(organization.id)).toEqual({
@@ -114,7 +116,11 @@ describe('recordEnkryptGuardrailCharge', () => {
     const { user, organization } = await organizationWithMember();
 
     await recordEnkryptGuardrailCharge(
-      charge(organization.id, user.id, { decision: 'error', creditsCost: null })
+      charge(organization.id, user.id, {
+        decision: 'error',
+        creditsCost: null,
+        addedLatencyMs: null,
+      })
     );
 
     const rows = await db
@@ -126,6 +132,7 @@ describe('recordEnkryptGuardrailCharge', () => {
         decision: 'error',
         enkrypt_credits_cost: null,
         charged_microdollars: 0,
+        added_latency_ms: null,
       }),
     ]);
     expect(await organizationBalance(organization.id)).toEqual({

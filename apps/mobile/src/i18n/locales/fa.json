@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "دسترسی به نمونه ممکن نشد. ممکن است اتصال آن قطع شده باشد.",
     "remoteSpawnNonRetryable": "نمونه نتوانست نشست را شروع کند. دستگاه را بررسی کنید یا CLI را به‌روزرسانی کنید.",
-    "remoteSpawnInstanceDisconnected": "اتصال نمونهٔ انتخاب‌شده قطع شد. نشستی در Cloud Agent شروع کنید یا نمونهٔ دیگری انتخاب کنید.",
-    "liveCount_one": "{{count}} زنده",
-    "liveCount_other": "{{count}} زنده"
+    "remoteSpawnInstanceDisconnected": "اتصال نمونهٔ انتخاب‌شده قطع شد. نشستی در Cloud Agent شروع کنید یا نمونهٔ دیگری انتخاب کنید."
   },
   "agentChat": {
     "session": {

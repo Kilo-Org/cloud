@@ -1,11 +1,10 @@
 import { useCallback, useEffect, useState } from 'react';
 import * as WebBrowser from 'expo-web-browser';
 import { useFocusEffect } from 'expo-router';
-import { Alert, AppState, Platform, View } from 'react-native';
+import { Alert, AppState, Platform } from 'react-native';
 
 import { i18n } from '@/i18n';
 import { AgentSessionListScreen } from '@/components/agents/session-list-screen';
-import { ContextControl } from '@/components/context-control';
 import { type AgentsView, AgentsViewSegment } from '@/components/todos/agents-view-segment';
 import { TodoListsScreen } from '@/components/todos/todo-lists-screen';
 import { runPendingWidgetActions } from '@/glanceable-ios/widget-actions';
@@ -169,20 +168,7 @@ export default function AgentSessionList() {
     }, [])
   );
 
-  // The account the tab is scoped to belongs to the tab, not to either view:
-  // both the live list and the To-dos list query the selected personal or
-  // organization scope, and an organization scope with no rows otherwise reads
-  // as "no sessions" while the user's personal sessions sit one switch away.
-  // Both views render this header under their title, so the scope and its
-  // switch are identical on Sessions and on To-dos.
-  const tabHeader = (
-    <>
-      <View className="px-[22px] pb-1">
-        <ContextControl />
-      </View>
-      <AgentsViewSegment value={view} onChange={setView} />
-    </>
-  );
+  const tabHeader = <AgentsViewSegment value={view} onChange={setView} />;
   return view === 'sessions' ? (
     <AgentSessionListScreen tabHeader={tabHeader} />
   ) : (

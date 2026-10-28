@@ -70,6 +70,12 @@ describe('POST /api/openrouter/models/validate', () => {
     });
   });
 
+  test('validates against the catalog for the request country', async () => {
+    await handleModelValidationRequest(request('available/model', { 'x-vercel-ip-country': 'CU' }));
+
+    expect(mockedGetEnhancedOpenRouterModels).toHaveBeenCalledWith({ countryCode: 'CU' });
+  });
+
   test('does not expose details for an unavailable model', async () => {
     const response = await handleModelValidationRequest(request('missing/model'));
 
@@ -124,6 +130,27 @@ describe('POST /api/openrouter/models/validate', () => {
     );
 
     expect(response.status).toBe(400);
+    expect(mockedGetUserFromAuth).not.toHaveBeenCalled();
     expect(mockedGetEnhancedOpenRouterModels).not.toHaveBeenCalled();
+  });
+
+  test('rejects malformed JSON before authentication or catalog reads', async () => {
+    const response = await handleModelValidationRequest(
+      new NextRequest('http://localhost:3000/api/openrouter/models/validate', {
+        method: 'POST',
+        body: '{not json',
+      })
+    );
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'Invalid JSON body' });
+    expect(mockedGetUserFromAuth).not.toHaveBeenCalled();
+    expect(mockedGetEnhancedOpenRouterModels).not.toHaveBeenCalled();
+  });
+
+  test('matches the trimmed model ID', async () => {
+    const response = await handleModelValidationRequest(request('  available/model  '));
+
+    await expect(response.json()).resolves.toEqual({ valid: true });
   });
 });

@@ -62,6 +62,9 @@ function repositoryMetadataFromRegistrationInput(
         type: 'github',
         repo: repository.repo,
         githubAccessPurpose: repository.githubAccessPurpose ?? 'workflow',
+        ...(repository.allowUserAuthorization === undefined
+          ? {}
+          : { allowUserAuthorization: repository.allowUserAuthorization }),
         ...(repository.githubIntegrationId
           ? { githubIntegrationId: repository.githubIntegrationId }
           : {}),

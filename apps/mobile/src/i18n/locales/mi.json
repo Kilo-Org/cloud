@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Kāore i taea te hono ki te tauira whakahaere — kua motu pea tōna hononga.",
     "remoteSpawnNonRetryable": "Kāore i taea e te tauira whakahaere te tīmata i te wātū — tirohia te mīhini, whakahoutia rānei te CLI.",
-    "remoteSpawnInstanceDisconnected": "Kua motu te hononga o te tauira whakahaere kua kōwhiria. Tīmataria he wātū ki Cloud Agent, kōwhiria rānei tētahi atu tauira whakahaere.",
-    "liveCount_one": "{{count}} MATAORA",
-    "liveCount_other": "{{count}} MATAORA"
+    "remoteSpawnInstanceDisconnected": "Kua motu te hononga o te tauira whakahaere kua kōwhiria. Tīmataria he wātū ki Cloud Agent, kōwhiria rānei tētahi atu tauira whakahaere."
   },
   "agentChat": {
     "session": {

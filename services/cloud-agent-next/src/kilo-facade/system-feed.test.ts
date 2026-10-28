@@ -48,6 +48,36 @@ describe('projectSystemFeedEvent', () => {
     });
   });
 
+  it('preserves terminal preparation failure correlation and safeError for replay', () => {
+    const preparation = {
+      version: 2,
+      attemptId: 'attempt_failed_1',
+      triggerMessageId: 'msg_failed_1',
+      revision: 8,
+      timestamp: 1_700_000_000_000,
+      step: 'workspace_setup',
+      message: 'Preparation snapshot',
+      action: 'attempt_snapshot',
+      attempt: {
+        id: 'attempt_failed_1',
+        triggerMessageId: 'msg_failed_1',
+        status: 'failed',
+        startedAt: 1_700_000_000_000,
+        revision: 8,
+        completedAt: 1_700_000_000_100,
+        safeError: 'workspace_setup_failed',
+      },
+    };
+    expect(projectSystemFeedEvent('preparing', preparation, kiloSessionId)).toEqual({
+      type: 'preparing',
+      properties: {
+        sessionID: kiloSessionId,
+        directory: `/cloud-agent/sessions/${kiloSessionId}`,
+        preparation,
+      },
+    });
+  });
+
   it('drops a preparation payload that carries no step', () => {
     expect(projectSystemFeedEvent('preparing', { message: 'no step' }, kiloSessionId)).toBeNull();
     expect(projectSystemFeedEvent('preparing', 'not-an-object', kiloSessionId)).toBeNull();

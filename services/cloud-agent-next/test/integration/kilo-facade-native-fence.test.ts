@@ -207,6 +207,60 @@ async function startReadySession(): Promise<ActiveSession> {
   return { sandboxId, stub, wrapper, stopPump, message };
 }
 
+async function startPreparationFailureSession(): Promise<ActiveSession> {
+  const sandboxId = await generateSandboxId(
+    undefined,
+    ORG_ID,
+    USER_ID,
+    cloudAgentSessionId,
+    undefined
+  );
+  const provider = createFakeProvider();
+  await installSandbox(sandboxId, provider.adapter);
+
+  const stub = sessions.getByName(sessionDoName(USER_ID, cloudAgentSessionId));
+  const message: ControlPlanePromptPayload = {
+    messageId: createMessageId(),
+    turn: { type: 'prompt', prompt: 'failed preparation fixture' },
+    agent: { mode: 'code', model: 'test/model' },
+  };
+  await stub.createSessionWithInitialAdmission({
+    metadata: metadata({
+      sessionId: cloudAgentSessionId,
+      kiloSessionId: qualifiedKiloSessionId,
+      sandboxId,
+    }),
+    message,
+    sandboxSelection: { provider: 'cloudflare' },
+  });
+
+  await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+  const launchEnv = provider.launchEnvs[0];
+  if (!launchEnv?.SANDBOX_CONTROL_CREDENTIAL || !launchEnv.CONTROL_PLANE_ALLOCATION_ID) {
+    throw new Error('launch environment is missing identity');
+  }
+  const wrapper = await FakeWrapper.connect({
+    sandboxId,
+    credential: launchEnv.SANDBOX_CONTROL_CREDENTIAL,
+  });
+  await wrapper.hello({
+    wrapperId: 'wr_native_fence_failure',
+    allocationId: launchEnv.CONTROL_PLANE_ALLOCATION_ID,
+  });
+  expect(await wrapper.next()).toMatchObject({
+    type: 'session.prepare',
+    spec: { sessionId: cloudAgentSessionId },
+  });
+  wrapper.send({
+    type: 'session.failed',
+    sessionId: cloudAgentSessionId,
+    reason: 'workspace_setup_failed',
+  });
+  await waitFor(async () => expect(await messageStatus(stub, message.messageId)).toBe('failed'));
+
+  return { sandboxId, stub, wrapper, stopPump: () => undefined, message };
+}
+
 async function durableSnapshot(stub: DurableObjectStub<SandboxSessionV2>) {
   return runInDurableObject(stub, instance => instance.nativeSnapshot({}));
 }
@@ -842,6 +896,91 @@ describe('hosted native history/live fence', { timeout: 30_000 }, () => {
           (event.properties as { part?: { id?: string } }).part?.id === 'prt_tool_replay'
       ) as { properties: { part: { state: { status: string } } } } | undefined;
       expect(tool?.properties.part.state.status).toBe('completed');
+    } finally {
+      session.stopPump();
+      session.wrapper.close();
+    }
+  });
+
+  it('replays sanitized preparation failure evidence through the system feed after reconnect', async () => {
+    const session = await startPreparationFailureSession();
+    try {
+      await seedFacadeRoots({
+        kiloSessionId: qualifiedKiloSessionId,
+        cloudAgentSessionId,
+        title: 'failed preparation fixture',
+      });
+      const directory = encodeURIComponent(`/cloud-agent/sessions/${qualifiedKiloSessionId}`);
+      const response = await SELF.fetch(
+        `http://worker.test/kilo-test/kilo/cloud-agent/event?userId=${userId}&directory=${directory}`
+      );
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-type')).toContain('text/event-stream');
+
+      const reader = createSseDataReader(response);
+      const observed: unknown[] = [];
+      let attemptReplay: Record<string, unknown> | undefined;
+      let stepReplay: Record<string, unknown> | undefined;
+      let cloudStatusFrame: unknown;
+      for (let index = 0; index < 64; index++) {
+        const frame = await reader.next();
+        observed.push(frame);
+        if (isFrame(frame, 'cloud.status')) cloudStatusFrame = frame;
+        const preparation =
+          isFrame(frame, 'preparing') &&
+          (frame.properties as { preparation?: Record<string, unknown> }).preparation;
+        if (
+          preparation?.action === 'attempt_snapshot' &&
+          (preparation.attempt as { status?: string } | undefined)?.status === 'failed'
+        ) {
+          attemptReplay = preparation;
+        }
+        if (
+          preparation?.action === 'step_snapshot' &&
+          (preparation.stepSnapshot as { status?: string } | undefined)?.status === 'failed'
+        ) {
+          stepReplay = preparation;
+        }
+        if (
+          attemptReplay !== undefined &&
+          stepReplay !== undefined &&
+          cloudStatusFrame !== undefined
+        ) {
+          break;
+        }
+      }
+      await reader.cancel();
+      expect(attemptReplay).toBeDefined();
+      expect(stepReplay).toBeDefined();
+
+      expect(attemptReplay).toMatchObject({
+        attemptId: expect.any(String),
+        triggerMessageId: session.message.messageId,
+        revision: expect.any(Number),
+        timestamp: expect.any(Number),
+        attempt: {
+          id: attemptReplay?.attemptId,
+          status: 'failed',
+          triggerMessageId: session.message.messageId,
+          safeError: 'workspace_setup_failed',
+        },
+      });
+      expect(stepReplay).toMatchObject({
+        attemptId: attemptReplay?.attemptId,
+        triggerMessageId: session.message.messageId,
+        revision: expect.any(Number),
+        timestamp: expect.any(Number),
+        stepSnapshot: {
+          status: 'failed',
+          safeError: 'workspace_setup_failed',
+        },
+      });
+
+      expect(cloudStatusFrame).toBeDefined();
+      expect((cloudStatusFrame as { properties: unknown }).properties).toMatchObject({
+        sessionID: qualifiedKiloSessionId,
+        cloudStatus: { type: 'error' },
+      });
     } finally {
       session.stopPump();
       session.wrapper.close();

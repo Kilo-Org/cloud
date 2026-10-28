@@ -1,3 +1,4 @@
+import { DIRECT_BYOK_PROVIDER_IDS } from '@kilocode/worker-utils/direct-byok-model';
 import * as z from 'zod';
 
 export const OpenRouterInferenceProviderIdSchema = z.enum([
@@ -108,24 +109,8 @@ export type VercelUserByokInferenceProviderId = z.infer<
 >;
 
 export const DirectUserByokInferenceProviderIdSchema = z.enum([
-  'alibaba-token-plan',
-  'byteplus-coding',
-  'chutes-byok',
+  ...DIRECT_BYOK_PROVIDER_IDS,
   'codestral',
-  'edenai',
-  'inceptron-byok',
-  'kimi-coding',
-  'martian',
-  'morph-byok',
-  'neuralwatt',
-  'nvidia-byok',
-  'ollama-cloud',
-  'opencode-go',
-  'orcarouter',
-  'synthetic',
-  'xiaomi-token-plan-ams',
-  'xiaomi-token-plan-sgp',
-  'zai-coding',
 ]);
 
 export type DirectUserByokInferenceProviderId = z.infer<

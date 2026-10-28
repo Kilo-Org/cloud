@@ -1,23 +1,10 @@
+import {
+  forEachChildSchema,
+  isRecord,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
-// Keywords whose values are instance data rather than subschemas.
-const DATA_KEYWORDS = new Set(['const', 'default', 'enum', 'examples']);
-
-// Keywords whose values map arbitrary names, such as property names, to subschemas.
-const SUBSCHEMA_MAP_KEYWORDS = new Set([
-  '$defs',
-  'definitions',
-  'dependencies',
-  'dependentSchemas',
-  'patternProperties',
-  'properties',
-]);
-
 const SCALAR_TYPES = new Set(['string', 'integer', 'number', 'boolean']);
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
 
 function enumValueType(value: unknown): string {
   if (value === null) return 'null';
@@ -48,32 +35,16 @@ function inferEnumType(values: unknown[]): string | string[] | undefined {
  * Mutates the schema in place.
  */
 export function addMissingJsonSchemaEnumTypes(schema: unknown): void {
-  const visit = (node: unknown, isSubschemaMap = false) => {
-    if (Array.isArray(node)) {
-      for (const item of node) visit(item);
-      return;
+  if (!isRecord(schema)) {
+    return;
+  }
+  if (schema.type === undefined && Array.isArray(schema.enum)) {
+    const type = inferEnumType(schema.enum);
+    if (type !== undefined) {
+      schema.type = type;
     }
-    if (!isRecord(node)) {
-      return;
-    }
-    if (!isSubschemaMap && node.type === undefined && Array.isArray(node.enum)) {
-      const type = inferEnumType(node.enum);
-      if (type !== undefined) {
-        node.type = type;
-      }
-    }
-    for (const [key, value] of Object.entries(node)) {
-      if (isSubschemaMap) {
-        visit(value);
-      } else if (SUBSCHEMA_MAP_KEYWORDS.has(key)) {
-        visit(value, true);
-      } else if (!DATA_KEYWORDS.has(key)) {
-        visit(value);
-      }
-    }
-  };
-
-  visit(schema);
+  }
+  forEachChildSchema(schema, addMissingJsonSchemaEnumTypes);
 }
 
 export function addMissingToolSchemaEnumTypes(request: GatewayRequest): void {

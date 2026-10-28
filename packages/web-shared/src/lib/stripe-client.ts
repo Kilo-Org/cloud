@@ -10,8 +10,14 @@ if (!stripeSecretKey) {
 const skipStripeApi =
   process.env.NODE_ENV !== 'production' && process.env.SKIP_STRIPE_API === 'true';
 
+// Stripe rejects requests that hit a locked object ("another API request or
+// Stripe process is currently accessing it") and advises retrying; the SDK
+// retries those with backoff. Pinned explicitly so the bound is deliberate.
+const STRIPE_MAX_NETWORK_RETRIES = 2;
+
 export const client: Stripe = new Stripe(stripeSecretKey, {
   apiVersion: '2026-09-30.endive',
+  maxNetworkRetries: STRIPE_MAX_NETWORK_RETRIES,
 });
 
 type ConstrainedMetadata = UserConstrainedMetadata | OrganizationConstrainedMetdata;

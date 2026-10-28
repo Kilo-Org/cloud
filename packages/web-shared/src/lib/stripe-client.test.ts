@@ -43,6 +43,17 @@ function noSuchCustomer(customerId: string): Error {
   });
 }
 
+describe('client', () => {
+  it('retries transient Stripe failures a bounded number of times', () => {
+    const StripeConstructor = (jest.requireMock('stripe') as { default: jest.Mock }).default;
+
+    expect(StripeConstructor).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({ apiVersion: '2026-09-30.endive', maxNetworkRetries: 2 })
+    );
+  });
+});
+
 describe('hasPaymentMethodInStripe', () => {
   it('reports a payment method on file', async () => {
     mockList.mockResolvedValue({ data: [{ id: 'pm_1' }] });

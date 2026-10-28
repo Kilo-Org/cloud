@@ -2075,6 +2075,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Varnostna storitev ni nastavljena. Ponovna oddaja ne more uspeti, dokler to ni odpravljeno.",
+      "serviceUnavailable": "Varnostna storitev ni na voljo. Poskusi znova.",
       "syncMayNotHaveCompleted": "Sinhronizacija se morda ni končala. Poskusi znova, da uskladiš njeno stanje, ali jo zavrzi.",
       "syncInProgress": "Sinhronizacija varnostnih ugotovitev že poteka. Poskusi znova.",
       "dismissalInProgress": "Ta zavrnitev že poteka. Poskusi znova.",

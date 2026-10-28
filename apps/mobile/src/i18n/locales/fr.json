@@ -1473,6 +1473,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Le service de sécurité n'est pas configuré. Aucun nouvel envoi ne pourra aboutir tant que ce problème persiste.",
+      "serviceUnavailable": "Le service de sécurité est indisponible. Réessayez.",
       "syncMayNotHaveCompleted": "Une synchronisation n'a peut-être pas abouti. Réessayez pour mettre son état à jour, ou abandonnez.",
       "syncInProgress": "Une synchronisation des données de sécurité est déjà en cours. Réessayez.",
       "dismissalInProgress": "L'exclusion de ce signalement est déjà en cours. Réessayez.",

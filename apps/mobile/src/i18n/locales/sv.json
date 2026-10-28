@@ -2021,6 +2021,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Säkerhetstjänsten är inte konfigurerad. Det går inte att skicka begäran igen förrän detta har åtgärdats.",
+      "serviceUnavailable": "Säkerhetstjänsten är inte tillgänglig. Försök igen.",
       "syncMayNotHaveCompleted": "En synkronisering kanske inte har slutförts. Försök igen för att stämma av statusen, eller kasta begäran.",
       "syncInProgress": "En säkerhetssynkronisering pågår redan. Försök igen.",
       "dismissalInProgress": "Det här avfärdandet pågår redan. Försök igen.",

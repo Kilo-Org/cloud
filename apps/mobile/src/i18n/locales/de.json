@@ -1497,6 +1497,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Der Sicherheitsdienst ist nicht konfiguriert. Erst nach der Behebung dieses Problems ist ein erneutes Senden möglich.",
+      "serviceUnavailable": "Der Sicherheitsdienst ist nicht verfügbar. Bitte versuche es erneut.",
       "syncMayNotHaveCompleted": "Eine Synchronisierung wurde möglicherweise nicht abgeschlossen. Wiederhole sie zum Abgleich oder verwirf sie.",
       "syncInProgress": "Die Sicherheitsbefunde werden bereits synchronisiert. Bitte versuche es erneut.",
       "dismissalInProgress": "Dieser Befund wird bereits verworfen. Bitte versuche es erneut.",

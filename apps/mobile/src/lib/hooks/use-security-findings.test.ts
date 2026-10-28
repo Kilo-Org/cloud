@@ -14,6 +14,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as OperationKeyModule from '@/lib/operation-key';
 import type * as SecurityAgentModule from '@kilocode/app-shared/security-agent';
 import { INFINITE_QUERY_MAX_PAGES } from '@/lib/query/infinite-retention';
+import { SECURITY_SERVICE_UNAVAILABLE_MESSAGE } from '@/lib/security-agent-ledger';
 import {
   buildSecurityFindingsQueryOptions,
   dismissFindingIntentFingerprint,
@@ -252,6 +253,19 @@ describe('useDismissSecurityFinding (P1-A-08e wiring)', () => {
     lastCapturedOptions?.onSuccess?.({ success: true, commandId: 'cmd-9' }, DISMISS_VARS);
     expect(trackCommandMock).toHaveBeenCalled();
   });
+
+  it('regenerates the key when the Worker was unreachable and shows retry copy', async () => {
+    personalDismissMutateMock.mockRejectedValueOnce(
+      new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE)
+    );
+    useDismissSecurityFinding('personal');
+
+    // The server settled the intent's row, so the next submit needs a new key...
+    await expect(lastCapturedOptions?.mutationFn?.(DISMISS_VARS)).rejects.toMatchObject({
+      message: 'The security service is unavailable. Try again.',
+    });
+    expect(hoistedKeys.rotateKey).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('useStartSecurityAnalysis (P1-B-18 forceSandbox)', () => {
@@ -298,6 +312,17 @@ describe('useStartSecurityAnalysis (P1-B-18 forceSandbox)', () => {
 
     expect(trackCommandMock).not.toHaveBeenCalled();
     expect(invalidateQueriesMock).toHaveBeenCalled();
+  });
+
+  it('toasts the catalog copy for a known server marker and the server text otherwise', () => {
+    useStartSecurityAnalysis('personal');
+
+    lastCapturedOptions?.onError?.(new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE));
+    expect(toastErrorMock).toHaveBeenCalledWith('The security service is unavailable. Try again.');
+
+    toastErrorMock.mockClear();
+    lastCapturedOptions?.onError?.(new Error('Analysis queue is full'));
+    expect(toastErrorMock).toHaveBeenCalledWith('Analysis queue is full');
   });
 });
 

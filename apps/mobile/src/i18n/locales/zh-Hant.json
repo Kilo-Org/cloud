@@ -1497,6 +1497,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "資安服務尚未設定。完成設定前，重新提交也無法成功。",
+      "serviceUnavailable": "安全服務無法使用。請再試一次。",
       "syncMayNotHaveCompleted": "同步可能尚未完成。請再試一次以確認同步狀態，或捨棄這次同步。",
       "syncInProgress": "資安資料正在同步中。請再試一次。",
       "dismissalInProgress": "此忽略動作已在進行中。請再試一次。",

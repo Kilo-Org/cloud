@@ -2075,6 +2075,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Saugos paslauga nesukonfigūruota. Kol tai nebus sutvarkyta, pakartotinai pateikti užklausos nepavyks.",
+      "serviceUnavailable": "Saugos tarnyba nepasiekiama. Bandyk dar kartą.",
       "syncMayNotHaveCompleted": "Sinchronizavimas galėjo likti neužbaigtas. Bandyk dar kartą, kad suderintum jo būseną, arba atmesk užklausą.",
       "syncInProgress": "Saugos duomenys jau sinchronizuojami. Bandyk dar kartą.",
       "dismissalInProgress": "Šis radinys jau atmetamas. Bandyk dar kartą.",

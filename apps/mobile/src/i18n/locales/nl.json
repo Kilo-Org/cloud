@@ -1497,6 +1497,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "De beveiligingsservice is niet ingesteld. Opnieuw indienen werkt pas als dit is opgelost.",
+      "serviceUnavailable": "De beveiligingsdienst is niet beschikbaar. Probeer het opnieuw.",
       "syncMayNotHaveCompleted": "Een synchronisatie is mogelijk niet voltooid. Probeer het opnieuw om de status bij te werken of verwerp de synchronisatie.",
       "syncInProgress": "Er wordt al een beveiligingssynchronisatie uitgevoerd. Probeer het opnieuw.",
       "dismissalInProgress": "Deze afwijzing wordt al verwerkt. Probeer het opnieuw.",

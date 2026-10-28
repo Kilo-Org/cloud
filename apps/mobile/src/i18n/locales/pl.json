@@ -1513,6 +1513,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Usługa bezpieczeństwa nie jest skonfigurowana. Ponowne przesłanie będzie możliwe dopiero po poprawieniu konfiguracji.",
+      "serviceUnavailable": "Usługa zabezpieczeń jest niedostępna. Spróbuj ponownie.",
       "syncMayNotHaveCompleted": "Synchronizacja mogła się nie zakończyć. Ponów próbę, aby uzgodnić jej stan, lub ją odrzuć.",
       "syncInProgress": "Synchronizacja problemów z bezpieczeństwem już trwa. Spróbuj ponownie.",
       "dismissalInProgress": "Odrzucanie tego problemu już trwa. Spróbuj ponownie.",

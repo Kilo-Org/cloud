@@ -2021,6 +2021,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Turbeteenus pole seadistatud. Kuni see pole seadistatud, ei saa uuesti esitamine õnnestuda.",
+      "serviceUnavailable": "Turvateenus pole saadaval. Proovi uuesti.",
       "syncMayNotHaveCompleted": "Sünkroonimine ei pruukinud lõppeda. Oleku ühtlustamiseks proovi uuesti või loobu.",
       "syncInProgress": "Turbesünkroonimine on juba käimas. Proovi uuesti.",
       "dismissalInProgress": "See kõrvalejätmine on juba käimas. Proovi uuesti.",

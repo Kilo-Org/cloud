@@ -2048,6 +2048,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Drošības pakalpojums nav konfigurēts. Kamēr tas nav novērsts, atkārtota iesniegšana neizdosies.",
+      "serviceUnavailable": "Drošības pakalpojums nav pieejams. Lūdzu, mēģini vēlreiz.",
       "syncMayNotHaveCompleted": "Sinhronizācija, iespējams, nav pabeigta. Mēģini vēlreiz, lai atjauninātu tās stāvokli, vai atmet to.",
       "syncInProgress": "Drošības datu sinhronizācija jau notiek. Lūdzu, mēģini vēlreiz.",
       "dismissalInProgress": "Šī noraidīšana jau notiek. Lūdzu, mēģini vēlreiz.",

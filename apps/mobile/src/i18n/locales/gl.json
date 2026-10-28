@@ -2021,6 +2021,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "O servizo de seguridade non está configurado. Non se poderá reenviar a solicitude ata que se corrixa este problema.",
+      "serviceUnavailable": "O servizo de seguridade non está dispoñible. Téntao de novo.",
       "syncMayNotHaveCompleted": "É posible que unha sincronización non rematase. Téntaa de novo para actualizar o seu estado ou descártaa.",
       "syncInProgress": "Xa hai unha sincronización de seguridade en curso. Téntao de novo.",
       "dismissalInProgress": "Este descarte xa está en curso. Téntao de novo.",

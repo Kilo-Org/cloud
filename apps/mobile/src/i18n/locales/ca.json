@@ -2048,6 +2048,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "El servei de seguretat no està configurat. Fins que no es resolgui aquest problema, els nous intents d'enviament fallaran.",
+      "serviceUnavailable": "El servei de seguretat no està disponible. Torna-ho a provar.",
       "syncMayNotHaveCompleted": "És possible que una sincronització no s'hagi completat. Torna-ho a provar per actualitzar-ne l'estat o descarta-la.",
       "syncInProgress": "Ja hi ha una sincronització de seguretat en curs. Torna-ho a provar.",
       "dismissalInProgress": "Aquest descart ja està en curs. Torna-ho a provar.",

@@ -2021,6 +2021,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Sèvis sekirite a pa konfigire. Soumèt demann lan ankò pa ka mache toutotan sa pa korije.",
+      "serviceUnavailable": "Sèvis sekirite a pa disponib. Tanpri eseye ankò.",
       "syncMayNotHaveCompleted": "Yon senkronizasyon ka pa t fini. Eseye ankò pou mete eta li ajou, oswa abandone li.",
       "syncInProgress": "Yon senkronizasyon sekirite deja an pwosesis. Tanpri eseye ankò.",
       "dismissalInProgress": "Rejè sa a deja an pwosesis. Tanpri eseye ankò.",

@@ -2021,6 +2021,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Shërbimi i sigurisë nuk është i konfiguruar. Ridërgimi nuk mund të ketë sukses derisa kjo të rregullohet.",
+      "serviceUnavailable": "Shërbimi i sigurisë nuk është i disponueshëm. Provo përsëri.",
       "syncMayNotHaveCompleted": "Një sinkronizim mund të mos ketë përfunduar. Riprovo për të përputhur gjendjen ose hiq dorë.",
       "syncInProgress": "Një sinkronizim i sigurisë është tashmë në vazhdim. Provo përsëri.",
       "dismissalInProgress": "Kjo hedhje poshtë është tashmë në vazhdim. Provo përsëri.",

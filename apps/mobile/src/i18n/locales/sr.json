@@ -2048,6 +2048,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Bezbednosni servis nije podešen. Ponovno slanje neće uspeti dok se to ne ispravi.",
+      "serviceUnavailable": "Usluga bezbednosti nije dostupna. Pokušaj ponovo.",
       "syncMayNotHaveCompleted": "Sinhronizacija možda nije završena. Pokušaj ponovo da uskladiš njeno stanje ili je odbaci.",
       "syncInProgress": "Sinhronizacija bezbednosnih nalaza je već u toku. Pokušaj ponovo.",
       "dismissalInProgress": "Odbacivanje ovog nalaza je već u toku. Pokušaj ponovo.",

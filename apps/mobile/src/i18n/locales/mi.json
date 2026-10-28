@@ -2021,6 +2021,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Kāore i whirihorahia te ratonga haumarutanga. Kāore e angitu te tuku anō kia whakatikaina rā anō tēnei.",
+      "serviceUnavailable": "Kāore te ratonga haumaru i te wātea. Whakamātau anō.",
       "syncMayNotHaveCompleted": "Kāore pea i oti tētahi tukutahi. Whakamātau anō kia whakaōritea ngā raraunga, whakakorea rānei.",
       "syncInProgress": "Kei te haere kē tētahi tukutahi haumarutanga. Whakamātau anō.",
       "dismissalInProgress": "Kei te haere tonu tēnei whakakorenga. Whakamātau anō.",

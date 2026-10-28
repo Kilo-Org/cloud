@@ -64,8 +64,8 @@ vi.mock('@/lib/trpc', () => ({
     },
     organizations: {
       getCreditBlocks: {
-        queryOptions: () => ({
-          queryKey: ['organizations', 'getCreditBlocks'] as const,
+        queryOptions: (input: { organizationId: string }) => ({
+          queryKey: ['organizations', 'getCreditBlocks', input] as const,
           queryFn: orgCreditBlocksQueryFn,
         }),
       },
@@ -386,6 +386,128 @@ describe('CreditsCard balance state', () => {
   });
 
   it.each([
+    { name: 'empty credits', creditBlocks: [] },
+    {
+      name: 'nonexpiring credits',
+      creditBlocks: [{ balance_mUsd: 10_000_000, expiry_date: null }],
+    },
+  ])(
+    'keeps the expiry note visible for $name when amounts are hidden',
+    async ({ creditBlocks }) => {
+      currentUser.userId = 'user-a';
+      getContextBalanceQueryFn.mockResolvedValue({ balance: 10 });
+      personalCreditBlocksQueryFn.mockResolvedValue({ creditBlocks });
+      const { renderer, texts, unmount } = await mountCard();
+      await waitFor(() => texts().includes('No expiring credits.'));
+
+      await choose(renderer, 'Hide balance');
+      expect(texts()).toContain('No expiring credits.');
+      expect(texts()).toContain('*****');
+      expect(texts()).not.toContain('$10.00');
+      unmount();
+    }
+  );
+
+  it('masks the expiry amount and keeps its date and explanation visible', async () => {
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 10 });
+    personalCreditBlocksQueryFn.mockResolvedValue({
+      creditBlocks: [{ balance_mUsd: 2_000_000, expiry_date: '2099-12-17T12:00:00Z' }],
+    });
+    const { renderer, texts, unmount } = await mountCard();
+    const explanation =
+      ' in credits expires 12/17/2099 (UTC). Credits with the earliest expiry are used first.';
+    await waitFor(() => texts().includes(`$2.00${explanation}`));
+
+    await choose(renderer, 'Hide balance');
+    expect(texts()).toContain(`*****${explanation}`);
+    expect(texts()).not.toContain(`$2.00${explanation}`);
+    expect(texts()).not.toContain('$10.00');
+    await choose(renderer, 'Show balance');
+    expect(texts()).toContain(`$2.00${explanation}`);
+    expect(texts()).toContain('$10.00');
+    unmount();
+  });
+
+  it('reserves the expiry note while the credit blocks load', async () => {
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 10 });
+    const pending = Promise.withResolvers<{ creditBlocks: [] }>();
+    personalCreditBlocksQueryFn.mockReturnValue(pending.promise);
+    const { renderer, texts, unmount } = await mountCard();
+    await waitFor(() => texts().includes('$10.00'));
+
+    expect(texts()).toContain('SKELETON');
+    expect(texts()).not.toContain('No expiring credits.');
+    await choose(renderer, 'Hide balance');
+    expect(texts()).toContain('SKELETON');
+    await act(async () => {
+      pending.resolve({ creditBlocks: [] });
+      await pending.promise;
+    });
+    await waitFor(() => texts().includes('No expiring credits.'));
+    expect(texts()).not.toContain('SKELETON');
+    unmount();
+  });
+
+  it.each(['personal', 'organization'])(
+    'shows unavailable expiry for failed %s credits',
+    async context => {
+      currentUser.userId = 'user-a';
+      getContextBalanceQueryFn.mockResolvedValue({ balance: 10 });
+      const orgs = [
+        { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
+      ] as OrgListEntry[];
+      if (context === 'organization') {
+        listState.payload = orgs;
+        savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+        orgCreditBlocksQueryFn.mockRejectedValue(new Error('Unavailable'));
+      } else {
+        personalCreditBlocksQueryFn.mockRejectedValue(new Error('Unavailable'));
+      }
+      const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+      await waitFor(() => texts().includes('Credit expiry unavailable.'));
+      expect(texts()).not.toContain('No expiring credits.');
+      await choose(renderer, 'Hide balance');
+      expect(texts()).toContain('Credit expiry unavailable.');
+      unmount();
+    }
+  );
+
+  it('reserves expiry for the selected organization while its credits load', async () => {
+    currentUser.userId = 'user-a';
+    getContextBalanceQueryFn.mockResolvedValue({ balance: 10 });
+    const orgs = [
+      { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
+      { organizationId: 'org-b', organizationName: 'Beta', role: 'owner' },
+    ] as OrgListEntry[];
+    listState.payload = orgs;
+    savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
+    orgCreditBlocksQueryFn.mockResolvedValue({
+      creditBlocks: [{ balance_mUsd: 2_000_000, expiry_date: '2099-12-17T12:00:00Z' }],
+    });
+    const { renderer, texts, unmount } = await mountCard(createTestQueryClient(), orgs);
+    const previousNote =
+      '$2.00 in credits expires 12/17/2099 (UTC). Credits with the earliest expiry are used first.';
+    await waitFor(() => texts().includes(previousNote));
+    const pending = Promise.withResolvers<{ creditBlocks: [] }>();
+    orgCreditBlocksQueryFn.mockReturnValue(pending.promise);
+    await openSheet(renderer);
+    await choose(renderer, 'Beta');
+    await waitFor(() => texts().includes('$10.00') && texts().includes('SKELETON'));
+
+    expect(texts()).not.toContain(previousNote);
+    expect(texts()).not.toContain('No expiring credits.');
+    await act(async () => {
+      pending.resolve({ creditBlocks: [] });
+      await pending.promise;
+    });
+    await waitFor(() => texts().includes('No expiring credits.'));
+    expect(texts()).not.toContain('SKELETON');
+    unmount();
+  });
+
+  it.each([
     { name: 'expired grants', future: false },
     { name: 'mixed grants', future: true },
   ])('excludes elapsed expiry dates from $name', async ({ future }) => {
@@ -457,11 +579,11 @@ describe('CreditsCard balance state', () => {
     }
   });
 
-  it('renders without the block list when a credits payload settles without one', async () => {
+  it('shows no expiring credits for an empty organization block list', async () => {
     currentUser.userId = 'user-a';
     savedMetadata.set(ORGANIZATION_STORAGE_KEY, 'org-a');
     getContextBalanceQueryFn.mockResolvedValue({ balance: 0 });
-    orgCreditBlocksQueryFn.mockResolvedValue({});
+    orgCreditBlocksQueryFn.mockResolvedValue({ creditBlocks: [] });
     const orgs = [
       { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' },
     ] as OrgListEntry[];
@@ -470,6 +592,7 @@ describe('CreditsCard balance state', () => {
     try {
       await waitFor(() => texts().includes('$0.00') && !texts().includes('SKELETON'));
       expect(texts().filter(text => text.includes('in credits expires'))).toEqual([]);
+      expect(texts()).toContain('No expiring credits.');
     } finally {
       unmount();
     }
@@ -697,7 +820,7 @@ describe('CreditsCard balance state', () => {
     unmount();
   });
 
-  it('shows the nearest paid or bonus deadline and hides it with the balance', async () => {
+  it('shows the nearest paid or bonus deadline and masks its amount with the balance', async () => {
     currentUser.userId = 'user-A';
     getContextBalanceQueryFn.mockResolvedValue({ balance: 65 });
     personalCreditBlocksQueryFn.mockResolvedValue({
@@ -716,7 +839,9 @@ describe('CreditsCard balance state', () => {
     await act(() => {
       (hide.props.onPress as () => void)();
     });
-    expect(texts().some(text => text.includes('in credits expires'))).toBe(false);
+    expect(texts()).toContain(
+      '***** in credits expires 10/15/2027 (UTC). Credits with the earliest expiry are used first.'
+    );
     unmount();
   });
 });

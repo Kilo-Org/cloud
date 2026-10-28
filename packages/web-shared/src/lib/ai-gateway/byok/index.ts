@@ -1,7 +1,7 @@
 import { type db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { byok_api_keys } from '@kilocode/db/schema';
 import { ByokApiKeySettingsSchema } from '@kilocode/db/schema-types';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import type { BYOKApiKeyEnvelope, EncryptedData } from '@kilocode/db/schema-types';
 import {
@@ -286,11 +286,12 @@ export async function decryptByokRow(row: {
 
 export type ByokCredential = BYOKResult & { serveCatalogModels: boolean };
 
-/** The owner's enabled keys for `providerIds`, oldest first. */
+/** The owner's enabled keys for `providerIds`, oldest first; `catalogModeOnly` keeps catalog-mode keys. */
 export async function getByokCredentials(
   fromDb: ByokSourceDb,
   owner: ByokOwner,
-  providerIds: UserByokProviderId[]
+  providerIds: UserByokProviderId[],
+  { catalogModeOnly = false }: { catalogModeOnly?: boolean } = {}
 ): Promise<ByokCredential[]> {
   if (providerIds.length === 0) {
     return [];
@@ -310,7 +311,12 @@ export async function getByokCredentials(
       and(
         eq(ownerColumn(owner), owner.id),
         eq(byok_api_keys.is_enabled, true),
-        inArray(byok_api_keys.provider_id, providerIds)
+        inArray(byok_api_keys.provider_id, providerIds),
+        // Filtering before decryption keeps keys that cannot serve the request out of the KMS
+        // round-trips and out of the fail-closed decryption check below.
+        catalogModeOnly
+          ? sql`(${byok_api_keys.settings}->>'serve_catalog_models')::boolean is true`
+          : undefined
       )
     )
     .orderBy(byok_api_keys.created_at);

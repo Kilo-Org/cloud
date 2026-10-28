@@ -184,7 +184,8 @@ async function resolveDirectByokProvider(
   const credentials = await getByokCredentials(
     readDb,
     owner,
-    catalogModels.map(({ provider }) => provider.id)
+    catalogModels.map(({ provider }) => provider.id),
+    { catalogModeOnly: true }
   );
   let unsupportedApiKind: GetProviderProviderResult | null = null;
   for (const { provider, model } of catalogModels) {

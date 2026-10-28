@@ -846,7 +846,8 @@ describe('getProvider direct BYOK routing', () => {
     expect(getByokCredentials).toHaveBeenCalledWith(
       expect.anything(),
       { type: 'organization', id: ORG_ID },
-      ['synthetic', 'zai-coding']
+      ['synthetic', 'zai-coding'],
+      { catalogModeOnly: true }
     );
     expect(result.provider).toMatchObject({
       id: 'direct-byok',

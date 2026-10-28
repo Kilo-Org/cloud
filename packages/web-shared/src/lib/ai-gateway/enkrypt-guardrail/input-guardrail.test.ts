@@ -42,7 +42,7 @@ const scan: EnkryptGuardrailScan = {
   apiKind: 'messages',
   clientRequestId: null,
   text: 'tool output',
-  config: { failMode: 'open', detectors: {} },
+  config: { scanToolResults: true, status: 'ready', detectors: {}, blockingDetectors: [] },
 };
 
 function call(overrides: Partial<EnkryptGuardrailCall> = {}): EnkryptGuardrailCall {

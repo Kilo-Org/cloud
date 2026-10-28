@@ -7,7 +7,7 @@ import {
   getDirectByokModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
-import { modelsServedByOrganizationInferenceProviderByok } from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-byok';
+import { modelsServedByOrganizationInferenceProviderUserByok } from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok';
 import { validateOrganizationAutoTarget } from './organization-auto-model';
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {} }));
@@ -32,9 +32,12 @@ jest.mock(
   })
 );
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({ getByokCredentials: jest.fn() }));
-jest.mock('@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-byok', () => ({
-  modelsServedByOrganizationInferenceProviderByok: jest.fn(async () => []),
-}));
+jest.mock(
+  '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok',
+  () => ({
+    modelsServedByOrganizationInferenceProviderUserByok: jest.fn(async () => []),
+  })
+);
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   formatDirectByokModelId: (provider: { id: string }, model: { id: string }) =>
     `${provider.id}/${model.id}`.toLowerCase(),
@@ -142,7 +145,7 @@ describe('validateOrganizationAutoTarget with direct BYOK targets', () => {
 });
 
 describe('validateOrganizationAutoTarget with organization inference provider keys', () => {
-  const mockedServedModels = jest.mocked(modelsServedByOrganizationInferenceProviderByok);
+  const mockedServedModels = jest.mocked(modelsServedByOrganizationInferenceProviderUserByok);
   const notAllowed = {
     kind: 'error',
     message:

@@ -8,7 +8,7 @@ import {
 import type { OrganizationGroupPolicyContext } from './organization-group-policy-context.server';
 import type { OrganizationGroupModelAccessPolicy } from './group-policies/organization-group-policies';
 import {
-  allowsInferenceProviderByok,
+  allowsInferenceProviderUserByok,
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
 } from './effective-model-access.server';
@@ -574,7 +574,7 @@ describe('effective organization model access', () => {
         modelId,
         googleLookup
       );
-      return { decision, allowsByok: allowsInferenceProviderByok(decision) };
+      return { decision, allowsByok: allowsInferenceProviderUserByok(decision) };
     }
 
     it('admits a model whose providers are all outside the organization provider allow-list', async () => {

@@ -236,7 +236,7 @@ export async function getEffectiveModelDecision(
  * provider allow-list limits where Kilo's gateways may route prompts, but such a key names a
  * provider the organization configured itself, so only the model restrictions and grants apply.
  */
-export function allowsInferenceProviderByok(decision: EffectiveModelDecision): boolean {
+export function allowsInferenceProviderUserByok(decision: EffectiveModelDecision): boolean {
   return decision.allowed || decision.denialSource === 'organization_provider';
 }
 

@@ -4,7 +4,7 @@ import {
   getEnhancedOpenRouterModels,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import {
-  allowsInferenceProviderByok,
+  allowsInferenceProviderUserByok,
   getEffectiveModelDecision,
   evaluateEffectiveModelAccessPolicy,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
@@ -19,7 +19,7 @@ import {
   addDirectByokCatalogAvailability,
   addUserByokAvailability,
   getOrganizationByokProviderIds,
-  hasInferenceProviderByokForModel,
+  hasInferenceProviderUserByokForModel,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 import { tagOpenAiChatGptByokModels } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
@@ -85,8 +85,8 @@ export async function getAvailableModelsForOrganization(
     const decision = await getEffectiveModelDecision(policy, model.id);
     if (
       decision.allowed ||
-      (allowsInferenceProviderByok(decision) &&
-        (await hasInferenceProviderByokForModel(
+      (allowsInferenceProviderUserByok(decision) &&
+        (await hasInferenceProviderUserByokForModel(
           model.id,
           byokProviderIds,
           directByokCatalogModelIds

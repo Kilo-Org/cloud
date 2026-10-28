@@ -6,7 +6,7 @@ import {
   hasActiveModelRestrictions,
   type ModelRestrictions,
 } from '@kilocode/web-shared/lib/model-allow.server';
-import { modelsServedByOrganizationInferenceProviderByok } from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-byok';
+import { modelsServedByOrganizationInferenceProviderUserByok } from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
@@ -93,7 +93,7 @@ export function getOrganizationAutoSettings(
 
 /**
  * Like the organization model list, the provider allow-list does not exclude a model that one of
- * the organization's inference provider keys serves (see `allowsInferenceProviderByok`).
+ * the organization's inference provider keys serves (see `allowsInferenceProviderUserByok`).
  */
 async function isAllowedAutoTarget(
   organizationId: string,
@@ -108,7 +108,8 @@ async function isAllowedAutoTarget(
   });
   return (
     (await isAllowedWithoutProviderAllowList(modelId)) &&
-    (await modelsServedByOrganizationInferenceProviderByok(organizationId, [modelId])).length > 0
+    (await modelsServedByOrganizationInferenceProviderUserByok(organizationId, [modelId])).length >
+      0
   );
 }
 

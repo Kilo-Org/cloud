@@ -11,7 +11,7 @@ import {
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import {
   getOrganizationByokProviderIds,
-  hasInferenceProviderByokForModel,
+  hasInferenceProviderUserByokForModel,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { getDirectByokCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import {
@@ -37,7 +37,7 @@ jest.mock(
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/ai-gateway/byok'),
   getOrganizationByokProviderIds: jest.fn(async () => []),
-  hasInferenceProviderByokForModel: jest.fn(async () => false),
+  hasInferenceProviderUserByokForModel: jest.fn(async () => false),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   ...jest.requireActual<object>('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'),
@@ -194,7 +194,7 @@ describe('deniedAutoRoutingCandidates with organization inference provider keys'
     jest.mocked(getOrganizationByokProviderIds).mockClear().mockResolvedValue(['openai']);
     jest.mocked(getDirectByokCatalogModelIds).mockClear().mockResolvedValue(catalogModelIds);
     jest
-      .mocked(hasInferenceProviderByokForModel)
+      .mocked(hasInferenceProviderUserByokForModel)
       .mockClear()
       .mockImplementation(async modelId => modelId !== 'deepseek/deepseek-v4');
     jest
@@ -207,7 +207,7 @@ describe('deniedAutoRoutingCandidates with organization inference provider keys'
   afterEach(() => {
     jest.mocked(getOrganizationByokProviderIds).mockResolvedValue([]);
     jest.mocked(getDirectByokCatalogModelIds).mockResolvedValue(new Set());
-    jest.mocked(hasInferenceProviderByokForModel).mockResolvedValue(false);
+    jest.mocked(hasInferenceProviderUserByokForModel).mockResolvedValue(false);
   });
 
   it('admits models outside the provider allow-list that an inference provider key serves', async () => {
@@ -228,7 +228,7 @@ describe('deniedAutoRoutingCandidates with organization inference provider keys'
     });
     expect(
       jest
-        .mocked(hasInferenceProviderByokForModel)
+        .mocked(hasInferenceProviderUserByokForModel)
         .mock.calls.map(([id]) => id)
         .sort()
     ).toEqual(['deepseek/deepseek-v4', 'openai/gpt-5']);

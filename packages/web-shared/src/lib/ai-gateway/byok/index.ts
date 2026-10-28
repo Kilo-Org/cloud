@@ -232,7 +232,7 @@ export async function addUserByokAvailability(
  * sent through Vercel. Gateway keys leave the choice of provider to the gateway, so they do not
  * count, and neither does any key for an id a custom LLM owns, which `getProvider` serves first.
  */
-export async function hasInferenceProviderByokForModel(
+export async function hasInferenceProviderUserByokForModel(
   modelId: string,
   enabledProviderIds: readonly UserByokProviderId[],
   directByokCatalogModelIds: ReadonlySet<string>
@@ -247,7 +247,7 @@ export async function hasInferenceProviderByokForModel(
 }
 
 /** Whether `userByok` are inference provider keys rather than a gateway key. */
-export function isInferenceProviderByok(userByok: readonly BYOKResult[] | null): boolean {
+export function isInferenceProviderUserByok(userByok: readonly BYOKResult[] | null): boolean {
   return (
     userByok !== null &&
     userByok.length > 0 &&

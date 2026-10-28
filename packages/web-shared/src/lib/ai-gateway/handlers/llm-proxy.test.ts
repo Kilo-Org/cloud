@@ -161,9 +161,9 @@ jest.mock(
   })
 );
 jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
-  allowsInferenceProviderByok: jest.requireActual<Record<string, unknown>>(
+  allowsInferenceProviderUserByok: jest.requireActual<Record<string, unknown>>(
     '@kilocode/web-shared/lib/organizations/effective-model-access.server'
-  ).allowsInferenceProviderByok,
+  ).allowsInferenceProviderUserByok,
   evaluateEffectiveModelAccessPolicy: jest.fn().mockReturnValue({}),
   getEffectiveModelDecision: jest.fn().mockResolvedValue({ allowed: true }),
 }));

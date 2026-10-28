@@ -47,7 +47,7 @@ const INFERENCE_PROVIDER_BYOK_MODELS = new Set([
   'provider/deny-listed-inference',
   'provider/ungranted-inference',
 ]);
-const mockInferenceProviderByok = jest.fn(
+const mockInferenceProviderUserByok = jest.fn(
   async (
     modelId: string,
     _providers: readonly string[],
@@ -101,9 +101,9 @@ jest.mock(
   })
 );
 jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
-  allowsInferenceProviderByok: jest.requireActual<Record<string, unknown>>(
+  allowsInferenceProviderUserByok: jest.requireActual<Record<string, unknown>>(
     '@kilocode/web-shared/lib/organizations/effective-model-access.server'
-  ).allowsInferenceProviderByok,
+  ).allowsInferenceProviderUserByok,
   evaluateEffectiveModelAccessPolicy: mockEvaluatePolicy,
   getEffectiveModelDecision: mockDecision,
 }));
@@ -124,7 +124,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
   addDirectByokCatalogAvailability: mockCatalogAvailability,
   addUserByokAvailability: mockAvailability,
   getOrganizationByokProviderIds: mockProviderIds,
-  hasInferenceProviderByokForModel: mockInferenceProviderByok,
+  hasInferenceProviderUserByokForModel: mockInferenceProviderUserByok,
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing', () => ({
   tagOpenAiChatGptByokModels: mockTagChatGpt,
@@ -566,12 +566,12 @@ describe('organization model producer publication', () => {
       'morph-byok/private',
       'kilo-internal/private',
     ]);
-    expect(mockInferenceProviderByok).toHaveBeenCalledWith(
+    expect(mockInferenceProviderUserByok).toHaveBeenCalledWith(
       'provider/ceiling-gateway',
       ['moonshotai', 'openrouter'],
       catalogModelIds
     );
-    expect(mockInferenceProviderByok).not.toHaveBeenCalledWith(
+    expect(mockInferenceProviderUserByok).not.toHaveBeenCalledWith(
       'provider/deny-listed-inference',
       expect.anything(),
       expect.anything()

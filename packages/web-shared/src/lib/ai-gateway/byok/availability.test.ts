@@ -31,8 +31,8 @@ import {
   addDirectByokCatalogAvailability,
   addUserByokAvailability,
   getModelUserByokProviders,
-  hasInferenceProviderByokForModel,
-  isInferenceProviderByok,
+  hasInferenceProviderUserByokForModel,
+  isInferenceProviderUserByok,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 
 const EXCLUSIVE_MODEL_ID = kiloExclusiveModelFixture.public_id;
@@ -127,23 +127,23 @@ describe('addUserByokAvailability', () => {
   });
 });
 
-describe('hasInferenceProviderByokForModel', () => {
+describe('hasInferenceProviderUserByokForModel', () => {
   const noCatalogModels: ReadonlySet<string> = new Set();
 
   test('counts an enabled provider key sent through Vercel', async () => {
     mockedGetVercelModelsMetadata.mockResolvedValue(metadata);
 
     await expect(
-      hasInferenceProviderByokForModel('anthropic/claude-fixture', ['bedrock'], noCatalogModels)
+      hasInferenceProviderUserByokForModel('anthropic/claude-fixture', ['bedrock'], noCatalogModels)
     ).resolves.toBe(true);
     await expect(
-      hasInferenceProviderByokForModel('openai/gpt-fixture', ['bedrock'], noCatalogModels)
+      hasInferenceProviderUserByokForModel('openai/gpt-fixture', ['bedrock'], noCatalogModels)
     ).resolves.toBe(false);
   });
 
   test('counts a catalog-mode direct BYOK key without reading the Vercel metadata', async () => {
     await expect(
-      hasInferenceProviderByokForModel(
+      hasInferenceProviderUserByokForModel(
         'moonshotai/kimi-k2.6',
         [],
         new Set(['moonshotai/kimi-k2.6'])
@@ -154,7 +154,7 @@ describe('hasInferenceProviderByokForModel', () => {
 
   test('does not count gateway keys', async () => {
     await expect(
-      hasInferenceProviderByokForModel(
+      hasInferenceProviderUserByokForModel(
         'anthropic/claude-fixture',
         ['openrouter', 'vercel-ai-gateway'],
         noCatalogModels
@@ -167,7 +167,7 @@ describe('hasInferenceProviderByokForModel', () => {
     mockedGetVercelModelsMetadata.mockResolvedValue(metadata);
 
     await expect(
-      hasInferenceProviderByokForModel(EXCLUSIVE_MODEL_ID, ['anthropic'], noCatalogModels)
+      hasInferenceProviderUserByokForModel(EXCLUSIVE_MODEL_ID, ['anthropic'], noCatalogModels)
     ).resolves.toBe(false);
   });
 
@@ -179,7 +179,7 @@ describe('hasInferenceProviderByokForModel', () => {
     );
     try {
       await expect(
-        hasInferenceProviderByokForModel(
+        hasInferenceProviderUserByokForModel(
           'anthropic/claude-fixture',
           ['anthropic'],
           new Set(['anthropic/claude-fixture'])
@@ -191,7 +191,7 @@ describe('hasInferenceProviderByokForModel', () => {
   });
 });
 
-describe('isInferenceProviderByok', () => {
+describe('isInferenceProviderUserByok', () => {
   test.each([
     [
       'a provider key sent through Vercel',
@@ -207,7 +207,7 @@ describe('isInferenceProviderByok', () => {
     ],
     ['no key', null, false],
   ] as const)('classifies %s', (_name, userByok, expected) => {
-    expect(isInferenceProviderByok(userByok)).toBe(expected);
+    expect(isInferenceProviderUserByok(userByok)).toBe(expected);
   });
 });
 

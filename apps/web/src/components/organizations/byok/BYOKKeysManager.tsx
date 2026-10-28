@@ -99,6 +99,11 @@ const ADD_BYOK_PROVIDERS = BYOK_PROVIDERS.filter(
   provider => provider.id !== DirectUserByokInferenceProviderIdSchema.enum.codestral
 );
 
+function getProviderDisplayName(providerId: string) {
+  const provider = BYOK_PROVIDERS.find(p => p.id === providerId);
+  return provider?.name || providerId;
+}
+
 type StructuredCredentialKind = 'azure' | 'bedrock' | 'vertex';
 
 /** Providers whose credential is a JSON object rather than a single API key. */
@@ -431,12 +436,6 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   // provider id, but it is not a pasted key: the card above the list owns it, so
   // it never appears here with edit, toggle, test or delete controls.
   const listedKeys = keys?.filter(key => key.provider_id !== OPENAI_CHATGPT_PROVIDER_ID);
-
-  // Map provider IDs to display names
-  const getProviderDisplayName = (providerId: string) => {
-    const provider = BYOK_PROVIDERS.find(p => p.id === providerId);
-    return provider?.name || providerId;
-  };
 
   const getProviderModels = (providerId: string): string[] => {
     return supportedModels?.[providerId] ?? [];

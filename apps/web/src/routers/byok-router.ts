@@ -65,6 +65,23 @@ function validateVercelUserByokCredential(providerId: string, credential: string
   }
 }
 
+const BYOK_KEY_COLUMNS = {
+  id: byok_api_keys.id,
+  provider_id: byok_api_keys.provider_id,
+  created_at: byok_api_keys.created_at,
+  updated_at: byok_api_keys.updated_at,
+  created_by: byok_api_keys.created_by,
+  management_source: byok_api_keys.management_source,
+  is_enabled: byok_api_keys.is_enabled,
+};
+
+function toBYOKApiKeyResponse(key: Omit<BYOKApiKeyResponse, 'provider_name'>): BYOKApiKeyResponse {
+  return {
+    ...key,
+    provider_name: key.provider_id,
+  };
+}
+
 function rejectManagedKeyMutation(managementSource: 'user' | 'coding_plan') {
   if (managementSource === 'coding_plan') {
     throw new TRPCError({
@@ -144,15 +161,7 @@ export const byokRouter = createTRPCRouter({
       }
 
       const keys = await db
-        .select({
-          id: byok_api_keys.id,
-          provider_id: byok_api_keys.provider_id,
-          created_at: byok_api_keys.created_at,
-          updated_at: byok_api_keys.updated_at,
-          created_by: byok_api_keys.created_by,
-          management_source: byok_api_keys.management_source,
-          is_enabled: byok_api_keys.is_enabled,
-        })
+        .select(BYOK_KEY_COLUMNS)
         .from(byok_api_keys)
         .where(
           organizationId
@@ -161,10 +170,7 @@ export const byokRouter = createTRPCRouter({
         );
 
       // Map provider_id to provider_name (will be enhanced in UI with actual provider names)
-      return keys.map(key => ({
-        ...key,
-        provider_name: key.provider_id,
-      }));
+      return keys.map(toBYOKApiKeyResponse);
     }),
 
   create: baseProcedure
@@ -193,15 +199,7 @@ export const byokRouter = createTRPCRouter({
           encrypted_api_key: encrypted,
           created_by: ctx.user.id,
         })
-        .returning({
-          id: byok_api_keys.id,
-          provider_id: byok_api_keys.provider_id,
-          created_at: byok_api_keys.created_at,
-          updated_at: byok_api_keys.updated_at,
-          created_by: byok_api_keys.created_by,
-          management_source: byok_api_keys.management_source,
-          is_enabled: byok_api_keys.is_enabled,
-        });
+        .returning(BYOK_KEY_COLUMNS);
 
       // Create audit log only for organization keys
       if (organizationId) {
@@ -215,10 +213,7 @@ export const byokRouter = createTRPCRouter({
         });
       }
 
-      return {
-        ...newKey,
-        provider_name: provider_id,
-      };
+      return toBYOKApiKeyResponse(newKey);
     }),
 
   update: baseProcedure
@@ -275,15 +270,7 @@ export const byokRouter = createTRPCRouter({
         .update(byok_api_keys)
         .set({ encrypted_api_key: encrypted })
         .where(eq(byok_api_keys.id, id))
-        .returning({
-          id: byok_api_keys.id,
-          provider_id: byok_api_keys.provider_id,
-          created_at: byok_api_keys.created_at,
-          updated_at: byok_api_keys.updated_at,
-          created_by: byok_api_keys.created_by,
-          management_source: byok_api_keys.management_source,
-          is_enabled: byok_api_keys.is_enabled,
-        });
+        .returning(BYOK_KEY_COLUMNS);
 
       if (!updatedKey) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'BYOK key not found' });
@@ -301,10 +288,7 @@ export const byokRouter = createTRPCRouter({
         });
       }
 
-      return {
-        ...updatedKey,
-        provider_name: updatedKey.provider_id,
-      };
+      return toBYOKApiKeyResponse(updatedKey);
     }),
 
   setEnabled: baseProcedure
@@ -358,15 +342,7 @@ export const byokRouter = createTRPCRouter({
           is_enabled,
         })
         .where(eq(byok_api_keys.id, id))
-        .returning({
-          id: byok_api_keys.id,
-          provider_id: byok_api_keys.provider_id,
-          created_at: byok_api_keys.created_at,
-          updated_at: byok_api_keys.updated_at,
-          created_by: byok_api_keys.created_by,
-          management_source: byok_api_keys.management_source,
-          is_enabled: byok_api_keys.is_enabled,
-        });
+        .returning(BYOK_KEY_COLUMNS);
 
       if (existingKey.organization_id) {
         await createAuditLog({
@@ -379,10 +355,7 @@ export const byokRouter = createTRPCRouter({
         });
       }
 
-      return {
-        ...updatedKey,
-        provider_name: updatedKey.provider_id,
-      };
+      return toBYOKApiKeyResponse(updatedKey);
     }),
 
   testApiKey: baseProcedure

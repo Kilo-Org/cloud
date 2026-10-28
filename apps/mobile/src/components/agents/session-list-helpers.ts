@@ -2,7 +2,7 @@ import { i18n } from '@/i18n';
 import { CLOUD_AGENT_CONNECTION_ID } from '@/lib/active-sessions-live';
 import { CURRENCY_ZERO_THRESHOLD, formatCurrency } from '@/lib/format';
 import { type StoredSession } from '@/lib/hooks/use-agent-sessions';
-import { dateTimeFormat, listFormat } from '@/lib/intl-cache';
+import { dateTimeFormat } from '@/lib/intl-cache';
 import { platformLabel } from '@/lib/platform-label';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -300,11 +300,9 @@ export function selectRemoteRowSpokenMeta(params: {
     const parts = [
       params.scheduledWake,
       composeActiveSessionSpokenMeta(params.costSpoken, params.timeSpoken),
-    ].filter((part): part is string => Boolean(part));
-    if (parts.length < 2) {
-      return parts[0] ?? null;
-    }
-    return listFormat(i18n.language, { style: 'long', type: 'conjunction' }).format(parts);
+    ].filter(Boolean);
+    // Intl unit lists still add a conjunction in Arabic; the outer label owns its connector.
+    return parts.join(', ') || null;
   }
   if (params.scheduled) {
     return params.scheduledWake;

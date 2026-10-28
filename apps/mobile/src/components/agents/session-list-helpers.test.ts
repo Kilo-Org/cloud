@@ -475,11 +475,8 @@ describe('composeActiveSessionSpokenMeta', () => {
 });
 
 describe('selectRemoteRowSpokenMeta', () => {
-  it.each([
-    { language: 'ja', expected: 'wake、activity' },
-    { language: 'ar', expected: 'wake وactivity' },
-  ])('uses the $language list separator for scheduled metadata', async ({ language, expected }) => {
-    await i18n.changeLanguage(language);
+  it('keeps metadata clauses separate from the outer Arabic conjunction', async () => {
+    await i18n.changeLanguage('ar');
     expect(
       selectRemoteRowSpokenMeta({
         variant: 'list',
@@ -489,7 +486,7 @@ describe('selectRemoteRowSpokenMeta', () => {
         costSpoken: null,
         timeSpoken: 'activity',
       })
-    ).toBe(expected);
+    ).toBe('wake, activity');
   });
 
   it('keeps cost and activity alongside a scheduled wake', () => {

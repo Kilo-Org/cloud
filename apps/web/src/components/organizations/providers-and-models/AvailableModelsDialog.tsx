@@ -25,7 +25,11 @@ export function AvailableModelsDialog({
   onOpenChange,
   organizationId,
 }: AvailableModelsDialogProps) {
-  const { data: modelsData, isLoading, error } = useOrganizationAvailableModels(organizationId);
+  const {
+    data: modelsData,
+    isLoading,
+    error,
+  } = useOrganizationAvailableModels(organizationId, { enabled: open });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

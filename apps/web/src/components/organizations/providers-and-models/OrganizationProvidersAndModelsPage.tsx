@@ -112,7 +112,9 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
   const updateOrganizationSettings = useUpdateOrganizationSettings();
 
   const { data: organizationData } = useOrganizationWithMembers(organizationId);
-  const { data: availableModels } = useOrganizationAvailableModels(organizationId);
+  const availableModels = useOrganizationAvailableModels(organizationId, {
+    enabled: organizationData?.plan === 'enterprise',
+  });
   const {
     models: openRouterModels,
     providers: openRouterProviders,
@@ -499,7 +501,9 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
               onSearchChange={actions.setModelSearch}
               onSelectedOnlyChange={actions.setModelSelectedOnly}
               allowedModelIds={allowedModelIds}
-              availableModelCount={availableModels?.data.length ?? null}
+              availableModelCount={
+                availableModels.isError ? undefined : (availableModels.data?.data.length ?? null)
+              }
               enabledProviderSlugs={enabledProviderSlugs}
               filteredModelRows={filteredModelRows}
               onToggleModelAllowed={handleToggleModelAllowed}

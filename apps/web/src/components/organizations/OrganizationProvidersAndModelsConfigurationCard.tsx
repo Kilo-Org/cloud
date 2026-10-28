@@ -29,6 +29,13 @@ type ProviderForSummaryCard = {
   }>;
 };
 
+function hasModelAccessRestrictions(
+  providerAllowList: string[] | undefined,
+  modelDenyList: string[] | undefined
+): boolean {
+  return providerAllowList !== undefined || (modelDenyList?.length ?? 0) > 0;
+}
+
 /**
  * Groups the organization's available models by the enabled providers that
  * serve them. Availability comes from `listAvailableModels`, not from the
@@ -42,7 +49,7 @@ export function computeProviderSelectionsForSummaryCard(params: {
   availableModelIds: ReadonlyArray<string>;
 }): ProviderSelection[] | null {
   const { openRouterProviders, providerAllowList, modelDenyList, availableModelIds } = params;
-  if (providerAllowList === undefined && (!modelDenyList || modelDenyList.length === 0)) {
+  if (!hasModelAccessRestrictions(providerAllowList, modelDenyList)) {
     return null;
   }
 
@@ -78,7 +85,12 @@ export function OrganizationProvidersAndModelsConfigurationCard({
   const { isLoading, organizationData, configurationData } =
     useOrganizationConfiguration(organizationId);
   const { providers: openRouterProviders } = useOpenRouterModelsAndProviders();
-  const availableModels = useOrganizationAvailableModels(organizationId);
+  const availableModels = useOrganizationAvailableModels(organizationId, {
+    enabled: hasModelAccessRestrictions(
+      organizationData?.settings?.provider_allow_list,
+      organizationData?.settings?.model_deny_list
+    ),
+  });
 
   const providerSelections = useMemo((): ProviderSelection[] | null => {
     if (!configurationData || !organizationData) {

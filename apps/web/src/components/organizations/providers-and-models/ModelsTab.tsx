@@ -28,7 +28,7 @@ export function ModelsTab({
   onSearchChange: (value: string) => void;
   onSelectedOnlyChange: (value: boolean) => void;
   allowedModelIds: ReadonlySet<string>;
-  /** Length of `listAvailableModels` for the saved settings; null while it loads. */
+  /** Length of `listAvailableModels` for the saved settings; null while it loads, omitted to hide. */
   availableModelCount?: number | null;
   enabledProviderSlugs: ReadonlySet<string>;
   filteredModelRows: ReadonlyArray<ModelRow>;

@@ -7,7 +7,8 @@ import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/defini
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import { createAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import {
-  getModelUserByokProviders,
+  getModelGatewayUserByokProviders,
+  getModelInferenceUserByokProviders,
   getBYOKforUser,
   getBYOKforOrganization,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
@@ -16,7 +17,7 @@ import { readDb } from '@kilocode/web-shared/lib/drizzle';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok');
 
-const mockedGetModelUserByokProviders = getModelUserByokProviders as jest.Mock;
+const mockedGetModelInferenceUserByokProviders = getModelInferenceUserByokProviders as jest.Mock;
 const mockedGetBYOKforUser = getBYOKforUser as jest.Mock;
 const mockedGetBYOKforOrganization = getBYOKforOrganization as jest.Mock;
 
@@ -33,7 +34,7 @@ function createTestUser(overrides: Partial<User> = {}): User {
 
 describe('getEmbeddingProvider', () => {
   beforeEach(() => {
-    mockedGetModelUserByokProviders.mockClear().mockResolvedValue([]);
+    mockedGetModelInferenceUserByokProviders.mockClear().mockResolvedValue([]);
     mockedGetBYOKforUser.mockClear().mockResolvedValue(null);
     mockedGetBYOKforOrganization.mockClear().mockResolvedValue(null);
   });
@@ -57,14 +58,14 @@ describe('getEmbeddingProvider', () => {
     const user = createTestUser();
     const mockByokResult = [{ decryptedAPIKey: 'sk-test', providerId: 'openai' as const }];
 
-    mockedGetModelUserByokProviders.mockResolvedValue(['openai']);
+    mockedGetModelInferenceUserByokProviders.mockResolvedValue(['openai']);
     mockedGetBYOKforUser.mockResolvedValue(mockByokResult);
 
     const result = await getEmbeddingProvider('openai/text-embedding-3-small', user, undefined);
 
     expect(result.provider.id).toBe('vercel');
     expect(result.provider).toBe(VERCEL_AI_GATEWAY);
-    expect(result.userByok).toBe(mockByokResult);
+    expect(result.userByok).toEqual(mockByokResult);
     expect(mockedGetBYOKforUser).toHaveBeenCalledWith(readDb, user.id, ['openai']);
   });
 
@@ -72,13 +73,13 @@ describe('getEmbeddingProvider', () => {
     const user = createTestUser();
     const mockByokResult = [{ decryptedAPIKey: 'sk-org', providerId: 'mistral' as const }];
 
-    mockedGetModelUserByokProviders.mockResolvedValue(['mistral']);
+    mockedGetModelInferenceUserByokProviders.mockResolvedValue(['mistral']);
     mockedGetBYOKforOrganization.mockResolvedValue(mockByokResult);
 
     const result = await getEmbeddingProvider('mistralai/mistral-embed-2312', user, 'org-123');
 
     expect(result.provider.id).toBe('vercel');
-    expect(result.userByok).toBe(mockByokResult);
+    expect(result.userByok).toEqual(mockByokResult);
     expect(mockedGetBYOKforOrganization).toHaveBeenCalledWith(readDb, 'org-123', ['mistral']);
   });
 
@@ -88,12 +89,35 @@ describe('getEmbeddingProvider', () => {
 
     expect(result.provider.id).toBe('openrouter');
     expect(result.userByok).toBeNull();
-    expect(mockedGetModelUserByokProviders).not.toHaveBeenCalled();
+    expect(mockedGetModelInferenceUserByokProviders).not.toHaveBeenCalled();
+  });
+
+  it('does not use gateway keys for embeddings', async () => {
+    const user = createTestUser();
+    mockedGetModelInferenceUserByokProviders.mockResolvedValue(['openai']);
+
+    const result = await getEmbeddingProvider('openai/text-embedding-3-small', user, undefined);
+
+    expect(result.provider).toBe(OPENROUTER);
+    expect(result.userByok).toBeNull();
+    expect(mockedGetBYOKforUser).toHaveBeenCalledWith(readDb, user.id, ['openai']);
+    expect(getModelGatewayUserByokProviders).not.toHaveBeenCalled();
+  });
+
+  it('skips the key lookup when no inference provider serves the model', async () => {
+    const result = await getEmbeddingProvider(
+      'openai/text-embedding-3-small',
+      createTestUser(),
+      undefined
+    );
+
+    expect(result.provider).toBe(OPENROUTER);
+    expect(mockedGetBYOKforUser).not.toHaveBeenCalled();
   });
 
   it('should fall through to OpenRouter when no BYOK keys found', async () => {
     const user = createTestUser();
-    mockedGetModelUserByokProviders.mockResolvedValue(['openai']);
+    mockedGetModelInferenceUserByokProviders.mockResolvedValue(['openai']);
     mockedGetBYOKforUser.mockResolvedValue(null);
 
     const result = await getEmbeddingProvider('mistralai/codestral-embed-2505', user, undefined);

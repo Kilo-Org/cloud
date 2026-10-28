@@ -2,29 +2,42 @@ import { type db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizz
 import { byok_api_keys } from '@kilocode/db/schema';
 import { ByokApiKeySettingsSchema } from '@kilocode/db/schema-types';
 import { and, eq, inArray } from 'drizzle-orm';
-import type { EncryptedData } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { captureException } from '@sentry/nextjs';
+import type { BYOKApiKeyEnvelope, EncryptedData } from '@kilocode/db/schema-types';
+import {
+  decryptByokEnvelope,
+  getByokKmsClientConfig,
+  type ByokKmsContext,
+} from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import {
+  GatewayUserByokProviderIdSchema,
   UserByokProviderIdSchema,
   getVercelUserByokProviderIdForEndpoint,
+  isGatewayUserByokProviderId,
+  type GatewayUserByokProviderId,
   type UserByokProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { isCodestralModel } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
+  getVercelModelsFromDatabase,
   getVercelModelsMetadataFromDatabase,
+  isValidOpenRouterModelId,
   type StoredModelMap,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { hasEnabledUserByokForModel } from '@kilocode/web-shared/lib/ai-gateway/byok/availability';
 
 // A BYOK key belongs to exactly one owner, either a user or an organization.
 type ByokOwnerColumn = typeof byok_api_keys.kilo_user_id | typeof byok_api_keys.organization_id;
 type ByokSourceDb = typeof db | DrizzleTransaction;
 
-async function deriveModelUserByokProviders(
+async function deriveModelInferenceUserByokProviders(
   modelId: string,
   vercelModelMetadata: StoredModelMap
 ): Promise<UserByokProviderId[]> {
@@ -45,13 +58,71 @@ async function deriveModelUserByokProviders(
   return providers;
 }
 
-export async function getModelUserByokProviders(modelId: string): Promise<UserByokProviderId[]> {
-  const vercelModelMetadata = await getVercelModelsMetadataFromDatabase();
-  if (Object.keys(vercelModelMetadata).length === 0) {
-    console.error('[getModelUserByokProviders] no Vercel model metadata for model %s', modelId);
+/**
+ * Kilo-exclusive and free models stay on Kilo's own accounts: they are served
+ * through Kilo-specific routes or paid for by Kilo, so a gateway key must not
+ * take them over. Custom LLMs are never in the gateway catalogs, so the
+ * built-in free rules suffice.
+ */
+export function isGatewayUserByokEligibleModel(modelId: string): boolean {
+  return !isKiloExclusiveModel(modelId) && !isFreeModelExcludingCustomLlms(modelId);
+}
+
+export async function getModelGatewayUserByokProviders(
+  modelId: string
+): Promise<GatewayUserByokProviderId[]> {
+  if (!isGatewayUserByokEligibleModel(modelId)) {
     return [];
   }
-  return deriveModelUserByokProviders(modelId, vercelModelMetadata);
+  const [vercelModels, vercelModelId, isOpenRouterModel] = await Promise.all([
+    getVercelModelsFromDatabase(),
+    mapModelIdToVercel(modelId),
+    isValidOpenRouterModelId(modelId),
+  ]);
+  return GatewayUserByokProviderIdSchema.options.filter(providerId =>
+    providerId === 'vercel-ai-gateway' ? vercelModels.has(vercelModelId) : isOpenRouterModel
+  );
+}
+
+async function getVercelModelMetadata(caller: string): Promise<StoredModelMap | null> {
+  const vercelModelMetadata = await getVercelModelsMetadataFromDatabase();
+  if (Object.keys(vercelModelMetadata).length === 0) {
+    console.error('[%s] no Vercel model metadata', caller);
+    return null;
+  }
+  return vercelModelMetadata;
+}
+
+/** The inference providers routed through Vercel whose key can serve `modelId`. */
+export async function getModelInferenceUserByokProviders(
+  modelId: string
+): Promise<UserByokProviderId[]> {
+  const vercelModelMetadata = await getVercelModelMetadata('getModelInferenceUserByokProviders');
+  return vercelModelMetadata
+    ? deriveModelInferenceUserByokProviders(modelId, vercelModelMetadata)
+    : [];
+}
+
+/**
+ * Returns every user BYOK provider whose key can serve `modelId`: first the
+ * inference providers routed through Vercel, then the gateway keys in order of
+ * preference. With `enabledProviderIds`, skips the catalog lookups that cannot
+ * match an enabled key.
+ */
+export async function getModelUserByokProviders(
+  modelId: string,
+  enabledProviderIds?: ReadonlySet<UserByokProviderId>
+): Promise<UserByokProviderId[]> {
+  const enabled = enabledProviderIds ? [...enabledProviderIds] : undefined;
+  const [inferenceProviders, gatewayProviders] = await Promise.all([
+    !enabled || enabled.some(id => !isGatewayUserByokProviderId(id))
+      ? getModelInferenceUserByokProviders(modelId)
+      : [],
+    !enabled || enabled.some(isGatewayUserByokProviderId)
+      ? getModelGatewayUserByokProviders(modelId)
+      : [],
+  ]);
+  return [...inferenceProviders, ...gatewayProviders];
 }
 
 export type ByokOwner = { type: 'user'; id: string } | { type: 'organization'; id: string };
@@ -117,39 +188,85 @@ export async function getOrganizationByokProviderIds(
   return providers.map(provider => provider.providerId);
 }
 
+/**
+ * `getAllowedProviders` returns the organization's allowed providers for a
+ * model, or undefined when every provider is allowed.
+ */
 export async function addUserByokAvailability(
   models: OpenRouterModel[],
-  enabledProviderIds: UserByokProviderId[]
+  enabledProviderIds: UserByokProviderId[],
+  getAllowedProviders: (modelId: string) => ReadonlySet<string> | undefined = () => undefined
 ): Promise<OpenRouterModel[]> {
   const enabledProviders = new Set(enabledProviderIds);
-  const vercelModelMetadata = await getVercelModelsMetadataFromDatabase();
-  const hasMetadata = Object.keys(vercelModelMetadata).length > 0;
-  if (!hasMetadata) {
-    console.error('[addUserByokAvailability] no Vercel model metadata');
-  }
+  const enabled = [...enabledProviders];
+  const vercelModelMetadata = enabled.some(id => !isGatewayUserByokProviderId(id))
+    ? await getVercelModelMetadata('addUserByokAvailability')
+    : null;
+  const hasGatewayKey = enabled.some(isGatewayUserByokProviderId);
   return Promise.all(
     models.map(async model => {
-      const hasUserByokAvailable =
-        hasMetadata &&
-        !isKiloExclusiveModel(model.id) &&
-        (await deriveModelUserByokProviders(model.id, vercelModelMetadata)).some(provider =>
-          enabledProviders.has(provider)
-        );
+      if (enabledProviders.size === 0 || isKiloExclusiveModel(model.id)) {
+        return { ...model, hasUserByokAvailable: false };
+      }
+      const modelProviders = [
+        ...(vercelModelMetadata
+          ? await deriveModelInferenceUserByokProviders(model.id, vercelModelMetadata)
+          : []),
+        ...(hasGatewayKey ? await getModelGatewayUserByokProviders(model.id) : []),
+      ];
+      const hasUserByokAvailable = await hasEnabledUserByokForModel({
+        modelId: model.id,
+        modelProviders,
+        enabledProviderIds: enabledProviders,
+        allowedProviders: getAllowedProviders(model.id),
+      });
       return { ...model, hasUserByokAvailable };
     })
   );
 }
 
-export function decryptByokRow({
-  encrypted_api_key,
-  provider_id,
-}: {
+export function getByokKmsContext(row: {
+  id: string;
+  organization_id: string | null;
+  kilo_user_id: string | null;
+  provider_id: string;
+}): ByokKmsContext {
+  if (row.organization_id) {
+    return {
+      key_id: row.id,
+      owner_type: 'organization',
+      owner_id: row.organization_id,
+      provider_id: row.provider_id,
+    };
+  }
+  if (row.kilo_user_id) {
+    return {
+      key_id: row.id,
+      owner_type: 'user',
+      owner_id: row.kilo_user_id,
+      provider_id: row.provider_id,
+    };
+  }
+  throw new Error('BYOK row has no owner');
+}
+
+export async function decryptByokRow(row: {
+  id: string;
   encrypted_api_key: EncryptedData;
+  encrypted_api_key_envelope: BYOKApiKeyEnvelope | null;
+  organization_id: string | null;
+  kilo_user_id: string | null;
   provider_id: string;
 }) {
+  // The legacy column is always written alongside the envelope, so with the KMS service
+  // unconfigured (rollback) it is still valid and we read it instead of failing.
+  const decryptedAPIKey =
+    row.encrypted_api_key_envelope && getByokKmsClientConfig()
+      ? await decryptByokEnvelope(row.encrypted_api_key_envelope, getByokKmsContext(row))
+      : decryptApiKey(row.encrypted_api_key, BYOK_ENCRYPTION_KEY);
   return {
-    decryptedAPIKey: decryptApiKey(encrypted_api_key, BYOK_ENCRYPTION_KEY),
-    providerId: UserByokProviderIdSchema.parse(provider_id),
+    decryptedAPIKey,
+    providerId: UserByokProviderIdSchema.parse(row.provider_id),
   };
 }
 
@@ -166,7 +283,11 @@ export async function getByokCredentials(
   }
   const rows = await fromDb
     .select({
+      id: byok_api_keys.id,
       encrypted_api_key: byok_api_keys.encrypted_api_key,
+      encrypted_api_key_envelope: byok_api_keys.encrypted_api_key_envelope,
+      organization_id: byok_api_keys.organization_id,
+      kilo_user_id: byok_api_keys.kilo_user_id,
       provider_id: byok_api_keys.provider_id,
       settings: byok_api_keys.settings,
     })
@@ -180,10 +301,24 @@ export async function getByokCredentials(
     )
     .orderBy(byok_api_keys.created_at);
 
-  return rows.map(row => ({
-    ...decryptByokRow(row),
-    serveCatalogModels: servesCatalogModels(row.settings),
-  }));
+  const results = await Promise.allSettled(
+    rows.map(async row => ({
+      ...(await decryptByokRow(row)),
+      serveCatalogModels: servesCatalogModels(row.settings),
+    }))
+  );
+
+  const credentials: ByokCredential[] = [];
+  const failures: unknown[] = [];
+  for (const result of results) {
+    if (result.status === 'fulfilled') credentials.push(result.value);
+    else failures.push(result.reason);
+  }
+  for (const failure of failures) captureException(failure);
+
+  // Fail closed when no key could be decrypted so the request never falls back to Kilo-paid routing.
+  if (credentials.length === 0 && failures.length > 0) throw failures[0];
+  return credentials;
 }
 
 async function getByokRowsForOwner(

@@ -98,7 +98,7 @@
     "expo-router": "~58.0.19",
     "expo-screen-corner-radius": "1.1.0",
     "expo-secure-store": "~58.0.2",
-    "expo-share-intent": "8.0.1",
+    "expo-share-intent": "9.0.0",
     "expo-sharing": "~58.0.18",
     "expo-speech-recognition": "57.1.1",
     "expo-splash-screen": "~58.0.9",

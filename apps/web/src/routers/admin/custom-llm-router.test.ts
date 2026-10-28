@@ -10,6 +10,7 @@ import type { CustomLlmDefinition, StoredModel } from '@kilocode/db/schema-types
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { useKiloExclusiveModel } from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   ...jest.requireActual<typeof GatewayModelsCache>(
@@ -55,6 +56,8 @@ beforeEach(async () => {
 });
 
 describe('adminCustomLlmRouter', () => {
+  useKiloExclusiveModel();
+
   it('rejects a non-admin caller', async () => {
     const caller = await createCallerForUser(nonAdmin.id);
     await expect(caller.admin.customLlm.list()).rejects.toMatchObject({

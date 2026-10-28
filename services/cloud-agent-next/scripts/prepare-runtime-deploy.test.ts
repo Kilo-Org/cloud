@@ -54,7 +54,6 @@ async function checkout(config: string, recipe?: string, mode = 'downloaded') {
     '-m',
     'fixture',
   ]);
-  vi.stubEnv('RUNTIME_PUBLICATION_ENABLED', 'true');
   vi.stubEnv('RUNTIME_R2_ACCOUNT_ID', 'c'.repeat(32));
   vi.stubEnv('RUNTIME_R2_BUCKET', 'runtime-test');
   vi.stubEnv('RUNTIME_R2_ACCESS_KEY_ID', 'fixture-key');
@@ -84,14 +83,6 @@ for (const recipe of [undefined, 'FROM debian:trixie-slim\nCOPY undeclared /tmp/
       fs.stat(path.join(f.root, 'wrangler.runtime-generated.json'))
     ).rejects.toHaveProperty('code', 'ENOENT');
   });
-it('fails a downloaded deployment promptly when publication is disabled', async () => {
-  const f = await checkout(config());
-  vi.stubEnv('RUNTIME_PUBLICATION_ENABLED', '');
-  await expect(main(['production', f.sha], f.root)).rejects.toThrow(
-    'Runtime publication is not enabled'
-  );
-  expect(lookup).not.toHaveBeenCalled();
-});
 it('rejects malformed JSONC before writing a deploy configuration', async () => {
   const f = await checkout(config().slice(0, -1), undefined, 'preinstalled');
   await expect(main(['production', f.sha], f.root)).rejects.toThrow('Invalid wrangler.jsonc');

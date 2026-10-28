@@ -556,7 +556,8 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
         user_byok: true,
         is_free: false,
       }),
-      expect.anything()
+      expect.anything(),
+      expect.objectContaining({ id: provider.id, apiKey: provider.apiKey })
     );
   });
 
@@ -1186,8 +1187,10 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
 
     async function sendClaudeRequest() {
       let routingProvider: OpenRouterProviderConfig | undefined;
-      mockedGetProvider.mockImplementationOnce(async ({ getRoutingProviderConfig }) => {
-        routingProvider = await getRoutingProviderConfig?.();
+      let kiloIgnoredProviders: string[] | undefined;
+      mockedGetProvider.mockImplementationOnce(async input => {
+        routingProvider = await input.getRoutingProviderConfig?.();
+        kiloIgnoredProviders = input.kiloIgnoredProviders;
         return {
           kind: 'provider',
           provider,
@@ -1203,14 +1206,16 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       expect(response.status).toBe(200);
       return {
         routingProvider,
+        kiloIgnoredProviders,
         upstreamProvider: mockedUpstreamRequest.mock.calls[0]?.[0].body.provider,
       };
     }
 
     it('ignores Anthropic for personal accounts without an organization lookup', async () => {
-      const { routingProvider, upstreamProvider } = await sendClaudeRequest();
+      const { routingProvider, kiloIgnoredProviders, upstreamProvider } = await sendClaudeRequest();
 
-      expect(routingProvider).toEqual({ ignore: ['anthropic'] });
+      expect(routingProvider).toBeUndefined();
+      expect(kiloIgnoredProviders).toEqual(['anthropic']);
       expect(upstreamProvider).toEqual({
         order: ['google-vertex', 'amazon-bedrock'],
         ignore: ['anthropic'],
@@ -1231,11 +1236,11 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       setOrganizationAuth('enterprise');
       mockedIsNonTrialEnterpriseOrganization.mockResolvedValueOnce(false);
 
-      const { routingProvider, upstreamProvider } = await sendClaudeRequest();
+      const { kiloIgnoredProviders, upstreamProvider } = await sendClaudeRequest();
 
       expect(mockedIsNonTrialEnterpriseOrganization.mock.calls[0]?.[0]).toBe('org-1');
       expect(mockedIsNonTrialEnterpriseOrganization.mock.calls[0]?.[1]).toBe(readDb);
-      expect(routingProvider?.ignore).toEqual(['anthropic']);
+      expect(kiloIgnoredProviders).toEqual(['anthropic']);
       expect(upstreamProvider?.ignore).toEqual(['anthropic']);
     });
 
@@ -1243,9 +1248,9 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       setOrganizationAuth('enterprise');
       mockedIsNonTrialEnterpriseOrganization.mockResolvedValueOnce(true);
 
-      const { routingProvider, upstreamProvider } = await sendClaudeRequest();
+      const { kiloIgnoredProviders, upstreamProvider } = await sendClaudeRequest();
 
-      expect(routingProvider?.ignore).toBeUndefined();
+      expect(kiloIgnoredProviders).toEqual([]);
       expect(upstreamProvider).toEqual({ order: ['google-vertex', 'amazon-bedrock'] });
     });
 

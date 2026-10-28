@@ -1,4 +1,5 @@
-import { describe, test, expect, beforeAll, afterEach } from '@jest/globals';
+import { describe, test, expect, beforeAll, beforeEach, afterEach, jest } from '@jest/globals';
+import { randomBytes } from 'crypto';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
@@ -317,6 +318,161 @@ describe('BYOK Router', () => {
 
       const keys = await caller.byok.list({ organizationId: organizationA.id });
       expect(keys).toHaveLength(2);
+    });
+  });
+
+  describe('KMS envelope encryption', () => {
+    const originalFetch = global.fetch;
+    const originalUrl = process.env.BYOK_KMS_SERVICE_URL;
+    const originalToken = process.env.BYOK_KMS_SERVICE_TOKEN;
+
+    afterEach(() => {
+      global.fetch = originalFetch;
+      if (originalUrl === undefined) delete process.env.BYOK_KMS_SERVICE_URL;
+      else process.env.BYOK_KMS_SERVICE_URL = originalUrl;
+      if (originalToken === undefined) delete process.env.BYOK_KMS_SERVICE_TOKEN;
+      else process.env.BYOK_KMS_SERVICE_TOKEN = originalToken;
+    });
+
+    function configureKms(response: () => Response) {
+      process.env.BYOK_KMS_SERVICE_URL = 'http://kms.test';
+      process.env.BYOK_KMS_SERVICE_TOKEN = 'token';
+      const fetchMock = jest.fn(async () => response());
+      global.fetch = fetchMock as unknown as typeof fetch;
+      return fetchMock;
+    }
+
+    const issuedDataKeys: string[] = [];
+    const dataKeyResponse = () => {
+      const data_key = randomBytes(32).toString('base64');
+      issuedDataKeys.push(data_key);
+      return Response.json({
+        data_key,
+        wrapped_dek: 'wrapped',
+        kms_key_id: 'alias/test',
+        kms_key_version: '1',
+      });
+    };
+
+    beforeEach(() => {
+      issuedDataKeys.length = 0;
+    });
+
+    test('leaves the envelope NULL when the service is not configured', async () => {
+      delete process.env.BYOK_KMS_SERVICE_URL;
+      const caller = await createCallerForUser(ownerUser.id);
+
+      const created = await caller.byok.create({
+        organizationId: organizationA.id,
+        provider_id: 'anthropic',
+        api_key: 'sk-ant-no-kms',
+      });
+
+      const [dbKey] = await db.select().from(byok_api_keys).where(eq(byok_api_keys.id, created.id));
+      expect(dbKey.encrypted_api_key_envelope).toBeNull();
+    });
+
+    test('writes both columns on create and update when the service is configured', async () => {
+      const fetchMock = configureKms(dataKeyResponse);
+      const caller = await createCallerForUser(ownerUser.id);
+
+      const created = await caller.byok.create({
+        organizationId: organizationA.id,
+        provider_id: 'anthropic',
+        api_key: 'sk-ant-kms',
+      });
+
+      const [createdKey] = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.id, created.id));
+      expect(createdKey.encrypted_api_key_envelope).toMatchObject({
+        wrapped_dek: 'wrapped',
+        kms_key_id: 'alias/test',
+      });
+      expect(decryptApiKey(createdKey.encrypted_api_key, BYOK_ENCRYPTION_KEY)).toBe('sk-ant-kms');
+      expect(
+        decryptApiKey(createdKey.encrypted_api_key_envelope!.encrypted_data, issuedDataKeys[0])
+      ).toBe('sk-ant-kms');
+
+      await caller.byok.update({
+        organizationId: organizationA.id,
+        id: created.id,
+        api_key: 'sk-ant-kms-2',
+      });
+
+      const [updatedKey] = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.id, created.id));
+      expect(decryptApiKey(updatedKey.encrypted_api_key, BYOK_ENCRYPTION_KEY)).toBe('sk-ant-kms-2');
+      expect(
+        decryptApiKey(updatedKey.encrypted_api_key_envelope!.encrypted_data, issuedDataKeys[1])
+      ).toBe('sk-ant-kms-2');
+      expect(fetchMock).toHaveBeenCalledTimes(2);
+      const sent = fetchMock.mock.calls.map(call => {
+        const [, init] = call as unknown as [string, RequestInit];
+        return JSON.parse(String(init.body));
+      });
+      for (const body of sent) {
+        expect(body).toEqual({
+          key_id: created.id,
+          actor_user_id: ownerUser.id,
+          owner_type: 'organization',
+          owner_id: organizationA.id,
+          provider_id: 'anthropic',
+        });
+      }
+    });
+
+    test('testApiKey reports a failure instead of throwing when the KMS call fails', async () => {
+      configureKms(dataKeyResponse);
+      const caller = await createCallerForUser(ownerUser.id);
+      const created = await caller.byok.create({
+        organizationId: organizationA.id,
+        provider_id: 'anthropic',
+        api_key: 'sk-ant-kms',
+      });
+      configureKms(() => new Response('{}', { status: 503 }));
+
+      await expect(
+        caller.byok.testApiKey({ organizationId: organizationA.id, id: created.id })
+      ).resolves.toEqual({
+        success: false,
+        message: 'API key test failed: the stored key could not be read. Try again later.',
+      });
+    });
+
+    test('fails create and update without writing when the KMS call fails', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const created = await caller.byok.create({
+        organizationId: organizationA.id,
+        provider_id: 'anthropic',
+        api_key: 'sk-ant-before',
+      });
+      configureKms(() => new Response('{}', { status: 503 }));
+
+      await expect(
+        caller.byok.create({
+          organizationId: organizationA.id,
+          provider_id: 'openai',
+          api_key: 'sk-openai-kms-fail',
+        })
+      ).rejects.toThrow();
+      await expect(
+        caller.byok.update({
+          organizationId: organizationA.id,
+          id: created.id,
+          api_key: 'sk-ant-after',
+        })
+      ).rejects.toThrow();
+
+      const keys = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.organization_id, organizationA.id));
+      expect(keys.map(key => key.provider_id)).toEqual(['anthropic']);
+      expect(decryptApiKey(keys[0].encrypted_api_key, BYOK_ENCRYPTION_KEY)).toBe('sk-ant-before');
     });
   });
 
@@ -725,6 +881,97 @@ describe('BYOK Router', () => {
     });
   });
 
+  describe('gateway keys', () => {
+    function chatCompletionResponse() {
+      return new Response(
+        JSON.stringify({
+          id: 'gen-1',
+          object: 'chat.completion',
+          created: 0,
+          model: 'openai/gpt-5-nano',
+          choices: [
+            { index: 0, message: { role: 'assistant', content: 'hi' }, finish_reason: 'stop' },
+          ],
+          usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 },
+        }),
+        { status: 200, headers: { 'content-type': 'application/json' } }
+      );
+    }
+
+    test.each([
+      { owner: 'user', providerId: 'openrouter' },
+      { owner: 'organization', providerId: 'vercel-ai-gateway' },
+    ] as const)('stores a $owner $providerId key', async ({ owner, providerId }) => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const scope = owner === 'organization' ? { organizationId: organizationA.id } : {};
+
+      const created = await caller.byok.create({
+        ...scope,
+        provider_id: providerId,
+        api_key: 'gateway-secret',
+      });
+
+      expect(created).toMatchObject({ provider_id: providerId, is_enabled: true });
+      const [stored] = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.id, created.id));
+      expect(decryptApiKey(stored.encrypted_api_key, BYOK_ENCRYPTION_KEY)).toBe('gateway-secret');
+    });
+
+    test('tests an OpenRouter key against OpenRouter with the stored key', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const key = await caller.byok.create({
+        provider_id: 'openrouter',
+        api_key: 'user-openrouter-key',
+      });
+      const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(chatCompletionResponse());
+
+      try {
+        await expect(caller.byok.testApiKey({ id: key.id })).resolves.toMatchObject({
+          success: true,
+        });
+
+        expect(fetchSpy).toHaveBeenCalledTimes(1);
+        const [url, init] = fetchSpy.mock.calls[0];
+        expect(String(url)).toBe('https://openrouter.ai/api/v1/chat/completions');
+        expect(new Headers(init?.headers).get('authorization')).toBe('Bearer user-openrouter-key');
+        expect(JSON.parse(String(init?.body))).toMatchObject({ model: 'openai/gpt-5-nano' });
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+
+    test('reports a rejected Vercel AI Gateway key without SDK setup instructions', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+      const key = await caller.byok.create({
+        provider_id: 'vercel-ai-gateway',
+        api_key: 'revoked-vercel-key',
+      });
+      const fetchSpy = jest.spyOn(globalThis, 'fetch').mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: { message: 'Invalid API key', type: 'authentication_error' },
+          }),
+          { status: 401, headers: { 'content-type': 'application/json' } }
+        )
+      );
+
+      try {
+        await expect(caller.byok.testApiKey({ id: key.id })).resolves.toEqual({
+          success: false,
+          message:
+            'API key test failed: Vercel AI Gateway rejected this API key. Check that the key is correct and has not been revoked.',
+        });
+        const [url, init] = fetchSpy.mock.calls[0];
+        expect(String(url)).toMatch(/^https:\/\/ai-gateway\.vercel\.sh\//);
+        expect(new Headers(init?.headers).get('authorization')).toBe('Bearer revoked-vercel-key');
+      } finally {
+        fetchSpy.mockRestore();
+      }
+    });
+  });
+
   describe('listSupportedModels', () => {
     test('lists models as "name (id)" per provider', async () => {
       const [snapshot] = await db
@@ -761,6 +1008,70 @@ describe('BYOK Router', () => {
       } finally {
         await db.delete(modelsByProvider).where(eq(modelsByProvider.id, snapshot.id));
       }
+    });
+  });
+
+  describe('direct cloud providers', () => {
+    const originalTargetEnv = process.env.VERCEL_TARGET_ENV;
+
+    afterEach(() => {
+      if (originalTargetEnv === undefined) delete process.env.VERCEL_TARGET_ENV;
+      else process.env.VERCEL_TARGET_ENV = originalTargetEnv;
+    });
+
+    test('creates direct Bedrock and Vertex keys outside production', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+
+      await expect(caller.byok.experimentalByokEnabled({})).resolves.toBe(true);
+      await expect(
+        caller.byok.create({
+          provider_id: 'bedrock-byok',
+          api_key: JSON.stringify(BEDROCK_IAM_CREDENTIALS),
+        })
+      ).resolves.toMatchObject({ provider_id: 'bedrock-byok' });
+      await expect(
+        caller.byok.create({
+          organizationId: organizationA.id,
+          provider_id: 'vertex-byok',
+          api_key: JSON.stringify({
+            type: 'service_account',
+            project_id: 'example-project',
+            private_key: 'private-key',
+            client_email: 'gateway@example-project.iam.gserviceaccount.com',
+          }),
+        })
+      ).resolves.toMatchObject({ provider_id: 'vertex-byok' });
+    });
+
+    test('rejects malformed direct cloud credentials', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+
+      await expect(
+        caller.byok.create({ provider_id: 'bedrock-byok', api_key: '{"accessKeyId":"AKIA"}' })
+      ).rejects.toThrow('Invalid credentials for provider: bedrock-byok');
+      await expect(
+        caller.byok.create({ provider_id: 'vertex-byok', api_key: '{"project_id":"p"}' })
+      ).rejects.toThrow('Invalid credentials for provider: vertex-byok');
+    });
+
+    test('rejects direct cloud keys in production outside the Kilo organization', async () => {
+      process.env.VERCEL_TARGET_ENV = 'production';
+      const caller = await createCallerForUser(ownerUser.id);
+
+      await expect(caller.byok.experimentalByokEnabled({})).resolves.toBe(false);
+      await expect(
+        caller.byok.experimentalByokEnabled({ organizationId: organizationA.id })
+      ).resolves.toBe(false);
+      await expect(
+        caller.byok.create({
+          organizationId: organizationA.id,
+          provider_id: 'bedrock-byok',
+          api_key: JSON.stringify(BEDROCK_IAM_CREDENTIALS),
+        })
+      ).rejects.toThrow('Provider bedrock-byok is not available yet.');
+      await expect(
+        caller.byok.create({ provider_id: 'nvidia-byok', api_key: 'nvidia-key' })
+      ).resolves.toMatchObject({ provider_id: 'nvidia-byok' });
     });
   });
 

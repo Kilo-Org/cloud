@@ -38,10 +38,10 @@ describe('client-safe model imports', () => {
         '@kilocode/web-shared/lib/ai-gateway/providers/stepfun'
       );
 
-      expect(models.isPdfSupportingModel(anthropic.CLAUDE_OPUS_CURRENT_MODEL_ID)).toBe(true);
+      expect(models.isPdfSupportingModel('anthropic/claude-opus-5.5')).toBe(true);
       expect(autoModel.AUTO_SMALL_TARGET_MODELS.free).toBe(google.GEMMA_4_26B_A4B_IT_FREE_ID);
-      expect(anthropic.isClaudeModel(anthropic.CLAUDE_OPUS_CURRENT_MODEL_ID)).toBe(true);
-      expect(google.isGeminiModel(google.GEMINI_FLASH_CURRENT_MODEL_ID)).toBe(true);
+      expect(anthropic.isClaudeModel('anthropic/claude-opus-5.5')).toBe(true);
+      expect(google.isGeminiModel('google/gemini-3.8-flash')).toBe(true);
       expect(qwen.isQwenModel('qwen/qwen3.7-plus')).toBe(true);
       expect(stepfun.isStepModel('stepfun/step-3.7-flash')).toBe(true);
 
@@ -54,7 +54,7 @@ describe('client-safe model imports', () => {
       expect(
         customPricing.getCustomPricing(
           customPricing.EMPTY_CUSTOM_PRICING_CONFIG,
-          google.GEMINI_FLASH_CURRENT_MODEL_ID
+          'google/gemini-3.8-flash'
         )
       ).toBeUndefined();
       expect(modelUtils.normalizeModelId(google.GEMMA_4_26B_A4B_IT_FREE_ID)).toBe(

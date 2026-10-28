@@ -7,6 +7,7 @@ import {
   getDirectByokModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
+import { modelsServedByOrganizationInferenceProviderByok } from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-byok';
 import { validateOrganizationAutoTarget } from './organization-auto-model';
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {} }));
@@ -31,6 +32,9 @@ jest.mock(
   })
 );
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({ getByokCredentials: jest.fn() }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-byok', () => ({
+  modelsServedByOrganizationInferenceProviderByok: jest.fn(async () => []),
+}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   formatDirectByokModelId: (provider: { id: string }, model: { id: string }) =>
     `${provider.id}/${model.id}`.toLowerCase(),
@@ -134,5 +138,54 @@ describe('validateOrganizationAutoTarget with direct BYOK targets', () => {
       message:
         "Organization Auto route target 'synthetic/hf:example/finetune' is unavailable because this organization's synthetic key uses Kilo catalog model IDs and this model has no catalog ID.",
     });
+  });
+});
+
+describe('validateOrganizationAutoTarget with organization inference provider keys', () => {
+  const mockedServedModels = jest.mocked(modelsServedByOrganizationInferenceProviderByok);
+  const notAllowed = {
+    kind: 'error',
+    message:
+      "Organization Auto route target 'moonshotai/kimi-k2.6' is not allowed by the organization's model policy.",
+  };
+
+  beforeEach(() => {
+    mockedServedModels.mockReset().mockResolvedValue([]);
+  });
+
+  test('accepts a model outside the provider allow-list that an inference provider key serves', async () => {
+    mockedServedModels.mockResolvedValue(['moonshotai/kimi-k2.6']);
+
+    await expect(
+      validateOrganizationAutoTarget(
+        organization({ provider_allow_list: ['anthropic'] }),
+        'moonshotai/kimi-k2.6'
+      )
+    ).resolves.toEqual({ kind: 'ok', modelId: 'moonshotai/kimi-k2.6' });
+    expect(mockedServedModels).toHaveBeenCalledWith('org-1', ['moonshotai/kimi-k2.6']);
+  });
+
+  test('rejects a model outside the provider allow-list without such a key', async () => {
+    await expect(
+      validateOrganizationAutoTarget(
+        organization({ provider_allow_list: ['anthropic'] }),
+        'moonshotai/kimi-k2.6'
+      )
+    ).resolves.toEqual(notAllowed);
+  });
+
+  test('keeps the model deny list for models such a key serves', async () => {
+    mockedServedModels.mockResolvedValue(['moonshotai/kimi-k2.6']);
+
+    await expect(
+      validateOrganizationAutoTarget(
+        organization({
+          provider_allow_list: ['anthropic'],
+          model_deny_list: ['moonshotai/kimi-k2.6'],
+        }),
+        'moonshotai/kimi-k2.6'
+      )
+    ).resolves.toEqual(notAllowed);
+    expect(mockedServedModels).not.toHaveBeenCalled();
   });
 });

@@ -16,11 +16,7 @@ import {
   resolveOrganizationMemberModelPolicy,
   type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
-import {
-  getOrganizationByokProviderIds,
-  hasInferenceProviderByokForModel,
-} from '@kilocode/web-shared/lib/ai-gateway/byok';
-import { getDirectByokCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { modelsServedByOrganizationInferenceProviderByok } from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-byok';
 
 export function policyNeedsCandidateEvaluation(policy: EffectiveOrganizationModelPolicy): boolean {
   return (
@@ -97,22 +93,6 @@ export async function deniedAutoRoutingCandidates(
     allowed.add(modelId);
   }
   return deniedModelIdsForCandidates(policy, uniqueCandidates, modelId => allowed.has(modelId));
-}
-
-/** Like the organization model list, admits models the organization's inference provider keys serve. */
-async function modelsServedByOrganizationInferenceProviderByok(
-  organizationId: string,
-  modelIds: string[]
-): Promise<string[]> {
-  if (modelIds.length === 0) return [];
-  const [providerIds, catalogModelIds] = await Promise.all([
-    getOrganizationByokProviderIds(readDb, organizationId),
-    getDirectByokCatalogModelIds({ type: 'organization', id: organizationId }),
-  ]);
-  const served = await Promise.all(
-    modelIds.map(modelId => hasInferenceProviderByokForModel(modelId, providerIds, catalogModelIds))
-  );
-  return modelIds.filter((_modelId, index) => served[index]);
 }
 
 async function dataCollectionRequiredCandidates(

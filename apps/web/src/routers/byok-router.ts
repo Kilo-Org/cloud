@@ -308,6 +308,7 @@ export const byokRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, organizationId);
       }
       return previewByokRouting({
+        fromDb: db,
         owner: byokOwner(ctx.user.id, organizationId),
         requestedModel: modelId.toLowerCase(),
         apiKind,

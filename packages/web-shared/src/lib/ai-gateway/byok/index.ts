@@ -35,7 +35,7 @@ import { hasEnabledUserByokForModel } from '@kilocode/web-shared/lib/ai-gateway/
 
 // A BYOK key belongs to exactly one owner, either a user or an organization.
 type ByokOwnerColumn = typeof byok_api_keys.kilo_user_id | typeof byok_api_keys.organization_id;
-type ByokSourceDb = typeof db | DrizzleTransaction;
+export type ByokSourceDb = typeof db | DrizzleTransaction;
 
 async function deriveModelInferenceUserByokProviders(
   modelId: string,

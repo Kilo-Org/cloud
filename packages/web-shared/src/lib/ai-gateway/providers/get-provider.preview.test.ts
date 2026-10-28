@@ -19,6 +19,8 @@ import {
 import type * as byokModule from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type * as directByokModule from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import type * as encryptionModule from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import type * as chatGptRoutingModule from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
+import { getOpenAiChatGptCandidateModel } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
 import type * as gatewayModelsCacheModule from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { decryptApiKey, encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import {
@@ -68,6 +70,15 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', 
   ),
   isValidOpenRouterModelId: jest.fn(async () => true),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing', () => {
+  const actual = jest.requireActual<typeof chatGptRoutingModule>(
+    '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing'
+  );
+  return {
+    ...actual,
+    getOpenAiChatGptCandidateModel: jest.fn(actual.getOpenAiChatGptCandidateModel),
+  };
+});
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
   canRouteToVercel: jest.fn(),
   shouldRouteToVercel: jest.fn(),
@@ -237,7 +248,12 @@ describe('previewByokRouting', () => {
 
         jest.mocked(decryptApiKey).mockClear();
         jest.mocked(getByokCredentials).mockClear();
-        const preview = await previewByokRouting({ owner, requestedModel: MODEL, apiKind });
+        const preview = await previewByokRouting({
+          fromDb: db,
+          owner,
+          requestedModel: MODEL,
+          apiKind,
+        });
         expect(decryptApiKey).not.toHaveBeenCalled();
         expect(getByokCredentials).not.toHaveBeenCalled();
 
@@ -246,7 +262,40 @@ describe('previewByokRouting', () => {
           scenario,
           route: routeOf(routed, apiKind),
         });
+        const directKeyServes = preview.steps.some(
+          step => step.route === 'direct-byok' && step.reason === 'serves'
+        );
+        if (directKeyServes) {
+          expect(preview.steps.map(step => step.route)).not.toContain('unsupported-api-kind');
+        }
       }
     }
   );
+
+  test('marks the ChatGPT connection as not tried below a serving key', async () => {
+    const user = await insertTestUser();
+    await db.insert(byok_api_keys).values({
+      kilo_user_id: user.id,
+      provider_id: 'zai-coding',
+      encrypted_api_key: encryptApiKey('zai-coding-secret', BYOK_ENCRYPTION_KEY),
+      created_by: user.id,
+      settings: { serve_catalog_models: true },
+    });
+    jest.mocked(getOpenAiChatGptCandidateModel).mockResolvedValueOnce('gpt-test');
+    jest.mocked(shouldRouteToVercel).mockResolvedValue(false);
+
+    const preview = await previewByokRouting({
+      fromDb: db,
+      owner: { type: 'user', id: user.id },
+      requestedModel: MODEL,
+      apiKind: 'responses',
+    });
+
+    if (preview.kind !== 'routes') throw new Error(`unexpected ${preview.kind} preview`);
+    expect(preview.steps.map(({ route, outcome }) => ({ route, outcome }))).toEqual([
+      { route: 'direct-byok', outcome: 'used' },
+      { route: 'chatgpt', outcome: 'unreached' },
+      { route: 'kilo', outcome: 'unreached' },
+    ]);
+  });
 });

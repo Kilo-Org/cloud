@@ -25,6 +25,7 @@ import {
   isGatewayUserByokEligibleModel,
   type ByokKeyState,
   type ByokOwner,
+  type ByokSourceDb,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type { User } from '@kilocode/db/schema';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
@@ -665,12 +666,10 @@ export type ByokRoutingPreview = z.infer<typeof ByokRoutingPreviewSchema>;
 function markUnreachedSteps(steps: ByokRoutePreviewStep[]): ByokRoutePreviewStep[] {
   let taken = false;
   return steps.map(step => {
-    if (step.outcome !== 'used') return step;
-    if (!taken) {
-      taken = true;
-      return step;
-    }
-    return { ...step, outcome: 'unreached' };
+    if (step.outcome !== 'used' && step.outcome !== 'conditional') return step;
+    if (taken) return { ...step, outcome: 'unreached' };
+    if (step.outcome === 'used') taken = true;
+    return step;
   });
 }
 
@@ -684,10 +683,13 @@ function markUnreachedSteps(steps: ByokRoutePreviewStep[]): ByokRoutePreviewStep
  * KEEP IN SYNC WITH `getProvider` above: mirror any change to its step order or key decisions.
  */
 export async function previewByokRouting({
+  fromDb,
   owner,
   requestedModel,
   apiKind,
 }: {
+  /** The settings page passes the primary, so the preview matches the key list it explains. */
+  fromDb: ByokSourceDb;
   owner: ByokOwner;
   requestedModel: string;
   apiKind: GatewayChatApiKind;
@@ -698,7 +700,7 @@ export async function previewByokRouting({
     return { kind: 'not-catalog-model' };
   }
 
-  const keys = await getByokKeyStates(readDb, owner);
+  const keys = await getByokKeyStates(fromDb, owner);
   const steps: ByokRoutePreviewStep[] = [];
 
   const directCandidates = rankDirectByokCatalogKeys(
@@ -768,9 +770,10 @@ export async function previewByokRouting({
     });
   }
 
-  const unsupported = directCandidates.find(
-    candidate => candidate.decision === 'unsupported-api-kind'
-  );
+  // Like `resolveDirectByokProvider`, the failure applies only when no catalog-mode key serves.
+  const unsupported = directCandidates.some(candidate => candidate.decision === 'serves')
+    ? undefined
+    : directCandidates.find(candidate => candidate.decision === 'unsupported-api-kind');
   if (unsupported) {
     steps.push({
       route: 'unsupported-api-kind',

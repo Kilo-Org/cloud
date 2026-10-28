@@ -1,7 +1,6 @@
 import assert from 'node:assert/strict';
-import type { KiloEvent } from './local-kilo.js';
 import type { Harness } from './local-kilo-harness.js';
-import { eventMessage, record, type FeedStream } from './local-kilo-stack.js';
+import type { FeedStream } from './local-kilo-stack.js';
 
 /**
  * Which sandbox family a scenario needs. The local Docker sandbox cannot clone
@@ -29,26 +28,6 @@ export function orderBySandbox(scenarios: Scenario[]): Scenario[] {
       return rank !== 0 ? rank : left.index - right.index;
     })
     .map(entry => entry.scenario);
-}
-
-export function isIdle(event: KiloEvent): boolean {
-  if (event.type === 'session.idle') return true;
-  if (event.type !== 'session.status') return false;
-  return record(event.properties.status).type === 'idle';
-}
-
-export function partText(event: KiloEvent): string {
-  const part = record(event.properties.part);
-  return typeof part.text === 'string' ? part.text : '';
-}
-
-export function partMessageID(event: KiloEvent): string | undefined {
-  const part = record(event.properties.part);
-  return typeof part.messageID === 'string' ? part.messageID : undefined;
-}
-
-export function messageKey(event: KiloEvent): string {
-  return eventMessage(event).id as string;
 }
 
 export function validateSystem(feed: FeedStream, sessionID: string): void {

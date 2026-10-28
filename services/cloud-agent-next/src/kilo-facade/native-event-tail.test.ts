@@ -161,6 +161,52 @@ describe('native event tail', () => {
     ]);
   });
 
+  it('treats a live delta during the snapshot as an unproven gap', async () => {
+    const h = harness();
+    const page = deferred<NativeTailPage>();
+    const opened = openWith(h, () => page.promise);
+    h.send(ev(0, 'kilocode', kilocode('message.part.delta', { delta: 'x' })));
+    page.resolve({ kind: 'page', fence: 10, events: [] });
+    const result = await opened;
+    if (result.kind !== 'open') throw new Error('expected an open tail');
+
+    const sink = recordingSink();
+    await result.tail.run(sink.sink);
+    await settle();
+
+    expect(sink.frames).toEqual([]);
+    expect(sink.finishes).toEqual(['continuity_unproven']);
+    expect(h.closed()).toBe(true);
+  });
+
+  it('reuses a verified root mapping across bursts within the identity TTL', async () => {
+    const h = harness();
+    let resolves = 0;
+    const result = await openWith(
+      h,
+      async () => ({ kind: 'page', fence: 0, events: [] }),
+      async () => {
+        resolves += 1;
+        return { cloudAgentSessionId: WORKSPACE };
+      }
+    );
+    if (result.kind !== 'open') throw new Error('expected an open tail');
+    const sink = recordingSink();
+    await result.tail.run(sink.sink);
+
+    h.send(ev(1, 'kilocode', kilocode('custom.first', {})));
+    await settle();
+    h.send(ev(2, 'kilocode', kilocode('custom.second', {})));
+    await settle();
+
+    expect(sink.frames.map(frame => frame.type)).toEqual([
+      'kilo.native.fence',
+      'custom.first',
+      'custom.second',
+    ]);
+    expect(resolves).toBe(1);
+  });
+
   it('treats a socket error envelope as an unproven gap', async () => {
     const h = harness();
     const result = await openWith(h, async () => ({ kind: 'page', fence: 0, events: [] }));

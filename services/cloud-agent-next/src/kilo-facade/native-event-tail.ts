@@ -83,6 +83,8 @@ type BufferedFrame = {
 
 const OPEN_DEADLINE_MS = 5_000;
 const IDENTITY_RESOLVE_DEADLINE_MS = 2_000;
+/** A verified root mapping covers later bursts for this long, bounding resolves per tail. */
+const IDENTITY_TTL_MS = 1_000;
 
 function isErrorEnvelope(payload: unknown): boolean {
   return (
@@ -189,7 +191,10 @@ export async function openNativeEventTail(params: {
     return true;
   };
 
+  let identityVerifiedAt: number | null = null;
   const revalidateIdentity = async (): Promise<boolean> => {
+    if (identityVerifiedAt !== null && Date.now() - identityVerifiedAt < IDENTITY_TTL_MS)
+      return true;
     const deadlineAt = Date.now() + IDENTITY_RESOLVE_DEADLINE_MS;
     for (let attempt = 0; attempt < 3; attempt += 1) {
       const remaining = deadlineAt - Date.now();
@@ -199,7 +204,9 @@ export async function openNativeEventTail(params: {
       resolve.catch(() => undefined);
       try {
         const root = await withTimeout(resolve, remaining, 'Native identity resolve timed out');
-        return root?.cloudAgentSessionId === cloudAgentSessionId;
+        if (root?.cloudAgentSessionId !== cloudAgentSessionId) return false;
+        identityVerifiedAt = Date.now();
+        return true;
       } catch {
         // A transient resolve failure is retried to the probe bound.
       }
@@ -249,6 +256,11 @@ export async function openNativeEventTail(params: {
     }
     const event = payload as StreamEvent;
     if (!isDeliverableNativeEvent(event, true)) return;
+    // A live delta has no log position, so it cannot be ordered against the snapshot fence.
+    if (history && !fenceReady && event.eventId === 0) {
+      fail('continuity_unproven');
+      return;
+    }
     const native = toNativePublicEvent(event, kiloSessionId);
     if (native === null) return;
     const bytes = encoder.encode(JSON.stringify(native)).byteLength;

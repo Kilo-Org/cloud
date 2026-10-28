@@ -13,7 +13,6 @@ import {
   getDynamicRequestLoggingMode,
   type RequestLoggingMode,
 } from '@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins';
-import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/constants';
 import { logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { ReasoningDetailsTransform } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
@@ -2059,14 +2058,14 @@ describe.each(usageShapes)('$kind billed usage normalization', shape => {
           { name: 'user BYOK', model: 'openai/gpt-5', isFree: false, userByok: true, cost: 0 },
           {
             name: 'custom pricing',
-            model: GEMINI_FLASH_CURRENT_MODEL_ID,
+            model: 'google/gemini-3.8-flash',
             isFree: false,
             userByok: false,
             cost: 2.419167,
           },
           {
             name: 'custom pricing with user BYOK',
-            model: GEMINI_FLASH_CURRENT_MODEL_ID,
+            model: 'google/gemini-3.8-flash',
             isFree: false,
             userByok: true,
             cost: 0,
@@ -2329,7 +2328,7 @@ test.each(['openrouter', 'vercel'] as const)(
           'event: message_stop\ndata: {"type":"message_stop"}\n\n'
       ),
       usageContext: {
-        requested_model: GEMINI_FLASH_CURRENT_MODEL_ID,
+        requested_model: 'google/gemini-3.8-flash',
         provider,
         is_free: false,
         user_byok: false,
@@ -2740,10 +2739,10 @@ describe('rewriteModelResponse', () => {
     jest.mocked(getCustomPricingConfig).mockResolvedValueOnce(TEST_CUSTOM_PRICING_CONFIG);
     const result = await rewriteModelResponse({
       response: jsonResponse({
-        model: GEMINI_FLASH_CURRENT_MODEL_ID,
+        model: 'google/gemini-3.8-flash',
         usage: { cost: 0.5, cost_details: { upstream_inference_cost: 0.4 }, is_byok: false },
       }),
-      model: GEMINI_FLASH_CURRENT_MODEL_ID,
+      model: 'google/gemini-3.8-flash',
       providerId: 'openrouter',
       kind: 'chat_completions',
       isFree: false,
@@ -2753,7 +2752,7 @@ describe('rewriteModelResponse', () => {
     });
 
     expect(await result.json()).toEqual({
-      model: GEMINI_FLASH_CURRENT_MODEL_ID,
+      model: 'google/gemini-3.8-flash',
       usage: { cost: 0, cost_details: { upstream_inference_cost: 0.4 }, is_byok: false },
     });
   });

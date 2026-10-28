@@ -15,7 +15,6 @@ import {
   withIgnoredProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import {
   ReasoningDetailsTransform,
   type BYOKResult,
@@ -110,7 +109,7 @@ function makeMessagesRequest(model: string): Extract<GatewayRequest, { kind: 'me
 describe('removeUnsupportedRequestServiceTier', () => {
   it.each([
     {
-      model: GEMINI_FLASH_CURRENT_MODEL_ID,
+      model: 'google/gemini-3.8-flash',
       kiloExclusiveModel: null,
       reason: 'non-fallback custom pricing',
     },
@@ -150,7 +149,7 @@ describe('removeUnsupportedRequestServiceTier', () => {
   it.each(['auto', 'default', 'flex', 'priority', 'scale'] as const)(
     'records the recognized tier verbatim (%s)',
     tier => {
-      const model = GEMINI_FLASH_CURRENT_MODEL_ID;
+      const model = 'google/gemini-3.8-flash';
       const request = makeRequest(model);
       request.body.service_tier = tier;
       const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
@@ -169,7 +168,7 @@ describe('removeUnsupportedRequestServiceTier', () => {
   it.each(['unrecognized-tier', 'constructor', '__proto__', 42, null] as const)(
     'records only a recognized tier value (%s)',
     tier => {
-      const model = GEMINI_FLASH_CURRENT_MODEL_ID;
+      const model = 'google/gemini-3.8-flash';
       const request = makeRequest(model);
       request.body.service_tier = tier as unknown as typeof request.body.service_tier;
       const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);

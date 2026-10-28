@@ -64,12 +64,10 @@ type UsageAnalyticsSidebarProps = {
   dateRange: DateRange;
   personalScope: PersonalScope;
 
-  // Scope (personal only)
   personalView: PersonalView;
   onPersonalViewChange: (value: PersonalView) => void;
   organizations: OrganizationSummary[];
 
-  // Scope (org context, role-gated)
   viewAs: ViewAs;
   /**
    * Org-context scope selection: `'self'`, `'all-orgs'`, or an organization id.
@@ -95,27 +93,22 @@ type UsageAnalyticsSidebarProps = {
    */
   isOrgWideView: boolean;
 
-  // Period
   period: PeriodOption;
   onPeriodChange: (value: PeriodOption) => void;
 
-  // Granularity
   granularity: Granularity;
   onGranularityChange: (value: Granularity) => void;
   granularityOptions: Granularity[];
 
-  // Cost source
   costSource: CostSource;
   onCostSourceChange: (value: CostSource) => void;
 
-  // Trends controls
   chartMetric: MetricKey;
   onChartMetricChange: (value: MetricKey) => void;
   metricOptions: MetricKey[];
   groupBy: Dimension | 'none';
   onGroupByChange: (value: Dimension | 'none') => void;
 
-  // Filters
   filters: UsageFilters;
   activeFilters: ActiveFilter[];
   onAddFilter: (dimension: Dimension, direction: FilterDirection, value: string) => void;

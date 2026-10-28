@@ -73,10 +73,6 @@ export type {
   UsageAnalyticsFilters,
 } from '@/routers/usage-analytics-schemas';
 
-// ---------------------------------------------------------------------------
-// Table / tier resolution
-// ---------------------------------------------------------------------------
-
 type GranularityTier = 'hourly' | 'daily' | 'monthly';
 
 type TableMeta = {
@@ -118,14 +114,9 @@ function getTableName(tier: GranularityTier): string {
   return tier === 'hourly' ? 'MICRODOLLAR_USAGE_HOURLY' : 'MICRODOLLAR_USAGE_DAILY';
 }
 
-/** The column that holds the time value for a given tier. */
 function getTimeColumn(tier: GranularityTier): string {
   return tier === 'hourly' ? 'usage_hour' : 'usage_date';
 }
-
-// ---------------------------------------------------------------------------
-// Date helpers
-// ---------------------------------------------------------------------------
 
 function ceilIsoToUtcDayExclusive(iso: string): string {
   const d = new Date(iso);
@@ -150,14 +141,6 @@ function ceilIsoToUtcMonthExclusive(iso: string): string {
   return next.toISOString().slice(0, 10);
 }
 
-// ---------------------------------------------------------------------------
-// SQL WHERE clause builder
-// ---------------------------------------------------------------------------
-
-/**
- * Accumulates SQL WHERE clauses with positional `?` bindings.
- * Callers push conditions in any order; `sql()` joins them with AND.
- */
 export class WhereBuilder {
   readonly clauses: string[] = [];
   readonly bindings: SnowflakeBinding[] = [];
@@ -212,11 +195,6 @@ export class WhereBuilder {
   }
 }
 
-// ---------------------------------------------------------------------------
-// Authorization
-// ---------------------------------------------------------------------------
-
-/** True when the filters target one or more organizations (vs personal usage). */
 function isOrgScope(filters: UsageAnalyticsFilters): boolean {
   return Boolean(filters.organizationId) || (filters.organizationIds?.length ?? 0) > 0;
 }
@@ -260,10 +238,6 @@ async function ensureScopeAccess(ctx: TRPCContext, filters: UsageAnalyticsFilter
   }
 }
 
-// ---------------------------------------------------------------------------
-// WHERE clause helpers
-// ---------------------------------------------------------------------------
-
 function buildDateConditions(
   where: WhereBuilder,
   tier: GranularityTier,
@@ -280,7 +254,6 @@ function buildDateConditions(
       ceilIsoToUtcDayExclusive(filters.endDate)
     );
   } else {
-    // monthly — daily table, filter by day boundaries aligned to month
     where.addDateRange(
       timeCol,
       floorIsoToUtcMonth(filters.startDate),
@@ -363,10 +336,6 @@ function buildWhereClause(
   return where;
 }
 
-// ---------------------------------------------------------------------------
-// Metric SQL expression
-// ---------------------------------------------------------------------------
-
 export function costColumnFor(costSource: CostSource): string {
   switch (costSource) {
     case 'cost':
@@ -445,16 +414,10 @@ function bucketExprSql(effectiveGranularity: Granularity, tier: GranularityTier)
     return `TO_VARCHAR(DATE_TRUNC('WEEK', ${timeCol}), 'YYYY-MM-DD')`;
   }
   if (effectiveGranularity === 'month') {
-    // Daily table, group by month
     return `TO_VARCHAR(DATE_TRUNC('MONTH', ${timeCol}), 'YYYY-MM-DD')`;
   }
-  // 'day'
   return `TO_VARCHAR(${timeCol}, 'YYYY-MM-DD')`;
 }
-
-// ---------------------------------------------------------------------------
-// Dimension column name
-// ---------------------------------------------------------------------------
 
 export function dimensionColumn(dimension: BreakdownDimension): string {
   switch (dimension) {
@@ -474,10 +437,6 @@ export function dimensionColumn(dimension: BreakdownDimension): string {
       return 'organization_id';
   }
 }
-
-// ---------------------------------------------------------------------------
-// Timed query wrapper
-// ---------------------------------------------------------------------------
 
 function parseTimeoutEnv(envKey: string, fallback: number): number {
   const raw = getEnvVariable(envKey);
@@ -552,10 +511,6 @@ async function timedSnowflakeQuery<T>(
   }
 }
 
-// ---------------------------------------------------------------------------
-// getSummary
-// ---------------------------------------------------------------------------
-
 function ratioSafe(numerator: number, denominator: number): number {
   if (denominator === 0) return 0;
   return numerator / denominator;
@@ -577,10 +532,6 @@ function toSafeNumber(value: unknown): number {
   return n;
 }
 
-// ---------------------------------------------------------------------------
-// User list (for org context)
-// ---------------------------------------------------------------------------
-
 const MAX_USER_LABEL_LOOKUP_IDS = 1_000;
 
 const UserListInputSchema = z.object({
@@ -597,10 +548,6 @@ const UserListOutputSchema = z.object({
     })
   ),
 });
-
-// ---------------------------------------------------------------------------
-// Scope organizations (org usage page Scope selector)
-// ---------------------------------------------------------------------------
 
 const ScopeOrganizationsInputSchema = z.object({
   organizationId: z.uuid(),
@@ -659,10 +606,6 @@ function requireSnowflakeConfig() {
   }
   return config;
 }
-
-// ---------------------------------------------------------------------------
-// Router definition
-// ---------------------------------------------------------------------------
 
 export const usageAnalyticsRouter = createTRPCRouter({
   getSummary: baseProcedure
@@ -922,7 +865,6 @@ export const usageAnalyticsRouter = createTRPCRouter({
       const providerExpr = requestedDims.includes('provider') ? 'provider' : "''";
       const projectExpr = requestedDims.includes('project') ? 'project_id' : "''";
 
-      // GROUP BY columns: bucket (pos 1) + each requested dimension column
       // SAFETY: dimensionColumn() returns only hardcoded string literals from
       // a typed enum chain — never user input.
       const dimGroupByCols = requestedDims.map(d => dimensionColumn(d)).join(', ');
@@ -1066,7 +1008,6 @@ export const usageAnalyticsRouter = createTRPCRouter({
     .query(async ({ input, ctx }) => {
       const accessByOrg = await getOrganizationsAccessRoles(ctx, input.organizationIds);
 
-      // Require access to every requested org (mirrors the single-org guard).
       const hasAccessToAll = input.organizationIds.every(orgId => accessByOrg.has(orgId));
       if (!hasAccessToAll) {
         throw new TRPCError({
@@ -1075,8 +1016,6 @@ export const usageAnalyticsRouter = createTRPCRouter({
         });
       }
 
-      // Only owner/billing_manager of *every* requested org may resolve other
-      // members; anyone else can resolve only their own id.
       const canSeeAllMembers = input.organizationIds.every(orgId => {
         const role = accessByOrg.get(orgId);
         return role === 'owner' || role === 'billing_manager';

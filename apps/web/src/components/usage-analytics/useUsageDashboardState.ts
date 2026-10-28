@@ -73,7 +73,6 @@ const DIM_KEY_TO_NAME: Record<string, Dimension> = {
 };
 
 function serializeFiltersToParams(params: URLSearchParams, filters: UsageFilters): void {
-  // Clear existing filter params
   [...params.keys()].forEach(key => {
     if (key.startsWith('filter.')) params.delete(key);
   });
@@ -235,7 +234,6 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
   const prevState = useRef<DashboardState | null>(null);
   const syncDirection = useRef<'push' | 'ignore'>('push');
 
-  // Mark as initialized after first render
   useEffect(() => {
     isInitialized.current = true;
     prevState.current = state;
@@ -305,7 +303,6 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
     state.usageView,
   ]);
 
-  // Sync state to URL parameters when state changes
   useEffect(() => {
     if (!isInitialized.current) return;
     if (syncDirection.current === 'ignore') return;
@@ -313,13 +310,11 @@ export function useUsageDashboardState(defaultState?: Partial<DashboardState>): 
       prevState.current = state;
       return;
     }
-    // Skip if nothing changed
     if (JSON.stringify(prevState.current) === JSON.stringify(state)) return;
     prevState.current = state;
 
     const params = new URLSearchParams(searchParams.toString());
 
-    // Set simple params
     params.set('period', state.period);
     params.set('granularity', state.granularity);
     params.set('metric', state.chartMetric);

@@ -2,10 +2,6 @@ import jwt from 'jsonwebtoken';
 
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 export type SnowflakeConfig = {
   accountHost: string;
   jwtAccountIdentifier: string;
@@ -32,10 +28,6 @@ export type SnowflakeBinding =
 /** A row returned by Snowflake — values are always strings in the SQL API. */
 export type SnowflakeRow = string[];
 
-// ---------------------------------------------------------------------------
-// Config resolution
-// ---------------------------------------------------------------------------
-
 const REQUIRED_ENV_KEYS = [
   'SNOWFLAKE_ACCOUNT_HOST',
   'SNOWFLAKE_JWT_ACCOUNT_IDENTIFIER',
@@ -52,10 +44,6 @@ export function getMissingSnowflakeEnvKeys(): string[] {
   return REQUIRED_ENV_KEYS.filter(k => !getEnvVariable(k));
 }
 
-/**
- * Reads Snowflake config from environment variables.
- * Returns `null` when any required variable is missing.
- */
 export function resolveSnowflakeConfig(): SnowflakeConfig | null {
   if (getMissingSnowflakeEnvKeys().length > 0) return null;
 
@@ -79,10 +67,6 @@ export function resolveSnowflakeConfig(): SnowflakeConfig | null {
     publicKeyFingerprint: fingerprint.startsWith('SHA256:') ? fingerprint : `SHA256:${fingerprint}`,
   };
 }
-
-// ---------------------------------------------------------------------------
-// JWT
-// ---------------------------------------------------------------------------
 
 const SNOWFLAKE_JWT_LIFETIME_SECONDS = 59 * 60;
 
@@ -123,10 +107,6 @@ function buildJwt(config: SnowflakeConfig): string {
     expiresIn: SNOWFLAKE_JWT_LIFETIME_SECONDS,
   });
 }
-
-// ---------------------------------------------------------------------------
-// HTTP helpers
-// ---------------------------------------------------------------------------
 
 const SNOWFLAKE_USER_AGENT = 'kilo-web/1.0';
 const SNOWFLAKE_MAX_POLL_ATTEMPTS = (() => {
@@ -253,10 +233,6 @@ async function pollStatement(
 
   throw new Error('Snowflake query timed out after polling');
 }
-
-// ---------------------------------------------------------------------------
-// Public API
-// ---------------------------------------------------------------------------
 
 /**
  * Execute a SQL statement against Snowflake via the SQL API v2.

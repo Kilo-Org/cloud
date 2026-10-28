@@ -9,6 +9,7 @@ import {
   GatewayUserByokProviderIdSchema,
   UserByokProviderIdSchema,
   getVercelUserByokProviderIdForEndpoint,
+  isGatewayUserByokProviderId,
   type GatewayUserByokProviderId,
   type UserByokProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
@@ -57,10 +58,14 @@ async function deriveModelInferenceUserByokProviders(
  * take them over. Custom LLMs are never in the gateway catalogs, so the
  * built-in free rules suffice.
  */
+export function isGatewayUserByokEligibleModel(modelId: string): boolean {
+  return !isKiloExclusiveModel(modelId) && !isFreeModelExcludingCustomLlms(modelId);
+}
+
 export async function getModelGatewayUserByokProviders(
   modelId: string
 ): Promise<GatewayUserByokProviderId[]> {
-  if (isKiloExclusiveModel(modelId) || isFreeModelExcludingCustomLlms(modelId)) {
+  if (!isGatewayUserByokEligibleModel(modelId)) {
     return [];
   }
   const [vercelModels, vercelModelId, isOpenRouterModel] = await Promise.all([
@@ -73,24 +78,45 @@ export async function getModelGatewayUserByokProviders(
   );
 }
 
+async function getVercelModelMetadata(caller: string): Promise<StoredModelMap | null> {
+  const vercelModelMetadata = await getVercelModelsMetadataFromDatabase();
+  if (Object.keys(vercelModelMetadata).length === 0) {
+    console.error('[%s] no Vercel model metadata', caller);
+    return null;
+  }
+  return vercelModelMetadata;
+}
+
+/** The inference providers routed through Vercel whose key can serve `modelId`. */
+export async function getModelInferenceUserByokProviders(
+  modelId: string
+): Promise<UserByokProviderId[]> {
+  const vercelModelMetadata = await getVercelModelMetadata('getModelInferenceUserByokProviders');
+  return vercelModelMetadata
+    ? deriveModelInferenceUserByokProviders(modelId, vercelModelMetadata)
+    : [];
+}
+
 /**
  * Returns every user BYOK provider whose key can serve `modelId`: first the
  * inference providers routed through Vercel, then the gateway keys in order of
- * preference.
+ * preference. With `enabledProviderIds`, skips the catalog lookups that cannot
+ * match an enabled key.
  */
-export async function getModelUserByokProviders(modelId: string): Promise<UserByokProviderId[]> {
-  const [vercelModelMetadata, gatewayProviders] = await Promise.all([
-    getVercelModelsMetadataFromDatabase(),
-    getModelGatewayUserByokProviders(modelId),
+export async function getModelUserByokProviders(
+  modelId: string,
+  enabledProviderIds?: ReadonlySet<UserByokProviderId>
+): Promise<UserByokProviderId[]> {
+  const enabled = enabledProviderIds ? [...enabledProviderIds] : undefined;
+  const [inferenceProviders, gatewayProviders] = await Promise.all([
+    !enabled || enabled.some(id => !isGatewayUserByokProviderId(id))
+      ? getModelInferenceUserByokProviders(modelId)
+      : [],
+    !enabled || enabled.some(isGatewayUserByokProviderId)
+      ? getModelGatewayUserByokProviders(modelId)
+      : [],
   ]);
-  if (Object.keys(vercelModelMetadata).length === 0) {
-    console.error('[getModelUserByokProviders] no Vercel model metadata for model %s', modelId);
-    return gatewayProviders;
-  }
-  return [
-    ...(await deriveModelInferenceUserByokProviders(modelId, vercelModelMetadata)),
-    ...gatewayProviders,
-  ];
+  return [...inferenceProviders, ...gatewayProviders];
 }
 
 export type ByokOwner = { type: 'user'; id: string } | { type: 'organization'; id: string };
@@ -166,21 +192,21 @@ export async function addUserByokAvailability(
   getAllowedProviders: (modelId: string) => ReadonlySet<string> | undefined = () => undefined
 ): Promise<OpenRouterModel[]> {
   const enabledProviders = new Set(enabledProviderIds);
-  const vercelModelMetadata = await getVercelModelsMetadataFromDatabase();
-  const hasMetadata = Object.keys(vercelModelMetadata).length > 0;
-  if (!hasMetadata) {
-    console.error('[addUserByokAvailability] no Vercel model metadata');
-  }
+  const enabled = [...enabledProviders];
+  const vercelModelMetadata = enabled.some(id => !isGatewayUserByokProviderId(id))
+    ? await getVercelModelMetadata('addUserByokAvailability')
+    : null;
+  const hasGatewayKey = enabled.some(isGatewayUserByokProviderId);
   return Promise.all(
     models.map(async model => {
-      if (isKiloExclusiveModel(model.id)) {
+      if (enabledProviders.size === 0 || isKiloExclusiveModel(model.id)) {
         return { ...model, hasUserByokAvailable: false };
       }
       const modelProviders = [
-        ...(hasMetadata
+        ...(vercelModelMetadata
           ? await deriveModelInferenceUserByokProviders(model.id, vercelModelMetadata)
           : []),
-        ...(await getModelGatewayUserByokProviders(model.id)),
+        ...(hasGatewayKey ? await getModelGatewayUserByokProviders(model.id) : []),
       ];
       const hasUserByokAvailable = await hasEnabledUserByokForModel({
         modelId: model.id,

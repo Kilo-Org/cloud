@@ -6,7 +6,10 @@ import {
   canRouteToVercel,
   shouldRouteToVercel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
-import { isGatewayUserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
+import {
+  GatewayUserByokProviderIdSchema,
+  isGatewayUserByokProviderId,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { withIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import {
   findKiloExclusiveModel,
@@ -17,7 +20,9 @@ import {
   getBYOKforOrganization,
   getBYOKforUser,
   getByokCredentials,
-  getModelUserByokProviders,
+  getModelGatewayUserByokProviders,
+  getModelInferenceUserByokProviders,
+  isGatewayUserByokEligibleModel,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type { User } from '@kilocode/db/schema';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
@@ -237,7 +242,8 @@ type GatewayRoutedByok = {
 async function getGatewayRoutedByok(
   user: User | AnonymousUserContext,
   requestedModel: string,
-  organizationId: string | undefined
+  organizationId: string | undefined,
+  { includeGatewayKeys }: { includeGatewayKeys: boolean }
 ): Promise<GatewayRoutedByok> {
   const none: GatewayRoutedByok = { inference: [], gateway: [] };
   if (isAnonymousContext(user)) return none;
@@ -248,14 +254,26 @@ async function getGatewayRoutedByok(
   // response ends up corrupted. Skip the BYOK lookup entirely and let the caller fall
   // through to the model's declared gateway.
   if (isKiloExclusiveModel(requestedModel)) return none;
-  const modelProviders = await getModelUserByokProviders(requestedModel);
-  if (modelProviders.length === 0) return none;
-  const userByok = organizationId
-    ? await getBYOKforOrganization(readDb, organizationId, modelProviders)
-    : await getBYOKforUser(readDb, user.id, modelProviders);
+  const candidateProviders = [
+    ...(await getModelInferenceUserByokProviders(requestedModel)),
+    ...(includeGatewayKeys && isGatewayUserByokEligibleModel(requestedModel)
+      ? GatewayUserByokProviderIdSchema.options
+      : []),
+  ];
+  if (candidateProviders.length === 0) return none;
+  const userByok =
+    (organizationId
+      ? await getBYOKforOrganization(readDb, organizationId, candidateProviders)
+      : await getBYOKforUser(readDb, user.id, candidateProviders)) ?? [];
+  const inference = userByok.filter(byok => !isGatewayUserByokProviderId(byok.providerId));
+  const gatewayKeys = userByok.filter(byok => isGatewayUserByokProviderId(byok.providerId));
+  // Inference provider keys take priority, so gateway keys then go unused.
+  if (inference.length > 0 || gatewayKeys.length === 0) return { inference, gateway: [] };
+  const gatewayProviders: readonly string[] =
+    await getModelGatewayUserByokProviders(requestedModel);
   return {
-    inference: userByok?.filter(byok => !isGatewayUserByokProviderId(byok.providerId)) ?? [],
-    gateway: userByok?.filter(byok => isGatewayUserByokProviderId(byok.providerId)) ?? [],
+    inference,
+    gateway: gatewayKeys.filter(byok => gatewayProviders.includes(byok.providerId)),
   };
 }
 
@@ -374,7 +392,9 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     };
   }
 
-  const gatewayRoutedByok = await getGatewayRoutedByok(user, requestedModel, organizationId);
+  const gatewayRoutedByok = await getGatewayRoutedByok(user, requestedModel, organizationId, {
+    includeGatewayKeys: true,
+  });
   if (gatewayRoutedByok.inference.length > 0) {
     return {
       kind: 'provider',
@@ -434,7 +454,9 @@ export async function getEmbeddingProvider(
 ): Promise<{ provider: Provider; userByok: BYOKResult[] | null; isFree: boolean }> {
   const isFree = isFreeModelExcludingCustomLlms(requestedModel);
   // 1. BYOK check — route through Vercel AI Gateway when user has their own key
-  const { inference } = await getGatewayRoutedByok(user, requestedModel, organizationId);
+  const { inference } = await getGatewayRoutedByok(user, requestedModel, organizationId, {
+    includeGatewayKeys: false,
+  });
   if (inference.length > 0) {
     return { provider: VERCEL_AI_GATEWAY, userByok: inference, isFree };
   }

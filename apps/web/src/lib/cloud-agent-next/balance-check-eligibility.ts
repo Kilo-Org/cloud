@@ -54,16 +54,15 @@ export async function computeCloudAgentNextBalanceCheckEligibility(params: {
     return { isFree: false, hasUserByokAvailable: false };
   }
 
-  const modelProviders = await getModelUserByokProviders(params.modelId);
-  if (modelProviders.length === 0) {
-    return { isFree: false, hasUserByokAvailable: false };
-  }
-
   const enabledProviderIds = params.organizationId
     ? await getOrganizationByokProviderIds(params.fromDb, params.organizationId)
     : await getUserByokProviderIds(params.fromDb, params.user.id);
+  if (enabledProviderIds.length === 0) {
+    return { isFree: false, hasUserByokAvailable: false };
+  }
 
   const enabled = new Set(enabledProviderIds);
+  const modelProviders = await getModelUserByokProviders(params.modelId, enabled);
   // Callers authorize organization access first, which also admits Kilo admins
   // and parent-organization owners who hold no membership row.
   const allowedProviders =

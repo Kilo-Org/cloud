@@ -105,18 +105,20 @@ describe('Cloud Agent authority contract', () => {
       })
     ).toMatchObject({ organizationId });
   });
-  it.each([true, false, undefined])('allows normal repositories/models and flag %s', flag => {
+  it('allows normal repositories and models', () => {
     const request = {
       ...launch,
       githubRepo: 'Other-Org/AnotherRepo',
       model: 'another-provider/another-model',
-      ...(flag === undefined ? {} : { allowSubagentSessions: flag }),
     };
     expect(
       validateCloudAgentAuthorityRequest(scope, 'cloudAgentNext.prepareSession', request)
     ).toEqual(request);
     expect(cloudAgentAuthorityInputSchema(scope)).not.toHaveProperty(
       'properties.parentCloudAgentSessionId'
+    );
+    expect(cloudAgentAuthorityInputSchema(scope)).not.toHaveProperty(
+      'properties.allowSubagentSessions'
     );
   });
   it('permits launches beyond fifteen minutes until session authorization expires', () => {
@@ -137,7 +139,7 @@ describe('Cloud Agent authority contract', () => {
   it.each([
     { parentCloudAgentSessionId: 'workspace_sibling' },
     { parentCloudAgentSessionId: scope.parentSessionId },
-    { allowSubagentSessions: 'true' },
+    { allowSubagentSessions: true },
     { autoInitiate: false },
     { autoInitiate: undefined },
     { organizationId },

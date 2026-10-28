@@ -1,13 +1,13 @@
 /* eslint-disable max-lines -- The live list keeps its query, pull-refresh, keyboard container, and FAB orchestration together on one screen. */
 import { type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
-import { AppState, I18nManager, Keyboard, Pressable, View } from 'react-native';
+import { AppState, Keyboard, Pressable, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { Bot } from '@/components/ui/icons';
+import { Bot, History, Search } from '@/components/ui/icons';
 
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
@@ -24,7 +24,6 @@ import { SessionFilterButton } from '@/components/agents/session-filter-button';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
 import { SessionStatusFilterBar } from '@/components/agents/session-status-filter-bar';
 import { SessionListSkeletonRows } from '@/components/agents/session-list-skeleton-rows';
-import { estimateSessionListHeaderActionsWidth } from '@/components/agents/session-list-header-actions-width';
 import { useLiveSessionQuery } from '@/components/agents/use-live-session-query';
 import { usePullRefresh } from '@/components/agents/use-pull-refresh';
 import { SessionListFab } from '@/components/agents/session-list-fab';
@@ -37,8 +36,10 @@ import {
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { useAgentsListChrome } from '@/components/agents/use-agents-list-chrome';
 import { Button } from '@/components/ui/button';
-import { Eyebrow } from '@/components/ui/eyebrow';
-import { EYEBROW_LATIN_DISPLAY, Text } from '@/components/ui/text';
+import { Text } from '@/components/ui/text';
+import { ContextControl } from '@/components/context-control';
+import { IconButton } from '@/components/ui/icon-button';
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ScreenHeader } from '@/components/screen-header';
 import { STATE_ACTION_CLASS, textActionTargetClass } from '@/lib/a11y/tap-target';
 import { getRevisionSnapshot } from '@/lib/session-attention';
@@ -55,11 +56,12 @@ import {
   useScrollToTop,
 } from 'expo-router';
 
-/** `tabHeader` renders under the header: the account scope line and the Agents tab's Sessions | To-dos switch. */
-export function AgentSessionListScreen({ tabHeader }: Readonly<{ tabHeader?: ReactNode }> = {}) {
+type AgentSessionListScreenProps = { tabHeader?: ReactNode };
+export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListScreenProps> = {}) {
   const router = useRouter();
   const navigation = useNavigation();
   const { t } = useTranslation();
+  const colors = useThemeColors();
   const { left, right } = useSafeAreaInsets();
   // The tabs layout's width-aware label decision rides along, so this screen's
   // clearance (list frame, FAB and state-surface insets) tracks the bar height.
@@ -132,6 +134,17 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<{ tabHeader?: Rea
   // session-list-screen.tsx:101).
   const { surfaceBand, rowsFrameBand } = useAgentsBottomBands(tabBarHeight, showFab);
   const [showFilterModal, setShowFilterModal] = useState(false);
+  const [searchOpen, setSearchOpen] = useState(false);
+  const showSearch = searchOpen || query.searchQuery.length > 0;
+  useEffect(() => {
+    if (searchOpen) {
+      query.searchInputRef.current?.focus();
+    }
+  }, [searchOpen, query.searchInputRef]);
+  const handleClearSearch = () => {
+    query.handleClearSearch();
+    setSearchOpen(false);
+  };
 
   const refetchRef = useRef(refetch);
   useEffect(() => {
@@ -235,44 +248,7 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<{ tabHeader?: Rea
   // bare `home.seeAll` here claimed a longer live list that is not on screen
   // (finding live-now-all).
   const historyLabel = t('agents.sessionList.pastSessions');
-  // The accepted-empty body names where its history route goes for the same
-  // reason: a bare See-all on an empty live list does not say what it opens, and
-  // this is the only route to stored sessions there (UX repair, agents-empty).
   const viewHistoryLabel = t('agents.sessionList.viewHistory');
-  // The list controls share the title's row through the header's `inlineActions`
-  // slot while the row can still hold a readable 30px title: the heading keeps
-  // `min-w-0 flex-1`, so the title tail-ellipsizes and the controls keep their
-  // full width instead of the old `headerRight` half-row cap wrapping them. The
-  // row holds only the two trailing controls — the history link and the filter
-  // button — packed to the row end, so the live count beside the title is the
-  // row's only label and nothing sits between the title and the controls. It
-  // reflows onto its own full-width row when the controls cannot share the
-  // title's row: the Croatian catalog made the row as wide as the title's
-  // readable minimum on a narrow phone, so `Agenti` broke mid-word into
-  // "Age" / "nti" (owner capture, agents-header-hr-20260929). The estimate below
-  // reserves the row's laid-out width for that decision; on its own row the
-  // controls keep the header's full width at every display size, and the box can
-  // shrink so an extreme accessibility scale ellipsizes the link instead of
-  // wrapping it to a second line.
-  const inlineActionsWidth = estimateSessionListHeaderActionsWidth({
-    historyLabel,
-    showFilter: query.canFilter,
-    fontScale,
-    isRTL: I18nManager.isRTL,
-  });
-  // The history route is the app's only route to the stored-session history,
-  // which exists independently of the live list, so it outlives the live
-  // section: the accepted-empty state carries the same control in the body,
-  // labeled by its destination (`viewHistoryAction`), while the header links to
-  // the same route with its own destination copy (`historyLabel`) over a
-  // non-empty live list.
-  //
-  // The label is one eyebrow line, so without a box of its own the control's
-  // frame would be that line — 14.7pt, far under the 44pt minimum a tap target
-  // needs. `textActionTargetClass()` is the frame, and the accessibility rect
-  // reports it, which `hitSlop` never does. The slop is gone with it: the box
-  // is the target, and the old 12pt vertical slop would reach into the New
-  // session button above the empty-state link, whose stack gap is 10.5pt.
   const historyControl = (label: string) => (
     <Pressable
       onPress={() => {
@@ -280,37 +256,55 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<{ tabHeader?: Rea
       }}
       accessibilityRole="button"
       accessibilityLabel={label}
-      testID="agents-view-history"
+      testID="agents-view-history-empty"
       className={cn(textActionTargetClass(), 'min-w-0 shrink justify-center active:opacity-70')}
     >
-      {/* An eyebrow-scale label, with the same LTR-only treatment: the
-          letterspaced capitals break a cursive script's joins, so an RTL
-          label drops them (home-ar-loading) while the variant and
-          `SectionHeader` keep the identical class string. */}
-      <Eyebrow
-        numberOfLines={1}
-        className={cn(
-          'shrink text-center text-[11px] text-primary',
-          !I18nManager.isRTL && EYEBROW_LATIN_DISPLAY
-        )}
-      >
+      <Text className="text-sm text-primary" numberOfLines={1}>
         {label}
-      </Eyebrow>
+      </Text>
     </Pressable>
   );
   const viewHistoryAction = historyControl(viewHistoryLabel);
   const headerActions = (
-    <View className="min-h-11 min-w-0 shrink flex-row items-center justify-end gap-4">
-      {historyControl(historyLabel)}
+    <View className="min-w-0 shrink flex-row items-center">
+      <View className="min-w-0 shrink">
+        <ContextControl />
+      </View>
+      <IconButton
+        accessibilityLabel={historyLabel}
+        testID="agents-view-history"
+        onPress={() => {
+          router.push('/(app)/(tabs)/(2_agents)/history' as Href);
+        }}
+      >
+        <History size={20} color={colors.mutedForeground} />
+      </IconButton>
+    </View>
+  );
+  const listActions = (
+    <View className="shrink-0 flex-row items-center">
+      <IconButton
+        accessibilityLabel={t('agents.search.searchSessions')}
+        accessibilityState={{ expanded: showSearch }}
+        testID="agents-open-search"
+        onPress={() => {
+          if (showSearch) {
+            query.searchInputRef.current?.focus();
+          } else {
+            setSearchOpen(true);
+          }
+        }}
+      >
+        <Search size={20} color={colors.mutedForeground} />
+      </IconButton>
       {query.canFilter ? (
         <SessionFilterButton
           activeCount={query.activeFilterCount}
           onPress={() => {
-            // The search field sits above this button; without the dismissal
-            // the keyboard stays up and covers the sheet’s Apply row.
             Keyboard.dismiss();
             setShowFilterModal(true);
           }}
+          hitSlop={0}
           testID="agents-open-filters"
         />
       ) : null}
@@ -405,7 +399,7 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<{ tabHeader?: Rea
   if (statusKind !== null) {
     clearNoMatch = clearStatusFilter;
   } else if (isSearching) {
-    clearNoMatch = query.handleClearSearch;
+    clearNoMatch = handleClearSearch;
   }
 
   let body: ReactNode = null;
@@ -531,42 +525,33 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<{ tabHeader?: Rea
       <View className="flex-1 bg-background">
         <ScreenHeader
           title={t('common.agents')}
-          eyebrow={
-            // The count is an assertion about the current snapshot, so it is
-            // withheld whenever that snapshot cannot be confirmed: while the
-            // list is unresolved (loading or membership unknown) and while the
-            // live query is in an error state, exactly as the tab badge is. An
-            // accepted-empty snapshot is confirmed but names no live sessions,
-            // so it withholds the count too, matching the badge's hide-at-zero,
-            // and the empty card below is the sole live-session content. The
-            // cached rows themselves stay on screen, so a failed refresh never
-            // blanks the list it kept.
-            !sessions.isLoading && !sessions.isError && hasLiveRows
-              ? t('agents.liveCount', { count: activeSessions.length })
-              : undefined
-          }
-          reserveEyebrow
           size="large"
           showBackButton={false}
           className="px-[22px]"
-          // An accepted empty live list carries the history route in its body
-          // (`LiveSessionListEmptyState`'s `historyAction`), so the controls row
-          // is withheld there: the empty state renders exactly one history
-          // control instead of a duplicate in the header. Rows, pending, and
-          // error keep the full row byte-identical, and the search/filter
-          // no-match body is a `rows` state
-          // (`hasLiveRows && visibleSessions.length === 0`), so its row stays.
-          inlineActions={content === 'empty' ? undefined : headerActions}
-          inlineActionsWidth={inlineActionsWidth}
+          inlineActions={headerActions}
+          allowInlineActionsStacking={false}
         />
-        {tabHeader}
-        {hasLiveRows || isSearching ? (
+        <View style={sidePadding}>
+          <View className="flex-row items-center justify-between border-b border-border">
+            {tabHeader}
+            {listActions}
+          </View>
+        </View>
+        {showSearch ? (
           <SessionListSearchHeader
             inputRef={query.searchInputRef}
             hasText={query.searchQuery.length > 0}
             showSearchBusy={false}
             onChangeText={query.handleSearchChange}
-            onClearSearch={query.handleClearSearch}
+            defaultValue={query.searchQuery}
+            compact
+            onFocus={() => {
+              setSearchOpen(true);
+            }}
+            onBlur={() => {
+              setSearchOpen(false);
+            }}
+            onClearSearch={handleClearSearch}
           />
         ) : null}
         {/* The Home card's status link shows the list narrowed to one state.

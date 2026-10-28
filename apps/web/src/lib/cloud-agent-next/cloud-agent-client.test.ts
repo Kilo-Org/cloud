@@ -400,35 +400,24 @@ describe('CloudAgentNextClient saved worktree files', () => {
   );
 });
 
-describe('CloudAgentNextClient scoped launch fields', () => {
-  it('forwards explicit boolean opt-in without adding permission to ordinary sessions', async () => {
-    const common = {
+describe('CloudAgentNextClient prepare fields', () => {
+  it('forwards prepare input unchanged', async () => {
+    const input: PrepareSessionInput = {
       githubRepo: 'acme/repo',
       prompt: 'Launch a task',
       mode: 'code',
       model: 'kilo/test-model',
       autoInitiate: true,
     };
-    const inputs: PrepareSessionInput[] = [
-      {
-        ...common,
-        allowSubagentSessions: true,
-      },
-      { ...common, allowSubagentSessions: false },
-      common,
-    ];
-    for (const input of inputs) {
-      const mutate = jest
-        .fn<CloudAgentClientModule.CloudAgentNextClient['prepareSession']>()
-        .mockResolvedValue({
-          kiloSessionId: 'ses_12345678901234567890123456',
-          cloudAgentSessionId: 'workspace_child',
-        });
-      mockCreateTRPCClient.mockReturnValueOnce({ prepareSession: { mutate } });
-      await new CloudAgentNextClient('scoped-control-token').prepareSession(input);
-      expect(mutate).toHaveBeenCalledWith(input);
-    }
-    expect(inputs[2].allowSubagentSessions).toBeUndefined();
+    const mutate = jest
+      .fn<CloudAgentClientModule.CloudAgentNextClient['prepareSession']>()
+      .mockResolvedValue({
+        kiloSessionId: 'ses_12345678901234567890123456',
+        cloudAgentSessionId: 'workspace_child',
+      });
+    mockCreateTRPCClient.mockReturnValueOnce({ prepareSession: { mutate } });
+    await new CloudAgentNextClient('scoped-control-token').prepareSession(input);
+    expect(mutate).toHaveBeenCalledWith(input);
   });
 });
 

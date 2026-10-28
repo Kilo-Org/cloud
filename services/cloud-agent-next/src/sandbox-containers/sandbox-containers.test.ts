@@ -3223,3 +3223,76 @@ describe('SandboxContainers preview fetch boundary', () => {
     expect(lease).not.toHaveBeenCalled();
   });
 });
+
+describe('SandboxContainers native image selection', () => {
+  const RUNTIME_FREE_IMAGE = 'registry.example/kilo/runtime-free:test';
+
+  it('starts the baseline app image when no image is selected', async () => {
+    const { instance, container, readRecord } = setup();
+
+    await launch(instance, REF_A);
+
+    expect(container.startCalls[0]?.image).toBe(IMAGE);
+    expect(readRecord().startImage).toBe(IMAGE);
+  });
+
+  it('starts the runtime-free image when it is selected', async () => {
+    const { instance, container, readRecord } = setup();
+    container.images['runtime-free'] = RUNTIME_FREE_IMAGE;
+
+    await instance.launchWrapper({
+      command: preinstalledStartup(),
+      allocationRef: REF_A,
+      env: {},
+      instance: 'standard-4',
+      nativeImage: 'runtime-free',
+    });
+
+    expect(container.startCalls[0]?.image).toBe(RUNTIME_FREE_IMAGE);
+    expect(readRecord()).toMatchObject({
+      state: 'running',
+      startSource: 'image',
+      startImage: RUNTIME_FREE_IMAGE,
+    });
+  });
+
+  it('fails before any physical start when the selected image is unavailable', async () => {
+    const { instance, container, readRecord } = setup();
+
+    await expect(
+      instance.launchWrapper({
+        command: preinstalledStartup(),
+        allocationRef: REF_A,
+        env: {},
+        instance: 'standard-4',
+        nativeImage: 'runtime-free',
+      })
+    ).rejects.toThrow('Container image "runtime-free" is unavailable');
+
+    expect(container.startCalls).toEqual([]);
+    expect(container.execCalls).toEqual([]);
+    expect(readRecord()).toMatchObject({ state: 'idle', allocationRef: null });
+  });
+
+  it('restores only environment snapshots captured from the selected image', async () => {
+    const baselineSnapshot = setup();
+    baselineSnapshot.container.images['runtime-free'] = RUNTIME_FREE_IMAGE;
+    await expect(
+      launchFromSnapshot(baselineSnapshot.instance, REF_A, { nativeImage: 'runtime-free' })
+    ).resolves.toEqual({ started: true, startSource: 'image' });
+    expect(baselineSnapshot.container.startCalls[0]).toMatchObject({ image: RUNTIME_FREE_IMAGE });
+
+    const runtimeFreeSnapshot = setup();
+    runtimeFreeSnapshot.container.images['runtime-free'] = RUNTIME_FREE_IMAGE;
+    await expect(
+      launchFromSnapshot(runtimeFreeSnapshot.instance, REF_A, {
+        nativeImage: 'runtime-free',
+        snapshot: { snapshotId: 'snap-runtime-free', baseImage: RUNTIME_FREE_IMAGE },
+      })
+    ).resolves.toEqual({ started: true, startSource: 'repository' });
+    expect(runtimeFreeSnapshot.container.startCalls[0]).toMatchObject({
+      containerSnapshot: { id: 'snap-runtime-free' },
+    });
+    expect(runtimeFreeSnapshot.readRecord().startImage).toBe(RUNTIME_FREE_IMAGE);
+  });
+});

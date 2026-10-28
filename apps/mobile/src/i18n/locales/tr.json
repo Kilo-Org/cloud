@@ -1665,9 +1665,7 @@
     },
     "remoteSpawnRetryable": "Örneğe ulaşılamadı — bağlantısı kesilmiş olabilir.",
     "remoteSpawnNonRetryable": "Örnek oturumu başlatamadı. Makineyi kontrol et veya CLI'yi güncelle.",
-    "remoteSpawnInstanceDisconnected": "Seçili örneğin bağlantısı kesildi. Cloud Agent üzerinde bir oturum başlat veya başka bir örnek seç.",
-    "liveCount_one": "{{count}} CANLI",
-    "liveCount_other": "{{count}} CANLI"
+    "remoteSpawnInstanceDisconnected": "Seçili örneğin bağlantısı kesildi. Cloud Agent üzerinde bir oturum başlat veya başka bir örnek seç."
   },
   "agentChat": {
     "session": {

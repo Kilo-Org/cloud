@@ -376,6 +376,52 @@ describe('shouldRouteToVercel', () => {
   });
 });
 
+describe('canRouteToVercel', () => {
+  async function loadCanRouteToVercel(vercelInferenceProviders: string[] | null = ['anthropic']) {
+    jest.resetModules();
+    jest.doMock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+      getVercelModelsFromDatabase: jest.fn(async () => new Set(['anthropic/claude-sonnet-4.5'])),
+      getCachedVercelInferenceProviderIdsForModel: jest.fn(async () => vercelInferenceProviders),
+    }));
+    return (await import('@kilocode/web-shared/lib/ai-gateway/providers/vercel')).canRouteToVercel;
+  }
+
+  it('rejects a model Vercel does not serve', async () => {
+    const canRouteToVercel = await loadCanRouteToVercel();
+
+    await expect(canRouteToVercel('vendor/unknown-model', async () => undefined)).resolves.toBe(
+      false
+    );
+  });
+
+  it('rejects an only list with no provider available on Vercel', async () => {
+    const canRouteToVercel = await loadCanRouteToVercel();
+
+    await expect(
+      canRouteToVercel('anthropic/claude-sonnet-4.5', async () => ({ only: ['google-vertex'] }))
+    ).resolves.toBe(false);
+  });
+
+  it('rejects an ignore list when inference provider data is unavailable', async () => {
+    const canRouteToVercel = await loadCanRouteToVercel(null);
+
+    await expect(
+      canRouteToVercel('anthropic/claude-sonnet-4.5', async () => ({ ignore: ['openai'] }))
+    ).resolves.toBe(false);
+  });
+
+  it('accepts a served model with compatible provider settings', async () => {
+    const canRouteToVercel = await loadCanRouteToVercel();
+
+    await expect(
+      canRouteToVercel('anthropic/claude-sonnet-4.5', async () => ({
+        only: ['anthropic'],
+        ignore: ['amazon-bedrock'],
+      }))
+    ).resolves.toBe(true);
+  });
+});
+
 describe('applyVercelSettings BYOK pinning', () => {
   function byokRequest(ignore: string[]): GatewayRequest {
     return {

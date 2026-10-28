@@ -1,0 +1,1 @@
+ALTER TABLE "enkrypt_guardrail_charges" ADD COLUMN "added_latency_ms" integer;

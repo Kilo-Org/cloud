@@ -226,6 +226,18 @@ export function runtimeKey(spec: ControlPlaneRouteSpec): string {
   return spec.runtimeIsolation === 'per-session' ? spec.sessionId : spec.directory;
 }
 
+/**
+ * The scoped Cloud Agent MCP grant carries a session-specific token. Only a
+ * per-session runtime may receive it; a runtime shared by a worktree must keep
+ * one MCP configuration for every member.
+ */
+function scopedCloudAgentMcp(
+  spec: ControlPlaneRouteSpec,
+  cloudAgentMcp: ControlPlaneSessionCredentialsPayload['cloudAgentMcp'] | undefined
+): ControlPlaneSessionCredentialsPayload['cloudAgentMcp'] | undefined {
+  return spec.runtimeIsolation === 'per-session' ? cloudAgentMcp : undefined;
+}
+
 function isTimeoutMessage(step: ControlPlanePreparationStep, error: unknown): boolean {
   return error instanceof Error && error.message === `${step} timed out`;
 }
@@ -992,6 +1004,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       // Built inside the failure scope: an over-limit CLI config must surface as
       // `session.failed`, not reject the prepare promise (which the caller
       // swallows while the route waits out its timeout).
+      const cloudAgentMcp = scopedCloudAgentMcp(spec, credentials?.cloudAgentMcp);
       const builtEnv = withRuntimeProfileEnvironment(
         buildWorktreeKiloEnvironment(
           directory,
@@ -1000,7 +1013,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           spec.env ?? {},
           inheritedEnv,
           spec.mcp,
-          { ...spec, cloudAgentMcp: credentials?.cloudAgentMcp }
+          { ...spec, ...(cloudAgentMcp === undefined ? {} : { cloudAgentMcp }) }
         ),
         spec
       );
@@ -1011,9 +1024,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           {
             ...builtEnv,
             ...(credentials?.git?.token ? { GIT_TOKEN: credentials.git.token } : {}),
-            ...(credentials?.cloudAgentMcp
-              ? { CLOUD_AGENT_MCP_TOKEN: credentials.cloudAgentMcp.token }
-              : {}),
+            ...(cloudAgentMcp ? { CLOUD_AGENT_MCP_TOKEN: cloudAgentMcp.token } : {}),
           },
         ],
         spec.secretEnvKeys ?? []
@@ -1158,7 +1169,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         home,
         kilo: kiloAuth,
         env: builtEnv,
-        cloudAgentMcp: credentials?.cloudAgentMcp,
+        cloudAgentMcp,
       });
       // A credentials frame that arrived while this route was preparing is
       // applied before the route reports ready; a release during the apply
@@ -1203,7 +1214,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       if (preparation && !preparation.released) preparation.pendingCredentials = credentials;
       return;
     }
-    route.cloudAgentMcp = credentials.cloudAgentMcp ?? route.cloudAgentMcp;
+    const cloudAgentMcp = scopedCloudAgentMcp(
+      route.spec,
+      credentials.cloudAgentMcp ?? route.cloudAgentMcp
+    );
+    route.cloudAgentMcp = cloudAgentMcp;
     const nextEnv = withRuntimeProfileEnvironment(
       buildWorktreeKiloEnvironment(
         route.directory,
@@ -1216,12 +1231,12 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         route.spec.env ?? {},
         inheritedEnv,
         route.spec.mcp,
-        { ...route.spec, cloudAgentMcp: route.cloudAgentMcp }
+        { ...route.spec, ...(cloudAgentMcp === undefined ? {} : { cloudAgentMcp }) }
       ),
       route.spec
     );
     route.env = nextEnv;
-    await deps.runtimes.installCredentials(route.key, nextEnv, route.cloudAgentMcp);
+    await deps.runtimes.installCredentials(route.key, nextEnv, cloudAgentMcp);
     if (credentials.git?.token && route.spec.git) {
       // The helper re-reads the record on the next git command, so the agent's
       // push/fetch picks up the renewed token while `origin` stays credential-free.

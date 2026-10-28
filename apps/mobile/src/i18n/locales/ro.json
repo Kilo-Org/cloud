@@ -2220,10 +2220,7 @@
     },
     "remoteSpawnRetryable": "Nu s-a putut stabili conexiunea cu instanța — este posibil să se fi deconectat.",
     "remoteSpawnNonRetryable": "Instanța nu a reușit să pornească sesiunea — verifică sistemul sau actualizează CLI-ul.",
-    "remoteSpawnInstanceDisconnected": "Instanța selectată s-a deconectat. Pornește o sesiune pe Cloud Agent sau alege altă instanță.",
-    "liveCount_one": "{{count}} ÎN TIMP REAL",
-    "liveCount_other": "{{count}} ÎN TIMP REAL",
-    "liveCount_few": "{{count}} ACTIVE"
+    "remoteSpawnInstanceDisconnected": "Instanța selectată s-a deconectat. Pornește o sesiune pe Cloud Agent sau alege altă instanță."
   },
   "agentChat": {
     "session": {

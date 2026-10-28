@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Данаға қосылу мүмкін болмады — байланыс үзілген болуы мүмкін.",
     "remoteSpawnNonRetryable": "Дана сеансты бастай алмады — компьютерді тексеріңіз немесе CLI құралын жаңартыңыз.",
-    "remoteSpawnInstanceDisconnected": "Таңдалған данамен байланыс үзілді. Cloud Agent арқылы сеанс бастаңыз немесе басқа дананы таңдаңыз.",
-    "liveCount_one": "{{count}} БЕЛСЕНДІ",
-    "liveCount_other": "{{count}} БЕЛСЕНДІ"
+    "remoteSpawnInstanceDisconnected": "Таңдалған данамен байланыс үзілді. Cloud Agent арқылы сеанс бастаңыз немесе басқа дананы таңдаңыз."
   },
   "agentChat": {
     "session": {

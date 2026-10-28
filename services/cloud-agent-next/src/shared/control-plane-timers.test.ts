@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import {
   CONTROL_PLANE_TIMERS,
   resolveControlPlaneTimers,
@@ -31,6 +32,38 @@ describe('control-plane idle timers', () => {
   it.each(['0', '1', '-1', 'invalid'])('preserves production timers for divisor %s', divisor => {
     expect(resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: divisor })).toEqual(
       CONTROL_PLANE_TIMERS
+    );
+  });
+});
+
+describe('control-plane preparation attempt budget', () => {
+  it('outlasts every step of one preparation attempt in sequence', () => {
+    const { sandbox, wrapper } = CONTROL_PLANE_TIMERS;
+    // Environment snapshot starts use the wider repository startup bound.
+    const createMs = Math.max(sandbox.providerCreateMs, DEADLINE_MS.repositoryStartup);
+    const steps =
+      // A transient create failure creates again inside the same attempt.
+      createMs +
+      sandbox.providerCreateRetryMs +
+      createMs +
+      sandbox.wrapperFirstConnectMs +
+      sandbox.wrapperHelloMs +
+      wrapper.restoreMs +
+      wrapper.cloneMs +
+      // Kilo runtime start and the Kilo session each retry once inside the
+      // attempt, so each can consume two of its own bounds.
+      2 * wrapper.kiloRuntimeStartMs +
+      2 * wrapper.kiloSessionMs;
+
+    expect(sandbox.routePreparationMs).toBeGreaterThanOrEqual(steps);
+  });
+
+  it('keeps the attempt budget real when the development divisor shrinks step timers', () => {
+    const scaled = resolveControlPlaneTimers({ CONTROL_PLANE_TIMER_DIVISOR: '10' });
+
+    expect(scaled.sandbox.routePreparationMs).toBe(CONTROL_PLANE_TIMERS.sandbox.routePreparationMs);
+    expect(scaled.sandbox.routePreparationMs).toBeGreaterThanOrEqual(
+      scaled.wrapper.cloneMs + scaled.wrapper.restoreMs
     );
   });
 });

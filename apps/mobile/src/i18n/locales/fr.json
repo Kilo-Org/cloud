@@ -2637,10 +2637,7 @@
     },
     "remoteSpawnRetryable": "Impossible de joindre l'instance. Elle s'est peut-être déconnectée.",
     "remoteSpawnNonRetryable": "L'instance n'a pas pu démarrer la session. Vérifiez la machine ou mettez à jour la CLI.",
-    "remoteSpawnInstanceDisconnected": "L'instance sélectionnée s'est déconnectée. Démarrez une session sur Cloud Agent ou choisissez une autre instance.",
-    "liveCount_one": "{{count}} EN DIRECT",
-    "liveCount_other": "{{count}} EN DIRECT",
-    "liveCount_many": "{{count}} EN COURS"
+    "remoteSpawnInstanceDisconnected": "L'instance sélectionnée s'est déconnectée. Démarrez une session sur Cloud Agent ou choisissez une autre instance."
   },
   "monoScrollBlock": {
     "wrap": "Retour à la ligne",

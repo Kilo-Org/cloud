@@ -2251,11 +2251,7 @@
     },
     "remoteSpawnRetryable": "S inštanciou sa nepodarilo spojiť — možno sa odpojila.",
     "remoteSpawnNonRetryable": "Inštancii sa nepodarilo spustiť reláciu. Skontroluj zariadenie alebo aktualizuj CLI.",
-    "remoteSpawnInstanceDisconnected": "Vybraná inštancia sa odpojila. Spusti reláciu v službe Cloud Agent alebo vyber inú inštanciu.",
-    "liveCount_one": "{{count}} NAŽIVO",
-    "liveCount_other": "{{count}} NAŽIVO",
-    "liveCount_few": "AKTÍVNE: {{count}}",
-    "liveCount_many": "AKTÍVNE: {{count}}"
+    "remoteSpawnInstanceDisconnected": "Vybraná inštancia sa odpojila. Spusti reláciu v službe Cloud Agent alebo vyber inú inštanciu."
   },
   "agentChat": {
     "session": {

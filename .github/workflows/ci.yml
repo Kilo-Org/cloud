@@ -841,6 +841,9 @@ jobs:
           cp ../web/.env .env
           cp ../web/.env.test .env.production.local
 
+      - name: Check ai-gateway usage queue targets
+        run: pnpm --filter ai-gateway run test:usage-queue
+
       - name: Build ai-gateway
         env:
           NODE_ENV: production

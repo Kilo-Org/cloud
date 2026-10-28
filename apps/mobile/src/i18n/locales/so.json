@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Nuqulka lama gaari karin — waxaa laga yaabaa in xiriirkiisu go'ay.",
     "remoteSpawnNonRetryable": "Nuqulku ma bilaabi karin kalfadhiga — hubi mashiinka ama cusboonaysii CLI-ga.",
-    "remoteSpawnInstanceDisconnected": "Xiriirka nuqulkii la doortay ayaa go'ay. Kalfadhi ka bilow Cloud Agent ama dooro nuqul kale.",
-    "liveCount_one": "{{count}} TOOS AH",
-    "liveCount_other": "{{count}} TOOS AH"
+    "remoteSpawnInstanceDisconnected": "Xiriirka nuqulkii la doortay ayaa go'ay. Kalfadhi ka bilow Cloud Agent ama dooro nuqul kale."
   },
   "agentChat": {
     "session": {

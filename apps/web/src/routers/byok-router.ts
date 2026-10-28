@@ -208,19 +208,23 @@ export const byokRouter = createTRPCRouter({
 
       // Encrypt the API key
       const encrypted = encryptApiKey(api_key, BYOK_ENCRYPTION_KEY);
+      const keyId = crypto.randomUUID();
       const envelope = await encryptByokForStorage({
         apiKey: api_key,
         context: {
+          key_id: keyId,
           owner_type: organizationId ? 'organization' : 'user',
           owner_id: organizationId ?? ctx.user.id,
           provider_id,
         },
+        actorUserId: ctx.user.id,
       });
 
       // Insert into database - either org-owned or user-owned
       const [newKey] = await db
         .insert(byok_api_keys)
         .values({
+          id: keyId,
           organization_id: organizationId ?? null,
           kilo_user_id: organizationId ? null : ctx.user.id,
           provider_id,
@@ -259,6 +263,7 @@ export const byokRouter = createTRPCRouter({
       // Verify key exists and belongs to the organization or user
       const [existingKey] = await db
         .select({
+          id: byok_api_keys.id,
           organization_id: byok_api_keys.organization_id,
           kilo_user_id: byok_api_keys.kilo_user_id,
           provider_id: byok_api_keys.provider_id,
@@ -298,6 +303,7 @@ export const byokRouter = createTRPCRouter({
       const envelope = await encryptByokForStorage({
         apiKey: api_key,
         context: getByokKmsContext(existingKey),
+        actorUserId: ctx.user.id,
       });
       const [updatedKey] = await db
         .update(byok_api_keys)
@@ -403,6 +409,7 @@ export const byokRouter = createTRPCRouter({
 
       const [existingKey] = await db
         .select({
+          id: byok_api_keys.id,
           organization_id: byok_api_keys.organization_id,
           kilo_user_id: byok_api_keys.kilo_user_id,
           provider_id: byok_api_keys.provider_id,

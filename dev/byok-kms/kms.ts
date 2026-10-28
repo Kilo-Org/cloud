@@ -2,6 +2,15 @@ import { AwsClient } from 'aws4fetch';
 
 export type KmsContext = Record<string, string>;
 
+export class KmsRequestError extends Error {
+  constructor(
+    target: string,
+    readonly status: number
+  ) {
+    super(`KMS ${target} failed with ${status}`);
+  }
+}
+
 export type DataKey = {
   plaintext: Buffer;
   ciphertextBlob: string;
@@ -41,7 +50,7 @@ export function createKmsApi(config: KmsConfig): KmsApi {
     });
     const response = await doFetch(signed);
     if (!response.ok) {
-      throw new Error(`KMS ${target} failed with ${response.status}`);
+      throw new KmsRequestError(target, response.status);
     }
     return (await response.json()) as Record<string, unknown>;
   }

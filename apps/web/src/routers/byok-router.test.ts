@@ -342,14 +342,12 @@ describe('BYOK Router', () => {
       return fetchMock;
     }
 
-    const envelopeResponse = () =>
+    const dataKeyResponse = () =>
       Response.json({
-        encrypted_data: encryptApiKey('ignored', randomBytes(32).toString('base64')),
+        data_key: randomBytes(32).toString('base64'),
         wrapped_dek: 'wrapped',
         kms_key_id: 'alias/test',
         kms_key_version: '1',
-        algorithm: 'aes-256-gcm',
-        envelope_version: 1,
       });
 
     test('leaves the envelope NULL when the service is not configured', async () => {
@@ -367,7 +365,7 @@ describe('BYOK Router', () => {
     });
 
     test('writes both columns on create and update when the service is configured', async () => {
-      const fetchMock = configureKms(envelopeResponse);
+      const fetchMock = configureKms(dataKeyResponse);
       const caller = await createCallerForUser(ownerUser.id);
 
       const created = await caller.byok.create({
@@ -399,6 +397,19 @@ describe('BYOK Router', () => {
       expect(updatedKey.encrypted_api_key_envelope).not.toBeNull();
       expect(decryptApiKey(updatedKey.encrypted_api_key, BYOK_ENCRYPTION_KEY)).toBe('sk-ant-kms-2');
       expect(fetchMock).toHaveBeenCalledTimes(2);
+      const sent = fetchMock.mock.calls.map(call => {
+        const [, init] = call as unknown as [string, RequestInit];
+        return JSON.parse(String(init.body));
+      });
+      for (const body of sent) {
+        expect(body).toEqual({
+          key_id: created.id,
+          actor_user_id: ownerUser.id,
+          owner_type: 'organization',
+          owner_id: organizationA.id,
+          provider_id: 'anthropic',
+        });
+      }
     });
 
     test('fails create and update without writing when the KMS call fails', async () => {

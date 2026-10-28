@@ -68,7 +68,6 @@
     "eslint-plugin-zod-utils": "1.0.11",
     "husky": "9.1.7",
     "ink": "6.8.0",
-    "jose": "catalog:",
     "js-yaml": "4.3.2",
     "oxfmt": "0.73.0",
     "oxlint": "1.88.0",

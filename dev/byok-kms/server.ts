@@ -1,7 +1,7 @@
 import { existsSync } from 'node:fs';
 import { createServer } from 'node:http';
 
-import { handleRequest } from './handlers';
+import { handleRequest, type HandlerDeps } from './handlers';
 import { createKmsApi } from './kms';
 
 if (existsSync('.env.local')) process.loadEnvFile('.env.local');
@@ -11,17 +11,7 @@ const HOST = '127.0.0.1';
 const KMS_ENDPOINT = process.env.BYOK_KMS_ENDPOINT ?? 'http://127.0.0.1:8900';
 const MAX_BODY_BYTES = 64 * 1024;
 
-const transportKeyBase64 =
-  process.env.BYOK_KMS_TRANSPORT_ENCRYPTION_KEY?.trim() || process.env.BYOK_ENCRYPTION_KEY?.trim();
-if (!transportKeyBase64) {
-  throw new Error('Set BYOK_KMS_TRANSPORT_ENCRYPTION_KEY or BYOK_ENCRYPTION_KEY in .env.local');
-}
-const transportKey = Buffer.from(transportKeyBase64, 'base64');
-if (transportKey.length !== 32) {
-  throw new Error('The BYOK transport key must be a base64 32-byte value');
-}
-
-const deps = {
+const deps: HandlerDeps = {
   kms: createKmsApi({
     endpoint: KMS_ENDPOINT,
     region: process.env.AWS_REGION ?? 'eu-west-1',
@@ -30,7 +20,7 @@ const deps = {
   }),
   kmsKeyId: process.env.BYOK_KMS_KEY_ID ?? 'alias/byok-local',
   serviceToken: process.env.BYOK_KMS_SERVICE_TOKEN ?? 'dev-byok-kms-token',
-  transportKey,
+  log: event => console.log(JSON.stringify({ event: 'byok_kms.data_key', ...event })),
 };
 
 const server = createServer(async (request, response) => {
@@ -54,15 +44,18 @@ const server = createServer(async (request, response) => {
     body = undefined;
   }
 
+  const url = new URL(request.url ?? '/', `http://${HOST}`);
   const result = await handleRequest(deps, {
     method: request.method ?? 'GET',
-    path: new URL(request.url ?? '/', `http://${HOST}`).pathname,
+    path: url.pathname,
     authorization: request.headers.authorization,
+    query: Object.fromEntries(url.searchParams),
     body,
   });
   const payload = JSON.stringify(result.body);
   response.writeHead(result.status, {
     'content-type': 'application/json',
+    'cache-control': 'no-store',
     'content-length': Buffer.byteLength(payload),
   });
   response.end(payload);

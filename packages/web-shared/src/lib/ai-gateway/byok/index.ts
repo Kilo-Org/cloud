@@ -224,24 +224,32 @@ export async function addUserByokAvailability(
 }
 
 export function getByokKmsContext(row: {
+  id: string;
   organization_id: string | null;
   kilo_user_id: string | null;
   provider_id: string;
 }): ByokKmsContext {
   if (row.organization_id) {
     return {
+      key_id: row.id,
       owner_type: 'organization',
       owner_id: row.organization_id,
       provider_id: row.provider_id,
     };
   }
   if (row.kilo_user_id) {
-    return { owner_type: 'user', owner_id: row.kilo_user_id, provider_id: row.provider_id };
+    return {
+      key_id: row.id,
+      owner_type: 'user',
+      owner_id: row.kilo_user_id,
+      provider_id: row.provider_id,
+    };
   }
   throw new Error('BYOK row has no owner');
 }
 
 export async function decryptByokRow(row: {
+  id: string;
   encrypted_api_key: EncryptedData;
   encrypted_api_key_envelope: BYOKApiKeyEnvelope | null;
   organization_id: string | null;
@@ -270,6 +278,7 @@ export async function getByokCredentials(
   }
   const rows = await fromDb
     .select({
+      id: byok_api_keys.id,
       encrypted_api_key: byok_api_keys.encrypted_api_key,
       encrypted_api_key_envelope: byok_api_keys.encrypted_api_key_envelope,
       organization_id: byok_api_keys.organization_id,

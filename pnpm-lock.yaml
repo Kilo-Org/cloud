@@ -261,9 +261,6 @@ importers:
       ink:
         specifier: 6.8.0
         version: 6.8.0(@types/react@19.2.14)(bufferutil@4.1.0)(react-devtools-core@6.1.5(bufferutil@4.1.0)(utf-8-validate@6.0.6))(react@19.2.6)(utf-8-validate@6.0.6)
-      jose:
-        specifier: 'catalog:'
-        version: 6.2.12
       js-yaml:
         specifier: 4.3.2
         version: 4.3.2
@@ -2142,9 +2139,6 @@ importers:
       google-auth-library:
         specifier: 10.6.2
         version: 10.6.2
-      jose:
-        specifier: 'catalog:'
-        version: 6.2.12
       jsonwebtoken:
         specifier: 'catalog:'
         version: 9.0.3

@@ -1,13 +1,11 @@
 import assert from 'node:assert/strict';
-import { createDecipheriv, randomBytes } from 'node:crypto';
+import { randomBytes } from 'node:crypto';
 import test from 'node:test';
-import { CompactEncrypt } from 'jose';
 
-import { handleRequest, type HandlerDeps } from './handlers';
-import type { KmsApi, KmsContext } from './kms';
+import { handleRequest, type HandlerDeps, type HandlerRequest, type LogEvent } from './handlers';
+import { KmsRequestError, type KmsApi, type KmsContext } from './kms';
 
 const TOKEN = 'test-token';
-const transportKey = randomBytes(32);
 const dek = randomBytes(32);
 
 function fakeKms(): KmsApi {
@@ -17,99 +15,200 @@ function fakeKms(): KmsApi {
       return { plaintext: Buffer.from(dek), ciphertextBlob: wrap(context), keyId: 'arn:test' };
     },
     async decrypt({ ciphertextBlob, context }) {
-      if (ciphertextBlob !== wrap(context)) throw new Error('context mismatch');
+      if (ciphertextBlob !== wrap(context)) throw new KmsRequestError('Decrypt', 400);
       return Buffer.from(dek);
     },
   };
 }
 
+const logs: LogEvent[] = [];
+
 const deps: HandlerDeps = {
   kms: fakeKms(),
   kmsKeyId: 'alias/test',
   serviceToken: TOKEN,
-  transportKey,
+  log: event => logs.push(event),
 };
 
-const context = { owner_type: 'user', owner_id: 'u1', provider_id: 'openai' } as const;
+const userContext = {
+  key_id: 'key-1',
+  owner_type: 'user',
+  owner_id: 'u1',
+  provider_id: 'openai',
+} as const;
 
-function makeJwe(apiKey: string, header: Record<string, unknown> = { v: 1, ...context }) {
-  return new CompactEncrypt(new TextEncoder().encode(apiKey))
-    .setProtectedHeader({ alg: 'dir', enc: 'A256GCM', ...header })
-    .encrypt(transportKey);
-}
+const orgContext = {
+  key_id: 'key-2',
+  owner_type: 'organization',
+  owner_id: 'org-1',
+  provider_id: 'openai',
+} as const;
 
-const call = (path: string, body: unknown, authorization: string | undefined = `Bearer ${TOKEN}`) =>
-  handleRequest(deps, { method: 'POST', path, authorization, body });
-
-test('encrypt returns an envelope that decrypts with the unwrapped DEK', async () => {
-  const encrypted = await call('/encrypt', { jwe: await makeJwe('sk-secret') });
-  assert.equal(encrypted.status, 200);
-  const envelope = encrypted.body as {
-    encrypted_data: { iv: string; data: string; authTag: string };
-    wrapped_dek: string;
-    kms_key_id: string;
-  };
-
-  const decrypted = await call('/decrypt', {
-    wrapped_dek: envelope.wrapped_dek,
-    kms_key_id: envelope.kms_key_id,
-    kms_key_version: '1',
-    context,
-  });
-  assert.equal(decrypted.status, 200);
-  const key = Buffer.from((decrypted.body as { dek: string }).dek, 'base64');
-  const decipher = createDecipheriv(
-    'aes-256-gcm',
-    key,
-    Buffer.from(envelope.encrypted_data.iv, 'base64')
-  );
-  decipher.setAuthTag(Buffer.from(envelope.encrypted_data.authTag, 'base64'));
-  const plaintext = Buffer.concat([
-    decipher.update(Buffer.from(envelope.encrypted_data.data, 'base64')),
-    decipher.final(),
-  ]).toString();
-  assert.equal(plaintext, 'sk-secret');
+const request = (overrides: Partial<HandlerRequest>): HandlerRequest => ({
+  method: 'POST',
+  path: '/data-key',
+  authorization: `Bearer ${TOKEN}`,
+  query: {},
+  body: undefined,
+  ...overrides,
 });
 
-test('decrypt fails when the context differs from encryption time', async () => {
-  const encrypted = await call('/encrypt', { jwe: await makeJwe('sk-secret') });
-  const envelope = encrypted.body as { wrapped_dek: string; kms_key_id: string };
-  const result = await call('/decrypt', {
-    wrapped_dek: envelope.wrapped_dek,
-    kms_key_id: envelope.kms_key_id,
-    kms_key_version: '1',
-    context: { ...context, owner_id: 'u2' },
-  });
+const create = (body: unknown, authorization: string | undefined = `Bearer ${TOKEN}`) =>
+  handleRequest(deps, request({ method: 'POST', body, authorization }));
+
+const get = (
+  query: Record<string, string>,
+  authorization: string | undefined = `Bearer ${TOKEN}`
+) => handleRequest(deps, request({ method: 'GET', query, authorization }));
+
+type Created = {
+  data_key: string;
+  wrapped_dek: string;
+  kms_key_id: string;
+  kms_key_version: string;
+};
+
+const fakeCreated: Created = {
+  data_key: '',
+  wrapped_dek: 'wrapped',
+  kms_key_id: 'arn:test',
+  kms_key_version: '1',
+};
+
+const getQuery = (context: Record<string, string>, created: Created) => ({
+  ...context,
+  wrapped_dek: created.wrapped_dek,
+  kms_key_id: created.kms_key_id,
+  kms_key_version: created.kms_key_version,
+});
+
+test('POST returns a data key and its wrapped form, and GET returns the same data key', async () => {
+  const created = await create({ ...userContext, actor_user_id: 'u1' });
+  assert.equal(created.status, 200);
+  const body = created.body as Created;
+  assert.equal(body.data_key, dek.toString('base64'));
+  assert.equal(body.kms_key_id, 'arn:test');
+  assert.equal(body.kms_key_version, '1');
+
+  const fetched = await get(getQuery(userContext, body));
+  assert.equal(fetched.status, 200);
+  assert.deepEqual(fetched.body, { data_key: body.data_key });
+});
+
+test('GET rejects any identifier that differs from creation time', async () => {
+  const body = (await create(orgContext)).body as Created;
+
+  for (const spoofed of [
+    { owner_id: 'org-2' },
+    { owner_type: 'user' },
+    { key_id: 'key-3' },
+    { provider_id: 'anthropic' },
+  ]) {
+    const result = await get(getQuery({ ...orgContext, ...spoofed }, body));
+    assert.equal(result.status, 403, JSON.stringify(spoofed));
+  }
+});
+
+test('GET reports 502 when KMS itself fails', async () => {
+  const failing: HandlerDeps = {
+    ...deps,
+    kms: {
+      ...fakeKms(),
+      decrypt: async () => {
+        throw new KmsRequestError('Decrypt', 503);
+      },
+    },
+  };
+  const result = await handleRequest(
+    failing,
+    request({ method: 'GET', query: getQuery(userContext, fakeCreated) })
+  );
   assert.equal(result.status, 502);
 });
 
-test('rejects missing or wrong bearer token', async () => {
-  assert.equal((await call('/encrypt', {}, '')).status, 401);
-  assert.equal((await call('/decrypt', {}, 'Bearer nope')).status, 401);
+test('rejects requests missing key id or owner context', async () => {
+  const { key_id: _keyId, ...withoutKeyId } = userContext;
+  const { owner_id: _ownerId, ...withoutOwnerId } = userContext;
+  assert.equal((await create(withoutKeyId)).status, 400);
+  assert.equal((await create(withoutOwnerId)).status, 400);
+  assert.equal((await get({ ...userContext })).status, 400);
 });
 
-test('rejects a JWE under a different transport key', async () => {
-  const jwe = await new CompactEncrypt(new TextEncoder().encode('x'))
-    .setProtectedHeader({ alg: 'dir', enc: 'A256GCM', v: 1, ...context })
-    .encrypt(randomBytes(32));
-  assert.equal((await call('/encrypt', { jwe })).status, 400);
-});
+test('logs KMS-verified identifiers on GET and unverified claims otherwise', async () => {
+  logs.length = 0;
+  const body = (await create({ ...orgContext, actor_user_id: 'u9' })).body as Created;
+  await get(getQuery(orgContext, body));
+  await get(getQuery({ ...orgContext, owner_id: 'org-2' }, body));
+  await create({ provider_id: 'openai' });
 
-test('rejects unknown envelope version and missing header fields', async () => {
-  assert.equal(
-    (await call('/encrypt', { jwe: await makeJwe('x', { v: 2, ...context }) })).status,
-    400
+  assert.deepEqual(
+    logs.map(event => ({
+      operation: event.operation,
+      status: event.status,
+      verified: event.identifiers_verified,
+      key_id: event.key_id,
+      organization_id: event.organization_id,
+      user_id: event.user_id,
+      actor_user_id: event.actor_user_id,
+    })),
+    [
+      {
+        operation: 'create',
+        status: 200,
+        verified: false,
+        key_id: 'key-2',
+        organization_id: 'org-1',
+        user_id: undefined,
+        actor_user_id: 'u9',
+      },
+      {
+        operation: 'get',
+        status: 200,
+        verified: true,
+        key_id: 'key-2',
+        organization_id: 'org-1',
+        user_id: undefined,
+        actor_user_id: undefined,
+      },
+      {
+        operation: 'get',
+        status: 403,
+        verified: false,
+        key_id: 'key-2',
+        organization_id: 'org-2',
+        user_id: undefined,
+        actor_user_id: undefined,
+      },
+      {
+        operation: 'create',
+        status: 400,
+        verified: false,
+        key_id: undefined,
+        organization_id: undefined,
+        user_id: undefined,
+        actor_user_id: undefined,
+      },
+    ]
   );
-  assert.equal((await call('/encrypt', { jwe: await makeJwe('x', { v: 1 }) })).status, 400);
+  const serialized = JSON.stringify(logs);
+  assert.ok(!serialized.includes(body.data_key));
+  assert.ok(!serialized.includes(body.wrapped_dek));
+});
+
+test('user keys log the owner as user_id and never as organization_id', async () => {
+  logs.length = 0;
+  await create(userContext);
+  assert.equal(logs[0].user_id, 'u1');
+  assert.equal(logs[0].organization_id, undefined);
+});
+
+test('rejects missing or wrong bearer token', async () => {
+  assert.equal((await create(userContext, '')).status, 401);
+  assert.equal((await get({}, 'Bearer nope')).status, 401);
 });
 
 test('rejects unknown routes and methods', async () => {
-  assert.equal((await call('/other', {})).status, 404);
-  const get = await handleRequest(deps, {
-    method: 'GET',
-    path: '/encrypt',
-    authorization: `Bearer ${TOKEN}`,
-    body: undefined,
-  });
-  assert.equal(get.status, 405);
+  assert.equal((await handleRequest(deps, request({ path: '/encrypt' }))).status, 404);
+  assert.equal((await handleRequest(deps, request({ path: '/decrypt' }))).status, 404);
+  assert.equal((await handleRequest(deps, request({ method: 'DELETE' }))).status, 405);
 });

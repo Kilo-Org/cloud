@@ -1,31 +1,55 @@
-import { createCipheriv, timingSafeEqual } from 'node:crypto';
-import { compactDecrypt } from 'jose';
+import { timingSafeEqual } from 'node:crypto';
 import { z } from 'zod';
 
-import type { KmsApi } from './kms';
+import { KmsRequestError, type KmsApi } from './kms';
+
+const KMS_KEY_VERSION = '1';
 
 const contextSchema = z.object({
+  key_id: z.string().min(1),
   owner_type: z.enum(['user', 'organization']),
   owner_id: z.string().min(1),
   provider_id: z.string().min(1),
 });
 
-const encryptRequestSchema = z.object({ jwe: z.string().min(1) });
+const createDataKeyRequestSchema = contextSchema.extend({
+  actor_user_id: z.string().min(1).optional(),
+});
 
-const decryptRequestSchema = z.object({
+const getDataKeyRequestSchema = contextSchema.extend({
   wrapped_dek: z.string().min(1),
   kms_key_id: z.string().min(1),
   kms_key_version: z.string().min(1),
-  context: contextSchema,
 });
 
-const protectedHeaderSchema = contextSchema.extend({ v: z.literal(1) });
+type Context = z.infer<typeof contextSchema>;
+
+export type LogEvent = {
+  operation: 'create' | 'get';
+  status: number;
+  identifiers_verified: boolean;
+  key_id?: string;
+  user_id?: string;
+  organization_id?: string;
+  actor_user_id?: string;
+  owner_type?: string;
+  owner_id?: string;
+  provider_id?: string;
+};
 
 export type HandlerDeps = {
   kms: KmsApi;
   kmsKeyId: string;
   serviceToken: string;
-  transportKey: Uint8Array;
+  log: (event: LogEvent) => void;
+};
+
+export type HandlerRequest = {
+  method: string;
+  path: string;
+  authorization: string | undefined;
+  query: Record<string, string>;
+  body: unknown;
 };
 
 export type HandlerResult = { status: number; body: unknown };
@@ -38,45 +62,43 @@ function isAuthorized(authorization: string | undefined, token: string): boolean
   return expected.length === actual.length && timingSafeEqual(expected, actual);
 }
 
-async function encrypt(deps: HandlerDeps, body: unknown): Promise<HandlerResult> {
-  const parsed = encryptRequestSchema.safeParse(body);
-  if (!parsed.success) return fail(400, 'invalid request');
+function kmsContext(context: Context) {
+  return {
+    key_id: context.key_id,
+    owner_type: context.owner_type,
+    owner_id: context.owner_id,
+    provider_id: context.provider_id,
+  };
+}
 
-  let plaintext: Uint8Array;
-  let header: unknown;
+function ownerIdentifiers(context: Context) {
+  return {
+    key_id: context.key_id,
+    owner_type: context.owner_type,
+    owner_id: context.owner_id,
+    provider_id: context.provider_id,
+    ...(context.owner_type === 'organization'
+      ? { organization_id: context.owner_id }
+      : { user_id: context.owner_id }),
+  };
+}
+
+async function createDataKey(
+  deps: HandlerDeps,
+  request: z.infer<typeof createDataKeyRequestSchema>
+): Promise<HandlerResult> {
+  const dataKey = await deps.kms.generateDataKey({
+    keyId: deps.kmsKeyId,
+    context: kmsContext(request),
+  });
   try {
-    const result = await compactDecrypt(parsed.data.jwe, deps.transportKey, {
-      keyManagementAlgorithms: ['dir'],
-      contentEncryptionAlgorithms: ['A256GCM'],
-    });
-    plaintext = result.plaintext;
-    header = result.protectedHeader;
-  } catch {
-    return fail(400, 'invalid jwe');
-  }
-
-  const context = protectedHeaderSchema.safeParse(header);
-  if (!context.success) return fail(400, 'invalid jwe header');
-  const { v: _version, ...kmsContext } = context.data;
-
-  const dataKey = await deps.kms.generateDataKey({ keyId: deps.kmsKeyId, context: kmsContext });
-  try {
-    const iv = crypto.getRandomValues(new Uint8Array(12));
-    const cipher = createCipheriv('aes-256-gcm', dataKey.plaintext, iv);
-    const data = Buffer.concat([cipher.update(plaintext), cipher.final()]);
     return {
       status: 200,
       body: {
-        encrypted_data: {
-          iv: Buffer.from(iv).toString('base64'),
-          data: data.toString('base64'),
-          authTag: cipher.getAuthTag().toString('base64'),
-        },
+        data_key: dataKey.plaintext.toString('base64'),
         wrapped_dek: dataKey.ciphertextBlob,
         kms_key_id: dataKey.keyId,
-        kms_key_version: '1',
-        algorithm: 'aes-256-gcm',
-        envelope_version: 1,
+        kms_key_version: KMS_KEY_VERSION,
       },
     };
   } finally {
@@ -84,34 +106,80 @@ async function encrypt(deps: HandlerDeps, body: unknown): Promise<HandlerResult>
   }
 }
 
-async function decrypt(deps: HandlerDeps, body: unknown): Promise<HandlerResult> {
-  const parsed = decryptRequestSchema.safeParse(body);
-  if (!parsed.success) return fail(400, 'invalid request');
-
-  const dek = await deps.kms.decrypt({
-    ciphertextBlob: parsed.data.wrapped_dek,
-    keyId: parsed.data.kms_key_id,
-    context: parsed.data.context,
+async function getDataKey(
+  deps: HandlerDeps,
+  request: z.infer<typeof getDataKeyRequestSchema>
+): Promise<HandlerResult> {
+  const dataKey = await deps.kms.decrypt({
+    ciphertextBlob: request.wrapped_dek,
+    keyId: request.kms_key_id,
+    context: kmsContext(request),
   });
   try {
-    return { status: 200, body: { dek: dek.toString('base64') } };
+    return { status: 200, body: { data_key: dataKey.toString('base64') } };
   } finally {
-    dek.fill(0);
+    dataKey.fill(0);
+  }
+}
+
+function failureStatus(error: unknown): number {
+  return error instanceof KmsRequestError && error.status >= 400 && error.status < 500 ? 403 : 502;
+}
+
+async function createDataKeyRoute(deps: HandlerDeps, input: unknown): Promise<HandlerResult> {
+  const parsed = createDataKeyRequestSchema.safeParse(input);
+  if (!parsed.success) {
+    deps.log({ operation: 'create', status: 400, identifiers_verified: false });
+    return fail(400, 'invalid request');
+  }
+
+  const event = {
+    operation: 'create',
+    identifiers_verified: false,
+    ...ownerIdentifiers(parsed.data),
+    actor_user_id: parsed.data.actor_user_id,
+  } as const;
+  try {
+    const result = await createDataKey(deps, parsed.data);
+    deps.log({ ...event, status: result.status });
+    return result;
+  } catch (error) {
+    const status = failureStatus(error);
+    deps.log({ ...event, status });
+    return fail(status, 'kms request failed');
+  }
+}
+
+async function getDataKeyRoute(deps: HandlerDeps, input: unknown): Promise<HandlerResult> {
+  const parsed = getDataKeyRequestSchema.safeParse(input);
+  if (!parsed.success) {
+    deps.log({ operation: 'get', status: 400, identifiers_verified: false });
+    return fail(400, 'invalid request');
+  }
+
+  const event = { operation: 'get', ...ownerIdentifiers(parsed.data) } as const;
+  try {
+    const result = await getDataKey(deps, parsed.data);
+    deps.log({ ...event, status: result.status, identifiers_verified: true });
+    return result;
+  } catch (error) {
+    const status = failureStatus(error);
+    deps.log({ ...event, status, identifiers_verified: false });
+    return fail(status, 'kms request failed');
   }
 }
 
 export async function handleRequest(
   deps: HandlerDeps,
-  request: { method: string; path: string; authorization: string | undefined; body: unknown }
+  request: HandlerRequest
 ): Promise<HandlerResult> {
-  if (request.method !== 'POST') return fail(405, 'method not allowed');
-  if (request.path !== '/encrypt' && request.path !== '/decrypt') return fail(404, 'not found');
-  if (!isAuthorized(request.authorization, deps.serviceToken)) return fail(401, 'unauthorized');
-  try {
-    return request.path === '/encrypt'
-      ? await encrypt(deps, request.body)
-      : await decrypt(deps, request.body);
-  } catch {
-    return fail(502, 'kms request failed');
+  if (request.path !== '/data-key') return fail(404, 'not found');
+  if (request.method !== 'POST' && request.method !== 'GET') {
+    return fail(405, 'method not allowed');
   }
+  if (!isAuthorized(request.authorization, deps.serviceToken)) return fail(401, 'unauthorized');
+
+  return request.method === 'POST'
+    ? createDataKeyRoute(deps, request.body)
+    : getDataKeyRoute(deps, request.query);
 }

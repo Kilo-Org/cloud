@@ -20,6 +20,7 @@ import {
   getBYOKforUser,
   getByokCredentials,
   getByokKeyStates,
+  getCatalogModeByokCredentials,
   getModelGatewayUserByokProviders,
   getModelInferenceUserByokProviders,
   isGatewayUserByokEligibleModel,
@@ -198,11 +199,10 @@ async function resolveDirectByokProvider(
   if (isAnonymousContext(user)) return null;
   const catalogModels = await findDirectByokCatalogModels(requestedModel);
   if (catalogModels.length === 0) return null;
-  const credentials = await getByokCredentials(
+  const credentials = await getCatalogModeByokCredentials(
     readDb,
     owner,
-    catalogModels.map(({ provider }) => provider.id),
-    { catalogModeOnly: true }
+    catalogModels.map(({ provider }) => provider.id)
   );
   const candidates = rankDirectByokCatalogKeys(
     catalogModels,

@@ -125,6 +125,15 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
   const status = getFindingLifecycleStatusPresentation(finding);
   const deadline = getSecurityDeadlinePresentation(finding);
   const deadlineCopy = getDeadlineCopy(deadline.state);
+  // The row already names the lifecycle status. A dismissed, superseded or
+  // after-deadline fixed finding carries that same word as its deadline label,
+  // so the badge would repeat the chip beside it; it renders only when it adds a
+  // deadline of its own. The SLA deadline row below keeps the detail either way.
+  const deadlineBadgeCopy =
+    deadline.state.kind === 'closed' ||
+    (deadline.state.kind === 'fixed' && !deadline.state.beforeDeadline)
+      ? null
+      : deadlineCopy;
   const supersedingFindingId = getSupersedingFindingId(finding);
   // A code the app does not know yet reads as the raw code, the same way
   // packages/app-shared renders it for web. A word like "Unknown" would hide
@@ -152,11 +161,13 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
           <Text className={cn('text-xs font-medium', FINDING_TONE_TEXT_CLASS[status.tone])}>
             {statusLabel}
           </Text>
-          <FindingStatusBadge
-            icon={deadline.icon}
-            label={deadlineCopy.label}
-            tone={deadline.tone}
-          />
+          {deadlineBadgeCopy ? (
+            <FindingStatusBadge
+              icon={deadline.icon}
+              label={deadlineBadgeCopy.label}
+              tone={deadline.tone}
+            />
+          ) : null}
         </View>
         {finding.description ? (
           <Text variant="muted" className="text-sm" selectable>

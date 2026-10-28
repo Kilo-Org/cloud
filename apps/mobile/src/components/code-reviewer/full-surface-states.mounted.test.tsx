@@ -71,6 +71,7 @@ vi.mock('expo-router', () => ({
   useLocalSearchParams: () => ({}),
   useRouter: () => ({ push: state.push }),
   useNavigation: () => ({ isFocused: () => true }),
+  useFocusEffect: () => undefined,
 }));
 vi.mock('react-native', () => ({
   AppState: { addEventListener: () => ({ remove: vi.fn() }) },
@@ -348,6 +349,26 @@ describe('Recent review bodies', () => {
       expect(renderer.root.findAll(node => String(node.type) === 'ScrollView')).toHaveLength(0);
       const action = empty.props.action as ReactElement<{ onPress: () => void }>;
       action.props.onPress();
+      expect(state.push).toHaveBeenCalledWith(
+        `/(app)/code-reviewer/personal${connected ? '/manual-review' : ''}`
+      );
+      unmount();
+    }
+  );
+
+  it.each([false, true])(
+    'opens the empty action destination once on a fast double tap, connected %s',
+    async connected => {
+      state.connected = connected;
+      const { renderer, unmount } = await renderWithProviders(
+        createElement(ReviewListScreen, { scope: 'personal' })
+      );
+      const empty = renderer.root.find(node => String(node.type) === 'EmptyState');
+      const action = empty.props.action as ReactElement<{ onPress: () => void }>;
+      action.props.onPress();
+      action.props.onPress();
+
+      expect(state.push).toHaveBeenCalledTimes(1);
       expect(state.push).toHaveBeenCalledWith(
         `/(app)/code-reviewer/personal${connected ? '/manual-review' : ''}`
       );

@@ -130,10 +130,10 @@ import {
   user_moderation_blocks,
   user_moderation_mutes,
   user_terms_acceptances,
-  agent_briefing_reports,
-  agent_briefing_events,
+  agent_briefing_snapshots,
   agent_briefing_context_preferences,
   agent_briefing_preferences,
+  cli_sessions_v2,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, ne, notExists } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@kilocode/web-shared/lib/constants';
@@ -1606,8 +1606,13 @@ export async function anonymizeCloudUserData(
   // Recorded pushes hold the content that was sent to this account's devices
   // (titles, bodies, i18n params, payloads), so they go with the account.
   await tx.delete(user_notification_history).where(eq(user_notification_history.user_id, userId));
-  await tx.delete(agent_briefing_reports).where(eq(agent_briefing_reports.kilo_user_id, userId));
-  await tx.delete(agent_briefing_events).where(eq(agent_briefing_events.kilo_user_id, userId));
+  await tx
+    .update(cli_sessions_v2)
+    .set({ briefing_excerpt: null, briefing_excerpt_scope_changed_at: sql`now()` })
+    .where(eq(cli_sessions_v2.kilo_user_id, userId));
+  await tx
+    .delete(agent_briefing_snapshots)
+    .where(eq(agent_briefing_snapshots.kilo_user_id, userId));
   await tx
     .delete(agent_briefing_context_preferences)
     .where(eq(agent_briefing_context_preferences.kilo_user_id, userId));

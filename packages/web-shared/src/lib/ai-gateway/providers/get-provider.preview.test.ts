@@ -12,6 +12,7 @@ import {
 import { apiKeyUpstream } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import {
   getByokCredentials,
+  getCatalogModeByokCredentials,
   getModelGatewayUserByokProviders,
   getModelInferenceUserByokProviders,
   type ByokOwner,
@@ -56,6 +57,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => {
     getModelInferenceUserByokProviders: jest.fn(),
     getModelGatewayUserByokProviders: jest.fn(),
     getByokCredentials: jest.fn(actual.getByokCredentials),
+    getCatalogModeByokCredentials: jest.fn(actual.getCatalogModeByokCredentials),
   };
 });
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok/encryption', () => {
@@ -248,6 +250,7 @@ describe('previewByokRouting', () => {
 
         jest.mocked(decryptApiKey).mockClear();
         jest.mocked(getByokCredentials).mockClear();
+        jest.mocked(getCatalogModeByokCredentials).mockClear();
         const preview = await previewByokRouting({
           fromDb: db,
           owner,
@@ -256,6 +259,7 @@ describe('previewByokRouting', () => {
         });
         expect(decryptApiKey).not.toHaveBeenCalled();
         expect(getByokCredentials).not.toHaveBeenCalled();
+        expect(getCatalogModeByokCredentials).not.toHaveBeenCalled();
 
         if (preview.kind !== 'routes') throw new Error(`unexpected ${preview.kind} preview`);
         expect({ scenario, route: previewRouteOf(preview.steps) }).toEqual({

@@ -53,12 +53,12 @@ describe('metadataFormKey', () => {
 describe('overviewSectionRows', () => {
   it('returns the six sections in a fixed order with their counts', () => {
     const rows = overviewSectionRows({
-      vars: [{ key: 'A' }, { key: 'B' }, { key: 'C' }],
-      commands: ['pnpm install', 'pnpm build'],
-      kiloCommands: [{ id: 'k1' }, { id: 'k2' }, { id: 'k3' }, { id: 'k4' }],
-      mcpServers: [{ id: 'm1' }],
-      skills: [{ id: 'skill-1' }],
-      agents: [{ id: 'a1' }, { id: 'a2' }],
+      varCount: 3,
+      commandCount: 2,
+      kiloCommandCount: 4,
+      mcpServerCount: 1,
+      skillCount: 1,
+      agentCount: 2,
     });
 
     expect(rows).toEqual([
@@ -74,12 +74,12 @@ describe('overviewSectionRows', () => {
   it('keeps every row with zero counts for an empty profile', () => {
     expect(
       overviewSectionRows({
-        vars: [],
-        commands: [],
-        kiloCommands: [],
-        mcpServers: [],
-        skills: [],
-        agents: [],
+        varCount: 0,
+        commandCount: 0,
+        kiloCommandCount: 0,
+        mcpServerCount: 0,
+        skillCount: 0,
+        agentCount: 0,
       })
     ).toEqual([
       { key: 'variables', titleKey: 'profiles.variablesTitle', count: 0 },

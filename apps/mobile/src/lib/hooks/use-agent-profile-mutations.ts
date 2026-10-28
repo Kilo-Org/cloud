@@ -6,6 +6,7 @@ import {
   type AgentProfileDetail,
   type AgentProfileListCombined,
   type AgentProfileListItem,
+  type AgentProfileOverview,
 } from '@/lib/hooks/agent-profile-types';
 import {
   isLatestMutationGeneration,
@@ -71,6 +72,7 @@ export function useAgentProfileMutations(organizationId?: string) {
   const detailFilter = trpc.agentProfiles.get.pathFilter();
   const defaultListKey = trpc.agentProfiles.list.queryKey({ organizationId });
   const defaultDetailKey = trpc.agentProfiles.get.queryKey({ organizationId });
+  const defaultOverviewKey = trpc.agentProfiles.overview.queryKey({ organizationId });
   const defaultCombinedKey = organizationId
     ? trpc.agentProfiles.listCombined.queryKey({ organizationId })
     : combinedFilter.queryKey;
@@ -121,18 +123,27 @@ export function useAgentProfileMutations(organizationId?: string) {
     queryClient.setQueriesData<AgentProfileDetail>({ queryKey: defaultDetailKey }, old =>
       old ? withDefaultDetail(old, profileId, setDefault) : old
     );
+    // The Overview renders `isDefault` from the counts read; without this the
+    // switch would only move after the invalidation refetch lands.
+    queryClient.setQueriesData<AgentProfileOverview>(
+      { queryKey: defaultOverviewKey },
+      (old: AgentProfileOverview | undefined) =>
+        old ? withDefaultDetail(old, profileId, setDefault) : old
+    );
   };
 
   const snapshotProfiles = async () => {
     await queryClient.cancelQueries({ queryKey: defaultListKey });
     await queryClient.cancelQueries({ queryKey: defaultCombinedKey });
     await queryClient.cancelQueries({ queryKey: defaultDetailKey });
+    await queryClient.cancelQueries({ queryKey: defaultOverviewKey });
     const previous: [QueryKey, unknown][] = [
       ...queryClient.getQueriesData<AgentProfileListItem[]>({ queryKey: defaultListKey }),
       ...queryClient.getQueriesData<AgentProfileListCombined>({
         queryKey: defaultCombinedKey,
       }),
       ...queryClient.getQueriesData<AgentProfileDetail>({ queryKey: defaultDetailKey }),
+      ...queryClient.getQueriesData<AgentProfileOverview>({ queryKey: defaultOverviewKey }),
     ];
     return { generation: nextMutationGeneration(DEFAULT_MUTATION_KEY), previous };
   };
@@ -159,12 +170,18 @@ export function useAgentProfileMutations(organizationId?: string) {
       trpc.agentProfiles.delete.mutationOptions({
         ...callbacks,
         // The deleted profile's screens stay mounted until navigation ends.
-        // Refetching its detail can only fail with NOT_FOUND, so skip it.
+        // Refetching its detail, its Overview, or its agent list can only fail
+        // with NOT_FOUND, so skip all three.
         onSuccess: (_data, { profileId }) => {
           const deletedDetail = trpc.agentProfiles.get.queryFilter({ profileId });
+          const deletedOverview = trpc.agentProfiles.overview.queryFilter({ profileId });
+          const deletedAgents = trpc.agentProfiles.agents.queryFilter({ profileId });
           void queryClient.invalidateQueries({
             ...profilesFilter,
-            predicate: query => !matchQuery(deletedDetail, query),
+            predicate: query =>
+              !matchQuery(deletedDetail, query) &&
+              !matchQuery(deletedOverview, query) &&
+              !matchQuery(deletedAgents, query),
           });
         },
       }),

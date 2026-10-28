@@ -15,6 +15,7 @@ import {
   getBYOKforOrganization,
   getBYOKforUser,
   getByokCredentials,
+  getCatalogModeByokCredentials,
   getModelGatewayUserByokProviders,
   getModelInferenceUserByokProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
@@ -64,6 +65,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
       .requireActual<typeof byokModule>('@kilocode/web-shared/lib/ai-gateway/byok')
       .isGatewayUserByokEligibleModel(modelId),
   getByokCredentials: jest.fn().mockResolvedValue([]),
+  getCatalogModeByokCredentials: jest.fn().mockResolvedValue([]),
   getBYOKforUser: jest.fn(),
   getBYOKforOrganization: jest.fn(),
 }));
@@ -648,6 +650,7 @@ describe('getProvider direct BYOK routing', () => {
     jest.mocked(findDirectByokCatalogModels).mockReset().mockResolvedValue([]);
     jest.mocked(getDirectByokCatalogModelId).mockReset().mockResolvedValue(null);
     jest.mocked(getByokCredentials).mockReset().mockResolvedValue([]);
+    jest.mocked(getCatalogModeByokCredentials).mockReset().mockResolvedValue([]);
   });
 
   test.each(['nvidia-byok', 'opencode-go'] as const)(
@@ -833,7 +836,7 @@ describe('getProvider direct BYOK routing', () => {
       { provider: synthetic, model: directByokModel('hf:moonshotai/Kimi-K2.6') },
       { provider: zaiCoding, model: directByokModel('kimi-k2.6') },
     ]);
-    jest.mocked(getByokCredentials).mockResolvedValue([
+    jest.mocked(getCatalogModeByokCredentials).mockResolvedValue([
       { decryptedAPIKey: 'synthetic-key', providerId: 'synthetic', serveCatalogModels: false },
       { decryptedAPIKey: 'zai-key', providerId: 'zai-coding', serveCatalogModels: true },
     ]);
@@ -844,11 +847,10 @@ describe('getProvider direct BYOK routing', () => {
     });
     if (result.kind !== 'provider') throw new Error('expected provider result');
 
-    expect(getByokCredentials).toHaveBeenCalledWith(
+    expect(getCatalogModeByokCredentials).toHaveBeenCalledWith(
       expect.anything(),
       { type: 'organization', id: ORG_ID },
-      ['synthetic', 'zai-coding'],
-      { catalogModeOnly: true }
+      ['synthetic', 'zai-coding']
     );
     expect(result.provider).toMatchObject({
       id: 'direct-byok',
@@ -885,7 +887,7 @@ describe('getProvider direct BYOK routing', () => {
       },
     ]);
     jest
-      .mocked(getByokCredentials)
+      .mocked(getCatalogModeByokCredentials)
       .mockResolvedValue([
         { decryptedAPIKey: 'synthetic-key', providerId: 'synthetic', serveCatalogModels: false },
       ]);
@@ -908,7 +910,7 @@ describe('getProvider direct BYOK routing', () => {
         model: directByokModel('gpt-oss'),
       },
     ]);
-    jest.mocked(getByokCredentials).mockResolvedValue([
+    jest.mocked(getCatalogModeByokCredentials).mockResolvedValue([
       { decryptedAPIKey: 'synthetic-key', providerId: 'synthetic', serveCatalogModels: true },
       { decryptedAPIKey: 'zai-key', providerId: 'zai-coding', serveCatalogModels: true },
     ]);
@@ -929,7 +931,7 @@ describe('getProvider direct BYOK routing', () => {
         { provider: directByokProvider('synthetic'), model: directByokModel('hf:openai/gpt-oss') },
       ]);
     jest
-      .mocked(getByokCredentials)
+      .mocked(getCatalogModeByokCredentials)
       .mockResolvedValue([
         { decryptedAPIKey: 'synthetic-key', providerId: 'synthetic', serveCatalogModels: true },
       ]);
@@ -959,7 +961,7 @@ describe('getProvider direct BYOK routing', () => {
         { provider: directByokProvider('synthetic'), model: directByokModel('hf:openai/gpt-oss') },
       ]);
     jest
-      .mocked(getByokCredentials)
+      .mocked(getCatalogModeByokCredentials)
       .mockResolvedValue([
         { decryptedAPIKey: 'synthetic-key', providerId: 'synthetic', serveCatalogModels: true },
       ]);

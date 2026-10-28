@@ -3,7 +3,7 @@ import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
-import { agent_briefing_reports, api_request_log, type User } from '@kilocode/db/schema';
+import { agent_briefing_snapshots, api_request_log, type User } from '@kilocode/db/schema';
 import { BRIEFING_SETTLEMENT_HEADER } from '@kilocode/web-shared/lib/agent-briefing-usage';
 import type { UsageAccountingResult } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -3420,15 +3420,18 @@ describe('briefing gateway accounting receipts', () => {
       },
     };
     const [report] = await db
-      .insert(agent_briefing_reports)
+      .insert(agent_briefing_snapshots)
       .values({
         kilo_user_id: user.id,
         context_key: 'personal',
-        kind: 'one_off',
+        local_date: now.slice(0, 10),
+        timezone: 'UTC',
+        language: 'en',
+        captured_at: now,
+        expires_at: new Date(Date.now() + 86_400_000).toISOString(),
         night_start_at: now,
         cutoff_at: now,
         morning_end_at: now,
-        evidence_hash: 'gateway-receipt-test',
         facts: {},
         summary,
         generation_id: generationId,
@@ -3452,9 +3455,9 @@ describe('briefing gateway accounting receipts', () => {
 
   async function persistedSummary(reportId: string) {
     const [report] = await db
-      .select({ summary: agent_briefing_reports.summary })
-      .from(agent_briefing_reports)
-      .where(eq(agent_briefing_reports.id, reportId));
+      .select({ summary: agent_briefing_snapshots.summary })
+      .from(agent_briefing_snapshots)
+      .where(eq(agent_briefing_snapshots.id, reportId));
     if (!report) throw new Error('Report fixture was not found');
     return report.summary;
   }

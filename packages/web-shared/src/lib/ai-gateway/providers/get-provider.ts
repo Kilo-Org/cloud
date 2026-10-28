@@ -137,11 +137,6 @@ async function directByokProviderResult(
 }
 
 /**
- * Direct BYOK model IDs name their provider, such as `neuralwatt/...`, and the
- * request goes straight to that provider with the stored key, bypassing Kilo's
- * gateways. A key in catalog mode instead serves the catalog ids its provider maps.
- */
-/**
  * The caller's catalog-mode keys serve the catalog id, but none over the request's API kind. The
  * caller's other BYOK routes may still serve it; otherwise `result` fails the request with the
  * unsupported-API error.
@@ -151,6 +146,11 @@ type DirectByokUnsupportedApiKind = {
   result: GetProviderProviderResult;
 };
 
+/**
+ * Direct BYOK model IDs name their provider, such as `neuralwatt/...`, and the
+ * request goes straight to that provider with the stored key, bypassing Kilo's
+ * gateways. A key in catalog mode instead serves the catalog ids its provider maps.
+ */
 async function resolveDirectByokProvider(
   user: User | AnonymousUserContext,
   requestedModel: string,

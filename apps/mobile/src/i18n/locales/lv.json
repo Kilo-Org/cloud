@@ -2220,10 +2220,7 @@
     },
     "remoteSpawnRetryable": "Neizdevās sazināties ar vidi — iespējams, savienojums ir pārtrūcis.",
     "remoteSpawnNonRetryable": "Vidē neizdevās sākt sesiju — pārbaudi datoru vai atjaunini CLI.",
-    "remoteSpawnInstanceDisconnected": "Savienojums ar izvēlēto vidi pārtrūka. Sāc sesiju Cloud Agent vai izvēlies citu vidi.",
-    "liveCount_one": "{{count}} REĀLLAIKĀ",
-    "liveCount_other": "{{count}} REĀLLAIKĀ",
-    "liveCount_zero": "{{count}} AKTĪVU"
+    "remoteSpawnInstanceDisconnected": "Savienojums ar izvēlēto vidi pārtrūka. Sāc sesiju Cloud Agent vai izvēlies citu vidi."
   },
   "agentChat": {
     "session": {

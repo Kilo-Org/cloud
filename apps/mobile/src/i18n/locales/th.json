@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "ติดต่ออินสแตนซ์ไม่ได้ การเชื่อมต่ออาจขาดหาย",
     "remoteSpawnNonRetryable": "อินสแตนซ์ไม่สามารถเริ่มเซสชันได้ — ตรวจสอบเครื่องหรืออัปเดต CLI",
-    "remoteSpawnInstanceDisconnected": "อินสแตนซ์ที่เลือกตัดการเชื่อมต่อแล้ว เริ่มเซสชันบน Cloud Agent หรือเลือกอินสแตนซ์อื่น",
-    "liveCount_one": "กำลังทำงาน {{count}} เซสชัน",
-    "liveCount_other": "กำลังทำงาน {{count}} เซสชัน"
+    "remoteSpawnInstanceDisconnected": "อินสแตนซ์ที่เลือกตัดการเชื่อมต่อแล้ว เริ่มเซสชันบน Cloud Agent หรือเลือกอินสแตนซ์อื่น"
   },
   "agentChat": {
     "session": {

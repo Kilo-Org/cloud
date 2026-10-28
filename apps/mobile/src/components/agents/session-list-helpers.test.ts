@@ -475,52 +475,47 @@ describe('composeActiveSessionSpokenMeta', () => {
 });
 
 describe('selectRemoteRowSpokenMeta', () => {
-  const costSpoken = '12 cents';
-  const timeSpoken = '5 minutes ago';
-
-  it('needsInput + cost + time → null', () => {
-    expect(selectRemoteRowSpokenMeta({ needsInput: true, costSpoken, timeSpoken })).toBeNull();
-  });
-
-  it('needsInput + cost only → null', () => {
-    expect(
-      selectRemoteRowSpokenMeta({ needsInput: true, costSpoken, timeSpoken: null })
-    ).toBeNull();
-  });
-
-  it('needsInput + time only → null', () => {
-    expect(
-      selectRemoteRowSpokenMeta({ needsInput: true, costSpoken: null, timeSpoken })
-    ).toBeNull();
-  });
-
-  it('needsInput + neither → null', () => {
-    expect(
-      selectRemoteRowSpokenMeta({ needsInput: true, costSpoken: null, timeSpoken: null })
-    ).toBeNull();
-  });
-
-  it('cost + time → combined spoken form', () => {
-    expect(selectRemoteRowSpokenMeta({ needsInput: false, costSpoken, timeSpoken })).toBe(
-      'cost 12 cents, 5 minutes ago'
-    );
-  });
-
-  it('cost only → spoken cost alone', () => {
-    expect(selectRemoteRowSpokenMeta({ needsInput: false, costSpoken, timeSpoken: null })).toBe(
-      'cost 12 cents'
-    );
-  });
-
-  it('time only → spoken time alone', () => {
-    expect(selectRemoteRowSpokenMeta({ needsInput: false, costSpoken: null, timeSpoken })).toBe(
-      '5 minutes ago'
-    );
-  });
-
-  it('neither → null', () => {
-    expect(
-      selectRemoteRowSpokenMeta({ needsInput: false, costSpoken: null, timeSpoken: null })
-    ).toBeNull();
-  });
+  it.each([
+    {
+      variant: 'list',
+      needsInput: true,
+      scheduled: false,
+      scheduledWake: null,
+      expected: 'cost 12 cents, 5 minutes ago',
+    },
+    {
+      variant: 'list',
+      needsInput: false,
+      scheduled: true,
+      scheduledWake: 'tomorrow',
+      expected: 'tomorrow, cost 12 cents, 5 minutes ago',
+    },
+    {
+      variant: 'list',
+      needsInput: false,
+      scheduled: true,
+      scheduledWake: null,
+      expected: 'cost 12 cents, 5 minutes ago',
+    },
+    { variant: 'card', needsInput: true, scheduled: false, scheduledWake: null, expected: null },
+    {
+      variant: 'card',
+      needsInput: false,
+      scheduled: true,
+      scheduledWake: 'tomorrow',
+      expected: 'tomorrow',
+    },
+    { variant: 'card', needsInput: false, scheduled: true, scheduledWake: null, expected: null },
+  ] as const)(
+    'preserves $variant metadata precedence for needsInput=$needsInput, scheduled=$scheduled, wake=$scheduledWake',
+    ({ expected, ...state }) => {
+      expect(
+        selectRemoteRowSpokenMeta({
+          ...state,
+          costSpoken: '12 cents',
+          timeSpoken: '5 minutes ago',
+        })
+      ).toBe(expected);
+    }
+  );
 });

@@ -288,17 +288,24 @@ export function composeActiveSessionSpokenMeta(
   return null;
 }
 
-/**
- * Selector for the spoken meta of a remote session row. When `needsInput`
- * is true, spoken cost/time are suppressed entirely (`null`) — the spoken
- * label announces "needs input" instead via `sessionRowAccessibilityLabel`.
- * Otherwise delegates to `composeActiveSessionSpokenMeta`.
- */
 export function selectRemoteRowSpokenMeta(params: {
+  variant: 'card' | 'list';
+  scheduled: boolean;
+  scheduledWake: string | null;
   needsInput: boolean;
   costSpoken: string | null;
   timeSpoken: string | null;
 }): string | null {
+  if (params.variant === 'list') {
+    return (
+      [params.scheduledWake, composeActiveSessionSpokenMeta(params.costSpoken, params.timeSpoken)]
+        .filter(Boolean)
+        .join(', ') || null
+    );
+  }
+  if (params.scheduled) {
+    return params.scheduledWake;
+  }
   if (params.needsInput) {
     return null;
   }

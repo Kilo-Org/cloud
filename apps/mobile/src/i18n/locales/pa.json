@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "ਇੰਸਟੈਂਸ ਨਾਲ ਸੰਪਰਕ ਨਹੀਂ ਹੋ ਸਕਿਆ — ਹੋ ਸਕਦਾ ਹੈ ਕਿ ਇਹ ਡਿਸਕਨੈਕਟ ਹੋ ਗਿਆ ਹੋਵੇ।",
     "remoteSpawnNonRetryable": "ਇੰਸਟੈਂਸ ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਨਹੀਂ ਕਰ ਸਕਿਆ — ਮਸ਼ੀਨ ਦੀ ਜਾਂਚ ਕਰੋ ਜਾਂ CLI ਅੱਪਡੇਟ ਕਰੋ।",
-    "remoteSpawnInstanceDisconnected": "ਚੁਣਿਆ ਗਿਆ ਇੰਸਟੈਂਸ ਡਿਸਕਨੈਕਟ ਹੋ ਗਿਆ। Cloud Agent 'ਤੇ ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰੋ ਜਾਂ ਕੋਈ ਹੋਰ ਇੰਸਟੈਂਸ ਚੁਣੋ।",
-    "liveCount_one": "{{count}} ਲਾਈਵ",
-    "liveCount_other": "{{count}} ਲਾਈਵ"
+    "remoteSpawnInstanceDisconnected": "ਚੁਣਿਆ ਗਿਆ ਇੰਸਟੈਂਸ ਡਿਸਕਨੈਕਟ ਹੋ ਗਿਆ। Cloud Agent 'ਤੇ ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰੋ ਜਾਂ ਕੋਈ ਹੋਰ ਇੰਸਟੈਂਸ ਚੁਣੋ।"
   },
   "agentChat": {
     "session": {

@@ -1,27 +1,48 @@
 import { useTranslation } from 'react-i18next';
-import { View } from 'react-native';
+import { Pressable, View } from 'react-native';
 
-import { SegmentedControl } from '@/components/ui/segmented-control';
+import { Text } from '@/components/ui/text';
+import { cn } from '@/lib/utils';
 
 export type AgentsView = 'sessions' | 'todos';
 
-/** The Agents tab's switch between its sessions and its to-do lists. */
 export function AgentsViewSegment({
   value,
   onChange,
 }: Readonly<{ value: AgentsView; onChange: (view: AgentsView) => void }>) {
   const { t } = useTranslation();
   return (
-    <View className="px-4 pb-2">
-      <SegmentedControl<AgentsView>
-        accessibilityLabel={t('todos.segment.label')}
-        options={[
-          { value: 'sessions', label: t('todos.segment.sessions') },
-          { value: 'todos', label: t('todos.segment.todos') },
-        ]}
-        value={value}
-        onChange={onChange}
-      />
+    <View
+      accessibilityRole="tablist"
+      accessibilityLabel={t('todos.segment.label')}
+      className="min-w-0 flex-1 flex-row items-center gap-4"
+    >
+      {(['sessions', 'todos'] as const).map(view => (
+        <Pressable
+          key={view}
+          accessibilityRole="tab"
+          accessibilityState={{ selected: value === view }}
+          onPress={() => {
+            if (value !== view) {
+              onChange(view);
+            }
+          }}
+          className={cn(
+            'min-h-[48px] min-w-[48px] shrink items-center justify-center border-b-2 active:opacity-70',
+            value === view ? 'border-foreground' : 'border-transparent'
+          )}
+        >
+          <Text
+            numberOfLines={1}
+            className={cn(
+              'text-sm',
+              value === view ? 'font-semibold text-foreground' : 'text-muted-foreground'
+            )}
+          >
+            {view === 'sessions' ? t('todos.segment.sessions') : t('todos.segment.todos')}
+          </Text>
+        </Pressable>
+      ))}
     </View>
   );
 }

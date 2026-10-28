@@ -7,6 +7,7 @@ import { useTranslation } from 'react-i18next';
 
 import { Input } from '@/components/ui/input';
 import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 // The row's `gap-2` compiles to 7pt, not 8pt: NativeWind v5 fixes 1rem at
@@ -30,6 +31,8 @@ type SessionListSearchHeaderProps = {
   showSearchBusy: boolean;
   onChangeText: (text: string) => void;
   onClearSearch: () => void;
+  onBlur?: () => void;
+  compact?: boolean;
   /** Initial content for the uncontrolled input, applied on a restore remount. */
   defaultValue?: string;
   /** Remount key: changes once when a stored non-empty draft is restored. */
@@ -42,6 +45,8 @@ export function SessionListSearchHeader({
   showSearchBusy,
   onChangeText,
   onClearSearch,
+  onBlur,
+  compact = false,
   defaultValue,
   inputKey,
 }: Readonly<SessionListSearchHeaderProps>) {
@@ -57,21 +62,12 @@ export function SessionListSearchHeader({
   );
   return (
     <View>
-      {/* The row's height comes from the shared field box, not from this row:
-          the field's 44pt floor plus this row's 10.5pt vertical padding
-          (`py-1.5` is 0.375rem at the app's 14pt rem) and its 2pt vertical
-          `border` (1pt a side, inside the border box React Native lays out) is
-          56.5pt, the same whether the clear control is showing or not, so the
-          first keystroke cannot grow the row and shift the list below. The
-          row's own `min-h-[51px]` (the clear control's 38pt box plus that same
-          padding and border, 50.5pt) stays as a lower bound the field's floor
-          dominates, so the row never shrinks below the control's own box. A
-          second `min-h-*` class would set the same property, leaving which
-          floor wins to the order Tailwind emits its rules rather than to this
-          intent. */}
       <View
         style={fieldMargins}
-        className="my-2 min-h-[51px] flex-row items-center gap-2 rounded-[10px] border border-border bg-card px-4 py-1.5"
+        className={cn(
+          'my-2 flex-row items-center gap-2 rounded-[10px] border border-border',
+          compact ? 'min-h-[44px] px-2' : 'min-h-[51px] bg-card px-4 py-1.5'
+        )}
       >
         {/* Fixed-size slot: the spinner swaps in for the icon, so the row never reflows. */}
         <View className="h-[18px] w-[18px] items-center justify-center">
@@ -100,6 +96,7 @@ export function SessionListSearchHeader({
           placeholder={t('agents.search.searchSessionsPlaceholder')}
           placeholderTextColor={colors.mutedForeground}
           onChangeText={onChangeText}
+          onBlur={onBlur}
           defaultValue={defaultValue}
           returnKeyType="search"
           // Android's IME, with little room left in a landscape window, swaps

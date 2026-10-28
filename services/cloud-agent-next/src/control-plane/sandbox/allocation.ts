@@ -368,14 +368,6 @@ export function reduceAllocation(
     }
 
     case 'stop-requested': {
-      if (state.kind === 'stopped' && state.unconfirmedProviderRef !== null) {
-        return enterStopping(
-          { ...state, providerRef: state.unconfirmedProviderRef, unconfirmedProviderRef: null },
-          event.at,
-          timers,
-          event.reason
-        );
-      }
       if (state.kind === 'stopped' || state.kind === 'stopping') {
         return { state, effects: NO_EFFECTS };
       }

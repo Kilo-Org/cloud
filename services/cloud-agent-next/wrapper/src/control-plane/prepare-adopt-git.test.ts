@@ -1,4 +1,4 @@
-import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { execFileSync } from 'node:child_process';
 import fs from 'node:fs/promises';
 import os from 'node:os';
@@ -11,11 +11,10 @@ import type {
 } from '../../../src/shared/control-plane-protocol.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
 import { createPreparationManager, type PrepareDeps } from './prepare.js';
-import { readWorkspaceStamp, writeWorkspaceStamp } from './workspace-stamp.js';
+import { readWorkspaceStamp } from './workspace-stamp.js';
 import { directoryHome } from './workspace-home.js';
 import { profileConfigPath } from './runtime-profile.js';
 import { gitCredentialRecordPath } from '../control/git-credentials.js';
-import { restoreSession } from '../restore-session.js';
 
 // These tests run real git against a local origin. A mocked git proves the command
 // sequence; only a real repository proves an adopted snapshot ends on the same
@@ -87,11 +86,20 @@ function spec(overrides: Partial<ControlPlaneRouteSpec> = {}): ControlPlaneRoute
 function manager(allocationId: string, overrides: Partial<PrepareDeps> = {}) {
   const frames: ControlPlaneWrapperFrame[] = [];
   const gitCalls: string[][] = [];
-  const restores: Array<{ restoreFiles?: boolean }> = [];
   const runtimeEnvs: Record<string, string>[] = [];
-  let setupCalls = 0;
-  let recoveryCalls = 0;
-  let sessionQueries = 0;
+  const restore = mock<NonNullable<PrepareDeps['restore']>>(async () => ({
+    ok: true,
+    downloaded: true,
+    imported: true,
+    diffs: { applied: 0, skipped: 0, total: 0 },
+  }));
+  const runSetup = mock(async () => ({ exitCode: 0, stdout: '', stderr: '' }));
+  const recoverWorktree = mock(async () => ({
+    applied: 0,
+    skipped: 0,
+    total: 0,
+    skippedDiffs: [],
+  }));
   const prepared = createPreparationManager({
     timers: CONTROL_PLANE_TIMERS,
     allocationId,
@@ -115,40 +123,14 @@ function manager(allocationId: string, overrides: Partial<PrepareDeps> = {}) {
       return run(args, options);
     },
     seedRegistration: async () => undefined,
-    sessionExists: async () => {
-      sessionQueries++;
-      return true;
-    },
-    restore: async (_id, _directory, _file, options) => {
-      restores.push({ restoreFiles: options?.restoreFiles });
-      return {
-        ok: true,
-        downloaded: true,
-        imported: true,
-        diffs: { applied: 0, skipped: 0, total: 0 },
-      };
-    },
-    runSetup: async () => {
-      setupCalls++;
-      return { exitCode: 0, stdout: '', stderr: '' };
-    },
-    recoverWorktree: async () => {
-      recoveryCalls++;
-      return { applied: 0, skipped: 0, total: 0, skippedDiffs: [] };
-    },
+    sessionExists: async () => true,
+    restore,
+    runSetup,
+    recoverWorktree,
     sleep: async () => undefined,
     ...overrides,
   });
-  return {
-    prepared,
-    frames,
-    gitCalls,
-    restores,
-    runtimeEnvs,
-    setupCalls: () => setupCalls,
-    recoveryCalls: () => recoveryCalls,
-    sessionQueries: () => sessionQueries,
-  };
+  return { prepared, frames, gitCalls, restore, runtimeEnvs, runSetup, recoverWorktree };
 }
 
 function ready(frames: ControlPlaneWrapperFrame[]) {
@@ -181,7 +163,6 @@ describe('adopting an environment snapshot against a real repository', () => {
     expect(await readWorkspaceStamp(directory)).toEqual({
       allocationId: 'alloc-restored',
       commit: tip,
-      session: { sessionId: 'ses_b', kiloSessionId: 'kilo_a' },
     });
   });
 
@@ -289,7 +270,7 @@ describe('adopting an environment snapshot against a real repository', () => {
 describe('restoring a private session disk snapshot', () => {
   const provenance = { sourceAllocationId: 'alloc-source' };
 
-  it('preserves local branches, commits, index, dirty, untracked, ignored and home files while refreshing config and history', async () => {
+  it('preserves local git, files, home and history while refreshing credentials and config', async () => {
     await manager('alloc-source').prepared.prepare(spec());
     git(directory, 'checkout', '-q', '-b', 'local-work');
     await fs.writeFile(path.join(directory, '.gitignore'), 'node_modules/\n');
@@ -335,84 +316,40 @@ describe('restoring a private session disk snapshot', () => {
       'ignored dependency\n'
     );
     expect(await fs.readFile(path.join(home, 'user-state'), 'utf8')).toBe('home state\n');
-    expect(
-      await fs.access(profileConfigPath(home)).then(
-        () => true,
-        () => false
-      )
-    ).toBe(false);
+    expect(await fs.stat(profileConfigPath(home)).catch(() => null)).toBeNull();
     expect(git(directory, 'remote', 'get-url', 'origin')).toBe('https://github.com/acme/repo.git');
     expect(restored.runtimeEnvs[0]?.CURRENT_CONFIG).toBe('refreshed');
     expect(await fs.readFile(gitCredentialRecordPath(home), 'utf8')).toContain(
       'password=current-git-token\n'
     );
-    expect(restored.restores).toEqual([{ restoreFiles: false }]);
-    expect(restored.sessionQueries()).toBe(0);
-    expect(restored.setupCalls()).toBe(0);
-    expect(restored.recoveryCalls()).toBe(0);
+    expect(restored.restore).not.toHaveBeenCalled();
+    expect(restored.runSetup).not.toHaveBeenCalled();
+    expect(restored.recoverWorktree).not.toHaveBeenCalled();
     expect(
       restored.gitCalls.some(args => ['clone', 'fetch', 'checkout', 'branch'].includes(args[0]!))
     ).toBe(false);
-    expect(await readWorkspaceStamp(directory)).toEqual({
-      allocationId: 'alloc-restored',
-      commit: head,
-      session: {
-        sessionId: restoredSpec.sessionId,
-        kiloSessionId: restoredSpec.kiloSessionId,
-        snapshotSourceAllocationId: 'alloc-source',
-      },
-    });
-
-    const restarted = manager('alloc-restored');
-    await restarted.prepared.prepare(restoredSpec);
-    expect(ready(restarted.frames)).toMatchObject({ workspace: 'same' });
-    expect(restarted.restores).toEqual([]);
-    expect(git(directory, 'show-ref', '--heads')).toBe(refs);
   });
 
-  it.each(['missing', 'corrupt', 'allocation', 'session', 'kilo', 'legacy', 'repository'])(
-    'fails closed for %s provenance without clone, setup, runtime or deleting recovered files',
-    async mismatch => {
-      await manager('alloc-source').prepared.prepare(spec());
-      const stamp = await readWorkspaceStamp(directory);
-      expect(stamp).not.toBeNull();
-      if (!stamp?.session) throw new Error('Missing source stamp');
-      await fs.writeFile(path.join(directory, 'recovered.txt'), 'keep me');
-      if (mismatch === 'missing') await fs.rm(path.join(directory, '.git', 'kilo-workspace.json'));
-      else if (mismatch === 'corrupt')
-        await fs.writeFile(path.join(directory, '.git', 'kilo-workspace.json'), 'invalid');
-      else if (mismatch === 'repository') await fs.rm(path.join(directory, '.git', 'HEAD'));
-      else
-        await writeWorkspaceStamp(directory, true, {
-          ...stamp,
-          allocationId: mismatch === 'allocation' ? 'other-allocation' : stamp.allocationId,
-          session:
-            mismatch === 'legacy'
-              ? undefined
-              : {
-                  sessionId: mismatch === 'session' ? 'other-session' : stamp.session.sessionId,
-                  kiloSessionId: mismatch === 'kilo' ? 'other-kilo' : stamp.session.kiloSessionId,
-                },
-        });
-      const restored = manager('alloc-restored');
+  it('fails a source allocation mismatch without touching recovered files or starting Kilo', async () => {
+    await manager('alloc-source').prepared.prepare(spec());
+    await fs.writeFile(path.join(directory, 'recovered.txt'), 'keep me');
+    const restored = manager('alloc-restored');
+    await restored.prepared.prepare(spec({ sessionSnapshot: { sourceAllocationId: 'other' } }));
+    expect(restored.frames.at(-1)).toMatchObject({
+      type: 'session.failed',
+      reason: 'workspace_setup_failed',
+      step: 'restore',
+    });
+    expect(restored.gitCalls).toEqual([]);
+    expect(restored.runtimeEnvs).toEqual([]);
+    expect(restored.runSetup).not.toHaveBeenCalled();
+    expect(await fs.readFile(path.join(directory, 'recovered.txt'), 'utf8')).toBe('keep me');
+  });
 
-      await restored.prepared.prepare(spec({ sessionSnapshot: provenance }));
-
-      expect(restored.frames.at(-1)).toMatchObject({
-        type: 'session.failed',
-        reason: 'workspace_setup_failed',
-        step: 'restore',
-      });
-      expect(restored.gitCalls).toEqual([]);
-      expect(restored.runtimeEnvs).toEqual([]);
-      expect(restored.setupCalls()).toBe(0);
-      expect(await fs.readFile(path.join(directory, 'recovered.txt'), 'utf8')).toBe('keep me');
-    }
-  );
-
-  it('does not stamp a failed history import as current and retries authoritative import after restart', async () => {
+  it('defers stamping until session resolution succeeds and falls back to history-only ingest', async () => {
     await manager('alloc-source').prepared.prepare(spec());
     const failed = manager('alloc-restored', {
+      sessionExists: async () => false,
       restore: async () => ({ ok: false, error: 'unavailable', code: 503, step: 'download' }),
     });
     await failed.prepared.prepare(spec({ sessionSnapshot: provenance }));
@@ -420,181 +357,39 @@ describe('restoring a private session disk snapshot', () => {
     expect(await readWorkspaceStamp(directory)).toMatchObject({
       allocationId: 'alloc-source',
     });
-    const restarted = manager('alloc-restored');
+    const restarted = manager('alloc-restored', { sessionExists: async () => false });
     await restarted.prepared.prepare(spec({ sessionSnapshot: provenance }));
     expect(ready(restarted.frames)).toBeDefined();
-    expect(restarted.restores).toEqual([{ restoreFiles: false }]);
+    expect(restarted.restore.mock.calls[0]?.[3]?.restoreFiles).toBe(false);
   });
 
-  it('imports newer ingest history over a stale local session without applying older ingest file diffs', async () => {
-    await manager('alloc-source').prepared.prepare(spec());
-    const home = directoryHome(directory, path.join(root, 'homes'));
-    const historyFile = path.join(home, 'history.json');
-    await fs.writeFile(historyFile, JSON.stringify({ messages: ['stale local history'] }));
-    await fs.writeFile(path.join(directory, 'README'), 'current disk bytes');
-    const bin = path.join(root, 'bin');
-    await fs.mkdir(bin);
-    await fs.writeFile(path.join(bin, 'kilo'), '#!/bin/sh\ncp "$2" "$HOME/history.json"\n', {
-      mode: 0o755,
-    });
-    const history = {
-      info: { id: spec().kiloSessionId },
-      messages: [{ info: { id: 'new-message' }, parts: [{ text: 'newer ingest history' }] }],
-      sessionDiff: [{ file: 'README', status: 'modified', after: 'older ingest bytes' }],
-    };
-    const fetchSpy = spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(JSON.stringify(history), { status: 200 })
-    );
-    try {
-      const restored = manager('alloc-restored', {
-        restore: (id, cwd, file, options) =>
-          restoreSession(id, cwd, file, {
-            ...options,
-            env: { ...options?.env, PATH: `${bin}:${process.env.PATH}` },
-          }),
-      });
-      await restored.prepared.prepare(spec({ sessionSnapshot: provenance }));
-      expect(ready(restored.frames)).toBeDefined();
-      expect(restored.sessionQueries()).toBe(0);
-      expect(JSON.parse(await fs.readFile(historyFile, 'utf8'))).toEqual(history);
-      expect(await fs.readFile(path.join(directory, 'README'), 'utf8')).toBe('current disk bytes');
-      expect(fetchSpy).toHaveBeenCalledTimes(1);
-    } finally {
-      fetchSpy.mockRestore();
-    }
-  });
-
-  it('stamps and preserves a session with no repository or setup commands', async () => {
+  it.each([false, true])('restores a bare session with git init=%s', async initializeGit => {
     const bareSpec = spec({ git: undefined });
     await manager('alloc-source').prepared.prepare(bareSpec);
-    await fs.writeFile(path.join(directory, 'disk-state'), 'preserved');
-    const restored = manager('alloc-restored');
-    await restored.prepared.prepare({ ...bareSpec, sessionSnapshot: provenance });
-    expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
-    expect(await fs.readFile(path.join(directory, 'disk-state'), 'utf8')).toBe('preserved');
-    expect(restored.restores).toEqual([{ restoreFiles: false }]);
-    expect(restored.gitCalls).toEqual([['rev-parse', 'HEAD']]);
-    const restoredStamp = {
-      allocationId: 'alloc-restored',
-      commit: '',
-      workspacePrepared: false as const,
-      session: {
-        sessionId: bareSpec.sessionId,
-        kiloSessionId: bareSpec.kiloSessionId,
-        snapshotSourceAllocationId: 'alloc-source',
-      },
-    };
-    expect(await readWorkspaceStamp(directory)).toEqual(restoredStamp);
-    const restarted = manager('alloc-restored');
-    await restarted.prepared.prepare({ ...bareSpec, sessionSnapshot: provenance });
-    expect(ready(restarted.frames)).toMatchObject({ workspace: 'same' });
-    expect(restarted.restores).toEqual([]);
-    expect(await readWorkspaceStamp(directory)).toEqual(restoredStamp);
-    expect(await fs.readFile(path.join(directory, 'disk-state'), 'utf8')).toBe('preserved');
-    await manager('alloc-restored').prepared.prepare(bareSpec);
-    expect(await readWorkspaceStamp(directory)).toEqual(restoredStamp);
-    const nextRestart = manager('alloc-restored');
-    await nextRestart.prepared.prepare({ ...bareSpec, sessionSnapshot: provenance });
-    expect(ready(nextRestart.frames)).toMatchObject({ workspace: 'same' });
-    const nextRestore = manager('alloc-next');
-    await nextRestore.prepared.prepare({
-      ...bareSpec,
-      sessionSnapshot: { sourceAllocationId: 'alloc-restored' },
-    });
-    expect(ready(nextRestore.frames)).toMatchObject({ workspace: 'adopted' });
-    expect(nextRestore.restores).toEqual([{ restoreFiles: false }]);
-    expect(await fs.readFile(path.join(directory, 'disk-state'), 'utf8')).toBe('preserved');
-    const normalSetup = manager('alloc-next');
-    await normalSetup.prepared.prepare({ ...bareSpec, setupCommands: ['normal setup'] });
-    expect(ready(normalSetup.frames)).toBeDefined();
-    expect(normalSetup.setupCalls()).toBe(1);
-    expect((await readWorkspaceStamp(directory))?.workspacePrepared).toBeUndefined();
-  });
-
-  it('restores a bare session after git init without losing local commits, untracked or home files', async () => {
-    const bareSpec = spec({ git: undefined });
-    await manager('alloc-source').prepared.prepare(bareSpec);
-    git(directory, 'init', '-q', '-b', 'local-work');
+    if (initializeGit) git(directory, 'init', '-q', '-b', 'local-work');
     await fs.writeFile(path.join(directory, 'local.txt'), 'local commit\n');
-    git(directory, 'add', 'local.txt');
-    git(directory, 'commit', '-q', '-m', 'local only');
-    await fs.writeFile(path.join(directory, 'untracked.txt'), 'untracked\n');
-    const home = directoryHome(directory, path.join(root, 'homes'));
-    await fs.writeFile(path.join(home, 'user-state'), 'home state\n');
-    const head = git(directory, 'rev-parse', 'HEAD');
-    const status = git(directory, 'status', '--porcelain=v1', '--untracked-files=all');
+    if (initializeGit) {
+      git(directory, 'add', 'local.txt');
+      git(directory, 'commit', '-q', '-m', 'local only');
+    }
+    const head = initializeGit ? git(directory, 'rev-parse', 'HEAD') : '';
     const restored = manager('alloc-restored');
 
     await restored.prepared.prepare({ ...bareSpec, sessionSnapshot: provenance });
 
     expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
-    expect(git(directory, 'branch', '--show-current')).toBe('local-work');
-    expect(git(directory, 'rev-parse', 'HEAD')).toBe(head);
-    expect(git(directory, 'status', '--porcelain=v1', '--untracked-files=all')).toBe(status);
-    expect(await fs.readFile(path.join(directory, 'untracked.txt'), 'utf8')).toBe('untracked\n');
-    expect(await fs.readFile(path.join(home, 'user-state'), 'utf8')).toBe('home state\n');
-    expect(restored.restores).toEqual([{ restoreFiles: false }]);
-    expect(restored.setupCalls()).toBe(0);
+    expect(await fs.readFile(path.join(directory, 'local.txt'), 'utf8')).toBe('local commit\n');
     expect(await readWorkspaceStamp(directory)).toMatchObject({
       allocationId: 'alloc-restored',
       commit: head,
-      session: {
-        sessionId: bareSpec.sessionId,
-        kiloSessionId: bareSpec.kiloSessionId,
-        snapshotSourceAllocationId: 'alloc-source',
-      },
+      workspacePrepared: false,
     });
     const restarted = manager('alloc-restored');
     await restarted.prepared.prepare({ ...bareSpec, sessionSnapshot: provenance });
     expect(ready(restarted.frames)).toMatchObject({ workspace: 'same' });
-    expect(restarted.restores).toEqual([]);
-    expect(git(directory, 'rev-parse', 'HEAD')).toBe(head);
-  });
-
-  it.each(['corrupt', 'allocation', 'session', 'kilo'])(
-    'rejects a %s repository stamp instead of trusting a valid bare-session sidecar',
-    async mismatch => {
-      const bareSpec = spec({ git: undefined });
-      await manager('alloc-source').prepared.prepare(bareSpec);
-      const stamp = await readWorkspaceStamp(directory);
-      if (!stamp?.session) throw new Error('Missing bare source stamp');
-      git(directory, 'init', '-q', '-b', 'local-work');
-      await fs.writeFile(path.join(directory, 'untracked.txt'), 'preserve me');
-      if (mismatch === 'corrupt')
-        await fs.writeFile(path.join(directory, '.git', 'kilo-workspace.json'), 'invalid');
-      else
-        await writeWorkspaceStamp(directory, true, {
-          ...stamp,
-          allocationId: mismatch === 'allocation' ? 'other-allocation' : stamp.allocationId,
-          session: {
-            sessionId: mismatch === 'session' ? 'other-session' : stamp.session.sessionId,
-            kiloSessionId: mismatch === 'kilo' ? 'other-kilo' : stamp.session.kiloSessionId,
-          },
-        });
-      const restored = manager('alloc-restored');
-
-      await restored.prepared.prepare({ ...bareSpec, sessionSnapshot: provenance });
-
-      expect(restored.frames.at(-1)).toMatchObject({
-        type: 'session.failed',
-        reason: 'workspace_setup_failed',
-        step: 'restore',
-      });
-      expect(restored.gitCalls).toEqual([]);
-      expect(restored.runtimeEnvs).toEqual([]);
-      expect(await fs.readFile(path.join(directory, 'untracked.txt'), 'utf8')).toBe('preserve me');
-    }
-  );
-
-  it('keeps environment adoption and setup replay when provenance is unset', async () => {
-    await manager('alloc-source').prepared.prepare(spec());
-    git(directory, 'branch', 'local-only');
-    const restored = manager('alloc-restored');
-    await restored.prepared.prepare(spec({ setupCommands: ['normal setup'] }));
-    expect(ready(restored.frames)).toMatchObject({ workspace: 'adopted' });
-    expect(git(directory, 'branch', '--format=%(refname:short)')).not.toContain('local-only');
-    expect(restored.setupCalls()).toBe(1);
-    expect(restored.restores).toEqual([]);
-    expect(restored.gitCalls.some(args => args[0] === 'fetch')).toBe(true);
+    if (initializeGit) expect(git(directory, 'rev-parse', 'HEAD')).toBe(head);
+    const normal = manager('alloc-restored');
+    await normal.prepared.prepare({ ...bareSpec, setupCommands: ['normal setup'] });
+    expect(normal.runSetup).toHaveBeenCalledTimes(1);
   });
 });

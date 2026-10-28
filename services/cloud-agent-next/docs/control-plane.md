@@ -571,44 +571,32 @@ restore. The first rollout supports only isolated native `cloudflare-containers`
 `/workspace/app` with one session throughout the allocation's lifetime. Shared worktrees and other
 providers retain their current recovery behavior.
 
-- **Capture.** After a completed wrapper outcome durably settles a turn, with no remaining open
-  messages, the Session DO records a waiting capture obligation. The existing wrapper heartbeat
-  with `active: false`, on the current connection after the outcome, starts background capture.
-  No new wrapper idle detector is introduced. The Sandbox DO requires a current ready route and
-  a wrapper advertising `hello.sessionSnapshots`.
-  Provider capture runs outside both serial queues, so completion and Stop do not await it. The
-  first call is bounded at 30 seconds; alarms reconcile the same ID read-only through the native
-  five-minute capture deadline plus a five-second margin. A lost response never triggers a second
-  physical capture. Failure does not change the completed turn.
-- **Ownership and freshness.** The Session DO stores one runtime-validated descriptor under
-  `session_disk_snapshot:v1`; the Sandbox DO stores allocation membership/ownership and a capture
-  fence. Publication checks allocation, connection, route attempt, tenant and session identity.
-  Admission cancels waiting/pending captures; actual or uncertain delivery, Stop, and native execution
-  activity invalidate prior checkpoints. Native activity also durably revokes the Sandbox fence,
-  protecting against a lost activity notification. Idle and finalization-only events do not revoke
-  snapshots. Delayed finalization execution events defer the obligation until the next existing
-  idle heartbeat, rather than losing the checkpoint or capturing busy native work. Idle waiting
-  is bounded at five minutes and 30 seconds, and a revoked in-flight capture must finish or reach
-  its native deadline before another physical capture is issued. A descriptor covers the latest
-  completed Cloud message and is usable for 24 hours.
+- **Capture.** `src/control-plane/sandbox/session-snapshot.ts` owns checkpoint metadata, capture
+  and selection. The existing `heartbeat.active` signal and `lastActivityAt` schedule the existing
+  Sandbox DO alarm after two minutes idle (`SESSION_SNAPSHOT_IDLE_MS`). Capture runs outside the
+  serial queue, once per idle period, through the native snapshot API. No Session DO coordination,
+  event classification, new idle detector or capture retry loop is involved.
+- **Ownership and freshness.** Metadata stays in the Sandbox DO. Publication checks the same
+  allocation, connection, activity timestamp, ready route and session identity. Active heartbeats,
+  delivery, Stop and release invalidate the checkpoint. A container that hosted a second session
+  is ineligible even after that route leaves. Capture failure never fails a user turn.
 - **Cold start.** Selection prefers a compatible private session checkpoint, then the existing
-  environment lookup, then the image. The session lookup is non-destructive and bounded at two
-  seconds. Runtime selection and base-image compatibility are checked. Only a confirmed physical
+  environment lookup, then the image. Selection reads local metadata without an RPC. Runtime
+  selection and base-image compatibility are checked. Only a confirmed physical
   snapshot start adds frame-only `spec.sessionSnapshot: { sourceAllocationId }`; early wrapper
   hello cannot race this decision. Registration rejects client-supplied provenance. An incompatible
   wrapper or failed restore/preparation takes the bounded fresh-start fallback, retaining the
   queued turn and existing ingest/worktree recovery.
-- **Preparation.** The wrapper validates the source allocation and exact session/Kilo identity in
-  the workspace stamp. It preserves the checkout, local refs and commits, index, dirty/untracked/
+- **Preparation.** The wrapper validates the source allocation in the workspace stamp; session
+  ownership is checked by the Sandbox DO. It preserves local refs and commits, index, dirty/untracked/
   ignored files, and HOME instead of running environment adoption, checkout or setup again. Current
-  credentials and profile configuration are refreshed. First restore imports authoritative ingest
-  history with file restoration disabled; saved worktree patches cannot overwrite the disk either.
-  The new stamp is published only after history resolution succeeds. Subsequent wrapper restarts
-  recognize this allocation and do not reimport over newer local work. Bare workspaces retain their
-  identity stamp across a later `git init`.
+  credentials and profile configuration are refreshed. The restored Kilo session is reused; ordinary
+  ingest recovery remains a fallback with file restoration disabled. Saved worktree patches cannot
+  overwrite the disk either. The new stamp is published after session preparation succeeds and
+  remains discoverable if a bare workspace later runs `git init`.
 - **Retention and rollout.** A full disk can contain credentials, configuration, caches and user
   secrets; these checkpoints must remain private and are not sanitized environment snapshots.
-  Descriptor expiry, invalidation and session deletion remove eligibility, not the physical artifact.
+  Invalidation and session release remove eligibility, not the physical artifact.
   The provider's existing 30-day unused retention applies; this release has no list/delete API.
   Ship the capability-bearing wrapper/runtime before enrollment. Native live-disk consistency,
   database WAL recovery, heartbeat behavior during capture, and startup-configuration replacement

@@ -9,14 +9,6 @@ const workspaceStampSchema = z
     allocationId: z.string().min(1),
     commit: z.string(),
     workspacePrepared: z.literal(false).optional(),
-    session: z
-      .object({
-        sessionId: z.string().min(1),
-        kiloSessionId: z.string().min(1),
-        snapshotSourceAllocationId: z.string().min(1).optional(),
-      })
-      .strict()
-      .optional(),
     // Lineage written by wrappers that captured session snapshots. Read only so
     // a stamp in an older snapshot still classifies; never written again.
     capturedAt: z.number().int().nonnegative().optional(),

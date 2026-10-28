@@ -2594,11 +2594,7 @@ describe('adopting an environment snapshot', () => {
       'kilo_runtime',
       'kilo_session',
     ]);
-    expect(harness.stamp()).toEqual({
-      allocationId: 'alloc-current',
-      commit: 'new-commit',
-      session: { sessionId: routeSpec().sessionId, kiloSessionId: routeSpec().kiloSessionId },
-    });
+    expect(harness.stamp()).toEqual({ allocationId: 'alloc-current', commit: 'new-commit' });
     expect(lastFrame(harness.frames)).toEqual({
       type: 'session.ready',
       sessionId: spec.sessionId,
@@ -2615,11 +2611,7 @@ describe('adopting an environment snapshot', () => {
 
     expect(harness.gitCalls.some(args => args[0] === 'clone')).toBe(false);
     expect(lastFrame(harness.frames)).toMatchObject({ workspace: 'adopted' });
-    expect(harness.stamp()).toEqual({
-      allocationId: 'alloc-current',
-      commit: 'new-commit',
-      session: { sessionId: routeSpec().sessionId, kiloSessionId: routeSpec().kiloSessionId },
-    });
+    expect(harness.stamp()).toEqual({ allocationId: 'alloc-current', commit: 'new-commit' });
   });
 
   it('checks out an explicit branch with the ordinary branch logic', async () => {

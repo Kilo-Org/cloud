@@ -724,14 +724,9 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     if (spec.sessionSnapshot !== undefined) {
       setStep('restore');
       const sourceAllocationId = spec.sessionSnapshot.sourceAllocationId;
-      const sameRestoredWorkspace =
-        stamp?.allocationId === deps.allocationId &&
-        stamp.session?.snapshotSourceAllocationId === sourceAllocationId;
       if (
         stamp === null ||
-        (stamp.allocationId !== sourceAllocationId && !sameRestoredWorkspace) ||
-        stamp.session?.sessionId !== spec.sessionId ||
-        stamp.session.kiloSessionId !== spec.kiloSessionId ||
+        (stamp.allocationId !== sourceAllocationId && stamp.allocationId !== deps.allocationId) ||
         (spec.git !== undefined && !(await hasGit(directory))) ||
         !(await fs.stat(directory).then(
           stat => stat.isDirectory(),
@@ -827,11 +822,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       );
       return { outcome: adopted ? 'adopted' : 'cloned', deferredStamp: { commit } };
     }
-    await writeStamp(directory, {
-      allocationId: deps.allocationId,
-      commit,
-      session: { sessionId: spec.sessionId, kiloSessionId: spec.kiloSessionId },
-    });
+    await writeStamp(directory, { allocationId: deps.allocationId, commit });
     log(
       `control-plane workspace prepared session=${spec.sessionId} outcome=${adopted ? 'adopted' : 'cloned'} elapsedMs=${Date.now() - workspaceStartedAt}`
     );
@@ -867,12 +858,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     env: Record<string, string>,
     client: WrapperKiloClient,
     signal: AbortSignal,
-    restoreFiles: boolean,
-    restoreHistory: boolean
+    restoreFiles: boolean
   ): Promise<void> {
     await seedRegistration(spec.kiloSessionId, env, signal);
-    if (!restoreHistory && (await sessionExists(client, spec.kiloSessionId, directory, signal)))
-      return;
+    if (await sessionExists(client, spec.kiloSessionId, directory, signal)) return;
     emitProgress(spec.sessionId, 'kilo_session', 'Loading session history');
     const restored = await restore(spec.kiloSessionId, directory, undefined, {
       env,
@@ -1160,15 +1149,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         await withOneRetry(
           () =>
             withinStep('kilo_session', timers.kiloSessionMs, signal =>
-              resolveKiloSession(
-                spec,
-                directory,
-                builtEnv,
-                client,
-                signal,
-                restoreFiles,
-                spec.sessionSnapshot !== undefined && workspace !== 'same'
-              )
+              resolveKiloSession(spec, directory, builtEnv, client, signal, restoreFiles)
             ),
           () => !owner.released
         );
@@ -1239,13 +1220,6 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
           await writeStamp(directory, {
             allocationId: deps.allocationId,
             ...preparedWorkspace.deferredStamp,
-            session: {
-              sessionId,
-              kiloSessionId: spec.kiloSessionId,
-              ...(spec.sessionSnapshot === undefined
-                ? {}
-                : { snapshotSourceAllocationId: spec.sessionSnapshot.sourceAllocationId }),
-            },
           });
         }
       });
@@ -1261,20 +1235,11 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
       if (owner.released) return;
       if (!needsWorkspace) {
         await withWorkspaceLock(directory, async () => {
-          const stamp = await readStamp(directory);
-          if (
-            stamp !== null &&
-            (stamp.workspacePrepared !== false ||
-              (stamp.allocationId === deps.allocationId &&
-                stamp.session?.sessionId === sessionId &&
-                stamp.session.kiloSessionId === spec.kiloSessionId))
-          )
-            return;
+          if (await readStamp(directory)) return;
           await writeStamp(directory, {
             allocationId: deps.allocationId,
             commit: '',
             workspacePrepared: false,
-            session: { sessionId, kiloSessionId: spec.kiloSessionId },
           });
         });
       }

@@ -53,20 +53,6 @@ describe('workspace stamp', () => {
     expect(await fs.readdir(path.join(directory, '.git'))).toEqual(['kilo-workspace.json']);
   });
 
-  it('round-trips session identity and validated snapshot lineage', async () => {
-    const stamp = {
-      allocationId: 'alloc-restored',
-      commit: 'c1',
-      session: {
-        sessionId: 'workspace-one',
-        kiloSessionId: 'kilo-one',
-        snapshotSourceAllocationId: 'alloc-source',
-      },
-    };
-    await writeWorkspaceStamp(directory, true, stamp);
-    expect(await readWorkspaceStamp(directory)).toEqual(stamp);
-  });
-
   it('reads a missing, corrupt or foreign-shaped stamp as none', async () => {
     expect(await readWorkspaceStamp(directory)).toBeNull();
     const file = workspaceStampPath(directory, true);
@@ -81,23 +67,6 @@ describe('workspace stamp', () => {
     expect(await readWorkspaceStamp(directory)).toBeNull();
     await fs.writeFile(file, 'ready\n');
     expect(await readWorkspaceStamp(directory)).toBeNull();
-  });
-
-  it('discovers a bare workspace stamp before and after a repository is initialized', async () => {
-    const stamp = {
-      allocationId: 'alloc-source',
-      commit: '',
-      workspacePrepared: false as const,
-      session: { sessionId: 'workspace-one', kiloSessionId: 'kilo-one' },
-    };
-    await fs.rm(path.join(directory, '.git'), { recursive: true });
-    await writeWorkspaceStamp(directory, false, stamp);
-    expect(await readWorkspaceStamp(directory)).toEqual(stamp);
-    await fs.mkdir(path.join(directory, '.git'));
-    expect(await readWorkspaceStamp(directory)).toEqual(stamp);
-    const current = { ...stamp, allocationId: 'alloc-current' };
-    await writeWorkspaceStamp(directory, true, current);
-    expect(await readWorkspaceStamp(directory)).toEqual(current);
   });
 
   it.each(['corrupt', 'invalid', 'unreadable'])(

@@ -4,7 +4,6 @@ import type {
   ControlPlaneRouteUpdate,
 } from '../../shared/control-plane-protocol.js';
 import type { WorktreeChangesReady } from '../worktree-changes-ready.js';
-import type { SessionSnapshotActivity } from '../session-snapshot.js';
 
 export const SANDBOX_NOTIFICATION_LIMITS = {
   count: 1_000,
@@ -16,8 +15,7 @@ export type SandboxNotification =
   | { kind: 'events'; payload: ControlPlaneEventsNotification }
   | { kind: 'route'; payload: ControlPlaneRouteUpdate }
   | { kind: 'outcome'; payload: ControlPlaneOutcome }
-  | { kind: 'worktree_changes'; payload: WorktreeChangesReady }
-  | { kind: 'native_activity'; payload: SessionSnapshotActivity };
+  | { kind: 'worktree_changes'; payload: WorktreeChangesReady };
 
 type DropCause = 'capacity' | 'expired' | 'failed' | 'retired' | 'wrapper';
 export type NotificationLoss = {

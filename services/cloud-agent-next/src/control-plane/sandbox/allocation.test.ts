@@ -36,20 +36,6 @@ function stoppingState(): AllocationState {
 }
 
 describe('allocation stop-ladder exhaustion', () => {
-  it('retries a previously unconfirmed physical stop when recovery explicitly requests it', () => {
-    const reduction = reduceAllocation(
-      { ...initialAllocationState(), unconfirmedProviderRef: 'ref-1' },
-      { type: 'stop-requested', at: 100, reason: 'workspace_setup_failed' },
-      TIMERS
-    );
-    expect(reduction.state).toMatchObject({
-      kind: 'stopping',
-      providerRef: 'ref-1',
-      unconfirmedProviderRef: null,
-      stopAttempt: 1,
-    });
-    expect(reduction.effects).toEqual([{ type: 'stop', stopAttempt: 1 }]);
-  });
   it('keeps the provider ref when a retryable result exhausts the ladder', () => {
     const state = stoppingState();
     const { state: next } = reduceAllocation(

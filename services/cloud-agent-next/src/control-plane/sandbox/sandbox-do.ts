@@ -15,30 +15,17 @@ import { DurableObject } from 'cloudflare:workers';
 import { getSandbox, type Sandbox } from '@cloudflare/sandbox';
 import { z } from 'zod';
 import {
-  sessionSnapshotCaptureInputSchema,
-  sessionSnapshotDescriptorSchema,
+  readSessionSnapshotAllocation,
   sessionSnapshotIdentity,
-  isSessionSnapshotExecutionEvent,
   sessionSnapshotsEnabled,
   sameSessionSnapshotIdentity,
-  SESSION_SNAPSHOT_CAPTURE_MS,
-  SESSION_SNAPSHOT_OPERATION_MS,
-  SESSION_SNAPSHOT_READ_MS,
-  SESSION_SNAPSHOT_LOOKUP_MS,
-  SESSION_SNAPSHOT_TTL_MS,
-  type SessionSnapshotCaptureInput,
-  type SessionSnapshotCaptureResult,
-  type SessionSnapshotActivity,
-  type SessionSnapshotDescriptor,
-} from '../session-snapshot.js';
-import {
-  readSessionSnapshotAllocation,
-  sessionSnapshotFenceSchema,
-  sessionSnapshotRevoked,
-  sessionSnapshotRevocationSchema,
+  selectSessionSnapshot,
+  snapshotRestorePending,
+  sessionSnapshotFrame,
+  captureIdleSessionSnapshot,
+  SESSION_SNAPSHOT_IDLE_MS,
   SESSION_SNAPSHOT_ALLOCATION_KEY,
-  SESSION_SNAPSHOT_FENCE_KEY,
-  SESSION_SNAPSHOT_REVOKED_KEY,
+  SESSION_SNAPSHOT_KEY,
 } from './session-snapshot.js';
 import { DEFAULT_DO_RETRY_CONFIG, withTimeout } from '@kilocode/worker-utils';
 import { egressPolicySchema, type EgressMode } from '@kilocode/worker-utils/egress-allowlist';
@@ -449,8 +436,6 @@ function materializationStage(error: unknown): PrepareFrameMaterializationStage 
  * binding exists; tests inject a fake peer instead.
  */
 export type ControlPlaneSessionPeer = {
-  onNativeActivity?(activity: SessionSnapshotActivity): Promise<void>;
-  getSessionDiskSnapshot?(sandboxId: string): Promise<SessionSnapshotDescriptor | null>;
   issueCloudAgentMcpGrant?(
     workspace?: WorkspaceMcpBinding
   ): Promise<{ url: string; token: string; expiresAt: number } | undefined>;
@@ -726,7 +711,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
   >();
   /** Bound on one wrapper reply; overridable in tests to exercise the timeout. */
   controlRequestTimeoutMs = CONTROL_PLANE_REQUEST_TIMEOUT_MS;
-  sessionSnapshotCaptureTimeoutMs = SESSION_SNAPSHOT_CAPTURE_MS;
+  sessionSnapshotIdleMs = SESSION_SNAPSHOT_IDLE_MS;
+  private sessionSnapshotCapturePending = false;
   /**
    * Notification factory for the V2 Session DO. The default resolves the
    * `ownerId:sessionId` name through the shared binding accessor; tests inject a
@@ -978,227 +964,48 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
   }
 
-  async captureSessionSnapshot(
-    raw: SessionSnapshotCaptureInput
-  ): Promise<SessionSnapshotCaptureResult> {
-    await this.initialized;
-    const input = sessionSnapshotCaptureInputSchema.parse(raw);
+  private async captureIdleSessionSnapshot(): Promise<void> {
     const provider = this.provider.sessionSnapshots;
-    if (provider === undefined || input.sandboxId !== this.sandboxId)
-      return { status: 'unavailable' };
-    const revoked = sessionSnapshotRevocationSchema.safeParse(
-      this.ctx.storage.kv.get(SESSION_SNAPSHOT_REVOKED_KEY)
-    );
-    const currentAllocation = await this.readAllocation();
-    if (
-      !input.reconcile &&
-      revoked.success &&
-      revoked.data.allocationId === currentAllocation.allocationId &&
-      revoked.data.captureId !== input.captureId &&
-      revoked.data.deadlineAt > Date.now()
-    ) {
-      try {
-        const previous = await withTimeout(
-          provider.read(revoked.data.captureId),
-          SESSION_SNAPSHOT_READ_MS,
-          'Previous session capture reconciliation timed out'
-        );
-        if (previous?.status === 'in_progress') return { status: 'deferred' };
-      } catch {
-        return { status: 'deferred' };
-      }
-    }
-    const fence = await this.enqueue(async () => {
-      if (sessionSnapshotRevoked(this.ctx.storage.kv, input.captureId)) return 'deferred';
-      const state = await this.readAllocation();
-      const latestRevoked = sessionSnapshotRevocationSchema.safeParse(
-        this.ctx.storage.kv.get(SESSION_SNAPSHOT_REVOKED_KEY)
-      );
-      if (
-        !input.reconcile &&
-        latestRevoked.success &&
-        latestRevoked.data.allocationId === state.allocationId &&
-        latestRevoked.data.deadlineAt > Date.now() &&
-        (!revoked.success || latestRevoked.data.captureId !== revoked.data.captureId)
-      )
-        return 'deferred';
-      const routes = await listRoutes(this.db);
-      const route = routes[0];
-      const allocation = readSessionSnapshotAllocation(this.ctx.storage.kv);
-      const socket = this.boundWrapperSocket(state);
-      if (
-        state.kind !== 'connected' ||
-        state.allocationId === null ||
-        state.connectionId === null ||
-        state.providerRef === null ||
-        socket === null ||
-        this.readAttachment(socket)?.sessionSnapshots !== true ||
-        routes.length !== 1 ||
-        route === undefined ||
-        route.state !== 'ready' ||
-        route.attemptId !== input.attemptId ||
-        !this.sessionSnapshotRouteEligible(route) ||
-        allocation?.allocationId !== state.allocationId ||
-        allocation.sessions.length !== 1 ||
-        allocation.sessions[0] !== input.sessionId ||
-        route.credentialSource === null ||
-        !sameSessionSnapshotIdentity(
-          input,
-          sessionSnapshotIdentity(
-            this.sandboxId,
-            route.sessionId,
-            route.spec.kiloSessionId,
-            route.credentialSource
-          )
-        )
-      )
-        return null;
-      if (
-        allocation.activity?.active !== false ||
-        allocation.activity.connectionId !== state.connectionId
-      )
-        return 'deferred';
-      const existing = sessionSnapshotFenceSchema.safeParse(
-        this.ctx.storage.kv.get(SESSION_SNAPSHOT_FENCE_KEY)
-      );
-      if (input.reconcile)
-        return existing.success && existing.data.input.captureId === input.captureId
-          ? existing.data
-          : null;
-      if (
-        existing.success &&
-        existing.data.input.captureId !== input.captureId &&
-        existing.data.deadlineAt > Date.now()
-      )
-        return 'deferred';
-      if (existing.success && existing.data.input.captureId === input.captureId)
-        return existing.data;
-      const next = {
-        input,
-        allocationId: state.allocationId,
-        connectionId: state.connectionId,
-        providerRef: state.providerRef,
-        attemptId: route.attemptId,
-        runtimeIdentity: allocation.runtimeIdentity,
-        deadlineAt: Date.now() + SESSION_SNAPSHOT_OPERATION_MS,
-      };
-      this.ctx.storage.kv.put(SESSION_SNAPSHOT_ALLOCATION_KEY, {
-        ...allocation,
-        owner: sessionSnapshotIdentity(
-          input.sandboxId,
-          input.sessionId,
-          input.kiloSessionId,
-          input
-        ),
-      });
-      this.ctx.storage.kv.put(SESSION_SNAPSHOT_FENCE_KEY, next);
-      return next;
-    });
-    if (fence === null) return { status: 'unavailable' };
-    if (fence === 'deferred') return { status: 'deferred' };
-    logControlDiagnostic('session_snapshot_capture', {
-      sandboxId: this.sandboxId,
-      sessionId: input.sessionId,
-      allocationId: fence.allocationId,
-      connectionId: fence.connectionId,
-      attemptId: fence.attemptId,
-      captureId: input.captureId,
-      result: input.reconcile ? 'reconciling' : 'issued',
-    });
-    let result;
+    if (provider === undefined || this.sessionSnapshotCapturePending) return;
+    this.sessionSnapshotCapturePending = true;
     try {
-      result = await withTimeout(
-        input.reconcile
-          ? provider.read(input.captureId)
-          : provider.capture(fence.providerRef, input.captureId),
-        input.reconcile ? SESSION_SNAPSHOT_READ_MS : this.sessionSnapshotCaptureTimeoutMs,
-        'Session disk capture timed out'
-      );
-    } catch {
-      try {
-        result = await withTimeout(
-          provider.read(input.captureId),
-          SESSION_SNAPSHOT_READ_MS,
-          'Session disk capture reconciliation timed out'
-        );
-      } catch {
-        return { status: 'pending' };
-      }
-    }
-    if (result?.status !== 'stored') {
-      logControlDiagnostic('session_snapshot_capture', {
-        sandboxId: this.sandboxId,
-        sessionId: input.sessionId,
-        captureId: input.captureId,
-        result: result?.status ?? 'missing',
-        reason: result?.status === 'failed' ? result.reason : undefined,
+      await captureIdleSessionSnapshot({
+        storage: this.ctx.storage.kv,
+        provider,
+        idleMs: this.sessionSnapshotIdleMs,
+        enqueue: operation =>
+          this.enqueue(async () => {
+            const result = await operation();
+            await this.armAlarm(await this.readAllocation());
+            return result;
+          }),
+        eligible: route => this.sessionSnapshotRouteEligible(route),
+        read: async () => {
+          const state = await this.readAllocation();
+          const socket = this.boundWrapperSocket(state);
+          return {
+            state,
+            routes: await listRoutes(this.db),
+            capable: socket !== null && this.readAttachment(socket)?.sessionSnapshots === true,
+          };
+        },
       });
-      return { status: result?.status === 'in_progress' ? 'pending' : 'unavailable' };
-    }
-    const { reconcile: _reconcile, ...identity } = fence.input;
-    const descriptor = sessionSnapshotDescriptorSchema.parse({
-      ...identity,
-      sourceAllocationId: fence.allocationId,
-      snapshotId: result.snapshotId,
-      baseImage: result.baseImage,
-      runtimeIdentity: fence.runtimeIdentity,
-      capturedAt: result.capturedAt,
-      expiresAt: result.capturedAt + SESSION_SNAPSHOT_TTL_MS,
-    });
-    return this.enqueue(async () => {
-      const current = sessionSnapshotFenceSchema.safeParse(
-        this.ctx.storage.kv.get(SESSION_SNAPSHOT_FENCE_KEY)
-      );
-      const state = await this.readAllocation();
-      const routes = await listRoutes(this.db);
-      const route = routes[0];
-      if (
-        !current.success ||
-        sessionSnapshotRevoked(this.ctx.storage.kv, input.captureId) ||
-        current.data.input.captureId !== input.captureId ||
-        state.kind !== 'connected' ||
-        state.allocationId !== fence.allocationId ||
-        state.connectionId !== fence.connectionId ||
-        state.providerRef !== fence.providerRef ||
-        routes.length !== 1 ||
-        route?.sessionId !== input.sessionId ||
-        route.attemptId !== fence.attemptId ||
-        route.state !== 'ready' ||
-        !this.sessionSnapshotRouteEligible(route)
-      ) {
-        logControlDiagnostic('session_snapshot_capture', {
-          sandboxId: this.sandboxId,
-          sessionId: input.sessionId,
-          captureId: input.captureId,
-          result: 'discarded',
-          reason: 'stale_fence',
-          expectedAllocationId: fence.allocationId,
-          allocationId: state.allocationId,
-          expectedConnectionId: fence.connectionId,
-          connectionId: state.connectionId,
-        });
-        return {
-          status: sessionSnapshotRevoked(this.ctx.storage.kv, input.captureId)
-            ? 'deferred'
-            : 'unavailable',
-        };
-      }
-      logControlDiagnostic('session_snapshot_capture', {
+    } catch (error) {
+      logControlDiagnostic('session_snapshot_capture_failed', {
         sandboxId: this.sandboxId,
-        sessionId: input.sessionId,
-        allocationId: fence.allocationId,
-        captureId: input.captureId,
-        result: 'stored',
+        error: error instanceof Error ? error.name : 'unknown',
       });
-      return { status: 'stored', descriptor };
-    });
+    } finally {
+      this.sessionSnapshotCapturePending = false;
+      await this.enqueue(async () => this.armAlarm(await this.readAllocation()));
+    }
   }
 
   async abort(payload: ControlPlaneSessionRefPayload): Promise<ControlPlaneDispatchResult> {
     await this.initialized;
     const parsed = controlPlaneSessionRefPayloadSchema.parse(payload);
     return this.enqueue(() => {
-      this.retireSessionSnapshotCapture('session_stopped');
+      this.invalidateSessionSnapshot();
       return this.dispatchToWrapper({ type: 'session.abort', sessionId: parsed.sessionId });
     });
   }
@@ -1220,7 +1027,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const parsed = controlPlaneSessionRefPayloadSchema.parse(payload);
     await this.enqueue(async () => {
       this.notifications.retire(parsed.sessionId);
-      this.retireSessionSnapshotCapture('session_stopped');
+      this.invalidateSessionSnapshot();
       const released = await readRoute(this.db, parsed.sessionId);
       // A shared canonical handle survives on the other members, so removing
       // this route's path rules is not worth a policy rebuild: a transient
@@ -2257,6 +2064,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       });
       await this.armAlarm(await this.readAllocation());
     });
+    this.ctx.waitUntil(this.captureIdleSessionSnapshot());
   }
 
   private async initializeStorage(): Promise<void> {
@@ -2598,36 +2406,19 @@ export class SandboxControlV2 extends DurableObject<Env> {
     let state = await this.readAllocation();
     const disk = readSessionSnapshotAllocation(this.ctx.storage.kv);
     if (
-      this.ctx.storage.kv.get(SESSION_SNAPSHOT_ALLOCATION_KEY) !== undefined &&
-      disk === undefined
-    ) {
-      if (state.kind === 'stopped' && state.unconfirmedProviderRef === null) {
-        this.ctx.storage.kv.delete(SESSION_SNAPSHOT_ALLOCATION_KEY);
-        this.ctx.storage.kv.delete(SESSION_SNAPSHOT_FENCE_KEY);
-      } else {
-        await this.applyEvent({
-          type: 'stop-requested',
-          at: Date.now(),
-          reason: 'workspace_setup_failed',
-        });
-        state = await this.readAllocation();
-      }
-    }
-    if (
       disk?.allocationId === state.allocationId &&
-      disk.owner !== undefined &&
       !sameSessionSnapshotIdentity(
         disk.owner,
         sessionSnapshotIdentity(this.sandboxId, spec.sessionId, spec.kiloSessionId, source)
       )
     ) {
-      return { state: 'failed', attemptId: spec.attemptId, reason: 'invalid_configuration' };
-    }
-    if (disk?.allocationId === state.allocationId && !disk.sessions.includes(spec.sessionId)) {
+      if (disk.restore !== undefined)
+        return { state: 'failed', attemptId: spec.attemptId, reason: 'invalid_configuration' };
       this.ctx.storage.kv.put(SESSION_SNAPSHOT_ALLOCATION_KEY, {
         ...disk,
-        sessions: [...disk.sessions, spec.sessionId],
+        contaminated: true,
       });
+      this.ctx.storage.kv.delete(SESSION_SNAPSHOT_KEY);
     }
     if (
       (sandboxSelection?.provider ?? this.currentProvider()) === 'vercel' &&
@@ -3036,7 +2827,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (adopted) await this.ensureRouteCredentialsCurrent(payload.sessionId, state);
 
     for (const message of payload.messages) {
-      this.retireSessionSnapshotCapture('work_admitted');
+      this.invalidateSessionSnapshot();
       const sent = this.trySendFrame(socket, {
         type: 'session.prompt',
         sessionId: payload.sessionId,
@@ -3656,20 +3447,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
     next: AllocationState
   ): Promise<void> {
     const ctx = this.routeContext(next);
-    if (
-      this.ctx.storage.kv.get(SESSION_SNAPSHOT_ALLOCATION_KEY) !== undefined &&
-      readSessionSnapshotAllocation(this.ctx.storage.kv) === undefined
-    ) {
-      if (next.unconfirmedProviderRef === null) {
-        this.ctx.storage.kv.delete(SESSION_SNAPSHOT_ALLOCATION_KEY);
-        this.ctx.storage.kv.delete(SESSION_SNAPSHOT_FENCE_KEY);
-      } else {
-        for (const route of await listRoutes(this.db)) {
-          if (route.state === 'preparing')
-            await onRouteFailed(ctx, route.sessionId, 'workspace_setup_failed', undefined, true);
-        }
-      }
-    }
     this.db.transaction(tx => retireScopeGrants(tx, this.ctx.storage.kv));
     // `create-failed` with no retry, a confirmed stop and `provider-gone` can
     // all reach `stopped` without arming an alarm, so sweep expired routes now.
@@ -3724,77 +3501,27 @@ export class SandboxControlV2 extends DurableObject<Env> {
     current: boolean
   ): void {
     if (!current) return;
-    if (
-      this.ctx.storage.kv.get(SESSION_SNAPSHOT_ALLOCATION_KEY) !== undefined &&
-      frame.events.some(isSessionSnapshotExecutionEvent)
-    )
-      this.retireSessionSnapshotCapture('native_execution');
     this.notifications.enqueue(frame.sessionId, {
       kind: 'events',
       payload: { events: frame.events },
     });
   }
 
-  private retireSessionSnapshotCapture(
-    reason: 'native_execution' | 'active_heartbeat' | 'work_admitted' | 'session_stopped'
-  ): void {
-    const fence = sessionSnapshotFenceSchema.safeParse(
-      this.ctx.storage.kv.get(SESSION_SNAPSHOT_FENCE_KEY)
-    );
-    const allocation = readSessionSnapshotAllocation(this.ctx.storage.kv);
-    const previous = sessionSnapshotRevocationSchema.safeParse(
-      this.ctx.storage.kv.get(SESSION_SNAPSHOT_REVOKED_KEY)
-    );
-    const allocationId = fence.success ? fence.data.allocationId : allocation?.allocationId;
-    if (allocation?.activity !== undefined)
+  private invalidateSessionSnapshot(): void {
+    this.ctx.storage.kv.delete(SESSION_SNAPSHOT_KEY);
+    const disk = readSessionSnapshotAllocation(this.ctx.storage.kv);
+    if (disk)
       this.ctx.storage.kv.put(SESSION_SNAPSHOT_ALLOCATION_KEY, {
-        ...allocation,
-        activity: { ...allocation.activity, active: true },
+        ...disk,
+        idleConnectionId: undefined,
       });
-    const captureId = fence.success
-      ? fence.data.input.captureId
-      : previous.success && previous.data.allocationId === allocationId
-        ? previous.data.captureId
-        : allocation?.restore?.descriptor.captureId;
-    if (
-      captureId !== undefined &&
-      allocationId !== undefined &&
-      (!previous.success ||
-        previous.data.captureId !== captureId ||
-        previous.data.allocationId !== allocationId)
-    ) {
-      const deadlineAt = fence.success
-        ? fence.data.deadlineAt
-        : previous.success && previous.data.allocationId === allocationId
-          ? previous.data.deadlineAt
-          : (allocation?.restore?.descriptor.capturedAt ?? Date.now());
-      this.ctx.storage.kv.put(SESSION_SNAPSHOT_REVOKED_KEY, {
-        captureId,
-        allocationId,
-        deadlineAt,
-      });
-      logControlDiagnostic('session_snapshot_revoked', {
-        sandboxId: this.sandboxId,
-        allocationId,
-        captureId,
-        reason,
-      });
-    }
-    this.ctx.storage.kv.delete(SESSION_SNAPSHOT_FENCE_KEY);
   }
 
   private forwardOutcome(
     frame: Extract<ControlPlaneWrapperFrame, { type: 'session.outcome' }>,
-    current: boolean,
-    state: AllocationState
+    current: boolean
   ): void {
     if (!current) return;
-    const disk = readSessionSnapshotAllocation(this.ctx.storage.kv);
-    if (disk?.allocationId === state.allocationId && state.connectionId !== null)
-      this.ctx.storage.kv.put(SESSION_SNAPSHOT_ALLOCATION_KEY, {
-        ...disk,
-        activity: { connectionId: state.connectionId, active: true },
-      });
     const outcome: ControlPlaneOutcome = {
       sessionId: frame.sessionId,
       status: frame.status,
@@ -3837,12 +3564,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   private sendSessionPrepare(state: AllocationState, route: RouteRecord): void {
-    const disk = readSessionSnapshotAllocation(this.ctx.storage.kv);
-    if (
-      disk?.allocationId === state.allocationId &&
-      (disk.restore?.state === 'pending' || disk.restore?.state === 'failed')
-    )
-      return;
+    if (snapshotRestorePending(this.ctx.storage.kv, state.allocationId)) return;
     const socket = this.boundWrapperSocket(state);
     if (socket === null) return;
     // A route without a grant never reaches `preparing` (issuance failure marks
@@ -3923,7 +3645,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       }
       const frameSpec = controlPlaneRouteSpecSchema.parse({
         ...wireSpec,
-        ...this.sessionSnapshotFrame(route, socket),
+        ...sessionSnapshotFrame(this.ctx.storage.kv, route, this.readAttachment(socket)),
         createdOnPlatform: route.credentialSource?.createdOnPlatform,
         ...(frameEnv.env === undefined ? {} : { env: frameEnv.env }),
         ...(frameEnv.secretEnvKeys.length === 0 ? {} : { secretEnvKeys: frameEnv.secretEnvKeys }),
@@ -3961,31 +3683,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
         errorClassName(error)
       );
     }
-  }
-
-  private sessionSnapshotFrame(
-    route: RouteRecord,
-    socket: WebSocket
-  ): Pick<ControlPlaneRouteSpec, 'sessionSnapshot'> {
-    const disk = readSessionSnapshotAllocation(this.ctx.storage.kv);
-    if (
-      this.ctx.storage.kv.get(SESSION_SNAPSHOT_ALLOCATION_KEY) !== undefined &&
-      disk === undefined
-    ) {
-      throw new PrepareFrameMaterializationError('frame_materialization_failed');
-    }
-    if (
-      disk?.allocationId !== this.readAttachment(socket)?.allocationId ||
-      disk?.restore?.state !== 'restored'
-    )
-      return {};
-    if (
-      disk.owner?.sessionId !== route.sessionId ||
-      this.readAttachment(socket)?.sessionSnapshots !== true
-    ) {
-      throw new PrepareFrameMaterializationError('frame_materialization_failed');
-    }
-    return { sessionSnapshot: { sourceAllocationId: disk.restore.descriptor.sourceAllocationId } };
   }
 
   /** One sanitized failure line: stage, error class and secret count only. */
@@ -4217,12 +3914,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const state = await this.readAllocation();
     const socket = this.boundWrapperSocket(state);
     if (socket === null) return;
-    const disk = readSessionSnapshotAllocation(this.ctx.storage.kv);
-    if (
-      disk?.allocationId === state.allocationId &&
-      (disk.restore?.state === 'pending' || disk.restore?.state === 'failed')
-    )
-      return;
+    if (snapshotRestorePending(this.ctx.storage.kv, state.allocationId)) return;
     const latest = await readRoute(this.db, sessionId);
     if (!isCurrentPreparingAttempt(latest, attemptId)) return;
     if (latest.grant === null || latest.grant.kilo.runtimeProxy === undefined) return;
@@ -4551,8 +4243,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       () => this.sessionPeerFor(ownerId, sessionId) ?? peer,
       target => {
         switch (notification.kind) {
-          case 'native_activity':
-            return target.onNativeActivity?.(notification.payload) ?? Promise.resolve();
           case 'events':
             return target.onEvents(notification.payload);
           case 'route':
@@ -4650,19 +4340,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
         });
         const createDeadline =
           state.createDeadlineAt ?? Date.now() + this.sandboxTimers().providerCreateMs;
-        await this.enqueue(async () => {
-          const current = await this.readAllocation();
-          if (current.allocationId !== allocationId || current.kind !== 'creating') return;
-          const routes = await listRoutes(this.db);
-          if (routes.some(route => this.sessionSnapshotRouteEligible(route))) {
-            this.ctx.storage.kv.put(SESSION_SNAPSHOT_ALLOCATION_KEY, {
-              allocationId,
-              runtimeIdentity: JSON.stringify(selection),
-              sessions: routes.map(route => route.sessionId),
-            });
-          } else this.ctx.storage.kv.delete(SESSION_SNAPSHOT_ALLOCATION_KEY);
-          this.ctx.storage.kv.delete(SESSION_SNAPSHOT_FENCE_KEY);
-        });
         const startupCommand =
           selection.mode === 'preinstalled'
             ? preinstalledStartup()
@@ -4749,15 +4426,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         const launch =
           sessionSnapshot === null
             ? await this.environmentSnapshotLaunch(current, allocationId, launchDeadline)
-            : {
-                options: {
-                  snapshot: {
-                    snapshotId: sessionSnapshot.snapshotId,
-                    baseImage: sessionSnapshot.baseImage,
-                  },
-                },
-                skipped: false,
-              };
+            : { options: { snapshot: sessionSnapshot }, skipped: false };
         // Persist a placeholder before the launch so a `hello` accepted while it
         // runs confirms this allocation, and that confirmation outlives the
         // allocation stopping before the launch resolves.
@@ -4795,9 +4464,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           });
           if (!ownsCleanup) {
             if (sessionSnapshot !== null) {
-              await this.enqueue(() =>
-                this.retrySessionSnapshotRestore(allocationId, 'provider_snapshot_failed')
-              );
+              await this.enqueue(() => this.retrySessionSnapshotRestore(allocationId));
             }
             await this.recordLaunch(allocationId, launched.startSource);
             return;
@@ -4844,14 +4511,16 @@ export class SandboxControlV2 extends DurableObject<Env> {
         }
         await this.enqueue(async () => {
           const disk = readSessionSnapshotAllocation(this.ctx.storage.kv);
-          if (disk?.allocationId !== allocationId || disk.restore?.state !== 'pending') return;
+          if (disk?.allocationId !== allocationId || disk.restore?.confirmed !== false) return;
           this.ctx.storage.kv.put(SESSION_SNAPSHOT_ALLOCATION_KEY, {
             ...disk,
-            restore: {
-              ...disk.restore,
-              state: launched.startSource === 'repository' ? 'restored' : 'fresh',
-            },
+            restore:
+              launched.startSource === 'repository'
+                ? { ...disk.restore, confirmed: true }
+                : undefined,
           });
+          if (launched.startSource !== 'repository')
+            this.ctx.storage.kv.delete(SESSION_SNAPSHOT_KEY);
           const latest = await this.readAllocation();
           if (latest.allocationId !== allocationId || latest.kind !== 'connected') return;
           for (const route of await listRoutes(this.db)) {
@@ -4866,10 +4535,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
           providerRef: createdRef,
         });
       } catch (error) {
-        if (
-          await this.enqueue(() => this.retrySessionSnapshotRestore(allocationId, 'launch_failed'))
-        )
-          return;
+        if (await this.enqueue(() => this.retrySessionSnapshotRestore(allocationId))) return;
         if (error instanceof ByocVercelProviderError) {
           await this.failCreationRoutes(allocationId, false, error.reason);
           return;
@@ -4924,83 +4590,48 @@ export class SandboxControlV2 extends DurableObject<Env> {
     }
   }
 
-  private async sessionSnapshotLaunch(
-    allocationId: string,
-    runtimeIdentity: string
-  ): Promise<SessionSnapshotDescriptor | null> {
-    const routes = await listRoutes(this.db);
-    const route = routes[0];
-    if (
-      routes.length !== 1 ||
-      route === undefined ||
-      route.state !== 'preparing' ||
-      !this.sessionSnapshotRouteEligible(route) ||
-      this.provider.sessionSnapshots === undefined ||
-      previousSnapshotStartFailed(await readRepositoryLaunch(this.ctx.storage))
-    )
-      return null;
-    const owner = await this.requireOwner();
-    const peer = owner === null ? null : this.sessionPeerFor(owner, route.sessionId);
-    if (peer?.getSessionDiskSnapshot === undefined) return null;
-    let raw: SessionSnapshotDescriptor | null;
-    try {
-      raw = await withTimeout(
-        peer.getSessionDiskSnapshot(this.sandboxId),
-        SESSION_SNAPSHOT_LOOKUP_MS,
-        'Session disk snapshot lookup timed out'
-      );
-    } catch {
-      return null;
-    }
-    const parsed = sessionSnapshotDescriptorSchema.safeParse(raw);
-    if (
-      !parsed.success ||
-      sessionSnapshotRevoked(this.ctx.storage.kv, parsed.data.captureId) ||
-      parsed.data.runtimeIdentity !== runtimeIdentity ||
-      parsed.data.expiresAt <= Date.now() ||
-      route.credentialSource === null ||
-      !sameSessionSnapshotIdentity(
-        parsed.data,
-        sessionSnapshotIdentity(
+  private async sessionSnapshotLaunch(allocationId: string, runtimeIdentity: string) {
+    return this.enqueue(async () => {
+      const current = await this.readAllocation();
+      const routes = await listRoutes(this.db);
+      const route = routes[0];
+      if (current.kind !== 'creating' || current.allocationId !== allocationId) return null;
+      this.ctx.storage.kv.delete(SESSION_SNAPSHOT_ALLOCATION_KEY);
+      if (
+        route?.credentialSource === null ||
+        route === undefined ||
+        !this.sessionSnapshotRouteEligible(route)
+      )
+        return null;
+      const disk = {
+        allocationId,
+        runtimeIdentity,
+        contaminated: routes.length !== 1,
+        owner: sessionSnapshotIdentity(
           this.sandboxId,
           route.sessionId,
           route.spec.kiloSessionId,
           route.credentialSource
-        )
-      )
-    )
-      return null;
-    return this.enqueue(async () => {
-      const current = await this.readAllocation();
-      const disk = readSessionSnapshotAllocation(this.ctx.storage.kv);
-      const latest = await listRoutes(this.db);
+        ),
+      };
+      this.ctx.storage.kv.put(SESSION_SNAPSHOT_ALLOCATION_KEY, disk);
       if (
-        current.kind !== 'creating' ||
-        current.allocationId !== allocationId ||
-        sessionSnapshotRevoked(this.ctx.storage.kv, parsed.data.captureId) ||
-        disk?.allocationId !== allocationId ||
-        disk.sessions.length !== 1 ||
-        disk.sessions[0] !== route.sessionId ||
-        latest.length !== 1 ||
-        latest[0]?.attemptId !== route.attemptId ||
-        !this.sessionSnapshotRouteEligible(latest[0])
+        disk.contaminated ||
+        route.state !== 'preparing' ||
+        previousSnapshotStartFailed(await readRepositoryLaunch(this.ctx.storage))
       )
         return null;
+      const descriptor = selectSessionSnapshot(this.ctx.storage.kv, disk.owner, runtimeIdentity);
+      if (descriptor === null) return null;
       this.ctx.storage.kv.put(SESSION_SNAPSHOT_ALLOCATION_KEY, {
         ...disk,
-        owner: sessionSnapshotIdentity(
-          parsed.data.sandboxId,
-          parsed.data.sessionId,
-          parsed.data.kiloSessionId,
-          parsed.data
-        ),
-        restore: { state: 'pending', descriptor: parsed.data },
+        restore: { sourceAllocationId: descriptor.sourceAllocationId, confirmed: false },
       });
       await notifyPreparingRoutes(this.routeContext(current), {
         step: 'restore',
         detail: 'Restoring the session disk snapshot',
       });
-      return parsed.data;
+      return { snapshotId: descriptor.snapshotId, baseImage: descriptor.baseImage };
     });
   }
 
@@ -5110,8 +4741,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const disk = readSessionSnapshotAllocation(this.ctx.storage.kv);
     if (
       disk?.allocationId === state.allocationId &&
-      disk.restore?.state === 'pending' &&
-      (await this.retrySessionSnapshotRestore(disk.allocationId, 'abandoned_launch'))
+      disk.restore?.confirmed === false &&
+      (await this.retrySessionSnapshotRestore(disk.allocationId))
     )
       return;
     const launch = await readRepositoryLaunch(this.ctx.storage);
@@ -5132,18 +4763,17 @@ export class SandboxControlV2 extends DurableObject<Env> {
 
   private async retryRepositoryPreparation(
     state: AllocationState,
-    failure: RepositoryPreparationFailure
+    failure: RepositoryPreparationFailure,
+    forceFresh = false
   ): Promise<boolean> {
     const launch = await readRepositoryLaunch(this.ctx.storage);
     if (launch === undefined || launch.allocationId !== state.allocationId) return false;
-    if (launch.startSource === 'image' || launch.skipRepository === true) return false;
+    if (!forceFresh && (launch.startSource === 'image' || launch.skipRepository === true))
+      return false;
     const routes = await listRoutes(this.db);
     const route = routes.find(candidate => candidate.sessionId === failure.sessionId);
     const disk = readSessionSnapshotAllocation(this.ctx.storage.kv);
-    const sessionRestore =
-      disk?.allocationId === state.allocationId &&
-      disk.restore !== undefined &&
-      disk.restore.state !== 'fresh';
+    const sessionRestore = disk?.allocationId === state.allocationId && disk.restore !== undefined;
     if (
       route === undefined ||
       !isCurrentPreparingAttempt(route, failure.attemptId) ||
@@ -5154,6 +4784,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       return false;
     const preparationFailures = launch.preparationFailures ?? [];
     if (
+      forceFresh ||
       !preparationFailures.some(
         candidate =>
           candidate.sessionId === failure.sessionId && candidate.attemptId === failure.attemptId
@@ -5161,10 +4792,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
     ) {
       await recordRepositoryLaunch(this.ctx.storage, {
         ...launch,
+        ...(forceFresh
+          ? { startSource: 'repository' as const, skipRepository: true as const }
+          : {}),
         preparationFailures: [...preparationFailures, failure],
       });
     }
-    if (this.createInFlight) return true;
+    if (this.createInFlight && !forceFresh) return true;
     logControlDiagnostic('snapshot_fallback', {
       sandboxId: this.sandboxId,
       allocationId: state.allocationId,
@@ -5180,51 +4814,24 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return true;
   }
 
-  private async retrySessionSnapshotRestore(
-    allocationId: string,
-    reason: string
-  ): Promise<boolean> {
+  private async retrySessionSnapshotRestore(allocationId: string): Promise<boolean> {
     const state = await this.readAllocation();
     const disk = readSessionSnapshotAllocation(this.ctx.storage.kv);
     if (
       state.allocationId !== allocationId ||
       disk?.allocationId !== allocationId ||
-      disk.restore === undefined ||
-      disk.restore.state === 'fresh' ||
-      disk.restore.state === 'failed'
+      disk.restore === undefined
     )
       return false;
     const routes = await listRoutes(this.db);
-    const preparing = routes.filter(route => route.state === 'preparing');
-    if (routes.some(route => route.state === 'ready')) return false;
-    this.ctx.storage.kv.put(SESSION_SNAPSHOT_ALLOCATION_KEY, {
-      ...disk,
-      restore: { ...disk.restore, state: 'failed' },
-    });
-    const launch = await readRepositoryLaunch(this.ctx.storage);
-    if (launch?.allocationId === allocationId)
-      await recordRepositoryLaunch(this.ctx.storage, {
-        ...launch,
-        startSource: 'repository',
-        skipRepository: true,
-        preparationFailures: preparing.map(route => ({
-          sessionId: route.sessionId,
-          attemptId: route.attemptId,
-        })),
-      });
-    logControlDiagnostic('snapshot_fallback', { sandboxId: this.sandboxId, allocationId, reason });
-    await notifyPreparingRoutes(this.routeContext(state), {
-      step: 'snapshot_fallback',
-      detail: 'Session disk restore failed. Retrying from a fresh image.',
-    });
-    if (state.kind !== 'stopping' && state.kind !== 'stopped') {
-      await this.applyEvent({
-        type: 'stop-requested',
-        at: Date.now(),
-        reason: 'workspace_setup_failed',
-      });
-    }
-    return true;
+    const route = routes.find(route => route.state === 'preparing');
+    if (route === undefined) return false;
+    this.ctx.storage.kv.delete(SESSION_SNAPSHOT_KEY);
+    return this.retryRepositoryPreparation(
+      state,
+      { sessionId: route.sessionId, attemptId: route.attemptId },
+      true
+    );
   }
 
   private async dispatchCreateFailed(allocationId: string): Promise<void> {
@@ -5469,12 +5076,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
       if (
         disk?.allocationId === frame.allocationId &&
         disk.restore !== undefined &&
-        disk.restore.state !== 'fresh' &&
         frame.sessionSnapshots !== true
       ) {
         this.sendFrame(ws, { type: 'shutdown', reason: 'hello_rejected' });
         ws.close(1008, 'Session snapshot capability required');
-        await this.retrySessionSnapshotRestore(frame.allocationId, 'unsupported_runtime');
+        await this.retrySessionSnapshotRestore(frame.allocationId);
         return;
       }
       if (
@@ -5569,26 +5175,19 @@ export class SandboxControlV2 extends DurableObject<Env> {
         connectionId: attachment.connectionId,
         active: frame.active,
       });
+      if (frame.active) this.invalidateSessionSnapshot();
       const disk = readSessionSnapshotAllocation(this.ctx.storage.kv);
-      if (disk?.allocationId === state.allocationId && state.connectionId !== null) {
+      if (
+        !frame.active &&
+        disk?.allocationId === state.allocationId &&
+        state.connectionId !== null
+      ) {
         this.ctx.storage.kv.put(SESSION_SNAPSHOT_ALLOCATION_KEY, {
           ...disk,
-          activity: { connectionId: state.connectionId, active: frame.active },
+          idleConnectionId: state.connectionId,
         });
-        const routes = await listRoutes(this.db);
-        const route = routes[0];
-        if (routes.length === 1 && route?.state === 'ready' && state.allocationId !== null) {
-          if (frame.active) this.retireSessionSnapshotCapture('active_heartbeat');
-          this.notifications.enqueue(route.sessionId, {
-            kind: 'native_activity',
-            payload: {
-              allocationId: state.allocationId,
-              attemptId: route.attemptId,
-              active: frame.active,
-            },
-          });
-        }
       }
+      await this.armAlarm(await this.readAllocation());
       if (
         !frame.active &&
         state.lastActivityAt !== null &&
@@ -5680,7 +5279,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         this.forwardEvents(frame, current);
         return;
       case 'session.outcome':
-        this.forwardOutcome(frame, current, currentState);
+        this.forwardOutcome(frame, current);
         return;
       case 'events_dropped':
         if (current) this.notifications.wrapperDropped(frame.dropped);
@@ -5999,9 +5598,25 @@ export class SandboxControlV2 extends DurableObject<Env> {
       (await routeRetryAllowed(this.routeContext(state)))
         ? Date.now() + this.sandboxTimers().providerCreateRetryMs
         : null;
-    const candidates = [allocationAt, routeAt, retryAt, this.earliestHelloDeadlineAt()].filter(
-      (at): at is number => at !== null
-    );
+    const disk = readSessionSnapshotAllocation(this.ctx.storage.kv);
+    const snapshotAt =
+      this.provider.sessionSnapshots !== undefined &&
+      !this.sessionSnapshotCapturePending &&
+      state.kind === 'connected' &&
+      state.lastActivityAt !== null &&
+      disk?.allocationId === state.allocationId &&
+      disk.idleConnectionId === state.connectionId &&
+      !disk.contaminated &&
+      disk.attemptedIdleAt !== state.lastActivityAt
+        ? state.lastActivityAt + this.sessionSnapshotIdleMs
+        : null;
+    const candidates = [
+      allocationAt,
+      routeAt,
+      retryAt,
+      snapshotAt,
+      this.earliestHelloDeadlineAt(),
+    ].filter((at): at is number => at !== null);
     if (candidates.length === 0) {
       await this.ctx.storage.deleteAlarm();
       return;

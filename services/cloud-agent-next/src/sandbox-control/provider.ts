@@ -168,7 +168,6 @@ export type ProviderAdapter = {
   readonly environmentSnapshots?: true;
   readonly sessionSnapshots?: {
     capture(ref: string, captureId: string): Promise<NativeCaptureResult>;
-    read(captureId: string): Promise<NativeCaptureResult | null>;
   };
   /**
    * Replace the live sandbox's contained-credential network policy with one

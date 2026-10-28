@@ -50,6 +50,7 @@ vi.mock('expo-router', () => ({
   useSegments: () => ['(app)', '(tabs)', '(0_home)'],
   useRouter: () => ({ replace: routerReplace }),
   useNavigation: () => ({ isFocused: () => false }),
+  useIsFocused: () => false,
   useFocusEffect: () => undefined,
   useScrollToTop: () => undefined,
 }));

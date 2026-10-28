@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Keyboard, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useTranslation } from 'react-i18next';
-import { useFocusEffect, useNavigation } from 'expo-router';
+import { useFocusEffect, useIsFocused, useNavigation } from 'expo-router';
 
 import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
 import { AgentSessionListContent } from '@/components/agents/session-list-content';
@@ -30,6 +30,7 @@ import { useOrganization } from '@/lib/organization-context';
 export function SessionHistoryScreen() {
   const { t } = useTranslation();
   const navigation = useNavigation();
+  const isFocused = useIsFocused();
 
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
   const {
@@ -246,7 +247,7 @@ export function SessionHistoryScreen() {
           />
         }
       />
-      <KeyboardAvoidingView className="flex-1" behavior="padding">
+      <KeyboardAvoidingView className="flex-1" behavior="padding" enabled={isFocused}>
         {sessionListBody}
       </KeyboardAvoidingView>
       <SessionFilterModal

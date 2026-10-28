@@ -127,6 +127,7 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
 const routerPush = vi.hoisted(() => vi.fn());
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ isFocused: () => focusState.current }),
+  useIsFocused: () => focusState.current,
   useRouter: () => ({ push: routerPush }),
   useFocusEffect: (effect: () => void) => {
     focusCallbacks.current.add(effect);

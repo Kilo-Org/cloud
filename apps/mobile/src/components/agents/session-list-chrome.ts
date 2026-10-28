@@ -6,12 +6,19 @@ import { FAB_MARGIN, FAB_SIZE } from '@/components/agents/session-list-content';
 /** The FAB's own height plus its fixed margin above the tab bar. */
 const FAB_BAND = FAB_SIZE + FAB_MARGIN;
 
-/** Fixed overlay clearance left after the native keyboard container resizes the body. */
+/**
+ * Fixed overlay clearance left after the native keyboard container resizes the
+ * body. A keyboard another screen raised is not this screen's: while
+ * `keyboardOwned` is false the occlusion reads as zero, matching the container,
+ * which stands down too.
+ */
 export function useAgentsBottomBands(
   tabBarHeight: number,
-  showFab: boolean
+  showFab: boolean,
+  keyboardOwned: boolean
 ): { surfaceBand: number; rowsFrameBand: number } {
-  const keyboardOcclusion = useKeyboardState(state => state.height);
+  const keyboardHeight = useKeyboardState(state => state.height);
+  const keyboardOcclusion = keyboardOwned ? keyboardHeight : 0;
   return useMemo(() => {
     const surfaceBand = keyboardOcclusion > 0 ? keyboardOcclusion : tabBarHeight;
     // The band the button's overlay covers from the screen bottom, `0` while the

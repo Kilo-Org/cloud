@@ -771,8 +771,9 @@ describe('AgentSessionListContent liveness', () => {
       platform: 'ios',
       fontScale: 1,
     });
-    // Only the bottom tab-bar clearance stays on the content container.
-    expect(contentStyle()).toEqual({ paddingBottom: tabClearance });
+    // The content container carries the status band's top padding and the
+    // bottom tab-bar clearance; the side insets stay off it.
+    expect(contentStyle()).toEqual({ paddingTop: 20, paddingBottom: tabClearance });
 
     // The landscape side insets live on the wrapper around the list.
     expect(wrapperStyle()).toEqual({ paddingLeft: 0, paddingRight: 0 });
@@ -783,7 +784,7 @@ describe('AgentSessionListContent liveness', () => {
     act(() => {
       renderer.update(createElement(AgentSessionListContent, contentProps({ sections })));
     });
-    expect(contentStyle()).toEqual({ paddingBottom: tabClearance });
+    expect(contentStyle()).toEqual({ paddingTop: 20, paddingBottom: tabClearance });
     expect(wrapperStyle()).toEqual({ paddingLeft: 47, paddingRight: 59 });
   });
 

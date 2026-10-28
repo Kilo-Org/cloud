@@ -295,6 +295,29 @@ pnpm --filter web exec env NODE_ENV=test jest --runInBand \
   src/routers/organizations/organization-router.test.ts
 ```
 
+### Native build artifacts
+
+Native build tooling verifies artifact provenance before installation or build reuse.
+Installation accepts successful, completed native workflow runs from the repository itself.
+Push builds must originate from the default branch.
+Manual builds must match the consumer commit, or `GITHUB_SHA` when the gate runs in CI.
+Pull-request artifacts do not qualify for installation.
+The pull-request gate can reuse a successful artifact from that same pull request and head repository.
+Trusted push and manual artifacts remain available for gate reuse.
+Pull-request artifact reuse requires a recorded pull-request association.
+Fork runs without that association require a fresh build.
+
+The native fingerprint includes the artifact trust revision.
+This revision changes remote artifact names and local cache keys.
+Each platform requires a fresh trusted build after this change.
+Existing worktrees must receive the tooling update before they use remote artifacts.
+
+Require a remote iOS build without permitting a local compilation fallback:
+
+```bash
+KILO_REMOTE_NATIVE=required pnpm dev:mobile:ios build <udid>
+```
+
 ## Common Development Commands
 
 | Command | Description |
@@ -674,6 +697,7 @@ Manual creation, historical period selection, preparation drafts, and manual sum
 Pricing estimates use the model picker's configured provider prices and the stored target for model aliases.
 The gateway preserves bounded-request price ceilings and model access checks.
 Usage receipts retain the existing committed-versus-queued settlement behavior.
+Tiered custom pricing uses the highest tier reachable from the request’s bounded input length.
 The default summary model is `~deepseek/deepseek-flash-latest`.
 
 The protected cron routes are `/api/cron/agent-briefing` and `/api/cron/agent-briefing-summaries`.

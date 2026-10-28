@@ -11,7 +11,7 @@ import { enforceRequestCostLimit } from '@kilocode/web-shared/lib/ai-gateway/req
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
 import {
-  paidStealthModelFixture,
+  kiloExclusiveModelFixture,
   useKiloExclusiveModel,
 } from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 import { briefingPriceBound } from './summary';
@@ -228,7 +228,7 @@ describe('briefing model pricing', () => {
   });
 
   it('quotes a picker-built entry at its own price, ignoring a same-id catalog row and snapshot route', async () => {
-    const exclusive = catalogModel(paidStealthModelFixture.public_id, {
+    const exclusive = catalogModel(kiloExclusiveModelFixture.public_id, {
       prompt: '0.00001',
       completion: '0.00002',
     });

@@ -1,5 +1,4 @@
 import { describe, expect, it } from '@jest/globals';
-import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import {
   createUserVercelAiGatewayProvider,
   VERCEL_AI_GATEWAY,
@@ -20,7 +19,7 @@ import {
   type BYOKResult,
   type Provider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
+import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import { EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
 import type { PreferredProviderOrderConfig } from '@kilocode/db/schema-types';
@@ -45,27 +44,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-orde
     ],
   })),
 }));
-
-const nonFlexExclusiveModel: KiloExclusiveModel = {
-  public_id: 'test/non-flex-exclusive',
-  internal_id: 'test/non-flex',
-  display_name: 'Non-Flex test model',
-  description: 'Test model',
-  context_length: 8_192,
-  max_completion_tokens: 4_096,
-  provider: OPENROUTER,
-  flags: [],
-  pricing: null,
-  inference_providers: [],
-};
-
-const flexExclusiveModel: KiloExclusiveModel = {
-  ...nonFlexExclusiveModel,
-  public_id: 'test/flex-exclusive',
-  internal_id: 'test/flex',
-  display_name: 'Flex test model',
-  flags: ['flex'],
-};
 
 function makeRequest(
   model: string,
@@ -110,41 +88,31 @@ describe('removeUnsupportedRequestServiceTier', () => {
   it.each([
     {
       model: 'google/gemini-3.8-flash',
-      kiloExclusiveModel: null,
       reason: 'non-fallback custom pricing',
     },
     {
-      model: nonFlexExclusiveModel.public_id,
-      kiloExclusiveModel: nonFlexExclusiveModel,
-      reason: 'non-Flex Kilo-exclusive model',
+      model: gemma_4_26b_a4b_it_free_model.public_id,
+      reason: 'Kilo-exclusive model',
     },
-  ])(
-    'removes and logs the request-level tier for $reason',
-    ({ model, kiloExclusiveModel, reason }) => {
-      const request = makeRequest(model);
-      request.body.service_tier = 'priority';
-      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+  ])('removes and logs the request-level tier for $reason', ({ model, reason }) => {
+    const request = makeRequest(model);
+    request.body.service_tier = 'priority';
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-      removeUnsupportedRequestServiceTier(
+    removeUnsupportedRequestServiceTier(model, request, customPricingFor(model));
+
+    expect(request.body.service_tier).toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(
+      '[applyProviderSpecificLogic] Removed unsupported request-level service tier',
+      {
         model,
-        request,
-        kiloExclusiveModel,
-        customPricingFor(model)
-      );
-
-      expect(request.body.service_tier).toBeUndefined();
-      expect(warn).toHaveBeenCalledWith(
-        '[applyProviderSpecificLogic] Removed unsupported request-level service tier',
-        {
-          model,
-          requestKind: 'chat_completions',
-          serviceTier: 'priority',
-          reason,
-        }
-      );
-      warn.mockRestore();
-    }
-  );
+        requestKind: 'chat_completions',
+        serviceTier: 'priority',
+        reason,
+      }
+    );
+    warn.mockRestore();
+  });
 
   it.each(['auto', 'default', 'flex', 'priority', 'scale'] as const)(
     'records the recognized tier verbatim (%s)',
@@ -154,7 +122,7 @@ describe('removeUnsupportedRequestServiceTier', () => {
       request.body.service_tier = tier;
       const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-      removeUnsupportedRequestServiceTier(model, request, null, customPricingFor(model));
+      removeUnsupportedRequestServiceTier(model, request, customPricingFor(model));
 
       expect(request.body.service_tier).toBeUndefined();
       expect(warn).toHaveBeenCalledWith(
@@ -173,7 +141,7 @@ describe('removeUnsupportedRequestServiceTier', () => {
       request.body.service_tier = tier as unknown as typeof request.body.service_tier;
       const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-      removeUnsupportedRequestServiceTier(model, request, null, customPricingFor(model));
+      removeUnsupportedRequestServiceTier(model, request, customPricingFor(model));
 
       expect(request.body.service_tier).toBeUndefined();
       expect(warn).toHaveBeenCalledWith(
@@ -189,23 +157,17 @@ describe('removeUnsupportedRequestServiceTier', () => {
     }
   );
 
-  it.each([
-    ['moonshotai/kimi-k3', null],
-    [flexExclusiveModel.public_id, flexExclusiveModel],
-    ['vendor/standard-model', null],
-  ] as const)('preserves the request-level tier for %s', (model, kiloExclusiveModel) => {
-    const request = makeRequest(model);
-    request.body.service_tier = 'priority';
+  it.each(['moonshotai/kimi-k3', 'vendor/standard-model'])(
+    'preserves the request-level tier for %s',
+    model => {
+      const request = makeRequest(model);
+      request.body.service_tier = 'priority';
 
-    removeUnsupportedRequestServiceTier(
-      model,
-      request,
-      kiloExclusiveModel,
-      customPricingFor(model)
-    );
+      removeUnsupportedRequestServiceTier(model, request, customPricingFor(model));
 
-    expect(request.body.service_tier).toBe('priority');
-  });
+      expect(request.body.service_tier).toBe('priority');
+    }
+  );
 });
 
 describe('applyProviderSpecificLogic JSON ref field sanitization', () => {

@@ -7,7 +7,7 @@ import {
   readVercelModelIdOverrides,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import {
-  paidStealthModelFixture,
+  kiloExclusiveModelFixture,
   useKiloExclusiveModel,
 } from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 
@@ -118,17 +118,12 @@ describe('mapModelIdToVercel', () => {
   describe('kilo-exclusive models', () => {
     useKiloExclusiveModel();
 
-    it('maps an exclusive flagged with vercel-routing to its internal id', async () => {
-      // google/gemma-4-26b-a4b-it:free is registered in kiloExclusiveModels
-      // with the 'vercel-routing' flag and internal_id 'google/gemma-4-26b-a4b-it'.
+    it('maps an exclusive to its internal id', async () => {
       await expect(mapModelIdToVercel('google/gemma-4-26b-a4b-it:free')).resolves.toBe(
         'google/gemma-4-26b-a4b-it'
       );
-    });
-
-    it('does not use internal_id for exclusives that are not vercel-routed', async () => {
-      await expect(mapModelIdToVercel(paidStealthModelFixture.public_id)).resolves.toBe(
-        paidStealthModelFixture.public_id
+      await expect(mapModelIdToVercel(kiloExclusiveModelFixture.public_id)).resolves.toBe(
+        kiloExclusiveModelFixture.internal_id
       );
     });
   });

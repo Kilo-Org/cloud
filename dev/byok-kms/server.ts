@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs';
-import { createServer } from 'node:http';
+import { createServer, type IncomingMessage, type ServerResponse } from 'node:http';
 
 import { handleRequest, type HandlerDeps } from './handlers';
 import { createKmsApi } from './kms';
@@ -23,7 +23,7 @@ const deps: HandlerDeps = {
   log: event => console.log(JSON.stringify({ event: 'byok_kms.data_key', ...event })),
 };
 
-const server = createServer(async (request, response) => {
+async function handle(request: IncomingMessage, response: ServerResponse) {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const chunk of request) {
@@ -44,7 +44,13 @@ const server = createServer(async (request, response) => {
     body = undefined;
   }
 
-  const url = new URL(request.url ?? '/', `http://${HOST}`);
+  let url: URL;
+  try {
+    url = new URL(request.url ?? '/', `http://${HOST}`);
+  } catch {
+    response.writeHead(400).end();
+    return;
+  }
   const result = await handleRequest(deps, {
     method: request.method ?? 'GET',
     path: url.pathname,
@@ -58,6 +64,16 @@ const server = createServer(async (request, response) => {
     'content-length': Buffer.byteLength(payload),
   });
   response.end(payload);
+}
+
+const server = createServer(async (request, response) => {
+  try {
+    await handle(request, response);
+  } catch (error) {
+    console.error('byok-kms request failed:', error instanceof Error ? error.message : error);
+    if (response.headersSent) response.destroy();
+    else response.writeHead(500).end();
+  }
 });
 
 server.listen(PORT, HOST, () => {

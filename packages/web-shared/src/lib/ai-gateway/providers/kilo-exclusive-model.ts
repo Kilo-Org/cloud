@@ -1,7 +1,6 @@
-import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
-export type KiloExclusiveModelFlag = 'reasoning' | 'vision' | 'flex' | 'vercel-routing';
+export type KiloExclusiveModelFlag = 'reasoning' | 'vision';
 
 export type KiloExclusiveModel = {
   public_id: string;
@@ -10,7 +9,6 @@ export type KiloExclusiveModel = {
   context_length: number;
   max_completion_tokens: number;
   flags: KiloExclusiveModelFlag[];
-  provider: Provider;
   internal_id: string;
 };
 
@@ -94,9 +92,6 @@ export function applyKiloExclusiveModelSettings(
 ) {
   requestToMutate.body.model = kiloExclusiveModel.internal_id;
   removeNonSensicalMaxTokens(requestToMutate, kiloExclusiveModel);
-  if (kiloExclusiveModel.flags.includes('flex')) {
-    requestToMutate.body.service_tier = 'flex';
-  }
 }
 
 const FREE_PRICE_PER_TOKEN = '0.000000000000';

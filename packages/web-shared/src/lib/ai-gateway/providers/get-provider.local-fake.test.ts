@@ -236,34 +236,30 @@ describe('getProvider exclusive model routing', () => {
     jest.mocked(getModelInferenceUserByokProviders).mockReset().mockResolvedValue([]);
   });
 
-  test.each(kiloExclusiveModels)('routes $public_id to its provider', async model => {
+  test.each(kiloExclusiveModels)('routes $public_id to OpenRouter', async model => {
     const result = await getProvider(providerInput(model.public_id));
     expect(result.kind).toBe('provider');
     if (result.kind !== 'provider') throw new Error('Expected a provider');
-    expect(result.provider).toBe(model.provider);
+    expect(result.provider).toBe(OPENROUTER);
     expect(result.userByok).toBeNull();
     expect(result.bypassAccessCheck).toBe(false);
   });
 
-  test('does not divert an exclusive without Vercel routing to Vercel or BYOK', async () => {
+  test('does not divert an exclusive to BYOK', async () => {
     const removeModel = addKiloExclusiveModel(kiloExclusiveModelFixture);
     try {
-      jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
       jest.mocked(getModelInferenceUserByokProviders).mockResolvedValue(['anthropic']);
 
       const result = await getProvider(providerInput(kiloExclusiveModelFixture.public_id));
 
-      expect(result.kind === 'provider' && result.provider).toBe(
-        kiloExclusiveModelFixture.provider
-      );
-      expect(shouldRouteToVercel).not.toHaveBeenCalled();
+      expect(result.kind === 'provider' && result.provider).toBe(OPENROUTER);
       expect(getModelInferenceUserByokProviders).not.toHaveBeenCalled();
     } finally {
       removeModel();
     }
   });
 
-  test.each(kiloExclusiveModels.filter(model => model.flags.includes('vercel-routing')))(
+  test.each(kiloExclusiveModels)(
     'preserves Vercel routing eligibility for $public_id',
     async model => {
       jest.mocked(shouldRouteToVercel).mockResolvedValue(true);

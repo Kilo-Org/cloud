@@ -58,7 +58,8 @@ unavailable signing secret returns 503, so ordinary bounded-backoff reconnect re
 - A **route** is one session on one sandbox: `sessionId`, worktree directory, `kiloSessionId`.
   New allocations with a compatible wrapper share one Kilo runtime per directory.
   Existing allocations retain their original `runtimeIsolation` and HOME keys until normal replacement.
-  MCP servers are workspace configuration in shared runtimes.
+  Profile MCP, environment values, secrets, skills, agents, commands and setup commands
+  initialize once per shared runtime. Sibling attachments reuse that configuration.
 - Compatible routes reference one Sandbox-owned credential scope. Scope membership includes every
   eligible root Kilo session. Shared runtimes use **one handle per worktree scope**.
   Existing allocations retain per-session handles. A modern grant never merges with a legacy grant.
@@ -1121,10 +1122,21 @@ mode. The environment default is captured at registration when admission omitted
 callers cannot choose proxy mode independently. Runtime authorization does not require SCM
 containment: Cloudflare Sandbox and Cloudflare Containers support both modes, while Vercel still
 requires containment. Unsupported modes and invalid modern facade configuration are rejected
-before queuing work. Contained SCM resolution and Vercel policy remain enforced. MCP servers are
-workspace configuration: sessions in one worktree share one runtime, and a session whose MCP set
-differs from the warm runtime's fails with `Kilo worktree MCP configuration mismatch` rather than
-running with another session's servers.
+before queuing work. Contained SCM resolution and Vercel policy remain enforced.
+Every `session.attach` carries the route's workspace configuration. The wrapper's preparation
+manager owns the decision: while another route holds the runtime key, the attachment uses the
+retained configuration and the offered one is ignored. When no route holds the key, the offered
+configuration replaces the retained one. The last route's release drops it. The Sandbox DO keeps no
+per-socket record of sent configuration, so hibernation does not change the result.
+The runtime still rejects profile MCP drift on legacy preparation paths.
+
+The built-in `kilo-cloud-agent` MCP server uses workspace authority. The worktree UUID identifies
+its original root chat, which remains the authorization anchor for the existing child-session API.
+Every grant renewal checks that root's authorization and its owner, organization and worktree.
+Deleting or revoking the root disables new grants; another sibling never becomes the anchor.
+Children and parent callbacks belong to that root, not necessarily the chat invoking MCP.
+The MCP transport does not send the invoking chat's identity. Built-in credential rotation is
+not profile MCP drift.
 
 Sandbox DO ↔ wrapper (WebSocket frames): `hello`, `welcome`, `shutdown`, `heartbeat`, `heartbeat_ack`,
 `session.prepare`, `session.progress`, `session.ready`, `session.failed`, `workspace.capture` and

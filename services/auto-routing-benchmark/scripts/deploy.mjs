@@ -299,11 +299,11 @@ async function deploy() {
     report('completed');
     phase = 'verify';
     // A renewal that started during deploy already observed the pre-completion
-    // lock. Wait it out, then read again so a pause change at the end of deploy
-    // is not hidden by that in-flight check.
+    // lock. Wait it out, then start a new renewal so the post-deploy read is
+    // fresh and still retries transient D1 failures.
     await renewal?.catch(() => {});
     try {
-      await renewOnce();
+      await renew();
     } catch {
       failure = new DeploymentError(
         pauseToken === undefined

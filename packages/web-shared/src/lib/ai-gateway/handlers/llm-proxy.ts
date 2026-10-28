@@ -1,4 +1,3 @@
-import { randomUUID } from 'crypto';
 import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import { after, NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
@@ -157,15 +156,15 @@ import {
   type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
-import { bouncerAccountId, normalizeJa4 } from '@kilocode/web-shared/lib/bouncer/client';
 import {
   bareIpLiteral,
   bouncerDecideTier,
-  bouncerRejectionResponse,
-  payerSharingIp,
   rawClientIp,
-  startBouncerDecide,
 } from '@kilocode/web-shared/lib/bouncer/inference';
+import {
+  anonymousBouncerRequest,
+  signedInBouncerRequest,
+} from '@kilocode/web-shared/lib/bouncer/request';
 import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 import { startEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/input-guardrail';
 import { enkryptGuardrailRejectionResponse } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/responses';
@@ -709,26 +708,25 @@ export async function handleLlmProxyRequest(
   // Start the one decide alongside balance and provider work; it is awaited just before the
   // upstream call. The event id is generated server-side so decide and usage share one identity
   // for this request.
-  const bouncerRequestId = randomUUID();
-  const bouncerVerdictPromise = startBouncerDecide(
-    isAnonymousContext(user)
-      ? {
-          requestId: bouncerRequestId,
-          ip: clientIp,
-          ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
-        }
-      : balanceAndSettingsPromise.then(({ balance, plan, payer }) => ({
-          requestId: bouncerRequestId,
-          ip: clientIp,
-          ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
-          account: {
-            accountId: bouncerAccountId(user.id, organizationId),
-            userId: user.id,
+  const ja4Digest = fraudHeaders.http_x_vercel_ja4_digest;
+  const bouncer = isAnonymousContext(user)
+    ? anonymousBouncerRequest({ ip: clientIp, ja4Digest })
+    : signedInBouncerRequest({
+        ip: clientIp,
+        ja4Digest,
+        userId: user.id,
+        organizationId,
+        feature,
+      });
+  const bouncerVerdictPromise =
+    bouncer.kind === 'signed-in'
+      ? bouncer.decide(
+          balanceAndSettingsPromise.then(({ balance, plan, payer }) => ({
             tier: bouncerDecideTier(organizationId, plan, balance),
             payer,
-          },
-        }))
-  );
+          }))
+        )
+      : bouncer.decide();
 
   // New workers persist classifier usage themselves and return zero. Retain
   // positive-cost billing only for workers still running the previous protocol.
@@ -995,23 +993,15 @@ export async function handleLlmProxyRequest(
     ttfb_ms: null,
     requestStartedAt,
     clientRequestId,
-    // Anonymous requests have no bouncer account: bouncer keys them on the IP
-    // and must never turn them into a payer-sharing row.
-    bouncer: {
-      requestId: bouncerRequestId,
+    bouncer: bouncer.usage({
       occurredAt: new Date(requestStartedAtMs),
-      accountId: isAnonymousContext(user) ? null : bouncerAccountId(user.id, organizationId),
-      // A signed-in request must not publish shared Kilo infrastructure as a
-      // payer signal. An anonymous request keeps the real IP: it is keyed on it
-      // for rate limits and never shares a payer.
-      clientIp: isAnonymousContext(user) ? clientIp : payerSharingIp(clientIp, feature),
       clientAttributed: feature !== null || Boolean(xKiloCodeVersion),
       requestedLogprobs: requestedLogprobs(requestBodyParsed.body),
       samples: requestedSamples(requestBodyParsed.body),
       // Hash now (about 0.1 ms for the 4 KiB cap), so the raw prompt never rides on the
       // usage context, which reaches Sentry and several helpers.
       promptSimHash: simHash64(lastUserPromptText(requestBodyParsed) ?? ''),
-    },
+    }),
   };
 
   setTag('ui.ai_model', requestBodyParsed.body.model);
@@ -1077,9 +1067,8 @@ export async function handleLlmProxyRequest(
   // The one decide for this request, bounded by its 500 ms budget. Only an enforced verdict
   // rejects; every other outcome sends the request.
   const bouncerVerdict = await bouncerVerdictPromise;
-  const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
+  const bouncerRejection = bouncer.apply(bouncerVerdict, usageContext.bouncer);
   if (bouncerRejection) return bouncerRejection;
-  if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
   const guardrailWaitStartedAt = performance.now();
   const guardrailVerdict = await enkryptGuardrailVerdictPromise;
   if (guardrailVerdict.action !== 'skip') {

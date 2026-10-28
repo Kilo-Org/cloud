@@ -1,4 +1,3 @@
-import { randomUUID } from 'crypto';
 import { INCEPTION_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
@@ -29,15 +28,12 @@ import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/pro
 import { checkDirectProviderAccess } from '@kilocode/web-shared/lib/ai-gateway/direct-provider-access';
 import { findSupportedFimModel } from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
-import { bouncerAccountId, normalizeJa4 } from '@kilocode/web-shared/lib/bouncer/client';
 import {
   bareIpLiteral,
   bouncerDecideTier,
-  bouncerRejectionResponse,
-  payerSharingIp,
   rawClientIp,
-  startBouncerDecide,
 } from '@kilocode/web-shared/lib/bouncer/inference';
+import { signedInBouncerRequest } from '@kilocode/web-shared/lib/bouncer/request';
 
 // Inception's edit endpoint mirrors a chat completion shape but is hosted at
 // a separate path. It accepts a single `role: "user"` message; the system prompt
@@ -157,10 +153,13 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
   const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER));
 
-  // Resolve bouncer's identity once for this request. Edit is always signed in, so
-  // its usage row uses a payer-safe IP that drops shared Kilo infrastructure.
-  const bouncerIp = bareIpLiteral(rawClientIp(request));
-  const bouncerRequestId = randomUUID();
+  const bouncer = signedInBouncerRequest({
+    ip: bareIpLiteral(rawClientIp(request)),
+    ja4Digest: fraudHeaders.http_x_vercel_ja4_digest,
+    userId: user.id,
+    organizationId,
+    feature,
+  });
 
   const promptInfo = extractEditPromptInfo(requestBody);
 
@@ -197,17 +196,14 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     auto_model: null,
     ttfb_ms: null,
     requestStartedAt,
-    bouncer: {
-      requestId: bouncerRequestId,
+    bouncer: bouncer.usage({
       occurredAt: new Date(requestStartedAtMs),
-      accountId: bouncerAccountId(user.id, organizationId),
-      clientIp: payerSharingIp(bouncerIp, feature),
       clientAttributed: feature !== null || Boolean(xKiloCodeVersion),
       requestedLogprobs: false,
       samples: null,
       // Edit feeds volume rules only, which do not read a prompt hash.
       promptSimHash: null,
-    },
+    }),
   };
 
   setTag('ui.ai_model', requestBody.model);
@@ -243,21 +239,13 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
 
   // The one decide for this request, awaited before the upstream call within its 500 ms budget.
   // Only an enforced verdict rejects; every other outcome sends the request.
-  const bouncerVerdictPromise = startBouncerDecide({
-    requestId: bouncerRequestId,
-    ip: bouncerIp,
-    ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
-    account: {
-      accountId: bouncerAccountId(user.id, organizationId),
-      userId: user.id,
-      tier: bouncerDecideTier(organizationId, plan, balance),
-      payer,
-    },
+  const bouncerVerdictPromise = bouncer.decide({
+    tier: bouncerDecideTier(organizationId, plan, balance),
+    payer,
   });
   const bouncerVerdict = await bouncerVerdictPromise;
-  const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
+  const bouncerRejection = bouncer.apply(bouncerVerdict, usageContext.bouncer);
   if (bouncerRejection) return bouncerRejection;
-  if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
 
   sentryRootSpan()?.setAttribute(
     'edit.time_to_request_start_ms',

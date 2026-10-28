@@ -1,4 +1,3 @@
-import { randomUUID } from 'crypto';
 import { MISTRAL_API_KEY, INCEPTION_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
@@ -32,15 +31,12 @@ import {
   type FimProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
-import { bouncerAccountId, normalizeJa4 } from '@kilocode/web-shared/lib/bouncer/client';
 import {
   bareIpLiteral,
   bouncerDecideTier,
-  bouncerRejectionResponse,
-  payerSharingIp,
   rawClientIp,
-  startBouncerDecide,
 } from '@kilocode/web-shared/lib/bouncer/inference';
+import { signedInBouncerRequest } from '@kilocode/web-shared/lib/bouncer/request';
 
 // Mistral exposes FIM on two separate, key-incompatible endpoints:
 //   - https://api.mistral.ai          (La Plateforme, paid tier keys)
@@ -162,10 +158,13 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER));
 
-  // Resolve bouncer's identity once for this request. FIM is always signed in, so
-  // its usage row uses a payer-safe IP that drops shared Kilo infrastructure.
-  const bouncerIp = bareIpLiteral(rawClientIp(request));
-  const bouncerRequestId = randomUUID();
+  const bouncer = signedInBouncerRequest({
+    ip: bareIpLiteral(rawClientIp(request)),
+    ja4Digest: fraudHeaders.http_x_vercel_ja4_digest,
+    userId: user.id,
+    organizationId,
+    feature,
+  });
 
   // Extract properties for usage context
   const promptInfo = extractFimPromptInfo(requestBody);
@@ -204,17 +203,14 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     auto_model: null,
     ttfb_ms: null,
     requestStartedAt,
-    bouncer: {
-      requestId: bouncerRequestId,
+    bouncer: bouncer.usage({
       occurredAt: new Date(requestStartedAtMs),
-      accountId: bouncerAccountId(user.id, organizationId),
-      clientIp: payerSharingIp(bouncerIp, feature),
       clientAttributed: feature !== null || Boolean(xKiloCodeVersion),
       requestedLogprobs: false,
       samples: null,
       // FIM feeds volume rules only, which do not read a prompt hash.
       promptSimHash: null,
-    },
+    }),
   };
 
   setTag('ui.ai_model', requestBody.model);
@@ -253,21 +249,13 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
 
   // The one decide for this request, awaited before the upstream call within its 500 ms budget.
   // Only an enforced verdict rejects; every other outcome sends the request.
-  const bouncerVerdictPromise = startBouncerDecide({
-    requestId: bouncerRequestId,
-    ip: bouncerIp,
-    ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
-    account: {
-      accountId: bouncerAccountId(user.id, organizationId),
-      userId: user.id,
-      tier: bouncerDecideTier(organizationId, plan, balance),
-      payer,
-    },
+  const bouncerVerdictPromise = bouncer.decide({
+    tier: bouncerDecideTier(organizationId, plan, balance),
+    payer,
   });
   const bouncerVerdict = await bouncerVerdictPromise;
-  const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
+  const bouncerRejection = bouncer.apply(bouncerVerdict, usageContext.bouncer);
   if (bouncerRejection) return bouncerRejection;
-  if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
 
   sentryRootSpan()?.setAttribute(
     'fim.time_to_request_start_ms',

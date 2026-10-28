@@ -31,15 +31,18 @@ function signatureFor(payload: string, secret: string): string {
   return `sha256=${crypto.createHmac('sha256', secret).update(payload).digest('hex')}`;
 }
 
-function liteRequest(signature: string, payload = PAYLOAD): Request {
+function liteRequest(signature: string | null, payload = PAYLOAD): Request {
+  const headers: Record<string, string> = {
+    'content-type': 'application/json',
+    'x-github-delivery': 'delivery-lite-route',
+    'x-github-event': 'pull_request',
+  };
+  if (signature !== null) {
+    headers['x-hub-signature-256'] = signature;
+  }
   return new Request('https://app.example.com/api/webhooks/github-lite', {
     method: 'POST',
-    headers: {
-      'content-type': 'application/json',
-      'x-github-delivery': `delivery-${signature.slice(-8)}`,
-      'x-github-event': 'pull_request',
-      'x-hub-signature-256': signature,
-    },
+    headers,
     body: payload,
   });
 }
@@ -82,6 +85,15 @@ describe('github-lite webhook route authentication', () => {
 
     expect(unconfigured.status).toBe(invalid.status);
     expect(await unconfigured.text()).toBe(await invalid.text());
+  });
+
+  it('refuses a delivery that carries no signature header', async () => {
+    process.env.GITHUB_LITE_APP_WEBHOOK_SECRET = LITE_SECRET;
+
+    const response = await POST(liteRequest(null) as never);
+
+    expect(response.status).toBe(401);
+    expect(await response.text()).toBe('Unauthorized');
   });
 
   it('reaches the shared handler with a correctly signed delivery and keeps its response', async () => {

@@ -6,6 +6,7 @@ const NAMES: Record<string, string> = {
   anthropic: 'Anthropic',
   bedrock: 'AWS Bedrock',
   openrouter: 'OpenRouter',
+  openai: 'OpenAI API key',
 };
 
 function getProviderName(providerId: string) {
@@ -81,5 +82,27 @@ describe('describeRouteStep', () => {
         true
       )
     ).toEqual({ title: 'Kilo via Vercel AI Gateway', detail: 'Paid with Kilo credits.' });
+  });
+
+  it('keeps one "key" for display names that already name the credential', () => {
+    expect(
+      describeRouteStep(
+        { route: 'vercel-byok', outcome: 'used', providerIds: ['openai'], reason: 'serves' },
+        getProviderName,
+        false
+      ).title
+    ).toBe('OpenAI API key via Vercel AI Gateway');
+    expect(
+      describeRouteStep(
+        {
+          route: 'vercel-byok',
+          outcome: 'used',
+          providerIds: ['anthropic', 'openai'],
+          reason: 'serves',
+        },
+        getProviderName,
+        false
+      ).title
+    ).toBe('Anthropic, OpenAI API keys via Vercel AI Gateway');
   });
 });

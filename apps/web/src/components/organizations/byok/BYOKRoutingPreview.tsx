@@ -46,8 +46,10 @@ function formatApiKinds(apiKinds: readonly ApiKind[]) {
   return apiKinds.map(apiKind => API_KIND_LABELS[apiKind]).join(' and ');
 }
 
+/** Some display names already name the credential ("OpenAI API key"), so they keep one "key". */
 function keyLabel(names: string[]) {
-  return `${names.join(', ')} ${names.length === 1 ? 'key' : 'keys'}`;
+  const providers = names.map(name => name.replace(/\s+key$/i, ''));
+  return `${providers.join(', ')} ${names.length === 1 ? 'key' : 'keys'}`;
 }
 
 type StepDescription = { title: string; detail: string };

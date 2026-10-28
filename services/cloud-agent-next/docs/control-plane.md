@@ -985,8 +985,8 @@ Worker forwards an admitted report to the Sandbox DO as `startup-failed`.
 - CI publishes runtime payloads create-only by content hash, and the descriptor last. The deploy
   reads an immutable handoff for the exact commit, and verifies the base image digest and both
   payloads before it deploys a `downloaded` target.
-- Roll out on an isolated target first: `downloaded` on the all-in-one image, then `downloaded` on
-  the runtime-free image, then production. Roll back the first step by mode and the second by image.
+- Roll out through a production `interactiveOrgIds` cohort: one test organization on `downloaded`
+  runtime-free first, then a wider cohort after qualification. Roll back by image or by mode.
 - The runtime-free image change relies on B1 (#7914), which is already merged: a running container
   captures under the image that it started with, including after DO reconstruction.
 - `runtime-targets.json` owns mode and image. Deployment renders Worker vars and the native image

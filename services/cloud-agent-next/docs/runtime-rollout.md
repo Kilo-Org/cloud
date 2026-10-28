@@ -45,21 +45,21 @@ still restore. The `Stable base` row covers repository snapshots only.
 
 Production uses downloaded runtime-free for its `interactiveOrgIds` cohort; every other target and session
 uses preinstalled all-in-one. A downloaded catalog entry is the only
-switch: it makes main CI publish a handoff for that SHA, and deployment waits for that handoff. Real-provider
-qualification remains required. Use an isolated named environment first. Record its account,
-Worker name, exact source SHA, bucket and instance type before deployment.
+switch: it makes main CI publish a handoff for that SHA, and deployment waits for that handoff.
+Real-provider qualification runs on the production test-organization cohort. Record the Worker name,
+exact source SHA, bucket and instance type for each qualification deployment.
 
 1. Provision publication through the process in [runtime-publication.md](runtime-publication.md).
-   Verify one manual publication creates the exact-SHA handoff. Failed CI, PR, fork and merge-group
-   runs must not publish. Repeat successful publication and confirm identical retained objects.
-2. Approve one isolated target using downloaded startup on the all-in-one image. Add only that environment
-   to the catalog. Deploy its verified handoff and complete the checks below.
-3. Runtime-free relies on B1 ([PR #7914](https://github.com/Kilo-Org/cloud/pull/7914)): a running
+   Verify that a main CI run with a downloaded catalog entry publishes the exact-SHA handoff, and that
+   a preinstalled-only catalog skips publication. Failed CI, PR, fork and merge-group runs must not
+   publish. Repeat successful publication and confirm identical retained objects.
+2. Runtime-free relies on B1 ([PR #7914](https://github.com/Kilo-Org/cloud/pull/7914)): a running
    container captures under its start image. B1 is merged into main, and its regression test runs
    in CI.
-4. Approve runtime-free on the same isolated target. Change its catalog image only. Repeat qualification.
-5. Enroll production organizations through `interactiveOrgIds` in a separate reviewed catalog change.
-   Expanding the list or removing the cohort restriction requires qualification evidence.
+3. Enroll one test organization through `interactiveOrgIds` on production runtime-free. Complete the
+   checks below with web sessions in that organization.
+4. Expanding the list or removing the cohort restriction requires that qualification evidence and a
+   separate reviewed catalog change.
 
 For a clean checkout, preview deployment preparation without running Wrangler:
 
@@ -123,5 +123,6 @@ The locally built runtime-free image passed the actual packaged CLI version prob
 hello/shutdown. A real CLI version mismatch failed the compatibility gate. This proves local payload/base
 execution, not provider restore semantics, minimum-instance timing or metadata retention.
 
-No CI bucket or credentials were provisioned. No remote release or registry image was published.
-No Worker was deployed. Real-provider qualification and production rollout remain pending.
+Publication is provisioned, and a manual publication created an exact-SHA handoff. Production enrolls
+one test organization for qualification. Real-provider qualification evidence remains pending, and
+no other organization is enrolled.

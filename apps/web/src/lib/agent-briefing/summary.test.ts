@@ -255,7 +255,7 @@ describe('briefing model pricing', () => {
   });
 
   it('quotes a free picker model at zero and admits it without a route price cap', async () => {
-    const freeModel = 'stealth/glyph-cluster';
+    const freeModel = 'google/gemma-4-26b-a4b-it:free';
     const quote = await briefingPriceBound(freeModel, 'Overnight activity', 2_000_000);
 
     expect(quote.inputRate).toBe(0);

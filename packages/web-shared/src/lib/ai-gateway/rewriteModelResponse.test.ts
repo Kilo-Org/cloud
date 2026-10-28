@@ -2069,6 +2069,8 @@ describe.each(usageShapes)('$kind billed usage normalization', shape => {
           },
         ])('$name', async ({ model, isFree, userByok, cost }) => {
           const usesMetadataCost = provider === 'vercel' && shape.kind !== 'chat_completions';
+          // On BYOK, OpenRouter charges its 5% fee and Vercel charges nothing.
+          const gatewayCost = upstreamByok ? (provider === 'openrouter' ? 0.06 : 0) : 1.2;
           const usage = {
             ...shape.tokens,
             market_cost: 99,
@@ -2076,14 +2078,14 @@ describe.each(usageShapes)('$kind billed usage normalization', shape => {
             ...(usesMetadataCost
               ? {}
               : {
-                  cost: upstreamByok ? 0.06 : 1.2,
+                  cost: gatewayCost,
                   cost_details: { upstream_inference_cost: 1.2 },
                   is_byok: upstreamByok,
                 }),
           };
           const providerMetadata = {
             gateway: {
-              cost: '0.06',
+              cost: String(gatewayCost),
               marketCost: '1.2',
               routing: {
                 modelAttempts: [
@@ -2124,6 +2126,56 @@ describe.each(usageShapes)('$kind billed usage normalization', shape => {
         });
       });
     });
+
+    // Real BYOK usage with web search: OpenRouter charges an Exa search plus
+    // its 5% fee, Vercel charges five Perplexity searches without a fee.
+    test.each([
+      { provider: 'openrouter', gatewayCost: 0.0072658, upstream: 0.005316, billed: 0.012316 },
+      { provider: 'vercel', gatewayCost: 0.025, upstream: 0.041388, billed: 0.066388 },
+    ] as const)(
+      'reports $provider BYOK non-inference costs in the billed cost',
+      async ({ provider, gatewayCost, upstream, billed }) => {
+        const usesMetadataCost = provider === 'vercel' && shape.kind !== 'chat_completions';
+        const usage = {
+          ...shape.tokens,
+          ...(usesMetadataCost
+            ? {}
+            : {
+                cost: gatewayCost,
+                cost_details: { upstream_inference_cost: upstream },
+                is_byok: true,
+              }),
+        };
+        const providerMetadata = {
+          gateway: {
+            cost: String(gatewayCost),
+            marketCost: String(upstream),
+            routing: {
+              modelAttempts: [
+                { success: true, providerAttempts: [{ success: true, credentialType: 'byok' }] },
+              ],
+            },
+          },
+        };
+        const { payload } = await rewriteUsageFixture(
+          shape,
+          stream,
+          {
+            requested_model: 'openai/gpt-5',
+            provider,
+            is_free: false,
+            user_byok: false,
+            api_kind: shape.kind,
+            custom_pricing_config: CUSTOM_PRICING_FALLBACK_CONFIG,
+          },
+          usage,
+          provider === 'vercel' ? { provider_metadata: providerMetadata, providerMetadata } : {}
+        );
+
+        expect(payload.usage.cost).toBeCloseTo(billed, 8);
+        expect(payload.usage.cost_details).toEqual({ upstream_inference_cost: upstream });
+      }
+    );
 
     test('reports ChatGPT subscription usage as BYOK with zero billed cost', async () => {
       const { payload } = await rewriteUsageFixture(

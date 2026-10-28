@@ -201,6 +201,32 @@ describe('applyUsagePricing', () => {
     }
   );
 
+  test('charges BYOK non-inference costs on top of exclusive pricing', () => {
+    const usage = makeUsage({ cost_mUsd: 907_000, nonInferenceCost_mUsd: 7000 });
+
+    applyUsagePricing(
+      usage,
+      makeContext({ requested_model: claude_opus_4_7_stealth_model.public_id }),
+      CUSTOM_PRICING_FALLBACK_CONFIG
+    );
+
+    expect(usage.cost_mUsd).toBe(600_000 + 7000);
+    expect(usage.market_cost).toBe(907_000);
+  });
+
+  test('applies fallback-only pricing when only non-inference costs were reported', () => {
+    jest.mocked(findKiloExclusiveModel).mockReturnValueOnce(fallbackOnlyModel);
+    const usage = makeUsage({ cost_mUsd: 7000, nonInferenceCost_mUsd: 7000 });
+
+    applyUsagePricing(
+      usage,
+      makeContext({ requested_model: fallbackOnlyModel.public_id }),
+      CUSTOM_PRICING_FALLBACK_CONFIG
+    );
+
+    expect(usage.cost_mUsd).toBe(600_000 + 7000);
+  });
+
   test('does not apply custom fallback pricing over a positive exclusive price', () => {
     const usage = makeUsage({ cost_mUsd: 0 });
 

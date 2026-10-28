@@ -25,7 +25,9 @@ export function isolatedKiloEnvironment(input: {
     XDG_CACHE_HOME: path.join(input.home, 'cache'),
     XDG_STATE_HOME: path.join(input.home, 'state'),
     KILO_DB: path.join(input.home, 'kilo.db'),
-    ...(input.token ? { KILO_AUTH_CONTENT: JSON.stringify({ kilo: { type: 'api', key: input.token } }) } : {}),
+    ...(input.token
+      ? { KILO_AUTH_CONTENT: JSON.stringify({ kilo: { type: 'api', key: input.token } }) }
+      : {}),
     KILO_SERVER_USERNAME: 'kilo',
     KILO_SERVER_PASSWORD: input.password,
     KILO_CONFIG_CONTENT: '{}',

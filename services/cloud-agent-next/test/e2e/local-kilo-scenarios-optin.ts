@@ -74,10 +74,16 @@ export const optInScenarios: Scenario[] = [
       const from = stream.events.length;
       await delay(IDLE_MS);
       const id = newMessageId();
-      const admitted = await h.prompt(fixture.session, attachment, `__fake__:echo:${h.run}-wake`, id);
+      const admitted = await h.prompt(
+        fixture.session,
+        attachment,
+        `__fake__:echo:${h.run}-wake`,
+        id
+      );
       assert.equal(admitted.status, 204);
       await stream.wait(
-        event => event.type === 'message.updated' && record(event.properties.info).role === 'assistant',
+        event =>
+          event.type === 'message.updated' && record(event.properties.info).role === 'assistant',
         'assistant event on the idle feed after the wait',
         from
       );

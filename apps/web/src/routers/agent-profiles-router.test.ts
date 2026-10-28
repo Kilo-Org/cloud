@@ -298,7 +298,10 @@ describe('Agent Profiles Router', () => {
           value: 'value',
           isSecret: false,
         });
-        await caller.agentProfiles.setCommands({ profileId, commands: ['npm install', 'npm test'] });
+        await caller.agentProfiles.setCommands({
+          profileId,
+          commands: ['npm install', 'npm test'],
+        });
         await caller.agentProfiles.createCustomSkill({
           profileId,
           name: 'heavy-skill',

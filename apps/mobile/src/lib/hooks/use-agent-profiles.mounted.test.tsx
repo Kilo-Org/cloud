@@ -338,7 +338,9 @@ describe('useAgentProfileMutations', () => {
    */
   it("delete invalidates the namespace without refetching the deleted profile's reads", async () => {
     const holder: { current: MutationsResult | null } = { current: null };
-    const { queryClient, unmount } = await renderWithProviders(createElement(MutationsProbe, { holder }));
+    const { queryClient, unmount } = await renderWithProviders(
+      createElement(MutationsProbe, { holder })
+    );
     const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
     const invalidateArg = z.object({
       predicate: z.custom<(query: { queryKey: readonly unknown[] }) => boolean>(
@@ -363,7 +365,9 @@ describe('useAgentProfileMutations', () => {
         false
       );
     }
-    expect(predicate({ queryKey: ['agentProfiles', 'get', { profileId: 'profile-2' }] })).toBe(true);
+    expect(predicate({ queryKey: ['agentProfiles', 'get', { profileId: 'profile-2' }] })).toBe(
+      true
+    );
     expect(predicate({ queryKey: ['agentProfiles', 'agents', { profileId: 'profile-3' }] })).toBe(
       true
     );

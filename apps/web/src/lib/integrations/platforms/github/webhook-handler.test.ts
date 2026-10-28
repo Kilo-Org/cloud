@@ -7,7 +7,8 @@ jest.mock('@sentry/nextjs', () => ({
 }));
 
 const mockVerifyGitHubWebhookSignature = jest.fn(
-  (_payload: string, _signature: string, _appType: string) => true
+  (_payload: string, _signature: string, _appType: string): 'valid' | 'invalid' | 'unconfigured' =>
+    'valid'
 );
 const mockFindIntegrationByInstallationId = jest.fn();
 const mockFindConnectedIntegrationByInstallationId = jest.fn();
@@ -237,7 +238,7 @@ describe('handleGitHubWebhook', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockGetIntegrationForOrganization.mockResolvedValue(integration);
-    mockVerifyGitHubWebhookSignature.mockReturnValue(true);
+    mockVerifyGitHubWebhookSignature.mockReturnValue('valid');
     mockFindIntegrationByInstallationId.mockResolvedValue(integration);
     mockFindConnectedIntegrationByInstallationId.mockResolvedValue(integration);
     mockIsSharedGitHubInstallation.mockResolvedValue(false);
@@ -478,7 +479,7 @@ describe('handleGitHubWebhook', () => {
   });
 
   it('still rejects unauthenticated pushes without scheduling work', async () => {
-    mockVerifyGitHubWebhookSignature.mockReturnValue(false);
+    mockVerifyGitHubWebhookSignature.mockReturnValue('invalid');
 
     const response = await handleGitHubWebhook(
       signedGitHubRequest('push', {
@@ -492,6 +493,43 @@ describe('handleGitHubWebhook', () => {
     expect(response.status).toBe(401);
     expect(after).not.toHaveBeenCalled();
     expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
+  });
+
+  it('refuses every delivery and reports the configuration error when the app secret is absent', async () => {
+    mockVerifyGitHubWebhookSignature.mockReturnValue('unconfigured');
+
+    const response = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', pullRequestPayload()),
+      'lite'
+    );
+
+    expect(response.status).toBe(401);
+    expect(await response.text()).toBe('Unauthorized');
+    expect(captureException).toHaveBeenCalledTimes(1);
+    expect(captureException).toHaveBeenCalledWith(expect.any(Error), {
+      tags: { source: 'github_lite_webhook_signature', app: 'lite' },
+    });
+    expect(mockLogWebhookEvent).not.toHaveBeenCalled();
+    expect(mockFindIntegrationByInstallationId).not.toHaveBeenCalled();
+    expect(mockHandlePullRequest).not.toHaveBeenCalled();
+    expect(after).not.toHaveBeenCalled();
+  });
+
+  it('returns the same refusal for a missing secret and a bad signature', async () => {
+    mockVerifyGitHubWebhookSignature.mockReturnValue('unconfigured');
+    const unconfigured = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', pullRequestPayload()),
+      'standard'
+    );
+
+    mockVerifyGitHubWebhookSignature.mockReturnValue('invalid');
+    const invalid = await handleGitHubWebhook(
+      signedGitHubRequest('pull_request', pullRequestPayload()),
+      'standard'
+    );
+
+    expect(unconfigured.status).toBe(invalid.status);
+    expect(await unconfigured.text()).toBe(await invalid.text());
   });
 
   it('routes pull_request_review_comment created events to review memory feedback', async () => {
@@ -653,7 +691,7 @@ describe('handleGitHubWebhook', () => {
   );
 
   it('rejects installation.deleted with a null installation when signature verification fails', async () => {
-    mockVerifyGitHubWebhookSignature.mockReturnValue(false);
+    mockVerifyGitHubWebhookSignature.mockReturnValue('invalid');
 
     const response = await handleGitHubWebhook(
       signedGitHubRequest('installation', { action: 'deleted', installation: null }),

@@ -111,8 +111,19 @@ export async function handleGitHubWebhook(
     const rawBody = await request.text();
     const signature = request.headers.get('x-hub-signature-256') || '';
 
-    if (!verifyGitHubWebhookSignature(rawBody, signature, appType)) {
-      logExceptInTest(`Invalid webhook signature${logSuffix}`);
+    const signatureStatus = verifyGitHubWebhookSignature(rawBody, signature, appType);
+    if (signatureStatus !== 'valid') {
+      if (signatureStatus === 'unconfigured') {
+        const configurationError = new Error(
+          `GitHub ${appType} app webhook secret is not configured`
+        );
+        logExceptInTest(`${configurationError.message}${logSuffix}`);
+        captureException(configurationError, {
+          tags: { source: `${sentryPrefix}webhook_signature`, app: appType },
+        });
+      } else {
+        logExceptInTest(`Invalid webhook signature${logSuffix}`);
+      }
       return new NextResponse('Unauthorized', { status: 401 });
     }
 

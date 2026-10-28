@@ -4,8 +4,11 @@
 
 export type GitHubAppType = 'standard' | 'lite';
 
-export function verifyGitHubWebhookSignature(_payload: string, _signature: string): boolean {
-  return true;
+export function verifyGitHubWebhookSignature(
+  _payload: string,
+  _signature: string
+): 'valid' {
+  return 'valid';
 }
 
 export async function generateGitHubInstallationToken(

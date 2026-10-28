@@ -58,9 +58,8 @@ A manual `workflow_dispatch` run accepts an exact main SHA and requires a succes
 run for that SHA. A manual run publishes whatever the catalog contains.
 The admission checkout and the publication environment are restricted to `main`.
 
-Publication does not change startup selection. All committed targets stay on preinstalled all-in-one
-images until a separate reviewed catalog change. Publication does not provision credentials or deploy
-the Worker.
+Publication does not change startup selection; the catalog does. Publication does not provision
+credentials or deploy the Worker.
 
 `runtime-targets.json` owns target mode/image selection. See [runtime-rollout.md](runtime-rollout.md)
 for rendering, isolated qualification and rollback.

@@ -22,7 +22,7 @@ their installed release until a new allocation starts. Base dependency changes s
 upgrade. Upgrade older BYOC snapshots once before enabling downloaded mode, so they have the required
 fixed Node path. Native image selection does not change the Vercel snapshot.
 
-A downloaded target can scope its startup to an `interactiveOrgIds` list. No committed target uses it yet.
+A downloaded target can scope its startup to an `interactiveOrgIds` list. Production uses it for one test organization.
 Deployment renders this list as `RUNTIME_INTERACTIVE_ORG_IDS`.
 A new allocation selects it only when all its preparing routes belong to one listed organization and have
 `createdOnPlatform: cloud-agent-web`. Native allocations must also be isolated; Vercel allocations use
@@ -43,7 +43,8 @@ still restore. The `Stable base` row covers repository snapshots only.
 
 ## Approval and rollout order
 
-All committed targets use preinstalled startup on all-in-one. A downloaded catalog entry is the only
+Production uses downloaded runtime-free for its `interactiveOrgIds` cohort; every other target and session
+uses preinstalled all-in-one. A downloaded catalog entry is the only
 switch: it makes main CI publish a handoff for that SHA, and deployment waits for that handoff. Real-provider
 qualification remains required. Use an isolated named environment first. Record its account,
 Worker name, exact source SHA, bucket and instance type before deployment.

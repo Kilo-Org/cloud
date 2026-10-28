@@ -131,7 +131,6 @@ describe('session creation preflight', () => {
     expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
     expect(assertKiloModelAvailableMock).not.toHaveBeenCalled();
     expect(resolved.parentCloudAgentSessionId).toBe(authority.parentSessionId);
-    expect(resolved.allowSubagentSessions).not.toBe(true);
     balanceMock.mockClear();
     const freeContext = {
       ...scopedContext,

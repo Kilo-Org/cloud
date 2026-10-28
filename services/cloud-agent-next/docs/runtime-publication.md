@@ -43,15 +43,21 @@ The trigger stays disabled until infrastructure owners approve and provision:
 
 - A private runtime R2 bucket, separate from session storage. Keep public access disabled.
 - Repository variables `CLOUD_AGENT_RUNTIME_ACCOUNT_ID` and `CLOUD_AGENT_RUNTIME_BUCKET`.
-- Environment `cloud-agent-runtime-publication`, with its required reviewers.
-- Secrets `CLOUD_AGENT_RUNTIME_R2_WRITE_ACCESS_KEY_ID` and `CLOUD_AGENT_RUNTIME_R2_WRITE_SECRET_ACCESS_KEY`,
-  with the minimum bucket-scoped object write/read permissions. The publisher performs no deletes.
-- Secret `CLOUD_AGENT_RUNTIME_REGISTRY_PUBLISH_TOKEN`, restricted to the selected account's registry.
-- Deployment read credentials `CLOUD_AGENT_RUNTIME_R2_READ_ACCESS_KEY_ID` and
-  `CLOUD_AGENT_RUNTIME_R2_READ_SECRET_ACCESS_KEY`, restricted to the same bucket.
-- Finally, repository variable `CLOUD_AGENT_RUNTIME_PUBLICATION_ENABLED=true`.
+- Environment `cloud-agent-runtime-publication`, with a deployment branch policy restricted to `main`.
+- Repository secrets `CLOUD_AGENT_RUNTIME_R2_ACCESS_KEY_ID` and
+  `CLOUD_AGENT_RUNTIME_R2_SECRET_ACCESS_KEY`, with bucket-scoped object read/write permission.
+  The publisher performs no deletes. Publication and deployment use the same pair.
+- Repository secret `CLOUDFLARE_API_TOKEN` with permission to push to the selected account's container
+  registry. The publisher reuses the existing deploy token.
+- Finally, repository variable `CLOUD_AGENT_RUNTIME_PUBLICATION_ENABLED=true` for automatic runs.
 
-No resources or credentials were provisioned by this change. No deployed target selects downloaded startup.
+A manual `workflow_dispatch` run accepts an exact main SHA and requires a successful trusted CI push
+run for that SHA. Manual runs work while the enablement variable is unset; automatic runs require it.
+The admission checkout and the publication environment are restricted to `main`.
+
+Publication does not change startup selection. All committed targets stay on preinstalled all-in-one
+images until a separate reviewed catalog change. Publication does not provision credentials or deploy
+the Worker.
 
 `runtime-targets.json` owns target mode/image selection. See [runtime-rollout.md](runtime-rollout.md)
 for rendering, isolated qualification and rollback.

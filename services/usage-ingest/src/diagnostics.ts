@@ -7,23 +7,26 @@ export function logSafely(level: 'info' | 'warn', fields: () => object): void {
   }
 }
 
+function record(value: unknown): Record<string, unknown> | undefined {
+  return value !== null && typeof value === 'object'
+    ? (value as Record<string, unknown>)
+    : undefined;
+}
+
+function nonNegativeInteger(value: unknown): number | undefined {
+  return typeof value === 'number' && Number.isSafeInteger(value) && value >= 0 ? value : undefined;
+}
+
 export function queueMetrics(value: unknown): object {
   try {
-    if (!value || typeof value !== 'object' || !('metadata' in value)) return {};
-    const metadata = value.metadata;
-    if (!metadata || typeof metadata !== 'object' || !('metrics' in metadata)) return {};
-    const metrics = metadata.metrics;
-    if (!metrics || typeof metrics !== 'object') return {};
-    const count = 'backlogCount' in metrics ? metrics.backlogCount : undefined;
-    const bytes = 'backlogBytes' in metrics ? metrics.backlogBytes : undefined;
-    const oldest = 'oldestMessageTimestamp' in metrics ? metrics.oldestMessageTimestamp : undefined;
+    const metrics = record(record(record(value)?.metadata)?.metrics);
+    if (!metrics) return {};
+    const count = nonNegativeInteger(metrics.backlogCount);
+    const bytes = nonNegativeInteger(metrics.backlogBytes);
+    const oldest = metrics.oldestMessageTimestamp;
     return {
-      ...(typeof count === 'number' && Number.isSafeInteger(count) && count >= 0
-        ? { queue_backlog_count: count }
-        : {}),
-      ...(typeof bytes === 'number' && Number.isSafeInteger(bytes) && bytes >= 0
-        ? { queue_backlog_bytes: bytes }
-        : {}),
+      ...(count === undefined ? {} : { queue_backlog_count: count }),
+      ...(bytes === undefined ? {} : { queue_backlog_bytes: bytes }),
       ...(oldest instanceof Date && Number.isFinite(oldest.getTime())
         ? { queue_oldest_message_at_ms: oldest.getTime() }
         : {}),

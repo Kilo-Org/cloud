@@ -629,7 +629,7 @@ function assertCanCreate(existing: { slug: string }[], slug: string): void {
   }
 }
 
-export async function ownerRouterSlugs(
+async function ownerRouterSlugs(
   executor: DrizzleTransaction | typeof db,
   owner: CustomRouterOwner
 ): Promise<{ slug: string }[]> {

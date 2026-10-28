@@ -8,6 +8,7 @@ import {
   byok_api_keys,
   coding_plan_key_inventory,
   coding_plan_subscriptions,
+  modelsByProvider,
   organization_audit_logs,
 } from '@kilocode/db/schema';
 import { eq, and } from 'drizzle-orm';
@@ -721,6 +722,45 @@ describe('BYOK Router', () => {
         .where(eq(organization_audit_logs.organization_id, organizationA.id))
         .orderBy(organization_audit_logs.id);
       expect(logsAfter).toEqual(logsBefore);
+    });
+  });
+
+  describe('listSupportedModels', () => {
+    test('lists models as "name (id)" per provider', async () => {
+      const [snapshot] = await db
+        .insert(modelsByProvider)
+        .values({
+          data: { providers: [], total_providers: 0, total_models: 0, generated_at: '' },
+          openrouter: {
+            'anthropic/claude-fixture': {
+              id: 'anthropic/claude-fixture',
+              name: 'Claude Fixture',
+              endpoints: [],
+            },
+          },
+          vercel: {
+            'anthropic/claude-fixture': {
+              id: 'anthropic/claude-fixture',
+              name: 'Claude Fixture',
+              type: 'language',
+              endpoints: [{ provider_name: 'anthropic' }, { provider_name: 'bedrock' }],
+            },
+          },
+        })
+        .returning({ id: modelsByProvider.id });
+
+      try {
+        const caller = await createCallerForUser(ownerUser.id);
+        const result = await caller.byok.listSupportedModels();
+
+        expect(result.anthropic).toEqual(['Claude Fixture (anthropic/claude-fixture)']);
+        expect(result.bedrock).toEqual(['Claude Fixture (anthropic/claude-fixture)']);
+        expect(result['byteplus-coding']).toContain(
+          'ByteDance-Seed-Code (byteplus-coding/bytedance-seed-code)'
+        );
+      } finally {
+        await db.delete(modelsByProvider).where(eq(modelsByProvider.id, snapshot.id));
+      }
     });
   });
 

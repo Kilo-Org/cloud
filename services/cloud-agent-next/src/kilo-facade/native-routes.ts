@@ -207,9 +207,10 @@ export async function parseNativeAnswerBody(
   | { ok: true; reply: Extract<NativeSessionRoute, { kind: 'answering' }>['reply'] }
   | { ok: false; status: number; code: string; message: string }
 > {
+  // The native question.reject route takes no body.
+  if (route.reply.action === 'question.reject') return { ok: true, reply: route.reply };
   const body = await readNativeJsonBody(request);
   if (!body.ok) return body;
-  if (route.reply.action === 'question.reject') return { ok: true, reply: route.reply };
   if (route.reply.action === 'question.reply') {
     const parsed = questionReplyBodySchema.safeParse(body.value);
     if (!parsed.success) {

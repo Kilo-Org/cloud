@@ -21,13 +21,11 @@ import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/pro
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import { EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
 import type { PreferredProviderOrderConfig } from '@kilocode/db/schema-types';
-import {
-  CUSTOM_PRICING_FALLBACK_CONFIG,
-  getCustomPricing,
-} from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import { getCustomPricing } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
 
 function customPricingFor(model: string) {
-  return getCustomPricing(CUSTOM_PRICING_FALLBACK_CONFIG, model);
+  return getCustomPricing(TEST_CUSTOM_PRICING_CONFIG, model);
 }
 
 const nonFlexExclusiveModel: KiloExclusiveModel = {

@@ -32,6 +32,10 @@ const streamChunkSchema = z.object({
   usage: z
     .object({
       cost: z.number().nonnegative().nullish(),
+      is_byok: z.boolean().nullish(),
+      cost_details: z
+        .object({ upstream_inference_cost: z.number().nonnegative().nullish() })
+        .nullish(),
       prompt_tokens: z.number().int().nonnegative().nullish(),
       completion_tokens: z.number().int().nonnegative().nullish(),
     })
@@ -83,7 +87,14 @@ export async function readSweepCompletion(
       }
       output += delta.content ?? '';
     }
-    if (chunk.usage?.cost != null) costUsd = chunk.usage.cost;
+    if (chunk.usage) {
+      // With BYOK, `cost` is only OpenRouter's fee; the provider bills the upstream inference cost.
+      const billed =
+        chunk.usage.is_byok === true
+          ? chunk.usage.cost_details?.upstream_inference_cost
+          : chunk.usage.cost;
+      if (billed != null) costUsd = billed;
+    }
     if (chunk.usage?.prompt_tokens != null || chunk.usage?.completion_tokens != null) {
       tokenUsage = {
         promptTokens: chunk.usage.prompt_tokens ?? tokenUsage?.promptTokens ?? null,

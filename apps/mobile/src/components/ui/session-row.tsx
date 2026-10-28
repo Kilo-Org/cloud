@@ -76,6 +76,7 @@ type SessionRowProps = {
    *   row's horizontal padding. Used by the Agents list rows.
    */
   stripMode?: 'edge' | 'inline';
+  titleFirst?: boolean;
   className?: string;
 };
 
@@ -99,6 +100,7 @@ export function SessionRow({
   last,
   stripMode = 'edge',
   subtitleVariant = 'mono',
+  titleFirst = false,
   className,
 }: Readonly<SessionRowProps>) {
   const colors = useThemeColors();
@@ -112,7 +114,7 @@ export function SessionRow({
     scheduled: statusKind === 'scheduled',
     live: Boolean(live),
     hasMeta: Boolean(meta),
-    metaWhileLive,
+    metaWhileLive: metaWhileLive && !titleFirst,
     hasPlatformIcon: platformIcon != null,
   });
 
@@ -158,7 +160,16 @@ export function SessionRow({
       </View>
     );
   } else if (eyebrowDecision.kind === 'live') {
-    branchContent = <SessionStatusIcon kind={liveKind} />;
+    branchContent = titleFirst ? (
+      <View className="shrink-0 flex-row items-center gap-1.5">
+        <SessionStatusIcon kind={liveKind} />
+        <Text className="text-xs text-muted-foreground">
+          {t(liveKind === 'idle' ? 'common.idle' : 'common.working')}
+        </Text>
+      </View>
+    ) : (
+      <SessionStatusIcon kind={liveKind} />
+    );
   } else if (eyebrowDecision.kind === 'meta' && meta) {
     branchContent = (
       <Text
@@ -191,6 +202,18 @@ export function SessionRow({
     eyebrowRight = branchContent;
   }
 
+  const titleNode = (
+    <Text
+      className={cn(
+        'font-medium tracking-tight text-foreground',
+        titleFirst ? 'text-[16px] leading-[22px]' : 'text-sm'
+      )}
+      numberOfLines={2}
+    >
+      {title}
+    </Text>
+  );
+
   const row = (
     <View
       className={cn(
@@ -199,44 +222,46 @@ export function SessionRow({
         className
       )}
     >
-      {stripMode === 'edge' ? (
-        <AgentBadge
-          agent={agentLabel}
-          variant="strip"
-          className={dimStrip ? 'opacity-30' : undefined}
-        />
-      ) : (
-        <View
-          className={cn(
-            'w-[3px] self-stretch rounded-[2px]',
-            color.hueClass,
-            dimStrip && 'opacity-30'
-          )}
-        />
-      )}
+      {!titleFirst &&
+        (stripMode === 'edge' ? (
+          <AgentBadge
+            agent={agentLabel}
+            variant="strip"
+            className={dimStrip ? 'opacity-30' : undefined}
+          />
+        ) : (
+          <View
+            className={cn(
+              'w-[3px] self-stretch rounded-[2px]',
+              color.hueClass,
+              dimStrip && 'opacity-30'
+            )}
+          />
+        ))}
       <View className="min-w-0 flex-1">
-        <View className="mb-[3px] flex-row items-center justify-between">
-          {/* flex-1 basis 0: the right cluster is sized first at its full
-              natural width, so a long agent label truncates instead of
-              crowding the status glyph and relative time out of the row.
-              The label is the repo identifier, so it ellipsizes in the middle
-              rather than at the tail: a tail ellipsis hides the distinguishing
-              suffix ("TAX-REPORT-GENERA…"), while middle keeps both ends legible
-              (the long-identifier convention in `KvRow` and `SheetHeader`). The
-              one-line clamp still bounds the eyebrow. */}
-          <Eyebrow
-            className={cn('min-w-0 flex-1', color.hueTextClass)}
-            numberOfLines={1}
+        {titleFirst ? titleNode : null}
+        {titleFirst ? (
+          <Text
+            className="mt-1 text-xs text-muted-foreground"
+            numberOfLines={2}
             ellipsizeMode="middle"
           >
-            {agentLabel}
-          </Eyebrow>
-          {eyebrowRight}
-        </View>
-        <Text className="text-sm font-medium tracking-tight text-foreground" numberOfLines={2}>
-          {title}
-        </Text>
-        {subtitle ? (
+            {[subtitle, agentLabel].filter(Boolean).join(' · ')}
+          </Text>
+        ) : (
+          <View className="mb-[3px] flex-row items-center justify-between">
+            <Eyebrow
+              className={cn('min-w-0 flex-1', color.hueTextClass)}
+              numberOfLines={1}
+              ellipsizeMode="middle"
+            >
+              {agentLabel}
+            </Eyebrow>
+            {eyebrowRight}
+          </View>
+        )}
+        {!titleFirst ? titleNode : null}
+        {!titleFirst && subtitle ? (
           <Text
             variant={subtitleVariant}
             className={
@@ -248,6 +273,21 @@ export function SessionRow({
           >
             {subtitle}
           </Text>
+        ) : null}
+        {titleFirst ? (
+          <View className="mt-2 min-w-0 flex-row items-center gap-2">
+            {eyebrowRight}
+            {meta ? (
+              <Text
+                variant="mono"
+                className="min-w-0 shrink text-xs text-muted-foreground"
+                numberOfLines={1}
+                ellipsizeMode="tail"
+              >
+                {meta}
+              </Text>
+            ) : null}
+          </View>
         ) : null}
       </View>
       <DirectionalChevronRight size={14} color={colors.mutedSoft} />

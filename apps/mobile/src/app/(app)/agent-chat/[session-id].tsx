@@ -289,6 +289,7 @@ export default function SessionDetailScreen() {
             </View>
           }
           headerRightShrinks
+          className="pb-1"
         />
         <SessionSkeletonMessages sessionId={sessionId} />
         <SessionComposerSkeleton />
@@ -360,6 +361,7 @@ export default function SessionDetailScreen() {
           reserveTitleSpace
           titleNumberOfLines={SESSION_HEADER_TITLE_LINES}
           backFallback={AGENTS_SESSIONS_HREF}
+          className="pb-1"
         />
         <CenteredState>
           <View className="items-center gap-3 px-6">

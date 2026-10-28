@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Nem sikerült elérni a példányt — lehet, hogy megszakadt a kapcsolat.",
     "remoteSpawnNonRetryable": "A példány nem tudta elindítani a munkamenetet. Ellenőrizd a gépet, vagy frissítsd a CLI-t.",
-    "remoteSpawnInstanceDisconnected": "Megszakadt a kapcsolat a kiválasztott példánnyal. Indíts munkamenetet a Cloud Agent szolgáltatásban, vagy válassz másik példányt.",
-    "liveCount_one": "{{count}} ÉLŐ",
-    "liveCount_other": "{{count}} ÉLŐ"
+    "remoteSpawnInstanceDisconnected": "Megszakadt a kapcsolat a kiválasztott példánnyal. Indíts munkamenetet a Cloud Agent szolgáltatásban, vagy válassz másik példányt."
   },
   "agentChat": {
     "session": {

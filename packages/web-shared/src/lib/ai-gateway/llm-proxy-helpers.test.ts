@@ -42,9 +42,8 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
 
 import {
   gemma_4_26b_a4b_it_free_model,
-  glyph_cluster_stealth_free_model,
   kiloExclusiveModels,
-  reflection_beam_free_model,
+  qwen36_plus_stealth_model,
 } from './kilo-exclusive-models';
 import type { KiloExclusiveModel } from './providers/kilo-exclusive-model';
 import {
@@ -1876,7 +1875,7 @@ describe('requestedSamples', () => {
 
 describe('checkExclusiveModelProviderAllowed', () => {
   const multiProviderModel: KiloExclusiveModel = {
-    ...reflection_beam_free_model,
+    ...qwen36_plus_stealth_model,
     public_id: 'test/multi-provider-exclusive',
     inference_providers: ['anthropic', 'amazon-bedrock'],
   };
@@ -1892,7 +1891,7 @@ describe('checkExclusiveModelProviderAllowed', () => {
   it('allows non-exclusive models, missing provider config, and unrestricted exclusives', () => {
     expect(checkExclusiveModelProviderAllowed('vendor/model', { only: ['openai'] })).toBeNull();
     expect(
-      checkExclusiveModelProviderAllowed(reflection_beam_free_model.public_id, undefined)
+      checkExclusiveModelProviderAllowed(qwen36_plus_stealth_model.public_id, undefined)
     ).toBeNull();
     expect(
       checkExclusiveModelProviderAllowed(gemma_4_26b_a4b_it_free_model.public_id, {
@@ -1923,12 +1922,9 @@ describe('checkExclusiveModelProviderAllowed', () => {
         'No eligible provider can serve the selected model. Please enable provider: anthropic, amazon-bedrock',
     });
 
-    const ignoreResult = checkExclusiveModelProviderAllowed(
-      glyph_cluster_stealth_free_model.public_id,
-      {
-        ignore: ['stealth'],
-      }
-    );
+    const ignoreResult = checkExclusiveModelProviderAllowed(qwen36_plus_stealth_model.public_id, {
+      ignore: ['stealth'],
+    });
     expect(ignoreResult?.status).toBe(403);
   });
 });

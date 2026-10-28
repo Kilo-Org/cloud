@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import jwt from 'jsonwebtoken';
+import { verifyKiloBearerAgainstCurrentPepper } from '@kilocode/worker-utils/kilo-token-auth';
 import { mintApiToken, mintStreamTicket, type TestUser } from '../e2e/auth.js';
 
 describe('E2E API token', () => {
@@ -50,20 +51,46 @@ describe('E2E API token', () => {
     });
   });
 
-  it('normalizes an empty persisted pepper to null', () => {
-    const secret = 'test-secret';
+  it.each([null, '', 'pepper'])(
+    'preserves the persisted pepper %j for account verification',
+    async pepper => {
+      const secret = 'test-secret';
+      const user = { id: 'usr_e2e_test', api_token_pepper: pepper };
+      const token = mintApiToken(user, secret);
+      const payload = jwt.verify(token, secret, {
+        algorithms: ['HS256'],
+        audience: 'cloud-agent-next',
+      });
 
-    const payload = jwt.verify(
-      mintApiToken({ id: 'usr_e2e_test', api_token_pepper: '' }, secret),
-      secret,
-      { algorithms: ['HS256'], audience: 'cloud-agent-next' }
-    );
+      expect(payload).toMatchObject({
+        apiTokenPepper: pepper,
+        runtimeAdmission: { authorizationPepper: pepper },
+      });
 
-    expect(payload).toMatchObject({
-      apiTokenPepper: null,
-      runtimeAdmission: { authorizationPepper: null },
-    });
-  });
+      const auth = {
+        token,
+        nextAuthSecret: secret,
+        workerEnv: 'development',
+        connectionString: 'unused',
+        audience: 'cloud-agent-next',
+      };
+      await expect(
+        verifyKiloBearerAgainstCurrentPepper({
+          ...auth,
+          getUserPepper: async () => ({ pepper, blockedReason: null }),
+        })
+      ).resolves.toEqual({ userId: user.id });
+      await expect(
+        verifyKiloBearerAgainstCurrentPepper({
+          ...auth,
+          getUserPepper: async () => ({
+            pepper: pepper === null ? '' : null,
+            blockedReason: null,
+          }),
+        })
+      ).resolves.toBeNull();
+    }
+  );
 });
 
 describe('E2E stream ticket', () => {

@@ -1713,13 +1713,7 @@
     },
     "remoteSpawnRetryable": "تعذّر الوصول إلى المثيل — ربما انقطع الاتصال.",
     "remoteSpawnNonRetryable": "فشل المثيل في بدء الجلسة — تحقق من الجهاز أو حدّث CLI.",
-    "remoteSpawnInstanceDisconnected": "انقطع الاتصال بالمثيل المحدد. ابدأ جلسة على Cloud Agent أو اختر مثيلًا آخر.",
-    "liveCount_one": "{{count}} على المباشر",
-    "liveCount_other": "{{count}} على المباشر",
-    "liveCount_zero": "الجلسات النشطة: {{count}}",
-    "liveCount_two": "جلستان نشطتان ({{count}})",
-    "liveCount_few": "{{count}} جلسات نشطة",
-    "liveCount_many": "{{count}} جلسة نشطة"
+    "remoteSpawnInstanceDisconnected": "انقطع الاتصال بالمثيل المحدد. ابدأ جلسة على Cloud Agent أو اختر مثيلًا آخر."
   },
   "agentChat": {
     "session": {

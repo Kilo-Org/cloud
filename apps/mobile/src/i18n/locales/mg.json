@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Tsy tratra ny milina — mety tapaka ny fifandraisana.",
     "remoteSpawnNonRetryable": "Tsy vitan'ny milina ny nanomboka ny fotoam-piasana — jereo ny milina na havaozy ny CLI.",
-    "remoteSpawnInstanceDisconnected": "Tapaka ny fifandraisana amin'ny milina voafidy. Manomboha fotoam-piasana ao amin'ny Cloud Agent na mifidiana milina hafa.",
-    "liveCount_one": "{{count}} MIVANTANA",
-    "liveCount_other": "{{count}} MIVANTANA"
+    "remoteSpawnInstanceDisconnected": "Tapaka ny fifandraisana amin'ny milina voafidy. Manomboha fotoam-piasana ao amin'ny Cloud Agent na mifidiana milina hafa."
   },
   "agentChat": {
     "session": {

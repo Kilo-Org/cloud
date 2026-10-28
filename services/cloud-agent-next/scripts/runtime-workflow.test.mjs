@@ -12,13 +12,39 @@ test('write credentials follow admission and checkout uses its exact SHA', async
   const workflow = await read('cloud-agent-runtime-publish.yml');
   assert.deepEqual(workflow.on, {
     workflow_run: { workflows: ['CI'], types: ['completed'], branches: ['main'] },
+    workflow_dispatch: {
+      inputs: {
+        source_sha: {
+          description: 'Exact main commit SHA with a successful CI run',
+          required: true,
+          type: 'string',
+        },
+      },
+    },
   });
-  assert.equal(workflow.jobs.admit.if, "github.event.workflow_run.conclusion == 'success'");
+  assert.equal(
+    workflow.jobs.admit.if,
+    "(github.event_name == 'workflow_run' && github.event.workflow_run.conclusion == 'success') || github.event_name == 'workflow_dispatch'"
+  );
   assert.deepEqual(workflow.jobs.publish.needs, 'admit');
-  assert.equal(workflow.jobs.publish.if, "vars.CLOUD_AGENT_RUNTIME_PUBLICATION_ENABLED == 'true'");
+  assert.equal(
+    workflow.jobs.publish.if,
+    "github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || vars.CLOUD_AGENT_RUNTIME_PUBLICATION_ENABLED == 'true')"
+  );
   assert.equal(workflow.jobs.publish.environment, 'cloud-agent-runtime-publication');
   assert.ok(!JSON.stringify(workflow.jobs.admit).includes('secrets.'));
   assert.equal(workflow.jobs.admit.steps[0].with.ref, 'refs/heads/main');
+  const automatic = workflow.jobs.admit.steps.find(
+    step => step.name === 'Verify trusted successful CI run'
+  );
+  assert.equal(automatic.if, "github.event_name == 'workflow_run'");
+  assert.equal(automatic.run, 'node services/cloud-agent-next/scripts/runtime-ci-admission.mjs');
+  const manual = workflow.jobs.admit.steps.find(
+    step => step.name === 'Verify manual publication request'
+  );
+  assert.equal(manual.if, "github.event_name == 'workflow_dispatch'");
+  assert.equal(manual.env.SOURCE_SHA, '${{ inputs.source_sha }}');
+  assert.equal(manual.run, 'node services/cloud-agent-next/scripts/runtime-manual-admission.mjs');
   const steps = workflow.jobs.publish.steps;
   assert.equal(steps[0].with.ref, '${{ needs.admit.outputs.source_sha }}');
   const publish = steps.find(

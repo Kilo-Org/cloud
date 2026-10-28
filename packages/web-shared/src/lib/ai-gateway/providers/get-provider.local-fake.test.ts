@@ -922,7 +922,7 @@ describe('getProvider direct BYOK routing', () => {
     });
   });
 
-  test('keeps the regular route when no catalog-mode key serves the API kind', async () => {
+  test('never takes the Kilo route when the catalog-mode keys cannot serve the API kind', async () => {
     jest
       .mocked(findDirectByokCatalogModels)
       .mockResolvedValue([
@@ -933,13 +933,17 @@ describe('getProvider direct BYOK routing', () => {
       .mockResolvedValue([
         { decryptedAPIKey: 'synthetic-key', providerId: 'synthetic', serveCatalogModels: true },
       ]);
-    jest.mocked(shouldRouteToVercel).mockResolvedValue(false);
-    jest.mocked(getModelInferenceUserByokProviders).mockResolvedValue([]);
-    jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue([]);
-    jest.mocked(getBYOKforUser).mockResolvedValue(null);
 
     const result = await getProvider(responsesInput('openai/gpt-oss'));
 
-    expect(result).toMatchObject({ kind: 'provider', provider: OPENROUTER, userByok: null });
+    if (result.kind !== 'provider') throw new Error('expected provider result');
+    expect(result.provider).toMatchObject({
+      id: 'direct-byok',
+      apiKey: 'synthetic-key',
+      supportedChatApis: ['chat_completions'],
+    });
+    expect(result.userByok).toEqual([
+      { decryptedAPIKey: 'synthetic-key', providerId: 'synthetic' },
+    ]);
   });
 });

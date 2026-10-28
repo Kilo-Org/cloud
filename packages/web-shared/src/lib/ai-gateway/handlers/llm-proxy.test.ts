@@ -2111,6 +2111,29 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
+  it('names the BYOK key when it cannot serve the API kind', async () => {
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider: { ...provider, id: 'direct-byok', supportedChatApis: ['responses'] },
+      userByok: [{ decryptedAPIKey: 'key', providerId: 'synthetic' }],
+      isFree: false,
+      bypassAccessCheck: false,
+    });
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('moonshotai/kimi-k2.6')) as never
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error_type: 'api_kind_not_supported',
+      message:
+        'This model does not support the chat_completions API through your Synthetic key, please use any of: responses',
+    });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
   it('explains an unmapped bespoke id when the key serves catalog ids', async () => {
     mockedGetProvider.mockResolvedValue({
       kind: 'direct-byok-catalog-only',

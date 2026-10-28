@@ -177,6 +177,7 @@ async function resolveDirectByokProvider(
     owner,
     catalogModels.map(({ provider }) => provider.id)
   );
+  let unsupportedApiKind: GetProviderProviderResult | null = null;
   for (const { provider, model } of catalogModels) {
     const credential = credentials.find(
       candidate => candidate.providerId === provider.id && candidate.serveCatalogModels
@@ -190,11 +191,12 @@ async function resolveDirectByokProvider(
       request,
       true
     );
-    // A key whose upstream cannot serve this API kind is skipped, so the catalog id falls back to
-    // the next catalog-mode key or the regular route instead of failing the request.
     if (result.provider.supportedChatApis.includes(request.kind)) return result;
+    unsupportedApiKind ??= result;
   }
-  return null;
+  // BYOK requests are never billed to Kilo, so a catalog id the caller's keys serve, but not over
+  // this API kind, fails with the unsupported-API error instead of taking the Kilo route.
+  return unsupportedApiKind;
 }
 
 async function isEligibleForCustomLlm(

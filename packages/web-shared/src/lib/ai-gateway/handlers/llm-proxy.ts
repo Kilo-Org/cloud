@@ -956,7 +956,10 @@ export async function handleLlmProxyRequest(
   if (!effectiveProviderContext.provider.supportedChatApis.includes(requestBodyParsed.kind)) {
     return apiKindNotSupportedResponse(
       requestBodyParsed.kind,
-      effectiveProviderContext.provider.supportedChatApis
+      effectiveProviderContext.provider.supportedChatApis,
+      effectiveProviderContext.provider.id === 'direct-byok'
+        ? effectiveProviderContext.userByok?.[0]?.providerId
+        : undefined
     );
   }
 

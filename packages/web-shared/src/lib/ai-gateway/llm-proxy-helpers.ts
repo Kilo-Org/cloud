@@ -289,11 +289,21 @@ export function inferenceProvidersNotAllowedResponse(inferenceProviders: readonl
   );
 }
 
+const DIRECT_BYOK_PROVIDER_NAMES = new Map<string, string>(
+  Object.entries(DIRECT_BYOK_PROVIDERS_META)
+);
+
+/** `directByokProviderId` names the caller's direct BYOK key that serves the model. */
 export function apiKindNotSupportedResponse(
   apiKind: GatewayChatApiKind,
-  supportedApiKinds: ReadonlyArray<GatewayChatApiKind>
+  supportedApiKinds: ReadonlyArray<GatewayChatApiKind>,
+  directByokProviderId?: string
 ) {
-  const error = `This model does not support the ${apiKind} API, please use any of: ${supportedApiKinds.join()}`;
+  const providerName =
+    directByokProviderId &&
+    (DIRECT_BYOK_PROVIDER_NAMES.get(directByokProviderId) ?? directByokProviderId);
+  const through = providerName ? ` through your ${providerName} key` : '';
+  const error = `This model does not support the ${apiKind} API${through}, please use any of: ${supportedApiKinds.join()}`;
   warnExceptInTest(`[apiKindNotSupportedResponse] ${error}`);
   return NextResponse.json(
     { error, error_type: ProxyErrorType.api_kind_not_supported, message: error },

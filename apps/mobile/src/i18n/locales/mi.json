@@ -3955,6 +3955,8 @@
     "title": "Hoko whiwhinga",
     "description": "He hokonga kotahi ngā whiwhinga ka tāpirihia ki tō toenga Kilo hei whakahaere i ngā wātū whakawaehere AI i te Taupānga Kilo. Ka utu te toa i tō pūkete, ā, ka tāpirihia ngā whiwhinga i muri i te whakamanatanga a te toa i te utu.",
     "nextExpiry": "Ka mōnehu ā te {{date}} (UTC) ngā whiwhinga {{amount}}. Ka whakamahia tuatahitia ngā whiwhinga ka mōnehu tuatahi.",
+    "noExpiringCredits": "Kāore he whiwhinga ka mōnehu.",
+    "expiryUnavailable": "Kāore ngā kōrero mō te mōnehu o ngā whiwhinga e wātea.",
     "appStoreExpiry": "Kāore e mōnehu ngā whiwhinga i hokona mā te App Store.",
     "playOneYearExpiry": "Ka mōnehu ēnei whiwhinga kotahi tau maramataka i muri i te hokonga.",
     "playNonexpiring": "Kāore e mōnehu ēnei whiwhinga.",

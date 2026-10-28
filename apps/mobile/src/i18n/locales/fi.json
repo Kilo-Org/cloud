@@ -3955,6 +3955,8 @@
     "title": "Osta krediittejä",
     "description": "Krediitit ovat kertaostos, joka lisätään Kilo-saldoosi AI-koodausistuntojen ajamista varten Kilo-sovelluksessa. Kauppa veloittaa tiliäsi ja krediitit lisätään, kun kauppa vahvistaa maksun.",
     "nextExpiry": "Krediittejä vanhenee {{date}} (UTC): {{amount}}. Aikaisimmin vanhenevat krediitit käytetään ensin.",
+    "noExpiringCredits": "Ei vanhenevia krediittejä.",
+    "expiryUnavailable": "Krediittien vanhenemistiedot eivät ole saatavilla.",
     "appStoreExpiry": "App Storen kautta ostetut krediitit eivät vanhene.",
     "playOneYearExpiry": "Nämä krediitit vanhenevat yhden kalenterivuoden kuluttua ostosta.",
     "playNonexpiring": "Nämä krediitit eivät vanhene.",

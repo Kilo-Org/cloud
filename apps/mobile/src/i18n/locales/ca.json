@@ -4006,6 +4006,8 @@
     "title": "Compra crèdits",
     "description": "Els crèdits són una compra única que s'afegeix al teu saldo de Kilo per executar sessions de programació amb IA a l'aplicació Kilo. La botiga cobra al teu compte i els crèdits s'afegeixen quan la botiga confirma el pagament.",
     "nextExpiry": "{{amount}} en crèdits caduquen el {{date}} (UTC). Els crèdits amb la caducitat més propera s'utilitzen primer.",
+    "noExpiringCredits": "No hi ha crèdits pendents de caducar.",
+    "expiryUnavailable": "La informació de caducitat dels crèdits no està disponible.",
     "appStoreExpiry": "Els crèdits comprats a l'App Store no caduquen.",
     "playOneYearExpiry": "Aquests crèdits caduquen un any natural després de la compra.",
     "playNonexpiring": "Aquests crèdits no caduquen.",

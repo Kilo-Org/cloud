@@ -4006,6 +4006,8 @@
     "title": "Kupi kredite",
     "description": "Krediti su jednokratna kupnja koja se dodaje tvom Kilo saldu za pokretanje AI sesija kodiranja u aplikaciji Kilo. Trgovina naplaćuje tvoj račun, a krediti se dodaju nakon što trgovina potvrdi plaćanje.",
     "nextExpiry": "Krediti u iznosu od {{amount}} istječu {{date}} (UTC). Najprije se troše krediti s najranijim istekom.",
+    "noExpiringCredits": "Nema kredita koji istječu.",
+    "expiryUnavailable": "Podaci o isteku kredita nisu dostupni.",
     "appStoreExpiry": "Krediti kupljeni putem App Storea ne istječu.",
     "playOneYearExpiry": "Ovi krediti istječu jednu kalendarsku godinu nakon kupnje.",
     "playNonexpiring": "Ovi krediti ne istječu.",

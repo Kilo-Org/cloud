@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Eksemplariga ei õnnestunud ühendust saada — ühendus võib olla katkenud.",
     "remoteSpawnNonRetryable": "Eksemplar ei suutnud seanssi käivitada — kontrolli arvutit või uuenda CLI-d.",
-    "remoteSpawnInstanceDisconnected": "Valitud eksemplari ühendus katkes. Alusta seanssi Cloud Agentis või vali teine eksemplar.",
-    "liveCount_one": "{{count}} REAALAJAS",
-    "liveCount_other": "{{count}} REAALAJAS"
+    "remoteSpawnInstanceDisconnected": "Valitud eksemplari ühendus katkes. Alusta seanssi Cloud Agentis või vali teine eksemplar."
   },
   "agentChat": {
     "session": {

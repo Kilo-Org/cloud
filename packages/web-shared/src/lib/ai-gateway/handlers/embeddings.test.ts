@@ -14,12 +14,18 @@ import {
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { countAndStoreEmbeddingUsage } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
+import { decide, type DecideResponse } from '@kilocode/web-shared/lib/bouncer/client';
 
 jest.mock('next/server', () => ({
   ...(jest.requireActual('next/server') as Record<string, unknown>),
   after: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/user/server');
+jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
+  ...(jest.requireActual('@kilocode/web-shared/lib/bouncer/client') as Record<string, unknown>),
+  decide: jest.fn(),
+  releaseDecideLease: jest.fn(),
+}));
 jest.mock('@kilocode/web-shared/lib/organizations/organization-usage');
 jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
   resolveOrganizationMemberModelDecision: jest.fn(),
@@ -300,6 +306,46 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1]).toMatchObject({
       is_free: false,
       user_byok: true,
+    });
+  });
+
+  describe('bouncer wiring', () => {
+    function verdict(fields: Partial<DecideResponse>): DecideResponse {
+      return { enforced: false, flags: [], spendWatch: false, ...fields } as DecideResponse;
+    }
+
+    it('rejects an enforced verdict before the upstream call', async () => {
+      jest.mocked(decide).mockResolvedValue(verdict({ enforced: true, code: 'restricted' }));
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(403);
+      expect(mockedFetch).not.toHaveBeenCalled();
+      expect(decide).toHaveBeenCalledTimes(1);
+    });
+
+    it('shares the decide id with usage and does not attribute the billing fallback feature', async () => {
+      jest.mocked(decide).mockResolvedValue(verdict({ spendWatch: true }));
+
+      const { handleEmbeddingsRequest } = await import('./embeddings');
+      const response = await handleEmbeddingsRequest(makeRequest());
+
+      expect(response.status).toBe(200);
+      expect(decide).toHaveBeenCalledTimes(1);
+      const decided = jest.mocked(decide).mock.calls[0]?.[0];
+      expect(decided).toMatchObject({ tier: 'paid', accountId: 'user:user-123', ip: '127.0.0.1' });
+      expect(jest.mocked(countAndStoreEmbeddingUsage).mock.calls[0]?.[1].bouncer).toEqual({
+        requestId: decided?.requestId,
+        occurredAt: expect.any(Date),
+        accountId: 'user:user-123',
+        clientIp: '127.0.0.1',
+        clientAttributed: false,
+        requestedLogprobs: false,
+        samples: null,
+        promptSimHash: null,
+        spendWatch: true,
+      });
     });
   });
 });

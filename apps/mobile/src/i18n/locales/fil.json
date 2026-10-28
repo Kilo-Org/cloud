@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Hindi maabot ang instance — maaaring nadiskonekta ito.",
     "remoteSpawnNonRetryable": "Hindi masimulan ng instance ang session — suriin ang computer o i-update ang CLI.",
-    "remoteSpawnInstanceDisconnected": "Nadiskonekta ang napiling instance. Magsimula ng session sa Cloud Agent o pumili ng ibang instance.",
-    "liveCount_one": "{{count}} NA AKTIBO",
-    "liveCount_other": "{{count}} NA AKTIBO"
+    "remoteSpawnInstanceDisconnected": "Nadiskonekta ang napiling instance. Magsimula ng session sa Cloud Agent o pumili ng ibang instance."
   },
   "agentChat": {
     "session": {

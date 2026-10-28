@@ -370,6 +370,8 @@ patchedDependencies:
   llama.rn@0.12.9: patches/llama.rn@0.12.9.patch
   stripe@23.0.0: patches/stripe@23.0.0.patch
   '@expo/react-native-action-sheet@4.1.1': patches/@expo+react-native-action-sheet@4.1.1.patch
+  # Keep lease renewal errors categorical; neither runtime may log receipt handles.
+  '@vercel/queue@0.8.0': patches/@vercel+queue@0.8.0.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'

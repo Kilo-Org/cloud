@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "له انسټنس سره اړیکه ټینګه نه شوه — کېدای شي اړیکه یې پرې شوې وي.",
     "remoteSpawnNonRetryable": "انسټنس ونه شو کړای ناسته پیل کړي — ماشین وګورئ یا CLI تازه کړئ.",
-    "remoteSpawnInstanceDisconnected": "د ټاکل شوي انسټنس اړیکه پرې شوه. په Cloud Agent کې ناسته پیل کړئ یا بل انسټنس غوره کړئ.",
-    "liveCount_one": "{{count}} ژوندۍ",
-    "liveCount_other": "{{count}} ژوندۍ"
+    "remoteSpawnInstanceDisconnected": "د ټاکل شوي انسټنس اړیکه پرې شوه. په Cloud Agent کې ناسته پیل کړئ یا بل انسټنس غوره کړئ."
   },
   "agentChat": {
     "session": {

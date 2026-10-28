@@ -1,5 +1,3 @@
-import { randomUUID } from 'crypto';
-import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import { INCEPTION_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
@@ -7,10 +5,7 @@ import z from 'zod';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
-import {
-  isFreeModel,
-  isFreeModelExcludingCustomLlms,
-} from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
@@ -23,27 +18,22 @@ import {
   wrapInSafeNextResponse,
   captureProxyError,
   extractHeaderAndLimitLength,
-  modelNotAllowedResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
-import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { getBYOKforOrganization, getBYOKforUser } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { checkDirectProviderAccess } from '@kilocode/web-shared/lib/ai-gateway/direct-provider-access';
 import { findSupportedFimModel } from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
-import { bouncerAccountId, normalizeJa4 } from '@kilocode/web-shared/lib/bouncer/client';
 import {
   bareIpLiteral,
   bouncerDecideTier,
-  bouncerRejectionResponse,
-  payerSharingIp,
   rawClientIp,
-  startBouncerDecide,
 } from '@kilocode/web-shared/lib/bouncer/inference';
+import { signedInBouncerRequest } from '@kilocode/web-shared/lib/bouncer/request';
 
 // Inception's edit endpoint mirrors a chat completion shape but is hosted at
 // a separate path. It accepts a single `role: "user"` message; the system prompt
@@ -163,10 +153,13 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
   const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER));
 
-  // Resolve bouncer's identity once for this request. Edit is always signed in, so
-  // its usage row uses a payer-safe IP that drops shared Kilo infrastructure.
-  const bouncerIp = bareIpLiteral(rawClientIp(request));
-  const bouncerRequestId = randomUUID();
+  const bouncer = signedInBouncerRequest({
+    ip: bareIpLiteral(rawClientIp(request)),
+    ja4Digest: fraudHeaders.http_x_vercel_ja4_digest,
+    userId: user.id,
+    organizationId,
+    feature,
+  });
 
   const promptInfo = extractEditPromptInfo(requestBody);
 
@@ -203,55 +196,27 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
     auto_model: null,
     ttfb_ms: null,
     requestStartedAt,
-    bouncer: {
-      requestId: bouncerRequestId,
+    bouncer: bouncer.usage({
       occurredAt: new Date(requestStartedAtMs),
-      accountId: bouncerAccountId(user.id, organizationId),
-      clientIp: payerSharingIp(bouncerIp, feature),
       clientAttributed: feature !== null || Boolean(xKiloCodeVersion),
       requestedLogprobs: false,
       samples: null,
       // Edit feeds volume rules only, which do not read a prompt hash.
       promptSimHash: null,
-    },
+    }),
   };
 
   setTag('ui.ai_model', requestBody.model);
-
-  // Use read replica for balance check - this is a read-only operation that can tolerate
-  // slight replication lag, and provides lower latency for US users.
-  const freeRequest = await isFreeModel(requestBody.model);
-  const { balance, plan, payer } = await getBalanceAndOrgSettings(
-    organizationId,
+  const accessResult = await checkDirectProviderAccess({
     user,
-    readDb,
-    freeRequest ? undefined : 'usage'
-  );
-
-  if (!canSpendPaidUsage(balance) && !usageContext.is_free && !userByok) {
-    return NextResponse.json(
-      {
-        error: { message: 'Insufficient credits' },
-        error_type: ProxyErrorType.insufficient_credits,
-      },
-      { status: 402 }
-    );
-  }
-
-  if (organizationId) {
-    const { decision } = await resolveOrganizationMemberModelDecision({
-      organizationId,
-      kiloUserId: user.id,
-      modelId: requestBody.model,
-      fromDb: readDb,
-    });
-    if (
-      !decision.allowed ||
-      (decision.eligibleProviderRoutes && !decision.eligibleProviderRoutes.has(editProvider))
-    ) {
-      return modelNotAllowedResponse();
-    }
-  }
+    organizationId,
+    model: requestBody.model,
+    provider: editProvider,
+    isFreeUsage: usageContext.is_free,
+    hasByok: !!userByok,
+  });
+  if (accessResult.rejection) return accessResult.rejection;
+  const { balance, plan, payer } = accessResult.access;
 
   // Data-use contract for this route: edit goes straight to Inception, which the gateway's
   // provider data policy classifies as not training on prompts and not retaining them
@@ -274,21 +239,13 @@ export async function handleEditCompletionsRequest(request: NextRequest) {
 
   // The one decide for this request, awaited before the upstream call within its 500 ms budget.
   // Only an enforced verdict rejects; every other outcome sends the request.
-  const bouncerVerdictPromise = startBouncerDecide({
-    requestId: bouncerRequestId,
-    ip: bouncerIp,
-    ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
-    account: {
-      accountId: bouncerAccountId(user.id, organizationId),
-      userId: user.id,
-      tier: bouncerDecideTier(organizationId, plan, balance),
-      payer,
-    },
+  const bouncerVerdictPromise = bouncer.decide({
+    tier: bouncerDecideTier(organizationId, plan, balance),
+    payer,
   });
   const bouncerVerdict = await bouncerVerdictPromise;
-  const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
+  const bouncerRejection = bouncer.apply(bouncerVerdict, usageContext.bouncer);
   if (bouncerRejection) return bouncerRejection;
-  if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
 
   sentryRootSpan()?.setAttribute(
     'edit.time_to_request_start_ms',

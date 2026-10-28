@@ -1665,9 +1665,7 @@
     },
     "remoteSpawnRetryable": "無法連線到此執行個體，可能已中斷連線。",
     "remoteSpawnNonRetryable": "此執行個體無法啟動工作階段。請檢查電腦或更新 CLI。",
-    "remoteSpawnInstanceDisconnected": "選取的執行個體已中斷連線。請在 Cloud Agent 上開始工作階段，或選擇其他執行個體。",
-    "liveCount_one": "{{count}} 個即時工作階段",
-    "liveCount_other": "{{count}} 個即時工作階段"
+    "remoteSpawnInstanceDisconnected": "選取的執行個體已中斷連線。請在 Cloud Agent 上開始工作階段，或選擇其他執行個體。"
   },
   "agentChat": {
     "session": {

@@ -46,6 +46,7 @@ import {
   getOrganizationById,
   addUserToOrganization,
   markOrganizationAsDeleted,
+  mutateOrganizationSettings,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import { OrganizationRoleSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
@@ -160,6 +161,11 @@ const UpdateFreeTrialEndAtInputSchema = z.object({
 const UpdateSuppressTrialMessagingInputSchema = z.object({
   organizationId: z.uuid(),
   suppress_trial_messaging: z.boolean(),
+});
+
+const UpdateKiloEncryptInputSchema = z.object({
+  organizationId: z.uuid(),
+  kilo_encrypt: z.boolean(),
 });
 
 const AdminOrganizationDetailsSchema = z.object({
@@ -289,6 +295,11 @@ const AddMemberInputSchema = z.object({
   organizationId: z.uuid(),
   userId: z.string(),
   role: OrganizationRoleSchema,
+});
+
+const SearchParentMembersInputSchema = z.object({
+  organizationId: z.uuid(),
+  search: z.string().trim().min(1).max(200),
 });
 
 export const organizationAdminRouter = createTRPCRouter({
@@ -497,6 +508,35 @@ export const organizationAdminRouter = createTRPCRouter({
         metadata: {
           previousSuppressTrialMessaging: organization.settings.suppress_trial_messaging ?? null,
           suppressTrialMessaging: suppress_trial_messaging,
+        },
+      });
+
+      return successResult();
+    }),
+
+  updateKiloEncrypt: adminProcedure
+    .input(UpdateKiloEncryptInputSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, kilo_encrypt } = input;
+      const organization = await db.query.organizations.findFirst({
+        where: eq(organizations.id, organizationId),
+      });
+      if (!organization) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+
+      await mutateOrganizationSettings(organizationId, current => ({
+        ...current.settings,
+        kilo_encrypt,
+      }));
+
+      await recordAdminAction(ctx, {
+        action: 'organization.kilo_encrypt.set',
+        target: organizationActionTarget(organizationId),
+        message: kilo_encrypt ? 'Enabled AI Guardrails' : 'Disabled AI Guardrails',
+        metadata: {
+          previousKiloEncrypt: organization.settings.kilo_encrypt ?? null,
+          kiloEncrypt: kilo_encrypt,
         },
       });
 
@@ -1006,6 +1046,53 @@ export const organizationAdminRouter = createTRPCRouter({
     };
   }),
 
+  searchParentMembers: adminProcedure
+    .input(SearchParentMembersInputSchema)
+    .query(async ({ input }) => {
+      const organization = await getOrganizationById(input.organizationId);
+      if (!organization?.parent_organization_id) {
+        return { users: [] };
+      }
+
+      const childMemberships = alias(organization_memberships, 'child_memberships');
+      const pattern = `%${input.search}%`;
+      const users = await db
+        .select({
+          id: kilocode_users.id,
+          google_user_email: kilocode_users.google_user_email,
+          google_user_name: kilocode_users.google_user_name,
+        })
+        .from(organization_memberships)
+        .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+        .innerJoin(
+          organizations,
+          and(
+            eq(organizations.id, organization_memberships.organization_id),
+            isNull(organizations.deleted_at)
+          )
+        )
+        .leftJoin(
+          childMemberships,
+          and(
+            eq(childMemberships.organization_id, organization.id),
+            eq(childMemberships.kilo_user_id, kilocode_users.id)
+          )
+        )
+        .where(
+          and(
+            eq(organization_memberships.organization_id, organization.parent_organization_id),
+            eq(kilocode_users.is_bot, false),
+            isNull(childMemberships.id),
+            or(
+              ilike(kilocode_users.google_user_email, pattern),
+              ilike(kilocode_users.google_user_name, pattern)
+            )
+          )
+        )
+        .limit(10);
+
+      return { users };
+    }),
   addMember: adminProcedure.input(AddMemberInputSchema).mutation(async ({ input, ctx }) => {
     const { organizationId, userId, role } = input;
 
@@ -1023,6 +1110,35 @@ export const organizationAdminRouter = createTRPCRouter({
         code: 'NOT_FOUND',
         message: 'User not found',
       });
+    }
+
+    if (organization.parent_organization_id) {
+      const [parentMembership] = await db
+        .select({ id: organization_memberships.id })
+        .from(organization_memberships)
+        .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+        .innerJoin(
+          organizations,
+          and(
+            eq(organizations.id, organization_memberships.organization_id),
+            isNull(organizations.deleted_at)
+          )
+        )
+        .where(
+          and(
+            eq(organization_memberships.organization_id, organization.parent_organization_id),
+            eq(organization_memberships.kilo_user_id, userId),
+            eq(kilocode_users.is_bot, false)
+          )
+        )
+        .limit(1);
+      if (!parentMembership || existingUser.is_bot) {
+        throw new TRPCError({
+          code: 'PRECONDITION_FAILED',
+          message:
+            'Child organizations can only add people who are already members of the parent organization.',
+        });
+      }
     }
 
     const ssoPolicy = await resolveEffectiveOrganizationSsoPolicy(organizationId);

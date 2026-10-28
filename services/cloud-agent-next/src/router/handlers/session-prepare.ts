@@ -56,6 +56,9 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
       repo: input.githubRepo,
       githubAccessPurpose: input.githubAccessPurpose ?? 'workflow',
       ...(input.githubIntegrationId ? { githubIntegrationId: input.githubIntegrationId } : {}),
+      ...(input.allowUserAuthorization === undefined
+        ? {}
+        : { allowUserAuthorization: input.allowUserAuthorization }),
       ...(input.githubPullRequestNumber !== undefined
         ? { pullRequestNumber: input.githubPullRequestNumber }
         : {}),
@@ -116,7 +119,6 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
           };
 
   return {
-    allowSubagentSessions: input.allowSubagentSessions ?? false,
     initialTurn,
     agent: {
       mode: input.mode,

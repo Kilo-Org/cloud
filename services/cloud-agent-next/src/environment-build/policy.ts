@@ -33,8 +33,6 @@ export const BUILD_HISTORY_RETENTION_MS = 7 * 24 * 60 * 60_000;
 export const MAX_BUILD_LOG_BYTES = 1024 * 1024;
 /** Session snapshot lookup budget, including retries. */
 export const SNAPSHOT_LOOKUP_BUDGET_MS = 15_000;
-/** One fresh session preparation attempt (`routePreparationMs`). */
-export const SESSION_PREPARATION_BUDGET_MS = 12 * 60_000;
 /** Alarm cadence while a builder runs. */
 export const PREPARING_TICK_MS = 30_000;
 /** Stop retries back off up to this interval and continue until confirmed. */

@@ -1,5 +1,4 @@
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
-import { CUSTOM_PRICING_FALLBACK_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config } from '@kilocode/db/schema';
 import { CustomPricingConfigSchema } from '@kilocode/db/schema-types';
@@ -17,13 +16,10 @@ export const adminCustomPricingRouter = createTRPCRouter({
       .from(ai_gateway_config)
       .where(eq(ai_gateway_config.id, 1))
       .limit(1);
-    if (!row?.config) return { config: null, fallback: CUSTOM_PRICING_FALLBACK_CONFIG };
+    if (!row?.config) return { config: null };
     // jsonb sorts object keys; parsing restores the schema's key order for the editor.
     const parsed = CustomPricingConfigSchema.safeParse(row.config);
-    return {
-      config: parsed.success ? parsed.data : row.config,
-      fallback: CUSTOM_PRICING_FALLBACK_CONFIG,
-    };
+    return { config: parsed.success ? parsed.data : row.config };
   }),
 
   set: adminProcedure.input(SetCustomPricingConfigSchema).mutation(async ({ input }) => {

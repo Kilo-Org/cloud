@@ -10307,6 +10307,10 @@ export const enkrypt_guardrail_charges = pgTable(
     decision: text().notNull().$type<EnkryptGuardrailDecision>(),
     enkrypt_credits_cost: real(),
     charged_microdollars: bigint({ mode: 'number' }).notNull(),
+    // How long the request waited for the guardrail verdict before its upstream call. Set only on
+    // the request's final call, so it is counted once per request; null on a retried call or when
+    // the request returned before awaiting the verdict.
+    added_latency_ms: integer(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [

@@ -1665,9 +1665,7 @@
     },
     "remoteSpawnRetryable": "Không thể kết nối với phiên chạy — có thể phiên chạy đã mất kết nối.",
     "remoteSpawnNonRetryable": "Phiên chạy không thể mở phiên làm việc — hãy kiểm tra máy hoặc cập nhật CLI.",
-    "remoteSpawnInstanceDisconnected": "Phiên chạy đã chọn bị ngắt kết nối. Bắt đầu phiên trên Cloud Agent hoặc chọn phiên chạy khác.",
-    "liveCount_one": "{{count}} TRỰC TIẾP",
-    "liveCount_other": "{{count}} TRỰC TIẾP"
+    "remoteSpawnInstanceDisconnected": "Phiên chạy đã chọn bị ngắt kết nối. Bắt đầu phiên trên Cloud Agent hoặc chọn phiên chạy khác."
   },
   "agentChat": {
     "session": {

@@ -65,7 +65,10 @@ describe('briefing dismissal read boundary', () => {
   it('drops malformed or expired persisted records', async () => {
     storage.getItem.mockResolvedValueOnce('{');
     await expect(readBriefingDismissals('user-1', 1)).resolves.toEqual([]);
-    expect(storage.removeItem).toHaveBeenCalledWith(readCacheScope('user-1'), BRIEFING_DISMISSALS_KEY);
+    expect(storage.removeItem).toHaveBeenCalledWith(
+      readCacheScope('user-1'),
+      BRIEFING_DISMISSALS_KEY
+    );
     storage.getItem.mockResolvedValueOnce(
       JSON.stringify([{ ...dismissal, expiresAt: '2000-01-01T00:00:00.000Z' }])
     );

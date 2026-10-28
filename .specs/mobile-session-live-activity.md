@@ -374,6 +374,9 @@ observable behavior is the same.
 4. A user dismissal of the notification MUST count as Unfollow: the app MUST
    stop following that session, MUST delete the session's server row, and MUST
    NOT re-post the notification for a later update of that session.
+5. Approve MUST answer at most once per request and MUST NOT be dropped because
+   another answer is in flight: a repeat tap of the same ask while its answer
+   runs MUST be suppressed, and a tap on a different ask MUST be answered.
 
 ### Android: updates and ending
 
@@ -414,6 +417,17 @@ observable behavior is the same.
    the notification's data for routing and approval only.
 
 ## Changelog
+
+### 2026-10-27 -- Android answers keep their own ask, and cards survive a failed write
+
+- Added Actions rule 5: a repeat tap of one ask is suppressed while its answer
+  runs, and a tap on a different ask is answered rather than dropped. A
+  notification action names the ask it answers, so only a genuine duplicate is
+  the one it holds back.
+- The card's own writes — the stored card, the quiet moment, the dismissal and
+  the widget deadline — run off the broadcast thread, and a refused write is
+  reported instead of ending the process: a card action never takes the app down
+  and never leaves the broadcast unfinished.
 
 ### 2026-10-23 -- The aggregate Approve names its request
 

@@ -1,31 +1,37 @@
 import { pathToFileURL } from 'node:url';
 import { experimental_readRawConfig } from 'wrangler';
 
+export const supportedEnvironments = ['staging', 'production'];
+
 export async function prepareQueues(
   environment,
   { token = process.env.CLOUDFLARE_API_TOKEN, request = fetch } = {}
 ) {
-  if (environment !== 'staging') throw new Error('Queue preparation supports staging only.');
+  if (!supportedEnvironments.includes(environment))
+    throw new Error('Queue preparation requires staging or production.');
   const { rawConfig: config } = experimental_readRawConfig({
     config: new URL('../wrangler.jsonc', import.meta.url).pathname,
   });
-  const queues = config.env?.staging?.queues;
+  const selected = environment === 'production' ? config : config.env?.staging;
+  const suffix = environment === 'staging' ? '-staging' : '';
+  const globalSource = `usage-ingest-processing${suffix}`;
+  const globalDlq = `usage-ingest-processing-dlq${suffix}`;
+  const queues = selected?.queues;
   const source = queues?.producers?.find(p => p.binding === 'USAGE_INGEST_QUEUE')?.queue;
   const dlq = queues?.producers?.find(p => p.binding === 'USAGE_INGEST_DLQ')?.queue;
-  const eu = source === 'usage-ingest-processing-staging-eu';
-  const worker = config.env?.staging?.name;
+  const eu = source === `${globalSource}-eu`;
+  const worker = selected?.name;
   if (
-    source !== (eu ? 'usage-ingest-processing-staging-eu' : 'usage-ingest-processing-staging') ||
-    dlq !==
-      (eu ? 'usage-ingest-processing-dlq-staging-eu' : 'usage-ingest-processing-dlq-staging') ||
-    worker !== 'usage-ingest-staging' ||
+    source !== (eu ? `${globalSource}-eu` : globalSource) ||
+    dlq !== (eu ? `${globalDlq}-eu` : globalDlq) ||
+    worker !== `usage-ingest${suffix}` ||
     queues.producers.length !== 2 ||
     queues.consumers?.length !== 1 ||
     queues.consumers[0].queue !== source ||
     queues.consumers[0].dead_letter_queue !== dlq ||
     !/^[a-f0-9]{32}$/.test(config.account_id)
   ) {
-    throw new Error('Expected matching staging source/DLQ bindings and Worker name.');
+    throw new Error(`Expected matching ${environment} source/DLQ bindings and Worker name.`);
   }
   if (!token) throw new Error('CLOUDFLARE_API_TOKEN is required.');
   const api = async (path, body, method = body ? 'POST' : 'GET') => {
@@ -90,14 +96,14 @@ export async function prepareQueues(
     if (!queue && !eu) throw new Error(`Rollback queue ${name} is missing; preserve resources.`);
     existing.push(queue);
   }
-  const obsolete = await find(
-    eu ? 'usage-ingest-processing-staging' : 'usage-ingest-processing-staging-eu'
-  );
-  const consumers = obsolete?.consumers ?? (obsolete ? undefined : []);
-  if (!Array.isArray(consumers) || consumers.length > 1)
-    throw new Error('Cannot verify obsolete staging consumer ownership.');
-  const consumer = consumers[0];
-  if (consumer) {
+  const verifyConsumer = async queue => {
+    if (!queue) return;
+    if (!Array.isArray(queue.consumers) || queue.consumers.length > 1)
+      throw new Error(`Cannot verify ${environment} consumer ownership.`);
+    if (!queue.consumers.length) return;
+    const consumer = queue.consumers[0];
+    if (!consumer || typeof consumer !== 'object')
+      throw new Error(`Cannot verify ${environment} consumer ownership.`);
     const owners = [consumer.script_name, consumer.script, consumer.service].filter(
       value => value !== undefined
     );
@@ -107,20 +113,27 @@ export async function prepareQueues(
       owners.some(owner => owner !== worker) ||
       !/^[a-f0-9]{32}$/.test(consumer.consumer_id)
     )
-      throw new Error('Obsolete staging consumer ownership mismatch; nothing detached.');
+      throw new Error(`${environment} consumer ownership mismatch; nothing detached.`);
     if (consumer.service) {
       const { result } = await api(`/workers/services/${worker}`);
       if (
         !result?.default_environment?.environment ||
         consumer.environment !== result.default_environment.environment
       )
-        throw new Error('Obsolete staging consumer environment mismatch; nothing detached.');
+        throw new Error(`${environment} consumer environment mismatch; nothing detached.`);
     }
-  }
+    return consumer;
+  };
+  // Validate the selected slot before changing the old attachment.
+  await verifyConsumer(existing[1]);
+  const obsolete = await find(eu ? globalSource : `${globalSource}-eu`);
+  const consumer = await verifyConsumer(obsolete);
   for (const [index, name] of names.entries()) {
     if (!existing[index]) {
       await api('/queues', { queue_name: name, jurisdiction: 'eu' });
-      verify(await find(name), name);
+      const created = await find(name);
+      verify(created, name);
+      if (index === 1) await verifyConsumer(created);
     }
   }
   // Traffic must already be paused/drained. This detaches, never deletes a queue.

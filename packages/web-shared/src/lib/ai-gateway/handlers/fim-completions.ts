@@ -209,6 +209,7 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     mode: null,
     auto_model: null,
     ttfb_ms: null,
+    requestStartedAt,
     bouncer: {
       requestId: bouncerRequestId,
       occurredAt: new Date(requestStartedAtMs),
@@ -304,7 +305,12 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     op: 'http.client',
   });
 
-  const bodyForUpstream = { ...requestBody, model: upstreamModel };
+  const bodyForUpstream = {
+    ...requestBody,
+    model: upstreamModel,
+    // Inception reports usage in a stream only when asked. Mistral always does and accepts it.
+    ...(requestBody.stream ? { stream_options: { include_usage: true } } : {}),
+  };
 
   // Make upstream request to the resolved provider
   const proxyRes = await fetch(upstreamUrl, {
@@ -316,7 +322,6 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     body: JSON.stringify(bodyForUpstream),
   });
   const ttfbMs = Math.max(0, Math.round(performance.now() - requestStartedAt));
-  usageContext.ttfb_ms = ttfbMs;
   usageContext.status_code = proxyRes.status;
 
   emitApiMetricsForResponse(

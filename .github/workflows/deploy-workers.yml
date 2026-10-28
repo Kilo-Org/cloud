@@ -104,39 +104,35 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: pnpm run deploy
 
-      - name: Check selected staging source for usage writer relay
-        id: usage_relay
-        if: inputs.worker == 'services/usage-ingest' && inputs.target_environment == 'staging'
+      - name: Check selected usage queues
+        id: usage_queues
+        if: inputs.worker == 'services/usage-ingest' && (inputs.target_environment == 'staging' || inputs.target_environment == 'production')
         working-directory: services/usage-ingest
+        env:
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
         run: |
           node --input-type=commonjs <<'NODE'
           const { appendFileSync, existsSync } = require('node:fs');
           const { unstable_readConfig } = require('wrangler');
-          const config = unstable_readConfig({ config: 'wrangler.jsonc', env: 'staging' });
-          const required = config.services.some(service => service.binding === 'USAGE_WRITER_RELAY');
-          if (required && !existsSync('wrangler.writer-relay.jsonc')) {
-            throw new Error('Selected staging source requires the usage writer relay but its config is missing');
+          const environment = process.env.TARGET_ENVIRONMENT;
+          const config = unstable_readConfig({ config: 'wrangler.jsonc', env: environment === 'staging' ? 'staging' : undefined });
+          if (config.services.some(service => service.binding === 'USAGE_WRITER_RELAY')) {
+            throw new Error('Selected usage source requires the retired usage writer relay; use a direct-writer revision or its historical deployment workflow');
           }
           const queuesRequired = config.queues.producers.some(p => p.queue?.endsWith('-eu'));
           appendFileSync(process.env.GITHUB_OUTPUT, `queues_required=${queuesRequired}\n`);
-          appendFileSync(process.env.GITHUB_OUTPUT, `prepare_required=${queuesRequired || existsSync('scripts/provision-queues.mjs')}\n`);
-          appendFileSync(process.env.GITHUB_OUTPUT, `required=${required}\n`);
+          const helper = 'scripts/provision-queues.mjs';
+          const supported = existsSync(helper) && (environment === 'staging' || require(`./${helper}`).supportedEnvironments?.includes('production') === true);
+          appendFileSync(process.env.GITHUB_OUTPUT, `prepare_required=${queuesRequired || supported}\n`);
           NODE
 
-      - name: Prepare staging usage queues
-        if: steps.usage_relay.outputs.prepare_required == 'true'
+      - name: Prepare usage queues
+        if: steps.usage_queues.outputs.prepare_required == 'true'
         working-directory: services/usage-ingest
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: node scripts/provision-queues.mjs staging
-
-      - name: Deploy private staging usage writer relay
-        if: steps.usage_relay.outputs.required == 'true'
-        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          workingDirectory: services/usage-ingest
-          command: deploy --config wrangler.writer-relay.jsonc
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
+        run: node scripts/provision-queues.mjs "$TARGET_ENVIRONMENT"
 
       - name: Deploy to Cloudflare Workers
         id: deploy
@@ -152,7 +148,7 @@ jobs:
           # right before deploy; all other workers are unaffected.
           preCommands: |
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
-          command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} ${{ steps.usage_relay.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}
+          command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} ${{ steps.usage_queues.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}
 
       - name: Deploy to Cloudflare Workers (retry)
         if: steps.deploy.outcome == 'failure'
@@ -162,7 +158,7 @@ jobs:
           workingDirectory: ${{ inputs.worker }}
           preCommands: |
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
-          command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} ${{ steps.usage_relay.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}
+          command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} ${{ steps.usage_queues.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}
 
   detect-changes:
     if: inputs.worker == '' && inputs.base_sha != ''
@@ -409,39 +405,35 @@ jobs:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
         run: pnpm run deploy
 
-      - name: Check selected staging source for usage writer relay
-        id: usage_relay
-        if: matrix.worker == 'services/usage-ingest' && inputs.target_environment == 'staging'
+      - name: Check selected usage queues
+        id: usage_queues
+        if: matrix.worker == 'services/usage-ingest' && (inputs.target_environment == 'staging' || inputs.target_environment == 'production')
         working-directory: services/usage-ingest
+        env:
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
         run: |
           node --input-type=commonjs <<'NODE'
           const { appendFileSync, existsSync } = require('node:fs');
           const { unstable_readConfig } = require('wrangler');
-          const config = unstable_readConfig({ config: 'wrangler.jsonc', env: 'staging' });
-          const required = config.services.some(service => service.binding === 'USAGE_WRITER_RELAY');
-          if (required && !existsSync('wrangler.writer-relay.jsonc')) {
-            throw new Error('Selected staging source requires the usage writer relay but its config is missing');
+          const environment = process.env.TARGET_ENVIRONMENT;
+          const config = unstable_readConfig({ config: 'wrangler.jsonc', env: environment === 'staging' ? 'staging' : undefined });
+          if (config.services.some(service => service.binding === 'USAGE_WRITER_RELAY')) {
+            throw new Error('Selected usage source requires the retired usage writer relay; use a direct-writer revision or its historical deployment workflow');
           }
           const queuesRequired = config.queues.producers.some(p => p.queue?.endsWith('-eu'));
           appendFileSync(process.env.GITHUB_OUTPUT, `queues_required=${queuesRequired}\n`);
-          appendFileSync(process.env.GITHUB_OUTPUT, `prepare_required=${queuesRequired || existsSync('scripts/provision-queues.mjs')}\n`);
-          appendFileSync(process.env.GITHUB_OUTPUT, `required=${required}\n`);
+          const helper = 'scripts/provision-queues.mjs';
+          const supported = existsSync(helper) && (environment === 'staging' || require(`./${helper}`).supportedEnvironments?.includes('production') === true);
+          appendFileSync(process.env.GITHUB_OUTPUT, `prepare_required=${queuesRequired || supported}\n`);
           NODE
 
-      - name: Prepare staging usage queues
-        if: steps.usage_relay.outputs.prepare_required == 'true'
+      - name: Prepare usage queues
+        if: steps.usage_queues.outputs.prepare_required == 'true'
         working-directory: services/usage-ingest
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-        run: node scripts/provision-queues.mjs staging
-
-      - name: Deploy private staging usage writer relay
-        if: steps.usage_relay.outputs.required == 'true'
-        uses: cloudflare/wrangler-action@da0e0dfe58b7a431659754fdf3f186c529afbe65 # v3.14.1
-        with:
-          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
-          workingDirectory: services/usage-ingest
-          command: deploy --config wrangler.writer-relay.jsonc
+          TARGET_ENVIRONMENT: ${{ inputs.target_environment }}
+        run: node scripts/provision-queues.mjs "$TARGET_ENVIRONMENT"
 
       - name: Deploy to Cloudflare Workers
         id: deploy
@@ -461,7 +453,7 @@ jobs:
           # right before deploy; all other workers are unaffected.
           preCommands: |
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
-          command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} ${{ steps.usage_relay.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}
+          command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} ${{ steps.usage_queues.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}
 
       - name: Deploy to Cloudflare Workers (retry)
         if: steps.deploy.outcome == 'failure'
@@ -471,7 +463,7 @@ jobs:
           workingDirectory: ${{ matrix.worker }}
           preCommands: |
             if [ "$(jq -r '.scripts.predeploy // empty' package.json)" != "" ]; then pnpm run predeploy; fi
-          command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} ${{ steps.usage_relay.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}
+          command: ${{ steps.runtime.outputs.command || (inputs.target_environment == 'production' && 'deploy' || format('deploy --env {0}', inputs.target_environment)) }} ${{ steps.usage_queues.outputs.queues_required == 'true' && '--experimental-provision=false' || '' }}
 
   deploy-cloud-agent-after-session-ingest:
     needs: detect-changes
@@ -502,7 +494,7 @@ jobs:
           for attempt in $(seq 1 360); do
             conclusion=$(gh api \
               "repos/${{ github.repository }}/actions/runs/${{ github.run_id }}/jobs?per_page=100" \
-              --jq '.jobs[] | select(.name == "Deploy services/session-ingest") | (.conclusion // .status)' \
+              --jq '.jobs[] | select(.name == "Deploy services/session-ingest" or (.name | endswith(" / Deploy services/session-ingest"))) | (.conclusion // .status)' \
               | head -n 1)
             if [ "$conclusion" = success ]; then exit 0; fi
             if [ -n "$conclusion" ] \

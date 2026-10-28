@@ -5,7 +5,6 @@ import { usage } from './usage.test-fixture';
 
 const writerSecret = 'synthetic-writer-secret';
 const env = {
-  USAGE_INGEST_MODE: 'processing',
   USAGE_WRITER_URL: 'https://writer.test/api/internal/usage/record',
   USAGE_WRITER_SECRET: writerSecret,
   USAGE_WRITER_PROTECTION_BYPASS: 'synthetic-bypass',
@@ -47,18 +46,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe('usage consumer mode', () => {
-  it.each([undefined, 'receipt'])('keeps %s receipt behavior without writer calls', async mode => {
-    const { fetch } = setup();
-    const messages = [message(), message(null)];
-    await worker.queue(batch(messages), { ...env, USAGE_INGEST_MODE: mode });
-    for (const msg of messages) {
-      expect(msg.ack).toHaveBeenCalledExactlyOnceWith();
-      expect(msg.retry).not.toHaveBeenCalled();
-    }
-    expect(fetch).not.toHaveBeenCalled();
-  });
-
+describe('usage consumer', () => {
   it('waits for each validated acknowledgement before ACK and the next write', async () => {
     const { fetch, logs, processingLogs } = setup();
     const clock = vi.spyOn(performance, 'now').mockReturnValue(100);
@@ -137,22 +125,6 @@ describe('usage consumer mode', () => {
       'x-usage-write-source': 'queue',
       'x-vercel-protection-bypass': env.USAGE_WRITER_PROTECTION_BYPASS,
     });
-  });
-
-  it.each(['', 'unexpected'])('retries unknown mode %s without network or ACK', async mode => {
-    const { fetch, logs, processingLogs } = setup();
-    const msg = message();
-    await worker.queue(batch([msg]), { ...env, USAGE_INGEST_MODE: mode });
-    expect(msg.ack).not.toHaveBeenCalled();
-    expect(msg.retry).toHaveBeenCalledExactlyOnceWith();
-    expect(fetch).not.toHaveBeenCalled();
-    expect(processingLogs()).toEqual([
-      expect.objectContaining({ level: 'warn', reason: 'invalid_mode', queue_action: 'retry' }),
-    ]);
-    expect(processingLogs()[0]).not.toHaveProperty('writer_duration_ms');
-    expect(logs[0]).not.toHaveBeenCalled();
-    expect(logs[1]).not.toHaveBeenCalled();
-    expect(logs[2]).toHaveBeenCalledTimes(1);
   });
 
   it.each(['invalid', 'missing_url', 'missing_secret'])(

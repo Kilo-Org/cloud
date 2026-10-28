@@ -18,11 +18,14 @@ import androidx.work.WorkManager
  * same unlocked-device requirement.
  *
  * The receiver only enqueues and returns: a broadcast has a short budget, and a
- * background `startService` is restricted on Android 8+, so the answer runs as
- * headless JS in a unique OneTimeWorkRequest. `KEEP` means a double tap while
- * one answer is in flight enqueues nothing, so the same ask cannot be answered
- * twice. A force-stopped app has no notification to tap, so there is nothing to
- * handle there.
+ * background `startService` is restricted on Android 8+. The answer runs as
+ * headless JS in a WorkManager order, and the card's own writes — the prefs
+ * fsync, the notification post or cancel, the quiet alarm — go to the process's
+ * durable queue (`enqueueDurableWrite`), never to this thread. `KEEP` means a
+ * repeat of one answer while it is in flight enqueues nothing, so the same ask
+ * cannot be answered twice; each ask carries its own order
+ * (`ApprovalGate.enqueue`), so a different one is not dropped. A force-stopped
+ * app has no notification to tap, so there is nothing to handle there.
  *
  * Android-only by capability: an iOS Live Activity press performs inside the
  * app's process through `expo-widgets` (`src/glanceable-ios/interaction.ts`) and
@@ -39,7 +42,9 @@ class ActiveAgentsActionReceiver : BroadcastReceiver() {
     if (action == ACTION_QUIET) {
       // The card itself changes, so no JS runs: the stored card has the quiet form.
       if (sessionId != null) {
-        SessionNotifications.postQuiet(context, sessionId, intent.getLongExtra(EXTRA_QUIET_AT, 0))
+        enqueueDurableWrite {
+          SessionNotifications.postQuiet(context, sessionId, intent.getLongExtra(EXTRA_QUIET_AT, 0))
+        }
       }
       return
     }
@@ -52,8 +57,10 @@ class ActiveAgentsActionReceiver : BroadcastReceiver() {
       // stops following the session and deletes its server row. Each session
       // has its own unique work: a clear-all dismisses several cards at once,
       // and one shared name would let `KEEP` drop all but the first.
-      SessionNotifications.cancel(context, sessionId)
-      enqueueDismiss(context, sessionId)
+      enqueueDurableWrite {
+        SessionNotifications.cancel(context, sessionId)
+        enqueueDismiss(context, sessionId)
+      }
       return
     }
     if (ApprovalGate.isDeviceLocked(context)) {

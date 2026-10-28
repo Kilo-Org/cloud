@@ -25,7 +25,7 @@ import { getFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detecti
 import { normalizeProjectId } from '@kilocode/web-shared/lib/normalizeProjectId';
 import { getXKiloCodeVersionNumber } from '@kilocode/web-shared/lib/userAgent';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
-import { createParser, type EventSourceMessage } from 'eventsource-parser';
+import type { EventSourceMessage } from 'eventsource-parser';
 import { sentryRootSpan } from '../getRootSpan';
 import {
   findKiloExclusiveModel,
@@ -49,6 +49,7 @@ import type {
 import {
   computeOpenRouterCostFields,
   computeVercelCostFields,
+  drainSseStream,
   extractVercelIsByok,
   providerReportsIsByok,
   readResponseText,
@@ -986,19 +987,24 @@ export type MistralFimCompletion = {
   }>;
 };
 
-export type MistralFimStreamChunk = {
+/**
+ * A streamed FIM chunk. Mistral sends the text in `delta.content` and usage in
+ * its final chunk. Inception sends the text in `text`, and usage only in an extra
+ * final chunk with no choices when the request sets `stream_options.include_usage`.
+ */
+type FimStreamChunk = {
   id: string;
-  object: 'fim.completion.chunk';
   model: string;
   created: number;
   choices: Array<{
     index: number;
-    delta: {
+    delta?: {
       content?: string;
     };
+    text?: string;
     finish_reason: string | null;
   }>;
-  usage?: FimUsage; // Only present in final chunk
+  usage?: FimUsage;
 };
 
 function computeInceptionFimMicrodollarCost(usage: FimUsage): number {
@@ -1052,7 +1058,8 @@ async function parseMistralFimUsageFromStream(
   stream: ReadableStream<Uint8Array>,
   requestSpan: Span | undefined,
   provider: ProviderId,
-  statusCode: number
+  statusCode: number,
+  requestStartedAt: number | undefined
 ): Promise<MicrodollarUsageStats> {
   requestSpan?.end();
   const streamProcessingSpan = startInactiveSpan({
@@ -1072,52 +1079,45 @@ async function parseMistralFimUsageFromStream(
   let firstTokenReceived = false;
   let usage: FimUsage | undefined;
 
-  const reader = stream.getReader();
-  const decoder = new TextDecoder();
-
-  const sseStreamParser = createParser({
-    onEvent(event: EventSourceMessage) {
-      if (!firstTokenReceived) {
-        sentryRootSpan()?.setAttribute('fim.time_to_first_token_ms', performance.now() - startedAt);
-        firstTokenReceived = true;
-        timeToFirstTokenSpan.end();
-      }
-
-      if (event.data === '[DONE]') return;
-
-      try {
-        const json = JSON.parse(event.data) as MistralFimStreamChunk;
-
-        model = json.model ?? model;
-        messageId = json.id ?? messageId;
-        usage = json.usage ?? usage; // Usage comes in final chunk
-
-        const contentDelta = json.choices?.[0]?.delta?.content;
-        if (contentDelta) {
-          responseContent += contentDelta;
-        }
-      } catch (e) {
-        reportedError = true;
-        captureException(e, {
-          tags: { source: 'fim_sse_parsing' },
-          extra: { eventData: event.data },
-        });
-      }
-    },
-  });
-
-  try {
-    while (true) {
-      const { done, value } = await reader.read();
-      if (done) break;
-      sseStreamParser.feed(decoder.decode(value, { stream: true }));
+  const onEvent = (event: EventSourceMessage) => {
+    if (!firstTokenReceived) {
+      sentryRootSpan()?.setAttribute('fim.time_to_first_token_ms', performance.now() - startedAt);
+      firstTokenReceived = true;
+      timeToFirstTokenSpan.end();
     }
-  } finally {
-    reader.releaseLock();
-    streamProcessingSpan.end();
-  }
 
-  if (!usage) {
+    if (event.data === '[DONE]') return;
+
+    try {
+      const json = JSON.parse(event.data) as FimStreamChunk;
+
+      model = json.model ?? model;
+      messageId = json.id ?? messageId;
+      usage = json.usage ?? usage;
+
+      const choice = json.choices?.[0];
+      const contentDelta = choice?.delta?.content ?? choice?.text;
+      if (contentDelta) {
+        responseContent += contentDelta;
+      }
+    } catch (e) {
+      reportedError = true;
+      captureException(e, {
+        tags: { source: 'fim_sse_parsing' },
+        extra: { eventData: event.data },
+      });
+    }
+  };
+
+  const { wasAborted, timing } = await drainSseStream(
+    stream,
+    onEvent,
+    streamProcessingSpan,
+    requestStartedAt
+  );
+  if (!firstTokenReceived) timeToFirstTokenSpan.end();
+
+  if (!usage && !wasAborted) {
     captureMessage('SUSPICIOUS: No usage info in FIM stream', {
       level: 'error',
       tags: { source: 'fim_usage_processing' },
@@ -1129,7 +1129,7 @@ async function parseMistralFimUsageFromStream(
     messageId,
     model,
     responseContent,
-    hasError: reportedError,
+    hasError: reportedError || wasAborted,
     inference_provider: provider,
     inputTokens: usage?.prompt_tokens ?? 0,
     outputTokens: usage?.completion_tokens ?? 0,
@@ -1139,9 +1139,9 @@ async function parseMistralFimUsageFromStream(
     is_byok: null,
     upstream_id: null,
     finish_reason: null,
-    latency: null,
+    latency: timing.latency,
     moderation_latency: null,
-    generation_time: null,
+    generation_time: timing.generation_time,
     streamed: null,
     cancelled: null,
     status_code: statusCode,
@@ -1157,6 +1157,7 @@ export function countAndStoreFimUsage(
   debugSaveProxyResponseStream(clonedResponse, logFileExtension);
 
   const statusCode = usageContext.status_code ?? 0;
+  const { requestStartedAt } = usageContext;
   const usageStatsPromise = !clonedResponse.body
     ? Promise.resolve(null)
     : usageContext.isStreaming
@@ -1164,13 +1165,21 @@ export function countAndStoreFimUsage(
           clonedResponse.body,
           requestSpan,
           usageContext.provider,
-          statusCode
+          statusCode,
+          requestStartedAt
         )
-      : clonedResponse
-          .text()
-          .then(content =>
-            parseMistralFimUsageFromString(content, usageContext.provider, statusCode)
-          );
+      : readResponseText(clonedResponse.body, requestStartedAt)
+          .then(({ text, timing }) => ({
+            ...parseMistralFimUsageFromString(text, usageContext.provider, statusCode),
+            ...timing,
+          }))
+          .catch(error => {
+            captureException(error, {
+              tags: { source: 'fim_usage_processing' },
+              extra: { statusCode },
+            });
+            return null;
+          });
 
   after(
     usageStatsPromise.then(usageStats => {
@@ -1297,9 +1306,11 @@ export function countAndStoreEditUsage(
   const statusCode = usageContext.status_code ?? 0;
   const usageStatsPromise = !clonedResponse.body
     ? Promise.resolve(null)
-    : clonedResponse
-        .text()
-        .then(content => parseEditUsageFromResponse(content, usageContext.provider, statusCode))
+    : readResponseText(clonedResponse.body, usageContext.requestStartedAt)
+        .then(({ text, timing }) => ({
+          ...parseEditUsageFromResponse(text, usageContext.provider, statusCode),
+          ...timing,
+        }))
         .catch(error => {
           captureException(error, {
             tags: { source: 'edit_usage_processing' },

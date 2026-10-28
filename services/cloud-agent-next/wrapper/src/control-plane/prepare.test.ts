@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { spawn } from 'node:child_process';
 import { profileConfigPath } from './runtime-profile.js';
 import { describe, expect, it, spyOn } from 'bun:test';
 import { createHash } from 'node:crypto';
@@ -17,7 +18,7 @@ import type {
 import { controlPlaneWrapperFrameSchema } from '../../../src/shared/control-plane-protocol.js';
 import type { ControlDiagnosticFields } from '../../../src/shared/control-diagnostics.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
-import type { ExecResult, ProcessOptions, ProcessOutputStream } from '../utils.js';
+import type { ExecResult, ProcessOptions, ProcessOutputStream, ProcessSpawn } from '../utils.js';
 import * as processUtils from '../utils.js';
 import { createPreparationManager, type PrepareRuntimePort } from './prepare.js';
 import type { WorkspaceStamp } from './workspace-stamp.js';
@@ -667,6 +668,8 @@ function createHarness(
     beforeWorkspace?: () => Promise<void>;
     releaseCleanupDeadlineMs?: number;
     runtimes?: PrepareRuntimePort;
+    runSkillInstall?: typeof processUtils.runProcess;
+    spawnSetup?: ProcessSpawn;
   } = {}
 ): Harness {
   const frames: ControlPlaneWrapperFrame[] = [];
@@ -801,6 +804,8 @@ function createHarness(
     log: message => logs.push(message),
     onNativeDiagnostic: (event, fields) => nativeDiagnostics.push({ event, fields }),
     runtimes,
+    runSkillInstall: options.runSkillInstall,
+    spawnSetup: options.spawnSetup,
     inheritedEnv: {},
     homeRoots: homeRootsFor(options.homeRoot ?? '/tmp/prepare-test-homes'),
     allocationId: 'alloc-current',
@@ -2913,6 +2918,145 @@ describe('control-plane runtime profiles', () => {
     expect(JSON.parse(harness.installCalls[0].env.KILO_CONFIG_CONTENT).permission).toMatchObject(
       permission
     );
+  });
+
+  it('runs skills.sh installation through the setup process spawn', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'control-skills-spawn-'));
+    let spawns = 0;
+    try {
+      const harness = createHarness(FAST_TIMERS, {
+        homeRoot: root,
+        spawnSetup: (command, args, options) => {
+          spawns++;
+          expect(command).toBe('pnpm');
+          expect(args).toContain('skills@1.7.4');
+          expect(options.detached).toBe(true);
+          expect(options.env?.KILOCODE_TOKEN).toBeUndefined();
+          return spawn(
+            process.execPath,
+            [
+              '-e',
+              `const fs = require('node:fs');
+               const path = require('node:path');
+               const dir = path.join(process.env.HOME, '.agents/skills/find-skills');
+               fs.mkdirSync(dir, { recursive: true });
+               fs.writeFileSync(path.join(dir, 'SKILL.md'), '# Find skills');`,
+            ],
+            options
+          );
+        },
+      });
+      await harness.manager.prepare(
+        routeSpec({ runtimeSkills: [{ name: 'find-skills', source: 'vercel-labs/skills' }] })
+      );
+      expect(spawns).toBe(1);
+      expect(harness.frames.at(-1)?.type).toBe('session.ready');
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('installs skills.sh references before Kilo starts and reports progress', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'control-skills-sh-'));
+    try {
+      const harness = createHarness(FAST_TIMERS, {
+        homeRoot: root,
+        runSkillInstall: async (_command, args, options) => {
+          expect(args).toContain('vercel-labs/skills');
+          const installed = path.join(String(options?.env?.HOME), '.agents/skills/find-skills');
+          await fs.mkdir(installed, { recursive: true });
+          await fs.writeFile(path.join(installed, 'SKILL.md'), '# Find skills');
+          return result(0);
+        },
+        beforeEnsure: async () => {
+          const home = harness.ensureInputs[0].env.HOME;
+          expect(
+            await fs.readFile(path.join(home, '.kilocode/skills/find-skills/SKILL.md'), 'utf8')
+          ).toBe('# Find skills');
+        },
+      });
+      await harness.manager.prepare(
+        routeSpec({ runtimeSkills: [{ name: 'find-skills', source: 'vercel-labs/skills' }] })
+      );
+      expect(
+        harness.frames.some(
+          frame =>
+            frame.type === 'session.progress' &&
+            frame.detail?.includes('Installing skills.sh skill')
+        )
+      ).toBe(true);
+      expect(harness.frames.at(-1)?.type).toBe('session.ready');
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('fails setup after bounded skill installation attempts without starting Kilo', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'control-skills-sh-'));
+    let attempts = 0;
+    try {
+      const harness = createHarness(FAST_TIMERS, {
+        homeRoot: root,
+        runSkillInstall: async () => {
+          attempts++;
+          return result(1);
+        },
+      });
+      await harness.manager.prepare(
+        routeSpec({ runtimeSkills: [{ name: 'missing', source: 'owner/repo' }] })
+      );
+      expect(attempts).toBe(2);
+      expect(harness.ensureCalls()).toBe(0);
+      expect(harness.frames.at(-1)).toMatchObject({
+        type: 'session.failed',
+        step: 'setup',
+        subtype: 'setup_command_failed',
+      });
+      expect(
+        harness.frames.some(
+          frame =>
+            frame.type === 'session.progress' &&
+            frame.detail?.includes('Failed to install skills.sh skill owner/repo@missing')
+        )
+      ).toBe(true);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('aborts skill installation on release without retrying or starting Kilo', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'control-skills-sh-'));
+    const started = Promise.withResolvers<void>();
+    let attempts = 0;
+    try {
+      const harness = createHarness(FAST_TIMERS, {
+        homeRoot: root,
+        runSkillInstall: async (_command, _args, options) => {
+          attempts++;
+          started.resolve();
+          await new Promise<void>(resolve =>
+            options?.signal?.addEventListener('abort', () => resolve(), { once: true })
+          );
+          return result(124);
+        },
+      });
+      const spec = routeSpec({
+        runtimeSkills: [{ name: 'find-skills', source: 'vercel-labs/skills' }],
+      });
+      const preparing = harness.manager.prepare(spec);
+      await started.promise;
+      harness.manager.release(spec.sessionId);
+      await preparing;
+      expect(attempts).toBe(1);
+      expect(harness.ensureCalls()).toBe(0);
+      expect(
+        harness.frames.some(
+          frame => frame.type === 'session.failed' || frame.type === 'session.ready'
+        )
+      ).toBe(false);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
   });
 
   it('materializes skills, agents and commands before Kilo starts and retains them through credential refresh', async () => {

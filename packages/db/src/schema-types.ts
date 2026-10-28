@@ -1051,6 +1051,34 @@ export const OrganizationAutoModelSettingsSchema = z.object({
 
 export type OrganizationAutoModelSettings = z.infer<typeof OrganizationAutoModelSettingsSchema>;
 
+export const EnkryptPiiEntitySchema = z.enum(['pii', 'secrets', 'ip_address', 'url']);
+
+export type EnkryptPiiEntity = z.infer<typeof EnkryptPiiEntitySchema>;
+
+/**
+ * Blocking Enkrypt AI input scan of each gateway chat turn. `fail_mode` decides whether a request
+ * is sent (`open`, the default) or rejected (`closed`) when Enkrypt fails or times out. Omitting
+ * `detectors` selects the default set; listing it enables only the detectors it names.
+ */
+export const EnkryptInputGuardrailSettingsSchema = z.object({
+  enabled: z.boolean(),
+  fail_mode: z.enum(['open', 'closed']).optional(),
+  detectors: z
+    .object({
+      injection_attack: z.boolean().optional(),
+      pii_entities: z.array(EnkryptPiiEntitySchema).optional(),
+      nsfw: z.boolean().optional(),
+      toxicity: z.boolean().optional(),
+    })
+    .optional(),
+});
+
+export type EnkryptInputGuardrailSettings = z.infer<typeof EnkryptInputGuardrailSettingsSchema>;
+
+export const OrganizationEnkryptSettingsSchema = z.object({
+  input_guardrail: EnkryptInputGuardrailSettingsSchema.optional(),
+});
+
 const OrganizationSettingsSchema = z.object({
   provider_allow_list: z.array(z.string()).optional(),
 
@@ -1091,6 +1119,7 @@ const OrganizationSettingsSchema = z.object({
   // Seeded usage microdollars written by the sales demo populate step. Used to
   // separate seeded usage from real spend when computing the ledger entry.
   sales_demo_seeded_microdollars: z.number().optional(),
+  enkrypt: OrganizationEnkryptSettingsSchema.optional(),
 });
 
 export type OrganizationSettings = z.infer<typeof OrganizationSettingsSchema>;
@@ -2120,6 +2149,10 @@ export const EnkryptVerificationsSchema = z.record(z.string().min(1), EnkryptVer
 
 export type EnkryptVerifications = z.infer<typeof EnkryptVerificationsSchema>;
 
+export type EnkryptGuardrailApiKind = 'chat_completions' | 'messages' | 'responses';
+
+export type EnkryptGuardrailDecision = 'allowed' | 'blocked' | 'error';
+
 export const ENKRYPT_STALE_AFTER_MS = 26 * 60 * 60 * 1000;
 
 export const EnkryptPublishedBenchmarkSchema = EnkryptBenchmarkSchema.extend({
@@ -2292,8 +2325,28 @@ export const ReasoningDetailsTransformSchema = z.enum(ReasoningDetailsTransform)
 
 export type ReasoningDetailsTransform = z.infer<typeof ReasoningDetailsTransformSchema>;
 
+export const CustomLlmApiKindSchema = z.enum(['chat_completions', 'messages', 'responses']);
+
+export type CustomLlmApiKind = z.infer<typeof CustomLlmApiKindSchema>;
+
+/** The API that clients use for a custom LLM, given its `opencode_settings.ai_sdk_provider`. */
+export function getCustomLlmClientApiKind(
+  aiSdkProvider: CustomLlmProvider | undefined
+): CustomLlmApiKind {
+  switch (aiSdkProvider) {
+    case 'anthropic':
+      return 'messages';
+    case 'openai':
+      return 'responses';
+    default:
+      return 'chat_completions';
+  }
+}
+
 export const CustomLlmApiConfigSchema = z.object({
   internal_id: z.string().min(1).optional(),
+  /** Gateway APIs the upstream serves, including the one clients use. Without it, only that one. */
+  api_kinds: z.array(CustomLlmApiKindSchema).min(1).optional(),
   base_url: z.url(),
   disable_url_suffix: z.boolean().optional(),
   add_cache_breakpoints: z.boolean().optional(),
@@ -2424,6 +2477,14 @@ export const CustomLlmDefinitionSchema = z
     public: CustomLlmPublicSchema.optional(),
   })
   .superRefine((definition, ctx) => {
+    const clientApiKind = getCustomLlmClientApiKind(definition.opencode_settings?.ai_sdk_provider);
+    if (definition.api_kinds && !definition.api_kinds.includes(clientApiKind)) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['api_kinds'],
+        message: `api_kinds must include ${clientApiKind}, the API clients use for this ai_sdk_provider`,
+      });
+    }
     if (!definition.public) return;
     for (const key of ['organization_ids', 'group_ids'] as const) {
       if (definition[key] !== undefined) {

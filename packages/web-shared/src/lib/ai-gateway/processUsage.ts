@@ -5,9 +5,10 @@ import { recordUsageInPrimaryRegion } from './usage-record-client';
 import { after } from 'next/server';
 import {
   USAGE_QUEUE_ONLY_ENABLED,
-  USAGE_SHADOW_PUBLISH_ENABLED,
+  USAGE_QUEUE_SFO_CONFIG,
 } from '@kilocode/web-shared/lib/config.server';
 import { enqueueUsage, type UsageEnqueueOutcome } from './usage-publisher';
+import { isSfoUsageQueueSelected } from './usage-queue-policy';
 import {
   describeDatabaseError,
   isUsageRowConflict,
@@ -297,22 +298,6 @@ export async function toInsertableDbUsageRecord(
   return { core, metadata };
 }
 
-function scheduleUsageEnqueue(payload: UsageRecordRequest): void {
-  if (!USAGE_SHADOW_PUBLISH_ENABLED) return;
-
-  void enqueueUsageWithinLifetime(payload).then(outcome => {
-    if (outcome.kind === 'accepted') {
-      console.info('usage enqueue accepted', { usageId: payload.core.id });
-    } else if (
-      outcome.kind === 'unavailable' &&
-      (outcome.reason === 'registration_failed' || outcome.reason === 'unexpected_rejection')
-    ) {
-      // Transport failures are already reported by the publisher.
-      console.warn('usage enqueue unavailable', { usageId: payload.core.id, ...outcome });
-    }
-  });
-}
-
 async function enqueueUsageWithinLifetime(
   payload: UsageRecordRequest
 ): Promise<UsageEnqueueOutcome> {
@@ -320,7 +305,7 @@ async function enqueueUsageWithinLifetime(
   const publication = start.promise.then(async (registered): Promise<UsageEnqueueOutcome> => {
     if (!registered) return { kind: 'unavailable', reason: 'registration_failed' };
     try {
-      return await enqueueUsage(payload, { retryTransientFailures: USAGE_QUEUE_ONLY_ENABLED });
+      return await enqueueUsage(payload, { retryTransientFailures: true });
     } catch {
       return { kind: 'unavailable', reason: 'unexpected_rejection' };
     }
@@ -353,7 +338,9 @@ export async function logMicrodollarUsage(
     bouncer_usage_event: bouncerUsageEvent,
   };
 
-  if (USAGE_QUEUE_ONLY_ENABLED) {
+  const queueOnly =
+    USAGE_QUEUE_ONLY_ENABLED || isSfoUsageQueueSelected(USAGE_QUEUE_SFO_CONFIG, usageContext);
+  if (queueOnly) {
     const outcome = await enqueueUsageWithinLifetime(payload);
     if (outcome.kind === 'accepted') {
       console.info('usage accounting queued', { usageId: core.id });
@@ -365,8 +352,6 @@ export async function logMicrodollarUsage(
     });
     return null;
   }
-
-  scheduleUsageEnqueue(payload);
 
   const inserted = await saveUsageRelatedData(
     core,
@@ -1449,7 +1434,10 @@ export async function processTokenData(
     genStats.hasError = usageStats.hasError; // retain by choice
     genStats.status_code = usageStats.status_code; // retain by choice
     genStats.streamed ??= usageContext.isStreaming;
-    if (genStats.cost_mUsd !== usageStats.cost_mUsd) {
+    // OpenRouter BYOK transcriptions report neither is_byok nor the upstream cost,
+    // so their response cost is only the BYOK fee and is expected to differ.
+    const responseCostIsOnlyByokFee = usageStats.is_byok == null && genStats.is_byok === true;
+    if (genStats.cost_mUsd !== usageStats.cost_mUsd && !responseCostIsOnlyByokFee) {
       // The provider's generation lookup and the response's own usage payload should
       // yield the same cost. A mismatch means inconsistent token or pricing data from
       // the provider; the generation lookup values win (see assignment below).

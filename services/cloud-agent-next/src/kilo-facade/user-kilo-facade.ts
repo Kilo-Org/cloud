@@ -83,6 +83,7 @@ import {
   projectPublicStoredMessages,
   publicCloudAgentDirectory,
 } from './public-sdk-projection.js';
+import { openSystemFeedStream, SYSTEM_FEED_KILO_PATH } from './system-feed.js';
 
 export const KILO_FACADE_USER_ID_HEADER = 'x-kilo-facade-user-id';
 export const KILO_FACADE_AUTH_TOKEN_HEADER = 'x-kilo-facade-auth-token';
@@ -184,6 +185,16 @@ export type KiloFacadeRequestDeps = {
     kiloSessionId: string;
     attachmentId?: string;
   }) => Promise<NativeAttachOutcome>;
+  /**
+   * Opens the bounded SSE system feed for an owned hosted session's
+   * infrastructure lifecycle (preparation, Cloud status, sandbox status).
+   */
+  systemFeed?: (params: {
+    env: Env;
+    userId: string;
+    cloudAgentSessionId: string;
+    kiloSessionId: string;
+  }) => Response;
   globalEvents?: KiloFacadeGlobalEvents;
 };
 
@@ -1039,6 +1050,58 @@ export async function defaultResolveRootSessionForKiloSession(params: {
   });
 }
 
+/**
+ * Resolves the hosted session named by the public directory selector. This is
+ * the only accepted handle, and authorization runs for exactly that owner/org
+ * session, so a sibling workspace can never be selected.
+ */
+async function resolvePublicEventTarget(params: {
+  env: Env;
+  userId: string;
+  deps?: KiloFacadeRequestDeps;
+  url: URL;
+}): Promise<{ kiloSessionId: string; cloudAgentSessionId: string } | Response> {
+  if ([...params.url.searchParams.keys()].some(key => key !== 'directory')) {
+    return facadeError(
+      400,
+      'KILO_EVENT_SELECTOR_UNSUPPORTED',
+      'Only the Cloud Agent session directory selector is supported'
+    );
+  }
+  if (hasDuplicateQueryParameters(params.url.searchParams)) {
+    return duplicateQueryParametersResponse();
+  }
+  const directory = params.url.searchParams.get('directory');
+  if (!directory) {
+    return facadeError(
+      400,
+      'KILO_EVENT_DIRECTORY_REQUIRED',
+      'A Cloud Agent session directory selector is required'
+    );
+  }
+  const kiloSessionId = parsePublicSessionDirectory(directory);
+  if (!kiloSessionId) {
+    return facadeError(
+      400,
+      'KILO_EVENT_SELECTOR_UNSUPPORTED',
+      'Only a Cloud Agent root session directory selector is supported'
+    );
+  }
+  if (!isSessionIngestKiloSessionId(kiloSessionId)) {
+    return missingRootKiloSessionResponse();
+  }
+  const resolveRoot =
+    params.deps?.resolveRootSessionForKiloSession ?? defaultResolveRootSessionForKiloSession;
+  const root = await resolveRoot({ env: params.env, userId: params.userId, kiloSessionId });
+  if (!root) {
+    return missingRootKiloSessionResponse();
+  }
+  if (!isControlSession(root.cloudAgentSessionId)) {
+    return missingRootKiloSessionResponse();
+  }
+  return { kiloSessionId, cloudAgentSessionId: root.cloudAgentSessionId };
+}
+
 async function eventStreamResponse(params: {
   request: Request;
   env: Env;
@@ -1066,56 +1129,39 @@ async function eventStreamResponse(params: {
     return globalEvents.openPublicGlobalEventStream(userId);
   }
 
+  if (kiloPath === SYSTEM_FEED_KILO_PATH) {
+    if (request.method !== 'GET') {
+      return facadeError(501, 'KILO_ROUTE_UNSUPPORTED', 'Kilo facade route is not supported');
+    }
+    const target = await resolvePublicEventTarget({ env, userId, deps, url });
+    if (target instanceof Response) {
+      return target;
+    }
+    const openSystemFeed = deps?.systemFeed ?? openSystemFeedStream;
+    return openSystemFeed({
+      env,
+      userId,
+      cloudAgentSessionId: target.cloudAgentSessionId,
+      kiloSessionId: target.kiloSessionId,
+    });
+  }
+
   if (kiloPath !== '/event') {
     return null;
   }
   if (request.method !== 'GET') {
     return facadeError(501, 'KILO_ROUTE_UNSUPPORTED', 'Kilo facade route is not supported');
   }
-  if ([...url.searchParams.keys()].some(key => key !== 'directory')) {
-    return facadeError(
-      400,
-      'KILO_EVENT_SELECTOR_UNSUPPORTED',
-      'Only the Cloud Agent session directory selector is supported'
-    );
-  }
-  if (hasDuplicateQueryParameters(url.searchParams)) {
-    return duplicateQueryParametersResponse();
-  }
-  const directory = url.searchParams.get('directory');
-  if (!directory) {
-    return facadeError(
-      400,
-      'KILO_EVENT_DIRECTORY_REQUIRED',
-      'A Cloud Agent session directory selector is required'
-    );
-  }
-  const kiloSessionId = parsePublicSessionDirectory(directory);
-  if (!kiloSessionId) {
-    return facadeError(
-      400,
-      'KILO_EVENT_SELECTOR_UNSUPPORTED',
-      'Only a Cloud Agent root session directory selector is supported'
-    );
-  }
-  if (!isSessionIngestKiloSessionId(kiloSessionId)) {
-    return missingRootKiloSessionResponse();
-  }
-  const resolveRoot =
-    deps?.resolveRootSessionForKiloSession ?? defaultResolveRootSessionForKiloSession;
-  const root = await resolveRoot({ env, userId, kiloSessionId });
-  if (!root) {
-    return missingRootKiloSessionResponse();
-  }
-  if (!isControlSession(root.cloudAgentSessionId)) {
-    return missingRootKiloSessionResponse();
+  const target = await resolvePublicEventTarget({ env, userId, deps, url });
+  if (target instanceof Response) {
+    return target;
   }
   return openHostedNativeAttachment({
     env,
     userId,
     deps,
-    cloudAgentSessionId: root.cloudAgentSessionId,
-    kiloSessionId,
+    cloudAgentSessionId: target.cloudAgentSessionId,
+    kiloSessionId: target.kiloSessionId,
   });
 }
 

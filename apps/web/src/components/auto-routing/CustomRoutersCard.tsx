@@ -58,15 +58,13 @@ export function CustomRoutersCard({ organizationId, readonly = false }: Props) {
   const deleteMutation = useMutation({
     mutationFn: (router: CustomRouterSummary) => deleteCustomRouter(router, organizationId),
     onSuccess: (_result, router) => {
-      queryClient.setQueryData<CustomRouterListResponse | null>(queryKey, current =>
+      queryClient.setQueryData<CustomRouterListResponse>(queryKey, current =>
         current ? { routers: current.routers.filter(item => item.id !== router.id) } : current
       );
       toast.success(`Deleted ${router.name}`);
     },
     onError: error => toast.error(error.message),
   });
-
-  if (query.data === null) return null;
 
   const routers = (query.data?.routers ?? []).filter(router => router.scope === scope);
   const canCreate = !readonly && query.data?.canCreate !== false;
@@ -150,6 +148,7 @@ export function CustomRoutersCard({ organizationId, readonly = false }: Props) {
               <CustomRouterItem
                 key={router.id}
                 router={router}
+                canEdit={!readonly && router.canEdit}
                 deleting={deleteMutation.isPending && deleteMutation.variables?.id === router.id}
                 onEdit={() => setEditor({ router })}
                 onDelete={() => deleteMutation.mutateAsync(router)}
@@ -177,11 +176,13 @@ export function CustomRoutersCard({ organizationId, readonly = false }: Props) {
 
 function CustomRouterItem({
   router,
+  canEdit,
   deleting,
   onEdit,
   onDelete,
 }: {
   router: CustomRouterSummary;
+  canEdit: boolean;
   deleting: boolean;
   onEdit: () => void;
   onDelete: () => Promise<void>;
@@ -198,29 +199,22 @@ function CustomRouterItem({
           <p className="font-medium">{router.name}</p>
           <p className="text-muted-foreground truncate font-mono text-sm">{router.modelId}</p>
           <p className="text-muted-foreground text-sm">
-            Benchmark difficulty: {baseLabel} · {modeLabel}
+            {baseLabel} benchmark difficulty · {modeLabel}
             {defaultEntry ? ` · Default: ${entryLabel(defaultEntry.entry)}` : null}
           </p>
-          {router.legacyPool ? (
-            <p className="text-muted-foreground text-sm">
-              Shared with kilo-auto/efficient during the transition.
-            </p>
-          ) : null}
         </div>
-        {router.canEdit ? (
+        {canEdit ? (
           <div className="flex shrink-0 items-start gap-2">
             <Button type="button" variant="ghost" size="sm" disabled={deleting} onClick={onEdit}>
               <Pencil className="size-4" aria-hidden />
               Edit
             </Button>
-            {!router.legacyPool ? (
-              <InlineDeleteConfirmation
-                onDelete={onDelete}
-                isLoading={deleting}
-                confirmText="Delete router"
-                warningText={`Requests that use ${router.modelId} will fail.`}
-              />
-            ) : null}
+            <InlineDeleteConfirmation
+              onDelete={onDelete}
+              isLoading={deleting}
+              confirmText="Delete router"
+              warningText={`Requests that use ${router.modelId} will fail.`}
+            />
           </div>
         ) : null}
       </div>

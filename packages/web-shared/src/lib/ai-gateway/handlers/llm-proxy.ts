@@ -119,7 +119,6 @@ import {
   applyResolvedModel,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
 import { decideCustomRouter } from '@kilocode/web-shared/lib/ai-gateway/auto-model/custom-router';
-import { findEffectiveLegacyPoolRouter } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import { checkAutoDecision } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-decision';
 import {
   fetchCustomRouterDecision,
@@ -168,6 +167,10 @@ import {
   startBouncerDecide,
 } from '@kilocode/web-shared/lib/bouncer/inference';
 import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
+import { startEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/input-guardrail';
+import { enkryptGuardrailRejectionResponse } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/responses';
+import { resolveEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
+import { extractTurnDeltaText } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/turn-delta';
 
 const MAX_TOKENS_LIMIT = 99999999999; // GPT4.1 default is ~32k
 
@@ -385,6 +388,25 @@ export async function handleLlmProxyRequest(
   // error it causes, and with the platform logs for the same invocation.
   const vercelRequestId = extractHeaderAndLimitLength(request, 'x-vercel-id');
 
+  // Like the bouncer decide, the organization's guardrail scan overlaps auth, balance, and routing
+  // work and is awaited just before the upstream call.
+  const enkryptGuardrailVerdictPromise = startEnkryptInputGuardrail(
+    Promise.all([authPromise, balanceAndSettingsPromise]).then(([auth, { settings }]) => {
+      if (!auth.user || auth.authFailedResponse || !auth.organizationId) return null;
+      const config = resolveEnkryptInputGuardrail(auth.organizationId, settings);
+      if (!config) return null;
+      return {
+        sessionId: taskId ?? sessionHeader ?? null,
+        organizationId: auth.organizationId,
+        kiloUserId: auth.user.id,
+        apiKind: requestBodyParsed.kind,
+        clientRequestId,
+        text: extractTurnDeltaText(requestBodyParsed),
+        config,
+      };
+    })
+  );
+
   const logClientDisconnect = () => {
     // The request signal is forwarded to the upstream fetch and to the response
     // stream reader, so this disconnect also aborts them. Any abort/cancellation
@@ -507,17 +529,6 @@ export async function handleLlmProxyRequest(
       requestedModelLowerCased === KILO_AUTO_EFFICIENT_MODEL.id ||
       requestedModelLowerCased === KILO_AUTO_BALANCED_MODEL.id;
     isAutoRoutedRequest = isAutoEfficientId || isCustomRouterModelId(requestedModelLowerCased);
-    let legacyPoolTarget = false;
-    const legacyPoolRouter = async (): Promise<CustomRouterReference | null> => {
-      const auth = await authPromise;
-      if (!auth.user || auth.authFailedResponse) return null;
-      const router = await findEffectiveLegacyPoolRouter({
-        userId: auth.user.id,
-        organizationId: auth.organizationId ?? null,
-      });
-      legacyPoolTarget = router !== null;
-      return router ? { scope: router.ownerType, slug: router.slug } : null;
-    };
     const decisionForRouter = async (router: AutoRouter) => {
       const { user, authFailedResponse, organizationId } = await authPromise;
       // The classifier uses Kilo's paid credential. Unauthenticated callers
@@ -525,8 +536,8 @@ export async function handleLlmProxyRequest(
       if (!user || authFailedResponse) return null;
       const owner = { userId: user.id, organizationId: organizationId ?? null };
       const deniedModelIds = await autoRoutingDenials(
-        policy => collectDeniedAutoRoutingModelIds(policy, owner, router),
-        () => collectDataCollectionRequiredAutoRoutingModelIds(owner, router)
+        policy => collectDeniedAutoRoutingModelIds(policy, router),
+        () => collectDataCollectionRequiredAutoRoutingModelIds(router)
       );
       const result = await fetchEfficientAutoDecision({
         ...decisionRequest(owner),
@@ -560,9 +571,7 @@ export async function handleLlmProxyRequest(
             ...decisionRequest(caller),
             router: router.baseRouter,
             customRouter: reference,
-            requestedModel: legacyPoolTarget
-              ? requestedModel
-              : customRouterModelId(router.ownerType, router.slug),
+            requestedModel: customRouterModelId(router.ownerType, router.slug),
             deniedModelIds,
           });
           if (outcome.kind === 'ok') legacyClassifierCostUsd = outcome.costUsd;
@@ -589,7 +598,6 @@ export async function handleLlmProxyRequest(
         efficientDecision,
         frontierDecision,
         customRouterDecision,
-        legacyPoolRouter,
         organizationContext: organizationContextPromise,
         isAutoFreeCandidateAllowed: async modelId => {
           const policy = await organizationGroupPolicyPromise;
@@ -1072,6 +1080,23 @@ export async function handleLlmProxyRequest(
   const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
   if (bouncerRejection) return bouncerRejection;
   if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
+  const guardrailWaitStartedAt = performance.now();
+  const guardrailVerdict = await enkryptGuardrailVerdictPromise;
+  if (guardrailVerdict.action !== 'skip') {
+    const guardrailWaitEndedAt = performance.now();
+    console.debug('[enkrypt-guardrail] verdict awaited', {
+      organization_id: organizationId,
+      session_id: taskId ?? sessionHeader ?? null,
+      action: guardrailVerdict.action,
+      waited_ms: Math.round(guardrailWaitEndedAt - guardrailWaitStartedAt),
+      request_elapsed_ms: Math.round(guardrailWaitEndedAt - requestStartedAt),
+    });
+  }
+  const guardrailRejection = enkryptGuardrailRejectionResponse(
+    requestBodyParsed.kind,
+    guardrailVerdict
+  );
+  if (guardrailRejection) return guardrailRejection;
   const requestCostBalance = requestCostLimit !== null ? await balanceAndSettingsPromise : null;
 
   const attempt = await sendUpstreamAttempt({

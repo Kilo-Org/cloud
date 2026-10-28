@@ -2,6 +2,7 @@ import type { Env, SandboxId, SessionId, SessionContext, ExecutionSession } from
 
 import type { MCPSecretValue } from '../router/schemas.js';
 import type { SessionMetadata } from './session-metadata.js';
+import type { RuntimeSkillInput } from '../shared/runtime-profile.js';
 
 /**
  * Local MCP server configuration (runs a command).
@@ -44,16 +45,7 @@ export type MCPRemoteServerConfig = {
  */
 export type MCPServerConfig = MCPLocalServerConfig | MCPRemoteServerConfig;
 
-/**
- * Runtime skill injected from the web app's merged profile stack. `rawMarkdown`
- * is materialized to `${SESSION_HOME}/.kilocode/skills/<name>/SKILL.md`; each
- * entry in `files` is written under the same directory.
- */
-export type RuntimeSkill = {
-  name: string;
-  rawMarkdown: string;
-  files?: Record<string, string>;
-};
+export type RuntimeSkill = RuntimeSkillInput;
 
 /**
  * Runtime agent injected from the web app's merged profile stack. Stored in

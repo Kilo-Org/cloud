@@ -53,7 +53,6 @@ it.each([undefined, 'staging'])(
             configPath: new URL('../wrangler.jsonc', import.meta.url),
             env,
             vars: {
-              USAGE_INGEST_MODE: 'processing',
               USAGE_WRITER_URL: `http://127.0.0.1:${address.port}/api/internal/usage/record`,
             },
             secrets: {

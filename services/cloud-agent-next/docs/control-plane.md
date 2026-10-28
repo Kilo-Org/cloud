@@ -114,7 +114,7 @@ terminal. Nothing else.
 | Outcome (status, reason, `lastMessageId`) | Every `accepted` message up to and including `lastMessageId` takes the status. If `lastMessageId` is unknown, every `accepted` message does. |
 | Stop | All `queued` and `accepted` → `cancelled`; send `abort` (best effort). |
 | Cancel one queued message | That message → `cancelled`. |
-| Backstop alarm | `queued` older than 16.5 minutes → `failed` (`preparation_timeout`). `accepted` older than 125 minutes → `failed` (`no_outcome`). |
+| Backstop alarm | `queued` older than its queued backstop → `failed` (`preparation_timeout`). `accepted` older than its accepted backstop → `failed` (`no_outcome`). |
 
 Stop still forwards a best-effort abort to an existing ready Kilo route when no
 message is queued or accepted and the wrapper has no active turn. It does not
@@ -123,7 +123,7 @@ rewrite terminal message outcomes or prepare/wake a stopped sandbox.
 Late outcomes and notifications for terminal messages are ignored. The backstop exists only for
 lost notifications; the Sandbox DO and the wrapper settle every normal case earlier. Both values
 are derived from the owners' timers so the backstop does not end work within its owner's bound:
-queued = reconnect window (90 s) + one preparation attempt (12 min) + 3 min, which covers the
+queued = reconnect window (90 s) + one preparation attempt (the sum of its step bounds, below) + 3 min, which covers the
 longest normal wait (a message sent while the socket is down, then a fresh attempt on a new
 sandbox); accepted = turn hard cap (120 min) + 5 min. The hard cap bounds one native execution, not
 an accepted message, so a batch whose follow-up waits behind a serialized command spans several
@@ -312,10 +312,16 @@ so a later report changes nothing.
 
 ### Route state (per session)
 
-`preparing` → `ready` → `failed`. Each preparation attempt has a 12-minute deadline. An attempt
+`preparing` → `ready` → `failed`. Each preparation attempt has a deadline that outlasts its
+own steps in sequence (sandbox create, wrapper first connect and hello, snapshot restore with
+the clone fallback, Kilo runtime start, session import), including one create retry and one
+retry each of the last two steps. Environment snapshot builds run separately. An attempt
 starts when a route enters `preparing`: the first `prepare`, a `prepare` after `failed`, or a
 re-prepare after a wrapper restart. A repeated `prepare`, a reconnect or a new allocation inside the
-attempt keeps its deadline.
+attempt keeps its deadline. Setup commands keep their own per-command limits, and how many run is
+configuration, so the attempt deadline is their aggregate stop: a preparation whose setup work
+together outlasts the attempt fails as `preparation_timeout`.
+Environment-build status reports this same timer as `sessionPreparationBudgetMs` for setup warnings.
 
 `prepare` returns the route view that the Sandbox DO would notify: `ready` only when the route is
 ready and the wrapper is connected, `reconnecting` when the route is ready but the socket is down,
@@ -872,7 +878,7 @@ them through one development-only override.
 
 | Owner | Timer | Value | On expiry |
 |---|---|---|---|
-| Session DO | Queued backstop | 16.5 min from send (reconnect + attempt + 3 min) | `failed` (`preparation_timeout`) |
+| Session DO | Queued backstop | From send: reconnect window + one preparation attempt + 3 min | `failed` (`preparation_timeout`) |
 | Session DO | Accepted backstop | 125 min from accept | `failed` (`no_outcome`) |
 | Session DO | Sandbox transport pass / best-effort abort | 2 s including RPC retries, not scaled | Retain queued intent / return from abort |
 | Session DO | Queued transport recovery | 15 s after exhaustion; development-only scaling | Consume once; passive status then bounded prepare/deliver, no self-rearm |
@@ -882,7 +888,7 @@ them through one development-only override.
 | Sandbox DO | Unbound wrapper hello | 30 s from socket admission, not scaled | Close candidate only; attachment deadline survives hibernation and participates in the existing alarm even while stopped |
 | Sandbox DO | Heartbeat | 45 s | Treat the socket as lost |
 | Sandbox DO | Reconnect | 90 s from the last frame received | Stop the sandbox |
-| Sandbox DO | Route preparation | 12 min per preparation attempt | Route `failed` (`preparation_timeout`) |
+| Sandbox DO | Route preparation | Sum of one preparation attempt's step bounds (see Preparation) | Route `failed` (`preparation_timeout`) |
 | Sandbox DO | Session notification | 2 s from enqueue including queue wait and RPC retries, not scaled | Drop expired queued work before RPC; bounded best-effort loss, existing Session backstop |
 | Sandbox DO | Idle | 10 min without activity | Stop the sandbox |
 | Sandbox DO | Provider lease | Existing lease length, renewed while active | Provider may stop an inactive sandbox |
@@ -931,7 +937,7 @@ them through one development-only override.
 | Native execution over 120 min | Native session supervisor | Bounded tree abort | Accepted fail (`execution_limit`), or routed error without a current turn |
 | Idle 10 min, question pending | Sandbox DO | Stop the sandbox | Accepted fail (`sandbox_stopped`); a later answer is a new message |
 | Sandbox gone | Provider via Sandbox DO | New allocation on next `prepare` | Accepted fail (`sandbox_lost`); queued re-prepare |
-| Notification lost | Session DO backstop | — | Fail at 16.5 or 125 min |
+| Notification lost | Session DO backstop | — | Fail at the queued or accepted backstop |
 | User Stop | Session DO | Abort the Kilo session only | Queued and accepted `cancelled` |
 | Auto-commit or condense fails | Wrapper | None | Warning event; turn `completed` |
 | Provider stop not confirmed | Sandbox DO | Logged; next `prepare` may create again | None; worktree deletion reports incomplete |
@@ -1400,7 +1406,7 @@ counts.
     overflow drops newest, loss diagnostics stay bounded/internal and expired queue heads make no RPC.
     Heartbeats, alarms, stop and reconnect continue while notifications are held. Release retires
     references; reconstruction replays no notification backlog. Public events, reports, callbacks
-    and the 16.5/125-minute lost-notification backstops are unchanged.
+    and the queued and accepted lost-notification backstops are unchanged.
 22. **Permanent versus transient creation failure.** Balance lost after send preflight fails queued
     work promptly with `billing_blocked`, not preparation timeout. Proven local invalid configuration
     fails promptly with `invalid_configuration`. The safe stream reason, durable route/message,

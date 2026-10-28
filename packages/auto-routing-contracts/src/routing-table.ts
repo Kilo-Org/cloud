@@ -3,7 +3,7 @@ import { ReasoningEffortSchema } from './reasoning';
 import { TaxonomyRouteKeySchema } from './taxonomy';
 import { DEFAULT_AUTO_ROUTER, type AutoRouter } from './router';
 
-/** Maximum Pool entries in an owner-configured Efficient model pool. */
+/** Maximum models in one benchmark profile registration request. */
 export const MAX_POOL_ENTRIES = 10;
 
 export const PoolEntrySchema = z.object({
@@ -39,7 +39,7 @@ function addDuplicatePoolEntryIssues(entries: PoolEntry[], ctx: z.RefinementCtx)
   });
 }
 
-/** Owner-configured pool of unique models; null inherits the platform pool. */
+/** The unique models of one benchmark profile registration request. */
 export const EfficientModelPoolSchema = z
   .array(PoolEntrySchema)
   .min(1)
@@ -48,11 +48,6 @@ export const EfficientModelPoolSchema = z
     addDuplicatePoolEntryIssues(entries, ctx);
   });
 export type EfficientModelPool = z.infer<typeof EfficientModelPoolSchema>;
-
-export const PersistedEfficientModelPoolSchema = z
-  .array(PoolEntrySchema)
-  .transform(entries => [...new Map(entries.map(entry => [entry.model, entry])).values()])
-  .pipe(EfficientModelPoolSchema);
 
 export const CandidatePricingSchema = z.object({
   promptUsdPerToken: z.number().nonnegative(),

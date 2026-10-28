@@ -45,7 +45,7 @@ Capability lookups derive candidate IDs from the selected router's table; the ca
 cache remains a shared model-ID union because modalities and context limits belong to models.
 
 Both routers are custom-router bases (ADR 0005): owner profile admission, the owner queue,
-owner-pool tables, custom router tables, and client evals accept `efficient` and `frontier`.
+custom router tables, and client evals accept `efficient` and `frontier`.
 Owner work for a base uses that base's configuration, dataset, engine identity, and quota.
 
 Client and direct-BYOK custom-router entries can explicitly link `measuredAs` to a globally
@@ -278,28 +278,24 @@ measurements are included in routing-table version hashes.
 - Daily target changes do not consume the owner's request quota.
 - An unchanged concrete ID has no automatic measurement expiry. Use targeted refresh after a confirmed provider change.
 
-Saved owner pools enter the subscription index when settings are read, saved, or used to assemble a custom table.
-Untouched historical Durable Objects are not centrally enumerable. Backfill known owners before relying on daily coverage for those pools.
+Existing benchmark subscriptions retain their persisted alias targets. Backfill known owners
+with the full model list before relying on daily coverage for historical pools.
 Send the existing full pool to `POST /admin/profiles/subscriptions`:
 
 ```json
 {
   "ownerType": "user",
-  "ownerId": "owner-from-settings",
+  "ownerId": "owner-id",
   "entries": [{ "model": "~vendor/latest" }]
 }
 ```
 
-This authenticated endpoint replaces the owner's tracked pool without editing its saved routing settings.
-Send `entries: null` to remove its subscriptions.
-Use `restorePrevious: true` only to compensate a failed settings save.
+This authenticated endpoint replaces the owner's tracked benchmark models without editing
+its custom router. Send `entries: null` to remove its subscriptions.
+Use `restorePrevious: true` only to compensate a failed router save.
 Ordinary removal and re-addition resolve a new subscription instead of restoring its previous target.
-Apply the additive D1 migration and deploy both routing workers before resuming paused benchmark queues.
+Apply the additive D1 migration and deploy the benchmark worker before resuming paused benchmark queues.
 
-The serving worker bounds its owner-table cache and retains its existing expiry and single-flight loading.
-A mode-only save returns current pool statuses without changing the alias subscription.
-If that status lookup fails, the save leaves the previous mode unchanged.
-A save without an owner pool does not require the benchmark service.
 
 
 ### Unavailable models and targeted refresh
@@ -661,8 +657,8 @@ All under `/admin`, gated by `Authorization: Bearer <INTERNAL_API_SECRET_PROD>`
 (the gateway's admin panel proxies these with the internal secret):
 
 GET endpoints accept `?router=efficient|frontier`; mutations accept `router` in their body
-or query. Omission selects efficient. Owner profile, owner-pool table, and custom router
-endpoints accept both routers. The classifier-winner endpoint returns the shared winner.
+or query. Omission selects efficient. Owner profile and custom router endpoints accept both
+routers. The classifier-winner endpoint returns the shared winner.
 The client eval routes (`/v1/eval/*`, below) use the same bearer secret.
 
 
@@ -678,32 +674,31 @@ The client eval routes (`/v1/eval/*`, below) use the same bearer secret.
 | `GET /admin/routing-table` | Latest published **platform** routing table |
 | `GET /admin/classifier-winner` | Current classifier winner |
 | `POST /admin/debug-cli` | Run one ad-hoc prompt through the kilo CLI container (diagnostic) |
-| `POST /admin/profiles/register` | Admit missing/stale/retried profiles for every current catalog effort of the pool models (quota 20 models per base router per 24h) |
-| `POST /admin/profiles/status` | Read current per-effort coverage; free re-admission for engine-stale pairs |
-| `POST /admin/custom-routing-table` | Rank ready/current exact pairs for the selected models (`table: null` → balanced fallback) |
+| `POST /admin/profiles/register` | Admit missing/stale/retried profiles for every current catalog effort of a custom router's gateway models (quota 20 models per base router per 24h) |
 | `POST /admin/custom-router-table` | Custom router table from platform and owner client measurements (`CustomRouterBenchmarkContextSchema`) |
 | `POST /admin/custom-router-status` | Per-variant status of every custom router entry (`CustomRouterStatusResponseSchema`) |
 
-## Owner pools and Benchmark profiles
+## Owner Benchmark profiles
 
-Owners (personal users or organizations) can constrain `kilo-auto/efficient` to
-1–10 **pool models**, and custom routers name gateway models of either base router
-(ADR 0005). The pool lives in the auto-routing Durable Object, whose
-read path collapses and deduplicates legacy exact-pair pools. Each selected model
+Custom routers (ADR 0005) name gateway models of either base router. When an owner saves a
+router whose entries or base router changed, the web app registers the gateway entries the
+platform key can serve with `POST /admin/profiles/register`. Each selected model
 expands through the live catalog into every supported reasoning effort, or one
 default pair when there are no reasoning controls. This worker measures exact
 model-effort pairs globally under the current engine identity and repetitions.
-Custom tables rank every measured pair; the router, not the owner, chooses effort.
+Custom router tables rank every measured pair; the router, not the owner, chooses effort.
+ADR 0003 owner pools, which constrained efficient itself, were converted to custom routers
+with slug `efficient` at the ADR 0005 cutover.
 
 ### The two registry queues
 
 A registry row records who wants the measurement: `platform_requested` (the
-saved decider list) and `user_requested` (owner pools). Both can be set — the
+saved decider list) and `user_requested` (custom router gateway entries). Both can be set — the
 row is global, so the pair is benchmarked once and serves both.
 
 | | Platform queue | User queue |
 |---|---|---|
-| Filled by | `syncPlatformRegistry` expands the saved models from the current catalog on config save, daily sync, and platform drain | `POST /admin/profiles/register` from owner pools (quota-charged) |
+| Filled by | `syncPlatformRegistry` expands the saved models from the current catalog on config save, daily sync, and platform drain | `POST /admin/profiles/register` from the web custom routers API (quota-charged) |
 | Trigger | Admin `POST /admin/runs`, daily cron, any decider terminal state | Admin `POST /admin/runs`, one-minute cron, any decider terminal state |
 | `benchmark_runs.purpose` | `platform` | `user` |
 | Execution share | Efficient and frontier each have default weight 2 | Efficient and frontier each have default weight 1 |
@@ -719,8 +714,8 @@ If a desired pair remains pending or running, the previous table stays live.
 Failed pairs do not contribute scores.
 If any taxonomy route has no measured candidate, the worker skips publication and keeps the previous table.
 
-Rollback: turning off owner pools (or clearing a pool) leaves the platform table
-untouched — it only ever draws on rows the platform list asks for.
+Rollback: removing a model from a custom router (or deleting the router) leaves the platform
+table untouched — it only ever draws on rows the platform list asks for.
 
 ### Request ledger and admission
 
@@ -735,9 +730,9 @@ remeasurement is quota-free.
 Concurrent requests share one global pair; the first admission wins and the
 others report its status.
 
-Admission returns before the caller's Durable Object settings write. If that
-write fails, the previous pool remains, but admitted measurements still run.
-Retrying reuses the same global profiles without charging quota twice.
+Admission returns before the web app's router write. If that write fails, the previous
+router remains, but admitted measurements still run. Retrying reuses the same global
+profiles without charging quota twice.
 
 ### Status transitions and drain
 
@@ -755,9 +750,9 @@ pending → running → ready
   transition — a newer pending/ready row is never clobbered.
 
 Currency: a profile is current only when `engine_identity`, `repetitions`, and
-exact variant match the live decider engine. The platform table and owner-pool tables
-never use a stale row. Custom router tables serve a stale row, flagged `stale`, until the
-current one is ready (see below).
+exact variant match the live decider engine. The platform table never uses a stale row.
+Custom router tables serve a stale row, flagged `stale`, until the current one is ready (see
+below).
 
 **Per-queue drain** (after any decider terminal state, on the admin's manual
 trigger, and on the one-minute cron):
@@ -817,21 +812,6 @@ Runbook, after the whole stack is merged and deployed (the migration applies on 
    `GET /admin/routing-table` shows a new version.
 4. Stop: `"action":"cancel"` deletes queued claims. A claimed pair finishes or drops with
    its run.
-
-### Sparse custom routing tables
-
-`POST /admin/custom-routing-table` with 1–10 entries returns
-`CustomRoutingTableResponse`:
-
-- Candidates come only from **ready + current** profiles' provenance
-  `model_summaries` for that entry's exact pair **and** measuring `run_id`
-  (no cross-run leakage), ranked with the saved policy knobs via
-  `rankCandidates`.
-- Candidates carry exact `variant` (never `reasoningEffort`).
-- Route keys with no graded candidates are **omitted** (not empty arrays).
-- If no requested entry is ready/current → `{ table: null }` so the gateway
-  falls back to balanced. Never fabricate candidates.
-
 ## Custom routers and client measurements
 
 ADR 0005 custom routers rank a pool of gateway and client entries against one base
@@ -861,7 +841,7 @@ entry keys the owner's CLI measures); this worker has no PostgreSQL access.
   count.
 - **Status** (`POST /admin/custom-router-status`): `ready`, `stale`, `pending`, `running`,
   `failed`, or `missing` per variant. A platform pair with only older-engine rows is
-  re-admitted for free, as owner-pool status lookups do.
+  re-admitted for free.
 
 ### Client eval API
 
@@ -871,7 +851,7 @@ context; schemas live in `@kilocode/auto-routing-contracts`. Errors use
 
 | Route | Request | Behavior |
 |---|---|---|
-| `POST /v1/eval/plan` | `InternalClientEvalPlanRequestSchema` | Every (entry, variant, case, repetition) without a current-engine upload, plus `staleEntries` that still serve an older-engine measurement |
+| `POST /v1/eval/plan` | `InternalClientEvalPlanRequestSchema` | Every (entry, variant, case, repetition) without a successful current-engine upload, plus `staleEntries` that still serve an older-engine measurement |
 | `POST /v1/eval/case` | `InternalClientEvalCaseRequestSchema` | `prompt`: the exact `kilo run` prompt the platform container sends (`deciderCliPrompt`, so client and platform rows share byte-identical prompts), and the 180-second timeout; checks and golden answers stay here |
 | `POST /v1/eval/result` | `InternalClientEvalResultRequestSchema` | Grade with the platform graders, store, roll up the profile, return the score |
 
@@ -885,7 +865,9 @@ context; schemas live in `@kilocode/auto-routing-contracts`. Errors use
   stored. The usage id derives from the graded case, so a retried upload records it once.
   If usage cannot be recorded the upload fails with `internal_error` and nothing is stored.
   The serving worker checks the paying owner's balance before forwarding.
-- A case repetition that is already stored returns its stored score without grading again.
+- A case repetition reuses its stored score only after exit code 0, no timeout, and nonempty
+  output. Nonzero exits, timeouts, and empty output remain in the plan; a new upload replaces
+  the failed attempt.
 
 Rollout: apply the additive D1 migration (new tables and the `profile_request_events.router`
 column, defaulting existing rows to `efficient`) with the deploy; no queue pause is needed.
@@ -923,7 +905,7 @@ curl -s http://localhost:8814/admin/config -H "Authorization: Bearer $SECRET"
 ```
 
 A fresh local database has no benchmark configuration, and none is fabricated
-(ADR 0002): profile admission, owner-pool tables, custom routers, and client evals
+(ADR 0002): profile admission, custom routers, and client evals
 answer 400 `benchmark config not set` until one is saved. Save one per base router
 you use, with models from your local catalog, through the admin panel's Benchmarks
 tab or this call (repeat with `?router=frontier` for frontier):

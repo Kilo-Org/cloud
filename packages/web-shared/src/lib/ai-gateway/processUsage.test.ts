@@ -1645,9 +1645,17 @@ describe('logMicrodollarUsage', () => {
       generation_time: 2,
     };
 
+    const costMismatchWarning =
+      'Cost from provider generation lookup differs from cost computed from response usage data:';
+
     beforeEach(() => {
       jest.mocked(captureMessage).mockClear();
       jest.mocked(fetchGeneration).mockReset();
+      jest.spyOn(console, 'warn').mockImplementation(() => {});
+    });
+
+    afterEach(() => {
+      jest.mocked(console.warn).mockRestore();
     });
 
     test('reports the unresolved cost when the generation lookup fails', async () => {
@@ -1695,6 +1703,35 @@ describe('logMicrodollarUsage', () => {
       expect(result).not.toBeNull();
       expect((await findUserById(user.id))?.microdollars_used).toBe(200);
       expect(captureMessage).not.toHaveBeenCalled();
+      expect(console.warn).not.toHaveBeenCalledWith(costMismatchWarning, expect.anything());
+    });
+
+    test('warns when a non-BYOK generation cost differs from the response cost', async () => {
+      const user = await insertTestUser({
+        id: 'test-generation-cost-mismatch-user',
+        microdollars_used: 0,
+        google_user_email: 'generation-cost-mismatch@example.com',
+      });
+      jest.mocked(fetchGeneration).mockResolvedValue({
+        data: {
+          id: 'gen-stt-123',
+          model: 'openai/whisper-1',
+          is_byok: false,
+          total_cost: 0.00003,
+          provider_name: 'OpenAI',
+        },
+      } as OpenRouterGeneration);
+
+      await processTokenData(
+        { ...transcriptionStats },
+        { ...createBaseUsageContext(user), api_kind: 'audio_transcriptions' }
+      );
+
+      expect((await findUserById(user.id))?.microdollars_used).toBe(30);
+      expect(console.warn).toHaveBeenCalledWith(
+        costMismatchWarning,
+        expect.objectContaining({ cost_mUsd: { generation: 30, response: 10 } })
+      );
     });
   });
 

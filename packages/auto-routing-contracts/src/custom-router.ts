@@ -340,8 +340,6 @@ export const CustomRouterDefinitionSchema = z
     mode: AutoRoutingModeSchema,
     entries: CustomRouterEntriesSchema,
     defaultEntryKey: EntryKeySchema,
-    legacyPool: z.boolean().optional(),
-    legacyModeInherited: z.boolean().optional(),
   })
   .superRefine((definition, ctx) => {
     addReservedSlugIssue(definition.ownerType, definition.slug, ctx);
@@ -710,8 +708,6 @@ export const CustomRouterSummarySchema = z.object({
   defaultEntryKey: EntryKeySchema,
   canEdit: z.boolean(),
   entries: z.array(CustomRouterListEntrySchema),
-  legacyPool: z.boolean().optional(),
-  legacyModeInherited: z.boolean().optional(),
 });
 export type CustomRouterSummary = z.infer<typeof CustomRouterSummarySchema>;
 

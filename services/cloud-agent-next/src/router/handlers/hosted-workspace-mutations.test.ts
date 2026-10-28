@@ -17,6 +17,7 @@ const mocks = vi.hoisted(() => ({
   recordOperationProgress: vi.fn(),
   settleOperation: vi.fn(),
   getPgDb: vi.fn(),
+  requireCurrentSessionAccess: vi.fn(),
 }));
 
 vi.mock('@kilocode/db/operation-ledger', () => ({
@@ -28,6 +29,10 @@ vi.mock('@kilocode/db/operation-ledger', () => ({
 }));
 
 vi.mock('../../db/pg.js', () => ({ getPgDb: mocks.getPgDb }));
+
+vi.mock('../../session-access.js', () => ({
+  requireCurrentSessionAccess: mocks.requireCurrentSessionAccess,
+}));
 
 const workspaceId = 'worktree_11111111-1111-4111-8111-111111111111';
 const cloudAgentSessionId = 'workspace_11111111-1111-4111-8111-111111111111';
@@ -199,5 +204,172 @@ describe('deleteHostedWorkspaceSession retry after the ownership row is gone', (
       expect.objectContaining({ rowId: 'ledger-row-1', status: 'completed' })
     );
     expect(mocks.markReconcilePending).not.toHaveBeenCalled();
+  });
+});
+
+const LIVE_SESSION_ROW = {
+  sessionId: kiloSessionId,
+  cloudAgentSessionId,
+  organizationId: null,
+  worktreeId: workspaceId,
+  parentSessionId: null,
+};
+
+const ORG_ID = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
+const DELETE_KEY = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+
+const LIVE_LEDGER_ROW = {
+  id: 'ledger-live',
+  kilo_user_id: 'usr_test',
+  domain: 'session',
+  operation_key: DELETE_KEY,
+  intent: 'delete_workspace_session',
+  organization_id: null,
+  resource_key: workspaceId,
+  taxonomy: 'safe-retry',
+  status: 'admitted',
+  outcome_code: null,
+  canonical_result: null,
+  provider_ref: null,
+  created_at: '2026-10-27T10:00:00.000Z',
+  updated_at: '2026-10-27T10:00:00.000Z',
+  lease_expires_at: '2026-10-27T10:00:00.000Z',
+  expires_at: '2026-10-28T10:00:00.000Z',
+};
+
+/** One DB double whose `limit()` calls resolve the supplied result rows in order. */
+function sequenceDb(...results: unknown[][]): WorkerDb {
+  return {
+    select: vi.fn(() => ({
+      from: vi.fn(() => ({
+        where: vi.fn(() => ({
+          limit: vi.fn(async () => results.shift() ?? []),
+        })),
+      })),
+    })),
+  } as unknown as WorkerDb;
+}
+
+function liveDeleteContext(ingest: Mock, deleteSession: Mock): TRPCContext {
+  return {
+    userId: 'usr_test',
+    authToken: 'test-token',
+    request: { headers: new Headers() } as unknown as Request,
+    env: {
+      SESSION_INGEST: { deleteHostedWorkspaceSession: ingest },
+      SANDBOX_SESSION: {
+        idFromName: (name: string) => name,
+        get: () => ({ deleteSession }),
+      },
+    },
+  } as unknown as TRPCContext;
+}
+
+const liveDeleteInput = {
+  workspaceId: workspaceId as `worktree_${string}`,
+  sessionId: cloudAgentSessionId as `workspace_${string}`,
+  operationKey: DELETE_KEY,
+};
+
+describe('deleteHostedWorkspaceSession partial-failure recovery', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mocks.requireCurrentSessionAccess.mockResolvedValue({
+      kiloSessionId,
+      organizationId: null,
+    });
+    mocks.markReconcilePending.mockResolvedValue({ settled: false });
+    mocks.recordOperationProgress.mockResolvedValue({ recorded: true });
+    mocks.admitOperation.mockResolvedValue({
+      admission: 'admitted',
+      row: LIVE_LEDGER_ROW,
+    });
+  });
+
+  it('keeps an ingest failure retryable and marks the ledger for reconciliation', async () => {
+    mocks.getPgDb.mockReturnValue(
+      sequenceDb([{ organizationId: null, deletionStartedAt: null }], [LIVE_SESSION_ROW])
+    );
+    const ingest = vi.fn().mockRejectedValue(new Error('session ingest unavailable'));
+    const deleteSession = vi.fn();
+    const caller = appRouter.createCaller(liveDeleteContext(ingest, deleteSession));
+
+    await expect(caller.deleteHostedWorkspaceSession(liveDeleteInput)).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'session_deletion_unavailable',
+    });
+    expect(mocks.markReconcilePending).toHaveBeenCalledWith(expect.anything(), {
+      rowId: 'ledger-live',
+    });
+    expect(deleteSession).not.toHaveBeenCalled();
+    expect(mocks.settleOperation).not.toHaveBeenCalled();
+  });
+
+  it('keeps a Session DO teardown failure retryable after the ingest row is gone', async () => {
+    mocks.getPgDb.mockReturnValue(
+      sequenceDb([{ organizationId: null, deletionStartedAt: null }], [LIVE_SESSION_ROW])
+    );
+    const ingest = vi.fn().mockResolvedValue({ deleted: true });
+    const deleteSession = vi.fn().mockRejectedValue(new Error('session DO unavailable'));
+    const caller = appRouter.createCaller(liveDeleteContext(ingest, deleteSession));
+
+    await expect(caller.deleteHostedWorkspaceSession(liveDeleteInput)).rejects.toMatchObject({
+      code: 'SERVICE_UNAVAILABLE',
+      message: 'session_deletion_incomplete',
+    });
+    expect(ingest).toHaveBeenCalledWith({
+      kiloUserId: 'usr_test',
+      workspaceId,
+      sessionId: kiloSessionId,
+      cloudAgentSessionId,
+    });
+    expect(mocks.markReconcilePending).toHaveBeenCalledWith(expect.anything(), {
+      rowId: 'ledger-live',
+    });
+    expect(mocks.settleOperation).not.toHaveBeenCalled();
+  });
+
+  it('rejects a root delete once the caller left the owning organization', async () => {
+    mocks.getPgDb.mockReturnValue(
+      sequenceDb([{ organizationId: ORG_ID, deletionStartedAt: null }], [])
+    );
+    const caller = appRouter.createCaller(liveDeleteContext(vi.fn(), vi.fn()));
+
+    await expect(caller.deleteHostedWorkspaceSession(liveDeleteInput)).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'You do not have access to this organization',
+    });
+    expect(mocks.admitOperation).not.toHaveBeenCalled();
+  });
+});
+
+describe('createHostedWorkspaceSession organization authorization', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('rejects a sibling create once the caller left the owning organization', async () => {
+    mocks.getPgDb.mockReturnValue(sequenceDb([]));
+    const caller = appRouter.createCaller({
+      userId: 'usr_test',
+      authToken: 'test-token',
+      request: { headers: new Headers() } as unknown as Request,
+      env: {},
+    } as unknown as TRPCContext);
+
+    await expect(
+      caller.createHostedWorkspaceSession({
+        workspaceId: workspaceId as `worktree_${string}`,
+        operationKey: DELETE_KEY,
+        clientProvenance: 'agent-manager',
+        message: { prompt: 'Second chat' },
+        agent: { mode: 'code', model: 'anthropic/claude-sonnet-4' },
+        kilocodeOrganizationId: ORG_ID,
+      })
+    ).rejects.toMatchObject({
+      code: 'FORBIDDEN',
+      message: 'You do not have access to this organization',
+    });
+    expect(mocks.admitOperation).not.toHaveBeenCalled();
   });
 });

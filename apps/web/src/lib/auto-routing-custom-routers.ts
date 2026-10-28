@@ -107,6 +107,7 @@ async function resolveRequestContext(request: NextRequest): Promise<CustomRouter
       'Authentication required'
     );
   }
+
   const queryOrganizationId = request.nextUrl.searchParams.get('organizationId');
   const authOrganizationId = auth.organizationId ?? null;
   if (queryOrganizationId && authOrganizationId && queryOrganizationId !== authOrganizationId) {
@@ -323,8 +324,6 @@ async function toSummary(
     baseRouter: router.baseRouter,
     mode: router.mode,
     defaultEntryKey: router.defaultEntryKey,
-    legacyPool: router.legacyPool ?? false,
-    legacyModeInherited: router.legacyModeInherited ?? false,
     canEdit,
     entries,
   };
@@ -516,7 +515,7 @@ async function requestPlatformBenchmarks(params: {
     ) {
       throw new CustomRouterApiError(
         'invalid_request',
-        `baseRouter: Benchmarks for the ${params.plan.baseRouter} base router are not available yet. Choose another base router.`
+        `baseRouter: Benchmarks for the ${params.plan.baseRouter} benchmark difficulty are not available yet. Choose another benchmark difficulty.`
       );
     }
     if (result.status === 400) {
@@ -574,7 +573,6 @@ async function saveRouter(
       mode: router.mode,
       entries: router.entries,
       default_entry_key: router.defaultEntryKey,
-      legacy_mode_inherited: router.legacyModeInherited ?? false,
     })
     .where(eq(auto_routing_custom_routers.id, router.id))
     .returning();
@@ -631,7 +629,7 @@ function assertCanCreate(existing: { slug: string }[], slug: string): void {
   }
 }
 
-export async function ownerRouterSlugs(
+async function ownerRouterSlugs(
   executor: DrizzleTransaction | typeof db,
   owner: CustomRouterOwner
 ): Promise<{ slug: string }[]> {
@@ -703,7 +701,6 @@ function applyUpdate(
     name: input.name ?? current.name,
     baseRouter: input.baseRouter ?? current.baseRouter,
     mode: input.mode ?? current.mode,
-    legacyModeInherited: input.mode === undefined ? current.legacyModeInherited : false,
     entries: input.entries ?? current.entries,
     defaultEntryKey: input.defaultEntryKey ?? current.defaultEntryKey,
   };
@@ -728,8 +725,6 @@ export async function updateCustomRouterResponse(
   const input = parsed.data;
   const owner = await resolveEditableOwner(context, scope);
 
-  const requestedSlug =
-    rawInput !== null && typeof rawInput === 'object' && 'slug' in rawInput ? rawInput.slug : slug;
   const rejections = await gatewayEntryRejections({
     userId: context.user.id,
     owner,
@@ -738,12 +733,6 @@ export async function updateCustomRouterResponse(
 
   const existing = await findRouter(db, owner, slug);
   const planned = applyUpdate(existing, input);
-  if (planned.legacyPool && requestedSlug !== slug) {
-    throw new CustomRouterApiError(
-      'invalid_request',
-      'The migrated pool slug cannot change during the notice period'
-    );
-  }
   validateNewGatewayEntries({
     entries: planned.entries,
     existingKeys: new Set(existing.entries.map(customRouterEntryKey)),
@@ -768,12 +757,6 @@ export async function updateCustomRouterResponse(
   const router = await db.transaction(async tx => {
     await lockOwner(tx, owner);
     const current = await findRouter(tx, owner, slug);
-    if (current.legacyPool && requestedSlug !== slug) {
-      throw new CustomRouterApiError(
-        'invalid_request',
-        'The migrated pool slug cannot change during the notice period'
-      );
-    }
     const next = applyUpdate(current, input);
     validateNewGatewayEntries({
       entries: next.entries,
@@ -816,12 +799,6 @@ export async function deleteCustomRouterResponse(
   await db.transaction(async tx => {
     await lockOwner(tx, owner);
     const current = await findRouter(tx, owner, slug);
-    if (current.legacyPool) {
-      throw new CustomRouterApiError(
-        'invalid_request',
-        'The migrated pool cannot be deleted during the notice period'
-      );
-    }
     await tx
       .delete(auto_routing_custom_routers)
       .where(eq(auto_routing_custom_routers.id, current.id));

@@ -15,8 +15,15 @@ import {
   platform_integrations,
 } from '@kilocode/db/schema';
 import { eq } from 'drizzle-orm';
-import { markOrganizationFeatureAdoptionCompleted } from '@kilocode/web-shared/lib/organizations/organizations';
-import { resolveFeatureAdoptionCompletion } from '@/lib/organizations/feature-adoption';
+import {
+  markOrganizationFeatureAdoptionCompleted,
+  mutateOrganizationSettings,
+  updateOrganizationSettings,
+} from '@kilocode/web-shared/lib/organizations/organizations';
+import {
+  resolveFeatureAdoption,
+  resolveFeatureAdoptionCompletion,
+} from '@/lib/organizations/feature-adoption';
 import type { User, Organization } from '@kilocode/db/schema';
 
 // Test users and organization will be created dynamically
@@ -297,6 +304,47 @@ describe('organizations usage details trpc router', () => {
           settings: regressed.settings,
         })
       ).toBe(true);
+    });
+
+    it('keeps the completion mark when a writer saves stale whole settings', async () => {
+      const stale = await readSettings();
+      await markOrganizationFeatureAdoptionCompleted(completionOrg.id, new Date('2030-01-01'));
+
+      const updated = await updateOrganizationSettings(completionOrg.id, {
+        ...stale.settings,
+        projects_ui_enabled: true,
+      });
+      expect(updated.feature_adoption_completed_at).toBe('2030-01-01T00:00:00.000Z');
+
+      await mutateOrganizationSettings(completionOrg.id, () => ({
+        recommendations_digest_enabled: false,
+      }));
+
+      const after = await readSettings();
+      expect(after.settings.feature_adoption_completed_at).toBe('2030-01-01T00:00:00.000Z');
+      expect(after.settings.projects_ui_enabled).toBeUndefined();
+      expect(after.settings.recommendations_digest_enabled).toBe(false);
+    });
+
+    it('returns evaluated checks only when completion was not already recorded', async () => {
+      const incomplete = await readSettings();
+      const evaluated = await resolveFeatureAdoption({
+        organizationId: completionOrg.id,
+        plan: incomplete.plan,
+        settings: incomplete.settings,
+      });
+      expect(evaluated.complete).toBe(false);
+      expect(evaluated.checks).toHaveLength(5);
+
+      await markOrganizationFeatureAdoptionCompleted(completionOrg.id);
+      const marked = await readSettings();
+      expect(
+        await resolveFeatureAdoption({
+          organizationId: completionOrg.id,
+          plan: marked.plan,
+          settings: marked.settings,
+        })
+      ).toEqual({ complete: true, checks: null });
     });
 
     it('never marks a non-enterprise org', async () => {

@@ -18,6 +18,7 @@ import {
 import { Download, SlidersHorizontal } from 'lucide-react';
 import type { Organization } from '@kilocode/db/schema';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
+import type { FeatureAdoptionCheck } from '@/lib/organizations/feature-adoption';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import { SummarySection } from './SummarySection';
 import { PrimaryChart } from './PrimaryChart';
@@ -108,6 +109,8 @@ type UsageAnalyticsDashboardProps =
        * Collapses the page to the AI usage view.
        */
       featureAdoptionComplete?: boolean;
+      /** Server-evaluated adoption checks used to seed the Overview checklist. */
+      initialFeatureAdoptionChecks?: FeatureAdoptionCheck[];
       /** Page title override. */
       title?: string;
       /** Optional content rendered above the usage panels. */
@@ -835,6 +838,7 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
                   <FeatureAdoptionView
                     organizationId={enterpriseOrg.organizationId}
                     compact
+                    initialChecks={org?.initialFeatureAdoptionChecks}
                     onViewDetails={() => setState({ usageView: 'feature-adoption' })}
                   />
                   <AIAdoptionSummaryCard
@@ -973,12 +977,14 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
                   </>
                 )}
 
-                {enterpriseOrg && featureAdoptionComplete && (
-                  <RecommendationsView
-                    organizationId={enterpriseOrg.organizationId}
-                    canDismiss={canManageOrganization(callerRole)}
-                  />
-                )}
+                {enterpriseOrg &&
+                  featureAdoptionComplete &&
+                  effectiveOrgId === enterpriseOrg.organizationId && (
+                    <RecommendationsView
+                      organizationId={enterpriseOrg.organizationId}
+                      canDismiss={canManageOrganization(callerRole)}
+                    />
+                  )}
               </>
             )}
           </div>

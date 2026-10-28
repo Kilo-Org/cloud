@@ -1,7 +1,7 @@
 import type { Organization } from '@kilocode/db/schema';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { UsageAnalyticsDashboard } from '@/components/usage-analytics/UsageAnalyticsDashboard';
-import { resolveFeatureAdoptionCompletion } from '@/lib/organizations/feature-adoption';
+import { resolveFeatureAdoption } from '@/lib/organizations/feature-adoption';
 
 export async function OrganizationUsageDashboardServer({
   organization,
@@ -11,13 +11,13 @@ export async function OrganizationUsageDashboardServer({
   role: OrganizationRole;
 }) {
   const isSalesDemo = organization.settings.is_sales_demo === true;
-  const featureAdoptionComplete =
-    !isSalesDemo &&
-    (await resolveFeatureAdoptionCompletion({
-      organizationId: organization.id,
-      plan: organization.plan,
-      settings: organization.settings,
-    }));
+  const featureAdoption = isSalesDemo
+    ? { complete: false, checks: null }
+    : await resolveFeatureAdoption({
+        organizationId: organization.id,
+        plan: organization.plan,
+        settings: organization.settings,
+      });
 
   return (
     <UsageAnalyticsDashboard
@@ -27,7 +27,8 @@ export async function OrganizationUsageDashboardServer({
       callerRole={role}
       organizationPlan={organization.plan}
       isSalesDemo={isSalesDemo}
-      featureAdoptionComplete={featureAdoptionComplete}
+      featureAdoptionComplete={featureAdoption.complete}
+      initialFeatureAdoptionChecks={featureAdoption.checks ?? undefined}
       title={`Usage — ${organization.name}`}
     />
   );

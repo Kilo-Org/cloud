@@ -195,19 +195,35 @@ export async function recordFeatureAdoptionCompletion(
   return true;
 }
 
-export async function resolveFeatureAdoptionCompletion({
-  organizationId,
-  plan,
-  settings,
-}: {
+type FeatureAdoptionCompletionInput = {
   organizationId: string;
   plan: Organization['plan'];
   settings: OrganizationSettings | null | undefined;
-}): Promise<boolean> {
-  if (plan !== 'enterprise') return false;
-  if (hasRecordedFeatureAdoptionCompletion(settings)) return true;
+};
+
+/**
+ * Resolves sticky completion and, when live checks had to be evaluated, also
+ * returns them so callers can reuse the result instead of querying again.
+ */
+export async function resolveFeatureAdoption({
+  organizationId,
+  plan,
+  settings,
+}: FeatureAdoptionCompletionInput): Promise<{
+  complete: boolean;
+  checks: FeatureAdoptionCheck[] | null;
+}> {
+  if (plan !== 'enterprise') return { complete: false, checks: null };
+  if (hasRecordedFeatureAdoptionCompletion(settings)) return { complete: true, checks: null };
   const state = await getFeatureAdoptionState(organizationId);
-  return recordFeatureAdoptionCompletion(organizationId, settings, state);
+  const complete = await recordFeatureAdoptionCompletion(organizationId, settings, state);
+  return { complete, checks: buildFeatureAdoptionChecks(organizationId, state) };
+}
+
+export async function resolveFeatureAdoptionCompletion(
+  input: FeatureAdoptionCompletionInput
+): Promise<boolean> {
+  return (await resolveFeatureAdoption(input)).complete;
 }
 
 export async function getOrganizationFeatureAdoption(organizationId: string): Promise<{

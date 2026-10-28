@@ -943,6 +943,16 @@ export function getAcceptInviteUrl(inviteToken: OrganizationInvitation['token'])
   return acceptInviteUrl;
 }
 
+// Whole-object settings writes keep the sticky feature-adoption completion
+// mark from the row being updated, so a writer holding a stale copy of
+// `settings` can't drop a mark recorded after its read.
+function preservingStickySettings(settings: OrganizationSettings) {
+  return sql`jsonb_strip_nulls(jsonb_build_object(
+      'feature_adoption_completed_at',
+      ${organizations.settings}->'feature_adoption_completed_at'
+    )) || ${JSON.stringify(settings)}::jsonb`;
+}
+
 export async function mutateOrganizationSettings(
   organizationId: Organization['id'],
   mutate: (organization: Organization) => Promise<OrganizationSettings> | OrganizationSettings,
@@ -963,8 +973,12 @@ export async function mutateOrganizationSettings(
       return organization.settings;
     }
     const settings = OrganizationSettingsSchema.parse(nextSettings);
-    await tx.update(organizations).set({ settings }).where(eq(organizations.id, organizationId));
-    return settings;
+    const [row] = await tx
+      .update(organizations)
+      .set({ settings: preservingStickySettings(settings) })
+      .where(eq(organizations.id, organizationId))
+      .returning({ settings: organizations.settings });
+    return row?.settings ?? settings;
   };
 
   return txn ? run(txn) : db.transaction(run);
@@ -976,14 +990,15 @@ export async function updateOrganizationSettings(
   txn?: DrizzleTransaction
 ): Promise<OrganizationSettings> {
   const validated = OrganizationSettingsSchema.parse(settings);
-  await (txn || db)
+  const [row] = await (txn || db)
     .update(organizations)
     .set({
-      settings: validated,
+      settings: preservingStickySettings(validated),
     })
-    .where(eq(organizations.id, organizationId));
+    .where(eq(organizations.id, organizationId))
+    .returning({ settings: organizations.settings });
 
-  return validated;
+  return row?.settings ?? validated;
 }
 
 // Atomically update the recommendations-digest flag inside the settings JSONB

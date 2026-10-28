@@ -104,6 +104,22 @@ function getProviderDisplayName(providerId: string) {
   return provider?.name || providerId;
 }
 
+type StructuredCredentialKind = 'azure' | 'bedrock' | 'vertex';
+
+/** Providers whose credential is a JSON object rather than a single API key. */
+export function getStructuredCredentialKind(providerId: string): StructuredCredentialKind | null {
+  switch (providerId) {
+    case VercelUserByokInferenceProviderIdSchema.enum.azure:
+      return 'azure';
+    case VercelUserByokInferenceProviderIdSchema.enum.bedrock:
+      return 'bedrock';
+    case VercelUserByokInferenceProviderIdSchema.enum.vertex:
+      return 'vertex';
+    default:
+      return null;
+  }
+}
+
 /**
  * The object of a key-row action ("Anthropic API key"). A display name that
  * already ends in 'API key' is used as-is, so an entry named for the kind of
@@ -301,12 +317,13 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
 
   const validateStructuredCredentials = (providerId: string, value: string): string | null => {
     if (!value) return null;
+    const kind = getStructuredCredentialKind(providerId);
     const schema =
-      providerId === VercelUserByokInferenceProviderIdSchema.enum.azure
+      kind === 'azure'
         ? AzureCredentialsSchema
-        : providerId === VercelUserByokInferenceProviderIdSchema.enum.bedrock
+        : kind === 'bedrock'
           ? BedrockCredentialsSchema
-          : providerId === VercelUserByokInferenceProviderIdSchema.enum.vertex
+          : kind === 'vertex'
             ? VertexCredentialsSchema
             : null;
     if (!schema) return null;
@@ -318,12 +335,12 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     }
     const result = schema.safeParse(parsed);
     if (!result.success) {
-      if (providerId === VercelUserByokInferenceProviderIdSchema.enum.azure) {
+      if (kind === 'azure') {
         return result.error.issues.some(issue => issue.path[0] === 'modelMappings')
           ? 'Each model mapping must include gatewayModelSlug and customModelId.'
           : 'Enter JSON with apiKey and resourceName.';
       }
-      if (providerId === VercelUserByokInferenceProviderIdSchema.enum.bedrock) {
+      if (kind === 'bedrock') {
         return 'Enter JSON with apiKey and region, or accessKeyId, secretAccessKey, and region. Use only one authentication method.';
       }
       return `Invalid Google Vertex credentials:\n${z.prettifyError(result.error)}`;
@@ -423,10 +440,8 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const getProviderModels = (providerId: string): string[] => {
     return supportedModels?.[providerId] ?? [];
   };
-  const usesStructuredCredentials =
-    selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.azure ||
-    selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.bedrock ||
-    selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.vertex;
+  const structuredCredentialKind = getStructuredCredentialKind(selectedProvider);
+  const usesStructuredCredentials = structuredCredentialKind !== null;
   return (
     <div className="space-y-4">
       <BYOKDescription showsCodingPlanKey={showsCodingPlanKey} />
@@ -612,11 +627,11 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
 
               <div className="space-y-2">
                 <Label htmlFor="apiKey">
-                  {selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.azure
+                  {structuredCredentialKind === 'azure'
                     ? 'Azure OpenAI Credentials'
-                    : selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.bedrock
+                    : structuredCredentialKind === 'bedrock'
                       ? 'AWS Bedrock Credentials'
-                      : selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.vertex
+                      : structuredCredentialKind === 'vertex'
                         ? 'Google Vertex Credentials'
                         : 'API Key'}
                 </Label>
@@ -637,10 +652,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                           )
                         }
                         placeholder={
-                          selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.azure
+                          structuredCredentialKind === 'azure'
                             ? '{"apiKey": "...", "resourceName": "..."}'
-                            : selectedProvider ===
-                                VercelUserByokInferenceProviderIdSchema.enum.bedrock
+                            : structuredCredentialKind === 'bedrock'
                               ? '{"accessKeyId": "...", "secretAccessKey": "...", "region": "us-east-1"}'
                               : '{"project": "...", "location": "global", "googleCredentials": {"clientEmail": "...", "privateKey": "..."}}'
                         }
@@ -657,10 +671,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                         data-lpignore="true"
                         data-form-type="other"
                         aria-label={
-                          selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.azure
+                          structuredCredentialKind === 'azure'
                             ? 'Azure OpenAI credentials'
-                            : selectedProvider ===
-                                VercelUserByokInferenceProviderIdSchema.enum.bedrock
+                            : structuredCredentialKind === 'bedrock'
                               ? 'AWS credentials'
                               : 'Google Vertex credentials'
                         }
@@ -707,7 +720,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                     </Button>
                   </div>
                 )}
-                {selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.azure && (
+                {structuredCredentialKind === 'azure' && (
                   <Alert>
                     <Info className="size-4" />
                     <AlertDescription>
@@ -729,7 +742,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                     </AlertDescription>
                   </Alert>
                 )}
-                {selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.bedrock && (
+                {structuredCredentialKind === 'bedrock' && (
                   <Alert>
                     <Info className="size-4" />
                     <AlertDescription>
@@ -753,7 +766,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                     </AlertDescription>
                   </Alert>
                 )}
-                {selectedProvider === VercelUserByokInferenceProviderIdSchema.enum.vertex && (
+                {structuredCredentialKind === 'vertex' && (
                   <Alert>
                     <Info className="size-4" />
                     <AlertDescription>

@@ -1,5 +1,3 @@
-import { randomUUID } from 'crypto';
-import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import { MISTRAL_API_KEY, INCEPTION_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
@@ -7,10 +5,7 @@ import z from 'zod';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
-import {
-  isFreeModel,
-  isFreeModelExcludingCustomLlms,
-} from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
@@ -23,30 +18,25 @@ import {
   wrapInSafeNextResponse,
   captureProxyError,
   extractHeaderAndLimitLength,
-  modelNotAllowedResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
-import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { getBYOKforOrganization, getBYOKforUser } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { checkDirectProviderAccess } from '@kilocode/web-shared/lib/ai-gateway/direct-provider-access';
 import {
   findSupportedFimModel,
   type FimProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/supported-fim-models';
 import { emitApiMetricsForResponse } from '@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server';
-import { bouncerAccountId, normalizeJa4 } from '@kilocode/web-shared/lib/bouncer/client';
 import {
   bareIpLiteral,
   bouncerDecideTier,
-  bouncerRejectionResponse,
-  payerSharingIp,
   rawClientIp,
-  startBouncerDecide,
 } from '@kilocode/web-shared/lib/bouncer/inference';
+import { signedInBouncerRequest } from '@kilocode/web-shared/lib/bouncer/request';
 
 // Mistral exposes FIM on two separate, key-incompatible endpoints:
 //   - https://api.mistral.ai          (La Plateforme, paid tier keys)
@@ -168,10 +158,13 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   const taskId = extractHeaderAndLimitLength(request, 'x-kilocode-taskid') ?? undefined;
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER));
 
-  // Resolve bouncer's identity once for this request. FIM is always signed in, so
-  // its usage row uses a payer-safe IP that drops shared Kilo infrastructure.
-  const bouncerIp = bareIpLiteral(rawClientIp(request));
-  const bouncerRequestId = randomUUID();
+  const bouncer = signedInBouncerRequest({
+    ip: bareIpLiteral(rawClientIp(request)),
+    ja4Digest: fraudHeaders.http_x_vercel_ja4_digest,
+    userId: user.id,
+    organizationId,
+    feature,
+  });
 
   // Extract properties for usage context
   const promptInfo = extractFimPromptInfo(requestBody);
@@ -210,50 +203,27 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
     auto_model: null,
     ttfb_ms: null,
     requestStartedAt,
-    bouncer: {
-      requestId: bouncerRequestId,
+    bouncer: bouncer.usage({
       occurredAt: new Date(requestStartedAtMs),
-      accountId: bouncerAccountId(user.id, organizationId),
-      clientIp: payerSharingIp(bouncerIp, feature),
       clientAttributed: feature !== null || Boolean(xKiloCodeVersion),
       requestedLogprobs: false,
       samples: null,
       // FIM feeds volume rules only, which do not read a prompt hash.
       promptSimHash: null,
-    },
+    }),
   };
 
   setTag('ui.ai_model', requestBody.model);
-  const freeRequest = await isFreeModel(requestBody.model);
-  const { balance, plan, payer } = await getBalanceAndOrgSettings(
-    organizationId,
+  const accessResult = await checkDirectProviderAccess({
     user,
-    readDb,
-    freeRequest ? undefined : 'usage'
-  );
-
-  if (!canSpendPaidUsage(balance) && !usageContext.is_free && !userByok) {
-    return NextResponse.json(
-      {
-        error: { message: 'Insufficient credits' },
-        error_type: ProxyErrorType.insufficient_credits,
-      },
-      { status: 402 }
-    );
-  }
-
-  if (organizationId) {
-    const { decision } = await resolveOrganizationMemberModelDecision({
-      organizationId,
-      kiloUserId: user.id,
-      modelId: requestBody.model,
-      fromDb: readDb,
-    });
-    if (!decision.allowed) return modelNotAllowedResponse();
-    if (decision.eligibleProviderRoutes && !decision.eligibleProviderRoutes.has(fimProvider)) {
-      return modelNotAllowedResponse();
-    }
-  }
+    organizationId,
+    model: requestBody.model,
+    provider: fimProvider,
+    isFreeUsage: usageContext.is_free,
+    hasByok: !!userByok,
+  });
+  if (accessResult.rejection) return accessResult.rejection;
+  const { balance, plan, payer } = accessResult.access;
 
   // Data-use contract for this route: FIM goes straight to the provider, and the supported
   // providers are classified by the gateway's provider data policy as not training on prompts
@@ -279,21 +249,13 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
 
   // The one decide for this request, awaited before the upstream call within its 500 ms budget.
   // Only an enforced verdict rejects; every other outcome sends the request.
-  const bouncerVerdictPromise = startBouncerDecide({
-    requestId: bouncerRequestId,
-    ip: bouncerIp,
-    ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
-    account: {
-      accountId: bouncerAccountId(user.id, organizationId),
-      userId: user.id,
-      tier: bouncerDecideTier(organizationId, plan, balance),
-      payer,
-    },
+  const bouncerVerdictPromise = bouncer.decide({
+    tier: bouncerDecideTier(organizationId, plan, balance),
+    payer,
   });
   const bouncerVerdict = await bouncerVerdictPromise;
-  const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
+  const bouncerRejection = bouncer.apply(bouncerVerdict, usageContext.bouncer);
   if (bouncerRejection) return bouncerRejection;
-  if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
 
   sentryRootSpan()?.setAttribute(
     'fim.time_to_request_start_ms',

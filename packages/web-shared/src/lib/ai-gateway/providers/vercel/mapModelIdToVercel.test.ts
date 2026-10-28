@@ -128,17 +128,5 @@ describe('mapModelIdToVercel', () => {
         'stealth/claude-sonnet-4.6'
       );
     });
-
-    it('maps the Vercel-served Glyph Cluster stealth model to its gateway id', async () => {
-      await expect(mapModelIdToVercel('stealth/glyph-cluster')).resolves.toBe(
-        'stealth/glyph-cluster'
-      );
-    });
-
-    it('maps the Vercel-served Reflection Beam free model to its gateway id', async () => {
-      await expect(mapModelIdToVercel('reflection/beam-free')).resolves.toBe(
-        'reflection/beam-free'
-      );
-    });
   });
 });

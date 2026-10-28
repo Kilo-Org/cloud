@@ -10,6 +10,7 @@ import type {
 import {
   BENCHMARK_PROFILE_FAILURE_REASON_MAX_LENGTH,
   MAX_POOL_ENTRIES,
+  MeasuredAsModelIdSchema,
   benchmarkPairKey,
 } from '@kilocode/auto-routing-contracts';
 import type { BatchItem } from 'drizzle-orm/batch';
@@ -202,7 +203,9 @@ export async function listReadyPlatformMeasurements(
       )
     )
     .orderBy(asc(benchmarkProfiles.model), asc(benchmarkProfiles.variant));
-  return rows.map(row => ({ ...row, variant: variantFromStorage(row.variant) }));
+  return rows
+    .filter(row => MeasuredAsModelIdSchema.safeParse(row.model).success)
+    .map(row => ({ ...row, variant: variantFromStorage(row.variant) }));
 }
 
 function groupRowsByEntry(rows: readonly ProfileRow[]): Map<string, ProfileRow[]> {

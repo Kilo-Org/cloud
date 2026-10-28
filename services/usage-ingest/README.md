@@ -110,13 +110,14 @@ contain only the usage ID and categorical outcome or HTTP status.
 
 `usage_record_completion` is a persistence event for lasting
 diagnosis and log-derived counts/latency. `entrypoint` is `gateway`,
-`writer_endpoint`, or `unknown`; `writer_caller` is `queue`, `region_handoff`, or
-`unknown`. These finite fields separate concurrent paths:
+`writer_endpoint`, or `unknown`; `writer_caller` is `queue`, `queue_vercel`,
+`region_handoff`, or `unknown`. These finite fields separate concurrent paths:
 
 | Persistence path | `entrypoint` | `writer_caller` |
 |---|---|---|
 | Frankfurt gateway direct write or SFO local fallback | `gateway` | `unknown` |
 | Queue consumer through HTTP writer | `writer_endpoint` | `queue` |
+| Staging Vercel queue consumer through HTTP writer | `writer_endpoint` | `queue_vercel` |
 | SFO gateway handoff through HTTP writer | `writer_endpoint` | `region_handoff` |
 | HTTP writer without a classified caller, including classifier/grader writes | `writer_endpoint` | `unknown` |
 | Unclassified local caller | `unknown` | `unknown` |
@@ -124,9 +125,11 @@ diagnosis and log-derived counts/latency. `entrypoint` is `gateway`,
 The Queue consumer explicitly opts into `x-usage-write-source: queue`; the SFO
 handoff client sets `region_handoff`. Other shared-client users, including the
 classifier and benchmark grader, omit the marker. After internal API authentication,
-the writer route accepts only `queue` or `region_handoff`; missing or other values
-map to `unknown` without logging the raw header. This is caller-supplied diagnostic
+the writer route accepts only `queue`, `queue_vercel`, or `region_handoff`; missing
+or other values map to `unknown` without logging the raw header. This is caller-supplied diagnostic
 context, not an authorization or accounting input. Older clients remain compatible.
+See the [Vercel queue prototype runbook](../../packages/usage-queue/README.md) for
+the isolated staging transport and its `queue_vercel` caller label.
 `execution_region` identifies the persistence function's region when available:
 SFO HTTP handoffs record `fra1`; a local fallback in SFO records `sfo1`.
 Missing or unrecognized `VERCEL_REGION` values are reported as `unknown`.

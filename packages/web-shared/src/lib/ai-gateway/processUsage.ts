@@ -88,6 +88,7 @@ import {
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@kilocode/web-shared/lib/ai-gateway/processUsage.constants';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 import {
+  byokNonInferenceCost_mUsd,
   computeOpenRouterCostFields,
   providerReportsIsByok,
   drainSseStream,
@@ -263,6 +264,7 @@ export async function toInsertableDbUsageRecord(
     streamed: usageStats.streamed,
     cancelled: usageStats.cancelled,
     market_cost: usageStats.market_cost ?? null,
+    non_inference_cost: usageStats.nonInferenceCost_mUsd ?? null,
     abuse_delay: metadataFromContext.abuse_delay,
     abuse_downgraded_from: metadataFromContext.abuse_downgraded_from,
   };
@@ -319,10 +321,32 @@ async function enqueueUsageWithinLifetime(
   return publication;
 }
 
+type UsageAccountingTransport = 'queue' | 'direct';
+
+function usageAccountingTransport(usageContext: MicrodollarUsageContext): UsageAccountingTransport {
+  return USAGE_QUEUE_ONLY_ENABLED || isSfoUsageQueueSelected(USAGE_QUEUE_SFO_CONFIG, usageContext)
+    ? 'queue'
+    : 'direct';
+}
+
 export async function logMicrodollarUsage(
   usageStats: MicrodollarUsageStats,
   usageContext: MicrodollarUsageContext,
   bouncerUsageEvent: BouncerUsageEventEnqueue | null = null
+): Promise<UsageAccountingResult | null> {
+  return logMicrodollarUsageWithTransport(
+    usageStats,
+    usageContext,
+    bouncerUsageEvent,
+    usageAccountingTransport(usageContext)
+  );
+}
+
+async function logMicrodollarUsageWithTransport(
+  usageStats: MicrodollarUsageStats,
+  usageContext: MicrodollarUsageContext,
+  bouncerUsageEvent: BouncerUsageEventEnqueue | null,
+  transport: UsageAccountingTransport
 ): Promise<UsageAccountingResult | null> {
   usageContext.status_code = usageStats.status_code;
   const contextInfo = extractUsageContextInfo(usageContext);
@@ -336,9 +360,7 @@ export async function logMicrodollarUsage(
     bouncer_usage_event: bouncerUsageEvent,
   };
 
-  const queueOnly =
-    USAGE_QUEUE_ONLY_ENABLED || isSfoUsageQueueSelected(USAGE_QUEUE_SFO_CONFIG, usageContext);
-  if (queueOnly) {
+  if (transport === 'queue') {
     const outcome = await enqueueUsageWithinLifetime(payload);
     if (outcome.kind === 'accepted') {
       console.info('usage accounting queued', { usageId: core.id });
@@ -962,6 +984,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               machine_id,
               session_id,
               market_cost,
+              non_inference_cost,
               is_free,
               abuse_delay,
               abuse_downgraded_from,
@@ -1003,6 +1026,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               ${metadataFields.machine_id},
               ${metadataFields.session_id},
               ${metadataFields.market_cost},
+              ${metadataFields.non_inference_cost},
               ${metadataFields.is_free},
               ${metadataFields.abuse_delay},
               ${metadataFields.abuse_downgraded_from},
@@ -1176,11 +1200,12 @@ export function processOpenRouterUsage(
   vercelProviderMetadata?: VercelProviderMetaData | null
 ): JustTheCostsUsageStats {
   // usage may be null when there's no response (e.g. error), so default to empty object
-  const { cost_mUsd, is_byok } = computeOpenRouterCostFields(
+  const { cost_mUsd, nonInferenceCost_mUsd, is_byok } = computeOpenRouterCostFields(
     usage ?? {},
     coreProps,
     'sse_processing',
-    providerReportsIsByok(provider)
+    providerReportsIsByok(provider),
+    provider
   );
 
   return {
@@ -1192,6 +1217,7 @@ export function processOpenRouterUsage(
       0,
     outputTokens: usage?.completion_tokens ?? 0,
     cost_mUsd,
+    nonInferenceCost_mUsd,
     is_byok: is_byok ?? extractVercelIsByok(vercelProviderMetadata?.gateway),
   };
 }
@@ -1492,23 +1518,33 @@ export async function processTokenData(
  * When the request's decide verdict said `spendWatch`, the writer enqueues the usage event in its
  * transaction and attempts delivery right after commit; the cron drainer retries a failure.
  * Queued and recorded outcomes leave delivery with that writer/outbox. Failed accounting
- * keeps the best-effort send; bouncer dedupes on `requestId`. Every other request also keeps the
+ * retains the existing best-effort fallback. Every other request also keeps the
  * independent best-effort send, which never rejects.
+ * Ordinary queued reporting starts alongside publication and both are awaited by the caller's
+ * existing lifetime. Its queue payload has no Bouncer event, so the writer cannot send it again.
  */
 export async function logMicrodollarUsageAndReportToBouncer(
   usageStats: MicrodollarUsageStats,
   usageContext: MicrodollarUsageContext
 ): Promise<UsageAccountingResult | null> {
   const event = bouncerUsageEvent(usageStats, usageContext);
+  const transport = usageAccountingTransport(usageContext);
   if (!event || usageContext.bouncer?.spendWatch !== true) {
-    const record = await logMicrodollarUsage(usageStats, usageContext);
+    const accounting = logMicrodollarUsageWithTransport(usageStats, usageContext, null, transport);
+    if (event && transport === 'queue') {
+      const [record] = await Promise.all([accounting, reportUsageEvent(event)]);
+      return record;
+    }
+    const record = await accounting;
     if (event) await reportUsageEvent(event);
     return record;
   }
-  const record = await logMicrodollarUsage(usageStats, usageContext, {
-    request_id: event.requestId,
-    payload: usageEventWireBody(event),
-  });
+  const record = await logMicrodollarUsageWithTransport(
+    usageStats,
+    usageContext,
+    { request_id: event.requestId, payload: usageEventWireBody(event) },
+    transport
+  );
   if (!record) await reportUsageEvent(event);
   return record;
 }
@@ -1597,6 +1633,7 @@ export const mapToUsageStats = (
   provider: ProviderId
 ): MicrodollarUsageStats => {
   let llmCostUsd;
+  let nonInferenceCost_mUsd: number | undefined;
   if (!data.is_byok) {
     llmCostUsd = data.total_cost;
   } else if (data.upstream_inference_cost == undefined) {
@@ -1609,6 +1646,11 @@ export const mapToUsageStats = (
     // openrouter bug, see
   } else {
     llmCostUsd = data.upstream_inference_cost;
+    nonInferenceCost_mUsd = byokNonInferenceCost_mUsd(
+      provider,
+      data.total_cost,
+      data.upstream_inference_cost
+    );
   }
 
   return {
@@ -1628,7 +1670,8 @@ export const mapToUsageStats = (
       provider === 'vercel'
         ? (data.native_tokens_completion ?? 0) + (data.native_tokens_reasoning ?? 0)
         : (data.native_tokens_completion ?? 0),
-    cost_mUsd: toMicrodollars(llmCostUsd),
+    cost_mUsd: toMicrodollars(llmCostUsd) + (nonInferenceCost_mUsd ?? 0),
+    nonInferenceCost_mUsd,
     is_byok: data.is_byok ?? null,
     cacheDiscount_mUsd:
       data.cache_discount == undefined ? undefined : toMicrodollars(data.cache_discount),

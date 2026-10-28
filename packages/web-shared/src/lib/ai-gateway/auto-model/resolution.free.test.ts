@@ -4,7 +4,6 @@ import { getOpenRouterModelsFromDatabase } from '@kilocode/web-shared/lib/ai-gat
 import {
   findKiloExclusiveModel,
   gemma_4_26b_a4b_it_free_model,
-  glyph_cluster_stealth_free_model,
 } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 import { getConfiguredAutoFreeModels } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
@@ -67,23 +66,14 @@ describe('getAutoFreeCandidates', () => {
   beforeEach(() => {
     jest.mocked(findKiloExclusiveModel).mockImplementation(actualFindKiloExclusiveModel);
     jest.mocked(getOpenRouterModelsFromDatabase).mockResolvedValue(new Set(['test/present:free']));
-    configure([
-      gemma_4_26b_a4b_it_free_model.public_id,
-      glyph_cluster_stealth_free_model.public_id,
-      'test/present:free',
-      'test/absent:free',
-    ]);
+    configure([gemma_4_26b_a4b_it_free_model.public_id, 'test/present:free', 'test/absent:free']);
   });
 
   it.each(['chat_completions', 'messages', 'responses', null] as const)(
     'includes hidden and public free models for %s without requiring catalog presence',
     async apiKind => {
       expect(await getAutoFreeCandidates(apiKind)).toEqual(
-        [
-          gemma_4_26b_a4b_it_free_model.public_id,
-          glyph_cluster_stealth_free_model.public_id,
-          'test/present:free',
-        ].toSorted()
+        [gemma_4_26b_a4b_it_free_model.public_id, 'test/present:free'].toSorted()
       );
     }
   );
@@ -91,9 +81,7 @@ describe('getAutoFreeCandidates', () => {
   it('filters using the model provider capabilities', async () => {
     restrictGemmaToChatCompletions();
 
-    expect(await getAutoFreeCandidates('messages')).toEqual(
-      [glyph_cluster_stealth_free_model.public_id, 'test/present:free'].toSorted()
-    );
+    expect(await getAutoFreeCandidates('messages')).toEqual(['test/present:free']);
   });
 
   it('does not filter provider capabilities when the API kind is null', async () => {
@@ -128,7 +116,7 @@ describe('getAutoFreeCandidates', () => {
 
     afterEach(async () => {
       for (const id of customLlmIds) await deleteCustomLlmForTest(id);
-      await deleteCustomLlmForTest(glyph_cluster_stealth_free_model.public_id);
+      await deleteCustomLlmForTest(gemma_4_26b_a4b_it_free_model.public_id);
     });
 
     it.each([
@@ -142,13 +130,13 @@ describe('getAutoFreeCandidates', () => {
 
     it('keeps the Kilo-exclusive model in charge of an id a custom LLM claims', async () => {
       await insertCustomLlmForTest(
-        glyph_cluster_stealth_free_model.public_id,
+        gemma_4_26b_a4b_it_free_model.public_id,
         publicCustomLlmDefinition(['acme'])
       );
-      configure([glyph_cluster_stealth_free_model.public_id]);
+      configure([gemma_4_26b_a4b_it_free_model.public_id]);
 
       expect(await getAutoFreeCandidates('responses')).toEqual([
-        glyph_cluster_stealth_free_model.public_id,
+        gemma_4_26b_a4b_it_free_model.public_id,
       ]);
     });
   });

@@ -26,6 +26,7 @@ import {
   useRetrySecurityRemediation,
   useStartSecurityRemediation,
 } from '@/lib/hooks/use-security-remediation';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { remediationNeedsAnalysisRefresh, type SecurityAnalysis } from '@/lib/security-agent';
 import { getRemediationUnavailableKey } from '@/lib/security-agent-copy';
@@ -172,6 +173,7 @@ export function FindingRemediationPanel({
   const router = useRouter();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
+  const now = useRelativeTimeNow();
   const startRemediation = useStartSecurityRemediation(scope);
   const retryRemediation = useRetrySecurityRemediation(scope);
   const cancelRemediation = useCancelSecurityRemediation(scope);
@@ -363,7 +365,7 @@ export function FindingRemediationPanel({
                 >
                   <Text className="text-xs">{labelKey ? t(labelKey) : event.action}</Text>
                   <Text variant="muted" className="text-xs">
-                    {timeAgo(parseTimestamp(event.occurredAt))}
+                    {timeAgo(parseTimestamp(event.occurredAt), undefined, now)}
                   </Text>
                 </View>
               );
@@ -419,7 +421,7 @@ export function FindingRemediationPanel({
                       })}
                     </Text>
                     <Text variant="muted" className="text-xs">
-                      {timeAgo(parseTimestamp(attempt.updatedAt))}
+                      {timeAgo(parseTimestamp(attempt.updatedAt), undefined, now)}
                     </Text>
                   </View>
                   <FindingStatusBadge

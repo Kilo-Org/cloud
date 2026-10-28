@@ -1445,6 +1445,8 @@
       "byline": "{{repo}} #{{number}} láti ọwọ́ {{author}}",
       "noFindings": "Kò sí àbùkù.",
       "findingsUnavailable": "Àwọn àbájáde kò sí nítorí pé àtúnyẹ̀wò yìí kùnà.",
+      "findingsInProgress": "Àtúnyẹ̀wò yìí ń tẹ̀ síwájú sì. Àwọn àbùkù yóò fara hàn níbí nígbà tí ó bá parí.",
+      "findingsEndedWithoutResults": "Àtúnyẹ̀wò yìí parí ṣáájú kí ó tó gbé àbùkù kan jáde.",
       "serviceUnavailable": "A kò lè sopọ̀ mọ́ iṣẹ́ àtúnyẹ̀wò kóòdù. Tún gbìyànjú àtúnyẹ̀wò nígbà tí iṣẹ́ náà bá wà.",
       "reviewFailed": "Àtúnyẹ̀wò náà kùnà. Jọ̀wọ́ tún gbìyànjú.",
       "showMore": "Fi sí i hàn",

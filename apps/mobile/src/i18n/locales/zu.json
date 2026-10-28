@@ -1445,6 +1445,8 @@
       "byline": "{{repo}} #{{number}} ngu-{{author}}",
       "noFindings": "Akukho okutholakele.",
       "findingsUnavailable": "Imiphumela ayitholakali ngoba lokhu kuhlolwa kuhlulekile.",
+      "findingsInProgress": "Lokhu kuhlolwa kusaqhubeka. Okutholakele kuzovela lapha uma kuqedile.",
+      "findingsEndedWithoutResults": "Lokhu kuhlolwa kuphelile ngaphambi kokuthi kukhiqize noma yikuphi okutholakele.",
       "serviceUnavailable": "Asikwazanga ukuxhumana nesevisi yokuhlola ikhodi. Phinda uzame ukuhlola uma isevisi isitholakala.",
       "reviewFailed": "Ukuhlolwa kuhlulekile. Sicela uzame futhi.",
       "showMore": "Khombisa okunye",

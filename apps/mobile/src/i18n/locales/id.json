@@ -973,6 +973,8 @@
       "gateNone": "Tidak ada",
       "noFindings": "Tidak ada temuan.",
       "findingsUnavailable": "Hasil tidak tersedia karena tinjauan ini gagal.",
+      "findingsInProgress": "Tinjauan ini masih berlangsung. Temuan akan muncul di sini setelah selesai.",
+      "findingsEndedWithoutResults": "Tinjauan ini berakhir sebelum menghasilkan temuan apa pun.",
       "serviceUnavailable": "Tidak dapat terhubung ke layanan tinjauan kode. Coba tinjauan lagi saat layanan tersedia.",
       "reviewFailed": "Tinjauan gagal. Silakan coba lagi.",
       "retryMessage": "Ini akan menjalankan ulang tinjauan kode.",

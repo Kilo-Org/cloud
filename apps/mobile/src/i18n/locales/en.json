@@ -1511,6 +1511,8 @@
       "byline": "{{repo}} #{{number}} by {{author}}",
       "noFindings": "No findings",
       "findingsUnavailable": "Results are unavailable because this review failed.",
+      "findingsInProgress": "This review is still in progress. Findings appear here when it finishes.",
+      "findingsEndedWithoutResults": "This review ended before it produced any findings.",
       "serviceUnavailable": "Could not reach the code review service. Retry the review when the service is available.",
       "reviewFailed": "The review failed. Please try again.",
       "showMore": "Show more",

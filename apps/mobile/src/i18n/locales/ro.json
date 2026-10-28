@@ -1467,6 +1467,8 @@
       "byline": "{{repo}} #{{number}}, autor: {{author}}",
       "noFindings": "Nu există constatări.",
       "findingsUnavailable": "Rezultatele nu sunt disponibile deoarece această revizuire a eșuat.",
+      "findingsInProgress": "Această revizuire este încă în desfășurare. Constatările vor apărea aici la finalizarea ei.",
+      "findingsEndedWithoutResults": "Această revizuire s-a încheiat înainte de a produce constatări.",
       "serviceUnavailable": "Nu s-a putut stabili conexiunea cu serviciul de revizuire a codului. Reîncearcă revizuirea când serviciul este disponibil.",
       "reviewFailed": "Revizuirea a eșuat. Te rugăm să încerci din nou.",
       "showMore": "Afișează mai mult",

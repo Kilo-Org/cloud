@@ -21,6 +21,7 @@ import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useGitHubStatus, useGitLabStatus } from '@/lib/hooks/use-code-reviewer';
 import { useReviewList } from '@/lib/hooks/use-code-reviews';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { dedupeById } from '@/lib/query/dedupe-by-id';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -96,6 +97,11 @@ function ReviewListFooter({
 export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
+  // The page-one probe refetches unchanged rows while a review is in flight, so
+  // the row objects keep their identity and nothing re-renders. A shared minute
+  // clock is the row's one changing input: it advances the relative label, and
+  // it is the same instant the review's detail screen reads.
+  const now = useRelativeTimeNow();
   const paddingBottom = useTabBarBottomPadding();
   const insets = useSafeAreaInsets();
   // One style for the whole content container: every row starts at the same
@@ -220,7 +226,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
               <View className="mt-1 flex-row items-center gap-2">
                 <Text className={cn('text-xs', meta.className)}>{meta.label}</Text>
                 <Text variant="muted" className="text-xs">
-                  {timeAgo(reviewTime(review))}
+                  {timeAgo(reviewTime(review), undefined, now)}
                 </Text>
               </View>
             </Pressable>

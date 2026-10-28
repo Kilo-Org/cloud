@@ -658,6 +658,43 @@ describe('ReviewDetailScreen empty council', () => {
     expect(texts).not.toContain(i18n.t('codeReviewer.reviewDetail.findingsUnavailable'));
     expect(texts).not.toContain(i18n.t('codeReviewer.reviewDetail.noFindings'));
   });
+
+  it.each(['queued', 'pending', 'running'] as const)(
+    'never claims a clean result while the review is unfinished (%s)',
+    status => {
+      // The empty findings list of an unfinished review means "not yet", not
+      // "none": the section must say the review is still in progress.
+      detail.data = {
+        success: true,
+        review: makeReview({ status, council_result: null }),
+        tokenUsage: { input: 0, output: 0 },
+      };
+
+      const texts = renderScreen();
+
+      expect(texts).toContain(i18n.t('codeReviewer.reviewDetail.findingsInProgress'));
+      expect(texts).not.toContain(i18n.t('codeReviewer.reviewDetail.noFindings'));
+      expect(texts).not.toContain(i18n.t('codeReviewer.reviewDetail.findingsUnavailable'));
+    }
+  );
+
+  it.each(['cancelled', 'interrupted'] as const)(
+    'says a %s review ended before it produced findings',
+    status => {
+      detail.data = {
+        success: true,
+        review: makeReview({ status, council_result: null }),
+        tokenUsage: { input: 0, output: 0 },
+      };
+
+      const texts = renderScreen();
+
+      expect(texts).toContain(i18n.t('codeReviewer.reviewDetail.findingsEndedWithoutResults'));
+      expect(texts).not.toContain(i18n.t('codeReviewer.reviewDetail.noFindings'));
+      // It did not fail, so the failure sentence would be wrong too.
+      expect(texts).not.toContain(i18n.t('codeReviewer.reviewDetail.findingsUnavailable'));
+    }
+  );
 });
 
 describe('ReviewDetailScreen redacted check run', () => {

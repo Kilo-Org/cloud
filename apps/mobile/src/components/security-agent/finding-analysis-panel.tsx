@@ -31,6 +31,7 @@ import { AnalysisCapacityNotice } from '@/components/security-agent/analysis-cap
 import { AnalysisRerunAction } from '@/components/security-agent/analysis-rerun-action';
 import { formatNumber } from '@/lib/format';
 import { useSecurityAnalysisCapacity } from '@/lib/hooks/use-security-agent';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { remediationNeedsAnalysisRefresh, type SecurityAnalysis } from '@/lib/security-agent';
@@ -65,6 +66,7 @@ export function FindingAnalysisPanel({
   const { confirm, dialog } = useConfirmDialog();
   const capacity = useSecurityAnalysisCapacity(scope);
   const startAnalysis = useStartSecurityAnalysis(scope);
+  const now = useRelativeTimeNow();
 
   if (isLoading && !analysis) {
     return (
@@ -110,7 +112,7 @@ export function FindingAnalysisPanel({
   const analyzedLabel =
     analyzedAt === null || Number.isNaN(analyzedAt.getTime())
       ? t('securityAgent.analysis.notRecorded')
-      : timeAgo(analyzedAt);
+      : timeAgo(analyzedAt, undefined, now);
   const presentationTitle = getSecurityAnalysisDetailTitle(analysisState);
   const presentationDescription = getSecurityAnalysisDetailDescription(analysisState, {
     analysisError: analysis.error,

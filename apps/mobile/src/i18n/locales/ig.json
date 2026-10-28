@@ -1445,6 +1445,8 @@
       "byline": "{{repo}} #{{number}} nke {{author}}",
       "noFindings": "Enweghị ihe achọpụtara.",
       "findingsUnavailable": "Nsonaazụ adịghị n'ihi na nyocha a kụrụ afọ n'ala.",
+      "findingsInProgress": "Nyocha a ka na-aga n'ihu. Ihe achọpụtara ga-apụta ebe a mgbe ọ gwụchara.",
+      "findingsEndedWithoutResults": "Nyocha a kwụsịrị tupu ọ mepụta ihe achọpụtara ọ bụla.",
       "serviceUnavailable": "Enweghị ike ijikọ na ọrụ nyocha koodu. Nwaa nyocha ọzọ mgbe ọrụ ahụ dị.",
       "reviewFailed": "Nyocha ahụ kụrụ afọ n'ala. Biko nwaa ọzọ.",
       "showMore": "Gosi ọzọ",

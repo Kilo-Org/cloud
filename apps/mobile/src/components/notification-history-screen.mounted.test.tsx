@@ -106,7 +106,7 @@ vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 24 }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'jwt' }) }));
-vi.mock('@/lib/hooks/use-now-ticker', () => ({ useNowTicker: () => NOW }));
+vi.mock('@/lib/hooks/use-now-ticker', () => ({ useRelativeTimeNow: () => NOW }));
 vi.mock('@/lib/hooks/use-notification-master-gate', () => ({
   useNotificationMasterGate: () => state.gate,
 }));

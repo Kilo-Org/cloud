@@ -57,6 +57,7 @@ import {
   useUnresolveThreadMutation,
 } from '@/lib/pr-review/discussion/use-review-discussion-mutations';
 import { providerPrCapabilities, useProviderPrScope } from '@/lib/pr-review/provider-pr-ref';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -269,7 +270,8 @@ function ThreadHeader({
 }: Readonly<ThreadHeaderProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const relative = firstTimestamp ? timeAgo(parseTimestamp(firstTimestamp)) : null;
+  const now = useRelativeTimeNow();
+  const relative = firstTimestamp ? timeAgo(parseTimestamp(firstTimestamp), undefined, now) : null;
   const LabelRow = (expanded ? Pressable : View) as typeof View;
   const labelRowA11y = expanded
     ? ({

@@ -1445,6 +1445,8 @@
       "byline": "{{repo}} #{{number}} av {{author}}",
       "noFindings": "Ingen funn ble gjort.",
       "findingsUnavailable": "Resultatene er ikke tilgjengelige fordi denne gjennomgangen mislyktes.",
+      "findingsInProgress": "Denne gjennomgangen pågår fortsatt. Funn vises her når den er fullført.",
+      "findingsEndedWithoutResults": "Denne gjennomgangen ble avsluttet før den ga noen funn.",
       "serviceUnavailable": "Kunne ikke koble til tjenesten for kodegjennomgang. Prøv gjennomgangen på nytt når tjenesten er tilgjengelig.",
       "reviewFailed": "Gjennomgangen mislyktes. Prøv på nytt.",
       "showMore": "Vis mer",

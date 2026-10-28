@@ -1467,6 +1467,8 @@
       "byline": "{{repo}} #{{number}} · Autor: {{author}}",
       "noFindings": "Nema nalaza.",
       "findingsUnavailable": "Rezultati nisu dostupni jer ovaj pregled nije uspeo.",
+      "findingsInProgress": "Ovaj pregled je još u toku. Nalazi će se pojaviti ovde kada se završi.",
+      "findingsEndedWithoutResults": "Ovaj pregled se završio pre nego što je dao bilo kakve nalaze.",
       "serviceUnavailable": "Nije moguće povezati se sa uslugom za pregled koda. Ponovi pregled kada usluga bude dostupna.",
       "reviewFailed": "Pregled nije uspeo. Molimo te, pokušaj ponovo.",
       "showMore": "Prikaži više",

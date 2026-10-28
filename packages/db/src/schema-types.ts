@@ -1559,6 +1559,15 @@ export type EncryptedData = {
   authTag: string;
 };
 
+export type BYOKApiKeyEnvelope = {
+  encrypted_data: EncryptedData;
+  wrapped_dek: string;
+  kms_key_id: string;
+  kms_key_version: string;
+  algorithm: 'aes-256-gcm';
+  envelope_version: 1;
+};
+
 /**
  * RSA + AES envelope stored for secrets that are encrypted by the web app
  * and decrypted by a Worker. Kept structural here so the schema package does

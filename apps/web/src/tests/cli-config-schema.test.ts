@@ -94,6 +94,61 @@ describe('kilo config.json schema merge', () => {
     expect(props.privacy_mode).toBeDefined();
     expect(props.retention).toBeDefined();
     expect(props.memory_model).toBeDefined();
+    expect(props.hooks).toBeDefined();
+  });
+
+  test('hooks accepts command hooks for every CLI hook event', () => {
+    type Groups = {
+      type: string;
+      items: { properties: { hooks: { items: { properties: Record<string, unknown> } } } };
+    };
+    const hooks = props.hooks as {
+      additionalProperties: boolean;
+      properties: Record<string, Groups>;
+    };
+    expect(hooks.additionalProperties).toBe(false);
+    expect(Object.keys(hooks.properties).sort()).toEqual(
+      [
+        'BranchName',
+        'CommitMessage',
+        'ConfigChange',
+        'CwdChanged',
+        'FileChanged',
+        'GoalReport',
+        'InstructionsLoaded',
+        'Notification',
+        'PermissionRequest',
+        'PostCompact',
+        'PostModelSwitch',
+        'PostToolBatch',
+        'PostToolUse',
+        'PostToolUseFailure',
+        'PreCompact',
+        'PreModelSwitch',
+        'PreToolUse',
+        'SessionEnd',
+        'SessionStart',
+        'Stop',
+        'StopFailure',
+        'SubagentStart',
+        'SubagentStop',
+        'TaskCompleted',
+        'TaskCreated',
+        'UserPromptExpansion',
+        'UserPromptSubmit',
+        'WakeupFire',
+        'WorktreeSetup',
+        'WorktreeTeardown',
+      ].sort()
+    );
+    for (const groups of Object.values(hooks.properties)) expect(groups.type).toBe('array');
+    const handler = hooks.properties.PreToolUse.items.properties.hooks.items.properties;
+    expect(handler.type).toEqual({ type: 'string', enum: ['command'] });
+    expect(handler.command).toEqual(expect.objectContaining({ type: 'string' }));
+    expect(handler.onFailure).toEqual(expect.objectContaining({ enum: ['continue', 'block'] }));
+    expect(handler.shell).toEqual(expect.objectContaining({ enum: ['bash', 'powershell'] }));
+    expect(handler.if).toEqual(expect.objectContaining({ type: 'string' }));
+    expect(handler.async).toEqual(expect.objectContaining({ type: 'boolean' }));
   });
 
   test('retention exposes enabled boolean and maxAgeDays number', () => {

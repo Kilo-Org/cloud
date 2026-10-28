@@ -35,6 +35,122 @@ const agentConfig = {
   additionalProperties: {},
 } as const;
 
+const hookEvents = {
+  PreToolUse:
+    'Before a tool call. Exit 2 or a JSON deny blocks the call; ask forces a confirmation prompt.',
+  PostToolUse:
+    'After a tool call succeeds. Exit 2 stderr, a block reason or additionalContext is shown to the model; updatedToolOutput replaces the output.',
+  PostToolUseFailure:
+    'After a tool call fails (including a shell command that exits non-zero). additionalContext is shown to the model.',
+  PostToolBatch:
+    'After a model step that ran tools, before the next model call. A block stops the turn.',
+  PermissionRequest:
+    'When Kilo shows a permission prompt for a tool call. A JSON deny denies the call; hooks cannot approve.',
+  TaskCreated: 'When a todo is added. A block rolls back that todo.',
+  TaskCompleted: 'When a todo is marked completed. A block keeps that todo open.',
+  UserPromptSubmit:
+    'When a prompt or command is submitted. A block rejects it; stdout or additionalContext is added to the prompt.',
+  UserPromptExpansion: 'When a custom command, skill or MCP prompt expands. Matcher: command name.',
+  PreModelSwitch:
+    'Before a prompt switches the session to another model. A block, ask or timeout rejects the prompt. Matcher: model name.',
+  PostModelSwitch:
+    'After the session model changed. stdout or additionalContext is added to the next request.',
+  SessionStart:
+    'When a session starts, resumes, forks or is compacted. Matcher: startup, resume, fork, compact. stdout or additionalContext is added to the conversation.',
+  SessionEnd: 'When a session is deleted or Kilo exits. Matcher: other, prompt_input_exit.',
+  InstructionsLoaded:
+    'When an instruction file (AGENTS.md, CLAUDE.md) is loaded. Matcher: session_start, nested_traversal, compact.',
+  Stop: 'When the agent finishes responding. A block makes it continue (at most 8 times in a row).',
+  SubagentStop: 'When a subagent finishes. A block makes it continue. Matcher: agent type.',
+  SubagentStart:
+    'When a subagent starts. additionalContext is added to its first prompt. Matcher: agent type.',
+  StopFailure: 'When a turn ends with an API error. Matcher: error type.',
+  PreCompact: 'Before compaction. A block skips it. Matcher: manual, auto.',
+  PostCompact: 'After compaction. Matcher: manual, auto.',
+  Notification:
+    'When Kilo is waiting for you. Matcher: permission_prompt, agent_needs_input, idle_prompt.',
+  ConfigChange:
+    'After Kilo changes its config. Matcher: user_settings, project_settings. Cannot block; not read from Claude Code settings.',
+  FileChanged: 'When a watched file changes. Matcher: file names to watch, separated by |.',
+  CwdChanged: 'When a shell command runs in a different directory than the previous one.',
+  GoalReport:
+    'Kilo only. Before a /goal is marked complete or blocked. A block keeps the goal running. Matcher: complete, blocked.',
+  WakeupFire:
+    'Kilo only. Before a scheduled wakeup or cron task runs. A block skips it. Matcher: once, cron.',
+  WorktreeSetup:
+    'Kilo only. After a managed worktree is created and its setup script ran. A block marks setup as failed.',
+  WorktreeTeardown: 'Kilo only. Before a managed worktree is removed.',
+  CommitMessage:
+    'Kilo only. After a commit message is generated. hookSpecificOutput.commitMessage replaces it; a block rejects it.',
+  BranchName:
+    'Kilo only. After a worktree branch name is generated. hookSpecificOutput.branchName replaces it; a block keeps the current name.',
+} as const;
+
+const hookGroups = {
+  type: 'array',
+  items: {
+    type: 'object',
+    properties: {
+      matcher: {
+        description:
+          'What it matches depends on the event (tool name, source, trigger, ...): "*" or omitted matches everything, "a|b" matches exact names, anything else is a regular expression. Ignored on events without a matcher.',
+        type: 'string',
+      },
+      hooks: {
+        type: 'array',
+        items: {
+          type: 'object',
+          properties: {
+            type: { type: 'string', enum: ['command'] },
+            command: {
+              description:
+                'Command to run. Without args it runs in bash (Git Bash on Windows) or the platform shell; with args it is the program to spawn directly. It receives the hook input as JSON on stdin.',
+              type: 'string',
+            },
+            args: {
+              description:
+                'Arguments for exec form: the command is spawned directly, without a shell.',
+              type: 'array',
+              items: { type: 'string' },
+            },
+            shell: {
+              description: 'Shell for the command when args is not set. Default: bash.',
+              type: 'string',
+              enum: ['bash', 'powershell'],
+            },
+            if: {
+              description:
+                'Tool events only: a permission-rule condition such as "Bash(rm *)" or "Edit(*.env)". The hook runs only when the call matches, or when Kilo cannot tell.',
+              type: 'string',
+            },
+            timeout: {
+              description:
+                'Timeout in seconds. Default: 600; 30 for UserPromptSubmit and the model-switch events; 10 for BranchName; see the docs for the rest. A hook that times out does not block unless onFailure is "block"; on PreModelSwitch a timeout always blocks.',
+              type: 'integer',
+              exclusiveMinimum: 0,
+            },
+            onFailure: {
+              description:
+                'What happens when the hook fails (cannot start, times out, exits with a code other than 0 or 2, prints invalid JSON): "continue" (default) lets the action proceed, "block" blocks it (on PermissionRequest: denies). Honored only on PreToolUse, PostToolBatch, PermissionRequest, TaskCreated, UserPromptSubmit, UserPromptExpansion, PreModelSwitch, PreCompact, WakeupFire, WorktreeSetup, CommitMessage and BranchName.',
+              type: 'string',
+              enum: ['continue', 'block'],
+            },
+            async: {
+              description:
+                'Run in the background without waiting. Output, exit code and onFailure are ignored.',
+              type: 'boolean',
+            },
+          },
+          required: ['type', 'command'],
+          additionalProperties: false,
+        },
+      },
+    },
+    required: ['hooks'],
+    additionalProperties: false,
+  },
+} as const;
+
 export const kiloExtras = {
   top: {
     auto_expand_history: {
@@ -128,6 +244,18 @@ export const kiloExtras = {
           minimum: 1,
         },
       },
+      additionalProperties: false,
+    },
+    hooks: {
+      description:
+        'Shell command hooks run on agent events. Uses the Claude Code hooks format; behavior matches Claude Code 2.1.301 except where the docs list a difference. Only read from global, managed, or organization config; project config hooks are ignored.',
+      type: 'object',
+      properties: Object.fromEntries(
+        Object.entries(hookEvents).map(([name, description]) => [
+          name,
+          { description, ...hookGroups },
+        ])
+      ),
       additionalProperties: false,
     },
   },

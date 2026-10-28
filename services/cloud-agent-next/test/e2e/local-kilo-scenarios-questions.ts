@@ -35,7 +35,9 @@ export const questionsScenarios: Scenario[] = [
         from
       );
       const id = questionId(event.properties);
-      const listed = await h.tryRequest(`/question?workspace=${encodeURIComponent(fixture.attachment)}`);
+      const listed = await h.tryRequest(
+        `/question?workspace=${encodeURIComponent(fixture.attachment)}`
+      );
       assert.equal(listed.status, 200);
       assert(
         Array.isArray(listed.value) && listed.value.some(item => record(item).id === id),
@@ -52,7 +54,10 @@ export const questionsScenarios: Scenario[] = [
         `/question?workspace=${encodeURIComponent(fixture.attachment)}`
       );
       assert.equal(after.status, 200);
-      assert(Array.isArray(after.value) && after.value.length === 0, 'answered question stayed pending');
+      assert(
+        Array.isArray(after.value) && after.value.length === 0,
+        'answered question stayed pending'
+      );
     },
   },
   {
@@ -86,8 +91,16 @@ export const questionsScenarios: Scenario[] = [
         `/question/${id}/reject?workspace=${encodeURIComponent(fixture.attachment)}`,
         { method: 'POST' }
       );
-      assert.equal(rejected.status, 200, `bodyless question reject failed: HTTP ${rejected.status}`);
-      await fixture.native.wait(item => item.type === 'question.rejected', 'question.rejected', from);
+      assert.equal(
+        rejected.status,
+        200,
+        `bodyless question reject failed: HTTP ${rejected.status}`
+      );
+      await fixture.native.wait(
+        item => item.type === 'question.rejected',
+        'question.rejected',
+        from
+      );
       await h.waitIdle(fixture.session, fixture.attachment);
     },
   },
@@ -134,7 +147,11 @@ export const questionsScenarios: Scenario[] = [
         `/question/${id}/reply?workspace=${encodeURIComponent(attachment)}`,
         { method: 'POST', body: { answers: [['Yes']] } }
       );
-      assert.equal(reply.status, 200, `question reply after reattach rejected: HTTP ${reply.status}`);
+      assert.equal(
+        reply.status,
+        200,
+        `question reply after reattach rejected: HTTP ${reply.status}`
+      );
       await h.waitIdle(fixture.session, fixture.attachment);
     },
   },

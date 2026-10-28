@@ -66,7 +66,10 @@ export const validationScenarios: Scenario[] = [
       const cases: Array<{ name: string; body: unknown }> = [
         { name: 'no parts', body: { messageID: newMessageId(), parts: [] } },
         { name: 'invalid json', body: '{not json' },
-        { name: 'bad messageID', body: { messageID: 'msg_1', parts: [{ type: 'text', text: 'hi' }] } },
+        {
+          name: 'bad messageID',
+          body: { messageID: 'msg_1', parts: [{ type: 'text', text: 'hi' }] },
+        },
         {
           name: 'unknown model',
           body: {

@@ -421,7 +421,9 @@ later scenario.
   replaying idempotently, changed intent under the same key rejected, immediate
   listing, attach while the snapshot is still pending, and `cloud.status` on the
   system feed during start.
-- **turns** (`turns.*`): queued prompts delivered FIFO, aborting a slow turn then
+- **turns** (`turns.*`): prompts sent while a turn is busy are all persisted
+  once and the session ends with a completed reply (the driver does not pair
+  replies with prompts; queued prompts may steer a running turn), aborting a slow turn then
   following up, duplicate `messageID` deduplication, provider-error surfacing and
   recovery, a slash command, and native transcript pagination.
 - **questions** (`questions.*`): ask, list through `GET /question`, reply, then
@@ -438,7 +440,7 @@ Pass `--only <name>` (repeatable or comma-separated) to run specific scenarios:
 ```bash
 pnpm --filter cloud-agent-next run e2e:local-kilo \
   --kilo-repo /path/to/kilocode --email you@example.com \
-  --only hosted.start,turns.fifo
+  --only hosted.start,turns.queued
 ```
 
 By default every non-opt-in scenario runs. Two scenarios are opt-in only:

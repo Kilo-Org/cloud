@@ -28,7 +28,9 @@ export const hostedScenarios: Scenario[] = [
       assert.equal(fixture.listedAtStart.status, 200);
       const listed = z.array(object).parse(record(fixture.listedAtStart.value).items);
       assert(
-        listed.some(item => identity.parse(record(item).id).sessionID === fixture.session.sessionID),
+        listed.some(
+          item => identity.parse(record(item).id).sessionID === fixture.session.sessionID
+        ),
         'new hosted session missing from the hosted list'
       );
 

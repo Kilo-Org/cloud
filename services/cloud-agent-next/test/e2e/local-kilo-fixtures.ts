@@ -78,8 +78,17 @@ export function createFixtures(state: FixtureState): {
   workspaceSession: (label: string, marker: string) => Promise<WorkspaceSessionFixture>;
   reset: () => void;
 } {
-  const { client, config, profile, run, scrub, attachments, ownedWorkspaces, knownSessions, gateTags } =
-    state;
+  const {
+    client,
+    config,
+    profile,
+    run,
+    scrub,
+    attachments,
+    ownedWorkspaces,
+    knownSessions,
+    gateTags,
+  } = state;
   let workspaceFixture: WorkspaceFixture | undefined;
   let hostedFixture: HostedFixture | undefined;
   const workspaceSessions = new Map<string, WorkspaceSessionFixture>();
@@ -131,7 +140,8 @@ export function createFixtures(state: FixtureState): {
     const failed = system
       .wait(
         event =>
-          (event.type === 'cloud.status' && record(event.properties.cloudStatus).type === 'error') ||
+          (event.type === 'cloud.status' &&
+            record(event.properties.cloudStatus).type === 'error') ||
           (event.type === 'preparing' &&
             record(event.properties.preparation).action === 'attempt_failed'),
         'preparation failure',
@@ -164,11 +174,13 @@ export function createFixtures(state: FixtureState): {
     }
     await system.wait(
       event =>
-        event.type === 'cloud.sandbox.status' && record(event.properties.sandbox).status === 'active',
+        event.type === 'cloud.sandbox.status' &&
+        record(event.properties.sandbox).status === 'active',
       'active sandbox'
     );
     await system.wait(
-      event => event.type === 'cloud.status' && record(event.properties.cloudStatus).type === 'ready',
+      event =>
+        event.type === 'cloud.status' && record(event.properties.cloudStatus).type === 'ready',
       'ready cloud lifecycle'
     );
     workspaceFixture = {
@@ -214,7 +226,7 @@ export function createFixtures(state: FixtureState): {
     const attachment = await client.attach(parsed.session);
     const native = await client.feed('/event', attachment);
     await native.wait(event => event.type === 'kilo.native.fence', `${label} native fence`);
-    await client.completion(parsed.session, messageID, marker);
+    await client.completion(parsed.session, messageID);
     await client.waitIdle(parsed.session, attachment);
     const entry = { session: parsed.session, messageID, attachment, native };
     workspaceSessions.set(label, entry);
@@ -256,7 +268,7 @@ export function createFixtures(state: FixtureState): {
     const system = await client.feed('/cloud-agent/event', attachment);
     const native = await client.feed('/event', attachment);
     await native.wait(event => event.type === 'kilo.native.fence', 'hosted native fence');
-    await client.completion(session, messageID, `${run}-hosted`);
+    await client.completion(session, messageID);
     await client.waitIdle(session, attachment);
     hostedFixture = {
       session,

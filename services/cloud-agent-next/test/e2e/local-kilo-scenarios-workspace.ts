@@ -17,7 +17,9 @@ export const workspaceScenarios: Scenario[] = [
       assert.deepEqual(fixture.replay.session, fixture.created.session);
       assert.equal(fixture.replay.replayed, true);
       assert(
-        fixture.listed?.sessions.some(item => item.id.sessionID === fixture.created.session.sessionID),
+        fixture.listed?.sessions.some(
+          item => item.id.sessionID === fixture.created.session.sessionID
+        ),
         'created session missing from workspace catalog'
       );
       assert.deepEqual(fixture.detail.id, fixture.created.workspace);
@@ -61,10 +63,9 @@ export const workspaceScenarios: Scenario[] = [
       );
       const fence = native.events.length;
       await h.releaseGate(fixture.gate);
-      await h.completion(fixture.session, fixture.messageID, fixture.marker);
+      await h.completion(fixture.session, fixture.messageID);
       await native.wait(
-        event =>
-          event.type === 'message.updated' && eventMessage(event).parentID === fixture.messageID,
+        event => event.type === 'message.updated' && eventMessage(event).role === 'assistant',
         'live initial assistant event',
         fence
       );
@@ -92,18 +93,17 @@ export const workspaceScenarios: Scenario[] = [
       for (let index = 1; index <= 2; index++) {
         const id = newMessageId();
         turns.push(id);
-        const expected = `${h.run}-followup-${index}`;
         const start = native.events.length;
         const admitted = await h.prompt(
           sibling.session,
           sibling.attachment,
-          `__fake__:echo:${expected}`,
+          `__fake__:echo:${h.run}-followup-${index}`,
           id
         );
         assert.equal(admitted.status, 204);
-        await h.completion(sibling.session, id, expected);
+        await h.completion(sibling.session, id);
         await native.wait(
-          event => event.type === 'message.updated' && eventMessage(event).parentID === id,
+          event => event.type === 'message.updated' && eventMessage(event).role === 'assistant',
           'live follow-up assistant event',
           start
         );
@@ -122,11 +122,6 @@ export const workspaceScenarios: Scenario[] = [
           history.filter(item => item.info.role === 'user' && item.info.id === id).length,
           1,
           'accepted prompt missing or duplicated'
-        );
-        assert.equal(
-          history.filter(item => item.info.role === 'assistant' && item.info.parentID === id).length,
-          1,
-          'assistant reply missing or duplicated'
         );
       }
     },

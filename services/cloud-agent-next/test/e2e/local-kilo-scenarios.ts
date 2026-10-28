@@ -24,7 +24,8 @@ export function orderBySandbox(scenarios: Scenario[]): Scenario[] {
     .map((scenario, index) => ({ scenario, index }))
     .sort((left, right) => {
       const rank =
-        SANDBOX_RANK[left.scenario.sandbox ?? 'none'] - SANDBOX_RANK[right.scenario.sandbox ?? 'none'];
+        SANDBOX_RANK[left.scenario.sandbox ?? 'none'] -
+        SANDBOX_RANK[right.scenario.sandbox ?? 'none'];
       return rank !== 0 ? rank : left.index - right.index;
     })
     .map(entry => entry.scenario);

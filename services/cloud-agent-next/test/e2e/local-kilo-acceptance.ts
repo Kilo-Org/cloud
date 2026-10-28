@@ -32,7 +32,9 @@ async function main() {
   }
 
   const failed = harness.results.filter(result => result.status === 'fail');
-  console.log(`\n${harness.results.length - failed.length}/${harness.results.length} scenarios passed`);
+  console.log(
+    `\n${harness.results.length - failed.length}/${harness.results.length} scenarios passed`
+  );
   console.log(`Evidence: ${harness.out}`);
   if (failed.length > 0) process.exitCode = 1;
 }

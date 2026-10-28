@@ -15,7 +15,11 @@ export const optInScenarios: Scenario[] = [
         'Reply with exactly real-cold-ok. Do not use tools or edit files.',
         { agent: { mode: 'code', model: REAL_MODEL } }
       );
-      assert.equal(start.result.status, 200, `real-model start failed: HTTP ${start.result.status}`);
+      assert.equal(
+        start.result.status,
+        200,
+        `real-model start failed: HTTP ${start.result.status}`
+      );
       const session = record(record(start.result.value).session);
       const providerID = String(session.providerID);
       const sessionID = String(session.sessionID);
@@ -67,7 +71,9 @@ export const optInScenarios: Scenario[] = [
       await stream.wait(event => event.type === 'kilo.native.fence', 'idle native fence');
       const from = stream.events.length;
       await delay(30_000);
-      const resnapshots = stream.events.slice(from).filter(event => event.type === 'kilo.native.resnapshot');
+      const resnapshots = stream.events
+        .slice(from)
+        .filter(event => event.type === 'kilo.native.resnapshot');
       assert.equal(
         resnapshots.length,
         0,

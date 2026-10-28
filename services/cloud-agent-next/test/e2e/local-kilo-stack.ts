@@ -84,7 +84,9 @@ export function record(value: unknown): Record<string, unknown> {
   return parsed.success ? parsed.data : {};
 }
 
-export function eventMessage(event: { properties: Record<string, unknown> }): Record<string, unknown> {
+export function eventMessage(event: {
+  properties: Record<string, unknown>;
+}): Record<string, unknown> {
   const parsed = object.safeParse(event.properties.info);
   return parsed.success ? parsed.data : {};
 }
@@ -200,7 +202,19 @@ export async function discoverStack(input: { kiloRepo: string; bun?: string }): 
       Number(target.port) === postgres,
     'Database does not belong to the discovered local stack'
   );
-  return { service, root, kiloRepo, bun, bunVersion, web, worker, gateway, fake, postgres, database };
+  return {
+    service,
+    root,
+    kiloRepo,
+    bun,
+    bunVersion,
+    web,
+    worker,
+    gateway,
+    fake,
+    postgres,
+    database,
+  };
 }
 
 export function driverConfig(input: {
@@ -251,7 +265,7 @@ export type KiloClient = {
   attachmentRoute: (session: Identity) => string;
   feed: (route: string, attachment: string) => Promise<FeedStream>;
   messages: (session: Identity) => Promise<TranscriptItem[]>;
-  completion: (session: Identity, id: string, expected: string) => Promise<TranscriptItem>;
+  completion: (session: Identity, id: string) => Promise<TranscriptItem>;
   status: (session: Identity, attachment: string) => Promise<Record<string, unknown>>;
   waitIdle: (session: Identity, attachment: string, milliseconds?: number) => Promise<void>;
   prompt: (
@@ -339,7 +353,8 @@ export function createKiloClient(input: {
       assert(!cursors.has(page.cursor), 'Workspace pagination repeated its cursor');
       cursors.add(page.cursor);
       page = record(
-        (await request(`${HOST}/workspace?limit=50&cursor=${encodeURIComponent(page.cursor)}`)).value
+        (await request(`${HOST}/workspace?limit=50&cursor=${encodeURIComponent(page.cursor)}`))
+          .value
       );
     }
     throw new Error('Workspace catalog exceeded the integration pagination bound');
@@ -373,30 +388,26 @@ export function createKiloClient(input: {
   const messages = async (session: Identity) =>
     transcriptPage.parse(
       (
-        await request(`${HOST}/session/${session.providerID}/${session.sessionID}/message?limit=100`)
+        await request(
+          `${HOST}/session/${session.providerID}/${session.sessionID}/message?limit=100`
+        )
       ).value
     ).items;
 
-  const completion = (session: Identity, id: string, expected: string) =>
+  const completion = (session: Identity, id: string) =>
     eventually('persisted assistant reply', async () => {
       const items = await messages(session).catch(error => {
         if (error instanceof KiloRequestError && error.status === 503) return undefined;
         throw error;
       });
       if (!items) return undefined;
-      const replies = items.filter(item => item.info.role === 'assistant' && item.info.parentID === id);
+      const prompt = items.findIndex(item => item.info.role === 'user' && item.info.id === id);
+      if (prompt < 0) return undefined;
+      const replies = items.slice(prompt + 1).filter(item => item.info.role === 'assistant');
       for (const item of replies) {
         assert.equal(item.info.error, undefined, JSON.stringify(item.info.error));
       }
-      const reply = replies.find(item =>
-        item.parts
-          .filter(part => part.type === 'text')
-          .map(part => part.text)
-          .join('')
-          .includes(expected)
-      );
-      if (!reply) return undefined;
-      return typeof record(reply.info.time).completed === 'number' ? reply : undefined;
+      return replies.find(item => typeof record(item.info.time).completed === 'number');
     });
 
   const status = async (session: Identity, attachment: string) => {

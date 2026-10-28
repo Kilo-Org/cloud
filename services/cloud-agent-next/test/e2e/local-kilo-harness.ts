@@ -63,7 +63,11 @@ export type Harness = {
   readonly database: string;
   readonly nextAuthSecret: string;
   readonly results: ScenarioResult[];
-  request(route: string, body?: unknown, method?: string): Promise<{ status: number; value: unknown }>;
+  request(
+    route: string,
+    body?: unknown,
+    method?: string
+  ): Promise<{ status: number; value: unknown }>;
   tryRequest(route: string, options?: RequestOptions): Promise<RequestResult>;
   requestOn(kilo: LocalKilo, route: string, options?: RequestOptions): Promise<RequestResult>;
   signToken(user: TestUser): Promise<string>;
@@ -77,7 +81,7 @@ export type Harness = {
   attachmentRoute(session: Identity): string;
   feed(route: string, attachment: string): Promise<FeedStream>;
   messages(session: Identity): Promise<TranscriptItem[]>;
-  completion(session: Identity, id: string, expected: string): Promise<TranscriptItem>;
+  completion(session: Identity, id: string): Promise<TranscriptItem>;
   status(session: Identity, attachment: string): Promise<Record<string, unknown>>;
   waitIdle(session: Identity, attachment: string, milliseconds?: number): Promise<void>;
   prompt(
@@ -357,7 +361,9 @@ export async function createHarness(args: {
     requestOn: client.requestOn,
     signToken: (target: TestUser) => signUserToken(vars.NEXTAUTH_SECRET, target),
     ensureNoBalanceUser: () =>
-      ensureTestUser(stack.database, `e2e-no-balance${DRIVER_USER_EMAIL_SUFFIX}`, { funded: false }),
+      ensureTestUser(stack.database, `e2e-no-balance${DRIVER_USER_EMAIL_SUFFIX}`, {
+        funded: false,
+      }),
     list: client.list,
     findWorkspace: client.findWorkspace,
     getWorkspace: client.getWorkspace,

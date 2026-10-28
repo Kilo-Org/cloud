@@ -63,6 +63,7 @@ import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/cust
 import { isGeminiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { sanitizeJsonRefToolResults } from '@kilocode/web-shared/lib/ai-gateway/providers/sanitize-json-ref-tool-results';
 import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
+import { addMissingToolSchemaEnumTypes } from '@kilocode/web-shared/lib/ai-gateway/providers/add-missing-tool-schema-enum-types';
 import { removeRecursiveToolSchemaRefs } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-recursive-tool-schema-refs';
 import { removeTopLevelToolSchemaCombinators } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-top-level-tool-schema-combinators';
 import { removePaidServerFeatures } from '@kilocode/web-shared/lib/ai-gateway/providers/remove-paid-server-features';
@@ -344,6 +345,11 @@ export async function applyProviderSpecificLogic(
   if (isClaudeModel(requestedModel)) {
     // Anthropic rejects tools with "input_schema does not support oneOf, allOf, or anyOf at the top level"
     removeTopLevelToolSchemaCombinators(requestToMutate);
+  }
+
+  if (isKimiModel(requestedModel)) {
+    // Moonshot rejects tools with "tools.function.parameters is not a valid moonshot flavored json schema, details: <At path '...': type is not defined>"
+    addMissingToolSchemaEnumTypes(requestToMutate);
   }
 
   if (requestToMutate.kind === 'chat_completions') {

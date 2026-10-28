@@ -250,20 +250,6 @@ describe('request cost admission', () => {
       request: 0,
     });
   });
-  it('uses the tier reachable by the bounded input length for exclusive models', async () => {
-    const longRequest = {
-      ...body,
-      messages: [{ role: 'user' as const, content: 'x'.repeat(265_000) }],
-    };
-    const decision = await enforceRequestCostLimitDecision(
-      '500000',
-      'stealth/qwen3.6-plus',
-      longRequest,
-      2_000_000,
-      { id: 'openrouter', userFunded: false }
-    );
-    expect(decision.refusal).toBe('Request exceeds its spend safeguard before generation');
-  });
   it('rejects before upstream spend for an insufficient ceiling or balance', async () => {
     await expect(enforceRequestCostLimit('1', model.id, body, 2_000_000)).resolves.toMatch(
       /spend safeguard/

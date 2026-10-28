@@ -36,6 +36,22 @@ Keep credentials out of tracked defaults. For local monitor development, generat
 a separate value with `openssl rand -base64 32` and set it in the local environment;
 ordinary local startup does not require this credential.
 
+### Cloud agent dispatch health monitor
+
+`CLOUD_AGENT_DISPATCH_HEALTH_SECRET` is a dedicated server-only monitor credential for
+`GET /api/cloud-agent/dispatch-health`. `[SECRET]` The monitor must send
+`Authorization: Bearer <configured value>`. An unset or empty value disables access, and the
+endpoint accepts no other credential, including request parameters.
+
+For initial deployment or rotation, the owner runs
+`pnpm web:env set CLOUD_AGENT_DISPATCH_HEALTH_SECRET`, supplies a newly generated secret, and
+coordinates the application deployment with the external monitor's header update.
+Verify the monitor after the deployment and header update. Only one configured
+secret is accepted; deployment and monitor configuration must agree.
+Keep credentials out of tracked defaults. For local monitor development, generate
+a separate value with `openssl rand -base64 32` and set it in the local environment;
+ordinary local startup does not require this credential.
+
 ### Configuration & Constant URLs
 
 - `APP_URL_OVERRIDE` - Optional base application URL override in any environment; used in `packages/web-shared/src/lib/constants.ts` and `next.config.mjs`. When unset, Vercel's `staging` target uses `https://staging-app.kilo.ai`, production uses `https://app.kilo.ai`, and local development uses `PORT`. [SERVER]
@@ -142,6 +158,8 @@ ordinary local startup does not require this credential.
 - `GITHUB_LITE_APP_ID` - Lighter/secondary GitHub App ID for select integrations. `[SECRET]`
 - `GITHUB_LITE_APP_PRIVATE_KEY` - Private key for the lite GitHub App. `[SECRET]`
 - `GITHUB_LITE_APP_CLIENT_ID` - OAuth Client ID for the lite GitHub App install/login flow. [PUBLIC]
+- `GITHUB_APP_WEBHOOK_SECRET` - Webhook signing secret of the standard GitHub App; `apps/web/src/lib/integrations/platforms/github/app-selector.ts` reads it for `/api/webhooks/github`, which refuses every delivery (401) while it is empty. `[SECRET]`
+- `GITHUB_LITE_APP_WEBHOOK_SECRET` - Webhook signing secret of the lite GitHub App; read for `/api/webhooks/github-lite`, which refuses every delivery (401) while it is empty. `[SECRET]`
 - `GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS` - Comma-separated Kilo organization UUIDs allowed to connect multiple GitHub App installations. Unset or empty disables multiple installations for all organizations. [SERVER]
 - `GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS` - Comma-separated destination Kilo organization UUIDs allowed to create an association to a GitHub App installation already associated elsewhere. Unset or empty disables new shared associations without revoking existing ones. [SERVER]
 
@@ -274,6 +292,8 @@ admission responses within the same slot and deadline.
 ### Encryption & Secrets
 
 - `BYOK_ENCRYPTION_KEY` - Base64 encryption key for Bring-Your-Own-Key encryption of sensitive app data. `[SECRET]`
+- `BYOK_KMS_SERVICE_URL` - Base URL of the BYOK KMS envelope service. Unset disables envelope writes and reads fall back to the legacy column. `[SERVER]`
+- `BYOK_KMS_SERVICE_TOKEN` - Bearer token for the BYOK KMS service; required when `BYOK_KMS_SERVICE_URL` is set. `[SECRET]`
 - `USER_DELETION_AUDIT_HMAC_KEY` - Base64 32-byte HMAC key for user-deletion email hashes and audit subjects. `[SECRET]`
 - `USER_DELETION_ENCRYPTION_KEY` - Base64 32-byte AES key for user-deletion effect checkpoints and provider credentials. `[SECRET]`
 - `BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID` - Server-only BytePlus access key ID for Coding Plan seat resolution and quota usage APIs. Optional at startup; install with `pnpm web:env set BYTEPLUS_CODING_PLAN_ACCESS_KEY_ID`. `[SECRET]`

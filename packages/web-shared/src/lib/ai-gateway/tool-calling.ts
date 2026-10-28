@@ -31,8 +31,12 @@ export function normalizeToolCallIds(
   filter: (toolCallId: string) => boolean,
   maxIdLength: number | undefined
 ) {
-  const normalize = (toolCallId: string) =>
-    filter(toolCallId) ? normalizeToolCallId(toolCallId, maxIdLength) : toolCallId;
+  const normalizedIds = new Set<string>();
+  const normalize = (toolCallId: string) => {
+    if (!filter(toolCallId)) return toolCallId;
+    normalizedIds.add(toolCallId);
+    return normalizeToolCallId(toolCallId, maxIdLength);
+  };
 
   if (requestToMutate.kind === 'chat_completions') {
     normalizeChatCompletionsToolCallIds(requestToMutate.body, normalize);
@@ -40,6 +44,17 @@ export function normalizeToolCallIds(
     normalizeResponsesToolCallIds(requestToMutate.body, normalize);
   } else {
     normalizeMessagesToolCallIds(requestToMutate.body, normalize);
+  }
+
+  // One line per request, not per id: histories are resent every turn.
+  const [exampleId] = normalizedIds;
+  if (exampleId !== undefined) {
+    console.warn('[normalizeToolCallIds] normalized tool call ids', {
+      kind: requestToMutate.kind,
+      model: requestToMutate.body.model,
+      normalizedIdCount: normalizedIds.size,
+      exampleId: exampleId.slice(0, 64),
+    });
   }
 }
 

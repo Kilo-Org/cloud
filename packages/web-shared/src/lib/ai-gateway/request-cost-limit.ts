@@ -8,7 +8,6 @@ import {
   pickerModelPricing,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
-import { findKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   formatPricePerToken,
   getCustomPricing,
@@ -100,9 +99,9 @@ function pickerRequestPrice(
 }
 
 /**
- * Replaces picker rates with the Kilo-exclusive and custom pricing tiers that
- * apply at `inputTokenCeiling`, as billing selects them; fallback-only tiers
- * can only raise the rates.
+ * Replaces picker rates with the custom pricing tier that applies at
+ * `inputTokenCeiling`, as billing selects it; a fallback-only tier can only
+ * raise the rates.
  */
 export function applyTieredPricingRates(
   modelId: string,
@@ -110,24 +109,13 @@ export function applyTieredPricingRates(
   customPricingConfig: CustomPricingConfig,
   inputTokenCeiling: number
 ): TextPricingRates {
-  let rates = pickerRates;
-  const exclusivePricing = findKiloExclusiveModel(modelId)?.pricing;
   const customPricing = getCustomPricing(customPricingConfig, modelId);
-  const exclusiveTier = exclusivePricing
-    ? tierAtInputLength(exclusivePricing.tiers, inputTokenCeiling)
-    : undefined;
   const customTier = customPricing
     ? tierAtInputLength(customPricing.pricing, inputTokenCeiling)
     : undefined;
-  if (exclusiveTier) {
-    const tierRates = ratesForTier(exclusiveTier, rates.requestCost);
-    rates = exclusivePricing?.fallbackOnly ? combineRates(rates, tierRates) : tierRates;
-  }
-  if (customTier) {
-    const tierRates = ratesForTier(customTier, rates.requestCost);
-    rates = customPricing?.fallbackOnly ? combineRates(rates, tierRates) : tierRates;
-  }
-  return rates;
+  if (!customTier) return pickerRates;
+  const tierRates = ratesForTier(customTier, pickerRates.requestCost);
+  return customPricing?.fallbackOnly ? combineRates(pickerRates, tierRates) : tierRates;
 }
 
 export type RequestCostLimitResult = {
@@ -455,10 +443,9 @@ function storedModelWorstRates(
     ])
   );
   const tiers = worstRates(
-    [
-      ...(getCustomPricing(customPricingConfig, metadata.id)?.pricing ?? []),
-      ...(findKiloExclusiveModel(metadata.id)?.pricing?.tiers ?? []),
-    ].map(tier => pricedRates(tierPricing(tier)))
+    (getCustomPricing(customPricingConfig, metadata.id)?.pricing ?? []).map(tier =>
+      pricedRates(tierPricing(tier))
+    )
   );
   if (!routes) return null;
   return tiers ? combineRates(routes, tiers) : routes;

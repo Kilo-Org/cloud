@@ -1,4 +1,6 @@
+import { DIRECT_BYOK_PROVIDER_IDS } from '@kilocode/worker-utils/direct-byok-model';
 import * as z from 'zod';
+import { GoogleServiceAccountSigningKeySchema } from '@kilocode/db/schema-types';
 
 export const OpenRouterInferenceProviderIdSchema = z.enum([
   'ai21',
@@ -108,33 +110,49 @@ export type VercelUserByokInferenceProviderId = z.infer<
 >;
 
 export const DirectUserByokInferenceProviderIdSchema = z.enum([
-  'alibaba-token-plan',
-  'byteplus-coding',
-  'chutes-byok',
+  ...DIRECT_BYOK_PROVIDER_IDS,
   'codestral',
-  'edenai',
-  'inceptron-byok',
-  'kimi-coding',
-  'martian',
-  'morph-byok',
-  'neuralwatt',
-  'nvidia-byok',
-  'ollama-cloud',
-  'opencode-go',
-  'orcarouter',
-  'synthetic',
-  'xiaomi-token-plan-ams',
-  'xiaomi-token-plan-sgp',
-  'zai-coding',
 ]);
+
+/**
+ * Direct BYOK providers in proof of concept. Keys for them can only be added
+ * where `isExperimentalByokEnabled` allows it.
+ */
+export const ExperimentalByokProviderIdSchema = DirectUserByokInferenceProviderIdSchema.extract([
+  'bedrock-byok',
+  'vertex-byok',
+]);
+
+export type ExperimentalByokProviderId = z.infer<typeof ExperimentalByokProviderIdSchema>;
+
+export function isExperimentalByokProviderId(
+  providerId: string
+): providerId is ExperimentalByokProviderId {
+  return ExperimentalByokProviderIdSchema.safeParse(providerId).success;
+}
 
 export type DirectUserByokInferenceProviderId = z.infer<
   typeof DirectUserByokInferenceProviderIdSchema
 >;
 
+/**
+ * Keys for a whole gateway rather than one inference provider. They serve the
+ * regular catalog models under their regular ids, ordered by preference: when a
+ * user has both, the Vercel AI Gateway key wins for models Vercel can serve.
+ */
+export const GatewayUserByokProviderIdSchema = z.enum(['vercel-ai-gateway', 'openrouter']);
+
+export type GatewayUserByokProviderId = z.infer<typeof GatewayUserByokProviderIdSchema>;
+
+export function isGatewayUserByokProviderId(
+  providerId: string
+): providerId is GatewayUserByokProviderId {
+  return GatewayUserByokProviderIdSchema.safeParse(providerId).success;
+}
+
 export const UserByokProviderIdSchema = VercelUserByokInferenceProviderIdSchema.or(
   DirectUserByokInferenceProviderIdSchema
-);
+).or(GatewayUserByokProviderIdSchema);
 
 export type UserByokProviderId = z.infer<typeof UserByokProviderIdSchema>;
 
@@ -159,6 +177,7 @@ export const UserByokTestModels = {
   [VercelUserByokInferenceProviderIdSchema.enum.xiaomi]: 'xiaomi/mimo-v2-flash',
   [VercelUserByokInferenceProviderIdSchema.enum.zai]: 'zai/glm-4.7-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['alibaba-token-plan']]: 'deepseek-v3.2',
+  [DirectUserByokInferenceProviderIdSchema.enum['bedrock-byok']]: 'openai.gpt-oss-120b-1:0',
   [DirectUserByokInferenceProviderIdSchema.enum['byteplus-coding']]: 'bytedance-seed-code',
   [DirectUserByokInferenceProviderIdSchema.enum['chutes-byok']]: 'Qwen/Qwen3-30B-A3B',
   [DirectUserByokInferenceProviderIdSchema.enum.codestral]: 'mistral/codestral',
@@ -174,9 +193,12 @@ export const UserByokTestModels = {
   [DirectUserByokInferenceProviderIdSchema.enum['synthetic']]: 'hf:zai-org/GLM-5.1',
   [DirectUserByokInferenceProviderIdSchema.enum['ollama-cloud']]: 'kimi-k2.6:cloud',
   [DirectUserByokInferenceProviderIdSchema.enum['opencode-go']]: 'qwen3.7-plus',
+  [DirectUserByokInferenceProviderIdSchema.enum['vertex-byok']]: 'google/gemini-3.5-flash-lite',
   [DirectUserByokInferenceProviderIdSchema.enum['xiaomi-token-plan-ams']]: 'mimo-v2-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['xiaomi-token-plan-sgp']]: 'mimo-v2-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['zai-coding']]: 'glm-4.7',
+  [GatewayUserByokProviderIdSchema.enum['vercel-ai-gateway']]: 'openai/gpt-5-nano',
+  [GatewayUserByokProviderIdSchema.enum.openrouter]: 'openai/gpt-5-nano',
 } satisfies Record<UserByokProviderId, string>;
 
 // This is a registry of provider IDs referenced explicitly in our mappings, not
@@ -315,3 +337,25 @@ export const VertexCredentialsSchema = z.object({
 });
 
 export type VertexCredentials = z.infer<typeof VertexCredentialsSchema>;
+
+/**
+ * A Google Cloud service account key file, as downloaded from the console, with
+ * an optional Vertex AI `location`. Only the fields needed to sign token
+ * requests and address the project are required.
+ */
+export const GoogleServiceAccountKeyFileSchema = GoogleServiceAccountSigningKeySchema.extend({
+  type: z.literal('service_account'),
+  project_id: z.string().min(1),
+  location: z.string().trim().min(1).optional(),
+});
+
+/**
+ * Direct Vertex AI BYOK accepts the Vercel-shaped credentials above, or a
+ * service account key file with an optional `location` (default `global`).
+ */
+export const DirectVertexCredentialsSchema = z.union([
+  VertexCredentialsSchema,
+  GoogleServiceAccountKeyFileSchema,
+]);
+
+export type DirectVertexCredentials = z.infer<typeof DirectVertexCredentialsSchema>;

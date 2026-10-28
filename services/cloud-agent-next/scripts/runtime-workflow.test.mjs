@@ -29,8 +29,9 @@ test('write credentials follow admission and checkout uses its exact SHA', async
   assert.deepEqual(workflow.jobs.publish.needs, 'admit');
   assert.equal(
     workflow.jobs.publish.if,
-    "github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || vars.CLOUD_AGENT_RUNTIME_PUBLICATION_ENABLED == 'true')"
+    "github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || needs.admit.outputs.needed == 'true')"
   );
+  assert.equal(workflow.jobs.admit.outputs.needed, '${{ steps.catalog.outputs.needed }}');
   assert.equal(workflow.jobs.publish.environment, 'cloud-agent-runtime-publication');
   assert.ok(!JSON.stringify(workflow.jobs.admit).includes('secrets.'));
   assert.equal(workflow.jobs.admit.steps[0].with.ref, 'refs/heads/main');
@@ -45,6 +46,10 @@ test('write credentials follow admission and checkout uses its exact SHA', async
   assert.equal(manual.if, "github.event_name == 'workflow_dispatch'");
   assert.equal(manual.env.SOURCE_SHA, '${{ inputs.source_sha }}');
   assert.equal(manual.run, 'node services/cloud-agent-next/scripts/runtime-manual-admission.mjs');
+  const catalog = workflow.jobs.admit.steps.find(step => step.id === 'catalog');
+  assert.equal(catalog.if, "github.event_name == 'workflow_run'");
+  assert.equal(catalog.env.SOURCE_SHA, '${{ steps.admit.outputs.source_sha }}');
+  assert.equal(catalog.run, 'node services/cloud-agent-next/scripts/runtime-publication-need.mjs');
   const steps = workflow.jobs.publish.steps;
   assert.equal(steps[0].with.ref, '${{ needs.admit.outputs.source_sha }}');
   const publish = steps.find(

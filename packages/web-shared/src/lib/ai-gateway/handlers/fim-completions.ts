@@ -1,4 +1,3 @@
-import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import { MISTRAL_API_KEY, INCEPTION_API_KEY } from '@kilocode/web-shared/lib/config.server';
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
@@ -6,10 +5,7 @@ import z from 'zod';
 import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import type { MicrodollarUsageContext } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
-import {
-  isFreeModel,
-  isFreeModelExcludingCustomLlms,
-} from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
+import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
@@ -22,16 +18,14 @@ import {
   wrapInSafeNextResponse,
   captureProxyError,
   extractHeaderAndLimitLength,
-  modelNotAllowedResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
 import { ProxyErrorType } from '@kilocode/web-shared/lib/proxy-error-types';
-import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { getBYOKforOrganization, getBYOKforUser } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import { checkDirectProviderAccess } from '@kilocode/web-shared/lib/ai-gateway/direct-provider-access';
 import {
   findSupportedFimModel,
   type FimProvider,
@@ -220,36 +214,16 @@ export async function handleFimCompletionsRequest(request: NextRequest) {
   };
 
   setTag('ui.ai_model', requestBody.model);
-  const freeRequest = await isFreeModel(requestBody.model);
-  const { balance, plan, payer } = await getBalanceAndOrgSettings(
-    organizationId,
+  const accessResult = await checkDirectProviderAccess({
     user,
-    readDb,
-    freeRequest ? undefined : 'usage'
-  );
-
-  if (!canSpendPaidUsage(balance) && !usageContext.is_free && !userByok) {
-    return NextResponse.json(
-      {
-        error: { message: 'Insufficient credits' },
-        error_type: ProxyErrorType.insufficient_credits,
-      },
-      { status: 402 }
-    );
-  }
-
-  if (organizationId) {
-    const { decision } = await resolveOrganizationMemberModelDecision({
-      organizationId,
-      kiloUserId: user.id,
-      modelId: requestBody.model,
-      fromDb: readDb,
-    });
-    if (!decision.allowed) return modelNotAllowedResponse();
-    if (decision.eligibleProviderRoutes && !decision.eligibleProviderRoutes.has(fimProvider)) {
-      return modelNotAllowedResponse();
-    }
-  }
+    organizationId,
+    model: requestBody.model,
+    provider: fimProvider,
+    isFreeUsage: usageContext.is_free,
+    hasByok: !!userByok,
+  });
+  if (accessResult.rejection) return accessResult.rejection;
+  const { balance, plan, payer } = accessResult.access;
 
   // Data-use contract for this route: FIM goes straight to the provider, and the supported
   // providers are classified by the gateway's provider data policy as not training on prompts

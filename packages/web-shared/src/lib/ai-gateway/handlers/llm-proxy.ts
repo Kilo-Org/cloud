@@ -5,6 +5,7 @@ import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { extractPromptInfo } from '@kilocode/web-shared/lib/ai-gateway/extractPromptInfo';
 import { determineFallbackFeature } from '@kilocode/web-shared/lib/ai-gateway/determineFallbackFeature';
 import { validateFeatureHeader, FEATURE_HEADER } from '@kilocode/web-shared/lib/feature-detection';
+import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/upstream-error-policy';
 import {
   BRIEFING_SETTLEMENT_HEADER,
   recordBriefingUsage,
@@ -43,7 +44,6 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
   accountForMicrodollarUsage,
-  captureProxyError,
   getOrganizationProviderPrivacy,
   dataCollectionRequiredResponse,
   extractFraudAndProjectHeaders,
@@ -1141,37 +1141,18 @@ export async function handleLlmProxyRequest(
       ? null
       : effectiveProviderContext.userByok.map(byok => byok.providerId);
 
-  // Handle OpenRouter 402 errors - don't pass them through to the client. We need to pay, not them.
-  // Skip this conversion when user BYOK is used - the 402 is about their account, not ours.
-  if (response.status === 402 && !effectiveProviderContext.userByok) {
-    await captureProxyError({
-      user,
-      request: requestBodyParsed.body,
-      response,
-      organizationId,
-      model: finalUpstreamModel,
-      gatewayModel: effectiveModelIdLowerCased,
-      errorMessage: `${effectiveProviderContext.provider.id} returned 402 Payment Required`,
-      trackInSentry: true,
-    });
-
-    // Return a service unavailable error instead of the 402
-    return temporarilyUnavailableResponse();
-  }
-
-  if (response.status >= 400) {
-    await captureProxyError({
-      user,
-      request: requestBodyParsed.body,
-      response,
-      organizationId,
-      model: finalUpstreamModel,
-      gatewayModel: effectiveModelIdLowerCased,
-      byokProviderIds: userByokProviderIds,
-      errorMessage: `${effectiveProviderContext.provider.id} returned error ${response.status}`,
-      trackInSentry: response.status >= 500,
-    });
-  }
+  const upstreamErrorResponse = await applyUpstreamErrorPolicy({
+    response,
+    providerId: effectiveProviderContext.provider.id,
+    isUserByok: !!effectiveProviderContext.userByok,
+    user,
+    request: requestBodyParsed.body,
+    organizationId,
+    model: finalUpstreamModel,
+    gatewayModel: effectiveModelIdLowerCased,
+    byokProviderIds: userByokProviderIds,
+  });
+  if (upstreamErrorResponse) return upstreamErrorResponse;
 
   const clonedReponse = response.clone(); // reading from body is side-effectful
 

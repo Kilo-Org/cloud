@@ -56,6 +56,8 @@ const ModelsDevModelSchema = z.object({
   canonical_model_id: z.string().optional().catch(undefined),
 });
 
+type ModelsDevModel = z.infer<typeof ModelsDevModelSchema>;
+
 // A models.dev per-model `provider.npm` names the SDK for the model's own endpoint. Several SDK
 // names, such as `@ai-sdk/mistral`, still speak Chat Completions, so only SDKs for the native
 // Gemini API, which the gateway cannot proxy, are excluded.
@@ -143,6 +145,27 @@ function supportedReasoningOptions(
   return options?.length && toLegacyVariants(options, undefined) ? options : undefined;
 }
 
+function isUsableModelsDevModel(model: ModelsDevModel) {
+  return (
+    model.status !== 'deprecated' &&
+    (!model.modalities?.output || model.modalities.output.includes('text')) &&
+    model.tool_call !== false &&
+    (!model.modalities?.input || model.modalities.input.includes('text'))
+  );
+}
+
+function toRawModel(model: ModelsDevModel): RawModel {
+  return {
+    id: model.id,
+    name: shortenDisplayName(model.name),
+    context_length: model.limit?.context,
+    max_completion_tokens: model.limit?.output,
+    input_modalities: model.modalities?.input,
+    flags: model.reasoning ? ['reasoning'] : undefined,
+    reasoning_options: supportedReasoningOptions(model.reasoning_options),
+  };
+}
+
 export function parseModelsDevProviderModels(
   entry: unknown,
   providerId: DirectUserByokInferenceProviderId,
@@ -152,24 +175,11 @@ export function parseModelsDevProviderModels(
   return Object.values(provider.models)
     .filter(
       model =>
-        model.status !== 'deprecated' &&
-        (!model.modalities?.output || model.modalities.output.includes('text')) &&
+        isUsableModelsDevModel(model) &&
         (!availableModelIds || availableModelIds.has(model.id)) &&
-        model.tool_call !== false &&
-        (!model.modalities?.input || model.modalities.input.includes('text')) &&
         (!model.provider?.npm || !GEMINI_API_MODELS_DEV_SDKS.has(model.provider.npm))
     )
-    .map(model => {
-      return {
-        id: model.id,
-        name: shortenDisplayName(model.name),
-        context_length: model.limit?.context,
-        max_completion_tokens: model.limit?.output,
-        input_modalities: model.modalities?.input,
-        flags: model.reasoning ? ['reasoning'] : undefined,
-        reasoning_options: supportedReasoningOptions(model.reasoning_options),
-      };
-    });
+    .map(model => toRawModel(model));
 }
 
 function getModelsDevId(providerId: DirectUserByokInferenceProviderId): string | undefined {
@@ -222,6 +232,21 @@ async function getCatalogModelIds(
   return catalogModelIds;
 }
 
+function getModelsDevEntry(
+  providerId: DirectUserByokInferenceProviderId,
+  catalog: ModelsDevCatalog
+) {
+  const catalogKey = getModelsDevId(providerId);
+  if (!catalogKey) {
+    throw new Error(`${providerId} has no models.dev ID`);
+  }
+  const entry = catalog[catalogKey];
+  if (!entry) {
+    throw new Error(`models.dev catalog missing ${catalogKey} entry`);
+  }
+  return entry;
+}
+
 function modelsDevFetcher(
   providerId: DirectUserByokInferenceProviderId,
   availableModelsUrl?: string
@@ -229,15 +254,7 @@ function modelsDevFetcher(
   return {
     providerId,
     async fetch(ctx) {
-      const catalogKey = getModelsDevId(providerId);
-      if (!catalogKey) {
-        throw new Error(`${providerId} has no models.dev ID`);
-      }
-      const catalog = await ctx.getModelsDevCatalog();
-      const entry = catalog[catalogKey];
-      if (!entry) {
-        throw new Error(`models.dev catalog missing ${catalogKey} entry`);
-      }
+      const entry = getModelsDevEntry(providerId, await ctx.getModelsDevCatalog());
       if (!availableModelsUrl) {
         return parseModelsDevProviderModels(entry, providerId);
       }

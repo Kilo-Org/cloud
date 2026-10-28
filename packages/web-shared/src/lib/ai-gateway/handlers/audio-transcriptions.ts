@@ -11,15 +11,14 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/upstream-error-policy';
 import {
-  captureProxyError,
   countAndStoreTranscriptionUsage,
   extractFraudAndProjectHeaders,
   extractHeaderAndLimitLength,
   invalidRequestResponse,
   modelDoesNotExistResponse,
   modelNotAllowedResponse,
-  temporarilyUnavailableResponse,
   creditsBlockedResponse,
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
@@ -398,30 +397,16 @@ export async function handleAudioTranscriptionsRequest(
     requestStartedAt
   );
 
-  if (response.status === 402 && !userByok) {
-    await captureProxyError({
-      user,
-      request: upstreamBody,
-      response,
-      organizationId,
-      model: requestedModelLowerCased,
-      errorMessage: `${provider.id} returned 402 Payment Required`,
-      trackInSentry: true,
-    });
-    return temporarilyUnavailableResponse();
-  }
-
-  if (response.status >= 400) {
-    await captureProxyError({
-      user,
-      request: upstreamBody,
-      response,
-      organizationId,
-      model: requestedModelLowerCased,
-      errorMessage: `${provider.id} returned error ${response.status}`,
-      trackInSentry: response.status >= 500,
-    });
-  }
+  const upstreamErrorResponse = await applyUpstreamErrorPolicy({
+    response,
+    providerId: provider.id,
+    isUserByok: !!userByok,
+    user,
+    request: upstreamBody,
+    organizationId,
+    model: requestedModelLowerCased,
+  });
+  if (upstreamErrorResponse) return upstreamErrorResponse;
 
   countAndStoreTranscriptionUsage(response.clone(), usageContext, span);
   return wrapInSafeNextResponse(response);

@@ -5277,7 +5277,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private async armAlarm(state: AllocationState): Promise<void> {
     // The one alarm is the earliest of the allocation timers and the route
     // preparation deadlines, so a hung wrapper's route cannot outlive its
-    // 12-minute attempt.
+    // preparation attempt.
     const allocationAt = nextAllocationAlarmAt(state, this.sandboxTimers());
     const routeAt = await earliestRouteDeadlineAt(this.db);
     // Pending work must survive loss of the in-memory launch continuation.

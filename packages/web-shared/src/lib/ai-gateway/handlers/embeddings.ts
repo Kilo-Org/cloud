@@ -11,13 +11,13 @@ import { captureException, setTag, startInactiveSpan } from '@sentry/nextjs';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
+import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/upstream-error-policy';
 import {
   isFreeModel,
   isFreeModelExcludingCustomLlms,
 } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
-  captureProxyError,
   getOrganizationProviderPrivacy,
   countAndStoreEmbeddingUsage,
   extractEmbeddingPromptInfo,
@@ -27,7 +27,6 @@ import {
   invalidTokenResponse,
   modelDoesNotExistResponse,
   modelNotAllowedResponse,
-  temporarilyUnavailableResponse,
   creditsBlockedResponse,
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
@@ -433,31 +432,16 @@ export async function handleEmbeddingsRequest(
 
   usageContext.status_code = response.status;
 
-  // Handle upstream 402 — don't pass through to client (same as chat completions)
-  if (response.status === 402 && !userByok) {
-    await captureProxyError({
-      user,
-      request: upstreamBody,
-      response,
-      organizationId,
-      model: requestedModelLowerCased,
-      errorMessage: `${provider.id} returned 402 Payment Required`,
-      trackInSentry: true,
-    });
-    return temporarilyUnavailableResponse();
-  }
-
-  if (response.status >= 400) {
-    await captureProxyError({
-      user,
-      request: upstreamBody,
-      response,
-      organizationId,
-      model: requestedModelLowerCased,
-      errorMessage: `${provider.id} returned error ${response.status}`,
-      trackInSentry: response.status >= 500,
-    });
-  }
+  const upstreamErrorResponse = await applyUpstreamErrorPolicy({
+    response,
+    providerId: provider.id,
+    isUserByok: !!userByok,
+    user,
+    request: upstreamBody,
+    organizationId,
+    model: requestedModelLowerCased,
+  });
+  if (upstreamErrorResponse) return upstreamErrorResponse;
 
   const clonedResponse = response.clone();
   countAndStoreEmbeddingUsage(clonedResponse, usageContext, embeddingRequestSpan);

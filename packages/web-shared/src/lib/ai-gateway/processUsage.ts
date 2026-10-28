@@ -88,6 +88,7 @@ import {
 import { OPENROUTER_BYOK_COST_MULTIPLIER } from '@kilocode/web-shared/lib/ai-gateway/processUsage.constants';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 import {
+  byokNonInferenceCost_mUsd,
   computeOpenRouterCostFields,
   providerReportsIsByok,
   drainSseStream,
@@ -263,6 +264,7 @@ export async function toInsertableDbUsageRecord(
     streamed: usageStats.streamed,
     cancelled: usageStats.cancelled,
     market_cost: usageStats.market_cost ?? null,
+    non_inference_cost: usageStats.nonInferenceCost_mUsd ?? null,
     abuse_delay: metadataFromContext.abuse_delay,
     abuse_downgraded_from: metadataFromContext.abuse_downgraded_from,
   };
@@ -962,6 +964,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               machine_id,
               session_id,
               market_cost,
+              non_inference_cost,
               is_free,
               abuse_delay,
               abuse_downgraded_from,
@@ -1003,6 +1006,7 @@ async function insertUsageAndMetadataWithBalanceUpdate(
               ${metadataFields.machine_id},
               ${metadataFields.session_id},
               ${metadataFields.market_cost},
+              ${metadataFields.non_inference_cost},
               ${metadataFields.is_free},
               ${metadataFields.abuse_delay},
               ${metadataFields.abuse_downgraded_from},
@@ -1176,11 +1180,12 @@ export function processOpenRouterUsage(
   vercelProviderMetadata?: VercelProviderMetaData | null
 ): JustTheCostsUsageStats {
   // usage may be null when there's no response (e.g. error), so default to empty object
-  const { cost_mUsd, is_byok } = computeOpenRouterCostFields(
+  const { cost_mUsd, nonInferenceCost_mUsd, is_byok } = computeOpenRouterCostFields(
     usage ?? {},
     coreProps,
     'sse_processing',
-    providerReportsIsByok(provider)
+    providerReportsIsByok(provider),
+    provider
   );
 
   return {
@@ -1192,6 +1197,7 @@ export function processOpenRouterUsage(
       0,
     outputTokens: usage?.completion_tokens ?? 0,
     cost_mUsd,
+    nonInferenceCost_mUsd,
     is_byok: is_byok ?? extractVercelIsByok(vercelProviderMetadata?.gateway),
   };
 }
@@ -1597,6 +1603,7 @@ export const mapToUsageStats = (
   provider: ProviderId
 ): MicrodollarUsageStats => {
   let llmCostUsd;
+  let nonInferenceCost_mUsd: number | undefined;
   if (!data.is_byok) {
     llmCostUsd = data.total_cost;
   } else if (data.upstream_inference_cost == undefined) {
@@ -1609,6 +1616,11 @@ export const mapToUsageStats = (
     // openrouter bug, see
   } else {
     llmCostUsd = data.upstream_inference_cost;
+    nonInferenceCost_mUsd = byokNonInferenceCost_mUsd(
+      provider,
+      data.total_cost,
+      data.upstream_inference_cost
+    );
   }
 
   return {
@@ -1628,7 +1640,8 @@ export const mapToUsageStats = (
       provider === 'vercel'
         ? (data.native_tokens_completion ?? 0) + (data.native_tokens_reasoning ?? 0)
         : (data.native_tokens_completion ?? 0),
-    cost_mUsd: toMicrodollars(llmCostUsd),
+    cost_mUsd: toMicrodollars(llmCostUsd) + (nonInferenceCost_mUsd ?? 0),
+    nonInferenceCost_mUsd,
     is_byok: data.is_byok ?? null,
     cacheDiscount_mUsd:
       data.cache_discount == undefined ? undefined : toMicrodollars(data.cache_discount),

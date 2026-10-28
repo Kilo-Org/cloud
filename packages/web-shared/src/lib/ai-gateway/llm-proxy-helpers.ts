@@ -48,7 +48,7 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
   computeOpenRouterCostFields,
-  computeVercelCostMicrodollars,
+  computeVercelCostFields,
   drainSseStream,
   extractVercelIsByok,
   providerReportsIsByok,
@@ -1395,6 +1395,11 @@ function parseEmbeddingResponse(responseText: string, statusCode: number): Embed
   }
 }
 
+function embeddingVercelCosts(vercelGateway: NonNullable<VercelProviderMetaData['gateway']>) {
+  const is_byok = extractVercelIsByok(vercelGateway);
+  return { ...computeVercelCostFields(vercelGateway, is_byok), is_byok };
+}
+
 export function parseEmbeddingUsageFromResponse(
   responseText: string,
   statusCode: number,
@@ -1436,13 +1441,11 @@ export function parseEmbeddingUsageFromResponse(
           usage,
           base,
           'embedding_usage_processing',
-          providerReportsIsByok(provider)
+          providerReportsIsByok(provider),
+          provider
         )
       : vercelGateway
-        ? {
-            cost_mUsd: computeVercelCostMicrodollars(vercelGateway),
-            is_byok: extractVercelIsByok(vercelGateway),
-          }
+        ? embeddingVercelCosts(vercelGateway)
         : { cost_mUsd: 0, is_byok: null };
 
   return {
@@ -1451,8 +1454,7 @@ export function parseEmbeddingUsageFromResponse(
     outputTokens: 0,
     cacheHitTokens: 0,
     cacheWriteTokens: 0,
-    cost_mUsd: cost.cost_mUsd,
-    is_byok: cost.is_byok,
+    ...cost,
   };
 }
 
@@ -1491,7 +1493,8 @@ export function parseTranscriptionUsageFromResponse(
     json.usage ?? {},
     base,
     'transcription_usage_processing',
-    messageId === null && providerReportsIsByok(provider)
+    messageId === null && providerReportsIsByok(provider),
+    provider
   );
 
   return {
@@ -1500,8 +1503,7 @@ export function parseTranscriptionUsageFromResponse(
     outputTokens: json.usage?.output_tokens ?? 0,
     cacheHitTokens: 0,
     cacheWriteTokens: 0,
-    cost_mUsd: cost.cost_mUsd,
-    is_byok: cost.is_byok,
+    ...cost,
   };
 }
 

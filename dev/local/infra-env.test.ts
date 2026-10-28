@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import test from 'node:test';
+import { parseEnv } from 'node:util';
 
 import {
   applyAppEnv,
@@ -105,6 +106,47 @@ test('publishes this worktree database to the Jest env file', () => {
   } finally {
     applyPortOffset(original);
     fs.rmSync(root, { recursive: true, force: true });
+  }
+});
+
+test('fills the BYOK KMS token when it is empty or missing and keeps one that is set', () => {
+  const cases: Array<{ line: string; expected: string }> = [
+    { line: '', expected: 'dev-byok-kms-token' },
+    { line: 'BYOK_KMS_SERVICE_TOKEN=', expected: 'dev-byok-kms-token' },
+    { line: 'BYOK_KMS_SERVICE_TOKEN=   ', expected: 'dev-byok-kms-token' },
+    { line: 'BYOK_KMS_SERVICE_TOKEN=""', expected: 'dev-byok-kms-token' },
+    { line: "BYOK_KMS_SERVICE_TOKEN=''", expected: 'dev-byok-kms-token' },
+    { line: 'BYOK_KMS_SERVICE_TOKEN=my-token', expected: 'my-token' },
+    { line: 'BYOK_KMS_SERVICE_TOKEN="my token"', expected: 'my token' },
+  ];
+  const original = portOffset;
+
+  try {
+    applyPortOffset(700);
+    for (const { line, expected } of cases) {
+      const root = fs.mkdtempSync(path.join(os.tmpdir(), 'infra-env-'));
+      try {
+        fs.mkdirSync(path.join(root, 'dev'));
+        fs.mkdirSync(path.join(root, 'apps', 'web'), { recursive: true });
+        const envLocalPath = path.join(root, '.env.local');
+        fs.writeFileSync(envLocalPath, `BYOK_KMS_SERVICE_URL=""\n${line}\n`);
+
+        syncInfraEnv(root);
+
+        const env = parseEnv(fs.readFileSync(envLocalPath, 'utf-8'));
+        assert.equal(env.BYOK_KMS_SERVICE_TOKEN, expected, `token for ${JSON.stringify(line)}`);
+        assert.match(env.BYOK_KMS_SERVICE_URL ?? '', /^http:\/\/127\.0\.0\.1:\d+$/);
+        const occurrences = fs
+          .readFileSync(envLocalPath, 'utf-8')
+          .split('\n')
+          .filter(l => l.startsWith('BYOK_KMS_SERVICE_TOKEN=')).length;
+        assert.equal(occurrences, 1);
+      } finally {
+        fs.rmSync(root, { recursive: true, force: true });
+      }
+    }
+  } finally {
+    applyPortOffset(original);
   }
 });
 

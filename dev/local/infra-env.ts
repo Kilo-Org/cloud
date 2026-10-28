@@ -18,6 +18,7 @@
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import { parseEnv } from 'node:util';
 import { byokKmsServicePort, getInfraBasePort, localPostgresUrl, portOffset } from './services';
 import { writeSecretsFile } from './secrets-file';
 
@@ -146,6 +147,20 @@ export function applyAppEnv(
   return { content: result, changed, kept };
 }
 
+/**
+ * Gives `BYOK_KMS_SERVICE_TOKEN` the dev default when its parsed value is empty
+ * or the key is missing, and leaves any real token alone. The value is parsed
+ * the way `process.loadEnvFile` reads it, so `""` and `''` count as empty.
+ */
+export function ensureByokKmsToken(content: string): string {
+  if (parseEnv(content).BYOK_KMS_SERVICE_TOKEN?.trim()) return content;
+  const tokenLine = `BYOK_KMS_SERVICE_TOKEN=${DEV_BYOK_KMS_SERVICE_TOKEN}`;
+  const line = /^BYOK_KMS_SERVICE_TOKEN=.*$/m;
+  return line.test(content)
+    ? content.replace(line, tokenLine)
+    : `${content.replace(/\n*$/, '\n')}${tokenLine}\n`;
+}
+
 function infraPorts(offset: number): Record<string, number> {
   const ports: Record<string, number> = {};
   for (const service of Object.keys(COMPOSE_PORT_VARS)) {
@@ -161,13 +176,7 @@ function syncAppEnv(repoRoot: string, ports: Record<string, number>): string[] {
   if (!fs.existsSync(envLocalPath)) return [];
 
   const current = fs.readFileSync(envLocalPath, 'utf-8');
-  const tokenLine = `BYOK_KMS_SERVICE_TOKEN=${DEV_BYOK_KMS_SERVICE_TOKEN}`;
-  let withToken = current;
-  if (!/^BYOK_KMS_SERVICE_TOKEN=\S/m.test(current)) {
-    withToken = /^BYOK_KMS_SERVICE_TOKEN=[ \t]*$/m.test(current)
-      ? current.replace(/^BYOK_KMS_SERVICE_TOKEN=[ \t]*$/m, tokenLine)
-      : `${current.replace(/\n*$/, '\n')}${tokenLine}\n`;
-  }
+  const withToken = ensureByokKmsToken(current);
   const { content, changed, kept } = applyAppEnv(withToken, buildAppEnv(ports));
   if (withToken !== current && !changed.includes('BYOK_KMS_SERVICE_TOKEN')) {
     changed.push('BYOK_KMS_SERVICE_TOKEN');

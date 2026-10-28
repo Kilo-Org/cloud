@@ -12,6 +12,7 @@ import {
   useVoiceRecognitionLanguagesMock,
 } from '@/components/voice-language-picker-sheet.test-helpers';
 import { VoiceLanguagePickerSheet } from '@/components/voice-language-picker-sheet';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 
 // The mocked FlashList renders through its render props and does not forward
 // `data` to the host node, so the element carrying the render props is the one
@@ -223,7 +224,7 @@ describe('VoiceLanguagePickerSheet', () => {
     const skeletonRows = findByType(renderer.root, 'View').filter(
       node =>
         typeof node.props.className === 'string' &&
-        node.props.className.includes('min-h-11') &&
+        node.props.className.includes(ROW_TARGET_CLASS) &&
         node.props.className.includes('py-3')
     );
     expect(skeletonRows).toHaveLength(6);

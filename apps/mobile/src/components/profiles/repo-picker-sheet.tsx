@@ -16,7 +16,9 @@ import { Check, GitBranch, Lock, Search, SearchX, Unlock } from '@/components/ui
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
 
 type RepoPickerSheetProps = Readonly<{
   repositories: readonly RepoOption[];
@@ -53,7 +55,7 @@ function RepoOptionRow({
   const colors = useThemeColors();
   return (
     <Pressable
-      className="min-h-11 flex-row items-center gap-2 px-4 active:opacity-70"
+      className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-2 px-4 active:opacity-70')}
       accessibilityRole="button"
       accessibilityLabel={repo.fullName}
       accessibilityState={{ selected: isSelected }}

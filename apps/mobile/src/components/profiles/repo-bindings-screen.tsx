@@ -26,7 +26,7 @@ import {
   useRepoOptions,
 } from '@/lib/hooks/use-repo-bindings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 /** The mutation hook toasts `error.message`; the screen supplies a fallback otherwise. */
@@ -108,7 +108,7 @@ function PickerField({
   const colors = useThemeColors();
   return (
     <Pressable
-      className="min-h-11 flex-row items-center justify-between gap-2 rounded-md border border-border bg-secondary px-3 py-2 active:opacity-70"
+      className={`${ROW_TARGET_CLASS} flex-row items-center justify-between gap-2 rounded-md border border-border bg-secondary px-3 py-2 active:opacity-70`}
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel}
       accessibilityState={{ disabled }}

@@ -10,10 +10,11 @@ import { useConfirmDialog } from '@/components/ui/dialog';
 import { Shield, X } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { revokeImageHost, useTrustedImageHosts } from '@/lib/hooks/use-trusted-image-hosts';
 import { revokeHost, useTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
+import { cn } from '@/lib/utils';
 
 function TrustedHostRow({
   host,
@@ -34,7 +35,10 @@ function TrustedHostRow({
         hitSlop={8}
         accessibilityRole="button"
         accessibilityLabel={t('trustedHosts.revoke', { host })}
-        className="min-h-11 min-w-11 shrink-0 items-center justify-center active:opacity-70"
+        className={cn(
+          ROW_TARGET_CLASS,
+          'min-w-11 shrink-0 items-center justify-center active:opacity-70'
+        )}
       >
         <X size={16} color={colors.destructive} />
       </Pressable>

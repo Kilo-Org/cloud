@@ -3820,10 +3820,9 @@
                     "alibaba-token-plan",
                     "byteplus-coding",
                     "chutes-byok",
-                    "codestral",
                     "edenai",
-                    "inceptron-byok",
                     "kimi-coding",
+                    "inceptron-byok",
                     "martian",
                     "morph-byok",
                     "neuralwatt",
@@ -3834,7 +3833,8 @@
                     "synthetic",
                     "xiaomi-token-plan-ams",
                     "xiaomi-token-plan-sgp",
-                    "zai-coding"
+                    "zai-coding",
+                    "codestral"
                   ]
                 }
               ]

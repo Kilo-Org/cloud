@@ -32,6 +32,7 @@ An unauthenticated request whose cookies make getServerSession throw gets the no
 - No patch or upgrade of next-auth or cookie, and no cookie-header sanitizing middleware.
 - No change to authOptions, the sign-in flows, the accept-invite page's getServerSession(authOptions) call, or the bearer-token auth path.
 - No change to Sentry configuration. sendDefaultPii and cookie capture stay off.
+- No manual end-to-end or post-deployment reproduction criterion (removed at the operator's request).
 
 ## Approach
 
@@ -63,14 +64,10 @@ An unauthenticated request whose cookies make getServerSession throw gets the no
 
 **Verification:** Source review
 
-### ac-5: After deployment, sending a malformed Cookie header (for example a next-auth session-token cookie with an invalid value plus an invalid-named session-token-prefixed cookie) to GET /api/user returns 401, and Sentry records no new KILOCODE-WEB-28HC event for it.
-
-**Verification:** Manual: reproduce against a preview or local deployment with curl using a crafted Cookie header, and confirm a 401 response and no new Sentry event
-
 ## Risks
 
 - A blanket catch could hide a real next-auth misconfiguration, such as a missing secret, by turning it into 401s for everyone. Mitigation: next-auth's logger still routes its own errors (for example JWT_SESSION_ERROR) to Sentry via sentryLogger at error level, and NEXTAUTH_SECRET is validated at config load. The implementer may narrow the catch to TypeError if review prefers that.
-- The exact malformed cookie name is unknown, so the regression test simulates the throw at the getServerSession boundary rather than reproducing next-auth's internals. AC-5 covers the end-to-end manual check.
+- The exact malformed cookie name is unknown, so the regression test simulates the throw at the getServerSession boundary rather than reproducing next-auth's internals. With no manual end-to-end check in the plan, confirming that the production error stops relies on Sentry KILOCODE-WEB-28HC not recurring after deployment.
 - Failure UX: a genuine auth failure still returns 401 immediately, with no added wait. Only the 500 becomes a 401.
 
 ## Assumptions

@@ -5,6 +5,8 @@ import {
   USAGE_INGEST_PUBLISH_SECRET,
 } from '@kilocode/web-shared/lib/config.server';
 import type { UsageRecordRequest } from '@kilocode/usage-contracts';
+import { enqueueVercelUsage } from '@kilocode/usage-queue/vercel/publisher';
+import { USAGE_VERCEL_QUEUE_ENABLED } from '@kilocode/usage-queue/vercel/config';
 
 export const USAGE_ENQUEUE_TIMEOUT_MS = 2_000;
 export const USAGE_ENQUEUE_MAX_ATTEMPTS = 3;
@@ -26,6 +28,9 @@ export async function enqueueUsage(
   payload: UsageRecordRequest,
   { retryTransientFailures = false }: { retryTransientFailures?: boolean } = {}
 ): Promise<UsageEnqueueOutcome> {
+  if (USAGE_VERCEL_QUEUE_ENABLED) {
+    return enqueueVercelUsage(payload);
+  }
   if (!USAGE_INGEST_URL || !USAGE_INGEST_PUBLISH_SECRET) return { kind: 'disabled' };
 
   let url: string;

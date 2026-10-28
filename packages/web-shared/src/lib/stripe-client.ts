@@ -12,7 +12,7 @@ const skipStripeApi =
 
 // Stripe rejects requests that hit a locked object ("another API request or
 // Stripe process is currently accessing it") and advises retrying; the SDK
-// retries those with fixed backoff (0.5s doubling, 5s cap). The stripe@23
+// retries those with exponential backoff and jitter (0.5s doubling, 5s cap). The stripe@23
 // default of 2 retries covers only ~1.5s and still let webhook contention fail,
 // so 4 retries stretch the window to roughly 4-7.5s while staying bounded.
 const STRIPE_MAX_NETWORK_RETRIES = 4;

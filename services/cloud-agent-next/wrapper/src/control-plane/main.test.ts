@@ -153,7 +153,9 @@ describe('workspace session attachment', () => {
   function createDispatcher() {
     const prepared: ControlPlaneRouteSpec[] = [];
     const frames: ControlPlaneWrapperFrame[] = [];
+    const retained = { setupCommands: ['pnpm install'], env: { WORKSPACE_FLAG: 'retained' } };
     const preparation: PreparationManager = {
+      workspaceConfiguration: () => retained,
       prepare: async spec => {
         prepared.push(spec);
       },
@@ -181,86 +183,18 @@ describe('workspace session attachment', () => {
       directory: '/workspace/app',
       attemptId: 'attempt_first',
     };
-    return { dispatch, prepared, frames, spec };
+    return { dispatch, prepared, frames, spec, retained };
   }
 
-  it('rehydrates thin siblings and retains workspace configuration after creator release', () => {
+  it('prepares the route with the configuration the preparation manager selects', () => {
     const h = createDispatcher();
-    const workspace = {
-      mcp: { docs: { type: 'remote' as const, url: 'https://docs.test/mcp' } },
-      runtimeSkills: [{ name: 'test-skill', rawMarkdown: 'Workspace skill' }],
-      setupCommands: ['pnpm install'],
-    };
-    h.dispatch({ type: 'session.attach', spec: h.spec, workspace });
-    h.dispatch({ type: 'session.release', sessionId: h.spec.sessionId });
     h.dispatch({
       type: 'session.attach',
-      spec: { ...h.spec, sessionId: 'workspace_sibling', kiloSessionId: 'ses_sibling' },
+      spec: h.spec,
+      workspace: { setupCommands: ['echo offered'] },
     });
-    expect(h.prepared).toHaveLength(2);
-    expect(h.prepared[1]).toMatchObject({ sessionId: 'workspace_sibling', ...workspace });
+    expect(h.prepared).toEqual([{ ...h.spec, ...h.retained }]);
     expect(h.frames).toEqual([]);
-  });
-
-  it('replays identical workspace configuration without conflating session identity', () => {
-    const h = createDispatcher();
-    const workspace = {
-      kiloCommands: [{ name: 'test', template: 'Run checks' }],
-      env: { WORKSPACE_FLAG: 'on' },
-    };
-    h.dispatch({ type: 'session.attach', spec: h.spec, workspace });
-    h.dispatch({
-      type: 'session.attach',
-      spec: { ...h.spec, sessionId: 'workspace_sibling' },
-      workspace: structuredClone(workspace),
-    });
-    expect(h.prepared[1]).toMatchObject({ sessionId: 'workspace_sibling', ...workspace });
-    expect(h.frames).toEqual([]);
-  });
-
-  it('rejects missing configuration before registering a route', () => {
-    const h = createDispatcher();
-    h.dispatch({ type: 'session.attach', spec: h.spec });
-    expect(h.prepared).toEqual([]);
-    expect(h.frames).toEqual([
-      { type: 'session.failed', sessionId: 'workspace_first', reason: 'invalid_configuration' },
-    ]);
-  });
-
-  it('rejects a sibling configuration overwrite and retains the original snapshot', () => {
-    const h = createDispatcher();
-    h.dispatch({ type: 'session.attach', spec: h.spec, workspace: {} });
-    const workspace = { setupCommands: ['pnpm install'] };
-    h.dispatch({
-      type: 'session.attach',
-      spec: { ...h.spec, sessionId: 'workspace_changed' },
-      workspace,
-    });
-    h.dispatch({
-      type: 'session.attach',
-      spec: { ...h.spec, sessionId: 'workspace_thin' },
-    });
-    expect(h.prepared).toHaveLength(2);
-    expect(h.prepared[1]).toMatchObject({ sessionId: 'workspace_thin' });
-    expect(h.prepared[1]).not.toHaveProperty('setupCommands');
-    expect(h.frames).toEqual([
-      { type: 'session.failed', sessionId: 'workspace_changed', reason: 'invalid_configuration' },
-    ]);
-  });
-
-  it('does not share configuration between different workspace directories or isolated runtimes', () => {
-    const h = createDispatcher();
-    h.dispatch({ type: 'session.attach', spec: h.spec, workspace: {} });
-    h.dispatch({
-      type: 'session.attach',
-      spec: { ...h.spec, directory: '/workspace/other' },
-    });
-    h.dispatch({
-      type: 'session.attach',
-      spec: { ...h.spec, runtimeIsolation: 'per-session' },
-    });
-    expect(h.prepared).toHaveLength(1);
-    expect(h.frames).toHaveLength(2);
   });
 });
 

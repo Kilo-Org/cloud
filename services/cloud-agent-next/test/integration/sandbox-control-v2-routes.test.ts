@@ -1165,7 +1165,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
     await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
   });
 
-  it('sends the workspace configuration once and attaches a sibling thinly', async () => {
+  it('sends every attachment its own workspace configuration', async () => {
     const provider = createFakeProvider();
     const { stub } = await setup(provider);
     await stub.prepare(configuredPrepareInput(SESSION, SHARED_DIRECTORY));
@@ -1192,14 +1192,14 @@ describe('SandboxControlV2 routes and forwarding', () => {
     expect(sibling?.type).toBe('session.attach');
     if (sibling?.type !== 'session.attach') throw new Error('expected session.attach');
     expect(sibling.spec.sessionId).toBe(SESSION_NEXT);
-    expect(sibling.workspace).toBeUndefined();
+    expect(sibling.workspace).toEqual(first.workspace);
 
     await stub.prepare(configuredPrepareInput(SESSION_THIRD, SHARED_DIRECTORY, ['echo changed']));
     const changed = await wrapper.next();
     expect(changed?.type).toBe('session.attach');
     if (changed?.type !== 'session.attach') throw new Error('expected session.attach');
     expect(changed.spec.sessionId).toBe(SESSION_THIRD);
-    expect(changed.workspace).toBeUndefined();
+    expect(changed.workspace.setupCommands).toEqual(['echo changed']);
     expect(changed.spec).not.toHaveProperty('setupCommands');
     expect(changed.spec).not.toHaveProperty('env');
   });
@@ -1251,45 +1251,6 @@ describe('SandboxControlV2 routes and forwarding', () => {
         binding: { worktreeId: scopeId, ownerId: 'user_123', organizationId: 'org_123' },
       },
     ]);
-    expect(
-      frames.filter(frame => frame?.type === 'session.attach' && frame.workspace)
-    ).toHaveLength(1);
-  });
-
-  it('retains the workspace configuration when an individual session fails', async () => {
-    const provider = createFakeProvider();
-    const { stub } = await setup(provider);
-    await stub.prepare(configuredPrepareInput(SESSION, SHARED_DIRECTORY));
-    const { wrapper } = await connectAndHello(provider, 'wr_1', { workspaceConfiguration: true });
-    const first = await wrapper.next();
-    if (first?.type !== 'session.attach') throw new Error('expected session.attach');
-    expect(first.workspace).toBeDefined();
-
-    wrapper.send({ type: 'session.failed', sessionId: SESSION, reason: 'invalid_configuration' });
-    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('failed'));
-    await stub.prepare(configuredPrepareInput(SESSION_NEXT, SHARED_DIRECTORY));
-    const sibling = await wrapper.next();
-    expect(sibling?.type).toBe('session.attach');
-    if (sibling?.type !== 'session.attach') throw new Error('expected session.attach');
-    expect(sibling.workspace).toBeUndefined();
-  });
-
-  it('sends the workspace configuration once for concurrent sibling preparations', async () => {
-    const provider = createFakeProvider();
-    const { stub } = await setup(provider);
-    await stub.prepare(configuredPrepareInput(SESSION, SHARED_DIRECTORY));
-    await stub.prepare(configuredPrepareInput(SESSION_NEXT, SHARED_DIRECTORY));
-
-    const { wrapper } = await connectAndHello(provider, 'wr_1', { workspaceConfiguration: true });
-    const frames = [await wrapper.next(), await wrapper.next()];
-    const attach = frames.flatMap(frame => (frame?.type === 'session.attach' ? [frame] : []));
-    expect(attach).toHaveLength(2);
-    expect(attach.filter(frame => frame.workspace !== undefined)).toHaveLength(1);
-    expect(attach.filter(frame => frame.workspace === undefined)).toHaveLength(1);
-    expect(new Set(attach.map(frame => frame.spec.sessionId))).toEqual(
-      new Set([SESSION, SESSION_NEXT])
-    );
-    wrapper.close();
   });
 
   it('keeps sending session.credentials after a workspace attach', async () => {

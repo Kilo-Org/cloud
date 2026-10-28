@@ -1109,9 +1109,11 @@ callers cannot choose proxy mode independently. Runtime authorization does not r
 containment: Cloudflare Sandbox and Cloudflare Containers support both modes, while Vercel still
 requires containment. Unsupported modes and invalid modern facade configuration are rejected
 before queuing work. Contained SCM resolution and Vercel policy remain enforced.
-The first attachment initializes the workspace configuration. Subsequent attachments do not
-materialize, compare or overwrite another profile snapshot. A replacement wrapper receives the
-configuration again. The wrapper rejects conflicting attempts to initialize an existing workspace.
+Every `session.attach` carries the route's workspace configuration. The wrapper's preparation
+manager owns the decision: while another route holds the runtime key, the attachment uses the
+retained configuration and the offered one is ignored. When no route holds the key, the offered
+configuration replaces the retained one. The last route's release drops it. The Sandbox DO keeps no
+per-socket record of sent configuration, so hibernation does not change the result.
 The runtime still rejects profile MCP drift on legacy preparation paths.
 
 The built-in `kilo-cloud-agent` MCP server uses workspace authority. The worktree UUID identifies

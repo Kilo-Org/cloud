@@ -3283,6 +3283,46 @@ describe('control-plane runtime profiles', () => {
   });
 });
 
+describe('workspace configuration ownership', () => {
+  const first = { setupCommands: ['echo first'], env: { WORKSPACE_FLAG: 'first' } };
+  const second = { setupCommands: ['echo second'], env: { WORKSPACE_FLAG: 'second' } };
+
+  it('gives a sibling the retained configuration while a route holds the runtime', async () => {
+    const harness = createHarness();
+    const spec = routeSpec();
+    expect(harness.manager.workspaceConfiguration(spec, first)).toBe(first);
+    await harness.manager.prepare({ ...spec, ...first });
+    const sibling = routeSpec({
+      sessionId: 'ses_22222222222222222222222222',
+      kiloSessionId: 'ses_22222222222222222222222222',
+    });
+    expect(harness.manager.workspaceConfiguration(sibling, second)).toBe(first);
+  });
+
+  it('applies a new configuration after every route releases the runtime', async () => {
+    const harness = createHarness();
+    const spec = routeSpec();
+    harness.manager.workspaceConfiguration(spec, first);
+    await harness.manager.prepare({ ...spec, ...first });
+    harness.manager.release(spec.sessionId);
+    const next = routeSpec({
+      sessionId: 'ses_22222222222222222222222222',
+      kiloSessionId: 'ses_22222222222222222222222222',
+    });
+    expect(harness.manager.workspaceConfiguration(next, second)).toBe(second);
+  });
+
+  it('replaces configuration retained by a route that never prepared', () => {
+    const harness = createHarness();
+    harness.manager.workspaceConfiguration(routeSpec(), first);
+    const next = routeSpec({
+      sessionId: 'ses_22222222222222222222222222',
+      kiloSessionId: 'ses_22222222222222222222222222',
+    });
+    expect(harness.manager.workspaceConfiguration(next, second)).toBe(second);
+  });
+});
+
 describe('release cleanup and last-route accounting', () => {
   const directory = '/tmp/prepare-release-shared';
   const exp = EXP_NOW;

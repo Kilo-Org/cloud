@@ -8,11 +8,13 @@ import fs from 'node:fs/promises';
 import path from 'node:path';
 import {
   CONTROL_PLANE_PREPARATION_DETAIL_MAX_LENGTH,
+  type AttachmentSpec,
   type ControlPlanePreparationStep,
   type ControlPlaneRouteSpec,
   type ControlPlaneSessionCredentialsPayload,
   type ControlPlaneWorkspaceOutcome,
   type ControlPlaneWrapperFrame,
+  type WorkspaceConfig,
 } from '../../../src/shared/control-plane-protocol.js';
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
 import type { ControlDiagnosticReporter } from '../../../src/shared/control-diagnostics.js';
@@ -167,6 +169,11 @@ export type PreparationManager = {
     spec: ControlPlaneRouteSpec,
     credentials?: ControlPlaneSessionCredentialsPayload
   ): Promise<void>;
+  /**
+   * The configuration the route's runtime uses: the retained one while another
+   * route holds the runtime key, otherwise `offered`, which becomes retained.
+   */
+  workspaceConfiguration(spec: AttachmentSpec, offered: WorkspaceConfig): WorkspaceConfig;
   release(sessionId: string): void;
   isPrepared(sessionId: string): boolean;
   /**
@@ -346,6 +353,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   const log = deps.log ?? ((): void => undefined);
   const inheritedEnv = deps.inheritedEnv ?? process.env;
   const profileMaterializer = createRuntimeProfileMaterializer();
+  const workspaceConfigurations = new Map<string, WorkspaceConfig>();
   const runGit = deps.runGit ?? ((args, options) => git(args, options));
   const runSetup =
     deps.runSetup ??
@@ -895,6 +903,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     if (!hasRoutesForKey(input.key, input.sessionId)) {
       deps.runtimes.release(input.key);
       profileMaterializer.release(routeHome(input.spec, homeRoots));
+      workspaceConfigurations.delete(input.key);
       return;
     }
     // Resolve the CURRENT live client: a restart replaces the runtime on a new
@@ -1249,6 +1258,15 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   }
 
   return {
+    workspaceConfiguration(spec, offered) {
+      const key = workspaceConfigRuntimeKey(spec);
+      const retained = hasRoutesForKey(key, spec.sessionId)
+        ? workspaceConfigurations.get(key)
+        : undefined;
+      if (retained !== undefined) return retained;
+      workspaceConfigurations.set(key, offered);
+      return offered;
+    },
     prepare: function prepare(spec, credentials) {
       const existing = preparing.get(spec.sessionId);
       if (existing && !existing.released) return existing.promise;

@@ -172,7 +172,6 @@ import {
 import {
   attachmentSpecFromRouteSpec,
   workspaceConfigFromSpec,
-  workspaceConfigRuntimeKey,
 } from '../../shared/workspace-config.js';
 import {
   CONTROL_PLANE_ALLOCATION_ID_ENV,
@@ -404,12 +403,7 @@ class PrepareFrameMaterializationError extends Error {
 
 type MaterializedPrepareFrame =
   | { type: 'session.prepare'; spec: ControlPlaneRouteSpec }
-  | {
-      type: 'session.attach';
-      spec: AttachmentSpec;
-      workspace: WorkspaceConfig | undefined;
-      runtimeKey: string;
-    };
+  | { type: 'session.attach'; spec: AttachmentSpec; workspace: WorkspaceConfig };
 
 function errorClassName(error: unknown): string {
   return error instanceof Error ? error.name : 'unknown';
@@ -700,7 +694,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       timer: ReturnType<typeof setTimeout>;
     }
   >();
-  private readonly configuredWorkspaces = new WeakMap<WebSocket, Set<string>>();
   /** Bound on one wrapper reply; overridable in tests to exercise the timeout. */
   controlRequestTimeoutMs = CONTROL_PLANE_REQUEST_TIMEOUT_MS;
   /**
@@ -3507,39 +3500,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return this.readAttachment(socket)?.workspaceConfiguration === true;
   }
 
-  private workspaceConfigCache(socket: WebSocket): Set<string> {
-    let cache = this.configuredWorkspaces.get(socket);
-    if (cache === undefined) {
-      cache = new Set();
-      this.configuredWorkspaces.set(socket, cache);
-    }
-    return cache;
-  }
-
   /**
    * A failure throws rather than sending a frame the wrapper would drop while the
    * route waits out its preparation deadline.
    */
-  private async materializePrepareFrame(
-    route: RouteRecord,
-    socket: WebSocket
-  ): Promise<MaterializedPrepareFrame> {
+  private materializePrepareFrame(route: RouteRecord, socket: WebSocket): MaterializedPrepareFrame {
     const wireSpec = runtimeSpecForContract(
       route.spec,
       readRuntimeContract(this.ctx.storage.kv, this.readAttachment(socket)?.allocationId ?? null)
     );
-    const runtimeKey = workspaceConfigRuntimeKey(wireSpec);
-    if (
-      this.wrapperAcceptsWorkspaceConfiguration(socket) &&
-      this.configuredWorkspaces.get(socket)?.has(runtimeKey)
-    ) {
-      return {
-        type: 'session.attach',
-        spec: attachmentSpecFromRouteSpec(wireSpec),
-        workspace: undefined,
-        runtimeKey,
-      };
-    }
     if (
       route.spec.runtimeSkills?.some(skill => 'source' in skill) &&
       !this.wrapperInstallsSkillsSh(socket)
@@ -3589,7 +3558,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
         type: 'session.attach',
         spec: attachmentSpecFromRouteSpec(frameSpec),
         workspace: workspaceConfigFromSpec(frameSpec, this.materializeRouteMcp(route)),
-        runtimeKey,
       };
     } catch (error) {
       if (error instanceof PrepareFrameMaterializationError) throw error;
@@ -3849,7 +3817,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const cloudAgentMcp = await this.tryIssueCloudAgentMcpGrant(latest);
     let frame: MaterializedPrepareFrame;
     try {
-      frame = await this.materializePrepareFrame(latest, socket);
+      frame = this.materializePrepareFrame(latest, socket);
     } catch (error) {
       this.logPrepareFrameMaterializationFailure(latest, error);
       await this.failPrepareAttempt(sessionId, attemptId, materializationStage(error));
@@ -3870,28 +3838,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
       ...this.prepareCredentials(sendRoute.grant, sessionId),
       ...(cloudAgentMcp ? { cloudAgentMcp } : {}),
     });
-    const sendWorkspace =
-      frame.type === 'session.attach' &&
-      frame.workspace !== undefined &&
-      !this.configuredWorkspaces.get(socket)?.has(frame.runtimeKey);
-    const sent = this.trySendFrame(
-      socket,
-      frame.type === 'session.prepare'
-        ? { type: 'session.prepare', spec: frame.spec, credentials }
-        : {
-            type: 'session.attach',
-            spec: frame.spec,
-            ...(sendWorkspace && frame.workspace !== undefined
-              ? { workspace: frame.workspace }
-              : {}),
-            credentials,
-          }
-    );
-    if (!sent) return;
-    if (frame.type === 'session.attach' && sendWorkspace) {
-      this.workspaceConfigCache(socket).add(frame.runtimeKey);
-    }
-    await this.markRouteCredentialsSent(sessionId, sendRoute.grant);
+    const sent = this.trySendFrame(socket, { ...frame, credentials });
+    if (sent) await this.markRouteCredentialsSent(sessionId, sendRoute.grant);
   }
 
   /**

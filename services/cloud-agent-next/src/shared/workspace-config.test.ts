@@ -3,7 +3,6 @@ import {
   attachmentSpecFromRouteSpec,
   workspaceConfigFromSpec,
   workspaceConfigRuntimeKey,
-  workspaceConfigsEqual,
 } from './workspace-config.js';
 import type { ControlPlaneRouteSpec } from './control-plane-protocol.js';
 
@@ -55,27 +54,5 @@ describe('workspace config', () => {
       setupCommands: [],
       mcp: { local: { type: 'remote', url: 'u' } },
     });
-  });
-
-  it('compares workspace snapshots independently of object key order', () => {
-    const first = workspaceConfigFromSpec(spec(), {
-      github: { type: 'remote', url: 'https://mcp.example.com' },
-    });
-    expect(
-      workspaceConfigsEqual(first, {
-        ...first,
-        mcp: {
-          github: { url: 'https://mcp.example.com', type: 'remote' },
-        },
-      })
-    ).toBe(true);
-    for (const changed of [
-      { setupCommands: ['echo changed'] },
-      { env: { WORKSPACE_SETTING: 'changed' } },
-      { secretEnvKeys: [] },
-      { mcp: {} },
-    ]) {
-      expect(workspaceConfigsEqual(first, { ...first, ...changed })).toBe(false);
-    }
   });
 });

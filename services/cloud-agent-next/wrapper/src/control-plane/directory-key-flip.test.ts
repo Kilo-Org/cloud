@@ -241,7 +241,7 @@ function createHarness() {
 }
 
 describe('directory-key flip (production dispatcher)', () => {
-  it('serves two thin sibling attachments in one directory from one configured runtime', async () => {
+  it('serves two sibling attachments in one directory from the first configuration', async () => {
     const h = createHarness();
     try {
       const specA = routeSpec('ses_a', 'ses_kilo_a');
@@ -259,6 +259,7 @@ describe('directory-key flip (production dispatcher)', () => {
       h.dispatcher({
         type: 'session.attach',
         spec: specB,
+        workspace: {},
         credentials: credentialsFor('ses_b', handle),
       });
       await waitFor(() => h.frames.filter(frame => frame.type === 'session.ready').length === 2);

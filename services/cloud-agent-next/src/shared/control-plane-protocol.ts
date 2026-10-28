@@ -351,7 +351,7 @@ export const controlPlaneRouteSpecSchema = z
   })
   .strict();
 
-/** Heavy fields that are workspace-shared; `session.attach` carries them only on change. */
+/** Fields that one shared runtime applies once, from its first live attachment. */
 export const workspaceConfigSchema = controlPlaneRouteSpecSchema
   .pick({
     mcp: true,
@@ -844,12 +844,12 @@ const controlPlaneSessionPrepareFrameSchema = z
   })
   .strict();
 
-/** `workspace` is present only when this socket has not received that exact configuration. */
+/** The wrapper applies `workspace` only when no live route holds the runtime key. */
 const controlPlaneSessionAttachFrameSchema = z
   .object({
     type: z.literal('session.attach'),
     spec: attachmentSpecSchema,
-    workspace: workspaceConfigSchema.optional(),
+    workspace: workspaceConfigSchema,
     credentials: controlPlaneSessionCredentialsPayloadSchema.optional(),
   })
   .strict();

@@ -3,10 +3,16 @@ import type { ControlDiagnosticFields } from '../../../src/shared/control-diagno
 import type { ControlPlaneConnection } from './connection.js';
 import {
   controlPlaneExitPolicy,
+  createControlPlaneFrameDispatcher,
   createControlPlaneLifecycle,
   type ControlPlaneLifecycle,
   type ControlPlaneProcess,
 } from './main.js';
+import type { PreparationManager } from './prepare.js';
+import type {
+  ControlPlaneRouteSpec,
+  ControlPlaneWrapperFrame,
+} from '../../../src/shared/control-plane-protocol.js';
 import {
   createNativeStatusReporter,
   type NativeStatusScheduler,
@@ -140,6 +146,121 @@ describe('controlPlaneExitPolicy', () => {
     expect(controlPlaneExitPolicy('sigterm')).toBe(1);
     expect(controlPlaneExitPolicy('uncaught_exception')).toBe(1);
     expect(controlPlaneExitPolicy('unhandled_rejection')).toBeNull();
+  });
+});
+
+describe('workspace session attachment', () => {
+  function createDispatcher() {
+    const prepared: ControlPlaneRouteSpec[] = [];
+    const frames: ControlPlaneWrapperFrame[] = [];
+    const preparation: PreparationManager = {
+      prepare: async spec => {
+        prepared.push(spec);
+      },
+      release: () => undefined,
+      isPrepared: () => false,
+      preparedRoute: () => null,
+      isPreparing: () => false,
+      preparingCount: () => 0,
+      sessionCount: () => 0,
+      installCredentials: async () => undefined,
+    };
+    const dispatch = createControlPlaneFrameDispatcher({
+      preparation: { current: preparation },
+      turns: {},
+      terminals: {},
+      worktreeChanges: {},
+      worktreeDeletion: {},
+      kiloRequests: {},
+      send: frame => frames.push(frame),
+      log: () => undefined,
+    });
+    const spec = {
+      sessionId: 'workspace_first',
+      kiloSessionId: 'ses_first',
+      directory: '/workspace/app',
+      attemptId: 'attempt_first',
+    };
+    return { dispatch, prepared, frames, spec };
+  }
+
+  it('rehydrates thin siblings and retains workspace configuration after creator release', () => {
+    const h = createDispatcher();
+    const workspace = {
+      mcp: { docs: { type: 'remote' as const, url: 'https://docs.test/mcp' } },
+      runtimeSkills: [{ name: 'test-skill', rawMarkdown: 'Workspace skill' }],
+      setupCommands: ['pnpm install'],
+    };
+    h.dispatch({ type: 'session.attach', spec: h.spec, workspace });
+    h.dispatch({ type: 'session.release', sessionId: h.spec.sessionId });
+    h.dispatch({
+      type: 'session.attach',
+      spec: { ...h.spec, sessionId: 'workspace_sibling', kiloSessionId: 'ses_sibling' },
+    });
+    expect(h.prepared).toHaveLength(2);
+    expect(h.prepared[1]).toMatchObject({ sessionId: 'workspace_sibling', ...workspace });
+    expect(h.frames).toEqual([]);
+  });
+
+  it('replays identical workspace configuration without conflating session identity', () => {
+    const h = createDispatcher();
+    const workspace = {
+      kiloCommands: [{ name: 'test', template: 'Run checks' }],
+      env: { WORKSPACE_FLAG: 'on' },
+    };
+    h.dispatch({ type: 'session.attach', spec: h.spec, workspace });
+    h.dispatch({
+      type: 'session.attach',
+      spec: { ...h.spec, sessionId: 'workspace_sibling' },
+      workspace: structuredClone(workspace),
+    });
+    expect(h.prepared[1]).toMatchObject({ sessionId: 'workspace_sibling', ...workspace });
+    expect(h.frames).toEqual([]);
+  });
+
+  it('rejects missing configuration before registering a route', () => {
+    const h = createDispatcher();
+    h.dispatch({ type: 'session.attach', spec: h.spec });
+    expect(h.prepared).toEqual([]);
+    expect(h.frames).toEqual([
+      { type: 'session.failed', sessionId: 'workspace_first', reason: 'invalid_configuration' },
+    ]);
+  });
+
+  it('rejects a sibling configuration overwrite and retains the original snapshot', () => {
+    const h = createDispatcher();
+    h.dispatch({ type: 'session.attach', spec: h.spec, workspace: {} });
+    const workspace = { setupCommands: ['pnpm install'] };
+    h.dispatch({
+      type: 'session.attach',
+      spec: { ...h.spec, sessionId: 'workspace_changed' },
+      workspace,
+    });
+    h.dispatch({
+      type: 'session.attach',
+      spec: { ...h.spec, sessionId: 'workspace_thin' },
+    });
+    expect(h.prepared).toHaveLength(2);
+    expect(h.prepared[1]).toMatchObject({ sessionId: 'workspace_thin' });
+    expect(h.prepared[1]).not.toHaveProperty('setupCommands');
+    expect(h.frames).toEqual([
+      { type: 'session.failed', sessionId: 'workspace_changed', reason: 'invalid_configuration' },
+    ]);
+  });
+
+  it('does not share configuration between different workspace directories or isolated runtimes', () => {
+    const h = createDispatcher();
+    h.dispatch({ type: 'session.attach', spec: h.spec, workspace: {} });
+    h.dispatch({
+      type: 'session.attach',
+      spec: { ...h.spec, directory: '/workspace/other' },
+    });
+    h.dispatch({
+      type: 'session.attach',
+      spec: { ...h.spec, runtimeIsolation: 'per-session' },
+    });
+    expect(h.prepared).toHaveLength(1);
+    expect(h.frames).toHaveLength(2);
   });
 });
 

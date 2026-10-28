@@ -14,6 +14,7 @@ import {
   authorizeCloudAgentChild,
   issueCloudAgentMcpGrant,
   assertCloudAgentParentAuthority,
+  type WorkspaceMcpBinding,
 } from '../../cloud-agent-authority.js';
 import {
   CloudAgentAuthoritySchema,
@@ -980,14 +981,15 @@ export class SandboxSessionV2 extends DurableObject<Env> {
     });
   }
 
-  async issueCloudAgentMcpGrant(): Promise<
-    { url: string; token: string; expiresAt: number } | undefined
-  > {
+  async issueCloudAgentMcpGrant(
+    workspace?: WorkspaceMcpBinding
+  ): Promise<{ url: string; token: string; expiresAt: number } | undefined> {
     await this.initialized;
     if (this.metadata?.allowSubagentSessions !== true) return undefined;
     const secret = await resolveSecret(this.env.NEXTAUTH_SECRET);
     if (!secret) throw new Error('Authentication unavailable');
     return issueCloudAgentMcpGrant({
+      workspace,
       secret,
       connectionString: this.env.HYPERDRIVE.connectionString,
       metadata: () => this.getMetadata(),

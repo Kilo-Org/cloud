@@ -1,5 +1,9 @@
 import { runSetupScript } from '../setup-script.js';
-import { materializeRuntimeProfile, withRuntimeProfileEnvironment } from './runtime-profile.js';
+import {
+  createRuntimeProfileMaterializer,
+  RuntimeProfileMismatchError,
+  withRuntimeProfileEnvironment,
+} from './runtime-profile.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {
@@ -60,6 +64,7 @@ import {
   managedGitHubPreparationGitArgs,
 } from './repository-preparation.js';
 import { defaultHomeRoots, routeHome, type HomeRoots } from './workspace-home.js';
+import { workspaceConfigRuntimeKey } from '../../../src/shared/workspace-config.js';
 
 /** Spec §7: Kilo runtime start and Kilo session each get one retry. */
 const STEP_RETRY_ATTEMPTS = 2;
@@ -223,7 +228,7 @@ async function defaultSessionExists(
 
 /** Keep existing allocations on their original runtime and HOME identities. */
 export function runtimeKey(spec: ControlPlaneRouteSpec): string {
-  return spec.runtimeIsolation === 'per-session' ? spec.sessionId : spec.directory;
+  return workspaceConfigRuntimeKey(spec);
 }
 
 function isTimeoutMessage(step: ControlPlanePreparationStep, error: unknown): boolean {
@@ -340,6 +345,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   const timers = deps.timers.wrapper;
   const log = deps.log ?? ((): void => undefined);
   const inheritedEnv = deps.inheritedEnv ?? process.env;
+  const profileMaterializer = createRuntimeProfileMaterializer();
   const runGit = deps.runGit ?? ((args, options) => git(args, options));
   const runSetup =
     deps.runSetup ??
@@ -415,7 +421,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     deps.emit({
       type: 'session.failed',
       sessionId,
-      reason: 'workspace_setup_failed',
+      reason:
+        error instanceof RuntimeProfileMismatchError
+          ? 'invalid_configuration'
+          : 'workspace_setup_failed',
       step,
       ...(subtype === undefined ? {} : { subtype }),
     });
@@ -885,6 +894,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   }): void {
     if (!hasRoutesForKey(input.key, input.sessionId)) {
       deps.runtimes.release(input.key);
+      profileMaterializer.release(routeHome(input.spec, homeRoots));
       return;
     }
     // Resolve the CURRENT live client: a restart replaces the runtime on a new
@@ -1041,7 +1051,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         const installsSkills = spec.runtimeSkills?.some(skill => skill.source !== undefined);
         currentStep = installsSkills ? 'setup' : 'kilo_runtime';
         owner.skillInstallController = new AbortController();
-        await materializeRuntimeProfile(home, spec, {
+        await profileMaterializer.materialize(home, spec, {
           run: (command, args, options) =>
             (deps.runSkillInstall ?? runProcess)(command, args, {
               ...options,

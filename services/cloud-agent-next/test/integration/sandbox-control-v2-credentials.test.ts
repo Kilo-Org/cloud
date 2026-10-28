@@ -1487,7 +1487,11 @@ describe('SandboxControlV2 credentials (B3)', () => {
           view: { state: 'ready' },
         });
         expect(issueMcpGrant).toHaveBeenCalledTimes(1);
-        expect(fields).toHaveBeenCalledWith({ sandboxId: SANDBOX_ID, sessionId: SESSION });
+        expect(fields).toHaveBeenCalledWith({
+          sandboxId: SANDBOX_ID,
+          sessionId: SESSION,
+          anchorSessionId: SESSION,
+        });
         expect(warn).toHaveBeenCalledWith(
           'Optional Cloud Agent MCP grant unavailable; continuing without it'
         );

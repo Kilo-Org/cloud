@@ -241,7 +241,7 @@ function createHarness() {
 }
 
 describe('directory-key flip (production dispatcher)', () => {
-  it('serves two sibling modern routes in one directory from one runtime', async () => {
+  it('serves two thin sibling attachments in one directory from one configured runtime', async () => {
     const h = createHarness();
     try {
       const specA = routeSpec('ses_a', 'ses_kilo_a');
@@ -249,12 +249,15 @@ describe('directory-key flip (production dispatcher)', () => {
       const handle = proxyHandle(EXP_NOW);
 
       h.dispatcher({
-        type: 'session.prepare',
+        type: 'session.attach',
         spec: specA,
+        workspace: {
+          mcp: { docs: { type: 'remote', url: 'https://docs.test/mcp' } },
+        },
         credentials: credentialsFor('ses_a', handle),
       });
       h.dispatcher({
-        type: 'session.prepare',
+        type: 'session.attach',
         spec: specB,
         credentials: credentialsFor('ses_b', handle),
       });
@@ -269,6 +272,10 @@ describe('directory-key flip (production dispatcher)', () => {
 
       const runtime = h.runtimes.get(DIRECTORY);
       expect(runtime).toBeDefined();
+      expect(JSON.parse(runtime!.env.KILO_CONFIG_CONTENT).mcp.docs).toEqual({
+        type: 'remote',
+        url: 'https://docs.test/mcp',
+      });
       // Siblings share one HOME keyed by the directory alone.
       expect(runtime!.env.HOME).toBe(
         path.join(HOME_ROOT, createHash('sha256').update(DIRECTORY).digest('hex'))

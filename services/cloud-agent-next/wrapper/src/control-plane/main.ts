@@ -1,5 +1,6 @@
 import {
   CONTROL_PLANE_ALLOCATION_ID_ENV,
+  type WorkspaceConfig,
   type ControlPlaneWrapperFrame,
 } from '../../../src/shared/control-plane-protocol.js';
 import {
@@ -9,6 +10,7 @@ import {
   type ControlDiagnosticReporter,
 } from '../../../src/shared/control-diagnostics.js';
 import { resolveControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
+import { workspaceConfigsEqual } from '../../../src/shared/workspace-config.js';
 import { installInterceptTrustIfEnabled } from '../control/cert.js';
 import { createControlDiagnostics, type ControlDiagnostics } from '../control/diagnostics.js';
 import {
@@ -223,8 +225,48 @@ export type ControlPlaneFrameDispatcherDeps = {
 export function createControlPlaneFrameDispatcher(
   deps: ControlPlaneFrameDispatcherDeps
 ): (frame: ControlPlaneWrapperFrame) => void {
+  const workspaces = new Map<string, WorkspaceConfig>();
   return function onFrame(frame: ControlPlaneWrapperFrame): void {
     switch (frame.type) {
+      case 'session.attach': {
+        const key = runtimeKey(frame.spec);
+        const existing = workspaces.get(key);
+        if (
+          existing !== undefined &&
+          frame.workspace !== undefined &&
+          !workspaceConfigsEqual(existing, frame.workspace)
+        ) {
+          deps.log(
+            `control-plane attach rejected session=${frame.spec.sessionId} reason=workspace_configuration_mismatch`
+          );
+          deps.send({
+            type: 'session.failed',
+            sessionId: frame.spec.sessionId,
+            reason: 'invalid_configuration',
+          });
+          return;
+        }
+        if (existing === undefined && frame.workspace !== undefined)
+          workspaces.set(key, frame.workspace);
+        const workspace = workspaces.get(key);
+        if (workspace === undefined) {
+          deps.log(
+            `control-plane attach rejected session=${frame.spec.sessionId} reason=workspace_configuration_missing`
+          );
+          deps.send({
+            type: 'session.failed',
+            sessionId: frame.spec.sessionId,
+            reason: 'invalid_configuration',
+          });
+          return;
+        }
+        onFrame({
+          type: 'session.prepare',
+          spec: { ...frame.spec, ...workspace },
+          credentials: frame.credentials,
+        });
+        return;
+      }
       case 'session.prepare':
         deps.turns.current?.registerRoute(frame.spec);
         void deps.preparation.current

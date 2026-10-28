@@ -19,6 +19,7 @@ import {
   getModelInferenceUserByokProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type * as byokModule from '@kilocode/web-shared/lib/ai-gateway/byok';
+import type * as directByokModule from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import type { BYOKResult } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { resolveOpenAiChatGptAccessToken } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/refresh';
 import { getOpenAiChatGptStoredConnection } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/store';
@@ -48,6 +49,9 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModel: jest.fn().mockResolvedValue({ provider: null, model: null }),
   findDirectByokCatalogModels: jest.fn().mockResolvedValue([]),
   getDirectByokCatalogModelId: jest.fn().mockResolvedValue(null),
+  getDirectByokModelChatApis: jest.requireActual<typeof directByokModule>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'
+  ).getDirectByokModelChatApis,
   supportsCatalogMode: jest.fn(() => true),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
@@ -227,11 +231,7 @@ describe('getProvider local fake deterministic routing', () => {
           isFree: true,
           bypassAccessCheck: false,
         });
-        expect(shouldRouteToVercel).toHaveBeenCalledWith(
-          modelId,
-          input.request,
-          expect.any(Function)
-        );
+        expect(shouldRouteToVercel).toHaveBeenCalledWith(modelId, expect.any(Function));
       }
     );
   });
@@ -586,7 +586,7 @@ describe('getProvider gateway BYOK routing', () => {
       kiloIgnoredProviders: ['anthropic'],
     });
 
-    const getRoutingProviderConfig = jest.mocked(shouldRouteToVercel).mock.calls[0][2];
+    const getRoutingProviderConfig = jest.mocked(shouldRouteToVercel).mock.calls[0][1];
     await expect(getRoutingProviderConfig()).resolves.toEqual({
       only: ['amazon-bedrock', 'anthropic'],
       ignore: ['anthropic'],
@@ -659,7 +659,7 @@ describe('getProvider direct BYOK routing', () => {
       jest.mocked(getDirectByokModel).mockResolvedValue({
         provider: {
           id: providerId,
-          resolveUpstream: apiKeyUpstream({
+          ...apiKeyUpstream({
             apiUrl: 'https://direct-byok.example/v1',
             supportedChatApis: ['chat_completions', 'responses', 'messages'],
             responseTransforms: ReasoningDetailsTransform.ReasoningContent,
@@ -738,6 +738,7 @@ describe('getProvider direct BYOK routing', () => {
         id: 'nvidia-byok',
         transformRequest() {},
         models: async () => [],
+        supportedChatApis: ['chat_completions'],
         resolveUpstream,
       },
       model: {
@@ -784,7 +785,7 @@ describe('getProvider direct BYOK routing', () => {
     return {
       id,
       models_dev_id: id,
-      resolveUpstream: apiKeyUpstream({
+      ...apiKeyUpstream({
         apiUrl: `https://${id}.example/v1`,
         supportedChatApis,
         responseTransforms: null,

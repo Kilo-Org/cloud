@@ -70,3 +70,8 @@ export const BYOKApiKeyResponseSchema = z.object({
   updated_at: z.string(),
   created_by: z.string(),
 });
+
+export const PreviewBYOKRoutingInputSchema = OptionalOrganizationIdSchema.extend({
+  modelId: z.string().trim().min(1).max(256),
+  apiKind: z.enum(['chat_completions', 'responses', 'messages']).default('chat_completions'),
+});

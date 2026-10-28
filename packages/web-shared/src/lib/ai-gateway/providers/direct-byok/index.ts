@@ -106,6 +106,14 @@ function convertModel(
   };
 }
 
+/** The chat APIs `provider` serves `model` over, known without the stored credential. */
+export function getDirectByokModelChatApis(
+  provider: DirectByokProvider,
+  model: DirectByokModel
+): ReadonlyArray<GatewayChatApiKind> {
+  return provider.getModelChatApi ? [provider.getModelChatApi(model)] : provider.supportedChatApis;
+}
+
 function findDirectByokProvider(providerId: string): DirectByokProvider | undefined {
   const providers: ReadonlyArray<DirectByokProvider> = DIRECT_BYOK_PROVIDERS;
   return providers.find(provider => provider.id === providerId);

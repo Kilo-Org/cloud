@@ -102,7 +102,10 @@ type DestroyBehavior = 'ok' | 'reject' | 'deferred' | 'hang';
 
 class FakeContainer {
   running = false;
-  images: Record<string, string> = { app: 'registry.example/kilo/app:test' };
+  images: Record<string, string> = {
+    app: 'registry.example/kilo/app:test',
+    'runtime-free': 'registry.example/kilo/runtime-free:test',
+  };
   calls: string[] = [];
   startCalls: ContainerStartupOptions[] = [];
   execCalls: { cmd: string[]; options?: ContainerExecOptions }[] = [];
@@ -2875,7 +2878,7 @@ function launchBuilder(instance: SandboxContainers, ref: string, extra = {}) {
 }
 
 describe('SandboxContainers environment builder', () => {
-  it('starts the builder bundle as PID 1 from the image with internet egress', async () => {
+  it('starts the builder from runtime-free with internet egress', async () => {
     const { instance, container, readRecord } = setup();
     const outbound = attachOutbound(instance);
 
@@ -2884,7 +2887,7 @@ describe('SandboxContainers environment builder', () => {
       startSource: 'image',
     });
     expect(container.startCalls[0]).toEqual({
-      image: IMAGE,
+      image: 'registry.example/kilo/runtime-free:test',
       instance: 'standard-4',
       enableInternet: true,
       entrypoint: [RUNTIME_BUN_PATH, ENVIRONMENT_BUILDER_PATH],
@@ -2904,6 +2907,7 @@ describe('SandboxContainers environment builder', () => {
       state: 'running',
       allocationRef: REF_A,
       instance: 'standard-4',
+      startImage: 'registry.example/kilo/runtime-free:test',
     });
     const execs = container.execCalls.length;
     await expect(launchBuilder(instance, REF_A)).resolves.toEqual({
@@ -2913,6 +2917,39 @@ describe('SandboxContainers environment builder', () => {
     expect(container.startCalls).toHaveLength(1);
     // The delivery script checks whether the runner was already consumed.
     expect(container.execCalls).toHaveLength(execs + 1);
+  });
+
+  it('does not fall back to app when runtime-free is unavailable', async () => {
+    const { instance, container } = setup();
+    delete container.images['runtime-free'];
+    await expect(launchBuilder(instance, REF_A)).rejects.toThrow(
+      'Container image "runtime-free" is unavailable'
+    );
+    expect(container.startCalls).toEqual([]);
+  });
+
+  it('captures the split base and restores it with a new session command', async () => {
+    const builder = setup();
+    const image = builder.container.images['runtime-free'];
+    expect(await builder.instance.currentImage('runtime-free')).toBe(image);
+    await launchBuilder(builder.instance, REF_A);
+    builder.container.images['runtime-free'] = 'registry.example/kilo/runtime-free:next';
+    const capture = await builder.instance.captureSnapshot(REF_A, 'split-build');
+    expect(capture).toMatchObject({ status: 'stored', baseImage: image });
+    if (capture.status !== 'stored') throw new Error('Expected a stored builder snapshot');
+
+    const session = setup();
+    await expect(
+      launchFromSnapshot(session.instance, REF_B, {
+        nativeImage: 'runtime-free',
+        snapshot: { snapshotId: capture.snapshotId, baseImage: capture.baseImage },
+      })
+    ).resolves.toMatchObject({ started: true, startSource: 'repository' });
+    expect(session.container.startCalls[0]).toMatchObject({
+      containerSnapshot: { id: capture.snapshotId },
+      entrypoint: [...preinstalledStartup().argv],
+    });
+    expect(session.readRecord().startImage).toBe(image);
   });
 
   it('fails the launch when the runner cannot be delivered', async () => {
@@ -3258,6 +3295,7 @@ describe('SandboxContainers native image selection', () => {
 
   it('fails before any physical start when the selected image is unavailable', async () => {
     const { instance, container, readRecord } = setup();
+    delete container.images['runtime-free'];
 
     await expect(
       instance.launchWrapper({

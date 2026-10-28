@@ -127,6 +127,12 @@ The repo includes a seed runner for creating local fixtures via `pnpm dev:seed`.
 - `pnpm dev:seed app:create-user <name> <email>` — creates a `kilocode_users` row with a real Stripe test customer, pre-bypassing onboarding gates so you can use the app immediately.
 - `pnpm dev:seed app:add-credits <user-id> <usd>` — grants credits to an existing user, updating the `total_microdollars_acquired` balance and creating a `credit_transactions` row. Supports `--paid`/`--free`, `--category`, `--expires-in-days`, etc. Useful for testing billing and credit flows without manual DB edits.
 
+### Sales demos
+
+The scheduled `/api/cron/sales-demo-reset` route refreshes demo credits and usage.
+Scheduled and manual resets preserve organization membership, sub-organization membership, roles, and group assignments.
+Resets do not restore assignments that an earlier reset removed.
+
 ### KiloClaw
 
 - `pnpm dev:seed kiloclaw:fake-instance <user-id> [options]` — creates a fake personal KiloClaw instance + subscription in the database only (no real container or Worker). Before creating, it retires any prior fake personal instances for that user. Supports `--plan=trial|standard|commit` and `--days=<n>`. For paid plans, it also grants enough credits to cover the plan cost and then deducts the subscription cost.

@@ -22,7 +22,7 @@ their installed release until a new allocation starts. Base dependency changes s
 upgrade. Upgrade older BYOC snapshots once before enabling downloaded mode, so they have the required
 fixed Node path. Native image selection does not change the Vercel snapshot.
 
-A downloaded target can scope its startup to an `interactiveOrgIds` list. No committed target uses it yet.
+A downloaded target can scope its startup to an `interactiveOrgIds` list. Production uses it for one test organization.
 Deployment renders this list as `RUNTIME_INTERACTIVE_ORG_IDS`.
 A new allocation selects it only when all its preparing routes belong to one listed organization and have
 `createdOnPlatform: cloud-agent-web`. Native allocations must also be isolated; Vercel allocations use
@@ -36,30 +36,32 @@ are used together, including snapshot fallback. Existing allocations keep their 
 An absent `interactiveOrgIds` means deployment-wide startup selection; an empty catalog list is
 rejected. For a complete rollback, remove the production override so it inherits the preinstalled default.
 
-Known limitation: the environment builder always starts the `app` image, so its snapshots never match
-a `runtime-free` allocation. Enrolled organizations cold-start from the image instead of restoring
-builder-produced environment snapshots. Repository snapshots captured by a `runtime-free` container
-still restore. The `Stable base` row covers repository snapshots only.
+Environment snapshot builders use only `runtime-free` with downloaded startup. Snapshot enrollment
+remains controlled by `ENVIRONMENT_SNAPSHOT_ORG_IDS`, independently of the interactive runtime cohort.
+Builds require a downloaded runtime-free deployment and a published runtime release. Existing
+all-in-one environment snapshots are incompatible and trigger replacement builds. Sessions on `app`
+start from the image instead of restoring split-image snapshots. Runtime-only updates retain snapshot
+compatibility when the runtime-free base image and ABI stay unchanged.
 
 ## Approval and rollout order
 
-All committed targets use preinstalled startup on all-in-one. A downloaded catalog entry requires
-`CLOUD_AGENT_RUNTIME_PUBLICATION_ENABLED=true` and a published handoff for the deployed SHA: downloaded
-deployment fails promptly when publication is disabled. Real-provider
-qualification remains required. Use an isolated named environment first. Record its account,
-Worker name, exact source SHA, bucket and instance type before deployment.
+Production uses downloaded runtime-free for its `interactiveOrgIds` cohort; every other target and session
+uses preinstalled all-in-one. A downloaded catalog entry is the only
+switch: it makes main CI publish a handoff for that SHA, and deployment waits for that handoff.
+Real-provider qualification runs on the production test-organization cohort. Record the Worker name,
+exact source SHA, bucket and instance type for each qualification deployment.
 
-1. Provision and enable publication through the process in [runtime-publication.md](runtime-publication.md).
-   Verify one successful main-push CI run creates the exact-SHA handoff. Failed CI, PR, fork and merge-group
-   runs must not publish. Repeat successful publication and confirm identical retained objects.
-2. Approve one isolated target using downloaded startup on the all-in-one image. Add only that environment
-   to the catalog. Deploy its verified handoff and complete the checks below.
-3. Runtime-free relies on B1 ([PR #7914](https://github.com/Kilo-Org/cloud/pull/7914)): a running
+1. Provision publication through the process in [runtime-publication.md](runtime-publication.md).
+   Verify that a main CI run with a downloaded catalog entry publishes the exact-SHA handoff, and that
+   a preinstalled-only catalog skips publication. Failed CI, PR, fork and merge-group runs must not
+   publish. Repeat successful publication and confirm identical retained objects.
+2. Runtime-free relies on B1 ([PR #7914](https://github.com/Kilo-Org/cloud/pull/7914)): a running
    container captures under its start image. B1 is merged into main, and its regression test runs
    in CI.
-4. Approve runtime-free on the same isolated target. Change its catalog image only. Repeat qualification.
-5. Enroll production organizations through `interactiveOrgIds` in a separate reviewed catalog change.
-   Expanding the list or removing the cohort restriction requires qualification evidence.
+3. Enroll one test organization through `interactiveOrgIds` on production runtime-free. Complete the
+   checks below with web sessions in that organization.
+4. Expanding the list or removing the cohort restriction requires that qualification evidence and a
+   separate reviewed catalog change.
 
 For a clean checkout, preview deployment preparation without running Wrangler:
 
@@ -68,9 +70,8 @@ For a clean checkout, preview deployment preparation without running Wrangler:
 
 The generated wrangler.runtime-generated.json stays ignored. Preinstalled preparation requires no runtime
 bucket or registry credentials. Downloaded preparation needs the approved read credentials and exact-SHA
-handoff, and fails at once unless `CLOUD_AGENT_RUNTIME_PUBLICATION_ENABLED` is `true`. Inspect the
-generated image reference and vars before an approved deployment. The existing Worker workflow
-consumes that exact generated config.
+handoff. Inspect the generated image reference and vars before an approved deployment. The existing
+Worker workflow consumes that exact generated config.
 
 ## Required provider evidence
 
@@ -124,5 +125,6 @@ The locally built runtime-free image passed the actual packaged CLI version prob
 hello/shutdown. A real CLI version mismatch failed the compatibility gate. This proves local payload/base
 execution, not provider restore semantics, minimum-instance timing or metadata retention.
 
-No CI bucket or credentials were provisioned. No remote release or registry image was published.
-No Worker was deployed. Real-provider qualification and production rollout remain pending.
+Publication is provisioned, and a manual publication created an exact-SHA handoff. Production enrolls
+one test organization for qualification. Real-provider qualification evidence remains pending, and
+no other organization is enrolled.

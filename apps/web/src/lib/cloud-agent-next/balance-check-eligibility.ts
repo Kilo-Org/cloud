@@ -7,6 +7,8 @@ import {
   getOrganizationByokProviderIds,
   getUserByokProviderIds,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { hasEnabledUserByokForModel } from '@kilocode/web-shared/lib/ai-gateway/byok/availability';
+import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import type { User } from '@kilocode/db/schema';
 
 export type BalanceCheckModelEligibility = {
@@ -24,11 +26,11 @@ export type BalanceCheckModelEligibility = {
  *   configured that can serve it, so the session is billed against the
  *   user's own key rather than their balance.
  *
- * Kilo-exclusive models (e.g. `stealth/qwen3.6-plus`) are
- * always excluded from the BYOK bypass: they are Kilo-funded and platform
- * billed, so even when `getModelUserByokProviders` reports a provider that
- * can route the model, they must still go through the worker-side balance
- * check and cannot be legitimately served via a user's own BYOK key.
+ * Kilo-exclusive models are always excluded from the BYOK bypass: they are
+ * Kilo-funded and platform billed, so even when `getModelUserByokProviders`
+ * reports a provider that can route the model, they must still go through the
+ * worker-side balance check and cannot be legitimately served via a user's own
+ * BYOK key.
  *
  * The resulting predicate is a strict subset of the
  * `isFree || hasUserByokAvailable` predicate used by the NewSessionPanel
@@ -52,16 +54,35 @@ export async function computeCloudAgentNextBalanceCheckEligibility(params: {
     return { isFree: false, hasUserByokAvailable: false };
   }
 
-  const modelProviders = await getModelUserByokProviders(params.modelId);
-  if (modelProviders.length === 0) {
-    return { isFree: false, hasUserByokAvailable: false };
-  }
-
   const enabledProviderIds = params.organizationId
     ? await getOrganizationByokProviderIds(params.fromDb, params.organizationId)
     : await getUserByokProviderIds(params.fromDb, params.user.id);
+  if (enabledProviderIds.length === 0) {
+    return { isFree: false, hasUserByokAvailable: false };
+  }
 
   const enabled = new Set(enabledProviderIds);
-  const hasUserByokAvailable = modelProviders.some(provider => enabled.has(provider));
+  const modelProviders = await getModelUserByokProviders(params.modelId, enabled);
+  // Callers authorize organization access first, which also admits Kilo admins
+  // and parent-organization owners who hold no membership row.
+  const allowedProviders =
+    params.organizationId &&
+    enabled.has('vercel-ai-gateway') &&
+    modelProviders.includes('vercel-ai-gateway')
+      ? (
+          await resolveOrganizationMemberModelDecision({
+            organizationId: params.organizationId,
+            kiloUserId: params.user.id,
+            allowNonMember: true,
+            modelId: params.modelId,
+          })
+        ).decision.eligibleProviderRoutes
+      : undefined;
+  const hasUserByokAvailable = await hasEnabledUserByokForModel({
+    modelId: params.modelId,
+    modelProviders,
+    enabledProviderIds: enabled,
+    allowedProviders,
+  });
   return { isFree: false, hasUserByokAvailable };
 }

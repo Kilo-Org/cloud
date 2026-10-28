@@ -2579,9 +2579,27 @@ describe('createKiloRuntimes', () => {
     await runtimes.ensure(input({ a: 1 }, 'alias-b'));
     expect(created).toBe(1);
 
+    await runtimes.ensure(
+      input({
+        a: 1,
+        'kilo-cloud-agent': { headers: { Authorization: 'Bearer workspace-grant-a' } },
+      })
+    );
+    await runtimes.ensure(
+      input({
+        a: 1,
+        'kilo-cloud-agent': { headers: { Authorization: 'Bearer workspace-grant-b' } },
+      })
+    );
+    expect(created).toBe(1);
     let drift: unknown;
     try {
-      await runtimes.ensure(input({ a: 2 }));
+      await runtimes.ensure(
+        input({
+          a: 2,
+          'kilo-cloud-agent': { headers: { Authorization: 'Bearer workspace-grant-b' } },
+        })
+      );
     } catch (error) {
       drift = error;
     }

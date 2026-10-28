@@ -2192,6 +2192,13 @@
       "when": 1793169931649,
       "tag": "0312_enkrypt_guardrail_added_latency",
       "breakpoints": true
+    },
+    {
+      "idx": 313,
+      "version": "7",
+      "when": 1793206978720,
+      "tag": "0313_byok_api_key_envelope",
+      "breakpoints": true
     }
   ]
 }

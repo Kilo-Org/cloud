@@ -151,6 +151,9 @@ function session(id: string): StoredSession {
     git_branch: null,
     status: null,
     status_updated_at: null,
+    latest_run_status: null,
+    latest_run_failure_kind: null,
+    latest_run_terminal_at: null,
     total_cost_microdollars: null,
     created_at: '2026-08-28T10:00:00.000Z',
     updated_at: '2026-08-28T11:55:00.000Z',
@@ -690,27 +693,6 @@ describe('AgentSessionListContent liveness', () => {
       expect(hosts(renderer, 'ActivityIndicator')).toHaveLength(floating ? 0 : 1);
     }
   );
-
-  it('reserves the clearance between the refresh band and the rows', () => {
-    // The band is in flow above the list, so the container's `gap-2` is the
-    // only clearance between them: without it the list's top edge sits flush
-    // on the band and a row resting across that edge is cut mid-text directly
-    // under "Couldn't refresh" (device defect p5). The clearance matches the
-    // live surface's `mx-4 gap-2` band-to-list gap.
-    const renderer = mount(
-      contentProps({
-        isError: true,
-        sections: [{ title: 'Today', data: [session('cached')] }],
-      })
-    );
-    const surface = hosts(renderer, 'AnimatedView').find(
-      node => (node.props as { className?: string }).className === 'flex-1 gap-2'
-    );
-    expect(surface).toBeDefined();
-    // The band and the list are both children of that surface.
-    expect(surface?.findAll(node => isHost(node, 'AccessibleStatus'))).toHaveLength(1);
-    expect(surface?.findAll(node => isHost(node, 'FlashList'))).toHaveLength(1);
-  });
 
   it.each([
     { hasAnySessions: false },

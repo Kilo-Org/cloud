@@ -27,10 +27,6 @@ import { getXKiloCodeVersionNumber } from '@kilocode/web-shared/lib/userAgent';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import type { EventSourceMessage } from 'eventsource-parser';
 import { sentryRootSpan } from '../getRootSpan';
-import {
-  findKiloExclusiveModel,
-  shouldRedactErrorResponse,
-} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
@@ -44,6 +40,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import type {
   GatewayChatApiKind,
+  Provider,
   ProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
@@ -233,30 +230,6 @@ export function dataCollectionRequiredResponse() {
   );
 }
 
-export function checkExclusiveModelProviderAllowed(
-  model: string,
-  provider: OpenRouterProviderConfig | undefined
-) {
-  const exclusiveModel = findKiloExclusiveModel(model);
-  if (!exclusiveModel) return null;
-  const inferenceProviders = exclusiveModel.inference_providers;
-  if (inferenceProviders.length === 0) return null;
-  return checkInferenceProvidersAllowed(inferenceProviders, provider);
-}
-
-/**
- * Rejects a request whose provider config excludes every provider that can
- * serve the model. Used for models routed to a fixed set of providers.
- */
-export function checkInferenceProvidersAllowed(
-  inferenceProviders: readonly string[],
-  provider: OpenRouterProviderConfig | undefined
-) {
-  return allowedInferenceProviders(inferenceProviders, provider).length > 0
-    ? null
-    : inferenceProvidersNotAllowedResponse(inferenceProviders);
-}
-
 /** The inference providers that every given provider config's only/ignore lists allow. */
 export function allowedInferenceProviders(
   inferenceProviders: readonly string[],
@@ -296,20 +269,21 @@ export function apiKindNotSupportedResponse(
   );
 }
 
-async function redactedErrorResponse(response: Response) {
-  const error = 'The upstream provider was unable to process the request';
-  warnExceptInTest(`Responding with ${response.status} ${error}`);
-  return NextResponse.json(
-    { error, error_type: ProxyErrorType.upstream_error, message: error },
-    { status: response.status }
-  );
-}
-
 const BYOK_MODEL_PERMISSION_DENIED_MESSAGE =
   '[BYOK] Your API key does not have permission to access this model. Please check your API key permissions.';
 
 const OPENCODE_GO_BYOK_MODEL_PERMISSION_DENIED_MESSAGE =
   '[BYOK] Your API key does not have permission to access this model. Some OpenCode Go models require opting in to data collection or region-specific inference in OpenCode Go.';
+
+// Vercel's explanation for a rejected key tells developers to set the
+// AI_GATEWAY_API_KEY environment variable, which does not apply to a key saved
+// in Kilo, so it is not appended.
+const VERCEL_AI_GATEWAY_BYOK_KEY_REJECTED_MESSAGE =
+  '[BYOK] Vercel AI Gateway rejected your API key. Check that the key is correct and has not been revoked.';
+
+function isRejectedVercelAiGatewayKey(status: number, userByokProviderIds: UserByokProviderId[]) {
+  return status === 401 && userByokProviderIds.includes('vercel-ai-gateway');
+}
 
 const byokErrorMessages: Record<number, string> = {
   401: '[BYOK] Your API key is invalid or has been revoked. Please check your API key configuration.',
@@ -346,6 +320,9 @@ function specificByokErrorMessage(
   if (status === 403 && userByokProviderIds.includes('opencode-go')) {
     return OPENCODE_GO_BYOK_MODEL_PERMISSION_DENIED_MESSAGE;
   }
+  if (isRejectedVercelAiGatewayKey(status, userByokProviderIds)) {
+    return VERCEL_AI_GATEWAY_BYOK_KEY_REJECTED_MESSAGE;
+  }
   return byokErrorMessages[status];
 }
 
@@ -355,6 +332,9 @@ async function byokErrorMessage(
 ): Promise<string | undefined> {
   const specificMessage = specificByokErrorMessage(response.status, userByokProviderIds);
   if (!specificMessage && (response.status < 400 || response.status >= 500)) return undefined;
+  if (isRejectedVercelAiGatewayKey(response.status, userByokProviderIds)) {
+    return VERCEL_AI_GATEWAY_BYOK_KEY_REJECTED_MESSAGE;
+  }
 
   // The provider's own explanation (for example an expired rather than revoked
   // key) is often more actionable than our status-based summary.
@@ -482,10 +462,6 @@ export async function makeErrorReadable({
         { status: response.status }
       );
     }
-  }
-
-  if (shouldRedactErrorResponse(providerId, requestedModel)) {
-    return await redactedErrorResponse(response);
   }
 
   return undefined;
@@ -690,11 +666,17 @@ export function wrapInSafeNextResponse(response: Response) {
 export function accountForMicrodollarUsage(
   clonedReponse: Response,
   usageContext: MicrodollarUsageContext,
-  openrouterRequestSpan: Span | undefined
+  openrouterRequestSpan: Span | undefined,
+  servingProvider: Provider
 ) {
   const logFileExtension = usageContext.isStreaming ? '.log.resp.sse' : '.log.resp.json';
   debugSaveProxyResponseStream(clonedReponse, logFileExtension);
-  const accounting = countAndStoreUsage(clonedReponse, usageContext, openrouterRequestSpan);
+  const accounting = countAndStoreUsage(
+    clonedReponse,
+    usageContext,
+    openrouterRequestSpan,
+    servingProvider
+  );
   after(accounting);
   return accounting;
 }

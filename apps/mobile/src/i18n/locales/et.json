@@ -3953,6 +3953,8 @@
     "title": "Osta krediiti",
     "description": "Krediit on ühekordne ost, mis lisatakse sinu Kilo saldole AI kodeerimisseansside käitamiseks Kilo Appis. Pood võtab tasu sinu kontolt ja krediit lisatakse pärast seda, kui pood makse kinnitab.",
     "nextExpiry": "Krediit summas {{amount}} aegub {{date}} (UTC). Esmalt kasutatakse kõige varem aeguvaid krediite.",
+    "noExpiringCredits": "Aeguvaid krediite pole.",
+    "expiryUnavailable": "Krediidi aegumisinfo pole saadaval.",
     "appStoreExpiry": "App Store'i kaudu ostetud krediidid ei aegu.",
     "playOneYearExpiry": "Need krediidid aeguvad üks kalendriaasta pärast ostu.",
     "playNonexpiring": "Need krediidid ei aegu.",

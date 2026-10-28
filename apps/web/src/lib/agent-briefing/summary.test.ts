@@ -10,6 +10,10 @@ import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gat
 import { enforceRequestCostLimit } from '@kilocode/web-shared/lib/ai-gateway/request-cost-limit';
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
+import {
+  kiloExclusiveModelFixture,
+  useKiloExclusiveModel,
+} from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 import { briefingPriceBound, briefingPrompt } from './summary';
 import type { BriefingReportRow } from './store';
 
@@ -44,6 +48,8 @@ function catalogModel(id: string, pricing: OpenRouterModel['pricing']): OpenRout
 }
 
 describe('briefing model pricing', () => {
+  useKiloExclusiveModel();
+
   const aion = catalogModel('aion-labs/aion-3.5-mini', {
     prompt: '0.0000007',
     completion: '0.0000014',
@@ -223,7 +229,7 @@ describe('briefing model pricing', () => {
   });
 
   it('quotes a picker-built entry at its own price, ignoring a same-id catalog row and snapshot route', async () => {
-    const exclusive = catalogModel('stealth/qwen3.6-plus', {
+    const exclusive = catalogModel(kiloExclusiveModelFixture.public_id, {
       prompt: '0.00001',
       completion: '0.00002',
     });

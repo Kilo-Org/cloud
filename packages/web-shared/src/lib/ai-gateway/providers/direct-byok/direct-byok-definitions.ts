@@ -1,5 +1,6 @@
 import type { DirectByokProvider } from './types';
 import alibabaTokenPlan from './alibaba-token-plan';
+import bedrockByok from './bedrock-byok';
 import byteplusCoding from './byteplus-coding';
 import chutesByok from './chutes-byok';
 import edenai from './edenai';
@@ -13,12 +14,14 @@ import ollamaCloud from './ollama-cloud';
 import openCodeGo from './opencode-go';
 import orcarouter from './orcarouter';
 import synthetic from './synthetic';
+import vertexByok from './vertex-byok';
 import xiaomiTokenPlanAms from './xiaomi-token-plan-ams';
 import xiaomiTokenPlanSgp from './xiaomi-token-plan-sgp';
 import zaiCoding from './zai-coding';
 
 export default [
   alibabaTokenPlan,
+  bedrockByok,
   byteplusCoding,
   chutesByok,
   edenai,
@@ -32,6 +35,7 @@ export default [
   openCodeGo,
   orcarouter,
   synthetic,
+  vertexByok,
   xiaomiTokenPlanAms,
   xiaomiTokenPlanSgp,
   zaiCoding,

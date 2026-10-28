@@ -1272,7 +1272,12 @@ export class SessionIngestDO extends DurableObject<Env> {
               ELSE ''
             END`,
             item_data_r2_key: ingestItems.item_data_r2_key,
-            oversized_inline: sql<number>`length(${ingestItems.item_data}) > ${BRIEFING_MAX_INLINE_BYTES}`,
+            oversized_inline: sql<number>`CASE
+              WHEN ${ingestItems.item_data_r2_key} IS NULL
+                AND length(${ingestItems.item_data}) > ${BRIEFING_MAX_INLINE_BYTES}
+                THEN json_extract(${ingestItems.item_data}, '$.type') = 'text'
+              ELSE 0
+            END`,
           })
           .from(ingestItems)
           .where(

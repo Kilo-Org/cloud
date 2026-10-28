@@ -13,8 +13,12 @@ import { collectBriefingSnapshot } from './evidence';
 import { nextBriefingTime, latestScheduledBriefingWindow } from './schedule';
 import { reconcileBriefingCharge, runBriefingSummary } from './summary';
 
+/** Lets an in-flight success write land before the sweep expires a running generation. */
+const RUNNING_EXPIRY_GRACE_MS = 2 * 60_000;
+
 export async function sweepAgentBriefings(now = new Date()) {
   const iso = now.toISOString();
+  const expiredDeadline = new Date(now.getTime() - RUNNING_EXPIRY_GRACE_MS).toISOString();
   const due = await db
     .select({ userId: agent_briefing_preferences.kilo_user_id })
     .from(agent_briefing_preferences)
@@ -124,7 +128,7 @@ export async function sweepAgentBriefings(now = new Date()) {
         or(
           and(
             sql`${agent_briefing_snapshots.summary}->>'status' = 'running'`,
-            lte(agent_briefing_snapshots.generation_deadline_at, iso)
+            lte(agent_briefing_snapshots.generation_deadline_at, expiredDeadline)
           ),
           and(
             sql`${agent_briefing_snapshots.summary}->>'status' = 'pending'`,
@@ -140,7 +144,7 @@ export async function sweepAgentBriefings(now = new Date()) {
     if (
       row.summary.status === 'running' &&
       row.generation_deadline_at &&
-      Date.parse(row.generation_deadline_at) <= now.getTime()
+      Date.parse(row.generation_deadline_at) <= now.getTime() - RUNNING_EXPIRY_GRACE_MS
     ) {
       await db
         .update(agent_briefing_snapshots)
@@ -153,7 +157,7 @@ export async function sweepAgentBriefings(now = new Date()) {
           and(
             eq(agent_briefing_snapshots.id, row.id),
             sql`${agent_briefing_snapshots.summary}->>'status' = 'running'`,
-            lte(agent_briefing_snapshots.generation_deadline_at, iso)
+            lte(agent_briefing_snapshots.generation_deadline_at, expiredDeadline)
           )
         );
     } else if (

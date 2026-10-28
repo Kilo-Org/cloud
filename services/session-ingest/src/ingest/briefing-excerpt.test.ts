@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { BRIEFING_MAX_EXCERPT_BYTES } from '@kilocode/app-shared/agent-briefing';
 import {
+  BRIEFING_MAX_CLOCK_SKEW_MS,
   BRIEFING_MAX_INLINE_BYTES,
   BRIEFING_MAX_EXCERPT_SOURCE_ROWS,
   buildBriefingExcerpt,
@@ -44,6 +45,20 @@ describe('completed briefing responses', () => {
       completedAt: new Date(completedAt).toISOString(),
       text: 'Updated the parser.',
     });
+  });
+
+  it('bounds the client completion time by the server clock', () => {
+    const serverNow = completedAt - 1000;
+    expect(buildBriefingExcerpt(message, [textPart('Done.')], serverNow)?.completedAt).toBe(
+      new Date(serverNow).toISOString()
+    );
+    expect(
+      buildBriefingExcerpt(
+        message,
+        [textPart('Done.')],
+        completedAt - BRIEFING_MAX_CLOCK_SKEW_MS - 1
+      )
+    ).toBeUndefined();
   });
 
   it.each([

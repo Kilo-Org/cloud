@@ -475,6 +475,28 @@ it('repairs an expired running job behind an entire batch of still-open pending 
   expect(rows.filter(row => row.summary.status === 'pending')).toHaveLength(100);
 });
 
+it('leaves a running job within the expiry grace for its in-flight success write', async () => {
+  const user = await insertTestUser();
+  const [running] = await db
+    .insert(agent_briefing_snapshots)
+    .values({
+      ...maintenanceSnapshot(user.id, 'running'),
+      job_due_at: '2026-10-28T08:09:00.000Z',
+      generation_id: 'agent-briefing:finishing',
+      generation_started_at: '2026-10-28T08:00:00.000Z',
+      generation_deadline_at: '2026-10-28T08:09:00.000Z',
+      summary: { ...emptySummary, status: 'running' },
+    })
+    .returning();
+  if (!running) throw new Error('Missing running report');
+  await sweepAgentBriefings(new Date('2026-10-28T08:10:00.000Z'));
+  const [row] = await db.select().from(agent_briefing_snapshots);
+  expect(row?.summary.status).toBe('running');
+  await sweepAgentBriefings(new Date('2026-10-28T08:11:00.000Z'));
+  const [expired] = await db.select().from(agent_briefing_snapshots);
+  expect(expired?.summary.status).toBe('failed');
+});
+
 it('recovers a stale due timestamp into the current morning without capturing multiple nights', async () => {
   const user = await insertTestUser();
   await db.insert(agent_briefing_preferences).values({

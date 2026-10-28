@@ -335,9 +335,10 @@ export async function listBriefings(
     )
     .orderBy(desc(agent_briefing_snapshots.cutoff_at), desc(agent_briefing_snapshots.id))
     .limit(limit + 1);
-  const candidates = rows.slice(0, limit).map(row => {
-    const facts = briefingFactsSchema.parse(row.facts);
-    return { row, facts, ids: briefingSourceIds(facts) };
+  const candidates = rows.slice(0, limit).flatMap(row => {
+    const parsed = briefingFactsSchema.safeParse(row.facts);
+    if (!parsed.success) return [];
+    return [{ row, facts: parsed.data, ids: briefingSourceIds(parsed.data) }];
   });
   const ids = [...new Set(candidates.flatMap(candidate => candidate.ids))];
   const sessions = await sourceSessionsById(userId, ids);

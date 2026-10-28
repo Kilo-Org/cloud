@@ -182,6 +182,18 @@ it('does not authorize a source in another accessible context through the batche
   expect(listed.reports.map(report => report.id)).toEqual([row.id]);
 });
 
+it('skips an unparseable snapshot without hiding the rest of the page', async () => {
+  const { user, row } = await fixture();
+  await db.insert(agent_briefing_snapshots).values({
+    ...row,
+    id: crypto.randomUUID(),
+    local_date: 'unparseable-occurrence',
+    cutoff_at: new Date(Date.parse(row.cutoff_at) + 1000).toISOString(),
+    facts: { scorecard: 'unparseable' } as unknown as typeof row.facts,
+  });
+  expect((await listBriefings(user.id)).reports.map(report => report.id)).toEqual([row.id]);
+});
+
 it('excludes quiet snapshots before limiting current reports while retaining quiet history', async () => {
   const { user, row } = await fixture();
   const [quiet] = await db

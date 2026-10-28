@@ -7,6 +7,8 @@ export type BriefingExcerpt = NonNullable<typeof cli_sessions_v2.$inferSelect.br
 
 export const BRIEFING_MAX_INLINE_BYTES = 8 * 1024;
 export const BRIEFING_MAX_EXCERPT_SOURCE_ROWS = 32;
+/** Client completion times further ahead of the server clock are not trusted for scope fencing. */
+export const BRIEFING_MAX_CLOCK_SKEW_MS = 60_000;
 
 const completedResponseSchema = z.object({
   id: z.string().min(1),
@@ -46,10 +48,11 @@ export function isFinalizedBriefingText(data: unknown): boolean {
 
 export function buildBriefingExcerpt(
   data: unknown,
-  parts: Iterable<unknown>
+  parts: Iterable<unknown>,
+  nowMs = Date.now()
 ): BriefingExcerpt | undefined {
   const message = completedBriefingResponse(data);
-  if (!message) return undefined;
+  if (!message || message.time.completed > nowMs + BRIEFING_MAX_CLOCK_SKEW_MS) return undefined;
   const text: string[] = [];
   const encoder = new TextEncoder();
   let rawBytes = 0;
@@ -78,7 +81,7 @@ export function buildBriefingExcerpt(
   if (!excerpt) return undefined;
   return {
     messageId: message.id,
-    completedAt: new Date(message.time.completed).toISOString(),
+    completedAt: new Date(Math.min(message.time.completed, nowMs)).toISOString(),
     text: excerpt,
   };
 }

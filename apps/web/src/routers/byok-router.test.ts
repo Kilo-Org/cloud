@@ -1,4 +1,4 @@
-import { describe, test, expect, beforeAll, afterEach, jest } from '@jest/globals';
+import { describe, test, expect, beforeAll, beforeEach, afterEach, jest } from '@jest/globals';
 import { randomBytes } from 'crypto';
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -342,13 +342,21 @@ describe('BYOK Router', () => {
       return fetchMock;
     }
 
-    const dataKeyResponse = () =>
-      Response.json({
-        data_key: randomBytes(32).toString('base64'),
+    const issuedDataKeys: string[] = [];
+    const dataKeyResponse = () => {
+      const data_key = randomBytes(32).toString('base64');
+      issuedDataKeys.push(data_key);
+      return Response.json({
+        data_key,
         wrapped_dek: 'wrapped',
         kms_key_id: 'alias/test',
         kms_key_version: '1',
       });
+    };
+
+    beforeEach(() => {
+      issuedDataKeys.length = 0;
+    });
 
     test('leaves the envelope NULL when the service is not configured', async () => {
       delete process.env.BYOK_KMS_SERVICE_URL;
@@ -383,6 +391,9 @@ describe('BYOK Router', () => {
         kms_key_id: 'alias/test',
       });
       expect(decryptApiKey(createdKey.encrypted_api_key, BYOK_ENCRYPTION_KEY)).toBe('sk-ant-kms');
+      expect(
+        decryptApiKey(createdKey.encrypted_api_key_envelope!.encrypted_data, issuedDataKeys[0])
+      ).toBe('sk-ant-kms');
 
       await caller.byok.update({
         organizationId: organizationA.id,
@@ -394,8 +405,10 @@ describe('BYOK Router', () => {
         .select()
         .from(byok_api_keys)
         .where(eq(byok_api_keys.id, created.id));
-      expect(updatedKey.encrypted_api_key_envelope).not.toBeNull();
       expect(decryptApiKey(updatedKey.encrypted_api_key, BYOK_ENCRYPTION_KEY)).toBe('sk-ant-kms-2');
+      expect(
+        decryptApiKey(updatedKey.encrypted_api_key_envelope!.encrypted_data, issuedDataKeys[1])
+      ).toBe('sk-ant-kms-2');
       expect(fetchMock).toHaveBeenCalledTimes(2);
       const sent = fetchMock.mock.calls.map(call => {
         const [, init] = call as unknown as [string, RequestInit];

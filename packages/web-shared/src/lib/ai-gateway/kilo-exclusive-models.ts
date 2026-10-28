@@ -19,7 +19,6 @@ import {
 import { type ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { MARTIAN } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/martian';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
-import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 
 const CLAUDE_OPUS_STEALTH_PRICING: PricingTiers = [
   {
@@ -194,34 +193,6 @@ export const qwen36_plus_stealth_model: KiloExclusiveModel = {
   inference_providers: ['stealth'],
 };
 
-export const glyph_cluster_stealth_free_model: KiloExclusiveModel = {
-  public_id: 'stealth/glyph-cluster',
-  display_name: 'Stealth: Glyph Cluster (free)',
-  description:
-    "Your prompts and completions may be retained and used to train or improve the provider's services. Glyph Cluster is a reasoning model for coding and long-context analysis, served through Vercel AI Gateway during its stealth period at no cost. It supports function calling and streaming, takes text input only, and does not support structured outputs. Zero Data Retention is not available for this model.",
-  context_length: 256_000,
-  max_completion_tokens: 256_000,
-  flags: ['reasoning', 'requires-data-collection'],
-  provider: VERCEL_AI_GATEWAY,
-  internal_id: 'stealth/glyph-cluster',
-  pricing: null,
-  inference_providers: ['stealth'],
-};
-
-export const reflection_beam_free_model: KiloExclusiveModel = {
-  public_id: 'reflection/beam-free',
-  display_name: 'Reflection: Beam 1.0 (free)',
-  description:
-    "Your prompts and completions may be retained and used to train or improve the provider's services. Beam is Reflection's reasoning model for coding and agentic workflows, combining strong coding capabilities with fast, low-latency inference, served through Vercel AI Gateway at no cost. It supports function calling, structured outputs, and streaming, and takes text input only. Zero Data Retention is not available for this model.",
-  context_length: 1_048_576,
-  max_completion_tokens: 131_072,
-  flags: ['reasoning', 'requires-data-collection'],
-  provider: VERCEL_AI_GATEWAY,
-  internal_id: 'reflection/beam-free',
-  pricing: null,
-  inference_providers: ['reflection'],
-};
-
 export const kiloExclusiveModels = [
   gemma_4_26b_a4b_it_free_model,
   qwen36_plus_stealth_model,
@@ -229,8 +200,6 @@ export const kiloExclusiveModels = [
   claude_opus_4_7_stealth_model,
   claude_sonnet_4_6_stealth_model,
   claude_opus_4_6_stealth_model,
-  glyph_cluster_stealth_free_model,
-  reflection_beam_free_model,
 ] as KiloExclusiveModel[];
 
 export function findKiloExclusiveModel(model: string): KiloExclusiveModel | null {

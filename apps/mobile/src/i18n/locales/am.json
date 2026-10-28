@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "ከኢንስታንሱ ጋር መገናኘት አልተቻለም — ግንኙነቱ ተቋርጦ ሊሆን ይችላል።",
     "remoteSpawnNonRetryable": "ኢንስታንሱ ክፍለ ጊዜውን ማስጀመር አልቻለም — ኮምፒውተሩን ፈትሽ ወይም CLIን አዘምን።",
-    "remoteSpawnInstanceDisconnected": "የተመረጠው ኢንስታንስ ግንኙነት ተቋርጧል። በCloud Agent ላይ ክፍለ ጊዜ ጀምር ወይም ሌላ ኢንስታንስ ምረጥ።",
-    "liveCount_one": "{{count}} ቀጥታ",
-    "liveCount_other": "{{count}} ቀጥታ"
+    "remoteSpawnInstanceDisconnected": "የተመረጠው ኢንስታንስ ግንኙነት ተቋርጧል። በCloud Agent ላይ ክፍለ ጊዜ ጀምር ወይም ሌላ ኢንስታንስ ምረጥ።"
   },
   "agentChat": {
     "session": {

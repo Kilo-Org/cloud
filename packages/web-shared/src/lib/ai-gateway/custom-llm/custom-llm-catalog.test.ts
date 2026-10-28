@@ -53,6 +53,19 @@ describe('custom LLM catalog', () => {
     }
   });
 
+  test.each(['stealth/glyph-cluster', 'reflection/beam-free'])(
+    'serves a custom LLM with the id of the removed Kilo-exclusive model %s',
+    async id => {
+      await insertCustomLlmForTest(id, publicCustomLlmDefinition(['acme']));
+      try {
+        await expect(findCustomLlm(id)).resolves.toMatchObject({ public_id: id });
+        await expect(isFreeModel(id)).resolves.toBe(true);
+      } finally {
+        await deleteCustomLlmForTest(id);
+      }
+    }
+  );
+
   test('picks up new rows only after the cache expires', async () => {
     const now = Date.now();
     const clock = jest.spyOn(Date, 'now').mockReturnValue(now);

@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Kunne ikke nå instansen. Den kan ha mistet tilkoblingen.",
     "remoteSpawnNonRetryable": "Instansen kunne ikke starte økten. Sjekk maskinen eller oppdater CLI-en.",
-    "remoteSpawnInstanceDisconnected": "Den valgte instansen mistet tilkoblingen. Start en økt på Cloud Agent eller velg en annen instans.",
-    "liveCount_one": "{{count}} I SANNTID",
-    "liveCount_other": "{{count}} I SANNTID"
+    "remoteSpawnInstanceDisconnected": "Den valgte instansen mistet tilkoblingen. Start en økt på Cloud Agent eller velg en annen instans."
   },
   "agentChat": {
     "session": {

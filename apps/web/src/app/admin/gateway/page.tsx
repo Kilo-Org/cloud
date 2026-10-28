@@ -13,6 +13,7 @@ import { GatewayModelListContent } from '@/app/admin/gateway/GatewayModelListCon
 import { VercelModelIdOverridesContent } from '@/app/admin/gateway/VercelModelIdOverridesContent';
 import { PreferredProviderOrderContent } from '@/app/admin/gateway/PreferredProviderOrderContent';
 import { CustomPricingContent } from '@/app/admin/gateway/CustomPricingContent';
+import { EnkryptGuardrailChargesContent } from '@/app/admin/gateway/EnkryptGuardrailChargesContent';
 import ApiRequestLogPage from '@/app/admin/api-request-log/page';
 import RequestLoggingOptInsContent from '@/app/admin/request-logging-opt-ins/RequestLoggingOptInsContent';
 
@@ -26,6 +27,7 @@ const VALID_TABS: readonly string[] = [
   'provider-order',
   'custom-pricing',
   'api-request-log',
+  'enkrypt-charges',
 ];
 type Tab =
   | 'sync-providers'
@@ -36,7 +38,8 @@ type Tab =
   | 'unavailable-models'
   | 'provider-order'
   | 'custom-pricing'
-  | 'api-request-log';
+  | 'api-request-log'
+  | 'enkrypt-charges';
 const isValidTab = (value: string | null): value is Tab =>
   value !== null && VALID_TABS.includes(value);
 
@@ -104,6 +107,9 @@ export default function AdminGatewayPage() {
             <TabsTrigger value="api-request-log" className={tabTriggerClass}>
               API Request Log
             </TabsTrigger>
+            <TabsTrigger value="enkrypt-charges" className={tabTriggerClass}>
+              Enkrypt Charges
+            </TabsTrigger>
           </TabsList>
           <TabsContent value="sync-providers" className="mt-4">
             <SyncProvidersContent />
@@ -163,6 +169,9 @@ export default function AdminGatewayPage() {
             <div className="mt-8">
               <RequestLoggingOptInsContent />
             </div>
+          </TabsContent>
+          <TabsContent value="enkrypt-charges" className="mt-4">
+            <EnkryptGuardrailChargesContent />
           </TabsContent>
         </Tabs>
       </div>

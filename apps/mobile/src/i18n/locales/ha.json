@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Ba a iya tuntuɓar muhallin aiki ba — wataƙila haɗinsa ya katse.",
     "remoteSpawnNonRetryable": "Muhallin aiki ya kasa fara zaman — duba na'urar ko sabunta CLI.",
-    "remoteSpawnInstanceDisconnected": "Haɗin muhallin aikin da aka zaɓa ya katse. Fara zama a Cloud Agent ko zaɓi wani muhallin aiki.",
-    "liveCount_one": "KAI TSAYE: {{count}}",
-    "liveCount_other": "KAI TSAYE: {{count}}"
+    "remoteSpawnInstanceDisconnected": "Haɗin muhallin aikin da aka zaɓa ya katse. Fara zama a Cloud Agent ko zaɓi wani muhallin aiki."
   },
   "agentChat": {
     "session": {

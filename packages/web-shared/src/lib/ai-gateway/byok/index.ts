@@ -1,5 +1,6 @@
 import { type db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { byok_api_keys } from '@kilocode/db/schema';
+import { ByokApiKeySettingsSchema } from '@kilocode/db/schema-types';
 import { and, eq, inArray } from 'drizzle-orm';
 import type { EncryptedData } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
@@ -53,38 +54,67 @@ export async function getModelUserByokProviders(modelId: string): Promise<UserBy
   return deriveModelUserByokProviders(modelId, vercelModelMetadata);
 }
 
-async function getEnabledByokProviderIds(
-  fromDb: ByokSourceDb,
-  ownerColumn: ByokOwnerColumn,
-  ownerId: string
-): Promise<UserByokProviderId[]> {
-  const rows = await fromDb
-    .select({ provider_id: byok_api_keys.provider_id })
-    .from(byok_api_keys)
-    .where(and(eq(ownerColumn, ownerId), eq(byok_api_keys.is_enabled, true)));
+export type ByokOwner = { type: 'user'; id: string } | { type: 'organization'; id: string };
 
-  return parseUserByokProviderIds(rows);
+export function byokOwner(userId: string, organizationId: string | null | undefined): ByokOwner {
+  return organizationId
+    ? { type: 'organization', id: organizationId }
+    : { type: 'user', id: userId };
+}
+
+function ownerColumn(owner: ByokOwner): ByokOwnerColumn {
+  return owner.type === 'organization' ? byok_api_keys.organization_id : byok_api_keys.kilo_user_id;
+}
+
+/** Whether stored key settings put the key in catalog mode. */
+export function servesCatalogModels(settings: unknown): boolean {
+  const parsed = ByokApiKeySettingsSchema.safeParse(settings);
+  return parsed.success && parsed.data.serve_catalog_models === true;
+}
+
+export type EnabledByokProvider = {
+  providerId: UserByokProviderId;
+  /** Catalog mode as stored. */
+  serveCatalogModels: boolean;
+};
+
+export async function getEnabledByokProviders(
+  fromDb: ByokSourceDb,
+  owner: ByokOwner
+): Promise<EnabledByokProvider[]> {
+  const rows = await fromDb
+    .select({
+      provider_id: byok_api_keys.provider_id,
+      settings: byok_api_keys.settings,
+    })
+    .from(byok_api_keys)
+    .where(and(eq(ownerColumn(owner), owner.id), eq(byok_api_keys.is_enabled, true)));
+
+  return rows.flatMap(row => {
+    const providerId = UserByokProviderIdSchema.safeParse(row.provider_id);
+    return providerId.success
+      ? [{ providerId: providerId.data, serveCatalogModels: servesCatalogModels(row.settings) }]
+      : [];
+  });
 }
 
 export async function getUserByokProviderIds(
   fromDb: typeof db,
   userId: string
 ): Promise<UserByokProviderId[]> {
-  return getEnabledByokProviderIds(fromDb, byok_api_keys.kilo_user_id, userId);
+  const providers = await getEnabledByokProviders(fromDb, { type: 'user', id: userId });
+  return providers.map(provider => provider.providerId);
 }
 
 export async function getOrganizationByokProviderIds(
   fromDb: typeof db,
   organizationId: string
 ): Promise<UserByokProviderId[]> {
-  return getEnabledByokProviderIds(fromDb, byok_api_keys.organization_id, organizationId);
-}
-
-function parseUserByokProviderIds(rows: { provider_id: string }[]): UserByokProviderId[] {
-  return rows.flatMap(row => {
-    const providerId = UserByokProviderIdSchema.safeParse(row.provider_id);
-    return providerId.success ? [providerId.data] : [];
+  const providers = await getEnabledByokProviders(fromDb, {
+    type: 'organization',
+    id: organizationId,
   });
+  return providers.map(provider => provider.providerId);
 }
 
 export async function addUserByokAvailability(
@@ -123,31 +153,48 @@ export function decryptByokRow({
   };
 }
 
-async function getByokRowsForOwner(
+export type ByokCredential = BYOKResult & { serveCatalogModels: boolean };
+
+/** The owner's enabled keys for `providerIds`, oldest first. */
+export async function getByokCredentials(
   fromDb: ByokSourceDb,
-  ownerColumn: ByokOwnerColumn,
-  ownerId: string,
+  owner: ByokOwner,
   providerIds: UserByokProviderId[]
-): Promise<BYOKResult[] | null> {
+): Promise<ByokCredential[]> {
   if (providerIds.length === 0) {
-    return null;
+    return [];
   }
   const rows = await fromDb
     .select({
       encrypted_api_key: byok_api_keys.encrypted_api_key,
       provider_id: byok_api_keys.provider_id,
+      settings: byok_api_keys.settings,
     })
     .from(byok_api_keys)
     .where(
       and(
-        eq(ownerColumn, ownerId),
+        eq(ownerColumn(owner), owner.id),
         eq(byok_api_keys.is_enabled, true),
         inArray(byok_api_keys.provider_id, providerIds)
       )
     )
     .orderBy(byok_api_keys.created_at);
 
-  return rows.length === 0 ? null : rows.map(row => decryptByokRow(row));
+  return rows.map(row => ({
+    ...decryptByokRow(row),
+    serveCatalogModels: servesCatalogModels(row.settings),
+  }));
+}
+
+async function getByokRowsForOwner(
+  fromDb: ByokSourceDb,
+  owner: ByokOwner,
+  providerIds: UserByokProviderId[]
+): Promise<BYOKResult[] | null> {
+  const credentials = await getByokCredentials(fromDb, owner, providerIds);
+  return credentials.length === 0
+    ? null
+    : credentials.map(({ decryptedAPIKey, providerId }) => ({ decryptedAPIKey, providerId }));
 }
 
 export async function getBYOKforUser(
@@ -155,7 +202,7 @@ export async function getBYOKforUser(
   userId: string,
   providerIds: UserByokProviderId[]
 ): Promise<BYOKResult[] | null> {
-  return getByokRowsForOwner(fromDb, byok_api_keys.kilo_user_id, userId, providerIds);
+  return getByokRowsForOwner(fromDb, { type: 'user', id: userId }, providerIds);
 }
 
 export async function getBYOKforOrganization(
@@ -163,5 +210,5 @@ export async function getBYOKforOrganization(
   organizationId: string,
   providerIds: UserByokProviderId[]
 ): Promise<BYOKResult[] | null> {
-  return getByokRowsForOwner(fromDb, byok_api_keys.organization_id, organizationId, providerIds);
+  return getByokRowsForOwner(fromDb, { type: 'organization', id: organizationId }, providerIds);
 }

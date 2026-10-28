@@ -75,7 +75,6 @@ const scopedPrepareSessionSchema = z
     autoCommit: z.boolean().optional(),
     autoInitiate: z.literal(true),
     operationKey: z.uuid().optional(),
-    allowSubagentSessions: z.boolean().optional(),
     callbackTarget: ParentSessionCallbackTargetSchema.optional(),
     organizationId: z.string().min(1).optional(),
   })

@@ -68,7 +68,8 @@ it('renders the selected runtime-free digest and retains unrelated target settin
     startup,
     release,
   });
-  expect(output.containers?.[0].images?.app).toEqual({ image: release.baseImage });
+  expect(output.containers?.[0].images?.app).toEqual({ dockerfile: './Dockerfile.containers' });
+  expect(output.containers?.[0].images?.['runtime-free']).toEqual({ image: release.baseImage });
   expect(output.vars).toMatchObject({
     EXISTING: 'keep',
     RUNTIME_STARTUP_MODE: 'downloaded',
@@ -95,7 +96,7 @@ it('isolated rendering leaves production selection and vars untouched', () => {
       RUNTIME_STARTUP_MODE: 'downloaded',
       NATIVE_RUNTIME_IMAGE: 'runtime-free',
     },
-    containers: [{ images: { app: { image: release.baseImage } } }],
+    containers: [{ images: { 'runtime-free': { image: release.baseImage } } }],
   });
 });
 it('supports independent image rollback, then mode rollback', () => {
@@ -116,6 +117,45 @@ it('supports independent image rollback, then mode rollback', () => {
   });
   expect(modeRollback.vars?.RUNTIME_STARTUP_MODE).toBe('preinstalled');
   expect(modeRollback.vars?.RUNTIME_RELEASE_DESCRIPTOR).toBeUndefined();
+  expect(modeRollback.vars?.RUNTIME_INTERACTIVE_ORG_IDS).toBeUndefined();
+  expect(modeRollback.containers?.[0].images?.['runtime-free']).toBeUndefined();
+});
+it('renders scoped startup without replacing the baseline image or changing provider enrollment', () => {
+  const config = baseline();
+  Object.assign(config.vars, { CLOUDFLARE_CONTAINERS_ORG_IDS: '*' });
+  const output = renderRuntimeTarget({
+    config,
+    environment: 'production',
+    startup: { ...startup, interactiveOrgIds: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'] },
+    release,
+  });
+  expect(output.vars).toMatchObject({
+    RUNTIME_INTERACTIVE_ORG_IDS: '9d278969-5453-4ae3-a51f-a8d2274a7b56',
+    CLOUDFLARE_CONTAINERS_ORG_IDS: '*',
+  });
+  expect(output.containers?.[0].images).toEqual({
+    app: { dockerfile: './Dockerfile.containers' },
+    'runtime-free': { image: release.baseImage },
+  });
+});
+it.each([{ ids: [] }, { ids: ['*'] }, { ids: ['not-an-org-id'] }])(
+  'rejects invalid interactive org scope $ids',
+  ({ ids: interactiveOrgIds }) => {
+    expect(() =>
+      selectRuntimeTarget({ default: { ...startup, interactiveOrgIds }, targets: {} }, 'production')
+    ).toThrow();
+  }
+);
+it('rejects manual cohort settings and secondary image drift', () => {
+  const scopedVars = { ...baseline(), vars: { RUNTIME_INTERACTIVE_ORG_IDS: '*' } };
+  expect(() =>
+    renderRuntimeTarget({ config: scopedVars, environment: 'production', startup, release })
+  ).toThrow('configuration drift');
+  const imageDrift = baseline();
+  Object.assign(imageDrift.containers[0].images, { 'runtime-free': { image: release.baseImage } });
+  expect(() =>
+    renderRuntimeTarget({ config: imageDrift, environment: 'production', startup, release })
+  ).toThrow('configuration drift');
 });
 it('rejects manual Worker settings and image drift before rendering', () => {
   const varsDrift = { ...baseline(), vars: { RUNTIME_STARTUP_MODE: 'downloaded' } };

@@ -2220,10 +2220,7 @@
     },
     "remoteSpawnRetryable": "No s'ha pogut connectar amb la instància. Pot ser que s'hagi desconnectat.",
     "remoteSpawnNonRetryable": "La instància no ha pogut iniciar la sessió. Comprova la màquina o actualitza la CLI.",
-    "remoteSpawnInstanceDisconnected": "La instància seleccionada s'ha desconnectat. Inicia una sessió a Cloud Agent o tria una altra instància.",
-    "liveCount_one": "{{count}} EN DIRECTE",
-    "liveCount_other": "{{count}} EN DIRECTE",
-    "liveCount_many": "{{count}} ACTIUS"
+    "remoteSpawnInstanceDisconnected": "La instància seleccionada s'ha desconnectat. Inicia una sessió a Cloud Agent o tria una altra instància."
   },
   "agentChat": {
     "session": {

@@ -2282,12 +2282,7 @@
     },
     "remoteSpawnRetryable": "Níorbh fhéidir nascadh leis an ásc — seans gur dícheanglaíodh é.",
     "remoteSpawnNonRetryable": "Níorbh fhéidir leis an ásc an seisiún a thosú — seiceáil an meaisín nó nuashonraigh an CLI.",
-    "remoteSpawnInstanceDisconnected": "Dícheanglaíodh an t-ásc roghnaithe. Tosaigh seisiún ar Cloud Agent nó roghnaigh ásc eile.",
-    "liveCount_one": "{{count}} BEO",
-    "liveCount_other": "{{count}} BEO",
-    "liveCount_two": "{{count}} AR SIÚL",
-    "liveCount_few": "{{count}} AR SIÚL",
-    "liveCount_many": "{{count}} AR SIÚL"
+    "remoteSpawnInstanceDisconnected": "Dícheanglaíodh an t-ásc roghnaithe. Tosaigh seisiún ar Cloud Agent nó roghnaigh ásc eile."
   },
   "agentChat": {
     "session": {

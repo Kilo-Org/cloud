@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Enweghị ike ịkpọtụrụ igwe ahụ — o nwere ike ịbụ na njikọ ya akwụsịla.",
     "remoteSpawnNonRetryable": "Igwe ahụ enweghị ike ịmalite nnọkọ — lelee igwe ahụ ma ọ bụ melite CLI.",
-    "remoteSpawnInstanceDisconnected": "Njikọ igwe ahọpụtara akwụsịla. Malite nnọkọ na Cloud Agent ma ọ bụ họrọ igwe ọzọ.",
-    "liveCount_one": "{{count}} NA-AGA UGBU A",
-    "liveCount_other": "{{count}} NA-AGA UGBU A"
+    "remoteSpawnInstanceDisconnected": "Njikọ igwe ahọpụtara akwụsịla. Malite nnọkọ na Cloud Agent ma ọ bụ họrọ igwe ọzọ."
   },
   "agentChat": {
     "session": {

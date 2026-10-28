@@ -1,4 +1,3 @@
-import { randomUUID } from 'crypto';
 import { canSpendPaidUsage } from '@kilocode/worker-utils/account-access';
 import { NextResponse, type NextResponse as NextResponseType } from 'next/server';
 import { type NextRequest } from 'next/server';
@@ -12,15 +11,14 @@ import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { sentryRootSpan } from '@kilocode/web-shared/lib/getRootSpan';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+import { applyUpstreamErrorPolicy } from '@kilocode/web-shared/lib/ai-gateway/upstream-error-policy';
 import {
-  captureProxyError,
   countAndStoreTranscriptionUsage,
   extractFraudAndProjectHeaders,
   extractHeaderAndLimitLength,
   invalidRequestResponse,
   modelDoesNotExistResponse,
   modelNotAllowedResponse,
-  temporarilyUnavailableResponse,
   creditsBlockedResponse,
   wrapInSafeNextResponse,
 } from '@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers';
@@ -48,15 +46,12 @@ import {
 import type { PromptInfo } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import { resolveOrganizationMemberModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
-import { bouncerAccountId, normalizeJa4 } from '@kilocode/web-shared/lib/bouncer/client';
 import {
   bareIpLiteral,
   bouncerDecideTier,
-  bouncerRejectionResponse,
-  payerSharingIp,
   rawClientIp,
-  startBouncerDecide,
 } from '@kilocode/web-shared/lib/bouncer/inference';
+import { signedInBouncerRequest } from '@kilocode/web-shared/lib/bouncer/request';
 
 const PAID_MODEL_AUTH_REQUIRED = 'PAID_MODEL_AUTH_REQUIRED';
 
@@ -236,11 +231,13 @@ export async function handleAudioTranscriptionsRequest(
   const { provider, userByok } = await getTranscriptionProvider();
   const feature = validateFeatureHeader(request.headers.get(FEATURE_HEADER) || '');
 
-  // Resolve bouncer's identity once for this request. Transcription is always
-  // signed in, so its usage row uses a payer-safe IP that drops shared Kilo
-  // infrastructure.
-  const bouncerIp = bareIpLiteral(ipAddress);
-  const bouncerRequestId = randomUUID();
+  const bouncer = signedInBouncerRequest({
+    ip: bareIpLiteral(ipAddress),
+    ja4Digest: fraudHeaders.http_x_vercel_ja4_digest,
+    userId: user.id,
+    organizationId,
+    feature,
+  });
 
   const promptInfo =
     parsedRequest.kind === 'multipart'
@@ -283,17 +280,14 @@ export async function handleAudioTranscriptionsRequest(
     auto_model: null,
     ttfb_ms: null,
     requestStartedAt,
-    bouncer: {
-      requestId: bouncerRequestId,
+    bouncer: bouncer.usage({
       occurredAt: new Date(requestStartedAtMs),
-      accountId: bouncerAccountId(user.id, organizationId),
-      clientIp: payerSharingIp(bouncerIp, feature),
       clientAttributed: feature !== null || Boolean(xKiloCodeVersion),
       requestedLogprobs: false,
       samples: null,
       // Audio carries no user text, so there is no prompt to hash.
       promptSimHash: null,
-    },
+    }),
   };
 
   setTag('ui.ai_model', requestedModel);
@@ -336,16 +330,9 @@ export async function handleAudioTranscriptionsRequest(
 
   // The one decide for this request, awaited just before the upstream call within its 500 ms
   // budget. Only an enforced verdict rejects; every other outcome sends the request.
-  const bouncerVerdictPromise = startBouncerDecide({
-    requestId: bouncerRequestId,
-    ip: bouncerIp,
-    ja4: normalizeJa4(fraudHeaders.http_x_vercel_ja4_digest),
-    account: {
-      accountId: bouncerAccountId(user.id, organizationId),
-      userId: user.id,
-      tier: bouncerDecideTier(organizationId, plan, balance),
-      payer,
-    },
+  const bouncerVerdictPromise = bouncer.decide({
+    tier: bouncerDecideTier(organizationId, plan, balance),
+    payer,
   });
 
   sentryRootSpan()?.setAttribute(
@@ -379,9 +366,8 @@ export async function handleAudioTranscriptionsRequest(
   }
 
   const bouncerVerdict = await bouncerVerdictPromise;
-  const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
+  const bouncerRejection = bouncer.apply(bouncerVerdict, usageContext.bouncer);
   if (bouncerRejection) return bouncerRejection;
-  if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
 
   const response = await transcriptionProxyRequest({
     body: upstreamBody,
@@ -411,30 +397,16 @@ export async function handleAudioTranscriptionsRequest(
     requestStartedAt
   );
 
-  if (response.status === 402 && !userByok) {
-    await captureProxyError({
-      user,
-      request: upstreamBody,
-      response,
-      organizationId,
-      model: requestedModelLowerCased,
-      errorMessage: `${provider.id} returned 402 Payment Required`,
-      trackInSentry: true,
-    });
-    return temporarilyUnavailableResponse();
-  }
-
-  if (response.status >= 400) {
-    await captureProxyError({
-      user,
-      request: upstreamBody,
-      response,
-      organizationId,
-      model: requestedModelLowerCased,
-      errorMessage: `${provider.id} returned error ${response.status}`,
-      trackInSentry: response.status >= 500,
-    });
-  }
+  const upstreamErrorResponse = await applyUpstreamErrorPolicy({
+    response,
+    providerId: provider.id,
+    isUserByok: !!userByok,
+    user,
+    request: upstreamBody,
+    organizationId,
+    model: requestedModelLowerCased,
+  });
+  if (upstreamErrorResponse) return upstreamErrorResponse;
 
   countAndStoreTranscriptionUsage(response.clone(), usageContext, span);
   return wrapInSafeNextResponse(response);

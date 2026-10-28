@@ -12,6 +12,7 @@ import {
   type EnvironmentBuildInput,
   type EnvironmentBuildResult,
 } from '../shared/environment-build-protocol.js';
+import { CONTROL_PLANE_TIMERS } from '../shared/control-plane-timers.js';
 import type {
   EnvironmentBuildCancelResult,
   EnvironmentBuildLogs,
@@ -32,7 +33,6 @@ import {
   CLEANUP_ATTEMPTS_BEFORE_FAILURE,
   COUNTED_FAILURE_REASONS,
   PREPARING_TICK_MS,
-  SESSION_PREPARATION_BUDGET_MS,
   SNAPSHOT_ELIGIBLE_LIFETIME_MS,
   automaticAdmission,
   cleanupRetryDelay,
@@ -456,7 +456,7 @@ export class EnvironmentBuildCoordinator {
               nextAttemptAt: backoff.retryAt,
             }
           : null,
-      sessionPreparationBudgetMs: SESSION_PREPARATION_BUDGET_MS,
+      sessionPreparationBudgetMs: CONTROL_PLANE_TIMERS.sandbox.routePreparationMs,
     };
   }
 

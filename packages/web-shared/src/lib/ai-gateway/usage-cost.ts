@@ -49,23 +49,30 @@ export function applyUsagePricing(
   context: Pick<MicrodollarUsageContext, 'requested_model' | 'is_free' | 'user_byok' | 'provider'>,
   customPricingConfig: CustomPricingConfig
 ): void {
+  // Kilo-exclusive and custom pricing replace the inference cost; non-inference costs stay charged on top.
+  const nonInferenceCost_mUsd = usage.nonInferenceCost_mUsd ?? 0;
+  const inferenceUsage = { ...usage, cost_mUsd: usage.cost_mUsd - nonInferenceCost_mUsd };
+
   const kiloExclusiveModel = findKiloExclusiveModel(context.requested_model);
   if (kiloExclusiveModel?.pricing) {
-    const exclusiveCost_mUsd = calculateKiloExclusiveCost_mUsd(kiloExclusiveModel, usage);
+    const exclusiveCost_mUsd = calculateKiloExclusiveCost_mUsd(kiloExclusiveModel, inferenceUsage);
     if (exclusiveCost_mUsd !== undefined) {
       usage.market_cost = usage.cost_mUsd;
-      usage.cost_mUsd = exclusiveCost_mUsd;
+      usage.cost_mUsd = exclusiveCost_mUsd + nonInferenceCost_mUsd;
+      inferenceUsage.cost_mUsd = exclusiveCost_mUsd;
     }
   }
 
   const customCost_mUsd = calculateCustomCost_mUsd(
     customPricingConfig,
     context.requested_model,
-    usage
+    inferenceUsage
   );
 
   usage.market_cost ??= usage.cost_mUsd;
-  usage.cost_mUsd = customCost_mUsd ?? usage.cost_mUsd;
+  if (customCost_mUsd !== undefined) {
+    usage.cost_mUsd = customCost_mUsd + nonInferenceCost_mUsd;
+  }
 
   if (context.is_free || context.user_byok || context.provider === OPENAI_CHATGPT_PROVIDER_ID) {
     usage.cost_mUsd = 0;

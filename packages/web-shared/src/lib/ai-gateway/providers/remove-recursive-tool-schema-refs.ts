@@ -3,12 +3,7 @@ import {
   isRecord,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import { throttledLog } from '@kilocode/web-shared/lib/ai-gateway/providers/throttled-log';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
-
-const logChangedTools = throttledLog(details =>
-  warnExceptInTest('[removeRecursiveToolSchemaRefs] removed recursive tool schema refs', details)
-);
 
 function decodePointerSegment(segment: string): string | undefined {
   try {
@@ -114,6 +109,10 @@ export function removeRecursiveToolSchemaRefs(request: GatewayRequest): void {
   }
 
   if (changedTools.length > 0) {
-    logChangedTools({ model: request.body.model, requestKind: request.kind, tools: changedTools });
+    warnExceptInTest('[removeRecursiveToolSchemaRefs] removed recursive tool schema refs', {
+      model: request.body.model,
+      requestKind: request.kind,
+      tools: changedTools,
+    });
   }
 }

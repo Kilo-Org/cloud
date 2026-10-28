@@ -3,7 +3,6 @@ import {
   isRecord,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import { throttledLog } from '@kilocode/web-shared/lib/ai-gateway/providers/throttled-log';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 const SCALAR_TYPES = new Set(['string', 'integer', 'number', 'boolean']);
@@ -33,13 +32,6 @@ function inferEnumType(values: unknown[]): string | string[] | undefined {
 }
 
 type EnumTypeCounts = { typedEnums: number; untypedEnums: number };
-
-const logAffectedTools = throttledLog(details =>
-  warnExceptInTest(
-    '[addMissingToolSchemaEnumTypes] found tool schema enums without a type',
-    details
-  )
-);
 
 /**
  * Adds the `type` implied by the values of every `enum` that has no `type`.
@@ -95,7 +87,7 @@ export function addMissingToolSchemaEnumTypes(request: GatewayRequest): void {
   }
 
   if (affectedTools.length > 0) {
-    logAffectedTools({
+    warnExceptInTest('[addMissingToolSchemaEnumTypes] found tool schema enums without a type', {
       model: request.body.model,
       requestKind: request.kind,
       tools: affectedTools,

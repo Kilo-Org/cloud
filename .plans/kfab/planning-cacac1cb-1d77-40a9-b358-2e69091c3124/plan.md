@@ -32,6 +32,7 @@ When Google Play definitively rejects a credits purchase token (HTTP 400/404/410
 - No second, separate implementation for #9059. The kiloPass.completePlayPurchase variant (#9061 / KILOCODE-WEB-27WB) and the breadcrumb redaction are covered by #9050's plan, and this item does not re-plan them.
 - No change to App Store completion, to retryable classification of Google 5xx/429/401/403/network/database/consume failures, or to the mobile client.
 - #9060 (Stripe auto-top-up 'Invalid integer: 0.5') is unrelated.
+- Per operator request, no manual post-deployment Sentry verification is part of this plan's acceptance criteria.
 
 ## Approach
 
@@ -55,14 +56,11 @@ When Google Play definitively rejects a credits purchase token (HTTP 400/404/410
 
 **Verification:** Code review
 
-### ac-3: After deployment, Sentry records no new KILOCODE-WEB-2889 or KILOCODE-WEB-288A events from Play token rejections on credits.completePlayPurchase.
-
-**Verification:** Manual: check Sentry issues KILOCODE-WEB-2889 and KILOCODE-WEB-288A for new events after the fix is released
-
 ## Risks
 
 - If 400 is classified too broadly as terminal, a real paid purchase could be stranded if Google returns 400 for a transient reason. Limiting the classifier to 400/404/410 on the token lookup and keeping every other failure retryable bounds this. The observed events come from a single user calling from a desktop browser.
 - If #9059 is implemented separately from #9050, the two changes could conflict in the same functions. Keeping one implementation avoids this.
+- With the manual Sentry check removed, nothing in this plan confirms the fix in production. Confirmation rests on the unit tests and on the existing beforeSend filter that drops tRPC 4xx errors.
 
 ## Assumptions
 

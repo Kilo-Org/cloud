@@ -19,11 +19,13 @@ const mocks = vi.hoisted(() => ({
     list: vi.fn(),
     listCombined: vi.fn(),
     get: vi.fn(),
+    overview: vi.fn(),
   },
   queryInputs: {
     list: undefined as unknown,
     listCombined: undefined as unknown,
     get: undefined as unknown,
+    overview: undefined as unknown,
   },
   mutations: {
     create: vi.fn(),
@@ -72,6 +74,7 @@ vi.mock('@/lib/trpc', () => {
       list: queryProcedure('list', 'list'),
       listCombined: queryProcedure('listCombined', 'listCombined'),
       get: queryProcedure('get', 'get'),
+      overview: queryProcedure('overview', 'overview'),
       create: mutationProcedure('create', 'create'),
       update: mutationProcedure('update', 'update'),
       delete: mutationProcedure('delete', 'delete'),
@@ -449,9 +452,18 @@ describe('useAgentProfileMutations', () => {
       const listKey = ['agentProfiles', 'list', { organizationId }];
       const untouchedListKey = ['agentProfiles', 'list', { organizationId: 'org-2' }];
       const detailKey = ['agentProfiles', 'get', { profileId: 'other', organizationId: 'org-2' }];
+      const ownId = organizationId ? 'org' : 'personal';
+      const overviewKey = ['agentProfiles', 'overview', { profileId: ownId, organizationId }];
+      const siblingOverviewKey = [
+        'agentProfiles',
+        'overview',
+        { profileId: 'sibling', organizationId },
+      ];
       queryClient.setQueryData(listKey, [organizationId ? org : personal]);
       queryClient.setQueryData(untouchedListKey, [summary({ id: 'other', isDefault: true })]);
       queryClient.setQueryData(detailKey, summary({ id: 'other', isDefault: true }));
+      queryClient.setQueryData(overviewKey, summary({ id: ownId, isDefault: true }));
+      queryClient.setQueryData(siblingOverviewKey, summary({ id: 'sibling', isDefault: true }));
       await act(async () => {
         await (clear
           ? current(holder).clearDefault.mutateAsync({
@@ -468,6 +480,10 @@ describe('useAgentProfileMutations', () => {
       });
       expect(queryClient.getQueryData(untouchedListKey)).toMatchObject([{ isDefault: true }]);
       expect(queryClient.getQueryData(detailKey)).toMatchObject({ isDefault: true });
+      // The Overview renders `isDefault` from the counts read, so the toggle
+      // must move there too, and only inside this owner's scope.
+      expect(queryClient.getQueryData(overviewKey)).toMatchObject({ isDefault: !clear });
+      expect(queryClient.getQueryData(siblingOverviewKey)).toMatchObject({ isDefault: clear });
       expect(queryClient.getQueryData(otherKey)).toMatchObject({
         orgProfiles: [{ isDefault: true }],
         personalProfiles: [{ isDefault: organizationId ? true : personalDefault }],

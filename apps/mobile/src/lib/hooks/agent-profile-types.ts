@@ -14,6 +14,10 @@ export type AgentProfileListItem = RouterOutputs['agentProfiles']['list'][number
 
 export type AgentProfileListCombined = RouterOutputs['agentProfiles']['listCombined'];
 export type AgentProfileDetail = RouterOutputs['agentProfiles']['get'];
+/** One profile's metadata and collection counts, as the Overview renders them. */
+export type AgentProfileOverview = RouterOutputs['agentProfiles']['overview'];
+/** One profile's agents, as the session role picker reads them. */
+export type AgentProfileAgents = RouterOutputs['agentProfiles']['agents'];
 
 /** One repo-to-profile binding as `listRepoBindings` returns it. */
 export type AgentRepoBinding = RouterOutputs['agentProfiles']['listRepoBindings'][number];

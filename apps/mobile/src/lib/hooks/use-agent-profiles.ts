@@ -112,21 +112,66 @@ export function useAgentProfileList(organizationId?: string) {
   };
 }
 
+/**
+ * Options every profile read shares.
+ *
+ * The read must settle even when the online manager is committed offline
+ * (NetInfo can misreport while the backend is reachable); a paused read would
+ * hold the load-failure banner with a Retry that refetches into another pause
+ * and never settles.
+ *
+ * `networkMode: 'always'` also disables the derived reconnect refetch
+ * (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !== 'always'`
+ * when the option is undefined), so re-enable it unconditionally: a
+ * connectivity blip must recover the profile without waiting for the freshness
+ * window, instead of needing a manual Retry.
+ */
+const PROFILE_READ_OPTIONS = {
+  networkMode: 'always',
+  refetchOnReconnect: 'always',
+} as const;
+
 /** A single profile with its variables, commands, MCP servers, skills and agents. */
 export function useAgentProfile(profileId: string, organizationId?: string) {
   const trpc = useTRPC();
   return useQuery({
     ...trpc.agentProfiles.get.queryOptions({ profileId, organizationId }),
-    // The read must settle even when the online manager is committed offline
-    // (NetInfo can misreport while the backend is reachable); a paused read
-    // would hold the load-failure banner with a Retry that refetches into
-    // another pause and never settles.
-    networkMode: 'always',
-    // `networkMode: 'always'` also disables the derived reconnect refetch
-    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
-    // 'always'` when the option is undefined), so re-enable it unconditionally:
-    // a connectivity blip must recover the profile without waiting for the
-    // freshness window, instead of needing a manual Retry.
-    refetchOnReconnect: 'always',
+    ...PROFILE_READ_OPTIONS,
+  });
+}
+
+/**
+ * A single profile's metadata and collection counts.
+ *
+ * The Overview screen renders metadata and six counts and nothing else, so it
+ * reads this instead of `useAgentProfile`: a profile may carry every skill's
+ * markdown and companion files, and the caps allow those to dwarf the response
+ * that renders six numbers.
+ */
+export function useAgentProfileOverview(profileId: string, organizationId?: string) {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.agentProfiles.overview.queryOptions({ profileId, organizationId }),
+    ...PROFILE_READ_OPTIONS,
+  });
+}
+
+/**
+ * A single profile's agents, for the role picker's custom modes. Reading the
+ * agents alone keeps every skill's markdown and companion files out of that
+ * decision's request.
+ */
+export function useAgentProfileAgents(
+  profileId: string,
+  organizationId: string | undefined,
+  enabled: boolean
+) {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.agentProfiles.agents.queryOptions(
+      { profileId, organizationId },
+      { enabled: enabled && Boolean(profileId) }
+    ),
+    ...PROFILE_READ_OPTIONS,
   });
 }

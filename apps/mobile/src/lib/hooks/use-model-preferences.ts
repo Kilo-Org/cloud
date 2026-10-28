@@ -160,9 +160,7 @@ export function useModelPreferences(organizationId: string | undefined) {
     // the caller renders the error inline (no toast).
     mutationFn: (vars: { model: string }) =>
       // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
-      chainSave(FAVORITES_CHAIN_KEY, () =>
-        trpcClient.modelPreferences.removeFavorite.mutate({ ...vars, ...input })
-      ),
+      chainSave(FAVORITES_CHAIN_KEY, () => trpcClient.modelPreferences.removeFavorite.mutate(vars)),
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     onMutate: ({ model }) => {
       setFavoritesError(null);

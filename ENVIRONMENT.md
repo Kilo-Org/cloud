@@ -142,6 +142,8 @@ ordinary local startup does not require this credential.
 - `GITHUB_LITE_APP_ID` - Lighter/secondary GitHub App ID for select integrations. `[SECRET]`
 - `GITHUB_LITE_APP_PRIVATE_KEY` - Private key for the lite GitHub App. `[SECRET]`
 - `GITHUB_LITE_APP_CLIENT_ID` - OAuth Client ID for the lite GitHub App install/login flow. [PUBLIC]
+- `GITHUB_APP_WEBHOOK_SECRET` - Webhook signing secret of the standard GitHub App; `apps/web/src/lib/integrations/platforms/github/app-selector.ts` reads it for `/api/webhooks/github`, which refuses every delivery (401) while it is empty. `[SECRET]`
+- `GITHUB_LITE_APP_WEBHOOK_SECRET` - Webhook signing secret of the lite GitHub App; read for `/api/webhooks/github-lite`, which refuses every delivery (401) while it is empty. `[SECRET]`
 - `GITHUB_MULTIPLE_INSTALLATION_ORGANIZATION_IDS` - Comma-separated Kilo organization UUIDs allowed to connect multiple GitHub App installations. Unset or empty disables multiple installations for all organizations. [SERVER]
 - `GITHUB_SHARED_INSTALLATION_ORGANIZATION_IDS` - Comma-separated destination Kilo organization UUIDs allowed to create an association to a GitHub App installation already associated elsewhere. Unset or empty disables new shared associations without revoking existing ones. [SERVER]
 

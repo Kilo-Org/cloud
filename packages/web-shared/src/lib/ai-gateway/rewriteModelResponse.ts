@@ -35,7 +35,7 @@ export type LogUnrewrittenResponseParams = {
   providerId: ProviderId;
   logging: RequestLoggingParams;
   /** Merged into the row's `error`, e.g. to mark a response the gateway produced itself. */
-  error?: Record<string, string>;
+  error: Record<string, string> | null;
 };
 
 export type RewriteModelResponseParams = {
@@ -80,7 +80,7 @@ async function createRequestLogCapture(
   model: string,
   provider: string,
   logging: RequestLoggingParams,
-  extraError?: Record<string, string>
+  extraError: Record<string, string> | null
 ): Promise<RequestLogCapture | null> {
   const { user, organization_id, session_id, vercel_request_id, request } = logging;
   const loggingMode = await getDynamicRequestLoggingMode({
@@ -127,7 +127,7 @@ async function createRequestLogCapture(
             : detectToolCallArgumentErrors(responseText, request)
           : { response_body_read_error: responseReadError };
       const detectedError =
-        extraError === undefined ? responseError : { ...(responseError ?? {}), ...extraError };
+        extraError === null ? responseError : { ...(responseError ?? {}), ...extraError };
       if (loggingMode === 'errors_only' && status < 400 && detectedError === null) {
         return;
       }
@@ -211,7 +211,7 @@ export async function rewriteModelResponse({
   logging,
   responseTransforms,
 }: RewriteModelResponseParams): Promise<NextResponse> {
-  const capture = await createRequestLogCapture(response, model, providerId, logging);
+  const capture = await createRequestLogCapture(response, model, providerId, logging, null);
   const usageContext: ResponseUsageContext = {
     requested_model: model,
     provider: providerId,

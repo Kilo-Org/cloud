@@ -2844,6 +2844,7 @@ describe('rewriteModelResponse', () => {
       model: 'kilo-internal/my-model',
       providerId: 'custom',
       logging: makeLogging(),
+      error: null,
     });
 
     expect(mockedAfter).not.toHaveBeenCalled();
@@ -2876,7 +2877,7 @@ describe('api_request_log storage', () => {
   async function logUpstreamResponse(
     response: Response,
     mode: RequestLoggingMode,
-    error?: Record<string, string>
+    error: Record<string, string> | null
   ) {
     mockedOptIn.mockResolvedValueOnce(mode);
     await logUnrewrittenResponse({
@@ -2900,7 +2901,7 @@ describe('api_request_log storage', () => {
   }
 
   async function logUpstreamError() {
-    await logUpstreamResponse(jsonResponse({ error: 'upstream error' }, 400), 'all');
+    await logUpstreamResponse(jsonResponse({ error: 'upstream error' }, 400), 'all', null);
   }
 
   async function selectLoggedRows() {
@@ -2982,7 +2983,7 @@ describe('api_request_log storage', () => {
   });
 
   test('logs upstream error statuses for errors-only opt-ins', async () => {
-    await logUpstreamResponse(jsonResponse({ error: 'upstream error' }, 400), 'errors_only');
+    await logUpstreamResponse(jsonResponse({ error: 'upstream error' }, 400), 'errors_only', null);
 
     const row = await selectLoggedRow();
     expect(row).toMatchObject({ status_code: 400, error: null });
@@ -2992,7 +2993,11 @@ describe('api_request_log storage', () => {
   });
 
   test('skips successful responses for errors-only opt-ins', async () => {
-    await logUpstreamResponse(jsonResponse({ model: 'kilo-internal/my-model' }), 'errors_only');
+    await logUpstreamResponse(
+      jsonResponse({ model: 'kilo-internal/my-model' }),
+      'errors_only',
+      null
+    );
 
     expect(await selectLoggedRows()).toHaveLength(0);
     expect(fakeR2.objects.size).toBe(0);
@@ -3001,7 +3006,8 @@ describe('api_request_log storage', () => {
   test('logs successful statuses with a response read error for errors-only opt-ins', async () => {
     await logUpstreamResponse(
       failingResponse('application/json', 'upstream disconnected'),
-      'errors_only'
+      'errors_only',
+      null
     );
 
     const row = await selectLoggedRow();
@@ -3012,7 +3018,7 @@ describe('api_request_log storage', () => {
   });
 
   test('logs successful responses for opt-ins that log all requests', async () => {
-    await logUpstreamResponse(jsonResponse({ model: 'kilo-internal/my-model' }), 'all');
+    await logUpstreamResponse(jsonResponse({ model: 'kilo-internal/my-model' }), 'all', null);
 
     expect(await selectLoggedRow()).toMatchObject({ status_code: 200, error: null });
   });

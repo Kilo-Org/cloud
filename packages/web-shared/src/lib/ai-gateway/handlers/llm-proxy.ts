@@ -1208,6 +1208,7 @@ export async function handleLlmProxyRequest(
         model: effectiveModelIdLowerCased,
         providerId: effectiveProviderContext.provider.id,
         logging: requestLogging,
+        error: null,
       });
       return errorResponse;
     }

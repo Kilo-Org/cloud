@@ -212,6 +212,14 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     [actions, canEdit]
   );
 
+  const handleSetModelsAllowed = useCallback(
+    (modelIds: ReadonlyArray<string>, nextAllowed: boolean) => {
+      if (!canEdit) return;
+      actions.setModelsAllowed({ modelIds, nextAllowed });
+    },
+    [actions, canEdit]
+  );
+
   const handleCancelChanges = useCallback(() => {
     if (!canEdit) return;
     actions.resetToInitial();
@@ -578,6 +586,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
           formatPriceCompact={formatPriceCompact}
           onToggleProviderEnabled={handleToggleProviderEnabled}
           onToggleModelAllowed={handleToggleModelAllowed}
+          onSetModelsAllowed={handleSetModelsAllowed}
           onClose={() => actions.setInfoProviderSlug(null)}
         />
 

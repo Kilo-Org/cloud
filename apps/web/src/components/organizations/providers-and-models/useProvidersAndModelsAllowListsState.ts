@@ -7,6 +7,7 @@ import {
   computeAllModelIds,
   computeAllProviderSlugsWithEndpoints,
   computeEnabledProviderSlugs,
+  setModelsAllowed as setModelsAllowedInDenyList,
   stringListsEqual,
   toggleModelAllowed,
   toggleProviderEnabled,
@@ -62,6 +63,11 @@ export type ProvidersAndModelsAllowListsAction =
   | {
       type: 'TOGGLE_MODEL';
       modelId: string;
+      nextAllowed: boolean;
+    }
+  | {
+      type: 'SET_MODELS_ALLOWED';
+      modelIds: ReadonlyArray<string>;
       nextAllowed: boolean;
     }
   | {
@@ -174,6 +180,19 @@ export function providersAndModelsAllowListsReducer(
       };
     }
 
+    case 'SET_MODELS_ALLOWED': {
+      if (state.status !== 'ready') return state;
+      const nextModelDenyList = setModelsAllowedInDenyList({
+        modelIds: action.modelIds,
+        nextAllowed: action.nextAllowed,
+        draftModelDenyList: state.draftModelDenyList,
+      });
+      return {
+        ...state,
+        draftModelDenyList: nextModelDenyList,
+      };
+    }
+
     case 'RESET_TO_INITIAL': {
       if (state.status !== 'ready') return state;
       return {
@@ -236,6 +255,7 @@ export function useProvidersAndModelsAllowListsState(params: {
     }) => void;
     toggleProvider: (params: { providerSlug: string; nextEnabled: boolean }) => void;
     toggleModel: (params: { modelId: string; nextAllowed: boolean }) => void;
+    setModelsAllowed: (params: { modelIds: ReadonlyArray<string>; nextAllowed: boolean }) => void;
     resetToInitial: () => void;
     markSaved: () => void;
     setModelSearch: (value: string) => void;
@@ -326,6 +346,17 @@ export function useProvidersAndModelsAllowListsState(params: {
     });
   }, []);
 
+  const setModelsAllowed = useCallback(
+    (input: { modelIds: ReadonlyArray<string>; nextAllowed: boolean }) => {
+      dispatch({
+        type: 'SET_MODELS_ALLOWED',
+        modelIds: input.modelIds,
+        nextAllowed: input.nextAllowed,
+      });
+    },
+    []
+  );
+
   const selectors: ProvidersAndModelsAllowListsSelectors = useMemo(
     () => ({
       allProviderSlugsWithEndpoints,
@@ -350,6 +381,7 @@ export function useProvidersAndModelsAllowListsState(params: {
       initFromServer,
       toggleProvider,
       toggleModel,
+      setModelsAllowed,
       resetToInitial: () => dispatch({ type: 'RESET_TO_INITIAL' }),
       markSaved: () => dispatch({ type: 'MARK_SAVED' }),
       setModelSearch: (value: string) => dispatch({ type: 'SET_MODEL_SEARCH', value }),
@@ -368,7 +400,7 @@ export function useProvidersAndModelsAllowListsState(params: {
       setInfoProviderSlug: (value: string | null) =>
         dispatch({ type: 'SET_INFO_PROVIDER_SLUG', value }),
     }),
-    [initFromServer, toggleModel, toggleProvider]
+    [initFromServer, setModelsAllowed, toggleModel, toggleProvider]
   );
 
   return {

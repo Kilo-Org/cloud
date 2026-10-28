@@ -283,7 +283,7 @@ export async function persistLiveSessionColumns(
     costMicrodollars?: number;
     lastActivityAtIso?: string;
     liveSummary?: { summary: SessionLiveSummary; atIso: string };
-    briefingExcerpt?: BriefingExcerpt;
+    briefingExcerpt?: { excerpt: BriefingExcerpt; receivedAtIso: string };
   }
 ): Promise<void> {
   const set: {
@@ -326,7 +326,8 @@ export async function persistLiveSessionColumns(
   }
 
   if (columns.briefingExcerpt !== undefined) {
-    set.briefing_excerpt = briefingExcerptUpdate(columns.briefingExcerpt);
+    const { excerpt, receivedAtIso } = columns.briefingExcerpt;
+    set.briefing_excerpt = briefingExcerptUpdate(excerpt, receivedAtIso);
   }
 
   if (Object.keys(set).length === 0) return;
@@ -991,7 +992,7 @@ export class SessionIngestDO extends DurableObject<Env> {
         costMicrodollars?: number;
         lastActivityAtIso?: string;
         liveSummary?: { summary: SessionLiveSummary; atIso: string };
-        briefingExcerpt?: BriefingExcerpt;
+        briefingExcerpt?: { excerpt: BriefingExcerpt; receivedAtIso: string };
       } = {};
       if (decision.persistCost && currentCostMicrodollars !== null) {
         columns.costMicrodollars = currentCostMicrodollars;
@@ -1017,7 +1018,13 @@ export class SessionIngestDO extends DurableObject<Env> {
           try {
             if (briefingResponseChanged) {
               try {
-                columns.briefingExcerpt = this.latestBriefingExcerpt(storedItems);
+                const excerpt = this.latestBriefingExcerpt(storedItems);
+                if (excerpt) {
+                  columns.briefingExcerpt = {
+                    excerpt,
+                    receivedAtIso: new Date(ingestedAt ?? nowMsLive).toISOString(),
+                  };
+                }
               } catch (error) {
                 console.error('SessionIngestDO failed to read completed briefing response', {
                   kiloUserId,

@@ -69,10 +69,10 @@ async function enableContext(
   `);
 }
 
-async function persist(candidate: BriefingExcerpt) {
+async function persist(candidate: BriefingExcerpt, receivedAtIso = candidate.completedAt) {
   const [row] = await client.db
     .update(cli_sessions_v2)
-    .set({ briefing_excerpt: briefingExcerptUpdate(candidate) })
+    .set({ briefing_excerpt: briefingExcerptUpdate(candidate, receivedAtIso) })
     .where(and(eq(cli_sessions_v2.session_id, sessionId), eq(cli_sessions_v2.kilo_user_id, userId)))
     .returning({ excerpt: cli_sessions_v2.briefing_excerpt });
   return row?.excerpt;
@@ -141,6 +141,16 @@ describe('briefing excerpt conditional persistence', () => {
     expect(await persist(organization)).toBeNull();
     const current = excerpt('personal-after-return', '2026-10-20T08:04:00.000Z');
     expect(await persist(current)).toEqual(current);
+  });
+
+  it('fences a response received before a scope change even when the client clock runs ahead', async () => {
+    await enableContext(null);
+    await client.db.execute(sql`
+      UPDATE pg_temp.cli_sessions_v2 SET briefing_excerpt_scope_changed_at = '2026-10-20T08:01:00.000Z'
+    `);
+    const skewed = excerpt('skewed-client', '2026-10-20T08:01:30.000Z');
+    expect(await persist(skewed, '2026-10-20T08:00:50.000Z')).toBeNull();
+    expect(await persist(skewed, '2026-10-20T08:01:10.000Z')).toEqual(skewed);
   });
 
   it('does not recreate a deleted session', async () => {

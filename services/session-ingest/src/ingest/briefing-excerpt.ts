@@ -7,7 +7,7 @@ export type BriefingExcerpt = NonNullable<typeof cli_sessions_v2.$inferSelect.br
 
 export const BRIEFING_MAX_INLINE_BYTES = 8 * 1024;
 export const BRIEFING_MAX_EXCERPT_SOURCE_ROWS = 32;
-/** Client completion times further ahead of the server clock are not trusted for scope fencing. */
+/** Excerpts whose client completion time runs further ahead of the server clock are rejected. */
 export const BRIEFING_MAX_CLOCK_SKEW_MS = 60_000;
 
 const completedResponseSchema = z.object({
@@ -81,12 +81,16 @@ export function buildBriefingExcerpt(
   if (!excerpt) return undefined;
   return {
     messageId: message.id,
-    completedAt: new Date(Math.min(message.time.completed, nowMs)).toISOString(),
+    completedAt: new Date(message.time.completed).toISOString(),
     text: excerpt,
   };
 }
 
-export function briefingExcerptUpdate(excerpt: BriefingExcerpt) {
+/**
+ * The scope fence uses the earlier of the client completion time and the server receipt time,
+ * so a client clock that runs ahead cannot admit a response received before a scope change.
+ */
+export function briefingExcerptUpdate(excerpt: BriefingExcerpt, receivedAtIso: string) {
   return sql`CASE
     WHEN EXISTS (
       SELECT 1 FROM ${agent_briefing_context_preferences}
@@ -96,7 +100,7 @@ export function briefingExcerptUpdate(excerpt: BriefingExcerpt) {
         AND ${agent_briefing_context_preferences.context_key} = coalesce(${cli_sessions_v2.organization_id}::text, 'personal')
     )
       AND (${cli_sessions_v2.briefing_excerpt_scope_changed_at} IS NULL
-        OR ${cli_sessions_v2.briefing_excerpt_scope_changed_at} < ${excerpt.completedAt}::timestamptz)
+        OR ${cli_sessions_v2.briefing_excerpt_scope_changed_at} < least(${excerpt.completedAt}::timestamptz, ${receivedAtIso}::timestamptz))
       AND (${cli_sessions_v2.briefing_excerpt} IS NULL
         OR (${cli_sessions_v2.briefing_excerpt}->>'completedAt')::timestamptz < ${excerpt.completedAt}::timestamptz
         OR ((${cli_sessions_v2.briefing_excerpt}->>'completedAt')::timestamptz = ${excerpt.completedAt}::timestamptz

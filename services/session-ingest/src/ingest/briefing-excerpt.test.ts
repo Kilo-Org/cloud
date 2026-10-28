@@ -47,10 +47,10 @@ describe('completed briefing responses', () => {
     });
   });
 
-  it('bounds the client completion time by the server clock', () => {
+  it('keeps the source completion time within the clock skew and rejects later values', () => {
     const serverNow = completedAt - 1000;
     expect(buildBriefingExcerpt(message, [textPart('Done.')], serverNow)?.completedAt).toBe(
-      new Date(serverNow).toISOString()
+      new Date(completedAt).toISOString()
     );
     expect(
       buildBriefingExcerpt(

@@ -434,6 +434,7 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
               compact
               onClearSearch={query.handleClearSearch}
               onFocus={keyboard.handleInputFocus}
+              onBlur={keyboard.handleInputBlur}
             />
           }
         />

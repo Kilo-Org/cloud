@@ -1628,6 +1628,22 @@ describe('AgentSessionListScreen live filtering', () => {
     });
     expect(requireNode('KeyboardAvoidingView').props.enabled).toBe(true);
     expect(listStyle()).toEqual({ marginBottom: 0 });
+
+    // Android Back hides the IME while the field keeps focus; a tap on the
+    // field reopens it without a new focus event, and the lift must follow.
+    act(() => {
+      hideKeyboard();
+    });
+    act(() => {
+      showKeyboard(320);
+    });
+    expect(listStyle()).toEqual({ marginBottom: 0 });
+
+    act(() => {
+      (requireNode('SessionListSearchHeader').props.onBlur as () => void)();
+    });
+    expect(requireNode('KeyboardAvoidingView').props.enabled).toBe(false);
+    expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
   });
 
   it('subscribes to the keyboard once for the bands, not once per band consumer', async () => {

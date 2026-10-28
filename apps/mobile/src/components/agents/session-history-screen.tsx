@@ -242,6 +242,7 @@ export function SessionHistoryScreen() {
             onChangeText={handleSearchInputChange}
             onClearSearch={handleClearSearchInput}
             onFocus={keyboard.handleInputFocus}
+            onBlur={keyboard.handleInputBlur}
             defaultValue={searchDefaultValue}
             inputKey={searchInputKey}
             compact

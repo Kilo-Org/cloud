@@ -141,12 +141,24 @@ async function directByokProviderResult(
  * request goes straight to that provider with the stored key, bypassing Kilo's
  * gateways. A key in catalog mode instead serves the catalog ids its provider maps.
  */
+/**
+ * The caller's catalog-mode keys serve the catalog id, but none over the request's API kind. The
+ * caller's other BYOK routes may still serve it; otherwise `result` fails the request with the
+ * unsupported-API error.
+ */
+type DirectByokUnsupportedApiKind = {
+  kind: 'direct-byok-unsupported-api-kind';
+  result: GetProviderProviderResult;
+};
+
 async function resolveDirectByokProvider(
   user: User | AnonymousUserContext,
   requestedModel: string,
   request: GatewayRequest,
   organizationId: string | undefined
-): Promise<GetProviderProviderResult | DirectByokCatalogOnlyResult | null> {
+): Promise<
+  GetProviderProviderResult | DirectByokCatalogOnlyResult | DirectByokUnsupportedApiKind | null
+> {
   const owner = byokOwner(user.id, organizationId);
   const { provider: directByok, model: directByokModel } = await getDirectByokModel(requestedModel);
   if (directByok && directByokModel) {
@@ -194,9 +206,9 @@ async function resolveDirectByokProvider(
     if (result.provider.supportedChatApis.includes(request.kind)) return result;
     unsupportedApiKind ??= result;
   }
-  // BYOK requests are never billed to Kilo, so a catalog id the caller's keys serve, but not over
-  // this API kind, fails with the unsupported-API error instead of taking the Kilo route.
-  return unsupportedApiKind;
+  return (
+    unsupportedApiKind && { kind: 'direct-byok-unsupported-api-kind', result: unsupportedApiKind }
+  );
 }
 
 async function isEligibleForCustomLlm(
@@ -435,7 +447,10 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     request,
     organizationId
   );
-  if (directByokProvider) {
+  let directByokUnsupportedApiKind: DirectByokUnsupportedApiKind | null = null;
+  if (directByokProvider?.kind === 'direct-byok-unsupported-api-kind') {
+    directByokUnsupportedApiKind = directByokProvider;
+  } else if (directByokProvider) {
     return directByokProvider;
   }
 
@@ -484,6 +499,12 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
   );
   if (gatewayByok) {
     return gatewayByok;
+  }
+
+  // BYOK requests are never billed to Kilo, so a catalog id the caller's keys serve, but not over
+  // this API kind, fails with the unsupported-API error instead of taking a Kilo route.
+  if (directByokUnsupportedApiKind) {
+    return directByokUnsupportedApiKind.result;
   }
 
   const kiloExclusiveModel = findKiloExclusiveModel(requestedModel);

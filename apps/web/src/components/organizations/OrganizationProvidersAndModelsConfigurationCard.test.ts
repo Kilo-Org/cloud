@@ -1,5 +1,8 @@
 import { describe, test, expect } from '@jest/globals';
-import { computeProviderSelectionsForSummaryCard } from './OrganizationProvidersAndModelsConfigurationCard';
+import {
+  computeProviderSelectionsForSummaryCard,
+  countDistinctAllowedModels,
+} from './OrganizationProvidersAndModelsConfigurationCard';
 
 describe('computeProviderSelectionsForSummaryCard', () => {
   test('undefined provider allow and model deny lists return null (all providers and models)', () => {
@@ -159,5 +162,24 @@ describe('computeProviderSelectionsForSummaryCard', () => {
         models: ['anthropic/claude-3-opus'],
       },
     ]);
+  });
+});
+
+describe('countDistinctAllowedModels', () => {
+  test('counts a model once when it is offered by multiple providers', () => {
+    expect(
+      countDistinctAllowedModels([
+        { slug: 'anthropic', models: ['anthropic/claude-3-opus', 'anthropic/claude-3-sonnet'] },
+        { slug: 'amazon-bedrock', models: ['anthropic/claude-3-opus'] },
+      ])
+    ).toBe(2);
+  });
+
+  test('treats variant suffixes as the same model', () => {
+    expect(
+      countDistinctAllowedModels([
+        { slug: 'openai', models: ['openai/gpt-4', 'openai/gpt-4:free'] },
+      ])
+    ).toBe(1);
   });
 });

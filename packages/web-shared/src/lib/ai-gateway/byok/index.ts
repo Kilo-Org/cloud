@@ -6,6 +6,7 @@ import { captureException } from '@sentry/nextjs';
 import type { BYOKApiKeyEnvelope, EncryptedData } from '@kilocode/db/schema-types';
 import {
   decryptByokEnvelope,
+  getByokKmsClientConfig,
   type ByokKmsContext,
 } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
@@ -257,9 +258,12 @@ export async function decryptByokRow(row: {
   kilo_user_id: string | null;
   provider_id: string;
 }) {
-  const decryptedAPIKey = row.encrypted_api_key_envelope
-    ? await decryptByokEnvelope(row.encrypted_api_key_envelope, getByokKmsContext(row))
-    : decryptApiKey(row.encrypted_api_key, BYOK_ENCRYPTION_KEY);
+  // The legacy column is always written alongside the envelope, so with the KMS service
+  // unconfigured (rollback) it is still valid and we read it instead of failing.
+  const decryptedAPIKey =
+    row.encrypted_api_key_envelope && getByokKmsClientConfig()
+      ? await decryptByokEnvelope(row.encrypted_api_key_envelope, getByokKmsContext(row))
+      : decryptApiKey(row.encrypted_api_key, BYOK_ENCRYPTION_KEY);
   return {
     decryptedAPIKey,
     providerId: UserByokProviderIdSchema.parse(row.provider_id),

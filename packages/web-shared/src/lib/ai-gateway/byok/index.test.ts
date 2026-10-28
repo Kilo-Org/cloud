@@ -16,7 +16,7 @@ import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { UserByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { byok_api_keys, kilocode_users, organizations } from '@kilocode/db/schema';
-import type { ByokApiKeySettings } from '@kilocode/db/schema-types';
+import type { ByokApiKeySettings, EncryptedData } from '@kilocode/db/schema-types';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { inArray } from 'drizzle-orm';
@@ -324,16 +324,20 @@ describe('envelope-encrypted BYOK rows', () => {
     else process.env.BYOK_KMS_SERVICE_TOKEN = originalToken;
   });
 
-  async function insertEnvelopeRow(ownerId: string, secret: string, dek: string) {
+  async function insertEnvelopeRow(
+    ownerId: string,
+    secret: string,
+    dek: string,
+    legacy?: EncryptedData
+  ) {
     const [row] = await db
       .insert(byok_api_keys)
       .values({
         kilo_user_id: ownerId,
         provider_id: 'anthropic',
-        encrypted_api_key: encryptApiKey(
-          'legacy-value-must-not-be-read',
-          randomBytes(32).toString('base64')
-        ),
+        encrypted_api_key:
+          legacy ??
+          encryptApiKey('legacy-value-must-not-be-read', randomBytes(32).toString('base64')),
         encrypted_api_key_envelope: {
           encrypted_data: encryptApiKey(secret, dek),
           wrapped_dek: 'wrapped',
@@ -373,6 +377,26 @@ describe('envelope-encrypted BYOK rows', () => {
       kms_key_id: 'alias/test',
       kms_key_version: '1',
     });
+  });
+
+  test('falls back to the legacy column without calling KMS when the service is unconfigured', async () => {
+    const user = await createUser();
+    const secret = `anthropic-${crypto.randomUUID()}`;
+    await insertEnvelopeRow(
+      user.id,
+      secret,
+      randomBytes(32).toString('base64'),
+      encryptApiKey(secret, BYOK_ENCRYPTION_KEY)
+    );
+    delete process.env.BYOK_KMS_SERVICE_URL;
+    delete process.env.BYOK_KMS_SERVICE_TOKEN;
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(getBYOKforUser(db, user.id, ['anthropic'])).resolves.toEqual([
+      { decryptedAPIKey: secret, providerId: 'anthropic' },
+    ]);
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   test('fails key resolution when the KMS service rejects the request', async () => {

@@ -1,3 +1,7 @@
+import type * as z from 'zod';
+import { DirectByokModelEndpointSchema } from '@kilocode/db/schema-types';
+import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import { isKimiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/moonshotai';
 import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import {
   BedrockCredentialsSchema,
@@ -23,6 +27,16 @@ import {
  *   Completions and the Responses API for models only available through a
  *   cross-region inference profile.
  */
+export const AwsBedrockEndpointSchema = DirectByokModelEndpointSchema.extract([
+  'mantle-chat',
+  'mantle-openai',
+  'runtime-anthropic',
+  'runtime-openai',
+  'runtime-responses',
+]);
+
+export type AwsBedrockEndpoint = z.infer<typeof AwsBedrockEndpointSchema>;
+
 export const AWS_BEDROCK_ENDPOINTS = {
   'mantle-chat': {
     api: 'chat_completions',
@@ -44,20 +58,21 @@ export const AWS_BEDROCK_ENDPOINTS = {
     api: 'responses',
     url: region => `https://bedrock-runtime.${region}.amazonaws.com/openai/v1`,
   },
-} as const satisfies Record<string, { api: GatewayChatApiKind; url(region: string): string }>;
-
-export type AwsBedrockEndpoint = keyof typeof AWS_BEDROCK_ENDPOINTS;
+} as const satisfies Record<
+  AwsBedrockEndpoint,
+  { api: GatewayChatApiKind; url(region: string): string }
+>;
 
 const AWS_REGION_PATTERN = /^[a-z]{2}(-[a-z]+)+-\d+$/;
 const ANTHROPIC_VERSION = '2023-06-01';
 
 function isAwsBedrockEndpoint(endpoint: string): endpoint is AwsBedrockEndpoint {
-  return Object.hasOwn(AWS_BEDROCK_ENDPOINTS, endpoint);
+  return AwsBedrockEndpointSchema.safeParse(endpoint).success;
 }
 
 export function getAwsBedrockEndpoint(model: Pick<DirectByokModel, 'id' | 'endpoint'>) {
   if (model.endpoint && isAwsBedrockEndpoint(model.endpoint)) return model.endpoint;
-  return model.id.includes('anthropic.claude') ? 'runtime-anthropic' : 'runtime-openai';
+  return isClaudeModel(model.id) ? 'runtime-anthropic' : 'runtime-openai';
 }
 
 /**
@@ -70,7 +85,7 @@ function getAwsBedrockResponseTransforms(
   modelId: string
 ): ProviderResponseTransforms | null {
   if (AWS_BEDROCK_ENDPOINTS[endpoint].api !== 'chat_completions') return null;
-  if (endpoint === 'runtime-openai' && modelId.includes('moonshotai.')) {
+  if (endpoint === 'runtime-openai' && isKimiModel(modelId)) {
     return ReasoningDetailsTransform.ReasoningContent;
   }
   return ReasoningDetailsTransform.Reasoning;
@@ -120,14 +135,14 @@ export function resolveAwsBedrockUpstream(
 }
 
 export default {
-  id: 'aws-bedrock',
+  id: 'bedrock-byok',
   models_dev_id: 'amazon-bedrock',
   transformRequest(context) {
     if (context.request.kind === 'messages') {
       context.extraHeaders['anthropic-version'] ??= ANTHROPIC_VERSION;
     }
   },
-  models: cachedEnhancedDirectByokModelList({ providerId: 'aws-bedrock', recommendedModels: [] }),
+  models: cachedEnhancedDirectByokModelList({ providerId: 'bedrock-byok', recommendedModels: [] }),
   async resolveUpstream({ credential, model }) {
     return resolveAwsBedrockUpstream(credential, model);
   },

@@ -1,3 +1,7 @@
+import type * as z from 'zod';
+import { DirectByokModelEndpointSchema } from '@kilocode/db/schema-types';
+import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import { isGeminiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import { DirectVertexCredentialsSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type {
@@ -17,14 +21,21 @@ import { getGoogleServiceAccountAccessToken } from '@kilocode/web-shared/lib/ai-
  * the Responses API on the same base URL, and Claude and Mistral through their
  * own Messages and Chat Completions formats on per-model `rawPredict` URLs.
  */
+export const GcpVertexEndpointSchema = DirectByokModelEndpointSchema.extract([
+  'openapi',
+  'openapi-responses',
+  'anthropic',
+  'mistral',
+]);
+
+export type GcpVertexEndpoint = z.infer<typeof GcpVertexEndpointSchema>;
+
 export const GCP_VERTEX_ENDPOINTS = {
   openapi: 'chat_completions',
   'openapi-responses': 'responses',
   anthropic: 'messages',
   mistral: 'chat_completions',
-} as const satisfies Record<string, GatewayChatApiKind>;
-
-export type GcpVertexEndpoint = keyof typeof GCP_VERTEX_ENDPOINTS;
+} as const satisfies Record<GcpVertexEndpoint, GatewayChatApiKind>;
 
 const DEFAULT_LOCATION = 'global';
 const LOCATION_PATTERN = /^[a-z0-9-]+$/;
@@ -72,7 +83,7 @@ export type GcpVertexCredentials = {
 };
 
 function isGcpVertexEndpoint(endpoint: string): endpoint is GcpVertexEndpoint {
-  return Object.hasOwn(GCP_VERTEX_ENDPOINTS, endpoint);
+  return GcpVertexEndpointSchema.safeParse(endpoint).success;
 }
 
 function isGcpVertexMistralModelId(modelId: string) {
@@ -81,7 +92,7 @@ function isGcpVertexMistralModelId(modelId: string) {
 
 export function getGcpVertexEndpoint(model: Pick<DirectByokModel, 'id' | 'endpoint'>) {
   if (model.endpoint && isGcpVertexEndpoint(model.endpoint)) return model.endpoint;
-  if (model.id.startsWith('claude-')) return 'anthropic';
+  if (isClaudeModel(model.id)) return 'anthropic';
   return isGcpVertexMistralModelId(model.id) ? 'mistral' : 'openapi';
 }
 
@@ -207,7 +218,7 @@ export function buildGcpVertexUpstream(
     disableUrlSuffix: false,
     supportedChatApis: ['chat_completions'],
     // Gemini returns thoughts in Google's extra content; the managed open models in `reasoning_content`.
-    responseTransforms: model.id.includes('gemini')
+    responseTransforms: isGeminiModel(model.id)
       ? ReasoningDetailsTransform.GeminiThought
       : ReasoningDetailsTransform.ReasoningContent,
   };
@@ -227,7 +238,7 @@ export async function resolveGcpVertexUpstream(
 }
 
 export default {
-  id: 'gcp-vertex',
+  id: 'vertex-byok',
   models_dev_id: 'google-vertex',
   transformRequest(context) {
     const { request } = context;
@@ -246,7 +257,7 @@ export default {
       request.body.model = toGcpVertexOpenApiModelId(request.body.model);
     }
   },
-  models: cachedEnhancedDirectByokModelList({ providerId: 'gcp-vertex', recommendedModels: [] }),
+  models: cachedEnhancedDirectByokModelList({ providerId: 'vertex-byok', recommendedModels: [] }),
   async resolveUpstream({ credential, model, stream }) {
     return resolveGcpVertexUpstream(credential, model, stream);
   },

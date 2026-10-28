@@ -110,12 +110,11 @@ export type VercelUserByokInferenceProviderId = z.infer<
 
 export const DirectUserByokInferenceProviderIdSchema = z.enum([
   'alibaba-token-plan',
-  'aws-bedrock',
+  'bedrock-byok',
   'byteplus-coding',
   'chutes-byok',
   'codestral',
   'edenai',
-  'gcp-vertex',
   'inceptron-byok',
   'kimi-coding',
   'martian',
@@ -126,10 +125,28 @@ export const DirectUserByokInferenceProviderIdSchema = z.enum([
   'opencode-go',
   'orcarouter',
   'synthetic',
+  'vertex-byok',
   'xiaomi-token-plan-ams',
   'xiaomi-token-plan-sgp',
   'zai-coding',
 ]);
+
+/**
+ * Direct BYOK providers in proof of concept. Keys for them can only be added
+ * where `isExperimentalByokEnabled` allows it.
+ */
+export const ExperimentalByokProviderIdSchema = DirectUserByokInferenceProviderIdSchema.extract([
+  'bedrock-byok',
+  'vertex-byok',
+]);
+
+export type ExperimentalByokProviderId = z.infer<typeof ExperimentalByokProviderIdSchema>;
+
+export function isExperimentalByokProviderId(
+  providerId: string
+): providerId is ExperimentalByokProviderId {
+  return ExperimentalByokProviderIdSchema.safeParse(providerId).success;
+}
 
 export type DirectUserByokInferenceProviderId = z.infer<
   typeof DirectUserByokInferenceProviderIdSchema
@@ -177,12 +194,11 @@ export const UserByokTestModels = {
   [VercelUserByokInferenceProviderIdSchema.enum.xiaomi]: 'xiaomi/mimo-v2-flash',
   [VercelUserByokInferenceProviderIdSchema.enum.zai]: 'zai/glm-4.7-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['alibaba-token-plan']]: 'deepseek-v3.2',
-  [DirectUserByokInferenceProviderIdSchema.enum['aws-bedrock']]: 'openai.gpt-oss-120b-1:0',
+  [DirectUserByokInferenceProviderIdSchema.enum['bedrock-byok']]: 'openai.gpt-oss-120b-1:0',
   [DirectUserByokInferenceProviderIdSchema.enum['byteplus-coding']]: 'bytedance-seed-code',
   [DirectUserByokInferenceProviderIdSchema.enum['chutes-byok']]: 'Qwen/Qwen3-30B-A3B',
   [DirectUserByokInferenceProviderIdSchema.enum.codestral]: 'mistral/codestral',
   [DirectUserByokInferenceProviderIdSchema.enum.edenai]: 'openai/gpt-5.6-luna',
-  [DirectUserByokInferenceProviderIdSchema.enum['gcp-vertex']]: 'google/gemini-3.5-flash-lite',
   [DirectUserByokInferenceProviderIdSchema.enum['kimi-coding']]: 'kimi-for-coding',
   [DirectUserByokInferenceProviderIdSchema.enum['inceptron-byok']]: 'moonshotai/Kimi-K2.6',
   [DirectUserByokInferenceProviderIdSchema.enum.martian]: 'google/gemini-3.5-flash',
@@ -194,6 +210,7 @@ export const UserByokTestModels = {
   [DirectUserByokInferenceProviderIdSchema.enum['synthetic']]: 'hf:zai-org/GLM-5.1',
   [DirectUserByokInferenceProviderIdSchema.enum['ollama-cloud']]: 'kimi-k2.6:cloud',
   [DirectUserByokInferenceProviderIdSchema.enum['opencode-go']]: 'qwen3.7-plus',
+  [DirectUserByokInferenceProviderIdSchema.enum['vertex-byok']]: 'google/gemini-3.5-flash-lite',
   [DirectUserByokInferenceProviderIdSchema.enum['xiaomi-token-plan-ams']]: 'mimo-v2-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['xiaomi-token-plan-sgp']]: 'mimo-v2-flash',
   [DirectUserByokInferenceProviderIdSchema.enum['zai-coding']]: 'glm-4.7',

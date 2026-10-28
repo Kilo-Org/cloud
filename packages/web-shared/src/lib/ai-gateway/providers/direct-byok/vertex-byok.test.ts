@@ -2,12 +2,12 @@ import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detec
 import type { GatewayRequest } from '../openrouter/types';
 import { ReasoningDetailsTransform, type TransformRequestContext } from '../types';
 import { getGoogleServiceAccountAccessToken } from '../../custom-llm/google-service-account';
-import gcpVertex, {
+import vertexByok, {
   buildGcpVertexUpstream,
   getGcpVertexHost,
   parseGcpVertexCredentials,
   resolveGcpVertexUpstream,
-} from './gcp-vertex';
+} from './vertex-byok';
 
 jest.mock('../../custom-llm/google-service-account', () => ({
   getGoogleServiceAccountAccessToken: jest.fn(async () => 'gcp-token'),
@@ -193,7 +193,7 @@ describe('resolveGcpVertexUpstream', () => {
   });
 });
 
-describe('gcpVertex definition', () => {
+describe('vertexByok definition', () => {
   function createContext(request: GatewayRequest): TransformRequestContext {
     return {
       provider: {
@@ -207,7 +207,7 @@ describe('gcpVertex definition', () => {
         responseTransforms: null,
         async transformRequest() {},
       },
-      model: 'gcp-vertex/model',
+      model: 'vertex-byok/model',
       request,
       originalHeaders: EmptyFraudDetectionHeaders,
       extraHeaders: {},
@@ -224,7 +224,7 @@ describe('gcpVertex definition', () => {
       body: { model: 'claude-sonnet-4-6@default', messages: [], max_tokens: 10 },
     });
 
-    gcpVertex.transformRequest(context);
+    vertexByok.transformRequest(context);
 
     expect(context.request.body).toEqual({
       messages: [],
@@ -263,7 +263,7 @@ describe('gcpVertex definition', () => {
       },
     });
 
-    gcpVertex.transformRequest(context);
+    vertexByok.transformRequest(context);
 
     expect(context.request.body).toEqual({
       model: 'mistral-medium-3',
@@ -285,7 +285,7 @@ describe('gcpVertex definition', () => {
   ])('sends %s as %s to the OpenAI-compatible endpoint', (model, upstreamModel) => {
     const context = createContext({ kind: 'chat_completions', body: { model, messages: [] } });
 
-    gcpVertex.transformRequest(context);
+    vertexByok.transformRequest(context);
 
     expect(context.request.body.model).toBe(upstreamModel);
   });

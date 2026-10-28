@@ -26,6 +26,8 @@ import {
   UserByokTestModels,
   getVercelUserByokProviderIdForEndpoint,
   VercelUserByokInferenceProviderIdSchema,
+  isExperimentalByokProviderId,
+  type ExperimentalByokProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   getVercelModelsMetadataFromDatabase,
@@ -49,9 +51,8 @@ import {
   createAiSdkProvider,
   formatDirectByokModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
-import { isDirectCloudByokProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
-import { parseAwsBedrockCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/aws-bedrock';
-import { parseGcpVertexCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/gcp-vertex';
+import { parseAwsBedrockCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/bedrock-byok';
+import { parseGcpVertexCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/vertex-byok';
 import { isExperimentalByokEnabled } from '@/lib/byok/experimental-byok';
 
 const GENERIC_TEST_FAILURE_MESSAGE = 'API key test failed. Check the credential and try again.';
@@ -61,15 +62,17 @@ const MANAGED_KEY_READ_ONLY_MESSAGE =
   'This key is managed by your coding plan and is read-only. Cancel the coding plan to remove it.';
 const logByokWarning = sentryLogger('byok-key-test', 'warning');
 
-const DIRECT_CLOUD_CREDENTIAL_PARSERS: Partial<Record<string, (credential: string) => unknown>> = {
-  'aws-bedrock': parseAwsBedrockCredentials,
-  'gcp-vertex': parseGcpVertexCredentials,
-};
+const EXPERIMENTAL_BYOK_CREDENTIAL_PARSERS = {
+  'bedrock-byok': parseAwsBedrockCredentials,
+  'vertex-byok': parseGcpVertexCredentials,
+} satisfies Record<ExperimentalByokProviderId, (credential: string) => unknown>;
 
 function validateUserByokCredential(providerId: string, credential: string) {
   const parsedProviderId = VercelUserByokInferenceProviderIdSchema.safeParse(providerId);
-  const parseDirectCloudCredential = DIRECT_CLOUD_CREDENTIAL_PARSERS[providerId];
-  if (!parsedProviderId.success && !parseDirectCloudCredential) return;
+  const parseExperimentalCredential = isExperimentalByokProviderId(providerId)
+    ? EXPERIMENTAL_BYOK_CREDENTIAL_PARSERS[providerId]
+    : undefined;
+  if (!parsedProviderId.success && !parseExperimentalCredential) return;
 
   try {
     if (parsedProviderId.success) {
@@ -78,7 +81,7 @@ function validateUserByokCredential(providerId: string, credential: string) {
         decryptedAPIKey: credential,
       });
     } else {
-      parseDirectCloudCredential?.(credential);
+      parseExperimentalCredential?.(credential);
     }
   } catch {
     throw new TRPCError({
@@ -105,11 +108,11 @@ function toBYOKApiKeyResponse(key: Omit<BYOKApiKeyResponse, 'provider_name'>): B
   };
 }
 
-function rejectUnavailableDirectCloudProvider(
+function rejectUnavailableExperimentalProvider(
   providerId: string,
   organizationId: string | null | undefined
 ) {
-  if (isDirectCloudByokProviderId(providerId) && !isExperimentalByokEnabled(organizationId)) {
+  if (isExperimentalByokProviderId(providerId) && !isExperimentalByokEnabled(organizationId)) {
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: `Provider ${providerId} is not available yet.`,
@@ -239,7 +242,7 @@ export const byokRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES);
       }
 
-      rejectUnavailableDirectCloudProvider(provider_id, organizationId);
+      rejectUnavailableExperimentalProvider(provider_id, organizationId);
       validateUserByokCredential(provider_id, api_key);
 
       // Encrypt the API key
@@ -319,7 +322,7 @@ export const byokRouter = createTRPCRouter({
       }
 
       rejectManagedKeyMutation(existingKey.management_source);
-      rejectUnavailableDirectCloudProvider(existingKey.provider_id, existingKey.organization_id);
+      rejectUnavailableExperimentalProvider(existingKey.provider_id, existingKey.organization_id);
       validateUserByokCredential(existingKey.provider_id, api_key);
 
       const encrypted = encryptApiKey(api_key, BYOK_ENCRYPTION_KEY);

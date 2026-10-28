@@ -2500,6 +2500,23 @@ export const DirectByokModelFlagSchema = z.enum(['recommended', 'vision', 'reaso
 
 export type DirectByokModelFlag = z.infer<typeof DirectByokModelFlagSchema>;
 
+/** The upstream endpoint of a direct BYOK model, for providers that serve models from several. */
+export const DirectByokModelEndpointSchema = z.enum([
+  // Amazon Bedrock
+  'mantle-chat',
+  'mantle-openai',
+  'runtime-anthropic',
+  'runtime-openai',
+  'runtime-responses',
+  // Google Vertex AI
+  'openapi',
+  'openapi-responses',
+  'anthropic',
+  'mistral',
+]);
+
+export type DirectByokModelEndpoint = z.infer<typeof DirectByokModelEndpointSchema>;
+
 export const DirectByokModelSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -2514,7 +2531,7 @@ export const DirectByokModelSchema = z.object({
    * Provider-specific upstream endpoint for providers whose models are served
    * by different endpoints, such as Amazon Bedrock runtime versus mantle.
    */
-  endpoint: z.string().optional(),
+  endpoint: DirectByokModelEndpointSchema.optional(),
 });
 
 export const DirectByokModelArraySchema = z.array(DirectByokModelSchema);

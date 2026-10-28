@@ -47,14 +47,12 @@ import {
   BedrockCredentialsSchema,
   DirectVertexCredentialsSchema,
   VertexCredentialsSchema,
+  isExperimentalByokProviderId,
   isGatewayUserByokProviderId,
   type GatewayUserByokProviderId,
   type VercelUserByokInferenceProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
-import {
-  DIRECT_BYOK_PROVIDERS_META,
-  isDirectCloudByokProviderId,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
+import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
 import { getCodingPlanManagedKeyLabel } from '@/components/subscriptions/coding-plans/coding-plan-provider';
 import { cn } from '@/lib/utils';
@@ -129,10 +127,10 @@ export function getStructuredCredentialKind(providerId: string): StructuredCrede
     case VercelUserByokInferenceProviderIdSchema.enum.azure:
       return 'azure';
     case VercelUserByokInferenceProviderIdSchema.enum.bedrock:
-    case DirectUserByokInferenceProviderIdSchema.enum['aws-bedrock']:
+    case DirectUserByokInferenceProviderIdSchema.enum['bedrock-byok']:
       return 'bedrock';
     case VercelUserByokInferenceProviderIdSchema.enum.vertex:
-    case DirectUserByokInferenceProviderIdSchema.enum['gcp-vertex']:
+    case DirectUserByokInferenceProviderIdSchema.enum['vertex-byok']:
       return 'vertex';
     default:
       return null;
@@ -257,7 +255,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
     trpc.byok.experimentalByokEnabled.queryOptions(listQueryInput)
   );
   const addableProviders = ADD_BYOK_PROVIDERS.filter(
-    provider => experimentalByokEnabled || !isDirectCloudByokProviderId(provider.id)
+    provider => experimentalByokEnabled || !isExperimentalByokProviderId(provider.id)
   );
   const showsCodingPlanKey =
     !organizationId && (keys?.some(key => key.management_source === 'coding_plan') ?? false);
@@ -349,7 +347,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
         : kind === 'bedrock'
           ? BedrockCredentialsSchema
           : kind === 'vertex'
-            ? providerId === DirectUserByokInferenceProviderIdSchema.enum['gcp-vertex']
+            ? providerId === DirectUserByokInferenceProviderIdSchema.enum['vertex-byok']
               ? DirectVertexCredentialsSchema
               : VertexCredentialsSchema
             : null;
@@ -470,7 +468,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const structuredCredentialKind = getStructuredCredentialKind(selectedProvider);
   const usesStructuredCredentials = structuredCredentialKind !== null;
   const isDirectVertex =
-    selectedProvider === DirectUserByokInferenceProviderIdSchema.enum['gcp-vertex'];
+    selectedProvider === DirectUserByokInferenceProviderIdSchema.enum['vertex-byok'];
   return (
     <div className="space-y-4">
       <BYOKDescription showsCodingPlanKey={showsCodingPlanKey} />
@@ -794,7 +792,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                         <code className="text-xs">bedrock:InvokeModelWithResponseStream</code>{' '}
                         permissions.
                         {selectedProvider ===
-                        DirectUserByokInferenceProviderIdSchema.enum['aws-bedrock'] ? (
+                        DirectUserByokInferenceProviderIdSchema.enum['bedrock-byok'] ? (
                           <>
                             {' '}
                             Models served by the <code className="text-xs">

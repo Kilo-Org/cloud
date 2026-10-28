@@ -869,14 +869,14 @@ describe('BYOK Router', () => {
       await expect(caller.byok.experimentalByokEnabled({})).resolves.toBe(true);
       await expect(
         caller.byok.create({
-          provider_id: 'aws-bedrock',
+          provider_id: 'bedrock-byok',
           api_key: JSON.stringify(BEDROCK_IAM_CREDENTIALS),
         })
-      ).resolves.toMatchObject({ provider_id: 'aws-bedrock' });
+      ).resolves.toMatchObject({ provider_id: 'bedrock-byok' });
       await expect(
         caller.byok.create({
           organizationId: organizationA.id,
-          provider_id: 'gcp-vertex',
+          provider_id: 'vertex-byok',
           api_key: JSON.stringify({
             type: 'service_account',
             project_id: 'example-project',
@@ -884,18 +884,18 @@ describe('BYOK Router', () => {
             client_email: 'gateway@example-project.iam.gserviceaccount.com',
           }),
         })
-      ).resolves.toMatchObject({ provider_id: 'gcp-vertex' });
+      ).resolves.toMatchObject({ provider_id: 'vertex-byok' });
     });
 
     test('rejects malformed direct cloud credentials', async () => {
       const caller = await createCallerForUser(ownerUser.id);
 
       await expect(
-        caller.byok.create({ provider_id: 'aws-bedrock', api_key: '{"accessKeyId":"AKIA"}' })
-      ).rejects.toThrow('Invalid credentials for provider: aws-bedrock');
+        caller.byok.create({ provider_id: 'bedrock-byok', api_key: '{"accessKeyId":"AKIA"}' })
+      ).rejects.toThrow('Invalid credentials for provider: bedrock-byok');
       await expect(
-        caller.byok.create({ provider_id: 'gcp-vertex', api_key: '{"project_id":"p"}' })
-      ).rejects.toThrow('Invalid credentials for provider: gcp-vertex');
+        caller.byok.create({ provider_id: 'vertex-byok', api_key: '{"project_id":"p"}' })
+      ).rejects.toThrow('Invalid credentials for provider: vertex-byok');
     });
 
     test('rejects direct cloud keys in production outside the Kilo organization', async () => {
@@ -909,10 +909,10 @@ describe('BYOK Router', () => {
       await expect(
         caller.byok.create({
           organizationId: organizationA.id,
-          provider_id: 'aws-bedrock',
+          provider_id: 'bedrock-byok',
           api_key: JSON.stringify(BEDROCK_IAM_CREDENTIALS),
         })
-      ).rejects.toThrow('Provider aws-bedrock is not available yet.');
+      ).rejects.toThrow('Provider bedrock-byok is not available yet.');
       await expect(
         caller.byok.create({ provider_id: 'nvidia-byok', api_key: 'nvidia-key' })
       ).resolves.toMatchObject({ provider_id: 'nvidia-byok' });

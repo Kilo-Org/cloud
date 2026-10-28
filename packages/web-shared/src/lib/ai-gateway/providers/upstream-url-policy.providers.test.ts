@@ -7,8 +7,8 @@ import DIRECT_BYOK_PROVIDERS from '@kilocode/web-shared/lib/ai-gateway/providers
 import type { ProviderApiUrlOverrides } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { DirectByokProviderMetaId } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import type { DirectByokResolveUpstreamInput } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
-import { AWS_BEDROCK_ENDPOINTS } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/aws-bedrock';
-import { GCP_VERTEX_ENDPOINTS } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/gcp-vertex';
+import { AwsBedrockEndpointSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/bedrock-byok';
+import { GcpVertexEndpointSchema } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/vertex-byok';
 import {
   clearUpstreamUrlPolicyCache,
   findUpstreamUrlViolation,
@@ -19,12 +19,12 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/google-service-account
 }));
 
 const TEST_CREDENTIALS: Partial<Record<DirectByokProviderMetaId, string>> = {
-  'aws-bedrock': JSON.stringify({
+  'bedrock-byok': JSON.stringify({
     accessKeyId: 'AKIDEXAMPLE',
     secretAccessKey: 'secret',
     region: 'us-east-1',
   }),
-  'gcp-vertex': JSON.stringify({
+  'vertex-byok': JSON.stringify({
     type: 'service_account',
     project_id: 'example-project',
     private_key: 'private-key',
@@ -36,11 +36,14 @@ const TEST_CREDENTIALS: Partial<Record<DirectByokProviderMetaId, string>> = {
 const TEST_MODELS: Partial<
   Record<DirectByokProviderMetaId, ReadonlyArray<DirectByokResolveUpstreamInput['model']>>
 > = {
-  'aws-bedrock': Object.keys(AWS_BEDROCK_ENDPOINTS).map(endpoint => ({
+  'bedrock-byok': AwsBedrockEndpointSchema.options.map(endpoint => ({
     id: 'test-model',
     endpoint,
   })),
-  'gcp-vertex': Object.keys(GCP_VERTEX_ENDPOINTS).map(endpoint => ({ id: 'test-model', endpoint })),
+  'vertex-byok': GcpVertexEndpointSchema.options.map(endpoint => ({
+    id: 'test-model',
+    endpoint,
+  })),
 };
 
 function urlsOf(name: string, apiUrl: string, overrides: ProviderApiUrlOverrides) {

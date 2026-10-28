@@ -1,7 +1,7 @@
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import type { GatewayRequest } from '../openrouter/types';
 import { ReasoningDetailsTransform, type TransformRequestContext } from '../types';
-import awsBedrock, { parseAwsBedrockCredentials, resolveAwsBedrockUpstream } from './aws-bedrock';
+import awsBedrock, { parseAwsBedrockCredentials, resolveAwsBedrockUpstream } from './bedrock-byok';
 
 const iamCredential = JSON.stringify({
   accessKeyId: 'AKIDEXAMPLE',
@@ -54,7 +54,7 @@ describe('resolveAwsBedrockUpstream', () => {
       api: 'responses',
       responseTransforms: null,
     },
-  ])(
+  ] as const)(
     'routes $id on $endpoint to $apiUrl and signs with IAM keys',
     ({ endpoint, id, apiUrl, api, responseTransforms }) => {
       expect(resolveAwsBedrockUpstream(iamCredential, { id, endpoint })).toEqual({
@@ -129,7 +129,7 @@ describe('awsBedrock definition', () => {
         responseTransforms: null,
         async transformRequest() {},
       },
-      model: 'aws-bedrock/global.anthropic.claude-sonnet-4-6',
+      model: 'bedrock-byok/global.anthropic.claude-sonnet-4-6',
       request,
       originalHeaders: EmptyFraudDetectionHeaders,
       extraHeaders: {},

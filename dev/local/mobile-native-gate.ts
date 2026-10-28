@@ -1,31 +1,9 @@
-// Decide the `mobile-native-build` gate: which platforms to build, which to
-// copy from a short-lived artifact, and the artifact-name prefix a
-// pull_request run publishes under.
-//
-// A pull request that edits the workflow file itself is validating that edit,
-// so its artifacts must stay out of the namespace hosts install from
-// (dev/local/mobile-remote-native.ts, which looks up the plain
-// mobile-native-<platform>-<nativeHash> name) and are keyed on the workflow
-// file as well, so each revision of it builds once and a re-push skips.
-// Every other pull_request run exists because a native input changed: it
-// publishes the plain name a fleet host installs instead of compiling.
-// A run that publishes a durable artifact (push, workflow_dispatch) skips only
-// on a durable artifact, so the one-day pull_request artifact cannot leave
-// main without the build it keeps for hosts. When that short-lived artifact is
-// the only one, the run promotes it (copies it under the same name with the
-// durable retention) instead of spending a runner on a second build.
-//
-// A finished artifact is the only thing the gate can see, and one native build
-// takes longer than the gap between two pushes of the same native inputs, so
-// the workflow also serializes the jobs of one nativeHash behind a job-level
-// concurrency group and each heavy job re-checks its artifact (`--published`)
-// before it builds.
 import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { artifactName } from './mobile-remote-native';
+import { artifactName, findNativeArtifacts } from './mobile-remote-native';
 
 export const NATIVE_WORKFLOW_PATH = '.github/workflows/mobile-native-build.yml';
 
@@ -33,21 +11,8 @@ type Platform = 'ios' | 'android';
 
 const PLATFORMS: readonly Platform[] = ['ios', 'android'];
 
-// The workflow gives a pull_request artifact one day and a push or
-// workflow_dispatch artifact the durable 90 (retention-days in
-// .github/workflows/mobile-native-build.yml). A pull_request run publishes the
-// plain name for hosts to install, but a run that publishes a durable artifact
-// must not let that one-day artifact satisfy its skip: once it expires main
-// has no durable build for the nativeHash and every host falls back to
-// compiling.
 const PULL_REQUEST_ARTIFACT_RETENTION_MS = 24 * 60 * 60 * 1000;
 
-// Where the artifact lookup for one name stands.
-// - `missing`: nothing live; the platform must be built.
-// - `short`: a live artifact whose own lifetime is the pull_request one. A
-//   pull_request run is done; a run that must publish a durable artifact
-//   promotes this one instead of rebuilding.
-// - `durable`: a long-lived artifact; every run is done.
 export type ArtifactState = 'missing' | 'short' | 'durable';
 
 export type ArtifactLookup = {
@@ -124,37 +89,18 @@ function gh(args: string[]): string {
   return execFileSync('gh', args, { encoding: 'utf8' });
 }
 
-type ArtifactRecord = {
-  id?: number;
-  name?: string;
-  created_at?: string;
-  expires_at?: string;
-  expired?: boolean;
-};
-
-// The API lists every artifact under a name, newest first, expired ones
-// included. A durable artifact wins; otherwise the newest live one is what a
-// promote copies. The page holds 100: one nativeHash was observed with 11
-// uploads, and the durable one must not fall off the page behind them.
 function lookupArtifact(repository: string, name: string): ArtifactLookup {
-  const raw = gh(['api', `repos/${repository}/actions/artifacts?name=${name}&per_page=100`]);
-  const parsed = JSON.parse(raw) as { artifacts?: ArtifactRecord[] };
-  if (!Array.isArray(parsed.artifacts)) {
-    throw new Error(`unexpected artifact listing for ${name}: ${raw.trim()}`);
-  }
-  const live = parsed.artifacts.filter(
-    artifact => artifact.expired !== true && artifact.id !== undefined
-  );
+  const live = findNativeArtifacts(name, repository, process.env.GITHUB_SHA ?? '');
   const durable = live.find(
     artifact =>
       Date.parse(artifact.expires_at ?? '') - Date.parse(artifact.created_at ?? '') >
       PULL_REQUEST_ARTIFACT_RETENTION_MS
   );
   const found = durable ?? live[0];
-  if (!found || found.id === undefined) return { state: 'missing' };
+  if (!found) return { state: 'missing' };
   return {
     state: durable ? 'durable' : 'short',
-    artifact: { id: found.id, name: found.name ?? name },
+    artifact: { id: found.id, name: found.name },
   };
 }
 

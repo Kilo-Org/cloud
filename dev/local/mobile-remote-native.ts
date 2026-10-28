@@ -57,14 +57,122 @@ function git(args: string[]): string | undefined {
   }
 }
 
-type ArtifactRecord = { id: number; expired: boolean };
+export type NativeArtifact = {
+  id: number;
+  name: string;
+  created_at: string;
+  expires_at: string;
+};
 
-function findArtifact(name: string): ArtifactRecord | undefined {
-  // `gh api` resolves {owner}/{repo} from the current repository. Name
-  // lookup returns newest first across all workflow runs.
-  const raw = gh(['api', `repos/{owner}/{repo}/actions/artifacts?name=${name}&per_page=10`]);
-  const parsed = JSON.parse(raw) as { artifacts?: Array<{ id: number; expired: boolean }> };
-  return parsed.artifacts?.find(artifact => !artifact.expired);
+type ArtifactMetadata = Partial<NativeArtifact> & {
+  expired?: boolean;
+  workflow_run?: {
+    id?: number;
+    repository_id?: number;
+    head_repository_id?: number;
+    head_sha?: string;
+  };
+};
+
+type RepositoryMetadata = { id?: number; default_branch?: string };
+type WorkflowMetadata = { id?: number; path?: string; state?: string };
+type RunMetadata = {
+  id?: number;
+  workflow_id?: number;
+  path?: string;
+  event?: string;
+  status?: string;
+  conclusion?: string;
+  head_sha?: string;
+  head_branch?: string;
+  repository?: { id?: number };
+  head_repository?: { id?: number };
+};
+
+export function findNativeArtifacts(
+  name: string,
+  repository = '{owner}/{repo}',
+  expectedHeadSha: string | undefined = git(['rev-parse', 'HEAD'])
+): NativeArtifact[] {
+  const base = `repos/${repository}`;
+  const repo = JSON.parse(gh(['api', base])) as RepositoryMetadata | null;
+  const workflowPath = `.github/workflows/${WORKFLOW_FILE}`;
+  const workflow = JSON.parse(
+    gh(['api', `${base}/actions/workflows/${WORKFLOW_FILE}`])
+  ) as WorkflowMetadata | null;
+  if (
+    typeof repo?.id !== 'number' ||
+    !Number.isSafeInteger(repo.id) ||
+    repo.id <= 0 ||
+    typeof repo.default_branch !== 'string' ||
+    repo.default_branch.length === 0 ||
+    typeof workflow?.id !== 'number' ||
+    !Number.isSafeInteger(workflow.id) ||
+    workflow.id <= 0 ||
+    workflow.path !== workflowPath ||
+    workflow.state !== 'active'
+  ) {
+    throw new Error('Native artifact source could not be verified');
+  }
+  const listing = JSON.parse(
+    gh(['api', `${base}/actions/artifacts?name=${encodeURIComponent(name)}&per_page=100`])
+  ) as { artifacts?: (ArtifactMetadata | null)[] } | null;
+  if (!Array.isArray(listing?.artifacts)) throw new Error('Invalid native artifact listing');
+  const trusted: NativeArtifact[] = [];
+  for (const artifact of listing.artifacts) {
+    if (
+      typeof artifact?.id !== 'number' ||
+      !Number.isSafeInteger(artifact.id) ||
+      artifact.id <= 0 ||
+      artifact.name !== name ||
+      artifact.expired !== false ||
+      typeof artifact.created_at !== 'string' ||
+      !Number.isFinite(Date.parse(artifact.created_at)) ||
+      typeof artifact.expires_at !== 'string' ||
+      Date.parse(artifact.expires_at) <= Date.now() ||
+      !Number.isFinite(Date.parse(artifact.expires_at))
+    ) {
+      continue;
+    }
+    const source = artifact.workflow_run;
+    if (
+      typeof source?.id !== 'number' ||
+      !Number.isSafeInteger(source.id) ||
+      source.id <= 0 ||
+      source.repository_id !== repo.id ||
+      source.head_repository_id !== repo.id ||
+      typeof source.head_sha !== 'string' ||
+      !/^[a-f0-9]{40}$/.test(source.head_sha)
+    ) {
+      continue;
+    }
+    const run = JSON.parse(gh(['api', `${base}/actions/runs/${source.id}`])) as RunMetadata | null;
+    if (
+      run?.id !== source.id ||
+      run.workflow_id !== workflow.id ||
+      run.path !== workflowPath ||
+      run.repository?.id !== repo.id ||
+      run.head_repository?.id !== repo.id ||
+      run.head_sha !== source.head_sha ||
+      run.status !== 'completed' ||
+      run.conclusion !== 'success' ||
+      typeof run.head_branch !== 'string' ||
+      run.head_branch.length === 0 ||
+      !(
+        (run.event === 'workflow_dispatch' && run.head_sha === expectedHeadSha) ||
+        (run.event === 'push' && run.head_branch === repo.default_branch)
+      )
+    ) {
+      continue;
+    }
+    trusted.push({
+      id: artifact.id,
+      name,
+      created_at: artifact.created_at,
+      expires_at: artifact.expires_at,
+    });
+  }
+  return trusted;
 }
 
 // Download an artifact zip and hand the caller its unpacked directory.
@@ -77,9 +185,9 @@ function withArtifact(
 ): boolean {
   if (remoteNativeDisabled()) return false;
   const name = artifactName(platform, nativeHash);
-  let artifact: ArtifactRecord | undefined;
+  let artifact: NativeArtifact | undefined;
   try {
-    artifact = findArtifact(name);
+    artifact = findNativeArtifacts(name)[0];
   } catch (error) {
     // No gh, no auth, or no network: local build is the fallback.
     log(`artifact lookup failed (${message(error)})`);
@@ -89,7 +197,7 @@ function withArtifact(
     log(`no artifact ${name}; trying a remote build dispatch`);
     if (!dispatchAndWatch(platform)) return false;
     try {
-      artifact = findArtifact(name);
+      artifact = findNativeArtifacts(name)[0];
     } catch (error) {
       log(`artifact lookup failed after dispatch (${message(error)})`);
       return false;

@@ -95,6 +95,13 @@ try {
         event('renew_transient');
         output = count('renew_transient') % 2 === 1 ? 'failure' : 'malformed';
       }
+      const afterDeploy = Number(
+        process.env.BENCHMARK_DEPLOY_FIXTURE_RENEW_FAILURES_AFTER_DEPLOY ?? 0
+      );
+      if (count('deploy_completed') > 0 && count('renew_after_deploy_transient') < afterDeploy) {
+        event('renew_after_deploy_transient');
+        output = 'failure';
+      }
     }
     if (process.env.BENCHMARK_DEPLOY_FIXTURE_BAD_JSON === kind) output = 'malformed';
     if (output === 'failure') {

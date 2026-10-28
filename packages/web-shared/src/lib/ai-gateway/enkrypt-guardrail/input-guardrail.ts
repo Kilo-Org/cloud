@@ -22,7 +22,7 @@ export type EnkryptInputGuardrail = {
    * Await immediately before the upstream call. Never rejects. The measured wait is the latency the
    * guardrail added to the request, and is stored on the request's final ledger row.
    */
-  awaitVerdict(): Promise<{ verdict: EnkryptGuardrailVerdict; waitedMs: number }>;
+  awaitVerdict(): Promise<EnkryptGuardrailVerdict>;
 };
 
 /**
@@ -80,9 +80,8 @@ export function startEnkryptInputGuardrail(
     async awaitVerdict() {
       const waitStartedAt = performance.now();
       const { verdict } = await result;
-      const waitedMs = Math.round(performance.now() - waitStartedAt);
-      addedLatencyMs = waitedMs;
-      return { verdict, waitedMs };
+      addedLatencyMs = Math.round(performance.now() - waitStartedAt);
+      return verdict;
     },
   };
 }

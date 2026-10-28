@@ -81,10 +81,7 @@ describe('startEnkryptInputGuardrail', () => {
     jest.spyOn(performance, 'now').mockReturnValueOnce(1_000).mockReturnValueOnce(1_237.4);
 
     const guardrail = startEnkryptInputGuardrail(Promise.resolve(scan));
-    expect(await guardrail.awaitVerdict()).toEqual({
-      verdict: { action: 'allow' },
-      waitedMs: 237,
-    });
+    expect(await guardrail.awaitVerdict()).toEqual({ action: 'allow' });
     await runAfterTasks();
 
     expect(mockedRecordCharge.mock.calls).toEqual([
@@ -105,10 +102,7 @@ describe('startEnkryptInputGuardrail', () => {
   it('skips the scan and records nothing without a guardrail', async () => {
     const guardrail = startEnkryptInputGuardrail(Promise.resolve(null));
 
-    expect(await guardrail.awaitVerdict()).toEqual({
-      verdict: { action: 'skip' },
-      waitedMs: expect.any(Number),
-    });
+    expect(await guardrail.awaitVerdict()).toEqual({ action: 'skip' });
     await runAfterTasks();
 
     expect(mockedScanTurnDelta).not.toHaveBeenCalled();

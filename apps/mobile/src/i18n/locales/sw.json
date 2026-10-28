@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Hatukuweza kufikia kizio — huenda muunganisho wake umekatika.",
     "remoteSpawnNonRetryable": "Kizio kimeshindwa kuanzisha kikao — angalia mashine au sasisha CLI.",
-    "remoteSpawnInstanceDisconnected": "Muunganisho wa kizio ulichochagua umekatika. Anzisha kikao kwenye Cloud Agent au chagua kizio kingine.",
-    "liveCount_one": "{{count}} MOJA KWA MOJA",
-    "liveCount_other": "{{count}} MOJA KWA MOJA"
+    "remoteSpawnInstanceDisconnected": "Muunganisho wa kizio ulichochagua umekatika. Anzisha kikao kwenye Cloud Agent au chagua kizio kingine."
   },
   "agentChat": {
     "session": {

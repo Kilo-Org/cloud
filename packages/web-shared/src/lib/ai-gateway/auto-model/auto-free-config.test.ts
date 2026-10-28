@@ -84,6 +84,16 @@ describe('isAutoFreeEligibleModelId', () => {
       false,
     ],
     ['a private custom LLM', customLlmDefinition(), false],
+    [
+      'a public custom LLM with a country deny list',
+      publicCustomLlmDefinition(['acme'], { country_deny_list: ['CU'] }),
+      false,
+    ],
+    [
+      'a public custom LLM with an empty country deny list',
+      publicCustomLlmDefinition(['acme'], { country_deny_list: [] }),
+      true,
+    ],
   ])('%s', (_name, definition, expected) => {
     expect(isAutoFreeEligibleModelId('acme/model', customLlm(definition))).toBe(expected);
   });

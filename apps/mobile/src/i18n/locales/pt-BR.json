@@ -1645,10 +1645,7 @@
     },
     "remoteSpawnRetryable": "Não foi possível acessar a instância — ela pode ter se desconectado.",
     "remoteSpawnNonRetryable": "A instância não conseguiu iniciar a sessão — verifique a máquina ou atualize a CLI.",
-    "remoteSpawnInstanceDisconnected": "A instância selecionada se desconectou. Inicie uma sessão no Cloud Agent ou escolha outra instância.",
-    "liveCount_one": "{{count}} EM TEMPO REAL",
-    "liveCount_other": "{{count}} EM TEMPO REAL",
-    "liveCount_many": "{{count}} ATIVOS"
+    "remoteSpawnInstanceDisconnected": "A instância selecionada se desconectou. Inicie uma sessão no Cloud Agent ou escolha outra instância."
   },
   "agentChat": {
     "session": {

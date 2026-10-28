@@ -85,7 +85,10 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     bouncer_usage_event ?? null,
     {
       entrypoint: 'writer_endpoint',
-      writer_caller: source === 'queue' || source === 'region_handoff' ? source : 'unknown',
+      writer_caller:
+        source === 'queue' || source === 'queue_vercel' || source === 'region_handoff'
+          ? source
+          : 'unknown',
     }
   );
   timer.mark('write');

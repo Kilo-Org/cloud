@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Nusxaga ulanib bo'lmadi — uning ulanishi uzilgan bo'lishi mumkin.",
     "remoteSpawnNonRetryable": "Nusxa sessiyani ishga tushira olmadi — kompyuterni tekshiring yoki CLI dasturini yangilang.",
-    "remoteSpawnInstanceDisconnected": "Tanlangan nusxa bilan ulanish uzildi. Cloud Agentda sessiya boshlang yoki boshqa nusxani tanlang.",
-    "liveCount_one": "{{count}} TA JONLI",
-    "liveCount_other": "{{count}} TA JONLI"
+    "remoteSpawnInstanceDisconnected": "Tanlangan nusxa bilan ulanish uzildi. Cloud Agentda sessiya boshlang yoki boshqa nusxani tanlang."
   },
   "agentChat": {
     "session": {

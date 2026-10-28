@@ -2313,13 +2313,7 @@
     },
     "remoteSpawnRetryable": "Ni lwyddwyd i gysylltu â'r instans — efallai ei fod wedi datgysylltu.",
     "remoteSpawnNonRetryable": "Methodd yr instans â dechrau'r sesiwn — gwiriwch y peiriant neu ddiweddarwch y CLI.",
-    "remoteSpawnInstanceDisconnected": "Mae'r instans a ddewiswyd wedi datgysylltu. Dechreuwch sesiwn ar Cloud Agent neu dewiswch instans arall.",
-    "liveCount_one": "{{count}} BYW",
-    "liveCount_other": "{{count}} BYW",
-    "liveCount_zero": "{{count}} BYW",
-    "liveCount_two": "{{count}} BYW",
-    "liveCount_few": "{{count}} BYW",
-    "liveCount_many": "{{count}} BYW"
+    "remoteSpawnInstanceDisconnected": "Mae'r instans a ddewiswyd wedi datgysylltu. Dechreuwch sesiwn ar Cloud Agent neu dewiswch instans arall."
   },
   "agentChat": {
     "session": {

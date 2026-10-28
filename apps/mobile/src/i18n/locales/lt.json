@@ -2251,11 +2251,7 @@
     },
     "remoteSpawnRetryable": "Nepavyko pasiekti egzemplioriaus — jis galėjo atsijungti.",
     "remoteSpawnNonRetryable": "Egzemplioriui nepavyko pradėti sesijos — patikrink įrenginį arba atnaujink CLI.",
-    "remoteSpawnInstanceDisconnected": "Pasirinktas egzempliorius atsijungė. Pradėk sesiją su Cloud Agent arba pasirink kitą egzempliorių.",
-    "liveCount_one": "TIESIOGIAI: {{count}}",
-    "liveCount_other": "TIESIOGIAI: {{count}}",
-    "liveCount_few": "VEIKIA: {{count}}",
-    "liveCount_many": "VEIKIA: {{count}}"
+    "remoteSpawnInstanceDisconnected": "Pasirinktas egzempliorius atsijungė. Pradėk sesiją su Cloud Agent arba pasirink kitą egzempliorių."
   },
   "agentChat": {
     "session": {

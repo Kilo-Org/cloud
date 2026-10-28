@@ -6,6 +6,7 @@ import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organiza
 import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
 import { addCustomRouterModels } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-models';
 import { listUsableCustomRouters } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
+import { requestCountryCode } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import {
   OrganizationIdInputSchema,
   organizationMemberProcedure,
@@ -33,7 +34,8 @@ export const listAvailableModelsProcedure = organizationMemberProcedure
         // against organization-level policy instead of being rejected.
         allowNonMember: true,
       },
-      audience
+      audience,
+      { countryCode: requestCountryCode(ctx.headersList) }
     );
     if (!result) {
       throw new TRPCError({

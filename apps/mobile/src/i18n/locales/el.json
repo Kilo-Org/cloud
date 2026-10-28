@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Δεν ήταν δυνατή η επικοινωνία με το στιγμιότυπο — ίσως αποσυνδέθηκε.",
     "remoteSpawnNonRetryable": "Το στιγμιότυπο δεν μπόρεσε να ξεκινήσει τη συνεδρία — έλεγξε τον υπολογιστή ή ενημέρωσε το CLI.",
-    "remoteSpawnInstanceDisconnected": "Το επιλεγμένο στιγμιότυπο αποσυνδέθηκε. Ξεκίνα μια συνεδρία στο Cloud Agent ή επίλεξε άλλο στιγμιότυπο.",
-    "liveCount_one": "{{count}} ΣΕ ΠΡΑΓΜΑΤΙΚΟ ΧΡΟΝΟ",
-    "liveCount_other": "{{count}} ΣΕ ΠΡΑΓΜΑΤΙΚΟ ΧΡΟΝΟ"
+    "remoteSpawnInstanceDisconnected": "Το επιλεγμένο στιγμιότυπο αποσυνδέθηκε. Ξεκίνα μια συνεδρία στο Cloud Agent ή επίλεξε άλλο στιγμιότυπο."
   },
   "agentChat": {
     "session": {

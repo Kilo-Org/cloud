@@ -18,6 +18,7 @@ import { addAutoRoutingModels } from '@kilocode/web-shared/lib/ai-gateway/auto-r
 import type * as AutoRouting from '@kilocode/web-shared/lib/ai-gateway/auto-routing-models';
 import {
   addUserByokAvailability,
+  getEnabledByokProviders,
   getUserByokProviderIds,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
@@ -179,6 +180,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => {
     ...actual,
     addUserByokAvailability: jest.fn(actual.addUserByokAvailability),
     getUserByokProviderIds: jest.fn(async () => []),
+    getEnabledByokProviders: jest.fn(async () => []),
   };
 });
 
@@ -214,9 +216,10 @@ const publishedEnkryptBenchmark: EnkryptPublishedBenchmark = {
   freshness: 'fresh',
 };
 
-function createTestRequest(path: string) {
+function createTestRequest(path: string, headers?: HeadersInit) {
   return new NextRequest(new URL(path, 'http://localhost:3000'), {
     method: 'GET',
+    headers,
   });
 }
 
@@ -257,6 +260,7 @@ beforeEach(() => {
     .mockReset()
     .mockImplementation(realDirectByok.getDirectByokModelsForUser);
   jest.mocked(getUserByokProviderIds).mockReset().mockResolvedValue([]);
+  jest.mocked(getEnabledByokProviders).mockReset().mockResolvedValue([]);
   jest.mocked(getAvailableModelsForOrganization).mockReset().mockResolvedValue(null);
   jest.mocked(getCustomLlmsById).mockReset().mockResolvedValue(new Map());
   invalidateModelStatsCache();
@@ -279,7 +283,7 @@ describe('GET /api/v1/models', () => {
         .spyOn(global, 'fetch')
         .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
 
-      const catalog = await getEnhancedOpenRouterModels();
+      const catalog = await getEnhancedOpenRouterModels({ countryCode: null });
       const publicModel = catalog.data.find(
         model => model.id === qwen36_plus_stealth_model.public_id
       );
@@ -540,6 +544,52 @@ describe('GET /api/v1/models', () => {
       false
     );
   });
+
+  test.each([
+    ['hides', 'CU', false],
+    ['lists', 'US', true],
+    ['lists', null, true],
+  ])(
+    '%s a country-restricted public custom LLM for country %s, still claiming its id',
+    async (_verb, countryCode, listed) => {
+      mockAuth = { user: null, organizationId: null };
+      jest.mocked(getCustomLlmsById).mockResolvedValue(
+        new Map([
+          [
+            'some-other-model',
+            {
+              public_id: 'some-other-model',
+              encrypted_api_key: null,
+              definition: {
+                display_name: 'Custom some-other-model',
+                context_length: 1000,
+                max_completion_tokens: 100,
+                base_url: 'https://upstream.example.com/v1',
+                public: { inference_providers: ['acme'], description: 'Public custom model' },
+                country_deny_list: ['CU'],
+              },
+            },
+          ],
+        ])
+      );
+      global.fetch = jest
+        .fn<ReturnType<typeof fetch>, Parameters<typeof fetch>>()
+        .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
+
+      const response = await GET(
+        createTestRequest(
+          '/api/v1/models',
+          countryCode ? { 'x-vercel-ip-country': countryCode } : undefined
+        )
+      );
+      const responseData = OpenRouterModelsResponseSchema.parse(await response.json());
+
+      expect(response.status).toBe(200);
+      expect(responseData.data.filter(item => item.id === 'some-other-model')).toEqual(
+        listed ? [expect.objectContaining({ name: 'Custom some-other-model' })] : []
+      );
+    }
+  );
 
   test('omits the Enkrypt field when no score is available', async () => {
     global.fetch = jest
@@ -911,7 +961,7 @@ describe('final Enkrypt serialization boundaries', () => {
   }
 
   async function organizationModels(): Promise<OpenRouterModelsResponse> {
-    const response = await getEnhancedOpenRouterModels();
+    const response = await getEnhancedOpenRouterModels({ countryCode: null });
     return { ...response, data: response.data.filter(model => model.id === 'some-other-model') };
   }
 
@@ -924,7 +974,7 @@ describe('final Enkrypt serialization boundaries', () => {
   }
 
   async function responseFor(branch: Branch) {
-    if (branch === 'direct') return getEnhancedOpenRouterModels();
+    if (branch === 'direct') return getEnhancedOpenRouterModels({ countryCode: null });
     const response = await GET(createTestRequest('/api/v1/models'));
     expect(response.status).toBe(200);
     return OpenRouterModelsResponseSchema.parse(await response.json());
@@ -984,12 +1034,12 @@ describe('final Enkrypt serialization boundaries', () => {
           expect(JSON.stringify(result)).not.toContain(field);
         }
         if (branch === 'organization') {
-          const [organizationId, subject, audience, fromDb] =
+          const [organizationId, subject, audience, options] =
             jest.mocked(getAvailableModelsForOrganization).mock.lastCall ?? [];
           expect(organizationId).toBe('test-org-id');
           expect(subject).toEqual({ type: 'member', kiloUserId: 'test-user-id' });
           expect(audience).toBe('member');
-          expect(fromDb).toBe(readDb);
+          expect(options?.fromDb).toBe(readDb);
           expect(result.data.map(model => model.id)).toEqual(['some-other-model']);
           expect(getDirectByokModelsForUser).not.toHaveBeenCalled();
         }

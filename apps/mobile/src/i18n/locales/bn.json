@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "ইনস্ট্যান্সের সঙ্গে যোগাযোগ করা যায়নি — এর সংযোগ বিচ্ছিন্ন হয়ে থাকতে পারে।",
     "remoteSpawnNonRetryable": "ইনস্ট্যান্সটি সেশন শুরু করতে ব্যর্থ হয়েছে — মেশিনটি পরীক্ষা করুন বা CLI আপডেট করুন।",
-    "remoteSpawnInstanceDisconnected": "নির্বাচিত ইনস্ট্যান্সের সংযোগ বিচ্ছিন্ন হয়েছে। Cloud Agent-এ একটি সেশন শুরু করুন অথবা অন্য একটি ইনস্ট্যান্স বেছে নিন।",
-    "liveCount_one": "{{count}}টি লাইভ",
-    "liveCount_other": "{{count}}টি লাইভ"
+    "remoteSpawnInstanceDisconnected": "নির্বাচিত ইনস্ট্যান্সের সংযোগ বিচ্ছিন্ন হয়েছে। Cloud Agent-এ একটি সেশন শুরু করুন অথবা অন্য একটি ইনস্ট্যান্স বেছে নিন।"
   },
   "agentChat": {
     "session": {

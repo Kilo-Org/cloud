@@ -1689,11 +1689,7 @@
     },
     "remoteSpawnRetryable": "Nie udało się połączyć z instancją — mogła się rozłączyć.",
     "remoteSpawnNonRetryable": "Instancja nie uruchomiła sesji — sprawdź komputer lub zaktualizuj CLI.",
-    "remoteSpawnInstanceDisconnected": "Wybrana instancja utraciła połączenie. Uruchom sesję w usłudze Cloud Agent lub wybierz inną instancję.",
-    "liveCount_one": "{{count}} NA ŻYWO",
-    "liveCount_other": "{{count}} NA ŻYWO",
-    "liveCount_few": "{{count}} AKTYWNE",
-    "liveCount_many": "{{count}} AKTYWNYCH"
+    "remoteSpawnInstanceDisconnected": "Wybrana instancja utraciła połączenie. Uruchom sesję w usłudze Cloud Agent lub wybierz inną instancję."
   },
   "agentChat": {
     "session": {

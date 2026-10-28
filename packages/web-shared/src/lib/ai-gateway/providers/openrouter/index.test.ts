@@ -193,13 +193,13 @@ describe('auto models', () => {
   });
 
   it('includes kilo-auto/efficient in the public model list', async () => {
-    const models = await getEnhancedOpenRouterModels();
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
 
     expect(models.data.some(model => model.id === KILO_AUTO_EFFICIENT_MODEL.id)).toBe(true);
   });
 
   it('explicitly caches authenticated catalog requests', async () => {
-    await getEnhancedOpenRouterModels();
+    await getEnhancedOpenRouterModels({ countryCode: null });
 
     expect(global.fetch).toHaveBeenCalledWith(
       'https://openrouter.ai/api/v1/models',
@@ -246,7 +246,7 @@ describe('auto models', () => {
         )
       ) as typeof fetch;
 
-      const response = await getEnhancedOpenRouterModels();
+      const response = await getEnhancedOpenRouterModels({ countryCode: null });
       const model = response.data.find(entry => entry.id === modelId);
       expect(model).toBeDefined();
       expect(model?.alias_target).toBeUndefined();
@@ -295,7 +295,9 @@ describe('auto models', () => {
       )
     ) as unknown as typeof fetch;
 
-    const response = OpenRouterModelsResponseSchema.parse(await getEnhancedOpenRouterModels());
+    const response = OpenRouterModelsResponseSchema.parse(
+      await getEnhancedOpenRouterModels({ countryCode: null })
+    );
     expect(response.data.find(model => model.id === alias.id)?.alias_target).toBe(target.id);
     expect(response.data.find(model => model.id === target.id)?.alias_target).toBeUndefined();
     expect(response.data.find(model => model.id === alias.id)?.inference_provider_ids).toEqual([
@@ -322,7 +324,9 @@ describe('auto models', () => {
       Promise.resolve(createMockResponse({ jsonData: { data: [buildModel()] } }))
     ) as typeof fetch;
 
-    const response = OpenRouterModelsResponseSchema.parse(await getEnhancedOpenRouterModels());
+    const response = OpenRouterModelsResponseSchema.parse(
+      await getEnhancedOpenRouterModels({ countryCode: null })
+    );
     expect(
       response.data.find(model => model.id === 'vendor/model')?.inference_provider_ids
     ).toEqual(['deepinfra', 'fireworks', 'together']);
@@ -334,14 +338,14 @@ describe('auto models', () => {
       Promise.resolve(createMockResponse({ jsonData: { data: [buildModel()] } }))
     ) as typeof fetch;
 
-    const response = await getEnhancedOpenRouterModels();
+    const response = await getEnhancedOpenRouterModels({ countryCode: null });
     expect(
       response.data.find(model => model.id === 'vendor/model')?.inference_provider_ids
     ).toEqual([]);
   });
 
   it('publishes authoritative exclusive model inference providers', async () => {
-    const response = await getEnhancedOpenRouterModels();
+    const response = await getEnhancedOpenRouterModels({ countryCode: null });
     const unavailableModelIds = await getUnavailableModelIds();
     const models = kiloExclusiveModels.filter(model => !unavailableModelIds.has(model.public_id));
     expect(models.length).toBeGreaterThan(0);
@@ -358,7 +362,7 @@ describe('auto models', () => {
       .mocked(getUnavailableModelIds)
       .mockResolvedValueOnce(new Set([qwen36_plus_stealth_model.public_id]));
 
-    const models = await getEnhancedOpenRouterModels();
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
 
     expect(models.data.some(model => model.id === qwen36_plus_stealth_model.public_id)).toBe(false);
     for (const model of kiloExclusiveModels) {
@@ -376,7 +380,7 @@ describe('auto models', () => {
       )
     ) as unknown as typeof fetch;
 
-    const models = await getEnhancedOpenRouterModels();
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
 
     expect(models.data.some(model => model.id === gemma_4_26b_a4b_it_free_model.public_id)).toBe(
       false
@@ -394,7 +398,7 @@ describe('auto models', () => {
       )
     ) as unknown as typeof fetch;
 
-    const models = await getEnhancedOpenRouterModels();
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
     const matches = models.data.filter(model => model.id === qwen36_plus_stealth_model.public_id);
 
     expect(matches).toHaveLength(1);
@@ -412,7 +416,7 @@ describe('auto models', () => {
       )
     ) as unknown as typeof fetch;
 
-    const models = await getEnhancedOpenRouterModels();
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
 
     expect(models.data.some(model => model.id === 'vendor/model')).toBe(true);
     expect(models.data.some(model => model.id === 'vendor/model:batch')).toBe(false);
@@ -436,7 +440,7 @@ describe.each(['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free'])(
         Promise.resolve(createMockResponse({ jsonData: { data: [catalogModel] } }))
       ) as typeof fetch;
 
-      const models = await getEnhancedOpenRouterModels();
+      const models = await getEnhancedOpenRouterModels({ countryCode: null });
       const matches = models.data.filter(entry => entry.id === modelId);
 
       expect(matches).toHaveLength(1);
@@ -449,7 +453,7 @@ describe.each(['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free'])(
         Promise.resolve(createMockResponse({ jsonData: { data: [] } }))
       ) as typeof fetch;
 
-      const models = await getEnhancedOpenRouterModels();
+      const models = await getEnhancedOpenRouterModels({ countryCode: null });
 
       expect(models.data.some(model => model.id === modelId)).toBe(false);
     });
@@ -483,7 +487,7 @@ describe('reasoning variants', () => {
       )
     ) as unknown as typeof fetch;
 
-    const models = await getEnhancedOpenRouterModels();
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
 
     expect(
       models.data.find(model => model.id === unsupportedId)?.opencode?.variants
@@ -536,7 +540,7 @@ describe('reasoning options', () => {
         })
       )
     ) as unknown as typeof fetch;
-    const models = await getEnhancedOpenRouterModels();
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
     return (id: string) => models.data.find(model => model.id === id)?.opencode;
   }
 
@@ -639,7 +643,7 @@ describe('mayTrainOnYourPrompts', () => {
       )
     ) as unknown as typeof fetch;
 
-    const models = await getEnhancedOpenRouterModels();
+    const models = await getEnhancedOpenRouterModels({ countryCode: null });
     const mayTrain = (id: string) =>
       models.data.find(model => model.id === id)?.mayTrainOnYourPrompts;
 

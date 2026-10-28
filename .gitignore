@@ -141,3 +141,6 @@ run-milvus-test.sh
 # Harness markers: the kwf workflow drops these in a worktree, and one
 # reached a product commit (46640f5e8e96) before it was removed by hand.
 .kwf*
+
+# Staging-only usage queue callback, created by the gateway build.
+/apps/ai-gateway/src/app/api/v1/internal/queues/usage/route.ts

@@ -134,7 +134,6 @@ function workspaceIdForSession(cloudAgentSessionId: string): CloudAgentWorktreeI
 
 export function hostedWorkspaceCreateRequest(input: HostedWorkspaceCreate): SessionCreateRequest {
   return {
-    allowSubagentSessions: false,
     initialTurn: {
       type: 'prompt',
       prompt: input.message.prompt,

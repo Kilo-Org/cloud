@@ -436,8 +436,12 @@ repository.
 3. If the environment dies, the next prompt MUST recover in the same chat. The
    user MUST NOT be forced to start a new session.
 4. Recovery MUST preserve each worktree chat, its transcript, and its grouping.
-   Uncommitted files are not guaranteed to survive replacement of the shared
-   physical environment.
+   Uncommitted tracked and untracked text changes in the saved worktree snapshot
+   are restored best-effort into a replacement environment. Binary, oversized,
+   truncated, ignored, or over-budget files MAY be omitted, and a partial
+   recovery MUST NOT block the next turn.
+5. Every preparation attempt for an existing route, including one started after
+   a wrapper restart, MUST use the latest saved worktree recovery.
 
 ### Continuity
 

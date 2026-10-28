@@ -1,6 +1,6 @@
 import * as z from 'zod';
 import type { EnkryptGuardrailApiKind, EnkryptGuardrailDecision } from '@kilocode/db/schema-types';
-import type { EnkryptGuardrailCharge } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/charges';
+import type { EnkryptGuardrailCall } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/charges';
 import type { EnkryptInputGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
@@ -69,7 +69,7 @@ export type EnkryptGuardrailVerdict =
 
 export type EnkryptGuardrailScanResult = {
   verdict: EnkryptGuardrailVerdict;
-  charges: EnkryptGuardrailCharge[];
+  charges: EnkryptGuardrailCall[];
 };
 
 export type EnkryptDetectDependencies = {
@@ -256,7 +256,7 @@ export async function scanTurnDelta(
   );
   const latencyMs = Math.round(performance.now() - startedAt);
 
-  const charges = attempts.map((each): EnkryptGuardrailCharge => ({
+  const charges = attempts.map((each): EnkryptGuardrailCall => ({
     organizationId: scan.organizationId,
     kiloUserId: scan.kiloUserId,
     sessionId: scan.sessionId,
@@ -288,7 +288,7 @@ export async function scanTurnDelta(
   };
 }
 
-function totalCredits(charges: EnkryptGuardrailCharge[]): number | null {
+function totalCredits(charges: EnkryptGuardrailCall[]): number | null {
   const costs = charges.flatMap(charge =>
     charge.creditsCost === null ? [] : [charge.creditsCost]
   );
@@ -297,7 +297,7 @@ function totalCredits(charges: EnkryptGuardrailCharge[]): number | null {
 
 function failedVerdict(
   scan: EnkryptGuardrailScan,
-  charges: EnkryptGuardrailCharge[],
+  charges: EnkryptGuardrailCall[],
   logFields: Record<string, unknown>,
   failure: { error: string; latencyMs: number; closedVerdict?: EnkryptGuardrailVerdict }
 ): EnkryptGuardrailScanResult {

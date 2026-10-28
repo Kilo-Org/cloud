@@ -17,7 +17,7 @@ import {
  */
 export const MICRODOLLARS_PER_ENKRYPT_CREDIT = 100;
 
-export type EnkryptGuardrailCharge = {
+export type EnkryptGuardrailCall = {
   organizationId: string;
   kiloUserId: string;
   sessionId: string | null;
@@ -25,6 +25,11 @@ export type EnkryptGuardrailCharge = {
   decision: EnkryptGuardrailDecision;
   /** Enkrypt's `X-Enkrypt-Credits-Cost` header, or null when the call returned none. */
   creditsCost: number | null;
+};
+
+export type EnkryptGuardrailCharge = EnkryptGuardrailCall & {
+  /** The request's wait for the verdict, on its final call only; see the ledger column. */
+  addedLatencyMs: number | null;
 };
 
 export function enkryptCreditsToMicrodollars(creditsCost: number | null): number {
@@ -53,6 +58,7 @@ export async function recordEnkryptGuardrailCharge(charge: EnkryptGuardrailCharg
       decision: charge.decision,
       enkrypt_credits_cost: charge.creditsCost,
       charged_microdollars: chargedMicrodollars,
+      added_latency_ms: charge.addedLatencyMs,
       created_at: occurredAt,
     });
     if (chargedMicrodollars === 0) return null;

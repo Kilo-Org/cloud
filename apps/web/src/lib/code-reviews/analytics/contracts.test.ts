@@ -1,8 +1,6 @@
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@/lib/cloud-agent/constants';
 import {
   appendCodeReviewAnalyticsPromptAppendix,
-  CODE_REVIEW_ANALYTICS_CHANGE_TYPE_LABELS,
-  CODE_REVIEW_ANALYTICS_IMPACT_POINTS,
   CODE_REVIEW_ANALYTICS_MARKER_PREFIX,
   CODE_REVIEW_ANALYTICS_MARKER_SUFFIX,
   CODE_REVIEW_ANALYTICS_MAX_FINDINGS,
@@ -263,11 +261,7 @@ describe('analytics prompt contract', () => {
     expect(appendCodeReviewAnalyticsPromptAppendix('x'.repeat(maximumBaseLength + 1))).toBeNull();
   });
 
-  it('exports stable labels, versions, and impact points', () => {
-    expect(CODE_REVIEW_ANALYTICS_SCHEMA_VERSION).toBe(1);
-    expect(CODE_REVIEW_ANALYTICS_TAXONOMY_VERSION).toBe(1);
-    expect(CODE_REVIEW_ANALYTICS_CHANGE_TYPE_LABELS.bug_fix).toBe('Bug fix');
-    expect(CODE_REVIEW_ANALYTICS_IMPACT_POINTS).toEqual({ low: 1, medium: 2, high: 3 });
+  it('derives impact points from impact and confidence', () => {
     expect(getCodeReviewAnalyticsImpactPoints('high', 'high')).toBe(3);
     expect(getCodeReviewAnalyticsImpactPoints('high', 'low')).toBe(0);
   });

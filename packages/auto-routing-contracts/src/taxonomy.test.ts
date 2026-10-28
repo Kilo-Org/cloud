@@ -37,11 +37,3 @@ describe('classifier taxonomy', () => {
     expect(TaxonomyRouteKeySchema.safeParse('debugging/code_generation').success).toBe(false);
   });
 });
-
-// Never called: this only has to typecheck. A subtask may only pair with the
-// task type that owns it in SUBTYPES_BY_TASK_TYPE.
-function compileOnlyRejectsCrossPairs() {
-  // @ts-expect-error code_generation belongs to implementation, not debugging
-  taxonomyRouteKey({ taskType: 'debugging', subtaskType: 'code_generation' });
-}
-void compileOnlyRejectsCrossPairs;

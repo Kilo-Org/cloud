@@ -2375,6 +2375,13 @@ export const GoogleServiceAccountKeySchema = z.object({
 
 export type GoogleServiceAccountKey = z.infer<typeof GoogleServiceAccountKeySchema>;
 
+export const GoogleServiceAccountSigningKeySchema = GoogleServiceAccountKeySchema.pick({
+  client_email: true,
+  private_key: true,
+});
+
+export type GoogleServiceAccountSigningKey = z.infer<typeof GoogleServiceAccountSigningKeySchema>;
+
 export const CustomLlmApiKeyCredentialsSchema = z.object({
   type: z.literal('api_key'),
   api_key: z.string().min(1),

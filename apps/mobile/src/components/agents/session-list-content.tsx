@@ -425,7 +425,7 @@ export function AgentSessionListContent({
   // phase would live entirely inside the fade). The skeleton → rows swap is
   // a same-pitch data update inside the mounted list.
   return (
-    <Animated.View className="flex-1">
+    <Animated.View className="flex-1 gap-2">
       {/* The band's height is allocated whenever the rows show, so the
           in-flight spinner and the failure line replace empty space instead of
           pushing the rows down (device defect uxs1). */}

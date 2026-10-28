@@ -339,9 +339,6 @@ export function AgentSessionListContent({
             );
           }}
           onDelete={() => {
-            // The hook's success toast announces the deletion; onDeleted only
-            // restores focus, and requestA11yFocus no-ops once the header is
-            // unmounted (last session deleted).
             deleteSession(item.session.session_id, () => {
               requestA11yFocus(searchInputRef);
             });
@@ -427,17 +424,8 @@ export function AgentSessionListContent({
   // 200ms fade reads as a blank list area on a fast cold open (the skeleton
   // phase would live entirely inside the fade). The skeleton → rows swap is
   // a same-pitch data update inside the mounted list.
-  //
-  // `gap-2` is the clearance between the status band and the rows — the same
-  // gap the live surface leaves below its band (`mx-4 gap-2` in
-  // `AgentSessionsSection`). Without it the list's top edge sits flush on the
-  // band, and a row resting across that edge is cut mid-text directly under
-  // "Couldn't refresh", so the two read as colliding (device defect p5). The
-  // gap lives on the container rather than as the band's padding on purpose:
-  // the clearance must not depend on whether the status line renders, or the
-  // failure line would push the rows down by the gap as it appears.
   return (
-    <Animated.View className="flex-1 gap-2">
+    <Animated.View className="flex-1">
       {/* The band's height is allocated whenever the rows show, so the
           in-flight spinner and the failure line replace empty space instead of
           pushing the rows down (device defect uxs1). */}

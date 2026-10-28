@@ -32,6 +32,7 @@ import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/org
 import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { hasEnabledUserByokForModel } from '@kilocode/web-shared/lib/ai-gateway/byok/availability';
+import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 
 // A BYOK key belongs to exactly one owner, either a user or an organization.
 type ByokOwnerColumn = typeof byok_api_keys.kilo_user_id | typeof byok_api_keys.organization_id;
@@ -229,13 +230,14 @@ export async function addUserByokAvailability(
  * Whether an inference provider key among `enabledProviderIds` serves `modelId`, as `getProvider`
  * routes it: a direct BYOK key in catalog mode (`directByokCatalogModelIds`), or a provider key
  * sent through Vercel. Gateway keys leave the choice of provider to the gateway, so they do not
- * count.
+ * count, and neither does any key for an id a custom LLM owns, which `getProvider` serves first.
  */
 export async function hasInferenceProviderByokForModel(
   modelId: string,
   enabledProviderIds: readonly UserByokProviderId[],
   directByokCatalogModelIds: ReadonlySet<string>
 ): Promise<boolean> {
+  if (await isCustomLlm(modelId)) return false;
   if (directByokCatalogModelIds.has(modelId)) return true;
   if (isKiloExclusiveModel(modelId) || enabledProviderIds.every(isGatewayUserByokProviderId)) {
     return false;

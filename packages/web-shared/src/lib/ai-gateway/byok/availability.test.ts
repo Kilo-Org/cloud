@@ -6,6 +6,11 @@ import {
   kiloExclusiveModelFixture,
   useKiloExclusiveModel,
 } from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
+import {
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+  publicCustomLlmDefinition,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getVercelModelsMetadataFromDatabase: jest.fn(),
@@ -164,6 +169,25 @@ describe('hasInferenceProviderByokForModel', () => {
     await expect(
       hasInferenceProviderByokForModel(EXCLUSIVE_MODEL_ID, ['anthropic'], noCatalogModels)
     ).resolves.toBe(false);
+  });
+
+  test('does not count keys for an id a custom LLM owns, which routing serves first', async () => {
+    mockedGetVercelModelsMetadata.mockResolvedValue(metadata);
+    await insertCustomLlmForTest(
+      'anthropic/claude-fixture',
+      publicCustomLlmDefinition(['custom-provider'])
+    );
+    try {
+      await expect(
+        hasInferenceProviderByokForModel(
+          'anthropic/claude-fixture',
+          ['anthropic'],
+          new Set(['anthropic/claude-fixture'])
+        )
+      ).resolves.toBe(false);
+    } finally {
+      await deleteCustomLlmForTest('anthropic/claude-fixture');
+    }
   });
 });
 

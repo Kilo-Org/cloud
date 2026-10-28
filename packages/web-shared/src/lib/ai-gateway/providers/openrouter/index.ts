@@ -2,6 +2,7 @@ import type { PreferredProviderOrderConfig } from '@kilocode/db/schema-types';
 import { isPdfSupportingModel } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
 import {
+  convertFromKiloExclusiveModel,
   findKiloExclusiveModel,
   isKiloExclusiveModel,
   kiloExclusiveModels,
@@ -19,7 +20,6 @@ import {
 } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { convertFromKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { getGatewayOpenCodeSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
 import { withLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';

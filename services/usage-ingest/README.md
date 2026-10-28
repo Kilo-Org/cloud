@@ -276,11 +276,15 @@ pnpm --filter cloudflare-usage-ingest exec node scripts/provision-queues.mjs pro
 pnpm --filter cloudflare-usage-ingest exec wrangler deploy --experimental-provision=false
 ```
 
-Staging enables its public `workers.dev` URL. After deployment, append `/usage`
-to the hostname shown for `usage-ingest-staging` and use that as the gateway's
-`USAGE_INGEST_URL`. Requests require the dedicated publisher secret above.
-Production keeps `workers_dev: false`; no custom routes or preview URLs are
-configured. The consumer is attached to each environment's producer queue.
+Production and staging enable their public `workers.dev` URLs. After an authorized
+deployment, append `/usage` to the hostname shown for `usage-ingest` or
+`usage-ingest-staging` and configure that environment's gateway `USAGE_INGEST_URL`.
+`POST /usage` requires `Authorization: Bearer <USAGE_INGEST_PUBLISH_SECRET>`; configure
+the same dedicated publisher secret in the Worker and gateway. Set the gateway URL
+and secret before gateway startup; redeploy the gateway after changing either.
+The HTTP address alone selects no traffic: production selection still requires
+the existing `USAGE_QUEUE_ONLY_ENABLED` and SFO cohort controls above. No custom
+routes or preview URLs are configured. The consumer is attached to each environment's producer queue.
 The Worker has no direct database connection; the authenticated writer owns persistence. See
 [Wrangler automatic provisioning](https://developers.cloudflare.com/workers/wrangler/configuration/#automatic-provisioning).
 

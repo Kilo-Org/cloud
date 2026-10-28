@@ -13,6 +13,7 @@ export function ModelsTab({
   onSearchChange,
   onSelectedOnlyChange,
   allowedModelIds,
+  availableModelCount,
   enabledProviderSlugs,
   filteredModelRows,
   onToggleModelAllowed,
@@ -27,6 +28,8 @@ export function ModelsTab({
   onSearchChange: (value: string) => void;
   onSelectedOnlyChange: (value: boolean) => void;
   allowedModelIds: ReadonlySet<string>;
+  /** Length of `listAvailableModels` for the saved settings; null while it loads. */
+  availableModelCount?: number | null;
   enabledProviderSlugs: ReadonlySet<string>;
   filteredModelRows: ReadonlyArray<ModelRow>;
   onToggleModelAllowed: (modelId: string, nextAllowed: boolean) => void;
@@ -66,8 +69,10 @@ export function ModelsTab({
             <div className="bg-muted/50 flex items-center justify-between gap-4 border-b px-4 py-3">
               <div className="text-sm font-medium">Models</div>
               <div className="text-muted-foreground text-xs">
-                {allowedModelIds.size} {scope === 'group' ? 'selected' : 'allowed'} •{' '}
-                {filteredModelRows.length} shown
+                {availableModelCount !== undefined && (
+                  <>{availableModelCount ?? '…'} available to you • </>
+                )}
+                {allowedModelIds.size} selected • {filteredModelRows.length} shown
               </div>
             </div>
 

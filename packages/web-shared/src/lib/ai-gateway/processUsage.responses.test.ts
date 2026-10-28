@@ -159,7 +159,7 @@ describe('processResponsesApiUsage', () => {
       gateway: { routing: { finalProvider: 'openai' }, cost: '0', marketCost: '0.0962825' },
     };
 
-    const result = processResponsesApiUsage(usage, providerMetadata, coreProps, 'openrouter');
+    const result = processResponsesApiUsage(usage, providerMetadata, coreProps, 'vercel');
 
     expect(result.cost_mUsd).toBe(96283); // toMicrodollars(0.0962825)
     expect(result.is_byok).toBeNull();
@@ -167,6 +167,63 @@ describe('processResponsesApiUsage', () => {
     expect(result.outputTokens).toBe(6);
     expect(result.cacheWriteTokens).toBe(15374);
     expect(result.inputTokens - result.cacheWriteTokens).toBe(3);
+  });
+
+  test.each([
+    // Real Vercel responses: Perplexity searches billed to gateway credits, and a
+    // native OpenAI web search billed to the BYOK key within marketCost.
+    { cost: '0.025', marketCost: '0.041388', nonInference: 25000 },
+    { cost: '0', marketCost: '0.05655', nonInference: 0 },
+  ])('charges Vercel BYOK non-inference costs from gateway cost $cost', input => {
+    const usage = {
+      input_tokens: 10,
+      output_tokens: 5,
+      total_tokens: 15,
+      input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0 },
+      output_tokens_details: { reasoning_tokens: 0 },
+    };
+    const providerMetadata = {
+      gateway: {
+        routing: {
+          finalProvider: 'xai',
+          modelAttempts: [
+            {
+              success: true,
+              providerAttempts: [{ provider: 'xai', credentialType: 'byok', success: true }],
+            },
+          ],
+        },
+        cost: input.cost,
+        marketCost: input.marketCost,
+      },
+    };
+
+    const result = processResponsesApiUsage(usage, providerMetadata, coreProps, 'vercel');
+
+    expect(result.is_byok).toBe(true);
+    expect(result.nonInferenceCost_mUsd).toBe(input.nonInference);
+    expect(result.cost_mUsd).toBe(
+      Math.round(parseFloat(input.marketCost) * 1_000_000) + input.nonInference
+    );
+  });
+
+  test('charges OpenRouter BYOK non-inference costs without the 5% BYOK fee', () => {
+    // A real OpenRouter Responses request with one $0.007 Exa search.
+    const usage = {
+      input_tokens: 1421,
+      output_tokens: 203,
+      total_tokens: 1624,
+      input_tokens_details: { cached_tokens: 0, cache_write_tokens: 0 },
+      output_tokens_details: { reasoning_tokens: 142 },
+      cost: 0.00765975,
+      is_byok: true,
+      cost_details: { upstream_inference_cost: 0.013195 },
+    };
+
+    const result = processResponsesApiUsage(usage, null, coreProps, 'openrouter');
+
+    expect(result.nonInferenceCost_mUsd).toBe(7000);
+    expect(result.cost_mUsd).toBe(13195 + 7000);
   });
 
   test('returns zero cost when no usage or metadata is provided', () => {
@@ -202,7 +259,7 @@ describe('processResponsesApiUsage', () => {
       },
     };
 
-    const result = processResponsesApiUsage(usage, providerMetadata, coreProps, 'openrouter');
+    const result = processResponsesApiUsage(usage, providerMetadata, coreProps, 'vercel');
 
     expect(result.is_byok).toBe(true);
     expect(result.cost_mUsd).toBe(100);
@@ -359,7 +416,7 @@ describe('parseMicrodollarUsageFromString approval tests', () => {
   test(vercelResponsesJson, async () => {
     const inputFile = join(sampleDir, vercelResponsesJson);
     const jsonString = await readFile(inputFile, 'utf-8');
-    const result = parseResponsesMicrodollarUsageFromString(jsonString, 200, 'openrouter');
+    const result = parseResponsesMicrodollarUsageFromString(jsonString, 200, 'vercel');
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
     await verifyApproval(resultString, approvalFilePath);

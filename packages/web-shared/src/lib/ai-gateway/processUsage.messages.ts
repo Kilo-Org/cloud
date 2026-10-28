@@ -89,14 +89,14 @@ export function processMessagesApiUsage(
   const inputTokens = (usage?.input_tokens ?? 0) + cacheHitTokens + cacheWriteTokens;
   const outputTokens = usage?.output_tokens ?? 0;
 
-  const { cost_mUsd, is_byok } = selectUsageCostFields(
+  const costs = selectUsageCostFields(
     usage,
     providerMetadata,
     coreProps,
     'messages_sse_processing',
     provider
   );
-  return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens, cost_mUsd, is_byok };
+  return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens, ...costs };
 }
 
 export async function parseMessagesMicrodollarUsageFromStream(

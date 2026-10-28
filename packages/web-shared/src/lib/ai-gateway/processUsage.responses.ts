@@ -57,14 +57,14 @@ export function processResponsesApiUsage(
   const cacheHitTokens = usage?.input_tokens_details?.cached_tokens ?? 0;
   const cacheWriteTokens = usage?.input_tokens_details?.cache_write_tokens ?? 0;
 
-  const { cost_mUsd, is_byok } = selectUsageCostFields(
+  const costs = selectUsageCostFields(
     usage,
     providerMetadata,
     coreProps,
     'responses_sse_processing',
     provider
   );
-  return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens, cost_mUsd, is_byok };
+  return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens, ...costs };
 }
 
 function extractResponseContent(output: OpenAI.Responses.ResponseOutputItem[]): string {

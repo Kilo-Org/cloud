@@ -1,15 +1,13 @@
 import type { NextRequest } from 'next/server';
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
-import * as z from 'zod';
+import { parseModelValidationRequest } from './model-validation-request';
 import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { getDirectByokModelsForUser } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
-
-const BodySchema = z.object({ modelId: z.string().trim().min(1) });
 
 async function tryGetUserFromAuth() {
   try {
@@ -24,19 +22,9 @@ async function tryGetUserFromAuth() {
 }
 
 export async function handleModelValidationRequest(request: NextRequest) {
-  let body: unknown;
-  try {
-    body = await request.json();
-  } catch {
-    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
-  }
-
-  const bodyResult = BodySchema.safeParse(body);
+  const bodyResult = await parseModelValidationRequest(request);
   if (!bodyResult.success) {
-    return NextResponse.json(
-      { error: 'Invalid request body', details: z.treeifyError(bodyResult.error) },
-      { status: 400 }
-    );
+    return bodyResult.response;
   }
 
   if (request.headers.get(ORGANIZATION_ID_HEADER)) {

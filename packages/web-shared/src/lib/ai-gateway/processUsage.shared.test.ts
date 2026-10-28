@@ -164,7 +164,7 @@ describe('selectUsageCostFields', () => {
     usage: Parameters<typeof selectUsageCostFields>[0];
     providerMetadata?: VercelProviderMetaData | null;
     provider?: ProviderId;
-    expected: { cost_mUsd: number; is_byok: boolean | null };
+    expected: ReturnType<typeof selectUsageCostFields>;
     warns?: boolean;
   };
 
@@ -177,7 +177,12 @@ describe('selectUsageCostFields', () => {
     {
       name: 'OpenRouter BYOK uses upstream_inference_cost',
       usage: { cost: 0.001, is_byok: true, cost_details: { upstream_inference_cost: 0.02 } },
-      expected: { cost_mUsd: 20000, is_byok: true },
+      expected: { cost_mUsd: 20000, nonInferenceCost_mUsd: 0, is_byok: true },
+    },
+    {
+      name: 'OpenRouter BYOK charges gateway cost above the fee as non-inference cost',
+      usage: { cost: 0.002, is_byok: true, cost_details: { upstream_inference_cost: 0.02 } },
+      expected: { cost_mUsd: 21000, nonInferenceCost_mUsd: 1000, is_byok: true },
     },
     {
       name: 'OpenRouter zero cost takes precedence over Vercel metadata',
@@ -211,9 +216,9 @@ describe('selectUsageCostFields', () => {
       expected: { cost_mUsd: 1000, is_byok: null },
     },
     {
-      name: 'BYOK cost that is not 5% of upstream warns',
-      usage: { cost: 0.002, is_byok: true, cost_details: { upstream_inference_cost: 0.02 } },
-      expected: { cost_mUsd: 20000, is_byok: true },
+      name: 'BYOK cost below the 5% fee warns',
+      usage: { cost: 0.0005, is_byok: true, cost_details: { upstream_inference_cost: 0.02 } },
+      expected: { cost_mUsd: 20000, nonInferenceCost_mUsd: 0, is_byok: true },
       warns: true,
     },
     {
@@ -238,7 +243,7 @@ describe('selectUsageCostFields', () => {
       name: 'Vercel BYOK credential',
       usage: null,
       providerMetadata: vercelGateway({ marketCost: '0.000402' }, 'byok'),
-      expected: { cost_mUsd: 402, is_byok: true },
+      expected: { cost_mUsd: 402, nonInferenceCost_mUsd: 0, is_byok: true },
     },
     {
       name: 'Vercel system credential',
@@ -250,7 +255,7 @@ describe('selectUsageCostFields', () => {
       name: 'Vercel zero cost still reports the credential type',
       usage: null,
       providerMetadata: vercelGateway({ marketCost: '0' }, 'byok'),
-      expected: { cost_mUsd: 0, is_byok: true },
+      expected: { cost_mUsd: 0, nonInferenceCost_mUsd: 0, is_byok: true },
     },
     {
       name: 'Vercel metadata without costs falls through to unknown',

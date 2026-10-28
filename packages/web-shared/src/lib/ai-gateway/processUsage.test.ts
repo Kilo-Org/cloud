@@ -22,7 +22,8 @@ import {
 } from '@kilocode/web-shared/lib/bouncer/client';
 import type { OpenRouterGeneration } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import { calculateCustomCost_mUsd } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
-import { CUSTOM_PRICING_FALLBACK_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
+import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
 import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { verifyApproval } from '@kilocode/web-shared/tests/helpers/approval.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -80,6 +81,10 @@ jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
 jest.mock('./providers/upstream-request', () => ({
   ...(jest.requireActual('./providers/upstream-request') as Record<string, unknown>),
   fetchGeneration: jest.fn(async () => undefined),
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-pricing-config', () => ({
+  getCustomPricingConfig: jest.fn(async () => ({ models: [] })),
 }));
 
 const mockedReportUsageEvent = jest.mocked(reportUsageEvent);
@@ -2038,11 +2043,12 @@ describe('logMicrodollarUsage', () => {
     });
     const usageStats = { ...BASE_USAGE_STATS, messageId: null, cost_mUsd: 12_316 };
     const customInferenceCost_mUsd = calculateCustomCost_mUsd(
-      CUSTOM_PRICING_FALLBACK_CONFIG,
+      TEST_CUSTOM_PRICING_CONFIG,
       GEMINI_FLASH_CURRENT_MODEL_ID,
       { ...usageStats, cost_mUsd: 5316 }
     );
     assert(customInferenceCost_mUsd !== undefined);
+    jest.mocked(getCustomPricingConfig).mockResolvedValueOnce(TEST_CUSTOM_PRICING_CONFIG);
 
     const result = await processTokenData(
       { ...usageStats, nonInferenceCost_mUsd: 7000 },

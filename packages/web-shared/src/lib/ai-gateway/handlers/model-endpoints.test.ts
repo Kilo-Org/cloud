@@ -4,6 +4,7 @@ import { ai_gateway_config } from '@kilocode/db/schema';
 import { NextRequest } from 'next/server';
 import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
 import { handleModelEndpointsRequest } from './model-endpoints';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
@@ -16,9 +17,10 @@ const mockedGetOpenRouterModelsMetadataFromDatabase = jest.mocked(
 
 beforeAll(async () => {
   await cleanupDbForTest();
-  await db
-    .insert(ai_gateway_config)
-    .values({ unavailable_models: { models: ['google/gemma-4-31b-it:free'] } });
+  await db.insert(ai_gateway_config).values({
+    unavailable_models: { models: ['google/gemma-4-31b-it:free'] },
+    custom_pricing: TEST_CUSTOM_PRICING_CONFIG,
+  });
 });
 
 function request(modelId: string) {

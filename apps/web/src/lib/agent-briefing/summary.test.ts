@@ -9,7 +9,7 @@ import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unav
 import { getPreferredProviderOrderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config';
 import { enforceRequestCostLimit } from '@kilocode/web-shared/lib/ai-gateway/request-cost-limit';
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
-import { CUSTOM_PRICING_FALLBACK_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
 import { briefingPriceBound, briefingPrompt } from './summary';
 import type { BriefingReportRow } from './store';
 
@@ -53,7 +53,7 @@ describe('briefing model pricing', () => {
     jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValue({});
     jest.mocked(getUnavailableModelIds).mockResolvedValue(new Set<string>());
     jest.mocked(getPreferredProviderOrderConfig).mockResolvedValue({ rules: [] });
-    jest.mocked(getCustomPricingConfig).mockResolvedValue(CUSTOM_PRICING_FALLBACK_CONFIG);
+    jest.mocked(getCustomPricingConfig).mockResolvedValue(TEST_CUSTOM_PRICING_CONFIG);
     jest
       .mocked(getRawOpenRouterModels)
       .mockResolvedValue({ data: [aion] } satisfies OpenRouterModelsResponse);

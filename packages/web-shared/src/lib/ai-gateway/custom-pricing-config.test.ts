@@ -2,7 +2,8 @@ import { beforeEach, describe, expect, test } from '@jest/globals';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { ai_gateway_config } from '@kilocode/db/schema';
 import { CustomPricingConfigSchema, type CustomPricingConfig } from '@kilocode/db/schema-types';
-import { CUSTOM_PRICING_FALLBACK_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import { EMPTY_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
 import { readCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 
 const tier = (start_context_length: number) => ({
@@ -24,13 +25,13 @@ describe('readCustomPricingConfig', () => {
     await cleanupDbForTest();
   });
 
-  test('returns the in-code fallback when no config row exists', async () => {
-    expect(await readCustomPricingConfig()).toBe(CUSTOM_PRICING_FALLBACK_CONFIG);
+  test('returns no custom pricing when no config row exists', async () => {
+    expect(await readCustomPricingConfig()).toBe(EMPTY_CUSTOM_PRICING_CONFIG);
   });
 
-  test('returns the in-code fallback when the column is null', async () => {
+  test('returns no custom pricing when the column is null', async () => {
     await db.insert(ai_gateway_config).values({ preferred_models: { models: ['provider/a'] } });
-    expect(await readCustomPricingConfig()).toBe(CUSTOM_PRICING_FALLBACK_CONFIG);
+    expect(await readCustomPricingConfig()).toBe(EMPTY_CUSTOM_PRICING_CONFIG);
   });
 
   test('reads the stored config', async () => {
@@ -52,9 +53,9 @@ describe('readCustomPricingConfig', () => {
 });
 
 describe('CustomPricingConfigSchema', () => {
-  test('accepts the in-code fallback', () => {
-    expect(CustomPricingConfigSchema.parse(CUSTOM_PRICING_FALLBACK_CONFIG)).toEqual(
-      CUSTOM_PRICING_FALLBACK_CONFIG
+  test('accepts the test fixture', () => {
+    expect(CustomPricingConfigSchema.parse(TEST_CUSTOM_PRICING_CONFIG)).toEqual(
+      TEST_CUSTOM_PRICING_CONFIG
     );
   });
 

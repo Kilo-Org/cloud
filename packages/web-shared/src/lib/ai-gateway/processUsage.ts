@@ -298,6 +298,23 @@ export async function toInsertableDbUsageRecord(
   return { core, metadata };
 }
 
+const PUBLISHER_NOT_CONFIGURED_REPORT_INTERVAL_MS = 60_000;
+let lastPublisherNotConfiguredReportAt = Number.NEGATIVE_INFINITY;
+
+/** Every selected event fails the same way, so report once per interval per instance. */
+function reportPublisherNotConfigured(usageId: string): void {
+  const now = Date.now();
+  if (now - lastPublisherNotConfiguredReportAt < PUBLISHER_NOT_CONFIGURED_REPORT_INTERVAL_MS) {
+    return;
+  }
+  lastPublisherNotConfiguredReportAt = now;
+  captureMessage('usage accounting queue publisher is not configured', {
+    level: 'error',
+    tags: { source: 'logMicrodollarUsage' },
+    extra: { usageId },
+  });
+}
+
 async function enqueueUsageWithinLifetime(
   payload: UsageRecordRequest
 ): Promise<UsageEnqueueOutcome> {
@@ -366,13 +383,41 @@ async function logMicrodollarUsageWithTransport(
       console.info('usage accounting queued', { usageId: core.id });
       return { status: 'queued', usageId: core.id, createdAt: core.created_at };
     }
+    if (outcome.reason === 'publisher_not_configured') {
+      // Nothing was attempted, so a direct write cannot duplicate the event.
+      reportPublisherNotConfigured(core.id);
+      console.warn('usage accounting queue publisher not configured', {
+        usageId: core.id,
+        fallback: 'direct',
+      });
+      return recordUsageDirectly(core, metadata, usageContext, bouncerUsageEvent);
+    }
+    if (outcome.reason === 'registration_failed') {
+      // No request scope or `waitUntil`, so `after()` could not track the publication.
+      // Nothing was published, so the direct write cannot duplicate it.
+      console.warn('usage accounting queue unavailable without a request lifetime', {
+        usageId: core.id,
+        reason: outcome.reason,
+        fallback: 'direct',
+      });
+      return recordUsageDirectly(core, metadata, usageContext, bouncerUsageEvent);
+    }
     console.error('usage accounting publication failed', {
       usageId: core.id,
-      reason: outcome.kind === 'disabled' ? 'publisher_disabled' : outcome.reason,
+      reason: outcome.reason,
     });
     return null;
   }
 
+  return recordUsageDirectly(core, metadata, usageContext, bouncerUsageEvent);
+}
+
+async function recordUsageDirectly(
+  core: MicrodollarUsage,
+  metadata: UsageMetaData,
+  usageContext: MicrodollarUsageContext,
+  bouncerUsageEvent: BouncerUsageEventEnqueue | null
+): Promise<UsageAccountingResult | null> {
   const inserted = await saveUsageRelatedData(
     core,
     metadata,

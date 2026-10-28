@@ -8,6 +8,7 @@ import { useTRPC } from '@/lib/trpc/utils';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { CustomPricingConfigSchema, type CustomPricingConfig } from '@kilocode/db/schema-types';
+import { EMPTY_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
 import { deepStrict } from '@/lib/zod/deep-strict';
 import { formatZodError } from '@/lib/zod/format-zod-error';
 
@@ -42,7 +43,7 @@ export function CustomPricingContent() {
 
   useEffect(() => {
     if (data) {
-      setJson(toJson(data.config ?? data.fallback));
+      setJson(toJson(data.config ?? EMPTY_CUSTOM_PRICING_CONFIG));
       setValidationError(null);
       setHasChanges(false);
     }
@@ -54,11 +55,7 @@ export function CustomPricingContent() {
         void queryClient.invalidateQueries({
           queryKey: trpc.admin.customPricing.get.queryKey(),
         });
-        toast.success(
-          result.config
-            ? 'Custom pricing saved'
-            : 'Custom pricing cleared; the in-code defaults apply again'
-        );
+        toast.success(result.config ? 'Custom pricing saved' : 'Custom pricing cleared');
       },
       onError: error => {
         toast.error(formatZodError(error));
@@ -108,15 +105,15 @@ export function CustomPricingContent() {
             <code>input_cache_write_per_million</code> to <code>null</code> to bill cache tokens at
             the prompt price. The optional <code>discountPercentage</code> is only shown in the
             model name. With <code>fallbackOnly</code>, the prices apply only when the upstream
-            reports no cost. When no configuration is stored, the in-code defaults shown below
-            apply. Changes take effect within one minute on warm instances.
+            reports no cost. When no configuration is stored, no custom pricing applies. Changes
+            take effect within one minute on warm instances.
           </CardDescription>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <p className="text-muted-foreground text-sm">
             {hasStoredConfig
               ? 'Showing the stored configuration.'
-              : 'No configuration stored. The gateway uses the in-code defaults shown below.'}
+              : 'No configuration stored. The gateway applies no custom pricing.'}
           </p>
           <div className="border-input overflow-hidden rounded-md border">
             <Editor

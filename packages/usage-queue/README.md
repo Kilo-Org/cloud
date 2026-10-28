@@ -76,8 +76,8 @@ ignores this selector and deploys neither the callback nor its queue trigger.
 There is still a one-time setup: supply the gateway's existing staging writer
 URL/credential and optional protection bypass from the activation table, confirm
 Queues/OIDC project access, and deploy gateway + writer. The normal staging
-workflow includes the FRA trigger at cap 200 automatically; no separate queue
-publish endpoint or manual topic-creation script is part of this POC. These
+workflow automatically includes the FRA trigger without a queue-level concurrency
+cap; no separate queue publish endpoint or manual topic-creation script is part of this POC. These
 prerequisites have not been inspected or activated on the hosted project here.
 
 Before the first deployment of this change, verify the staging selector is not
@@ -131,23 +131,21 @@ The configuration explicitly selects `pnpm run build`, which runs
 `src/app/api/v1/internal/queues/usage/route.ts` only in staging and removes a stale
 copy on other targets. This is also the trigger selector in `vercel.mjs`. Its
 `queue/v2beta` trigger uses
-`usage-staging`, retries after 60s, caps deliveries at 20 and sets
-**maxConcurrency=200**. It has a separate function `regions: ["fra1"]` override;
+`usage-staging`, retries after 60s, caps deliveries at 20 and omits
+**maxConcurrency** for the staging diagnostic experiment. It has a separate
+function `regions: ["fra1"]` override;
 normal gateway functions retain FRA/SFO. Consumer maxDuration is 180s, writer
 HTTP timeout 160s, existing writer maxDuration 150s, SDK visibility 300s with renewal.
 The maintained pnpm SDK patch removes receipt handles/raw errors from renewal
 logs in both runtime bundles; retain its slow-renewal tests on SDK upgrades.
 
-**Capacity is static deployment configuration, not a runtime variable.** The
-previous prototype cap 4 was a smoke ceiling. This candidate selects 200 for
-comparability with checked-in CF staging capacity. Changing 4 ↔ 200 requires
-changing the trigger field and redeploying; enabling the runtime flags cannot
-raise a deployed cap. This uses supported programmatic Vercel configuration; no
-JSON interpolation or project-setting mutation is supplied. A one-request smoke
-at ceiling 200 still sends only one event;
-operators who require a cap-4 smoke must deploy that explicit static variant
-first, then review/redeploy the cap-200 variant before load. A ceiling of 200 does
-not guarantee 100 requests/s: actual scheduling, writer latency and retries matter.
+**Capacity is static deployment configuration, not a runtime variable.** Earlier
+prototype variants used cap 4 for smoke and cap 200 for comparison. This candidate
+removes the staging queue-level cap by omitting `maxConcurrency`; Vercel function
+and account limits may still apply. The omission takes effect only after deployment,
+so inspect the deployed trigger and retain old deployment settings in the run manifest.
+Runtime flags cannot change a deployed cap. This diagnostic experiment makes no
+latency or throughput improvement claim; actual scheduling, writer latency and retries matter.
 
 Production/preview/unknown-target builds contain neither the callback route nor
 its queue trigger. The ordinary gateway routes retain their FRA/SFO defaults.
@@ -181,9 +179,10 @@ messages retain their original consumer code; keep those deployments and writer
 credentials/schema compatible while they drain.
 
 Topics are project scoped and messages deployment pinned. Put the callback in
-the producer gateway project, not the separate writer project. Each old/new
-consumer deployment has its own budget; simultaneous partitions can exceed 200
-aggregate writer calls. Drain/isolate old partitions before comparisons.
+the producer gateway project, not the separate writer project. Old cap-200
+consumer deployments retain their own limits; new uncapped deployments set no
+queue-level concurrency budget. The shared writer sees aggregate traffic from
+all active deployment partitions. Drain/isolate old partitions before comparisons.
 
 Current Vercel docs define queue-triggered functions as private, with no public
 URL. Verify deployed output/console actually classifies this function that way;
@@ -216,7 +215,7 @@ never pasted into commands, PRs, logs or manifests.
 | Gateway project | OIDC + Queues access | Confirm deployed SDK can publish/consume in this project; verify plan/permissions | Platform prerequisite; no login/pull performed here |
 | Writer / staging | `INTERNAL_API_SECRET` | Existing matching secret, existing DB/runtime settings retained | No new queue flags; deploy caller-label change |
 | Gateway / staging | CF `USAGE_INGEST_URL` / `USAGE_INGEST_PUBLISH_SECRET` | Retain existing values for switchback | Existing configuration/credential |
-| Gateway deployment | Topic / storage / callback region / cap | `usage-staging` / FRA / FRA / 200 | Static config; requires deployment |
+| Gateway deployment | Topic / storage / callback region / cap | `usage-staging` / FRA / FRA / omitted `maxConcurrency` | Static config; requires deployment |
 
 Exact `vercel` alone selects Vercel plus queue-only accounting under the staging
 guard, including when the legacy queue-only flag is absent/false. Setting only
@@ -301,7 +300,7 @@ publishing, weaken validation or add a failed-event ACK to make the check pass.
    do not bypass rate limits or turn 429s into more load. Start with a small cohort,
    then separately authorized 10/25/50/100 requests/s stages, bounded in count/time
    and separated by full drain and fresh baseline windows. Do not start 100rps
-   merely because the configured consumer ceiling is 200.
+   merely because the queue-level concurrency cap is omitted.
 5. Stop **new intake** on unexplained publish loss/unknown acceptance, sustained
    retries/backlog age beyond the declared gate, writer 429/503, DB overload,
    spend cap, or account/provider rejection. Keep accepted work consuming; examine
@@ -314,29 +313,33 @@ publishing, weaken validation or add a failed-event ACK to make the check pass.
 
 | Control | Cloudflare pinned source / deployed comparator | Vercel candidate |
 |---|---|---|
-| Ceiling and scope | Pinned main uses one global queue at `max_concurrency=200`; record actual queue identity/location, deployed Worker revision and all consumers | Trigger `maxConcurrency=200` per consumer group/deployment partition; inventory old partitions |
+| Ceiling and scope | Pinned main uses one global queue at `max_concurrency=200`; record actual queue identity/location, deployed Worker revision and all consumers | Staging trigger omits `maxConcurrency`; record platform limits and inventory old deployment partitions |
 | Batch / writer calls | Pinned main uses batch 1 / timeout 0 / sequential calls; deployed batch and per-batch parallelism must be recorded | One event/callback and one awaited writer call |
 | Retry / recovery | `max_retries=3`, `retry_delay=60`, configured DLQ; verify retention and deployed settings | 20 deliveries, 60s retry, 24h TTL, no built-in DLQ |
-| Writer admission | Same existing staging writer, revision, HTTP budget, DB pool and other traffic | Same; configured cap does not prove achieved concurrency |
+| Writer admission | Same existing staging writer, revision, HTTP budget, DB pool and other traffic | Same; omitting the queue cap does not prove achieved concurrency |
 
 These source defaults describe main `b63e3f2b12ee2b8876dc266edd1e260553936f92`,
 not verified hosted settings. If the operator selects a single EU queue, record
 its actual identity/location and deployed revision; this prototype neither creates
 nor depends on it. A comparator with batch 2, parallelism 2 and cap 200 can permit
-up to **400 concurrent writer calls**, versus Vercel’s 200 one-event callbacks.
-A cap of 100 with parallelism 2 instead preserves a 200-call bound. Include all
+up to **400 concurrent writer calls**; the earlier Vercel cap-200 variant allowed
+200 one-event callbacks. This candidate omits the Vercel queue cap. A CF cap of
+100 with parallelism 2 preserves a 200-call bound. Include all
 retained consumers/partitions and the deployed relay/writer revisions in the
 manifest; do not import pending EU or batching changes to construct this POC.
 
 Align observed effective writer concurrency and workload before attributing any
-result to transport. A CF400/Vercel200 scenario is an **unmatched whole-system
+result to transport. Comparing capped CF with this uncapped Vercel candidate is an
+**unmatched whole-system comparison** unless effective writer concurrency is aligned.
+A historical CF400/Vercel200 scenario is an **unmatched whole-system
 comparison**, even if both consumer settings say 200. If CF200 is compared
 with a cap-4 smoke variant, label it
 **unmatched whole-system configurations (CF200/Vercel4)**, not transport isolation.
 The intentional Vercel policy remains **20 total deliveries with 60s retry**;
 CF has three retries after the first attempt, **four total attempts**. For each valid
 queued message whose attempts reach the writer, Vercel therefore permits up to
-**5× the configured attempt budget** (20 versus 4), even with both caps at 200.
+**5× the configured attempt budget** (20 versus 4), independent of the concurrency
+setting.
 Delivery failures before the writer can consume budget without an HTTP write;
 measure actual writer calls, retries and DB pressure rather than inferring them.
 Failure/saturation tests are **not matched on retry pressure** and must be labeled

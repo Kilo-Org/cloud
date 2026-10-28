@@ -115,6 +115,11 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
 
   result['codestral'] = ['Codestral (mistralai/codestral-2508)'];
 
+  const addSupportedModel = (providerId: string, model: { id: string; name: string }) => {
+    if (!result[providerId]) result[providerId] = [];
+    result[providerId].push(model.name + ' (' + model.id + ')');
+  };
+
   for (const openRouterModel of Object.values(openRouterModelMetadata)) {
     if (isKiloExclusiveModel(openRouterModel.id)) continue;
     const vercelModel = vercelModelMetadata[await mapModelIdToVercel(openRouterModel.id)];
@@ -125,15 +130,16 @@ async function fetchSupportedModels(): Promise<Record<string, string[]>> {
         endpoint.provider_name ?? endpoint.tag
       );
       if (!providerId) continue;
-      if (!result[providerId]) result[providerId] = [];
-      result[providerId].push(openRouterModel.name + ' (' + openRouterModel.id + ')');
+      addSupportedModel(providerId, openRouterModel);
     }
   }
 
   for (const provider of DIRECT_BYOK_PROVIDERS) {
     for (const model of await provider.models()) {
-      if (!result[provider.id]) result[provider.id] = [];
-      result[provider.id].push(model.name + ' (' + formatDirectByokModelId(provider, model) + ')');
+      addSupportedModel(provider.id, {
+        id: formatDirectByokModelId(provider, model),
+        name: model.name,
+      });
     }
   }
 

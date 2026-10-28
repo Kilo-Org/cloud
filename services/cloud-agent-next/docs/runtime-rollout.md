@@ -59,7 +59,8 @@ exact source SHA, bucket and instance type for each qualification deployment.
    container captures under its start image. B1 is merged into main, and its regression test runs
    in CI.
 3. Enroll one test organization through `interactiveOrgIds` on production runtime-free. Complete the
-   checks below with web sessions in that organization.
+   checks below with sessions in that organization, including at least one web session and one
+   non-web session (for example a webhook trigger).
 4. Expanding the list or removing the cohort restriction requires that qualification evidence and a
    separate reviewed catalog change.
 

@@ -1308,6 +1308,7 @@
       "noDeadlineData": "Noch keine Befunde mit SLA-Frist",
       "deadlinePassed": "Frist abgelaufen",
       "deadlinePassedDetail": "{{critical}} kritisch, {{high}} hoch",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} kritisch, {{high}} hoch, {{mediumLow}} mittel und niedrig",
       "dueThisWeek": "Diese Woche fällig",
       "dueThisWeekDetail": "{{exploitable}} davon nachweislich ausnutzbar",
       "noDeadline": "Keine Frist",

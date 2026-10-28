@@ -1308,6 +1308,7 @@
       "noDeadlineData": "Chưa có vấn đề nào được đặt hạn chót SLA",
       "deadlinePassed": "Đã quá hạn",
       "deadlinePassedDetail": "{{critical}} nghiêm trọng, {{high}} cao",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} nghiêm trọng, {{high}} cao, {{mediumLow}} trung bình và thấp",
       "dueThisWeek": "Đến hạn trong tuần này",
       "dueThisWeekDetail": "{{exploitable}} trong số này đã được xác nhận là có thể bị khai thác",
       "noDeadline": "Không có hạn chót",

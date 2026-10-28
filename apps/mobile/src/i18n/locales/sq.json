@@ -1781,6 +1781,7 @@
       "noDeadlineData": "Asnjë gjetje nuk ka ende afat SLA",
       "deadlinePassed": "Afati kaloi",
       "deadlinePassedDetail": "{{critical}} kritike, {{high}} me rrezik të lartë",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} kritike, {{high}} me rrezik të lartë, {{mediumLow}} me rrezik të mesëm ose të ulët",
       "dueThisWeek": "Afati këtë javë",
       "dueThisWeekDetail": "{{exploitable}} prej tyre të konfirmuara si të shfrytëzueshme",
       "noDeadline": "Pa afat",

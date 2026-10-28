@@ -1781,6 +1781,7 @@
       "noDeadlineData": "እስካሁን ምንም ግኝት የSLA ጊዜ ገደብ የለውም",
       "deadlinePassed": "የጊዜ ገደቡ አልፏል",
       "deadlinePassedDetail": "{{critical}} እጅግ ከፍተኛ፣ {{high}} ከፍተኛ",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} እጅግ ከፍተኛ፣ {{high}} ከፍተኛ፣ {{mediumLow}} መካከለኛና ዝቅተኛ",
       "dueThisWeek": "በዚህ ሳምንት ጊዜያቸው የሚያበቃ",
       "dueThisWeekDetail": "ከእነዚህ ውስጥ {{exploitable}} ለጥቃት ሊውሉ እንደሚችሉ ተረጋግጠዋል",
       "noDeadline": "ምንም ጊዜ ገደብ የለም",

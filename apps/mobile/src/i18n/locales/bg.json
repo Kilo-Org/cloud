@@ -1781,6 +1781,7 @@
       "noDeadlineData": "Все още няма проблеми с краен срок по SLA",
       "deadlinePassed": "Крайният срок изтече",
       "deadlinePassedDetail": "{{critical}} критични, {{high}} с висока тежест",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} критични, {{high}} с висока тежест, {{mediumLow}} със средна и ниска тежест",
       "dueThisWeek": "С краен срок тази седмица",
       "dueThisWeekDetail": "От тях {{exploitable}} с потвърдена възможност за атака",
       "noDeadline": "Няма краен срок",

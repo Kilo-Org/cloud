@@ -1847,6 +1847,7 @@
       "noDeadlineData": "No findings have an SLA deadline yet",
       "deadlinePassed": "Deadline passed",
       "deadlinePassedDetail": "{{critical}} critical, {{high}} high",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} critical, {{high}} high, {{mediumLow}} medium & low",
       "dueThisWeek": "Due this week",
       "dueThisWeekDetail": "{{exploitable}} of these confirmed exploitable",
       "noDeadline": "No deadline",

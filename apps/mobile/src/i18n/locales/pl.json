@@ -1322,6 +1322,7 @@
       "noDeadlineData": "Żaden problem nie ma jeszcze terminu SLA",
       "deadlinePassed": "Termin minął",
       "deadlinePassedDetail": "Poziom krytyczny: {{critical}}, wysoki: {{high}}",
+      "deadlinePassedDetailWithMediumLow": "Poziom krytyczny: {{critical}}, wysoki: {{high}}, średni i niski: {{mediumLow}}",
       "dueThisWeek": "Termin w tym tygodniu",
       "dueThisWeekDetail": "W tym {{exploitable}} z potwierdzoną możliwością wykorzystania w ataku",
       "noDeadline": "Brak terminu",

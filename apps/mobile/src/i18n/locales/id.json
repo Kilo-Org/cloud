@@ -1308,6 +1308,7 @@
       "noDeadlineData": "Belum ada temuan yang memiliki tenggat SLA",
       "deadlinePassed": "Tenggat terlewati",
       "deadlinePassedDetail": "{{critical}} kritis, {{high}} tinggi",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} kritis, {{high}} tinggi, {{mediumLow}} sedang dan rendah",
       "dueThisWeek": "Jatuh tempo minggu ini",
       "dueThisWeekDetail": "{{exploitable}} di antaranya terkonfirmasi dapat dieksploitasi",
       "noDeadline": "Tanpa tenggat",

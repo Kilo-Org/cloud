@@ -1322,6 +1322,7 @@
       "noDeadlineData": "Ни для одной уязвимости ещё не задан срок исправления по SLA",
       "deadlinePassed": "Срок истек",
       "deadlinePassedDetail": "Критический уровень: {{critical}}, высокий: {{high}}",
+      "deadlinePassedDetailWithMediumLow": "Критический уровень: {{critical}}, высокий: {{high}}, средний и низкий: {{mediumLow}}",
       "dueThisWeek": "Срок истекает на этой неделе",
       "dueThisWeekDetail": "Возможность эксплуатации подтверждена у {{exploitable}} из этих уязвимостей",
       "noDeadline": "Без срока",

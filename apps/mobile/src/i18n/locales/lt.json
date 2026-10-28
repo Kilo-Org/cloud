@@ -1831,6 +1831,7 @@
       "noDeadlineData": "Dar nė vienam radiniui nenustatytas SLA terminas",
       "deadlinePassed": "Terminas pasibaigęs",
       "deadlinePassedDetail": "Kritinio lygio: {{critical}}, aukšto lygio: {{high}}",
+      "deadlinePassedDetailWithMediumLow": "Kritinio lygio: {{critical}}, aukšto lygio: {{high}}, vidutinio ir mažo pavojingumo: {{mediumLow}}",
       "dueThisWeek": "Terminas šią savaitę",
       "dueThisWeekDetail": "{{exploitable}} iš šių patvirtinti kaip išnaudojami",
       "noDeadline": "Nėra termino",

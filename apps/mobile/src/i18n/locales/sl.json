@@ -1831,6 +1831,7 @@
       "noDeadlineData": "Nobena ugotovitev še nima roka SLA",
       "deadlinePassed": "Rok je potekel",
       "deadlinePassedDetail": "Kritično: {{critical}}, visoko: {{high}}",
+      "deadlinePassedDetailWithMediumLow": "Kritično: {{critical}}, visoko: {{high}}, srednje in nisko: {{mediumLow}}",
       "dueThisWeek": "Rok poteče ta teden",
       "dueThisWeekDetail": "{{exploitable}} od teh je potrjeno izkoristljivih",
       "noDeadline": "Brez roka",

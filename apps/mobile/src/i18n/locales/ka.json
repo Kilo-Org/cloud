@@ -1781,6 +1781,7 @@
       "noDeadlineData": "არცერთ მიგნებას ჯერ არ აქვს SLA-ის ვადა",
       "deadlinePassed": "ვადა ამოიწურა",
       "deadlinePassedDetail": "{{critical}} კრიტიკული, {{high}} მაღალი",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} კრიტიკული, {{high}} მაღალი, {{mediumLow}} საშუალო და დაბალი",
       "dueThisWeek": "ვადა ამ კვირაშია",
       "dueThisWeekDetail": "{{exploitable}} ამათგან ბოროტად გამოყენების შესაძლებლობა დადასტურებულია",
       "noDeadline": "ვადის გარეშე",

@@ -1781,6 +1781,7 @@
       "noDeadlineData": "Oraindik ez dago SLAren epemuga duen aurkikuntzarik",
       "deadlinePassed": "Epea gainditu da",
       "deadlinePassedDetail": "{{critical}} kritiko, {{high}} larritasun altuko",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} kritiko, {{high}} larritasun altuko, {{mediumLow}} larritasun ertaineko eta txikiko",
       "dueThisWeek": "Aste honetan amaitzen da",
       "dueThisWeekDetail": "Horietatik {{exploitable}} ustiagarri direla baieztatuta",
       "noDeadline": "Eperik gabe",

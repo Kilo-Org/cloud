@@ -1781,6 +1781,7 @@
       "noDeadlineData": "කිසිදු සොයාගැනීමකට තවම SLA අවසන් දිනයක් නියම කර නැත",
       "deadlinePassed": "නියමිත කාලය ඉක්මවා ඇත",
       "deadlinePassedDetail": "බරපතළ {{critical}}, ඉහළ {{high}}",
+      "deadlinePassedDetailWithMediumLow": "බරපතළ {{critical}}, ඉහළ {{high}}, {{mediumLow}} මධ්‍යම හා පහළ",
       "dueThisWeek": "මෙම සතිය තුළ නිම කළ යුතුයි",
       "dueThisWeekDetail": "මේවායින් {{exploitable}} ක් ප්‍රහාරයකට යොදාගත හැකි බව තහවුරුයි",
       "noDeadline": "නියමිත කාලයක් නැත",

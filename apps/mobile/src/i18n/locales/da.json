@@ -1781,6 +1781,7 @@
       "noDeadlineData": "Ingen fund har en SLA-frist endnu",
       "deadlinePassed": "Frist overskredet",
       "deadlinePassedDetail": "{{critical}} med kritisk risiko, {{high}} med høj risiko",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} med kritisk risiko, {{high}} med høj risiko, {{mediumLow}} med middel og lav alvorlighed",
       "dueThisWeek": "Frist i denne uge",
       "dueThisWeekDetail": "{{exploitable}} af disse fund er bekræftet udnyttelige",
       "noDeadline": "Ingen frist",

@@ -1781,6 +1781,7 @@
       "noDeadlineData": "Akukho okutholakele okunomnqamulajuqu we-SLA okwamanje",
       "deadlinePassed": "Umnqamulajuqu usudlulile",
       "deadlinePassedDetail": "{{critical}} okubucayi, {{high}} okuphezulu",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} okubucayi, {{high}} okuphezulu, {{mediumLow}} obumaphakathi nobuphansi",
       "dueThisWeek": "Kufanele kwenziwe kuleli sonto",
       "dueThisWeekDetail": "Okungu-{{exploitable}} kulawa kuqinisekiswe ukuthi kungasetshenziswa ekuhlaseleni",
       "noDeadline": "Awukho umnqamulajuqu",

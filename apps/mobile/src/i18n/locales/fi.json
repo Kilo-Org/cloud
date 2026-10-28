@@ -1781,6 +1781,7 @@
       "noDeadlineData": "Millään havainnolla ei ole vielä SLA-määräaikaa",
       "deadlinePassed": "Määräaika umpeutunut",
       "deadlinePassedDetail": "{{critical}} kriittistä, {{high}} vakavaa",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} kriittistä, {{high}} vakavaa, {{mediumLow}} keskivakavaa ja lievää",
       "dueThisWeek": "Määräaika tällä viikolla",
       "dueThisWeekDetail": "{{exploitable}} näistä hyödynnettäväksi vahvistettua",
       "noDeadline": "Ei määräaikaa",

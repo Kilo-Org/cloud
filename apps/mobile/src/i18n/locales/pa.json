@@ -1781,6 +1781,7 @@
       "noDeadlineData": "ਅਜੇ ਕਿਸੇ ਵੀ ਸਮੱਸਿਆ ਲਈ SLA ਦੀ ਸਮਾਂ ਸੀਮਾ ਨਹੀਂ ਹੈ",
       "deadlinePassed": "ਸਮਾਂ ਸੀਮਾ ਲੰਘ ਗਈ",
       "deadlinePassedDetail": "{{critical}} ਅਤਿ ਗੰਭੀਰ, {{high}} ਉੱਚ",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} ਅਤਿ ਗੰਭੀਰ, {{high}} ਉੱਚ, {{mediumLow}} ਦਰਮਿਆਨੀ ਤੇ ਘੱਟ",
       "dueThisWeek": "ਇਸ ਹਫ਼ਤੇ ਆਖ਼ਰੀ ਮਿਤੀ",
       "dueThisWeekDetail": "ਇਹਨਾਂ ਵਿੱਚੋਂ {{exploitable}} ਦੀ ਦੁਰਵਰਤੋਂ ਸੰਭਵ ਹੋਣ ਦੀ ਪੁਸ਼ਟੀ",
       "noDeadline": "ਕੋਈ ਸਮਾਂ ਸੀਮਾ ਨਹੀਂ",

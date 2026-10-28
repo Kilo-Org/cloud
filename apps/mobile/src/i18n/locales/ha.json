@@ -1781,6 +1781,7 @@
       "noDeadlineData": "Har yanzu ba a saita wa'adin SLA ga wata matsala ba",
       "deadlinePassed": "Wa'adin ya wuce",
       "deadlinePassedDetail": "Masu tsanani: {{critical}}, manya: {{high}}",
+      "deadlinePassedDetailWithMediumLow": "Masu tsanani: {{critical}}, manya: {{high}}, matsakaici da ƙarami: {{mediumLow}}",
       "dueThisWeek": "Wa'adi zai cika wannan makon",
       "dueThisWeekDetail": "An tabbatar da yiwuwar amfani da {{exploitable}} daga cikin waɗannan wajen kai hari",
       "noDeadline": "Babu wa'adi",

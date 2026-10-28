@@ -1315,6 +1315,7 @@
       "noDeadlineData": "Aún no hay hallazgos con un plazo del SLA asignado",
       "deadlinePassed": "Plazo vencido",
       "deadlinePassedDetail": "{{critical}} de nivel crítico, {{high}} de nivel alto",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} de nivel crítico, {{high}} de nivel alto, {{mediumLow}} de gravedad media y baja",
       "dueThisWeek": "Vencen esta semana",
       "dueThisWeekDetail": "{{exploitable}} de ellos son explotables confirmados",
       "noDeadline": "Sin plazo",

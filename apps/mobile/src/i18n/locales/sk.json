@@ -1831,6 +1831,7 @@
       "noDeadlineData": "Žiadny nález zatiaľ nemá termín SLA",
       "deadlinePassed": "Termín uplynul",
       "deadlinePassedDetail": "Kritická závažnosť: {{critical}}, vysoká závažnosť: {{high}}",
+      "deadlinePassedDetailWithMediumLow": "Kritická závažnosť: {{critical}}, vysoká závažnosť: {{high}}, stredná a nízka závažnosť: {{mediumLow}}",
       "dueThisWeek": "Termín tento týždeň",
       "dueThisWeekDetail": "{{exploitable}} z týchto je potvrdených ako zneužiteľných",
       "noDeadline": "Bez termínu",

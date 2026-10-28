@@ -1781,6 +1781,7 @@
       "noDeadlineData": "Ingen funn har en SLA-frist ennå",
       "deadlinePassed": "Fristen er overskredet",
       "deadlinePassedDetail": "{{critical}} kritiske, {{high}} med høy alvorlighetsgrad",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} kritiske, {{high}} med høy alvorlighetsgrad, {{mediumLow}} middels og lav",
       "dueThisWeek": "Frist denne uken",
       "dueThisWeekDetail": "{{exploitable}} av disse er bekreftet utnyttbare",
       "noDeadline": "Ingen frist",

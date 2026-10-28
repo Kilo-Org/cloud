@@ -1781,6 +1781,7 @@
       "noDeadlineData": "ยังไม่มีข้อค้นพบที่มีกำหนดเวลา SLA",
       "deadlinePassed": "เลยกำหนดเวลา",
       "deadlinePassedDetail": "ระดับวิกฤต {{critical}} รายการ ระดับสูง {{high}} รายการ",
+      "deadlinePassedDetailWithMediumLow": "ระดับวิกฤต {{critical}} รายการ ระดับสูง {{high}} รายการ ระดับปานกลางและต่ำ {{mediumLow}} รายการ",
       "dueThisWeek": "ถึงกำหนดสัปดาห์นี้",
       "dueThisWeekDetail": "จากจำนวนนี้ยืนยันว่าผู้โจมตีนำไปใช้ได้ {{exploitable}} รายการ",
       "noDeadline": "ไม่มีกำหนดเวลา",

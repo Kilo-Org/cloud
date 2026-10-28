@@ -1781,6 +1781,7 @@
       "noDeadlineData": "Hali hech bir muammo uchun SLA muddati belgilanmagan",
       "deadlinePassed": "Muddat o'tdi",
       "deadlinePassedDetail": "{{critical}} ta o‘ta yuqori, {{high}} ta yuqori",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} ta o‘ta yuqori, {{high}} ta yuqori, {{mediumLow}} ta o‘rta va past",
       "dueThisWeek": "Muddati shu hafta tugaydi",
       "dueThisWeekDetail": "{{exploitable}} tasida hujumda foydalanish mumkinligi tasdiqlangan",
       "noDeadline": "Muddat yo'q",

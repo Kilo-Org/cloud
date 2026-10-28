@@ -1781,6 +1781,7 @@
       "noDeadlineData": "Aínda non hai achados cun prazo do SLA",
       "deadlinePassed": "Prazo vencido",
       "deadlinePassedDetail": "{{critical}} críticos, {{high}} de gravidade alta",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} críticos, {{high}} de gravidade alta, {{mediumLow}} de gravidade media e baixa",
       "dueThisWeek": "Vence esta semana",
       "dueThisWeekDetail": "{{exploitable}} destes confirmados como explotables",
       "noDeadline": "Sen prazo",

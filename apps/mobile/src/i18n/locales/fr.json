@@ -1283,6 +1283,7 @@
       "noDeadlineData": "Aucun signalement n'a encore d'échéance de SLA",
       "deadlinePassed": "Échéance dépassée",
       "deadlinePassedDetail": "{{critical}} de niveau critique, {{high}} de niveau élevé",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} de niveau critique, {{high}} de niveau élevé, {{mediumLow}} de gravité moyenne ou faible",
       "dueThisWeek": "Échéance cette semaine",
       "dueThisWeekDetail": "Dont {{exploitable}} confirmés exploitables",
       "noDeadline": "Aucune échéance",

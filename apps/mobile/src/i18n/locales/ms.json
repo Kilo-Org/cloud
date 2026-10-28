@@ -1781,6 +1781,7 @@
       "noDeadlineData": "Belum ada penemuan yang mempunyai tarikh akhir SLA",
       "deadlinePassed": "Tarikh akhir telah berlalu",
       "deadlinePassedDetail": "{{critical}} kritikal, {{high}} tinggi",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} kritikal, {{high}} tinggi, {{mediumLow}} sederhana atau rendah",
       "dueThisWeek": "Tarikh akhir minggu ini",
       "dueThisWeekDetail": "{{exploitable}} daripada ini disahkan boleh dieksploitasi",
       "noDeadline": "Tiada tarikh akhir",

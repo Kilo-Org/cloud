@@ -1781,6 +1781,7 @@
       "noDeadlineData": "ಪತ್ತೆಯಾದ ಯಾವುದೇ ಸಮಸ್ಯೆಗೆ ಇನ್ನೂ SLA ಗಡುವು ನಿಗದಿಯಾಗಿಲ್ಲ",
       "deadlinePassed": "ಗಡುವು ಕಳೆದಿದೆ",
       "deadlinePassedDetail": "{{critical}} ಗಂಭೀರ, {{high}} ಹೆಚ್ಚು",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} ಗಂಭೀರ, {{high}} ಹೆಚ್ಚು, {{mediumLow}} ಮಧ್ಯಮ ಮತ್ತು ಕಡಿಮೆ",
       "dueThisWeek": "ಈ ವಾರ ಗಡುವು",
       "dueThisWeekDetail": "ಇವುಗಳಲ್ಲಿ {{exploitable}} ಸಮಸ್ಯೆಗಳನ್ನು ದುರ್ಬಳಕೆ ಮಾಡಬಹುದೆಂದು ದೃಢಪಟ್ಟಿದೆ",
       "noDeadline": "ಗಡುವು ಇಲ್ಲ",

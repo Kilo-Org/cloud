@@ -1781,6 +1781,7 @@
       "noDeadlineData": "Ühelgi leiul pole veel SLA tähtaega",
       "deadlinePassed": "Tähtaeg möödunud",
       "deadlinePassedDetail": "{{critical}} kriitilise, {{high}} kõrge raskusastmega",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} kriitilise, {{high}} kõrge raskusastmega, {{mediumLow}} keskmise ja madala raskusastmega",
       "dueThisWeek": "Tähtajaga sel nädalal",
       "dueThisWeekDetail": "{{exploitable}} neist on kinnitatud ärakasutatavad",
       "noDeadline": "Tähtaega pole",

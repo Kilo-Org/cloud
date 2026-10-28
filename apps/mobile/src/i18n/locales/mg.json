@@ -1781,6 +1781,7 @@
       "noDeadlineData": "Mbola tsy misy olana hita manana fe-potoana SLA",
       "deadlinePassed": "Nihoatra ny fe-potoana",
       "deadlinePassedDetail": "{{critical}} tena avo, {{high}} avo",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} tena avo, {{high}} avo, {{mediumLow}} antonony na ambany hamafy",
       "dueThisWeek": "Fe-potoana farany amin'ity herinandro ity",
       "dueThisWeekDetail": "{{exploitable}} amin'ireto no voamarina fa azo hararaotina",
       "noDeadline": "Tsy misy fe-potoana",

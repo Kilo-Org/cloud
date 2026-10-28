@@ -1283,6 +1283,7 @@
       "noDeadlineData": "Nessuna segnalazione ha ancora una scadenza SLA",
       "deadlinePassed": "Scadenza superata",
       "deadlinePassedDetail": "{{critical}} di gravità critica, {{high}} di gravità alta",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} di gravità critica, {{high}} di gravità alta, {{mediumLow}} di gravità media e bassa",
       "dueThisWeek": "In scadenza questa settimana",
       "dueThisWeekDetail": "{{exploitable}} di queste con sfruttabilità confermata",
       "noDeadline": "Nessuna scadenza",

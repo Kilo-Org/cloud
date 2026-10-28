@@ -1806,6 +1806,7 @@
       "noDeadlineData": "Encara no hi ha cap incidència amb un termini de l'SLA",
       "deadlinePassed": "Termini vençut",
       "deadlinePassedDetail": "{{critical}} de nivell crític, {{high}} de nivell alt",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} de nivell crític, {{high}} de nivell alt, {{mediumLow}} de nivell mitjà i baix",
       "dueThisWeek": "Vencen aquesta setmana",
       "dueThisWeekDetail": "{{exploitable}} d'aquestes confirmades com a explotables",
       "noDeadline": "Sense termini",

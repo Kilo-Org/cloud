@@ -280,7 +280,7 @@ describe('GET /api/v1/models', () => {
         .spyOn(global, 'fetch')
         .mockResolvedValue(createMockResponse({ jsonData: mockOpenRouterModels }));
 
-      const catalog = await getEnhancedOpenRouterModels();
+      const catalog = await getEnhancedOpenRouterModels({ countryCode: null });
       const publicModel = catalog.data.find(
         model => model.id === qwen36_plus_stealth_model.public_id
       );
@@ -958,7 +958,7 @@ describe('final Enkrypt serialization boundaries', () => {
   }
 
   async function organizationModels(): Promise<OpenRouterModelsResponse> {
-    const response = await getEnhancedOpenRouterModels();
+    const response = await getEnhancedOpenRouterModels({ countryCode: null });
     return { ...response, data: response.data.filter(model => model.id === 'some-other-model') };
   }
 
@@ -971,7 +971,7 @@ describe('final Enkrypt serialization boundaries', () => {
   }
 
   async function responseFor(branch: Branch) {
-    if (branch === 'direct') return getEnhancedOpenRouterModels();
+    if (branch === 'direct') return getEnhancedOpenRouterModels({ countryCode: null });
     const response = await GET(createTestRequest('/api/v1/models'));
     expect(response.status).toBe(200);
     return OpenRouterModelsResponseSchema.parse(await response.json());

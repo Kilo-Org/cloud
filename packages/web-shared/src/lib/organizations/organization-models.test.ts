@@ -259,7 +259,8 @@ async function resultFor(policySubject = subject, audience: OrganizationModelAud
   const result = await producer.getAvailableModelsForOrganization(
     'fixture-org',
     policySubject,
-    audience
+    audience,
+    { countryCode: null }
   );
   if (!result) throw new Error('Expected organization catalog');
   expect(result).toHaveProperty('fixtureCatalogMarker', 'preserved');

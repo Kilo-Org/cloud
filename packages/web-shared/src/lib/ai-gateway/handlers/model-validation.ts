@@ -8,6 +8,7 @@ import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-t
 import { getDirectByokModelsForUser } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { ORGANIZATION_ID_HEADER } from '@kilocode/web-shared/lib/constants';
 import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
+import { requestCountryCode } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 
 const BodySchema = z.object({ modelId: z.string().trim().min(1) });
 
@@ -48,7 +49,9 @@ export async function handleModelValidationRequest(request: NextRequest) {
 
   const auth = await tryGetUserFromAuth();
   try {
-    const models = await getEnhancedOpenRouterModels();
+    const models = await getEnhancedOpenRouterModels({
+      countryCode: requestCountryCode(request.headers),
+    });
     if (!Array.isArray(models.data)) {
       throw new Error('Model catalog returned invalid data');
     }

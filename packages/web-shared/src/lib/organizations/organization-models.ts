@@ -54,12 +54,13 @@ export async function getAvailableModelsForOrganization(
   audience: OrganizationModelAudience = 'member',
   {
     fromDb = db,
-    countryCode = null,
+    countryCode,
   }: {
     fromDb?: typeof db;
-    /** The requester's Vercel IP country; custom LLMs denied there are left out. */
-    countryCode?: string | null;
-  } = {}
+    /** The requester's Vercel IP country; custom LLMs denied there are left out.
+     * Null lists every custom LLM, for callers that do not serve a request. */
+    countryCode: string | null;
+  }
 ): Promise<OpenRouterModelsResponse | null> {
   const context = await getOrganizationGroupPolicyContext({ organizationId, subject, fromDb });
   const organization = context.organization;

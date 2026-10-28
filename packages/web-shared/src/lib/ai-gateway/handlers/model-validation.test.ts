@@ -70,6 +70,12 @@ describe('POST /api/openrouter/models/validate', () => {
     });
   });
 
+  test('validates against the catalog for the request country', async () => {
+    await handleModelValidationRequest(request('available/model', { 'x-vercel-ip-country': 'CU' }));
+
+    expect(mockedGetEnhancedOpenRouterModels).toHaveBeenCalledWith({ countryCode: 'CU' });
+  });
+
   test('does not expose details for an unavailable model', async () => {
     const response = await handleModelValidationRequest(request('missing/model'));
 

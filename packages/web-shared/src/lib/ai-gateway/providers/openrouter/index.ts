@@ -379,11 +379,12 @@ export async function getRawOpenRouterModels(): Promise<OpenRouterModelsResponse
  * Use this for user-facing model selection where you want filtered, sorted models
  */
 export async function getEnhancedOpenRouterModels({
-  countryCode = null,
+  countryCode,
 }: {
-  /** The requester's Vercel IP country; custom LLMs denied there are left out. */
-  countryCode?: string | null;
-} = {}): Promise<OpenRouterModelsResponse> {
+  /** The requester's Vercel IP country; custom LLMs denied there are left out.
+   * Null lists every custom LLM, for callers that do not serve a request. */
+  countryCode: string | null;
+}): Promise<OpenRouterModelsResponse> {
   const rawResponse = await getRawOpenRouterModels();
 
   // If data is not in expected format (e.g., validation failed), return as-is

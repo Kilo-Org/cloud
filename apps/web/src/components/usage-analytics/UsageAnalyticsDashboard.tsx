@@ -59,6 +59,7 @@ import {
   type FilterDirection,
   type Granularity,
   type MetricKey,
+  type OrganizationUsageView,
   type PeriodOption,
 } from './types';
 import { formatDollarsFromMicrodollars, humanize } from './format';
@@ -66,7 +67,7 @@ import { exportUsageTableToCsv } from './csvExport';
 import { AIAdoptionSummaryCard } from './AIAdoptionSummaryCard';
 import { FeatureAdoptionView } from './FeatureAdoptionView';
 import { RecommendationsView } from './RecommendationsView';
-import { UsageViewNavigation } from './UsageViewNavigation';
+import { getVisibleUsageViews, UsageViewNavigation } from './UsageViewNavigation';
 import { SpendAlertsPanel } from '@/components/spend-alerts/SpendAlertsPanel';
 
 /**
@@ -102,6 +103,11 @@ type UsageAnalyticsDashboardProps =
       organizationPlan?: Organization['plan'];
       /** Renders the populated sales-demo default view and trims demo-only panels. */
       isSalesDemo?: boolean;
+      /**
+       * Enterprise org has passed all feature-adoption checks at least once.
+       * Collapses the page to the AI usage view.
+       */
+      featureAdoptionComplete?: boolean;
       /** Page title override. */
       title?: string;
       /** Optional content rendered above the usage panels. */
@@ -121,6 +127,8 @@ type ActiveFilter = {
   direction: FilterDirection;
   value: string;
 };
+
+const AI_USAGE_ONLY_VIEWS: readonly OrganizationUsageView[] = ['ai-usage'];
 
 const METRIC_OPTIONS: MetricKey[] = [
   'cost',
@@ -148,6 +156,8 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
   const organizationName = org?.organizationName;
   const callerRole = org?.callerRole;
   const isSalesDemo = org?.isSalesDemo === true;
+  const featureAdoptionComplete =
+    org?.organizationPlan === 'enterprise' && org.featureAdoptionComplete === true;
 
   const trpc = useTRPC();
   // Migrate legacy `?viewAs=org-wide` links (which meant page-org-wide) to the
@@ -168,8 +178,11 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
           orgScope: organizationId,
         }
       : undefined;
+  const scopeDefaults = legacyOrgWideScope ? { orgScope: legacyOrgWideScope } : undefined;
   const { state, setState } = useUsageDashboardState(
-    salesDemoDefaults ?? (legacyOrgWideScope ? { orgScope: legacyOrgWideScope } : undefined)
+    salesDemoDefaults ??
+      (featureAdoptionComplete ? { ...scopeDefaults, usageView: 'ai-usage' } : scopeDefaults),
+    featureAdoptionComplete ? { allowedViews: AI_USAGE_ONLY_VIEWS } : undefined
   );
   const {
     period,
@@ -802,18 +815,20 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
                   <p className="text-muted-foreground mt-1 text-sm">
                     {isSalesDemo
                       ? `Track AI usage across ${organizationName}.`
-                      : `Track feature adoption and AI assisted work across ${organizationName}.`}
+                      : featureAdoptionComplete
+                        ? `Track AI assisted work across ${organizationName}.`
+                        : `Track feature adoption and AI assisted work across ${organizationName}.`}
                   </p>
                 </div>
                 <UsageViewNavigation
                   value={usageView}
                   onValueChange={nextView => setState({ usageView: nextView })}
-                  isSalesDemo={isSalesDemo}
+                  views={getVisibleUsageViews({ isSalesDemo, featureAdoptionComplete })}
                 />
               </div>
             )}
 
-            {enterpriseOrg && usageView === 'overview' ? (
+            {enterpriseOrg && !featureAdoptionComplete && usageView === 'overview' ? (
               <>
                 <UsageWarning />
                 <div className="grid gap-6 lg:grid-cols-[minmax(0,2fr)_minmax(280px,1fr)]">
@@ -829,7 +844,7 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
                   />
                 </div>
               </>
-            ) : enterpriseOrg && usageView === 'feature-adoption' ? (
+            ) : enterpriseOrg && !featureAdoptionComplete && usageView === 'feature-adoption' ? (
               <div className="space-y-6">
                 <FeatureAdoptionView organizationId={enterpriseOrg.organizationId} />
                 <RecommendationsView
@@ -956,6 +971,13 @@ export function UsageAnalyticsDashboard(props: UsageAnalyticsDashboardProps) {
                       <ActiveKiloclawsTable organizationId={effectiveOrgId} />
                     )}
                   </>
+                )}
+
+                {enterpriseOrg && featureAdoptionComplete && (
+                  <RecommendationsView
+                    organizationId={enterpriseOrg.organizationId}
+                    canDismiss={canManageOrganization(callerRole)}
+                  />
                 )}
               </>
             )}

@@ -1009,6 +1009,27 @@ export async function setOrganizationRecommendationsDigestEnabled(
   return row?.settings ?? {};
 }
 
+export async function markOrganizationFeatureAdoptionCompleted(
+  organizationId: Organization['id'],
+  now: Date = new Date()
+): Promise<void> {
+  await db
+    .update(organizations)
+    .set({
+      settings: sql`jsonb_set(
+        COALESCE(${organizations.settings}, '{}'::jsonb),
+        '{feature_adoption_completed_at}',
+        to_jsonb(${now.toISOString()}::text)
+      )`,
+    })
+    .where(
+      and(
+        eq(organizations.id, organizationId),
+        sql`${organizations.settings}->>'feature_adoption_completed_at' IS NULL`
+      )
+    );
+}
+
 export async function markOrganizationAsDeleted(
   organizationId: Organization['id'],
   txn?: DrizzleTransaction

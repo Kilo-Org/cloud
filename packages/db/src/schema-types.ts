@@ -1326,6 +1326,10 @@ const OrganizationSettingsSchema = z.object({
   // Named "recommendations" (not "adoption") to avoid confusion with AI adoption
   // usage data and the Feature adoption tab.
   recommendations_digest_enabled: z.boolean().optional(),
+  // ISO timestamp of the first time all five enterprise feature-adoption checks
+  // passed together. Sticky: never cleared when a feature is later disabled, so
+  // the Usage page keeps showing only AI usage once adoption is complete.
+  feature_adoption_completed_at: z.string().optional(),
   suppress_trial_messaging: z.boolean().optional(),
   // OSS Sponsorship fields
   // null/undefined = not an OSS org, values: 1, 2, or 3

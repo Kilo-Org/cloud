@@ -13,6 +13,7 @@ import {
   FEATURE_ADOPTION_KEYS,
   buildFeatureAdoptionChecks,
   getFeatureAdoptionState,
+  recordFeatureAdoptionCompletion,
 } from '@/lib/organizations/feature-adoption';
 import { getOrganizationSeatUsage } from '@/lib/organizations/organization-seats';
 import { resolveEffectiveOrganizationSsoPolicy } from '@kilocode/web-shared/lib/organizations/organization-sso-policy';
@@ -503,7 +504,7 @@ export async function getOrganizationRecommendations(organizationId: string): Pr
   recommendations: Recommendation[];
 }> {
   const orgRows = await readDb
-    .select({ plan: organizations.plan })
+    .select({ plan: organizations.plan, settings: organizations.settings })
     .from(organizations)
     .where(and(eq(organizations.id, organizationId), isNull(organizations.deleted_at)))
     .limit(1);
@@ -522,6 +523,8 @@ export async function getOrganizationRecommendations(organizationId: string): Pr
       .from(organization_recommendation_dismissals)
       .where(eq(organization_recommendation_dismissals.owned_by_organization_id, organizationId)),
   ]);
+
+  await recordFeatureAdoptionCompletion(organizationId, organization.settings, state);
 
   const dismissed = new Set(dismissedRows.map(row => row.key));
   const recommendations = buildRecommendations(organizationId, state).map(recommendation =>

@@ -178,6 +178,7 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
       expect(mockResolveOrganizationMemberModelDecision).toHaveBeenCalledWith({
         organizationId: 'org-1',
         kiloUserId: fakeUser.id,
+        allowNonMember: true,
         modelId: NON_EXCLUSIVE_MODEL,
       });
       const getRoutingProviderConfig = mockCanRouteToVercel.mock
@@ -198,6 +199,14 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
 
       expect(await eligibility()).toEqual({ isFree: false, hasUserByokAvailable: true });
       expect(mockCanRouteToVercel).not.toHaveBeenCalled();
+    });
+
+    it('skips the policy lookup when the Vercel AI Gateway key does not serve the model', async () => {
+      mockGetModelUserByokProviders.mockResolvedValue(['openrouter']);
+      mockGetOrganizationByokProviderIds.mockResolvedValue(['vercel-ai-gateway']);
+
+      expect(await eligibility()).toEqual({ isFree: false, hasUserByokAvailable: false });
+      expect(mockResolveOrganizationMemberModelDecision).not.toHaveBeenCalled();
     });
   });
 });

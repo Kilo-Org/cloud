@@ -2,6 +2,7 @@ import { OrganizationDashboard } from '@/components/organizations/OrganizationDa
 import { OrganizationByPageLayout } from '@/components/organizations/OrganizationByPageLayout';
 import { TOPUP_AMOUNT_QUERY_STRING_KEY } from '@kilocode/web-shared/lib/organizations/constants';
 import { isOrgAutoTopUpFeatureEnabled } from '@/lib/organizations/organization-auto-top-up';
+import { isEnkryptGuardrailsFeatureEnabled } from '@/lib/organizations/enkrypt-guardrails-feature';
 
 export default async function OrganizationByIdPage({
   params,
@@ -13,7 +14,10 @@ export default async function OrganizationByIdPage({
   const { id: organizationId } = await params;
   const search = new URLSearchParams(await searchParams);
   const topupAmount = Number.parseFloat(search.get(TOPUP_AMOUNT_QUERY_STRING_KEY) || '0') || 0;
-  const isAutoTopUpEnabled = await isOrgAutoTopUpFeatureEnabled(organizationId);
+  const [isAutoTopUpEnabled, isGuardrailsEnabled] = await Promise.all([
+    isOrgAutoTopUpFeatureEnabled(organizationId),
+    isEnkryptGuardrailsFeatureEnabled(organizationId),
+  ]);
 
   return (
     <OrganizationByPageLayout
@@ -24,6 +28,7 @@ export default async function OrganizationByIdPage({
           role={role}
           topupAmount={topupAmount}
           isAutoTopUpEnabled={isAutoTopUpEnabled}
+          isGuardrailsEnabled={isGuardrailsEnabled}
         />
       )}
     />

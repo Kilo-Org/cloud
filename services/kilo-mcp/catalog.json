@@ -3821,10 +3821,9 @@
                     "bedrock-byok",
                     "byteplus-coding",
                     "chutes-byok",
-                    "codestral",
                     "edenai",
-                    "inceptron-byok",
                     "kimi-coding",
+                    "inceptron-byok",
                     "martian",
                     "morph-byok",
                     "neuralwatt",
@@ -3836,7 +3835,8 @@
                     "vertex-byok",
                     "xiaomi-token-plan-ams",
                     "xiaomi-token-plan-sgp",
-                    "zai-coding"
+                    "zai-coding",
+                    "codestral"
                   ]
                 }
               ]

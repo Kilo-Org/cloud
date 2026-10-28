@@ -1,7 +1,8 @@
 /* eslint-disable drizzle/enforce-delete-with-where */
-import { eq } from 'drizzle-orm';
+import { randomBytes } from 'node:crypto';
+import { eq, sql } from 'drizzle-orm';
 
-import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import { decryptApiKey, encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { codingPlanCredentialFingerprint } from '@/lib/coding-plans/credential-fingerprint';
 import {
@@ -299,6 +300,137 @@ describe('coding plans', () => {
     expect(managedKey.management_source).toBe('coding_plan');
     expect(inventoryKey.status).toBe('assigned');
     expect(inventoryKey.assigned_to_user_id).toBe(user.id);
+  });
+
+  it('writes the envelope alongside the legacy key when the KMS service is configured', async () => {
+    const originalUrl = process.env.BYOK_KMS_SERVICE_URL;
+    const originalToken = process.env.BYOK_KMS_SERVICE_TOKEN;
+    const originalFetch = global.fetch;
+    const dataKeys: string[] = [];
+    process.env.BYOK_KMS_SERVICE_URL = 'http://kms.test';
+    process.env.BYOK_KMS_SERVICE_TOKEN = 'token';
+    const fetchMock = jest.fn(async () => {
+      const data_key = randomBytes(32).toString('base64');
+      dataKeys.push(data_key);
+      return Response.json({
+        data_key,
+        wrapped_dek: 'wrapped',
+        kms_key_id: 'alias/test',
+        kms_key_version: '1',
+      });
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+    try {
+      const user = await createUserWithBalance(COST_MICRODOLLARS);
+      await seedInventoryKey('kms-key', BYTEPLUS_PLAN_ID, BYTEPLUS_PROVIDER_ID);
+
+      const result = await subscribeToCodingPlan(user.id, BYTEPLUS_PLAN_ID, 'kms-activation');
+      const [subscription] = await db
+        .select()
+        .from(coding_plan_subscriptions)
+        .where(eq(coding_plan_subscriptions.id, result.subscriptionId));
+      const [managedKey] = await db
+        .select()
+        .from(byok_api_keys)
+        .where(eq(byok_api_keys.id, subscription.installed_byok_key_id!));
+
+      expect(decryptApiKey(managedKey.encrypted_api_key, BYOK_ENCRYPTION_KEY)).toBe('kms-key');
+      expect(managedKey.encrypted_api_key_envelope).toMatchObject({
+        wrapped_dek: 'wrapped',
+        kms_key_id: 'alias/test',
+      });
+      expect(
+        decryptApiKey(managedKey.encrypted_api_key_envelope!.encrypted_data, dataKeys[0])
+      ).toBe('kms-key');
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+      expect(JSON.parse(String(init.body))).toEqual({
+        key_id: managedKey.id,
+        actor_user_id: user.id,
+        owner_type: 'user',
+        owner_id: user.id,
+        provider_id: BYTEPLUS_PROVIDER_ID,
+      });
+    } finally {
+      if (originalUrl === undefined) delete process.env.BYOK_KMS_SERVICE_URL;
+      else process.env.BYOK_KMS_SERVICE_URL = originalUrl;
+      if (originalToken === undefined) delete process.env.BYOK_KMS_SERVICE_TOKEN;
+      else process.env.BYOK_KMS_SERVICE_TOKEN = originalToken;
+      global.fetch = originalFetch;
+    }
+  });
+
+  it('requests the KMS data key without holding the user row lock', async () => {
+    const originalUrl = process.env.BYOK_KMS_SERVICE_URL;
+    const originalToken = process.env.BYOK_KMS_SERVICE_TOKEN;
+    const originalFetch = global.fetch;
+    process.env.BYOK_KMS_SERVICE_URL = 'http://kms.test';
+    process.env.BYOK_KMS_SERVICE_TOKEN = 'token';
+    try {
+      const user = await createUserWithBalance(COST_MICRODOLLARS);
+      await seedInventoryKey('lock-key', BYTEPLUS_PLAN_ID, BYTEPLUS_PROVIDER_ID);
+      let userRowLockedDuringKms: boolean | undefined;
+      global.fetch = jest.fn(async () => {
+        try {
+          await db.execute(sql`
+            SELECT id FROM kilocode_users WHERE id = ${user.id} FOR UPDATE NOWAIT
+          `);
+          userRowLockedDuringKms = false;
+        } catch {
+          userRowLockedDuringKms = true;
+        }
+        return Response.json({
+          data_key: randomBytes(32).toString('base64'),
+          wrapped_dek: 'wrapped',
+          kms_key_id: 'alias/test',
+          kms_key_version: '1',
+        });
+      }) as unknown as typeof fetch;
+
+      await subscribeToCodingPlan(user.id, BYTEPLUS_PLAN_ID, 'lock-activation');
+
+      expect(userRowLockedDuringKms).toBe(false);
+    } finally {
+      if (originalUrl === undefined) delete process.env.BYOK_KMS_SERVICE_URL;
+      else process.env.BYOK_KMS_SERVICE_URL = originalUrl;
+      if (originalToken === undefined) delete process.env.BYOK_KMS_SERVICE_TOKEN;
+      else process.env.BYOK_KMS_SERVICE_TOKEN = originalToken;
+      global.fetch = originalFetch;
+    }
+  });
+
+  it('fails the purchase before charging or claiming credentials when KMS is unavailable', async () => {
+    const originalUrl = process.env.BYOK_KMS_SERVICE_URL;
+    const originalToken = process.env.BYOK_KMS_SERVICE_TOKEN;
+    const originalFetch = global.fetch;
+    process.env.BYOK_KMS_SERVICE_URL = 'http://kms.test';
+    process.env.BYOK_KMS_SERVICE_TOKEN = 'token';
+    global.fetch = jest.fn(
+      async () => new Response('{}', { status: 503 })
+    ) as unknown as typeof fetch;
+    try {
+      const user = await createUserWithBalance(COST_MICRODOLLARS);
+      await seedInventoryKey('kms-down-key', BYTEPLUS_PLAN_ID, BYTEPLUS_PROVIDER_ID);
+
+      await expect(
+        subscribeToCodingPlan(user.id, BYTEPLUS_PLAN_ID, 'kms-down-activation')
+      ).rejects.toThrow('BYOK KMS /data-key failed with status 503');
+
+      const [unchangedUser] = await db
+        .select()
+        .from(kilocode_users)
+        .where(eq(kilocode_users.id, user.id));
+      const [inventoryKey] = await db.select().from(coding_plan_key_inventory);
+      expect(unchangedUser.microdollars_used).toBe(0);
+      expect(inventoryKey.status).toBe('available');
+      expect(await db.select().from(coding_plan_subscriptions)).toHaveLength(0);
+    } finally {
+      if (originalUrl === undefined) delete process.env.BYOK_KMS_SERVICE_URL;
+      else process.env.BYOK_KMS_SERVICE_URL = originalUrl;
+      if (originalToken === undefined) delete process.env.BYOK_KMS_SERVICE_TOKEN;
+      else process.env.BYOK_KMS_SERVICE_TOKEN = originalToken;
+      global.fetch = originalFetch;
+    }
   });
 
   it('returns prior outcome when an activation request is retried', async () => {

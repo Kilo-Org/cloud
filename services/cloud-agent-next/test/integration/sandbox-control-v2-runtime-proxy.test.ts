@@ -780,7 +780,7 @@ describe('SandboxControlV2 runtime credential proxy (R1)', () => {
       ).not.toBeNull();
       expect(await sandbox.status({ sessionId })).toMatchObject({ view: { state: 'preparing' } });
       expect(issueMcpGrant).toHaveBeenCalledTimes(1);
-      expect(fields).toHaveBeenCalledWith({ sandboxId, sessionId });
+      expect(fields).toHaveBeenCalledWith({ sandboxId, sessionId, anchorSessionId: sessionId });
       expect(warn).toHaveBeenCalledWith(
         'Optional Cloud Agent MCP grant unavailable; continuing without it'
       );

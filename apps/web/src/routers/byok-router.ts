@@ -47,9 +47,11 @@ import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/provide
 import { getVercelInferenceProviderConfigForUserByok } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
   decryptByokRow,
+  getByokKmsContext,
   getModelGatewayUserByokProviders,
   servesCatalogModels,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { encryptByokForStorage } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
 import { GatewayAuthenticationError, type GatewayProviderOptions } from '@ai-sdk/gateway';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
@@ -65,6 +67,8 @@ import { parseGcpVertexCredentials } from '@kilocode/web-shared/lib/ai-gateway/p
 import { isExperimentalByokEnabled } from '@/lib/byok/experimental-byok';
 
 const GENERIC_TEST_FAILURE_MESSAGE = 'API key test failed. Check the credential and try again.';
+const KEY_DECRYPTION_FAILURE_MESSAGE =
+  'API key test failed: the stored key could not be read. Try again later.';
 const VERCEL_AI_GATEWAY_KEY_REJECTED_MESSAGE =
   'API key test failed: Vercel AI Gateway rejected this API key. Check that the key is correct and has not been revoked.';
 const MANAGED_KEY_READ_ONLY_MESSAGE =
@@ -301,15 +305,28 @@ export const byokRouter = createTRPCRouter({
 
       // Encrypt the API key
       const encrypted = encryptApiKey(api_key, BYOK_ENCRYPTION_KEY);
+      const keyId = crypto.randomUUID();
+      const envelope = await encryptByokForStorage({
+        apiKey: api_key,
+        context: {
+          key_id: keyId,
+          owner_type: organizationId ? 'organization' : 'user',
+          owner_id: organizationId ?? ctx.user.id,
+          provider_id,
+        },
+        actorUserId: ctx.user.id,
+      });
 
       // Insert into database - either org-owned or user-owned
       const [newKey] = await db
         .insert(byok_api_keys)
         .values({
+          id: keyId,
           organization_id: organizationId ?? null,
           kilo_user_id: organizationId ? null : ctx.user.id,
           provider_id,
           encrypted_api_key: encrypted,
+          encrypted_api_key_envelope: envelope,
           created_by: ctx.user.id,
         })
         .returning(BYOK_KEY_COLUMNS);
@@ -343,6 +360,7 @@ export const byokRouter = createTRPCRouter({
       // Verify key exists and belongs to the organization or user
       const [existingKey] = await db
         .select({
+          id: byok_api_keys.id,
           organization_id: byok_api_keys.organization_id,
           kilo_user_id: byok_api_keys.kilo_user_id,
           provider_id: byok_api_keys.provider_id,
@@ -380,9 +398,14 @@ export const byokRouter = createTRPCRouter({
       validateUserByokCredential(existingKey.provider_id, api_key);
 
       const encrypted = encryptApiKey(api_key, BYOK_ENCRYPTION_KEY);
+      const envelope = await encryptByokForStorage({
+        apiKey: api_key,
+        context: getByokKmsContext(existingKey),
+        actorUserId: ctx.user.id,
+      });
       const [updatedKey] = await db
         .update(byok_api_keys)
-        .set({ encrypted_api_key: encrypted })
+        .set({ encrypted_api_key: encrypted, encrypted_api_key_envelope: envelope })
         .where(eq(byok_api_keys.id, id))
         .returning(BYOK_KEY_COLUMNS);
 
@@ -542,10 +565,12 @@ export const byokRouter = createTRPCRouter({
 
       const [existingKey] = await db
         .select({
+          id: byok_api_keys.id,
           organization_id: byok_api_keys.organization_id,
           kilo_user_id: byok_api_keys.kilo_user_id,
           provider_id: byok_api_keys.provider_id,
           encrypted_api_key: byok_api_keys.encrypted_api_key,
+          encrypted_api_key_envelope: byok_api_keys.encrypted_api_key_envelope,
           management_source: byok_api_keys.management_source,
         })
         .from(byok_api_keys)
@@ -573,7 +598,16 @@ export const byokRouter = createTRPCRouter({
         };
       }
 
-      const decryptedKey = decryptByokRow(existingKey);
+      let decryptedKey: Awaited<ReturnType<typeof decryptByokRow>>;
+      try {
+        decryptedKey = await decryptByokRow(existingKey);
+      } catch (e) {
+        logByokWarning('BYOK key test could not decrypt the stored key', {
+          providerId: existingKey.provider_id,
+          message: e instanceof Error ? e.message : undefined,
+        });
+        return { success: false, message: KEY_DECRYPTION_FAILURE_MESSAGE };
+      }
 
       // Codestral is deprecated and its key only authenticates against codestral.mistral.ai,
       // which the gateway test path below cannot reach (it routes codestral to api.mistral.ai).

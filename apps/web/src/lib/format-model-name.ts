@@ -1,5 +1,7 @@
 import { KILOCODE_KILO_PROVIDER_PREFIX } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 
+export { formatShortModelDisplayName } from '@kilocode/app-shared/utils';
+
 /**
  * Strips provider prefixes from a model slug to produce a short display name.
  *
@@ -27,18 +29,4 @@ export function formatShortModelName(slug: string): string {
  */
 export function formatModelRefName(model: { providerID: string; modelID: string }): string {
   return formatShortModelName(`${model.providerID}/${model.modelID}`);
-}
-
-/**
- * Strips "Provider: " prefix from a human-readable model display name.
- *
- * - `"Anthropic: Claude Opus 4.6"` → `"Claude Opus 4.6"`
- * - `"Google: Gemini 2.5 Pro"` → `"Gemini 2.5 Pro"`
- * - `"GPT-4o"` (no colon) → `"GPT-4o"`
- * - Empty string → empty string
- */
-export function formatShortModelDisplayName(name: string): string {
-  if (!name) return name;
-  const colonIndex = name.indexOf(': ');
-  return colonIndex === -1 ? name : name.slice(colonIndex + 2);
 }

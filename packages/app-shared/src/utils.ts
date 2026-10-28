@@ -66,3 +66,14 @@ export function formatCents(amount: number, currency: string = 'USD') {
     currency: currency.toUpperCase(),
   }).format(amount / 100);
 }
+
+/**
+ * Strips the `"Vendor: "` prefix from a human-readable model display name.
+ * Catalog names arrive as `<Vendor>: <Model>`; the model picker already shows
+ * the vendor as its group header, so only the model part is shown.
+ */
+export function formatShortModelDisplayName(name: string): string {
+  if (!name) return name;
+  const colonIndex = name.indexOf(': ');
+  return colonIndex === -1 ? name : name.slice(colonIndex + 2);
+}

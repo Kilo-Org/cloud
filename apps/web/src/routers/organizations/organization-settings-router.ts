@@ -218,9 +218,12 @@ async function validateOrganizationDefaultReplacement(
   );
   let availableModels: Awaited<ReturnType<typeof getAvailableModelsForOrganization>>;
   try {
-    availableModels = await getAvailableModelsForOrganization(organization.id, {
-      type: 'defaultAccess',
-    });
+    availableModels = await getAvailableModelsForOrganization(
+      organization.id,
+      { type: 'defaultAccess' },
+      'member',
+      { countryCode: null }
+    );
   } catch {
     throw new TRPCError({
       code: 'BAD_REQUEST',

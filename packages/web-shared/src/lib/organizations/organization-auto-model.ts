@@ -206,7 +206,7 @@ export async function validateOrganizationAutoTarget(
 
   let models;
   try {
-    models = await getEnhancedOpenRouterModels();
+    models = await getEnhancedOpenRouterModels({ countryCode: null });
   } catch {
     return {
       kind: 'error',

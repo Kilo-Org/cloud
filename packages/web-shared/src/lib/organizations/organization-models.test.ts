@@ -29,7 +29,10 @@ const mockDecision = jest.fn(async (_policy: unknown, id: string) => ({
   allowed: id !== 'provider/blocked',
 }));
 const mockByok = jest.fn<Promise<OpenRouterModel[]>, [string]>();
-const mockCustom = jest.fn<Promise<OpenRouterModel[]>, [string, readonly string[]]>();
+const mockCustom = jest.fn<
+  Promise<OpenRouterModel[]>,
+  [string, readonly string[], string | null]
+>();
 const mockProviderIds = jest.fn(async (_db: unknown, _organizationId: string) => ['openai']);
 const mockAvailability = jest.fn(async (models: OpenRouterModel[], _providers: string[]) =>
   models.map(model => ({ ...model, hasUserByokAvailable: model.id === 'provider/allowed' }))
@@ -256,7 +259,8 @@ async function resultFor(policySubject = subject, audience: OrganizationModelAud
   const result = await producer.getAvailableModelsForOrganization(
     'fixture-org',
     policySubject,
-    audience
+    audience,
+    { countryCode: null }
   );
   if (!result) throw new Error('Expected organization catalog');
   expect(result).toHaveProperty('fixtureCatalogMarker', 'preserved');
@@ -344,7 +348,7 @@ describe('organization model producer publication', () => {
       expect.objectContaining({ organizationId: 'fixture-org', subject: defaultSubject })
     );
     expect(mockEvaluatePolicy).toHaveBeenCalledWith(mockContext);
-    expect(mockCustom).toHaveBeenCalledWith('fixture-org', ['fixture-group']);
+    expect(mockCustom).toHaveBeenCalledWith('fixture-org', ['fixture-group'], null);
     expect(mockByok).toHaveBeenCalledWith('fixture-org');
     expect(mockProviderIds).toHaveBeenCalledWith(expect.anything(), 'fixture-org');
     expect(mockAvailability).toHaveBeenCalledWith(
@@ -399,6 +403,18 @@ describe('organization model producer publication', () => {
       expect(mockReadRows).toHaveBeenCalledTimes(1);
     }
   );
+
+  it('builds the public and private custom LLM lists for the requester country', async () => {
+    await producer.getAvailableModelsForOrganization('fixture-org', subject, 'member', {
+      countryCode: 'CU',
+    });
+
+    const { getEnhancedOpenRouterModels } = jest.requireMock<{
+      getEnhancedOpenRouterModels: jest.Mock;
+    }>('@kilocode/web-shared/lib/ai-gateway/providers/openrouter');
+    expect(getEnhancedOpenRouterModels).toHaveBeenCalledWith({ countryCode: 'CU' });
+    expect(mockCustom).toHaveBeenCalledWith('fixture-org', ['fixture-group'], 'CU');
+  });
 
   it('does not freshen new score content with an old mismatched verification', async () => {
     await primeAnnotatedCatalog();

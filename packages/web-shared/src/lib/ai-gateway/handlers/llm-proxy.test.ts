@@ -2980,6 +2980,17 @@ describe('custom LLM requests', () => {
     );
   });
 
+  it.each([
+    ['the Vercel IP country', { 'x-vercel-ip-country': 'cu' }, 'CU'],
+    ['no country without the header', {}, null],
+  ])('passes %s to provider resolution', async (_name, headers, countryCode) => {
+    mockCustomLlm(customLlm('acme/public-model', true));
+
+    await handleLlmProxyRequest(makeRequest(makeBody('acme/public-model'), headers) as never);
+
+    expect(mockedGetProvider).toHaveBeenCalledWith(expect.objectContaining({ countryCode }));
+  });
+
   it('serves a public custom LLM to a user without balance', async () => {
     mockedGetBalanceAndOrgSettings.mockResolvedValue({
       balance: 0,

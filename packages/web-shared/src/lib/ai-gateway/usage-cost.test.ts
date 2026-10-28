@@ -1,28 +1,8 @@
-import { afterEach, describe, expect, test } from '@jest/globals';
-import { captureMessage } from '@sentry/nextjs';
+import { describe, expect, test } from '@jest/globals';
 import type { CustomPricing, CustomPricingConfig } from '@kilocode/db/schema-types';
 import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
-import { findKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import type * as kiloExclusiveModels from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import type { JustTheCostsUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
-import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
-import {
-  applyUsagePricing,
-  calculateKiloExclusiveCost_mUsd,
-} from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
-import {
-  paidStealthModelFixture,
-  tieredStealthModelFixture,
-  useKiloExclusiveModel,
-} from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
-
-jest.mock('@sentry/nextjs', () => ({ captureMessage: jest.fn() }));
-jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
-  const actual = jest.requireActual<typeof kiloExclusiveModels>(
-    '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models'
-  );
-  return { ...actual, findKiloExclusiveModel: jest.fn(actual.findKiloExclusiveModel) };
-});
+import { applyUsagePricing } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
 
 const makeUsage = (overrides: Partial<JustTheCostsUsageStats> = {}): JustTheCostsUsageStats => ({
   cost_mUsd: 900_000,
@@ -44,27 +24,6 @@ const makeContext = (
   ...overrides,
 });
 
-useKiloExclusiveModel(paidStealthModelFixture);
-useKiloExclusiveModel(tieredStealthModelFixture);
-
-const fallbackOnlyModel: KiloExclusiveModel = {
-  ...paidStealthModelFixture,
-  pricing: {
-    tiers: [
-      {
-        start_context_length: 0,
-        pricing: {
-          prompt_per_million: 4,
-          completion_per_million: 20,
-          input_cache_read_per_million: 0.4,
-          input_cache_write_per_million: 5,
-        },
-      },
-    ],
-    fallbackOnly: true,
-  },
-};
-
 function fallbackOnlyCustomPricingFor(model: string): CustomPricingConfig {
   return { models: [{ ...fallbackOnlyCustomPricing, model }] };
 }
@@ -84,10 +43,6 @@ const fallbackOnlyCustomPricing: CustomPricing = {
   ],
   fallbackOnly: true,
 };
-
-afterEach(() => {
-  jest.clearAllMocks();
-});
 
 describe('applyUsagePricing', () => {
   test('preserves paid upstream cost and cache discount while recording market cost', () => {
@@ -137,59 +92,6 @@ describe('applyUsagePricing', () => {
   });
 
   test.each([
-    { inputTokens: 262_143, expected: 69_286 },
-    { inputTokens: 262_144, expected: 247_144 },
-  ])(
-    'selects exclusive pricing by total input tokens at $inputTokens',
-    ({ inputTokens, expected }) => {
-      const usage = makeUsage({ inputTokens, cacheHitTokens: 50_000 });
-
-      applyUsagePricing(
-        usage,
-        makeContext({ requested_model: tieredStealthModelFixture.public_id }),
-        TEST_CUSTOM_PRICING_CONFIG
-      );
-
-      expect(usage.cost_mUsd).toBe(expected);
-      expect(usage.market_cost).toBe(900_000);
-    }
-  );
-
-  test('applies custom pricing after exclusive pricing and retains the original upstream cost', () => {
-    jest.mocked(findKiloExclusiveModel).mockReturnValueOnce(paidStealthModelFixture);
-    const usage = makeUsage();
-
-    applyUsagePricing(
-      usage,
-      makeContext({ requested_model: 'google/gemini-3.8-flash' }),
-      TEST_CUSTOM_PRICING_CONFIG
-    );
-
-    expect(usage.cost_mUsd).toBe(112_500);
-    expect(usage.market_cost).toBe(900_000);
-  });
-
-  test.each([
-    { upstreamCost: 123_000, expected: 123_000 },
-    { upstreamCost: 0, expected: 600_000 },
-  ])(
-    'respects exclusive fallback-only pricing for upstream cost $upstreamCost',
-    ({ upstreamCost, expected }) => {
-      jest.mocked(findKiloExclusiveModel).mockReturnValueOnce(fallbackOnlyModel);
-      const usage = makeUsage({ cost_mUsd: upstreamCost });
-
-      applyUsagePricing(
-        usage,
-        makeContext({ requested_model: fallbackOnlyModel.public_id }),
-        TEST_CUSTOM_PRICING_CONFIG
-      );
-
-      expect(usage.cost_mUsd).toBe(expected);
-      expect(usage.market_cost).toBe(upstreamCost);
-    }
-  );
-
-  test.each([
     { upstreamCost: 123_000, expected: 123_000 },
     { upstreamCost: 0, expected: 120_000 },
   ])(
@@ -204,43 +106,25 @@ describe('applyUsagePricing', () => {
     }
   );
 
-  test('charges BYOK non-inference costs on top of exclusive pricing', () => {
+  test('charges BYOK non-inference costs on top of custom pricing', () => {
     const usage = makeUsage({ cost_mUsd: 907_000, nonInferenceCost_mUsd: 7000 });
 
     applyUsagePricing(
       usage,
-      makeContext({ requested_model: paidStealthModelFixture.public_id }),
+      makeContext({ requested_model: 'google/gemini-3.8-flash' }),
       TEST_CUSTOM_PRICING_CONFIG
     );
 
-    expect(usage.cost_mUsd).toBe(600_000 + 7000);
+    expect(usage.cost_mUsd).toBe(112_500 + 7000);
     expect(usage.market_cost).toBe(907_000);
   });
 
   test('applies fallback-only pricing when only non-inference costs were reported', () => {
-    jest.mocked(findKiloExclusiveModel).mockReturnValueOnce(fallbackOnlyModel);
     const usage = makeUsage({ cost_mUsd: 7000, nonInferenceCost_mUsd: 7000 });
 
-    applyUsagePricing(
-      usage,
-      makeContext({ requested_model: fallbackOnlyModel.public_id }),
-      TEST_CUSTOM_PRICING_CONFIG
-    );
+    applyUsagePricing(usage, makeContext(), fallbackOnlyCustomPricingFor('openai/gpt-4.1'));
 
-    expect(usage.cost_mUsd).toBe(600_000 + 7000);
-  });
-
-  test('does not apply custom fallback pricing over a positive exclusive price', () => {
-    const usage = makeUsage({ cost_mUsd: 0 });
-
-    applyUsagePricing(
-      usage,
-      makeContext({ requested_model: paidStealthModelFixture.public_id }),
-      fallbackOnlyCustomPricingFor(paidStealthModelFixture.public_id)
-    );
-
-    expect(usage.cost_mUsd).toBe(600_000);
-    expect(usage.market_cost).toBe(0);
+    expect(usage.cost_mUsd).toBe(120_000 + 7000);
   });
 
   test.each([
@@ -272,23 +156,5 @@ describe('applyUsagePricing', () => {
     expect(usage.cost_mUsd).toBe(0);
     expect(usage.cacheDiscount_mUsd).toBe(0);
     expect(usage.market_cost).toBe(900_000);
-  });
-});
-
-describe('calculateKiloExclusiveCost_mUsd', () => {
-  test('returns zero when no exclusive pricing exists', () => {
-    expect(
-      calculateKiloExclusiveCost_mUsd({ ...paidStealthModelFixture, pricing: null }, makeUsage())
-    ).toBe(0);
-  });
-
-  test('preserves the uncached-input fallback and diagnostic for inconsistent cache counts', () => {
-    const usage = makeUsage({ inputTokens: 10, outputTokens: 0, cacheHitTokens: 20 });
-
-    expect(calculateKiloExclusiveCost_mUsd(paidStealthModelFixture, usage)).toBe(48);
-    expect(captureMessage).toHaveBeenCalledWith(
-      'SUSPICIOUS: negative uncached input tokens',
-      expect.objectContaining({ level: 'error' })
-    );
   });
 });

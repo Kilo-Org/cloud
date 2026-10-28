@@ -1,22 +1,13 @@
 import { describe, test, expect } from '@jest/globals';
 import { selectAutoFreeCandidate } from './models';
-import {
-  findKiloExclusiveModel,
-  getKiloExclusiveInferenceProviders,
-  kiloExclusiveModels,
-  shouldRedactErrorResponse,
-  shouldRedactModelNameInMicrodollarUsage,
-} from './kilo-exclusive-models';
+import { findKiloExclusiveModel, kiloExclusiveModels } from './kilo-exclusive-models';
 import {
   hasBestEffortGuessDataCollectionRequirement,
   isFreeModelExcludingCustomLlms,
 } from './is-free-model';
-import { getInferenceProviders } from './providers/kilo-exclusive-model';
-import { gemma_4_26b_a4b_it_free_model } from './kilo-exclusive-models';
 import { getRandomNumber } from './getRandomNumber';
 import {
-  addKiloExclusiveModel,
-  paidStealthModelFixture,
+  kiloExclusiveModelFixture,
   useKiloExclusiveModel,
 } from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 
@@ -43,39 +34,15 @@ describe('isFreeModelExcludingCustomLlms', () => {
     test('should return true for OpenRouter stealth alpha models', async () => {
       expect(isFreeModelExcludingCustomLlms('stealth/ox-alpha')).toBe(true);
       expect(isFreeModelExcludingCustomLlms('stealth/other-alpha')).toBe(true);
-      expect(isFreeModelExcludingCustomLlms(paidStealthModelFixture.public_id)).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('stealth/paid-model')).toBe(false);
       expect(isFreeModelExcludingCustomLlms('openrouter/model-alpha')).toBe(false);
       expect(isFreeModelExcludingCustomLlms('stealth/model-beta')).toBe(false);
     });
 
-    test('should return true for Kilo exclusive models with no pricing', async () => {
-      for (const model of kiloExclusiveModels.filter(m => !m.pricing)) {
-        expect(isFreeModelExcludingCustomLlms(model.public_id)).toBe(true);
-      }
-    });
-
-    test('should return false for Kilo exclusive models with pricing', async () => {
-      for (const model of kiloExclusiveModels.filter(m => !!m.pricing)) {
-        expect(isFreeModelExcludingCustomLlms(model.public_id)).toBe(false);
-      }
-    });
-
-    test.each(['vendor/priced-exclusive:free', 'stealth/priced-exclusive-alpha'])(
-      'returns false for priced Kilo exclusive model %s even when its id matches a free pattern',
-      modelId => {
-        const remove = addKiloExclusiveModel({ ...paidStealthModelFixture, public_id: modelId });
-        try {
-          expect(isFreeModelExcludingCustomLlms(modelId)).toBe(false);
-        } finally {
-          remove();
-        }
-      }
-    );
-
-    test('getInferenceProviders does not crash for any Kilo exclusive model', () => {
-      expect(kiloExclusiveModels.length).toBeGreaterThan(0);
+    test('should return true for Kilo exclusive models', async () => {
+      expect(kiloExclusiveModels).toContain(kiloExclusiveModelFixture);
       for (const model of kiloExclusiveModels) {
-        expect(() => getInferenceProviders(model)).not.toThrow();
+        expect(isFreeModelExcludingCustomLlms(model.public_id)).toBe(true);
       }
     });
 
@@ -98,29 +65,13 @@ describe('isFreeModelExcludingCustomLlms', () => {
     });
 
     test.each(['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free'])(
-      'inherits %s without an exclusive definition or provider restriction',
+      'inherits %s without an exclusive definition',
       async model => {
         expect(kiloExclusiveModels.some(entry => entry.public_id === model)).toBe(false);
         expect(findKiloExclusiveModel(model)).toBeNull();
-        expect(getKiloExclusiveInferenceProviders(model)).toBeUndefined();
         expect(isFreeModelExcludingCustomLlms(model)).toBe(true);
       }
     );
-
-    test('all Kilo exclusive models should have either no pricing or valid ordered pricing tiers', () => {
-      for (const model of kiloExclusiveModels) {
-        if (model.pricing) {
-          expect(model.pricing.tiers[0].start_context_length).toBe(0);
-          let previousStartContextLength = -1;
-          for (const tier of model.pricing.tiers) {
-            expect(typeof tier.pricing.prompt_per_million).toBe('number');
-            expect(typeof tier.pricing.completion_per_million).toBe('number');
-            expect(tier.start_context_length).toBeGreaterThan(previousStartContextLength);
-            previousStartContextLength = tier.start_context_length;
-          }
-        }
-      }
-    });
 
     test('uses candidate weights when selecting an Auto Free model', () => {
       const candidates = [
@@ -196,9 +147,9 @@ describe('isFreeModelExcludingCustomLlms', () => {
 });
 
 describe('hasBestEffortGuessDataCollectionRequirement', () => {
-  test('requires data collection for paid training-enabled offerings', async () => {
+  test('requires data collection for Kilo-exclusive models', async () => {
     expect(
-      await hasBestEffortGuessDataCollectionRequirement(paidStealthModelFixture.public_id)
+      await hasBestEffortGuessDataCollectionRequirement(kiloExclusiveModelFixture.public_id)
     ).toBe(true);
   });
 
@@ -210,53 +161,5 @@ describe('hasBestEffortGuessDataCollectionRequirement', () => {
     expect(await hasBestEffortGuessDataCollectionRequirement('anthropic/claude-sonnet-4')).toBe(
       false
     );
-  });
-});
-
-describe('shouldRedactErrorResponse', () => {
-  test('does not redact errors for custom models', () => {
-    expect(shouldRedactErrorResponse('custom', 'kilo-internal/my-custom-model')).toBe(false);
-  });
-
-  test('redacts errors for stealth models regardless of provider', () => {
-    expect(shouldRedactErrorResponse('openrouter', paidStealthModelFixture.public_id)).toBe(true);
-  });
-
-  test('does not redact errors for regular models and providers', () => {
-    expect(shouldRedactErrorResponse('openrouter', 'anthropic/claude-3.5-sonnet')).toBe(false);
-    expect(shouldRedactErrorResponse('vercel', 'openai/gpt-4o')).toBe(false);
-  });
-});
-
-describe('shouldRedactModelNameInMicrodollarUsage', () => {
-  test('redacts model name for custom provider', () => {
-    expect(shouldRedactModelNameInMicrodollarUsage('custom', 'kilo-internal/my-custom-model')).toBe(
-      true
-    );
-  });
-
-  test('redacts model name for stealth models', () => {
-    expect(
-      shouldRedactModelNameInMicrodollarUsage('openrouter', paidStealthModelFixture.public_id)
-    ).toBe(true);
-  });
-});
-
-describe('getKiloExclusiveInferenceProviders', () => {
-  test('returns the stealth provider for stealth exclusives', () => {
-    expect([
-      ...(getKiloExclusiveInferenceProviders(paidStealthModelFixture.public_id) ?? []),
-    ]).toEqual(['stealth']);
-  });
-
-  test('does not treat removed or unrestricted exclusives or unknown ids as restricted', () => {
-    expect(getKiloExclusiveInferenceProviders('stepfun/step-5-preview-free')).toBeUndefined();
-    expect(getKiloExclusiveInferenceProviders('openai/gpt-5.6-sol-discounted')).toBeUndefined();
-    expect(getKiloExclusiveInferenceProviders('tencent/hy3:free')).toBeUndefined();
-    expect(
-      getKiloExclusiveInferenceProviders(gemma_4_26b_a4b_it_free_model.public_id)
-    ).toBeUndefined();
-    expect(getKiloExclusiveInferenceProviders('deepseek/deepseek-v4-pro')).toBeUndefined();
-    expect(getKiloExclusiveInferenceProviders('unknown/model')).toBeUndefined();
   });
 });

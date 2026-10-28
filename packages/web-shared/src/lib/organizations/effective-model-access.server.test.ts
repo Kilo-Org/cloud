@@ -12,22 +12,8 @@ import {
 } from './effective-model-access.server';
 import { CLAUDE_SONNET_LATEST_MODEL_ALIAS } from '@kilocode/web-shared/lib/ai-gateway/latest-model-aliases';
 import { VIRTUAL_PROVIDER } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
-import type * as ExclusiveModels from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 
-// The live catalog's restricted Kilo-exclusive models come and go, so the restriction
-// cases use a synthetic alias restricted to StepFun and keep the real lookup otherwise.
-jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
-  const actual = jest.requireActual<typeof ExclusiveModels>(
-    '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models'
-  );
-  return {
-    ...actual,
-    getKiloExclusiveInferenceProviders: (modelId: string) =>
-      modelId === 'test/restricted-exclusive'
-        ? new Set(['stepfun'])
-        : actual.getKiloExclusiveInferenceProviders(modelId),
-  };
-});
+const RESTRICTED_PUBLIC_MODEL = 'test/restricted-public';
 
 function context(
   overrides: Partial<OrganizationGroupPolicyContext> = {}
@@ -73,6 +59,14 @@ const currentSnapshotLookup = async (modelId: string) =>
   );
 
 describe('effective organization model access', () => {
+  beforeAll(async () => {
+    await insertCustomLlmForTest(RESTRICTED_PUBLIC_MODEL, publicCustomLlmDefinition(['stepfun']));
+  });
+
+  afterAll(async () => {
+    await deleteCustomLlmForTest(RESTRICTED_PUBLIC_MODEL);
+  });
+
   it('preserves current organization access outside Enterprise', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({
@@ -475,7 +469,7 @@ describe('effective organization model access', () => {
     ).resolves.toEqual({ allowed: true });
   });
 
-  it('hides restricted exclusive models when every restricted provider is disabled', async () => {
+  it('hides restricted public custom LLMs when every restricted provider is disabled', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({
         organization: {
@@ -487,12 +481,12 @@ describe('effective organization model access', () => {
     );
     const catalogLookup = async () => new Set(['fireworks', 'stepfun']);
 
-    expect(
-      await getEffectiveModelDecision(policy, 'test/restricted-exclusive', catalogLookup)
-    ).toEqual({ allowed: false, denialSource: 'organization_provider' });
+    expect(await getEffectiveModelDecision(policy, RESTRICTED_PUBLIC_MODEL, catalogLookup)).toEqual(
+      { allowed: false, denialSource: 'organization_provider' }
+    );
   });
 
-  it('keeps restricted exclusive models when a restricted provider remains enabled', async () => {
+  it('keeps restricted public custom LLMs when a restricted provider remains enabled', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({
         organization: {
@@ -504,7 +498,7 @@ describe('effective organization model access', () => {
     );
     const decision = await getEffectiveModelDecision(
       policy,
-      'test/restricted-exclusive',
+      RESTRICTED_PUBLIC_MODEL,
       async () => new Set(['fireworks'])
     );
 
@@ -512,7 +506,7 @@ describe('effective organization model access', () => {
     expect([...decision.eligibleProviderRoutes!]).toEqual(['stepfun']);
   });
 
-  it('does not apply exclusive restrictions to the unsuffixed catalog model', async () => {
+  it('does not apply public custom LLM restrictions to other catalog models', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({
         organization: {
@@ -526,7 +520,7 @@ describe('effective organization model access', () => {
 
     const exclusive = await getEffectiveModelDecision(
       policy,
-      'test/restricted-exclusive',
+      RESTRICTED_PUBLIC_MODEL,
       catalogLookup
     );
     const catalogModel = await getEffectiveModelDecision(
@@ -540,7 +534,7 @@ describe('effective organization model access', () => {
     expect([...catalogModel.eligibleProviderRoutes!]).toEqual(['fireworks']);
   });
 
-  it('still evaluates restricted exclusive models missing from the snapshot', async () => {
+  it('still evaluates restricted public custom LLMs missing from the snapshot', async () => {
     const policy = evaluateEffectiveModelAccessPolicy(
       context({
         organization: {
@@ -554,7 +548,7 @@ describe('effective organization model access', () => {
 
     const restricted = await getEffectiveModelDecision(
       policy,
-      'test/restricted-exclusive',
+      RESTRICTED_PUBLIC_MODEL,
       emptySnapshot
     );
     const unrestricted = await getEffectiveModelDecision(policy, 'unknown/model', emptySnapshot);

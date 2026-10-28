@@ -44,7 +44,6 @@ import {
 import type { OrganizationUsageMutationResult } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import type { Provider, ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { shouldRedactModelNameInMicrodollarUsage } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
 import { getEffectiveKiloPassThreshold } from '@kilocode/web-shared/lib/kilo-pass/threshold';
@@ -113,8 +112,6 @@ import {
 import { deliverBouncerUsageEventNow } from '@kilocode/web-shared/lib/bouncer/dispatch-usage-event-outbox';
 import { enqueueBouncerUsageEvent } from '@kilocode/db/bouncer-usage-event-outbox';
 import type { BouncerUsageEventEnqueue, UsageRecordRequest } from '@kilocode/usage-contracts';
-
-export { calculateKiloExclusiveCost_mUsd } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
 
 const posthogClient = PostHogClient();
 
@@ -1554,7 +1551,7 @@ export async function processTokenData(
 
   if (
     !usageStats.model || // fallback for failure cases
-    shouldRedactModelNameInMicrodollarUsage(usageContext.provider, usageContext.requested_model)
+    usageContext.provider === 'custom' // custom LLMs do not reveal their upstream model
   ) {
     usageStats.model = usageContext.requested_model;
   }

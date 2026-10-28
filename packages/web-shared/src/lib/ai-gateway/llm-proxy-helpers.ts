@@ -27,10 +27,6 @@ import { getXKiloCodeVersionNumber } from '@kilocode/web-shared/lib/userAgent';
 import { getEffectiveProviderPrivacy } from '@kilocode/web-shared/lib/ai-gateway/provider-privacy';
 import type { EventSourceMessage } from 'eventsource-parser';
 import { sentryRootSpan } from '../getRootSpan';
-import {
-  findKiloExclusiveModel,
-  shouldRedactErrorResponse,
-} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import type {
   MicrodollarUsageContext,
   MicrodollarUsageStats,
@@ -238,30 +234,6 @@ export function dataCollectionRequiredResponse() {
   );
 }
 
-export function checkExclusiveModelProviderAllowed(
-  model: string,
-  provider: OpenRouterProviderConfig | undefined
-) {
-  const exclusiveModel = findKiloExclusiveModel(model);
-  if (!exclusiveModel) return null;
-  const inferenceProviders = exclusiveModel.inference_providers;
-  if (inferenceProviders.length === 0) return null;
-  return checkInferenceProvidersAllowed(inferenceProviders, provider);
-}
-
-/**
- * Rejects a request whose provider config excludes every provider that can
- * serve the model. Used for models routed to a fixed set of providers.
- */
-export function checkInferenceProvidersAllowed(
-  inferenceProviders: readonly string[],
-  provider: OpenRouterProviderConfig | undefined
-) {
-  return allowedInferenceProviders(inferenceProviders, provider).length > 0
-    ? null
-    : inferenceProvidersNotAllowedResponse(inferenceProviders);
-}
-
 /** The inference providers that every given provider config's only/ignore lists allow. */
 export function allowedInferenceProviders(
   inferenceProviders: readonly string[],
@@ -308,15 +280,6 @@ export function apiKindNotSupportedResponse(
   return NextResponse.json(
     { error, error_type: ProxyErrorType.api_kind_not_supported, message: error },
     { status: 400 }
-  );
-}
-
-async function redactedErrorResponse(response: Response) {
-  const error = 'The upstream provider was unable to process the request';
-  warnExceptInTest(`Responding with ${response.status} ${error}`);
-  return NextResponse.json(
-    { error, error_type: ProxyErrorType.upstream_error, message: error },
-    { status: response.status }
   );
 }
 
@@ -513,10 +476,6 @@ export async function makeErrorReadable({
         { status: response.status }
       );
     }
-  }
-
-  if (shouldRedactErrorResponse(providerId, requestedModel)) {
-    return await redactedErrorResponse(response);
   }
 
   return undefined;

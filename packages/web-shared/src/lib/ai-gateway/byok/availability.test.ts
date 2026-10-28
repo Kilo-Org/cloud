@@ -45,7 +45,7 @@ const metadata: StoredModelMap = {
   'anthropic/claude-fixture': storedModel('anthropic/claude-fixture', ['anthropic', 'bedrock']),
   'openai/gpt-fixture': storedModel('openai/gpt-fixture', ['openai']),
   'mistral/codestral-fixture': storedModel('mistral/codestral-fixture', ['mistral']),
-  'stealth/glyph-cluster': storedModel('stealth/glyph-cluster', ['anthropic']),
+  'stealth/qwen3.6-plus': storedModel('stealth/qwen3.6-plus', ['anthropic']),
 };
 
 beforeEach(() => {
@@ -60,7 +60,7 @@ describe('addUserByokAvailability', () => {
       makeModel('anthropic/claude-fixture'),
       makeModel('openai/gpt-fixture'),
       makeModel('mistral/codestral-fixture'),
-      makeModel('stealth/glyph-cluster'),
+      makeModel('stealth/qwen3.6-plus'),
       makeModel('absent/model'),
     ];
 
@@ -71,7 +71,7 @@ describe('addUserByokAvailability', () => {
       ['anthropic/claude-fixture', true],
       ['openai/gpt-fixture', false],
       ['mistral/codestral-fixture', true],
-      ['stealth/glyph-cluster', false],
+      ['stealth/qwen3.6-plus', false],
       ['absent/model', false],
     ]);
     expect(result.map(model => model.name)).toEqual(models.map(model => model.name));
@@ -80,7 +80,7 @@ describe('addUserByokAvailability', () => {
 
   test('reports no availability when the Vercel metadata is empty', async () => {
     mockedGetVercelModelsMetadata.mockResolvedValue({});
-    const models = [makeModel('anthropic/claude-fixture'), makeModel('stealth/glyph-cluster')];
+    const models = [makeModel('anthropic/claude-fixture'), makeModel('stealth/qwen3.6-plus')];
 
     const result = await addUserByokAvailability(models, ['anthropic']);
 

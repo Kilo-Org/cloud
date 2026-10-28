@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "İnstansa qoşulmaq mümkün olmadı — bağlantısı kəsilmiş ola bilər.",
     "remoteSpawnNonRetryable": "İnstans sessiyanı başlada bilmədi — kompüteri yoxla və ya CLI-ni yenilə.",
-    "remoteSpawnInstanceDisconnected": "Seçilmiş instansın bağlantısı kəsildi. Cloud Agent-də sessiya başlat və ya başqa instans seç.",
-    "liveCount_one": "{{count}} CANLI",
-    "liveCount_other": "{{count}} CANLI"
+    "remoteSpawnInstanceDisconnected": "Seçilmiş instansın bağlantısı kəsildi. Cloud Agent-də sessiya başlat və ya başqa instans seç."
   },
   "agentChat": {
     "session": {

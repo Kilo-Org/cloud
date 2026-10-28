@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "ඉන්ස්ටන්සයට සම්බන්ධ වීමට නොහැකි විය — එය විසන්ධි වී තිබිය හැක.",
     "remoteSpawnNonRetryable": "ඉන්ස්ටන්සයට සැසිය ආරම්භ කිරීමට නොහැකි විය — යන්ත්‍රය පරීක්ෂා කරන්න හෝ CLI යාවත්කාලීන කරන්න.",
-    "remoteSpawnInstanceDisconnected": "තෝරාගත් ඉන්ස්ටන්සය විසන්ධි විය. Cloud Agent හි සැසියක් ආරම්භ කරන්න හෝ වෙනත් ඉන්ස්ටන්සයක් තෝරන්න.",
-    "liveCount_one": "සජීවී {{count}}ක්",
-    "liveCount_other": "සජීවී {{count}}ක්"
+    "remoteSpawnInstanceDisconnected": "තෝරාගත් ඉන්ස්ටන්සය විසන්ධි විය. Cloud Agent හි සැසියක් ආරම්භ කරන්න හෝ වෙනත් ඉන්ස්ටන්සයක් තෝරන්න."
   },
   "agentChat": {
     "session": {

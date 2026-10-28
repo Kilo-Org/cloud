@@ -183,7 +183,11 @@ describe('deployment preparation', () => {
     const order: string[] = [];
     const result = await prepareRuntimeDeployment({
       config: config(),
-      startup: { mode: 'downloaded', image: 'runtime-free' },
+      startup: {
+        mode: 'downloaded',
+        image: 'runtime-free',
+        interactiveOrgIds: ['9d278969-5453-4ae3-a51f-a8d2274a7b56'],
+      },
       environment: 'production',
       sourceSha: f.sourceSha,
       bucket: 'runtime-test',
@@ -196,7 +200,9 @@ describe('deployment preparation', () => {
       },
     });
     expect(order).toEqual(['verified']);
-    expect(result?.containers?.[0].images?.app).toEqual({ image: f.base.image });
+    expect(result?.containers?.[0].images?.app).toEqual({ dockerfile: './Dockerfile.containers' });
+    expect(result?.containers?.[0].images?.['runtime-free']).toEqual({ image: f.base.image });
+    expect(result?.vars?.RUNTIME_INTERACTIVE_ORG_IDS).toBe('9d278969-5453-4ae3-a51f-a8d2274a7b56');
     expect(result?.vars?.RUNTIME_RELEASE_DESCRIPTOR).toBe(f.published.descriptor.sha256);
   });
   it('configuration drift prevents base verification and deployment', async () => {

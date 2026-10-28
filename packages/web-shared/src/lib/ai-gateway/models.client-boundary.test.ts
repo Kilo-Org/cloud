@@ -53,10 +53,10 @@ describe('client-safe model imports', () => {
       );
       expect(
         customPricing.getCustomPricing(
-          customPricing.CUSTOM_PRICING_FALLBACK_CONFIG,
+          customPricing.EMPTY_CUSTOM_PRICING_CONFIG,
           google.GEMINI_FLASH_CURRENT_MODEL_ID
         )
-      ).toBeDefined();
+      ).toBeUndefined();
       expect(modelUtils.normalizeModelId(google.GEMMA_4_26B_A4B_IT_FREE_ID)).toBe(
         google.GEMMA_4_26B_A4B_IT_ID
       );

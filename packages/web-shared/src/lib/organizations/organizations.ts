@@ -28,7 +28,7 @@ import {
 } from '@kilocode/db/schema';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { auto_deleted_at, db, sql } from '@kilocode/web-shared/lib/drizzle';
-import { and, asc, desc, eq, isNull, gt } from 'drizzle-orm';
+import { and, asc, desc, eq, isNull, gt, or } from 'drizzle-orm';
 import { TRIAL_DURATION_DAYS } from '@kilocode/web-shared/lib/constants';
 import { randomUUID } from 'crypto';
 import { getLowerDomainFromEmail, normalizeEmail } from '@kilocode/web-shared/lib/email-address';
@@ -452,6 +452,37 @@ export async function updateUserRoleInOrganization(
   return txn ? run(txn) : db.transaction(run);
 }
 
+export const CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER =
+  'Child organizations can only invite people who are already members of the parent organization.';
+
+export const CHILD_ORGANIZATION_ACCEPT_REQUIRES_PARENT_MEMBER =
+  'Only parent organization members can join a child organization.';
+
+async function parentOrganizationMemberIdForEmail(
+  tx: DrizzleTransaction,
+  parentOrganizationId: Organization['id'],
+  email: string
+): Promise<User['id'] | null> {
+  const [member] = await tx
+    .select({ userId: kilocode_users.id })
+    .from(organization_memberships)
+    .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+    .where(
+      and(
+        eq(organization_memberships.organization_id, parentOrganizationId),
+        eq(kilocode_users.is_bot, false),
+        or(
+          sql`lower(${kilocode_users.google_user_email}) = ${email.trim().toLowerCase()}`,
+          eq(kilocode_users.normalized_email, normalizeEmail(email))
+        )
+      )
+    )
+    .limit(1)
+    .for('share');
+
+  return member?.userId ?? null;
+}
+
 export async function inviteUserToOrganization(
   organizationId: Organization['id'],
   invitingUserId: User['id'],
@@ -468,10 +499,24 @@ export async function inviteUserToOrganization(
     if (!organization) {
       throw new Error('Organization SSO policy is misconfigured');
     }
-    // Child organizations manage membership through their parent organization,
-    // so direct invitations into a child org are not allowed.
+    // A child org can invite only people who already belong to its live parent.
     if (organization.parentOrganizationId) {
-      throw new Error('Child organizations cannot invite members');
+      const [parentOrganization] = await tx
+        .select({ id: organizations.id })
+        .from(organizations)
+        .where(
+          and(
+            eq(organizations.id, organization.parentOrganizationId),
+            isNull(organizations.deleted_at)
+          )
+        )
+        .limit(1);
+      const parentMemberId = parentOrganization
+        ? await parentOrganizationMemberIdForEmail(tx, parentOrganization.id, email)
+        : null;
+      if (!parentMemberId) {
+        throw new Error(CHILD_ORGANIZATION_INVITE_REQUIRES_PARENT_MEMBER);
+      }
     }
 
     const policy = await resolveEffectiveOrganizationSsoPolicy(organizationId, tx);
@@ -709,10 +754,32 @@ export async function acceptOrganizationInvite(
       if (!organization) {
         return failureResult('Organization not found');
       }
-      // Child organizations manage membership through their parent organization.
-      // Reject any invitation (including pre-existing ones) into a child org.
+      // Joining a child org still requires a live parent membership, including
+      // invitations created before the invitee left the parent.
       if (organization.parent_organization_id) {
-        return failureResult('Child organizations cannot accept invitations');
+        await lockOrganizationMembershipMutation(tx, organization.parent_organization_id, userId);
+        const [parentMembership] = await tx
+          .select({ id: organization_memberships.id })
+          .from(organization_memberships)
+          .innerJoin(kilocode_users, eq(kilocode_users.id, organization_memberships.kilo_user_id))
+          .innerJoin(
+            organizations,
+            and(
+              eq(organizations.id, organization_memberships.organization_id),
+              isNull(organizations.deleted_at)
+            )
+          )
+          .where(
+            and(
+              eq(organization_memberships.organization_id, organization.parent_organization_id),
+              eq(organization_memberships.kilo_user_id, userId),
+              eq(kilocode_users.is_bot, false)
+            )
+          )
+          .limit(1);
+        if (!parentMembership) {
+          return failureResult(CHILD_ORGANIZATION_ACCEPT_REQUIRES_PARENT_MEMBER);
+        }
       }
 
       const ssoPolicy = await resolveEffectiveOrganizationSsoPolicy(organization.id, tx);

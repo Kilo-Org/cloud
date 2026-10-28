@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Naannoo hojii bira ga'uun hin danda'amne — walqunnamtiin isaa citeera ta'a.",
     "remoteSpawnNonRetryable": "Naannoon hojii turtii jalqabuu hin dandeenye — kompiitara ilaali ykn CLI haaromsi.",
-    "remoteSpawnInstanceDisconnected": "Walqunnamtiin naannoo hojii filatamee citeera. Cloud Agent irratti turtii jalqabi ykn naannoo hojii biraa filadhu.",
-    "liveCount_one": "{{count}} KALLATTIIN",
-    "liveCount_other": "{{count}} KALLATTIIN"
+    "remoteSpawnInstanceDisconnected": "Walqunnamtiin naannoo hojii filatamee citeera. Cloud Agent irratti turtii jalqabi ykn naannoo hojii biraa filadhu."
   },
   "agentChat": {
     "session": {

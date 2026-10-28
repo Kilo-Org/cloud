@@ -2251,11 +2251,7 @@
     },
     "remoteSpawnRetryable": "Не атрымалася злучыцца з экзэмплярам — магчыма, ён адключыўся.",
     "remoteSpawnNonRetryable": "Экзэмпляр не змог запусціць сеанс — правер камп'ютар або абнаві CLI.",
-    "remoteSpawnInstanceDisconnected": "Выбраны экзэмпляр адключыўся. Запусці сеанс у Cloud Agent або выберы іншы экзэмпляр.",
-    "liveCount_one": "НАЖЫВА: {{count}}",
-    "liveCount_other": "НАЖЫВА: {{count}}",
-    "liveCount_few": "{{count}} АКТЫЎНЫЯ",
-    "liveCount_many": "{{count}} АКТЫЎНЫХ"
+    "remoteSpawnInstanceDisconnected": "Выбраны экзэмпляр адключыўся. Запусці сеанс у Cloud Agent або выберы іншы экзэмпляр."
   },
   "agentChat": {
     "session": {

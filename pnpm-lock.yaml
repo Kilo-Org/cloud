@@ -195,6 +195,7 @@ overrides:
 packageExtensionsChecksum: sha256-4VOdk6qTUHv8033DHUo0mVKYsDsR7hVjr+J4jX+smuo=
 
 patchedDependencies:
+  '@vercel/queue@0.8.0': a0942a1d1f0521e89afba6e6f9896636c2e96b85762e12ac2fae66d3f2bac4d4
   '@expo/react-native-action-sheet@4.1.1': 6c5a51f63014cf72209ab55847db73304854dd6afe4d60241e0fc9d6853601db
   '@expo/router-server@58.0.13': 83ef7e975269c998aa00b0345a478a67bc0f7742eb253201b9120125ae051269
   '@expo/ui@58.0.17': 107fc3bb89a262de75123c9449bcefaef274d247dd3d240846ad06520aa6d3e3
@@ -290,6 +291,9 @@ importers:
 
   apps/ai-gateway:
     dependencies:
+      '@kilocode/usage-queue':
+        specifier: workspace:*
+        version: link:../../packages/usage-queue
       '@kilocode/web-shared':
         specifier: workspace:*
         version: link:../../packages/web-shared
@@ -1988,6 +1992,37 @@ importers:
         specifier: catalog:vitest5
         version: 5.0.5(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@5.0.5)(jsdom@29.1.1)(vite@8.1.6(@types/node@25.5.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4))
 
+  packages/usage-queue:
+    dependencies:
+      '@kilocode/usage-contracts':
+        specifier: workspace:*
+        version: link:../usage-contracts
+      '@kilocode/worker-utils':
+        specifier: workspace:*
+        version: link:../worker-utils
+      '@opentelemetry/api':
+        specifier: 1.9.1
+        version: 1.9.1
+      '@vercel/queue':
+        specifier: 0.8.0
+        version: 0.8.0(patch_hash=a0942a1d1f0521e89afba6e6f9896636c2e96b85762e12ac2fae66d3f2bac4d4)(@opentelemetry/api@1.9.1)
+      server-only:
+        specifier: 0.0.1
+        version: 0.0.1
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.12.4
+      '@typescript/native-preview':
+        specifier: 'catalog:'
+        version: 7.0.0-dev.20260707.2
+      typescript:
+        specifier: 'catalog:'
+        version: 7.0.2
+      vitest:
+        specifier: catalog:vitest5
+        version: 5.0.5(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@5.0.5)(jsdom@29.1.1)(vite@8.1.6(@types/node@24.12.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4))
+
   packages/web-shared:
     dependencies:
       '@ai-sdk/anthropic':
@@ -2035,6 +2070,9 @@ importers:
       '@kilocode/usage-contracts':
         specifier: workspace:*
         version: link:../usage-contracts
+      '@kilocode/usage-queue':
+        specifier: workspace:*
+        version: link:../usage-queue
       '@kilocode/worker-utils':
         specifier: workspace:*
         version: link:../worker-utils
@@ -21783,6 +21821,19 @@ packages:
   zwitch@2.0.4:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
 
+  '@vercel/queue@0.8.0':
+    resolution: {integrity: sha512-Rwaoq8DbSN2/qVPMdHzBdBXqpoD2h2s7+gOSaE3Gff9XI1NjNh281uMesP30k1kbsnjgeaibLTSiuYDlNPlw+g==}
+    engines: {node: '>=20.0.0'}
+    peerDependencies:
+      '@opentelemetry/api': ^1.0.0
+    peerDependenciesMeta:
+      '@opentelemetry/api':
+        optional: true
+
+
+  mixpart@0.0.6:
+    resolution: {integrity: sha512-CRdXtgfQH2jARmtNmPR0Q7jL20fiESbaYk1b0KvLD0jCdUuemepREtsbd8nbiY6BHV9OGGddAZITNXklupUPUQ==}
+    engines: {node: '>=20.0.0'}
 snapshots:
 
   2g@1.0.1(typescript@7.0.2):
@@ -45429,3 +45480,13 @@ snapshots:
       use-sync-external-store: 1.7.0(react@19.3.0)
 
   zwitch@2.0.4: {}
+  '@vercel/queue@0.8.0(patch_hash=a0942a1d1f0521e89afba6e6f9896636c2e96b85762e12ac2fae66d3f2bac4d4)(@opentelemetry/api@1.9.1)':
+    dependencies:
+      '@vercel/oidc': 3.3.1
+      minimatch: 10.2.6
+      mixpart: 0.0.6
+      picocolors: 1.1.1
+    optionalDependencies:
+      '@opentelemetry/api': 1.9.1
+
+  mixpart@0.0.6: {}

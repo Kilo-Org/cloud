@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "ఇన్‌స్టాన్స్‌కు కనెక్ట్ కాలేకపోయాము — అది డిస్కనెక్ట్ అయి ఉండవచ్చు.",
     "remoteSpawnNonRetryable": "ఇన్‌స్టాన్స్ సెషన్‌ను ప్రారంభించలేకపోయింది — కంప్యూటర్‌ను తనిఖీ చేయండి లేదా CLIని నవీకరించండి.",
-    "remoteSpawnInstanceDisconnected": "ఎంచుకున్న ఇన్‌స్టాన్స్ డిస్కనెక్ట్ అయింది. Cloud Agentలో సెషన్‌ను ప్రారంభించండి లేదా మరో ఇన్‌స్టాన్స్‌ను ఎంచుకోండి.",
-    "liveCount_one": "{{count}} లైవ్",
-    "liveCount_other": "{{count}} లైవ్"
+    "remoteSpawnInstanceDisconnected": "ఎంచుకున్న ఇన్‌స్టాన్స్ డిస్కనెక్ట్ అయింది. Cloud Agentలో సెషన్‌ను ప్రారంభించండి లేదా మరో ఇన్‌స్టాన్స్‌ను ఎంచుకోండి."
   },
   "agentChat": {
     "session": {

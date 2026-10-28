@@ -67,7 +67,9 @@ describe('buildEligibleCatalog', () => {
 
     expect(mockedGetByokOrg).toHaveBeenCalledWith('org-1');
     expect(mockedGetByokUser).not.toHaveBeenCalled();
-    expect(mockedGetOrgModels).toHaveBeenCalledWith('org-1', { type: 'defaultAccess' });
+    expect(mockedGetOrgModels).toHaveBeenCalledWith('org-1', { type: 'defaultAccess' }, 'member', {
+      countryCode: null,
+    });
     expect([...catalog.byId.keys()]).toEqual(['anthropic/claude-sonnet-4']);
     expect([...catalog.managedIds]).toEqual(['openai/gpt-4o', 'anthropic/claude-sonnet-4']);
     expect([...catalog.ownerCatalogIds]).toEqual(['anthropic/claude-sonnet-4']);

@@ -65,9 +65,13 @@ function agentsOptions(renderer: Mount['renderer']) {
   ).props.options as { title: string; tabBarBadge?: number; tabBarAccessibilityLabel: string };
 }
 
-function expectCounts(renderer: Mount['renderer'], count?: number, liveCount?: number) {
+function expectCounts(renderer: Mount['renderer'], count?: number, visibleSessionCount?: number) {
   const header = renderer.root.find(item => isHostType(item, 'ScreenHeader'));
-  expect(header.props.eyebrow).toBe(liveCount === undefined ? undefined : `${liveCount} LIVE`);
+  expect(header.props.eyebrow).toBeUndefined();
+  if (visibleSessionCount !== undefined) {
+    const list = renderer.root.find(item => isHostType(item, 'FlashList'));
+    expect(list.props.data).toHaveLength(visibleSessionCount);
+  }
   const options = agentsOptions(renderer);
   expect(options.tabBarBadge).toBe(count);
   expect(options.title).toBe('Agents');
@@ -93,7 +97,7 @@ async function updateSessions(result: Mount, rows: ActiveSession[]) {
   });
 }
 
-describe('Agents needs-input badge and shared live count', () => {
+describe('Agents needs-input badge and live rows', () => {
   beforeEach(() => {
     (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
     organization.organizationId = null;
@@ -121,8 +125,7 @@ describe('Agents needs-input badge and shared live count', () => {
         queryFn: makeQueryFn(),
       });
       const result = await mount(queryClient);
-      // The fetched snapshot is an accepted empty: both surfaces withhold the
-      // count, the badge hiding at zero and the eyebrow matching it.
+      // An accepted empty snapshot has no badge and no live rows.
       expectCounts(result.renderer, undefined, undefined);
       expect(queryClient.getQueryCache().getAll()).toHaveLength(1);
       expect(queryClient.getQueryCache().find({ queryKey: key() })?.getObserversCount()).toBe(2);
@@ -141,7 +144,7 @@ describe('Agents needs-input badge and shared live count', () => {
     }
   );
 
-  it('counts only questions and permissions while the live header counts every status', async () => {
+  it('counts only questions and permissions while keeping every live status in the list', async () => {
     const result = await mount();
     await updateSessions(result, sessions(['busy', 'idle', 'retry', 'question', 'permission']));
     expectCounts(result.renderer, 2, 5);
@@ -268,11 +271,11 @@ describe('Agents needs-input badge and shared live count', () => {
     });
     organization.isLoaded = true;
     rerender(result);
-    await waitFor(
-      () =>
-        result.renderer.root.find(item => isHostType(item, 'ScreenHeader')).props.eyebrow ===
-        '4 LIVE'
-    );
+    await waitFor(() => {
+      const data: unknown = result.renderer.root.findAll(item => isHostType(item, 'FlashList'))[0]
+        ?.props.data;
+      return Array.isArray(data) && data.length === 4;
+    });
     expectCounts(result.renderer, 2, 4);
   });
 

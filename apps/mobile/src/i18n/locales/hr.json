@@ -2220,10 +2220,7 @@
     },
     "remoteSpawnRetryable": "Nije moguće povezati se s instancom — veza se možda prekinula.",
     "remoteSpawnNonRetryable": "Instanca nije uspjela pokrenuti sesiju — provjeri računalo ili ažuriraj CLI.",
-    "remoteSpawnInstanceDisconnected": "Veza s odabranom instancom se prekinula. Pokreni sesiju na usluzi Cloud Agent ili odaberi drugu instancu.",
-    "liveCount_one": "{{count}} UŽIVO",
-    "liveCount_other": "{{count}} UŽIVO",
-    "liveCount_few": "{{count}} UŽIVO"
+    "remoteSpawnInstanceDisconnected": "Veza s odabranom instancom se prekinula. Pokreni sesiju na usluzi Cloud Agent ili odaberi drugu instancu."
   },
   "agentChat": {
     "session": {

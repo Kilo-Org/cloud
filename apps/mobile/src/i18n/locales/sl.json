@@ -2251,11 +2251,7 @@
     },
     "remoteSpawnRetryable": "Primerka ni bilo mogoče doseči — povezava se je morda prekinila.",
     "remoteSpawnNonRetryable": "Primerek ni mogel zagnati seje — preveri računalnik ali posodobi CLI.",
-    "remoteSpawnInstanceDisconnected": "Povezava z izbranim primerkom je prekinjena. Začni sejo v Cloud Agent ali izberi drug primerek.",
-    "liveCount_one": "{{count}} V ŽIVO",
-    "liveCount_other": "{{count}} V ŽIVO",
-    "liveCount_two": "{{count}} V ŽIVO",
-    "liveCount_few": "{{count}} V ŽIVO"
+    "remoteSpawnInstanceDisconnected": "Povezava z izbranim primerkom je prekinjena. Začni sejo v Cloud Agent ali izberi drug primerek."
   },
   "agentChat": {
     "session": {

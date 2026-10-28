@@ -357,7 +357,6 @@ export const sendMessageNextSendPayloadSchema = z.discriminatedUnion('type', [
  * initial turn fields.
  */
 const PrepareSessionSharedFields = {
-  allowSubagentSessions: z.boolean().optional(),
   callbackTarget: ParentSessionCallbackTargetSchema.optional(),
   // Repository source (mutually exclusive - must provide exactly one)
   githubRepo: z

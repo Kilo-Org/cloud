@@ -2323,6 +2323,32 @@ describe('createPreparationManager', () => {
     expect(config.mcp?.['kilo-cloud-agent']).toBeUndefined();
   });
 
+  it('does not inject a session-scoped MCP grant into a shared worktree runtime', async () => {
+    const harness = createHarness();
+    const spec = routeSpec();
+    const cloudAgentMcp = {
+      url: 'https://mcp.kiloapps.io/mcp' as const,
+      token: 'shared-worktree-token',
+      expiresAt: Math.floor(Date.now() / 1000) + 24 * 3600,
+    };
+    await harness.manager.prepare(spec, {
+      sessionId: spec.sessionId,
+      kilo: { token: 'model-runtime-alias' },
+      cloudAgentMcp,
+    });
+    const env = harness.ensureInputs[0]?.env;
+    const config = JSON.parse(env?.KILO_CONFIG_CONTENT ?? '{}');
+    expect(config.mcp?.['kilo-cloud-agent']).toBeUndefined();
+    expect(env?.KILO_CONFIG_CONTENT).not.toContain(cloudAgentMcp.token);
+    await harness.manager.installCredentials({
+      sessionId: spec.sessionId,
+      kilo: { token: 'renewed-model-alias' },
+      cloudAgentMcp,
+    });
+    expect(harness.installCalls[0]?.cloudAgentMcp).toBeUndefined();
+    expect(harness.installCalls[0]?.env.KILO_CONFIG_CONTENT).not.toContain(cloudAgentMcp.token);
+  });
+
   it('surfaces setup-command output on the wire', async () => {
     const harness = createHarness();
     const manager = createPreparationManager({

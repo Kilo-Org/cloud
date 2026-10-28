@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Не можеше да се пристапи до инстанцата — можеби се исклучи.",
     "remoteSpawnNonRetryable": "Инстанцата не успеа да ја започне сесијата — провери го компјутерот или ажурирај го CLI.",
-    "remoteSpawnInstanceDisconnected": "Избраната инстанца се исклучи. Започни сесија на Cloud Agent или избери друга инстанца.",
-    "liveCount_one": "{{count}} ВО ЖИВО",
-    "liveCount_other": "{{count}} ВО ЖИВО"
+    "remoteSpawnInstanceDisconnected": "Избраната инстанца се исклучи. Започни сесија на Cloud Agent или избери друга инстанца."
   },
   "agentChat": {
     "session": {

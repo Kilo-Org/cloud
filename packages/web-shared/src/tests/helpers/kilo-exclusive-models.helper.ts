@@ -11,8 +11,7 @@ export const kiloExclusiveModelFixture: KiloExclusiveModel = {
   context_length: 1_000_000,
   max_completion_tokens: 128_000,
   provider: MARTIAN,
-  flags: ['reasoning', 'vision', 'requires-data-collection'],
-  inference_providers: ['stealth'],
+  flags: ['reasoning', 'vision'],
 };
 
 export function addKiloExclusiveModel(model: KiloExclusiveModel): () => void {

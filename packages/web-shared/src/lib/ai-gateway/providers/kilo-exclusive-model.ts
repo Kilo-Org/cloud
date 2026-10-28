@@ -1,16 +1,7 @@
-import type { OpenRouterInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import {
-  isOpenRouterProviderConfig,
-  type GatewayRequest,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 
-export type KiloExclusiveModelFlag =
-  | 'reasoning'
-  | 'vision'
-  | 'flex'
-  | 'vercel-routing'
-  | 'requires-data-collection';
+export type KiloExclusiveModelFlag = 'reasoning' | 'vision' | 'flex' | 'vercel-routing';
 
 export type KiloExclusiveModel = {
   public_id: string;
@@ -21,17 +12,7 @@ export type KiloExclusiveModel = {
   flags: KiloExclusiveModelFlag[];
   provider: Provider;
   internal_id: string;
-  /**
-   * Inference providers serving this model. Empty is only allowed for the
-   * OpenRouter and Vercel AI Gateway upstreams and means no restriction there.
-   * `stealth` hides the real upstream and marks the model as a stealth model.
-   */
-  inference_providers: ReadonlyArray<OpenRouterInferenceProviderId>;
 };
-
-export function isStealthModel(model: KiloExclusiveModel): boolean {
-  return model.inference_providers.includes('stealth');
-}
 
 type TokenLimitMutation = 'removed' | 'clamped';
 
@@ -116,44 +97,6 @@ export function applyKiloExclusiveModelSettings(
   if (kiloExclusiveModel.flags.includes('flex')) {
     requestToMutate.body.service_tier = 'flex';
   }
-  const restriction = kiloExclusiveModel.inference_providers;
-  const routesByInferenceProvider =
-    kiloExclusiveModel.provider.id === 'openrouter' || kiloExclusiveModel.provider.id === 'vercel';
-  if (
-    !routesByInferenceProvider ||
-    restriction.length === 0 ||
-    isStealthModel(kiloExclusiveModel)
-  ) {
-    return;
-  }
-  const provider = requestToMutate.body.provider;
-  if (isOpenRouterProviderConfig(provider) && provider.only) {
-    provider.only = [...new Set(provider.only).intersection(new Set<string>(restriction))];
-  } else if (isOpenRouterProviderConfig(provider)) {
-    provider.only = [...restriction];
-  } else {
-    requestToMutate.body.provider = { only: [...restriction] };
-  }
-}
-
-type InferenceProvider = {
-  slug: OpenRouterInferenceProviderId;
-  name: string;
-  training: boolean;
-  retainsPrompts: boolean;
-};
-
-export function getInferenceProviders(model: KiloExclusiveModel): InferenceProvider[] {
-  return model.inference_providers.map(slug =>
-    slug === 'stealth'
-      ? { slug, name: 'Stealth', training: true, retainsPrompts: true }
-      : {
-          slug,
-          name: slug.toUpperCase(),
-          training: model.flags.includes('requires-data-collection'),
-          retainsPrompts: true,
-        }
-  );
 }
 
 const FREE_PRICE_PER_TOKEN = '0.000000000000';

@@ -27,6 +27,11 @@ import {
   setSessionGoalCollapsed,
 } from '@/components/agents/session-goal-collapse';
 import {
+  conversationRetentionKey,
+  retainConversationAcrossMounts,
+} from '@/lib/pr-review/discussion/conversation-retention';
+import { type ConversationComment } from '@/lib/pr-review/discussion/review-discussion-types';
+import {
   clearSessionScopedState,
   clearSystemSearchIndexOnSignedOutLaunch,
 } from './session-scoped-state';
@@ -190,6 +195,24 @@ describe('clearSessionScopedState', () => {
     // clear; without it the collector re-indexes the previous account's PRs.
     clearSessionScopedState();
     expect(recentPrsMock.clearRecentPrs).toHaveBeenCalledTimes(1);
+  });
+
+  it('drops the retained PR discussion conversation', () => {
+    // Real store, real clear: a conversation retained under one account is
+    // gone after the boundary, so an evicted first page reads empty.
+    const retentionKey = conversationRetentionKey({
+      userId: 'user_a',
+      organizationId: null,
+      ref: { platform: 'github', owner: 'octocat', repo: 'hello', number: 1 },
+    });
+    const comment = { id: 'c1' } as unknown as ConversationComment;
+    expect(
+      retainConversationAcrossMounts(retentionKey, [{ conversation: [comment] }], true)
+    ).toEqual([comment]);
+
+    clearSessionScopedState();
+
+    expect(retainConversationAcrossMounts(retentionKey, [{ conversation: [] }], false)).toEqual([]);
   });
 
   it('reports a rejected recents clear instead of leaving it unhandled', async () => {

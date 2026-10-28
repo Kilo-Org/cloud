@@ -16,6 +16,7 @@ import { clearRepoSelectionSenders } from '@/lib/hooks/repo-selection-senders';
 import { clearTrustedImageHosts } from '@/lib/hooks/use-trusted-image-hosts';
 import { clearTrustedHosts } from '@/lib/hooks/use-trusted-hosts';
 import { clearSystemSearchIndex } from '@/lib/native-system-search';
+import { clearConversationRetention } from '@/lib/pr-review/discussion/conversation-retention';
 import { clearRecentPrs } from '@/lib/pr-review/recent-prs';
 import { reportSystemSearchFailure } from '@/lib/system-search-telemetry';
 import { captureTelemetry } from '@/lib/telemetry/error-sink';
@@ -88,13 +89,13 @@ function clearRecentPrsBestEffort(): void {
  * caches, per-session auto-approve and goal-disclosure flags, the remote MCP
  * connection and the stored servers behind it, the app-settings-tools group
  * switch, the debounced repository-selection send state, the browsable
- * artifact mirror, app-owned temp copies, the stored PR recents, and the
- * phone's own search index. Every member is best-effort; one
- * member's throw falls through to the members after it, and to the caller's own
- * sign-in/sign-out state reset. The recents delete and OS search clear are
- * fired without awaiting, so the function stays synchronous; a rejection is
- * reported through telemetry, and the signed-out-launch re-clear retries the
- * index clear.
+ * artifact mirror, app-owned temp copies, the stored PR recents, the retained
+ * PR discussion conversation, and the phone's own search index. Every member is
+ * best-effort; one member's throw falls through to the members after it, and to
+ * the caller's own sign-in/sign-out state reset. The recents delete and OS
+ * search clear are fired without awaiting, so the function stays synchronous;
+ * a rejection is reported through telemetry, and the signed-out-launch re-clear
+ * retries the index clear.
  *
  * Both boundaries call this: the sign-out body and the account switch. A clear
  * that only the sign-out path ran would let a direct switch hand the next
@@ -138,6 +139,12 @@ export function clearSessionScopedState(): void {
   // index itself. Without this, an account switch re-indexes the previous
   // account's pull requests from the recents the new account then inherits.
   runClear(clearRecentPrsBestEffort);
+  // The retained PR discussion conversation is private provider data read with
+  // the departing account's own connection, and the store lives for the whole
+  // app process. Dropping it here means a direct account or organization
+  // change can never be handed what the previous account loaded, even for the
+  // same PR.
+  runClear(clearConversationRetention);
   // The phone's search index is device-wide, not scoped to the signed-in
   // session, so without this the previous account's session, pull-request and
   // security titles stay searchable in Spotlight and Android app search after a

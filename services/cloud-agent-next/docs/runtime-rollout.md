@@ -36,6 +36,11 @@ are used together, including snapshot fallback. Existing allocations keep their 
 An absent `interactiveOrgIds` means deployment-wide startup selection; an empty catalog list is
 rejected. For a complete rollback, remove the production override so it inherits the preinstalled default.
 
+Known limitation: the environment builder always starts the `app` image, so its snapshots never match
+a `runtime-free` allocation. Enrolled organizations cold-start from the image instead of restoring
+builder-produced environment snapshots. Repository snapshots captured by a `runtime-free` container
+still restore. The `Stable base` row covers repository snapshots only.
+
 ## Approval and rollout order
 
 All committed targets use preinstalled startup on all-in-one. A downloaded catalog entry requires

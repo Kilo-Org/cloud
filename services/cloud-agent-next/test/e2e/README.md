@@ -447,7 +447,8 @@ By default every non-opt-in scenario runs. Two scenarios are opt-in only:
 
 - `real-model` drives `kilo-auto/efficient` for a cold turn and a tool follow-up.
 - `idle-stream` holds `/event` on an idle session for about 30 s and asserts no
-  `kilo.native.resnapshot` and no close. This is a known open bug and fails today.
+  `kilo.native.resnapshot` and no close. This is the manual check for the native tail fix, not a
+  CI gate.
 
 The local Docker sandbox cannot clone for a second workspace while another
 sandbox is alive, so the runner releases one sandbox family before it starts the

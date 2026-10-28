@@ -189,6 +189,14 @@ public stream has no reconnecting status today, so `reconnecting` changes no cli
   sent as a new message.
 - Each terminal message produces one report. The batch callback fires when no `queued` or
   `accepted` message remains (current callback semantics).
+- The per-user facade serves native `/event` and `/global/event`. `/event` snapshots through
+  `nativeSnapshot`, then tails the same session `/stream` log the client stream uses. The durable
+  log is the only cursor: the tail advances a monotonic last-delivered persisted id but does not
+  resume after a gap, because a gap cannot be proven continuous. An upstream transport gap or an
+  identity change emits `kilo.native.resnapshot` (`continuity_unproven`) and closes the response; an
+  oversized snapshot is an advisory `kilo.native.resnapshot` (`snapshot_too_large`) that keeps the
+  response open. The client rebuilds and re-attaches. A plain Session DO eviction does not emit a
+  resnapshot. `/global/event` opens one live-only tail per owned root without history.
 
 ## 6. Sandbox DO
 

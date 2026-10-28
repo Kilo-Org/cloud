@@ -296,7 +296,7 @@ describe('openSystemFeedStream', () => {
         })
       ).rejects.toThrow('System event source unavailable');
       expect(socket.accept).toHaveBeenCalledOnce();
-      expect(socket.close).toHaveBeenCalledExactlyOnceWith(1000, 'System feed closed');
+      expect(socket.close).toHaveBeenCalledExactlyOnceWith(1000, 'Session stream closed');
     }
   );
 

@@ -4,6 +4,7 @@ import { newMessageId, record } from './local-kilo-stack.js';
 import type { Scenario } from './local-kilo-scenarios.js';
 
 const REAL_MODEL = 'kilo-auto/efficient';
+const IDLE_MS = Number(process.env.LOCAL_KILO_IDLE_MS ?? 60_000);
 
 export const optInScenarios: Scenario[] = [
   {
@@ -66,11 +67,20 @@ export const optInScenarios: Scenario[] = [
     sandbox: 'workspace',
     run: async h => {
       const fixture = await h.workspaceSession('idle', `${h.run}-idle`);
+      await fixture.native.close();
       const attachment = await h.attach(fixture.session);
       const stream = await h.feed('/event', attachment);
       await stream.wait(event => event.type === 'kilo.native.fence', 'idle native fence');
       const from = stream.events.length;
-      await delay(30_000);
+      await delay(IDLE_MS);
+      const id = newMessageId();
+      const admitted = await h.prompt(fixture.session, attachment, `__fake__:echo:${h.run}-wake`, id);
+      assert.equal(admitted.status, 204);
+      await stream.wait(
+        event => event.type === 'message.updated' && record(event.properties.info).role === 'assistant',
+        'assistant event on the idle feed after the wait',
+        from
+      );
       const resnapshots = stream.events
         .slice(from)
         .filter(event => event.type === 'kilo.native.resnapshot');

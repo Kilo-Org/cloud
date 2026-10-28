@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@cloudflare/sandbox', () => ({ getSandbox: vi.fn() }));
 vi.mock('cloudflare:workers', () => ({
@@ -24,7 +24,6 @@ import {
 } from './session-do.js';
 import type { EventQueryFilters } from '../../session/queries/events.js';
 import { formatStreamEvent } from '../../websocket/stream.js';
-import { createNativeEventOutbox } from './native-outbox.js';
 import {
   NATIVE_DELIVERY_LIMITS,
   toNativePublicEvent,
@@ -145,84 +144,49 @@ describe('native durable attachment', () => {
   function attachmentUnit() {
     const session = Object.create(SandboxSessionV2.prototype) as Pick<
       SandboxSessionV2,
-      'nativeSnapshot' | 'subscribeNativeEvents' | 'releaseNativeEvents'
+      'nativeSnapshot'
     > & {
       initialized: Promise<void>;
       registration: unknown;
-      nativeOutbox: ReturnType<typeof createNativeEventOutbox>;
-      nativeDeliveryGeneration: number;
       eventQueries: unknown;
       sessionId: string;
       deriveSessionStatus: () => unknown;
       pendingInteractions?: { questions: unknown[]; permissions: unknown[] };
-      clearSessionInMemoryState: () => void;
       preparationRecorders: Map<string, unknown>;
     };
     Object.assign(session, {
       initialized: Promise.resolve(),
       registration: { spec: { kiloSessionId: KILO_SESSION_ID } },
       sessionId: SESSION_ID,
-      nativeDeliveryGeneration: 1,
-      nativeOutbox: createNativeEventOutbox({
-        identity: () => ({
-          kiloUserId: 'owner',
-          cloudAgentSessionId: SESSION_ID,
-          kiloSessionId: KILO_SESSION_ID,
-        }),
-        generation: () => 1,
-        send: async () => undefined,
-        waitUntil: vi.fn(),
-        diagnostic: vi.fn(),
-      }),
       deriveSessionStatus: () => ({ type: 'idle' }),
       preparationRecorders: new Map(),
     });
     return session;
   }
 
-  afterEach(() => vi.useRealTimers());
+  it('reports stopped for a missing registration or a mismatched Kilo session id', async () => {
+    const missing = attachmentUnit();
+    Object.assign(missing, { registration: null });
+    await expect(missing.nativeSnapshot({})).resolves.toEqual({
+      oversized: false,
+      fence: null,
+      events: [],
+      stopped: true,
+    });
+    const mismatched = attachmentUnit();
+    await expect(
+      mismatched.nativeSnapshot({ kiloSessionId: 'ses_zzzzzzzzzzzzzzzzzzzzzzzzzz' })
+    ).resolves.toEqual({ oversized: false, fence: null, events: [], stopped: true });
+  });
 
-  it('closes queued native transport before teardown clears its identity and supports fresh registration', async () => {
-    vi.useFakeTimers();
+  it('returns a null fence for a registered empty log without reporting stopped', async () => {
     const session = attachmentUnit();
-    const send = vi.fn(async () => undefined);
-    const work: Promise<void>[] = [];
-    const identity = vi.fn(() => {
-      if (session.registration === null) throw new Error('identity disappeared');
-      return {
-        kiloUserId: 'owner',
-        cloudAgentSessionId: SESSION_ID,
-        kiloSessionId: KILO_SESSION_ID,
-      };
+    Object.assign(session, {
+      eventQueries: { getLatestEventId: () => null, *iterateByFilters() {} },
     });
-    session.nativeOutbox = createNativeEventOutbox({
-      identity,
-      generation: () => 1,
-      send,
-      waitUntil: promise => work.push(promise),
-      diagnostic: vi.fn(),
-    });
-    session.nativeOutbox.subscribe('deleted');
-    session.nativeOutbox.enqueue({
-      eventId: 1,
-      event: { type: 'message.updated', properties: {} },
-    });
-    session.clearSessionInMemoryState();
-    expect(session.registration).toBeNull();
-    expect(session.nativeOutbox.snapshot()).toMatchObject({ count: 0, bytes: 0, subscriptions: 0 });
-    expect(vi.getTimerCount()).toBe(0);
-    await expect(Promise.all(work)).resolves.toEqual([undefined]);
-    expect(identity).not.toHaveBeenCalled();
-    expect(send).not.toHaveBeenCalled();
-    session.registration = { spec: { kiloSessionId: KILO_SESSION_ID } };
-    session.eventQueries = { getLatestEventId: () => 0 };
-    await session.subscribeNativeEvents({ kiloSessionId: KILO_SESSION_ID, attachmentId: 'fresh' });
-    session.nativeOutbox.enqueue({
-      eventId: 2,
-      event: { type: 'message.updated', properties: {} },
-    });
-    await vi.runAllTimersAsync();
-    expect(send).toHaveBeenCalledOnce();
+    const page = await session.nativeSnapshot({ kiloSessionId: KILO_SESSION_ID });
+    expect(page).toMatchObject({ oversized: false, fence: null, events: [] });
+    expect(page.stopped).toBeUndefined();
   });
 
   it.each([70, 128, 240])(
@@ -361,28 +325,6 @@ describe('native durable attachment', () => {
     await expect(session.nativeSnapshot({})).resolves.toMatchObject({
       sessionStatus: { type: 'idle' },
     });
-  });
-
-  it('distinguishes missing registration from an empty log and fences stale releases', async () => {
-    const session = attachmentUnit();
-    Object.assign(session, { eventQueries: { getLatestEventId: () => null } });
-    expect(
-      await session.subscribeNativeEvents({ kiloSessionId: KILO_SESSION_ID, attachmentId: 'old' })
-    ).toMatchObject({ registered: true, fence: null });
-    await session.subscribeNativeEvents({ kiloSessionId: KILO_SESSION_ID, attachmentId: 'new' });
-    await session.releaseNativeEvents({ attachmentId: 'old' });
-    expect(session.nativeOutbox.snapshot().subscriptions).toBe(1);
-    await session.releaseNativeEvents({ attachmentId: 'old' });
-    expect(session.nativeOutbox.snapshot().subscriptions).toBe(1);
-    await session.releaseNativeEvents({ attachmentId: 'new' });
-    expect(session.nativeOutbox.snapshot().subscriptions).toBe(0);
-    Object.assign(session, { registration: null });
-    expect(
-      await session.subscribeNativeEvents({
-        kiloSessionId: KILO_SESSION_ID,
-        attachmentId: 'missing',
-      })
-    ).toMatchObject({ registered: false });
   });
 
   it('paginates UTF-8 bytes through log, updates and removals with independent exclusive positions', async () => {

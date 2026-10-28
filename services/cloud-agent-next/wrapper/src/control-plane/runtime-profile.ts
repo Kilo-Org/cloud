@@ -123,7 +123,9 @@ export function createRuntimeProfileMaterializer(): RuntimeProfileMaterializer {
         };
         created.promise = materializeRuntimeProfile(home, profile, sharedOptions).then(
           () => {
-            if (profiles.get(home) === created) created.state = 'ready';
+            if (profiles.get(home) !== created) return;
+            if (created.state === 'installing') created.state = 'ready';
+            else profiles.delete(home);
           },
           error => {
             if (profiles.get(home) === created) profiles.delete(home);

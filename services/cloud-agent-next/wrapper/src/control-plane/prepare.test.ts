@@ -3299,6 +3299,19 @@ describe('workspace configuration ownership', () => {
     expect(harness.manager.workspaceConfiguration(sibling, second)).toBe(first);
   });
 
+  it('keeps the retained configuration when a prepared route re-attaches', async () => {
+    const harness = createHarness();
+    const spec = routeSpec();
+    harness.manager.workspaceConfiguration(spec, first);
+    await harness.manager.prepare({ ...spec, ...first });
+    expect(harness.manager.workspaceConfiguration(spec, second)).toBe(first);
+    const sibling = routeSpec({
+      sessionId: 'ses_22222222222222222222222222',
+      kiloSessionId: 'ses_22222222222222222222222222',
+    });
+    expect(harness.manager.workspaceConfiguration(sibling, second)).toBe(first);
+  });
+
   it('applies a new configuration after every route releases the runtime', async () => {
     const harness = createHarness();
     const spec = routeSpec();

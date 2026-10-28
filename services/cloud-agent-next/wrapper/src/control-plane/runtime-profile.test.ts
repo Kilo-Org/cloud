@@ -395,6 +395,36 @@ describe('workspace profile single-flight', () => {
     }
   });
 
+  it('does not pin a HOME when the last sibling releases during the final commit', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-commit-abort-'));
+    const controller = new AbortController();
+    const rename = fs.rename.bind(fs);
+    const commit = spyOn(fs, 'rename').mockImplementation(async (from, to) => {
+      if (to === profileConfigPath(home)) controller.abort(new Error('released'));
+      return rename(from, to);
+    });
+    try {
+      const materializer = createRuntimeProfileMaterializer();
+      expect(
+        await captureRejection(
+          materializer.materialize(home, previousProfile, { signal: controller.signal })
+        )
+      ).toMatchObject({ message: 'released' });
+      commit.mockRestore();
+      materializer.release(home);
+      // Queues behind the aborted write, so the aborted install has settled.
+      await materializeRuntimeProfile(home, previousProfile);
+      await Bun.sleep(0);
+      await materializer.materialize(home, nextProfile);
+      expect(await fs.readFile(path.join(home, '.kilocode/skills/next/SKILL.md'), 'utf8')).toBe(
+        'Next'
+      );
+    } finally {
+      commit.mockRestore();
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
   it('retries the next attach after a failed installation', async () => {
     const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-retry-'));
     try {

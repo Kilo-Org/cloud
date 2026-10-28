@@ -889,6 +889,18 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   }
 
   /**
+   * Whether `prepare` for `sessionId` reuses its current runtime and ignores a
+   * newly offered configuration: an unreleased in-flight prepare, or a prepared
+   * route whose runtime is still available.
+   */
+  function callerKeepsRuntime(sessionId: string, key: string): boolean {
+    const record = preparing.get(sessionId);
+    if (record && !record.released && record.runtimeKey === key) return true;
+    const route = prepared.get(sessionId);
+    return route?.key === key && !deps.runtimes.isUnavailable(key);
+  }
+
+  /**
    * Finish a route that left `prepared`, or never reached it. When it was the
    * last holder of its runtime key the process is released: the runtime's owned
    * process scope reaps the background processes it started, so walking a dying
@@ -1260,9 +1272,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   return {
     workspaceConfiguration(spec, offered) {
       const key = workspaceConfigRuntimeKey(spec);
-      const retained = hasRoutesForKey(key, spec.sessionId)
-        ? workspaceConfigurations.get(key)
-        : undefined;
+      const retained =
+        callerKeepsRuntime(spec.sessionId, key) || hasRoutesForKey(key, spec.sessionId)
+          ? workspaceConfigurations.get(key)
+          : undefined;
       if (retained !== undefined) return retained;
       workspaceConfigurations.set(key, offered);
       return offered;

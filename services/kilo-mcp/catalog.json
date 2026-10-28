@@ -14901,6 +14901,10 @@
         "model": {
           "type": "string",
           "minLength": 1
+        },
+        "organizationId": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
@@ -14910,9 +14914,10 @@
     "tags": [
       "modelpreferences",
       "removefavorite",
-      "model"
+      "model",
+      "organizationid"
     ],
-    "searchBlob": "modelPreferences.removeFavorite Remove a model from the current user's list of favorite models. modelpreferences removefavorite model model"
+    "searchBlob": "modelPreferences.removeFavorite Remove a model from the current user's list of favorite models. modelpreferences removefavorite model organizationid model organizationId"
   },
   "modelPreferences.setFavorites": {
     "path": "modelPreferences.setFavorites",
@@ -14922,6 +14927,10 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
+        "organizationId": {
+          "type": "string",
+          "minLength": 1
+        },
         "models": {
           "maxItems": 500,
           "type": "array",
@@ -14938,9 +14947,10 @@
     "tags": [
       "modelpreferences",
       "setfavorites",
+      "organizationid",
       "models"
     ],
-    "searchBlob": "modelPreferences.setFavorites Replace the current user's favorite models with the given list, removing duplicates. modelpreferences setfavorites models models"
+    "searchBlob": "modelPreferences.setFavorites Replace the current user's favorite models with the given list, removing duplicates. modelpreferences setfavorites organizationid models organizationId models"
   },
   "modelPreferences.setLastSelected": {
     "path": "modelPreferences.setLastSelected",

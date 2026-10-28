@@ -16,7 +16,14 @@ const modelIdInput = z.object({
   model: z.string().min(1),
 });
 
-const setFavoritesInput = z.object({
+// The organization whose context the caller saw the favorites in.
+const organizationIdInput = z.object({
+  organizationId: z.string().min(1).optional(),
+});
+
+const removeFavoriteInput = modelIdInput.extend(organizationIdInput.shape);
+
+const setFavoritesInput = organizationIdInput.extend({
   models: z.array(z.string().min(1)).max(500),
 });
 
@@ -114,7 +121,10 @@ export const modelPreferencesRouter = createTRPCRouter({
     return { success: true };
   }),
 
-  removeFavorite: baseProcedure.input(modelIdInput).mutation(async ({ ctx, input }) => {
+  removeFavorite: baseProcedure.input(removeFavoriteInput).mutation(async ({ ctx, input }) => {
+    if (input.organizationId) {
+      await ensureOrganizationAccess(ctx, input.organizationId);
+    }
     await db
       .insert(user_model_preferences)
       .values({ user_id: ctx.user.id, favorites: [] })
@@ -129,6 +139,9 @@ export const modelPreferencesRouter = createTRPCRouter({
   }),
 
   setFavorites: baseProcedure.input(setFavoritesInput).mutation(async ({ ctx, input }) => {
+    if (input.organizationId) {
+      await ensureOrganizationAccess(ctx, input.organizationId);
+    }
     const deduped = Array.from(new Set(input.models));
     await db
       .insert(user_model_preferences)

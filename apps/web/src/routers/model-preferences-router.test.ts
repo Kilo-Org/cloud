@@ -225,6 +225,77 @@ describe('modelPreferences', () => {
     });
   });
 
+  describe('favorite writes with an organization', () => {
+    const nonMemberOrganizationId = '00000000-0000-0000-0000-000000000000';
+
+    it('removes a favorite for an organization the user belongs to', async () => {
+      const organization = await createTestOrganization('Remove Favorite Org', testUser.id, 0);
+      const caller = await createCallerForUser(testUser.id);
+      await caller.modelPreferences.addFavorite({ model: 'openai/gpt-4o' });
+      await caller.modelPreferences.addFavorite({ model: 'anthropic/claude-3.5-sonnet' });
+
+      const result = await caller.modelPreferences.removeFavorite({
+        model: 'openai/gpt-4o',
+        organizationId: organization.id,
+      });
+
+      expect(result).toEqual({ success: true });
+      const row = await db.query.user_model_preferences.findFirst({
+        where: eq(user_model_preferences.user_id, testUser.id),
+      });
+      expect(row?.favorites).toEqual(['anthropic/claude-3.5-sonnet']);
+    });
+
+    it('replaces the favorites for an organization the user belongs to', async () => {
+      const organization = await createTestOrganization('Set Favorites Org', testUser.id, 0);
+      const caller = await createCallerForUser(testUser.id);
+      await caller.modelPreferences.addFavorite({ model: 'openai/gpt-4o' });
+
+      const result = await caller.modelPreferences.setFavorites({
+        models: ['openai/gpt-4o-mini', 'openai/gpt-4o-mini'],
+        organizationId: organization.id,
+      });
+
+      expect(result).toEqual({ success: true });
+      const row = await db.query.user_model_preferences.findFirst({
+        where: eq(user_model_preferences.user_id, testUser.id),
+      });
+      expect(row?.favorites).toEqual(['openai/gpt-4o-mini']);
+    });
+
+    it('rejects removing a favorite for an organization the user is not a member of', async () => {
+      const caller = await createCallerForUser(testUser.id);
+      await caller.modelPreferences.addFavorite({ model: 'openai/gpt-4o' });
+
+      await expect(
+        caller.modelPreferences.removeFavorite({
+          model: 'openai/gpt-4o',
+          organizationId: nonMemberOrganizationId,
+        })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+      const row = await db.query.user_model_preferences.findFirst({
+        where: eq(user_model_preferences.user_id, testUser.id),
+      });
+      expect(row?.favorites).toEqual(['openai/gpt-4o']);
+    });
+
+    it('rejects replacing favorites for an organization the user is not a member of', async () => {
+      const caller = await createCallerForUser(testUser.id);
+      await caller.modelPreferences.addFavorite({ model: 'openai/gpt-4o' });
+
+      await expect(
+        caller.modelPreferences.setFavorites({
+          models: ['openai/gpt-4o-mini'],
+          organizationId: nonMemberOrganizationId,
+        })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+      const row = await db.query.user_model_preferences.findFirst({
+        where: eq(user_model_preferences.user_id, testUser.id),
+      });
+      expect(row?.favorites).toEqual(['openai/gpt-4o']);
+    });
+  });
+
   describe('cascade on user delete', () => {
     it('removes the row when the user is hard-deleted', async () => {
       const caller = await createCallerForUser(testUser.id);

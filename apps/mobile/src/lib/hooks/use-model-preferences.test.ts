@@ -27,6 +27,7 @@ const setFavoritesErrorMock = vi.hoisted(() => vi.fn());
 const chainSaveMock = vi.hoisted(() =>
   vi.fn(async (_key: string, op: () => Promise<unknown>) => op())
 );
+const removeFavoriteMutateMock = vi.hoisted(() => vi.fn());
 
 vi.mock('react', async () => {
   const actual = await vi.importActual<typeof React>('react');
@@ -78,7 +79,7 @@ vi.mock('@/lib/trpc', () => ({
   trpcClient: {
     modelPreferences: {
       addFavorite: { mutate: vi.fn() },
-      removeFavorite: { mutate: vi.fn() },
+      removeFavorite: { mutate: removeFavoriteMutateMock },
       setLastSelected: { mutate: vi.fn() },
     },
   },
@@ -110,6 +111,18 @@ describe('useModelPreferences (generation guard)', () => {
     expect(chainSaveMock).toHaveBeenCalledWith('model-preferences-favorites', expect.any(Function));
     expect(addFavorite?.scope).toBeUndefined();
     expect(removeFavorite?.scope).toBeUndefined();
+  });
+
+  it('sends the organization context with removeFavorite', async () => {
+    useModelPreferences('org-1');
+    await capturedMutations[3]?.mutationFn?.({ model: 'm1' });
+    expect(removeFavoriteMutateMock).toHaveBeenCalledWith({ model: 'm1', organizationId: 'org-1' });
+  });
+
+  it('sends removeFavorite without an organization outside one', async () => {
+    useModelPreferences(undefined);
+    await capturedMutations[3]?.mutationFn?.({ model: 'm1' });
+    expect(removeFavoriteMutateMock).toHaveBeenCalledWith({ model: 'm1' });
   });
 
   it('a failing older addFavorite does not roll back while a newer one owns the cache', async () => {

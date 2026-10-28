@@ -174,7 +174,6 @@ export function SessionRow({
 
   let eyebrowRight: React.ReactNode = null;
   if (eyebrowDecision.kind === 'needs-input') {
-    // Icon suppressed — render exactly as today.
     eyebrowRight = branchContent;
   } else if (eyebrowDecision.showPlatformIcon && platformIcon != null) {
     // `none` kind: icon alone, no extra wrapper. Otherwise wrap icon + branch.

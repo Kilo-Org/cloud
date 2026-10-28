@@ -6,6 +6,7 @@ import {
   agent_briefing_context_preferences,
   agent_briefing_reports,
   cli_sessions_v2,
+  kilocode_users,
   microdollar_usage,
   microdollar_usage_metadata,
   organization_memberships,
@@ -19,15 +20,37 @@ import { reconcileBriefingCharge } from '@/lib/agent-briefing/summary';
 import { sweepAgentBriefings } from '@/lib/agent-briefing/sweep';
 import { agentBriefingRouter } from './agent-briefing-router';
 import { dispatchAgentBriefingPush } from '@kilocode/web-shared/lib/notifications-worker-client';
+import { getRawOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
+import type {
+  OpenRouterModel,
+  OpenRouterModelsResponse,
+} from '@kilocode/web-shared/lib/organizations/organization-types';
 
 jest.mock('@kilocode/web-shared/lib/notifications-worker-client', () => ({
   dispatchAgentBriefingPush: jest.fn().mockResolvedValue(true),
 }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/openrouter', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/providers/openrouter'),
+  getRawOpenRouterModels: jest.fn(),
+}));
+const boundedModel: OpenRouterModel = {
+  id: 'test/bounded',
+  name: 'test/bounded',
+  created: 0,
+  description: '',
+  architecture: { input_modalities: ['text'], output_modalities: ['text'], tokenizer: 'Other' },
+  top_provider: { is_moderated: false },
+  pricing: { prompt: '0.000001', completion: '0.000002' },
+  context_length: 128_000,
+};
 let user: User;
 let other: User;
 let organizationId: string;
 let sessionSequence = 0;
 beforeEach(async () => {
+  jest
+    .mocked(getRawOpenRouterModels)
+    .mockResolvedValue({ data: [boundedModel] } satisfies OpenRouterModelsResponse);
   await cleanupDbForTest();
   user = await insertTestUser({ id: 'oauth/briefing-owner', is_admin: false });
   other = await insertTestUser({ id: 'oauth/briefing-other', is_admin: false });
@@ -449,8 +472,14 @@ describe('agent briefing ownership and lifecycle', () => {
       blockers: 0,
       spendMicrodollars: 0,
     });
-    const caller = agentBriefingRouter.createCaller({ user });
+    const [funded] = await db
+      .update(kilocode_users)
+      .set({ total_microdollars_acquired: 10_000_000 })
+      .where(eq(kilocode_users.id, user.id))
+      .returning();
+    const caller = agentBriefingRouter.createCaller({ user: funded });
     const estimate = await caller.estimateSummary({ reportId: report.id });
+    expect(estimate.unavailableReason).toBeNull();
     expect(estimate.canGenerate).toBe(false);
     await expect(
       caller.generateSummary({ reportId: report.id, estimateToken: estimate.estimateToken })

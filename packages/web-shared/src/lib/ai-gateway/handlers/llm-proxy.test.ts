@@ -3,7 +3,7 @@ import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
-import { agent_briefing_reports, type User } from '@kilocode/db/schema';
+import { agent_briefing_reports, api_request_log, type User } from '@kilocode/db/schema';
 import { BRIEFING_SETTLEMENT_HEADER } from '@kilocode/web-shared/lib/agent-briefing-usage';
 import type { UsageAccountingResult } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -59,7 +59,15 @@ import { logMicrodollarUsage } from '@kilocode/web-shared/lib/ai-gateway/process
 import { applyResolvedAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
 import type * as AutoModelResolution from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
 import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
-import { rewriteModelResponse } from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse';
+import {
+  logUnrewrittenResponse,
+  rewriteModelResponse,
+} from '@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse';
+import {
+  getDynamicRequestLoggingMode,
+  type RequestLoggingMode,
+} from '@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins';
+import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
 import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
@@ -170,6 +178,7 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse', () => {
   );
   return {
     ...actual,
+    logUnrewrittenResponse: jest.fn(actual.logUnrewrittenResponse),
     // Mirror the production passthrough; these tests exercise the route, not
     // the response rewrite.
     rewriteModelResponse: jest.fn(async ({ response }: { response: Response }) =>
@@ -177,6 +186,22 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/rewriteModelResponse', () => {
     ),
   };
 });
+jest.mock('@kilocode/web-shared/lib/ai-gateway/request-logging-opt-ins', () => ({
+  getDynamicRequestLoggingMode: jest.fn(async (): Promise<RequestLoggingMode | null> => null),
+}));
+jest.mock('@kilocode/web-shared/lib/r2/create-client', () =>
+  jest
+    .requireActual<{
+      createFakeR2ClientModule: () => FakeR2ClientModule;
+    }>('@kilocode/web-shared/tests/helpers/fake-r2.helper')
+    .createFakeR2ClientModule()
+);
+jest.mock('@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/charges', () => ({
+  ...jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/charges'
+  ),
+  recordEnkryptGuardrailCharge: jest.fn(async () => undefined),
+}));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers', () => {
   const actual = jest.requireActual('@kilocode/web-shared/lib/ai-gateway/llm-proxy-helpers');
   return {
@@ -251,6 +276,8 @@ const mockedLogMicrodollarUsage = jest.mocked(logMicrodollarUsage);
 const mockedApplyResolvedAutoModel = jest.mocked(applyResolvedAutoModel);
 const mockedGetDirectByokModel = jest.mocked(getDirectByokModel);
 const mockedRewriteModelResponse = jest.mocked(rewriteModelResponse);
+const mockedLogUnrewrittenResponse = jest.mocked(logUnrewrittenResponse);
+const mockedGetDynamicRequestLoggingMode = jest.mocked(getDynamicRequestLoggingMode);
 const mockedIsFreeModelRateLimited = jest.mocked(isFreeModelRateLimited);
 const mockedIsCustomLlm = jest.mocked(isCustomLlm);
 const mockedGetEffectiveModelDecision = jest.mocked(getEffectiveModelDecision);
@@ -3627,5 +3654,112 @@ describe('Enkrypt input guardrail', () => {
     expect(response.status).toBe(503);
     expect(await response.json()).toMatchObject({ error_type: 'guardrail_unavailable' });
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  describe('request logging', () => {
+    const { fakeR2 } = jest.requireMock<FakeR2ClientModule>(
+      '@kilocode/web-shared/lib/r2/create-client'
+    );
+    const vercelRequestId = 'enkrypt-guardrail-request-log-test';
+
+    beforeEach(() => {
+      mockedGetDynamicRequestLoggingMode.mockResolvedValue('all');
+      fakeR2.objects.clear();
+    });
+
+    afterEach(async () => {
+      mockedGetDynamicRequestLoggingMode.mockResolvedValue(null);
+      await db
+        .delete(api_request_log)
+        .where(eq(api_request_log.vercel_request_id, vercelRequestId));
+    });
+
+    async function handleLoggedRequest() {
+      const response = await handleLlmProxyRequest(
+        makeRequest(makeBody(), { 'x-vercel-id': vercelRequestId })
+      );
+      await Promise.all(
+        jest.mocked(after).mock.calls.map(([task]) => (typeof task === 'function' ? task() : task))
+      );
+      return response;
+    }
+
+    function loggedRows() {
+      return db
+        .select()
+        .from(api_request_log)
+        .where(eq(api_request_log.vercel_request_id, vercelRequestId));
+    }
+
+    it.each([
+      {
+        verdict: 'block',
+        enkrypt: { body: injection, status: 200 },
+        status: 400,
+        errorType: 'guardrail_blocked',
+      },
+      {
+        verdict: 'unavailable',
+        enkrypt: { body: { detail: 'unavailable' }, status: 503 },
+        status: 503,
+        errorType: 'guardrail_unavailable',
+      },
+    ])(
+      'logs a $verdict rejection with the guardrail marker and returns it unchanged',
+      async ({ verdict, enkrypt, status, errorType }) => {
+        setOrganization({ enkrypt: { input_guardrail: { enabled: true } } });
+        enkryptAnswers(enkrypt.body, enkrypt.status);
+
+        const response = await handleLoggedRequest();
+
+        expect(response.status).toBe(status);
+        const body = await response.json();
+        expect(body).toMatchObject({ error_type: errorType });
+        expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+        const rows = await loggedRows();
+        expect(rows).toEqual([
+          expect.objectContaining({
+            kilo_user_id: 'user-123',
+            organization_id: 'org-1',
+            status_code: status,
+            provider: provider.id,
+            model: 'openai/gpt-4o',
+            error: { guardrail_rejection: verdict },
+          }),
+        ]);
+        expect(
+          JSON.parse(fakeR2.objects.get(`test-api-request-log/${rows[0].response_r2_key}`) ?? '')
+        ).toEqual(body);
+      }
+    );
+
+    it.each([
+      {
+        verdict: 'allow',
+        settings: { enkrypt: { input_guardrail: { enabled: true } } },
+      },
+      {
+        verdict: 'skip',
+        settings: { enkrypt: { input_guardrail: { enabled: false } } },
+      },
+    ])('leaves logging of an $verdict verdict to the response rewrite', async ({ settings }) => {
+      setOrganization(settings);
+      enkryptAnswers({ summary: { injection_attack: 0, pii: 0 }, result_message: null });
+
+      const response = await handleLoggedRequest();
+
+      expect(response.status).toBe(200);
+      expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+      expect(mockedLogUnrewrittenResponse).not.toHaveBeenCalled();
+      expect(mockedRewriteModelResponse).toHaveBeenCalledWith(
+        expect.objectContaining({
+          logging: expect.objectContaining({
+            organization_id: 'org-1',
+            vercel_request_id: vercelRequestId,
+          }),
+        })
+      );
+      expect(await loggedRows()).toEqual([]);
+    });
   });
 });

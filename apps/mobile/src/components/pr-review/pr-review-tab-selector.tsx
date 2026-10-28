@@ -56,7 +56,10 @@ export function PrReviewTabSelector({
         return (
           <Pressable
             key={tab.id}
-            accessibilityRole="tab"
+            // React Native gives the `tab` role no iOS accessibility trait, so
+            // VoiceOver would read the tab as static text; `button` types it as
+            // a control and `selected` still marks the open one.
+            accessibilityRole="button"
             accessibilityState={{ selected: active, disabled }}
             disabled={disabled}
             onPress={() => {

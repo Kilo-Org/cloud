@@ -87,7 +87,9 @@ it('announces the active briefing tab and context filter as selected', () => {
   }
   expect(root.root.findAll(node => node.props.accessibilityRole === 'tablist')).toHaveLength(1);
   for (const label of ['agentBriefing.available', 'agentBriefing.history']) {
-    expect(optionByText(root.root, label).props.role).toBe('tab');
+    // `Button` types both options as controls; a `tab` role would leave iOS
+    // with no accessibility trait at all.
+    expect(optionByText(root.root, label).props.role).toBe('button');
   }
   expect(selectedOf(root.root, 'agentBriefing.available')).toBe(true);
   expect(selectedOf(root.root, 'agentBriefing.history')).toBe(false);

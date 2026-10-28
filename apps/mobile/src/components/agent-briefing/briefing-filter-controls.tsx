@@ -25,8 +25,8 @@ type BriefingFilterControlsProps = {
 /**
  * Available/History tabs and the context filter chips above the briefing list.
  * Both rows pick one option at a time, so every option carries
- * `accessibilityState.selected` for the active one; the tabs also announce as a
- * tablist instead of a loose pair of buttons.
+ * `accessibilityState.selected` for the active one, and the shared `Button`
+ * types each option as a control on both platforms.
  */
 export function BriefingFilterControls({
   history,
@@ -38,11 +38,8 @@ export function BriefingFilterControls({
   const { t } = useTranslation();
   return (
     <>
-      {/* `Button` pins role="button" and `role` takes precedence over
-          `accessibilityRole`, so the tabs pass `role` to replace it. */}
       <View accessibilityRole="tablist" className="flex-row flex-wrap gap-2">
         <Button
-          role="tab"
           variant={history ? 'ghost' : 'secondary'}
           size="sm"
           accessibilityState={{ selected: !history }}
@@ -53,7 +50,6 @@ export function BriefingFilterControls({
           <Text>{t('agentBriefing.available')}</Text>
         </Button>
         <Button
-          role="tab"
           variant={history ? 'secondary' : 'ghost'}
           size="sm"
           accessibilityState={{ selected: history }}

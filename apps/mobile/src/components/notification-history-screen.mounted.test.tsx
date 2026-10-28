@@ -356,15 +356,18 @@ describe('NotificationHistoryScreen', () => {
     expect(texts).not.toContain('Notification settings');
   });
 
-  it('announces the chip row as a tab list with the selected chip marked', async () => {
+  it('keeps the chip row a tab list while the shared button types each chip', async () => {
     state.rows = [row({ category: 'chatMessages', pushType: 'chat.message' })];
     await mount();
 
+    expect(byType('ScrollView').some(node => node.props.accessibilityRole === 'tablist')).toBe(
+      true
+    );
     const chip = withText(byType('Button'), 'Chat messages');
-    expect(chipProps(chip)).toMatchObject({
-      role: 'tab',
-      accessibilityState: { selected: false },
-    });
+    // `Button` supplies role="button"; a `tab` role would leave iOS without a
+    // control trait, so the chip must not override it.
+    expect(chipProps(chip)?.role).toBeUndefined();
+    expect(chipProps(chip)?.accessibilityState).toEqual({ selected: false });
 
     press(chip);
     await waitFor(

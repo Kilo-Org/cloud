@@ -257,6 +257,10 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
           />
         </View>
       ) : null}
+      {/* One selectable panel per entry. React Native maps the `tab` role to no
+          iOS accessibility trait, so VoiceOver reads such an entry as static
+          text; the button role makes it a control on both platforms, and
+          `selected` still marks the open panel. */}
       <View className="flex-row gap-2 px-6 pb-2 pt-1">
         {TABS.map(({ key, labelKey }) => {
           const selected = tab === key;
@@ -270,7 +274,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
               onPress={() => {
                 setTab(key);
               }}
-              accessibilityRole="tab"
+              accessibilityRole="button"
               accessibilityState={{ selected }}
             >
               <Text

@@ -20,7 +20,10 @@ export function AgentsViewSegment({
       {(['sessions', 'todos'] as const).map(view => (
         <Pressable
           key={view}
-          accessibilityRole="tab"
+          // `tab` carries no iOS accessibility trait in React Native, so the
+          // entry would read as static text; `button` makes it a control and
+          // `selected` still marks the active view.
+          accessibilityRole="button"
           accessibilityState={{ selected: value === view }}
           onPress={() => {
             if (value !== view) {

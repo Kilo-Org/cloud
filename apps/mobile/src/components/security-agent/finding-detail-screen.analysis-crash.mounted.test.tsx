@@ -129,6 +129,18 @@ function renderScreen(): R {
   return renderer;
 }
 
+// The strip entries are the button-role controls that carry a selected state;
+// the header's own buttons carry none.
+function tabEntries(tree: R) {
+  return tree.root.findAll(
+    node =>
+      node.props.accessibilityRole === 'button' &&
+      typeof node.props.accessibilityState === 'object' &&
+      node.props.accessibilityState !== null &&
+      'selected' in node.props.accessibilityState
+  );
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -161,7 +173,7 @@ describe('FindingDetailScreen analysis pane render crash', () => {
     });
     analysisPanel.crashOnRender = true;
     const tree = renderScreen();
-    const tabs = tree.root.findAllByProps({ accessibilityRole: 'tab' });
+    const tabs = tabEntries(tree);
     act(tabs[1]?.props.onPress as () => void);
 
     const fallback = tree.root.findByType(QueryError);

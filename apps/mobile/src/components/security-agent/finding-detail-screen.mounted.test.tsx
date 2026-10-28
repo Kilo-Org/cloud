@@ -146,6 +146,18 @@ function press(tree: R, accessibilityLabel: string) {
   act(tree.root.findByProps({ accessibilityLabel }).props.onPress as () => void);
 }
 
+// The strip entries are the button-role controls that carry a selected state;
+// the header's own buttons carry none.
+function tabEntries(tree: R) {
+  return tree.root.findAll(
+    node =>
+      node.props.accessibilityRole === 'button' &&
+      typeof node.props.accessibilityState === 'object' &&
+      node.props.accessibilityState !== null &&
+      'selected' in node.props.accessibilityState
+  );
+}
+
 beforeEach(() => {
   vi.clearAllMocks();
   vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
@@ -176,7 +188,7 @@ describe('FindingDetailScreen pane containers', () => {
     finding.isError = true;
     finding.error = { data: { code: 'INTERNAL_SERVER_ERROR' } };
     const tree = renderScreen();
-    const tabs = tree.root.findAllByProps({ accessibilityRole: 'tab' });
+    const tabs = tabEntries(tree);
     const onPress = tabs[tab === 'analysis' ? 1 : 2]?.props.onPress as () => void;
     act(onPress);
     expect(tree.root.findAllByType(TabScreenScrollView)).toHaveLength(0);

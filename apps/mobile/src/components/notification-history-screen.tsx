@@ -58,9 +58,9 @@ function FilterChip({
     <Button
       variant={active ? 'secondary' : 'ghost'}
       size="sm"
-      // `Button` pins `role="button"`; a real role must replace it, because
-      // `role` outranks `accessibilityRole`.
-      role="tab"
+      // No `tab` role: it carries no iOS accessibility trait, so VoiceOver
+      // would read the chip as static text. `Button` already types it as a
+      // control, and `selected` marks the active category.
       accessibilityState={{ selected: active }}
       onPress={onPress}
     >

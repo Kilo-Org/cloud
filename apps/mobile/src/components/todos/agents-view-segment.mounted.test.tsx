@@ -29,7 +29,13 @@ describe('Agents view tabs', () => {
     if (!renderer) {
       throw new Error('Missing Agents tabs');
     }
-    const tabs = renderer.root.findAllByProps({ accessibilityRole: 'tab' });
+    const tabs = renderer.root.findAll(
+      node =>
+        node.props.accessibilityRole === 'button' &&
+        typeof node.props.accessibilityState === 'object' &&
+        node.props.accessibilityState !== null &&
+        'selected' in node.props.accessibilityState
+    );
     const [sessions, todos] = tabs;
     if (!sessions || !todos) {
       throw new Error('Missing Agents tabs');

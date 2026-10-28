@@ -1,8 +1,10 @@
 import { enkrypt_guardrail_charges, kilocode_users, organizations } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { adminProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
-import { desc, eq, sql } from 'drizzle-orm';
+import { and, desc, eq, gte, sql } from 'drizzle-orm';
 import * as z from 'zod';
+
+const ENKRYPT_CHARGES_WINDOW_DAYS = 30;
 
 const ListInputSchema = z.object({
   organizationId: z.string().uuid().optional(),
@@ -11,9 +13,15 @@ const ListInputSchema = z.object({
 
 export const adminEnkryptGuardrailChargesRouter = createTRPCRouter({
   list: adminProcedure.input(ListInputSchema).query(async ({ input }) => {
-    const where = input.organizationId
-      ? eq(enkrypt_guardrail_charges.organization_id, input.organizationId)
-      : undefined;
+    const where = and(
+      gte(
+        enkrypt_guardrail_charges.created_at,
+        sql`now() - make_interval(days => ${ENKRYPT_CHARGES_WINDOW_DAYS})`
+      ),
+      input.organizationId
+        ? eq(enkrypt_guardrail_charges.organization_id, input.organizationId)
+        : undefined
+    );
 
     const [rows, [summary]] = await Promise.all([
       db

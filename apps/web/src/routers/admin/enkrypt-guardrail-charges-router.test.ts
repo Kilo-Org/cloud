@@ -4,8 +4,10 @@ import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organ
 import { enkrypt_guardrail_charges } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 
+const hoursAgo = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString();
+
 describe('admin enkrypt guardrail charges router', () => {
-  it('lists charges with organization and user details, and rejects non-admins', async () => {
+  it('lists the last 30 days of charges with organization and user details, and rejects non-admins', async () => {
     const admin = await insertTestUser({
       google_user_email: 'admin-enkrypt-charges@example.com',
       is_admin: true,
@@ -15,6 +17,8 @@ describe('admin enkrypt guardrail charges router', () => {
       is_admin: false,
     });
     const organization = await createTestOrganization('Enkrypt Charges Org', user.id, 0);
+    const allowedAt = hoursAgo(2);
+    const blockedAt = hoursAgo(1);
     await db.insert(enkrypt_guardrail_charges).values([
       {
         organization_id: organization.id,
@@ -24,7 +28,7 @@ describe('admin enkrypt guardrail charges router', () => {
         enkrypt_credits_cost: 1.5,
         charged_microdollars: 150,
         added_latency_ms: 40,
-        created_at: '2026-10-28 10:00:00+00',
+        created_at: allowedAt,
       },
       {
         organization_id: organization.id,
@@ -35,7 +39,15 @@ describe('admin enkrypt guardrail charges router', () => {
         enkrypt_credits_cost: 2,
         charged_microdollars: 200,
         added_latency_ms: 60,
-        created_at: '2026-10-28 11:00:00+00',
+        created_at: blockedAt,
+      },
+      {
+        organization_id: organization.id,
+        kilo_user_id: user.id,
+        api_kind: 'responses',
+        decision: 'error',
+        charged_microdollars: 0,
+        created_at: hoursAgo(31 * 24),
       },
     ]);
 
@@ -48,8 +60,8 @@ describe('admin enkrypt guardrail charges router', () => {
     ).admin.enkryptGuardrailCharges.list({ organizationId: organization.id });
 
     expect(result.rows.map(row => [row.decision, row.created_at])).toEqual([
-      ['blocked', '2026-10-28T11:00:00.000Z'],
-      ['allowed', '2026-10-28T10:00:00.000Z'],
+      ['blocked', blockedAt],
+      ['allowed', allowedAt],
     ]);
     expect(result.rows[0]).toMatchObject({
       organization_name: 'Enkrypt Charges Org',

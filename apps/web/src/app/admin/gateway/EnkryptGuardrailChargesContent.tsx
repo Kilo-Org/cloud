@@ -67,7 +67,8 @@ export function EnkryptGuardrailChargesContent() {
           <h1 className="type-title">Enkrypt Guardrail Charges</h1>
           <p className="text-muted-foreground mt-1 type-body">
             Rows in <code>enkrypt_guardrail_charges</code>: one per Enkrypt guardrail detect call
-            billed to an organization. Shows the latest 200 rows; totals cover every matching row.
+            billed to an organization. Covers the last 30 days: the table shows the latest 200 rows
+            and the totals cover every matching row.
           </p>
         </div>
         <Button variant="outline" size="sm" onClick={() => void refetch()} disabled={isFetching}>
@@ -86,6 +87,7 @@ export function EnkryptGuardrailChargesContent() {
             value={organizationInput}
             onChange={event => setOrganizationInput(event.target.value)}
             aria-invalid={inputInvalid}
+            aria-describedby={inputInvalid ? 'enkrypt-org-filter-error' : undefined}
           />
         </div>
         <Button type="submit" variant="secondary" disabled={inputInvalid}>
@@ -102,6 +104,11 @@ export function EnkryptGuardrailChargesContent() {
           >
             Clear
           </Button>
+        )}
+        {inputInvalid && (
+          <p id="enkrypt-org-filter-error" className="text-destructive basis-full text-sm">
+            Enter a full organization ID (UUID) or leave the field empty.
+          </p>
         )}
       </form>
 

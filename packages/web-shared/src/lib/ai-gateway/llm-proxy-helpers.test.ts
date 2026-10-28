@@ -1240,6 +1240,56 @@ describe('makeErrorReadable', () => {
     expect(result).toBeUndefined();
   });
 
+  it('reports a rejected Vercel AI Gateway key without Vercel setup instructions', async () => {
+    const response = Response.json(
+      {
+        error: {
+          message:
+            'Authentication failed. Create an API key and set in AI_GATEWAY_API_KEY environment variable: https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fai-gateway%2Fapi-keys%3FshowCreateKeyModal',
+          type: 'authentication_error',
+        },
+      },
+      { status: 401 }
+    );
+
+    const result = await makeErrorReadable({
+      providerId: 'vercel',
+      requestedModel: 'anthropic/claude-sonnet-4.5',
+      request,
+      response,
+      userByokProviderIds: ['vercel-ai-gateway'],
+    });
+
+    const message =
+      '[BYOK] Vercel AI Gateway rejected your API key. Check that the key is correct and has not been revoked.';
+    expect(result?.status).toBe(401);
+    await expect(result?.json()).resolves.toEqual({
+      error: message,
+      error_type: 'byok_error',
+      message,
+    });
+  });
+
+  it('keeps the provider message for other Vercel AI Gateway key errors', async () => {
+    const response = Response.json(
+      { error: { message: 'Insufficient credits.', type: 'insufficient_funds' } },
+      { status: 402 }
+    );
+
+    const result = await makeErrorReadable({
+      providerId: 'vercel',
+      requestedModel: 'anthropic/claude-sonnet-4.5',
+      request,
+      response,
+      userByokProviderIds: ['vercel-ai-gateway'],
+    });
+
+    await expect(result?.json()).resolves.toMatchObject({
+      message:
+        '[BYOK] Your API account has insufficient funds. Please check your billing details with your API provider. Provider message: Insufficient credits.',
+    });
+  });
+
   it('explains a missing model for a Vertex user BYOK request', async () => {
     const response = Response.json({ error: { message: 'AI_APICallError' } }, { status: 404 });
 

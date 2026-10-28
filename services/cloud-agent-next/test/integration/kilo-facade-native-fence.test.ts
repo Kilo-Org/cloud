@@ -1,4 +1,4 @@
-import { SELF, env, reset, runInDurableObject } from 'cloudflare:test';
+import { SELF, env, evictDurableObject, reset, runInDurableObject } from 'cloudflare:test';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
@@ -262,7 +262,9 @@ async function startPreparationFailureSession(): Promise<ActiveSession> {
 }
 
 async function durableSnapshot(stub: DurableObjectStub<SandboxSessionV2>) {
-  return runInDurableObject(stub, instance => instance.nativeSnapshot({}));
+  return runInDurableObject(stub, instance =>
+    instance.nativeSnapshot({ kiloSessionId: qualifiedKiloSessionId })
+  );
 }
 
 async function messageStatus(
@@ -450,6 +452,23 @@ function permissionAsked(id: string): ControlPlaneEvent {
       patterns: ['*'],
     },
   };
+}
+
+function partDelta(messageId: string, partId: string, delta: string): ControlPlaneEvent {
+  return {
+    type: 'message.part.delta',
+    properties: {
+      sessionID: qualifiedKiloSessionId,
+      messageID: messageId,
+      partID: partId,
+      field: 'text',
+      delta,
+    },
+  };
+}
+
+function isPartDelta(value: unknown): boolean {
+  return isFrame(value, 'message.part.delta');
 }
 
 async function pushEvents(
@@ -1033,6 +1052,9 @@ describe('hosted native history/live fence', { timeout: 30_000 }, () => {
       );
       const notice = noticed.match as { properties: { sessionID?: string; reason?: string } };
       expect(notice.properties.sessionID).toBe(qualifiedKiloSessionId);
+      // The post-move content must never be delivered on the stale attachment.
+      expect(notice.properties.reason).toBe('continuity_unproven');
+      expect(JSON.stringify(noticed.observed)).not.toContain('after move');
 
       // Restore the mapping and re-attach: the rebuilt snapshot is the durable
       // log, unchanged by the continuity failure, and still carries the pending
@@ -1046,6 +1068,130 @@ describe('hosted native history/live fence', { timeout: 30_000 }, () => {
       await rebuilt.reader.cancel();
       expectContainsState(transcriptState(durable), transcriptState(rebuilt.events));
       expect(rebuilt.events.some(event => isFrame(event, 'question.asked'))).toBe(true);
+    } finally {
+      session.stopPump();
+      session.wrapper.close();
+    }
+  });
+
+  it('reports continuity_unproven and closes when the session stream socket closes', async () => {
+    const session = await startReadySession();
+    try {
+      await seedFacadeRoots({
+        kiloSessionId: qualifiedKiloSessionId,
+        cloudAgentSessionId,
+        title: 'native socket close',
+      });
+      await pushEvents(session, [messageUpdated('msg_user_socket', 'user', 'hello')]);
+      await waitFor(async () => {
+        const snapshot = await durableSnapshot(session.stub);
+        expect(snapshot.events.length).toBeGreaterThanOrEqual(1);
+      });
+
+      const attached = await readAttach(await attach());
+      try {
+        await runInDurableObject(session.stub, (_instance, state) => {
+          for (const socket of state.getWebSockets('stream')) socket.close(1011, 'test close');
+        });
+        const noticed = await readSseUntil(attached.reader, frame =>
+          isFrame(frame, 'kilo.native.resnapshot')
+        );
+        const notice = noticed.match as { properties: { sessionID?: string; reason?: string } };
+        expect(notice.properties.sessionID).toBe(qualifiedKiloSessionId);
+        expect(notice.properties.reason).toBe('continuity_unproven');
+        await expect(attached.reader.nextOptional()).resolves.toBeNull();
+      } finally {
+        await attached.reader.cancel().catch(() => undefined);
+      }
+    } finally {
+      session.stopPump();
+      session.wrapper.close();
+    }
+  });
+
+  // Miniflare cannot hibernate a DO-to-DO `/stream` socket here. Awaiting
+  // `evictDurableObject` on the warm session DO wedges the test isolate (later
+  // timers and socket sends never complete), and not awaiting it turns the
+  // eviction window into a race that sometimes drops the post-eviction frames.
+  // The assertion is kept intact for a harness that can multiplex DO-to-DO
+  // sockets; it is not replaced with a forced-close case.
+  it.skip('keeps the same SSE open across a hibernating session eviction', async () => {
+    const session = await startReadySession();
+    try {
+      await seedFacadeRoots({
+        kiloSessionId: qualifiedKiloSessionId,
+        cloudAgentSessionId,
+        title: 'native eviction hibernate',
+      });
+      const assistantMessageId = 'msg_assistant_evict';
+      await pushEvents(session, [
+        messageUpdated('msg_user_evict', 'user', 'hello'),
+        messageUpdated(assistantMessageId, 'assistant', ''),
+      ]);
+      await waitFor(async () => {
+        const snapshot = await durableSnapshot(session.stub);
+        expect(snapshot.events.length).toBeGreaterThanOrEqual(2);
+      });
+
+      const attached = await readAttach(await attach());
+      try {
+        await evictDurableObject(session.stub, { webSockets: 'hibernate' });
+        await pushEvents(session, [
+          partUpdated(assistantMessageId, 'prt_evict_persisted', 'persisted after eviction'),
+          partDelta(assistantMessageId, 'prt_evict_persisted', 'live delta'),
+        ]);
+        const delta = await readSseUntil(attached.reader, isPartDelta);
+        const observed = JSON.stringify(delta.observed);
+        expect(observed).toContain('persisted after eviction');
+        expect(observed).not.toContain('kilo.native.resnapshot');
+
+        // A later event on the same reader proves the response never closed.
+        await pushEvents(session, [
+          partUpdated(assistantMessageId, 'prt_evict_marker', 'still open'),
+        ]);
+        const marker = await readSseUntil(attached.reader, frame =>
+          isPartUpdate(frame, 'prt_evict_marker')
+        );
+        expect(JSON.stringify(marker.observed)).not.toContain('kilo.native.resnapshot');
+      } finally {
+        await attached.reader.cancel().catch(() => undefined);
+      }
+    } finally {
+      session.stopPump();
+      session.wrapper.close();
+    }
+  });
+
+  // Same harness limitation as the hibernating case above: the eviction cannot
+  // complete deterministically while `/event` is open, so this close-path
+  // assertion cannot run in Miniflare either.
+  it.skip('reports continuity_unproven and closes when the session eviction closes the socket', async () => {
+    const session = await startReadySession();
+    try {
+      await seedFacadeRoots({
+        kiloSessionId: qualifiedKiloSessionId,
+        cloudAgentSessionId,
+        title: 'native eviction close',
+      });
+      await pushEvents(session, [messageUpdated('msg_user_close', 'user', 'hello')]);
+      await waitFor(async () => {
+        const snapshot = await durableSnapshot(session.stub);
+        expect(snapshot.events.length).toBeGreaterThanOrEqual(1);
+      });
+
+      const attached = await readAttach(await attach());
+      try {
+        await evictDurableObject(session.stub, { webSockets: 'close' });
+        const noticed = await readSseUntil(attached.reader, frame =>
+          isFrame(frame, 'kilo.native.resnapshot')
+        );
+        const notice = noticed.match as { properties: { sessionID?: string; reason?: string } };
+        expect(notice.properties.sessionID).toBe(qualifiedKiloSessionId);
+        expect(notice.properties.reason).toBe('continuity_unproven');
+        await expect(attached.reader.nextOptional()).resolves.toBeNull();
+      } finally {
+        await attached.reader.cancel().catch(() => undefined);
+      }
     } finally {
       session.stopPump();
       session.wrapper.close();

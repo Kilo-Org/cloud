@@ -140,6 +140,8 @@ Native compatibility requirements:
   purchase connector, which share a namespace. AGP 9 otherwise rejects that vendor pair.
 - The supported Gesture Handler builder API remains explicitly allowed by the
   deprecation lint rule; other deprecated APIs remain checked.
+- `expo-share-intent` 9.x targets SDK 58. Keep its Expo, linking and constants
+  peers aligned with the app; rebuild the development clients after upgrading it.
 - `react-native-css` forwards React Native's native component registry through its
   CommonJS facade for Router's native screen host, so the styling facade needs no
   patch of its own.

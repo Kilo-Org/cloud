@@ -16,6 +16,7 @@ import { BellOff } from '@/components/ui/icons';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { tabEntryA11y } from '@/lib/a11y/tab-entry';
 import { useAuth } from '@/lib/auth/auth-context';
 import { setPendingDeepLink } from '@/lib/deep-link-launch';
 import { pendingDeepLinkOptionsForData } from '@/lib/notification-actions';
@@ -60,8 +61,7 @@ function FilterChip({
       size="sm"
       // `Button` pins `role="button"`; a real role must replace it, because
       // `role` outranks `accessibilityRole`.
-      role="tab"
-      accessibilityState={{ selected: active }}
+      {...tabEntryA11y({ selected: active })}
       onPress={onPress}
     >
       <Text>{label}</Text>

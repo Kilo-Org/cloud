@@ -2873,12 +2873,17 @@ describe('api_request_log storage', () => {
     return rows[0];
   }
 
-  async function logUpstreamResponse(response: Response, mode: RequestLoggingMode) {
+  async function logUpstreamResponse(
+    response: Response,
+    mode: RequestLoggingMode,
+    error?: Record<string, string>
+  ) {
     mockedOptIn.mockResolvedValueOnce(mode);
     await logUnrewrittenResponse({
       response,
       model: 'kilo-internal/my-model',
       providerId: 'custom',
+      error,
       logging: makeLogging({
         vercel_request_id: vercelRequestId,
         request: {
@@ -3010,6 +3015,36 @@ describe('api_request_log storage', () => {
     await logUpstreamResponse(jsonResponse({ model: 'kilo-internal/my-model' }), 'all');
 
     expect(await selectLoggedRow()).toMatchObject({ status_code: 200, error: null });
+  });
+
+  test.each<RequestLoggingMode>(['all', 'errors_only'])(
+    'stores the caller error marker for %s opt-ins',
+    async mode => {
+      await logUpstreamResponse(jsonResponse({ error: 'blocked' }, 400), mode, {
+        guardrail_rejection: 'block',
+      });
+
+      expect(await selectLoggedRow()).toMatchObject({
+        status_code: 400,
+        error: { guardrail_rejection: 'block' },
+      });
+    }
+  );
+
+  test('merges the caller error marker with the R2 upload failure', async () => {
+    jest.spyOn(fakeR2, 'send').mockRejectedValue(new Error('R2 unavailable'));
+
+    await logUpstreamResponse(jsonResponse({ error: 'unavailable' }, 503), 'all', {
+      guardrail_rejection: 'unavailable',
+    });
+
+    expect(await selectLoggedRow()).toMatchObject({
+      status_code: 503,
+      error: {
+        guardrail_rejection: 'unavailable',
+        r2_upload_error: 'request: Error: R2 unavailable; response: Error: R2 unavailable',
+      },
+    });
   });
 });
 

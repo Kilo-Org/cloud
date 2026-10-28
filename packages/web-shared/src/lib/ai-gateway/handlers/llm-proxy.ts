@@ -1074,12 +1074,28 @@ export async function handleLlmProxyRequest(
   const bouncerVerdict = await bouncerVerdictPromise;
   const bouncerRejection = bouncer.apply(bouncerVerdict, usageContext.bouncer);
   if (bouncerRejection) return bouncerRejection;
+  const requestLogging = {
+    user: maybeUser,
+    organization_id: organizationId || null,
+    session_id: usageContext.session_id,
+    vercel_request_id: vercelRequestId,
+    request: requestBodyParsed,
+  };
   const guardrailVerdict = await enkryptGuardrail.awaitVerdict();
   const guardrailRejection = enkryptGuardrailRejectionResponse(
     requestBodyParsed.kind,
     guardrailVerdict
   );
-  if (guardrailRejection) return guardrailRejection;
+  if (guardrailRejection) {
+    await logUnrewrittenResponse({
+      response: guardrailRejection.clone(),
+      model: effectiveModelIdLowerCased,
+      providerId: effectiveProviderContext.provider.id,
+      logging: requestLogging,
+      error: { guardrail_rejection: guardrailVerdict.action },
+    });
+    return guardrailRejection;
+  }
   const requestCostBalance = requestCostLimit !== null ? await balanceAndSettingsPromise : null;
 
   const attempt = await sendUpstreamAttempt({
@@ -1177,14 +1193,6 @@ export async function handleLlmProxyRequest(
         })
     );
   }
-
-  const requestLogging = {
-    user: maybeUser,
-    organization_id: organizationId || null,
-    session_id: usageContext.session_id,
-    vercel_request_id: vercelRequestId,
-    request: requestBodyParsed,
-  };
 
   {
     const errorResponse = await makeErrorReadable({

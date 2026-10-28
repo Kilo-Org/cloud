@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "មិនអាចភ្ជាប់ទៅអ៊ីនស្តង់បានទេ។ ការតភ្ជាប់របស់វាអាចបានដាច់។",
     "remoteSpawnNonRetryable": "អ៊ីនស្តង់មិនអាចចាប់ផ្តើមវគ្គបានទេ។ ពិនិត្យម៉ាស៊ីន ឬធ្វើបច្ចុប្បន្នភាព CLI។",
-    "remoteSpawnInstanceDisconnected": "អ៊ីនស្តង់ដែលបានជ្រើសរើសបានដាច់ការតភ្ជាប់។ ចាប់ផ្តើមវគ្គនៅលើ Cloud Agent ឬជ្រើសរើសអ៊ីនស្តង់ផ្សេង។",
-    "liveCount_one": "{{count}} ផ្ទាល់",
-    "liveCount_other": "{{count}} ផ្ទាល់"
+    "remoteSpawnInstanceDisconnected": "អ៊ីនស្តង់ដែលបានជ្រើសរើសបានដាច់ការតភ្ជាប់។ ចាប់ផ្តើមវគ្គនៅលើ Cloud Agent ឬជ្រើសរើសអ៊ីនស្តង់ផ្សេង។"
   },
   "agentChat": {
     "session": {

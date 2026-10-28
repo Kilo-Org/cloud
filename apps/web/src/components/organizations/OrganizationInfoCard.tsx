@@ -8,6 +8,7 @@ import {
   useUpdateCompanyDomain,
   useOrganizationWithMembers,
   useUpdateSuppressTrialMessaging,
+  useUpdateKiloEncrypt,
 } from '@/app/api/organizations/hooks';
 import type { OrganizationWithMembersResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
@@ -181,6 +182,7 @@ function Inner(props: InnerProps) {
   const updateOrganizationName = useUpdateOrganizationName();
   const updateCompanyDomain = useUpdateCompanyDomain();
   const updateSuppressTrialMessaging = useUpdateSuppressTrialMessaging();
+  const updateKiloEncrypt = useUpdateKiloEncrypt();
 
   const expiringCreditGroups = useExpiringCredits(id);
 
@@ -285,6 +287,17 @@ function Inner(props: InnerProps) {
       });
     } catch (error) {
       console.error('Failed to toggle suppress trial messaging:', error);
+    }
+  };
+
+  const handleKiloEncryptToggle = async () => {
+    try {
+      await updateKiloEncrypt.mutateAsync({
+        organizationId: id,
+        kilo_encrypt: !info.settings?.kilo_encrypt,
+      });
+    } catch (error) {
+      console.error('Failed to toggle AI Guardrails:', error);
     }
   };
 
@@ -544,6 +557,23 @@ function Inner(props: InnerProps) {
                   disabled={updateSuppressTrialMessaging.isPending}
                   className="hover:bg-muted inline-flex cursor-pointer items-center gap-1 rounded p-1 transition-all duration-200 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
                   title="Toggle trial messaging suppression"
+                >
+                  <Edit className="text-muted-foreground hover:text-foreground h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <div>
+              <label className="text-muted-foreground text-sm font-medium">AI Guardrails</label>
+              <div className="mt-1 flex items-center gap-2">
+                <BooleanBadge positive={info.settings?.kilo_encrypt ?? false}>
+                  {info.settings?.kilo_encrypt ? 'Enabled' : 'Disabled'}
+                </BooleanBadge>
+                <button
+                  onClick={handleKiloEncryptToggle}
+                  disabled={updateKiloEncrypt.isPending}
+                  className="hover:bg-muted inline-flex cursor-pointer items-center gap-1 rounded p-1 transition-all duration-200 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+                  title="Toggle AI Guardrails for this organization"
+                  aria-label="Toggle AI Guardrails for this organization"
                 >
                   <Edit className="text-muted-foreground hover:text-foreground h-4 w-4" />
                 </button>

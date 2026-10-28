@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "نەتوانرا پەیوەندی بە ڕاژەکە بکرێت — ڕەنگە پەیوەندییەکەی پچڕابێت.",
     "remoteSpawnNonRetryable": "ڕاژەکە نەیتوانی سێشنەکە دەست پێ بکات — ئامێرەکە بپشکنە یان CLI نوێ بکەرەوە.",
-    "remoteSpawnInstanceDisconnected": "پەیوەندیی ڕاژە هەڵبژێردراوەکە پچڕا. لە Cloud Agent سێشنێک دەست پێ بکە یان ڕاژەیەکی دیکە هەڵبژێرە.",
-    "liveCount_one": "{{count}} ڕاستەوخۆ",
-    "liveCount_other": "{{count}} ڕاستەوخۆ"
+    "remoteSpawnInstanceDisconnected": "پەیوەندیی ڕاژە هەڵبژێردراوەکە پچڕا. لە Cloud Agent سێشنێک دەست پێ بکە یان ڕاژەیەکی دیکە هەڵبژێرە."
   },
   "agentChat": {
     "session": {

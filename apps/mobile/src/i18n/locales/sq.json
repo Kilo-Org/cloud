@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Nuk u arrit lidhja me instancën. Ajo mund të jetë shkëputur.",
     "remoteSpawnNonRetryable": "Instanca nuk arriti të niste seancën. Kontrollo kompjuterin ose përditëso CLI-në.",
-    "remoteSpawnInstanceDisconnected": "Instanca e zgjedhur u shkëput. Nis një seancë në Cloud Agent ose zgjidh një instancë tjetër.",
-    "liveCount_one": "{{count}} DREJTPËRDREJT",
-    "liveCount_other": "{{count}} DREJTPËRDREJT"
+    "remoteSpawnInstanceDisconnected": "Instanca e zgjedhur u shkëput. Nis një seancë në Cloud Agent ose zgjidh një instancë tjetër."
   },
   "agentChat": {
     "session": {

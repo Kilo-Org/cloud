@@ -105,7 +105,8 @@ describe('creator Cloud Agent dispatch', () => {
   function harness(
     processStatus = 'captured',
     cloudAgentSessionId: string | null = null,
-    profileId: string | null = 'profile-1'
+    profileId: string | null = 'profile-1',
+    method = 'POST'
   ) {
     const config = makeTriggerConfig({
       userId: null,
@@ -118,7 +119,10 @@ describe('creator Cloud Agent dispatch', () => {
       profileId,
     });
     const stub = {
-      getRequest: vi.fn(async () => ({ ...makeRequest(processStatus), cloudAgentSessionId })),
+      getRequest: vi.fn(async () => ({
+        ...makeRequest(processStatus, { method }),
+        cloudAgentSessionId,
+      })),
       getConfig: vi.fn(async () => config),
       updateRequest: vi.fn(async () => ({ success: true })),
     };
@@ -170,7 +174,10 @@ describe('creator Cloud Agent dispatch', () => {
     expect(h.calls).toHaveLength(2);
     for (const request of h.calls)
       expect(request.headers.get('Authorization')).toBe('Bearer creator-token');
-    expect(await h.calls[0].json()).toMatchObject({ kilocodeOrganizationId: 'org-1' });
+    expect(await h.calls[0].json()).toMatchObject({
+      kilocodeOrganizationId: 'org-1',
+      allowUserAuthorization: true,
+    });
     expect(h.ack).toHaveBeenCalledOnce();
     expect(h.retry).not.toHaveBeenCalled();
   });
@@ -188,6 +195,16 @@ describe('creator Cloud Agent dispatch', () => {
       'req-1',
       expect.objectContaining({ process_status: 'failed' })
     );
+  });
+
+  it('allows user GitHub authorization for scheduled creator dispatch', async () => {
+    const h = harness('captured', null, 'profile-1', 'SCHEDULED');
+    await handleWebhookDeliveryBatch(h.batch, h.env);
+    expect(h.calls).toHaveLength(2);
+    expect(await h.calls[0].json()).toMatchObject({
+      createdOnPlatform: 'scheduled',
+      allowUserAuthorization: true,
+    });
   });
 
   it('mints fresh authorization again for an initiate-only retry', async () => {
@@ -631,6 +648,7 @@ describe('handleWebhookDeliveryBatch Cloud Agent callback target', () => {
         expect(prepareBody).toHaveProperty('sandboxAllocation', sandboxAllocation);
       }
       expect(prepareBody.createdOnPlatform).toBe(triggerSource);
+      expect(prepareBody).not.toHaveProperty('allowUserAuthorization');
       expect(await initiateRequests[0].json()).not.toHaveProperty('sandboxAllocation');
       expect(ack).toHaveBeenCalledTimes(1);
       expect(retry).not.toHaveBeenCalled();

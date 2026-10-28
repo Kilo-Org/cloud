@@ -127,6 +127,21 @@ describe('getGoogleServiceAccountAccessToken', () => {
     });
   });
 
+  it('accepts a key with only the fields needed to sign token requests', async () => {
+    const getAccessToken = jest.fn(async () => 'gcp-token');
+    mockGoogleAuth.mockImplementation(() => ({ getAccessToken }) as unknown as GoogleAuth);
+    const credentials = {
+      client_email: 'direct-byok@example-project.iam.gserviceaccount.com',
+      private_key: 'private-key-four',
+    };
+
+    await expect(getGoogleServiceAccountAccessToken(credentials)).resolves.toBe('gcp-token');
+    expect(mockGoogleAuth).toHaveBeenCalledWith({
+      credentials,
+      scopes: ['https://www.googleapis.com/auth/cloud-platform'],
+    });
+  });
+
   it('reuses the Google auth client so its access token cache remains effective', async () => {
     const getAccessToken = jest.fn(async () => 'cached-token');
     mockGoogleAuth.mockImplementation(() => ({ getAccessToken }) as unknown as GoogleAuth);

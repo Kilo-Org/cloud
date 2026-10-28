@@ -1689,11 +1689,7 @@
     },
     "remoteSpawnRetryable": "Не вдалося з'єднатися з екземпляром — можливо, він від'єднався.",
     "remoteSpawnNonRetryable": "Не вдалося запустити сеанс на екземплярі — перевірте комп'ютер або оновіть CLI.",
-    "remoteSpawnInstanceDisconnected": "Вибраний екземпляр від'єднався. Запустіть сеанс у Cloud Agent або виберіть інший екземпляр.",
-    "liveCount_one": "{{count}} НАЖИВО",
-    "liveCount_other": "{{count}} НАЖИВО",
-    "liveCount_few": "{{count}} АКТИВНІ",
-    "liveCount_many": "{{count}} АКТИВНИХ"
+    "remoteSpawnInstanceDisconnected": "Вибраний екземпляр від'єднався. Запустіть сеанс у Cloud Agent або виберіть інший екземпляр."
   },
   "agentChat": {
     "session": {

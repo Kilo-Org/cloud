@@ -34,7 +34,7 @@ export async function buildEligibleCatalog(params: {
   const { userId, organizationId } = params;
 
   const [enhanced, byokModels] = await Promise.all([
-    getEnhancedOpenRouterModels(),
+    getEnhancedOpenRouterModels({ countryCode: null }),
     organizationId
       ? getDirectByokModelsForOrganization(organizationId)
       : getDirectByokModelsForUser(userId),
@@ -50,9 +50,12 @@ export async function buildEligibleCatalog(params: {
     // the organization's own policy rather than the configuring owner's group
     // grants. A member subject would also require direct membership, which a
     // parent-organization owner or platform admin may not have.
-    const orgCatalog = await getAvailableModelsForOrganization(organizationId, {
-      type: 'defaultAccess',
-    });
+    const orgCatalog = await getAvailableModelsForOrganization(
+      organizationId,
+      { type: 'defaultAccess' },
+      'member',
+      { countryCode: null }
+    );
     ownerModels = orgCatalog?.data ?? [];
   } else {
     ownerModels = managedModels;

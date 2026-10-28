@@ -16,6 +16,15 @@ import type { UserForBalance } from '@kilocode/web-shared/lib/user/balance-types
 import type { UsageQueueSfoConfig } from './usage-queue-config';
 
 const nativeFetch = globalThis.fetch;
+const nativeDateNow = Date.now;
+let publisherReportClockMs = 0;
+
+/** Moves past the per-instance Sentry throttle so each test observes its own first report. */
+function advancePublisherReportClock() {
+  publisherReportClockMs += 60 * 60_000;
+  const offset = publisherReportClockMs;
+  jest.spyOn(Date, 'now').mockImplementation(() => nativeDateNow() + offset);
+}
 
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
   isUSRegion: () => process.env.VERCEL_REGION === 'sfo1',
@@ -68,7 +77,7 @@ jest.mock('./kilo-exclusive-models', () => ({
 jest.mock('./custom-pricing', () => ({ calculateCustomCost_mUsd: () => undefined }));
 jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
   normalizeJa4: () => null,
-  usageEventWireBody: (event: unknown) => event,
+  usageEventWireBody: jest.fn((event: unknown) => event),
   reportUsageEvent: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/bouncer/dispatch-usage-event-outbox', () => ({
@@ -123,7 +132,9 @@ const outbox = jest.requireMock<{ enqueueBouncerUsageEvent: jest.Mock }>(
 const autoTopUp = jest.requireMock<{ maybePerformAutoTopUp: jest.Mock }>(
   '@kilocode/web-shared/lib/autoTopUp'
 );
-const sentry = jest.requireMock<{ captureException: jest.Mock }>('@sentry/nextjs');
+const sentry = jest.requireMock<{ captureException: jest.Mock; captureMessage: jest.Mock }>(
+  '@sentry/nextjs'
+);
 const { fetchGeneration } = jest.requireMock<{ fetchGeneration: jest.Mock }>(
   './providers/upstream-request'
 );
@@ -498,15 +509,18 @@ describe('production SFO queued accounting', () => {
   );
 
   test.each(['no_scope', 'no_wait_until'])(
-    '%s fails accounting without network or direct fallback',
+    '%s falls back to direct accounting instead of dropping selected usage',
     async missing => {
       configureQueueEnvironment();
       const work = () => logMicrodollarUsage({ ...stats }, { ...personalContext });
       const record = await (missing === 'no_scope' ? work() : requestLifetime(false).run(work));
-      expect(record).toBeNull();
+      expect(record?.status).toBe('recorded');
+      expect(publisher.enqueueUsage).not.toHaveBeenCalled();
       expect(fetch).not.toHaveBeenCalled();
-      expect(writer).not.toHaveBeenCalled();
+      expect(writer).toHaveBeenCalledTimes(1);
+      expect(writer.mock.calls[0][0].core.id).toBe(record?.usageId);
       expect(db.transaction).not.toHaveBeenCalled();
+      expect(error).not.toHaveBeenCalled();
     }
   );
 
@@ -546,39 +560,103 @@ describe('production SFO queued accounting', () => {
     }
   });
 
-  test.each(['missing_config', 'timeout'])(
-    'selected %s returns failed accounting without direct fallback',
-    async failure => {
-      configureQueueEnvironment();
-      if (failure === 'missing_config') config.USAGE_INGEST_URL = '';
-      else {
-        const nativeTimeout = AbortSignal.timeout;
-        jest.spyOn(AbortSignal, 'timeout').mockImplementation(() => nativeTimeout(5));
-        jest.mocked(fetch).mockImplementation(async (_url, init) => {
-          sent.push(JSON.parse(init?.body as string) as UsageRecordRequest);
-          return new Promise((_resolve, reject) =>
-            init?.signal?.addEventListener('abort', () => reject(new Error('synthetic-timeout')), {
-              once: true,
-            })
-          );
-        });
-      }
+  test('selected missing_config writes the row directly instead of dropping it', async () => {
+    configureQueueEnvironment();
+    config.USAGE_INGEST_URL = '';
+    advancePublisherReportClock();
+    const lifetime = requestLifetime();
+    const result = await lifetime.run(() =>
+      logMicrodollarUsage({ ...stats }, { ...personalContext })
+    );
+    lifetime.close();
+    await lifetime.drain();
+    expect(result?.status).toBe('recorded');
+    expect(fetch).not.toHaveBeenCalled();
+    expect(writer).toHaveBeenCalledTimes(1);
+    expect(db.transaction).not.toHaveBeenCalled();
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(1);
+    expect(lifetime.errors).toEqual([]);
+  });
+
+  test('selected malformed URL writes the row directly instead of dropping it', async () => {
+    configureQueueEnvironment();
+    config.USAGE_INGEST_URL = 'usage.example.test/missing-scheme';
+    advancePublisherReportClock();
+    const lifetime = requestLifetime();
+    const result = await lifetime.run(() =>
+      logMicrodollarUsage({ ...stats }, { ...personalContext })
+    );
+    lifetime.close();
+    await lifetime.drain();
+    expect(result?.status).toBe('recorded');
+    expect(fetch).not.toHaveBeenCalled();
+    expect(writer).toHaveBeenCalledTimes(1);
+    expect(db.transaction).not.toHaveBeenCalled();
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(1);
+    expect(lifetime.errors).toEqual([]);
+  });
+
+  test('selected timeout returns failed accounting without direct fallback', async () => {
+    configureQueueEnvironment();
+    const nativeTimeout = AbortSignal.timeout;
+    jest.spyOn(AbortSignal, 'timeout').mockImplementation(() => nativeTimeout(5));
+    jest.mocked(fetch).mockImplementation(async (_url, init) => {
+      sent.push(JSON.parse(init?.body as string) as UsageRecordRequest);
+      return new Promise((_resolve, reject) =>
+        init?.signal?.addEventListener('abort', () => reject(new Error('synthetic-timeout')), {
+          once: true,
+        })
+      );
+    });
+    const lifetime = requestLifetime();
+    const result = await lifetime.run(() =>
+      logMicrodollarUsage({ ...stats }, { ...personalContext })
+    );
+    lifetime.close();
+    await lifetime.drain();
+    expect(result).toBeNull();
+    expect(fetch).toHaveBeenCalledTimes(publisher.USAGE_ENQUEUE_MAX_ATTEMPTS);
+    expect(sent).toEqual([sent[0], sent[0], sent[0]]);
+    expect(writer).not.toHaveBeenCalled();
+    expect(db.transaction).not.toHaveBeenCalled();
+    expect(lifetime.errors).toEqual([]);
+  });
+
+  test('writes every unconfigured-publisher row but reports at most once per interval', async () => {
+    configureQueueEnvironment();
+    config.USAGE_INGEST_PUBLISH_SECRET = '';
+    const record = async () => {
       const lifetime = requestLifetime();
       const result = await lifetime.run(() =>
         logMicrodollarUsage({ ...stats }, { ...personalContext })
       );
       lifetime.close();
       await lifetime.drain();
-      expect(result).toBeNull();
-      expect(fetch).toHaveBeenCalledTimes(
-        failure === 'timeout' ? publisher.USAGE_ENQUEUE_MAX_ATTEMPTS : 0
-      );
-      if (failure === 'timeout') expect(sent).toEqual([sent[0], sent[0], sent[0]]);
-      expect(writer).not.toHaveBeenCalled();
-      expect(db.transaction).not.toHaveBeenCalled();
-      expect(lifetime.errors).toEqual([]);
-    }
-  );
+      return result;
+    };
+    advancePublisherReportClock();
+    const first = await record();
+    const second = await record();
+    expect([first?.status, second?.status]).toEqual(['recorded', 'recorded']);
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(1);
+    advancePublisherReportClock();
+    const third = await record();
+    expect(third?.status).toBe('recorded');
+    expect(sentry.captureMessage).toHaveBeenCalledTimes(2);
+    const directFallbacks = warn.mock.calls.filter(
+      ([message]) => message === 'usage accounting queue publisher not configured'
+    );
+    expect(directFallbacks).toEqual(
+      Array.from({ length: 3 }, () => [
+        'usage accounting queue publisher not configured',
+        { usageId: expect.any(String), fallback: 'direct' },
+      ])
+    );
+    expect(error).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(writer).toHaveBeenCalledTimes(3);
+    expect(db.transaction).not.toHaveBeenCalled();
+  });
 
   test('an attached durable enforcement event follows the selected queue transport', async () => {
     configureQueueEnvironment();
@@ -1133,7 +1211,7 @@ describe('queued usage accounting', () => {
 
   describe.each(callers)('$name', ({ run, reportsUsage }) => {
     test.each(['fra1', 'sfo1'].flatMap(region => failures.map(failure => ({ region, failure }))))(
-      '$region returns failed accounting without any direct write on $failure',
+      '$region accounts for $failure without publishing a duplicate',
       async ({ region, failure }) => {
         config.USAGE_QUEUE_ONLY_ENABLED = true;
         process.env.VERCEL_REGION = region;
@@ -1142,6 +1220,7 @@ describe('queued usage accounting', () => {
           const nativeTimeout = AbortSignal.timeout;
           jest.spyOn(AbortSignal, 'timeout').mockImplementation(() => nativeTimeout(5));
         }
+        if (failure.startsWith('missing')) advancePublisherReportClock();
         if (failure === 'missing_url') config.USAGE_INGEST_URL = '';
         else if (failure === 'missing_secret') config.USAGE_INGEST_PUBLISH_SECRET = '';
         else if (failure === 'unexpected_rejection')
@@ -1170,7 +1249,6 @@ describe('queued usage accounting', () => {
         lifecycle.close();
         await lifecycle.drain();
         const payload = jest.mocked(publisher.enqueueUsage).mock.calls[0][0];
-        expect(record).toBeNull();
         expect(publisher.enqueueUsage).toHaveBeenCalledTimes(1);
         expect(payload.core.id).toEqual(expect.any(String));
         expect(payload.metadata.id).toBe(payload.core.id);
@@ -1192,20 +1270,63 @@ describe('queued usage accounting', () => {
         expect(publisher.enqueueUsage).toHaveBeenCalledWith(payload, {
           retryTransientFailures: true,
         });
-        expect(writer).not.toHaveBeenCalled();
-        expect(db.transaction).not.toHaveBeenCalled();
-        expect(outbox.enqueueBouncerUsageEvent).not.toHaveBeenCalled();
-        expect(bouncer.deliverBouncerUsageEventNow).not.toHaveBeenCalled();
-        expect(report).toHaveBeenCalledTimes(reportsUsage ? 1 : 0);
-        expect(error).toHaveBeenCalledTimes(1);
-        expect(error).toHaveBeenCalledWith('usage accounting publication failed', {
-          usageId: payload.core.id,
-          reason: failure.startsWith('missing')
-            ? 'publisher_disabled'
-            : failure === 'transport_failure'
-              ? 'request_failed'
-              : failure,
-        });
+        if (failure.startsWith('missing')) {
+          // Nothing was published, so the row is written directly instead of dropped.
+          expect(record).toEqual({
+            status: 'recorded',
+            usageId: payload.core.id,
+            createdAt: payload.core.created_at,
+          });
+          if (region === 'sfo1') {
+            const handoff = writer.mock.calls[0][0] as UsageRecordRequest;
+            expect(writer).toHaveBeenCalledTimes(1);
+            expect(handoff.core.id).toBe(payload.core.id);
+            expect(handoff.metadata.id).toBe(payload.core.id);
+            expect(db.transaction).not.toHaveBeenCalled();
+          } else {
+            expect(writer).not.toHaveBeenCalled();
+            expect(db.transaction).toHaveBeenCalledTimes(1);
+          }
+          expect(error).not.toHaveBeenCalled();
+          expect(warn).toHaveBeenCalledWith('usage accounting queue publisher not configured', {
+            usageId: payload.core.id,
+            fallback: 'direct',
+          });
+          expect(sentry.captureMessage).toHaveBeenCalledTimes(1);
+          // Frankfurt writes locally and emits the shared completion record. An SFO write
+          // happens inside the Frankfurt endpoint, so only its response comes back.
+          if (region === 'sfo1') expect(completionLogs).toEqual([]);
+          else
+            expect(completionLogs.map(value => JSON.parse(value))).toEqual([
+              expect.objectContaining({
+                outcome: 'recorded',
+                usage_id: payload.core.id,
+                execution_region: 'fra1',
+              }),
+            ]);
+          // The attached event rides the direct write, so the gateway never reports it.
+          expect(report).not.toHaveBeenCalled();
+        } else {
+          // The queue may hold the event, so no direct write and no second Bouncer report.
+          expect(record).toBeNull();
+          expect(writer).not.toHaveBeenCalled();
+          expect(db.transaction).not.toHaveBeenCalled();
+          expect(error).toHaveBeenCalledTimes(1);
+          expect(error).toHaveBeenCalledWith('usage accounting publication failed', {
+            usageId: payload.core.id,
+            reason: failure === 'transport_failure' ? 'request_failed' : failure,
+          });
+          expect(report).toHaveBeenCalledTimes(reportsUsage ? 1 : 0);
+          expect(sentry.captureMessage).not.toHaveBeenCalled();
+          expect(completionLogs).toEqual([]);
+        }
+        expect(outbox.enqueueBouncerUsageEvent).toHaveBeenCalledTimes(
+          failure.startsWith('missing') && reportsUsage && region === 'fra1' ? 1 : 0
+        );
+        // A direct write is this outbox row's first delivery; the handoff delivers it in Frankfurt.
+        expect(bouncer.deliverBouncerUsageEventNow).toHaveBeenCalledTimes(
+          region === 'fra1' && failure.startsWith('missing') && reportsUsage ? 1 : 0
+        );
         const logs = JSON.stringify([...error.mock.calls, ...warn.mock.calls, ...info.mock.calls]);
         for (const sensitive of [
           'sensitive-secret-prompt',
@@ -1216,7 +1337,6 @@ describe('queued usage accounting', () => {
           expect(logs).not.toContain(sensitive);
         }
         expect(info).not.toHaveBeenCalled();
-        expect(completionLogs).toEqual([]);
         expect(lifecycle.errors).toEqual([]);
       }
     );
@@ -1226,7 +1346,7 @@ describe('queued usage accounting', () => {
         ['no_scope', 'no_wait_until'].map(missing => ({ region, missing }))
       )
     )(
-      '$region / $missing returns failure without untracked publication or direct billing',
+      '$region / $missing falls back to direct accounting instead of dropping usage',
       async ({ region, missing }) => {
         config.USAGE_QUEUE_ONLY_ENABLED = true;
         process.env.VERCEL_REGION = region;
@@ -1236,23 +1356,41 @@ describe('queued usage accounting', () => {
         const record = await (missing === 'no_scope' ? work() : lifecycle.run(work));
         lifecycle.close();
         await lifecycle.drain();
-        expect(record).toBeNull();
+        expect(record).toMatchObject({ status: 'recorded', usageId: expect.any(String) });
         expect(publisher.enqueueUsage).not.toHaveBeenCalled();
         expect(fetch).not.toHaveBeenCalled();
         expect(sent).toEqual([]);
-        expect(writer).not.toHaveBeenCalled();
-        expect(db.transaction).not.toHaveBeenCalled();
-        expect(outbox.enqueueBouncerUsageEvent).not.toHaveBeenCalled();
-        expect(bouncer.deliverBouncerUsageEventNow).not.toHaveBeenCalled();
-        expect(report).toHaveBeenCalledTimes(reportsUsage ? 1 : 0);
-        expect(error).toHaveBeenCalledTimes(1);
-        expect(error).toHaveBeenCalledWith('usage accounting publication failed', {
-          usageId: expect.stringMatching(/^[0-9a-f-]{36}$/),
-          reason: 'registration_failed',
-        });
-        expect(warn).not.toHaveBeenCalled();
+        const attachedEvent = reportsUsage
+          ? expect.objectContaining({ request_id: 'synthetic-request' })
+          : null;
+        if (region === 'sfo1') {
+          expect(writer).toHaveBeenCalledTimes(1);
+          expect(writer).toHaveBeenCalledWith(
+            expect.objectContaining({
+              core: expect.objectContaining({ id: record?.usageId }),
+              metadata: expect.objectContaining({ id: record?.usageId }),
+              bouncer_usage_event: attachedEvent,
+            })
+          );
+          expect(db.transaction).not.toHaveBeenCalled();
+          expect(outbox.enqueueBouncerUsageEvent).not.toHaveBeenCalled();
+          expect(bouncer.deliverBouncerUsageEventNow).not.toHaveBeenCalled();
+        } else {
+          expect(writer).not.toHaveBeenCalled();
+          expect(db.transaction).toHaveBeenCalledTimes(1);
+          expect(outbox.enqueueBouncerUsageEvent).toHaveBeenCalledTimes(reportsUsage ? 1 : 0);
+          expect(bouncer.deliverBouncerUsageEventNow).toHaveBeenCalledTimes(reportsUsage ? 1 : 0);
+        }
+        expect(report).not.toHaveBeenCalled();
+        expect(sentry.captureMessage).not.toHaveBeenCalled();
+        expect(error).not.toHaveBeenCalled();
+        expect(warn.mock.calls).toEqual([
+          [
+            'usage accounting queue unavailable without a request lifetime',
+            { usageId: record?.usageId, reason: 'registration_failed', fallback: 'direct' },
+          ],
+        ]);
         expect(info).not.toHaveBeenCalled();
-        expect(completionLogs).toEqual([]);
         expect(lifecycle.errors).toEqual([]);
       }
     );
@@ -1390,4 +1528,291 @@ test('unexpected post-commit Bouncer failure preserves recorded accounting and c
   });
   expect(JSON.stringify(error.mock.calls)).not.toContain('sensitive-secret-prompt');
   expect(lifecycle.errors).toEqual([]);
+});
+
+describe('prompt ordinary Bouncer reports for the selected queue transport', () => {
+  const client = jest.requireMock<{ reportUsageEvent: jest.Mock; usageEventWireBody: jest.Mock }>(
+    '@kilocode/web-shared/lib/bouncer/client'
+  );
+  const selected = [
+    { name: 'production SFO', env: {} },
+    {
+      name: 'staging FRA',
+      env: { VERCEL_ENV: 'preview', VERCEL_TARGET_ENV: 'staging', VERCEL_REGION: 'fra1' },
+    },
+    {
+      name: 'staging SFO',
+      env: { VERCEL_ENV: 'preview', VERCEL_TARGET_ENV: 'staging', VERCEL_REGION: 'sfo1' },
+    },
+  ];
+  beforeEach(() => {
+    client.reportUsageEvent.mockResolvedValue(undefined);
+    fetchGeneration.mockResolvedValue(null);
+  });
+
+  test.each(
+    selected.flatMap(selection =>
+      ['promise', 'function', 'late'].flatMap(mode =>
+        ['report_first', 'publication_first'].map(order => ({ ...selection, mode, order }))
+      )
+    )
+  )(
+    '$name / $mode / $order starts one ordinary report before acceptance and awaits both',
+    async ({ env, mode, order }) => {
+      configureQueueEnvironment(env);
+      const publicationStarted = Promise.withResolvers<void>();
+      const acceptance = Promise.withResolvers<Response>();
+      const reportDone = Promise.withResolvers<void>();
+      jest.mocked(fetch).mockImplementation(async (_url, init) => {
+        sent.push(JSON.parse(init?.body as string) as UsageRecordRequest);
+        publicationStarted.resolve();
+        return acceptance.promise;
+      });
+      client.reportUsageEvent.mockImplementation(() => reportDone.promise);
+      const lifecycle = requestLifetime();
+      if (mode === 'late') {
+        lifecycle.run(() => after(() => {}));
+        lifecycle.close();
+        await lifecycle.drain();
+      }
+      let result: Awaited<ReturnType<typeof logMicrodollarUsageAndReportToBouncer>> = null;
+      let completed = false;
+      const work = async () => {
+        result = await logMicrodollarUsageAndReportToBouncer({ ...stats }, { ...personalContext });
+        completed = true;
+      };
+      lifecycle.run(() => after(mode === 'function' ? work : work()));
+      if (mode !== 'late') lifecycle.close();
+      let drained = false;
+      const drain = lifecycle.drain().then(() => {
+        drained = true;
+      });
+      try {
+        await publicationStarted.promise;
+        expect(client.reportUsageEvent).toHaveBeenCalledTimes(1);
+        expect(client.reportUsageEvent).toHaveBeenCalledWith(
+          expect.objectContaining({
+            requestId: personalBouncer.requestId,
+            occurredAt: personalBouncer.occurredAt,
+            accountId: personalBouncer.accountId,
+            costMicrodollars: stats.cost_mUsd,
+            inputTokens: stats.inputTokens,
+            outputTokens: stats.outputTokens,
+          })
+        );
+        expect(completed).toBe(false);
+        expect(drained).toBe(false);
+        if (order === 'report_first') reportDone.resolve();
+        else acceptance.resolve(new Response(null, { status: 202 }));
+        await new Promise<void>(resolve => setImmediate(resolve));
+        expect(completed).toBe(false);
+        expect(drained).toBe(false);
+        expect(client.reportUsageEvent).toHaveBeenCalledTimes(1);
+      } finally {
+        reportDone.resolve();
+        acceptance.resolve(new Response(null, { status: 202 }));
+        await drain;
+      }
+      expect(completed).toBe(true);
+      expect(drained).toBe(true);
+      expect(result).toEqual({
+        status: 'queued',
+        usageId: sent[0].core.id,
+        createdAt: sent[0].core.created_at,
+      });
+      expect(sent[0].metadata.id).toBe(sent[0].core.id);
+      expect(sent[0].bouncer_usage_event).toBeNull();
+      expect(publisher.enqueueUsage).toHaveBeenCalledTimes(1);
+      expect(client.usageEventWireBody).not.toHaveBeenCalled();
+      expect(writer).not.toHaveBeenCalled();
+      expect(db.transaction).not.toHaveBeenCalled();
+      expect(outbox.enqueueBouncerUsageEvent).not.toHaveBeenCalled();
+      expect(lifecycle.errors).toEqual([]);
+    }
+  );
+
+  test.each([false, true])(
+    '503 retry retains one payload/report with spendWatch=%s',
+    async spendWatch => {
+      configureQueueEnvironment();
+      const retryStarted = Promise.withResolvers<void>();
+      const accepted = Promise.withResolvers<Response>();
+      jest.mocked(fetch).mockImplementation(async (_url, init) => {
+        sent.push(JSON.parse(init?.body as string) as UsageRecordRequest);
+        if (sent.length === 1) return new Response(null, { status: 503 });
+        retryStarted.resolve();
+        return accepted.promise;
+      });
+      const lifecycle = requestLifetime();
+      let result: Awaited<ReturnType<typeof logMicrodollarUsageAndReportToBouncer>> = null;
+      lifecycle.run(() =>
+        after(async () => {
+          result = await logMicrodollarUsageAndReportToBouncer(
+            { ...stats },
+            {
+              ...personalContext,
+              bouncer: { ...personalBouncer, spendWatch },
+            }
+          );
+        })
+      );
+      lifecycle.close();
+      const drain = lifecycle.drain();
+      try {
+        await retryStarted.promise;
+        expect(client.reportUsageEvent).toHaveBeenCalledTimes(spendWatch ? 0 : 1);
+        expect(result).toBeNull();
+        expect(sent).toHaveLength(2);
+        expect(sent[1]).toEqual(sent[0]);
+        if (spendWatch) {
+          const payload = jest.mocked(publisher.enqueueUsage).mock.calls[0][0];
+          expect(payload.bouncer_usage_event).toEqual({
+            request_id: personalBouncer.requestId,
+            payload: client.usageEventWireBody.mock.results[0].value,
+          });
+          expect(payload.bouncer_usage_event?.payload).toBe(
+            client.usageEventWireBody.mock.results[0].value
+          );
+          expect(client.usageEventWireBody).toHaveBeenCalledTimes(1);
+        } else expect(sent[0].bouncer_usage_event).toBeNull();
+      } finally {
+        accepted.resolve(new Response(null, { status: 202 }));
+        await drain;
+      }
+      expect(result).toEqual({
+        status: 'queued',
+        usageId: sent[0].core.id,
+        createdAt: sent[0].core.created_at,
+      });
+      expect(client.reportUsageEvent).toHaveBeenCalledTimes(spendWatch ? 0 : 1);
+      expect(writer).not.toHaveBeenCalled();
+      expect(db.transaction).not.toHaveBeenCalled();
+      expect(outbox.enqueueBouncerUsageEvent).not.toHaveBeenCalled();
+      expect(bouncer.deliverBouncerUsageEventNow).not.toHaveBeenCalled();
+      expect(lifecycle.errors).toEqual([]);
+    }
+  );
+
+  test.each([
+    { name: 'production FRA', env: { VERCEL_REGION: 'fra1' } },
+    { name: 'master off', env: { USAGE_QUEUE_ONLY_ENABLED: 'false' } },
+    { name: 'zero exposure', env: { USAGE_QUEUE_SFO_EXPOSURE: '0' } },
+    { name: 'unlisted SFO payer', env: { USAGE_QUEUE_SFO_USER_IDS: '["other"]' } },
+  ])('$name preserves direct accounting-before-report order', async ({ env }) => {
+    configureQueueEnvironment(env);
+    const started = Promise.withResolvers<void>();
+    const committed = Promise.withResolvers<void>();
+    const originalWriter = writer.getMockImplementation();
+    const originalTransaction = db.transaction.getMockImplementation();
+    writer.mockImplementation(async (...args: unknown[]) => {
+      started.resolve();
+      await committed.promise;
+      return originalWriter?.(...args);
+    });
+    db.transaction.mockImplementation(async (...args: unknown[]) => {
+      started.resolve();
+      await committed.promise;
+      return originalTransaction?.(...args);
+    });
+    const lifecycle = requestLifetime();
+    const work = lifecycle.run(() =>
+      logMicrodollarUsageAndReportToBouncer({ ...stats }, { ...personalContext })
+    );
+    try {
+      await started.promise;
+      expect(client.reportUsageEvent).not.toHaveBeenCalled();
+      expect(publisher.enqueueUsage).not.toHaveBeenCalled();
+    } finally {
+      committed.resolve();
+    }
+    expect(await work).toMatchObject({ status: 'recorded' });
+    lifecycle.close();
+    await lifecycle.drain();
+    expect(client.reportUsageEvent).toHaveBeenCalledTimes(1);
+    expect(writer).toHaveBeenCalledTimes(process.env.VERCEL_REGION === 'sfo1' ? 1 : 0);
+    expect(db.transaction).toHaveBeenCalledTimes(process.env.VERCEL_REGION === 'fra1' ? 1 : 0);
+    expect(lifecycle.errors).toEqual([]);
+  });
+
+  test.each(['not_configured', 'ambiguous_200', 'http_503', 'unexpected_rejection', 'no_scope'])(
+    'ordinary report remains single when queued accounting writes directly: %s',
+    async failure => {
+      configureQueueEnvironment();
+      if (failure === 'not_configured') {
+        config.USAGE_INGEST_URL = '';
+        advancePublisherReportClock();
+      }
+      if (failure === 'ambiguous_200')
+        jest.mocked(fetch).mockResolvedValue(new Response(null, { status: 200 }));
+      if (failure === 'http_503')
+        jest.mocked(fetch).mockResolvedValue(new Response(null, { status: 503 }));
+      if (failure === 'unexpected_rejection')
+        jest
+          .mocked(publisher.enqueueUsage)
+          .mockRejectedValue(new Error('synthetic publisher rejection'));
+      const lifecycle = requestLifetime();
+      const work = () =>
+        logMicrodollarUsageAndReportToBouncer({ ...stats }, { ...personalContext });
+      const failuresThatFallBack = failure === 'not_configured' || failure === 'no_scope';
+      const result = await (failure === 'no_scope' ? work() : lifecycle.run(work));
+      lifecycle.close();
+      await lifecycle.drain();
+      // A direct write cannot have published the event, so the gateway still reports it once
+      // and the Bouncer event rides the write instead of a second best-effort send.
+      expect(result).toEqual(
+        failuresThatFallBack ? expect.objectContaining({ status: 'recorded' }) : null
+      );
+      expect(client.reportUsageEvent).toHaveBeenCalledTimes(1);
+      expect(client.usageEventWireBody).not.toHaveBeenCalled();
+      expect(writer).toHaveBeenCalledTimes(
+        failuresThatFallBack && process.env.VERCEL_REGION === 'sfo1' ? 1 : 0
+      );
+      expect(db.transaction).toHaveBeenCalledTimes(
+        failuresThatFallBack && process.env.VERCEL_REGION === 'fra1' ? 1 : 0
+      );
+      // An ordinary event carries no durable Bouncer payload, so the direct write enqueues none.
+      expect(outbox.enqueueBouncerUsageEvent).not.toHaveBeenCalled();
+      expect(fetch).toHaveBeenCalledTimes(
+        failure === 'http_503'
+          ? publisher.USAGE_ENQUEUE_MAX_ATTEMPTS
+          : failure === 'ambiguous_200'
+            ? 1
+            : 0
+      );
+      expect(lifecycle.errors).toEqual([]);
+    }
+  );
+
+  test('missing event keeps queued accounting without any Bouncer report', async () => {
+    configureQueueEnvironment();
+    const lifecycle = requestLifetime();
+    expect(
+      await lifecycle.run(() => logMicrodollarUsageAndReportToBouncer({ ...stats }, { ...context }))
+    ).toMatchObject({ status: 'queued' });
+    lifecycle.close();
+    await lifecycle.drain();
+    expect(sent[0].bouncer_usage_event).toBeNull();
+    expect(client.reportUsageEvent).not.toHaveBeenCalled();
+    expect(publisher.enqueueUsage).toHaveBeenCalledTimes(1);
+  });
+
+  test.each([{ is_free: true }, { user_byok: true }])(
+    'processTokenData reports finalized zero cost for %p',
+    async change => {
+      configureQueueEnvironment();
+      const lifecycle = requestLifetime();
+      expect(
+        await lifecycle.run(() => processTokenData({ ...stats }, { ...personalContext, ...change }))
+      ).toMatchObject({ status: 'queued' });
+      lifecycle.close();
+      await lifecycle.drain();
+      expect(client.reportUsageEvent).toHaveBeenCalledWith(
+        expect.objectContaining({ requestId: personalBouncer.requestId, costMicrodollars: 0 })
+      );
+      expect(sent[0].core.cost).toBe(0);
+      expect(sent[0].bouncer_usage_event).toBeNull();
+      expect(writer).not.toHaveBeenCalled();
+      expect(db.transaction).not.toHaveBeenCalled();
+    }
+  );
 });

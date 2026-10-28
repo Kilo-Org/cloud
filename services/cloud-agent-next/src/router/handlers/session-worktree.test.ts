@@ -1188,26 +1188,33 @@ describe('createWorktreeChat ownership, metadata, and control-plane routing', ()
     );
   });
 
-  it('never copies parent opt-in or delegated lineage when copying a session profile to a sibling', async () => {
+  it('derives sibling spawn permission from the interactive origin and never copies delegated lineage', async () => {
     for (const scope of [
       { allowSubagentSessions: true },
       { parentCloudAgentSessionId: SOURCE_WORKSPACE_ID },
     ]) {
       const metadata = { ...sourceMetadata(), ...scope };
       const { caller, input, destinationStub } = fixture({ metadata });
-      if (scope.allowSubagentSessions === true) {
-        await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({
-          code: 'BAD_REQUEST',
-        });
-        expect(destinationStub.registerSessionFromMetadata).not.toHaveBeenCalled();
-        continue;
-      }
       await caller.createWorktreeChat(input);
       const registration = destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0];
       expect(registration?.metadata.profile?.envVars).toEqual(metadata.profile?.envVars);
-      expect(registration?.metadata.allowSubagentSessions).not.toBe(true);
+      expect(registration?.metadata.allowSubagentSessions).toBe(false);
       expect(registration?.metadata.parentCloudAgentSessionId).toBeUndefined();
     }
+  });
+
+  it('grants sibling spawn permission when the interactive source is isolated', async () => {
+    verifyKiloTokenForPolicyMock.mockResolvedValue({
+      claims: { aud: 'cloud-agent-next', runtimeAdmission: {} },
+    });
+    const metadata = sourceMetadataWithPreset('cloudflare-containers-standard-3');
+    const { caller, input, destinationStub } = fixture({
+      metadata,
+      organizationId: ORGANIZATION_ID,
+    });
+    await caller.createWorktreeChat(input);
+    const registration = destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0];
+    expect(registration?.metadata.allowSubagentSessions).toBe(true);
   });
 });
 

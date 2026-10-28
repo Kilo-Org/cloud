@@ -216,7 +216,7 @@ describe('organization guardrails router', () => {
       .where(eq(admin_action_audit_logs.action, 'organization.kilo_encrypt.set'))
       .orderBy(desc(admin_action_audit_logs.created_at))
       .limit(1);
-    expect(auditEntry?.message).toBe('Disabled AI Guardrails (kilo_encrypt)');
+    expect(auditEntry?.message).toBe('Disabled AI Guardrails');
   });
 
   it('reports invalid saved detectors and keeps them from breaking other settings', async () => {

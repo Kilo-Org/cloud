@@ -563,9 +563,7 @@ function Inner(props: InnerProps) {
               </div>
             </div>
             <div>
-              <label className="text-muted-foreground text-sm font-medium">
-                AI Guardrails (kilo_encrypt)
-              </label>
+              <label className="text-muted-foreground text-sm font-medium">AI Guardrails</label>
               <div className="mt-1 flex items-center gap-2">
                 <BooleanBadge positive={info.settings?.kilo_encrypt ?? false}>
                   {info.settings?.kilo_encrypt ? 'Enabled' : 'Disabled'}

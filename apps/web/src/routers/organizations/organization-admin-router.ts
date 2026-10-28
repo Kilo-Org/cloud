@@ -528,9 +528,7 @@ export const organizationAdminRouter = createTRPCRouter({
       await recordAdminAction(ctx, {
         action: 'organization.kilo_encrypt.set',
         target: organizationActionTarget(organizationId),
-        message: kilo_encrypt
-          ? 'Enabled AI Guardrails (kilo_encrypt)'
-          : 'Disabled AI Guardrails (kilo_encrypt)',
+        message: kilo_encrypt ? 'Enabled AI Guardrails' : 'Disabled AI Guardrails',
         metadata: {
           previousKiloEncrypt: organization.settings.kilo_encrypt ?? null,
           kiloEncrypt: kilo_encrypt,

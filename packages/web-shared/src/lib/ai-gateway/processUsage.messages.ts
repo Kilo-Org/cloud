@@ -14,7 +14,7 @@ import type { GatewayMessagesRequest } from '@kilocode/web-shared/lib/ai-gateway
 import {
   computeOpenRouterCostFields,
   providerReportsIsByok,
-  computeVercelCostMicrodollars,
+  computeVercelCostFields,
   drainSseStream,
   extractVercelIsByok,
   extractVercelUpstreamId,
@@ -94,26 +94,27 @@ export function processMessagesApiUsage(
 
   // OpenRouter path: cost fields are present directly in usage
   if (usage?.cost != null || usage?.is_byok != null) {
-    const { cost_mUsd, is_byok } = computeOpenRouterCostFields(
+    const costs = computeOpenRouterCostFields(
       usage,
       coreProps,
       'messages_sse_processing',
-      providerReportsIsByok(provider)
+      providerReportsIsByok(provider),
+      provider
     );
-    return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens, cost_mUsd, is_byok };
+    return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens, ...costs };
   }
 
   // Vercel path: cost is in provider_metadata.gateway
   const vercelGateway = providerMetadata?.gateway;
   if (vercelGateway?.marketCost != null || vercelGateway?.cost != null) {
-    const cost_mUsd = computeVercelCostMicrodollars(vercelGateway);
+    const is_byok = extractVercelIsByok(vercelGateway);
     return {
       inputTokens,
       outputTokens,
       cacheHitTokens,
       cacheWriteTokens,
-      cost_mUsd,
-      is_byok: extractVercelIsByok(vercelGateway),
+      ...computeVercelCostFields(vercelGateway, is_byok),
+      is_byok,
     };
   }
 

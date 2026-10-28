@@ -3,7 +3,9 @@ import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/provide
 import { getReasoningEffortTimeoutSuggestion } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/request-helpers';
 import { UpstreamTimeoutError } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import {
-  computeVercelCostMicrodollars,
+  computeOpenRouterCosts,
+  computeVercelCostFields,
+  extractVercelIsByok,
   getUpstreamBodyTermination,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import type {
@@ -12,7 +14,6 @@ import type {
   VercelProviderMetaData,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { applyUsagePricing } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
-import { toMicrodollars } from '@kilocode/web-shared/lib/microdollars';
 import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { withRequestId } from '@kilocode/web-shared/lib/ai-gateway/request-id';
 import type { createParser } from 'eventsource-parser';
@@ -307,14 +308,11 @@ export function rewriteUsage(
       ? (usage.cache_creation_input_tokens ?? startUsage?.cache_creation_input_tokens ?? 0)
       : (usage.input_tokens_details?.cache_write_tokens ?? 0);
   const gateway = providerMetadata?.gateway;
-  const upstreamCost = usage.is_byok
-    ? (usage.cost_details?.upstream_inference_cost ?? 0)
-    : (usage.cost ?? 0);
+  const vercelCosts = gateway && computeVercelCostFields(gateway, extractVercelIsByok(gateway));
   const costs: JustTheCostsUsageStats = {
-    cost_mUsd:
-      !isChat && usage.cost == null && usage.is_byok == null && gateway
-        ? computeVercelCostMicrodollars(gateway)
-        : toMicrodollars(upstreamCost),
+    ...(!isChat && usage.cost == null && usage.is_byok == null && vercelCosts
+      ? vercelCosts
+      : computeOpenRouterCosts(usage, context.provider)),
     inputTokens: isChat
       ? (usage.prompt_tokens ?? 0)
       : isMessages
@@ -335,7 +333,8 @@ export function rewriteUsage(
   ) {
     usage.cost_details = {
       ...usage.cost_details,
-      upstream_inference_cost: computeVercelCostMicrodollars(gateway) / 1_000_000,
+      upstream_inference_cost:
+        ((vercelCosts?.cost_mUsd ?? 0) - (vercelCosts?.nonInferenceCost_mUsd ?? 0)) / 1_000_000,
     };
   }
   delete usage.market_cost;

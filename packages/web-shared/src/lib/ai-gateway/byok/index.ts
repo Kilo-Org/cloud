@@ -2,7 +2,11 @@ import { type db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizz
 import { byok_api_keys } from '@kilocode/db/schema';
 import { ByokApiKeySettingsSchema } from '@kilocode/db/schema-types';
 import { and, eq, inArray } from 'drizzle-orm';
-import type { EncryptedData } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
+import type { BYOKApiKeyEnvelope, EncryptedData } from '@kilocode/db/schema-types';
+import {
+  decryptByokEnvelope,
+  type ByokKmsContext,
+} from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import {
@@ -219,16 +223,37 @@ export async function addUserByokAvailability(
   );
 }
 
-export function decryptByokRow({
-  encrypted_api_key,
-  provider_id,
-}: {
+export function getByokKmsContext(row: {
+  organization_id: string | null;
+  kilo_user_id: string | null;
+  provider_id: string;
+}): ByokKmsContext {
+  if (row.organization_id) {
+    return {
+      owner_type: 'organization',
+      owner_id: row.organization_id,
+      provider_id: row.provider_id,
+    };
+  }
+  if (row.kilo_user_id) {
+    return { owner_type: 'user', owner_id: row.kilo_user_id, provider_id: row.provider_id };
+  }
+  throw new Error('BYOK row has no owner');
+}
+
+export async function decryptByokRow(row: {
   encrypted_api_key: EncryptedData;
+  encrypted_api_key_envelope: BYOKApiKeyEnvelope | null;
+  organization_id: string | null;
+  kilo_user_id: string | null;
   provider_id: string;
 }) {
+  const decryptedAPIKey = row.encrypted_api_key_envelope
+    ? await decryptByokEnvelope(row.encrypted_api_key_envelope, getByokKmsContext(row))
+    : decryptApiKey(row.encrypted_api_key, BYOK_ENCRYPTION_KEY);
   return {
-    decryptedAPIKey: decryptApiKey(encrypted_api_key, BYOK_ENCRYPTION_KEY),
-    providerId: UserByokProviderIdSchema.parse(provider_id),
+    decryptedAPIKey,
+    providerId: UserByokProviderIdSchema.parse(row.provider_id),
   };
 }
 
@@ -246,6 +271,9 @@ export async function getByokCredentials(
   const rows = await fromDb
     .select({
       encrypted_api_key: byok_api_keys.encrypted_api_key,
+      encrypted_api_key_envelope: byok_api_keys.encrypted_api_key_envelope,
+      organization_id: byok_api_keys.organization_id,
+      kilo_user_id: byok_api_keys.kilo_user_id,
       provider_id: byok_api_keys.provider_id,
       settings: byok_api_keys.settings,
     })
@@ -259,10 +287,12 @@ export async function getByokCredentials(
     )
     .orderBy(byok_api_keys.created_at);
 
-  return rows.map(row => ({
-    ...decryptByokRow(row),
-    serveCatalogModels: servesCatalogModels(row.settings),
-  }));
+  return Promise.all(
+    rows.map(async row => ({
+      ...(await decryptByokRow(row)),
+      serveCatalogModels: servesCatalogModels(row.settings),
+    }))
+  );
 }
 
 async function getByokRowsForOwner(

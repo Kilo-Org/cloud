@@ -2142,6 +2142,9 @@ importers:
       google-auth-library:
         specifier: 10.6.2
         version: 10.6.2
+      jose:
+        specifier: 'catalog:'
+        version: 6.2.12
       jsonwebtoken:
         specifier: 'catalog:'
         version: 9.0.3

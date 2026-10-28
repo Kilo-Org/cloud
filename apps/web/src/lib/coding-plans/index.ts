@@ -553,7 +553,10 @@ export async function reassignSubscriptionCredential(
       const plaintext = decryptApiKey(claimed.encrypted_api_key, BYOK_ENCRYPTION_KEY);
       const byokUpdateResult = await tx
         .update(byok_api_keys)
-        .set({ encrypted_api_key: encryptApiKey(plaintext, BYOK_ENCRYPTION_KEY) })
+        .set({
+          encrypted_api_key: encryptApiKey(plaintext, BYOK_ENCRYPTION_KEY),
+          encrypted_api_key_envelope: null,
+        })
         .where(
           and(
             eq(byok_api_keys.id, installedByokKeyId),
@@ -1139,7 +1142,7 @@ export async function replaceInventoryCredential(
         if (installedKeyIds.length > 0) {
           await tx
             .update(byok_api_keys)
-            .set({ encrypted_api_key: encryptedApiKey })
+            .set({ encrypted_api_key: encryptedApiKey, encrypted_api_key_envelope: null })
             .where(
               and(
                 eq(byok_api_keys.management_source, 'coding_plan'),

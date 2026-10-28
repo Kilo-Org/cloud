@@ -1,4 +1,4 @@
-import { SELF, env, reset, runInDurableObject } from 'cloudflare:test';
+import { SELF, env, evictDurableObject, reset, runInDurableObject } from 'cloudflare:test';
 import { afterEach, describe, expect, it } from 'vitest';
 import type { SandboxControlV2 } from '../../src/control-plane/sandbox/sandbox-do.js';
 import type { SandboxSessionV2 } from '../../src/control-plane/session/session-do.js';
@@ -52,6 +52,7 @@ type ActiveSession = {
   stub: DurableObjectStub<SandboxSessionV2>;
   wrapper: FakeWrapper;
   stopPump: () => void;
+  message: ControlPlanePromptPayload;
 };
 
 function metadata(input: { sessionId: string; kiloSessionId: string; sandboxId: string }) {
@@ -203,11 +204,75 @@ async function startReadySession(): Promise<ActiveSession> {
     expect(result.type === 'found' ? result.result.status : null).toBe('running');
   });
 
-  return { sandboxId, stub, wrapper, stopPump };
+  return { sandboxId, stub, wrapper, stopPump, message };
+}
+
+async function startPreparationFailureSession(): Promise<ActiveSession> {
+  const sandboxId = await generateSandboxId(
+    undefined,
+    ORG_ID,
+    USER_ID,
+    cloudAgentSessionId,
+    undefined
+  );
+  const provider = createFakeProvider();
+  await installSandbox(sandboxId, provider.adapter);
+
+  const stub = sessions.getByName(sessionDoName(USER_ID, cloudAgentSessionId));
+  const message: ControlPlanePromptPayload = {
+    messageId: createMessageId(),
+    turn: { type: 'prompt', prompt: 'failed preparation fixture' },
+    agent: { mode: 'code', model: 'test/model' },
+  };
+  await stub.createSessionWithInitialAdmission({
+    metadata: metadata({
+      sessionId: cloudAgentSessionId,
+      kiloSessionId: qualifiedKiloSessionId,
+      sandboxId,
+    }),
+    message,
+    sandboxSelection: { provider: 'cloudflare' },
+  });
+
+  await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+  const launchEnv = provider.launchEnvs[0];
+  if (!launchEnv?.SANDBOX_CONTROL_CREDENTIAL || !launchEnv.CONTROL_PLANE_ALLOCATION_ID) {
+    throw new Error('launch environment is missing identity');
+  }
+  const wrapper = await FakeWrapper.connect({
+    sandboxId,
+    credential: launchEnv.SANDBOX_CONTROL_CREDENTIAL,
+  });
+  await wrapper.hello({
+    wrapperId: 'wr_native_fence_failure',
+    allocationId: launchEnv.CONTROL_PLANE_ALLOCATION_ID,
+  });
+  expect(await wrapper.next()).toMatchObject({
+    type: 'session.prepare',
+    spec: { sessionId: cloudAgentSessionId },
+  });
+  wrapper.send({
+    type: 'session.failed',
+    sessionId: cloudAgentSessionId,
+    reason: 'workspace_setup_failed',
+  });
+  await waitFor(async () => expect(await messageStatus(stub, message.messageId)).toBe('failed'));
+
+  return { sandboxId, stub, wrapper, stopPump: () => undefined, message };
 }
 
 async function durableSnapshot(stub: DurableObjectStub<SandboxSessionV2>) {
-  return runInDurableObject(stub, instance => instance.nativeSnapshot({}));
+  return runInDurableObject(stub, instance =>
+    instance.nativeSnapshot({ kiloSessionId: qualifiedKiloSessionId })
+  );
+}
+
+async function messageStatus(
+  stub: DurableObjectStub<SandboxSessionV2>,
+  messageId: string
+): Promise<string | null> {
+  const result = await stub.getMessageResult(messageId);
+  return result.type === 'found' ? result.result.status : null;
 }
 
 async function seedFacadeRoots(root: TestSessionIngestRoot): Promise<void> {
@@ -387,6 +452,23 @@ function permissionAsked(id: string): ControlPlaneEvent {
       patterns: ['*'],
     },
   };
+}
+
+function partDelta(messageId: string, partId: string, delta: string): ControlPlaneEvent {
+  return {
+    type: 'message.part.delta',
+    properties: {
+      sessionID: qualifiedKiloSessionId,
+      messageID: messageId,
+      partID: partId,
+      field: 'text',
+      delta,
+    },
+  };
+}
+
+function isPartDelta(value: unknown): boolean {
+  return isFrame(value, 'message.part.delta');
 }
 
 async function pushEvents(
@@ -601,6 +683,329 @@ describe('hosted native history/live fence', { timeout: 30_000 }, () => {
     }
   });
 
+  it('publishes Cloud terminal events live and replays them from stored rows without payload type metadata', async () => {
+    const session = await startReadySession();
+    try {
+      await seedFacadeRoots({
+        kiloSessionId: qualifiedKiloSessionId,
+        cloudAgentSessionId,
+        title: 'cloud terminal fixture',
+      });
+      const attached = await readAttach(await attach());
+      try {
+        session.wrapper.send({
+          type: 'session.outcome',
+          sessionId: cloudAgentSessionId,
+          status: 'completed',
+          lastMessageId: session.message.messageId,
+        });
+        const live = await readSseUntil(attached.reader, frame =>
+          isFrame(frame, 'cloud.message.completed')
+        );
+        const terminal = live.match as { properties: Record<string, unknown> };
+        expect(terminal.properties).toMatchObject({
+          sessionID: qualifiedKiloSessionId,
+          messageId: session.message.messageId,
+          status: 'completed',
+          delivery: 'sent',
+          accepted: true,
+        });
+        expect(
+          live.observed.filter(frame => isFrame(frame, 'cloud.message.completed'))
+        ).toHaveLength(1);
+
+        await waitFor(async () =>
+          expect(await messageStatus(session.stub, session.message.messageId)).toBe('completed')
+        );
+        const replay = await readAttach(await attach());
+        await replay.reader.cancel();
+        const replayed = replay.events.filter(frame => isFrame(frame, 'cloud.message.completed'));
+        expect(replayed).toHaveLength(1);
+        expect(replayed[0]).toMatchObject({
+          properties: {
+            sessionID: qualifiedKiloSessionId,
+            messageId: session.message.messageId,
+            status: 'completed',
+            delivery: 'sent',
+            accepted: true,
+          },
+        });
+      } finally {
+        await attached.reader.cancel();
+      }
+    } finally {
+      session.stopPump();
+      session.wrapper.close();
+    }
+  });
+
+  it('replays a stale busy status as authoritative idle before a newer live busy state', async () => {
+    const session = await startReadySession();
+    try {
+      await seedFacadeRoots({
+        kiloSessionId: qualifiedKiloSessionId,
+        cloudAgentSessionId,
+        title: 'stale status fixture',
+      });
+      await pushEvents(session, [
+        {
+          type: 'session.status',
+          properties: { sessionID: qualifiedKiloSessionId, status: { type: 'busy' } },
+        },
+      ]);
+      await waitFor(async () => {
+        const snapshot = await durableSnapshot(session.stub);
+        expect(
+          snapshot.events.some(
+            event =>
+              event.streamEventType === 'kilocode' &&
+              (event.data as { type?: string }).type === 'session.status'
+          )
+        ).toBe(true);
+      });
+
+      session.wrapper.send({
+        type: 'session.outcome',
+        sessionId: cloudAgentSessionId,
+        status: 'completed',
+        lastMessageId: session.message.messageId,
+      });
+      await waitFor(async () =>
+        expect((await durableSnapshot(session.stub)).sessionStatus).toEqual({ type: 'idle' })
+      );
+
+      const attached = await readAttach(await attach());
+      try {
+        const statuses = attached.events
+          .filter(frame => isFrame(frame, 'session.status'))
+          .map(frame => (frame.properties as { status?: { type?: string } }).status?.type);
+        expect(statuses[0]).toBe('busy');
+        expect(statuses.at(-1)).toBe('idle');
+
+        await pushEvents(session, [
+          {
+            type: 'session.status',
+            properties: { sessionID: qualifiedKiloSessionId, status: { type: 'busy' } },
+          },
+        ]);
+        const live = await readSseUntil(
+          attached.reader,
+          frame =>
+            isFrame(frame, 'session.status') &&
+            (frame.properties as { status?: { type?: string } }).status?.type === 'busy'
+        );
+        expect(live.match).toMatchObject({
+          properties: { sessionID: qualifiedKiloSessionId, status: { type: 'busy' } },
+        });
+      } finally {
+        await attached.reader.cancel();
+      }
+    } finally {
+      session.stopPump();
+      session.wrapper.close();
+    }
+  });
+
+  it('clears replayed interactions that the authoritative snapshot no longer reports', async () => {
+    const session = await startReadySession();
+    try {
+      await seedFacadeRoots({
+        kiloSessionId: qualifiedKiloSessionId,
+        cloudAgentSessionId,
+        title: 'interaction reconciliation fixture',
+      });
+      await pushEvents(session, [
+        questionAsked('que_reconcile_stale'),
+        permissionAsked('per_reconcile_stale'),
+      ]);
+      await waitFor(async () => {
+        const snapshot = await durableSnapshot(session.stub);
+        expect(snapshot.questions).toHaveLength(1);
+        expect(snapshot.permissions).toHaveLength(1);
+      });
+
+      await expect(
+        session.stub.answer({
+          sessionId: cloudAgentSessionId,
+          reply: { action: 'answer', questionId: 'que_reconcile_stale', answers: [['yes']] },
+        })
+      ).resolves.toBe('sent');
+      await expect(
+        session.stub.answer({
+          sessionId: cloudAgentSessionId,
+          reply: { action: 'permission', permissionId: 'per_reconcile_stale', response: 'once' },
+        })
+      ).resolves.toBe('sent');
+      await waitFor(async () => {
+        const snapshot = await durableSnapshot(session.stub);
+        expect(snapshot.questions).toHaveLength(0);
+        expect(snapshot.permissions).toHaveLength(0);
+      });
+
+      const attached = await readAttach(await attach());
+      await attached.reader.cancel();
+      const types = attached.events.map(frame => (frame as { type?: string }).type);
+      expect(types).toContain('question.asked');
+      expect(types).toContain('permission.asked');
+      expect(attached.events).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            type: 'question.rejected',
+            properties: expect.objectContaining({ requestID: 'que_reconcile_stale' }),
+          }),
+          expect.objectContaining({
+            type: 'permission.replied',
+            properties: expect.objectContaining({ requestID: 'per_reconcile_stale' }),
+          }),
+        ])
+      );
+      expect(types.at(-1)).toBe('permission.replied');
+    } finally {
+      session.stopPump();
+      session.wrapper.close();
+    }
+  });
+
+  it('replays a completed tool part whose materialized row predates later events', async () => {
+    const session = await startReadySession();
+    try {
+      await seedFacadeRoots({
+        kiloSessionId: qualifiedKiloSessionId,
+        cloudAgentSessionId,
+        title: 'materialized tool fixture',
+      });
+      const assistantMessageId = 'msg_tool_replay';
+      await pushEvents(session, [
+        messageUpdated('msg_user_tool_replay', 'user', 'run a command'),
+        messageUpdated(assistantMessageId, 'assistant', ''),
+        {
+          type: 'message.part.updated',
+          properties: {
+            sessionID: qualifiedKiloSessionId,
+            part: {
+              id: 'prt_tool_replay',
+              messageID: assistantMessageId,
+              sessionID: qualifiedKiloSessionId,
+              type: 'tool',
+              tool: 'bash',
+              state: { status: 'completed', input: { command: 'echo done' }, output: 'done' },
+            },
+          },
+        },
+      ]);
+      await waitFor(async () => {
+        const snapshot = await durableSnapshot(session.stub);
+        expect(
+          snapshot.events.some(
+            event =>
+              event.streamEventType === 'kilocode' &&
+              (event.data as { type?: string }).type === 'message.part.updated'
+          )
+        ).toBe(true);
+      });
+      await pushEvents(session, [
+        partUpdated(assistantMessageId, 'prt_later_replay', 'later event'),
+      ]);
+
+      const attached = await readAttach(await attach());
+      await attached.reader.cancel();
+      const tool = attached.events.find(
+        event =>
+          isFrame(event, 'message.part.updated') &&
+          (event.properties as { part?: { id?: string } }).part?.id === 'prt_tool_replay'
+      ) as { properties: { part: { state: { status: string } } } } | undefined;
+      expect(tool?.properties.part.state.status).toBe('completed');
+    } finally {
+      session.stopPump();
+      session.wrapper.close();
+    }
+  });
+
+  it('replays sanitized preparation failure evidence through the system feed after reconnect', async () => {
+    const session = await startPreparationFailureSession();
+    try {
+      await seedFacadeRoots({
+        kiloSessionId: qualifiedKiloSessionId,
+        cloudAgentSessionId,
+        title: 'failed preparation fixture',
+      });
+      const directory = encodeURIComponent(`/cloud-agent/sessions/${qualifiedKiloSessionId}`);
+      const response = await SELF.fetch(
+        `http://worker.test/kilo-test/kilo/cloud-agent/event?userId=${userId}&directory=${directory}`
+      );
+      expect(response.status).toBe(200);
+      expect(response.headers.get('content-type')).toContain('text/event-stream');
+
+      const reader = createSseDataReader(response);
+      const observed: unknown[] = [];
+      let attemptReplay: Record<string, unknown> | undefined;
+      let stepReplay: Record<string, unknown> | undefined;
+      let cloudStatusFrame: unknown;
+      for (let index = 0; index < 64; index++) {
+        const frame = await reader.next();
+        observed.push(frame);
+        if (isFrame(frame, 'cloud.status')) cloudStatusFrame = frame;
+        const preparation =
+          isFrame(frame, 'preparing') &&
+          (frame.properties as { preparation?: Record<string, unknown> }).preparation;
+        if (
+          preparation?.action === 'attempt_snapshot' &&
+          (preparation.attempt as { status?: string } | undefined)?.status === 'failed'
+        ) {
+          attemptReplay = preparation;
+        }
+        if (
+          preparation?.action === 'step_snapshot' &&
+          (preparation.stepSnapshot as { status?: string } | undefined)?.status === 'failed'
+        ) {
+          stepReplay = preparation;
+        }
+        if (
+          attemptReplay !== undefined &&
+          stepReplay !== undefined &&
+          cloudStatusFrame !== undefined
+        ) {
+          break;
+        }
+      }
+      await reader.cancel();
+      expect(attemptReplay).toBeDefined();
+      expect(stepReplay).toBeDefined();
+
+      expect(attemptReplay).toMatchObject({
+        attemptId: expect.any(String),
+        triggerMessageId: session.message.messageId,
+        revision: expect.any(Number),
+        timestamp: expect.any(Number),
+        attempt: {
+          id: attemptReplay?.attemptId,
+          status: 'failed',
+          triggerMessageId: session.message.messageId,
+          safeError: 'workspace_setup_failed',
+        },
+      });
+      expect(stepReplay).toMatchObject({
+        attemptId: attemptReplay?.attemptId,
+        triggerMessageId: session.message.messageId,
+        revision: expect.any(Number),
+        timestamp: expect.any(Number),
+        stepSnapshot: {
+          status: 'failed',
+          safeError: 'workspace_setup_failed',
+        },
+      });
+
+      expect(cloudStatusFrame).toBeDefined();
+      expect((cloudStatusFrame as { properties: unknown }).properties).toMatchObject({
+        sessionID: qualifiedKiloSessionId,
+        cloudStatus: { type: 'error' },
+      });
+    } finally {
+      session.stopPump();
+      session.wrapper.close();
+    }
+  });
+
   it('reports a resnapshot when continuity cannot be proven, then rebuilds the full state', async () => {
     const session = await startReadySession();
     try {
@@ -647,6 +1052,9 @@ describe('hosted native history/live fence', { timeout: 30_000 }, () => {
       );
       const notice = noticed.match as { properties: { sessionID?: string; reason?: string } };
       expect(notice.properties.sessionID).toBe(qualifiedKiloSessionId);
+      // The post-move content must never be delivered on the stale attachment.
+      expect(notice.properties.reason).toBe('continuity_unproven');
+      expect(JSON.stringify(noticed.observed)).not.toContain('after move');
 
       // Restore the mapping and re-attach: the rebuilt snapshot is the durable
       // log, unchanged by the continuity failure, and still carries the pending
@@ -660,6 +1068,130 @@ describe('hosted native history/live fence', { timeout: 30_000 }, () => {
       await rebuilt.reader.cancel();
       expectContainsState(transcriptState(durable), transcriptState(rebuilt.events));
       expect(rebuilt.events.some(event => isFrame(event, 'question.asked'))).toBe(true);
+    } finally {
+      session.stopPump();
+      session.wrapper.close();
+    }
+  });
+
+  it('reports continuity_unproven and closes when the session stream socket closes', async () => {
+    const session = await startReadySession();
+    try {
+      await seedFacadeRoots({
+        kiloSessionId: qualifiedKiloSessionId,
+        cloudAgentSessionId,
+        title: 'native socket close',
+      });
+      await pushEvents(session, [messageUpdated('msg_user_socket', 'user', 'hello')]);
+      await waitFor(async () => {
+        const snapshot = await durableSnapshot(session.stub);
+        expect(snapshot.events.length).toBeGreaterThanOrEqual(1);
+      });
+
+      const attached = await readAttach(await attach());
+      try {
+        await runInDurableObject(session.stub, (_instance, state) => {
+          for (const socket of state.getWebSockets('stream')) socket.close(1011, 'test close');
+        });
+        const noticed = await readSseUntil(attached.reader, frame =>
+          isFrame(frame, 'kilo.native.resnapshot')
+        );
+        const notice = noticed.match as { properties: { sessionID?: string; reason?: string } };
+        expect(notice.properties.sessionID).toBe(qualifiedKiloSessionId);
+        expect(notice.properties.reason).toBe('continuity_unproven');
+        await expect(attached.reader.nextOptional()).resolves.toBeNull();
+      } finally {
+        await attached.reader.cancel().catch(() => undefined);
+      }
+    } finally {
+      session.stopPump();
+      session.wrapper.close();
+    }
+  });
+
+  // Miniflare cannot hibernate a DO-to-DO `/stream` socket here. Awaiting
+  // `evictDurableObject` on the warm session DO wedges the test isolate (later
+  // timers and socket sends never complete), and not awaiting it turns the
+  // eviction window into a race that sometimes drops the post-eviction frames.
+  // The assertion is kept intact for a harness that can multiplex DO-to-DO
+  // sockets; it is not replaced with a forced-close case.
+  it.skip('keeps the same SSE open across a hibernating session eviction', async () => {
+    const session = await startReadySession();
+    try {
+      await seedFacadeRoots({
+        kiloSessionId: qualifiedKiloSessionId,
+        cloudAgentSessionId,
+        title: 'native eviction hibernate',
+      });
+      const assistantMessageId = 'msg_assistant_evict';
+      await pushEvents(session, [
+        messageUpdated('msg_user_evict', 'user', 'hello'),
+        messageUpdated(assistantMessageId, 'assistant', ''),
+      ]);
+      await waitFor(async () => {
+        const snapshot = await durableSnapshot(session.stub);
+        expect(snapshot.events.length).toBeGreaterThanOrEqual(2);
+      });
+
+      const attached = await readAttach(await attach());
+      try {
+        await evictDurableObject(session.stub, { webSockets: 'hibernate' });
+        await pushEvents(session, [
+          partUpdated(assistantMessageId, 'prt_evict_persisted', 'persisted after eviction'),
+          partDelta(assistantMessageId, 'prt_evict_persisted', 'live delta'),
+        ]);
+        const delta = await readSseUntil(attached.reader, isPartDelta);
+        const observed = JSON.stringify(delta.observed);
+        expect(observed).toContain('persisted after eviction');
+        expect(observed).not.toContain('kilo.native.resnapshot');
+
+        // A later event on the same reader proves the response never closed.
+        await pushEvents(session, [
+          partUpdated(assistantMessageId, 'prt_evict_marker', 'still open'),
+        ]);
+        const marker = await readSseUntil(attached.reader, frame =>
+          isPartUpdate(frame, 'prt_evict_marker')
+        );
+        expect(JSON.stringify(marker.observed)).not.toContain('kilo.native.resnapshot');
+      } finally {
+        await attached.reader.cancel().catch(() => undefined);
+      }
+    } finally {
+      session.stopPump();
+      session.wrapper.close();
+    }
+  });
+
+  // Same harness limitation as the hibernating case above: the eviction cannot
+  // complete deterministically while `/event` is open, so this close-path
+  // assertion cannot run in Miniflare either.
+  it.skip('reports continuity_unproven and closes when the session eviction closes the socket', async () => {
+    const session = await startReadySession();
+    try {
+      await seedFacadeRoots({
+        kiloSessionId: qualifiedKiloSessionId,
+        cloudAgentSessionId,
+        title: 'native eviction close',
+      });
+      await pushEvents(session, [messageUpdated('msg_user_close', 'user', 'hello')]);
+      await waitFor(async () => {
+        const snapshot = await durableSnapshot(session.stub);
+        expect(snapshot.events.length).toBeGreaterThanOrEqual(1);
+      });
+
+      const attached = await readAttach(await attach());
+      try {
+        await evictDurableObject(session.stub, { webSockets: 'close' });
+        const noticed = await readSseUntil(attached.reader, frame =>
+          isFrame(frame, 'kilo.native.resnapshot')
+        );
+        const notice = noticed.match as { properties: { sessionID?: string; reason?: string } };
+        expect(notice.properties.sessionID).toBe(qualifiedKiloSessionId);
+        expect(notice.properties.reason).toBe('continuity_unproven');
+        await expect(attached.reader.nextOptional()).resolves.toBeNull();
+      } finally {
+        await attached.reader.cancel().catch(() => undefined);
+      }
     } finally {
       session.stopPump();
       session.wrapper.close();

@@ -295,6 +295,29 @@ pnpm --filter web exec env NODE_ENV=test jest --runInBand \
   src/routers/organizations/organization-router.test.ts
 ```
 
+### Native build artifacts
+
+Native build tooling verifies artifact provenance before installation or build reuse.
+Installation accepts successful, completed native workflow runs from the repository itself.
+Push builds must originate from the default branch.
+Manual builds must match the consumer commit, or `GITHUB_SHA` when the gate runs in CI.
+Pull-request artifacts do not qualify for installation.
+The pull-request gate can reuse a successful artifact from that same pull request and head repository.
+Trusted push and manual artifacts remain available for gate reuse.
+Pull-request artifact reuse requires a recorded pull-request association.
+Fork runs without that association require a fresh build.
+
+The native fingerprint includes the artifact trust revision.
+This revision changes remote artifact names and local cache keys.
+Each platform requires a fresh trusted build after this change.
+Existing worktrees must receive the tooling update before they use remote artifacts.
+
+Require a remote iOS build without permitting a local compilation fallback:
+
+```bash
+KILO_REMOTE_NATIVE=required pnpm dev:mobile:ios build <udid>
+```
+
 ## Common Development Commands
 
 | Command | Description |
@@ -654,7 +677,7 @@ AI summaries and briefing notifications require separate opt-ins.
 Summary settings include a model override and finite generation time and spend limits.
 Summary estimates and gateway spend admission use the model picker’s configured preferred-provider price, falling back to catalog pricing when no matching route exists.
 Bounded OpenRouter requests enforce `provider.max_price` for prompt/completion rates (USD per million tokens) and per-request fees, preserving provider allow-lists, exclusions, and stricter caller price caps. Bounded requests routed through providers that cannot enforce that ceiling are refused before upstream generation, unless the quoted price is zero.
-Tiered custom and Kilo-exclusive pricing uses the highest tier reachable from the request’s bounded input length.
+Tiered custom pricing uses the highest tier reachable from the request’s bounded input length.
 The default summary model is `~deepseek/deepseek-flash-latest`.
 Pricing estimates and gateway spend checks resolve latest-model aliases through the stored catalog target.
 An alias remains unavailable when its target is missing or has no usable pricing.

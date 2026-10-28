@@ -252,12 +252,18 @@ export async function isModelRouteAllowed(
 export async function resolveOrganizationMemberModelPolicy(params: {
   organizationId: string;
   kiloUserId: string;
+  /** See `allowNonMember` on the member policy subject. */
+  allowNonMember?: boolean;
   fromDb?: typeof db;
 }): Promise<EffectiveOrganizationModelPolicy> {
   return evaluateEffectiveModelAccessPolicy(
     await getOrganizationGroupPolicyContext({
       organizationId: params.organizationId,
-      subject: { type: 'member', kiloUserId: params.kiloUserId },
+      subject: {
+        type: 'member',
+        kiloUserId: params.kiloUserId,
+        allowNonMember: params.allowNonMember,
+      },
       fromDb: params.fromDb,
     })
   );
@@ -282,6 +288,7 @@ export async function resolveOrganizationDefaultModelPolicy(params: {
 export async function resolveOrganizationMemberModelDecision(params: {
   organizationId: string;
   kiloUserId: string;
+  allowNonMember?: boolean;
   modelId: string;
   providerLookup?: ProviderLookup;
   fromDb?: typeof db;

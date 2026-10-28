@@ -107,11 +107,14 @@ const serviceMeta: Record<string, ServiceMeta> = {
       'cloudflare-session-ingest',
       'ai-gateway',
       'cloudflare-git-token-service',
+      'byok-kms',
     ],
   },
   postgres: { group: 'core', dependsOn: [] },
   redis: { group: 'core', dependsOn: [] },
   'redis-http': { group: 'core', dependsOn: ['redis'] },
+  'local-kms': { group: 'core', dependsOn: [] },
+  'byok-kms': { group: 'core', dependsOn: ['local-kms'] },
   stripe: { group: 'core', dependsOn: [] },
   'ai-gateway': {
     group: 'core',
@@ -572,8 +575,15 @@ const INFRA_PORTS: Record<string, number> = {
   postgres: 5432,
   redis: 6379,
   'redis-http': 8079,
+  'local-kms': 8900,
   grafana: 4000,
 };
+
+const BYOK_KMS_SERVICE_BASE_PORT = 8901;
+
+export function byokKmsServicePort(offset: number = portOffset): number {
+  return BYOK_KMS_SERVICE_BASE_PORT + offset;
+}
 
 export function getInfraBasePort(serviceName: string): number | undefined {
   return INFRA_PORTS[serviceName];
@@ -832,6 +842,28 @@ function buildServiceDefs(): ServiceDef[] {
         port: INFRA_PORTS[name] + portOffset,
         dependsOn: meta.dependsOn,
         command: dockerComposeUp(name),
+        group: meta.group,
+      });
+      continue;
+    }
+
+    if (name === 'byok-kms') {
+      const byokKmsPort = byokKmsServicePort();
+      defs.push({
+        name,
+        type: 'process',
+        dir: '.',
+        port: byokKmsPort,
+        dependsOn: meta.dependsOn,
+        command: [
+          'env',
+          `BYOK_KMS_SERVICE_PORT=${byokKmsPort}`,
+          `BYOK_KMS_ENDPOINT=http://127.0.0.1:${INFRA_PORTS['local-kms'] + portOffset}`,
+          'pnpm',
+          'exec',
+          'tsx',
+          'dev/byok-kms/server.ts',
+        ],
         group: meta.group,
       });
       continue;

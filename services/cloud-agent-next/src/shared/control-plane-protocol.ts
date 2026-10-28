@@ -351,6 +351,33 @@ export const controlPlaneRouteSpecSchema = z
   })
   .strict();
 
+/** Fields that one shared runtime applies once, from its first live attachment. */
+export const workspaceConfigSchema = controlPlaneRouteSpecSchema
+  .pick({
+    mcp: true,
+    env: true,
+    secretEnvKeys: true,
+    setupCommands: true,
+    runtimeSkills: true,
+    runtimeAgents: true,
+    kiloCommands: true,
+  })
+  .strict();
+export type WorkspaceConfig = z.infer<typeof workspaceConfigSchema>;
+
+export const attachmentSpecSchema = controlPlaneRouteSpecSchema
+  .omit({
+    mcp: true,
+    env: true,
+    secretEnvKeys: true,
+    setupCommands: true,
+    runtimeSkills: true,
+    runtimeAgents: true,
+    kiloCommands: true,
+  })
+  .strict();
+export type AttachmentSpec = z.infer<typeof attachmentSpecSchema>;
+
 /**
  * Route spec accepted at the registration boundary. `secretEnvKeys` is
  * frame-only, so a registration that carries it is rejected here rather than
@@ -817,6 +844,16 @@ const controlPlaneSessionPrepareFrameSchema = z
   })
   .strict();
 
+/** The wrapper applies `workspace` only when no live route holds the runtime key. */
+const controlPlaneSessionAttachFrameSchema = z
+  .object({
+    type: z.literal('session.attach'),
+    spec: attachmentSpecSchema,
+    workspace: workspaceConfigSchema,
+    credentials: controlPlaneSessionCredentialsPayloadSchema.optional(),
+  })
+  .strict();
+
 const controlPlaneSessionProgressFrameSchema = z
   .object({
     type: z.literal('session.progress'),
@@ -1202,6 +1239,7 @@ export const controlPlaneWrapperFrameSchema = z.discriminatedUnion('type', [
   controlPlaneHeartbeatFrameSchema,
   z.object({ type: z.literal('heartbeat_ack') }).strict(),
   controlPlaneSessionPrepareFrameSchema,
+  controlPlaneSessionAttachFrameSchema,
   controlPlaneSessionProgressFrameSchema,
   controlPlaneSessionReadyFrameSchema,
   controlPlaneWorkspaceCaptureFrameSchema,
@@ -1254,6 +1292,7 @@ export type ControlPlaneWelcomeFrame = z.infer<typeof controlPlaneWelcomeFrameSc
 export type ControlPlaneShutdownFrame = z.infer<typeof controlPlaneShutdownFrameSchema>;
 export type ControlPlaneHeartbeatFrame = z.infer<typeof controlPlaneHeartbeatFrameSchema>;
 export type ControlPlaneSessionPrepareFrame = z.infer<typeof controlPlaneSessionPrepareFrameSchema>;
+export type ControlPlaneSessionAttachFrame = z.infer<typeof controlPlaneSessionAttachFrameSchema>;
 export type ControlPlaneSessionProgressFrame = z.infer<
   typeof controlPlaneSessionProgressFrameSchema
 >;

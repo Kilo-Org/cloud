@@ -3953,6 +3953,8 @@
     "title": "Erosi kredituak",
     "description": "Kredituak Kilo App-en AI kodetze-saioak exekutatzeko zure Kilo saldoari gehitzen zaion behin betiko erosketa bat dira. Dendak zure kontuari kobratzen dio eta kredituak dendak ordainketa baieztatu ondoren gehitzen dira.",
     "nextExpiry": "{{amount}} kreditu iraungiko dira data honetan: {{date}} (UTC). Lehenago iraungitzen diren kredituak erabiltzen dira lehenik.",
+    "noExpiringCredits": "Ez dago iraungiko den krediturik.",
+    "expiryUnavailable": "Kredituen iraungitze-informazioa ez dago erabilgarri.",
     "appStoreExpiry": "App Store bidez erositako kredituak ez dira iraungitzen.",
     "playOneYearExpiry": "Kreditu hauek erosi eta urte natural batera iraungitzen dira.",
     "playNonexpiring": "Kreditu hauek ez dira iraungitzen.",

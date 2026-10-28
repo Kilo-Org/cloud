@@ -1,14 +1,20 @@
 import { runSetupScript } from '../setup-script.js';
-import { materializeRuntimeProfile, withRuntimeProfileEnvironment } from './runtime-profile.js';
+import {
+  createRuntimeProfileMaterializer,
+  RuntimeProfileMismatchError,
+  withRuntimeProfileEnvironment,
+} from './runtime-profile.js';
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {
   CONTROL_PLANE_PREPARATION_DETAIL_MAX_LENGTH,
+  type AttachmentSpec,
   type ControlPlanePreparationStep,
   type ControlPlaneRouteSpec,
   type ControlPlaneSessionCredentialsPayload,
   type ControlPlaneWorkspaceOutcome,
   type ControlPlaneWrapperFrame,
+  type WorkspaceConfig,
 } from '../../../src/shared/control-plane-protocol.js';
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
 import type { ControlDiagnosticReporter } from '../../../src/shared/control-diagnostics.js';
@@ -60,6 +66,7 @@ import {
   managedGitHubPreparationGitArgs,
 } from './repository-preparation.js';
 import { defaultHomeRoots, routeHome, type HomeRoots } from './workspace-home.js';
+import { workspaceConfigRuntimeKey } from '../../../src/shared/workspace-config.js';
 
 /** Spec §7: Kilo runtime start and Kilo session each get one retry. */
 const STEP_RETRY_ATTEMPTS = 2;
@@ -162,6 +169,11 @@ export type PreparationManager = {
     spec: ControlPlaneRouteSpec,
     credentials?: ControlPlaneSessionCredentialsPayload
   ): Promise<void>;
+  /**
+   * The configuration the route's runtime uses: the retained one while another
+   * route holds the runtime key, otherwise `offered`, which becomes retained.
+   */
+  workspaceConfiguration(spec: AttachmentSpec, offered: WorkspaceConfig): WorkspaceConfig;
   release(sessionId: string): void;
   isPrepared(sessionId: string): boolean;
   /**
@@ -223,7 +235,7 @@ async function defaultSessionExists(
 
 /** Keep existing allocations on their original runtime and HOME identities. */
 export function runtimeKey(spec: ControlPlaneRouteSpec): string {
-  return spec.runtimeIsolation === 'per-session' ? spec.sessionId : spec.directory;
+  return workspaceConfigRuntimeKey(spec);
 }
 
 /**
@@ -352,6 +364,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   const timers = deps.timers.wrapper;
   const log = deps.log ?? ((): void => undefined);
   const inheritedEnv = deps.inheritedEnv ?? process.env;
+  const profileMaterializer = createRuntimeProfileMaterializer();
+  const workspaceConfigurations = new Map<string, WorkspaceConfig>();
   const runGit = deps.runGit ?? ((args, options) => git(args, options));
   const runSetup =
     deps.runSetup ??
@@ -427,7 +441,10 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
     deps.emit({
       type: 'session.failed',
       sessionId,
-      reason: 'workspace_setup_failed',
+      reason:
+        error instanceof RuntimeProfileMismatchError
+          ? 'invalid_configuration'
+          : 'workspace_setup_failed',
       step,
       ...(subtype === undefined ? {} : { subtype }),
     });
@@ -884,6 +901,18 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   }
 
   /**
+   * Whether `prepare` for `sessionId` reuses its current runtime and ignores a
+   * newly offered configuration: an unreleased in-flight prepare, or a prepared
+   * route whose runtime is still available.
+   */
+  function callerKeepsRuntime(sessionId: string, key: string): boolean {
+    const record = preparing.get(sessionId);
+    if (record && !record.released && record.runtimeKey === key) return true;
+    const route = prepared.get(sessionId);
+    return route?.key === key && !deps.runtimes.isUnavailable(key);
+  }
+
+  /**
    * Finish a route that left `prepared`, or never reached it. When it was the
    * last holder of its runtime key the process is released: the runtime's owned
    * process scope reaps the background processes it started, so walking a dying
@@ -897,6 +926,8 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   }): void {
     if (!hasRoutesForKey(input.key, input.sessionId)) {
       deps.runtimes.release(input.key);
+      profileMaterializer.release(routeHome(input.spec, homeRoots));
+      workspaceConfigurations.delete(input.key);
       return;
     }
     // Resolve the CURRENT live client: a restart replaces the runtime on a new
@@ -1052,7 +1083,7 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
         const installsSkills = spec.runtimeSkills?.some(skill => skill.source !== undefined);
         currentStep = installsSkills ? 'setup' : 'kilo_runtime';
         owner.skillInstallController = new AbortController();
-        await materializeRuntimeProfile(home, spec, {
+        await profileMaterializer.materialize(home, spec, {
           run: (command, args, options) =>
             (deps.runSkillInstall ?? runProcess)(command, args, {
               ...options,
@@ -1254,6 +1285,16 @@ export function createPreparationManager(deps: PrepareDeps): PreparationManager 
   }
 
   return {
+    workspaceConfiguration(spec, offered) {
+      const key = workspaceConfigRuntimeKey(spec);
+      const retained =
+        callerKeepsRuntime(spec.sessionId, key) || hasRoutesForKey(key, spec.sessionId)
+          ? workspaceConfigurations.get(key)
+          : undefined;
+      if (retained !== undefined) return retained;
+      workspaceConfigurations.set(key, offered);
+      return offered;
+    },
     prepare: function prepare(spec, credentials) {
       const existing = preparing.get(spec.sessionId);
       if (existing && !existing.released) return existing.promise;

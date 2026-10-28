@@ -1,7 +1,12 @@
 import type { PreferredProviderOrderConfig } from '@kilocode/db/schema-types';
 import { isPdfSupportingModel } from '@kilocode/web-shared/lib/ai-gateway/models';
 import { getPreferredModels } from '@kilocode/web-shared/lib/ai-gateway/preferred-models';
-import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import {
+  convertFromKiloExclusiveModel,
+  findKiloExclusiveModel,
+  isKiloExclusiveModel,
+  kiloExclusiveModels,
+} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { isFreeModel } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import {
   getLocalFakeTranscriptionModelsUrl,
@@ -15,7 +20,6 @@ import {
 } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { captureException, captureMessage } from '@sentry/nextjs';
-import { convertFromKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import { getUnavailableModelIds } from '@kilocode/web-shared/lib/ai-gateway/unavailable-models';
 import { getGatewayOpenCodeSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/model-settings';
 import { withLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
@@ -161,7 +165,7 @@ export function pickerModelPricing(
  * does not carry: a Kilo-exclusive model or one of Kilo's own Auto models.
  */
 export function pickerExtraModel(modelId: string): OpenRouterModel | undefined {
-  const exclusive = kiloExclusiveModels.find(model => model.public_id === modelId);
+  const exclusive = findKiloExclusiveModel(modelId);
   return exclusive
     ? convertFromKiloExclusiveModel(exclusive)
     : buildAutoModels().find(model => model.id === modelId);
@@ -211,7 +215,7 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
         // OpenRouter may add a model after a custom LLM claimed its id, and
         // routing serves the custom LLM.
         !customLlmsById.has(model.id.toLowerCase()) &&
-        !kiloExclusiveModels.some(m => m.public_id === model.id) &&
+        !isKiloExclusiveModel(model.id) &&
         !unavailableModelIds.has(model.id) &&
         !model.id.endsWith(':batch')
     )
@@ -238,19 +242,16 @@ async function enhancedModelList(models: OpenRouterModel[], countryCode: string 
     // Public custom LLMs are complete as defined; id-based pricing, PDF, and
     // protocol guesses below would describe a model routing does not serve.
     .concat(publicCustomLlmModels);
-  const exclusiveById = new Map(kiloExclusiveModels.map(entry => [entry.public_id, entry]));
   const providerLookupId = (model: OpenRouterModel) =>
-    exclusiveById.get(model.id)?.internal_id ?? model.alias_target ?? model.id;
+    findKiloExclusiveModel(model.id)?.internal_id ?? model.alias_target ?? model.id;
   const indexedProviders = await getProviderSlugsForModels(catalogModels.map(providerLookupId));
   const enhancedModels = await Promise.all(
     catalogModels.map(async (model: OpenRouterModel) => {
       const preferredIndex = preferredModels.indexOf(model.id);
-      const exclusive = exclusiveById.get(model.id);
       const providerIds =
         publicCustomLlmProviders.get(model.id) ??
-        (exclusive && exclusive.inference_providers.length > 0
-          ? exclusive.inference_providers
-          : (indexedProviders.get(providerLookupId(model)) ?? []));
+        indexedProviders.get(providerLookupId(model)) ??
+        [];
       const inferenceProviderIds = [
         ...new Set([...providerIds].map(id => normalizeInferenceProviderId(id))),
       ];

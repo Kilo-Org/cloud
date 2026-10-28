@@ -6,6 +6,7 @@ import {
   getBYOKforOrganization,
   getBYOKforUser,
   getByokCredentials,
+  getCatalogModeByokCredentials,
   getEnabledByokProviders,
   getOrganizationByokProviderIds,
   getUserByokProviderIds,
@@ -293,7 +294,26 @@ describe('getByokCredentials', () => {
     await expect(getByokCredentials(db, organizationOwner, ['openai'])).resolves.toEqual([]);
   });
 
-  test('with catalogModeOnly, never decrypts keys outside catalog mode', async () => {
+  test('backs getBYOKforUser without exposing catalog mode', async () => {
+    const user = await createUser();
+    await insertByokKey(
+      byokOwner(user.id, null),
+      user.id,
+      'anthropic',
+      '2026-01-01T00:00:00.000Z',
+      {
+        settings: { serve_catalog_models: true },
+      }
+    );
+
+    await expect(getBYOKforUser(db, user.id, ['anthropic'])).resolves.toEqual([
+      { decryptedAPIKey: expect.any(String), providerId: 'anthropic' },
+    ]);
+  });
+});
+
+describe('getCatalogModeByokCredentials', () => {
+  test('never decrypts keys outside catalog mode', async () => {
     const user = await createUser();
     const owner = byokOwner(user.id, null);
     const catalogSecret = await insertByokKey(
@@ -318,31 +338,10 @@ describe('getByokCredentials', () => {
     const providers: UserByokProviderId[] = ['synthetic', 'chutes-byok', 'edenai'];
 
     await expect(getByokCredentials(db, owner, ['edenai'])).rejects.toThrow();
-    await expect(
-      getByokCredentials(db, owner, providers, { catalogModeOnly: true })
-    ).resolves.toEqual([
+    await expect(getCatalogModeByokCredentials(db, owner, providers)).resolves.toEqual([
       { decryptedAPIKey: catalogSecret, providerId: 'synthetic', serveCatalogModels: true },
     ]);
-    await expect(
-      getByokCredentials(db, owner, ['edenai'], { catalogModeOnly: true })
-    ).resolves.toEqual([]);
-  });
-
-  test('backs getBYOKforUser without exposing catalog mode', async () => {
-    const user = await createUser();
-    await insertByokKey(
-      byokOwner(user.id, null),
-      user.id,
-      'anthropic',
-      '2026-01-01T00:00:00.000Z',
-      {
-        settings: { serve_catalog_models: true },
-      }
-    );
-
-    await expect(getBYOKforUser(db, user.id, ['anthropic'])).resolves.toEqual([
-      { decryptedAPIKey: expect.any(String), providerId: 'anthropic' },
-    ]);
+    await expect(getCatalogModeByokCredentials(db, owner, ['edenai'])).resolves.toEqual([]);
   });
 });
 

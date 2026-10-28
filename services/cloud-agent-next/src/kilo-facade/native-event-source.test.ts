@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { StreamEvent } from '../websocket/types.js';
 import {
   createNativeAttachmentRegistry,
+  createNativeSnapshotReconciler,
   canRetainNativeEvent,
   NATIVE_DELIVERY_LIMITS,
   isDeliverableNativeEvent,
@@ -248,6 +249,197 @@ describe('toNativePublicEvent', () => {
     expect(
       isDeliverableNativeEvent(streamEvent(0, { type: 'cloud.status' }, 'cloud.status'), true)
     ).toBe(false);
+  });
+});
+
+describe('cloud terminal native projection', () => {
+  const directory = publicCloudAgentDirectory(kiloSessionId);
+
+  it('projects a stored completed row from its stream identity without duplicated payload metadata', () => {
+    expect(
+      toNativePublicEvent(
+        streamEvent(
+          21,
+          {
+            messageId: 'msg_completed',
+            status: 'completed',
+            delivery: 'sent',
+            accepted: true,
+            assistantMessageId: 'msg_private_assistant',
+          },
+          'cloud.message.completed'
+        ),
+        kiloSessionId
+      )
+    ).toEqual({
+      type: 'cloud.message.completed',
+      properties: {
+        sessionID: kiloSessionId,
+        messageId: 'msg_completed',
+        status: 'completed',
+        delivery: 'sent',
+        accepted: true,
+        directory,
+      },
+    });
+  });
+
+  it.each([
+    [
+      'failed',
+      {
+        messageId: 'msg_failed',
+        status: 'failed',
+        delivery: 'sent',
+        accepted: true,
+        reason: 'no_progress',
+        error: 'The turn made no progress',
+      },
+    ],
+    [
+      'interrupted',
+      {
+        messageId: 'msg_interrupted',
+        status: 'interrupted',
+        delivery: 'queued',
+        accepted: false,
+        reason: 'interrupted',
+        error: 'The message was interrupted',
+      },
+    ],
+  ])(
+    'projects a stored %s row while retaining status and delivery semantics',
+    (status, payload) => {
+      const projected = toNativePublicEvent(
+        streamEvent(22, payload, 'cloud.message.failed'),
+        kiloSessionId
+      );
+      expect(projected).toEqual({
+        type: 'cloud.message.failed',
+        properties: {
+          sessionID: kiloSessionId,
+          messageId: payload.messageId,
+          status,
+          delivery: payload.delivery,
+          accepted: payload.accepted,
+          directory,
+        },
+      });
+      expect(projected?.properties).not.toHaveProperty('error');
+      expect(projected?.properties).not.toHaveProperty('reason');
+    }
+  );
+
+  it('drops a malformed Cloud terminal payload instead of inventing a native terminal', () => {
+    expect(
+      toNativePublicEvent(
+        streamEvent(23, { content: 'missing message id' }, 'cloud.message.completed'),
+        kiloSessionId
+      )
+    ).toBeNull();
+  });
+
+  it('delivers a duplicate terminal batch only once after the snapshot fence', () => {
+    const registry = createNativeAttachmentRegistry(vi.fn());
+    const received = vi.fn();
+    const terminal = toNativePublicEvent(
+      streamEvent(
+        21,
+        { messageId: 'msg_completed', status: 'completed', delivery: 'sent', accepted: true },
+        'cloud.message.completed'
+      ),
+      kiloSessionId
+    );
+    if (terminal === null) throw new Error('expected terminal projection');
+    const terminalBatch: NativeEventBatch = {
+      kiloUserId: 'owner',
+      cloudAgentSessionId,
+      kiloSessionId,
+      kind: 'events',
+      generation: 1,
+      firstSequence: 1,
+      events: [{ eventId: 21, event: terminal }],
+    };
+    registry.begin(cloudAgentSessionId, kiloSessionId);
+    registry.bind(cloudAgentSessionId, { generation: 1, sequence: 0 });
+    registry.subscribe(cloudAgentSessionId, received);
+    registry.complete(cloudAgentSessionId, 20);
+    registry.deliverBatch(terminalBatch, [cloudAgentSessionId]);
+    registry.deliverBatch(terminalBatch, [cloudAgentSessionId]);
+    expect(received).toHaveBeenCalledExactlyOnceWith(terminal);
+  });
+});
+
+describe('createNativeSnapshotReconciler', () => {
+  it('emits the authoritative idle status and reconciles stale and pending interactions', () => {
+    const reconciler = createNativeSnapshotReconciler(kiloSessionId);
+    for (const event of [
+      {
+        type: 'session.status',
+        properties: { sessionID: kiloSessionId, status: { type: 'busy' } },
+      },
+      { type: 'question.asked', properties: { sessionID: kiloSessionId, id: 'que_stale' } },
+      { type: 'permission.asked', properties: { sessionID: kiloSessionId, id: 'per_stale' } },
+      { type: 'question.asked', properties: { sessionID: kiloSessionId, id: 'que_keep' } },
+    ]) {
+      reconciler.observe(event);
+    }
+
+    expect(
+      reconciler.corrections({
+        sessionStatus: { type: 'idle' },
+        questions: [{ id: 'que_new', sessionID: kiloSessionId }],
+        permissions: [],
+      })
+    ).toEqual([
+      expect.objectContaining({
+        type: 'session.status',
+        properties: expect.objectContaining({ status: { type: 'idle' } }),
+      }),
+      expect.objectContaining({
+        type: 'question.asked',
+        properties: expect.objectContaining({ id: 'que_new', sessionID: kiloSessionId }),
+      }),
+      expect.objectContaining({
+        type: 'question.rejected',
+        properties: expect.objectContaining({ requestID: 'que_stale' }),
+      }),
+      expect.objectContaining({
+        type: 'question.rejected',
+        properties: expect.objectContaining({ requestID: 'que_keep' }),
+      }),
+      expect.objectContaining({
+        type: 'permission.replied',
+        properties: expect.objectContaining({ requestID: 'per_stale' }),
+      }),
+    ]);
+  });
+
+  it('does not clear interactions when an older snapshot carries no authoritative list', () => {
+    const reconciler = createNativeSnapshotReconciler(kiloSessionId);
+    reconciler.observe({
+      type: 'question.asked',
+      properties: { sessionID: kiloSessionId, id: 'que_open' },
+    });
+    expect(reconciler.corrections({})).toEqual([]);
+  });
+
+  it('filters an authoritative interaction from another root session', () => {
+    const reconciler = createNativeSnapshotReconciler(kiloSessionId);
+    expect(
+      reconciler.corrections({
+        questions: [
+          { id: 'que_other', sessionID: 'ses_other_session_identifier_00' },
+          { id: 'que_owned', sessionID: kiloSessionId },
+        ],
+        permissions: [],
+      })
+    ).toEqual([
+      expect.objectContaining({
+        type: 'question.asked',
+        properties: expect.objectContaining({ id: 'que_owned' }),
+      }),
+    ]);
   });
 });
 

@@ -1,4 +1,6 @@
+import type { SessionStatus } from '../shared/protocol.js';
 import type { StreamEvent } from '../websocket/types.js';
+import { projectPublicCloudAgentExtensionEvent } from './cloud-agent-extension-events.js';
 import {
   projectPublicStructuredPaths,
   publicCloudAgentDirectory,
@@ -129,10 +131,27 @@ export function isDeliverableNativeEvent(event: StreamEvent, live = false): bool
 
 /** Translates one stored stream envelope into a native Kilo event payload. */
 export function toNativePublicEvent(
-  event: Pick<StreamEvent, 'data'>,
+  event: Pick<StreamEvent, 'data'> & { streamEventType?: StreamEvent['streamEventType'] },
   kiloSessionId: string
 ): NativePublicEvent | null {
   const directory = publicCloudAgentDirectory(kiloSessionId);
+  // Cloud terminal rows carry their identity in the stream event type, not in
+  // the payload. Project them through the existing public extension contract so
+  // a stored `cloud.message.completed`/`failed` row remains replayable.
+  if (event.streamEventType?.startsWith('cloud.')) {
+    const projected = projectPublicCloudAgentExtensionEvent(
+      {
+        stream_event_type: event.streamEventType,
+        payload: JSON.stringify(event.data) ?? 'null',
+      },
+      kiloSessionId
+    );
+    if (projected === null) return null;
+    return {
+      type: projected.type,
+      properties: { ...projected.properties, directory },
+    };
+  }
   if (!isRecord(event.data)) return null;
   // Preparation progress rows carry the reported native event verbatim.
   if (typeof event.data.event === 'string' && isRecord(event.data.properties)) {
@@ -155,6 +174,116 @@ export function toNativePublicEvent(
       ...projectPublicStructuredPaths(payload, kiloSessionId),
       sessionID: kiloSessionId,
       directory,
+    },
+  };
+}
+
+/**
+ * The Session DO's authoritative view of a native snapshot. The stored log can
+ * end on a stale `busy` status or a pending prompt whose resolution was never
+ * persisted, so reconnects emit these corrections after replay and before the
+ * fence.
+ */
+export type NativeSnapshotAuthority = {
+  sessionStatus?: SessionStatus;
+  questions?: readonly unknown[];
+  permissions?: readonly unknown[];
+};
+
+function interactionId(value: unknown): string | undefined {
+  return isRecord(value) && typeof value.id === 'string' && value.id.length > 0
+    ? value.id
+    : undefined;
+}
+
+function replyRequestId(event: NativePublicEvent): string | undefined {
+  return typeof event.properties.requestID === 'string' && event.properties.requestID.length > 0
+    ? event.properties.requestID
+    : undefined;
+}
+
+/**
+ * Tracks the interactions a snapshot replay leaves open, then emits the
+ * authoritative corrections at the end of that replay:
+ *
+ * - the derived session status, so a stale replayed `busy` cannot survive;
+ * - an ask for every interaction the Session DO still reports as pending;
+ * - a resolution for every replayed ask the Session DO no longer reports.
+ *
+ * The reconcile runs before the fence, while live pushes remain buffered, so a
+ * newer live busy/ask always wins over an older snapshot correction.
+ */
+export function createNativeSnapshotReconciler(kiloSessionId: string) {
+  const openQuestions = new Set<string>();
+  const openPermissions = new Set<string>();
+
+  const project = (type: string, properties: Record<string, unknown>) =>
+    toNativePublicEvent({ data: { event: type, properties } }, kiloSessionId);
+
+  return {
+    observe(event: NativePublicEvent): void {
+      if (event.type === 'question.asked' || event.type === 'permission.asked') {
+        const id = interactionId(event.properties);
+        if (id !== undefined) {
+          (event.type === 'question.asked' ? openQuestions : openPermissions).add(id);
+        }
+        return;
+      }
+      const id = replyRequestId(event);
+      if (id === undefined) return;
+      if (event.type === 'question.replied' || event.type === 'question.rejected') {
+        openQuestions.delete(id);
+      } else if (event.type === 'permission.replied') {
+        openPermissions.delete(id);
+      }
+    },
+
+    corrections(authority: NativeSnapshotAuthority): NativePublicEvent[] {
+      const corrections: NativePublicEvent[] = [];
+      if (authority.sessionStatus !== undefined) {
+        const status = project('session.status', {
+          sessionID: kiloSessionId,
+          status: authority.sessionStatus,
+        });
+        if (status !== null) corrections.push(status);
+      }
+      const reconcileCollection = (
+        items: readonly unknown[] | undefined,
+        open: ReadonlySet<string>,
+        askedType: string,
+        resolvedType: string
+      ): void => {
+        if (items === undefined) return;
+        const pending = new Set<string>();
+        for (const item of items) {
+          const id = interactionId(item);
+          if (id === undefined) continue;
+          pending.add(id);
+          const asked = project(askedType, isRecord(item) ? item : {});
+          if (asked !== null) corrections.push(asked);
+        }
+        for (const id of open) {
+          if (pending.has(id)) continue;
+          const resolved = project(resolvedType, {
+            sessionID: kiloSessionId,
+            requestID: id,
+          });
+          if (resolved !== null) corrections.push(resolved);
+        }
+      };
+      reconcileCollection(
+        authority.questions,
+        openQuestions,
+        'question.asked',
+        'question.rejected'
+      );
+      reconcileCollection(
+        authority.permissions,
+        openPermissions,
+        'permission.asked',
+        'permission.replied'
+      );
+      return corrections;
     },
   };
 }

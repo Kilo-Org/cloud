@@ -26,6 +26,8 @@ import {
   UserByokTestModels,
   getVercelUserByokProviderIdForEndpoint,
   VercelUserByokInferenceProviderIdSchema,
+  isExperimentalByokProviderId,
+  type ExperimentalByokProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import {
   getVercelModelsMetadataFromDatabase,
@@ -49,6 +51,9 @@ import {
   createAiSdkProvider,
   formatDirectByokModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { parseAwsBedrockCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/bedrock-byok';
+import { parseGcpVertexCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/vertex-byok';
+import { isExperimentalByokEnabled } from '@/lib/byok/experimental-byok';
 
 const GENERIC_TEST_FAILURE_MESSAGE = 'API key test failed. Check the credential and try again.';
 const VERCEL_AI_GATEWAY_KEY_REJECTED_MESSAGE =
@@ -57,15 +62,27 @@ const MANAGED_KEY_READ_ONLY_MESSAGE =
   'This key is managed by your coding plan and is read-only. Cancel the coding plan to remove it.';
 const logByokWarning = sentryLogger('byok-key-test', 'warning');
 
-function validateVercelUserByokCredential(providerId: string, credential: string) {
+const EXPERIMENTAL_BYOK_CREDENTIAL_PARSERS = {
+  'bedrock-byok': parseAwsBedrockCredentials,
+  'vertex-byok': parseGcpVertexCredentials,
+} satisfies Record<ExperimentalByokProviderId, (credential: string) => unknown>;
+
+function validateUserByokCredential(providerId: string, credential: string) {
   const parsedProviderId = VercelUserByokInferenceProviderIdSchema.safeParse(providerId);
-  if (!parsedProviderId.success) return;
+  const parseExperimentalCredential = isExperimentalByokProviderId(providerId)
+    ? EXPERIMENTAL_BYOK_CREDENTIAL_PARSERS[providerId]
+    : undefined;
+  if (!parsedProviderId.success && !parseExperimentalCredential) return;
 
   try {
-    getVercelInferenceProviderConfigForUserByok({
-      providerId: parsedProviderId.data,
-      decryptedAPIKey: credential,
-    });
+    if (parsedProviderId.success) {
+      getVercelInferenceProviderConfigForUserByok({
+        providerId: parsedProviderId.data,
+        decryptedAPIKey: credential,
+      });
+    } else {
+      parseExperimentalCredential?.(credential);
+    }
   } catch {
     throw new TRPCError({
       code: 'BAD_REQUEST',
@@ -89,6 +106,18 @@ function toBYOKApiKeyResponse(key: Omit<BYOKApiKeyResponse, 'provider_name'>): B
     ...key,
     provider_name: key.provider_id,
   };
+}
+
+function rejectUnavailableExperimentalProvider(
+  providerId: string,
+  organizationId: string | null | undefined
+) {
+  if (isExperimentalByokProviderId(providerId) && !isExperimentalByokEnabled(organizationId)) {
+    throw new TRPCError({
+      code: 'FORBIDDEN',
+      message: `Provider ${providerId} is not available yet.`,
+    });
+  }
 }
 
 function rejectManagedKeyMutation(managementSource: 'user' | 'coding_plan') {
@@ -167,6 +196,17 @@ export const byokRouter = createTRPCRouter({
     .output(z.record(z.string(), z.array(z.string())))
     .query(fetchSupportedModels),
 
+  /** Whether keys for experimental BYOK providers, currently direct Amazon Bedrock and Google Vertex AI, can be added. */
+  experimentalByokEnabled: baseProcedure
+    .input(ListBYOKKeysInputSchema)
+    .output(z.boolean())
+    .query(async ({ input, ctx }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      return isExperimentalByokEnabled(input.organizationId);
+    }),
+
   list: baseProcedure
     .input(ListBYOKKeysInputSchema)
     .output(z.array(BYOKApiKeyResponseSchema))
@@ -202,7 +242,8 @@ export const byokRouter = createTRPCRouter({
         await ensureOrganizationAccess(ctx, organizationId, ORGANIZATION_BILLING_ROLES);
       }
 
-      validateVercelUserByokCredential(provider_id, api_key);
+      rejectUnavailableExperimentalProvider(provider_id, organizationId);
+      validateUserByokCredential(provider_id, api_key);
 
       // Encrypt the API key
       const encrypted = encryptApiKey(api_key, BYOK_ENCRYPTION_KEY);
@@ -281,7 +322,8 @@ export const byokRouter = createTRPCRouter({
       }
 
       rejectManagedKeyMutation(existingKey.management_source);
-      validateVercelUserByokCredential(existingKey.provider_id, api_key);
+      rejectUnavailableExperimentalProvider(existingKey.provider_id, existingKey.organization_id);
+      validateUserByokCredential(existingKey.provider_id, api_key);
 
       const encrypted = encryptApiKey(api_key, BYOK_ENCRYPTION_KEY);
       const [updatedKey] = await db

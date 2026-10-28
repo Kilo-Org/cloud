@@ -43,14 +43,13 @@ still restore. The `Stable base` row covers repository snapshots only.
 
 ## Approval and rollout order
 
-All committed targets use preinstalled startup on all-in-one. A downloaded catalog entry requires
-`CLOUD_AGENT_RUNTIME_PUBLICATION_ENABLED=true` and a published handoff for the deployed SHA: downloaded
-deployment fails promptly when publication is disabled. Real-provider
+All committed targets use preinstalled startup on all-in-one. A downloaded catalog entry is the only
+switch: it makes main CI publish a handoff for that SHA, and deployment waits for that handoff. Real-provider
 qualification remains required. Use an isolated named environment first. Record its account,
 Worker name, exact source SHA, bucket and instance type before deployment.
 
-1. Provision and enable publication through the process in [runtime-publication.md](runtime-publication.md).
-   Verify one successful main-push CI run creates the exact-SHA handoff. Failed CI, PR, fork and merge-group
+1. Provision publication through the process in [runtime-publication.md](runtime-publication.md).
+   Verify one manual publication creates the exact-SHA handoff. Failed CI, PR, fork and merge-group
    runs must not publish. Repeat successful publication and confirm identical retained objects.
 2. Approve one isolated target using downloaded startup on the all-in-one image. Add only that environment
    to the catalog. Deploy its verified handoff and complete the checks below.
@@ -68,7 +67,7 @@ For a clean checkout, preview deployment preparation without running Wrangler:
 
 The generated wrangler.runtime-generated.json stays ignored. Preinstalled preparation requires no runtime
 bucket or registry credentials. Downloaded preparation needs the approved read credentials and exact-SHA
-handoff, and fails at once unless `CLOUD_AGENT_RUNTIME_PUBLICATION_ENABLED` is `true`. Inspect the
+handoff. Inspect the
 generated image reference and vars before an approved deployment. The existing Worker workflow
 consumes that exact generated config.
 

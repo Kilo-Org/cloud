@@ -167,6 +167,16 @@ describe('blob attempt fencing', () => {
       new TextEncoder().encode('aborted bytes')
     );
     expect((await stub.abortBlob(upload.input)).ok).toBe(true);
+    const { attempt: _attempt, ...input } = upload.input;
+    const retry = await stub.beginBlob(input);
+    expect(retry.ok).toBe(false);
+    if (!retry.ok) {
+      // The aborted row is claimable only after its admitted deadline.
+      expect(retry.error).toMatchObject({
+        code: 'upload_in_progress',
+        details: { retryAt: upload.deadline + blobOps.SWEEP_MARGIN_MS },
+      });
+    }
     await store(upload);
     const commit = await stub.commitBlob(upload.input);
     expect(commit.ok).toBe(false);

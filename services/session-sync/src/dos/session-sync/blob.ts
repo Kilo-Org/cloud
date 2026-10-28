@@ -47,10 +47,8 @@ export function begin(
       'upload_in_progress',
       'Another upload or cleanup owns this hash; retry after its deadline',
       {
-        retryAt:
-          row.state === 'cleaning'
-            ? now + SWEEP_MARGIN_MS
-            : Math.max(now + 1000, row.deadline + SWEEP_MARGIN_MS),
+        // Cleanup can claim the row only after its deadline plus the margin.
+        retryAt: Math.max(now, row.deadline) + SWEEP_MARGIN_MS,
       }
     );
   }

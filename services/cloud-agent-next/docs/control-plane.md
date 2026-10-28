@@ -539,8 +539,12 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   builder. Heartbeats from reports renew the build lease; a builder silent for 90 s is lost.
 - **Lifetime.** The platform keeps an unused snapshot for 30 days and has no list or delete API in
   this release, so a superseded snapshot is unreferenced rather than deleted.
-- **Runtime selection.** Builders and sessions use the deployment's explicit startup selection.
-  Downloaded mode uses the current runtime installer and its named builder or supervisor target,
+- **Runtime selection.** Environment builders always use the `runtime-free` image and downloaded
+  startup. Snapshot enrollment controls builder access independently of the interactive session cohort.
+  Builds are unsupported without a downloaded runtime-free deployment and a published runtime release.
+  Existing all-in-one snapshots are incompatible and trigger replacement builds. Sessions keep their
+  cohort-selected image; an `app` session starts from its image instead of a split-image snapshot.
+  Downloaded startup uses the current runtime installer and its named builder or supervisor target,
   including on snapshot restore. The installed control bundle includes the builder. A preinstalled
   launch rejects snapshots captured with downloaded aliases; a downloaded launch can install a
   newer compatible runtime over a snapshot. The artifact read grant travels in the installer

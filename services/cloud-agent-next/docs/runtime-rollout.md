@@ -36,10 +36,12 @@ are used together, including snapshot fallback. Existing allocations keep their 
 An absent `interactiveOrgIds` means deployment-wide startup selection; an empty catalog list is
 rejected. For a complete rollback, remove the production override so it inherits the preinstalled default.
 
-Known limitation: the environment builder always starts the `app` image, so its snapshots never match
-a `runtime-free` allocation. Enrolled organizations cold-start from the image instead of restoring
-builder-produced environment snapshots. Repository snapshots captured by a `runtime-free` container
-still restore. The `Stable base` row covers repository snapshots only.
+Environment snapshot builders use only `runtime-free` with downloaded startup. Snapshot enrollment
+remains controlled by `ENVIRONMENT_SNAPSHOT_ORG_IDS`, independently of the interactive runtime cohort.
+Builds require a downloaded runtime-free deployment and a published runtime release. Existing
+all-in-one environment snapshots are incompatible and trigger replacement builds. Sessions on `app`
+start from the image instead of restoring split-image snapshots. Runtime-only updates retain snapshot
+compatibility when the runtime-free base image and ABI stay unchanged.
 
 ## Approval and rollout order
 

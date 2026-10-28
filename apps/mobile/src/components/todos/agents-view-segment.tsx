@@ -15,7 +15,7 @@ export function AgentsViewSegment({
     <View
       accessibilityRole="tablist"
       accessibilityLabel={t('todos.segment.label')}
-      className="min-w-0 flex-1 flex-row items-center gap-4"
+      className="min-w-0 flex-1 flex-row gap-4"
     >
       {(['sessions', 'todos'] as const).map(view => (
         <Pressable
@@ -28,14 +28,13 @@ export function AgentsViewSegment({
             }
           }}
           className={cn(
-            'min-h-[48px] min-w-[48px] shrink items-center justify-center border-b-2 active:opacity-70',
+            'min-h-[48px] min-w-[48px] shrink justify-center border-b-2 active:opacity-70',
             value === view ? 'border-foreground' : 'border-transparent'
           )}
         >
           <Text
-            numberOfLines={1}
             className={cn(
-              'text-sm',
+              'text-center text-sm',
               value === view ? 'font-semibold text-foreground' : 'text-muted-foreground'
             )}
           >

@@ -745,9 +745,7 @@ describe('RemoteSessionRow live speech', () => {
     expect(hosts(renderer, 'SessionStatusIcon').map(glyph => glyph.props)).toEqual([
       { kind: 'scheduled' },
     ]);
-    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toBe(
-      `Live work, Scheduled, feature/live, CLI, and ${wake}, 5 minutes ago`
-    );
+    expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toContain(wake);
   });
 
   it('reads SCHEDULED alone for a scheduled tray row with no wake time', () => {

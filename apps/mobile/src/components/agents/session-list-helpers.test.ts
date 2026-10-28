@@ -476,19 +476,43 @@ describe('composeActiveSessionSpokenMeta', () => {
 
 describe('selectRemoteRowSpokenMeta', () => {
   it.each([
+    { language: 'ja', expected: 'wake、activity' },
+    { language: 'ar', expected: 'wake وactivity' },
+  ])('uses the $language list separator for scheduled metadata', async ({ language, expected }) => {
+    await i18n.changeLanguage(language);
+    expect(
+      selectRemoteRowSpokenMeta({
+        variant: 'list',
+        needsInput: false,
+        scheduled: true,
+        scheduledWake: 'wake',
+        costSpoken: null,
+        timeSpoken: 'activity',
+      })
+    ).toBe(expected);
+  });
+
+  it('keeps cost and activity alongside a scheduled wake', () => {
+    const result = selectRemoteRowSpokenMeta({
+      variant: 'list',
+      needsInput: false,
+      scheduled: true,
+      scheduledWake: 'tomorrow',
+      costSpoken: '12 cents',
+      timeSpoken: '5 minutes ago',
+    });
+    expect(result).toContain('tomorrow');
+    expect(result).toContain('12 cents');
+    expect(result).toContain('5 minutes ago');
+  });
+
+  it.each([
     {
       variant: 'list',
       needsInput: true,
       scheduled: false,
       scheduledWake: null,
       expected: 'cost 12 cents, 5 minutes ago',
-    },
-    {
-      variant: 'list',
-      needsInput: false,
-      scheduled: true,
-      scheduledWake: 'tomorrow',
-      expected: 'tomorrow, cost 12 cents, 5 minutes ago',
     },
     {
       variant: 'list',

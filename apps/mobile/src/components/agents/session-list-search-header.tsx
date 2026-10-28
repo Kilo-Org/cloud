@@ -31,6 +31,7 @@ type SessionListSearchHeaderProps = {
   showSearchBusy: boolean;
   onChangeText: (text: string) => void;
   onClearSearch: () => void;
+  onFocus?: () => void;
   onBlur?: () => void;
   compact?: boolean;
   /** Initial content for the uncontrolled input, applied on a restore remount. */
@@ -45,6 +46,7 @@ export function SessionListSearchHeader({
   showSearchBusy,
   onChangeText,
   onClearSearch,
+  onFocus,
   onBlur,
   compact = false,
   defaultValue,
@@ -96,6 +98,7 @@ export function SessionListSearchHeader({
           placeholder={t('agents.search.searchSessionsPlaceholder')}
           placeholderTextColor={colors.mutedForeground}
           onChangeText={onChangeText}
+          onFocus={onFocus}
           onBlur={onBlur}
           defaultValue={defaultValue}
           returnKeyType="search"

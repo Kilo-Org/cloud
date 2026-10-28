@@ -276,14 +276,21 @@ vi.mock('@/components/agents/session-list-search-header', async () => {
   // Vitest hoists this factory before React's static imports.
   const { useLayoutEffect } = await import('react');
   return {
-    SessionListSearchHeader: (props: { inputRef: { current: typeof searchInput | null } }) => {
+    SessionListSearchHeader: (props: {
+      inputRef: { current: typeof searchInput | null };
+      onFocus?: () => void;
+    }) => {
+      const { inputRef, onFocus } = props;
       useLayoutEffect(() => {
-        const ref = props.inputRef;
+        const ref = inputRef;
         ref.current = searchInput;
+        searchInput.focus.mockImplementation(() => {
+          onFocus?.();
+        });
         return () => {
           ref.current = null;
         };
-      }, [props.inputRef]);
+      }, [inputRef, onFocus]);
       return createElement('SessionListSearchHeader', props);
     },
   };
@@ -1377,6 +1384,37 @@ describe('AgentSessionListScreen live filtering', () => {
     });
     expect(nodes('SessionListSearchHeader')).toHaveLength(0);
   });
+
+  it.each(['field', 'search button'])(
+    'keeps a retained query editable after refocusing through the %s',
+    async target => {
+      state.live.activeSessions = [row];
+      await renderScreen();
+      const searchHeader = openSearch();
+      act(() => {
+        (searchHeader.props.onChangeText as (text: string) => void)('bump');
+        (searchHeader.props.onBlur as () => void)();
+      });
+      act(() => {
+        if (target === 'field') {
+          searchInput.focus();
+        } else {
+          press(i18n.t('agents.search.searchSessions'));
+        }
+      });
+      act(() => {
+        (searchHeader.props.onChangeText as (text: string) => void)('');
+      });
+      expect(nodes('SessionListSearchHeader')).toHaveLength(1);
+      expect(requireNode('SessionListSearchHeader')).toBe(searchHeader);
+      expect(searchHeader.props.hasText).toBe(false);
+      act(() => {
+        (searchHeader.props.onChangeText as (text: string) => void)(row.title);
+      });
+      expect(searchHeader.props.hasText).toBe(true);
+      expect(nodes('FlashList')).toHaveLength(1);
+    }
+  );
 
   it('holds the skeletons until the persisted filter record resolves', async () => {
     readFilterRecord.mockReturnValue(new Promise<string | null>(() => undefined));

@@ -495,6 +495,9 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
             onChangeText={query.handleSearchChange}
             defaultValue={query.searchQuery}
             compact
+            onFocus={() => {
+              setSearchOpen(true);
+            }}
             onBlur={() => {
               setSearchOpen(false);
             }}

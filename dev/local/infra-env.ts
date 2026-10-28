@@ -18,7 +18,7 @@
  */
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { getInfraBasePort, localPostgresUrl, portOffset } from './services';
+import { byokKmsServicePort, getInfraBasePort, localPostgresUrl, portOffset } from './services';
 import { writeSecretsFile } from './secrets-file';
 
 /** Compose variable substituted into `dev/docker-compose.yml`, per service. */
@@ -26,6 +26,7 @@ const COMPOSE_PORT_VARS: Record<string, string> = {
   postgres: 'KILO_POSTGRES_PORT',
   redis: 'KILO_REDIS_PORT',
   'redis-http': 'KILO_REDIS_HTTP_PORT',
+  'local-kms': 'KILO_KMS_PORT',
   grafana: 'KILO_GRAFANA_PORT',
 };
 
@@ -80,8 +81,13 @@ export function buildAppEnv(ports: Record<string, number>): Record<string, strin
     POSTGRES_URL: `postgres://postgres:postgres@localhost:${ports.postgres}/postgres`,
     REDIS_URL: `redis://localhost:${ports.redis}`,
     UPSTASH_REDIS_REST_URL: `http://localhost:${ports['redis-http']}`,
+    ...(ports['byok-kms'] === undefined
+      ? {}
+      : { BYOK_KMS_SERVICE_URL: `http://127.0.0.1:${ports['byok-kms']}` }),
   };
 }
+
+const DEV_BYOK_KMS_SERVICE_TOKEN = 'dev-byok-kms-token';
 
 const LOCAL_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
 
@@ -129,7 +135,7 @@ export function applyAppEnv(
     }
     const current = match[1].trim().replace(/^["']|["']$/g, '');
     if (sameEndpoint(current, value)) continue;
-    if (!isLocalHostUrl(current)) {
+    if (current !== '' && !isLocalHostUrl(current)) {
       kept.push(key);
       continue;
     }
@@ -146,6 +152,7 @@ function infraPorts(offset: number): Record<string, number> {
     const base = getInfraBasePort(service);
     if (base !== undefined) ports[service] = base + offset;
   }
+  ports['byok-kms'] = byokKmsServicePort(offset);
   return ports;
 }
 
@@ -153,10 +160,18 @@ function syncAppEnv(repoRoot: string, ports: Record<string, number>): string[] {
   const envLocalPath = path.join(repoRoot, '.env.local');
   if (!fs.existsSync(envLocalPath)) return [];
 
-  const { content, changed, kept } = applyAppEnv(
-    fs.readFileSync(envLocalPath, 'utf-8'),
-    buildAppEnv(ports)
-  );
+  const current = fs.readFileSync(envLocalPath, 'utf-8');
+  const tokenLine = `BYOK_KMS_SERVICE_TOKEN=${DEV_BYOK_KMS_SERVICE_TOKEN}`;
+  let withToken = current;
+  if (!/^BYOK_KMS_SERVICE_TOKEN=\S/m.test(current)) {
+    withToken = /^BYOK_KMS_SERVICE_TOKEN=[ \t]*$/m.test(current)
+      ? current.replace(/^BYOK_KMS_SERVICE_TOKEN=[ \t]*$/m, tokenLine)
+      : `${current.replace(/\n*$/, '\n')}${tokenLine}\n`;
+  }
+  const { content, changed, kept } = applyAppEnv(withToken, buildAppEnv(ports));
+  if (withToken !== current && !changed.includes('BYOK_KMS_SERVICE_TOKEN')) {
+    changed.push('BYOK_KMS_SERVICE_TOKEN');
+  }
   const report: string[] = [];
   if (changed.length > 0) {
     writeSecretsFile(envLocalPath, content);

@@ -7,16 +7,13 @@ KMS-compatible mock, seeded with `alias/byok-local` from `seed.yaml`. Calls are
 SigV4-signed, so pointing `BYOK_KMS_ENDPOINT` and `BYOK_KMS_KEY_ID` at real AWS
 KMS uses the same code path.
 
+`pnpm dev:start` starts `local-kms` and this service (`byok-kms`) as part of the
+core group, and points `BYOK_KMS_SERVICE_URL` / `BYOK_KMS_SERVICE_TOKEN` in
+`.env.local` at it, using the worktree's port offset. To run it by hand:
+
 ```bash
 docker compose -f dev/docker-compose.yml up -d local-kms
 pnpm dev:byok-kms
-```
-
-Then set in `.env.local` and restart the web app:
-
-```
-BYOK_KMS_SERVICE_URL=http://127.0.0.1:8901
-BYOK_KMS_SERVICE_TOKEN=dev-byok-kms-token
 ```
 
 | Variable | Default |

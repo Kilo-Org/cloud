@@ -49,6 +49,17 @@ test('rewrites local endpoints in .env.local and adds a missing key', () => {
   assert.match(content, /^UPSTASH_REDIS_REST_URL=http:\/\/localhost:8179$/m);
 });
 
+test('points the web app at the offset BYOK KMS service and fills a blank value', () => {
+  const ports = { ...PORTS, 'local-kms': 8932, 'byok-kms': 8933 };
+  const before = ['BYOK_KMS_SERVICE_URL=', 'BYOK_KMS_SERVICE_TOKEN=', ''].join('\n');
+
+  const { content, changed } = applyAppEnv(before, buildAppEnv(ports));
+
+  assert.ok(changed.includes('BYOK_KMS_SERVICE_URL'));
+  assert.match(content, /^BYOK_KMS_SERVICE_URL=http:\/\/127\.0\.0\.1:8933$/m);
+  assert.equal(buildComposeEnv('p', ports).KILO_KMS_PORT, '8932');
+});
+
 test('keeps a value that names another host', () => {
   // No credentials in the fixture: a connection string with them trips secret scanning.
   const before = 'POSTGRES_URL=postgres://db.example.com:5432/prod\n';

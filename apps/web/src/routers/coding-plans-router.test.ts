@@ -117,7 +117,9 @@ async function isRowLocked(
   id: string
 ) {
   try {
-    await db.execute(sql`SELECT id FROM ${sql.identifier(table)} WHERE id = ${id} FOR UPDATE NOWAIT`);
+    await db.execute(
+      sql`SELECT id FROM ${sql.identifier(table)} WHERE id = ${id} FOR UPDATE NOWAIT`
+    );
     return false;
   } catch {
     return true;

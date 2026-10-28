@@ -117,7 +117,7 @@ const navigationRoutes = vi.hoisted(() => ['session-detail']);
 // The personal `agentProfiles.list` rows the header's active-profile chip
 // reads; tests set it before mounting to drive the chip's presence.
 const profileRowsState = vi.hoisted(() => {
-  // profileId -> `agentProfiles.get` agents, so a test can prove the session's
+  // profileId -> `agentProfiles.agents` rows, so a test can prove the session's
   // own profile agents are the ones offered by the in-session role picker.
   const agentsById: Record<string, unknown[]> = {};
   return {
@@ -578,13 +578,13 @@ vi.mock('@/lib/trpc', () => ({
           initialData: profileRowsState.combined,
         }),
       },
-      get: {
+      agents: {
         queryOptions: (input: { profileId?: string } = {}) => {
           const agents = profileRowsState.agentsById[input.profileId ?? ''] ?? [];
           return {
-            queryKey: ['agentProfiles', 'get', input.profileId ?? ''],
-            queryFn: () => ({ agents }),
-            initialData: { agents },
+            queryKey: ['agentProfiles', 'agents', input.profileId ?? ''],
+            queryFn: () => agents,
+            initialData: agents,
           };
         },
       },

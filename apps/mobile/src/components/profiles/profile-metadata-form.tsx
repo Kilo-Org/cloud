@@ -7,10 +7,10 @@ import { Button } from '@/components/ui/button';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 import { validateProfileDescription, validateProfileName } from '@/lib/agent-profile-forms';
-import { type AgentProfileDetail } from '@/lib/hooks/use-agent-profiles';
 
 type MetadataFormProps = Readonly<{
-  profile: AgentProfileDetail;
+  /** Only the metadata the form edits: the Overview reads counts, not collections. */
+  profile: { name: string; description: string | null };
   isSaving: boolean;
   onSave: (values: { name: string; description: string }) => Promise<boolean>;
   disabled?: boolean;

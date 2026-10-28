@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 
 import { CenteredState } from '@/components/centered-state';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { AnalysisRerunAction } from '@/components/security-agent/analysis-rerun-action';
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
 import { EmptyState } from '@/components/empty-state';
@@ -26,7 +27,7 @@ import {
   useStartSecurityRemediation,
 } from '@/lib/hooks/use-security-remediation';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { type SecurityAnalysis } from '@/lib/security-agent';
+import { remediationNeedsAnalysisRefresh, type SecurityAnalysis } from '@/lib/security-agent';
 import { getRemediationUnavailableKey } from '@/lib/security-agent-copy';
 import { openFindingLink } from '@/lib/security-agent-link';
 import { firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';
@@ -239,6 +240,9 @@ export function FindingRemediationPanel({
     remediationCapability.retryReason !== remediationCapability.startReason
       ? getRemediationUnavailableKey(remediationCapability.retryReason)
       : null;
+  // The blocker copy tells the admin to rerun the analysis; the action that
+  // does it belongs next to that copy, not on another tab.
+  const needsAnalysisRefresh = remediationNeedsAnalysisRefresh(analysis);
 
   const hasContent =
     Boolean(remediationSummary) || remediationAttempts.length > 0 || remediationTimeline.length > 0;
@@ -269,6 +273,8 @@ export function FindingRemediationPanel({
           </Text>
         ) : null}
       </View>
+
+      {needsAnalysisRefresh ? <AnalysisRerunAction scope={scope} findingId={findingId} /> : null}
 
       {remediationCapability.canStart ? (
         <Button

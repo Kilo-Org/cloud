@@ -1141,6 +1141,7 @@
     },
     "analysis": {
       "analyzeRepository": "分析仓库",
+      "rerunAnalysis": "重新运行分析",
       "analyzed": "已分析",
       "capacityFull": "同时进行的分析任务已达上限。请等待其中一个任务完成。",
       "couldNotCheckCapacity": "无法检查可用的分析名额。",

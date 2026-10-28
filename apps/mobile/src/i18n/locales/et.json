@@ -1706,6 +1706,7 @@
       "restartAnalysis": "Käivita analüüs uuesti",
       "retryAnalysis": "Analüüsi uuesti",
       "analyzeRepository": "Analüüsi hoidlat",
+      "rerunAnalysis": "Tee analüüs uuesti",
       "capacityFull": "Rohkem analüüse ei saa praegu käivitada. Oota, kuni mõni käimasolev analüüs lõpeb.",
       "couldNotCheckCapacity": "Analüüside käivitamiseks vabu ressursse ei õnnestunud kontrollida.",
       "watchInCloudAgent": "Jälgi pilveagendis",

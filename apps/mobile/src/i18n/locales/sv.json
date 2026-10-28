@@ -1706,6 +1706,7 @@
       "restartAnalysis": "Starta om analysen",
       "retryAnalysis": "Analysera igen",
       "analyzeRepository": "Analysera kodarkiv",
+      "rerunAnalysis": "Kör analysen igen",
       "capacityFull": "Ingen analyskapacitet är ledig. Vänta tills en pågående analys är klar.",
       "couldNotCheckCapacity": "Kunde inte kontrollera analyskapaciteten.",
       "watchInCloudAgent": "Följ i molnagenten",

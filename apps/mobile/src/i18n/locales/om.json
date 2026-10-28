@@ -1706,6 +1706,7 @@
       "restartAnalysis": "Xiinxala irra deebi'ii jalqabi",
       "retryAnalysis": "Xiinxala irra deebi'ii yaali",
       "analyzeRepository": "Kuusaa koodii xiinxali",
+      "rerunAnalysis": "Xiinxala irra deebi'ii raawwadhu",
       "capacityFull": "Dandeettiin xiinxalaa guuteera. Xiinxalli adeemaa jiru akka xumuramu eegi.",
       "couldNotCheckCapacity": "Dandeettii xiinxalaa mirkaneessuun hin danda'amne.",
       "watchInCloudAgent": "Gargaaraa duumessaa keessatti ilaali",

@@ -1810,6 +1810,7 @@
       "restartAnalysis": "Restart analysis",
       "retryAnalysis": "Retry analysis",
       "analyzeRepository": "Analyze repository",
+      "rerunAnalysis": "Rerun analysis",
       "capacityFull": "Analysis capacity is full. Wait for an active analysis to finish.",
       "couldNotCheckCapacity": "Could not check analysis capacity.",
       "watchInCloudAgent": "Watch in Cloud Agent",

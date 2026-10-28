@@ -1706,6 +1706,7 @@
       "restartAnalysis": "Mulakan semula analisis",
       "retryAnalysis": "Cuba analisis semula",
       "analyzeRepository": "Jalankan analisis repositori",
+      "rerunAnalysis": "Jalankan semula analisis",
       "capacityFull": "Kapasiti analisis penuh. Tunggu sehingga salah satu analisis yang sedang berjalan selesai.",
       "couldNotCheckCapacity": "Tidak dapat menyemak kapasiti analisis.",
       "watchInCloudAgent": "Lihat dalam Ejen Awan",

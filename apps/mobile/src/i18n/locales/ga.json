@@ -1775,6 +1775,7 @@
       "restartAnalysis": "Atosaigh an anailís",
       "retryAnalysis": "Rith an anailís arís",
       "analyzeRepository": "Anailísigh an stór",
+      "rerunAnalysis": "Anailísigh arís",
       "capacityFull": "Níl acmhainn ar fáil le haghaidh tuilleadh anailíse. Fan go gcríochnóidh anailís atá ar siúl.",
       "couldNotCheckCapacity": "Níorbh fhéidir acmhainn na hanailíse a sheiceáil.",
       "watchInCloudAgent": "Féach sa Ghníomhaire néil",

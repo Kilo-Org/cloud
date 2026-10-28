@@ -1141,6 +1141,7 @@
     },
     "analysis": {
       "analyzeRepository": "저장소 분석",
+      "rerunAnalysis": "분석 다시 실행",
       "analyzed": "분석 완료",
       "capacityFull": "동시에 실행할 수 있는 분석 수에 도달했습니다. 진행 중인 분석이 끝날 때까지 기다리세요.",
       "couldNotCheckCapacity": "분석을 추가로 실행할 수 있는지 확인하지 못했습니다.",

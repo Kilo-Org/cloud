@@ -1706,6 +1706,7 @@
       "restartAnalysis": "Simulan muli ang pagsusuri",
       "retryAnalysis": "Subukang suriin muli",
       "analyzeRepository": "Suriin ang repository",
+      "rerunAnalysis": "Isagawa muli ang pagsusuri",
       "capacityFull": "Naabot na ang limitasyon ng sabay-sabay na pagsusuri. Hintaying matapos ang isang kasalukuyang pagsusuri.",
       "couldNotCheckCapacity": "Hindi masuri kung may puwang para sa isa pang pagsusuri.",
       "watchInCloudAgent": "Subaybayan sa Cloud Agent",

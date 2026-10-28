@@ -1706,6 +1706,7 @@
       "restartAnalysis": "Käynnistä analyysi uudelleen",
       "retryAnalysis": "Analysoi uudelleen",
       "analyzeRepository": "Analysoi koodivarasto",
+      "rerunAnalysis": "Suorita analyysi uudelleen",
       "capacityFull": "Kaikki analyysipaikat ovat käytössä. Odota, että jokin käynnissä oleva analyysi valmistuu.",
       "couldNotCheckCapacity": "Analyysikapasiteettia ei voitu tarkistaa.",
       "watchInCloudAgent": "Seuraa Cloud Agentissa",

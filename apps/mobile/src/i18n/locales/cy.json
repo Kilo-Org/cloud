@@ -1798,6 +1798,7 @@
       "restartAnalysis": "Ailgychwyn y dadansoddiad",
       "retryAnalysis": "Rhoi cynnig arall ar y dadansoddiad",
       "analyzeRepository": "Dadansoddi ystorfa",
+      "rerunAnalysis": "Rhedeg y dadansoddiad eto",
       "capacityFull": "Nid oes lle i ddadansoddiad arall ar hyn o bryd. Arhoswch i un sydd ar y gweill orffen.",
       "couldNotCheckCapacity": "Ni ellid gwirio'r capasiti dadansoddi.",
       "watchInCloudAgent": "Gwylio yn yr Asiant cwmwl",

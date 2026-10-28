@@ -1706,6 +1706,7 @@
       "restartAnalysis": "Qala kabusha ukuhlaziywa",
       "retryAnalysis": "Zama ukuhlaziywa futhi",
       "analyzeRepository": "Hlaziya inqolobane yekhodi",
+      "rerunAnalysis": "Qhuba ukuhlaziywa kabusha",
       "capacityFull": "Isibalo sokuhlaziywa okuqhubekayo sesifinyelele emkhawulweni. Linda kuze kuqedwe okunye ukuhlaziywa.",
       "couldNotCheckCapacity": "Asikwazanga ukuhlola ukuthi kukhona yini indawo yokunye ukuhlaziywa.",
       "watchInCloudAgent": "Buka ku-ejenti yasefwini",

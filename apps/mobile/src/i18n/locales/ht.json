@@ -1706,6 +1706,7 @@
       "restartAnalysis": "Rekòmanse analiz la",
       "retryAnalysis": "Eseye analiz la ankò",
       "analyzeRepository": "Analize depo a",
+      "rerunAnalysis": "Kouri analiz la ankò",
       "capacityFull": "Pa gen plas pou lòt analiz. Tann yon analiz ki an pwosesis fini.",
       "couldNotCheckCapacity": "Nou pa t ka verifye kapasite analiz la.",
       "watchInCloudAgent": "Swiv nan Ajan nan nwaj la",

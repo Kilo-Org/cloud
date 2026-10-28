@@ -1706,6 +1706,7 @@
       "restartAnalysis": "تحلیل بیا پیل کړئ",
       "retryAnalysis": "شننه بیا پیل کړئ",
       "analyzeRepository": "ذخیره تحلیل کړئ",
+      "rerunAnalysis": "شننه بیا وکړئ",
       "capacityFull": "د تحلیل ظرفیت ډک دی. انتظار وکړئ چې یو فعال تحلیل پای ته ورسي.",
       "couldNotCheckCapacity": "د تحلیل ظرفیت و نه کتل شو.",
       "watchInCloudAgent": "په کلاوډ اجنټ کې وګورئ",

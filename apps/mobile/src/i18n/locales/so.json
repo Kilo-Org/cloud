@@ -1706,6 +1706,7 @@
       "restartAnalysis": "Dib u bilow falanqaynta",
       "retryAnalysis": "Mar kale isku day falanqaynta",
       "analyzeRepository": "Falanqee kaydka",
+      "rerunAnalysis": "Dib u fuli falanqaynta",
       "capacityFull": "Awoodda falanqayntu way buuxdaa. Sug inta ay dhammaanayso mid ka mid ah falanqaymaha socda.",
       "couldNotCheckCapacity": "Lama hubin karin awoodda falanqaynta.",
       "watchInCloudAgent": "Kala soco Wakiilka daruurta",

@@ -1141,6 +1141,7 @@
     },
     "analysis": {
       "analyzeRepository": "リポジトリを分析",
+      "rerunAnalysis": "分析を再度実行",
       "analyzed": "分析済み",
       "capacityFull": "同時に実行できる分析数の上限に達しています。実行中の分析が終わるまでお待ちください。",
       "couldNotCheckCapacity": "分析の実行枠に空きがあるか確認できませんでした。",

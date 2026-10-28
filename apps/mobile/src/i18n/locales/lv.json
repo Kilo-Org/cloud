@@ -1729,6 +1729,7 @@
       "restartAnalysis": "Sākt analīzi no jauna",
       "retryAnalysis": "Atkārtot analīzi",
       "analyzeRepository": "Analizēt repozitoriju",
+      "rerunAnalysis": "Izpildīt analīzi atkārtoti",
       "capacityFull": "Sasniegts vienlaicīgu analīžu limits. Pagaidi, līdz kāda no pašreizējām analīzēm beidzas.",
       "couldNotCheckCapacity": "Neizdevās pārbaudīt, vai var sākt vēl vienu analīzi.",
       "watchInCloudAgent": "Skatīt mākoņa aģentā",

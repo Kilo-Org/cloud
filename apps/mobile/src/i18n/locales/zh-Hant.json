@@ -1141,6 +1141,7 @@
     },
     "analysis": {
       "analyzeRepository": "分析存放庫",
+      "rerunAnalysis": "重新執行分析",
       "analyzed": "已分析",
       "capacityFull": "同時進行的分析已達上限。請等待其中一項分析完成。",
       "couldNotCheckCapacity": "無法確認是否有可用的分析名額。",

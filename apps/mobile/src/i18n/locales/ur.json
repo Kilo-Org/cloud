@@ -1706,6 +1706,7 @@
       "restartAnalysis": "تجزیہ دوبارہ شروع کریں",
       "retryAnalysis": "دوبارہ تجزیہ کریں",
       "analyzeRepository": "ریپوزٹری کا تجزیہ کریں",
+      "rerunAnalysis": "تجزیہ دوبارہ چلائیں",
       "capacityFull": "مزید تجزیوں کی گنجائش نہیں ہے۔ کسی جاری تجزیے کے مکمل ہونے کا انتظار کریں۔",
       "couldNotCheckCapacity": "تجزیے کی گنجائش کی جانچ نہیں ہو سکی۔",
       "watchInCloudAgent": "کلاؤڈ ایجنٹ میں دیکھیں",

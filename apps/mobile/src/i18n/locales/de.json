@@ -1141,6 +1141,7 @@
     },
     "analysis": {
       "analyzeRepository": "Repository analysieren",
+      "rerunAnalysis": "Analyse erneut ausführen",
       "analyzed": "Analysiert",
       "capacityFull": "Die Analysekapazität ist ausgeschöpft. Warte, bis eine laufende Analyse abgeschlossen ist.",
       "couldNotCheckCapacity": "Die Analysekapazität konnte nicht geprüft werden.",

@@ -1706,6 +1706,7 @@
       "restartAnalysis": "Tahlilni qayta boshlash",
       "retryAnalysis": "Qayta tahlil qilish",
       "analyzeRepository": "Repozitoriyani tahlil qilish",
+      "rerunAnalysis": "Tahlilni qayta o'tkazish",
       "capacityFull": "Bir vaqtda bajariladigan tahlillar soni chegaraga yetdi. Davom etayotgan tahlillardan biri tugashini kuting.",
       "couldNotCheckCapacity": "Yangi tahlilni boshlash imkoniyatini tekshirib bo'lmadi.",
       "watchInCloudAgent": "Bulut agentida kuzatish",

@@ -8,7 +8,9 @@ import type { AllocationState } from '../../src/control-plane/sandbox/allocation
 import {
   allocation as allocationTable,
   routes as routesTable,
+  scopeGrants as scopeGrantsTable,
 } from '../../src/control-plane/sandbox/sqlite-schema.js';
+import { readScopeGrant } from '../../src/control-plane/sandbox/scope-grants.js';
 import {
   failExpiredRoutes,
   onRouteFailed,
@@ -43,6 +45,8 @@ import { waitFor } from './wait-for.js';
 const SANDBOX_ID = 'sbx__control_v2_routes';
 const SESSION = 'workspace_11111111-1111-1111-1111-111111111111';
 const SESSION_NEXT = 'workspace_22222222-2222-2222-2222-222222222222';
+const SESSION_THIRD = 'workspace_33333333-3333-3333-3333-333333333333';
+const SHARED_DIRECTORY = '/workspace/shared';
 const NATIVE_KILO_TOKEN =
   'eyJhbGciOiJub25lIn0.eyJydW50aW1lQXV0aG9yaXphdGlvbiI6eyJpZCI6InJhXzEifX0.c2ln';
 const TIMERS = CONTROL_PLANE_TIMERS.sandbox;
@@ -111,9 +115,9 @@ function createFakeProvider(
 }
 
 function kiloSessionIdFor(sessionId: string): string {
-  return sessionId === SESSION_NEXT
-    ? 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb'
-    : 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
+  if (sessionId === SESSION_NEXT) return 'ses_bbbbbbbbbbbbbbbbbbbbbbbbbb';
+  if (sessionId === SESSION_THIRD) return 'ses_cccccccccccccccccccccccccc';
+  return 'ses_aaaaaaaaaaaaaaaaaaaaaaaaaa';
 }
 
 function routeSpec(sessionId: string): ControlPlaneRouteSpec {
@@ -138,6 +142,44 @@ function prepareInput(sessionId: string, createdOnPlatform?: string) {
       createdOnPlatform,
     },
   };
+}
+
+function configuredPrepareInput(
+  sessionId: string,
+  directory: string,
+  setupCommands: string[] = ['echo shared']
+) {
+  const input = prepareInput(sessionId);
+  return {
+    ...input,
+    spec: {
+      ...input.spec,
+      directory,
+      setupCommands,
+      runtimeAgents: [{ slug: 'helper', name: 'Helper', config: {} }],
+      kiloCommands: [{ name: 'review', template: 'Review the change' }],
+    },
+    credentials: { ...input.credentials, scopeId: 'shared-worktree' },
+  };
+}
+
+async function patchGrant(
+  stub: DurableObjectStub<SandboxControlV2>,
+  sessionId: string,
+  patch: (grant: Record<string, unknown>) => Record<string, unknown>
+): Promise<void> {
+  await runInDurableObject(stub, async (_instance, state) => {
+    const db = drizzle(state.storage, { logger: false });
+    const rows = await db.select().from(routesTable).where(eq(routesTable.session_id, sessionId));
+    const row = rows[0];
+    if (row === undefined || row.grant === null) throw new Error('route has no grant');
+    const existing = readScopeGrant(db, row.grant);
+    if (existing === null) throw new Error('scope has no grant');
+    await db
+      .update(scopeGrantsTable)
+      .set({ grant: JSON.stringify(patch(existing)) })
+      .where(eq(scopeGrantsTable.id, row.grant));
+  });
 }
 
 function promptPayload(messageId: string) {
@@ -236,7 +278,8 @@ async function setup(
 
 async function connectAndHello(
   provider: FakeProvider,
-  wrapperId = 'wr_1'
+  wrapperId = 'wr_1',
+  options: { workspaceConfiguration?: boolean } = {}
 ): Promise<{ wrapper: FakeWrapper; credential: string; allocationId: string }> {
   await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
   const launchEnv = provider.launchEnvs[0];
@@ -244,7 +287,7 @@ async function connectAndHello(
   const credential = launchEnv.SANDBOX_CONTROL_CREDENTIAL;
   const allocationId = launchEnv.CONTROL_PLANE_ALLOCATION_ID;
   if (!credential || !allocationId) throw new Error('launch environment is missing identity');
-  const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+  const wrapper = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential, ...options });
   const reply = await wrapper.hello({ wrapperId, allocationId });
   expect(reply).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
   return { wrapper, credential, allocationId };
@@ -1120,6 +1163,166 @@ describe('SandboxControlV2 routes and forwarding', () => {
       expect(provider.createCalls).toBe(2);
     });
     await waitFor(async () => expect((await readState(stub)).kind).toBe('starting'));
+  });
+
+  it('sends every attachment its own workspace configuration', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(configuredPrepareInput(SESSION, SHARED_DIRECTORY));
+
+    const { wrapper } = await connectAndHello(provider, 'wr_1', { workspaceConfiguration: true });
+    const first = await wrapper.next();
+    expect(first?.type).toBe('session.attach');
+    if (first?.type !== 'session.attach') throw new Error('expected session.attach');
+    expect(first.spec).not.toHaveProperty('setupCommands');
+    expect(first.spec).not.toHaveProperty('runtimeAgents');
+    expect(first.spec).not.toHaveProperty('kiloCommands');
+    expect(first.spec).not.toHaveProperty('env');
+    expect(first.workspace).toMatchObject({
+      setupCommands: ['echo shared'],
+      runtimeAgents: [{ slug: 'helper', name: 'Helper', config: {} }],
+      kiloCommands: [{ name: 'review', template: 'Review the change' }],
+    });
+
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    await stub.prepare(configuredPrepareInput(SESSION_NEXT, SHARED_DIRECTORY));
+    const sibling = await wrapper.next();
+    expect(sibling?.type).toBe('session.attach');
+    if (sibling?.type !== 'session.attach') throw new Error('expected session.attach');
+    expect(sibling.spec.sessionId).toBe(SESSION_NEXT);
+    expect(sibling.workspace).toEqual(first.workspace);
+
+    await stub.prepare(configuredPrepareInput(SESSION_THIRD, SHARED_DIRECTORY, ['echo changed']));
+    const changed = await wrapper.next();
+    expect(changed?.type).toBe('session.attach');
+    if (changed?.type !== 'session.attach') throw new Error('expected session.attach');
+    expect(changed.spec.sessionId).toBe(SESSION_THIRD);
+    expect(changed.workspace.setupCommands).toEqual(['echo changed']);
+    expect(changed.spec).not.toHaveProperty('setupCommands');
+    expect(changed.spec).not.toHaveProperty('env');
+  });
+
+  it('binds sibling MCP credentials to the canonical workspace root rather than the attaching chat', async () => {
+    const root = 'workspace_12345678-1234-4234-8234-123456789abc';
+    const scopeId = 'worktree_12345678-1234-4234-8234-123456789abc';
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    const issuances: { sessionId: string; binding: unknown }[] = [];
+    const grant = {
+      url: 'https://mcp.kiloapps.io/mcp',
+      token: 'workspace-root-grant',
+      expiresAt: 1_900_000_000,
+    };
+    await runInDurableObject(stub, instance => {
+      const peerFor = instance.sessionPeerFor.bind(instance);
+      instance.sessionPeerFor = (ownerId, sessionId) => {
+        const peer = peerFor(ownerId, sessionId);
+        return peer
+          ? {
+              ...peer,
+              issueCloudAgentMcpGrant: async binding => {
+                issuances.push({ sessionId, binding });
+                return grant;
+              },
+            }
+          : null;
+      };
+    });
+    for (const sessionId of [root, SESSION_NEXT]) {
+      const input = configuredPrepareInput(sessionId, SHARED_DIRECTORY);
+      await stub.prepare({ ...input, credentials: { ...input.credentials, scopeId } });
+    }
+    const { wrapper } = await connectAndHello(provider, 'wr_1', { workspaceConfiguration: true });
+    const frames = [await wrapper.next(), await wrapper.next()];
+    expect(frames).toHaveLength(2);
+    for (const frame of frames) {
+      if (frame?.type !== 'session.attach') throw new Error('expected session.attach');
+      expect(frame.credentials?.cloudAgentMcp).toEqual(grant);
+    }
+    expect(issuances).toEqual([
+      {
+        sessionId: root,
+        binding: { worktreeId: scopeId, ownerId: 'user_123', organizationId: 'org_123' },
+      },
+      {
+        sessionId: root,
+        binding: { worktreeId: scopeId, ownerId: 'user_123', organizationId: 'org_123' },
+      },
+    ]);
+  });
+
+  it('keeps sending session.credentials after a workspace attach', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(configuredPrepareInput(SESSION, SHARED_DIRECTORY));
+    const { wrapper } = await connectAndHello(provider, 'wr_1', { workspaceConfiguration: true });
+    expect((await wrapper.next())?.type).toBe('session.attach');
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    await patchGrant(stub, SESSION, grant => ({
+      ...grant,
+      expiresAt: Date.now() + TIMERS.credentialGrantReissueBelowMs / 2,
+    }));
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+      'sent'
+    );
+    expect((await wrapper.next())?.type).toBe('session.credentials');
+    expect((await wrapper.next())?.type).toBe('session.prompt');
+  });
+
+  it('replays the workspace configuration when the wrapper is replaced', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(configuredPrepareInput(SESSION, SHARED_DIRECTORY));
+    const { wrapper, credential, allocationId } = await connectAndHello(provider, 'wr_1', {
+      workspaceConfiguration: true,
+    });
+    const first = await wrapper.next();
+    if (first?.type !== 'session.attach') throw new Error('expected session.attach');
+    expect(first.workspace).toBeDefined();
+    wrapper.send({ type: 'session.ready', sessionId: SESSION });
+    await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
+
+    wrapper.close();
+    await waitFor(async () => expect((await readState(stub)).kind).toBe('disconnected'));
+    const replacement = await FakeWrapper.connect({
+      sandboxId: SANDBOX_ID,
+      credential,
+      workspaceConfiguration: true,
+    });
+    try {
+      expect(
+        await replacement.hello({
+          wrapperId: 'wr_2',
+          allocationId,
+        })
+      ).toEqual({ type: 'welcome', protocolVersion: CONTROL_PLANE_PROTOCOL_VERSION });
+
+      const replay = await replacement.next();
+      expect(replay?.type).toBe('session.attach');
+      if (replay?.type !== 'session.attach') throw new Error('expected session.attach');
+      expect(replay.spec.sessionId).toBe(SESSION);
+      expect(replay.workspace).toEqual(first.workspace);
+    } finally {
+      replacement.close();
+    }
+  });
+
+  it('keeps the full legacy session.prepare spec without the capability', async () => {
+    const provider = createFakeProvider();
+    const { stub } = await setup(provider);
+    await stub.prepare(configuredPrepareInput(SESSION, SHARED_DIRECTORY));
+    const { wrapper } = await connectAndHello(provider);
+
+    const frame = await wrapper.next();
+    expect(frame?.type).toBe('session.prepare');
+    if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(frame.spec.setupCommands).toEqual(['echo shared']);
+    expect(frame.spec.runtimeAgents).toEqual([{ slug: 'helper', name: 'Helper', config: {} }]);
+    expect(frame.spec.kiloCommands).toEqual([{ name: 'review', template: 'Review the change' }]);
   });
 
   it('gives a re-prepare after a wrapper restart a fresh attempt', async () => {

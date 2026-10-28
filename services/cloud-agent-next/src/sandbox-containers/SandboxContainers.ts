@@ -443,6 +443,7 @@ export class SandboxContainers extends DurableObject<Env> {
           env: {},
           instance: input.instance,
           command: input.command,
+          nativeImage: 'runtime-free',
         },
         'environment-builder',
         false
@@ -1365,8 +1366,8 @@ export class SandboxContainers extends DurableObject<Env> {
 
   /** The stored outcome of one capture, or null when this DO never recorded it. */
   /** The image a launch uses now; environment snapshots must match it. */
-  async currentImage(): Promise<string> {
-    return this.containerImage('all-in-one');
+  async currentImage(nativeImage: RuntimeStartupConfig['image']): Promise<string> {
+    return this.containerImage(nativeImage);
   }
 
   async readCapture(captureId: string): Promise<NativeCaptureResult | null> {

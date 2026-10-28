@@ -1,15 +1,49 @@
 import { captureMessage } from '@sentry/nextjs';
-import type { CustomPricingConfig } from '@kilocode/db/schema-types';
+import type { CustomPricing, CustomPricingConfig } from '@kilocode/db/schema-types';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import type { JustTheCostsUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
-import {
-  calculateCost_mUsd,
-  type Pricing,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import {
   formatPricePerToken,
   getCustomPricing,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing.constants';
+
+type PricingTiers = CustomPricing['pricing'];
+type Pricing = PricingTiers[number]['pricing'];
+
+type Usage = {
+  uncachedInputTokens: number;
+  totalOutputTokens: number;
+  cacheWriteTokens: number;
+  cacheHitTokens: number;
+};
+
+function calculateCost_mUsd(usage: Usage, pricingTiers: PricingTiers): number {
+  if (pricingTiers[0].start_context_length !== 0) {
+    throw new Error('The first pricing tier must start at context length 0');
+  }
+
+  const totalInputTokens =
+    usage.uncachedInputTokens + usage.cacheWriteTokens + usage.cacheHitTokens;
+  let selectedTier = pricingTiers[0];
+  let previousTier = pricingTiers[0];
+  for (const tier of pricingTiers.slice(1)) {
+    if (tier.start_context_length <= previousTier.start_context_length) {
+      throw new Error('Pricing tiers must be ordered by ascending start context length');
+    }
+    if (tier.start_context_length <= totalInputTokens) {
+      selectedTier = tier;
+    }
+    previousTier = tier;
+  }
+
+  const pricing = selectedTier.pricing;
+  return (
+    usage.uncachedInputTokens * pricing.prompt_per_million +
+    usage.cacheWriteTokens * (pricing.input_cache_write_per_million ?? pricing.prompt_per_million) +
+    usage.cacheHitTokens * (pricing.input_cache_read_per_million ?? pricing.prompt_per_million) +
+    usage.totalOutputTokens * pricing.completion_per_million
+  );
+}
 
 function applyPricing(pricing: OpenRouterModel['pricing'], customPricing: Pricing) {
   return {

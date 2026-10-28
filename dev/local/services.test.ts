@@ -220,6 +220,28 @@ test('runs the AI gateway app with the core services', () => {
   assert.ok(resolveGroups(getAlwaysOnGroupIds()).includes('ai-gateway'));
 });
 
+test('starts the BYOK KMS service on its own port before the web app', () => {
+  const kms = getService('local-kms');
+  const service = getService('byok-kms');
+
+  assert.equal(kms.type, 'infra');
+  assert.equal(kms.port, 8900 + portOffset);
+  assert.equal(service.group, 'core');
+  assert.equal(service.type, 'process');
+  assert.equal(service.port, 8901 + portOffset);
+  assert.deepEqual(service.dependsOn, ['local-kms']);
+  assert.deepEqual(service.command, [
+    'env',
+    `BYOK_KMS_SERVICE_PORT=${8901 + portOffset}`,
+    `BYOK_KMS_ENDPOINT=http://127.0.0.1:${8900 + portOffset}`,
+    'pnpm',
+    'exec',
+    'tsx',
+    'dev/byok-kms/server.ts',
+  ]);
+  assert.ok(getService('nextjs').dependsOn.includes('byok-kms'));
+});
+
 test('starts the AI gateway app before the web app that rewrites to it', () => {
   const web = getService('nextjs');
   const gateway = getService('ai-gateway');
@@ -265,9 +287,11 @@ test('registers user data export with worktree-aware ports and dependencies', ()
   assert.equal(service.port, 8818 + portOffset);
   assert.deepEqual(service.dependsOn, ['postgres', 'nextjs']);
   assert.deepEqual(resolveTargets(['data-export']), [
+    'local-kms',
     'postgres',
     'redis',
     'stripe',
+    'byok-kms',
     'cloudflare-git-token-service',
     'cloudflare-session-ingest',
     'redis-http',

@@ -4,10 +4,6 @@ import {
   getRawOpenRouterModels,
   normalizeModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
-import {
-  convertFromKiloExclusiveModel,
-  getInferenceProviders,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import type {
   NormalizedOpenRouterResponse,
   NormalizedProvider,
@@ -46,10 +42,7 @@ import {
   fetchCustomLlmsFromDatabase,
   type CustomLlm,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
-import {
-  buildPublicCustomLlmSnapshotModels,
-  type SnapshotExtraModel,
-} from '@/lib/providers/openrouter/public-custom-llm-snapshot';
+import { buildPublicCustomLlmSnapshotModels } from '@/lib/providers/openrouter/public-custom-llm-snapshot';
 
 /**
  * Advisory lock key hashed from a stable identifier. Serializes concurrent
@@ -202,43 +195,10 @@ async function syncProviders(params: {
   injectExtraProviderModels(vercelModels, providerModelData, vercelModelIdOverrides);
   injectVercelOnlyProviders(vercelModels, providerModelData, vercelModelIdOverrides);
 
-  const mappedKiloExclusiveModels: SnapshotExtraModel[] = kiloExclusiveModels
-    .flatMap(kfm =>
-      unavailableModelIds.has(kfm.public_id)
-        ? []
-        : getInferenceProviders(kfm).map(inferenceProvider => ({ kfm, inferenceProvider }))
-    )
-    .map(({ kfm, inferenceProvider }) => {
-      const model = convertFromKiloExclusiveModel(kfm);
-      return {
-        model: {
-          slug: normalizeModelId(model.id),
-          name: model.name,
-          author: 'Other',
-          description: model.description,
-          context_length: model.context_length,
-          input_modalities: model.architecture.input_modalities,
-          output_modalities: model.architecture.output_modalities,
-          group: 'other',
-          updated_at: new Date().toISOString(),
-          endpoint: {
-            provider_display_name: 'Other',
-            is_free: !kfm.pricing,
-            pricing: {
-              prompt: model.pricing.prompt,
-              completion: model.pricing.completion,
-            },
-            ...((!kfm.pricing || kfm.flags.includes('requires-data-collection')) &&
-              !unavailableModelIds.has(kfm.public_id) && {
-                data_policy: { training: true, retainsPrompts: true },
-              }),
-          },
-        },
-        provider: inferenceProvider,
-      };
-    });
-  const mappedExtraModels = mappedKiloExclusiveModels.concat(
-    buildPublicCustomLlmSnapshotModels(customLlms, unavailableModelIds, new Date().toISOString())
+  const mappedExtraModels = buildPublicCustomLlmSnapshotModels(
+    customLlms,
+    unavailableModelIds,
+    new Date().toISOString()
   );
 
   for (const extraModel of mappedExtraModels) {
@@ -258,7 +218,7 @@ async function syncProviders(params: {
   applyFreeEndpointDataPolicy({
     providerModelData,
     openRouterFreeEndpoints,
-    kiloExclusiveModels,
+    kiloExclusiveModelIds: kiloExclusiveModels.map(model => model.public_id),
     unavailableModelIds,
   });
 

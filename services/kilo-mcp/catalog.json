@@ -3789,50 +3789,63 @@
         "provider_id": {
           "anyOf": [
             {
-              "type": "string",
-              "enum": [
-                "anthropic",
-                "azure",
-                "bedrock",
-                "deepseek",
-                "fireworks",
-                "gmicloud",
-                "google",
-                "inception",
-                "openai",
-                "minimax",
-                "mistral",
-                "moonshotai",
-                "nebius",
-                "novita",
-                "perplexity",
-                "vertex",
-                "xai",
-                "xiaomi",
-                "zai"
+              "anyOf": [
+                {
+                  "type": "string",
+                  "enum": [
+                    "anthropic",
+                    "azure",
+                    "bedrock",
+                    "deepseek",
+                    "fireworks",
+                    "gmicloud",
+                    "google",
+                    "inception",
+                    "openai",
+                    "minimax",
+                    "mistral",
+                    "moonshotai",
+                    "nebius",
+                    "novita",
+                    "perplexity",
+                    "vertex",
+                    "xai",
+                    "xiaomi",
+                    "zai"
+                  ]
+                },
+                {
+                  "type": "string",
+                  "enum": [
+                    "alibaba-token-plan",
+                    "bedrock-byok",
+                    "byteplus-coding",
+                    "chutes-byok",
+                    "edenai",
+                    "kimi-coding",
+                    "inceptron-byok",
+                    "martian",
+                    "morph-byok",
+                    "neuralwatt",
+                    "nvidia-byok",
+                    "ollama-cloud",
+                    "opencode-go",
+                    "orcarouter",
+                    "synthetic",
+                    "vertex-byok",
+                    "xiaomi-token-plan-ams",
+                    "xiaomi-token-plan-sgp",
+                    "zai-coding",
+                    "codestral"
+                  ]
+                }
               ]
             },
             {
               "type": "string",
               "enum": [
-                "alibaba-token-plan",
-                "byteplus-coding",
-                "chutes-byok",
-                "codestral",
-                "edenai",
-                "inceptron-byok",
-                "kimi-coding",
-                "martian",
-                "morph-byok",
-                "neuralwatt",
-                "nvidia-byok",
-                "ollama-cloud",
-                "opencode-go",
-                "orcarouter",
-                "synthetic",
-                "xiaomi-token-plan-ams",
-                "xiaomi-token-plan-sgp",
-                "zai-coding"
+                "vercel-ai-gateway",
+                "openrouter"
               ]
             }
           ]
@@ -3886,6 +3899,28 @@
       "id"
     ],
     "searchBlob": "byok.delete Remove a stored BYOK provider API key belonging to the current user or an organization. Deletes the saved credential so it can no longer be used for inference. byok delete organizationid id organizationId id"
+  },
+  "byok.experimentalByokEnabled": {
+    "path": "byok.experimentalByokEnabled",
+    "kind": "query",
+    "summary": "Check whether experimental BYOK providers, such as direct Amazon Bedrock and Google Vertex AI, can be added for the current user or a specified organization. Use before offering those providers when adding a key.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "byok",
+      "experimentalbyokenabled",
+      "organizationid"
+    ],
+    "searchBlob": "byok.experimentalByokEnabled Check whether experimental BYOK providers, such as direct Amazon Bedrock and Google Vertex AI, can be added for the current user or a specified organization. Use before offering those providers when adding a key. byok experimentalbyokenabled organizationid organizationId"
   },
   "byok.list": {
     "path": "byok.list",

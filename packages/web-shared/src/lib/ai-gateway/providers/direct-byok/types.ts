@@ -42,7 +42,7 @@ export type DirectByokUpstream = Pick<
 export type DirectByokResolveUpstreamInput = {
   /** The decrypted credential stored for the provider. */
   credential: string;
-  model: Pick<DirectByokModel, 'id'>;
+  model: Pick<DirectByokModel, 'id' | 'endpoint'>;
   stream: boolean;
 };
 
@@ -59,6 +59,8 @@ export type DirectByokProvider = {
    * use `apiKeyUpstream`; cloud providers can derive regions or signed requests.
    */
   resolveUpstream(input: DirectByokResolveUpstreamInput): Promise<DirectByokUpstream>;
+  /** The chat API a model must be called with, for providers where it varies per model. */
+  getModelChatApi?(model: DirectByokModel): GatewayChatApiKind;
 };
 
 /** The upstream of a provider that takes the stored credential as a bearer API key. */

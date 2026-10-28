@@ -92,6 +92,29 @@ async function isAvailableForDeferredGitHubDispatch(integration: {
   }
 }
 
+const UNCONFIGURED_SECRET_REPORT_INTERVAL_MS = 60_000;
+const unconfiguredSecretReportedAt: Record<GitHubAppType, number> = { standard: 0, lite: 0 };
+
+/**
+ * A deployment without the app's webhook secret refuses every delivery, and an
+ * anonymous caller can retry at will, and GitHub retries every delivery it
+ * considers failed. Reporting each request would flood Sentry at exactly the
+ * moment operators need the alarm, so one report a minute per app raises it.
+ */
+function reportUnconfiguredWebhookSecret(appType: GitHubAppType): void {
+  const now = Date.now();
+  if (now - unconfiguredSecretReportedAt[appType] < UNCONFIGURED_SECRET_REPORT_INTERVAL_MS) {
+    return;
+  }
+  unconfiguredSecretReportedAt[appType] = now;
+  captureException(new Error(`GitHub ${appType} app webhook secret is not configured`), {
+    tags: {
+      source: appType === 'lite' ? 'github_lite_webhook_signature' : 'github_webhook_signature',
+      app: appType,
+    },
+  });
+}
+
 export async function handleGitHubWebhook(
   request: NextRequest,
   appType: GitHubAppType
@@ -111,8 +134,14 @@ export async function handleGitHubWebhook(
     const rawBody = await request.text();
     const signature = request.headers.get('x-hub-signature-256') || '';
 
-    if (!verifyGitHubWebhookSignature(rawBody, signature, appType)) {
-      logExceptInTest(`Invalid webhook signature${logSuffix}`);
+    const signatureStatus = verifyGitHubWebhookSignature(rawBody, signature, appType);
+    if (signatureStatus !== 'valid') {
+      if (signatureStatus === 'unconfigured') {
+        logExceptInTest(`GitHub ${appType} app webhook secret is not configured${logSuffix}`);
+        reportUnconfiguredWebhookSecret(appType);
+      } else {
+        logExceptInTest(`Invalid webhook signature${logSuffix}`);
+      }
       return new NextResponse('Unauthorized', { status: 401 });
     }
 

@@ -24,9 +24,9 @@ fixed Node path. Native image selection does not change the Vercel snapshot.
 
 A downloaded target can scope its startup to an `interactiveOrgIds` list. Production uses it for one test organization.
 Deployment renders this list as `RUNTIME_INTERACTIVE_ORG_IDS`.
-A new allocation selects it only when all its preparing routes belong to one listed organization and have
-`createdOnPlatform: cloud-agent-web`. Native allocations must also be isolated; Vercel allocations use
-the same organization rule. Other organizations, personal sessions, non-web sessions, code reviews and
+A new allocation selects it only when all its preparing routes belong to one listed organization, whatever
+their origin (web, webhook, Slack and other automation). Native allocations must also be isolated; Vercel
+allocations use the same organization rule. Other organizations, personal sessions, code reviews and
 shared native sandboxes retain preinstalled startup on the unchanged `app` image. SDK pins always stay
 preinstalled. A missing or mixed route identity stays on the baseline. These identity values are rollout
 metadata, not an authorization boundary.

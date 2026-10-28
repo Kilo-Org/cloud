@@ -105,6 +105,7 @@ vi.mock('react-native-reanimated', () => ({
 vi.mock('expo-router', () => ({
   useRouter: () => routerMock,
   useNavigation: () => ({ addListener: () => () => undefined }),
+  useFocusEffect: () => undefined,
 }));
 vi.mock('expo-haptics', () => ({
   notificationAsync: vi.fn(),

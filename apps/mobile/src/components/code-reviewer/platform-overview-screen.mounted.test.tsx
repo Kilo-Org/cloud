@@ -73,6 +73,7 @@ vi.mock('@/lib/a11y/motion', () => ({
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
+  useFocusEffect: () => undefined,
 }));
 vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(),

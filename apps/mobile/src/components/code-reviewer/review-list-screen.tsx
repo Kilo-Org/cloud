@@ -1,4 +1,4 @@
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { GitPullRequest } from '@/components/ui/icons';
 import { FlashList } from '@shopify/flash-list';
 import { type ReactNode, useMemo } from 'react';
@@ -8,6 +8,7 @@ import Animated, { FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { type CodeReviewStatus, isCodeReviewStatus } from '@kilocode/app-shared/code-review';
+import { useSinglePushRoute } from '@/components/code-reviewer/use-single-push-route';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -93,7 +94,7 @@ function ReviewListFooter({
 }
 
 export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const paddingBottom = useTabBarBottomPadding();
   const insets = useSafeAreaInsets();
@@ -156,7 +157,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
           <Button
             className={STATE_ACTION_CLASS}
             onPress={() => {
-              router.push(
+              pushOnce(
                 (hasConnectedProvider
                   ? `/(app)/code-reviewer/${scope}/manual-review`
                   : `/(app)/code-reviewer/${scope}`) as Href
@@ -207,7 +208,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
                 index < reviews.length - 1 && 'border-b-[0.5px] border-hair-soft'
               )}
               onPress={() => {
-                router.push(`/(app)/code-reviewer/${scope}/reviews/${review.id}` as Href);
+                pushOnce(`/(app)/code-reviewer/${scope}/reviews/${review.id}` as Href);
               }}
             >
               <Text className="text-sm font-medium" numberOfLines={1}>

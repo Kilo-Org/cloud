@@ -397,7 +397,7 @@ importers:
         version: link:../../packages/trpc
       '@modelcontextprotocol/sdk':
         specifier: 1.32.1
-        version: 1.32.1(@cfworker/json-schema@4.1.1)
+        version: 1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7)
       '@tanstack/react-query':
         specifier: 'catalog:'
         version: 5.104.3(react@19.2.6)
@@ -1624,7 +1624,7 @@ importers:
         version: 7.0.0-dev.20260707.2
       jest:
         specifier: 30.3.0
-        version: 30.3.0(@types/node@25.5.2)(node-notifier@10.0.1)(ts-node@10.9.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@25.5.2)(typescript@7.0.2))
+        version: 30.3.0(@types/node@24.12.4)(node-notifier@10.0.1)(ts-node@10.9.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@24.12.4)(typescript@7.0.2))
       typescript:
         specifier: 'catalog:'
         version: 7.0.2
@@ -1738,10 +1738,10 @@ importers:
     dependencies:
       '@modelcontextprotocol/ext-apps':
         specifier: 1.7.5
-        version: 1.7.5(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1))(react-dom@19.2.6(react@19.3.0))(react@19.3.0)(zod@4.6.7)
+        version: 1.7.5(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7))(react-dom@19.2.6(react@19.3.0))(react@19.3.0)(zod@4.6.7)
       '@modelcontextprotocol/sdk':
         specifier: 1.32.1
-        version: 1.32.1(@cfworker/json-schema@4.1.1)
+        version: 1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7)
       drizzle-orm:
         specifier: 0.45.2
         version: 0.45.2(@cloudflare/workers-types@4.20260605.1)(@opentelemetry/api@1.9.1)(@types/pg@8.23.1)(@upstash/redis@1.38.0)(bun-types@1.4.4)(expo-sqlite@58.0.13(expo@58.0.10)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(kysely@0.29.2)(pg@8.23.1)
@@ -6928,6 +6928,7 @@ packages:
     engines: {node: '>=18'}
     peerDependencies:
       '@cfworker/json-schema': ^4.1.1
+      zod: 4.6.7
     peerDependenciesMeta:
       '@cfworker/json-schema':
         optional: true
@@ -14572,6 +14573,9 @@ packages:
 
   es-module-lexer@2.0.0:
     resolution: {integrity: sha512-5POEcUuZybH7IdmGsD8wlf0AI55wMecM9rVBTI/qEAy2c1kTOm3DjFYjrBdI2K3BaJjJYfYFeRtM0t9ssnRuxw==}
+
+  es-module-lexer@2.3.1:
+    resolution: {integrity: sha512-shc1dbU90Yl/xq1QrC7QRtfcwURZuVRfPhZbDoldJ1cn1gzDvBaBWlv0eFolj5+0znnPJz5TXLxsN77X/12KTA==}
 
   es-module-lexer@2.3.2:
     resolution: {integrity: sha512-poHGpORABojJJucnV9KbOavETW8lBVnphkW77ER5/BQ5Fz7oXSoCNek7IH3vR5nRjdsEz926ibFYX8KtLQmdyw==}
@@ -25072,7 +25076,7 @@ snapshots:
       postcss: 8.5.30
       resolve-from: 5.0.0
     optionalDependencies:
-      expo: 58.0.10(@babel/core@7.29.7)(@expo/metro-runtime@58.0.14)(bufferutil@4.1.0)(expo-router@58.0.19)(expo-widgets@58.0.17)(react-dom@19.2.6(react@19.2.6))(react-native-webview@14.0.1(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)(typescript@7.0.2)(utf-8-validate@6.0.6)
+      expo: 58.0.10(@babel/core@7.29.7)(@expo/metro-runtime@58.0.14)(bufferutil@4.1.0)(expo-router@58.0.19)(expo-widgets@58.0.17)(react-dom@19.2.6(react@19.2.6))(react-native-webview@14.0.1(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)(typescript@7.0.2)(utf-8-validate@6.0.6)
     transitivePeerDependencies:
       - bufferutil
       - supports-color
@@ -25540,14 +25544,14 @@ snapshots:
 
   '@fregante/relaxed-json@2.0.0': {}
 
-  '@google/genai@2.10.0(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1))(bufferutil@4.1.0)(utf-8-validate@6.0.6)':
+  '@google/genai@2.10.0(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7))(bufferutil@4.1.0)(utf-8-validate@6.0.6)':
     dependencies:
       google-auth-library: 10.6.2
       p-retry: 4.6.2
       protobufjs: 7.6.5
       ws: 8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6)
     optionalDependencies:
-      '@modelcontextprotocol/sdk': 1.32.1(@cfworker/json-schema@4.1.1)
+      '@modelcontextprotocol/sdk': 1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7)
     transitivePeerDependencies:
       - bufferutil
       - supports-color
@@ -25803,43 +25807,6 @@ snapshots:
       - supports-color
       - ts-node
 
-  '@jest/core@30.3.0(node-notifier@10.0.1)':
-    dependencies:
-      '@jest/console': 30.3.0
-      '@jest/pattern': 30.0.1
-      '@jest/reporters': 30.3.0(node-notifier@10.0.1)
-      '@jest/test-result': 30.3.0
-      '@jest/transform': 30.3.0
-      '@jest/types': 30.3.0
-      '@types/node': 24.12.4
-      ansi-escapes: 4.3.2
-      chalk: 4.1.2
-      ci-info: 4.4.0
-      exit-x: 0.2.2
-      graceful-fs: 4.2.11
-      jest-changed-files: 30.3.0
-      jest-config: 30.3.0(@types/node@24.12.4)(ts-node@10.9.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@24.12.4)(typescript@7.0.2))
-      jest-haste-map: 30.3.0
-      jest-message-util: 30.3.0
-      jest-regex-util: 30.0.1
-      jest-resolve: 30.3.0
-      jest-resolve-dependencies: 30.3.0
-      jest-runner: 30.3.0
-      jest-runtime: 30.3.0
-      jest-snapshot: 30.3.0
-      jest-util: 30.3.0
-      jest-validate: 30.3.0
-      jest-watcher: 30.3.0
-      pretty-format: 30.3.0
-      slash: 3.0.0
-    optionalDependencies:
-      node-notifier: 10.0.1
-    transitivePeerDependencies:
-      - babel-plugin-macros
-      - esbuild-register
-      - supports-color
-      - ts-node
-
   '@jest/core@30.3.0(node-notifier@10.0.1)(ts-node@10.9.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@24.12.4)(typescript@7.0.2))':
     dependencies:
       '@jest/console': 30.3.0
@@ -25856,43 +25823,6 @@ snapshots:
       graceful-fs: 4.2.11
       jest-changed-files: 30.3.0
       jest-config: 30.3.0(@types/node@24.12.4)(ts-node@10.9.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@24.12.4)(typescript@7.0.2))
-      jest-haste-map: 30.3.0
-      jest-message-util: 30.3.0
-      jest-regex-util: 30.0.1
-      jest-resolve: 30.3.0
-      jest-resolve-dependencies: 30.3.0
-      jest-runner: 30.3.0
-      jest-runtime: 30.3.0
-      jest-snapshot: 30.3.0
-      jest-util: 30.3.0
-      jest-validate: 30.3.0
-      jest-watcher: 30.3.0
-      pretty-format: 30.3.0
-      slash: 3.0.0
-    optionalDependencies:
-      node-notifier: 10.0.1
-    transitivePeerDependencies:
-      - babel-plugin-macros
-      - esbuild-register
-      - supports-color
-      - ts-node
-
-  '@jest/core@30.3.0(node-notifier@10.0.1)(ts-node@10.9.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@25.5.2)(typescript@7.0.2))':
-    dependencies:
-      '@jest/console': 30.3.0
-      '@jest/pattern': 30.0.1
-      '@jest/reporters': 30.3.0(node-notifier@10.0.1)
-      '@jest/test-result': 30.3.0
-      '@jest/transform': 30.3.0
-      '@jest/types': 30.3.0
-      '@types/node': 24.12.4
-      ansi-escapes: 4.3.2
-      chalk: 4.1.2
-      ci-info: 4.4.0
-      exit-x: 0.2.2
-      graceful-fs: 4.2.11
-      jest-changed-files: 30.3.0
-      jest-config: 30.3.0(@types/node@24.12.4)(ts-node@10.9.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@25.5.2)(typescript@7.0.2))
       jest-haste-map: 30.3.0
       jest-message-util: 30.3.0
       jest-regex-util: 30.0.1
@@ -26349,7 +26279,7 @@ snapshots:
 
   '@jridgewell/gen-mapping@0.3.13':
     dependencies:
-      '@jridgewell/sourcemap-codec': 1.6.0
+      '@jridgewell/sourcemap-codec': 1.5.5
       '@jridgewell/trace-mapping': 0.3.31
 
   '@jridgewell/remapping@2.3.5':
@@ -26987,16 +26917,16 @@ snapshots:
       - bufferutil
       - utf-8-validate
 
-  '@modelcontextprotocol/ext-apps@1.7.5(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1))(react-dom@19.2.6(react@19.3.0))(react@19.3.0)(zod@4.6.7)':
+  '@modelcontextprotocol/ext-apps@1.7.5(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7))(react-dom@19.2.6(react@19.3.0))(react@19.3.0)(zod@4.6.7)':
     dependencies:
-      '@modelcontextprotocol/sdk': 1.32.1(@cfworker/json-schema@4.1.1)
+      '@modelcontextprotocol/sdk': 1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7)
       '@standard-schema/spec': 1.1.0
       zod: 4.6.7
     optionalDependencies:
       react: 19.3.0
       react-dom: 19.2.6(react@19.3.0)
 
-  '@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)':
+  '@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7)':
     dependencies:
       '@hono/node-server': 2.0.10(hono@4.13.13)
       ajv: 8.20.0
@@ -27410,10 +27340,10 @@ snapshots:
 
   '@open-draft/deferred-promise@2.2.0': {}
 
-  '@openclaw/ai@2026.7.1(@aws-sdk/credential-provider-node@3.972.21)(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1))(@opentelemetry/api@1.9.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.7)':
+  '@openclaw/ai@2026.7.1(@aws-sdk/credential-provider-node@3.972.21)(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7))(@opentelemetry/api@1.9.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.7)':
     dependencies:
       '@anthropic-ai/sdk': 0.109.1(zod@4.6.7)
-      '@google/genai': 2.10.0(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1))(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      '@google/genai': 2.10.0(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7))(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       '@mistralai/mistralai': 2.4.0(@opentelemetry/api@1.9.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       openai: 6.45.0(@aws-sdk/credential-provider-node@3.972.21)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.7)
       partial-json: 0.1.7
@@ -29866,7 +29796,7 @@ snapshots:
       '@sentry/core': 11.7.0
       dotenv: 17.4.2
       glob: 13.0.6
-      magic-string: 1.4.3
+      magic-string: 0.30.21
       oxc-parser: 0.152.0
       sentry: 0.45.0
       supports-color: 8.1.1
@@ -29880,7 +29810,7 @@ snapshots:
       '@sentry/core': 11.7.0
       dotenv: 17.4.2
       glob: 13.0.6
-      magic-string: 1.4.3
+      magic-string: 0.30.21
       oxc-parser: 0.152.0
       sentry: 0.45.0
       supports-color: 8.1.1
@@ -31177,7 +31107,7 @@ snapshots:
       '@swc/core': 1.15.18(@swc/helpers@0.5.23)
       '@swc/jest': 0.2.39(@swc/core@1.15.18(@swc/helpers@0.5.23))
       expect-playwright: 0.8.0
-      jest: 30.3.0(@types/node@24.12.4)(node-notifier@10.0.1)
+      jest: 30.3.0(@types/node@24.12.4)(node-notifier@10.0.1)(ts-node@10.9.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@24.12.4)(typescript@7.0.2))
       jest-circus: 30.3.0
       jest-environment-node: 30.3.0
       jest-junit: 16.0.0
@@ -32613,7 +32543,7 @@ snapshots:
       obug: 2.1.1
       std-env: 4.3.0
       tinyrainbow: 3.2.0
-      vitest: 4.1.12(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.12)(@vitest/ui@4.1.12)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)
+      vitest: 4.1.12(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.12)(@vitest/ui@4.1.12)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)
 
   '@vitest/coverage-v8@5.0.5(vitest@5.0.5)':
     dependencies:
@@ -32625,7 +32555,7 @@ snapshots:
       obug: 3.0.0
       std-env: 4.3.0
       tinyrainbow: 3.2.0
-      vitest: 5.0.5(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@5.0.5)(jsdom@29.1.1)(vite@8.1.6(@types/node@25.5.2)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4))
+      vitest: 5.0.5(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@5.0.5)(jsdom@29.1.1)(vite@8.1.6(@types/node@24.12.4)(esbuild@0.28.2)(jiti@2.7.0)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4))
 
   '@vitest/expect@3.2.4':
     dependencies:
@@ -32737,7 +32667,7 @@ snapshots:
       sirv: 3.0.2
       tinyglobby: 0.2.17
       tinyrainbow: 3.2.0
-      vitest: 4.1.12(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@24.12.4)(@vitest/coverage-v8@4.1.12)(@vitest/ui@4.1.12)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)
+      vitest: 4.1.12(@edge-runtime/vm@3.2.0)(@opentelemetry/api@1.9.1)(@types/node@25.5.2)(@vitest/coverage-v8@4.1.12)(@vitest/ui@4.1.12)(esbuild@0.28.2)(jiti@2.7.0)(jsdom@29.1.1)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)
 
   '@vitest/utils@3.2.4':
     dependencies:
@@ -33468,8 +33398,8 @@ snapshots:
       react-refresh: 0.14.2
     optionalDependencies:
       '@babel/runtime': 7.29.7
-      expo: 58.0.10(@babel/core@7.29.7)(@expo/metro-runtime@58.0.14)(bufferutil@4.1.0)(expo-router@58.0.19)(expo-widgets@58.0.17)(react-dom@19.2.6(react@19.2.6))(react-native-webview@14.0.1(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)(typescript@7.0.2)(utf-8-validate@6.0.6)
-      expo-widgets: 58.0.17(patch_hash=460b9294721505a0314d95a86cbf0063074e50259180af2d686cad950ef6ab42)(@babel/core@7.29.7)(expo@58.0.10)(react-dom@19.2.6(react@19.2.6))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)
+      expo: 58.0.10(@babel/core@7.29.7)(@expo/metro-runtime@58.0.14)(bufferutil@4.1.0)(expo-router@58.0.19)(expo-widgets@58.0.17)(react-dom@19.2.6(react@19.2.6))(react-native-webview@14.0.1(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)(typescript@7.0.2)(utf-8-validate@6.0.6)
+      expo-widgets: 58.0.17(patch_hash=460b9294721505a0314d95a86cbf0063074e50259180af2d686cad950ef6ab42)(@babel/core@7.29.7)(expo@58.0.10)(react-dom@19.2.6(react@19.2.6))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)
     transitivePeerDependencies:
       - '@babel/core'
       - supports-color
@@ -35111,6 +35041,8 @@ snapshots:
 
   es-module-lexer@2.0.0: {}
 
+  es-module-lexer@2.3.1: {}
+
   es-module-lexer@2.3.2: {}
 
   es-object-atoms@1.1.1:
@@ -35751,7 +35683,7 @@ snapshots:
 
   expo-keep-awake@58.0.3(expo@58.0.10)(react@19.2.6):
     dependencies:
-      expo: 58.0.10(@babel/core@7.29.7)(@expo/metro-runtime@58.0.14)(bufferutil@4.1.0)(expo-router@58.0.19)(expo-widgets@58.0.17)(react-dom@19.2.6(react@19.2.6))(react-native-webview@14.0.1(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)(typescript@7.0.2)(utf-8-validate@6.0.6)
+      expo: 58.0.10(@babel/core@7.29.7)(@expo/metro-runtime@58.0.14)(bufferutil@4.1.0)(expo-router@58.0.19)(expo-widgets@58.0.17)(react-dom@19.2.6(react@19.2.6))(react-native-webview@14.0.1(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)(typescript@7.0.2)(utf-8-validate@6.0.6)
       react: 19.2.6
     optional: true
 
@@ -36143,13 +36075,13 @@ snapshots:
       expo: 58.0.10(@babel/core@7.29.7)(@expo/metro-runtime@58.0.14)(bufferutil@4.1.0)(expo-router@58.0.19)(expo-widgets@58.0.17)(react-dom@19.2.6(react@19.3.0))(react-native-webview@14.0.1(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0))(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6))(react@19.3.0)(typescript@7.0.2)(utf-8-validate@6.0.6)
       react-native: 0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.3.0)(utf-8-validate@6.0.6)
 
-  expo-widgets@58.0.17(patch_hash=460b9294721505a0314d95a86cbf0063074e50259180af2d686cad950ef6ab42)(@babel/core@7.29.7)(expo@58.0.10)(react-dom@19.2.6(react@19.2.6))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6):
+  expo-widgets@58.0.17(patch_hash=460b9294721505a0314d95a86cbf0063074e50259180af2d686cad950ef6ab42)(@babel/core@7.29.7)(expo@58.0.10)(react-dom@19.2.6(react@19.2.6))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6):
     dependencies:
       '@expo/plist': 0.10.1
-      '@expo/ui': 58.0.17(patch_hash=107fc3bb89a262de75123c9449bcefaef274d247dd3d240846ad06520aa6d3e3)(@babel/core@7.29.7)(expo@58.0.10)(react-dom@19.2.6(react@19.2.6))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)
-      expo: 58.0.10(@babel/core@7.29.7)(@expo/metro-runtime@58.0.14)(bufferutil@4.1.0)(expo-router@58.0.19)(expo-widgets@58.0.17)(react-dom@19.2.6(react@19.2.6))(react-native-webview@14.0.1(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)(typescript@7.0.2)(utf-8-validate@6.0.6)
+      '@expo/ui': 58.0.17(patch_hash=107fc3bb89a262de75123c9449bcefaef274d247dd3d240846ad06520aa6d3e3)(@babel/core@7.29.7)(expo@58.0.10)(react-dom@19.2.6(react@19.2.6))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)
+      expo: 58.0.10(@babel/core@7.29.7)(@expo/metro-runtime@58.0.14)(bufferutil@4.1.0)(expo-router@58.0.19)(expo-widgets@58.0.17)(react-dom@19.2.6(react@19.2.6))(react-native-webview@14.0.1(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(react-native-worklets@0.13.0(@babel/core@7.29.7)(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6))(react-native@0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6))(react@19.2.6)(typescript@7.0.2)(utf-8-validate@6.0.6)
       react: 19.2.6
-      react-native: 0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.3.0)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6)
+      react-native: 0.88.0(patch_hash=669a6f4d03c40d89282d44110f509cacdd63696eb7f7a55a07b0d760ef7f644c)(@types/react@19.2.14)(bufferutil@4.1.0)(react@19.2.6)(utf-8-validate@6.0.6)
     transitivePeerDependencies:
       - '@babel/core'
       - react-dom
@@ -37724,27 +37656,6 @@ snapshots:
       - supports-color
       - ts-node
 
-  jest-cli@30.3.0(@types/node@24.12.4)(node-notifier@10.0.1):
-    dependencies:
-      '@jest/core': 30.3.0(node-notifier@10.0.1)
-      '@jest/test-result': 30.3.0
-      '@jest/types': 30.3.0
-      chalk: 4.1.2
-      exit-x: 0.2.2
-      import-local: 3.2.0
-      jest-config: 30.3.0(@types/node@24.12.4)(ts-node@10.9.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@24.12.4)(typescript@7.0.2))
-      jest-util: 30.3.0
-      jest-validate: 30.3.0
-      yargs: 17.7.2
-    optionalDependencies:
-      node-notifier: 10.0.1
-    transitivePeerDependencies:
-      - '@types/node'
-      - babel-plugin-macros
-      - esbuild-register
-      - supports-color
-      - ts-node
-
   jest-cli@30.3.0(@types/node@24.12.4)(node-notifier@10.0.1)(ts-node@10.9.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@24.12.4)(typescript@7.0.2)):
     dependencies:
       '@jest/core': 30.3.0(node-notifier@10.0.1)(ts-node@10.9.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@24.12.4)(typescript@7.0.2))
@@ -37754,27 +37665,6 @@ snapshots:
       exit-x: 0.2.2
       import-local: 3.2.0
       jest-config: 30.3.0(@types/node@24.12.4)(ts-node@10.9.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@24.12.4)(typescript@7.0.2))
-      jest-util: 30.3.0
-      jest-validate: 30.3.0
-      yargs: 17.7.2
-    optionalDependencies:
-      node-notifier: 10.0.1
-    transitivePeerDependencies:
-      - '@types/node'
-      - babel-plugin-macros
-      - esbuild-register
-      - supports-color
-      - ts-node
-
-  jest-cli@30.3.0(@types/node@25.5.2)(node-notifier@10.0.1)(ts-node@10.9.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@25.5.2)(typescript@7.0.2)):
-    dependencies:
-      '@jest/core': 30.3.0(node-notifier@10.0.1)(ts-node@10.9.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@25.5.2)(typescript@7.0.2))
-      '@jest/test-result': 30.3.0
-      '@jest/types': 30.3.0
-      chalk: 4.1.2
-      exit-x: 0.2.2
-      import-local: 3.2.0
-      jest-config: 30.3.0(@types/node@25.5.2)(ts-node@10.9.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@25.5.2)(typescript@7.0.2))
       jest-util: 30.3.0
       jest-validate: 30.3.0
       yargs: 17.7.2
@@ -37867,70 +37757,6 @@ snapshots:
     optionalDependencies:
       '@types/node': 24.12.4
       ts-node: 10.9.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@24.12.4)(typescript@7.0.2)
-    transitivePeerDependencies:
-      - babel-plugin-macros
-      - supports-color
-
-  jest-config@30.3.0(@types/node@24.12.4)(ts-node@10.9.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@25.5.2)(typescript@7.0.2)):
-    dependencies:
-      '@babel/core': 7.29.7
-      '@jest/get-type': 30.1.0
-      '@jest/pattern': 30.0.1
-      '@jest/test-sequencer': 30.3.0
-      '@jest/types': 30.3.0
-      babel-jest: 30.3.0(@babel/core@7.29.7)
-      chalk: 4.1.2
-      ci-info: 4.4.0
-      deepmerge: 4.3.1
-      glob: 13.0.6
-      graceful-fs: 4.2.11
-      jest-circus: 30.3.0
-      jest-docblock: 30.2.0
-      jest-environment-node: 30.3.0
-      jest-regex-util: 30.0.1
-      jest-resolve: 30.3.0
-      jest-runner: 30.3.0
-      jest-util: 30.3.0
-      jest-validate: 30.3.0
-      parse-json: 5.2.0
-      pretty-format: 30.3.0
-      slash: 3.0.0
-      strip-json-comments: 3.1.1
-    optionalDependencies:
-      '@types/node': 24.12.4
-      ts-node: 10.9.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@25.5.2)(typescript@7.0.2)
-    transitivePeerDependencies:
-      - babel-plugin-macros
-      - supports-color
-
-  jest-config@30.3.0(@types/node@25.5.2)(ts-node@10.9.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@25.5.2)(typescript@7.0.2)):
-    dependencies:
-      '@babel/core': 7.29.7
-      '@jest/get-type': 30.1.0
-      '@jest/pattern': 30.0.1
-      '@jest/test-sequencer': 30.3.0
-      '@jest/types': 30.3.0
-      babel-jest: 30.3.0(@babel/core@7.29.7)
-      chalk: 4.1.2
-      ci-info: 4.4.0
-      deepmerge: 4.3.1
-      glob: 13.0.6
-      graceful-fs: 4.2.11
-      jest-circus: 30.3.0
-      jest-docblock: 30.2.0
-      jest-environment-node: 30.3.0
-      jest-regex-util: 30.0.1
-      jest-resolve: 30.3.0
-      jest-runner: 30.3.0
-      jest-util: 30.3.0
-      jest-validate: 30.3.0
-      parse-json: 5.2.0
-      pretty-format: 30.3.0
-      slash: 3.0.0
-      strip-json-comments: 3.1.1
-    optionalDependencies:
-      '@types/node': 25.5.2
-      ts-node: 10.9.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@25.5.2)(typescript@7.0.2)
     transitivePeerDependencies:
       - babel-plugin-macros
       - supports-color
@@ -38617,7 +38443,7 @@ snapshots:
     dependencies:
       ansi-escapes: 7.3.0
       chalk: 5.6.2
-      jest: 30.3.0(@types/node@24.12.4)(node-notifier@10.0.1)
+      jest: 30.3.0(@types/node@24.12.4)(node-notifier@10.0.1)(ts-node@10.9.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@24.12.4)(typescript@7.0.2))
       jest-regex-util: 30.0.1
       jest-watcher: 30.3.0
       slash: 5.1.0
@@ -38700,42 +38526,12 @@ snapshots:
       - supports-color
       - ts-node
 
-  jest@30.3.0(@types/node@24.12.4)(node-notifier@10.0.1):
-    dependencies:
-      '@jest/core': 30.3.0(node-notifier@10.0.1)
-      '@jest/types': 30.3.0
-      import-local: 3.2.0
-      jest-cli: 30.3.0(@types/node@24.12.4)(node-notifier@10.0.1)
-    optionalDependencies:
-      node-notifier: 10.0.1
-    transitivePeerDependencies:
-      - '@types/node'
-      - babel-plugin-macros
-      - esbuild-register
-      - supports-color
-      - ts-node
-
   jest@30.3.0(@types/node@24.12.4)(node-notifier@10.0.1)(ts-node@10.9.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@24.12.4)(typescript@7.0.2)):
     dependencies:
       '@jest/core': 30.3.0(node-notifier@10.0.1)(ts-node@10.9.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@24.12.4)(typescript@7.0.2))
       '@jest/types': 30.3.0
       import-local: 3.2.0
       jest-cli: 30.3.0(@types/node@24.12.4)(node-notifier@10.0.1)(ts-node@10.9.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@24.12.4)(typescript@7.0.2))
-    optionalDependencies:
-      node-notifier: 10.0.1
-    transitivePeerDependencies:
-      - '@types/node'
-      - babel-plugin-macros
-      - esbuild-register
-      - supports-color
-      - ts-node
-
-  jest@30.3.0(@types/node@25.5.2)(node-notifier@10.0.1)(ts-node@10.9.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@25.5.2)(typescript@7.0.2)):
-    dependencies:
-      '@jest/core': 30.3.0(node-notifier@10.0.1)(ts-node@10.9.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@25.5.2)(typescript@7.0.2))
-      '@jest/types': 30.3.0
-      import-local: 3.2.0
-      jest-cli: 30.3.0(@types/node@25.5.2)(node-notifier@10.0.1)(ts-node@10.9.2(@swc/core@1.15.18(@swc/helpers@0.5.23))(@types/node@25.5.2)(typescript@7.0.2))
     optionalDependencies:
       node-notifier: 10.0.1
     transitivePeerDependencies:
@@ -40705,15 +40501,15 @@ snapshots:
       '@clack/core': 1.4.2
       '@clack/prompts': 1.6.0
       '@earendil-works/pi-tui': 0.80.3
-      '@google/genai': 2.10.0(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1))(bufferutil@4.1.0)(utf-8-validate@6.0.6)
+      '@google/genai': 2.10.0(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7))(bufferutil@4.1.0)(utf-8-validate@6.0.6)
       '@grammyjs/runner': 2.0.3(grammy@1.44.0)
       '@grammyjs/transformer-throttler': 1.2.1(grammy@1.44.0)
       '@homebridge/ciao': 1.3.9
       '@lydell/node-pty': 1.2.0-beta.12
       '@mistralai/mistralai': 2.4.0(@opentelemetry/api@1.9.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)
-      '@modelcontextprotocol/sdk': 1.32.1(@cfworker/json-schema@4.1.1)
+      '@modelcontextprotocol/sdk': 1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7)
       '@mozilla/readability': 0.6.0
-      '@openclaw/ai': 2026.7.1(@aws-sdk/credential-provider-node@3.972.21)(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1))(@opentelemetry/api@1.9.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.7)
+      '@openclaw/ai': 2026.7.1(@aws-sdk/credential-provider-node@3.972.21)(@modelcontextprotocol/sdk@1.32.1(@cfworker/json-schema@4.1.1)(zod@4.6.7))(@opentelemetry/api@1.9.1)(bufferutil@4.1.0)(utf-8-validate@6.0.6)(ws@8.21.0(bufferutil@4.1.0)(utf-8-validate@6.0.6))(zod@4.6.7)
       '@openclaw/fs-safe': 0.4.1
       '@openclaw/proxyline': 0.3.3(undici@8.12.2)
       '@silvia-odwyer/photon-node': 0.3.4
@@ -44567,7 +44363,7 @@ snapshots:
   vite-node@6.0.0(@types/node@24.12.4)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4):
     dependencies:
       cac: 7.0.0
-      es-module-lexer: 2.3.2
+      es-module-lexer: 2.3.1
       obug: 2.1.1
       pathe: 2.0.3
       vite: 8.1.6(@types/node@24.12.4)(esbuild@0.28.1)(jiti@2.7.0)(terser@5.46.0)(tsx@4.23.15)(yaml@2.8.4)

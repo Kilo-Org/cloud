@@ -2,11 +2,7 @@ import { afterEach, describe, expect, test } from '@jest/globals';
 import { captureMessage } from '@sentry/nextjs';
 import type { CustomPricing, CustomPricingConfig } from '@kilocode/db/schema-types';
 import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
-import {
-  claude_opus_4_7_stealth_model,
-  findKiloExclusiveModel,
-  qwen36_plus_stealth_model,
-} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { findKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import type * as kiloExclusiveModels from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import type { JustTheCostsUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
@@ -15,6 +11,11 @@ import {
   applyUsagePricing,
   calculateKiloExclusiveCost_mUsd,
 } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
+import {
+  paidStealthModelFixture,
+  tieredStealthModelFixture,
+  useKiloExclusiveModel,
+} from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 
 jest.mock('@sentry/nextjs', () => ({ captureMessage: jest.fn() }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
@@ -44,8 +45,11 @@ const makeContext = (
   ...overrides,
 });
 
+useKiloExclusiveModel(paidStealthModelFixture);
+useKiloExclusiveModel(tieredStealthModelFixture);
+
 const fallbackOnlyModel: KiloExclusiveModel = {
-  ...claude_opus_4_7_stealth_model,
+  ...paidStealthModelFixture,
   pricing: {
     tiers: [
       {
@@ -143,7 +147,7 @@ describe('applyUsagePricing', () => {
 
       applyUsagePricing(
         usage,
-        makeContext({ requested_model: qwen36_plus_stealth_model.public_id }),
+        makeContext({ requested_model: tieredStealthModelFixture.public_id }),
         TEST_CUSTOM_PRICING_CONFIG
       );
 
@@ -153,7 +157,7 @@ describe('applyUsagePricing', () => {
   );
 
   test('applies custom pricing after exclusive pricing and retains the original upstream cost', () => {
-    jest.mocked(findKiloExclusiveModel).mockReturnValueOnce(claude_opus_4_7_stealth_model);
+    jest.mocked(findKiloExclusiveModel).mockReturnValueOnce(paidStealthModelFixture);
     const usage = makeUsage();
 
     applyUsagePricing(
@@ -206,7 +210,7 @@ describe('applyUsagePricing', () => {
 
     applyUsagePricing(
       usage,
-      makeContext({ requested_model: claude_opus_4_7_stealth_model.public_id }),
+      makeContext({ requested_model: paidStealthModelFixture.public_id }),
       TEST_CUSTOM_PRICING_CONFIG
     );
 
@@ -232,8 +236,8 @@ describe('applyUsagePricing', () => {
 
     applyUsagePricing(
       usage,
-      makeContext({ requested_model: claude_opus_4_7_stealth_model.public_id }),
-      fallbackOnlyCustomPricingFor(claude_opus_4_7_stealth_model.public_id)
+      makeContext({ requested_model: paidStealthModelFixture.public_id }),
+      fallbackOnlyCustomPricingFor(paidStealthModelFixture.public_id)
     );
 
     expect(usage.cost_mUsd).toBe(600_000);
@@ -275,17 +279,14 @@ describe('applyUsagePricing', () => {
 describe('calculateKiloExclusiveCost_mUsd', () => {
   test('returns zero when no exclusive pricing exists', () => {
     expect(
-      calculateKiloExclusiveCost_mUsd(
-        { ...claude_opus_4_7_stealth_model, pricing: null },
-        makeUsage()
-      )
+      calculateKiloExclusiveCost_mUsd({ ...paidStealthModelFixture, pricing: null }, makeUsage())
     ).toBe(0);
   });
 
   test('preserves the uncached-input fallback and diagnostic for inconsistent cache counts', () => {
     const usage = makeUsage({ inputTokens: 10, outputTokens: 0, cacheHitTokens: 20 });
 
-    expect(calculateKiloExclusiveCost_mUsd(claude_opus_4_7_stealth_model, usage)).toBe(48);
+    expect(calculateKiloExclusiveCost_mUsd(paidStealthModelFixture, usage)).toBe(48);
     expect(captureMessage).toHaveBeenCalledWith(
       'SUSPICIOUS: negative uncached input tokens',
       expect.objectContaining({ level: 'error' })

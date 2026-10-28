@@ -341,7 +341,10 @@ describe('environment snapshot launch', () => {
     const launchDeadline = (await stub.getAllocationState()).createDeadlineAt;
     const { wrapper, allocationId } = await connect(sandboxId, provider, 2);
 
-    expect(provider.launchOptions).toEqual([{ snapshot: SNAPSHOT }, {}]);
+    expect(provider.launchOptions).toEqual([
+      { snapshot: SNAPSHOT, nativeImage: 'all-in-one' },
+      { nativeImage: 'all-in-one' },
+    ]);
     expect(provider.launchRefs[1]).toBe(provider.launchRefs[0]);
     expect(provider.stopRefs).toEqual([provider.launchRefs[0]]);
     // Diagnostic upload identities are per launch when a Worker URL is configured.

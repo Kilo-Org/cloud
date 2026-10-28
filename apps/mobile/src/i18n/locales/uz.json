@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Nusxaga ulanib bo'lmadi — uning ulanishi uzilgan bo'lishi mumkin.",
     "remoteSpawnNonRetryable": "Nusxa sessiyani ishga tushira olmadi — kompyuterni tekshiring yoki CLI dasturini yangilang.",
-    "remoteSpawnInstanceDisconnected": "Tanlangan nusxa bilan ulanish uzildi. Cloud Agentda sessiya boshlang yoki boshqa nusxani tanlang.",
-    "liveCount_one": "{{count}} TA JONLI",
-    "liveCount_other": "{{count}} TA JONLI"
+    "remoteSpawnInstanceDisconnected": "Tanlangan nusxa bilan ulanish uzildi. Cloud Agentda sessiya boshlang yoki boshqa nusxani tanlang."
   },
   "agentChat": {
     "session": {
@@ -3955,6 +3953,8 @@
     "title": "Kredit sotib olish",
     "description": "Kreditlar Kilo App'da AI kodlash sessiyalarini ishga tushirish uchun Kilo balansingizga qo'shiladigan bir martalik xariddir. Do'kon hisobingizdan to'lov oladi va do'kon to'lovni tasdiqlaganidan keyin kreditlar qo'shiladi.",
     "nextExpiry": "{{amount}} miqdoridagi kreditlarning muddati {{date}} (UTC) sanasida tugaydi. Muddati eng erta tugaydigan kreditlar birinchi sarflanadi.",
+    "noExpiringCredits": "Muddati tugaydigan kreditlar yo'q.",
+    "expiryUnavailable": "Kreditlarning muddati haqida ma'lumot mavjud emas.",
     "appStoreExpiry": "App Store orqali sotib olingan kreditlarning muddati tugamaydi.",
     "playOneYearExpiry": "Bu kreditlarning muddati xariddan bir kalendar yil o'tgach tugaydi.",
     "playNonexpiring": "Bu kreditlarning muddati tugamaydi.",

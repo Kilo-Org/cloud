@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Non se puido conectar coa instancia. Pode que se desconectase.",
     "remoteSpawnNonRetryable": "A instancia non puido iniciar a sesión. Comproba a máquina ou actualiza o CLI.",
-    "remoteSpawnInstanceDisconnected": "A instancia seleccionada desconectouse. Inicia unha sesión en Cloud Agent ou escolle outra instancia.",
-    "liveCount_one": "{{count}} EN TEMPO REAL",
-    "liveCount_other": "{{count}} EN TEMPO REAL"
+    "remoteSpawnInstanceDisconnected": "A instancia seleccionada desconectouse. Inicia unha sesión en Cloud Agent ou escolle outra instancia."
   },
   "agentChat": {
     "session": {
@@ -3955,6 +3953,8 @@
     "title": "Mercar créditos",
     "description": "Os créditos son unha compra única que se engade ao teu saldo de Kilo para executar sesións de codificación con IA na app de Kilo. A tenda cobra na túa conta e os créditos engádense despois de que a tenda confirme o pagamento.",
     "nextExpiry": "{{amount}} en créditos caducan o {{date}} (UTC). Os créditos coa caducidade máis próxima úsanse primeiro.",
+    "noExpiringCredits": "Non hai créditos pendentes de caducar.",
+    "expiryUnavailable": "Caducidade dos créditos non dispoñible.",
     "appStoreExpiry": "Os créditos mercados a través da App Store non caducan.",
     "playOneYearExpiry": "Estes créditos caducan un ano natural despois da compra.",
     "playNonexpiring": "Estes créditos non caducan.",

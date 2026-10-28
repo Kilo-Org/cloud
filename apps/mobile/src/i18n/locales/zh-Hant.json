@@ -1665,9 +1665,7 @@
     },
     "remoteSpawnRetryable": "無法連線到此執行個體，可能已中斷連線。",
     "remoteSpawnNonRetryable": "此執行個體無法啟動工作階段。請檢查電腦或更新 CLI。",
-    "remoteSpawnInstanceDisconnected": "選取的執行個體已中斷連線。請在 Cloud Agent 上開始工作階段，或選擇其他執行個體。",
-    "liveCount_one": "{{count}} 個即時工作階段",
-    "liveCount_other": "{{count}} 個即時工作階段"
+    "remoteSpawnInstanceDisconnected": "選取的執行個體已中斷連線。請在 Cloud Agent 上開始工作階段，或選擇其他執行個體。"
   },
   "agentChat": {
     "session": {
@@ -3955,6 +3953,8 @@
     "title": "購買點數",
     "description": "點數是一次性購買，會加入你的 Kilo 餘額，用於在 Kilo App 中執行 AI 程式設計工作階段。商店會向你的帳戶收費，商店確認付款後點數才會入帳。",
     "nextExpiry": "{{amount}} 的點數將於 {{date}}（UTC）到期。最早到期的點數會優先使用。",
+    "noExpiringCredits": "目前沒有會到期的點數。",
+    "expiryUnavailable": "無法取得點數到期資訊。",
     "appStoreExpiry": "透過 App Store 購買的點數不會過期。",
     "playOneYearExpiry": "這些點數將在購買滿一個日曆年後過期。",
     "playNonexpiring": "這些點數不會過期。",

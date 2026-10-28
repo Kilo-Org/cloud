@@ -1677,10 +1677,7 @@
     },
     "remoteSpawnRetryable": "לא ניתן היה ליצור קשר עם המופע — ייתכן שהחיבור נותק.",
     "remoteSpawnNonRetryable": "המופע לא הצליח להתחיל את השיחה — בדוק את המחשב או עדכן את ה-CLI.",
-    "remoteSpawnInstanceDisconnected": "המופע שנבחר נותק. התחל שיחה ב-Cloud Agent או בחר מופע אחר.",
-    "liveCount_one": "בזמן אמת: {{count}}",
-    "liveCount_other": "בזמן אמת: {{count}}",
-    "liveCount_two": "{{count}} פעילים"
+    "remoteSpawnInstanceDisconnected": "המופע שנבחר נותק. התחל שיחה ב-Cloud Agent או בחר מופע אחר."
   },
   "agentChat": {
     "session": {
@@ -4006,6 +4003,8 @@
     "title": "קניית קרדיטים",
     "description": "קרדיטים הם רכישה חד-פעמית שמתווספת ליתרת ה-Kilo שלך להרצת מפגשי קידוד בינה מלאכותית ב-Kilo App. החנות מחייבת את החשבון שלך והקרדיטים מתווספים לאחר שהחנות מאשרת את התשלום.",
     "nextExpiry": "תוקפם של קרדיטים בסך {{amount}} יפוג ב-{{date}} (UTC). קרדיטים שתוקפם יפוג ראשון מנוצלים קודם.",
+    "noExpiringCredits": "אין קרדיטים שתוקפם עתיד לפוג.",
+    "expiryUnavailable": "פרטי תפוגת הקרדיטים אינם זמינים.",
     "appStoreExpiry": "קרדיטים שנרכשו דרך App Store אינם פגים.",
     "playOneYearExpiry": "תוקפם של קרדיטים אלה יפוג שנה קלנדרית אחת לאחר הרכישה.",
     "playNonexpiring": "קרדיטים אלה אינם פגים.",

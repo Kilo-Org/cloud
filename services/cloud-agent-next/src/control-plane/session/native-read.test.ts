@@ -341,6 +341,28 @@ describe('native durable attachment', () => {
     });
   });
 
+  it('omits a derived idle status while a newer accepted turn is still active', async () => {
+    const session = attachmentUnit();
+    delete (session as { deriveSessionStatus?: unknown }).deriveSessionStatus;
+    Object.assign(session, {
+      eventQueries: {
+        getLatestEventId: () => null,
+        *iterateByFilters() {},
+      },
+      rootStatus: { type: 'busy', settled: true },
+      messages: [
+        { messageId: 'msg_completed', state: 'completed' },
+        { messageId: 'msg_newer', state: 'accepted' },
+      ],
+    });
+    await expect(session.nativeSnapshot({})).resolves.toMatchObject({ sessionStatus: undefined });
+
+    Object.assign(session, { messages: [{ messageId: 'msg_completed', state: 'completed' }] });
+    await expect(session.nativeSnapshot({})).resolves.toMatchObject({
+      sessionStatus: { type: 'idle' },
+    });
+  });
+
   it('distinguishes missing registration from an empty log and fences stale releases', async () => {
     const session = attachmentUnit();
     Object.assign(session, { eventQueries: { getLatestEventId: () => null } });

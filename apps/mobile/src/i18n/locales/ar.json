@@ -1713,13 +1713,7 @@
     },
     "remoteSpawnRetryable": "تعذّر الوصول إلى المثيل — ربما انقطع الاتصال.",
     "remoteSpawnNonRetryable": "فشل المثيل في بدء الجلسة — تحقق من الجهاز أو حدّث CLI.",
-    "remoteSpawnInstanceDisconnected": "انقطع الاتصال بالمثيل المحدد. ابدأ جلسة على Cloud Agent أو اختر مثيلًا آخر.",
-    "liveCount_one": "{{count}} على المباشر",
-    "liveCount_other": "{{count}} على المباشر",
-    "liveCount_zero": "الجلسات النشطة: {{count}}",
-    "liveCount_two": "جلستان نشطتان ({{count}})",
-    "liveCount_few": "{{count}} جلسات نشطة",
-    "liveCount_many": "{{count}} جلسة نشطة"
+    "remoteSpawnInstanceDisconnected": "انقطع الاتصال بالمثيل المحدد. ابدأ جلسة على Cloud Agent أو اختر مثيلًا آخر."
   },
   "agentChat": {
     "session": {
@@ -4159,6 +4153,8 @@
     "title": "شراء الرصيد",
     "description": "الرصيد عملية شراء لمرة واحدة تُضاف إلى رصيدك في Kilo لتشغيل جلسات البرمجة بالذكاء الاصطناعي في تطبيق Kilo. يتقاضى المتجر المبلغ من حسابك وتُضاف الأرصدة بعد تأكيد المتجر للدفع.",
     "nextExpiry": "تنتهي صلاحية رصيد بقيمة {{amount}} في {{date}} (UTC). يُستخدم الرصيد الأقرب انتهاءً أولاً.",
+    "noExpiringCredits": "لا يوجد رصيد تنتهي صلاحيته.",
+    "expiryUnavailable": "تفاصيل انتهاء صلاحية الرصيد غير متاحة.",
     "appStoreExpiry": "الرصيد الذي تم شراؤه عبر App Store لا تنتهي صلاحيته.",
     "playOneYearExpiry": "تنتهي صلاحية هذا الرصيد بعد سنة تقويمية واحدة من الشراء.",
     "playNonexpiring": "لا تنتهي صلاحية هذا الرصيد.",

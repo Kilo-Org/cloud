@@ -2251,11 +2251,7 @@
     },
     "remoteSpawnRetryable": "K instanci se nepodařilo připojit. Možná se odpojila.",
     "remoteSpawnNonRetryable": "Instance nedokázala spustit relaci. Zkontroluj počítač nebo aktualizuj CLI.",
-    "remoteSpawnInstanceDisconnected": "Vybraná instance se odpojila. Spusť relaci ve službě Cloud Agent nebo vyber jinou instanci.",
-    "liveCount_one": "{{count}} ŽIVĚ",
-    "liveCount_other": "{{count}} ŽIVĚ",
-    "liveCount_few": "BĚŽÍ: {{count}}",
-    "liveCount_many": "BĚŽÍ: {{count}}"
+    "remoteSpawnInstanceDisconnected": "Vybraná instance se odpojila. Spusť relaci ve službě Cloud Agent nebo vyber jinou instanci."
   },
   "agentChat": {
     "session": {
@@ -4057,6 +4053,8 @@
     "title": "Koupit kredity",
     "description": "Kredity jsou jednorázový nákup přidaný do vašeho zůstatku Kilo pro spouštění AI programovacích relací v aplikaci Kilo. Obchod vám strhne platbu z účtu a kredity se přidají po potvrzení platby obchodem.",
     "nextExpiry": "Platnost kreditů v hodnotě {{amount}} vyprší {{date}} (UTC). Nejdříve se čerpají kredity s nejbližším datem vypršení.",
+    "noExpiringCredits": "Žádné kredity s datem vypršení platnosti.",
+    "expiryUnavailable": "Informace o vypršení platnosti kreditů nejsou k dispozici.",
     "appStoreExpiry": "Kredity zakoupené přes App Store nevyprší.",
     "playOneYearExpiry": "Platnost těchto kreditů vyprší jeden kalendářní rok po nákupu.",
     "playNonexpiring": "Platnost těchto kreditů nevyprší.",

@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Nem sikerült elérni a példányt — lehet, hogy megszakadt a kapcsolat.",
     "remoteSpawnNonRetryable": "A példány nem tudta elindítani a munkamenetet. Ellenőrizd a gépet, vagy frissítsd a CLI-t.",
-    "remoteSpawnInstanceDisconnected": "Megszakadt a kapcsolat a kiválasztott példánnyal. Indíts munkamenetet a Cloud Agent szolgáltatásban, vagy válassz másik példányt.",
-    "liveCount_one": "{{count}} ÉLŐ",
-    "liveCount_other": "{{count}} ÉLŐ"
+    "remoteSpawnInstanceDisconnected": "Megszakadt a kapcsolat a kiválasztott példánnyal. Indíts munkamenetet a Cloud Agent szolgáltatásban, vagy válassz másik példányt."
   },
   "agentChat": {
     "session": {
@@ -3955,6 +3953,8 @@
     "title": "Kreditek vásárlása",
     "description": "A kreditek egyszeri vásárlás, amely a Kilo egyenlegedhez adódik AI kódolási munkamenetek futtatásához a Kilo alkalmazásban. Az áruház terheli a fiókodat, és a kreditek az áruház fizetésigazolása után kerülnek jóváírásra.",
     "nextExpiry": "{{amount}} értékű kredit lejárati ideje: {{date}} (UTC). A legkorábban lejáró kreditek használódnak fel először.",
+    "noExpiringCredits": "Nincsenek lejáró kreditek.",
+    "expiryUnavailable": "A kreditek lejárati adatai nem érhetők el.",
     "appStoreExpiry": "Az App Store-on keresztül vásárolt kreditek nem járnak le.",
     "playOneYearExpiry": "Ezek a kreditek a vásárlás után egy naptári évvel járnak le.",
     "playNonexpiring": "Ezek a kreditek nem járnak le.",

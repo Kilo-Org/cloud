@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Kunde inte nå instansen – den kan ha kopplats från.",
     "remoteSpawnNonRetryable": "Instansen kunde inte starta sessionen. Kontrollera datorn eller uppdatera CLI-verktyget.",
-    "remoteSpawnInstanceDisconnected": "Den valda instansen kopplades från. Starta en session med Cloud Agent eller välj en annan instans.",
-    "liveCount_one": "{{count}} I REALTID",
-    "liveCount_other": "{{count}} I REALTID"
+    "remoteSpawnInstanceDisconnected": "Den valda instansen kopplades från. Starta en session med Cloud Agent eller välj en annan instans."
   },
   "agentChat": {
     "session": {
@@ -3955,6 +3953,8 @@
     "title": "Köp krediter",
     "description": "Krediter är ett engångsköp som läggs till på ditt Kilo-saldo för att köra AI-kodningssessioner i Kilo-appen. Butiken debiterar ditt konto och krediterna läggs till efter att butiken bekräftar betalningen.",
     "nextExpiry": "{{amount}} i krediter går ut {{date}} (UTC). Krediter som går ut först används först.",
+    "noExpiringCredits": "Inga krediter som går ut.",
+    "expiryUnavailable": "Information om krediternas utgångsdatum är inte tillgänglig.",
     "appStoreExpiry": "Krediter som köpts via App Store går inte ut.",
     "playOneYearExpiry": "Dessa krediter går ut ett kalenderår efter köpet.",
     "playNonexpiring": "Dessa krediter går inte ut.",

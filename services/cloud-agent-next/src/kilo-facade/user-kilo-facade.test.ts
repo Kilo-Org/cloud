@@ -3849,6 +3849,101 @@ describe('hosted native routes', () => {
     expect(releaseNativeEvents).toHaveBeenCalledWith({ attachmentId: expect.any(String) });
   });
 
+  it('reconciles authoritative status and interactions after all pages and before the live tail', async () => {
+    const env = envStub();
+    env.SANDBOX_SESSION.get = vi
+      .fn()
+      .mockReturnValue({ releaseNativeEvents: vi.fn(async () => undefined) });
+    vi.mocked(env.SESSION_INGEST.resolveCloudAgentRootSessionForKiloSession).mockResolvedValue({
+      cloudAgentSessionId: workspaceSession,
+    } as never);
+    const facade = new UserKiloFacade({ waitUntil: vi.fn() } as unknown as DurableObjectState, env);
+    const attachmentId = facade.prepareNativeAttachment(workspaceSession, kiloSessionId, 'usr_1');
+    const publish = nativePublisher(facade);
+    const staleBusy = {
+      type: 'session.status',
+      properties: { sessionID: kiloSessionId, status: { type: 'busy' } },
+    };
+    const staleQuestion = {
+      type: 'question.asked',
+      properties: { sessionID: kiloSessionId, id: 'que_stale' },
+    };
+    const stalePermission = {
+      type: 'permission.asked',
+      properties: { sessionID: kiloSessionId, id: 'per_stale' },
+    };
+    let releaseNextPage: () => void = () => undefined;
+    const nextPageGate = new Promise<void>(resolve => {
+      releaseNextPage = resolve;
+    });
+    const response = facade.openPublicSessionEventStream(kiloSessionId, {
+      attachmentId,
+      fence: 10,
+      continuity: fixtureContinuity,
+      snapshot: [staleBusy, staleQuestion, stalePermission],
+      authority: {
+        sessionStatus: { type: 'idle' },
+        questions: [{ id: 'que_new', sessionID: kiloSessionId }],
+        permissions: [],
+      },
+      nextPage: async () => {
+        await nextPageGate;
+        return {
+          kind: 'fenced',
+          fence: 10,
+          events: [{ type: 'last-page', properties: {} }],
+          snapshot: { oversized: false, fence: 10, events: [] },
+          authority: {
+            questions: [{ id: 'que_new', sessionID: kiloSessionId }],
+            permissions: [],
+          },
+        };
+      },
+    });
+    const reader = response.body!.getReader();
+    try {
+      await readSseFrame(reader);
+      const frames: Array<{ type: string; properties: Record<string, unknown> }> = [];
+      for (let index = 0; index < 3; index++) {
+        frames.push(await readSseFrame(reader));
+      }
+      expect(frames.map(frame => frame.type)).toEqual([
+        'session.status',
+        'question.asked',
+        'permission.asked',
+      ]);
+
+      await publish({
+        kiloUserId: 'usr_1',
+        cloudAgentSessionId: workspaceSession,
+        kiloSessionId,
+        eventId: 11,
+        event: {
+          type: 'session.status',
+          properties: { sessionID: kiloSessionId, status: { type: 'busy' } },
+        },
+      });
+      releaseNextPage();
+      for (let index = 0; index < 7; index++) frames.push(await readSseFrame(reader));
+
+      expect(frames.slice(3).map(frame => frame.type)).toEqual([
+        'last-page',
+        'session.status',
+        'question.asked',
+        'question.rejected',
+        'permission.replied',
+        'kilo.native.fence',
+        'session.status',
+      ]);
+      expect(frames[4]?.properties).toMatchObject({ status: { type: 'idle' } });
+      expect(frames[6]?.properties).toMatchObject({ requestID: 'que_stale' });
+      expect(frames[7]?.properties).toMatchObject({ requestID: 'per_stale' });
+      expect(frames.at(-1)?.properties).toMatchObject({ status: { type: 'busy' } });
+    } finally {
+      await reader.cancel();
+    }
+  });
+
   it('does not send an overflowing attachment notice to a healthy same-session stream', async () => {
     const env = envStub();
     env.SANDBOX_SESSION.get = vi

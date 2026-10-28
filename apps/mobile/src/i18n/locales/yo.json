@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "A kò lè dé ọ̀dọ̀ ẹ̀rọ náà — àsopọ̀ rẹ̀ lè ti já.",
     "remoteSpawnNonRetryable": "Ẹ̀rọ náà kò lè bẹ̀rẹ̀ ìgbà iṣẹ́ — ṣàyẹ̀wò ẹ̀rọ náà tàbí ṣe ìmúdójúìwọ̀n CLI.",
-    "remoteSpawnInstanceDisconnected": "Àsopọ̀ ẹ̀rọ tí a yàn ti já. Bẹ̀rẹ̀ ìgbà iṣẹ́ kan lórí Cloud Agent tàbí yan ẹ̀rọ mìíràn.",
-    "liveCount_one": "{{count}} LỌ́WỌ́LỌ́WỌ́",
-    "liveCount_other": "{{count}} LỌ́WỌ́LỌ́WỌ́"
+    "remoteSpawnInstanceDisconnected": "Àsopọ̀ ẹ̀rọ tí a yàn ti já. Bẹ̀rẹ̀ ìgbà iṣẹ́ kan lórí Cloud Agent tàbí yan ẹ̀rọ mìíràn."
   },
   "agentChat": {
     "session": {
@@ -3955,6 +3953,8 @@
     "title": "Ra kírẹ́dítì",
     "description": "Kírẹ́dítì jẹ́ rírà ẹ̀ẹ̀kan tí a fi kún iwọntunwọnsi Kilo rẹ fún ṣíṣe àwọn ìpàdé kíkọ kóòdù AI nínú Kilo App. Ṣọ́ọ̀bù gba owó láti inú àkọọ́lẹ̀ rẹ, a sì fi kírẹ́dítì kún un lẹ́yìn tí ṣọ́ọ̀bù bá fọwọ́sí ìsanwó.",
     "nextExpiry": "Kírẹ́dítì {{amount}} yóò dópin {{date}} (UTC). A máa kọ́kọ́ lo kírẹ́dítì tí yóò tètè dópin.",
+    "noExpiringCredits": "Kò sí kírẹ́dítì tí yóò dópin.",
+    "expiryUnavailable": "Àlàyé nípa ìgbà tí kírẹ́dítì yóò dópin kò sí.",
     "appStoreExpiry": "Kírẹ́dítì tí a rà nípasẹ̀ App Store kì í dópin.",
     "playOneYearExpiry": "Àwọn kírẹ́dítì wọ̀nyí yóò dópin ní ọdún kàlẹ́ńdà kan lẹ́yìn ríra.",
     "playNonexpiring": "Àwọn kírẹ́dítì wọ̀nyí kì í dópin.",

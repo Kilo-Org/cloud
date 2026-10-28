@@ -8,7 +8,6 @@ import { createAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import { resetCustomLlmCacheForTest } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { User } from '@kilocode/db/schema';
-import { MARTIAN } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/martian';
 import {
   customLlmDefinition,
   deleteCustomLlmForTest,
@@ -150,7 +149,8 @@ describe('getProvider with public custom LLMs', () => {
       providerInput(kiloExclusiveModelFixture.public_id, user, undefined)
     );
 
-    expect(result).toMatchObject({ kind: 'provider', provider: { id: MARTIAN.id } });
+    expect(result.kind).toBe('provider');
+    expect(['openrouter', 'vercel']).toContain(result.kind === 'provider' && result.provider.id);
   });
 
   test('keeps a private custom LLM to its grantees, exempt from policy checks', async () => {

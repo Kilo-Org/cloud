@@ -12,12 +12,12 @@ import {
   applyMistralModelSettings,
   isMistralModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/mistral';
-import { findKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { applyVercelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
-  applyKiloExclusiveModelSettings,
-  type KiloExclusiveModel,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
+  findKiloExclusiveModel,
+  isKiloExclusiveModel,
+} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { applyVercelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
+import { applyKiloExclusiveModelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import { applyAnthropicModelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic';
 import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
 import {
@@ -248,14 +248,13 @@ function serviceTierForLog(serviceTier: unknown) {
 export function removeUnsupportedRequestServiceTier(
   requestedModel: string,
   requestToMutate: GatewayRequest,
-  kiloExclusiveModel: KiloExclusiveModel | null,
   customPricing: CustomPricing | undefined
 ) {
   const reason =
     customPricing && !customPricing.fallbackOnly
       ? 'non-fallback custom pricing'
-      : kiloExclusiveModel && !kiloExclusiveModel.flags.includes('flex')
-        ? 'non-Flex Kilo-exclusive model'
+      : isKiloExclusiveModel(requestedModel)
+        ? 'Kilo-exclusive model'
         : null;
   const serviceTier = requestToMutate.body.service_tier;
   if (!reason || serviceTier === undefined) {
@@ -369,13 +368,12 @@ export async function applyProviderSpecificLogic(
 
   enableReasoningSummaries(requestToMutate);
 
-  const kiloExclusiveModel = findKiloExclusiveModel(requestedModel);
   removeUnsupportedRequestServiceTier(
     requestedModel,
     requestToMutate,
-    kiloExclusiveModel,
     getCustomPricing(await getCustomPricingConfig(), requestedModel)
   );
+  const kiloExclusiveModel = findKiloExclusiveModel(requestedModel);
   if (kiloExclusiveModel) {
     applyKiloExclusiveModelSettings(requestToMutate, kiloExclusiveModel);
   }

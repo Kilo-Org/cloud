@@ -1,6 +1,5 @@
 import { afterAll, beforeAll } from '@jest/globals';
 import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { MARTIAN } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/martian';
 import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 
 export const kiloExclusiveModelFixture: KiloExclusiveModel = {
@@ -10,7 +9,6 @@ export const kiloExclusiveModelFixture: KiloExclusiveModel = {
   description: 'A Kilo-exclusive model used by tests.',
   context_length: 1_000_000,
   max_completion_tokens: 128_000,
-  provider: MARTIAN,
   flags: ['reasoning', 'vision'],
 };
 

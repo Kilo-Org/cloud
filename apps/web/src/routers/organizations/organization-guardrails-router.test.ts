@@ -6,19 +6,15 @@ import {
   getOrganizationById,
   mutateOrganizationSettings,
 } from '@kilocode/web-shared/lib/organizations/organizations';
-import { organization_audit_logs, type Organization, type User } from '@kilocode/db/schema';
+import {
+  admin_action_audit_logs,
+  organization_audit_logs,
+  type Organization,
+  type User,
+} from '@kilocode/db/schema';
 import { createKiloDefaultEnkryptInputDetectors } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { desc, eq } from 'drizzle-orm';
-
-jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
-  isFeatureFlagEnabled: jest.fn(async () => true),
-  isReleaseToggleEnabled: jest.fn(async () => true),
-}));
-
-import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
-
-const mockedIsReleaseToggleEnabled = jest.mocked(isReleaseToggleEnabled);
 
 let owner: User;
 let member: User;
@@ -56,14 +52,10 @@ describe('organization guardrails router', () => {
       'Guardrails Org',
       owner.id,
       0,
-      { data_collection: 'deny' },
+      { data_collection: 'deny', kilo_encrypt: true },
       false
     );
     await addUserToOrganization(organization.id, member.id, 'member');
-  });
-
-  beforeEach(() => {
-    mockedIsReleaseToggleEnabled.mockResolvedValue(true);
   });
 
   it('returns Kilo Default, off, for an organization that never saved guardrails', async () => {
@@ -167,17 +159,64 @@ describe('organization guardrails router', () => {
     ).rejects.toThrow();
   });
 
-  it('is unavailable when the kilo_encrypt flag is off for the organization', async () => {
-    mockedIsReleaseToggleEnabled.mockResolvedValue(false);
+  it('is unavailable until a Kilo admin enables kilo_encrypt for the organization', async () => {
+    const ungranted = await createTestOrganization(
+      'Ungranted Guardrails Org',
+      owner.id,
+      0,
+      {},
+      false
+    );
     const caller = await createCallerForUser(owner.id);
 
     await expect(
-      caller.organizations.guardrails.get({ organizationId: organization.id })
+      caller.organizations.guardrails.get({ organizationId: ungranted.id })
     ).rejects.toThrow('AI Guardrails is not available for this organization.');
     await expect(
-      caller.organizations.guardrails.update({ organizationId: organization.id, ...savedConfig() })
+      caller.organizations.guardrails.update({ organizationId: ungranted.id, ...savedConfig() })
     ).rejects.toThrow('AI Guardrails is not available for this organization.');
-    expect(mockedIsReleaseToggleEnabled).toHaveBeenCalledWith('kilo_encrypt', organization.id);
+  });
+
+  it('lets only Kilo admins turn kilo_encrypt on and off, with an admin audit entry', async () => {
+    const target = await createTestOrganization('Kilo Encrypt Org', owner.id, 0, {}, false);
+    const kiloAdmin = await insertTestUser({
+      google_user_email: 'kilo-admin-guardrails@admin.example.com',
+      google_user_name: 'Kilo Admin',
+      is_admin: true,
+    });
+
+    await expect(
+      (await createCallerForUser(owner.id)).organizations.admin.updateKiloEncrypt({
+        organizationId: target.id,
+        kilo_encrypt: true,
+      })
+    ).rejects.toThrow();
+
+    const adminCaller = await createCallerForUser(kiloAdmin.id);
+    await adminCaller.organizations.admin.updateKiloEncrypt({
+      organizationId: target.id,
+      kilo_encrypt: true,
+    });
+    expect((await getOrganizationById(target.id))?.settings.kilo_encrypt).toBe(true);
+    await expect(
+      (await createCallerForUser(owner.id)).organizations.guardrails.get({
+        organizationId: target.id,
+      })
+    ).resolves.toMatchObject({ enabled: false });
+
+    await adminCaller.organizations.admin.updateKiloEncrypt({
+      organizationId: target.id,
+      kilo_encrypt: false,
+    });
+    expect((await getOrganizationById(target.id))?.settings.kilo_encrypt).toBe(false);
+
+    const [auditEntry] = await db
+      .select()
+      .from(admin_action_audit_logs)
+      .where(eq(admin_action_audit_logs.action, 'organization.kilo_encrypt.set'))
+      .orderBy(desc(admin_action_audit_logs.created_at))
+      .limit(1);
+    expect(auditEntry?.message).toBe('Disabled AI Guardrails (kilo_encrypt)');
   });
 
   it('reports invalid saved detectors and keeps them from breaking other settings', async () => {
@@ -185,7 +224,10 @@ describe('organization guardrails router', () => {
       'Invalid Guardrails Org',
       owner.id,
       0,
-      { enkrypt: { input_guardrail: { enabled: true, detectors: { injection_attack: true } } } },
+      {
+        kilo_encrypt: true,
+        enkrypt: { input_guardrail: { enabled: true, detectors: { injection_attack: true } } },
+      },
       false
     );
     const caller = await createCallerForUser(owner.id);

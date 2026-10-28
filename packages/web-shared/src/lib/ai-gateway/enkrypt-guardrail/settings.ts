@@ -49,14 +49,16 @@ export function readStoredEnkryptDetectors(
 }
 
 /**
- * The organization's input guardrail, or null when it is absent, disabled, invalid in settings,
- * or selects no detector. Organizations that never saved detectors get Kilo Default.
+ * The organization's input guardrail, or null when Kilo admins have not granted the feature
+ * (`kilo_encrypt`), or the guardrail is absent, disabled, invalid in settings, or selects no
+ * detector. Organizations that never saved detectors get Kilo Default.
  */
 export function resolveEnkryptInputGuardrail(
   organizationId: string,
   settings: OrganizationSettings | undefined
 ): EnkryptInputGuardrailConfig | null {
-  const raw: unknown = settings?.enkrypt?.input_guardrail;
+  if (settings?.kilo_encrypt !== true) return null;
+  const raw: unknown = settings.enkrypt?.input_guardrail;
   if (raw === undefined) return null;
   const parsed = EnkryptInputGuardrailSettingsSchema.safeParse(raw);
   if (!parsed.success) {

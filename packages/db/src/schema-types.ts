@@ -875,6 +875,7 @@ export const AdminActionAuditAction = z.enum([
   'organization.created_by.set',
   'organization.free_trial_end.set',
   'organization.trial_messaging.set',
+  'organization.kilo_encrypt.set',
   'organization.sso.config.create',
   'organization.sso.config.delete',
   'organization.sso.admin_portal_link.generate',
@@ -1346,6 +1347,8 @@ const OrganizationSettingsSchema = z.object({
   // Seeded usage microdollars written by the sales demo populate step. Used to
   // separate seeded usage from real spend when computing the ledger entry.
   sales_demo_seeded_microdollars: z.number().optional(),
+  // Set by Kilo admins: lets the organization configure Enkrypt AI guardrails in Kilo Cloud
+  kilo_encrypt: z.boolean().optional(),
   enkrypt: OrganizationEnkryptSettingsSchema.optional(),
 });
 

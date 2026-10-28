@@ -21,7 +21,7 @@ import {
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { isEnkryptGuardrailsFeatureEnabled } from '@/lib/organizations/enkrypt-guardrails-feature';
+import { isKiloEncryptEnabled } from '@/lib/organizations/kilo-encrypt';
 
 const OrganizationGuardrailsConfigSchema = z.object({
   enabled: z.boolean(),
@@ -40,13 +40,18 @@ const OrganizationGuardrailsResponseSchema = OrganizationGuardrailsConfigSchema.
   invalid_saved_detectors: z.boolean(),
 });
 
-async function requireGuardrailsFeature(organizationId: string) {
-  if (!(await isEnkryptGuardrailsFeatureEnabled(organizationId))) {
+async function requireGuardrailsOrganization(organizationId: string) {
+  const organization = await getOrganizationById(organizationId);
+  if (!organization) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+  }
+  if (!isKiloEncryptEnabled(organization.settings)) {
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: 'AI Guardrails is not available for this organization.',
     });
   }
+  return organization;
 }
 
 /** Describes a saved configuration for the audit log without keywords, topics, or policy text. */
@@ -82,11 +87,7 @@ export const organizationGuardrailsRouter = createTRPCRouter({
   get: organizationAdminProcedure
     .output(OrganizationGuardrailsResponseSchema)
     .query(async ({ input }) => {
-      await requireGuardrailsFeature(input.organizationId);
-      const organization = await getOrganizationById(input.organizationId);
-      if (!organization) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
-      }
+      const organization = await requireGuardrailsOrganization(input.organizationId);
       const settings = EnkryptInputGuardrailSettingsSchema.safeParse(
         organization.settings.enkrypt?.input_guardrail
       );
@@ -113,7 +114,7 @@ export const organizationGuardrailsRouter = createTRPCRouter({
     .output(OrganizationGuardrailsResponseSchema)
     .mutation(async ({ input, ctx }) => {
       const { organizationId, ...config } = input;
-      await requireGuardrailsFeature(organizationId);
+      await requireGuardrailsOrganization(organizationId);
       if (config.enabled && enabledEnkryptDetectorIds(config.detectors).length === 0) {
         throw new TRPCError({ code: 'BAD_REQUEST', message: 'Turn on at least one detector.' });
       }

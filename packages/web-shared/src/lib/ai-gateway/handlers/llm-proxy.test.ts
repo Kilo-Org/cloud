@@ -3394,7 +3394,7 @@ describe('Enkrypt input guardrail', () => {
     });
     mockedGetBalanceAndOrgSettings.mockResolvedValue({
       balance: 1000,
-      settings,
+      settings: settings && { kilo_encrypt: true, ...settings },
       plan: 'enterprise',
     });
   }
@@ -3424,6 +3424,17 @@ describe('Enkrypt input guardrail', () => {
 
     expect(response.status).toBe(200);
     expect(fetchSpy).not.toHaveBeenCalled();
+    expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
+  });
+
+  it('makes no Enkrypt call when Kilo admins have not granted kilo_encrypt', async () => {
+    setOrganization({ kilo_encrypt: false, enkrypt: { input_guardrail: { enabled: true } } });
+    enkryptAnswers(injection);
+
+    const response = await handleLlmProxyRequest(makeRequest(makeBody()));
+
+    expect(response.status).toBe(200);
+    expect(enkryptRequestBodies()).toEqual([]);
     expect(mockedUpstreamRequest).toHaveBeenCalledTimes(1);
   });
 

@@ -6,10 +6,23 @@ import { resolveEnkryptInputGuardrail } from './settings';
 const organizationId = '00000000-0000-4000-8000-000000000002';
 
 function resolve(settings: OrganizationSettings | undefined) {
-  return resolveEnkryptInputGuardrail(organizationId, settings);
+  return resolveEnkryptInputGuardrail(
+    organizationId,
+    settings && { kilo_encrypt: true, ...settings }
+  );
 }
 
 describe('resolveEnkryptInputGuardrail', () => {
+  it.each([
+    ['not granted', { enkrypt: { input_guardrail: { enabled: true } } }],
+    ['revoked', { kilo_encrypt: false, enkrypt: { input_guardrail: { enabled: true } } }],
+  ] satisfies [string, OrganizationSettings][])(
+    'is off when kilo_encrypt is %s, even with the guardrail enabled',
+    (_name, settings) => {
+      expect(resolveEnkryptInputGuardrail(organizationId, settings)).toBeNull();
+    }
+  );
+
   it.each([
     ['no settings', undefined],
     ['no guardrail setting', { data_collection: 'deny' }],

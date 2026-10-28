@@ -46,6 +46,7 @@ import {
   getOrganizationById,
   addUserToOrganization,
   markOrganizationAsDeleted,
+  mutateOrganizationSettings,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import { OrganizationRoleSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { getOrCreateStripeCustomerIdForOrganization } from '@/lib/organizations/organization-billing';
@@ -160,6 +161,11 @@ const UpdateFreeTrialEndAtInputSchema = z.object({
 const UpdateSuppressTrialMessagingInputSchema = z.object({
   organizationId: z.uuid(),
   suppress_trial_messaging: z.boolean(),
+});
+
+const UpdateKiloEncryptInputSchema = z.object({
+  organizationId: z.uuid(),
+  kilo_encrypt: z.boolean(),
 });
 
 const AdminOrganizationDetailsSchema = z.object({
@@ -497,6 +503,37 @@ export const organizationAdminRouter = createTRPCRouter({
         metadata: {
           previousSuppressTrialMessaging: organization.settings.suppress_trial_messaging ?? null,
           suppressTrialMessaging: suppress_trial_messaging,
+        },
+      });
+
+      return successResult();
+    }),
+
+  updateKiloEncrypt: adminProcedure
+    .input(UpdateKiloEncryptInputSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, kilo_encrypt } = input;
+      const organization = await db.query.organizations.findFirst({
+        where: eq(organizations.id, organizationId),
+      });
+      if (!organization) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+
+      await mutateOrganizationSettings(organizationId, current => ({
+        ...current.settings,
+        kilo_encrypt,
+      }));
+
+      await recordAdminAction(ctx, {
+        action: 'organization.kilo_encrypt.set',
+        target: organizationActionTarget(organizationId),
+        message: kilo_encrypt
+          ? 'Enabled AI Guardrails (kilo_encrypt)'
+          : 'Disabled AI Guardrails (kilo_encrypt)',
+        metadata: {
+          previousKiloEncrypt: organization.settings.kilo_encrypt ?? null,
+          kiloEncrypt: kilo_encrypt,
         },
       });
 

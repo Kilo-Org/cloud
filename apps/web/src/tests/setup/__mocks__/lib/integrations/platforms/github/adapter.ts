@@ -4,10 +4,7 @@
 
 export type GitHubAppType = 'standard' | 'lite';
 
-export function verifyGitHubWebhookSignature(
-  _payload: string,
-  _signature: string
-): 'valid' {
+export function verifyGitHubWebhookSignature(_payload: string, _signature: string): 'valid' {
   return 'valid';
 }
 

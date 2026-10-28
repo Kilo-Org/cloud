@@ -1677,10 +1677,7 @@
     },
     "remoteSpawnRetryable": "לא ניתן היה ליצור קשר עם המופע — ייתכן שהחיבור נותק.",
     "remoteSpawnNonRetryable": "המופע לא הצליח להתחיל את השיחה — בדוק את המחשב או עדכן את ה-CLI.",
-    "remoteSpawnInstanceDisconnected": "המופע שנבחר נותק. התחל שיחה ב-Cloud Agent או בחר מופע אחר.",
-    "liveCount_one": "בזמן אמת: {{count}}",
-    "liveCount_other": "בזמן אמת: {{count}}",
-    "liveCount_two": "{{count}} פעילים"
+    "remoteSpawnInstanceDisconnected": "המופע שנבחר נותק. התחל שיחה ב-Cloud Agent או בחר מופע אחר."
   },
   "agentChat": {
     "session": {

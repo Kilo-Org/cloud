@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Asikwazanga ukufinyelela ikhophi — kungenzeka ukuxhumana kwayo kunqamukile.",
     "remoteSpawnNonRetryable": "Ikhophi yehlulekile ukuqala iseshini — hlola umshini noma ubuyekeze i-CLI.",
-    "remoteSpawnInstanceDisconnected": "Ukuxhumana kwekhophi ekhethiwe kunqamukile. Qala iseshini ku-Cloud Agent noma ukhethe enye ikhophi.",
-    "liveCount_one": "{{count}} BUKHOMA",
-    "liveCount_other": "{{count}} BUKHOMA"
+    "remoteSpawnInstanceDisconnected": "Ukuxhumana kwekhophi ekhethiwe kunqamukile. Qala iseshini ku-Cloud Agent noma ukhethe enye ikhophi."
   },
   "agentChat": {
     "session": {

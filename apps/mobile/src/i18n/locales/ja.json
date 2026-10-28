@@ -1665,9 +1665,7 @@
     },
     "remoteSpawnRetryable": "インスタンスと通信できませんでした。接続が切れた可能性があります。",
     "remoteSpawnNonRetryable": "インスタンスでセッションを開始できませんでした。マシンの状態を確認するか、CLIを更新してください。",
-    "remoteSpawnInstanceDisconnected": "選択したインスタンスとの接続が切れました。Cloud Agentでセッションを開始するか、別のインスタンスを選択してください。",
-    "liveCount_one": "ライブ：{{count}}件",
-    "liveCount_other": "ライブ：{{count}}件"
+    "remoteSpawnInstanceDisconnected": "選択したインスタンスとの接続が切れました。Cloud Agentでセッションを開始するか、別のインスタンスを選択してください。"
   },
   "agentChat": {
     "session": {

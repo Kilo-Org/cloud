@@ -1645,10 +1645,7 @@
     },
     "remoteSpawnRetryable": "Impossibile raggiungere l'istanza: potrebbe essersi disconnessa.",
     "remoteSpawnNonRetryable": "L'istanza non è riuscita ad avviare la sessione: controlla la macchina o aggiorna la CLI.",
-    "remoteSpawnInstanceDisconnected": "L'istanza selezionata si è disconnessa. Avvia una sessione su Cloud Agent oppure scegli un'altra istanza.",
-    "liveCount_one": "{{count}} IN TEMPO REALE",
-    "liveCount_other": "{{count}} IN TEMPO REALE",
-    "liveCount_many": "{{count}} ATTIVI"
+    "remoteSpawnInstanceDisconnected": "L'istanza selezionata si è disconnessa. Avvia una sessione su Cloud Agent oppure scegli un'altra istanza."
   },
   "agentChat": {
     "session": {

@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "A kò lè dé ọ̀dọ̀ ẹ̀rọ náà — àsopọ̀ rẹ̀ lè ti já.",
     "remoteSpawnNonRetryable": "Ẹ̀rọ náà kò lè bẹ̀rẹ̀ ìgbà iṣẹ́ — ṣàyẹ̀wò ẹ̀rọ náà tàbí ṣe ìmúdójúìwọ̀n CLI.",
-    "remoteSpawnInstanceDisconnected": "Àsopọ̀ ẹ̀rọ tí a yàn ti já. Bẹ̀rẹ̀ ìgbà iṣẹ́ kan lórí Cloud Agent tàbí yan ẹ̀rọ mìíràn.",
-    "liveCount_one": "{{count}} LỌ́WỌ́LỌ́WỌ́",
-    "liveCount_other": "{{count}} LỌ́WỌ́LỌ́WỌ́"
+    "remoteSpawnInstanceDisconnected": "Àsopọ̀ ẹ̀rọ tí a yàn ti já. Bẹ̀rẹ̀ ìgbà iṣẹ́ kan lórí Cloud Agent tàbí yan ẹ̀rọ mìíràn."
   },
   "agentChat": {
     "session": {

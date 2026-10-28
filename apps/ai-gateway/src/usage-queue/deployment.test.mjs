@@ -78,8 +78,15 @@ for (const [name, env, staging] of targets) {
           readFileSync(join(fixture, templatePath), 'utf8')
         );
         assert.deepEqual(trigger.regions, ['fra1']);
-        assert.equal(trigger.experimentalTriggers[0].type, 'queue/v2beta');
-        assert.equal(trigger.experimentalTriggers[0].maxConcurrency, 200);
+        assert.equal(Object.hasOwn(trigger.experimentalTriggers[0], 'maxConcurrency'), false);
+        assert.deepEqual(trigger.experimentalTriggers, [
+          {
+            type: 'queue/v2beta',
+            topic: 'usage-staging',
+            retryAfterSeconds: 60,
+            maxDeliveries: 20,
+          },
+        ]);
       } else {
         assert.equal(config.functions, undefined);
       }

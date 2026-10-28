@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- the screen keeps every existing detail section plus the read-only transcript slot */
 
 import * as Haptics from 'expo-haptics';
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Alert, View } from 'react-native';
@@ -20,6 +20,7 @@ import {
   selectRetryAction,
 } from '@/components/code-reviewer/review-detail-helpers';
 import { ReviewSpectatorSheet } from '@/components/code-reviewer/review-spectator-sheet';
+import { useSinglePushRoute } from '@/components/code-reviewer/use-single-push-route';
 import {
   CouncilSection,
   FindingCard,
@@ -61,7 +62,7 @@ export function ReviewDetailScreen({
   scope,
   reviewId,
 }: Readonly<{ scope: string; reviewId: string }>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
   const { data, isLoading, isError, isFetching, error, refetch } = useReviewDetail(reviewId);
@@ -338,7 +339,7 @@ export function ReviewDetailScreen({
               if (isPersonal(scope)) {
                 const destination = resolveCodeReviewerOpenPrDestination(review.pr_url);
                 if (destination.kind === 'in-app') {
-                  router.push(destination.href);
+                  pushOnce(destination.href);
                   return;
                 }
               }
@@ -397,7 +398,7 @@ export function ReviewDetailScreen({
               <Button
                 variant="secondary"
                 onPress={() => {
-                  router.push(`/(app)/code-reviewer/${scope}/${review.platform}` as Href);
+                  pushOnce(`/(app)/code-reviewer/${scope}/${review.platform}` as Href);
                 }}
               >
                 <Text>{t('codeReviewer.reviewDetail.fixSettings')}</Text>

@@ -390,7 +390,7 @@ export async function handleLlmProxyRequest(
 
   // Like the bouncer decide, the organization's guardrail scan overlaps auth, balance, and routing
   // work and is awaited just before the upstream call.
-  const enkryptGuardrailVerdictPromise = startEnkryptInputGuardrail(
+  const enkryptGuardrail = startEnkryptInputGuardrail(
     Promise.all([authPromise, balanceAndSettingsPromise]).then(([auth, { settings }]) => {
       if (!auth.user || auth.authFailedResponse || !auth.organizationId) return null;
       const config = resolveEnkryptInputGuardrail(auth.organizationId, settings);
@@ -1080,16 +1080,15 @@ export async function handleLlmProxyRequest(
   const bouncerRejection = bouncerRejectionResponse(bouncerVerdict, bouncerRequestId);
   if (bouncerRejection) return bouncerRejection;
   if (usageContext.bouncer) usageContext.bouncer.spendWatch = bouncerVerdict?.spendWatch === true;
-  const guardrailWaitStartedAt = performance.now();
-  const guardrailVerdict = await enkryptGuardrailVerdictPromise;
+  const { verdict: guardrailVerdict, waitedMs: guardrailWaitedMs } =
+    await enkryptGuardrail.awaitVerdict();
   if (guardrailVerdict.action !== 'skip') {
-    const guardrailWaitEndedAt = performance.now();
     console.debug('[enkrypt-guardrail] verdict awaited', {
       organization_id: organizationId,
       session_id: taskId ?? sessionHeader ?? null,
       action: guardrailVerdict.action,
-      waited_ms: Math.round(guardrailWaitEndedAt - guardrailWaitStartedAt),
-      request_elapsed_ms: Math.round(guardrailWaitEndedAt - requestStartedAt),
+      waited_ms: guardrailWaitedMs,
+      request_elapsed_ms: Math.round(performance.now() - requestStartedAt),
     });
   }
   const guardrailRejection = enkryptGuardrailRejectionResponse(

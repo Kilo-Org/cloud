@@ -47,7 +47,9 @@ import {
 } from './user-kilo-facade';
 import type { NativeEventTail, NativeTailOpenResult, NativeTailSink } from './native-event-tail.js';
 
-function nativeTailDouble(options: { run?: (sink: NativeTailSink) => Promise<void> } = {}): NativeEventTail {
+function nativeTailDouble(
+  options: { run?: (sink: NativeTailSink) => Promise<void> } = {}
+): NativeEventTail {
   return {
     async run(sink) {
       if (options.run !== undefined) return options.run(sink);
@@ -2511,7 +2513,6 @@ describe('UserKiloFacade producer messages', () => {
   });
 });
 
-
 describe('hosted global native events', () => {
   function rootSummary(
     id = kiloSessionId,
@@ -2592,7 +2593,18 @@ describe('hosted global native events', () => {
       const list = sinksFor(root);
       for (const item of frames) for (const entry of list) await entry.sink?.send(item as never);
     };
-    return { env, facade, listCloudAgentRootSessions, resolveRoot, openNativeTail, tails, waitUntil, event, push, sinksFor };
+    return {
+      env,
+      facade,
+      listCloudAgentRootSessions,
+      resolveRoot,
+      openNativeTail,
+      tails,
+      waitUntil,
+      event,
+      push,
+      sinksFor,
+    };
   }
 
   function globalReader(facade: UserKiloFacade, openNativeTail: KiloFacadeNativeTailOpener) {
@@ -2690,7 +2702,10 @@ describe('hosted global native events', () => {
   });
 
   it('resnapshots only the root whose tail reports a gap and keeps the global SSE open', async () => {
-    const fixture = globalFixture([rootSummary(), rootSummary(siblingKiloSessionId, siblingWorkspaceSessionId)]);
+    const fixture = globalFixture([
+      rootSummary(),
+      rootSummary(siblingKiloSessionId, siblingWorkspaceSessionId),
+    ]);
     const reader = globalReader(fixture.facade, fixture.openNativeTail);
     try {
       await expectGlobalConnected(reader);
@@ -2715,7 +2730,10 @@ describe('hosted global native events', () => {
   });
 
   it('keeps two global consumers distinct when one cancels', async () => {
-    const fixture = globalFixture([rootSummary(), rootSummary(siblingKiloSessionId, siblingWorkspaceSessionId)]);
+    const fixture = globalFixture([
+      rootSummary(),
+      rootSummary(siblingKiloSessionId, siblingWorkspaceSessionId),
+    ]);
     const first = globalReader(fixture.facade, fixture.openNativeTail);
     const second = globalReader(fixture.facade, fixture.openNativeTail);
     try {

@@ -33,7 +33,10 @@ import {
 import { fetchSessionMetadata } from '../session/metadata.js';
 import { isControlSession } from '../session-identity.js';
 import type { SessionId } from '../types/ids.js';
-import type { ControlPlaneSendResult, SandboxSessionV2 } from '../control-plane/session/session-do.js';
+import type {
+  ControlPlaneSendResult,
+  SandboxSessionV2,
+} from '../control-plane/session/session-do.js';
 import type {
   ControlPlaneAnswerReply,
   ControlPlaneControlResult,
@@ -1111,7 +1114,11 @@ async function openHostedNativeAttachment(params: {
     return facadeError(503, 'KILO_SESSION_READ_RETRYABLE', 'Native event stream is unavailable');
   }
   if (opened.kind === 'stopped')
-    return facadeError(503, 'KILO_LIVE_RUNTIME_UNAVAILABLE', 'Cloud Agent Kilo runtime is not live');
+    return facadeError(
+      503,
+      'KILO_LIVE_RUNTIME_UNAVAILABLE',
+      'Cloud Agent Kilo runtime is not live'
+    );
   if (opened.kind === 'unavailable') return facadeError(503, opened.code, opened.message);
   return globalEvents.openPublicSessionEventStream(kiloSessionId, { tail: opened.tail });
 }
@@ -1610,7 +1617,10 @@ export class UserKiloFacade extends DurableObject<Env> implements KiloFacadeGlob
     );
   }
 
-  openPublicSessionEventStream(kiloSessionId: string, native?: { tail: NativeEventTail }): Response {
+  openPublicSessionEventStream(
+    kiloSessionId: string,
+    native?: { tail: NativeEventTail }
+  ): Response {
     return this.openPublicEventStream({ kind: 'session', kiloSessionId }, native);
   }
 

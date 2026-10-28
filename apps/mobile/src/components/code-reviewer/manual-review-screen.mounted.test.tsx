@@ -214,11 +214,7 @@ function only<T>(items: T[], what: string): T {
 async function renderScreen(scope = 'personal') {
   // The root stack publishes `null`: no tab bar under this screen.
   const { renderer, unmount } = await renderWithProviders(
-    createElement(
-      TabBarLabelContext,
-      { value: null },
-      createElement(ManualReviewScreen, { scope })
-    )
+    createElement(TabBarLabelContext, { value: null }, createElement(ManualReviewScreen, { scope }))
   );
   return { renderer, unmount };
 }

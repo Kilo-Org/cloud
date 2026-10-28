@@ -9,11 +9,15 @@ import {
 } from './detect';
 
 const config = {
-  failMode: 'open',
+  scanToolResults: true,
+  status: 'ready',
   detectors: {
     injection_attack: { enabled: true, need_explanation: false },
     pii: { enabled: true, entities: ['secrets'] },
+    toxicity: { enabled: true },
+    keyword_detector: { enabled: true, banned_keywords: ['Project Phoenix'] },
   },
+  blockingDetectors: ['injection_attack', 'toxicity', 'keyword_detector'],
 } satisfies EnkryptGuardrailScan['config'];
 
 function makeScan(overrides: Partial<EnkryptGuardrailScan> = {}): EnkryptGuardrailScan {
@@ -74,10 +78,7 @@ describe('scanTurnDelta', () => {
     });
     expect(JSON.parse(String(init.body))).toEqual({
       text: 'tool output',
-      detectors: {
-        injection_attack: { enabled: true, need_explanation: false },
-        pii: { enabled: true, entities: ['secrets'] },
-      },
+      detectors: config.detectors,
       user_metadata: { organization_id: '00000000-0000-4000-8000-000000000002' },
     });
   });
@@ -154,11 +155,51 @@ describe('scanTurnDelta', () => {
     expect(result.verdict).toEqual({
       action: 'block',
       message:
-        "Your organization's Enkrypt AI guardrail blocked this request (detected: toxicity). The request was flagged as unsafe. Review it and retry.",
+        "Your organization's Enkrypt AI guardrail blocked this request (detected: toxicity). The request was flagged by your organization policy. Review it and retry.",
     });
   });
 
-  it('allows a turn when only the revise-type pii detector fires', async () => {
+  it('blocks a revise-type detector set to block without showing the redacted text', async () => {
+    const result = await scanTurnDelta(
+      makeScan(),
+      deps(async () =>
+        detectResponse({
+          summary: { keyword_detected: 1, pii: 0 },
+          result_message: 'You are working on [KEYWORD_1]',
+        })
+      )
+    );
+
+    expect(result.verdict).toEqual({
+      action: 'block',
+      message:
+        "Your organization's Enkrypt AI guardrail blocked this request (detected: keyword_detector). The request was flagged by your organization policy. Review it and retry.",
+    });
+    expect(result.charges).toEqual([expect.objectContaining({ decision: 'blocked' })]);
+  });
+
+  it('ignores detections from detectors it does not know', async () => {
+    const result = await scanTurnDelta(
+      makeScan(),
+      deps(async () => detectResponse({ summary: { system_prompt_similarity: 1 } }))
+    );
+
+    expect(result.verdict).toEqual({ action: 'allow' });
+  });
+
+  it('rejects every turn without calling Enkrypt when the saved detectors are unreadable', async () => {
+    const dependencies = deps(async () => detectResponse({ summary: {} }));
+
+    const result = await scanTurnDelta(
+      makeScan({ config: { scanToolResults: true, status: 'invalid' } }),
+      dependencies
+    );
+
+    expect(result).toEqual({ verdict: { action: 'unavailable' }, charges: [] });
+    expect(dependencies.fetch).not.toHaveBeenCalled();
+  });
+
+  it('allows a turn when only a revise-type detector set to log fires', async () => {
     const result = await scanTurnDelta(
       makeScan(),
       deps(async () =>
@@ -185,22 +226,10 @@ describe('scanTurnDelta', () => {
   describe('a turn above the scan limit', () => {
     const text = 'a'.repeat(ENKRYPT_MAX_SCAN_CHARACTERS + 1);
 
-    it('is sent unscanned when failing open, never truncated', async () => {
+    it('is rejected with the reason, never truncated or sent', async () => {
       const dependencies = deps(async () => detectResponse({ summary: {} }));
 
       const result = await scanTurnDelta(makeScan({ text }), dependencies);
-
-      expect(result).toEqual({ verdict: { action: 'allow' }, charges: [] });
-      expect(dependencies.fetch).not.toHaveBeenCalled();
-    });
-
-    it('is rejected without a retry hint when failing closed', async () => {
-      const dependencies = deps(async () => detectResponse({ summary: {} }));
-
-      const result = await scanTurnDelta(
-        makeScan({ text, config: { ...config, failMode: 'closed' } }),
-        dependencies
-      );
 
       expect(result).toEqual({
         verdict: {
@@ -236,10 +265,10 @@ describe('scanTurnDelta', () => {
     const result = await scanTurnDelta(makeScan(), dependencies);
 
     expect(dependencies.fetch).toHaveBeenCalledTimes(1);
-    expect(result.verdict).toEqual({ action: 'allow' });
+    expect(result.verdict).toEqual({ action: 'unavailable' });
   });
 
-  describe('fail mode', () => {
+  describe('when Enkrypt is unavailable', () => {
     const failures: [string, () => Promise<Response>][] = [
       ['a persistent server error', async () => detectResponse({ summary: {} }, { status: 503 })],
       ['a network error', async () => Promise.reject(new TypeError('fetch failed'))],
@@ -250,50 +279,33 @@ describe('scanTurnDelta', () => {
       ],
     ];
 
-    it.each(failures)('sends the request on %s when failing open', async (_name, failure) => {
+    it.each(failures)('rejects the request on %s', async (_name, failure) => {
       const result = await scanTurnDelta(makeScan(), deps(failure));
 
-      expect(result.verdict).toEqual({ action: 'allow' });
+      expect(result.verdict).toEqual({ action: 'unavailable' });
       expect(result.charges.every(charge => charge.decision === 'error')).toBe(true);
     });
 
-    it.each(failures)('rejects the request on %s when failing closed', async (_name, failure) => {
-      const result = await scanTurnDelta(
-        makeScan({ config: { ...config, failMode: 'closed' } }),
-        deps(failure)
-      );
-
-      expect(result.verdict).toEqual({ action: 'unavailable' });
-    });
-
-    it('applies the fail mode when Enkrypt does not answer within the timeout', async () => {
+    it('rejects the request when Enkrypt does not answer within the timeout', async () => {
       const hang = (_input: string, init: RequestInit) =>
         new Promise<Response>((_resolve, reject) => {
           init.signal?.addEventListener('abort', () => reject(init.signal?.reason));
         });
       const dependencies = deps(hang, { timeoutMs: 20 });
 
-      const open = await scanTurnDelta(makeScan(), dependencies);
-      const closed = await scanTurnDelta(
-        makeScan({ config: { ...config, failMode: 'closed' } }),
-        deps(hang, { timeoutMs: 20 })
-      );
+      const result = await scanTurnDelta(makeScan(), dependencies);
 
-      expect(open.verdict).toEqual({ action: 'allow' });
-      expect(closed.verdict).toEqual({ action: 'unavailable' });
+      expect(result.verdict).toEqual({ action: 'unavailable' });
       expect(dependencies.fetch).toHaveBeenCalledTimes(1);
-      expect(open.charges).toEqual([expect.objectContaining({ decision: 'error' })]);
+      expect(result.charges).toEqual([expect.objectContaining({ decision: 'error' })]);
     });
 
-    it('applies the fail mode without calling Enkrypt when the API key is unset', async () => {
+    it('rejects the request without calling Enkrypt when the API key is unset', async () => {
       const dependencies = deps(async () => detectResponse({ summary: {} }), {
         apiKey: undefined,
       });
 
-      const result = await scanTurnDelta(
-        makeScan({ config: { ...config, failMode: 'closed' } }),
-        dependencies
-      );
+      const result = await scanTurnDelta(makeScan(), dependencies);
 
       expect(result).toEqual({ verdict: { action: 'unavailable' }, charges: [] });
       expect(dependencies.fetch).not.toHaveBeenCalled();

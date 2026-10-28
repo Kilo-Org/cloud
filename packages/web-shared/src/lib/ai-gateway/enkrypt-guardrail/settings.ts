@@ -1,52 +1,56 @@
 import {
+  EnkryptInputDetectorsSchema,
   EnkryptInputGuardrailSettingsSchema,
-  type EnkryptInputGuardrailSettings,
-  type EnkryptPiiEntity,
+  type EnkryptDetectorId,
+  type EnkryptInputDetectors,
   type OrganizationSettings,
 } from '@kilocode/db/schema-types';
+import {
+  blockingEnkryptDetectorIds,
+  buildEnkryptDetectRequestDetectors,
+  createKiloDefaultEnkryptInputDetectors,
+  enabledEnkryptDetectorIds,
+  type EnkryptDetectRequestDetectors,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
-/** The `detectors` object of Enkrypt's `POST /guardrails/detect` request. */
-export type EnkryptDetectors = {
-  injection_attack?: { enabled: true; need_explanation: false };
-  pii?: { enabled: true; entities: EnkryptPiiEntity[] };
-  nsfw?: { enabled: true };
-  toxicity?: { enabled: true };
-};
-
-export type EnkryptInputGuardrailConfig = {
-  failMode: 'open' | 'closed';
-  detectors: EnkryptDetectors;
-};
-
 /**
- * Injection detection covers indirect prompt injection in tool results, the main threat to coding
- * agents; secrets detection reports credentials read into the conversation.
+ * `invalid`: the organization enabled the guardrail but its saved detectors do not match the
+ * schema, so every scanned turn is rejected as if Enkrypt were unavailable rather than falling
+ * back to a weaker policy.
  */
-export const DEFAULT_ENKRYPT_DETECTORS = {
-  injection_attack: true,
-  pii_entities: ['secrets'],
-} satisfies EnkryptInputGuardrailSettings['detectors'];
+export type EnkryptInputGuardrailConfig = { scanToolResults: boolean } & (
+  | {
+      status: 'ready';
+      detectors: EnkryptDetectRequestDetectors;
+      blockingDetectors: EnkryptDetectorId[];
+    }
+  | { status: 'invalid' }
+);
 
-function enkryptDetectors(
-  selection: NonNullable<EnkryptInputGuardrailSettings['detectors']>
-): EnkryptDetectors {
-  const piiEntities = [...new Set(selection.pii_entities ?? [])];
-  return {
-    // Explanations double the detector's credit cost and never change the verdict.
-    ...(selection.injection_attack
-      ? { injection_attack: { enabled: true, need_explanation: false } }
-      : {}),
-    ...(piiEntities.length > 0 ? { pii: { enabled: true, entities: piiEntities } } : {}),
-    ...(selection.nsfw ? { nsfw: { enabled: true } } : {}),
-    ...(selection.toxicity ? { toxicity: { enabled: true } } : {}),
-  };
+export type StoredEnkryptDetectors =
+  | { status: 'missing' }
+  | { status: 'invalid' }
+  | { status: 'found'; detectors: EnkryptInputDetectors };
+
+/** The saved detectors of `settings.enkrypt.input_guardrail`, validated. */
+export function readStoredEnkryptDetectors(
+  organizationId: string,
+  detectors: unknown
+): StoredEnkryptDetectors {
+  if (detectors === undefined) return { status: 'missing' };
+  const parsed = EnkryptInputDetectorsSchema.safeParse(detectors);
+  if (parsed.success) return { status: 'found', detectors: parsed.data };
+  warnExceptInTest('[enkrypt-guardrail] saved detectors are invalid', {
+    organization_id: organizationId,
+    issues: parsed.error.issues.map(issue => issue.path.join('.')),
+  });
+  return { status: 'invalid' };
 }
 
 /**
- * The organization's input guardrail, or null when it is absent, disabled, invalid, or selects no
- * detector. Organization settings are edited directly in the database for now, so they are
- * validated here rather than trusted.
+ * The organization's input guardrail, or null when it is absent, disabled, invalid in settings,
+ * or selects no detector. Organizations that never saved detectors get Kilo Default.
  */
 export function resolveEnkryptInputGuardrail(
   organizationId: string,
@@ -63,7 +67,17 @@ export function resolveEnkryptInputGuardrail(
     return null;
   }
   if (!parsed.data.enabled) return null;
-  const detectors = enkryptDetectors(parsed.data.detectors ?? DEFAULT_ENKRYPT_DETECTORS);
-  if (Object.keys(detectors).length === 0) return null;
-  return { failMode: parsed.data.fail_mode ?? 'open', detectors };
+  const scanToolResults = parsed.data.scan_tool_results ?? true;
+
+  const stored = readStoredEnkryptDetectors(organizationId, parsed.data.detectors);
+  if (stored.status === 'invalid') return { scanToolResults, status: 'invalid' };
+  const detectors =
+    stored.status === 'found' ? stored.detectors : createKiloDefaultEnkryptInputDetectors();
+  if (enabledEnkryptDetectorIds(detectors).length === 0) return null;
+  return {
+    scanToolResults,
+    status: 'ready',
+    detectors: buildEnkryptDetectRequestDetectors(detectors),
+    blockingDetectors: blockingEnkryptDetectorIds(detectors),
+  };
 }

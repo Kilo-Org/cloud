@@ -1,8 +1,18 @@
 import * as z from 'zod';
-import type { EnkryptGuardrailApiKind, EnkryptGuardrailDecision } from '@kilocode/db/schema-types';
+import type {
+  EnkryptDetectorId,
+  EnkryptGuardrailApiKind,
+  EnkryptGuardrailDecision,
+} from '@kilocode/db/schema-types';
 import type { EnkryptGuardrailCall } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/charges';
+import {
+  ENKRYPT_DETECTOR_TYPES,
+  ENKRYPT_SUMMARY_DETECTORS,
+} from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/detectors';
 import type { EnkryptInputGuardrailConfig } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
+
+type ReadyEnkryptInputGuardrailConfig = Extract<EnkryptInputGuardrailConfig, { status: 'ready' }>;
 
 export const ENKRYPT_DETECT_URL = 'https://api.enkryptai.com/guardrails/detect';
 
@@ -30,20 +40,6 @@ const MAX_BLOCK_MESSAGE_LENGTH = 500;
 export const MAX_ENKRYPT_CREDITS_PER_CALL = 1_000;
 
 const TURN_TOO_LARGE_MESSAGE = `Your organization's Enkrypt AI guardrail cannot scan more than ${ENKRYPT_MAX_SCAN_CHARACTERS.toLocaleString('en-US')} characters of new messages and tool results at once, so this request was not sent. Reduce the size of the latest tool output or message and retry.`;
-
-/**
- * Enkrypt only blocks on block-type detectors, which answer with a block message in
- * `result_message`. `pii` is revise-type: its `result_message` is redacted input text, so a pii
- * detection is reported but never blocks and its message is never shown.
- */
-const DETECTOR_TYPES = {
-  injection_attack: 'block',
-  nsfw: 'block',
-  toxicity: 'block',
-  pii: 'revise',
-} as const;
-
-type DetectorName = keyof typeof DETECTOR_TYPES;
 
 const detectResponseSchema = z.object({
   summary: z.record(z.string(), z.unknown()),
@@ -81,15 +77,11 @@ export type EnkryptDetectDependencies = {
 type DetectAttempt =
   | {
       kind: 'detected';
-      firedDetectors: DetectorName[];
+      firedDetectors: EnkryptDetectorId[];
       resultMessage: string | null;
       creditsCost: number | null;
     }
   | { kind: 'failed'; error: string; retryable: boolean; creditsCost: number | null };
-
-function isDetectorName(name: string): name is DetectorName {
-  return Object.hasOwn(DETECTOR_TYPES, name);
-}
 
 function hasFired(value: unknown): boolean {
   if (typeof value === 'number') return value > 0;
@@ -97,14 +89,21 @@ function hasFired(value: unknown): boolean {
   return value === true;
 }
 
-function firedDetectors(summary: Record<string, unknown>): DetectorName[] {
-  return Object.entries(summary).flatMap(([name, value]) =>
-    isDetectorName(name) && hasFired(value) ? [name] : []
-  );
+function firedDetectors(summary: Record<string, unknown>): EnkryptDetectorId[] {
+  return Object.entries(summary).flatMap(([name, value]) => {
+    const detector = Object.hasOwn(ENKRYPT_SUMMARY_DETECTORS, name)
+      ? ENKRYPT_SUMMARY_DETECTORS[name]
+      : undefined;
+    return detector && hasFired(value) ? [detector] : [];
+  });
 }
 
-function blockingDetectors(detectors: DetectorName[]): DetectorName[] {
-  return detectors.filter(name => DETECTOR_TYPES[name] === 'block');
+/** Detections block only when the organization configured the detector to block. */
+function blockingDetectors(
+  fired: EnkryptDetectorId[],
+  config: ReadyEnkryptInputGuardrailConfig
+): EnkryptDetectorId[] {
+  return fired.filter(detector => config.blockingDetectors.includes(detector));
 }
 
 function parseCreditsCost(response: Response): number | null {
@@ -186,45 +185,64 @@ function sanitizeBlockMessage(message: string | null): string | null {
   return cleaned || null;
 }
 
+/**
+ * Enkrypt's `result_message` is a block message only when a block-type detector fired; when only
+ * revise-type detectors fired it is the redacted input text, which is never shown.
+ */
 export function guardrailBlockMessage(
-  detectors: DetectorName[],
+  detectors: EnkryptDetectorId[],
   resultMessage: string | null
 ): string {
+  const enkryptBlocked = detectors.some(detector => ENKRYPT_DETECTOR_TYPES[detector] === 'block');
   const reason =
-    sanitizeBlockMessage(resultMessage) ??
-    'The request was flagged as unsafe. Review it and retry.';
+    (enkryptBlocked ? sanitizeBlockMessage(resultMessage) : null) ??
+    'The request was flagged by your organization policy. Review it and retry.';
   return `Your organization's Enkrypt AI guardrail blocked this request (detected: ${detectors.join(', ')}). ${reason}`;
 }
 
-function attemptDecision(attempt: DetectAttempt): EnkryptGuardrailDecision {
+function attemptDecision(
+  attempt: DetectAttempt,
+  config: ReadyEnkryptInputGuardrailConfig
+): EnkryptGuardrailDecision {
   if (attempt.kind === 'failed') return 'error';
-  return blockingDetectors(attempt.firedDetectors).length > 0 ? 'blocked' : 'allowed';
+  return blockingDetectors(attempt.firedDetectors, config).length > 0 ? 'blocked' : 'allowed';
 }
 
 /**
  * Scans the turn delta once, retrying a single transient failure within the shared deadline, and
  * maps the result to a verdict. Never throws. Returns one ledger charge per Enkrypt call, including
- * calls that failed, so a blocked or failed request is still accounted for.
+ * calls that failed, so a blocked or failed request is still accounted for. Any failure blocks the
+ * request: an enabled guardrail never lets an unscanned turn reach the model.
  */
 export async function scanTurnDelta(
   scan: EnkryptGuardrailScan,
   deps: EnkryptDetectDependencies
 ): Promise<EnkryptGuardrailScanResult> {
-  const { text } = scan;
+  const { text, config } = scan;
   if (text.length === 0) return { verdict: { action: 'allow' }, charges: [] };
 
-  const logFields = {
+  const baseLogFields = {
     organization_id: scan.organizationId,
     session_id: scan.sessionId,
     client_request_id: scan.clientRequestId,
     api_kind: scan.apiKind,
-    detectors_enabled: Object.keys(scan.config.detectors),
+    scan_tool_results: config.scanToolResults,
     scanned_characters: text.length,
   };
 
+  if (config.status === 'invalid') {
+    return failedVerdict([], baseLogFields, { error: 'invalid_config', latencyMs: 0 });
+  }
+
+  const logFields = {
+    ...baseLogFields,
+    detectors_enabled: Object.keys(config.detectors),
+    detectors_blocking: config.blockingDetectors,
+  };
+
   if (text.length > ENKRYPT_MAX_SCAN_CHARACTERS) {
-    // Retrying cannot shrink the turn, so failing closed rejects it for good with the reason.
-    return failedVerdict(scan, [], logFields, {
+    // Retrying cannot shrink the turn, so the rejection carries the reason.
+    return failedVerdict([], logFields, {
       error: 'turn_too_large',
       latencyMs: 0,
       closedVerdict: { action: 'block', message: TURN_TOO_LARGE_MESSAGE },
@@ -233,12 +251,12 @@ export async function scanTurnDelta(
 
   const apiKey = deps.apiKey;
   if (!apiKey) {
-    return failedVerdict(scan, [], logFields, { error: 'missing_api_key', latencyMs: 0 });
+    return failedVerdict([], logFields, { error: 'missing_api_key', latencyMs: 0 });
   }
 
   const body = JSON.stringify({
     text,
-    detectors: scan.config.detectors,
+    detectors: config.detectors,
     user_metadata: { organization_id: scan.organizationId },
   });
   const signal = AbortSignal.timeout(deps.timeoutMs);
@@ -261,15 +279,15 @@ export async function scanTurnDelta(
     kiloUserId: scan.kiloUserId,
     sessionId: scan.sessionId,
     apiKind: scan.apiKind,
-    decision: attemptDecision(each),
+    decision: attemptDecision(each, config),
     creditsCost: each.creditsCost,
   }));
 
   if (attempt.kind === 'failed') {
-    return failedVerdict(scan, charges, logFields, { error: attempt.error, latencyMs });
+    return failedVerdict(charges, logFields, { error: attempt.error, latencyMs });
   }
 
-  const blocking = blockingDetectors(attempt.firedDetectors);
+  const blocking = blockingDetectors(attempt.firedDetectors, config);
   const decided = {
     ...logFields,
     detectors_fired: attempt.firedDetectors,
@@ -296,23 +314,17 @@ function totalCredits(charges: EnkryptGuardrailCall[]): number | null {
 }
 
 function failedVerdict(
-  scan: EnkryptGuardrailScan,
   charges: EnkryptGuardrailCall[],
   logFields: Record<string, unknown>,
   failure: { error: string; latencyMs: number; closedVerdict?: EnkryptGuardrailVerdict }
 ): EnkryptGuardrailScanResult {
-  const failClosed = scan.config.failMode === 'closed';
-  const closedVerdict = failure.closedVerdict ?? { action: 'unavailable' };
   warnExceptInTest('[enkrypt-guardrail] decision', {
     ...logFields,
-    decision: failClosed ? 'error_fail_closed' : 'error_fail_open',
+    decision: 'error_fail_closed',
     error: failure.error,
     latency_ms: failure.latencyMs,
     attempts: charges.length,
     credits_cost: totalCredits(charges),
   });
-  return {
-    verdict: failClosed ? closedVerdict : { action: 'allow' },
-    charges,
-  };
+  return { verdict: failure.closedVerdict ?? { action: 'unavailable' }, charges };
 }

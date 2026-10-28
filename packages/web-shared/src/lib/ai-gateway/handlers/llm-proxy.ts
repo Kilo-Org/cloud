@@ -400,7 +400,9 @@ export async function handleLlmProxyRequest(
         kiloUserId: auth.user.id,
         apiKind: requestBodyParsed.kind,
         clientRequestId,
-        text: extractTurnDeltaText(requestBodyParsed),
+        text: extractTurnDeltaText(requestBodyParsed, {
+          includeToolResults: config.scanToolResults,
+        }),
         config,
       };
     })

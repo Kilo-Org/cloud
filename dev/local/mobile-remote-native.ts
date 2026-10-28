@@ -87,12 +87,18 @@ type RunMetadata = {
   head_branch?: string;
   repository?: { id?: number };
   head_repository?: { id?: number };
+  pull_requests?: {
+    number?: number;
+    head?: { repo?: { id?: number } };
+    base?: { repo?: { id?: number } };
+  }[];
 };
 
 export function findNativeArtifacts(
   name: string,
   repository = '{owner}/{repo}',
-  expectedHeadSha: string | undefined = git(['rev-parse', 'HEAD'])
+  expectedHeadSha: string | undefined = git(['rev-parse', 'HEAD']),
+  validationScope?: { pullRequestNumber: number; headRepositoryId: number }
 ): NativeArtifact[] {
   const base = `repos/${repository}`;
   const repo = JSON.parse(gh(['api', base])) as RepositoryMetadata | null;
@@ -140,7 +146,11 @@ export function findNativeArtifacts(
       !Number.isSafeInteger(source.id) ||
       source.id <= 0 ||
       source.repository_id !== repo.id ||
-      source.head_repository_id !== repo.id ||
+      typeof source.head_repository_id !== 'number' ||
+      !Number.isSafeInteger(source.head_repository_id) ||
+      source.head_repository_id <= 0 ||
+      (source.head_repository_id !== repo.id &&
+        source.head_repository_id !== validationScope?.headRepositoryId) ||
       typeof source.head_sha !== 'string' ||
       !/^[a-f0-9]{40}$/.test(source.head_sha)
     ) {
@@ -152,15 +162,26 @@ export function findNativeArtifacts(
       run.workflow_id !== workflow.id ||
       run.path !== workflowPath ||
       run.repository?.id !== repo.id ||
-      run.head_repository?.id !== repo.id ||
+      run.head_repository?.id !== source.head_repository_id ||
       run.head_sha !== source.head_sha ||
       run.status !== 'completed' ||
       run.conclusion !== 'success' ||
       typeof run.head_branch !== 'string' ||
       run.head_branch.length === 0 ||
       !(
-        (run.event === 'workflow_dispatch' && run.head_sha === expectedHeadSha) ||
-        (run.event === 'push' && run.head_branch === repo.default_branch)
+        (source.head_repository_id === repo.id &&
+          ((run.event === 'workflow_dispatch' && run.head_sha === expectedHeadSha) ||
+            (run.event === 'push' && run.head_branch === repo.default_branch))) ||
+        (validationScope !== undefined &&
+          run.event === 'pull_request' &&
+          source.head_repository_id === validationScope.headRepositoryId &&
+          Array.isArray(run.pull_requests) &&
+          run.pull_requests.some(
+            request =>
+              request?.number === validationScope.pullRequestNumber &&
+              request.head?.repo?.id === validationScope.headRepositoryId &&
+              request.base?.repo?.id === repo.id
+          ))
       )
     ) {
       continue;

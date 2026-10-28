@@ -11,19 +11,8 @@ type Platform = 'ios' | 'android';
 
 const PLATFORMS: readonly Platform[] = ['ios', 'android'];
 
-const PULL_REQUEST_ARTIFACT_RETENTION_MS = 24 * 60 * 60 * 1000;
-
-export type ArtifactState = 'missing' | 'short' | 'durable';
-
-export type ArtifactLookup = {
-  state: ArtifactState;
-  // Present unless the state is `missing`. The promote job copies this one.
-  artifact?: { id: number; name: string };
-};
-
 export type PlatformPlan = {
   need: boolean;
-  promote?: { id: number; name: string };
 };
 
 export type NativeBuildGate = {
@@ -51,7 +40,7 @@ export function decideNativeBuildGate(input: {
   changedFiles: readonly string[];
   iosHash: string;
   androidHash: string;
-  lookup: (name: string) => ArtifactLookup;
+  lookup: (name: string) => boolean;
 }): NativeBuildGate {
   const prefix =
     input.eventName === 'pull_request'
@@ -61,23 +50,9 @@ export function decideNativeBuildGate(input: {
           changedFiles: input.changedFiles,
         })
       : '';
-  // Only a pull_request run publishes the short-lived artifact; a push or
-  // dispatch run publishes the durable one, so it may only skip on a durable
-  // artifact (a pull_request artifact expires in a day and would leave main
-  // without a build).
-  const requireDurable = input.eventName !== 'pull_request';
   const plan = (platform: Platform, hash: string): PlatformPlan => {
     if (input.platform !== 'all' && input.platform !== platform) return { need: false };
-    // Same name a host looks up (dev/local/mobile-remote-native.ts), so a
-    // published artifact is installable and an existing one is skipped.
-    const found = input.lookup(`${prefix}${artifactName(platform, hash)}`);
-    if (found.state === 'durable') return { need: false };
-    if (found.state === 'short') {
-      return requireDurable && found.artifact
-        ? { need: false, promote: found.artifact }
-        : { need: false };
-    }
-    return { need: true };
+    return { need: !input.lookup(`${prefix}${artifactName(platform, hash)}`) };
   };
   return {
     prefix,
@@ -89,19 +64,51 @@ function gh(args: string[]): string {
   return execFileSync('gh', args, { encoding: 'utf8' });
 }
 
-function lookupArtifact(repository: string, name: string): ArtifactLookup {
-  const live = findNativeArtifacts(name, repository, process.env.GITHUB_SHA ?? '');
-  const durable = live.find(
-    artifact =>
-      Date.parse(artifact.expires_at ?? '') - Date.parse(artifact.created_at ?? '') >
-      PULL_REQUEST_ARTIFACT_RETENTION_MS
-  );
-  const found = durable ?? live[0];
-  if (!found) return { state: 'missing' };
+function pullRequestValidationScope():
+  | { pullRequestNumber: number; headRepositoryId: number }
+  | undefined {
+  if (process.env.GITHUB_EVENT_NAME !== 'pull_request') return undefined;
+  const eventPath = process.env.GITHUB_EVENT_PATH;
+  if (!eventPath) throw new Error('Missing GITHUB_EVENT_PATH for pull_request');
+  const event: unknown = JSON.parse(fs.readFileSync(eventPath, 'utf8'));
+  if (
+    typeof event !== 'object' ||
+    event === null ||
+    !('number' in event) ||
+    typeof event.number !== 'number' ||
+    !Number.isSafeInteger(event.number) ||
+    event.number <= 0 ||
+    !('pull_request' in event) ||
+    typeof event.pull_request !== 'object' ||
+    event.pull_request === null ||
+    !('head' in event.pull_request) ||
+    typeof event.pull_request.head !== 'object' ||
+    event.pull_request.head === null ||
+    !('repo' in event.pull_request.head) ||
+    typeof event.pull_request.head.repo !== 'object' ||
+    event.pull_request.head.repo === null ||
+    !('id' in event.pull_request.head.repo) ||
+    typeof event.pull_request.head.repo.id !== 'number' ||
+    !Number.isSafeInteger(event.pull_request.head.repo.id) ||
+    event.pull_request.head.repo.id <= 0
+  ) {
+    throw new Error('Invalid pull_request number or head repository ID');
+  }
   return {
-    state: durable ? 'durable' : 'short',
-    artifact: { id: found.id, name: found.name },
+    pullRequestNumber: event.number,
+    headRepositoryId: event.pull_request.head.repo.id,
   };
+}
+
+function lookupArtifact(repository: string, name: string): boolean {
+  return (
+    findNativeArtifacts(
+      name,
+      repository,
+      process.env.GITHUB_SHA ?? '',
+      pullRequestValidationScope()
+    ).length > 0
+  );
 }
 
 // The API lists the PR's changed files against its base; a workflow-file edit
@@ -142,7 +149,7 @@ function appendOutput(key: string, value: string): void {
 // A lookup failure must not cost the build. The safe direction is "not
 // published": the job builds, which is the duplicate this re-check exists to
 // avoid, not a hash left without an artifact.
-function lookupOrMissing(repository: string, name: string): ArtifactLookup {
+function lookupOrMissing(repository: string, name: string): boolean {
   try {
     return lookupArtifact(repository, name);
   } catch (error) {
@@ -150,20 +157,13 @@ function lookupOrMissing(repository: string, name: string): ArtifactLookup {
       `artifact ${name}: lookup failed (${error instanceof Error ? error.message : error}); ` +
         'treating it as unpublished\n'
     );
-    return { state: 'missing' };
+    return false;
   }
 }
 
-// A heavy job re-checks its own artifact once its concurrency slot is free:
-// the run that held the slot may have published it, and a second build of the
-// same nativeHash is the waste this workflow exists to avoid. A pull_request
-// run accepts the short-lived artifact it would publish itself; anything else
-// must find the durable one.
 function isPublished(name: string): boolean {
   const repository = process.env.GITHUB_REPOSITORY ?? '';
-  const found = lookupOrMissing(repository, name);
-  if (found.state === 'durable') return true;
-  return found.state === 'short' && process.env.GITHUB_EVENT_NAME === 'pull_request';
+  return lookupOrMissing(repository, name);
 }
 
 function main(): void {
@@ -196,7 +196,7 @@ function main(): void {
     androidHash,
     lookup: name => {
       const found = lookupOrMissing(repository, name);
-      process.stderr.write(`artifact ${name}: ${found.state}\n`);
+      process.stderr.write(`artifact ${name}: ${found ? 'published' : 'missing'}\n`);
       return found;
     },
   });
@@ -204,9 +204,6 @@ function main(): void {
   for (const platform of PLATFORMS) {
     const plan = gate.platforms[platform];
     appendOutput(`need_${platform}`, String(plan.need));
-    appendOutput(`promote_${platform}`, String(plan.promote !== undefined));
-    appendOutput(`promote_${platform}_artifact_id`, plan.promote ? String(plan.promote.id) : '');
-    appendOutput(`promote_${platform}_name`, plan.promote?.name ?? '');
   }
 }
 

@@ -91,6 +91,9 @@ function trustedRun(id = 301) {
     head_branch: 'main',
     repository: { id: repositoryId },
     head_repository: { id: repositoryId },
+    pull_requests: [
+      { number: 6115, head: { repo: { id: repositoryId } }, base: { repo: { id: repositoryId } } },
+    ],
   };
 }
 
@@ -253,12 +256,16 @@ test('artifact lookup rejects a manual build from another commit even when its s
 test('artifact lookup reuses a trusted main-push build across consumer commits', () => {
   const artifact = nativeArtifact();
   artifact.workflow_run.head_sha = OTHER;
-  withOfflineArtifacts([artifact], { 301: { ...trustedRun(), head_sha: OTHER } }, invoke => {
-    assert.equal(
-      JSON.parse(invoke(`native.findNativeArtifacts(${JSON.stringify(nativeName)})`))[0]?.id,
-      401
-    );
-  });
+  withOfflineArtifacts(
+    [artifact],
+    { 301: { ...trustedRun(), head_sha: OTHER, pull_requests: null } },
+    invoke => {
+      assert.equal(
+        JSON.parse(invoke(`native.findNativeArtifacts(${JSON.stringify(nativeName)})`))[0]?.id,
+        401
+      );
+    }
+  );
 });
 
 test('artifact lookup rejects untrusted or incomplete run provenance', () => {
@@ -275,7 +282,9 @@ test('artifact lookup rejects untrusted or incomplete run provenance', () => {
     { repository: { id: 999 } },
     { head_repository: { id: 999 } },
     { id: 999 },
-    ...Object.keys(trustedRun()).map(key => ({ [key]: null })),
+    ...Object.keys(trustedRun())
+      .filter(key => key !== 'pull_requests')
+      .map(key => ({ [key]: null })),
   ];
   for (const invalid of invalidRuns) {
     withOfflineArtifacts([nativeArtifact()], { 301: { ...trustedRun(), ...invalid } }, invoke => {
@@ -326,6 +335,107 @@ test('artifact lookup fails closed on artifact and canonical metadata mismatches
       metadata
     );
   }
+});
+
+test('validation scope accepts the same PR across consumer commits without authorizing installation', () => {
+  const run = { ...trustedRun(), event: 'pull_request', head_branch: 'feature/native' };
+  withOfflineArtifacts([nativeArtifact()], { 301: run }, invoke => {
+    assert.equal(
+      JSON.parse(
+        invoke(
+          `native.findNativeArtifacts(${JSON.stringify(nativeName)}, undefined, ${JSON.stringify(OTHER)}, {pullRequestNumber:6115,headRepositoryId:101})`
+        )
+      )[0]?.id,
+      401
+    );
+    assert.deepEqual(
+      JSON.parse(invoke(`native.findNativeArtifacts(${JSON.stringify(nativeName)})`)),
+      []
+    );
+  });
+});
+
+test('validation lookup rejects another PR, source repository, or base repository', () => {
+  for (const pullRequests of [
+    [],
+    null,
+    [{ number: 6116, head: { repo: { id: 101 } }, base: { repo: { id: 101 } } }],
+    [{ number: 6115, head: { repo: { id: 999 } }, base: { repo: { id: 101 } } }],
+    [{ number: 6115, head: { repo: { id: 101 } }, base: { repo: { id: 999 } } }],
+  ]) {
+    const run = { ...trustedRun(), event: 'pull_request', pull_requests: pullRequests };
+    withOfflineArtifacts([nativeArtifact()], { 301: run }, invoke => {
+      assert.deepEqual(
+        JSON.parse(
+          invoke(
+            `native.findNativeArtifacts(${JSON.stringify(nativeName)}, undefined, undefined, {pullRequestNumber:6115,headRepositoryId:101})`
+          )
+        ),
+        []
+      );
+    });
+  }
+});
+
+test('validation scope preserves canonical run and source SHA verification', () => {
+  for (const invalid of [
+    { head_sha: OTHER },
+    { workflow_id: 999 },
+    { status: 'in_progress' },
+    { conclusion: 'failure' },
+    { repository: { id: 999 } },
+    { head_repository: { id: 999 } },
+    { path: '.github/workflows/other.yml' },
+  ]) {
+    withOfflineArtifacts(
+      [nativeArtifact()],
+      { 301: { ...trustedRun(), event: 'pull_request', ...invalid } },
+      invoke => {
+        assert.deepEqual(
+          JSON.parse(
+            invoke(
+              `native.findNativeArtifacts(${JSON.stringify(nativeName)}, undefined, undefined, {pullRequestNumber:6115,headRepositoryId:101})`
+            )
+          ),
+          [],
+          JSON.stringify(invalid)
+        );
+      }
+    );
+  }
+});
+
+test('validation lookup binds fork PR artifacts to the requested source repository', () => {
+  const artifact = nativeArtifact();
+  artifact.workflow_run.head_repository_id = 999;
+  const run = {
+    ...trustedRun(),
+    event: 'pull_request',
+    head_repository: { id: 999 },
+    pull_requests: [{ number: 6115, head: { repo: { id: 999 } }, base: { repo: { id: 101 } } }],
+  };
+  withOfflineArtifacts([artifact], { 301: run }, invoke => {
+    assert.equal(
+      JSON.parse(
+        invoke(
+          `native.findNativeArtifacts(${JSON.stringify(nativeName)}, undefined, undefined, {pullRequestNumber:6115,headRepositoryId:999})`
+        )
+      )[0]?.id,
+      401
+    );
+    assert.deepEqual(
+      JSON.parse(
+        invoke(
+          `native.findNativeArtifacts(${JSON.stringify(nativeName)}, undefined, undefined, {pullRequestNumber:6115,headRepositoryId:101})`
+        )
+      ),
+      []
+    );
+    assert.deepEqual(
+      JSON.parse(invoke(`native.findNativeArtifacts(${JSON.stringify(nativeName)})`)),
+      []
+    );
+  });
 });
 
 test('the shipped host downloader refuses a pull-request artifact without downloading its ZIP', () => {

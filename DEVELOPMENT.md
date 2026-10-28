@@ -297,11 +297,15 @@ pnpm --filter web exec env NODE_ENV=test jest --runInBand \
 
 ### Native build artifacts
 
-Native build tooling verifies artifact provenance before installation, build reuse, or promotion.
-It accepts successful, completed native workflow runs from the repository itself.
+Native build tooling verifies artifact provenance before installation or build reuse.
+Installation accepts successful, completed native workflow runs from the repository itself.
 Push builds must originate from the default branch.
 Manual builds must match the consumer commit, or `GITHUB_SHA` when the gate runs in CI.
-Pull-request artifacts remain available for build validation but do not qualify for installation or promotion.
+Pull-request artifacts do not qualify for installation.
+The pull-request gate can reuse a successful artifact from that same pull request and head repository.
+Trusted push and manual artifacts remain available for gate reuse.
+Pull-request artifact reuse requires a recorded pull-request association.
+Fork runs without that association require a fresh build.
 
 The native fingerprint includes the artifact trust revision.
 This revision changes remote artifact names and local cache keys.

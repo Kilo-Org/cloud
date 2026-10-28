@@ -218,7 +218,7 @@ describe('classifyPermission', () => {
         role: undefined,
         refetch: vi.fn<() => void>(),
       })
-    ).toEqual({ status: 'ready', canEdit: true });
+    ).toEqual({ status: 'ready', canEdit: true, canManage: true });
   });
 
   it('is loading while the org list query is loading', () => {
@@ -262,7 +262,34 @@ describe('classifyPermission', () => {
           role,
           refetch: vi.fn<() => void>(),
         })
-      ).toEqual({ status: 'ready', canEdit: true });
+      ).toEqual({ status: 'ready', canEdit: true, canManage: role === 'owner' });
+    }
+  });
+
+  it('grants manage (provider app install) to owner and admin only', () => {
+    for (const role of ['owner', 'admin']) {
+      expect(
+        classifyPermission({
+          isPersonal: false,
+          isLoading: false,
+          isError: false,
+          isFetching: false,
+          role,
+          refetch: vi.fn<() => void>(),
+        })
+      ).toEqual({ status: 'ready', canEdit: true, canManage: true });
+    }
+    for (const role of ['billing_manager', 'member']) {
+      expect(
+        classifyPermission({
+          isPersonal: false,
+          isLoading: false,
+          isError: false,
+          isFetching: false,
+          role,
+          refetch: vi.fn<() => void>(),
+        })
+      ).toMatchObject({ status: 'ready', canManage: false });
     }
   });
 
@@ -276,7 +303,7 @@ describe('classifyPermission', () => {
         role: 'member',
         refetch: vi.fn<() => void>(),
       })
-    ).toEqual({ status: 'ready', canEdit: false });
+    ).toEqual({ status: 'ready', canEdit: false, canManage: false });
 
     expect(
       classifyPermission({
@@ -287,6 +314,6 @@ describe('classifyPermission', () => {
         role: undefined,
         refetch: vi.fn<() => void>(),
       })
-    ).toEqual({ status: 'ready', canEdit: false });
+    ).toEqual({ status: 'ready', canEdit: false, canManage: false });
   });
 });

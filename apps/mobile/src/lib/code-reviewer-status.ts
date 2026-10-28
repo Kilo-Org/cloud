@@ -1,4 +1,7 @@
-import { canManageOrganizationBilling } from '@kilocode/app-shared/organizations';
+import {
+  canManageOrganization,
+  canManageOrganizationBilling,
+} from '@kilocode/app-shared/organizations';
 
 // Pure classification logic for the code-reviewer domain's async query
 // states. Kept dependency-free (no react-query/expo-router/react-native)
@@ -80,13 +83,17 @@ export function classifyProviderState(input: {
   return input.connected ? { status: 'connected' } : { status: 'disconnected' };
 }
 
-// Discriminated status for "can this scope's role edit reviewer settings",
+// Discriminated status for "which reviewer actions can this scope's role take",
 // so a still-loading or failed org-list fetch isn't silently treated as
 // "read-only" (it used to fall through to `role === undefined` -> false).
+//
+// `canEdit` is the settings-level capability (billing roles included);
+// `canManage` is the narrower owner/admin capability that installing a
+// provider's app for the organization requires.
 export type PermissionState =
   | { status: 'loading' }
   | { status: 'error'; refetch: () => void; isRetrying: boolean }
-  | { status: 'ready'; canEdit: boolean };
+  | { status: 'ready'; canEdit: boolean; canManage: boolean };
 
 /**
  * Discriminated status for a reviewer config read's body, so a screen always
@@ -152,7 +159,7 @@ export function classifyPermission(input: {
   refetch: () => void;
 }): PermissionState {
   if (input.isPersonal) {
-    return { status: 'ready', canEdit: true };
+    return { status: 'ready', canEdit: true, canManage: true };
   }
   if (input.isLoading) {
     return { status: 'loading' };
@@ -160,5 +167,9 @@ export function classifyPermission(input: {
   if (input.isError) {
     return { status: 'error', refetch: input.refetch, isRetrying: input.isFetching };
   }
-  return { status: 'ready', canEdit: canManageOrganizationBilling(input.role) };
+  return {
+    status: 'ready',
+    canEdit: canManageOrganizationBilling(input.role),
+    canManage: canManageOrganization(input.role),
+  };
 }

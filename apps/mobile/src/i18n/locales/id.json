@@ -1665,9 +1665,7 @@
     },
     "remoteSpawnRetryable": "Tidak dapat menghubungi instans. Koneksinya mungkin terputus.",
     "remoteSpawnNonRetryable": "Instans gagal memulai sesi. Periksa mesin atau perbarui CLI.",
-    "remoteSpawnInstanceDisconnected": "Koneksi instans yang dipilih terputus. Mulai sesi di Cloud Agent atau pilih instans lain.",
-    "liveCount_one": "{{count}} LANGSUNG",
-    "liveCount_other": "{{count}} LANGSUNG"
+    "remoteSpawnInstanceDisconnected": "Koneksi instans yang dipilih terputus. Mulai sesi di Cloud Agent atau pilih instans lain."
   },
   "agentChat": {
     "session": {

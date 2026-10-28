@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "इन्स्ट्यान्ससँग सम्पर्क हुन सकेन — यसको जडान टुटेको हुन सक्छ।",
     "remoteSpawnNonRetryable": "इन्स्ट्यान्सले सत्र सुरु गर्न सकेन — मेसिन जाँच्नुहोस् वा CLI अद्यावधिक गर्नुहोस्।",
-    "remoteSpawnInstanceDisconnected": "छानिएको इन्स्ट्यान्सको जडान टुट्यो। Cloud Agent मा सत्र सुरु गर्नुहोस् वा अर्को इन्स्ट्यान्स छान्नुहोस्।",
-    "liveCount_one": "{{count}} प्रत्यक्ष",
-    "liveCount_other": "{{count}} प्रत्यक्ष"
+    "remoteSpawnInstanceDisconnected": "छानिएको इन्स्ट्यान्सको जडान टुट्यो। Cloud Agent मा सत्र सुरु गर्नुहोस् वा अर्को इन्स्ट्यान्स छान्नुहोस्।"
   },
   "agentChat": {
     "session": {

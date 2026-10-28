@@ -4160,7 +4160,16 @@ export class SandboxControlV2 extends DurableObject<Env> {
         const credential = generateSandboxCredential();
         await this.ctx.storage.put(CREDENTIAL_HASH_KEY, await hashSandboxCredential(credential));
         const pin = this.providerPin ?? this.defaultPin('cloudflare');
-        const selection = selectStartup(this.env, pin.provider);
+        const selection = selectStartup(this.env, pin.provider, {
+          preparingRoutes: (await listRoutes(this.db))
+            .filter(route => route.state === 'preparing')
+            .map(route => ({
+              createdOnPlatform: route.credentialSource?.createdOnPlatform,
+              orgId: route.credentialSource?.orgId,
+            })),
+          sandboxKind: pin.sandboxKind,
+          sandboxId: this.sandboxId,
+        });
         const createDeadline =
           state.createDeadlineAt ?? Date.now() + this.sandboxTimers().providerCreateMs;
         const startupCommand =
@@ -4250,7 +4259,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
         if (Date.now() >= launchDeadline) throw new Error('Sandbox launch timed out');
         const launchOptions: ProviderLaunchOptions = {
           ...launch.options,
-          ...(pin.provider === 'cloudflare-containers' ? { deadlineAt: launchDeadline } : {}),
+          ...(pin.provider === 'cloudflare-containers'
+            ? { deadlineAt: launchDeadline, nativeImage: selection.image }
+            : {}),
         };
         let launched = await withTimeout(
           this.provider.launch(
@@ -4310,6 +4321,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
               { command: startupCommand, env: imageLaunchEnv },
               {
                 deadlineAt: launchDeadline,
+                ...(pin.provider === 'cloudflare-containers'
+                  ? { nativeImage: selection.image }
+                  : {}),
               }
             ),
             remainingMs(launchDeadline),
@@ -5277,7 +5291,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private async armAlarm(state: AllocationState): Promise<void> {
     // The one alarm is the earliest of the allocation timers and the route
     // preparation deadlines, so a hung wrapper's route cannot outlive its
-    // 12-minute attempt.
+    // preparation attempt.
     const allocationAt = nextAllocationAlarmAt(state, this.sandboxTimers());
     const routeAt = await earliestRouteDeadlineAt(this.db);
     // Pending work must survive loss of the in-memory launch continuation.

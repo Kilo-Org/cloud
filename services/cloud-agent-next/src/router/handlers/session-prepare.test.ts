@@ -14,7 +14,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type * as CloudAgentProfile from '@kilocode/cloud-agent-profile';
 
 import { t } from '../auth.js';
-import { PrepareSessionInput } from '../schemas.js';
+import { PrepareSessionInput, StartSessionInput } from '../schemas.js';
 import type { TRPCContext } from '../../types.js';
 import {
   createSessionPrepareHandlers,
@@ -227,9 +227,8 @@ describe('prepareSession operation-ledger admission gate', () => {
     expect(registerNewSessionMock).not.toHaveBeenCalled();
   });
 
-  it('keeps opt-in outside the profile and defaults ordinary sessions to disabled', async () => {
-    const caller = router.createCaller(createContext());
-    await caller.prepareSession({
+  it('removes the caller-controlled spawn opt-in from the prepare input', () => {
+    const parsed = PrepareSessionInput.parse({
       prompt: 'parent',
       mode: 'code',
       model: 'kilo/test-model',
@@ -237,24 +236,10 @@ describe('prepareSession operation-ledger admission gate', () => {
       autoInitiate: true,
       allowSubagentSessions: true,
     });
-    expect(startNewSessionMock).toHaveBeenCalledWith(
-      expect.objectContaining({ allowSubagentSessions: true }),
-      expect.anything(),
-      expect.anything()
-    );
-    const optedIn = startNewSessionMock.mock.calls[0][0];
-    expect(optedIn.profile).not.toHaveProperty('allowSubagentSessions');
-    await caller.prepareSession({
-      prompt: 'ordinary',
-      mode: 'code',
-      model: 'kilo/test-model',
-      githubRepo: 'acme/repo',
-      autoInitiate: true,
-    });
-    expect(startNewSessionMock.mock.calls[1][0].allowSubagentSessions).toBe(false);
+    expect(parsed).not.toHaveProperty('allowSubagentSessions');
   });
 
-  it('derives child lineage from authority and defaults child opt-in to false', async () => {
+  it('derives child lineage from authority', async () => {
     const context = createContext();
     context.authToken = jwt.sign({ aud: 'cloud-agent-next' }, 'fixture');
     const authority = {
@@ -278,22 +263,10 @@ describe('prepareSession operation-ledger admission gate', () => {
     });
     const [request, registration] = startNewSessionMock.mock.calls[0];
     expect(request.parentCloudAgentSessionId).toBe(authority.parentSessionId);
-    expect(request.allowSubagentSessions).toBe(false);
+    expect(request).not.toHaveProperty('allowSubagentSessions');
     expect(request.options.createdOnPlatform).toBe('cloud-agent');
     expect(request.options.callbackTarget).toEqual({ url: 'session:parent' });
     expect(registration.cloudAgentAuthority).toEqual(context.cloudAgentAuthority);
-    await caller.prepareSession({
-      prompt: 'grandchild-enabled child',
-      mode: 'code',
-      model: 'other/model',
-      githubRepo: 'other/repo',
-      autoInitiate: true,
-      allowSubagentSessions: true,
-    });
-    expect(startNewSessionMock.mock.calls[1][0]).toMatchObject({
-      allowSubagentSessions: true,
-      parentCloudAgentSessionId: authority.parentSessionId,
-    });
   });
 
   it('permits normal parent preparation inputs without requiring auto-initiation or GitHub', async () => {
@@ -304,13 +277,11 @@ describe('prepareSession operation-ledger admission gate', () => {
       model: 'kilo/test-model',
       gitUrl: 'https://example.test/repo.git',
       autoInitiate: false,
-      allowSubagentSessions: true,
       envVars: { CUSTOM: 'value' },
       setupCommands: ['pnpm install'],
       mcpServers: {},
     });
     expect(registerNewSessionMock.mock.calls[0][0]).toMatchObject({
-      allowSubagentSessions: true,
       repository: { type: 'git', url: 'https://example.test/repo.git' },
       profile: { overrides: { envVars: { CUSTOM: 'value' }, setupCommands: ['pnpm install'] } },
     });
@@ -358,14 +329,13 @@ describe('prepareSession operation-ledger admission gate', () => {
     });
   });
 
-  it('retains normal repository and model access checks for opted-in parents', async () => {
+  it('retains normal repository and model access checks for interactive parents', async () => {
     const input = {
       prompt: 'parent',
       mode: 'code',
       model: 'kilo/test-model',
       githubRepo: 'new-owner/new-repo',
       autoInitiate: true,
-      allowSubagentSessions: true,
     };
     assertBitbucketRepositoryAccessMock.mockRejectedValueOnce(
       new TRPCError({ code: 'FORBIDDEN', message: 'Repository access denied' })
@@ -382,21 +352,15 @@ describe('prepareSession operation-ledger admission gate', () => {
     expect(startNewSessionMock).not.toHaveBeenCalled();
   });
 
-  it.each([undefined, false, true])(
-    'propagates grouped start opt-in %s and otherwise retains normal start inputs',
-    async allowSubagentSessions => {
-      await router.createCaller(createContext()).start({
-        message: { prompt: 'start' },
-        agent: { mode: 'code', model: 'kilo/test-model' },
-        repository: { type: 'git', url: 'https://example.test/repo.git' },
-        allowSubagentSessions,
-      });
-      expect(startNewSessionMock.mock.calls[0][0]).toMatchObject({
-        allowSubagentSessions: allowSubagentSessions ?? false,
-      });
-      expect(startNewSessionMock.mock.calls[0][0].parentCloudAgentSessionId).toBeUndefined();
-    }
-  );
+  it('removes the caller-controlled spawn opt-in from the grouped start input', () => {
+    const parsed = StartSessionInput.parse({
+      message: { prompt: 'start' },
+      agent: { mode: 'code', model: 'kilo/test-model' },
+      repository: { type: 'git', url: 'https://example.test/repo.git' },
+      allowSubagentSessions: true,
+    });
+    expect(parsed).not.toHaveProperty('allowSubagentSessions');
+  });
 
   it('adapts the legacy GitHub integration id into grouped repository identity', async () => {
     const caller = router.createCaller(createContext());

@@ -399,13 +399,17 @@ describe('Cloud Agent spawn authority', () => {
         ...launch,
         githubRepo: 'new-owner/new-repo',
         model: 'kilo/other',
-        allowSubagentSessions: true,
       })
     ).toMatchObject({
       githubRepo: 'new-owner/new-repo',
       model: 'kilo/other',
-      allowSubagentSessions: true,
     });
+    expect(() =>
+      validateScopedWorkerPreparation(scope, {
+        ...launch,
+        allowSubagentSessions: true,
+      })
+    ).toThrow();
     expect(() => CloudAgentAuthoritySchema.parse({ ...scope, remainingDepth: 2 })).toThrow();
   });
 

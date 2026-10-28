@@ -99,7 +99,7 @@ describe('processMessagesApiUsage', () => {
       gateway: { routing: { finalProvider: 'anthropic' }, cost: '0', marketCost: '0.000375' },
     };
 
-    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'openrouter');
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'vercel');
 
     expect(result.cost_mUsd).toBe(375); // toMicrodollars(0.000375)
     expect(result.is_byok).toBeNull();
@@ -134,7 +134,7 @@ describe('processMessagesApiUsage', () => {
       },
     };
 
-    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'openrouter');
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'vercel');
 
     expect(result.is_byok).toBe(true);
     expect(result.cost_mUsd).toBe(402);
@@ -165,7 +165,7 @@ describe('processMessagesApiUsage', () => {
       },
     };
 
-    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'openrouter');
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'vercel');
 
     expect(result.is_byok).toBe(false);
   });
@@ -198,9 +198,75 @@ describe('processMessagesApiUsage', () => {
       },
     };
 
-    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'openrouter');
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'vercel');
 
     expect(result.is_byok).toBe(false);
+  });
+
+  test('prefers OpenRouter zero cost over Vercel metadata and adds cache tokens to input', () => {
+    const usage = {
+      input_tokens: 20,
+      output_tokens: 4,
+      cache_read_input_tokens: 7,
+      cache_creation_input_tokens: 3,
+      server_tool_use: null,
+      output_tokens_details: null,
+      cost: 0,
+      is_byok: false,
+    };
+    const providerMetadata = {
+      gateway: { routing: { finalProvider: 'anthropic' }, marketCost: '0.5' },
+    };
+
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'openrouter');
+
+    expect(result).toEqual({
+      inputTokens: 30,
+      outputTokens: 4,
+      cacheHitTokens: 7,
+      cacheWriteTokens: 3,
+      cost_mUsd: 0,
+      is_byok: false,
+    });
+  });
+
+  test.each([
+    // Real Vercel responses: Perplexity searches billed to gateway credits, and a
+    // native Anthropic web search billed to the BYOK key within marketCost.
+    { cost: '0.025', marketCost: '0.041388', nonInference: 25000 },
+    { cost: '0', marketCost: '0.020541', nonInference: 0 },
+  ])('charges Vercel BYOK non-inference costs from gateway cost $cost', input => {
+    const usage = {
+      input_tokens: 10,
+      output_tokens: 5,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 0,
+      server_tool_use: { input_tokens: 0, web_fetch_requests: 0, web_search_requests: 0 },
+      output_tokens_details: null,
+    };
+    const providerMetadata = {
+      gateway: {
+        routing: {
+          finalProvider: 'xai',
+          modelAttempts: [
+            {
+              success: true,
+              providerAttempts: [{ provider: 'xai', credentialType: 'byok', success: true }],
+            },
+          ],
+        },
+        cost: input.cost,
+        marketCost: input.marketCost,
+      },
+    };
+
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'vercel');
+
+    expect(result.is_byok).toBe(true);
+    expect(result.nonInferenceCost_mUsd).toBe(input.nonInference);
+    expect(result.cost_mUsd).toBe(
+      Math.round(parseFloat(input.marketCost) * 1_000_000) + input.nonInference
+    );
   });
 
   test('returns zero cost when no usage or metadata is provided', () => {
@@ -490,7 +556,7 @@ describe('parseMessagesMicrodollarUsageFromString approval tests', () => {
   test(vercelMessagesJson, async () => {
     const inputFile = join(sampleDir, vercelMessagesJson);
     const jsonString = await readFile(inputFile, 'utf-8');
-    const result = parseMessagesMicrodollarUsageFromString(jsonString, 200, 'openrouter');
+    const result = parseMessagesMicrodollarUsageFromString(jsonString, 200, 'vercel');
     const resultString = JSON.stringify(result, null, 2);
     const approvalFilePath = inputFile + '.approved.json';
     await verifyApproval(resultString, approvalFilePath);

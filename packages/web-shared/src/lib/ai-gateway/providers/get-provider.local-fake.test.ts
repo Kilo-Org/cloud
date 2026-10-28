@@ -10,6 +10,7 @@ import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers
 import { shouldRouteToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
   getBYOKforUser,
+  getByokCredentials,
   getModelUserByokProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { resolveOpenAiChatGptAccessToken } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/refresh';
@@ -32,7 +33,10 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModel: jest.fn().mockResolvedValue({ provider: null, model: null }),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
+  byokOwner: (userId: string, organizationId: string | undefined) =>
+    organizationId ? { type: 'organization', id: organizationId } : { type: 'user', id: userId },
   getModelUserByokProviders: jest.fn().mockResolvedValue([]),
+  getByokCredentials: jest.fn().mockResolvedValue([]),
   getBYOKforUser: jest.fn(),
   getBYOKforOrganization: jest.fn(),
 }));
@@ -433,7 +437,7 @@ describe('getProvider ChatGPT connection routing order', () => {
 describe('getProvider direct BYOK routing', () => {
   afterEach(() => {
     jest.mocked(getDirectByokModel).mockReset().mockResolvedValue({ provider: null, model: null });
-    jest.mocked(getBYOKforUser).mockReset();
+    jest.mocked(getByokCredentials).mockReset().mockResolvedValue([]);
   });
 
   test.each(['nvidia-byok', 'opencode-go'] as const)(
@@ -461,8 +465,10 @@ describe('getProvider direct BYOK routing', () => {
         },
       });
       jest
-        .mocked(getBYOKforUser)
-        .mockResolvedValue([{ decryptedAPIKey: 'user-direct-key', providerId }]);
+        .mocked(getByokCredentials)
+        .mockResolvedValue([
+          { decryptedAPIKey: 'user-direct-key', providerId, serveCatalogModels: false },
+        ]);
 
       const result = await getProvider(providerInput(`${providerId}/upstream-model`));
       if (result.kind !== 'provider') throw new Error('expected provider result');
@@ -487,6 +493,11 @@ describe('getProvider direct BYOK routing', () => {
         session_id: null,
       });
 
+      expect(getByokCredentials).toHaveBeenCalledWith(
+        expect.anything(),
+        { type: 'user', id: user.id },
+        [providerId]
+      );
       expect(result.provider.id).toBe('direct-byok');
       expect(result.provider.responseTransforms).toBe(ReasoningDetailsTransform.ReasoningContent);
       expect(result.userByok).toEqual([{ decryptedAPIKey: 'user-direct-key', providerId }]);
@@ -526,11 +537,13 @@ describe('getProvider direct BYOK routing', () => {
         max_completion_tokens: 1000,
       },
     });
-    jest
-      .mocked(getBYOKforUser)
-      .mockResolvedValue([
-        { decryptedAPIKey: '{"stored":"credential"}', providerId: 'nvidia-byok' },
-      ]);
+    jest.mocked(getByokCredentials).mockResolvedValue([
+      {
+        decryptedAPIKey: '{"stored":"credential"}',
+        providerId: 'nvidia-byok',
+        serveCatalogModels: false,
+      },
+    ]);
 
     const input = providerInput('nvidia-byok/zai.glm-5');
     const result = await getProvider({

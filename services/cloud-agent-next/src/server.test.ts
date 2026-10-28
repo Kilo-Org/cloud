@@ -1723,7 +1723,7 @@ describe('server runtime credential proxy', () => {
 });
 
 describe('server /kilo facade route', () => {
-  for (const path of ['/kilo', '/kilo/event']) {
+  for (const path of ['/kilo', '/kilo/event', '/kilo/cloud-agent/event']) {
     it(`returns 401 before facade dispatch when auth is missing for ${path}`, async () => {
       const env = createEnv();
 

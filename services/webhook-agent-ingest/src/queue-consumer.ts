@@ -434,6 +434,7 @@ async function processWebhookMessage(
         profileId?: string;
         autoCommit?: boolean;
         condenseOnComplete?: boolean;
+        allowUserAuthorization?: boolean;
         createdOnPlatform: string;
       } = {
         prompt: renderedPrompt,
@@ -447,6 +448,10 @@ async function processWebhookMessage(
 
       if (triggerConfig.orgId) {
         prepareSessionBody.kilocodeOrganizationId = triggerConfig.orgId;
+      }
+
+      if (triggerConfig.executionUserId != null) {
+        prepareSessionBody.allowUserAuthorization = true;
       }
 
       // Behavior flags from trigger config (not profile-related)

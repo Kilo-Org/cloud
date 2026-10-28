@@ -2282,12 +2282,7 @@
     },
     "remoteSpawnRetryable": "Ma stajniex nikkonnettjaw mal-istanza — tista' tkun ġiet skonnettjata.",
     "remoteSpawnNonRetryable": "L-istanza ma rnexxiliex tibda s-sessjoni — iċċekkja l-magna jew aġġorna l-CLI.",
-    "remoteSpawnInstanceDisconnected": "L-istanza magħżula ġiet skonnettjata. Ibda sessjoni fuq Cloud Agent jew agħżel istanza oħra.",
-    "liveCount_one": "{{count}} F'ĦIN REALI",
-    "liveCount_other": "{{count}} F'ĦIN REALI",
-    "liveCount_two": "{{count}} ATTIVI",
-    "liveCount_few": "{{count}} ATTIVI",
-    "liveCount_many": "{{count}} ATTIVI"
+    "remoteSpawnInstanceDisconnected": "L-istanza magħżula ġiet skonnettjata. Ibda sessjoni fuq Cloud Agent jew agħżel istanza oħra."
   },
   "agentChat": {
     "session": {

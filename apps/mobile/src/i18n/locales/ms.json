@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Tidak dapat menghubungi tika — sambungannya mungkin telah terputus.",
     "remoteSpawnNonRetryable": "Tika gagal memulakan sesi — semak mesin atau kemas kini CLI.",
-    "remoteSpawnInstanceDisconnected": "Sambungan tika yang dipilih telah terputus. Mulakan sesi pada Cloud Agent atau pilih tika lain.",
-    "liveCount_one": "{{count}} LANGSUNG",
-    "liveCount_other": "{{count}} LANGSUNG"
+    "remoteSpawnInstanceDisconnected": "Sambungan tika yang dipilih telah terputus. Mulakan sesi pada Cloud Agent atau pilih tika lain."
   },
   "agentChat": {
     "session": {

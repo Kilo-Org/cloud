@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Инстанцтай холбогдож чадсангүй. Холболт нь тасарсан байж болзошгүй.",
     "remoteSpawnNonRetryable": "Инстанц сессийг эхлүүлж чадсангүй. Компьютерыг шалгах эсвэл CLI-г шинэчилнэ үү.",
-    "remoteSpawnInstanceDisconnected": "Сонгосон инстанцын холболт тасарсан. Cloud Agent дээр сесс эхлүүлэх эсвэл өөр инстанц сонгоно уу.",
-    "liveCount_one": "{{count}} ШУУД",
-    "liveCount_other": "{{count}} ШУУД"
+    "remoteSpawnInstanceDisconnected": "Сонгосон инстанцын холболт тасарсан. Cloud Agent дээр сесс эхлүүлэх эсвэл өөр инстанц сонгоно уу."
   },
   "agentChat": {
     "session": {

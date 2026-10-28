@@ -6310,6 +6310,8 @@ export const cli_sessions_v2 = pgTable(
     // session-ingest from tool, todo, diff and error items; only this summary
     // is stored, never the raw text. Null means "no summary".
     live_summary: jsonb().$type<SessionLiveSummary>(),
+    briefing_excerpt: jsonb().$type<{ messageId: string; completedAt: string; text: string }>(),
+    briefing_excerpt_scope_changed_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
       .defaultNow()
@@ -6339,6 +6341,14 @@ export const cli_sessions_v2 = pgTable(
       .where(isNotNull(table.cloud_agent_session_id)),
     index('IDX_cli_sessions_v2_organization_id').on(table.organization_id),
     index('IDX_cli_sessions_v2_user_updated').on(table.kilo_user_id, table.updated_at),
+    index('IDX_cli_sessions_v2_briefing_activity')
+      .on(
+        table.kilo_user_id,
+        table.organization_id,
+        table.last_activity_at.desc(),
+        table.session_id
+      )
+      .concurrently(),
     // Mirror of the index above for `orderBy: 'created_at'`. Every list and
     // search query filters on kilo_user_id first, so a bare created_at index
     // makes the planner walk the global created_at order and discard other
@@ -11372,7 +11382,7 @@ export const agent_briefing_context_preferences = pgTable(
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     context_key: text().notNull(),
     organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
-    ai_enabled: boolean().notNull().default(false),
+    enabled: boolean().notNull().default(false),
     model: text().notNull(),
     max_duration_seconds: integer().notNull().default(600),
     max_spend_microdollars: bigint({ mode: 'number' }).notNull().default(2_000_000),
@@ -11386,38 +11396,8 @@ export const agent_briefing_context_preferences = pgTable(
   ]
 );
 
-export const agent_briefing_events = pgTable(
-  'agent_briefing_events',
-  {
-    id: text().primaryKey(),
-    kilo_user_id: text().notNull(),
-    session_id: text().notNull(),
-    organization_id: uuid(),
-    kind: text().notNull(),
-    occurred_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-    recorded_at: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
-    status: text(),
-    title: text(),
-    url: text(),
-    payload: jsonb().$type<Record<string, unknown>>(),
-  },
-  table => [
-    foreignKey({
-      columns: [table.session_id, table.kilo_user_id],
-      foreignColumns: [cli_sessions_v2.session_id, cli_sessions_v2.kilo_user_id],
-      name: 'agent_briefing_events_session_fk',
-    }).onDelete('cascade'),
-    index('agent_briefing_events_user_window').on(table.kilo_user_id, table.occurred_at),
-    index('agent_briefing_events_session_window').on(
-      table.session_id,
-      table.kilo_user_id,
-      table.occurred_at
-    ),
-  ]
-);
-
-export const agent_briefing_reports = pgTable(
-  'agent_briefing_reports',
+export const agent_briefing_snapshots = pgTable(
+  'agent_briefing_snapshots',
   {
     id: uuid().primaryKey().defaultRandom(),
     kilo_user_id: text()
@@ -11425,44 +11405,50 @@ export const agent_briefing_reports = pgTable(
       .references(() => kilocode_users.id, { onDelete: 'cascade' }),
     context_key: text().notNull(),
     organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
-    kind: text().$type<'scheduled' | 'one_off'>().notNull().default('scheduled'),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
-    timezone: text(),
-    language: text(),
-    evidence_recorded_before: timestamp({ withTimezone: true, mode: 'string' }),
-    // NULL leaves one-off reports outside the scheduled uniqueness key.
-    local_date: text(),
+    timezone: text().notNull(),
+    language: text().notNull(),
+    local_date: text().notNull(),
+    captured_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     night_start_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     cutoff_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     morning_end_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
     published_at: timestamp({ withTimezone: true, mode: 'string' }),
     updated_at: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
-    next_refresh_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
     next_charge_check_at: timestamp({ withTimezone: true, mode: 'string' }),
     read_at: timestamp({ withTimezone: true, mode: 'string' }),
     dismissed_at: timestamp({ withTimezone: true, mode: 'string' }),
-    revision: integer().notNull().default(1),
-    evidence_hash: text().notNull(),
     facts: jsonb().notNull().$type<Record<string, unknown>>(),
     summary: jsonb().notNull().$type<Record<string, unknown>>(),
     generation_id: text(),
     generation_started_at: timestamp({ withTimezone: true, mode: 'string' }),
     generation_finished_at: timestamp({ withTimezone: true, mode: 'string' }),
     generation_deadline_at: timestamp({ withTimezone: true, mode: 'string' }),
-    generation_revision: integer(),
     generation_max_cost: bigint({ mode: 'number' }),
     notification_sent_at: timestamp({ withTimezone: true, mode: 'string' }),
+    job_due_at: timestamp({ withTimezone: true, mode: 'string' }),
+    expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
   },
   table => [
-    uniqueIndex('agent_briefing_reports_window').on(
+    uniqueIndex('agent_briefing_snapshots_window').on(
       table.kilo_user_id,
       table.context_key,
       table.local_date
     ),
-    index('agent_briefing_reports_user_history').on(table.kilo_user_id, table.cutoff_at),
-    index('agent_briefing_reports_active').on(table.morning_end_at),
-    index('agent_briefing_reports_refresh_due').on(table.next_refresh_at),
-    index('agent_briefing_reports_charge_due').on(table.next_charge_check_at),
+    index('agent_briefing_snapshots_user_history').on(
+      table.kilo_user_id,
+      table.cutoff_at,
+      table.id
+    ),
+    index('agent_briefing_snapshots_job_due').on(table.job_due_at),
+    index('agent_briefing_snapshots_expiry').on(table.expires_at),
+    index('agent_briefing_snapshots_charge_due').on(table.next_charge_check_at),
+    index('agent_briefing_snapshots_notification_due')
+      .on(table.morning_end_at, table.cutoff_at)
+      .where(isNull(table.notification_sent_at)),
+    index('agent_briefing_snapshots_running_deadline')
+      .on(table.generation_deadline_at)
+      .where(sql`${table.summary}->>'status' = 'running'`),
   ]
 );
 

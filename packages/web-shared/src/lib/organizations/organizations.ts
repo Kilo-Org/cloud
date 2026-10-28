@@ -1028,7 +1028,11 @@ export async function markOrganizationAsDeleted(
 
     await tx
       .update(cli_sessions_v2)
-      .set({ public_id: null })
+      .set({
+        public_id: null,
+        briefing_excerpt: null,
+        briefing_excerpt_scope_changed_at: sql`now()`,
+      })
       .where(eq(cli_sessions_v2.organization_id, organizationId));
     await tx
       .delete(provider_oauth_attempts)

@@ -184,7 +184,6 @@ export default function AppLayout() {
                 options={{ ...sheetOptions, gestureEnabled: false }}
               />
               <Stack.Screen name="agent-briefing/index" />
-              <Stack.Screen name="agent-briefing/create" />
               <Stack.Screen name="agent-briefing/[report-id]" />
               <Stack.Screen name="agent-briefing/settings" />
               <Stack.Screen name="share-gate" options={sheetOptions} />

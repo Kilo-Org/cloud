@@ -645,54 +645,48 @@ git lfs pull
 
 ## Agent morning briefings
 
-The mobile Home briefing summarizes overnight coding sessions separately for Personal and each organization.
-Users configure a saved timezone, night start, shared night-end/morning-start, and morning end.
-Dismissal restores live status across devices; report history remains available.
+Morning briefings are scheduled snapshot digests for explicitly enabled Personal and organization contexts.
+Reading preferences does not enable a context or create a schedule.
+Users configure a timezone, night start, morning start, morning end, model, and finite generation budgets.
+Notifications require a separate opt-in.
 
-The backend owns scheduling, report revisions, optional paid summaries, and notification dispatch.
-AI summaries and briefing notifications require separate opt-ins.
-Summary settings include a model override and finite generation time and spend limits.
-Summary estimates and gateway spend admission use the model picker’s configured preferred-provider price, falling back to catalog pricing when no matching route exists.
-Bounded OpenRouter requests enforce `provider.max_price` for prompt/completion rates (USD per million tokens) and per-request fees, preserving provider allow-lists, exclusions, and stricter caller price caps. Bounded requests routed through providers that cannot enforce that ceiling are refused before upstream generation, unless the quoted price is zero.
-Tiered custom and Kilo-exclusive pricing uses the highest tier reachable from the request’s bounded input length.
+The morning scheduler captures recent session metadata once for each enabled context.
+The snapshot contains current status, verified pull request links, available session summaries, and a bounded final-response excerpt.
+It describes the latest available state at capture time, not an exact historical reconstruction.
+Counts describe selected sessions, not exhaustive overnight totals.
+Reports show the capture time and disclose selection limits.
+They do not report overnight spending or infer success from an idle session.
+
+Session ingestion stores one redacted completed-response excerpt per eligible session.
+Streaming fragments, reasoning, and tool output do not become briefing excerpts.
+A newer completed response replaces the previous excerpt.
+Context changes and account deletion clear the excerpt.
+The collector does not maintain a separate event ledger or an evidence retry queue.
+
+The scheduler saves bounded, immutable evidence in `agent_briefing_snapshots`.
+The summary worker atomically claims each due report and generates its summary asynchronously.
+Report reads do not refresh evidence, scan transcripts, or start generation.
+The structured digest remains available while generation runs or fails.
+Saved content requires current context and referenced-session access.
+Reports expire through the existing retention policy.
+Manual creation, historical period selection, preparation drafts, and manual summary retries are not available.
+
+Pricing estimates use the model picker's configured provider prices and the stored target for model aliases.
+The gateway preserves bounded-request price ceilings and model access checks.
+Usage receipts retain the existing committed-versus-queued settlement behavior.
 The default summary model is `~deepseek/deepseek-flash-latest`.
-Pricing estimates and gateway spend checks resolve latest-model aliases through the stored catalog target.
-An alias remains unavailable when its target is missing or has no usable pricing.
-The gateway rejects an alias request if provider routing selects a different target from the priced catalog target.
-The structured report remains available when generation fails or reaches a limit.
-Summary charges accumulate across a report's generations: each generation keeps its settlement record, a pending update preserves the reconciled total, and retry becomes available only when every tracked generation's usage is final.
-The settlement record also keeps the gateway's delivery outcome: a queued usage event keeps its generation open for the usage queue's delivery window, because queue acceptance precedes the committed row, while a failed accounting closes its generation at once.
-
-Apply database migrations before deploying the session-ingest, notification, gateway, and web changes.
-The CLI status producer must send occurrence timestamps and transition identities for reliable historical blocker counts.
-Legacy activity remains readable with partial coverage; unknown values must not appear as confirmed zeroes.
-
-Report display contracts allow 64 sessions, 256 sources, and 32 sources per session.
-Titles use 160 characters, URLs 2048, and excerpts 600. Scheduled collection selects
-the latest 2048 activity events and 2048 usage records, with up to 256 session ancestry lookups.
-Session selection favors recent activity and sampled evidence carries partial coverage.
-Scorecards describe the collected evidence. Scheduled refresh replaces facts using current collection.
-One-off period sampling and the summary model's 16-source/24-session selection remain independent.
-History pages allow up to 100 reports within a 3 MB JSON response budget.
-Stored reports must satisfy the shared contract; unreadable records are skipped during pagination.
-
-Manual preparation persists an unpublished draft through `startOneOffPreparation` before collecting evidence in `after()`.
-`oneOffPreparation` returns preparation progress or the completed report and a fresh cost estimate.
-`oneOffDrafts` lists resumable, unconfirmed drafts after navigation or an app restart.
-Attempt claims prevent concurrent or stale workers from overwriting a newer attempt.
-Interrupted preparation reaches a terminal failure and requires explicit retry.
-The summary cron recovers pending preparation independently of paid summary work.
-Preparation scheduler failures are logged without discarding completed summary job results.
-Preparations use the existing indexed `next_refresh_at` marker: pending work is immediately due,
-running work is due at its deadline, and terminal attempts clear the marker.
-Expiry checks use this due index, and each preparation collection batch selects at most five drafts.
-Scheduled refresh excludes one-off drafts.
-Preparation does not publish a report, invoke inference, or authorize a charge.
-`createOneOff` remains the explicit cost-confirmation step.
-Deploy the backend before releasing the new mobile client.
-The synchronous `prepareOneOff` endpoint remains supported for released clients.
 
 The protected cron routes are `/api/cron/agent-briefing` and `/api/cron/agent-briefing-summaries`.
 They use the existing cron authorization, database, gateway, and notification configuration.
-Local verification must use an isolated database and fake accounts.
-Use a local notification sink and fixture inference provider to avoid real pushes or upstream charges.
+Use `pnpm dev:seed app:agent-briefing --help` for the scheduled snapshot fixture.
+Run local verification with an isolated database, fake accounts, and local notification and inference fixtures.
+
+### Cutover deployment
+
+The generated migration creates the snapshot store and removes the obsolete event and report stores.
+The existing deployment workflow applies migrations before promoting web and worker code.
+Do not apply this destructive cutover while an older producer or summary worker can use the retired stores.
+Disable the old briefing cron jobs and settle outstanding briefing usage before retiring the old report store.
+Quiesce old event producers before the migration, then deploy the matching web, gateway, notification, and session-ingest code.
+Enable contexts explicitly after deployment.
+Do not treat an unshipped user interface as proof that its ingestion code is inactive.

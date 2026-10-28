@@ -1,401 +1,253 @@
-import { and, asc, eq, gt, isNull, lte, or, sql } from 'drizzle-orm';
-import { createHash } from 'node:crypto';
+import { and, asc, eq, isNull, lte, or, sql } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { agent_briefing_preferences, agent_briefing_reports } from '@kilocode/db/schema';
+import {
+  agent_briefing_preferences,
+  agent_briefing_context_preferences,
+  agent_briefing_snapshots,
+} from '@kilocode/db/schema';
 import { dispatchAgentBriefingPush } from '@kilocode/web-shared/lib/notifications-worker-client';
-import {
-  briefingCoverageSchema,
-  briefingHasActivity,
-  briefingScorecardSchema,
-  briefingSummarySchema,
-} from '@kilocode/app-shared/agent-briefing';
-import {
-  briefingContexts,
-  briefingContextSettings,
-  emptySummary,
-  refreshBriefingEvidence,
-  requireBriefingContext,
-  type BriefingReportRow,
-} from './store';
-import { briefingWindow, nextBriefingTime, type BriefingWindow } from './schedule';
+import { briefingHasActivity } from '@kilocode/app-shared/agent-briefing';
+import { briefingContexts, assertBriefingSourcesAccessible, emptySummary } from './store';
+import { collectBriefingSnapshot } from './evidence';
+import { nextBriefingTime, latestScheduledBriefingWindow } from './schedule';
 import { reconcileBriefingCharge, runBriefingSummary } from './summary';
-import { generatePendingOneOffBriefingPreparations } from './preparation';
-
-async function freezeBriefingContexts(userId: string, window: BriefingWindow, timezone: string) {
-  for (const context of await briefingContexts(userId)) {
-    const facts = {
-      scorecard: { sessions: 0, pullRequests: 0, blockers: 0, spendMicrodollars: 0 },
-      sessions: [],
-      sources: [],
-      coverage: {
-        activity: 'partial',
-        spend: 'unavailable',
-        blockers: 'partial',
-        pullRequests: 'partial',
-      },
-    };
-    await db
-      .insert(agent_briefing_reports)
-      .values({
-        kilo_user_id: userId,
-        context_key: context.id,
-        organization_id: context.organizationId,
-        timezone,
-        local_date: window.localDate,
-        night_start_at: window.nightStartAt,
-        cutoff_at: window.cutoffAt,
-        morning_end_at: window.morningEndAt,
-        next_refresh_at: window.cutoffAt,
-        revision: 0,
-        facts,
-        evidence_hash: createHash('sha256').update(JSON.stringify(facts)).digest('hex'),
-        summary: emptySummary,
-      })
-      .onConflictDoNothing();
-  }
-}
-
-/**
- * A quiet night is publishable only when the evidence proves the zero: no session, pull request
- * or blocker, and every evidence dimension collected for the whole window. Partial coverage
- * cannot prove a zero, so those reports stay unpublished and unreadable.
- */
-function quietBriefingProven(facts: Record<string, unknown>): boolean {
-  const scorecard = briefingScorecardSchema.safeParse(facts.scorecard);
-  const coverage = briefingCoverageSchema.safeParse(facts.coverage);
-  return (
-    scorecard.success &&
-    !briefingHasActivity(scorecard.data) &&
-    coverage.success &&
-    Object.values(coverage.data).every(value => value === 'complete')
-  );
-}
-
-/**
- * A quiet night has nothing to summarize, so it never starts a paid generation: an AI-enabled
- * context publishes `unavailable` instead of the `disabled` state that offers a Generate button.
- */
-async function publishQuietBriefing(row: BriefingReportRow, iso: string) {
-  if (row.published_at) return;
-  const summary = briefingSummarySchema.parse(row.summary);
-  const settings = await briefingContextSettings(row.kilo_user_id, row.organization_id);
-  const quietSummary =
-    settings.aiEnabled &&
-    row.generation_id === null &&
-    summary.text === null &&
-    (summary.status === 'disabled' || summary.status === 'pending')
-      ? briefingSummarySchema.parse({
-          ...summary,
-          status: 'unavailable',
-          error: null,
-          canRetry: false,
-        })
-      : null;
-  await db
-    .update(agent_briefing_reports)
-    .set({ published_at: iso, ...(quietSummary ? { summary: quietSummary } : {}) })
-    .where(and(eq(agent_briefing_reports.id, row.id), isNull(agent_briefing_reports.published_at)));
-}
-
-async function deferBriefingRefresh(row: BriefingReportRow, now: Date) {
-  await db
-    .update(agent_briefing_reports)
-    .set({
-      next_refresh_at:
-        new Date(row.morning_end_at) <= now ? null : new Date(now.getTime() + 60_000).toISOString(),
-    })
-    .where(eq(agent_briefing_reports.id, row.id));
-}
 
 export async function sweepAgentBriefings(now = new Date()) {
   const iso = now.toISOString();
   const due = await db
-    .select()
+    .select({ userId: agent_briefing_preferences.kilo_user_id })
     .from(agent_briefing_preferences)
     .where(lte(agent_briefing_preferences.next_run_at, iso))
-    .limit(200);
-  for (const preferences of due) {
-    const night = new Date(preferences.next_run_at);
-    const window = briefingWindow(preferences, night);
-    await freezeBriefingContexts(preferences.kilo_user_id, window, preferences.timezone);
-    await db
-      .update(agent_briefing_preferences)
-      .set({
-        next_run_at: nextBriefingTime(
-          preferences.night_start,
-          preferences.timezone,
-          now
-        ).toISOString(),
-      })
-      .where(
-        and(
-          eq(agent_briefing_preferences.kilo_user_id, preferences.kilo_user_id),
-          eq(agent_briefing_preferences.next_run_at, preferences.next_run_at)
+    .orderBy(asc(agent_briefing_preferences.next_run_at))
+    .limit(100);
+  let captured = 0;
+  for (const candidate of due) {
+    captured += await db.transaction(async tx => {
+      const [preferences] = await tx
+        .select()
+        .from(agent_briefing_preferences)
+        .where(
+          and(
+            eq(agent_briefing_preferences.kilo_user_id, candidate.userId),
+            lte(agent_briefing_preferences.next_run_at, iso)
+          )
         )
-      );
+        .for('update', { skipLocked: true });
+      if (!preferences) return 0;
+      const window = latestScheduledBriefingWindow(preferences, now);
+      const captureThrough = new Date(
+        Math.min(now.getTime(), Date.parse(window.morningEndAt))
+      ).toISOString();
+      const contexts = await briefingContexts(preferences.kilo_user_id);
+      const enabled = await tx
+        .select()
+        .from(agent_briefing_context_preferences)
+        .where(
+          and(
+            eq(agent_briefing_context_preferences.kilo_user_id, preferences.kilo_user_id),
+            eq(agent_briefing_context_preferences.enabled, true)
+          )
+        )
+        .for('share');
+      let count = 0;
+      for (const setting of enabled) {
+        if (
+          !contexts.some(
+            context =>
+              context.id === setting.context_key &&
+              context.organizationId === setting.organization_id
+          )
+        )
+          continue;
+        const facts = await collectBriefingSnapshot(
+          preferences.kilo_user_id,
+          setting.organization_id,
+          window.nightStartAt,
+          captureThrough
+        );
+        const active = briefingHasActivity(facts.scorecard);
+        const expired = Date.parse(window.morningEndAt) <= now.getTime();
+        const pending = active && !expired;
+        const inserted = await tx
+          .insert(agent_briefing_snapshots)
+          .values({
+            kilo_user_id: preferences.kilo_user_id,
+            context_key: setting.context_key,
+            organization_id: setting.organization_id,
+            timezone: preferences.timezone,
+            language: preferences.language,
+            local_date: window.localDate,
+            night_start_at: window.nightStartAt,
+            cutoff_at: window.cutoffAt,
+            morning_end_at: window.morningEndAt,
+            captured_at: iso,
+            published_at: iso,
+            facts,
+            expires_at: new Date(now.getTime() + 30 * 86400_000).toISOString(),
+            job_due_at: pending ? iso : null,
+            summary: {
+              ...emptySummary,
+              status: pending ? 'pending' : 'unavailable',
+              model: setting.model,
+              ...(expired && active ? { error: 'time_limit', finishedAt: iso } : {}),
+              authorization: {
+                model: setting.model,
+                maxSpendMicrodollars: setting.max_spend_microdollars,
+                maxDurationSeconds: setting.max_duration_seconds,
+              },
+            },
+          })
+          .onConflictDoNothing()
+          .returning({ id: agent_briefing_snapshots.id });
+        count += inserted.length;
+      }
+      await tx
+        .update(agent_briefing_preferences)
+        .set({
+          next_run_at: nextBriefingTime(
+            preferences.morning_start,
+            preferences.timezone,
+            now
+          ).toISOString(),
+        })
+        .where(eq(agent_briefing_preferences.kilo_user_id, preferences.kilo_user_id));
+      return count;
+    });
   }
-  const active = await db
+  const jobs = await db
     .select()
-    .from(agent_briefing_reports)
+    .from(agent_briefing_snapshots)
     .where(
       and(
-        eq(agent_briefing_reports.kind, 'scheduled'),
-        lte(agent_briefing_reports.cutoff_at, iso),
-        lte(agent_briefing_reports.next_refresh_at, iso)
+        lte(agent_briefing_snapshots.job_due_at, iso),
+        or(
+          and(
+            sql`${agent_briefing_snapshots.summary}->>'status' = 'running'`,
+            lte(agent_briefing_snapshots.generation_deadline_at, iso)
+          ),
+          and(
+            sql`${agent_briefing_snapshots.summary}->>'status' = 'pending'`,
+            isNull(agent_briefing_snapshots.generation_id),
+            lte(agent_briefing_snapshots.morning_end_at, iso)
+          )
+        )
       )
     )
-    .orderBy(asc(agent_briefing_reports.next_refresh_at))
-    .limit(500);
-  for (const original of active) {
-    const localDate = original.local_date;
-    if (localDate === null) {
-      throw new Error('Scheduled briefing is missing its local date');
-    }
-    try {
-      await requireBriefingContext(original.kilo_user_id, original.organization_id);
-    } catch (error) {
-      if (!(error instanceof TRPCError && error.code === 'FORBIDDEN')) throw error;
-      await db.delete(agent_briefing_reports).where(eq(agent_briefing_reports.id, original.id));
-      continue;
-    }
-    if (original.context_key === 'personal')
-      await freezeBriefingContexts(
-        original.kilo_user_id,
-        {
-          localDate,
-          nightStartAt: new Date(original.night_start_at).toISOString(),
-          cutoffAt: new Date(original.cutoff_at).toISOString(),
-          morningEndAt: new Date(original.morning_end_at).toISOString(),
-        },
-        original.timezone ?? (await getScheduledTimezone(original.kilo_user_id))
-      );
-    let row = await refreshBriefingEvidence(original);
-    row = await reconcileBriefingCharge(row);
-    const facts = row.facts;
-    if (quietBriefingProven(facts)) {
-      await publishQuietBriefing(row, iso);
-      await deferBriefingRefresh(row, now);
-      continue;
-    }
-    const scorecard = briefingScorecardSchema.safeParse(facts.scorecard);
-    if (!scorecard.success || !briefingHasActivity(scorecard.data)) {
-      await deferBriefingRefresh(row, now);
-      continue;
-    }
-    let summary = briefingSummarySchema.parse(row.summary);
-    /**
-     * The `unavailable` state a quiet publish writes before any generation ran. Late evidence can
-     * still make the night active, and that report may then enter generation like any other.
-     */
-    const quietSummaryOnly =
-      summary.status === 'unavailable' &&
-      summary.error === null &&
-      summary.text === null &&
-      summary.costMicrodollars === 0 &&
-      summary.startedAt === null &&
-      row.generation_id === null;
-    if ((!row.published_at && summary.status === 'disabled') || quietSummaryOnly) {
-      const settings = await briefingContextSettings(row.kilo_user_id, row.organization_id);
-      if (settings.aiEnabled && new Date(row.morning_end_at) > now) {
-        const [updated] = await db
-          .update(agent_briefing_reports)
-          .set({
-            summary: { ...summary, status: 'pending', model: settings.model, waitStartedAt: iso },
-            updated_at: iso,
-          })
-          .where(
-            and(
-              eq(agent_briefing_reports.id, row.id),
-              sql`${agent_briefing_reports.summary}->>'status' = ${summary.status}`
-            )
-          )
-          .returning();
-        if (updated) row = updated;
-      } else if (!row.published_at) {
-        const [published] = await db
-          .update(agent_briefing_reports)
-          .set({
-            published_at: iso,
-            ...(settings.aiEnabled
-              ? {
-                  summary: {
-                    ...summary,
-                    status: 'unavailable',
-                    model: settings.model,
-                    error: 'time_limit',
-                    finishedAt: iso,
-                    canRetry: false,
-                  },
-                }
-              : {}),
-          })
-          .where(
-            and(eq(agent_briefing_reports.id, row.id), isNull(agent_briefing_reports.published_at))
-          )
-          .returning();
-        if (published) row = published;
-      }
-    }
-    summary = briefingSummarySchema.parse(row.summary);
+    .orderBy(asc(agent_briefing_snapshots.job_due_at))
+    .limit(100);
+  for (const row of jobs) {
     if (
-      new Date(row.morning_end_at) <= now &&
-      summary.status === 'pending' &&
-      row.generation_id === null &&
-      row.summary.manualRequested !== true
-    ) {
-      const [closed] = await db
-        .update(agent_briefing_reports)
-        .set({
-          summary: sql`${agent_briefing_reports.summary} || ${JSON.stringify({ status: 'unavailable', error: 'time_limit', finishedAt: iso, canRetry: false })}::jsonb`,
-        })
-        .where(
-          and(
-            eq(agent_briefing_reports.id, row.id),
-            isNull(agent_briefing_reports.generation_id),
-            sql`${agent_briefing_reports.summary}->>'status' = 'pending'`
-          )
-        )
-        .returning();
-      if (closed) row = closed;
-    }
-    if (
-      summary.status === 'running' &&
+      row.summary.status === 'running' &&
       row.generation_deadline_at &&
-      new Date(row.generation_deadline_at) < now
-    ) {
-      const [failed] = await db
-        .update(agent_briefing_reports)
-        .set({
-          generation_finished_at: iso,
-          summary: sql`${agent_briefing_reports.summary} || ${JSON.stringify({ status: 'failed', finishedAt: iso, error: 'time_limit', canRetry: false })}::jsonb`,
-        })
-        .where(
-          and(
-            eq(agent_briefing_reports.id, row.id),
-            sql`${agent_briefing_reports.summary}->>'status' = 'running'`
-          )
-        )
-        .returning();
-      if (failed) row = await reconcileBriefingCharge(failed);
-    }
-    const waitStartedAt =
-      typeof row.summary.waitStartedAt === 'string'
-        ? Date.parse(row.summary.waitStartedAt)
-        : new Date(row.cutoff_at).getTime();
-    if (
-      !row.published_at &&
-      (new Date(row.morning_end_at) <= now ||
-        now.getTime() >= waitStartedAt + 5 * 60_000 ||
-        ['ready', 'outdated', 'failed', 'unavailable'].includes(String(row.summary.status)))
-    ) {
-      const [published] = await db
-        .update(agent_briefing_reports)
-        .set({ published_at: iso })
-        .where(
-          and(eq(agent_briefing_reports.id, row.id), isNull(agent_briefing_reports.published_at))
-        )
-        .returning();
-      if (published) row = published;
-    }
-    if (
-      row.published_at &&
-      !row.notification_sent_at &&
-      new Date(row.morning_end_at) > now &&
-      (await dispatchAgentBriefingPush({
-        userId: row.kilo_user_id,
-        localDate,
-        expiresAt: new Date(row.morning_end_at).toISOString(),
-      }))
+      Date.parse(row.generation_deadline_at) <= now.getTime()
     ) {
       await db
-        .update(agent_briefing_reports)
-        .set({ notification_sent_at: iso })
-        .where(eq(agent_briefing_reports.id, row.id));
-    }
-    await deferBriefingRefresh(row, now);
-  }
-  await db
-    .update(agent_briefing_reports)
-    .set({
-      generation_finished_at: iso,
-      next_charge_check_at: iso,
-      summary: sql`${agent_briefing_reports.summary} || ${JSON.stringify({ status: 'failed', finishedAt: iso, error: 'time_limit', canRetry: false })}::jsonb`,
-    })
-    .where(
-      and(
-        sql`${agent_briefing_reports.summary}->>'status' = 'running'`,
-        lte(agent_briefing_reports.generation_deadline_at, iso)
-      )
-    );
-  const unfinished = await db
-    .select()
-    .from(agent_briefing_reports)
-    .where(
-      and(
-        sql`${agent_briefing_reports.generation_id} IS NOT NULL`,
-        lte(agent_briefing_reports.next_charge_check_at, iso)
-      )
-    )
-    .orderBy(asc(agent_briefing_reports.next_charge_check_at))
-    .limit(100);
-  for (const report of unfinished) await reconcileBriefingCharge(report);
-  await db
-    .delete(agent_briefing_reports)
-    .where(
-      or(
-        and(
-          eq(agent_briefing_reports.kind, 'scheduled'),
-          lte(
-            agent_briefing_reports.cutoff_at,
-            new Date(now.getTime() - 30 * 86400_000).toISOString()
+        .update(agent_briefing_snapshots)
+        .set({
+          job_due_at: null,
+          generation_finished_at: iso,
+          summary: sql`${agent_briefing_snapshots.summary} || ${JSON.stringify({ status: 'failed', text: null, finishedAt: iso, error: 'time_limit' })}::jsonb`,
+        })
+        .where(
+          and(
+            eq(agent_briefing_snapshots.id, row.id),
+            sql`${agent_briefing_snapshots.summary}->>'status' = 'running'`,
+            lte(agent_briefing_snapshots.generation_deadline_at, iso)
           )
-        ),
-        and(
-          eq(agent_briefing_reports.kind, 'one_off'),
-          lte(agent_briefing_reports.morning_end_at, iso)
-        )
-      )
-    );
-  return { scheduledUsers: due.length, activeReports: active.length };
-}
-export async function generatePendingAgentBriefings() {
-  const reports = await db
-    .select({ id: agent_briefing_reports.id })
-    .from(agent_briefing_reports)
+        );
+    } else if (
+      row.summary.status === 'pending' &&
+      Date.parse(row.morning_end_at) <= now.getTime()
+    ) {
+      await db
+        .update(agent_briefing_snapshots)
+        .set({
+          job_due_at: null,
+          summary: sql`${agent_briefing_snapshots.summary} || ${JSON.stringify({ status: 'unavailable', finishedAt: iso, error: 'time_limit' })}::jsonb`,
+        })
+        .where(
+          and(
+            eq(agent_briefing_snapshots.id, row.id),
+            isNull(agent_briefing_snapshots.generation_id),
+            sql`${agent_briefing_snapshots.summary}->>'status' = 'pending'`
+          )
+        );
+    }
+  }
+  const charges = await db
+    .select()
+    .from(agent_briefing_snapshots)
+    .where(lte(agent_briefing_snapshots.next_charge_check_at, iso))
+    .orderBy(asc(agent_briefing_snapshots.next_charge_check_at))
+    .limit(100);
+  for (const row of charges) await reconcileBriefingCharge(row);
+  const notifications = await db
+    .select()
+    .from(agent_briefing_snapshots)
     .where(
       and(
-        sql`${agent_briefing_reports.summary}->>'status' = 'pending'`,
-        isNull(agent_briefing_reports.generation_id),
-        or(
-          gt(agent_briefing_reports.morning_end_at, new Date().toISOString()),
-          sql`${agent_briefing_reports.summary}->>'manualRequested' = 'true'`
-        )
+        isNull(agent_briefing_snapshots.notification_sent_at),
+        sql`${agent_briefing_snapshots.summary}->>'notificationSuppressed' IS DISTINCT FROM 'true'`,
+        lte(agent_briefing_snapshots.cutoff_at, iso),
+        sql`${agent_briefing_snapshots.morning_end_at} > ${iso}::timestamptz`,
+        sql`(${agent_briefing_snapshots.facts}->'scorecard'->>'sessions')::int > 0`,
+        sql`EXISTS (SELECT 1 FROM ${agent_briefing_preferences} WHERE ${agent_briefing_preferences.kilo_user_id} = ${agent_briefing_snapshots.kilo_user_id} AND ${agent_briefing_preferences.notifications_enabled})`
       )
     )
-    .orderBy(asc(agent_briefing_reports.updated_at))
-    .limit(10);
-  const [results, preparations] = await Promise.all([
-    Promise.allSettled(reports.map(report => runBriefingSummary(report.id))),
-    generatePendingOneOffBriefingPreparations().catch(error => {
-      console.error('Agent briefing preparation scheduler rejected', error);
-      return null;
-    }),
-  ]);
-  const rejected = results.filter(result => result.status === 'rejected').length;
-  if (rejected > 0) console.error('Agent briefing summary jobs rejected', { rejected });
-  return {
-    attempted: reports.length,
-    fulfilled: results.length - rejected,
-    rejected,
-    preparations,
-  };
+    .orderBy(asc(agent_briefing_snapshots.cutoff_at))
+    .limit(100);
+  for (const row of notifications) {
+    try {
+      await assertBriefingSourcesAccessible(row);
+      const accepted = await dispatchAgentBriefingPush({
+        userId: row.kilo_user_id,
+        localDate: row.local_date,
+        expiresAt: new Date(row.morning_end_at).toISOString(),
+      });
+      if (accepted) {
+        await db
+          .update(agent_briefing_snapshots)
+          .set({ notification_sent_at: iso })
+          .where(
+            and(
+              eq(agent_briefing_snapshots.id, row.id),
+              isNull(agent_briefing_snapshots.notification_sent_at)
+            )
+          );
+      }
+    } catch (error) {
+      if (error instanceof TRPCError && ['FORBIDDEN', 'NOT_FOUND'].includes(error.code)) {
+        await db
+          .update(agent_briefing_snapshots)
+          .set({
+            summary: sql`${agent_briefing_snapshots.summary} || '{"notificationSuppressed":true}'::jsonb`,
+          })
+          .where(eq(agent_briefing_snapshots.id, row.id));
+        continue;
+      }
+      console.error('Agent briefing notification dispatch failed', { reportId: row.id });
+    }
+  }
+  await db.delete(agent_briefing_snapshots).where(lte(agent_briefing_snapshots.expires_at, iso));
+  return { scheduledUsers: due.length, capturedReports: captured };
 }
 
-async function getScheduledTimezone(userId: string) {
-  const [preferences] = await db
-    .select({ timezone: agent_briefing_preferences.timezone })
-    .from(agent_briefing_preferences)
-    .where(eq(agent_briefing_preferences.kilo_user_id, userId));
-  return preferences?.timezone ?? 'UTC';
+export async function generatePendingAgentBriefings() {
+  const reports = await db
+    .select({ id: agent_briefing_snapshots.id })
+    .from(agent_briefing_snapshots)
+    .where(
+      and(
+        lte(agent_briefing_snapshots.job_due_at, new Date().toISOString()),
+        isNull(agent_briefing_snapshots.generation_id),
+        sql`${agent_briefing_snapshots.summary}->>'status' = 'pending'`
+      )
+    )
+    .orderBy(asc(agent_briefing_snapshots.job_due_at))
+    .limit(2);
+  const results = await Promise.allSettled(reports.map(report => runBriefingSummary(report.id)));
+  const rejected = results.filter(result => result.status === 'rejected').length;
+  if (rejected) console.error('Agent briefing summary jobs rejected', { rejected });
+  return { attempted: reports.length, fulfilled: results.length - rejected, rejected };
 }

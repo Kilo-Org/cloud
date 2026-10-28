@@ -60,9 +60,6 @@ const NATIVE_ONLY_PATHS: Record<string, true> = {
   'organizations.vercelCompute.retrySetup': true,
   'organizations.vercelCompute.upgradeRuntime': true,
   'activeSessions.widgetCredential': true,
-  'agentBriefing.createOneOff': true,
-  'agentBriefing.generateSummary': true,
-  'agentBriefing.retrySummary': true,
   'agentBriefing.updateContextPreferences': true,
 };
 

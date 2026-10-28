@@ -1,35 +1,47 @@
 import { createElement } from 'react';
-import { expect, it, vi } from 'vitest';
+import { beforeEach, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
+import { waitFor } from '@/test/render-with-providers';
 
 import { BriefingContextSettings } from './briefing-context-settings';
 
-/**
- * The AI block's switch is the control that spends money, so it has to be the
- * one thing a screen reader names: the row's own label plus its on/off state.
- * The explorer reported the section heading as the switch's name, which reads
- * as "AI settings · Personal" with no indication of what the control does. The
- * catalogue keys are stubbed with their English copy so the assertions read as
- * the sentence a person hears.
- */
 const COPY: Readonly<Record<string, string>> = {
-  'agentBriefing.aiOptIn': 'Paid AI summaries',
-  'agentBriefing.aiHint': 'Optional for this context.',
-  'agentBriefing.contextSettings': 'AI settings · {{context}}',
+  'agentBriefing.scheduledContextEnabled': 'Scheduled briefs',
+  'agentBriefing.scheduledContextHint': 'Scheduled for this context.',
+  'agentBriefing.scheduledContextSettings': 'Scheduled briefs · {{context}}',
   'common.personal': 'Personal',
   'common.couldNotLoadModels': 'Could not load models',
   'agentBriefing.defaultModel': 'Use the default model',
   'agentBriefing.duration': 'Time limit (minutes)',
   'agentBriefing.spendLimit': 'Spend limit (USD)',
-  'agentBriefing.safeguardHint': 'Per-summary limits.',
+  'agentBriefing.snapshotSafeguards': 'Per-summary limits.',
   'agentBriefing.invalidSafeguards': 'Invalid limits',
   'agentBriefing.enablePaid': 'Enable paid summaries',
   'common.retry': 'Retry',
 };
 
+const paid = vi.hoisted(() => ({
+  mutate: vi.fn(),
+  refetch: vi.fn(),
+  alert: vi.fn(),
+}));
+
+beforeEach(() => {
+  vi.clearAllMocks();
+  paid.refetch.mockResolvedValue({
+    data: {
+      canGenerate: true,
+      estimatedCostMicrodollars: 1000,
+      maximumCostMicrodollars: 2_000_000,
+      maxDurationSeconds: 600,
+      estimateToken: 'confirmed-estimate',
+    },
+  });
+});
+
 vi.mock('react-native', () => ({
-  Alert: { alert: vi.fn() },
+  Alert: { alert: paid.alert },
   Platform: { OS: 'android' },
   Switch: 'Switch',
   View: 'View',
@@ -45,8 +57,8 @@ vi.mock('react-i18next', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 vi.mock('@tanstack/react-query', () => ({
-  useMutation: () => ({ mutate: vi.fn(), isPending: false }),
-  useQuery: () => ({ data: undefined, isError: false, isFetching: false, refetch: vi.fn() }),
+  useMutation: () => ({ mutate: paid.mutate, isPending: false }),
+  useQuery: () => ({ data: undefined, isError: false, isFetching: false, refetch: paid.refetch }),
   useQueryClient: () => ({}),
 }));
 vi.mock('@/lib/trpc', () => ({
@@ -68,19 +80,20 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({ useOfflineBannerState: 
 
 const preference = {
   context: { id: 'personal', organizationId: null, name: 'Personal' },
-  aiEnabled: true,
+  enabled: true,
   model: 'model-a',
   maxDurationSeconds: 600,
   maxSpendMicrodollars: 2_000_000,
 } as const;
 
-function mount(aiEnabled: boolean) {
+function mount(enabled: boolean) {
   const holder: { renderer?: TestRenderer.ReactTestRenderer } = {};
   act(() => {
     holder.renderer = TestRenderer.create(
       createElement(BriefingContextSettings, {
-        preference: { ...preference, aiEnabled },
+        preference: { ...preference, enabled },
         defaultModel: 'model-a',
+        timezone: 'Europe/Berlin',
       })
     );
   });
@@ -91,13 +104,13 @@ function mount(aiEnabled: boolean) {
   return mounted;
 }
 
-it('names the paid summaries switch after its row and reports that it is on', () => {
+it('names the scheduled briefs switch after its row and reports that it is on', () => {
   const mounted = mount(true);
   const switchNode = mounted.root.find(node => (node.type as string) === 'Switch');
   const props: { accessibilityLabel?: string; accessibilityState?: { checked?: boolean } } =
     switchNode.props;
 
-  expect(props.accessibilityLabel).toBe('Paid AI summaries');
+  expect(props.accessibilityLabel).toBe('Scheduled briefs');
   expect(props.accessibilityState?.checked).toBe(true);
 
   act(() => {
@@ -112,6 +125,36 @@ it('reports the off state instead of leaving the switch unstated', () => {
 
   expect(props.accessibilityState?.checked).toBe(false);
 
+  act(() => {
+    mounted.unmount();
+  });
+});
+
+it('requires a fresh cost confirmation before explicitly enabling scheduled capture', async () => {
+  const mounted = mount(false);
+  expect(paid.mutate).not.toHaveBeenCalled();
+  const switchNode = mounted.root.find(node => (node.type as string) === 'Switch');
+  const { onValueChange } = switchNode.props as { onValueChange: (next: boolean) => void };
+  act(() => {
+    onValueChange(true);
+  });
+  await waitFor(() => paid.alert.mock.calls.length === 1);
+  expect(paid.refetch).toHaveBeenCalledTimes(1);
+  expect(paid.mutate).not.toHaveBeenCalled();
+  const buttons = paid.alert.mock.calls[0]?.[2] as { onPress?: () => void }[];
+  act(() => {
+    buttons[1]?.onPress?.();
+  });
+  expect(paid.mutate).toHaveBeenCalledWith({
+    organizationId: undefined,
+    enabled: true,
+    timezone: 'Europe/Berlin',
+    language: 'en',
+    model: 'model-a',
+    maxDurationSeconds: 600,
+    maxSpendMicrodollars: 2_000_000,
+    estimateToken: 'confirmed-estimate',
+  });
   act(() => {
     mounted.unmount();
   });

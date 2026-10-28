@@ -24,8 +24,8 @@ function installFakeKms() {
   const fakeFetch = jest.fn(async (url: string | URL | Request, init?: RequestInit) => {
     const target = new URL(String(url));
     calls.push({ url: target, init: init ?? {} });
-    if (init?.method === 'POST') {
-      const body = JSON.parse(String(init.body));
+    const body = JSON.parse(String(init?.body));
+    if (target.pathname === '/data-key') {
       const dataKey = randomBytes(32).toString('base64');
       const wrapped = `wrapped-${dataKeys.size}`;
       dataKeys.set(wrapped, {
@@ -44,13 +44,12 @@ function installFakeKms() {
         kms_key_version: '1',
       });
     }
-    const params = target.searchParams;
-    const entry = dataKeys.get(params.get('wrapped_dek') ?? '');
+    const entry = dataKeys.get(body.wrapped_dek ?? '');
     const requestContext = {
-      key_id: params.get('key_id'),
-      owner_type: params.get('owner_type'),
-      owner_id: params.get('owner_id'),
-      provider_id: params.get('provider_id'),
+      key_id: body.key_id,
+      owner_type: body.owner_type,
+      owner_id: body.owner_id,
+      provider_id: body.provider_id,
     };
     if (!entry || JSON.stringify(entry.context) !== JSON.stringify(requestContext)) {
       return new Response('{}', { status: 400 });
@@ -139,10 +138,14 @@ describe('byok kms client', () => {
 
     await expect(decryptByokEnvelope(envelope, orgContext)).resolves.toBe('sk-secret');
 
-    expect(calls[1].init.method).toBe('GET');
-    expect(calls[1].init.body).toBeUndefined();
-    expect(calls[1].init.headers).toMatchObject({ authorization: 'Bearer token-1' });
-    expect(Object.fromEntries(calls[1].url.searchParams)).toEqual({
+    expect(calls[1].url.href).toBe('http://kms.test/decrypt');
+    expect(calls[1].url.search).toBe('');
+    expect(calls[1].init.method).toBe('POST');
+    expect(calls[1].init.headers).toMatchObject({
+      authorization: 'Bearer token-1',
+      'content-type': 'application/json',
+    });
+    expect(JSON.parse(String(calls[1].init.body))).toEqual({
       ...orgContext,
       wrapped_dek: envelope.wrapped_dek,
       kms_key_id: envelope.kms_key_id,
@@ -231,15 +234,15 @@ describe('byok kms client', () => {
     const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });
     if (!envelope) throw new Error('expected envelope');
 
-    const response = await fakeFetch(
-      `http://kms.test/data-key?${new URLSearchParams({
+    const response = await fakeFetch('http://kms.test/decrypt', {
+      method: 'POST',
+      body: JSON.stringify({
         ...context,
         wrapped_dek: envelope.wrapped_dek,
         kms_key_id: envelope.kms_key_id,
         kms_key_version: envelope.kms_key_version,
-      })}`,
-      { method: 'GET' }
-    );
+      }),
+    });
     const { data_key } = (await response.json()) as { data_key: string };
     expect(decryptApiKey(envelope.encrypted_data, data_key)).toBe('sk-secret');
   });

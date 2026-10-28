@@ -16,7 +16,7 @@ const createDataKeyRequestSchema = contextSchema.extend({
   actor_user_id: z.string().min(1).optional(),
 });
 
-const getDataKeyRequestSchema = contextSchema.extend({
+const decryptDataKeyRequestSchema = contextSchema.extend({
   wrapped_dek: z.string().min(1),
   kms_key_id: z.string().min(1),
   kms_key_version: z.string().min(1),
@@ -25,7 +25,7 @@ const getDataKeyRequestSchema = contextSchema.extend({
 type Context = z.infer<typeof contextSchema>;
 
 export type LogEvent = {
-  operation: 'create' | 'get';
+  operation: 'create' | 'decrypt';
   status: number;
   identifiers_verified: boolean;
   key_id?: string;
@@ -48,7 +48,6 @@ export type HandlerRequest = {
   method: string;
   path: string;
   authorization: string | undefined;
-  query: Record<string, string>;
   body: unknown;
 };
 
@@ -106,9 +105,9 @@ async function createDataKey(
   }
 }
 
-async function getDataKey(
+async function decryptDataKey(
   deps: HandlerDeps,
-  request: z.infer<typeof getDataKeyRequestSchema>
+  request: z.infer<typeof decryptDataKeyRequestSchema>
 ): Promise<HandlerResult> {
   const dataKey = await deps.kms.decrypt({
     ciphertextBlob: request.wrapped_dek,
@@ -150,16 +149,16 @@ async function createDataKeyRoute(deps: HandlerDeps, input: unknown): Promise<Ha
   }
 }
 
-async function getDataKeyRoute(deps: HandlerDeps, input: unknown): Promise<HandlerResult> {
-  const parsed = getDataKeyRequestSchema.safeParse(input);
+async function decryptDataKeyRoute(deps: HandlerDeps, input: unknown): Promise<HandlerResult> {
+  const parsed = decryptDataKeyRequestSchema.safeParse(input);
   if (!parsed.success) {
-    deps.log({ operation: 'get', status: 400, identifiers_verified: false });
+    deps.log({ operation: 'decrypt', status: 400, identifiers_verified: false });
     return fail(400, 'invalid request');
   }
 
-  const event = { operation: 'get', ...ownerIdentifiers(parsed.data) } as const;
+  const event = { operation: 'decrypt', ...ownerIdentifiers(parsed.data) } as const;
   try {
-    const result = await getDataKey(deps, parsed.data);
+    const result = await decryptDataKey(deps, parsed.data);
     deps.log({ ...event, status: result.status, identifiers_verified: true });
     return result;
   } catch (error) {
@@ -173,13 +172,11 @@ export async function handleRequest(
   deps: HandlerDeps,
   request: HandlerRequest
 ): Promise<HandlerResult> {
-  if (request.path !== '/data-key') return fail(404, 'not found');
-  if (request.method !== 'POST' && request.method !== 'GET') {
-    return fail(405, 'method not allowed');
-  }
+  if (request.path !== '/data-key' && request.path !== '/decrypt') return fail(404, 'not found');
+  if (request.method !== 'POST') return fail(405, 'method not allowed');
   if (!isAuthorized(request.authorization, deps.serviceToken)) return fail(401, 'unauthorized');
 
-  return request.method === 'POST'
+  return request.path === '/data-key'
     ? createDataKeyRoute(deps, request.body)
-    : getDataKeyRoute(deps, request.query);
+    : decryptDataKeyRoute(deps, request.body);
 }

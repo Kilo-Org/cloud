@@ -49,7 +49,6 @@ const server = createServer(async (request, response) => {
     method: request.method ?? 'GET',
     path: url.pathname,
     authorization: request.headers.authorization,
-    query: Object.fromEntries(url.searchParams),
     body,
   });
   const payload = JSON.stringify(result.body);
@@ -64,5 +63,5 @@ const server = createServer(async (request, response) => {
 server.listen(PORT, HOST, () => {
   console.log(`BYOK KMS dev service on http://${HOST}:${PORT} (KMS ${KMS_ENDPOINT})`);
   console.log(`Set BYOK_KMS_SERVICE_URL=http://${HOST}:${PORT}`);
-  console.log(`Set BYOK_KMS_SERVICE_TOKEN=${deps.serviceToken}`);
+  console.log('Set BYOK_KMS_SERVICE_TOKEN to the configured service token');
 });

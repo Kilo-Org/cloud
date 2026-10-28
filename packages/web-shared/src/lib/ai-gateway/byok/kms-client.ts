@@ -45,7 +45,7 @@ async function sendToKms(config: ByokKmsClientConfig, url: string, init: Request
     signal: AbortSignal.timeout(KMS_REQUEST_TIMEOUT_MS),
   });
   if (!response.ok) {
-    throw new Error(`BYOK KMS ${init.method} /data-key failed with status ${response.status}`);
+    throw new Error(`BYOK KMS ${new URL(url).pathname} failed with status ${response.status}`);
   }
   return response.json();
 }
@@ -89,14 +89,17 @@ export async function decryptByokEnvelope(
     throw new Error('BYOK_KMS_SERVICE_URL is required to decrypt an envelope-encrypted BYOK key');
   }
 
-  const query = new URLSearchParams({
-    ...context,
-    wrapped_dek: envelope.wrapped_dek,
-    kms_key_id: envelope.kms_key_id,
-    kms_key_version: envelope.kms_key_version,
-  });
   const { data_key } = RetrievedDataKeySchema.parse(
-    await sendToKms(config, `${config.url}/data-key?${query}`, { method: 'GET' })
+    await sendToKms(config, `${config.url}/decrypt`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        ...context,
+        wrapped_dek: envelope.wrapped_dek,
+        kms_key_id: envelope.kms_key_id,
+        kms_key_version: envelope.kms_key_version,
+      }),
+    })
   );
   return decryptApiKey(envelope.encrypted_data, data_key);
 }

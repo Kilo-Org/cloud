@@ -2,6 +2,7 @@ import { type db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizz
 import { byok_api_keys } from '@kilocode/db/schema';
 import { ByokApiKeySettingsSchema } from '@kilocode/db/schema-types';
 import { and, eq, inArray } from 'drizzle-orm';
+import { captureException } from '@sentry/nextjs';
 import type { BYOKApiKeyEnvelope, EncryptedData } from '@kilocode/db/schema-types';
 import {
   decryptByokEnvelope,
@@ -296,12 +297,24 @@ export async function getByokCredentials(
     )
     .orderBy(byok_api_keys.created_at);
 
-  return Promise.all(
+  const results = await Promise.allSettled(
     rows.map(async row => ({
       ...(await decryptByokRow(row)),
       serveCatalogModels: servesCatalogModels(row.settings),
     }))
   );
+
+  const credentials: ByokCredential[] = [];
+  const failures: unknown[] = [];
+  for (const result of results) {
+    if (result.status === 'fulfilled') credentials.push(result.value);
+    else failures.push(result.reason);
+  }
+  for (const failure of failures) captureException(failure);
+
+  // Fail closed when no key could be decrypted so the request never falls back to Kilo-paid routing.
+  if (credentials.length === 0 && failures.length > 0) throw failures[0];
+  return credentials;
 }
 
 async function getByokRowsForOwner(

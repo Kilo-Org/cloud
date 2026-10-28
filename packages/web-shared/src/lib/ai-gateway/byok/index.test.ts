@@ -362,10 +362,9 @@ describe('envelope-encrypted BYOK rows', () => {
 
     expect(byok).toEqual([{ decryptedAPIKey: secret, providerId: 'anthropic' }]);
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    const target = new URL(url);
-    expect(target.origin + target.pathname).toBe('http://kms.test/data-key');
-    expect(init.method).toBe('GET');
-    expect(Object.fromEntries(target.searchParams)).toEqual({
+    expect(url).toBe('http://kms.test/decrypt');
+    expect(init.method).toBe('POST');
+    expect(JSON.parse(String(init.body))).toEqual({
       key_id: keyId,
       owner_type: 'user',
       owner_id: user.id,
@@ -386,5 +385,26 @@ describe('envelope-encrypted BYOK rows', () => {
     ) as unknown as typeof fetch;
 
     await expect(getBYOKforUser(db, user.id, ['anthropic'])).rejects.toThrow('403');
+  });
+
+  test('keeps the keys that decrypt when another key fails and fails closed when none do', async () => {
+    const user = await createUser();
+    await insertEnvelopeRow(user.id, 'secret', randomBytes(32).toString('base64'));
+    const openaiSecret = await insertByokKey(
+      { type: 'user', id: user.id },
+      user.id,
+      'openai',
+      '2026-01-01T00:00:00.000Z'
+    );
+    process.env.BYOK_KMS_SERVICE_URL = 'http://kms.test';
+    process.env.BYOK_KMS_SERVICE_TOKEN = 'token';
+    global.fetch = jest.fn(
+      async () => new Response('{}', { status: 502 })
+    ) as unknown as typeof fetch;
+
+    await expect(getBYOKforUser(db, user.id, ['anthropic', 'openai'])).resolves.toEqual([
+      { decryptedAPIKey: openaiSecret, providerId: 'openai' },
+    ]);
+    await expect(getBYOKforUser(db, user.id, ['anthropic'])).rejects.toThrow('502');
   });
 });

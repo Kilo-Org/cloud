@@ -48,7 +48,6 @@ const request = (overrides: Partial<HandlerRequest>): HandlerRequest => ({
   method: 'POST',
   path: '/data-key',
   authorization: `Bearer ${TOKEN}`,
-  query: {},
   body: undefined,
   ...overrides,
 });
@@ -56,10 +55,8 @@ const request = (overrides: Partial<HandlerRequest>): HandlerRequest => ({
 const create = (body: unknown, authorization: string | undefined = `Bearer ${TOKEN}`) =>
   handleRequest(deps, request({ method: 'POST', body, authorization }));
 
-const get = (
-  query: Record<string, string>,
-  authorization: string | undefined = `Bearer ${TOKEN}`
-) => handleRequest(deps, request({ method: 'GET', query, authorization }));
+const decrypt = (body: unknown, authorization: string | undefined = `Bearer ${TOKEN}`) =>
+  handleRequest(deps, request({ path: '/decrypt', body, authorization }));
 
 type Created = {
   data_key: string;
@@ -75,14 +72,14 @@ const fakeCreated: Created = {
   kms_key_version: '1',
 };
 
-const getQuery = (context: Record<string, string>, created: Created) => ({
+const decryptBody = (context: Record<string, string>, created: Created) => ({
   ...context,
   wrapped_dek: created.wrapped_dek,
   kms_key_id: created.kms_key_id,
   kms_key_version: created.kms_key_version,
 });
 
-test('POST returns a data key and its wrapped form, and GET returns the same data key', async () => {
+test('POST /data-key returns a data key and its wrapped form, and POST /decrypt returns the same data key', async () => {
   const created = await create({ ...userContext, actor_user_id: 'u1' });
   assert.equal(created.status, 200);
   const body = created.body as Created;
@@ -90,12 +87,12 @@ test('POST returns a data key and its wrapped form, and GET returns the same dat
   assert.equal(body.kms_key_id, 'arn:test');
   assert.equal(body.kms_key_version, '1');
 
-  const fetched = await get(getQuery(userContext, body));
+  const fetched = await decrypt(decryptBody(userContext, body));
   assert.equal(fetched.status, 200);
   assert.deepEqual(fetched.body, { data_key: body.data_key });
 });
 
-test('GET rejects any identifier that differs from creation time', async () => {
+test('decrypt rejects any identifier that differs from creation time', async () => {
   const body = (await create(orgContext)).body as Created;
 
   for (const spoofed of [
@@ -104,12 +101,12 @@ test('GET rejects any identifier that differs from creation time', async () => {
     { key_id: 'key-3' },
     { provider_id: 'anthropic' },
   ]) {
-    const result = await get(getQuery({ ...orgContext, ...spoofed }, body));
+    const result = await decrypt(decryptBody({ ...orgContext, ...spoofed }, body));
     assert.equal(result.status, 403, JSON.stringify(spoofed));
   }
 });
 
-test('GET reports 502 when KMS itself fails', async () => {
+test('decrypt reports 502 when KMS itself fails', async () => {
   const failing: HandlerDeps = {
     ...deps,
     kms: {
@@ -121,7 +118,7 @@ test('GET reports 502 when KMS itself fails', async () => {
   };
   const result = await handleRequest(
     failing,
-    request({ method: 'GET', query: getQuery(userContext, fakeCreated) })
+    request({ path: '/decrypt', body: decryptBody(userContext, fakeCreated) })
   );
   assert.equal(result.status, 502);
 });
@@ -131,14 +128,14 @@ test('rejects requests missing key id or owner context', async () => {
   const { owner_id: _ownerId, ...withoutOwnerId } = userContext;
   assert.equal((await create(withoutKeyId)).status, 400);
   assert.equal((await create(withoutOwnerId)).status, 400);
-  assert.equal((await get({ ...userContext })).status, 400);
+  assert.equal((await decrypt({ ...userContext })).status, 400);
 });
 
-test('logs KMS-verified identifiers on GET and unverified claims otherwise', async () => {
+test('logs KMS-verified identifiers on decrypt and unverified claims otherwise', async () => {
   logs.length = 0;
   const body = (await create({ ...orgContext, actor_user_id: 'u9' })).body as Created;
-  await get(getQuery(orgContext, body));
-  await get(getQuery({ ...orgContext, owner_id: 'org-2' }, body));
+  await decrypt(decryptBody(orgContext, body));
+  await decrypt(decryptBody({ ...orgContext, owner_id: 'org-2' }, body));
   await create({ provider_id: 'openai' });
 
   assert.deepEqual(
@@ -162,7 +159,7 @@ test('logs KMS-verified identifiers on GET and unverified claims otherwise', asy
         actor_user_id: 'u9',
       },
       {
-        operation: 'get',
+        operation: 'decrypt',
         status: 200,
         verified: true,
         key_id: 'key-2',
@@ -171,7 +168,7 @@ test('logs KMS-verified identifiers on GET and unverified claims otherwise', asy
         actor_user_id: undefined,
       },
       {
-        operation: 'get',
+        operation: 'decrypt',
         status: 403,
         verified: false,
         key_id: 'key-2',
@@ -204,11 +201,16 @@ test('user keys log the owner as user_id and never as organization_id', async ()
 
 test('rejects missing or wrong bearer token', async () => {
   assert.equal((await create(userContext, '')).status, 401);
-  assert.equal((await get({}, 'Bearer nope')).status, 401);
+  assert.equal((await decrypt({}, 'Bearer nope')).status, 401);
 });
 
 test('rejects unknown routes and methods', async () => {
   assert.equal((await handleRequest(deps, request({ path: '/encrypt' }))).status, 404);
-  assert.equal((await handleRequest(deps, request({ path: '/decrypt' }))).status, 404);
+  assert.equal((await handleRequest(deps, request({ path: '/data-key/decrypt' }))).status, 404);
+  assert.equal((await handleRequest(deps, request({ method: 'GET' }))).status, 405);
   assert.equal((await handleRequest(deps, request({ method: 'DELETE' }))).status, 405);
+  assert.equal(
+    (await handleRequest(deps, request({ method: 'GET', path: '/decrypt' }))).status,
+    405
+  );
 });

@@ -293,6 +293,41 @@ describe('getByokCredentials', () => {
     await expect(getByokCredentials(db, organizationOwner, ['openai'])).resolves.toEqual([]);
   });
 
+  test('with catalogModeOnly, never decrypts keys outside catalog mode', async () => {
+    const user = await createUser();
+    const owner = byokOwner(user.id, null);
+    const catalogSecret = await insertByokKey(
+      owner,
+      user.id,
+      'synthetic',
+      '2026-01-01T00:00:00.000Z',
+      {
+        settings: { serve_catalog_models: true },
+      }
+    );
+    await insertByokKey(owner, user.id, 'chutes-byok', '2026-01-02T00:00:00.000Z', {
+      settings: { serve_catalog_models: false },
+    });
+    // A key outside catalog mode that cannot be decrypted, as during a KMS outage.
+    await db.insert(byok_api_keys).values({
+      kilo_user_id: user.id,
+      provider_id: 'edenai',
+      encrypted_api_key: encryptApiKey('unreadable', randomBytes(32).toString('base64')),
+      created_by: user.id,
+    });
+    const providers: UserByokProviderId[] = ['synthetic', 'chutes-byok', 'edenai'];
+
+    await expect(getByokCredentials(db, owner, ['edenai'])).rejects.toThrow();
+    await expect(
+      getByokCredentials(db, owner, providers, { catalogModeOnly: true })
+    ).resolves.toEqual([
+      { decryptedAPIKey: catalogSecret, providerId: 'synthetic', serveCatalogModels: true },
+    ]);
+    await expect(
+      getByokCredentials(db, owner, ['edenai'], { catalogModeOnly: true })
+    ).resolves.toEqual([]);
+  });
+
   test('backs getBYOKforUser without exposing catalog mode', async () => {
     const user = await createUser();
     await insertByokKey(

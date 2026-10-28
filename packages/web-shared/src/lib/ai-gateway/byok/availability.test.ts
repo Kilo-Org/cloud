@@ -23,6 +23,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import {
+  addDirectByokCatalogAvailability,
   addUserByokAvailability,
   getModelUserByokProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
@@ -103,6 +104,19 @@ describe('addUserByokAvailability', () => {
 
     expect(mockedGetVercelModelsMetadata).toHaveBeenCalledTimes(1);
     expect(result.map(model => model.hasUserByokAvailable)).toEqual([false, false]);
+  });
+
+  test('marks catalog models served by a catalog-mode direct BYOK key', async () => {
+    const models = [makeModel('moonshotai/kimi-k2.6'), makeModel('openai/gpt-fixture')].map(
+      model => ({ ...model, hasUserByokAvailable: false })
+    );
+
+    const result = addDirectByokCatalogAvailability(models, new Set(['moonshotai/kimi-k2.6']));
+
+    expect(result.map(model => [model.id, model.hasUserByokAvailable])).toEqual([
+      ['moonshotai/kimi-k2.6', true],
+      ['openai/gpt-fixture', false],
+    ]);
   });
 });
 

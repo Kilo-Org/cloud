@@ -66,7 +66,12 @@ export type GetProviderResult =
   /** The id is a custom LLM the caller may not use, or its stored credentials are unusable. */
   | { kind: 'custom-llm-unavailable' };
 
-async function checkDirectBYOK(
+/**
+ * Direct BYOK model IDs name their provider, such as `neuralwatt/...`, and the
+ * request goes straight to that provider with the stored key, bypassing Kilo's
+ * gateways.
+ */
+async function resolveDirectByokProvider(
   user: User | AnonymousUserContext,
   requestedModel: string,
   request: GatewayRequest,
@@ -199,16 +204,20 @@ function withoutPaidServerFeatures(provider: Provider): Provider {
   };
 }
 
-type ModelUserByok = {
+type GatewayRoutedByok = {
   /** Inference provider keys, sent through Kilo's Vercel AI Gateway account. */
   inference: BYOKResult[];
 };
 
-async function getModelUserByok(
+/**
+ * Stored keys that can serve a catalog model through a gateway, unlike direct
+ * BYOK, where the model ID itself names the provider.
+ */
+async function getGatewayRoutedByok(
   user: User | AnonymousUserContext,
   requestedModel: string,
   organizationId: string | undefined
-): Promise<ModelUserByok> {
+): Promise<GatewayRoutedByok> {
   if (isAnonymousContext(user)) return { inference: [] };
   // Kilo-exclusive models are not routable through Vercel BYOK. Reasoning in particular
   // breaks: the Vercel AI Gateway normalizes reasoning to each provider's upstream-native
@@ -269,9 +278,14 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     return await resolveCustomLlmProvider(customLlm, user, organizationId);
   }
 
-  const directByokByok = await checkDirectBYOK(user, requestedModel, request, organizationId);
-  if (directByokByok) {
-    return directByokByok;
+  const directByokProvider = await resolveDirectByokProvider(
+    user,
+    requestedModel,
+    request,
+    organizationId
+  );
+  if (directByokProvider) {
+    return directByokProvider;
   }
 
   // An enabled "Sign in with ChatGPT" connection wins for an eligible OpenAI
@@ -296,12 +310,12 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     };
   }
 
-  const modelUserByok = await getModelUserByok(user, requestedModel, organizationId);
-  if (modelUserByok.inference.length > 0) {
+  const gatewayRoutedByok = await getGatewayRoutedByok(user, requestedModel, organizationId);
+  if (gatewayRoutedByok.inference.length > 0) {
     return {
       kind: 'provider',
       provider: VERCEL_AI_GATEWAY,
-      userByok: modelUserByok.inference,
+      userByok: gatewayRoutedByok.inference,
       isFree: isFreeModelExcludingCustomLlms(requestedModel),
       bypassAccessCheck: false,
     };
@@ -345,7 +359,7 @@ export async function getEmbeddingProvider(
 ): Promise<{ provider: Provider; userByok: BYOKResult[] | null; isFree: boolean }> {
   const isFree = isFreeModelExcludingCustomLlms(requestedModel);
   // 1. BYOK check — route through Vercel AI Gateway when user has their own key
-  const { inference } = await getModelUserByok(user, requestedModel, organizationId);
+  const { inference } = await getGatewayRoutedByok(user, requestedModel, organizationId);
   if (inference.length > 0) {
     return { provider: VERCEL_AI_GATEWAY, userByok: inference, isFree };
   }

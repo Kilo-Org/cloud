@@ -1,5 +1,4 @@
 import 'server-only';
-import { getKiloExclusiveInferenceProviders } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
   KILO_AUTO_MODEL_PREFIX,
   normalizeModelId,
@@ -57,16 +56,12 @@ export async function isModelRestrictionExempt(
 
 /**
  * Providers a model is pinned to regardless of the snapshot: those a public
- * custom LLM or a Kilo-exclusive model declares. Undefined when the snapshot
- * decides.
+ * custom LLM declares. Undefined when the snapshot decides.
  */
 export async function getModelInferenceProviders(
   modelId: string
 ): Promise<ReadonlySet<string> | undefined> {
-  return (
-    (await getPublicCustomLlmInferenceProviders(modelId)) ??
-    getKiloExclusiveInferenceProviders(modelId)
-  );
+  return (await getPublicCustomLlmInferenceProviders(modelId)) ?? undefined;
 }
 
 export function hasActiveModelRestrictions(restrictions: ModelRestrictions): boolean {

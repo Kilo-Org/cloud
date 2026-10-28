@@ -40,15 +40,12 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   errorExceptInTest: (...args: unknown[]) => mockedErrorExceptInTest(...args),
 }));
 
-import { gemma_4_26b_a4b_it_free_model, kiloExclusiveModels } from './kilo-exclusive-models';
 import {
   kiloExclusiveModelFixture,
   useKiloExclusiveModel,
 } from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
-import type { KiloExclusiveModel } from './providers/kilo-exclusive-model';
 import {
   captureProxyError,
-  checkExclusiveModelProviderAllowed,
   countAndStoreEditUsage,
   countAndStoreFimUsage,
   countAndStoreEmbeddingUsage,
@@ -1786,9 +1783,9 @@ describe('makeErrorReadable', () => {
     expect(result).toBeUndefined();
   });
 
-  it('redacts errors for stealth models', async () => {
+  it('does not redact errors for Kilo-exclusive models', async () => {
     const response = Response.json(
-      { error: { message: 'Upstream vendor secret error' } },
+      { error: { message: 'Upstream vendor error' } },
       { status: 502 }
     );
 
@@ -1800,13 +1797,7 @@ describe('makeErrorReadable', () => {
       userByokProviderIds: null,
     });
 
-    expect(result).toBeDefined();
-    expect(result?.status).toBe(502);
-    await expect(result?.json()).resolves.toEqual({
-      error: 'The upstream provider was unable to process the request',
-      error_type: 'upstream_error',
-      message: 'The upstream provider was unable to process the request',
-    });
+    expect(result).toBeUndefined();
   });
 });
 
@@ -1922,61 +1913,5 @@ describe('requestedSamples', () => {
     expect(requestedSamples({ n: 3 })).toBe(3);
     expect(requestedSamples({})).toBeNull();
     expect(requestedSamples({ n: null })).toBeNull();
-  });
-});
-
-describe('checkExclusiveModelProviderAllowed', () => {
-  const multiProviderModel: KiloExclusiveModel = {
-    ...kiloExclusiveModelFixture,
-    public_id: 'test/multi-provider-exclusive',
-    inference_providers: ['anthropic', 'amazon-bedrock'],
-  };
-
-  beforeEach(() => {
-    kiloExclusiveModels.push(multiProviderModel);
-  });
-
-  afterEach(() => {
-    kiloExclusiveModels.splice(kiloExclusiveModels.indexOf(multiProviderModel), 1);
-  });
-
-  it('allows non-exclusive models, missing provider config, and unrestricted exclusives', () => {
-    expect(checkExclusiveModelProviderAllowed('vendor/model', { only: ['openai'] })).toBeNull();
-    expect(
-      checkExclusiveModelProviderAllowed(kiloExclusiveModelFixture.public_id, undefined)
-    ).toBeNull();
-    expect(
-      checkExclusiveModelProviderAllowed(gemma_4_26b_a4b_it_free_model.public_id, {
-        only: ['openai'],
-      })
-    ).toBeNull();
-  });
-
-  it('allows a model when any of its inference providers is eligible', () => {
-    expect(
-      checkExclusiveModelProviderAllowed(multiProviderModel.public_id, {
-        only: ['amazon-bedrock'],
-      })
-    ).toBeNull();
-    expect(
-      checkExclusiveModelProviderAllowed(multiProviderModel.public_id, { ignore: ['anthropic'] })
-    ).toBeNull();
-  });
-
-  it('rejects a model when none of its inference providers is eligible', async () => {
-    const onlyResult = checkExclusiveModelProviderAllowed(multiProviderModel.public_id, {
-      only: ['openai'],
-    });
-    expect(onlyResult?.status).toBe(403);
-    expect(await onlyResult?.json()).toMatchObject({
-      error_type: 'provider_not_allowed',
-      error:
-        'No eligible provider can serve the selected model. Please enable provider: anthropic, amazon-bedrock',
-    });
-
-    const ignoreResult = checkExclusiveModelProviderAllowed(kiloExclusiveModelFixture.public_id, {
-      ignore: ['stealth'],
-    });
-    expect(ignoreResult?.status).toBe(403);
   });
 });

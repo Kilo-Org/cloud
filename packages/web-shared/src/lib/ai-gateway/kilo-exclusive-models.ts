@@ -4,11 +4,7 @@ import {
   GEMMA_4_26B_A4B_IT_ID,
   GEMMA_4_26B_A4B_IT_FREE_ID,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
-import {
-  isStealthModel,
-  type KiloExclusiveModel,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
-import { type ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
 
 export const gemma_4_26b_a4b_it_free_model: KiloExclusiveModel = {
@@ -21,7 +17,6 @@ export const gemma_4_26b_a4b_it_free_model: KiloExclusiveModel = {
   flags: ['vision', 'vercel-routing'],
   provider: OPENROUTER,
   internal_id: GEMMA_4_26B_A4B_IT_ID,
-  inference_providers: [],
 };
 
 export const kiloExclusiveModels = [gemma_4_26b_a4b_it_free_model] as KiloExclusiveModel[];
@@ -32,34 +27,4 @@ export function findKiloExclusiveModel(model: string): KiloExclusiveModel | null
 
 export function isKiloExclusiveModel(model: string): boolean {
   return findKiloExclusiveModel(model) !== null;
-}
-
-export function isKiloStealthModel(model: string): boolean {
-  const exclusive = findKiloExclusiveModel(model);
-  return exclusive !== null && isStealthModel(exclusive);
-}
-
-export function shouldRedactModelNameInMicrodollarUsage(
-  provider: ProviderId,
-  model: string
-): boolean {
-  return provider === 'custom' || isKiloStealthModel(model);
-}
-
-export function shouldRedactErrorResponse(provider: ProviderId, model: string): boolean {
-  return isKiloStealthModel(model);
-}
-
-/**
- * Inference providers of an exclusive model. `undefined` means the model is
- * not an exclusive with explicit providers and catalog provider metadata should be used.
- */
-export function getKiloExclusiveInferenceProviders(
-  modelId: string
-): ReadonlySet<string> | undefined {
-  const exclusive = findKiloExclusiveModel(modelId);
-  if (!exclusive || exclusive.inference_providers.length === 0) {
-    return undefined;
-  }
-  return new Set(exclusive.inference_providers);
 }

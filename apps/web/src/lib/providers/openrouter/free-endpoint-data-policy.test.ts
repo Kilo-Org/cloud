@@ -1,6 +1,4 @@
 import { describe, expect, test } from '@jest/globals';
-import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
-import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import {
   applyFreeEndpointDataPolicy,
   getOpenRouterFreeEndpoints,
@@ -27,32 +25,6 @@ function offering(slug: string, isFree = false): OpenRouterModel {
   };
 }
 
-function freeExclusiveModel(
-  public_id: string,
-  inference_providers: KiloExclusiveModel['inference_providers']
-): KiloExclusiveModel {
-  return {
-    public_id,
-    internal_id: public_id,
-    display_name: public_id,
-    description: '',
-    context_length: 1,
-    max_completion_tokens: 1,
-    flags: [],
-    provider: OPENROUTER,
-    inference_providers,
-  };
-}
-
-function dataCollectionExclusiveModel(
-  public_id: string,
-  inference_providers: KiloExclusiveModel['inference_providers']
-): KiloExclusiveModel {
-  const model = freeExclusiveModel(public_id, inference_providers);
-  model.flags = ['requires-data-collection'];
-  return model;
-}
-
 const noUnavailableModels: ReadonlySet<string> = new Set();
 
 describe('applyFreeEndpointDataPolicy', () => {
@@ -72,7 +44,7 @@ describe('applyFreeEndpointDataPolicy', () => {
     applyFreeEndpointDataPolicy({
       providerModelData,
       openRouterFreeEndpoints,
-      kiloExclusiveModels: [],
+      kiloExclusiveModelIds: [],
       unavailableModelIds: noUnavailableModels,
     });
 
@@ -95,14 +67,14 @@ describe('applyFreeEndpointDataPolicy', () => {
         [{ provider: { slug: 'novita' }, models: [model] }],
         noUnavailableModels
       ),
-      kiloExclusiveModels: [],
+      kiloExclusiveModelIds: [],
       unavailableModelIds: noUnavailableModels,
     });
 
     expect(model.endpoint?.data_policy).toEqual({ training: false, retainsPrompts: false });
   });
 
-  test('applies an unrestricted free exclusive model to every provider', () => {
+  test('applies a Kilo-exclusive model to every provider', () => {
     const first = offering('example/model');
     const second = offering('example/model');
 
@@ -112,59 +84,7 @@ describe('applyFreeEndpointDataPolicy', () => {
         { provider: { slug: 'deepinfra' }, models: [second] },
       ],
       openRouterFreeEndpoints: [],
-      kiloExclusiveModels: [freeExclusiveModel('example/model:free', [])],
-      unavailableModelIds: noUnavailableModels,
-    });
-
-    expect(first.endpoint?.data_policy).toEqual({ training: true, retainsPrompts: true });
-    expect(second.endpoint?.data_policy).toEqual({ training: true, retainsPrompts: true });
-  });
-
-  test('applies data-collection exclusive model policy', () => {
-    const model = offering('example/model');
-
-    applyFreeEndpointDataPolicy({
-      providerModelData: [{ provider: { slug: 'deepseek' }, models: [model] }],
-      openRouterFreeEndpoints: [],
-      kiloExclusiveModels: [dataCollectionExclusiveModel('example/model:discounted', ['deepseek'])],
-      unavailableModelIds: noUnavailableModels,
-    });
-
-    expect(model.endpoint?.data_policy).toEqual({ training: true, retainsPrompts: true });
-  });
-
-  test('respects free exclusive model provider restrictions', () => {
-    const allowed = offering('example/model');
-    const blocked = offering('example/model');
-
-    applyFreeEndpointDataPolicy({
-      providerModelData: [
-        { provider: { slug: 'stepfun' }, models: [allowed] },
-        { provider: { slug: 'novita' }, models: [blocked] },
-      ],
-      openRouterFreeEndpoints: [],
-      kiloExclusiveModels: [freeExclusiveModel('example/model:free', ['stepfun'])],
-      unavailableModelIds: noUnavailableModels,
-    });
-
-    expect(allowed.endpoint?.data_policy).toEqual({ training: true, retainsPrompts: true });
-    expect(blocked.endpoint?.data_policy).toEqual({ training: false, retainsPrompts: false });
-  });
-
-  test('combines restrictions from normalized free exclusive variants', () => {
-    const first = offering('example/model');
-    const second = offering('example/model');
-
-    applyFreeEndpointDataPolicy({
-      providerModelData: [
-        { provider: { slug: 'stepfun' }, models: [first] },
-        { provider: { slug: 'novita' }, models: [second] },
-      ],
-      openRouterFreeEndpoints: [],
-      kiloExclusiveModels: [
-        freeExclusiveModel('example/model:free', ['stepfun']),
-        freeExclusiveModel('example/model:promo', ['novita']),
-      ],
+      kiloExclusiveModelIds: ['example/model:free'],
       unavailableModelIds: noUnavailableModels,
     });
 
@@ -181,7 +101,7 @@ describe('applyFreeEndpointDataPolicy', () => {
     applyFreeEndpointDataPolicy({
       providerModelData,
       openRouterFreeEndpoints: getOpenRouterFreeEndpoints(providerModelData, unavailableModelIds),
-      kiloExclusiveModels: [freeExclusiveModel('google/gemma-4-31b-it:free', [])],
+      kiloExclusiveModelIds: ['google/gemma-4-31b-it:free'],
       unavailableModelIds,
     });
 
@@ -201,7 +121,7 @@ describe('applyFreeEndpointDataPolicy', () => {
     applyFreeEndpointDataPolicy({
       providerModelData,
       openRouterFreeEndpoints,
-      kiloExclusiveModels: [],
+      kiloExclusiveModelIds: [],
       unavailableModelIds: noUnavailableModels,
     });
 

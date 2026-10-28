@@ -44,7 +44,6 @@ import {
 import type { OrganizationUsageMutationResult } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import type { DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import type { Provider, ProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { shouldRedactModelNameInMicrodollarUsage } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { maybeIssueKiloPassBonusFromUsageThreshold } from '@kilocode/web-shared/lib/kilo-pass/usage-triggered-bonus';
 import { getEffectiveKiloPassThreshold } from '@kilocode/web-shared/lib/kilo-pass/threshold';
@@ -1552,7 +1551,7 @@ export async function processTokenData(
 
   if (
     !usageStats.model || // fallback for failure cases
-    shouldRedactModelNameInMicrodollarUsage(usageContext.provider, usageContext.requested_model)
+    usageContext.provider === 'custom' // custom LLMs do not reveal their upstream model
   ) {
     usageStats.model = usageContext.requested_model;
   }

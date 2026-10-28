@@ -1,18 +1,10 @@
 import { describe, test, expect } from '@jest/globals';
 import { selectAutoFreeCandidate } from './models';
-import {
-  findKiloExclusiveModel,
-  getKiloExclusiveInferenceProviders,
-  kiloExclusiveModels,
-  shouldRedactErrorResponse,
-  shouldRedactModelNameInMicrodollarUsage,
-} from './kilo-exclusive-models';
+import { findKiloExclusiveModel, kiloExclusiveModels } from './kilo-exclusive-models';
 import {
   hasBestEffortGuessDataCollectionRequirement,
   isFreeModelExcludingCustomLlms,
 } from './is-free-model';
-import { getInferenceProviders } from './providers/kilo-exclusive-model';
-import { gemma_4_26b_a4b_it_free_model } from './kilo-exclusive-models';
 import { getRandomNumber } from './getRandomNumber';
 import {
   kiloExclusiveModelFixture,
@@ -54,13 +46,6 @@ describe('isFreeModelExcludingCustomLlms', () => {
       }
     });
 
-    test('getInferenceProviders does not crash for any Kilo exclusive model', () => {
-      expect(kiloExclusiveModels.length).toBeGreaterThan(0);
-      for (const model of kiloExclusiveModels) {
-        expect(() => getInferenceProviders(model)).not.toThrow();
-      }
-    });
-
     test('does not register discounted OpenRouter Qwen models as Kilo exclusive', () => {
       expect(findKiloExclusiveModel('qwen/qwen3.7-max')).toBeNull();
       expect(findKiloExclusiveModel('qwen/qwen3.7-plus')).toBeNull();
@@ -80,11 +65,10 @@ describe('isFreeModelExcludingCustomLlms', () => {
     });
 
     test.each(['minimax/minimax-m3:free', 'minimax/minimax-m2.7:free'])(
-      'inherits %s without an exclusive definition or provider restriction',
+      'inherits %s without an exclusive definition',
       async model => {
         expect(kiloExclusiveModels.some(entry => entry.public_id === model)).toBe(false);
         expect(findKiloExclusiveModel(model)).toBeNull();
-        expect(getKiloExclusiveInferenceProviders(model)).toBeUndefined();
         expect(isFreeModelExcludingCustomLlms(model)).toBe(true);
       }
     );
@@ -177,53 +161,5 @@ describe('hasBestEffortGuessDataCollectionRequirement', () => {
     expect(await hasBestEffortGuessDataCollectionRequirement('anthropic/claude-sonnet-4')).toBe(
       false
     );
-  });
-});
-
-describe('shouldRedactErrorResponse', () => {
-  test('does not redact errors for custom models', () => {
-    expect(shouldRedactErrorResponse('custom', 'kilo-internal/my-custom-model')).toBe(false);
-  });
-
-  test('redacts errors for stealth models regardless of provider', () => {
-    expect(shouldRedactErrorResponse('openrouter', kiloExclusiveModelFixture.public_id)).toBe(true);
-  });
-
-  test('does not redact errors for regular models and providers', () => {
-    expect(shouldRedactErrorResponse('openrouter', 'anthropic/claude-3.5-sonnet')).toBe(false);
-    expect(shouldRedactErrorResponse('vercel', 'openai/gpt-4o')).toBe(false);
-  });
-});
-
-describe('shouldRedactModelNameInMicrodollarUsage', () => {
-  test('redacts model name for custom provider', () => {
-    expect(shouldRedactModelNameInMicrodollarUsage('custom', 'kilo-internal/my-custom-model')).toBe(
-      true
-    );
-  });
-
-  test('redacts model name for stealth models', () => {
-    expect(
-      shouldRedactModelNameInMicrodollarUsage('openrouter', kiloExclusiveModelFixture.public_id)
-    ).toBe(true);
-  });
-});
-
-describe('getKiloExclusiveInferenceProviders', () => {
-  test('returns the stealth provider for stealth exclusives', () => {
-    expect([
-      ...(getKiloExclusiveInferenceProviders(kiloExclusiveModelFixture.public_id) ?? []),
-    ]).toEqual(['stealth']);
-  });
-
-  test('does not treat removed or unrestricted exclusives or unknown ids as restricted', () => {
-    expect(getKiloExclusiveInferenceProviders('stepfun/step-5-preview-free')).toBeUndefined();
-    expect(getKiloExclusiveInferenceProviders('openai/gpt-5.6-sol-discounted')).toBeUndefined();
-    expect(getKiloExclusiveInferenceProviders('tencent/hy3:free')).toBeUndefined();
-    expect(
-      getKiloExclusiveInferenceProviders(gemma_4_26b_a4b_it_free_model.public_id)
-    ).toBeUndefined();
-    expect(getKiloExclusiveInferenceProviders('deepseek/deepseek-v4-pro')).toBeUndefined();
-    expect(getKiloExclusiveInferenceProviders('unknown/model')).toBeUndefined();
   });
 });

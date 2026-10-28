@@ -349,17 +349,19 @@ describe('auto models', () => {
     ).toEqual([]);
   });
 
-  it('publishes authoritative exclusive model inference providers', async () => {
+  it('publishes the inference providers serving each exclusive model', async () => {
+    jest
+      .mocked(getProviderSlugsForModels)
+      .mockResolvedValueOnce(
+        new Map([[kiloExclusiveModelFixture.internal_id, new Set(['novita'])]])
+      );
+
     const response = await getEnhancedOpenRouterModels({ countryCode: null });
-    const unavailableModelIds = await getUnavailableModelIds();
-    const models = kiloExclusiveModels.filter(model => !unavailableModelIds.has(model.public_id));
-    expect(models.length).toBeGreaterThan(0);
-    for (const model of models) {
-      if (model.inference_providers.length === 0) continue;
-      expect(
-        response.data.find(entry => entry.id === model.public_id)?.inference_provider_ids
-      ).toEqual(model.inference_providers);
-    }
+
+    expect(
+      response.data.find(entry => entry.id === kiloExclusiveModelFixture.public_id)
+        ?.inference_provider_ids
+    ).toEqual(['novita']);
   });
 
   it('lists every exclusive model except unavailable ones', async () => {

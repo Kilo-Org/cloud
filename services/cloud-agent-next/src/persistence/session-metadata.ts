@@ -83,7 +83,6 @@ const MetadataIdentitySchema = z
     orgId: z.string().optional(),
     botId: z.string().optional(),
     createdOnPlatform: z.string().max(100).optional(),
-    clientProvenance: z.enum(['browser', 'mobile', 'agent-manager']).optional(),
     billingOrigin: z.string().max(100).optional(),
   })
   .strip();

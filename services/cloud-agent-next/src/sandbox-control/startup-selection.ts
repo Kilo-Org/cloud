@@ -17,7 +17,6 @@ export type StartupSelection =
 
 export type StartupRouteIdentity = {
   createdOnPlatform?: string;
-  clientProvenance?: 'browser' | 'mobile' | 'agent-manager';
   orgId?: string;
 };
 
@@ -66,7 +65,6 @@ function isScopedCohort(
   let orgId: string | undefined;
   for (const route of routes) {
     if (route.createdOnPlatform !== 'cloud-agent-web') return false;
-    if (route.clientProvenance !== 'browser') return false;
     if (route.orgId === undefined || route.orgId === '') return false;
     if (orgId !== undefined && route.orgId !== orgId) return false;
     orgId = route.orgId;
@@ -95,12 +93,11 @@ export function selectStartup(
   // The retired SDK provider keeps its preinstalled launch contract.
   if (mode === 'preinstalled' || provider === 'cloudflare')
     return { mode: 'preinstalled', image: 'all-in-one' };
-  // The organization cohort scopes native containers only; Vercel follows the deployment mode.
   const interactiveOrgIds = configuredInteractiveOrgIds(env.RUNTIME_INTERACTIVE_ORG_IDS);
   if (
-    provider === 'cloudflare-containers' &&
     interactiveOrgIds !== undefined &&
-    (!isIsolatedNativeSandbox(cohort) || !isScopedCohort(cohort, interactiveOrgIds))
+    (!isScopedCohort(cohort, interactiveOrgIds) ||
+      (provider === 'cloudflare-containers' && !isIsolatedNativeSandbox(cohort)))
   )
     return { mode: 'preinstalled', image: 'all-in-one' };
   if (!env.RUNTIME_RELEASE_DESCRIPTOR) throw new ProviderCreationError('invalid_configuration');

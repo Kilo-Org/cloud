@@ -1,8 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { parseSessionMetadata } from '../persistence/session-metadata.js';
 import {
   buildControlNetworkPolicy,
-  credentialSourceFromMetadata,
   prepareCredentialGrant,
   sessionCredentialsPayloadFromGrant,
   type CredentialGrantPreparation,
@@ -71,19 +69,4 @@ describe('Vercel credentials with private control-plane upstreams', () => {
     input.env.WORKER_URL = 'http://worker.example.com';
     await expect(prepareCredentialGrant(input)).rejects.toThrow();
   });
-});
-
-describe('credential source projection', () => {
-  it.each(['browser', 'mobile'] as const)(
-    'projects %s client provenance from session metadata',
-    clientProvenance => {
-      const metadata = parseSessionMetadata({
-        metadataSchemaVersion: 2,
-        identity: { sessionId: 'workspace_test', userId: 'user_test', clientProvenance },
-        auth: { kiloSessionId: 'ses_test', kilocodeToken: 'token' },
-        lifecycle: { version: 1, timestamp: 1 },
-      });
-      expect(credentialSourceFromMetadata(metadata)).toMatchObject({ clientProvenance });
-    }
-  );
 });

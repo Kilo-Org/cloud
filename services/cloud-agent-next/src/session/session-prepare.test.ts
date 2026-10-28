@@ -2498,12 +2498,6 @@ describe('createSessionWithLedger admission ladder', () => {
     }
   );
 
-  it('persists client provenance from the create options', async () => {
-    const doStub = makeDoStub();
-    await runCreate(makeContext(doStub), makeRequest({ options: { clientProvenance: 'mobile' } }));
-    expect(createdMetadata(doStub)?.identity.clientProvenance).toBe('mobile');
-  });
-
   it('does not group browser requests without a stable request operation key', async () => {
     const doStub = makeDoStub();
     const ctx = makeContext(doStub);

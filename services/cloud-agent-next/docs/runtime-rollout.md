@@ -24,16 +24,16 @@ fixed Node path. Native image selection does not change the Vercel snapshot.
 
 A downloaded target can scope its startup to an `interactiveOrgIds` list. No committed target uses it yet.
 Deployment renders this list as `RUNTIME_INTERACTIVE_ORG_IDS`.
-Only new isolated native allocations whose preparing routes all belong to one listed organization and have
-`createdOnPlatform: cloud-agent-web` and `clientProvenance: browser` select it. Other organizations,
-personal sessions, mobile and non-web sessions, code reviews and shared sandboxes retain preinstalled startup on the unchanged `app` image. SDK and
-Vercel selections are not moved to the native provider. A missing or mixed route identity stays on the baseline.
-Sessions persisted before client provenance was recorded remain on the baseline. These identity values
-are rollout metadata, not an authorization boundary.
+A new allocation selects it only when all its preparing routes belong to one listed organization and have
+`createdOnPlatform: cloud-agent-web`. Native allocations must also be isolated; Vercel allocations use
+the same organization rule. Other organizations, personal sessions, non-web sessions, code reviews and
+shared native sandboxes retain preinstalled startup on the unchanged `app` image. SDK pins always stay
+preinstalled. A missing or mixed route identity stays on the baseline. These identity values are rollout
+metadata, not an authorization boundary.
 
 The renderer retains `app` alongside `runtime-free`; the allocation's selected startup mode and image
 are used together, including snapshot fallback. Existing allocations keep their running image and mode.
-An absent `interactiveOrgIds` means deployment-wide native startup selection; an empty catalog list is
+An absent `interactiveOrgIds` means deployment-wide startup selection; an empty catalog list is
 rejected. For a complete rollback, remove the production override so it inherits the preinstalled default.
 
 ## Approval and rollout order
@@ -100,9 +100,6 @@ The renderer applies each change to new allocations. It does not rewrite existin
 deadlines. Do not deploy an older Worker that cannot read stored startup modes. A mode rollback also
 removes the rendered `RUNTIME_RELEASE_BUCKET` binding. A downloaded allocation that is still
 bootstrapping then gets 503 for artifact reads and restarts on the preinstalled path.
-
-Rollback this rollout through the catalog, not by reverting the Worker code: persisted credential sources
-now contain optional client provenance, which older strict-schema readers cannot parse.
 
 Keep earlier descriptors, payloads, handoffs and image digests. Do not delete snapshots or publication
 objects during rollback. A mode change uses a separate repository snapshot namespace.

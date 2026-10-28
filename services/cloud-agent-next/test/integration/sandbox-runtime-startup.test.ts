@@ -45,8 +45,8 @@ const scopedEnv = {
 const SCOPED_SANDBOX = `sbx-${'1'.repeat(48)}`;
 const SCOPED_FALLBACK_SANDBOX = `sbx-${'2'.repeat(48)}`;
 const EXCLUDED_SANDBOX = `sbx-${'3'.repeat(48)}`;
-const MOBILE_SANDBOX = `sbx-${'4'.repeat(48)}`;
-const ABSENT_PROVENANCE_SANDBOX = `sbx-${'5'.repeat(48)}`;
+const NON_WEB_SANDBOX = `sbx-${'4'.repeat(48)}`;
+const ABSENT_PLATFORM_SANDBOX = `sbx-${'5'.repeat(48)}`;
 const descriptor = JSON.stringify({
   format: 1,
   bootstrap: 1,
@@ -191,7 +191,6 @@ async function setup(
 type PrepareOptions = {
   orgId?: string;
   createdOnPlatform?: string;
-  clientProvenance?: 'browser' | 'mobile';
   sandboxKind?: 'isolated' | 'isolated-standard' | 'code-review' | 'shared';
 };
 async function prepare(h: Harness, options: PrepareOptions = {}) {
@@ -211,9 +210,6 @@ async function prepare(h: Harness, options: PrepareOptions = {}) {
       ...(options.createdOnPlatform === undefined
         ? {}
         : { createdOnPlatform: options.createdOnPlatform }),
-      ...(options.clientProvenance === undefined
-        ? {}
-        : { clientProvenance: options.clientProvenance }),
       repository: { type: 'github', repo: 'acme/widgets' },
       scopeId: SESSION,
     },
@@ -397,7 +393,6 @@ describe('downloaded startup in the allocation owner', () => {
     await prepare(h, {
       orgId: TARGET_ORG,
       createdOnPlatform: 'cloud-agent-web',
-      clientProvenance: 'browser',
       sandboxKind: 'isolated',
     });
     await waitFor(async () => expect((await record(h))?.startupMode).toBe('downloaded'));
@@ -423,7 +418,6 @@ describe('downloaded startup in the allocation owner', () => {
     await prepare(h, {
       orgId: OTHER_ORG,
       createdOnPlatform: 'cloud-agent-web',
-      clientProvenance: 'browser',
       sandboxKind: 'isolated',
     });
     await waitFor(async () => expect((await record(h))?.startupMode).toBe('preinstalled'));
@@ -433,14 +427,13 @@ describe('downloaded startup in the allocation owner', () => {
     expect(artifactReads).toBe(0);
   });
   it.each([
-    { label: 'mobile', clientProvenance: 'mobile' as const, sandboxId: MOBILE_SANDBOX },
-    { label: 'absent', clientProvenance: undefined, sandboxId: ABSENT_PROVENANCE_SANDBOX },
-  ])('keeps $label provenance on the baseline', async ({ clientProvenance, sandboxId }) => {
+    { label: 'non-web', createdOnPlatform: 'cloud-agent', sandboxId: NON_WEB_SANDBOX },
+    { label: 'absent', createdOnPlatform: undefined, sandboxId: ABSENT_PLATFORM_SANDBOX },
+  ])('keeps a $label platform on the baseline', async ({ createdOnPlatform, sandboxId }) => {
     const h = await setup(sandboxId, {}, scopedEnv);
     await prepare(h, {
       orgId: TARGET_ORG,
-      createdOnPlatform: 'cloud-agent-web',
-      clientProvenance,
+      ...(createdOnPlatform === undefined ? {} : { createdOnPlatform }),
       sandboxKind: 'isolated',
     });
     await waitFor(async () => expect((await record(h))?.startupMode).toBe('preinstalled'));
@@ -452,7 +445,6 @@ describe('downloaded startup in the allocation owner', () => {
     await prepare(h, {
       orgId: TARGET_ORG,
       createdOnPlatform: 'cloud-agent-web',
-      clientProvenance: 'browser',
       sandboxKind: 'isolated',
     });
     await waitFor(() => expect(h.provider.launches.length).toBe(2));

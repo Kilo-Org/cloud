@@ -4165,7 +4165,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
             .filter(route => route.state === 'preparing')
             .map(route => ({
               createdOnPlatform: route.credentialSource?.createdOnPlatform,
-              clientProvenance: route.credentialSource?.clientProvenance,
               orgId: route.credentialSource?.orgId,
             })),
           sandboxKind: pin.sandboxKind,

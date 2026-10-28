@@ -54,7 +54,6 @@ const otherOrgId = '11111111-1111-4111-8111-111111111111';
 const isolatedSandboxId = `sbx-${'c'.repeat(48)}`;
 const webRoute = {
   createdOnPlatform: 'cloud-agent-web',
-  clientProvenance: 'browser' as const,
   orgId: interactiveOrgId,
 };
 const scopedEnv = {
@@ -174,23 +173,7 @@ describe('startup selection and preflight', () => {
     [
       'a missing platform',
       {
-        preparingRoutes: [{ clientProvenance: 'browser' as const, orgId: interactiveOrgId }],
-        sandboxId: isolatedSandboxId,
-        sandboxKind: 'isolated' as const,
-      },
-    ],
-    [
-      'a mobile provenance',
-      {
-        preparingRoutes: [{ ...webRoute, clientProvenance: 'mobile' as const }],
-        sandboxId: isolatedSandboxId,
-        sandboxKind: 'isolated' as const,
-      },
-    ],
-    [
-      'a missing provenance',
-      {
-        preparingRoutes: [{ createdOnPlatform: 'cloud-agent-web', orgId: interactiveOrgId }],
+        preparingRoutes: [{ orgId: interactiveOrgId }],
         sandboxId: isolatedSandboxId,
         sandboxKind: 'isolated' as const,
       },
@@ -198,9 +181,7 @@ describe('startup selection and preflight', () => {
     [
       'a missing organization',
       {
-        preparingRoutes: [
-          { createdOnPlatform: 'cloud-agent-web', clientProvenance: 'browser' as const },
-        ],
+        preparingRoutes: [{ createdOnPlatform: 'cloud-agent-web' }],
         sandboxId: isolatedSandboxId,
         sandboxKind: 'isolated' as const,
       },
@@ -279,11 +260,14 @@ describe('startup selection and preflight', () => {
   it('keeps SDK pins on the baseline even for a matching cohort', () => {
     expect(selectStartup(scopedEnv, 'cloudflare', isolatedCohort)).toEqual(baseline);
   });
-  it('applies the organization scope to native containers only', () => {
-    expect(selectStartup(scopedEnv, 'vercel', {})).toMatchObject({
-      mode: 'downloaded',
-      descriptor: text,
-    });
+  it('applies the organization scope to Vercel without native isolation', () => {
+    expect(selectStartup(scopedEnv, 'vercel', { preparingRoutes: [webRoute] })).toEqual(
+      scopedDownloaded
+    );
+    expect(selectStartup(scopedEnv, 'vercel', {})).toEqual(baseline);
+    expect(
+      selectStartup(scopedEnv, 'vercel', { preparingRoutes: [{ ...webRoute, orgId: otherOrgId }] })
+    ).toEqual(baseline);
   });
   it('ignores an invalid interactive scope before native downloaded startup is selected', () => {
     for (const [env, provider] of [

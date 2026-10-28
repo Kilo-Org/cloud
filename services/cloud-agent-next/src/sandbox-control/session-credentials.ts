@@ -1426,9 +1426,6 @@ export function credentialSourceFromMetadata(
     ...(metadata.identity.createdOnPlatform === undefined
       ? {}
       : { createdOnPlatform: metadata.identity.createdOnPlatform }),
-    ...(metadata.identity.clientProvenance === undefined
-      ? {}
-      : { clientProvenance: metadata.identity.clientProvenance }),
     ...(repository === undefined ? {} : { repository }),
   };
 }

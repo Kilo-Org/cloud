@@ -484,17 +484,28 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
         </CardHeader>
         <CardContent>
           {listedKeys && listedKeys.length > 0 ? (
-            <div className="rounded-md border">
-              <table className="w-full">
-                <thead>
-                  <tr className="bg-muted/50 border-b">
-                    <th className="p-4 text-left font-medium">Provider</th>
-                    <th className="p-4 text-left font-medium">Created</th>
-                    <th className="p-4 text-left font-medium">Enabled</th>
-                    <th className="p-4 text-right font-medium">Actions</th>
+            // Narrow containers stack each key into a grid instead of table
+            // columns. The explicit roles keep table semantics, which browsers
+            // otherwise drop when table elements get a non-table display.
+            <div className="@container rounded-md border">
+              <table role="table" className="block w-full @2xl:table">
+                <thead role="rowgroup" className="sr-only @2xl:not-sr-only">
+                  <tr role="row" className="bg-muted/50 border-b">
+                    <th role="columnheader" className="p-4 text-left font-medium">
+                      Provider
+                    </th>
+                    <th role="columnheader" className="p-4 text-left font-medium">
+                      Created
+                    </th>
+                    <th role="columnheader" className="p-4 text-left font-medium">
+                      Enabled
+                    </th>
+                    <th role="columnheader" className="p-4 text-right font-medium">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody role="rowgroup" className="block @2xl:table-row-group">
                   {listedKeys.map(
                     (key: {
                       id: string;
@@ -507,14 +518,22 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                       return (
                         <tr
                           key={key.id}
-                          className={
-                            !key.is_enabled
-                              ? 'bg-muted/20 border-b last:border-0'
-                              : 'border-b last:border-0'
-                          }
+                          role="row"
+                          className={cn(
+                            'grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 border-b p-4 last:border-0 @2xl:table-row @2xl:p-0',
+                            !key.is_enabled && 'bg-muted/20'
+                          )}
                         >
-                          <td className={!key.is_enabled ? 'text-muted-foreground p-4' : 'p-4'}>
-                            <div>{getProviderDisplayName(key.provider_id)}</div>
+                          <td
+                            role="cell"
+                            className={cn(
+                              'col-span-2 min-w-0 @2xl:table-cell @2xl:p-4',
+                              !key.is_enabled && 'text-muted-foreground'
+                            )}
+                          >
+                            <div className="break-words">
+                              {getProviderDisplayName(key.provider_id)}
+                            </div>
                             {isManaged ? (
                               <p className="text-muted-foreground mt-1 text-xs">
                                 {getCodingPlanManagedKeyLabel(
@@ -524,10 +543,14 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                             ) : null}
                             <SupportedModelsList models={getProviderModels(key.provider_id)} />
                           </td>
-                          <td className="text-muted-foreground p-4">
+                          <td
+                            role="cell"
+                            className="text-muted-foreground col-span-2 text-sm @2xl:table-cell @2xl:p-4 @2xl:text-base"
+                          >
+                            <span className="@2xl:hidden">Created </span>
                             {new Date(key.created_at).toLocaleDateString()}
                           </td>
-                          <td className="p-4">
+                          <td role="cell" className="@2xl:table-cell @2xl:p-4">
                             <div className="flex items-center gap-3">
                               {!isManaged ? (
                                 <Switch
@@ -539,51 +562,55 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                                   aria-label={`Toggle ${apiKeyObjectLabel(getProviderDisplayName(key.provider_id))}`}
                                 />
                               ) : null}
-                              <span className="text-sm">
+                              <span
+                                className={cn('text-sm', !isManaged && 'sr-only @sm:not-sr-only')}
+                              >
                                 {key.is_enabled ? 'Enabled' : 'Disabled'}
                               </span>
                             </div>
                           </td>
-                          <td className="space-x-2 p-4 text-right">
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={() =>
-                                testMutation.mutate({
-                                  ...(organizationId && { organizationId }),
-                                  id: key.id,
-                                })
-                              }
-                              disabled={testMutation.isPending}
-                              title="Test API key"
-                              aria-label={`Test ${apiKeyObjectLabel(getProviderDisplayName(key.provider_id))}`}
-                            >
-                              <FlaskConical className="size-4" />
-                            </Button>
-                            {!isManaged ? (
-                              <>
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  onClick={() => handleEdit(key.id)}
-                                  disabled={updateMutation.isPending}
-                                  aria-label={`Update ${apiKeyObjectLabel(getProviderDisplayName(key.provider_id))}`}
-                                >
-                                  <Edit className="size-4" />
-                                </Button>
-                                <Button
-                                  variant="secondary"
-                                  size="sm"
-                                  onClick={() =>
-                                    handleDelete(key.id, getProviderDisplayName(key.provider_id))
-                                  }
-                                  disabled={deleteMutation.isPending}
-                                  aria-label={`Delete ${apiKeyObjectLabel(getProviderDisplayName(key.provider_id))}`}
-                                >
-                                  <Trash2 className="size-4" />
-                                </Button>
-                              </>
-                            ) : null}
+                          <td role="cell" className="@2xl:table-cell @2xl:p-4">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() =>
+                                  testMutation.mutate({
+                                    ...(organizationId && { organizationId }),
+                                    id: key.id,
+                                  })
+                                }
+                                disabled={testMutation.isPending}
+                                title="Test API key"
+                                aria-label={`Test ${apiKeyObjectLabel(getProviderDisplayName(key.provider_id))}`}
+                              >
+                                <FlaskConical className="size-4" />
+                              </Button>
+                              {!isManaged ? (
+                                <>
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => handleEdit(key.id)}
+                                    disabled={updateMutation.isPending}
+                                    aria-label={`Update ${apiKeyObjectLabel(getProviderDisplayName(key.provider_id))}`}
+                                  >
+                                    <Edit className="size-4" />
+                                  </Button>
+                                  <Button
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() =>
+                                      handleDelete(key.id, getProviderDisplayName(key.provider_id))
+                                    }
+                                    disabled={deleteMutation.isPending}
+                                    aria-label={`Delete ${apiKeyObjectLabel(getProviderDisplayName(key.provider_id))}`}
+                                  >
+                                    <Trash2 className="size-4" />
+                                  </Button>
+                                </>
+                              ) : null}
+                            </div>
                           </td>
                         </tr>
                       );

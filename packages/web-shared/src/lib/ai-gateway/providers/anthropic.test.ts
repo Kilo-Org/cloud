@@ -154,3 +154,63 @@ describe('applyAnthropicModelSettings tool call ids', () => {
     expect(secondResult.tool_use_id).toBe('toolu_ok');
   });
 });
+
+describe('applyAnthropicModelSettings tool call id normalization logging', () => {
+  let warn: jest.SpyInstance;
+
+  beforeEach(() => {
+    warn = jest.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    warn.mockRestore();
+  });
+
+  function chatRequest(toolCallIds: string[]): GatewayRequest {
+    return {
+      kind: 'chat_completions',
+      body: {
+        model: 'anthropic/claude-sonnet-4.5',
+        messages: [
+          {
+            role: 'assistant',
+            content: '',
+            tool_calls: toolCallIds.map(id => ({
+              id,
+              type: 'function' as const,
+              function: { name: 'read', arguments: '{}' },
+            })),
+          },
+          ...toolCallIds.map(id => ({ role: 'tool' as const, tool_call_id: id, content: 'ok' })),
+        ],
+      },
+    };
+  }
+
+  it('logs once per request with the number of distinct normalized ids', () => {
+    apply(chatRequest(['call:1', 'call:2', 'call_ok']));
+
+    expect(warn).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledWith('[normalizeToolCallIds] normalized tool call ids', {
+      kind: 'chat_completions',
+      model: 'anthropic/claude-sonnet-4.5',
+      normalizedIdCount: 2,
+      exampleId: 'call:1',
+    });
+  });
+
+  it('truncates the example id', () => {
+    apply(chatRequest(['a'.repeat(200)]));
+
+    expect(warn).toHaveBeenCalledWith(
+      '[normalizeToolCallIds] normalized tool call ids',
+      expect.objectContaining({ normalizedIdCount: 1, exampleId: 'a'.repeat(64) })
+    );
+  });
+
+  it('does not log when no ids need normalization', () => {
+    apply(chatRequest(['call_1', 'toolu_2']));
+
+    expect(warn).not.toHaveBeenCalled();
+  });
+});

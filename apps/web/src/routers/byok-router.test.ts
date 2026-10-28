@@ -1,12 +1,22 @@
 import { describe, test, expect, beforeAll, afterAll, afterEach } from '@jest/globals';
-// Catalog-mode checks read the catalog snapshot through a process-wide cache. Stubbing them keeps
-// that cache empty for the listSupportedModels test, which inserts its own snapshot.
-jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
-  ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache'),
-  isValidOpenRouterModelId: jest.fn(async () => true),
-}));
+// Catalog-mode code reads the catalog snapshot through a process-wide cache. Stubbing those reads
+// keeps the cache unfilled for the listSupportedModels test, which inserts its own snapshot.
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => {
+  const actual = jest.requireActual<typeof GatewayModelsCache>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache'
+  );
+  return {
+    ...actual,
+    isValidOpenRouterModelId: jest.fn(async () => true),
+    getOpenRouterModelsMetadataFromDatabase: jest.fn(
+      actual.getOpenRouterModelsMetadataFromDatabase
+    ),
+  };
+});
 
 import { createCallerForUser } from '@/routers/test-utils';
+import type * as GatewayModelsCache from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { getOpenRouterModelsMetadataFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
@@ -815,6 +825,18 @@ describe('BYOK Router', () => {
       await expect(
         caller.byok.setCatalogMode({ id: vercel.id, serve_catalog_models: true })
       ).rejects.toThrow('Provider openai does not support Kilo catalog model IDs.');
+    });
+
+    test('lists the catalog ids each provider serves in catalog mode', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+
+      jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValueOnce({});
+
+      const result = await caller.byok.listCatalogModeSupportedModels();
+
+      expect(result['zai-coding']).toEqual(['GLM-5.2 (z-ai/glm-5.2)']);
+      expect(result).not.toHaveProperty('morph-byok');
+      expect(result).not.toHaveProperty('martian');
     });
 
     test('stores catalog mode in the key settings', async () => {

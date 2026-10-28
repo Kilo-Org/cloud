@@ -116,17 +116,27 @@ export function supportsCatalogMode(providerId: string): boolean {
   return findDirectByokProvider(providerId)?.models_dev_id !== undefined;
 }
 
+export type DirectByokCatalogEntry = { catalogModelId: string; model: DirectByokModel };
+
+/** The catalog ids a key of this provider serves in catalog mode, with the model serving each. */
+export async function listDirectByokCatalogModels(
+  providerId: string
+): Promise<DirectByokCatalogEntry[]> {
+  const provider = findDirectByokProvider(providerId);
+  if (!provider?.models_dev_id) return [];
+  const entries: DirectByokCatalogEntry[] = [];
+  for (const [catalogModelId, model] of getPrimaryCatalogModels(await provider.models())) {
+    if (await isLiveCatalogModelId(catalogModelId)) entries.push({ catalogModelId, model });
+  }
+  return entries;
+}
+
 /**
  * Catalog mode is only offered while the provider maps at least one model to a catalog id;
  * otherwise a key in catalog mode would serve nothing.
  */
 export async function offersCatalogMode(providerId: string): Promise<boolean> {
-  const provider = findDirectByokProvider(providerId);
-  if (!provider?.models_dev_id) return false;
-  for (const catalogModelId of getPrimaryCatalogModels(await provider.models()).keys()) {
-    if (await isLiveCatalogModelId(catalogModelId)) return true;
-  }
-  return false;
+  return (await listDirectByokCatalogModels(providerId)).length > 0;
 }
 
 function isCatalogModeKey(key: EnabledByokProvider): boolean {
@@ -164,13 +174,10 @@ export async function findDirectByokCatalogModels(
 }
 
 async function getCatalogModeModelIds(keys: EnabledByokProvider[]): Promise<ReadonlySet<string>> {
-  const catalogModeProviders = DIRECT_BYOK_PROVIDERS.filter(provider =>
-    keys.some(key => key.providerId === provider.id && isCatalogModeKey(key))
-  );
   const modelIds = new Set<string>();
-  for (const provider of catalogModeProviders) {
-    for (const catalogModelId of getPrimaryCatalogModels(await provider.models()).keys()) {
-      if (await isLiveCatalogModelId(catalogModelId)) modelIds.add(catalogModelId);
+  for (const key of keys.filter(isCatalogModeKey)) {
+    for (const { catalogModelId } of await listDirectByokCatalogModels(key.providerId)) {
+      modelIds.add(catalogModelId);
     }
   }
   return modelIds;
@@ -182,7 +189,7 @@ export async function getDirectByokCatalogModelIds(owner: ByokOwner): Promise<Re
 }
 
 /**
- * Resolves a stored model reference, such as a favorite or an Auto route target, for the owner's
+ * Resolves a stored model reference, such as a custom router entry, for the owner's
  * keys: a bespoke id of a catalog-mode key becomes its catalog id, or null when it has none. Any
  * other id is returned unchanged.
  */

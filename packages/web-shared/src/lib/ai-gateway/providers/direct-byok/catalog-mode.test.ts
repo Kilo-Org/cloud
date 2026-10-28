@@ -5,6 +5,7 @@ import { getEnabledByokProviders } from '@kilocode/web-shared/lib/ai-gateway/byo
 import { isValidOpenRouterModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import {
   createDirectByokReferenceResolver,
+  listDirectByokCatalogModels,
   offersCatalogMode,
   findDirectByokCatalogModels,
   getDirectByokCatalogModelIds,
@@ -94,6 +95,14 @@ describe('catalog mode support', () => {
     await expect(offersCatalogMode('morph-byok')).resolves.toBe(false);
     await expect(offersCatalogMode('chutes-byok')).resolves.toBe(false);
     await expect(offersCatalogMode('martian')).resolves.toBe(false);
+  });
+
+  test('lists the current catalog ids a provider serves with their primary model', async () => {
+    const entries = await listDirectByokCatalogModels('synthetic');
+
+    expect(entries.map(({ catalogModelId, model }) => [catalogModelId, model.id])).toEqual([
+      ['moonshotai/kimi-k2.6', 'hf:moonshotai/Kimi-K2.6'],
+    ]);
   });
 });
 

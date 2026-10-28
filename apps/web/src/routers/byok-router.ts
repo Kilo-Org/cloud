@@ -57,6 +57,7 @@ import DIRECT_BYOK_PROVIDERS from '@kilocode/web-shared/lib/ai-gateway/providers
 import {
   createAiSdkProvider,
   formatDirectByokModelId,
+  listDirectByokCatalogModels,
   offersCatalogMode,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { parseAwsBedrockCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/bedrock-byok';
@@ -163,6 +164,20 @@ function rejectManagedKeyMutation(managementSource: 'user' | 'coding_plan') {
   }
 }
 
+async function fetchCatalogModeSupportedModels(): Promise<Record<string, string[]>> {
+  const openRouterModelMetadata = await getOpenRouterModelsMetadataFromDatabase();
+  const result: Record<string, string[]> = {};
+  for (const provider of DIRECT_BYOK_PROVIDERS) {
+    const entries = await listDirectByokCatalogModels(provider.id);
+    if (entries.length === 0) continue;
+    result[provider.id] = entries.map(({ catalogModelId, model }) => {
+      const name = openRouterModelMetadata[catalogModelId]?.name ?? model.name;
+      return `${name} (${catalogModelId})`;
+    });
+  }
+  return result;
+}
+
 async function fetchSupportedModels(): Promise<Record<string, string[]>> {
   const [vercelModelMetadata, openRouterModelMetadata] = await Promise.all([
     getVercelModelsMetadataFromDatabase(),
@@ -229,6 +244,11 @@ export const byokRouter = createTRPCRouter({
   listSupportedModels: baseProcedure
     .output(z.record(z.string(), z.array(z.string())))
     .query(fetchSupportedModels),
+
+  /** The models a key of each direct BYOK provider serves in catalog mode, listed by catalog id. */
+  listCatalogModeSupportedModels: baseProcedure
+    .output(z.record(z.string(), z.array(z.string())))
+    .query(fetchCatalogModeSupportedModels),
 
   /** Whether keys for experimental BYOK providers, currently direct Amazon Bedrock and Google Vertex AI, can be added. */
   experimentalByokEnabled: baseProcedure

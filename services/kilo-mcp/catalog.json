@@ -3944,6 +3944,17 @@
     ],
     "searchBlob": "byok.list List all saved bring-your-own-key (BYOK) API keys for the current user or a specified organization, including provider, enabled status, and management source. byok list organizationid organizationId"
   },
+  "byok.listCatalogModeSupportedModels": {
+    "path": "byok.listCatalogModeSupportedModels",
+    "kind": "query",
+    "summary": "List which AI models each direct BYOK provider supports when running in catalog mode, grouped by provider and returned as model names with catalog ids. Use to discover available catalog-mode models per provider.",
+    "inputSchema": {},
+    "tags": [
+      "byok",
+      "listcatalogmodesupportedmodels"
+    ],
+    "searchBlob": "byok.listCatalogModeSupportedModels List which AI models each direct BYOK provider supports when running in catalog mode, grouped by provider and returned as model names with catalog ids. Use to discover available catalog-mode models per provider. byok listcatalogmodesupportedmodels"
+  },
   "byok.listSupportedModels": {
     "path": "byok.listSupportedModels",
     "kind": "query",
@@ -14966,10 +14977,6 @@
         "model": {
           "type": "string",
           "minLength": 1
-        },
-        "organizationId": {
-          "type": "string",
-          "minLength": 1
         }
       },
       "required": [
@@ -14979,10 +14986,9 @@
     "tags": [
       "modelpreferences",
       "removefavorite",
-      "model",
-      "organizationid"
+      "model"
     ],
-    "searchBlob": "modelPreferences.removeFavorite Remove a model from the current user's list of favorite models. modelpreferences removefavorite model organizationid model organizationId"
+    "searchBlob": "modelPreferences.removeFavorite Remove a model from the current user's list of favorite models. modelpreferences removefavorite model model"
   },
   "modelPreferences.setFavorites": {
     "path": "modelPreferences.setFavorites",
@@ -14992,10 +14998,6 @@
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
       "properties": {
-        "organizationId": {
-          "type": "string",
-          "minLength": 1
-        },
         "models": {
           "maxItems": 500,
           "type": "array",
@@ -15012,10 +15014,9 @@
     "tags": [
       "modelpreferences",
       "setfavorites",
-      "organizationid",
       "models"
     ],
-    "searchBlob": "modelPreferences.setFavorites Replace the current user's favorite models with the given list, removing duplicates. modelpreferences setfavorites organizationid models organizationId models"
+    "searchBlob": "modelPreferences.setFavorites Replace the current user's favorite models with the given list, removing duplicates. modelpreferences setfavorites models models"
   },
   "modelPreferences.setLastSelected": {
     "path": "modelPreferences.setLastSelected",

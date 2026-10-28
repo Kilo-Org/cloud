@@ -601,12 +601,12 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
         </CardContent>
 
         <Dialog open={isDialogOpen} onOpenChange={closeDialog}>
-          <DialogContent className="max-w-2xl">
+          <DialogContent className="max-h-[calc(100dvh-2rem)] max-w-2xl grid-rows-[auto_minmax(0,1fr)_auto]">
             <DialogHeader>
               <DialogTitle>{editingKeyId ? 'Update API Key' : 'Add API Key'}</DialogTitle>
             </DialogHeader>
 
-            <div className="space-y-4 py-4">
+            <div className="-mx-6 min-h-0 space-y-4 overflow-y-auto px-6 py-4">
               <div className="space-y-2">
                 <Label htmlFor="provider">Provider</Label>
                 <Select

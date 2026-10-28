@@ -3507,12 +3507,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
     });
   }
 
-  private invalidateSessionSnapshot(): void {
-    this.ctx.storage.kv.delete(SESSION_SNAPSHOT_KEY);
+  private invalidateSessionSnapshot(preserveRestore = false): void {
     const disk = readSessionSnapshotAllocation(this.ctx.storage.kv);
+    const restoring =
+      preserveRestore &&
+      disk?.restore !== undefined &&
+      selectSessionSnapshot(this.ctx.storage.kv, disk.owner, disk.runtimeIdentity)
+        ?.sourceAllocationId === disk.restore.sourceAllocationId;
+    if (!restoring) this.ctx.storage.kv.delete(SESSION_SNAPSHOT_KEY);
     if (disk)
       this.ctx.storage.kv.put(SESSION_SNAPSHOT_ALLOCATION_KEY, {
         ...disk,
+        invalidationGeneration: disk.invalidationGeneration + 1,
         idleConnectionId: undefined,
       });
   }
@@ -5175,7 +5181,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         connectionId: attachment.connectionId,
         active: frame.active,
       });
-      if (frame.active) this.invalidateSessionSnapshot();
+      if (frame.active) this.invalidateSessionSnapshot(true);
       const disk = readSessionSnapshotAllocation(this.ctx.storage.kv);
       if (
         !frame.active &&

@@ -30,6 +30,7 @@ const allocationSchema = z.object({
   runtimeIdentity: z.string().min(1),
   owner: identitySchema,
   contaminated: z.boolean(),
+  invalidationGeneration: z.number().int().nonnegative().default(0),
   idleConnectionId: z.string().optional(),
   attemptedIdleAt: z.number().optional(),
   restore: z.object({ sourceAllocationId: z.string().min(1), confirmed: z.boolean() }).optional(),
@@ -181,6 +182,7 @@ export async function captureIdleSessionSnapshot(input: {
       current.state.allocationId !== fence.state.allocationId ||
       current.state.connectionId !== fence.state.connectionId ||
       current.state.lastActivityAt !== fence.state.lastActivityAt ||
+      current.disk.invalidationGeneration !== fence.disk.invalidationGeneration ||
       current.route.attemptId !== fence.route.attemptId
     )
       return;

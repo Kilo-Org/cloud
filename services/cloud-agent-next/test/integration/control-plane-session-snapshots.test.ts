@@ -321,6 +321,35 @@ describe('idle session disk checkpoint', () => {
     test.wrappers.forEach(wrapper => wrapper.close());
   });
 
+  it('does not republish an in-flight capture after Stop and another idle heartbeat', async () => {
+    const test = await setup();
+    const wrapper = await test.start();
+    const held = Promise.withResolvers<NativeCaptureResult>();
+    test.controls.capture = () => held.promise;
+    await test.idle(wrapper);
+    await test.alarm(false);
+    await waitFor(() => expect(test.captures).toHaveLength(1));
+    try {
+      await test.session.stop();
+      expect(
+        await wrapper.nextSkipping(['worktree.snapshot', 'worktree.summary', 'session.prompt'])
+      ).toMatchObject({ type: 'session.abort' });
+      wrapper.heartbeat(false);
+      await waitFor(async () => {
+        const disk = await runInDurableObject(test.sandbox, (_instance, state) =>
+          state.storage.kv.get<{ idleConnectionId?: string }>(SESSION_SNAPSHOT_ALLOCATION_KEY)
+        );
+        expect(disk?.idleConnectionId).toBeTruthy();
+      });
+    } finally {
+      held.resolve(stored());
+    }
+    await test.alarm();
+    expect(await test.snapshot()).toBeUndefined();
+    expect(test.captures).toHaveLength(1);
+    test.wrappers.forEach(wrapper => wrapper.close());
+  });
+
   it('never checkpoints an allocation that hosted a second session, even after release', async () => {
     const test = await setup();
     const wrapper = await test.start();
@@ -387,6 +416,59 @@ describe('idle session disk checkpoint', () => {
     wrapper.send({ type: 'session.ready', sessionId: test.sessionId });
     await test.messageState('m2', 'accepted');
     expect(await test.snapshot()).toBeUndefined();
+    test.wrappers.forEach(wrapper => wrapper.close());
+  });
+
+  it('retains a checkpoint through preparation heartbeats and retries it after allocation loss', async () => {
+    const test = await setup();
+    await test.checkpoint();
+    const checkpoint = await test.snapshot();
+    const sourceAllocationId = (await test.sandbox.getAllocationState()).allocationId;
+    await test.cold();
+    await test.session.send(prompt('m2'));
+    const { wrapper } = await test.connect(1);
+    const lastActivityAt = Date.now() - 1_000;
+    await runInDurableObject(test.sandbox, async instance => {
+      const state = await instance.getAllocationState();
+      await instance['writeAllocation']({ ...state, lastActivityAt }, state);
+    });
+    wrapper.heartbeat(true);
+    await waitFor(async () =>
+      expect((await test.sandbox.getAllocationState()).lastActivityAt).toBeGreaterThan(
+        lastActivityAt
+      )
+    );
+    expect(await test.snapshot()).toEqual(checkpoint);
+
+    await runInDurableObject(test.sandbox, instance =>
+      instance['applyEvent']({ type: 'stop-requested', at: Date.now(), reason: 'sandbox_stopped' })
+    );
+    const retried = await test.connect(2);
+    expect(test.launchOptions[2]?.snapshot).toEqual({
+      snapshotId: 'session-snapshot',
+      baseImage: 'image:1',
+    });
+    expect(retried.frame && 'spec' in retried.frame && retried.frame.spec.sessionSnapshot).toEqual({
+      sourceAllocationId,
+    });
+    retried.wrapper.send({ type: 'session.ready', sessionId: test.sessionId });
+    await test.messageState('m2', 'accepted');
+    expect(await test.snapshot()).toBeUndefined();
+
+    retried.wrapper.send({
+      type: 'session.outcome',
+      sessionId: test.sessionId,
+      status: 'completed',
+      lastMessageId: 'm2',
+    });
+    await test.messageState('m2', 'completed');
+    await test.idle(retried.wrapper);
+    await test.alarm();
+    expect(await test.snapshot()).toMatchObject({
+      sourceAllocationId: (await test.sandbox.getAllocationState()).allocationId,
+    });
+    retried.wrapper.heartbeat(true);
+    await waitFor(async () => expect(await test.snapshot()).toBeUndefined());
     test.wrappers.forEach(wrapper => wrapper.close());
   });
 

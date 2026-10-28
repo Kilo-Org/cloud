@@ -24,7 +24,6 @@ import type { OpenRouterGeneration } from '@kilocode/web-shared/lib/ai-gateway/p
 import { calculateCustomCost_mUsd } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing';
 import { getCustomPricingConfig } from '@kilocode/web-shared/lib/ai-gateway/custom-pricing-config';
 import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
-import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { verifyApproval } from '@kilocode/web-shared/tests/helpers/approval.helper';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import {
@@ -2090,7 +2089,7 @@ describe('logMicrodollarUsage', () => {
     const usageStats = { ...BASE_USAGE_STATS, messageId: null, cost_mUsd: 12_316 };
     const customInferenceCost_mUsd = calculateCustomCost_mUsd(
       TEST_CUSTOM_PRICING_CONFIG,
-      GEMINI_FLASH_CURRENT_MODEL_ID,
+      'google/gemini-3.8-flash',
       { ...usageStats, cost_mUsd: 5316 }
     );
     assert(customInferenceCost_mUsd !== undefined);
@@ -2098,7 +2097,7 @@ describe('logMicrodollarUsage', () => {
 
     const result = await processTokenData(
       { ...usageStats, nonInferenceCost_mUsd: 7000 },
-      { ...createBaseUsageContext(user), requested_model: GEMINI_FLASH_CURRENT_MODEL_ID }
+      { ...createBaseUsageContext(user), requested_model: 'google/gemini-3.8-flash' }
     );
 
     assert(result);

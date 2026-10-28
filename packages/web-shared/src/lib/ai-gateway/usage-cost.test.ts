@@ -5,7 +5,6 @@ import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/c
 import { findKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import type * as kiloExclusiveModels from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import type { JustTheCostsUsageStats } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
-import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import {
   applyUsagePricing,
@@ -128,7 +127,7 @@ describe('applyUsagePricing', () => {
 
     applyUsagePricing(
       usage,
-      makeContext({ requested_model: GEMINI_FLASH_CURRENT_MODEL_ID }),
+      makeContext({ requested_model: 'google/gemini-3.8-flash' }),
       TEST_CUSTOM_PRICING_CONFIG
     );
 
@@ -162,7 +161,7 @@ describe('applyUsagePricing', () => {
 
     applyUsagePricing(
       usage,
-      makeContext({ requested_model: GEMINI_FLASH_CURRENT_MODEL_ID }),
+      makeContext({ requested_model: 'google/gemini-3.8-flash' }),
       TEST_CUSTOM_PRICING_CONFIG
     );
 
@@ -266,7 +265,7 @@ describe('applyUsagePricing', () => {
 
     applyUsagePricing(
       usage,
-      makeContext({ requested_model: GEMINI_FLASH_CURRENT_MODEL_ID, is_free: true }),
+      makeContext({ requested_model: 'google/gemini-3.8-flash', is_free: true }),
       TEST_CUSTOM_PRICING_CONFIG
     );
 

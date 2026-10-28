@@ -15,8 +15,7 @@ import { getInferenceProviders } from './providers/kilo-exclusive-model';
 import { gemma_4_26b_a4b_it_free_model } from './kilo-exclusive-models';
 import { getRandomNumber } from './getRandomNumber';
 import {
-  addKiloExclusiveModel,
-  paidStealthModelFixture,
+  kiloExclusiveModelFixture,
   useKiloExclusiveModel,
 } from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 
@@ -43,34 +42,17 @@ describe('isFreeModelExcludingCustomLlms', () => {
     test('should return true for OpenRouter stealth alpha models', async () => {
       expect(isFreeModelExcludingCustomLlms('stealth/ox-alpha')).toBe(true);
       expect(isFreeModelExcludingCustomLlms('stealth/other-alpha')).toBe(true);
-      expect(isFreeModelExcludingCustomLlms(paidStealthModelFixture.public_id)).toBe(false);
+      expect(isFreeModelExcludingCustomLlms('stealth/paid-model')).toBe(false);
       expect(isFreeModelExcludingCustomLlms('openrouter/model-alpha')).toBe(false);
       expect(isFreeModelExcludingCustomLlms('stealth/model-beta')).toBe(false);
     });
 
-    test('should return true for Kilo exclusive models with no pricing', async () => {
-      for (const model of kiloExclusiveModels.filter(m => !m.pricing)) {
+    test('should return true for Kilo exclusive models', async () => {
+      expect(kiloExclusiveModels).toContain(kiloExclusiveModelFixture);
+      for (const model of kiloExclusiveModels) {
         expect(isFreeModelExcludingCustomLlms(model.public_id)).toBe(true);
       }
     });
-
-    test('should return false for Kilo exclusive models with pricing', async () => {
-      for (const model of kiloExclusiveModels.filter(m => !!m.pricing)) {
-        expect(isFreeModelExcludingCustomLlms(model.public_id)).toBe(false);
-      }
-    });
-
-    test.each(['vendor/priced-exclusive:free', 'stealth/priced-exclusive-alpha'])(
-      'returns false for priced Kilo exclusive model %s even when its id matches a free pattern',
-      modelId => {
-        const remove = addKiloExclusiveModel({ ...paidStealthModelFixture, public_id: modelId });
-        try {
-          expect(isFreeModelExcludingCustomLlms(modelId)).toBe(false);
-        } finally {
-          remove();
-        }
-      }
-    );
 
     test('getInferenceProviders does not crash for any Kilo exclusive model', () => {
       expect(kiloExclusiveModels.length).toBeGreaterThan(0);
@@ -106,21 +88,6 @@ describe('isFreeModelExcludingCustomLlms', () => {
         expect(isFreeModelExcludingCustomLlms(model)).toBe(true);
       }
     );
-
-    test('all Kilo exclusive models should have either no pricing or valid ordered pricing tiers', () => {
-      for (const model of kiloExclusiveModels) {
-        if (model.pricing) {
-          expect(model.pricing.tiers[0].start_context_length).toBe(0);
-          let previousStartContextLength = -1;
-          for (const tier of model.pricing.tiers) {
-            expect(typeof tier.pricing.prompt_per_million).toBe('number');
-            expect(typeof tier.pricing.completion_per_million).toBe('number');
-            expect(tier.start_context_length).toBeGreaterThan(previousStartContextLength);
-            previousStartContextLength = tier.start_context_length;
-          }
-        }
-      }
-    });
 
     test('uses candidate weights when selecting an Auto Free model', () => {
       const candidates = [
@@ -196,9 +163,9 @@ describe('isFreeModelExcludingCustomLlms', () => {
 });
 
 describe('hasBestEffortGuessDataCollectionRequirement', () => {
-  test('requires data collection for paid training-enabled offerings', async () => {
+  test('requires data collection for Kilo-exclusive models', async () => {
     expect(
-      await hasBestEffortGuessDataCollectionRequirement(paidStealthModelFixture.public_id)
+      await hasBestEffortGuessDataCollectionRequirement(kiloExclusiveModelFixture.public_id)
     ).toBe(true);
   });
 
@@ -219,7 +186,7 @@ describe('shouldRedactErrorResponse', () => {
   });
 
   test('redacts errors for stealth models regardless of provider', () => {
-    expect(shouldRedactErrorResponse('openrouter', paidStealthModelFixture.public_id)).toBe(true);
+    expect(shouldRedactErrorResponse('openrouter', kiloExclusiveModelFixture.public_id)).toBe(true);
   });
 
   test('does not redact errors for regular models and providers', () => {
@@ -237,7 +204,7 @@ describe('shouldRedactModelNameInMicrodollarUsage', () => {
 
   test('redacts model name for stealth models', () => {
     expect(
-      shouldRedactModelNameInMicrodollarUsage('openrouter', paidStealthModelFixture.public_id)
+      shouldRedactModelNameInMicrodollarUsage('openrouter', kiloExclusiveModelFixture.public_id)
     ).toBe(true);
   });
 });
@@ -245,7 +212,7 @@ describe('shouldRedactModelNameInMicrodollarUsage', () => {
 describe('getKiloExclusiveInferenceProviders', () => {
   test('returns the stealth provider for stealth exclusives', () => {
     expect([
-      ...(getKiloExclusiveInferenceProviders(paidStealthModelFixture.public_id) ?? []),
+      ...(getKiloExclusiveInferenceProviders(kiloExclusiveModelFixture.public_id) ?? []),
     ]).toEqual(['stealth']);
   });
 

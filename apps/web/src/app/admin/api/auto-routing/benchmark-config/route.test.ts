@@ -36,7 +36,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
     flags: [],
     provider: { ...OPENROUTER, id: 'dev-tools', supportedChatApis: ['chat_completions'] },
     internal_id: 'stub-internal',
-    pricing: null,
     inference_providers: [],
   };
   return {

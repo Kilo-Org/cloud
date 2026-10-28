@@ -37,7 +37,7 @@ import type { OpenAiChatGptConnection } from '@kilocode/web-shared/lib/ai-gatewa
 import type { User } from '@kilocode/db/schema';
 import {
   addKiloExclusiveModel,
-  paidStealthModelFixture,
+  kiloExclusiveModelFixture,
 } from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
@@ -246,14 +246,16 @@ describe('getProvider exclusive model routing', () => {
   });
 
   test('does not divert an exclusive without Vercel routing to Vercel or BYOK', async () => {
-    const removeModel = addKiloExclusiveModel(paidStealthModelFixture);
+    const removeModel = addKiloExclusiveModel(kiloExclusiveModelFixture);
     try {
       jest.mocked(shouldRouteToVercel).mockResolvedValue(true);
       jest.mocked(getModelInferenceUserByokProviders).mockResolvedValue(['anthropic']);
 
-      const result = await getProvider(providerInput(paidStealthModelFixture.public_id));
+      const result = await getProvider(providerInput(kiloExclusiveModelFixture.public_id));
 
-      expect(result.kind === 'provider' && result.provider).toBe(paidStealthModelFixture.provider);
+      expect(result.kind === 'provider' && result.provider).toBe(
+        kiloExclusiveModelFixture.provider
+      );
       expect(shouldRouteToVercel).not.toHaveBeenCalled();
       expect(getModelInferenceUserByokProviders).not.toHaveBeenCalled();
     } finally {

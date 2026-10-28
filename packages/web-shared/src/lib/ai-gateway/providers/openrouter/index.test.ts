@@ -13,7 +13,7 @@ import {
 } from '@kilocode/web-shared/tests/helpers/openrouter-models.helper';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
-  paidStealthModelFixture,
+  kiloExclusiveModelFixture,
   useKiloExclusiveModel,
 } from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
@@ -365,13 +365,13 @@ describe('auto models', () => {
   it('lists every exclusive model except unavailable ones', async () => {
     jest
       .mocked(getUnavailableModelIds)
-      .mockResolvedValueOnce(new Set([paidStealthModelFixture.public_id]));
+      .mockResolvedValueOnce(new Set([kiloExclusiveModelFixture.public_id]));
 
     const models = await getEnhancedOpenRouterModels({ countryCode: null });
 
-    expect(models.data.some(model => model.id === paidStealthModelFixture.public_id)).toBe(false);
+    expect(models.data.some(model => model.id === kiloExclusiveModelFixture.public_id)).toBe(false);
     for (const model of kiloExclusiveModels) {
-      if (model === paidStealthModelFixture) continue;
+      if (model === kiloExclusiveModelFixture) continue;
       expect(models.data.some(entry => entry.id === model.public_id)).toBe(true);
     }
   });
@@ -397,14 +397,14 @@ describe('auto models', () => {
       Promise.resolve(
         createMockResponse({
           jsonData: {
-            data: [buildModel({ id: paidStealthModelFixture.public_id, name: 'Upstream' })],
+            data: [buildModel({ id: kiloExclusiveModelFixture.public_id, name: 'Upstream' })],
           },
         })
       )
     ) as unknown as typeof fetch;
 
     const models = await getEnhancedOpenRouterModels({ countryCode: null });
-    const matches = models.data.filter(model => model.id === paidStealthModelFixture.public_id);
+    const matches = models.data.filter(model => model.id === kiloExclusiveModelFixture.public_id);
 
     expect(matches).toHaveLength(1);
     expect(matches[0]?.name).not.toBe('Upstream');

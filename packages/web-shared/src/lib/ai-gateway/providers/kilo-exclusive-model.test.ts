@@ -3,11 +3,9 @@ import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/defini
 import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 import {
   applyKiloExclusiveModelSettings,
-  calculateCost_mUsd,
   convertFromKiloExclusiveModel,
   getInferenceProviders,
   type KiloExclusiveModel,
-  type PricingTiers,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
 import type {
   GatewayMessagesRequest,
@@ -29,7 +27,6 @@ function makeModel(
     max_completion_tokens: 0,
     flags: [],
     provider: OPENROUTER,
-    pricing: null,
     inference_providers: [],
     ...overrides,
   };
@@ -46,52 +43,6 @@ function makeRequest(
   } as OpenRouterChatCompletionRequest;
   return { kind: 'chat_completions', body };
 }
-
-const usage = {
-  uncachedInputTokens: 100,
-  totalOutputTokens: 0,
-  cacheWriteTokens: 0,
-  cacheHitTokens: 0,
-};
-
-const pricing = (prompt_per_million: number) => ({
-  prompt_per_million,
-  completion_per_million: 0,
-  input_cache_read_per_million: null,
-  input_cache_write_per_million: null,
-});
-
-describe('calculateCost_mUsd', () => {
-  it('selects the tier whose start context length is reached', () => {
-    const pricingTiers: PricingTiers = [
-      { start_context_length: 0, pricing: pricing(1) },
-      { start_context_length: 100, pricing: pricing(2) },
-      { start_context_length: 200, pricing: pricing(3) },
-    ];
-
-    expect(calculateCost_mUsd(usage, pricingTiers)).toBe(200);
-  });
-
-  it('requires the first tier to start at zero', () => {
-    const pricingTiers: PricingTiers = [{ start_context_length: 1, pricing: pricing(1) }];
-
-    expect(() => calculateCost_mUsd(usage, pricingTiers)).toThrow(
-      'The first pricing tier must start at context length 0'
-    );
-  });
-
-  it('requires tiers to be ordered by ascending start context length', () => {
-    const pricingTiers: PricingTiers = [
-      { start_context_length: 0, pricing: pricing(1) },
-      { start_context_length: 200, pricing: pricing(2) },
-      { start_context_length: 100, pricing: pricing(3) },
-    ];
-
-    expect(() => calculateCost_mUsd(usage, pricingTiers)).toThrow(
-      'Pricing tiers must be ordered by ascending start context length'
-    );
-  });
-});
 
 describe('convertFromKiloExclusiveModel', () => {
   it('does not expose the provider or its credentials in public metadata', () => {
@@ -110,32 +61,6 @@ describe('convertFromKiloExclusiveModel', () => {
     expect(serialized).not.toContain('exclusive-provider-secret');
     expect(serialized).not.toContain('private-provider.example');
     expect(serialized).not.toContain('private/upstream-model');
-  });
-
-  it('only exposes the cheapest pricing tier in model metadata', () => {
-    const model = makeModel({
-      internal_id: 'vendor/x',
-      pricing: {
-        tiers: [
-          { start_context_length: 0, pricing: pricing(1) },
-          { start_context_length: 100, pricing: pricing(2) },
-        ],
-      },
-    });
-
-    expect(convertFromKiloExclusiveModel(model).pricing.prompt).toBe('0.000001000000');
-  });
-
-  it('exposes fallback-only pricing in model metadata', () => {
-    const model = makeModel({
-      internal_id: 'vendor/x',
-      pricing: {
-        fallbackOnly: true,
-        tiers: [{ start_context_length: 0, pricing: pricing(1) }],
-      },
-    });
-
-    expect(convertFromKiloExclusiveModel(model).pricing.prompt).toBe('0.000001000000');
   });
 });
 

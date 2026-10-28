@@ -40,10 +40,7 @@ import {
   getConfiguredAutoFreeModels,
   isAutoFreeEligibleModelId,
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model/auto-free-config';
-import {
-  findKiloExclusiveModel,
-  isKiloExclusiveFreeModel,
-} from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { findKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { getOpenRouterModelsFromDatabase } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { getCustomLlmsById } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { getCustomLlmApiKinds } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/api-kinds';
@@ -79,7 +76,7 @@ type ResolveAutoModelParams = {
  * configured, the configuration is invalid, or no configured model is eligible.
  *
  * Other free models are only eligible when they appear in the OpenRouter
- * models cache. Kilo-exclusive free models and public custom LLMs are eligible
+ * models cache. Kilo-exclusive models and public custom LLMs are eligible
  * when they serve the current `apiKind`; when `apiKind` is null no API-kind
  * filtering is applied.
  */
@@ -99,12 +96,9 @@ async function getEligibleAutoFreeModels(
     if (customLlm) {
       return apiKind === null || getCustomLlmApiKinds(customLlm.definition).includes(apiKind);
     }
-    if (isKiloExclusiveFreeModel(model)) {
-      const kiloModel = findKiloExclusiveModel(model);
-      return (
-        kiloModel !== null &&
-        (apiKind === null || kiloModel.provider.supportedChatApis.some(k => k === apiKind))
-      );
+    const kiloModel = findKiloExclusiveModel(model);
+    if (kiloModel) {
+      return apiKind === null || kiloModel.provider.supportedChatApis.some(k => k === apiKind);
     }
     return openRouterModels.has(model);
   });

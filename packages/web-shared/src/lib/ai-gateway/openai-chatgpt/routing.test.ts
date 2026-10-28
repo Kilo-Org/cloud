@@ -44,7 +44,6 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => {
     max_completion_tokens: 4_096,
     provider: { ...OPENROUTER, id: 'vercel' },
     flags: [],
-    pricing: null,
     inference_providers: ['openai'],
   };
   return {

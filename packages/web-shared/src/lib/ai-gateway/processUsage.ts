@@ -114,8 +114,6 @@ import { deliverBouncerUsageEventNow } from '@kilocode/web-shared/lib/bouncer/di
 import { enqueueBouncerUsageEvent } from '@kilocode/db/bouncer-usage-event-outbox';
 import type { BouncerUsageEventEnqueue, UsageRecordRequest } from '@kilocode/usage-contracts';
 
-export { calculateKiloExclusiveCost_mUsd } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
-
 const posthogClient = PostHogClient();
 
 export function extractPromptInfo(body: OpenRouterChatCompletionRequest): PromptInfo {

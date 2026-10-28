@@ -223,15 +223,12 @@ async function syncProviders(params: {
           updated_at: new Date().toISOString(),
           endpoint: {
             provider_display_name: 'Other',
-            is_free: !kfm.pricing,
+            is_free: true,
             pricing: {
               prompt: model.pricing.prompt,
               completion: model.pricing.completion,
             },
-            ...((!kfm.pricing || kfm.flags.includes('requires-data-collection')) &&
-              !unavailableModelIds.has(kfm.public_id) && {
-                data_policy: { training: true, retainsPrompts: true },
-              }),
+            data_policy: { training: true, retainsPrompts: true },
           },
         },
         provider: inferenceProvider,

@@ -12,61 +12,6 @@ export type KiloExclusiveModelFlag =
   | 'vercel-routing'
   | 'requires-data-collection';
 
-export type Usage = {
-  uncachedInputTokens: number;
-  totalOutputTokens: number;
-  cacheWriteTokens: number;
-  cacheHitTokens: number;
-};
-
-export type Pricing = {
-  prompt_per_million: number;
-  completion_per_million: number;
-  input_cache_read_per_million: number | null;
-  input_cache_write_per_million: number | null;
-};
-
-export type PricingTier = {
-  start_context_length: number;
-  pricing: Pricing;
-};
-
-export type PricingTiers = readonly [PricingTier, ...PricingTier[]];
-
-export type KiloExclusivePricing = {
-  tiers: PricingTiers;
-  /** Only use these tiers when the upstream response does not report a positive market cost. */
-  fallbackOnly?: boolean;
-};
-
-export function calculateCost_mUsd(usage: Usage, pricingTiers: PricingTiers): number {
-  if (pricingTiers[0].start_context_length !== 0) {
-    throw new Error('The first pricing tier must start at context length 0');
-  }
-
-  const totalInputTokens =
-    usage.uncachedInputTokens + usage.cacheWriteTokens + usage.cacheHitTokens;
-  let selectedTier = pricingTiers[0];
-  let previousTier = pricingTiers[0];
-  for (const tier of pricingTiers.slice(1)) {
-    if (tier.start_context_length <= previousTier.start_context_length) {
-      throw new Error('Pricing tiers must be ordered by ascending start context length');
-    }
-    if (tier.start_context_length <= totalInputTokens) {
-      selectedTier = tier;
-    }
-    previousTier = tier;
-  }
-
-  const pricing = selectedTier.pricing;
-  return (
-    usage.uncachedInputTokens * pricing.prompt_per_million +
-    usage.cacheWriteTokens * (pricing.input_cache_write_per_million ?? pricing.prompt_per_million) +
-    usage.cacheHitTokens * (pricing.input_cache_read_per_million ?? pricing.prompt_per_million) +
-    usage.totalOutputTokens * pricing.completion_per_million
-  );
-}
-
 export type KiloExclusiveModel = {
   public_id: string;
   display_name: string;
@@ -76,7 +21,6 @@ export type KiloExclusiveModel = {
   flags: KiloExclusiveModelFlag[];
   provider: Provider;
   internal_id: string;
-  pricing: KiloExclusivePricing | null;
   /**
    * Inference providers serving this model. Empty is only allowed for the
    * OpenRouter and Vercel AI Gateway upstreams and means no restriction there.
@@ -212,15 +156,9 @@ export function getInferenceProviders(model: KiloExclusiveModel): InferenceProvi
   );
 }
 
-function formatPricePerMillionAsPerToken(price: number): string;
-function formatPricePerMillionAsPerToken(price: number | null | undefined): string | undefined;
-function formatPricePerMillionAsPerToken(price: number | null | undefined): string | undefined {
-  return price === null || price === undefined ? undefined : (price / 1_000_000).toFixed(12);
-}
+const FREE_PRICE_PER_TOKEN = '0.000000000000';
 
 export function convertFromKiloExclusiveModel(model: KiloExclusiveModel) {
-  const cheapestPricing = model.pricing?.tiers[0].pricing;
-  const isFree = !model.pricing;
   return {
     id: model.public_id,
     canonical_slug: model.public_id,
@@ -237,18 +175,13 @@ export function convertFromKiloExclusiveModel(model: KiloExclusiveModel) {
       instruct_type: null,
     },
     pricing: {
-      prompt: formatPricePerMillionAsPerToken(cheapestPricing?.prompt_per_million ?? 0),
-      completion: formatPricePerMillionAsPerToken(cheapestPricing?.completion_per_million ?? 0),
+      prompt: FREE_PRICE_PER_TOKEN,
+      completion: FREE_PRICE_PER_TOKEN,
       request: '0',
       image: '0',
       web_search: '0',
       internal_reasoning: '0',
-      input_cache_read: formatPricePerMillionAsPerToken(
-        cheapestPricing?.input_cache_read_per_million ?? cheapestPricing?.prompt_per_million ?? 0
-      ),
-      input_cache_write: formatPricePerMillionAsPerToken(
-        cheapestPricing?.input_cache_write_per_million
-      ),
+      input_cache_read: FREE_PRICE_PER_TOKEN,
     },
     top_provider: {
       context_length: model.context_length,
@@ -260,7 +193,7 @@ export function convertFromKiloExclusiveModel(model: KiloExclusiveModel) {
       model.flags.includes('reasoning') ? ['reasoning', 'include_reasoning'] : []
     ),
     default_parameters: {},
-    isFree,
-    mayTrainOnYourPrompts: isFree || model.flags.includes('requires-data-collection'),
+    isFree: true,
+    mayTrainOnYourPrompts: true,
   };
 }

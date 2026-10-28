@@ -42,7 +42,7 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
 
 import { gemma_4_26b_a4b_it_free_model, kiloExclusiveModels } from './kilo-exclusive-models';
 import {
-  paidStealthModelFixture,
+  kiloExclusiveModelFixture,
   useKiloExclusiveModel,
 } from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 import type { KiloExclusiveModel } from './providers/kilo-exclusive-model';
@@ -1794,7 +1794,7 @@ describe('makeErrorReadable', () => {
 
     const result = await makeErrorReadable({
       providerId: 'openrouter',
-      requestedModel: paidStealthModelFixture.public_id,
+      requestedModel: kiloExclusiveModelFixture.public_id,
       request,
       response,
       userByokProviderIds: null,
@@ -1927,7 +1927,7 @@ describe('requestedSamples', () => {
 
 describe('checkExclusiveModelProviderAllowed', () => {
   const multiProviderModel: KiloExclusiveModel = {
-    ...paidStealthModelFixture,
+    ...kiloExclusiveModelFixture,
     public_id: 'test/multi-provider-exclusive',
     inference_providers: ['anthropic', 'amazon-bedrock'],
   };
@@ -1943,7 +1943,7 @@ describe('checkExclusiveModelProviderAllowed', () => {
   it('allows non-exclusive models, missing provider config, and unrestricted exclusives', () => {
     expect(checkExclusiveModelProviderAllowed('vendor/model', { only: ['openai'] })).toBeNull();
     expect(
-      checkExclusiveModelProviderAllowed(paidStealthModelFixture.public_id, undefined)
+      checkExclusiveModelProviderAllowed(kiloExclusiveModelFixture.public_id, undefined)
     ).toBeNull();
     expect(
       checkExclusiveModelProviderAllowed(gemma_4_26b_a4b_it_free_model.public_id, {
@@ -1974,7 +1974,7 @@ describe('checkExclusiveModelProviderAllowed', () => {
         'No eligible provider can serve the selected model. Please enable provider: anthropic, amazon-bedrock',
     });
 
-    const ignoreResult = checkExclusiveModelProviderAllowed(paidStealthModelFixture.public_id, {
+    const ignoreResult = checkExclusiveModelProviderAllowed(kiloExclusiveModelFixture.public_id, {
       ignore: ['stealth'],
     });
     expect(ignoreResult?.status).toBe(403);

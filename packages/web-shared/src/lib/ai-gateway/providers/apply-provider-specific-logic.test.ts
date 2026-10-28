@@ -55,7 +55,6 @@ const nonFlexExclusiveModel: KiloExclusiveModel = {
   max_completion_tokens: 4_096,
   provider: OPENROUTER,
   flags: [],
-  pricing: null,
   inference_providers: [],
 };
 

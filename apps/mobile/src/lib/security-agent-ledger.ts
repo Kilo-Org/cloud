@@ -113,11 +113,6 @@ export function isSecuritySyncRetryable(error: unknown): boolean {
   return classifyPrReviewMutationError(error).kind === 'retryable';
 }
 
-/** The Worker was provably unreachable, so the server settled the intent. */
-export function isSecurityServiceUnavailable(error: unknown): boolean {
-  return error instanceof Error && error.message === SECURITY_SERVICE_UNAVAILABLE_MESSAGE;
-}
-
 /**
  * Whether a retry reuses the operation key. Two different questions a failure
  * answers: can a retry succeed (`isSecuritySyncRetryable`), and is the key
@@ -126,7 +121,10 @@ export function isSecurityServiceUnavailable(error: unknown): boolean {
  * expected to succeed, as with an unreachable Worker it is a fresh intent.
  */
 export function securityRetainsOperationKey(error: unknown): boolean {
-  return isSecuritySyncRetryable(error) && !isSecurityServiceUnavailable(error);
+  return (
+    isSecuritySyncRetryable(error) &&
+    !(error instanceof Error && error.message === SECURITY_SERVICE_UNAVAILABLE_MESSAGE)
+  );
 }
 
 /** The catalog key each known server marker's copy comes from, or null. */

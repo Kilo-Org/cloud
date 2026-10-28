@@ -38,7 +38,9 @@ describe('parseAwsBedrockModelsDevModels', () => {
 
   test('selects one endpoint per model and skips unsupported and deprecated models', () => {
     expect(
-      parseAwsBedrockModelsDevModels(ModelsDevProviderSchema.parse({ models })).map(({ id, endpoint }) => ({ id, endpoint }))
+      parseAwsBedrockModelsDevModels(ModelsDevProviderSchema.parse({ models })).map(
+        ({ id, endpoint }) => ({ id, endpoint })
+      )
     ).toEqual([
       { id: 'global.anthropic.claude-sonnet-4-6', endpoint: 'runtime-anthropic' },
       { id: 'zai.glm-5', endpoint: 'mantle-chat' },

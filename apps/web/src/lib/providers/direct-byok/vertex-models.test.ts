@@ -28,7 +28,9 @@ describe('parseGcpVertexModelsDevModels', () => {
     };
 
     expect(
-      parseGcpVertexModelsDevModels(ModelsDevProviderSchema.parse({ models })).map(({ id, endpoint }) => ({ id, endpoint }))
+      parseGcpVertexModelsDevModels(ModelsDevProviderSchema.parse({ models })).map(
+        ({ id, endpoint }) => ({ id, endpoint })
+      )
     ).toEqual([
       { id: 'gemini-3.5-flash', endpoint: 'openapi' },
       { id: 'zai-org/glm-5.2-maas', endpoint: 'openapi' },

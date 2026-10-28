@@ -35,7 +35,7 @@ function RepoPickerSkeleton() {
   return (
     <View className="gap-1 px-4">
       {[0, 1, 2, 3].map(index => (
-        <Skeleton key={index} className="h-11 w-full rounded-md bg-muted-soft" />
+        <Skeleton key={index} className={cn(ROW_TARGET_CLASS, 'w-full rounded-md bg-muted-soft')} />
       ))}
     </View>
   );

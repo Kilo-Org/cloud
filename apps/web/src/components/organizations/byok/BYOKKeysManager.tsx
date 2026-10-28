@@ -547,7 +547,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                             role="cell"
                             className="text-muted-foreground col-span-2 text-sm @2xl:table-cell @2xl:p-4 @2xl:text-base"
                           >
-                            <span className="@2xl:hidden">Created </span>
+                            <span className="@2xl:hidden" aria-hidden="true">
+                              Created{' '}
+                            </span>
                             {new Date(key.created_at).toLocaleDateString()}
                           </td>
                           <td role="cell" className="@2xl:table-cell @2xl:p-4">

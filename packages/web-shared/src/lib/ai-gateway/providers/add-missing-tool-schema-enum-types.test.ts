@@ -21,8 +21,7 @@ describe('addMissingJsonSchemaEnumTypes', () => {
       },
     };
 
-    addMissingJsonSchemaEnumTypes(schema);
-
+    expect(addMissingJsonSchemaEnumTypes(schema)).toEqual({ typedEnums: 1, untypedEnums: 0 });
     expect(schema.properties.operations.items.properties.op).toEqual({
       type: 'string',
       enum: ['set_title', 'delete_block'],
@@ -51,8 +50,7 @@ describe('addMissingJsonSchemaEnumTypes', () => {
       const schema = { type: 'object', properties: { value: { enum: values } } };
       const expected = structuredClone(schema);
 
-      addMissingJsonSchemaEnumTypes(schema);
-
+      expect(addMissingJsonSchemaEnumTypes(schema)).toEqual({ typedEnums: 0, untypedEnums: 1 });
       expect(schema).toEqual(expected);
     }
   );
@@ -61,7 +59,7 @@ describe('addMissingJsonSchemaEnumTypes', () => {
     const schema = { type: 'object', properties: { value: { type: 'string', enum: [1] } } };
     const expected = structuredClone(schema);
 
-    addMissingJsonSchemaEnumTypes(schema);
+    expect(addMissingJsonSchemaEnumTypes(schema)).toEqual({ typedEnums: 0, untypedEnums: 0 });
 
     expect(schema).toEqual(expected);
   });
@@ -72,7 +70,7 @@ describe('addMissingJsonSchemaEnumTypes', () => {
       $defs: { mode: { enum: ['b'] } },
     };
 
-    addMissingJsonSchemaEnumTypes(schema);
+    expect(addMissingJsonSchemaEnumTypes(schema)).toEqual({ typedEnums: 2, untypedEnums: 0 });
 
     expect(schema).toEqual({
       anyOf: [{ type: 'string', enum: ['a'] }],

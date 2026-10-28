@@ -3,6 +3,8 @@ import {
   isRecord,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/json-schema-traversal';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
+import { throttledLog } from '@kilocode/web-shared/lib/ai-gateway/providers/throttled-log';
+import { warnExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 
 const SCALAR_TYPES = new Set(['string', 'integer', 'number', 'boolean']);
 
@@ -30,39 +32,73 @@ function inferEnumType(values: unknown[]): string | string[] | undefined {
   return nullable ? [type, 'null'] : type;
 }
 
+type EnumTypeCounts = { typedEnums: number; untypedEnums: number };
+
+const logAffectedTools = throttledLog(details =>
+  warnExceptInTest(
+    '[addMissingToolSchemaEnumTypes] found tool schema enums without a type',
+    details
+  )
+);
+
 /**
  * Adds the `type` implied by the values of every `enum` that has no `type`.
- * Mutates the schema in place.
+ * Mutates the schema in place and counts the enums that got a type and those
+ * left untyped because Moonshot accepts no type for their values.
  */
-export function addMissingJsonSchemaEnumTypes(schema: unknown): void {
-  if (!isRecord(schema)) {
-    return;
-  }
-  if (schema.type === undefined && Array.isArray(schema.enum)) {
-    const type = inferEnumType(schema.enum);
-    if (type !== undefined) {
-      schema.type = type;
+export function addMissingJsonSchemaEnumTypes(schema: unknown): EnumTypeCounts {
+  const counts: EnumTypeCounts = { typedEnums: 0, untypedEnums: 0 };
+  const visit = (node: unknown) => {
+    if (!isRecord(node)) {
+      return;
     }
-  }
-  forEachChildSchema(schema, addMissingJsonSchemaEnumTypes);
+    if (node.type === undefined && Array.isArray(node.enum)) {
+      const type = inferEnumType(node.enum);
+      if (type === undefined) {
+        counts.untypedEnums++;
+      } else {
+        node.type = type;
+        counts.typedEnums++;
+      }
+    }
+    forEachChildSchema(node, visit);
+  };
+  visit(schema);
+  return counts;
 }
 
 export function addMissingToolSchemaEnumTypes(request: GatewayRequest): void {
+  const affectedTools: ({ name: string } & EnumTypeCounts)[] = [];
+  const update = (name: string, schema: unknown) => {
+    const counts = addMissingJsonSchemaEnumTypes(schema);
+    if (counts.typedEnums > 0 || counts.untypedEnums > 0) {
+      affectedTools.push({ name, ...counts });
+    }
+  };
+
   switch (request.kind) {
     case 'chat_completions':
       for (const tool of request.body.tools ?? []) {
-        if (tool.type === 'function') addMissingJsonSchemaEnumTypes(tool.function.parameters);
+        if (tool.type === 'function') update(tool.function.name, tool.function.parameters);
       }
       break;
     case 'responses':
       for (const tool of request.body.tools ?? []) {
-        if (tool.type === 'function') addMissingJsonSchemaEnumTypes(tool.parameters);
+        if (tool.type === 'function') update(tool.name, tool.parameters);
       }
       break;
     case 'messages':
       for (const tool of request.body.tools ?? []) {
-        if ('input_schema' in tool) addMissingJsonSchemaEnumTypes(tool.input_schema);
+        if ('input_schema' in tool) update(tool.name, tool.input_schema);
       }
       break;
+  }
+
+  if (affectedTools.length > 0) {
+    logAffectedTools({
+      model: request.body.model,
+      requestKind: request.kind,
+      tools: affectedTools,
+    });
   }
 }

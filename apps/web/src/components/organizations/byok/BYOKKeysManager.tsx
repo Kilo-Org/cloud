@@ -673,7 +673,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                             : structuredCredentialKind === 'bedrock'
                               ? '{"accessKeyId": "...", "secretAccessKey": "...", "region": "us-east-1"}'
                               : isDirectVertex
-                                ? '{"type": "service_account", "project_id": "...", "client_email": "...", "private_key": "...", ...}'
+                                ? '{"type": "service_account", "project_id": "...", "client_email": "...", "private_key": "..."}'
                                 : '{"project": "...", "location": "global", "googleCredentials": {"clientEmail": "...", "privateKey": "..."}}'
                         }
                         className={cn(
@@ -825,7 +825,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                     </AlertDescription>
                   </Alert>
                 )}
-                {structuredCredentialKind === 'vertex' && (
+                {structuredCredentialKind === 'vertex' && !isDirectVertex && (
                   <Alert>
                     <Info className="size-4" />
                     <AlertDescription>

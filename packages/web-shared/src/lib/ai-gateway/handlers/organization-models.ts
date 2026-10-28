@@ -4,10 +4,6 @@ import { ORGANIZATION_MODEL_AUDIENCES } from '@kilocode/app-shared/organizations
 import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { handleTRPCRequest } from '@kilocode/web-shared/lib/organizations/organization-settings-route-handler';
 import { addAutoRoutingModels } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-models';
-import {
-  requestCountryCode,
-  withoutCustomLlmsDeniedInCountry,
-} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 
 const AudienceSchema = z.enum(ORGANIZATION_MODEL_AUDIENCES).optional();
 
@@ -29,9 +25,7 @@ export async function handleOrganizationModelsRequest(
     });
     return {
       ...result,
-      data: await addAutoRoutingModels(
-        await withoutCustomLlmsDeniedInCountry(result.data, requestCountryCode(request.headers))
-      ),
+      data: await addAutoRoutingModels(result.data),
     };
   });
 }

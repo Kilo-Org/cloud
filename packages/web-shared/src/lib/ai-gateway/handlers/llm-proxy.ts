@@ -42,10 +42,7 @@ import {
   findCustomLlm,
   isPublicCustomLlm,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
-import {
-  isCustomLlmDeniedInCountry,
-  requestCountryCode,
-} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
+import { requestCountryCode } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import {
   accountForMicrodollarUsage,
   captureProxyError,
@@ -605,13 +602,6 @@ export async function handleLlmProxyRequest(
         customRouterDecision,
         organizationContext: organizationContextPromise,
         isAutoFreeCandidateAllowed: async modelId => {
-          const candidateCustomLlm = await findCustomLlm(modelId);
-          if (
-            candidateCustomLlm &&
-            isCustomLlmDeniedInCountry(candidateCustomLlm.definition, countryCode)
-          ) {
-            return false;
-          }
           const policy = await organizationGroupPolicyPromise;
           return policy ? (await getEffectiveModelDecision(policy, modelId)).allowed : true;
         },

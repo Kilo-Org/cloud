@@ -18,10 +18,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/auto-routing-models';
 import { listUsableCustomRouters } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
-import {
-  requestCountryCode,
-  withoutCustomLlmsDeniedInCountry,
-} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
+import { requestCountryCode } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
 import {
   getEnkryptBenchmarks,
   publishEnkryptModels,
@@ -75,12 +72,12 @@ export async function handleModelsRequest(
             auth.organizationId,
             { type: 'member', kiloUserId: auth.user.id },
             'member',
-            readDb
+            { fromDb: readDb, countryCode }
           )
         : null;
     if (result && auth.user && auth.organizationId) {
       const [models, customRouters] = await Promise.all([
-        withoutCustomLlmsDeniedInCountry(result.data, countryCode).then(addAutoRoutingModels),
+        addAutoRoutingModels(result.data),
         usableCustomRouters({ userId: auth.user.id, organizationId: auth.organizationId }),
       ]);
       return await modelResponse({
@@ -89,13 +86,11 @@ export async function handleModelsRequest(
       });
     }
 
-    const data = await getEnhancedOpenRouterModels();
+    const data = await getEnhancedOpenRouterModels({ countryCode });
     if (!Array.isArray(data.data)) {
       return NextResponse.json(data);
     }
-    const models = await addAutoRoutingModels(
-      await withoutCustomLlmsDeniedInCountry(data.data, countryCode)
-    );
+    const models = await addAutoRoutingModels(data.data);
     if (!auth?.user) {
       return await modelResponse({
         data: appendLocalFakeDeterministicCatalogModels(models),

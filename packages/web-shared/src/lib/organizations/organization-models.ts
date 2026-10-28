@@ -52,13 +52,20 @@ export async function getAvailableModelsForOrganization(
   organizationId: string,
   subject: OrganizationPolicySubject,
   audience: OrganizationModelAudience = 'member',
-  fromDb: typeof db = db
+  {
+    fromDb = db,
+    countryCode = null,
+  }: {
+    fromDb?: typeof db;
+    /** The requester's Vercel IP country; custom LLMs denied there are left out. */
+    countryCode?: string | null;
+  } = {}
 ): Promise<OpenRouterModelsResponse | null> {
   const context = await getOrganizationGroupPolicyContext({ organizationId, subject, fromDb });
   const organization = context.organization;
   const policy = evaluateEffectiveModelAccessPolicy(context);
 
-  const responseData = await getEnhancedOpenRouterModels();
+  const responseData = await getEnhancedOpenRouterModels({ countryCode });
   const restrictionCandidates = [...responseData.data];
 
   const filteredModels = [];
@@ -82,7 +89,9 @@ export async function getAvailableModelsForOrganization(
   }
 
   availableModels.push(...(await getDirectByokModelsForOrganization(organizationId)));
-  availableModels.push(...(await listAvailableCustomLlms(organizationId, context.groupIds)));
+  availableModels.push(
+    ...(await listAvailableCustomLlms(organizationId, context.groupIds, countryCode))
+  );
 
   const chatGptOwner = chatGptByokOwner(organizationId, subject, audience);
   if (chatGptOwner) {

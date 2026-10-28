@@ -25,7 +25,6 @@ export function usageQueueDeployment(env) {
                   topic: 'usage-staging',
                   retryAfterSeconds: 60,
                   maxDeliveries: 20,
-                  maxConcurrency: 200,
                 },
               ],
               regions: ['fra1'],

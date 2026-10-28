@@ -5324,14 +5324,27 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     );
   });
 
-  it('preserves existing opt-out fingerprints but binds opt-in and authenticated lineage to creation intent', async () => {
+  it('does not bind the fingerprint to an allocation resolved after admission', async () => {
+    const request = {
+      ...originalRequest(),
+      options: { ...ORIGINAL_OPTIONS, createdOnPlatform: 'cloud-agent-web' },
+    };
+    expect(
+      await sessionCreateIntentFingerprint({
+        ...request,
+        savedSandboxAllocation: 'cloudflare-shared',
+      })
+    ).toBe(await sessionCreateIntentFingerprint(request));
+  });
+
+  it('binds interactive origin and authenticated lineage to creation intent', async () => {
     const request = originalRequest();
     const original = await sessionCreateIntentFingerprint(request);
-    expect(await sessionCreateIntentFingerprint({ ...request, allowSubagentSessions: false })).toBe(
-      original
-    );
     expect(
-      await sessionCreateIntentFingerprint({ ...request, allowSubagentSessions: true })
+      await sessionCreateIntentFingerprint({
+        ...request,
+        options: { ...ORIGINAL_OPTIONS, createdOnPlatform: 'cloud-agent-web' },
+      })
     ).not.toBe(original);
     expect(
       await sessionCreateIntentFingerprint({
@@ -5354,8 +5367,10 @@ describe('createSessionWithLedger changed-intent rejection', () => {
     retry: SessionCreateRequest;
   }> = [
     {
-      name: 'subagent opt-in',
-      retry: makeRequest({ allowSubagentSessions: true, options: ORIGINAL_OPTIONS }),
+      name: 'interactive origin',
+      retry: makeRequest({
+        options: { ...ORIGINAL_OPTIONS, createdOnPlatform: 'cloud-agent-web' },
+      }),
     },
     {
       name: 'authenticated parent lineage',

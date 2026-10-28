@@ -119,7 +119,6 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
           };
 
   return {
-    allowSubagentSessions: input.allowSubagentSessions ?? false,
     initialTurn,
     agent: {
       mode: input.mode,

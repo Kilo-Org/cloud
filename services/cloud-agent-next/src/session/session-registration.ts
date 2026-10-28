@@ -122,9 +122,41 @@ import {
   withSavedSandboxAllocation,
 } from './sandbox-allocation-resolution.js';
 import type { SessionCreateRequest, SessionRepositoryRequest } from './session-requests.js';
+import { isInteractiveSessionOrigin } from '../shared/control-plane-permission.js';
 import { egressAllowlistSchema, egressPolicySchema } from '@kilocode/worker-utils/egress-allowlist';
 
 export type SessionRegistrationInput = SessionCreateRequest;
+
+/**
+ * Whether a create may launch child Cloud Agent sessions. The capability is not
+ * caller-controlled: a session gets it when a person created it through an
+ * interactive client, it is not itself a spawned child, and it does not run on
+ * a shared sandbox.
+ */
+export function allowsSubagentSessions(
+  input: Pick<
+    SessionRegistrationInput,
+    'options' | 'parentCloudAgentSessionId' | 'runtime' | 'savedSandboxAllocation'
+  >
+): boolean {
+  return (
+    input.parentCloudAgentSessionId === undefined &&
+    isInteractiveSessionOrigin(input.options?.createdOnPlatform) &&
+    requestedSandboxAllocation(input) !== 'cloudflare-shared'
+  );
+}
+
+function resolvedAllowsSubagentSessions(
+  input: SessionRegistrationInput,
+  sandboxAllocation: SandboxAllocation | undefined,
+  sandboxKind?: SandboxKind
+): boolean {
+  return (
+    allowsSubagentSessions(input) &&
+    sandboxAllocation !== 'cloudflare-shared' &&
+    sandboxKind !== 'shared'
+  );
+}
 
 function assertSupportedSandboxAllocation(
   input: SessionRegistrationInput,
@@ -639,10 +671,7 @@ async function issueSessionRuntimeAuthorization(
   initialTurn: AcceptedExecutionTurn | undefined
 ): Promise<NewSessionAllocation['runtimeAuthorization']> {
   const orgId = input.options?.kilocodeOrganizationId;
-  if (
-    (input.allowSubagentSessions === true || input.parentCloudAgentSessionId !== undefined) &&
-    !isPolicyBearingAuthToken(ctx.authToken)
-  ) {
+  if (input.parentCloudAgentSessionId !== undefined && !isPolicyBearingAuthToken(ctx.authToken)) {
     throw new TRPCError({
       code: 'PRECONDITION_FAILED',
       message: 'Cloud Agent spawn requires modern workspace authorization',
@@ -768,10 +797,8 @@ async function allocateNewSession(
     createdOnPlatform: input.options?.createdOnPlatform,
     billingOrigin: options?.billingOrigin,
   });
-  assertCloudAgentIsolatedAllocation(
-    input.allowSubagentSessions === true || input.parentCloudAgentSessionId !== undefined,
-    sandboxAllocation
-  );
+  const childSession = input.parentCloudAgentSessionId !== undefined;
+  assertCloudAgentIsolatedAllocation(childSession, sandboxAllocation);
   const kiloSessionId = input.options?.kiloSessionId ?? generateKiloSessionId();
   const worktreeId = ledger?.worktreeEnabled
     ? cloudAgentWorktreeIdSchema.parse(`worktree_${cloudAgentSessionId.slice('workspace_'.length)}`)
@@ -1181,17 +1208,19 @@ function buildSessionRegistrationCommand(
   allocation: NewSessionAllocation,
   options?: { billingOrigin?: string }
 ) {
-  const scoped =
-    input.allowSubagentSessions === true || input.parentCloudAgentSessionId !== undefined;
-  assertCloudAgentIsolatedAllocation(scoped, allocation.sandboxAllocation);
-  if (scoped && allocation.sandboxKind === 'shared') {
+  const childSession = input.parentCloudAgentSessionId !== undefined;
+  assertCloudAgentIsolatedAllocation(childSession, allocation.sandboxAllocation);
+  if (childSession && allocation.sandboxKind === 'shared') {
     throw new TRPCError({
       code: 'FORBIDDEN',
       message: 'Cloud Agent spawn authority requires an isolated sandbox',
     });
   }
   return {
-    allowSubagentSessions: input.allowSubagentSessions ?? false,
+    allowSubagentSessions:
+      resolvedAllowsSubagentSessions(input, allocation.sandboxAllocation, allocation.sandboxKind) &&
+      isPolicyBearingAuthToken(ctx.authToken) &&
+      ctx.botId === undefined,
     parentCloudAgentSessionId: input.parentCloudAgentSessionId,
     identity: {
       sessionId: allocation.cloudAgentSessionId,
@@ -1780,7 +1809,6 @@ export async function sessionCreateIntentFingerprint(
           };
   return sha256Hex(
     canonicalJson({
-      allowSubagentSessions: input.allowSubagentSessions === true ? true : undefined,
       parentCloudAgentSessionId: input.parentCloudAgentSessionId,
       initialTurn,
       // Undefined for creates without a proposed ID, so their fingerprint is unchanged.

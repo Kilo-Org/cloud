@@ -56,7 +56,6 @@ export type SessionRuntimeIntent = {
 };
 
 export type SessionCreateRequest = {
-  allowSubagentSessions?: boolean;
   parentCloudAgentSessionId?: string;
   /** Omitted for a clone-only create: the copied transcript is the session state. */
   initialTurn?: ExecutionTurnSubmission;

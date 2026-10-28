@@ -427,7 +427,6 @@ export const CloseTerminalOutput = z.object({
  * stable `operationKey`, and forbids any synthetic initial turn fields.
  */
 const PrepareSessionSharedFields = {
-  allowSubagentSessions: z.boolean().optional(),
   githubAccessPurpose: z.enum(['workflow', 'agent']).optional(),
   allowUserAuthorization: z
     .boolean()
@@ -901,7 +900,6 @@ export type ProfileInput = z.infer<typeof ProfileInputSchema>;
 export const StartSessionInput = z
   .object({
     operationKey: z.string().uuid().optional(),
-    allowSubagentSessions: z.boolean().optional(),
     message: z.object({
       prompt: z.string().min(1).max(Limits.MAX_PROMPT_LENGTH),
       ...AttachmentFieldsSchema,

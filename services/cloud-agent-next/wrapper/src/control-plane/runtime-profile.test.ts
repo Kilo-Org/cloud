@@ -1,12 +1,14 @@
-import { writeRuntimeSkills } from '../runtime-skills.js';
+import { writeRuntimeSkills, type RuntimeSkillInstallOptions } from '../runtime-skills.js';
 import { existsSync } from 'node:fs';
 import { describe, expect, it, spyOn } from 'bun:test';
 import fs from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import {
+  createRuntimeProfileMaterializer,
   materializeRuntimeProfile,
   profileConfigPath,
+  RuntimeProfileMismatchError,
   withRuntimeProfileEnvironment,
 } from './runtime-profile.js';
 
@@ -17,6 +19,64 @@ async function captureRejection(promise: Promise<unknown>): Promise<unknown> {
     },
     (error: unknown) => error
   );
+}
+
+const skillsShProfile = {
+  runtimeSkills: [{ name: 'find-skills', source: 'vercel-labs/skills' }],
+};
+
+function skillsInstaller(): {
+  run: NonNullable<RuntimeSkillInstallOptions['run']>;
+  installs: () => number;
+} {
+  let installs = 0;
+  return {
+    installs: () => installs,
+    run: async (_command, args, options) => {
+      installs += 1;
+      const name = args[args.indexOf('--skill') + 1]!;
+      const directory = path.join(String(options?.env?.HOME), '.agents/skills', name);
+      await fs.mkdir(directory, { recursive: true });
+      await fs.writeFile(path.join(directory, 'SKILL.md'), `# ${name}`);
+      return { exitCode: 0, stdout: '', stderr: '' };
+    },
+  };
+}
+
+function blockingInstaller(): {
+  run: NonNullable<RuntimeSkillInstallOptions['run']>;
+  started: Promise<void>;
+  release: () => void;
+  installs: () => number;
+} {
+  let installs = 0;
+  const started = Promise.withResolvers<void>();
+  const released = Promise.withResolvers<void>();
+  return {
+    installs: () => installs,
+    run: async (_command, args, options) => {
+      installs += 1;
+      started.resolve();
+      await Promise.race([
+        released.promise,
+        new Promise<never>((_resolve, reject) => {
+          options?.signal?.addEventListener(
+            'abort',
+            () => reject(options.signal?.reason ?? new Error('aborted')),
+            { once: true }
+          );
+        }),
+      ]);
+      options?.signal?.throwIfAborted();
+      const name = args[args.indexOf('--skill') + 1]!;
+      const directory = path.join(String(options?.env?.HOME), '.agents/skills', name);
+      await fs.mkdir(directory, { recursive: true });
+      await fs.writeFile(path.join(directory, 'SKILL.md'), `# ${name}`);
+      return { exitCode: 0, stdout: '', stderr: '' };
+    },
+    release: () => released.resolve(),
+    started: started.promise,
+  };
 }
 
 const previousProfile = {
@@ -222,6 +282,295 @@ describe('runtime profile preparation failures', () => {
       expect(existsSync(path.join(home, '.kilocode/skills/next'))).toBe(false);
       expect(existsSync(config)).toBe(false);
       expect((await fs.readdir(home)).some(name => name.startsWith('.profile-'))).toBe(false);
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('workspace profile single-flight', () => {
+  it('installs one profile for concurrent siblings and fans progress out to both', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-shared-'));
+    try {
+      const materializer = createRuntimeProfileMaterializer();
+      const installer = skillsInstaller();
+      const progressA: string[] = [];
+      const progressB: string[] = [];
+      await Promise.all([
+        materializer.materialize(home, skillsShProfile, {
+          run: installer.run,
+          onProgress: detail => progressA.push(detail),
+        }),
+        materializer.materialize(home, skillsShProfile, {
+          run: installer.run,
+          onProgress: detail => progressB.push(detail),
+        }),
+      ]);
+      expect(installer.installs()).toBe(1);
+      expect(progressA.some(detail => detail.includes('Installing skills.sh skill'))).toBe(true);
+      expect(progressB.some(detail => detail.includes('Installing skills.sh skill'))).toBe(true);
+      expect(
+        await fs.readFile(path.join(home, '.kilocode/skills/find-skills/SKILL.md'), 'utf8')
+      ).toBe('# find-skills');
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('reuses a successful profile for later siblings in the same HOME', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-sequential-'));
+    try {
+      const materializer = createRuntimeProfileMaterializer();
+      const installer = skillsInstaller();
+      await materializer.materialize(home, skillsShProfile, { run: installer.run });
+      await materializer.materialize(home, skillsShProfile, { run: installer.run });
+      expect(installer.installs()).toBe(1);
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps the shared install running when one sibling releases', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-release-'));
+    const controller = new AbortController();
+    const installer = blockingInstaller();
+    try {
+      const materializer = createRuntimeProfileMaterializer();
+      const released = materializer.materialize(home, skillsShProfile, {
+        run: installer.run,
+        signal: controller.signal,
+      });
+      await installer.started;
+      const sibling = materializer.materialize(home, skillsShProfile, { run: installer.run });
+
+      controller.abort(new Error('released'));
+      expect(await captureRejection(released)).toMatchObject({ message: 'released' });
+      installer.release();
+      await sibling;
+      expect(installer.installs()).toBe(1);
+      expect(
+        await fs.readFile(path.join(home, '.kilocode/skills/find-skills/SKILL.md'), 'utf8')
+      ).toBe('# find-skills');
+    } finally {
+      installer.release();
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('aborts the shared install when the last sibling releases, then retries the next attach', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-abort-'));
+    try {
+      const materializer = createRuntimeProfileMaterializer();
+      const installer = blockingInstaller();
+      const first = new AbortController();
+      const second = new AbortController();
+      const a = captureRejection(
+        materializer.materialize(home, skillsShProfile, {
+          run: installer.run,
+          signal: first.signal,
+        })
+      );
+      await installer.started;
+      const b = captureRejection(
+        materializer.materialize(home, skillsShProfile, {
+          run: installer.run,
+          signal: second.signal,
+        })
+      );
+
+      first.abort(new Error('first released'));
+      second.abort(new Error('second released'));
+      expect(await a).toMatchObject({ message: 'first released' });
+      expect(await b).toMatchObject({ message: 'second released' });
+
+      const retry = skillsInstaller();
+      await materializer.materialize(home, skillsShProfile, { run: retry.run });
+      expect(installer.installs()).toBe(1);
+      expect(retry.installs()).toBe(1);
+      expect(
+        await fs.readFile(path.join(home, '.kilocode/skills/find-skills/SKILL.md'), 'utf8')
+      ).toBe('# find-skills');
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('does not pin a HOME when the last sibling releases during the final commit', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-commit-abort-'));
+    const controller = new AbortController();
+    const rename = fs.rename.bind(fs);
+    const commit = spyOn(fs, 'rename').mockImplementation(async (from, to) => {
+      if (to === profileConfigPath(home)) controller.abort(new Error('released'));
+      return rename(from, to);
+    });
+    try {
+      const materializer = createRuntimeProfileMaterializer();
+      expect(
+        await captureRejection(
+          materializer.materialize(home, previousProfile, { signal: controller.signal })
+        )
+      ).toMatchObject({ message: 'released' });
+      commit.mockRestore();
+      materializer.release(home);
+      // Queues behind the aborted write, so the aborted install has settled.
+      await materializeRuntimeProfile(home, previousProfile);
+      await Bun.sleep(0);
+      await materializer.materialize(home, nextProfile);
+      expect(await fs.readFile(path.join(home, '.kilocode/skills/next/SKILL.md'), 'utf8')).toBe(
+        'Next'
+      );
+    } finally {
+      commit.mockRestore();
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('retries the next attach after a failed installation', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-retry-'));
+    try {
+      const materializer = createRuntimeProfileMaterializer();
+      let fail = true;
+      let attempts = 0;
+      const run: NonNullable<RuntimeSkillInstallOptions['run']> = async (
+        _command,
+        args,
+        options
+      ) => {
+        attempts += 1;
+        if (fail) return { exitCode: 1, stdout: '', stderr: 'install failed' };
+        const name = args[args.indexOf('--skill') + 1]!;
+        const directory = path.join(String(options?.env?.HOME), '.agents/skills', name);
+        await fs.mkdir(directory, { recursive: true });
+        await fs.writeFile(path.join(directory, 'SKILL.md'), `# ${name}`);
+        return { exitCode: 0, stdout: '', stderr: '' };
+      };
+
+      expect(
+        await captureRejection(materializer.materialize(home, skillsShProfile, { run }))
+      ).toBeDefined();
+      fail = false;
+      await materializer.materialize(home, skillsShProfile, { run });
+      expect(attempts).toBe(3);
+      expect(
+        await fs.readFile(path.join(home, '.kilocode/skills/find-skills/SKILL.md'), 'utf8')
+      ).toBe('# find-skills');
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps distinct HOME directories isolated', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-homes-'));
+    const homeA = path.join(root, 'a');
+    const homeB = path.join(root, 'b');
+    try {
+      const materializer = createRuntimeProfileMaterializer();
+      const installer = skillsInstaller();
+      await materializer.materialize(homeA, skillsShProfile, { run: installer.run });
+      await materializer.materialize(homeB, skillsShProfile, { run: installer.run });
+      expect(installer.installs()).toBe(2);
+      expect(
+        await fs.readFile(path.join(homeA, '.kilocode/skills/find-skills/SKILL.md'), 'utf8')
+      ).toBe('# find-skills');
+      expect(
+        await fs.readFile(path.join(homeB, '.kilocode/skills/find-skills/SKILL.md'), 'utf8')
+      ).toBe('# find-skills');
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects a different profile on an already configured HOME without overwriting it', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-mismatch-'));
+    try {
+      const materializer = createRuntimeProfileMaterializer();
+      await materializer.materialize(home, {
+        runtimeSkills: [{ name: 'first', rawMarkdown: 'First' }],
+      });
+      expect(
+        await captureRejection(
+          materializer.materialize(home, {
+            runtimeSkills: [{ name: 'second', rawMarkdown: 'Second' }],
+          })
+        )
+      ).toBeInstanceOf(RuntimeProfileMismatchError);
+      expect(await captureRejection(materializer.materialize(home, {}))).toBeInstanceOf(
+        RuntimeProfileMismatchError
+      );
+      expect(await fs.readFile(path.join(home, '.kilocode/skills/first/SKILL.md'), 'utf8')).toBe(
+        'First'
+      );
+      expect(existsSync(path.join(home, '.kilocode/skills/second'))).toBe(false);
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('caches an empty profile as the canonical workspace configuration', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-empty-'));
+    const staging = spyOn(fs, 'mkdtemp');
+    try {
+      const materializer = createRuntimeProfileMaterializer();
+      await materializer.materialize(home, {});
+      await materializer.materialize(home, {});
+      expect(staging).toHaveBeenCalledTimes(1);
+      expect(
+        await captureRejection(materializer.materialize(home, skillsShProfile))
+      ).toBeInstanceOf(RuntimeProfileMismatchError);
+      expect(staging).toHaveBeenCalledTimes(1);
+    } finally {
+      staging.mockRestore();
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps a completed profile cached when its waiter aborts afterwards', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-late-abort-'));
+    const controller = new AbortController();
+    try {
+      const materializer = createRuntimeProfileMaterializer();
+      const installer = skillsInstaller();
+      await materializer.materialize(home, skillsShProfile, {
+        run: installer.run,
+        signal: controller.signal,
+      });
+      controller.abort(new Error('late release'));
+      await materializer.materialize(home, skillsShProfile, { run: installer.run });
+      expect(installer.installs()).toBe(1);
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('reuses the profile for the same config after release', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-idle-same-'));
+    try {
+      const materializer = createRuntimeProfileMaterializer();
+      const installer = skillsInstaller();
+      await materializer.materialize(home, skillsShProfile, { run: installer.run });
+      materializer.release(home);
+      await materializer.materialize(home, skillsShProfile, { run: installer.run });
+      expect(installer.installs()).toBe(1);
+    } finally {
+      await fs.rm(home, { recursive: true, force: true });
+    }
+  });
+
+  it('reinstalls a changed profile after release', async () => {
+    const home = await fs.mkdtemp(path.join(os.tmpdir(), 'runtime-profile-idle-changed-'));
+    try {
+      const materializer = createRuntimeProfileMaterializer();
+      await materializer.materialize(home, {
+        runtimeSkills: [{ name: 'first', rawMarkdown: 'First' }],
+      });
+      materializer.release(home);
+      await materializer.materialize(home, {
+        runtimeSkills: [{ name: 'second', rawMarkdown: 'Second' }],
+      });
+      expect(await fs.readFile(path.join(home, '.kilocode/skills/second/SKILL.md'), 'utf8')).toBe(
+        'Second'
+      );
+      expect(existsSync(path.join(home, '.kilocode/skills/first'))).toBe(false);
     } finally {
       await fs.rm(home, { recursive: true, force: true });
     }

@@ -14,6 +14,7 @@ import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timer
 import { RUNTIME_CREDENTIAL_PROXY_AUDIENCE } from '../../../src/shared/runtime-credential-proxy-handle.js';
 import type { ControlPlaneSessionCredentialsPayload } from '../../../src/shared/control-plane-protocol.js';
 import { createWrapperKiloClient, type WrapperKiloClient } from '../kilo-api.js';
+import { WORKSPACE_MCP_SERVER_NAME } from '../control/worktree-runtime.js';
 import { createOwnedProcessScope, type OwnedProcessScope } from '../control/owned-processes.js';
 import { isKiloServerProcess } from '../tool-cgroup.js';
 import {
@@ -1403,9 +1404,11 @@ export function proxyHandleExpiry(token: string | undefined): number | undefined
 }
 
 /**
- * The MCP portion of the runtime configuration. Credential refreshes rotate the
- * Kilo alias inside `KILO_CONFIG_CONTENT`, so comparing the whole config would
- * false-positive; only `mcp` identifies the runtime's server set.
+ * The workspace-profile MCP portion of the runtime configuration. Credential
+ * refreshes rotate the Kilo alias inside `KILO_CONFIG_CONTENT`, and the
+ * workspace-owned built-in server carries a rotating workspace credential, so
+ * comparing the whole config or the raw server set would false-positive; only
+ * the workspace-profile servers identify the shared runtime's configuration.
  */
 function mcpConfigurationSignature(env: Record<string, string>): string {
   const raw = env.KILO_CONFIG_CONTENT;
@@ -1413,7 +1416,16 @@ function mcpConfigurationSignature(env: Record<string, string>): string {
   try {
     const parsed: unknown = JSON.parse(raw);
     if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) return raw;
-    return JSON.stringify((parsed as { mcp?: unknown }).mcp ?? {});
+    const mcp = (parsed as { mcp?: unknown }).mcp;
+    if (typeof mcp !== 'object' || mcp === null || Array.isArray(mcp)) {
+      return JSON.stringify(mcp ?? {});
+    }
+    const profileServers = Object.fromEntries(
+      Object.entries(mcp as Record<string, unknown>).filter(
+        ([name]) => name !== WORKSPACE_MCP_SERVER_NAME
+      )
+    );
+    return JSON.stringify(profileServers);
   } catch {
     return raw;
   }

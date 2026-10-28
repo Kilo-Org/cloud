@@ -1011,6 +1011,70 @@ describe('BYOK Router', () => {
     });
   });
 
+  describe('direct cloud providers', () => {
+    const originalTargetEnv = process.env.VERCEL_TARGET_ENV;
+
+    afterEach(() => {
+      if (originalTargetEnv === undefined) delete process.env.VERCEL_TARGET_ENV;
+      else process.env.VERCEL_TARGET_ENV = originalTargetEnv;
+    });
+
+    test('creates direct Bedrock and Vertex keys outside production', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+
+      await expect(caller.byok.experimentalByokEnabled({})).resolves.toBe(true);
+      await expect(
+        caller.byok.create({
+          provider_id: 'bedrock-byok',
+          api_key: JSON.stringify(BEDROCK_IAM_CREDENTIALS),
+        })
+      ).resolves.toMatchObject({ provider_id: 'bedrock-byok' });
+      await expect(
+        caller.byok.create({
+          organizationId: organizationA.id,
+          provider_id: 'vertex-byok',
+          api_key: JSON.stringify({
+            type: 'service_account',
+            project_id: 'example-project',
+            private_key: 'private-key',
+            client_email: 'gateway@example-project.iam.gserviceaccount.com',
+          }),
+        })
+      ).resolves.toMatchObject({ provider_id: 'vertex-byok' });
+    });
+
+    test('rejects malformed direct cloud credentials', async () => {
+      const caller = await createCallerForUser(ownerUser.id);
+
+      await expect(
+        caller.byok.create({ provider_id: 'bedrock-byok', api_key: '{"accessKeyId":"AKIA"}' })
+      ).rejects.toThrow('Invalid credentials for provider: bedrock-byok');
+      await expect(
+        caller.byok.create({ provider_id: 'vertex-byok', api_key: '{"project_id":"p"}' })
+      ).rejects.toThrow('Invalid credentials for provider: vertex-byok');
+    });
+
+    test('rejects direct cloud keys in production outside the Kilo organization', async () => {
+      process.env.VERCEL_TARGET_ENV = 'production';
+      const caller = await createCallerForUser(ownerUser.id);
+
+      await expect(caller.byok.experimentalByokEnabled({})).resolves.toBe(false);
+      await expect(
+        caller.byok.experimentalByokEnabled({ organizationId: organizationA.id })
+      ).resolves.toBe(false);
+      await expect(
+        caller.byok.create({
+          organizationId: organizationA.id,
+          provider_id: 'bedrock-byok',
+          api_key: JSON.stringify(BEDROCK_IAM_CREDENTIALS),
+        })
+      ).rejects.toThrow('Provider bedrock-byok is not available yet.');
+      await expect(
+        caller.byok.create({ provider_id: 'nvidia-byok', api_key: 'nvidia-key' })
+      ).resolves.toMatchObject({ provider_id: 'nvidia-byok' });
+    });
+  });
+
   describe('deprecated codestral provider', () => {
     test('declines to test a legacy codestral key with a deprecation message', async () => {
       const caller = await createCallerForUser(ownerUser.id);

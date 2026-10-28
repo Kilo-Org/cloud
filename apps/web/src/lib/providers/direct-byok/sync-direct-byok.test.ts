@@ -447,6 +447,8 @@ describe('syncDirectByokModels database snapshots', () => {
           'opencode-go': { models: openCodeGoModels },
           'xiaomi-token-plan-ams': { models: {} },
           'xiaomi-token-plan-sgp': { models: {} },
+          'amazon-bedrock': { models: {} },
+          'google-vertex': { models: {} },
         });
       }
       if (input === 'https://integrate.api.nvidia.com/v1/models') {

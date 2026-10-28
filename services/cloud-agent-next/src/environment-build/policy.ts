@@ -70,17 +70,16 @@ export type PublishedSnapshot = z.infer<typeof publishedSnapshotSchema>;
 export type SnapshotCompatibility = {
   baseImage: string | null;
   runtimeAbi: string;
-  runtimeMode: 'preinstalled' | 'downloaded';
 };
 
-/** Whether `published` can start under `current` (plan "Session launch"). */
+/** Only split-image snapshots with a downloaded runtime can serve sessions. */
 export function compatibleWith(
   published: PublishedSnapshot,
   current: SnapshotCompatibility
 ): boolean {
   return (
     published.runtimeAbi === current.runtimeAbi &&
-    (current.runtimeMode === 'downloaded' || published.runtimeRelease === null) &&
+    published.runtimeRelease !== null &&
     (current.baseImage === null || published.baseImage === current.baseImage)
   );
 }

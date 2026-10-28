@@ -1,23 +1,27 @@
 import * as z from 'zod';
-import {
-  type DirectByokModel,
-  type DirectByokModelFlag,
-  type DirectByokProvider,
+import type {
+  DirectByokModel,
+  DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
 import DIRECT_BYOK_PROVIDERS from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-definitions';
 import type { DirectUserByokInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { direct_byok_model_lists } from '@kilocode/db/schema';
-import { ReasoningOptionSchema, type ReasoningOption } from '@kilocode/db/schema-types';
-import { toLegacyVariants } from '@kilocode/web-shared/lib/ai-gateway/providers/legacy-variants';
+import {
+  ModalitySchema,
+  ModelsDevProviderSchema,
+  isUsableModelsDevModel,
+  shortenDisplayName,
+  toRawModel,
+  type ModelsDevProvider,
+  type RawModel,
+} from './models-dev';
+import { parseAwsBedrockModelsDevModels } from './bedrock-models';
+import { parseGcpVertexModelsDevModels } from './vertex-models';
 import { recordSyncCompleted } from '@/lib/providers/openrouter/sync-providers-stale-alert';
 
 const DEFAULT_CONTENT_LENGTH = 200_000;
 const DEFAULT_MAX_COMPLETION_TOKENS = 32_000;
-
-const ModalitySchema = z
-  .enum(['text', 'image', 'video', 'pdf', 'audio', 'unknown'])
-  .catch('unknown');
 
 const OpenAICompatibleModelsResponseSchema = z.object({
   data: z.array(
@@ -33,31 +37,6 @@ const OpenAICompatibleModelsResponseSchema = z.object({
   ),
 });
 
-const ModelsDevModelSchema = z.object({
-  id: z.string(),
-  name: z.string().optional(),
-  reasoning: z.boolean().optional(),
-  reasoning_options: z.array(ReasoningOptionSchema).optional().catch(undefined),
-  status: z.enum(['alpha', 'beta', 'deprecated']).optional().catch(undefined),
-  limit: z
-    .object({
-      context: z.number().optional(),
-      output: z.number().optional(),
-    })
-    .optional(),
-  modalities: z
-    .object({
-      input: z.array(ModalitySchema).optional(),
-      output: z.array(ModalitySchema).optional(),
-    })
-    .optional(),
-  tool_call: z.boolean().optional(),
-  provider: z.object({ npm: z.string().optional() }).optional().catch(undefined),
-  canonical_model_id: z.string().optional().catch(undefined),
-});
-
-type ModelsDevModel = z.infer<typeof ModelsDevModelSchema>;
-
 // A models.dev per-model `provider.npm` names the SDK for the model's own endpoint. Several SDK
 // names, such as `@ai-sdk/mistral`, still speak Chat Completions, so only SDKs for the native
 // Gemini API, which the gateway cannot proxy, are excluded.
@@ -66,25 +45,11 @@ const GEMINI_API_MODELS_DEV_SDKS: ReadonlySet<string> = new Set([
   '@ai-sdk/google-vertex',
 ]);
 
-const ModelsDevProviderSchema = z.object({
-  models: z.record(z.string(), ModelsDevModelSchema),
-});
-
 const ModelsDevCatalogSchema = z.record(z.string(), z.unknown());
 
 type ModelsDevCatalog = z.infer<typeof ModelsDevCatalogSchema>;
 
 const MODELS_DEV_OPENROUTER_ID = 'openrouter';
-
-type RawModel = {
-  id: string;
-  name?: string;
-  context_length?: number;
-  max_completion_tokens?: number;
-  input_modalities?: ReadonlyArray<z.infer<typeof ModalitySchema>>;
-  flags?: ReadonlyArray<DirectByokModelFlag>;
-  reasoning_options?: ReasoningOption[];
-};
 
 type SyncContext = {
   getModelsDevCatalog(): Promise<ModelsDevCatalog>;
@@ -95,14 +60,6 @@ type ProviderFetcher = {
   providerId: DirectUserByokInferenceProviderId;
   fetch(ctx: SyncContext): Promise<RawModel[]>;
 };
-
-function shortenDisplayName(id: string): string;
-function shortenDisplayName(id: string | undefined): string | undefined;
-function shortenDisplayName(id: string | undefined) {
-  if (!id) return undefined;
-  const slash = id.lastIndexOf('/');
-  return slash >= 0 ? id.slice(slash + 1).trim() : id;
-}
 
 function openAICompatibleFetcher(options: {
   providerId: DirectUserByokInferenceProviderId;
@@ -135,35 +92,6 @@ export function parseOpenAICompatibleProviderModels(entry: unknown): RawModel[] 
       input_modalities: model.input_modalities,
       flags: ['reasoning'],
     }));
-}
-
-// models.dev `[]` and effort values the gateway cannot send are treated as unknown, so that
-// reasoning models fall back to the model-name defaults when served.
-function supportedReasoningOptions(
-  options: ReasoningOption[] | undefined
-): ReasoningOption[] | undefined {
-  return options?.length && toLegacyVariants(options, undefined) ? options : undefined;
-}
-
-function isUsableModelsDevModel(model: ModelsDevModel) {
-  return (
-    model.status !== 'deprecated' &&
-    (!model.modalities?.output || model.modalities.output.includes('text')) &&
-    model.tool_call !== false &&
-    (!model.modalities?.input || model.modalities.input.includes('text'))
-  );
-}
-
-function toRawModel(model: ModelsDevModel): RawModel {
-  return {
-    id: model.id,
-    name: shortenDisplayName(model.name),
-    context_length: model.limit?.context,
-    max_completion_tokens: model.limit?.output,
-    input_modalities: model.modalities?.input,
-    flags: model.reasoning ? ['reasoning'] : undefined,
-    reasoning_options: supportedReasoningOptions(model.reasoning_options),
-  };
 }
 
 export function parseModelsDevProviderModels(
@@ -247,6 +175,20 @@ function getModelsDevEntry(
   return entry;
 }
 
+/** Parses a provider's models.dev entry with a provider-specific selection. */
+function customModelsDevFetcher(
+  providerId: DirectUserByokInferenceProviderId,
+  parse: (provider: ModelsDevProvider) => RawModel[]
+): ProviderFetcher {
+  return {
+    providerId,
+    async fetch(ctx) {
+      const entry = getModelsDevEntry(providerId, await ctx.getModelsDevCatalog());
+      return parse(ModelsDevProviderSchema.parse(entry));
+    },
+  };
+}
+
 function modelsDevFetcher(
   providerId: DirectUserByokInferenceProviderId,
   availableModelsUrl?: string
@@ -328,6 +270,8 @@ const FETCHERS: ReadonlyArray<ProviderFetcher> = [
   modelsDevFetcher('opencode-go', 'https://opencode.ai/zen/go/v1/models'),
   modelsDevFetcher('xiaomi-token-plan-ams'),
   modelsDevFetcher('xiaomi-token-plan-sgp'),
+  customModelsDevFetcher('bedrock-byok', parseAwsBedrockModelsDevModels),
+  customModelsDevFetcher('vertex-byok', parseGcpVertexModelsDevModels),
 ];
 
 async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise<number> {
@@ -354,6 +298,7 @@ async function syncProvider(fetcher: ProviderFetcher, ctx: SyncContext): Promise
       max_completion_tokens,
       reasoning_options: raw.reasoning_options,
       catalog_model_id: catalogModelIds.get(raw.id),
+      ...(raw.endpoint && { endpoint: raw.endpoint }),
     });
   }
 

@@ -44,7 +44,10 @@ function createRegistration(intervalMs: number): TickerRegistration {
       subscribe: listener => {
         listeners.add(listener);
         if (listeners.size === 1) {
-          now = Date.now();
+          // `now` is not re-stamped here. The ticker was created inside the
+          // render that read `getSnapshot`, so moving the value between that
+          // render and this subscription is a change React never saw: it would
+          // tear the store and force a second commit on every first mount.
           timer = setInterval(() => {
             now = Date.now();
             for (const current of listeners) {

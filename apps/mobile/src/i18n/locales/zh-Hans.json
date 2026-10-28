@@ -973,6 +973,8 @@
       "gateNone": "无",
       "noFindings": "未发现问题",
       "findingsUnavailable": "由于本次审查失败，结果不可用。",
+      "findingsInProgress": "本次审查仍在进行中，完成后问题将显示在这里。",
+      "findingsEndedWithoutResults": "本次审查提前结束，未产生任何问题。",
       "serviceUnavailable": "无法连接到代码审查服务。请在服务可用时重试审查。",
       "reviewFailed": "审查失败。请重试。",
       "retryMessage": "这将重新执行代码审查。",

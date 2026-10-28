@@ -14,6 +14,7 @@ import {
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import { statusMeta } from '@/components/code-reviewer/review-list-screen';
 import {
+  findingsEmptyCopyKey,
   flattenCouncilFindings,
   reviewCancellationLabel,
   reviewFailureLabel,
@@ -40,6 +41,7 @@ import { reviewerPlatformLabel } from '@/lib/code-reviewer-config';
 import { openExternalUrl } from '@/lib/external-link';
 import { formatMoney, formatNumber } from '@/lib/format';
 import { isPersonal, useReviewConfig } from '@/lib/hooks/use-code-reviewer';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useCancelReview, useRetriggerReview, useReviewDetail } from '@/lib/hooks/use-code-reviews';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -65,6 +67,10 @@ export function ReviewDetailScreen({
   const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
+  // One shared minute clock for every relative label on the screen, so the
+  // timestamps stay current while the review is polled and a row here reads the
+  // same age as the same review's row in the list.
+  const now = useRelativeTimeNow();
   const { data, isLoading, isError, isFetching, error, refetch } = useReviewDetail(reviewId);
   const cancelReview = useCancelReview(scope);
   const retriggerReview = useRetriggerReview(scope);
@@ -250,11 +256,7 @@ export function ReviewDetailScreen({
           <Text className="text-sm font-medium">{t('common.findings')}</Text>
           {visibleFindings.length === 0 ? (
             <Text variant="muted" className="text-xs">
-              {t(
-                review.status === 'failed'
-                  ? 'codeReviewer.reviewDetail.findingsUnavailable'
-                  : 'codeReviewer.reviewDetail.noFindings'
-              )}
+              {t(findingsEmptyCopyKey(review.status))}
             </Text>
           ) : (
             <View className="gap-2">
@@ -295,12 +297,12 @@ export function ReviewDetailScreen({
             {review.model ? <MetaRow label={t('common.model')} value={review.model} /> : null}
             <MetaRow
               label={t('codeReviewer.reviewDetail.created')}
-              value={timeAgo(parseTimestamp(review.created_at))}
+              value={timeAgo(parseTimestamp(review.created_at), undefined, now)}
             />
             {review.started_at ? (
               <MetaRow
                 label={t('codeReviewer.reviewDetail.started')}
-                value={timeAgo(parseTimestamp(review.started_at))}
+                value={timeAgo(parseTimestamp(review.started_at), undefined, now)}
               />
             ) : null}
             {review.completed_at ? (
@@ -310,7 +312,7 @@ export function ReviewDetailScreen({
                     ? 'common.completed'
                     : 'codeReviewer.reviewDetail.reviewEnded'
                 )}
-                value={timeAgo(parseTimestamp(review.completed_at))}
+                value={timeAgo(parseTimestamp(review.completed_at), undefined, now)}
               />
             ) : null}
             {review.total_cost_musd != null && review.total_cost_musd > 0 ? (

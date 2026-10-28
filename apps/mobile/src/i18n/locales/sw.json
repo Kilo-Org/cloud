@@ -1445,6 +1445,8 @@
       "byline": "{{repo}} #{{number}} na {{author}}",
       "noFindings": "Hakuna matatizo yaliyopatikana.",
       "findingsUnavailable": "Matokeo hayapatikani kwa sababu ukaguzi huu umeshindikana.",
+      "findingsInProgress": "Ukaguzi huu bado unaendelea. Matokeo yataonekana hapa ukaguzi ukikamilika.",
+      "findingsEndedWithoutResults": "Ukaguzi huu uliisha kabla ya kutoa matokeo yoyote.",
       "serviceUnavailable": "Imeshindikana kuunganishwa na huduma ya ukaguzi wa msimbo. Jaribu ukaguzi tena huduma itakapopatikana.",
       "reviewFailed": "Ukaguzi umeshindikana. Tafadhali jaribu tena.",
       "showMore": "Onyesha zaidi",

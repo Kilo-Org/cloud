@@ -1489,6 +1489,8 @@
       "byline": "{{repo}} #{{number}} · Autorius: {{author}}",
       "noFindings": "Radinių nerasta.",
       "findingsUnavailable": "Rezultatai nepasiekiami, nes ši peržiūra nepavyko.",
+      "findingsInProgress": "Ši peržiūra vis dar vyksta. Radiniai čia atsiras jai pasibaigus.",
+      "findingsEndedWithoutResults": "Ši peržiūra baigėsi, nespėjusi pateikti jokių radinių.",
       "serviceUnavailable": "Nepavyko prisijungti prie kodo peržiūros paslaugos. Pakartokite peržiūrą, kai paslauga bus pasiekiama.",
       "reviewFailed": "Peržiūra nepavyko. Bandykite dar kartą.",
       "showMore": "Rodyti daugiau",

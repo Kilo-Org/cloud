@@ -973,6 +973,8 @@
       "gateNone": "Geen",
       "noFindings": "Er zijn geen bevindingen.",
       "findingsUnavailable": "De resultaten zijn niet beschikbaar omdat deze review is mislukt.",
+      "findingsInProgress": "Deze review is nog niet afgerond. De bevindingen verschijnen hier zodra hij klaar is.",
+      "findingsEndedWithoutResults": "Deze review is beëindigd voordat er bevindingen waren.",
       "serviceUnavailable": "De codereviewservice kon niet worden bereikt. Probeer de review opnieuw wanneer de service beschikbaar is.",
       "reviewFailed": "De review is mislukt. Probeer het opnieuw.",
       "retryMessage": "Dit voert de codereview opnieuw uit.",

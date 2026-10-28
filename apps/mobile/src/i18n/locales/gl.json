@@ -1445,6 +1445,8 @@
       "byline": "{{repo}} #{{number}} por {{author}}",
       "noFindings": "Non hai achados.",
       "findingsUnavailable": "Os resultados non están dispoñibles porque esta revisión fallou.",
+      "findingsInProgress": "Esta revisión segue en curso. Os achados aparecerán aquí cando remate.",
+      "findingsEndedWithoutResults": "Esta revisión rematou antes de producir ningún achado.",
       "serviceUnavailable": "Non se puido conectar co servizo de revisión de código. Tenta de novo a revisión cando o servizo estea dispoñible.",
       "reviewFailed": "A revisión fallou. Téntao de novo, por favor.",
       "showMore": "Amosar máis",

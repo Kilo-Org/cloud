@@ -944,6 +944,8 @@
       "gateNone": "Aucun",
       "noFindings": "Aucun signalement.",
       "findingsUnavailable": "Les résultats ne sont pas disponibles, car cette revue a échoué.",
+      "findingsInProgress": "Cette revue est toujours en cours. Les signalements apparaîtront ici une fois qu'elle sera terminée.",
+      "findingsEndedWithoutResults": "Cette revue s'est terminée avant de produire le moindre signalement.",
       "serviceUnavailable": "Impossible de joindre le service de revue de code. Relancez la revue lorsque le service sera disponible.",
       "reviewFailed": "La revue a échoué. Veuillez réessayer.",
       "retryMessage": "Cela relancera la revue de code.",

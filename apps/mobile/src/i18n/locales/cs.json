@@ -1489,6 +1489,8 @@
       "byline": "{{repo}} #{{number}} · autor: {{author}}",
       "noFindings": "Kontrola neodhalila žádné nálezy.",
       "findingsUnavailable": "Výsledky nejsou k dispozici, protože tato kontrola selhala.",
+      "findingsInProgress": "Tato kontrola stále probíhá. Nálezy se zde zobrazí po jejím dokončení.",
+      "findingsEndedWithoutResults": "Tato kontrola skončila dříve, než mohla vyprodukovat jakékoli nálezy.",
       "serviceUnavailable": "Nepodařilo se připojit ke službě kontroly kódu. Zopakujte kontrolu, až bude služba dostupná.",
       "reviewFailed": "Kontrola selhala. Zkuste to prosím znovu.",
       "showMore": "Zobrazit více",

@@ -1,11 +1,14 @@
 /* eslint-disable max-lines -- cohesive mounted suite for the code-reviewer surface states */
 import { createElement, type ReactElement, type ReactNode } from 'react';
+import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import '@/i18n';
 import ReposRoute from '@/app/(app)/code-reviewer/[scope]/[platform]/(edit)/repos';
 import { type ReviewerPlatform, type ReviewerScopePlatform } from '@/lib/code-reviewer-config';
 import { ReviewerRouteParamsProvider } from '@/lib/hooks/use-reviewer-route-params';
+import { resetNowTickersForTests } from '@/lib/hooks/now-ticker-store';
+import { parseTimestamp, timeAgo } from '@/lib/utils';
 import { ReviewListScreen } from './review-list-screen';
 import { renderWithProviders, type RenderWithProvidersResult } from '@/test/render-with-providers';
 
@@ -86,7 +89,27 @@ vi.mock('react-native-safe-area-context', () => ({
     right: state.insets.right,
   }),
 }));
-vi.mock('@shopify/flash-list', () => ({ FlashList: 'FlashList' }));
+// The real list renders its rows; the stub keeps that, wrapping each one in a
+// host node the suite can read, while the `FlashList` props stay inspectable for
+// the list-contract assertions.
+vi.mock('@shopify/flash-list', async () => {
+  // `vi.mock` factories run before the file's imports bind, so React is loaded
+  // here rather than from the top-level import.
+  const { createElement: create } = await import('react');
+  return {
+    FlashList: (props: {
+      data?: unknown[];
+      renderItem: (info: { item: never; index: number }) => ReactNode;
+    }) =>
+      create(
+        'FlashList',
+        props,
+        (props.data ?? []).map((item, index) =>
+          create('ReviewRow', { key: index }, props.renderItem({ item: item as never, index }))
+        )
+      ),
+  };
+});
 vi.mock('react-native-reanimated', () => ({
   default: { View: 'Animated.View' },
   FadeOut: { duration: vi.fn() },
@@ -212,6 +235,44 @@ function reposRoute() {
 
 function firstList(renderer: Awaited<ReturnType<typeof renderWithProviders>>['renderer']) {
   return renderer.root.find(node => String(node.type) === 'FlashList');
+}
+
+/** Every string a React element tree renders, in order. */
+function elementTexts(node: unknown): string[] {
+  if (node == null || typeof node === 'boolean') {
+    return [];
+  }
+  if (typeof node === 'string' || typeof node === 'number') {
+    return [String(node)];
+  }
+  if (Array.isArray(node)) {
+    return node.flatMap(child => elementTexts(child));
+  }
+  if (typeof node === 'object' && 'props' in node) {
+    const props = node.props;
+    if (typeof props === 'object' && props !== null && 'children' in props) {
+      return elementTexts(props.children);
+    }
+  }
+  return [];
+}
+
+/**
+ * The relative time the first row paints, read from the row the list rendered.
+ * Nothing here rebuilds the row: a row element is created inside the screen's
+ * own render, so re-reading the tree is exactly what a person sees when the
+ * data behind the list has not changed.
+ */
+function firstRowAge(renderer: Awaited<ReturnType<typeof renderWithProviders>>['renderer']) {
+  const row = renderer.root.findAll(node => String(node.type) === 'ReviewRow')[0];
+  if (row === undefined) {
+    throw new Error('The list rendered no review row.');
+  }
+  const age = elementTexts(row.props.children).at(-1);
+  if (age === undefined) {
+    throw new Error('The review row rendered no relative time.');
+  }
+  return age;
 }
 
 /** The GitHub empty state's action button, typed enough for oxlint. */
@@ -502,5 +563,55 @@ describe('Recent review bodies', () => {
     onRetry();
     expect(state.reviews.fetchNextPage).toHaveBeenCalledTimes(1);
     footerRender.unmount();
+  });
+
+  it('advances a row relative time without new data, from the shared clock', async () => {
+    // The page-one probe keeps refetching while a review is in flight, and its
+    // rows come back unchanged, so the row element is never rebuilt with a new
+    // label. The relative time must therefore follow the clock by itself.
+    vi.useFakeTimers();
+    resetNowTickersForTests();
+    try {
+      vi.setSystemTime(new Date('2026-09-01T00:36:00.000Z').getTime());
+      const startedAt = '2026-09-01T00:18:00.000Z';
+      state.reviews.data = {
+        pages: [
+          {
+            success: true,
+            reviews: [
+              {
+                ...review('running'),
+                status: 'running',
+                created_at: '2026-09-01T00:16:00.000Z',
+                started_at: startedAt,
+                completed_at: null,
+              },
+            ],
+          },
+        ],
+        pageParams: [0],
+      };
+      const { renderer, unmount } = await renderWithProviders(
+        createElement(ReviewListScreen, { scope: 'personal' })
+      );
+
+      expect(firstRowAge(renderer)).toBe('18 minutes ago');
+      expect(firstRowAge(renderer)).toBe(timeAgo(parseTimestamp(startedAt)));
+
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(60_000);
+      });
+
+      // Same row object, same rendered tree shape: only the clock moved.
+      expect(firstRowAge(renderer)).toBe('19 minutes ago');
+      expect(firstRowAge(renderer)).toBe(timeAgo(parseTimestamp(startedAt)));
+
+      act(() => {
+        unmount();
+      });
+    } finally {
+      resetNowTickersForTests();
+      vi.useRealTimers();
+    }
   });
 });

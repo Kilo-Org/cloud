@@ -1445,6 +1445,8 @@
       "byline": "{{repo}} #{{number}}, autor {{author}}",
       "noFindings": "Leide ei leitud.",
       "findingsUnavailable": "Tulemused pole saadaval, sest see ülevaatus ebaõnnestus.",
+      "findingsInProgress": "See ülevaatus on veel käimas. Leiud ilmuvad siia, kui see lõpeb.",
+      "findingsEndedWithoutResults": "See ülevaatus lõppes, enne kui ilmus ühtegi leidu.",
       "serviceUnavailable": "Koodi ülevaatuse teenusega ei õnnestunud ühendust luua. Proovi ülevaatust uuesti, kui teenus on saadaval.",
       "reviewFailed": "Ülevaatus ebaõnnestus. Palun proovi uuesti.",
       "showMore": "Kuva rohkem",

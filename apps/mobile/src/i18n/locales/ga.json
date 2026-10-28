@@ -1511,6 +1511,8 @@
       "byline": "{{repo}} #{{number}} le {{author}}",
       "noFindings": "Níor aimsíodh aon toradh.",
       "findingsUnavailable": "Níl na torthaí ar fáil mar gur theip ar an athbhreithniú seo.",
+      "findingsInProgress": "Tá an athbhreithniú seo ar siúl fós. Tiocfaidh na torthaí le feiceáil anseo nuair a bheidh sé críochnaithe.",
+      "findingsEndedWithoutResults": "Críochnaíodh an athbhreithniú seo sular ndearnadh aon torthaí.",
       "serviceUnavailable": "Níorbh fhéidir ceangal leis an tseirbhís athbhreithnithe cóid. Bain triail as an athbhreithniú arís nuair a bheidh an tseirbhís ar fáil.",
       "reviewFailed": "Theip ar an athbhreithniú. Bain triail eile as, le do thoil.",
       "showMore": "Taispeáin níos mó",

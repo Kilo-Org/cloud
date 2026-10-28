@@ -1489,6 +1489,8 @@
       "byline": "{{repo}} #{{number}} · Avtor: {{author}}",
       "noFindings": "Ni ugotovitev.",
       "findingsUnavailable": "Rezultati niso na voljo, ker ta pregled ni uspel.",
+      "findingsInProgress": "Ta pregled je še v teku. Ugotovitve se prikažejo tukaj, ko se zaključi.",
+      "findingsEndedWithoutResults": "Ta pregled se je končal, preden je prinesel kakršne koli ugotovitve.",
       "serviceUnavailable": "Povezave s storitvijo za pregled kode ni bilo mogoče vzpostaviti. Znova zaženi pregled, ko bo storitev na voljo.",
       "reviewFailed": "Pregled ni uspel. Poskusi znova.",
       "showMore": "Prikaži več",

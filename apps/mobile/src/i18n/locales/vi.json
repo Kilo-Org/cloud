@@ -973,6 +973,8 @@
       "gateNone": "Không có",
       "noFindings": "Không phát hiện vấn đề nào.",
       "findingsUnavailable": "Không có kết quả vì phiên rà soát này đã thất bại.",
+      "findingsInProgress": "Phiên rà soát này vẫn đang được thực hiện. Kết quả sẽ xuất hiện ở đây khi phiên rà soát hoàn tất.",
+      "findingsEndedWithoutResults": "Phiên rà soát này đã kết thúc trước khi phát hiện bất kỳ vấn đề nào.",
       "serviceUnavailable": "Không thể kết nối với dịch vụ rà soát mã. Hãy rà soát lại khi dịch vụ khả dụng.",
       "reviewFailed": "Phiên rà soát đã thất bại. Vui lòng thử lại.",
       "retryMessage": "Thao tác này sẽ chạy lại lượt rà soát mã.",

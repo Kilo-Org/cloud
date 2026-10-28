@@ -43,6 +43,7 @@ import {
 } from '@/lib/hooks/use-security-dismiss-draft';
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
@@ -193,12 +194,13 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const metrics = data ? buildLocalizedMetrics(data, slaEnabled) : [];
 
   const lastSyncTime = lastSync.data?.lastSyncTime;
+  const now = useRelativeTimeNow();
   let lastSyncLabel = t('securityAgent.dashboard.notYetSynced');
   if (lastSync.isError) {
     lastSyncLabel = t('securityAgent.dashboard.syncStatusUnavailable');
   } else if (lastSyncTime) {
     lastSyncLabel = t('securityAgent.dashboard.lastSynced', {
-      time: timeAgo(parseTimestamp(lastSyncTime)),
+      time: timeAgo(parseTimestamp(lastSyncTime), undefined, now),
     });
   }
 

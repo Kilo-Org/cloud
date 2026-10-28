@@ -21,6 +21,7 @@ import { KvRow } from '@/components/ui/kv-row';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { getSecurityAgentPath, type SecurityFinding } from '@/lib/security-agent';
 import { openFindingLink } from '@/lib/security-agent-link';
 import { cn, firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';
@@ -121,6 +122,7 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
   const router = useRouter();
   const { t } = useTranslation();
   const colors = useThemeColors();
+  const now = useRelativeTimeNow();
   const severity = getFindingSeverityPresentation(finding.severity);
   const status = getFindingLifecycleStatusPresentation(finding);
   const deadline = getSecurityDeadlinePresentation(finding);
@@ -218,17 +220,17 @@ export function FindingDetailsPanel({ finding, scope }: Readonly<FindingDetailsP
       <View className="rounded-lg bg-secondary px-3">
         <KvRow
           label={t('securityAgent.findingDetails.detected')}
-          value={timeAgo(parseTimestamp(finding.first_detected_at))}
+          value={timeAgo(parseTimestamp(finding.first_detected_at), undefined, now)}
         />
         <KvRow
           label={t('common.updated')}
-          value={timeAgo(parseTimestamp(finding.updated_at))}
+          value={timeAgo(parseTimestamp(finding.updated_at), undefined, now)}
           last={!finding.fixed_at && !finding.sla_due_at}
         />
         {finding.fixed_at ? (
           <KvRow
             label={t('securityAgent.filter.fixed')}
-            value={timeAgo(parseTimestamp(finding.fixed_at))}
+            value={timeAgo(parseTimestamp(finding.fixed_at), undefined, now)}
             last={!finding.sla_due_at}
           />
         ) : null}

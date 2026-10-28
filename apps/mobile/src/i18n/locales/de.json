@@ -973,6 +973,8 @@
       "gateNone": "Ohne",
       "noFindings": "Es liegen keine Befunde vor.",
       "findingsUnavailable": "Die Ergebnisse sind nicht verfügbar, weil dieses Review fehlgeschlagen ist.",
+      "findingsInProgress": "Dieses Review läuft noch. Befunde erscheinen hier, sobald es abgeschlossen ist.",
+      "findingsEndedWithoutResults": "Dieses Review wurde beendet, bevor Befunde entstanden sind.",
       "serviceUnavailable": "Der Code-Review-Dienst konnte nicht erreicht werden. Führe das Review erneut aus, wenn der Dienst verfügbar ist.",
       "reviewFailed": "Das Review ist fehlgeschlagen. Bitte versuche es erneut.",
       "retryMessage": "Das Code-Review wird erneut ausgeführt.",

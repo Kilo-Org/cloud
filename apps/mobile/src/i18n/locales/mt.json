@@ -1511,6 +1511,8 @@
       "byline": "{{repo}} #{{number}} minn {{author}}",
       "noFindings": "M'hemm l-ebda sejba.",
       "findingsUnavailable": "Ir-riżultati mhumiex disponibbli għax din ir-reviżjoni falliet.",
+      "findingsInProgress": "Din ir-reviżjoni għadha għaddejja. Is-sejbiet jidhru hawn meta tispiċċa.",
+      "findingsEndedWithoutResults": "Din ir-reviżjoni spiċċat qabel ma pproduċiet l-ebda sejbiet.",
       "serviceUnavailable": "Ma setax isir kuntatt mas-servizz tar-reviżjoni tal-kodiċi. Erġa' pprova r-reviżjoni meta s-servizz ikun disponibbli.",
       "reviewFailed": "Ir-reviżjoni falliet. Jekk jogħġbok, erġa' pprova.",
       "showMore": "Uri aktar",

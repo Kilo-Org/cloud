@@ -979,6 +979,8 @@
       "gateNone": "Brak",
       "noFindings": "Nie wykryto problemów.",
       "findingsUnavailable": "Wyniki są niedostępne, ponieważ ten przegląd się nie powiódł.",
+      "findingsInProgress": "Ten przegląd jest jeszcze w toku. Wyniki pojawią się tutaj po jego zakończeniu.",
+      "findingsEndedWithoutResults": "Ten przegląd zakończył się przedwcześnie, nie generując żadnych wyników.",
       "serviceUnavailable": "Nie udało się połączyć z usługą przeglądu kodu. Ponów przegląd, gdy usługa będzie dostępna.",
       "reviewFailed": "Przegląd się nie powiódł. Spróbuj ponownie.",
       "retryMessage": "Spowoduje to ponowne uruchomienie przeglądu kodu.",

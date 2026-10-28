@@ -973,6 +973,8 @@
       "gateNone": "無",
       "noFindings": "未發現問題。",
       "findingsUnavailable": "由於此次審查失敗，無法取得結果。",
+      "findingsInProgress": "此審查仍在進行中。完成後，發現的問題會顯示在這裡。",
+      "findingsEndedWithoutResults": "此審查在發現任何問題前即已結束。",
       "serviceUnavailable": "無法連線至程式碼審查服務。請在服務可用時重新嘗試審查。",
       "reviewFailed": "審查失敗。請再試一次。",
       "retryMessage": "這會重新執行程式碼審查。",

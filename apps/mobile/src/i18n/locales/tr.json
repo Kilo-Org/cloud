@@ -973,6 +973,8 @@
       "gateNone": "Yok",
       "noFindings": "Bulgu yok.",
       "findingsUnavailable": "Bu inceleme başarısız olduğu için sonuçlar kullanılamıyor.",
+      "findingsInProgress": "Bu inceleme hâlâ sürüyor. İnceleme tamamlandığında bulgular burada görünür.",
+      "findingsEndedWithoutResults": "Bu inceleme, herhangi bir bulgu üretmeden sona erdi.",
       "serviceUnavailable": "Kod inceleme hizmetine ulaşılamadı. Hizmet kullanılabilir olduğunda incelemeyi tekrar dene.",
       "reviewFailed": "İnceleme başarısız oldu. Lütfen tekrar dene.",
       "retryMessage": "Kod incelemesi yeniden çalıştırılacak.",

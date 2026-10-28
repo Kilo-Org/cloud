@@ -1445,6 +1445,8 @@
       "byline": "{{repo}} #{{number}} kan {{author}}",
       "noFindings": "Argamni hin jiru.",
       "findingsUnavailable": "Sakatta'i kun waan hin milkoofneef bu'aawwan hin argaman.",
+      "findingsInProgress": "Sakatta'i kun hojjetaa jira. Yeroo xumuru argamni asitti mul'ata.",
+      "findingsEndedWithoutResults": "Sakatta'i kun argamni tokkolleen hin uumamin dura dhaateera.",
       "serviceUnavailable": "Tajaajila sakatta'a koodii qunnamuun hin danda'amne. Yeroo tajaajilichi argamutti sakatta'a irra deebi'ii yaali.",
       "reviewFailed": "Sakatta'i hin milkoofne. Maaloo irra deebi'ii yaali.",
       "showMore": "Dabalataa agarsiisi",

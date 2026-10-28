@@ -47,6 +47,7 @@ import {
   type ReviewReactionContent,
   selectCommentAuthorName,
 } from '@/lib/pr-review/discussion/review-discussion-types';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { Pressable, View } from 'react-native';
@@ -96,7 +97,8 @@ export function CommentRow({
 }: Readonly<CommentRowProps>) {
   const authorName = selectCommentAuthorName(comment.author);
   const timestamp = parseTimestamp(comment.createdAt);
-  const relative = timeAgo(timestamp);
+  const now = useRelativeTimeNow();
+  const relative = timeAgo(timestamp, undefined, now);
   const colors = useThemeColors();
   const { t } = useTranslation();
   const themedSheet = useThemedActionSheetOptions();

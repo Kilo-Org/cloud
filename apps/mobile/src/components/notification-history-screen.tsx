@@ -27,7 +27,7 @@ import {
 } from '@/lib/notification-history';
 import { useNotificationMasterGate } from '@/lib/hooks/use-notification-master-gate';
 import { type HistoryRow, HistoryRowView } from '@/components/notification-history-row';
-import { useNowTicker } from '@/lib/hooks/use-now-ticker';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
@@ -39,8 +39,6 @@ import { useTRPC } from '@/lib/trpc';
 
 /** Rows requested per page; the server defaults to the same 30. */
 const PAGE_SIZE = 30;
-/** How often a row's relative time is re-read while the screen stays open. */
-const RELATIVE_TIME_TICK_MS = 60_000;
 
 /** Retained pages; the bound refuses the next page rather than dropping the newest. */
 const MAX_PAGES = 10;
@@ -85,7 +83,7 @@ export function NotificationHistoryScreen() {
   const { t } = useTranslation();
   const { token: authToken } = useAuth();
   const gate = useNotificationMasterGate();
-  const now = useNowTicker(RELATIVE_TIME_TICK_MS);
+  const now = useRelativeTimeNow();
   const queryClient = useQueryClient();
   const paddingBottom = useTabBarBottomPadding();
   const [category, setCategory] = useState<NotificationHistoryFilter['category']>(null);

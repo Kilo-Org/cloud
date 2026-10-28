@@ -8,8 +8,10 @@ import {
   isKiloExclusiveModel,
 } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import {
+  byokOwner,
   getBYOKforOrganization,
   getBYOKforUser,
+  getByokCredentials,
   getModelUserByokProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type { User } from '@kilocode/db/schema';
@@ -76,15 +78,15 @@ async function checkDirectBYOK(
   if (!directByok || !directByokModel) {
     return null;
   }
-  const userByok = organizationId
-    ? await getBYOKforOrganization(readDb, organizationId, [directByok.id])
-    : await getBYOKforUser(readDb, user.id, [directByok.id]);
-  if (!userByok || userByok.length === 0) {
+  const [credential] = await getByokCredentials(readDb, byokOwner(user.id, organizationId), [
+    directByok.id,
+  ]);
+  if (!credential) {
     return null;
   }
 
   const upstream = await directByok.resolveUpstream({
-    credential: userByok[0].decryptedAPIKey,
+    credential: credential.decryptedAPIKey,
     model: directByokModel,
     stream: request.body.stream === true,
   });
@@ -100,7 +102,7 @@ async function checkDirectBYOK(
         directByok.transformRequest(context);
       },
     } satisfies Provider,
-    userByok,
+    userByok: [{ decryptedAPIKey: credential.decryptedAPIKey, providerId: credential.providerId }],
     isFree: isFreeModelExcludingCustomLlms(requestedModel),
     bypassAccessCheck: true,
   };

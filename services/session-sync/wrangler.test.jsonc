@@ -1,0 +1,48 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Test configuration for vitest-pool-workers. Every value is local and synthetic.
+  "name": "session-sync-test",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-15",
+  "compatibility_flags": ["nodejs_compat", "service_binding_extra_handlers"],
+  "rules": [
+    {
+      "type": "Text",
+      "globs": ["**/*.sql"],
+      "fallthrough": true,
+    },
+  ],
+  "vars": {
+    "ENVIRONMENT": "development",
+    "NEXTAUTH_SECRET": "nextauth-test-secret-0123456789abcdef",
+    "SESSION_SYNC_SECRET": "session-sync-test-secret-0123456789abcdef",
+  },
+  // The isolated exchange smoke database. Data-route tests never connect to it.
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      "id": "session-sync-test",
+      "localConnectionString": "postgres://postgres:postgres@localhost:5544/session_sync",
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "SESSION_SYNC_DO",
+        "class_name": "SessionSyncDO",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["SessionSyncDO"],
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "SESSION_SYNC_R2",
+      "bucket_name": "session-sync-test",
+    },
+  ],
+}

@@ -540,6 +540,37 @@
     ],
     "searchBlob": "agentBriefing.updatePreferences Update agent briefing settings for the current user, including timezone, language, and notification windows. agentbriefing updatepreferences timezone language nightstart morningstart morningend notificationsenabled timezone language nightStart morningStart morningEnd notificationsEnabled"
   },
+  "agentProfiles.agents": {
+    "path": "agentProfiles.agents",
+    "kind": "query",
+    "summary": "List the agents that belong to a specific agent profile, optionally scoped to an organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "profileId"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "agents",
+      "profileid",
+      "organizationid"
+    ],
+    "searchBlob": "agentProfiles.agents List the agents that belong to a specific agent profile, optionally scoped to an organization. agentprofiles agents profileid organizationid profileId organizationId"
+  },
   "agentProfiles.applyConfigImport": {
     "path": "agentProfiles.applyConfigImport",
     "kind": "mutation",
@@ -2174,6 +2205,37 @@
       "organizationid"
     ],
     "searchBlob": "agentProfiles.listRepoBindings List repository bindings that associate repos with agent profiles for the current user or an organization. agentprofiles listrepobindings organizationid organizationId"
+  },
+  "agentProfiles.overview": {
+    "path": "agentProfiles.overview",
+    "kind": "query",
+    "summary": "Get a summary overview of an agent profile, including its details and high-level stats, for a personal or organization-owned profile.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "profileId"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "overview",
+      "profileid",
+      "organizationid"
+    ],
+    "searchBlob": "agentProfiles.overview Get a summary overview of an agent profile, including its details and high-level stats, for a personal or organization-owned profile. agentprofiles overview profileid organizationid profileId organizationId"
   },
   "agentProfiles.previewConfigImport": {
     "path": "agentProfiles.previewConfigImport",
@@ -3944,6 +4006,17 @@
     ],
     "searchBlob": "byok.list List all saved bring-your-own-key (BYOK) API keys for the current user or a specified organization, including provider, enabled status, and management source. byok list organizationid organizationId"
   },
+  "byok.listCatalogModeSupportedModels": {
+    "path": "byok.listCatalogModeSupportedModels",
+    "kind": "query",
+    "summary": "List which AI models each direct BYOK provider supports when running in catalog mode, grouped by provider and returned as model names with catalog ids. Use to discover available catalog-mode models per provider.",
+    "inputSchema": {},
+    "tags": [
+      "byok",
+      "listcatalogmodesupportedmodels"
+    ],
+    "searchBlob": "byok.listCatalogModeSupportedModels List which AI models each direct BYOK provider supports when running in catalog mode, grouped by provider and returned as model names with catalog ids. Use to discover available catalog-mode models per provider. byok listcatalogmodesupportedmodels"
+  },
   "byok.listSupportedModels": {
     "path": "byok.listSupportedModels",
     "kind": "query",
@@ -3954,6 +4027,42 @@
       "listsupportedmodels"
     ],
     "searchBlob": "byok.listSupportedModels Get the list of supported models per provider for bring-your-own-key (BYOK) usage, showing which model IDs each provider offers. byok listsupportedmodels"
+  },
+  "byok.setCatalogMode": {
+    "path": "byok.setCatalogMode",
+    "kind": "mutation",
+    "summary": "Enable or disable Kilo catalog model ID routing for an existing BYOK API key, for a user or organization key, and return the updated key details.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "serve_catalog_models": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "serve_catalog_models"
+      ]
+    },
+    "tags": [
+      "byok",
+      "setcatalogmode",
+      "organizationid",
+      "id",
+      "serve_catalog_models"
+    ],
+    "searchBlob": "byok.setCatalogMode Enable or disable Kilo catalog model ID routing for an existing BYOK API key, for a user or organization key, and return the updated key details. byok setcatalogmode organizationid id serve_catalog_models organizationId id serve_catalog_models"
   },
   "byok.setEnabled": {
     "path": "byok.setEnabled",

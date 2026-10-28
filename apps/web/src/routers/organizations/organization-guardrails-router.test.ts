@@ -16,9 +16,9 @@ jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
   isReleaseToggleEnabled: jest.fn(async () => true),
 }));
 
-import { isFeatureFlagEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
+import { isReleaseToggleEnabled } from '@kilocode/web-shared/lib/posthog-feature-flags';
 
-const mockedIsFeatureFlagEnabled = jest.mocked(isFeatureFlagEnabled);
+const mockedIsReleaseToggleEnabled = jest.mocked(isReleaseToggleEnabled);
 
 let owner: User;
 let member: User;
@@ -63,7 +63,7 @@ describe('organization guardrails router', () => {
   });
 
   beforeEach(() => {
-    mockedIsFeatureFlagEnabled.mockResolvedValue(true);
+    mockedIsReleaseToggleEnabled.mockResolvedValue(true);
   });
 
   it('returns Kilo Default, off, for an organization that never saved guardrails', async () => {
@@ -167,14 +167,17 @@ describe('organization guardrails router', () => {
     ).rejects.toThrow();
   });
 
-  it('is unavailable when the feature flag is off for the organization', async () => {
-    mockedIsFeatureFlagEnabled.mockResolvedValue(false);
+  it('is unavailable when the kilo_encrypt flag is off for the organization', async () => {
+    mockedIsReleaseToggleEnabled.mockResolvedValue(false);
     const caller = await createCallerForUser(owner.id);
 
     await expect(
       caller.organizations.guardrails.get({ organizationId: organization.id })
     ).rejects.toThrow('AI Guardrails is not available for this organization.');
-    expect(mockedIsFeatureFlagEnabled).toHaveBeenCalledWith('enkrypt-guardrails', organization.id);
+    await expect(
+      caller.organizations.guardrails.update({ organizationId: organization.id, ...savedConfig() })
+    ).rejects.toThrow('AI Guardrails is not available for this organization.');
+    expect(mockedIsReleaseToggleEnabled).toHaveBeenCalledWith('kilo_encrypt', organization.id);
   });
 
   it('reports invalid saved detectors and keeps them from breaking other settings', async () => {

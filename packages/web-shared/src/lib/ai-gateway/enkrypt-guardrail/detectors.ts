@@ -7,8 +7,6 @@ import {
   type EnkryptPolicyRule,
 } from '@kilocode/db/schema-types';
 
-export const ENKRYPT_GUARDRAILS_FLAG = 'enkrypt-guardrails';
-
 /**
  * Enkrypt's detector types. Block-type detectors answer with a block message; revise-type
  * detectors answer with rewritten input text, so whether they block is the organization's choice.

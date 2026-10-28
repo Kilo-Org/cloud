@@ -41,18 +41,21 @@ export const SECURITY_SERVICE_UNAVAILABLE_MESSAGE = 'Security service is unavail
 type SecurityErrorSurface = 'sync' | 'dismiss';
 
 /**
- * A ledger error re-wrapped for display. The retryability travels on the error,
- * not in its text, so the surfaces can still decide whether the operation key
- * survives after the message is translated. `copyKey` names the catalog key the
- * message was translated from (null for an unrecognised message), so a surface
- * that persists the failure — the durable dismiss draft — can store the key and
- * re-translate at render instead of freezing one language's sentence.
+ * A ledger error re-wrapped for display. The retryability and key-retention
+ * decisions travel on the error, not in its text, so the surfaces can still
+ * decide whether the operation key survives after the message is translated.
+ * `copyKey` names the catalog key the message was translated from (null for an
+ * unrecognised message), so a surface that persists the failure — the durable
+ * dismiss draft — can store the key and re-translate at render instead of
+ * freezing one language's sentence.
  */
 type SecurityMutationErrorOptions = {
   /** The copy's catalog key, or null when the message is not catalog copy. */
   copyKey: string | null;
   /** The retryability decision taken from the raw error before mapping. */
   retryable: boolean;
+  /** The key-retention decision taken from the raw error before mapping. */
+  retainsOperationKey: boolean;
   /** The raw server error, kept for the app-error reporter's skip rule. */
   cause: unknown;
 };
@@ -60,11 +63,13 @@ type SecurityMutationErrorOptions = {
 class SecurityMutationError extends Error {
   readonly retryable: boolean;
   readonly copyKey: string | null;
+  readonly retainsOperationKey: boolean;
 
   constructor(message: string, options: SecurityMutationErrorOptions) {
     super(message, { cause: options.cause });
     this.retryable = options.retryable;
     this.copyKey = options.copyKey;
+    this.retainsOperationKey = options.retainsOperationKey;
   }
 }
 
@@ -121,6 +126,9 @@ export function isSecuritySyncRetryable(error: unknown): boolean {
  * expected to succeed, as with an unreachable Worker it is a fresh intent.
  */
 export function securityRetainsOperationKey(error: unknown): boolean {
+  if (error instanceof SecurityMutationError) {
+    return error.retainsOperationKey;
+  }
   return (
     isSecuritySyncRetryable(error) &&
     !(error instanceof Error && error.message === SECURITY_SERVICE_UNAVAILABLE_MESSAGE)
@@ -181,12 +189,18 @@ function fallbackKeyFor(retryable: boolean): string {
 
 function mapSecurityOperationError(error: unknown, surface: SecurityErrorSurface): Error {
   const retryable = isSecuritySyncRetryable(error);
+  const retainsOperationKey = securityRetainsOperationKey(error);
   const markerKey = error instanceof Error ? markerKeyFor(error) : null;
   const fallbackKey = isOperationInProgress(error)
     ? IN_PROGRESS_KEY_BY_SURFACE[surface]
     : fallbackKeyFor(retryable);
   const copyKey = markerKey ?? fallbackKey;
-  return new SecurityMutationError(i18n.t(copyKey), { copyKey, retryable, cause: error });
+  return new SecurityMutationError(i18n.t(copyKey), {
+    copyKey,
+    retryable,
+    retainsOperationKey,
+    cause: error,
+  });
 }
 
 /**

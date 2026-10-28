@@ -601,6 +601,21 @@ describe('isSecuritySyncRetryable (P1-A-08e key-rotation policy)', () => {
     expect(securityRetainsOperationKey(unavailable)).toBe(false);
     expect(securityRetainsOperationKey(new Error(SECURITY_AMBIGUOUS_MESSAGE))).toBe(true);
   });
+
+  it('keeps the key-retention decision on the mapped error, after its text is replaced', () => {
+    const mapped = mapSecurityDismissOperationError(
+      new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE)
+    );
+
+    expect(mapped.message).toBe('The security service is unavailable. Try again.');
+    expect(isSecuritySyncRetryable(mapped)).toBe(true);
+    expect(securityRetainsOperationKey(mapped)).toBe(false);
+    expect(
+      securityRetainsOperationKey(
+        mapSecurityDismissOperationError(new Error(SECURITY_AMBIGUOUS_MESSAGE))
+      )
+    ).toBe(true);
+  });
 });
 
 describe('ledger marker copy per surface', () => {

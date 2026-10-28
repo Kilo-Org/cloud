@@ -549,8 +549,12 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   builder. Heartbeats from reports renew the build lease; a builder silent for 90 s is lost.
 - **Lifetime.** The platform keeps an unused snapshot for 30 days and has no list or delete API in
   this release, so a superseded snapshot is unreferenced rather than deleted.
-- **Runtime selection.** Builders and sessions use the deployment's explicit startup selection.
-  Downloaded mode uses the current runtime installer and its named builder or supervisor target,
+- **Runtime selection.** Environment builders always use the `runtime-free` image and downloaded
+  startup. Snapshot enrollment controls builder access independently of the interactive session cohort.
+  Builds are unsupported without a downloaded runtime-free deployment and a published runtime release.
+  Existing all-in-one snapshots are incompatible and trigger replacement builds. Sessions keep their
+  cohort-selected image; an `app` session starts from its image instead of a split-image snapshot.
+  Downloaded startup uses the current runtime installer and its named builder or supervisor target,
   including on snapshot restore. The installed control bundle includes the builder. A preinstalled
   launch rejects snapshots captured with downloaded aliases; a downloaded launch can install a
   newer compatible runtime over a snapshot. The artifact read grant travels in the installer
@@ -995,8 +999,8 @@ Worker forwards an admitted report to the Sandbox DO as `startup-failed`.
 - CI publishes runtime payloads create-only by content hash, and the descriptor last. The deploy
   reads an immutable handoff for the exact commit, and verifies the base image digest and both
   payloads before it deploys a `downloaded` target.
-- Roll out on an isolated target first: `downloaded` on the all-in-one image, then `downloaded` on
-  the runtime-free image, then production. Roll back the first step by mode and the second by image.
+- Roll out through a production `interactiveOrgIds` cohort: one test organization on `downloaded`
+  runtime-free first, then a wider cohort after qualification. Roll back by image or by mode.
 - The runtime-free image change relies on B1 (#7914), which is already merged: a running container
   captures under the image that it started with, including after DO reconstruction.
 - `runtime-targets.json` owns mode and image. Deployment renders Worker vars and the native image

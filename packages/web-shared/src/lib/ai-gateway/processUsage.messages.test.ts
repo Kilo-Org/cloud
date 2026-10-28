@@ -203,6 +203,33 @@ describe('processMessagesApiUsage', () => {
     expect(result.is_byok).toBe(false);
   });
 
+  test('prefers OpenRouter zero cost over Vercel metadata and adds cache tokens to input', () => {
+    const usage = {
+      input_tokens: 20,
+      output_tokens: 4,
+      cache_read_input_tokens: 7,
+      cache_creation_input_tokens: 3,
+      server_tool_use: null,
+      output_tokens_details: null,
+      cost: 0,
+      is_byok: false,
+    };
+    const providerMetadata = {
+      gateway: { routing: { finalProvider: 'anthropic' }, marketCost: '0.5' },
+    };
+
+    const result = processMessagesApiUsage(usage, providerMetadata, coreProps, 'openrouter');
+
+    expect(result).toEqual({
+      inputTokens: 30,
+      outputTokens: 4,
+      cacheHitTokens: 7,
+      cacheWriteTokens: 3,
+      cost_mUsd: 0,
+      is_byok: false,
+    });
+  });
+
   test.each([
     // Real Vercel responses: Perplexity searches billed to gateway credits, and a
     // native Anthropic web search billed to the BYOK key within marketCost.

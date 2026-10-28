@@ -13,13 +13,10 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import type { GatewayResponsesRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
-  computeOpenRouterCostFields,
-  providerReportsIsByok,
-  computeVercelCostFields,
   drainSseStream,
-  extractVercelIsByok,
   extractVercelUpstreamId,
   reportUpstreamStreamError,
+  selectUsageCostFields,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 
@@ -60,41 +57,14 @@ export function processResponsesApiUsage(
   const cacheHitTokens = usage?.input_tokens_details?.cached_tokens ?? 0;
   const cacheWriteTokens = usage?.input_tokens_details?.cache_write_tokens ?? 0;
 
-  // OpenRouter path: cost fields are present directly in usage
-  if (usage?.cost != null || usage?.is_byok != null) {
-    const costs = computeOpenRouterCostFields(
-      usage,
-      coreProps,
-      'responses_sse_processing',
-      providerReportsIsByok(provider),
-      provider
-    );
-    return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens, ...costs };
-  }
-
-  // Vercel path: cost is in provider_metadata.gateway
-  const vercelGateway = providerMetadata?.gateway;
-  if (vercelGateway?.marketCost != null || vercelGateway?.cost != null) {
-    const is_byok = extractVercelIsByok(vercelGateway);
-    return {
-      inputTokens,
-      outputTokens,
-      cacheHitTokens,
-      cacheWriteTokens,
-      ...computeVercelCostFields(vercelGateway, is_byok),
-      is_byok,
-    };
-  }
-
-  // No cost info available
-  return {
-    inputTokens,
-    outputTokens,
-    cacheHitTokens,
-    cacheWriteTokens,
-    cost_mUsd: 0,
-    is_byok: null,
-  };
+  const costs = selectUsageCostFields(
+    usage,
+    providerMetadata,
+    coreProps,
+    'responses_sse_processing',
+    provider
+  );
+  return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens, ...costs };
 }
 
 function extractResponseContent(output: OpenAI.Responses.ResponseOutputItem[]): string {

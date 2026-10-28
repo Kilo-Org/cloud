@@ -12,13 +12,10 @@ import type {
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import type { GatewayMessagesRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
-  computeOpenRouterCostFields,
-  providerReportsIsByok,
-  computeVercelCostFields,
   drainSseStream,
-  extractVercelIsByok,
   extractVercelUpstreamId,
   reportUpstreamStreamError,
+  selectUsageCostFields,
 } from '@kilocode/web-shared/lib/ai-gateway/processUsage.shared';
 import { isErrorFinishReason } from '@kilocode/web-shared/lib/ai-gateway/finishReason';
 import type Anthropic from '@anthropic-ai/sdk';
@@ -92,41 +89,14 @@ export function processMessagesApiUsage(
   const inputTokens = (usage?.input_tokens ?? 0) + cacheHitTokens + cacheWriteTokens;
   const outputTokens = usage?.output_tokens ?? 0;
 
-  // OpenRouter path: cost fields are present directly in usage
-  if (usage?.cost != null || usage?.is_byok != null) {
-    const costs = computeOpenRouterCostFields(
-      usage,
-      coreProps,
-      'messages_sse_processing',
-      providerReportsIsByok(provider),
-      provider
-    );
-    return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens, ...costs };
-  }
-
-  // Vercel path: cost is in provider_metadata.gateway
-  const vercelGateway = providerMetadata?.gateway;
-  if (vercelGateway?.marketCost != null || vercelGateway?.cost != null) {
-    const is_byok = extractVercelIsByok(vercelGateway);
-    return {
-      inputTokens,
-      outputTokens,
-      cacheHitTokens,
-      cacheWriteTokens,
-      ...computeVercelCostFields(vercelGateway, is_byok),
-      is_byok,
-    };
-  }
-
-  // No cost info available
-  return {
-    inputTokens,
-    outputTokens,
-    cacheHitTokens,
-    cacheWriteTokens,
-    cost_mUsd: 0,
-    is_byok: null,
-  };
+  const costs = selectUsageCostFields(
+    usage,
+    providerMetadata,
+    coreProps,
+    'messages_sse_processing',
+    provider
+  );
+  return { inputTokens, outputTokens, cacheHitTokens, cacheWriteTokens, ...costs };
 }
 
 export async function parseMessagesMicrodollarUsageFromStream(

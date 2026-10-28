@@ -53,6 +53,8 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 
 const GENERIC_TEST_FAILURE_MESSAGE = 'API key test failed. Check the credential and try again.';
+const KEY_DECRYPTION_FAILURE_MESSAGE =
+  'API key test failed: the stored key could not be read. Try again later.';
 const VERCEL_AI_GATEWAY_KEY_REJECTED_MESSAGE =
   'API key test failed: Vercel AI Gateway rejected this API key. Check that the key is correct and has not been revoked.';
 const MANAGED_KEY_READ_ONLY_MESSAGE =
@@ -442,7 +444,16 @@ export const byokRouter = createTRPCRouter({
         };
       }
 
-      const decryptedKey = await decryptByokRow(existingKey);
+      let decryptedKey: Awaited<ReturnType<typeof decryptByokRow>>;
+      try {
+        decryptedKey = await decryptByokRow(existingKey);
+      } catch (e) {
+        logByokWarning('BYOK key test could not decrypt the stored key', {
+          providerId: existingKey.provider_id,
+          message: e instanceof Error ? e.message : undefined,
+        });
+        return { success: false, message: KEY_DECRYPTION_FAILURE_MESSAGE };
+      }
 
       // Codestral is deprecated and its key only authenticates against codestral.mistral.ai,
       // which the gateway test path below cannot reach (it routes codestral to api.mistral.ai).

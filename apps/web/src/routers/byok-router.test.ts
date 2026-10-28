@@ -425,6 +425,24 @@ describe('BYOK Router', () => {
       }
     });
 
+    test('testApiKey reports a failure instead of throwing when the KMS call fails', async () => {
+      configureKms(dataKeyResponse);
+      const caller = await createCallerForUser(ownerUser.id);
+      const created = await caller.byok.create({
+        organizationId: organizationA.id,
+        provider_id: 'anthropic',
+        api_key: 'sk-ant-kms',
+      });
+      configureKms(() => new Response('{}', { status: 503 }));
+
+      await expect(
+        caller.byok.testApiKey({ organizationId: organizationA.id, id: created.id })
+      ).resolves.toEqual({
+        success: false,
+        message: 'API key test failed: the stored key could not be read. Try again later.',
+      });
+    });
+
     test('fails create and update without writing when the KMS call fails', async () => {
       const caller = await createCallerForUser(ownerUser.id);
       const created = await caller.byok.create({

@@ -30,6 +30,7 @@ import {
 } from '@/components/agents/session-list-chrome';
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { useAgentsListChrome } from '@/components/agents/use-agents-list-chrome';
+import { useOwnedKeyboard } from '@/components/agents/use-owned-keyboard';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { IconButton } from '@/components/ui/icon-button';
@@ -40,14 +41,7 @@ import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 import { type ActiveSession, useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
 import { cn } from '@/lib/utils';
 
-import {
-  type Href,
-  useFocusEffect,
-  useIsFocused,
-  useNavigation,
-  useRouter,
-  useScrollToTop,
-} from 'expo-router';
+import { type Href, useFocusEffect, useNavigation, useRouter, useScrollToTop } from 'expo-router';
 
 type AgentSessionListScreenProps = { tabHeader?: ReactNode };
 export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListScreenProps> = {}) {
@@ -89,8 +83,12 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
   // affordance while the list is failing.
   const noMatchBody = hasLiveRows && visibleSessions.length === 0;
   const showFab = context.isReady && content !== 'empty' && !noMatchBody;
-  const isFocused = useIsFocused();
-  const { surfaceBand, rowsFrameBand } = useAgentsBottomBands(tabBarHeight, showFab, isFocused);
+  const keyboard = useOwnedKeyboard();
+  const { surfaceBand, rowsFrameBand } = useAgentsBottomBands(
+    tabBarHeight,
+    showFab,
+    keyboard.occlusion
+  );
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const showSearch = searchOpen || query.searchQuery.length > 0;
@@ -435,13 +433,14 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
               defaultValue={query.searchQuery}
               compact
               onClearSearch={query.handleClearSearch}
+              onFocus={keyboard.handleInputFocus}
             />
           }
         />
         {/* Android runs edge-to-edge and never resizes the window for the IME,
             so the keyboard is cleared natively: `KeyboardProvider` measures the
             IME and this view lifts by the overlap it reports. */}
-        <KeyboardAvoidingView className="flex-1" behavior="padding" enabled={isFocused}>
+        <KeyboardAvoidingView className="flex-1" behavior="padding" enabled={keyboard.owned}>
           {region}
         </KeyboardAvoidingView>
         {/* Empty content owns its creation action; the no-match body owns the band. */}

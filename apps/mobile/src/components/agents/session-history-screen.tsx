@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Keyboard, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { useTranslation } from 'react-i18next';
-import { useFocusEffect, useIsFocused, useNavigation } from 'expo-router';
+import { useFocusEffect, useNavigation } from 'expo-router';
 
 import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
 import { AgentSessionListContent } from '@/components/agents/session-list-content';
@@ -14,6 +14,7 @@ import { useAgentSessionListData } from '@/components/agents/use-agent-session-l
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { useNewSessionNavigator } from '@/components/agents/use-new-session-navigator';
 import { useSessionSearchInput } from '@/components/agents/use-session-search-input';
+import { useOwnedKeyboard } from '@/components/agents/use-owned-keyboard';
 import { shouldLoadMoreSessions } from '@/lib/agent-session-pages';
 import { usePersistedAgentSessionFilters } from '@/lib/hooks/use-persisted-agent-session-filters';
 import { SESSION_FILTERS_KEY } from '@/lib/storage-keys';
@@ -30,7 +31,6 @@ import { useOrganization } from '@/lib/organization-context';
 export function SessionHistoryScreen() {
   const { t } = useTranslation();
   const navigation = useNavigation();
-  const isFocused = useIsFocused();
 
   const { organizationId, isLoaded: orgLoaded } = useOrganization();
   const {
@@ -69,6 +69,7 @@ export function SessionHistoryScreen() {
     restoredQuery: searchDraftState.value,
     restoreSettled: searchDraftState.settled,
   });
+  const keyboard = useOwnedKeyboard();
 
   const ready = filtersLoaded && orgLoaded;
 
@@ -240,6 +241,7 @@ export function SessionHistoryScreen() {
             showSearchBusy={showSearchBusy}
             onChangeText={handleSearchInputChange}
             onClearSearch={handleClearSearchInput}
+            onFocus={keyboard.handleInputFocus}
             defaultValue={searchDefaultValue}
             inputKey={searchInputKey}
             compact
@@ -247,7 +249,7 @@ export function SessionHistoryScreen() {
           />
         }
       />
-      <KeyboardAvoidingView className="flex-1" behavior="padding" enabled={isFocused}>
+      <KeyboardAvoidingView className="flex-1" behavior="padding" enabled={keyboard.owned}>
         {sessionListBody}
       </KeyboardAvoidingView>
       <SessionFilterModal

@@ -502,7 +502,7 @@ function repositoryFingerprint(repository: SessionMetadata['repository']): strin
     case 'github':
       return `github:${repository.repo}:${repository.githubIntegrationId ?? ''}:${
         repository.githubAccessPurpose ?? 'workflow'
-      }`;
+      }:${repository.allowUserAuthorization === true ? 'user' : 'installation'}`;
     case 'bitbucket':
       return `bitbucket:${repository.workspaceUuid}:${repository.repositoryUuid}:${
         repository.bitbucketIntegrationId ?? ''

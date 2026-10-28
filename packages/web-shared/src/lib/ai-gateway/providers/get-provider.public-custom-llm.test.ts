@@ -68,6 +68,16 @@ describe('getProvider with public custom LLMs', () => {
       customLlmDefinition({ organization_ids: [ORG_ID] }),
       encryptedApiKey
     );
+    await insertCustomLlmForTest(
+      'acme/country-denied-public-model',
+      publicCustomLlmDefinition(['acme'], { country_deny_list: ['CU', 'KP'] }),
+      encryptedApiKey
+    );
+    await insertCustomLlmForTest(
+      'acme/country-denied-private-model',
+      customLlmDefinition({ organization_ids: [ORG_ID], country_deny_list: ['CU'] }),
+      encryptedApiKey
+    );
   });
 
   afterAll(async () => {
@@ -76,6 +86,31 @@ describe('getProvider with public custom LLMs', () => {
     await deleteCustomLlmForTest('acme/private-model');
     await deleteCustomLlmForTest('acme/multi-api-model');
     await deleteCustomLlmForTest(qwen36_plus_stealth_model.public_id);
+    await deleteCustomLlmForTest('acme/country-denied-public-model');
+    await deleteCustomLlmForTest('acme/country-denied-private-model');
+  });
+
+  test.each([
+    ['acme/country-denied-public-model', createAnonymousContext('127.0.0.1'), undefined],
+    ['acme/country-denied-private-model', user, ORG_ID],
+  ])('refuses %s for a caller from a denied country', async (model, caller, organizationId) => {
+    await expect(
+      getProvider({ ...providerInput(model, caller, organizationId), countryCode: 'CU' })
+    ).resolves.toEqual({ kind: 'custom-llm-unavailable' });
+  });
+
+  test.each([
+    ['another country', 'US'],
+    ['an unknown country', null],
+  ])('serves a country-restricted custom LLM to %s', async (_name, countryCode) => {
+    for (const [model, caller, organizationId] of [
+      ['acme/country-denied-public-model', createAnonymousContext('127.0.0.1'), undefined],
+      ['acme/country-denied-private-model', user, ORG_ID],
+    ] as const) {
+      await expect(
+        getProvider({ ...providerInput(model, caller, organizationId), countryCode })
+      ).resolves.toMatchObject({ kind: 'provider', provider: { id: 'custom' } });
+    }
   });
 
   afterEach(() => {

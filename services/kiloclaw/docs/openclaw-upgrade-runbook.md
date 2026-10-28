@@ -1,8 +1,8 @@
 # OpenClaw Upgrade Runbook
 
-When a new OpenClaw release is published, an automated watcher opens a draft bump PR in this
-repo and posts a Slack notification. This runbook tells you exactly what to do from that point
-to a merged, production-deployed upgrade.
+An OpenClaw upgrade starts from a bump PR in this repo. To create one for a new OpenClaw
+release, run `services/kiloclaw/scripts/openclaw-bump.sh <TARGET_VERSION>`. This runbook tells
+you exactly what to do from that point to a merged, production-deployed upgrade.
 
 **Lab repo**: https://github.com/Kilo-Org/kiloclaw-openclaw-upgrade-lab
 **Open bump PRs**: https://github.com/Kilo-Org/cloud/pulls?q=feat%2Fbump-openclaw+is%3Aopen

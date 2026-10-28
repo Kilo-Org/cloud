@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "Instanssiin ei saatu yhteyttä. Sen yhteys on voinut katketa.",
     "remoteSpawnNonRetryable": "Instanssi ei pystynyt käynnistämään istuntoa. Tarkista kone tai päivitä Kilo CLI.",
-    "remoteSpawnInstanceDisconnected": "Valitun instanssin yhteys katkesi. Aloita istunto Cloud Agentissa tai valitse toinen instanssi.",
-    "liveCount_one": "{{count}} REAALIAJASSA",
-    "liveCount_other": "{{count}} REAALIAJASSA"
+    "remoteSpawnInstanceDisconnected": "Valitun instanssin yhteys katkesi. Aloita istunto Cloud Agentissa tai valitse toinen instanssi."
   },
   "agentChat": {
     "session": {

@@ -1422,7 +1422,7 @@ describe('organizations members trpc router', () => {
       expect(result.acceptInviteUrl).toMatch(/^https?:\/\/.+\/users\/accept-invite\/.+$/);
     });
 
-    it('should reject inviting members into a child organization', async () => {
+    it('should reject inviting someone who is not a parent organization member', async () => {
       const childOrg = await createOrganization('Child Members Organization', regularUser.id);
       await db
         .update(organizations)
@@ -1437,7 +1437,29 @@ describe('organizations members trpc router', () => {
           email: 'child-org-invite@example.com',
           role: 'member',
         })
-      ).rejects.toThrow('Child organizations manage membership through their parent organization.');
+      ).rejects.toThrow(
+        'Child organizations can only invite people who are already members of the parent organization.'
+      );
+    });
+
+    it('should invite a parent organization member into a child organization', async () => {
+      const childOrg = await createOrganization(
+        'Child Members Invite Organization',
+        regularUser.id
+      );
+      await db
+        .update(organizations)
+        .set({ parent_organization_id: testOrganization.id })
+        .where(eq(organizations.id, childOrg.id));
+
+      const caller = await createCallerForUser(regularUser.id);
+      const result = await caller.organizations.members.invite({
+        organizationId: childOrg.id,
+        email: memberUser.google_user_email,
+        role: 'member',
+      });
+
+      expect(result).toHaveProperty('acceptInviteUrl');
     });
 
     it('should reject billing managers inviting owners', async () => {

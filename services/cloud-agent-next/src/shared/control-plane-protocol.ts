@@ -384,6 +384,7 @@ export const controlPlaneCredentialRepositorySchema = z.discriminatedUnion('type
       token: z.string().min(1).optional(),
       githubIntegrationId: z.string().uuid().optional(),
       githubAccessPurpose: z.enum(['workflow', 'agent']).optional(),
+      allowUserAuthorization: z.boolean().optional(),
     })
     .strict(),
   z

@@ -1665,9 +1665,7 @@
     },
     "remoteSpawnRetryable": "Die Instanz konnte nicht erreicht werden. Möglicherweise wurde die Verbindung unterbrochen.",
     "remoteSpawnNonRetryable": "Die Instanz konnte die Sitzung nicht starten. Prüfe den Computer oder aktualisiere die CLI.",
-    "remoteSpawnInstanceDisconnected": "Die Verbindung zur ausgewählten Instanz wurde unterbrochen. Starte eine Sitzung mit Cloud Agent oder wähle eine andere Instanz.",
-    "liveCount_one": "{{count}} IN ECHTZEIT",
-    "liveCount_other": "{{count}} IN ECHTZEIT"
+    "remoteSpawnInstanceDisconnected": "Die Verbindung zur ausgewählten Instanz wurde unterbrochen. Starte eine Sitzung mit Cloud Agent oder wähle eine andere Instanz."
   },
   "agentChat": {
     "session": {

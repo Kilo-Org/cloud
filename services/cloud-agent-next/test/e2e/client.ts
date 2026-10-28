@@ -47,7 +47,7 @@ export type CallbackTarget = {
  * (which also carries `api_token_pepper`) satisfies it; the deployed profile
  * supplies identity only and authenticates with a bearer token.
  */
-export type DriverUser = { id: string; email?: string; api_token_pepper?: string };
+export type DriverUser = { id: string; email?: string; api_token_pepper?: string | null };
 
 export type DriverConfig = {
   /**

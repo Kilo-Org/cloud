@@ -2189,9 +2189,7 @@
     },
     "remoteSpawnRetryable": "ଇନ୍ସଟାନ୍ସ ସହ ସଂଯୋଗ କରିହେଲା ନାହିଁ — ଏହାର ସଂଯୋଗ ବିଚ୍ଛିନ୍ନ ହୋଇଥାଇପାରେ।",
     "remoteSpawnNonRetryable": "ଇନ୍ସଟାନ୍ସ ସେସନ୍ ଆରମ୍ଭ କରିପାରିଲା ନାହିଁ — ମେସିନ୍ ଯାଞ୍ଚ କରନ୍ତୁ କିମ୍ବା CLI ଅପଡେଟ୍ କରନ୍ତୁ।",
-    "remoteSpawnInstanceDisconnected": "ବଛାଯାଇଥିବା ଇନ୍ସଟାନ୍ସର ସଂଯୋଗ ବିଚ୍ଛିନ୍ନ ହେଲା। Cloud Agent ରେ ଏକ ସେସନ୍ ଆରମ୍ଭ କରନ୍ତୁ କିମ୍ବା ଅନ୍ୟ ଏକ ଇନ୍ସଟାନ୍ସ ବାଛନ୍ତୁ।",
-    "liveCount_one": "{{count}} ଲାଇଭ୍",
-    "liveCount_other": "{{count}} ଲାଇଭ୍"
+    "remoteSpawnInstanceDisconnected": "ବଛାଯାଇଥିବା ଇନ୍ସଟାନ୍ସର ସଂଯୋଗ ବିଚ୍ଛିନ୍ନ ହେଲା। Cloud Agent ରେ ଏକ ସେସନ୍ ଆରମ୍ଭ କରନ୍ତୁ କିମ୍ବା ଅନ୍ୟ ଏକ ଇନ୍ସଟାନ୍ସ ବାଛନ୍ତୁ।"
   },
   "agentChat": {
     "session": {

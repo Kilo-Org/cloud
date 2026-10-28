@@ -103,4 +103,21 @@ describe('session registration repository metadata', () => {
       pullRequestNumber: 17,
     });
   });
+
+  it('persists the GitHub user authorization decision from the registration input', async () => {
+    const result = await buildSessionMetadataFromRegistration({
+      identity: { sessionId: 'agent_test', userId: 'user_test', orgId: 'org_test' },
+      auth: {},
+      agent: { mode: 'code', model: 'kilo/test-model' },
+      repository: { ...GITHUB_REPOSITORY, allowUserAuthorization: true },
+    });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+    expect(result.metadata.repository).toMatchObject({
+      type: 'github',
+      repo: 'acme/widgets',
+      allowUserAuthorization: true,
+    });
+  });
 });

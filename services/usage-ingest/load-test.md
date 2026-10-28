@@ -13,6 +13,10 @@ With the gateway queue-selection change installed, configure the intended stagin
 gateway deployment as follows. Keep the Worker in processing mode with the same
 writer endpoint and queue policy for both runs.
 
+For both Cloudflare/direct runs, keep `USAGE_QUEUE_TRANSPORT` unset or set to
+`cloudflare`. Setting `USAGE_QUEUE_ONLY_ENABLED=false` alone does not disable the
+[staging Vercel queue prototype](../../packages/usage-queue/README.md).
+
 | Gateway setting | Direct baseline | Queued run |
 |---|---|---|
 | `USAGE_QUEUE_ONLY_ENABLED` | `false` | `true` |
@@ -63,7 +67,7 @@ and confirm hosted log retention, ingestion and sampling cover the test window.
 | `event_age_ms` | Age of the event at operation completion, clamped at zero; omitted if timestamp cannot be parsed |
 | `execution_region` | Function region from `VERCEL_REGION`, restricted to `fra1`, `sfo1`, or `unknown` |
 | `entrypoint` | `gateway`, `writer_endpoint`, or `unknown` |
-| `writer_caller` | `queue`, `region_handoff`, or `unknown`; authenticated route allowlists the HTTP client's diagnostic header |
+| `writer_caller` | `queue`, `queue_vercel`, `region_handoff`, or `unknown`; authenticated route allowlists the HTTP client's diagnostic header |
 
 `execution_region` identifies where persistence ran, not the originating gateway.
 SFO gateway direct writes handed to the Frankfurt HTTP writer therefore log `fra1`;

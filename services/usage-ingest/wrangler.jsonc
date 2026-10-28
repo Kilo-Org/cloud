@@ -6,7 +6,7 @@
   // Matches the workerd runtime pinned by the repository's Wrangler version.
   "compatibility_date": "2026-09-18",
   "compatibility_flags": ["nodejs_compat"],
-  "workers_dev": false,
+  "workers_dev": true,
   "preview_urls": false,
   "observability": { "enabled": true },
   // Production merge/deployment prerequisites: eu-queues.md.

@@ -7,7 +7,7 @@ import type { UsageRecordWriteOutcome } from './processUsage.types';
 
 export type UsageRecordObservationContext = {
   entrypoint: 'gateway' | 'writer_endpoint' | 'unknown';
-  writer_caller: 'queue' | 'region_handoff' | 'unknown';
+  writer_caller: 'queue' | 'queue_vercel' | 'region_handoff' | 'unknown';
 };
 
 function completionSuccessSampleRate(): number {

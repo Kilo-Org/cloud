@@ -340,21 +340,17 @@ describe('raw tRPC scope enforcement', () => {
     ).rejects.toMatchObject({ code: 'FORBIDDEN' });
     expect(mockResolver).not.toHaveBeenCalled();
   });
-  it.each([true, false])(
-    'allows normally valid repository/model choices and opt-in %s',
-    async flag => {
-      const request = {
-        ...launch,
-        githubRepo: 'Other-Org/AnotherRepo',
-        model: 'another-provider/another-model',
-        allowSubagentSessions: flag,
-      };
-      expect(await router.createCaller(context()).cloudAgentNext.prepareSession(request)).toBe(
-        'launched'
-      );
-      expect(mockResolver).toHaveBeenCalledWith(request);
-    }
-  );
+  it('allows normally valid repository and model choices', async () => {
+    const request = {
+      ...launch,
+      githubRepo: 'Other-Org/AnotherRepo',
+      model: 'another-provider/another-model',
+    };
+    expect(await router.createCaller(context()).cloudAgentNext.prepareSession(request)).toBe(
+      'launched'
+    );
+    expect(mockResolver).toHaveBeenCalledWith(request);
+  });
   it('denies unrelated procedures, expired scope and user mismatch', async () => {
     const caller = router.createCaller(context());
     await expect(caller.user.getMe()).rejects.toMatchObject({ code: 'FORBIDDEN' });
@@ -473,7 +469,7 @@ describe('scope-preserving control token exchange', () => {
   });
 });
 
-describe('ordinary opt-in schema', () => {
+describe('ordinary prepare schema', () => {
   it('preserves the parent callback through personal and organization web prepare schemas', () => {
     const input = { ...launch, callbackTarget: { url: 'session:parent' } };
     expect(personalPrepareSessionNextSchema.parse(input).callbackTarget).toEqual(
@@ -483,25 +479,16 @@ describe('ordinary opt-in schema', () => {
       organizationPrepareSessionNextSchema.parse({ ...input, organizationId }).callbackTarget
     ).toEqual(input.callbackTarget);
   });
-  it.each([true, false])('preserves boolean opt-in %s through prepare parsing', flag => {
+  it('strips the retired spawn opt-in through prepare parsing', () => {
     expect(
-      personalPrepareSessionNextSchema.parse({ ...launch, allowSubagentSessions: flag })
-    ).toMatchObject({ allowSubagentSessions: flag });
+      personalPrepareSessionNextSchema.parse({ ...launch, allowSubagentSessions: true })
+    ).not.toHaveProperty('allowSubagentSessions');
     expect(
       organizationPrepareSessionNextSchema.parse({
         ...launch,
         organizationId,
-        allowSubagentSessions: flag,
+        allowSubagentSessions: true,
       })
-    ).toMatchObject({ allowSubagentSessions: flag });
-  });
-  it('defaults to opt-out and rejects nonboolean opt-in', () => {
-    expect(personalPrepareSessionNextSchema.parse(launch).allowSubagentSessions).toBeUndefined();
-    expect(
-      personalPrepareSessionNextSchema.safeParse({
-        ...launch,
-        allowSubagentSessions: { repositories: ['acme/repo'] },
-      }).success
-    ).toBe(false);
+    ).not.toHaveProperty('allowSubagentSessions');
   });
 });

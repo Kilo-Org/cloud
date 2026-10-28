@@ -115,7 +115,10 @@ export type Principal = z.infer<typeof principalSchema>;
 
 export const exchangeRequestSchema = z.strictObject({
   version: z.literal(1),
-  organizationID: z.uuid().optional(),
+  organizationID: z
+    .uuid()
+    .transform(id => id.toLowerCase())
+    .optional(),
 });
 
 export const exchangeResponseSchema = z.strictObject({

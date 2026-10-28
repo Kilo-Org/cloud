@@ -258,7 +258,7 @@ export async function exchange(request: Request, env: AuthEnv): Promise<Response
   if (body instanceof Response) return body;
 
   try {
-    const nextAuthSecret = await resolveSecret(env.NEXTAUTH_SECRET, 1);
+    const nextAuthSecret = await resolveSecret(env.NEXTAUTH_SECRET, MIN_GRANT_SECRET_BYTES);
     const grantSecret = await resolveSecret(env.SESSION_SYNC_SECRET, MIN_GRANT_SECRET_BYTES);
     const credential = await verifyCredential(token, nextAuthSecret, env.ENVIRONMENT);
     if (credential instanceof Response) return credential;

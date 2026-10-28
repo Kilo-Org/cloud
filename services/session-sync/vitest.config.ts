@@ -1,7 +1,7 @@
 import { createRequire } from 'node:module';
 
 import { cloudflareTest } from '@cloudflare/vitest-pool-workers';
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 /**
  * Load the CommonJS builds of `pg-protocol` and `pg-pool`. Their ESM entry
@@ -32,5 +32,6 @@ export default defineConfig({
   test: {
     globals: true,
     include: ['src/**/*.test.ts', 'test/**/*.test.ts'],
+    exclude: [...configDefaults.exclude, 'test/postgres/**'],
   },
 });

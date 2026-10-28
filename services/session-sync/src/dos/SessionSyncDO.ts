@@ -136,7 +136,12 @@ export class SessionSyncDO extends DurableObject<Env> {
     if (!parsed.ok) return parsed;
     const { principal, sessionID, blob: ref } = parsed.value;
     const begun = this.tx(() => blob.begin(this.db, principal, sessionID, ref, Date.now()));
-    if (begun.ok && begun.value.status === 'upload') await this.scheduleSweep();
+    if (
+      (begun.ok && begun.value.status === 'upload') ||
+      (!begun.ok && begun.error.code === 'upload_in_progress')
+    ) {
+      await this.scheduleSweep();
+    }
     return begun;
   }
 
@@ -144,10 +149,12 @@ export class SessionSyncDO extends DurableObject<Env> {
     const parsed = parse(attemptInput, input);
     if (!parsed.ok) return parsed;
     const { principal, sessionID, blob: ref, attempt } = parsed.value;
-    return this.tx(() => {
+    const aborted = this.tx(() => {
       blob.abort(this.db, principal, sessionID, ref.hash, attempt);
       return null;
     });
+    if (aborted.ok) await this.scheduleSweep();
+    return aborted;
   }
 
   /**
@@ -171,7 +178,8 @@ export class SessionSyncDO extends DurableObject<Env> {
     const object = await bucket.head(key);
     const checksum = object?.checksums.sha256;
     if (!object || object.size !== ref.bytes || (checksum && toHex(checksum) !== ref.hash)) {
-      this.tx(() => blob.abort(this.db, principal, sessionID, ref.hash, attempt));
+      const aborted = this.tx(() => blob.abort(this.db, principal, sessionID, ref.hash, attempt));
+      if (aborted.ok) await this.scheduleSweep();
       return fail('blob_missing', 'The uploaded object is missing or does not match its hash', {
         hash: ref.hash,
       });
@@ -205,8 +213,11 @@ export class SessionSyncDO extends DurableObject<Env> {
     const { principal, sessionID } = parsed.value;
     const erased = this.tx(() => erase.tombstone(this.db, principal, sessionID, Date.now()));
     if (!erased.ok) return erased;
-    await this.scheduleSweep();
-    await this.cleanup();
+    try {
+      await this.scheduleSweep();
+    } finally {
+      await this.cleanup();
+    }
     return ok(erased.value.state);
   }
 

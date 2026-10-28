@@ -200,6 +200,19 @@ describe('blob attempt fencing', () => {
     expect(await runDurableObjectAlarm(stub)).toBe(false);
     expect((await api.getBlob(sessionID, input.blob.hash)).status).toBe(410);
   });
+
+  it('re-arms cleanup when a retry finds a reservation without an alarm', async () => {
+    const { principal, sessionID, stub } = await fixture();
+    const upload = await begin(stub, principal, sessionID, new TextEncoder().encode('lost alarm'));
+    await runInDurableObject(stub, (_instance, state) => state.storage.deleteAlarm());
+    const { attempt: _attempt, ...input } = upload.input;
+    const retry = await stub.beginBlob(input);
+    expect(retry.ok).toBe(false);
+    if (!retry.ok) expect(retry.error.code).toBe('upload_in_progress');
+    expect(
+      await runInDurableObject(stub, (_instance, state) => state.storage.getAlarm())
+    ).not.toBeNull();
+  });
 });
 
 describe('bounded blob cleanup', () => {
@@ -212,7 +225,9 @@ describe('bounded blob cleanup', () => {
       uploads.push(upload);
     }
     await expire(stub);
-    await runDurableObjectAlarm(stub);
+    // Each alarm claims one bounded page and schedules the next one. Drain the
+    // scheduled pages, then wait for a page the runtime may already be running.
+    while (await runDurableObjectAlarm(stub));
     await expect
       .poll(async () => sessionStateSchema.parse(await (await api.state(sessionID)).json()))
       .toMatchObject({ usage: { blobBytes: 0 } });

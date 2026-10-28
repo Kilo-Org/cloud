@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm';
 import { index, integer, primaryKey, sqliteTable, text } from 'drizzle-orm/sqlite-core';
 
 /**
@@ -58,11 +59,19 @@ export const receipts = sqliteTable(
  * Each attempt has its own R2 key; pending and cleaning rows retain their
  * upload deadline until cleanup deletes the object and releases the row.
  */
-export const blobs = sqliteTable('blobs', {
-  hash: text('hash').primaryKey(),
-  attempt: text('attempt').notNull(),
-  bytes: integer('bytes').notNull(),
-  state: text('state', { enum: ['pending', 'ready', 'cleaning'] }).notNull(),
-  deadline: integer('deadline').notNull(),
-  created_at: integer('created_at').notNull(),
-});
+export const blobs = sqliteTable(
+  'blobs',
+  {
+    hash: text('hash').primaryKey(),
+    attempt: text('attempt').notNull(),
+    bytes: integer('bytes').notNull(),
+    state: text('state', { enum: ['pending', 'ready', 'cleaning'] }).notNull(),
+    deadline: integer('deadline').notNull(),
+    created_at: integer('created_at').notNull(),
+  },
+  table => [
+    index('blobs_cleanup_idx')
+      .on(table.deadline, table.hash)
+      .where(sql`${table.state} <> 'ready'`),
+  ]
+);

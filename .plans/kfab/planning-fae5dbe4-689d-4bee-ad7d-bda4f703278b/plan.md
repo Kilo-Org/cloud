@@ -32,12 +32,14 @@ Transient Stripe lock-contention and other SDK-retryable failures get a few boun
 - No change to the webhook route's 400/captureException behavior, and no Sentry throttling or classification of residual errors. That is deferred until the retry's effect is observed.
 - No investigation or serialization of Kilo-originated concurrent PaymentIntent access (triage hyp-3, unverified).
 - No reconciliation of past events or ledger audit (triage mi-1). This needs access to the ledger and the Stripe dashboard.
+- No manual acceptance criteria (operator request). Post-deploy Sentry monitoring and PR-description review are not acceptance gates for this plan.
 
 ## Approach
 
 - In stripe-client.ts, add `const STRIPE_MAX_NETWORK_RETRIES = 2` and pass `maxNetworkRetries: STRIPE_MAX_NETWORK_RETRIES` in the `new Stripe(...)` options. The SDK then retries connection errors and responses it marks as retryable (409 conflicts, `Stripe-Should-Retry: true`, which Stripe sends for lock timeouts, and 5xx on safe requests) with exponential backoff and jitter. It also adds idempotency keys automatically to retried POSTs, so mutating calls stay safe to retry.
 - Before setting the value, the implementer must confirm in the installed stripe@23 SDK source (RequestSender `_shouldRetry` / default `maxNetworkRetries`) that this error's response is classed as retryable and that the explicit value is not lower than the SDK default. If the SDK does not retry this case, stop and report back instead of adding a custom wrapper.
 - Update stripe-client.test.ts: the existing `jest.mock('stripe')` default constructor mock already records its calls. Assert it was called with the secret key and an options object containing `apiVersion` and `maxNetworkRetries: 2`.
+- Following the repository's Failure UX guidance, the change description should state both effects. Brief contention is absorbed in-process. Non-retryable errors still fail on the first attempt, and persistent retryable errors add at most the SDK's bounded backoff before the unchanged 400 path.
 
 ## Affected areas
 
@@ -54,19 +56,12 @@ Transient Stripe lock-contention and other SDK-retryable failures get a few boun
 
 **Verification:** Code review
 
-### ac-3: The change states both failure-UX effects. Brief Stripe lock contention on the `charge.succeeded` path (and other Stripe calls) is retried in-process and no longer fails the webhook. Genuine failures that the SDK classes as non-retryable (e.g. 4xx invalid request, resource_missing) still fail on the first attempt, while persistent retryable failures add at most the SDK's bounded backoff (a few seconds at most) before surfacing through the unchanged 400 + captureException path. The PR description records the stripe@23 SDK retry classification the implementer confirmed.
-
-**Verification:** Manual: reviewer confirms the PR description states the confirmed SDK retry predicate/default and both latency effects
-
-### ac-4: After deploy, new KILOCODE-WEB-28H0 occurrences (Stripe 'currently accessing it' message on POST /api/stripe/webhook) stop or drop clearly below the ~1 per 1-2 days baseline over a two-week window.
-
-**Verification:** Manual: check Sentry issue KILOCODE-WEB-28H0 and the message search for production events two weeks after release
-
 ## Risks
 
 - Global blast radius: retries apply to every Stripe call made through this client, including user-facing ones (checkout, payment-method lookups). Worst-case added latency is bounded by 2 backed-off retries. A Vercel function near its timeout could be pushed over it, but this is unlikely at 2 retries.
 - Retried mutating POSTs rely on the SDK's automatic idempotency keys. Call sites that already pass their own idempotencyKey keep it. No duplicate charges are expected, but reviewers should confirm no call site depends on a single non-idempotent attempt.
 - If the installed SDK does not class this response as retryable, the option will not silence the issue. The approach requires confirming this first and stopping rather than widening scope.
+- With the manual post-deploy criterion removed, whether the Sentry issue actually stops recurring is not gated by this plan.
 
 ## Assumptions
 
@@ -84,5 +79,11 @@ Transient Stripe lock-contention and other SDK-retryable failures get a few boun
 ### d-2: Should residual Stripe transient errors in the webhook route be throttled or downgraded in Sentry now?
 
 **Answer:** No. Keep the existing capture-and-400 path. Revisit only if occurrences persist after the retry ships.
+
+**Blocking:** no
+
+### d-3: Should the plan include manual acceptance criteria (PR-description review, post-deploy Sentry recurrence check)?
+
+**Answer:** No. The operator asked to remove them; only source/code-review criteria remain.
 
 **Blocking:** no

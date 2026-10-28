@@ -40,11 +40,11 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   errorExceptInTest: (...args: unknown[]) => mockedErrorExceptInTest(...args),
 }));
 
+import { gemma_4_26b_a4b_it_free_model, kiloExclusiveModels } from './kilo-exclusive-models';
 import {
-  gemma_4_26b_a4b_it_free_model,
-  kiloExclusiveModels,
-  qwen36_plus_stealth_model,
-} from './kilo-exclusive-models';
+  paidStealthModelFixture,
+  useKiloExclusiveModel,
+} from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 import type { KiloExclusiveModel } from './providers/kilo-exclusive-model';
 import {
   captureProxyError,
@@ -71,6 +71,8 @@ import { createControlledClock } from '@kilocode/web-shared/tests/helpers/timed-
 const clock = createControlledClock();
 
 const waitForUsageWrite = () => new Promise(resolve => setImmediate(resolve));
+
+useKiloExclusiveModel();
 
 describe('getOutputHeaders', () => {
   it.each(['text/event-stream', 'text/event-stream; charset=utf-8', 'Text/Event-Stream'])(
@@ -1742,7 +1744,7 @@ describe('makeErrorReadable', () => {
 
     const result = await makeErrorReadable({
       providerId: 'openrouter',
-      requestedModel: 'stealth/claude-opus-4.7',
+      requestedModel: paidStealthModelFixture.public_id,
       request,
       response,
       userByokProviderIds: null,
@@ -1875,7 +1877,7 @@ describe('requestedSamples', () => {
 
 describe('checkExclusiveModelProviderAllowed', () => {
   const multiProviderModel: KiloExclusiveModel = {
-    ...qwen36_plus_stealth_model,
+    ...paidStealthModelFixture,
     public_id: 'test/multi-provider-exclusive',
     inference_providers: ['anthropic', 'amazon-bedrock'],
   };
@@ -1891,7 +1893,7 @@ describe('checkExclusiveModelProviderAllowed', () => {
   it('allows non-exclusive models, missing provider config, and unrestricted exclusives', () => {
     expect(checkExclusiveModelProviderAllowed('vendor/model', { only: ['openai'] })).toBeNull();
     expect(
-      checkExclusiveModelProviderAllowed(qwen36_plus_stealth_model.public_id, undefined)
+      checkExclusiveModelProviderAllowed(paidStealthModelFixture.public_id, undefined)
     ).toBeNull();
     expect(
       checkExclusiveModelProviderAllowed(gemma_4_26b_a4b_it_free_model.public_id, {
@@ -1922,7 +1924,7 @@ describe('checkExclusiveModelProviderAllowed', () => {
         'No eligible provider can serve the selected model. Please enable provider: anthropic, amazon-bedrock',
     });
 
-    const ignoreResult = checkExclusiveModelProviderAllowed(qwen36_plus_stealth_model.public_id, {
+    const ignoreResult = checkExclusiveModelProviderAllowed(paidStealthModelFixture.public_id, {
       ignore: ['stealth'],
     });
     expect(ignoreResult?.status).toBe(403);

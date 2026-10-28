@@ -15,9 +15,14 @@ import {
   insertCustomLlmForTest,
   publicCustomLlmDefinition,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
-import { qwen36_plus_stealth_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import {
+  paidStealthModelFixture,
+  useKiloExclusiveModel,
+} from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 
 describe('custom LLM catalog', () => {
+  useKiloExclusiveModel();
+
   beforeAll(async () => {
     await insertCustomLlmForTest('Acme/Public-Model', publicCustomLlmDefinition(['acme']));
     await insertCustomLlmForTest('acme/private-model');
@@ -42,7 +47,7 @@ describe('custom LLM catalog', () => {
   });
 
   test('ignores a custom LLM whose id is still a Kilo-exclusive model', async () => {
-    const exclusiveId = qwen36_plus_stealth_model.public_id;
+    const exclusiveId = paidStealthModelFixture.public_id;
     await insertCustomLlmForTest(exclusiveId, publicCustomLlmDefinition(['acme']));
     try {
       await expect(findCustomLlm(exclusiveId)).resolves.toBeNull();

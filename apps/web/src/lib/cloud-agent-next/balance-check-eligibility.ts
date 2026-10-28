@@ -24,11 +24,11 @@ export type BalanceCheckModelEligibility = {
  *   configured that can serve it, so the session is billed against the
  *   user's own key rather than their balance.
  *
- * Kilo-exclusive models (e.g. `stealth/qwen3.6-plus`) are
- * always excluded from the BYOK bypass: they are Kilo-funded and platform
- * billed, so even when `getModelUserByokProviders` reports a provider that
- * can route the model, they must still go through the worker-side balance
- * check and cannot be legitimately served via a user's own BYOK key.
+ * Kilo-exclusive models are always excluded from the BYOK bypass: they are
+ * Kilo-funded and platform billed, so even when `getModelUserByokProviders`
+ * reports a provider that can route the model, they must still go through the
+ * worker-side balance check and cannot be legitimately served via a user's own
+ * BYOK key.
  *
  * The resulting predicate is a strict subset of the
  * `isFree || hasUserByokAvailable` predicate used by the NewSessionPanel

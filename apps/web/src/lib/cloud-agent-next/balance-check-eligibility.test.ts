@@ -15,8 +15,14 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/byok', () => ({
 }));
 
 import { computeCloudAgentNextBalanceCheckEligibility } from './balance-check-eligibility';
+import {
+  paidStealthModelFixture,
+  useKiloExclusiveModel,
+} from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 
-const KILO_EXCLUSIVE_MODEL = 'stealth/qwen3.6-plus';
+useKiloExclusiveModel();
+
+const KILO_EXCLUSIVE_MODEL = paidStealthModelFixture.public_id;
 const NON_EXCLUSIVE_MODEL = 'anthropic/claude-sonnet-4';
 
 const fakeDb = {} as never;

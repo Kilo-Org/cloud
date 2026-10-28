@@ -1,4 +1,11 @@
 import { describe, test, expect, beforeAll, afterAll, afterEach } from '@jest/globals';
+// Catalog-mode checks read the catalog snapshot through a process-wide cache. Stubbing them keeps
+// that cache empty for the listSupportedModels test, which inserts its own snapshot.
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+  ...jest.requireActual('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache'),
+  isValidOpenRouterModelId: jest.fn(async () => true),
+}));
+
 import { createCallerForUser } from '@/routers/test-utils';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';

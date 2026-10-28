@@ -106,7 +106,10 @@ export function supportsCatalogMode(providerId: string): boolean {
 export async function offersCatalogMode(providerId: string): Promise<boolean> {
   const provider = findDirectByokProvider(providerId);
   if (!provider?.models_dev_id) return false;
-  return getPrimaryCatalogModels(await provider.models()).size > 0;
+  for (const catalogModelId of getPrimaryCatalogModels(await provider.models()).keys()) {
+    if (await isLiveCatalogModelId(catalogModelId)) return true;
+  }
+  return false;
 }
 
 function isCatalogModeKey(key: EnabledByokProvider): boolean {
@@ -150,7 +153,7 @@ async function getCatalogModeModelIds(keys: EnabledByokProvider[]): Promise<Read
   const modelIds = new Set<string>();
   for (const provider of catalogModeProviders) {
     for (const catalogModelId of getPrimaryCatalogModels(await provider.models()).keys()) {
-      if (!isKiloExclusiveModel(catalogModelId)) modelIds.add(catalogModelId);
+      if (await isLiveCatalogModelId(catalogModelId)) modelIds.add(catalogModelId);
     }
   }
   return modelIds;

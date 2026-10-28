@@ -59,6 +59,7 @@ jest.mock('./direct-byok-definitions', () => ({
       mockModel('hf:moonshotai/Kimi-K2.6-fast', 'moonshotai/kimi-k2.6'),
       mockModel('hf:example/finetune'),
       mockModel('hf:stealth/exclusive', 'stealth/exclusive'),
+      mockModel('hf:moonshotai/retired', 'moonshotai/retired'),
     ]),
     mockProvider('zai-coding', 'zai-coding-plan', [
       mockModel('glm-5.2', 'z-ai/glm-5.2'),
@@ -66,6 +67,7 @@ jest.mock('./direct-byok-definitions', () => ({
     ]),
     mockProvider('martian', undefined, [mockModel('moonshotai/kimi-k2.6', 'moonshotai/kimi-k2.6')]),
     mockProvider('morph-byok', 'morph', [mockModel('morph-v3-fast')]),
+    mockProvider('chutes-byok', 'chutes', [mockModel('moonshotai/retired', 'moonshotai/retired')]),
   ],
 }));
 
@@ -85,11 +87,12 @@ beforeEach(() => {
 });
 
 describe('catalog mode support', () => {
-  test('requires a models.dev id and at least one mapped model', async () => {
+  test('requires a models.dev id and at least one current catalog mapping', async () => {
     expect(supportsCatalogMode('synthetic')).toBe(true);
     expect(supportsCatalogMode('martian')).toBe(false);
     await expect(offersCatalogMode('synthetic')).resolves.toBe(true);
     await expect(offersCatalogMode('morph-byok')).resolves.toBe(false);
+    await expect(offersCatalogMode('chutes-byok')).resolves.toBe(false);
     await expect(offersCatalogMode('martian')).resolves.toBe(false);
   });
 });
@@ -107,7 +110,7 @@ describe('direct BYOK model lists in catalog mode', () => {
     ]);
   });
 
-  test('lists catalog ids served by catalog-mode keys only', async () => {
+  test('lists current catalog ids served by catalog-mode keys only', async () => {
     mockedKeys.mockResolvedValueOnce(keys({ synthetic: true, 'zai-coding': false, martian: true }));
 
     const catalogIds = await getDirectByokCatalogModelIds({ type: 'user', id: 'user-id' });

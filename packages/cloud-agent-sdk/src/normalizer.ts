@@ -135,6 +135,7 @@ export type ServiceEvent =
       branch?: string | undefined;
     }
   | { type: 'warning' }
+  | { type: 'reconnecting' }
   | {
       type: 'preparing';
       step: string;

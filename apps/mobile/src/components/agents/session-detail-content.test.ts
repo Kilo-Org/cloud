@@ -790,6 +790,30 @@ function transcriptKeys(renderer: ReactTestRenderer): string[] {
 }
 
 beforeEach(() => {
+  // Complete the cloud stream bootstrap without opening a network connection.
+  const TestSocket = vi.fn(function TestSocket() {
+    const socket = {
+      readyState: 1,
+      onmessage: null as ((event: { data: string }) => void) | null,
+      close: vi.fn(),
+    };
+    queueMicrotask(() => {
+      socket.onmessage?.({
+        data: JSON.stringify({
+          eventId: 0,
+          sessionId: 'cag-1',
+          streamEventType: 'bootstrap.complete',
+          timestamp: new Date().toISOString(),
+          data: {},
+        }),
+      });
+    });
+    return socket;
+  });
+  vi.stubGlobal('WebSocket', Object.assign(TestSocket, { OPEN: 1 }));
+  onTestFinished(() => {
+    vi.unstubAllGlobals();
+  });
   navigationRoutes.splice(0, navigationRoutes.length, 'session-detail');
   profileRowsState.personal = [];
   profileRowsState.combined = { orgProfiles: [], personalProfiles: [], effectiveDefaultId: null };
@@ -876,7 +900,7 @@ async function mountDetails(
       }
       return { type: 'read-only', kiloSessionId: id };
     },
-    getTicket: vi.fn(),
+    getTicket: vi.fn().mockResolvedValue('test-ticket'),
     fetchSnapshot: vi.fn(),
     // Required by the cloud-agent transport factory; unused by read-only and
     // remote sessions.
@@ -4020,6 +4044,31 @@ describe('SessionDetailContent fixed indicator row', () => {
     // tail ("Retry first.") on a phone width.
     expect(reason?.props.numberOfLines).toBeUndefined();
     expect(reason?.props.ellipsizeMode).toBeUndefined();
+  });
+
+  it('keeps Retry on the terminal card when only preparation rows exist', async () => {
+    const view = await mountDetails([]);
+    act(() => {
+      view.store.set(view.manager.atoms.preparationAttempts, [
+        {
+          id: 'preparation-only',
+          triggerMessageId: 'not-replayed',
+          status: 'failed',
+          startedAt: 1,
+          revision: 1,
+          steps: [],
+        },
+      ]);
+      view.store.set(view.manager.atoms.statusIndicator, {
+        type: 'error',
+        code: 'agent-connection-lost',
+        message: 'Connection to agent lost',
+        timestamp: 0,
+      });
+    });
+
+    expect(view.renderer.root.findByType(QueryError).props.onRetry).toBeTypeOf('function');
+    expect(indicatorNodes(view)).toHaveLength(0);
   });
 
   it('lets the status indicator outrank a resolved cannot-send reason', async () => {

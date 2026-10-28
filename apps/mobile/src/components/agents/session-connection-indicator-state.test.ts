@@ -29,6 +29,7 @@ function resolve(input: {
   return resolveSessionConnectionState({
     activeSessionType: input.activeSessionType,
     agentStatusType: input.agentStatusType,
+    agentActivityType: 'idle',
     userWebConnected: input.userWebConnected,
     reconnectExhausted: input.reconnectExhausted ?? false,
   });
@@ -63,6 +64,25 @@ describe('resolveSessionConnectionState - remote', () => {
 });
 
 describe('resolveSessionConnectionState - cloud-agent', () => {
+  it('reports reconnecting when the session socket drops while the app-wide connection stays up', () => {
+    const transport = resolveSessionConnectionState({
+      activeSessionType: 'cloud-agent',
+      agentStatusType: 'idle',
+      agentActivityType: 'reconnecting',
+      userWebConnected: true,
+      reconnectExhausted: false,
+    });
+    expect(transport).toBe('down');
+    expect(
+      resolveSessionConnectionDisplay({
+        transport,
+        userWebConnected: true,
+        reconnectExhausted: false,
+        everConnected: true,
+      })
+    ).toBe('reconnecting');
+  });
+
   it('reports up for non-disconnected statuses without consulting the user-web leg', () => {
     for (const status of STATUSES.filter(item => item !== 'disconnected')) {
       for (const userWebConnected of CONNECTION_VALUES) {

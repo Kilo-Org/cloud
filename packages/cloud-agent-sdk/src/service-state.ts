@@ -164,6 +164,7 @@ const IDLE_STATUS: AgentStatus = { type: 'idle' };
 
 type ServiceReplayBatch = {
   statusAtStart: AgentStatus;
+  terminalAtStart: boolean;
   questions: readonly QuestionState[];
   permissions: readonly PermissionState[];
   infos: Map<string, SessionInfo>;
@@ -314,7 +315,51 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
     notify();
   }
 
+  function hasAuthoritativeTerminal(): boolean {
+    return (
+      (terminated ||
+        status.type === 'error' ||
+        status.type === 'interrupted' ||
+        status.type === 'disconnected') &&
+      disconnectedSource !== 'transport' &&
+      (replay === null || replay.terminalAtStart)
+    );
+  }
+
+  function processReconnecting(): void {
+    // A reconnecting projection must not replace an authoritative non-transport
+    // terminal (a wrapper `disconnected`, an `error`, an `interrupted`). That
+    // is a projection invariant: the transport emits reconnecting after
+    // `onReconnected` already cleared its per-socket guard, so this is what
+    // keeps the real reason. It is not a second close policy.
+    if (hasAuthoritativeTerminal()) {
+      return;
+    }
+
+    activity = { type: 'reconnecting' };
+
+    // Discard a transport failure or an uncommitted historical replay error.
+    // A terminal present before replay remains authoritative.
+    if (terminated || status.type === 'error') {
+      status = IDLE_STATUS;
+      disconnectedSource = null;
+      terminated = false;
+    }
+
+    notify();
+  }
+
   function processStopped(event: Extract<ServiceEvent, { type: 'stopped' }>): void {
+    // A synthetic transport stop keeps authoritative terminal details, cloud
+    // status, and setup output. It still ends any activity left by the turn.
+    if (event.reason === 'transport-disconnected' && hasAuthoritativeTerminal()) {
+      if (activity.type !== 'idle') {
+        activity = { type: 'idle' };
+        notify();
+      }
+      return;
+    }
+
     activity = { type: 'idle' };
     cloudStatus = null;
     setupLog = [];
@@ -351,9 +396,9 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
         break;
       case 'transport-disconnected':
         // Do NOT clear `pendingMessages` here. Only `cloud-agent-transport.ts`
-        // emits this reason, synthesized locally on any WebSocket hiccup
-        // (frequent, purely client-side, self-recovering via reconnect) —
-        // it never fires for CLI sessions. Cloud-agent sessions genuinely
+        // emits this reason, and only from the reconnect-exhaustion callback —
+        // not on every WebSocket hiccup. It never fires for CLI sessions.
+        // Cloud-agent sessions genuinely
         // populate `pendingMessages` via `cloud.message.queued`, and there is
         // no snapshot-replay mechanism that would repopulate it afterward
         // (unlike the CLI's always-on `session.queue.changed` replay), so
@@ -949,13 +994,11 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       activeMessageId = null;
     }
     if (sessionStatus === undefined) {
-      // When sessionStatus is absent (server has no execution-derived state
-      // yet), default to idle — we know the transport connected, so we're at
-      // least no longer in the 'connecting' phase. Only on initial connect
-      // (activity === 'connecting'); on reconnect, preserve existing activity —
-      // the server will send a separate session.status event with the
-      // authoritative state.
-      if (activity.type === 'connecting') {
+      // Default to idle on initial connect (activity === 'connecting') and on
+      // a reconnect that was showing progress (`reconnecting`). Otherwise
+      // preserve existing activity — the server will send a separate
+      // session.status event with the authoritative state.
+      if (activity.type === 'connecting' || activity.type === 'reconnecting') {
         activity = { type: 'idle' };
       }
     } else {
@@ -1052,6 +1095,9 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       case 'connected':
         processConnected(event);
         break;
+      case 'reconnecting':
+        processReconnecting();
+        break;
       case 'cloud.message.queued':
         processMessageQueued(event);
         break;
@@ -1120,6 +1166,7 @@ function createServiceState(initialConfig: ServiceStateConfig): ServiceState {
       if (replay) return;
       const batch: ServiceReplayBatch = {
         statusAtStart: status,
+        terminalAtStart: hasAuthoritativeTerminal(),
         questions,
         permissions,
         infos: new Map(),

@@ -230,7 +230,10 @@ jest.mock('./QuestionContext', () => ({
 }));
 jest.mock('./PermissionCard', () => ({
   PermissionContextProvider: ({ children }: { children: ReactNode }) => children,
-  PermissionCard: () => null,
+  PermissionCard: () => createElement('div', { 'data-permission': true }),
+}));
+jest.mock('./QuestionToolCard', () => ({
+  QuestionToolCard: () => createElement('div', { 'data-question': true }),
 }));
 jest.mock('./SuggestionCard', () => ({
   SuggestionContextProvider: ({ children }: { children: ReactNode }) => children,
@@ -613,6 +616,21 @@ describe('CloudChatPage terminal ownership across navigation', () => {
       sessionId: 'ses_recent',
       message: 'Installing dependencies',
     });
+    expect(dom.container.querySelector('[role="status"]')?.classList.contains('h-0')).toBe(true);
+  });
+
+  it('keeps reconnecting visible while a preparation row shows progress', () => {
+    mockAtomValues.statusIndicator = {
+      type: 'progress',
+      code: 'reconnecting-to-agent',
+      message: 'Reconnecting to agent…',
+    };
+    mockAtomValues.preparationAttempts = [{ status: 'running', steps: [] }];
+    render();
+
+    const slot = dom.container.querySelector('[role="status"]');
+    expect(slot?.textContent).toContain('Reconnecting to agent');
+    expect(slot?.classList.contains('h-0')).toBe(false);
   });
 
   it('keeps the conversation, composer and PTY mounted while a file is selected in the changes view', () => {
@@ -1076,6 +1094,41 @@ describe('CloudChatPage terminal ownership across navigation', () => {
 
     expect(chatUiWrites()).toEqual([]);
   });
+
+  it.each([
+    ['activeQuestion', { requestId: 'q1', questions: [] }, '[data-question]'],
+    [
+      'activePermission',
+      { requestId: 'p1', permission: 'bash', patterns: [], always: [] },
+      '[data-permission]',
+    ],
+  ] as const)(
+    'keeps the error row and Retry out of the %s hide',
+    (atomKey, value, cardSelector) => {
+      mockAtomValues[atomKey] = value;
+      mockAtomValues.statusIndicator = {
+        type: 'error',
+        message: 'Agent connection lost',
+        code: 'agent-connection-lost',
+      };
+      render();
+
+      // The pending card is really on screen, not just gated in the atoms.
+      expect(dom.container.querySelector(cardSelector)).not.toBeNull();
+
+      const alert = dom.container.querySelector('[role="alert"]');
+      expect(alert).not.toBeNull();
+      // The error row must not sit inside the composer's question/permission hide.
+      expect(alert?.closest('.hidden')).toBeNull();
+      expect(alert?.querySelector('button')?.textContent).toBe('Retry');
+
+      // The composer itself exists and stays hidden behind the question or
+      // permission.
+      const composer = dom.container.querySelector('[data-composer]');
+      expect(composer).not.toBeNull();
+      expect(composer?.closest('.hidden')).not.toBeNull();
+    }
+  );
 });
 
 describe('getWorkspaceTabScope', () => {

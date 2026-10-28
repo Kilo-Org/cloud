@@ -416,7 +416,11 @@ export function isManagerStillWaitingForApproval(handle: LiveSessionManagerHandl
     return true;
   }
   const activity = store.get(manager.atoms.activity);
-  if (activity.type === 'connecting' || activity.type === 'retrying') {
+  if (
+    activity.type === 'connecting' ||
+    activity.type === 'reconnecting' ||
+    activity.type === 'retrying'
+  ) {
     return true;
   }
   return store.get(manager.atoms.agentStatus).type === 'disconnected';

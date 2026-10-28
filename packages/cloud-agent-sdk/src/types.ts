@@ -101,6 +101,7 @@ export type SessionActivity =
   | { type: 'connecting' }
   | { type: 'busy' }
   | { type: 'idle' }
+  | { type: 'reconnecting' }
   | { type: 'retrying'; attempt: number; message: string };
 
 /**
@@ -128,7 +129,8 @@ export type SdkStatusMessageCode =
   | 'service-temporarily-unavailable'
   | 'generic-error'
   | 'connection-lost'
-  | 'connection-failed';
+  | 'connection-failed'
+  | 'reconnecting-to-agent';
 
 /** Lifecycle outcome — drives bottom bar content (one thing at a time). */
 export type AgentStatus =

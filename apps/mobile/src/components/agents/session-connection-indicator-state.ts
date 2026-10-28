@@ -1,10 +1,15 @@
-import { type AgentStatus, type ResolvedSession } from '@kilocode/cloud-agent-sdk';
+import {
+  type AgentStatus,
+  type ResolvedSession,
+  type SessionActivity,
+} from '@kilocode/cloud-agent-sdk';
 
 export type SessionConnectionState = 'up' | 'down' | 'exhausted' | 'none';
 
 export function resolveSessionConnectionState(input: {
   activeSessionType: ResolvedSession['type'] | null;
   agentStatusType: AgentStatus['type'];
+  agentActivityType: SessionActivity['type'];
   userWebConnected: boolean;
   reconnectExhausted: boolean;
 }): SessionConnectionState {
@@ -15,7 +20,9 @@ export function resolveSessionConnectionState(input: {
     return 'up';
   }
   if (input.activeSessionType === 'cloud-agent') {
-    return input.agentStatusType === 'disconnected' ? 'down' : 'up';
+    return input.agentStatusType === 'disconnected' || input.agentActivityType === 'reconnecting'
+      ? 'down'
+      : 'up';
   }
   return 'none';
 }

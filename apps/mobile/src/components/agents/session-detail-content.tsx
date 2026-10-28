@@ -320,6 +320,7 @@ export function SessionDetailContent({
   const isStreaming = useAtomValue(manager.atoms.isStreaming);
   const statusIndicator = useAtomValue(manager.atoms.statusIndicator);
   const agentStatus = useAtomValue(manager.atoms.agentStatus);
+  const agentActivity = useAtomValue(manager.atoms.activity);
   const cloudStatus = useAtomValue(manager.atoms.cloudStatus);
   const preparationAttempts = useAtomValue(manager.atoms.preparationAttempts);
   const canSend = useAtomValue(manager.atoms.canSend);
@@ -1684,6 +1685,7 @@ export function SessionDetailContent({
   const connectionState = resolveSessionConnectionState({
     activeSessionType,
     agentStatusType: agentStatus.type,
+    agentActivityType: agentActivity.type,
     userWebConnected,
     reconnectExhausted,
   });
@@ -1804,10 +1806,17 @@ export function SessionDetailContent({
   const hasFooterStatusIndicator =
     (!cachedMetadataRefresh && footerStatusIndicator !== null) ||
     (cloudStatus !== null && cloudStatus.type !== 'ready');
-  const shouldShowFooterWorking = shouldShowFooterWorkingIndicator({
-    isAgentWorking: shouldShowWorkingIndicator,
-    hasStatusIndicator: hasFooterStatusIndicator,
+  const terminalError = resolveSessionTerminalError({
+    error,
+    statusIndicator,
+    messageCount: messages.length,
   });
+  const shouldShowFooterWorking =
+    terminalError === null &&
+    shouldShowFooterWorkingIndicator({
+      isAgentWorking: shouldShowWorkingIndicator,
+      hasStatusIndicator: hasFooterStatusIndicator,
+    });
   // Only a live PreparationGroup duplicates footer progress. Completed groups
   // stay in the transcript after cold starts and must not suppress a later
   // recycle re-prepare footer (Setting up environment…).
@@ -1852,9 +1861,12 @@ export function SessionDetailContent({
     cloudStatusType: cloudStatus?.type,
     hasInProgressTranscriptPreparation,
     shouldShowFooterWorking,
-    hasStatusIndicator: !cachedMetadataRefresh && footerStatusIndicator !== null,
+    hasStatusIndicator:
+      terminalError === null && !cachedMetadataRefresh && footerStatusIndicator !== null,
     hasSendReason: sendDisabledReason !== null && !isReadOnlyTranscript,
-    messageCount: messages.length,
+    statusIndicatorCode: footerStatusIndicator?.code,
+    statusIndicatorType: footerStatusIndicator?.type,
+    transcriptItemCount: transcript.length,
   });
 
   const isSessionLoaded = fetchedData?.kiloSessionId === sessionId;
@@ -2554,7 +2566,13 @@ export function SessionDetailContent({
               <WorkingIndicator messages={messages} isStreaming={shouldShowFooterWorking} />
             ) : null}
             {sessionFooterItem === 'status' && footerStatusIndicator !== null ? (
-              <SessionStatusIndicator indicator={footerStatusIndicator} />
+              <SessionStatusIndicator
+                indicator={footerStatusIndicator}
+                onRetry={() => {
+                  void manager.switchSession(sessionId);
+                }}
+                disabled={isLoading}
+              />
             ) : null}
             {sessionFooterItem === 'reason' && sendDisabledReason !== null ? (
               <AccessibleStatus
@@ -2695,11 +2713,6 @@ export function SessionDetailContent({
   }
 
   function renderContent() {
-    const terminalError = resolveSessionTerminalError({
-      error,
-      statusIndicator,
-      messageCount: messages.length,
-    });
     if (terminalError) {
       const copyText = buildTerminalErrorCopyText({
         sessionId,
@@ -2777,7 +2790,13 @@ export function SessionDetailContent({
         return (
           <CenteredState>
             <View className="items-center px-6">
-              <SessionStatusIndicator indicator={statusIndicator} />
+              <SessionStatusIndicator
+                indicator={statusIndicator}
+                onRetry={() => {
+                  void manager.switchSession(sessionId);
+                }}
+                disabled={isLoading}
+              />
             </View>
           </CenteredState>
         );

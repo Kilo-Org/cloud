@@ -602,6 +602,7 @@ function makeManager() {
       isStreaming: { value: false },
       statusIndicator: { value: null },
       agentStatus: { value: { type: 'connected' } },
+      activity: { value: { type: 'idle' } },
       cloudStatus: { value: null },
       preparationAttempts: { value: [] },
       canSend: { value: true },

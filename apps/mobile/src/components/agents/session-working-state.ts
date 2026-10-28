@@ -16,7 +16,14 @@ type SessionFooterRowInput = {
   hasStatusIndicator: boolean;
   /** True when the composer resolved a cannot-send reason to state. */
   hasSendReason: boolean;
-  messageCount: number;
+  /**
+   * The footer indicator's code and type. The preparing hide exempts the
+   * reconnecting indicator and every error indicator because the preparation
+   * row cannot show connection recovery or terminal failures.
+   */
+  statusIndicatorCode?: string | null | undefined;
+  statusIndicatorType?: string | null | undefined;
+  transcriptItemCount: number;
 };
 
 /**
@@ -60,8 +67,8 @@ export function shouldShowFooterWorkingIndicator({
  * indicator, then the cannot-send reason.
  *
  * Two transcript surfaces already state progress, so neither takes a progress
- * item here. An empty transcript renders its own centered indicator, and a live
- * PreparationGroup shows the current preparation attempt. Stale
+ * item here. An empty transcript centers an available status indicator, and a
+ * live PreparationGroup shows the current preparation attempt. Stale
  * completed/failed groups must not suppress the row — otherwise a recycle
  * re-prepare can leave a blank progress window until the new running attempt
  * merges. The reason states a send gate no transcript surface carries, so it
@@ -74,11 +81,20 @@ export function resolveSessionFooterRowItem({
   shouldShowFooterWorking,
   hasStatusIndicator,
   hasSendReason,
-  messageCount,
+  statusIndicatorCode,
+  statusIndicatorType,
+  transcriptItemCount,
 }: SessionFooterRowInput): SessionFooterRowItem | null {
   const transcriptOwnsProgress =
-    messageCount === 0 || (cloudStatusType === 'preparing' && hasInProgressTranscriptPreparation);
-  if (!transcriptOwnsProgress) {
+    (transcriptItemCount === 0 && hasStatusIndicator) ||
+    (cloudStatusType === 'preparing' && hasInProgressTranscriptPreparation);
+  // An empty rendered transcript shows its own centered status indicator.
+  const indicatorMustStayVisible =
+    transcriptItemCount > 0 &&
+    cloudStatusType === 'preparing' &&
+    hasInProgressTranscriptPreparation &&
+    (statusIndicatorCode === 'reconnecting-to-agent' || statusIndicatorType === 'error');
+  if (!transcriptOwnsProgress || indicatorMustStayVisible) {
     if (shouldShowFooterWorking) {
       return 'working';
     }

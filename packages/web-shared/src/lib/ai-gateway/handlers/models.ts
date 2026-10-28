@@ -19,6 +19,10 @@ import {
 import { listUsableCustomRouters } from '@kilocode/web-shared/lib/ai-gateway/custom-routers';
 import { appendLocalFakeDeterministicCatalogModels } from '@kilocode/web-shared/lib/ai-gateway/local-fake-llm';
 import {
+  requestCountryCode,
+  withoutCustomLlmsDeniedInCountry,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
+import {
   getEnkryptBenchmarks,
   publishEnkryptModels,
 } from '@kilocode/web-shared/lib/model-stats/enkrypt';
@@ -59,10 +63,11 @@ async function tryGetUserFromAuth() {
  * Test using:
  * curl -vvv 'http://localhost:3000/api/openrouter/models'
  */
-export async function handleModelsRequest(): Promise<
-  NextResponse<{ error: string; message?: string } | OpenRouterModelsResponse>
-> {
+export async function handleModelsRequest(
+  request: Request
+): Promise<NextResponse<{ error: string; message?: string } | OpenRouterModelsResponse>> {
   const auth = await tryGetUserFromAuth();
+  const countryCode = requestCountryCode(request.headers);
   try {
     const result =
       auth?.organizationId && auth.user
@@ -75,7 +80,7 @@ export async function handleModelsRequest(): Promise<
         : null;
     if (result && auth.user && auth.organizationId) {
       const [models, customRouters] = await Promise.all([
-        addAutoRoutingModels(result.data),
+        withoutCustomLlmsDeniedInCountry(result.data, countryCode).then(addAutoRoutingModels),
         usableCustomRouters({ userId: auth.user.id, organizationId: auth.organizationId }),
       ]);
       return await modelResponse({
@@ -88,7 +93,9 @@ export async function handleModelsRequest(): Promise<
     if (!Array.isArray(data.data)) {
       return NextResponse.json(data);
     }
-    const models = await addAutoRoutingModels(data.data);
+    const models = await addAutoRoutingModels(
+      await withoutCustomLlmsDeniedInCountry(data.data, countryCode)
+    );
     if (!auth?.user) {
       return await modelResponse({
         data: appendLocalFakeDeterministicCatalogModels(models),

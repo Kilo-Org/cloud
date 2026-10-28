@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
+import type { CustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { handleModelsRequest } from './models';
 
 jest.mock('@sentry/nextjs', () => ({ captureException: jest.fn() }));
@@ -35,6 +36,9 @@ jest.mock('@kilocode/web-shared/lib/ai-gateway/auto-model/resolution', () => ({
   getAutoFreeCandidates: jest.fn(),
 }));
 jest.mock('@kilocode/web-shared/lib/drizzle', () => ({ readDb: {} }));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog', () => ({
+  getCustomLlmsById: jest.fn(),
+}));
 
 const { getUserFromAuth } = jest.requireMock('@kilocode/web-shared/lib/user/server');
 const { getEnhancedOpenRouterModels } = jest.requireMock(
@@ -72,6 +76,34 @@ const mockedGetAvailableModelsForOrganization = jest.mocked(getAvailableModelsFo
 const mockedGetCachedRoutingTable = jest.mocked(getCachedRoutingTable);
 const mockedGetAutoFreeCandidates = jest.mocked(getAutoFreeCandidates);
 const mockedListUsableCustomRouters = jest.mocked(listUsableCustomRouters);
+const { getCustomLlmsById } = jest.requireMock(
+  '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog'
+);
+const mockedGetCustomLlmsById = jest.mocked(getCustomLlmsById);
+
+function request(headers?: Record<string, string>) {
+  return new Request('http://localhost:3000/api/v1/models', { headers });
+}
+
+function countryDeniedCustomLlms(): ReadonlyMap<string, CustomLlm> {
+  return new Map([
+    [
+      'acme/country-denied',
+      {
+        public_id: 'acme/country-denied',
+        encrypted_api_key: null,
+        definition: {
+          display_name: 'Country-denied custom LLM',
+          context_length: 1000,
+          max_completion_tokens: 100,
+          base_url: 'https://upstream.example.com/v1',
+          public: { inference_providers: ['acme'], description: 'Public model' },
+          country_deny_list: ['CU'],
+        },
+      },
+    ],
+  ]);
+}
 
 function makeModel(id: string): OpenRouterModel {
   return {
@@ -108,10 +140,50 @@ describe('GET /api/openrouter/models', () => {
     mockedGetCachedRoutingTable.mockResolvedValue(null);
     mockedGetAutoFreeCandidates.mockResolvedValue([]);
     mockedListUsableCustomRouters.mockResolvedValue([]);
+    mockedGetCustomLlmsById.mockResolvedValue(countryDeniedCustomLlms());
+  });
+
+  test('hides custom LLMs denied in the request country', async () => {
+    const publicModel = makeModel('public/model');
+    mockedGetEnhancedOpenRouterModels.mockResolvedValue({
+      data: [publicModel, makeModel('acme/country-denied')],
+    });
+
+    const response = await handleModelsRequest(request({ 'x-vercel-ip-country': 'CU' }));
+
+    await expect(response.json()).resolves.toEqual({ data: [publicModel] });
+  });
+
+  test('hides custom LLMs denied in the request country from organization models', async () => {
+    const allowedModel = makeModel('openai/gpt-5.4-mini');
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: { id: 'user-id' },
+      organizationId: 'org-1',
+      authFailedResponse: null,
+    } as never);
+    mockedGetAvailableModelsForOrganization.mockResolvedValue({
+      data: [allowedModel, makeModel('acme/country-denied')],
+    } as never);
+
+    const response = await handleModelsRequest(request({ 'x-vercel-ip-country': 'CU' }));
+
+    await expect(response.json()).resolves.toEqual({ data: [allowedModel] });
+  });
+
+  test.each([
+    ['another country', { 'x-vercel-ip-country': 'US' }],
+    ['an unknown country', undefined],
+  ])('keeps country-restricted custom LLMs for %s', async (_name, headers) => {
+    const deniedModel = makeModel('acme/country-denied');
+    mockedGetEnhancedOpenRouterModels.mockResolvedValue({ data: [deniedModel] });
+
+    const response = await handleModelsRequest(request(headers));
+
+    await expect(response.json()).resolves.toEqual({ data: [deniedModel] });
   });
 
   test('leaves BYOK availability undefined for unauthenticated requests', async () => {
-    const response = await handleModelsRequest();
+    const response = await handleModelsRequest(request());
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ data: [makeModel('public/model')] });
@@ -139,7 +211,7 @@ describe('GET /api/openrouter/models', () => {
       { ...publicModel, hasUserByokAvailable: true },
     ]);
 
-    const response = await handleModelsRequest();
+    const response = await handleModelsRequest(request());
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
@@ -164,7 +236,7 @@ describe('GET /api/openrouter/models', () => {
         )
     );
 
-    const response = await handleModelsRequest();
+    const response = await handleModelsRequest(request());
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
@@ -203,7 +275,7 @@ describe('GET /api/openrouter/models', () => {
       },
     } as never);
 
-    const response = await handleModelsRequest();
+    const response = await handleModelsRequest(request());
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
@@ -250,7 +322,7 @@ describe('GET /api/openrouter/models', () => {
       },
     } as never);
 
-    const response = await handleModelsRequest();
+    const response = await handleModelsRequest(request());
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({
@@ -291,7 +363,7 @@ describe('GET /api/openrouter/models', () => {
       },
     ]);
 
-    const response = await handleModelsRequest();
+    const response = await handleModelsRequest(request());
 
     expect(response.status).toBe(200);
     expect(mockedListUsableCustomRouters).toHaveBeenCalledWith({
@@ -320,7 +392,7 @@ describe('GET /api/openrouter/models', () => {
     mockedAddUserByokAvailability.mockResolvedValue([publicModel]);
     mockedListUsableCustomRouters.mockRejectedValue(new Error('database unavailable'));
 
-    const response = await handleModelsRequest();
+    const response = await handleModelsRequest(request());
 
     expect(response.status).toBe(200);
     await expect(response.json()).resolves.toEqual({ data: [publicModel] });

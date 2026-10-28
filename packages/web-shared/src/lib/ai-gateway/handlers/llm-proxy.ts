@@ -43,6 +43,10 @@ import {
   isPublicCustomLlm,
 } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
+  isCustomLlmDeniedInCountry,
+  requestCountryCode,
+} from '@kilocode/web-shared/lib/ai-gateway/custom-llm/country-deny-list';
+import {
   accountForMicrodollarUsage,
   captureProxyError,
   getOrganizationProviderPrivacy,
@@ -246,6 +250,7 @@ export async function handleLlmProxyRequest(
 
   // Extract IP early (needed for free model routing fallback and rate limiting)
   const ipAddress = rawClientIp(request);
+  const countryCode = requestCountryCode(request.headers);
 
   // Cap the account before this function starts any database work. Every WAF
   // rule in front of this route counts per IP, so an actor rotating addresses
@@ -600,6 +605,13 @@ export async function handleLlmProxyRequest(
         customRouterDecision,
         organizationContext: organizationContextPromise,
         isAutoFreeCandidateAllowed: async modelId => {
+          const candidateCustomLlm = await findCustomLlm(modelId);
+          if (
+            candidateCustomLlm &&
+            isCustomLlmDeniedInCountry(candidateCustomLlm.definition, countryCode)
+          ) {
+            return false;
+          }
           const policy = await organizationGroupPolicyPromise;
           return policy ? (await getEffectiveModelDecision(policy, modelId)).allowed : true;
         },
@@ -873,6 +885,7 @@ export async function handleLlmProxyRequest(
     organizationId,
     botId,
     boundedSpending: requestCostLimit !== null,
+    countryCode,
     getRoutingProviderConfig: async () =>
       withIgnoredProviders(
         (await accessCheckResolver.getRoutingProviderConfig?.()) ?? requestBodyParsed.body.provider,

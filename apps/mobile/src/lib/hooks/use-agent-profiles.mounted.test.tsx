@@ -3,6 +3,7 @@ import { createElement } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as z from 'zod';
 
 import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
 import {
@@ -20,12 +21,14 @@ const mocks = vi.hoisted(() => ({
     listCombined: vi.fn(),
     get: vi.fn(),
     overview: vi.fn(),
+    agents: vi.fn(),
   },
   queryInputs: {
     list: undefined as unknown,
     listCombined: undefined as unknown,
     get: undefined as unknown,
     overview: undefined as unknown,
+    agents: undefined as unknown,
   },
   mutations: {
     create: vi.fn(),
@@ -49,6 +52,7 @@ vi.mock('@/lib/trpc', () => {
     return {
       pathFilter: () => ({ queryKey: ['agentProfiles', path] }),
       queryKey: (input: unknown) => ['agentProfiles', path, input],
+      queryFilter: (input: unknown) => ({ queryKey: ['agentProfiles', path, input] }),
       queryOptions: (input: unknown) => {
         mocks.queryInputs[name] = input;
         return {
@@ -75,6 +79,7 @@ vi.mock('@/lib/trpc', () => {
       listCombined: queryProcedure('listCombined', 'listCombined'),
       get: queryProcedure('get', 'get'),
       overview: queryProcedure('overview', 'overview'),
+      agents: queryProcedure('agents', 'agents'),
       create: mutationProcedure('create', 'create'),
       update: mutationProcedure('update', 'update'),
       delete: mutationProcedure('delete', 'delete'),
@@ -322,6 +327,46 @@ describe('useAgentProfileMutations', () => {
     });
     await waitFor(() => invalidateSpy.mock.calls.length > 0);
     expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ['agentProfiles'] });
+    unmount();
+  });
+
+  /**
+   * The delete path invalidates the whole namespace but must not refetch the
+   * deleted profile's own reads: their only possible answer is NOT_FOUND, which
+   * the mounted screens would render as a failure over a profile the user just
+   * removed. Parsed with zod because the spy's arguments are untyped.
+   */
+  it("delete invalidates the namespace without refetching the deleted profile's reads", async () => {
+    const holder: { current: MutationsResult | null } = { current: null };
+    const { queryClient, unmount } = await renderWithProviders(createElement(MutationsProbe, { holder }));
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const invalidateArg = z.object({
+      predicate: z.custom<(query: { queryKey: readonly unknown[] }) => boolean>(
+        value => typeof value === 'function'
+      ),
+    });
+
+    await act(async () => {
+      await current(holder).deleteProfile.mutateAsync({ profileId: 'profile-1' });
+    });
+
+    const parsed = invalidateSpy.mock.calls
+      .map(([arg]) => invalidateArg.safeParse(arg))
+      .find(result => result.success);
+    const predicate = parsed?.data.predicate;
+    expect(predicate).toBeDefined();
+    if (predicate === undefined) {
+      throw new Error('delete did not invalidate with a predicate');
+    }
+    for (const path of ['get', 'overview', 'agents']) {
+      expect(predicate({ queryKey: ['agentProfiles', path, { profileId: 'profile-1' }] })).toBe(
+        false
+      );
+    }
+    expect(predicate({ queryKey: ['agentProfiles', 'get', { profileId: 'profile-2' }] })).toBe(true);
+    expect(predicate({ queryKey: ['agentProfiles', 'agents', { profileId: 'profile-3' }] })).toBe(
+      true
+    );
     unmount();
   });
 

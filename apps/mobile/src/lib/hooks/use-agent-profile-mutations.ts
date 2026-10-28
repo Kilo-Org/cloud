@@ -170,15 +170,18 @@ export function useAgentProfileMutations(organizationId?: string) {
       trpc.agentProfiles.delete.mutationOptions({
         ...callbacks,
         // The deleted profile's screens stay mounted until navigation ends.
-        // Refetching its detail or its Overview can only fail with NOT_FOUND,
-        // so skip both.
+        // Refetching its detail, its Overview, or its agent list can only fail
+        // with NOT_FOUND, so skip all three.
         onSuccess: (_data, { profileId }) => {
           const deletedDetail = trpc.agentProfiles.get.queryFilter({ profileId });
           const deletedOverview = trpc.agentProfiles.overview.queryFilter({ profileId });
+          const deletedAgents = trpc.agentProfiles.agents.queryFilter({ profileId });
           void queryClient.invalidateQueries({
             ...profilesFilter,
             predicate: query =>
-              !matchQuery(deletedDetail, query) && !matchQuery(deletedOverview, query),
+              !matchQuery(deletedDetail, query) &&
+              !matchQuery(deletedOverview, query) &&
+              !matchQuery(deletedAgents, query),
           });
         },
       }),

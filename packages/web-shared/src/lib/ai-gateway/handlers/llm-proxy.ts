@@ -1150,7 +1150,12 @@ export async function handleLlmProxyRequest(
 
   const clonedReponse = response.clone(); // reading from body is side-effectful
 
-  const accounting = accountForMicrodollarUsage(clonedReponse, usageContext, openrouterRequestSpan);
+  const accounting = accountForMicrodollarUsage(
+    clonedReponse,
+    usageContext,
+    openrouterRequestSpan,
+    effectiveProviderContext.provider
+  );
   const settlementToken = request.headers.get(BRIEFING_SETTLEMENT_HEADER);
   if (
     settlementToken &&

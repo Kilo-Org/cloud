@@ -60,6 +60,11 @@ import {
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import { extractReasoningSetting } from './llm-proxy-helpers';
 import { fetchGeneration } from './providers/upstream-request';
+import {
+  createUserOpenRouterProvider,
+  OPENROUTER,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
+import { createUserVercelAiGatewayProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
 
 jest.mock('@sentry/nextjs', () => ({
   ...jest.requireActual<object>('@sentry/nextjs'),
@@ -1657,6 +1662,47 @@ describe('logMicrodollarUsage', () => {
     afterEach(() => {
       jest.mocked(console.warn).mockRestore();
     });
+
+    test.each([
+      {
+        case: 'the serving provider with a user gateway key',
+        userSuffix: 'user-key',
+        servingProvider: createUserOpenRouterProvider('user-openrouter-key'),
+        expectedApiKey: 'user-openrouter-key',
+      },
+      {
+        case: 'Kilo OpenRouter without a serving provider',
+        userSuffix: 'kilo-key',
+        expectedApiKey: OPENROUTER.apiKey,
+      },
+      {
+        case: 'Kilo OpenRouter when the serving provider is another gateway',
+        userSuffix: 'other-gateway',
+        servingProvider: createUserVercelAiGatewayProvider('user-vercel-key'),
+        expectedApiKey: OPENROUTER.apiKey,
+      },
+    ])(
+      'looks up the generation with $case',
+      async ({ userSuffix, servingProvider, expectedApiKey }) => {
+        const user = await insertTestUser({
+          id: `test-generation-lookup-${userSuffix}`,
+          microdollars_used: 0,
+          google_user_email: `generation-lookup-${userSuffix}@example.com`,
+        });
+        jest.mocked(fetchGeneration).mockResolvedValue(undefined);
+
+        await processTokenData(
+          { ...transcriptionStats },
+          { ...createBaseUsageContext(user), api_kind: 'audio_transcriptions', user_byok: true },
+          servingProvider
+        );
+
+        expect(fetchGeneration).toHaveBeenCalledWith(
+          'gen-stt-123',
+          expect.objectContaining({ id: 'openrouter', apiKey: expectedApiKey })
+        );
+      }
+    );
 
     test('reports the unresolved cost when the generation lookup fails', async () => {
       const user = await insertTestUser({

@@ -44,6 +44,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import type {
   GatewayChatApiKind,
+  Provider,
   ProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
@@ -690,11 +691,17 @@ export function wrapInSafeNextResponse(response: Response) {
 export function accountForMicrodollarUsage(
   clonedReponse: Response,
   usageContext: MicrodollarUsageContext,
-  openrouterRequestSpan: Span | undefined
+  openrouterRequestSpan: Span | undefined,
+  servingProvider: Provider
 ) {
   const logFileExtension = usageContext.isStreaming ? '.log.resp.sse' : '.log.resp.json';
   debugSaveProxyResponseStream(clonedReponse, logFileExtension);
-  const accounting = countAndStoreUsage(clonedReponse, usageContext, openrouterRequestSpan);
+  const accounting = countAndStoreUsage(
+    clonedReponse,
+    usageContext,
+    openrouterRequestSpan,
+    servingProvider
+  );
   after(accounting);
   return accounting;
 }

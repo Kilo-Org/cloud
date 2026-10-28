@@ -529,7 +529,8 @@ describe('POST /api/openrouter/v1/chat/completions bearer audiences', () => {
         user_byok: true,
         is_free: false,
       }),
-      expect.anything()
+      expect.anything(),
+      expect.objectContaining({ id: provider.id, apiKey: provider.apiKey })
     );
   });
 

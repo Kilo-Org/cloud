@@ -715,6 +715,7 @@ describe('production SFO queued accounting', () => {
   );
 
   test('selected production mode retries a real HTTP publication with the same finalized identity', async () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0);
     configureQueueEnvironment();
     const bodies: UsageRecordRequest[] = [];
     const server = createServer(async (request, response) => {
@@ -787,6 +788,7 @@ describe('production SFO queued accounting', () => {
   });
 
   test('selected timeout returns failed accounting without direct fallback', async () => {
+    jest.spyOn(Math, 'random').mockReturnValue(0);
     configureQueueEnvironment();
     const nativeTimeout = AbortSignal.timeout;
     jest.spyOn(AbortSignal, 'timeout').mockImplementation(() => nativeTimeout(5));
@@ -872,6 +874,7 @@ describe('production SFO queued accounting', () => {
   test.each([202, 401, 503])(
     'selected late after() work tracks HTTP %s without a second accounting path',
     async status => {
+      if (status === 503) jest.spyOn(Math, 'random').mockReturnValue(0);
       configureQueueEnvironment();
       const lifetime = requestLifetime();
       const generation = Promise.withResolvers<void>();
@@ -1284,6 +1287,7 @@ describe('queued usage accounting', () => {
   )(
     'Next accounting lifetime awaits $region HTTP $status from $mode work',
     async ({ region, mode, status }) => {
+      if (status === 503) jest.spyOn(Math, 'random').mockReturnValue(0);
       config.USAGE_QUEUE_ONLY_ENABLED = true;
       process.env.VERCEL_REGION = region;
       const lifecycle = requestLifetime();
@@ -1334,6 +1338,7 @@ describe('queued usage accounting', () => {
   test.each(['fra1', 'sfo1'])(
     '%s accounting lifetime includes retry backoff and the next publication',
     async region => {
+      jest.spyOn(Math, 'random').mockReturnValue(0);
       config.USAGE_QUEUE_ONLY_ENABLED = true;
       process.env.VERCEL_REGION = region;
       const secondAttempt = Promise.withResolvers<void>();
@@ -1415,6 +1420,8 @@ describe('queued usage accounting', () => {
     test.each(['fra1', 'sfo1'].flatMap(region => failures.map(failure => ({ region, failure }))))(
       '$region accounts for $failure without publishing a duplicate',
       async ({ region, failure }) => {
+        if (['http_503', 'timeout', 'transport_failure'].includes(failure))
+          jest.spyOn(Math, 'random').mockReturnValue(0);
         config.USAGE_QUEUE_ONLY_ENABLED = true;
         process.env.VERCEL_REGION = region;
         fetchGeneration.mockResolvedValue(null);
@@ -1607,6 +1614,7 @@ describe('queued usage accounting', () => {
   )(
     'Bouncer $region HTTP $status spendWatch=$spendWatch avoids gateway outbox delivery',
     async ({ region, spendWatch, status }) => {
+      if (status === 503) jest.spyOn(Math, 'random').mockReturnValue(0);
       config.USAGE_QUEUE_ONLY_ENABLED = true;
       process.env.VERCEL_REGION = region;
       jest.mocked(fetch).mockImplementation(async (_url, init) => {
@@ -1836,6 +1844,7 @@ describe('prompt ordinary Bouncer reports for the selected queue transport', () 
   test.each([false, true])(
     '503 retry retains one payload/report with spendWatch=%s',
     async spendWatch => {
+      jest.spyOn(Math, 'random').mockReturnValue(0);
       configureQueueEnvironment();
       const retryStarted = Promise.withResolvers<void>();
       const accepted = Promise.withResolvers<Response>();
@@ -1939,6 +1948,7 @@ describe('prompt ordinary Bouncer reports for the selected queue transport', () 
   test.each(['not_configured', 'ambiguous_200', 'http_503', 'unexpected_rejection', 'no_scope'])(
     'ordinary report remains single when queued accounting writes directly: %s',
     async failure => {
+      if (failure === 'http_503') jest.spyOn(Math, 'random').mockReturnValue(0);
       configureQueueEnvironment();
       if (failure === 'not_configured') {
         config.USAGE_INGEST_URL = '';

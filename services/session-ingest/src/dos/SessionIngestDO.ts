@@ -231,7 +231,11 @@ function readIngestMetaNumber(db: DrizzleSqliteDODatabase, key: NumericMetaKey):
   return Number.isFinite(n) ? n : null;
 }
 
-function writeIngestMetaNumber(db: DrizzleSqliteDODatabase, key: NumericMetaKey, value: number): void {
+function writeIngestMetaNumber(
+  db: DrizzleSqliteDODatabase,
+  key: NumericMetaKey,
+  value: number
+): void {
   const serialized = String(value);
   db.insert(ingestMeta)
     .values({ key, value: serialized })
@@ -2314,10 +2318,7 @@ export class SessionIngestDO extends DurableObject<Env> {
     writeCloneMeta(this.db, 'cloneDestinationSessionId', params.destinationSessionId);
     // Staged rows are written here, outside the ingest loop, so the running cost no longer
     // describes them: drop it and let the destination seed from its copied rows once.
-    this.db
-      .delete(ingestMeta)
-      .where(eq(ingestMeta.key, RUNNING_ASSISTANT_COST_META_KEY))
-      .run();
+    this.db.delete(ingestMeta).where(eq(ingestMeta.key, RUNNING_ASSISTANT_COST_META_KEY)).run();
     // Keep "no cut key <=> full clone" true on every write, without relying on
     // resets wiping the whole meta table.
     if (params.upToMessageId !== undefined) {

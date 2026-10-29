@@ -507,9 +507,9 @@ describe('storedAssistantMessageCostUsd', () => {
   });
 
   it('contributes nothing for an offloaded body', () => {
-    expect(
-      storedAssistantMessageCostUsd({ item_data: '{}', item_data_r2_key: 'items/blob' })
-    ).toBe(0);
+    expect(storedAssistantMessageCostUsd({ item_data: '{}', item_data_r2_key: 'items/blob' })).toBe(
+      0
+    );
   });
 
   it('contributes nothing for a missing, user or malformed row', () => {
@@ -520,7 +520,9 @@ describe('storedAssistantMessageCostUsd', () => {
         item_data_r2_key: null,
       })
     ).toBe(0);
-    expect(storedAssistantMessageCostUsd({ item_data: 'not json', item_data_r2_key: null })).toBe(0);
+    expect(storedAssistantMessageCostUsd({ item_data: 'not json', item_data_r2_key: null })).toBe(
+      0
+    );
   });
 
   it('applies the same clamp as the full recomputation', () => {

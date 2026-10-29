@@ -3402,7 +3402,7 @@ describe('SessionIngestDO integration', () => {
     it('reads a bounded number of part rows for a turn with many parts', async () => {
       const partCount = 3000;
 
-      async function seedTurn(sessionId: string, completed: boolean) {
+      async function seedTurn(sessionId: string, completed: boolean, partText: string) {
         const stub = getStub(kiloUserId, sessionId);
         await ingestBusyStatus(stub, sessionId);
         await stub.ingest(
@@ -3431,7 +3431,7 @@ describe('SessionIngestDO integration', () => {
                 id: partId,
                 messageID: 'msg_many',
                 type: 'text',
-                text: 'Response text. ',
+                text: partText,
               }),
               1000 + index
             );
@@ -3454,7 +3454,8 @@ describe('SessionIngestDO integration', () => {
             return cursor;
           };
           JSON.parse = ((text: string, ...rest: unknown[]) => {
-            if (typeof text === 'string' && text.includes('"messageID":"msg_many"')) parsedParts += 1;
+            if (typeof text === 'string' && text.includes('"messageID":"msg_many"'))
+              parsedParts += 1;
             return (jsonParse as (value: string, ...args: unknown[]) => unknown)(text, ...rest);
           }) as typeof JSON.parse;
           try {
@@ -3476,28 +3477,41 @@ describe('SessionIngestDO integration', () => {
         });
       }
 
-      const completedSessionId = 'ses_attention_many_parts_completed';
+      // One-character parts never fill the excerpt on their own, so the source-row limit decides
+      // how many of them the read consumes.
+      const cappedSessionId = 'ses_attention_many_parts_capped';
       const unfinishedSessionId = 'ses_attention_many_parts_unfinished';
-      await seedTurn(completedSessionId, true);
-      const completed = await idleIngest(completedSessionId);
-      await seedTurn(unfinishedSessionId, false);
+      // Long parts fill the excerpt after a few rows, so the read stops before the row limit.
+      const settledSessionId = 'ses_attention_many_parts_settled';
+      await seedTurn(cappedSessionId, true, 'x');
+      const capped = await idleIngest(cappedSessionId);
+      await seedTurn(unfinishedSessionId, false, 'x');
       const unfinished = await idleIngest(unfinishedSessionId);
+      await seedTurn(settledSessionId, true, 'Response text. ');
+      const settled = await idleIngest(settledSessionId);
 
-      expect(completed.attentionSignals).toEqual([
+      expect(capped.attentionSignals).toEqual([
         {
           signalId: 'msg_many',
           kind: 'completed',
-          messageExcerpt: `${'Response text. '.repeat(6)}Respons...`,
+          messageExcerpt: 'x'.repeat(BRIEFING_MAX_EXCERPT_SOURCE_ROWS),
         },
       ]);
       // A session without a finished turn builds no excerpt, so the completed session's parsed
       // part bodies are the excerpt read itself, once per part body it takes from the database.
       expect(unfinished.attentionSignals).toEqual([]);
       expect(unfinished.parsedParts).toBe(0);
-      expect(completed.parsedParts).toBeGreaterThan(0);
-      expect(completed.parsedParts).toBeLessThanOrEqual(BRIEFING_MAX_EXCERPT_SOURCE_ROWS);
+      expect(capped.parsedParts).toBe(BRIEFING_MAX_EXCERPT_SOURCE_ROWS);
       // The excerpt read stays within one ordered range pass over the stored parts.
-      expect(completed.rowsRead - unfinished.rowsRead).toBeLessThan(10_000);
+      expect(capped.rowsRead - unfinished.rowsRead).toBeLessThan(10_000);
+      expect(settled.attentionSignals).toEqual([
+        {
+          signalId: 'msg_many',
+          kind: 'completed',
+          messageExcerpt: `${'Response text. '.repeat(6)}Respons...`,
+        },
+      ]);
+      expect(settled.parsedParts).toBe(7);
     });
 
     it('keeps the excerpt of a turn whose text follows many non-text parts', async () => {

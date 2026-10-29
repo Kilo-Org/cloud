@@ -183,7 +183,12 @@ export function CommentRow({
 
   return (
     <View className="gap-2.5">
-      <View className="flex-row items-center gap-2">
+      {/* The overflow's 48dp frame sets this row's height, 10pt above and below
+          its 28pt circle. `-mb-2.5` cancels the root's `gap-2.5` so the body
+          starts at the frame's edge; the containers trim their top padding by
+          the same slack. Every edge stays inside its parent, so the whole
+          frame keeps receiving touches. */}
+      <View className="-mb-2.5 flex-row items-center gap-2">
         {comment.author?.avatarUrl ? (
           <Image
             source={{ uri: comment.author.avatarUrl }}
@@ -221,11 +226,11 @@ export function CommentRow({
             accessibilityLabel={t('prReview.discussion.commentActions')}
             hitSlop={COMMENT_ACTIONS_HIT_SLOP}
             // The frame, not the 16pt glyph, is what the size audit measures.
-            // The author row holds the whole frame (no negative margin: RN
-            // stops delivering touches outside the parent, so a shrunk layout
-            // box would leave part of the target dead). The visible circle
-            // stays compact at 28pt. The 48dp box alone meets Android's
-            // minimum; the slop only extends the reach.
+            // The author row holds the whole frame (no negative margin on the
+            // frame: RN stops delivering touches outside the parent, so a
+            // shrunk layout box would leave part of the target dead). The
+            // visible circle stays compact at 28pt. The 48dp box alone meets
+            // Android's minimum; the slop only extends the reach.
             className={cn(ICON_TARGET_BOX_CLASS, 'rounded-full active:bg-muted')}
           >
             <View className="h-[28px] w-[28px] items-center justify-center">

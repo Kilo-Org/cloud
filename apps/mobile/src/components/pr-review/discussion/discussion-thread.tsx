@@ -182,7 +182,7 @@ export function DiscussionThread({
         {diffSnippet ? <ThreadDiffSnippet snippet={diffSnippet} /> : null}
         <View className="gap-4">
           {thread.comments.map((comment, index) => (
-            <View key={comment.nodeId} className={cn(index > 0 && 'border-t border-border pt-4')}>
+            <View key={comment.nodeId} className={cn(index > 0 && 'border-t border-border pt-1')}>
               <CommentRow
                 comment={comment}
                 owner={owner}

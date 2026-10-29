@@ -194,7 +194,9 @@ export function PrReviewDiscussionList({
         if (item.kind === 'comment') {
           return (
             <View className="px-4 pb-3">
-              <View className="gap-2.5 rounded-xl border border-border bg-card p-3.5">
+              {/* `pt-[2px]`: the author row's overflow frame already carries
+                  10pt above its visible circle (see comment-row.tsx). */}
+              <View className="gap-2.5 rounded-xl border border-border bg-card px-3.5 pb-3.5 pt-[2px]">
                 <CommentRow
                   comment={item.comment}
                   owner={owner}

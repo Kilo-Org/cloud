@@ -11,6 +11,7 @@ import { SessionPreviewOverlay } from '@/components/agents/session-preview-overl
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { TabBarButton } from '@/components/tab-bar-button';
 import { TabBarLabel } from '@/components/tab-bar-label';
+import { TabSwitchInputSettle } from '@/components/tab-screen-input-gate';
 import { BlurBar } from '@/components/ui/blur-bar';
 import { usePendingAppAction } from '@/lib/app-actions/use-pending-app-action';
 import { useLiveAgentSessions } from '@/lib/hooks/use-agent-sessions';
@@ -175,6 +176,7 @@ export default function TabsLayout() {
   const tabsLayout = (
     <StateSurfaceInsets bottomInset={hideTabs ? 0 : tabBarHeight}>
       <Tabs
+        screenLayout={TabSwitchInputSettle}
         screenOptions={{
           headerShown: false,
           freezeOnBlur: true,

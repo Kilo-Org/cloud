@@ -1,4 +1,3 @@
-import * as Haptics from 'expo-haptics';
 import { useRouter } from 'expo-router';
 import { Bell, Clock, Cpu, FolderGit2, Zap } from '@/components/ui/icons';
 import { useEffect, useRef } from 'react';
@@ -9,9 +8,9 @@ import { AuditReportButton } from '@/components/security-agent/audit-report-butt
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
+import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
@@ -166,8 +165,9 @@ export function SettingsOverviewScreen({
     ? t(ANALYSIS_MODE_KEYS[data.analysisMode])
     : data.analysisMode;
 
+  // The haptic on toggle belongs to `ToggleRow`, which owns the press for this
+  // row — firing one here too would fire it twice for a single tap.
   const handleToggle = (value: boolean) => {
-    void Haptics.selectionAsync();
     // When this screen is the PUSHED settings route (reached from the
     // Dashboard's Settings button), toggling OFF makes the base
     // `[scope]/index` re-derive to `disabled-settings` too — leaving two
@@ -241,23 +241,23 @@ export function SettingsOverviewScreen({
       />
       <TabScreenScrollView className="flex-1">
         <View className="gap-6 px-6 py-4">
-          <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
-            <View className="flex-1 pr-3">
-              <Text className="text-sm font-medium">{t('common.securityAgent')}</Text>
-            </View>
-            {capability.canManage ? (
-              <Switch
-                accessibilityLabel={t('common.securityAgent')}
-                value={data.isEnabled}
-                disabled={setEnabled.isPending || (!data.isEnabled && !hasEffectiveRepo)}
-                onValueChange={handleToggle}
-              />
-            ) : (
+          {capability.canManage ? (
+            <ToggleRow
+              title={t('common.securityAgent')}
+              value={data.isEnabled}
+              disabled={setEnabled.isPending || (!data.isEnabled && !hasEffectiveRepo)}
+              onValueChange={handleToggle}
+            />
+          ) : (
+            <View className="flex-row items-center justify-between rounded-lg bg-secondary p-4">
+              <View className="flex-1 pr-3">
+                <Text className="text-sm font-medium">{t('common.securityAgent')}</Text>
+              </View>
               <Text variant="muted" className="text-xs">
                 {data.isEnabled ? t('common.enabled') : t('common.disabled')}
               </Text>
-            )}
-          </View>
+            </View>
+          )}
 
           {(!data.isEnabled || repositoriesLoading || recoveryError) && (
             <View className="gap-3">

@@ -1,4 +1,4 @@
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { useRouter } from 'expo-router';
 import { Bell, Clock, Cpu, FolderGit2, Zap } from '@/components/ui/icons';
 import { useEffect, useRef } from 'react';
@@ -167,7 +167,7 @@ export function SettingsOverviewScreen({
     : data.analysisMode;
 
   const handleToggle = (value: boolean) => {
-    void Haptics.selectionAsync();
+    selectionHaptic();
     // When this screen is the PUSHED settings route (reached from the
     // Dashboard's Settings button), toggling OFF makes the base
     // `[scope]/index` re-derive to `disabled-settings` too — leaving two

@@ -1,4 +1,5 @@
 /* eslint-disable typescript-eslint/no-deprecated -- DOM-free mounted React Native layout regression tests. */
+import * as Haptics from 'expo-haptics';
 import { createElement, type ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
@@ -29,6 +30,7 @@ type RowProps = {
   busy?: boolean;
   multi?: boolean;
   disabled?: boolean;
+  onPress?: () => void;
   children?: ReactNode;
 };
 
@@ -109,6 +111,37 @@ describe('ChoiceRow accessible name', () => {
 
     const multiple = rowControl(renderRow({ label: 'Many', selected: true, multi: true }));
     expect(multiple.props.accessibilityRole).toBe('checkbox');
+  });
+});
+
+describe('ChoiceRow selection haptic', () => {
+  it('runs the row action when the selection tick rejects', async () => {
+    const onPress = vi.fn<() => void>();
+    vi.mocked(Haptics.selectionAsync).mockRejectedValue(new Error('no haptic engine'));
+    const unhandledRejections: unknown[] = [];
+    const onUnhandledRejection = (reason: unknown) => {
+      unhandledRejections.push(reason);
+    };
+    process.on('unhandledRejection', onUnhandledRejection);
+
+    try {
+      const control = rowControl(renderRow({ label: 'Balanced', selected: false, onPress }));
+      act(() => {
+        (control.props.onPress as () => void)();
+      });
+      // One macrotask, the turn Node flags an unhandled rejection in.
+      const flushed = Promise.withResolvers<undefined>();
+      setImmediate(() => {
+        flushed.resolve(undefined);
+      });
+      await flushed.promise;
+
+      expect(onPress).toHaveBeenCalledOnce();
+      expect(unhandledRejections).toEqual([]);
+    } finally {
+      process.off('unhandledRejection', onUnhandledRejection);
+      vi.mocked(Haptics.selectionAsync).mockReset();
+    }
   });
 });
 

@@ -17,7 +17,7 @@ import {
 } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
 import { isValidGitUrl, sanitizeGitUrl } from '@kilocode/worker-utils/git-url';
-import { cliSessions, sharedCliSessions } from '@kilocode/db/schema';
+import { cliSessions, sharedCliSessions, type CliSession } from '@kilocode/db/schema';
 import { CliSessionSharedState } from '@/types/cli-session-shared-state';
 import {
   generateSignedUrls,
@@ -34,8 +34,12 @@ import {
   publishSharedSessionCopy,
   reserveForkedSession,
   sessionBlobRefs,
+  sharedSessionCopyColumns,
   sharedSessionCopyIds,
   sharedSessionCurrentCopyId,
+  sharedSessionCurrentCopyIds,
+  withOwnerCopyTurn,
+  type CopiedSessionBlobUrls,
 } from '@/lib/cli-sessions/session-copies';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import { getCodeReviewById } from '@/lib/code-reviews/db/code-reviews';
@@ -73,6 +77,9 @@ const commonSessionFields = {
   last_model: cliSessions.last_model,
   parent_session_id: cliSessions.parent_session_id,
 } as const;
+
+/** Session row the session procedures return. */
+type SessionFields = Pick<CliSession, keyof typeof commonSessionFields>;
 
 /**
  * Sanitize a string by removing null bytes (0x00) which PostgreSQL rejects
@@ -283,7 +290,10 @@ async function getForkableSession(
 /**
  * Insert a fork row under the account's fork allowance, copy the source folder
  * into it, then attach the blob urls. A fork that cannot be copied is removed
- * again, so every forked session resolves to stored blobs.
+ * again, so every forked session resolves to stored blobs. The copy is taken
+ * before the row write; a copy taken from a shared link is verified against the
+ * link's current copy folder before its urls are attached, because a link may
+ * publish a new folder while the copy runs.
  */
 async function createForkedSessionCopy(params: {
   kiloUserId: string;
@@ -295,42 +305,104 @@ async function createForkedSessionCopy(params: {
   const sessionId = await reserveForkedSession(params.kiloUserId, params.values);
 
   try {
-    return await db.transaction(async tx => {
-      let sourceId = params.sourceId;
-      if (params.sourceShareId) {
-        const [share] = await tx
-          .select()
-          .from(sharedCliSessions)
-          .where(eq(sharedCliSessions.share_id, params.sourceShareId))
-          .for('share');
+    return await withOwnerCopyTurn(params.kiloUserId, async () => {
+      for (let attempt = 1; attempt <= FORK_COPY_ATTEMPTS; attempt += 1) {
+        const sourceId = params.sourceShareId
+          ? await sharedSessionPublishedCopyId(params.sourceShareId)
+          : params.sourceId;
 
-        if (!share) {
-          throw new TRPCError({ code: 'NOT_FOUND', message: 'Shared session not found' });
-        }
-        sourceId = sharedSessionCurrentCopyId(share);
+        const blobUrls = await copySessionBlobs(
+          sourceId,
+          params.sourceFolder,
+          sessionId,
+          'sessions'
+        );
+
+        const attached = await attachForkedSessionCopy(
+          sessionId,
+          blobUrls,
+          params.sourceShareId,
+          sourceId
+        );
+        if (attached) return attached;
+
+        await deleteBlobs(sessionId, sessionBlobRefs('sessions'));
       }
 
-      const blobUrls = await copySessionBlobs(sourceId, params.sourceFolder, sessionId, 'sessions');
-
-      const [newSession] = await tx
-        .update(cliSessions)
-        .set(blobUrlColumns(blobUrls))
-        .where(eq(cliSessions.session_id, sessionId))
-        .returning(commonSessionFields);
-
-      if (!newSession) {
-        throw new TRPCError({
-          code: 'NOT_FOUND',
-          message: 'Session not found',
-        });
-      }
-
-      return newSession;
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: 'The shared session changed while it was being copied. Try forking it again.',
+      });
     });
   } catch (error) {
     await discardReservedFork(sessionId);
     throw error;
   }
+}
+
+/** Copy folders per attempt when a shared link publishes a new folder mid-copy. */
+const FORK_COPY_ATTEMPTS = 2;
+
+/** Current copy folder of a shared link, refusing a link that no longer exists. */
+async function sharedSessionPublishedCopyId(shareId: string): Promise<string> {
+  const [share] = await db
+    .select(sharedSessionCopyColumns)
+    .from(sharedCliSessions)
+    .where(eq(sharedCliSessions.share_id, shareId))
+    .limit(1);
+
+  if (!share) {
+    throw new TRPCError({ code: 'NOT_FOUND', message: 'Shared session not found' });
+  }
+
+  return sharedSessionCurrentCopyIds(share)[0];
+}
+
+/**
+ * Attach a completed fork copy in a short transaction. A fork of a shared link
+ * only attaches while the link still points at the folder that was copied; a
+ * link publishes its new folder before it deletes the old one, so a folder that
+ * is still current when the copy has finished was copied whole. Returns null
+ * when the link moved on and the copy has to be taken again.
+ */
+async function attachForkedSessionCopy(
+  sessionId: string,
+  blobUrls: CopiedSessionBlobUrls,
+  sourceShareId: string | undefined,
+  sourceCopyId: string
+): Promise<SessionFields | null> {
+  return db.transaction(async tx => {
+    if (sourceShareId) {
+      const [share] = await tx
+        .select(sharedSessionCopyColumns)
+        .from(sharedCliSessions)
+        .where(eq(sharedCliSessions.share_id, sourceShareId))
+        .for('share');
+
+      if (!share) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Shared session not found' });
+      }
+
+      if (!sharedSessionCurrentCopyIds(share).includes(sourceCopyId)) {
+        return null;
+      }
+    }
+
+    const [newSession] = await tx
+      .update(cliSessions)
+      .set(blobUrlColumns(blobUrls))
+      .where(eq(cliSessions.session_id, sessionId))
+      .returning(commonSessionFields);
+
+    if (!newSession) {
+      throw new TRPCError({
+        code: 'NOT_FOUND',
+        message: 'Session not found',
+      });
+    }
+
+    return newSession;
+  });
 }
 
 /**

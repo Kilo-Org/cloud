@@ -3824,6 +3824,7 @@
     "addCommand": "Tambah arahan",
     "commandLabel": "Perintah",
     "commandPlaceholder": "cth. pnpm install",
+    "commandShortened": "Hanya {{max}} aksara pertama dikekalkan",
     "commandsEmpty": "Tiada arahan persediaan lagi",
     "commandsSaveFailed": "Tidak dapat menyimpan arahan persediaan",
     "moveUp": "Bergerak ke atas",

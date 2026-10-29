@@ -3824,6 +3824,7 @@
     "addCommand": "Προσθήκη εντολής",
     "commandLabel": "Εντολή",
     "commandPlaceholder": "π.χ. pnpm install",
+    "commandShortened": "Διατηρήθηκαν μόνο οι πρώτοι {{max}} χαρακτήρες",
     "commandsEmpty": "Δεν υπάρχουν ακόμη εντολές ρύθμισης",
     "commandsSaveFailed": "Δεν ήταν δυνατή η αποθήκευση εντολών ρύθμισης",
     "moveUp": "Μετακινηθείτε προς τα πάνω",

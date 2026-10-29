@@ -3824,6 +3824,7 @@
     "addCommand": "دستور اضافه کنید",
     "commandLabel": "فرمان",
     "commandPlaceholder": "مثلاً pnpm install",
+    "commandShortened": "فقط {{max}} نویسه اول نگه داشته شد",
     "commandsEmpty": "هنوز دستور راه اندازی وجود ندارد",
     "commandsSaveFailed": "دستورات راه اندازی ذخیره نشد",
     "moveUp": "حرکت به بالا",

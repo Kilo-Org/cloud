@@ -3874,6 +3874,7 @@
     "addCommand": "Ajouter une commande",
     "commandLabel": "Commande",
     "commandPlaceholder": "p. ex. pnpm install",
+    "commandShortened": "Seuls les {{max}} premiers caractères ont été conservés",
     "commandsEmpty": "Aucune commande de configuration pour l'instant",
     "commandsSaveFailed": "Impossible d'enregistrer les commandes de configuration",
     "moveUp": "Monter",

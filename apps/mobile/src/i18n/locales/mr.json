@@ -3824,6 +3824,7 @@
     "addCommand": "आदेश जोडा",
     "commandLabel": "आज्ञा",
     "commandPlaceholder": "उदा. pnpm install",
+    "commandShortened": "फक्त पहिली {{max}} अक्षरे ठेवली गेली",
     "commandsEmpty": "अद्याप सेटअप आदेश नाहीत",
     "commandsSaveFailed": "सेटअप कमांड सेव्ह करू शकलो नाही",
     "moveUp": "वर हलवा",

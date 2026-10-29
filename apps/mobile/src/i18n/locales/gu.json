@@ -3824,6 +3824,7 @@
     "addCommand": "આદેશ ઉમેરો",
     "commandLabel": "આદેશ",
     "commandPlaceholder": "દા.ત. pnpm install",
+    "commandShortened": "ફક્ત પ્રથમ {{max}} અક્ષરો રાખવામાં આવ્યા છે",
     "commandsEmpty": "હજુ સુધી કોઈ સેટઅપ આદેશો નથી",
     "commandsSaveFailed": "સેટઅપ આદેશો સાચવી શકાયા નથી",
     "moveUp": "ઉપર ખસેડો",

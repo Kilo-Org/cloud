@@ -3824,6 +3824,7 @@
     "addCommand": "Legg til kommando",
     "commandLabel": "Kommando",
     "commandPlaceholder": "f.eks. pnpm install",
+    "commandShortened": "Bare de første {{max}} tegnene ble beholdt",
     "commandsEmpty": "Ingen oppsettkommandoer ennå",
     "commandsSaveFailed": "Kunne ikke lagre oppsettkommandoer",
     "moveUp": "Flytt opp",

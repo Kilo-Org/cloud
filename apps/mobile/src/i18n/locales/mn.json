@@ -3824,6 +3824,7 @@
     "addCommand": "Команд нэмэх",
     "commandLabel": "Тушаал",
     "commandPlaceholder": "жишээ нь pnpm install",
+    "commandShortened": "Зөвхөн эхний {{max}} тэмдэгтийг хадгалсан",
     "commandsEmpty": "Одоогоор тохируулах команд алга",
     "commandsSaveFailed": "Тохируулгын командуудыг хадгалж чадсангүй",
     "moveUp": "Дээш хөдөл",

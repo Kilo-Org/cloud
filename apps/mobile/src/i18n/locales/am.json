@@ -3824,6 +3824,7 @@
     "addCommand": "ትዕዛዝ ጨምር",
     "commandLabel": "ትዕዛዝ",
     "commandPlaceholder": "ለምሳሌ pnpm install",
+    "commandShortened": "የመጀመሪያዎቹ {{max}} ቁምፊዎች ብቻ ተቀምጠዋል",
     "commandsEmpty": "እስካሁን ምንም የማዋቀር ትዕዛዞች የሉም",
     "commandsSaveFailed": "የማዋቀር ትዕዛዞችን ማስቀመጥ አልተቻለም",
     "moveUp": "ወደ ላይ ተንቀሳቀስ",

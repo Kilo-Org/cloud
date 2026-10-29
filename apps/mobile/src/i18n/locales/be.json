@@ -3924,6 +3924,7 @@
     "addCommand": "Дадаць каманду",
     "commandLabel": "Камандаванне",
     "commandPlaceholder": "напр. pnpm install",
+    "commandShortened": "Захаваны толькі першыя {{max}} сімвалаў",
     "commandsEmpty": "Пакуль няма каманд наладкі",
     "commandsSaveFailed": "Не ўдалося захаваць каманды наладкі",
     "moveUp": "Рухайцеся ўверх",

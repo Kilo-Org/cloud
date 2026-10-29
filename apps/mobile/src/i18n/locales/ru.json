@@ -3924,6 +3924,7 @@
     "addCommand": "Добавить команду",
     "commandLabel": "Команда",
     "commandPlaceholder": "напр. pnpm install",
+    "commandShortened": "Сохранены только первые {{max}} символов",
     "commandsEmpty": "Команд настройки пока нет",
     "commandsSaveFailed": "Не удалось сохранить команды настройки.",
     "moveUp": "Вверх",

@@ -114,4 +114,18 @@ describe('ProfileCommandsScreen without the manage role', () => {
 
     unmount();
   });
+
+  it('shows no length counter on a command a member cannot edit', async () => {
+    h.query.data = testProfile(['a'.repeat(499)]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen('org-1');
+
+    const texts = findAll(renderer.root, 'Text')
+      .map(node => node.props.children)
+      .filter((child): child is string => typeof child === 'string');
+    expect(texts.filter(text => text.includes('character'))).toEqual([]);
+
+    unmount();
+  });
 });

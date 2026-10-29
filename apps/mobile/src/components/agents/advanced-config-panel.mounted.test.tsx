@@ -385,6 +385,20 @@ describe('AdvancedConfigPanel', () => {
     expect(commandFields()).toHaveLength(MAX_SETUP_COMMANDS);
   });
 
+  it('counts the characters left on a setup command and reports a shortened paste', () => {
+    const renderer = mount();
+    press(byLabel(renderer, 'Advanced Configuration'));
+
+    press(buttonByText(renderer, 'Add command'));
+    typeInto(renderer, 'Command', 'a'.repeat(470));
+    expect(texts(renderer)).toContain('30 characters remaining');
+
+    // The native input clips a longer paste exactly on the bound.
+    typeInto(renderer, 'Command', 'a'.repeat(500));
+    expect(texts(renderer)).toContain('0 characters remaining');
+    expect(texts(renderer)).toContain('Only the first 500 characters were kept');
+  });
+
   it('caps a manual env-var value at the 256-character session bound', () => {
     const renderer = mount();
     press(byLabel(renderer, 'Advanced Configuration'));

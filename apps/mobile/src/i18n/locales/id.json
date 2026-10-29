@@ -3824,6 +3824,7 @@
     "addCommand": "Tambahkan perintah",
     "commandLabel": "Memerintah",
     "commandPlaceholder": "mis. pnpm install",
+    "commandShortened": "Hanya {{max}} karakter pertama yang disimpan",
     "commandsEmpty": "Belum ada perintah pengaturan",
     "commandsSaveFailed": "Tidak dapat menyimpan perintah penyiapan",
     "moveUp": "Naik",

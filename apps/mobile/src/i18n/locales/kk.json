@@ -3824,6 +3824,7 @@
     "addCommand": "Пәрменді қосу",
     "commandLabel": "Пәрмен",
     "commandPlaceholder": "мыс. pnpm install",
+    "commandShortened": "Алғашқы {{max}} таңба ғана сақталды",
     "commandsEmpty": "Орнату пәрмендері әлі жоқ",
     "commandsSaveFailed": "Орнату пәрмендерін сақтау мүмкін болмады",
     "moveUp": "Жоғары жылжытыңыз",

@@ -3924,6 +3924,7 @@
     "addCommand": "Přidat příkaz",
     "commandLabel": "Příkaz",
     "commandPlaceholder": "např. pnpm install",
+    "commandShortened": "Bylo zachováno pouze prvních {{max}} znaků",
     "commandsEmpty": "Zatím žádné příkazy k nastavení",
     "commandsSaveFailed": "Příkazy nastavení se nepodařilo uložit",
     "moveUp": "Posuňte se nahoru",

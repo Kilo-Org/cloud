@@ -3824,6 +3824,7 @@
     "addCommand": "ਕਮਾਂਡ ਸ਼ਾਮਲ ਕਰੋ",
     "commandLabel": "ਹੁਕਮ",
     "commandPlaceholder": "ਉਦਾ. pnpm install",
+    "commandShortened": "ਸਿਰਫ਼ ਪਹਿਲੇ {{max}} ਅੱਖਰ ਹੀ ਰੱਖੇ ਗਏ",
     "commandsEmpty": "ਹਾਲੇ ਤੱਕ ਕੋਈ ਸੈੱਟਅੱਪ ਕਮਾਂਡ ਨਹੀਂ ਹੈ",
     "commandsSaveFailed": "ਸੈੱਟਅੱਪ ਕਮਾਂਡਾਂ ਨੂੰ ਰੱਖਿਅਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
     "moveUp": "ਉੱਪਰ ਜਾਓ",

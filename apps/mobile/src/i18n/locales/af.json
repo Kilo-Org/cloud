@@ -3824,6 +3824,7 @@
     "addCommand": "Voeg opdrag by",
     "commandLabel": "Bevel",
     "commandPlaceholder": "bv. pnpm install",
+    "commandShortened": "Slegs die eerste {{max}} karakters is behou",
     "commandsEmpty": "Nog geen opstelopdragte nie",
     "commandsSaveFailed": "Kon nie opstellingopdragte stoor nie",
     "moveUp": "Beweeg op",

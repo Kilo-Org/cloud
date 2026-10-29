@@ -3874,6 +3874,7 @@
     "addCommand": "הוסף פקודה",
     "commandLabel": "פְּקוּדָה",
     "commandPlaceholder": "למשל pnpm install",
+    "commandShortened": "רק {{max}} התווים הראשונים נשמרו",
     "commandsEmpty": "אין עדיין פקודות הגדרה",
     "commandsSaveFailed": "לא ניתן לשמור פקודות הגדרה",
     "moveUp": "לזוז למעלה",

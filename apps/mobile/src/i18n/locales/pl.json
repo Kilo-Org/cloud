@@ -3924,6 +3924,7 @@
     "addCommand": "Dodaj polecenie",
     "commandLabel": "Rozkaz",
     "commandPlaceholder": "np. pnpm install",
+    "commandShortened": "Zachowano tylko pierwsze {{max}} znaków",
     "commandsEmpty": "Nie ma jeszcze żadnych poleceń konfiguracyjnych",
     "commandsSaveFailed": "Nie udało się zapisać poleceń konfiguracyjnych",
     "moveUp": "Podnieść",

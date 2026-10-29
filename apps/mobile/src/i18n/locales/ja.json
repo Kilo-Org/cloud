@@ -3824,6 +3824,7 @@
     "addCommand": "コマンドの追加",
     "commandLabel": "指示",
     "commandPlaceholder": "例: pnpm install",
+    "commandShortened": "先頭の{{max}}文字のみを保持しました",
     "commandsEmpty": "セットアップ コマンドはまだありません",
     "commandsSaveFailed": "セットアップコマンドを保存できませんでした",
     "moveUp": "上に移動",

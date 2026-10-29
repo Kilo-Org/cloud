@@ -182,6 +182,46 @@ describe('ProfileCommandsScreen', () => {
     unmount();
   });
 
+  it('counts the characters left near the bound and reports a shortened paste', async () => {
+    h.query.data = testProfile(['pnpm install']);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    const hintTexts = () =>
+      findAll(renderer.root, 'Text')
+        .map(node => node.props.children)
+        .filter((child): child is string => typeof child === 'string');
+
+    // An ordinary command is far from the server bound, so the row stays quiet.
+    expect(hintTexts().filter(text => text.includes('characters remaining'))).toEqual([]);
+
+    changeRowText(renderer.root, 0, 'a'.repeat(470));
+    expect(hintTexts()).toContain('30 characters remaining');
+
+    // The input clips a longer paste exactly on the bound, and the row says so.
+    changeRowText(renderer.root, 0, 'a'.repeat(500));
+    expect(hintTexts()).toContain('0 characters remaining');
+    expect(hintTexts()).toContain('Only the first 500 characters were kept');
+
+    unmount();
+  });
+
+  it('does not report the last allowed keystroke as a shortened command', async () => {
+    h.query.data = testProfile(['a'.repeat(499)]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    changeRowText(renderer.root, 0, 'a'.repeat(500));
+
+    const hintTexts = findAll(renderer.root, 'Text')
+      .map(node => node.props.children)
+      .filter((child): child is string => typeof child === 'string');
+    expect(hintTexts).toContain('0 characters remaining');
+    expect(hintTexts).not.toContain('Only the first 500 characters were kept');
+
+    unmount();
+  });
+
   it('names each reorder control by its one-based position', async () => {
     h.query.data = testProfile(['a', 'b', 'c']);
     h.query.isPending = false;

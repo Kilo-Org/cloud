@@ -3974,6 +3974,7 @@
     "addCommand": "Żid kmand",
     "commandLabel": "Kmand",
     "commandPlaceholder": "eż. pnpm install",
+    "commandShortened": "Inżammu biss l-ewwel {{max}} karattru",
     "commandsEmpty": "S'issa l-ebda kmand tas-setup",
     "commandsSaveFailed": "Ma setgħetx tissejvja l-kmandi tas-setup",
     "moveUp": "Nimxu 'l fuq",

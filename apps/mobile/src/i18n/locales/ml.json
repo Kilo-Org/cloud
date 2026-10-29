@@ -3824,6 +3824,7 @@
     "addCommand": "കമാൻഡ് ചേർക്കുക",
     "commandLabel": "കമാൻഡ്",
     "commandPlaceholder": "ഉദാ. pnpm install",
+    "commandShortened": "ആദ്യത്തെ {{max}} അക്ഷരങ്ങൾ മാത്രമേ സൂക്ഷിച്ചിട്ടുള്ളൂ",
     "commandsEmpty": "ഇതുവരെ സജ്ജീകരണ കമാൻഡുകൾ ഒന്നുമില്ല",
     "commandsSaveFailed": "സജ്ജീകരണ കമാൻഡുകൾ സംരക്ഷിക്കാനായില്ല",
     "moveUp": "മുകളിലേക്ക് നീങ്ങുക",

@@ -3824,6 +3824,7 @@
     "addCommand": "Tilføj kommando",
     "commandLabel": "Kommando",
     "commandPlaceholder": "f.eks. pnpm install",
+    "commandShortened": "Kun de første {{max}} tegn blev beholdt",
     "commandsEmpty": "Ingen opsætningskommandoer endnu",
     "commandsSaveFailed": "Opsætningskommandoer kunne ikke gemmes",
     "moveUp": "Flyt op",

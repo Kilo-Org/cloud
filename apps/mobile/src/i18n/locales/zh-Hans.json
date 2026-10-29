@@ -3824,6 +3824,7 @@
     "addCommand": "添加命令",
     "commandLabel": "命令",
     "commandPlaceholder": "例如 pnpm install",
+    "commandShortened": "只保留了前 {{max}} 个字符",
     "commandsEmpty": "还没有设置命令",
     "commandsSaveFailed": "无法保存设置命令",
     "moveUp": "向上移动",

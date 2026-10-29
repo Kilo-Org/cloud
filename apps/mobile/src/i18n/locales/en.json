@@ -3890,6 +3890,7 @@
     "addCommand": "Add command",
     "commandLabel": "Command",
     "commandPlaceholder": "e.g. pnpm install",
+    "commandShortened": "Only the first {{max}} characters were kept",
     "commandsEmpty": "No setup commands yet",
     "commandsSaveFailed": "Couldn't save setup commands",
     "moveUp": "Move up",

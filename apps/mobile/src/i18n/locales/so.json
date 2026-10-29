@@ -3824,6 +3824,7 @@
     "addCommand": "Ku dar amar",
     "commandLabel": "Taliska",
     "commandPlaceholder": "tus. pnpm install",
+    "commandShortened": "Kaliya {{max}} xaraf oo ugu horreeya ayaa la hayay",
     "commandsEmpty": "Ma jiro amar dejin weli",
     "commandsSaveFailed": "Ma kaydin kari waayay amarrada dejinta",
     "moveUp": "Kor u dhaqaaq",

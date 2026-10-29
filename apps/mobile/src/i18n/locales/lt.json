@@ -3924,6 +3924,7 @@
     "addCommand": "Pridėti komandą",
     "commandLabel": "komandą",
     "commandPlaceholder": "pvz. pnpm install",
+    "commandShortened": "Išsaugoti tik pirmieji {{max}} simbolių",
     "commandsEmpty": "Dar nėra sąrankos komandų",
     "commandsSaveFailed": "Nepavyko išsaugoti sąrankos komandų",
     "moveUp": "Judėti aukštyn",

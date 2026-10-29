@@ -3824,6 +3824,7 @@
     "addCommand": "Tinye iwu",
     "commandLabel": "Iwu",
     "commandPlaceholder": "dịka pnpm install",
+    "commandShortened": "Edebere naanị mkpụrụedemede {{max}} mbụ",
     "commandsEmpty": "Enweghị iwu ntọlite ka",
     "commandsSaveFailed": "Enweghị ike ichekwa iwu ntọala",
     "moveUp": "Bulie elu",

@@ -3824,6 +3824,7 @@
     "addCommand": "کمانڈ شامل کریں۔",
     "commandLabel": "حکم",
     "commandPlaceholder": "مثلاً pnpm install",
+    "commandShortened": "صرف پہلے {{max}} حروف رکھے گئے ہیں",
     "commandsEmpty": "ابھی تک کوئی سیٹ اپ کمانڈ نہیں ہے۔",
     "commandsSaveFailed": "سیٹ اپ کمانڈز کو محفوظ نہیں کیا جا سکا",
     "moveUp": "اوپر بڑھیں۔",

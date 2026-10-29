@@ -3924,6 +3924,7 @@
     "addCommand": "Dodaj ukaz",
     "commandLabel": "Ukaz",
     "commandPlaceholder": "npr. pnpm install",
+    "commandShortened": "Ohranjenih je bilo le prvih {{max}} znakov",
     "commandsEmpty": "Ni še nobenih ukazov za nastavitev",
     "commandsSaveFailed": "Nastavitvenih ukazov ni bilo mogoče shraniti",
     "moveUp": "Premakni se navzgor",

@@ -3824,6 +3824,7 @@
     "addCommand": "Ƙara umarni",
     "commandLabel": "Umurni",
     "commandPlaceholder": "misali pnpm install",
+    "commandShortened": "An kiyaye haruffa {{max}} na farko kawai",
     "commandsEmpty": "Babu umarnin saitin tukuna",
     "commandsSaveFailed": "An kasa ajiye umarnin saitin",
     "moveUp": "Matsa sama",

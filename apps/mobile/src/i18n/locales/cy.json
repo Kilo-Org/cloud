@@ -4024,6 +4024,7 @@
     "addCommand": "Ychwanegu gorchymyn",
     "commandLabel": "Gorchymyn",
     "commandPlaceholder": "e.e. pnpm install",
+    "commandShortened": "Dim ond y {{max}} nod cyntaf a gadwyd",
     "commandsEmpty": "Dim gorchmynion gosod eto",
     "commandsSaveFailed": "Ni fu modd cadw'r gorchmynion gosod",
     "moveUp": "Symud i fyny",

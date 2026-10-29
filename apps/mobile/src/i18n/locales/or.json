@@ -3824,6 +3824,7 @@
     "addCommand": "କମାଣ୍ଡ୍ ଯୋଡନ୍ତୁ।",
     "commandLabel": "ନିର୍ଦ୍ଦେଶ।",
     "commandPlaceholder": "ଉଦା. pnpm install",
+    "commandShortened": "କେବଳ ପ୍ରଥମ {{max}} ଅକ୍ଷର ରଖାଯାଇଛି।",
     "commandsEmpty": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ସେଟଅପ୍ ନିର୍ଦ୍ଦେଶ ନାହିଁ।",
     "commandsSaveFailed": "ସେଟଅପ୍ କମାଣ୍ଡ୍ ସଞ୍ଚୟ କରିପାରିଲା ନାହିଁ।",
     "moveUp": "ଉପରକୁ ଯାଅ।",

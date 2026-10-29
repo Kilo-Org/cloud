@@ -3874,6 +3874,7 @@
     "addCommand": "Dodaj naredbu",
     "commandLabel": "Naredba",
     "commandPlaceholder": "npr. pnpm install",
+    "commandShortened": "Zadržano je samo prvih {{max}} znakova",
     "commandsEmpty": "Još nema naredbi za postavljanje",
     "commandsSaveFailed": "Nije moguće spremiti naredbe za postavljanje",
     "moveUp": "Pomakni se gore",

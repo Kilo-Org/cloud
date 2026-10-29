@@ -4024,6 +4024,7 @@
     "addCommand": "إضافة أمر",
     "commandLabel": "يأمر",
     "commandPlaceholder": "مثال: pnpm install",
+    "commandShortened": "تم الاحتفاظ بأول {{max}} حرفًا فقط",
     "commandsEmpty": "لا توجد أوامر الإعداد حتى الآن",
     "commandsSaveFailed": "تعذر حفظ أوامر الإعداد",
     "moveUp": "تحرك للأعلى",

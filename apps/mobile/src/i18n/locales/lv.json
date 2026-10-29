@@ -3874,6 +3874,7 @@
     "addCommand": "Pievienot komandu",
     "commandLabel": "Pavēli",
     "commandPlaceholder": "piem. pnpm install",
+    "commandShortened": "Tika saglabātas tikai pirmās {{max}} rakstzīmes",
     "commandsEmpty": "Vēl nav nevienas iestatīšanas komandas",
     "commandsSaveFailed": "Nevarēja saglabāt iestatīšanas komandas",
     "moveUp": "Pārvietojieties uz augšu",

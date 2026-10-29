@@ -99,19 +99,24 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
 
 type RouteModule = ComponentType;
 
-const ROUTES: [string, RouteModule][] = [
-  ['index', SecurityAgentScopeRoute],
-  ['audit-report', SecurityAgentAuditReportRoute],
-  ['dismiss/[id]', SecurityAgentDismissFindingRoute],
-  ['findings/[id]', SecurityAgentFindingDetailRoute],
-  ['findings/index', SecurityAgentFindingListRoute],
-  ['filter', SecurityAgentFilterRoute],
-  ['settings/analysis', SecurityAgentAnalysisSettingsRoute],
-  ['settings/automation', SecurityAgentAutomationSettingsRoute],
-  ['settings/index', SecurityAgentSettingsRoute],
-  ['settings/notifications', SecurityAgentNotificationSettingsRoute],
-  ['settings/repositories', SecurityAgentRepositorySettingsRoute],
-  ['settings/sla', SecurityAgentSlaSettingsRoute],
+// Each route's screen mock reports `<name>:<scope>`, so a passing valid-scope
+// case proves the segment reached the screen. The filter route's screen is the
+// sheet, whose stub reports a scope-less marker instead.
+type RouteCase = [string, RouteModule, 'screen' | 'sheet'];
+
+const ROUTES: RouteCase[] = [
+  ['index', SecurityAgentScopeRoute, 'screen'],
+  ['audit-report', SecurityAgentAuditReportRoute, 'screen'],
+  ['dismiss/[id]', SecurityAgentDismissFindingRoute, 'screen'],
+  ['findings/[id]', SecurityAgentFindingDetailRoute, 'screen'],
+  ['findings/index', SecurityAgentFindingListRoute, 'screen'],
+  ['filter', SecurityAgentFilterRoute, 'sheet'],
+  ['settings/analysis', SecurityAgentAnalysisSettingsRoute, 'screen'],
+  ['settings/automation', SecurityAgentAutomationSettingsRoute, 'screen'],
+  ['settings/index', SecurityAgentSettingsRoute, 'screen'],
+  ['settings/notifications', SecurityAgentNotificationSettingsRoute, 'screen'],
+  ['settings/repositories', SecurityAgentRepositorySettingsRoute, 'screen'],
+  ['settings/sla', SecurityAgentSlaSettingsRoute, 'screen'],
 ];
 
 const ORG_SCOPE = 'c0a8012e-9a3b-4f5c-8d1e-2b3c4d5e6f70';
@@ -141,7 +146,7 @@ afterEach(() => {
   renderer = undefined;
 });
 
-describe.each(ROUTES)('%s route scope guard', (_name, Route) => {
+describe.each(ROUTES)('%s route scope guard', (_name, Route, kind) => {
   it.each([{ scope: 'undefined' }, { scope: 'not-a-scope' }, { scope: '' }])(
     'renders the invalid state for scope $scope instead of the screen',
     ({ scope }) => {
@@ -158,10 +163,14 @@ describe.each(ROUTES)('%s route scope guard', (_name, Route) => {
     params.current = { scope: ORG_SCOPE, id: 'finding-1' };
     const tree = mount(Route);
 
-    // The filter route's own "screen" is the sheet, which carries no scope;
-    // every other route mounts the screen it names.
-    expect(mounted.screens).toHaveLength(1);
     expect(tree.root.findAllByType('InvalidRouteState')).toHaveLength(0);
+    expect(mounted.screens).toHaveLength(1);
+    if (kind === 'screen') {
+      // The validated segment is what the screen receives, not just any string.
+      expect(mounted.screens[0]?.endsWith(`:${ORG_SCOPE}`)).toBe(true);
+    } else {
+      expect(mounted.screens[0]).toBe('filter-sheet');
+    }
   });
 });
 

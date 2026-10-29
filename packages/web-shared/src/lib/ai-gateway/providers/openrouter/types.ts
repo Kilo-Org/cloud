@@ -102,10 +102,16 @@ export type SharedGatewayRequestProperties = {
 export type GatewayResponsesRequest = SharedGatewayRequestProperties &
   OpenAI.Responses.ResponseCreateParams;
 
+// https://platform.claude.com/docs/en/build-with-claude/preserved-thinking
+export type ThinkingBlockBinding = {
+  prefix_mismatch_behavior?: 'error' | 'drop_block';
+};
+
 export type GatewayMessagesRequest = SharedGatewayRequestProperties &
   Anthropic.MessageCreateParams & {
     user?: string;
     session_id?: string;
+    thinking?: Anthropic.ThinkingConfigParam & { block_binding?: ThinkingBlockBinding };
   };
 
 /**

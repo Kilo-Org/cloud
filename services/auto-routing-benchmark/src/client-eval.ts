@@ -29,6 +29,7 @@ import type { Hono } from 'hono';
 import type * as z from 'zod';
 import { DECIDER_CLI_TIMEOUT_MS, deciderCliPrompt } from './cli-runner';
 import {
+  claimClientCaseGrading,
   clearPendingGraderUsage,
   clientCaseKey,
   clientPairKey,
@@ -40,7 +41,9 @@ import {
   listClientCaseKeys,
   listOwnerClientProfiles,
   refreshClientProfileRollup,
+  releaseClientCaseGrading,
   saveClientCaseResult,
+  type ClientProfileRow,
 } from './client-profiles';
 import { getBenchmarkConfig } from './config';
 import {
@@ -165,7 +168,9 @@ const STORED_OUTPUT_MAX_LENGTH = 200_000;
  * client profile. The graded case is stored before judged grading is billed to the
  * paying owner, and removed again when billing fails, so a retry never bills twice for
  * one stored case. A case that already ran returns its stored score; one that did not
- * (nonzero exit, timeout, or empty output) is replaced by the new upload.
+ * (nonzero exit, timeout, or empty output) is replaced by the new upload. Judged grading
+ * happens under a per-case claim, so a parallel upload of the same case either reads the
+ * winner's stored score or is told to retry instead of paying for a second grading.
  */
 export async function gradeClientEvalResult(
   db: D1Database,
@@ -204,7 +209,8 @@ export async function gradeClientEvalResult(
     throw new ClientEvalError('invalid_request', `Unknown variant for ${entryKey}`);
   }
 
-  const nowIso = (deps.now?.() ?? new Date()).toISOString();
+  const now = deps.now?.() ?? new Date();
+  const nowIso = now.toISOString();
   const profile = await ensureClientProfile(
     db,
     {
@@ -222,102 +228,157 @@ export async function gradeClientEvalResult(
   const plannedResults = deciderCasesForRouter(request.baseRouter).length * current.repetitions;
   const stored = await getClientCase(db, caseKey);
   if (stored?.ran) {
-    if (stored.pendingGraderUsage !== null) {
-      const storedKey = { ...caseKey, revision: stored.revision };
-      let pending: unknown;
-      try {
-        pending = JSON.parse(stored.pendingGraderUsage);
-      } catch {
-        pending = null;
+    return settleStoredClientCase(db, profile, caseKey, stored, plannedResults, nowIso, deps);
+  }
+
+  const ran = request.exitCode === 0 && !request.timedOut && request.output.length > 0;
+  // Only a judged check pays for a grading call, so only it needs the claim.
+  const gradingToken = ran && benchCase.check.kind === 'judged' ? crypto.randomUUID() : null;
+  if (
+    gradingToken !== null &&
+    !(await claimClientCaseGrading(db, caseKey, gradingToken, nowIso, now.getTime()))
+  ) {
+    // Another upload holds the claim. If it already stored the case, its score settles this
+    // one too; otherwise this upload must not start a second grading.
+    const concurrent = await getClientCase(db, caseKey);
+    if (concurrent?.ran) {
+      return settleStoredClientCase(db, profile, caseKey, concurrent, plannedResults, nowIso, deps);
+    }
+    throw new ClientEvalError(
+      'internal_error',
+      'This case is already being graded; retry the upload.'
+    );
+  }
+  try {
+    if (gradingToken !== null) {
+      // A grading that finished between the first read and the claim leaves a score to return.
+      const claimed = await getClientCase(db, caseKey);
+      if (claimed?.ran) {
+        return settleStoredClientCase(db, profile, caseKey, claimed, plannedResults, nowIso, deps);
       }
-      const usage = UsageRecordRequestSchema.safeParse(pending);
-      if (!usage.success) {
-        // An unreadable record cannot be billed; drop the result so a retry grades it again.
-        console.error(
+    }
+
+    const grade = ran
+      ? await gradeDeciderOutput(benchCase.check, {
+          userPrompt: benchCase.userPrompt,
+          output: request.output,
+          judge: benchCase.check.kind === 'judged' ? await deps.createJudge() : null,
+        })
+      : { score: 0, costUsd: 0, graderError: null };
+    if (grade.score === null) {
+      throw new ClientEvalError('internal_error', 'The grader is unavailable; retry the upload.');
+    }
+
+    const usage =
+      grade.costUsd > 0
+        ? await buildGraderUsage(
+            request.billing,
+            [
+              request.billing.userId,
+              request.billing.organizationId,
+              request.ownerType,
+              request.ownerId,
+              request.baseRouter,
+              entryKey,
+              request.variant,
+              current.engineIdentity,
+              current.repetitions,
+              request.caseId,
+              request.rep,
+            ],
+            grade.costUsd,
+            nowIso
+          ).catch(() => {
+            throw graderUsageNotRecorded();
+          })
+        : null;
+    const revision = await saveClientCaseResult(db, {
+      profile_id: profile.id,
+      case_id: request.caseId,
+      rep: request.rep,
+      route_key: taxonomyRouteKey(benchCase),
+      output: request.output.slice(0, STORED_OUTPUT_MAX_LENGTH),
+      cost_usd: request.costUsd,
+      duration_ms: Math.round(request.durationMs),
+      exit_code: request.exitCode,
+      timed_out: request.timedOut,
+      score: grade.score,
+      grader_cost_usd: grade.costUsd,
+      uploaded_at: nowIso,
+      pending_grader_usage: usage === null ? null : JSON.stringify(usage),
+    });
+    if (revision === null) {
+      await refreshClientProfileRollup(db, profile, plannedResults, nowIso);
+      return { score: (await getClientCase(db, caseKey))?.score ?? grade.score };
+    }
+
+    if (usage !== null) {
+      if (!(await recordGraderUsage(deps, usage))) {
+        await deleteClientCaseUpload(db, { ...caseKey, revision });
+        await refreshClientProfileRollup(db, profile, plannedResults, nowIso);
+        throw graderUsageNotRecorded();
+      }
+      await clearPendingGraderUsage(db, { ...caseKey, revision });
+    }
+
+    await refreshClientProfileRollup(db, profile, plannedResults, nowIso);
+    return { score: grade.score };
+  } finally {
+    // A failed or unbilled grading releases the claim so a retry can grade again. A failed
+    // release only leaves the claim to expire, so it must not fail a finished grading.
+    if (gradingToken !== null) {
+      await releaseClientCaseGrading(db, caseKey, gradingToken).catch(() => {
+        console.warn(
           JSON.stringify({
-            event: 'client_eval_pending_usage_invalid',
+            event: 'client_eval_grading_claim_release_failed',
             profileId: profile.id,
             caseId: request.caseId,
             rep: request.rep,
           })
         );
-        await deleteClientCaseUpload(db, storedKey);
-        await refreshClientProfileRollup(db, profile, plannedResults, nowIso);
-        throw graderUsageNotRecorded();
-      }
-      if (!(await recordGraderUsage(deps, usage.data))) throw graderUsageNotRecorded();
-      await clearPendingGraderUsage(db, storedKey);
+      });
     }
-    await refreshClientProfileRollup(db, profile, plannedResults, nowIso);
-    return { score: stored.score };
   }
+}
 
-  const ran = request.exitCode === 0 && !request.timedOut && request.output.length > 0;
-  const grade = ran
-    ? await gradeDeciderOutput(benchCase.check, {
-        userPrompt: benchCase.userPrompt,
-        output: request.output,
-        judge: benchCase.check.kind === 'judged' ? await deps.createJudge() : null,
-      })
-    : { score: 0, costUsd: 0, graderError: null };
-  if (grade.score === null) {
-    throw new ClientEvalError('internal_error', 'The grader is unavailable; retry the upload.');
-  }
-
-  const usage =
-    grade.costUsd > 0
-      ? await buildGraderUsage(
-          request.billing,
-          [
-            request.billing.userId,
-            request.billing.organizationId,
-            request.ownerType,
-            request.ownerId,
-            request.baseRouter,
-            entryKey,
-            request.variant,
-            current.engineIdentity,
-            current.repetitions,
-            request.caseId,
-            request.rep,
-          ],
-          grade.costUsd,
-          nowIso
-        ).catch(() => {
-          throw graderUsageNotRecorded();
+/** Return a stored case that ran, first resending any grader usage its upload still owes. */
+async function settleStoredClientCase(
+  db: D1Database,
+  profile: ClientProfileRow,
+  caseKey: { profileId: string; caseId: string; rep: number },
+  stored: { score: number; revision: number; pendingGraderUsage: string | null },
+  plannedResults: number,
+  nowIso: string,
+  deps: ClientEvalDeps
+): Promise<ClientEvalResultResponse> {
+  if (stored.pendingGraderUsage !== null) {
+    const storedKey = { ...caseKey, revision: stored.revision };
+    let pending: unknown;
+    try {
+      pending = JSON.parse(stored.pendingGraderUsage);
+    } catch {
+      pending = null;
+    }
+    const usage = UsageRecordRequestSchema.safeParse(pending);
+    if (!usage.success) {
+      // An unreadable record cannot be billed; drop the result so a retry grades it again.
+      console.error(
+        JSON.stringify({
+          event: 'client_eval_pending_usage_invalid',
+          profileId: profile.id,
+          caseId: caseKey.caseId,
+          rep: caseKey.rep,
         })
-      : null;
-  const revision = await saveClientCaseResult(db, {
-    profile_id: profile.id,
-    case_id: request.caseId,
-    rep: request.rep,
-    route_key: taxonomyRouteKey(benchCase),
-    output: request.output.slice(0, STORED_OUTPUT_MAX_LENGTH),
-    cost_usd: request.costUsd,
-    duration_ms: Math.round(request.durationMs),
-    exit_code: request.exitCode,
-    timed_out: request.timedOut,
-    score: grade.score,
-    grader_cost_usd: grade.costUsd,
-    uploaded_at: nowIso,
-    pending_grader_usage: usage === null ? null : JSON.stringify(usage),
-  });
-  if (revision === null) {
-    await refreshClientProfileRollup(db, profile, plannedResults, nowIso);
-    return { score: (await getClientCase(db, caseKey))?.score ?? grade.score };
-  }
-
-  if (usage !== null) {
-    if (!(await recordGraderUsage(deps, usage))) {
-      await deleteClientCaseUpload(db, { ...caseKey, revision });
+      );
+      await deleteClientCaseUpload(db, storedKey);
       await refreshClientProfileRollup(db, profile, plannedResults, nowIso);
       throw graderUsageNotRecorded();
     }
-    await clearPendingGraderUsage(db, { ...caseKey, revision });
+    if (!(await recordGraderUsage(deps, usage.data))) throw graderUsageNotRecorded();
+    await clearPendingGraderUsage(db, storedKey);
   }
-
   await refreshClientProfileRollup(db, profile, plannedResults, nowIso);
-  return { score: grade.score };
+  return { score: stored.score };
 }
 
 function recordGraderUsage(deps: ClientEvalDeps, usage: UsageRecordRequest): Promise<boolean> {

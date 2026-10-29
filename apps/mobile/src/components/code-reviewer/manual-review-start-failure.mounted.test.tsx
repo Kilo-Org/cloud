@@ -107,6 +107,7 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
     refetch: vi.fn(),
   }),
   useReviewConfig: () => ({ data: { modelSlug: 'model-x', thinkingEffort: null } }),
+  useReviewerPermission: () => ({ status: 'ready', canEdit: true, canManage: true }),
 }));
 vi.mock('@/lib/hooks/use-code-reviews', () => ({
   useCreateManualReview: () => ({

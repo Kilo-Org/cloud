@@ -21,6 +21,14 @@ const BOTTOM_INSET = 24;
 const TAB_SCREEN_BOTTOM_GAP = 16;
 
 const platformState = vi.hoisted(() => ({ OS: 'android' }));
+// The empty state's connect action is the provider app install, which only an
+// organization-manage role may run; `canManage` is that role, `canEdit` the
+// wider settings capability the sibling screens use.
+const permissionState = vi.hoisted(() => ({
+  status: 'ready' as 'loading' | 'error' | 'ready',
+  canEdit: true,
+  canManage: true,
+}));
 const status = vi.hoisted(() => ({
   connected: true,
   loading: false,
@@ -151,6 +159,21 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   }),
 }));
 vi.mock('@/lib/hooks/use-reviewer-models', () => ({ useReviewerModels: () => ({ models: [] }) }));
+/** The permission the screen reads, driven per test through `permissionState`. */
+function reviewerPermission() {
+  if (permissionState.status === 'loading') {
+    return { status: 'loading' as const };
+  }
+  if (permissionState.status === 'error') {
+    return { status: 'error' as const, refetch: vi.fn(), isRetrying: false };
+  }
+  return {
+    status: 'ready' as const,
+    canEdit: permissionState.canEdit,
+    canManage: permissionState.canManage,
+  };
+}
+
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   PERSONAL_SCOPE: 'personal',
   useGitHubStatus: () => ({
@@ -170,6 +193,7 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
     refetch: status.refetch,
   }),
   useReviewConfig: () => ({ data: { modelSlug: 'model-x', thinkingEffort: null } }),
+  useReviewerPermission: reviewerPermission,
 }));
 vi.mock('@/lib/hooks/use-code-reviews', () => ({
   useCreateManualReview: () => ({ mutate: status.mutate, isPending: status.pending }),
@@ -187,14 +211,10 @@ function only<T>(items: T[], what: string): T {
   return item;
 }
 
-async function renderScreen() {
+async function renderScreen(scope = 'personal') {
   // The root stack publishes `null`: no tab bar under this screen.
   const { renderer, unmount } = await renderWithProviders(
-    createElement(
-      TabBarLabelContext,
-      { value: null },
-      createElement(ManualReviewScreen, { scope: 'personal' })
-    )
+    createElement(TabBarLabelContext, { value: null }, createElement(ManualReviewScreen, { scope }))
   );
   return { renderer, unmount };
 }
@@ -269,6 +289,9 @@ function paddingBottomsAbove(node: TestRenderer.ReactTestInstance): number[] {
 
 beforeEach(() => {
   keyboardStore.setHeight(0);
+  permissionState.status = 'ready';
+  permissionState.canEdit = true;
+  permissionState.canManage = true;
   status.connected = true;
   status.loading = false;
   status.errorCode = null;
@@ -417,6 +440,79 @@ describe('ManualReviewScreen connect provider CTA', () => {
 
     unmount();
   });
+});
+
+describe('ManualReviewScreen empty state role gate', () => {
+  const ORG_SCOPE = 'org-1';
+
+  /** The sentence the read-only notice renders, read from the catalog. */
+  function readOnlyNotice(): string {
+    return i18n.t('codeReviewer.notConnectedReadOnly', { platform: 'GitHub' });
+  }
+
+  it('tells an organization member only owners and admins can connect, with no action', async () => {
+    status.connected = false;
+    permissionState.canEdit = false;
+    permissionState.canManage = false;
+    const { renderer, unmount } = await renderScreen(ORG_SCOPE);
+
+    const empty = only(findAllOfType(renderer.root, 'EmptyState'), 'empty state');
+    expect(propOf(empty, 'description')).toBe(readOnlyNotice());
+    expect(propOf(empty, 'action')).toBeUndefined();
+    expect(findAllOfType(renderer.root, 'Button')).toHaveLength(0);
+    // It must not offer the copy that instructs a member to connect.
+    expect(renderedTexts(renderer.root)).not.toContain(
+      i18n.t('codeReviewer.manualReview.connectProviderDescription')
+    );
+
+    unmount();
+  });
+
+  it('withholds the action from a billing manager, who cannot install the provider app', async () => {
+    status.connected = false;
+    permissionState.canEdit = true;
+    permissionState.canManage = false;
+    const { renderer, unmount } = await renderScreen(ORG_SCOPE);
+
+    const empty = only(findAllOfType(renderer.root, 'EmptyState'), 'empty state');
+    expect(propOf(empty, 'description')).toBe(readOnlyNotice());
+    expect(propOf(empty, 'action')).toBeUndefined();
+
+    unmount();
+  });
+
+  it('keeps the connect action for an owner or admin', async () => {
+    status.connected = false;
+    permissionState.canManage = true;
+    const { renderer, unmount } = await renderScreen(ORG_SCOPE);
+
+    const empty = only(findAllOfType(renderer.root, 'EmptyState'), 'empty state');
+    const action = propOf(empty, 'action') as ReactElement<{ onPress: () => void }>;
+    expect(action).toBeDefined();
+    act(() => {
+      action.props.onPress();
+    });
+    expect(status.push).toHaveBeenCalledWith(`/(app)/code-reviewer/${ORG_SCOPE}/github`);
+
+    unmount();
+  });
+
+  it.each(['loading', 'error'] as const)(
+    'keeps the connect action while the permission is %s',
+    async state => {
+      status.connected = false;
+      permissionState.status = state;
+      const { renderer, unmount } = await renderScreen(ORG_SCOPE);
+
+      const empty = only(findAllOfType(renderer.root, 'EmptyState'), 'empty state');
+      expect(propOf(empty, 'description')).toBe(
+        i18n.t('codeReviewer.manualReview.connectProviderDescription')
+      );
+      expect(propOf(empty, 'action')).toBeDefined();
+
+      unmount();
+    }
+  );
 });
 
 describe('ManualReviewScreen failed start', () => {

@@ -98,35 +98,33 @@ export async function getModelInferenceUserByokProviders(
   modelId: string
 ): Promise<UserByokProviderId[]> {
   const vercelModelMetadata = await getVercelModelMetadata('getModelInferenceUserByokProviders');
-  if (!vercelModelMetadata) {
-    return [];
-  }
-  const providers = await deriveModelInferenceUserByokProviders(modelId, vercelModelMetadata);
-  if (providers.length === 0) {
-    console.debug(`[getModelUserByokProviders] no user byok providers for ${modelId}`);
-  }
-  return providers;
+  return vercelModelMetadata
+    ? deriveModelInferenceUserByokProviders(modelId, vercelModelMetadata)
+    : [];
 }
 
 /**
  * Returns every user BYOK provider whose key can serve `modelId`: first the
  * inference providers routed through Vercel, then the gateway keys in order of
  * preference. With `enabledProviderIds`, skips the catalog lookups that cannot
- * match an enabled key.
+ * match an enabled key. This is the single-model lookup, so it keeps one record
+ * per call; catalog passes aggregate their own counts instead.
  */
 export async function getModelUserByokProviders(
   modelId: string,
   enabledProviderIds?: ReadonlySet<UserByokProviderId>
 ): Promise<UserByokProviderId[]> {
   const enabled = enabledProviderIds ? [...enabledProviderIds] : undefined;
+  const checksInferenceProviders = !enabled || enabled.some(id => !isGatewayUserByokProviderId(id));
   const [inferenceProviders, gatewayProviders] = await Promise.all([
-    !enabled || enabled.some(id => !isGatewayUserByokProviderId(id))
-      ? getModelInferenceUserByokProviders(modelId)
-      : [],
+    checksInferenceProviders ? getModelInferenceUserByokProviders(modelId) : [],
     !enabled || enabled.some(isGatewayUserByokProviderId)
       ? getModelGatewayUserByokProviders(modelId)
       : [],
   ]);
+  if (checksInferenceProviders && inferenceProviders.length === 0) {
+    console.debug(`[getModelUserByokProviders] no user byok providers for ${modelId}`);
+  }
   return [...inferenceProviders, ...gatewayProviders];
 }
 

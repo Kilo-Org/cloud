@@ -18,6 +18,7 @@ import {
 } from './active-sessions-live';
 import { currentAuthEpoch, isCurrentAuthEpoch } from './auth/auth-epoch';
 import { isSignOutActive } from './auth/sign-out-state';
+import { isTerminalTrpcCode, readTrpcErrorField } from './trpc-error';
 import {
   captureActiveSessionsQueryRefresh,
   fenceActiveSessionsQuery,
@@ -74,6 +75,14 @@ export class ActiveSessionsLiveSync {
    * still settle instead of being restarted forever.
    */
   private unacceptedCancelCount = 0;
+  /**
+   * The scope's last attempt failed with a code a retry cannot fix. Such a
+   * failure is an outcome even though its query can leave the cache (a
+   * permission denial drops an unobserved query, and its metadata with it), so
+   * the reason must not come back and replace a fetch that can only fail the
+   * same way again.
+   */
+  private terminalFailureSeen = false;
   private lastConnectedState: boolean;
   private attachmentEpoch = 0;
   private authEpoch = currentAuthEpoch();
@@ -96,6 +105,9 @@ export class ActiveSessionsLiveSync {
     }
     this.attachmentEpoch += 1;
     this.authEpoch = currentAuthEpoch();
+    // A terminal failure belongs to the attempt that reported it; a fresh
+    // attachment starts learning its scope again.
+    this.terminalFailureSeen = false;
     const { connection } = this.options;
     // Re-attachment while connected must not look like a rising edge.
     this.lastConnectedState = connection.isConnected();
@@ -267,7 +279,10 @@ export class ActiveSessionsLiveSync {
    * outcome too, and its own Retry owns that recovery.
    */
   private updateReconcileReason(): void {
-    if (hasActiveSessionsServerOutcome(this.options.queryClient, this.options.queryKey)) {
+    if (
+      this.terminalFailureSeen ||
+      hasActiveSessionsServerOutcome(this.options.queryClient, this.options.queryKey)
+    ) {
       this.pendingReasons.delete('reconcile');
       this.unacceptedCancelCount = 0;
       return;
@@ -352,8 +367,12 @@ export class ActiveSessionsLiveSync {
         await fetchPromise;
         success = !this.readInFlightFetchCanceled() && refresh.hasAcceptedResult();
       }
-    } catch {
-      // Cancellation and network failure keep reasons pending for Retry.
+    } catch (error) {
+      // Cancellation and network failure keep reasons pending for Retry. A code
+      // a retry cannot fix is recorded: its query may leave the cache (a
+      // permission denial drops an unobserved query) and with it the metadata
+      // this owner reads as the outcome.
+      this.terminalFailureSeen = isTerminalTrpcCode(readTrpcErrorField(error, 'code'));
     } finally {
       this.isFetchInFlight = false;
     }
@@ -366,6 +385,7 @@ export class ActiveSessionsLiveSync {
       this.lastEnrichmentAttemptAt = this.now();
     }
     if (success) {
+      this.terminalFailureSeen = false;
       for (const reason of inFlightReasons) {
         this.pendingReasons.delete(reason);
       }

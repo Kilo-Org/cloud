@@ -153,6 +153,25 @@ describe('ActiveSessionsLiveSync — a scope with no server outcome yet', () => 
     sync.detach();
   });
 
+  it('does not replace an attempt a permission denial already dropped from the cache', async () => {
+    const qc = makeFakeQueryClient({ sessions: [] });
+    const failure = Object.assign(new Error('denied'), { data: { code: 'FORBIDDEN' } });
+    const queryFn = vi.fn(() => Promise.reject(failure));
+    const { connection, sync } = makeSync(qc, queryFn as never);
+    sync.scheduleRefresh('manual');
+    await sync.getFetchQueue();
+    await sync.getFetchCompletion();
+    // A permission denial drops an unobserved query and its metadata with it,
+    // so the cache alone cannot remember that this scope already has an answer.
+    expect(qc.getQueryCache().find({ queryKey: QUERY_KEY, exact: true })).toBeUndefined();
+    connection.__fireSystem(heartbeat as never);
+    await sync.getWriteQueue();
+    await flushQueryUpdates();
+    expect(queryFn).toHaveBeenCalledTimes(1);
+    expect(sync.getPendingReasons().has('reconcile')).toBe(false);
+    sync.detach();
+  });
+
   it('does not restore the reason for a scope whose load was never canceled', async () => {
     const qc = makeFakeQueryClient({ sessions: [] });
     const { sync } = makeSync(qc, makeQueryFn());

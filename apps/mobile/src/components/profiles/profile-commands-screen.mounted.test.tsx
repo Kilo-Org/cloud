@@ -184,7 +184,7 @@ describe('ProfileCommandsScreen', () => {
   });
 
   it('counts the characters left near the bound and names the bound at it', async () => {
-    h.query.data = testProfile(['pnpm install']);
+    h.query.data = testCommands(['pnpm install']);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
@@ -219,7 +219,7 @@ describe('ProfileCommandsScreen', () => {
   });
 
   it('names the bound for a saved command that already sits on it', async () => {
-    h.query.data = testProfile(['a'.repeat(500)]);
+    h.query.data = testCommands(['a'.repeat(500)]);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();

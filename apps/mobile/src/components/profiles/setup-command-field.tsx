@@ -5,6 +5,7 @@ import {
   COMMAND_COUNTER_VISIBLE_REMAINING,
   MAX_SETUP_COMMAND_LENGTH,
 } from '@/components/profiles/profile-commands-model';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
 import { Text } from '@/components/ui/text';
 
@@ -66,9 +67,11 @@ export function SetupCommandField({
             </Text>
           </View>
           {showsBound ? (
-            <Text className="text-xs text-muted-foreground">
-              {t('profiles.commandAtLimit', { max: MAX_SETUP_COMMAND_LENGTH })}
-            </Text>
+            <AccessibleStatus
+              message={t('profiles.commandAtLimit', { max: MAX_SETUP_COMMAND_LENGTH })}
+              tone="status"
+              className="text-xs"
+            />
           ) : null}
         </View>
       ) : null}

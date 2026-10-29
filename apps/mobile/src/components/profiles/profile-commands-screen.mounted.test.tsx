@@ -51,6 +51,7 @@ vi.mock('expo-router', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
 vi.mock('react-native', () => ({
+  Platform: { OS: 'android' },
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',

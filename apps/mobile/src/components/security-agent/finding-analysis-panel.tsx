@@ -121,10 +121,7 @@ export function FindingAnalysisPanel({
     triageReasoning: triage?.needsSandboxReasoning,
   });
   const technicalMarkdown = firstNonEmpty(sandbox?.rawMarkdown, analysis.analysis?.rawMarkdown);
-  // A stored record can omit the location list; the spread then throws on the
-  // missing array, so absence reads as no recorded locations.
-  const recordedLocations = sandbox?.usageLocations ?? [];
-  const uniqueLocations = [...new Set(recordedLocations)];
+  const uniqueLocations = sandbox ? [...new Set(sandbox.usageLocations)] : [];
   const exploitabilityReasoning = sandbox
     ? firstNonEmpty(sandbox.summary, sandbox.exploitabilityReasoning)
     : '';

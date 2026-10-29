@@ -335,6 +335,14 @@ const BITBUCKET_GIT_ORIGIN = 'https://bitbucket.org';
 const BITBUCKET_API_ORIGIN = 'https://api.bitbucket.org';
 const GITLAB_CREDENTIAL_BROKER_PATH = '/internal/gitlab/credentials';
 const INTERNAL_REQUEST_MAX_BYTES = 16_000;
+const GITHUB_USER_ATTACHMENT_PATH = '/user-attachments/assets';
+const GITHUB_REPOSITORY_METADATA_MAX_BYTES = 64 * 1024;
+const GITHUB_REPOSITORY_METADATA_TIMEOUT_MS = 10_000;
+
+const GitHubRepositoryMetadataSchema = z.object({
+  id: z.number().int().positive().max(Number.MAX_SAFE_INTEGER),
+  full_name: z.string().min(1),
+});
 
 const BitbucketPullRequestHttpRequestSchema = BitbucketPullRequestRequestSchema.omit({
   owner: true,
@@ -402,8 +410,12 @@ async function readBoundedInternalJsonRequest(request: Request): Promise<unknown
 type GitHubCapabilityCredential = 'pinned' | 'none';
 
 type GitHubCapabilityUpstream =
-  | { failure: RedeemGitHubSessionCapabilityFailureReason; credential?: never }
-  | { failure: null; credential: GitHubCapabilityCredential };
+  | {
+      failure: RedeemGitHubSessionCapabilityFailureReason;
+      credential?: never;
+      repositoryId?: never;
+    }
+  | { failure: null; credential: GitHubCapabilityCredential; repositoryId?: number };
 
 // Methods that may reach the recorded repository's REST surface. Everything here is
 // repository-confined before the credential is minted, so the list covers the write
@@ -415,6 +427,16 @@ const GITHUB_REGISTRY_METHODS = ['GET', 'HEAD'];
 
 function repositoryApiPath(repository: { owner: string; repo: string }): string {
   return `/repos/${repository.owner}/${repository.repo}`;
+}
+
+function parseGitHubRepositoryId(url: URL): number | null {
+  if (url.search.includes(';')) return null;
+  const values = url.searchParams.getAll('repository_id');
+  if (values.length !== 1) return null;
+  const value = values[0];
+  if (!value || !/^[1-9][0-9]*$/.test(value)) return null;
+  const repositoryId = Number(value);
+  return Number.isSafeInteger(repositoryId) ? repositoryId : null;
 }
 
 function isRepositoryApiPath(path: string, repository: { owner: string; repo: string }): boolean {
@@ -564,6 +586,13 @@ function validateGitHubCapabilityUpstream(
       : { failure: 'invalid_upstream_request' };
   }
   if (url.hostname === 'uploads.github.com') {
+    if (path === GITHUB_USER_ATTACHMENT_PATH) {
+      if (method !== 'POST') return { failure: 'invalid_upstream_request' };
+      const repositoryId = parseGitHubRepositoryId(url);
+      return repositoryId === null
+        ? { failure: 'invalid_upstream_request' }
+        : { failure: null, credential: 'pinned', repositoryId };
+    }
     if (!isRepositoryApiPath(path, repository)) return { failure: 'repository_mismatch' };
     return GITHUB_UPLOAD_METHODS.includes(method)
       ? { failure: null, credential: 'pinned' }
@@ -1150,17 +1179,17 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
       return { success: false, reason: 'container_mismatch' };
     }
 
-    const upstream =
-      claims.version === 2
-        ? validateGitHubCapabilityUpstream(params.requestMethod, params.requestUrl, claims)
-        : {
-            failure: validateLegacyGitHubCapabilityUpstream(
-              params.requestMethod,
-              params.requestUrl,
-              claims
-            ),
-            credential: 'pinned' as const,
-          };
+    let upstream: GitHubCapabilityUpstream;
+    if (claims.version === 2) {
+      upstream = validateGitHubCapabilityUpstream(params.requestMethod, params.requestUrl, claims);
+    } else {
+      const failure = validateLegacyGitHubCapabilityUpstream(
+        params.requestMethod,
+        params.requestUrl,
+        claims
+      );
+      upstream = failure === null ? { failure: null, credential: 'pinned' } : { failure };
+    }
     if (upstream.failure) return { success: false, reason: upstream.failure };
 
     const authParams = {
@@ -1201,6 +1230,15 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     if (!this.matchesSessionIdentity(claims.identity, auth)) {
       return { success: false, reason: 'identity_mismatch' };
     }
+    if (upstream.repositoryId !== undefined) {
+      const repositoryFailure = await this.verifyGitHubRepositoryId(
+        claims.owner,
+        claims.repo,
+        upstream.repositoryId,
+        auth.githubToken
+      );
+      if (repositoryFailure !== null) return { success: false, reason: repositoryFailure };
+    }
     return {
       success: true,
       authorization: this.formatUpstreamAuthorization(params.requestUrl, auth.githubToken),
@@ -1225,6 +1263,47 @@ export class GitTokenRPCEntrypoint extends WorkerEntrypoint<CloudflareEnv> {
     auth: GetCloudAgentAuthForRepoSuccess
   ): boolean {
     return JSON.stringify(issuedIdentity) === JSON.stringify(this.getSessionIdentity(auth));
+  }
+
+  private async verifyGitHubRepositoryId(
+    owner: string,
+    repo: string,
+    expectedRepositoryId: number,
+    token: string
+  ): Promise<'source_unavailable' | 'repository_mismatch' | null> {
+    let response: Response;
+    try {
+      response = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
+        method: 'GET',
+        headers: {
+          Accept: 'application/vnd.github+json',
+          Authorization: `Bearer ${token}`,
+        },
+        redirect: 'manual',
+        signal: AbortSignal.timeout(GITHUB_REPOSITORY_METADATA_TIMEOUT_MS),
+      });
+    } catch {
+      return 'source_unavailable';
+    }
+    if (response.status !== 200) return 'source_unavailable';
+
+    let body: unknown;
+    try {
+      if (!response.body) return 'source_unavailable';
+      body = await readBoundedJsonBody(response.body, GITHUB_REPOSITORY_METADATA_MAX_BYTES);
+    } catch {
+      return 'source_unavailable';
+    }
+
+    const parsed = GitHubRepositoryMetadataSchema.safeParse(body);
+    if (!parsed.success) return 'source_unavailable';
+    if (
+      parsed.data.id !== expectedRepositoryId ||
+      parsed.data.full_name.toLowerCase() !== `${owner}/${repo}`.toLowerCase()
+    ) {
+      return 'repository_mismatch';
+    }
+    return null;
   }
 
   private formatUpstreamAuthorization(requestUrl: string, token: string): string {

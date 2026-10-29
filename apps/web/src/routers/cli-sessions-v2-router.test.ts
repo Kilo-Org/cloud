@@ -2132,6 +2132,24 @@ describe('cli-sessions-v2-router', () => {
         () => TRPCClientError.from(new TypeError('fetch failed', { cause: headersTimeout })),
       ],
       ['a headers timeout', () => TRPCClientError.from(headersTimeout)],
+      [
+        'an AbortSignal timeout',
+        () =>
+          TRPCClientError.from(
+            new Error('The operation was aborted', {
+              cause: new DOMException('The operation timed out', 'TimeoutError'),
+            })
+          ),
+      ],
+      [
+        'a non-Error abort cause',
+        () =>
+          TRPCClientError.from(
+            new Error('The operation was aborted', {
+              cause: { name: 'AbortError', message: 'This operation was aborted' },
+            })
+          ),
+      ],
     ])('reports %s as temporarily unavailable', async (_label, createError) => {
       await insertWorkspaceSession();
       mockGetSession.mockRejectedValue(createError());

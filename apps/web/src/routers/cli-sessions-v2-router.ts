@@ -129,10 +129,11 @@ const TRANSPORT_ERROR_NAMES = new Set([
 ]);
 
 function isTransportFailure(cause: unknown, depth = 0): boolean {
-  if (!(cause instanceof Error) || depth > 3) return false;
-  if (TRANSPORT_ERROR_NAMES.has(cause.name)) return true;
-  if (cause instanceof TypeError && cause.message === 'fetch failed') return true;
-  return isTransportFailure(cause.cause, depth + 1);
+  if (typeof cause !== 'object' || cause === null || depth > 3) return false;
+  const { name, message } = cause as { name?: unknown; message?: unknown };
+  if (typeof name === 'string' && TRANSPORT_ERROR_NAMES.has(name)) return true;
+  if (cause instanceof TypeError && message === 'fetch failed') return true;
+  return isTransportFailure((cause as { cause?: unknown }).cause, depth + 1);
 }
 
 /** Worker outages, timeouts, and network failures that a later retry may resolve. */

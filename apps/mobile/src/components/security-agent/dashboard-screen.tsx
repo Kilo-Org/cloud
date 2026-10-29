@@ -389,7 +389,18 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
 
         {syncFailure ? (
           <View className="flex-row items-center gap-3">
-            <Text className="flex-1 text-xs text-destructive">{syncFailure.message}</Text>
+            {/* While a retry runs this sentence is the failure being retried,
+                not a fresh one, so it steps back from error red — to the warn
+                tone this screen already gives its other degraded state — while
+                the control reports the attempt. */}
+            <Text
+              className={cn(
+                'flex-1 text-xs',
+                triggerSync.isPending ? 'text-warn' : 'text-destructive'
+              )}
+            >
+              {syncFailure.message}
+            </Text>
             {syncRetryable ? (
               // The retry sits beside the sentence it retries and reports its
               // own progress: a failed sync can settle in a blink, so the
@@ -398,6 +409,10 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                 size="sm"
                 variant="ghost"
                 loading={triggerSync.isPending}
+                // A busy non-primary control dims itself, spinner included,
+                // which left the control the reader just pressed fainter than
+                // the header icon spinning beside it.
+                className={cn(triggerSync.isPending && 'opacity-100')}
                 onPress={() => {
                   startSync(lastSyncAttempt?.intent ?? { repoFullName });
                 }}

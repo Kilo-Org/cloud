@@ -467,6 +467,16 @@ describe('DashboardScreen sync control terminal states', () => {
     expect(renderedTexts(root.root)).toContain(
       i18n.t('securityAgent.mutations.serviceUnavailable')
     );
+    // The pressed control keeps its own spinner visible, and the sentence it is
+    // retrying steps back so it does not read as a fresh failure.
+    expect(syncRetries(root.root)[0]?.props.className).toContain('opacity-100');
+    const message = root.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'Text' &&
+        n.props.children === i18n.t('securityAgent.mutations.serviceUnavailable')
+    )[0];
+    expect(message?.props.className).toContain('text-warn');
   });
 
   it('drops the failure row once a retry succeeds', () => {

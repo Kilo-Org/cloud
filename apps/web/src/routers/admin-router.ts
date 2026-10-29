@@ -212,6 +212,11 @@ type KiloClawCancelActor = Pick<User, 'id' | 'google_user_email' | 'google_user_
 const BULK_CANCEL_KILOCLAW_CONFIRMATION = 'STOP RENEWALS';
 const BULK_CANCEL_KILOCLAW_STATUSES = ['active', 'past_due'] as const;
 const BULK_CANCEL_KILOCLAW_CONCURRENCY = 5;
+const BULK_CANCEL_KILOCLAW_OUTCOMES = {
+  updated: 'updated',
+  already_desired: 'skipped',
+  local_row_changed_after_stripe: 'failed',
+} as const satisfies Record<KiloClawCancelReconciliationStatus, 'updated' | 'skipped' | 'failed'>;
 
 const KILOCLAW_STATUS_LABELS: Record<KiloClawSubscription['status'], string> = {
   trialing: 'trialing',
@@ -302,6 +307,11 @@ async function cancelKiloClawSubscriptionAtPeriodEnd(params: {
     target_user_id: userId,
   };
 
+  const withBulkOutcome = (metadata: KiloClawCancelAuditMetadata) =>
+    bulkRunId
+      ? { ...metadata, outcome: BULK_CANCEL_KILOCLAW_OUTCOMES[metadata.reconciliationStatus] }
+      : metadata;
+
   return db.transaction(async tx => {
     const localSubscription = await findKiloClawSubscriptionForUpdate({
       tx,
@@ -332,7 +342,7 @@ async function cancelKiloClawSubscriptionAtPeriodEnd(params: {
         action: 'kiloclaw.subscription.admin_cancel',
         ...auditActor,
         message: `Stripe cancel succeeded for KiloClaw subscription ${subscription.id}, but local row changed before reconciliation`,
-        metadata,
+        metadata: withBulkOutcome(metadata),
         tx,
       });
       return 'local_row_changed_after_stripe';
@@ -347,7 +357,7 @@ async function cancelKiloClawSubscriptionAtPeriodEnd(params: {
         action: 'kiloclaw.subscription.admin_cancel',
         ...auditActor,
         message: `Stripe period-end cancel succeeded for KiloClaw subscription ${subscription.id}, but local row was no longer ${statusDescription} during reconciliation`,
-        metadata,
+        metadata: withBulkOutcome(metadata),
         tx,
       });
       return 'local_row_changed_after_stripe';
@@ -362,7 +372,7 @@ async function cancelKiloClawSubscriptionAtPeriodEnd(params: {
         action: 'kiloclaw.subscription.admin_cancel',
         ...auditActor,
         message: `Admin cancel reconciliation found KiloClaw subscription ${subscription.id} already in desired state`,
-        metadata,
+        metadata: withBulkOutcome(metadata),
         tx,
       });
       return 'already_desired';
@@ -393,7 +403,7 @@ async function cancelKiloClawSubscriptionAtPeriodEnd(params: {
         action: 'kiloclaw.subscription.admin_cancel',
         ...auditActor,
         message: `Stripe cancel succeeded for KiloClaw subscription ${subscription.id}, but local update failed during reconciliation`,
-        metadata,
+        metadata: withBulkOutcome(metadata),
         tx,
       });
       return 'local_row_changed_after_stripe';
@@ -416,7 +426,7 @@ async function cancelKiloClawSubscriptionAtPeriodEnd(params: {
       action: 'kiloclaw.subscription.admin_cancel',
       ...auditActor,
       message: `Admin set cancel-at-period-end on KiloClaw subscription ${subscription.id} (status was ${previousStatus}, stripe_sub=${subscription.stripe_subscription_id ?? 'none'})`,
-      metadata,
+      metadata: withBulkOutcome(metadata),
       tx,
     });
     return 'updated';
@@ -465,6 +475,7 @@ async function bulkCancelKiloClawSubscriptions(actor: KiloClawCancelActor) {
   const auditRow = (params: {
     userId: string;
     subscriptionId: string;
+    noRenewalPeriod: boolean;
     message: string;
     metadata: Record<string, unknown>;
   }) =>
@@ -479,12 +490,17 @@ async function bulkCancelKiloClawSubscriptions(actor: KiloClawCancelActor) {
         bulkRunId,
         subscriptionId: params.subscriptionId,
         mode: 'period_end',
+        noRenewalPeriod: params.noRenewalPeriod,
         ...params.metadata,
       },
     });
 
   const processRow = async (row: (typeof eligible)[number]) => {
     const ref = { subscriptionId: row.id, userId: row.userId };
+    const rowNoRenewalPeriod = hasNoKiloClawRenewalPeriod({
+      current_period_end: row.currentPeriodEnd,
+      credit_renewal_at: row.creditRenewalAt,
+    });
     try {
       const subscription = await db.transaction(tx =>
         findKiloClawSubscriptionForUpdate({ tx, userId: row.userId, subscriptionId: row.id })
@@ -498,6 +514,7 @@ async function bulkCancelKiloClawSubscriptions(actor: KiloClawCancelActor) {
         skipped += 1;
         await auditRow({
           ...ref,
+          noRenewalPeriod: rowNoRenewalPeriod,
           message: `Bulk cancel skipped KiloClaw subscription ${row.id}: no longer eligible`,
           metadata: {
             outcome: 'skipped',
@@ -532,6 +549,7 @@ async function bulkCancelKiloClawSubscriptions(actor: KiloClawCancelActor) {
       try {
         await auditRow({
           ...ref,
+          noRenewalPeriod: rowNoRenewalPeriod,
           message: `Bulk cancel failed for KiloClaw subscription ${row.id}`,
           metadata: { outcome: 'failed', error: message },
         });

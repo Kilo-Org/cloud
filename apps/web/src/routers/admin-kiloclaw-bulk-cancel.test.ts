@@ -271,6 +271,7 @@ describe('admin.users.bulkCancelKiloClawSubscriptions', () => {
     for (const audit of perRowAudits) {
       expect(audit.metadata?.bulkRunId).toBe(result.bulkRunId);
       expect(audit.metadata?.reconciliationStatus).toBe('updated');
+      expect(audit.metadata?.outcome).toBe('updated');
     }
     const orgAudit = perRowAudits.find(
       audit => audit.metadata?.subscriptionId === fleet.eligible.orgManaged.id
@@ -340,6 +341,7 @@ describe('admin.users.bulkCancelKiloClawSubscriptions', () => {
         subscriptionId: fleet.eligible.pastDueStripe.id,
         outcome: 'failed',
         error: 'Stripe is unavailable',
+        noRenewalPeriod: false,
       })
     );
 

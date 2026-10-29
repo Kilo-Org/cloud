@@ -3910,7 +3910,7 @@
       "timeout": "Taimauts",
       "secretCount_zero": "{{count}} noslēpumu",
       "secretCount_one": "{{count}} noslēpums",
-      "secretCount_other": "{{count}} noslēpumus",
+      "secretCount_other": "{{count}} noslēpumi",
       "namePlaceholder": "my-server",
       "commandPlaceholder": "npx @example/mcp-server",
       "jsonPlaceholder": "{\n  \"API_KEY\": \"sk-...\"\n}",

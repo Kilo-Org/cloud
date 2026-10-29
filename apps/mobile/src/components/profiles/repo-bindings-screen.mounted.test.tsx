@@ -58,7 +58,7 @@ vi.mock('@/lib/hooks/use-repo-bindings', () => ({
 }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn<(href: string) => void>() }) }));
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
-  useCanManageOrganizationProfiles: () => true,
+  useOrganizationProfilePermission: () => 'allowed',
 }));
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileList: () => h.profileList,

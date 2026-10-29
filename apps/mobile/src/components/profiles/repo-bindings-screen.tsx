@@ -25,7 +25,10 @@ import { Button } from '@/components/ui/button';
 import { GitBranch } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
-import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
+import {
+  type OrganizationProfilePermission,
+  useOrganizationProfilePermission,
+} from '@/lib/hooks/use-can-manage-profiles';
 import {
   useRepoBindingMutations,
   useRepoBindings,
@@ -42,7 +45,9 @@ function hasUsableMessage(error: unknown): boolean {
  * The picker's empty-state copy. It names the profile a user could select in
  * this context: a personal one, an organization one, or — without the manage
  * role — who can create an organization profile, since the server rejects the
- * create itself.
+ * create itself. While the role is still resolving it names the organization
+ * profile the context lists: the read-only copy would tell an owner or admin
+ * they cannot act on what they can.
  */
 const PICKER_EMPTY_DESCRIPTION_KEYS = {
   personal: 'profiles.emptyDescription',
@@ -55,14 +60,14 @@ type PickerEmptyDescriptionKey =
 
 function pickerEmptyDescriptionKey(
   organizationId: string | undefined,
-  canManageProfiles: boolean
+  permission: OrganizationProfilePermission
 ): PickerEmptyDescriptionKey {
   if (organizationId === undefined) {
     return PICKER_EMPTY_DESCRIPTION_KEYS.personal;
   }
-  return canManageProfiles
-    ? PICKER_EMPTY_DESCRIPTION_KEYS.organization
-    : PICKER_EMPTY_DESCRIPTION_KEYS.organizationReadOnly;
+  return permission === 'read-only'
+    ? PICKER_EMPTY_DESCRIPTION_KEYS.organizationReadOnly
+    : PICKER_EMPTY_DESCRIPTION_KEYS.organization;
 }
 
 /**
@@ -86,8 +91,11 @@ export function RepoBindingsScreen({
   const { bind, unbind } = useRepoBindingMutations(organizationId);
   const profileList = useAgentProfileList(organizationId);
   // Personal scope is always creatable; an organization profile needs a manage
-  // role, and the server rejects the create without one.
-  const canCreateProfile = useCanManageOrganizationProfiles(organizationId);
+  // role, and the server rejects the create without one. `resolving` is not yet
+  // a refusal, so the picker's create action waits for the answer instead of
+  // telling the user they cannot act.
+  const profilePermission = useOrganizationProfilePermission(organizationId);
+  const canCreateProfile = profilePermission === 'allowed';
 
   const [isAdding, setIsAdding] = useState(false);
   const [selectedRepo, setSelectedRepo] = useState<RepoOption | null>(null);
@@ -103,7 +111,7 @@ export function RepoBindingsScreen({
   const canAdd = selectedRepo !== null && selectedProfileId !== '' && !bind.isPending;
   // The picker lists this context's own profiles, so its empty state names the
   // profile that would appear there.
-  const pickerEmptyDescription = t(pickerEmptyDescriptionKey(organizationId, canCreateProfile));
+  const pickerEmptyDescription = t(pickerEmptyDescriptionKey(organizationId, profilePermission));
   // The create form starts on the owner whose profiles this context lists.
   const createOwner: ProfileOwnerChoice =
     organizationId === undefined ? 'personal' : 'organization';

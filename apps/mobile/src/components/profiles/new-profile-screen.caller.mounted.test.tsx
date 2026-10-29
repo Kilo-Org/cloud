@@ -37,10 +37,6 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
     return boundaryState;
   },
 }));
-vi.mock('@/lib/profile-agent-navigation', () => ({
-  getProfileOverviewPath: (profileId: string, organizationId?: string) =>
-    organizationId ? `/profiles/${profileId}?org=${organizationId}` : `/profiles/${profileId}`,
-}));
 vi.mock('react-native', () => ({ View: 'View', ScrollView: 'ScrollView' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: () => null }));
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'ScrollView' }));
@@ -133,7 +129,9 @@ describe('NewProfileScreen caller request', () => {
 
     await waitFor(() => createMutate.mock.calls.length > 0);
     expect(routerBack).not.toHaveBeenCalled();
-    expect(routerReplace).toHaveBeenCalledWith('/profiles/profile-1?org=org-1');
+    expect(routerReplace).toHaveBeenCalledWith(
+      '/(app)/profile-management/profile-1?organizationId=org-1'
+    );
 
     unmount();
   });
@@ -146,7 +144,9 @@ describe('NewProfileScreen caller request', () => {
 
     await waitFor(() => createMutate.mock.calls.length > 0);
     expect(routerBack).not.toHaveBeenCalled();
-    expect(routerReplace).toHaveBeenCalledWith('/profiles/profile-1?org=org-1');
+    expect(routerReplace).toHaveBeenCalledWith(
+      '/(app)/profile-management/profile-1?organizationId=org-1'
+    );
 
     unmount();
   });

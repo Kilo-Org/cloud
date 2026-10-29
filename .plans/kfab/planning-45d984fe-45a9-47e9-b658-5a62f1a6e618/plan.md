@@ -44,6 +44,7 @@ If the stored GitHub PR is confirmed gone (404), retriggering it fails immediate
 - The helper splits review.repo_full_name into owner/repo and calls fetchPullRequestByNumber({ installationId: Number(platform_installation_id), owner, repo, number: review.pr_number, appType: integration.github_app_type ?? 'standard' }). If the result is null, it throws a TRPCError BAD_REQUEST with the specific 'pull request no longer available' message. The router's existing catch rethrows TRPCErrors, so the client sees the message. Any other thrown error (including GitHubRateLimitError) is caught, logged with logExceptInTest/warn, and ignored.
 - Billing: add a local `isProviderNotFoundError(error)` in billing.ts. It returns true for objects with numeric `status === 404`, which is the Octokit RequestError shape and matches adapter.ts isHttpError. In finalizeCodeReviewBillingFailure, both the closeProviderGate and postCodeReviewBillingNotice catches log a warning (e.g. '[code-review-billing] Pull request or repository no longer available; skipping billing notice') with the reviewId and return without captureException when this is true. Otherwise they behave as today.
 - Tests: extend routers/code-reviews-router.test.ts with (a) a GitHub review whose PR fetch returns null → retrigger rejects with BAD_REQUEST containing the message; the review status stays terminal, no attempt row is created, and createCheckRun and dispatch are not called; (b) PR fetch throws a non-404 error → retrigger proceeds as before. Extend dispatch-pending-reviews.test.ts (or add billing.test.ts) so that mockHasPRCommentWithMarker rejecting with { status: 404 } results in no captureException call while the review is still marked failed, and rejecting with { status: 500 } still calls captureException with operation code-review-billing-post-notice.
+- Per the repository Failure UX guidance, the PR description should note both effects: gone PRs fail fast in one GitHub call, and valid retriggers gain at most one extra GitHub PR fetch with no new retries or timeouts.
 - Mention 'Fixes KILOCODE-WEB-28HJ' in the PR or commit.
 
 ## Affected areas
@@ -70,10 +71,6 @@ If the stored GitHub PR is confirmed gone (404), retriggering it fails immediate
 ### ac-4: Non-404 failures in finalizeCodeReviewBillingFailure (e.g. status 500 or a non-HTTP error) still call captureException with the existing operation tags code-review-billing-post-notice / code-review-billing-close-provider-gate. hasPRCommentWithMarker, scanPRIssueComments, and the status-callback route's direct postCodeReviewBillingNotice calls are unchanged. A unit test covers this, and source review confirms the unchanged callers.
 
 **Verification:** Code review
-
-### ac-5: Failure UX check, recorded in the PR description. Gone PR: the user learns the outcome from the retrigger response in one GitHub round trip, instead of waiting through sandbox dispatch and a delayed failure. Genuine retriggers: they gain at most one extra GitHub PR fetch before reset, with no new retries or timeouts.
-
-**Verification:** Manual: reviewer confirms the PR description states both effects (fail-fast for gone PRs; at most one extra GitHub call for valid retriggers)
 
 ## Risks
 

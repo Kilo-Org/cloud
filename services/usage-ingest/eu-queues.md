@@ -4,10 +4,10 @@
 
 | Environment | Worker | Source / DLQ | Mode and capacity |
 |---|---|---|---|
-| Production (top-level) | `usage-ingest` | `usage-ingest-processing-eu` / `usage-ingest-processing-dlq-eu` | Processing, batch2/parallelism2/cap200 (up to 400 writer calls) |
+| Production (top-level) | `usage-ingest` | `usage-ingest-processing-eu` / `usage-ingest-processing-dlq-eu` | Processing, batch4/parallelism2/cap200 (up to 400 writer calls) |
 | Staging | `usage-ingest-staging` | `usage-ingest-processing-staging-eu` / `usage-ingest-processing-dlq-staging-eu` | Processing, batch2/parallelism2/cap200 (at most400 writer calls) |
 
-Production uses batch2/parallelism2/cap200; staging policy is unchanged.
+Production uses batch4/parallelism2/cap200; staging policy is unchanged.
 Complete the production merge gate below before merge, deployment or cohort exposure. Receipt mode at batch1/cap1 belongs
 to the preceding EU plumbing prerequisite, which must be deployed and verified first.
 **Merging this change arms an automatic production queue cutover.** The production

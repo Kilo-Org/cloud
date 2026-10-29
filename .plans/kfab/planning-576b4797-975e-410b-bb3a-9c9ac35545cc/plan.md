@@ -41,6 +41,7 @@ If the Vercel Firewall rate-limit check throws a transport error, the AI gateway
 - Adding a Sentry beforeSend filter for 'fetch failed'.
 - Changing apps/web's firewall-rate-limit helper or the auth limiters, which fail closed by design.
 - Shortening the 10 s undici connect timeout of checkRateLimit. The library exposes no timeout or signal option at the pinned version, and the pinned checkout has no node_modules to confirm otherwise.
+- Post-deploy production monitoring of Sentry/Axiom is not an acceptance criterion of this change; it remains an optional operational follow-up.
 
 ## Approach
 
@@ -75,13 +76,9 @@ If the Vercel Firewall rate-limit check throws a transport error, the AI gateway
 
 **Verification:** Code review
 
-### ac-5: After deployment, Sentry KILOCODE-WEB-1W27 stops receiving new unhandled events of this early-failure shape (fetch-failed 500s ending in under about 250 ms on /api/v1/chat/completions), and the new throttled 'could not be checked' message appears in their place.
-
-**Verification:** Manual: After deploy, check Sentry KILOCODE-WEB-1W27 event rate and the Axiom vercel dataset for raw '[TypeError: fetch failed]' lines with status=500 on /api/v1/chat/completions over several days
-
 ## Risks
 
-- The attribution comes from timing and elimination, not a stack trace (Sentry has no first-party frames). If some events come from a different early call site, they will keep occurring. AC-5 is how to spot that, and the remaining cases can be followed up separately.
+- The attribution comes from timing and elimination, not a stack trace (Sentry has no first-party frames). If some events come from a different early call site, they will keep occurring; watching KILOCODE-WEB-1W27 after deploy (outside this plan's acceptance criteria) would reveal that, and the remaining cases can be followed up separately.
 - Failing open means that while the firewall API is unreachable, the account cap and free-model abuse limits stop applying. That is the same exposure as today's missing-rule behavior, and the throttled Sentry report keeps it visible.
 - A connect timeout to the firewall API still costs up to about 10 s before failing open, because checkRateLimit offers no timeout option. Users get a slow success instead of a slow 500. Bounding that latency is out of scope.
 - Throttle state is per instance, so a fleet-wide outage still produces up to N reports per minute. This matches the existing pattern.

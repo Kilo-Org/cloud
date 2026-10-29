@@ -644,7 +644,12 @@
       "loading": "Postkasti laadimine",
       "noReviewRequests": "Ülevaatustaotlusi pole",
       "noReviewRequestsDescription": "Siin kuvatakse sinu ülevaatust ootavad tõmbetaotlused. Ülalolevale väljale saad endiselt kleepida mis tahes PR-i lingi.",
-      "couldNotLoad": "Postkasti ei õnnestunud laadida."
+      "couldNotLoad": "Postkasti ei õnnestunud laadida.",
+      "accessLostTitle": "Sul pole enam juurdepääsu sellele organisatsioonile",
+      "accessLostDescription": "Sa pole enam selle organisatsiooni liige, seega ei saa selle ülevaatustaotlusi laadida. Ülevaatamise jätkamiseks mine üle isiklikule kontole.",
+      "organizationUnavailableTitle": "See organisatsioon pole enam olemas",
+      "organizationUnavailableDescription": "See organisatsioon kustutati, seega ei saa selle ülevaatustaotlusi laadida. Ülevaatamise jätkamiseks mine üle isiklikule kontole.",
+      "continueInPersonal": "Jätka isikliku kontoga"
     },
     "composer": {
       "commentBodyPlaceholder": "Kommentaar",

@@ -659,7 +659,12 @@
       "loading": "Tiek ielādēta iesūtne",
       "noReviewRequests": "Nav pārskatīšanas pieprasījumu",
       "noReviewRequestsDescription": "Šeit būs redzami izmaiņu pieprasījumi, kas gaida tavu vērtējumu. Arī augstāk vari ielīmēt jebkuru PR saiti.",
-      "couldNotLoad": "Neizdevās ielādēt iesūtni."
+      "couldNotLoad": "Neizdevās ielādēt iesūtni.",
+      "accessLostTitle": "Nav piekļuves šai organizācijai",
+      "accessLostDescription": "Tu vairs neesi šīs organizācijas dalībnieks, tāpēc tās pārskatīšanas pieprasījumus nevar ielādēt. Turpini savā personīgajā kontā, lai varētu turpināt vērtēt.",
+      "organizationUnavailableTitle": "Šī organizācija vairs neeksistē",
+      "organizationUnavailableDescription": "Šī organizācija tika izdzēsta, tāpēc tās pārskatīšanas pieprasījumus nevar ielādēt. Turpini savā personīgajā kontā, lai varētu turpināt vērtēt.",
+      "continueInPersonal": "Turpini personīgajā kontā"
     },
     "composer": {
       "commentBodyPlaceholder": "Komentārs",

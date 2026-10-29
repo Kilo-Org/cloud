@@ -644,7 +644,12 @@
       "loading": "Läser in inkorgen",
       "noReviewRequests": "Inga granskningsförfrågningar",
       "noReviewRequestsDescription": "PR:er som väntar på din granskning visas här. Du kan också klistra in valfri PR-länk ovan.",
-      "couldNotLoad": "Kunde inte läsa in inkorgen"
+      "couldNotLoad": "Kunde inte läsa in inkorgen",
+      "accessLostTitle": "Ingen åtkomst till den här organisationen",
+      "accessLostDescription": "Du är inte längre medlem i den här organisationen, så dess granskningsförfrågningar kan inte läsas in. Fortsätt i ditt personliga konto för att fortsätta granska.",
+      "organizationUnavailableTitle": "Den här organisationen finns inte längre",
+      "organizationUnavailableDescription": "Den här organisationen har tagits bort, så dess granskningsförfrågningar kan inte läsas in. Fortsätt i ditt personliga konto för att fortsätta granska.",
+      "continueInPersonal": "Fortsätt i personligt konto"
     },
     "composer": {
       "commentBodyPlaceholder": "Din kommentar",

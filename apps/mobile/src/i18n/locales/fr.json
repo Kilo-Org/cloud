@@ -2943,6 +2943,11 @@
     },
     "inbox": {
       "couldNotLoad": "Impossible de charger la boîte de réception.",
+      "accessLostTitle": "Accès à cette organisation perdu",
+      "accessLostDescription": "Vous n'êtes plus membre de cette organisation, ses demandes de revue ne peuvent donc pas être chargées. Continuez dans votre compte personnel pour continuer à faire des revues.",
+      "organizationUnavailableTitle": "Cette organisation n'existe plus",
+      "organizationUnavailableDescription": "Cette organisation a été supprimée, ses demandes de revue ne peuvent donc pas être chargées. Continuez dans votre compte personnel pour continuer à faire des revues.",
+      "continueInPersonal": "Continuer dans le compte personnel",
       "loading": "Chargement de la boîte de réception",
       "noReviewRequests": "Aucune demande de revue",
       "noReviewRequestsDescription": "Les demandes de fusion en attente de votre revue apparaissent ici. Vous pouvez aussi coller n'importe quel lien de PR ci-dessus.",

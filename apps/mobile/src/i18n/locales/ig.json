@@ -644,7 +644,12 @@
       "loading": "Na-ebudata igbe nnabata",
       "noReviewRequests": "Enweghị arịrịọ nyocha",
       "noReviewRequestsDescription": "Arịrịọ njikọta na-echere nyocha gị na-apụta ebe a. Ị ka nwere ike ịmado njikọ PR ọ bụla n'elu.",
-      "couldNotLoad": "Enweghị ike ibudata igbe nnabata."
+      "couldNotLoad": "Enweghị ike ibudata igbe nnabata.",
+      "accessLostTitle": "Enweghị mgbanye n'ụlọ ọrụ a",
+      "accessLostDescription": "Ị abụghịzi onye òtù ụlọ ọrụ a, ya mere enweghị ike ibudata arịrịọ nyocha ya. Gaa n'ihu na akaụntụ nkeonwe gị ka ị wee nwee ike ịga n'ihu na nyocha.",
+      "organizationUnavailableTitle": "Ụlọ ọrụ a adịkwaghị",
+      "organizationUnavailableDescription": "Ehichapụla ụlọ ọrụ a, ya mere enweghị ike ibudata arịrịọ nyocha ya. Gaa n'ihu na akaụntụ nkeonwe gị ka ị wee nwee ike ịga n'ihu na nyocha.",
+      "continueInPersonal": "Gaa n'ihu na akaụntụ nkeonwe"
     },
     "composer": {
       "commentBodyPlaceholder": "Okwu gị",

@@ -674,7 +674,12 @@
       "loading": "Įkeliamos gautos užklausos",
       "noReviewRequests": "Nėra prašymų peržiūrėti",
       "noReviewRequestsDescription": "Čia rodomos tavo peržiūros laukiančios pakeitimų užklausos. Viršuje taip pat gali įklijuoti bet kurio PR nuorodą.",
-      "couldNotLoad": "Nepavyko įkelti gautų užklausų."
+      "couldNotLoad": "Nepavyko įkelti gautų užklausų.",
+      "accessLostTitle": "Nėra prieigos prie šios organizacijos",
+      "accessLostDescription": "Tu nebesi šios organizacijos narys, todėl jos peržiūros prašymų įkelti nepavyks. Tęsk savo asmeninėje paskyroje ir toliau peržiūrėk.",
+      "organizationUnavailableTitle": "Šios organizacijos nebėra",
+      "organizationUnavailableDescription": "Ši organizacija buvo ištrinta, todėl jos peržiūros prašymų įkelti nepavyks. Tęsk savo asmeninėje paskyroje ir toliau peržiūrėk.",
+      "continueInPersonal": "Tęsti asmeninėje paskyroje"
     },
     "composer": {
       "commentBodyPlaceholder": "Komentaras",

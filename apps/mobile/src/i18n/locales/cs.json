@@ -674,7 +674,12 @@
       "loading": "Načítání doručených žádostí",
       "noReviewRequests": "Žádné žádosti o revizi",
       "noReviewRequestsDescription": "Tady se zobrazí PR, které čekají na tvou revizi. Do pole výše můžeš vložit odkaz na libovolný PR.",
-      "couldNotLoad": "Doručené žádosti se nepodařilo načíst."
+      "couldNotLoad": "Doručené žádosti se nepodařilo načíst.",
+      "accessLostTitle": "K této organizaci už nemáš přístup",
+      "accessLostDescription": "Už nejsi členem této organizace, takže její žádosti o revizi se nedají načíst. Přepni se na osobní účet a pokračuj v revizích.",
+      "organizationUnavailableTitle": "Tato organizace už neexistuje",
+      "organizationUnavailableDescription": "Tato organizace byla smazána, takže její žádosti o revizi se nedají načíst. Přepni se na osobní účtu a pokračuj v revizích.",
+      "continueInPersonal": "Pokračovat v osobním účtu"
     },
     "composer": {
       "commentBodyPlaceholder": "Tvůj komentář",

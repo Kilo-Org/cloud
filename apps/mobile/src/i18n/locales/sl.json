@@ -674,7 +674,12 @@
       "loading": "Nalaganje prejetih zahtevkov",
       "noReviewRequests": "Ni zahtevkov za pregled",
       "noReviewRequestsDescription": "Tukaj se prikažejo zahtevki za združitev, ki čakajo na tvoj pregled. Zgoraj lahko še vedno prilepiš poljubno povezavo do PR-ja.",
-      "couldNotLoad": "Prejetih zahtevkov ni bilo mogoče naložiti."
+      "couldNotLoad": "Prejetih zahtevkov ni bilo mogoče naložiti.",
+      "accessLostTitle": "Ni dostopa do te organizacije",
+      "accessLostDescription": "Nisi več član te organizacije, zato zahtevkov za pregled ni mogoče naložiti. Za nadaljevanje pregledovanja nadaljuj v svojem osebnem računu.",
+      "organizationUnavailableTitle": "Ta organizacija ne obstaja več",
+      "organizationUnavailableDescription": "Ta organizacija je bila izbrisana, zato zahtevkov za pregled ni mogoče naložiti. Za nadaljevanje pregledovanja nadaljuj v svojem osebnem računu.",
+      "continueInPersonal": "Nadaljuj v osebnem računu"
     },
     "composer": {
       "commentBodyPlaceholder": "Komentar",

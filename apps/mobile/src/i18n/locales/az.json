@@ -644,7 +644,12 @@
       "loading": "Gələnlər yüklənir",
       "noReviewRequests": "Kod baxışı sorğusu yoxdur",
       "noReviewRequestsDescription": "Nəzərdən keçirməyini gözləyən birləşdirmə sorğuları burada görünür. Yuxarıdakı sahəyə istənilən PR keçidini də yapışdıra bilərsən.",
-      "couldNotLoad": "Gələnləri yükləmək mümkün olmadı."
+      "couldNotLoad": "Gələnləri yükləmək mümkün olmadı.",
+      "accessLostTitle": "Bu təşkilata giriş itirildi",
+      "accessLostDescription": "Artıq bu təşkilatın üzvü deyilsən, ona görə də onun baxış sorğularını yükləmək mümkün deyil. Nəzərdən keçirməyə davam etmək üçün şəxsi hesabına keç.",
+      "organizationUnavailableTitle": "Bu təşkilat artıq mövcud deyil",
+      "organizationUnavailableDescription": "Bu təşkilat silindi, ona görə də onun baxış sorğularını yükləmək mümkün deyil. Nəzərdən keçirməyə davam etmək üçün şəxsi hesabına keç.",
+      "continueInPersonal": "Şəxsi hesabda davam et"
     },
     "composer": {
       "commentBodyPlaceholder": "Şərh mətni",

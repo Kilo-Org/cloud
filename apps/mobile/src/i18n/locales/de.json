@@ -2905,6 +2905,11 @@
     },
     "inbox": {
       "couldNotLoad": "Der Posteingang konnte nicht geladen werden.",
+      "accessLostTitle": "Kein Zugriff auf diese Organisation",
+      "accessLostDescription": "Du bist kein Mitglied dieser Organisation mehr, deshalb können ihre Review-Anfragen nicht geladen werden. Fahre in deinem persönlichen Account fort, um weiter zu reviewen.",
+      "organizationUnavailableTitle": "Diese Organisation existiert nicht mehr",
+      "organizationUnavailableDescription": "Diese Organisation wurde gelöscht, deshalb können ihre Review-Anfragen nicht geladen werden. Fahre in deinem persönlichen Account fort, um weiter zu reviewen.",
+      "continueInPersonal": "Im persönlichen Account fortfahren",
       "loading": "Posteingang wird geladen",
       "noReviewRequests": "Keine Review-Anfragen",
       "noReviewRequestsDescription": "Hier erscheinen Pull-Requests, die auf dein Review warten. Du kannst oben auch einen beliebigen PR-Link einfügen.",

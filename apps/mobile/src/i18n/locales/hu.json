@@ -644,7 +644,12 @@
       "loading": "Beérkezett kérelmek betöltése",
       "noReviewRequests": "Nincs kódellenőrzési felkérés",
       "noReviewRequestsDescription": "Itt jelennek meg a kódellenőrzésedre váró módosítási kérelmek. Fent továbbra is beilleszthetsz bármilyen PR-hivatkozást.",
-      "couldNotLoad": "Nem sikerült betölteni a beérkezett kérelmeket."
+      "couldNotLoad": "Nem sikerült betölteni a beérkezett kérelmeket.",
+      "accessLostTitle": "Nincs hozzáférésed ehhez a szervezethez",
+      "accessLostDescription": "Már nem vagy tagja ennek a szervezetnek, ezért a kérelmei nem tölthetők be. A folytatáshoz válts át a személyes fiókodra.",
+      "organizationUnavailableTitle": "Ez a szervezet már nem létezik",
+      "organizationUnavailableDescription": "Ez a szervezet törölve lett, ezért a kérelmei nem tölthetők be. A folytatáshoz válts át a személyes fiókodra.",
+      "continueInPersonal": "Folytatás személyes fiókkal"
     },
     "composer": {
       "commentBodyPlaceholder": "Írj hozzászólást",

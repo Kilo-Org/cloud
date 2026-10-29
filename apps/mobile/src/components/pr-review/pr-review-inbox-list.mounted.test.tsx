@@ -91,7 +91,10 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   useThemeColors: () => ({ mutedForeground: '#6F6A61' }),
 }));
 vi.mock('@/lib/organization-context', () => ({
-  useOrganization: () => ({ organizationId: inboxState.organizationId }),
+  useOrganization: () => ({
+    organizationId: inboxState.organizationId,
+    setOrganizationId: vi.fn(),
+  }),
 }));
 vi.mock('@/lib/profile-agent-navigation', () => ({
   getPrReviewPath: (owner: string, repo: string, number: number) => `/${owner}/${repo}/${number}`,
@@ -113,6 +116,7 @@ vi.mock('@/lib/pr-review/use-provider-inbox', () => ({
     firstPageErrorState: inboxState.firstPageErrorState,
     firstPageErrorPlatform: inboxState.firstPageErrorPlatform,
     laterPageError: inboxState.laterPageError,
+    organizationScopeAccess: 'granted',
   }),
 }));
 // `@/lib/utils` initializes real i18n; the row only needs timestamp shaping.

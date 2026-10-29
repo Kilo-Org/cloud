@@ -644,7 +644,12 @@
       "loading": "กำลังโหลดกล่องขาเข้า",
       "noReviewRequests": "ไม่มีคำขอรีวิว",
       "noReviewRequestsDescription": "PR ที่รอคุณรีวิวจะแสดงที่นี่ คุณยังวางลิงก์ PR ใดก็ได้ด้านบน",
-      "couldNotLoad": "ไม่สามารถโหลดกล่องขาเข้าได้"
+      "couldNotLoad": "ไม่สามารถโหลดกล่องขาเข้าได้",
+      "accessLostTitle": "ไม่มีสิทธิ์เข้าถึงองค์กรนี้",
+      "accessLostDescription": "คุณไม่ได้เป็นสมาชิกขององค์กรนี้แล้ว จึงโหลดคำขอรีวิวไม่ได้ ไปต่อในบัญชีส่วนตัวเพื่อรีวิวต่อไป",
+      "organizationUnavailableTitle": "องค์กรนี้ไม่มีอยู่แล้ว",
+      "organizationUnavailableDescription": "องค์กรนี้ถูกลบไปแล้ว จึงโหลดคำขอรีวิวไม่ได้ ไปต่อในบัญชีส่วนตัวเพื่อรีวิวต่อไป",
+      "continueInPersonal": "ไปต่อในบัญชีส่วนตัว"
     },
     "composer": {
       "commentBodyPlaceholder": "เขียนความคิดเห็น…",

@@ -644,7 +644,12 @@
       "loading": "Kei te utaina te pouakauru",
       "noReviewRequests": "Kāore he tono arotake",
       "noReviewRequestsDescription": "Ka puta i konei ngā tono kume e tatari ana kia arotakehia e koe. Ka taea tonu e koe te whakapiri i tētahi hono PR ki runga.",
-      "couldNotLoad": "Kāore i taea te uta i te pouakauru."
+      "couldNotLoad": "Kāore i taea te uta i te pouakauru.",
+      "accessLostTitle": "Kāore he uru ki tēnei rōpū",
+      "accessLostDescription": "Kāore koe he mema o tēnei rōpū ināianei, nō reira kāore e taea te uta i ōna tono arotake. Haere tonu i tō pūkete whaiaro kia haere tonu te arotake.",
+      "organizationUnavailableTitle": "Kāore tēnei rōpū e ora ana",
+      "organizationUnavailableDescription": "Kua tangohia tēnei rōpū, nō reira kāore e taea te uta i ōna tono arotake. Haere tonu i tō pūkete whaiaro kia haere tonu te arotake.",
+      "continueInPersonal": "Haere tonu i te pūkete whaiaro"
     },
     "composer": {
       "commentBodyPlaceholder": "He kōrero…",

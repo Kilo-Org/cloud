@@ -644,7 +644,12 @@
       "loading": "Laster inn innboksen",
       "noReviewRequests": "Ingen forespørsler om kodegjennomgang",
       "noReviewRequestsDescription": "PR-er som venter på at du går gjennom dem, vises her. Du kan fortsatt lime inn en hvilken som helst PR-lenke ovenfor.",
-      "couldNotLoad": "Kunne ikke laste inn innboksen."
+      "couldNotLoad": "Kunne ikke laste inn innboksen.",
+      "accessLostTitle": "Ingen tilgang til denne organisasjonen",
+      "accessLostDescription": "Du er ikke lenger medlem av denne organisasjonen, så forespørslene om kodegjennomgang kan ikke lastes inn. Fortsett i den personlige kontoen din for å holde på med kodegjennomgang.",
+      "organizationUnavailableTitle": "Denne organisasjonen finnes ikke lenger",
+      "organizationUnavailableDescription": "Denne organisasjonen ble slettet, så forespørslene om kodegjennomgang kan ikke lastes inn. Fortsett i den personlige kontoen din for å holde på med kodegjennomgang.",
+      "continueInPersonal": "Fortsett i personlig konto"
     },
     "composer": {
       "commentBodyPlaceholder": "Kommentar…",

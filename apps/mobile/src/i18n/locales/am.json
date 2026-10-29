@@ -644,7 +644,12 @@
       "loading": "ገቢ መልእክቶችን በመጫን ላይ",
       "noReviewRequests": "ምንም የግምገማ ጥያቄዎች የሉም",
       "noReviewRequestsDescription": "ግምገማህን የሚጠብቁ የማዋሃድ ጥያቄዎች እዚህ ይታያሉ። ማንኛውንም የPR አገናኝ ከላይ መለጠፍም ትችላለህ።",
-      "couldNotLoad": "ገቢ መልእክቶችን መጫን አልተቻለም።"
+      "couldNotLoad": "ገቢ መልእክቶችን መጫን አልተቻለም።",
+      "accessLostTitle": "ለዚህ ድርጅት የመድረስ ፈቃድ የለህም",
+      "accessLostDescription": "ከዚህ ድርጅት አባል አይደለህም፣ ስለዚህ የግምገማ ጥያቄዎቹን መጫን አይቻልም። ግምገማህን ለመቀጠል በየግል መለያህ ቀጥል።",
+      "organizationUnavailableTitle": "ይህ ድርጅት ከእንግዲህ አይኖርም",
+      "organizationUnavailableDescription": "ይህ ድርጅት ተሰርዟል፣ ስለዚህ የግምገማ ጥያቄዎቹን መጫን አይቻልም። ግምገማህን ለመቀጠል በየግል መለያህ ቀጥል።",
+      "continueInPersonal": "በየግል መለያ ቀጥል"
     },
     "composer": {
       "commentBodyPlaceholder": "አስተያየትህ…",

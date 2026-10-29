@@ -2905,6 +2905,11 @@
     },
     "inbox": {
       "couldNotLoad": "受信トレイを読み込めませんでした。",
+      "accessLostTitle": "この組織にアクセスできません",
+      "accessLostDescription": "この組織のメンバーではなくなったため、レビュー依頼を読み込めません。個人アカウントで続行して、レビューを続けましょう。",
+      "organizationUnavailableTitle": "この組織は存在しなくなりました",
+      "organizationUnavailableDescription": "この組織が削除されたため、レビュー依頼を読み込めません。個人アカウントで続行して、レビューを続けましょう。",
+      "continueInPersonal": "個人アカウントで続行",
       "loading": "受信トレイを読み込み中",
       "noReviewRequests": "レビュー依頼はありません",
       "noReviewRequestsDescription": "レビューを依頼されたプルリクエストがここに表示されます。上の欄に任意のPRのリンクを貼り付けることもできます。",

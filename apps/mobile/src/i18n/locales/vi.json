@@ -2905,6 +2905,11 @@
     },
     "inbox": {
       "couldNotLoad": "Không thể tải hộp thư đến.",
+      "accessLostTitle": "Bạn không còn quyền truy cập vào tổ chức này",
+      "accessLostDescription": "Bạn không còn là thành viên của tổ chức này nên không thể tải các yêu cầu đánh giá. Hãy tiếp tục với tài khoản cá nhân để đánh giá tiếp.",
+      "organizationUnavailableTitle": "Tổ chức này không còn tồn tại",
+      "organizationUnavailableDescription": "Tổ chức này đã bị xóa nên không thể tải các yêu cầu đánh giá. Hãy tiếp tục với tài khoản cá nhân để đánh giá tiếp.",
+      "continueInPersonal": "Tiếp tục với tài khoản cá nhân",
       "loading": "Đang tải hộp thư đến",
       "noReviewRequests": "Chưa có yêu cầu đánh giá",
       "noReviewRequestsDescription": "Các PR đang chờ bạn đánh giá sẽ xuất hiện ở đây. Bạn vẫn có thể dán liên kết của bất kỳ PR nào ở trên.",

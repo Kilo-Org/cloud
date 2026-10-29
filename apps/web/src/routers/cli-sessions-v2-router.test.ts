@@ -1979,6 +1979,20 @@ describe('cli-sessions-v2-router', () => {
         repo: 'repo',
       });
     });
+    it('strips trailing .git after trailing slashes', () => {
+      expect(parseGitHubOwnerRepo('https://github.com/kilo/repo.git/')).toEqual({
+        owner: 'kilo',
+        repo: 'repo',
+      });
+      expect(parseGitHubOwnerRepo('https://github.com/kilo/repo/')).toEqual({
+        owner: 'kilo',
+        repo: 'repo',
+      });
+      expect(parseGitHubOwnerRepo('git@github.com:kilo/repo.git/')).toEqual({
+        owner: 'kilo',
+        repo: 'repo',
+      });
+    });
     it('parses ssh URLs', () => {
       expect(parseGitHubOwnerRepo('git@github.com:kilo/repo.git')).toEqual({
         owner: 'kilo',

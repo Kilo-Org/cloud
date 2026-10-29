@@ -53,7 +53,8 @@ export function parseGitHubOwnerRepo(url: string): { owner: string; repo: string
     return null;
   }
 
-  const cleaned = path.replace(/\.git$/i, '').replace(/\/+$/, '');
+  // Strip trailing slashes first, so `owner/repo.git/` loses its `.git` too.
+  const cleaned = path.replace(/\/+$/, '').replace(/\.git$/i, '');
   const segments = cleaned.split('/').filter(Boolean);
   if (segments.length !== 2) {
     return null;

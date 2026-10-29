@@ -27,6 +27,8 @@ import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import { canConnectProvider } from '@/lib/code-reviewer-status';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
 import { useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
 import {
@@ -233,7 +235,7 @@ export function PlatformOverviewScreen({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="flex-row gap-2"
+                    className={cn(STATE_ACTION_CLASS, 'flex-row gap-2')}
                     disabled={save.isPending}
                     onPress={() => {
                       save.mutate({});
@@ -252,9 +254,7 @@ export function PlatformOverviewScreen({
                   scope={scope}
                   reason={data.actionRequired.reason}
                   canEdit={canEdit}
-                  onRefreshConfig={() => {
-                    void config.refetch();
-                  }}
+                  onRefreshConfig={() => void config.refetch()}
                   onOpenModelPicker={openReviewerModelPicker}
                 />
               )}

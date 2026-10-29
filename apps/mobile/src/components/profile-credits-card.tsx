@@ -17,6 +17,7 @@ import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { WEB_BASE_URL } from '@/lib/config';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatMoney } from '@/lib/format';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
 import { useHideBalancePreference } from '@/lib/hooks/use-hide-balance-preference';
@@ -205,7 +206,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
             accessibilityState={{ busy: isSaving, disabled: isSaving }}
             disabled={isSaving}
             onPress={retry}
-            className="min-h-11 flex-row items-center gap-2 active:opacity-70"
+            className={cn(STATE_ACTION_CLASS, 'flex-row items-center gap-2 active:opacity-70')}
           >
             <Text className="text-sm text-primary">{t('common.retry')}</Text>
             {isSaving && <ActivityIndicator size="small" color={colors.mutedForeground} />}

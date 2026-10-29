@@ -12,6 +12,7 @@ import { Eyebrow } from '@/components/ui/eyebrow';
 import { SearchX } from '@/components/ui/icons';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { deviceFit, fitsDevice } from '@/lib/chat/device-fit';
 import { GGUF_CATALOG } from '@/lib/chat/gguf-catalog';
 import { type HfListedModel } from '@/lib/chat/hf-catalog';
@@ -110,6 +111,7 @@ export function ModelCatalogScreen() {
         <Button
           size="sm"
           variant="outline"
+          className={STATE_ACTION_CLASS}
           onPress={() => void models.fetchNextPage()}
           accessibilityLabel={t('common.retryLoadingMore')}
         >

@@ -16,6 +16,7 @@ import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { formatDate, formatMoney } from '@/lib/format';
 import {
   type CreditTransaction,
@@ -269,6 +270,7 @@ export function OrganizationCreditActivityScreen() {
             <Button
               variant="outline"
               size="sm"
+              className={STATE_ACTION_CLASS}
               onPress={() => void query.fetchNextPage()}
               loading={query.isFetchingNextPage}
               accessibilityLabel={t('common.retry')}

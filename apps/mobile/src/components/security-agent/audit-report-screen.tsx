@@ -126,14 +126,21 @@ function AuditReportSkeleton() {
   );
 }
 
+// The report's window is a UTC calendar range. `start` is an instant rendered in
+// UTC; `displayEnd` is a date-only calendar day, not an instant, so its calendar
+// components are formatted as they are. The header and the empty state both
+// render these values through `periodUtc`, so neither can describe the window in
+// the reader's own calendar days without saying which zone it is.
+function reportPeriod(report: SecurityAgentAuditReport) {
+  return {
+    start: formatDate(parseTimestamp(report.period.start), i18n.language, { timeZone: 'UTC' }),
+    end: formatCalendarDate(report.period.displayEnd, i18n.language),
+  };
+}
+
 function ReportHeader({ report }: Readonly<{ report: SecurityAgentAuditReport }>) {
   const { t } = useTranslation();
-  const start = formatDate(parseTimestamp(report.period.start), i18n.language, {
-    timeZone: 'UTC',
-  });
-  // `displayEnd` is a date-only calendar day, not an instant: format its
-  // calendar components so its rendered day matches the backend value.
-  const end = formatCalendarDate(report.period.displayEnd, i18n.language);
+  const { start, end } = reportPeriod(report);
   const generatedAt = formatUtcTimestamp(report.generatedAt);
 
   return (
@@ -186,20 +193,29 @@ function AuditReportView({
 }: Readonly<{ report: SecurityAgentAuditReport; onRetry?: () => void }>) {
   const { t } = useTranslation();
   if (report.findings.length === 0) {
-    const start = formatDate(parseTimestamp(report.period.start), i18n.language, {
-      timeZone: 'UTC',
-    });
-    const end = formatCalendarDate(report.period.displayEnd, i18n.language);
+    const period = reportPeriod(report);
     // Explorer security-audit finding 3: CenteredState's measured path painted
     // the icon bubble but collapsed the copy, so the screen owns the layout and
     // EmptyState renders its plain content (`placement="static"`).
+    // The empty report names its window the way the header does: `periodUtc`
+    // carries the invariant UTC marker, so a reader whose calendar is not UTC
+    // can tell which days the empty period covers.
     return (
       <TabScreenScrollView className="flex-1" contentContainerClassName="grow justify-center">
         <EmptyState
           placement="static"
           icon={FileText}
           title={t('securityAgent.auditReport.noActivity')}
-          description={t('securityAgent.auditReport.noActivityDescription', { start, end })}
+          description={
+            <View className="items-center gap-1">
+              <Text variant="muted" className="text-center">
+                {t('securityAgent.auditReport.noActivityDescription', period)}
+              </Text>
+              <Text variant="muted" className="text-center">
+                {t('securityAgent.auditReport.periodUtc', period)}
+              </Text>
+            </View>
+          }
         />
       </TabScreenScrollView>
     );

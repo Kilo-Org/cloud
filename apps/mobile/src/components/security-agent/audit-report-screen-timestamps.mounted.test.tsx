@@ -2,7 +2,7 @@
 // zone and clock; a system or masked actor is labelled in the app language,
 // while a named user keeps the name the server recorded.
 
-import { createElement } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -44,7 +44,12 @@ vi.mock('@/lib/utils', () => ({
   parseTimestamp: (value: unknown) => value,
 }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
-vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
+// The real state renders its description node (string or node) below the title;
+// the mock renders the node too, so the empty report's copy is part of the tree.
+vi.mock('@/components/empty-state', () => ({
+  EmptyState: (props: { description?: ReactNode }) =>
+    createElement('EmptyState', null, props.description),
+}));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/security-agent/collapsible-section', () => ({
   CollapsibleSection: 'CollapsibleSection',
@@ -191,6 +196,24 @@ describe('AuditReportScreen timestamps and actor labels', () => {
         generatedAt: '2026-01-02T00:00:00.000Z UTC',
       })
     );
+  });
+
+  it('labels the empty report period as UTC', () => {
+    const root = renderReport([]);
+    const period = { start: '2026-01-01T00:00:00.000Z', end: '2026-01-01' };
+
+    expect(renderedText(root)).toEqual([
+      i18n.t('securityAgent.auditReport.noActivityDescription', period),
+      i18n.t('securityAgent.auditReport.periodUtc', period),
+    ]);
+    expect(renderedText(root).at(-1)).toMatch(/ · UTC$/);
+  });
+
+  it.each(['en', 'de', 'ar'])('keeps the zone marker on the empty period in %s', async language => {
+    await i18n.changeLanguage(language);
+    const root = renderReport([]);
+
+    expect(renderedText(root).at(-1)).toMatch(/ · UTC$/);
   });
 
   it('labels the event actor in the app language and keeps a named user verbatim', async () => {

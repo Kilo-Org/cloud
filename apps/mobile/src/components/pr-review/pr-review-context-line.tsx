@@ -5,9 +5,11 @@ import { useContextPicker } from '@/components/context-control';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { ChevronDown } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useOrganizationsList } from '@/lib/hooks/use-organizations-list';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
+import { cn } from '@/lib/utils';
 
 /**
  * The active account/organization a PR-review surface operates under, as one
@@ -83,7 +85,10 @@ export function PrReviewContextLine({ instanceHint }: Readonly<{ instanceHint?: 
           accessibilityLabel={name}
           accessibilityHint={t('profile.selectAccount')}
           onPress={openPicker}
-          className="min-h-11 max-w-full flex-row items-center gap-1 px-2 active:opacity-70"
+          className={cn(
+            ROW_TARGET_CLASS,
+            'max-w-full flex-row items-center gap-1 px-2 active:opacity-70'
+          )}
         >
           {line}
           <View className="size-5 shrink-0 items-center justify-center">
@@ -91,7 +96,7 @@ export function PrReviewContextLine({ instanceHint }: Readonly<{ instanceHint?: 
           </View>
         </Pressable>
       ) : (
-        <View className="min-h-11 max-w-full justify-center px-2">{line}</View>
+        <View className={cn(ROW_TARGET_CLASS, 'max-w-full justify-center px-2')}>{line}</View>
       )}
       {statusMessage ? (
         <AccessibleStatus message={statusMessage} className="text-center text-xs" tone="error" />
@@ -103,7 +108,7 @@ export function PrReviewContextLine({ instanceHint }: Readonly<{ instanceHint?: 
           onPress={() => {
             void organizations.refetch();
           }}
-          className="min-h-11 items-center justify-center px-2 active:opacity-70"
+          className={cn(ROW_TARGET_CLASS, 'items-center justify-center px-2 active:opacity-70')}
         >
           <Text className="text-sm text-muted-foreground">{t('common.retry')}</Text>
         </Pressable>

@@ -14,6 +14,7 @@ it.each([undefined, 'all'])(
     let statuses: (number | 'recorded' | 'duplicate')[] = [];
     let mixedStatus: number | undefined;
     let heldFirst: ReturnType<typeof Promise.withResolvers<void>> | undefined;
+    let heldSecond: ReturnType<typeof Promise.withResolvers<void>> | undefined;
     let active = 0;
     let peak = 0;
     const writer = createServer(async (request, response) => {
@@ -30,6 +31,7 @@ it.each([undefined, 'all'])(
             ? 'recorded'
             : mixedStatus;
       if (heldFirst && event.core.id.endsWith('3300')) await heldFirst.promise;
+      if (heldSecond && event.core.id.endsWith('3301')) await heldSecond.promise;
       if (typeof status === 'number') {
         response.writeHead(status, { 'x-sensitive-header': 'synthetic-private-header' });
         response.end('synthetic-private-body');
@@ -105,6 +107,35 @@ it.each([undefined, 'all'])(
         attempts: 2,
         body,
       }));
+      // Hold both writer slots: the other two items must wait inside this full batch.
+      statuses = ['recorded', 'duplicate', 'recorded', 'duplicate'];
+      heldFirst = Promise.withResolvers<void>();
+      heldSecond = Promise.withResolvers<void>();
+      let succeeded = false;
+      const successfulBatch = entrypoint.queue('local-usage', messages).then(result => {
+        succeeded = true;
+        return result;
+      });
+      await vi.waitFor(() => expect(calls).toHaveLength(2));
+      expect(active).toBe(2);
+      expect(peak).toBe(2);
+      expect(succeeded).toBe(false);
+      heldFirst.resolve();
+      heldSecond.resolve();
+      heldFirst = undefined;
+      heldSecond = undefined;
+      const successfulResult = await successfulBatch;
+      expect(successfulResult.outcome).toBe('ok');
+      expect(successfulResult.explicitAcks.toSorted()).toEqual([
+        'queue-0',
+        'queue-1',
+        'queue-2',
+        'queue-3',
+      ]);
+      expect(successfulResult.retryMessages).toEqual([]);
+      expect(calls).toEqual(events);
+      expect(peak).toBe(2);
+      expect(statuses).toEqual([]);
       for (const status of [400, 429, 503]) {
         mixedStatus = status;
         heldFirst = Promise.withResolvers<void>();
@@ -163,7 +194,7 @@ it.each([undefined, 'all'])(
         expect(result.explicitAcks).toEqual([]);
         expect(result.retryMessages.map(message => message.msgId)).toEqual(['queue-0']);
       }
-      expect(calls).toHaveLength(22);
+      expect(calls).toHaveLength(26);
       const serialized = JSON.stringify(logs);
       expect(serialized).toContain('usage_ingest_processing');
       expect(serialized).toContain('writer_overloaded');
@@ -178,6 +209,7 @@ it.each([undefined, 'all'])(
       }
     } finally {
       heldFirst?.resolve();
+      heldSecond?.resolve();
       try {
         await worker?.dispose();
       } finally {

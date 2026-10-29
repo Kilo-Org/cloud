@@ -2775,11 +2775,12 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           conclusion: 'failure',
           output: expect.objectContaining({
             title: 'Kilo Code Review failed',
-            summary: expect.stringContaining(errorMessage),
+            summary: 'Review failed.',
           }),
         }),
         'standard'
       );
+      expect(JSON.stringify(mockUpdateCheckRun.mock.calls)).not.toContain(errorMessage);
     });
 
     it('publishes action-required GitHub check output on the third repository clone timeout', async () => {
@@ -3403,6 +3404,82 @@ describe('POST /api/internal/code-review-status/[reviewId]', () => {
           }),
         }),
         'standard'
+      );
+    });
+
+    it('publishes fixed failure copy on the GitHub check run', async () => {
+      const errorMessage =
+        'Execution exceeded maximum runtime: upstream 502 from the assistant service; owner user:8f14e45f-ceea-467a-9f1a-2f3f4b8b7d21';
+      mockGetCodeReviewById.mockResolvedValue(makeReview());
+
+      const response = await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage,
+          terminalReason: 'upstream_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(response.status).toBe(200);
+      expect(mockUpdateCheckRun).toHaveBeenCalledWith(
+        'inst-1',
+        'owner',
+        'repo',
+        12345,
+        expect.objectContaining({
+          conclusion: 'failure',
+          output: expect.objectContaining({
+            title: 'Kilo Code Review failed',
+            summary: 'Review failed.',
+          }),
+        }),
+        'standard'
+      );
+      const published = JSON.stringify(mockUpdateCheckRun.mock.calls);
+      expect(published).not.toContain('upstream 502');
+      expect(published).not.toContain('8f14e45f');
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ errorMessage })
+      );
+    });
+
+    it('publishes fixed failure copy on the GitLab commit status', async () => {
+      const errorMessage =
+        'Execution exceeded maximum runtime: upstream 502 from the assistant service; owner user:8f14e45f-ceea-467a-9f1a-2f3f4b8b7d21';
+      mockGetCodeReviewById.mockResolvedValue(
+        makeReview({ platform: 'gitlab', platform_project_id: 42, check_run_id: null })
+      );
+      mockGetIntegrationById.mockResolvedValue(
+        makeIntegration({ platform: 'gitlab', platform_installation_id: null })
+      );
+
+      await POST(
+        makeRequest({
+          status: 'failed',
+          errorMessage,
+          terminalReason: 'upstream_error',
+        }),
+        makeParams(REVIEW_ID)
+      );
+
+      expect(mockSetCommitStatus).toHaveBeenCalledWith(
+        'mock-token',
+        42,
+        'abc123',
+        'failed',
+        expect.objectContaining({ description: 'Kilo Code Review failed' }),
+        'https://gitlab.com'
+      );
+      const published = JSON.stringify(mockSetCommitStatus.mock.calls);
+      expect(published).not.toContain('upstream 502');
+      expect(published).not.toContain('8f14e45f');
+      expect(mockUpdateCodeReviewStatus).toHaveBeenCalledWith(
+        REVIEW_ID,
+        'failed',
+        expect.objectContaining({ errorMessage })
       );
     });
 

@@ -28,7 +28,7 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
-  useAgentProfile: () => h.query,
+  useAgentProfileOverview: () => h.query,
   useAgentProfileMutations: () => h.mutations,
 }));
 vi.mock('@/lib/hooks/use-offline-banner-state', () => ({

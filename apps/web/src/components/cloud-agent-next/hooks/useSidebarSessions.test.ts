@@ -981,7 +981,7 @@ describe('useSidebarSessions live update helpers', () => {
 
   describe('sidebar worktree grouping', () => {
     it.each(['failed', 'system_interrupted'] as const)(
-      'includes a hidden persisted %s outcome even with live idle status',
+      'ignores an older hidden persisted %s outcome when the latest session is healthy',
       latestRunFailureKind => {
         const visible = makeStoredSession('ses_visible', '2026-01-03T12:00:00.000Z');
         const hidden = makeStoredSession('ses_hidden', '2025-01-03T12:00:00.000Z', {
@@ -989,7 +989,7 @@ describe('useSidebarSessions live update helpers', () => {
         });
         for (const active of [new Map<string, string>(), new Map([['ses_hidden', 'idle']])]) {
           expect(getSidebarWorktreeActivity([visible], active, [visible, hidden])).toEqual({
-            status: latestRunFailureKind,
+            status: null,
             statusUpdatedAt: null,
             isLive: active.size > 0,
           });
@@ -999,12 +999,100 @@ describe('useSidebarSessions live update helpers', () => {
             sessionId: hidden.sessionId,
             status: 'idle',
           }).status
-        ).toBe(latestRunFailureKind);
+        ).toBeNull();
         expect(
           getSidebarWorktreeActivity([visible], new Map([['ses_hidden', 'idle']]), [visible]).status
         ).toBeNull();
       }
     );
+
+    it.each(['failed', 'system_interrupted'] as const)(
+      'includes the latest hidden session persisted %s outcome even with live idle status',
+      latestRunFailureKind => {
+        const visible = makeStoredSession('ses_visible', '2026-01-03T12:00:00.000Z');
+        const hidden = makeStoredSession('ses_hidden', '2026-01-03T13:00:00.000Z', {
+          latestRunFailureKind,
+        });
+        for (const authoritative of [
+          [visible, hidden],
+          [hidden, visible],
+        ]) {
+          for (const active of [new Map<string, string>(), new Map([['ses_hidden', 'idle']])]) {
+            expect(getSidebarWorktreeActivity([visible], active, authoritative)).toEqual({
+              status: latestRunFailureKind,
+              statusUpdatedAt: null,
+              isLive: active.size > 0,
+            });
+          }
+        }
+        expect(
+          getSidebarWorktreeActivity([visible], new Map(), [visible, hidden], {
+            sessionId: hidden.sessionId,
+            status: 'idle',
+          }).status
+        ).toBe(latestRunFailureKind);
+        const latest = { ...hidden, latestRunFailureKind: null };
+        expect(
+          getSidebarWorktreeActivity(
+            [visible],
+            new Map([[latest.sessionId, latestRunFailureKind]]),
+            [visible, latest]
+          ).status
+        ).toBe(latestRunFailureKind);
+        expect(
+          getSidebarWorktreeActivity([visible], new Map(), [visible, latest], {
+            sessionId: latest.sessionId,
+            status: 'failed',
+          }).status
+        ).toBe('failed');
+      }
+    );
+
+    it.each(['failed', 'system_interrupted'] as const)(
+      'ignores an older visible %s session when the latest healthy sibling is hidden',
+      status => {
+        const older = makeStoredSession('ses_older', '2026-01-03T12:00:00.000Z', {
+          sessionStatus: status,
+        });
+        const latest = makeStoredSession('ses_latest', '2026-01-03T13:00:00.000Z');
+        for (const sessions of [[older], [older, latest], [latest, older]]) {
+          expect(
+            getSidebarWorktreeActivity(sessions, new Map(), [older, latest]).status
+          ).toBeNull();
+          expect(
+            getSidebarWorktreeActivity(sessions, new Map([[older.sessionId, status]]), [
+              older,
+              latest,
+            ]).status
+          ).toBeNull();
+          expect(
+            getSidebarWorktreeActivity(sessions, new Map(), [older, latest], {
+              sessionId: older.sessionId,
+              status,
+            }).status
+          ).toBeNull();
+        }
+      }
+    );
+
+    it('uses the sidebar session-ID tie-breaker for equally recent failure warnings', () => {
+      const first = makeStoredSession('ses_a', '2026-01-03T12:00:00.000Z', {
+        latestRunFailureKind: 'failed',
+      });
+      const second = makeStoredSession('ses_b', '2026-01-03T12:00:00.000Z');
+      for (const sessions of [
+        [first, second],
+        [second, first],
+      ]) {
+        expect(getSidebarWorktreeActivity(sessions, new Map()).status).toBeNull();
+        expect(
+          getSidebarWorktreeActivity(
+            sessions.map(session => ({ ...session, latestRunFailureKind: 'failed' })),
+            new Map()
+          ).status
+        ).toBe('failed');
+      }
+    });
 
     it.each(['question', 'permission', 'busy', 'retry'])(
       'prioritizes sibling %s over a persisted failure regardless of order',

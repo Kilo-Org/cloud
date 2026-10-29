@@ -297,6 +297,29 @@ describe('AdvancedConfigPanel', () => {
     expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
   });
 
+  it('names each setup-command control after the command position', () => {
+    const renderer = mount();
+    press(byLabel(renderer, 'Advanced Configuration'));
+    press(buttonByText(renderer, 'Add command'));
+
+    // A blank draft row is not a command, so its controls keep the plain names.
+    expect(
+      renderer.root
+        .findAll(node => typeof node.props.onPress === 'function')
+        .map(node => node.props.accessibilityLabel)
+    ).toEqual(expect.arrayContaining(['Move up', 'Move down', 'Delete']));
+
+    typeInto(renderer, 'Command', 'pnpm install');
+
+    expect(
+      renderer.root
+        .findAll(node => typeof node.props.onPress === 'function')
+        .map(node => node.props.accessibilityLabel)
+    ).toEqual(
+      expect.arrayContaining(['Move command 1 up', 'Move command 1 down', 'Delete command 1'])
+    );
+  });
+
   it('offers Save as Profile once a manual variable exists', () => {
     const renderer = mount();
     press(byLabel(renderer, 'Advanced Configuration'));

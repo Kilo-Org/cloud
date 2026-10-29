@@ -132,9 +132,6 @@ describe('mcp-catalog catalog', () => {
       expect(isDenylistedPath('debug.ping')).toBe(false);
       // Native-only credential issuers are withheld by exact path.
       expect(isDenylistedPath('activeSessions.widgetCredential')).toBe(true);
-      expect(isDenylistedPath('agentBriefing.createOneOff')).toBe(true);
-      expect(isDenylistedPath('agentBriefing.generateSummary')).toBe(true);
-      expect(isDenylistedPath('agentBriefing.retrySummary')).toBe(true);
       expect(isDenylistedPath('agentBriefing.updateContextPreferences')).toBe(true);
       expect(isDenylistedPath('agentBriefing.estimateSummary')).toBe(false);
       expect(isDenylistedPath('agentBriefing.dismiss')).toBe(false);
@@ -158,7 +155,24 @@ describe('mcp-catalog catalog', () => {
       }
     });
 
-    it('withholds briefing cost confirmation while retaining preparation and read access', () => {
+    it('withholds every MCP guardrail policy mutation', () => {
+      const mutations = collectCatalogLeaves(rootRouter).filter(
+        leaf => leaf.path.startsWith('organizations.mcpGuardrails.') && leaf.type === 'mutation'
+      );
+      expect(mutations.map(leaf => leaf.path).sort()).toEqual([
+        'organizations.mcpGuardrails.add',
+        'organizations.mcpGuardrails.approveConnection',
+        'organizations.mcpGuardrails.delete',
+        'organizations.mcpGuardrails.setEnforcement',
+        'organizations.mcpGuardrails.setStatus',
+        'organizations.mcpGuardrails.update',
+      ]);
+      for (const leaf of mutations) {
+        expect(isDenylistedPath(leaf.path)).toBe(true);
+      }
+    });
+
+    it('withholds paid scheduling consent while exposing scheduled report reads', () => {
       const leaves = collectCatalogLeaves(rootRouter).filter(leaf =>
         leaf.path.startsWith('agentBriefing.')
       );
@@ -170,20 +184,13 @@ describe('mcp-catalog catalog', () => {
       expect(missing).toEqual([]);
       expect(paths).toEqual(
         expect.arrayContaining([
-          'agentBriefing.prepareOneOff',
           'agentBriefing.estimateSummary',
-          'agentBriefing.oneOffPreferences',
           'agentBriefing.get',
           'agentBriefing.list',
           'agentBriefing.dismiss',
         ])
       );
-      for (const path of [
-        'agentBriefing.createOneOff',
-        'agentBriefing.generateSummary',
-        'agentBriefing.retrySummary',
-        'agentBriefing.updateContextPreferences',
-      ]) {
+      for (const path of ['agentBriefing.updateContextPreferences']) {
         expect(leaves.some(leaf => leaf.path === path)).toBe(true);
         expect(paths).not.toContain(path);
       }

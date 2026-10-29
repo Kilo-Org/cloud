@@ -17,6 +17,7 @@ import {
   useBriefingAccess,
   useBriefingDismissals,
   useBriefingInvalidation,
+  useBriefingPreferences,
 } from '@/lib/agent-briefing';
 import { briefingAccessDenied } from '@/lib/agent-briefing-state';
 import { useBriefingListFilters } from '@/lib/hooks/use-briefing-list-filters';
@@ -34,6 +35,19 @@ export function BriefingListScreen() {
   const { history, setHistory, organizationId, setOrganizationId } = useBriefingListFilters();
   const memberships = useOrganizationsList();
   const dismissals = useBriefingDismissals();
+  const preferences = useBriefingPreferences();
+  const noEnabledContexts =
+    !history &&
+    !briefingAccessDenied(preferences.error) &&
+    preferences.data?.contexts
+      .filter(item => access.canRead(item.context.organizationId))
+      .every(item => !item.enabled);
+  let emptyLabel = 'agentBriefing.empty';
+  if (history) {
+    emptyLabel = 'agentBriefing.emptyHistory';
+  } else if (noEnabledContexts) {
+    emptyLabel = 'agentBriefing.noEnabledContexts';
+  }
   let scope: 'all' | 'personal' | 'organization' = 'organization';
   if (organizationId === undefined) {
     scope = 'all';
@@ -98,19 +112,6 @@ export function BriefingListScreen() {
         }
       />
       <View className="gap-3 px-4 pb-3">
-        <Button
-          disabled={!access.enabled}
-          onPress={() => {
-            const context = organizationId === null ? 'personal' : organizationId;
-            const destination: Href = {
-              pathname: `${BRIEFING_PATH}/create`,
-              params: context === undefined ? {} : { context },
-            };
-            router.push(destination);
-          }}
-        >
-          <Text>{t('agentBriefing.create')}</Text>
-        </Button>
         <BriefingFilterControls
           history={history}
           onSelectHistory={setHistory}
@@ -169,11 +170,6 @@ export function BriefingListScreen() {
                   {item.context.organizationId === null ? t('common.personal') : item.context.name}
                 </Text>
                 <BriefingPeriodLabel report={item} />
-                {item.revised ? (
-                  <Text className="text-xs text-muted-foreground">
-                    {t('agentBriefing.revised', { revision: item.revision })}
-                  </Text>
-                ) : null}
                 {item.dismissedAt || dismissals.data?.some(entry => entry.reportId === item.id) ? (
                   <Text className="text-xs text-muted-foreground">{t('common.dismissed')}</Text>
                 ) : null}
@@ -183,12 +179,20 @@ export function BriefingListScreen() {
           )}
           ListEmptyComponent={
             <View className="gap-2 p-8">
-              <Text className="text-center">
-                {t(history ? 'agentBriefing.emptyHistory' : 'agentBriefing.empty')}
-              </Text>
-              <Text className="text-center text-sm text-muted-foreground">
-                {t(history ? 'agentBriefing.historyHint' : 'agentBriefing.emptyHint')}
-              </Text>
+              <Text className="text-center">{t(emptyLabel)}</Text>
+              {noEnabledContexts ? (
+                <Button
+                  onPress={() => {
+                    router.push(`${BRIEFING_PATH}/settings` as Href);
+                  }}
+                >
+                  <Text>{t('agentBriefing.settings')}</Text>
+                </Button>
+              ) : (
+                <Text className="text-center text-sm text-muted-foreground">
+                  {t(history ? 'agentBriefing.historyHint' : 'agentBriefing.emptyHint')}
+                </Text>
+              )}
             </View>
           }
           ListFooterComponent={footer}

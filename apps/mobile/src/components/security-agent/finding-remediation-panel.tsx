@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 
 import { CenteredState } from '@/components/centered-state';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { AnalysisRerunAction } from '@/components/security-agent/analysis-rerun-action';
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
 import { EmptyState } from '@/components/empty-state';
@@ -25,8 +26,9 @@ import {
   useRetrySecurityRemediation,
   useStartSecurityRemediation,
 } from '@/lib/hooks/use-security-remediation';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { type SecurityAnalysis } from '@/lib/security-agent';
+import { remediationNeedsAnalysisRefresh, type SecurityAnalysis } from '@/lib/security-agent';
 import { getRemediationUnavailableKey } from '@/lib/security-agent-copy';
 import { openFindingLink } from '@/lib/security-agent-link';
 import { firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';
@@ -171,6 +173,7 @@ export function FindingRemediationPanel({
   const router = useRouter();
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
+  const now = useRelativeTimeNow();
   const startRemediation = useStartSecurityRemediation(scope);
   const retryRemediation = useRetrySecurityRemediation(scope);
   const cancelRemediation = useCancelSecurityRemediation(scope);
@@ -239,6 +242,9 @@ export function FindingRemediationPanel({
     remediationCapability.retryReason !== remediationCapability.startReason
       ? getRemediationUnavailableKey(remediationCapability.retryReason)
       : null;
+  // The blocker copy tells the admin to rerun the analysis; the action that
+  // does it belongs next to that copy, not on another tab.
+  const needsAnalysisRefresh = remediationNeedsAnalysisRefresh(analysis);
 
   const hasContent =
     Boolean(remediationSummary) || remediationAttempts.length > 0 || remediationTimeline.length > 0;
@@ -269,6 +275,8 @@ export function FindingRemediationPanel({
           </Text>
         ) : null}
       </View>
+
+      {needsAnalysisRefresh ? <AnalysisRerunAction scope={scope} findingId={findingId} /> : null}
 
       {remediationCapability.canStart ? (
         <Button
@@ -357,7 +365,7 @@ export function FindingRemediationPanel({
                 >
                   <Text className="text-xs">{labelKey ? t(labelKey) : event.action}</Text>
                   <Text variant="muted" className="text-xs">
-                    {timeAgo(parseTimestamp(event.occurredAt))}
+                    {timeAgo(parseTimestamp(event.occurredAt), undefined, now)}
                   </Text>
                 </View>
               );
@@ -413,7 +421,7 @@ export function FindingRemediationPanel({
                       })}
                     </Text>
                     <Text variant="muted" className="text-xs">
-                      {timeAgo(parseTimestamp(attempt.updatedAt))}
+                      {timeAgo(parseTimestamp(attempt.updatedAt), undefined, now)}
                     </Text>
                   </View>
                   <FindingStatusBadge

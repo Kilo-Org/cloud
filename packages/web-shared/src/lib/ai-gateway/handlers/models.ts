@@ -4,9 +4,13 @@ import type { OpenRouterModelsResponse } from '@kilocode/web-shared/lib/organiza
 import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
-import { getDirectByokModelsForUser } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
+  getDirectByokCatalogModelIds,
+  getDirectByokModelsForUser,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { getAvailableModelsForOrganization } from '@kilocode/web-shared/lib/organizations/organization-models';
 import {
+  addDirectByokCatalogAvailability,
   addUserByokAvailability,
   getUserByokProviderIds,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
@@ -97,14 +101,19 @@ export async function handleModelsRequest(
       });
     }
 
-    const [byokModels, enabledByokProviderIds, customRouters] = await Promise.all([
-      getDirectByokModelsForUser(auth.user.id),
-      getUserByokProviderIds(readDb, auth.user.id),
-      usableCustomRouters({ userId: auth.user.id, organizationId: null }),
-    ]);
+    const [byokModels, enabledByokProviderIds, directByokCatalogModelIds, customRouters] =
+      await Promise.all([
+        getDirectByokModelsForUser(auth.user.id),
+        getUserByokProviderIds(readDb, auth.user.id),
+        getDirectByokCatalogModelIds({ type: 'user', id: auth.user.id }),
+        usableCustomRouters({ userId: auth.user.id, organizationId: null }),
+      ]);
     const modelsWithByokAvailability = await tagOpenAiChatGptByokModels(
       { kiloUserId: auth.user.id, organizationId: null },
-      await addUserByokAvailability(models, enabledByokProviderIds)
+      addDirectByokCatalogAvailability(
+        await addUserByokAvailability(models, enabledByokProviderIds),
+        directByokCatalogModelIds
+      )
     );
     return await modelResponse({
       data: appendLocalFakeDeterministicCatalogModels(

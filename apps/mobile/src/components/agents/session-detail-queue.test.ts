@@ -134,6 +134,7 @@ vi.mock('@/lib/trpc', () => ({
         queryOptions: (input: unknown) => ({ queryKey: ['profiles', 'listCombined'], input }),
       },
       get: { queryOptions: (input: unknown) => ({ queryKey: ['profiles', 'get'], input }) },
+      agents: { queryOptions: (input: unknown) => ({ queryKey: ['profiles', 'agents'], input }) },
     },
   }),
   trpcClient: {

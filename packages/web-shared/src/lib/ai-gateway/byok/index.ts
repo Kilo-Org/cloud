@@ -1,7 +1,7 @@
 import { type db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
 import { byok_api_keys } from '@kilocode/db/schema';
 import { ByokApiKeySettingsSchema } from '@kilocode/db/schema-types';
-import { and, eq, inArray } from 'drizzle-orm';
+import { and, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import type { BYOKApiKeyEnvelope, EncryptedData } from '@kilocode/db/schema-types';
 import {
@@ -32,10 +32,11 @@ import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/org
 import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { isFreeModelExcludingCustomLlms } from '@kilocode/web-shared/lib/ai-gateway/is-free-model';
 import { hasEnabledUserByokForModel } from '@kilocode/web-shared/lib/ai-gateway/byok/availability';
+import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 
 // A BYOK key belongs to exactly one owner, either a user or an organization.
 type ByokOwnerColumn = typeof byok_api_keys.kilo_user_id | typeof byok_api_keys.organization_id;
-type ByokSourceDb = typeof db | DrizzleTransaction;
+export type ByokSourceDb = typeof db | DrizzleTransaction;
 
 async function deriveModelInferenceUserByokProviders(
   modelId: string,
@@ -61,8 +62,8 @@ async function deriveModelInferenceUserByokProviders(
 /**
  * Kilo-exclusive and free models stay on Kilo's own accounts: they are served
  * through Kilo-specific routes or paid for by Kilo, so a gateway key must not
- * take them over. Custom LLMs are never in the gateway catalogs, so the
- * built-in free rules suffice.
+ * take them over. A custom LLM can share an id with a gateway catalog model, so
+ * callers that may see custom LLM ids exclude them separately.
  */
 export function isGatewayUserByokEligibleModel(modelId: string): boolean {
   return !isKiloExclusiveModel(modelId) && !isFreeModelExcludingCustomLlms(modelId);
@@ -145,28 +146,63 @@ export function servesCatalogModels(settings: unknown): boolean {
 
 export type EnabledByokProvider = {
   providerId: UserByokProviderId;
-  /** Catalog mode as stored. */
+  /** Catalog mode as stored; only providers that support it can store true. */
   serveCatalogModels: boolean;
 };
+
+export type ByokKeyState = EnabledByokProvider & { isEnabled: boolean };
+
+async function selectByokKeyStates(
+  fromDb: ByokSourceDb,
+  owner: ByokOwner,
+  { enabledOnly }: { enabledOnly: boolean }
+): Promise<ByokKeyState[]> {
+  const rows = await fromDb
+    .select({
+      provider_id: byok_api_keys.provider_id,
+      settings: byok_api_keys.settings,
+      is_enabled: byok_api_keys.is_enabled,
+    })
+    .from(byok_api_keys)
+    .where(
+      and(
+        eq(ownerColumn(owner), owner.id),
+        enabledOnly ? eq(byok_api_keys.is_enabled, true) : undefined
+      )
+    )
+    .orderBy(byok_api_keys.created_at);
+
+  return rows.flatMap(row => {
+    const providerId = UserByokProviderIdSchema.safeParse(row.provider_id);
+    return providerId.success
+      ? [
+          {
+            providerId: providerId.data,
+            serveCatalogModels: servesCatalogModels(row.settings),
+            isEnabled: row.is_enabled,
+          },
+        ]
+      : [];
+  });
+}
 
 export async function getEnabledByokProviders(
   fromDb: ByokSourceDb,
   owner: ByokOwner
 ): Promise<EnabledByokProvider[]> {
-  const rows = await fromDb
-    .select({
-      provider_id: byok_api_keys.provider_id,
-      settings: byok_api_keys.settings,
-    })
-    .from(byok_api_keys)
-    .where(and(eq(ownerColumn(owner), owner.id), eq(byok_api_keys.is_enabled, true)));
+  const keys = await selectByokKeyStates(fromDb, owner, { enabledOnly: true });
+  return keys.map(({ providerId, serveCatalogModels }) => ({ providerId, serveCatalogModels }));
+}
 
-  return rows.flatMap(row => {
-    const providerId = UserByokProviderIdSchema.safeParse(row.provider_id);
-    return providerId.success
-      ? [{ providerId: providerId.data, serveCatalogModels: servesCatalogModels(row.settings) }]
-      : [];
-  });
+/**
+ * Every key the owner stored, enabled or not, in the order `getByokCredentials` returns them. Reads
+ * no key material, so it suits previews that must not decrypt keys.
+ */
+export async function getByokKeyStates(
+  fromDb: ByokSourceDb,
+  owner: ByokOwner
+): Promise<ByokKeyState[]> {
+  return selectByokKeyStates(fromDb, owner, { enabledOnly: false });
 }
 
 export async function getUserByokProviderIds(
@@ -190,7 +226,8 @@ export async function getOrganizationByokProviderIds(
 
 /**
  * `getAllowedProviders` returns the organization's allowed providers for a
- * model, or undefined when every provider is allowed.
+ * model, or undefined when every provider is allowed. No key serves an id a
+ * custom LLM owns, because `getProvider` serves the custom LLM first.
  */
 export async function addUserByokAvailability(
   models: OpenRouterModel[],
@@ -205,7 +242,11 @@ export async function addUserByokAvailability(
   const hasGatewayKey = enabled.some(isGatewayUserByokProviderId);
   return Promise.all(
     models.map(async model => {
-      if (enabledProviders.size === 0 || isKiloExclusiveModel(model.id)) {
+      if (
+        enabledProviders.size === 0 ||
+        isKiloExclusiveModel(model.id) ||
+        (await isCustomLlm(model.id))
+      ) {
         return { ...model, hasUserByokAvailable: false };
       }
       const modelProviders = [
@@ -222,6 +263,49 @@ export async function addUserByokAvailability(
       });
       return { ...model, hasUserByokAvailable };
     })
+  );
+}
+
+/**
+ * Whether an inference provider key among `enabledProviderIds` serves `modelId`, as `getProvider`
+ * routes it: a direct BYOK key in catalog mode (`directByokCatalogModelIds`), or a provider key
+ * sent through Vercel. Gateway keys leave the choice of provider to the gateway, so they do not
+ * count, and neither does any key for an id a custom LLM owns, which `getProvider` serves first.
+ */
+export async function hasInferenceProviderUserByokForModel(
+  modelId: string,
+  enabledProviderIds: readonly UserByokProviderId[],
+  directByokCatalogModelIds: ReadonlySet<string>
+): Promise<boolean> {
+  if (await isCustomLlm(modelId)) return false;
+  if (directByokCatalogModelIds.has(modelId)) return true;
+  if (isKiloExclusiveModel(modelId) || enabledProviderIds.every(isGatewayUserByokProviderId)) {
+    return false;
+  }
+  const modelProviders = await getModelInferenceUserByokProviders(modelId);
+  return modelProviders.some(providerId => enabledProviderIds.includes(providerId));
+}
+
+/** Whether `userByok` are inference provider keys rather than a gateway key. */
+export function isInferenceProviderUserByok(userByok: readonly BYOKResult[] | null): boolean {
+  return (
+    userByok !== null &&
+    userByok.length > 0 &&
+    !userByok.some(byok => isGatewayUserByokProviderId(byok.providerId))
+  );
+}
+
+/**
+ * Marks catalog models the caller's direct BYOK keys in catalog mode serve
+ * (`getDirectByokCatalogModelIds`), alongside the gateway and Vercel BYOK availability.
+ */
+export function addDirectByokCatalogAvailability(
+  models: OpenRouterModel[],
+  directByokCatalogModelIds: ReadonlySet<string>
+): OpenRouterModel[] {
+  if (directByokCatalogModelIds.size === 0) return models;
+  return models.map(model =>
+    directByokCatalogModelIds.has(model.id) ? { ...model, hasUserByokAvailable: true } : model
   );
 }
 
@@ -278,6 +362,33 @@ export async function getByokCredentials(
   owner: ByokOwner,
   providerIds: UserByokProviderId[]
 ): Promise<ByokCredential[]> {
+  return queryByokCredentials(fromDb, owner, providerIds, undefined);
+}
+
+/**
+ * The owner's enabled keys in catalog mode for `providerIds`, oldest first. Keys outside catalog
+ * mode are filtered out before decryption, so they cost no KMS round-trips and a key that cannot
+ * be decrypted cannot fail the lookup.
+ */
+export async function getCatalogModeByokCredentials(
+  fromDb: ByokSourceDb,
+  owner: ByokOwner,
+  providerIds: UserByokProviderId[]
+): Promise<ByokCredential[]> {
+  return queryByokCredentials(
+    fromDb,
+    owner,
+    providerIds,
+    sql`(${byok_api_keys.settings}->>'serve_catalog_models')::boolean is true`
+  );
+}
+
+async function queryByokCredentials(
+  fromDb: ByokSourceDb,
+  owner: ByokOwner,
+  providerIds: UserByokProviderId[],
+  extraCondition: SQL | undefined
+): Promise<ByokCredential[]> {
   if (providerIds.length === 0) {
     return [];
   }
@@ -296,7 +407,8 @@ export async function getByokCredentials(
       and(
         eq(ownerColumn(owner), owner.id),
         eq(byok_api_keys.is_enabled, true),
-        inArray(byok_api_keys.provider_id, providerIds)
+        inArray(byok_api_keys.provider_id, providerIds),
+        extraCondition
       )
     )
     .orderBy(byok_api_keys.created_at);

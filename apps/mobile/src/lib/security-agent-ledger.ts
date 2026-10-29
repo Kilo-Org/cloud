@@ -33,23 +33,29 @@ export const SECURITY_LEDGER_PERSISTENCE_FAILED_MESSAGE =
 // The manual-sync Worker URL or internal secret is unset server-side, so no
 // resubmit can succeed until the deployment is reconfigured.
 export const SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE = 'Security service is not configured';
+// The server provably never reached the security Worker: nothing was enqueued,
+// so the intent is over even though a later attempt can succeed.
+export const SECURITY_SERVICE_UNAVAILABLE_MESSAGE = 'Security service is unavailable';
 
 /** Which security surface renders a mapped error; the in-progress copy differs. */
 type SecurityErrorSurface = 'sync' | 'dismiss';
 
 /**
- * A ledger error re-wrapped for display. The retryability travels on the error,
- * not in its text, so the surfaces can still decide whether the operation key
- * survives after the message is translated. `copyKey` names the catalog key the
- * message was translated from (null for an unrecognised message), so a surface
- * that persists the failure — the durable dismiss draft — can store the key and
- * re-translate at render instead of freezing one language's sentence.
+ * A ledger error re-wrapped for display. The retryability and key-retention
+ * decisions travel on the error, not in its text, so the surfaces can still
+ * decide whether the operation key survives after the message is translated.
+ * `copyKey` names the catalog key the message was translated from (null for an
+ * unrecognised message), so a surface that persists the failure — the durable
+ * dismiss draft — can store the key and re-translate at render instead of
+ * freezing one language's sentence.
  */
 type SecurityMutationErrorOptions = {
   /** The copy's catalog key, or null when the message is not catalog copy. */
   copyKey: string | null;
   /** The retryability decision taken from the raw error before mapping. */
   retryable: boolean;
+  /** The key-retention decision taken from the raw error before mapping. */
+  retainsOperationKey: boolean;
   /** The raw server error, kept for the app-error reporter's skip rule. */
   cause: unknown;
 };
@@ -57,11 +63,13 @@ type SecurityMutationErrorOptions = {
 class SecurityMutationError extends Error {
   readonly retryable: boolean;
   readonly copyKey: string | null;
+  readonly retainsOperationKey: boolean;
 
   constructor(message: string, options: SecurityMutationErrorOptions) {
     super(message, { cause: options.cause });
     this.retryable = options.retryable;
     this.copyKey = options.copyKey;
+    this.retainsOperationKey = options.retainsOperationKey;
   }
 }
 
@@ -75,8 +83,12 @@ export function securitySyncReconcileCopy(): string {
 }
 
 /**
- * True when the mutation may be retried under the SAME operation key. Also
- * used for finding dismissal, which shares the ledger markers.
+ * True when a retry of the action can succeed, which is what the surfaces use
+ * to keep their retry affordance. Also used for finding dismissal, which shares
+ * the ledger markers.
+ *
+ * This is the "may I try again" question, not the "may I reuse the key" one:
+ * see `securityRetainsOperationKey` for the latter.
  */
 export function isSecuritySyncRetryable(error: unknown): boolean {
   if (error instanceof SecurityMutationError) {
@@ -97,12 +109,30 @@ export function isSecuritySyncRetryable(error: unknown): boolean {
     }
     if (
       error.message === SECURITY_AMBIGUOUS_MESSAGE ||
-      error.message === SECURITY_LEDGER_SETTLE_FAILED_MESSAGE
+      error.message === SECURITY_LEDGER_SETTLE_FAILED_MESSAGE ||
+      error.message === SECURITY_SERVICE_UNAVAILABLE_MESSAGE
     ) {
       return true;
     }
   }
   return classifyPrReviewMutationError(error).kind === 'retryable';
+}
+
+/**
+ * Whether a retry reuses the operation key. Two different questions a failure
+ * answers: can a retry succeed (`isSecuritySyncRetryable`), and is the key
+ * still the intent's. A definitive pre-acceptance rejection settles the ledger
+ * row, so its key can never be replayed — even when the retry itself is
+ * expected to succeed, as with an unreachable Worker it is a fresh intent.
+ */
+export function securityRetainsOperationKey(error: unknown): boolean {
+  if (error instanceof SecurityMutationError) {
+    return error.retainsOperationKey;
+  }
+  return (
+    isSecuritySyncRetryable(error) &&
+    !(error instanceof Error && error.message === SECURITY_SERVICE_UNAVAILABLE_MESSAGE)
+  );
 }
 
 /** The catalog key each known server marker's copy comes from, or null. */
@@ -122,6 +152,9 @@ function markerKeyFor(error: Error): string | null {
     }
     case SECURITY_SERVICE_NOT_CONFIGURED_MESSAGE: {
       return 'securityAgent.mutations.serviceNotConfiguredResubmit';
+    }
+    case SECURITY_SERVICE_UNAVAILABLE_MESSAGE: {
+      return 'securityAgent.mutations.serviceUnavailable';
     }
     default: {
       return null;
@@ -156,12 +189,18 @@ function fallbackKeyFor(retryable: boolean): string {
 
 function mapSecurityOperationError(error: unknown, surface: SecurityErrorSurface): Error {
   const retryable = isSecuritySyncRetryable(error);
+  const retainsOperationKey = securityRetainsOperationKey(error);
   const markerKey = error instanceof Error ? markerKeyFor(error) : null;
   const fallbackKey = isOperationInProgress(error)
     ? IN_PROGRESS_KEY_BY_SURFACE[surface]
     : fallbackKeyFor(retryable);
   const copyKey = markerKey ?? fallbackKey;
-  return new SecurityMutationError(i18n.t(copyKey), { copyKey, retryable, cause: error });
+  return new SecurityMutationError(i18n.t(copyKey), {
+    copyKey,
+    retryable,
+    retainsOperationKey,
+    cause: error,
+  });
 }
 
 /**
@@ -186,6 +225,16 @@ export function securityMutationCopyKey(error: unknown): string | null {
     return IN_PROGRESS_KEY_BY_SURFACE.dismiss;
   }
   return fallbackKeyFor(isSecuritySyncRetryable(error));
+}
+
+/**
+ * The localized copy for a known server marker, for the surfaces that show the
+ * server's own sentence otherwise (the analysis and remediation toasts). Null
+ * for an unrecognised message, so the caller keeps the server's text.
+ */
+export function localizedSecurityMarkerMessage(error: unknown): string | null {
+  const markerKey = error instanceof Error ? markerKeyFor(error) : null;
+  return markerKey === null ? null : i18n.t(markerKey);
 }
 
 /** Maps a sync failure onto retryable or terminal security copy. */

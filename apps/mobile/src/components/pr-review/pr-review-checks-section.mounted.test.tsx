@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ExternalLink } from '@/components/ui/icons';
 import { SpinningIcon } from '@/components/ui/spinning-icon';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { ProviderPrScopeProvider, ProviderPrWebUrlProvider } from '@/lib/pr-review/provider-pr-ref';
 import { openExternalUrl } from '@/lib/external-link';
 import { PrReviewChecksSection } from './pr-review-checks-section';
@@ -197,7 +198,7 @@ function rowShells(card: TestRenderer.ReactTestInstance) {
   return card.findAll(node => {
     const classes = tokens(node);
     return (
-      classes.includes('min-h-11') &&
+      classes.includes(ROW_TARGET_CLASS) &&
       classes.includes('flex-row') &&
       classes.includes('items-center') &&
       classes.includes('gap-3') &&

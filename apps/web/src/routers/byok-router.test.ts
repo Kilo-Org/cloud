@@ -934,6 +934,13 @@ describe('BYOK Router', () => {
                 max_completion_tokens: 32000,
                 catalog_model_id: 'z-ai/glm-5.2',
               },
+              {
+                id: 'glm-4.7',
+                name: 'GLM-4.7',
+                context_length: 200000,
+                max_completion_tokens: 32000,
+                catalog_model_id: 'z-ai/glm-4.7',
+              },
             ],
             synced_at,
           },
@@ -990,14 +997,14 @@ describe('BYOK Router', () => {
       ).rejects.toThrow('Provider openai does not support Kilo catalog model IDs.');
     });
 
-    test('lists the catalog ids each provider serves in catalog mode', async () => {
+    test('lists the catalog ids each provider serves in catalog mode, sorted', async () => {
       const caller = await createCallerForUser(ownerUser.id);
 
       jest.mocked(getOpenRouterModelsMetadataFromDatabase).mockResolvedValueOnce({});
 
       const result = await caller.byok.listCatalogModeSupportedModels();
 
-      expect(result['zai-coding']).toEqual(['GLM-5.2 (z-ai/glm-5.2)']);
+      expect(result['zai-coding']).toEqual(['GLM-4.7 (z-ai/glm-4.7)', 'GLM-5.2 (z-ai/glm-5.2)']);
       expect(result).not.toHaveProperty('morph-byok');
       expect(result).not.toHaveProperty('martian');
     });

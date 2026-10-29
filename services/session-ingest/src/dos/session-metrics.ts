@@ -373,6 +373,32 @@ export function adjustRunningAssistantCostUsd(
   return nonNegative(runningUsd - previousUsd + nextUsd);
 }
 
+/**
+ * Contribution of the message row a new version replaces. A row stored with its
+ * contribution contributes that value; a row that predates the column, or that was
+ * copied without one, contributes what its body says — the rule the full
+ * recomputation applies to it.
+ */
+export function storedMessageCostUsd(
+  row:
+    | {
+        cost_usd: number | null;
+        /** The body, present only for a row without a stored contribution. */
+        legacy_item_data: string | null;
+        item_data_r2_key: string | null;
+      }
+    | null
+    | undefined
+): number {
+  if (row === null || row === undefined) return 0;
+  if (typeof row.cost_usd === 'number') return row.cost_usd;
+  if (row.legacy_item_data === null) return 0;
+  return storedAssistantMessageCostUsd({
+    item_data: row.legacy_item_data,
+    item_data_r2_key: row.item_data_r2_key,
+  });
+}
+
 export function computeRunningAssistantCostUsd(
   rows: Array<{ item_data: string; item_data_r2_key?: string | null }>
 ): number {
@@ -388,6 +414,12 @@ export function computeRunningAssistantCostUsd(
 
 const ACTIVITY_PERSIST_THROTTLE_MS = 15_000;
 export const COST_PERSIST_THROTTLE_MS = 30_000;
+
+/**
+ * A close-path comparison of the running total against a recomputation over the
+ * stored rows tolerates one microdollar, the smallest unit the persisted column holds.
+ */
+export const COST_DIVERGENCE_TOLERANCE_USD = 1 / 1_000_000;
 
 /**
  * `ingest_meta` key holding the session's running assistant cost in USD. It is

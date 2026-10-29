@@ -776,7 +776,12 @@ describe('SessionIngestDO live activity + cost persist', () => {
     /** Pre-seeded ingest_meta rows (throttle state, prior status, etc.). */
     seedMeta?: Record<string, string | null>;
     /** Pre-seeded message item rows returned by cost SELECT .all(). */
-    seedMessageRows?: Array<{ item_data: string }>;
+    seedMessageRows?: Array<{
+      item_data: string;
+      item_id?: string;
+      /** Stored contribution; omitted means a row that predates the column. */
+      cost_usd?: number | null;
+    }>;
     /** If set, Postgres update rejects with this error. */
     persistError?: Error;
     r2Objects?: Record<string, string>;
@@ -796,12 +801,13 @@ describe('SessionIngestDO live activity + cost persist', () => {
         item_data: string;
         ingested_at: number | null;
         item_data_r2_key: string | null;
+        cost_usd: number | null;
       }
     >();
     // Seeded message rows are stored rows: the full cost scan projects them like any other
     // inline message row, so it stays a true recomputation of what the DO holds.
     messageRows.forEach((row, index) => {
-      const itemId = `message/seed-${index}`;
+      const itemId = row.item_id ?? `message/seed-${index}`;
       itemRows.set(itemId, {
         id: index + 1,
         item_id: itemId,
@@ -809,9 +815,13 @@ describe('SessionIngestDO live activity + cost persist', () => {
         item_data: row.item_data,
         ingested_at: null,
         item_data_r2_key: null,
+        cost_usd: row.cost_usd ?? null,
       });
     });
     let costScanCount = 0;
+    // Replaced-row projections that returned a stored message body: the CASE materializes
+    // one only for a row that has no stored contribution.
+    let messageBodyReads = 0;
 
     type SelectKind =
       | 'meta_get'
@@ -826,6 +836,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
     let eqKey: string | undefined;
     let boundKeys: string[] = [];
     let selectLimit = Infinity;
+    let orderedQuery = false;
     let partRowsRead = 0;
 
     const selectQuery = {
@@ -839,7 +850,10 @@ describe('SessionIngestDO live activity + cost persist', () => {
         boundKeys = params.filter((p): p is string => typeof p === 'string');
         return selectQuery;
       }),
-      orderBy: vi.fn(() => selectQuery),
+      orderBy: vi.fn(() => {
+        orderedQuery = true;
+        return selectQuery;
+      }),
       limit: vi.fn((limit: number) => {
         selectLimit = limit;
         return selectQuery;
@@ -849,7 +863,16 @@ describe('SessionIngestDO live activity + cost persist', () => {
           (selectKind === 'item_guard' || selectKind === 'parent_message') &&
           eqKey !== undefined
         ) {
-          return itemRows.get(eqKey);
+          const row = itemRows.get(eqKey);
+          if (row === undefined) return undefined;
+          if (selectKind !== 'item_guard') return row;
+          // The replaced-row projection materializes a body only for a row that has no
+          // stored contribution, like the SQL CASE it models.
+          if (row.item_type === 'message' && row.cost_usd === null) messageBodyReads += 1;
+          return {
+            ...row,
+            legacy_item_data: row.cost_usd === null ? row.item_data : null,
+          };
         }
         if (eqKey !== undefined && meta.has(eqKey)) {
           return { value: meta.get(eqKey) };
@@ -886,8 +909,8 @@ describe('SessionIngestDO live activity + cost persist', () => {
                 (right.ingested_at ?? 0) - (left.ingested_at ?? 0) || right.id - left.id
             )
             .map(row => ({ item_data: row.item_data }));
-          // The completed-turn lookup is newest-first and bounded; the cost scan is not.
-          if (selectLimit !== Infinity) return rows.slice(0, selectLimit);
+          // The completed-turn lookup is ordered and bounded; the cost scan is neither.
+          if (orderedQuery) return rows.slice(0, selectLimit);
           costScanCount += 1;
           return rows;
         }
@@ -898,6 +921,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
     const db = {
       select: vi.fn((columns?: unknown) => {
         selectLimit = Infinity;
+        orderedQuery = false;
         const cols = columns as Record<string, unknown> | undefined;
         boundKeys = [];
         if (cols && 'item_type' in cols && !('item_id' in cols)) {
@@ -933,6 +957,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
             item_data?: string;
             item_data_r2_key?: string | null;
             ingested_at?: number | null;
+            cost_usd?: number | null;
           }) => ({
             onConflictDoUpdate: vi.fn(() => ({
               run: vi.fn(() => {
@@ -947,6 +972,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
                     item_data: values.item_data ?? '{}',
                     ingested_at: values.ingested_at ?? null,
                     item_data_r2_key: values.item_data_r2_key ?? null,
+                    cost_usd: values.cost_usd ?? null,
                   });
                 }
               }),
@@ -991,9 +1017,18 @@ describe('SessionIngestDO live activity + cost persist', () => {
         alarmAt = null;
       }),
       transactionSync: vi.fn((fn: () => unknown) => {
+        // Model SQLite's rollback: a throw discards every row and meta write the callback made.
+        const rowsBefore = new Map([...itemRows].map(([key, row]) => [key, { ...row }]));
+        const metaBefore = new Map(meta);
         inTransaction = true;
         try {
           return fn();
+        } catch (error) {
+          itemRows.clear();
+          for (const [key, row] of rowsBefore) itemRows.set(key, row);
+          meta.clear();
+          for (const [key, value] of metaBefore) meta.set(key, value);
+          throw error;
         } finally {
           inTransaction = false;
         }
@@ -1068,6 +1103,9 @@ describe('SessionIngestDO live activity + cost persist', () => {
       },
       get costScanCount() {
         return costScanCount;
+      },
+      get messageBodyReads() {
+        return messageBodyReads;
       },
       metaWritesInTransaction,
       pgSet,
@@ -1693,6 +1731,33 @@ describe('SessionIngestDO live activity + cost persist', () => {
       expect(harness.alarmAt).toBeNull();
     });
 
+    it('reports a running total that no longer matches the stored rows', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const harness = makeLiveHarness({
+          seedMeta: {
+            kiloUserId: 'usr_live',
+            sessionId: 'ses_live',
+            runningAssistantCostUsd: '0.5',
+            metricsAlarmAt: String(Date.now() - 1),
+          },
+          seedMessageRows: [
+            { item_data: JSON.stringify(assistantItem('existing-turn', 0.25).data) },
+          ],
+        });
+
+        await harness.durableObject.alarm();
+
+        expect(harness.ingestSessionMetrics).toHaveBeenCalledTimes(1);
+        expect(warn).toHaveBeenCalledWith(
+          'SessionIngestDO session cost total diverges from its stored rows',
+          expect.objectContaining({ storedUsd: 0.5, recomputedUsd: 0.25 })
+        );
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
     it('keeps a newer open alarm that interleaves with metrics emission', async () => {
       const harness = makeLiveHarness({
         seedMeta: {
@@ -1839,6 +1904,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
       item_data: '{}',
       ingested_at: 5000,
       item_data_r2_key: null,
+      cost_usd: null,
     });
 
     await harness.durableObject.ingest(
@@ -2187,6 +2253,82 @@ describe('SessionIngestDO live activity + cost persist', () => {
     await harness.settle();
     expect(harness.metaWritesInTransaction.has('runningAssistantCostUsd')).toBe(true);
     expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.5');
+  });
+
+  it('moves the running total from the stored contribution of the row it replaces', async () => {
+    const harness = makeLiveHarness();
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.25)],
+      'usr_live',
+      'ses_live',
+      1,
+      1_000
+    );
+    await harness.settle();
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.25');
+
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.5)],
+      'usr_live',
+      'ses_live',
+      1,
+      2_000
+    );
+    await harness.settle();
+
+    expect(harness.messageBodyReads).toBe(0);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.5');
+  });
+
+  it('reads a pre-column row body once and uses its stored contribution afterwards', async () => {
+    const harness = makeLiveHarness({
+      seedMeta: { runningAssistantCostUsd: '0.25' },
+      seedMessageRows: [
+        { item_id: 'message/m1', item_data: JSON.stringify(assistantItem('m1', 0.25).data) },
+      ],
+    });
+
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.5)],
+      'usr_live',
+      'ses_live',
+      1,
+      2_000
+    );
+    await harness.settle();
+    expect(harness.messageBodyReads).toBe(1);
+    expect(harness.costScanCount).toBe(0);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.5');
+
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.75)],
+      'usr_live',
+      'ses_live',
+      1,
+      3_000
+    );
+    await harness.settle();
+    expect(harness.messageBodyReads).toBe(1);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.75');
+  });
+
+  it('discards stored rows and the running total when a batch throws after a row write', async () => {
+    const harness = makeLiveHarness({ seedMeta: { runningAssistantCostUsd: '0.25' } });
+    const unstringifiable: Record<string, unknown> = { ...assistantItem('m2', 0.5).data };
+    unstringifiable.self = unstringifiable;
+
+    await expect(
+      harness.durableObject.ingest(
+        [assistantItem('m1', 0.1), { type: 'message', data: unstringifiable } as never],
+        'usr_live',
+        'ses_live',
+        1,
+        2_000
+      )
+    ).rejects.toThrow();
+
+    expect(harness.itemRows.has('message/m1')).toBe(false);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.25');
   });
 
   it('user-only message batch does not open cost persist (KB-4)', async () => {

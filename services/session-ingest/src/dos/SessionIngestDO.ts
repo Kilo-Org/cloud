@@ -66,6 +66,7 @@ import {
   assistantMessageCostUsd,
   computeRunningAssistantCostUsd,
   computeSessionMetrics,
+  COST_DIVERGENCE_TOLERANCE_USD,
   COST_PERSIST_THROTTLE_MS,
   decideLivePersist,
   INACTIVITY_TIMEOUT_MS,
@@ -73,6 +74,7 @@ import {
   RUNNING_ASSISTANT_COST_META_KEY,
   runningAssistantCostMicrodollars,
   storedAssistantMessageCostUsd,
+  storedMessageCostUsd,
   type TerminationReason,
 } from './session-metrics';
 import migrations from '../../drizzle/migrations';
@@ -632,15 +634,19 @@ export class SessionIngestDO extends DurableObject<Env> {
       for (const item of payload) {
         const { item_id, item_type } = getItemIdentity(item);
 
-        // The row this item replaces. A message row's body decides its cost contribution, so
-        // message items read it with the body; other items read only what the stale guard needs.
+        // The row this item replaces. A message row's contribution is stored beside the body
+        // it was decided from, so this reads a column; only a row that predates the column
+        // reads the body, which the projection returns for that case alone.
         const replacedMessageRow =
           item.type === 'message'
             ? this.db
                 .select({
                   ingested_at: ingestItems.ingested_at,
-                  item_data: ingestItems.item_data,
                   item_data_r2_key: ingestItems.item_data_r2_key,
+                  cost_usd: ingestItems.cost_usd,
+                  legacy_item_data: sql<
+                    string | null
+                  >`CASE WHEN ${ingestItems.cost_usd} IS NULL THEN ${ingestItems.item_data} END`,
                 })
                 .from(ingestItems)
                 .where(eq(ingestItems.item_id, item_id))
@@ -704,6 +710,15 @@ export class SessionIngestDO extends DurableObject<Env> {
         const r2Key = r2References?.[item_id];
         const itemDataJson = r2Key ? '{}' : JSON.stringify(item.data);
         const itemDataR2Key = r2Key ?? null;
+        // A message row stores its contribution beside the body it was decided from, so a
+        // later version of the row moves the running total without reading that body. An
+        // offloaded body is not read by the recomputation either, so it contributes nothing.
+        const itemCostUsd =
+          item.type === 'message'
+            ? itemDataR2Key === null
+              ? assistantMessageCostUsd(item.data)
+              : 0
+            : null;
 
         this.db
           .insert(ingestItems)
@@ -713,6 +728,7 @@ export class SessionIngestDO extends DurableObject<Env> {
             item_data: itemDataJson,
             item_data_r2_key: itemDataR2Key,
             ingested_at: ingestedAt ?? null,
+            cost_usd: itemCostUsd,
           })
           .onConflictDoUpdate({
             target: ingestItems.item_id,
@@ -721,6 +737,7 @@ export class SessionIngestDO extends DurableObject<Env> {
               item_data: itemDataJson,
               item_data_r2_key: itemDataR2Key,
               ingested_at: ingestedAt ?? null,
+              cost_usd: itemCostUsd,
             },
           })
           .run();
@@ -761,8 +778,8 @@ export class SessionIngestDO extends DurableObject<Env> {
         // An offloaded body is not scanned, so it contributes nothing — the same rule the
         // full recomputation applies to a stored row.
         if (item.type === 'message') {
-          replacedMessageCostUsd += storedAssistantMessageCostUsd(replacedMessageRow);
-          addedMessageCostUsd += itemDataR2Key === null ? assistantMessageCostUsd(item.data) : 0;
+          replacedMessageCostUsd += storedMessageCostUsd(replacedMessageRow);
+          addedMessageCostUsd += itemCostUsd ?? 0;
         }
 
         // §4.10: agent_notification items carry no state transition, so the DO durably tracks
@@ -1745,6 +1762,23 @@ export class SessionIngestDO extends DurableObject<Env> {
 
     const metrics = computeSessionMetrics(rows, closeReason);
 
+    // The running total moves with each accepted batch; this close-path recomputation reads
+    // the stored rows themselves. A divergence means some path wrote message rows without
+    // maintaining the total, which the monotonic persist below could never correct.
+    const storedRunningCostUsd = readIngestMetaNumber(this.db, RUNNING_ASSISTANT_COST_META_KEY);
+    if (
+      storedRunningCostUsd !== null &&
+      Number.isFinite(metrics.totalCost) &&
+      Math.abs(storedRunningCostUsd - metrics.totalCost) > COST_DIVERGENCE_TOLERANCE_USD
+    ) {
+      console.warn('SessionIngestDO session cost total diverges from its stored rows', {
+        sessionId,
+        kiloUserId,
+        storedUsd: storedRunningCostUsd,
+        recomputedUsd: metrics.totalCost,
+      });
+    }
+
     const modelRow = this.db
       .select({ item_data: ingestItems.item_data })
       .from(ingestItems)
@@ -2303,6 +2337,15 @@ export class SessionIngestDO extends DurableObject<Env> {
     }
 
     for (const row of params.rows) {
+      // A copied message row keeps the same contribution rule the ingest path stores, so a
+      // replacement in the destination never reads the copied body either.
+      const costUsd =
+        row.itemType === 'message'
+          ? storedAssistantMessageCostUsd({
+              item_data: row.itemData,
+              item_data_r2_key: row.itemDataR2Key,
+            })
+          : null;
       this.db
         .insert(ingestItems)
         .values({
@@ -2311,6 +2354,7 @@ export class SessionIngestDO extends DurableObject<Env> {
           item_data: row.itemData,
           item_data_r2_key: row.itemDataR2Key,
           ingested_at: row.ingestedAt,
+          cost_usd: costUsd,
         })
         .onConflictDoUpdate({
           target: ingestItems.item_id,
@@ -2319,6 +2363,7 @@ export class SessionIngestDO extends DurableObject<Env> {
             item_data: row.itemData,
             item_data_r2_key: row.itemDataR2Key,
             ingested_at: row.ingestedAt,
+            cost_usd: costUsd,
           },
         })
         .run();

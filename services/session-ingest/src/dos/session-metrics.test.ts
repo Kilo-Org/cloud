@@ -9,6 +9,7 @@ import {
   MAX_ASSISTANT_COST_USD,
   runningAssistantCostMicrodollars,
   storedAssistantMessageCostUsd,
+  storedMessageCostUsd,
   type DecideLivePersistArgs,
 } from '../dos/session-metrics';
 
@@ -540,6 +541,46 @@ describe('assistantMessageCostUsd', () => {
   it('contributes nothing for other item shapes', () => {
     expect(assistantMessageCostUsd({ role: 'user', time: { created: 1000 } })).toBe(0);
     expect(assistantMessageCostUsd(undefined)).toBe(0);
+  });
+});
+
+describe('storedMessageCostUsd', () => {
+  it('uses the contribution stored beside the body', () => {
+    expect(
+      storedMessageCostUsd({ cost_usd: 0.15, legacy_item_data: null, item_data_r2_key: null })
+    ).toBeCloseTo(0.15);
+    // The stored value decides, whatever a later body would parse to.
+    expect(
+      storedMessageCostUsd({
+        cost_usd: 0,
+        legacy_item_data: assistantMessage(0.4).item_data,
+        item_data_r2_key: null,
+      })
+    ).toBe(0);
+  });
+
+  it('reads the body of a row stored before the column', () => {
+    expect(
+      storedMessageCostUsd({
+        cost_usd: null,
+        legacy_item_data: assistantMessage(0.25).item_data,
+        item_data_r2_key: null,
+      })
+    ).toBeCloseTo(0.25);
+    expect(
+      storedMessageCostUsd({
+        cost_usd: null,
+        legacy_item_data: '{}',
+        item_data_r2_key: 'items/blob',
+      })
+    ).toBe(0);
+  });
+
+  it('contributes nothing for a missing row or one without a body to read', () => {
+    expect(storedMessageCostUsd(undefined)).toBe(0);
+    expect(
+      storedMessageCostUsd({ cost_usd: null, legacy_item_data: null, item_data_r2_key: null })
+    ).toBe(0);
   });
 });
 

@@ -3768,6 +3768,121 @@ describe('SessionIngestDO integration', () => {
     });
   });
 
+  describe('session cost aggregate', () => {
+    function assistantMessage(id: string, cost: number) {
+      return {
+        type: 'message' as const,
+        data: {
+          id,
+          role: 'assistant',
+          time: { created: 1000 },
+          tokens: { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
+          cost,
+        },
+      };
+    }
+
+    function readStoredTotal(state: DurableObjectState): number {
+      const rows = [
+        ...state.storage.sql.exec<{ value: string }>(
+          "SELECT value FROM ingest_meta WHERE key = 'runningAssistantCostUsd'"
+        ),
+      ];
+      return Number(rows[0]?.value);
+    }
+
+    function readRowCosts(state: DurableObjectState) {
+      return [
+        ...state.storage.sql.exec<{ item_id: string; cost_usd: number | null }>(
+          'SELECT item_id, cost_usd FROM ingest_items WHERE item_type = ? ORDER BY item_id',
+          'message'
+        ),
+      ];
+    }
+
+    it('stores each message contribution beside its row and keeps the total equal to the rows', async () => {
+      const sessionId = 'ses_cost_aggregate_versions_1';
+      const stub = getStub(kiloUserId, sessionId);
+
+      await stub.ingest([assistantMessage('msg_a', 0.25)], kiloUserId, sessionId, 1, 1_000);
+      await stub.ingest([assistantMessage('msg_a', 0.5)], kiloUserId, sessionId, 1, 2_000);
+      await stub.ingest([assistantMessage('msg_b', 0.125)], kiloUserId, sessionId, 1, 3_000);
+
+      await runInDurableObject(stub, async (_instance, state) => {
+        expect(readRowCosts(state)).toEqual([
+          { item_id: 'message/msg_a', cost_usd: 0.5 },
+          { item_id: 'message/msg_b', cost_usd: 0.125 },
+        ]);
+        const [recomputed] = [
+          ...state.storage.sql.exec<{ total: number | null }>(
+            "SELECT SUM(json_extract(item_data, '$.cost')) AS total FROM ingest_items " +
+              "WHERE item_type = 'message' AND item_data_r2_key IS NULL"
+          ),
+        ];
+        expect(readStoredTotal(state)).toBeCloseTo(recomputed.total ?? 0, 10);
+        expect(readStoredTotal(state)).toBeCloseTo(0.625, 10);
+      });
+
+      await stub.clear();
+    });
+
+    it('moves the total by the stored contribution, not by the body of the row it replaces', async () => {
+      const sessionId = 'ses_cost_aggregate_stored_2';
+      const stub = getStub(kiloUserId, sessionId);
+
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at, cost_usd) ' +
+            'VALUES (?, ?, ?, ?, ?)',
+          'message/msg_c',
+          'message',
+          JSON.stringify(assistantMessage('msg_c', 0.9).data),
+          1_000,
+          0.1
+        );
+        state.storage.sql.exec(
+          "INSERT INTO ingest_meta (key, value) VALUES ('runningAssistantCostUsd', '0.1')"
+        );
+      });
+
+      await stub.ingest([assistantMessage('msg_c', 0.2)], kiloUserId, sessionId, 1, 2_000);
+
+      await runInDurableObject(stub, async (_instance, state) => {
+        expect(readStoredTotal(state)).toBeCloseTo(0.2, 10);
+        expect(readRowCosts(state)).toEqual([{ item_id: 'message/msg_c', cost_usd: 0.2 }]);
+      });
+
+      await stub.clear();
+    });
+
+    it('reads a row stored before the column and keeps the total equal to the rows', async () => {
+      const sessionId = 'ses_cost_aggregate_legacy_3';
+      const stub = getStub(kiloUserId, sessionId);
+
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+          'message/msg_legacy',
+          'message',
+          JSON.stringify(assistantMessage('msg_legacy', 0.25).data),
+          1_000
+        );
+        state.storage.sql.exec(
+          "INSERT INTO ingest_meta (key, value) VALUES ('runningAssistantCostUsd', '0.25')"
+        );
+      });
+
+      await stub.ingest([assistantMessage('msg_legacy', 0.5)], kiloUserId, sessionId, 1, 2_000);
+
+      await runInDurableObject(stub, async (_instance, state) => {
+        expect(readStoredTotal(state)).toBeCloseTo(0.5, 10);
+        expect(readRowCosts(state)).toEqual([{ item_id: 'message/msg_legacy', cost_usd: 0.5 }]);
+      });
+
+      await stub.clear();
+    });
+  });
+
   describe('timestamp guard', () => {
     it('stale ingest (older ingestedAt) does not overwrite newer item', async () => {
       const sessionId = 'ses_ts_guard_stale_000012';

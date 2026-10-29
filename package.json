@@ -17,7 +17,7 @@
     "test:setup-smoke": "pnpm --filter web run test:setup-smoke",
     "test:mobile-artifacts": "node --test scripts/inspect-mobile-artifacts.test.mjs",
     "test:mobile-sbom": "node --test scripts/mobile-sbom.test.mjs scripts/mobile-sbom-cyclonedx.test.mjs scripts/mobile-sbom-pnpm.test.mjs scripts/mobile-sbom-ipa.test.mjs scripts/mobile-sbom-aab.test.mjs scripts/mobile-sbom-workflow.test.mjs",
-    "test:kilo-app-release": "node --test scripts/kilo-app-release.test.mjs scripts/kilo-app-release-workflow.test.mjs",
+    "test:kilo-app-release": "node --test scripts/kilo-app-release.test.mjs scripts/kilo-app-release-workflow.test.mjs scripts/eas-cli-config.test.mjs",
     "test:kilo-mcp-release": "node --test scripts/kilo-mcp-release.test.mjs",
     "lint": "scripts/lint-all.sh",
     "format": "oxfmt",

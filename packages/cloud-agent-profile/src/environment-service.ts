@@ -250,10 +250,14 @@ async function replacePlainVars(
       )
     );
 
-  for (const [key, value] of Object.entries(plainVars)) {
-    await tx
-      .insert(cloud_agent_environment_vars)
-      .values({ environment_id: environmentId, key, value, is_secret: false });
+  const rows = Object.entries(plainVars).map(([key, value]) => ({
+    environment_id: environmentId,
+    key,
+    value,
+    is_secret: false,
+  }));
+  if (rows.length > 0) {
+    await tx.insert(cloud_agent_environment_vars).values(rows);
   }
 }
 
@@ -264,42 +268,61 @@ async function applySecretChanges(
   publicKeyBase64: string,
   changes: EnvironmentSecretChange[]
 ): Promise<boolean> {
-  let changed = false;
+  // A later entry for the same key wins, which matches applying the list one at
+  // a time and keeps the bulk upsert from touching one key twice.
+  const finalChangeByKey = new Map<string, EnvironmentSecretChange>();
   for (const change of changes) {
-    if ('delete' in change) {
-      const deleted = await tx
-        .delete(cloud_agent_environment_vars)
-        .where(
-          and(
-            eq(cloud_agent_environment_vars.environment_id, environmentId),
-            eq(cloud_agent_environment_vars.key, change.key),
-            eq(cloud_agent_environment_vars.is_secret, true)
-          )
-        )
-        .returning({ id: cloud_agent_environment_vars.id });
-      if (deleted.length > 0) changed = true;
-      continue;
-    }
-    changed = true;
+    finalChangeByKey.set(change.key, change);
+  }
 
-    const encryptedValue = encryptValue(publicKeyBase64, change.value);
+  const deleteKeys: string[] = [];
+  const upserts: Array<{ key: string; value: string }> = [];
+  for (const change of finalChangeByKey.values()) {
+    if ('delete' in change) {
+      deleteKeys.push(change.key);
+    } else {
+      upserts.push(change);
+    }
+  }
+
+  let changed = false;
+  if (deleteKeys.length > 0) {
+    const deleted = await tx
+      .delete(cloud_agent_environment_vars)
+      .where(
+        and(
+          eq(cloud_agent_environment_vars.environment_id, environmentId),
+          inArray(cloud_agent_environment_vars.key, deleteKeys),
+          eq(cloud_agent_environment_vars.is_secret, true)
+        )
+      )
+      .returning({ id: cloud_agent_environment_vars.id });
+    if (deleted.length > 0) changed = true;
+  }
+
+  if (upserts.length > 0) {
+    changed = true;
+    const updatedAt = new Date().toISOString();
     await tx
       .insert(cloud_agent_environment_vars)
-      .values({
-        environment_id: environmentId,
-        key: change.key,
-        value: encryptedValue,
-        is_secret: true,
-      })
+      .values(
+        upserts.map(change => ({
+          environment_id: environmentId,
+          key: change.key,
+          value: encryptValue(publicKeyBase64, change.value),
+          is_secret: true,
+        }))
+      )
       .onConflictDoUpdate({
         target: [cloud_agent_environment_vars.environment_id, cloud_agent_environment_vars.key],
         set: {
-          value: encryptedValue,
+          value: sql`excluded.value`,
           is_secret: true,
-          updated_at: new Date().toISOString(),
+          updated_at: updatedAt,
         },
       });
   }
+
   return changed;
 }
 
@@ -410,6 +433,21 @@ export async function updateEnvironment(
     input.commands === undefined ? undefined : validateEnvironmentCommands(input.commands);
   const secretChanges = input.secrets;
 
+  if (secretChanges !== undefined) {
+    for (const change of secretChanges) {
+      assertValidEnvironmentKey(change.key);
+      if (!('delete' in change)) validateEnvironmentSecretValue(change.value);
+    }
+  }
+
+  // Submitted additions can only raise the stored variable count, so this
+  // bound rejects an oversized request before the transaction reaches the
+  // database. The resulting count is checked once the stored rows are read.
+  const addedSecretKeys = new Set(
+    (secretChanges ?? []).filter(change => !('delete' in change)).map(change => change.key)
+  );
+  validateEnvironmentVarCount(Object.keys(plainVars ?? {}).length + addedSecretKeys.size);
+
   if (input.owner.type === 'organization') {
     await lockActiveOrganization(tx, input.owner.id);
   }
@@ -430,6 +468,38 @@ export async function updateEnvironment(
     throw new TRPCError({ code: 'NOT_FOUND', message: 'Environment not found' });
   }
 
+  const changesVariables =
+    plainVars !== undefined || (secretChanges !== undefined && secretChanges.length > 0);
+  const storedVars = changesVariables
+    ? await tx
+        .select({
+          key: cloud_agent_environment_vars.key,
+          value: cloud_agent_environment_vars.value,
+          isSecret: cloud_agent_environment_vars.is_secret,
+        })
+        .from(cloud_agent_environment_vars)
+        .where(eq(cloud_agent_environment_vars.environment_id, input.environmentId))
+    : [];
+  const storedPlainVars = Object.fromEntries(
+    storedVars.filter(row => !row.isSecret).map(row => [row.key, row.value])
+  );
+  const changedSecretKeys = new Set((secretChanges ?? []).map(change => change.key));
+  const retainedSecretKeys = storedVars
+    .filter(row => row.isSecret && !changedSecretKeys.has(row.key))
+    .map(row => row.key);
+
+  // The variable cap is decided from the resulting set, before the first
+  // write, so one request cannot spend database work per submitted entry.
+  if (changesVariables) {
+    validateEnvironmentVarCount(
+      (plainVars === undefined
+        ? Object.keys(storedPlainVars).length
+        : Object.keys(plainVars).length) +
+        retainedSecretKeys.length +
+        addedSecretKeys.size
+    );
+  }
+
   // Name and allocation are not build inputs; they never advance the revision.
   if (name !== undefined || input.sandboxAllocation !== undefined) {
     await tx
@@ -443,49 +513,16 @@ export async function updateEnvironment(
       .where(eq(cloud_agent_environments.id, input.environmentId));
   }
 
-  if (secretChanges !== undefined) {
-    for (const change of secretChanges) {
-      assertValidEnvironmentKey(change.key);
-      if (!('delete' in change)) validateEnvironmentSecretValue(change.value);
-    }
-  }
-
   // Build inputs change when the submitted commands or plaintext variables
   // differ from the stored ones, or when any secret is replaced or removed. A
   // submitted secret value is never compared: the stored value is encrypted.
   let buildInputsChanged = commands !== undefined && !sameStrings(commands, environment.commands);
   if (plainVars !== undefined && !buildInputsChanged) {
-    const storedPlainRows = await tx
-      .select({ key: cloud_agent_environment_vars.key, value: cloud_agent_environment_vars.value })
-      .from(cloud_agent_environment_vars)
-      .where(
-        and(
-          eq(cloud_agent_environment_vars.environment_id, input.environmentId),
-          eq(cloud_agent_environment_vars.is_secret, false)
-        )
-      );
-    const storedPlainVars = Object.fromEntries(storedPlainRows.map(row => [row.key, row.value]));
     buildInputsChanged = !sameRecord(plainVars, storedPlainVars);
   }
 
   if (plainVars !== undefined) {
-    const existingSecretRows = await tx
-      .select({ key: cloud_agent_environment_vars.key })
-      .from(cloud_agent_environment_vars)
-      .where(
-        and(
-          eq(cloud_agent_environment_vars.environment_id, input.environmentId),
-          eq(cloud_agent_environment_vars.is_secret, true)
-        )
-      );
-    const changedKeys = new Set((secretChanges ?? []).map(change => change.key));
-    const retainedSecretKeys = existingSecretRows
-      .map(row => row.key)
-      .filter(key => !changedKeys.has(key));
-    const newSecretKeys = (secretChanges ?? [])
-      .filter(change => !('delete' in change))
-      .map(change => change.key);
-    assertNoPlainSecretCollision(plainVars, [...retainedSecretKeys, ...newSecretKeys]);
+    assertNoPlainSecretCollision(plainVars, [...retainedSecretKeys, ...addedSecretKeys]);
   }
 
   // Secret changes run before the plaintext replacement so a deleted secret
@@ -507,6 +544,8 @@ export async function updateEnvironment(
       .where(eq(cloud_agent_environments.id, input.environmentId));
   }
 
+  // The cap is enforced above from the resulting set; this keeps the stored
+  // rows as the last word for a set that predates the limit.
   const rows = await tx
     .select({ key: cloud_agent_environment_vars.key })
     .from(cloud_agent_environment_vars)

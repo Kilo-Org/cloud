@@ -1,4 +1,5 @@
 import { after } from 'next/server';
+import { S3ServiceException } from '@aws-sdk/client-s3';
 import { createVercelProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/vercel-provider-metadata';
 import { errorExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake-r2.helper';
@@ -27,6 +28,7 @@ async function runScheduledUpload() {
 beforeEach(() => {
   jest.replaceProperty(process, 'env', {
     ...process.env,
+    R2_ACCOUNT_ID: 'test-metadata-account',
     R2_VERCEL_PROVIDER_METADATA_BUCKET_NAME: 'test-provider-metadata',
     R2_VERCEL_PROVIDER_METADATA_ACCESS_KEY_ID: 'test-metadata-access-key',
     R2_VERCEL_PROVIDER_METADATA_SECRET_ACCESS_KEY: 'test-metadata-secret-key',
@@ -40,6 +42,7 @@ beforeEach(() => {
 afterEach(() => jest.restoreAllMocks());
 
 test.each([
+  'R2_ACCOUNT_ID',
   'R2_VERCEL_PROVIDER_METADATA_BUCKET_NAME',
   'R2_VERCEL_PROVIDER_METADATA_ACCESS_KEY_ID',
   'R2_VERCEL_PROVIDER_METADATA_SECRET_ACCESS_KEY',
@@ -51,6 +54,7 @@ test.each([
   expect(console.debug).toHaveBeenCalledWith(
     '[vercel-provider-metadata] capture disabled: missing configuration',
     {
+      accountConfigured: name !== 'R2_ACCOUNT_ID',
       bucketConfigured: name !== 'R2_VERCEL_PROVIDER_METADATA_BUCKET_NAME',
       accessKeyIdConfigured: name !== 'R2_VERCEL_PROVIDER_METADATA_ACCESS_KEY_ID',
       secretAccessKeyConfigured: name !== 'R2_VERCEL_PROVIDER_METADATA_SECRET_ACCESS_KEY',
@@ -85,6 +89,7 @@ test('uploads the latest metadata once, after the response, keyed by generation 
   expect(console.debug).toHaveBeenCalledTimes(1);
   expect(console.debug).toHaveBeenLastCalledWith('[vercel-provider-metadata] scheduling archive', {
     generationId: 'gen_test',
+    bucket: 'test-provider-metadata',
   });
 
   await runScheduledUpload();
@@ -99,6 +104,7 @@ test('uploads the latest metadata once, after the response, keyed by generation 
   expect(console.debug).toHaveBeenCalledTimes(2);
   expect(console.debug).toHaveBeenLastCalledWith('[vercel-provider-metadata] archived metadata', {
     generationId: 'gen_test',
+    bucket: 'test-provider-metadata',
   });
 });
 
@@ -106,8 +112,13 @@ test('retains metadata received before the generation ID', async () => {
   const capture = createVercelProviderMetadataCapture();
   const metadata = { gateway: { cost: '0.1' } };
   capture?.(metadata);
+  capture?.(metadata);
   expect(mockedAfter).not.toHaveBeenCalled();
-  expect(console.debug).not.toHaveBeenCalled();
+  expect(console.debug).toHaveBeenCalledTimes(1);
+  expect(console.debug).toHaveBeenCalledWith(
+    '[vercel-provider-metadata] waiting for metadata and generation ID',
+    { generationId: undefined, metadataReceived: true, generationIdReceived: false }
+  );
 
   capture?.(undefined, 'gen_late_id');
   await runScheduledUpload();
@@ -123,10 +134,23 @@ test('does not schedule an upload without an ID and valid metadata', () => {
     capture?.(metadata, 'gen_test');
   }
   expect(mockedAfter).not.toHaveBeenCalled();
+  expect(console.debug).toHaveBeenCalledTimes(1);
+  expect(console.debug).toHaveBeenCalledWith(
+    '[vercel-provider-metadata] waiting for metadata and generation ID',
+    { generationId: 'gen_test', metadataReceived: false, generationIdReceived: true }
+  );
 
   const captureWithoutId = createVercelProviderMetadataCapture();
   captureWithoutId?.({ gateway: {} }, '');
   expect(mockedAfter).not.toHaveBeenCalled();
+  expect(console.debug).toHaveBeenCalledTimes(2);
+});
+
+test('does not log empty stream chunks', () => {
+  const capture = createVercelProviderMetadataCapture();
+  capture?.(undefined);
+  capture?.(undefined);
+  expect(console.debug).not.toHaveBeenCalled();
 });
 
 test('contains upload failures without logging metadata or upstream error text', async () => {
@@ -138,7 +162,12 @@ test('contains upload failures without logging metadata or upstream error text',
 
   expect(errorExceptInTest).toHaveBeenCalledWith(
     '[vercel-provider-metadata] failed to archive metadata',
-    { generationId: 'gen_failed', errorType: 'Error' }
+    {
+      generationId: 'gen_failed',
+      bucket: 'test-provider-metadata',
+      stage: 'upload',
+      errorType: 'Error',
+    }
   );
   expect(JSON.stringify(jest.mocked(errorExceptInTest).mock.calls)).not.toMatch(
     /sensitive upstream|private metadata/
@@ -146,6 +175,37 @@ test('contains upload failures without logging metadata or upstream error text',
   expect(console.debug).toHaveBeenCalledTimes(1);
   expect(JSON.stringify(jest.mocked(console.debug).mock.calls)).not.toMatch(
     /sensitive upstream|private metadata/
+  );
+});
+
+test('includes safe S3 diagnostics without logging the raw service error', async () => {
+  jest.spyOn(fakeR2, 'send').mockRejectedValue(
+    new S3ServiceException({
+      name: 'AccessDenied',
+      $fault: 'client',
+      $metadata: { httpStatusCode: 403, requestId: 'test-r2-request', attempts: 1 },
+      message: 'sensitive upstream error text',
+    })
+  );
+  const capture = createVercelProviderMetadataCapture();
+  capture?.({ gateway: { additionalField: 'private metadata' } }, 'gen_denied');
+
+  await expect(runScheduledUpload()).resolves.toBeUndefined();
+
+  expect(errorExceptInTest).toHaveBeenCalledWith(
+    '[vercel-provider-metadata] failed to archive metadata',
+    {
+      generationId: 'gen_denied',
+      bucket: 'test-provider-metadata',
+      stage: 'upload',
+      errorType: 'AccessDenied',
+      httpStatusCode: 403,
+      requestId: 'test-r2-request',
+      attempts: 1,
+    }
+  );
+  expect(JSON.stringify(jest.mocked(errorExceptInTest).mock.calls)).not.toMatch(
+    /sensitive upstream|private metadata|test-metadata-secret-key|test-metadata-access-key/
   );
 });
 
@@ -159,5 +219,14 @@ test('attempts registration and reports scheduling failures only once per respon
   expect(() => capture?.({ gateway: { cost: '0.1' } }, 'gen_test')).not.toThrow();
   expect(mockedAfter).toHaveBeenCalledTimes(1);
   expect(errorExceptInTest).toHaveBeenCalledTimes(1);
+  expect(errorExceptInTest).toHaveBeenCalledWith(
+    '[vercel-provider-metadata] failed to archive metadata',
+    {
+      generationId: 'gen_test',
+      bucket: 'test-provider-metadata',
+      stage: 'registration',
+      errorType: 'Error',
+    }
+  );
   expect(console.debug).toHaveBeenCalledTimes(1);
 });

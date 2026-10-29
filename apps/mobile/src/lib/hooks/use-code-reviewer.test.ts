@@ -1,9 +1,16 @@
 /* eslint-disable max-lines -- one file for the save/toggle serialization and generation-guard rollback suites */
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
 import { type ConfigPatch, PERSONAL_SCOPE } from '@/lib/code-reviewer-config';
+import { ORGANIZATION_TRIAL_EXPIRED_MESSAGE } from '@/lib/server-error-copy';
 
 import { useReviewConfig, useSaveReviewConfig, useToggleReviewer } from './use-code-reviewer';
+
+/** A tRPC client rejection, as `readTrpcErrorField` reads it. */
+function makeServerError(code: string, message: string): Error {
+  return Object.assign(new Error(message), { data: { code, message } });
+}
 
 type MutationOptions = {
   mutationFn?: (vars: unknown) => Promise<unknown>;
@@ -427,7 +434,7 @@ describe('useSaveReviewConfig onError', () => {
     expect(invalidateQueriesMock).not.toHaveBeenCalled();
   });
 
-  it('propagates a transport-level rejection from patchReviewConfig verbatim and still toasts it', async () => {
+  it('propagates a transport-level rejection from patchReviewConfig verbatim but toasts the app copy', async () => {
     personalPatchMutateMock.mockReset();
     personalPatchMutateMock.mockRejectedValue(new Error('Network unreachable'));
     const opts = getSaveOptions(PERSONAL_SCOPE, 'github');
@@ -440,8 +447,27 @@ describe('useSaveReviewConfig onError', () => {
       opts.onError?.(error);
     }
 
+    // The promise rejection keeps the transport detail for the caller; the
+    // toast never shows a raw transport or server sentence.
     expect((thrown as Error).message).toBe('Network unreachable');
-    expect(toastErrorMock).toHaveBeenCalledWith('Network unreachable');
+    expect(toastErrorMock).toHaveBeenCalledWith(i18n.t('codeReviewer.configSaveFailed'));
+  });
+
+  it('explains the organization trial gate instead of quoting the server sentence', async () => {
+    orgPatchMutateMock.mockReset();
+    orgPatchMutateMock.mockRejectedValue(
+      makeServerError('FORBIDDEN', ORGANIZATION_TRIAL_EXPIRED_MESSAGE)
+    );
+    const opts = getSaveOptions('org-1', 'github');
+
+    try {
+      await opts.mutationFn?.({ focusAreas: ['bugs'] });
+    } catch (error) {
+      opts.onError?.(error);
+    }
+
+    expect(toastErrorMock).toHaveBeenCalledWith(i18n.t('common.organizationTrialEnded'));
+    expect(toastErrorMock).not.toHaveBeenCalledWith(ORGANIZATION_TRIAL_EXPIRED_MESSAGE);
   });
 });
 
@@ -477,7 +503,7 @@ describe('useSaveReviewConfig (generation guard)', () => {
     setQueryDataMock.mockClear();
     opts.onError?.(new Error('boom'), { reviewStyle: 'strict' }, context);
     expect(setQueryDataMock).toHaveBeenCalledTimes(1);
-    expect(toastErrorMock).toHaveBeenCalledWith('boom');
+    expect(toastErrorMock).toHaveBeenCalledWith(i18n.t('codeReviewer.configSaveFailed'));
   });
 });
 

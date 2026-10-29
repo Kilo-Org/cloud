@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- one mounted suite covers the picker's resync affordances and its config-read states */
+
 // The repository picker's plain read answers from the integration snapshot, so
 // the screen must offer the two ways out of a short or stale list: the provider
 // settings page that widens installation access, and a resync that ignores the
@@ -33,6 +35,14 @@ const state = vi.hoisted(() => ({
   manageAccess: undefined as { handlePress: () => void; pending: boolean } | undefined,
   accessHandlers: null as { onOpen?: () => void; onReturn?: () => void } | null,
   appStateHandler: null as AppStateHandler | null,
+  config: {
+    data: { repositorySelectionMode: 'selected', selectedRepositoryIds: [] } as unknown,
+    isError: false,
+    isFetching: false,
+    fetchStatus: 'idle' as string,
+    refetch: vi.fn(),
+  },
+  queryErrorProps: [] as { variant?: string; onRetry?: () => void; isRetrying?: boolean }[],
 }));
 
 vi.mock('expo-router', () => ({
@@ -61,7 +71,16 @@ vi.mock('@/components/centered-state', () => ({
   CenteredState: (props: { children?: ReactNode }) =>
     createElement('CenteredState', null, props.children),
 }));
-vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
+vi.mock('@/components/query-error', () => ({
+  QueryError: (props: {
+    variant?: string;
+    onRetry?: () => void;
+    isRetrying?: boolean;
+  }): ReactNode => {
+    state.queryErrorProps.push(props);
+    return createElement('QueryError', props);
+  },
+}));
 vi.mock('@/components/empty-state', () => ({
   EmptyState: (props: { title: string; action?: ReactNode }) =>
     createElement('EmptyState', { title: props.title }, props.action),
@@ -104,11 +123,12 @@ vi.mock('@/lib/utils', () => ({
   parseTimestamp: (value: string) => new Date(value),
   timeAgo: () => '2 days ago',
 }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
+}));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   PERSONAL_SCOPE: 'personal',
-  useReviewConfig: () => ({
-    data: { repositorySelectionMode: 'selected', selectedRepositoryIds: [] },
-  }),
+  useReviewConfig: () => state.config,
   useSaveReviewConfig: () => ({ mutate: vi.fn() }),
   useGitHubRepositories: () => ({
     isLoading: false,
@@ -202,6 +222,12 @@ beforeEach(() => {
   state.manageAccess = { handlePress: vi.fn<() => void>(), pending: false };
   state.accessHandlers = null;
   state.appStateHandler = null;
+  state.config.data = { repositorySelectionMode: 'selected', selectedRepositoryIds: [] };
+  state.config.isError = false;
+  state.config.isFetching = false;
+  state.config.fetchStatus = 'idle';
+  state.config.refetch.mockReset();
+  state.queryErrorProps = [];
 });
 
 describe('repository picker resync affordance', () => {
@@ -346,6 +372,65 @@ describe('repository picker resync affordance', () => {
     button(renderer, 'Refresh')?.onPress?.();
     expect(state.readinessRefetch).toHaveBeenCalledTimes(1);
     expect(state.resync).not.toHaveBeenCalled();
+    unmount();
+  });
+});
+
+// The repository selection this screen draws is unusable without the reviewer
+// config, so a config read that failed -- or that stayed pending with nothing
+// in flight -- must replace the disabled toggles with the action that resolves
+// it, while the repositories query keeps its own error state.
+describe('repository picker config read states', () => {
+  it('shows the retryable error instead of disabled toggles when the load fails', async () => {
+    state.config.data = null;
+    state.config.isError = true;
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(() => state.queryErrorProps.length > 0);
+
+    expect(state.queryErrorProps.at(-1)?.variant).toBe('server');
+    // The error owns the body: no repository scroll area behind it. The rows
+    // themselves were already absent here in the failure state (the mode
+    // picker only draws them once a selection mode is chosen), so the scroll
+    // area is the surface that tells the two bodies apart.
+    expect(renderer.root.findAll(node => String(node.type) === 'ScrollView')).toHaveLength(0);
+    unmount();
+  });
+
+  it('retries the config read from the error state', async () => {
+    state.config.data = null;
+    state.config.isError = true;
+    const { unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(() => state.queryErrorProps.length > 0);
+    act(() => {
+      state.queryErrorProps.at(-1)?.onRetry?.();
+    });
+
+    expect(state.config.refetch).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('names the confirmed-offline pause as the reason the load stopped', async () => {
+    state.config.data = null;
+    state.config.fetchStatus = 'paused';
+    const { unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(() => state.queryErrorProps.length > 0);
+
+    expect(state.queryErrorProps.at(-1)?.variant).toBe('offline');
+    unmount();
+  });
+
+  it('keeps the repository rows when cached config backs a failed refetch', async () => {
+    state.config.isError = true;
+    const { renderer, unmount } = await renderWithProviders(createElement(ReposRoute));
+
+    await waitFor(
+      () => renderer.root.findAll(node => String(node.type) === 'RepoToggleRow').length === 2
+    );
+
+    expect(state.queryErrorProps).toHaveLength(0);
     unmount();
   });
 });

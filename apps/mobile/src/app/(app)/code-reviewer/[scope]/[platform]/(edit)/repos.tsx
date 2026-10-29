@@ -5,6 +5,7 @@ import { AppState, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { CenteredState } from '@/components/centered-state';
+import { repositoryEmptyCopy } from '@/components/code-reviewer/repository-empty-copy';
 import { RepositorySyncFooter } from '@/components/code-reviewer/repository-sync-footer';
 import { EmptyState } from '@/components/empty-state';
 import { InvalidRouteState } from '@/components/invalid-route-state';
@@ -36,6 +37,7 @@ import {
 } from '@/lib/hooks/use-code-reviewer-repo-sync';
 import { useRepoSelectionToggle } from '@/lib/hooks/use-code-reviewer-repo-selection';
 import { useNowTicker } from '@/lib/hooks/use-now-ticker';
+import { reviewConfigFailure, useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
 import { useReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
 import { getBitbucketIntegrationUrl } from '@/lib/integration-urls';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
@@ -49,7 +51,10 @@ export default function ReposRoute() {
 }
 
 function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
-  const { data } = useReviewConfig(scope, platform);
+  const config = useReviewConfig(scope, platform);
+  const configBody = useReviewConfigBody(config);
+  const { data } = config;
+  const configFailure = reviewConfigFailure(configBody, config.isFetching);
   const save = useSaveReviewConfig(scope, platform);
   const toggleRepo = useRepoSelectionToggle(scope, platform);
   const { t } = useTranslation();
@@ -147,21 +152,7 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
         time: timeAgo(parseTimestamp(syncedAt), undefined, now),
       })
     : null;
-  const emptyStateCopyByPlatform = {
-    github: {
-      title: t('codeReviewer.repos.installGithubApp'),
-      description: t('codeReviewer.repos.installGithubAppDescription'),
-    },
-    gitlab: {
-      title: t('common.noRepositoriesFound'),
-      description: t('codeReviewer.repos.gitlabNoRepositoriesDescription'),
-    },
-    bitbucket: {
-      title: t('common.noRepositoriesFound'),
-      description: t('codeReviewer.repos.bitbucketNoRepositoriesDescription'),
-    },
-  } satisfies Record<ReviewerPlatform, { title: string; description: string }>;
-  const emptyStateCopy = emptyStateCopyByPlatform[platform];
+  const emptyStateCopy = repositoryEmptyCopy(platform, t);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextState => {
@@ -179,9 +170,24 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
     save.mutate({ repositorySelectionMode: nextMode });
   };
 
-  const fullBodyState = !capabilities.selectionModePicker && !reposLoading && repoRows.length === 0;
+  // The repository selection this screen draws is unusable without the
+  // config read, so its failure owns the whole body; the repositories query
+  // keeps its own error state below.
+  const fullBodyState =
+    configFailure != null ||
+    (!capabilities.selectionModePicker && !reposLoading && repoRows.length === 0);
   let repoState: ReactNode = null;
-  if (!reposLoading && reposError) {
+  if (configFailure) {
+    repoState = (
+      <QueryError
+        variant={configFailure.variant}
+        onRetry={() => {
+          configFailure.onRetry();
+        }}
+        isRetrying={configFailure.isRetrying}
+      />
+    );
+  } else if (!reposLoading && reposError) {
     repoState = (
       <QueryError
         variant="server"

@@ -168,6 +168,9 @@ vi.mock('@/lib/trpc', () => ({
     },
   },
 }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => 'online',
+}));
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   isPersonal: (scope: string) => scope === 'personal',
   PERSONAL_SCOPE: 'personal',

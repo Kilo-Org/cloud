@@ -43,10 +43,7 @@ export function getByokKmsClientConfig(): ByokKmsClientConfig | null {
   return { url: url.replace(/\/+$/, ''), token };
 }
 
-/**
- * Only a failure that a repeat can change is retried: a timeout, a connection failure, or a
- * 5xx answer. A 4xx rejects the request itself, so retrying it would only add latency.
- */
+/** A timeout or a connection failure: the only transport failures a repeat can change. */
 function isTransientKmsError(error: unknown): boolean {
   if (typeof error !== 'object' || error === null) return false;
   // fetch raises a TypeError for network-level failures such as a reset connection.
@@ -90,12 +87,13 @@ async function sendToKms(config: ByokKmsClientConfig, url: string, init: Request
     let retryable: boolean;
     if (outcome.kind === 'response') {
       if (outcome.response.ok) return outcome.response.json();
+      const { status } = outcome.response;
       // Release the unused body so the retry reuses the connection.
       void outcome.response.body?.cancel().catch(() => {});
-      error = new Error(
-        `BYOK KMS ${new URL(url).pathname} failed with status ${outcome.response.status}`
-      );
-      retryable = outcome.response.status >= 500;
+      error = new Error(`BYOK KMS ${new URL(url).pathname} failed with status ${status}`);
+      // 408 and 429 are the 4xx answers a lagging or rate-limited KMS returns; every other 4xx
+      // rejects the request itself, so a repeat would only add latency.
+      retryable = status === 408 || status === 429 || status >= 500;
     } else {
       ({ error, retryable } = outcome);
     }

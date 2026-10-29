@@ -271,6 +271,28 @@ describe('byok kms client', () => {
     expect(fetchMock).toHaveBeenCalledTimes(KMS_MAX_ATTEMPTS);
   });
 
+  test('retries the transient 4xx answers 408 and 429', async () => {
+    const dataKey = randomBytes(32).toString('base64');
+    let calls = 0;
+    const fetchMock = jest.fn(async () => {
+      calls += 1;
+      if (calls === 1) return new Response('{}', { status: 408 });
+      if (calls === 2) return new Response('{}', { status: 429 });
+      return Response.json({
+        data_key: dataKey,
+        wrapped_dek: 'wrapped-after-throttling',
+        kms_key_id: 'alias/test',
+        kms_key_version: '1',
+      });
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });
+
+    expect(envelope?.wrapped_dek).toBe('wrapped-after-throttling');
+    expect(fetchMock).toHaveBeenCalledTimes(KMS_MAX_ATTEMPTS);
+  });
+
   test('gives up after the last attempt and throws the final status', async () => {
     const fetchMock = jest.fn(async () => new Response('nope', { status: 503 }));
     global.fetch = fetchMock as unknown as typeof fetch;

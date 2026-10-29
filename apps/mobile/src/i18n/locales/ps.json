@@ -3824,7 +3824,7 @@
     "addCommand": "کمانډ اضافه کړئ",
     "commandLabel": "امر",
     "commandPlaceholder": "لکه pnpm install",
-    "commandShortened": "یوازې لومړني {{max}} توري وساتل شول",
+    "commandAtLimit": "امر تر {{max}} توري پورې محدود دی",
     "commandsEmpty": "تر اوسه د تنظیم کولو امرونه ندي",
     "commandsSaveFailed": "د ترتیب کولو کمانډونه خوندي نشو کولی",
     "moveUp": "پورته لاړ شه",

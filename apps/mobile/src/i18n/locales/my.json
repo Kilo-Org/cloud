@@ -3824,7 +3824,7 @@
     "addCommand": "အမိန့်ကိုထည့်ပါ။",
     "commandLabel": "အမိန့်ပေးသည်။",
     "commandPlaceholder": "ဥပမာ pnpm install",
-    "commandShortened": "ပထမ စာလုံး {{max}} လုံးကိုသာ သိမ်းဆည်းထားပါသည်။",
+    "commandAtLimit": "အမိန့်ကို စာလုံး {{max}} လုံးအထိ ကန့်သတ်ထားသည်။",
     "commandsEmpty": "စနစ်ထည့်သွင်းရန် အမိန့်များမရှိသေးပါ။",
     "commandsSaveFailed": "စနစ်ထည့်သွင်းမှု အမိန့်များကို မသိမ်းဆည်းနိုင်ခဲ့ပါ။",
     "moveUp": "အပေါ်ကိုရွှေ့ပါ။",

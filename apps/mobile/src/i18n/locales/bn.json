@@ -3824,7 +3824,7 @@
     "addCommand": "কমান্ড যোগ করুন",
     "commandLabel": "আদেশ",
     "commandPlaceholder": "যেমন pnpm install",
-    "commandShortened": "শুধুমাত্র প্রথম {{max}}টি অক্ষর রাখা হয়েছে",
+    "commandAtLimit": "কমান্ডটি সর্বাধিক {{max}}টি অক্ষরের মধ্যে সীমাবদ্ধ",
     "commandsEmpty": "এখনো কোনো সেটআপ কমান্ড নেই",
     "commandsSaveFailed": "সেটআপ কমান্ড সংরক্ষণ করা যায়নি",
     "moveUp": "উপরে সরান",

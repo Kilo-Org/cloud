@@ -3824,7 +3824,7 @@
     "addCommand": "Додадете команда",
     "commandLabel": "Команда",
     "commandPlaceholder": "пр. pnpm install",
-    "commandShortened": "Задржани се само првите {{max}} знаци",
+    "commandAtLimit": "Командата е ограничена на {{max}} знаци",
     "commandsEmpty": "Сè уште нема команди за поставување",
     "commandsSaveFailed": "Не може да се зачуваат командите за поставување",
     "moveUp": "Движете се нагоре",

@@ -3824,7 +3824,7 @@
     "addCommand": "Lisää komento",
     "commandLabel": "Komento",
     "commandPlaceholder": "esim. pnpm install",
-    "commandShortened": "Vain ensimmäiset {{max}} merkkiä säilytettiin",
+    "commandAtLimit": "Komento saa olla enintään {{max}} merkkiä",
     "commandsEmpty": "Ei vielä asennuskomentoja",
     "commandsSaveFailed": "Asennuskomentoja ei voitu tallentaa",
     "moveUp": "Siirrä ylös",

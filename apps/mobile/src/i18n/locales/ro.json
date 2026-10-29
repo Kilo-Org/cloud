@@ -3874,7 +3874,7 @@
     "addCommand": "Adăugați comanda",
     "commandLabel": "Comanda",
     "commandPlaceholder": "de ex. pnpm install",
-    "commandShortened": "Au fost păstrate doar primele {{max}} caractere",
+    "commandAtLimit": "Comanda este limitată la {{max}} caractere",
     "commandsEmpty": "Încă nu există comenzi de configurare",
     "commandsSaveFailed": "Comenzile de configurare nu au putut fi salvate",
     "moveUp": "Mișcă-te în sus",

@@ -3974,7 +3974,7 @@
     "addCommand": "Cuir ordú leis",
     "commandLabel": "Ordú",
     "commandPlaceholder": "m.sh. pnpm install",
-    "commandShortened": "Níor coimeádadh ach an chéad {{max}} carachtar",
+    "commandAtLimit": "Tá an t-ordú teoranta do {{max}} carachtar",
     "commandsEmpty": "Níl aon orduithe socraithe fós",
     "commandsSaveFailed": "Níorbh fhéidir na horduithe socraithe a shábháil",
     "moveUp": "Bog suas",

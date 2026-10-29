@@ -3824,7 +3824,7 @@
     "addCommand": "Commando toevoegen",
     "commandLabel": "Commando",
     "commandPlaceholder": "bijv. pnpm install",
-    "commandShortened": "Alleen de eerste {{max}} tekens zijn bewaard",
+    "commandAtLimit": "Het commando is beperkt tot {{max}} tekens",
     "commandsEmpty": "Nog geen installatieopdrachten",
     "commandsSaveFailed": "Kan installatieopdrachten niet opslaan",
     "moveUp": "Ga omhoog",

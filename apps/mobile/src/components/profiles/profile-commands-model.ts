@@ -10,7 +10,7 @@
  * payload helpers.
  */
 
-import {
+export {
   addCommand,
   MAX_SETUP_COMMAND_LENGTH,
   MAX_SETUP_COMMANDS,
@@ -19,28 +19,8 @@ import {
   replaceCommand,
 } from '@/lib/agent-profile-forms';
 
-export {
-  addCommand,
-  MAX_SETUP_COMMAND_LENGTH,
-  MAX_SETUP_COMMANDS,
-  moveCommand,
-  removeCommand,
-  replaceCommand,
-};
-
 /** Hide the remaining-characters counter until a command nears the bound. */
 export const COMMAND_COUNTER_VISIBLE_REMAINING = 50;
-
-/**
- * Whether the change that produced `next` was cut at the server bound. The
- * native input clips a value before the change reaches JS, so the dropped tail
- * is only visible as a multi-character insertion that stops exactly on the
- * bound. A single-character step to the bound is the last allowed keystroke and
- * is not reported; the counter stays the truthful signal there.
- */
-export function commandClippedByLimit(previousLength: number, next: string): boolean {
-  return next.length === MAX_SETUP_COMMAND_LENGTH && next.length - previousLength > 1;
-}
 
 /** Whether two lists hold the same commands in the same order. */
 export function sameCommands(a: readonly string[], b: readonly string[]): boolean {

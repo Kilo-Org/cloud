@@ -3824,7 +3824,7 @@
     "addCommand": "ఆదేశాన్ని జోడించండి",
     "commandLabel": "ఆదేశం",
     "commandPlaceholder": "ఉదా. pnpm install",
-    "commandShortened": "మొదటి {{max}} అక్షరాలు మాత్రమే ఉంచబడ్డాయి",
+    "commandAtLimit": "ఆదేశం {{max}} అక్షరాలకు పరిమితం చేయబడింది",
     "commandsEmpty": "ఇంకా సెటప్ ఆదేశాలు లేవు",
     "commandsSaveFailed": "సెటప్ ఆదేశాలను సేవ్ చేయడం సాధ్యపడలేదు",
     "moveUp": "పైకి కదలండి",

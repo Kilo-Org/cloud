@@ -3824,7 +3824,7 @@
     "addCommand": "Bæta við skipun",
     "commandLabel": "Skipun",
     "commandPlaceholder": "t.d. pnpm install",
-    "commandShortened": "Aðeins fyrstu {{max}} stafirnir voru geymdir",
+    "commandAtLimit": "Skipunin er takmörkuð við {{max}} stafi",
     "commandsEmpty": "Engar uppsetningarskipanir ennþá",
     "commandsSaveFailed": "Gat ekki vistað uppsetningarskipanir",
     "moveUp": "Færðu þig upp",

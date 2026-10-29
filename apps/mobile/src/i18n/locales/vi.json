@@ -3824,7 +3824,7 @@
     "addCommand": "Thêm lệnh",
     "commandLabel": "Yêu cầu",
     "commandPlaceholder": "ví dụ: pnpm install",
-    "commandShortened": "Chỉ giữ lại {{max}} ký tự đầu tiên",
+    "commandAtLimit": "Lệnh được giới hạn tối đa {{max}} ký tự",
     "commandsEmpty": "Chưa có lệnh thiết lập nào",
     "commandsSaveFailed": "Không thể lưu lệnh thiết lập",
     "moveUp": "Di chuyển lên",

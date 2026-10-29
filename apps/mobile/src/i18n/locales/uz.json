@@ -3824,7 +3824,7 @@
     "addCommand": "Buyruq qo'shish",
     "commandLabel": "Buyruq",
     "commandPlaceholder": "mas. pnpm install",
-    "commandShortened": "Faqat dastlabki {{max}} ta belgi saqlandi",
+    "commandAtLimit": "Buyruq {{max}} ta belgi bilan cheklangan",
     "commandsEmpty": "Hozircha sozlash buyruqlari yo'q",
     "commandsSaveFailed": "Sozlash buyruqlarini saqlab bo‘lmadi",
     "moveUp": "Yuqoriga siljiting",

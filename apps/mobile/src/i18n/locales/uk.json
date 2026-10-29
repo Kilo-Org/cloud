@@ -3924,7 +3924,7 @@
     "addCommand": "Додати команду",
     "commandLabel": "Команда",
     "commandPlaceholder": "напр. pnpm install",
-    "commandShortened": "Збережено лише перші {{max}} символів",
+    "commandAtLimit": "Команда обмежена до {{max}} символів",
     "commandsEmpty": "Ще немає команд налаштування",
     "commandsSaveFailed": "Не вдалося зберегти команди налаштування",
     "moveUp": "Рухатися вгору",

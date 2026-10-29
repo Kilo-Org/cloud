@@ -3824,7 +3824,7 @@
     "addCommand": "เพิ่มคำสั่ง",
     "commandLabel": "คำสั่ง",
     "commandPlaceholder": "เช่น pnpm install",
-    "commandShortened": "เก็บไว้เฉพาะ {{max}} อักขระแรก",
+    "commandAtLimit": "คำสั่งจำกัดไว้ที่ {{max}} อักขระ",
     "commandsEmpty": "ยังไม่มีคำสั่งการตั้งค่า",
     "commandsSaveFailed": "ไม่สามารถบันทึกคำสั่งการตั้งค่าได้",
     "moveUp": "เลื่อนขึ้น",

@@ -3824,7 +3824,7 @@
     "addCommand": "கட்டளையைச் சேர்க்கவும்",
     "commandLabel": "கட்டளை",
     "commandPlaceholder": "எ.கா. pnpm install",
-    "commandShortened": "முதல் {{max}} எழுத்துகள் மட்டுமே தக்கவைக்கப்பட்டன",
+    "commandAtLimit": "கட்டளை {{max}} எழுத்துகள் வரை மட்டுப்படுத்தப்பட்டுள்ளது",
     "commandsEmpty": "இதுவரை அமைவு கட்டளைகள் இல்லை",
     "commandsSaveFailed": "அமைவு கட்டளைகளைச் சேமிக்க முடியவில்லை",
     "moveUp": "மேலே செல்லவும்",

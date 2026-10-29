@@ -3824,7 +3824,7 @@
     "addCommand": "Komanda əlavə edin",
     "commandLabel": "Əmr",
     "commandPlaceholder": "məs. pnpm install",
-    "commandShortened": "Yalnız ilk {{max}} simvol saxlanıldı",
+    "commandAtLimit": "Əmr {{max}} simvolla məhduddur",
     "commandsEmpty": "Hələ quraşdırma əmrləri yoxdur",
     "commandsSaveFailed": "Quraşdırma əmrlərini saxlamaq mümkün olmadı",
     "moveUp": "Yuxarı hərəkət edin",

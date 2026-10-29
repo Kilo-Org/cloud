@@ -3874,7 +3874,7 @@
     "addCommand": "Afegeix l'ordre",
     "commandLabel": "Comandament",
     "commandPlaceholder": "p. ex. pnpm install",
-    "commandShortened": "Només s'han conservat els primers {{max}} caràcters",
+    "commandAtLimit": "El comandament està limitat a {{max}} caràcters",
     "commandsEmpty": "Encara no hi ha ordres de configuració",
     "commandsSaveFailed": "No s'han pogut desar les ordres de configuració",
     "moveUp": "Mou cap amunt",

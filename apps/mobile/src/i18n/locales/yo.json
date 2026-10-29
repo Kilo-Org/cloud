@@ -3824,7 +3824,7 @@
     "addCommand": "Fi aṣẹ kun",
     "commandLabel": "Òfin",
     "commandPlaceholder": "fun apẹẹrẹ pnpm install",
-    "commandShortened": "Àwọn àmì {{max}} àkọ́kọ́ nìkan ni a tọju",
+    "commandAtLimit": "Pipaṣẹ naa ní ààlà {{max}} àmì",
     "commandsEmpty": "Ko si awọn pipaṣẹ iṣeto sibẹsibẹ",
     "commandsSaveFailed": "Ko le fi awọn pipaṣẹ iṣeto pamọ",
     "moveUp": "Gbe soke",

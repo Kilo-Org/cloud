@@ -3824,7 +3824,7 @@
     "addCommand": "Ampio baiko",
     "commandLabel": "didy",
     "commandPlaceholder": "oh. pnpm install",
-    "commandShortened": "Ny {{max}} tarehintsoratra voalohany ihany no voatahiry",
+    "commandAtLimit": "Ny baiko dia voafetra ho {{max}} tarehintsoratra",
     "commandsEmpty": "Tsy mbola misy baiko fanamboarana",
     "commandsSaveFailed": "Tsy afaka mitahiry baiko fanamboarana",
     "moveUp": "Miakatra",

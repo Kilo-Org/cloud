@@ -3824,7 +3824,7 @@
     "addCommand": "បន្ថែមពាក្យបញ្ជា",
     "commandLabel": "បញ្ជា",
     "commandPlaceholder": "ឧ. pnpm install",
-    "commandShortened": "រក្សាទុកតែ {{max}} តួអក្សរដំបូងប៉ុណ្ណោះ",
+    "commandAtLimit": "ពាក្យបញ្ជាមានកំណត់ត្រឹម {{max}} តួអក្សរ",
     "commandsEmpty": "មិនទាន់មានពាក្យបញ្ជាដំឡើងនៅឡើយទេ",
     "commandsSaveFailed": "មិនអាចរក្សាទុកពាក្យបញ្ជាដំឡើងបានទេ។",
     "moveUp": "ផ្លាស់ទីឡើងលើ",

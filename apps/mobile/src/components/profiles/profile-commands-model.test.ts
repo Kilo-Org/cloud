@@ -2,10 +2,8 @@ import { describe, expect, it } from 'vitest';
 
 import {
   addCommand,
-  commandClippedByLimit,
   commandPosition,
   commandRowA11yLabel,
-  MAX_SETUP_COMMAND_LENGTH,
   MAX_SETUP_COMMANDS,
   moveCommand,
   nonBlankCommands,
@@ -86,21 +84,5 @@ describe('commandPosition', () => {
     expect(commandPosition(['a', '', 'b'], 2)).toBe(2);
     expect(commandPosition(['  '], 0)).toBeNull();
     expect(commandPosition([], 0)).toBeNull();
-  });
-});
-
-describe('setup command length limit', () => {
-  it('reports a paste that stopped on the bound as shortened', () => {
-    const pasted = 'x'.repeat(MAX_SETUP_COMMAND_LENGTH);
-    expect(commandClippedByLimit(0, pasted)).toBe(true);
-    expect(commandClippedByLimit(200, pasted)).toBe(true);
-    expect(commandClippedByLimit(MAX_SETUP_COMMAND_LENGTH - 5, pasted)).toBe(true);
-  });
-
-  it('does not report typing the last allowed character or a short value', () => {
-    const atBound = 'x'.repeat(MAX_SETUP_COMMAND_LENGTH);
-    expect(commandClippedByLimit(MAX_SETUP_COMMAND_LENGTH - 1, atBound)).toBe(false);
-    expect(commandClippedByLimit(MAX_SETUP_COMMAND_LENGTH, atBound)).toBe(false);
-    expect(commandClippedByLimit(3, 'pnpm install')).toBe(false);
   });
 });

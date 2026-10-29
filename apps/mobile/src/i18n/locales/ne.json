@@ -3824,7 +3824,7 @@
     "addCommand": "आदेश थप्नुहोस्",
     "commandLabel": "आदेश",
     "commandPlaceholder": "जस्तै pnpm install",
-    "commandShortened": "पहिलो {{max}} अक्षरहरू मात्र राखिएका छन्",
+    "commandAtLimit": "आदेश {{max}} अक्षरहरूमा सीमित छ",
     "commandsEmpty": "अहिलेसम्म कुनै सेटअप आदेशहरू छैनन्",
     "commandsSaveFailed": "सेटअप आदेशहरू बचत गर्न सकिएन",
     "moveUp": "माथि सार्नुहोस्",

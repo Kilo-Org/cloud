@@ -3874,7 +3874,7 @@
     "addCommand": "Aggiungi comando",
     "commandLabel": "Comando",
     "commandPlaceholder": "es. pnpm install",
-    "commandShortened": "Sono stati mantenuti solo i primi {{max}} caratteri",
+    "commandAtLimit": "Il comando è limitato a {{max}} caratteri",
     "commandsEmpty": "Nessun comando di configurazione ancora",
     "commandsSaveFailed": "Impossibile salvare i comandi di configurazione",
     "moveUp": "Vai su",

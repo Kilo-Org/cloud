@@ -3824,7 +3824,7 @@
     "addCommand": "Engeza umyalo",
     "commandLabel": "Umyalo",
     "commandPlaceholder": "isb. pnpm install",
-    "commandShortened": "Kugcinwe izinhlamvu zokuqala ezingu-{{max}} kuphela",
+    "commandAtLimit": "Umyalo ulinganiselwe ezinhlamvini ezingu-{{max}}",
     "commandsEmpty": "Ayikho imiyalo yokusetha okwamanje",
     "commandsSaveFailed": "Ayikwazanga ukulondoloza imiyalo yokusetha",
     "moveUp": "Hamba uyephezulu",

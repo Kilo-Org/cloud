@@ -3824,7 +3824,7 @@
     "addCommand": "Lägg till kommando",
     "commandLabel": "Kommando",
     "commandPlaceholder": "t.ex. pnpm install",
-    "commandShortened": "Endast de första {{max}} tecknen behölls",
+    "commandAtLimit": "Kommandot är begränsat till {{max}} tecken",
     "commandsEmpty": "Inga installationskommandon ännu",
     "commandsSaveFailed": "Det gick inte att spara installationskommandon",
     "moveUp": "Flytta upp",

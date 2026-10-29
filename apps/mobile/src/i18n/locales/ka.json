@@ -3824,7 +3824,7 @@
     "addCommand": "დაამატეთ ბრძანება",
     "commandLabel": "ბრძანება",
     "commandPlaceholder": "მაგ. pnpm install",
-    "commandShortened": "შენარჩუნდა მხოლოდ პირველი {{max}} სიმბოლო",
+    "commandAtLimit": "ბრძანება შემოიფარგლება {{max}} სიმბოლოთი",
     "commandsEmpty": "დაყენების ბრძანებები ჯერ არ არის",
     "commandsSaveFailed": "დაყენების ბრძანებების შენახვა ვერ მოხერხდა",
     "moveUp": "ზევით გადაადგილება",

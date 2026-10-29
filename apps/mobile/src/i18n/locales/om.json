@@ -3824,7 +3824,7 @@
     "addCommand": "Ajaja itti dabali",
     "commandLabel": "Ajaja",
     "commandPlaceholder": "fakkeenyaaf pnpm install",
-    "commandShortened": "Arfiileen {{max}} jalqabaa qofa qabamaniiru",
+    "commandAtLimit": "Ajajni arfiilee {{max}}tti daangeffama",
     "commandsEmpty": "Ajajni setup hanga ammaatti hin jiru",
     "commandsSaveFailed": "Ajajoota saaguu qusachuu hin dandeenye",
     "moveUp": "Ol socho'aa",

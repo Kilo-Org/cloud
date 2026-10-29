@@ -3824,7 +3824,7 @@
     "addCommand": "Ավելացնել հրաման",
     "commandLabel": "Հրաման",
     "commandPlaceholder": "օր. pnpm install",
-    "commandShortened": "Պահպանվել են միայն առաջին {{max}} նիշերը",
+    "commandAtLimit": "Հրամանը սահմանափակված է {{max}} նիշով",
     "commandsEmpty": "Կարգավորման հրամաններ դեռ չկան",
     "commandsSaveFailed": "Չհաջողվեց պահել կարգավորումների հրամանները",
     "moveUp": "Շարժվեք վերև",

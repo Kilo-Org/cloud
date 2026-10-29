@@ -3824,7 +3824,7 @@
     "addCommand": "විධානය එක් කරන්න",
     "commandLabel": "විධානය",
     "commandPlaceholder": "උදා. pnpm install",
-    "commandShortened": "පළමු අක්ෂර {{max}}ක් පමණක් තබා ගන්නා ලදී",
+    "commandAtLimit": "විධානය අක්ෂර {{max}}කට සීමා වේ",
     "commandsEmpty": "තවමත් පිහිටුවීම් විධාන නොමැත",
     "commandsSaveFailed": "පිහිටුවීම් විධාන සුරැකීමට නොහැකි විය",
     "moveUp": "ඉහළට ගමන් කරන්න",

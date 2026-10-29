@@ -3824,7 +3824,7 @@
     "addCommand": "Ajoute lòd",
     "commandLabel": "Kòmandman",
     "commandPlaceholder": "pa ekzanp pnpm install",
-    "commandShortened": "Se sèlman premye {{max}} karaktè yo ki te kenbe",
+    "commandAtLimit": "Kòmandman an limite a {{max}} karaktè",
     "commandsEmpty": "Pa gen lòd konfigirasyon ankò",
     "commandsSaveFailed": "Pa t 'kapab sove lòd konfigirasyon",
     "moveUp": "Deplase moute",

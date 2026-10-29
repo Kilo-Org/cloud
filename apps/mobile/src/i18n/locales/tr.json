@@ -3824,7 +3824,7 @@
     "addCommand": "Komut ekle",
     "commandLabel": "Emretmek",
     "commandPlaceholder": "örn. pnpm install",
-    "commandShortened": "Yalnızca ilk {{max}} karakter tutuldu",
+    "commandAtLimit": "Komut {{max}} karakterle sınırlıdır",
     "commandsEmpty": "Henüz kurulum komutu yok",
     "commandsSaveFailed": "Kurulum komutları kaydedilemedi",
     "moveUp": "Yukarı taşı",

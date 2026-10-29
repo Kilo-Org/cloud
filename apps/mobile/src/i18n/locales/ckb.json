@@ -3824,7 +3824,7 @@
     "addCommand": "فەرمان زیاد بکە",
     "commandLabel": "فەرمان",
     "commandPlaceholder": "بۆ نموونە pnpm install",
-    "commandShortened": "تەنها یەکەم {{max}} نووسە هێڵدرانەوە",
+    "commandAtLimit": "فەرمانەکە بە {{max}} نووسە سنووردارە",
     "commandsEmpty": "هێشتا هیچ فەرمانێکی ڕێکخستن نییە",
     "commandsSaveFailed": "نەتوانرا فەرمانەکانی ڕێکخستن پاشەکەوت بکرێت",
     "moveUp": "بەرەو سەرەوە بڕۆ",

@@ -3824,7 +3824,7 @@
     "addCommand": "Befehl hinzufügen",
     "commandLabel": "Befehl",
     "commandPlaceholder": "z. B. pnpm install",
-    "commandShortened": "Nur die ersten {{max}} Zeichen wurden beibehalten",
+    "commandAtLimit": "Der Befehl ist auf {{max}} Zeichen beschränkt",
     "commandsEmpty": "Noch keine Setup-Befehle",
     "commandsSaveFailed": "Setup-Befehle konnten nicht gespeichert werden",
     "moveUp": "Nach oben verschieben",

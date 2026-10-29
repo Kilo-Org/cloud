@@ -3824,7 +3824,7 @@
     "addCommand": "Ongeza amri",
     "commandLabel": "Amri",
     "commandPlaceholder": "kmf. pnpm install",
-    "commandShortened": "Vibambo {{max}} vya kwanza tu vimehifadhiwa",
+    "commandAtLimit": "Amri ina kikomo cha vibambo {{max}}",
     "commandsEmpty": "Bado hakuna amri za usanidi",
     "commandsSaveFailed": "Haikuweza kuhifadhi amri za usanidi",
     "moveUp": "Sogeza juu",

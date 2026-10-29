@@ -1519,7 +1519,7 @@
       "changeRequestNoGitHubAccess": "Tsy misy fifandraisana GitHub manana fidirana amin'ity repositera ity. Avereno ampifandraisina amin'ny GitHub manana fidirana aminy, dia andramo indray.",
       "changeRequestMissingPermissions": "Tsy afaka manokatra PR ao amin'ity repositera ity ny GitHub App an'i Kilo. Tsy maintsy omen'ny tompon'ny repositera ny zo hanoratra amin'ny votoaty sy amin'ny PR ny app, dia andramo indray.",
       "changeRequestFailed": "Tsy nety nosokafan'i Kilo ny PR. Andramo indray afaka kelikely.",
-      "changeRequestReviewMemoryOff": "Tsy mandeha ny fitadidiana ny fanamarinana, ka tsy nisy PR nosokafana. Alefaso izany ary andramo indray."
+      "offAction": "Tsy mandeha ny fitadidiana ny fanamarinana. Alefaso izany, dia andramo indray."
     },
     "manualReview": {
       "title": "Fanamarinana atomboka mivantana",

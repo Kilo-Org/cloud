@@ -1541,7 +1541,7 @@
       "changeRequestNoGitHubAccess": "Nevienam GitHub savienojumam nav piekļuves šim repozitorijam. Pievieno GitHub no jauna ar piekļuvi tam un mēģini vēlreiz.",
       "changeRequestMissingPermissions": "Kilo GitHub lietotne nevar atvērt PR šajā repozitorijā. Repozitorija īpašniekam ir jāpiešķir lietotnei rakstīšanas piekļuve saturam un PR, pēc tam mēģini vēlreiz.",
       "changeRequestFailed": "Kilo neizdevās atvērt PR. Mēģini vēlreiz pēc brīža.",
-      "changeRequestReviewMemoryOff": "Koda pārskatīšanas atmiņa ir izslēgta, tāpēc PR netika atvērts. Ieslēdz to un mēģini vēlreiz."
+      "offAction": "Koda pārskatīšanas atmiņa ir izslēgta. Ieslēdz to, tad mēģini vēlreiz."
     },
     "manualReview": {
       "title": "Manuāla koda pārskatīšana",

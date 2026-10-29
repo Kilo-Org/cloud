@@ -1519,7 +1519,7 @@
       "changeRequestNoGitHubAccess": "Hakuna muunganisho wa GitHub wenye ufikiaji wa hazina hii. Unganisha tena GitHub yenye ufikiaji wake, kisha ujaribu tena.",
       "changeRequestMissingPermissions": "Programu ya GitHub ya Kilo haiwezi kufungua maombi ya kuunganisha mabadiliko kwenye hazina hii. Mmiliki wa hazina lazima aipe programu ruhusa ya kuandika maudhui na maombi ya kuunganisha mabadiliko, kisha ujaribu tena.",
       "changeRequestFailed": "Kilo imeshindikana kufungua ombi la kuunganisha mabadiliko. Jaribu tena baada ya muda mfupi.",
-      "changeRequestReviewMemoryOff": "Kumbukumbu ya ukaguzi imezimwa, kwa hivyo hakuna ombi la kuunganisha mabadiliko lililofunguliwa. Iwashe na ujaribu tena."
+      "offAction": "Kumbukumbu ya ukaguzi imezimwa. Iwashe, kisha jaribu tena."
     },
     "manualReview": {
       "title": "Ukaguzi unaoanzishwa na mtumiaji",

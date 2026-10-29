@@ -1519,7 +1519,7 @@
       "changeRequestNoGitHubAccess": "Никоя връзка с GitHub няма достъп до това хранилище. Свържи GitHub отново с достъп до него и опитай пак.",
       "changeRequestMissingPermissions": "Приложението на Kilo в GitHub не може да отваря pull request в това хранилище. Собственик на хранилището трябва да даде на приложението права за запис върху съдържанието и за отваряне на pull request, след което опитай пак.",
       "changeRequestFailed": "Kilo не успя да отвори pull request. Опитай отново след малко.",
-      "changeRequestReviewMemoryOff": "Паметта за прегледи е изключена, затова не беше отворен pull request. Активирай я и опитай отново."
+      "offAction": "Паметта за прегледи е изключена. Активирай я и опитай отново."
     },
     "manualReview": {
       "title": "Ръчен преглед",

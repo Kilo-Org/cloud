@@ -1519,7 +1519,7 @@
       "changeRequestNoGitHubAccess": "Akukho ukuxhumana kwe-GitHub okunokufinyelela kule rejistri. Xhuma kabusha i-GitHub enokufinyelela kuyo, bese uzama futhi.",
       "changeRequestMissingPermissions": "I-GitHub App ye-Kilo ayikwazi ukuvula ama-PR kule rejistri. Umnikazi we-rejistri kufanele anikeze i-app ilungelo lokubhala kokuqukethwe nakuma-PR, bese uzama futhi.",
       "changeRequestFailed": "I-Kilo ayikwazanga ukuvula i-PR. Zama futhi emva kwesikhashana.",
-      "changeRequestReviewMemoryOff": "Inkumbulo yokuhlola ivaliwe, ngakho akukho i-PR evuliwe. Yivule bese uzama futhi."
+      "offAction": "Inkumbulo yokuhlola ivaliwe. Yivule, bese uzama futhi."
     },
     "manualReview": {
       "title": "Ukuhlola okuqalwa nguwe",

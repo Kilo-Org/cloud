@@ -94,7 +94,9 @@ function copyKeyFor(message: string): string | undefined {
       return 'queryError.notFoundDescription';
     }
     case REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.review_memory_disabled: {
-      return 'codeReviewer.reviewMemory.changeRequestReviewMemoryOff';
+      // `assertEnabled` gates save, reject and approve alike, so this line must
+      // not describe one action's outcome.
+      return 'codeReviewer.reviewMemory.offAction';
     }
     case REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.change_request_in_progress: {
       return 'codeReviewer.reviewMemory.changeRequestInProgress';

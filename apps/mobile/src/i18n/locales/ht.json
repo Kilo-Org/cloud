@@ -1519,7 +1519,7 @@
       "changeRequestNoGitHubAccess": "Okenn koneksyon GitHub pa gen aksè a depo sa a. Rekonekte GitHub ak aksè a li, epi eseye ankò.",
       "changeRequestMissingPermissions": "Aplikasyon GitHub Kilo a pa ka ouvri pull request nan depo sa a. Yon pwopriyetè depo dwe bay aplikasyon an aksè ekriti sou kontni ak pull request, epi eseye ankò.",
       "changeRequestFailed": "Kilo pa t ka ouvri pull request la. Eseye ankò nan yon ti moman.",
-      "changeRequestReviewMemoryOff": "Memwa revizyon an dezaktive, kidonk yo pa t ouvri okenn pull request. Aktive li epi eseye ankò."
+      "offAction": "Memwa revizyon an dezaktive. Aktive li, epi eseye ankò."
     },
     "manualReview": {
       "title": "Revizyon manyèl",

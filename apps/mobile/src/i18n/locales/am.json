@@ -1519,7 +1519,7 @@
       "changeRequestNoGitHubAccess": "ማንኛውም የGitHub ግንኙነት ይህን ማከማቻ ማግኘት አይችልም። GitHubን የዚህ ማከማቻ መዳረሻ ይኖረው ዘንድ እንደገና ያገናኙ፣ ከዚያ እንደገና ይሞክሩ።",
       "changeRequestMissingPermissions": "የKilo GitHub App በዚህ ማከማቻ ውስጥ pull request መክፈት አይችልም። የማከማቻ ባለቤት ለመተግበሪያው የይዘት እና pull request የመጻፍ መዳረሻ መስጠት አለበት፣ ከዚያ እንደገና ይሞክሩ።",
       "changeRequestFailed": "Kilo pull request መክፈት አልቻለም። ከጥቂት ጊዜ በኋላ እንደገና ይሞክሩ።",
-      "changeRequestReviewMemoryOff": "የግምገማ ትውስታ ተሰናክሏል፣ ስለዚህ pull request አልተከፈተም። ያንቁትና እንደገና ይሞክሩ።"
+      "offAction": "የግምገማ ትውስታ ተሰናክሏል። ያንቁት፣ ከዚያ እንደገና ይሞክሩ።"
     },
     "manualReview": {
       "title": "በተጠቃሚ የሚጀመር ግምገማ",

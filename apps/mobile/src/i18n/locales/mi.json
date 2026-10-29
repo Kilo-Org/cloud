@@ -1519,7 +1519,7 @@
       "changeRequestNoGitHubAccess": "Kāore he hononga GitHub e whai āheitanga ana ki tēnei pātaka. Hono anōtia a GitHub kia whai āheitanga ki a ia, kātahi ka whakamātauria anō.",
       "changeRequestMissingPermissions": "Kāore e taea e te GitHub App a Kilo te whakatuwhera PR i tēnei pātaka. Me hoatu e te kaipupuri o te pātaka te āheitanga tuhi ki ngā ihirangi me ngā PR, kātahi ka whakamātauria anō.",
       "changeRequestFailed": "Kāore i taea e Kilo te whakatuwhera i te PR. Whakamātauria anō ā te wā poto nei.",
-      "changeRequestReviewMemoryOff": "Kua monoa te mahara arotake, nō reira kāore i whakatuwheratia he PR. Whakahohea, kātahi ka whakamātauria anō."
+      "offAction": "Kua monoa te mahara arotake. Whakahohea, kātahi ka whakamātauria anō."
     },
     "manualReview": {
       "title": "Te arotake ā-ringa",

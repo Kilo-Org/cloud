@@ -109,8 +109,6 @@ describe('useSetReviewMemoryEnabled', () => {
       }) as unknown as Error
     );
 
-    expect(state.toast.error).toHaveBeenCalledWith(
-      i18n.t('codeReviewer.reviewMemory.changeRequestReviewMemoryOff')
-    );
+    expect(state.toast.error).toHaveBeenCalledWith(i18n.t('codeReviewer.reviewMemory.offAction'));
   });
 });

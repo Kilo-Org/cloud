@@ -1049,7 +1049,7 @@
       "changeRequestNoGitHubAccess": "Geen enkele GitHub-verbinding heeft toegang tot deze repository. Maak opnieuw verbinding met GitHub met toegang hiertoe en probeer het daarna opnieuw.",
       "changeRequestMissingPermissions": "De GitHub App van Kilo kan geen pull requests openen in deze repository. Een eigenaar van de repository moet de app schrijftoegang geven tot inhoud en pull requests en het daarna opnieuw proberen.",
       "changeRequestFailed": "Kilo kon de pull request niet openen. Probeer het over een moment opnieuw.",
-      "changeRequestReviewMemoryOff": "Het reviewgeheugen is uitgeschakeld, dus er is geen pull request geopend. Schakel het in en probeer het opnieuw.",
+      "offAction": "Het reviewgeheugen is uitgeschakeld. Schakel het in en probeer het daarna opnieuw.",
       "off": "Het reviewgeheugen is uitgeschakeld.",
       "on": "Het reviewgeheugen is ingeschakeld.",
       "offDescription": "Schakel het reviewgeheugen in zodat Kilo leert van antwoorden van beheerders en richtlijnen voor REVIEW.md voorstelt.",

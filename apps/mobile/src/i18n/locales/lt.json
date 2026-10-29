@@ -1563,7 +1563,7 @@
       "changeRequestNoGitHubAccess": "Nė vienas GitHub prisijungimas neturi prieigos prie šios saugyklos. Iš naujo prijunk GitHub, kad jis turėtų prieigą prie jos, tada bandyk dar kartą.",
       "changeRequestMissingPermissions": "Kilo GitHub programėlė negali atidaryti PR šioje saugykloje. Saugyklos savininkas turi suteikti programėlei rašymo prieigą prie turinio ir PR, tada bandyk dar kartą.",
       "changeRequestFailed": "Kilo nepavyko atidaryti PR. Bandyk dar kartą po akimirkos.",
-      "changeRequestReviewMemoryOff": "Peržiūros atmintis išjungta, todėl PR nebuvo atidarytas. Įjunk ją ir bandyk dar kartą."
+      "offAction": "Peržiūros atmintis išjungta. Įjunk ją, tada bandyk dar kartą."
     },
     "manualReview": {
       "title": "Rankinė peržiūra",

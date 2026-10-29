@@ -1563,7 +1563,7 @@
       "changeRequestNoGitHubAccess": "Žádné připojení k GitHubu nemá přístup k tomuto repozitáři. Znovu připojte GitHub s přístupem k tomuto repozitáři a poté to zkuste znovu.",
       "changeRequestMissingPermissions": "GitHub App od Kilo nemůže v tomto repozitáři otevírat pull requesty. Vlastník repozitáře musí aplikaci udělit přístup pro zápis k obsahu a pull requestům. Poté to zkuste znovu.",
       "changeRequestFailed": "Kilo nedokázalo otevřít pull request. Zkuste to znovu za chvíli.",
-      "changeRequestReviewMemoryOff": "Paměť kontrol je vypnutá, takže nebyl otevřen žádný pull request. Zapněte ji a zkuste to znovu."
+      "offAction": "Paměť kontrol je vypnutá. Zapněte ji a zkuste to znovu."
     },
     "manualReview": {
       "title": "Ruční kontrola",

@@ -1020,7 +1020,7 @@
       "changeRequestNoGitHubAccess": "Nenhuma conexão do GitHub tem acesso a este repositório. Reconecte o GitHub com acesso a ele e tente novamente.",
       "changeRequestMissingPermissions": "O GitHub App do Kilo não pode abrir pull requests neste repositório. Peça a um proprietário do repositório que conceda ao app acesso de escrita a conteúdos e pull requests, depois tente novamente.",
       "changeRequestFailed": "O Kilo não conseguiu abrir o pull request. Tente novamente em instantes.",
-      "changeRequestReviewMemoryOff": "A memória de revisão está desativada, então nenhum pull request foi aberto. Ative-a e tente novamente.",
+      "offAction": "A memória de revisão está desativada. Ative-a e tente novamente.",
       "off": "A memória de revisão está desativada.",
       "on": "A memória de revisão está ativada.",
       "offDescription": "Ative-a para que o Kilo aprenda com as respostas dos mantenedores e proponha orientações para o REVIEW.md.",

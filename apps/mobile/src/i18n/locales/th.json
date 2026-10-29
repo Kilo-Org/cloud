@@ -1519,7 +1519,7 @@
       "changeRequestNoGitHubAccess": "ไม่มีการเชื่อมต่อ GitHub ใดที่เข้าถึงที่เก็บนี้ได้ โปรดเชื่อมต่อ GitHub ใหม่ด้วยบัญชีที่เข้าถึงที่เก็บนี้ได้ แล้วลองอีกครั้ง",
       "changeRequestMissingPermissions": "แอป GitHub ของ Kilo ไม่สามารถเปิด Pull Request ในที่เก็บนี้ได้ เจ้าของที่เก็บต้องให้สิทธิ์การเขียนเนื้อหาและ Pull Request แก่แอป แล้วลองอีกครั้ง",
       "changeRequestFailed": "Kilo ไม่สามารถเปิด Pull Request ได้ โปรดลองอีกครั้งในอีกสักครู่",
-      "changeRequestReviewMemoryOff": "ความจำในการตรวจสอบปิดอยู่ จึงไม่มีการเปิด Pull Request โปรดเปิดใช้งานแล้วลองอีกครั้ง"
+      "offAction": "ความจำในการตรวจสอบปิดอยู่ เปิดใช้งานแล้วลองอีกครั้ง"
     },
     "manualReview": {
       "title": "การตรวจสอบที่เริ่มด้วยตนเอง",

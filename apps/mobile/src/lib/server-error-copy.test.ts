@@ -87,6 +87,17 @@ describe('knownServerErrorMessage', () => {
       expect(copy).not.toBe(sentence);
     }
   );
+
+  // `assertEnabled` refuses save, reject and approve with this one sentence, so
+  // its copy must describe the gate and never one action's outcome.
+  it('describes only the gate for the shared disabled rejection', () => {
+    const copy = knownServerErrorMessage(
+      makeError('FORBIDDEN', REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.review_memory_disabled)
+    );
+    expect(copy).toBe(i18n.t('codeReviewer.reviewMemory.offAction'));
+    expect(copy).not.toContain(i18n.t('common.pullRequest'));
+    expect(copy).not.toContain('REVIEW.md');
+  });
 });
 
 describe('organizationErrorMessage', () => {

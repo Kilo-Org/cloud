@@ -985,6 +985,22 @@ rows renew.
 10. Reactivation before final cancellation MUST preserve the existing price
     version. Re-enrollment after final cancellation MUST follow Pricing
     Versions and Legacy Lineages rule 9 and MUST offer Standard only.
+11. Admins MAY stop renewal for every eligible subscription in one bulk
+    operation (end-of-life non-renewal). Eligible rows are current
+    (not transferred), not already pending cancellation, and in `active` or
+    `past_due` status, for both personal and organization-managed instances.
+    Trialing rows are excluded because trials expire without converting.
+    For each row the operation MUST follow rules 3, 5 and 6: release any
+    pending schedule, set the cancel-at-period-end flag on the payment
+    provider when a provider subscription ID exists, and set the flag
+    locally. It MUST NOT change status, period or renewal dates, commit end,
+    trial end, past-due, suspension, or destruction timestamps, so access
+    continues until each existing period ends (rule 4). It MUST write one
+    summary admin audit entry per run plus one per-subscription audit entry
+    for every outcome (updated, skipped, failed), linked by a run ID, and
+    MUST report rows with no renewal period separately. A failure on one row
+    MUST NOT stop the others, and re-running MUST process only rows that are
+    still eligible.
 
 ### Fraud-Enforcement Cancellation Exception
 

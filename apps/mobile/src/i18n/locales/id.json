@@ -3913,7 +3913,7 @@
       "deleteFailed": "Tidak dapat menghapus agen",
       "nameRequired": "Masukkan nama agen",
       "slugRequired": "Masukkan slug agen",
-      "slugInvalid": "Siput harus dimulai dengan huruf ASCII kecil dan hanya menggunakan huruf kecil ASCII, angka, dan tanda hubung, maksimal 50 karakter",
+      "slugInvalid": "Slug agen harus dimulai dengan huruf ASCII kecil dan hanya menggunakan huruf kecil ASCII, angka, dan tanda hubung, maksimal 50 karakter",
       "slugConflict": "Slug tersebut sudah digunakan oleh agen bawaan atau agen lain di profil ini",
       "edit": "Edit agen {{name}}",
       "delete": "Hapus agen {{name}}"

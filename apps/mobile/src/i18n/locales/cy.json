@@ -4117,7 +4117,7 @@
       "deleteFailed": "Ni fu modd dileu'r asiant",
       "nameRequired": "Rhowch enw asiant",
       "slugRequired": "Rhowch slug asiant",
-      "slugInvalid": "Rhaid i wlithen ddechrau gyda llythyren fach ASCII a defnyddio llythrennau bach ASCII, digidau a llinellau toriad yn unig, hyd at 50 nod",
+      "slugInvalid": "Rhaid i’r slug ddechrau gyda llythyren fach ASCII a defnyddio llythrennau bach ASCII, digidau a llinellau toriad yn unig, hyd at 50 nod",
       "slugConflict": "Mae'r slug hwnnw eisoes yn cael ei ddefnyddio gan asiant adeiledig neu asiant arall yn y proffil hwn",
       "edit": "Golygu asiant {{name}}",
       "delete": "Dileu asiant {{name}}"

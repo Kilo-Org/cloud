@@ -3964,7 +3964,7 @@
       "deleteFailed": "Nije moguće izbrisati agenta",
       "nameRequired": "Unesite ime agenta",
       "slugRequired": "Unesite slug agenta",
-      "slugInvalid": "Puž mora započeti malim ASCII slovom i smije sadržavati samo mala ASCII slova, znamenke i crtice, najviše 50 znakova",
+      "slugInvalid": "Slug agenta mora započeti malim ASCII slovom i smije sadržavati samo mala ASCII slova, znamenke i crtice, najviše 50 znakova",
       "slugConflict": "Taj slug već koristi ugrađeni agent ili drugi agent u ovom profilu",
       "edit": "Uredi agenta {{name}}",
       "delete": "Obriši agenta {{name}}"

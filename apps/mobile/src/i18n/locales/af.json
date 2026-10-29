@@ -3913,7 +3913,7 @@
       "deleteFailed": "Kon nie agent verwyder nie",
       "nameRequired": "Voer 'n agentnaam in",
       "slugRequired": "Voer 'n agent-identifiseerder in",
-      "slugInvalid": "Slak moet met 'n ASCII-kleinletter begin en slegs ASCII-kleinletters, syfers en strepe tot 50 karakters gebruik",
+      "slugInvalid": "Die agent-identifiseerder moet met 'n ASCII-kleinletter begin en slegs ASCII-kleinletters, syfers en strepe tot 50 karakters gebruik",
       "slugConflict": "Daardie agent-identifiseerder word deur 'n ingeboude agent of 'n ander agent in hierdie profiel gebruik",
       "edit": "Wysig agent {{name}}",
       "delete": "Skrap agent {{name}}"

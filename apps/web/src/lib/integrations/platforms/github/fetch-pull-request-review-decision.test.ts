@@ -135,11 +135,8 @@ describe('fetchPullRequestReviewDecision', () => {
   });
 
   it('returns null without a request when a coordinate is outside the name charset', async () => {
-    const hostileOwner = 'acme") { viewer { login } } #';
-    const hostileRepo = 'widgets") { viewer { login } } #';
-
-    expect(await fetchPullRequestReviewDecision({ ...params, owner: hostileOwner })).toBeNull();
-    expect(await fetchPullRequestReviewDecision({ ...params, repo: hostileRepo })).toBeNull();
+    expect(await fetchPullRequestReviewDecision({ ...params, owner: 'acme.corp' })).toBeNull();
+    expect(await fetchPullRequestReviewDecision({ ...params, repo: 'widgets[1]' })).toBeNull();
     expect(await fetchPullRequestReviewDecision({ ...params, owner: '' })).toBeNull();
     expect(await fetchPullRequestReviewDecision({ ...params, repo: '' })).toBeNull();
 
@@ -156,23 +153,17 @@ describe('fetchBatchedReviewDecisions', () => {
       })
     );
 
+    const unusualAlias = 'branch 4 (older)';
     const decisions = await fetchBatchedReviewDecisions({
       installationId: '42',
       prs: [
         { alias: 'older-branch', owner: 'acme', repo: 'widgets', number: 3 },
-        {
-          alias: 'branch: x: repository(owner: "other", name: "repo") { viewer { login } }',
-          owner: 'acme',
-          repo: 'gadgets',
-          number: 4,
-        },
+        { alias: unusualAlias, owner: 'acme', repo: 'gadgets', number: 4 },
       ],
     });
 
     expect(decisions.get('older-branch')).toBe('approved');
-    expect(
-      decisions.get('branch: x: repository(owner: "other", name: "repo") { viewer { login } }')
-    ).toBeNull();
+    expect(decisions.get(unusualAlias)).toBeNull();
 
     const { query, variables } = postedGraphQlBody();
     expect(variables).toEqual({
@@ -183,8 +174,8 @@ describe('fetchBatchedReviewDecisions', () => {
       name1: 'gadgets',
       number1: 4,
     });
-    expect(query).not.toContain('viewer');
-    expect(query).not.toContain('other');
+    expect(query).not.toContain(unusualAlias);
+    expect(query).not.toContain('older-branch');
     expect(query.match(/repository\(owner: \$owner\d, name: \$name\d\)/g)).toEqual([
       'repository(owner: $owner0, name: $name0)',
       'repository(owner: $owner1, name: $name1)',
@@ -200,8 +191,8 @@ describe('fetchBatchedReviewDecisions', () => {
       installationId: '42',
       prs: [
         { alias: 'ok', owner: 'acme', repo: 'widgets', number: 9 },
-        { alias: 'bad-owner', owner: 'acme.corp', repo: 'widgets', number: 10 },
-        { alias: 'bad-repo', owner: 'acme', repo: 'wid)gets', number: 11 },
+        { alias: 'dotted', owner: 'acme.corp', repo: 'widgets', number: 10 },
+        { alias: 'spaced', owner: 'acme', repo: 'wid gets', number: 11 },
       ],
     });
 
@@ -243,7 +234,7 @@ describe('fetchBatchedReviewDecisions', () => {
     const decisions = await fetchBatchedReviewDecisions({
       installationId: '42',
       prs: [
-        { alias: 'a', owner: 'acme)', repo: 'widgets', number: 1 },
+        { alias: 'a', owner: 'acme.corp', repo: 'widgets', number: 1 },
         { alias: 'b', owner: 'acme', repo: '', number: 2 },
       ],
     });

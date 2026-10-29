@@ -1347,10 +1347,10 @@ function normalizeReviewDecision(decision: string | null | undefined): ReviewDec
 const GRAPHQL_INT_MAX = 2_147_483_647;
 
 /**
- * An entry the batched query can ask GitHub about: repository coordinates
- * inside GitHub's name charset (so GitHub itself could have issued them) and a
- * PR number inside GraphQL's `Int` range. Anything else is left out of the
- * query — one malformed entry must not fail the whole batch.
+ * An entry the batched query can ask GitHub about: repository coordinates that
+ * follow GitHub's name rules and a PR number inside GraphQL's `Int` range.
+ * Anything else is left out of the request, so one unusable entry cannot fail
+ * the rest of the batch.
  */
 function isActionableReviewDecisionInput(input: BatchedPrInput): boolean {
   return (
@@ -1380,9 +1380,8 @@ type ReviewDecisionQueryEntry = {
  * Map, which callers read as "no review decision".
  *
  * Repository coordinates and PR numbers cross the GraphQL boundary as
- * operation variables; the document text is built only from fixed literals and
- * the generated `pr<N>` aliases, so a caller-supplied string can never change
- * the shape of the query.
+ * operation variables, so the document text holds only fixed literals and the
+ * generated `pr<N>` aliases.
  *
  * @throws {GitHubRateLimitError} on 403 secondary rate limit.
  */

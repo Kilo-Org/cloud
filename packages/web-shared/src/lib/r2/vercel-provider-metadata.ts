@@ -12,7 +12,14 @@ export function createVercelProviderMetadataCapture(): VercelProviderMetadataCap
   const bucket = getEnvVariable('R2_VERCEL_PROVIDER_METADATA_BUCKET_NAME');
   const accessKeyId = getEnvVariable('R2_VERCEL_PROVIDER_METADATA_ACCESS_KEY_ID');
   const secretAccessKey = getEnvVariable('R2_VERCEL_PROVIDER_METADATA_SECRET_ACCESS_KEY');
-  if (!bucket || !accessKeyId || !secretAccessKey) return undefined;
+  if (!bucket || !accessKeyId || !secretAccessKey) {
+    console.debug('[vercel-provider-metadata] capture disabled: missing configuration', {
+      bucketConfigured: Boolean(bucket),
+      accessKeyIdConfigured: Boolean(accessKeyId),
+      secretAccessKeyConfigured: Boolean(secretAccessKey),
+    });
+    return undefined;
+  }
 
   let capturedMetadata: object | undefined;
   let capturedGenerationId: string | undefined;

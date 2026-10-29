@@ -47,7 +47,15 @@ test.each([
   delete process.env[name];
   expect(createVercelProviderMetadataCapture()).toBeUndefined();
   expect(mockedAfter).not.toHaveBeenCalled();
-  expect(console.debug).not.toHaveBeenCalled();
+  expect(console.debug).toHaveBeenCalledTimes(1);
+  expect(console.debug).toHaveBeenCalledWith(
+    '[vercel-provider-metadata] capture disabled: missing configuration',
+    {
+      bucketConfigured: name !== 'R2_VERCEL_PROVIDER_METADATA_BUCKET_NAME',
+      accessKeyIdConfigured: name !== 'R2_VERCEL_PROVIDER_METADATA_ACCESS_KEY_ID',
+      secretAccessKeyConfigured: name !== 'R2_VERCEL_PROVIDER_METADATA_SECRET_ACCESS_KEY',
+    }
+  );
 });
 
 test('uploads the latest metadata once, after the response, keyed by generation ID', async () => {

@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Modifications",
-    "organizationTrialEnded": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Le propriétaire de l'organisation peut mettre à jour la facturation sur kilo.ai, puis réessayer."
+    "organizationTrialEnded": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Le propriétaire de l'organisation peut mettre à jour la facturation sur kilo.ai, puis réessayer.",
+    "privateRepositoryA11y": "{{name}}, dépôt privé"
   },
   "language": {
     "restarting": "Redémarrage pour changer de langue",
@@ -1015,6 +1016,12 @@
         "superseded": "Déjà présent"
       },
       "noProposalsDescription": "Les propositions de la mémoire de revue apparaissent ici après l'analyse des réponses des responsables du dépôt par Kilo.",
+      "changeRequestInProgress": "Kilo ouvre déjà une pull request pour cette proposition. Réessayez dans un instant.",
+      "changeRequestNotActionable": "Cette proposition ne peut plus être approuvée. Fermez-la et actualisez la liste.",
+      "changeRequestNoGitHubAccess": "Aucune connexion GitHub n'a accès à ce dépôt. Reconnectez GitHub avec un accès à ce dépôt, puis réessayez.",
+      "changeRequestMissingPermissions": "L'application GitHub de Kilo ne peut pas ouvrir de pull requests dans ce dépôt. Un propriétaire du dépôt doit accorder à l'application l'accès en écriture au contenu et aux pull requests, puis réessayer.",
+      "changeRequestFailed": "Kilo n'a pas pu ouvrir la pull request. Réessayez dans un instant.",
+      "offAction": "La mémoire de revue est désactivée. Activez-la, puis réessayez.",
       "off": "La mémoire de revue est désactivée.",
       "on": "La mémoire de revue est activée.",
       "offDescription": "Activez-la pour permettre à Kilo d'apprendre des réponses des responsables du dépôt et de proposer des consignes pour REVIEW.md.",
@@ -3894,6 +3901,7 @@
     "skillSaveFailed": "Impossible de sauvegarder la compétence",
     "skillSourceCustom": "Personnalisé",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Collez un SKILL.md et son nom est renseigné ; ajoutez une compétence depuis votre téléphone sans glisser-déposer.",
     "skillEditTitle": "Modifier la compétence",
     "skillEdit": "Modifier la compétence {{name}}",
@@ -4002,7 +4010,6 @@
       "repo": "Sélectionnez le référentiel…",
       "profile": "Sélectionnez un profil",
       "remove": "Délier",
-      "private": "Privé",
       "search": "Rechercher des référentiels…",
       "addedToast": "Profil par défaut défini pour \"{{repo}}\"",
       "addFailed": "Impossible de définir le profil par défaut",

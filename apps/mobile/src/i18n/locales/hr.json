@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Izmjene",
-    "organizationTrialEnded": "Probno razdoblje organizacije je završilo i organizacija nema aktivan plan. Vlasnik organizacije može ažurirati naplatu na kilo.ai i zatim pokušati ponovno."
+    "organizationTrialEnded": "Probno razdoblje organizacije je završilo i organizacija nema aktivan plan. Vlasnik organizacije može ažurirati naplatu na kilo.ai i zatim pokušati ponovno.",
+    "privateRepositoryA11y": "{{name}}, privatni repozitorij"
   },
   "language": {
     "restarting": "Ponovno pokretanje radi promjene jezika",
@@ -1535,7 +1536,13 @@
         "change_request_failed": "Otvaranje PR-a nije uspjelo",
         "superseded": "Već postoji"
       },
-      "noProposalsDescription": "Prijedlozi memorije pregleda pojavit će se ovdje nakon što Kilo analizira odgovore održavatelja."
+      "noProposalsDescription": "Prijedlozi memorije pregleda pojavit će se ovdje nakon što Kilo analizira odgovore održavatelja.",
+      "changeRequestInProgress": "Kilo već otvara zahtjev za povlačenje za ovaj prijedlog. Pokušajte ponovno za koji trenutak.",
+      "changeRequestNotActionable": "Ovaj prijedlog više nije moguće odobriti. Zatvorite ga i osvježite popis.",
+      "changeRequestNoGitHubAccess": "Nijedna veza s GitHubom nema pristup ovom repozitoriju. Ponovno povežite GitHub s pristupom ovom repozitoriju, zatim pokušajte ponovno.",
+      "changeRequestMissingPermissions": "Kilo-ova GitHub aplikacija ne može otvoriti zahtjeve za povlačenje u ovom repozitoriju. Vlasnik repozitorija mora aplikaciji dati pravo pisanja za sadržaj i zahtjeve za povlačenje, zatim pokušajte ponovno.",
+      "changeRequestFailed": "Kilo nije mogao otvoriti zahtjev za povlačenje. Pokušajte ponovno za koji trenutak.",
+      "offAction": "Memorija pregleda je isključena. Uključi je pa pokušaj ponovno."
     },
     "manualReview": {
       "title": "Ručni pregled",
@@ -3894,6 +3901,7 @@
     "skillSaveFailed": "Nije moguće spremiti vještinu",
     "skillSourceCustom": "Prilagođeno",
     "skillSourceMarketplace": "Trgovina",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Zalijepite SKILL.md i popunite njegovo ime; dodajte vještinu sa svog telefona bez povlačenja i ispuštanja.",
     "skillEditTitle": "Uredi vještinu",
     "skillEdit": "Uredi vještinu {{name}}",
@@ -4002,7 +4010,6 @@
       "repo": "Odaberite spremište…",
       "profile": "Odaberite profil",
       "remove": "Odvezati",
-      "private": "Privatno",
       "search": "Pretraži spremišta…",
       "addedToast": "Zadani profil postavljen za \"{{repo}}\"",
       "addFailed": "Nije moguće postaviti zadani profil",

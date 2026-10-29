@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "ການປ່ຽນແປງ",
-    "organizationTrialEnded": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າຂອງອົງກອນສາມາດອັບເດດການເກັບເງິນໄດ້ທີ່ kilo.ai, ແລ້ວລອງອີກຄັ້ງ."
+    "organizationTrialEnded": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າຂອງອົງກອນສາມາດອັບເດດການເກັບເງິນໄດ້ທີ່ kilo.ai, ແລ້ວລອງອີກຄັ້ງ.",
+    "privateRepositoryA11y": "{{name}}, ຄັງໂຄ້ດສ່ວນຕົວ"
   },
   "language": {
     "restarting": "ກຳລັງເປີດແອັບໃໝ່ເພື່ອໃຊ້ພາສາທີ່ເລືອກ",
@@ -1513,7 +1514,13 @@
         "change_request_failed": "ເປີດ PR ບໍ່ສຳເລັດ",
         "superseded": "ມີຢູ່ແລ້ວ"
       },
-      "noProposalsDescription": "ຂໍ້ສະເໜີຈາກຄວາມຈຳການກວດສອບຈະປາກົດຢູ່ບ່ອນນີ້ ຫຼັງຈາກ Kilo ວິເຄາະຄຳຕອບຂອງຜູ້ດູແລ."
+      "noProposalsDescription": "ຂໍ້ສະເໜີຈາກຄວາມຈຳການກວດສອບຈະປາກົດຢູ່ບ່ອນນີ້ ຫຼັງຈາກ Kilo ວິເຄາະຄຳຕອບຂອງຜູ້ດູແລ.",
+      "changeRequestInProgress": "Kilo ກຳລັງເປີດ PR ສຳລັບຂໍ້ສະເໜີນີ້ຢູ່ແລ້ວ. ລອງອີກຄັ້ງໃນອີກຈັກຄູ່.",
+      "changeRequestNotActionable": "ບໍ່ສາມາດອະນຸມັດຂໍ້ສະເໜີນີ້ໄດ້ອີກແລ້ວ. ປິດມັນ ແລະ ໂຫຼດລາຍການຄືນໃໝ່.",
+      "changeRequestNoGitHubAccess": "ບໍ່ມີການເຊື່ອມຕໍ່ GitHub ໃດທີ່ມີສິດເຂົ້າເຖິງ repository ນີ້. ເຊື່ອມຕໍ່ GitHub ຄືນໃໝ່ພ້ອມກັບສິດເຂົ້າເຖິງ repository ນີ້, ແລ້ວລອງອີກຄັ້ງ.",
+      "changeRequestMissingPermissions": "GitHub App ຂອງ Kilo ບໍ່ສາມາດເປີດ PR ໃນ repository ນີ້ໄດ້. ເຈົ້າຂອງ repository ຕ້ອງໃຫ້ສິດຂຽນແກ່ແອັບສຳລັບເນື້ອຫາ ແລະ PR, ແລ້ວລອງອີກຄັ້ງ.",
+      "changeRequestFailed": "Kilo ບໍ່ສາມາດເປີດ PR ໄດ້. ລອງອີກຄັ້ງໃນອີກຈັກຄູ່.",
+      "offAction": "ຄວາມຈຳການກວດສອບປິດຢູ່. ເປີດໃຊ້ມັນ, ແລ້ວລອງອີກຄັ້ງ."
     },
     "manualReview": {
       "title": "ການກວດສອບທີ່ເລີ່ມເອງ",
@@ -3844,6 +3851,7 @@
     "skillSaveFailed": "ບໍ່ສາມາດບັນທຶກທັກສະໄດ້",
     "skillSourceCustom": "ກຳນົດເອງ",
     "skillSourceMarketplace": "ຕະຫຼາດ",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "ວາງ SKILL.md ແລະຊື່ຂອງມັນຕື່ມໃສ່; ເພີ່ມທັກສະຈາກໂທລະສັບຂອງທ່ານໂດຍບໍ່ຕ້ອງລາກແລະວາງ.",
     "skillEditTitle": "ແກ້ໄຂທັກສະ",
     "skillEdit": "ແກ້ໄຂທັກສະ {{name}}",
@@ -3951,7 +3959,6 @@
       "repo": "ເລືອກບ່ອນເກັບມ້ຽນ...",
       "profile": "ເລືອກໂປຣໄຟລ໌",
       "remove": "ຍົກເລີກການຜູກມັດ",
-      "private": "ສ່ວນຕົວ",
       "search": "ຊອກຫາບ່ອນເກັບມ້ຽນ...",
       "addedToast": "ຕັ້ງໂປຣໄຟລ໌ເລີ່ມຕົ້ນສຳລັບ \"{{repo}}\" ແລ້ວ",
       "addFailed": "ບໍ່ສາມາດຕັ້ງໂປຣໄຟລ໌ເລີ່ມຕົ້ນໄດ້",

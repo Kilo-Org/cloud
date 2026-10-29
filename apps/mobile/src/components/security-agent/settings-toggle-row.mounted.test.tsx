@@ -139,4 +139,32 @@ describe('<ToggleRow>', () => {
     expect(wrapperProps.accessibilityElementsHidden).toBe(true);
     expect(wrapperProps.importantForAccessibility).toBe('no-hide-descendants');
   });
+
+  it('flips the value when the selection tick rejects', async () => {
+    const onValueChange = vi.fn<(next: boolean) => void>();
+    haptics.selectionAsync.mockRejectedValue(new Error('no haptic engine'));
+    const renderer = renderRow({ value: false, onValueChange });
+    const unhandledRejections: unknown[] = [];
+    const onUnhandledRejection = (reason: unknown) => {
+      unhandledRejections.push(reason);
+    };
+    try {
+      process.on('unhandledRejection', onUnhandledRejection);
+      act(() => {
+        pressRow(renderer);
+      });
+      // One macrotask, the turn Node flags an unhandled rejection in.
+      const flushed = Promise.withResolvers<undefined>();
+      setImmediate(() => {
+        flushed.resolve(undefined);
+      });
+      await flushed.promise;
+
+      expect(onValueChange).toHaveBeenCalledTimes(1);
+      expect(unhandledRejections).toEqual([]);
+    } finally {
+      process.off('unhandledRejection', onUnhandledRejection);
+      haptics.selectionAsync.mockReset();
+    }
+  });
 });

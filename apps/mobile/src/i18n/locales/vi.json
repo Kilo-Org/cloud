@@ -148,7 +148,8 @@
     "durationMinuteShort": "phút",
     "durationHourShort": "giờ",
     "changes": "Thay đổi",
-    "organizationTrialEnded": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động. Chủ sở hữu tổ chức có thể cập nhật thanh toán tại kilo.ai, sau đó thử lại."
+    "organizationTrialEnded": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động. Chủ sở hữu tổ chức có thể cập nhật thanh toán tại kilo.ai, sau đó thử lại.",
+    "privateRepositoryA11y": "{{name}}, kho lưu trữ riêng tư"
   },
   "language": {
     "restarting": "Đang khởi động lại để áp dụng ngôn ngữ",
@@ -1044,6 +1045,12 @@
         "superseded": "Đã có"
       },
       "noProposalsDescription": "Các đề xuất từ bộ nhớ rà soát sẽ xuất hiện tại đây sau khi Kilo phân tích phản hồi của người bảo trì.",
+      "changeRequestInProgress": "Kilo đang mở pull request cho đề xuất này. Vui lòng thử lại sau giây lát.",
+      "changeRequestNotActionable": "Không thể phê duyệt đề xuất này nữa. Hãy đóng đề xuất và làm mới danh sách.",
+      "changeRequestNoGitHubAccess": "Không có kết nối GitHub nào có quyền truy cập vào kho lưu trữ này. Hãy kết nối lại GitHub với quyền truy cập vào kho lưu trữ, sau đó thử lại.",
+      "changeRequestMissingPermissions": "Ứng dụng GitHub của Kilo không thể mở pull request trong kho lưu trữ này. Chủ sở hữu kho lưu trữ phải cấp cho ứng dụng quyền ghi vào nội dung và pull request, sau đó thử lại.",
+      "changeRequestFailed": "Kilo không thể mở pull request. Vui lòng thử lại sau giây lát.",
+      "offAction": "Bộ nhớ rà soát đang tắt. Bật tính năng này rồi thử lại.",
       "off": "Bộ nhớ rà soát đang tắt.",
       "on": "Bộ nhớ rà soát đang bật.",
       "offDescription": "Bật tính năng này để Kilo học từ phản hồi của người bảo trì và đề xuất hướng dẫn cho tệp REVIEW.md.",
@@ -3844,6 +3851,7 @@
     "skillSaveFailed": "Không thể lưu kỹ năng",
     "skillSourceCustom": "Tùy chỉnh",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Dán SKILL.md và điền tên của nó vào; thêm kỹ năng từ điện thoại của bạn mà không cần kéo và thả.",
     "skillEditTitle": "Chỉnh sửa kỹ năng",
     "skillEdit": "Chỉnh sửa kỹ năng {{name}}",
@@ -3951,7 +3959,6 @@
       "repo": "Chọn kho lưu trữ…",
       "profile": "Chọn hồ sơ",
       "remove": "Hủy liên kết",
-      "private": "Riêng tư",
       "search": "Tìm kiếm kho lưu trữ…",
       "addedToast": "Đã đặt cấu hình mặc định cho \"{{repo}}\"",
       "addFailed": "Không thể đặt hồ sơ mặc định",

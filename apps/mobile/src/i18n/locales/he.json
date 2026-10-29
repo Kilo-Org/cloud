@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "שינויים",
-    "organizationTrialEnded": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. בעל הארגון יכול לעדכן את החיוב ב-kilo.ai, ואז לנסות שוב."
+    "organizationTrialEnded": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. בעל הארגון יכול לעדכן את החיוב ב-kilo.ai, ואז לנסות שוב.",
+    "privateRepositoryA11y": "{{name}}, מאגר פרטי"
   },
   "language": {
     "restarting": "האפליקציה מופעלת מחדש לשינוי השפה",
@@ -1047,6 +1048,12 @@
         "superseded": "כבר קיים"
       },
       "noProposalsDescription": "הצעות המבוססות על זיכרון הסקירה יופיעו כאן לאחר ש-Kilo ינתח תשובות של מתחזקים.",
+      "changeRequestInProgress": "Kilo כבר פותח בקשת משיכה עבור ההצעה הזו. יש לנסות שוב בעוד רגע.",
+      "changeRequestNotActionable": "לא ניתן עוד לאשר את ההצעה הזו. יש לסגור אותה ולרענן את הרשימה.",
+      "changeRequestNoGitHubAccess": "לאף חיבור GitHub אין גישה למאגר הזה. יש לחבר מחדש את GitHub עם גישה אליו ולנסות שוב.",
+      "changeRequestMissingPermissions": "אפליקציית ה-GitHub של Kilo אינה יכולה לפתוח בקשות משיכה במאגר הזה. על בעל המאגר להעניק לאפליקציה הרשאת כתיבה לתוכן ולבקשות משיכה, ולאחר מכן לנסות שוב.",
+      "changeRequestFailed": "Kilo לא הצליח לפתוח את בקשת המשיכה. יש לנסות שוב בעוד רגע.",
+      "offAction": "זיכרון הסקירה כבוי. הפעל אותו ואז נסה שוב.",
       "off": "זיכרון הסקירה כבוי.",
       "on": "זיכרון הסקירה דלוק.",
       "offDescription": "הפעל אותו כדי לאפשר ל-Kilo ללמוד מתשובות של מתחזקים ולהציע הנחיות לקובץ REVIEW.md.",
@@ -3894,6 +3901,7 @@
     "skillSaveFailed": "לא ניתן היה לשמור את המיומנות",
     "skillSourceCustom": "מותאם אישית",
     "skillSourceMarketplace": "חנות",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "הדבק SKILL.md ושמו ימלא; הוסף מיומנות מהטלפון שלך ללא גרירה ושחרור.",
     "skillEditTitle": "ערוך מיומנות",
     "skillEdit": "ערוך מיומנות {{name}}",
@@ -4002,7 +4010,6 @@
       "repo": "בחר מאגר...",
       "profile": "בחר פרופיל",
       "remove": "לְהַתִיר",
-      "private": "פְּרָטִי",
       "search": "חפש במאגרים...",
       "addedToast": "פרופיל ברירת המחדל הוגדר עבור \"{{repo}}\"",
       "addFailed": "לא ניתן להגדיר פרופיל ברירת מחדל",

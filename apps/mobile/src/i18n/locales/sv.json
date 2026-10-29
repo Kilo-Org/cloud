@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Ändringar",
-    "organizationTrialEnded": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. En organisationsägare kan uppdatera faktureringen på kilo.ai och sedan försöka igen."
+    "organizationTrialEnded": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. En organisationsägare kan uppdatera faktureringen på kilo.ai och sedan försöka igen.",
+    "privateRepositoryA11y": "{{name}}, privat kodarkiv"
   },
   "language": {
     "restarting": "Startar om för att byta språk",
@@ -1513,7 +1514,13 @@
         "change_request_failed": "PR misslyckades",
         "superseded": "Finns redan"
       },
-      "noProposalsDescription": "Förslag från granskningsminnet visas här när Kilo har analyserat de projektansvarigas svar."
+      "noProposalsDescription": "Förslag från granskningsminnet visas här när Kilo har analyserat de projektansvarigas svar.",
+      "changeRequestInProgress": "Kilo öppnar redan en pull request för det här förslaget. Försök igen om en stund.",
+      "changeRequestNotActionable": "Det här förslaget kan inte längre godkännas. Stäng det och uppdatera listan.",
+      "changeRequestNoGitHubAccess": "Ingen GitHub-anslutning har åtkomst till det här arkivet. Anslut GitHub igen med åtkomst till det och försök sedan igen.",
+      "changeRequestMissingPermissions": "Kilos GitHub-app kan inte öppna pull requests i det här arkivet. En arkivägare måste ge appen skrivåtkomst till innehåll och pull requests och sedan försöka igen.",
+      "changeRequestFailed": "Kilo kunde inte öppna pull requesten. Försök igen om en stund.",
+      "offAction": "Granskningsminnet är avstängt. Aktivera det och försök igen."
     },
     "manualReview": {
       "title": "Manuell granskning",
@@ -3844,6 +3851,7 @@
     "skillSaveFailed": "Det gick inte att spara färdigheten",
     "skillSourceCustom": "Anpassad",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Klistra in en SKILL.md och dess namn fylls i; lägg till en färdighet från din telefon utan att dra och släppa.",
     "skillEditTitle": "Redigera färdighet",
     "skillEdit": "Redigera färdighet {{name}}",
@@ -3951,7 +3959,6 @@
       "repo": "Välj kodarkiv…",
       "profile": "Välj profil",
       "remove": "Koppla från",
-      "private": "Privat",
       "search": "Sök kodarkiv…",
       "addedToast": "Standardprofil inställd för \"{{repo}}\"",
       "addFailed": "Det gick inte att ange standardprofil",

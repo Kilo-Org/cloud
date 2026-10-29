@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Zmiany",
-    "organizationTrialEnded": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Właściciel organizacji może zaktualizować rozliczenia na kilo.ai, a następnie spróbować ponownie."
+    "organizationTrialEnded": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Właściciel organizacji może zaktualizować rozliczenia na kilo.ai, a następnie spróbować ponownie.",
+    "privateRepositoryA11y": "{{name}}, prywatne repozytorium"
   },
   "language": {
     "restarting": "Ponowne uruchamianie po zmianie języka",
@@ -1050,6 +1051,12 @@
         "superseded": "Już istnieje"
       },
       "noProposalsDescription": "Propozycje z pamięci przeglądów pojawią się tutaj, gdy Kilo przeanalizuje odpowiedzi opiekunów repozytorium.",
+      "changeRequestInProgress": "Kilo już otwiera pull request dla tej propozycji. Spróbuj ponownie za chwilę.",
+      "changeRequestNotActionable": "Tej propozycji nie można już zatwierdzić. Zamknij ją i odśwież listę.",
+      "changeRequestNoGitHubAccess": "Żadne połączenie z GitHub nie ma dostępu do tego repozytorium. Połącz ponownie GitHub z dostępem do tego repozytorium i spróbuj ponownie.",
+      "changeRequestMissingPermissions": "Aplikacja GitHub Kilo nie może otwierać pull requestów w tym repozytorium. Właściciel repozytorium musi przyznać aplikacji dostęp do zapisu treści i pull requestów, a następnie spróbuj ponownie.",
+      "changeRequestFailed": "Kilo nie mogło otworzyć pull requesta. Spróbuj ponownie za chwilę.",
+      "offAction": "Pamięć przeglądów jest wyłączona. Włącz ją, a następnie spróbuj ponownie.",
       "off": "Pamięć przeglądów jest wyłączona.",
       "on": "Pamięć przeglądów jest włączona.",
       "offDescription": "Włącz ją, aby Kilo uczyło się na podstawie odpowiedzi opiekunów repozytorium i proponowało wytyczne do pliku REVIEW.md.",
@@ -3944,6 +3951,7 @@
     "skillSaveFailed": "Nie udało się zapisać umiejętności",
     "skillSourceCustom": "Własne",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Wklej SKILL.md, a jego nazwa zostanie wypełniona; dodaj umiejętność ze swojego telefonu bez przeciągania i upuszczania.",
     "skillEditTitle": "Edytuj umiejętność",
     "skillEdit": "Edytuj umiejętność {{name}}",
@@ -4053,7 +4061,6 @@
       "repo": "Wybierz repozytorium…",
       "profile": "Wybierz profil",
       "remove": "Rozwiązać",
-      "private": "Prywatny",
       "search": "Przeszukaj repozytoria…",
       "addedToast": "Domyślny profil ustawiony na „{{repo}}”",
       "addFailed": "Nie można ustawić profilu domyślnego",

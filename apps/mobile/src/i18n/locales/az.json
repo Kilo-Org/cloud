@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Dəyişikliklər",
-    "organizationTrialEnded": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Təşkilat sahibi kilo.ai ünvanında billinqi yeniləyə və sonra yenidən cəhd edə bilər."
+    "organizationTrialEnded": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Təşkilat sahibi kilo.ai ünvanında billinqi yeniləyə və sonra yenidən cəhd edə bilər.",
+    "privateRepositoryA11y": "{{name}}, şəxsi repozitoriya"
   },
   "language": {
     "restarting": "Dil dəyişikliyini tətbiq etmək üçün yenidən başladılır",
@@ -1513,7 +1514,13 @@
         "change_request_failed": "PR uğursuz oldu",
         "superseded": "Artıq mövcuddur"
       },
-      "noProposalsDescription": "Kilo layihəyə cavabdeh şəxslərin cavablarını təhlil etdikdən sonra kod yoxlaması yaddaşının təklifləri burada görünəcək."
+      "noProposalsDescription": "Kilo layihəyə cavabdeh şəxslərin cavablarını təhlil etdikdən sonra kod yoxlaması yaddaşının təklifləri burada görünəcək.",
+      "changeRequestInProgress": "Kilo bu təklif üçün artıq pull sorğusu açır. Bir azdan yenidən cəhd et.",
+      "changeRequestNotActionable": "Bu təklifi artıq təsdiqləmək mümkün deyil. Onu bağla və siyahını yenilə.",
+      "changeRequestNoGitHubAccess": "Heç bir GitHub bağlantısının bu repozitoriyaya girişi yoxdur. GitHub-u ona girişlə yenidən qoş, sonra yenidən cəhd et.",
+      "changeRequestMissingPermissions": "Kilo-nun GitHub Tətbiqi bu repozitoriyada pull sorğusu aça bilmir. Repozitoriya sahibi tətbiqə məzmun və pull sorğuları üçün yazma icazəsi verməlidir, sonra yenidən cəhd et.",
+      "changeRequestFailed": "Kilo pull sorğusunu aça bilmədi. Bir azdan yenidən cəhd et.",
+      "offAction": "Kod yoxlaması yaddaşı deaktivdir. Onu aktivləşdir, sonra yenidən cəhd et."
     },
     "manualReview": {
       "title": "Əl ilə kod yoxlaması",
@@ -3844,6 +3851,7 @@
     "skillSaveFailed": "Bacarıq saxlamaq mümkün olmadı",
     "skillSourceCustom": "Fərdi",
     "skillSourceMarketplace": "Marketpleys",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "SKILL.md yapışdırın və onun adı doldurulur; sürükləyib buraxmadan telefonunuzdan bacarıq əlavə edin.",
     "skillEditTitle": "Bacarıqları redaktə edin",
     "skillEdit": "{{name}} bacarığını redaktə edin",
@@ -3951,7 +3959,6 @@
       "repo": "Repozitoru seçin...",
       "profile": "Profil seçin",
       "remove": "Açın",
-      "private": "Şəxsi",
       "search": "Repozitoriyaları axtarın...",
       "addedToast": "\"{{repo}}\" üçün defolt profil ayarlandı",
       "addFailed": "Defolt profili qurmaq mümkün olmadı",

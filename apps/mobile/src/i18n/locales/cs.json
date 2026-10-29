@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Změny",
-    "organizationTrialEnded": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Vlastník organizace může aktualizovat fakturaci na kilo.ai a poté to zkuste znovu."
+    "organizationTrialEnded": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Vlastník organizace může aktualizovat fakturaci na kilo.ai a poté to zkuste znovu.",
+    "privateRepositoryA11y": "{{name}}, soukromý repozitář"
   },
   "language": {
     "restarting": "Aplikace se restartuje kvůli změně jazyka",
@@ -1557,7 +1558,13 @@
         "change_request_failed": "PR selhal",
         "superseded": "Již existuje"
       },
-      "noProposalsDescription": "Návrhy z paměti kontrol se zde zobrazí, jakmile Kilo analyzuje odpovědi správců."
+      "noProposalsDescription": "Návrhy z paměti kontrol se zde zobrazí, jakmile Kilo analyzuje odpovědi správců.",
+      "changeRequestInProgress": "Kilo již otevírá pull request pro tento návrh. Zkuste to znovu za chvíli.",
+      "changeRequestNotActionable": "Tento návrh již nelze schválit. Zavřete ho a obnovte seznam.",
+      "changeRequestNoGitHubAccess": "Žádné připojení k GitHubu nemá přístup k tomuto repozitáři. Znovu připojte GitHub s přístupem k tomuto repozitáři a poté to zkuste znovu.",
+      "changeRequestMissingPermissions": "GitHub App od Kilo nemůže v tomto repozitáři otevírat pull requesty. Vlastník repozitáře musí aplikaci udělit přístup pro zápis k obsahu a pull requestům. Poté to zkuste znovu.",
+      "changeRequestFailed": "Kilo nedokázalo otevřít pull request. Zkuste to znovu za chvíli.",
+      "offAction": "Paměť kontrol je vypnutá. Zapněte ji a zkuste to znovu."
     },
     "manualReview": {
       "title": "Ruční kontrola",
@@ -3944,6 +3951,7 @@
     "skillSaveFailed": "Nepodařilo se zachránit dovednost",
     "skillSourceCustom": "Vlastní",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Vložte SKILL.md a jeho název se vyplní; přidejte dovednost z telefonu bez přetahování.",
     "skillEditTitle": "Upravit dovednost",
     "skillEdit": "Upravit dovednost {{name}}",
@@ -4053,7 +4061,6 @@
       "repo": "Vyberte úložiště…",
       "profile": "Vyberte profil",
       "remove": "Zrušit vazbu",
-      "private": "Soukromé",
       "search": "Prohledat úložiště…",
       "addedToast": "Výchozí profil nastavený pro „{{repo}}“",
       "addFailed": "Nepodařilo se nastavit výchozí profil",

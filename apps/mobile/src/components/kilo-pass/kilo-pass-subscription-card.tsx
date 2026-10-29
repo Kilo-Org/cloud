@@ -1,5 +1,5 @@
 import { type Href, useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { type ReactNode } from 'react';
 import { Linking, Platform, Pressable, useWindowDimensions, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
@@ -61,7 +61,7 @@ export function KiloPassSubscriptionCard({
 
     const cardState = contentState.state;
 
-    void Haptics.selectionAsync();
+    selectionHaptic();
     if (cardState.action === 'open-web') {
       const webUrl = presentationQuery.data?.webUrl;
       if (webUrl) {
@@ -72,7 +72,7 @@ export function KiloPassSubscriptionCard({
     router.push('/(app)/kilo-pass' as Href);
   };
   const handleRetryPress = () => {
-    void Haptics.selectionAsync();
+    selectionHaptic();
     void presentationQuery.refetch();
   };
 

@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Spremembe",
-    "organizationTrialEnded": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Lastnik organizacije lahko posodobi obračun na kilo.ai, nato poskusi znova."
+    "organizationTrialEnded": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Lastnik organizacije lahko posodobi obračun na kilo.ai, nato poskusi znova.",
+    "privateRepositoryA11y": "{{name}}, zasebno skladišče"
   },
   "language": {
     "restarting": "Ponovni zagon za spremembo jezika",
@@ -1557,7 +1558,13 @@
         "change_request_failed": "PR ni uspel",
         "superseded": "Že obstaja"
       },
-      "noProposalsDescription": "Predlogi pomnjenja pregledov se prikažejo tukaj, ko Kilo analizira odgovore vzdrževalcev."
+      "noProposalsDescription": "Predlogi pomnjenja pregledov se prikažejo tukaj, ko Kilo analizira odgovore vzdrževalcev.",
+      "changeRequestInProgress": "Kilo že odpira zahtevek za združitev za ta predlog. Poskusite znova čez trenutek.",
+      "changeRequestNotActionable": "Tega predloga ni več mogoče odobriti. Zaprite ga in osvežite seznam.",
+      "changeRequestNoGitHubAccess": "Nobena povezava z GitHub nima dostopa do tega repozitorija. Ponovno povežite GitHub z dostopom do njega in poskusite znova.",
+      "changeRequestMissingPermissions": "Kiloova aplikacija GitHub ne more odpirati zahtevkov za združitev v tem repozitoriju. Lastnik repozitorija mora aplikaciji dati pravico pisanja do vsebine in zahtevkov za združitev, nato poskusite znova.",
+      "changeRequestFailed": "Kilu ni uspelo odpreti zahtevka za združitev. Poskusite znova čez trenutek.",
+      "offAction": "Pomnjenje pregledov je izklopljeno. Vklopi ga, nato poskusi znova."
     },
     "manualReview": {
       "title": "Ročni pregled",
@@ -3944,6 +3951,7 @@
     "skillSaveFailed": "Spretnosti ni bilo mogoče shraniti",
     "skillSourceCustom": "Po meri",
     "skillSourceMarketplace": "Tržnica",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Prilepite SKILL.md in njegovo ime se izpolni; dodajte veščino iz telefona brez povleci in spusti.",
     "skillEditTitle": "Spretnost urejanja",
     "skillEdit": "Uredi spretnost {{name}}",
@@ -4053,7 +4061,6 @@
       "repo": "Izberite repozitorij ...",
       "profile": "Izberite profil",
       "remove": "Odveži",
-      "private": "Zasebno",
       "search": "Iskanje po skladiščih ...",
       "addedToast": "Privzeti profil nastavljen za \"{{repo}}\"",
       "addFailed": "Privzetega profila ni bilo mogoče nastaviti",

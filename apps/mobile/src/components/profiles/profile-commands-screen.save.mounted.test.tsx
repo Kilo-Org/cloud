@@ -10,8 +10,8 @@ import {
   mountScreen,
   pressBack,
   pressButton,
-  testProfile,
-  type TestProfileDetail,
+  testCommands,
+  type TestCommands,
 } from '@/components/profiles/profile-commands-screen.test-helpers';
 import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
@@ -19,7 +19,7 @@ import { waitFor } from '@/test/render-with-providers';
 const h = vi.hoisted(() => ({
   error: vi.fn(),
   query: {
-    data: undefined as TestProfileDetail | undefined,
+    data: undefined as TestCommands | undefined,
     isError: false,
     isPending: true,
     isRefetching: false,
@@ -42,7 +42,7 @@ vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
   useCanManageOrganizationProfiles: () => true,
 }));
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
-  useAgentProfile: () => h.query,
+  useAgentProfileCommands: () => h.query,
   useAgentProfileMutations: () => h.mutations,
 }));
 vi.mock('expo-router', () => ({
@@ -121,7 +121,7 @@ describe('ProfileCommandsScreen Back', () => {
   });
 
   it('saves the focused edit before the header Back leaves the screen', async () => {
-    h.query.data = testProfile(['git fetch']);
+    h.query.data = testCommands(['git fetch']);
     h.query.isPending = false;
     const pending = Promise.withResolvers<{ success: boolean }>();
     h.mutations.setCommands.mutateAsync.mockReturnValueOnce(pending.promise);
@@ -149,7 +149,7 @@ describe('ProfileCommandsScreen Back', () => {
   });
 
   it('does not write twice when a blur save is already in flight for Back', async () => {
-    h.query.data = testProfile(['a']);
+    h.query.data = testCommands(['a']);
     h.query.isPending = false;
     const pending = Promise.withResolvers<{ success: boolean }>();
     h.mutations.setCommands.mutateAsync.mockReturnValueOnce(pending.promise);
@@ -174,7 +174,7 @@ describe('ProfileCommandsScreen Back', () => {
   });
 
   it('keeps the screen and the draft when the Back save fails', async () => {
-    h.query.data = testProfile(['a']);
+    h.query.data = testCommands(['a']);
     h.query.isPending = false;
     const error = new Error('placeholder');
     error.message = '';
@@ -192,7 +192,7 @@ describe('ProfileCommandsScreen Back', () => {
   });
 
   it('sends the newest list after a pending save settles and leaves only then', async () => {
-    h.query.data = testProfile(['a']);
+    h.query.data = testCommands(['a']);
     h.query.isPending = false;
     const first = Promise.withResolvers<{ success: boolean }>();
     const second = Promise.withResolvers<{ success: boolean }>();
@@ -236,7 +236,7 @@ describe('ProfileCommandsScreen Back', () => {
   });
 
   it('saves an edit typed while the Back write is in flight before leaving', async () => {
-    h.query.data = testProfile(['a']);
+    h.query.data = testCommands(['a']);
     h.query.isPending = false;
     const first = Promise.withResolvers<{ success: boolean }>();
     const second = Promise.withResolvers<{ success: boolean }>();
@@ -272,7 +272,7 @@ describe('ProfileCommandsScreen Back', () => {
   });
 
   it('leaves without a write when Back only dismisses an empty draft row', async () => {
-    h.query.data = testProfile(['a']);
+    h.query.data = testCommands(['a']);
     h.query.isPending = false;
     const { renderer, unmount } = await mountScreen();
 
@@ -286,7 +286,7 @@ describe('ProfileCommandsScreen Back', () => {
   });
 
   it('does not number a blank draft row as a command', async () => {
-    h.query.data = testProfile(['a']);
+    h.query.data = testCommands(['a']);
     h.query.isPending = false;
     const { renderer, unmount } = await mountScreen();
     pressButton(renderer.root);
@@ -303,7 +303,7 @@ describe('ProfileCommandsScreen Back', () => {
   });
 
   it('arms the removal guard only while there is unsaved work or a write in flight', async () => {
-    h.query.data = testProfile(['a']);
+    h.query.data = testCommands(['a']);
     h.query.isPending = false;
     const pending = Promise.withResolvers<{ success: boolean }>();
     h.mutations.setCommands.mutateAsync.mockReturnValueOnce(pending.promise);
@@ -329,7 +329,7 @@ describe('ProfileCommandsScreen Back', () => {
   });
 
   it('saves the focused edit when a system back is blocked, then replays the leave', async () => {
-    h.query.data = testProfile(['git fetch']);
+    h.query.data = testCommands(['git fetch']);
     h.query.isPending = false;
     const pending = Promise.withResolvers<{ success: boolean }>();
     h.mutations.setCommands.mutateAsync.mockReturnValueOnce(pending.promise);
@@ -363,7 +363,7 @@ describe('ProfileCommandsScreen Back', () => {
   });
 
   it('keeps the screen and retries on the next system back when the save fails', async () => {
-    h.query.data = testProfile(['a']);
+    h.query.data = testCommands(['a']);
     h.query.isPending = false;
     const error = new Error('placeholder');
     error.message = '';

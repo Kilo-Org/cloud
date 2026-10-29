@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Izmaiņas",
-    "organizationTrialEnded": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Organizācijas īpašnieks var atjaunināt norēķinu informāciju vietnē kilo.ai un pēc tam mēģināt vēlreiz."
+    "organizationTrialEnded": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Organizācijas īpašnieks var atjaunināt norēķinu informāciju vietnē kilo.ai un pēc tam mēģināt vēlreiz.",
+    "privateRepositoryA11y": "{{name}}, privāts repozitorijs"
   },
   "language": {
     "restarting": "Notiek restartēšana, lai lietotu izvēlēto valodu",
@@ -1535,7 +1536,13 @@
         "change_request_failed": "Neizdevās atvērt PR",
         "superseded": "Jau ir pievienots"
       },
-      "noProposalsDescription": "Koda pārskatīšanas atmiņas priekšlikumi būs redzami šeit pēc tam, kad Kilo būs analizējis uzturētāju atbildes."
+      "noProposalsDescription": "Koda pārskatīšanas atmiņas priekšlikumi būs redzami šeit pēc tam, kad Kilo būs analizējis uzturētāju atbildes.",
+      "changeRequestInProgress": "Kilo jau atver PR šim priekšlikumam. Mēģini vēlreiz pēc brīža.",
+      "changeRequestNotActionable": "Šo priekšlikumu vairs nevar apstiprināt. Aizver to un atjauno sarakstu.",
+      "changeRequestNoGitHubAccess": "Nevienam GitHub savienojumam nav piekļuves šim repozitorijam. Pievieno GitHub no jauna ar piekļuvi tam un mēģini vēlreiz.",
+      "changeRequestMissingPermissions": "Kilo GitHub lietotne nevar atvērt PR šajā repozitorijā. Repozitorija īpašniekam ir jāpiešķir lietotnei rakstīšanas piekļuve saturam un PR, pēc tam mēģini vēlreiz.",
+      "changeRequestFailed": "Kilo neizdevās atvērt PR. Mēģini vēlreiz pēc brīža.",
+      "offAction": "Koda pārskatīšanas atmiņa ir izslēgta. Ieslēdz to, tad mēģini vēlreiz."
     },
     "manualReview": {
       "title": "Manuāla koda pārskatīšana",
@@ -3894,6 +3901,7 @@
     "skillSaveFailed": "Nevarēja saglabāt prasmi",
     "skillSourceCustom": "Pielāgots",
     "skillSourceMarketplace": "Tirgus",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Ielīmējiet failu SKILL.md, un tā nosaukums tiks aizpildīts; pievienojiet prasmi no sava tālruņa bez vilkšanas un nomešanas.",
     "skillEditTitle": "Rediģēt prasmi",
     "skillEdit": "Rediģēt prasmi {{name}}",
@@ -4002,7 +4010,6 @@
       "repo": "Atlasīt repozitoriju…",
       "profile": "Izvēlieties profilu",
       "remove": "Atsaistīt",
-      "private": "Privāts",
       "search": "Meklēt repozitorijās…",
       "addedToast": "Noklusējuma profils iestatīts uz \"{{repo}}\"",
       "addFailed": "Nevarēja iestatīt noklusējuma profilu",

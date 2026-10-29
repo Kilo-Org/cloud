@@ -1,4 +1,4 @@
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { Pressable, View } from 'react-native';
 
 import { Switch } from '@/components/ui/switch';
@@ -42,7 +42,7 @@ export function ToggleRow({
     if (disabled) {
       return;
     }
-    void Haptics.selectionAsync();
+    selectionHaptic();
     onValueChange(!value);
   };
 

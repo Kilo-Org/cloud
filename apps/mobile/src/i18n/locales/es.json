@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Cambios",
-    "organizationTrialEnded": "La prueba de la organización ha finalizado y no tiene ningún plan activo. El propietario de la organización puede actualizar la facturación en kilo.ai y, después, volver a intentarlo."
+    "organizationTrialEnded": "La prueba de la organización ha finalizado y no tiene ningún plan activo. El propietario de la organización puede actualizar la facturación en kilo.ai y, después, volver a intentarlo.",
+    "privateRepositoryA11y": "{{name}}, repositorio privado"
   },
   "language": {
     "restarting": "Reiniciando para aplicar el idioma",
@@ -1047,6 +1048,12 @@
         "superseded": "Ya existe"
       },
       "noProposalsDescription": "Las propuestas de la memoria de revisión aparecen aquí después de que Kilo analice las respuestas de los responsables del mantenimiento.",
+      "changeRequestInProgress": "Kilo ya está abriendo una pull request para esta propuesta. Inténtalo de nuevo en un momento.",
+      "changeRequestNotActionable": "Esta propuesta ya no se puede aprobar. Ciérrala y actualiza la lista.",
+      "changeRequestNoGitHubAccess": "Ninguna conexión de GitHub tiene acceso a este repositorio. Vuelve a conectar GitHub con acceso a él y luego inténtalo de nuevo.",
+      "changeRequestMissingPermissions": "La aplicación de GitHub de Kilo no puede abrir pull requests en este repositorio. Un propietario del repositorio debe dar a la aplicación acceso de escritura al contenido y a las pull requests, y luego inténtalo de nuevo.",
+      "changeRequestFailed": "Kilo no pudo abrir la pull request. Inténtalo de nuevo en un momento.",
+      "offAction": "La memoria de revisión está desactivada. Actívala y vuelve a intentarlo.",
       "off": "La memoria de revisión está desactivada.",
       "on": "La memoria de revisión está activada.",
       "offDescription": "Actívala para que Kilo aprenda de las respuestas de los responsables del mantenimiento y proponga directrices para REVIEW.md.",
@@ -3894,6 +3901,7 @@
     "skillSaveFailed": "No se pudo guardar la habilidad",
     "skillSourceCustom": "Personalizada",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Pegue un SKILL.md y su nombre se completará; agregue una habilidad desde su teléfono sin arrastrar y soltar.",
     "skillEditTitle": "Editar habilidad",
     "skillEdit": "Editar la habilidad {{name}}",
@@ -4002,7 +4010,6 @@
       "repo": "Seleccionar repositorio…",
       "profile": "Seleccionar perfil",
       "remove": "Desatar",
-      "private": "Privado",
       "search": "Buscar repositorios…",
       "addedToast": "Perfil predeterminado establecido para \"{{repo}}\"",
       "addFailed": "No se pudo establecer el perfil predeterminado",

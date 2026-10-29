@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "ለውጦች",
-    "organizationTrialEnded": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ንቁ ዕቅድም የለውም። የድርጅት ባለቤት በkilo.ai ላይ የክፍያ መረጃን ማዘመን ይችላል፣ ከዚያ እንደገና ይሞክሩ።"
+    "organizationTrialEnded": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ንቁ ዕቅድም የለውም። የድርጅት ባለቤት በkilo.ai ላይ የክፍያ መረጃን ማዘመን ይችላል፣ ከዚያ እንደገና ይሞክሩ።",
+    "privateRepositoryA11y": "{{name}}፣ የግል ማኅደር"
   },
   "language": {
     "restarting": "ቋንቋውን ለመቀየር እንደገና በመጀመር ላይ",
@@ -1513,7 +1514,13 @@
         "change_request_failed": "PR አልተሳካም",
         "superseded": "አስቀድሞ አለ"
       },
-      "noProposalsDescription": "Kilo የፕሮጀክት ተንከባካቢዎችን ምላሾች ከተነተነ በኋላ የግምገማ ትውስታ ያቀረባቸው ሐሳቦች እዚህ ይታያሉ።"
+      "noProposalsDescription": "Kilo የፕሮጀክት ተንከባካቢዎችን ምላሾች ከተነተነ በኋላ የግምገማ ትውስታ ያቀረባቸው ሐሳቦች እዚህ ይታያሉ።",
+      "changeRequestInProgress": "Kilo ለዚህ ሐሳብ አስቀድሞ pull request በመክፈት ላይ ነው። ከጥቂት ጊዜ በኋላ እንደገና ይሞክሩ።",
+      "changeRequestNotActionable": "ይህ ሐሳብ ከእንግዲህ ማጽደቅ አይቻልም። ይዘጉት እና ዝርዝሩን ያድሱ።",
+      "changeRequestNoGitHubAccess": "ማንኛውም የGitHub ግንኙነት ይህን ማከማቻ ማግኘት አይችልም። GitHubን የዚህ ማከማቻ መዳረሻ ይኖረው ዘንድ እንደገና ያገናኙ፣ ከዚያ እንደገና ይሞክሩ።",
+      "changeRequestMissingPermissions": "የKilo GitHub App በዚህ ማከማቻ ውስጥ pull request መክፈት አይችልም። የማከማቻ ባለቤት ለመተግበሪያው የይዘት እና pull request የመጻፍ መዳረሻ መስጠት አለበት፣ ከዚያ እንደገና ይሞክሩ።",
+      "changeRequestFailed": "Kilo pull request መክፈት አልቻለም። ከጥቂት ጊዜ በኋላ እንደገና ይሞክሩ።",
+      "offAction": "የግምገማ ትውስታ ተሰናክሏል። ያንቁት፣ ከዚያ እንደገና ይሞክሩ።"
     },
     "manualReview": {
       "title": "በተጠቃሚ የሚጀመር ግምገማ",
@@ -3844,6 +3851,7 @@
     "skillSaveFailed": "ችሎታ ማዳን አልተቻለም",
     "skillSourceCustom": "ብጁ",
     "skillSourceMarketplace": "መደብር",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "SKILL.md ይለጥፉ እና ስሙ ይሞላል; ሳይጎትቱ እና መጣል ሳይኖር ከስልክዎ ላይ ችሎታ ይጨምሩ።",
     "skillEditTitle": "ችሎታን ያርትዑ",
     "skillEdit": "ችሎታ {{name}} ያርትዑ",
@@ -3951,7 +3959,6 @@
       "repo": "ማከማቻ ምረጥ…",
       "profile": "መገለጫ ይምረጡ",
       "remove": "ንቀል",
-      "private": "የግል",
       "search": "ማከማቻዎችን ፈልግ…",
       "addedToast": "ለ\"{{repo}}\" ነባሪ መገለጫ ተቀናብሯል",
       "addFailed": "ነባሪ መገለጫ ማዘጋጀት አልተቻለም",

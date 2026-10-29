@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Breytingar",
-    "organizationTrialEnded": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun. Eigandi fyrirtækis getur uppfært greiðsluupplýsingar á kilo.ai og reynir síðan aftur."
+    "organizationTrialEnded": "Próftímabili fyrirtækisins er lokið og það er ekki með virka áætlun. Eigandi fyrirtækis getur uppfært greiðsluupplýsingar á kilo.ai og reynir síðan aftur.",
+    "privateRepositoryA11y": "{{name}}, einkakóðasafn"
   },
   "language": {
     "restarting": "Endurræsi til að virkja valið tungumál",
@@ -1513,7 +1514,13 @@
         "change_request_failed": "Ekki tókst að opna PR",
         "superseded": "Þegar til staðar"
       },
-      "noProposalsDescription": "Tillögur úr yfirferðarminninu birtast hér eftir að Kilo greinir svör viðhaldsaðila."
+      "noProposalsDescription": "Tillögur úr yfirferðarminninu birtast hér eftir að Kilo greinir svör viðhaldsaðila.",
+      "changeRequestInProgress": "Kilo er þegar að opna samrunabeiðni fyrir þessa tillögu. Reyndu aftur eftir smástund.",
+      "changeRequestNotActionable": "Ekki er lengur hægt að samþykkja þessa tillögu. Lokaðu henni og endurnýjaðu listann.",
+      "changeRequestNoGitHubAccess": "Engin GitHub-tenging hefur aðgang að þessu hugbúnaðarsafni. Tengdu GitHub aftur með aðgangi að því og reyndu svo aftur.",
+      "changeRequestMissingPermissions": "GitHub-app Kilo getur ekki opnað samrunabeiðnir í þessu hugbúnaðarsafni. Eigandi hugbúnaðarsafnsins verður að veita appinu skrifaðgang að efni og samrunabeiðnum og reyna svo aftur.",
+      "changeRequestFailed": "Kilo tókst ekki að opna samrunabeiðnina. Reyndu aftur eftir smástund.",
+      "offAction": "Slökkt er á yfirferðarminni. Kveiktu á því og reyndu aftur."
     },
     "manualReview": {
       "title": "Handvirk yfirferð",
@@ -3844,6 +3851,7 @@
     "skillSaveFailed": "Ekki tókst að bjarga kunnáttu",
     "skillSourceCustom": "Sérsniðið",
     "skillSourceMarketplace": "Markaður",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Límdu SKILL.md og nafn þess fyllir út; bættu við færni úr símanum þínum án þess að draga og sleppa.",
     "skillEditTitle": "Breyta færni",
     "skillEdit": "Breyta færni {{name}}",
@@ -3951,7 +3959,6 @@
       "repo": "Veldu geymslu…",
       "profile": "Veldu prófíl",
       "remove": "Afbinda",
-      "private": "Einkamál",
       "search": "Leita í geymslum...",
       "addedToast": "Sjálfgefið snið stillt fyrir „{{repo}}“",
       "addFailed": "Gat ekki stillt sjálfgefna prófíl",

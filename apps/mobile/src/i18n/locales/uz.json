@@ -148,7 +148,8 @@
     "durationMinuteShort": "daq",
     "durationHourShort": "soat",
     "changes": "O'zgarishlar",
-    "organizationTrialEnded": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Tashkilot egasi kilo.ai saytida hisob-kitobni yangilab, so'ng qayta urinib ko'rishi mumkin."
+    "organizationTrialEnded": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Tashkilot egasi kilo.ai saytida hisob-kitobni yangilab, so'ng qayta urinib ko'rishi mumkin.",
+    "privateRepositoryA11y": "{{name}}, shaxsiy repozitoriya"
   },
   "language": {
     "restarting": "Tilni qo'llash uchun qayta ishga tushirilmoqda",
@@ -1513,7 +1514,13 @@
         "change_request_failed": "PR ochilmadi",
         "superseded": "Allaqachon mavjud"
       },
-      "noProposalsDescription": "Kilo loyiha mas'ullarining javoblarini tahlil qilgach, ko'rib chiqish xotirasining takliflari shu yerda ko'rsatiladi."
+      "noProposalsDescription": "Kilo loyiha mas'ullarining javoblarini tahlil qilgach, ko'rib chiqish xotirasining takliflari shu yerda ko'rsatiladi.",
+      "changeRequestInProgress": "Kilo bu taklif uchun allaqachon pull request ochmoqda. Bir ozdan so'ng qayta urinib ko'ring.",
+      "changeRequestNotActionable": "Bu taklifni endi tasdiqlab bo'lmaydi. Uni yoping va ro'yxatni yangilang.",
+      "changeRequestNoGitHubAccess": "Hech bir GitHub ulanishi bu repozitoriyga kira olmaydi. GitHubni bu repozitoriyga kirish huquqi bilan qayta ulang, so'ng qayta urinib ko'ring.",
+      "changeRequestMissingPermissions": "Kilo'ning GitHub ilovasi bu repozitoriyada pull request ocholmaydi. Repozitoriya egasi ilovaga kontent va pull requestlar uchun yozish huquqini berishi kerak, so'ng qayta urinib ko'ring.",
+      "changeRequestFailed": "Kilo pull requestni ocholmadi. Bir ozdan so'ng qayta urinib ko'ring.",
+      "offAction": "Ko'rib chiqish xotirasi o'chiq. Uni yoqing, so'ng qayta urinib ko'ring."
     },
     "manualReview": {
       "title": "Qo'lda ko'rib chiqish",
@@ -3844,6 +3851,7 @@
     "skillSaveFailed": "Mahorat saqlanmadi",
     "skillSourceCustom": "Maxsus",
     "skillSourceMarketplace": "Bozor",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "SKILL.md-ni joylashtiring va uning nomi kiritiladi; sudrab tashlamasdan telefoningizdan mahorat qo'shing.",
     "skillEditTitle": "Tahrirlash mahorati",
     "skillEdit": "{{name}} koʻnikmasini tahrirlang",
@@ -3951,7 +3959,6 @@
       "repo": "Repozitoriyni tanlang…",
       "profile": "Profilni tanlang",
       "remove": "Bog'lash",
-      "private": "Shaxsiy",
       "search": "Repozitariylarni qidirish…",
       "addedToast": "“{{repo}}” uchun birlamchi profil oʻrnatilgan",
       "addFailed": "Standart profilni o‘rnatib bo‘lmadi",

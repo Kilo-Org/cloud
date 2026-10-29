@@ -43,8 +43,9 @@ function RepoPickerSkeleton() {
 
 /**
  * One repo option: a private/public lock, the full name, the provider badge and
- * a check on the selected row. The `accessibilityLabel` is the full name, so a
- * screen reader matches the row by the repository it picks.
+ * a check on the selected row. The accessible name is the full name — plus the
+ * localized privacy qualifier for a private row, because the lock is decorative
+ * and a screen reader would otherwise read both kinds of row the same way.
  */
 function RepoOptionRow({
   repo,
@@ -57,17 +58,23 @@ function RepoOptionRow({
     <Pressable
       className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-2 px-4 active:opacity-70')}
       accessibilityRole="button"
-      accessibilityLabel={repo.fullName}
+      accessibilityLabel={
+        repo.private ? t('common.privateRepositoryA11y', { name: repo.fullName }) : repo.fullName
+      }
       accessibilityState={{ selected: isSelected }}
       onPress={onSelect}
     >
-      {repo.private ? (
-        <View accessibilityLabel={t('profiles.repoBindings.private')}>
+      <View
+        className="shrink-0"
+        accessibilityElementsHidden
+        importantForAccessibility="no-hide-descendants"
+      >
+        {repo.private ? (
           <Lock size={14} color={colors.mutedForeground} />
-        </View>
-      ) : (
-        <Unlock size={14} color={colors.mutedForeground} />
-      )}
+        ) : (
+          <Unlock size={14} color={colors.mutedForeground} />
+        )}
+      </View>
       <Text variant="mono" className="min-w-0 flex-1 text-xs" numberOfLines={1}>
         {repo.fullName}
       </Text>

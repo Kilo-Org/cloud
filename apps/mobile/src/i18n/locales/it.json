@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Modifiche",
-    "organizationTrialEnded": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Il proprietario dell'organizzazione può aggiornare la fatturazione su kilo.ai, poi riprova."
+    "organizationTrialEnded": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Il proprietario dell'organizzazione può aggiornare la fatturazione su kilo.ai, poi riprova.",
+    "privateRepositoryA11y": "{{name}}, repository privato"
   },
   "language": {
     "restarting": "Riavvio per applicare la lingua selezionata",
@@ -1015,6 +1016,12 @@
         "superseded": "Già presente"
       },
       "noProposalsDescription": "Le proposte della memoria di revisione compaiono qui dopo che Kilo ha analizzato le risposte dei responsabili del progetto.",
+      "changeRequestInProgress": "Kilo sta già aprendo una pull request per questa proposta. Riprova tra un momento.",
+      "changeRequestNotActionable": "Questa proposta non può più essere approvata. Chiudila e aggiorna l'elenco.",
+      "changeRequestNoGitHubAccess": "Nessuna connessione GitHub ha accesso a questo repository. Riconnetti GitHub con accesso al repository, poi riprova.",
+      "changeRequestMissingPermissions": "L'app GitHub di Kilo non può aprire pull request in questo repository. Un proprietario del repository deve concedere all'app l'accesso in scrittura ai contenuti e alle pull request, poi riprova.",
+      "changeRequestFailed": "Kilo non è riuscito ad aprire la pull request. Riprova tra un momento.",
+      "offAction": "La memoria di revisione è disattivata. Attivala, poi riprova.",
       "off": "La memoria di revisione è disattivata.",
       "on": "La memoria di revisione è attivata.",
       "offDescription": "Attivala per consentire a Kilo di imparare dalle risposte dei responsabili del progetto e proporre indicazioni per REVIEW.md.",
@@ -3894,6 +3901,7 @@
     "skillSaveFailed": "Impossibile salvare l'abilità",
     "skillSourceCustom": "Personalizzata",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Incolla un SKILL.md e il suo nome si riempie; aggiungi un'abilità dal tuo telefono senza trascinare e rilasciare.",
     "skillEditTitle": "Modifica abilità",
     "skillEdit": "Modifica l'abilità {{name}}",
@@ -4002,7 +4010,6 @@
       "repo": "Seleziona archivio...",
       "profile": "Seleziona profilo",
       "remove": "Slegare",
-      "private": "Privato",
       "search": "Cerca repository...",
       "addedToast": "Profilo predefinito impostato per \"{{repo}}\"",
       "addFailed": "Impossibile impostare il profilo predefinito",

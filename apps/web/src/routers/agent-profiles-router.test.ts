@@ -8,6 +8,7 @@ import {
   agent_environment_profiles,
   agent_environment_profile_vars,
   agent_environment_profile_commands,
+  agent_environment_profile_agents,
   agent_environment_profile_repo_bindings,
   cloud_agent_webhook_triggers,
 } from '@kilocode/db/schema';
@@ -417,6 +418,104 @@ describe('Agent Profiles Router', () => {
           'Profile not found'
         );
       });
+    });
+
+    describe('section reads', () => {
+      test('vars returns the masked list for the profile alone', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'Vars Profile' });
+        await caller.agentProfiles.setVar({
+          profileId,
+          key: 'PLAIN',
+          value: 'visible',
+          isSecret: false,
+        });
+        await caller.agentProfiles.setVar({
+          profileId,
+          key: 'SECRET',
+          value: 'hidden',
+          isSecret: true,
+        });
+        await caller.agentProfiles.setCommands({ profileId, commands: ['npm ci'] });
+
+        const vars = await caller.agentProfiles.vars({ profileId });
+
+        expect(vars.map(variable => variable.key)).toEqual(['PLAIN', 'SECRET']);
+        expect(vars.find(variable => variable.key === 'PLAIN')?.value).toBe('visible');
+        expect(vars.find(variable => variable.key === 'SECRET')?.value).toBe('***');
+      });
+
+      test.each(['vars', 'commands', 'mcpServers', 'skills', 'kiloCommands'] as const)(
+        '%s keeps answering when another collection holds a row the whole-profile read refuses',
+        async procedure => {
+          const caller = await createCallerForUser(ownerUser.id);
+          const { id: profileId } = await caller.agentProfiles.create({ name: 'Mixed Profile' });
+          await caller.agentProfiles.setVar({
+            profileId,
+            key: 'API_BASE',
+            value: 'http://localhost:3000',
+            isSecret: false,
+          });
+          // An agent config the response contract rejects (a variant is
+          // model-specific). It is not part of any other collection's read.
+          await db.insert(agent_environment_profile_agents).values({
+            profile_id: profileId,
+            slug: 'legacy',
+            name: 'Legacy',
+            config: { variant: 'fast' },
+          });
+
+          await expect(caller.agentProfiles.get({ profileId })).rejects.toThrow();
+
+          const result = await caller.agentProfiles[procedure]({ profileId });
+          expect(Array.isArray(result)).toBe(true);
+        }
+      );
+
+      test('vars lists six variables including secrets', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'Full Profile' });
+        const keys = ['ALPHA', 'BETA', 'GAMMA', 'DELTA', 'EPSILON', 'ZETA'];
+        for (const [index, key] of keys.entries()) {
+          await caller.agentProfiles.setVar({
+            profileId,
+            key,
+            value: `value-${String(index)}`,
+            isSecret: index % 2 === 1,
+          });
+        }
+
+        const vars = await caller.agentProfiles.vars({ profileId });
+
+        expect(vars).toHaveLength(keys.length);
+        expect(
+          vars.map(variable => ({
+            key: variable.key,
+            value: variable.value,
+            isSecret: variable.isSecret,
+          }))
+        ).toEqual([
+          { key: 'ALPHA', value: 'value-0', isSecret: false },
+          { key: 'BETA', value: '***', isSecret: true },
+          { key: 'DELTA', value: '***', isSecret: true },
+          { key: 'EPSILON', value: 'value-4', isSecret: false },
+          { key: 'GAMMA', value: 'value-2', isSecret: false },
+          { key: 'ZETA', value: '***', isSecret: true },
+        ]);
+      });
+
+      test.each(['vars', 'commands', 'mcpServers', 'skills', 'kiloCommands'] as const)(
+        '%s refuses another user profile',
+        async procedure => {
+          const callerA = await createCallerForUser(ownerUser.id);
+          const callerB = await createCallerForUser(otherUser.id);
+          const { id: profileId } = await callerA.agentProfiles.create({ name: 'Private' });
+
+          await expect(callerB.agentProfiles[procedure]({ profileId })).rejects.toThrow(
+            'Profile not found'
+          );
+        }
+      );
     });
 
     describe('update', () => {

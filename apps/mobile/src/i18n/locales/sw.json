@@ -148,7 +148,8 @@
     "durationMinuteShort": "dk",
     "durationHourShort": "saa",
     "changes": "Mabadiliko",
-    "organizationTrialEnded": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Mmiliki wa shirika anaweza kusasisha malipo kwenye kilo.ai, kisha ajaribu tena."
+    "organizationTrialEnded": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Mmiliki wa shirika anaweza kusasisha malipo kwenye kilo.ai, kisha ajaribu tena.",
+    "privateRepositoryA11y": "{{name}}, hazina ya kibinafsi"
   },
   "language": {
     "restarting": "Programu inaanza upya ili kutumia lugha",
@@ -1513,7 +1514,13 @@
         "change_request_failed": "PR imeshindikana",
         "superseded": "Tayari upo"
       },
-      "noProposalsDescription": "Mapendekezo ya kumbukumbu ya ukaguzi yataonekana hapa baada ya Kilo kuchambua majibu ya watunzaji wa mradi."
+      "noProposalsDescription": "Mapendekezo ya kumbukumbu ya ukaguzi yataonekana hapa baada ya Kilo kuchambua majibu ya watunzaji wa mradi.",
+      "changeRequestInProgress": "Kilo tayari inafungua ombi la kuunganisha mabadiliko kwa pendekezo hili. Jaribu tena baada ya muda mfupi.",
+      "changeRequestNotActionable": "Pendekezo hili haliwezi kuidhinishwa tena. Lifunge na uonyeshe upya orodha.",
+      "changeRequestNoGitHubAccess": "Hakuna muunganisho wa GitHub wenye ufikiaji wa hazina hii. Unganisha tena GitHub yenye ufikiaji wake, kisha ujaribu tena.",
+      "changeRequestMissingPermissions": "Programu ya GitHub ya Kilo haiwezi kufungua maombi ya kuunganisha mabadiliko kwenye hazina hii. Mmiliki wa hazina lazima aipe programu ruhusa ya kuandika maudhui na maombi ya kuunganisha mabadiliko, kisha ujaribu tena.",
+      "changeRequestFailed": "Kilo imeshindikana kufungua ombi la kuunganisha mabadiliko. Jaribu tena baada ya muda mfupi.",
+      "offAction": "Kumbukumbu ya ukaguzi imezimwa. Iwashe, kisha jaribu tena."
     },
     "manualReview": {
       "title": "Ukaguzi unaoanzishwa na mtumiaji",
@@ -3844,6 +3851,7 @@
     "skillSaveFailed": "Haikuweza kuhifadhi ujuzi",
     "skillSourceCustom": "Maalum",
     "skillSourceMarketplace": "Soko",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Bandika SKILL.md na jina lake lijazwe; ongeza ujuzi kutoka kwa simu yako bila kuburuta na kuangusha.",
     "skillEditTitle": "Hariri ujuzi",
     "skillEdit": "Hariri ujuzi {{name}}",
@@ -3951,7 +3959,6 @@
       "repo": "Chagua hazina...",
       "profile": "Chagua wasifu",
       "remove": "Tendua",
-      "private": "Privat",
       "search": "Tafuta hazina...",
       "addedToast": "Wasifu chaguomsingi umewekwa kwa ajili ya \"{{repo}}\"",
       "addFailed": "Haikuweza kuweka wasifu chaguomsingi",

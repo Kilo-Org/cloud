@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Canvis",
-    "organizationTrialEnded": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. El propietari de l'organització pot actualitzar la facturació a kilo.ai i tornar-ho a provar."
+    "organizationTrialEnded": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. El propietari de l'organització pot actualitzar la facturació a kilo.ai i tornar-ho a provar.",
+    "privateRepositoryA11y": "{{name}}, repositori privat"
   },
   "language": {
     "restarting": "S'està reiniciant per aplicar l'idioma",
@@ -1535,7 +1536,13 @@
         "change_request_failed": "La PR ha fallat",
         "superseded": "Ja hi és"
       },
-      "noProposalsDescription": "Les propostes de la memòria de revisió apareixeran aquí quan Kilo hagi analitzat les respostes dels mantenidors."
+      "noProposalsDescription": "Les propostes de la memòria de revisió apareixeran aquí quan Kilo hagi analitzat les respostes dels mantenidors.",
+      "changeRequestInProgress": "Kilo ja està obrint una pull request per a aquesta proposta. Torna-ho a provar d'aquí a un moment.",
+      "changeRequestNotActionable": "Aquesta proposta ja no es pot aprovar. Tanca-la i actualitza la llista.",
+      "changeRequestNoGitHubAccess": "Cap connexió de GitHub té accés a aquest repositori. Torna a connectar GitHub amb accés a aquest repositori i torna-ho a provar.",
+      "changeRequestMissingPermissions": "L'aplicació GitHub de Kilo no pot obrir pull requests en aquest repositori. Un propietari del repositori ha de donar a l'aplicació accés d'escriptura als continguts i a les pull requests, i després tornar-ho a provar.",
+      "changeRequestFailed": "Kilo no ha pogut obrir la pull request. Torna-ho a provar d'aquí a un moment.",
+      "offAction": "La memòria de revisió està desactivada. Activa-la i torna-ho a provar."
     },
     "manualReview": {
       "title": "Revisió manual",
@@ -3894,6 +3901,7 @@
     "skillSaveFailed": "No s'ha pogut estalviar l'habilitat",
     "skillSourceCustom": "Personalitzada",
     "skillSourceMarketplace": "Mercat",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Enganxeu un SKILL.md i el seu nom s'omple; afegeix una habilitat des del teu telèfon sense arrossegar i deixar anar.",
     "skillEditTitle": "Edita l'habilitat",
     "skillEdit": "Edita l'habilitat {{name}}",
@@ -4002,7 +4010,6 @@
       "repo": "Seleccioneu el repositori...",
       "profile": "Seleccioneu el perfil",
       "remove": "Desvincular",
-      "private": "Privat",
       "search": "Cerca repositoris...",
       "addedToast": "Perfil predeterminat definit per a \"{{repo}}\"",
       "addFailed": "No s'ha pogut establir el perfil predeterminat",

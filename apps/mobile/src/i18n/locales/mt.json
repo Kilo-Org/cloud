@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Bidliet",
-    "organizationTrialEnded": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Sid l-organizzazzjoni jista' jaġġorna l-fatturazzjoni fuq kilo.ai, imbagħad jerġa' jipprova."
+    "organizationTrialEnded": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Sid l-organizzazzjoni jista' jaġġorna l-fatturazzjoni fuq kilo.ai, imbagħad jerġa' jipprova.",
+    "privateRepositoryA11y": "{{name}}, repositorju privat"
   },
   "language": {
     "restarting": "L-app qed terġa' tibda biex tapplika l-lingwa",
@@ -1579,7 +1580,13 @@
         "change_request_failed": "Il-PR falliet",
         "superseded": "Diġà preżenti"
       },
-      "noProposalsDescription": "Il-proposti tal-memorja tar-reviżjoni jidhru hawn wara li Kilo janalizza t-tweġibiet tal-manutenturi."
+      "noProposalsDescription": "Il-proposti tal-memorja tar-reviżjoni jidhru hawn wara li Kilo janalizza t-tweġibiet tal-manutenturi.",
+      "changeRequestInProgress": "Kilo diġà qed jiftaħ pull request għal din il-proposta. Erġa' pprova fi ftit mument.",
+      "changeRequestNotActionable": "Din il-proposta ma tistax tiġi approvata aktar. Agħlaqha u aġġorna l-lista.",
+      "changeRequestNoGitHubAccess": "L-ebda konnessjoni ta' GitHub m'għandha aċċess għal dan ir-repożitorju. Erġa' qabbad GitHub b'aċċess għalih, imbagħad erġa' pprova.",
+      "changeRequestMissingPermissions": "L-App GitHub ta' Kilo ma tistax tiftaħ pull requests f'dan ir-repożitorju. Sid ir-repożitorju jrid jagħti lill-app aċċess tal-kitba għall-kontenut u l-pull requests, imbagħad erġa' pprova.",
+      "changeRequestFailed": "Kilo ma setax jiftaħ il-pull request. Erġa' pprova fi ftit mument.",
+      "offAction": "Il-memorja tar-reviżjoni hija diżattivata. Attivaha, mbagħad erġa' pprova."
     },
     "manualReview": {
       "title": "Reviżjoni manwali",
@@ -3994,6 +4001,7 @@
     "skillSaveFailed": "Ma setgħetx tiffranka l-ħiliet",
     "skillSourceCustom": "Personalizzat",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Pasta SKILL.md u isimha jimla; żid ħila mit-telefon tiegħek mingħajr drag and drop.",
     "skillEditTitle": "Edit ħiliet",
     "skillEdit": "Edit il-ħila {{name}}",
@@ -4104,7 +4112,6 @@
       "repo": "Agħżel repożitorju...",
       "profile": "Agħżel il-profil",
       "remove": "Ħoll",
-      "private": "Privat",
       "search": "Fittex repożitorji...",
       "addedToast": "Profil default issettjat għal \"{{repo}}\"",
       "addFailed": "Ma setax jissettja l-profil default",

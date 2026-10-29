@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Cambios",
-    "organizationTrialEnded": "O período de proba da organización rematou e non ten ningún plan activo. Un propietario da organización pode actualizar a facturación en kilo.ai e despois tentalo de novo."
+    "organizationTrialEnded": "O período de proba da organización rematou e non ten ningún plan activo. Un propietario da organización pode actualizar a facturación en kilo.ai e despois tentalo de novo.",
+    "privateRepositoryA11y": "{{name}}, repositorio privado"
   },
   "language": {
     "restarting": "Reiniciando para aplicar o idioma",
@@ -1513,7 +1514,13 @@
         "change_request_failed": "Erro ao abrir a PR",
         "superseded": "Xa existe"
       },
-      "noProposalsDescription": "As propostas da memoria de revisión aparecerán aquí despois de que Kilo analice as respostas dos responsables do mantemento."
+      "noProposalsDescription": "As propostas da memoria de revisión aparecerán aquí despois de que Kilo analice as respostas dos responsables do mantemento.",
+      "changeRequestInProgress": "Kilo xa está a abrir unha solicitude de incorporación para esta proposta. Téntao de novo dentro dun intre.",
+      "changeRequestNotActionable": "Xa non se pode aprobar esta proposta. Péchaa e actualiza a lista.",
+      "changeRequestNoGitHubAccess": "Ningunha conexión de GitHub ten acceso a este repositorio. Volve conectar GitHub cunha conta que teña acceso a el e téntao de novo.",
+      "changeRequestMissingPermissions": "A aplicación de GitHub de Kilo non pode abrir solicitudes de incorporación neste repositorio. Un propietario do repositorio debe darlle á aplicación permiso de escritura sobre os contidos e as solicitudes de incorporación e, despois, téntao de novo.",
+      "changeRequestFailed": "Kilo non puido abrir a solicitude de incorporación. Téntao de novo dentro dun intre.",
+      "offAction": "A memoria de revisión está desactivada. Actívaa e téntao de novo."
     },
     "manualReview": {
       "title": "Revisión manual",
@@ -3844,6 +3851,7 @@
     "skillSaveFailed": "Non se puido gardar a habilidade",
     "skillSourceCustom": "Personalizada",
     "skillSourceMarketplace": "Mercado",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Pega un SKILL.md e o seu nome énchese; engade unha habilidade desde o teu teléfono sen arrastrar e soltar.",
     "skillEditTitle": "Editar habilidade",
     "skillEdit": "Editar habilidade {{name}}",
@@ -3951,7 +3959,6 @@
       "repo": "Seleccionar repositorio...",
       "profile": "Seleccione o perfil",
       "remove": "Desvincular",
-      "private": "Privado",
       "search": "Buscar repositorios...",
       "addedToast": "Perfil predeterminado definido para \"{{repo}}\"",
       "addFailed": "Non se puido establecer o perfil predeterminado",

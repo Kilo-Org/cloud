@@ -15,6 +15,7 @@ import { DiscussionThread } from '@/components/pr-review/discussion/discussion-t
 import { Button } from '@/components/ui/button';
 import { MessageSquarePlus } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { commentAuthorRowTopPadding } from '@/lib/pr-review/comment-trailing-controls';
 import {
   type DiscussionListItem,
@@ -326,6 +327,7 @@ function ListFooter({
         <Button
           size="sm"
           variant="outline"
+          className={STATE_ACTION_CLASS}
           onPress={onRetryLoadMore}
           accessibilityLabel={t('prReview.discussion.retryLoadingMore')}
         >

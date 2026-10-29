@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Canje-canje",
-    "organizationTrialEnded": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Mai mallakar ƙungiyar zai iya sabunta lissafin kuɗi a kilo.ai, sannan ya sake gwadawa."
+    "organizationTrialEnded": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Mai mallakar ƙungiyar zai iya sabunta lissafin kuɗi a kilo.ai, sannan ya sake gwadawa.",
+    "privateRepositoryA11y": "{{name}}, ma'ajiya na sirri"
   },
   "language": {
     "restarting": "Ana sake kunnawa don amfani da harshen da aka zaɓa",
@@ -1513,7 +1514,13 @@
         "change_request_failed": "An kasa buɗe PR",
         "superseded": "Ya riga ya kasance"
       },
-      "noProposalsDescription": "Shawarwarin ƙwaƙwalwar bita suna bayyana a nan bayan Kilo ya nazarci amsoshin masu kula da shirin."
+      "noProposalsDescription": "Shawarwarin ƙwaƙwalwar bita suna bayyana a nan bayan Kilo ya nazarci amsoshin masu kula da shirin.",
+      "changeRequestInProgress": "Kilo yana buɗe pull request don wannan shawara. Sake gwadawa nan da ɗan lokaci.",
+      "changeRequestNotActionable": "Ba za a iya amincewa da wannan shawara ba kuma. Rufe ta ka sabunta jerin.",
+      "changeRequestNoGitHubAccess": "Babu haɗin GitHub da ke da damar shiga wannan ajiya. Sake haɗa GitHub da ke da damar shiga ta, sannan sake gwadawa.",
+      "changeRequestMissingPermissions": "Aplikashin GitHub na Kilo ba zai iya buɗe pull request a cikin wannan ajiya ba. Dole mai ajiyar ya ba app ɗin damar rubutu ga abubuwan ciki da pull request, sannan sake gwadawa.",
+      "changeRequestFailed": "Kilo ya kasa buɗe pull request ɗin. Sake gwadawa nan da ɗan lokaci.",
+      "offAction": "An kashe ƙwaƙwalwar bita. Kunna ta, sannan sake gwadawa."
     },
     "manualReview": {
       "title": "Bita da hannu",
@@ -3844,6 +3851,7 @@
     "skillSaveFailed": "An kasa ajiye fasaha",
     "skillSourceCustom": "Al'ada",
     "skillSourceMarketplace": "Kasuwa",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Manna SKILL.md kuma sunansa ya cika; ƙara fasaha daga wayarka ba tare da ja da sauke ba.",
     "skillEditTitle": "Gyara fasaha",
     "skillEdit": "Gyara fasaha {{name}}",
@@ -3951,7 +3959,6 @@
       "repo": "Zaɓi wurin ajiya…",
       "profile": "Zaɓi bayanin martaba",
       "remove": "Cire daurin",
-      "private": "Na sirri",
       "search": "Bincika wuraren ajiya…",
       "addedToast": "An saita tsoffin bayanan martaba don \"{{repo}}\"",
       "addFailed": "An kasa saita bayanan martaba na asali",

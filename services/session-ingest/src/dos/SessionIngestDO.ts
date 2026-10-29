@@ -54,9 +54,11 @@ import {
   extractStatusTransitionIdFromItem,
 } from './session-ingest-extractors';
 import {
+  assistantExcerptIsComplete,
   attentionKindForNeedsInputStatus,
   buildAssistantExcerpt,
   completedAssistantMessageIdFromItemData,
+  extractTextFromPartItemData,
   isCompletedStatus,
   isNeedsInputStatus,
   type AttentionSignal,
@@ -367,9 +369,6 @@ export type IngestResult =
   | { accepted: false; reason: 'deleted'; changes: never[] };
 /** How many of the newest message rows to inspect when pairing an idle transition with the assistant turn that just finished. */
 const COMPLETED_MESSAGE_SCAN_LIMIT = 50;
-
-/** Part rows read per batch when building the excerpt a completed turn's push carries. */
-const EXCERPT_PART_BATCH_SIZE = 256;
 
 type PartExcerptRow = {
   id: number;
@@ -1392,15 +1391,30 @@ export class SessionIngestDO extends DurableObject<Env> {
     return buildBriefingExcerpt(latestMessage, parts);
   }
 
-  /** Builds a text excerpt for a completed assistant message from its already-ingested text parts. */
+  /**
+   * Builds a text excerpt for a completed assistant message from its already-ingested text parts.
+   *
+   * This runs inside the status-change ingest request, so it is bounded like
+   * `latestBriefingExcerpt`: at most `BRIEFING_MAX_EXCERPT_SOURCE_ROWS` text-part rows and
+   * `BRIEFING_MAX_INLINE_BYTES` of text, and it stops as soon as the excerpt is complete. A
+   * message may hold an arbitrary number of parts, and the push only ever shows the start of its
+   * text, so a capped read still returns the excerpt of the text read so far: the caps drop only
+   * text the snippet would not have shown.
+   */
   private buildAssistantExcerptForMessage(messageId: string): string {
-    const itemDataRows: string[] = [];
+    const encoder = new TextEncoder();
+    let fetchedRows = 0;
+    let consumedRows = 0;
+    let textBytes = 0;
+    let text = '';
     for (const row of streamMessagePartRows<PartExcerptRow>({
       messageId,
       order: 'ingest',
-      batchSize: EXCERPT_PART_BATCH_SIZE,
-      fetchPage: (range, after, limit) =>
-        this.db
+      batchSize: BRIEFING_MAX_EXCERPT_SOURCE_ROWS + 1,
+      fetchPage: (range, after, limit) => {
+        const remaining = BRIEFING_MAX_EXCERPT_SOURCE_ROWS + 1 - fetchedRows;
+        if (remaining <= 0) return [];
+        const rows = this.db
           .select({
             id: ingestItems.id,
             ingested_at: ingestItems.ingested_at,
@@ -1413,22 +1427,33 @@ export class SessionIngestDO extends DurableObject<Env> {
               eq(ingestItems.item_type, 'part'),
               gte(ingestItems.item_id, range.start),
               lt(ingestItems.item_id, range.end),
+              // Parts offloaded to R2 (oversized items) store '{}' inline; skip them rather than
+              // fetching from R2 — this is a best-effort excerpt, not a full transcript.
               isNull(ingestItems.item_data_r2_key),
+              // Only text parts carry excerpt text. Filtering them in SQL keeps every other part
+              // body (tool arguments, tool output) out of the row cap and out of the DO's memory.
+              sql`json_extract(${ingestItems.item_data}, '$.type') = 'text'`,
               after
                 ? afterIngestOrderCursor({ ingestedAt: after.ingested_at, id: after.id })
                 : undefined
             )
           )
           .orderBy(ingestItems.ingested_at, ingestItems.id)
-          .limit(limit)
-          .all(),
+          .limit(Math.min(limit, remaining))
+          .all();
+        fetchedRows += rows.length;
+        return rows;
+      },
     })) {
-      itemDataRows.push(row.item_data);
+      if (++consumedRows > BRIEFING_MAX_EXCERPT_SOURCE_ROWS) break;
+      const partText = extractTextFromPartItemData(row.item_data);
+      if (!partText) continue;
+      text += partText;
+      textBytes += encoder.encode(partText).byteLength;
+      if (textBytes >= BRIEFING_MAX_INLINE_BYTES || assistantExcerptIsComplete(text)) break;
     }
 
-    // Parts offloaded to R2 (oversized items) store '{}' inline; skip them rather
-    // than fetching from R2 — this is a best-effort excerpt, not a full transcript.
-    return buildAssistantExcerpt(itemDataRows);
+    return buildAssistantExcerpt([text]);
   }
 
   /**

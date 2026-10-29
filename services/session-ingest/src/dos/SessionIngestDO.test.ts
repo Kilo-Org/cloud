@@ -34,6 +34,7 @@ vi.mock('@kilocode/db/client', () => ({
 
 import { SessionIngestDO, ingestOrderCursor } from './SessionIngestDO';
 import { ingestItems, ingestMeta } from '../db/sqlite-schema';
+import { BRIEFING_MAX_EXCERPT_SOURCE_ROWS } from '../ingest/briefing-excerpt';
 import { INACTIVITY_TIMEOUT_MS, POST_CLOSE_DRAIN_MS } from './session-metrics';
 
 describe('SessionIngestDO ingest ordering', () => {
@@ -1455,6 +1456,134 @@ describe('SessionIngestDO live activity + cost persist', () => {
     await harness.settle();
     expect(harness.pgCallCount).toBe(0);
     expect(harness.r2Get).not.toHaveBeenCalled();
+  });
+
+  it('builds the excerpt from at most the source-row limit', async () => {
+    const harness = makeLiveHarness({ seedMeta: { status: 'busy' } });
+    await harness.durableObject.ingest(
+      [
+        ...Array.from({ length: 200 }, (_, index) => ({
+          type: 'part' as const,
+          data: { id: `text-${index}`, messageID: 'final', type: 'text', text: 'x' },
+        })),
+        {
+          type: 'message' as const,
+          data: { id: 'final', role: 'assistant', time: { created: 1, completed: 2 } },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      10_000
+    );
+    await harness.settle();
+    const rowsBeforeIdle = harness.partRowsRead;
+
+    const result = await harness.durableObject.ingest(
+      [{ type: 'session_status', data: { status: 'idle' } }],
+      'usr_live',
+      'ses_live',
+      1,
+      20_000
+    );
+    await harness.settle();
+
+    expect(result).toMatchObject({
+      accepted: true,
+      attentionSignals: [
+        {
+          signalId: 'final',
+          kind: 'completed',
+          messageExcerpt: 'x'.repeat(BRIEFING_MAX_EXCERPT_SOURCE_ROWS),
+        },
+      ],
+    });
+    expect(harness.partRowsRead - rowsBeforeIdle).toBeLessThanOrEqual(
+      BRIEFING_MAX_EXCERPT_SOURCE_ROWS + 1
+    );
+  });
+
+  it('limits the excerpt read to a text byte budget', async () => {
+    const harness = makeLiveHarness({ seedMeta: { status: 'busy' } });
+    await harness.durableObject.ingest(
+      [
+        ...Array.from({ length: 40 }, (_, index) => ({
+          type: 'part' as const,
+          data: { id: `blank-${index}`, messageID: 'final', type: 'text', text: ' '.repeat(1000) },
+        })),
+        {
+          type: 'message' as const,
+          data: { id: 'final', role: 'assistant', time: { created: 1, completed: 2 } },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      10_000
+    );
+    await harness.settle();
+    const rowsBeforeIdle = harness.partRowsRead;
+
+    const result = await harness.durableObject.ingest(
+      [{ type: 'session_status', data: { status: 'idle' } }],
+      'usr_live',
+      'ses_live',
+      1,
+      20_000
+    );
+    await harness.settle();
+
+    expect(result).toMatchObject({
+      accepted: true,
+      attentionSignals: [{ signalId: 'final', kind: 'completed', messageExcerpt: '' }],
+    });
+    expect(harness.partRowsRead - rowsBeforeIdle).toBeLessThanOrEqual(
+      BRIEFING_MAX_EXCERPT_SOURCE_ROWS + 1
+    );
+  });
+
+  it('keeps the snippet of a large single text part', async () => {
+    const harness = makeLiveHarness({ seedMeta: { status: 'busy' } });
+    await harness.durableObject.ingest(
+      [
+        {
+          type: 'part',
+          data: {
+            id: 'long-text',
+            messageID: 'final',
+            type: 'text',
+            text: `${'z'.repeat(20_000)} tail`,
+          },
+        },
+        {
+          type: 'message',
+          data: { id: 'final', role: 'assistant', time: { created: 1, completed: 2 } },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      10_000
+    );
+    await harness.settle();
+    const rowsBeforeIdle = harness.partRowsRead;
+
+    const result = await harness.durableObject.ingest(
+      [{ type: 'session_status', data: { status: 'idle' } }],
+      'usr_live',
+      'ses_live',
+      1,
+      20_000
+    );
+    await harness.settle();
+
+    expect(result).toMatchObject({
+      accepted: true,
+      attentionSignals: [
+        { signalId: 'final', kind: 'completed', messageExcerpt: `${'z'.repeat(97)}...` },
+      ],
+    });
+    expect(harness.partRowsRead - rowsBeforeIdle).toBe(1);
   });
 
   it('does not reuse a prior producer timestamp for a legacy status transition', async () => {

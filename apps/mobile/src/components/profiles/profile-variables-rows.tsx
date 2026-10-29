@@ -16,7 +16,7 @@ import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { cleanVariableKey } from '@/lib/agent-profile-forms';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 /** Content-shaped rows in the same slot and height as a loaded variable row. */
@@ -264,7 +264,10 @@ export function VariableEditForm({
       />
       {isSecret ? (
         <Pressable
-          className="min-h-11 flex-row items-center gap-2 self-start px-1 active:opacity-70"
+          className={cn(
+            ROW_TARGET_CLASS,
+            'flex-row items-center gap-2 self-start px-1 active:opacity-70'
+          )}
           accessibilityRole="button"
           accessibilityLabel={t('profiles.secrets.reveal')}
           accessibilityState={{ selected: revealed }}
@@ -280,7 +283,9 @@ export function VariableEditForm({
           <Text className="text-sm text-muted-foreground">{t('profiles.secrets.reveal')}</Text>
         </Pressable>
       ) : null}
-      <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
+      <View
+        className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 rounded-lg bg-secondary p-3')}
+      >
         <Lock size={18} color={colors.secondaryForeground} />
         <Text className="flex-1 text-sm font-medium text-foreground">
           {t('profiles.secrets.markSecret')}

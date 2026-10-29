@@ -10,6 +10,8 @@ import { SheetHeader } from '@/components/sheet-header';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { type AgentProfileListItem } from '@/lib/hooks/use-agent-profiles';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 
 type ProfilePickerSheetProps = Readonly<{
   profiles: readonly AgentProfileListItem[];
@@ -68,7 +70,7 @@ export function ProfilePickerSheet({
     body = profiles.map(profile => (
       <Pressable
         key={profile.id}
-        className="min-h-11 flex-row items-center gap-2 px-4 active:opacity-70"
+        className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-2 px-4 active:opacity-70')}
         accessibilityRole="button"
         accessibilityLabel={profile.name}
         accessibilityState={{ selected: profile.id === selectedProfileId }}

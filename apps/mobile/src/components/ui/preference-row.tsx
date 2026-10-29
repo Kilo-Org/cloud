@@ -4,6 +4,7 @@ import { Pressable, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -53,9 +54,14 @@ export function PreferenceRow({
     onValueChange(!(resolveValue?.() ?? value));
   };
   return (
-    <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
+    <View
+      className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 rounded-lg bg-secondary p-3')}
+    >
       <Pressable
-        className="min-h-11 min-w-0 flex-1 flex-row items-center gap-3 active:opacity-70"
+        className={cn(
+          ROW_TARGET_CLASS,
+          'min-w-0 flex-1 flex-row items-center gap-3 active:opacity-70'
+        )}
         disabled={disabled}
         onPress={flip}
         accessible={false}

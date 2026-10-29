@@ -1,0 +1,1 @@
+ALTER TABLE `ingest_items` ADD `cost_usd` real;

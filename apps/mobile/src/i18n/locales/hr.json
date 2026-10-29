@@ -661,9 +661,9 @@
       "noReviewRequestsDescription": "Ovdje se prikazuju zahtjevi za spajanje koji čekaju tvoj pregled koda. I dalje možeš zalijepiti bilo koju poveznicu na PR iznad.",
       "couldNotLoad": "Nije moguće učitati primljene zahtjeve.",
       "accessLostTitle": "Nemaš pristup ovoj organizaciji",
-      "accessLostDescription": "Više nisi član/ica ove organizacije, pa se njezini zahtjevi za pregled ne mogu učitati. Za nastavak prijelaza na osobni račun i dalje pregleduj kod.",
+      "accessLostDescription": "Više nisi član/ica ove organizacije, pa se njezini zahtjevi za pregled koda ne mogu učitati. Prebaci se na osobni račun da i dalje pregleduješ kod.",
       "organizationUnavailableTitle": "Ova organizacija više ne postoji",
-      "organizationUnavailableDescription": "Ova organizacija je izbrisana, pa se njezini zahtjevi za pregled ne mogu učitati. Za nastavak prijelaza na osobni račun i dalje pregleduj kod.",
+      "organizationUnavailableDescription": "Ova organizacija je izbrisana, pa se njezini zahtjevi za pregled koda ne mogu učitati. Prebaci se na osobni račun da i dalje pregleduješ kod.",
       "continueInPersonal": "Nastavi u osobnom računu"
     },
     "composer": {

@@ -391,6 +391,29 @@ describe('byok kms client', () => {
     }
   });
 
+  test('rethrows the earlier failure instead of retrying with too little budget left', async () => {
+    let clock = 1_000;
+    const nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => clock);
+    let calls = 0;
+    const fetchMock = jest.fn(async () => {
+      calls += 1;
+      // Leaves less than one attempt needs, so a retry could only abort.
+      clock += 7_700;
+      if (calls === 1) return new Response('{}', { status: 503 });
+      throw new DOMException('The operation timed out.', 'TimeoutError');
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    try {
+      await expect(
+        encryptByokForStorage({ apiKey: 'sk-test', context, actorUserId })
+      ).rejects.toThrow('status 503');
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      nowSpy.mockRestore();
+    }
+  });
+
   test('envelope decrypt fails when the service is not configured', async () => {
     installFakeKms();
     const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });

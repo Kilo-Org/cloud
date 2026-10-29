@@ -10,6 +10,9 @@ const KMS_RETRY_BASE_DELAY_MS = 100;
 /** Time all attempts may take together, so an outage fails closed promptly instead of
  * stalling the gateway request for one full timeout per attempt. */
 const KMS_TOTAL_BUDGET_MS = 8000;
+/** A retry is worth issuing only with a slice of budget this large left: a shorter one can
+ * only abort and would replace the specific error of the attempt before it with a timeout. */
+const KMS_MIN_ATTEMPT_BUDGET_MS = 500;
 
 export type ByokKmsContext = {
   key_id: string;
@@ -87,9 +90,13 @@ async function attemptKmsRequest(
 
 async function sendToKms(config: ByokKmsClientConfig, url: string, init: RequestInit) {
   const deadline = Date.now() + KMS_TOTAL_BUDGET_MS;
+  let failure: unknown;
   for (let attempt = 1; ; attempt++) {
-    // A retry only gets the time that is left, so the whole sequence stays inside the budget.
-    const timeoutMs = Math.max(1, Math.min(KMS_REQUEST_TIMEOUT_MS, deadline - Date.now()));
+    // A retry only gets the time that is left, so the whole sequence stays inside the budget,
+    // and a slice too short to answer is not spent: the earlier error is the specific one.
+    const remainingMs = deadline - Date.now();
+    if (attempt > 1 && remainingMs < KMS_MIN_ATTEMPT_BUDGET_MS) throw failure;
+    const timeoutMs = Math.min(KMS_REQUEST_TIMEOUT_MS, remainingMs);
     const outcome = await attemptKmsRequest(config, url, init, timeoutMs);
 
     let error: unknown;
@@ -116,6 +123,7 @@ async function sendToKms(config: ByokKmsClientConfig, url: string, init: Request
       retryAfter ?? 0
     );
     if (!retryable || attempt >= KMS_MAX_ATTEMPTS || Date.now() + delayMs >= deadline) throw error;
+    failure = error;
     const { promise: slept, resolve } = Promise.withResolvers<void>();
     setTimeout(resolve, delayMs);
     await slept;

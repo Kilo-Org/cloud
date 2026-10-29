@@ -149,11 +149,6 @@
           "type": "integer",
           "minimum": 1,
           "maximum": 600
-        },
-        "reportId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
         }
       }
     },
@@ -163,10 +158,9 @@
       "organizationid",
       "model",
       "maxspendmicrodollars",
-      "maxdurationseconds",
-      "reportid"
+      "maxdurationseconds"
     ],
-    "searchBlob": "agentBriefing.estimateSummary Preview or estimate the content and cost of an agent briefing summary before generating it for a user or organization. agentbriefing estimatesummary organizationid model maxspendmicrodollars maxdurationseconds reportid organizationId model maxSpendMicrodollars maxDurationSeconds reportId"
+    "searchBlob": "agentBriefing.estimateSummary Preview or estimate the content and cost of an agent briefing summary before generating it for a user or organization. agentbriefing estimatesummary organizationid model maxspendmicrodollars maxdurationseconds organizationId model maxSpendMicrodollars maxDurationSeconds"
   },
   "agentBriefing.get": {
     "path": "agentBriefing.get",
@@ -240,88 +234,6 @@
     ],
     "searchBlob": "agentBriefing.list List existing agent briefing reports for the user, optionally filtered by personal or organization scope with pagination. agentbriefing list scope organizationid cursor limit currentonly scope organizationId cursor limit currentOnly"
   },
-  "agentBriefing.oneOffDrafts": {
-    "path": "agentBriefing.oneOffDrafts",
-    "kind": "query",
-    "summary": "List resumable, unconfirmed agent briefs, including preparation progress and failures. Use the cursor to retrieve older drafts.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "cursor": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "limit": {
-          "default": 20,
-          "type": "integer",
-          "minimum": 1,
-          "maximum": 100
-        }
-      }
-    },
-    "tags": [
-      "agentbriefing",
-      "oneoffdrafts",
-      "cursor",
-      "limit"
-    ],
-    "searchBlob": "agentBriefing.oneOffDrafts List resumable, unconfirmed agent briefs, including preparation progress and failures. Use the cursor to retrieve older drafts. agentbriefing oneoffdrafts cursor limit cursor limit"
-  },
-  "agentBriefing.oneOffPreferences": {
-    "path": "agentBriefing.oneOffPreferences",
-    "kind": "query",
-    "summary": "Get the saved timezone and language preferences used when generating a one-off agent activity briefing for a custom date range.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "timezone": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 100
-        },
-        "language": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 35
-        }
-      }
-    },
-    "tags": [
-      "agentbriefing",
-      "oneoffpreferences",
-      "timezone",
-      "language"
-    ],
-    "searchBlob": "agentBriefing.oneOffPreferences Get the saved timezone and language preferences used when generating a one-off agent activity briefing for a custom date range. agentbriefing oneoffpreferences timezone language timezone language"
-  },
-  "agentBriefing.oneOffPreparation": {
-    "path": "agentBriefing.oneOffPreparation",
-    "kind": "query",
-    "summary": "Check background brief preparation and retrieve its report and cost estimate when ready. Paid generation still requires confirmation in the app.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "reportId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        }
-      },
-      "required": [
-        "reportId"
-      ]
-    },
-    "tags": [
-      "agentbriefing",
-      "oneoffpreparation",
-      "reportid"
-    ],
-    "searchBlob": "agentBriefing.oneOffPreparation Check background brief preparation and retrieve its report and cost estimate when ready. Paid generation still requires confirmation in the app. agentbriefing oneoffpreparation reportid reportId"
-  },
   "agentBriefing.preferences": {
     "path": "agentBriefing.preferences",
     "kind": "query",
@@ -350,65 +262,6 @@
     ],
     "searchBlob": "agentBriefing.preferences Get the current user's agent briefing preferences, such as timezone, language, and notification schedule. agentbriefing preferences timezone language timezone language"
   },
-  "agentBriefing.prepareOneOff": {
-    "path": "agentBriefing.prepareOneOff",
-    "kind": "mutation",
-    "summary": "Prepare a one-off agent briefing report for a specific date and time range, returning the draft report with session stats and a cost estimate for AI summary generation.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "requestId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "startAt": {
-          "type": "string",
-          "format": "date-time",
-          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
-        },
-        "endAt": {
-          "type": "string",
-          "format": "date-time",
-          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
-        },
-        "timezone": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 100
-        },
-        "language": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 35
-        }
-      },
-      "required": [
-        "requestId",
-        "startAt",
-        "endAt",
-        "timezone",
-        "language"
-      ]
-    },
-    "tags": [
-      "agentbriefing",
-      "prepareoneoff",
-      "requestid",
-      "organizationid",
-      "startat",
-      "endat",
-      "timezone",
-      "language"
-    ],
-    "searchBlob": "agentBriefing.prepareOneOff Prepare a one-off agent briefing report for a specific date and time range, returning the draft report with session stats and a cost estimate for AI summary generation. agentbriefing prepareoneoff requestid organizationid startat endat timezone language requestId organizationId startAt endAt timezone language"
-  },
   "agentBriefing.read": {
     "path": "agentBriefing.read",
     "kind": "mutation",
@@ -433,65 +286,6 @@
       "reportid"
     ],
     "searchBlob": "agentBriefing.read Mark an agent briefing report as read for the current user. agentbriefing read reportid reportId"
-  },
-  "agentBriefing.startOneOffPreparation": {
-    "path": "agentBriefing.startOneOffPreparation",
-    "kind": "mutation",
-    "summary": "Prepare a historical agent brief in the background for a selected period and context. Preparation does not publish a report or authorize a paid summary.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "requestId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "startAt": {
-          "type": "string",
-          "format": "date-time",
-          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
-        },
-        "endAt": {
-          "type": "string",
-          "format": "date-time",
-          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
-        },
-        "timezone": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 100
-        },
-        "language": {
-          "type": "string",
-          "minLength": 1,
-          "maxLength": 35
-        }
-      },
-      "required": [
-        "requestId",
-        "startAt",
-        "endAt",
-        "timezone",
-        "language"
-      ]
-    },
-    "tags": [
-      "agentbriefing",
-      "startoneoffpreparation",
-      "requestid",
-      "organizationid",
-      "startat",
-      "endat",
-      "timezone",
-      "language"
-    ],
-    "searchBlob": "agentBriefing.startOneOffPreparation Prepare a historical agent brief in the background for a selected period and context. Preparation does not publish a report or authorize a paid summary. agentbriefing startoneoffpreparation requestid organizationid startat endat timezone language requestId organizationId startAt endAt timezone language"
   },
   "agentBriefing.updatePreferences": {
     "path": "agentBriefing.updatePreferences",
@@ -539,6 +333,37 @@
       "notificationsenabled"
     ],
     "searchBlob": "agentBriefing.updatePreferences Update agent briefing settings for the current user, including timezone, language, and notification windows. agentbriefing updatepreferences timezone language nightstart morningstart morningend notificationsenabled timezone language nightStart morningStart morningEnd notificationsEnabled"
+  },
+  "agentProfiles.agents": {
+    "path": "agentProfiles.agents",
+    "kind": "query",
+    "summary": "List the agents that belong to a specific agent profile, optionally scoped to an organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "profileId"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "agents",
+      "profileid",
+      "organizationid"
+    ],
+    "searchBlob": "agentProfiles.agents List the agents that belong to a specific agent profile, optionally scoped to an organization. agentprofiles agents profileid organizationid profileId organizationId"
   },
   "agentProfiles.applyConfigImport": {
     "path": "agentProfiles.applyConfigImport",
@@ -2174,6 +1999,37 @@
       "organizationid"
     ],
     "searchBlob": "agentProfiles.listRepoBindings List repository bindings that associate repos with agent profiles for the current user or an organization. agentprofiles listrepobindings organizationid organizationId"
+  },
+  "agentProfiles.overview": {
+    "path": "agentProfiles.overview",
+    "kind": "query",
+    "summary": "Get a summary overview of an agent profile, including its details and high-level stats, for a personal or organization-owned profile.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "profileId"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "overview",
+      "profileid",
+      "organizationid"
+    ],
+    "searchBlob": "agentProfiles.overview Get a summary overview of an agent profile, including its details and high-level stats, for a personal or organization-owned profile. agentprofiles overview profileid organizationid profileId organizationId"
   },
   "agentProfiles.previewConfigImport": {
     "path": "agentProfiles.previewConfigImport",
@@ -3944,6 +3800,17 @@
     ],
     "searchBlob": "byok.list List all saved bring-your-own-key (BYOK) API keys for the current user or a specified organization, including provider, enabled status, and management source. byok list organizationid organizationId"
   },
+  "byok.listCatalogModeSupportedModels": {
+    "path": "byok.listCatalogModeSupportedModels",
+    "kind": "query",
+    "summary": "List which AI models each direct BYOK provider supports when running in catalog mode, grouped by provider and returned as model names with catalog ids. Use to discover available catalog-mode models per provider.",
+    "inputSchema": {},
+    "tags": [
+      "byok",
+      "listcatalogmodesupportedmodels"
+    ],
+    "searchBlob": "byok.listCatalogModeSupportedModels List which AI models each direct BYOK provider supports when running in catalog mode, grouped by provider and returned as model names with catalog ids. Use to discover available catalog-mode models per provider. byok listcatalogmodesupportedmodels"
+  },
   "byok.listSupportedModels": {
     "path": "byok.listSupportedModels",
     "kind": "query",
@@ -3954,6 +3821,83 @@
       "listsupportedmodels"
     ],
     "searchBlob": "byok.listSupportedModels Get the list of supported models per provider for bring-your-own-key (BYOK) usage, showing which model IDs each provider offers. byok listsupportedmodels"
+  },
+  "byok.previewRouting": {
+    "path": "byok.previewRouting",
+    "kind": "query",
+    "summary": "Preview which route and BYOK provider key a given model request would use before making it, showing the ordered routing steps and why each key is used or skipped. Use this to check or debug how a model resolves under your or your organization's bring-your-own-key setup.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "modelId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "apiKind": {
+          "default": "chat_completions",
+          "type": "string",
+          "enum": [
+            "chat_completions",
+            "responses",
+            "messages"
+          ]
+        }
+      },
+      "required": [
+        "modelId"
+      ]
+    },
+    "tags": [
+      "byok",
+      "previewrouting",
+      "organizationid",
+      "modelid",
+      "apikind"
+    ],
+    "searchBlob": "byok.previewRouting Preview which route and BYOK provider key a given model request would use before making it, showing the ordered routing steps and why each key is used or skipped. Use this to check or debug how a model resolves under your or your organization's bring-your-own-key setup. byok previewrouting organizationid modelid apikind organizationId modelId apiKind"
+  },
+  "byok.setCatalogMode": {
+    "path": "byok.setCatalogMode",
+    "kind": "mutation",
+    "summary": "Enable or disable Kilo catalog model ID routing for an existing BYOK API key, for a user or organization key, and return the updated key details.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "id": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "serve_catalog_models": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "serve_catalog_models"
+      ]
+    },
+    "tags": [
+      "byok",
+      "setcatalogmode",
+      "organizationid",
+      "id",
+      "serve_catalog_models"
+    ],
+    "searchBlob": "byok.setCatalogMode Enable or disable Kilo catalog model ID routing for an existing BYOK API key, for a user or organization key, and return the updated key details. byok setcatalogmode organizationid id serve_catalog_models organizationId id serve_catalog_models"
   },
   "byok.setEnabled": {
     "path": "byok.setEnabled",
@@ -6006,6 +5950,13 @@
           "minLength": 1,
           "maxLength": 4096
         },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "uncommitted",
+            "against-base-branch"
+          ]
+        },
         "expectedRevision": {
           "type": "integer",
           "exclusiveMinimum": 0,
@@ -6027,10 +5978,11 @@
       "cloudagentnext",
       "getworktreefile",
       "path",
+      "scope",
       "expectedrevision",
       "cloudagentsessionid"
     ],
-    "searchBlob": "cloudAgentNext.getWorktreeFile Read a single file from a cloud agent session's worktree snapshot, returning its diff, content, and revision metadata for the expected revision. cloudagentnext getworktreefile path expectedrevision cloudagentsessionid path expectedRevision cloudAgentSessionId"
+    "searchBlob": "cloudAgentNext.getWorktreeFile Read a single file from a cloud agent session's worktree snapshot, returning its diff, content, and revision metadata for the expected revision. cloudagentnext getworktreefile path scope expectedrevision cloudagentsessionid path scope expectedRevision cloudAgentSessionId"
   },
   "cloudAgentNext.initiateFromPreparedSession": {
     "path": "cloudAgentNext.initiateFromPreparedSession",
@@ -15524,7 +15476,10 @@
               "organization.group.policy_type.disable",
               "organization.created",
               "organization.token.generate",
-              "organization.funds.distribute_to_children"
+              "organization.funds.distribute_to_children",
+              "organization.guardrail.add",
+              "organization.guardrail.update",
+              "organization.guardrail.remove"
             ]
           }
         },
@@ -16842,6 +16797,13 @@
               "minLength": 1,
               "maxLength": 4096
             },
+            "scope": {
+              "type": "string",
+              "enum": [
+                "uncommitted",
+                "against-base-branch"
+              ]
+            },
             "expectedRevision": {
               "type": "integer",
               "exclusiveMinimum": 0,
@@ -16873,10 +16835,11 @@
       "getworktreefile",
       "organizationid",
       "path",
+      "scope",
       "expectedrevision",
       "cloudagentsessionid"
     ],
-    "searchBlob": "organizations.cloudAgentNext.getWorktreeFile Read a single file from an organization's cloud agent session worktree snapshot, returning its diff, content, and revision metadata for the expected revision. organizations cloudagentnext getworktreefile organizationid path expectedrevision cloudagentsessionid organizationId path expectedRevision cloudAgentSessionId"
+    "searchBlob": "organizations.cloudAgentNext.getWorktreeFile Read a single file from an organization's cloud agent session worktree snapshot, returning its diff, content, and revision metadata for the expected revision. organizations cloudagentnext getworktreefile organizationid path scope expectedrevision cloudagentsessionid organizationId path scope expectedRevision cloudAgentSessionId"
   },
   "organizations.cloudAgentNext.initiateFromPreparedSession": {
     "path": "organizations.cloudAgentNext.initiateFromPreparedSession",
@@ -20123,321 +20086,6 @@
     ],
     "searchBlob": "organizations.guardrails.get Get an organization's Enkrypt AI input guardrail settings: whether it is enabled, whether tool results are scanned, and the configured detectors. Owners and admins only. organizations guardrails get organizationid organizationId"
   },
-  "organizations.guardrails.update": {
-    "path": "organizations.guardrails.update",
-    "kind": "mutation",
-    "summary": "Save an organization's Enkrypt AI input guardrail settings: enable or disable it, choose whether tool results are scanned, and configure detectors. Owners and admins only.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "enabled": {
-          "type": "boolean"
-        },
-        "scan_tool_results": {
-          "type": "boolean"
-        },
-        "detectors": {
-          "type": "object",
-          "properties": {
-            "injection_attack": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "type": "boolean"
-                }
-              },
-              "required": [
-                "enabled"
-              ],
-              "additionalProperties": false
-            },
-            "pii": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "type": "boolean"
-                },
-                "action": {
-                  "type": "string",
-                  "enum": [
-                    "log",
-                    "block"
-                  ]
-                },
-                "entities": {
-                  "maxItems": 4,
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "enum": [
-                      "pii",
-                      "secrets",
-                      "ip_address",
-                      "url"
-                    ]
-                  }
-                }
-              },
-              "required": [
-                "enabled",
-                "action",
-                "entities"
-              ],
-              "additionalProperties": false
-            },
-            "keyword_detector": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "type": "boolean"
-                },
-                "action": {
-                  "type": "string",
-                  "enum": [
-                    "log",
-                    "block"
-                  ]
-                },
-                "banned_keywords": {
-                  "maxItems": 200,
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 100
-                  }
-                }
-              },
-              "required": [
-                "enabled",
-                "action",
-                "banned_keywords"
-              ],
-              "additionalProperties": false
-            },
-            "topic_detector": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "type": "boolean"
-                },
-                "topic": {
-                  "maxItems": 50,
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 100
-                  }
-                }
-              },
-              "required": [
-                "enabled",
-                "topic"
-              ],
-              "additionalProperties": false
-            },
-            "policy_violation": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "type": "boolean"
-                },
-                "format": {
-                  "type": "string",
-                  "enum": [
-                    "policy_text",
-                    "rules"
-                  ]
-                },
-                "policy_text": {
-                  "type": "string",
-                  "maxLength": 10000
-                },
-                "rules": {
-                  "maxItems": 50,
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 64,
-                        "pattern": "^[A-Za-z0-9._-]+$"
-                      },
-                      "display_text": {
-                        "type": "string",
-                        "maxLength": 120
-                      },
-                      "text": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 1000
-                      },
-                      "risk_category": {
-                        "type": "string",
-                        "enum": [
-                          "security_fraud",
-                          "safety_harm",
-                          "privacy_data_protection",
-                          "brand_reputation_trust",
-                          "bias_fairness_ethical",
-                          "legal_ip_liability",
-                          "product_misuse_abuse",
-                          "performance_reliability_quality"
-                        ]
-                      },
-                      "applicability": {
-                        "type": "string",
-                        "enum": [
-                          "user",
-                          "user_assistant"
-                        ]
-                      },
-                      "severity": {
-                        "type": "string",
-                        "enum": [
-                          "critical",
-                          "high",
-                          "medium",
-                          "low"
-                        ]
-                      },
-                      "frameworks": {
-                        "maxItems": 8,
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "enum": [
-                            "hipaa",
-                            "finra",
-                            "gdpr",
-                            "ccpa",
-                            "owasp_llm_2025",
-                            "nist_ai_rmf",
-                            "eu_ai_act",
-                            "iso_42001"
-                          ]
-                        }
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "display_text",
-                      "text",
-                      "risk_category",
-                      "applicability",
-                      "severity",
-                      "frameworks"
-                    ],
-                    "additionalProperties": false
-                  }
-                }
-              },
-              "required": [
-                "enabled",
-                "format",
-                "policy_text",
-                "rules"
-              ],
-              "additionalProperties": false
-            },
-            "toxicity": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "type": "boolean"
-                }
-              },
-              "required": [
-                "enabled"
-              ],
-              "additionalProperties": false
-            },
-            "nsfw": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "type": "boolean"
-                }
-              },
-              "required": [
-                "enabled"
-              ],
-              "additionalProperties": false
-            },
-            "bias": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "type": "boolean"
-                },
-                "action": {
-                  "type": "string",
-                  "enum": [
-                    "log",
-                    "block"
-                  ]
-                }
-              },
-              "required": [
-                "enabled",
-                "action"
-              ],
-              "additionalProperties": false
-            },
-            "sponge_attack": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "type": "boolean"
-                }
-              },
-              "required": [
-                "enabled"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "injection_attack",
-            "pii",
-            "keyword_detector",
-            "topic_detector",
-            "policy_violation",
-            "toxicity",
-            "nsfw",
-            "bias",
-            "sponge_attack"
-          ],
-          "additionalProperties": false
-        }
-      },
-      "required": [
-        "organizationId",
-        "enabled",
-        "scan_tool_results",
-        "detectors"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "guardrails",
-      "update",
-      "organizationid",
-      "enabled",
-      "scan_tool_results",
-      "detectors"
-    ],
-    "searchBlob": "organizations.guardrails.update Save an organization's Enkrypt AI input guardrail settings: enable or disable it, choose whether tool results are scanned, and configure detectors. Owners and admins only. organizations guardrails update organizationid enabled scan_tool_results detectors organizationId enabled scan_tool_results detectors"
-  },
   "organizations.invoices": {
     "path": "organizations.invoices",
     "kind": "query",
@@ -23490,6 +23138,185 @@
       "list"
     ],
     "searchBlob": "organizations.list List the organizations the current user belongs to along with any inherited child organizations. organizations list"
+  },
+  "organizations.mcpGuardrails.browse": {
+    "path": "organizations.mcpGuardrails.browse",
+    "kind": "query",
+    "summary": "Browse a searchable MCP server catalog or registry to find servers an admin can add to the organization's allowed list. Results flag which entries are already added; supports pagination.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "type": {
+          "type": "string",
+          "const": "mcp"
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "kilo_marketplace",
+            "mcp_registry"
+          ]
+        },
+        "query": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "cursor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 500
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "organizationId",
+        "type",
+        "source",
+        "query"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "mcpguardrails",
+      "browse",
+      "organizationid",
+      "type",
+      "source",
+      "query",
+      "cursor"
+    ],
+    "searchBlob": "organizations.mcpGuardrails.browse Browse a searchable MCP server catalog or registry to find servers an admin can add to the organization's allowed list. Results flag which entries are already added; supports pagination. organizations mcpguardrails browse organizationid type source query cursor organizationId type source query cursor"
+  },
+  "organizations.mcpGuardrails.connectionUsers": {
+    "path": "organizations.mcpGuardrails.connectionUsers",
+    "kind": "query",
+    "summary": "Show which users attempted to connect to a specific MCP server, including their name, email, client, allow/deny decision, connect count, and last seen time.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "allowed",
+            "denied"
+          ]
+        },
+        "client": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50
+        },
+        "identityKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      },
+      "required": [
+        "organizationId",
+        "identityKey"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "mcpguardrails",
+      "connectionusers",
+      "organizationid",
+      "decision",
+      "client",
+      "identitykey"
+    ],
+    "searchBlob": "organizations.mcpGuardrails.connectionUsers Show which users attempted to connect to a specific MCP server, including their name, email, client, allow/deny decision, connect count, and last seen time. organizations mcpguardrails connectionusers organizationid decision client identitykey organizationId decision client identityKey"
+  },
+  "organizations.mcpGuardrails.list": {
+    "path": "organizations.mcpGuardrails.list",
+    "kind": "query",
+    "summary": "List an organization's MCP guardrails (allowed MCP servers) along with the current MCP enforcement mode and skill scanning settings. Use this to see which MCP servers are approved for an organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "mcpguardrails",
+      "list",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.mcpGuardrails.list List an organization's MCP guardrails (allowed MCP servers) along with the current MCP enforcement mode and skill scanning settings. Use this to see which MCP servers are approved for an organization. organizations mcpguardrails list organizationid organizationId"
+  },
+  "organizations.mcpGuardrails.listConnections": {
+    "path": "organizations.mcpGuardrails.listConnections",
+    "kind": "query",
+    "summary": "List MCP server connections attempted by users in the organization, showing each server's name, clients used, number of allowed and denied users, last seen time, and whether it's on the allowed list.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "allowed",
+            "denied"
+          ]
+        },
+        "client": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50
+        },
+        "cursor": {
+          "default": 0,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "mcpguardrails",
+      "listconnections",
+      "organizationid",
+      "decision",
+      "client",
+      "cursor"
+    ],
+    "searchBlob": "organizations.mcpGuardrails.listConnections List MCP server connections attempted by users in the organization, showing each server's name, clients used, number of allowed and denied users, last seen time, and whether it's on the allowed list. organizations mcpguardrails listconnections organizationid decision client cursor organizationId decision client cursor"
   },
   "organizations.members.deleteInvite": {
     "path": "organizations.members.deleteInvite",

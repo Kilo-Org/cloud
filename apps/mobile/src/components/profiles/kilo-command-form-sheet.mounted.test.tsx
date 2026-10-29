@@ -8,6 +8,7 @@ import { renderWithProviders } from '@/test/render-with-providers';
 
 const h = vi.hoisted(() => ({
   onClose: vi.fn(),
+  onCreate: vi.fn(),
   confirm: vi.fn(),
   scrollTo: vi.fn(),
 }));
@@ -130,7 +131,9 @@ function mountSheet() {
       onClose: () => {
         h.onClose();
       },
-      onCreate: () => undefined,
+      onCreate: (payload: unknown) => {
+        h.onCreate(payload);
+      },
       onUpdate: () => undefined,
     })
   );
@@ -163,6 +166,54 @@ describe('KiloCommandFormSheet agent identifier field', () => {
     const field = findField(renderer.root, i18n.t('common.agent'));
     expect(field.props.placeholder).toBe('reviewer');
     expect(field.props.placeholder).not.toBe(modeLabel);
+
+    unmount();
+  });
+});
+
+describe('KiloCommandFormSheet command name', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('keeps a typed name the server rejects and refuses the save under the field', async () => {
+    const { renderer, unmount } = await mountSheet();
+    act(() => {
+      (findField(renderer.root, 'Command name').props.onChangeText as (v: string) => void)(
+        'Revisão de Teste'
+      );
+      (findField(renderer.root, 'Template').props.onChangeText as (v: string) => void)('x');
+    });
+
+    callHandler(findOne(renderer.root, 'SheetHeader'), 'onDone');
+
+    // The field holds what was typed, so Save refuses it instead of saving a
+    // shortened name the reader never saw.
+    expect(h.onCreate).not.toHaveBeenCalled();
+    expect(findField(renderer.root, 'Command name').props.error).toBe(
+      i18n.t('profiles.slashCommands.nameInvalid')
+    );
+
+    unmount();
+  });
+
+  it('creates a command under the name exactly as typed', async () => {
+    const { renderer, unmount } = await mountSheet();
+    act(() => {
+      (findField(renderer.root, 'Command name').props.onChangeText as (v: string) => void)(
+        'release-notes'
+      );
+      (findField(renderer.root, 'Template').props.onChangeText as (v: string) => void)('x');
+    });
+
+    callHandler(findOne(renderer.root, 'SheetHeader'), 'onDone');
+
+    expect(h.onCreate).toHaveBeenCalledWith({
+      name: 'release-notes',
+      template: 'x',
+      subtask: false,
+    });
+    expect(findField(renderer.root, 'Command name').props.error).toBeUndefined();
 
     unmount();
   });

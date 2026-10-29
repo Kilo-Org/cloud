@@ -4,6 +4,8 @@ export function parseUsageQueueSfoExposure(value: string): number {
   return Number.isFinite(exposure) && exposure >= 0 && exposure <= 1 ? exposure : 0;
 }
 
+export const parseUsageQueueFraExposure = parseUsageQueueSfoExposure;
+
 export function parseUsageQueueSfoUserIds(value: string): ReadonlySet<string> | null {
   if (!value) return null;
   try {
@@ -21,4 +23,9 @@ export type UsageQueueSfoConfig = {
   enabled: boolean;
   exposure: number;
   userIds: ReadonlySet<string> | null;
+};
+
+export type UsageQueueFraConfig = {
+  enabled: boolean;
+  exposure: number;
 };

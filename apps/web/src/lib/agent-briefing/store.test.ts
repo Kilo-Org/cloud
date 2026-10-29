@@ -1,316 +1,218 @@
 import { eq } from 'drizzle-orm';
-import { agent_briefing_reports } from '@kilocode/db/schema';
-import { db } from '@kilocode/web-shared/lib/drizzle';
-import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
+import {
+  agent_briefing_snapshots,
+  agent_briefing_preferences,
+  cli_sessions_v2,
+  organization_memberships,
+} from '@kilocode/db/schema';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
+import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
+import { buildBriefingSnapshot } from './evidence';
+import {
+  emptySummary,
+  getBriefingPreferences,
+  getBriefingReport,
+  listBriefings,
+  saveBriefingPreferences,
+} from './store';
 
-import { listBriefings, serializeBriefing } from './store';
-
-const DAY_MS = 86_400_000;
-const HISTORY_DAYS = 30;
-
-const readableFacts = {
-  scorecard: { sessions: 2, pullRequests: 1, blockers: 0, spendMicrodollars: 1200 },
-  coverage: {
-    activity: 'complete',
-    spend: 'complete',
-    blockers: 'complete',
-    pullRequests: 'complete',
-  },
-  sessions: [],
-  sources: [],
-};
-
-const readySummary = {
-  status: 'ready',
-  text: 'Two sessions overnight.',
-  model: null,
-  costMicrodollars: 0,
-  chargeStatus: 'settled',
-  estimatedCostMicrodollars: null,
-  startedAt: null,
-  finishedAt: null,
-  error: null,
-  canRetry: false,
-};
-
-function briefingRow(input: {
-  kiloUserId: string;
-  contextKey: string;
-  organizationId: string | null;
-  daysAgo: number;
-}) {
-  const cutoff = new Date(Date.now() - input.daysAgo * DAY_MS);
-  const cutoffAt = cutoff.toISOString();
-  return {
-    kilo_user_id: input.kiloUserId,
-    context_key: input.contextKey,
-    organization_id: input.organizationId,
-    local_date: cutoffAt.slice(0, 10),
-    night_start_at: new Date(cutoff.getTime() - 3 * 60 * 60_000).toISOString(),
-    cutoff_at: cutoffAt,
-    morning_end_at: new Date(cutoff.getTime() + 5 * 60 * 60_000).toISOString(),
-    published_at: cutoffAt,
-    updated_at: cutoffAt,
-    revision: 1,
-    evidence_hash: 'test-evidence',
-    facts: readableFacts,
-    summary: readySummary,
-  };
+beforeEach(cleanupDbForTest);
+async function fixture(organization = false) {
+  const user = await insertTestUser();
+  const org = organization ? await createTestOrganization('Snapshot context', user.id, 0) : null;
+  const captured = new Date().toISOString();
+  const [session] = await db
+    .insert(cli_sessions_v2)
+    .values({
+      session_id: `ses_${crypto.randomUUID()}`,
+      kilo_user_id: user.id,
+      organization_id: org?.id ?? null,
+      title: 'Captured title',
+      status: 'idle',
+      last_activity_at: captured,
+    })
+    .returning();
+  if (!session) throw new Error('Missing session fixture');
+  const facts = buildBriefingSnapshot([session]);
+  const [row] = await db
+    .insert(agent_briefing_snapshots)
+    .values({
+      kilo_user_id: user.id,
+      context_key: org?.id ?? 'personal',
+      organization_id: org?.id ?? null,
+      timezone: 'UTC',
+      language: 'en',
+      local_date: captured.slice(0, 10),
+      night_start_at: captured,
+      cutoff_at: captured,
+      morning_end_at: new Date(Date.now() + 3600_000).toISOString(),
+      captured_at: captured,
+      published_at: captured,
+      expires_at: new Date(Date.now() + 30 * 86400_000).toISOString(),
+      facts,
+      summary: { ...emptySummary, status: 'ready', text: 'Captured private summary' },
+    })
+    .returning();
+  if (!row) throw new Error('Missing snapshot fixture');
+  return { user, org, session, row };
 }
-
-describe('listBriefings', () => {
-  it('pages through every report and skips one it cannot read', async () => {
-    const user = await insertTestUser();
-    const organization = await createTestOrganization('Briefing history', user.id, 0);
-    const rows = [];
-    for (let day = 0; day < HISTORY_DAYS; day += 1) {
-      const personal = briefingRow({
-        kiloUserId: user.id,
-        contextKey: 'personal',
-        organizationId: null,
-        daysAgo: day,
-      });
-      rows.push(
-        day === HISTORY_DAYS - 1
-          ? { ...personal, summary: { status: 'unknown-status' } }
-          : personal,
-        briefingRow({
-          kiloUserId: user.id,
-          contextKey: organization.id,
-          organizationId: organization.id,
-          daysAgo: day,
-        })
-      );
-    }
-    const inserted = await db.insert(agent_briefing_reports).values(rows).returning({
-      id: agent_briefing_reports.id,
-    });
-    const reportId = (index: number) => {
-      const row = inserted[index];
-      if (!row) throw new Error(`no inserted report at ${index}`);
-      return row.id;
-    };
-    const silentConsole = jest.spyOn(console, 'error').mockImplementation(() => undefined);
-    try {
-      const first = await listBriefings(user.id, { scope: 'all', limit: 30, currentOnly: false });
-      expect(first.reports).toHaveLength(30);
-      expect(first.nextCursor).not.toBeNull();
-      const second = await listBriefings(user.id, {
-        scope: 'all',
-        limit: 30,
-        currentOnly: false,
-        cursor: first.nextCursor ?? undefined,
-      });
-      const loaded = [...first.reports, ...second.reports].map(report => report.id);
-      expect(second.reports).toHaveLength(29);
-      expect(second.nextCursor).toBeNull();
-      expect(loaded).toHaveLength(59);
-      expect(new Set(loaded).size).toBe(59);
-      const unreadableIndex = 2 * (HISTORY_DAYS - 1);
-      expect(loaded).not.toContain(reportId(unreadableIndex));
-      expect(silentConsole).toHaveBeenCalledWith(
-        'Agent briefing report skipped',
-        expect.objectContaining({ reportId: reportId(unreadableIndex) })
-      );
-    } finally {
-      silentConsole.mockRestore();
-    }
-  }, 120_000);
-  it.each([0, 1])(
-    'skips reports beyond the page envelope allowance (%i extra bytes)',
-    async extraBytes => {
-      const user = await insertTestUser();
-      const inserted = await db
-        .insert(agent_briefing_reports)
-        .values(
-          [0, 1, 2].map(daysAgo => ({
-            ...briefingRow({
-              kiloUserId: user.id,
-              contextKey: 'personal',
-              organizationId: null,
-              daysAgo,
-            }),
-            summary: { ...readySummary, text: '' },
-          }))
-        )
-        .returning();
-      const [largeRow, ...olderRows] = inserted;
-      if (!largeRow) throw new Error('No inserted report');
-      const serialized = await serializeBriefing(largeRow);
-      const text = 'x'.repeat(
-        3_000_000 - Buffer.byteLength(JSON.stringify(serialized), 'utf8') + extraBytes
-      );
+it('reads defaults without creating or mutating scheduling preferences', async () => {
+  const user = await insertTestUser();
+  const defaults = await getBriefingPreferences(user.id, 'Europe/Berlin', 'de');
+  expect(defaults.contexts.every(context => !context.enabled)).toBe(true);
+  expect(await db.select().from(agent_briefing_preferences)).toHaveLength(0);
+  await saveBriefingPreferences(user.id, { timezone: 'UTC', language: 'en' });
+  const before = await db.select().from(agent_briefing_preferences);
+  await getBriefingPreferences(user.id, 'Europe/Berlin', 'de');
+  expect(await db.select().from(agent_briefing_preferences)).toEqual(before);
+  expect(before[0]?.next_run_at).toBeDefined();
+});
+it('preserves captured facts on reads when live metadata changes', async () => {
+  const { user, session, row } = await fixture();
+  await db
+    .update(cli_sessions_v2)
+    .set({
+      title: 'Later title',
+      status: 'error',
+      briefing_excerpt: {
+        messageId: 'later',
+        completedAt: new Date().toISOString(),
+        text: 'Later response',
+      },
+    })
+    .where(eq(cli_sessions_v2.session_id, session.session_id));
+  const report = await getBriefingReport(user.id, row.id);
+  expect(report.sessions[0]?.title).toBe('Captured title');
+  expect(report.sessions[0]?.status).toBe('idle');
+  expect(report.capturedAt).toBe(new Date(row.captured_at).toISOString());
+  expect((await db.select().from(agent_briefing_snapshots))[0]?.facts).toEqual(row.facts);
+});
+it.each(['delete', 'move'] as const)(
+  'refuses an entire immutable report after source %s without refreshing facts',
+  async action => {
+    const { user, session, row } = await fixture();
+    if (action === 'delete')
+      await db.delete(cli_sessions_v2).where(eq(cli_sessions_v2.session_id, session.session_id));
+    else {
+      const org = await createTestOrganization('Other context', user.id, 0);
       await db
-        .update(agent_briefing_reports)
-        .set({ summary: { ...readySummary, text } })
-        .where(eq(agent_briefing_reports.id, largeRow.id));
-      const silentConsole = jest.spyOn(console, 'error').mockImplementation(() => undefined);
-      try {
-        const first = await listBriefings(user.id, { limit: 1 });
-        expect(first.reports).toEqual([]);
-        expect(first.nextCursor).toBe(largeRow.id);
-        const loaded: string[] = [];
-        let cursor = first.nextCursor;
-        for (let page = 0; cursor && page < olderRows.length; page += 1) {
-          const result = await listBriefings(user.id, { limit: 1, cursor });
-          expect(Buffer.byteLength(JSON.stringify(result), 'utf8')).toBeLessThanOrEqual(3_000_000);
-          loaded.push(...result.reports.map(report => report.id));
-          cursor = result.nextCursor;
-        }
-        expect(cursor).toBeNull();
-        expect(loaded).toEqual(olderRows.map(row => row.id));
-        expect(silentConsole).toHaveBeenCalledWith(
-          'Agent briefing report skipped',
-          expect.objectContaining({ reportId: largeRow.id })
-        );
-      } finally {
-        silentConsole.mockRestore();
-      }
-    },
-    120_000
-  );
-
-  it('keeps the next report reachable after a byte boundary and skipped row', async () => {
-    const user = await insertTestUser();
-    const inserted = await db
-      .insert(agent_briefing_reports)
-      .values(
-        [0, 1, 2, 3].map(daysAgo => ({
-          ...briefingRow({
-            kiloUserId: user.id,
-            contextKey: 'personal',
-            organizationId: null,
-            daysAgo,
-          }),
-          summary:
-            daysAgo === 1
-              ? { status: 'unknown-status' }
-              : { ...readySummary, text: daysAgo < 3 ? 'é'.repeat(750_000) : '' },
-        }))
-      )
-      .returning();
-    const [firstRow, skippedRow, deferredRow, lastRow] = inserted;
-    if (!firstRow || !skippedRow || !deferredRow || !lastRow) {
-      throw new Error('Missing inserted reports');
+        .update(cli_sessions_v2)
+        .set({ organization_id: org.id })
+        .where(eq(cli_sessions_v2.session_id, session.session_id));
     }
-    const silentConsole = jest.spyOn(console, 'error').mockImplementation(() => undefined);
-    try {
-      const first = await listBriefings(user.id, { limit: 3 });
-      expect(first.reports.map(report => report.id)).toEqual([firstRow.id]);
-      expect(first.nextCursor).toBe(skippedRow.id);
-      const second = await listBriefings(user.id, {
-        limit: 3,
-        cursor: first.nextCursor ?? undefined,
-      });
-      expect(second.reports.map(report => report.id)).toEqual([deferredRow.id, lastRow.id]);
-      expect(second.nextCursor).toBeNull();
-      for (const result of [first, second]) {
-        expect(Buffer.byteLength(JSON.stringify(result), 'utf8')).toBeLessThanOrEqual(3_000_000);
-      }
-      const loaded = [...first.reports, ...second.reports].map(report => report.id);
-      expect(new Set(loaded).size).toBe(3);
-    } finally {
-      silentConsole.mockRestore();
-    }
-  }, 120_000);
+    await expect(getBriefingReport(user.id, row.id)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+    expect((await listBriefings(user.id)).reports).toEqual([]);
+    expect((await db.select().from(agent_briefing_snapshots))[0]?.facts).toEqual(row.facts);
+  }
+);
+it('rejects membership revocation before disclosing summary or evidence', async () => {
+  const { user, org, row } = await fixture(true);
+  if (!org) throw new Error('Missing organization');
+  await db
+    .delete(organization_memberships)
+    .where(eq(organization_memberships.organization_id, org.id));
+  await expect(getBriefingReport(user.id, row.id)).rejects.toMatchObject({ code: 'FORBIDDEN' });
+  expect((await listBriefings(user.id)).reports).toEqual([]);
+});
+it('retains history after the morning window but refuses expired and foreign-owner reports', async () => {
+  const { user, row } = await fixture();
+  await db
+    .update(agent_briefing_snapshots)
+    .set({ morning_end_at: new Date(Date.now() - 3600_000).toISOString() })
+    .where(eq(agent_briefing_snapshots.id, row.id));
+  expect((await listBriefings(user.id)).reports).toHaveLength(1);
+  expect((await listBriefings(user.id, { currentOnly: true })).reports).toHaveLength(0);
+  const other = await insertTestUser();
+  await expect(getBriefingReport(other.id, row.id)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  await db
+    .update(agent_briefing_snapshots)
+    .set({ expires_at: new Date(Date.now() - 1).toISOString() })
+    .where(eq(agent_briefing_snapshots.id, row.id));
+  await expect(getBriefingReport(user.id, row.id)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+});
 
-  it('includes envelope and separators in the combined page budget', async () => {
-    const user = await insertTestUser();
-    const inserted = await db
-      .insert(agent_briefing_reports)
-      .values(
-        [0, 1].map(daysAgo => ({
-          ...briefingRow({
-            kiloUserId: user.id,
-            contextKey: 'personal',
-            organizationId: null,
-            daysAgo,
-          }),
-          summary: { ...readySummary, text: '' },
-        }))
-      )
-      .returning();
-    const [firstRow, secondRow] = inserted;
-    if (!firstRow || !secondRow) throw new Error('Missing inserted reports');
-    const reports = await Promise.all(inserted.map(serializeBriefing));
-    const reportBytes = reports.reduce(
-      (total, report) => total + Buffer.byteLength(JSON.stringify(report), 'utf8'),
-      0
-    );
-    await db
-      .update(agent_briefing_reports)
-      .set({ summary: { ...readySummary, text: 'x'.repeat(3_000_000 - reportBytes) } })
-      .where(eq(agent_briefing_reports.id, firstRow.id));
-    const first = await listBriefings(user.id, { limit: 2 });
-    expect(first.reports.map(report => report.id)).toEqual([firstRow.id]);
-    expect(first.nextCursor).toBe(firstRow.id);
-    const second = await listBriefings(user.id, {
-      limit: 2,
-      cursor: first.nextCursor ?? undefined,
-    });
-    expect(second.reports.map(report => report.id)).toEqual([secondRow.id]);
-    expect(second.nextCursor).toBeNull();
-    for (const result of [first, second]) {
-      expect(Buffer.byteLength(JSON.stringify(result), 'utf8')).toBeLessThanOrEqual(3_000_000);
-    }
-  }, 120_000);
+it('refuses stale captured evidence after a source moves away and back to the same context', async () => {
+  const { user, session, row } = await fixture();
+  const org = await createTestOrganization('Temporary context', user.id, 0);
+  const boundary = new Date(Date.parse(row.captured_at) + 1000).toISOString();
+  await db
+    .update(cli_sessions_v2)
+    .set({ organization_id: org.id, briefing_excerpt_scope_changed_at: boundary })
+    .where(eq(cli_sessions_v2.session_id, session.session_id));
+  await db
+    .update(cli_sessions_v2)
+    .set({ organization_id: null })
+    .where(eq(cli_sessions_v2.session_id, session.session_id));
+  await expect(getBriefingReport(user.id, row.id)).rejects.toMatchObject({ code: 'NOT_FOUND' });
+  expect((await listBriefings(user.id)).reports).toEqual([]);
+  expect((await db.select().from(agent_briefing_snapshots))[0]?.facts).toEqual(row.facts);
+});
 
-  it.each([0, -1, 1.9])(
-    'uses a positive integer internal page size for %s',
-    async limit => {
-      const user = await insertTestUser();
-      const inserted = await db
-        .insert(agent_briefing_reports)
-        .values(
-          [0, 1].map(daysAgo =>
-            briefingRow({
-              kiloUserId: user.id,
-              contextKey: 'personal',
-              organizationId: null,
-              daysAgo,
-            })
-          )
-        )
-        .returning({ id: agent_briefing_reports.id });
-      const first = await listBriefings(user.id, { limit });
-      expect(first.reports.map(report => report.id)).toEqual([inserted[0]?.id]);
-      expect(first.nextCursor).toBe(inserted[0]?.id);
-    },
-    120_000
-  );
+it('authorizes a bounded report page with one context query and one batched source query', async () => {
+  const { user, row } = await fixture();
+  await db.insert(agent_briefing_snapshots).values({
+    ...row,
+    id: crypto.randomUUID(),
+    local_date: 'previous-occurrence',
+    cutoff_at: new Date(Date.parse(row.cutoff_at) - 86400_000).toISOString(),
+  });
+  const select = jest.spyOn(db, 'select');
+  try {
+    expect((await listBriefings(user.id)).reports).toHaveLength(2);
+    expect(select).toHaveBeenCalledTimes(3);
+    select.mockClear();
+    await getBriefingReport(user.id, row.id);
+    expect(select).toHaveBeenCalledTimes(3);
+  } finally {
+    select.mockRestore();
+  }
+});
 
-  it('caps internal history pages at one hundred reports', async () => {
-    const user = await insertTestUser();
-    const organizations = await Promise.all(
-      [1, 2, 3].map(index => createTestOrganization(`Briefing context ${index}`, user.id, 0))
-    );
-    const contexts = [null, ...organizations.map(organization => organization.id)];
-    const rows = contexts.flatMap(organizationId =>
-      Array.from({ length: 26 }, (_, daysAgo) =>
-        briefingRow({
-          kiloUserId: user.id,
-          contextKey: organizationId ?? 'personal',
-          organizationId,
-          daysAgo,
-        })
-      )
-    );
-    const inserted = await db
-      .insert(agent_briefing_reports)
-      .values(rows)
-      .returning({ id: agent_briefing_reports.id });
-    const first = await listBriefings(user.id, { limit: 1000 });
-    expect(first.reports).toHaveLength(100);
-    expect(first.nextCursor).not.toBeNull();
-    const second = await listBriefings(user.id, {
-      limit: 1000,
-      cursor: first.nextCursor ?? undefined,
-    });
-    expect(second.reports).toHaveLength(4);
-    expect(second.nextCursor).toBeNull();
-    expect(new Set([...first.reports, ...second.reports].map(report => report.id))).toEqual(
-      new Set(inserted.map(row => row.id))
-    );
-  }, 120_000);
+it('does not authorize a source in another accessible context through the batched owner lookup', async () => {
+  const { user, row } = await fixture();
+  const org = await createTestOrganization('Other accessible context', user.id, 0);
+  await db.insert(agent_briefing_snapshots).values({
+    ...row,
+    id: crypto.randomUUID(),
+    context_key: org.id,
+    organization_id: org.id,
+  });
+  const listed = await listBriefings(user.id);
+  expect(listed.reports.map(report => report.id)).toEqual([row.id]);
+});
+
+it('skips an unparseable snapshot without hiding the rest of the page', async () => {
+  const { user, row } = await fixture();
+  await db.insert(agent_briefing_snapshots).values({
+    ...row,
+    id: crypto.randomUUID(),
+    local_date: 'unparseable-occurrence',
+    cutoff_at: new Date(Date.parse(row.cutoff_at) + 1000).toISOString(),
+    facts: { scorecard: 'unparseable' } as unknown as typeof row.facts,
+  });
+  expect((await listBriefings(user.id)).reports.map(report => report.id)).toEqual([row.id]);
+});
+
+it('excludes quiet snapshots before limiting current reports while retaining quiet history', async () => {
+  const { user, row } = await fixture();
+  const [quiet] = await db
+    .insert(agent_briefing_snapshots)
+    .values({
+      ...row,
+      id: crypto.randomUUID(),
+      local_date: 'quiet-occurrence',
+      cutoff_at: new Date(Date.parse(row.cutoff_at) + 1000).toISOString(),
+      facts: buildBriefingSnapshot([]),
+      summary: { ...emptySummary, status: 'unavailable' },
+    })
+    .returning();
+  if (!quiet) throw new Error('Missing quiet report');
+  expect(
+    (await listBriefings(user.id, { currentOnly: true, limit: 1 })).reports.map(report => report.id)
+  ).toEqual([row.id]);
+  expect((await listBriefings(user.id, { limit: 2 })).reports.map(report => report.id)).toEqual([
+    quiet.id,
+    row.id,
+  ]);
 });

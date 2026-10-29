@@ -6,9 +6,10 @@ import { after } from 'next/server';
 import {
   USAGE_QUEUE_ONLY_ENABLED,
   USAGE_QUEUE_SFO_CONFIG,
+  USAGE_QUEUE_FRA_CONFIG,
 } from '@kilocode/web-shared/lib/config.server';
 import { enqueueUsage, type UsageEnqueueOutcome } from './usage-publisher';
-import { isSfoUsageQueueSelected } from './usage-queue-policy';
+import { isFraUsageQueueSelected, isSfoUsageQueueSelected } from './usage-queue-policy';
 import {
   describeDatabaseError,
   isUsageRowConflict,
@@ -338,7 +339,9 @@ async function enqueueUsageWithinLifetime(
 type UsageAccountingTransport = 'queue' | 'direct';
 
 function usageAccountingTransport(usageContext: MicrodollarUsageContext): UsageAccountingTransport {
-  return USAGE_QUEUE_ONLY_ENABLED || isSfoUsageQueueSelected(USAGE_QUEUE_SFO_CONFIG, usageContext)
+  return USAGE_QUEUE_ONLY_ENABLED ||
+    isSfoUsageQueueSelected(USAGE_QUEUE_SFO_CONFIG, usageContext) ||
+    isFraUsageQueueSelected(USAGE_QUEUE_FRA_CONFIG, usageContext)
     ? 'queue'
     : 'direct';
 }

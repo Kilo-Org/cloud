@@ -39,6 +39,7 @@ const scrollView = vi.hoisted(() => vi.fn());
 const permission = vi.hoisted(() => ({
   status: 'ready',
   canEdit: true,
+  canManage: true,
 }));
 
 const mintInstallState = vi.hoisted(() =>
@@ -73,6 +74,7 @@ vi.mock('@/lib/a11y/motion', () => ({
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
+  useFocusEffect: () => undefined,
 }));
 vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(),
@@ -103,7 +105,7 @@ vi.mock('@/components/code-reviewer/platform-overview-rows', () => ({
   resolveRowOnPress: () => undefined,
 }));
 vi.mock('@/components/code-reviewer/provider-connect-card', () => ({
-  ProviderConnectCard: () => null,
+  ProviderConnectCard: 'ProviderConnectCard',
 }));
 vi.mock('@/components/platform-error-screen', () => ({
   PlatformErrorScreen: (props: {
@@ -277,6 +279,7 @@ beforeEach(() => {
   config.refetch.mockClear();
   permission.status = 'ready';
   permission.canEdit = true;
+  permission.canManage = true;
   provider.status = 'connected';
   connectivity.known = true;
   platformError.variants = [];
@@ -293,12 +296,36 @@ beforeEach(() => {
 });
 
 describe('PlatformOverviewScreen disconnected setup', () => {
-  it.each([false, true])('centers setup with edit permission %s', async canEdit => {
+  it.each([
+    ['an owner or admin', { canEdit: true, canManage: true }, true],
+    ['a billing manager', { canEdit: true, canManage: false }, false],
+    ['a member', { canEdit: false, canManage: false }, false],
+  ] as const)(
+    'offers the GitHub app install to %s only when that role may run it',
+    async (_who, capabilities, showsCard) => {
+      provider.status = 'disconnected';
+      permission.canEdit = capabilities.canEdit;
+      permission.canManage = capabilities.canManage;
+
+      const renderer = await render('org-1', 'github');
+      const texts = collectText(renderer.toJSON());
+
+      expect(centeredState).toHaveBeenCalledOnce();
+      expect(scrollView).not.toHaveBeenCalled();
+      expect(renderer.root.findAllByType('ProviderConnectCard')).toHaveLength(showsCard ? 1 : 0);
+      const notice = "GitHub isn't connected. Only organization owners and admins can connect it.";
+      expect(texts.includes(notice)).toBe(!showsCard);
+    }
+  );
+
+  it('keeps the GitLab account connect card for a billing manager', async () => {
     provider.status = 'disconnected';
-    permission.canEdit = canEdit;
-    await renderScreen();
-    expect(centeredState).toHaveBeenCalledOnce();
-    expect(scrollView).not.toHaveBeenCalled();
+    permission.canEdit = true;
+    permission.canManage = false;
+
+    const renderer = await render('org-1', 'gitlab');
+
+    expect(renderer.root.findAllByType('ProviderConnectCard')).toHaveLength(1);
   });
 
   it.each([
@@ -310,6 +337,7 @@ describe('PlatformOverviewScreen disconnected setup', () => {
   ] as const)('states who can connect %s to a read-only viewer', async (platform, copy) => {
     provider.status = 'disconnected';
     permission.canEdit = false;
+    permission.canManage = false;
 
     const texts = await renderScreen(platform);
 

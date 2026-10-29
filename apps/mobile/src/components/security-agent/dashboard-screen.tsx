@@ -43,6 +43,7 @@ import {
 } from '@/lib/hooks/use-security-dismiss-draft';
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
@@ -57,6 +58,19 @@ const METRIC_TONE_CLASS = {
 export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean) {
   const metrics = buildSecurityDashboardMetrics(data, slaEnabled);
   const number = (value: number) => formatNumber(value, i18n.language);
+  // The tile value counts every severity, so the detail line names every
+  // severity: medium and low share one bucket, which disappears while empty.
+  // Mirrors severityBreakdownDetail in @kilocode/app-shared.
+  const breakdownDetail = (counts: DashboardStats['severity']) => {
+    const parts = { critical: number(counts.critical), high: number(counts.high) };
+    const mediumLow = counts.medium + counts.low;
+    return mediumLow > 0
+      ? i18n.t('securityAgent.dashboardMetrics.deadlinePassedDetailWithMediumLow', {
+          ...parts,
+          mediumLow: number(mediumLow),
+        })
+      : i18n.t('securityAgent.dashboardMetrics.deadlinePassedDetail', parts);
+  };
 
   return metrics.map(metric => {
     switch (metric.id) {
@@ -64,10 +78,7 @@ export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean)
         return Object.assign(metric, {
           label: i18n.t('securityAgent.dashboardMetrics.openFindings'),
           value: number(data.analysis.total),
-          detail: i18n.t('securityAgent.dashboardMetrics.deadlinePassedDetail', {
-            critical: number(data.severity.critical),
-            high: number(data.severity.high),
-          }),
+          detail: breakdownDetail(data.severity),
         });
       }
       case 'exploitable': {
@@ -111,12 +122,15 @@ export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean)
         });
       }
       case 'deadlinePassed': {
+        const overdue = data.sla.bySeverity;
         return Object.assign(metric, {
           label: i18n.t('securityAgent.dashboardMetrics.deadlinePassed'),
           value: number(data.sla.overall.overdue),
-          detail: i18n.t('securityAgent.dashboardMetrics.deadlinePassedDetail', {
-            critical: number(data.sla.bySeverity.critical.overdue),
-            high: number(data.sla.bySeverity.high.overdue),
+          detail: breakdownDetail({
+            critical: overdue.critical.overdue,
+            high: overdue.high.overdue,
+            medium: overdue.medium.overdue,
+            low: overdue.low.overdue,
           }),
         });
       }
@@ -193,12 +207,13 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const metrics = data ? buildLocalizedMetrics(data, slaEnabled) : [];
 
   const lastSyncTime = lastSync.data?.lastSyncTime;
+  const now = useRelativeTimeNow();
   let lastSyncLabel = t('securityAgent.dashboard.notYetSynced');
   if (lastSync.isError) {
     lastSyncLabel = t('securityAgent.dashboard.syncStatusUnavailable');
   } else if (lastSyncTime) {
     lastSyncLabel = t('securityAgent.dashboard.lastSynced', {
-      time: timeAgo(parseTimestamp(lastSyncTime)),
+      time: timeAgo(parseTimestamp(lastSyncTime), undefined, now),
     });
   }
 

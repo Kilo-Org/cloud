@@ -116,14 +116,25 @@ describe('selectMessageFailure', () => {
       expect(result?.copyDetail).toBe('');
     });
 
-    it('derives fixed copy from a known error name and never emits provider text', () => {
-      const result = selectMessageFailure({ info: assistantInfo('ProviderAuthError') });
-      expect(result).not.toBeNull();
-      expect(result?.kind).toBe('assistant');
-      expect(result?.title).toBe('Response failed');
-      expect(result?.detail).toBe('The provider rejected the request.');
-      expect(result?.detail).not.toContain('RAW_PROVIDER_TEXT');
-      expect(result?.canCopy).toBe(false);
+    it('derives a fixed detail line from every classified error name and never emits provider text', () => {
+      const cases = [
+        ['ProviderAuthError', 'The provider rejected the request.'],
+        ['MessageAbortedError', 'The response was stopped.'],
+        ['ContextOverflowError', 'The conversation is too long for the model.'],
+        ['APIError', 'The provider returned an error.'],
+        ['MessageOutputLengthError', "The response reached the model's output limit."],
+        ['StructuredOutputError', 'The response did not match the required format.'],
+      ] as const;
+
+      for (const [name, detail] of cases) {
+        const result = selectMessageFailure({ info: assistantInfo(name) });
+        expect(result, name).not.toBeNull();
+        expect(result?.kind).toBe('assistant');
+        expect(result?.title).toBe('Response failed');
+        expect(result?.detail, name).toBe(detail);
+        expect(result?.detail).not.toContain('RAW_PROVIDER_TEXT');
+        expect(result?.canCopy).toBe(false);
+      }
     });
 
     it('adds no detail line for an unknown error name, which the title states', () => {

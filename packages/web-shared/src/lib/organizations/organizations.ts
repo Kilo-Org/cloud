@@ -13,6 +13,7 @@ import {
   OrganizationSettingsSchema,
 } from '@kilocode/web-shared/lib/organizations/organization-types';
 import {
+  agent_briefing_context_preferences,
   cloud_agent_environments,
   cli_sessions_v2,
   kilocode_users,
@@ -1028,8 +1029,16 @@ export async function markOrganizationAsDeleted(
 
     await tx
       .update(cli_sessions_v2)
-      .set({ public_id: null })
+      .set({
+        public_id: null,
+        briefing_excerpt: null,
+        briefing_excerpt_scope_changed_at: sql`now()`,
+      })
       .where(eq(cli_sessions_v2.organization_id, organizationId));
+    await tx
+      .update(agent_briefing_context_preferences)
+      .set({ enabled: false })
+      .where(eq(agent_briefing_context_preferences.organization_id, organizationId));
     await tx
       .delete(provider_oauth_attempts)
       .where(eq(provider_oauth_attempts.owned_by_organization_id, organizationId));

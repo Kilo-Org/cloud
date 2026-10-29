@@ -99,7 +99,7 @@ export function KiloCommandRowView({
               className={controlClass(isFirst)}
               disabled={isFirst}
               accessibilityRole="button"
-              accessibilityLabel={t('profiles.moveUp')}
+              accessibilityLabel={t('profiles.slashCommands.moveUp', { name })}
               onPress={onMoveUp}
             >
               <ChevronUp size={20} color={colors.mutedForeground} />
@@ -110,7 +110,7 @@ export function KiloCommandRowView({
               className={controlClass(isLast)}
               disabled={isLast}
               accessibilityRole="button"
-              accessibilityLabel={t('profiles.moveDown')}
+              accessibilityLabel={t('profiles.slashCommands.moveDown', { name })}
               onPress={onMoveDown}
             >
               <ChevronDown size={20} color={colors.mutedForeground} />
@@ -120,7 +120,7 @@ export function KiloCommandRowView({
             <Pressable
               className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
               accessibilityRole="button"
-              accessibilityLabel={t('profiles.slashCommands.edit')}
+              accessibilityLabel={t('profiles.slashCommands.edit', { name })}
               onPress={onEdit}
             >
               <Pencil size={18} color={colors.mutedForeground} />
@@ -130,7 +130,7 @@ export function KiloCommandRowView({
             <Pressable
               className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
               accessibilityRole="button"
-              accessibilityLabel={t('common.delete')}
+              accessibilityLabel={t('profiles.slashCommands.delete', { name })}
               onPress={onDelete}
             >
               <Trash2 size={18} color={colors.destructive} />

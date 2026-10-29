@@ -136,10 +136,16 @@ the isolated staging transport and its `queue_vercel` caller label.
 `execution_region` identifies the persistence function's region when available:
 SFO HTTP handoffs record `fra1`; a local fallback in SFO records `sfo1`.
 Missing or unrecognized `VERCEL_REGION` values are reported as `unknown`.
-With queue-only enabled, the gateway never calls a billing writer, including on
-publication failure. It retries transient publication failures up to three total
-attempts, with a fresh two-second timeout each and jittered 200–400 ms then
-400–600 ms backoffs. Every attempt reuses the same serialized event and usage ID;
+After attempting queue publication, the gateway never falls back to a billing
+writer. Existing direct fallbacks for missing publisher configuration or failed
+lifetime registration remain safe because no publication was attempted. The Cloudflare HTTP publisher retries transient failures up to four total
+attempts, with up to five seconds for each confirmation and a 25-second overall
+elapsed retry budget. Before retries it uses exponential full jitter: uniformly
+zero up to (excluding) 500 ms, 1,000 ms, then 2,000 ms. Attempt timeouts and sleeps
+are clipped to remaining budget; no new attempt starts after exhaustion. Runtime
+scheduling can delay observation of these deadlines. Non-retry calls retain one
+two-second attempt; the separate Vercel queue transport is unchanged. Every attempt
+reuses the same serialized event and usage ID;
 ambiguous acceptance can create duplicate messages, which the writer deduplicates.
 Configuration failures and HTTP outcomes other than 408/429/5xx are not retried.
 Redirects are terminal 3xx failures; their targets are never followed.

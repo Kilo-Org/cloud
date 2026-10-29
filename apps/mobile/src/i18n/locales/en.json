@@ -1580,7 +1580,13 @@
         "change_request_failed": "PR failed",
         "superseded": "Already present"
       },
-      "noProposalsDescription": "Review memory proposals appear here after Kilo analyzes maintainer replies."
+      "noProposalsDescription": "Review memory proposals appear here after Kilo analyzes maintainer replies.",
+      "changeRequestInProgress": "Kilo is already opening a pull request for this proposal. Try again in a moment.",
+      "changeRequestNotActionable": "This proposal can no longer be approved. Close it and refresh the list.",
+      "changeRequestNoGitHubAccess": "No GitHub connection has access to this repository. Reconnect GitHub with access to it, then try again.",
+      "changeRequestMissingPermissions": "Kilo's GitHub App cannot open pull requests in this repository. A repository owner must give the app write access to contents and pull requests, then try again.",
+      "changeRequestFailed": "Kilo could not open the pull request. Try again in a moment.",
+      "offAction": "Review memory is off. Turn it on, then try again."
     },
     "manualReview": {
       "title": "Manual review",
@@ -3910,6 +3916,7 @@
     "skillSaveFailed": "Couldn't save skill",
     "skillSourceCustom": "Custom",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Paste a SKILL.md and its name fills in; add a skill from your phone without drag and drop.",
     "skillEditTitle": "Edit skill",
     "skillEdit": "Edit skill {{name}}",

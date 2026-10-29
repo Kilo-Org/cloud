@@ -1514,7 +1514,13 @@
         "change_request_failed": "PR අසාර්ථක විය",
         "superseded": "දැනටමත් ඇත"
       },
-      "noProposalsDescription": "Kilo නඩත්තුකරුවන්ගේ පිළිතුරු විශ්ලේෂණය කළ පසු සමාලෝචන මතකයේ යෝජනා මෙහි දිස් වේ."
+      "noProposalsDescription": "Kilo නඩත්තුකරුවන්ගේ පිළිතුරු විශ්ලේෂණය කළ පසු සමාලෝචන මතකයේ යෝජනා මෙහි දිස් වේ.",
+      "changeRequestInProgress": "මෙම යෝජනාව සඳහා Kilo දැනටමත් pull request එකක් විවෘත කරමින් සිටී. මොහොතකින් නැවත උත්සාහ කරන්න.",
+      "changeRequestNotActionable": "මෙම යෝජනාව තවදුරටත් අනුමත කළ නොහැක. එය වසා ලැයිස්තුව නැවුම් කරන්න.",
+      "changeRequestNoGitHubAccess": "මෙම ගබඩාවට ප්‍රවේශය ඇති GitHub සම්බන්ධතාවයක් නොමැත. එයට ප්‍රවේශය සහිතව GitHub නැවත සම්බන්ධ කර නැවත උත්සාහ කරන්න.",
+      "changeRequestMissingPermissions": "Kilo හි GitHub App ට මෙම ගබඩාව තුළ pull request විවෘත කළ නොහැක. ගබඩා හිමිකරුවෙකු විසින් යෙදුමට contents සහ pull requests සඳහා ලිවීමේ ප්‍රවේශය ලබා දිය යුතුය, පසුව නැවත උත්සාහ කරන්න.",
+      "changeRequestFailed": "Kilo ට pull request විවෘත කළ නොහැකි විය. මොහොතකින් නැවත උත්සාහ කරන්න.",
+      "offAction": "සමාලෝචන මතකය අක්‍රීයයි. එය සක්‍රීය කර නැවත උත්සාහ කරන්න."
     },
     "manualReview": {
       "title": "ඔබ විසින් ආරම්භ කරන සමාලෝචනය",
@@ -3844,6 +3850,7 @@
     "skillSaveFailed": "කුසලතා සුරැකීමට නොහැකි විය",
     "skillSourceCustom": "අභිරුචි",
     "skillSourceMarketplace": "වෙළඳපොළ",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "SKILL.md එකක් අලවන්න සහ එහි නම පුරවයි; ඇදගෙන යාමකින් තොරව ඔබගේ දුරකථනයෙන් කුසලතා එක් කරන්න.",
     "skillEditTitle": "සංස්කරණ කුසලතා",
     "skillEdit": "කුසලතාව {{name}} සංස්කරණය කරන්න",

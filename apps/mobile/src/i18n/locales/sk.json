@@ -1558,7 +1558,13 @@
         "change_request_failed": "PR zlyhal",
         "superseded": "Už existuje"
       },
-      "noProposalsDescription": "Návrhy z pamäte kontrol sa tu zobrazia, keď Kilo analyzuje odpovede správcov."
+      "noProposalsDescription": "Návrhy z pamäte kontrol sa tu zobrazia, keď Kilo analyzuje odpovede správcov.",
+      "changeRequestInProgress": "Kilo už pre tento návrh otvára pull request. Skúste to o chvíľu znova.",
+      "changeRequestNotActionable": "Tento návrh už nemožno schváliť. Zatvorte ho a obnovte zoznam.",
+      "changeRequestNoGitHubAccess": "Žiadne pripojenie GitHub nemá prístup k tomuto úložisku. Znova pripojte GitHub s prístupom k nemu a potom to skúste znova.",
+      "changeRequestMissingPermissions": "Aplikácia Kilo na GitHube nemôže v tomto úložisku otvárať pull requesty. Vlastník úložiska musí aplikácii udeliť prístup na zápis k obsahu a pull requestom a potom to skúste znova.",
+      "changeRequestFailed": "Kilo nemohlo otvoriť pull request. Skúste to o chvíľu znova.",
+      "offAction": "Pamäť kontrol je vypnutá. Zapnite ju a skúste to znova."
     },
     "manualReview": {
       "title": "Manuálna kontrola",
@@ -3944,6 +3950,7 @@
     "skillSaveFailed": "Nepodarilo sa zachrániť zručnosť",
     "skillSourceCustom": "Vlastné",
     "skillSourceMarketplace": "Obchod",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Vložte súbor SKILL.md a jeho názov sa vyplní; pridajte zručnosť zo svojho telefónu bez presúvania myšou.",
     "skillEditTitle": "Upraviť zručnosť",
     "skillEdit": "Upraviť zručnosť {{name}}",

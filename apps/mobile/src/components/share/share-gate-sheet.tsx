@@ -1,6 +1,6 @@
 /* eslint-disable max-lines -- Share gate owns commit, destination admission, and CLI-spawn orchestration in one formSheet body. */
 import { useQuery } from '@tanstack/react-query';
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { useRouter } from 'expo-router';
 import { GitPullRequest, Plus, X } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -234,7 +234,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
     if (!reviewPr) {
       return;
     }
-    void Haptics.selectionAsync();
+    selectionHaptic();
     setPendingShareNavigation({
       href: providerPrRoutePath(reviewPr) as string,
       shareId: null,
@@ -258,7 +258,7 @@ export function ShareGateSheet({ shareId }: Readonly<ShareGateSheetProps>) {
       if (!shareId) {
         return;
       }
-      void Haptics.selectionAsync();
+      selectionHaptic();
       committedShareIdRef.current = shareId;
       setPendingShareNavigation({ href, shareId });
       // Clear only this id's durable pending hint (value-scoped). A kill after

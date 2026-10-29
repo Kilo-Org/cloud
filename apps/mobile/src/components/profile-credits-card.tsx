@@ -1,5 +1,5 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
@@ -290,7 +290,7 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
             <Pressable
               className="min-h-11 min-w-11 items-center justify-center active:opacity-70"
               onPress={() => {
-                void Haptics.selectionAsync();
+                selectionHaptic();
                 setHideBalance(!hideBalance);
               }}
               accessibilityRole="button"

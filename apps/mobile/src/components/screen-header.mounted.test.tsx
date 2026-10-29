@@ -24,6 +24,27 @@ const routerState = vi.hoisted(() => ({
   canGoBack: vi.fn(() => true),
 }));
 const i18nManager = vi.hoisted(() => ({ isRTL: false }));
+// The container ref the header subscribes to for navigation commits. The suite
+// fires its `state` listeners by hand to reproduce a commit that lands after
+// the header's first render (a restored stack completing).
+const navigationContainer = vi.hoisted(() => {
+  const stateListeners = new Set<() => void>();
+  return {
+    addListener: (event: string, listener: () => void) => {
+      if (event === 'state') {
+        stateListeners.add(listener);
+      }
+      return () => {
+        stateListeners.delete(listener);
+      };
+    },
+    emitState() {
+      for (const listener of stateListeners) {
+        listener();
+      }
+    },
+  };
+});
 const safeArea = vi.hoisted(() => ({ top: 0, bottom: 0, left: 0, right: 0 }));
 const platform = vi.hoisted(() => ({ OS: 'ios' as 'ios' | 'android' }));
 /** A normal phone window: wide enough for the title and its actions to share a row. */
@@ -31,6 +52,8 @@ const layout = vi.hoisted(() => ({ width: 390, fontScale: 1 }));
 
 vi.mock('expo-router', () => ({
   useRouter: () => routerState,
+  // The header re-reads `canGoBack` on this container's `state` events.
+  useNavigationContainerRef: () => navigationContainer,
 }));
 vi.mock('react-native', () => ({
   I18nManager: i18nManager,
@@ -605,6 +628,23 @@ describe('ScreenHeader mounted', () => {
       backFallback: AGENTS_SESSIONS_HREF,
     });
     expect(backPressableCount(explicitlyHidden.root)).toBe(0);
+  });
+
+  it('shows the back control when a later navigation commit supplies the history', () => {
+    // The relaunch restore renders its screen before the navigator tree above
+    // it holds the parents, so the first read is false; the header must not
+    // stay headerless once the stack completes.
+    routerState.canGoBack.mockReturnValue(false);
+    const renderer = renderHeader({ title: 'Review style' });
+    expect(backPressableCount(renderer.root)).toBe(0);
+
+    routerState.canGoBack.mockReturnValue(true);
+    act(() => {
+      navigationContainer.emitState();
+    });
+
+    expect(backPressableCount(renderer.root)).toBe(1);
+    renderer.unmount();
   });
 
   it('keeps the back bar and target classes when title is absent', () => {

@@ -1514,7 +1514,13 @@
         "change_request_failed": "ការបើក PR បានបរាជ័យ",
         "superseded": "មានរួចហើយ"
       },
-      "noProposalsDescription": "សំណើពីអង្គចងចាំសម្រាប់ការត្រួតពិនិត្យនឹងបង្ហាញនៅទីនេះ បន្ទាប់ពី Kilo វិភាគការឆ្លើយតបរបស់អ្នកថែទាំគម្រោង។"
+      "noProposalsDescription": "សំណើពីអង្គចងចាំសម្រាប់ការត្រួតពិនិត្យនឹងបង្ហាញនៅទីនេះ បន្ទាប់ពី Kilo វិភាគការឆ្លើយតបរបស់អ្នកថែទាំគម្រោង។",
+      "changeRequestInProgress": "Kilo កំពុងបើក pull request សម្រាប់សំណើនេះរួចហើយ។ សូមព្យាយាមម្តងទៀតបន្តិចទៀត។",
+      "changeRequestNotActionable": "សំណើនេះមិនអាចអនុម័តបានទៀតទេ។ សូមបិទវា ហើយផ្ទុកបញ្ជីឡើងវិញ។",
+      "changeRequestNoGitHubAccess": "គ្មានការភ្ជាប់ GitHub ណាមួយដែលមានសិទ្ធិចូលប្រើឃ្លាំងផ្ទុកនេះទេ។ សូមភ្ជាប់ GitHub ឡើងវិញជាមួយសិទ្ធិចូលប្រើវា បន្ទាប់មកព្យាយាមម្តងទៀត។",
+      "changeRequestMissingPermissions": "GitHub App របស់ Kilo មិនអាចបើក pull request នៅក្នុងឃ្លាំងផ្ទុកនេះបានទេ។ ម្ចាស់ឃ្លាំងផ្ទុកត្រូវផ្តល់សិទ្ធិសរសេរដល់ app សម្រាប់ខ្លឹមសារ និង pull request បន្ទាប់មកព្យាយាមម្តងទៀត។",
+      "changeRequestFailed": "Kilo មិនអាចបើក pull request បានទេ។ សូមព្យាយាមម្តងទៀតបន្តិចទៀត។",
+      "offAction": "អង្គចងចាំសម្រាប់ការត្រួតពិនិត្យត្រូវបានបិទ។ សូមបើកវា រួចព្យាយាមម្តងទៀត។"
     },
     "manualReview": {
       "title": "ការត្រួតពិនិត្យដោយដៃ",
@@ -3844,6 +3850,7 @@
     "skillSaveFailed": "មិនអាចរក្សាទុកជំនាញបានទេ។",
     "skillSourceCustom": "ផ្ទាល់ខ្លួន",
     "skillSourceMarketplace": "ទីផ្សារ",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "បិទភ្ជាប់ SKILL.md ហើយឈ្មោះរបស់វាបំពេញ; បន្ថែមជំនាញពីទូរស័ព្ទរបស់អ្នកដោយមិនចាំបាច់អូស និងទម្លាក់។",
     "skillEditTitle": "កែសម្រួលជំនាញ",
     "skillEdit": "កែសម្រួលជំនាញ {{name}}",

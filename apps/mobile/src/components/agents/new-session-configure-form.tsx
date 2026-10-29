@@ -104,6 +104,7 @@ export function NewSessionConfigureForm({
   onChangeFolderPath,
   runOnInlineNote,
   isCloneEntry = false,
+  autoFocusPrompt = true,
   groups,
   isRetrying,
   onChangeRepo,
@@ -231,6 +232,7 @@ export function NewSessionConfigureForm({
           belowCardHeight={runTargetHeight}
           onStartSession={isStartDisabled ? undefined : onStartSession}
           isCloneEntry={isCloneEntry}
+          autoFocusOnMount={autoFocusPrompt}
         />
       </View>
 

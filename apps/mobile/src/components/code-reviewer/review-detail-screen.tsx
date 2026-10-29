@@ -1,6 +1,7 @@
 /* eslint-disable max-lines -- the screen keeps every existing detail section plus the read-only transcript slot */
 
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic } from '@/lib/haptics';
 import { type Href } from 'expo-router';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -111,7 +112,7 @@ export function ReviewDetailScreen({
       { reviewId },
       {
         onSuccess: () => {
-          void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+          notificationHaptic(Haptics.NotificationFeedbackType.Success);
         },
         onSettled: () => {
           retryInFlight.current = false;
@@ -365,7 +366,7 @@ export function ReviewDetailScreen({
                     { reviewId },
                     {
                       onSuccess: () => {
-                        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
+                        notificationHaptic(Haptics.NotificationFeedbackType.Warning);
                       },
                     }
                   );

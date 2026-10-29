@@ -1514,7 +1514,13 @@
         "change_request_failed": "PR амжилтгүй болсон",
         "superseded": "Аль хэдийн байна"
       },
-      "noProposalsDescription": "Kilo төслийн хариуцагчдын хариултыг шинжилсний дараа шалгалтын санах ойн саналууд энд харагдана."
+      "noProposalsDescription": "Kilo төслийн хариуцагчдын хариултыг шинжилсний дараа шалгалтын санах ойн саналууд энд харагдана.",
+      "changeRequestInProgress": "Kilo энэ саналд зориулж pull request аль хэдийн нээж байна. Түр хүлээгээд дахин оролдоно уу.",
+      "changeRequestNotActionable": "Энэ саналыг цаашид зөвшөөрөх боломжгүй. Үүнийг хааж, жагсаалтыг дахин ачаална уу.",
+      "changeRequestNoGitHubAccess": "Энэ репозиторт хандах эрхтэй GitHub холболт байхгүй байна. Хандах эрхтэй GitHub холболтоо дахин холбож, дараа нь дахин оролдоно уу.",
+      "changeRequestMissingPermissions": "Kilo-ийн GitHub App энэ репозиторт pull request нээх боломжгүй. Репозиторийн эзэмшигч аппад агуулга болон pull request-д бичих эрх өгөх шаардлагатай, дараа нь дахин оролдоно уу.",
+      "changeRequestFailed": "Kilo pull request-ийг нээж чадсангүй. Түр хүлээгээд дахин оролдоно уу.",
+      "offAction": "Шалгалтын санах ой идэвхгүй байна. Санах ойг идэвхжүүлээд дахин оролдоно уу."
     },
     "manualReview": {
       "title": "Гараар эхлүүлэх шалгалт",
@@ -3844,6 +3850,7 @@
     "skillSaveFailed": "Ур чадвараа хадгалж чадсангүй",
     "skillSourceCustom": "Өөрийн",
     "skillSourceMarketplace": "Маркет",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "SKILL.md-г буулгаж, нэрийг нь бөглөнө; Чирэх, буулгахгүйгээр утаснаасаа ур чадвар нэмнэ үү.",
     "skillEditTitle": "Ур чадварыг засах",
     "skillEdit": "{{name}} ур чадварыг засах",

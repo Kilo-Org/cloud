@@ -1,4 +1,4 @@
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { Check } from '@/components/ui/icons';
 import { type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
@@ -37,7 +37,7 @@ type ChoiceRowProps = {
 
 /**
  * Shared radio/checkbox-style selection row. Owns the selection haptic —
- * callers must NOT fire their own `Haptics.selectionAsync()` on press.
+ * callers must NOT fire their own `selectionHaptic()` on press.
  */
 export function ChoiceRow({
   label,
@@ -69,7 +69,7 @@ export function ChoiceRow({
       )}
       disabled={disabled}
       onPress={() => {
-        void Haptics.selectionAsync();
+        selectionHaptic();
         onPress();
       }}
       {...selectableRowA11y({

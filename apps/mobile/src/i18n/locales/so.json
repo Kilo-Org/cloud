@@ -1514,7 +1514,13 @@
         "change_request_failed": "PR wuu fashilmay",
         "superseded": "Hore ayuu u jiraa"
       },
-      "noProposalsDescription": "Soo-jeedinnada xusuusta dib-u-eegista ayaa halkan ka soo muuqanaya marka Kilo uu falanqeeyo jawaabaha daryeelayaasha mashruuca."
+      "noProposalsDescription": "Soo-jeedinnada xusuusta dib-u-eegista ayaa halkan ka soo muuqanaya marka Kilo uu falanqeeyo jawaabaha daryeelayaasha mashruuca.",
+      "changeRequestInProgress": "Kilo hore ayay u furayaal pull request soo-jeedintan. Isku day mar kale wax yar kadib.",
+      "changeRequestNotActionable": "Soo-jeedintan mar dambe lama ansixin karo. Xir oo cusboonaysii liiska.",
+      "changeRequestNoGitHubAccess": "Ma jiro xiriir GitHub oo heli kara kaydkan. Dib u xiri GitHub oo leh helitaanka kaydka, kadibna isku day mar kale.",
+      "changeRequestMissingPermissions": "App-ka GitHub ee Kilo ma furi karo pull request-yo kaydkan. Milkiilaha kaydku waa inuu app-ka siiyo helitaan qoraal ah oo ku saabsan waxa ku jira iyo pull request-yada, kadibna isku day mar kale.",
+      "changeRequestFailed": "Kilo ma furi karin pull request-ka. Isku day mar kale wax yar kadib.",
+      "offAction": "Xusuusta dib-u-eegistu way dansan tahay. Shid, ka dibna isku day mar kale."
     },
     "manualReview": {
       "title": "Dib-u-eegis gacmeed",
@@ -3844,6 +3850,7 @@
     "skillSaveFailed": "Ma badbaadin karin xirfad",
     "skillSourceCustom": "Gaar ah",
     "skillSourceMarketplace": "Suuqa",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Ku dheji SKILL.md oo magaciisa ayaa buuxiya; ku dar xirfad taleefankaaga adigoon jiidin oo tuurin.",
     "skillEditTitle": "Xirfadda wax ka beddel",
     "skillEdit": "Wax ka beddel xirfadda {{name}}",

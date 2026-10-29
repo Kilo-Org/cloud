@@ -1,4 +1,4 @@
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -274,7 +274,7 @@ export function PlatformOverviewScreen({
                       !canEdit || toggle.isPending || (!hasRepoSelection && !data.isEnabled)
                     }
                     onValueChange={value => {
-                      void Haptics.selectionAsync();
+                      selectionHaptic();
                       toggle.mutate({ isEnabled: value });
                     }}
                   />

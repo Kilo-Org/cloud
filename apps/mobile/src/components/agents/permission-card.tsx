@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ScrollView, type TextInstance, View } from 'react-native';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import * as Haptics from 'expo-haptics';
+import { impactHaptic } from '@/lib/haptics';
 import { useTranslation } from 'react-i18next';
 import { z } from 'zod';
 
@@ -89,7 +90,7 @@ export function PermissionCard({
   );
 
   function handleRespond(response: 'once' | 'always' | 'reject') {
-    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    impactHaptic(Haptics.ImpactFeedbackStyle.Light);
     setActiveResponse(response);
     onRespond(response);
   }

@@ -1514,7 +1514,13 @@
         "change_request_failed": "PR mislykkedes",
         "superseded": "Findes allerede"
       },
-      "noProposalsDescription": "Forslag fra hukommelsen for gennemgange vises her, når Kilo har analyseret svar fra de vedligeholdelsesansvarlige."
+      "noProposalsDescription": "Forslag fra hukommelsen for gennemgange vises her, når Kilo har analyseret svar fra de vedligeholdelsesansvarlige.",
+      "changeRequestInProgress": "Kilo er allerede ved at åbne en pull request for dette forslag. Prøv igen om et øjeblik.",
+      "changeRequestNotActionable": "Dette forslag kan ikke længere godkendes. Luk det, og opdater listen.",
+      "changeRequestNoGitHubAccess": "Ingen GitHub-forbindelse har adgang til dette repository. Genopret forbindelsen til GitHub med adgang til repositoryet, og prøv derefter igen.",
+      "changeRequestMissingPermissions": "Kilos GitHub App kan ikke åbne pull requests i dette repository. En ejer af repositoryet skal give appen skriveadgang til indhold og pull requests. Prøv derefter igen.",
+      "changeRequestFailed": "Kilo kunne ikke åbne pull requesten. Prøv igen om et øjeblik.",
+      "offAction": "Hukommelsen for gennemgange er slået fra. Slå den til, og prøv igen."
     },
     "manualReview": {
       "title": "Manuel gennemgang",
@@ -3844,6 +3850,7 @@
     "skillSaveFailed": "Kunne ikke gemme færdighed",
     "skillSourceCustom": "Brugerdefineret",
     "skillSourceMarketplace": "Markedsplads",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Indsæt en SKILL.md og dens navn udfyldes; tilføje en færdighed fra din telefon uden træk og slip.",
     "skillEditTitle": "Rediger færdighed",
     "skillEdit": "Rediger færdighed {{name}}",

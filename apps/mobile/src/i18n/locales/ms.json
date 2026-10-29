@@ -1514,7 +1514,13 @@
         "change_request_failed": "PR gagal",
         "superseded": "Sudah ada"
       },
-      "noProposalsDescription": "Cadangan memori semakan muncul di sini selepas Kilo menganalisis balasan penyelenggara."
+      "noProposalsDescription": "Cadangan memori semakan muncul di sini selepas Kilo menganalisis balasan penyelenggara.",
+      "changeRequestInProgress": "Kilo sedang membuka pull request untuk cadangan ini. Cuba lagi sebentar.",
+      "changeRequestNotActionable": "Cadangan ini tidak lagi boleh diluluskan. Tutupnya dan muat semula senarai.",
+      "changeRequestNoGitHubAccess": "Tiada sambungan GitHub yang mempunyai akses kepada repositori ini. Sambung semula GitHub dengan akses kepadanya, kemudian cuba lagi.",
+      "changeRequestMissingPermissions": "Aplikasi GitHub Kilo tidak boleh membuka pull request dalam repositori ini. Pemilik repositori mesti memberikan aplikasi akses tulis kepada kandungan dan pull request, kemudian cuba lagi.",
+      "changeRequestFailed": "Kilo tidak dapat membuka pull request. Cuba lagi sebentar.",
+      "offAction": "Memori semakan dinyahdayakan. Dayakannya, kemudian cuba lagi."
     },
     "manualReview": {
       "title": "Semakan manual",
@@ -3844,6 +3850,7 @@
     "skillSaveFailed": "Tidak dapat menyelamatkan kemahiran",
     "skillSourceCustom": "Tersuai",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Tampal SKILL.md dan namanya diisi; tambah kemahiran daripada telefon anda tanpa seret dan lepas.",
     "skillEditTitle": "Kemahiran mengedit",
     "skillEdit": "Edit kemahiran {{name}}",

@@ -1514,7 +1514,13 @@
         "change_request_failed": "PR ebaõnnestus",
         "superseded": "Juba olemas"
       },
-      "noProposalsDescription": "Ülevaatuste mälu ettepanekud ilmuvad siia pärast seda, kui Kilo on hooldajate vastuseid analüüsinud."
+      "noProposalsDescription": "Ülevaatuste mälu ettepanekud ilmuvad siia pärast seda, kui Kilo on hooldajate vastuseid analüüsinud.",
+      "changeRequestInProgress": "Kilo avab selle ettepaneku jaoks juba tõmbetaotlust. Proovi hetke pärast uuesti.",
+      "changeRequestNotActionable": "Seda ettepanekut ei saa enam kinnitada. Sulge see ja värskenda loendit.",
+      "changeRequestNoGitHubAccess": "Ühelgi GitHubi ühendusel ei ole sellele hoidlale juurdepääsu. Ühenda GitHub uuesti nii, et sellel on juurdepääs sellele hoidlale, ja proovi seejärel uuesti.",
+      "changeRequestMissingPermissions": "Kilo GitHubi rakendus ei saa selles hoidlas tõmbetaotlusi avada. Hoidla omanik peab andma rakendusele kirjutamisõiguse sisule ja tõmbetaotlustele, seejärel proovi uuesti.",
+      "changeRequestFailed": "Kilol ei õnnestunud tõmbetaotlust avada. Proovi hetke pärast uuesti.",
+      "offAction": "Ülevaatuste mälu on välja lülitatud. Lülita see sisse ja proovi uuesti."
     },
     "manualReview": {
       "title": "Käsitsi käivitatav ülevaatus",
@@ -3844,6 +3850,7 @@
     "skillSaveFailed": "Oskust ei õnnestunud salvestada",
     "skillSourceCustom": "Kohandatud",
     "skillSourceMarketplace": "Turg",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Kleepige fail SKILL.md ja selle nimi täidetakse; lisage oma telefonist oskusi ilma lohistamata.",
     "skillEditTitle": "Muuda oskusi",
     "skillEdit": "Muuda oskust {{name}}",

@@ -1536,7 +1536,13 @@
         "change_request_failed": "PR nije uspio",
         "superseded": "Već postoji"
       },
-      "noProposalsDescription": "Prijedlozi iz memorije pregleda pojavit će se ovdje nakon što Kilo analizira odgovore održavatelja."
+      "noProposalsDescription": "Prijedlozi iz memorije pregleda pojavit će se ovdje nakon što Kilo analizira odgovore održavatelja.",
+      "changeRequestInProgress": "Kilo već otvara pull request za ovaj prijedlog. Pokušajte ponovo za trenutak.",
+      "changeRequestNotActionable": "Ovaj prijedlog više nije moguće odobriti. Zatvorite ga i osvježite listu.",
+      "changeRequestNoGitHubAccess": "Nijedna GitHub veza nema pristup ovom repozitoriju. Ponovo povežite GitHub s pristupom ovom repozitoriju, pa pokušajte ponovo.",
+      "changeRequestMissingPermissions": "Kilo-ova GitHub aplikacija ne može otvoriti pull requestove u ovom repozitoriju. Vlasnik repozitorija mora aplikaciji dati pravo pisanja za sadržaj i pull requestove, pa pokušajte ponovo.",
+      "changeRequestFailed": "Kilo nije mogao otvoriti pull request. Pokušajte ponovo za trenutak.",
+      "offAction": "Memorija pregleda je isključena. Uključi je, pa pokušaj ponovo."
     },
     "manualReview": {
       "title": "Ručni pregled",
@@ -3894,6 +3900,7 @@
     "skillSaveFailed": "Nije moguće sačuvati vještinu",
     "skillSourceCustom": "Prilagođeno",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Zalijepite SKILL.md i njegovo ime se popunjava; dodajte vještinu sa svog telefona bez povlačenja i ispuštanja.",
     "skillEditTitle": "Uredi vještinu",
     "skillEdit": "Uredi vještinu {{name}}",

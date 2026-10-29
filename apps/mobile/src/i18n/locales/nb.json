@@ -1514,7 +1514,13 @@
         "change_request_failed": "PR mislyktes",
         "superseded": "Finnes allerede"
       },
-      "noProposalsDescription": "Forslag fra minnet for kodegjennomganger vises her etter at Kilo har analysert svar fra vedlikeholderne."
+      "noProposalsDescription": "Forslag fra minnet for kodegjennomganger vises her etter at Kilo har analysert svar fra vedlikeholderne.",
+      "changeRequestInProgress": "Kilo åpner allerede en pull request for dette forslaget. Prøv igjen om et øyeblikk.",
+      "changeRequestNotActionable": "Dette forslaget kan ikke lenger godkjennes. Lukk det og oppdater listen.",
+      "changeRequestNoGitHubAccess": "Ingen GitHub-tilkobling har tilgang til dette repositoriet. Koble til GitHub på nytt med tilgang til det, og prøv igjen.",
+      "changeRequestMissingPermissions": "Kilos GitHub App kan ikke åpne pull requests i dette repositoriet. En eier av repositoriet må gi appen skrivetilgang til innhold og pull requests, og deretter prøve igjen.",
+      "changeRequestFailed": "Kilo kunne ikke åpne pull requesten. Prøv igjen om et øyeblikk.",
+      "offAction": "Minnet for kodegjennomganger er deaktivert. Aktiver det, og prøv igjen."
     },
     "manualReview": {
       "title": "Manuell gjennomgang",
@@ -3844,6 +3850,7 @@
     "skillSaveFailed": "Kunne ikke lagre ferdigheter",
     "skillSourceCustom": "Egendefinert",
     "skillSourceMarketplace": "Markedsplass",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Lim inn en SKILL.md og navnet fylles ut; legg til en ferdighet fra telefonen din uten å dra og slipp.",
     "skillEditTitle": "Rediger ferdighet",
     "skillEdit": "Rediger ferdighet {{name}}",

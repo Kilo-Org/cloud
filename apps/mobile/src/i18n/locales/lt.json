@@ -1558,7 +1558,13 @@
         "change_request_failed": "Nepavyko atidaryti PR",
         "superseded": "Jau yra"
       },
-      "noProposalsDescription": "Peržiūros atminties pasiūlymai bus rodomi čia, kai Kilo išanalizuos prižiūrėtojų atsakymus."
+      "noProposalsDescription": "Peržiūros atminties pasiūlymai bus rodomi čia, kai Kilo išanalizuos prižiūrėtojų atsakymus.",
+      "changeRequestInProgress": "Kilo jau atidaro šio pasiūlymo PR. Bandyk dar kartą po akimirkos.",
+      "changeRequestNotActionable": "Šio pasiūlymo nebegalima patvirtinti. Uždaryk jį ir atnaujink sąrašą.",
+      "changeRequestNoGitHubAccess": "Nė vienas GitHub prisijungimas neturi prieigos prie šios saugyklos. Iš naujo prijunk GitHub, kad jis turėtų prieigą prie jos, tada bandyk dar kartą.",
+      "changeRequestMissingPermissions": "Kilo GitHub programėlė negali atidaryti PR šioje saugykloje. Saugyklos savininkas turi suteikti programėlei rašymo prieigą prie turinio ir PR, tada bandyk dar kartą.",
+      "changeRequestFailed": "Kilo nepavyko atidaryti PR. Bandyk dar kartą po akimirkos.",
+      "offAction": "Peržiūros atmintis išjungta. Įjunk ją, tada bandyk dar kartą."
     },
     "manualReview": {
       "title": "Rankinė peržiūra",
@@ -3944,6 +3950,7 @@
     "skillSaveFailed": "Nepavyko išsaugoti įgūdžių",
     "skillSourceCustom": "Pasirinktinis",
     "skillSourceMarketplace": "Parduotuvė",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Įklijuokite SKILL.md ir užpildysite jo pavadinimą; pridėkite įgūdžių iš savo telefono nevilkdami ir numesdami.",
     "skillEditTitle": "Redaguoti įgūdžius",
     "skillEdit": "Redaguoti įgūdį {{name}}",

@@ -1514,7 +1514,13 @@
         "change_request_failed": "I-PR yehlulekile",
         "superseded": "Isivele ikhona"
       },
-      "noProposalsDescription": "Iziphakamiso zenkumbulo yokuhlola zivela lapha ngemva kokuba i-Kilo ihlaziye izimpendulo zabagcini bekhodi."
+      "noProposalsDescription": "Iziphakamiso zenkumbulo yokuhlola zivela lapha ngemva kokuba i-Kilo ihlaziye izimpendulo zabagcini bekhodi.",
+      "changeRequestInProgress": "I-Kilo isivele ivula i-PR yalesi siphakamiso. Zama futhi emva kwesikhashana.",
+      "changeRequestNotActionable": "Lesi siphakamiso asisakwazi ukugunyazwa. Vala futhi uvuselele uhlu.",
+      "changeRequestNoGitHubAccess": "Akukho ukuxhumana kwe-GitHub okunokufinyelela kule rejistri. Xhuma kabusha i-GitHub enokufinyelela kuyo, bese uzama futhi.",
+      "changeRequestMissingPermissions": "I-GitHub App ye-Kilo ayikwazi ukuvula ama-PR kule rejistri. Umnikazi we-rejistri kufanele anikeze i-app ilungelo lokubhala kokuqukethwe nakuma-PR, bese uzama futhi.",
+      "changeRequestFailed": "I-Kilo ayikwazanga ukuvula i-PR. Zama futhi emva kwesikhashana.",
+      "offAction": "Inkumbulo yokuhlola ivaliwe. Yivule, bese uzama futhi."
     },
     "manualReview": {
       "title": "Ukuhlola okuqalwa nguwe",
@@ -3844,6 +3850,7 @@
     "skillSaveFailed": "Ayikwazanga ukulondoloza ikhono",
     "skillSourceCustom": "Ngokwezifiso",
     "skillSourceMarketplace": "Imakethe",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Namathisela i-SKILL.md futhi igama layo ligcwalise; engeza ikhono kusuka kufoni yakho ngaphandle kokuhudula nokuwisa.",
     "skillEditTitle": "Hlela ikhono",
     "skillEdit": "Hlela ikhono {{name}}",

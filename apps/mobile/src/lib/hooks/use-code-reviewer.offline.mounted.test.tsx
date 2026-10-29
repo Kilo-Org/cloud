@@ -112,7 +112,9 @@ function respondWith(options: { failWrites?: Error } = {}) {
     if (options.failWrites && WRITE_PROCEDURES[procedure] === true) {
       throw options.failWrites;
     }
-    return Response.json({ result: { data: WRITE_PROCEDURES[procedure] === true ? CONFIG_SUCCESS : CONFIG } });
+    return Response.json({
+      result: { data: WRITE_PROCEDURES[procedure] === true ? CONFIG_SUCCESS : CONFIG },
+    });
   });
 }
 

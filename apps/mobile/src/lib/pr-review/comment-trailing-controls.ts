@@ -66,7 +66,7 @@ export const COMMENT_ROW_GAP_DP = 8.75;
  * Top padding for a view whose first child is a comment author row, so the
  * visible space above the row's circle equals `visibleDp`.
  */
-export function commentAuthorRowTopPadding(visibleDp: number): { paddingTop: number } {
+export function commentAuthorRowTopPadding(visibleDp: number) {
   return { paddingTop: Math.max(0, visibleDp - COMMENT_AUTHOR_ROW_SLACK_DP) };
 }
 

@@ -9,8 +9,11 @@ import {
   enqueueUsage,
   USAGE_ENQUEUE_TIMEOUT_MS,
   USAGE_ENQUEUE_MAX_ATTEMPTS,
+  USAGE_ENQUEUE_RETRY_TIMEOUT_MS,
+  USAGE_ENQUEUE_RETRY_BUDGET_MS,
 } from './usage-publisher';
 import type { UsageRecordRequest } from '@kilocode/usage-contracts';
+import type * as UsagePublisherModule from './usage-publisher';
 
 const payload: UsageRecordRequest = {
   core: {
@@ -281,7 +284,10 @@ describe('enqueueUsage transient retries', () => {
         expect(init?.body).toBe(JSON.stringify(payload));
       }
       expect(mockFetch.mock.calls[0][1]?.signal).not.toBe(mockFetch.mock.calls[1][1]?.signal);
-      expect(timeouts.mock.calls).toEqual([[USAGE_ENQUEUE_TIMEOUT_MS], [USAGE_ENQUEUE_TIMEOUT_MS]]);
+      expect(timeouts.mock.calls).toEqual([
+        [USAGE_ENQUEUE_RETRY_TIMEOUT_MS],
+        [USAGE_ENQUEUE_RETRY_TIMEOUT_MS],
+      ]);
       expect(warn.mock.calls).toEqual([
         [
           'usage enqueue retrying',
@@ -332,21 +338,23 @@ describe('enqueueUsage transient retries', () => {
     }
   );
 
-  test('waits for each backoff boundary before issuing the next fetch', async () => {
+  test('waits for capped exponential full-jitter boundaries before each fetch', async () => {
     jest.useFakeTimers();
-    jest.spyOn(Math, 'random').mockReturnValue(0);
+    jest.spyOn(Math, 'random').mockReturnValue(0.5);
     mockFetch.mockResolvedValue(new Response(null, { status: 503 }));
     const result = enqueueUsage(payload, { retryTransientFailures: true });
     await jest.advanceTimersByTimeAsync(0);
     expect(mockFetch).toHaveBeenCalledTimes(1);
-    await jest.advanceTimersByTimeAsync(199);
-    expect(mockFetch).toHaveBeenCalledTimes(1);
-    await jest.advanceTimersByTimeAsync(1);
-    expect(mockFetch).toHaveBeenCalledTimes(2);
-    await jest.advanceTimersByTimeAsync(399);
-    expect(mockFetch).toHaveBeenCalledTimes(2);
-    await jest.advanceTimersByTimeAsync(1);
-    expect(mockFetch).toHaveBeenCalledTimes(3);
+    for (const [delay, count] of [
+      [250, 2],
+      [500, 3],
+      [1000, 4],
+    ]) {
+      await jest.advanceTimersByTimeAsync(delay - 1);
+      expect(mockFetch).toHaveBeenCalledTimes(count - 1);
+      await jest.advanceTimersByTimeAsync(1);
+      expect(mockFetch).toHaveBeenCalledTimes(count);
+    }
     expect(await result).toEqual({ kind: 'unavailable', reason: 'http_503' });
   });
 
@@ -426,7 +434,7 @@ describe('enqueueUsage transient retries', () => {
 
   test('bounds retries and backoff, preserves bytes, and logs safe categorical outcomes', async () => {
     jest.useFakeTimers();
-    jest.spyOn(Math, 'random').mockReturnValue(0);
+    jest.spyOn(Math, 'random').mockReturnValue(0.5);
     const delays = jest.spyOn(globalThis, 'setTimeout');
     const event = { ...payload, core: { ...payload.core } };
     const originalBody = JSON.stringify(event);
@@ -441,7 +449,7 @@ describe('enqueueUsage transient retries', () => {
     expect(mockFetch.mock.calls.map(([, init]) => init?.body)).toEqual(
       Array(USAGE_ENQUEUE_MAX_ATTEMPTS).fill(originalBody)
     );
-    expect(delays.mock.calls.map(([, delay]) => delay)).toEqual([200, 400]);
+    expect(delays.mock.calls.map(([, delay]) => delay)).toEqual([250, 500, 1000]);
     expect(warn.mock.calls).toEqual([
       [
         'usage enqueue retrying',
@@ -458,6 +466,15 @@ describe('enqueueUsage transient retries', () => {
           usageId: payload.core.id,
           reason: 'request_failed',
           attempt: 2,
+          duplicate_possible: true,
+        },
+      ],
+      [
+        'usage enqueue retrying',
+        {
+          usageId: payload.core.id,
+          reason: 'request_failed',
+          attempt: 3,
           duplicate_possible: true,
         },
       ],
@@ -495,7 +512,7 @@ describe('enqueueUsage transient retries', () => {
     mockFetch
       .mockResolvedValueOnce(new Response(null, { status: 408 }))
       .mockResolvedValueOnce(new Response(null, { status: 429 }))
-      .mockResolvedValueOnce(new Response(null, { status: 408 }));
+      .mockResolvedValue(new Response(null, { status: 408 }));
     const result = enqueueUsage(payload, { retryTransientFailures: true });
     await jest.runAllTimersAsync();
     expect(await result).toEqual({ kind: 'unavailable', reason: 'http_408' });
@@ -503,6 +520,7 @@ describe('enqueueUsage transient retries', () => {
     expect(warn.mock.calls).toEqual([
       ['usage enqueue retrying', { usageId: payload.core.id, reason: 'http_408', attempt: 1 }],
       ['usage enqueue retrying', { usageId: payload.core.id, reason: 'http_429', attempt: 2 }],
+      ['usage enqueue retrying', { usageId: payload.core.id, reason: 'http_408', attempt: 3 }],
       [
         'usage enqueue unavailable',
         { usageId: payload.core.id, kind: 'unavailable', reason: 'http_408' },
@@ -553,10 +571,11 @@ describe('enqueueUsage transient retries', () => {
           server.close(error => (error ? reject(error) : resolve()))
         );
       }
-    }
+    },
+    10_000
   );
 
-  test('exhausts three real HTTP timeouts within the bounded attempt/backoff budget', async () => {
+  test('exhausts four real HTTP timeouts within the bounded attempt/backoff budget', async () => {
     let requests = 0;
     const server = createServer(() => {
       requests++;
@@ -573,13 +592,15 @@ describe('enqueueUsage transient retries', () => {
         reason: 'timeout',
       });
       const elapsed = performance.now() - start;
-      expect(elapsed).toBeGreaterThanOrEqual(USAGE_ENQUEUE_TIMEOUT_MS * USAGE_ENQUEUE_MAX_ATTEMPTS);
-      expect(elapsed).toBeLessThan(USAGE_ENQUEUE_TIMEOUT_MS * USAGE_ENQUEUE_MAX_ATTEMPTS + 2_000);
+      expect(elapsed).toBeGreaterThanOrEqual(
+        USAGE_ENQUEUE_RETRY_TIMEOUT_MS * USAGE_ENQUEUE_MAX_ATTEMPTS
+      );
+      expect(elapsed).toBeLessThan(USAGE_ENQUEUE_RETRY_BUDGET_MS + 1_000);
       expect(requests).toBe(USAGE_ENQUEUE_MAX_ATTEMPTS);
       expect(mockFetch).toHaveBeenCalledTimes(USAGE_ENQUEUE_MAX_ATTEMPTS);
       expect(
         warn.mock.calls.filter(([message]) => message === 'usage enqueue retrying')
-      ).toHaveLength(2);
+      ).toHaveLength(3);
       expect(warn).toHaveBeenLastCalledWith('usage enqueue unavailable', {
         usageId: payload.core.id,
         kind: 'unavailable',
@@ -592,5 +613,160 @@ describe('enqueueUsage transient retries', () => {
         server.close(error => (error ? reject(error) : resolve()))
       );
     }
-  }, 10_000);
+  }, 30_000);
+});
+
+describe('bounded CF confirmation policy', () => {
+  test('a real confirmation after three seconds succeeds on the first attempt', async () => {
+    let requests = 0;
+    const server = createServer((_request, response) => {
+      requests++;
+      setTimeout(() => {
+        response.writeHead(202);
+        response.end();
+      }, 3_000);
+    });
+    try {
+      await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+      const address = server.address();
+      if (!address || typeof address === 'string') throw new Error('Missing fixture port');
+      config.USAGE_INGEST_URL = `http://127.0.0.1:${address.port}/usage`;
+      mockFetch.mockImplementation(nativeFetch);
+      expect(await enqueueUsage(payload, { retryTransientFailures: true })).toEqual({
+        kind: 'accepted',
+      });
+      expect(requests).toBe(1);
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      expect(warn).not.toHaveBeenCalled();
+    } finally {
+      server.closeAllConnections();
+      await new Promise<void>((resolve, reject) =>
+        server.close(error => (error ? reject(error) : resolve()))
+      );
+    }
+  });
+
+  test('recovers on the fourth attempt and never issues a fifth', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0);
+    mockFetch
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValueOnce(new Response(null, { status: 503 }))
+      .mockResolvedValue(new Response(null, { status: 202 }));
+    const result = enqueueUsage(payload, { retryTransientFailures: true });
+    await jest.runAllTimersAsync();
+    expect(await result).toEqual({ kind: 'accepted' });
+    expect(mockFetch).toHaveBeenCalledTimes(4);
+    expect(new Set(mockFetch.mock.calls.map(([, init]) => init?.body))).toEqual(
+      new Set([JSON.stringify(payload)])
+    );
+  });
+
+  test('four full confirmation timeouts plus near-maximum jitter stay within 25 seconds', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0.999);
+    jest.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), ms);
+      return controller.signal;
+    });
+    mockFetch.mockImplementation(
+      (_url, init) =>
+        new Promise((_resolve, reject) => {
+          init?.signal?.addEventListener('abort', () => reject(new Error('synthetic timeout')), {
+            once: true,
+          });
+        })
+    );
+    const result = enqueueUsage(payload, { retryTransientFailures: true });
+    await jest.runAllTimersAsync();
+    expect(await result).toEqual({ kind: 'unavailable', reason: 'timeout' });
+    expect(mockFetch).toHaveBeenCalledTimes(4);
+    expect(performance.now()).toBeGreaterThanOrEqual(20_000);
+    expect(performance.now()).toBeLessThanOrEqual(25_000);
+    expect(warn).toHaveBeenLastCalledWith(
+      'usage enqueue unavailable',
+      expect.objectContaining({ duplicate_possible: true })
+    );
+  });
+
+  test('clips a later attempt timeout to the remaining elapsed budget', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0.5);
+    const timeouts = jest.spyOn(AbortSignal, 'timeout');
+    mockFetch
+      .mockImplementationOnce(async () => {
+        jest.advanceTimersByTime(23_000);
+        return new Response(null, { status: 503 });
+      })
+      .mockResolvedValue(new Response(null, { status: 202 }));
+    const result = enqueueUsage(payload, { retryTransientFailures: true });
+    await jest.runAllTimersAsync();
+    expect(await result).toEqual({ kind: 'accepted' });
+    expect(timeouts.mock.calls).toEqual([[5_000], [1_750]]);
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  test('clips sleep to the remaining budget and sends nothing after exhaustion', async () => {
+    jest.useFakeTimers();
+    jest.spyOn(Math, 'random').mockReturnValue(0.5);
+    const sleeps = jest.spyOn(globalThis, 'setTimeout');
+    mockFetch.mockImplementation(async () => {
+      jest.advanceTimersByTime(24_900);
+      return new Response(null, { status: 503 });
+    });
+    const result = enqueueUsage(payload, { retryTransientFailures: true });
+    await jest.runAllTimersAsync();
+    expect(await result).toEqual({ kind: 'unavailable', reason: 'http_503' });
+    expect(sleeps.mock.calls.map(([, delay]) => delay)).toEqual([100]);
+    expect(performance.now()).toBe(25_000);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenLastCalledWith(
+      'usage enqueue unavailable',
+      expect.objectContaining({ duplicate_possible: true })
+    );
+  });
+
+  test('a stalled runtime exhausts the budget without masking the last network failure', async () => {
+    jest.useFakeTimers();
+    mockFetch.mockImplementation(async () => {
+      jest.advanceTimersByTime(25_000);
+      throw new Error('synthetic network failure');
+    });
+    const result = await enqueueUsage(payload, { retryTransientFailures: true });
+    expect(result).toEqual({ kind: 'unavailable', reason: 'request_failed' });
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(warn).toHaveBeenCalledTimes(1);
+    expectUnavailableWarning('request_failed', true);
+  });
+
+  test.each([false, true])(
+    'Vercel transport bypasses CF policy (retries=%s)',
+    async retryTransientFailures => {
+      const vercel = jest.fn(async (_payload: UsageRecordRequest) => ({
+        kind: 'accepted' as const,
+      }));
+      jest.doMock('@kilocode/usage-queue/vercel/config', () => ({
+        USAGE_VERCEL_QUEUE_ENABLED: true,
+      }));
+      jest.doMock('@kilocode/usage-queue/vercel/publisher', () => ({ enqueueVercelUsage: vercel }));
+      const timeout = jest.spyOn(AbortSignal, 'timeout');
+      let selected = enqueueUsage;
+      try {
+        jest.isolateModules(() => {
+          selected =
+            jest.requireActual<typeof UsagePublisherModule>('./usage-publisher').enqueueUsage;
+        });
+        expect(await selected(payload, { retryTransientFailures })).toEqual({ kind: 'accepted' });
+        expect(vercel).toHaveBeenCalledTimes(1);
+        expect(vercel).toHaveBeenCalledWith(payload);
+        expect(mockFetch).not.toHaveBeenCalled();
+        expect(timeout).not.toHaveBeenCalled();
+      } finally {
+        jest.dontMock('@kilocode/usage-queue/vercel/config');
+        jest.dontMock('@kilocode/usage-queue/vercel/publisher');
+      }
+    }
+  );
 });

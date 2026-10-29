@@ -806,7 +806,7 @@ describe('production SFO queued accounting', () => {
     await lifetime.drain();
     expect(result).toBeNull();
     expect(fetch).toHaveBeenCalledTimes(publisher.USAGE_ENQUEUE_MAX_ATTEMPTS);
-    expect(sent).toEqual([sent[0], sent[0], sent[0]]);
+    expect(sent).toEqual(Array(publisher.USAGE_ENQUEUE_MAX_ATTEMPTS).fill(sent[0]));
     expect(writer).not.toHaveBeenCalled();
     expect(db.transaction).not.toHaveBeenCalled();
     expect(lifetime.errors).toEqual([]);
@@ -876,7 +876,18 @@ describe('production SFO queued accounting', () => {
       const lifetime = requestLifetime();
       const generation = Promise.withResolvers<void>();
       const accepted = Promise.withResolvers<Response>();
-      jest.mocked(fetch).mockReturnValue(accepted.promise);
+      jest.mocked(fetch).mockImplementation(
+        (_url, init) =>
+          new Promise((resolve, reject) => {
+            const signal = init?.signal;
+            const abort = () => reject(new Error('synthetic timeout'));
+            signal?.addEventListener('abort', abort, { once: true });
+            void accepted.promise.then(response => {
+              signal?.removeEventListener('abort', abort);
+              resolve(response);
+            });
+          })
+      );
       let result: Awaited<ReturnType<typeof logMicrodollarUsage>> = null;
       lifetime.run(() => {
         after(() => {});
@@ -898,6 +909,7 @@ describe('production SFO queued accounting', () => {
       await new Promise(resolve => setImmediate(resolve));
       expect(drained).toBe(false);
       config.USAGE_QUEUE_SFO_CONFIG = { enabled: false, exposure: 0, userIds: null };
+      if (status === 202) await new Promise(resolve => setTimeout(resolve, 3_000));
       accepted.resolve(new Response(null, { status }));
       await drain;
       expect(result).toEqual(status === 202 ? expect.objectContaining({ status: 'queued' }) : null);

@@ -479,12 +479,16 @@ export function ChatComposer({
   // paths) goes through it, and each setter fires only when the value the
   // composer renders actually changed.
   const publishDerivedState = useCallback((value: string, slashCandidate: string | null) => {
-    const nextHasText = hasVisibleComposerText(value);
-    if (nextHasText !== publishedHasTextRef.current) {
-      publishedHasTextRef.current = nextHasText;
-      setHasText(nextHasText);
+    const hasVisible = hasVisibleComposerText(value);
+    if (hasVisible !== publishedHasTextRef.current) {
+      publishedHasTextRef.current = hasVisible;
+      setHasText(hasVisible);
     }
-    const nextInputEmpty = value.length === 0;
+    // The placeholder follows the same reading: a draft that draws nothing is
+    // an empty composer to look at, so it must show the hint an empty one
+    // shows. Deriving it from `value.length` left such a draft with no glyph,
+    // no hint and a disabled Send — an empty state that reads as broken.
+    const nextInputEmpty = !hasVisible;
     if (nextInputEmpty !== publishedInputEmptyRef.current) {
       publishedInputEmptyRef.current = nextInputEmpty;
       setInputEmpty(nextInputEmpty);

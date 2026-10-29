@@ -16,6 +16,7 @@ import {
 } from '@/components/agents/blocking-card-state';
 import { permissionToolLabel } from '@/components/agents/permission-tool-label';
 import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -243,7 +244,7 @@ export function PermissionCard({
           {presentation.hasRetryCta && retryPermissionResponse && retryLabel ? (
             <Button
               size="sm"
-              className="flex-1"
+              className={cn(STATE_ACTION_CLASS, 'flex-1')}
               onPress={() => {
                 handleRespond(retryPermissionResponse);
               }}

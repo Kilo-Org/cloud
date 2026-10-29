@@ -421,8 +421,6 @@ export class EnvironmentBuildCoordinator {
     return {
       baseImage: await this.deps.provider.currentImage(this.deps.builderSandboxId),
       runtimeAbi: RUNTIME_BASE_ABI,
-      runtimeMode:
-        (await this.deps.provider.runtimeReleaseId()) === null ? 'preinstalled' : 'downloaded',
     };
   }
 
@@ -682,16 +680,21 @@ export class EnvironmentBuildCoordinator {
   }
 
   private async advance(build: BuildRow): Promise<void> {
-    if (
-      build.state !== 'stopping' &&
-      this.deps.unsupportedReason(parseBuildInput(build).reference.owner) !== null
-    ) {
-      if (build.state === 'queued') {
-        this.terminalWithoutAllocation(build, 'obsolete', 'snapshots_disabled');
-      } else {
-        this.beginStopping(build.id, [build.state], 'obsolete', { reason: 'snapshots_disabled' });
+    if (build.state !== 'stopping') {
+      const reason =
+        this.deps.unsupportedReason(parseBuildInput(build).reference.owner) !== null
+          ? 'snapshots_disabled'
+          : build.runtime_release === null
+            ? 'runtime_changed'
+            : null;
+      if (reason !== null) {
+        if (build.state === 'queued') {
+          this.terminalWithoutAllocation(build, 'obsolete', reason);
+        } else {
+          this.beginStopping(build.id, [build.state], 'obsolete', { reason });
+        }
+        return;
       }
-      return;
     }
     switch (build.state) {
       case 'queued':

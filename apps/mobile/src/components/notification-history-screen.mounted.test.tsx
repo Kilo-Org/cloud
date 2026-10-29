@@ -89,6 +89,7 @@ vi.mock('@shopify/flash-list', () => ({
 }));
 
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   View: 'View',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
@@ -106,7 +107,7 @@ vi.mock('@/components/ui/skeleton', () => ({ Skeleton: 'Skeleton' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/components/tab-screen', () => ({ useTabBarBottomPadding: () => 24 }));
 vi.mock('@/lib/auth/auth-context', () => ({ useAuth: () => ({ token: 'jwt' }) }));
-vi.mock('@/lib/hooks/use-now-ticker', () => ({ useNowTicker: () => NOW }));
+vi.mock('@/lib/hooks/use-now-ticker', () => ({ useRelativeTimeNow: () => NOW }));
 vi.mock('@/lib/hooks/use-notification-master-gate', () => ({
   useNotificationMasterGate: () => state.gate,
 }));
@@ -362,7 +363,9 @@ describe('NotificationHistoryScreen', () => {
 
     const chip = withText(byType('Button'), 'Chat messages');
     expect(chipProps(chip)).toMatchObject({
-      role: 'tab',
+      // iOS is the mocked platform: a chip is typed as a button there so
+      // VoiceOver gives it a control trait (see lib/a11y/tab-entry).
+      role: 'button',
       accessibilityState: { selected: false },
     });
 

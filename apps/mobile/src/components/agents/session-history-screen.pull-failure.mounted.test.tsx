@@ -173,9 +173,10 @@ vi.mock('@/lib/tab-bar-layout', () => ({ getEffectiveTabBarHeight: () => 60 }));
 vi.mock('@/components/context-control', () => ({ ContextControl: 'ContextControl' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
-vi.mock('@/components/agents/session-list-header-actions', () => ({
-  SessionListHeaderActions: 'SessionListHeaderActions',
+vi.mock('@/components/agents/session-filter-button', () => ({
+  SessionFilterButton: 'SessionFilterButton',
 }));
+vi.mock('@/components/ui/icon-button', () => ({ IconButton: 'IconButton' }));
 vi.mock('@/components/agents/session-list-section-header', () => ({
   SessionListSectionHeader: 'SessionListSectionHeader',
 }));

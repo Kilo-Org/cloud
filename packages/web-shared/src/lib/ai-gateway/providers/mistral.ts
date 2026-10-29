@@ -1,8 +1,5 @@
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import {
-  dropToolStrictProperties,
-  normalizeToolCallIds,
-} from '@kilocode/web-shared/lib/ai-gateway/tool-calling';
+import { dropToolStrictProperties } from '@kilocode/web-shared/lib/ai-gateway/tool-calling';
 
 export function isMistralModel(model: string) {
   return model.includes('mistral');
@@ -21,9 +18,6 @@ export function applyMistralModelSettings(requestToMutate: GatewayRequest) {
   if (requestToMutate.body.temperature === undefined) {
     requestToMutate.body.temperature = 0.2;
   }
-
-  // mistral requires tool call ids to be of length 9
-  normalizeToolCallIds(requestToMutate, toolCallId => toolCallId.length !== 9, 9);
 
   // mistral doesn't support strict for our schema
   dropToolStrictProperties(requestToMutate.body);

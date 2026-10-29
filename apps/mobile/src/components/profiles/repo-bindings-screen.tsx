@@ -1,33 +1,40 @@
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Pressable, View } from 'react-native';
+import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
+import { type ProfileOwnerChoice } from '@/components/profiles/profile-owner-model';
 import { ProfilePickerSheet } from '@/components/profiles/repo-bindings-profile-sheet';
-import { RepoPickerSheet } from '@/components/profiles/repo-picker-sheet';
 import {
   type RepoBindingPlatform,
   type RepoOption,
-  repoPlatformBadge,
   repositoryOptionKey,
 } from '@/components/profiles/repo-bindings-model';
+import {
+  PickerField,
+  RepoBindingRow,
+  RepoBindingsSkeleton,
+} from '@/components/profiles/repo-bindings-rows';
+import { RepoPickerSheet } from '@/components/profiles/repo-picker-sheet';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
-import { ChevronDown, GitBranch, Trash2 } from '@/components/ui/icons';
-import { Skeleton } from '@/components/ui/skeleton';
+import { GitBranch } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { useAgentProfileList } from '@/lib/hooks/use-agent-profiles';
+import {
+  type OrganizationProfilePermission,
+  useOrganizationProfilePermission,
+} from '@/lib/hooks/use-can-manage-profiles';
 import {
   useRepoBindingMutations,
   useRepoBindings,
   useRepoOptions,
 } from '@/lib/hooks/use-repo-bindings';
-import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
-import { cn } from '@/lib/utils';
+import { getNewProfilePath, type ProfileManagementStack } from '@/lib/profile-agent-navigation';
 
 /** The mutation hook toasts `error.message`; the screen supplies a fallback otherwise. */
 function hasUsableMessage(error: unknown): boolean {
@@ -35,95 +42,32 @@ function hasUsableMessage(error: unknown): boolean {
 }
 
 /**
- * Content-shaped rows in the same slot and height as a loaded binding row, so
- * the swap from skeleton to bindings does not move the Add control below it.
+ * The picker's empty-state copy. It names the profile a user could select in
+ * this context: a personal one, an organization one, or — without the manage
+ * role — who can create an organization profile, since the server rejects the
+ * create itself. While the role is still resolving it names the organization
+ * profile the context lists: the read-only copy would tell an owner or admin
+ * they cannot act on what they can.
  */
-function RepoBindingsSkeleton() {
-  return (
-    <View className="gap-2">
-      {[0, 1, 2].map(index => (
-        <Skeleton key={index} className="h-14 w-full rounded-lg bg-muted-soft" />
-      ))}
-    </View>
-  );
-}
+const PICKER_EMPTY_DESCRIPTION_KEYS = {
+  personal: 'profiles.emptyDescription',
+  organization: 'profiles.repoBindings.pickerEmptyDescriptionOrganization',
+  organizationReadOnly: 'profiles.repoBindings.pickerEmptyDescriptionOrganizationReadOnly',
+} as const;
 
-/** One binding row: repo full name, provider badge, profile name, remove. */
-function RepoBindingRow({
-  repoFullName,
-  platform,
-  profileName,
-  isRemoving,
-  onRemove,
-}: Readonly<{
-  repoFullName: string;
-  platform: string;
-  profileName: string;
-  isRemoving: boolean;
-  onRemove: () => void;
-}>) {
-  const { t } = useTranslation();
-  const colors = useThemeColors();
-  return (
-    <View className="min-h-14 flex-row items-center gap-2 rounded-lg bg-secondary px-3 py-2">
-      <GitBranch size={16} color={colors.mutedForeground} />
-      <View className="min-w-0 flex-1 gap-0.5">
-        <Text variant="mono" className="text-sm" numberOfLines={1}>
-          {repoFullName}
-        </Text>
-        <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-          {profileName}
-        </Text>
-      </View>
-      <Text className="rounded border border-border px-1.5 py-0.5 text-[10px] uppercase tracking-wider text-muted-foreground">
-        {repoPlatformBadge(platform)}
-      </Text>
-      <Pressable
-        className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
-        accessibilityRole="button"
-        accessibilityLabel={t('profiles.repoBindings.remove')}
-        disabled={isRemoving}
-        onPress={onRemove}
-      >
-        <Trash2 size={18} color={colors.destructive} />
-      </Pressable>
-    </View>
-  );
-}
+type PickerEmptyDescriptionKey =
+  (typeof PICKER_EMPTY_DESCRIPTION_KEYS)[keyof typeof PICKER_EMPTY_DESCRIPTION_KEYS];
 
-/** A tappable field row that opens one of the Add form's pickers. */
-function PickerField({
-  label,
-  value,
-  accessibilityLabel,
-  disabled,
-  onPress,
-}: Readonly<{
-  label: string;
-  value: string | null;
-  accessibilityLabel: string;
-  disabled: boolean;
-  onPress: () => void;
-}>) {
-  const colors = useThemeColors();
-  return (
-    <Pressable
-      className="min-h-11 flex-row items-center justify-between gap-2 rounded-md border border-border bg-secondary px-3 py-2 active:opacity-70"
-      accessibilityRole="button"
-      accessibilityLabel={accessibilityLabel}
-      accessibilityState={{ disabled }}
-      disabled={disabled}
-      onPress={onPress}
-    >
-      <Text
-        className={value === null ? 'text-sm text-muted-foreground' : 'text-sm text-foreground'}
-        numberOfLines={1}
-      >
-        {value ?? label}
-      </Text>
-      <ChevronDown size={16} color={colors.mutedForeground} />
-    </Pressable>
-  );
+function pickerEmptyDescriptionKey(
+  organizationId: string | undefined,
+  permission: OrganizationProfilePermission
+): PickerEmptyDescriptionKey {
+  if (organizationId === undefined) {
+    return PICKER_EMPTY_DESCRIPTION_KEYS.personal;
+  }
+  return permission === 'read-only'
+    ? PICKER_EMPTY_DESCRIPTION_KEYS.organizationReadOnly
+    : PICKER_EMPTY_DESCRIPTION_KEYS.organization;
 }
 
 /**
@@ -133,11 +77,25 @@ function PickerField({
  * web dialog's behaviour — so no invalid submit is possible. Selection is a tap
  * in a native sheet; there is no drag anywhere.
  */
-export function RepoBindingsScreen({ organizationId }: Readonly<{ organizationId?: string }>) {
+export function RepoBindingsScreen({
+  organizationId,
+  stack,
+}: Readonly<{
+  organizationId?: string;
+  /** The Stack this screen is mounted in; its create screen opens in it too. */
+  stack: ProfileManagementStack;
+}>) {
+  const router = useRouter();
   const { t } = useTranslation();
   const bindingsQuery = useRepoBindings(organizationId);
   const { bind, unbind } = useRepoBindingMutations(organizationId);
   const profileList = useAgentProfileList(organizationId);
+  // Personal scope is always creatable; an organization profile needs a manage
+  // role, and the server rejects the create without one. `resolving` is not yet
+  // a refusal, so the picker's create action waits for the answer instead of
+  // telling the user they cannot act.
+  const profilePermission = useOrganizationProfilePermission(organizationId);
+  const canCreateProfile = profilePermission === 'allowed';
 
   const [isAdding, setIsAdding] = useState(false);
   const [selectedRepo, setSelectedRepo] = useState<RepoOption | null>(null);
@@ -151,6 +109,26 @@ export function RepoBindingsScreen({ organizationId }: Readonly<{ organizationId
   const selectedProfile = profileChoices.find(profile => profile.id === selectedProfileId);
   const selectedRepoKey = selectedRepo === null ? null : repositoryOptionKey(selectedRepo);
   const canAdd = selectedRepo !== null && selectedProfileId !== '' && !bind.isPending;
+  // The picker lists this context's own profiles, so its empty state names the
+  // profile that would appear there.
+  const pickerEmptyDescription = t(pickerEmptyDescriptionKey(organizationId, profilePermission));
+  // The create form starts on the owner whose profiles this context lists.
+  const createOwner: ProfileOwnerChoice =
+    organizationId === undefined ? 'personal' : 'organization';
+
+  const openProfileCreator = () => {
+    setProfilePickerOpen(false);
+    router.push(
+      getNewProfilePath(stack, {
+        owner: createOwner,
+        returnTo: 'back',
+        // The form must create the profile in the organization whose list this
+        // picker shows, which is this screen's scope, not necessarily the
+        // account that is active elsewhere in the app.
+        ...(organizationId === undefined ? {} : { organizationId }),
+      })
+    );
+  };
 
   const resetAdd = () => {
     setSelectedRepo(null);
@@ -245,7 +223,11 @@ export function RepoBindingsScreen({ organizationId }: Readonly<{ organizationId
             <PickerField
               label={t('profiles.repoBindings.repo')}
               value={selectedRepo?.fullName ?? null}
-              accessibilityLabel={t('profiles.repoBindings.repo')}
+              accessibilityLabel={
+                selectedRepo === null
+                  ? t('profiles.repoBindings.repo')
+                  : t('profiles.repoBindings.repoValue', { name: selectedRepo.fullName })
+              }
               disabled={bind.isPending}
               onPress={() => {
                 setRepoPickerOpen(true);
@@ -254,7 +236,11 @@ export function RepoBindingsScreen({ organizationId }: Readonly<{ organizationId
             <PickerField
               label={t('profiles.repoBindings.profile')}
               value={selectedProfile?.name ?? null}
-              accessibilityLabel={t('profiles.repoBindings.profile')}
+              accessibilityLabel={
+                selectedProfile === undefined
+                  ? t('profiles.repoBindings.profile')
+                  : t('profiles.repoBindings.profileValue', { name: selectedProfile.name })
+              }
               disabled={bind.isPending}
               onPress={() => {
                 setProfilePickerOpen(true);
@@ -314,6 +300,8 @@ export function RepoBindingsScreen({ organizationId }: Readonly<{ organizationId
           isError={profileList.isError}
           isRefetching={profileList.isRefetching}
           selectedProfileId={selectedProfileId}
+          emptyDescription={pickerEmptyDescription}
+          onCreateProfile={canCreateProfile ? openProfileCreator : undefined}
           onRetry={() => {
             void profileList.refetch();
           }}

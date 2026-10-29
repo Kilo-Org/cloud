@@ -42,11 +42,11 @@ export type DirectByokUpstream = Pick<
 export type DirectByokResolveUpstreamInput = {
   /** The decrypted credential stored for the provider. */
   credential: string;
-  model: Pick<DirectByokModel, 'id'>;
+  model: Pick<DirectByokModel, 'id' | 'endpoint'>;
   stream: boolean;
 };
 
-export type DirectByokProvider = {
+type DirectByokProviderBase = {
   id: DirectByokProviderMetaId;
   /** models.dev provider key; omitted for providers models.dev does not list. */
   models_dev_id?: string;
@@ -57,26 +57,55 @@ export type DirectByokProvider = {
   /**
    * Builds the upstream for a request from the stored credential. Most providers
    * use `apiKeyUpstream`; cloud providers can derive regions or signed requests.
+   * The upstream's `supportedChatApis` must match `getDirectByokModelChatApis`.
    */
   resolveUpstream(input: DirectByokResolveUpstreamInput): Promise<DirectByokUpstream>;
 };
 
-/** The upstream of a provider that takes the stored credential as a bearer API key. */
+/**
+ * The chat APIs are known without the credential, so routing can choose between keys, and the
+ * BYOK routing preview can explain the choice, without decrypting any key.
+ */
+export type DirectByokProvider = DirectByokProviderBase &
+  (
+    | {
+        /** The chat APIs the upstream serves every model over. */
+        supportedChatApis: ReadonlyArray<GatewayChatApiKind>;
+        getModelChatApi?: undefined;
+      }
+    | {
+        supportedChatApis?: undefined;
+        /** The chat API a model must be called with, for providers where it varies per model. */
+        getModelChatApi(model: DirectByokModel): GatewayChatApiKind;
+      }
+  );
+
+/**
+ * The upstream of a provider that takes the stored credential as a bearer API key, with the chat
+ * APIs it serves. Spread the result into the provider.
+ */
 export function apiKeyUpstream(upstream: {
   apiUrl: string;
   apiUrlOverrides?: ProviderApiUrlOverrides;
   supportedChatApis: ReadonlyArray<GatewayChatApiKind>;
   responseTransforms: ProviderResponseTransforms | null;
-}): DirectByokProvider['resolveUpstream'] {
-  return async ({ credential }) => ({
-    apiUrl: upstream.apiUrl,
-    apiUrlOverrides: upstream.apiUrlOverrides ?? {},
-    disableUrlSuffix: false,
-    apiKey: credential,
-    apiKeyHeader: null,
+}): Pick<DirectByokProvider, 'resolveUpstream'> & {
+  supportedChatApis: ReadonlyArray<GatewayChatApiKind>;
+} {
+  return {
     supportedChatApis: upstream.supportedChatApis,
-    responseTransforms: upstream.responseTransforms,
-  });
+    async resolveUpstream({ credential }) {
+      return {
+        apiUrl: upstream.apiUrl,
+        apiUrlOverrides: upstream.apiUrlOverrides ?? {},
+        disableUrlSuffix: false,
+        apiKey: credential,
+        apiKeyHeader: null,
+        supportedChatApis: upstream.supportedChatApis,
+        responseTransforms: upstream.responseTransforms,
+      };
+    },
+  };
 }
 
 export function faviconIcon(siteUrl: string): DirectByokProviderListing['icon'] {

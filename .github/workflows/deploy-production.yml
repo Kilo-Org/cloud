@@ -67,7 +67,7 @@ jobs:
     # Guard: privileged workflow — only the canonical repo may run it.
     if: github.repository == 'Kilo-Org/cloud' && needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 15
+    timeout-minutes: 45
     environment: production
 
     env:

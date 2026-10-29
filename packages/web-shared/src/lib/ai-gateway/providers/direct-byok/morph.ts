@@ -8,7 +8,7 @@ import {
 export default {
   id: 'morph-byok',
   models_dev_id: 'morph',
-  resolveUpstream: apiKeyUpstream({
+  ...apiKeyUpstream({
     apiUrl: 'https://api.morphllm.com/v1',
     supportedChatApis: ['chat_completions'],
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,

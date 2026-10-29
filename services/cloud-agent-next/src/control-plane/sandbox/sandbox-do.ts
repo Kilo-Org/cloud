@@ -1,4 +1,6 @@
 import {
+  WORKSPACE_CONFIGURATION_HEADER,
+  WORKSPACE_CONFIGURATION_VERSION,
   WORKTREE_RUNTIME_HEADER,
   WORKTREE_RUNTIME_VERSION,
 } from '../../shared/control-plane-runtime-contract.js';
@@ -25,6 +27,10 @@ import {
   type SandboxBillingInput,
 } from '../../container-usage-context.js';
 import { resolveSecret } from '../../auth.js';
+import {
+  workspaceMcpAnchorSessionId,
+  type WorkspaceMcpBinding,
+} from '../../cloud-agent-authority.js';
 import {
   assertContainerCapacity,
   getContainerCapacityFailureReason,
@@ -164,6 +170,10 @@ import {
   type CliMcpServer,
 } from '../../mcp-config.js';
 import {
+  attachmentSpecFromRouteSpec,
+  workspaceConfigFromSpec,
+} from '../../shared/workspace-config.js';
+import {
   CONTROL_PLANE_ALLOCATION_ID_ENV,
   CONTROL_PLANE_PROTOCOL_VERSION,
   CONTROL_PLANE_REQUEST_TIMEOUT_MS,
@@ -178,6 +188,7 @@ import {
   controlPlaneWorktreeCaptureInputSchema,
   controlPlaneWorktreeDeletionPayloadSchema,
   controlPlaneWrapperFrameSchema,
+  type AttachmentSpec,
   type ControlPlaneAnswerPayload,
   type ControlPlaneControlResult,
   type ControlPlaneCredentialSource,
@@ -197,6 +208,7 @@ import {
   type ControlPlaneTerminalInput,
   type ControlPlaneWorktreeCaptureInput,
   type ControlPlaneWrapperFrame,
+  type WorkspaceConfig,
 } from '../../shared/control-plane-protocol.js';
 import {
   CONTROL_PLANE_TIMERS,
@@ -365,6 +377,7 @@ const wrapperSocketAttachmentSchema = z.object({
   heartbeatAck: z.literal(true).optional(),
   redactsNamedSecrets: z.literal(true).optional(),
   installsSkillsSh: z.literal(true).optional(),
+  workspaceConfiguration: z.literal(true).optional(),
   runtimeCapability: z.literal('worktree').optional(),
   billingCheckedAt: z.number().finite().nonnegative().optional(),
 });
@@ -388,6 +401,10 @@ class PrepareFrameMaterializationError extends Error {
   }
 }
 
+type MaterializedPrepareFrame =
+  | { type: 'session.prepare'; spec: ControlPlaneRouteSpec }
+  | { type: 'session.attach'; spec: AttachmentSpec; workspace: WorkspaceConfig };
+
 function errorClassName(error: unknown): string {
   return error instanceof Error ? error.name : 'unknown';
 }
@@ -404,9 +421,9 @@ function materializationStage(error: unknown): PrepareFrameMaterializationStage 
  * binding exists; tests inject a fake peer instead.
  */
 export type ControlPlaneSessionPeer = {
-  issueCloudAgentMcpGrant?(): Promise<
-    { url: string; token: string; expiresAt: number } | undefined
-  >;
+  issueCloudAgentMcpGrant?(
+    workspace?: WorkspaceMcpBinding
+  ): Promise<{ url: string; token: string; expiresAt: number } | undefined>;
   onRoute(update: ControlPlaneRouteUpdate): Promise<void>;
   onEvents(notification: ControlPlaneEventsNotification): Promise<void>;
   onOutcome(outcome: ControlPlaneOutcome): Promise<void>;
@@ -1880,6 +1897,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...(request.headers.get(WORKTREE_RUNTIME_HEADER) === WORKTREE_RUNTIME_VERSION
           ? { runtimeCapability: 'worktree' as const }
           : {}),
+        ...(request.headers.get(WORKSPACE_CONFIGURATION_HEADER) === WORKSPACE_CONFIGURATION_VERSION
+          ? { workspaceConfiguration: true as const }
+          : {}),
         helloDeadlineAt: Date.now() + this.sandboxTimers().wrapperHelloMs,
       } satisfies WrapperSocketAttachment);
       await this.armAlarm(await this.readAllocation());
@@ -2757,7 +2777,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     } catch {
       return 'failed';
     }
-    const cloudAgentMcp = await this.tryIssueCloudAgentMcpGrant(route.sessionId);
+    const cloudAgentMcp = await this.tryIssueCloudAgentMcpGrant(route);
     if (!(await this.applyCandidateGrantPolicy(issued.grant))) return 'policy_failed';
     const next: RouteRecord = { ...route, grant: issued.grant, spec: issued.spec };
     this.publishRouteGrant(next);
@@ -3476,11 +3496,19 @@ export class SandboxControlV2 extends DurableObject<Env> {
     return this.readAttachment(socket)?.installsSkillsSh === true;
   }
 
+  private wrapperAcceptsWorkspaceConfiguration(socket: WebSocket): boolean {
+    return this.readAttachment(socket)?.workspaceConfiguration === true;
+  }
+
   /**
    * A failure throws rather than sending a frame the wrapper would drop while the
    * route waits out its preparation deadline.
    */
-  private materializePrepareFrame(route: RouteRecord, socket: WebSocket): ControlPlaneRouteSpec {
+  private materializePrepareFrame(route: RouteRecord, socket: WebSocket): MaterializedPrepareFrame {
+    const wireSpec = runtimeSpecForContract(
+      route.spec,
+      readRuntimeContract(this.ctx.storage.kv, this.readAttachment(socket)?.allocationId ?? null)
+    );
     if (
       route.spec.runtimeSkills?.some(skill => 'source' in skill) &&
       !this.wrapperInstallsSkillsSh(socket)
@@ -3500,7 +3528,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
       if (frameEnv.secretEnvKeys.length > 0 && !this.wrapperRedactsNamedSecrets(socket)) {
         throw new PrepareFrameMaterializationError('wrapper_redaction_unsupported');
       }
-      const mcp = this.materializeRouteMcp(route);
       if (frameEnv.secretEnvKeys.length > 0) {
         logger
           .withFields({
@@ -3510,17 +3537,28 @@ export class SandboxControlV2 extends DurableObject<Env> {
           })
           .info('Materialized session.prepare secrets');
       }
-      const spec = runtimeSpecForContract(
-        route.spec,
-        readRuntimeContract(this.ctx.storage.kv, this.readAttachment(socket)?.allocationId ?? null)
-      );
-      return controlPlaneRouteSpecSchema.parse({
-        ...spec,
+      const frameSpec = controlPlaneRouteSpecSchema.parse({
+        ...wireSpec,
         createdOnPlatform: route.credentialSource?.createdOnPlatform,
         ...(frameEnv.env === undefined ? {} : { env: frameEnv.env }),
-        ...(mcp === undefined ? {} : { mcp }),
         ...(frameEnv.secretEnvKeys.length === 0 ? {} : { secretEnvKeys: frameEnv.secretEnvKeys }),
       });
+      if (!this.wrapperAcceptsWorkspaceConfiguration(socket)) {
+        const mcp = this.materializeRouteMcp(route);
+        return {
+          type: 'session.prepare',
+          spec: controlPlaneRouteSpecSchema.parse({
+            ...frameSpec,
+            ...(mcp === undefined ? {} : { mcp }),
+          }),
+        };
+      }
+
+      return {
+        type: 'session.attach',
+        spec: attachmentSpecFromRouteSpec(frameSpec),
+        workspace: workspaceConfigFromSpec(frameSpec, this.materializeRouteMcp(route)),
+      };
     } catch (error) {
       if (error instanceof PrepareFrameMaterializationError) throw error;
       // Preserve the sanitized, bounded MCP reason for diagnosis.
@@ -3766,7 +3804,6 @@ export class SandboxControlV2 extends DurableObject<Env> {
     attemptId: string,
     expectedFence: ControlRuntimeCredentialProxyFence | null
   ): Promise<void> {
-    const cloudAgentMcp = await this.tryIssueCloudAgentMcpGrant(sessionId);
     const state = await this.readAllocation();
     const socket = this.boundWrapperSocket(state);
     if (socket === null) return;
@@ -3777,23 +3814,32 @@ export class SandboxControlV2 extends DurableObject<Env> {
       const sendFence = this.runtimeProxyFenceFor(state);
       if (sendFence === null || !sameRuntimeProxyControlBinding(expectedFence, sendFence)) return;
     }
-    let spec: ControlPlaneRouteSpec;
+    const cloudAgentMcp = await this.tryIssueCloudAgentMcpGrant(latest);
+    let frame: MaterializedPrepareFrame;
     try {
-      spec = this.materializePrepareFrame(latest, socket);
+      frame = this.materializePrepareFrame(latest, socket);
     } catch (error) {
       this.logPrepareFrameMaterializationFailure(latest, error);
       await this.failPrepareAttempt(sessionId, attemptId, materializationStage(error));
       return;
     }
-    const sent = this.trySendFrame(socket, {
-      type: 'session.prepare',
-      spec,
-      credentials: controlPlaneSessionCredentialsPayloadSchema.parse({
-        ...this.prepareCredentials(latest.grant, sessionId),
-        ...(cloudAgentMcp ? { cloudAgentMcp } : {}),
-      }),
+
+    const sendState = await this.readAllocation();
+    if (this.boundWrapperSocket(sendState) !== socket) return;
+    const sendRoute = await readRoute(this.db, sessionId);
+    if (!isCurrentPreparingAttempt(sendRoute, attemptId)) return;
+    if (sendRoute.grant === null || sendRoute.grant.kilo.runtimeProxy === undefined) return;
+    if (expectedFence !== null) {
+      const sendFence = this.runtimeProxyFenceFor(sendState);
+      if (sendFence === null || !sameRuntimeProxyControlBinding(expectedFence, sendFence)) return;
+    }
+
+    const credentials = controlPlaneSessionCredentialsPayloadSchema.parse({
+      ...this.prepareCredentials(sendRoute.grant, sessionId),
+      ...(cloudAgentMcp ? { cloudAgentMcp } : {}),
     });
-    if (sent) await this.markRouteCredentialsSent(sessionId, latest.grant);
+    const sent = this.trySendFrame(socket, { ...frame, credentials });
+    if (sent) await this.markRouteCredentialsSent(sessionId, sendRoute.grant);
   }
 
   /**
@@ -3988,20 +4034,34 @@ export class SandboxControlV2 extends DurableObject<Env> {
   }
 
   private async tryIssueCloudAgentMcpGrant(
-    sessionId: string
+    route: RouteRecord
   ): Promise<{ url: string; token: string; expiresAt: number } | undefined> {
+    const anchor = workspaceMcpAnchorSessionId(route.credentialSource?.scopeId, route.sessionId);
+    if (anchor === undefined) return undefined;
     try {
       const ownerId = await this.requireOwner();
-      const peer = ownerId === null ? null : this.sessionPeerFor(ownerId, sessionId);
+      const peer = ownerId === null ? null : this.sessionPeerFor(ownerId, anchor);
       if (peer?.issueCloudAgentMcpGrant === undefined) return undefined;
       return await withTimeout(
-        peer.issueCloudAgentMcpGrant(),
+        peer.issueCloudAgentMcpGrant(
+          route.credentialSource?.scopeId?.startsWith('worktree_')
+            ? {
+                worktreeId: route.credentialSource.scopeId,
+                ownerId: route.credentialSource.userId,
+                organizationId: route.credentialSource.orgId ?? null,
+              }
+            : undefined
+        ),
         this.grantIssueTimeoutMs(),
         'Cloud Agent MCP grant issuance timed out'
       );
     } catch {
       logger
-        .withFields({ sandboxId: this.sandboxId, sessionId })
+        .withFields({
+          sandboxId: this.sandboxId,
+          sessionId: route.sessionId,
+          anchorSessionId: anchor,
+        })
         .warn('Optional Cloud Agent MCP grant unavailable; continuing without it');
       return undefined;
     }
@@ -4163,10 +4223,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         const selection = selectStartup(this.env, pin.provider, {
           preparingRoutes: (await listRoutes(this.db))
             .filter(route => route.state === 'preparing')
-            .map(route => ({
-              createdOnPlatform: route.credentialSource?.createdOnPlatform,
-              orgId: route.credentialSource?.orgId,
-            })),
+            .map(route => ({ orgId: route.credentialSource?.orgId })),
           sandboxKind: pin.sandboxKind,
           sandboxId: this.sandboxId,
         });
@@ -4823,6 +4880,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ...(frame.heartbeatAck ? { heartbeatAck: true } : {}),
         ...(frame.redactsNamedSecrets ? { redactsNamedSecrets: true } : {}),
         ...(frame.installsSkillsSh ? { installsSkillsSh: true } : {}),
+        ...(attachment?.workspaceConfiguration ? { workspaceConfiguration: true } : {}),
       });
       // Welcome first, then route effects: a re-prepared route resends
       // `session.prepare`, which must not arrive before the welcome.

@@ -8,7 +8,7 @@ import {
 export default {
   id: 'alibaba-token-plan',
   models_dev_id: 'alibaba-token-plan',
-  resolveUpstream: apiKeyUpstream({
+  ...apiKeyUpstream({
     apiUrl: 'https://token-plan.ap-southeast-1.maas.aliyuncs.com/compatible-mode/v1',
     supportedChatApis: ['chat_completions'],
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,

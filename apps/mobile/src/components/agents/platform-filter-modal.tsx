@@ -28,6 +28,7 @@ export { type ProjectFilterOption };
 const SHEET_SNAP_POINTS = ['100%'];
 
 type SessionFilterModalProps = {
+  visible: boolean;
   selectedPlatforms: string[];
   selectedProjects: string[];
   projectOptions: ProjectFilterOption[];
@@ -111,19 +112,31 @@ function FilterCheckboxRow({ label, isChecked, onPress }: Readonly<FilterCheckbo
   );
 }
 
-/**
- * The session list's filter picker. It is mounted only while open (the same
- * lifecycle `RenameModal` uses), so the draft selection starts from the applied
- * filters on every open.
- */
 export function SessionFilterModal({
+  visible,
+  ...contentProps
+}: Readonly<SessionFilterModalProps>) {
+  const { onClose: handleClose } = contentProps;
+  return (
+    <Sheet
+      visible={visible}
+      onClose={handleClose}
+      dismissGestures={false}
+      snapPoints={SHEET_SNAP_POINTS}
+    >
+      <SessionFilterContent {...contentProps} />
+    </Sheet>
+  );
+}
+
+function SessionFilterContent({
   selectedPlatforms,
   selectedProjects,
   projectOptions,
   platformOptions = PLATFORM_FILTERS,
   onClose,
   onApply,
-}: Readonly<SessionFilterModalProps>) {
+}: Readonly<Omit<SessionFilterModalProps, 'visible'>>) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [draftPlatforms, setDraftPlatforms] = useState<string[]>(() => [
@@ -178,84 +191,76 @@ export function SessionFilterModal({
   };
 
   return (
-    // The sheet edits a draft (platform and project selections) that Apply
-    // commits, so the downward drag stays off: on iOS it would otherwise close
-    // the sheet and drop the draft when the user dragged the option list.
-    <Sheet visible onClose={onClose} dismissGestures={false} snapPoints={SHEET_SNAP_POINTS}>
-      {/* The sheet fills the detent, so the row list takes the slack and
-          scrolls: a long recent-repository list can never push Apply off the
-          bottom of the sheet. */}
-      <View
-        className="flex-1 gap-4 p-5"
-        style={{
-          paddingTop: Platform.OS === 'ios' ? undefined : insets.top + 20,
-          paddingBottom: insets.bottom + 20,
-        }}
-      >
-        <Text accessibilityRole="header" className="text-center text-base font-semibold">
-          {t('agentChat.sessionFilter.title')}
-        </Text>
-        <ScrollView nestedScrollEnabled className="flex-1" showsVerticalScrollIndicator={false}>
-          <View className="gap-4">
-            {/* The rows are derived from the live sessions, so a list whose
-                rows all have an unknown origin (`liveSessionPlatformBucket`
-                returns null) offers no platform at all and nothing is
-                selected. Rendering the label then leaves an orphaned section
-                header above PROJECT (spot defect e4-filter); the section is
-                omitted exactly as PROJECT already is when it has no rows. */}
-            {platforms.length > 0 && (
-              <View className="gap-1">
-                <Text variant="eyebrow" className="px-3">
-                  {t('common.platform')}
-                </Text>
-                {platforms.map(platform => (
-                  <FilterCheckboxRow
-                    key={platform}
-                    label={platformFilterLabel(platform)}
-                    isChecked={draftPlatforms.includes(platform)}
-                    onPress={() => {
-                      togglePlatform(platform);
-                    }}
-                  />
-                ))}
-              </View>
-            )}
-            {projectGroups.size > 0 && (
-              <View className="gap-1">
-                <Text variant="eyebrow" className="px-3">
-                  {t('agentChat.sessionFilter.project')}
-                </Text>
-                {[...projectGroups.entries()].map(([key, group]) => (
-                  <FilterCheckboxRow
-                    key={key}
-                    label={group.displayName}
-                    isChecked={group.gitUrls.some(gitUrl => draftProjects.includes(gitUrl))}
-                    onPress={() => {
-                      toggleProjectGroup(group);
-                    }}
-                  />
-                ))}
-              </View>
-            )}
-          </View>
-        </ScrollView>
-        <View className="flex-row justify-end gap-3">
-          <Button variant="outline" onPress={onClose}>
-            <Text>{t('common.cancel')}</Text>
-          </Button>
-          <Button
-            onPress={() => {
-              onApply({
-                platformFilter: draftPlatforms,
-                projectFilter: draftProjects,
-              });
-              onClose();
-            }}
-          >
-            <Text className="text-primary-foreground">{t('common.apply')}</Text>
-          </Button>
+    <View
+      className="flex-1 gap-4 p-5"
+      style={{
+        paddingTop: Platform.OS === 'ios' ? undefined : insets.top + 20,
+        paddingBottom: insets.bottom + 20,
+      }}
+    >
+      <Text accessibilityRole="header" className="text-center text-base font-semibold">
+        {t('agentChat.sessionFilter.title')}
+      </Text>
+      <ScrollView nestedScrollEnabled className="flex-1" showsVerticalScrollIndicator={false}>
+        <View className="gap-4">
+          {/* The rows are derived from the live sessions, so a list whose
+              rows all have an unknown origin (`liveSessionPlatformBucket`
+              returns null) offers no platform at all and nothing is
+              selected. Rendering the label then leaves an orphaned section
+              header above PROJECT (spot defect e4-filter); the section is
+              omitted exactly as PROJECT already is when it has no rows. */}
+          {platforms.length > 0 && (
+            <View className="gap-1">
+              <Text variant="eyebrow" className="px-3">
+                {t('common.platform')}
+              </Text>
+              {platforms.map(platform => (
+                <FilterCheckboxRow
+                  key={platform}
+                  label={platformFilterLabel(platform)}
+                  isChecked={draftPlatforms.includes(platform)}
+                  onPress={() => {
+                    togglePlatform(platform);
+                  }}
+                />
+              ))}
+            </View>
+          )}
+          {projectGroups.size > 0 && (
+            <View className="gap-1">
+              <Text variant="eyebrow" className="px-3">
+                {t('agentChat.sessionFilter.project')}
+              </Text>
+              {[...projectGroups.entries()].map(([key, group]) => (
+                <FilterCheckboxRow
+                  key={key}
+                  label={group.displayName}
+                  isChecked={group.gitUrls.some(gitUrl => draftProjects.includes(gitUrl))}
+                  onPress={() => {
+                    toggleProjectGroup(group);
+                  }}
+                />
+              ))}
+            </View>
+          )}
         </View>
+      </ScrollView>
+      <View className="flex-row justify-end gap-3">
+        <Button variant="outline" onPress={onClose}>
+          <Text>{t('common.cancel')}</Text>
+        </Button>
+        <Button
+          onPress={() => {
+            onApply({
+              platformFilter: draftPlatforms,
+              projectFilter: draftProjects,
+            });
+            onClose();
+          }}
+        >
+          <Text className="text-primary-foreground">{t('common.apply')}</Text>
+        </Button>
       </View>
-    </Sheet>
+    </View>
   );
 }

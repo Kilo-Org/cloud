@@ -15,6 +15,7 @@ import {
   issueCloudAgentMcpGrant,
   resolveCloudAgentMcpUrl,
   validateScopedWorkerPreparation,
+  workspaceMcpAnchorSessionId,
 } from './cloud-agent-authority.js';
 
 const { renew, seal } = vi.hoisted(() => ({ renew: vi.fn(), seal: vi.fn() }));
@@ -80,6 +81,14 @@ function fixture() {
 }
 
 describe('Cloud Agent spawn authority', () => {
+  it('resolves every sibling to the original workspace root without electing another chat', () => {
+    const worktreeId = parentSessionId.replace('workspace_', 'worktree_');
+    expect(workspaceMcpAnchorSessionId(worktreeId, parentSessionId)).toBe(parentSessionId);
+    expect(workspaceMcpAnchorSessionId(worktreeId, childSessionId)).toBe(parentSessionId);
+    expect(workspaceMcpAnchorSessionId(undefined, childSessionId)).toBe(childSessionId);
+    expect(workspaceMcpAnchorSessionId('worktree_invalid', childSessionId)).toBeUndefined();
+  });
+
   it('rejects shared allocation for opted-in parents and scoped children after saved-settings resolution', () => {
     expect(() => assertCloudAgentIsolatedAllocation(true, 'cloudflare-shared')).toThrow(
       'isolated sandbox'
@@ -131,6 +140,35 @@ describe('Cloud Agent spawn authority', () => {
     await expect(issueCloudAgentMcpGrant(context)).resolves.toBeUndefined();
     expect(context.authorization).not.toHaveBeenCalled();
     expect(renew).not.toHaveBeenCalled();
+  });
+
+  it('issues workspace authority only from its original root with the matching owner and organization', async () => {
+    const { context, metadata } = fixture();
+    const workspace = {
+      worktreeId: `worktree_${parentSessionId.slice('workspace_'.length)}` as const,
+      ownerId: scope.ownerId,
+      organizationId: null,
+    };
+    metadata.workspace = { worktreeId: workspace.worktreeId };
+    const issued = await issueCloudAgentMcpGrant({ ...context, workspace });
+    expect(jwt.decode(issued?.token ?? '')).toMatchObject({
+      cloudAgentAuthority: { parentSessionId },
+    });
+    for (const mismatch of [
+      { worktreeId: childSessionId.replace('workspace_', 'worktree_') },
+      { ownerId: 'other-user' },
+      { organizationId: 'other-organization' },
+    ]) {
+      await expect(
+        issueCloudAgentMcpGrant({
+          ...context,
+          workspace: { ...workspace, ...mismatch },
+        })
+      ).resolves.toBeUndefined();
+    }
+    metadata.identity.sessionId = childSessionId;
+    await expect(issueCloudAgentMcpGrant({ ...context, workspace })).resolves.toBeUndefined();
+    expect(renew).toHaveBeenCalledTimes(1);
   });
 
   it('binds organization grants and Worker request metadata to exactly one organization', async () => {

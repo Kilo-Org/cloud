@@ -212,6 +212,10 @@ what a translator has to work from.
 - If one English word truly needs two senses, add it to `TWO_SENSE_COPY` in
   `tools/i18n/check-catalogs.mjs` and record both senses there.
 - Run `pnpm check:i18n` after you touch copy.
+- A key `en.json` gains must reach all 86 catalogs before the pull request
+  merges: `check:i18n` fails on a key one of them lacks, so a change that adds
+  copy either waits for the translation slice or lands the catalog values
+  itself and says so.
 
 ## Design
 

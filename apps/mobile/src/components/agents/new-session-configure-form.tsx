@@ -143,16 +143,16 @@ export function NewSessionConfigureForm({
   const sideInsetStyle = useSideInsetStyle();
   // The footer reserves the platform inset. KeyboardAvoidingView lifts the
   // scroll body and footer together; the prompt yields height to the viewport.
-  // The scroll view retains focused-input keyboard inset adjustment.
+  // The scroll view takes no keyboard inset of its own: iOS sized that inset
+  // before the lift, so the frame was cleared twice and the content scrolled
+  // the composer's mode and model row out of view once the keyboard settled.
+  // A focused field below the fold still scrolls into view through the text
+  // input's own caret reveal. (The picker-sheet sliver of the e1 spot check is
+  // fixed at the sheet triggers: a formSheet anchors over the keyboard that is
+  // up at its first layout and never re-anchors, so the keyboard must be
+  // dismissed before the sheet opens.)
   const bottomClearance = useDetailScreenBottomPadding();
   const { bottom } = useSafeAreaInsets();
-  // The ScrollView's keyboard-inset adjustment stays on for focused-field
-  // scroll-into-view; it sizes against the scroll view's own frame, which
-  // already ends above the footer, so the two never stack into a double lift.
-  // (The picker-sheet sliver of the e1 spot check is fixed at the sheet
-  // triggers: a formSheet anchors over the keyboard that is up at its first
-  // layout and never re-anchors, so the keyboard must be dismissed before
-  // the sheet opens.)
   // The scroll frame's own height, reported by the ScrollView below. It already
   // shrinks with the keyboard because the `KeyboardAvoidingView` below lifts this
   // parent; the prompt yields its minimum height to it so the whole composer
@@ -191,7 +191,6 @@ export function NewSessionConfigureForm({
       className="flex-1"
       contentContainerClassName="flex-grow px-4 pt-4"
       keyboardShouldPersistTaps="handled"
-      automaticallyAdjustKeyboardInsets
       keyboardDismissMode="on-drag"
       onLayout={handleScrollFrameLayout}
     >

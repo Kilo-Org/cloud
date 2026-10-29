@@ -63,6 +63,8 @@ export async function withNativeBuildSemaphore<T>(args: NativeBuildSemaphoreArgs
 // sorted relative paths plus contents so the result is deterministic.
 export function hashRootNativeInputs(repoRoot: string): string {
   const hash = createHash('sha256');
+  // Separate artifacts and local caches from builds without provenance checks.
+  hash.update('native-artifact-provenance-v1\0');
   const add = (label: string, filePath: string): void => {
     hash.update(label);
     hash.update('\0');

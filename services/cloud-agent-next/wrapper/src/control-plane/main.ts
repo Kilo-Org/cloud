@@ -225,6 +225,19 @@ export function createControlPlaneFrameDispatcher(
 ): (frame: ControlPlaneWrapperFrame) => void {
   return function onFrame(frame: ControlPlaneWrapperFrame): void {
     switch (frame.type) {
+      case 'session.attach': {
+        const preparation = deps.preparation.current;
+        if (preparation === undefined) return;
+        onFrame({
+          type: 'session.prepare',
+          spec: {
+            ...frame.spec,
+            ...preparation.workspaceConfiguration(frame.spec, frame.workspace),
+          },
+          credentials: frame.credentials,
+        });
+        return;
+      }
       case 'session.prepare':
         deps.turns.current?.registerRoute(frame.spec);
         void deps.preparation.current

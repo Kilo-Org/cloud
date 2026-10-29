@@ -2,7 +2,10 @@ import {
   AzureCredentialsSchema,
   BedrockCredentialsSchema,
   DirectUserByokInferenceProviderIdSchema,
+  GatewayUserByokProviderIdSchema,
   getVercelUserByokProviderIdForEndpoint,
+  isGatewayUserByokProviderId,
+  UserByokProviderIdSchema,
   normalizeVercelInferenceProviderIdForRouting,
   openRouterToVercelInferenceProviderId,
   OpenRouterInferenceProviderIdSchema,
@@ -94,6 +97,24 @@ describe('inference provider ids', () => {
     );
 
     expect(overlappingProviderIds).toEqual([]);
+  });
+
+  test('gateway BYOK provider ids do not overlap with other BYOK or inference provider ids', () => {
+    const overlappingProviderIds = GatewayUserByokProviderIdSchema.options.filter(
+      providerId =>
+        OpenRouterInferenceProviderIdSchema.safeParse(providerId).success ||
+        VercelInferenceProviderIdSchema.safeParse(providerId).success ||
+        DirectUserByokInferenceProviderIdSchema.safeParse(providerId).success
+    );
+
+    expect(overlappingProviderIds).toEqual([]);
+  });
+
+  test('accepts gateway keys as user BYOK providers', () => {
+    expect(UserByokProviderIdSchema.parse('openrouter')).toBe('openrouter');
+    expect(UserByokProviderIdSchema.parse('vercel-ai-gateway')).toBe('vercel-ai-gateway');
+    expect(isGatewayUserByokProviderId('openrouter')).toBe(true);
+    expect(isGatewayUserByokProviderId('anthropic')).toBe(false);
   });
 
   test('maps the OpenRouter Claude AWS provider to its Vercel provider id', () => {

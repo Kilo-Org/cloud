@@ -77,7 +77,7 @@ function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>
         <Pressable
           className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
           accessibilityRole="button"
-          accessibilityLabel={t('profiles.skillEditTitle')}
+          accessibilityLabel={t('profiles.skillEdit', { name: skill.name })}
           onPress={onEdit}
         >
           <Pencil size={18} color={colors.mutedForeground} />
@@ -87,7 +87,7 @@ function SkillRow({ skill, onToggle, onEdit, onDelete }: Readonly<SkillRowProps>
         <Pressable
           className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
           accessibilityRole="button"
-          accessibilityLabel={t('common.delete')}
+          accessibilityLabel={t('profiles.skillDelete', { name: skill.name })}
           onPress={onDelete}
         >
           <Trash2 size={18} color={colors.destructive} />

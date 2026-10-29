@@ -13,6 +13,7 @@ import {
   subscribeSignOutActive,
 } from '@/lib/auth/sign-out-state';
 import { CachePersistenceMount } from './cache-persistence-mount';
+import { readCacheScope } from './cache-scope';
 import { queryClient } from '@/lib/query-client';
 import {
   clearCacheScopeForSignOut,
@@ -187,7 +188,7 @@ describe('CachePersistenceMount', () => {
 
     // The persister is bound to exactly the user's scope for the schema.
     await latestPersistOptions()?.persister.restoreClient();
-    expect(kvMock.getItem).toHaveBeenCalledWith('cache:u1:1', 'read-cache');
+    expect(kvMock.getItem).toHaveBeenCalledWith(readCacheScope('u1'), 'read-cache');
 
     // No cold-start restore claimed a scope, so nothing is cleared.
     expect(kvMock.clearScope).not.toHaveBeenCalled();
@@ -293,9 +294,9 @@ describe('CachePersistenceMount', () => {
     // query client are cleared before the new scope subscribes.
     expect(takeOverColdStartRestore()).toBeNull();
     expect(clearSpy).toHaveBeenCalledTimes(1);
-    expect(kvMock.clearScope).toHaveBeenCalledWith('cache:user-a:1');
+    expect(kvMock.clearScope).toHaveBeenCalledWith(readCacheScope('user-a'));
     await latestPersistOptions()?.persister.restoreClient();
-    expect(kvMock.getItem).toHaveBeenCalledWith('cache:user-b:1', 'read-cache');
+    expect(kvMock.getItem).toHaveBeenCalledWith(readCacheScope('user-b'), 'read-cache');
 
     clearSpy.mockRestore();
     act(() => {

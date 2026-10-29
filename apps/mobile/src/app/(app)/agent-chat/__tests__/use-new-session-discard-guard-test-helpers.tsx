@@ -19,6 +19,7 @@ const backMock = vi.hoisted(() => vi.fn());
 // treat a Back as the picker's, exactly as the app's live stack does while a
 // sheet presents.
 const navigationState = vi.hoisted(() => ({ topRoute: 'agent-chat/new' }));
+const stateListeners = vi.hoisted(() => new Set<() => void>());
 const dispatchMock = vi.hoisted(() => vi.fn());
 const toastErrorMock = vi.hoisted(() => vi.fn());
 // Mutable so a single file proves the confirm is one cross-platform
@@ -89,16 +90,25 @@ vi.mock('sonner-native', () => ({
   toast: { error: toastErrorMock },
 }));
 
-vi.mock('expo-router', () => ({
-  useNavigation: () => ({
+vi.mock('expo-router', () => {
+  const navigation = {
     getState: () => ({
       index: 1,
       routes: [{ name: 'agent-chat/new' }, { name: navigationState.topRoute }],
     }),
-  }),
-  usePreventRemove: usePreventRemoveMock,
-  useRouter: () => ({ back: backMock }),
-}));
+    addListener: (_event: string, listener: () => void) => {
+      stateListeners.add(listener);
+      return () => {
+        stateListeners.delete(listener);
+      };
+    },
+  };
+  return {
+    useNavigation: () => navigation,
+    usePreventRemove: usePreventRemoveMock,
+    useRouter: () => ({ back: backMock }),
+  };
+});
 
 function GuardHarness({
   dirty,
@@ -199,6 +209,15 @@ export function triggerPreventRemoveInAct(): Action {
   return holder.action;
 }
 
+export function setPickerTopRoute(topRoute: string): void {
+  act(() => {
+    navigationState.topRoute = topRoute;
+    for (const listener of stateListeners) {
+      listener();
+    }
+  });
+}
+
 /** Returns every hoisted mock and the captured removal to its pre-test state. */
 export function resetGuardHarness(): void {
   platform.os = 'ios';
@@ -209,6 +228,7 @@ export function resetGuardHarness(): void {
   usePreventRemoveHolder.preventRemove = undefined;
   usePreventRemoveHolder.callback = undefined;
   navigationState.topRoute = 'agent-chat/new';
+  stateListeners.clear();
 }
 
 export function isType(node: TestRenderer.ReactTestInstance, type: string): boolean {

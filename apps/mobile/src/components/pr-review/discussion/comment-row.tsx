@@ -40,7 +40,10 @@ import { Image } from '@/components/ui/image';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
-import { COMMENT_ACTIONS_HIT_SLOP } from '@/lib/pr-review/comment-trailing-controls';
+import {
+  COMMENT_ACTIONS_HIT_SLOP,
+  COMMENT_ROW_GAP_DP,
+} from '@/lib/pr-review/comment-trailing-controls';
 import { type PrCommentKind } from '@/lib/pr-review/fix-with-kilo';
 import {
   type ReviewComment,
@@ -51,6 +54,11 @@ import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
 import { Pressable, View } from 'react-native';
+
+const ROOT_STYLE = { gap: COMMENT_ROW_GAP_DP };
+// The author row is as tall as the overflow's frame; cancelling the gap below
+// it starts the body at the frame's edge, and the frame stays inside the root.
+const AUTHOR_ROW_STYLE = { marginBottom: -COMMENT_ROW_GAP_DP };
 
 type CommentRowProps = {
   readonly comment: ReviewComment;
@@ -182,13 +190,8 @@ export function CommentRow({
   }
 
   return (
-    <View className="gap-2.5">
-      {/* The overflow's 48dp frame sets this row's height, 10pt above and below
-          its 28pt circle. `-mb-2.5` cancels the root's `gap-2.5` so the body
-          starts at the frame's edge; the containers trim their top padding by
-          the same slack. Every edge stays inside its parent, so the whole
-          frame keeps receiving touches. */}
-      <View className="-mb-2.5 flex-row items-center gap-2">
+    <View style={ROOT_STYLE}>
+      <View style={AUTHOR_ROW_STYLE} className="flex-row items-center gap-2">
         {comment.author?.avatarUrl ? (
           <Image
             source={{ uri: comment.author.avatarUrl }}

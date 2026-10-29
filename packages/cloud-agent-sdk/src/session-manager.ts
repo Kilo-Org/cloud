@@ -407,17 +407,21 @@ type SessionManagerConfig = {
   onBranchChanged?: (branch: string) => void;
   onSendFailed?: (messageText: string, displayMessage?: string, error?: unknown) => void;
   /**
-   * Optional durable memory of delivery failures the user already retried,
+   * Optional durable memory of message ids the user resolved by retrying,
    * scoped to one session. Read on `switchSession` and consulted when a
    * `cloud.message.failed` event arrives: the DO replays its stored events on
    * the next open, so without this the cleared footer returns after a relaunch.
-   * Callers without a reader (web, tests) keep the in-memory-only behaviour.
+   * It also carries every row an accepted retry replaced — a delivered user row
+   * and the failed response row it re-sent — so the transcript keeps hiding
+   * them after a relaunch. Callers without a reader (web, tests) keep the
+   * in-memory-only behaviour.
    */
   readResolvedDeliveryFailures?: (kiloSessionId: KiloSessionId) => Promise<readonly string[]>;
   /**
-   * Optional sink for a delivery failure the user resolved by retrying, so the
-   * next open can drop its replayed `cloud.message.failed`. Never throws into
-   * the caller; a failed write costs one restored footer, not a broken retry.
+   * Optional sink for a message id the user resolved by retrying, so the next
+   * open can drop its replayed `cloud.message.failed` and keep a replaced row
+   * hidden. Never throws into the caller; a failed write costs one restored
+   * footer, not a broken retry.
    */
   persistResolvedDeliveryFailure?: (kiloSessionId: KiloSessionId, messageId: string) => void;
   /**
@@ -558,9 +562,11 @@ type SessionManagerAtoms = {
    */
   transcriptCleared: W<boolean>;
   /**
-   * Ids whose delivery failure the user resolved by retrying, for the active
-   * session. Seeded from the durable resolved-delivery record on open, so a
-   * superseded row stays hidden across a switch-back and a relaunch.
+   * Ids the user resolved by retrying, for the active session: a failed
+   * delivery entry, or every row an accepted retry replaced (the delivered
+   * user row and the failed response row it re-sent). Seeded from the durable
+   * resolved record on open, so a replaced row stays hidden across a
+   * switch-back and a relaunch.
    */
   resolvedDeliveryFailures: Atom<ReadonlySet<string>>;
   /**
@@ -651,9 +657,12 @@ type SessionManager = {
   acceptSuggestion(requestId: string, index: number): Promise<void>;
   dismissSuggestion(requestId: string): Promise<void>;
   /**
-   * Remove one failed delivery entry after a successful retry so its row
-   * stops showing, and persist the id (when a sink is configured) so a
-   * replayed `cloud.message.failed` on the next open cannot bring it back.
+   * Record one message id as resolved by a successful retry so its row stops
+   * showing, and persist the id (when a sink is configured) so a replayed
+   * `cloud.message.failed` on the next open cannot bring it back. Used for a
+   * failed delivery entry and for every row an accepted retry replaced: a
+   * delivered user row and the failed response row it re-sent are both
+   * hidden, and they stay hidden after a relaunch.
    *
    * `ownerSessionId` is the session that owned the retried row, captured by
    * the caller before the re-send. Pass it whenever the re-send was awaited:
@@ -3651,13 +3660,16 @@ function createSessionManager(config: SessionManagerConfig): SessionManager {
       next.delete(messageId);
       store.set(pendingMessagesAtom, next);
     }
-    // Remember the resolution for the owner's in-memory suppression: the
-    // failure id is final on the server, so any later `cloud.message.failed`
+    // Remember the resolution for the owner's in-memory suppression: a failed
+    // message id is final on the server, so any later `cloud.message.failed`
     // for it is the DO's stored-event replay and must not restore the footer
-    // the user's retry cleared. Recording it under the owner — not only under
-    // the active session — is what suppresses the replay when the user
-    // switches back before the durable write below lands; that write is what
-    // keeps the clear across a relaunch.
+    // the user's retry cleared. The transcript also reads the record to keep a
+    // replaced row hidden — an accepted retry of a failed assistant response
+    // records the failed response and the delivered user row it re-sent.
+    // Recording it under the owner — not only under the active session — is
+    // what suppresses the replay when the user switches back before the
+    // durable write below lands; that write is what keeps the clear across a
+    // relaunch.
     resolvedFailuresForSession(owner).add(messageId);
     // The accepted resolution replaces the in-flight mark: one record per id,
     // and the resolved record is the one that survives a relaunch.

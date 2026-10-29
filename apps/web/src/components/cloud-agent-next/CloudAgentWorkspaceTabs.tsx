@@ -96,7 +96,7 @@ export function CloudAgentWorkspaceTabs({
   activeTabId: WorkspaceTabId;
   activeTabRef?: RefObject<HTMLButtonElement | null>;
   files: FileWorkspaceTab[];
-  onCloseFile: (path: string) => void;
+  onCloseFile: (path: string, scope?: FileWorkspaceTab['scope']) => void;
   chatSessions: StoredSession[];
   currentChatProgress?: { sessionId: string; message: string } | null;
   currentChatLoadingLabel?: string | null;
@@ -545,10 +545,16 @@ export function CloudAgentWorkspaceTabs({
           );
         })}
         {files.map(tab => {
-          const tabId = fileTabId(tab.path);
+          const tabId = fileTabId(tab.path, tab.scope);
           const active = activeTabId === tabId;
           const selected = active && !selectionSuppressed;
           const name = tab.path.slice(tab.path.lastIndexOf('/') + 1);
+          const scopeLabel =
+            tab.scope === 'uncommitted'
+              ? 'Uncommitted'
+              : tab.scope === 'against-base-branch'
+                ? 'Against base branch'
+                : undefined;
           return (
             <div
               key={tabId}
@@ -559,7 +565,8 @@ export function CloudAgentWorkspaceTabs({
                 ref={active ? selectedTabRef : undefined}
                 {...suppressedSelectionProps}
                 value={tabId}
-                title={tab.path}
+                title={scopeLabel ? `${tab.path} (${scopeLabel})` : tab.path}
+                aria-label={scopeLabel ? `${name} (${scopeLabel})` : undefined}
                 className={tabTriggerClassName}
               >
                 <FileDiff className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
@@ -569,9 +576,9 @@ export function CloudAgentWorkspaceTabs({
                 variant="ghost"
                 size="icon"
                 className={tabActionClassName}
-                aria-label={`Close ${name}`}
+                aria-label={`Close ${name}${scopeLabel ? ` (${scopeLabel})` : ''}`}
                 onClick={() => {
-                  onCloseFile(tab.path);
+                  onCloseFile(tab.path, tab.scope);
                   requestAnimationFrame(() => selectedTabRef.current?.focus());
                 }}
               >

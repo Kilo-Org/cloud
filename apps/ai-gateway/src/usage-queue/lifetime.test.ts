@@ -62,13 +62,10 @@ jest.mock('@kilocode/web-shared/lib/kilo-pass-org/consumption', () => ({}));
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   sentryLogger: () => () => {},
   logExceptInTest: () => {},
+  warnExceptInTest: () => {},
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/upstream-request', () => ({
   fetchGeneration: jest.fn(),
-}));
-jest.mock('@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models', () => ({
-  findKiloExclusiveModel: () => undefined,
-  shouldRedactModelNameInMicrodollarUsage: () => false,
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/custom-pricing', () => ({
   calculateCustomCost_mUsd: () => undefined,

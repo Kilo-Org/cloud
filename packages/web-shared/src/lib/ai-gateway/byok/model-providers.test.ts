@@ -1,0 +1,142 @@
+import { beforeEach, describe, expect, test } from '@jest/globals';
+import {
+  addUserByokAvailability,
+  getModelUserByokProviders,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { canRouteToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
+import type { OpenRouterModel } from '@kilocode/web-shared/lib/organizations/organization-types';
+import {
+  getVercelModelsFromDatabase,
+  getVercelModelsMetadataFromDatabase,
+  isValidOpenRouterModelId,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import type { StoredModel } from '@kilocode/db';
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
+  getVercelModelsMetadataFromDatabase: jest.fn(),
+  getVercelModelsFromDatabase: jest.fn(),
+  isValidOpenRouterModelId: jest.fn(),
+  resolveOpenRouterModelAlias: jest.fn(async (modelId: string) => modelId),
+}));
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
+  canRouteToVercel: jest.fn(),
+}));
+
+const ROUTES: ReadonlySet<string> = new Set(['groq']);
+const SONNET = 'anthropic/claude-sonnet-4.5';
+const OPENROUTER_ONLY_MODEL = 'vendor/openrouter-only';
+
+beforeEach(() => {
+  jest.clearAllMocks();
+  jest.mocked(canRouteToVercel).mockReset();
+  jest.mocked(getVercelModelsMetadataFromDatabase).mockResolvedValue({
+    [SONNET]: {
+      id: SONNET,
+      endpoints: [{ provider_name: 'anthropic' }, { provider_name: 'bedrock' }],
+    } as StoredModel,
+  });
+  jest.mocked(getVercelModelsFromDatabase).mockResolvedValue(new Set([SONNET]));
+  jest.mocked(isValidOpenRouterModelId).mockResolvedValue(true);
+});
+
+describe('addUserByokAvailability', () => {
+  const sonnet = { id: SONNET } as OpenRouterModel;
+
+  test('marks a Vercel AI Gateway key available only when Vercel honors the allowed providers', async () => {
+    jest.mocked(canRouteToVercel).mockResolvedValue(false);
+
+    const [restricted] = await addUserByokAvailability(
+      [sonnet],
+      ['vercel-ai-gateway'],
+      () => ROUTES
+    );
+    const [unrestricted] = await addUserByokAvailability([sonnet], ['vercel-ai-gateway']);
+
+    expect(restricted.hasUserByokAvailable).toBe(false);
+    expect(unrestricted.hasUserByokAvailable).toBe(true);
+    expect(canRouteToVercel).toHaveBeenCalledTimes(1);
+  });
+
+  test('marks an OpenRouter key available regardless of allowed providers', async () => {
+    jest.mocked(canRouteToVercel).mockResolvedValue(false);
+
+    const [model] = await addUserByokAvailability([sonnet], ['openrouter'], () => ROUTES);
+
+    expect(model.hasUserByokAvailable).toBe(true);
+  });
+
+  test('skips catalog discovery when no key is enabled', async () => {
+    const [model] = await addUserByokAvailability([sonnet], []);
+
+    expect(model.hasUserByokAvailable).toBe(false);
+    expect(getVercelModelsMetadataFromDatabase).not.toHaveBeenCalled();
+    expect(getVercelModelsFromDatabase).not.toHaveBeenCalled();
+    expect(isValidOpenRouterModelId).not.toHaveBeenCalled();
+  });
+
+  test('skips gateway discovery when only inference provider keys are enabled', async () => {
+    const [model] = await addUserByokAvailability([sonnet], ['anthropic']);
+
+    expect(model.hasUserByokAvailable).toBe(true);
+    expect(getVercelModelsFromDatabase).not.toHaveBeenCalled();
+    expect(isValidOpenRouterModelId).not.toHaveBeenCalled();
+  });
+
+  test('skips inference metadata when only gateway keys are enabled', async () => {
+    const [model] = await addUserByokAvailability([sonnet], ['openrouter']);
+
+    expect(model.hasUserByokAvailable).toBe(true);
+    expect(getVercelModelsMetadataFromDatabase).not.toHaveBeenCalled();
+  });
+});
+
+describe('getModelUserByokProviders', () => {
+  test('lists inference provider keys before gateway keys in preference order', async () => {
+    expect(await getModelUserByokProviders(SONNET)).toEqual([
+      'anthropic',
+      'bedrock',
+      'vercel-ai-gateway',
+      'openrouter',
+    ]);
+  });
+
+  test('offers only the OpenRouter key for models Vercel does not serve', async () => {
+    expect(await getModelUserByokProviders(OPENROUTER_ONLY_MODEL)).toEqual(['openrouter']);
+  });
+
+  test('offers no OpenRouter key for models OpenRouter does not list', async () => {
+    jest.mocked(isValidOpenRouterModelId).mockResolvedValue(false);
+
+    expect(await getModelUserByokProviders(OPENROUTER_ONLY_MODEL)).toEqual([]);
+  });
+
+  test('skips catalog lookups that cannot match an enabled key', async () => {
+    expect(await getModelUserByokProviders(SONNET, new Set(['anthropic']))).toEqual([
+      'anthropic',
+      'bedrock',
+    ]);
+    expect(getVercelModelsFromDatabase).not.toHaveBeenCalled();
+    expect(isValidOpenRouterModelId).not.toHaveBeenCalled();
+
+    jest.clearAllMocks();
+    expect(await getModelUserByokProviders(SONNET, new Set(['openrouter']))).toEqual([
+      'vercel-ai-gateway',
+      'openrouter',
+    ]);
+    expect(getVercelModelsMetadataFromDatabase).not.toHaveBeenCalled();
+  });
+
+  test.each(['vendor/model:free', kiloExclusiveModels[0].public_id])(
+    'keeps %s on Kilo accounts',
+    async modelId => {
+      jest.mocked(getVercelModelsFromDatabase).mockResolvedValue(new Set([modelId]));
+
+      const providers = await getModelUserByokProviders(modelId);
+
+      expect(providers).not.toContain('vercel-ai-gateway');
+      expect(providers).not.toContain('openrouter');
+    }
+  );
+});

@@ -2192,6 +2192,41 @@
       "when": 1793169931649,
       "tag": "0312_enkrypt_guardrail_added_latency",
       "breakpoints": true
+    },
+    {
+      "idx": 313,
+      "version": "7",
+      "when": 1793206978720,
+      "tag": "0313_byok_api_key_envelope",
+      "breakpoints": true
+    },
+    {
+      "idx": 314,
+      "version": "7",
+      "when": 1793214084646,
+      "tag": "0314_scheduled_briefing_snapshots",
+      "breakpoints": true
+    },
+    {
+      "idx": 315,
+      "version": "7",
+      "when": 1793264832628,
+      "tag": "0315_restore_briefing_legacy_objects",
+      "breakpoints": true
+    },
+    {
+      "idx": 316,
+      "version": "7",
+      "when": 1793269770753,
+      "tag": "0316_mcp_guardrails_and_connect_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 317,
+      "version": "7",
+      "when": 1793273409577,
+      "tag": "0317_drop_briefing_legacy_objects",
+      "breakpoints": true
     }
   ]
 }

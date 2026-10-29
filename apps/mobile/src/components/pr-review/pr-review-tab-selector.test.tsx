@@ -11,6 +11,7 @@ import type * as ReactI18next from 'react-i18next';
 import { type PrReviewTabId, PrReviewTabSelector } from './pr-review-tab-selector';
 
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   View: 'View',
   useColorScheme: () => 'light',

@@ -156,9 +156,10 @@ function facadeFixture() {
       messageId: 'msg_user_1',
     })),
     interruptPrompt: vi.fn(async () => ({ success: true })),
-    openNativeAttachment: vi.fn<NonNullable<KiloFacadeRequestDeps['openNativeAttachment']>>(
-      async () => ({ kind: 'resnapshot' })
-    ),
+    openNativeTail: vi.fn<NonNullable<KiloFacadeRequestDeps['openNativeTail']>>(async () => ({
+      kind: 'open',
+      tail: { run: async () => undefined, close: () => undefined },
+    })),
     globalEvents: {
       openPublicGlobalEventStream: vi.fn(
         () => new Response('', { headers: { 'Content-Type': 'text/event-stream' } })
@@ -232,7 +233,10 @@ function paginationHeaders(contract: Contract, response: Response): Record<strin
 describe('kilo native contract fixture', () => {
   it('pins delivery limits to the implementation', async () => {
     const { contract } = await loadContract();
-    expect(contract.limits.nativeDelivery).toEqual({ ...NATIVE_DELIVERY_LIMITS });
+    expect(contract.limits.nativeDelivery).toEqual({
+      eventBytes: NATIVE_DELIVERY_LIMITS.eventBytes,
+      batchBytes: NATIVE_DELIVERY_LIMITS.batchBytes,
+    });
   });
 
   it('pins the fence and resnapshot frame names to the implementation', async () => {

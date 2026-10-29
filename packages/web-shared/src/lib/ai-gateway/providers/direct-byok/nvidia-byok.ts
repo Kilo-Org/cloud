@@ -9,7 +9,7 @@ import {
 export default {
   id: 'nvidia-byok',
   models_dev_id: 'nvidia',
-  resolveUpstream: apiKeyUpstream({
+  ...apiKeyUpstream({
     apiUrl: 'https://integrate.api.nvidia.com/v1',
     supportedChatApis: ['chat_completions'],
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,

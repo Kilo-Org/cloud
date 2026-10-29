@@ -1,4 +1,4 @@
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { GitPullRequest } from '@/components/ui/icons';
 import { FlashList } from '@shopify/flash-list';
 import { type ReactNode, useMemo } from 'react';
@@ -8,6 +8,7 @@ import Animated, { FadeOut } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { type CodeReviewStatus, isCodeReviewStatus } from '@kilocode/app-shared/code-review';
+import { useSinglePushRoute } from '@/components/code-reviewer/use-single-push-route';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
@@ -20,6 +21,7 @@ import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useGitHubStatus, useGitLabStatus } from '@/lib/hooks/use-code-reviewer';
 import { useReviewList } from '@/lib/hooks/use-code-reviews';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { dedupeById } from '@/lib/query/dedupe-by-id';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 
@@ -93,8 +95,13 @@ function ReviewListFooter({
 }
 
 export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
+  // The page-one probe refetches unchanged rows while a review is in flight, so
+  // the row objects keep their identity and nothing re-renders. A shared minute
+  // clock is the row's one changing input: it advances the relative label, and
+  // it is the same instant the review's detail screen reads.
+  const now = useRelativeTimeNow();
   const paddingBottom = useTabBarBottomPadding();
   const insets = useSafeAreaInsets();
   // One style for the whole content container: every row starts at the same
@@ -156,7 +163,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
           <Button
             className={STATE_ACTION_CLASS}
             onPress={() => {
-              router.push(
+              pushOnce(
                 (hasConnectedProvider
                   ? `/(app)/code-reviewer/${scope}/manual-review`
                   : `/(app)/code-reviewer/${scope}`) as Href
@@ -207,7 +214,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
                 index < reviews.length - 1 && 'border-b-[0.5px] border-hair-soft'
               )}
               onPress={() => {
-                router.push(`/(app)/code-reviewer/${scope}/reviews/${review.id}` as Href);
+                pushOnce(`/(app)/code-reviewer/${scope}/reviews/${review.id}` as Href);
               }}
             >
               <Text className="text-sm font-medium" numberOfLines={1}>
@@ -219,7 +226,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
               <View className="mt-1 flex-row items-center gap-2">
                 <Text className={cn('text-xs', meta.className)}>{meta.label}</Text>
                 <Text variant="muted" className="text-xs">
-                  {timeAgo(reviewTime(review))}
+                  {timeAgo(reviewTime(review), undefined, now)}
                 </Text>
               </View>
             </Pressable>

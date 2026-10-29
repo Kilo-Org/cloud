@@ -106,9 +106,6 @@ export async function main(
     );
     return; // No publication storage request, registry access or publisher credentials.
   }
-  // A disabled publisher never writes the handoff; do not wait for it.
-  if (process.env.RUNTIME_PUBLICATION_ENABLED !== 'true')
-    throw new Error('Runtime publication is not enabled for downloaded deployment');
   const accountId = z.string().parse(process.env.RUNTIME_R2_ACCOUNT_ID);
   const bucket = z.string().parse(process.env.RUNTIME_R2_BUCKET);
   runtimeBucketBindings(target.r2_buckets, bucket);

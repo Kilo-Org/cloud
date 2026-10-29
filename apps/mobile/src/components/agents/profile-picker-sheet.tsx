@@ -9,9 +9,10 @@ import { Check, Settings2 } from '@/components/ui/icons';
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { ROW_TARGET_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { formatProfileCountItems, profileCountItems } from '@/lib/profile-count-labels';
+import { cn } from '@/lib/utils';
 
 const SKELETON_ROW_COUNT = 4;
 
@@ -71,7 +72,7 @@ export function ProfilePickerSheet({
       <PickerSheet title={title} onDone={onClose} scrollable={false}>
         <View className="bg-background">
           {Array.from({ length: SKELETON_ROW_COUNT }, (_, index) => (
-            <View key={index} className="px-4 py-3">
+            <View key={index} className={cn(ROW_TARGET_CLASS, 'justify-center px-4 py-3')}>
               <Skeleton className="h-5 w-2/3 rounded-md" />
             </View>
           ))}
@@ -133,7 +134,10 @@ export function ProfilePickerSheet({
       ) : null}
       <RadioGroup label={title} className="py-1">
         <Pressable
-          className="min-h-11 flex-row items-center justify-between gap-3 border-b border-border px-4 py-3 active:bg-secondary"
+          className={cn(
+            ROW_TARGET_CLASS,
+            'flex-row items-center justify-between gap-3 border-b border-border px-4 py-3 active:bg-secondary'
+          )}
           onPress={() => {
             onSelect(null);
           }}
@@ -156,7 +160,10 @@ export function ProfilePickerSheet({
           return (
             <Pressable
               key={candidate.id}
-              className="min-h-11 flex-row items-center justify-between gap-3 border-b border-border px-4 py-3 active:bg-secondary"
+              className={cn(
+                ROW_TARGET_CLASS,
+                'flex-row items-center justify-between gap-3 border-b border-border px-4 py-3 active:bg-secondary'
+              )}
               onPress={() => {
                 onSelect(candidate.id === selectedOverrideProfileId ? null : candidate.id);
               }}

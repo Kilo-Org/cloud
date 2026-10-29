@@ -42,19 +42,34 @@ export async function fetchGitHubInstallationRequests(
   }));
 }
 
+/**
+ * Outcome of authenticating a GitHub App webhook delivery.
+ *
+ * `unconfigured` means the app's webhook secret is absent, so no delivery can be
+ * authenticated on this deployment: an HMAC computed with an empty key is not a
+ * credential, and accepting it would let any caller forge a delivery.
+ */
+export type GitHubWebhookSignatureStatus = 'valid' | 'invalid' | 'unconfigured';
+
 export function verifyGitHubWebhookSignature(
   payload: string,
   signature: string,
   appType: GitHubAppType = 'standard'
-): boolean {
+): GitHubWebhookSignatureStatus {
   const credentials = getGitHubAppCredentials(appType);
+  if (!credentials.webhookSecret) {
+    return 'unconfigured';
+  }
+
   const hmac = crypto.createHmac('sha256', credentials.webhookSecret);
   const digest = 'sha256=' + hmac.update(payload).digest('hex');
 
   try {
-    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest));
+    return crypto.timingSafeEqual(Buffer.from(signature), Buffer.from(digest))
+      ? 'valid'
+      : 'invalid';
   } catch {
-    return false;
+    return 'invalid';
   }
 }
 

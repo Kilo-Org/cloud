@@ -7,7 +7,7 @@ import { useLiveFontScale } from '@/lib/font-scale/system-font-scale-context';
 import { RefreshControl } from '@/components/ui/refresh-control';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTranslation } from 'react-i18next';
-import { Bot, History, Search } from '@/components/ui/icons';
+import { Bot, History } from '@/components/ui/icons';
 
 import { StateSurfaceInsets } from '@/components/centered-state-surface';
 import { EmptyState } from '@/components/empty-state';
@@ -16,7 +16,7 @@ import { liveSessionContent, useLiveSessionContext } from '@/components/home/liv
 import { LiveSessionListEmptyState } from '@/components/agents/live-session-list-empty-state';
 import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
 import { RowsRefreshControl } from '@/components/agents/rows-refresh-control';
-import { SessionFilterButton } from '@/components/agents/session-filter-button';
+import { SessionListHeader } from '@/components/agents/session-list-header';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
 import { SessionListSkeletonRows } from '@/components/agents/session-list-skeleton-rows';
 import { useLiveSessionQuery } from '@/components/agents/use-live-session-query';
@@ -30,12 +30,11 @@ import {
 } from '@/components/agents/session-list-chrome';
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { useAgentsListChrome } from '@/components/agents/use-agents-list-chrome';
+import { useOwnedKeyboard } from '@/components/agents/use-owned-keyboard';
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
-import { ContextControl } from '@/components/context-control';
 import { IconButton } from '@/components/ui/icon-button';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { ScreenHeader } from '@/components/screen-header';
 import { STATE_ACTION_CLASS, textActionTargetClass } from '@/lib/a11y/tap-target';
 import { getRevisionSnapshot } from '@/lib/session-attention';
 import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
@@ -84,26 +83,12 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
   // affordance while the list is failing.
   const noMatchBody = hasLiveRows && visibleSessions.length === 0;
   const showFab = context.isReady && content !== 'empty' && !noMatchBody;
-  // The screen's bottom bands. Both are keyboard-aware: while the keyboard is up
-  // the IME's occlusion replaces the tab-bar band, because the bar hides with
-  // the keyboard (`tabBarHideOnKeyboard`). Android's edge-to-edge window does
-  // not resize for the IME, so without that reserve the centered empty states
-  // draw their copy and Clear search action behind the keyboard (explorer
-  // finding, agents-list / agents-search-empty) and the last rows of a search
-  // park behind it (review finding, session-list-chrome.ts). The rows list's
-  // total band is floored at the FAB's own overlay band inside the hook, because
-  // the button keeps its screen-bottom-anchored position while the keyboard is
-  // up (device defect uxs1); the frame carries only the part the keyboard
-  // container leaves (`rowsFrameBand`). The chrome hook below supplies the
-  // keyboard-down geometry — the FAB-aware centered reserve and the
-  // short-window frame clamp — so this hook's `surfaceBand` is the IME half of
-  // the centered band while the keyboard is up and the keyboard-down rule is not
-  // re-resolved here (review findings, session-list-chrome.ts:48 and
-  // session-list-screen.tsx:418). This is the screen's only keyboard
-  // subscription beside the container below: calling the occlusion hook here as
-  // well subscribed to the same events a second time (review finding,
-  // session-list-screen.tsx:101).
-  const { surfaceBand, rowsFrameBand } = useAgentsBottomBands(tabBarHeight, showFab);
+  const keyboard = useOwnedKeyboard();
+  const { surfaceBand, rowsFrameBand } = useAgentsBottomBands(
+    tabBarHeight,
+    showFab,
+    keyboard.occlusion
+  );
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
   const showSearch = searchOpen || query.searchQuery.length > 0;
@@ -112,11 +97,6 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
       query.searchInputRef.current?.focus();
     }
   }, [searchOpen, query.searchInputRef]);
-  const handleClearSearch = () => {
-    query.handleClearSearch();
-    setSearchOpen(false);
-  };
-
   const refetchRef = useRef(refetch);
   useEffect(() => {
     refetchRef.current = refetch;
@@ -227,50 +207,16 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
     </Pressable>
   );
   const viewHistoryAction = historyControl(viewHistoryLabel);
-  const headerActions = (
-    <View className="min-w-0 shrink flex-row items-center">
-      <View className="min-w-0 shrink">
-        <ContextControl />
-      </View>
-      <IconButton
-        accessibilityLabel={historyLabel}
-        testID="agents-view-history"
-        onPress={() => {
-          router.push('/(app)/(tabs)/(2_agents)/history' as Href);
-        }}
-      >
-        <History size={20} color={colors.mutedForeground} />
-      </IconButton>
-    </View>
-  );
-  const listActions = (
-    <View className="shrink-0 flex-row items-center">
-      <IconButton
-        accessibilityLabel={t('agents.search.searchSessions')}
-        accessibilityState={{ expanded: showSearch }}
-        testID="agents-open-search"
-        onPress={() => {
-          if (showSearch) {
-            query.searchInputRef.current?.focus();
-          } else {
-            setSearchOpen(true);
-          }
-        }}
-      >
-        <Search size={20} color={colors.mutedForeground} />
-      </IconButton>
-      {query.canFilter ? (
-        <SessionFilterButton
-          activeCount={query.activeFilterCount}
-          onPress={() => {
-            Keyboard.dismiss();
-            setShowFilterModal(true);
-          }}
-          hitSlop={0}
-          testID="agents-open-filters"
-        />
-      ) : null}
-    </View>
+  const historyAction = (
+    <IconButton
+      accessibilityLabel={historyLabel}
+      testID="agents-view-history"
+      onPress={() => {
+        router.push('/(app)/(tabs)/(2_agents)/history' as Href);
+      }}
+    >
+      <History size={20} color={colors.mutedForeground} />
+    </IconButton>
   );
 
   // One handler shared by every row: with the row memoised, a poll that writes
@@ -333,13 +279,6 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
   const rowsListBand = Math.max(surfaceBand, showFab ? tabBarHeight + FAB_SIZE + FAB_MARGIN : 0);
   const keyboardUp = rowsFrameBand < rowsListBand;
 
-  // The centered states' reserve: the FAB-aware band the chrome hook resolves
-  // while the keyboard is down (a centered state's full-width action must not
-  // reach under the corner overlay, device defect e3) and the IME's occlusion
-  // while it is up, so the two never stack (explorer finding,
-  // agents-search-empty).
-  const centeredBand = keyboardUp ? surfaceBand : centeredBottomInset;
-
   // The rows list's frame and content insets. While the keyboard is down the
   // screen's own split owns them: the frame ends at the tab bar (no bare band)
   // and the FAB clearance rides on the content, so the button floats over the
@@ -384,7 +323,7 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
           <Button
             variant="outline"
             size={compactEmptyState ? 'sm' : 'default'}
-            onPress={isSearching ? handleClearSearch : query.handleClearFilters}
+            onPress={isSearching ? query.handleClearSearch : query.handleClearFilters}
             className={STATE_ACTION_CLASS}
           >
             <Text>{isSearching ? t('common.clearSearch') : t('common.clearFilters')}</Text>
@@ -432,13 +371,14 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
   const region = (
     <>
       <View
-        className={query.hasLoaded && content === 'error' ? 'flex-1' : undefined}
+        className={query.hasLoaded && content === 'error' ? 'flex-1' : 'min-h-5'}
         style={query.hasLoaded && content === 'error' ? undefined : sidePadding}
       >
         <LiveSessionFeedback
           context={context}
           sessions={sessions}
           failureLabel={t('agents.sessionList.couldNotLoadActive')}
+          compact
           centered={query.hasLoaded && content === 'error'}
           refresh={{
             busy: pull.refreshing || pull.busy,
@@ -464,66 +404,59 @@ export function AgentSessionListScreen({ tabHeader }: Readonly<AgentSessionListS
   );
 
   return (
-    // The band the centered states are laid out in: the chrome hook's FAB-aware
-    // reserve while the keyboard is down — the FAB's band joins the tab bar's so
-    // a centered state's full-width action (the load failure's Retry, the
-    // boundary's back-to-profile) cannot reach under the corner overlay (device
-    // defect e3) — and the IME's occlusion while it is up, because the raised
-    // keyboard hides the tab bar and its band must not stack on the IME's. See
-    // `centeredBand` above.
-    <StateSurfaceInsets bottomInset={centeredBand}>
+    <StateSurfaceInsets bottomInset={centeredBottomInset}>
       <View className="flex-1 bg-background">
-        <ScreenHeader
+        <SessionListHeader
           title={t('common.agents')}
-          size="large"
-          showBackButton={false}
-          className="px-[22px]"
-          inlineActions={headerActions}
-          allowInlineActionsStacking={false}
-        />
-        <View style={sidePadding}>
-          <View className="flex-row items-center justify-between border-b border-border">
-            {tabHeader}
-            {listActions}
-          </View>
-        </View>
-        {showSearch ? (
-          <SessionListSearchHeader
-            inputRef={query.searchInputRef}
-            hasText={query.searchQuery.length > 0}
-            showSearchBusy={false}
-            onChangeText={query.handleSearchChange}
-            defaultValue={query.searchQuery}
-            compact
-            onFocus={() => {
+          tabHeader={tabHeader}
+          headerAction={historyAction}
+          searchOpen={showSearch}
+          onOpenSearch={() => {
+            if (showSearch) {
+              query.searchInputRef.current?.focus();
+            } else {
               setSearchOpen(true);
-            }}
-            onBlur={() => {
-              setSearchOpen(false);
-            }}
-            onClearSearch={handleClearSearch}
-          />
-        ) : null}
+            }
+          }}
+          canFilter={query.canFilter}
+          activeFilterCount={query.activeFilterCount}
+          onOpenFilters={() => {
+            Keyboard.dismiss();
+            setShowFilterModal(true);
+          }}
+          search={
+            <SessionListSearchHeader
+              inputRef={query.searchInputRef}
+              hasText={query.searchQuery.length > 0}
+              showSearchBusy={false}
+              onChangeText={query.handleSearchChange}
+              defaultValue={query.searchQuery}
+              compact
+              onClearSearch={query.handleClearSearch}
+              onFocus={keyboard.handleInputFocus}
+              onBlur={keyboard.handleInputBlur}
+            />
+          }
+        />
         {/* Android runs edge-to-edge and never resizes the window for the IME,
             so the keyboard is cleared natively: `KeyboardProvider` measures the
             IME and this view lifts by the overlap it reports. */}
-        <KeyboardAvoidingView className="flex-1" behavior="padding">
+        <KeyboardAvoidingView className="flex-1" behavior="padding" enabled={keyboard.owned}>
           {region}
         </KeyboardAvoidingView>
         {/* Empty content owns its creation action; the no-match body owns the band. */}
         {showFab && <SessionListFab organizationId={organizationId} style={fabStyle} />}
-        {showFilterModal && (
-          <SessionFilterModal
-            selectedPlatforms={query.platformFilter}
-            selectedProjects={query.projectFilter}
-            projectOptions={query.options.projectOptions}
-            platformOptions={query.options.platformOptions}
-            onClose={() => {
-              setShowFilterModal(false);
-            }}
-            onApply={query.handleApplyFilters}
-          />
-        )}
+        <SessionFilterModal
+          visible={showFilterModal}
+          selectedPlatforms={query.platformFilter}
+          selectedProjects={query.projectFilter}
+          projectOptions={query.options.projectOptions}
+          platformOptions={query.options.platformOptions}
+          onClose={() => {
+            setShowFilterModal(false);
+          }}
+          onApply={query.handleApplyFilters}
+        />
       </View>
     </StateSurfaceInsets>
   );

@@ -1,6 +1,8 @@
 import {
   WORKTREE_RUNTIME_HEADER,
   WORKTREE_RUNTIME_VERSION,
+  WORKSPACE_CONFIGURATION_HEADER,
+  WORKSPACE_CONFIGURATION_VERSION,
 } from '../../../src/shared/control-plane-runtime-contract.js';
 import {
   CONTROL_PLANE_PROTOCOL_VERSION,
@@ -373,6 +375,7 @@ export function createControlPlaneConnection(
         headers: {
           Authorization: `Bearer ${options.credential}`,
           [WORKTREE_RUNTIME_HEADER]: WORKTREE_RUNTIME_VERSION,
+          [WORKSPACE_CONFIGURATION_HEADER]: WORKSPACE_CONFIGURATION_VERSION,
         },
       });
     } catch (error) {

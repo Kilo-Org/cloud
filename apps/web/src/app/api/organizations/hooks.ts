@@ -624,9 +624,14 @@ export function useClearOrganizationSsoDomain() {
   );
 }
 
-export function useOrganizationAvailableModels(organizationId: string) {
+export function useOrganizationAvailableModels(
+  organizationId: string,
+  options?: { enabled?: boolean }
+) {
   const trpc = useTRPC();
-  return useQuery(trpc.organizations.settings.listAvailableModels.queryOptions({ organizationId }));
+  return useQuery(
+    trpc.organizations.settings.listAvailableModels.queryOptions({ organizationId }, options)
+  );
 }
 
 /// CUSTOM MODES HOOKS ///

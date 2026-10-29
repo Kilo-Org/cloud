@@ -26,7 +26,8 @@ function createStoredModelsFromDatabaseFetcher(provider: 'openrouter' | 'vercel'
       return StoredModelMapSchema.parse(row.models);
     },
     TTL_MS,
-    {}
+    {},
+    { name: `modelsByProvider[${provider}]` }
   );
 }
 
@@ -97,7 +98,8 @@ const getVercelInferenceProviderIdsByModel = createCachedFetch<ReadonlyMap<strin
     );
   },
   TTL_MS,
-  new Map()
+  new Map(),
+  { name: 'vercelInferenceProviderIdsByModel' }
 );
 
 export async function getCachedVercelInferenceProviderIdsForModel(
@@ -106,26 +108,30 @@ export async function getCachedVercelInferenceProviderIdsForModel(
   return (await getVercelInferenceProviderIdsByModel()).get(modelId) ?? null;
 }
 
-function createLanguageModelIdsFetcher(fetchModels: () => Promise<StoredModelMap>) {
+function createLanguageModelIdsFetcher(name: string, fetchModels: () => Promise<StoredModelMap>) {
   return createCachedFetch<ReadonlySet<string>>(
     async () => new Set(getLanguageModelIds(await fetchModels())),
     TTL_MS,
-    new Set<string>()
+    new Set<string>(),
+    { name }
   );
 }
 
 export const getVercelModelsFromDatabase = createLanguageModelIdsFetcher(
+  'vercelLanguageModelIds',
   getVercelModelsMetadataFromDatabase
 );
 
 export const getOpenRouterModelsFromDatabase = createLanguageModelIdsFetcher(
+  'openRouterLanguageModelIds',
   getOpenRouterModelsMetadataFromDatabase
 );
 
 export const getOpenRouterSystemOneModelsFromDatabase = createCachedFetch<ReadonlySet<string>>(
   async () => new Set(getSystemOneModelIds(await getOpenRouterModelsMetadataFromDatabase())),
   TTL_MS,
-  new Set<string>()
+  new Set<string>(),
+  { name: 'openRouterSystemOneModelIds' }
 );
 
 // Undocumented aliases that remain in active use but are absent from OpenRouter's model catalog.

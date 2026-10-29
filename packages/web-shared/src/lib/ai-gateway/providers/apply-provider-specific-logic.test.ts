@@ -1,6 +1,9 @@
-import { describe, expect, it, jest } from '@jest/globals';
-import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/openrouter';
-import { VERCEL_AI_GATEWAY } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+import { describe, expect, it } from '@jest/globals';
+import {
+  createUserVercelAiGatewayProvider,
+  VERCEL_AI_GATEWAY,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/vercel';
+import { applyVercelSettings } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
   applyPreferredProvider,
   applyProviderSpecificLogic,
@@ -11,13 +14,12 @@ import {
   withIgnoredProviders,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import { GEMINI_FLASH_CURRENT_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import {
   ReasoningDetailsTransform,
   type BYOKResult,
   type Provider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import type { KiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/providers/kilo-exclusive-model';
+import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { EmptyFraudDetectionHeaders } from '@kilocode/web-shared/lib/fraud-detection-headers';
 import { EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG } from '@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order';
 import type { PreferredProviderOrderConfig } from '@kilocode/db/schema-types';
@@ -28,26 +30,20 @@ function customPricingFor(model: string) {
   return getCustomPricing(TEST_CUSTOM_PRICING_CONFIG, model);
 }
 
-const nonFlexExclusiveModel: KiloExclusiveModel = {
-  public_id: 'test/non-flex-exclusive',
-  internal_id: 'test/non-flex',
-  display_name: 'Non-Flex test model',
-  description: 'Test model',
-  context_length: 8_192,
-  max_completion_tokens: 4_096,
-  provider: OPENROUTER,
-  flags: [],
-  pricing: null,
-  inference_providers: [],
-};
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/vercel', () => ({
+  applyVercelSettings: jest.fn(),
+}));
 
-const flexExclusiveModel: KiloExclusiveModel = {
-  ...nonFlexExclusiveModel,
-  public_id: 'test/flex-exclusive',
-  internal_id: 'test/flex',
-  display_name: 'Flex test model',
-  flags: ['flex'],
-};
+const USER_GATEWAY_TEST_MODEL = 'vendor/user-gateway-test-model';
+const USER_GATEWAY_TEST_ORDER = ['google-vertex', 'amazon-bedrock'];
+
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/preferred-provider-order-config', () => ({
+  getPreferredProviderOrderConfig: jest.fn(async () => ({
+    rules: [
+      { includes: ['user-gateway-test-model'], providers: ['google-vertex', 'amazon-bedrock'] },
+    ],
+  })),
+}));
 
 function makeRequest(
   model: string,
@@ -91,52 +87,42 @@ function makeMessagesRequest(model: string): Extract<GatewayRequest, { kind: 'me
 describe('removeUnsupportedRequestServiceTier', () => {
   it.each([
     {
-      model: GEMINI_FLASH_CURRENT_MODEL_ID,
-      kiloExclusiveModel: null,
+      model: 'google/gemini-3.8-flash',
       reason: 'non-fallback custom pricing',
     },
     {
-      model: nonFlexExclusiveModel.public_id,
-      kiloExclusiveModel: nonFlexExclusiveModel,
-      reason: 'non-Flex Kilo-exclusive model',
+      model: gemma_4_26b_a4b_it_free_model.public_id,
+      reason: 'Kilo-exclusive model',
     },
-  ])(
-    'removes and logs the request-level tier for $reason',
-    ({ model, kiloExclusiveModel, reason }) => {
-      const request = makeRequest(model);
-      request.body.service_tier = 'priority';
-      const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
+  ])('removes and logs the request-level tier for $reason', ({ model, reason }) => {
+    const request = makeRequest(model);
+    request.body.service_tier = 'priority';
+    const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-      removeUnsupportedRequestServiceTier(
+    removeUnsupportedRequestServiceTier(model, request, customPricingFor(model));
+
+    expect(request.body.service_tier).toBeUndefined();
+    expect(warn).toHaveBeenCalledWith(
+      '[applyProviderSpecificLogic] Removed unsupported request-level service tier',
+      {
         model,
-        request,
-        kiloExclusiveModel,
-        customPricingFor(model)
-      );
-
-      expect(request.body.service_tier).toBeUndefined();
-      expect(warn).toHaveBeenCalledWith(
-        '[applyProviderSpecificLogic] Removed unsupported request-level service tier',
-        {
-          model,
-          requestKind: 'chat_completions',
-          serviceTier: 'priority',
-          reason,
-        }
-      );
-      warn.mockRestore();
-    }
-  );
+        requestKind: 'chat_completions',
+        serviceTier: 'priority',
+        reason,
+      }
+    );
+    warn.mockRestore();
+  });
 
   it.each(['auto', 'default', 'flex', 'priority', 'scale'] as const)(
     'records the recognized tier verbatim (%s)',
     tier => {
-      const model = GEMINI_FLASH_CURRENT_MODEL_ID;
+      const model = 'google/gemini-3.8-flash';
       const request = makeRequest(model);
       request.body.service_tier = tier;
       const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-      removeUnsupportedRequestServiceTier(model, request, null, customPricingFor(model));
+      removeUnsupportedRequestServiceTier(model, request, customPricingFor(model));
 
       expect(request.body.service_tier).toBeUndefined();
       expect(warn).toHaveBeenCalledWith(
@@ -150,12 +136,12 @@ describe('removeUnsupportedRequestServiceTier', () => {
   it.each(['unrecognized-tier', 'constructor', '__proto__', 42, null] as const)(
     'records only a recognized tier value (%s)',
     tier => {
-      const model = GEMINI_FLASH_CURRENT_MODEL_ID;
+      const model = 'google/gemini-3.8-flash';
       const request = makeRequest(model);
       request.body.service_tier = tier as unknown as typeof request.body.service_tier;
       const warn = jest.spyOn(console, 'warn').mockImplementation(() => undefined);
 
-      removeUnsupportedRequestServiceTier(model, request, null, customPricingFor(model));
+      removeUnsupportedRequestServiceTier(model, request, customPricingFor(model));
 
       expect(request.body.service_tier).toBeUndefined();
       expect(warn).toHaveBeenCalledWith(
@@ -171,23 +157,17 @@ describe('removeUnsupportedRequestServiceTier', () => {
     }
   );
 
-  it.each([
-    ['moonshotai/kimi-k3', null],
-    [flexExclusiveModel.public_id, flexExclusiveModel],
-    ['vendor/standard-model', null],
-  ] as const)('preserves the request-level tier for %s', (model, kiloExclusiveModel) => {
-    const request = makeRequest(model);
-    request.body.service_tier = 'priority';
+  it.each(['moonshotai/kimi-k3', 'vendor/standard-model'])(
+    'preserves the request-level tier for %s',
+    model => {
+      const request = makeRequest(model);
+      request.body.service_tier = 'priority';
 
-    removeUnsupportedRequestServiceTier(
-      model,
-      request,
-      kiloExclusiveModel,
-      customPricingFor(model)
-    );
+      removeUnsupportedRequestServiceTier(model, request, customPricingFor(model));
 
-    expect(request.body.service_tier).toBe('priority');
-  });
+      expect(request.body.service_tier).toBe('priority');
+    }
+  );
 });
 
 describe('applyProviderSpecificLogic JSON ref field sanitization', () => {
@@ -357,6 +337,59 @@ describe('applyProviderSpecificLogic top-level tool schema combinators', () => {
         oneOf: [{ required: ['notebook_id'] }],
       },
     });
+  });
+});
+
+describe('applyProviderSpecificLogic untyped tool schema enums', () => {
+  async function applyToToolParameters(model: string) {
+    const request: Extract<GatewayRequest, { kind: 'chat_completions' }> = {
+      kind: 'chat_completions',
+      body: {
+        model,
+        messages: [{ role: 'user', content: 'hello' }],
+        tools: [
+          {
+            type: 'function',
+            function: {
+              name: 'edit_page',
+              parameters: {
+                type: 'object',
+                properties: { op: { enum: ['set_title', 'delete_block'] } },
+              },
+            },
+          },
+        ],
+      },
+    };
+
+    await applyProviderSpecificLogic(
+      makeProvider(null),
+      model,
+      request,
+      {},
+      null,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      false
+    );
+
+    const tool = request.body.tools?.[0];
+    return tool?.type === 'function' ? tool.function.parameters?.properties : undefined;
+  }
+
+  it('adds enum types for Kimi models', async () => {
+    const properties = await applyToToolParameters('moonshotai/kimi-k3.1-pro');
+
+    expect(properties).toEqual({ op: { type: 'string', enum: ['set_title', 'delete_block'] } });
+  });
+
+  it('preserves untyped enums for other models', async () => {
+    const properties = await applyToToolParameters('vendor/model');
+
+    expect(properties).toEqual({ op: { enum: ['set_title', 'delete_block'] } });
   });
 });
 
@@ -743,6 +776,92 @@ describe('removeModelsFallback', () => {
     );
     warn.mockRestore();
   });
+});
+
+describe('applyProviderSpecificLogic with a user gateway key', () => {
+  const requestedModel = USER_GATEWAY_TEST_MODEL;
+
+  async function apply(userByok: BYOKResult[] | null, provider = makeProvider(null)) {
+    const request = makeRequest(requestedModel, ['caller/fallback']);
+    await applyProviderSpecificLogic(
+      provider,
+      requestedModel,
+      request,
+      {},
+      userByok,
+      EmptyFraudDetectionHeaders,
+      'user-1',
+      null,
+      null,
+      null,
+      true
+    );
+    return request;
+  }
+
+  it('shapes a user Vercel AI Gateway key request like a managed Vercel request', async () => {
+    const request = await apply(
+      [{ providerId: 'vercel-ai-gateway', decryptedAPIKey: 'user-key' }],
+      createUserVercelAiGatewayProvider('user-key')
+    );
+
+    expect(applyVercelSettings).toHaveBeenCalledWith(requestedModel, request, null);
+  });
+
+  it('passes inference provider keys to the Vercel settings', async () => {
+    const userByok: BYOKResult[] = [{ providerId: 'anthropic', decryptedAPIKey: 'user-key' }];
+
+    const request = await apply(userByok, VERCEL_AI_GATEWAY);
+
+    expect(applyVercelSettings).toHaveBeenCalledWith(requestedModel, request, userByok);
+  });
+
+  it.each(['openrouter', 'vercel-ai-gateway'] as const)(
+    'skips Kilo provider order for a %s key',
+    async providerId => {
+      const request = await apply([{ providerId, decryptedAPIKey: 'user-key' }]);
+
+      expect(request.body.provider).toBeUndefined();
+    }
+  );
+
+  it('keeps Kilo provider order on Kilo keys', async () => {
+    const request = await apply(null);
+
+    expect(request.body.provider).toEqual({ order: USER_GATEWAY_TEST_ORDER });
+  });
+
+  it.each([
+    { providerId: 'openrouter', provider: makeProvider(null), tool: 'openrouter:web_search' },
+    {
+      providerId: 'vercel-ai-gateway',
+      provider: createUserVercelAiGatewayProvider('user-key'),
+      tool: 'vercel:perplexity_search',
+    },
+  ] as const)(
+    'keeps paid server features for a $providerId key, which bills the user account',
+    async ({ providerId, provider, tool }) => {
+      const request = makeRequest(requestedModel);
+      const serverFeatures = { plugins: [{ id: 'web' }], tools: [{ type: tool }] };
+      Object.assign(request.body, structuredClone(serverFeatures));
+
+      await applyProviderSpecificLogic(
+        provider,
+        requestedModel,
+        request,
+        {},
+        [{ providerId, decryptedAPIKey: 'user-key' }],
+        EmptyFraudDetectionHeaders,
+        'user-1',
+        null,
+        null,
+        null,
+        true
+      );
+
+      expect(request.body).toMatchObject(serverFeatures);
+    }
+  );
 });
 
 describe('applyProviderSpecificLogic paid server features', () => {

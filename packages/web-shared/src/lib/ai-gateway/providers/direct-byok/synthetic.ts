@@ -9,7 +9,7 @@ import {
 export default {
   id: 'synthetic',
   models_dev_id: 'synthetic',
-  resolveUpstream: apiKeyUpstream({
+  ...apiKeyUpstream({
     apiUrl: 'https://api.synthetic.new/v1',
     supportedChatApis: ['chat_completions'],
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,

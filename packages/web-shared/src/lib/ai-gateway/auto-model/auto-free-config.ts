@@ -77,5 +77,6 @@ export async function readConfiguredAutoFreeModels(): Promise<ReadonlyArray<Auto
 export const getConfiguredAutoFreeModels = createCachedFetch(
   readConfiguredAutoFreeModels,
   60_000,
-  null
+  null,
+  { name: 'autoFreeModels' }
 );

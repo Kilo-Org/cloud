@@ -26,7 +26,7 @@ import {
 } from './helpers/fake-credentials.js';
 import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
-import { createSseDataReader } from './helpers/sse-reader.js';
+import { createSseDataReader, readSseUntil } from './helpers/sse-reader.js';
 import {
   clearTestSessionIngestState,
   writeTestSessionIngestState,
@@ -381,7 +381,20 @@ describe('hosted session cold reads', { timeout: 30_000 }, () => {
       expect(attach.status).toBe(200);
       const stream = createSseDataReader(attach);
       await expect(stream.next()).resolves.toMatchObject({ type: 'server.connected' });
-      await expect(stream.next()).resolves.toMatchObject({ type: 'kilo.native.fence' });
+      const replay = await readSseUntil(
+        stream,
+        frame => (frame as { type?: string }).type === 'kilo.native.fence'
+      );
+      expect(replay.observed).toEqual([
+        expect.objectContaining({
+          type: 'cloud.message.failed',
+          properties: expect.objectContaining({
+            status: 'failed',
+            messageId: message.messageId,
+          }),
+        }),
+        expect.objectContaining({ type: 'kilo.native.fence' }),
+      ]);
       await stream.cancel();
     } finally {
       stopPump();

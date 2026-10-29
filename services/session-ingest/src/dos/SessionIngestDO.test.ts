@@ -34,41 +34,8 @@ vi.mock('@kilocode/db/client', () => ({
 
 import { SessionIngestDO, ingestOrderCursor } from './SessionIngestDO';
 import { ingestItems, ingestMeta } from '../db/sqlite-schema';
-import type { agent_briefing_events } from '@kilocode/db/schema';
-
-function makeEvidenceLedger(options: { gate?: Promise<void>; error?: Error } = {}) {
-  type Event = typeof agent_briefing_events.$inferInsert;
-  const events = new Map<string, Event>();
-  const tx = {
-    select: vi.fn(() => ({
-      from: vi.fn(() => ({
-        where: vi.fn(() => ({
-          for: vi.fn(() => ({ limit: vi.fn(async () => [{ organizationId: null }]) })),
-        })),
-      })),
-    })),
-    insert: vi.fn(() => ({
-      values: vi.fn((rows: Event[]) => ({
-        onConflictDoNothing: vi.fn(async () => {
-          for (const row of rows) if (!events.has(row.id)) events.set(row.id, row);
-        }),
-      })),
-    })),
-  };
-  let error = options.error;
-  const transaction = vi.fn(async (fn: (tx: unknown) => Promise<unknown>) => {
-    await options.gate;
-    if (error) throw error;
-    return fn(tx);
-  });
-  return {
-    events,
-    transaction,
-    setError: (next: Error | undefined) => {
-      error = next;
-    },
-  };
-}
+import { BRIEFING_MAX_EXCERPT_SOURCE_ROWS } from '../ingest/briefing-excerpt';
+import { INACTIVITY_TIMEOUT_MS, POST_CLOSE_DRAIN_MS } from './session-metrics';
 
 describe('SessionIngestDO ingest ordering', () => {
   it('uses ingested_at with id only as a tie-breaker for cursor progression', () => {
@@ -110,6 +77,7 @@ describe('SessionIngestDO ingest ordering', () => {
         setAlarm: vi.fn(async () => {
           operations.push('alarm');
         }),
+        transactionSync: (fn: () => unknown) => fn(),
       },
       blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
     } as unknown as DurableObjectState;
@@ -176,7 +144,7 @@ describe('SessionIngestDO ingest ordering', () => {
 
     const waitUntilPromises: Promise<unknown>[] = [];
     const state = {
-      storage: { setAlarm: vi.fn() },
+      storage: { setAlarm: vi.fn(), transactionSync: (fn: () => unknown) => fn() },
       waitUntil: vi.fn((promise: Promise<unknown>) => {
         operations.push('waitUntil');
         waitUntilPromises.push(promise);
@@ -250,6 +218,7 @@ describe('SessionIngestDO ingest ordering', () => {
         setAlarm: vi.fn(async () => {
           throw new Error('alarm failed');
         }),
+        transactionSync: (fn: () => unknown) => fn(),
       },
       blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
     } as unknown as DurableObjectState;
@@ -296,7 +265,7 @@ describe('SessionIngestDO ingest ordering', () => {
     drizzleMocks.db = db;
 
     const state = {
-      storage: { setAlarm: vi.fn() },
+      storage: { setAlarm: vi.fn(), transactionSync: (fn: () => unknown) => fn() },
       blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
     } as unknown as DurableObjectState;
     const env = { SESSION_INGEST_R2: { delete: vi.fn() } } as never;
@@ -386,7 +355,7 @@ describe('SessionIngestDO session-ready push', () => {
 
     const waitUntilPromises: Promise<unknown>[] = [];
     const state = {
-      storage: { setAlarm: vi.fn() },
+      storage: { setAlarm: vi.fn(), transactionSync: (fn: () => unknown) => fn() },
       waitUntil: vi.fn((promise: Promise<unknown>) => waitUntilPromises.push(promise)),
       blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
     } as unknown as DurableObjectState;
@@ -659,7 +628,7 @@ describe('SessionIngestDO emitSessionMetrics cost persist ordering', () => {
       operations.push('deleteAlarm');
     });
     const state = {
-      storage: { setAlarm: vi.fn(), deleteAlarm },
+      storage: { setAlarm: vi.fn(), deleteAlarm, transactionSync: (fn: () => unknown) => fn() },
       blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
     } as unknown as DurableObjectState;
 
@@ -739,7 +708,7 @@ describe('SessionIngestDO emitSessionMetrics cost persist ordering', () => {
   });
 });
 
-/** Walk nested drizzle queryChunks and collect bound Param values (string | number). */
+/** Collect Drizzle scalar interpolations and explicitly bound parameters. */
 function collectBoundParams(
   condition: unknown,
   out: Array<string | number> = []
@@ -748,6 +717,10 @@ function collectBoundParams(
     ? condition
     : ((condition as { queryChunks?: unknown[] } | undefined)?.queryChunks ?? []);
   for (const chunk of chunks) {
+    if (typeof chunk === 'string' || typeof chunk === 'number') {
+      out.push(chunk);
+      continue;
+    }
     if (Array.isArray(chunk)) {
       collectBoundParams(chunk, out);
       continue;
@@ -804,37 +777,72 @@ describe('SessionIngestDO live activity + cost persist', () => {
     /** Pre-seeded ingest_meta rows (throttle state, prior status, etc.). */
     seedMeta?: Record<string, string | null>;
     /** Pre-seeded message item rows returned by cost SELECT .all(). */
-    seedMessageRows?: Array<{ item_data: string }>;
+    seedMessageRows?: Array<{
+      item_data: string;
+      item_id?: string;
+      /** Stored contribution; omitted means a row that predates the column. */
+      cost_usd?: number | null;
+    }>;
     /** If set, Postgres update rejects with this error. */
     persistError?: Error;
-    evidenceGate?: Promise<void>;
-    evidenceError?: Error;
+    r2Objects?: Record<string, string>;
   };
 
   function makeLiveHarness(options: LiveHarnessOptions = {}) {
     const meta = new Map<string, string | null>(Object.entries(options.seedMeta ?? {}));
     const messageRows = options.seedMessageRows ?? [];
+
     // item rows keyed by item_id for stale-guard lookups during ingest loop
     const itemRows = new Map<
       string,
-      { ingested_at: number | null; item_data_r2_key: string | null }
+      {
+        id: number;
+        item_id: string;
+        item_type: string;
+        item_data: string;
+        ingested_at: number | null;
+        item_data_r2_key: string | null;
+        cost_usd: number | null;
+      }
     >();
+    // Seeded message rows are stored rows: the full cost scan projects them like any other
+    // inline message row, so it stays a true recomputation of what the DO holds.
+    messageRows.forEach((row, index) => {
+      const itemId = row.item_id ?? `message/seed-${index}`;
+      itemRows.set(itemId, {
+        id: index + 1,
+        item_id: itemId,
+        item_type: 'message',
+        item_data: row.item_data,
+        ingested_at: null,
+        item_data_r2_key: null,
+        cost_usd: row.cost_usd ?? null,
+      });
+    });
     let costScanCount = 0;
+    // Replaced-row projections that returned a stored message body: the CASE materializes
+    // one only for a row that has no stored contribution.
+    let messageBodyReads = 0;
 
     type SelectKind =
       | 'meta_get'
       | 'item_guard'
       | 'message_cost'
       | 'metrics_items'
-      | 'briefing_outbox'
+      | 'meta_rows'
+      | 'parent_message'
+      | 'part_excerpt'
       | 'other';
     let selectKind: SelectKind = 'other';
     let eqKey: string | undefined;
     let boundKeys: string[] = [];
+    let selectLimit = Infinity;
+    let orderedQuery = false;
+    let partRowsRead = 0;
 
     const selectQuery = {
       from: vi.fn((table: unknown) => {
-        if (table === ingestMeta && selectKind === 'other') selectKind = 'briefing_outbox';
+        if (table === ingestMeta && selectKind === 'other') selectKind = 'meta_rows';
         return selectQuery;
       }),
       where: vi.fn((condition: unknown) => {
@@ -843,11 +851,29 @@ describe('SessionIngestDO live activity + cost persist', () => {
         boundKeys = params.filter((p): p is string => typeof p === 'string');
         return selectQuery;
       }),
-      orderBy: vi.fn(() => selectQuery),
-      limit: vi.fn(() => selectQuery),
+      orderBy: vi.fn(() => {
+        orderedQuery = true;
+        return selectQuery;
+      }),
+      limit: vi.fn((limit: number) => {
+        selectLimit = limit;
+        return selectQuery;
+      }),
       get: vi.fn(() => {
-        if (selectKind === 'item_guard' && eqKey !== undefined) {
-          return itemRows.get(eqKey);
+        if (
+          (selectKind === 'item_guard' || selectKind === 'parent_message') &&
+          eqKey !== undefined
+        ) {
+          const row = itemRows.get(eqKey);
+          if (row === undefined) return undefined;
+          if (selectKind !== 'item_guard') return row;
+          // The replaced-row projection materializes a body only for a row that has no
+          // stored contribution, like the SQL CASE it models.
+          if (row.item_type === 'message' && row.cost_usd === null) messageBodyReads += 1;
+          return {
+            ...row,
+            legacy_item_data: row.cost_usd === null ? row.item_data : null,
+          };
         }
         if (eqKey !== undefined && meta.has(eqKey)) {
           return { value: meta.get(eqKey) };
@@ -859,23 +885,35 @@ describe('SessionIngestDO live activity + cost persist', () => {
         return undefined;
       }),
       all: vi.fn(() => {
-        if (selectKind === 'briefing_outbox') {
-          // alarm() loads named keys via inArray; the outbox scan binds no key.
-          if (boundKeys.length > 0) {
-            return boundKeys
-              .filter(key => meta.has(key))
-              .map(key => ({ key, value: meta.get(key) ?? null }));
-          }
-          return [...meta]
-            .filter(([key]) => key.startsWith('briefingEvidence:'))
-            .map(([key, value]) => ({ key, value }));
+        if (selectKind === 'meta_rows') {
+          return boundKeys
+            .filter(key => meta.has(key))
+            .map(key => ({ key, value: meta.get(key) ?? null }));
+        }
+        if (selectKind === 'part_excerpt') {
+          const [, start, end] = boundKeys;
+          const rows = [...itemRows.values()]
+            .filter(row => row.item_type === 'part' && row.item_id >= start && row.item_id < end)
+            .sort((left, right) => left.id - right.id)
+            .slice(0, selectLimit);
+          partRowsRead += rows.length;
+          return rows;
         }
         if (selectKind === 'metrics_items') {
-          return messageRows.map(row => ({ item_type: 'message', item_data: row.item_data }));
+          return [...itemRows.values()].filter(row => row.item_type !== 'session_diff');
         }
         if (selectKind === 'message_cost') {
+          const rows = [...itemRows.values()]
+            .filter(row => row.item_type === 'message' && row.item_data_r2_key === null)
+            .sort(
+              (left, right) =>
+                (right.ingested_at ?? 0) - (left.ingested_at ?? 0) || right.id - left.id
+            )
+            .map(row => ({ item_data: row.item_data }));
+          // The completed-turn lookup is ordered and bounded; the cost scan is neither.
+          if (orderedQuery) return rows.slice(0, selectLimit);
           costScanCount += 1;
-          return messageRows;
+          return rows;
         }
         return [];
       }),
@@ -883,10 +921,16 @@ describe('SessionIngestDO live activity + cost persist', () => {
 
     const db = {
       select: vi.fn((columns?: unknown) => {
+        selectLimit = Infinity;
+        orderedQuery = false;
         const cols = columns as Record<string, unknown> | undefined;
         boundKeys = [];
         if (cols && 'item_type' in cols && !('item_id' in cols)) {
           selectKind = 'metrics_items';
+        } else if (cols && 'id' in cols && 'item_data' in cols) {
+          selectKind = 'part_excerpt';
+        } else if (cols && 'item_data' in cols && 'item_data_r2_key' in cols) {
+          selectKind = 'parent_message';
         } else if (cols && 'item_data' in cols && !('item_type' in cols) && !('value' in cols)) {
           // Cost compute: select({ item_data }) ... all()
           // OR item guard: select({ ingested_at, item_data_r2_key }) — has ingested_at
@@ -914,19 +958,23 @@ describe('SessionIngestDO live activity + cost persist', () => {
             item_data?: string;
             item_data_r2_key?: string | null;
             ingested_at?: number | null;
+            cost_usd?: number | null;
           }) => ({
             onConflictDoUpdate: vi.fn(() => ({
               run: vi.fn(() => {
                 if (values.key !== undefined) {
                   meta.set(values.key, values.value ?? null);
+                  if (inTransaction) metaWritesInTransaction.add(values.key);
                 } else if (values.item_id !== undefined) {
                   itemRows.set(values.item_id, {
+                    id: itemRows.get(values.item_id)?.id ?? itemRows.size + 1,
+                    item_id: values.item_id,
+                    item_type: values.item_type ?? 'message',
+                    item_data: values.item_data ?? '{}',
                     ingested_at: values.ingested_at ?? null,
                     item_data_r2_key: values.item_data_r2_key ?? null,
+                    cost_usd: values.cost_usd ?? null,
                   });
-                  if (values.item_type === 'message' && values.item_data) {
-                    messageRows.push({ item_data: values.item_data });
-                  }
                 }
               }),
             })),
@@ -959,6 +1007,8 @@ describe('SessionIngestDO live activity + cost persist', () => {
       waitUntilPromises.push(promise);
     });
     let alarmAt: number | null = null;
+    let inTransaction = false;
+    const metaWritesInTransaction = new Set<string>();
     const storage = {
       setAlarm: vi.fn(async (at: number) => {
         alarmAt = at;
@@ -966,6 +1016,23 @@ describe('SessionIngestDO live activity + cost persist', () => {
       getAlarm: vi.fn(async () => alarmAt),
       deleteAlarm: vi.fn(async () => {
         alarmAt = null;
+      }),
+      transactionSync: vi.fn((fn: () => unknown) => {
+        // Model SQLite's rollback: a throw discards every row and meta write the callback made.
+        const rowsBefore = new Map([...itemRows].map(([key, row]) => [key, { ...row }]));
+        const metaBefore = new Map(meta);
+        inTransaction = true;
+        try {
+          return fn();
+        } catch (error) {
+          itemRows.clear();
+          for (const [key, row] of rowsBefore) itemRows.set(key, row);
+          meta.clear();
+          for (const [key, value] of metaBefore) meta.set(key, value);
+          throw error;
+        } finally {
+          inTransaction = false;
+        }
       }),
     };
     const state = {
@@ -996,18 +1063,18 @@ describe('SessionIngestDO live activity + cost persist', () => {
     });
     const pgUpdate = vi.fn(() => ({ set: pgSet }));
     dbClientMocks.getWorkerDb.mockReset();
-    const evidenceLedger = makeEvidenceLedger({
-      gate: options.evidenceGate,
-      error: options.evidenceError,
-    });
-    dbClientMocks.getWorkerDb.mockReturnValue({
-      update: pgUpdate,
-      transaction: evidenceLedger.transaction,
-    });
+    dbClientMocks.getWorkerDb.mockReturnValue({ update: pgUpdate });
 
     const ingestSessionMetrics = vi.fn(async () => undefined);
+    const r2Get = vi.fn(async (key: string) => {
+      const text = options.r2Objects?.[key];
+      return text === undefined ? null : { text: async () => text };
+    });
     const env = {
-      SESSION_INGEST_R2: { delete: vi.fn() },
+      SESSION_INGEST_R2: {
+        delete: vi.fn(),
+        get: r2Get,
+      },
       HYPERDRIVE: { connectionString: 'postgres://test' },
       NOTIFICATIONS: { sendSessionReadyNotification: vi.fn(async () => ({ dispatched: true })) },
       O11Y: { ingestSessionMetrics },
@@ -1019,9 +1086,12 @@ describe('SessionIngestDO live activity + cost persist', () => {
       itemRows,
       messageRows,
       waitUntil,
-      evidenceLedger,
       ingestSessionMetrics,
       storage,
+      r2Get,
+      get partRowsRead() {
+        return partRowsRead;
+      },
       get alarmAt() {
         return alarmAt;
       },
@@ -1035,6 +1105,10 @@ describe('SessionIngestDO live activity + cost persist', () => {
       get costScanCount() {
         return costScanCount;
       },
+      get messageBodyReads() {
+        return messageBodyReads;
+      },
+      metaWritesInTransaction,
       pgSet,
       pgWhere,
       getWorkerDb: dbClientMocks.getWorkerDb,
@@ -1078,18 +1152,72 @@ describe('SessionIngestDO live activity + cost persist', () => {
     };
   }
 
-  it('commits newer status and returns both metadata deliveries while an older evidence flush is blocked', async () => {
-    let release: () => void = () => undefined;
-    const gate = new Promise<void>(resolve => {
-      release = resolve;
-    });
-    const harness = makeLiveHarness({ evidenceGate: gate });
-    const older = await harness.durableObject.ingest(
+  function persistedBriefingExcerpt(harness: { lastPgSet: Record<string, unknown> | undefined }) {
+    const serialized = collectBoundParams(harness.lastPgSet?.briefing_excerpt).find(
+      value => typeof value === 'string' && value.startsWith('{')
+    );
+    return typeof serialized === 'string' ? JSON.parse(serialized) : undefined;
+  }
+
+  function warmLiveMeta() {
+    const now = Date.now();
+    return {
+      lastActivityPersistedAtMs: String(now),
+      lastActivityPersistedValueMs: String(now),
+      lastCostPersistedAtMs: String(now),
+      lastCostPersistedMicrodollars: '100000',
+    };
+  }
+
+  it('does not add a database write or eligibility read for streaming text and reasoning batches', async () => {
+    const harness = makeLiveHarness({ seedMeta: warmLiveMeta() });
+    for (let index = 0; index < 3; index += 1) {
+      await harness.durableObject.ingest(
+        [
+          assistantItem('streaming', 0.1),
+          {
+            type: 'part',
+            data: {
+              id: 'stream',
+              messageID: 'streaming',
+              type: index === 1 ? 'reasoning' : 'text',
+              text: 'Not a completed final response',
+              time: { start: 1000 },
+            },
+          },
+        ],
+        'usr_live',
+        'ses_live',
+        1,
+        10_000 + index
+      );
+    }
+    await harness.settle();
+    expect(harness.getWorkerDb).not.toHaveBeenCalled();
+    expect(harness.pgCallCount).toBe(0);
+  });
+
+  it('persists completed final text even while the existing live-column throttle is closed', async () => {
+    const harness = makeLiveHarness({ seedMeta: warmLiveMeta() });
+    await harness.durableObject.ingest(
       [
-        assistantItem('historical', 0.1),
         {
-          type: 'session_status',
-          data: { status: 'busy', occurredAt: '2026-07-24T07:58:00.000Z' },
+          type: 'part',
+          data: {
+            id: 'final-text',
+            messageID: 'final',
+            type: 'text',
+            text: 'Final response.',
+            time: { start: 1000, end: 3000 },
+          },
+        },
+        {
+          type: 'message',
+          data: {
+            ...assistantItem('final', 0.1).data,
+            finish: 'stop',
+            time: { created: 1000, completed: 3000 },
+          },
         },
       ],
       'usr_live',
@@ -1097,12 +1225,39 @@ describe('SessionIngestDO live activity + cost persist', () => {
       1,
       10_000
     );
-    expect(harness.meta.get('status')).toBe('busy');
-    const newer = await harness.durableObject.ingest(
+    await harness.settle();
+    expect(harness.pgCallCount).toBe(1);
+    expect(Object.keys(harness.lastPgSet ?? {})).toEqual(['briefing_excerpt']);
+    expect(persistedBriefingExcerpt(harness)).toEqual({
+      messageId: 'final',
+      completedAt: new Date(3000).toISOString(),
+      text: 'Final response.',
+    });
+  });
+
+  it('selects the latest completed source in a reverse-ordered batch and skips a stale envelope', async () => {
+    const harness = makeLiveHarness({ seedMeta: warmLiveMeta() });
+    await harness.durableObject.ingest(
       [
         {
-          type: 'session_status',
-          data: { status: 'idle', occurredAt: '2026-07-24T07:59:00.000Z' },
+          type: 'message',
+          data: {
+            id: 'z-final',
+            role: 'assistant',
+            finish: 'stop',
+            text: 'Latest',
+            time: { completed: 3000 },
+          },
+        },
+        {
+          type: 'message',
+          data: {
+            id: 'a-older',
+            role: 'assistant',
+            finish: 'stop',
+            text: 'Older',
+            time: { completed: 2000 },
+          },
         },
       ],
       'usr_live',
@@ -1110,24 +1265,20 @@ describe('SessionIngestDO live activity + cost persist', () => {
       1,
       20_000
     );
-    expect(older.changes).toEqual(expect.arrayContaining([{ name: 'status', value: 'busy' }]));
-    expect(newer.changes).toEqual(expect.arrayContaining([{ name: 'status', value: 'idle' }]));
-    expect(harness.meta.get('status')).toBe('idle');
-    expect(harness.meta.get('statusOccurredAt')).toBe('2026-07-24T07:59:00.000Z');
-    release();
     await harness.settle();
-    expect(harness.meta.get('status')).toBe('idle');
-    expect(harness.evidenceLedger.events.size).toBe(3);
-  });
-
-  it('retains the durable evidence outbox without dropping metadata on evidence failure', async () => {
-    const harness = makeLiveHarness({ evidenceError: new Error('evidence unavailable') });
-    const result = await harness.durableObject.ingest(
+    expect(persistedBriefingExcerpt(harness)?.messageId).toBe('z-final');
+    const writes = harness.pgCallCount;
+    await harness.durableObject.ingest(
       [
-        assistantItem('failure', 0.1),
         {
-          type: 'session_status',
-          data: { status: 'question', occurredAt: '2026-07-24T07:59:00.000Z' },
+          type: 'message',
+          data: {
+            id: 'z-final',
+            role: 'assistant',
+            finish: 'stop',
+            text: 'Stale replacement',
+            time: { completed: 3000 },
+          },
         },
       ],
       'usr_live',
@@ -1136,40 +1287,303 @@ describe('SessionIngestDO live activity + cost persist', () => {
       10_000
     );
     await harness.settle();
-    expect(result.changes).toEqual(
-      expect.arrayContaining([
-        { name: 'status', value: 'question' },
-        { name: 'statusOccurredAt', value: '2026-07-24T07:59:00.000Z' },
-      ])
-    );
-    expect(
-      [...harness.meta.keys()].filter(key => key.startsWith('briefingEvidence:'))
-    ).toHaveLength(2);
-    expect(harness.evidenceLedger.events.size).toBe(0);
+    expect(harness.pgCallCount).toBe(writes);
   });
 
-  it('stores each historical activity once across replay and clears acknowledged outbox records', async () => {
-    const harness = makeLiveHarness();
+  it('omits offloaded final text without fetching an R2 body', async () => {
+    const part = {
+      id: 'large-text',
+      messageID: 'final',
+      type: 'text',
+      text: 'Done for person@example.com. ' + '界'.repeat(1000),
+      time: { start: 1000, end: 3000 },
+    };
+    const harness = makeLiveHarness({
+      seedMeta: warmLiveMeta(),
+      r2Objects: { 'test/final-part': JSON.stringify(part) },
+    });
     await harness.durableObject.ingest(
-      [assistantItem('replay', 0.1)],
+      [{ type: 'part', data: part }],
+      'usr_live',
+      'ses_live',
+      1,
+      10_000,
+      { 'part/final/large-text': 'test/final-part' }
+    );
+    await harness.settle();
+    expect(harness.pgCallCount).toBe(0);
+    await harness.durableObject.ingest(
+      [
+        {
+          type: 'message',
+          data: { id: 'final', role: 'assistant', finish: 'stop', time: { completed: 3000 } },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      20_000
+    );
+    await harness.settle();
+    expect(harness.r2Get).not.toHaveBeenCalled();
+    expect(harness.pgCallCount).toBe(0);
+  });
+
+  it('omits an offloaded completed message without reading its body', async () => {
+    const harness = makeLiveHarness({ seedMeta: warmLiveMeta() });
+    await harness.durableObject.ingest(
+      [
+        {
+          type: 'message',
+          data: {
+            id: 'final',
+            role: 'assistant',
+            finish: 'stop',
+            text: 'Offloaded response',
+            time: { completed: 3000 },
+          },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      10_000,
+      { 'message/final': 'test/final-message' }
+    );
+    await harness.settle();
+    expect(harness.r2Get).not.toHaveBeenCalled();
+    expect(harness.pgCallCount).toBe(0);
+  });
+
+  it('uses inline final text without reading offloaded tool or reasoning bodies', async () => {
+    const harness = makeLiveHarness({ seedMeta: warmLiveMeta() });
+    await harness.durableObject.ingest(
+      [
+        {
+          type: 'part',
+          data: { id: 'tool', messageID: 'final', type: 'tool', state: { output: 'Tool secret' } },
+        },
+        {
+          type: 'part',
+          data: {
+            id: 'reasoning',
+            messageID: 'final',
+            type: 'reasoning',
+            text: 'Reasoning secret',
+          },
+        },
+        {
+          type: 'part',
+          data: {
+            id: 'text',
+            messageID: 'final',
+            type: 'text',
+            text: 'Final response.',
+            time: { start: 1000, end: 3000 },
+          },
+        },
+        {
+          type: 'message',
+          data: { id: 'final', role: 'assistant', finish: 'stop', time: { completed: 3000 } },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      10_000,
+      { 'part/final/tool': 'test/tool', 'part/final/reasoning': 'test/reasoning' }
+    );
+    await harness.settle();
+    expect(persistedBriefingExcerpt(harness)?.text).toBe('Final response.');
+    expect(harness.r2Get).not.toHaveBeenCalled();
+    expect(harness.pgCallCount).toBe(1);
+  });
+
+  it('reads only the source-row sentinel and omits an over-budget response', async () => {
+    const harness = makeLiveHarness({ seedMeta: warmLiveMeta() });
+    await harness.durableObject.ingest(
+      [
+        ...Array.from({ length: 40 }, (_, index) => ({
+          type: 'part' as const,
+          data: {
+            id: `text-${index}`,
+            messageID: 'final',
+            type: 'text',
+            text: 'Response text.',
+            time: { start: 1000, end: 3000 },
+          },
+        })),
+        {
+          type: 'message',
+          data: { id: 'final', role: 'assistant', finish: 'stop', time: { completed: 3000 } },
+        },
+      ],
       'usr_live',
       'ses_live',
       1,
       10_000
     );
     await harness.settle();
+    expect(harness.partRowsRead).toBe(33);
+    expect(harness.pgCallCount).toBe(0);
+    expect(harness.r2Get).not.toHaveBeenCalled();
+  });
+
+  it('omits oversized inline response evidence without persisting a truncated prefix', async () => {
+    const harness = makeLiveHarness({ seedMeta: warmLiveMeta() });
     await harness.durableObject.ingest(
-      [assistantItem('replay', 0.1)],
+      [
+        {
+          type: 'part',
+          data: {
+            id: 'oversized-text',
+            messageID: 'final',
+            type: 'text',
+            text: 'token=' + 'x'.repeat(8192),
+            time: { start: 1000, end: 3000 },
+          },
+        },
+        {
+          type: 'message',
+          data: { id: 'final', role: 'assistant', finish: 'stop', time: { completed: 3000 } },
+        },
+      ],
       'usr_live',
       'ses_live',
       1,
       10_000
     );
     await harness.settle();
-    expect(harness.evidenceLedger.events.size).toBe(1);
-    expect(
-      [...harness.meta.keys()].filter(key => key.startsWith('briefingEvidence:'))
-    ).toHaveLength(0);
+    expect(harness.pgCallCount).toBe(0);
+    expect(harness.r2Get).not.toHaveBeenCalled();
+  });
+
+  it('builds the excerpt from at most the source-row limit', async () => {
+    const harness = makeLiveHarness({ seedMeta: { status: 'busy' } });
+    await harness.durableObject.ingest(
+      [
+        ...Array.from({ length: 200 }, (_, index) => ({
+          type: 'part' as const,
+          data: { id: `text-${index}`, messageID: 'final', type: 'text', text: 'x' },
+        })),
+        {
+          type: 'message' as const,
+          data: { id: 'final', role: 'assistant', time: { created: 1, completed: 2 } },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      10_000
+    );
+    await harness.settle();
+    const rowsBeforeIdle = harness.partRowsRead;
+
+    const result = await harness.durableObject.ingest(
+      [{ type: 'session_status', data: { status: 'idle' } }],
+      'usr_live',
+      'ses_live',
+      1,
+      20_000
+    );
+    await harness.settle();
+
+    expect(result).toMatchObject({
+      accepted: true,
+      attentionSignals: [
+        {
+          signalId: 'final',
+          kind: 'completed',
+          messageExcerpt: 'x'.repeat(BRIEFING_MAX_EXCERPT_SOURCE_ROWS),
+        },
+      ],
+    });
+    expect(harness.partRowsRead - rowsBeforeIdle).toBeLessThanOrEqual(
+      BRIEFING_MAX_EXCERPT_SOURCE_ROWS + 1
+    );
+  });
+
+  it('limits the excerpt read to a text byte budget', async () => {
+    const harness = makeLiveHarness({ seedMeta: { status: 'busy' } });
+    await harness.durableObject.ingest(
+      [
+        ...Array.from({ length: 40 }, (_, index) => ({
+          type: 'part' as const,
+          data: { id: `blank-${index}`, messageID: 'final', type: 'text', text: ' '.repeat(1000) },
+        })),
+        {
+          type: 'message' as const,
+          data: { id: 'final', role: 'assistant', time: { created: 1, completed: 2 } },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      10_000
+    );
+    await harness.settle();
+    const rowsBeforeIdle = harness.partRowsRead;
+
+    const result = await harness.durableObject.ingest(
+      [{ type: 'session_status', data: { status: 'idle' } }],
+      'usr_live',
+      'ses_live',
+      1,
+      20_000
+    );
+    await harness.settle();
+
+    expect(result).toMatchObject({
+      accepted: true,
+      attentionSignals: [{ signalId: 'final', kind: 'completed', messageExcerpt: '' }],
+    });
+    expect(harness.partRowsRead - rowsBeforeIdle).toBeLessThanOrEqual(
+      BRIEFING_MAX_EXCERPT_SOURCE_ROWS + 1
+    );
+  });
+
+  it('keeps the snippet of a large single text part', async () => {
+    const harness = makeLiveHarness({ seedMeta: { status: 'busy' } });
+    await harness.durableObject.ingest(
+      [
+        {
+          type: 'part',
+          data: {
+            id: 'long-text',
+            messageID: 'final',
+            type: 'text',
+            text: `${'z'.repeat(20_000)} tail`,
+          },
+        },
+        {
+          type: 'message',
+          data: { id: 'final', role: 'assistant', time: { created: 1, completed: 2 } },
+        },
+      ],
+      'usr_live',
+      'ses_live',
+      1,
+      10_000
+    );
+    await harness.settle();
+    const rowsBeforeIdle = harness.partRowsRead;
+
+    const result = await harness.durableObject.ingest(
+      [{ type: 'session_status', data: { status: 'idle' } }],
+      'usr_live',
+      'ses_live',
+      1,
+      20_000
+    );
+    await harness.settle();
+
+    expect(result).toMatchObject({
+      accepted: true,
+      attentionSignals: [
+        { signalId: 'final', kind: 'completed', messageExcerpt: `${'z'.repeat(97)}...` },
+      ],
+    });
+    expect(harness.partRowsRead - rowsBeforeIdle).toBe(1);
   });
 
   it('does not reuse a prior producer timestamp for a legacy status transition', async () => {
@@ -1251,66 +1665,9 @@ describe('SessionIngestDO live activity + cost persist', () => {
     );
     if (result.accepted) expect(result.attentionSignals).toEqual([]);
     await harness.settle();
-    expect([...harness.evidenceLedger.events.values()]).toEqual([
-      expect.objectContaining({
-        kind: 'status',
-        status: 'question',
-        occurred_at: '2026-07-24T07:59:00.000Z',
-        payload: { previousStatus: 'busy', previousStatusKnown: true },
-      }),
-    ]);
-  });
-  it('retains every originating transition in one batch rather than only its final projected status', async () => {
-    const harness = makeLiveHarness();
-    await harness.durableObject.ingest(
-      [
-        {
-          type: 'session_status',
-          data: { status: 'busy', previousStatus: 'idle', occurredAt: '2026-07-24T07:58:00.000Z' },
-        },
-        {
-          type: 'session_status',
-          data: {
-            status: 'question',
-            previousStatus: 'busy',
-            occurredAt: '2026-07-24T07:59:00.000Z',
-          },
-        },
-        {
-          type: 'session_status',
-          data: {
-            status: 'busy',
-            previousStatus: 'question',
-            occurredAt: '2026-07-24T08:01:00.000Z',
-          },
-        },
-      ],
-      'usr_live',
-      'ses_live',
-      1,
-      20_000
-    );
-    await harness.settle();
-    expect(harness.meta.get('status')).toBe('busy');
-    const statuses = [...harness.evidenceLedger.events.values()];
-    expect(statuses).toHaveLength(3);
-    expect(statuses).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          status: 'question',
-          occurred_at: '2026-07-24T07:59:00.000Z',
-          payload: { previousStatus: 'busy', previousStatusKnown: true },
-        }),
-        expect.objectContaining({
-          status: 'busy',
-          occurred_at: '2026-07-24T08:01:00.000Z',
-          payload: { previousStatus: 'question', previousStatusKnown: true },
-        }),
-      ])
-    );
   });
 
-  it('retains old-envelope source transitions even when their stale snapshot is skipped', async () => {
+  it('does not regress local status when an old envelope is skipped', async () => {
     const harness = makeLiveHarness();
     await harness.durableObject.ingest(
       [
@@ -1348,10 +1705,9 @@ describe('SessionIngestDO live activity + cost persist', () => {
     await harness.settle();
     expect(result.changes).toEqual([]);
     expect(harness.meta.get('status')).toBe('idle');
-    expect(harness.evidenceLedger.events.size).toBe(2);
   });
 
-  it('keeps same-millisecond busy-question-busy events distinct and projects the newest transition id', async () => {
+  it('projects the newest transition identity when same-millisecond statuses arrive out of order', async () => {
     const harness = makeLiveHarness();
     const occurredAt = '2026-07-24T07:59:00.000Z';
     const latest = '01ARZ3NDEKTSV4RRFFQ69G5FAW';
@@ -1388,16 +1744,8 @@ describe('SessionIngestDO live activity + cost persist', () => {
     await harness.settle();
     expect(harness.meta.get('status')).toBe('busy');
     expect(harness.meta.get('statusTransitionId')).toBe(latest);
-    expect(harness.evidenceLedger.events.size).toBe(3);
-    expect([...harness.evidenceLedger.events.keys()]).toEqual(
-      expect.arrayContaining([
-        JSON.stringify(['usr_live', 'ses_live', 'status', latest]),
-        JSON.stringify(['usr_live', 'ses_live', 'status', '01ARZ3NDEKTSV4RRFFQ69G5FAV']),
-        JSON.stringify(['usr_live', 'ses_live', 'status', '01ARZ3NDEKTSV4RRFFQ69G5FAT']),
-      ])
-    );
   });
-  it('retains both equal-millisecond source events when the older identity arrives after the newer projection', async () => {
+  it('keeps the newer equal-millisecond status when an older identity arrives later', async () => {
     const harness = makeLiveHarness();
     const occurredAt = '2026-07-24T07:59:00.000Z';
     await harness.durableObject.ingest(
@@ -1438,7 +1786,6 @@ describe('SessionIngestDO live activity + cost persist', () => {
     await harness.settle();
     expect(harness.meta.get('status')).toBe('busy');
     expect(harness.meta.get('statusTransitionId')).toBe('01ARZ3NDEKTSV4RRFFQ69G5FAW');
-    expect(harness.evidenceLedger.events.size).toBe(2);
     expect(result.changes).toEqual(
       expect.arrayContaining([
         { name: 'status', value: 'question' },
@@ -1447,175 +1794,134 @@ describe('SessionIngestDO live activity + cost persist', () => {
     );
     if (result.accepted) expect(result.attentionSignals).toEqual([]);
   });
-  describe('briefing evidence retry alarm', () => {
-    const outboxKeys = (meta: Map<string, string | null>) =>
-      [...meta.keys()].filter(key => key.startsWith('briefingEvidence:'));
-
-    async function ingestWithFailedEvidence() {
-      const harness = makeLiveHarness({ evidenceError: new Error('evidence unavailable') });
+  describe('metrics alarm lifecycle', () => {
+    it('retains the close drain alarm across final-response and straggler ingests', async () => {
+      const harness = makeLiveHarness();
+      const before = Date.now();
+      await harness.durableObject.ingest(
+        [{ type: 'session_open', data: {} }],
+        'usr_live',
+        'ses_live',
+        1
+      );
+      expect(harness.alarmAt).toBeGreaterThanOrEqual(before + INACTIVITY_TIMEOUT_MS);
+      await harness.durableObject.ingest(
+        [{ type: 'session_close', data: { reason: 'completed' } }],
+        'usr_live',
+        'ses_live',
+        1
+      );
+      const closeAlarm = harness.alarmAt;
+      expect(closeAlarm).toBeLessThanOrEqual(Date.now() + POST_CLOSE_DRAIN_MS);
       await harness.durableObject.ingest(
         [
-          { type: 'session_open', data: {} },
-          assistantItem('retry', 0.1),
           {
-            type: 'session_status',
-            data: { status: 'question', occurredAt: '2026-07-24T07:59:00.000Z' },
+            type: 'message',
+            data: {
+              ...assistantItem('final', 0.1).data,
+              finish: 'stop',
+              text: 'Completed the change.',
+              time: { completed: 20_000 },
+            },
           },
         ],
         'usr_live',
         'ses_live',
         1,
-        10_000
-      );
-      await harness.settle();
-      return harness;
-    }
-
-    it('arms a durable backoff retry ahead of the metrics alarm without emitting metrics', async () => {
-      const before = Date.now();
-      const harness = await ingestWithFailedEvidence();
-      const metricsAlarmAt = harness.meta.get('metricsAlarmAt');
-      const retryAt = Number(harness.meta.get('briefingEvidenceRetryAt'));
-      expect(retryAt).toBeGreaterThanOrEqual(before + 30_000);
-      expect(retryAt).toBeLessThan(Number(metricsAlarmAt));
-      expect(harness.alarmAt).toBe(retryAt);
-      expect(harness.meta.get('briefingEvidenceRetryAttempt')).toBe('1');
-      expect(outboxKeys(harness.meta)).toHaveLength(2);
-
-      harness.meta.set('briefingEvidenceRetryAt', String(Date.now() - 1));
-      await harness.durableObject.alarm();
-      expect(harness.ingestSessionMetrics).not.toHaveBeenCalled();
-      expect(harness.meta.get('metricsEmitted')).toBeUndefined();
-      expect(harness.meta.get('metricsAlarmAt')).toBe(metricsAlarmAt);
-      expect(harness.meta.get('briefingEvidenceRetryAttempt')).toBe('2');
-      const nextRetryAt = Number(harness.meta.get('briefingEvidenceRetryAt'));
-      expect(nextRetryAt).toBeGreaterThanOrEqual(retryAt + 30_000);
-      expect(harness.alarmAt).toBe(nextRetryAt);
-      expect(outboxKeys(harness.meta)).toHaveLength(2);
-      expect(harness.evidenceLedger.events.size).toBe(0);
-    });
-
-    it('delivers evidence on the retry alarm, clears the retry and re-arms the metrics time', async () => {
-      const harness = await ingestWithFailedEvidence();
-      const metricsAlarmAt = harness.meta.get('metricsAlarmAt');
-      harness.evidenceLedger.setError(undefined);
-      harness.meta.set('briefingEvidenceRetryAt', String(Date.now() - 1));
-      await harness.durableObject.alarm();
-      expect(harness.evidenceLedger.events.size).toBe(2);
-      expect(outboxKeys(harness.meta)).toEqual([]);
-      expect(harness.meta.has('briefingEvidenceRetryAt')).toBe(false);
-      expect(harness.meta.has('briefingEvidenceRetryAttempt')).toBe(false);
-      expect(harness.meta.get('metricsAlarmAt')).toBe(metricsAlarmAt);
-      expect(harness.alarmAt).toBe(Number(metricsAlarmAt));
-      expect(harness.ingestSessionMetrics).not.toHaveBeenCalled();
-    });
-
-    it('does not retry the external write on a fresh ingest inside the backoff window', async () => {
-      const harness = await ingestWithFailedEvidence();
-      const attempts = harness.evidenceLedger.transaction.mock.calls.length;
-      await harness.durableObject.ingest(
-        [assistantItem('inside-window', 0.2)],
-        'usr_live',
-        'ses_live',
-        1,
         20_000
       );
       await harness.settle();
-      expect(harness.evidenceLedger.transaction).toHaveBeenCalledTimes(attempts);
-      expect(outboxKeys(harness.meta).length).toBeGreaterThan(2);
-      expect(harness.meta.get('briefingEvidenceRetryAttempt')).toBe('1');
-
-      harness.evidenceLedger.setError(undefined);
-      harness.meta.set('briefingEvidenceRetryAt', String(Date.now() - 1));
-      await harness.durableObject.alarm();
-      expect(outboxKeys(harness.meta)).toEqual([]);
-      expect(harness.evidenceLedger.events.size).toBeGreaterThan(2);
+      expect(harness.lastPgSet).toHaveProperty('briefing_excerpt');
+      expect(harness.alarmAt).toBe(closeAlarm);
+      expect(harness.meta.get('metricsAlarmAt')).toBe(String(closeAlarm));
+      expect(harness.ingestSessionMetrics).not.toHaveBeenCalled();
     });
 
-    it('clears the pending flag once the outbox drains so later ingests skip the scan', async () => {
+    it('re-arms an early alarm and emits due metrics once without scheduling another job', async () => {
       const harness = makeLiveHarness();
       await harness.durableObject.ingest(
-        [assistantItem('drains', 0.1)],
+        [{ type: 'session_open', data: {} }],
         'usr_live',
         'ses_live',
-        1,
-        10_000
+        1
       );
-      await harness.settle();
-      expect(outboxKeys(harness.meta)).toEqual([]);
-      expect(harness.meta.has('briefingEvidencePending')).toBe(false);
-      expect(harness.meta.has('briefingEvidenceRetryAt')).toBe(false);
-
-      const failing = await ingestWithFailedEvidence();
-      expect(failing.meta.get('briefingEvidencePending')).toBe('true');
-    });
-
-    it('flushes evidence staged while a flush was in flight without waiting for the backoff', async () => {
-      const gate = Promise.withResolvers<void>();
-      const harness = makeLiveHarness({ evidenceGate: gate.promise });
-      await harness.durableObject.ingest(
-        [assistantItem('first', 0.1)],
-        'usr_live',
-        'ses_live',
-        1,
-        10_000
-      );
-      await harness.durableObject.ingest(
-        [assistantItem('second', 0.2)],
-        'usr_live',
-        'ses_live',
-        1,
-        20_000
-      );
-      gate.resolve();
-      await harness.settle();
-      expect(outboxKeys(harness.meta)).toEqual([]);
-      expect(harness.meta.has('briefingEvidencePending')).toBe(false);
-      expect(harness.meta.has('briefingEvidenceRetryAt')).toBe(false);
-      expect(harness.evidenceLedger.events.size).toBeGreaterThanOrEqual(2);
-    });
-
-    it('still emits due metrics while evidence keeps failing and keeps the retry armed', async () => {
-      const harness = await ingestWithFailedEvidence();
+      const scheduled = harness.alarmAt;
+      await harness.durableObject.alarm();
+      expect(harness.alarmAt).toBe(scheduled);
+      expect(harness.ingestSessionMetrics).not.toHaveBeenCalled();
       harness.meta.set('metricsAlarmAt', String(Date.now() - 1));
       await harness.durableObject.alarm();
       expect(harness.ingestSessionMetrics).toHaveBeenCalledTimes(1);
       expect(harness.meta.get('metricsEmitted')).toBe('true');
       expect(harness.meta.has('metricsAlarmAt')).toBe(false);
-      expect(outboxKeys(harness.meta)).toHaveLength(2);
-      expect(harness.alarmAt).toBe(Number(harness.meta.get('briefingEvidenceRetryAt')));
+      expect(harness.alarmAt).toBeNull();
+      await harness.durableObject.alarm();
+      expect(harness.ingestSessionMetrics).toHaveBeenCalledTimes(1);
+      expect(harness.alarmAt).toBeNull();
     });
 
-    it('never retries or re-arms evidence delivery once the session is deleted', async () => {
-      const gate = Promise.withResolvers<void>();
-      const harness = makeLiveHarness({ evidenceGate: gate.promise });
+    it('reports a running total that no longer matches the stored rows', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        const harness = makeLiveHarness({
+          seedMeta: {
+            kiloUserId: 'usr_live',
+            sessionId: 'ses_live',
+            runningAssistantCostUsd: '0.5',
+            metricsAlarmAt: String(Date.now() - 1),
+          },
+          seedMessageRows: [
+            { item_data: JSON.stringify(assistantItem('existing-turn', 0.25).data) },
+          ],
+        });
+
+        await harness.durableObject.alarm();
+
+        expect(harness.ingestSessionMetrics).toHaveBeenCalledTimes(1);
+        expect(warn).toHaveBeenCalledWith(
+          'SessionIngestDO session cost total diverges from its stored rows',
+          expect.objectContaining({ storedUsd: 0.5, recomputedUsd: 0.25 })
+        );
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it('keeps a newer open alarm that interleaves with metrics emission', async () => {
+      const harness = makeLiveHarness({
+        seedMeta: {
+          kiloUserId: 'usr_live',
+          sessionId: 'ses_live',
+          metricsAlarmAt: String(Date.now() - 1),
+        },
+        seedMessageRows: [{ item_data: JSON.stringify(assistantItem('existing-turn', 0.1).data) }],
+      });
+      const entered = Promise.withResolvers<void>();
+      const release = Promise.withResolvers<void>();
+      harness.ingestSessionMetrics.mockImplementationOnce(async () => {
+        entered.resolve();
+        await release.promise;
+      });
+      const emission = harness.durableObject.alarm();
+      await entered.promise;
       await harness.durableObject.ingest(
-        [assistantItem('deleted', 0.1)],
+        [{ type: 'session_open', data: {} }],
         'usr_live',
         'ses_live',
-        1,
-        10_000
+        1
       );
-      await vi.waitFor(() => expect(harness.evidenceLedger.transaction).toHaveBeenCalled());
-      expect(harness.meta.has('briefingEvidenceRetryAt')).toBe(true);
+      const newerAlarm = harness.alarmAt;
+      release.resolve();
+      await emission;
+      expect(harness.alarmAt).toBe(newerAlarm);
+      expect(harness.meta.get('metricsAlarmAt')).toBe(String(newerAlarm));
+    });
 
-      // clearSessionData: keep only the tombstone and drop the alarm.
-      for (const key of [...harness.meta.keys()]) harness.meta.delete(key);
-      harness.meta.set('deleted', 'true');
-      await harness.storage.deleteAlarm();
-      const armedCalls = harness.storage.setAlarm.mock.calls.length;
-
-      gate.resolve();
-      await harness.settle();
+    it('does not emit metrics or re-arm a deleted session', async () => {
+      const harness = makeLiveHarness({ seedMeta: { deleted: 'true' } });
       await harness.durableObject.alarm();
-      expect(
-        [...harness.meta.keys()].filter(
-          key => key.startsWith('briefingEvidence') || key === 'metricsAlarmAt'
-        )
-      ).toEqual([]);
-      expect(harness.meta.get('deleted')).toBe('true');
-      expect(harness.storage.setAlarm.mock.calls.length).toBe(armedCalls);
-      expect(harness.alarmAt).toBeNull();
+      expect(harness.ingestSessionMetrics).not.toHaveBeenCalled();
+      expect(harness.storage.setAlarm).not.toHaveBeenCalled();
     });
   });
 
@@ -1721,8 +2027,13 @@ describe('SessionIngestDO live activity + cost persist', () => {
   it('does not persist when message is stale-skipped by ingested_at guard', async () => {
     const harness = makeLiveHarness();
     harness.itemRows.set('message/m1', {
+      id: 1,
+      item_id: 'message/m1',
+      item_type: 'message',
+      item_data: '{}',
       ingested_at: 5000,
       item_data_r2_key: null,
+      cost_usd: null,
     });
 
     await harness.durableObject.ingest(
@@ -1905,11 +2216,248 @@ describe('SessionIngestDO live activity + cost persist', () => {
     );
     await harness.settle();
 
-    // cost scan runs at least once (attention path may also select message rows)
-    expect(harness.costScanCount).toBeGreaterThanOrEqual(1);
+    // No stored total yet: the idle transition seeds it with the one full read.
+    expect(harness.costScanCount).toBe(1);
     expect(harness.pgCallCount).toBe(1);
     expect(sqlFragmentText(harness.lastPgSet!.total_cost_microdollars)).toContain('250000');
     expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('250000');
+  });
+
+  it('keeps the running cost equal to a full recomputation across message versions', async () => {
+    const harness = makeLiveHarness();
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.25)],
+      'usr_live',
+      'ses_live',
+      1,
+      1_000
+    );
+    await harness.settle();
+    // First persist of a session without a stored total seeds it from the stored rows.
+    expect(harness.costScanCount).toBe(1);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.25');
+
+    // A newer version of the same message replaces its contribution: no history read, and
+    // the 30s window keeps this batch from persisting.
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.5)],
+      'usr_live',
+      'ses_live',
+      1,
+      2_000
+    );
+    await harness.settle();
+    expect(harness.costScanCount).toBe(1);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.5');
+
+    // The idle transition forces the persist and reads the stored total.
+    await harness.durableObject.ingest(
+      [{ type: 'session_status', data: { status: 'idle' } }],
+      'usr_live',
+      'ses_live',
+      1,
+      3_000
+    );
+    await harness.settle();
+    expect(harness.costScanCount).toBe(1);
+    expect(sqlFragmentText(harness.lastPgSet!.total_cost_microdollars)).toContain('500000');
+    expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('500000');
+  });
+
+  it('persists a stored total without reading the message history', async () => {
+    const priorCost = JSON.stringify(assistantItem('prior', 0.5).data);
+    const harness = makeLiveHarness({
+      seedMeta: {
+        status: 'busy',
+        runningAssistantCostUsd: '0.5',
+        lastCostPersistedMicrodollars: '100000',
+        lastCostPersistedAtMs: String(Date.now()),
+      },
+      seedMessageRows: [{ item_data: priorCost }],
+    });
+
+    await harness.durableObject.ingest(
+      [{ type: 'session_status', data: { status: 'idle' } }],
+      'usr_live',
+      'ses_live',
+      1,
+      Date.now()
+    );
+    await harness.settle();
+
+    expect(harness.costScanCount).toBe(0);
+    expect(sqlFragmentText(harness.lastPgSet!.total_cost_microdollars)).toContain('500000');
+    expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('500000');
+  });
+
+  it('seeds a session without a stored total once', async () => {
+    const harness = makeLiveHarness({
+      seedMeta: { status: 'busy' },
+      seedMessageRows: [
+        { item_data: JSON.stringify(assistantItem('m1', 0.25).data) },
+        { item_data: JSON.stringify(assistantItem('m2', 0.25).data) },
+      ],
+    });
+    const idle = [{ type: 'session_status' as const, data: { status: 'idle' } }];
+
+    await harness.durableObject.ingest(idle, 'usr_live', 'ses_live', 1, 1_000);
+    await harness.settle();
+    expect(harness.costScanCount).toBe(1);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.5');
+    expect(sqlFragmentText(harness.lastPgSet!.total_cost_microdollars)).toContain('500000');
+
+    await harness.durableObject.ingest(
+      [{ type: 'session_status', data: { status: 'busy' } }],
+      'usr_live',
+      'ses_live',
+      1,
+      2_000
+    );
+    await harness.settle();
+    await harness.durableObject.ingest(idle, 'usr_live', 'ses_live', 1, 3_000);
+    await harness.settle();
+
+    expect(harness.costScanCount).toBe(1);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.5');
+  });
+
+  it('drops an offloaded message body from the running total', async () => {
+    const harness = makeLiveHarness();
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.25)],
+      'usr_live',
+      'ses_live',
+      1,
+      1_000
+    );
+    await harness.settle();
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.25');
+
+    // The same message now stores its body in R2, where the cost sum does not read it.
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.25)],
+      'usr_live',
+      'ses_live',
+      1,
+      2_000,
+      { 'message/m1': 'items/m1-blob' }
+    );
+    await harness.settle();
+    expect(harness.costScanCount).toBe(1);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0');
+
+    // Nothing to persist: the stored total did not grow.
+    await harness.durableObject.ingest(
+      [{ type: 'session_status', data: { status: 'idle' } }],
+      'usr_live',
+      'ses_live',
+      1,
+      3_000
+    );
+    await harness.settle();
+    expect(harness.costScanCount).toBe(1);
+    expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('250000');
+  });
+
+  it('commits the running total in the same transaction as the stored rows', async () => {
+    const harness = makeLiveHarness();
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.25)],
+      'usr_live',
+      'ses_live',
+      1,
+      1_000
+    );
+    await harness.settle();
+    // The first batch has no total yet, so the seeding write runs after the transaction.
+    expect(harness.metaWritesInTransaction.has('runningAssistantCostUsd')).toBe(false);
+
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.5)],
+      'usr_live',
+      'ses_live',
+      1,
+      2_000
+    );
+    await harness.settle();
+    expect(harness.metaWritesInTransaction.has('runningAssistantCostUsd')).toBe(true);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.5');
+  });
+
+  it('moves the running total from the stored contribution of the row it replaces', async () => {
+    const harness = makeLiveHarness();
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.25)],
+      'usr_live',
+      'ses_live',
+      1,
+      1_000
+    );
+    await harness.settle();
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.25');
+
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.5)],
+      'usr_live',
+      'ses_live',
+      1,
+      2_000
+    );
+    await harness.settle();
+
+    expect(harness.messageBodyReads).toBe(0);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.5');
+  });
+
+  it('reads a pre-column row body once and uses its stored contribution afterwards', async () => {
+    const harness = makeLiveHarness({
+      seedMeta: { runningAssistantCostUsd: '0.25' },
+      seedMessageRows: [
+        { item_id: 'message/m1', item_data: JSON.stringify(assistantItem('m1', 0.25).data) },
+      ],
+    });
+
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.5)],
+      'usr_live',
+      'ses_live',
+      1,
+      2_000
+    );
+    await harness.settle();
+    expect(harness.messageBodyReads).toBe(1);
+    expect(harness.costScanCount).toBe(0);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.5');
+
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.75)],
+      'usr_live',
+      'ses_live',
+      1,
+      3_000
+    );
+    await harness.settle();
+    expect(harness.messageBodyReads).toBe(1);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.75');
+  });
+
+  it('discards stored rows and the running total when a batch throws after a row write', async () => {
+    const harness = makeLiveHarness({ seedMeta: { runningAssistantCostUsd: '0.25' } });
+    const unstringifiable: Record<string, unknown> = { ...assistantItem('m2', 0.5).data };
+    unstringifiable.self = unstringifiable;
+
+    await expect(
+      harness.durableObject.ingest(
+        [assistantItem('m1', 0.1), { type: 'message', data: unstringifiable } as never],
+        'usr_live',
+        'ses_live',
+        1,
+        2_000
+      )
+    ).rejects.toThrow();
+
+    expect(harness.itemRows.has('message/m1')).toBe(false);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.25');
   });
 
   it('user-only message batch does not open cost persist (KB-4)', async () => {
@@ -1948,7 +2496,8 @@ describe('SessionIngestDO live activity + cost persist', () => {
   });
 
   it('decreased recomputed cost does not move lastCostPersistedMicrodollars backward (KB-7)', async () => {
-    // Prior persist was 200000; R2 offload left '{}' so recompute yields 0 → gate closed.
+    // Prior persist was 200000; R2 offload left '{}' so the recomputation yields only the
+    // 0.01 inline upsert → gate closed.
     const harness = makeLiveHarness({
       seedMeta: {
         lastCostPersistedMicrodollars: '200000',
@@ -1998,15 +2547,11 @@ describe('SessionIngestDO live activity + cost persist', () => {
       string,
       { ingested_at: number | null; item_data_r2_key: string | null }
     >();
-    let selectKind: 'meta_get' | 'item_guard' | 'message_cost' | 'briefing_outbox' | 'other' =
-      'other';
+    let selectKind: 'meta_get' | 'item_guard' | 'message_cost' | 'other' = 'other';
     let eqKey: string | undefined;
 
     const selectQuery = {
-      from: vi.fn((table: unknown) => {
-        if (table === ingestMeta && selectKind === 'other') selectKind = 'briefing_outbox';
-        return selectQuery;
-      }),
+      from: vi.fn(() => selectQuery),
       where: vi.fn((condition: unknown) => {
         const params = collectBoundParams(condition);
         eqKey = params.find((p): p is string => typeof p === 'string');
@@ -2020,15 +2565,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
         if (eqKey !== undefined) return meta.has(eqKey) ? { value: meta.get(eqKey) } : undefined;
         return undefined;
       }),
-      all: vi.fn(() =>
-        selectKind === 'message_cost'
-          ? messageRows
-          : selectKind === 'briefing_outbox'
-            ? [...meta]
-                .filter(([key]) => key.startsWith('briefingEvidence:'))
-                .map(([key, value]) => ({ key, value }))
-            : []
-      ),
+      all: vi.fn(() => (selectKind === 'message_cost' ? messageRows : [])),
     };
 
     const db = {
@@ -2095,7 +2632,12 @@ describe('SessionIngestDO live activity + cost persist', () => {
       waitUntilPromises.push(promise);
     });
     const state = {
-      storage: { setAlarm: vi.fn(), getAlarm: vi.fn(async () => null), deleteAlarm: vi.fn() },
+      storage: {
+        setAlarm: vi.fn(),
+        getAlarm: vi.fn(async () => null),
+        deleteAlarm: vi.fn(),
+        transactionSync: (fn: () => unknown) => fn(),
+      },
       waitUntil,
       blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
     } as unknown as DurableObjectState;
@@ -2114,7 +2656,6 @@ describe('SessionIngestDO live activity + cost persist', () => {
     });
     dbClientMocks.getWorkerDb.mockReset();
     dbClientMocks.getWorkerDb.mockReturnValue({
-      transaction: makeEvidenceLedger().transaction,
       update: vi.fn(() => ({ set: vi.fn(() => ({ where: pgWhere })) })),
     });
 
@@ -2130,16 +2671,16 @@ describe('SessionIngestDO live activity + cost persist', () => {
     // Ingest B: cost 250000 — held on gateB
     await durableObject.ingest([assistantItem('mb', 0.25)], 'usr_live', 'ses_live', 1, 20_000);
 
-    expect(waitUntilPromises.length).toBe(4);
+    expect(waitUntilPromises.length).toBe(2);
 
     // B completes first (sum 0.1+0.25 → 350000), then A (0.1 → 100000).
     // Without max-merge, A would regress meta to 100000.
     gateB.resolve();
-    await waitUntilPromises[3];
+    await waitUntilPromises[1];
     expect(meta.get('lastCostPersistedMicrodollars')).toBe('350000');
 
     gateA.resolve();
-    await waitUntilPromises[1];
+    await waitUntilPromises[0];
     expect(meta.get('lastCostPersistedMicrodollars')).toBe('350000');
     // activity value also max-merged
     expect(Number(meta.get('lastActivityPersistedValueMs'))).toBe(20_000);
@@ -2516,6 +3057,34 @@ describe('SessionIngestDO clone primitives', () => {
       })
     ).toMatchObject({ status: 'complete' });
     expect(harness.items).toHaveLength(2);
+  });
+
+  it('drops a destination running cost when staged rows are written', () => {
+    const harness = makeCloneHarness();
+    harness.meta.set('runningAssistantCostUsd', '0.5');
+    harness.meta.set('cloneSourceSessionId', 'src');
+
+    harness.durableObject.stageCloneBatch({
+      sourceSessionId: 'src',
+      destinationSessionId: 'dst',
+      rows: [
+        {
+          itemId: 'message/a',
+          itemType: 'message' as const,
+          itemData: JSON.stringify({ role: 'assistant', cost: 0.25 }),
+          itemDataR2Key: null,
+          ingestedAt: 1,
+        },
+      ],
+      nextCursor: { ingestedAt: 1, id: 1 },
+      rollingDigest: 'digest-1',
+      copiedItemCount: 1,
+    });
+
+    // The staged rows now describe the cost; the destination recomputes it from them.
+    expect(harness.meta.has('runningAssistantCostUsd')).toBe(false);
+    expect(harness.meta.get('cloneSourceSessionId')).toBe('src');
+    expect(harness.items.map(row => row.item_id)).toEqual(['message/a']);
   });
 
   it('resumes an incomplete same-source stage with the persisted next cursor', async () => {

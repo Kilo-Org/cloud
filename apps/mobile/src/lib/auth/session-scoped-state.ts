@@ -139,11 +139,10 @@ export function clearSessionScopedState(): void {
   // index itself. Without this, an account switch re-indexes the previous
   // account's pull requests from the recents the new account then inherits.
   runClear(clearRecentPrsBestEffort);
-  // The retained PR discussion conversation is private provider data read with
-  // the departing account's own connection, and the store lives for the whole
-  // app process. Dropping it here means a direct account or organization
-  // change can never be handed what the previous account loaded, even for the
-  // same PR.
+  // Cross-account separation for the retained PR discussion conversation: the
+  // sign-in account switch and the sign-out clear it with the other
+  // account-scoped members. Within one account, the organization component of
+  // `conversationRetentionKey` separates organizations' reads of the same PR.
   runClear(clearConversationRetention);
   // The phone's search index is device-wide, not scoped to the signed-in
   // session, so without this the previous account's session, pull-request and

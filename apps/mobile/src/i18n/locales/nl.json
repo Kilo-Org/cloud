@@ -1972,6 +1972,9 @@
       "assistantProviderRejected": "De aanbieder heeft het verzoek afgewezen.",
       "assistantStopped": "Het genereren van het antwoord is gestopt.",
       "assistantContextOverflow": "Het gesprek is te lang voor het model.",
+      "assistantProviderError": "De aanbieder heeft een fout geretourneerd.",
+      "assistantOutputLimit": "Het antwoord bereikte de uitvoerlimiet van het model.",
+      "assistantStructuredOutput": "Het antwoord voldeed niet aan het vereiste formaat.",
       "assistantFailed": "Het genereren van het antwoord is mislukt."
     },
     "filePart": {

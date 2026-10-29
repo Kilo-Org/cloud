@@ -2496,6 +2496,9 @@
       "assistantProviderRejected": "Mai ba da sabis ya ƙi buƙatar.",
       "assistantStopped": "An dakatar da amsar.",
       "assistantContextOverflow": "Tattaunawar ta yi tsawo fiye da abin da samfurin zai iya karɓa.",
+      "assistantProviderError": "Mai ba da sabis ya mayar da kuskure.",
+      "assistantOutputLimit": "Amsar ta kai iyakar fitar da samfurin.",
+      "assistantStructuredOutput": "Amsar ba ta dace da tsarin da ake buƙata ba.",
       "assistantFailed": "An kasa samar da amsar."
     },
     "filePart": {

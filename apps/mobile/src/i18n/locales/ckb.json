@@ -2496,6 +2496,9 @@
       "assistantProviderRejected": "دابینکەرەکە داواکارییەکەی ڕەتکردەوە.",
       "assistantStopped": "وەڵامەکە وەستێنرا.",
       "assistantContextOverflow": "گفتوگۆکە بۆ ئەم مۆدێلە زۆر درێژە.",
+      "assistantProviderError": "دابینکەرەکە هەڵەیەکی گەڕاندەوە.",
+      "assistantOutputLimit": "وەڵامەکە گەیشتووەتە سنووری دەرکردنی مۆدێلەکە.",
+      "assistantStructuredOutput": "وەڵامەکە لەگەڵ ئەو فۆرماتەی کە پێویست بوو نەگونجاوە.",
       "assistantFailed": "وەڵامدانەوە سەرکەوتوو نەبوو."
     },
     "filePart": {

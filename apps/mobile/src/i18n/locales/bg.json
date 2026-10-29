@@ -2496,6 +2496,9 @@
       "assistantProviderRejected": "Доставчикът отхвърли заявката.",
       "assistantStopped": "Генерирането на отговора беше спряно.",
       "assistantContextOverflow": "Разговорът е твърде дълъг за модела.",
+      "assistantProviderError": "Доставчикът върна грешка.",
+      "assistantOutputLimit": "Отговорът достигна ограничението за изходни данни на модела.",
+      "assistantStructuredOutput": "Отговорът не съответства на изисквания формат.",
       "assistantFailed": "Не успяхме да генерираме отговор."
     },
     "filePart": {

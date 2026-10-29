@@ -2496,6 +2496,9 @@
       "assistantProviderRejected": "Tinanggihan ng tagapagbigay ng serbisyo ang kahilingan.",
       "assistantStopped": "Inihinto ang tugon.",
       "assistantContextOverflow": "Masyadong mahaba ang pag-uusap para sa modelo.",
+      "assistantProviderError": "Nagbalik ang tagapagbigay ng serbisyo ng error.",
+      "assistantOutputLimit": "Naabot ng tugon ang limitasyon ng output ng modelo.",
+      "assistantStructuredOutput": "Hindi tumugma ang tugon sa kinakailangang format.",
       "assistantFailed": "Nabigo ang pagtugon."
     },
     "filePart": {

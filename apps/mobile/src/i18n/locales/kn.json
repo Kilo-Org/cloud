@@ -2496,6 +2496,9 @@
       "assistantProviderRejected": "ಪೂರೈಕೆದಾರರು ವಿನಂತಿಯನ್ನು ತಿರಸ್ಕರಿಸಿದ್ದಾರೆ.",
       "assistantStopped": "ಪ್ರತಿಕ್ರಿಯೆಯನ್ನು ನಿಲ್ಲಿಸಲಾಗಿದೆ.",
       "assistantContextOverflow": "ಸಂಭಾಷಣೆಯ ಉದ್ದವು ಮಾದರಿ ನಿಭಾಯಿಸಬಹುದಾದ ಮಿತಿಯನ್ನು ಮೀರಿದೆ.",
+      "assistantProviderError": "ಪೂರೈಕೆದಾರರು ದೋಷವನ್ನು ಹಿಂತಿರುಗಿಸಿದ್ದಾರೆ.",
+      "assistantOutputLimit": "ಪ್ರತಿಕ್ರಿಯೆಯು ಮಾದರಿಯ ಔಟ್‌ಪುಟ್ ಮಿತಿಯನ್ನು ತಲುಪಿದೆ.",
+      "assistantStructuredOutput": "ಪ್ರತಿಕ್ರಿಯೆಯು ಅಗತ್ಯ ಸ್ವರೂಪಕ್ಕೆ ಸರಿಹೊಂದಲಿಲ್ಲ.",
       "assistantFailed": "ಪ್ರತಿಕ್ರಿಯೆ ವಿಫಲವಾಗಿದೆ."
     },
     "filePart": {

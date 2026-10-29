@@ -2496,6 +2496,9 @@
       "assistantProviderRejected": "Ofruesi e refuzoi kërkesën.",
       "assistantStopped": "Gjenerimi i përgjigjes u ndal.",
       "assistantContextOverflow": "Biseda është shumë e gjatë për modelin.",
+      "assistantProviderError": "Ofruesi ktheu një gabim.",
+      "assistantOutputLimit": "Përgjigja arriti kufirin e daljes së modelit.",
+      "assistantStructuredOutput": "Përgjigja nuk përputhej me formatin e kërkuar.",
       "assistantFailed": "Gjenerimi i përgjigjes dështoi."
     },
     "filePart": {

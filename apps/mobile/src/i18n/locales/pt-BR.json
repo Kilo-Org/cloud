@@ -1956,6 +1956,9 @@
       "assistantProviderRejected": "O provedor rejeitou a solicitação.",
       "assistantStopped": "A resposta foi interrompida.",
       "assistantContextOverflow": "A conversa é longa demais para o modelo.",
+      "assistantProviderError": "O provedor retornou um erro.",
+      "assistantOutputLimit": "A resposta atingiu o limite de saída do modelo.",
+      "assistantStructuredOutput": "A resposta não correspondeu ao formato exigido.",
       "assistantFailed": "Não foi possível gerar a resposta."
     },
     "filePart": {

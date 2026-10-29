@@ -2496,6 +2496,9 @@
       "assistantProviderRejected": "პროვაიდერმა უარყო მოთხოვნა.",
       "assistantStopped": "პასუხის შექმნა შეწყდა.",
       "assistantContextOverflow": "საუბარი ძალიან გრძელია ამ მოდელისთვის.",
+      "assistantProviderError": "პროვაიდერმა შეცდომა დააბრუნა.",
+      "assistantOutputLimit": "პასუხმა მოდელის გამოტანის ლიმიტს მიაღწია.",
+      "assistantStructuredOutput": "პასუხი არ შეესაბამება საჭირო ფორმატს.",
       "assistantFailed": "პასუხის შექმნა ვერ მოხერხდა."
     },
     "filePart": {

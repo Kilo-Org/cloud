@@ -2496,6 +2496,9 @@
       "assistantProviderRejected": "प्रदायकले अनुरोध अस्वीकार गर्‍यो।",
       "assistantStopped": "उत्तर दिन रोकियो।",
       "assistantContextOverflow": "कुराकानी मोडेलका लागि धेरै लामो छ।",
+      "assistantProviderError": "प्रदायकले त्रुटि फर्कायो।",
+      "assistantOutputLimit": "उत्तर मोडेलको आउटपुट सीमामा पुग्यो।",
+      "assistantStructuredOutput": "उत्तर अपेक्षित ढाँचासँग मिलेन।",
       "assistantFailed": "उत्तर दिन सकिएन।"
     },
     "filePart": {

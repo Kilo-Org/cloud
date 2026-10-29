@@ -2601,6 +2601,9 @@
       "assistantProviderRejected": "Dhiúltaigh an soláthraí don iarratas.",
       "assistantStopped": "Stopadh an freagra.",
       "assistantContextOverflow": "Tá an comhrá rófhada don tsamhail.",
+      "assistantProviderError": "Chuir an soláthraí earráid ar ais.",
+      "assistantOutputLimit": "Shroicheadh an teorainn aschuir den tsamhail.",
+      "assistantStructuredOutput": "Ní raibh an freagra ag teacht leis an bhformáid riachtanach.",
       "assistantFailed": "Theip ar an bhfreagra."
     },
     "filePart": {

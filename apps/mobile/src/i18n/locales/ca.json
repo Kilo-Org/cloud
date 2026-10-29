@@ -2531,6 +2531,9 @@
       "assistantProviderRejected": "El proveïdor ha rebutjat la sol·licitud.",
       "assistantStopped": "S'ha aturat la generació de la resposta.",
       "assistantContextOverflow": "La conversa és massa llarga per al model.",
+      "assistantProviderError": "El proveïdor ha retornat un error.",
+      "assistantOutputLimit": "La resposta ha arribat al límit de sortida del model.",
+      "assistantStructuredOutput": "La resposta no coincideix amb el format requerit.",
       "assistantFailed": "No s'ha pogut generar la resposta."
     },
     "filePart": {

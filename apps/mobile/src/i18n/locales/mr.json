@@ -2496,6 +2496,9 @@
       "assistantProviderRejected": "सेवा पुरवठादाराने विनंती नाकारली.",
       "assistantStopped": "प्रतिसाद तयार करणे थांबवले.",
       "assistantContextOverflow": "हे संभाषण मॉडेलच्या मर्यादेपेक्षा मोठे आहे.",
+      "assistantProviderError": "सेवा पुरवठादाराने त्रुटी दिली.",
+      "assistantOutputLimit": "प्रतिसाद मॉडेलची आउटपुट मर्यादा गाठली.",
+      "assistantStructuredOutput": "प्रतिसाद आवश्यक स्वरूपाशी जुळला नाही.",
       "assistantFailed": "प्रतिसाद तयार करता आला नाही."
     },
     "filePart": {

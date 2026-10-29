@@ -2496,6 +2496,9 @@
       "assistantProviderRejected": "Təminatçı sorğunu rədd etdi.",
       "assistantStopped": "Cavabın yaradılması dayandırıldı.",
       "assistantContextOverflow": "Söhbət model üçün çox uzundur.",
+      "assistantProviderError": "Təminatçı xəta qaytardı.",
+      "assistantOutputLimit": "Cavab modelin çıxış həddinə çatdı.",
+      "assistantStructuredOutput": "Cavab tələb olunan formatla uyğun gəlmədi.",
       "assistantFailed": "Cavabı yaratmaq mümkün olmadı."
     },
     "filePart": {

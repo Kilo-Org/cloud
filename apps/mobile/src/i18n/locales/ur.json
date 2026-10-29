@@ -2496,6 +2496,9 @@
       "assistantProviderRejected": "فراہم کنندہ نے درخواست مسترد کر دی۔",
       "assistantStopped": "جواب روک دیا گیا۔",
       "assistantContextOverflow": "گفتگو ماڈل کے لیے بہت طویل ہے۔",
+      "assistantProviderError": "فراہم کنندہ نے ایک خرابی واپس کی۔",
+      "assistantOutputLimit": "جواب ماڈل کی آؤٹ پٹ حد تک پہنچ گیا۔",
+      "assistantStructuredOutput": "جواب مطلوبہ فارمیٹ سے مطابقت نہیں رکھتا۔",
       "assistantFailed": "جواب تیار نہیں ہو سکا۔"
     },
     "filePart": {

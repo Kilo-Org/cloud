@@ -2496,6 +2496,9 @@
       "assistantProviderRejected": "አቅራቢው ጥያቄውን ውድቅ አድርጓል።",
       "assistantStopped": "ምላሹ ቆሟል።",
       "assistantContextOverflow": "ውይይቱ ለሞዴሉ በጣም ረጅም ነው።",
+      "assistantProviderError": "አቅራቢው ስህተት መልሷል።",
+      "assistantOutputLimit": "ምላሹ የሞዴሉን የውጤት ገደብ ደርሷል።",
+      "assistantStructuredOutput": "ምላሹ ከተጠየቀው ቅርጸት ጋር አልተመሳሰለም።",
       "assistantFailed": "ምላሹ አልተሳካም።"
     },
     "filePart": {

@@ -2636,6 +2636,9 @@
       "assistantProviderRejected": "Gwrthododd y darparwr y cais.",
       "assistantStopped": "Ataliwyd yr ymateb.",
       "assistantContextOverflow": "Mae'r sgwrs yn rhy hir i'r model.",
+      "assistantProviderError": "Roedd gwall gan y darparwr.",
+      "assistantOutputLimit": "Cyrhaeddodd yr ymateb derfyn allbwn y model.",
+      "assistantStructuredOutput": "Nid oedd yr ymateb yn cyd-fynd â'r fformat gofynnol.",
       "assistantFailed": "Methodd yr ymateb."
     },
     "filePart": {

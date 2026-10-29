@@ -2531,6 +2531,9 @@
       "assistantProviderRejected": "Furnizorul a respins cererea.",
       "assistantStopped": "Generarea răspunsului a fost oprită.",
       "assistantContextOverflow": "Conversația este prea lungă pentru model.",
+      "assistantProviderError": "Furnizorul a returnat o eroare.",
+      "assistantOutputLimit": "Răspunsul a atins limita de ieșire a modelului.",
+      "assistantStructuredOutput": "Răspunsul nu a corespuns formatului cerut.",
       "assistantFailed": "Generarea răspunsului a eșuat."
     },
     "filePart": {

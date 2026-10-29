@@ -2496,6 +2496,9 @@
       "assistantProviderRejected": "Umhlinzeki wenqabe isicelo.",
       "assistantStopped": "Impendulo yamiswa.",
       "assistantContextOverflow": "Ingxoxo iyinde kakhulu kumodeli.",
+      "assistantProviderError": "Umhlinzeki ubuyise iphutha.",
+      "assistantOutputLimit": "Impendulo ifinyelele emkhawuleni wokukhipha womodeli.",
+      "assistantStructuredOutput": "Impendulo ayihambisani nomumo odingekile.",
       "assistantFailed": "Impendulo yehlulekile."
     },
     "filePart": {

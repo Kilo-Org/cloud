@@ -2573,6 +2573,9 @@
       "assistantProviderRejected": "The provider rejected the request.",
       "assistantStopped": "The response was stopped.",
       "assistantContextOverflow": "The conversation is too long for the model.",
+      "assistantProviderError": "The provider returned an error.",
+      "assistantOutputLimit": "The response reached the model's output limit.",
+      "assistantStructuredOutput": "The response did not match the required format.",
       "assistantFailed": "The response failed."
     },
     "filePart": {

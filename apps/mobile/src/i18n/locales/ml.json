@@ -2496,6 +2496,9 @@
       "assistantProviderRejected": "ദാതാവ് അഭ്യർത്ഥന നിരസിച്ചു.",
       "assistantStopped": "മറുപടി നൽകുന്നത് നിർത്തി.",
       "assistantContextOverflow": "ഈ സംഭാഷണത്തിന്റെ നീളം മോഡലിന് കൈകാര്യം ചെയ്യാവുന്ന പരിധിയിലും കൂടുതലാണ്.",
+      "assistantProviderError": "ദാതാവ് ഒരു പിശക് നൽകി.",
+      "assistantOutputLimit": "മറുപടി മോഡലിന്റെ ഔട്ട്പുട്ട് പരിധിയിലെത്തി.",
+      "assistantStructuredOutput": "മറുപടി ആവശ്യമായ ഫോർമാറ്റുമായി പൊരുത്തപ്പെട്ടില്ല.",
       "assistantFailed": "മറുപടി നൽകാൻ കഴിഞ്ഞില്ല."
     },
     "filePart": {

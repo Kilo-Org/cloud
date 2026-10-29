@@ -2566,6 +2566,9 @@
       "assistantProviderRejected": "Poskytovateľ odmietol požiadavku.",
       "assistantStopped": "Generovanie odpovede sa zastavilo.",
       "assistantContextOverflow": "Konverzácia je pre model príliš dlhá.",
+      "assistantProviderError": "Poskytovateľ vrátil chybu.",
+      "assistantOutputLimit": "Odpoveď dosiahla limit výstupu modelu.",
+      "assistantStructuredOutput": "Odpoveď nezodpovedala požadovanému formátu.",
       "assistantFailed": "Odpoveď sa nepodarilo vytvoriť."
     },
     "filePart": {

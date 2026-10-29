@@ -1972,6 +1972,9 @@
       "assistantProviderRejected": "供應商拒絕了此請求。",
       "assistantStopped": "回覆已停止。",
       "assistantContextOverflow": "對話長度超出模型可處理的範圍。",
+      "assistantProviderError": "供應商傳回錯誤。",
+      "assistantOutputLimit": "回覆已達到模型的輸出上限。",
+      "assistantStructuredOutput": "回覆與所需格式不符。",
       "assistantFailed": "回覆失敗。"
     },
     "filePart": {

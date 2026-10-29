@@ -1857,6 +1857,138 @@ describe('session detail failed delivery retry', () => {
   });
 });
 
+describe('session detail assistant response retry', () => {
+  type AssistantInfo = Extract<StoredMessage['info'], { role: 'assistant' }>;
+
+  function failedResponse(
+    id: string,
+    parentID: string,
+    error: NonNullable<AssistantInfo['error']>
+  ): StoredMessage {
+    const info: AssistantInfo = {
+      ...(assistantMessage(id).info as AssistantInfo),
+      id,
+      sessionID: ROOT_ID,
+      parentID,
+      error,
+    };
+    return {
+      info,
+      parts: [
+        stubTextPart({
+          id: `text-${id}`,
+          sessionID: ROOT_ID,
+          messageID: id,
+          text: 'Partial answer',
+        }),
+      ],
+    };
+  }
+
+  function promptRow(id: string, text: string): StoredMessage {
+    const base = userMessage(id);
+    return {
+      info: { ...base.info, sessionID: ROOT_ID },
+      parts: [stubTextPart({ id: `text-${id}`, sessionID: ROOT_ID, messageID: id, text })],
+    };
+  }
+
+  it('shows the prompt once and replaces the failed response once the retry is accepted', async () => {
+    // A cloud-agent session is the only harness type whose `api.send` resolves,
+    // so the real `manager.send` materialises the retry's own optimistic row.
+    goalMountOptions.resolvedType = 'cloud-agent';
+    sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+    const prompt = 'Rebase the feature branch onto main';
+    const messages = [
+      promptRow('msg-prompt', prompt),
+      failedResponse('msg-response', 'msg-prompt', {
+        name: 'APIError',
+        data: { message: 'RAW_PROVIDER_TEXT', isRetryable: false },
+      }),
+    ];
+    const view = await mountDetails(messages);
+    // The failed response states its classified reason, not only the title.
+    expect(renderedText(view.renderer.root)).toContain('The provider returned an error.');
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    const clearFailedMessage = vi.spyOn(view.manager, 'clearFailedMessage');
+    // Call through: the real send materialises the retry's own row, which is the
+    // duplicate the supersede must keep off screen.
+    const send = vi.spyOn(view.manager, 'send');
+    const retry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    await waitFor(() => view.store.get(view.manager.atoms.messagesList).length === 3);
+
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0]?.[0]).toMatchObject({ payload: { prompt } });
+    // Both the failed response and the user row whose prompt it re-sent are
+    // resolved, so neither renders next to the retry's own row.
+    expect(clearFailedMessage.mock.calls).toEqual([
+      ['msg-response', ROOT_ID],
+      ['msg-prompt', ROOT_ID],
+    ]);
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+    // The replaced response is gone, not merely outnumbered by the retry's row.
+    expect(renderedText(view.renderer.root)).not.toContain('Partial answer');
+    expect(renderedText(view.renderer.root)).not.toContain('Response failed');
+  });
+
+  it('restores the failed response and its Retry when the re-send is rejected', async () => {
+    goalMountOptions.resolvedType = 'cloud-agent';
+    sessionConfigSync.currentModel = 'anthropic/claude-sonnet-4';
+    const prompt = 'Rebase the feature branch onto main';
+    const messages = [
+      promptRow('msg-prompt', prompt),
+      failedResponse('msg-response', 'msg-prompt', {
+        name: 'APIError',
+        data: { message: 'RAW_PROVIDER_TEXT', isRetryable: false },
+      }),
+    ];
+    const view = await mountDetails(messages);
+    const clearFailedMessage = vi.spyOn(view.manager, 'clearFailedMessage');
+
+    const gate = Promise.withResolvers<unknown>();
+    pendingSend = gate.promise;
+    const retry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    await act(async () => {
+      (retry.props.onPress as () => void)();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // In flight the replaced rows are hidden, so the prompt is stated once.
+    await waitFor(() => view.store.get(view.manager.atoms.messagesList).length === 3);
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+
+    await act(async () => {
+      gate.reject(new Error('network down'));
+      await Promise.resolve();
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    // Nothing was delivered: the retry's own row is gone, and the failed
+    // response is back with its Retry control.
+    await waitFor(() => view.store.get(view.manager.atoms.messagesList).length === 2);
+    expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+    expect(clearFailedMessage).not.toHaveBeenCalled();
+    expect(renderedText(view.renderer.root)).toContain('Response failed');
+    const restoredRetry = view.renderer.root.find(
+      node =>
+        Object.is(node.type, 'Button') && node.props.accessibilityLabel === i18n.t('common.retry')
+    );
+    expect(typeof restoredRetry.props.onPress).toBe('function');
+  });
+});
+
 describe('session detail slow load', () => {
   it('swaps the endless skeleton for taking-longer copy and a working Retry', async () => {
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] });
@@ -4160,7 +4292,11 @@ describe('session detail duplicate failure state', () => {
 
   function rootFailedAssistantMessage(text: string): StoredMessage {
     const message = assistantMessage(ASSISTANT_ID);
-    message.info = { ...message.info, sessionID: ROOT_ID };
+    const info = message.info;
+    if (info.role !== 'assistant') {
+      throw new Error('fixture must be an assistant message');
+    }
+    message.info = { ...info, sessionID: ROOT_ID, parentID: USER_ID };
     (message.info as { error?: { name: string; data: unknown } }).error = {
       name: 'APIError',
       data: { message: 'raw provider text' },

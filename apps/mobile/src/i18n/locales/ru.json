@@ -2004,6 +2004,9 @@
       "assistantProviderRejected": "Провайдер отклонил запрос.",
       "assistantStopped": "Генерация ответа остановлена.",
       "assistantContextOverflow": "Переписка слишком длинная для этой модели.",
+      "assistantProviderError": "Провайдер вернул ошибку.",
+      "assistantOutputLimit": "Ответ достиг ограничения длины ответа модели.",
+      "assistantStructuredOutput": "Ответ не соответствует требуемому формату.",
       "assistantFailed": "Не удалось сформировать ответ."
     },
     "filePart": {

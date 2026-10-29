@@ -130,12 +130,10 @@ it.each([
   { scope: ['personal', ORG_SCOPE] },
   { scope: 'undefined' },
   { scope: 'not-a-scope' },
-])('rejects invalid scope $scope before mounting the Stack',
-  ({ scope }) => {
-    const tree = mountScope(scope);
-    expect(tree.root.findByType(InvalidRouteState).props).toMatchObject({
-      backTo: '/(app)/security-agent',
-    });
-    expect(captured.stack).toBeUndefined();
-  }
-);
+])('rejects invalid scope $scope before mounting the Stack', ({ scope }) => {
+  const tree = mountScope(scope);
+  expect(tree.root.findByType(InvalidRouteState).props).toMatchObject({
+    backTo: '/(app)/security-agent',
+  });
+  expect(captured.stack).toBeUndefined();
+});

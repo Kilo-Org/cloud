@@ -2494,6 +2494,9 @@
       "assistantProviderRejected": "Үйлчилгээ үзүүлэгч хүсэлтийг хүлээн авахаас татгалзлаа.",
       "assistantStopped": "Хариулт үүсгэхийг зогсоосон.",
       "assistantContextOverflow": "Харилцан яриа загварын боловсруулах хэмжээнээс хэтэрсэн байна.",
+      "assistantProviderError": "Үйлчилгээ үзүүлэгч алдаа буцаалаа.",
+      "assistantOutputLimit": "Хариулт загварын гаргах хэмжээний хязгаарт хүрлээ.",
+      "assistantStructuredOutput": "Хариулт шаардлагатай форматад нийцсэнгүй.",
       "assistantFailed": "Хариулт үүсгэж чадсангүй."
     },
     "filePart": {

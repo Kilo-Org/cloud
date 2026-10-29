@@ -2494,6 +2494,9 @@
       "assistantProviderRejected": "Veitandinn hafnaði beiðninni.",
       "assistantStopped": "Hætt var að mynda svarið.",
       "assistantContextOverflow": "Samtalið er of langt fyrir líkanið.",
+      "assistantProviderError": "Veitandinn skilaði villu.",
+      "assistantOutputLimit": "Svarið náði úttaksmörkum líkansins.",
+      "assistantStructuredOutput": "Svarið samræmist ekki umbeðnu sniði.",
       "assistantFailed": "Ekki tókst að mynda svarið."
     },
     "filePart": {

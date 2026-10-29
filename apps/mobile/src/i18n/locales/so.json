@@ -2494,6 +2494,9 @@
       "assistantProviderRejected": "Bixiyaha ayaa diiday codsiga.",
       "assistantStopped": "Jawaabta waa la joojiyay.",
       "assistantContextOverflow": "Wadahadalku aad buu ugu dheer yahay moodeelka.",
+      "assistantProviderError": "Bixiyaha ayaa cillad ku soo celiyay.",
+      "assistantOutputLimit": "Jawaabtu waxay gaartay xadka wax-soo-saarka moodeelka.",
+      "assistantStructuredOutput": "Jawaabtu ma ahayn qaabka loo baahnaa.",
       "assistantFailed": "Jawaabtu way fashilantay."
     },
     "filePart": {

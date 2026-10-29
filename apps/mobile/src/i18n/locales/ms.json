@@ -2494,6 +2494,9 @@
       "assistantProviderRejected": "Penyedia menolak permintaan.",
       "assistantStopped": "Respons dihentikan.",
       "assistantContextOverflow": "Perbualan terlalu panjang untuk model.",
+      "assistantProviderError": "Penyedia mengembalikan ralat.",
+      "assistantOutputLimit": "Respons mencapai had output model.",
+      "assistantStructuredOutput": "Respons tidak sepadan dengan format yang diperlukan.",
       "assistantFailed": "Respons gagal."
     },
     "filePart": {

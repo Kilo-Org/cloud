@@ -2494,6 +2494,9 @@
       "assistantProviderRejected": "អ្នកផ្តល់សេវាបានបដិសេធសំណើ។",
       "assistantStopped": "ការបង្កើតចម្លើយត្រូវបានបញ្ឈប់។",
       "assistantContextOverflow": "ការសន្ទនាវែងពេកសម្រាប់ម៉ូដែលនេះ។",
+      "assistantProviderError": "អ្នកផ្តល់សេវាបានតបដោយកំហុស។",
+      "assistantOutputLimit": "ចម្លើយបានឈានដល់កម្រិតអតិបរមានៃទិន្នផលរបស់ម៉ូដែល។",
+      "assistantStructuredOutput": "ចម្លើយមិនត្រូវគ្នានឹងទម្រង់ដែលត្រូវការទេ។",
       "assistantFailed": "មិនអាចបង្កើតចម្លើយបានទេ។"
     },
     "filePart": {

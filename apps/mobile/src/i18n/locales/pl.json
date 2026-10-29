@@ -2002,6 +2002,9 @@
       "assistantProviderRejected": "Dostawca odrzucił żądanie.",
       "assistantStopped": "Generowanie odpowiedzi zostało zatrzymane.",
       "assistantContextOverflow": "Rozmowa jest zbyt długa dla modelu.",
+      "assistantProviderError": "Dostawca zwrócił błąd.",
+      "assistantOutputLimit": "Odpowiedź osiągnęła limit wyjścia modelu.",
+      "assistantStructuredOutput": "Odpowiedź nie była zgodna z wymaganym formatem.",
       "assistantFailed": "Nie udało się wygenerować odpowiedzi."
     },
     "filePart": {

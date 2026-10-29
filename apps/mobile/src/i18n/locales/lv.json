@@ -2529,6 +2529,9 @@
       "assistantProviderRejected": "Pakalpojumu sniedzējs noraidīja pieprasījumu.",
       "assistantStopped": "Atbildes sagatavošana tika apturēta.",
       "assistantContextOverflow": "Saruna modelim ir pārāk gara.",
+      "assistantProviderError": "Pakalpojumu sniedzējs atgrieza kļūdu.",
+      "assistantOutputLimit": "Atbilde sasniedza modeļa izvades ierobežojumu.",
+      "assistantStructuredOutput": "Atbilde neatbilda pieprasītajam formātam.",
       "assistantFailed": "Neizdevās sagatavot atbildi."
     },
     "filePart": {

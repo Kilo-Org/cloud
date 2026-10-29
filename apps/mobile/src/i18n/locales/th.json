@@ -2494,6 +2494,9 @@
       "assistantProviderRejected": "ผู้ให้บริการปฏิเสธคำขอ",
       "assistantStopped": "หยุดสร้างคำตอบแล้ว",
       "assistantContextOverflow": "การสนทนายาวเกินไปสำหรับโมเดล",
+      "assistantProviderError": "ผู้ให้บริการส่งกลับข้อผิดพลาด",
+      "assistantOutputLimit": "คำตอบเข้าถึงขีดจำกัดผลลัพธ์ของโมเดล",
+      "assistantStructuredOutput": "คำตอบไม่ตรงกับรูปแบบที่กำหนด",
       "assistantFailed": "สร้างคำตอบไม่สำเร็จ"
     },
     "filePart": {

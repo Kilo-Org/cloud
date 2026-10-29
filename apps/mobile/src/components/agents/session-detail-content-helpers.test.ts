@@ -5,6 +5,7 @@ import {
   countInFlightMessages,
   lastVisibleMessageFailure,
   resolveRetryPrompt,
+  resolveRetryTarget,
   retryFailedMessage,
 } from './session-detail-content-helpers';
 import { getSessionTranscriptItemKey, mergeSessionTranscript } from './session-transcript';
@@ -36,47 +37,36 @@ describe('countInFlightMessages', () => {
 });
 
 describe('retryFailedMessage', () => {
-  it('re-sends the failed submission', async () => {
-    const send = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
-    const clearFailedMessage = vi.fn<(messageId: string) => void>();
-    await retryFailedMessage({
-      message: userMessage('m1'),
-      send,
-      clearFailedMessage,
-    });
-    expect(send).toHaveBeenCalledTimes(1);
-  });
-
   it('clears the original delivery failure once the re-send is accepted', async () => {
-    const message = userMessage('m-failed');
     const send = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
     const clearFailedMessage = vi.fn<(messageId: string) => void>();
-    await retryFailedMessage({ message, send, clearFailedMessage });
+    await retryFailedMessage({ replacedMessageIds: ['m-failed'], send, clearFailedMessage });
     expect(clearFailedMessage).toHaveBeenCalledExactlyOnceWith('m-failed');
   });
 
   it('leaves the failed delivery state alone when the re-send rejects', async () => {
-    const message = userMessage('m-failed');
     const send = vi
       .fn<() => Promise<void>>()
       .mockRejectedValue(new Error('Failed to send message'));
     const clearFailedMessage = vi.fn<(messageId: string) => void>();
     await expect(
-      retryFailedMessage({ message, send, clearFailedMessage })
+      retryFailedMessage({ replacedMessageIds: ['m-failed'], send, clearFailedMessage })
     ).resolves.toBeUndefined();
     expect(send).toHaveBeenCalledTimes(1);
     expect(clearFailedMessage).not.toHaveBeenCalled();
   });
 
-  it('does not clear an assistant failure row, which stays marked', async () => {
+  it('resolves every row an assistant retry replaces once the re-send is accepted', async () => {
+    // The retried turn's own user row carries the prompt; the failed response
+    // and the user row it re-sent both stop showing.
     const send = vi.fn<() => Promise<void>>().mockResolvedValue(undefined);
     const clearFailedMessage = vi.fn<(messageId: string) => void>();
     await retryFailedMessage({
-      message: assistantMessage('m-asst'),
+      replacedMessageIds: ['m-asst', 'm-prompt'],
       send,
       clearFailedMessage,
     });
-    expect(clearFailedMessage).not.toHaveBeenCalled();
+    expect(clearFailedMessage.mock.calls).toEqual([['m-asst'], ['m-prompt']]);
   });
 
   it('swallows a rejected re-send so the caller never sees the rejection', async () => {
@@ -85,7 +75,7 @@ describe('retryFailedMessage', () => {
       .mockRejectedValue(new Error('Failed to send message'));
     const clearFailedMessage = vi.fn<(messageId: string) => void>();
     await expect(
-      retryFailedMessage({ message: userMessage('m1'), send, clearFailedMessage })
+      retryFailedMessage({ replacedMessageIds: ['m1'], send, clearFailedMessage })
     ).resolves.toBeUndefined();
   });
 
@@ -109,7 +99,7 @@ describe('retryFailedMessage', () => {
     ).toEqual(['m-retried']);
 
     await retryFailedMessage({
-      message: submission,
+      replacedMessageIds: [submission.info.id],
       send: vi.fn<() => Promise<void>>().mockResolvedValue(undefined),
       clearFailedMessage: messageId => {
         deliveryStates.delete(messageId);
@@ -127,7 +117,7 @@ describe('retryFailedMessage', () => {
     ]);
 
     await retryFailedMessage({
-      message: submission,
+      replacedMessageIds: [submission.info.id],
       send: vi.fn<() => Promise<void>>().mockRejectedValue(new Error('Failed to send message')),
       clearFailedMessage: messageId => {
         deliveryStates.delete(messageId);
@@ -139,6 +129,31 @@ describe('retryFailedMessage', () => {
       error: 'boom',
       reason: 'execution',
     });
+  });
+});
+
+describe('resolveRetryTarget', () => {
+  it('replaces only a failed user row', () => {
+    const message = userMessage('m1');
+    expect(resolveRetryTarget(message, [message])).toEqual({
+      prompt: 'hi',
+      replacedMessageIds: ['m1'],
+    });
+  });
+
+  it('replaces the failed response and the user row it re-sends', () => {
+    const user = userMessage('m3');
+    const assistant = assistantMessage('m4');
+
+    expect(resolveRetryTarget(assistant, [user, assistant])).toEqual({
+      prompt: 'hi',
+      replacedMessageIds: ['m4', 'm3'],
+    });
+  });
+
+  it('returns null for an assistant row with no preceding user row', () => {
+    const assistant = assistantMessage('m5');
+    expect(resolveRetryTarget(assistant, [assistant])).toBeNull();
   });
 });
 
@@ -205,11 +220,6 @@ describe('resolveRetryPrompt', () => {
 
     expect(resolveRetryPrompt(assistant, messages)).toBe('hi');
   });
-
-  it('returns null for an assistant row with no preceding user row', () => {
-    const assistant = assistantMessage('m5');
-    expect(resolveRetryPrompt(assistant, [assistant])).toBeNull();
-  });
 });
 
 describe('lastVisibleMessageFailure', () => {
@@ -258,7 +268,7 @@ describe('lastVisibleMessageFailure', () => {
     });
     expect(failure?.kind).toBe('assistant');
     expect(failure?.title).toBe('Response failed');
-    expect(failure?.detail).toBeNull();
+    expect(failure?.detailKey).toBe('agentChat.messageFailure.assistantProviderError');
   });
 
   it('returns null for an assistant failure with no preceding user row (no Retry)', () => {

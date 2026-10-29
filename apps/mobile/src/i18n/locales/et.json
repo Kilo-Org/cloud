@@ -2494,6 +2494,9 @@
       "assistantProviderRejected": "Pakkuja lükkas päringu tagasi.",
       "assistantStopped": "Vastuse koostamine peatati.",
       "assistantContextOverflow": "Vestlus on mudeli jaoks liiga pikk.",
+      "assistantProviderError": "Pakkuja tagastas vea.",
+      "assistantOutputLimit": "Vastus jõudis mudeli väljundi piirini.",
+      "assistantStructuredOutput": "Vastus ei vastanud nõutud vormingule.",
       "assistantFailed": "Vastuse koostamine ebaõnnestus."
     },
     "filePart": {

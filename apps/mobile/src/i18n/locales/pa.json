@@ -2494,6 +2494,9 @@
       "assistantProviderRejected": "ਪ੍ਰਦਾਤਾ ਨੇ ਬੇਨਤੀ ਰੱਦ ਕਰ ਦਿੱਤੀ।",
       "assistantStopped": "ਜਵਾਬ ਰੋਕ ਦਿੱਤਾ ਗਿਆ।",
       "assistantContextOverflow": "ਗੱਲਬਾਤ ਮਾਡਲ ਲਈ ਬਹੁਤ ਲੰਬੀ ਹੈ।",
+      "assistantProviderError": "ਪ੍ਰਦਾਤਾ ਨੇ ਗ਼ਲਤੀ ਵਾਪਸ ਕੀਤੀ।",
+      "assistantOutputLimit": "ਜਵਾਬ ਮਾਡਲ ਦੀ ਆਉਟਪੁੱਟ ਸੀਮਾ ਤੱਕ ਪਹੁੰਚ ਗਿਆ।",
+      "assistantStructuredOutput": "ਜਵਾਬ ਲੋੜੀਂਦੇ ਫਾਰਮੈਟ ਨਾਲ ਮੇਲ ਨਹੀਂ ਖਾਂਦਾ।",
       "assistantFailed": "ਜਵਾਬ ਤਿਆਰ ਨਹੀਂ ਹੋ ਸਕਿਆ।"
     },
     "filePart": {

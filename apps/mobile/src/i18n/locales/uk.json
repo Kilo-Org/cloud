@@ -2002,6 +2002,9 @@
       "assistantProviderRejected": "Постачальник відхилив запит.",
       "assistantStopped": "Формування відповіді зупинено.",
       "assistantContextOverflow": "Розмова занадто довга для моделі.",
+      "assistantProviderError": "Постачальник повернув помилку.",
+      "assistantOutputLimit": "Відповідь досягла ліміту вихідних даних моделі.",
+      "assistantStructuredOutput": "Відповідь не відповідає потрібному формату.",
       "assistantFailed": "Не вдалося сформувати відповідь."
     },
     "filePart": {

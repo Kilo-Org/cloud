@@ -2494,6 +2494,9 @@
       "assistantProviderRejected": "প্রোভাইডার অনুরোধটি প্রত্যাখ্যান করেছে।",
       "assistantStopped": "উত্তর তৈরি করা বন্ধ হয়েছে।",
       "assistantContextOverflow": "কথোপকথনটি মডেলের জন্য খুব দীর্ঘ।",
+      "assistantProviderError": "প্রোভাইডার একটি ত্রুটি ফেরত দিয়েছে।",
+      "assistantOutputLimit": "উত্তরটি মডেলের সর্বোচ্চ আউটপুট সীমায় পৌঁছেছে।",
+      "assistantStructuredOutput": "উত্তরটি প্রয়োজনীয় ফরম্যাটের সঙ্গে মেলেনি।",
       "assistantFailed": "উত্তর তৈরি করা যায়নি।"
     },
     "filePart": {

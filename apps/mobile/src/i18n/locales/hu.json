@@ -2494,6 +2494,9 @@
       "assistantProviderRejected": "A szolgáltató elutasította a kérést.",
       "assistantStopped": "A válasz létrehozása leállt.",
       "assistantContextOverflow": "A beszélgetés túl hosszú a modell számára.",
+      "assistantProviderError": "A szolgáltató hibát adott vissza.",
+      "assistantOutputLimit": "A válasz elérte a modell kimeneti korlátját.",
+      "assistantStructuredOutput": "A válasz nem felelt meg a szükséges formátumnak.",
       "assistantFailed": "Nem sikerült létrehozni a választ."
     },
     "filePart": {

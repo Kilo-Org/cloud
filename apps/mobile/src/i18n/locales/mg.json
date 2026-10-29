@@ -2494,6 +2494,9 @@
       "assistantProviderRejected": "Nolavin'ny mpamatsy ny fangatahana.",
       "assistantStopped": "Najanona ny famaliana.",
       "assistantContextOverflow": "Lava loatra ny resaka ho an'ny modely.",
+      "assistantProviderError": "Namaly diso ny mpamatsy.",
+      "assistantOutputLimit": "Tonga tamin'ny fetran'ny valian'ny modely ny famaliana.",
+      "assistantStructuredOutput": "Tsy nifanaraka tamin'ny endrika takiana ny famaliana.",
       "assistantFailed": "Tsy nahomby ny famaliana."
     },
     "filePart": {

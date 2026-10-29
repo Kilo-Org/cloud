@@ -2494,6 +2494,9 @@
       "assistantProviderRejected": "Onye na-enye ọrụ jụrụ arịrịọ ahụ.",
       "assistantStopped": "Akwụsịrị nzaghachi ahụ.",
       "assistantContextOverflow": "Mkparịta ụka ahụ toro ogologo karịa ihe ihe nlereanya ahụ nwere ike ịnabata.",
+      "assistantProviderError": "Onye na-enye ọrụ zaghachiri na njehie.",
+      "assistantOutputLimit": "Nzaghachi ahụ ruru oke mmepụta nke ihe nlereanya ahụ.",
+      "assistantStructuredOutput": "Nzaghachi ahụ adabaghị n'usoro a chọrọ.",
       "assistantFailed": "Nzaghachi ahụ agaghị nke ọma."
     },
     "filePart": {

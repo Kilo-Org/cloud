@@ -2494,6 +2494,9 @@
       "assistantProviderRejected": "Udbyderen afviste anmodningen.",
       "assistantStopped": "Genereringen af svaret blev stoppet.",
       "assistantContextOverflow": "Samtalen er for lang til modellen.",
+      "assistantProviderError": "Udbyderen returnerede en fejl.",
+      "assistantOutputLimit": "Svaret nåede modellens outputgrænse.",
+      "assistantStructuredOutput": "Svaret matchede ikke det påkrævede format.",
       "assistantFailed": "Svaret kunne ikke genereres."
     },
     "filePart": {

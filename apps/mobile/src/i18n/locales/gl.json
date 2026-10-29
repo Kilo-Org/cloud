@@ -2494,6 +2494,9 @@
       "assistantProviderRejected": "O provedor rexeitou a solicitude.",
       "assistantStopped": "Detívose a resposta.",
       "assistantContextOverflow": "A conversa é demasiado longa para o modelo.",
+      "assistantProviderError": "O provedor devolveu un erro.",
+      "assistantOutputLimit": "A resposta alcanzou o límite de saída do modelo.",
+      "assistantStructuredOutput": "A resposta non coincidía co formato requirido.",
       "assistantFailed": "Non se puido xerar a resposta."
     },
     "filePart": {

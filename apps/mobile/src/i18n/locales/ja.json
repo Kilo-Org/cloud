@@ -1970,6 +1970,9 @@
       "assistantProviderRejected": "プロバイダーがリクエストを拒否しました。",
       "assistantStopped": "応答の生成が停止しました。",
       "assistantContextOverflow": "会話が長すぎてモデルで処理できません。",
+      "assistantProviderError": "プロバイダーがエラーを返しました。",
+      "assistantOutputLimit": "応答がモデルの出力上限に達しました。",
+      "assistantStructuredOutput": "応答が必要な形式に一致しませんでした。",
       "assistantFailed": "応答に失敗しました。"
     },
     "filePart": {

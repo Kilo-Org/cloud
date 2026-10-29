@@ -1888,6 +1888,9 @@
       "assistantProviderRejected": "Le fournisseur a rejeté la requête.",
       "assistantStopped": "La génération de la réponse a été interrompue.",
       "assistantContextOverflow": "La conversation est trop longue pour le modèle.",
+      "assistantProviderError": "Le fournisseur a renvoyé une erreur.",
+      "assistantOutputLimit": "La réponse a atteint la limite de sortie du modèle.",
+      "assistantStructuredOutput": "La réponse ne correspondait pas au format requis.",
       "assistantFailed": "La génération de la réponse a échoué."
     },
     "filePart": {

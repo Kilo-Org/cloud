@@ -2494,6 +2494,9 @@
       "assistantProviderRejected": "Leverantören avvisade begäran.",
       "assistantStopped": "Svaret avbröts.",
       "assistantContextOverflow": "Konversationen är för lång för modellen.",
+      "assistantProviderError": "Leverantören returnerade ett fel.",
+      "assistantOutputLimit": "Svaret nådde modellens utdata-gräns.",
+      "assistantStructuredOutput": "Svaret matchade inte det begärda formatet.",
       "assistantFailed": "Det gick inte att generera svaret."
     },
     "filePart": {

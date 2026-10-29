@@ -2564,6 +2564,9 @@
       "assistantProviderRejected": "Teikėjas atmetė užklausą.",
       "assistantStopped": "Atsakymo generavimas sustabdytas.",
       "assistantContextOverflow": "Pokalbis per ilgas šiam modeliui.",
+      "assistantProviderError": "Teikėjas grąžino klaidą.",
+      "assistantOutputLimit": "Atsakymas pasiekė modelio išvesties limitą.",
+      "assistantStructuredOutput": "Atsakymas neatitiko reikalaujamo formato.",
       "assistantFailed": "Nepavyko sugeneruoti atsakymo."
     },
     "filePart": {

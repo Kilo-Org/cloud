@@ -2564,6 +2564,9 @@
       "assistantProviderRejected": "Ponudnik je zavrnil zahtevo.",
       "assistantStopped": "Ustvarjanje odgovora je bilo ustavljeno.",
       "assistantContextOverflow": "Pogovor je predolg za model.",
+      "assistantProviderError": "Ponudnik je vrnil napako.",
+      "assistantOutputLimit": "Odgovor je dosegel omejitev izhoda modela.",
+      "assistantStructuredOutput": "Odgovor ni ustrezal zahtevanemu formatu.",
       "assistantFailed": "Odgovora ni bilo mogoče ustvariti."
     },
     "filePart": {

@@ -2494,6 +2494,9 @@
       "assistantProviderRejected": "چمتو کوونکي غوښتنه رد کړه.",
       "assistantStopped": "ځواب ودرول شو.",
       "assistantContextOverflow": "خبرې اترې د ماډل لپاره ډېرې اوږدې دي.",
+      "assistantProviderError": "چمتو کوونکي تېروتنه راستونه کړه.",
+      "assistantOutputLimit": "ځواب د ماډل د وتلو برېد ته ورسېد.",
+      "assistantStructuredOutput": "ځواب له اړین فورمټ سره سمون نه درلود.",
       "assistantFailed": "ځواب ناکام شو."
     },
     "filePart": {

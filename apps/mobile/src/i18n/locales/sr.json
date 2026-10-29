@@ -2529,6 +2529,9 @@
       "assistantProviderRejected": "Provajder je odbio zahtev.",
       "assistantStopped": "Generisanje odgovora je zaustavljeno.",
       "assistantContextOverflow": "Razgovor je predugačak za model.",
+      "assistantProviderError": "Provajder je vratio grešku.",
+      "assistantOutputLimit": "Odgovor je dostigao ograničenje izlaza modela.",
+      "assistantStructuredOutput": "Odgovor nije odgovarao zahtevanom formatu.",
       "assistantFailed": "Generisanje odgovora nije uspelo."
     },
     "filePart": {

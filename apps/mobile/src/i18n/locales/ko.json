@@ -1970,6 +1970,9 @@
       "assistantProviderRejected": "제공업체가 요청을 거부했습니다.",
       "assistantStopped": "응답 생성이 중지되었습니다.",
       "assistantContextOverflow": "대화가 너무 길어 모델이 처리할 수 없습니다.",
+      "assistantProviderError": "제공업체가 오류를 반환했습니다.",
+      "assistantOutputLimit": "응답이 모델의 출력 한도에 도달했습니다.",
+      "assistantStructuredOutput": "응답이 필요한 형식과 일치하지 않습니다.",
       "assistantFailed": "응답을 생성하지 못했습니다."
     },
     "filePart": {

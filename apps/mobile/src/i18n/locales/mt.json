@@ -2599,6 +2599,9 @@
       "assistantProviderRejected": "Il-fornitur ċaħad it-talba.",
       "assistantStopped": "It-tweġiba twaqqfet.",
       "assistantContextOverflow": "Il-konversazzjoni hija twila wisq għall-mudell.",
+      "assistantProviderError": "Il-fornitur rritorna żball.",
+      "assistantOutputLimit": "It-tweġiba laħqet il-limitu ta' output tal-mudell.",
+      "assistantStructuredOutput": "It-tweġiba ma kinitx konformi mal-format meħtieġ.",
       "assistantFailed": "It-tweġiba falliet."
     },
     "filePart": {

@@ -2494,6 +2494,9 @@
       "assistantProviderRejected": "வழங்குநர் கோரிக்கையை நிராகரித்தார்.",
       "assistantStopped": "பதில் நிறுத்தப்பட்டது.",
       "assistantContextOverflow": "இந்த உரையாடல் மாதிரி கையாளக்கூடிய அளவைவிட நீளமாக உள்ளது.",
+      "assistantProviderError": "வழங்குநர் பிழையைத் திருப்பினார்.",
+      "assistantOutputLimit": "பதில் மாதிரியின் வெளியீட்டு வரம்பை எட்டியது.",
+      "assistantStructuredOutput": "பதில் தேவையான வடிவமைப்புடன் பொருந்தவில்லை.",
       "assistantFailed": "பதிலை உருவாக்க முடியவில்லை."
     },
     "filePart": {

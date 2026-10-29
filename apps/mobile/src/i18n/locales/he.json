@@ -1986,6 +1986,9 @@
       "assistantProviderRejected": "הספק דחה את הבקשה.",
       "assistantStopped": "התשובה הופסקה.",
       "assistantContextOverflow": "השיחה ארוכה מדי עבור המודל.",
+      "assistantProviderError": "הספק החזיר שגיאה.",
+      "assistantOutputLimit": "התשובה הגיעה למגבלת הפלט של המודל.",
+      "assistantStructuredOutput": "התשובה לא התאימה לפורמט הנדרש.",
       "assistantFailed": "יצירת התשובה נכשלה."
     },
     "filePart": {

@@ -2494,6 +2494,9 @@
       "assistantProviderRejected": "Founisè a rejte demann lan.",
       "assistantStopped": "Repons lan te sispann.",
       "assistantContextOverflow": "Konvèsasyon an twò long pou modèl la.",
+      "assistantProviderError": "Founisè a retounen yon erè.",
+      "assistantOutputLimit": "Repons lan rive limit sòti modèl la.",
+      "assistantStructuredOutput": "Repons lan pa t koresponn ak fòma ki obligatwa a.",
       "assistantFailed": "Repons lan echwe."
     },
     "filePart": {

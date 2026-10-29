@@ -1970,6 +1970,9 @@
       "assistantProviderRejected": "Penyedia menolak permintaan.",
       "assistantStopped": "Respons dihentikan.",
       "assistantContextOverflow": "Percakapan ini terlalu panjang untuk diproses oleh model.",
+      "assistantProviderError": "Penyedia mengembalikan error.",
+      "assistantOutputLimit": "Respons mencapai batas output model.",
+      "assistantStructuredOutput": "Respons tidak sesuai dengan format yang diminta.",
       "assistantFailed": "Gagal menghasilkan respons."
     },
     "filePart": {

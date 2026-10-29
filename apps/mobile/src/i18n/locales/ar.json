@@ -2034,6 +2034,9 @@
       "assistantProviderRejected": "رفض المزود الطلب.",
       "assistantStopped": "تم إيقاف إنشاء الرد.",
       "assistantContextOverflow": "المحادثة أطول من أن يستوعبها النموذج.",
+      "assistantProviderError": "أعاد المزود رسالة خطأ.",
+      "assistantOutputLimit": "وصل الرد إلى حدّ الإخراج الأقصى للنموذج.",
+      "assistantStructuredOutput": "لم يتطابق الرد مع التنسيق المطلوب.",
       "assistantFailed": "تعذّر إنشاء الرد."
     },
     "filePart": {

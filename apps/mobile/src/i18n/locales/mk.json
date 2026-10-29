@@ -2494,6 +2494,9 @@
       "assistantProviderRejected": "Давателот го одби барањето.",
       "assistantStopped": "Создавањето на одговорот е запрено.",
       "assistantContextOverflow": "Разговорот е премногу долг за моделот.",
+      "assistantProviderError": "Давателот врати грешка.",
+      "assistantOutputLimit": "Одговорот го достигна ограничувањето за излез на моделот.",
+      "assistantStructuredOutput": "Одговорот не се совпаѓаше со бараниот формат.",
       "assistantFailed": "Не успеа создавањето на одговорот."
     },
     "filePart": {

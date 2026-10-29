@@ -2494,6 +2494,9 @@
       "assistantProviderRejected": "Провайдер сұрауды қабылдамады.",
       "assistantStopped": "Жауапты жасау тоқтатылды.",
       "assistantContextOverflow": "Сөйлесу көлемі модельдің шегінен асты.",
+      "assistantProviderError": "Провайдер қате қайтарды.",
+      "assistantOutputLimit": "Жауап модельдің шығыс шегіне жетті.",
+      "assistantStructuredOutput": "Жауап қажетті форматқа сәйкес келмеді.",
       "assistantFailed": "Жауапты жасау мүмкін болмады."
     },
     "filePart": {

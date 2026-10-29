@@ -2564,6 +2564,9 @@
       "assistantProviderRejected": "Пастаўшчык адхіліў запыт.",
       "assistantStopped": "Стварэнне адказу спынена.",
       "assistantContextOverflow": "Размова занадта доўгая для мадэлі.",
+      "assistantProviderError": "Пастаўшчык вярнуў памылку.",
+      "assistantOutputLimit": "Адказ дасягнуў максімальнай даўжыні вываду мадэлі.",
+      "assistantStructuredOutput": "Адказ не адпавядае патрабаванаму фармату.",
       "assistantFailed": "Не ўдалося стварыць адказ."
     },
     "filePart": {

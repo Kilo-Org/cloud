@@ -2494,6 +2494,9 @@
       "assistantProviderRejected": "ຜູ້ໃຫ້ບໍລິການໄດ້ປະຕິເສດຄຳຂໍແລ້ວ.",
       "assistantStopped": "ການສ້າງຄຳຕອບຖືກຢຸດແລ້ວ.",
       "assistantContextOverflow": "ການສົນທະນາຍາວເກີນກວ່າທີ່ໂມເດວຈະຮອງຮັບໄດ້.",
+      "assistantProviderError": "ຜູ້ໃຫ້ບໍລິການສົ່ງຂໍ້ຜິດພາດກັບມາ.",
+      "assistantOutputLimit": "ຄຳຕອບໄດ້ເຖິງຂີດຈຳກັດຜົນຜະລິດຂອງໂມເດວແລ້ວ.",
+      "assistantStructuredOutput": "ຄຳຕອບບໍ່ສອດຄ່ອງກັບຮູບແບບທີ່ຕ້ອງການ.",
       "assistantFailed": "ສ້າງຄຳຕອບບໍ່ສຳເລັດ."
     },
     "filePart": {

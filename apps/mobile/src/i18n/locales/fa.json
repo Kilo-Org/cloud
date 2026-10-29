@@ -2494,6 +2494,9 @@
       "assistantProviderRejected": "ارائه‌دهنده درخواست را رد کرد.",
       "assistantStopped": "پاسخ متوقف شد.",
       "assistantContextOverflow": "گفت‌وگو برای این مدل بیش از حد طولانی است.",
+      "assistantProviderError": "ارائه‌دهنده خطا برگرداند.",
+      "assistantOutputLimit": "پاسخ به محدودیت خروجی مدل رسید.",
+      "assistantStructuredOutput": "پاسخ با قالب مورد نیاز مطابقت نداشت.",
       "assistantFailed": "تولید پاسخ ناموفق بود."
     },
     "filePart": {

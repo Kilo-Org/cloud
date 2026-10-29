@@ -2494,6 +2494,9 @@
       "assistantProviderRejected": "પ્રદાતાએ વિનંતી નકારી કાઢી.",
       "assistantStopped": "જવાબ અટકાવવામાં આવ્યો.",
       "assistantContextOverflow": "મોડલ માટે વાતચીત ખૂબ લાંબી છે.",
+      "assistantProviderError": "પ્રદાતાએ ભૂલ પરત મોકલી.",
+      "assistantOutputLimit": "જવાબ મોડલની આઉટપુટ મર્યાદા સુધી પહોંચી ગયો.",
+      "assistantStructuredOutput": "જવાબ જરૂરી ફોર્મેટ સાથે બંધબેસતો નથી.",
       "assistantFailed": "જવાબ મળી શક્યો નહીં."
     },
     "filePart": {

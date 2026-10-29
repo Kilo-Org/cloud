@@ -5,6 +5,7 @@ import { InputAccessoryView, Keyboard, Pressable, TextInput, View } from 'react-
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -16,6 +17,7 @@ import {
   useReviewConfig,
   useSaveReviewConfig,
 } from '@/lib/hooks/use-code-reviewer';
+import { reviewConfigFailure, useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
 import {
   type SettingsBackGuardResult,
   useSettingsBackGuard,
@@ -118,7 +120,10 @@ function InstructionsScreen({
   platform,
 }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
   const router = useRouter();
-  const { data } = useReviewConfig(scope, platform);
+  const config = useReviewConfig(scope, platform);
+  const configBody = useReviewConfigBody(config);
+  const { data } = config;
+  const failure = reviewConfigFailure(configBody, config.isFetching);
   const save = useSaveReviewConfig(scope, platform);
   const { t } = useTranslation();
 
@@ -155,37 +160,50 @@ function InstructionsScreen({
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('codeReviewer.instructions.title')} onBack={onBack} />
       {dialog}
-      <TabScreenScrollView
-        // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
-        automaticallyAdjustKeyboardInsets
-        className="flex-1"
-        contentContainerClassName="px-6 pt-4"
-        keyboardShouldPersistTaps="handled"
-      >
-        <Animated.View layout={LinearTransition} className="gap-4">
-          {data == null && (
-            <Animated.View exiting={FadeOut.duration(150)} className="gap-4">
-              <Skeleton className="h-32 w-full rounded-lg" />
-              <Skeleton className="h-10 w-full rounded-md" />
-            </Animated.View>
-          )}
+      {failure ? (
+        // A config read that failed, or one that stayed pending with nothing
+        // in flight even after its automatic restart, gets the action that can
+        // resolve it instead of a skeleton that never ends.
+        <QueryError
+          variant={failure.variant}
+          onRetry={() => {
+            failure.onRetry();
+          }}
+          isRetrying={failure.isRetrying}
+        />
+      ) : (
+        <TabScreenScrollView
+          // iOS IME inset and focused-field auto-reveal (AGENTS.md: input screens).
+          automaticallyAdjustKeyboardInsets
+          className="flex-1"
+          contentContainerClassName="px-6 pt-4"
+          keyboardShouldPersistTaps="handled"
+        >
+          <Animated.View layout={LinearTransition} className="gap-4">
+            {configBody.body.status === 'loading' && (
+              <Animated.View exiting={FadeOut.duration(150)} className="gap-4">
+                <Skeleton className="h-32 w-full rounded-lg" />
+                <Skeleton className="h-10 w-full rounded-md" />
+              </Animated.View>
+            )}
 
-          {data != null && (
-            <InstructionsEditor
-              initial={data.customInstructions ?? ''}
-              onDirty={text => {
-                setDirty(text.trim() !== initialRef.current.trim());
-              }}
-              save={save}
-              onSaved={() => {
-                router.back();
-              }}
-              skipNextGuardRef={skipNextGuardRef}
-              draftRef={draftRef}
-            />
-          )}
-        </Animated.View>
-      </TabScreenScrollView>
+            {configBody.body.status === 'ready' && data != null && (
+              <InstructionsEditor
+                initial={data.customInstructions ?? ''}
+                onDirty={text => {
+                  setDirty(text.trim() !== initialRef.current.trim());
+                }}
+                save={save}
+                onSaved={() => {
+                  router.back();
+                }}
+                skipNextGuardRef={skipNextGuardRef}
+                draftRef={draftRef}
+              />
+            )}
+          </Animated.View>
+        </TabScreenScrollView>
+      )}
     </View>
   );
 }

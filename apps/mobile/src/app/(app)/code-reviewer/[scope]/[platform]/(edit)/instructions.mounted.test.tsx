@@ -21,7 +21,13 @@ const config = vi.hoisted(() => ({
   data: null as { customInstructions: string } | null,
   isLoading: false,
   isError: false,
+  isFetching: false,
+  fetchStatus: 'idle' as string,
   refetch: vi.fn(),
+}));
+const connectivity = vi.hoisted(() => ({ known: true }));
+const queryError = vi.hoisted(() => ({
+  props: [] as { variant?: string; onRetry?: () => void; isRetrying?: boolean }[],
 }));
 const save = vi.hoisted(() => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }));
 const router = vi.hoisted(() => ({ back: vi.fn(), push: vi.fn() }));
@@ -91,6 +97,21 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: { duration: () => ({}) },
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => (connectivity.known ? 'online' : 'unknown'),
+}));
+// Host stub: every rendered error state stays queryable, and its retry
+// callback is the one the screen handed it.
+vi.mock('@/components/query-error', () => ({
+  QueryError: (props: {
+    variant?: string;
+    onRetry?: () => void;
+    isRetrying?: boolean;
+  }): ReactNode => {
+    queryError.props.push(props);
+    return createElement('QueryError');
+  },
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/sheet', () => ({ Sheet: 'Sheet' }));
 vi.mock('@/components/destructive-confirm-dialog', () => ({
@@ -186,6 +207,11 @@ beforeEach(() => {
   config.data = null;
   config.isLoading = false;
   config.isError = false;
+  config.isFetching = false;
+  config.fetchStatus = 'idle';
+  config.refetch.mockReset();
+  connectivity.known = true;
+  queryError.props = [];
   save.isPending = false;
   save.mutate.mockReset();
   save.mutateAsync.mockReset();
@@ -427,5 +453,103 @@ describe('InstructionsRoute editor', () => {
     const input = latestInput();
     expect(input.accessibilityLabel).toBe(i18n.t('codeReviewer.instructions.title'));
     expect(input.accessibilityLabel).not.toBe('Custom instructions');
+  });
+});
+
+// The config read drives the whole body, so every state it can reach must
+// paint something the user can act on: a skeleton while the first load is in
+// flight, the editor once it lands, and a retryable error when it failed or
+// stopped with nothing in flight.
+describe('InstructionsRoute config read states', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('offers Retry instead of an endless skeleton when the load fails', () => {
+    config.isError = true;
+    const renderer = mount();
+
+    expect(findByHostType(renderer, 'Skeleton')).toHaveLength(0);
+    expect(textInputs.inputs).toHaveLength(0);
+    expect(queryError.props.at(-1)?.variant).toBe('server');
+    expect(config.refetch).not.toHaveBeenCalled();
+  });
+
+  it('retries the read when the error state Retry is pressed', () => {
+    config.isError = true;
+    mount();
+
+    act(() => {
+      queryError.props.at(-1)?.onRetry?.();
+    });
+
+    expect(config.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('names the confirmed-offline pause as the reason the load stopped', () => {
+    config.fetchStatus = 'paused';
+    const renderer = mount();
+
+    expect(queryError.props.at(-1)?.variant).toBe('offline');
+    expect(findByHostType(renderer, 'Skeleton')).toHaveLength(0);
+  });
+
+  it('keeps waiting while the pause has no settled connectivity yet', () => {
+    connectivity.known = false;
+    config.fetchStatus = 'paused';
+    const renderer = mount();
+
+    expect(queryError.props).toHaveLength(0);
+    expect(findByHostType(renderer, 'Skeleton')).toHaveLength(2);
+  });
+
+  it('keeps the editor when a background refetch fails with cached config', () => {
+    config.data = { customInstructions: STORED };
+    config.isError = true;
+    mount();
+
+    expect(queryError.props).toHaveLength(0);
+    expect(latestInput().defaultValue).toBe(STORED);
+  });
+
+  it('restarts an idle read on its own and paints the editor once it lands', async () => {
+    vi.useFakeTimers();
+    config.refetch.mockImplementation(() => {
+      config.data = { customInstructions: STORED };
+      return Promise.resolve();
+    });
+
+    const renderer = mount();
+    expect(findByHostType(renderer, 'Skeleton')).toHaveLength(2);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2500);
+    });
+
+    expect(config.refetch).toHaveBeenCalledTimes(1);
+    expect(queryError.props).toHaveLength(0);
+    expect(latestInput().defaultValue).toBe(STORED);
+  });
+
+  it('offers Retry when the restart cannot revive the read, and Retry re-requests it', async () => {
+    vi.useFakeTimers();
+    const renderer = mount();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2500);
+    });
+
+    // The single automatic attempt did not get a fetch running, so the body
+    // stops waiting behind a skeleton and offers the action that can.
+    expect(config.refetch).toHaveBeenCalledTimes(1);
+    expect(queryError.props.at(-1)?.variant).toBe('server');
+    expect(findByHostType(renderer, 'Skeleton')).toHaveLength(0);
+
+    act(() => {
+      queryError.props.at(-1)?.onRetry?.();
+    });
+
+    expect(config.refetch).toHaveBeenCalledTimes(2);
+    expect(findByHostType(renderer, 'Skeleton')).toHaveLength(2);
   });
 });

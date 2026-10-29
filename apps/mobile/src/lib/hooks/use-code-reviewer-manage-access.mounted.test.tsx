@@ -16,8 +16,8 @@ import {
 
 const mocks = vi.hoisted(() => ({
   toastError: vi.fn(),
-  mintInstallState: vi.fn(
-    (_input: unknown): Promise<{ token: string }> => Promise.resolve({ token: 'install-token' })
+  mintInstallState: vi.fn((_input: unknown): Promise<{ token: string }> =>
+    Promise.resolve({ token: 'install-token' })
   ),
   launch: vi.fn<(url: string) => Promise<unknown>>(),
 }));

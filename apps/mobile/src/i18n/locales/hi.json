@@ -2363,7 +2363,7 @@
       "invalidLink": "यह लिंक नहीं खोला जा सकता।",
       "hostConfirmTitle": "बाहरी लिंक खोलें?",
       "hostConfirmMessage": "यह लिंक आपके ब्राउज़र में {{host}} खोलता है।",
-      "open": "ओपन",
+      "open": "खोलें",
       "trustThisHost": "इस होस्ट पर भरोसा करें"
     },
     "folderPicker": {
@@ -2815,7 +2815,7 @@
       "openAccessibility": "पुल रिक्वेस्ट या मर्ज रिक्वेस्ट खोलें",
       "clearLink": "लिंक हटाएँ",
       "pasteLink": "पुल रिक्वेस्ट या मर्ज रिक्वेस्ट का लिंक पेस्ट करें",
-      "open": "ओपन"
+      "open": "खोलें"
     },
     "eventChips": {
       "comment": "टिप्पणी करें",

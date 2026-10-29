@@ -113,6 +113,31 @@ describe('addUserByokAvailability', () => {
     expect(result.map(model => model.hasUserByokAvailable)).toEqual([false, false]);
   });
 
+  test.each(['vercel-ai-gateway', 'openrouter', 'anthropic'] as const)(
+    'does not mark an id a custom LLM owns for a %s key, since routing serves the custom LLM',
+    async providerId => {
+      mockedGetVercelModelsMetadata.mockResolvedValue(metadata);
+      jest
+        .mocked(getVercelModelsFromDatabase)
+        .mockResolvedValue(new Set(['anthropic/claude-fixture']));
+      jest.mocked(isValidOpenRouterModelId).mockResolvedValue(true);
+      const models = [makeModel('anthropic/claude-fixture')];
+      const [beforeCustomLlm] = await addUserByokAvailability(models, [providerId]);
+      expect(beforeCustomLlm?.hasUserByokAvailable).toBe(true);
+
+      await insertCustomLlmForTest(
+        'anthropic/claude-fixture',
+        publicCustomLlmDefinition(['custom-provider'])
+      );
+      try {
+        const [owned] = await addUserByokAvailability(models, [providerId]);
+        expect(owned?.hasUserByokAvailable).toBe(false);
+      } finally {
+        await deleteCustomLlmForTest('anthropic/claude-fixture');
+      }
+    }
+  );
+
   test('marks catalog models served by a catalog-mode direct BYOK key', async () => {
     const models = [makeModel('moonshotai/kimi-k2.6'), makeModel('openai/gpt-fixture')].map(
       model => ({ ...model, hasUserByokAvailable: false })

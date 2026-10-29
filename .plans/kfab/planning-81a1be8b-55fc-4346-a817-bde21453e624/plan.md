@@ -66,10 +66,6 @@ When Apple's verifier definitively rejects a submitted App Store transaction JWS
 
 **Verification:** Code review
 
-### ac-4: After deployment, new occurrences of the undecodable-JWS case on credits.completeAppStorePurchase stop appearing as untyped 'Error' / INTERNAL_SERVER_ERROR (KILOCODE-WEB-288T and the generic 'We could not finish this purchase' group KILOCODE-WEB-28F1). In the Vercel log drain, invalid-receipt calls on this path return 400 instead of 500.
-
-**Verification:** Manual: after release, check Sentry kilocode-web for new KILOCODE-WEB-288T events and the Axiom vercel dataset status codes for completeAppStorePurchase
-
 ## Risks
 
 - Misclassifying a verifier status as terminal could make the mobile client permanently give up on a paid purchase. Mitigation: only RETRYABLE_VERIFICATION_FAILURE is treated as transient (Apple's own designation), and configuration errors thrown before verification (`requiredEnv`) are not VerificationExceptions, so they stay retryable.

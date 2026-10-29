@@ -95,7 +95,8 @@ async function readConfigSnapshot(): Promise<BlacklistDomainsConfigSnapshot> {
 const getConfigSnapshot = createCachedFetch<BlacklistDomainsConfigSnapshot | null>(
   readConfigSnapshot,
   60_000,
-  null
+  null,
+  { name: 'blacklistDomainsConfigSnapshot' }
 );
 
 /** Blacklisted domains from Redis, falling back to the BLACKLIST_DOMAINS env var. */

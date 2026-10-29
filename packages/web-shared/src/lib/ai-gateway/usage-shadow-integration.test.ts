@@ -69,6 +69,7 @@ jest.mock('@kilocode/web-shared/lib/kilo-pass-org/consumption', () => ({}));
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   sentryLogger: () => () => {},
   logExceptInTest: () => {},
+  warnExceptInTest: () => {},
 }));
 jest.mock('./providers/upstream-request', () => ({ fetchGeneration: jest.fn() }));
 jest.mock('./custom-pricing', () => ({ calculateCustomCost_mUsd: () => undefined }));

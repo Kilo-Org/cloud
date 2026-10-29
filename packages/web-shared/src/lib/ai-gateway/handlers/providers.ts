@@ -37,7 +37,8 @@ const getProviders = createCachedFetch(
     );
   },
   600_000,
-  null
+  null,
+  { name: 'openRouterProviders' }
 );
 
 /**

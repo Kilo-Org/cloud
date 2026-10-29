@@ -436,8 +436,7 @@ export function FindingRemediationPanel({
                     value={
                       originKey
                         ? t(originKey)
-                        : (storedText(attempt.origin)?.replaceAll('_', ' ') ??
-                          t('common.unknown'))
+                        : (storedText(attempt.origin)?.replaceAll('_', ' ') ?? t('common.unknown'))
                     }
                   />
                   <KvRow

@@ -36,9 +36,7 @@ export function formatConfidence(confidence: string | null | undefined): string 
   }
   // Object.hasOwn: a bare index would return inherited members like
   // `constructor` for an unknown code instead of falling through to humanize.
-  const key = Object.hasOwn(CONFIDENCE_LABEL_KEYS, code)
-    ? CONFIDENCE_LABEL_KEYS[code]
-    : undefined;
+  const key = Object.hasOwn(CONFIDENCE_LABEL_KEYS, code) ? CONFIDENCE_LABEL_KEYS[code] : undefined;
   return key === undefined ? humanize(code) : i18n.t(key);
 }
 
@@ -59,9 +57,7 @@ export function getAgentChatSessionHref(scope: string, cliSessionId: string | nu
   return (isPersonalSecurityScope(scope) ? path : `${path}?organizationId=${scope}`) as Href;
 }
 
-export function formatExploitable(
-  isExploitable: boolean | 'unknown' | null | undefined
-): string {
+export function formatExploitable(isExploitable: boolean | 'unknown' | null | undefined): string {
   // A stored record can omit the field (see stored-text); only the two booleans
   // are answers, so a missing value reads like 'unknown'.
   if (isExploitable === true) {

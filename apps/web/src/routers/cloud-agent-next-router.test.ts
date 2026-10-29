@@ -955,10 +955,9 @@ describe('cloudAgentNextRouter prepare attachment ledger', () => {
   };
   // This suite asserts on the ledger records themselves, so it runs the real
   // helper instead of the module mock the send suite asserts on.
-  const realReleaseRefusedSend =
-    jest.requireActual<typeof ReleaseRefusedSendModule>(
-      '@/lib/cloud-agent-next/release-refused-send'
-    ).releaseRefusedSend;
+  const realReleaseRefusedSend = jest.requireActual<typeof ReleaseRefusedSendModule>(
+    '@/lib/cloud-agent-next/release-refused-send'
+  ).releaseRefusedSend;
 
   function workerRefusal(code: string, httpStatus: number, message: string) {
     return new TRPCClientError(message, {

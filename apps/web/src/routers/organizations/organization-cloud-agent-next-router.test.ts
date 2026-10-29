@@ -1955,9 +1955,9 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
     );
     const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
 
-    await expect(
-      caller.prepareSession({ ...sandboxInput, attachments })
-    ).rejects.toThrow('refused');
+    await expect(caller.prepareSession({ ...sandboxInput, attachments })).rejects.toThrow(
+      'refused'
+    );
 
     expect(releaseRefusedSend).toHaveBeenCalledWith({
       attachments,

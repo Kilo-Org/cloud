@@ -45,6 +45,8 @@ test('classifies alias types across substitution layers and reports the control 
   const report = JSON.parse(stdout) as OxlintOutput;
   assert.deepEqual(report.diagnostics.map(diagnostic => diagnostic.code).sort(), [
     'anti-slop(no-known-value-widening)',
+    'anti-slop(no-known-value-widening)',
+    'anti-slop(no-unsafe-dictionary-type)',
     'anti-slop(no-unsafe-dictionary-type)',
     'anti-slop(no-unsafe-dictionary-type)',
   ]);

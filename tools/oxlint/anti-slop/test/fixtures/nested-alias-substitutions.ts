@@ -22,8 +22,20 @@ type Inner<X> = X;
 type LookupInner<X> = { readonly [key: string]: X };
 export type Nested = LookupInner<Inner<unknown>>;
 
+// Dictionary value reached through two alias layers that bind the same parameter name.
+type Root<X> = X;
+type Echo<X> = X;
+type DictOf<X> = { readonly [key: string]: X };
+export type Chained = Root<Echo<DictOf<unknown>>>;
+
+// Widening target reached through an alias layer that binds the same parameter name.
+type Mapped<X extends string> = { readonly [K in X]: string };
+type Revive<X> = X;
+type Plain = Revive<Mapped<string>>;
+
 export const forwarded: Forwarded = { key: 'a' };
 export const tabled: Tabled = { first: 'a', second: 'b', third: 'c' };
+export const plain: Plain = { first: 'a' };
 
 // Controls: both rules still report the contracts they exist to report.
 export type Loose = { readonly [key: string]: unknown };

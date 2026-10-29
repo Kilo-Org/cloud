@@ -3963,7 +3963,7 @@ export const organization_guardrails = pgTable(
     check('organization_guardrails_status_check', sql`${table.status} IN ('enabled', 'disabled')`),
     check(
       'organization_guardrails_name_check',
-      sql`char_length(btrim(${table.name})) BETWEEN 1 AND 120`
+      sql`char_length(btrim(${table.name})) BETWEEN 1 AND 500`
     ),
     check(
       'organization_guardrails_description_check',

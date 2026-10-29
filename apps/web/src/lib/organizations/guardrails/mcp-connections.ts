@@ -1,3 +1,4 @@
+import { MAX_ORGANIZATION_GUARDRAIL_NAME_LENGTH } from '@kilocode/db/schema-types';
 import { organization_mcp_connect_events } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import type { Organization } from '@kilocode/db/schema';
@@ -28,7 +29,7 @@ export type McpConnectionResult = McpConnectVerdict & {
 };
 
 function cleanServerName(name: string | null | undefined): string | null {
-  return name?.trim().slice(0, 120).trim() || null;
+  return name?.trim().slice(0, MAX_ORGANIZATION_GUARDRAIL_NAME_LENGTH).trim() || null;
 }
 
 /**

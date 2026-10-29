@@ -1,5 +1,5 @@
 {
-  "id": "a566b782-07a8-4466-90d8-b167e9e72222",
+  "id": "969edeb0-e89e-4809-b609-b748ba06ceef",
   "prevId": "09f37330-0925-4ed5-bcc7-4ec3b879f34d",
   "version": "7",
   "dialect": "postgresql",
@@ -25548,7 +25548,7 @@
         },
         "organization_guardrails_name_check": {
           "name": "organization_guardrails_name_check",
-          "value": "char_length(btrim(\"organization_guardrails\".\"name\")) BETWEEN 1 AND 120"
+          "value": "char_length(btrim(\"organization_guardrails\".\"name\")) BETWEEN 1 AND 500"
         },
         "organization_guardrails_description_check": {
           "name": "organization_guardrails_description_check",

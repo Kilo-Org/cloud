@@ -1,4 +1,5 @@
 import {
+  MAX_ORGANIZATION_GUARDRAIL_NAME_LENGTH,
   ORGANIZATION_GUARDRAIL_STATUSES,
   ORGANIZATION_MCP_CONNECT_DECISIONS,
   OrganizationGuardrailEnforcementSchema,
@@ -42,14 +43,16 @@ import {
   normalizeRemoteMcpUrl,
   type McpTarget,
 } from '@/lib/organizations/guardrails/mcp-identity';
+import { MAX_MCP_IDENTITY_KEY_LENGTH } from '@/lib/organizations/guardrails/guardrails-policy';
 import { requireGuardrailsOrganization } from '@/lib/organizations/require-guardrails-organization';
+import { isUniqueViolation } from '@/lib/db-errors';
 
 export const MAX_ORGANIZATION_GUARDRAILS = 500;
 
 const GuardrailStatusSchema = z.enum(ORGANIZATION_GUARDRAIL_STATUSES);
 const McpCatalogSourceSchema = z.enum(['kilo_marketplace', 'mcp_registry']);
 
-const GuardrailNameSchema = z.string().trim().min(1).max(120);
+const GuardrailNameSchema = z.string().trim().min(1).max(MAX_ORGANIZATION_GUARDRAIL_NAME_LENGTH);
 const GuardrailDescriptionSchema = z.string().trim().max(500);
 const MinVersionInputSchema = z.string().max(64).nullable().optional();
 
@@ -123,8 +126,31 @@ function minVersionForTarget(target: McpTarget, minVersion: string | null | unde
   return normalized.value;
 }
 
+/** Never truncated, because it is derived from the server's identity. */
 function defaultCustomName(target: McpTarget): string {
-  return target.kind === 'remote' ? new URL(target.url).host : target.identifier;
+  const name = target.kind === 'remote' ? new URL(target.url).host : target.identifier;
+  if (name.length > MAX_ORGANIZATION_GUARDRAIL_NAME_LENGTH) {
+    badRequest(
+      `That server’s name is too long. Keep it under ${MAX_ORGANIZATION_GUARDRAIL_NAME_LENGTH} characters, or enter a name.`
+    );
+  }
+  return name;
+}
+
+/** Display text from a registry or a client, which is safe to shorten. */
+function clipDisplayName(name: string | null | undefined): string {
+  return name?.trim().slice(0, MAX_ORGANIZATION_GUARDRAIL_NAME_LENGTH).trim() ?? '';
+}
+
+/** Connects with a longer identity key are always denied as unsupported, so don't allow one. */
+function identityKeyForAllowList(target: McpTarget): string {
+  const identityKey = mcpIdentityKey(target);
+  if (identityKey.length > MAX_MCP_IDENTITY_KEY_LENGTH) {
+    badRequest(
+      `That server is too long to allow. Keep it under ${MAX_MCP_IDENTITY_KEY_LENGTH} characters.`
+    );
+  }
+  return identityKey;
 }
 
 function approvedName(
@@ -132,12 +158,7 @@ function approvedName(
   eventName: string | null,
   target: McpTarget
 ): string {
-  const candidates = [registryName, eventName, defaultCustomName(target)];
-  for (const candidate of candidates) {
-    const name = candidate?.trim().slice(0, 120).trim();
-    if (name) return name;
-  }
-  return defaultCustomName(target).slice(0, 120);
+  return clipDisplayName(registryName) || clipDisplayName(eventName) || defaultCustomName(target);
 }
 
 async function resolveAddInput(input: z.infer<typeof AddInputSchema>): Promise<{
@@ -167,7 +188,7 @@ async function resolveAddInput(input: z.infer<typeof AddInputSchema>): Promise<{
   }
   return {
     target: variant.target,
-    name: item.name.slice(0, 120),
+    name: clipDisplayName(item.name) || defaultCustomName(variant.target),
     description: item.description.trim().slice(0, 500) || null,
     source: { registry: input.source, id: item.sourceId },
   };
@@ -248,7 +269,7 @@ async function createGuardrail(params: {
   minVersion: string | null;
   auditVerb: 'Added' | 'Approved';
 }) {
-  const identityKey = mcpIdentityKey(params.target);
+  const identityKey = identityKeyForAllowList(params.target);
   return await db.transaction(async tx => {
     const [{ total }] = await tx
       .select({ total: count() })
@@ -460,7 +481,7 @@ export const organizationMcpGuardrailsRouter = createTRPCRouter({
         }
         const target = targetFromCustomInput(input.target);
         config = mcpConfigFromTarget(target, minVersionForTarget(target, input.minVersion));
-        identityKey = mcpIdentityKey(target);
+        identityKey = identityKeyForAllowList(target);
         defaultName = defaultCustomName(target);
         if (identityKey !== guardrail.identity_key) {
           const [duplicate] = await db
@@ -488,22 +509,37 @@ export const organizationMcpGuardrailsRouter = createTRPCRouter({
         if (!normalized.ok) badRequest(normalized.reason);
         config = configWithMinVersion(guardrail.config, normalized.value);
       }
-      const [updated] = await db
-        .update(organization_guardrails)
-        .set({
-          name: input.name ?? defaultName ?? guardrail.name,
-          description:
-            input.description === undefined ? guardrail.description : input.description || null,
-          identity_key: identityKey,
-          config,
-        })
-        .where(eq(organization_guardrails.id, guardrail.id))
-        .returning();
-      await createAuditLog({
-        action: 'organization.guardrail.update',
-        ...auditEntry(ctx, input.organizationId),
-        message: `Updated ${describeGuardrail(updated)}`,
-      });
+      let updated: OrganizationGuardrail;
+      try {
+        updated = await db.transaction(async tx => {
+          const [row] = await tx
+            .update(organization_guardrails)
+            .set({
+              name: input.name ?? defaultName ?? guardrail.name,
+              description:
+                input.description === undefined ? guardrail.description : input.description || null,
+              identity_key: identityKey,
+              config,
+            })
+            .where(eq(organization_guardrails.id, guardrail.id))
+            .returning();
+          await createAuditLog({
+            action: 'organization.guardrail.update',
+            ...auditEntry(ctx, input.organizationId),
+            message: `Updated ${describeGuardrail(row)}`,
+            tx,
+          });
+          return row;
+        });
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'This MCP server is already allowed.',
+          });
+        }
+        throw error;
+      }
       return serializeGuardrail(updated);
     }),
 

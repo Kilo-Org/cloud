@@ -1,6 +1,7 @@
 'use client';
 
 import { useId, useState } from 'react';
+import { MAX_ORGANIZATION_GUARDRAIL_NAME_LENGTH } from '@kilocode/db/schema-types';
 import { useMutation } from '@tanstack/react-query';
 import { Button } from '@/components/ui/button';
 import { DialogFooter } from '@/components/ui/dialog';
@@ -165,7 +166,7 @@ export function CustomMcpForm({
         <Input
           id={nameId}
           value={name}
-          maxLength={120}
+          maxLength={MAX_ORGANIZATION_GUARDRAIL_NAME_LENGTH}
           placeholder="Shown in your allowed list"
           onChange={event => setName(event.target.value)}
         />

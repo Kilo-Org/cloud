@@ -1310,6 +1310,9 @@ export const OrganizationEnkryptSettingsSchema = z.object({
 export const ORGANIZATION_GUARDRAIL_TYPES = ['mcp'] as const;
 export type OrganizationGuardrailType = (typeof ORGANIZATION_GUARDRAIL_TYPES)[number];
 
+/** Matches the `organization_guardrails_name_check` constraint. */
+export const MAX_ORGANIZATION_GUARDRAIL_NAME_LENGTH = 500;
+
 export const ORGANIZATION_GUARDRAIL_STATUSES = ['enabled', 'disabled'] as const;
 export type OrganizationGuardrailStatus = (typeof ORGANIZATION_GUARDRAIL_STATUSES)[number];
 

@@ -1,6 +1,7 @@
 /**
  * Seeds fake MCP connect events so the MCP guardrails audit log can be reviewed locally.
- * Local development only: nothing records real connect events yet.
+ * Local development only: real connect events are recorded by
+ * POST /api/organizations/[id]/guardrails/mcp-connections, but no client reports them yet.
  *
  * Usage (from apps/web):
  *   pnpm script:run mcp-guardrails seed-connect-events <organizationId> [eventCount]

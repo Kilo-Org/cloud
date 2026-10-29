@@ -14,7 +14,7 @@ CREATE TABLE "organization_guardrails" (
 	CONSTRAINT "UQ_organization_guardrails_organization_id_type_identity_key" UNIQUE("organization_id","type","identity_key"),
 	CONSTRAINT "organization_guardrails_type_check" CHECK ("organization_guardrails"."type" IN ('mcp')),
 	CONSTRAINT "organization_guardrails_status_check" CHECK ("organization_guardrails"."status" IN ('enabled', 'disabled')),
-	CONSTRAINT "organization_guardrails_name_check" CHECK (char_length(btrim("organization_guardrails"."name")) BETWEEN 1 AND 120),
+	CONSTRAINT "organization_guardrails_name_check" CHECK (char_length(btrim("organization_guardrails"."name")) BETWEEN 1 AND 500),
 	CONSTRAINT "organization_guardrails_description_check" CHECK ("organization_guardrails"."description" IS NULL OR char_length("organization_guardrails"."description") <= 500)
 );
 --> statement-breakpoint

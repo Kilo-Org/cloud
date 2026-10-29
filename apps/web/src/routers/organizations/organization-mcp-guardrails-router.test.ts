@@ -291,6 +291,46 @@ describe('organization guardrails router', () => {
       ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     });
 
+    it('keeps the full package name as the default name, even when it is long', async () => {
+      const caller = await createCallerForUser(owner.id);
+      const identifier = `@scope/${'a'.repeat(200)}`;
+
+      const added = await caller.organizations.mcpGuardrails.add({
+        organizationId,
+        type: 'mcp',
+        source: 'custom',
+        target: { kind: 'package', ecosystem: 'npm', identifier },
+      });
+
+      expect(added.name).toBe(identifier);
+      expect(added.identityKey).toBe(`npm:${identifier}`);
+    });
+
+    it('rejects an explicit name over the name limit instead of shortening it', async () => {
+      const caller = await createCallerForUser(owner.id);
+      await expect(
+        caller.organizations.mcpGuardrails.add({
+          organizationId,
+          type: 'mcp',
+          source: 'custom',
+          name: 'n'.repeat(501),
+          target: { kind: 'package', ecosystem: 'npm', identifier: 'pkg' },
+        })
+      ).rejects.toThrow();
+    });
+
+    it('rejects a server whose identity key is too long to ever match a connect', async () => {
+      const caller = await createCallerForUser(owner.id);
+      await expect(
+        caller.organizations.mcpGuardrails.add({
+          organizationId,
+          type: 'mcp',
+          source: 'custom',
+          target: { kind: 'remote', url: `https://mcp.example.com/${'a'.repeat(500)}` },
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+
     it('rejects an invalid minimum version', async () => {
       const caller = await createCallerForUser(owner.id);
       await expect(
@@ -512,6 +552,37 @@ describe('organization guardrails router', () => {
         identityKey: 'npm:pkg',
       });
       expect((await latestAuditLog()).action).toBe('organization.guardrail.update');
+    });
+
+    it('uses the full package name as the default name when the target changes', async () => {
+      const { caller, added } = await addPackage();
+      const identifier = `@scope/${'b'.repeat(200)}`;
+
+      const updated = await caller.organizations.mcpGuardrails.update({
+        organizationId,
+        guardrailId: added.id,
+        target: { kind: 'package', ecosystem: 'npm', identifier },
+      });
+
+      expect(updated.name).toBe(identifier);
+    });
+
+    it('rejects changing the target to one that is already allowed', async () => {
+      const { caller, added } = await addPackage();
+      await caller.organizations.mcpGuardrails.add({
+        organizationId,
+        type: 'mcp',
+        source: 'custom',
+        target: { kind: 'package', ecosystem: 'npm', identifier: 'other' },
+      });
+
+      await expect(
+        caller.organizations.mcpGuardrails.update({
+          organizationId,
+          guardrailId: added.id,
+          target: { kind: 'package', ecosystem: 'npm', identifier: 'other' },
+        })
+      ).rejects.toMatchObject({ code: 'CONFLICT' });
     });
 
     it('clears the minimum version', async () => {

@@ -32,17 +32,27 @@ const preventRemove = vi.hoisted(() => ({
 }));
 // The TextInput records its props on render so the test drives a real edit
 // through the screen's own onChangeText, not a fabricated dirty flag.
+type RecordedInput = {
+  children?: ReactNode;
+  className?: string;
+  value?: string;
+  defaultValue?: string;
+  placeholder?: string;
+  accessibilityLabel?: string;
+  onChangeText: (text: string) => void;
+  multiline?: boolean;
+  ref?: { current: { setSelection: (start: number, end: number) => void } | null };
+  onLayout?: (event: { nativeEvent: { layout: { height: number } } }) => void;
+  onContentSizeChange?: (event: {
+    nativeEvent: { contentSize: { height: number; width: number } };
+  }) => void;
+};
 const textInputs = vi.hoisted(() => ({
-  inputs: [] as {
-    className?: string;
-    value?: string;
-    defaultValue?: string;
-    placeholder?: string;
-    accessibilityLabel?: string;
-    onChangeText: (text: string) => void;
-    multiline?: boolean;
-  }[],
+  inputs: [] as RecordedInput[],
 }));
+// The field's imperative handle, so the test can see the first-line alignment
+// the screen applies to a stored value taller than the capped field.
+const fieldHandle = vi.hoisted(() => ({ setSelection: vi.fn() }));
 const confirmDialog = vi.hoisted(() => ({
   current: null as {
     cancelLabel?: string;
@@ -71,16 +81,13 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   InputAccessoryView: 'InputAccessoryView',
   Keyboard: { dismiss: vi.fn() },
-  TextInput: (props: {
-    children?: ReactNode;
-    className?: string;
-    value?: string;
-    defaultValue?: string;
-    placeholder?: string;
-    onChangeText: (text: string) => void;
-    multiline?: boolean;
-  }): ReactNode => {
+  TextInput: (props: RecordedInput): ReactNode => {
     textInputs.inputs.push(props);
+    // React 19 hands `ref` to a function component as a prop; the screen reads
+    // its imperative handle, so the stub publishes it.
+    if (props.ref) {
+      props.ref.current = fieldHandle;
+    }
     return props.children ?? null;
   },
 }));
@@ -197,6 +204,7 @@ beforeEach(() => {
   preventRemove.enabled = false;
   preventRemove.handler = undefined;
   textInputs.inputs = [];
+  fieldHandle.setSelection.mockReset();
   confirmDialog.current = null;
   invalidate = () => undefined;
 });
@@ -222,6 +230,39 @@ describe('InstructionsRoute editor', () => {
     const classes = (input.className ?? '').split(' ');
     expect(classes).toContain('min-h-32');
     expect(classes).not.toContain('h-32');
+    // The field grows with a short stored value but stops at ten lines and
+    // scrolls its own text: without the cap one long draft makes the page a
+    // single oversized text view and pushes the note and Save out of view.
+    expect(classes).toContain('max-h-[196px]');
+  });
+
+  // A stored value taller than the capped field would otherwise open scrolled
+  // to the platform caret at its end, with the first line out of sight.
+  function measureField(input: RecordedInput, contentHeight: number) {
+    act(() => {
+      input.onLayout?.({ nativeEvent: { layout: { height: 196.19 } } });
+      input.onContentSizeChange?.({
+        nativeEvent: { contentSize: { height: contentHeight, width: 369.5 } },
+      });
+    });
+  }
+
+  it('opens an overflowing stored value at its first line', () => {
+    config.data = { customInstructions: STORED.repeat(40) };
+    mount();
+
+    measureField(latestInput(), 1264.76);
+
+    expect(fieldHandle.setSelection).toHaveBeenCalledWith(0, 0);
+  });
+
+  it('keeps the platform caret for a stored value that fits the field', () => {
+    config.data = { customInstructions: STORED };
+    mount();
+
+    measureField(latestInput(), 105);
+
+    expect(fieldHandle.setSelection).not.toHaveBeenCalled();
   });
 
   it('lets a clean screen back out with no confirmation', () => {

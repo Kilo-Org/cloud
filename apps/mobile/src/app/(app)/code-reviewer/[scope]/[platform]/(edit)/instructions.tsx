@@ -1,7 +1,14 @@
 import { type Href, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { InputAccessoryView, Keyboard, Pressable, TextInput, View } from 'react-native';
+import {
+  InputAccessoryView,
+  Keyboard,
+  Pressable,
+  TextInput,
+  type TextInputInstance,
+  View,
+} from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
@@ -11,6 +18,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { type ReviewerPlatform } from '@/lib/code-reviewer-config';
+import { instructionsFieldOverflows } from '@/lib/code-reviewer-instructions-field';
 import {
   type SaveReviewConfigMutation,
   useReviewConfig,
@@ -46,6 +54,25 @@ function InstructionsEditor({
   draftRef: { current: string };
 }>) {
   const { t } = useTranslation();
+  // A stored value taller than the capped field opens at the platform caret,
+  // which sits at its end: the value's first line is then out of sight, the
+  // symptom #7892 removed for a field that grew with its value. Once the field
+  // and its content have both been measured, put the caret on the first line
+  // for a value that overflows. A value that fits keeps the platform caret.
+  const fieldRef = useRef<TextInputInstance | null>(null);
+  const fieldHeightRef = useRef(0);
+  const contentHeightRef = useRef<number | null>(null);
+  const alignedRef = useRef(false);
+  const alignFirstLineIfOverflowing = () => {
+    const contentHeight = contentHeightRef.current;
+    if (alignedRef.current || contentHeight == null || fieldHeightRef.current === 0) {
+      return;
+    }
+    alignedRef.current = true;
+    if (instructionsFieldOverflows(contentHeight, fieldHeightRef.current)) {
+      fieldRef.current?.setSelection(0, 0);
+    }
+  };
 
   return (
     <Animated.View entering={FadeIn.duration(200)} className="gap-4">
@@ -53,9 +80,26 @@ function InstructionsEditor({
         {t('codeReviewer.instructions.deprecation')}
       </Text>
       {/* A multiline field takes the platform's generic text-view name on iOS,
-          so the accessible name is the localized heading this screen renders. */}
+          so the accessible name is the localized heading this screen renders.
+          `max-h-[196px]` is the `p-3` padding (2 × 10.5) plus ten
+          `leading-[1.25rem]` line boxes (10 × 17.5, native rem is 14): a cap
+          that is not a whole number of lines paints the top visible line cut
+          when the field scrolls to the caret. Past the cap the field scrolls
+          its own text, so a multi-thousand-character draft no longer turns the
+          page into one oversized text view that pushes the note and Save out
+          of the viewport; the min height still grows the field with a short
+          stored value. */}
       <TextInput
-        className="min-h-32 rounded-lg bg-secondary p-3 text-sm leading-[1.25rem] text-foreground"
+        ref={fieldRef}
+        onLayout={event => {
+          fieldHeightRef.current = event.nativeEvent.layout.height;
+          alignFirstLineIfOverflowing();
+        }}
+        onContentSizeChange={event => {
+          contentHeightRef.current = event.nativeEvent.contentSize.height;
+          alignFirstLineIfOverflowing();
+        }}
+        className="min-h-32 max-h-[196px] rounded-lg bg-secondary p-3 text-sm leading-[1.25rem] text-foreground"
         accessibilityLabel={t('codeReviewer.instructions.title')}
         multiline
         textAlignVertical="top"

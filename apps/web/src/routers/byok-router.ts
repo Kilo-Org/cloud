@@ -9,6 +9,10 @@ import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizat
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
 import { db } from '@kilocode/web-shared/lib/drizzle';
+import {
+  ByokRoutingPreviewSchema,
+  previewByokRouting,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { byok_api_keys, MODELS_BY_PROVIDER_ADMIN_URL } from '@kilocode/db/schema';
 import { eq, sql } from 'drizzle-orm';
@@ -23,6 +27,7 @@ import {
   SetBYOKKeyCatalogModeInputSchema,
   ListBYOKKeysInputSchema,
   TestBYOKKeyInputSchema,
+  PreviewBYOKRoutingInputSchema,
   BYOKApiKeyResponseSchema,
   type BYOKApiKeyResponse,
 } from '@/lib/byok/types';
@@ -46,6 +51,7 @@ import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/defini
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { getVercelInferenceProviderConfigForUserByok } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
+  byokOwner,
   decryptByokRow,
   getByokKmsContext,
   getModelGatewayUserByokProviders,
@@ -287,6 +293,26 @@ export const byokRouter = createTRPCRouter({
 
       // Map provider_id to provider_name (will be enhanced in UI with actual provider names)
       return Promise.all(keys.map(key => toBYOKApiKeyResponse(key, organizationRole)));
+    }),
+
+  /**
+   * The routes a request for a catalog model would try with the owner's keys, in order. Reads key
+   * metadata only and never decrypts a key.
+   */
+  previewRouting: baseProcedure
+    .input(PreviewBYOKRoutingInputSchema)
+    .output(ByokRoutingPreviewSchema)
+    .query(async ({ input, ctx }) => {
+      const { organizationId, modelId, apiKind } = input;
+      if (organizationId) {
+        await ensureOrganizationAccess(ctx, organizationId);
+      }
+      return previewByokRouting({
+        fromDb: db,
+        owner: byokOwner(ctx.user.id, organizationId),
+        requestedModel: modelId.toLowerCase(),
+        apiKind,
+      });
     }),
 
   create: baseProcedure

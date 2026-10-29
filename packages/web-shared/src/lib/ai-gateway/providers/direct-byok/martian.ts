@@ -7,7 +7,7 @@ import {
 
 export default {
   id: 'martian',
-  resolveUpstream: apiKeyUpstream({
+  ...apiKeyUpstream({
     apiUrl: 'https://api.withmartian.com/v1',
     supportedChatApis: ['chat_completions', 'messages', 'responses'],
     responseTransforms: null,

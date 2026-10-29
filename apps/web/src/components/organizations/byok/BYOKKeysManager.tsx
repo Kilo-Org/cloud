@@ -55,6 +55,7 @@ import {
 import { DIRECT_BYOK_PROVIDERS_META } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/direct-byok-meta';
 import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
 import { getCodingPlanManagedKeyLabel } from '@/components/subscriptions/coding-plans/coding-plan-provider';
+import { BYOKRoutingPreview } from '@/components/organizations/byok/BYOKRoutingPreview';
 import { cn } from '@/lib/utils';
 import * as z from 'zod';
 
@@ -310,12 +311,16 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const showsCodingPlanKey =
     !organizationId && (keys?.some(key => key.management_source === 'coding_plan') ?? false);
 
+  // Key changes alter the routes the preview shows.
+  const invalidateKeys = () => {
+    void queryClient.invalidateQueries({ queryKey: trpc.byok.list.queryKey(listQueryInput) });
+    void queryClient.invalidateQueries(trpc.byok.previewRouting.pathFilter());
+  };
+
   const createMutation = useMutation(
     trpc.byok.create.mutationOptions({
       onSuccess: () => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.byok.list.queryKey(listQueryInput),
-        });
+        invalidateKeys();
         toast.success('API key added successfully');
         closeDialog();
       },
@@ -328,9 +333,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const updateMutation = useMutation(
     trpc.byok.update.mutationOptions({
       onSuccess: () => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.byok.list.queryKey(listQueryInput),
-        });
+        invalidateKeys();
         toast.success('API key updated successfully');
         closeDialog();
       },
@@ -343,9 +346,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const deleteMutation = useMutation(
     trpc.byok.delete.mutationOptions({
       onSuccess: () => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.byok.list.queryKey(listQueryInput),
-        });
+        invalidateKeys();
         toast.success('API key deleted successfully');
       },
       onError: (error: { message: string }) => {
@@ -357,9 +358,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const setEnabledMutation = useMutation(
     trpc.byok.setEnabled.mutationOptions({
       onSuccess: data => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.byok.list.queryKey(listQueryInput),
-        });
+        invalidateKeys();
         toast.success(data.is_enabled ? 'API key enabled' : 'API key disabled');
       },
       onError: (error: { message: string }) => {
@@ -371,9 +370,7 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
   const setCatalogModeMutation = useMutation(
     trpc.byok.setCatalogMode.mutationOptions({
       onSuccess: data => {
-        void queryClient.invalidateQueries({
-          queryKey: trpc.byok.list.queryKey(listQueryInput),
-        });
+        invalidateKeys();
         toast.success(
           data.serve_catalog_models
             ? 'Key now serves Kilo catalog model IDs'
@@ -1158,6 +1155,12 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
           <BYOKSetupGuideLink />
         </CardFooter>
       </Card>
+      {listedKeys && listedKeys.length > 0 ? (
+        <BYOKRoutingPreview
+          organizationId={organizationId}
+          getProviderName={getProviderDisplayName}
+        />
+      ) : null}
     </div>
   );
 }

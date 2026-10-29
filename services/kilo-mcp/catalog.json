@@ -3822,6 +3822,47 @@
     ],
     "searchBlob": "byok.listSupportedModels Get the list of supported models per provider for bring-your-own-key (BYOK) usage, showing which model IDs each provider offers. byok listsupportedmodels"
   },
+  "byok.previewRouting": {
+    "path": "byok.previewRouting",
+    "kind": "query",
+    "summary": "Preview which route and BYOK provider key a given model request would use before making it, showing the ordered routing steps and why each key is used or skipped. Use this to check or debug how a model resolves under your or your organization's bring-your-own-key setup.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "modelId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 256
+        },
+        "apiKind": {
+          "default": "chat_completions",
+          "type": "string",
+          "enum": [
+            "chat_completions",
+            "responses",
+            "messages"
+          ]
+        }
+      },
+      "required": [
+        "modelId"
+      ]
+    },
+    "tags": [
+      "byok",
+      "previewrouting",
+      "organizationid",
+      "modelid",
+      "apikind"
+    ],
+    "searchBlob": "byok.previewRouting Preview which route and BYOK provider key a given model request would use before making it, showing the ordered routing steps and why each key is used or skipped. Use this to check or debug how a model resolves under your or your organization's bring-your-own-key setup. byok previewrouting organizationid modelid apikind organizationId modelId apiKind"
+  },
   "byok.setCatalogMode": {
     "path": "byok.setCatalogMode",
     "kind": "mutation",

@@ -36,7 +36,7 @@ import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/cust
 
 // A BYOK key belongs to exactly one owner, either a user or an organization.
 type ByokOwnerColumn = typeof byok_api_keys.kilo_user_id | typeof byok_api_keys.organization_id;
-type ByokSourceDb = typeof db | DrizzleTransaction;
+export type ByokSourceDb = typeof db | DrizzleTransaction;
 
 async function deriveModelInferenceUserByokProviders(
   modelId: string,
@@ -150,24 +150,59 @@ export type EnabledByokProvider = {
   serveCatalogModels: boolean;
 };
 
-export async function getEnabledByokProviders(
+export type ByokKeyState = EnabledByokProvider & { isEnabled: boolean };
+
+async function selectByokKeyStates(
   fromDb: ByokSourceDb,
-  owner: ByokOwner
-): Promise<EnabledByokProvider[]> {
+  owner: ByokOwner,
+  { enabledOnly }: { enabledOnly: boolean }
+): Promise<ByokKeyState[]> {
   const rows = await fromDb
     .select({
       provider_id: byok_api_keys.provider_id,
       settings: byok_api_keys.settings,
+      is_enabled: byok_api_keys.is_enabled,
     })
     .from(byok_api_keys)
-    .where(and(eq(ownerColumn(owner), owner.id), eq(byok_api_keys.is_enabled, true)));
+    .where(
+      and(
+        eq(ownerColumn(owner), owner.id),
+        enabledOnly ? eq(byok_api_keys.is_enabled, true) : undefined
+      )
+    )
+    .orderBy(byok_api_keys.created_at);
 
   return rows.flatMap(row => {
     const providerId = UserByokProviderIdSchema.safeParse(row.provider_id);
     return providerId.success
-      ? [{ providerId: providerId.data, serveCatalogModels: servesCatalogModels(row.settings) }]
+      ? [
+          {
+            providerId: providerId.data,
+            serveCatalogModels: servesCatalogModels(row.settings),
+            isEnabled: row.is_enabled,
+          },
+        ]
       : [];
   });
+}
+
+export async function getEnabledByokProviders(
+  fromDb: ByokSourceDb,
+  owner: ByokOwner
+): Promise<EnabledByokProvider[]> {
+  const keys = await selectByokKeyStates(fromDb, owner, { enabledOnly: true });
+  return keys.map(({ providerId, serveCatalogModels }) => ({ providerId, serveCatalogModels }));
+}
+
+/**
+ * Every key the owner stored, enabled or not, in the order `getByokCredentials` returns them. Reads
+ * no key material, so it suits previews that must not decrypt keys.
+ */
+export async function getByokKeyStates(
+  fromDb: ByokSourceDb,
+  owner: ByokOwner
+): Promise<ByokKeyState[]> {
+  return selectByokKeyStates(fromDb, owner, { enabledOnly: false });
 }
 
 export async function getUserByokProviderIds(

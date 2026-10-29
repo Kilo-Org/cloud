@@ -65,7 +65,6 @@ export function isVercelRoutingOptOut(requestedModel: string, optOutModels: Read
 
 export async function shouldRouteToVercel(
   requestedModel: string,
-  request: GatewayRequest,
   getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>
 ) {
   const routingConfig = await getRuntimeGatewayRoutingConfig();

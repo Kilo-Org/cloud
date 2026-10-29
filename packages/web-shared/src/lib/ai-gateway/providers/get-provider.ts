@@ -8,7 +8,9 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
   GatewayUserByokProviderIdSchema,
+  UserByokProviderIdSchema,
   isGatewayUserByokProviderId,
+  type UserByokProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { withIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { isKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
@@ -17,16 +19,24 @@ import {
   getBYOKforOrganization,
   getBYOKforUser,
   getByokCredentials,
+  getByokKeyStates,
   getCatalogModeByokCredentials,
   getModelGatewayUserByokProviders,
   getModelInferenceUserByokProviders,
   isGatewayUserByokEligibleModel,
+  type ByokKeyState,
+  type ByokOwner,
+  type ByokSourceDb,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import type { User } from '@kilocode/db/schema';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import type { AnonymousUserContext } from '@kilocode/web-shared/lib/anonymous';
 import { isAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
-import type { BYOKResult, Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import type {
+  BYOKResult,
+  GatewayChatApiKind,
+  Provider,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import {
   createUserOpenRouterProvider,
   OPENROUTER,
@@ -39,13 +49,20 @@ import {
   findDirectByokCatalogModels,
   getDirectByokCatalogModelId,
   getDirectByokModel,
+  getDirectByokModelChatApis,
   supportsCatalogMode,
+  type DirectByokCatalogModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import type {
   DirectByokModel,
   DirectByokProvider,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/types';
-import { checkOpenAiChatGptByok } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
+import {
+  checkOpenAiChatGptByok,
+  getOpenAiChatGptCandidateModel,
+} from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/routing';
+import { isValidOpenRouterModelId } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
+import * as z from 'zod';
 import { CustomLlmCredentialsSchema, type CustomLlmCredentials } from '@kilocode/db/schema-types';
 import {
   findCustomLlm,
@@ -187,26 +204,58 @@ async function resolveDirectByokProvider(
     owner,
     catalogModels.map(({ provider }) => provider.id)
   );
-  let unsupportedApiKind: GetProviderProviderResult | null = null;
-  for (const { provider, model } of catalogModels) {
-    const credential = credentials.find(
-      candidate => candidate.providerId === provider.id && candidate.serveCatalogModels
-    );
-    if (!credential) continue;
-    const result = await directByokProviderResult(
-      provider,
-      model,
-      credential,
-      requestedModel,
-      request,
-      true
-    );
-    if (result.provider.supportedChatApis.includes(request.kind)) return result;
-    unsupportedApiKind ??= result;
-  }
-  return (
-    unsupportedApiKind && { kind: 'direct-byok-unsupported-api-kind', result: unsupportedApiKind }
+  const candidates = rankDirectByokCatalogKeys(
+    catalogModels,
+    credentials.map(credential => ({ ...credential, isEnabled: true })),
+    request.kind
   );
+  const serving = candidates.find(candidate => candidate.decision === 'serves');
+  if (serving) {
+    const { provider, model, key } = serving;
+    return directByokProviderResult(provider, model, key, requestedModel, request, true);
+  }
+  const unsupported = candidates.find(candidate => candidate.decision === 'unsupported-api-kind');
+  if (!unsupported) return null;
+  const { provider, model, key } = unsupported;
+  return {
+    kind: 'direct-byok-unsupported-api-kind',
+    result: await directByokProviderResult(provider, model, key, requestedModel, request, true),
+  };
+}
+
+type DirectByokCatalogKeyDecision =
+  | 'serves'
+  | 'unsupported-api-kind'
+  | 'disabled'
+  | 'not-catalog-mode';
+
+type DirectByokCatalogCandidate<K> = DirectByokCatalogModel & {
+  key: K;
+  decision: DirectByokCatalogKeyDecision;
+};
+
+/**
+ * The owner's keys for the providers that serve a catalog id, in `DIRECT_BYOK_PROVIDERS` order,
+ * with whether each can take the request. The first `serves` candidate takes it. Routing passes
+ * decrypted credentials and the preview passes key metadata, so the decision never needs a key.
+ */
+function rankDirectByokCatalogKeys<K extends ByokKeyState>(
+  catalogModels: readonly DirectByokCatalogModel[],
+  keys: readonly K[],
+  apiKind: GatewayChatApiKind
+): DirectByokCatalogCandidate<K>[] {
+  return catalogModels.flatMap(({ provider, model }) => {
+    const key = keys.find(candidate => candidate.providerId === provider.id);
+    if (!key) return [];
+    const decision: DirectByokCatalogKeyDecision = !key.isEnabled
+      ? 'disabled'
+      : !key.serveCatalogModels
+        ? 'not-catalog-mode'
+        : getDirectByokModelChatApis(provider, model).includes(apiKind)
+          ? 'serves'
+          : 'unsupported-api-kind';
+    return [{ provider, model, key, decision }];
+  });
 }
 
 async function isEligibleForCustomLlm(
@@ -307,40 +356,40 @@ function withoutPaidServerFeatures(provider: Provider): Provider {
   };
 }
 
-type GatewayRoutedByok = {
+type GatewayRoutedByok<K> = {
   /** Inference provider keys, sent through Kilo's Vercel AI Gateway account. */
-  inference: BYOKResult[];
+  inference: K[];
   /** Whole-gateway keys that replace Kilo's own gateway key. */
-  gateway: BYOKResult[];
+  gateway: K[];
 };
 
+type ByokKeyRef = { providerId: UserByokProviderId };
+
 /**
- * Stored keys that can serve a catalog model through a gateway, unlike direct
+ * The providers whose stored key could serve a catalog model through a gateway, unlike direct
  * BYOK, where the model ID itself names the provider.
  */
-async function getGatewayRoutedByok(
-  user: User | AnonymousUserContext,
+async function getGatewayRoutedByokCandidateProviders(
   requestedModel: string,
-  organizationId: string | undefined,
   { includeGatewayKeys }: { includeGatewayKeys: boolean }
-): Promise<GatewayRoutedByok> {
-  const none: GatewayRoutedByok = { inference: [], gateway: [] };
-  if (isAnonymousContext(user)) return none;
+): Promise<UserByokProviderId[]> {
   // Kilo-exclusive models stay on Kilo's own accounts, like in `getModelGatewayUserByokProviders`.
-  if (isKiloExclusiveModel(requestedModel)) return none;
-  const candidateProviders = [
+  if (isKiloExclusiveModel(requestedModel)) return [];
+  return [
     ...(await getModelInferenceUserByokProviders(requestedModel)),
     ...(includeGatewayKeys && isGatewayUserByokEligibleModel(requestedModel)
       ? GatewayUserByokProviderIdSchema.options
       : []),
   ];
-  if (candidateProviders.length === 0) return none;
-  const userByok =
-    (organizationId
-      ? await getBYOKforOrganization(readDb, organizationId, candidateProviders)
-      : await getBYOKforUser(readDb, user.id, candidateProviders)) ?? [];
-  const inference = userByok.filter(byok => !isGatewayUserByokProviderId(byok.providerId));
-  const gatewayKeys = userByok.filter(byok => isGatewayUserByokProviderId(byok.providerId));
+}
+
+/** Splits the enabled candidate keys into the gateway-routed keys that serve the model. */
+async function splitGatewayRoutedByok<K extends ByokKeyRef>(
+  keys: readonly K[],
+  requestedModel: string
+): Promise<GatewayRoutedByok<K>> {
+  const inference = keys.filter(byok => !isGatewayUserByokProviderId(byok.providerId));
+  const gatewayKeys = keys.filter(byok => isGatewayUserByokProviderId(byok.providerId));
   // Inference provider keys take priority, so gateway keys then go unused.
   if (inference.length > 0 || gatewayKeys.length === 0) return { inference, gateway: [] };
   const gatewayProviders: readonly string[] =
@@ -351,36 +400,67 @@ async function getGatewayRoutedByok(
   };
 }
 
+async function getGatewayRoutedByok(
+  user: User | AnonymousUserContext,
+  requestedModel: string,
+  organizationId: string | undefined,
+  options: { includeGatewayKeys: boolean }
+): Promise<GatewayRoutedByok<BYOKResult>> {
+  const none: GatewayRoutedByok<BYOKResult> = { inference: [], gateway: [] };
+  if (isAnonymousContext(user)) return none;
+  const candidateProviders = await getGatewayRoutedByokCandidateProviders(requestedModel, options);
+  if (candidateProviders.length === 0) return none;
+  const userByok =
+    (organizationId
+      ? await getBYOKforOrganization(readDb, organizationId, candidateProviders)
+      : await getBYOKforUser(readDb, user.id, candidateProviders)) ?? [];
+  return splitGatewayRoutedByok(userByok, requestedModel);
+}
+
 /**
  * Prefers the Vercel AI Gateway key when Vercel can serve the model under the
  * provider routing settings, and the OpenRouter key otherwise.
  */
+async function selectGatewayByokKey<K extends ByokKeyRef>(
+  gatewayByok: readonly K[],
+  requestedModel: string,
+  getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>
+): Promise<K | null> {
+  const vercelKey = gatewayByok.find(byok => byok.providerId === 'vercel-ai-gateway');
+  if (vercelKey && (await canRouteToVercel(requestedModel, getRoutingProviderConfig))) {
+    return vercelKey;
+  }
+  return gatewayByok.find(byok => byok.providerId === 'openrouter') ?? null;
+}
+
 async function checkGatewayBYOK(
   gatewayByok: BYOKResult[],
   requestedModel: string,
   getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>
 ): Promise<GetProviderProviderResult | null> {
-  const vercelKey = gatewayByok.find(byok => byok.providerId === 'vercel-ai-gateway');
-  if (vercelKey && (await canRouteToVercel(requestedModel, getRoutingProviderConfig))) {
-    return {
-      kind: 'provider',
-      provider: createUserVercelAiGatewayProvider(vercelKey.decryptedAPIKey),
-      userByok: [vercelKey],
-      isFree: isFreeModelExcludingCustomLlms(requestedModel),
-      bypassAccessCheck: false,
-    };
-  }
-  const openRouterKey = gatewayByok.find(byok => byok.providerId === 'openrouter');
-  if (openRouterKey) {
-    return {
-      kind: 'provider',
-      provider: createUserOpenRouterProvider(openRouterKey.decryptedAPIKey),
-      userByok: [openRouterKey],
-      isFree: isFreeModelExcludingCustomLlms(requestedModel),
-      bypassAccessCheck: false,
-    };
-  }
-  return null;
+  const key = await selectGatewayByokKey(gatewayByok, requestedModel, getRoutingProviderConfig);
+  if (!key) return null;
+  return {
+    kind: 'provider',
+    provider:
+      key.providerId === 'vercel-ai-gateway'
+        ? createUserVercelAiGatewayProvider(key.decryptedAPIKey)
+        : createUserOpenRouterProvider(key.decryptedAPIKey),
+    userByok: [key],
+    isFree: isFreeModelExcludingCustomLlms(requestedModel),
+    bypassAccessCheck: false,
+  };
+}
+
+/** The gateway of Kilo's own route, used when no BYOK route takes the request. */
+async function selectKiloGateway(
+  requestedModel: string,
+  boundedSpending: boolean,
+  getRoutingProviderConfig: () => Promise<OpenRouterProviderConfig | undefined>
+): Promise<'vercel' | 'openrouter'> {
+  return !boundedSpending && (await shouldRouteToVercel(requestedModel, getRoutingProviderConfig))
+    ? 'vercel'
+    : 'openrouter';
 }
 
 export type GetProviderInput = {
@@ -403,6 +483,13 @@ export type GetProviderInput = {
   countryCode?: string | null;
 };
 
+/**
+ * KEEP IN SYNC WITH `previewByokRouting` below. The BYOK settings page explains this route order
+ * to users. Both share the key decisions (`rankDirectByokCatalogKeys`, `splitGatewayRoutedByok`,
+ * `selectGatewayByokKey`, `selectKiloGateway`), but each walks the steps itself, so a new step, a
+ * reordered step, or a new reason to skip a key must be reflected in both.
+ * `get-provider.preview.test.ts` runs both over the same keys and fails when they disagree.
+ */
 export async function getProvider(input: GetProviderInput): Promise<GetProviderResult> {
   const {
     requestedModel,
@@ -500,28 +587,208 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     return directByokUnsupportedApiKind.result;
   }
 
-  if (
-    !boundedSpending &&
-    (await shouldRouteToVercel(requestedModel, request, async () =>
-      withIgnoredProviders(await resolveRoutingProviderConfig(), kiloIgnoredProviders)
-    ))
-  ) {
-    return {
-      kind: 'provider',
-      provider: VERCEL_AI_GATEWAY,
-      userByok: null,
-      isFree: isFreeModelExcludingCustomLlms(requestedModel),
-      bypassAccessCheck: false,
-    };
-  }
-
+  const kiloGateway = await selectKiloGateway(requestedModel, boundedSpending, async () =>
+    withIgnoredProviders(await resolveRoutingProviderConfig(), kiloIgnoredProviders)
+  );
   return {
     kind: 'provider',
-    provider: OPENROUTER,
+    provider: kiloGateway === 'vercel' ? VERCEL_AI_GATEWAY : OPENROUTER,
     userByok: null,
     isFree: isFreeModelExcludingCustomLlms(requestedModel),
     bypassAccessCheck: false,
   };
+}
+
+export const GatewayChatApiKindSchema = z.enum([
+  'chat_completions',
+  'responses',
+  'messages',
+]) satisfies z.ZodType<GatewayChatApiKind>;
+
+/**
+ * `used`: the step takes the request. `unreached`: it would, but an earlier step takes it.
+ * `conditional`: it takes the request only when a credential outside the key list, such as a
+ * member's ChatGPT connection, is usable.
+ */
+const ByokRoutePreviewOutcomeSchema = z.enum(['used', 'skipped', 'unreached', 'conditional']);
+
+export const ByokRoutePreviewStepSchema = z.discriminatedUnion('route', [
+  z.object({
+    route: z.literal('direct-byok'),
+    outcome: ByokRoutePreviewOutcomeSchema,
+    providerId: UserByokProviderIdSchema,
+    reason: z.enum(['serves', 'unsupported-api-kind', 'disabled', 'not-catalog-mode']),
+    supportedApiKinds: z.array(GatewayChatApiKindSchema),
+  }),
+  z.object({ route: z.literal('chatgpt'), outcome: ByokRoutePreviewOutcomeSchema }),
+  z.object({
+    route: z.literal('vercel-byok'),
+    outcome: ByokRoutePreviewOutcomeSchema,
+    providerIds: z.array(UserByokProviderIdSchema),
+    reason: z.enum(['serves', 'disabled']),
+  }),
+  z.object({
+    route: z.literal('gateway-byok'),
+    outcome: ByokRoutePreviewOutcomeSchema,
+    providerId: GatewayUserByokProviderIdSchema,
+    reason: z.enum([
+      'serves',
+      'disabled',
+      'provider-key-preferred',
+      'model-unavailable',
+      'provider-settings',
+    ]),
+  }),
+  z.object({
+    route: z.literal('unsupported-api-kind'),
+    outcome: ByokRoutePreviewOutcomeSchema,
+    providerId: UserByokProviderIdSchema,
+    supportedApiKinds: z.array(GatewayChatApiKindSchema),
+  }),
+  z.object({
+    route: z.literal('kilo'),
+    outcome: ByokRoutePreviewOutcomeSchema,
+    gateway: z.enum(['vercel', 'openrouter']),
+  }),
+]);
+
+export type ByokRoutePreviewStep = z.infer<typeof ByokRoutePreviewStepSchema>;
+
+export const ByokRoutingPreviewSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('routes'), steps: z.array(ByokRoutePreviewStepSchema) }),
+  /** A custom LLM owns its id, so no BYOK key or Kilo route applies. */
+  z.object({ kind: z.literal('custom-llm') }),
+  z.object({ kind: z.literal('not-catalog-model') }),
+]);
+
+export type ByokRoutingPreview = z.infer<typeof ByokRoutingPreviewSchema>;
+
+function markUnreachedSteps(steps: ByokRoutePreviewStep[]): ByokRoutePreviewStep[] {
+  let taken = false;
+  return steps.map(step => {
+    if (step.outcome !== 'used' && step.outcome !== 'conditional') return step;
+    if (taken) return { ...step, outcome: 'unreached' };
+    if (step.outcome === 'used') taken = true;
+    return step;
+  });
+}
+
+/**
+ * The routes `getProvider` would try for a catalog model, in order, for the BYOK settings page.
+ * Reads key metadata only: it never decrypts a key or calls KMS. Organization model and provider
+ * policies are not applied, so Kilo's gateway and the Vercel AI Gateway key assume no provider
+ * restrictions. A ChatGPT connection is personal and its state is encrypted, so it is reported as
+ * conditional.
+ *
+ * KEEP IN SYNC WITH `getProvider` above: mirror any change to its step order or key decisions.
+ */
+export async function previewByokRouting({
+  fromDb,
+  owner,
+  requestedModel,
+  apiKind,
+}: {
+  /** The settings page passes the primary, so the preview matches the key list it explains. */
+  fromDb: ByokSourceDb;
+  owner: ByokOwner;
+  requestedModel: string;
+  apiKind: GatewayChatApiKind;
+}): Promise<ByokRoutingPreview> {
+  if (await findCustomLlm(requestedModel)) return { kind: 'custom-llm' };
+  const { provider: bespokeProvider } = await getDirectByokModel(requestedModel);
+  if (bespokeProvider || !(await isValidOpenRouterModelId(requestedModel))) {
+    return { kind: 'not-catalog-model' };
+  }
+
+  const keys = await getByokKeyStates(fromDb, owner);
+  const steps: ByokRoutePreviewStep[] = [];
+
+  const directCandidates = rankDirectByokCatalogKeys(
+    await findDirectByokCatalogModels(requestedModel),
+    keys,
+    apiKind
+  );
+  for (const { provider, model, key, decision } of directCandidates) {
+    steps.push({
+      route: 'direct-byok',
+      outcome: decision === 'serves' ? 'used' : 'skipped',
+      providerId: key.providerId,
+      reason: decision,
+      supportedApiKinds: [...getDirectByokModelChatApis(provider, model)],
+    });
+  }
+
+  if (await getOpenAiChatGptCandidateModel(apiKind, requestedModel)) {
+    steps.push({ route: 'chatgpt', outcome: 'conditional' });
+  }
+
+  const candidateProviders = await getGatewayRoutedByokCandidateProviders(requestedModel, {
+    includeGatewayKeys: true,
+  });
+  const candidateKeys = keys.filter(key => candidateProviders.includes(key.providerId));
+  const { inference, gateway } = await splitGatewayRoutedByok(
+    candidateKeys.filter(key => key.isEnabled),
+    requestedModel
+  );
+  const noProviderRestrictions = async () => undefined;
+  if (inference.length > 0) {
+    steps.push({
+      route: 'vercel-byok',
+      outcome: 'used',
+      providerIds: inference.map(key => key.providerId),
+      reason: 'serves',
+    });
+  }
+  for (const key of candidateKeys) {
+    if (!key.isEnabled && !isGatewayUserByokProviderId(key.providerId)) {
+      steps.push({
+        route: 'vercel-byok',
+        outcome: 'skipped',
+        providerIds: [key.providerId],
+        reason: 'disabled',
+      });
+    }
+  }
+  const gatewayKey = await selectGatewayByokKey(gateway, requestedModel, noProviderRestrictions);
+  for (const providerId of GatewayUserByokProviderIdSchema.options) {
+    const key = candidateKeys.find(candidate => candidate.providerId === providerId);
+    if (!key) continue;
+    const reason = !key.isEnabled
+      ? 'disabled'
+      : inference.length > 0
+        ? 'provider-key-preferred'
+        : !gateway.includes(key)
+          ? 'model-unavailable'
+          : key !== gatewayKey && providerId === 'vercel-ai-gateway'
+            ? 'provider-settings'
+            : 'serves';
+    steps.push({
+      route: 'gateway-byok',
+      outcome: reason === 'serves' ? 'used' : 'skipped',
+      providerId,
+      reason,
+    });
+  }
+
+  // Like `resolveDirectByokProvider`, the failure applies only when no catalog-mode key serves.
+  const unsupported = directCandidates.some(candidate => candidate.decision === 'serves')
+    ? undefined
+    : directCandidates.find(candidate => candidate.decision === 'unsupported-api-kind');
+  if (unsupported) {
+    steps.push({
+      route: 'unsupported-api-kind',
+      outcome: 'used',
+      providerId: unsupported.key.providerId,
+      supportedApiKinds: [...getDirectByokModelChatApis(unsupported.provider, unsupported.model)],
+    });
+  }
+
+  steps.push({
+    route: 'kilo',
+    outcome: 'used',
+    gateway: await selectKiloGateway(requestedModel, false, noProviderRestrictions),
+  });
+  return { kind: 'routes', steps: markUnreachedSteps(steps) };
 }
 
 export async function getEmbeddingProvider(

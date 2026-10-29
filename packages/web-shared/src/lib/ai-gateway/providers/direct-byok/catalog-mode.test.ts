@@ -40,7 +40,7 @@ function mockProvider(
     models_dev_id,
     models: async () => models,
     transformRequest: () => {},
-    resolveUpstream: jest.requireActual<typeof DirectByokTypes>('./types').apiKeyUpstream({
+    ...jest.requireActual<typeof DirectByokTypes>('./types').apiKeyUpstream({
       apiUrl: `https://${id}.example.com/v1`,
       supportedChatApis: ['chat_completions'],
       responseTransforms: null,

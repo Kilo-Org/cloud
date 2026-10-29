@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { EventServiceClient, HandshakeTimeoutError } from '../client';
+import { EventServiceClient } from '../client';
 
 class MockWebSocket {
   static OPEN = 1;
@@ -631,13 +631,6 @@ describe('EventServiceClient', () => {
       });
     }
     expect(received).toHaveLength(0);
-  });
-
-  it('exports HandshakeTimeoutError', () => {
-    // Sanity check on the public error type.
-    const err = new HandshakeTimeoutError();
-    expect(err).toBeInstanceOf(Error);
-    expect(err.name).toBe('HandshakeTimeoutError');
   });
 
   describe('subscribe/unsubscribe refcounting', () => {

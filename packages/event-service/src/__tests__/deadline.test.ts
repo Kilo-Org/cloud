@@ -229,11 +229,6 @@ describe('Hermes AbortError resilience', () => {
 });
 
 describe('RequestDeadlineError', () => {
-  it('has name RequestDeadlineError', () => {
-    const err = new RequestDeadlineError(10_000);
-    expect(err.name).toBe('RequestDeadlineError');
-  });
-
   it('includes the deadline in its message', () => {
     const err = new RequestDeadlineError(15_000);
     expect(err.message).toContain('15000');

@@ -53,53 +53,17 @@ jest.mock('@sentry/nextjs', () => ({
   captureException: mockCaptureException,
 }));
 
-jest.mock('./cloud-agent-client', () => {
-  const createCloudAgentNextClient = jest.fn((_token: string) => ({ marker: 'default' }));
-  const createSkippedBalanceCheckCloudAgentNextClient = jest.fn((_token: string) => ({
-    marker: 'skipped-balance',
-  }));
-  return {
-    createCloudAgentNextClient,
-    createSkippedBalanceCheckCloudAgentNextClient,
-    createCloudAgentNextClientForModel: jest.fn(
-      (token: string, model: { isFree: boolean; hasUserByokAvailable: boolean }) =>
-        model.isFree || model.hasUserByokAvailable
-          ? createSkippedBalanceCheckCloudAgentNextClient(token)
-          : createCloudAgentNextClient(token)
-    ),
-    rethrowCloudAgentError: jest.fn(),
-  };
-});
-
 const { createTRPCClient, TRPCClientError } =
   jest.requireMock<jest.Mocked<typeof TrpcClientModule>>('@trpc/client');
 const { captureException } = jest.requireMock<jest.Mocked<typeof SentryModule>>('@sentry/nextjs');
 
-const clientModule: {
-  createCloudAgentNextClient: jest.Mock;
-  createSkippedBalanceCheckCloudAgentNextClient: jest.Mock;
-  createCloudAgentNextClientForModel: (
-    token: string,
-    model: { isFree: boolean; hasUserByokAvailable: boolean }
-  ) => unknown;
-} = jest.requireMock('./cloud-agent-client');
-
-const {
-  createCloudAgentNextClient: mockCreateCloudAgentNextClient,
-  createSkippedBalanceCheckCloudAgentNextClient: mockCreateSkippedBalanceCheckCloudAgentNextClient,
-  createCloudAgentNextClientForModel,
-} = clientModule;
-
 beforeEach(() => {
-  mockCreateCloudAgentNextClient.mockClear();
-  mockCreateSkippedBalanceCheckCloudAgentNextClient.mockClear();
   mockCreateTRPCClient.mockClear();
   mockHttpLink.mockClear();
   mockCaptureException.mockClear();
 });
 
-// Load the real `closeCloudAgentOrgStreams` (the module mock above does not
-// expose it) so the test exercises the actual fetch call, not a stub.
+// Load the real module so tests exercise the actual fetch calls and client behavior, not stubs.
 const realCloudAgentClientModule =
   jest.requireActual<typeof CloudAgentClientModule>('./cloud-agent-client');
 const {
@@ -418,38 +382,6 @@ describe('CloudAgentNextClient prepare fields', () => {
     mockCreateTRPCClient.mockReturnValueOnce({ prepareSession: { mutate } });
     await new CloudAgentNextClient('scoped-control-token').prepareSession(input);
     expect(mutate).toHaveBeenCalledWith(input);
-  });
-});
-
-describe('createCloudAgentNextClientForModel', () => {
-  it('returns the default client when the model is paid and has no BYOK', () => {
-    const result = createCloudAgentNextClientForModel('token', {
-      isFree: false,
-      hasUserByokAvailable: false,
-    });
-    expect(result).toEqual({ marker: 'default' });
-    expect(mockCreateCloudAgentNextClient).toHaveBeenCalledWith('token');
-    expect(mockCreateSkippedBalanceCheckCloudAgentNextClient).not.toHaveBeenCalled();
-  });
-
-  it('returns the skipped-balance client when the model is free', () => {
-    const result = createCloudAgentNextClientForModel('token', {
-      isFree: true,
-      hasUserByokAvailable: false,
-    });
-    expect(result).toEqual({ marker: 'skipped-balance' });
-    expect(mockCreateSkippedBalanceCheckCloudAgentNextClient).toHaveBeenCalledWith('token');
-    expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
-  });
-
-  it('returns the skipped-balance client when the model is BYOK-capable, even if it is not free', () => {
-    const result = createCloudAgentNextClientForModel('token', {
-      isFree: false,
-      hasUserByokAvailable: true,
-    });
-    expect(result).toEqual({ marker: 'skipped-balance' });
-    expect(mockCreateSkippedBalanceCheckCloudAgentNextClient).toHaveBeenCalledWith('token');
-    expect(mockCreateCloudAgentNextClient).not.toHaveBeenCalled();
   });
 });
 

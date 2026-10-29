@@ -38,6 +38,7 @@ When the runtime authorization gate rejects the session owner's GitHub installat
 - No new sidebar UI for the auto-verify path beyond what already happens. Unverified links already render no PR.
 - No change to handling of rate-limit, 404, or real GitHub 5xx/timeout errors.
 - No data cleanup of unhealthy integrations, and no change to other Sentry groups.
+- Post-deploy production monitoring of Sentry groups is not part of this plan's acceptance criteria.
 
 ## Approach
 
@@ -70,10 +71,6 @@ When the runtime authorization gate rejects the session owner's GitHub installat
 ### ac-4: Failure UX, both effects: shouldRetryPrLinkVerification returns false for PRECONDITION_FAILED, so a known authorization condition fails right away with no extra retry delay. It still returns true on the first INTERNAL_SERVER_ERROR failure, so transient GitHub failures are retried within the same bound and don't take longer to surface. Unit tests cover both cases.
 
 **Verification:** Code review
-
-### ac-5: In production after deploy, refresh failures caused by runtime authorization show up under PRECONDITION_FAILED with a reason tag. New KILOCODE-WEB-287N events are limited to real GitHub fetch failures.
-
-**Verification:** Manual: after deployment, check Sentry for events tagged githubRuntimeAuthorizationReason on endpoint refreshAssociatedPullRequest, and confirm KILOCODE-WEB-287N no longer receives events whose underlying cause is GitHubRuntimeAuthorizationError
 
 ## Risks
 

@@ -7,10 +7,10 @@
  *
  * The window is a timestamp read when a touch arrives rather than React state:
  * a state update would only apply with the commit whose absence is the problem.
- * The destination tab closes it from its own layout (`settleTabSwitchInput`) —
- * the route state changes earlier than that, while the outgoing views are still
- * the touch targets — and the fallbacks below bound a press that has no
- * incoming screen to wait for.
+ * The destination stack closes it when its `transitionEnd` fires
+ * (`settleTabSwitchInput`) — the route state changes earlier than that, while
+ * the outgoing views are still the touch targets — and the fallbacks below
+ * bound a press that has no incoming screen to wait for.
  */
 export const TAB_SWITCH_INPUT_FALLBACK_MS = 1200;
 

@@ -26,7 +26,9 @@ export class HfRequestError extends Error {
 
   constructor(status: number | undefined, cause?: unknown) {
     super(
-      status === undefined ? 'Hugging Face could not be reached' : `Hugging Face answered ${status}`,
+      status === undefined
+        ? 'Hugging Face could not be reached'
+        : `Hugging Face answered ${status}`,
       cause === undefined ? undefined : { cause }
     );
     this.name = 'HfRequestError';

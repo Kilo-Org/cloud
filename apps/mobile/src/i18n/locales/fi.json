@@ -3823,6 +3823,7 @@
     "commandsTitle": "Asennuskomennot",
     "addCommand": "Lisää komento",
     "commandLabel": "Komento",
+    "commandLabelPosition": "Komento {{position}}",
     "commandPlaceholder": "esim. pnpm install",
     "commandsEmpty": "Ei vielä asennuskomentoja",
     "commandsSaveFailed": "Asennuskomentoja ei voitu tallentaa",

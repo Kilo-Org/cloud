@@ -3823,6 +3823,7 @@
     "commandsTitle": "Εντολές εγκατάστασης",
     "addCommand": "Προσθήκη εντολής",
     "commandLabel": "Εντολή",
+    "commandLabelPosition": "Εντολή {{position}}",
     "commandPlaceholder": "π.χ. pnpm install",
     "commandsEmpty": "Δεν υπάρχουν ακόμη εντολές ρύθμισης",
     "commandsSaveFailed": "Δεν ήταν δυνατή η αποθήκευση εντολών ρύθμισης",

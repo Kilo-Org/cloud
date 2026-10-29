@@ -3823,6 +3823,7 @@
     "commandsTitle": "Beállítási parancsok",
     "addCommand": "Parancs hozzáadása",
     "commandLabel": "Parancs",
+    "commandLabelPosition": "{{position}}. parancs",
     "commandPlaceholder": "pl. pnpm install",
     "commandsEmpty": "Még nincsenek beállítási parancsok",
     "commandsSaveFailed": "Nem sikerült menteni a beállítási parancsokat",

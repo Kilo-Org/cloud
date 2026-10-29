@@ -3973,6 +3973,7 @@
     "commandsTitle": "Setup kmandi",
     "addCommand": "Żid kmand",
     "commandLabel": "Kmand",
+    "commandLabelPosition": "Kmand {{position}}",
     "commandPlaceholder": "eż. pnpm install",
     "commandsEmpty": "S'issa l-ebda kmand tas-setup",
     "commandsSaveFailed": "Ma setgħetx tissejvja l-kmandi tas-setup",

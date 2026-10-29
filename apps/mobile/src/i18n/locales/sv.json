@@ -3823,6 +3823,7 @@
     "commandsTitle": "Installationskommandon",
     "addCommand": "Lägg till kommando",
     "commandLabel": "Kommando",
+    "commandLabelPosition": "Kommando {{position}}",
     "commandPlaceholder": "t.ex. pnpm install",
     "commandsEmpty": "Inga installationskommandon ännu",
     "commandsSaveFailed": "Det gick inte att spara installationskommandon",

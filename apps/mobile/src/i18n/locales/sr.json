@@ -3873,6 +3873,7 @@
     "commandsTitle": "Komande za podešavanje",
     "addCommand": "Dodaj komandu",
     "commandLabel": "Komanda",
+    "commandLabelPosition": "Komanda {{position}}",
     "commandPlaceholder": "npr. pnpm install",
     "commandsEmpty": "Još nema komandi za podešavanje",
     "commandsSaveFailed": "Nije moguće sačuvati komande za podešavanje",

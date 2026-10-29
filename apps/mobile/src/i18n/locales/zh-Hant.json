@@ -3823,6 +3823,7 @@
     "commandsTitle": "設定命令",
     "addCommand": "新增命令",
     "commandLabel": "命令",
+    "commandLabelPosition": "命令 {{position}}",
     "commandPlaceholder": "例如 pnpm install",
     "commandsEmpty": "還沒有設定命令",
     "commandsSaveFailed": "無法儲存設定命令",

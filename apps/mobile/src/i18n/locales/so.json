@@ -3823,6 +3823,7 @@
     "commandsTitle": "Dejinta amarrada",
     "addCommand": "Ku dar amar",
     "commandLabel": "Taliska",
+    "commandLabelPosition": "Taliska {{position}}",
     "commandPlaceholder": "tus. pnpm install",
     "commandsEmpty": "Ma jiro amar dejin weli",
     "commandsSaveFailed": "Ma kaydin kari waayay amarrada dejinta",

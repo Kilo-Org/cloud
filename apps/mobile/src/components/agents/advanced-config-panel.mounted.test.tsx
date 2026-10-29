@@ -293,7 +293,7 @@ describe('AdvancedConfigPanel', () => {
     expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
     typeInto(renderer, 'Command', 'pnpm install');
     expect(buttonByText(renderer, 'Save as Profile')).toBeDefined();
-    typeInto(renderer, 'Command', '');
+    typeInto(renderer, 'Command 1', '');
     expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
   });
 
@@ -311,6 +311,7 @@ describe('AdvancedConfigPanel', () => {
 
     typeInto(renderer, 'Command', 'pnpm install');
 
+    expect(field(renderer, 'Command 1')).toBeDefined();
     expect(
       renderer.root
         .findAll(node => typeof node.props.onPress === 'function')

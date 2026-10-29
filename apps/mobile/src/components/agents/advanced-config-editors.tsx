@@ -164,10 +164,16 @@ export function ManualSetupCommandsEditor({
           position === null ? t('profiles.moveDown') : t('profiles.moveCommandDown', { position });
         const deleteLabel =
           position === null ? t('common.delete') : t('profiles.deleteCommand', { position });
+        // The field's label is also its accessible name, so it carries the same
+        // position the row's move and delete controls announce.
+        const commandLabel =
+          position === null
+            ? t('profiles.commandLabel')
+            : t('profiles.commandLabelPosition', { position });
         return (
           <View key={`${generation}-${index}`} className="gap-3 rounded-lg bg-secondary p-3">
             <FormField
-              label={t('profiles.commandLabel')}
+              label={commandLabel}
               defaultValue={command}
               placeholder={t('profiles.commandPlaceholder')}
               className="min-h-[44px] leading-[normal]"

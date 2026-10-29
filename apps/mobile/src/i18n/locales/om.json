@@ -3823,6 +3823,7 @@
     "commandsTitle": "Ajajoota saaguu",
     "addCommand": "Ajaja itti dabali",
     "commandLabel": "Ajaja",
+    "commandLabelPosition": "Ajaja {{position}}",
     "commandPlaceholder": "fakkeenyaaf pnpm install",
     "commandsEmpty": "Ajajni setup hanga ammaatti hin jiru",
     "commandsSaveFailed": "Ajajoota saaguu qusachuu hin dandeenye",

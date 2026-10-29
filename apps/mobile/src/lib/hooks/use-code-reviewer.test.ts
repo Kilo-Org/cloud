@@ -572,6 +572,24 @@ describe('useToggleReviewer (generation guard + chain join)', () => {
     setQueryDataMock.mockClear();
     opts.onError?.(new Error('boom'), { isEnabled: true }, context);
     expect(setQueryDataMock).toHaveBeenCalledTimes(1);
-    expect(toastErrorMock).toHaveBeenCalledWith('boom');
+    // The toggle's own failure line, not the config-save one.
+    expect(toastErrorMock).toHaveBeenCalledWith(i18n.t('codeReviewer.updateFailed'));
+  });
+
+  it('explains the organization trial gate on the toggle instead of quoting the server sentence', async () => {
+    orgToggleMutateMock.mockReset();
+    orgToggleMutateMock.mockRejectedValue(
+      makeServerError('FORBIDDEN', ORGANIZATION_TRIAL_EXPIRED_MESSAGE)
+    );
+    const opts = getToggleOptions('org-1', 'github');
+
+    try {
+      await opts.mutationFn?.({ isEnabled: true });
+    } catch (error) {
+      opts.onError?.(error);
+    }
+
+    expect(toastErrorMock).toHaveBeenCalledWith(i18n.t('common.organizationTrialEnded'));
+    expect(toastErrorMock).not.toHaveBeenCalledWith(ORGANIZATION_TRIAL_EXPIRED_MESSAGE);
   });
 });

@@ -9,10 +9,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { RadioGroup } from '@/components/ui/radio-group';
-import {
-  reviewerConfigSaveFailure,
-  type ReviewerConfigSaveFailure,
-} from '@/lib/code-reviewer-save-error';
+import { reviewerSaveFailure, type ReviewerSaveFailure } from '@/lib/code-reviewer-save-error';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { usePopWhenFocused } from '@/lib/navigation/pop-when-focused';
 
@@ -45,7 +42,7 @@ export function OptionList<T extends string, TSaveResult>({
   const colors = useThemeColors();
   const { t } = useTranslation();
   const [pending, setPending] = useState<T | null>(null);
-  const [failure, setFailure] = useState<(ReviewerConfigSaveFailure & { option: T }) | null>(null);
+  const [failure, setFailure] = useState<(ReviewerSaveFailure & { option: T }) | null>(null);
   const retryInFlight = failure?.option === pending;
 
   const handleSelect = async (option: T) => {
@@ -64,7 +61,10 @@ export function OptionList<T extends string, TSaveResult>({
       // The save hook already surfaced the failure (toast + cache rollback) —
       // keep the screen up, clear the busy state, and hand the row to the
       // inline explanation below.
-      setFailure({ ...reviewerConfigSaveFailure(error), option });
+      setFailure({
+        ...reviewerSaveFailure(error, t('codeReviewer.configSaveFailed')),
+        option,
+      });
     } finally {
       setPending(null);
     }

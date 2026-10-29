@@ -352,7 +352,10 @@ describe('repository picker config read states', () => {
     await waitFor(() => state.queryErrorProps.length > 0);
 
     expect(state.queryErrorProps.at(-1)?.variant).toBe('server');
-    expect(renderer.root.findAll(node => String(node.type) === 'RepoToggleRow')).toHaveLength(0);
+    // The error owns the body: no repository scroll area behind it. The rows
+    // themselves were already absent here in the failure state (the mode
+    // picker only draws them once a selection mode is chosen), so the scroll
+    // area is the surface that tells the two bodies apart.
     expect(renderer.root.findAll(node => String(node.type) === 'ScrollView')).toHaveLength(0);
     unmount();
   });

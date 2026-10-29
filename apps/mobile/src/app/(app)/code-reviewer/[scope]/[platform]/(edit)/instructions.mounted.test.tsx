@@ -208,7 +208,10 @@ beforeEach(() => {
   config.isLoading = false;
   config.isError = false;
   config.isFetching = false;
-  config.fetchStatus = 'idle';
+  // A fetch in flight never arms the idle-restart timer, so a test that leaves
+  // the read pending cannot fire one into a later test's refetch count. The
+  // idle tests opt in explicitly with fake timers.
+  config.fetchStatus = 'fetching';
   config.refetch.mockReset();
   connectivity.known = true;
   queryError.props = [];
@@ -514,6 +517,7 @@ describe('InstructionsRoute config read states', () => {
 
   it('restarts an idle read on its own and paints the editor once it lands', async () => {
     vi.useFakeTimers();
+    config.fetchStatus = 'idle';
     config.refetch.mockImplementation(() => {
       config.data = { customInstructions: STORED };
       return Promise.resolve();
@@ -533,6 +537,7 @@ describe('InstructionsRoute config read states', () => {
 
   it('offers Retry when the restart cannot revive the read, and Retry re-requests it', async () => {
     vi.useFakeTimers();
+    config.fetchStatus = 'idle';
     const renderer = mount();
 
     await act(async () => {

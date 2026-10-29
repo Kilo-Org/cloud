@@ -93,38 +93,53 @@ async function getVercelModelMetadata(caller: string): Promise<StoredModelMap | 
   return vercelModelMetadata;
 }
 
-/** The inference providers routed through Vercel whose key can serve `modelId`. */
-export async function getModelInferenceUserByokProviders(
+/** The inference providers for `modelId`, or null when the Vercel metadata is unavailable. */
+async function lookupInferenceUserByokProviders(
   modelId: string
-): Promise<UserByokProviderId[]> {
+): Promise<UserByokProviderId[] | null> {
   const vercelModelMetadata = await getVercelModelMetadata('getModelInferenceUserByokProviders');
   return vercelModelMetadata
     ? deriveModelInferenceUserByokProviders(modelId, vercelModelMetadata)
-    : [];
+    : null;
+}
+
+/**
+ * The inference providers routed through Vercel whose key can serve `modelId`.
+ * This is the single-model lookup the routing path uses, so it keeps one record
+ * per call; catalog passes aggregate their own counts instead.
+ */
+export async function getModelInferenceUserByokProviders(
+  modelId: string
+): Promise<UserByokProviderId[]> {
+  const providers = await lookupInferenceUserByokProviders(modelId);
+  if (!providers) {
+    return [];
+  }
+  if (providers.length === 0) {
+    console.debug(`[getModelUserByokProviders] no user byok providers for ${modelId}`);
+  }
+  return providers;
 }
 
 /**
  * Returns every user BYOK provider whose key can serve `modelId`: first the
  * inference providers routed through Vercel, then the gateway keys in order of
  * preference. With `enabledProviderIds`, skips the catalog lookups that cannot
- * match an enabled key. This is the single-model lookup, so it keeps one record
- * per call; catalog passes aggregate their own counts instead.
+ * match an enabled key.
  */
 export async function getModelUserByokProviders(
   modelId: string,
   enabledProviderIds?: ReadonlySet<UserByokProviderId>
 ): Promise<UserByokProviderId[]> {
   const enabled = enabledProviderIds ? [...enabledProviderIds] : undefined;
-  const checksInferenceProviders = !enabled || enabled.some(id => !isGatewayUserByokProviderId(id));
   const [inferenceProviders, gatewayProviders] = await Promise.all([
-    checksInferenceProviders ? getModelInferenceUserByokProviders(modelId) : [],
+    !enabled || enabled.some(id => !isGatewayUserByokProviderId(id))
+      ? getModelInferenceUserByokProviders(modelId)
+      : [],
     !enabled || enabled.some(isGatewayUserByokProviderId)
       ? getModelGatewayUserByokProviders(modelId)
       : [],
   ]);
-  if (checksInferenceProviders && inferenceProviders.length === 0) {
-    console.debug(`[getModelUserByokProviders] no user byok providers for ${modelId}`);
-  }
   return [...inferenceProviders, ...gatewayProviders];
 }
 
@@ -289,6 +304,7 @@ export async function addUserByokAvailability(
  * routes it: a direct BYOK key in catalog mode (`directByokCatalogModelIds`), or a provider key
  * sent through Vercel. Gateway keys leave the choice of provider to the gateway, so they do not
  * count, and neither does any key for an id a custom LLM owns, which `getProvider` serves first.
+ * Catalog passes call this once per model, so it reads the lookup without writing a record.
  */
 export async function hasInferenceProviderUserByokForModel(
   modelId: string,
@@ -300,7 +316,7 @@ export async function hasInferenceProviderUserByokForModel(
   if (isKiloExclusiveModel(modelId) || enabledProviderIds.every(isGatewayUserByokProviderId)) {
     return false;
   }
-  const modelProviders = await getModelInferenceUserByokProviders(modelId);
+  const modelProviders = (await lookupInferenceUserByokProviders(modelId)) ?? [];
   return modelProviders.some(providerId => enabledProviderIds.includes(providerId));
 }
 

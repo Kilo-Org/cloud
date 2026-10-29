@@ -30,6 +30,7 @@ import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/provider
 import {
   addDirectByokCatalogAvailability,
   addUserByokAvailability,
+  getModelInferenceUserByokProviders,
   getModelUserByokProviders,
   hasInferenceProviderUserByokForModel,
   isInferenceProviderUserByok,
@@ -283,6 +284,14 @@ describe('getModelUserByokProviders', () => {
     mockedGetVercelModelsMetadata.mockResolvedValue(metadata);
     const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
     try {
+      await getModelInferenceUserByokProviders('absent/model');
+      expect(debug).toHaveBeenCalledTimes(1);
+
+      debug.mockClear();
+      await getModelInferenceUserByokProviders('anthropic/claude-fixture');
+      expect(debug).not.toHaveBeenCalled();
+
+      debug.mockClear();
       await getModelUserByokProviders('absent/model');
       expect(debug).toHaveBeenCalledTimes(1);
 

@@ -3824,6 +3824,7 @@
     "commandsTitle": "Komandat e konfigurimit",
     "addCommand": "Shto komandë",
     "commandLabel": "Komanda",
+    "commandLabelPosition": "Komanda {{position}}",
     "commandPlaceholder": "p.sh. pnpm install",
     "commandsEmpty": "Nuk ka ende komanda konfigurimi",
     "commandsSaveFailed": "Komandat e konfigurimit nuk mund të ruheshin",

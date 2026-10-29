@@ -3824,6 +3824,7 @@
     "commandsTitle": "Setup-Befehle",
     "addCommand": "Befehl hinzufügen",
     "commandLabel": "Befehl",
+    "commandLabelPosition": "Befehl {{position}}",
     "commandPlaceholder": "z. B. pnpm install",
     "commandsEmpty": "Noch keine Setup-Befehle",
     "commandsSaveFailed": "Setup-Befehle konnten nicht gespeichert werden",

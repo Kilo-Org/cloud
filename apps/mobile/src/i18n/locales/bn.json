@@ -3824,6 +3824,7 @@
     "commandsTitle": "সেটআপ কমান্ড",
     "addCommand": "কমান্ড যোগ করুন",
     "commandLabel": "আদেশ",
+    "commandLabelPosition": "আদেশ {{position}}",
     "commandPlaceholder": "যেমন pnpm install",
     "commandsEmpty": "এখনো কোনো সেটআপ কমান্ড নেই",
     "commandsSaveFailed": "সেটআপ কমান্ড সংরক্ষণ করা যায়নি",

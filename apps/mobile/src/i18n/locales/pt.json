@@ -3874,6 +3874,7 @@
     "commandsTitle": "Comandos de configuração",
     "addCommand": "Adicionar comando",
     "commandLabel": "Comando",
+    "commandLabelPosition": "Comando {{position}}",
     "commandPlaceholder": "p. ex. pnpm install",
     "commandsEmpty": "Ainda não há comandos de configuração",
     "commandsSaveFailed": "Não foi possível guardar os comandos de configuração",

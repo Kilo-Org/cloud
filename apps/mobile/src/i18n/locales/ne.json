@@ -3824,6 +3824,7 @@
     "commandsTitle": "आदेशहरू सेटअप गर्नुहोस्",
     "addCommand": "आदेश थप्नुहोस्",
     "commandLabel": "आदेश",
+    "commandLabelPosition": "आदेश {{position}}",
     "commandPlaceholder": "जस्तै pnpm install",
     "commandsEmpty": "अहिलेसम्म कुनै सेटअप आदेशहरू छैनन्",
     "commandsSaveFailed": "सेटअप आदेशहरू बचत गर्न सकिएन",

@@ -402,4 +402,25 @@ describe('ProfileCommandsScreen', () => {
 
     unmount();
   });
+
+  it('counts each saved row in its label and leaves a blank draft unnumbered', async () => {
+    h.query.data = testProfile(['pnpm install', 'pnpm build']);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findFields(renderer.root).map(field => field.props.label)).toEqual([
+      'Command 1',
+      'Command 2',
+    ]);
+
+    pressButton(renderer.root);
+    expect(findFields(renderer.root).map(field => field.props.label)).toEqual([
+      'Command 1',
+      'Command 2',
+      'Command',
+    ]);
+
+    unmount();
+  });
 });

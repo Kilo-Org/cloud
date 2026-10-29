@@ -3890,6 +3890,7 @@
     "commandsTitle": "Setup commands",
     "addCommand": "Add command",
     "commandLabel": "Command",
+    "commandLabelPosition": "Command {{position}}",
     "commandPlaceholder": "e.g. pnpm install",
     "commandsEmpty": "No setup commands yet",
     "commandsSaveFailed": "Couldn't save setup commands",

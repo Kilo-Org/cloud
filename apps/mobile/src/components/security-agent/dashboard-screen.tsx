@@ -50,6 +50,10 @@ import { getSecurityAgentPath } from '@/lib/security-agent';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
 
+// The input one sync attempt carries: the repository filter it was started
+// under, and the operation key a reconcile row replays.
+type SyncIntent = { repoFullName?: string; operationKey?: string };
+
 const METRIC_TONE_CLASS = {
   danger: 'text-destructive',
   warning: 'text-warn',
@@ -250,21 +254,26 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const syncBlocked = triggerSync.isError && !isSecuritySyncRetryable(triggerSync.error);
   const syncDisabled = triggerSync.isPending || syncBlocked;
   // React Query clears a mutation's error when the next attempt starts, so the
-  // failure copy and the retry under it would blink out for the length of the
-  // retry — the screen looked like the tap did nothing. Hold the failure the
-  // retry is retrying until that attempt reports its own outcome.
-  const [heldSyncFailure, setHeldSyncFailure] = useState<Error | null>(null);
-  const syncFailure = triggerSync.error ?? heldSyncFailure;
+  // failure copy and the retry under it blink out for the length of the retry —
+  // the screen looked like the tap did nothing. Hold the failure being retried,
+  // together with the intent that produced it, until that attempt reports its
+  // own outcome: a retry must resubmit the failed intent, not whatever filter
+  // the reader switched to meanwhile.
+  const [lastSyncAttempt, setLastSyncAttempt] = useState<{
+    error: Error | null;
+    intent: SyncIntent;
+  } | null>(null);
+  const syncFailure = triggerSync.error ?? lastSyncAttempt?.error ?? null;
   const syncRetryable = syncFailure !== null && isSecuritySyncRetryable(syncFailure);
 
   // One submit path for every control that starts a sync — the header button,
   // the empty-state action, the retry beside the failure copy, and a
   // reconcile-row retry — so their handlers cannot drift apart.
-  const startSync = (intent: { repoFullName?: string; operationKey?: string }) => {
-    setHeldSyncFailure(triggerSync.error);
+  const startSync = (intent: SyncIntent) => {
+    setLastSyncAttempt({ error: triggerSync.error, intent });
     triggerSync.mutate(intent, {
       onSuccess: () => {
-        setHeldSyncFailure(null);
+        setLastSyncAttempt(null);
         toast.success(t('securityAgent.dashboard.syncQueued'));
       },
       onSettled: () => {
@@ -390,7 +399,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                 variant="ghost"
                 loading={triggerSync.isPending}
                 onPress={() => {
-                  startSync({ repoFullName });
+                  startSync(lastSyncAttempt?.intent ?? { repoFullName });
                 }}
               >
                 <Text>{t('common.retry')}</Text>

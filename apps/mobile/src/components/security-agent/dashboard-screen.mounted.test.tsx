@@ -419,6 +419,34 @@ describe('DashboardScreen sync control terminal states', () => {
     );
   });
 
+  it('retries the intent that failed, not the filter selected since', () => {
+    outbox.needsReconcile = [
+      {
+        operationKey: 'kilo-repo-key',
+        fingerprint: 'sync:kilo/repo',
+        scope: 'personal',
+        input: { repoFullName: 'kilo/repo' },
+      },
+    ];
+    triggerSync.isError = true;
+    triggerSync.error = mapSecuritySyncOperationError(
+      new Error(SECURITY_SERVICE_UNAVAILABLE_MESSAGE)
+    );
+    const root = renderScreen();
+
+    act(() => {
+      retryCards.cards.find(card => card.lastError === RECONCILE_COPY)?.onRetry?.();
+    });
+    pressSyncRetry(root.root);
+
+    // The card's retry stored the reconcile intent; the inline retry replays it
+    // rather than the (unset) repository filter the screen shows now.
+    expect(triggerSync.mutate).toHaveBeenLastCalledWith(
+      { repoFullName: 'kilo/repo', operationKey: 'kilo-repo-key' },
+      expect.objectContaining({ onSuccess: expect.any(Function) })
+    );
+  });
+
   it('keeps the failure and reports progress on the retry while it runs', () => {
     triggerSync.isError = true;
     triggerSync.error = mapSecuritySyncOperationError(

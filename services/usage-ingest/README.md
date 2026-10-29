@@ -8,8 +8,11 @@ matching recorded/duplicate writer response permits ACK; invalid events and
 missing writer configuration retry and can exhaust into the DLQ.
 
 The gateway's `USAGE_QUEUE_ONLY_ENABLED` launch switch selects queued accounting
-for staging or for the production SFO cohort controlled by
-`USAGE_QUEUE_SFO_EXPOSURE` (`0`–`1`) and optional `USAGE_QUEUE_SFO_USER_IDS`.
+for staging or for the production regional cohorts controlled independently by
+`USAGE_QUEUE_SFO_EXPOSURE` and `USAGE_QUEUE_FRA_EXPOSURE` (`0`–`1`, default `0`).
+The optional `USAGE_QUEUE_SFO_USER_IDS` restricts only SFO. Configure the FRA
+exposure on `kilocode-ai-gateway` Production and redeploy the gateway; this changes
+accounting transport, not request routing.
 Unselected events keep direct accounting or the existing SFO handoff. Background
 shadow publication and its flag have been removed. Reconcile and drain historically
 accepted shadow events before deploying processing; this change does not remove

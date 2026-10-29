@@ -1514,7 +1514,13 @@
         "change_request_failed": "Nabigong buksan ang PR",
         "superseded": "Naroon na"
       },
-      "noProposalsDescription": "Lalabas dito ang mga mungkahi mula sa memorya ng pagsusuri kapag nasuri na ng Kilo ang mga tugon ng tagapangalaga ng code."
+      "noProposalsDescription": "Lalabas dito ang mga mungkahi mula sa memorya ng pagsusuri kapag nasuri na ng Kilo ang mga tugon ng tagapangalaga ng code.",
+      "changeRequestInProgress": "Bukas nang nagbubukas ang Kilo ng pull request para sa mungkahing ito. Subukan ulit sa ilang sandali.",
+      "changeRequestNotActionable": "Hindi na maaapruba ang mungkahing ito. Isara ito at i-refresh ang listahan.",
+      "changeRequestNoGitHubAccess": "Walang koneksyon sa GitHub na may access sa repositoryong ito. I-reconnect ang GitHub na may access dito, pagkatapos ay subukan ulit.",
+      "changeRequestMissingPermissions": "Hindi makapagbukas ng pull request ang GitHub App ng Kilo sa repositoryong ito. Kailangang bigyan ng may-ari ng repositoryo ang app ng write access sa contents at pull requests, pagkatapos ay subukan ulit.",
+      "changeRequestFailed": "Hindi nabuksan ng Kilo ang pull request. Subukan ulit sa ilang sandali.",
+      "offAction": "Hindi pinagana ang memorya ng pagsusuri. Paganahin ito, pagkatapos subukan ulit."
     },
     "manualReview": {
       "title": "Manu-manong pagsusuri",

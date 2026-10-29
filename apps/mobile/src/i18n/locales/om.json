@@ -1514,7 +1514,13 @@
         "change_request_failed": "PR hin milkoofne",
         "superseded": "Duraanuu jira"
       },
-      "noProposalsDescription": "Kilo deebii kunuunsitootaa erga xiinxalee booda yaadonni yaadannoo sakatta'aa irraa dhihaatan asitti mul'atu."
+      "noProposalsDescription": "Kilo deebii kunuunsitootaa erga xiinxalee booda yaadonni yaadannoo sakatta'aa irraa dhihaatan asitti mul'atu.",
+      "changeRequestInProgress": "Kilo duraanuu yaadota kanaaf pull request banaa jira. Yeroo gabaabaa booda irra deebi'ii yaali.",
+      "changeRequestNotActionable": "Yaadni kun amma mirkanaa'uu hin danda'u. Isa cufi tarree haaromsi.",
+      "changeRequestNoGitHubAccess": "Walitti hidhinnni GitHub tokko illee repository kanaaf dhaqqabama hin qabu. GitHub repository kanaaf dhaqqabamaan walitti deebi'ii hidhi, sana booda irra deebi'ii yaali.",
+      "changeRequestMissingPermissions": "Appiin GitHub Kilo repository kana keessatti pull request banuu hin danda'u. Abbaan repository appii sanatti qabeenyaa fi pull request irratti afoomicha barreessuu kennuu qaba, sana booda irra deebi'ii yaali.",
+      "changeRequestFailed": "Kilo pull request banuu hin dandeenye. Yeroo gabaabaa booda irra deebi'ii yaali.",
+      "offAction": "Yaadannoon sakatta'aa cufameera. Isa bani, sana booda irra deebi'ii yaali."
     },
     "manualReview": {
       "title": "Sakatta'a harkaa",

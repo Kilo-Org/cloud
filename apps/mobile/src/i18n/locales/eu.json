@@ -1514,7 +1514,13 @@
         "change_request_failed": "PRak huts egin du",
         "superseded": "Dagoeneko badago"
       },
-      "noProposalsDescription": "Berrikuspen-memoriaren proposamenak hemen agertuko dira Kilok mantentzaileen erantzunak aztertu ondoren."
+      "noProposalsDescription": "Berrikuspen-memoriaren proposamenak hemen agertuko dira Kilok mantentzaileen erantzunak aztertu ondoren.",
+      "changeRequestInProgress": "Kilo dagoeneko pull request bat irekitzen ari da proposamen honetarako. Saiatu berriro une bat barru.",
+      "changeRequestNotActionable": "Proposamen hau ezin da jada onartu. Itxi eta freskatu zerrenda.",
+      "changeRequestNoGitHubAccess": "GitHub konexio batek ere ez du biltegi honetarako sarbiderik. Berraskonektatu GitHub biltegi honetarako sarbidearekin eta saiatu berriro.",
+      "changeRequestMissingPermissions": "Kiloren GitHub App-ak ezin ditu pull requestak ireki biltegi honetan. Biltegiko jabe batek eduki eta pull requestetarako idazteko baimena eman behar dio aplikazioari eta saiatu berriro.",
+      "changeRequestFailed": "Kilok ezin izan du pull requesta ireki. Saiatu berriro une bat barru.",
+      "offAction": "Berrikuspen-memoria desgaituta dago. Gaitu, eta saiatu berriro."
     },
     "manualReview": {
       "title": "Eskuzko berrikuspena",

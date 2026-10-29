@@ -1514,7 +1514,13 @@
         "change_request_failed": "ເປີດ PR ບໍ່ສຳເລັດ",
         "superseded": "ມີຢູ່ແລ້ວ"
       },
-      "noProposalsDescription": "ຂໍ້ສະເໜີຈາກຄວາມຈຳການກວດສອບຈະປາກົດຢູ່ບ່ອນນີ້ ຫຼັງຈາກ Kilo ວິເຄາະຄຳຕອບຂອງຜູ້ດູແລ."
+      "noProposalsDescription": "ຂໍ້ສະເໜີຈາກຄວາມຈຳການກວດສອບຈະປາກົດຢູ່ບ່ອນນີ້ ຫຼັງຈາກ Kilo ວິເຄາະຄຳຕອບຂອງຜູ້ດູແລ.",
+      "changeRequestInProgress": "Kilo ກຳລັງເປີດ PR ສຳລັບຂໍ້ສະເໜີນີ້ຢູ່ແລ້ວ. ລອງອີກຄັ້ງໃນອີກຈັກຄູ່.",
+      "changeRequestNotActionable": "ບໍ່ສາມາດອະນຸມັດຂໍ້ສະເໜີນີ້ໄດ້ອີກແລ້ວ. ປິດມັນ ແລະ ໂຫຼດລາຍການຄືນໃໝ່.",
+      "changeRequestNoGitHubAccess": "ບໍ່ມີການເຊື່ອມຕໍ່ GitHub ໃດທີ່ມີສິດເຂົ້າເຖິງ repository ນີ້. ເຊື່ອມຕໍ່ GitHub ຄືນໃໝ່ພ້ອມກັບສິດເຂົ້າເຖິງ repository ນີ້, ແລ້ວລອງອີກຄັ້ງ.",
+      "changeRequestMissingPermissions": "GitHub App ຂອງ Kilo ບໍ່ສາມາດເປີດ PR ໃນ repository ນີ້ໄດ້. ເຈົ້າຂອງ repository ຕ້ອງໃຫ້ສິດຂຽນແກ່ແອັບສຳລັບເນື້ອຫາ ແລະ PR, ແລ້ວລອງອີກຄັ້ງ.",
+      "changeRequestFailed": "Kilo ບໍ່ສາມາດເປີດ PR ໄດ້. ລອງອີກຄັ້ງໃນອີກຈັກຄູ່.",
+      "offAction": "ຄວາມຈຳການກວດສອບປິດຢູ່. ເປີດໃຊ້ມັນ, ແລ້ວລອງອີກຄັ້ງ."
     },
     "manualReview": {
       "title": "ການກວດສອບທີ່ເລີ່ມເອງ",

@@ -1514,7 +1514,13 @@
         "change_request_failed": "PR dështoi",
         "superseded": "Tashmë i pranishëm"
       },
-      "noProposalsDescription": "Propozimet e kujtesës së shqyrtimit shfaqen këtu pasi Kilo analizon përgjigjet e mirëmbajtësve."
+      "noProposalsDescription": "Propozimet e kujtesës së shqyrtimit shfaqen këtu pasi Kilo analizon përgjigjet e mirëmbajtësve.",
+      "changeRequestInProgress": "Kilo po hap tashmë një pull request për këtë propozim. Provo përsëri pas një çasti.",
+      "changeRequestNotActionable": "Ky propozim nuk mund të aprovohet më. Mbylle dhe rifresko listën.",
+      "changeRequestNoGitHubAccess": "Asnjë lidhje me GitHub nuk ka akses në këtë depo. Rilidhe GitHub me akses në të, më pas provo përsëri.",
+      "changeRequestMissingPermissions": "Aplikacioni GitHub i Kilo nuk mund të hapë pull request në këtë depo. Një pronar i depos duhet t'i japë aplikacionit akses shkrimi në përmbajtje dhe pull request, më pas provo përsëri.",
+      "changeRequestFailed": "Kilo nuk mund të hapte pull request. Provo përsëri pas një çasti.",
+      "offAction": "Kujtesa e shqyrtimit është e çaktivizuar. Aktivizoje dhe pastaj provo përsëri."
     },
     "manualReview": {
       "title": "Shqyrtimi manual",

@@ -1045,6 +1045,12 @@
         "superseded": "已包含"
       },
       "noProposalsDescription": "Kilo 分析维护者回复后，审查记忆建议会显示在这里。",
+      "changeRequestInProgress": "Kilo 已经在为这个建议创建拉取请求。请稍后再试。",
+      "changeRequestNotActionable": "此建议已无法批准。请关闭它并刷新列表。",
+      "changeRequestNoGitHubAccess": "没有可访问此仓库的 GitHub 连接。请重新连接具有此仓库访问权限的 GitHub，然后重试。",
+      "changeRequestMissingPermissions": "Kilo 的 GitHub App 无法在此仓库中创建拉取请求。仓库所有者必须授予该应用对内容和拉取请求的写入权限，然后重试。",
+      "changeRequestFailed": "Kilo 无法创建拉取请求。请稍后再试。",
+      "offAction": "审查记忆已关闭。请开启后重试。",
       "off": "审查记忆已关闭。",
       "on": "审查记忆已开启。",
       "offDescription": "启用审查记忆后，Kilo 可以从维护者的回复中学习，并为 REVIEW.md 提出审查准则建议。",

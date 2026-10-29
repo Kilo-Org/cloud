@@ -1051,6 +1051,12 @@
         "superseded": "Już istnieje"
       },
       "noProposalsDescription": "Propozycje z pamięci przeglądów pojawią się tutaj, gdy Kilo przeanalizuje odpowiedzi opiekunów repozytorium.",
+      "changeRequestInProgress": "Kilo już otwiera pull request dla tej propozycji. Spróbuj ponownie za chwilę.",
+      "changeRequestNotActionable": "Tej propozycji nie można już zatwierdzić. Zamknij ją i odśwież listę.",
+      "changeRequestNoGitHubAccess": "Żadne połączenie z GitHub nie ma dostępu do tego repozytorium. Połącz ponownie GitHub z dostępem do tego repozytorium i spróbuj ponownie.",
+      "changeRequestMissingPermissions": "Aplikacja GitHub Kilo nie może otwierać pull requestów w tym repozytorium. Właściciel repozytorium musi przyznać aplikacji dostęp do zapisu treści i pull requestów, a następnie spróbuj ponownie.",
+      "changeRequestFailed": "Kilo nie mogło otworzyć pull requesta. Spróbuj ponownie za chwilę.",
+      "offAction": "Pamięć przeglądów jest wyłączona. Włącz ją, a następnie spróbuj ponownie.",
       "off": "Pamięć przeglądów jest wyłączona.",
       "on": "Pamięć przeglądów jest włączona.",
       "offDescription": "Włącz ją, aby Kilo uczyło się na podstawie odpowiedzi opiekunów repozytorium i proponowało wytyczne do pliku REVIEW.md.",

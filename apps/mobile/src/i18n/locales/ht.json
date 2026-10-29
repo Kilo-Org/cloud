@@ -1514,7 +1514,13 @@
         "change_request_failed": "Ouvèti PR la echwe",
         "superseded": "Deja prezan"
       },
-      "noProposalsDescription": "Pwopozisyon memwa revizyon an parèt isit la apre Kilo analize repons moun ki responsab antretyen kòd la."
+      "noProposalsDescription": "Pwopozisyon memwa revizyon an parèt isit la apre Kilo analize repons moun ki responsab antretyen kòd la.",
+      "changeRequestInProgress": "Kilo deja ap ouvri yon pull request pou pwopozisyon sa a. Eseye ankò nan yon ti moman.",
+      "changeRequestNotActionable": "Pwopozisyon sa a pa ka apwouve ankò. Fèmen li epi rafrechi lis la.",
+      "changeRequestNoGitHubAccess": "Okenn koneksyon GitHub pa gen aksè a depo sa a. Rekonekte GitHub ak aksè a li, epi eseye ankò.",
+      "changeRequestMissingPermissions": "Aplikasyon GitHub Kilo a pa ka ouvri pull request nan depo sa a. Yon pwopriyetè depo dwe bay aplikasyon an aksè ekriti sou kontni ak pull request, epi eseye ankò.",
+      "changeRequestFailed": "Kilo pa t ka ouvri pull request la. Eseye ankò nan yon ti moman.",
+      "offAction": "Memwa revizyon an dezaktive. Aktive li, epi eseye ankò."
     },
     "manualReview": {
       "title": "Revizyon manyèl",

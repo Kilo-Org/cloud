@@ -1045,6 +1045,12 @@
         "superseded": "Đã có"
       },
       "noProposalsDescription": "Các đề xuất từ bộ nhớ rà soát sẽ xuất hiện tại đây sau khi Kilo phân tích phản hồi của người bảo trì.",
+      "changeRequestInProgress": "Kilo đang mở pull request cho đề xuất này. Vui lòng thử lại sau giây lát.",
+      "changeRequestNotActionable": "Không thể phê duyệt đề xuất này nữa. Hãy đóng đề xuất và làm mới danh sách.",
+      "changeRequestNoGitHubAccess": "Không có kết nối GitHub nào có quyền truy cập vào kho lưu trữ này. Hãy kết nối lại GitHub với quyền truy cập vào kho lưu trữ, sau đó thử lại.",
+      "changeRequestMissingPermissions": "Ứng dụng GitHub của Kilo không thể mở pull request trong kho lưu trữ này. Chủ sở hữu kho lưu trữ phải cấp cho ứng dụng quyền ghi vào nội dung và pull request, sau đó thử lại.",
+      "changeRequestFailed": "Kilo không thể mở pull request. Vui lòng thử lại sau giây lát.",
+      "offAction": "Bộ nhớ rà soát đang tắt. Bật tính năng này rồi thử lại.",
       "off": "Bộ nhớ rà soát đang tắt.",
       "on": "Bộ nhớ rà soát đang bật.",
       "offDescription": "Bật tính năng này để Kilo học từ phản hồi của người bảo trì và đề xuất hướng dẫn cho tệp REVIEW.md.",

@@ -1514,7 +1514,13 @@
         "change_request_failed": "PR het misluk",
         "superseded": "Reeds teenwoordig"
       },
-      "noProposalsDescription": "Voorstelle uit die hersieningsgeheue verskyn hier nadat Kilo instandhouers se antwoorde ontleed het."
+      "noProposalsDescription": "Voorstelle uit die hersieningsgeheue verskyn hier nadat Kilo instandhouers se antwoorde ontleed het.",
+      "changeRequestInProgress": "Kilo maak reeds 'n pull request vir hierdie voorstel oop. Probeer weer oor 'n oomblik.",
+      "changeRequestNotActionable": "Hierdie voorstel kan nie meer goedgekeur word nie. Sluit dit en verfris die lys.",
+      "changeRequestNoGitHubAccess": "Geen GitHub-verbinding het toegang tot hierdie bewaarplek nie. Herverbind GitHub met toegang daartoe en probeer dan weer.",
+      "changeRequestMissingPermissions": "Kilo se GitHub-app kan nie pull requests in hierdie bewaarplek oopmaak nie. 'n Eienaar van die bewaarplek moet die app skryftoegang tot inhoud en pull requests gee en dan weer probeer.",
+      "changeRequestFailed": "Kilo kon nie die pull request oopmaak nie. Probeer weer oor 'n oomblik.",
+      "offAction": "Die hersieningsgeheue is af. Skakel dit aan en probeer dan weer."
     },
     "manualReview": {
       "title": "Handmatige hersiening",

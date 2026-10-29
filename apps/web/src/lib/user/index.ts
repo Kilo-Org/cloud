@@ -995,6 +995,7 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * - personal byoc_connections rows (organization-owned
  *   credentials are retained)
  * - organization_audit_logs (actor PII nulled)
+ * - organization_mcp_connect_events (retained; user ID reference only, no PII, deleted after 90 days)
  * - kiloclaw_admin_audit_logs (actor PII nulled, target_user_id anonymized)
  * - admin_action_audit_logs (actor PII nulled, user target_id anonymized)
  * - model_eval_ingestions (promoter email anonymized)

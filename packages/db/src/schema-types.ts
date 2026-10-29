@@ -1307,6 +1307,54 @@ export const OrganizationEnkryptSettingsSchema = z.object({
   input_guardrail: EnkryptInputGuardrailSettingsSchema.optional(),
 });
 
+export const ORGANIZATION_ADDON_TYPES = ['mcp'] as const;
+export type OrganizationAddonType = (typeof ORGANIZATION_ADDON_TYPES)[number];
+
+export const ORGANIZATION_ADDON_STATUSES = ['enabled', 'disabled'] as const;
+export type OrganizationAddonStatus = (typeof ORGANIZATION_ADDON_STATUSES)[number];
+
+export const ORGANIZATION_ADDON_ENFORCEMENT_MODES = ['off', 'shadow', 'enforce'] as const;
+export const OrganizationAddonEnforcementSchema = z.enum(ORGANIZATION_ADDON_ENFORCEMENT_MODES);
+export type OrganizationAddonEnforcement = z.infer<typeof OrganizationAddonEnforcementSchema>;
+
+export const OrganizationSkillGuardrailsSchema = z.object({
+  enabled: z.boolean(),
+  scan_before_use: z.boolean(),
+});
+export type OrganizationSkillGuardrails = z.infer<typeof OrganizationSkillGuardrailsSchema>;
+
+export const OrganizationAddonGuardrailsSettingsSchema = z.object({
+  mcp: z.object({ enforcement: OrganizationAddonEnforcementSchema }).optional(),
+  skill: OrganizationSkillGuardrailsSchema.optional(),
+});
+
+export type OrganizationAddonGuardrailsSettings = z.infer<
+  typeof OrganizationAddonGuardrailsSettingsSchema
+>;
+
+export type OrganizationMcpAddonConfig =
+  | { kind: 'remote'; url: string }
+  | {
+      kind: 'package';
+      ecosystem: 'npm' | 'pypi';
+      identifier: string;
+      min_version: string | null;
+    };
+
+export type OrganizationAddonConfig = OrganizationMcpAddonConfig;
+
+export type OrganizationAddonSource = {
+  registry: 'kilo_marketplace' | 'mcp_registry' | 'custom';
+  id: string | null;
+};
+
+export const ORGANIZATION_MCP_CONNECT_DECISIONS = ['allowed', 'denied'] as const;
+export type OrganizationMcpConnectDecision = (typeof ORGANIZATION_MCP_CONNECT_DECISIONS)[number];
+
+export type OrganizationMcpConnectTarget =
+  | { kind: 'remote'; url: string }
+  | { kind: 'package'; ecosystem: 'npm' | 'pypi'; identifier: string };
+
 const OrganizationSettingsSchema = z.object({
   provider_allow_list: z.array(z.string()).optional(),
 
@@ -1350,6 +1398,7 @@ const OrganizationSettingsSchema = z.object({
   // Set by Kilo admins: lets the organization configure Enkrypt AI guardrails in Kilo Cloud
   kilo_encrypt: z.boolean().optional(),
   enkrypt: OrganizationEnkryptSettingsSchema.optional(),
+  addon_guardrails: OrganizationAddonGuardrailsSettingsSchema.optional(),
 });
 
 export type OrganizationSettings = z.infer<typeof OrganizationSettingsSchema>;
@@ -1549,6 +1598,9 @@ export const AuditLogAction = z.enum([
   'organization.created', // ✅
   'organization.token.generate', // ✅
   'organization.funds.distribute_to_children', // ✅
+  'organization.addon.add',
+  'organization.addon.update',
+  'organization.addon.remove',
 ]);
 
 // --- EncryptedData ---

@@ -1,9 +1,8 @@
 'use client';
 
-import { useId, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { AlertCircle, ChevronDown, Info } from 'lucide-react';
-import { toast } from 'sonner';
+import { AlertCircle, ChevronDown } from 'lucide-react';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
 import {
   blockingEnkryptDetectorIds,
@@ -21,6 +20,8 @@ import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { useTRPC } from '@/lib/trpc/utils';
 import { cn } from '@/lib/utils';
 import { OrganizationPageHeader } from '../OrganizationPageHeader';
+import { AddonsSection } from './addons/AddonsSection';
+import { useDebouncedValue } from './addons/use-debounced-value';
 import { EnkryptDetectorList, type UpdateEnkryptDetector } from './EnkryptDetectorList';
 import {
   applyKiloDefaultPreset,
@@ -50,6 +51,8 @@ const SCAN_SCOPE_OPTIONS = [
   },
 ] as const;
 
+const AUTOSAVE_DELAY_MS = 800;
+
 const isDevelopment = process.env.NODE_ENV === 'development';
 
 export function OrganizationGuardrailsPage({
@@ -66,7 +69,10 @@ export function OrganizationGuardrailsPage({
     <div className="flex w-full flex-col gap-y-4">
       <OrganizationPageHeader organizationId={organizationId} title="AI Guardrails" />
       {canManageOrganization(currentRole) ? (
-        <GuardrailsLoader organizationId={organizationId} />
+        <div className="flex flex-col gap-6">
+          <GuardrailsLoader organizationId={organizationId} />
+          <AddonsSection organizationId={organizationId} />
+        </div>
       ) : (
         <Alert variant="destructive">
           <AlertCircle />
@@ -86,7 +92,7 @@ function GuardrailsLoader({ organizationId }: { organizationId: string }) {
 
   if (configQuery.isPending) {
     return (
-      <div className="flex max-w-4xl flex-col gap-6" aria-busy="true">
+      <div className="flex max-w-5xl flex-col gap-6" aria-busy="true">
         <Skeleton className="h-36 w-full" />
         <Skeleton className="h-96 w-full" />
       </div>
@@ -94,7 +100,7 @@ function GuardrailsLoader({ organizationId }: { organizationId: string }) {
   }
   if (configQuery.isError) {
     return (
-      <Alert variant="destructive" className="max-w-4xl">
+      <Alert variant="destructive" className="max-w-5xl">
         <AlertCircle />
         <AlertTitle>AI Guardrails couldn&apos;t load</AlertTitle>
         <AlertDescription className="grid gap-3">
@@ -136,158 +142,170 @@ function GuardrailsForm({
   const [savedDraft, setSavedDraft] = useState(() => toDraft(saved));
   const [draft, setDraft] = useState(savedDraft);
   const [syncedKey, setSyncedKey] = useState(() => configKey(saved));
-  const [changedElsewhere, setChangedElsewhere] = useState(false);
+  const debouncedDraft = useDebouncedValue(draft, AUTOSAVE_DELAY_MS);
+  const attemptedKey = useRef<string | null>(null);
+  const failedKey = useRef<string | null>(null);
   const issues = getEnkryptGuardrailsIssues(draft);
   const isDirty = !draftsEqual(draft, savedDraft);
-  const canSave = (isDirty || invalidSavedDetectors) && issues.size === 0;
   const configurationError = issues.get('detectors') ?? issues.get('');
   const firstIssue = issues.values().next().value;
 
-  // A refetch that brings a configuration saved elsewhere moves the baseline; unsaved edits are
-  // kept and flagged instead of being replaced.
+  const saveMutation = useMutation(
+    trpc.organizations.guardrails.update.mutationOptions({
+      onMutate: () =>
+        queryClient.cancelQueries({
+          queryKey: trpc.organizations.guardrails.get.queryKey({
+            organizationId,
+          }),
+        }),
+      onSuccess: result => {
+        const { invalid_saved_detectors: _invalid, ...savedConfig } = result;
+        failedKey.current = null;
+        setSyncedKey(configKey(savedConfig));
+        setSavedDraft(toDraft(savedConfig));
+        queryClient.setQueryData(
+          trpc.organizations.guardrails.get.queryKey({ organizationId }),
+          result
+        );
+      },
+      onError: () => {
+        failedKey.current = attemptedKey.current;
+      },
+    })
+  );
+
+  // A refetch that brings a configuration saved elsewhere moves the baseline. Edits that have not
+  // been saved yet win, because the next autosave replaces the newer settings.
   const savedKey = configKey(saved);
   if (savedKey !== syncedKey) {
     const next = toDraft(saved);
     setSyncedKey(savedKey);
     setSavedDraft(next);
-    if (isDirty) {
-      setChangedElsewhere(true);
-    } else {
-      setDraft(next);
-    }
+    if (!isDirty && !saveMutation.isPending) setDraft(next);
   }
 
-  const resetTo = (config: EnkryptGuardrailsConfig) => {
-    const next = toDraft(config);
-    setSyncedKey(configKey(config));
-    setSavedDraft(next);
-    setDraft(next);
-    setChangedElsewhere(false);
+  const save = (toSave: EnkryptGuardrailsDraft) => {
+    attemptedKey.current = configKey(fromDraft(toSave));
+    failedKey.current = null;
+    saveMutation.mutate({ organizationId, ...fromDraft(toSave) });
   };
 
-  const saveMutation = useMutation(
-    trpc.organizations.guardrails.update.mutationOptions({
-      onSuccess: result => {
-        const { invalid_saved_detectors: _invalid, ...savedConfig } = result;
-        resetTo(savedConfig);
-        queryClient.setQueryData(
-          trpc.organizations.guardrails.get.queryKey({ organizationId }),
-          result
-        );
-        toast.success('AI Guardrails saved.');
-      },
-      onError: error => {
-        toast.error(error.message || 'AI Guardrails couldn’t be saved. Try again.');
-      },
-    })
-  );
+  // Saves run one at a time. Invalid drafts wait for a fix, and a failed draft is not retried
+  // until it changes or the user asks.
+  const { isPending, mutate } = saveMutation;
+  useEffect(() => {
+    if (isPending) return;
+    if (draftsEqual(debouncedDraft, savedDraft)) return;
+    if (getEnkryptGuardrailsIssues(debouncedDraft).size > 0) return;
+    const key = configKey(fromDraft(debouncedDraft));
+    if (key === failedKey.current) return;
+    attemptedKey.current = key;
+    mutate({ organizationId, ...fromDraft(debouncedDraft) });
+  }, [debouncedDraft, savedDraft, isPending, mutate, organizationId]);
 
   const updateDetector: UpdateEnkryptDetector = (id, patch) =>
     setDraft(current => ({
       ...current,
-      detectors: { ...current.detectors, [id]: { ...current.detectors[id], ...patch } },
+      detectors: {
+        ...current.detectors,
+        [id]: { ...current.detectors[id], ...patch },
+      },
     }));
 
   return (
-    <form
-      className="flex max-w-4xl flex-col gap-6"
-      onSubmit={event => {
-        event.preventDefault();
-        if (!canSave) return;
-        saveMutation.mutate({ organizationId, ...fromDraft(draft) });
-      }}
-    >
+    <div className="flex max-w-5xl flex-col gap-6">
       {invalidSavedDetectors && (
         <Alert variant="destructive">
           <AlertCircle />
           <AlertTitle>Saved detector settings can&apos;t be read</AlertTitle>
-          <AlertDescription>
-            {saved.enabled ? 'Requests are blocked until the detectors are saved again. ' : ''}
-            Review the detectors below, which start from Kilo Default, then save.
-          </AlertDescription>
-        </Alert>
-      )}
-      {changedElsewhere && (
-        <Alert>
-          <Info />
-          <AlertTitle>These settings changed since you started editing</AlertTitle>
-          <AlertDescription>
-            Saving replaces the newer settings with yours. Discard your changes to load them.
+          <AlertDescription className="grid gap-3">
+            <span>
+              {saved.enabled ? 'Requests are blocked until the detectors are saved again. ' : ''}
+              Review the detectors below, which start from Kilo Default. Your changes save
+              automatically.
+            </span>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-fit"
+              disabled={issues.size > 0 || isPending}
+              onClick={() => save(draft)}
+            >
+              Save detector settings
+            </Button>
           </AlertDescription>
         </Alert>
       )}
 
-      <fieldset disabled={saveMutation.isPending} className="flex flex-col gap-6">
-        <GuardrailsSettingsCard draft={draft} onChange={setDraft} />
+      <GuardrailsSettingsCard draft={draft} onChange={setDraft} />
 
-        {draft.enabled && (
-          <>
-            <Card>
-              <CardHeader>
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div className="grid gap-1.5">
-                    <CardTitle>Input detectors</CardTitle>
-                    <CardDescription>
-                      Enkrypt runs the detectors you turn on against each checked input. Kilo
-                      Default blocks prompt injection and logs secrets.
-                    </CardDescription>
-                  </div>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() =>
-                      setDraft(current => ({
-                        ...current,
-                        detectors: applyKiloDefaultPreset(current.detectors),
-                      }))
-                    }
-                  >
-                    Apply Kilo Default
-                  </Button>
+      {draft.enabled && (
+        <>
+          <Card>
+            <CardHeader>
+              <div className="flex flex-wrap items-start justify-between gap-4">
+                <div className="grid gap-1.5">
+                  <CardTitle>Input detectors</CardTitle>
+                  <CardDescription>
+                    Enkrypt runs the detectors you turn on against each checked input. Kilo Default
+                    blocks prompt injection and logs secrets.
+                  </CardDescription>
                 </div>
-              </CardHeader>
-              <CardContent className="grid gap-4">
-                {configurationError && (
-                  <p className="text-destructive text-sm" role="status">
-                    {configurationError}
-                  </p>
-                )}
-                <EnkryptDetectorList
-                  detectors={draft.detectors}
-                  issues={issues}
-                  onUpdate={updateDetector}
-                />
-              </CardContent>
-            </Card>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() =>
+                    setDraft(current => ({
+                      ...current,
+                      detectors: applyKiloDefaultPreset(current.detectors),
+                    }))
+                  }
+                >
+                  Apply Kilo Default
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="grid gap-4">
+              {configurationError && (
+                <p className="text-destructive text-sm" role="status">
+                  {configurationError}
+                </p>
+              )}
+              <EnkryptDetectorList
+                detectors={draft.detectors}
+                issues={issues}
+                onUpdate={updateDetector}
+              />
+            </CardContent>
+          </Card>
 
-            {isDevelopment && <RequestPreviewCard draft={draft} />}
+          {isDevelopment && <RequestPreviewCard draft={draft} />}
+        </>
+      )}
+
+      <div className="flex flex-wrap items-center gap-3 text-sm" role="status">
+        {isDirty && firstIssue ? (
+          <p className="text-destructive">Not saved yet. {firstIssue}</p>
+        ) : saveMutation.isError ? (
+          <>
+            <p className="text-destructive">
+              {saveMutation.error.message || 'AI Guardrails couldn’t be saved.'}
+            </p>
+            <Button type="button" variant="outline" size="sm" onClick={() => save(draft)}>
+              Try again
+            </Button>
           </>
-        )}
-      </fieldset>
-
-      <div className="flex flex-wrap items-center gap-3">
-        <Button type="submit" disabled={!canSave || saveMutation.isPending}>
-          {saveMutation.isPending ? 'Saving…' : 'Save changes'}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={!isDirty || saveMutation.isPending}
-          onClick={() => {
-            setDraft(savedDraft);
-            setChangedElsewhere(false);
-          }}
-        >
-          Discard changes
-        </Button>
-        {isDirty && firstIssue && (
-          <p className="text-destructive text-sm" role="status">
-            {firstIssue}
-          </p>
+        ) : isPending || isDirty ? (
+          <p className="text-muted-foreground">Saving…</p>
+        ) : saveMutation.isSuccess ? (
+          <p className="text-muted-foreground">All changes saved.</p>
+        ) : (
+          <p className="text-muted-foreground">Changes save automatically.</p>
         )}
       </div>
-    </form>
+    </div>
   );
 }
 
@@ -327,7 +345,10 @@ function GuardrailsSettingsCard({
             options={SCAN_SCOPE_OPTIONS}
             value={draft.scan_tool_results ? 'every_input' : 'new_user_input'}
             onChange={scope =>
-              onChange(current => ({ ...current, scan_tool_results: scope === 'every_input' }))
+              onChange(current => ({
+                ...current,
+                scan_tool_results: scope === 'every_input',
+              }))
             }
           />
           <ul className="text-muted-foreground grid list-disc gap-1 pl-5 text-sm">

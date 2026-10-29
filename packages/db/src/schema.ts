@@ -145,6 +145,12 @@ import { KILOCLAW_PRICE_VERSIONS, type KiloClawPriceVersion } from './kiloclaw-p
 import type {
   OrganizationModeConfig,
   OrganizationGroupPolicies,
+  OrganizationAddonConfig,
+  OrganizationAddonSource,
+  OrganizationMcpConnectDecision,
+  OrganizationMcpConnectTarget,
+  OrganizationAddonStatus,
+  OrganizationAddonType,
   OrganizationPlan,
   OrganizationRole,
   OrganizationSettings,
@@ -3925,6 +3931,86 @@ export const organization_groups = pgTable(
     ),
   ]
 );
+
+export const organization_addons = pgTable(
+  'organization_addons',
+  {
+    id: idPrimaryKeyColumn,
+    organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    type: text().$type<OrganizationAddonType>().notNull(),
+    identity_key: text().notNull(),
+    name: text().notNull(),
+    description: text(),
+    status: text().$type<OrganizationAddonStatus>().default('enabled').notNull(),
+    config: jsonb().$type<OrganizationAddonConfig>().notNull(),
+    source: jsonb().$type<OrganizationAddonSource>().notNull(),
+    created_by_kilo_user_id: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_organization_addons_organization_id_type_identity_key').on(
+      table.organization_id,
+      table.type,
+      table.identity_key
+    ),
+    check('organization_addons_type_check', sql`${table.type} IN ('mcp')`),
+    check('organization_addons_status_check', sql`${table.status} IN ('enabled', 'disabled')`),
+    check(
+      'organization_addons_name_check',
+      sql`char_length(btrim(${table.name})) BETWEEN 1 AND 120`
+    ),
+    check(
+      'organization_addons_description_check',
+      sql`${table.description} IS NULL OR char_length(${table.description}) <= 500`
+    ),
+  ]
+);
+
+export type OrganizationAddon = typeof organization_addons.$inferSelect;
+export type NewOrganizationAddon = typeof organization_addons.$inferInsert;
+
+/**
+ * One MCP connect attempt by a member's client. Only connects are recorded, not tool calls. The
+ * user is referenced by ID only; names are joined at read time. Rows are deleted after 90 days.
+ */
+export const organization_mcp_connect_events = pgTable(
+  'organization_mcp_connect_events',
+  {
+    id: idPrimaryKeyColumn,
+    organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    kilo_user_id: text().notNull(),
+    client: text().notNull(),
+    decision: text().$type<OrganizationMcpConnectDecision>().notNull(),
+    identity_key: text().notNull(),
+    target: jsonb().$type<OrganizationMcpConnectTarget>().notNull(),
+    server_name: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_org_mcp_connect_events_org_identity').on(
+      table.organization_id,
+      table.identity_key,
+      table.created_at
+    ),
+    index('IDX_org_mcp_connect_events_org_created').on(table.organization_id, table.created_at),
+    index('IDX_org_mcp_connect_events_created_at').on(table.created_at),
+    check(
+      'organization_mcp_connect_events_decision_check',
+      sql`${table.decision} IN ('allowed', 'denied')`
+    ),
+  ]
+);
+
+export type OrganizationMcpConnectEvent = typeof organization_mcp_connect_events.$inferSelect;
+export type NewOrganizationMcpConnectEvent = typeof organization_mcp_connect_events.$inferInsert;
 
 export type OrganizationGroup = typeof organization_groups.$inferSelect;
 export type NewOrganizationGroup = typeof organization_groups.$inferInsert;

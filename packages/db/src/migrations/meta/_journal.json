@@ -2213,6 +2213,13 @@
       "when": 1793264832628,
       "tag": "0315_restore_briefing_legacy_objects",
       "breakpoints": true
+    },
+    {
+      "idx": 316,
+      "version": "7",
+      "when": 1793266764297,
+      "tag": "0316_mcp_addons_and_connect_events",
+      "breakpoints": true
     }
   ]
 }

@@ -12,6 +12,7 @@ import SecurityAgentScopeRoute from '@/app/(app)/security-agent/[scope]/index';
 import SecurityAgentAuditReportRoute from '@/app/(app)/security-agent/[scope]/audit-report';
 import SecurityAgentDismissFindingRoute from '@/app/(app)/security-agent/[scope]/dismiss/[id]';
 import SecurityAgentFindingDetailRoute from '@/app/(app)/security-agent/[scope]/findings/[id]';
+import SecurityAgentFilterRoute from '@/app/(app)/security-agent/[scope]/filter';
 import SecurityAgentFindingListRoute from '@/app/(app)/security-agent/[scope]/findings/index';
 import SecurityAgentAnalysisSettingsRoute from '@/app/(app)/security-agent/[scope]/settings/analysis';
 import SecurityAgentAutomationSettingsRoute from '@/app/(app)/security-agent/[scope]/settings/automation';
@@ -23,6 +24,12 @@ import SecurityAgentSlaSettingsRoute from '@/app/(app)/security-agent/[scope]/se
 const params = vi.hoisted(() => ({ current: Object.create(null) as Record<string, string> }));
 const mounted = vi.hoisted(() => ({ screens: [] as string[] }));
 
+// The filter sheet route renders React Native views directly; the other routes'
+// screens are mocked, so they never load the native runtime.
+vi.mock('react-native', () => ({ View: 'View' }));
+vi.mock('@sentry/react-native', () => ({
+  wrapExpoRouterErrorBoundary: (component: unknown) => component,
+}));
 vi.mock('expo-router', () => ({
   useLocalSearchParams: () => params.current,
   useRouter: () => ({ push: vi.fn(), back: vi.fn(), dismissTo: vi.fn() }),
@@ -69,7 +76,19 @@ vi.mock('@/components/security-agent/sla-settings-screen', () => ({
   SlaSettingsScreen: screenMock('sla'),
 }));
 vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'InvalidRouteState' }));
-vi.mock('@/components/picker-sheet', () => ({ PickerSheet: () => null }));
+// The sheet's own building blocks reach the native icon set; only the route's
+// scope decision is under test here.
+vi.mock('@/components/query-error', () => ({ QueryError: () => null }));
+vi.mock('@/components/ui/accessible-status', () => ({ AccessibleStatus: () => null }));
+vi.mock('@/components/ui/button', () => ({ Button: () => null }));
+vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
+vi.mock('@/components/ui/text', () => ({ Text: () => null }));
+vi.mock('@/components/picker-sheet', () => ({
+  PickerSheet: (props: { children?: unknown }) => {
+    mounted.screens.push('filter-sheet');
+    return props.children;
+  },
+}));
 vi.mock('@/components/security-agent/finding-filter-modal', () => ({
   FindingFilterModal: () => null,
 }));
@@ -86,6 +105,7 @@ const ROUTES: [string, RouteModule][] = [
   ['dismiss/[id]', SecurityAgentDismissFindingRoute],
   ['findings/[id]', SecurityAgentFindingDetailRoute],
   ['findings/index', SecurityAgentFindingListRoute],
+  ['filter', SecurityAgentFilterRoute],
   ['settings/analysis', SecurityAgentAnalysisSettingsRoute],
   ['settings/automation', SecurityAgentAutomationSettingsRoute],
   ['settings/index', SecurityAgentSettingsRoute],
@@ -136,10 +156,12 @@ describe.each(ROUTES)('%s route scope guard', (_name, Route) => {
 
   it('renders the screen for a real scope', () => {
     params.current = { scope: ORG_SCOPE, id: 'finding-1' };
-    mount(Route);
+    const tree = mount(Route);
 
+    // The filter route's own "screen" is the sheet, which carries no scope;
+    // every other route mounts the screen it names.
     expect(mounted.screens).toHaveLength(1);
-    expect(mounted.screens[0]?.endsWith(`:${ORG_SCOPE}`)).toBe(true);
+    expect(tree.root.findAllByType('InvalidRouteState')).toHaveLength(0);
   });
 });
 

@@ -16,6 +16,7 @@ import type {
 import { applyUsagePricing } from '@kilocode/web-shared/lib/ai-gateway/usage-cost';
 import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/utils.server';
 import { withRequestId } from '@kilocode/web-shared/lib/ai-gateway/request-id';
+import type { VercelProviderMetadataCapture } from '@kilocode/web-shared/lib/r2/vercel-provider-metadata';
 import type { createParser } from 'eventsource-parser';
 import { NextResponse } from 'next/server';
 
@@ -41,7 +42,10 @@ export type RewriteResponseParams = {
 export type ResponseUsageContext = Pick<
   MicrodollarUsageContext,
   'requested_model' | 'provider' | 'is_free' | 'user_byok' | 'api_kind'
-> & { custom_pricing_config: CustomPricingConfig };
+> & {
+  custom_pricing_config: CustomPricingConfig;
+  captureProviderMetadata?: VercelProviderMetadataCapture;
+};
 
 export type ResponseUsage = {
   cost?: number;
@@ -65,12 +69,14 @@ export type ResponseUsage = {
 };
 
 export type ResponseMetadata = {
+  id?: string;
   model?: string;
   provider_metadata?: VercelProviderMetaData;
   providerMetadata?: VercelProviderMetaData;
 };
 
 export function rewriteResponseMetadata(value: ResponseMetadata, context: ResponseUsageContext) {
+  context.captureProviderMetadata?.(value.provider_metadata ?? value.providerMetadata, value.id);
   if (
     value.model !== undefined &&
     !context.requested_model.startsWith('~') &&

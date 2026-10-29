@@ -1,14 +1,11 @@
 import type { CustomPricingConfig } from '@kilocode/db/schema-types';
-import {
-  GEMINI_4_ARGON_MODEL_ID,
-  GEMINI_FLASH_CURRENT_MODEL_ID,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+import { GEMINI_4_ARGON_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 
 /** 50% discounts on two Gemini models. */
 export const TEST_CUSTOM_PRICING_CONFIG: CustomPricingConfig = {
   models: [
     {
-      model: GEMINI_FLASH_CURRENT_MODEL_ID,
+      model: 'google/gemini-3.8-flash',
       discountPercentage: 50,
       pricing: [
         {

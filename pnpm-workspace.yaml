@@ -372,6 +372,11 @@ patchedDependencies:
   '@expo/react-native-action-sheet@4.1.1': patches/@expo+react-native-action-sheet@4.1.1.patch
   # Keep lease renewal errors categorical; neither runtime may log receipt handles.
   '@vercel/queue@0.8.0': patches/@vercel+queue@0.8.0.patch
+  # Give the Apple @ExpoModule class scan 60 s instead of the hard-coded 5 s.
+  # Slow macOS CI runners exceed 5 s; the configure phase then leaves modules
+  # out of the modules provider and the iOS build fails. Keep src/ and build/
+  # aligned: the build/ copy is the one autolinking runs.
+  expo-modules-autolinking@58.0.13: patches/expo-modules-autolinking@58.0.13.patch
 publicHoistPattern:
   - '@types/*'
   - '*import-in-the-middle*'

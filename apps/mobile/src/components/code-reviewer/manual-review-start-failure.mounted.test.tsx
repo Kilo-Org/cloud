@@ -59,7 +59,10 @@ vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(),
   NotificationFeedbackType: { Success: 'success' },
 }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ replace: vi.fn(), push: status.push }) }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ replace: vi.fn(), push: status.push }),
+  useFocusEffect: () => undefined,
+}));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
@@ -104,6 +107,7 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
     refetch: vi.fn(),
   }),
   useReviewConfig: () => ({ data: { modelSlug: 'model-x', thinkingEffort: null } }),
+  useReviewerPermission: () => ({ status: 'ready', canEdit: true, canManage: true }),
 }));
 vi.mock('@/lib/hooks/use-code-reviews', () => ({
   useCreateManualReview: () => ({

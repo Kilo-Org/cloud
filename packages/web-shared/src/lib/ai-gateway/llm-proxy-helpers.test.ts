@@ -41,14 +41,11 @@ jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
 }));
 
 import {
-  gemma_4_26b_a4b_it_free_model,
-  kiloExclusiveModels,
-  qwen36_plus_stealth_model,
-} from './kilo-exclusive-models';
-import type { KiloExclusiveModel } from './providers/kilo-exclusive-model';
+  kiloExclusiveModelFixture,
+  useKiloExclusiveModel,
+} from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 import {
   captureProxyError,
-  checkExclusiveModelProviderAllowed,
   countAndStoreEditUsage,
   countAndStoreFimUsage,
   countAndStoreEmbeddingUsage,
@@ -71,6 +68,8 @@ import { createControlledClock } from '@kilocode/web-shared/tests/helpers/timed-
 const clock = createControlledClock();
 
 const waitForUsageWrite = () => new Promise(resolve => setImmediate(resolve));
+
+useKiloExclusiveModel();
 
 describe('getOutputHeaders', () => {
   it.each(['text/event-stream', 'text/event-stream; charset=utf-8', 'Text/Event-Stream'])(
@@ -1240,6 +1239,56 @@ describe('makeErrorReadable', () => {
     expect(result).toBeUndefined();
   });
 
+  it('reports a rejected Vercel AI Gateway key without Vercel setup instructions', async () => {
+    const response = Response.json(
+      {
+        error: {
+          message:
+            'Authentication failed. Create an API key and set in AI_GATEWAY_API_KEY environment variable: https://vercel.com/d?to=%2F%5Bteam%5D%2F%7E%2Fai-gateway%2Fapi-keys%3FshowCreateKeyModal',
+          type: 'authentication_error',
+        },
+      },
+      { status: 401 }
+    );
+
+    const result = await makeErrorReadable({
+      providerId: 'vercel',
+      requestedModel: 'anthropic/claude-sonnet-4.5',
+      request,
+      response,
+      userByokProviderIds: ['vercel-ai-gateway'],
+    });
+
+    const message =
+      '[BYOK] Vercel AI Gateway rejected your API key. Check that the key is correct and has not been revoked.';
+    expect(result?.status).toBe(401);
+    await expect(result?.json()).resolves.toEqual({
+      error: message,
+      error_type: 'byok_error',
+      message,
+    });
+  });
+
+  it('keeps the provider message for other Vercel AI Gateway key errors', async () => {
+    const response = Response.json(
+      { error: { message: 'Insufficient credits.', type: 'insufficient_funds' } },
+      { status: 402 }
+    );
+
+    const result = await makeErrorReadable({
+      providerId: 'vercel',
+      requestedModel: 'anthropic/claude-sonnet-4.5',
+      request,
+      response,
+      userByokProviderIds: ['vercel-ai-gateway'],
+    });
+
+    await expect(result?.json()).resolves.toMatchObject({
+      message:
+        '[BYOK] Your API account has insufficient funds. Please check your billing details with your API provider. Provider message: Insufficient credits.',
+    });
+  });
+
   it('explains a missing model for a Vertex user BYOK request', async () => {
     const response = Response.json({ error: { message: 'AI_APICallError' } }, { status: 404 });
 
@@ -1734,27 +1783,21 @@ describe('makeErrorReadable', () => {
     expect(result).toBeUndefined();
   });
 
-  it('redacts errors for stealth models', async () => {
+  it('does not redact errors for Kilo-exclusive models', async () => {
     const response = Response.json(
-      { error: { message: 'Upstream vendor secret error' } },
+      { error: { message: 'Upstream vendor error' } },
       { status: 502 }
     );
 
     const result = await makeErrorReadable({
       providerId: 'openrouter',
-      requestedModel: 'stealth/claude-opus-4.7',
+      requestedModel: kiloExclusiveModelFixture.public_id,
       request,
       response,
       userByokProviderIds: null,
     });
 
-    expect(result).toBeDefined();
-    expect(result?.status).toBe(502);
-    await expect(result?.json()).resolves.toEqual({
-      error: 'The upstream provider was unable to process the request',
-      error_type: 'upstream_error',
-      message: 'The upstream provider was unable to process the request',
-    });
+    expect(result).toBeUndefined();
   });
 });
 
@@ -1870,61 +1913,5 @@ describe('requestedSamples', () => {
     expect(requestedSamples({ n: 3 })).toBe(3);
     expect(requestedSamples({})).toBeNull();
     expect(requestedSamples({ n: null })).toBeNull();
-  });
-});
-
-describe('checkExclusiveModelProviderAllowed', () => {
-  const multiProviderModel: KiloExclusiveModel = {
-    ...qwen36_plus_stealth_model,
-    public_id: 'test/multi-provider-exclusive',
-    inference_providers: ['anthropic', 'amazon-bedrock'],
-  };
-
-  beforeEach(() => {
-    kiloExclusiveModels.push(multiProviderModel);
-  });
-
-  afterEach(() => {
-    kiloExclusiveModels.splice(kiloExclusiveModels.indexOf(multiProviderModel), 1);
-  });
-
-  it('allows non-exclusive models, missing provider config, and unrestricted exclusives', () => {
-    expect(checkExclusiveModelProviderAllowed('vendor/model', { only: ['openai'] })).toBeNull();
-    expect(
-      checkExclusiveModelProviderAllowed(qwen36_plus_stealth_model.public_id, undefined)
-    ).toBeNull();
-    expect(
-      checkExclusiveModelProviderAllowed(gemma_4_26b_a4b_it_free_model.public_id, {
-        only: ['openai'],
-      })
-    ).toBeNull();
-  });
-
-  it('allows a model when any of its inference providers is eligible', () => {
-    expect(
-      checkExclusiveModelProviderAllowed(multiProviderModel.public_id, {
-        only: ['amazon-bedrock'],
-      })
-    ).toBeNull();
-    expect(
-      checkExclusiveModelProviderAllowed(multiProviderModel.public_id, { ignore: ['anthropic'] })
-    ).toBeNull();
-  });
-
-  it('rejects a model when none of its inference providers is eligible', async () => {
-    const onlyResult = checkExclusiveModelProviderAllowed(multiProviderModel.public_id, {
-      only: ['openai'],
-    });
-    expect(onlyResult?.status).toBe(403);
-    expect(await onlyResult?.json()).toMatchObject({
-      error_type: 'provider_not_allowed',
-      error:
-        'No eligible provider can serve the selected model. Please enable provider: anthropic, amazon-bedrock',
-    });
-
-    const ignoreResult = checkExclusiveModelProviderAllowed(qwen36_plus_stealth_model.public_id, {
-      ignore: ['stealth'],
-    });
-    expect(ignoreResult?.status).toBe(403);
   });
 });

@@ -13,7 +13,7 @@ import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
 
 const h = vi.hoisted(() => {
-  const permission: PermissionState = { status: 'ready', canEdit: true };
+  const permission: PermissionState = { status: 'ready', canEdit: true, canManage: true };
   return {
     rows: [] as ReviewMemoryProposal[],
     permission: permission as PermissionState,
@@ -193,7 +193,7 @@ async function mountOpen() {
 beforeEach(() => {
   vi.clearAllMocks();
   h.rows = [proposal()];
-  h.permission = { status: 'ready', canEdit: true };
+  h.permission = { status: 'ready', canEdit: true, canManage: true };
   h.saveFailure = false;
   h.approveFailure = false;
   h.saveGate = null;
@@ -277,7 +277,7 @@ describe('review memory proposal interaction', () => {
 
   it.each<PermissionState>([
     { status: 'loading' },
-    { status: 'ready', canEdit: false },
+    { status: 'ready', canEdit: false, canManage: false },
     {
       status: 'error',
       refetch: () => {
@@ -456,7 +456,7 @@ describe('review memory proposal interaction', () => {
       );
     });
     expect(hosts(ui.renderer.root, 'FormField')).toHaveLength(0);
-    h.permission = { status: 'ready', canEdit: true };
+    h.permission = { status: 'ready', canEdit: true, canManage: true };
     act(() => {
       ui.renderer.update(
         createElement(

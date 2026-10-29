@@ -33,6 +33,7 @@ import {
   providerPrTermKey,
 } from '@/lib/pr-review/provider-pr-ref';
 import { type ProviderInboxRow, useProviderInbox } from '@/lib/pr-review/use-provider-inbox';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 const SKELETON_ROW_COUNT = 5;
@@ -156,7 +157,8 @@ function InboxRow({ item }: Readonly<{ item: InboxItem }>) {
   const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
-  const updatedLabel = timeAgo(parseTimestamp(item.updatedAt));
+  const now = useRelativeTimeNow();
+  const updatedLabel = timeAgo(parseTimestamp(item.updatedAt), undefined, now);
   // `group/sub/repo!12` on GitLab, `owner/repo#7` elsewhere — the row says
   // which provider it came from before the term chip repeats it in words.
   const rowLabel = providerPrRefLabel(item.ref);

@@ -6,6 +6,7 @@ import { Pressable, View } from 'react-native';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { selectableRowA11y } from '@/lib/a11y/selectable-row';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatList } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
@@ -53,7 +54,8 @@ export function ChoiceRow({
   return (
     <Pressable
       className={cn(
-        'min-h-11 flex-row items-center justify-between py-3 active:opacity-70',
+        ROW_TARGET_CLASS,
+        'flex-row items-center justify-between py-3 active:opacity-70',
         disabled && 'opacity-50',
         className
       )}

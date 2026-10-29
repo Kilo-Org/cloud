@@ -3194,6 +3194,172 @@ describe('control-plane runtime profiles', () => {
       await fs.rm(root, { recursive: true, force: true });
     }
   });
+
+  it('installs a workspace profile once across sibling sessions', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'control-profile-shared-'));
+    let installs = 0;
+    const harness = createHarness(FAST_TIMERS, {
+      homeRoot: root,
+      runSkillInstall: async (_command, args, options) => {
+        installs += 1;
+        const name = args[args.indexOf('--skill') + 1]!;
+        const installed = path.join(String(options?.env?.HOME), '.agents/skills', name);
+        await fs.mkdir(installed, { recursive: true });
+        await fs.writeFile(path.join(installed, 'SKILL.md'), '# Find skills');
+        return result(0);
+      },
+    });
+    try {
+      const spec = routeSpec({
+        runtimeSkills: [{ name: 'find-skills', source: 'vercel-labs/skills' }],
+      });
+      await harness.manager.prepare(spec);
+      const sibling = routeSpec({
+        ...spec,
+        sessionId: 'ses_22222222222222222222222222',
+        kiloSessionId: 'ses_22222222222222222222222222',
+      });
+      await harness.manager.prepare(sibling);
+
+      expect(installs).toBe(1);
+      expect(harness.frames.filter(frame => frame.type === 'session.ready')).toHaveLength(2);
+      expect(harness.ensureInputs[1]?.env.HOME).toBe(harness.ensureInputs[0]?.env.HOME);
+      expect(
+        await fs.readFile(
+          path.join(harness.ensureInputs[1]!.env.HOME, '.kilocode/skills/find-skills/SKILL.md'),
+          'utf8'
+        )
+      ).toBe('# Find skills');
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rejects profile drift before mutating the shared runtime', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'control-profile-drift-'));
+    const harness = createHarness(FAST_TIMERS, { homeRoot: root });
+    try {
+      const spec = routeSpec({
+        runtimeSkills: [{ name: 'first', rawMarkdown: 'First' }],
+      });
+      await harness.manager.prepare(spec);
+      expect(harness.frames.at(-1)?.type).toBe('session.ready');
+      expect(harness.ensureCalls()).toBe(1);
+
+      const drifted = routeSpec({
+        ...spec,
+        sessionId: 'ses_22222222222222222222222222',
+        kiloSessionId: 'ses_22222222222222222222222222',
+        runtimeSkills: [{ name: 'second', rawMarkdown: 'Second' }],
+      });
+      await harness.manager.prepare(drifted);
+
+      expect(lastFrame(harness.frames)).toMatchObject({
+        type: 'session.failed',
+        sessionId: drifted.sessionId,
+        reason: 'invalid_configuration',
+        step: 'kilo_runtime',
+      });
+      expect(harness.ensureCalls()).toBe(1);
+      expect(harness.ensureInputs).toHaveLength(1);
+      const home = harness.ensureInputs[0]!.env.HOME;
+      expect(await fs.readFile(path.join(home, '.kilocode/skills/first/SKILL.md'), 'utf8')).toBe(
+        'First'
+      );
+      expect(existsSync(path.join(home, '.kilocode/skills/second'))).toBe(false);
+      expect(harness.manager.isPrepared(drifted.sessionId)).toBe(false);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('allows a changed profile after every route releases', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'control-profile-released-'));
+    const harness = createHarness(FAST_TIMERS, { homeRoot: root });
+    try {
+      const first = routeSpec({
+        runtimeSkills: [{ name: 'first', rawMarkdown: 'First' }],
+      });
+      await harness.manager.prepare(first);
+      expect(harness.frames.at(-1)?.type).toBe('session.ready');
+      harness.manager.release(first.sessionId);
+      expect(harness.releaseCalls).toEqual([first.directory]);
+
+      const second = routeSpec({
+        ...first,
+        sessionId: 'ses_22222222222222222222222222',
+        kiloSessionId: 'ses_22222222222222222222222222',
+        runtimeSkills: [{ name: 'second', rawMarkdown: 'Second' }],
+      });
+      await harness.manager.prepare(second);
+
+      expect(lastFrame(harness.frames)).toMatchObject({
+        type: 'session.ready',
+        sessionId: second.sessionId,
+      });
+      expect(harness.ensureCalls()).toBe(2);
+      const home = harness.ensureInputs[1]!.env.HOME;
+      expect(await fs.readFile(path.join(home, '.kilocode/skills/second/SKILL.md'), 'utf8')).toBe(
+        'Second'
+      );
+      expect(existsSync(path.join(home, '.kilocode/skills/first'))).toBe(false);
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
+describe('workspace configuration ownership', () => {
+  const first = { setupCommands: ['echo first'], env: { WORKSPACE_FLAG: 'first' } };
+  const second = { setupCommands: ['echo second'], env: { WORKSPACE_FLAG: 'second' } };
+
+  it('gives a sibling the retained configuration while a route holds the runtime', async () => {
+    const harness = createHarness();
+    const spec = routeSpec();
+    expect(harness.manager.workspaceConfiguration(spec, first)).toBe(first);
+    await harness.manager.prepare({ ...spec, ...first });
+    const sibling = routeSpec({
+      sessionId: 'ses_22222222222222222222222222',
+      kiloSessionId: 'ses_22222222222222222222222222',
+    });
+    expect(harness.manager.workspaceConfiguration(sibling, second)).toBe(first);
+  });
+
+  it('keeps the retained configuration when a prepared route re-attaches', async () => {
+    const harness = createHarness();
+    const spec = routeSpec();
+    harness.manager.workspaceConfiguration(spec, first);
+    await harness.manager.prepare({ ...spec, ...first });
+    expect(harness.manager.workspaceConfiguration(spec, second)).toBe(first);
+    const sibling = routeSpec({
+      sessionId: 'ses_22222222222222222222222222',
+      kiloSessionId: 'ses_22222222222222222222222222',
+    });
+    expect(harness.manager.workspaceConfiguration(sibling, second)).toBe(first);
+  });
+
+  it('applies a new configuration after every route releases the runtime', async () => {
+    const harness = createHarness();
+    const spec = routeSpec();
+    harness.manager.workspaceConfiguration(spec, first);
+    await harness.manager.prepare({ ...spec, ...first });
+    harness.manager.release(spec.sessionId);
+    const next = routeSpec({
+      sessionId: 'ses_22222222222222222222222222',
+      kiloSessionId: 'ses_22222222222222222222222222',
+    });
+    expect(harness.manager.workspaceConfiguration(next, second)).toBe(second);
+  });
+
+  it('replaces configuration retained by a route that never prepared', () => {
+    const harness = createHarness();
+    harness.manager.workspaceConfiguration(routeSpec(), first);
+    const next = routeSpec({
+      sessionId: 'ses_22222222222222222222222222',
+      kiloSessionId: 'ses_22222222222222222222222222',
+    });
+    expect(harness.manager.workspaceConfiguration(next, second)).toBe(second);
+  });
 });
 
 describe('release cleanup and last-route accounting', () => {

@@ -341,7 +341,6 @@ export const RemoteSessionRow = memo(function RemoteSessionRow({
         metaWhileLive
         platformIcon={platformIcon}
         stripMode={variant === 'card' ? 'edge' : 'inline'}
-        titleFirst={variant === 'list'}
         last={variant === 'card' ? true : undefined}
         className={variant === 'card' ? undefined : 'pl-[22px] pr-[22px]'}
       />

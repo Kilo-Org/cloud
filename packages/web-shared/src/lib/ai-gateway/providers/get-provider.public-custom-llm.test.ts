@@ -8,14 +8,16 @@ import { createAnonymousContext } from '@kilocode/web-shared/lib/anonymous';
 import { resetCustomLlmCacheForTest } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import type { User } from '@kilocode/db/schema';
-import { qwen36_plus_stealth_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { MARTIAN } from '@kilocode/web-shared/lib/ai-gateway/providers/definitions/martian';
 import {
   customLlmDefinition,
   deleteCustomLlmForTest,
   insertCustomLlmForTest,
   publicCustomLlmDefinition,
 } from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
+import {
+  kiloExclusiveModelFixture,
+  useKiloExclusiveModel,
+} from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
 
 const ORG_ID = '00000000-0000-4000-8000-000000000001';
 const OTHER_ORG_ID = '00000000-0000-4000-8000-000000000002';
@@ -42,6 +44,8 @@ function providerInput(
 }
 
 describe('getProvider with public custom LLMs', () => {
+  useKiloExclusiveModel();
+
   beforeAll(async () => {
     await insertCustomLlmForTest(
       'acme/public-model',
@@ -59,7 +63,7 @@ describe('getProvider with public custom LLMs', () => {
       encryptedApiKey
     );
     await insertCustomLlmForTest(
-      qwen36_plus_stealth_model.public_id,
+      kiloExclusiveModelFixture.public_id,
       publicCustomLlmDefinition(['acme']),
       encryptedApiKey
     );
@@ -85,7 +89,7 @@ describe('getProvider with public custom LLMs', () => {
     await deleteCustomLlmForTest('acme/public-web-model');
     await deleteCustomLlmForTest('acme/private-model');
     await deleteCustomLlmForTest('acme/multi-api-model');
-    await deleteCustomLlmForTest(qwen36_plus_stealth_model.public_id);
+    await deleteCustomLlmForTest(kiloExclusiveModelFixture.public_id);
     await deleteCustomLlmForTest('acme/country-denied-public-model');
     await deleteCustomLlmForTest('acme/country-denied-private-model');
   });
@@ -142,10 +146,11 @@ describe('getProvider with public custom LLMs', () => {
 
   test('routes a Kilo-exclusive id to the Kilo-exclusive model while it exists', async () => {
     const result = await getProvider(
-      providerInput(qwen36_plus_stealth_model.public_id, user, undefined)
+      providerInput(kiloExclusiveModelFixture.public_id, user, undefined)
     );
 
-    expect(result).toMatchObject({ kind: 'provider', provider: { id: MARTIAN.id } });
+    expect(result.kind).toBe('provider');
+    expect(['openrouter', 'vercel']).toContain(result.kind === 'provider' && result.provider.id);
   });
 
   test('keeps a private custom LLM to its grantees, exempt from policy checks', async () => {

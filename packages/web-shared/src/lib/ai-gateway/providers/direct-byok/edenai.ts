@@ -10,7 +10,7 @@ import {
 export default {
   id: 'edenai',
   models_dev_id: 'edenai',
-  resolveUpstream: apiKeyUpstream({
+  ...apiKeyUpstream({
     apiUrl: 'https://api.edenai.run/v3',
     apiUrlOverrides: { messages: 'https://api.edenai.run/v3/v1' },
     supportedChatApis: ['chat_completions', 'messages', 'responses'],

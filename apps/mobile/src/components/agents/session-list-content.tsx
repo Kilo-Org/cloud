@@ -42,6 +42,7 @@ import { useEffectiveTabBarHeight } from '@/lib/tab-bar-clearance';
 
 export const FAB_SIZE = 56;
 export const FAB_MARGIN = 16;
+const REFRESH_STATUS_BAND_HEIGHT = 20;
 
 type AgentSessionListContentProps = {
   /** Post-deletion focus anchor: the screen's always-mounted search input. */
@@ -159,10 +160,12 @@ export function AgentSessionListContent({
   }, [nonPullRefreshes, markSettled]);
 
   // The tab bar is an absolutely-positioned overlay, so scrollable content
-  // must clear it or the last rows are stuck underneath it. The history list
-  // owns no FAB, so a bottom-only TabBar clearance is the only inset the
-  // content container needs.
-  const tabBarOnlyClearanceStyle = useMemo(() => ({ paddingBottom: tabBarHeight }), [tabBarHeight]);
+  // must clear it or the last rows are stuck underneath it. The top padding
+  // holds the refresh status band at rest; scrolled rows pass under it.
+  const contentInsetStyle = useMemo(
+    () => ({ paddingTop: REFRESH_STATUS_BAND_HEIGHT, paddingBottom: tabBarHeight }),
+    [tabBarHeight]
+  );
 
   // The landscape side insets keep row text clear of the sensor housing
   // (portrait insets are 0, keeping the geometry unchanged). They live on a
@@ -339,9 +342,6 @@ export function AgentSessionListContent({
             );
           }}
           onDelete={() => {
-            // The hook's success toast announces the deletion; onDeleted only
-            // restores focus, and requestA11yFocus no-ops once the header is
-            // unmounted (last session deleted).
             deleteSession(item.session.session_id, () => {
               requestA11yFocus(searchInputRef);
             });
@@ -427,25 +427,18 @@ export function AgentSessionListContent({
   // 200ms fade reads as a blank list area on a fast cold open (the skeleton
   // phase would live entirely inside the fade). The skeleton → rows swap is
   // a same-pitch data update inside the mounted list.
-  //
-  // `gap-2` is the clearance between the status band and the rows — the same
-  // gap the live surface leaves below its band (`mx-4 gap-2` in
-  // `AgentSessionsSection`). Without it the list's top edge sits flush on the
-  // band, and a row resting across that edge is cut mid-text directly under
-  // "Couldn't refresh", so the two read as colliding (device defect p5). The
-  // gap lives on the container rather than as the band's padding on purpose:
-  // the clearance must not depend on whether the status line renders, or the
-  // failure line would push the rows down by the gap as it appears.
   return (
-    <Animated.View className="flex-1 gap-2">
-      {/* The band's height is allocated whenever the rows show, so the
-          in-flight spinner and the failure line replace empty space instead of
-          pushing the rows down (device defect uxs1). */}
-      <View className="mx-[22px] min-h-5">
+    <View className="flex-1">
+      {/* The band floats over the list's top padding, so the in-flight
+          spinner and the failure line never push the rows down (device defect
+          uxs1) and scrolled rows run up to the header instead of stopping
+          under an empty strip. */}
+      <View className="absolute left-[22px] right-[22px] top-0 z-10" pointerEvents="box-none">
         <SessionListRefreshStatus
           busy={pullBusy}
           failed={pull.failed || bodyModel.showInlineError}
           onRetry={handlePullRetry}
+          className="bg-background"
         />
       </View>
       <View className="flex-1" style={landscapeSideInsetStyle}>
@@ -463,7 +456,7 @@ export function AgentSessionListContent({
               </View>
             ) : null
           }
-          contentContainerStyle={tabBarOnlyClearanceStyle}
+          contentContainerStyle={contentInsetStyle}
           keyboardDismissMode="on-drag"
           onEndReached={handleEndReached}
           onEndReachedThreshold={0.5}
@@ -473,6 +466,6 @@ export function AgentSessionListContent({
           maintainVisibleContentPosition={{ autoscrollToTopThreshold: 10 }}
         />
       </View>
-    </Animated.View>
+    </View>
   );
 }

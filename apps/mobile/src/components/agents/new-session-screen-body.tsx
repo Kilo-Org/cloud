@@ -44,7 +44,6 @@ import {
   readCloneUpToMessageId,
   readForkPrefillText,
   readForkSourceIsCloudAgent,
-  resolvePrefillRepoSelection,
 } from '@/components/agents/new-session-prefill';
 import { shouldAutoFocusNewSessionPrompt } from '@/components/agents/new-session-prompt-focus';
 import { useNewSessionOrganization } from '@/components/agents/use-new-session-organization';
@@ -949,27 +948,19 @@ export function NewSessionScreenBody() {
   );
 
   const isRemoteTargetSelected = runOnInstance !== null || computerTargetSelected;
-  // The composer only takes focus on arrival when this entry has nothing left to
-  // configure. Focusing raises the keyboard, which shrinks the scroll frame past
+  // The composer only takes focus on arrival when the form already has its
+  // repository. Focusing raises the keyboard, which shrinks the scroll frame past
   // the repository picker, Changes, Environment and Advanced Configuration while
   // Start is still waiting on that selection — the form then looks like it lost
-  // its configuration until the keyboard comes down. A route prefill counts as
-  // an existing selection: it resolves from the repository list the auto-selection
-  // already reads, so the form is configured without a pick.
+  // its configuration until the keyboard comes down. The rule itself lives in
+  // `shouldAutoFocusNewSessionPrompt`, including the prefill gate the screen
+  // applies a prefill under.
   const autoFocusPrompt = shouldAutoFocusNewSessionPrompt({
     sharePrefilled: Boolean(shareId),
     hasSelectedRepository: selectedRepo !== '',
-    // Only a prefill the screen actually applies counts: the same condition
-    // `useNewSessionPrefillTargets` applies it under (`reposSettled`, and the
-    // repository is in the loaded list). A prefill whose repository is gone, or
-    // whose provider list failed, leaves the form as unconfigured as the plain
-    // entry, and taking focus then would raise the keyboard over the same
-    // configuration this decision exists to show. `reposSettled` is false while
-    // any provider is still loading or errored, so a cached list beside a
-    // failing provider does not count either.
-    hasRepositoryPrefill:
-      reposSettled &&
-      resolvePrefillRepoSelection(repositories, { mode, repo: routePrefillRepo }) !== null,
+    reposSettled,
+    repositories,
+    prefill: { mode, repo: routePrefillRepo },
   });
   // Clone CLI-capability gate: a full clone is optimistic (only an explicit
   // `sessionClone: false` refuses it); a fork cut needs

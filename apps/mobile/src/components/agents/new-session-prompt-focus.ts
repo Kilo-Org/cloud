@@ -1,3 +1,5 @@
+import { type NewSessionPrefill, resolvePrefillRepoSelection } from './new-session-prefill';
+
 /**
  * Whether the new-session prompt may take focus when the screen opens.
  *
@@ -11,9 +13,15 @@
  * its own card (the launch folder and the remote hint), so it is treated the
  * same way.
  *
- * So focus is only taken when the entry already has a repository: a route
- * prefill, a recent row, or the account's auto-selection. The form can then
- * start from the first keystroke, and nothing it still needs is below the card.
+ * So focus is only taken when the form already has a repository, which is the
+ * one piece of configuration the create cannot start without:
+ *
+ *  - a repository already selected on this mount, or
+ *  - a route prefill that the screen will actually apply: the same condition
+ *    `useNewSessionPrefillTargets` applies it under, so the list has to have
+ *    settled and contain that repository. A prefill whose repository is gone,
+ *    or whose provider list failed, leaves the form as unconfigured as the
+ *    plain entry.
  *
  * Every other entry keeps the keyboard down so the first screenful is the whole
  * form; tapping the input still focuses it, so prompt-first typing costs one tap
@@ -25,15 +33,25 @@
 export type NewSessionPromptFocusInput = {
   /** The entry carries a share payload, which prefills the composer itself. */
   sharePrefilled: boolean;
-  /** A repository is already selected. */
+  /** A repository is already selected on this mount. */
   hasSelectedRepository: boolean;
-  /** The route carries a repository prefill that resolves once the list settles. */
-  hasRepositoryPrefill: boolean;
+  /** Every provider list has settled without error (the prefill's own gate). */
+  reposSettled: boolean;
+  /** The repositories the picker offers, as loaded. */
+  repositories: readonly { platform: string; fullName: string }[];
+  /** The repository prefill the entry carries, if any. */
+  prefill: NewSessionPrefill;
 };
 
 export function shouldAutoFocusNewSessionPrompt(input: NewSessionPromptFocusInput): boolean {
   if (input.sharePrefilled) {
     return false;
   }
-  return input.hasSelectedRepository || input.hasRepositoryPrefill;
+  if (input.hasSelectedRepository) {
+    return true;
+  }
+  return (
+    input.reposSettled &&
+    resolvePrefillRepoSelection([...input.repositories], input.prefill) !== null
+  );
 }

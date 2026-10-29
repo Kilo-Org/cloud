@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "Ур чадвараа хадгалж чадсангүй",
     "skillSourceCustom": "Өөрийн",
     "skillSourceMarketplace": "Маркет",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "SKILL.md-г буулгаж, нэрийг нь бөглөнө; Чирэх, буулгахгүйгээр утаснаасаа ур чадвар нэмнэ үү.",
     "skillEditTitle": "Ур чадварыг засах",
     "skillEdit": "{{name}} ур чадварыг засах",

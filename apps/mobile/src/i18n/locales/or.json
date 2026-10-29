@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "ଦକ୍ଷତା ସଞ୍ଚୟ କରିପାରିଲା ନାହିଁ।",
     "skillSourceCustom": "କଷ୍ଟମ୍",
     "skillSourceMarketplace": "ମାର୍କେଟପ୍ଲେସ୍",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "ଏକ SKILL.md ଲେପନ କରନ୍ତୁ ଏବଂ ଏହାର ନାମ ପୁରଣ କରେ। ଡ୍ରାଗ୍ ଏବଂ ଡ୍ରପ୍ ନକରି ଆପଣଙ୍କ ଫୋନରୁ ଏକ ଦକ୍ଷତା ଯୋଡନ୍ତୁ।",
     "skillEditTitle": "ଦକ୍ଷତା ସମ୍ପାଦନ କରନ୍ତୁ।",
     "skillEdit": "ଦକ୍ଷତା {{name}} ସମ୍ପାଦନ କରନ୍ତୁ",

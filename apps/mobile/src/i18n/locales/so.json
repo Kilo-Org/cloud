@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "Ma badbaadin karin xirfad",
     "skillSourceCustom": "Gaar ah",
     "skillSourceMarketplace": "Suuqa",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Ku dheji SKILL.md oo magaciisa ayaa buuxiya; ku dar xirfad taleefankaaga adigoon jiidin oo tuurin.",
     "skillEditTitle": "Xirfadda wax ka beddel",
     "skillEdit": "Wax ka beddel xirfadda {{name}}",

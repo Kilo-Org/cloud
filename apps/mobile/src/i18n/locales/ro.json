@@ -3894,6 +3894,7 @@
     "skillSaveFailed": "Nu s-a putut salva calificarea",
     "skillSourceCustom": "Personalizat",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Lipiți un SKILL.md și numele acestuia se completează; adăugați o abilitate de pe telefon fără glisare și plasare.",
     "skillEditTitle": "Editați abilitate",
     "skillEdit": "Editați abilitatea {{name}}",

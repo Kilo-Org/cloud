@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "Չհաջողվեց պահպանել հմտությունը",
     "skillSourceCustom": "սեփական",
     "skillSourceMarketplace": "շուկա",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Տեղադրեք SKILL.md-ը և լրացվում է դրա անունը; ավելացնել հմտություն ձեր հեռախոսից՝ առանց քաշելու և թողնելու:",
     "skillEditTitle": "Խմբագրման հմտություն",
     "skillEdit": "Խմբագրել {{name}} հմտությունը",

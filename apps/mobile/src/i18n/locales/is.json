@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "Ekki tókst að bjarga kunnáttu",
     "skillSourceCustom": "Sérsniðið",
     "skillSourceMarketplace": "Markaður",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Límdu SKILL.md og nafn þess fyllir út; bættu við færni úr símanum þínum án þess að draga og sleppa.",
     "skillEditTitle": "Breyta færni",
     "skillEdit": "Breyta færni {{name}}",

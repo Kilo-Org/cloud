@@ -3994,6 +3994,7 @@
     "skillSaveFailed": "Níorbh fhéidir an scil a shábháil",
     "skillSourceCustom": "Saincheaptha",
     "skillSourceMarketplace": "Margadh",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Greamaigh SKILL.md agus líonann a ainm isteach; cuir scil ó do ghuthán gan tarraing agus scaoil.",
     "skillEditTitle": "Cuir scil in eagar",
     "skillEdit": "Cuir scil {{name}} in eagar",

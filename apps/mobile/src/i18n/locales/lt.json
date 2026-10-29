@@ -3944,6 +3944,7 @@
     "skillSaveFailed": "Nepavyko išsaugoti įgūdžių",
     "skillSourceCustom": "Pasirinktinis",
     "skillSourceMarketplace": "Parduotuvė",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Įklijuokite SKILL.md ir užpildysite jo pavadinimą; pridėkite įgūdžių iš savo telefono nevilkdami ir numesdami.",
     "skillEditTitle": "Redaguoti įgūdžius",
     "skillEdit": "Redaguoti įgūdį {{name}}",

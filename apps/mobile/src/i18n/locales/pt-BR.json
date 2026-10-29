@@ -3894,6 +3894,7 @@
     "skillSaveFailed": "Não foi possível salvar a habilidade",
     "skillSourceCustom": "Personalizado",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Cole um SKILL.md e seu nome será preenchido; adicione uma habilidade do seu telefone sem arrastar e soltar.",
     "skillEditTitle": "Editar habilidade",
     "skillEdit": "Editar a habilidade {{name}}",

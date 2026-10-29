@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "ບໍ່ສາມາດບັນທຶກທັກສະໄດ້",
     "skillSourceCustom": "ກຳນົດເອງ",
     "skillSourceMarketplace": "ຕະຫຼາດ",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "ວາງ SKILL.md ແລະຊື່ຂອງມັນຕື່ມໃສ່; ເພີ່ມທັກສະຈາກໂທລະສັບຂອງທ່ານໂດຍບໍ່ຕ້ອງລາກແລະວາງ.",
     "skillEditTitle": "ແກ້ໄຂທັກສະ",
     "skillEdit": "ແກ້ໄຂທັກສະ {{name}}",

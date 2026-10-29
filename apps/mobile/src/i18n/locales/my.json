@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "ကျွမ်းကျင်မှုကို မသိမ်းဆည်းနိုင်ခဲ့ပါ။",
     "skillSourceCustom": "စိတ်ကြိုက်",
     "skillSourceMarketplace": "မားကက်ပလေ့",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "SKILL.md ကို ကူးထည့်လိုက်ပြီး ၎င်း၏အမည်ကို ဖြည့်စွက်ပါ။ ဆွဲချ၍မရဘဲ သင့်ဖုန်းမှကျွမ်းကျင်မှုတစ်ခုကို ထည့်ပါ။",
     "skillEditTitle": "ကျွမ်းကျင်မှုကို တည်းဖြတ်ပါ။",
     "skillEdit": "ကျွမ်းကျင်မှု {{name}} ကို တည်းဖြတ်ပါ",

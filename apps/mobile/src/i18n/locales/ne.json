@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "कौशल बचाउन सकेन",
     "skillSourceCustom": "कस्टम",
     "skillSourceMarketplace": "मार्केटप्लेस",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "SKILL.md टाँस्नुहोस् र यसको नाम भरिन्छ; ड्र्याग र ड्रप बिना आफ्नो फोनबाट कौशल थप्नुहोस्।",
     "skillEditTitle": "कौशल सम्पादन गर्नुहोस्",
     "skillEdit": "कौशल {{name}} सम्पादन गर्नुहोस्",

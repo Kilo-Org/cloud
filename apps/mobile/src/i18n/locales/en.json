@@ -3910,6 +3910,7 @@
     "skillSaveFailed": "Couldn't save skill",
     "skillSourceCustom": "Custom",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Paste a SKILL.md and its name fills in; add a skill from your phone without drag and drop.",
     "skillEditTitle": "Edit skill",
     "skillEdit": "Edit skill {{name}}",

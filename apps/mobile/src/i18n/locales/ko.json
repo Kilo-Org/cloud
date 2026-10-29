@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "스킬 저장이 안되네요",
     "skillSourceCustom": "커스텀",
     "skillSourceMarketplace": "마켓플레이스",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "SKILL.md를 붙여넣으면 이름이 채워집니다. 드래그 앤 드롭 없이 휴대폰에서 스킬을 추가하세요.",
     "skillEditTitle": "스킬 편집",
     "skillEdit": "스킬 {{name}}을(를) 편집",

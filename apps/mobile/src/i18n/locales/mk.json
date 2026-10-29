@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "Не може да се спаси вештината",
     "skillSourceCustom": "Прилагодено",
     "skillSourceMarketplace": "Пазар",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Залепете SKILL.md и неговото име се пополнува; додадете вештина од вашиот телефон без влечење и пуштање.",
     "skillEditTitle": "Вештина за уредување",
     "skillEdit": "Уреди вештина {{name}}",

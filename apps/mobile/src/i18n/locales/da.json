@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "Kunne ikke gemme færdighed",
     "skillSourceCustom": "Brugerdefineret",
     "skillSourceMarketplace": "Markedsplads",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Indsæt en SKILL.md og dens navn udfyldes; tilføje en færdighed fra din telefon uden træk og slip.",
     "skillEditTitle": "Rediger færdighed",
     "skillEdit": "Rediger færdighed {{name}}",

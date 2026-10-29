@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "ಕೌಶಲ್ಯವನ್ನು ಉಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
     "skillSourceCustom": "ಕಸ್ಟಮ್",
     "skillSourceMarketplace": "ಮಾರುಕಟ್ಟೆ",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "SKILL.md ಅನ್ನು ಅಂಟಿಸಿ ಮತ್ತು ಅದರ ಹೆಸರು ತುಂಬುತ್ತದೆ; ಡ್ರ್ಯಾಗ್ ಮತ್ತು ಡ್ರಾಪ್ ಇಲ್ಲದೆ ನಿಮ್ಮ ಫೋನ್‌ನಿಂದ ಕೌಶಲ್ಯವನ್ನು ಸೇರಿಸಿ.",
     "skillEditTitle": "ಕೌಶಲ್ಯ ಸಂಪಾದಿಸಿ",
     "skillEdit": "ಕೌಶಲ್ಯ {{name}} ಸಂಪಾದಿಸಿ",

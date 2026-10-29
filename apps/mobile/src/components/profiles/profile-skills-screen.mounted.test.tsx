@@ -172,6 +172,9 @@ describe('ProfileSkillsScreen', () => {
     expect(pressableLabels).not.toContain('Edit skill code-review');
     expect(pressableLabels).toContain('Delete skill code-review');
     expect(findOne(renderer.root, 'Switch').props.accessibilityLabel).toBe('code-review');
+    const texts = findAll(renderer.root, 'Text').map(node => node.props.children);
+    expect(texts).toContain('skills.sh');
+    expect(texts).not.toContain('skills-sh');
 
     unmount();
   });

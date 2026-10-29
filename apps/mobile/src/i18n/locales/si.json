@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "කුසලතා සුරැකීමට නොහැකි විය",
     "skillSourceCustom": "අභිරුචි",
     "skillSourceMarketplace": "වෙළඳපොළ",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "SKILL.md එකක් අලවන්න සහ එහි නම පුරවයි; ඇදගෙන යාමකින් තොරව ඔබගේ දුරකථනයෙන් කුසලතා එක් කරන්න.",
     "skillEditTitle": "සංස්කරණ කුසලතා",
     "skillEdit": "කුසලතාව {{name}} සංස්කරණය කරන්න",

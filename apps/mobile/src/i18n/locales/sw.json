@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "Haikuweza kuhifadhi ujuzi",
     "skillSourceCustom": "Maalum",
     "skillSourceMarketplace": "Soko",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Bandika SKILL.md na jina lake lijazwe; ongeza ujuzi kutoka kwa simu yako bila kuburuta na kuangusha.",
     "skillEditTitle": "Hariri ujuzi",
     "skillEdit": "Hariri ujuzi {{name}}",

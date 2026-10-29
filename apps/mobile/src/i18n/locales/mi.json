@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "Kaore i taea te penapena pukenga",
     "skillSourceCustom": "Whaiaro",
     "skillSourceMarketplace": "Mākete",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Whakapiria he SKILL.md ka whakakiia tona ingoa; taapirihia he pukenga mai i to waea me te kore toia me te maturuturu.",
     "skillEditTitle": "Pukenga whakatika",
     "skillEdit": "Whakatika pukenga {{name}}",

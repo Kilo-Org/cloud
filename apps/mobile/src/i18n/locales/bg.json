@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "Умението не можа да бъде запазено",
     "skillSourceCustom": "Персонализирано",
     "skillSourceMarketplace": "Магазин",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Поставете SKILL.md и името му се попълва; добавете умение от телефона си без плъзгане и пускане.",
     "skillEditTitle": "Умение за редактиране",
     "skillEdit": "Редактирайте умение {{name}}",

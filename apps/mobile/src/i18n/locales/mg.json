@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "Tsy nahavonjy fahaizana",
     "skillSourceCustom": "Namboarinao",
     "skillSourceMarketplace": "Tsena",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Apetaho ny SKILL.md ary fenoy ny anarany; ampio fahaiza-manao avy amin'ny findainao tsy misy drag and drop.",
     "skillEditTitle": "Ahitsio fahaizana",
     "skillEdit": "Ahitsio fahaizana {{name}}",

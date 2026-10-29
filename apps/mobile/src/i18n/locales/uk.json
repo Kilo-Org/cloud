@@ -3944,6 +3944,7 @@
     "skillSaveFailed": "Не вдалося зберегти навички",
     "skillSourceCustom": "Власна",
     "skillSourceMarketplace": "Маркетплейс",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Вставте SKILL.md і заповніть його назву; додайте навички зі свого телефону без перетягування.",
     "skillEditTitle": "Редагувати вміння",
     "skillEdit": "Редагувати вміння {{name}}",

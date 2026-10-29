@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "Pa t 'kapab sove konpetans",
     "skillSourceCustom": "Pèsonalize",
     "skillSourceMarketplace": "Mache",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Kole yon SKILL.md epi non li ranpli; ajoute yon konpetans nan telefòn ou san yo pa trennen ak gout.",
     "skillEditTitle": "Edit konpetans",
     "skillEdit": "Edit konpetans {{name}}",

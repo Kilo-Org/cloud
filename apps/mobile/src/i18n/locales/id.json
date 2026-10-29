@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "Tidak dapat menyimpan keterampilan",
     "skillSourceCustom": "Kustom",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Tempelkan SKILL.md dan isikan namanya; tambahkan keterampilan dari ponsel Anda tanpa drag and drop.",
     "skillEditTitle": "Mengedit keterampilan",
     "skillEdit": "Edit keterampilan {{name}}",

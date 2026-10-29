@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "មិនអាចរក្សាទុកជំនាញបានទេ។",
     "skillSourceCustom": "ផ្ទាល់ខ្លួន",
     "skillSourceMarketplace": "ទីផ្សារ",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "បិទភ្ជាប់ SKILL.md ហើយឈ្មោះរបស់វាបំពេញ; បន្ថែមជំនាញពីទូរស័ព្ទរបស់អ្នកដោយមិនចាំបាច់អូស និងទម្លាក់។",
     "skillEditTitle": "កែសម្រួលជំនាញ",
     "skillEdit": "កែសម្រួលជំនាញ {{name}}",

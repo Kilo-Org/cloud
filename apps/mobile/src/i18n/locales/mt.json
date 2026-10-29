@@ -3994,6 +3994,7 @@
     "skillSaveFailed": "Ma setgħetx tiffranka l-ħiliet",
     "skillSourceCustom": "Personalizzat",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Pasta SKILL.md u isimha jimla; żid ħila mit-telefon tiegħek mingħajr drag and drop.",
     "skillEditTitle": "Edit ħiliet",
     "skillEdit": "Edit il-ħila {{name}}",

@@ -3944,6 +3944,7 @@
     "skillSaveFailed": "Nie udało się zapisać umiejętności",
     "skillSourceCustom": "Własne",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Wklej SKILL.md, a jego nazwa zostanie wypełniona; dodaj umiejętność ze swojego telefonu bez przeciągania i upuszczania.",
     "skillEditTitle": "Edytuj umiejętność",
     "skillEdit": "Edytuj umiejętność {{name}}",

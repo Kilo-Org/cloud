@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "Ezin izan da trebetasuna gorde",
     "skillSourceCustom": "Pertsonalizatua",
     "skillSourceMarketplace": "Merkatua",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Itsatsi SKILL.md bat eta bere izena beteko da; gehitu trebetasun bat telefonotik arrastatu eta jaregin gabe.",
     "skillEditTitle": "Editatu trebetasuna",
     "skillEdit": "Editatu trebetasuna {{name}}",

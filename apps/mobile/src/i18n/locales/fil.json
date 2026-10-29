@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "Hindi makapag-save ng kasanayan",
     "skillSourceCustom": "Custom",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Mag-paste ng SKILL.md at mapunan ang pangalan nito; magdagdag ng kasanayan mula sa iyong telepono nang walang drag at drop.",
     "skillEditTitle": "Mag-edit ng kasanayan",
     "skillEdit": "I-edit ang kasanayan {{name}}",

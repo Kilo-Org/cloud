@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "Fertigkeit konnte nicht gespeichert werden",
     "skillSourceCustom": "Benutzerdefiniert",
     "skillSourceMarketplace": "Marktplatz",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Füge eine SKILL.md ein und der Name wird ausgefüllt. Füge einen Skill von deinem Telefon aus ohne Drag & Drop hinzu.",
     "skillEditTitle": "Fertigkeit bearbeiten",
     "skillEdit": "Fertigkeit {{name}} bearbeiten",

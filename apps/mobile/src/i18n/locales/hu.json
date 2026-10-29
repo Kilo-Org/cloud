@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "Nem sikerült elmenteni a készséget",
     "skillSourceCustom": "Egyéni",
     "skillSourceMarketplace": "Piactér",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Illesszen be egy SKILL.md fájlt, és a neve automatikusan kitöltődik; töltsön fel egy készséget a telefonjáról húzás nélkül.",
     "skillEditTitle": "Készség szerkesztése",
     "skillEdit": "{{name}} készség szerkesztése",

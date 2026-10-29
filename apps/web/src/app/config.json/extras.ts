@@ -83,7 +83,7 @@ export const kiloExtras = {
       enum: ['expanded', 'collapsed'],
     },
     hide_prompt_training_models: {
-      description: 'Hide Kilo Gateway models that may train on your prompts from model listings',
+      description: 'Hide Kilo Router models that may train on your prompts from model listings',
       type: 'boolean',
     },
     web_search: {

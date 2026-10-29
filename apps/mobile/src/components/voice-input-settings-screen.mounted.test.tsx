@@ -131,9 +131,9 @@ describe('VoiceInputSettingsScreen', () => {
     expectGatewaySwitchState(renderer, { checked: false, disabled: false });
 
     const texts = findTexts(renderer);
-    expect(texts).toContain('Gateway transcription');
+    expect(texts).toContain('Kilo Router transcription');
     expect(texts).toContain(
-      "Transcribe voice input with a Kilo gateway model instead of the device's speech recognition. Your recording is sent to the Kilo gateway."
+      "Transcribe voice input with a Kilo Router model instead of the device's speech recognition. Your recording is sent to the Kilo Router."
     );
   });
 
@@ -270,7 +270,7 @@ describe('VoiceInputSettingsScreen', () => {
     expect(emptyState.props).toMatchObject({
       placement: 'top',
       title: 'No transcription models',
-      message: 'The gateway offers no transcription models right now.',
+      message: 'Kilo Router offers no transcription models right now.',
     });
     act(() => {
       (emptyState.props.onRetry as () => void)();

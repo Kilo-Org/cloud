@@ -137,7 +137,7 @@ const BOOLEAN_TOGGLES: readonly BooleanToggle[] = [
   },
   {
     name: 'gatewayTranscription',
-    description: 'Transcribe voice input through the Kilo gateway instead of on device.',
+    description: 'Transcribe voice input through the Kilo Router instead of on device.',
     read: isGatewayTranscriptionEnabled,
     write: setGatewayTranscriptionEnabled,
   },
@@ -241,7 +241,7 @@ export const ENTRIES: readonly AppSettingEntry[] = [
   },
   {
     name: 'transcriptionModel',
-    description: 'The gateway transcription model id. Empty keeps the model unchosen.',
+    description: 'The Kilo Router transcription model id. Empty keeps the model unchosen.',
     kind: 'string',
     bind: () =>
       stringSetting(

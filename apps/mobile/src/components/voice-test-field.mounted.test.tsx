@@ -195,14 +195,14 @@ describe('VoiceTestField', () => {
     voice.feedback = {
       action: 'none',
       availability: 'available',
-      message: "Couldn't reach the Kilo gateway. Check your connection and try again.",
+      message: "Couldn't reach the Kilo Router. Check your connection and try again.",
       retryable: true,
     };
     const renderer = await mountVoiceTestField();
 
     const [status] = findByType(renderer, 'AccessibleStatus');
     expect(status?.props).toMatchObject({
-      message: "Couldn't reach the Kilo gateway. Check your connection and try again.",
+      message: "Couldn't reach the Kilo Router. Check your connection and try again.",
       tone: 'error',
     });
     expect(textValues(renderer)).not.toContain('Listening...');

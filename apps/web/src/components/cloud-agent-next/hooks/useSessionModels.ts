@@ -306,7 +306,10 @@ function buildCliCatalogModels(input: BuildSessionModelsInput): SessionModels {
         providerGroup:
           provider.id === 'kilo' && isRemoteModelRecommended(provider.id, model)
             ? { id: 'kilo-recommended', label: 'Recommended' }
-            : { id: provider.id, label: provider.name ?? provider.id },
+            : {
+                id: provider.id,
+                label: provider.id === 'kilo' ? 'Kilo Router' : (provider.name ?? provider.id),
+              },
         searchTerms: [provider.id, provider.name, model.id, model.name].filter(
           (term): term is string => term !== undefined
         ),

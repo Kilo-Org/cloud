@@ -211,7 +211,7 @@ const productEngineeringItems: MenuItem[] = [
     icon: () => <Network />,
   },
   {
-    title: () => 'Gateway',
+    title: () => 'Kilo Router',
     url: '/admin/gateway',
     icon: () => <Network />,
   },

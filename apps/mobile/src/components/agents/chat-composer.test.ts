@@ -645,7 +645,7 @@ describe('ChatComposer draft restore', () => {
 
     onStop();
     await settle();
-    voice.onDraftChange('Gateway transcription online');
+    voice.onDraftChange('Kilo Router transcription online');
     expect(setNativeProps).toHaveBeenCalledTimes(1);
 
     // The first re-render lets the stop-remount machine bump `inputEpoch`
@@ -656,7 +656,7 @@ describe('ChatComposer draft restore', () => {
 
     expect(setNativeProps).toHaveBeenCalledTimes(2);
     const restoreCall = setNativeProps.mock.calls[1]?.[0] as { text?: string };
-    expect(restoreCall.text).toBe('Gateway transcription online');
+    expect(restoreCall.text).toBe('Kilo Router transcription online');
   });
 });
 

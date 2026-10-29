@@ -75,7 +75,7 @@ describe('PreferencesScreen hub', () => {
       icon: 'Mic',
       last: true,
       subtitle:
-        "Transcribe voice input with a Kilo gateway model instead of the device's speech recognition. Your recording is sent to the Kilo gateway.",
+        "Transcribe voice input with a Kilo Router model instead of the device's speech recognition. Your recording is sent to the Kilo Router.",
     });
     expect(row(renderer, 'Translate tool summaries').props).toMatchObject({
       icon: 'WandSparkles',

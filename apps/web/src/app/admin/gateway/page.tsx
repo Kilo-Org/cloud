@@ -70,14 +70,14 @@ export default function AdminGatewayPage() {
 
   const breadcrumbs = (
     <BreadcrumbItem>
-      <BreadcrumbPage>Gateway</BreadcrumbPage>
+      <BreadcrumbPage>Kilo Router</BreadcrumbPage>
     </BreadcrumbItem>
   );
 
   return (
     <AdminPage breadcrumbs={breadcrumbs}>
       <div className="flex w-full flex-col gap-y-4">
-        <h2 className="text-2xl font-bold">Gateway</h2>
+        <h2 className="text-2xl font-bold">Kilo Router</h2>
         <Tabs value={activeTab} onValueChange={onTabChange}>
           <TabsList className="h-auto w-full flex-wrap justify-start gap-x-6 rounded-none border-b bg-transparent p-0">
             <TabsTrigger value="sync-providers" className={tabTriggerClass}>

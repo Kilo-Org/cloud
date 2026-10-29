@@ -233,7 +233,10 @@ function buildCliCatalogOptions(input: BuildSessionModelOptionsInput): SessionMo
         mayTrainOnYourPrompts: model.mayTrainOnYourPrompts,
         hasUserByokAvailable: model.hasUserByokAvailable,
         contextWindow: model.limits.context,
-        provider: { id: provider.id, name: provider.name ?? provider.id },
+        provider: {
+          id: provider.id,
+          name: provider.id === 'kilo' ? 'Kilo Router' : (provider.name ?? provider.id),
+        },
         modelRef: { providerID: provider.id, modelID: model.id },
         overrideSource: 'cli-catalog',
         showGatewayMetadata: false,

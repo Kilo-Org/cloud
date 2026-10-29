@@ -556,7 +556,7 @@ describe('coding plans router', () => {
       planName: 'Enterprise Coding Plan Lite',
       providerName: 'BytePlus',
       providerId: 'byteplus-coding',
-      routeLabel: 'BytePlus via Kilo Gateway',
+      routeLabel: 'BytePlus via Kilo Router',
       features: expect.arrayContaining([
         'Kilo automatically configures BytePlus in your BYOK settings.',
       ]),

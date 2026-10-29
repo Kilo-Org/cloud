@@ -267,7 +267,7 @@ describe('buildSessionModels', () => {
     ]);
   });
 
-  it('uses Kilo Gateway recommendedIndex ranks and a Recommended group from CLI metadata', () => {
+  it('uses Kilo Router branding with recommendedIndex ranks and a Recommended group from CLI metadata', () => {
     const result = buildSessionModels({
       activeSessionType: 'remote',
       remoteModelState: {
@@ -324,7 +324,7 @@ describe('buildSessionModels', () => {
     expect(result.modelOptions.map(option => option.providerGroup)).toEqual([
       { id: 'kilo-recommended', label: 'Recommended' },
       { id: 'kilo-recommended', label: 'Recommended' },
-      { id: 'kilo', label: 'Kilo Gateway' },
+      { id: 'kilo', label: 'Kilo Router' },
     ]);
   });
 

@@ -418,8 +418,8 @@ export function ModelTrafficContent() {
         <div className="flex flex-col gap-1">
           <h2 className="text-2xl font-bold">Model Traffic</h2>
           <p className="text-muted-foreground text-sm">
-            Kilo Gateway requests from <code>o11y_api_metrics</code>, top models by volume.
-            Refreshes every minute
+            Kilo Router requests from <code>o11y_api_metrics</code>, top models by volume. Refreshes
+            every minute
             {dataUpdatedAt > 0 && ` (last updated ${format(dataUpdatedAt, 'HH:mm:ss')})`}.
           </p>
         </div>

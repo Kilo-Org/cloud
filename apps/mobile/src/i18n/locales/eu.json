@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Ezin izan da zure ingurunea kargatu.",
       "retryLoadingEnvironment": "Saiatu berriro ingurunea kargatzen",
       "defaultEnvironment": "Ingurune lehenetsia",
+      "environmentAccessibility": "Ingurunea: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Ingurunea: {{label}}. {{attention}}",
       "leaveChanges": "Utzi aldaketak",
       "commitAndPush": "Egin commit eta igo",
       "startSession": "Hasi saioa",

@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "An kasa loda muhallin aikinka.",
       "retryLoadingEnvironment": "Sake gwada loda muhallin aiki",
       "defaultEnvironment": "Muhallin aiki na asali",
+      "environmentAccessibility": "Muhallin aiki: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Muhallin aiki: {{label}}. {{attention}}",
       "leaveChanges": "Bar canje-canje",
       "commitAndPush": "Adana ka tura",
       "startSession": "Fara zama",

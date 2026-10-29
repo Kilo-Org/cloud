@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Δεν ήταν δυνατή η φόρτωση του περιβάλλοντός σου.",
       "retryLoadingEnvironment": "Επανάληψη φόρτωσης περιβάλλοντος",
       "defaultEnvironment": "Προεπιλεγμένο περιβάλλον",
+      "environmentAccessibility": "Περιβάλλον: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Περιβάλλον: {{label}}. {{attention}}",
       "leaveChanges": "Διατήρηση αλλαγών",
       "commitAndPush": "Καταχώριση και αποστολή",
       "startSession": "Έναρξη συνεδρίας",

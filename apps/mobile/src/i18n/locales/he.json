@@ -1804,6 +1804,8 @@
       "couldNotLoadEnvironment": "לא ניתן היה לטעון את הסביבה שלך.",
       "retryLoadingEnvironment": "ניסיון נוסף לטעון את הסביבה",
       "defaultEnvironment": "סביבת ברירת מחדל",
+      "environmentAccessibility": "סביבה: {{label}}",
+      "environmentAccessibilityNeedsAttention": "סביבה: {{label}}. {{attention}}",
       "leaveChanges": "השארת השינויים",
       "commitAndPush": "קומיט ודחיפה",
       "startSession": "התחלת סשן",

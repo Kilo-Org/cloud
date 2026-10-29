@@ -2347,6 +2347,8 @@
       "couldNotLoadEnvironment": "No s'ha pogut carregar el teu entorn.",
       "retryLoadingEnvironment": "Torna a provar de carregar l'entorn",
       "defaultEnvironment": "Entorn predeterminat",
+      "environmentAccessibility": "Entorn: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Entorn: {{label}}. {{attention}}",
       "leaveChanges": "Deixa els canvis",
       "commitAndPush": "Consigna i envia",
       "startSession": "Inicia la sessió",

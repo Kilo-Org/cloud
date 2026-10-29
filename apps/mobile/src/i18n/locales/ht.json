@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Nou pa t ka chaje anviwònman ou an.",
       "retryLoadingEnvironment": "Eseye chaje anviwònman an ankò",
       "defaultEnvironment": "Anviwònman pa defo",
+      "environmentAccessibility": "Anviwònman: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Anviwònman: {{label}}. {{attention}}",
       "leaveChanges": "Kite chanjman yo",
       "commitAndPush": "Anrejistre epi voye",
       "startSession": "Kòmanse sesyon an",

@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Ekki tókst að hlaða umhverfinu þínu.",
       "retryLoadingEnvironment": "Reyna að hlaða umhverfinu aftur",
       "defaultEnvironment": "Sjálfgefið umhverfi",
+      "environmentAccessibility": "Umhverfi: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Umhverfi: {{label}}. {{attention}}",
       "leaveChanges": "Halda breytingum",
       "commitAndPush": "Skrá og senda",
       "startSession": "Byrja lotu",

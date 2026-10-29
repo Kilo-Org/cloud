@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "ไม่สามารถโหลดสภาพแวดล้อมของคุณได้",
       "retryLoadingEnvironment": "ลองโหลดสภาพแวดล้อมใหม่",
       "defaultEnvironment": "สภาพแวดล้อมเริ่มต้น",
+      "environmentAccessibility": "สภาพแวดล้อม: {{label}}",
+      "environmentAccessibilityNeedsAttention": "สภาพแวดล้อม: {{label}}. {{attention}}",
       "leaveChanges": "เก็บการแก้ไขไว้",
       "commitAndPush": "คอมมิตและพุช",
       "startSession": "เริ่มเซสชัน",

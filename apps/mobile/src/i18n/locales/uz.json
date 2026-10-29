@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Muhitingizni yuklab bo'lmadi.",
       "retryLoadingEnvironment": "Muhitni qayta yuklash",
       "defaultEnvironment": "Standart muhit",
+      "environmentAccessibility": "Muhit: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Muhit: {{label}}. {{attention}}",
       "leaveChanges": "O'zgarishlarni qoldirish",
       "commitAndPush": "Kommit va yuborish",
       "startSession": "Sessiyani boshlash",

@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Hindi ma-load ang iyong kapaligiran.",
       "retryLoadingEnvironment": "Subukang i-load muli ang kapaligiran",
       "defaultEnvironment": "Paunang itinakdang kapaligiran",
+      "environmentAccessibility": "Kapaligiran: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Kapaligiran: {{label}}. {{attention}}",
       "leaveChanges": "Iwan ang mga pagbabago",
       "commitAndPush": "I-commit at i-push",
       "startSession": "Simulan ang sesyon",

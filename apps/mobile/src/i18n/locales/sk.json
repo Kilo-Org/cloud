@@ -2378,6 +2378,8 @@
       "couldNotLoadEnvironment": "Tvoje prostredie sa nepodarilo načítať.",
       "retryLoadingEnvironment": "Skúsiť znova načítať prostredie",
       "defaultEnvironment": "Predvolené prostredie",
+      "environmentAccessibility": "Prostredie: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Prostredie: {{label}}. {{attention}}",
       "leaveChanges": "Ponechať zmeny",
       "commitAndPush": "Vytvoriť commit a odoslať",
       "startSession": "Spustiť reláciu",

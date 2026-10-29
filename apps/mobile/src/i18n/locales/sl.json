@@ -2378,6 +2378,8 @@
       "couldNotLoadEnvironment": "Tvojega okolja ni bilo mogoče naložiti.",
       "retryLoadingEnvironment": "Poskusi znova naložiti okolje",
       "defaultEnvironment": "Privzeto okolje",
+      "environmentAccessibility": "Okolje: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Okolje: {{label}}. {{attention}}",
       "leaveChanges": "Pusti spremembe",
       "commitAndPush": "Uveljavi in potisni",
       "startSession": "Začni sejo",

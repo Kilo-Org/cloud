@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Imeshindikana kupakia mazingira yako.",
       "retryLoadingEnvironment": "Jaribu tena kupakia mazingira",
       "defaultEnvironment": "Mazingira chaguomsingi",
+      "environmentAccessibility": "Mazingira: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Mazingira: {{label}}. {{attention}}",
       "leaveChanges": "Acha mabadiliko",
       "commitAndPush": "Hifadhi na utume",
       "startSession": "Anza kikao",

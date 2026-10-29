@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Mühitini yükləmək mümkün olmadı.",
       "retryLoadingEnvironment": "Mühiti yenidən yüklə",
       "defaultEnvironment": "Standart mühit",
+      "environmentAccessibility": "Mühit: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Mühit: {{label}}. {{attention}}",
       "leaveChanges": "Dəyişiklikləri saxla",
       "commitAndPush": "Təsdiqlə və göndər",
       "startSession": "Sessiyanı başlat",

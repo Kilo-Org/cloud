@@ -1840,6 +1840,8 @@
       "couldNotLoadEnvironment": "تعذّر تحميل بيئتك.",
       "retryLoadingEnvironment": "إعادة محاولة تحميل البيئة",
       "defaultEnvironment": "البيئة الافتراضية",
+      "environmentAccessibility": "البيئة: {{label}}",
+      "environmentAccessibilityNeedsAttention": "البيئة: {{label}}. {{attention}}",
       "leaveChanges": "إبقاء التغييرات",
       "commitAndPush": "إيداع ودفع",
       "startSession": "بدء الجلسة",

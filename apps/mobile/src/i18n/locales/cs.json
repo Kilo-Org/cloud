@@ -2378,6 +2378,8 @@
       "couldNotLoadEnvironment": "Vaše prostředí se nepodařilo načíst.",
       "retryLoadingEnvironment": "Znovu načíst prostředí",
       "defaultEnvironment": "Výchozí prostředí",
+      "environmentAccessibility": "Prostředí: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Prostředí: {{label}}. {{attention}}",
       "leaveChanges": "Ponechat změny",
       "commitAndPush": "Vytvořit commit a odeslat",
       "startSession": "Spustit relaci",

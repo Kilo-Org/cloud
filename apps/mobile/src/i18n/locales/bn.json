@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "আপনার পরিবেশ লোড করা যায়নি।",
       "retryLoadingEnvironment": "পরিবেশ লোড করার জন্য আবার চেষ্টা করুন",
       "defaultEnvironment": "ডিফল্ট পরিবেশ",
+      "environmentAccessibility": "পরিবেশ: {{label}}",
+      "environmentAccessibilityNeedsAttention": "পরিবেশ: {{label}}। {{attention}}",
       "leaveChanges": "পরিবর্তন রেখে দিন",
       "commitAndPush": "কমিট ও পুশ করুন",
       "startSession": "সেশন শুরু করুন",

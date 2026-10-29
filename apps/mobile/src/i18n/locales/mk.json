@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Не успеа вчитувањето на твојата околина.",
       "retryLoadingEnvironment": "Повторно вчитај ја околината",
       "defaultEnvironment": "Стандардна околина",
+      "environmentAccessibility": "Околина: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Околина: {{label}}. {{attention}}",
       "leaveChanges": "Остави ги промените",
       "commitAndPush": "Комитирај и испрати",
       "startSession": "Започни сесија",

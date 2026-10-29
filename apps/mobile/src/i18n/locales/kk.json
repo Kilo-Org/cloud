@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Ортаңызды жүктеу мүмкін болмады.",
       "retryLoadingEnvironment": "Ортаны жүктеуді қайталау",
       "defaultEnvironment": "Әдепкі орта",
+      "environmentAccessibility": "Орта: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Орта: {{label}}. {{attention}}",
       "leaveChanges": "Өзгерістерді қалдыру",
       "commitAndPush": "Коммит жасап, жіберу",
       "startSession": "Сессияны бастау",

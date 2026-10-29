@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Jou omgewing kon nie gelaai word nie.",
       "retryLoadingEnvironment": "Probeer weer om die omgewing te laai",
       "defaultEnvironment": "Standaardomgewing",
+      "environmentAccessibility": "Omgewing: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Omgewing: {{label}}. {{attention}}",
       "leaveChanges": "Laat wysigings staan",
       "commitAndPush": "Lê vas en stoot op",
       "startSession": "Begin sessie",

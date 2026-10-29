@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Ympäristöäsi ei voitu ladata.",
       "retryLoadingEnvironment": "Yritä ladata ympäristö uudelleen",
       "defaultEnvironment": "Oletusympäristö",
+      "environmentAccessibility": "Ympäristö: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Ympäristö: {{label}}. {{attention}}",
       "leaveChanges": "Jätä muutokset ennalleen",
       "commitAndPush": "Tee muutostallennus ja pushaa",
       "startSession": "Aloita istunto",

@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Nem sikerült betölteni a környezetedet.",
       "retryLoadingEnvironment": "Környezet betöltésének újrapróbálása",
       "defaultEnvironment": "Alapértelmezett környezet",
+      "environmentAccessibility": "Környezet: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Környezet: {{label}}. {{attention}}",
       "leaveChanges": "Változtatások megtartása",
       "commitAndPush": "Véglegesítés és feltöltés",
       "startSession": "Munkamenet indítása",

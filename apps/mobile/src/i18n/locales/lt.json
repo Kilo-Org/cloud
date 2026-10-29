@@ -2378,6 +2378,8 @@
       "couldNotLoadEnvironment": "Nepavyko įkelti jūsų aplinkos.",
       "retryLoadingEnvironment": "Bandyti įkelti aplinką iš naujo",
       "defaultEnvironment": "Numatytoji aplinka",
+      "environmentAccessibility": "Aplinka: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Aplinka: {{label}}. {{attention}}",
       "leaveChanges": "Palikti pakeitimus",
       "commitAndPush": "Įrašyti ir išsiųsti",
       "startSession": "Pradėti sesiją",

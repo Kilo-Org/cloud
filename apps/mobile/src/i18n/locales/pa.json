@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "ਤੁਹਾਡਾ ਵਾਤਾਵਰਣ ਲੋਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ।",
       "retryLoadingEnvironment": "ਵਾਤਾਵਰਣ ਲੋਡ ਕਰਨ ਦੀ ਦੁਬਾਰਾ ਕੋਸ਼ਿਸ਼ ਕਰੋ",
       "defaultEnvironment": "ਪੂਰਵ-ਨਿਰਧਾਰਤ ਵਾਤਾਵਰਣ",
+      "environmentAccessibility": "ਵਾਤਾਵਰਣ: {{label}}",
+      "environmentAccessibilityNeedsAttention": "ਵਾਤਾਵਰਣ: {{label}}। {{attention}}",
       "leaveChanges": "ਤਬਦੀਲੀਆਂ ਰਹਿਣ ਦਿਓ",
       "commitAndPush": "ਕਮਿਟ ਤੇ ਪੁਸ਼ ਕਰੋ",
       "startSession": "ਸੈਸ਼ਨ ਸ਼ੁਰੂ ਕਰੋ",

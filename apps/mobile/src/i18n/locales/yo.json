@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "A kò lè gbé àyíká iṣẹ́ rẹ wọlé.",
       "retryLoadingEnvironment": "Gbìyànjú láti tún àyíká iṣẹ́ gbé wọlé",
       "defaultEnvironment": "Àyíká iṣẹ́ àiyípadà",
+      "environmentAccessibility": "Àyíká iṣẹ́: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Àyíká iṣẹ́: {{label}}. {{attention}}",
       "leaveChanges": "Fi àyípadà sílẹ̀",
       "commitAndPush": "Ṣe àkọsílẹ̀, firánṣẹ́",
       "startSession": "Bẹ̀rẹ̀ ìgbà iṣẹ́",

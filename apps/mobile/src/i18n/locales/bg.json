@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Не успяхме да заредим средата ти.",
       "retryLoadingEnvironment": "Опитай отново да заредиш средата",
       "defaultEnvironment": "Среда по подразбиране",
+      "environmentAccessibility": "Среда: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Среда: {{label}}. {{attention}}",
       "leaveChanges": "Остави промените",
       "commitAndPush": "Комитни и изпрати",
       "startSession": "Започни сесия",

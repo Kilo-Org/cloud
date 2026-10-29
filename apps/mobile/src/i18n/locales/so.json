@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Deegaankaaga lama soo shubi karin.",
       "retryLoadingEnvironment": "Mar kale isku day inaad soo shubto deegaanka",
       "defaultEnvironment": "Deegaanka caadiga ah",
+      "environmentAccessibility": "Deegaanka: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Deegaanka: {{label}}. {{attention}}",
       "leaveChanges": "Ka tag isbeddellada",
       "commitAndPush": "Diiwaangeli oo dir",
       "startSession": "Bilow kalfadhiga",

@@ -2347,6 +2347,8 @@
       "couldNotLoadEnvironment": "Nije moguće učitati tvoje okruženje.",
       "retryLoadingEnvironment": "Pokušaj ponovo učitati okruženje",
       "defaultEnvironment": "Zadano okruženje",
+      "environmentAccessibility": "Okruženje: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Okruženje: {{label}}. {{attention}}",
       "leaveChanges": "Ostavi izmjene",
       "commitAndPush": "Potvrdi i pošalji",
       "startSession": "Započni sesiju",

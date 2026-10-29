@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Tsy voaray ny tontolo fiasanao.",
       "retryLoadingEnvironment": "Andramo alaina indray ny tontolo fiasana",
       "defaultEnvironment": "Tontolo fiasana voafidy mialoha",
+      "environmentAccessibility": "Tontolo fiasana: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Tontolo fiasana: {{label}}. {{attention}}",
       "leaveChanges": "Avelao ny fiovana",
       "commitAndPush": "Raketo sy alefaso",
       "startSession": "Atombohy ny fotoam-piasana",

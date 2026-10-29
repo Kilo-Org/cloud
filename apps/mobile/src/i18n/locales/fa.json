@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "بارگذاری محیط شما ممکن نشد.",
       "retryLoadingEnvironment": "تلاش دوباره برای بارگذاری محیط",
       "defaultEnvironment": "محیط پیش‌فرض",
+      "environmentAccessibility": "محیط: {{label}}",
+      "environmentAccessibilityNeedsAttention": "محیط: {{label}}. {{attention}}",
       "leaveChanges": "حفظ تغییرات",
       "commitAndPush": "کامیت و پوش",
       "startSession": "شروع نشست",

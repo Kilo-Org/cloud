@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "ستاسو چاپېریال بار نه شو.",
       "retryLoadingEnvironment": "د چاپېریال بارولو بیا هڅه کړئ",
       "defaultEnvironment": "تلواله چاپېریال",
+      "environmentAccessibility": "چاپېریال: {{label}}",
+      "environmentAccessibilityNeedsAttention": "چاپېریال: {{label}}. {{attention}}",
       "leaveChanges": "بدلونونه پرېږدئ",
       "commitAndPush": "کمیټ او پش کړئ",
       "startSession": "ناسته پیل کړئ",

@@ -1772,6 +1772,8 @@
       "couldNotLoadEnvironment": "Impossibile caricare il tuo ambiente.",
       "retryLoadingEnvironment": "Riprova a caricare l'ambiente",
       "defaultEnvironment": "Ambiente predefinito",
+      "environmentAccessibility": "Ambiente: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Ambiente: {{label}}. {{attention}}",
       "leaveChanges": "Mantieni modifiche",
       "commitAndPush": "Commit e push",
       "startSession": "Avvia sessione",

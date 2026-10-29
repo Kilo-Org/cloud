@@ -16,6 +16,7 @@ import {
   UserByokProviderIdSchema,
   getVercelUserByokProviderIdForEndpoint,
   isGatewayUserByokProviderId,
+  isVercelUserByokProviderAllowed,
   type GatewayUserByokProviderId,
   type UserByokProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
@@ -266,11 +267,15 @@ export async function addUserByokAvailability(
   );
 }
 
+const NO_ALLOWED_PROVIDERS: ReadonlySet<string> = new Set();
+
 /**
- * Whether an inference provider key among `enabledProviderIds` serves `modelId`, as `getProvider`
- * routes it: a direct BYOK key in catalog mode (`directByokCatalogModelIds`), or a provider key
- * sent through Vercel. Gateway keys leave the choice of provider to the gateway, so they do not
- * count, and neither does any key for an id a custom LLM owns, which `getProvider` serves first.
+ * Whether an inference provider key among `enabledProviderIds` serves `modelId` although the
+ * organization provider allow-list admits none of its providers, as `getProvider` routes it: a
+ * direct BYOK key in catalog mode (`directByokCatalogModelIds`), or a provider key sent through
+ * Vercel whose provider the allow-list cannot name (see `isVercelUserByokProviderAllowed`).
+ * Gateway keys leave the choice of provider to the gateway, so they do not count, and neither does
+ * any key for an id a custom LLM owns, which `getProvider` serves first.
  */
 export async function hasInferenceProviderUserByokForModel(
   modelId: string,
@@ -283,7 +288,11 @@ export async function hasInferenceProviderUserByokForModel(
     return false;
   }
   const modelProviders = await getModelInferenceUserByokProviders(modelId);
-  return modelProviders.some(providerId => enabledProviderIds.includes(providerId));
+  return modelProviders.some(
+    providerId =>
+      enabledProviderIds.includes(providerId) &&
+      isVercelUserByokProviderAllowed(providerId, NO_ALLOWED_PROVIDERS)
+  );
 }
 
 /** Whether `userByok` are inference provider keys rather than a gateway key. */

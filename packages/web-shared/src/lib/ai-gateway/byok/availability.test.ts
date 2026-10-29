@@ -103,6 +103,25 @@ describe('addUserByokAvailability', () => {
     expect(models[0]).not.toHaveProperty('hasUserByokAvailable');
   });
 
+  test('ignores provider keys outside the organization provider allow-list', async () => {
+    mockedGetVercelModelsMetadata.mockResolvedValue(metadata);
+    const models = [makeModel('anthropic/claude-fixture')];
+
+    const [denied] = await addUserByokAvailability(
+      models,
+      ['bedrock'],
+      () => new Set(['anthropic'])
+    );
+    const [allowed] = await addUserByokAvailability(
+      models,
+      ['bedrock'],
+      () => new Set(['amazon-bedrock'])
+    );
+
+    expect(denied?.hasUserByokAvailable).toBe(false);
+    expect(allowed?.hasUserByokAvailable).toBe(true);
+  });
+
   test('reports no availability when the Vercel metadata is empty', async () => {
     mockedGetVercelModelsMetadata.mockResolvedValue({});
     const models = [makeModel('anthropic/claude-fixture'), makeModel(EXCLUSIVE_MODEL_ID)];
@@ -155,14 +174,18 @@ describe('addUserByokAvailability', () => {
 describe('hasInferenceProviderUserByokForModel', () => {
   const noCatalogModels: ReadonlySet<string> = new Set();
 
-  test('counts an enabled provider key sent through Vercel', async () => {
+  test('does not count a provider key sent through Vercel, which the allow-list can name', async () => {
     mockedGetVercelModelsMetadata.mockResolvedValue(metadata);
 
     await expect(
       hasInferenceProviderUserByokForModel('anthropic/claude-fixture', ['bedrock'], noCatalogModels)
-    ).resolves.toBe(true);
+    ).resolves.toBe(false);
     await expect(
-      hasInferenceProviderUserByokForModel('openai/gpt-fixture', ['bedrock'], noCatalogModels)
+      hasInferenceProviderUserByokForModel(
+        'mistral/codestral-fixture',
+        ['codestral', 'mistral'],
+        noCatalogModels
+      )
     ).resolves.toBe(false);
   });
 

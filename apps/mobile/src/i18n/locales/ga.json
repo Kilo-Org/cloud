@@ -1584,7 +1584,8 @@
       "changeRequestNotActionable": "Ní féidir ceadú a thabhairt don togra seo a thuilleadh. Dún é agus athnuaigh an liosta.",
       "changeRequestNoGitHubAccess": "Níl aon nasc GitHub a bhfuil rochtain aige ar an stór seo. Athnasc GitHub le rochtain air, ansin bain triail eile as.",
       "changeRequestMissingPermissions": "Ní féidir le hAip GitHub Kilo iarratais tarraingthe a oscailt sa stór seo. Caithfidh úinéir an stóir rochtain scríofa ar ábhair agus ar iarratais tarraingthe a thabhairt don aip, ansin bain triail eile as.",
-      "changeRequestFailed": "Níorbh fhéidir le Kilo an t-iarratas tarraingthe a oscailt. Bain triail eile as ar ball."
+      "changeRequestFailed": "Níorbh fhéidir le Kilo an t-iarratas tarraingthe a oscailt. Bain triail eile as ar ball.",
+      "changeRequestReviewMemoryOff": "Tá cuimhne athbhreithnithe múchta, mar sin níor osclaíodh aon iarratas tarraingthe. Cumasaigh í agus bain triail eile as."
     },
     "manualReview": {
       "title": "Athbhreithniú de láimh",

@@ -1020,6 +1020,7 @@
       "changeRequestNoGitHubAccess": "Aucune connexion GitHub n'a accès à ce dépôt. Reconnectez GitHub avec un accès à ce dépôt, puis réessayez.",
       "changeRequestMissingPermissions": "L'application GitHub de Kilo ne peut pas ouvrir de pull requests dans ce dépôt. Un propriétaire du dépôt doit accorder à l'application l'accès en écriture au contenu et aux pull requests, puis réessayer.",
       "changeRequestFailed": "Kilo n'a pas pu ouvrir la pull request. Réessayez dans un instant.",
+      "changeRequestReviewMemoryOff": "La mémoire de revue est désactivée, donc aucune pull request n'a été ouverte. Activez-la et réessayez.",
       "off": "La mémoire de revue est désactivée.",
       "on": "La mémoire de revue est activée.",
       "offDescription": "Activez-la pour permettre à Kilo d'apprendre des réponses des responsables du dépôt et de proposer des consignes pour REVIEW.md.",

@@ -1540,7 +1540,8 @@
       "changeRequestNotActionable": "Ovaj prijedlog više nije moguće odobriti. Zatvorite ga i osvježite listu.",
       "changeRequestNoGitHubAccess": "Nijedna GitHub veza nema pristup ovom repozitoriju. Ponovo povežite GitHub s pristupom ovom repozitoriju, pa pokušajte ponovo.",
       "changeRequestMissingPermissions": "Kilo-ova GitHub aplikacija ne može otvoriti pull requestove u ovom repozitoriju. Vlasnik repozitorija mora aplikaciji dati pravo pisanja za sadržaj i pull requestove, pa pokušajte ponovo.",
-      "changeRequestFailed": "Kilo nije mogao otvoriti pull request. Pokušajte ponovo za trenutak."
+      "changeRequestFailed": "Kilo nije mogao otvoriti pull request. Pokušajte ponovo za trenutak.",
+      "changeRequestReviewMemoryOff": "Memorija pregleda je isključena, pa nije otvoren nijedan pull request. Uključi je i pokušajte ponovo."
     },
     "manualReview": {
       "title": "Ručni pregled",

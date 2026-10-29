@@ -1518,7 +1518,8 @@
       "changeRequestNotActionable": "Bu təklifi artıq təsdiqləmək mümkün deyil. Onu bağla və siyahını yenilə.",
       "changeRequestNoGitHubAccess": "Heç bir GitHub bağlantısının bu repozitoriyaya girişi yoxdur. GitHub-u ona girişlə yenidən qoş, sonra yenidən cəhd et.",
       "changeRequestMissingPermissions": "Kilo-nun GitHub Tətbiqi bu repozitoriyada pull sorğusu aça bilmir. Repozitoriya sahibi tətbiqə məzmun və pull sorğuları üçün yazma icazəsi verməlidir, sonra yenidən cəhd et.",
-      "changeRequestFailed": "Kilo pull sorğusunu aça bilmədi. Bir azdan yenidən cəhd et."
+      "changeRequestFailed": "Kilo pull sorğusunu aça bilmədi. Bir azdan yenidən cəhd et.",
+      "changeRequestReviewMemoryOff": "Kod yoxlaması yaddaşı deaktivdir, buna görə pull sorğusu açılmadı. Onu aktivləşdir və yenidən cəhd et."
     },
     "manualReview": {
       "title": "Əl ilə kod yoxlaması",

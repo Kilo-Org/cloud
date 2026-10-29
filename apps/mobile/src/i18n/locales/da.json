@@ -1518,7 +1518,8 @@
       "changeRequestNotActionable": "Dette forslag kan ikke længere godkendes. Luk det, og opdater listen.",
       "changeRequestNoGitHubAccess": "Ingen GitHub-forbindelse har adgang til dette repository. Genopret forbindelsen til GitHub med adgang til repositoryet, og prøv derefter igen.",
       "changeRequestMissingPermissions": "Kilos GitHub App kan ikke åbne pull requests i dette repository. En ejer af repositoryet skal give appen skriveadgang til indhold og pull requests. Prøv derefter igen.",
-      "changeRequestFailed": "Kilo kunne ikke åbne pull requesten. Prøv igen om et øjeblik."
+      "changeRequestFailed": "Kilo kunne ikke åbne pull requesten. Prøv igen om et øjeblik.",
+      "changeRequestReviewMemoryOff": "Hukommelsen for gennemgange er slået fra, så der blev ikke åbnet nogen pull request. Slå den til, og prøv igen."
     },
     "manualReview": {
       "title": "Manuel gennemgang",

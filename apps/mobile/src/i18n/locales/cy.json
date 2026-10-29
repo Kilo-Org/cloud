@@ -1606,7 +1606,8 @@
       "changeRequestNotActionable": "Ni ellir cymeradwyo'r cynnig hwn mwyach. Caewch ef a diweddarwch y rhestr.",
       "changeRequestNoGitHubAccess": "Nid oes gan unrhyw gysylltiad GitHub fynediad at y gofrestrfa hon. Ailgysylltwch GitHub gyda mynediad ati, yna rhowch gynnig arall arni.",
       "changeRequestMissingPermissions": "Ni all ap GitHub Kilo agor ceisiadau tynnu yn y gofrestrfa hon. Rhaid i berchennog y gofrestrfa roi mynediad ysgrifennu i'r ap at gynnwys a cheisiadau tynnu, yna rhowch gynnig arall arni.",
-      "changeRequestFailed": "Ni allai Kilo agor y cais tynnu. Rhowch gynnig arall arni mewn munud."
+      "changeRequestFailed": "Ni allai Kilo agor y cais tynnu. Rhowch gynnig arall arni mewn munud.",
+      "changeRequestReviewMemoryOff": "Mae'r cof adolygu wedi'i ddiffodd, felly ni agorwyd cais tynnu. Trowch ef ymlaen a rhowch gynnig arall arni."
     },
     "manualReview": {
       "title": "Adolygiad â llaw",

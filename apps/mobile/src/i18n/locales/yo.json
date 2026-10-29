@@ -1518,7 +1518,8 @@
       "changeRequestNotActionable": "A kò lè fọwọ́ sí àbá yìí mọ́. Pa á, kí o sì sọ àkọsílẹ̀ náà di tuntun.",
       "changeRequestNoGitHubAccess": "Kò sí ìsopọ̀ GitHub kankan tó ní àǹfààní sí ibi ìpamọ́ yìí. Tún GitHub so pọ̀ pẹ̀lú àǹfààní sí ibi ìpamọ́ yìí, kí o sì gbìyànjú lẹ́ẹ̀kan si.",
       "changeRequestMissingPermissions": "GitHub App ti Kilo kò lè ṣí PR nínú ibi ìpamọ́ yìí. Ẹni tó ni ibi ìpamọ́ gbọ́dọ̀ fún app náà ní àǹfààní kíkọ sí àwọn àkóónú àti àwọn PR, kí o sì gbìyànjú lẹ́ẹ̀kan si.",
-      "changeRequestFailed": "Kilo kò lè ṣí PR náà. Gbìyànjú lẹ́ẹ̀kan si lẹ́yìn ìgbà díẹ̀."
+      "changeRequestFailed": "Kilo kò lè ṣí PR náà. Gbìyànjú lẹ́ẹ̀kan si lẹ́yìn ìgbà díẹ̀.",
+      "changeRequestReviewMemoryOff": "A ti pa ìrántí àtúnyẹ̀wò, nítorí náà a kò ṣí PR kankan. Mú un ṣiṣẹ́ kí o sì gbìyànjú lẹ́ẹ̀kan si."
     },
     "manualReview": {
       "title": "Àtúnyẹ̀wò tí o bẹ̀rẹ̀ fúnra rẹ",

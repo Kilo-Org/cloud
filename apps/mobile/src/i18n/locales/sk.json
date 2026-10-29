@@ -1562,7 +1562,8 @@
       "changeRequestNotActionable": "Tento návrh už nemožno schváliť. Zatvorte ho a obnovte zoznam.",
       "changeRequestNoGitHubAccess": "Žiadne pripojenie GitHub nemá prístup k tomuto úložisku. Znova pripojte GitHub s prístupom k nemu a potom to skúste znova.",
       "changeRequestMissingPermissions": "Aplikácia Kilo na GitHube nemôže v tomto úložisku otvárať pull requesty. Vlastník úložiska musí aplikácii udeliť prístup na zápis k obsahu a pull requestom a potom to skúste znova.",
-      "changeRequestFailed": "Kilo nemohlo otvoriť pull request. Skúste to o chvíľu znova."
+      "changeRequestFailed": "Kilo nemohlo otvoriť pull request. Skúste to o chvíľu znova.",
+      "changeRequestReviewMemoryOff": "Pamäť kontrol je vypnutá, takže sa neotvoril žiadny pull request. Zapnite ju a skúste to znova."
     },
     "manualReview": {
       "title": "Manuálna kontrola",

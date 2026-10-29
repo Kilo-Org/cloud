@@ -2,6 +2,7 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-reviews';
 import { i18n } from '@/i18n';
 
 import { useSetReviewMemoryEnabled } from './use-review-memory';
@@ -100,13 +101,16 @@ describe('useSetReviewMemoryEnabled', () => {
 
   it('explains a known rejection with its own copy', () => {
     const options = mount('personal');
+    const sentence = REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.review_memory_disabled;
 
     options.onError?.(
-      Object.assign(new Error('Review memory is disabled for this platform.'), {
-        data: { code: 'FORBIDDEN', message: 'Review memory is disabled for this platform.' },
+      Object.assign(new Error(sentence), {
+        data: { code: 'FORBIDDEN', message: sentence },
       }) as unknown as Error
     );
 
-    expect(state.toast.error).toHaveBeenCalledWith(i18n.t('codeReviewer.reviewMemory.off'));
+    expect(state.toast.error).toHaveBeenCalledWith(
+      i18n.t('codeReviewer.reviewMemory.changeRequestReviewMemoryOff')
+    );
   });
 });

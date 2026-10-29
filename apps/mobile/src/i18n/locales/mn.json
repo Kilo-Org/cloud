@@ -1518,7 +1518,8 @@
       "changeRequestNotActionable": "Энэ саналыг цаашид зөвшөөрөх боломжгүй. Үүнийг хааж, жагсаалтыг дахин ачаална уу.",
       "changeRequestNoGitHubAccess": "Энэ репозиторт хандах эрхтэй GitHub холболт байхгүй байна. Хандах эрхтэй GitHub холболтоо дахин холбож, дараа нь дахин оролдоно уу.",
       "changeRequestMissingPermissions": "Kilo-ийн GitHub App энэ репозиторт pull request нээх боломжгүй. Репозиторийн эзэмшигч аппад агуулга болон pull request-д бичих эрх өгөх шаардлагатай, дараа нь дахин оролдоно уу.",
-      "changeRequestFailed": "Kilo pull request-ийг нээж чадсангүй. Түр хүлээгээд дахин оролдоно уу."
+      "changeRequestFailed": "Kilo pull request-ийг нээж чадсангүй. Түр хүлээгээд дахин оролдоно уу.",
+      "changeRequestReviewMemoryOff": "Шалгалтын санах ой идэвхгүй байгаа тул pull request нээгдсэнгүй. Үүнийг идэвхжүүлээд дахин оролдоно уу."
     },
     "manualReview": {
       "title": "Гараар эхлүүлэх шалгалт",

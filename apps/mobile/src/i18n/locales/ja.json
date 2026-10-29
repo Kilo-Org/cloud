@@ -1049,6 +1049,7 @@
       "changeRequestNoGitHubAccess": "このリポジトリにアクセスできるGitHub接続がありません。このリポジトリにアクセスできる状態でGitHubを再接続してから、もう一度お試しください。",
       "changeRequestMissingPermissions": "KiloのGitHub Appはこのリポジトリでプルリクエストを作成できません。リポジトリのオーナーがアプリにコンテンツとプルリクエストへの書き込み権限を付与してから、もう一度お試しください。",
       "changeRequestFailed": "Kiloはプルリクエストを作成できませんでした。しばらくしてからもう一度お試しください。",
+      "changeRequestReviewMemoryOff": "レビューメモリはオフのため、プルリクエストは作成されませんでした。有効にして、もう一度お試しください。",
       "off": "レビューメモリはオフです。",
       "on": "レビューメモリはオンです。",
       "offDescription": "有効にすると、Kiloがメンテナーの返信から学習し、REVIEW.mdに記載する指針を提案します。",

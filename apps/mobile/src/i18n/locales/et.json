@@ -1518,7 +1518,8 @@
       "changeRequestNotActionable": "Seda ettepanekut ei saa enam kinnitada. Sulge see ja värskenda loendit.",
       "changeRequestNoGitHubAccess": "Ühelgi GitHubi ühendusel ei ole sellele hoidlale juurdepääsu. Ühenda GitHub uuesti nii, et sellel on juurdepääs sellele hoidlale, ja proovi seejärel uuesti.",
       "changeRequestMissingPermissions": "Kilo GitHubi rakendus ei saa selles hoidlas tõmbetaotlusi avada. Hoidla omanik peab andma rakendusele kirjutamisõiguse sisule ja tõmbetaotlustele, seejärel proovi uuesti.",
-      "changeRequestFailed": "Kilol ei õnnestunud tõmbetaotlust avada. Proovi hetke pärast uuesti."
+      "changeRequestFailed": "Kilol ei õnnestunud tõmbetaotlust avada. Proovi hetke pärast uuesti.",
+      "changeRequestReviewMemoryOff": "Ülevaatuste mälu on välja lülitatud, seega tõmbetaotlust ei avatud. Lülita see sisse ja proovi uuesti."
     },
     "manualReview": {
       "title": "Käsitsi käivitatav ülevaatus",

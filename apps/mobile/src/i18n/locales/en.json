@@ -1584,7 +1584,8 @@
       "changeRequestNotActionable": "This proposal can no longer be approved. Close it and refresh the list.",
       "changeRequestNoGitHubAccess": "No GitHub connection has access to this repository. Reconnect GitHub with access to it, then try again.",
       "changeRequestMissingPermissions": "Kilo's GitHub App cannot open pull requests in this repository. A repository owner must give the app write access to contents and pull requests, then try again.",
-      "changeRequestFailed": "Kilo could not open the pull request. Try again in a moment."
+      "changeRequestFailed": "Kilo could not open the pull request. Try again in a moment.",
+      "changeRequestReviewMemoryOff": "Review memory is off, so no pull request was opened. Turn it on and try again."
     },
     "manualReview": {
       "title": "Manual review",

@@ -1518,7 +1518,8 @@
       "changeRequestNotActionable": "Det här förslaget kan inte längre godkännas. Stäng det och uppdatera listan.",
       "changeRequestNoGitHubAccess": "Ingen GitHub-anslutning har åtkomst till det här arkivet. Anslut GitHub igen med åtkomst till det och försök sedan igen.",
       "changeRequestMissingPermissions": "Kilos GitHub-app kan inte öppna pull requests i det här arkivet. En arkivägare måste ge appen skrivåtkomst till innehåll och pull requests och sedan försöka igen.",
-      "changeRequestFailed": "Kilo kunde inte öppna pull requesten. Försök igen om en stund."
+      "changeRequestFailed": "Kilo kunde inte öppna pull requesten. Försök igen om en stund.",
+      "changeRequestReviewMemoryOff": "Granskningsminnet är avstängt, så ingen pull request öppnades. Aktivera det och försök igen."
     },
     "manualReview": {
       "title": "Manuell granskning",

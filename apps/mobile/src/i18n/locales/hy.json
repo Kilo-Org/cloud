@@ -1518,7 +1518,8 @@
       "changeRequestNotActionable": "Այս առաջարկն այլևս հնարավոր չէ հաստատել։ Փակեք այն և թարմացրեք ցանկը։",
       "changeRequestNoGitHubAccess": "Այս պահոցին հասանելիություն չունի GitHub-ի ոչ մի կապ։ Վերամիացրեք GitHub-ը՝ դրան հասանելիություն տալով, ապա կրկին փորձեք։",
       "changeRequestMissingPermissions": "Kilo-ի GitHub հավելվածը չի կարող pull request-ներ բացել այս պահոցում։ Պահոցի սեփականատերը պետք է հավելվածին գրելու հասանելիություն տա բովանդակությանը և pull request-ներին, ապա նորից փորձի։",
-      "changeRequestFailed": "Kilo-ն չկարողացավ բացել pull request-ը։ Փորձեք նորից մի փոքր ուշ։"
+      "changeRequestFailed": "Kilo-ն չկարողացավ բացել pull request-ը։ Փորձեք նորից մի փոքր ուշ։",
+      "changeRequestReviewMemoryOff": "Ստուգման հիշողությունն անջատված է, ուստի pull request չբացվեց։ Միացրու այն և նորից փորձիր։"
     },
     "manualReview": {
       "title": "Ձեռքով ստուգում",

@@ -1518,7 +1518,8 @@
       "changeRequestNotActionable": "Hierdie voorstel kan nie meer goedgekeur word nie. Sluit dit en verfris die lys.",
       "changeRequestNoGitHubAccess": "Geen GitHub-verbinding het toegang tot hierdie bewaarplek nie. Herverbind GitHub met toegang daartoe en probeer dan weer.",
       "changeRequestMissingPermissions": "Kilo se GitHub-app kan nie pull requests in hierdie bewaarplek oopmaak nie. 'n Eienaar van die bewaarplek moet die app skryftoegang tot inhoud en pull requests gee en dan weer probeer.",
-      "changeRequestFailed": "Kilo kon nie die pull request oopmaak nie. Probeer weer oor 'n oomblik."
+      "changeRequestFailed": "Kilo kon nie die pull request oopmaak nie. Probeer weer oor 'n oomblik.",
+      "changeRequestReviewMemoryOff": "Die hersieningsgeheue is af, dus is geen pull request oopgemaak nie. Skakel dit aan en probeer weer."
     },
     "manualReview": {
       "title": "Handmatige hersiening",

@@ -1518,7 +1518,8 @@
       "changeRequestNotActionable": "Ez a javaslat már nem hagyható jóvá. Zárd be, és frissítsd a listát.",
       "changeRequestNoGitHubAccess": "Egyetlen GitHub-kapcsolatnak sincs hozzáférése ehhez a tárolóhoz. Kapcsold újra a GitHubot úgy, hogy hozzáférjen ehhez a tárolóhoz, majd próbáld újra.",
       "changeRequestMissingPermissions": "A Kilo GitHub-alkalmazása nem tud pull requesteket nyitni ebben a tárolóban. A tároló tulajdonosának írási hozzáférést kell adnia az alkalmazásnak a tartalmakhoz és a pull requestekhez, majd próbáld újra.",
-      "changeRequestFailed": "A Kilo nem tudta megnyitni a pull requestet. Próbáld újra egy pillanat múlva."
+      "changeRequestFailed": "A Kilo nem tudta megnyitni a pull requestet. Próbáld újra egy pillanat múlva.",
+      "changeRequestReviewMemoryOff": "A kódellenőrzési memória ki van kapcsolva, ezért nem nyitottunk meg pull requestet. Kapcsold be, és próbáld újra."
     },
     "manualReview": {
       "title": "Kézi kódellenőrzés",

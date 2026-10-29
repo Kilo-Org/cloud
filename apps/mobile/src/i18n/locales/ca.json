@@ -1540,7 +1540,8 @@
       "changeRequestNotActionable": "Aquesta proposta ja no es pot aprovar. Tanca-la i actualitza la llista.",
       "changeRequestNoGitHubAccess": "Cap connexió de GitHub té accés a aquest repositori. Torna a connectar GitHub amb accés a aquest repositori i torna-ho a provar.",
       "changeRequestMissingPermissions": "L'aplicació GitHub de Kilo no pot obrir pull requests en aquest repositori. Un propietari del repositori ha de donar a l'aplicació accés d'escriptura als continguts i a les pull requests, i després tornar-ho a provar.",
-      "changeRequestFailed": "Kilo no ha pogut obrir la pull request. Torna-ho a provar d'aquí a un moment."
+      "changeRequestFailed": "Kilo no ha pogut obrir la pull request. Torna-ho a provar d'aquí a un moment.",
+      "changeRequestReviewMemoryOff": "La memòria de revisió està desactivada, així que no s'ha obert cap pull request. Activa-la i torna-ho a provar."
     },
     "manualReview": {
       "title": "Revisió manual",

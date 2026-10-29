@@ -1518,7 +1518,8 @@
       "changeRequestNotActionable": "Tätä ehdotusta ei voi enää hyväksyä. Sulje se ja päivitä lista.",
       "changeRequestNoGitHubAccess": "Yhdelläkään GitHub-yhteydellä ei ole pääsyä tähän repositorioon. Yhdistä GitHub uudelleen niin, että sillä on pääsy siihen, ja yritä sitten uudelleen.",
       "changeRequestMissingPermissions": "Kilon GitHub-sovellus ei voi avata pull requesteja tässä repositoriossa. Repositorion omistajan on myönnettävä sovellukselle kirjoitusoikeus sisältöihin ja pull requesteihin, ja yritä sitten uudelleen.",
-      "changeRequestFailed": "Kilo ei voinut avata pull requestia. Yritä uudelleen hetken kuluttua."
+      "changeRequestFailed": "Kilo ei voinut avata pull requestia. Yritä uudelleen hetken kuluttua.",
+      "changeRequestReviewMemoryOff": "Katselmointimuisti on pois käytöstä, joten pull requestia ei avattu. Ota se käyttöön ja yritä uudelleen."
     },
     "manualReview": {
       "title": "Manuaalinen katselmointi",

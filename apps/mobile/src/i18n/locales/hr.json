@@ -1540,7 +1540,8 @@
       "changeRequestNotActionable": "Ovaj prijedlog više nije moguće odobriti. Zatvorite ga i osvježite popis.",
       "changeRequestNoGitHubAccess": "Nijedna veza s GitHubom nema pristup ovom repozitoriju. Ponovno povežite GitHub s pristupom ovom repozitoriju, zatim pokušajte ponovno.",
       "changeRequestMissingPermissions": "Kilo-ova GitHub aplikacija ne može otvoriti zahtjeve za povlačenje u ovom repozitoriju. Vlasnik repozitorija mora aplikaciji dati pravo pisanja za sadržaj i zahtjeve za povlačenje, zatim pokušajte ponovno.",
-      "changeRequestFailed": "Kilo nije mogao otvoriti zahtjev za povlačenje. Pokušajte ponovno za koji trenutak."
+      "changeRequestFailed": "Kilo nije mogao otvoriti zahtjev za povlačenje. Pokušajte ponovno za koji trenutak.",
+      "changeRequestReviewMemoryOff": "Memorija pregleda je isključena pa zahtjev za povlačenje nije otvoren. Uključi je i pokušajte ponovno."
     },
     "manualReview": {
       "title": "Ručni pregled",

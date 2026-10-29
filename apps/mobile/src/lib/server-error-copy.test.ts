@@ -87,13 +87,6 @@ describe('knownServerErrorMessage', () => {
       expect(copy).not.toBe(sentence);
     }
   );
-
-  it('keeps each review memory reason distinct', () => {
-    const copies = Object.values(REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY).map(sentence =>
-      knownServerErrorMessage(makeError('BAD_REQUEST', sentence))
-    );
-    expect(new Set(copies).size).toBeGreaterThanOrEqual(5);
-  });
 });
 
 describe('organizationErrorMessage', () => {

@@ -94,7 +94,7 @@ function copyKeyFor(message: string): string | undefined {
       return 'queryError.notFoundDescription';
     }
     case REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.review_memory_disabled: {
-      return 'codeReviewer.reviewMemory.off';
+      return 'codeReviewer.reviewMemory.changeRequestReviewMemoryOff';
     }
     case REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.change_request_in_progress: {
       return 'codeReviewer.reviewMemory.changeRequestInProgress';

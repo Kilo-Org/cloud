@@ -1049,6 +1049,7 @@
       "changeRequestNoGitHubAccess": "이 저장소에 접근할 수 있는 GitHub 연결이 없습니다. 이 저장소에 대한 접근 권한이 있는 GitHub를 다시 연결한 후 다시 시도하세요.",
       "changeRequestMissingPermissions": "Kilo의 GitHub 앱은 이 저장소에서 풀 리퀘스트를 만들 수 없습니다. 저장소 소유자가 앱에 콘텐츠와 풀 리퀘스트에 대한 쓰기 권한을 부여한 후 다시 시도해야 합니다.",
       "changeRequestFailed": "Kilo가 풀 리퀘스트를 만들지 못했습니다. 잠시 후 다시 시도하세요.",
+      "changeRequestReviewMemoryOff": "리뷰 메모리가 꺼져 있어 풀 리퀘스트가 열리지 않았습니다. 리뷰 메모리를 켜고 다시 시도하세요.",
       "off": "리뷰 메모리가 꺼져 있습니다.",
       "on": "리뷰 메모리가 켜져 있습니다.",
       "offDescription": "리뷰 메모리를 활성화하면 Kilo가 유지보수 담당자의 답변을 학습하여 REVIEW.md 지침을 제안합니다.",

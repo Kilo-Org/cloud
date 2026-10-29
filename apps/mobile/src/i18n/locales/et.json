@@ -3959,7 +3959,11 @@
       "pinnedToast": "Kinnitatud \"{{repo}}\"",
       "pinFailed": "Repot ei saanud kinnitada",
       "unboundToast": "Repo sidumata",
-      "unbindFailed": "Repot ei saanud lahti siduda"
+      "unbindFailed": "Repot ei saanud lahti siduda",
+      "repoValue": "Hoidla: {{name}}",
+      "profileValue": "Profiil: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Looge organisatsiooniprofiil keskkonnamuutujate, häälestuskäskude ja oskuste taaskasutamiseks seansside jooksul.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Organisatsiooni omanik või administraator saab organisatsiooniprofiili luua."
     },
     "variablesDeleteFailed": "Muutujat ei õnnestunud kustutada",
     "deleteVariable": "Kustuta muutuja {{key}}",

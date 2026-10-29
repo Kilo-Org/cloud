@@ -3959,7 +3959,11 @@
       "pinnedToast": "\"{{repo}}\"-n ainguratuta",
       "pinFailed": "Ezin izan da repo ainguratu",
       "unboundToast": "Repo lotu gabe",
-      "unbindFailed": "Ezin izan da biltegia deslotu"
+      "unbindFailed": "Ezin izan da biltegia deslotu",
+      "repoValue": "Biltegia: {{name}}",
+      "profileValue": "Profila: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Sortu erakunde-profil bat ingurune-aldagaiak, konfigurazio komandoak eta trebetasunak saioetan berrerabiltzeko.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Erakundearen jabe batek edo administratzaile batek sor dezake erakunde-profil bat."
     },
     "variablesDeleteFailed": "Ezin izan da aldagaia ezabatu",
     "deleteVariable": "Ezabatu aldagaia {{key}}",

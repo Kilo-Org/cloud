@@ -3959,7 +3959,11 @@
       "pinnedToast": "ปักหมุดไว้ที่ \"{{repo}}\"",
       "pinFailed": "ไม่สามารถปักหมุดคลังโค้ดได้",
       "unboundToast": "เลิกผูกคลังโค้ดแล้ว",
-      "unbindFailed": "ไม่สามารถเลิกผูกคลังโค้ดได้"
+      "unbindFailed": "ไม่สามารถเลิกผูกคลังโค้ดได้",
+      "repoValue": "คลังโค้ด: {{name}}",
+      "profileValue": "โปรไฟล์: {{name}}",
+      "pickerEmptyDescriptionOrganization": "สร้างโปรไฟล์องค์กรเพื่อนำตัวแปรสภาพแวดล้อม คำสั่งการตั้งค่า และทักษะมาใช้ซ้ำในเซสชันต่างๆ",
+      "pickerEmptyDescriptionOrganizationReadOnly": "เจ้าขององค์กรหรือผู้ดูแลระบบสามารถสร้างโปรไฟล์องค์กรได้"
     },
     "variablesDeleteFailed": "ไม่สามารถลบตัวแปรได้",
     "deleteVariable": "ลบตัวแปร {{key}}",

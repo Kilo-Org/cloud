@@ -3959,7 +3959,11 @@
       "pinnedToast": "Imebandikwa kwa \"{{repo}}\"",
       "pinFailed": "Haikuweza kubandika repo",
       "unboundToast": "Repo huru",
-      "unbindFailed": "Haikuweza kubandua repo"
+      "unbindFailed": "Haikuweza kubandua repo",
+      "repoValue": "Hazina: {{name}}",
+      "profileValue": "Wasifu: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Unda wasifu wa shirika ili kutumia tena vigezo vya mazingira, amri za usanidi na ujuzi katika vipindi vyote.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Mmiliki au msimamizi wa shirika anaweza kuunda wasifu wa shirika."
     },
     "variablesDeleteFailed": "Haikuweza kufuta kigeu",
     "deleteVariable": "Futa kigeu {{key}}",

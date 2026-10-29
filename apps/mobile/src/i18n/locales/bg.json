@@ -3959,7 +3959,11 @@
       "pinnedToast": "Фиксирано към „{{repo}}“",
       "pinFailed": "Репото не можа да бъде фиксирано",
       "unboundToast": "Репо без обвързване",
-      "unbindFailed": "Не можа да се откачи репото"
+      "unbindFailed": "Не можа да се откачи репото",
+      "repoValue": "Хранилище: {{name}}",
+      "profileValue": "Профил: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Създайте организационен профил за повторно използване на променливи на средата, команди за настройка и умения в сесиите.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Собственик или администратор на организация може да създава организационен профил."
     },
     "variablesDeleteFailed": "Променливата не можа да бъде изтрита",
     "deleteVariable": "Изтрийте променлива {{key}}",

@@ -3959,7 +3959,11 @@
       "pinnedToast": "Fäst till \"{{repo}}\"",
       "pinFailed": "Det gick inte att fästa kodarkivet",
       "unboundToast": "Kodarkivet har kopplats från",
-      "unbindFailed": "Det gick inte att koppla från kodarkivet"
+      "unbindFailed": "Det gick inte att koppla från kodarkivet",
+      "repoValue": "Kodarkiv: {{name}}",
+      "profileValue": "Profil: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Skapa en organisationsprofil för att återanvända miljövariabler, installationskommandon och färdigheter över sessioner.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "En organisationsägare eller administratör kan skapa en organisationsprofil."
     },
     "variablesDeleteFailed": "Det gick inte att ta bort variabeln",
     "deleteVariable": "Ta bort variabel {{key}}",

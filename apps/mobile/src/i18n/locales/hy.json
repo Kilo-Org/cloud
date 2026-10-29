@@ -3959,7 +3959,11 @@
       "pinnedToast": "Ամրացված է «{{repo}}»-ին",
       "pinFailed": "Չհաջողվեց ամրացնել ռեպո",
       "unboundToast": "Repo-ն չկապված",
-      "unbindFailed": "Չհաջողվեց անջատել ռեպո-ն"
+      "unbindFailed": "Չհաջողվեց անջատել ռեպո-ն",
+      "repoValue": "Պահեստը: {{name}}",
+      "profileValue": "Պրոֆիլը: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Ստեղծեք կազմակերպության պրոֆիլ՝ շրջակա միջավայրի փոփոխականները, կարգաբերման հրամանները և հմտությունները սեսիաներում կրկին օգտագործելու համար:",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Կազմակերպության սեփականատերը կամ ադմինիստրատորը կարող է ստեղծել կազմակերպության պրոֆիլ:"
     },
     "variablesDeleteFailed": "Չհաջողվեց ջնջել փոփոխականը",
     "deleteVariable": "Ջնջել {{key}} փոփոխականը",

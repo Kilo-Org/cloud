@@ -3959,7 +3959,11 @@
       "pinnedToast": "\"{{repo}}\" 'ਤੇ ਪਿੰਨ ਕੀਤਾ ਗਿਆ",
       "pinFailed": "ਰੈਪੋ ਨੂੰ ਪਿੰਨ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
       "unboundToast": "ਰੇਪੋ ਅਨਬਾਉਂਡ",
-      "unbindFailed": "ਰੈਪੋ ਨੂੰ ਅਨਬਾਈਂਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ"
+      "unbindFailed": "ਰੈਪੋ ਨੂੰ ਅਨਬਾਈਂਡ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
+      "repoValue": "ਰਿਪੋਜ਼ਟਰੀ: {{name}}",
+      "profileValue": "ਪ੍ਰੋਫਾਈਲ: {{name}}",
+      "pickerEmptyDescriptionOrganization": "ਸਾਰੇ ਸੈਸ਼ਨਾਂ ਵਿੱਚ ਵਾਤਾਵਰਣ ਵੇਰੀਏਬਲ, ਸੈੱਟਅੱਪ ਕਮਾਂਡਾਂ ਅਤੇ ਹੁਨਰਾਂ ਦੀ ਮੁੜ ਵਰਤੋਂ ਕਰਨ ਲਈ ਇੱਕ ਸੰਗਠਨ ਪ੍ਰੋਫਾਈਲ ਬਣਾਓ।",
+      "pickerEmptyDescriptionOrganizationReadOnly": "ਸੰਗਠਨ ਦਾ ਮਾਲਕ ਜਾਂ ਪ੍ਰਬੰਧਕ ਇੱਕ ਸੰਗਠਨ ਪ੍ਰੋਫਾਈਲ ਬਣਾ ਸਕਦਾ ਹੈ।"
     },
     "variablesDeleteFailed": "ਵੇਰੀਏਬਲ ਨੂੰ ਮਿਟਾਇਆ ਨਹੀਂ ਜਾ ਸਕਿਆ",
     "deleteVariable": "ਵੇਰੀਏਬਲ {{key}} ਮਿਟਾਓ",

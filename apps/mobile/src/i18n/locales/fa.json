@@ -3959,7 +3959,11 @@
       "pinnedToast": "به \"{{repo}}\" پین شد",
       "pinFailed": "Repo پین نشد",
       "unboundToast": "Repo بدون محدودیت",
-      "unbindFailed": "Repo لغو پیوند نشد"
+      "unbindFailed": "Repo لغو پیوند نشد",
+      "repoValue": "مخزن: {{name}}",
+      "profileValue": "پروفایل: {{name}}",
+      "pickerEmptyDescriptionOrganization": "یک نمایه سازمانی برای استفاده مجدد از متغیرهای محیطی، دستورات راه‌اندازی و مهارت‌ها در جلسات ایجاد کنید.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "مالک یا مدیر سازمان می‌تواند یک نمایه سازمانی ایجاد کند."
     },
     "variablesDeleteFailed": "متغیر حذف نشد",
     "deleteVariable": "متغیر {{key}} را حذف کنید",

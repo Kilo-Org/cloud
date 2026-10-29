@@ -4009,7 +4009,11 @@
       "pinnedToast": "Zakačeno za \"{{repo}}\"",
       "pinFailed": "Nije moguće zakačiti repo",
       "unboundToast": "Repo je odvezan",
-      "unbindFailed": "Nije moguće opozvati vezivanje repo-a"
+      "unbindFailed": "Nije moguće opozvati vezivanje repo-a",
+      "repoValue": "Spremište: {{name}}",
+      "profileValue": "Profil: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Napravite profil organizacije da biste ponovo koristili promenljive okruženja, komande za podešavanje i veštine u svim sesijama.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Vlasnik ili administrator organizacije može da napravi profil organizacije."
     },
     "variablesDeleteFailed": "Nije moguće izbrisati promenljivu",
     "deleteVariable": "Obriši promenljivu {{key}}",

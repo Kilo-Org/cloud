@@ -4159,7 +4159,11 @@
       "pinnedToast": "تم التثبيت في \"{{repo}}\"",
       "pinFailed": "تعذر تثبيت الريبو",
       "unboundToast": "الريبو غير منضم",
-      "unbindFailed": "تعذر إلغاء ربط الريبو"
+      "unbindFailed": "تعذر إلغاء ربط الريبو",
+      "repoValue": "المستودع: {{name}}",
+      "profileValue": "الملف الشخصي: {{name}}",
+      "pickerEmptyDescriptionOrganization": "قم بإنشاء ملف شخصي للمؤسسة لإعادة استخدام متغيرات البيئة وأوامر الإعداد والمهارات عبر الجلسات.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "يمكن لمالك المؤسسة أو أحد مسؤوليها إنشاء ملف شخصي للمؤسسة."
     },
     "variablesDeleteFailed": "تعذر حذف المتغير",
     "deleteVariable": "احذف المتغير {{key}}",

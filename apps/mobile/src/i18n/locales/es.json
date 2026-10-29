@@ -4009,7 +4009,11 @@
       "pinnedToast": "Fijado en \"{{repo}}\"",
       "pinFailed": "No se pudo fijar el repositorio",
       "unboundToast": "Repo sin consolidar",
-      "unbindFailed": "No se pudo desvincular el repositorio"
+      "unbindFailed": "No se pudo desvincular el repositorio",
+      "repoValue": "Repositorio: {{name}}",
+      "profileValue": "Perfil: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Cree un perfil de organización para reutilizar variables de entorno, comandos de configuración y habilidades en todas las sesiones.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Un propietario o administrador de la organización puede crear un perfil de organización."
     },
     "variablesDeleteFailed": "No se pudo eliminar la variable",
     "deleteVariable": "Eliminar la variable {{key}}",

@@ -3959,7 +3959,11 @@
       "pinnedToast": "Закачено на „{{repo}}“",
       "pinFailed": "Не можеше да се закачи репо",
       "unboundToast": "Репото не е поврзано",
-      "unbindFailed": "Не можеше да се одврзе репото"
+      "unbindFailed": "Не можеше да се одврзе репото",
+      "repoValue": "Складиште: {{name}}",
+      "profileValue": "Профил: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Создадете профил на организација за повторна употреба на променливи на околината, команди за поставување и вештини низ сесиите.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Сопственик или администратор на организацијата може да создаде профил на организација."
     },
     "variablesDeleteFailed": "Не може да се избрише променливата",
     "deleteVariable": "Избриши променлива {{key}}",

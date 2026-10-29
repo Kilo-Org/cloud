@@ -3959,7 +3959,11 @@
       "pinnedToast": "Festet til «{{repo}}»",
       "pinFailed": "Kunne ikke feste repo",
       "unboundToast": "Repo ubundet",
-      "unbindFailed": "Kunne ikke løsne repoen"
+      "unbindFailed": "Kunne ikke løsne repoen",
+      "repoValue": "Depot: {{name}}",
+      "profileValue": "Profil: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Opprett en organisasjonsprofil for å gjenbruke miljøvariabler, oppsettkommandoer og ferdigheter på tvers av økter.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "En organisasjonseier eller administrator kan opprette en organisasjonsprofil."
     },
     "variablesDeleteFailed": "Kunne ikke slette variabelen",
     "deleteVariable": "Slett variabel {{key}}",

@@ -3959,7 +3959,11 @@
       "pinnedToast": "Vastgezet op '{{repo}}'",
       "pinFailed": "Kan de opslagplaats niet vastzetten",
       "unboundToast": "Repo niet geconsolideerd",
-      "unbindFailed": "Kan repository niet ongedaan maken"
+      "unbindFailed": "Kan repository niet ongedaan maken",
+      "repoValue": "Opslagplaats: {{name}}",
+      "profileValue": "Profiel: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Maak een organisatieprofiel aan om omgevingsvariabelen, installatieopdrachten en vaardigheden tijdens sessies opnieuw te gebruiken.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Een organisatie-eigenaar of beheerder kan een organisatieprofiel aanmaken."
     },
     "variablesDeleteFailed": "Kan variabele niet verwijderen",
     "deleteVariable": "Variabele {{key}} verwijderen",

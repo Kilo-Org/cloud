@@ -3959,7 +3959,11 @@
       "pinnedToast": "\"{{repo}}\" वर पिन केले",
       "pinFailed": "रेपो पिन करू शकलो नाही",
       "unboundToast": "रेपो अनबाउंड",
-      "unbindFailed": "रेपो अनबाइंड करू शकलो नाही"
+      "unbindFailed": "रेपो अनबाइंड करू शकलो नाही",
+      "repoValue": "भांडार: {{name}}",
+      "profileValue": "प्रोफाइल: {{name}}",
+      "pickerEmptyDescriptionOrganization": "संपूर्ण सत्रांमध्ये पर्यावरण व्हेरिएबल्स, सेटअप कमांड आणि कौशल्ये पुन्हा वापरण्यासाठी संस्था प्रोफाइल तयार करा.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "संस्था मालक किंवा प्रशासक संस्था प्रोफाइल तयार करू शकतो."
     },
     "variablesDeleteFailed": "व्हेरिएबल हटवू शकलो नाही",
     "deleteVariable": "व्हेरिएबल {{key}} हटवा",

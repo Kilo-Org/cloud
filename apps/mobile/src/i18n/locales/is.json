@@ -3959,7 +3959,11 @@
       "pinnedToast": "Fest við „{{repo}}“",
       "pinFailed": "Ekki tókst að festa geymslu",
       "unboundToast": "Geymsla óbundin",
-      "unbindFailed": "Ekki tókst að aftengja geymslu"
+      "unbindFailed": "Ekki tókst að aftengja geymslu",
+      "repoValue": "Geymsla: {{name}}",
+      "profileValue": "Prófíl: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Búðu til stofnunarprófíl til að endurnýta umhverfisbreytur, uppsetningarskipanir og færni yfir lotur.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Eigandi stofnunar eða stjórnandi getur búið til stofnunarprófíl."
     },
     "variablesDeleteFailed": "Ekki tókst að eyða breytunni",
     "deleteVariable": "Eyða breytu {{key}}",

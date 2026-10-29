@@ -60,9 +60,22 @@ function hasUsableMessage(error: unknown): boolean {
 
 export function NewProfileScreen({
   stack,
+  initialOwner,
+  returnToCaller = false,
 }: Readonly<{
   /** The Stack this screen is mounted in; the created profile opens in it. */
   stack: ProfileManagementStack;
+  /**
+   * The owner the form starts on. A picker that lists organization profiles
+   * opens the form on Organization so the profile it creates can be selected
+   * there; the user can still switch it.
+   */
+  initialOwner?: ProfileOwnerChoice;
+  /**
+   * Hand the form back to the caller after a create, instead of opening the new
+   * profile: a caller collecting a profile keeps its own state and place.
+   */
+  returnToCaller?: boolean;
 }>) {
   const router = useRouter();
   const { t } = useTranslation();
@@ -74,16 +87,20 @@ export function NewProfileScreen({
   const nameRef = useRef('');
   const nameValidationStarted = useRef(false);
   const descriptionRef = useRef('');
+  // `null` until the user picks: the route's request, or Personal, applies
+  // while the boundary is the one being edited. A selection is stamped with its
+  // organization so an organization switch drops a choice made for another one.
   const [ownerSelection, setOwnerSelection] = useState<{
     organizationId: string | null;
     owner: ProfileOwnerChoice;
-  }>({ organizationId: null, owner: 'personal' });
+  } | null>(null);
   const canOwnOrganization =
     !isResolving && hasOrganizationContext(organizationId) && canManageOrganization(role);
-  const owner: ProfileOwnerChoice =
-    canOwnOrganization && ownerSelection.organizationId === organizationId
-      ? ownerSelection.owner
-      : 'personal';
+  const pickedOwner =
+    ownerSelection?.organizationId === organizationId ? ownerSelection.owner : null;
+  const owner: ProfileOwnerChoice = canOwnOrganization
+    ? (pickedOwner ?? initialOwner ?? 'personal')
+    : 'personal';
   const selectOwner = (next: ProfileOwnerChoice) => {
     setOwnerSelection({ organizationId: organizationId ?? null, owner: next });
   };
@@ -113,6 +130,12 @@ export function NewProfileScreen({
         ...(ownerOrganizationId === undefined ? {} : { organizationId: ownerOrganizationId }),
       });
       toast.success(t('profiles.createdToast', { name }));
+      // The caller is collecting a profile to select, so it keeps its form and
+      // the user's place in it; only a direct create opens the new profile.
+      if (returnToCaller && router.canGoBack()) {
+        router.back();
+        return;
+      }
       router.replace(getProfileOverviewPath(created.id, ownerOrganizationId, stack));
     } catch (error) {
       if (!hasUsableMessage(error)) {

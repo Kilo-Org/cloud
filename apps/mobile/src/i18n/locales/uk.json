@@ -4059,7 +4059,11 @@
       "pinnedToast": "Закріплено на \"{{repo}}\"",
       "pinFailed": "Не вдалося закріпити репо",
       "unboundToast": "Репо без зв'язку",
-      "unbindFailed": "Не вдалося скасувати прив’язку репо"
+      "unbindFailed": "Не вдалося скасувати прив’язку репо",
+      "repoValue": "Сховище: {{name}}",
+      "profileValue": "Профіль: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Створіть профіль організації, щоб повторно використовувати змінні середовища, команди налаштування та навички під час сеансів.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Власник або адміністратор організації може створити профіль організації."
     },
     "variablesDeleteFailed": "Не вдалося видалити змінну",
     "deleteVariable": "Видалити змінну {{key}}",

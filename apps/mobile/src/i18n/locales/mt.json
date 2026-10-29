@@ -4109,7 +4109,11 @@
       "pinnedToast": "Imqabbad ma' \"{{repo}}\"",
       "pinFailed": "Repo ma setgħetx",
       "unboundToast": "Repo mhux marbut",
-      "unbindFailed": "Ma setgħetx tħoll repo"
+      "unbindFailed": "Ma setgħetx tħoll repo",
+      "repoValue": "Repożitorju: {{name}}",
+      "profileValue": "Profil: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Oħloq profil ta' organizzazzjoni biex tuża mill-ġdid il-varjabbli ambjentali, il-kmandi tas-setup, u l-ħiliet matul is-sessjonijiet.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Sid jew amministratur ta' organizzazzjoni jista' joħloq profil ta' organizzazzjoni."
     },
     "variablesDeleteFailed": "Ma setax jħassar il-varjabbli",
     "deleteVariable": "Ħassar il-varjabbli {{key}}",

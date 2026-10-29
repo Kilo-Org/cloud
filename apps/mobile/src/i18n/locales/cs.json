@@ -4059,7 +4059,11 @@
       "pinnedToast": "Připnuto k „{{repo}}“",
       "pinFailed": "Repo se nepodařilo připnout",
       "unboundToast": "Repo odpojeno",
-      "unbindFailed": "Repo se nepodařilo zrušit"
+      "unbindFailed": "Repo se nepodařilo zrušit",
+      "repoValue": "Úložiště: {{name}}",
+      "profileValue": "Profil: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Vytvořte profil organizace pro opětovné použití proměnných prostředí, instalačních příkazů a dovedností napříč relacemi.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Profil organizace může vytvořit vlastník organizace nebo správce."
     },
     "variablesDeleteFailed": "Proměnnou se nepodařilo smazat",
     "deleteVariable": "Smazat proměnnou {{key}}",

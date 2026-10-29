@@ -3959,7 +3959,11 @@
       "pinnedToast": "\"{{repo}}\" এ পিন করা হয়েছে",
       "pinFailed": "রেপো পিন করা যায়নি",
       "unboundToast": "রেপো আনবাউন্ড",
-      "unbindFailed": "রেপো আনবাইন্ড করা যায়নি"
+      "unbindFailed": "রেপো আনবাইন্ড করা যায়নি",
+      "repoValue": "সংগ্রহস্থল: {{name}}",
+      "profileValue": "প্রোফাইল: {{name}}",
+      "pickerEmptyDescriptionOrganization": "সেশন জুড়ে পরিবেশ ভেরিয়েবল, সেটআপ কমান্ড এবং দক্ষতা পুনরায় ব্যবহার করার জন্য একটি সংগঠন প্রোফাইল তৈরি করুন।",
+      "pickerEmptyDescriptionOrganizationReadOnly": "একজন সংগঠন মালিক বা অ্যাডমিন সংগঠন প্রোফাইল তৈরি করতে পারেন।"
     },
     "variablesDeleteFailed": "ভেরিয়েবল মুছে ফেলা যায়নি",
     "deleteVariable": "ভেরিয়েবল {{key}} মুছুন",

@@ -3959,7 +3959,11 @@
       "pinnedToast": "پێن کراوە بۆ \"{{repo}}\"",
       "pinFailed": "نەتوانرا ڕیپۆ پین بکرێت",
       "unboundToast": "ڕیپۆ بێ بەستنەوە",
-      "unbindFailed": "نەتوانرا ڕیپۆ بێ بەستنەوە بکرێت"
+      "unbindFailed": "نەتوانرا ڕیپۆ بێ بەستنەوە بکرێت",
+      "repoValue": "کۆگا: {{name}}",
+      "profileValue": "پرۆفایل: {{name}}",
+      "pickerEmptyDescriptionOrganization": "پرۆفایلی ڕێکخراو دروست بکە بۆ دووبارە بەکارهێنانەوەی گۆڕاوە ژینگەییەکان، فەرمانەکانی ڕێکخستن و لێهاتووییەکان لە سەرانسەری دانیشتنەکاندا.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "خاوەن یان بەڕێوەبەری ڕێکخراو دەتوانێت پرۆفایلی ڕێکخراو دروست بکات."
     },
     "variablesDeleteFailed": "نەتوانرا گۆڕاوەکە بسڕێتەوە",
     "deleteVariable": "گۆڕاو {{key}} بسڕەوە",

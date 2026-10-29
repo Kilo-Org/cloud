@@ -3959,7 +3959,11 @@
       "pinnedToast": "\"{{repo}}\" üzərinə bərkidildi",
       "pinFailed": "Repo bağlamaq mümkün olmadı",
       "unboundToast": "Repo bağlanmamışdır",
-      "unbindFailed": "Repo bağlamaq mümkün olmadı"
+      "unbindFailed": "Repo bağlamaq mümkün olmadı",
+      "repoValue": "Repozitoru: {{name}}",
+      "profileValue": "Profil: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Mühit dəyişənlərindən, quraşdırma əmrlərindən və sessiyalar arasında bacarıqlardan təkrar istifadə etmək üçün təşkilat profili yaradın.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Təşkilat sahibi və ya administratoru təşkilat profili yarada bilər."
     },
     "variablesDeleteFailed": "Dəyişəni silmək mümkün olmadı",
     "deleteVariable": "{{key}} dəyişənini sil",

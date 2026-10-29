@@ -4009,7 +4009,11 @@
       "pinnedToast": "Fixat la „{{repo}}”",
       "pinFailed": "Nu s-a putut fixa repo",
       "unboundToast": "Repo nelegat",
-      "unbindFailed": "Nu s-a putut dezlega repo"
+      "unbindFailed": "Nu s-a putut dezlega repo",
+      "repoValue": "Depozitul: {{name}}",
+      "profileValue": "Profilul: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Creați un profil de organizație pentru a reutiliza variabilele de mediu, comenzile de configurare și abilitățile în sesiuni.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Un proprietar sau un administrator al organizației poate crea un profil de organizație."
     },
     "variablesDeleteFailed": "Variabila nu a putut fi ștearsă",
     "deleteVariable": "Șterge variabila {{key}}",

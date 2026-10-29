@@ -3959,7 +3959,11 @@
       "pinnedToast": "\"{{repo}}\" இல் பின் செய்யப்பட்டது",
       "pinFailed": "ரெப்போவை பின் செய்ய முடியவில்லை",
       "unboundToast": "ரெப்போ கட்டுப்படாதது",
-      "unbindFailed": "ரெப்போவை அவிழ்க்க முடியவில்லை"
+      "unbindFailed": "ரெப்போவை அவிழ்க்க முடியவில்லை",
+      "repoValue": "களஞ்சியம்: {{name}}",
+      "profileValue": "சுயவிவரம்: {{name}}",
+      "pickerEmptyDescriptionOrganization": "சூழல் மாறிகள், அமைவு கட்டளைகள் மற்றும் அமர்வுகள் முழுவதும் திறன்களை மீண்டும் பயன்படுத்த அமைப்பு சுயவிவரத்தை உருவாக்கவும்.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "அமைப்பு உரிமையாளர் அல்லது நிர்வாகி அமைப்பு சுயவிவரத்தை உருவாக்க முடியும்."
     },
     "variablesDeleteFailed": "மாறியை நீக்க முடியவில்லை",
     "deleteVariable": "{{key}} மாறியை நீக்கவும்",

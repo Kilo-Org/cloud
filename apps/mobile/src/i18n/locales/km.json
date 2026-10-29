@@ -3959,7 +3959,11 @@
       "pinnedToast": "បានខ្ទាស់ទៅ \"{{repo}}\"។",
       "pinFailed": "មិនអាចខ្ទាស់ឃ្លាំងកូដបានទេ។",
       "unboundToast": "បានផ្ដាច់ចំណងឃ្លាំងកូដ។",
-      "unbindFailed": "មិនអាចផ្ដាច់ចំណងឃ្លាំងកូដបានទេ។"
+      "unbindFailed": "មិនអាចផ្ដាច់ចំណងឃ្លាំងកូដបានទេ។",
+      "repoValue": "ឃ្លាំងកូដ: {{name}}",
+      "profileValue": "កម្រងព័ត៌មាន: {{name}}",
+      "pickerEmptyDescriptionOrganization": "បង្កើតកម្រងព័ត៌មានអង្គភាពមួយ ដើម្បីប្រើអថេរបរិស្ថាន ពាក្យបញ្ជាដំឡើង និងជំនាញឡើងវិញនៅទូទាំងវគ្គ។",
+      "pickerEmptyDescriptionOrganizationReadOnly": "ម្ចាស់អង្គភាព ឬអ្នកគ្រប់គ្រងអង្គភាពអាចបង្កើតកម្រងព័ត៌មានអង្គភាពបាន។"
     },
     "variablesDeleteFailed": "មិនអាចលុបអថេរបានទេ។",
     "deleteVariable": "លុបអថេរ {{key}}",

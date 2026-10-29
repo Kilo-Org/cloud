@@ -1,6 +1,8 @@
 import { PERSONAL_SECURITY_SCOPE } from '@kilocode/app-shared/security-agent';
 import { type Href } from 'expo-router';
 
+import { type ProfileOwnerChoice } from '@/components/profiles/profile-owner-model';
+
 type ProfileOrganization = { organizationId: string };
 
 /**
@@ -79,9 +81,32 @@ export function getRepoBindingsPath(
   return `${PROFILE_ROOTS[stack]}/repo-bindings${profileContextQuery(organizationId)}` as Href;
 }
 
+/** What the create screen does after it saves, besides opening the new profile. */
+export type NewProfileReturn = 'back';
+
+/** The returns the create route accepts: `back` hands the form back to its caller. */
+export const NEW_PROFILE_RETURNS: readonly NewProfileReturn[] = ['back'];
+
+/** The owner and the return a caller of the create screen asks for. */
+export type NewProfilePathOptions = {
+  /** The owner the form starts on. The user can still switch it. */
+  owner?: ProfileOwnerChoice;
+  /** `back` returns to the caller instead of opening the new profile. */
+  returnTo?: NewProfileReturn;
+};
+
 /** The profile editor's create screen. */
-export function getNewProfilePath(stack: ProfileManagementStack = 'profileTab'): Href {
-  return `${PROFILE_ROOTS[stack]}/new` as Href;
+export function getNewProfilePath(
+  stack: ProfileManagementStack = 'profileTab',
+  options: NewProfilePathOptions = {}
+): Href {
+  const query = [
+    options.owner === undefined ? '' : `owner=${options.owner}`,
+    options.returnTo === undefined ? '' : `returnTo=${options.returnTo}`,
+  ]
+    .filter(part => part.length > 0)
+    .join('&');
+  return `${PROFILE_ROOTS[stack]}/new${query.length > 0 ? `?${query}` : ''}` as Href;
 }
 
 /** The profile editor's Overview tab (the profile's own route). */

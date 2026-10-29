@@ -3959,7 +3959,11 @@
       "pinnedToast": "Kuphinwe kokuthi \"{{repo}}\"",
       "pinFailed": "Ayikwazanga ukuphina i-repo",
       "unboundToast": "I-Repo ikhululiwe",
-      "unbindFailed": "Ayikwazanga ukukhulula i-repo"
+      "unbindFailed": "Ayikwazanga ukukhulula i-repo",
+      "repoValue": "Inqolobane: {{name}}",
+      "profileValue": "Iphrofayela: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Dala iphrofayela yenhlangano ukuze usebenzise kabusha okuguquguqukayo kwendawo, imiyalo yokusetha, namakhono kuzo zonke izikhathi.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Umnikazi wenhlangano noma umlawuli angadala iphrofayela yenhlangano."
     },
     "variablesDeleteFailed": "Ayikwazanga ukususa okuguquguqukayo",
     "deleteVariable": "Susa okuguquguqukayo {{key}}",

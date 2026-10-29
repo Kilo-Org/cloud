@@ -3959,7 +3959,11 @@
       "pinnedToast": "Đã ghim vào \"{{repo}}\"",
       "pinFailed": "Không thể ghim kho lưu trữ",
       "unboundToast": "Repo không bị ràng buộc",
-      "unbindFailed": "Không thể hủy liên kết repo"
+      "unbindFailed": "Không thể hủy liên kết repo",
+      "repoValue": "Kho lưu trữ: {{name}}",
+      "profileValue": "Hồ sơ: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Tạo hồ sơ tổ chức để sử dụng lại các biến môi trường, lệnh thiết lập và kỹ năng trong các phiên.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Chủ sở hữu hoặc quản trị viên của tổ chức có thể tạo hồ sơ tổ chức."
     },
     "variablesDeleteFailed": "Không thể xóa biến",
     "deleteVariable": "Xóa biến {{key}}",

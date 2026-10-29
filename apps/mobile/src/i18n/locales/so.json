@@ -3959,7 +3959,11 @@
       "pinnedToast": "Ku dheggan \"{{repo}}\"",
       "pinFailed": "Ma soo saari karin repo",
       "unboundToast": "Dib u fur fur",
-      "unbindFailed": "Waa la furi waayay repo"
+      "unbindFailed": "Waa la furi waayay repo",
+      "repoValue": "Kaydka: {{name}}",
+      "profileValue": "Astaanta: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Abuur profile urur si dib loogu isticmaalo doorsoomayaasha deegaanka, amarrada dejinta, iyo xirfadaha kalfadhiyada oo dhan.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Milkiilaha ururka ama maamulaha ayaa abuuri kara profile urur."
     },
     "variablesDeleteFailed": "Way tirtiran kari wayday doorsoomaha",
     "deleteVariable": "Tirtir doorsoomaha {{key}}",

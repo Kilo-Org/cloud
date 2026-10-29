@@ -3959,7 +3959,11 @@
       "pinnedToast": "\"{{repo}}\" ಗೆ ಪಿನ್ ಮಾಡಲಾಗಿದೆ",
       "pinFailed": "ರೆಪೋವನ್ನು ಪಿನ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
       "unboundToast": "ರೆಪೊ ಅನ್ಬೌಂಡ್",
-      "unbindFailed": "ರೆಪೊವನ್ನು ಅನ್‌ಬೈಂಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ"
+      "unbindFailed": "ರೆಪೊವನ್ನು ಅನ್‌ಬೈಂಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
+      "repoValue": "ರೆಪೊಸಿಟರಿ: {{name}}",
+      "profileValue": "ಪ್ರೊಫೈಲ್: {{name}}",
+      "pickerEmptyDescriptionOrganization": "ಸೆಷನ್‍ಗಳಾದ್ಯಂತ ಪರಿಸರ ವೇರಿಯಬಲ್‍ಗಳು, ಸೆಟಪ್ ಕಮಾಂಡ್‍ಗಳು ಮತ್ತು ಕೌಶಲ್ಯಗಳನ್ನು ಮರುಬಳಕೆ ಮಾಡಲು ಸಂಸ್ಥೆ ಪ್ರೊಫೈಲ್ ಅನ್ನು ರಚಿಸಿ.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "ಸಂಸ್ಥೆ ಮಾಲೀಕರು ಅಥವಾ ನಿರ್ವಾಹಕರು ಸಂಸ್ಥೆ ಪ್ರೊಫೈಲ್ ಅನ್ನು ರಚಿಸಬಹುದು."
     },
     "variablesDeleteFailed": "ವೇರಿಯಬಲ್ ಅನ್ನು ಅಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
     "deleteVariable": "ವೇರಿಯಬಲ್ {{key}} ಅನ್ನು ಅಳಿಸಿ",

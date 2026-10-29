@@ -3959,7 +3959,11 @@
       "pinnedToast": "\"{{repo}}\" ته پنډ شوی",
       "pinFailed": "ریپو ونشو کړای",
       "unboundToast": "ریپو بې حده",
-      "unbindFailed": "د ریپو بندول نشو کولی"
+      "unbindFailed": "د ریپو بندول نشو کولی",
+      "repoValue": "ذخیره: {{name}}",
+      "profileValue": "پروفایل: {{name}}",
+      "pickerEmptyDescriptionOrganization": "د چاپیریال متغیرونو ، تنظیم کولو امرونو ، او په غونډو کې مهارتونه د بیا کارولو لپاره د سازمان پروفایل رامینځته کړئ.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "د سازمان خاوند یا مدیر کولی شي د سازمان پروفایل رامینځته کړي."
     },
     "variablesDeleteFailed": "متغیر ړنګول نشو کړای",
     "deleteVariable": "د {{key}} متغیر ړنګ کړئ",

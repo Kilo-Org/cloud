@@ -3959,7 +3959,11 @@
       "pinnedToast": "\"{{repo}}\" руу бэхэлсэн",
       "pinFailed": "Репо-г тогтоож чадсангүй",
       "unboundToast": "Репо хязгааргүй",
-      "unbindFailed": "Репо-г салгаж чадсангүй"
+      "unbindFailed": "Репо-г салгаж чадсангүй",
+      "repoValue": "Хадгалах газар: {{name}}",
+      "profileValue": "Профайл: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Хүрээлэн буй орчны хувьсагч, тохируулах команд, ур чадварыг сешнүүдэд дахин ашиглахын тулд байгууллагын профайл үүсгээрэй.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Байгууллагын эзэмшигч эсвэл админ байгууллагын профайл үүсгэх боломжтой."
     },
     "variablesDeleteFailed": "Хувьсагчийг устгаж чадсангүй",
     "deleteVariable": "{{key}} хувьсагчийг устгах",

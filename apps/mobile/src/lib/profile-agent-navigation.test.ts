@@ -145,4 +145,13 @@ describe('Profile management paths in the app stack', () => {
       '/(app)/(tabs)/(3_profile)/profiles/repo-bindings?organizationId=org-1'
     );
   });
+
+  it('carries the owner and the return a picker asks of the create screen', () => {
+    expect(getNewProfilePath('app', { owner: 'organization', returnTo: 'back' })).toBe(
+      '/(app)/profile-management/new?owner=organization&returnTo=back'
+    );
+    expect(getNewProfilePath('profileTab', { owner: 'personal' })).toBe(
+      '/(app)/(tabs)/(3_profile)/profiles/new?owner=personal'
+    );
+  });
 });

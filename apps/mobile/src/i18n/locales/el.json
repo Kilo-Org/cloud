@@ -3959,7 +3959,11 @@
       "pinnedToast": "Καρφιτσώθηκε στο \"{{repo}}\"",
       "pinFailed": "Δεν ήταν δυνατό να καρφιτσωθεί το repo",
       "unboundToast": "Το repo αποδεσμεύτηκε",
-      "unbindFailed": "Δεν ήταν δυνατή η αποδέσμευση του repo"
+      "unbindFailed": "Δεν ήταν δυνατή η αποδέσμευση του repo",
+      "repoValue": "Αποθετήριο: {{name}}",
+      "profileValue": "Προφίλ: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Δημιουργήστε ένα προφίλ οργανισμού για να επαναχρησιμοποιήσετε μεταβλητές περιβάλλοντος, εντολές ρύθμισης και δεξιότητες στις συνεδρίες.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Ο κάτοχος ή ο διαχειριστής ενός οργανισμού μπορεί να δημιουργήσει ένα προφίλ οργανισμού."
     },
     "variablesDeleteFailed": "Δεν ήταν δυνατή η διαγραφή της μεταβλητής",
     "deleteVariable": "Διαγραφή μεταβλητής {{key}}",

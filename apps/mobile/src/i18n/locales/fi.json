@@ -3868,6 +3868,7 @@
       "headersHint": "Arvot, jotka näkyvät muodossa ••••, säilyttävät tallennetun salaisuutensa; korvaa arvo vaihtaaksesi sen. URL-osoitteen muuttaminen edellyttää kaikkien arvojen antamista uudelleen",
       "nameRequired": "Anna palvelimen nimi",
       "nameInvalid": "Nimessä voi käyttää vain ASCII-kirjaimia, numeroita, alaviivoja ja väliviivoja, enintään 100 merkkiä",
+      "nameConflict": "Palvelin tällä nimellä on jo olemassa",
       "commandRequired": "Anna komento",
       "commandTooLong": "Käytä enintään 50 argumenttia, kukin 500 merkkiä",
       "urlRequired": "Anna URL-osoite",

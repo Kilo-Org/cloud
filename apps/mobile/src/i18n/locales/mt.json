@@ -4021,6 +4021,7 @@
       "headersHint": "Il-valuri murija bħala •••• iżommu s-sigriet maħżun tagħhom; sostitwixxi valur biex iddawru. Il-bdil tal-URL jeħtieġ kull valur mill-ġdid",
       "nameRequired": "Daħħal isem server",
       "nameInvalid": "Isem jista' juża biss ittri ASCII, numri, underscores, u sings, sa 100 karattru",
+      "nameConflict": "Diġà jeżisti server b'dan l-isem",
       "commandRequired": "Daħħal kmand",
       "commandTooLong": "Uża mhux aktar minn 50 argument, kull wieħed 500 karattru",
       "urlRequired": "Daħħal URL",

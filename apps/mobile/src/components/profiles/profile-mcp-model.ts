@@ -137,6 +137,7 @@ const MCP_RECORD_VALUE_MAX_LENGTH = 4096;
 export type McpFormError =
   | 'name-required'
   | 'name-invalid'
+  | 'name-conflict'
   | 'command-required'
   | 'command-too-long'
   | 'url-required'
@@ -224,14 +225,25 @@ function parseTimeout(raw: string): number | undefined | null {
  * bound and a non-empty JSON fragment for a remote one, an integer timeout, and
  * a `Record<string,string>` JSON fragment within the entry/key/value bounds
  * either way.
+ *
+ * `otherNames` are the profile's other servers, so a name the unique index on
+ * `(profile_id, name)` would refuse fails here instead of on the wire. The
+ * comparison is trimmed and case-sensitive, exactly like the index; the caller
+ * leaves out the server being edited.
  */
-export function validateMcpForm(state: McpFormState): McpFormError | null {
+export function validateMcpForm(
+  state: McpFormState,
+  otherNames: readonly string[] = []
+): McpFormError | null {
   const name = state.name.trim();
   if (name.length === 0) {
     return 'name-required';
   }
   if (name.length > MCP_NAME_MAX_LENGTH || !MCP_NAME_PATTERN.test(name)) {
     return 'name-invalid';
+  }
+  if (otherNames.some(other => other === name)) {
+    return 'name-conflict';
   }
   if (state.type === 'local') {
     const args = commandParts(state.command);

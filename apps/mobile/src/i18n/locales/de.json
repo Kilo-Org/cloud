@@ -3868,6 +3868,7 @@
       "headersHint": "Als •••• angezeigte Werte behalten ihr gespeichertes Geheimnis; ersetze einen Wert, um ihn zu rotieren. Eine Änderung der URL erfordert erneut alle Werte",
       "nameRequired": "Gib einen Servernamen ein",
       "nameInvalid": "Der Name darf nur ASCII-Buchstaben, Zahlen, Unterstriche und Bindestriche enthalten, höchstens 100 Zeichen",
+      "nameConflict": "Ein Server mit diesem Namen existiert bereits",
       "commandRequired": "Gib einen Befehl ein",
       "commandTooLong": "Verwende höchstens 50 Argumente mit je 500 Zeichen",
       "urlRequired": "Gib eine URL ein",

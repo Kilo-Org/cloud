@@ -3868,6 +3868,7 @@
       "headersHint": "Pinapanatili ng mga value na ipinapakita bilang •••• ang kanilang nakaimbak na lihim; palitan ang isang value para i-rotate ito. Kinakailangan ang bawat value muli kapag nagbago ang URL",
       "nameRequired": "Maglagay ng pangalan ng server",
       "nameInvalid": "Ang pangalan ay maaari lamang gumamit ng mga ASCII na titik, numero, underscore, at gitling, hanggang 100 na character",
+      "nameConflict": "Mayroon nang server na may ganitong pangalan",
       "commandRequired": "Maglagay ng command",
       "commandTooLong": "Gumamit ng hindi hihigit sa 50 argumento na 500 character bawat isa",
       "urlRequired": "Maglagay ng URL",

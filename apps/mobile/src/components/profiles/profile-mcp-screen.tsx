@@ -28,6 +28,7 @@ import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-pro
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_MCP_SERVERS: AgentProfileDetail['mcpServers'] = [];
@@ -152,9 +153,16 @@ export function ProfileMcpScreen({
   const rows = mcpServerRows(servers);
   // `null` = closed, `{ server: null }` = add, `{ server }` = edit that server.
   const [form, setForm] = useState<{ server: McpServerSource | null } | null>(null);
+  // A save the server refused on the name index shows the inline conflict
+  // instead of a toast the open sheet covers; any other refusal shows one line
+  // inside the sheet. Both reset when the form opens and each save starts.
+  const [serverNameConflict, setServerNameConflict] = useState(false);
+  const [saveFailure, setSaveFailure] = useState<string | null>(null);
 
   const startAdd = () => {
     setForm({ server: null });
+    setServerNameConflict(false);
+    setSaveFailure(null);
   };
 
   const closeForm = () => {
@@ -162,14 +170,18 @@ export function ProfileMcpScreen({
   };
 
   const saveServer = async (target: McpServerSource | null, payload: McpServerPayload) => {
+    setServerNameConflict(false);
+    setSaveFailure(null);
     try {
       await (target === null
         ? createMcp.mutateAsync({ profileId, server: payload })
         : updateMcp.mutateAsync({ profileId, mcpServerId: target.id, server: payload }));
     } catch (error) {
-      if (!hasUsableMessage(error)) {
-        toast.error(t('profiles.mcp.saveFailed'));
+      if (readTrpcErrorField(error, 'code') === 'CONFLICT') {
+        setServerNameConflict(true);
+        return;
       }
+      setSaveFailure(t('profiles.mcp.saveFailed'));
       return;
     }
     closeForm();
@@ -259,6 +271,8 @@ export function ProfileMcpScreen({
                 canManage
                   ? () => {
                       setForm({ server });
+                      setServerNameConflict(false);
+                      setSaveFailure(null);
                     }
                   : undefined
               }
@@ -297,7 +311,12 @@ export function ProfileMcpScreen({
       {form !== null ? (
         <McpFormSheet
           server={form.server}
+          existingNames={servers
+            .filter(candidate => candidate.id !== form.server?.id)
+            .map(candidate => candidate.name)}
           isSaving={createMcp.isPending || updateMcp.isPending}
+          nameConflictFromServer={serverNameConflict}
+          saveFailure={saveFailure}
           onClose={closeForm}
           onSave={payload => {
             void saveServer(form.server, payload);

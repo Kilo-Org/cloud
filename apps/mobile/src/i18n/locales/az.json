@@ -3868,6 +3868,7 @@
       "headersHint": "•••• kimi göstərilən dəyərlər öz saxlanılan gizlisini qoruyur; yeniləmək üçün dəyəri dəyişin. URL-i dəyişdikdə bütün dəyərlər yenidən tələb olunur",
       "nameRequired": "Server adını daxil edin",
       "nameInvalid": "Ad yalnız ASCII hərflərindən, rəqəmlərdən, alt xəttlərindən və tirelərdən istifadə edə bilər, maksimum 100 simvol",
+      "nameConflict": "Bu adda server artıq mövcuddur",
       "commandRequired": "Komanda daxil edin",
       "commandTooLong": "Ən çoxu 500 simvoldan ibarət 50 arqumentdən istifadə edin",
       "urlRequired": "URL daxil edin",

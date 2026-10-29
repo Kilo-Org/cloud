@@ -3868,6 +3868,7 @@
       "headersHint": "Gatiwwan akka •••• agarsiifaman icciita isaanii kuufame qabu; isa jijjiiruuf gatii tokko bakka buusi. Yeroo URL jijjiiramu, gatiin hundi barbaachisaadha",
       "nameRequired": "Maqaa sarvarii galchi",
       "nameInvalid": "Maqaan qubee ASCII, lakkoofsota, sarara jalaa fi daash qofa fayyadamuu danda'a, arfiilee 100 ykn isaa gadi",
+      "nameConflict": "Sarvarrii maqaa kana qabu caalaa jira",
       "commandRequired": "Ajaja galchi",
       "commandTooLong": "Arguumentii 50 ol fayyadami, tokkoon tokkoon isaanii arfii 500",
       "urlRequired": "URL galchi",

@@ -3919,6 +3919,7 @@
       "headersHint": "Vērtības, kas parādītas kā ••••, saglabā savu esošo noslēpumu; aizstājiet vērtību, lai to nomainītu. Mainot URL, atkal ir nepieciešamas visas vērtības",
       "nameRequired": "Ievadiet servera nosaukumu",
       "nameInvalid": "Nosaukumā var izmantot tikai ASCII burtus, ciparus, pasvītras un domuzīmes, līdz 100 rakstzīmēm",
+      "nameConflict": "Serveris ar šādu nosaukumu jau eksistē",
       "commandRequired": "Ievadiet komandu",
       "commandTooLong": "Izmantojiet ne vairāk kā 50 argumentus, katrs 500 rakstzīmes",
       "urlRequired": "Ievadiet URL",

@@ -3970,6 +3970,7 @@
       "headersHint": "Reikšmės, rodomos kaip ••••, išlaiko savo saugomą paslaptį; pakeiskite reikšmę, kad ją rotuotumėte. Pakeitus URL, visos reikšmės vėl yra būtinos",
       "nameRequired": "Įveskite serverio pavadinimą",
       "nameInvalid": "Varde gali būti naudojamos tik ASCII raidės, skaičiai, apatiniai brūkšniai ir brūkšniai, iki 100 simbolių",
+      "nameConflict": "Serveris tokiu pavadinimu jau egzistuoja",
       "commandRequired": "Įveskite komandą",
       "commandTooLong": "Naudokite ne daugiau kaip 50 argumentų, kurių kiekvienas 500 simbolių",
       "urlRequired": "Įveskite URL",

@@ -3868,6 +3868,7 @@
       "headersHint": "Värden som visas som •••• behåller sin lagrade hemlighet; ersätt ett värde för att rotera det. Om URL:en ändras krävs alla värden igen",
       "nameRequired": "Ange ett servernamn",
       "nameInvalid": "Namn kan endast använda ASCII-bokstäver, siffror, understreck och bindestreck, upp till 100 tecken",
+      "nameConflict": "En server med det namnet finns redan",
       "commandRequired": "Ange ett kommando",
       "commandTooLong": "Använd högst 50 argument med 500 tecken vardera",
       "urlRequired": "Ange en URL",

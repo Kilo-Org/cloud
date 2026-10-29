@@ -3868,6 +3868,7 @@
       "headersHint": "Ny sanda aseho ho •••• dia mitazona ny tsiambaratelo voatahiry; soloy ny sanda iray raha tianao havaozina. Ilaina ny sanda rehetra rehefa miova ny URL",
       "nameRequired": "Ampidiro anarana mpizara",
       "nameInvalid": "Ny anarana dia tsy afaka mampiasa afa-tsy litera ASCII, isa, tsipiho ambany ary tsipiho, hatramin'ny 100 tarehintsoratra",
+      "nameConflict": "Efa misy mpizara mitondra ity anarana ity",
       "commandRequired": "Ampidiro baiko",
       "commandTooLong": "Ampiasao farafahabetsany 50 tohan-kevitra, 500 tarehintsoratra avy",
       "urlRequired": "Ampidiro URL",

@@ -3868,6 +3868,7 @@
       "headersHint": "Uru ndị egosiri dị ka •••• na-edebe nzuzo ha echekwara; dochie uru iji tụgharịa ya. Ịgbanwe URL na-achọ uru ọ bụla ọzọ",
       "nameRequired": "Tinye aha nkesa",
       "nameInvalid": "Aha nwere ike iji naanị mkpụrụedemede ASCII, ọnụọgụ, akara akara, na dashes, ruru mkpụrụedemede 100",
+      "nameConflict": "Nkesa nwere aha a dịla",
       "commandRequired": "Tinye iwu",
       "commandTooLong": "Ejila ihe karịrị arụmụka 50, nke ọ bụla mkpụrụedemede 500",
       "urlRequired": "Tinye URL",

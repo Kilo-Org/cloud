@@ -3868,6 +3868,7 @@
       "headersHint": "Værdier vist som •••• beholder deres gemte hemmelighed; erstat en værdi for at rotere den. Ændring af URL'en kræver alle værdier igen",
       "nameRequired": "Indtast et servernavn",
       "nameInvalid": "Navn kan kun bruge ASCII-bogstaver, tal, understregninger og bindestreger, højst 100 tegn",
+      "nameConflict": "En server med dette navn findes allerede",
       "commandRequired": "Indtast en kommando",
       "commandTooLong": "Brug højst 50 argumenter på 500 tegn hver",
       "urlRequired": "Indtast en URL",

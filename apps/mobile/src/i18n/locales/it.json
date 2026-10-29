@@ -3919,6 +3919,7 @@
       "headersHint": "I valori mostrati come •••• conservano il segreto archiviato; sostituisci un valore per ruotarlo. Modificare l'URL richiede nuovamente tutti i valori",
       "nameRequired": "Immettere un nome server",
       "nameInvalid": "Il nome può contenere solo lettere ASCII, numeri, trattini bassi e trattini, fino a 100 caratteri",
+      "nameConflict": "Esiste già un server con questo nome",
       "commandRequired": "Inserisci un comando",
       "commandTooLong": "Usa al massimo 50 argomenti da 500 caratteri ciascuno",
       "urlRequired": "Inserisci un URL",

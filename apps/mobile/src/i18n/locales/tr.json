@@ -3868,6 +3868,7 @@
       "headersHint": "•••• olarak gösterilen değerler kayıtlı gizliliklerini korur; döndürmek için bir değeri değiştirin. URL'yi değiştirmek tüm değerlerin yeniden girilmesini gerektirir",
       "nameRequired": "Bir sunucu adı girin",
       "nameInvalid": "Adda yalnızca ASCII harfleri, rakamlar, alt çizgi ve kısa çizgi kullanılabilir, en fazla 100 karakter",
+      "nameConflict": "Bu adda bir sunucu zaten mevcut",
       "commandRequired": "Bir komut girin",
       "commandTooLong": "En fazla 500 karakterlik 50 argüman kullanın",
       "urlRequired": "Bir URL girin",

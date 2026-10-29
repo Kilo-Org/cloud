@@ -3919,6 +3919,7 @@
       "headersHint": "Vrijednosti prikazane kao •••• zadržavaju svoju pohranjenu tajnu; zamijenite vrijednost da biste je rotirali. Promjena URL-a ponovno zahtijeva svaku vrijednost",
       "nameRequired": "Unesite naziv poslužitelja",
       "nameInvalid": "Ime može sadržavati samo ASCII slova, brojeve, podvlake i crtice, najviše 100 znakova",
+      "nameConflict": "Poslužitelj s ovim nazivom već postoji",
       "commandRequired": "Unesite naredbu",
       "commandTooLong": "Koristite najviše 50 argumenata od po 500 znakova",
       "urlRequired": "Unesite URL",

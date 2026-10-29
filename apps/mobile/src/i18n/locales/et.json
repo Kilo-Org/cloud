@@ -3868,6 +3868,7 @@
       "headersHint": "Väärtused, mis on kuvatud kujul ••••, säilitavad oma salvestatud saladuse; väärtuse asendamisega saab selle vahetada. URL-i muutmine nõuab kõiki väärtusi uuesti",
       "nameRequired": "Sisestage serveri nimi",
       "nameInvalid": "Nimes võib kasutada ainult ASCII tähti, numbreid, allkriipse ja sidekriipse, kuni 100 tähemärki",
+      "nameConflict": "Sellise nimega MCP-server on juba olemas",
       "commandRequired": "Sisestage käsk",
       "commandTooLong": "Kasuta kõige rohkem 50 argumenti, igaüks kuni 500 tähemärki",
       "urlRequired": "Sisestage URL",

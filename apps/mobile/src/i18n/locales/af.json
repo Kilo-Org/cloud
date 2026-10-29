@@ -3868,6 +3868,7 @@
       "headersHint": "Waardes wat as •••• vertoon word, behou hul gestoorde geheim; vervang 'n waarde om dit te roteer. Wanneer die URL verander word, word elke waarde weer vereis",
       "nameRequired": "Voer 'n bedienernaam in",
       "nameInvalid": "Naam kan slegs ASCII-letters, syfers, onderstrepe en strepe tot 100 karakters gebruik",
+      "nameConflict": "'n Bediener met hierdie naam bestaan reeds",
       "commandRequired": "Voer 'n opdrag in",
       "commandTooLong": "Gebruik hoogstens 50 argumente van 500 karakters elk",
       "urlRequired": "Voer 'n URL in",

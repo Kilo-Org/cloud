@@ -3919,6 +3919,7 @@
       "headersHint": "Els valors mostrats com a •••• mantenen el seu secret desat; substituïu un valor per rotar-lo. Canviar l'URL requereix tots els valors de nou",
       "nameRequired": "Introduïu un nom de servidor",
       "nameInvalid": "El nom només pot utilitzar lletres ASCII, números, guions baixos i guions, fins a 100 caràcters",
+      "nameConflict": "Ja existeix un servidor amb aquest nom",
       "commandRequired": "Introduïu una ordre",
       "commandTooLong": "Utilitzeu com a màxim 50 arguments de 500 caràcters cadascun",
       "urlRequired": "Introduïu un URL",

@@ -3868,6 +3868,7 @@
       "headersHint": "•••• ko'rinishida ko'rsatilgan qiymatlar saqlangan yashirin qiymatni o'zgartirmaydi; uni almashtirish uchun qiymatni yangilang. URL manzilini o'zgartirish barcha qiymatlarni qaytadan talab qiladi",
       "nameRequired": "Server nomini kiriting",
       "nameInvalid": "Ism faqat ASCII harflar, raqamlar, pastki chiziq va chiziqlardan foydalanishi mumkin, jami 100 ta belgidan oshmasligi kerak",
+      "nameConflict": "Bunday nomli server allaqachon mavjud",
       "commandRequired": "Buyruqni kiriting",
       "commandTooLong": "Ko'pi bilan 500 belgidan iborat 50 ta argumentdan foydalaning",
       "urlRequired": "URL manzilini kiriting",

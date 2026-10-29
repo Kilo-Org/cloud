@@ -646,9 +646,9 @@
       "noReviewRequestsDescription": "Maombi ya kuunganisha yanayosubiri ukaguzi wako yanaonekana hapa. Bado unaweza kubandika kiungo chochote cha PR hapo juu.",
       "couldNotLoad": "Imeshindikana kupakia kikasha.",
       "accessLostTitle": "Huna ruhusa ya shirika hili",
-      "accessLostDescription": "Hauwi tena mwanachama wa shirika hili, hivyo maombi yake ya ukaguzi hayawezi kupakiwa. Endelea kwenye akaunti yako ya binafsi ili uendelee kukagua.",
+      "accessLostDescription": "Huwi tena mwanachama wa shirika hili, hivyo maombi yake ya ukaguzi hayawezi kupakiwa. Endelea kwenye akaunti yako ya binafsi ili uendelee kukagua.",
       "organizationUnavailableTitle": "Shirika hili halipo tena",
-      "organizationUnavailableDescription": "Shirika hili lifutwa, hivyo maombi yake ya ukaguzi hayawezi kupakiwa. Endelea kwenye akaunti yako ya binafsi ili uendelee kukagua.",
+      "organizationUnavailableDescription": "Shirika hili lilifutwa, hivyo maombi yake ya ukaguzi hayawezi kupakiwa. Endelea kwenye akaunti yako ya binafsi ili uendelee kukagua.",
       "continueInPersonal": "Endelea kwenye akaunti ya binafsi"
     },
     "composer": {

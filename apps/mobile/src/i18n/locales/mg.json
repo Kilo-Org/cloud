@@ -3875,7 +3875,7 @@
       "urlTooLong": "Tsy mihoatra ny 2048 tarehintsoratra ny URL",
       "jsonInvalid": "Ampidiro JSON manan-kery - zavatra misy soatoavin'ny tady",
       "jsonTooLarge": "Ampiasao farafahabetsany 50 fidirana, fanalahidy hatramin'ny 128 ary sanda hatramin'ny 4096 tarehintsoratra",
-      "timeoutInvalid": "Tokony ho milisegondra iray manontolo ny fotoana fiatoana",
+      "timeoutInvalid": "Tokony ho isa milisegondra manontolo ny fe-potoana",
       "edit": "Ahitsio mpizara MCP {{name}}",
       "delete": "Fafao mpizara MCP {{name}}",
       "saveFailed": "Tsy afaka nitahiry mpizara MCP",

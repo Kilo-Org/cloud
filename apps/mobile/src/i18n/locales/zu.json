@@ -3875,7 +3875,7 @@
       "urlTooLong": "I-URL kufanele ibe yizinhlamvu ezingu-2048 noma ngaphansi",
       "jsonInvalid": "Faka i-JSON evumelekile — into enamanani eyunithi yezinhlamvu",
       "jsonTooLarge": "Sebenzisa okufakiwe okungu-50 noma ngaphansi, okhiye kufika ku-128 kanye namavelu kufika ezinhlamvu ezingu-4096",
-      "timeoutInvalid": "Isikhathi sokuvala kufanele sibe inani eliphelele lama-millisecond",
+      "timeoutInvalid": "Isikhathi sokulinda kufanele sibe inani eliphelele lama-millisecond.",
       "edit": "Hlela iseva ye-MCP {{name}}",
       "delete": "Susa iseva ye-MCP {{name}}",
       "saveFailed": "Ayikwazanga ukulondoloza iseva ye-MCP",

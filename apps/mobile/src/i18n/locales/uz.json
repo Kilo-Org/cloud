@@ -3875,7 +3875,7 @@
       "urlTooLong": "URL 2048 ta belgi yoki undan kam bo'lishi kerak",
       "jsonInvalid": "To'g'ri JSON kiriting - satr qiymatlari ob'ekti",
       "jsonTooLarge": "Ko'pi bilan 50 ta yozuv, kalitlar 128 tagacha va qiymatlar 4096 belgigacha foydalaning",
-      "timeoutInvalid": "Vaqt tugashi butun son millisekund bo'lishi kerak",
+      "timeoutInvalid": "Kutish vaqti butun sonli millisekundlarda bo'lishi kerak",
       "edit": "{{name}} MCP serverini tahrirlang",
       "delete": "{{name}} MCP serverini oʻchiring",
       "saveFailed": "MCP serverini saqlab boʻlmadi",

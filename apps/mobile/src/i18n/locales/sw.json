@@ -3875,7 +3875,7 @@
       "urlTooLong": "URL lazima iwe na vibambo 2048 au chini",
       "jsonInvalid": "Weka JSON halali - kitu cha thamani za mfuatano",
       "jsonTooLarge": "Tumia maingizo 50 au chini, funguo hadi 128 na thamani hadi vibambo 4096",
-      "timeoutInvalid": "Muda umekwisha lazima iwe idadi nzima ya milisekunde",
+      "timeoutInvalid": "Muda wa kusubiri lazima uwe idadi nzima ya milisekunde",
       "edit": "Hariri seva ya MCP {{name}}",
       "delete": "Futa seva ya MCP {{name}}",
       "saveFailed": "Haikuweza kuhifadhi seva ya MCP",

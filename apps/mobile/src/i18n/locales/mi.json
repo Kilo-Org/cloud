@@ -3875,7 +3875,7 @@
       "urlTooLong": "Kia 2048 pūāhua iti iho rānei te URL",
       "jsonInvalid": "Whakauruhia JSON whaimana - he ahanoa o nga uara aho",
       "jsonTooLarge": "Whakamahia kia 50 ngā tāurunga, kī tae atu ki 128 me ngā uara tae atu ki 4096 pūāhua",
-      "timeoutInvalid": "Ko te wa poto me he maha katoa o nga manomano",
+      "timeoutInvalid": "Ko te wā tatari me he tau katoa o ngā manomano",
       "edit": "Whakatika tūmau MCP {{name}}",
       "delete": "Muku tūmau MCP {{name}}",
       "saveFailed": "Kāore i taea te tiaki i te tūmau MCP",

@@ -3875,7 +3875,7 @@
       "urlTooLong": "URL ga-abụ mkpụrụedemede 2048 ma ọ bụ obere",
       "jsonInvalid": "Tinye JSON bara uru - ihe nwere ụkpụrụ eriri",
       "jsonTooLarge": "Ejila ihe karịrị ndenye 50, igodo ruo 128 na uru ruo mkpụrụedemede 4096",
-      "timeoutInvalid": "Oge ngwụcha ga-abụrịrị ọnụ ọgụgụ millisekọnd dum",
+      "timeoutInvalid": "Nkeji oge ga-abụrịrị ọnụ ọgụgụ millisekọnd dum",
       "edit": "Dezie ihe nkesa MCP {{name}}",
       "delete": "Hichapụ ihe nkesa MCP {{name}}",
       "saveFailed": "Enweghị ike ichekwa ihe nkesa MCP",

@@ -3875,7 +3875,7 @@
       "urlTooLong": "URL la dwe gen 2048 karaktè oswa mwens",
       "jsonInvalid": "Antre JSON valab - yon objè ki gen valè fisèl",
       "jsonTooLarge": "Sèvi ak pa plis pase 50 antre, kle jiska 128 ak valè jiska 4096 karaktè",
-      "timeoutInvalid": "Timeout dwe yon kantite antye milisgond",
+      "timeoutInvalid": "Delè a dwe yon nonb antye milisegond.",
       "edit": "Edit sèvè MCP {{name}}",
       "delete": "Efase sèvè MCP {{name}}",
       "saveFailed": "Pa t 'kapab sove sèvè MCP",

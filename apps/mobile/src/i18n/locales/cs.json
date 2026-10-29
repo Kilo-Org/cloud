@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Změny",
-    "organizationTrialEnded": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Vlastník organizace může aktualizovat fakturaci na kilo.ai a poté to zkuste znovu."
+    "organizationTrialEnded": "Zkušební období organizace skončilo a organizace nemá žádný aktivní plán. Vlastník organizace může aktualizovat fakturaci na kilo.ai a poté to zkuste znovu.",
+    "privateRepositoryA11y": "{{name}}, soukromý repozitář"
   },
   "language": {
     "restarting": "Aplikace se restartuje kvůli změně jazyka",
@@ -4050,7 +4051,6 @@
       "repo": "Vyberte úložiště…",
       "profile": "Vyberte profil",
       "remove": "Zrušit vazbu",
-      "private": "Soukromé",
       "search": "Prohledat úložiště…",
       "addedToast": "Výchozí profil nastavený pro „{{repo}}“",
       "addFailed": "Nepodařilo se nastavit výchozí profil",

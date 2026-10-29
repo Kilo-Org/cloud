@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Änderungen",
-    "organizationTrialEnded": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Ein Inhaber der Organisation kann die Abrechnung unter kilo.ai aktualisieren und es dann erneut versuchen."
+    "organizationTrialEnded": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Ein Inhaber der Organisation kann die Abrechnung unter kilo.ai aktualisieren und es dann erneut versuchen.",
+    "privateRepositoryA11y": "{{name}}, privates Repository"
   },
   "language": {
     "restarting": "Neustart zum Übernehmen der Sprache",
@@ -3948,7 +3949,6 @@
       "repo": "Repository auswählen…",
       "profile": "Profil auswählen",
       "remove": "Lösen",
-      "private": "Privat",
       "search": "Repositories durchsuchen…",
       "addedToast": "Standardprofil für „{{repo}}“ festgelegt",
       "addFailed": "Das Standardprofil konnte nicht festgelegt werden",

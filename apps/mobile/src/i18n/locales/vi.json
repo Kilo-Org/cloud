@@ -148,7 +148,8 @@
     "durationMinuteShort": "phút",
     "durationHourShort": "giờ",
     "changes": "Thay đổi",
-    "organizationTrialEnded": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động. Chủ sở hữu tổ chức có thể cập nhật thanh toán tại kilo.ai, sau đó thử lại."
+    "organizationTrialEnded": "Bản dùng thử của tổ chức đã kết thúc và tổ chức không có gói đang hoạt động. Chủ sở hữu tổ chức có thể cập nhật thanh toán tại kilo.ai, sau đó thử lại.",
+    "privateRepositoryA11y": "{{name}}, kho lưu trữ riêng tư"
   },
   "language": {
     "restarting": "Đang khởi động lại để áp dụng ngôn ngữ",
@@ -3948,7 +3949,6 @@
       "repo": "Chọn kho lưu trữ…",
       "profile": "Chọn hồ sơ",
       "remove": "Hủy liên kết",
-      "private": "Riêng tư",
       "search": "Tìm kiếm kho lưu trữ…",
       "addedToast": "Đã đặt cấu hình mặc định cho \"{{repo}}\"",
       "addFailed": "Không thể đặt hồ sơ mặc định",

@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Perubahan",
-    "organizationTrialEnded": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Pemilik organisasi dapat memperbarui penagihan di kilo.ai, lalu coba lagi."
+    "organizationTrialEnded": "Masa percobaan organisasi telah berakhir dan tidak memiliki paket aktif. Pemilik organisasi dapat memperbarui penagihan di kilo.ai, lalu coba lagi.",
+    "privateRepositoryA11y": "{{name}}, repositori pribadi"
   },
   "language": {
     "restarting": "Memulai ulang untuk menerapkan bahasa",
@@ -3948,7 +3949,6 @@
       "repo": "Pilih repositori…",
       "profile": "Pilih profil",
       "remove": "Memperlonggar",
-      "private": "Pribadi",
       "search": "Cari repositori…",
       "addedToast": "Profil default disetel untuk \"{{repo}}\"",
       "addFailed": "Tidak dapat menyetel profil default",

@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Modificări",
-    "organizationTrialEnded": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Un proprietar al organizației poate actualiza facturarea pe kilo.ai, apoi poate încerca din nou."
+    "organizationTrialEnded": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Un proprietar al organizației poate actualiza facturarea pe kilo.ai, apoi poate încerca din nou.",
+    "privateRepositoryA11y": "{{name}}, repository privat"
   },
   "language": {
     "restarting": "Se repornește aplicația pentru a schimba limba",
@@ -3999,7 +4000,6 @@
       "repo": "Selectați depozitul...",
       "profile": "Selectați profilul",
       "remove": "Desface",
-      "private": "Privat",
       "search": "Căutați în depozite...",
       "addedToast": "Profil implicit setat pentru „{{repo}}”",
       "addFailed": "Nu s-a putut seta profilul implicit",

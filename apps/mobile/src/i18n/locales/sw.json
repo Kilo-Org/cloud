@@ -148,7 +148,8 @@
     "durationMinuteShort": "dk",
     "durationHourShort": "saa",
     "changes": "Mabadiliko",
-    "organizationTrialEnded": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Mmiliki wa shirika anaweza kusasisha malipo kwenye kilo.ai, kisha ajaribu tena."
+    "organizationTrialEnded": "Kipindi cha majaribio cha shirika kimeisha na hakina mpango unaotumika. Mmiliki wa shirika anaweza kusasisha malipo kwenye kilo.ai, kisha ajaribu tena.",
+    "privateRepositoryA11y": "{{name}}, hazina ya kibinafsi"
   },
   "language": {
     "restarting": "Programu inaanza upya ili kutumia lugha",
@@ -3948,7 +3949,6 @@
       "repo": "Chagua hazina...",
       "profile": "Chagua wasifu",
       "remove": "Tendua",
-      "private": "Privat",
       "search": "Tafuta hazina...",
       "addedToast": "Wasifu chaguomsingi umewekwa kwa ajili ya \"{{repo}}\"",
       "addFailed": "Haikuweza kuweka wasifu chaguomsingi",

@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Izinguquko",
-    "organizationTrialEnded": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo. Umnikazi wenhlangano angabuyekeza ukukhokhela ku-kilo.ai, bese ezama futhi."
+    "organizationTrialEnded": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo. Umnikazi wenhlangano angabuyekeza ukukhokhela ku-kilo.ai, bese ezama futhi.",
+    "privateRepositoryA11y": "{{name}}, inqolobane yekhodi eyimfihlo"
   },
   "language": {
     "restarting": "Kuqaliswa kabusha ukuze kusetshenziswe ulimi olukhethiwe",
@@ -3948,7 +3949,6 @@
       "repo": "Khetha inqolobane...",
       "profile": "Khetha iphrofayela",
       "remove": "Khipha",
-      "private": "Okuyimfihlo",
       "search": "Sesha amaqoqo...",
       "addedToast": "Iphrofayela ezenzakalelayo isethelwe \"{{repo}}\"",
       "addFailed": "Ayikwazanga ukusetha iphrofayela ezenzakalelayo",

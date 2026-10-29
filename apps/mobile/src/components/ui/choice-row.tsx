@@ -15,6 +15,13 @@ type ChoiceRowProps = {
   /** Ignored when `children` is given. */
   label?: string;
   description?: string;
+  /**
+   * Accessible name for a row whose children spell out only part of what the
+   * row means, e.g. a name followed by a decorative-only status glyph. Takes
+   * precedence over the label/description composition and over the name React
+   * Native derives from the child text.
+   */
+  accessibleName?: string;
   selected: boolean;
   onPress: () => void;
   disabled?: boolean;
@@ -35,6 +42,7 @@ type ChoiceRowProps = {
 export function ChoiceRow({
   label,
   description,
+  accessibleName,
   selected,
   onPress,
   disabled,
@@ -70,7 +78,10 @@ export function ChoiceRow({
         disabled: Boolean(disabled),
         busy,
       })}
-      accessibilityLabel={namedParts.length > 0 ? formatList(namedParts, i18n.language) : undefined}
+      accessibilityLabel={
+        accessibleName ??
+        (namedParts.length > 0 ? formatList(namedParts, i18n.language) : undefined)
+      }
     >
       {children ?? (
         <View className="flex-1 pr-3">

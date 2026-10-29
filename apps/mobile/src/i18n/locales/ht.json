@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Chanjman",
-    "organizationTrialEnded": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Yon pwopriyetè òganizasyon ka mete ajou faktirasyon sou kilo.ai, epi eseye ankò."
+    "organizationTrialEnded": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Yon pwopriyetè òganizasyon ka mete ajou faktirasyon sou kilo.ai, epi eseye ankò.",
+    "privateRepositoryA11y": "{{name}}, repòsitwa prive"
   },
   "language": {
     "restarting": "Ap rekòmanse pou itilize lang ou chwazi a",
@@ -3948,7 +3949,6 @@
       "repo": "Chwazi depo...",
       "profile": "Chwazi pwofil",
       "remove": "Demare",
-      "private": "Prive",
       "search": "Chèche depo...",
       "addedToast": "Default pwofil mete pou \"{{repo}}\"",
       "addFailed": "Pa t 'kapab mete pwofil default",

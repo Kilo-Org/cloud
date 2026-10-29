@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "변경 사항",
-    "organizationTrialEnded": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. 조직 소유자는 kilo.ai에서 결제 정보를 업데이트한 후 다시 시도하세요."
+    "organizationTrialEnded": "조직의 체험이 종료되었으며 활성 요금제가 없습니다. 조직 소유자는 kilo.ai에서 결제 정보를 업데이트한 후 다시 시도하세요.",
+    "privateRepositoryA11y": "{{name}}, 비공개 저장소"
   },
   "language": {
     "restarting": "언어 적용을 위해 다시 시작 중",
@@ -3948,7 +3949,6 @@
       "repo": "저장소 선택…",
       "profile": "프로필 선택",
       "remove": "바인딩 해제",
-      "private": "사적인",
       "search": "저장소 검색…",
       "addedToast": "\"{{repo}}\"에 대한 기본 프로필 세트",
       "addFailed": "기본 프로필을 설정할 수 없습니다.",

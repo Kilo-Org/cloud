@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Canvis",
-    "organizationTrialEnded": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. El propietari de l'organització pot actualitzar la facturació a kilo.ai i tornar-ho a provar."
+    "organizationTrialEnded": "El període de prova de l'organització ha finalitzat i no té cap pla actiu. El propietari de l'organització pot actualitzar la facturació a kilo.ai i tornar-ho a provar.",
+    "privateRepositoryA11y": "{{name}}, repositori privat"
   },
   "language": {
     "restarting": "S'està reiniciant per aplicar l'idioma",
@@ -3999,7 +4000,6 @@
       "repo": "Seleccioneu el repositori...",
       "profile": "Seleccioneu el perfil",
       "remove": "Desvincular",
-      "private": "Privat",
       "search": "Cerca repositoris...",
       "addedToast": "Perfil predeterminat definit per a \"{{repo}}\"",
       "addFailed": "No s'ha pogut establir el perfil predeterminat",

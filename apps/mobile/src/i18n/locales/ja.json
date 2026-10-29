@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "変更内容",
-    "organizationTrialEnded": "組織のトライアルは終了し、有効なプランがありません。組織のオーナーは kilo.ai で請求情報を更新してから、もう一度お試しください。"
+    "organizationTrialEnded": "組織のトライアルは終了し、有効なプランがありません。組織のオーナーは kilo.ai で請求情報を更新してから、もう一度お試しください。",
+    "privateRepositoryA11y": "{{name}}、プライベートリポジトリ"
   },
   "language": {
     "restarting": "言語設定を適用するために再起動中",
@@ -3948,7 +3949,6 @@
       "repo": "リポジトリを選択してください…",
       "profile": "プロフィールの選択",
       "remove": "バインドを解除する",
-      "private": "プライベート",
       "search": "リポジトリを検索…",
       "addedToast": "「{{repo}}」に設定されたデフォルトのプロフィール",
       "addFailed": "デフォルトのプロフィールを設定できませんでした",

@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "ለውጦች",
-    "organizationTrialEnded": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ንቁ ዕቅድም የለውም። የድርጅት ባለቤት በkilo.ai ላይ የክፍያ መረጃን ማዘመን ይችላል፣ ከዚያ እንደገና ይሞክሩ።"
+    "organizationTrialEnded": "የድርጅቱ የሙከራ ጊዜ አልቋል፤ ንቁ ዕቅድም የለውም። የድርጅት ባለቤት በkilo.ai ላይ የክፍያ መረጃን ማዘመን ይችላል፣ ከዚያ እንደገና ይሞክሩ።",
+    "privateRepositoryA11y": "{{name}}፣ የግል ማኅደር"
   },
   "language": {
     "restarting": "ቋንቋውን ለመቀየር እንደገና በመጀመር ላይ",
@@ -3948,7 +3949,6 @@
       "repo": "ማከማቻ ምረጥ…",
       "profile": "መገለጫ ይምረጡ",
       "remove": "ንቀል",
-      "private": "የግል",
       "search": "ማከማቻዎችን ፈልግ…",
       "addedToast": "ለ\"{{repo}}\" ነባሪ መገለጫ ተቀናብሯል",
       "addFailed": "ነባሪ መገለጫ ማዘጋጀት አልተቻለም",

@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "變更",
-    "organizationTrialEnded": "組織的試用期已結束，且沒有使用中的方案。組織擁有者可以在 kilo.ai 更新帳單資訊，然後再試一次。"
+    "organizationTrialEnded": "組織的試用期已結束，且沒有使用中的方案。組織擁有者可以在 kilo.ai 更新帳單資訊，然後再試一次。",
+    "privateRepositoryA11y": "{{name}}，私有儲存庫"
   },
   "language": {
     "restarting": "正在重新啟動以套用語言",
@@ -3948,7 +3949,6 @@
       "repo": "選擇存儲庫...",
       "profile": "選擇個人資料",
       "remove": "解綁",
-      "private": "私有",
       "search": "搜尋儲存庫...",
       "addedToast": "為“{{repo}}”設定的預設設定文件",
       "addFailed": "無法設定預設設定檔",

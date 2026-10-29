@@ -148,7 +148,8 @@
     "durationMinuteShort": "dk",
     "durationHourShort": "sa",
     "changes": "Değişiklikler",
-    "organizationTrialEnded": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. Kuruluş sahibi kilo.ai adresinden faturalandırmayı güncelleyip ardından tekrar deneyebilir."
+    "organizationTrialEnded": "Kuruluşun deneme süresi sona erdi ve etkin bir planı yok. Kuruluş sahibi kilo.ai adresinden faturalandırmayı güncelleyip ardından tekrar deneyebilir.",
+    "privateRepositoryA11y": "{{name}}, özel depo"
   },
   "language": {
     "restarting": "Dil değişikliğini uygulamak için yeniden başlatılıyor",
@@ -3948,7 +3949,6 @@
       "repo": "Depoyu seçin…",
       "profile": "Profil seç",
       "remove": "Bağlantıyı kaldır",
-      "private": "Özel",
       "search": "Depolarda ara…",
       "addedToast": "\"{{repo}}\" için varsayılan profil ayarlandı",
       "addFailed": "Varsayılan profil ayarlanamadı",

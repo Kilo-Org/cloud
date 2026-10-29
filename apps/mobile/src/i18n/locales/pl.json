@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Zmiany",
-    "organizationTrialEnded": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Właściciel organizacji może zaktualizować rozliczenia na kilo.ai, a następnie spróbować ponownie."
+    "organizationTrialEnded": "Okres próbny organizacji zakończył się i nie ma ona aktywnego planu. Właściciel organizacji może zaktualizować rozliczenia na kilo.ai, a następnie spróbować ponownie.",
+    "privateRepositoryA11y": "{{name}}, prywatne repozytorium"
   },
   "language": {
     "restarting": "Ponowne uruchamianie po zmianie języka",
@@ -4050,7 +4051,6 @@
       "repo": "Wybierz repozytorium…",
       "profile": "Wybierz profil",
       "remove": "Rozwiązać",
-      "private": "Prywatny",
       "search": "Przeszukaj repozytoria…",
       "addedToast": "Domyślny profil ustawiony na „{{repo}}”",
       "addFailed": "Nie można ustawić profilu domyślnego",

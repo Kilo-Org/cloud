@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Endringer",
-    "organizationTrialEnded": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. En organisasjonseier kan oppdatere faktureringen på kilo.ai og deretter prøve igjen."
+    "organizationTrialEnded": "Organisasjonens prøveperiode er over, og den har ingen aktiv plan. En organisasjonseier kan oppdatere faktureringen på kilo.ai og deretter prøve igjen.",
+    "privateRepositoryA11y": "{{name}}, privat repository"
   },
   "language": {
     "restarting": "Starter på nytt for å bruke språket",
@@ -3948,7 +3949,6 @@
       "repo": "Velg depot...",
       "profile": "Velg profil",
       "remove": "Avbind",
-      "private": "Privat",
       "search": "Søk i depoter...",
       "addedToast": "Standard profil satt for «{{repo}}»",
       "addFailed": "Kunne ikke angi standardprofil",

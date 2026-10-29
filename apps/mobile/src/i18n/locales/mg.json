@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Fiovana",
-    "organizationTrialEnded": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy. Ny tompon'ny fikambanana dia afaka manavao ny faktiora ao amin'ny kilo.ai, ary hanandrana indray."
+    "organizationTrialEnded": "Lasa ny fe-potoana fanandramana ho an'ny fikambanana ary tsy manana drafitra mavitrika izy. Ny tompon'ny fikambanana dia afaka manavao ny faktiora ao amin'ny kilo.ai, ary hanandrana indray.",
+    "privateRepositoryA11y": "{{name}}, tahirin-kaody manokana"
   },
   "language": {
     "restarting": "Manomboka indray mba hampiharana ny fiteny",
@@ -3948,7 +3949,6 @@
       "repo": "Safidio ny tahiry…",
       "profile": "Fidio ny mombamomba",
       "remove": "Esory",
-      "private": "TSY MIANKINA",
       "search": "Hikaroka tahiry…",
       "addedToast": "piraofilina voafantina ho an'ny \"{{repo}}\"",
       "addFailed": "Tsy afaka nametraka ny mombamomba azy",

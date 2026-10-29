@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Jijjiiramoota",
-    "organizationTrialEnded": "Yeroon yaalii dhaabbataa xumurameera, karoora socho'aa hin qabu. Abbaan dhaabbataa kaffaltii kilo.ai irratti haaromsuu danda'a, sana booda irra deebi'ii yaali."
+    "organizationTrialEnded": "Yeroon yaalii dhaabbataa xumurameera, karoora socho'aa hin qabu. Abbaan dhaabbataa kaffaltii kilo.ai irratti haaromsuu danda'a, sana booda irra deebi'ii yaali.",
+    "privateRepositoryA11y": "{{name}}, kuusaa koodii dhuunfaa"
   },
   "language": {
     "restarting": "Afaan filatame fayyadamuuf irra deebi'ee jalqabaa jira",
@@ -3948,7 +3949,6 @@
       "repo": "Kuusaa filadhu...",
       "profile": "Profaayilii filadhu",
       "remove": "Hidhaa hiikaa",
-      "private": "Dhuunfaa",
       "search": "Kuusaawwan barbaadi...",
       "addedToast": "Profaayilii durtii \"{{repo}}\" tiif saagame.",
       "addFailed": "Profaayilii durtii saaguu hin dandeenye",

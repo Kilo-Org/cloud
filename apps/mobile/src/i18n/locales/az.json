@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Dəyişikliklər",
-    "organizationTrialEnded": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Təşkilat sahibi kilo.ai ünvanında billinqi yeniləyə və sonra yenidən cəhd edə bilər."
+    "organizationTrialEnded": "Təşkilatın sınaq müddəti başa çatıb və aktiv planı yoxdur. Təşkilat sahibi kilo.ai ünvanında billinqi yeniləyə və sonra yenidən cəhd edə bilər.",
+    "privateRepositoryA11y": "{{name}}, şəxsi repozitoriya"
   },
   "language": {
     "restarting": "Dil dəyişikliyini tətbiq etmək üçün yenidən başladılır",
@@ -3948,7 +3949,6 @@
       "repo": "Repozitoru seçin...",
       "profile": "Profil seçin",
       "remove": "Açın",
-      "private": "Şəxsi",
       "search": "Repozitoriyaları axtarın...",
       "addedToast": "\"{{repo}}\" üçün defolt profil ayarlandı",
       "addFailed": "Defolt profili qurmaq mümkün olmadı",

@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Bidliet",
-    "organizationTrialEnded": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Sid l-organizzazzjoni jista' jaġġorna l-fatturazzjoni fuq kilo.ai, imbagħad jerġa' jipprova."
+    "organizationTrialEnded": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Sid l-organizzazzjoni jista' jaġġorna l-fatturazzjoni fuq kilo.ai, imbagħad jerġa' jipprova.",
+    "privateRepositoryA11y": "{{name}}, repositorju privat"
   },
   "language": {
     "restarting": "L-app qed terġa' tibda biex tapplika l-lingwa",
@@ -4101,7 +4102,6 @@
       "repo": "Agħżel repożitorju...",
       "profile": "Agħżel il-profil",
       "remove": "Ħoll",
-      "private": "Privat",
       "search": "Fittex repożitorji...",
       "addedToast": "Profil default issettjat għal \"{{repo}}\"",
       "addFailed": "Ma setax jissettja l-profil default",

@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Ngā huringa",
-    "organizationTrialEnded": "Kua mutu te whakamātautau o te whakahaerenga, ā, kāore ōna mahere kaha. Ka taea e te rangatira o te whakahaerenga te whakahou i te nama i kilo.ai, kātahi ka whakamātau anō."
+    "organizationTrialEnded": "Kua mutu te whakamātautau o te whakahaerenga, ā, kāore ōna mahere kaha. Ka taea e te rangatira o te whakahaerenga te whakahou i te nama i kilo.ai, kātahi ka whakamātau anō.",
+    "privateRepositoryA11y": "{{name}}, tahua tūmataiti"
   },
   "language": {
     "restarting": "Kei te tīmata anō hei whakamahi i te reo",
@@ -3948,7 +3949,6 @@
       "repo": "Tīpakohia te rokiroki…",
       "profile": "Tīpakohia te kōtaha",
       "remove": "Wewetehia",
-      "private": "Tūmataiti",
       "search": "Rapua nga putunga…",
       "addedToast": "Kotaha taunoa kua tautuhia mo \"{{repo}}\"",
       "addFailed": "Kāore i taea te tautuhi kōtaha taunoa",

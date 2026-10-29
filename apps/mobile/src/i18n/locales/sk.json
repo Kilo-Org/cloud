@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Zmeny",
-    "organizationTrialEnded": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Vlastník organizácie môže aktualizovať fakturáciu na kilo.ai a potom to skúsiť znova."
+    "organizationTrialEnded": "Skúšobné obdobie organizácie sa skončilo a organizácia nemá aktívny plán. Vlastník organizácie môže aktualizovať fakturáciu na kilo.ai a potom to skúsiť znova.",
+    "privateRepositoryA11y": "{{name}}, súkromné úložisko"
   },
   "language": {
     "restarting": "Aplikácia sa reštartuje na zmenu jazyka",
@@ -4050,7 +4051,6 @@
       "repo": "Vybrať úložisko…",
       "profile": "Vyberte profil",
       "remove": "Odviazať",
-      "private": "Súkromné",
       "search": "Hľadať v úložiskách…",
       "addedToast": "Predvolený profil nastavený pre „{{repo}}“",
       "addFailed": "Nepodarilo sa nastaviť predvolený profil",

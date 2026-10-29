@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Izmene",
-    "organizationTrialEnded": "Probni period organizacije je završen i ona nema aktivan plan. Vlasnik organizacije može da ažurira naplatu na kilo.ai, a zatim pokuša ponovo."
+    "organizationTrialEnded": "Probni period organizacije je završen i ona nema aktivan plan. Vlasnik organizacije može da ažurira naplatu na kilo.ai, a zatim pokuša ponovo.",
+    "privateRepositoryA11y": "{{name}}, privatno spremište"
   },
   "language": {
     "restarting": "Ponovno pokretanje radi promene jezika",
@@ -3999,7 +4000,6 @@
       "repo": "Izaberite spremište…",
       "profile": "Izaberite profil",
       "remove": "Odveži",
-      "private": "Privatno",
       "search": "Pretražite spremišta…",
       "addedToast": "Podrazumevani profil je postavljen za \"{{repo}}\"",
       "addFailed": "Nije moguće postaviti podrazumevani profil",

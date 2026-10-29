@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Àwọn àyípadà",
-    "organizationTrialEnded": "Àkókò ìdánwò àjọ náà ti parí, kò sì ní ètò tó ń ṣiṣẹ́. Ẹnìkan tí ó ni àjọ lè ṣe àtúnṣe ìsanwó ní kilo.ai, kí ó sì tún gbìyànjú."
+    "organizationTrialEnded": "Àkókò ìdánwò àjọ náà ti parí, kò sì ní ètò tó ń ṣiṣẹ́. Ẹnìkan tí ó ni àjọ lè ṣe àtúnṣe ìsanwó ní kilo.ai, kí ó sì tún gbìyànjú.",
+    "privateRepositoryA11y": "{{name}}, ibi ìpamọ́ kòòdù ikọkọ"
   },
   "language": {
     "restarting": "A ń tún bẹ̀rẹ̀ láti lo èdè tí o yàn",
@@ -3948,7 +3949,6 @@
       "repo": "Yan ibi ipamọ…",
       "profile": "Yan profaili",
       "remove": "Yọọ",
-      "private": "Ikọkọ",
       "search": "Ṣewadii awọn ibi ipamọ…",
       "addedToast": "Eto profaili aiyipada fun \"{{repo}}\"",
       "addFailed": "Ko le ṣeto profaili aiyipada",

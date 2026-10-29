@@ -519,6 +519,7 @@ describe('cloudAgentNextRouter worktree changes access', () => {
           ? caller.getWorktreeFile({
               cloudAgentSessionId,
               path: 'src/exact\nfile.ts',
+              scope: 'uncommitted',
               expectedRevision: 7,
             })
           : caller[procedure]({ cloudAgentSessionId });
@@ -537,6 +538,7 @@ describe('cloudAgentNextRouter worktree changes access', () => {
           expect(mockGetWorktreeFile).toHaveBeenCalledWith({
             cloudAgentSessionId: personalSessionId,
             path: 'src/exact\nfile.ts',
+            scope: 'uncommitted',
             expectedRevision: 7,
           });
         }

@@ -2079,6 +2079,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Bezpečnostní služba není nastavená. Dokud se to neopraví, opakované odeslání nebude úspěšné.",
+      "serviceUnavailable": "Zabezpečovací služba není k dispozici. Zkuste to znovu.",
       "syncMayNotHaveCompleted": "Synchronizace se možná nedokončila. Opakováním sjednoťte její stav, nebo ji zahoďte.",
       "syncInProgress": "Synchronizace bezpečnostních nálezů již probíhá. Zkuste to znovu.",
       "dismissalInProgress": "Zamítání tohoto nálezu již probíhá. Zkuste to znovu.",

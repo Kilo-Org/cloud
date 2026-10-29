@@ -2025,6 +2025,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "A biztonsági szolgáltatás nincs beállítva. Az újraküldés csak a beállítás után lehet sikeres.",
+      "serviceUnavailable": "A biztonsági szolgáltatás nem érhető el. Próbáld újra.",
       "syncMayNotHaveCompleted": "Lehet, hogy egy szinkronizálás nem fejeződött be. Az állapot egyeztetéséhez próbáld újra, vagy vesd el.",
       "syncInProgress": "Már folyamatban van egy biztonsági szinkronizálás. Próbáld újra.",
       "dismissalInProgress": "Ez az elvetés már folyamatban van. Próbáld újra.",

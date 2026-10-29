@@ -1501,6 +1501,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Layanan keamanan belum dikonfigurasi. Pengiriman ulang tidak akan berhasil sebelum konfigurasi diperbaiki.",
+      "serviceUnavailable": "Layanan keamanan tidak tersedia. Coba lagi.",
       "syncMayNotHaveCompleted": "Sinkronisasi mungkin belum selesai. Coba lagi untuk menyelaraskan statusnya, atau batalkan.",
       "syncInProgress": "Sinkronisasi keamanan sedang berlangsung. Coba lagi.",
       "dismissalInProgress": "Pengabaian temuan ini sedang diproses. Coba lagi.",

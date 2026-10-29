@@ -2025,6 +2025,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Tajaajilli nageenyaa hin qindaa'ine. Hanga kun sirreeffamutti irra deebi'anii erguun milkaa'uu hin danda'u.",
+      "serviceUnavailable": "Tajaajila nageenya hin argamne. Irra deebi'ii yaali.",
       "syncMayNotHaveCompleted": "Walsimsiisuun hin xumuramne ta'a. Walsimsiisuu xumuruuf irra deebi'ii yaali, ykn dhiisi.",
       "syncInProgress": "Walsimsiisuun nageenyaa duraanuu adeemaa jira. Irra deebi'ii yaali.",
       "dismissalInProgress": "Dhiisuun kun duraanuu adeemaa jira. Irra deebi'ii yaali.",

@@ -2106,6 +2106,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Níl an tseirbhís slándála cumraithe. Ní éireoidh le hathsheoladh go dtí go gceartófar é seo.",
+      "serviceUnavailable": "Níl seirbhís slándála ar fáil. Bain triail as arís le do thoil.",
       "syncMayNotHaveCompleted": "Seans nár críochnaíodh sioncronú. Bain triail as arís chun a stádas a réiteach, nó caith amach é.",
       "syncInProgress": "Tá sioncronú slándála ar siúl cheana. Bain triail as arís le do thoil.",
       "dismissalInProgress": "Tá an díbhe seo ar siúl cheana. Bain triail as arís le do thoil.",

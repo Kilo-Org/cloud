@@ -2025,6 +2025,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Perkhidmatan keselamatan belum dikonfigurasikan. Penghantaran semula akan tetap gagal sehingga masalah ini diselesaikan.",
+      "serviceUnavailable": "Perkhidmatan keselamatan tidak tersedia. Sila cuba lagi.",
       "syncMayNotHaveCompleted": "Penyegerakan mungkin belum selesai. Cuba lagi untuk menyelaraskan statusnya atau buang rekodnya.",
       "syncInProgress": "Penyegerakan keselamatan sedang berjalan. Sila cuba lagi.",
       "dismissalInProgress": "Proses mengetepikan penemuan ini sedang berjalan. Sila cuba lagi.",

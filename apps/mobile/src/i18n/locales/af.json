@@ -2025,6 +2025,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Die sekuriteitsdiens is nie opgestel nie. Herindiening kan nie slaag voordat dit reggestel is nie.",
+      "serviceUnavailable": "Sekuriteitsdiens is nie beskikbaar nie. Probeer asseblief weer.",
       "syncMayNotHaveCompleted": "'N Sinkronisasie is dalk nie voltooi nie. Probeer weer om die status daarvan na te gaan en by te werk, of laat vaar dit.",
       "syncInProgress": "'N Sekuriteitsinkronisasie is reeds aan die gang. Probeer asseblief weer.",
       "dismissalInProgress": "Hierdie verwerping is reeds aan die gang. Probeer asseblief weer.",

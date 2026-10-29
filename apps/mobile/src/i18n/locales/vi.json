@@ -1501,6 +1501,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Dịch vụ bảo mật chưa được cấu hình. Bạn cần khắc phục vấn đề này thì mới có thể gửi lại thành công.",
+      "serviceUnavailable": "Dịch vụ bảo mật hiện không khả dụng. Vui lòng thử lại.",
       "syncMayNotHaveCompleted": "Một lần đồng bộ có thể chưa hoàn tất. Hãy thử lại để cập nhật trạng thái hoặc hủy bỏ.",
       "syncInProgress": "Một lần đồng bộ bảo mật đang diễn ra. Vui lòng thử lại.",
       "dismissalInProgress": "Việc bỏ qua này đang được xử lý. Vui lòng thử lại.",

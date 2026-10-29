@@ -2025,6 +2025,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "A kò tíì ṣètò iṣẹ́ ààbò. Fífiranṣẹ́ lẹ́ẹ̀kan sí i kò lè yọrí sí rere títí a ó fi tún èyí ṣe.",
+      "serviceUnavailable": "Iṣẹ́ aàbò kò wà. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
       "syncMayNotHaveCompleted": "Ó ṣeé ṣe kí ìmúṣiṣẹ́pọ̀ kan má tíì parí. Tún gbìyànjú láti mú dátà bá ara rẹ̀ mu, tàbí kọ̀ ọ́ sílẹ̀.",
       "syncInProgress": "Ìmúṣiṣẹ́pọ̀ ààbò kan ti ń lọ lọ́wọ́. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
       "dismissalInProgress": "Ìkọ̀sílẹ̀ yìí ti ń lọ lọ́wọ́. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",

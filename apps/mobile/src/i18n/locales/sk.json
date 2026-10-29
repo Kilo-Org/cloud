@@ -2079,6 +2079,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Bezpečnostná služba nie je nastavená. Kým sa tento problém nevyrieši, opätovné odoslanie zlyhá.",
+      "serviceUnavailable": "Zabezpečovacia služba nie je dostupná. Skúste to znova.",
       "syncMayNotHaveCompleted": "Synchronizácia sa možno nedokončila. Zopakujte ju, aby sa zosúladil stav údajov, alebo ju zrušte.",
       "syncInProgress": "Synchronizácia bezpečnostných nálezov už prebieha. Skúste to znova.",
       "dismissalInProgress": "Zamietanie tohto nálezu už prebieha. Skúste to znova.",

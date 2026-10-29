@@ -2025,6 +2025,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Segurtasun-zerbitzua ez dago konfiguratuta. Arazoa konpondu arte, berriro bidaltzeak ere huts egingo du.",
+      "serviceUnavailable": "Segurtasun-zerbitzua ez dago erabilgarri. Saiatu berriro.",
       "syncMayNotHaveCompleted": "Baliteke sinkronizazioa amaitu gabe geratu izana. Saiatu berriro haren egoera eguneratzeko, edo baztertu.",
       "syncInProgress": "Segurtasun-sinkronizazio bat jada martxan dago. Saiatu berriro.",
       "dismissalInProgress": "Baztertze hau jada martxan dago. Saiatu berriro.",

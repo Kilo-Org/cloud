@@ -2025,6 +2025,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Tsy voarafitra ny serivisy fiarovana. Tsy hahomby ny fandefasana indray mandra-pandaminana izany.",
+      "serviceUnavailable": "Tsy misy ny fanompoana fiarovana. Andramo indray azafady.",
       "syncMayNotHaveCompleted": "Mety tsy vita ny fampifanarahana iray. Andramo indray mba hampifanaraka ny angona, na ario ilay fangatahana.",
       "syncInProgress": "Efa mandeha ny fampifanarahana ny angon'ny fiarovana. Andramo indray azafady.",
       "dismissalInProgress": "Efa mandeha ity fanilihana ity. Andramo indray azafady.",

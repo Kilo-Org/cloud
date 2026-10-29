@@ -2133,6 +2133,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Nid yw'r gwasanaeth diogelwch wedi'i ffurfweddu. Ni fydd ailgyflwyno'n llwyddo nes bod hyn wedi'i drwsio.",
+      "serviceUnavailable": "Nid yw'r gwasanaeth diogelwch ar gael. Ceisiwch eto.",
       "syncMayNotHaveCompleted": "Efallai na chwblhawyd y cysoniad. Ceisiwch eto i gysoni'r statws, neu hepgorwch y cysoniad.",
       "syncInProgress": "Mae cysoniad diogelwch eisoes ar y gweill. Ceisiwch eto.",
       "dismissalInProgress": "Mae'r broses ddiystyru hon eisoes ar y gweill. Ceisiwch eto.",

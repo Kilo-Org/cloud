@@ -2052,6 +2052,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "O serviço de segurança não está configurado. É necessário corrigir a configuração antes de tentar reenviar.",
+      "serviceUnavailable": "O serviço de segurança não está disponível. Tenta novamente.",
       "syncMayNotHaveCompleted": "Uma sincronização pode ter ficado incompleta. Tenta novamente para atualizar o estado ou descarta a operação.",
       "syncInProgress": "Já está em curso uma sincronização de segurança. Tenta novamente.",
       "dismissalInProgress": "Esta ocorrência já está a ser descartada. Tenta novamente.",

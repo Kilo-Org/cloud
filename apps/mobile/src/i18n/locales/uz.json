@@ -2025,6 +2025,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Xavfsizlik xizmati sozlanmagan. Bu tuzatilmaguncha qayta yuborish natija bermaydi.",
+      "serviceUnavailable": "Xavfsizlik xizmati mavjud emas. Iltimos, qayta urinib ko'ring.",
       "syncMayNotHaveCompleted": "Sinxronlash yakunlanmagan bo'lishi mumkin. Uning holatini aniqlashtirish uchun qayta urinib ko'ring yoki bekor qiling.",
       "syncInProgress": "Xavfsizlik ma'lumotlari allaqachon sinxronlanmoqda. Iltimos, qayta urinib ko'ring.",
       "dismissalInProgress": "Bu muammo allaqachon rad etilmoqda. Iltimos, qayta urinib ko'ring.",

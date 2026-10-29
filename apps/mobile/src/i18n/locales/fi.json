@@ -2025,6 +2025,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Tietoturvapalvelua ei ole määritetty. Uudelleenlähetys ei voi onnistua ennen kuin tämä on korjattu.",
+      "serviceUnavailable": "Turvallisuuspalvelu ei ole käytettävissä. Yritä uudelleen.",
       "syncMayNotHaveCompleted": "Synkronointi on ehkä kesken. Yritä uudelleen sen tilan selvittämiseksi tai hylkää se.",
       "syncInProgress": "Tietoturvasynkronointi on jo käynnissä. Yritä uudelleen.",
       "dismissalInProgress": "Tämä hylkäys on jo käynnissä. Yritä uudelleen.",

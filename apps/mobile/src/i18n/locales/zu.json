@@ -2025,6 +2025,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Isevisi yezokuphepha ayikasethwa. Ukuphinda uthumele ngeke kuphumelele kuze kulungiswe lokhu.",
+      "serviceUnavailable": "Insizakalo yokuvikela ayitholakali. Sicela uzame futhi.",
       "syncMayNotHaveCompleted": "Kungenzeka ukuvumelanisa akuphelanga. Phinda uzame ukuze kulungiswe isimo sakho, noma ukulahle.",
       "syncInProgress": "Ukuvumelanisa kokuphepha sekuqhubeka. Sicela uzame futhi.",
       "dismissalInProgress": "Lokhu kuchitha sekuyaqhubeka. Sicela uzame futhi.",

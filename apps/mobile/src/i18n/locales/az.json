@@ -2025,6 +2025,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Təhlükəsizlik xidməti tənzimlənməyib. Bu problem həll olunana qədər sorğunu yenidən göndərmək nəticə verməyəcək.",
+      "serviceUnavailable": "Təhlükəsizlik xidməti əlçatmazdır. Yenidən cəhd et.",
       "syncMayNotHaveCompleted": "Sinxronlaşdırma tamamlanmamış ola bilər. Vəziyyəti dəqiqləşdirmək üçün yenidən cəhd et və ya ləğv et.",
       "syncInProgress": "Təhlükəsizlik məlumatlarının sinxronlaşdırılması artıq davam edir. Yenidən cəhd et.",
       "dismissalInProgress": "Bu tapıntının rədd edilməsi artıq davam edir. Yenidən cəhd et.",

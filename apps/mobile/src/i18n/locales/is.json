@@ -2025,6 +2025,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Öryggisþjónustan er ekki stillt. Ekki er hægt að senda aftur fyrr en það hefur verið lagað.",
+      "serviceUnavailable": "Öryggisþjónustan er ekki tiltæk. Reyndu aftur.",
       "syncMayNotHaveCompleted": "Samstillingu er hugsanlega ekki lokið. Reyndu aftur til að samræma stöðuna eða fargaðu beiðninni.",
       "syncInProgress": "Öryggissamstilling er þegar í gangi. Reyndu aftur.",
       "dismissalInProgress": "Þessi frávísun er þegar í gangi. Reyndu aftur.",

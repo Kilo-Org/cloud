@@ -1501,6 +1501,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "セキュリティサービスが設定されていません。設定が完了するまで再送信しても成功しません。",
+      "serviceUnavailable": "セキュリティサービスは利用できません。もう一度お試しください。",
       "syncMayNotHaveCompleted": "同期が完了していない可能性があります。再試行して状態の整合性を確認するか、破棄してください。",
       "syncInProgress": "セキュリティの同期はすでに実行中です。もう一度お試しください。",
       "dismissalInProgress": "この検出結果の却下はすでに処理中です。もう一度お試しください。",

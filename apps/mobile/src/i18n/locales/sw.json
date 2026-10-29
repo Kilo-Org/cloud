@@ -2025,6 +2025,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Huduma ya usalama haijasanidiwa. Kuwasilisha tena hakutafaulu hadi hili lirekebishwe.",
+      "serviceUnavailable": "Huduma ya usalama haipatikani. Tafadhali jaribu tena.",
       "syncMayNotHaveCompleted": "Huenda usawazishaji haujakamilika. Jaribu tena ili kupatanisha hali yake au uuondoe.",
       "syncInProgress": "Usawazishaji wa usalama tayari unaendelea. Tafadhali jaribu tena.",
       "dismissalInProgress": "Uondoaji huu tayari unaendelea. Tafadhali jaribu tena.",

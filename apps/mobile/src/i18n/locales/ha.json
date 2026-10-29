@@ -2025,6 +2025,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Ba a saita sabis ɗin tsaro ba. Sake ƙaddamarwa ba zai yi nasara ba har sai an gyara wannan.",
+      "serviceUnavailable": "Sabis na tsaro ba ya nan. Sake gwadawa.",
       "syncMayNotHaveCompleted": "Wataƙila ba a kammala daidaitawa ba. Sake gwadawa don tabbatar da halinta, ko ka yi watsi da ita.",
       "syncInProgress": "Tuni ake daidaita bayanan tsaro. Sake gwadawa.",
       "dismissalInProgress": "Tuni ake aiwatar da wannan watsi. Sake gwadawa.",

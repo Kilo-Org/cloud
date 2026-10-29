@@ -2025,6 +2025,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Hindi pa na-set up ang serbisyo sa seguridad. Hindi magtatagumpay ang muling pagsusumite hangga't hindi ito naaayos.",
+      "serviceUnavailable": "Hindi available ang serbisyo ng seguridad. Pakisubukang muli.",
       "syncMayNotHaveCompleted": "Maaaring hindi natapos ang isang pag-sync. Subukang muli para maitugma ang data, o itapon ito.",
       "syncInProgress": "May pag-sync na ng data ng seguridad na kasalukuyang isinasagawa. Pakisubukang muli.",
       "dismissalInProgress": "Isinasagawa na ang pagbalewalang ito. Pakisubukang muli.",

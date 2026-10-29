@@ -2025,6 +2025,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Sikkerhetstjenesten er ikke konfigurert. Du kan ikke sende inn på nytt før dette er rettet.",
+      "serviceUnavailable": "Sikkerhetstjenesten er utilgjengelig. Prøv igjen.",
       "syncMayNotHaveCompleted": "En synkronisering er kanskje ikke fullført. Prøv igjen for å avklare statusen, eller forkast forsøket.",
       "syncInProgress": "En sikkerhetssynkronisering pågår allerede. Prøv igjen.",
       "dismissalInProgress": "Denne avvisningen pågår allerede. Prøv igjen.",

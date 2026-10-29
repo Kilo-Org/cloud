@@ -1501,6 +1501,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Güvenlik hizmeti yapılandırılmamış. Bu sorun çözülmeden yeniden gönderme işlemi başarılı olamaz.",
+      "serviceUnavailable": "Güvenlik hizmeti kullanılamıyor. Lütfen tekrar dene.",
       "syncMayNotHaveCompleted": "Bir eşitleme tamamlanmamış olabilir. Durumunu güncellemek için tekrar dene veya işlemden vazgeç.",
       "syncInProgress": "Bir güvenlik eşitlemesi zaten devam ediyor. Lütfen tekrar dene.",
       "dismissalInProgress": "Bu yok sayma işlemi zaten devam ediyor. Lütfen tekrar dene.",

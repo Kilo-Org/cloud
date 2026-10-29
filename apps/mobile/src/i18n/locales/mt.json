@@ -2106,6 +2106,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Is-servizz tas-sigurtà mhuwiex ikkonfigurat. Is-sottomissjoni mill-ġdid ma tistax tirnexxi sakemm dan jitranġa.",
+      "serviceUnavailable": "Is-servizz tas-sigurtà mhuwiex disponibbli. Jekk jogħġbok erġa' pprova.",
       "syncMayNotHaveCompleted": "Jista' jkun li sinkronizzazzjoni ma tlestietx. Erġa' pprova biex tivverifika u taġġorna l-istat tagħha, jew warrabha.",
       "syncInProgress": "Sinkronizzazzjoni tas-sigurtà diġà għaddejja. Jekk jogħġbok erġa' pprova.",
       "dismissalInProgress": "Dan it-twarrib diġà qed isir. Jekk jogħġbok erġa' pprova.",

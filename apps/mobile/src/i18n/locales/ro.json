@@ -2052,6 +2052,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Serviciul de securitate nu este configurat. Retrimiterea nu va reuși până la rezolvarea acestei probleme.",
+      "serviceUnavailable": "Serviciul de securitate nu este disponibil. Încearcă din nou.",
       "syncMayNotHaveCompleted": "Este posibil ca o sincronizare să nu se fi finalizat. Reîncearcă pentru a-i actualiza starea sau renunță.",
       "syncInProgress": "O sincronizare de securitate este deja în curs. Încearcă din nou.",
       "dismissalInProgress": "Această respingere este deja în curs. Încearcă din nou.",

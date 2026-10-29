@@ -1509,6 +1509,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "שירות האבטחה אינו מוגדר. לא ניתן לשלוח שוב את הבקשה עד שהבעיה תתוקן.",
+      "serviceUnavailable": "שירות האבטחה אינו זמין. נסה שוב.",
       "syncMayNotHaveCompleted": "ייתכן שהסנכרון לא הושלם. נסה שוב כדי לעדכן את מצבו, או בטל את הבקשה.",
       "syncInProgress": "סנכרון אבטחה כבר מתבצע. נסה שוב.",
       "dismissalInProgress": "הדחייה הזו כבר מתבצעת. נסה שוב.",

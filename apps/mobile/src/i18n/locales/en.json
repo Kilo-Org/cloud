@@ -2091,6 +2091,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "Security service is not configured. Resubmitting cannot succeed until this is fixed.",
+      "serviceUnavailable": "The security service is unavailable. Try again.",
       "syncMayNotHaveCompleted": "A sync may not have completed. Retry to reconcile it, or discard.",
       "syncInProgress": "A security sync is already in progress. Please try again.",
       "dismissalInProgress": "This dismissal is already in progress. Please try again.",

@@ -2025,6 +2025,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "A hazibeghị ọrụ nchebe. Izigara ya ọzọ agaghị aga nke ọma ruo mgbe e doziri nke a.",
+      "serviceUnavailable": "Ọrụ nchekwa adịghị. Biko nwaa ọzọ.",
       "syncMayNotHaveCompleted": "O nwere ike ịbụ na mmekọrịta data ezubeghị. Nwaa ọzọ ka data kwekọọ, ma ọ bụ tufuo ya.",
       "syncInProgress": "Mmekọrịta data nchebe amalitela. Biko nwaa ọzọ.",
       "dismissalInProgress": "Mwepụ a amalitela. Biko nwaa ọzọ.",

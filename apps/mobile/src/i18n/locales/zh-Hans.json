@@ -1501,6 +1501,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "安全服务尚未配置。完成配置前，重新提交也无法成功。",
+      "serviceUnavailable": "安全服务不可用。请重试。",
       "syncMayNotHaveCompleted": "同步可能尚未完成。请重试以核对同步状态，或放弃此次同步。",
       "syncInProgress": "已有安全同步正在进行。请重试。",
       "dismissalInProgress": "此忽略操作正在进行中。请重试。",

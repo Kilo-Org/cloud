@@ -1477,6 +1477,7 @@
     },
     "mutations": {
       "serviceNotConfiguredResubmit": "O serviço de segurança não está configurado. O reenvio só funcionará após a correção desse problema.",
+      "serviceUnavailable": "O serviço de segurança está indisponível. Tente novamente.",
       "syncMayNotHaveCompleted": "Uma sincronização pode não ter sido concluída. Tente novamente para atualizar o status ou descarte-a.",
       "syncInProgress": "Uma sincronização de segurança já está em andamento. Tente novamente.",
       "dismissalInProgress": "O descarte já está em andamento. Tente novamente.",

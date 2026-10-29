@@ -1978,7 +1978,7 @@
       "eventsCount_other": "{{displayCount}} događaja",
       "generated": "Izvještaj je generiran {{generatedAt}}.",
       "noActivity": "Nema zabilježene aktivnosti",
-      "noActivityDescription": "Kilo nema aktivnosti vezanih za sigurnosne nalaze koje treba prikazati u izvještaju za period od {{start}} do {{end}}.",
+      "noActivityDescription": "Kilo nema aktivnosti vezanih za sigurnosne nalaze koje treba prikazati u izvještaju u ovom periodu.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Repozitorij nije zabilježen",
       "reasonUnknown": "Neprepoznat razlog",

@@ -1951,7 +1951,7 @@
       "eventsCount_other": "{{displayCount}} ክስተቶች",
       "generated": "ሪፖርቱ በ{{generatedAt}} ተዘጋጅቷል።",
       "noActivity": "ምንም የተመዘገበ እንቅስቃሴ የለም",
-      "noActivityDescription": "ከ{{start}} እስከ {{end}} በKilo ውስጥ በሪፖርት የሚካተት የደህንነት ግኝቶች እንቅስቃሴ የለም።",
+      "noActivityDescription": "በKilo ውስጥ በሪፖርት የሚካተት የደህንነት ግኝቶች እንቅስቃሴ የለም።",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "ማከማቻው አልተመዘገበም",
       "reasonUnknown": "ያልታወቀ ምክንያት",

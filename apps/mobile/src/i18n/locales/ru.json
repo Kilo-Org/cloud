@@ -1203,7 +1203,7 @@
       "eventsCount_other": "{{displayCount}} события",
       "generated": "Отчёт создан: {{generatedAt}}.",
       "noActivity": "Нет зарегистрированных действий",
-      "noActivityDescription": "В Kilo нет действий с уязвимостями для включения в отчёт за период с {{start}} по {{end}}.",
+      "noActivityDescription": "В Kilo нет действий с уязвимостями для включения в отчёт.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "Не удалось завершить запрос отчёта. Попробуйте снова.",
       "repositoryNotRecorded": "Данные о репозитории не сохранены",

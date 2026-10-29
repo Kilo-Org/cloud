@@ -1167,7 +1167,7 @@
       "eventsCount_other": "{{displayCount}} eventi",
       "generated": "Il report è stato generato il {{generatedAt}}.",
       "noActivity": "Nessuna attività registrata",
-      "noActivityDescription": "Kilo non ha attività relative alle segnalazioni di sicurezza da includere nel report per il periodo da {{start}} a {{end}}.",
+      "noActivityDescription": "Kilo non ha attività relative alle segnalazioni di sicurezza da includere nel report.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "Il recupero dei dati del report non è stato completato. Riprova.",
       "repositoryNotRecorded": "Repository non registrato",

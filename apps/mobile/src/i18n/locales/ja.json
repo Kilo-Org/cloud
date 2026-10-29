@@ -1195,7 +1195,7 @@
       "eventsCount_other": "{{displayCount}}件のイベント",
       "generated": "{{generatedAt}}に生成しました。",
       "noActivity": "記録されたアクティビティはありません",
-      "noActivityDescription": "{{start}}から{{end}}までの期間に、Kiloには報告対象となるセキュリティの検出結果に関するアクティビティがありません。",
+      "noActivityDescription": "Kiloには報告対象となるセキュリティの検出結果に関するアクティビティがありません。",
       "periodUtc": "{{start}}～{{end}}（UTC）",
       "queryFailed": "レポートの取得が完了しませんでした。もう一度お試しください。",
       "repositoryNotRecorded": "リポジトリの記録なし",

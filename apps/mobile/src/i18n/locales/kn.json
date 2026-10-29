@@ -1951,7 +1951,7 @@
       "eventsCount_other": "{{displayCount}} ಘಟನೆಗಳು",
       "generated": "{{generatedAt}} ರಂದು ರಚಿಸಲಾಗಿದೆ.",
       "noActivity": "ಯಾವುದೇ ಚಟುವಟಿಕೆ ದಾಖಲಾಗಿಲ್ಲ",
-      "noActivityDescription": "{{start}} ರಿಂದ {{end}} ವರೆಗೆ ಪತ್ತೆಯಾದ ಭದ್ರತಾ ಸಮಸ್ಯೆಗಳ ಕುರಿತು ವರದಿಯಲ್ಲಿ ಸೇರಿಸಬಹುದಾದ ಯಾವುದೇ ಚಟುವಟಿಕೆ Kilo ದಲ್ಲಿ ದಾಖಲಾಗಿಲ್ಲ.",
+      "noActivityDescription": "ವರದಿಯಲ್ಲಿ ಸೇರಿಸಬಹುದಾದ ಯಾವುದೇ ಭದ್ರತಾ ಸಮಸ್ಯೆಗಳ ಚಟುವಟಿಕೆ Kilo ದಲ್ಲಿ ದಾಖಲಾಗಿಲ್ಲ.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "ರೆಪೊಸಿಟರಿ ದಾಖಲಾಗಿಲ್ಲ",
       "reasonUnknown": "ಗುರುತಿಸಲಾಗದ ಕಾರಣ",

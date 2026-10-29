@@ -1195,7 +1195,7 @@
       "eventsCount_other": "{{displayCount}} gebeurtenissen",
       "generated": "Dit rapport is gegenereerd op {{generatedAt}}.",
       "noActivity": "Geen vastgelegde activiteit",
-      "noActivityDescription": "Kilo heeft van {{start}} tot {{end}} geen activiteit rond beveiligingsbevindingen om te rapporteren.",
+      "noActivityDescription": "Kilo heeft in deze periode geen activiteit rond beveiligingsbevindingen om te rapporteren.",
       "periodUtc": "{{start}} TOT {{end}} · UTC",
       "queryFailed": "Het opvragen van het rapport is niet voltooid. Probeer het opnieuw.",
       "repositoryNotRecorded": "Repository niet vastgelegd",

@@ -1978,7 +1978,7 @@
       "eventsCount_other": "{{displayCount}} notikumi",
       "generated": "Ziņojums sagatavots {{generatedAt}}.",
       "noActivity": "Nav reģistrētu darbību",
-      "noActivityDescription": "Laikposmā no {{start}} līdz {{end}} Kilo nav reģistrētas ar drošības konstatējumiem saistītas darbības, ko iekļaut ziņojumā.",
+      "noActivityDescription": "Kilo nav reģistrētas ar drošības konstatējumiem saistītas darbības, ko iekļaut ziņojumā.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Repozitorijs nav reģistrēts",
       "reasonUnknown": "Neatpazīts iemesls",

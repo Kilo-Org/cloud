@@ -1951,7 +1951,7 @@
       "eventsCount_other": "{{displayCount}} Zava-nitranga",
       "generated": "Noforonina tamin'ny {{generatedAt}}.",
       "noActivity": "Tsy misy asa voarakitra",
-      "noActivityDescription": "Tsy manana asa momba ny olana hita amin'ny fiarovana azo ampidirina anaty tatitra i Kilo, nanomboka ny {{start}} ka hatramin'ny {{end}}.",
+      "noActivityDescription": "Tsy manana asa momba ny olana hita amin'ny fiarovana azo ampidirina anaty tatitra i Kilo.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Tsy voarakitra ny tahirin-kaody",
       "reasonUnknown": "Antony tsy fantatra",

@@ -1951,7 +1951,7 @@
       "eventsCount_other": "{{displayCount}} kaganapan",
       "generated": "Nabuo noong {{generatedAt}}.",
       "noActivity": "Walang naitalang aktibidad",
-      "noActivityDescription": "Walang aktibidad sa mga natukoy na isyu sa seguridad na maiuulat ang Kilo mula {{start}} hanggang {{end}}.",
+      "noActivityDescription": "Walang aktibidad sa mga natukoy na isyu sa seguridad na maiuulat ang Kilo.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Hindi naitala ang repository",
       "reasonUnknown": "Hindi nakikilalang dahilan",

@@ -1951,7 +1951,7 @@
       "eventsCount_other": "{{displayCount}} tapahtumaa",
       "generated": "Raportti luotiin {{generatedAt}}",
       "noActivity": "Ei kirjattuja tapahtumia",
-      "noActivityDescription": "Kilossa ei ole raportoitavia tietoturvahavaintojen tapahtumia ajalta {{start}}–{{end}}.",
+      "noActivityDescription": "Kilossa ei ole raportoitavia tietoturvahavaintojen tapahtumia tällä ajanjaksolla.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Koodivarastoa ei ole kirjattu",
       "reasonUnknown": "Tunnistamaton syy",

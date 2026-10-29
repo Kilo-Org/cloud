@@ -1951,7 +1951,7 @@
       "eventsCount_other": "{{displayCount}} esemény",
       "generated": "A jelentés elkészült: {{generatedAt}}.",
       "noActivity": "Nincs rögzített tevékenység",
-      "noActivityDescription": "A Kilo nem rögzített jelentésbe foglalható tevékenységet a biztonsági találatokhoz {{start}} és {{end}} között.",
+      "noActivityDescription": "A Kilo nem rögzített jelentésbe foglalható tevékenységet a biztonsági találatokhoz ebben az időszakban.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Nincs rögzített adattár",
       "reasonUnknown": "Nem felismert indok",

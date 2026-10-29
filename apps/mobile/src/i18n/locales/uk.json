@@ -1203,7 +1203,7 @@
       "eventsCount_other": "{{displayCount}} події",
       "generated": "Звіт сформовано {{generatedAt}}.",
       "noActivity": "Немає зафіксованих дій",
-      "noActivityDescription": "За період із {{start}} до {{end}} у Kilo не зафіксовано дій із проблемами безпеки, які можна включити до звіту.",
+      "noActivityDescription": "За цей період у Kilo не зафіксовано дій із проблемами безпеки, які можна включити до звіту.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "Не вдалося завершити запит на звіт. Спробуйте ще раз.",
       "repositoryNotRecorded": "Репозиторій не зафіксовано",

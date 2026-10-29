@@ -1951,7 +1951,7 @@
       "eventsCount_other": "{{displayCount}} အဖြစ်အပျက်များ",
       "generated": "{{generatedAt}} တွင် ထုတ်ပေးထားသည်။",
       "noActivity": "မှတ်တမ်းတင်ထားသော လုပ်ဆောင်ချက် မရှိပါ",
-      "noActivityDescription": "{{start}} မှ {{end}} အထိ Kilo တွင် အစီရင်ခံရန် လုံခြုံရေးတွေ့ရှိချက်ဆိုင်ရာ လုပ်ဆောင်မှု မရှိပါ။",
+      "noActivityDescription": "Kilo တွင် အစီရင်ခံရန် လုံခြုံရေးတွေ့ရှိချက်ဆိုင်ရာ လုပ်ဆောင်မှု မရှိပါ။",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "ကုဒ်သိုလှောင်ရာကို မှတ်တမ်းမတင်ထား",
       "reasonUnknown": "အသိအမှတ်မပြုသော အကြောင်းရင်း",

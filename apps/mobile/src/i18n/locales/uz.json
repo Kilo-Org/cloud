@@ -1951,7 +1951,7 @@
       "eventsCount_other": "{{displayCount}} ta hodisa",
       "generated": "Yaratilgan vaqt: {{generatedAt}}.",
       "noActivity": "Qayd etilgan faoliyat yo'q",
-      "noActivityDescription": "{{start}} dan {{end}} gacha Kilo tizimida xavfsizlik muammolari bo'yicha hisobotga kiritiladigan amallar qayd etilmagan.",
+      "noActivityDescription": "Kilo tizimida xavfsizlik muammolari bo'yicha hisobotga kiritiladigan amallar qayd etilmagan.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Repozitoriya qayd etilmagan",
       "reasonUnknown": "Tanilmagan sabab",

@@ -1978,7 +1978,7 @@
       "eventsCount_other": "{{displayCount}} eventos",
       "generated": "Relatório gerado em {{generatedAt}}.",
       "noActivity": "Nenhuma atividade registada",
-      "noActivityDescription": "O Kilo não tem atividade de ocorrências de segurança para incluir no relatório de {{start}} a {{end}}.",
+      "noActivityDescription": "O Kilo não tem atividade de ocorrências de segurança para incluir no relatório neste período.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Repositório não registado",
       "reasonUnknown": "Motivo não reconhecido",

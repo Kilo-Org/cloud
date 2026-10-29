@@ -1199,7 +1199,7 @@
       "eventsCount_other": "{{displayCount}} eventos",
       "generated": "El informe se generó el {{generatedAt}}.",
       "noActivity": "Sin actividad registrada",
-      "noActivityDescription": "Kilo no ha registrado actividad de hallazgos de seguridad que incluir en el informe entre {{start}} y {{end}}.",
+      "noActivityDescription": "Kilo no ha registrado actividad de hallazgos de seguridad que incluir en el informe en este período.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "No se completó la consulta del informe. Inténtalo de nuevo.",
       "repositoryNotRecorded": "Repositorio no registrado",

@@ -1195,7 +1195,7 @@
       "eventsCount_other": "{{displayCount}} 個事件",
       "generated": "已於 {{generatedAt}} 產生。",
       "noActivity": "尚無活動記錄",
-      "noActivityDescription": "Kilo 在 {{start}} 至 {{end}} 期間沒有可列入報告的資安問題活動。",
+      "noActivityDescription": "Kilo 在此期間沒有可列入報告的資安問題活動。",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "報告查詢未完成。請再試一次。",
       "repositoryNotRecorded": "未記錄存放庫",

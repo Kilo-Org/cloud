@@ -1195,7 +1195,7 @@
       "eventsCount_other": "{{displayCount}} sự kiện",
       "generated": "Báo cáo được tạo vào {{generatedAt}}.",
       "noActivity": "Chưa ghi nhận hoạt động nào",
-      "noActivityDescription": "Kilo không ghi nhận hoạt động nào về vấn đề bảo mật để đưa vào báo cáo từ {{start}} đến {{end}}.",
+      "noActivityDescription": "Kilo không ghi nhận hoạt động nào về vấn đề bảo mật để đưa vào báo cáo trong khoảng thời gian này.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "Truy vấn báo cáo chưa hoàn tất. Hãy thử lại.",
       "repositoryNotRecorded": "Chưa ghi nhận kho lưu trữ",

@@ -1951,7 +1951,7 @@
       "eventsCount_other": "{{displayCount}} συμβάντα",
       "generated": "Η αναφορά δημιουργήθηκε: {{generatedAt}}.",
       "noActivity": "Δεν υπάρχει καταγεγραμμένη δραστηριότητα",
-      "noActivityDescription": "Το Kilo δεν έχει δραστηριότητα ευρημάτων ασφάλειας προς αναφορά από {{start}} έως {{end}}.",
+      "noActivityDescription": "Το Kilo δεν έχει δραστηριότητα ευρημάτων ασφάλειας προς αναφορά σε αυτή την περίοδο.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Το αποθετήριο δεν καταγράφηκε",
       "reasonUnknown": "Μη αναγνωρισμένος λόγος",

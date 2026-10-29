@@ -2005,7 +2005,7 @@
       "eventsCount_other": "{{displayCount}} udalostí",
       "generated": "Správa bola vygenerovaná {{generatedAt}}.",
       "noActivity": "Žiadna zaznamenaná aktivita",
-      "noActivityDescription": "Kilo za obdobie od {{start}} do {{end}} neeviduje žiadnu aktivitu týkajúcu sa bezpečnostných nálezov, ktorú by bolo možné zahrnúť do správy.",
+      "noActivityDescription": "Kilo neeviduje žiadnu aktivitu týkajúcu sa bezpečnostných nálezov, ktorú by bolo možné zahrnúť do správy za toto obdobie.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Repozitár nezaznamenaný",
       "reasonUnknown": "Nerozpoznaný dôvod",

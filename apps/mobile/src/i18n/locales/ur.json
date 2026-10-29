@@ -1951,7 +1951,7 @@
       "eventsCount_other": "{{displayCount}} واقعات",
       "generated": "رپورٹ {{generatedAt}} کو تیار کی گئی۔",
       "noActivity": "کوئی درج شدہ سرگرمی نہیں",
-      "noActivityDescription": "Kilo میں {{start}} سے {{end}} تک سکیورٹی مسائل سے متعلق کوئی قابلِ رپورٹ سرگرمی نہیں ہے۔",
+      "noActivityDescription": "Kilo میں اس عرصے کے دوران سکیورٹی مسائل سے متعلق کوئی قابلِ رپورٹ سرگرمی نہیں ہے۔",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "ریپوزٹری درج نہیں",
       "reasonUnknown": "ناقابلِ شناخت وجہ",

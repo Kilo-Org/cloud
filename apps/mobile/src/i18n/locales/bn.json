@@ -1951,7 +1951,7 @@
       "eventsCount_other": "{{displayCount}}টি ইভেন্ট",
       "generated": "তৈরির সময়: {{generatedAt}}।",
       "noActivity": "কোনো কার্যকলাপ রেকর্ড করা হয়নি",
-      "noActivityDescription": "{{start}} থেকে {{end}} পর্যন্ত নিরাপত্তা ত্রুটি নিয়ে রিপোর্টে দেখানোর মতো কোনো কার্যকলাপ Kilo-তে নেই।",
+      "noActivityDescription": "নিরাপত্তা ত্রুটি নিয়ে রিপোর্টে দেখানোর মতো কোনো কার্যকলাপ Kilo-তে নেই।",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "রিপোজিটরি রেকর্ড করা হয়নি",
       "reasonUnknown": "অপরিচিত কারণ",

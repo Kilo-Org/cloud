@@ -1951,7 +1951,7 @@
       "eventsCount_other": "{{displayCount}} സംഭവങ്ങൾ",
       "generated": "{{generatedAt}}-ൽ തയ്യാറാക്കി.",
       "noActivity": "രേഖപ്പെടുത്തിയ പ്രവർത്തനമൊന്നുമില്ല",
-      "noActivityDescription": "{{start}} മുതൽ {{end}} വരെ സുരക്ഷാ കണ്ടെത്തലുകളുമായി ബന്ധപ്പെട്ട് റിപ്പോർട്ട് ചെയ്യാവുന്ന പ്രവർത്തനങ്ങളൊന്നും Kilo-യിൽ ഇല്ല.",
+      "noActivityDescription": "ഈ കാലയളവിൽ സുരക്ഷാ കണ്ടെത്തലുകളുമായി ബന്ധപ്പെട്ട് റിപ്പോർട്ട് ചെയ്യാവുന്ന പ്രവർത്തനങ്ങളൊന്നും Kilo-യിൽ ഇല്ല.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "റിപ്പോസിറ്ററി രേഖപ്പെടുത്തിയിട്ടില്ല",
       "reasonUnknown": "തിരിച്ചറിയാത്ത കാരണം",

@@ -1951,7 +1951,7 @@
       "eventsCount_other": "{{displayCount}} peristiwa",
       "generated": "Laporan dijana pada {{generatedAt}}.",
       "noActivity": "Tiada aktiviti direkodkan",
-      "noActivityDescription": "Kilo tidak mempunyai aktiviti penemuan keselamatan yang boleh dilaporkan dari {{start}} hingga {{end}}.",
+      "noActivityDescription": "Kilo tidak mempunyai aktiviti penemuan keselamatan yang boleh dilaporkan dalam tempoh ini.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Repositori tidak direkodkan",
       "reasonUnknown": "Sebab tidak dikenali",

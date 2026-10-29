@@ -1951,7 +1951,7 @@
       "eventsCount_other": "{{displayCount}} atburðir",
       "generated": "Skýrslan var búin til {{generatedAt}}.",
       "noActivity": "Engin skráð virkni",
-      "noActivityDescription": "Kilo hefur enga skýrsluskylda virkni tengda öryggisfrávikum frá {{start}} til {{end}}.",
+      "noActivityDescription": "Kilo hefur enga skýrsluskylda virkni tengda öryggisfrávikum í þessu tímabili.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Geymsla ekki skráð",
       "reasonUnknown": "Óþekkt ástæða",

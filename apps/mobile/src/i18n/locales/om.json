@@ -1951,7 +1951,7 @@
       "eventsCount_other": "{{displayCount}} taateewwan",
       "generated": "{{generatedAt}} irratti uumame.",
       "noActivity": "Sochiin galmaa'e hin jiru",
-      "noActivityDescription": "Kilo sochii argamoota nageenyaa {{start}} irraa hanga {{end}}tti gabaasuu danda'u hin qabu.",
+      "noActivityDescription": "Kilo sochii argamoota nageenyaa gabaasuu danda'u hin qabu.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Kuusaan koodii hin galmoofne",
       "reasonUnknown": "Sababa hin beekamne",

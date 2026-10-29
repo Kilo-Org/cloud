@@ -201,12 +201,13 @@ describe('AuditReportScreen timestamps and actor labels', () => {
   it('labels the empty report period as UTC', () => {
     const root = renderReport([]);
     const period = { start: '2026-01-01T00:00:00.000Z', end: '2026-01-01' };
+    const lines = renderedText(root);
 
-    expect(renderedText(root)).toEqual([
-      i18n.t('securityAgent.auditReport.noActivityDescription', period),
+    expect(lines).toEqual([
+      i18n.t('securityAgent.auditReport.noActivityDescription'),
       i18n.t('securityAgent.auditReport.periodUtc', period),
     ]);
-    expect(renderedText(root).at(-1)).toMatch(/ · UTC$/);
+    expect(lines.at(-1)).toMatch(/ · UTC$/);
   });
 
   it.each(['en', 'de', 'ar'])('keeps the zone marker on the empty period in %s', async language => {

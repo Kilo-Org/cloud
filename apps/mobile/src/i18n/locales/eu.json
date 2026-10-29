@@ -1951,7 +1951,7 @@
       "eventsCount_other": "{{displayCount}} gertaera",
       "generated": "Txostena sortu da: {{generatedAt}}.",
       "noActivity": "Ez dago erregistratutako jarduerarik",
-      "noActivityDescription": "Kilok ez du txostenean sartzeko segurtasun-aurkikuntzen jarduerarik erregistratu {{start}} eta {{end}} artean.",
+      "noActivityDescription": "Kilok ez du txostenean sartzeko segurtasun-aurkikuntzen jarduerarik erregistratu epe honetan.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Biltegia ez da erregistratu",
       "reasonUnknown": "Arrazoi ezezaguna",

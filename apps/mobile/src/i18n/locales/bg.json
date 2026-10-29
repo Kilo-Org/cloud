@@ -1951,7 +1951,7 @@
       "eventsCount_other": "{{displayCount}} събития",
       "generated": "Докладът е генериран на {{generatedAt}}.",
       "noActivity": "Няма записана активност",
-      "noActivityDescription": "В Kilo няма действия по проблеми със сигурността за включване в доклада за периода от {{start}} до {{end}}.",
+      "noActivityDescription": "В Kilo няма действия по проблеми със сигурността за включване в доклада за този период.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Хранилището не е записано",
       "reasonUnknown": "Неразпозната причина",

@@ -1951,7 +1951,7 @@
       "eventsCount_other": "{{displayCount}} घटना",
       "generated": "{{generatedAt}} रोजी तयार केला.",
       "noActivity": "कोणतीही कृती नोंदवलेली नाही",
-      "noActivityDescription": "{{start}} ते {{end}} या काळात सुरक्षा निष्कर्षांबाबत अहवालात समाविष्ट करण्याजोग्या कोणत्याही कृती Kilo मध्ये नोंदवलेल्या नाहीत.",
+      "noActivityDescription": "Kilo मध्ये या काळात अहवालात समाविष्ट करण्याजोग्या कोणत्याही सुरक्षा निष्कर्षांबाबत कृती नोंदवलेल्या नाहीत.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "रिपॉझिटरी नोंदवलेली नाही",
       "reasonUnknown": "अनोळखी कारण",

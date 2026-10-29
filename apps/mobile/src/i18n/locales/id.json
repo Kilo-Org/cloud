@@ -1195,7 +1195,7 @@
       "eventsCount_other": "{{displayCount}} peristiwa",
       "generated": "Laporan dibuat pada {{generatedAt}}.",
       "noActivity": "Tidak ada aktivitas yang tercatat",
-      "noActivityDescription": "Tidak ada aktivitas temuan keamanan di Kilo yang dapat dilaporkan dari {{start}} hingga {{end}}.",
+      "noActivityDescription": "Tidak ada aktivitas temuan keamanan di Kilo yang dapat dilaporkan pada periode ini.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "Kueri laporan tidak selesai. Coba lagi.",
       "repositoryNotRecorded": "Repositori tidak tercatat",

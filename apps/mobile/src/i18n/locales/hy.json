@@ -1951,7 +1951,7 @@
       "eventsCount_other": "{{displayCount}} իրադարձություն",
       "generated": "Ստեղծվել է {{generatedAt}}։",
       "noActivity": "Գրանցված գործողություններ չկան",
-      "noActivityDescription": "{{start}}-ից մինչև {{end}} Kilo-ում անվտանգության խնդիրների վերաբերյալ հաշվետվության ենթակա գործողություններ չեն գրանցվել։",
+      "noActivityDescription": "Kilo-ում անվտանգության խնդիրների վերաբերյալ հաշվետվության ենթակա գործողություններ չեն գրանցվել։",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Պահոցը չի գրանցվել",
       "reasonUnknown": "Չճանաչված պատճառ",

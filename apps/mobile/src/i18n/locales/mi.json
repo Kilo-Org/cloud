@@ -1951,7 +1951,7 @@
       "eventsCount_other": "{{displayCount}} takahanga",
       "generated": "I hangaia i te {{generatedAt}}.",
       "noActivity": "Kāore he mahi i tuhia",
-      "noActivityDescription": "Kāore he mahi e pā ana ki ngā kitenga haumarutanga hei pūrongo mā Kilo mai i {{start}} ki {{end}}.",
+      "noActivityDescription": "Kāore he mahi e pā ana ki ngā kitenge haumarutanga hei pūrongo mā Kilo.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Kāore i tuhia te pūranga",
       "reasonUnknown": "Te take kāore i te mōhiotia",

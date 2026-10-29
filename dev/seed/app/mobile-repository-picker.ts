@@ -43,7 +43,7 @@ const REPOSITORIES = [
 const ORGANIZATION_ID = '5d0f6b21-8f3c-4a19-9a74-2c6e1b0d8f53';
 
 /** Refuses to touch anything but a loopback database, whatever the env says. */
-function assertLocalDatabaseTarget(): string {
+function assertLocalDatabaseTarget(): void {
   if (process.env.USE_PRODUCTION_DB === 'true') {
     throw new Error('The repository picker seed refuses to run with USE_PRODUCTION_DB=true.');
   }
@@ -54,8 +54,6 @@ function assertLocalDatabaseTarget(): string {
       `The repository picker seed requires a loopback database host; received ${databaseUrl.hostname}.`
     );
   }
-
-  return databaseUrl.hostname;
 }
 
 function printUsage(): void {
@@ -66,6 +64,8 @@ function printUsage(): void {
   console.log('render immediately. Used to check how the repository rows are announced.');
   console.log('');
   console.log('Refuses non-loopback databases and USE_PRODUCTION_DB=true; never calls GitHub.');
+  console.log('No Stripe customer is created, so keep to the pickers: an organization billing');
+  console.log('surface for this account has no customer behind it.');
   console.log('Sign the mobile development client in as the returned account, then open the');
   console.log('returned deep links.');
 }

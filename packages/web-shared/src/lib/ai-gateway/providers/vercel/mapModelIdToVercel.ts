@@ -31,7 +31,8 @@ export async function readVercelModelIdOverrides(): Promise<VercelModelIdOverrid
 export const getVercelModelIdOverrides = createCachedFetch<VercelModelIdOverrides>(
   readVercelModelIdOverrides,
   60_000,
-  new Map()
+  new Map(),
+  { name: 'vercelModelIdOverrides' }
 );
 
 /** The Vercel model ID derived from the built-in rules, ignoring admin overrides. */

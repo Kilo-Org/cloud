@@ -62,6 +62,7 @@ export function NewProfileScreen({
   stack,
   initialOwner,
   returnToCaller = false,
+  organizationId,
 }: Readonly<{
   /** The Stack this screen is mounted in; the created profile opens in it. */
   stack: ProfileManagementStack;
@@ -76,10 +77,21 @@ export function NewProfileScreen({
    * profile: a caller collecting a profile keeps its own state and place.
    */
   returnToCaller?: boolean;
+  /**
+   * The organization the caller is scoped to. It replaces the active account
+   * for this form, so a caller whose scope is not the active account still
+   * creates the profile where its list reads from.
+   */
+  organizationId?: string;
 }>) {
   const router = useRouter();
   const { t } = useTranslation();
-  const { organizationId, role, org, isResolving } = useOrgBoundary();
+  const {
+    organizationId: boundaryOrganizationId,
+    role,
+    org,
+    isResolving,
+  } = useOrgBoundary(organizationId);
   // No organization context on the hook: the owner choice below decides which
   // `organizationId` each create carries, so a personal create is never
   // rewritten to the selected organization.
@@ -95,14 +107,14 @@ export function NewProfileScreen({
     owner: ProfileOwnerChoice;
   } | null>(null);
   const canOwnOrganization =
-    !isResolving && hasOrganizationContext(organizationId) && canManageOrganization(role);
+    !isResolving && hasOrganizationContext(boundaryOrganizationId) && canManageOrganization(role);
   const pickedOwner =
-    ownerSelection?.organizationId === organizationId ? ownerSelection.owner : null;
+    ownerSelection?.organizationId === boundaryOrganizationId ? ownerSelection.owner : null;
   const owner: ProfileOwnerChoice = canOwnOrganization
     ? (pickedOwner ?? initialOwner ?? 'personal')
     : 'personal';
   const selectOwner = (next: ProfileOwnerChoice) => {
-    setOwnerSelection({ organizationId: organizationId ?? null, owner: next });
+    setOwnerSelection({ organizationId: boundaryOrganizationId ?? null, owner: next });
   };
   const [nameError, setNameError] = useState<ProfileNameError | null>(null);
   const [descriptionError, setDescriptionError] = useState<string | null>(null);
@@ -122,7 +134,7 @@ export function NewProfileScreen({
       return;
     }
     setDescriptionError(null);
-    const ownerOrganizationId = createOrganizationId(organizationId, owner);
+    const ownerOrganizationId = createOrganizationId(boundaryOrganizationId, owner);
     try {
       const created = await create.mutateAsync({
         name,
@@ -190,7 +202,7 @@ export function NewProfileScreen({
             <SegmentedControl
               // The create carries the organization only when Organization is
               // chosen; the options come from the active context.
-              options={ownerChoices(organizationId).map(choice => ({
+              options={ownerChoices(boundaryOrganizationId).map(choice => ({
                 value: choice,
                 label: t(OWNER_CHOICE_LABEL_KEYS[choice], {
                   defaultValue: t(OWNER_CHOICE_FALLBACK_KEYS[choice]),

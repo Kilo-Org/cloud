@@ -154,4 +154,14 @@ describe('Profile management paths in the app stack', () => {
       '/(app)/(tabs)/(3_profile)/profiles/new?owner=personal'
     );
   });
+
+  it('carries the caller scope so the form creates in the organization it showed', () => {
+    expect(
+      getNewProfilePath('app', {
+        owner: 'organization',
+        returnTo: 'back',
+        organizationId: 'org-1',
+      })
+    ).toBe('/(app)/profile-management/new?owner=organization&returnTo=back&organizationId=org-1');
+  });
 });

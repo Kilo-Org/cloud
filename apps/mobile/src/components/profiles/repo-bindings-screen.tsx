@@ -114,6 +114,10 @@ export function RepoBindingsScreen({
       getNewProfilePath(stack, {
         owner: createOwner,
         returnTo: 'back',
+        // The form must create the profile in the organization whose list this
+        // picker shows, which is this screen's scope, not necessarily the
+        // account that is active elsewhere in the app.
+        ...(organizationId === undefined ? {} : { organizationId }),
       })
     );
   };

@@ -12,6 +12,7 @@ const createMutate = vi.hoisted(() => vi.fn());
 const routerReplace = vi.hoisted(() => vi.fn());
 const routerBack = vi.hoisted(() => vi.fn());
 const routerCanGoBack = vi.hoisted(() => ({ value: true }));
+const boundaryArgs = vi.hoisted((): { value: (string | undefined)[] } => ({ value: [] }));
 const boundaryState = vi.hoisted(() => ({
   organizationId: 'org-1' as string | null,
   org: { organizationName: 'First test organization' },
@@ -31,7 +32,10 @@ vi.mock('expo-router', () => ({
   }),
 }));
 vi.mock('@/lib/hooks/use-organization-queries', () => ({
-  useOrgBoundary: () => boundaryState,
+  useOrgBoundary: (organizationId?: string) => {
+    boundaryArgs.value.push(organizationId);
+    return boundaryState;
+  },
 }));
 vi.mock('@/lib/profile-agent-navigation', () => ({
   getProfileOverviewPath: (profileId: string, organizationId?: string) =>
@@ -61,7 +65,11 @@ function typeName(root: ReactTestInstance, name: string): void {
   });
 }
 
-function mount(props: { initialOwner?: 'personal' | 'organization'; returnToCaller?: boolean }) {
+function mount(props: {
+  initialOwner?: 'personal' | 'organization';
+  returnToCaller?: boolean;
+  organizationId?: string;
+}) {
   return renderWithProviders(createElement(NewProfileScreen, { stack: 'app', ...props }));
 }
 
@@ -139,6 +147,19 @@ describe('NewProfileScreen caller request', () => {
     await waitFor(() => createMutate.mock.calls.length > 0);
     expect(routerBack).not.toHaveBeenCalled();
     expect(routerReplace).toHaveBeenCalledWith('/profiles/profile-1?org=org-1');
+
+    unmount();
+  });
+
+  it('resolves its organization from the caller, not the active account', async () => {
+    boundaryArgs.value = [];
+    const { unmount } = await mount({
+      initialOwner: 'organization',
+      returnToCaller: true,
+      organizationId: 'org-2',
+    });
+
+    expect(boundaryArgs.value).toContain('org-2');
 
     unmount();
   });

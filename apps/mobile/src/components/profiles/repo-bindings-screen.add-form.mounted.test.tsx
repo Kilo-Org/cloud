@@ -222,7 +222,7 @@ describe('RepoBindingsScreen add form', () => {
       empty.action?.props.onPress();
     });
     expect(routerPush).toHaveBeenCalledWith(
-      '/(app)/profile-management/new?owner=organization&returnTo=back'
+      '/(app)/profile-management/new?owner=organization&returnTo=back&organizationId=org-1'
     );
 
     unmount();

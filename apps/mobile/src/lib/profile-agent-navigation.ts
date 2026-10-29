@@ -93,6 +93,12 @@ export type NewProfilePathOptions = {
   owner?: ProfileOwnerChoice;
   /** `back` returns to the caller instead of opening the new profile. */
   returnTo?: NewProfileReturn;
+  /**
+   * The organization the caller is scoped to. The form resolves its boundary
+   * from it, so a caller whose scope is not the active account still creates
+   * the profile in the organization whose list it showed.
+   */
+  organizationId?: string;
 };
 
 /** The profile editor's create screen. */
@@ -103,6 +109,9 @@ export function getNewProfilePath(
   const query = [
     options.owner === undefined ? '' : `owner=${options.owner}`,
     options.returnTo === undefined ? '' : `returnTo=${options.returnTo}`,
+    options.organizationId === undefined
+      ? ''
+      : `organizationId=${encodeURIComponent(options.organizationId)}`,
   ]
     .filter(part => part.length > 0)
     .join('&');

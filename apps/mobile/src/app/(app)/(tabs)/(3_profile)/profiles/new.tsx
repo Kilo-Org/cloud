@@ -7,20 +7,23 @@ import { parseParam } from '@/lib/route-params';
 
 /**
  * The create screen in the Profile tab's Stack. A picker that opened it asks
- * for the owner its list shows (`owner`) and for the form to come back to it
- * (`returnTo=back`); a plain entry gets neither.
+ * for the owner its list shows (`owner`), for the organization that list reads
+ * from (`organizationId`), and for the form to come back to it
+ * (`returnTo=back`); a plain entry gets none of them.
  */
 export default function NewProfileRoute() {
   const stack: ProfileManagementStack = 'profileTab';
-  const { owner: rawOwner, returnTo: rawReturnTo } = useLocalSearchParams<{
-    owner?: string;
-    returnTo?: string;
-  }>();
+  const {
+    owner: rawOwner,
+    returnTo: rawReturnTo,
+    organizationId: rawOrganizationId,
+  } = useLocalSearchParams<{ owner?: string; returnTo?: string; organizationId?: string }>();
   return (
     <NewProfileScreen
       stack={stack}
       initialOwner={parseParam(rawOwner, PROFILE_OWNER_CHOICES) ?? undefined}
       returnToCaller={parseParam(rawReturnTo, NEW_PROFILE_RETURNS) !== null}
+      organizationId={parseParam(rawOrganizationId) ?? undefined}
     />
   );
 }

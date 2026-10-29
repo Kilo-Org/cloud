@@ -84,7 +84,7 @@ describe('GET /api/cron/cleanup-mcp-connect-events', () => {
     const organization = await createTestOrganization('MCP cleanup backlog org', user.id, 0);
     const expiredCount = 7_001;
     await db.insert(organization_mcp_connect_events).values(
-      Array.from({ length: expiredCount }, (_, index) => ({
+      Array.from({ length: expiredCount }, () => ({
         organization_id: organization.id,
         kilo_user_id: user.id,
         client: 'cli',

@@ -43,6 +43,7 @@ A Google Play notification whose purchase carries a missing or non-UUID account 
 - No change to Pub/Sub subscription retention, dead-letter or retry settings, and no replay or reconciliation of notifications that may already have been dropped during the earlier burst. These are operational follow-ups.
 - No work on the separate 'Google Play replacement has no current subscription' loops (KILOCODE-WEB-282V/281K). They are a different root cause.
 - No changes to PR #7306. It must be rebased over this fix if this merges first.
+- No post-deploy production-monitoring acceptance criterion; production confirmation in Sentry/Axiom is outside this plan's verification at the operator's request.
 
 ## Approach
 
@@ -82,22 +83,19 @@ A Google Play notification whose purchase carries a missing or non-UUID account 
 
 **Verification:** Source review
 
-### ac-6: After deployment, Sentry issue KILOCODE-WEB-2828 receives no new events, and the Axiom vercel dataset shows no repeated backoff-spaced 500s on /api/kilo-pass/play/notifications caused by this error.
-
-**Verification:** Manual: after deploy, confirm in Sentry (anaconda-nq/kilocode-web) that KILOCODE-WEB-2828 stops recurring and in Axiom that the route's 500 burst ends
-
 ## Risks
 
 - Acknowledging an unattributable renewal means Kilo never grants it. Kilo never issues non-UUID tokens, so no Kilo account can own such a purchase. The audit entry and Sentry warning keep the case visible for manual follow-up if a real customer turns out to be affected.
 - Notifications for this lineage that were dropped during the 2026-09-29 to 10-06 burst are not recovered by this change. Whether Pub/Sub dropped them depends on subscription retention (unverified).
 - PR #7306 rewrites the same handler. Whoever merges second must keep the rule that the claim insert receives only validated UUID tokens.
 - If a different branch also throws a permanent error when the token is null (for example an owner-token mismatch), the loop could move rather than end. The tests per notification type in AC1-AC3 guard against this.
+- No acceptance criterion confirms the production effect: whether KILOCODE-WEB-2828 actually stops recurring after deploy is not verified by this plan.
 
 ## Assumptions
 
 - The quoted value 'xxxx' is the real bound parameter (the sanitiser does not insert placeholders), and it comes from the client-set Play obfuscatedAccountId.
 - Kilo-issued account tokens are always UUIDs (kilocode_users.app_store_account_token defaults to gen_random_uuid()), so a non-UUID token can never match a Kilo user.
-- Test commands are not catalogued as approved baseline checks in the pinned context, so per-criterion verification is by code and source review of the added tests plus a post-deploy manual check.
+- Test commands are not catalogued as approved baseline checks in the pinned context, so per-criterion verification is by code and source review of the change and its added tests.
 
 ## Decisions
 

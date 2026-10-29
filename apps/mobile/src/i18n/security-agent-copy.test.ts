@@ -43,21 +43,23 @@ describe('Security Agent copy', () => {
 
   /**
    * One name per language. `common.securityAgent` renders the screen header and
-   * the Home and Profile tiles, so a body string that still spells the English
-   * name shows the reader two names for one feature — the defect the German
-   * reauthorize screen carried. English is the one catalog where the English
-   * name is its own.
+   * the Home and Profile tiles, and the notification category points at the
+   * feature by the same name, so a string that still spells the English name
+   * shows the reader two names for one feature — the defect the German
+   * reauthorize screen carried. Every namespace is scanned, not just the
+   * feature's own: the name is the reader's word for the feature wherever it
+   * appears. English is the one catalog where the English name is its own.
    */
-  it('uses the catalog name for the feature in every catalog string', () => {
+  it('uses the catalog name for the feature in every string of the catalog', () => {
     const found: string[] = [];
     for (const [language, load] of Object.entries(CATALOG_LOADERS)) {
       const catalog = load() as
-        | { common?: { securityAgent?: string }; securityAgent?: unknown }
+        | (Record<string, unknown> & { common?: { securityAgent?: string } })
         | undefined;
       const name = catalog?.common?.securityAgent;
       const strings: [string, string][] = [];
-      if (catalog?.securityAgent) {
-        copyStrings(catalog.securityAgent, 'securityAgent', strings);
+      for (const [namespace, value] of Object.entries(catalog ?? {})) {
+        copyStrings(value, namespace, strings);
       }
       if (name && name !== 'Security Agent') {
         for (const [path, value] of strings) {

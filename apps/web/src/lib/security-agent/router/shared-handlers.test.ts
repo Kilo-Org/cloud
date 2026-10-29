@@ -636,7 +636,7 @@ describe('setEnabled', () => {
 
     expect(mockSubmitManualSecuritySync).toHaveBeenCalledTimes(1);
     expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenCalledWith(
-      expect.objectContaining({ expectedRevision: 2 })
+      expect.objectContaining({ expectedRevision: 2, isEnabled: true })
     );
   });
 
@@ -681,7 +681,7 @@ describe('setEnabled', () => {
 
     expect(mockSubmitManualSecuritySync).toHaveBeenCalledTimes(1);
     expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenCalledWith(
-      expect.objectContaining({ expectedRevision: 2 })
+      expect.objectContaining({ expectedRevision: 2, isEnabled: true })
     );
   });
 
@@ -830,6 +830,25 @@ describe('saveConfig', () => {
         },
       })
     );
+  });
+
+  it('leaves the enabled state to the enable transition on a settings save', async () => {
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue({
+      isEnabled: false,
+      configRevision: 3,
+      storedConfig: {},
+      config: { sla_notification_min_severity: 'high' },
+    });
+    mockSaveSecurityAgentConfigWithRevision.mockResolvedValue({ newRevision: 4 });
+
+    await createHandlers().saveConfig.handler({
+      ctx: context,
+      input: { expectedRevision: 3, slaNotificationMinSeverity: 'critical' },
+    });
+
+    const [saveParams] = mockSaveSecurityAgentConfigWithRevision.mock.calls[0] ?? [];
+    expect(saveParams).not.toHaveProperty('isEnabled');
+    expect(mockSetSecurityAgentEnabled).not.toHaveBeenCalled();
   });
 
   it('propagates a stale-revision CONFLICT without a success receipt', async () => {

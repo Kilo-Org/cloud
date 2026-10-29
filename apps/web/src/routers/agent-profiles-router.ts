@@ -646,7 +646,25 @@ export const agentProfilesRouter = createTRPCRouter({
         await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
-      return profileMcpService.createMcpServer(db, publicKey, input.profileId, input.server, owner);
+      try {
+        return await profileMcpService.createMcpServer(
+          db,
+          publicKey,
+          input.profileId,
+          input.server,
+          owner
+        );
+      } catch (error) {
+        // The per-profile name unique index: the mobile sheet turns CONFLICT
+        // into its inline duplicate-name message.
+        if (isUniqueViolation(error)) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'An MCP server with this name already exists in this profile',
+          });
+        }
+        throw error;
+      }
     }),
 
   /**
@@ -667,14 +685,24 @@ export const agentProfilesRouter = createTRPCRouter({
         await ensureOrganizationManageAccess(ctx, input.organizationId);
       }
       const owner = getOwner(input.organizationId, ctx.user.id);
-      await profileMcpService.updateMcpServer(
-        db,
-        publicKey,
-        input.profileId,
-        input.mcpServerId,
-        input.server,
-        owner
-      );
+      try {
+        await profileMcpService.updateMcpServer(
+          db,
+          publicKey,
+          input.profileId,
+          input.mcpServerId,
+          input.server,
+          owner
+        );
+      } catch (error) {
+        if (isUniqueViolation(error)) {
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'An MCP server with this name already exists in this profile',
+          });
+        }
+        throw error;
+      }
       return { success: true };
     }),
 

@@ -48,6 +48,16 @@ Review generated migrations for data loss. Prefer additive or staged schema
 changes over destructive operations; when generated DDL is unsafe, revise the
 schema and regenerate rather than editing generated artifacts.
 
+Drop a table or column only after the deployed code no longer uses it. If a
+dropped table has foreign keys to busy tables, the generated `DROP TABLE ...
+CASCADE` locks the dropped table and every referenced table in one
+transaction. That can deadlock with live writers. As an exception to the rules
+above, you can hand-write this case:
+drop each foreign key in its own transaction (`COMMIT;` / `BEGIN;`), then drop
+the tables and columns. Set `SET LOCAL lock_timeout` in each transaction, use
+`IF EXISTS` on every statement so a partial run can be retried, and leave the
+snapshot and journal as generated. See `0317_drop_briefing_legacy_objects.sql`.
+
 Only intentional `UPDATE` or `INSERT` data backfills may be appended after the
 generated DDL, separated with the exact marker `-->  statement-breakpoint`.
 Prefer one generated migration per unshipped feature branch.

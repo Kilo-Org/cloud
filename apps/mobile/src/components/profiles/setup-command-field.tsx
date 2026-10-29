@@ -12,6 +12,8 @@ import { Text } from '@/components/ui/text';
 type SetupCommandFieldProps = Readonly<{
   /** The command the caller holds; seeds the field and sizes the hint. */
   command: string;
+  /** The field's label, which is also its accessible name. */
+  label: string;
   disabled?: boolean;
   accessibilityHint?: string;
   onChangeText: (next: string) => void;
@@ -30,6 +32,7 @@ type SetupCommandFieldProps = Readonly<{
  */
 export function SetupCommandField({
   command,
+  label,
   disabled = false,
   accessibilityHint,
   onChangeText,
@@ -45,7 +48,7 @@ export function SetupCommandField({
   return (
     <View className="gap-1.5">
       <FormField
-        label={t('profiles.commandLabel')}
+        label={label}
         defaultValue={command}
         placeholder={t('profiles.commandPlaceholder')}
         className="min-h-[44px] leading-[normal]"

@@ -15,6 +15,7 @@ import { Text } from '@/components/ui/text';
 import { deviceFit, fitsDevice } from '@/lib/chat/device-fit';
 import { GGUF_CATALOG } from '@/lib/chat/gguf-catalog';
 import { type HfListedModel } from '@/lib/chat/hf-catalog';
+import { isHfGone, isHfRestricted } from '@/lib/chat/hf-request';
 import { useDeviceBudget, useHfModelSearch } from '@/lib/chat/use-hf-catalog';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -73,15 +74,21 @@ export function ModelCatalogScreen() {
 
   let empty = <LoadingRows />;
   if (models.isError && !hasPages) {
-    empty = (
-      <QueryError
-        variant="server"
-        title={t('agentChat.newSession.couldNotLoadModels')}
-        placement="top"
-        onRetry={() => void models.refetch()}
-        isRetrying={models.isFetching}
-      />
-    );
+    if (isHfGone(models.error)) {
+      empty = <QueryError variant="not-found" placement="top" />;
+    } else if (isHfRestricted(models.error)) {
+      empty = <QueryError variant="permission" placement="top" />;
+    } else {
+      empty = (
+        <QueryError
+          variant="server"
+          title={t('agentChat.newSession.couldNotLoadModels')}
+          placement="top"
+          onRetry={() => void models.refetch()}
+          isRetrying={models.isFetching}
+        />
+      );
+    }
   } else if (hasPages) {
     empty = (
       <EmptyState

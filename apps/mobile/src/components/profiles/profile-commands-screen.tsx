@@ -186,11 +186,18 @@ export function ProfileCommandsScreen({
       position === null ? t('profiles.moveDown') : t('profiles.moveCommandDown', { position });
     const deleteLabel =
       position === null ? t('common.delete') : t('profiles.deleteCommand', { position });
+    // The field's label is also its accessible name, so it carries the same
+    // position the row's move and delete controls announce.
+    const commandLabel =
+      position === null
+        ? t('profiles.commandLabel')
+        : t('profiles.commandLabelPosition', { position });
     const rowHint = position === null ? undefined : commandRowA11yLabel(position - 1, commandTotal);
     return (
       <View key={`${generation}-${index}`} className="gap-3 rounded-lg bg-secondary p-3">
         <SetupCommandField
           command={command}
+          label={commandLabel}
           accessibilityHint={rowHint}
           disabled={!canManage}
           onChangeText={value => {

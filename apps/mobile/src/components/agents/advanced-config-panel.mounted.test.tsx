@@ -293,7 +293,7 @@ describe('AdvancedConfigPanel', () => {
     expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
     typeInto(renderer, 'Command', 'pnpm install');
     expect(buttonByText(renderer, 'Save as Profile')).toBeDefined();
-    typeInto(renderer, 'Command', '');
+    typeInto(renderer, 'Command 1', '');
     expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
   });
 
@@ -311,6 +311,7 @@ describe('AdvancedConfigPanel', () => {
 
     typeInto(renderer, 'Command', 'pnpm install');
 
+    expect(field(renderer, 'Command 1')).toBeDefined();
     expect(
       renderer.root
         .findAll(node => typeof node.props.onPress === 'function')
@@ -394,7 +395,8 @@ describe('AdvancedConfigPanel', () => {
     expect(texts(renderer)).toContain('30 characters remaining');
     expect(texts(renderer)).not.toContain('The command is limited to 500 characters');
 
-    typeInto(renderer, 'Command', 'a'.repeat(500));
+    // At 470 characters the row is a command, so its label carries its position.
+    typeInto(renderer, 'Command 1', 'a'.repeat(500));
     expect(texts(renderer)).toContain('0 characters remaining');
     expect(texts(renderer)).toContain('The command is limited to 500 characters');
   });

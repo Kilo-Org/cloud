@@ -1176,9 +1176,12 @@ describe('repository environment service', () => {
         plainVars: plainVarsBefore,
         secrets: secretsBefore,
       });
-      const plainVars = Object.fromEntries(
-        Array.from({ length: half }, (_, index) => [`PLAIN_${index}`, 'after'])
-      );
+      const plainVars = {
+        ...Object.fromEntries(
+          Array.from({ length: half - 1 }, (_, index) => [`PLAIN_${index + 1}`, 'after'])
+        ),
+        PLAIN_NEW: 'after',
+      };
       const secrets = [
         ...Object.keys(secretsBefore).map(key => ({ key, delete: true as const })),
         ...Array.from({ length: half }, (_, index) => ({
@@ -1254,6 +1257,63 @@ describe('repository environment service', () => {
       input = await loadEnvironmentBuildInput(db, id);
       if (!input) throw new Error('expected a stored environment');
       expect(input.encryptedSecrets.REPEATED).toBeUndefined();
+    });
+
+    test('a secret added under a stored plaintext key converts it at the cap', async () => {
+      const user = await insertTestUser();
+      const owner = userOwner(user.id);
+      const id = await createEnv({
+        owner,
+        createdByUserId: user.id,
+        name: 'converted',
+        platform: 'github',
+        repoFullName: 'acme/converted',
+        plainVars: Object.fromEntries(
+          Array.from({ length: ENVIRONMENT_LIMITS.MAX_VARS }, (_, index) => [
+            `PLAIN_${index}`,
+            'before',
+          ])
+        ),
+      });
+
+      const revision = await updateEnv({
+        owner,
+        environmentId: id,
+        secrets: [{ key: 'PLAIN_0', value: 'converted' }],
+      });
+
+      expect(revision).toBe(2);
+      const environment = await getEnvironment(db, id, owner);
+      expect(environment.secretKeys).toEqual(['PLAIN_0']);
+      expect(environment.plainVars).toHaveLength(ENVIRONMENT_LIMITS.MAX_VARS - 1);
+      expect(environment.plainVars.map(variable => variable.key)).not.toContain('PLAIN_0');
+    });
+
+    test('a final delete of a repeated key leaves a plaintext variable in place', async () => {
+      const user = await insertTestUser();
+      const owner = userOwner(user.id);
+      const id = await createEnv({
+        owner,
+        createdByUserId: user.id,
+        name: 'repeated-delete',
+        platform: 'github',
+        repoFullName: 'acme/repeated-delete',
+        plainVars: { KEPT: 'plain' },
+      });
+
+      const revision = await updateEnv({
+        owner,
+        environmentId: id,
+        secrets: [
+          { key: 'KEPT', value: 'transient' },
+          { key: 'KEPT', delete: true },
+        ],
+      });
+
+      expect(revision).toBe(1);
+      const environment = await getEnvironment(db, id, owner);
+      expect(environment.secretKeys).toEqual([]);
+      expect(environment.plainVars.map(variable => variable.key)).toEqual(['KEPT']);
     });
   });
 });

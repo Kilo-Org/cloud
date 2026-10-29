@@ -261,6 +261,21 @@ async function replacePlainVars(
   }
 }
 
+/**
+ * The last entry for a key wins, so a change list may repeat a key and the
+ * bulk statements never touch one key twice. A final delete removes a stored
+ * secret of that key; it leaves a plaintext variable of the same name alone.
+ */
+function finalSecretChangeByKey(
+  changes: readonly EnvironmentSecretChange[]
+): Map<string, EnvironmentSecretChange> {
+  const byKey = new Map<string, EnvironmentSecretChange>();
+  for (const change of changes) {
+    byKey.set(change.key, change);
+  }
+  return byKey;
+}
+
 /** Apply secret changes; returns whether any stored secret was replaced or removed. */
 async function applySecretChanges(
   tx: EnvironmentTransaction,
@@ -268,12 +283,7 @@ async function applySecretChanges(
   publicKeyBase64: string,
   changes: EnvironmentSecretChange[]
 ): Promise<boolean> {
-  // A later entry for the same key wins, which matches applying the list one at
-  // a time and keeps the bulk upsert from touching one key twice.
-  const finalChangeByKey = new Map<string, EnvironmentSecretChange>();
-  for (const change of changes) {
-    finalChangeByKey.set(change.key, change);
-  }
+  const finalChangeByKey = finalSecretChangeByKey(changes);
 
   const deleteKeys: string[] = [];
   const upserts: Array<{ key: string; value: string }> = [];
@@ -440,13 +450,14 @@ export async function updateEnvironment(
     }
   }
 
+  const finalSecretChanges = finalSecretChangeByKey(secretChanges ?? []);
+  const addedSecretKeys = [...finalSecretChanges.values()]
+    .filter(change => !('delete' in change))
+    .map(change => change.key);
   // Submitted additions can only raise the stored variable count, so this
   // bound rejects an oversized request before the transaction reaches the
   // database. The resulting count is checked once the stored rows are read.
-  const addedSecretKeys = new Set(
-    (secretChanges ?? []).filter(change => !('delete' in change)).map(change => change.key)
-  );
-  validateEnvironmentVarCount(Object.keys(plainVars ?? {}).length + addedSecretKeys.size);
+  validateEnvironmentVarCount(Object.keys(plainVars ?? {}).length + addedSecretKeys.length);
 
   if (input.owner.type === 'organization') {
     await lockActiveOrganization(tx, input.owner.id);
@@ -474,16 +485,24 @@ export async function updateEnvironment(
     ? await tx
         .select({
           key: cloud_agent_environment_vars.key,
-          value: cloud_agent_environment_vars.value,
+          // Only plaintext values are compared, so secret envelopes stay out of
+          // the row payload.
+          plainValue: sql<
+            string | null
+          >`case when ${cloud_agent_environment_vars.is_secret} then null else ${cloud_agent_environment_vars.value} end`,
           isSecret: cloud_agent_environment_vars.is_secret,
         })
         .from(cloud_agent_environment_vars)
         .where(eq(cloud_agent_environment_vars.environment_id, input.environmentId))
     : [];
-  const storedPlainVars = Object.fromEntries(
-    storedVars.filter(row => !row.isSecret).map(row => [row.key, row.value])
-  );
-  const changedSecretKeys = new Set((secretChanges ?? []).map(change => change.key));
+  const storedPlainVars: Record<string, string> = {};
+  for (const row of storedVars) {
+    if (!row.isSecret && row.plainValue !== null) {
+      storedPlainVars[row.key] = row.plainValue;
+    }
+  }
+  const storedPlainKeys = new Set(Object.keys(storedPlainVars));
+  const changedSecretKeys = new Set(finalSecretChanges.keys());
   const retainedSecretKeys = storedVars
     .filter(row => row.isSecret && !changedSecretKeys.has(row.key))
     .map(row => row.key);
@@ -491,12 +510,16 @@ export async function updateEnvironment(
   // The variable cap is decided from the resulting set, before the first
   // write, so one request cannot spend database work per submitted entry.
   if (changesVariables) {
+    // An added secret under a stored plaintext key reuses that row instead of
+    // adding one, and a plaintext replacement drops keys it does not carry.
+    const reusedPlainKeys =
+      plainVars === undefined ? addedSecretKeys.filter(key => storedPlainKeys.has(key)).length : 0;
     validateEnvironmentVarCount(
       (plainVars === undefined
-        ? Object.keys(storedPlainVars).length
+        ? storedPlainKeys.size - reusedPlainKeys
         : Object.keys(plainVars).length) +
         retainedSecretKeys.length +
-        addedSecretKeys.size
+        addedSecretKeys.length
     );
   }
 

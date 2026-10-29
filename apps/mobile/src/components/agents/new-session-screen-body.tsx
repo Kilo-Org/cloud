@@ -44,6 +44,7 @@ import {
   readCloneUpToMessageId,
   readForkPrefillText,
   readForkSourceIsCloudAgent,
+  resolvePrefillRepoSelection,
 } from '@/components/agents/new-session-prefill';
 import { shouldAutoFocusNewSessionPrompt } from '@/components/agents/new-session-prompt-focus';
 import { useNewSessionOrganization } from '@/components/agents/use-new-session-organization';
@@ -958,7 +959,12 @@ export function NewSessionScreenBody() {
   const autoFocusPrompt = shouldAutoFocusNewSessionPrompt({
     sharePrefilled: Boolean(shareId),
     hasSelectedRepository: selectedRepo !== '',
-    hasRepositoryPrefill: Boolean(routePrefillRepo),
+    // Only a prefill that resolves to a row in the loaded list counts. A prefill
+    // whose repository is gone, or whose provider list failed, leaves the form
+    // exactly as unconfigured as the plain entry: taking focus then would raise
+    // the keyboard over the same configuration this decision exists to show.
+    hasRepositoryPrefill:
+      resolvePrefillRepoSelection(repositories, { mode, repo: routePrefillRepo }) !== null,
   });
   // Clone CLI-capability gate: a full clone is optimistic (only an explicit
   // `sessionClone: false` refuses it); a fork cut needs

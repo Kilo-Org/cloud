@@ -257,7 +257,13 @@ pnpm --filter web exec jest --runInBand src/routers/cli-sessions-router.test.ts 
 Share publication refreshes a stable link with the current session snapshot.
 The blob URL columns identify the current copy folder. `pending_copy_ids`
 records folders awaiting deletion; later publication and deletion lifecycle
-calls retry that work before admitting another copy.
+calls retry that work before admitting another copy. Publication copies the
+blobs first and then writes the row in a short transaction, runs one copy at a
+time per account in an instance, and a fork of a shared link attaches its copy
+only while the link still points at the folder that was copied, copying again
+when it does not. Deleting a link records its folders in `pending_copy_ids`,
+deletes those objects, and removes the row only once no publication recorded a
+newer folder.
 
 For migration verification, run `pnpm drizzle:verify-bootstrap` to apply the
 complete chain to a disposable empty database. Also verify an upgrade from the

@@ -32,6 +32,15 @@ concurrent build fails, first inspect the index state; recover an invalid index
 explicitly with `DROP INDEX CONCURRENTLY` or `REINDEX INDEX CONCURRENTLY` as
 appropriate before retrying. `IF NOT EXISTS` can mask an invalid index.
 
+The production server sets a default `statement_timeout` that cancels a long
+concurrent build on a large table. For such a build, add
+`SET statement_timeout = 0;` after `COMMIT;` and `RESET statement_timeout;`
+before `BEGIN;`. A cancelled build still commits the migration's first
+transaction without recording the migration, so a retry must not fail on DDL
+that already applied. Guard that transaction as
+`0314_scheduled_briefing_snapshots.sql` does, and precede the build with
+`DROP INDEX CONCURRENTLY IF EXISTS`.
+
 Prefer `timestamp({ withTimezone: true })` over timestamps without time zone.
 Review generated migrations for data loss. Prefer additive or staged schema
 changes over destructive operations; when generated DDL is unsafe, revise the

@@ -17,7 +17,7 @@ import { cn } from '@/lib/utils';
 function useBriefingNotificationSwitch() {
   const trpc = useTRPC();
   const client = useQueryClient();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const offline = useOfflineBannerState();
   const preferences = useBriefingPreferences();
   const update = useMutation(
@@ -50,7 +50,18 @@ function useBriefingNotificationSwitch() {
     pending: update.isPending,
     unavailable: offline || !preferences.data || update.isPending,
     setEnabled: (notificationsEnabled: boolean) => {
-      update.mutate({ notificationsEnabled });
+      const current = preferences.data;
+      if (!current || offline || update.isPending) {
+        return;
+      }
+      update.mutate({
+        notificationsEnabled,
+        timezone: current.timezone,
+        nightStart: current.nightStart,
+        morningStart: current.morningStart,
+        morningEnd: current.morningEnd,
+        language: i18n.resolvedLanguage ?? i18n.language,
+      });
     },
   };
 }

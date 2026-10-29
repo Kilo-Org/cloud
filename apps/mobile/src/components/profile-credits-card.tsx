@@ -95,14 +95,18 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
     refetchOnReconnect: true,
   });
 
-  const { data: personalCreditData, isLoading: personalCreditsLoading } = useQuery({
+  const { data: personalCreditData, isError: personalCreditsError } = useQuery({
     ...personalCreditOptions,
     enabled: enabled && hasUserId && !selectedOrgId,
     networkMode: 'always',
     refetchOnReconnect: true,
   });
 
-  const { data: orgCreditData, isLoading: orgCreditsLoading } = useQuery({
+  const {
+    data: orgCreditData,
+    isError: orgCreditsError,
+    isPlaceholderData: orgCreditsPlaceholder,
+  } = useQuery({
     ...orgCreditOptions,
     enabled: enabled && hasUserId && Boolean(selectedOrgId),
     placeholderData: keepPreviousData,
@@ -115,7 +119,9 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
   const balanceFailed = balanceQueryError || userIdError;
 
   const creditData = selectedOrgId ? orgCreditData : personalCreditData;
-  const creditsLoading = selectedOrgId ? orgCreditsLoading : personalCreditsLoading;
+  const creditsFailed = selectedOrgId ? orgCreditsError : personalCreditsError;
+  const creditsPending =
+    creditData === undefined || (Boolean(selectedOrgId) && orgCreditsPlaceholder);
 
   const balanceDollars = balance?.balance ?? 0;
   // A read that has not answered yet is pending without fetching while the
@@ -248,11 +254,11 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
           )}
         >
           <Animated.View
-            className={cn('min-w-0 justify-center', !stackBalance && 'flex-1')}
+            className={cn('min-w-0 flex-row items-center gap-1', !stackBalance && 'flex-1')}
             layout={LinearTransition.duration(200)}
           >
-            <View className="flex-row items-center gap-1">
-              <ScrollView horizontal className="min-w-0 flex-1">
+            <View className="min-w-0 flex-1 gap-1">
+              <ScrollView horizontal className="min-w-0">
                 <Text
                   className="text-2xl font-bold tabular-nums"
                   accessibilityLabel={hideBalance ? t('profile.balanceHidden') : undefined}
@@ -260,35 +266,42 @@ export function CreditsCard({ enabled, orgs }: Readonly<CreditsCardProps>) {
                   {hideBalance ? HIDDEN_BALANCE : formatMoney(balanceDollars, i18n.language)}
                 </Text>
               </ScrollView>
-              <Pressable
-                className="min-h-11 min-w-11 items-center justify-center active:opacity-70"
-                onPress={() => {
-                  void Haptics.selectionAsync();
-                  setHideBalance(!hideBalance);
-                }}
-                accessibilityRole="button"
-                accessibilityLabel={
-                  hideBalance ? t('profile.showBalance') : t('profile.hideBalance')
-                }
-                hitSlop={4}
-              >
-                {hideBalance ? (
-                  <Eye size={18} color={colors.mutedForeground} />
-                ) : (
-                  <EyeOff size={18} color={colors.mutedForeground} />
-                )}
-              </Pressable>
-            </View>
-            {!hideBalance &&
-              (creditsLoading ? (
+              {creditsFailed && (
+                <Text className="text-xs text-muted-foreground">
+                  {t('credits.expiryUnavailable')}
+                </Text>
+              )}
+              {!creditsFailed && creditsPending && (
                 <Animated.View exiting={FadeOut.duration(150)}>
-                  <Skeleton className="mt-1 h-3 w-48 rounded bg-muted-soft" />
+                  <Skeleton className="h-3 w-40 max-w-full rounded bg-muted-soft" />
                 </Animated.View>
-              ) : (
+              )}
+              {!creditsFailed && !creditsPending && (
                 <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)}>
-                  <CreditExpiryNote creditBlocks={creditData?.creditBlocks ?? []} />
+                  <CreditExpiryNote
+                    creditBlocks={creditData.creditBlocks}
+                    hiddenAmount={hideBalance ? HIDDEN_BALANCE : undefined}
+                    emptyMessage={t('credits.noExpiringCredits')}
+                  />
                 </Animated.View>
-              ))}
+              )}
+            </View>
+            <Pressable
+              className="min-h-11 min-w-11 items-center justify-center active:opacity-70"
+              onPress={() => {
+                void Haptics.selectionAsync();
+                setHideBalance(!hideBalance);
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={hideBalance ? t('profile.showBalance') : t('profile.hideBalance')}
+              hitSlop={4}
+            >
+              {hideBalance ? (
+                <Eye size={18} color={colors.mutedForeground} />
+              ) : (
+                <EyeOff size={18} color={colors.mutedForeground} />
+              )}
+            </Pressable>
           </Animated.View>
           <View className="max-w-full flex-row flex-wrap items-center gap-2">
             {/* No in-progress indicator here: this row paints a balance that

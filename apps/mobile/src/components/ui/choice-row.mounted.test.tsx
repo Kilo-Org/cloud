@@ -4,6 +4,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
 
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+
 import { ChoiceRow } from './choice-row';
 
 vi.mock('react-native', () => ({
@@ -107,5 +109,23 @@ describe('ChoiceRow accessible name', () => {
 
     const multiple = rowControl(renderRow({ label: 'Many', selected: true, multi: true }));
     expect(multiple.props.accessibilityRole).toBe('checkbox');
+  });
+});
+
+describe('ChoiceRow touch target', () => {
+  it('carries the shared row floor on the row node itself', () => {
+    // A row sized by its own content reports that content's height as its
+    // rect; the target the audit reads is the row node's own rect, so the floor
+    // must be its class, not a hitSlop.
+    for (const props of [
+      { label: 'Balanced', selected: false },
+      { label: 'Lenient', description: 'Only serious problems', selected: true },
+      { selected: true, children: createElement('Text', null, 'English') },
+    ]) {
+      const control = rowControl(renderRow(props));
+
+      expect(String(control.props.className).split(' ')).toContain(ROW_TARGET_CLASS);
+      expect(control.props.hitSlop).toBeUndefined();
+    }
   });
 });

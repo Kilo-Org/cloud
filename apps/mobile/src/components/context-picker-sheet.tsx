@@ -4,6 +4,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Sheet } from '@/components/ui/sheet';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -87,7 +88,8 @@ function ContextPickerSheetBody({
               <Pressable
                 key={index}
                 className={cn(
-                  'min-h-11 flex-row items-center gap-2 px-3 py-3 active:bg-secondary',
+                  ROW_TARGET_CLASS,
+                  'flex-row items-center gap-2 px-3 py-3 active:bg-secondary',
                   index < cancelButtonIndex && 'border-b-[0.5px] border-hair-soft'
                 )}
                 onPress={() => {
@@ -114,7 +116,10 @@ function ContextPickerSheetBody({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={cancelLabel}
-          className="mt-1 min-h-11 items-center justify-center px-4 py-3 active:bg-secondary"
+          className={cn(
+            ROW_TARGET_CLASS,
+            'mt-1 items-center justify-center px-4 py-3 active:bg-secondary'
+          )}
           onPress={() => {
             onSelect(cancelButtonIndex);
           }}

@@ -28,6 +28,11 @@ const {
   verifyWorktreeReviewComment,
 }: typeof import('./worktree-review-verify') = require('./worktree-review-verify');
 const {
+  getWorktreeReviewAnnotations,
+  getWorktreeReviewSelectedLines,
+  worktreeReviewRangeHighlightCSS,
+}: typeof import('./worktree-review-bindings') = require('./worktree-review-bindings');
+const {
   MAX_WORKTREE_REVIEW_COMMENTS,
   MAX_WORKTREE_REVIEW_COMMENT_LENGTH,
   MAX_WORKTREE_REVIEW_SELECTION_LINES,
@@ -921,6 +926,104 @@ describe('worktree review verification', () => {
     };
   }
 
+  it('verifies and fetches the exact scoped entry rather than the first same path', async () => {
+    const { file, snapshot } = verificationFixture('alpha\nbeta\ndelta\n');
+    const scopedFile = { ...file, scope: 'against-base-branch' as const };
+    const scopedSnapshot = {
+      ...snapshot,
+      files: [
+        { ...snapshot.files[0], scope: 'uncommitted' as const, revision: 9 },
+        { ...snapshot.files[0], scope: scopedFile.scope },
+      ],
+    };
+    const reviewed = staleVerificationComment();
+    reviewed.anchor.capture = { ...capture, scope: scopedFile.scope };
+    const result = await verifyWorktreeReviewComment({
+      comment: reviewed,
+      scope: reviewScope,
+      snapshot: scopedSnapshot,
+      fetchFile: async input => {
+        assert.deepEqual(input, { path: file.path, revision: 4, scope: scopedFile.scope });
+        return fileOutput(scopedFile, snapshot);
+      },
+    });
+    assert.equal(result.status, 'applied');
+    if (result.status === 'applied')
+      assert.equal(result.comment.anchor.capture.scope, scopedFile.scope);
+    for (const wrongScope of [undefined, 'uncommitted'] as const) {
+      assert.deepEqual(
+        await verifyWorktreeReviewComment({
+          comment: reviewed,
+          scope: reviewScope,
+          snapshot: scopedSnapshot,
+          fetchFile: async () => fileOutput({ ...file, scope: wrongScope }, snapshot),
+        }),
+        { status: 'unverified' }
+      );
+    }
+  });
+
+  it('keeps legacy reviews unverified rather than guessing a new layer, even at the same revision', async () => {
+    const { snapshot } = verificationFixture('alpha\nbeta\ndelta\n');
+    const reviewed = staleVerificationComment();
+    reviewed.anchor.capture = latestCapture(snapshot);
+    assert.deepEqual(
+      await verifyWorktreeReviewComment({
+        comment: reviewed,
+        scope: reviewScope,
+        snapshot: { ...snapshot, files: [{ ...snapshot.files[0], scope: 'uncommitted' }] },
+        fetchFile: async () => {
+          assert.fail('Must not fetch a guessed scope');
+        },
+      }),
+      { status: 'unverified' }
+    );
+  });
+
+  it('marks disappeared scoped entries unapplied without fetching or crossing into the other layer', async () => {
+    const { snapshot } = verificationFixture('alpha\nbeta\ndelta\n');
+    const reviewed = staleVerificationComment();
+    reviewed.anchor.capture = { ...capture, scope: 'against-base-branch' };
+    for (const files of [[], [{ ...snapshot.files[0], scope: 'uncommitted' as const }]]) {
+      assert.deepEqual(
+        await verifyWorktreeReviewComment({
+          comment: reviewed,
+          scope: reviewScope,
+          snapshot: { ...snapshot, files },
+          fetchFile: async () => {
+            assert.fail('Must not fetch another layer');
+          },
+        }),
+        { status: 'unapplied' }
+      );
+    }
+  });
+
+  it('keeps scoped absence unverified for missing, truncated, older, or ambiguous legacy summaries', async () => {
+    const { snapshot } = verificationFixture('alpha\nbeta\ndelta\n');
+    const reviewed = staleVerificationComment();
+    reviewed.anchor.capture = { ...capture, scope: 'against-base-branch' };
+    for (const current of [
+      undefined,
+      null,
+      { ...snapshot, files: [], truncated: true },
+      { ...snapshot, files: [], revision: 2 },
+      snapshot,
+    ]) {
+      assert.deepEqual(
+        await verifyWorktreeReviewComment({
+          comment: reviewed,
+          scope: reviewScope,
+          snapshot: current,
+          fetchFile: async () => {
+            assert.fail('Must not fetch a guessed layer');
+          },
+        }),
+        { status: 'unverified' }
+      );
+    }
+  });
+
   it('applies a quote on an unchanged line outside the patch hunks where a patch-only search fails', async () => {
     const { file, snapshot } = verificationFixture('alpha\nbeta\ndelta\n');
     const reviewed = staleVerificationComment();
@@ -1020,6 +1123,64 @@ describe('worktree review verification', () => {
     });
     assert.equal(result.status, 'applied');
     assert.equal(fetched, false);
+  });
+});
+
+describe('worktree review layer identity', () => {
+  it('preserves legacy and scoped review payloads without relabeling captures', () => {
+    for (const scope of [undefined, 'uncommitted', 'against-base-branch'] as const) {
+      const source = fixture();
+      source.file = { ...source.file, scope };
+      const reviewed = comment('scoped', {
+        anchor: anchor(undefined, source, { ...capture, scope }),
+      });
+      const parsed = parseWorktreeReviewMessage(value(serialize([reviewed])));
+      assert.ok(parsed);
+      assert.equal(parsed.comments[0].anchor.capture.scope, scope);
+      assert.ok(
+        sameWorktreeReviewCapture(parsed.comments[0].anchor.capture, reviewed.anchor.capture)
+      );
+    }
+  });
+
+  it('does not create, render, select or rebase same-path anchors across layers', () => {
+    const source = fixture();
+    const uncommitted = { ...capture, scope: 'uncommitted' as const };
+    source.file = { ...source.file, scope: uncommitted.scope };
+    const reviewed = comment('scoped', { anchor: anchor(undefined, source, uncommitted) });
+    for (const scope of [undefined, 'against-base-branch'] as const) {
+      const otherCapture = { ...capture, scope };
+      const otherFile = { ...source.file, scope };
+      assert.equal(sameWorktreeReviewCapture(uncommitted, otherCapture), false);
+      assert.equal(
+        createWorktreeReviewAnchor({
+          ...source,
+          capture: otherCapture,
+          selection: { side: 'additions', start: 21, end: 22 },
+        }).ok,
+        false
+      );
+      assert.deepEqual(
+        getWorktreeReviewAnnotations([reviewed], otherCapture, source.file.path),
+        []
+      );
+      assert.equal(worktreeReviewRangeHighlightCSS([reviewed], otherCapture, source.file.path), '');
+      assert.equal(
+        getWorktreeReviewSelectedLines(otherCapture, source.file.path, {
+          anchor: reviewed.anchor,
+          text: '',
+        }),
+        null
+      );
+      assert.equal(
+        rebaseWorktreeReviewComment(reviewed, otherCapture, otherFile, source.diff),
+        reviewed
+      );
+      assert.deepEqual(
+        rebaseWorktreeReviewCommentsForFile([reviewed], otherCapture, otherFile, source.diff),
+        [reviewed]
+      );
+    }
   });
 });
 

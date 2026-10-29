@@ -97,29 +97,40 @@ export async function deleteProfile(
   });
 }
 
+/** The metadata and collection counts a list row and the Overview screen render. */
+type ProfileSummaryRow = {
+  id: string;
+  name: string;
+  description: string | null;
+  isDefault: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+
+type ProfileCounts = Omit<
+  ProfileSummary,
+  'id' | 'name' | 'description' | 'isDefault' | 'createdAt' | 'updatedAt'
+>;
+
+const NO_COLLECTIONS: ProfileCounts = {
+  varCount: 0,
+  commandCount: 0,
+  mcpServerCount: 0,
+  skillCount: 0,
+  agentCount: 0,
+  kiloCommandCount: 0,
+  instructionCount: 0,
+};
+
 /**
- * List all profiles for an owner with summary info.
+ * Collection counts per profile, in one grouped query per collection. Counting
+ * rows never transfers their contents, so this stays bounded however large a
+ * profile's skills or instructions are.
  */
-export async function listProfiles(db: WorkerDb, owner: ProfileOwner): Promise<ProfileSummary[]> {
-  const profiles = await db
-    .select({
-      id: agent_environment_profiles.id,
-      name: agent_environment_profiles.name,
-      description: agent_environment_profiles.description,
-      isDefault: agent_environment_profiles.is_default,
-      createdAt: agent_environment_profiles.created_at,
-      updatedAt: agent_environment_profiles.updated_at,
-    })
-    .from(agent_environment_profiles)
-    .where(buildOwnershipCondition(owner))
-    .orderBy(agent_environment_profiles.name);
-
-  const profileIds = profiles.map(p => p.id);
-
-  if (profileIds.length === 0) {
-    return [];
-  }
-
+async function countsByProfileId(
+  db: WorkerDb,
+  profileIds: string[]
+): Promise<Map<string, ProfileCounts>> {
   const [
     varCounts,
     commandCounts,
@@ -195,21 +206,84 @@ export async function listProfiles(db: WorkerDb, owner: ProfileOwner): Promise<P
   const kiloCommandCountMap = new Map(kiloCommandCounts.map(k => [k.profileId, Number(k.count)]));
   const instructionCountMap = new Map(instructionCounts.map(i => [i.profileId, Number(i.count)]));
 
-  return profiles.map(p => ({
-    id: p.id,
-    name: p.name,
-    description: p.description,
-    isDefault: p.isDefault,
-    createdAt: p.createdAt,
-    updatedAt: p.updatedAt,
-    varCount: varCountMap.get(p.id) ?? 0,
-    commandCount: commandCountMap.get(p.id) ?? 0,
-    mcpServerCount: mcpServerCountMap.get(p.id) ?? 0,
-    skillCount: skillCountMap.get(p.id) ?? 0,
-    agentCount: agentCountMap.get(p.id) ?? 0,
-    kiloCommandCount: kiloCommandCountMap.get(p.id) ?? 0,
-    instructionCount: instructionCountMap.get(p.id) ?? 0,
-  }));
+  const counts = new Map<string, ProfileCounts>();
+  for (const profileId of profileIds) {
+    counts.set(profileId, {
+      varCount: varCountMap.get(profileId) ?? 0,
+      commandCount: commandCountMap.get(profileId) ?? 0,
+      mcpServerCount: mcpServerCountMap.get(profileId) ?? 0,
+      skillCount: skillCountMap.get(profileId) ?? 0,
+      agentCount: agentCountMap.get(profileId) ?? 0,
+      kiloCommandCount: kiloCommandCountMap.get(profileId) ?? 0,
+      instructionCount: instructionCountMap.get(profileId) ?? 0,
+    });
+  }
+  return counts;
+}
+
+/** One summary row: the profile's metadata plus its collection counts. */
+function toProfileSummary(
+  profile: ProfileSummaryRow,
+  counts: ProfileCounts | undefined
+): ProfileSummary {
+  return { ...profile, ...(counts ?? NO_COLLECTIONS) };
+}
+
+/**
+ * List all profiles for an owner with summary info.
+ */
+export async function listProfiles(db: WorkerDb, owner: ProfileOwner): Promise<ProfileSummary[]> {
+  const profiles = await db
+    .select({
+      id: agent_environment_profiles.id,
+      name: agent_environment_profiles.name,
+      description: agent_environment_profiles.description,
+      isDefault: agent_environment_profiles.is_default,
+      createdAt: agent_environment_profiles.created_at,
+      updatedAt: agent_environment_profiles.updated_at,
+    })
+    .from(agent_environment_profiles)
+    .where(buildOwnershipCondition(owner))
+    .orderBy(agent_environment_profiles.name);
+
+  if (profiles.length === 0) {
+    return [];
+  }
+
+  const counts = await countsByProfileId(
+    db,
+    profiles.map(profile => profile.id)
+  );
+  return profiles.map(profile => toProfileSummary(profile, counts.get(profile.id)));
+}
+
+/**
+ * One profile's metadata and collection counts.
+ *
+ * The profile editor's Overview renders metadata and six counts and nothing
+ * else, so it reads this instead of {@link getProfile}: a profile may carry
+ * every skill's markdown and companion files (bounded per profile by the skill
+ * caps), and transferring all of it to render counts alone spends the client's
+ * request budget on bytes the screen never uses.
+ */
+export async function getProfileOverview(
+  db: WorkerDb,
+  profileId: string,
+  owner: ProfileOwner
+): Promise<ProfileSummary> {
+  const profile = await verifyProfileOwnership(db, profileId, owner);
+  const counts = await countsByProfileId(db, [profile.id]);
+  return toProfileSummary(
+    {
+      id: profile.id,
+      name: profile.name,
+      description: profile.description,
+      isDefault: profile.is_default,
+      createdAt: profile.created_at,
+      updatedAt: profile.updated_at,
+    },
+    counts.get(profile.id)
+  );
 }
 
 /**

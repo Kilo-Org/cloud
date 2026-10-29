@@ -87,7 +87,8 @@ function createTerminalBenchFetch(load = loadTerminalBench) {
         throw err;
       }),
     TTL,
-    new Map<string, TerminalBenchSummary>()
+    new Map<string, TerminalBenchSummary>(),
+    { name: 'terminalBenchSummaries' }
   );
 }
 

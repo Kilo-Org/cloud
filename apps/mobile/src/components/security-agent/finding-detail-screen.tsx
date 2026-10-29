@@ -29,6 +29,7 @@ import { useSecurityAnalysis, useSecurityFinding } from '@/lib/hooks/use-securit
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { findingDetailBackTarget, findingDetailHasLocalHistory } from '@/lib/finding-detail-back';
 import { getSecurityAgentPath } from '@/lib/security-agent';
+import { tabEntryA11y } from '@/lib/a11y/tab-entry';
 import { cn } from '@/lib/utils';
 
 type FindingTab = 'details' | 'analysis' | 'remediation';
@@ -257,7 +258,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
           />
         </View>
       ) : null}
-      <View className="flex-row gap-2 px-6 pb-2 pt-1">
+      <View accessibilityRole="tablist" className="flex-row gap-2 px-6 pb-2 pt-1">
         {TABS.map(({ key, labelKey }) => {
           const selected = tab === key;
           return (
@@ -270,8 +271,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
               onPress={() => {
                 setTab(key);
               }}
-              accessibilityRole="tab"
-              accessibilityState={{ selected }}
+              {...tabEntryA11y({ selected })}
             >
               <Text
                 className={cn(

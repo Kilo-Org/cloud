@@ -144,6 +144,18 @@ async function resolveOpenAiChatGptUpstreamModel(modelId: string): Promise<strin
 }
 
 /**
+ * The api.openai.com model a ChatGPT connection could serve the request with, before the
+ * connection and served-model checks; null when the request can never take the delegated route.
+ */
+export async function getOpenAiChatGptCandidateModel(
+  apiKind: GatewayRequest['kind'],
+  requestedModel: string
+): Promise<string | null> {
+  if (apiKind !== 'responses') return null;
+  return resolveOpenAiChatGptUpstreamModel(requestedModel);
+}
+
+/**
  * The connection owners a request may use, in order. A member connection is
  * always the caller's own: an organization request uses their connection for
  * that organization and never their personal one, so an organization without
@@ -191,10 +203,10 @@ async function eligibleUpstreamModelForOwner(
   input: OpenAiChatGptRoutingInput,
   owner: OpenAiChatGptOwner
 ): Promise<string | null> {
-  const { request, requestedModel } = input;
-
-  if (request.kind !== 'responses') return null;
-  const upstreamModel = await resolveOpenAiChatGptUpstreamModel(requestedModel);
+  const upstreamModel = await getOpenAiChatGptCandidateModel(
+    input.request.kind,
+    input.requestedModel
+  );
   if (!upstreamModel) return null;
 
   // The catalog can list an OpenAI model the plain API does not serve. A

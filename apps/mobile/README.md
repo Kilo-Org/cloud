@@ -140,6 +140,8 @@ Native compatibility requirements:
   purchase connector, which share a namespace. AGP 9 otherwise rejects that vendor pair.
 - The supported Gesture Handler builder API remains explicitly allowed by the
   deprecation lint rule; other deprecated APIs remain checked.
+- `expo-share-intent` 9.x targets SDK 58. Keep its Expo, linking and constants
+  peers aligned with the app; rebuild the development clients after upgrading it.
 - `react-native-css` forwards React Native's native component registry through its
   CommonJS facade for Router's native screen host, so the styling facade needs no
   patch of its own.
@@ -233,17 +235,15 @@ data-image diagrams.
 
 Scheduled report dates use the app language and preserve the report's calendar
 day across device timezones. Period windows retain the report's own timezone.
-Briefing totals, agent spend, estimates, and charges use USD currency precision
-and locale separators. Positive amounts below half a cent display as less than
-one cent; partial-coverage lower bounds retain the separate at-least marker.
-The summary prompt requests the same precision, separators, and sub-cent rule.
+Generation estimates and charges use USD currency precision and locale separators.
+Positive amounts below half a cent display as less than one cent.
 
-A brief is a saved retrospective activity report. Its preview precedes confirmation.
-Its AI summary is an optional section, not the complete report.
+A brief is a saved snapshot of recent agent activity captured on a schedule.
+Its AI summary is a section of the report, not the complete report.
 
-- Use a consistent artifact noun in each locale's title, history, settings, actions, progress messages, and unconfirmed drafts.
+- Use a consistent artifact noun in each locale's title, history, settings, and progress messages.
 - Keep natural inflections and established loanwords. Do not force identical substrings.
-- Keep the preview and AI summary distinct from the saved report.
+- Keep the selected session evidence and AI summary distinct from the complete report.
 - Treat a window as a time period. Treat an agent as software, not a human representative.
 - Describe redaction as concealment of sensitive information, not editing or censorship.
 - Preserve separate balances, per-context opt-in, explicit paid consent, and offline restrictions.
@@ -251,31 +251,22 @@ Its AI summary is an optional section, not the complete report.
 
 Catalog checks verify structure, not translation meaning. Verify corrected copy on its native screen.
 
-## On-demand agent briefs
+## Scheduled agent briefs
 
-- Open **Agent brief → Create brief** and select Personal or one organization.
-- Select a preset or a custom period of up to 31 days, then review the exact range and timezone.
-- Review starts persisted background activity collection.
-- Leave and return through **Unconfirmed briefs** to continue the same review, including after an app restart.
-- The creation form stays usable while activity collection continues in the background.
-- **Prepare a new review** returns to the creation form to choose a new context or period.
-- Collection has a two-minute deadline. Failed or interrupted collection becomes a visible terminal failure; retrying is explicit and keeps the original request and evidence cutoff.
-- Review coverage, the payer, the model, and the cost limit before creating a paid summary.
-- Incomplete history remains available with a coverage warning. Missing data does not mean zero activity.
-- Empty periods produce a saved report without an AI request or charge.
-- Reports preserve activity and session state at the selected period's end, not current live status.
-- Large reports use bounded evidence samples across the selected period, with explicit partial coverage and known omission counts.
-- The app discards pending results when the signed-in account changes.
-- Find confirmed reports in **History** for 30 days after creation, including reports whose AI summary is still running.
-- One-off reports do not replace the morning Home card or change the schedule or automatic AI preferences.
-- Paid retries require another cost review. Offline paid requests do not enter a background queue.
-- The Kilo Model Context Protocol (MCP) catalog excludes paid briefing confirmation.
+- Enable Personal and organization contexts separately in Agent brief settings.
+- Review the model, cost estimate, and generation limits before enabling a context.
+- Keep notification consent separate from paid summary consent.
+- Configure the saved timezone and overnight window.
+- Read the capture time and partial-coverage notice with each report.
+- Treat counts as selected-session counts, not complete historical totals.
+- Open a session or verified pull request for details.
+- Read the structured snapshot while its AI summary runs or fails.
+- Find retained reports in History.
 
-Background preparation uses existing report metadata and needs no additional database migration.
-Deploy the background preparation API before releasing the mobile client that uses it.
-The existing synchronous `prepareOneOff` API remains supported for released clients;
-new clients use `startOneOffPreparation`, `oneOffPreparation`, and paginated `oneOffDrafts`.
-Only `createOneOff` publishes a reviewed draft or authorizes its paid summary.
+The server captures each scheduled occurrence once from current session metadata and bounded completed-response excerpts.
+Report reads never start generation or recollect evidence.
+Manual creation, preparation drafts, custom historical periods, and manual generation retries are not available.
+The server checks current context and source-session access before returning saved content.
 
 ## Quick Chat backends
 

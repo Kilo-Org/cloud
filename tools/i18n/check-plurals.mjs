@@ -143,10 +143,6 @@ export const NO_AGREEMENT = new Map([
     'carried count, no inflected word: "Sign in to use this server"',
   ],
   ['profiles.counts.mcp', 'initialism, not agreement: "{{count}} MCP" names no inflected word'],
-  [
-    'profiles.mcp.secretCount',
-    'bare count after a label: "Secret count: {{count}}" names no inflected word',
-  ],
 ]);
 
 /** The source files the audit scans: app code, not tests or mounted harnesses. */

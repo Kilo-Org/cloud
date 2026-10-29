@@ -40,7 +40,7 @@ jest.mock('./direct-byok-definitions', () => ({
   default: [
     {
       id: 'chutes-byok',
-      resolveUpstream: jest.requireActual<typeof DirectByokTypes>('./types').apiKeyUpstream({
+      ...jest.requireActual<typeof DirectByokTypes>('./types').apiKeyUpstream({
         apiUrl: 'https://chutes.example.com/v1',
         supportedChatApis: ['chat_completions'],
         responseTransforms: 'reasoning-content',
@@ -66,7 +66,7 @@ jest.mock('./direct-byok-definitions', () => ({
     },
     {
       id: 'orcarouter',
-      resolveUpstream: jest.requireActual<typeof DirectByokTypes>('./types').apiKeyUpstream({
+      ...jest.requireActual<typeof DirectByokTypes>('./types').apiKeyUpstream({
         apiUrl: 'https://orcarouter.example.com/v1',
         supportedChatApis: ['chat_completions'],
         responseTransforms: 'reasoning-content',
@@ -169,6 +169,7 @@ describe('createAiSdkProvider resolved upstream', () => {
   function providerWith(upstream: DirectByokUpstream): DirectByokProvider {
     return {
       id: 'chutes-byok',
+      supportedChatApis: upstream.supportedChatApis,
       resolveUpstream: async () => upstream,
       transformRequest() {},
       models: async () => [],
@@ -321,6 +322,26 @@ describe('getDirectByokModel', () => {
     const models = await getDirectByokModelsForUser('user-id');
 
     expect(models.map(model => model.opencode.ai_sdk_provider)).toEqual(['anthropic', undefined]);
+  });
+
+  test('derives the AI SDK provider from the chat API a provider assigns each model', async () => {
+    const { directByokProviders, getDirectByokModelsForUser } = await loadDirectByokModule();
+    const { getEnabledByokProviders } = await import('@kilocode/web-shared/lib/ai-gateway/byok');
+    const { getAiSdkProvider } =
+      await import('@kilocode/web-shared/lib/ai-gateway/providers/model-settings');
+    const provider: DirectByokProvider = directByokProviders[0];
+    provider.getModelChatApi = model =>
+      model.id === 'supported-model' ? 'responses' : 'chat_completions';
+    jest.mocked(getEnabledByokProviders).mockResolvedValueOnce(enabledKeys('chutes-byok'));
+
+    try {
+      const models = await getDirectByokModelsForUser('user-id');
+
+      expect(models.map(model => model.opencode.ai_sdk_provider)).toEqual(['openai', undefined]);
+      expect(getAiSdkProvider).not.toHaveBeenCalled();
+    } finally {
+      delete provider.getModelChatApi;
+    }
   });
 
   test('does not fall back to model-name variants when reasoning is unsupported', async () => {

@@ -12,9 +12,8 @@ import type { SessionEnvironmentReference } from './reference.js';
 
 const NOW = 1_800_000_000_000;
 const CURRENT = {
-  baseImage: 'registry.example/app:1',
+  baseImage: 'registry.example/runtime-free:1',
   runtimeAbi: 'abi',
-  runtimeMode: 'preinstalled' as const,
 };
 const HOUR = 60 * 60_000;
 
@@ -35,9 +34,9 @@ function published(overrides: Partial<PublishedSnapshot> = {}): PublishedSnapsho
     sourceCommit: 'a'.repeat(40),
     sourceBranch: 'main',
     provider: 'cloudflare-containers',
-    baseImage: 'registry.example/app:1',
+    baseImage: 'registry.example/runtime-free:1',
     runtimeAbi: 'abi',
-    runtimeRelease: null,
+    runtimeRelease: 'release-1',
     builderInstance: 'standard-4',
     snapshotId: 'snap-1',
     capturedAt: NOW - HOUR,
@@ -48,14 +47,24 @@ function published(overrides: Partial<PublishedSnapshot> = {}): PublishedSnapsho
 }
 
 describe('snapshotEligibility', () => {
-  it('does not let preinstalled startup execute aliases from a downloaded snapshot', () => {
-    const snapshot = published({ runtimeRelease: 'previous-release' });
-    expect(snapshotEligibility(snapshot, REFERENCE, NOW, CURRENT)).toEqual({
+  it('rejects legacy snapshots even when the current image cannot be read', () => {
+    const snapshot = published({ runtimeRelease: null, baseImage: 'registry.example/app:1' });
+    const unknownImage = { ...CURRENT, baseImage: null };
+    expect(snapshotEligibility(snapshot, REFERENCE, NOW, unknownImage)).toEqual({
       eligible: false,
       reason: 'incompatible',
     });
+    expect(replacementNeeded(snapshot, 2, NOW, unknownImage)).toBe(true);
+  });
+
+  it('reuses the split base across runtime release updates', () => {
     expect(
-      snapshotEligibility(snapshot, REFERENCE, NOW, { ...CURRENT, runtimeMode: 'downloaded' })
+      snapshotEligibility(
+        published({ runtimeRelease: 'previous-release' }),
+        REFERENCE,
+        NOW,
+        CURRENT
+      )
     ).toEqual({ eligible: true, stale: false });
   });
 

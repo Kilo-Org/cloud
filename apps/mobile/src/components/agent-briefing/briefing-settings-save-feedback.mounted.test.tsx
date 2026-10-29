@@ -90,7 +90,7 @@ const preferences = {
 
 const contextPreference = {
   context: { id: 'ctx-1', organizationId: null, name: '' },
-  aiEnabled: false,
+  enabled: false,
   model: 'default-model',
   maxDurationSeconds: 600,
   maxSpendMicrodollars: 1_000_000,
@@ -174,23 +174,29 @@ describe('briefing schedule save confirmation', () => {
   });
 });
 
-describe('briefing AI-settings save confirmation', () => {
-  it('confirms after the summaries switch is turned off', () => {
+describe('briefing context-settings save confirmation', () => {
+  it('confirms after scheduled briefs are turned off', () => {
     const renderer = mount(
       createElement(BriefingContextSettings, {
         preference: contextPreference,
         defaultModel: 'default-model',
+        timezone: 'Asia/Kolkata',
       })
     );
     const [toggle] = byType(renderer, 'Switch');
     if (!toggle) {
-      throw new Error('summaries switch is missing');
+      throw new Error('scheduled briefs switch is missing');
     }
     const { onValueChange } = toggle.props as { onValueChange: (next: boolean) => void };
     act(() => {
       onValueChange(false);
     });
-    expect(h.mutate).toHaveBeenCalledWith({ organizationId: undefined, aiEnabled: false });
+    expect(h.mutate).toHaveBeenCalledWith({
+      organizationId: undefined,
+      enabled: false,
+      timezone: 'Asia/Kolkata',
+      language: 'hi',
+    });
     confirmSaved();
     expect(h.success).toHaveBeenCalledTimes(1);
     expect(h.success).toHaveBeenCalledWith('agentBriefing.saved');

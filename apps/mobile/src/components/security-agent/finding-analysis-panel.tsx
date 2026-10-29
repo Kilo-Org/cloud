@@ -28,11 +28,13 @@ import { KvRow } from '@/components/ui/kv-row';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { AnalysisCapacityNotice } from '@/components/security-agent/analysis-capacity-notice';
+import { AnalysisRerunAction } from '@/components/security-agent/analysis-rerun-action';
 import { formatNumber } from '@/lib/format';
 import { useSecurityAnalysisCapacity } from '@/lib/hooks/use-security-agent';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { type SecurityAnalysis } from '@/lib/security-agent';
+import { remediationNeedsAnalysisRefresh, type SecurityAnalysis } from '@/lib/security-agent';
 import {
   getAnalysisCapacityBlockedHint,
   getSecurityAnalysisDetailDescription,
@@ -64,6 +66,7 @@ export function FindingAnalysisPanel({
   const { confirm, dialog } = useConfirmDialog();
   const capacity = useSecurityAnalysisCapacity(scope);
   const startAnalysis = useStartSecurityAnalysis(scope);
+  const now = useRelativeTimeNow();
 
   if (isLoading && !analysis) {
     return (
@@ -109,7 +112,7 @@ export function FindingAnalysisPanel({
   const analyzedLabel =
     analyzedAt === null || Number.isNaN(analyzedAt.getTime())
       ? t('securityAgent.analysis.notRecorded')
-      : timeAgo(analyzedAt);
+      : timeAgo(analyzedAt, undefined, now);
   const presentationTitle = getSecurityAnalysisDetailTitle(analysisState);
   const presentationDescription = getSecurityAnalysisDetailDescription(analysisState, {
     analysisError: analysis.error,
@@ -142,6 +145,9 @@ export function FindingAnalysisPanel({
   const canStartAnalysis =
     findingOpen && (analysisState === 'not-analyzed' || analysisState === 'failed');
   const canRestartAnalysis = findingOpen && analysis.status === 'running';
+  // A completed analysis whose finding changed since offers no start or restart
+  // action above, so the stale blocker would read as unfixable on this tab too.
+  const needsAnalysisRefresh = remediationNeedsAnalysisRefresh(analysis);
   const hasCapacity = capacity.state === 'available';
 
   const handleStartAnalysis = () => {
@@ -183,7 +189,7 @@ export function FindingAnalysisPanel({
         </Text>
       </View>
 
-      {canStartAnalysis || canRestartAnalysis ? (
+      {canStartAnalysis || canRestartAnalysis || needsAnalysisRefresh ? (
         <View className="gap-2">
           {canStartAnalysis ? (
             <Button
@@ -218,6 +224,9 @@ export function FindingAnalysisPanel({
               ) : null}
               <Text>{t('securityAgent.analysis.restartAnalysis')}</Text>
             </Button>
+          ) : null}
+          {needsAnalysisRefresh ? (
+            <AnalysisRerunAction scope={scope} findingId={findingId} />
           ) : null}
         </View>
       ) : null}

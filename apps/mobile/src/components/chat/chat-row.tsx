@@ -8,6 +8,7 @@ import { RenameModal } from '@/components/rename-modal';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { SessionRow } from '@/components/ui/session-row';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import { CHAT_TITLE_MAX_LENGTH, type ChatSummary } from '@/lib/chat/store';
 import { useChatStatus } from '@/lib/chat/use-chat';
 import { timeAgo } from '@/lib/utils';
@@ -46,6 +47,7 @@ export function ChatRow({
   const { showActionSheetWithOptions } = useActionSheet();
   const themedSheet = useThemedActionSheetOptions();
   const { confirm, dialog } = useConfirmDialog();
+  const now = useRelativeTimeNow();
   const [renaming, setRenaming] = useState(false);
   const title = chat.title === '' ? t('chat.conversation.untitled') : chat.title;
   const label = modelName === '' ? t('common.chat') : modelName;
@@ -103,7 +105,7 @@ export function ChatRow({
           title={title}
           subtitle={preview}
           subtitleVariant="default"
-          meta={timeAgo(new Date(chat.updatedAt))}
+          meta={timeAgo(new Date(chat.updatedAt), undefined, now)}
           live={working}
           metaWhileLive
           last={last}

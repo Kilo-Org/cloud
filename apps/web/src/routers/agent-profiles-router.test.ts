@@ -284,6 +284,141 @@ describe('Agent Profiles Router', () => {
       });
     });
 
+    describe('overview', () => {
+      test('should count a profile collection without transferring it', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+
+        const { id: profileId } = await caller.agentProfiles.create({
+          name: 'Heavy Profile',
+          description: 'Counts only',
+        });
+        await caller.agentProfiles.setVar({
+          profileId,
+          key: 'PLAIN',
+          value: 'value',
+          isSecret: false,
+        });
+        await caller.agentProfiles.setCommands({
+          profileId,
+          commands: ['npm install', 'npm test'],
+        });
+        await caller.agentProfiles.createCustomSkill({
+          profileId,
+          name: 'heavy-skill',
+          rawMarkdown: `# Heavy\n\n${'body '.repeat(2000)}`,
+        });
+        await caller.agentProfiles.createAgent({
+          profileId,
+          slug: 'helper',
+          name: 'Helper',
+          config: {},
+        });
+
+        const overview = await caller.agentProfiles.overview({ profileId });
+
+        expect(overview).toMatchObject({
+          id: profileId,
+          name: 'Heavy Profile',
+          description: 'Counts only',
+          varCount: 1,
+          commandCount: 2,
+          skillCount: 1,
+          agentCount: 1,
+          mcpServerCount: 0,
+          kiloCommandCount: 0,
+          instructionCount: 0,
+        });
+        // The overview answers counts; the collection payloads stay behind
+        // `get`, so the response cannot grow with their contents.
+        expect(Object.keys(overview).sort()).toEqual(
+          [
+            'agentCount',
+            'commandCount',
+            'createdAt',
+            'description',
+            'id',
+            'instructionCount',
+            'isDefault',
+            'kiloCommandCount',
+            'mcpServerCount',
+            'name',
+            'skillCount',
+            'updatedAt',
+            'varCount',
+          ].sort()
+        );
+      });
+
+      test('should throw NOT_FOUND when accessing another user profile', async () => {
+        const callerA = await createCallerForUser(ownerUser.id);
+        const callerB = await createCallerForUser(otherUser.id);
+
+        const { id: profileId } = await callerA.agentProfiles.create({ name: 'Private Profile' });
+
+        await expect(callerB.agentProfiles.overview({ profileId })).rejects.toThrow(
+          'Profile not found'
+        );
+      });
+
+      test('should allow org members to read an org profile overview', async () => {
+        const ownerCaller = await createCallerForUser(ownerUser.id);
+        const memberCaller = await createCallerForUser(memberUser.id);
+
+        const { id: profileId } = await ownerCaller.agentProfiles.create({
+          organizationId: organizationA.id,
+          name: 'Shared Org Profile',
+        });
+        await ownerCaller.agentProfiles.setCommands({
+          organizationId: organizationA.id,
+          profileId,
+          commands: ['npm ci'],
+        });
+
+        const overview = await memberCaller.agentProfiles.overview({
+          organizationId: organizationA.id,
+          profileId,
+        });
+
+        expect(overview.name).toBe('Shared Org Profile');
+        expect(overview.commandCount).toBe(1);
+      });
+    });
+
+    describe('agents', () => {
+      test('should return only the profile agents', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'Agent Profile' });
+        await caller.agentProfiles.createAgent({
+          profileId,
+          slug: 'reviewer',
+          name: 'Reviewer',
+          config: { mode: 'subagent' },
+        });
+        await caller.agentProfiles.createCustomSkill({
+          profileId,
+          name: 'unread-skill',
+          rawMarkdown: '# Body',
+        });
+
+        const agents = await caller.agentProfiles.agents({ profileId });
+
+        expect(agents.map(agent => agent.slug)).toEqual(['reviewer']);
+        expect(agents[0]?.config).toEqual({ mode: 'subagent' });
+      });
+
+      test('should throw NOT_FOUND when accessing another user profile', async () => {
+        const callerA = await createCallerForUser(ownerUser.id);
+        const callerB = await createCallerForUser(otherUser.id);
+
+        const { id: profileId } = await callerA.agentProfiles.create({ name: 'Private Profile' });
+
+        await expect(callerB.agentProfiles.agents({ profileId })).rejects.toThrow(
+          'Profile not found'
+        );
+      });
+    });
+
     describe('update', () => {
       test('should update profile name and description', async () => {
         const caller = await createCallerForUser(ownerUser.id);

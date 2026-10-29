@@ -409,17 +409,56 @@ and creates an owned profile and workspace. It launches Kilo with a separate
 `HOME`, all XDG directories, local-only service origins, and an in-memory local
 credential. It does not change normal Kilo authentication or load project config.
 
-Coverage includes workspace listing, creation and idempotent replay, workspace
-detail, a second session in that workspace, preparation and sandbox status SSE,
-native snapshot/fence/live delivery, and two follow-up turns with persisted
-transcript checks. Every acceptance operation goes through local Kilo. Direct
-stack access is limited to fixture setup, health, fake-model gates, and cleanup.
+Coverage is grouped by topic. Every scenario asserts behavior and records
+pass/fail in `report.json`; one failure never skips cleanup or an independent
+later scenario.
+
+- **workspace** (`workspace.*`): catalog listing, creation and idempotent replay,
+  detail, a second session in that workspace, preparation and sandbox-status SSE,
+  native snapshot/fence/live delivery, and follow-up turns with persisted
+  transcript checks.
+- **hosted** (`hosted.start`): a cold hosted start, the same `operationKey`
+  replaying idempotently, changed intent under the same key rejected, immediate
+  listing, attach while the snapshot is still pending, and `cloud.status` on the
+  system feed during start.
+- **turns** (`turns.*`): prompts sent while a turn is busy are all persisted
+  once and the session ends with a completed reply (the driver does not pair
+  replies with prompts; queued prompts may steer a running turn), aborting a slow turn then
+  following up, duplicate `messageID` deduplication, provider-error surfacing and
+  recovery, a slash command, and native transcript pagination.
+- **questions** (`questions.*`): ask, list through `GET /question`, reply, then
+  idle with an empty list; a rejection with no request body (regression for
+  `6b660026ca`); and a pending question that survives re-attach.
+- **validation** (`validation.*`): detached, unknown, and mismatched selectors
+  rejected; the `x-kilo-workspace` header selector accepted; an oversized prompt
+  rejected while the session stays readable; and invalid prompt bodies rejected.
+- **auth** (`auth.*`): a signed-out Kilo gets 401 on hosted start; an account
+  without balance gets 402. Both use a second local Kilo with its own `HOME`.
+
+Pass `--only <name>` (repeatable or comma-separated) to run specific scenarios:
+
+```bash
+pnpm --filter cloud-agent-next run e2e:local-kilo \
+  --kilo-repo /path/to/kilocode --email you@example.com \
+  --only hosted.start,turns.queued
+```
+
+By default every non-opt-in scenario runs. Two scenarios are opt-in only:
+
+- `real-model` drives `kilo-auto/efficient` for a cold turn and a tool follow-up.
+- `idle-stream` holds `/event` on an idle session for about 30 s and asserts no
+  `kilo.native.resnapshot` and no close. This is the manual check for the native tail fix, not a
+  CI gate.
+
+The local Docker sandbox cannot clone for a second workspace while another
+sandbox is alive, so the runner releases one sandbox family before it starts the
+next.
 
 The model is `kilo/fake-deterministic`; the sandbox, wrapper, Kilo processes,
 Durable Objects, and database are real. The public Git fixture needs network access.
 Reports and redacted traces are stored under `dev/logs/local-kilo-*`; `--out`
-selects a new evidence directory. Cleanup removes only this run's workspace,
-profile, attachments, and local Kilo process.
+selects a new evidence directory. Cleanup removes only this run's workspaces,
+profile, attachments, and local Kilo processes.
 
 ## Deployed profile (`E2E_PROFILE=deployed`)
 

@@ -1,8 +1,4 @@
 /* eslint-disable max-lines -- root layout bootstrap: auth/consent/update gating, notification wiring, theme readiness gate, and Sentry error-boundary wrap are kept together */
-// Must run before the first view mounts: allowRTL(true) makes the native
-// direction known before any layout pass (see src/i18n/rtl.ts).
-// eslint-disable-next-line import/no-duplicates -- the side effect must run here, before the named import below
-import '@/i18n/rtl';
 import '../global.css';
 import '@/lib/cloud-agent-runtime';
 // Enter the local Android Live Update module's JS in the main process on both

@@ -4,16 +4,9 @@ import { useEffect, useRef, useState } from 'react';
 import { isLeaveAction } from '@/lib/navigation/leave-actions';
 import { pickerRouteOnTop } from '@/lib/picker-routes';
 
-/**
- * Android can deliver Back to the screen under an opening picker sheet.
- * Guard only while that picker is in the stack, leaving normal Back native.
- */
-export function usePickerAboveLeaveGuard(): void {
+export function usePickerRouteOnTop(): boolean {
   const navigation = useNavigation();
-  const router = useRouter();
   const [pickerOpen, setPickerOpen] = useState(() => pickerRouteOnTop(navigation.getState()));
-  const [leaveAllowed, setLeaveAllowed] = useState(false);
-  const pendingLeaveRef = useRef<(() => void) | null>(null);
 
   useEffect(() => {
     const sync = () => {
@@ -23,6 +16,20 @@ export function usePickerAboveLeaveGuard(): void {
     sync();
     return unsubscribe;
   }, [navigation]);
+
+  return pickerOpen;
+}
+
+/**
+ * Android can deliver Back to the screen under an opening picker sheet.
+ * Guard only while that picker is in the stack, leaving normal Back native.
+ */
+export function usePickerAboveLeaveGuard(): void {
+  const navigation = useNavigation();
+  const router = useRouter();
+  const pickerOpen = usePickerRouteOnTop();
+  const [leaveAllowed, setLeaveAllowed] = useState(false);
+  const pendingLeaveRef = useRef<(() => void) | null>(null);
 
   usePreventRemove(pickerOpen && !leaveAllowed, ({ data, repeat }) => {
     if (isLeaveAction(data.action.type) && pickerRouteOnTop(navigation.getState())) {

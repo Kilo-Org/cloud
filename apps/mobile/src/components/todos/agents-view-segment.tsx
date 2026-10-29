@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
+import { tabEntryA11y } from '@/lib/a11y/tab-entry';
 import { cn } from '@/lib/utils';
 
 export type AgentsView = 'sessions' | 'todos';
@@ -20,8 +21,7 @@ export function AgentsViewSegment({
       {(['sessions', 'todos'] as const).map(view => (
         <Pressable
           key={view}
-          accessibilityRole="tab"
-          accessibilityState={{ selected: value === view }}
+          {...tabEntryA11y({ selected: value === view })}
           onPress={() => {
             if (value !== view) {
               onChange(view);

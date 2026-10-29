@@ -34,11 +34,16 @@ const baseline = () => ({
   },
 });
 
-it('the committed catalog keeps all targets preinstalled/all-in-one', async () => {
+it('the committed catalog scopes production runtime-free to an org cohort', async () => {
   const catalog: unknown = JSON.parse(
     await fs.readFile(new URL('../runtime-targets.json', import.meta.url), 'utf8')
   );
-  for (const target of ['production', 'dev', 'isolated'])
+  expect(selectRuntimeTarget(catalog, 'production')).toMatchObject({
+    mode: 'downloaded',
+    image: 'runtime-free',
+    interactiveOrgIds: [expect.any(String)],
+  });
+  for (const target of ['dev', 'isolated'])
     expect(selectRuntimeTarget(catalog, target)).toEqual({
       mode: 'preinstalled',
       image: 'all-in-one',

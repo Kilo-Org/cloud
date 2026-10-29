@@ -35,7 +35,7 @@ import {
 } from '@/components/ui/icons';
 import { PreferenceRow } from '@/components/ui/preference-row';
 import { Text } from '@/components/ui/text';
-import { useAgentProfile, useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
+import { useAgentProfileMutations, useAgentProfileOverview } from '@/lib/hooks/use-agent-profiles';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useCommittedConnectivityStatus } from '@/lib/hooks/use-offline-banner-state';
@@ -102,7 +102,7 @@ export function ProfileOverviewScreen({
   const queryClient = useQueryClient();
   // Reactive: a connectivity commit re-renders the error variant selection.
   const committedConnectivity = useCommittedConnectivityStatus();
-  const profileQuery = useAgentProfile(profileId, organizationId);
+  const profileQuery = useAgentProfileOverview(profileId, organizationId);
   const { update, deleteProfile, setAsDefault, clearDefault } =
     useAgentProfileMutations(organizationId);
   const canManage = useCanManageOrganizationProfiles(organizationId);

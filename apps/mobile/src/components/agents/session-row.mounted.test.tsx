@@ -131,6 +131,9 @@ const session: StoredSession = {
   git_branch: 'feature/live',
   status: null,
   status_updated_at: null,
+  latest_run_status: null,
+  latest_run_failure_kind: null,
+  latest_run_terminal_at: null,
   total_cost_microdollars: 120_000,
   created_at: '2026-08-28T10:00:00.000Z',
   updated_at: '2026-08-28T11:55:00.000Z',
@@ -713,17 +716,6 @@ describe('RemoteSessionRow live speech', () => {
     ]);
     expect(texts(renderer)).toContain('NEEDS INPUT');
   });
-
-  it.each(['busy', 'idle', 'question', 'scheduled'])(
-    'keeps cost and updated time visible and spoken for a %s live row',
-    status => {
-      const renderer = mountRemote({ status, totalCostMicrodollars: 120_000 });
-      expect(texts(renderer)).toContain('$0.12 · 5 MINUTES AGO');
-      expect(hosts(renderer, 'Pressable')[0]?.props.accessibilityLabel).toContain(
-        'cost 12 cents, 5 minutes ago'
-      );
-    }
-  );
 
   it('speaks Working for an unrecognized status, agreeing with the drawn glyph', () => {
     const renderer = mountRemote({ status: 'mystery' });

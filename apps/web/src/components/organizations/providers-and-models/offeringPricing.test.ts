@@ -1,8 +1,5 @@
 import { describe, expect, test } from '@jest/globals';
-import {
-  GEMINI_4_ARGON_MODEL_ID,
-  GEMINI_FLASH_CURRENT_MODEL_ID,
-} from '@kilocode/web-shared/lib/ai-gateway/providers/google';
+import { GEMINI_4_ARGON_MODEL_ID } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { formatPrice } from '@/components/models/util';
 import { getOfferingPricing } from '@/components/organizations/providers-and-models/offeringPricing';
 import { TEST_CUSTOM_PRICING_CONFIG } from '@kilocode/web-shared/tests/helpers/custom-pricing.helper';
@@ -30,7 +27,7 @@ describe('getOfferingPricing', () => {
   });
 
   test('shows the custom price with the list price as the original', () => {
-    const pricing = getOfferingPricing(TEST_CUSTOM_PRICING_CONFIG, GEMINI_FLASH_CURRENT_MODEL_ID, {
+    const pricing = getOfferingPricing(TEST_CUSTOM_PRICING_CONFIG, 'google/gemini-3.8-flash', {
       prompt: '0.0000015',
       completion: '0.0000075',
     });
@@ -52,7 +49,7 @@ describe('getOfferingPricing', () => {
   });
 
   test('omits the original price when the custom price is not lower', () => {
-    const pricing = getOfferingPricing(TEST_CUSTOM_PRICING_CONFIG, GEMINI_FLASH_CURRENT_MODEL_ID, {
+    const pricing = getOfferingPricing(TEST_CUSTOM_PRICING_CONFIG, 'google/gemini-3.8-flash', {
       prompt: '0.00000075',
       completion: '0.000002',
     });
@@ -64,7 +61,7 @@ describe('getOfferingPricing', () => {
 
   test('does not apply custom pricing to other variants of the model', () => {
     expect(
-      getOfferingPricing(TEST_CUSTOM_PRICING_CONFIG, `${GEMINI_FLASH_CURRENT_MODEL_ID}:free`, {
+      getOfferingPricing(TEST_CUSTOM_PRICING_CONFIG, 'google/gemini-3.8-flash:free', {
         prompt: '0',
         completion: '0',
       })

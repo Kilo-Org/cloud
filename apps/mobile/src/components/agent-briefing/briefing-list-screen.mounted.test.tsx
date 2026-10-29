@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { createElement, type ElementType } from 'react';
+import { createElement, type ElementType, type ReactElement } from 'react';
 import { afterEach, expect, it, vi } from 'vitest';
 
 import { act, TestRenderer } from '@/test/renderer';
@@ -8,12 +8,21 @@ import { BriefingListScreen } from './briefing-list-screen';
 
 const requests = vi.hoisted(() => ({
   list: vi.fn<() => Promise<{ reports: never[]; nextCursor: null }>>(),
+  push: vi.fn(),
 }));
 const queryKey = ['briefing-list'];
 
-vi.mock('@shopify/flash-list', () => ({ FlashList: 'FlashList' }));
+vi.mock('@shopify/flash-list', () => ({
+  FlashList: ({
+    ListEmptyComponent,
+    ...props
+  }: {
+    data: readonly unknown[];
+    ListEmptyComponent: ReactElement;
+  }) => createElement('FlashList', props, props.data.length === 0 ? ListEmptyComponent : null),
+}));
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('expo-router', () => ({ useRouter: () => ({ push: requests.push }) }));
 vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
@@ -28,6 +37,9 @@ vi.mock('@/lib/agent-briefing', () => ({
   useBriefingAccess: () => ({ enabled: true, canRead: () => true }),
   useBriefingDismissals: () => ({ data: [] }),
   useBriefingInvalidation: vi.fn(),
+  useBriefingPreferences: () => ({
+    data: { contexts: [{ context: { organizationId: null }, enabled: false }] },
+  }),
 }));
 vi.mock('@/lib/hooks/use-briefing-list-filters', () => ({
   useBriefingListFilters: () => ({ history: false, organizationId: undefined }),
@@ -61,6 +73,7 @@ afterEach(() => {
   renderer = undefined;
   client = undefined;
   requests.list.mockReset();
+  requests.push.mockReset();
   vi.useRealTimers();
 });
 
@@ -117,4 +130,31 @@ it('keeps background updates silent and shows progress only for a pull until it 
     expect(list().props.refreshing).toBe(false);
   });
   expect(queryClient.isFetching({ queryKey })).toBe(0);
+});
+
+it('offers settings instead of claiming an empty activity window when no context is enabled', () => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, staleTime: Infinity } },
+  });
+  client = queryClient;
+  queryClient.setQueryData(queryKey, {
+    pages: [{ reports: [], nextCursor: null }],
+    pageParams: [undefined],
+  });
+  act(() => {
+    renderer = TestRenderer.create(
+      createElement(QueryClientProvider, { client: queryClient }, createElement(BriefingListScreen))
+    );
+  });
+  const mounted = renderer;
+  if (!mounted) {
+    throw new Error('Briefing list did not mount');
+  }
+  const { onPress } = mounted.root.findByType('Button' as ElementType).props as {
+    onPress: () => void;
+  };
+  act(() => {
+    onPress();
+  });
+  expect(requests.push).toHaveBeenCalledWith('/(app)/agent-briefing/settings');
 });

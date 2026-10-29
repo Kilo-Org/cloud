@@ -1211,7 +1211,6 @@
       "eventsCount_other": "{{displayCount}} حدث",
       "generated": "أُنشئ التقرير في {{generatedAt}}.",
       "noActivity": "لا يوجد نشاط مسجّل",
-      "noActivityDescription": "لم يسجّل Kilo نشاطًا للنتائج الأمنية يمكن تضمينه في التقرير.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "لم يكتمل استعلام التقرير. حاول مرة أخرى.",
       "repositoryNotRecorded": "المستودع غير مسجّل",

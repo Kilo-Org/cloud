@@ -1951,7 +1951,6 @@
       "eventsCount_other": "{{displayCount}} matukio",
       "generated": "Ripoti imetengenezwa {{generatedAt}}.",
       "noActivity": "Hakuna shughuli iliyorekodiwa",
-      "noActivityDescription": "Kilo haina shughuli zinazoweza kuripotiwa kuhusu matatizo ya usalama katika kipindi hiki.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Hazina haikurekodiwa",
       "reasonUnknown": "Sababu isiyotambulika",

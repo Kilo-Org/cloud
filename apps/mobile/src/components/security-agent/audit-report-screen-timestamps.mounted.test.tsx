@@ -203,11 +203,11 @@ describe('AuditReportScreen timestamps and actor labels', () => {
     const period = { start: '2026-01-01T00:00:00.000Z', end: '2026-01-01' };
     const lines = renderedText(root);
 
-    expect(lines).toEqual([
-      i18n.t('securityAgent.auditReport.noActivityDescription'),
-      i18n.t('securityAgent.auditReport.periodUtc', period),
-    ]);
-    expect(lines.at(-1)).toMatch(/ · UTC$/);
+    // The heading carries the "no activity" statement; the period line is the
+    // only other copy, so the window is stated once and never in prose.
+    expect(lines).toEqual([i18n.t('securityAgent.auditReport.periodUtc', period)]);
+    expect(lines[0]).toMatch(/ · UTC$/);
+    expect(lines.join(' ')).not.toContain(i18n.t('securityAgent.auditReport.noActivity'));
   });
 
   it.each(['en', 'de', 'ar'])('keeps the zone marker on the empty period in %s', async language => {

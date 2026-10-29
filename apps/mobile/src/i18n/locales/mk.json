@@ -1951,7 +1951,6 @@
       "eventsCount_other": "{{displayCount}} настани",
       "generated": "Извештајот е генериран {{generatedAt}}.",
       "noActivity": "Нема запишана активност",
-      "noActivityDescription": "Kilo нема активност поврзана со безбедносни наоди што може да ја вклучи во извештајот во овој период.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Складиштето не е запишано",
       "reasonUnknown": "Непрепознаена причина",

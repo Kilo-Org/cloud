@@ -2032,7 +2032,6 @@
       "eventsCount_other": "{{displayCount}} imeachtaí",
       "generated": "Gineadh an tuarascáil: {{generatedAt}}.",
       "noActivity": "Níl aon ghníomhaíocht taifeadta",
-      "noActivityDescription": "Níl aon ghníomhaíocht maidir le torthaí slándála le tuairisciú ag Kilo.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Stór gan taifeadadh",
       "reasonUnknown": "Cúis neamhaitheanta",

@@ -1951,7 +1951,6 @@
       "eventsCount_other": "{{displayCount}} dhacdooyin",
       "generated": "Waxaa la soo saaray {{generatedAt}}.",
       "noActivity": "Ma jiro dhaqdhaqaaq la diiwaangeliyay",
-      "noActivityDescription": "Kilo ma hayo wax hawlo ah oo la xiriira natiijooyinka amniga oo laga warbixin karo waqtigan.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Kaydka lama diiwaangelin",
       "reasonUnknown": "Sabab aan la aqoonsan",

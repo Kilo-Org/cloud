@@ -1167,7 +1167,6 @@
       "eventsCount_other": "{{displayCount}} événements",
       "generated": "Ce rapport a été généré le {{generatedAt}}.",
       "noActivity": "Aucune activité enregistrée",
-      "noActivityDescription": "Kilo n'a aucune activité liée aux signalements de sécurité à rapporter durant cette période.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "La requête de génération du rapport n'a pas abouti. Réessayez.",
       "repositoryNotRecorded": "Dépôt non enregistré",

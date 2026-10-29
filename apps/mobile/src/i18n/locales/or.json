@@ -1951,7 +1951,6 @@
       "eventsCount_other": "{{displayCount}}ଟି ଘଟଣା",
       "generated": "{{generatedAt}} ରେ ତିଆରି ହୋଇଛି।",
       "noActivity": "କୌଣସି କାର୍ଯ୍ୟକଳାପ ରେକର୍ଡ ହୋଇନାହିଁ",
-      "noActivityDescription": "ଚିହ୍ନଟ ସୁରକ୍ଷା ସମସ୍ୟା ସମ୍ବନ୍ଧୀୟ କୌଣସି ରିପୋର୍ଟଯୋଗ୍ୟ କାର୍ଯ୍ୟକଳାପ Kilo ରେ ନାହିଁ।",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "ରିପୋଜିଟୋରୀ ରେକର୍ଡ ହୋଇନାହିଁ",
       "reasonUnknown": "ଅଜଣା କାରଣ",

@@ -1951,7 +1951,6 @@
       "eventsCount_other": "{{displayCount}} ڕووداو",
       "generated": "لە {{generatedAt}} دروست کراوە.",
       "noActivity": "هیچ چالاکییەکی تۆمارکراو نییە",
-      "noActivityDescription": "Kilo هیچ چالاکییەکی دۆزینەوەی ئاسایشی نییە کە بکرێت لە ڕاپۆرتدا بخرێتە ڕوو.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "کۆگا تۆمارنەکراوە",
       "reasonUnknown": "هۆکاری نەناسراو",

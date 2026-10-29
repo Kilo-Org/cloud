@@ -1199,7 +1199,6 @@
       "eventsCount_other": "{{displayCount}} אירועים",
       "generated": "מועד יצירת הדוח: {{generatedAt}}.",
       "noActivity": "אין פעילות מתועדת",
-      "noActivityDescription": "אין ב-Kilo פעילות לדיווח הקשורה לממצאי אבטחה בתקופה זו.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "השאילתה להפקת הדוח לא הושלמה. נסה שוב.",
       "repositoryNotRecorded": "המאגר לא תועד",

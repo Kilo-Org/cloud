@@ -1951,7 +1951,6 @@
       "eventsCount_other": "{{displayCount}} izehlakalo",
       "generated": "Umbiko wenziwe ngo-{{generatedAt}}.",
       "noActivity": "Akukho msebenzi orekhodiwe",
-      "noActivityDescription": "I-Kilo ayinawo umsebenzi ongabikwa ophathelene nokutholakele kwezokuphepha kulesi sikhathi.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Inqolobane yekhodi ayirekhodwanga",
       "reasonUnknown": "Isizathu esingaziwa",

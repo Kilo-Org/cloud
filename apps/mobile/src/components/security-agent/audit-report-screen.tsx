@@ -197,10 +197,11 @@ function AuditReportView({
     // Explorer security-audit finding 3: CenteredState's measured path painted
     // the icon bubble but collapsed the copy, so the screen owns the layout and
     // EmptyState renders its plain content (`placement="static"`).
-    // The empty report names its window once: the sentence says there is no
-    // reportable activity in the period, and `periodUtc` below states that
-    // period with the invariant UTC marker, so a reader whose calendar is not
-    // UTC can tell which days the empty period covers.
+    // The heading says there is no recorded activity; the only other datum the
+    // empty state has is the window, so `periodUtc` states it once, with the
+    // invariant UTC marker, at the same size the non-empty header uses. A
+    // second sentence saying the same thing in words was removed: it restated
+    // the heading and pointed at this line.
     return (
       <TabScreenScrollView className="flex-1" contentContainerClassName="grow justify-center">
         <EmptyState
@@ -208,14 +209,9 @@ function AuditReportView({
           icon={FileText}
           title={t('securityAgent.auditReport.noActivity')}
           description={
-            <View className="items-center gap-1">
-              <Text variant="muted" className="text-center">
-                {t('securityAgent.auditReport.noActivityDescription')}
-              </Text>
-              <Text variant="muted" className="text-xs text-center">
-                {t('securityAgent.auditReport.periodUtc', period)}
-              </Text>
-            </View>
+            <Text variant="muted" className="text-xs text-center">
+              {t('securityAgent.auditReport.periodUtc', period)}
+            </Text>
           }
         />
       </TabScreenScrollView>

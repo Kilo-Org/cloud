@@ -1951,7 +1951,6 @@
       "eventsCount_other": "{{displayCount}} เหตุการณ์",
       "generated": "สร้างเมื่อ {{generatedAt}}",
       "noActivity": "ยังไม่มีกิจกรรมที่บันทึกไว้",
-      "noActivityDescription": "Kilo ไม่มีกิจกรรมเกี่ยวกับข้อค้นพบด้านความปลอดภัยที่รายงานได้ในช่วงเวลานี้",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "ไม่ได้บันทึกคลังโค้ดไว้",
       "reasonUnknown": "ไม่รู้จักเหตุผล",

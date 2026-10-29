@@ -1951,7 +1951,6 @@
       "eventsCount_other": "{{displayCount}} رویداد",
       "generated": "این گزارش در {{generatedAt}} تولید شده است.",
       "noActivity": "هیچ فعالیتی ثبت نشده",
-      "noActivityDescription": "در Kilo هیچ فعالیت قابل گزارشی درباره یافته‌های امنیتی در این بازه ثبت نشده است.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "مخزن ثبت نشده",
       "reasonUnknown": "دلیل ناشناخته",

@@ -1951,7 +1951,6 @@
       "eventsCount_other": "{{displayCount}} hadisə",
       "generated": "Hesabat {{generatedAt}} tarixində yaradılıb.",
       "noActivity": "Qeyd olunmuş fəaliyyət yoxdur",
-      "noActivityDescription": "Bu dövrdə Kilo-da təhlükəsizlik tapıntıları üzrə hesabata daxil ediləcək fəaliyyət yoxdur.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Repozitoriya qeyd olunmayıb",
       "reasonUnknown": "Tanınmayan səbəb",

@@ -1951,7 +1951,6 @@
       "eventsCount_other": "{{displayCount}} நிகழ்வுகள்",
       "generated": "உருவாக்கப்பட்ட நேரம்: {{generatedAt}}.",
       "noActivity": "பதிவுசெய்யப்பட்ட செயல்பாடு இல்லை",
-      "noActivityDescription": "இந்தக் காலகட்டத்தில் பாதுகாப்புச் சிக்கல்கள் தொடர்பாக அறிக்கையில் சேர்க்கக்கூடிய செயல்பாடுகள் Kilo-வில் இல்லை.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "களஞ்சியம் பதிவு செய்யப்படவில்லை",
       "reasonUnknown": "அங்கீகரிக்கப்படாத காரணம்",

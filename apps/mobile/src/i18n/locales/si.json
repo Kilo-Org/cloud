@@ -1951,7 +1951,6 @@
       "eventsCount_other": "{{displayCount}} සිදුවීම්",
       "generated": "{{generatedAt}} සකස් කර ඇත.",
       "noActivity": "සටහන් කළ ක්‍රියාකාරකම් නැත",
-      "noActivityDescription": "වාර්තා කළ හැකි ආරක්ෂක සොයාගැනීම් සම්බන්ධ ක්‍රියාකාරකම් Kilo තුළ නැත.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "ගබඩාව වාර්තා කර නැත",
       "reasonUnknown": "හඳුනා නොගත් හේතුව",

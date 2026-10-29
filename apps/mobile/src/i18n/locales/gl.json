@@ -1951,7 +1951,6 @@
       "eventsCount_other": "{{displayCount}} eventos",
       "generated": "O informe xerouse o {{generatedAt}}.",
       "noActivity": "Sen actividade rexistrada",
-      "noActivityDescription": "Kilo non ten actividade sobre achados de seguridade que incluír no informe neste período.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Repositorio non rexistrado",
       "reasonUnknown": "Motivo non recoñecido",

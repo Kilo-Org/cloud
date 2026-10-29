@@ -2005,7 +2005,6 @@
       "eventsCount_other": "{{displayCount}} dogodkov",
       "generated": "Poročilo je bilo ustvarjeno {{generatedAt}}.",
       "noActivity": "Ni zabeležene dejavnosti",
-      "noActivityDescription": "Kilo v tem obdobju nima zabeležene dejavnosti v zvezi z varnostnimi ugotovitvami, ki bi jo vključil v poročilo.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Skladišče ni zabeleženo",
       "reasonUnknown": "Neprepoznan razlog",

@@ -1951,7 +1951,6 @@
       "eventsCount_other": "{{displayCount}} үйл явдал",
       "generated": "{{generatedAt}} үед үүсгэсэн.",
       "noActivity": "Бүртгэсэн үйл ажиллагаа байхгүй",
-      "noActivityDescription": "Kilo-д тайлагнах аюулгүй байдлын асуудалтай холбоотой үйл ажиллагаа бүртгэгдээгүй.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Репозиторийг бүртгээгүй",
       "reasonUnknown": "Танигдаагүй шалтгаан",

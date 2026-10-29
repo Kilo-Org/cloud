@@ -2005,7 +2005,6 @@
       "eventsCount_other": "{{displayCount}} įvykių",
       "generated": "Ataskaita sugeneruota {{generatedAt}}.",
       "noActivity": "Užfiksuotos veiklos nėra",
-      "noActivityDescription": "Kilo neužfiksavo su saugos radiniais susijusios veiklos, kurią būtų galima įtraukti į ataskaitą.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Saugykla neužfiksuota",
       "reasonUnknown": "Neatpažinta priežastis",

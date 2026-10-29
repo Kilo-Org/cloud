@@ -2034,7 +2034,6 @@
       "eventsCount_other": "{{displayCount}} events",
       "generated": "Generated {{generatedAt}}",
       "noActivity": "No recorded activity",
-      "noActivityDescription": "Kilo has no reportable Security Finding activity in this period.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "reasonUnknown": "Unrecognized reason",
       "repositoryNotRecorded": "Repository not recorded",

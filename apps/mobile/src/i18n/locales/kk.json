@@ -1951,7 +1951,6 @@
       "eventsCount_other": "{{displayCount}} оқиға",
       "generated": "Жасалған уақыты: {{generatedAt}}.",
       "noActivity": "Тіркелген әрекет жоқ",
-      "noActivityDescription": "Kilo жүйесінде осы кезеңде қауіпсіздік мәселелері бойынша есепке енгізілетін әрекеттер жоқ.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Репозиторий тіркелмеген",
       "reasonUnknown": "Танылмаған себеп",

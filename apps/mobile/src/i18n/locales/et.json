@@ -1951,7 +1951,6 @@
       "eventsCount_other": "{{displayCount}} sündmust",
       "generated": "Aruanne on loodud {{generatedAt}}.",
       "noActivity": "Salvestatud tegevust pole",
-      "noActivityDescription": "Kilol pole aruandesse lisatavaid turvaleidudega seotud toiminguid.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Hoidlat pole salvestatud",
       "reasonUnknown": "Tuvastamata põhjus",

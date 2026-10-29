@@ -1951,7 +1951,6 @@
       "eventsCount_other": "{{displayCount}} ઘટનાઓ",
       "generated": "{{generatedAt}} ના રોજ તૈયાર કર્યો.",
       "noActivity": "કોઈ નોંધાયેલ પ્રવૃત્તિ નથી",
-      "noActivityDescription": "Kilo માં આ સમયગાળા દરમિયાન સુરક્ષા તારણો અંગે અહેવાલમાં સામેલ કરી શકાય તેવી કોઈ પ્રવૃત્તિ નોંધાઈ નથી.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "રિપોઝિટરી નોંધાયેલ નથી",
       "reasonUnknown": "અજાણ્યું કારણ",

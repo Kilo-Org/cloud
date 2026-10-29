@@ -1951,7 +1951,6 @@
       "eventsCount_other": "{{displayCount}} evènman",
       "generated": "Rapò a pwodui {{generatedAt}}.",
       "noActivity": "Pa gen aktivite anrejistre",
-      "noActivityDescription": "Kilo pa gen aktivite sou konsta sekirite pou rapòte.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Depo pa anrejistre",
       "reasonUnknown": "Rezon pa rekonèt",

@@ -1951,7 +1951,6 @@
       "eventsCount_other": "{{displayCount}} hendelser",
       "generated": "Rapporten ble generert {{generatedAt}}.",
       "noActivity": "Ingen registrert aktivitet",
-      "noActivityDescription": "Kilo har ingen aktivitet knyttet til sikkerhetsfunn å rapportere i denne perioden.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Kodelager ikke registrert",
       "reasonUnknown": "Ukjent årsak",

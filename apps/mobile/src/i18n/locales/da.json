@@ -1951,7 +1951,6 @@
       "eventsCount_other": "{{displayCount}} hændelser",
       "generated": "Rapporten blev genereret {{generatedAt}}.",
       "noActivity": "Ingen registreret aktivitet",
-      "noActivityDescription": "Kilo har ingen aktivitet om sikkerhedsfund at rapportere i denne periode.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Kodelager ikke registreret",
       "reasonUnknown": "Ukendt begrundelse",

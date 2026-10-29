@@ -1951,7 +1951,6 @@
       "eventsCount_other": "{{displayCount}} abubuwan da suka faru",
       "generated": "An samar da rahoton {{generatedAt}}.",
       "noActivity": "Babu aiki da aka rubuta",
-      "noActivityDescription": "Kilo ba shi da wani aikin da ya shafi matsalolin tsaro da aka gano wanda za a saka a rahoto.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Ba a rubuta ma'ajiya ba",
       "reasonUnknown": "Dalilin da ba a gane ba",

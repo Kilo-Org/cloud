@@ -2059,7 +2059,6 @@
       "eventsCount_other": "{{displayCount}} digwyddiad",
       "generated": "Cynhyrchwyd yr adroddiad {{generatedAt}}.",
       "noActivity": "Dim gweithgaredd wedi'i gofnodi",
-      "noActivityDescription": "Nid oes gan Kilo weithgaredd canfyddiadau diogelwch i adrodd arno yn y cyfnod hwn.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Ystorfa heb ei chofnodi",
       "reasonUnknown": "Rheswm heb ei adnabod",

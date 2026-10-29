@@ -1195,7 +1195,6 @@
       "eventsCount_other": "{{displayCount}} 个事件",
       "generated": "已于 {{generatedAt}} 生成",
       "noActivity": "暂无活动记录",
-      "noActivityDescription": "Kilo 在此期间没有可纳入报告的安全问题活动记录。",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "报告查询未完成。请重试。",
       "repositoryNotRecorded": "未记录仓库",

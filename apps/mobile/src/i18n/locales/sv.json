@@ -1951,7 +1951,6 @@
       "eventsCount_other": "{{displayCount}} händelser",
       "generated": "Rapporten skapades {{generatedAt}}",
       "noActivity": "Ingen registrerad aktivitet",
-      "noActivityDescription": "Kilo har ingen aktivitet att rapportera för säkerhetsfynd.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Kodarkiv inte registrerat",
       "reasonUnknown": "Okänd orsak",

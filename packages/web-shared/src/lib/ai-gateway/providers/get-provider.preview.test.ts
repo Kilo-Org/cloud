@@ -276,6 +276,48 @@ describe('previewByokRouting', () => {
     }
   );
 
+  test.each([
+    { priorities: undefined, expected: 'synthetic' },
+    { priorities: { synthetic: 1, 'zai-coding': 0 }, expected: 'zai-coding' },
+    { priorities: { synthetic: 0, 'zai-coding': 1 }, expected: 'synthetic' },
+  ])(
+    'serves a catalog id with the first catalog-mode key in the owner order: $expected',
+    async ({ priorities, expected }) => {
+      const user = await insertTestUser();
+      await db.insert(byok_api_keys).values(
+        (['zai-coding', 'synthetic'] as const).map(providerId => ({
+          kilo_user_id: user.id,
+          provider_id: providerId,
+          encrypted_api_key: encryptApiKey(`${providerId}-secret`, BYOK_ENCRYPTION_KEY),
+          created_by: user.id,
+          settings: { serve_catalog_models: true, priority: priorities?.[providerId] },
+        }))
+      );
+      jest.mocked(shouldRouteToVercel).mockResolvedValue(false);
+      jest.mocked(getModelGatewayUserByokProviders).mockResolvedValue([]);
+
+      const routed = await getProvider({
+        requestedModel: MODEL,
+        request: request('chat_completions'),
+        user,
+        organizationId: undefined,
+      });
+      const preview = await previewByokRouting({
+        fromDb: db,
+        owner: { type: 'user', id: user.id },
+        requestedModel: MODEL,
+        apiKind: 'chat_completions',
+      });
+
+      if (preview.kind !== 'routes') throw new Error(`unexpected ${preview.kind} preview`);
+      expect(routeOf(routed, 'chat_completions')).toEqual({
+        route: 'direct-byok',
+        providerId: expected,
+      });
+      expect(previewRouteOf(preview.steps)).toEqual({ route: 'direct-byok', providerId: expected });
+    }
+  );
+
   test('marks the ChatGPT connection as not tried below a serving key', async () => {
     const user = await insertTestUser();
     await db.insert(byok_api_keys).values({

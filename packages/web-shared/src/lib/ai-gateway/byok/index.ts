@@ -144,13 +144,30 @@ export function servesCatalogModels(settings: unknown): boolean {
   return parsed.success && parsed.data.serve_catalog_models === true;
 }
 
+/** The owner's chosen priority of a key, or undefined when the key keeps its default order. */
+export function getByokKeyPriority(settings: unknown): number | undefined {
+  return ByokApiKeySettingsSchema.safeParse(settings).data?.priority;
+}
+
+const byokKeyPriority = sql`case when jsonb_typeof(${byok_api_keys.settings}->'priority') = 'number' then (${byok_api_keys.settings}->>'priority')::numeric end`;
+
+/**
+ * Keys the owner prioritized come first, lowest priority first. The rest keep the original
+ * oldest-first order, so owners who never reorder their keys see no change.
+ */
+export const BYOK_KEY_ORDER = [
+  sql`${byokKeyPriority} asc nulls last`,
+  byok_api_keys.created_at,
+  byok_api_keys.id,
+];
+
 export type EnabledByokProvider = {
   providerId: UserByokProviderId;
   /** Catalog mode as stored; only providers that support it can store true. */
   serveCatalogModels: boolean;
 };
 
-export type ByokKeyState = EnabledByokProvider & { isEnabled: boolean };
+export type ByokKeyState = EnabledByokProvider & { isEnabled: boolean; priority?: number };
 
 async function selectByokKeyStates(
   fromDb: ByokSourceDb,
@@ -170,7 +187,7 @@ async function selectByokKeyStates(
         enabledOnly ? eq(byok_api_keys.is_enabled, true) : undefined
       )
     )
-    .orderBy(byok_api_keys.created_at);
+    .orderBy(...BYOK_KEY_ORDER);
 
   return rows.flatMap(row => {
     const providerId = UserByokProviderIdSchema.safeParse(row.provider_id);
@@ -180,6 +197,7 @@ async function selectByokKeyStates(
             providerId: providerId.data,
             serveCatalogModels: servesCatalogModels(row.settings),
             isEnabled: row.is_enabled,
+            priority: getByokKeyPriority(row.settings),
           },
         ]
       : [];
@@ -356,7 +374,7 @@ export async function decryptByokRow(row: {
 
 export type ByokCredential = BYOKResult & { serveCatalogModels: boolean };
 
-/** The owner's enabled keys for `providerIds`, oldest first. */
+/** The owner's enabled keys for `providerIds`, in `BYOK_KEY_ORDER`. */
 export async function getByokCredentials(
   fromDb: ByokSourceDb,
   owner: ByokOwner,
@@ -366,7 +384,7 @@ export async function getByokCredentials(
 }
 
 /**
- * The owner's enabled keys in catalog mode for `providerIds`, oldest first. Keys outside catalog
+ * The owner's enabled keys in catalog mode for `providerIds`, in `BYOK_KEY_ORDER`. Keys outside catalog
  * mode are filtered out before decryption, so they cost no KMS round-trips and a key that cannot
  * be decrypted cannot fail the lookup.
  */
@@ -411,12 +429,13 @@ async function queryByokCredentials(
         extraCondition
       )
     )
-    .orderBy(byok_api_keys.created_at);
+    .orderBy(...BYOK_KEY_ORDER);
 
   const results = await Promise.allSettled(
     rows.map(async row => ({
       ...(await decryptByokRow(row)),
       serveCatalogModels: servesCatalogModels(row.settings),
+      priority: getByokKeyPriority(row.settings),
     }))
   );
 
@@ -441,7 +460,11 @@ async function getByokRowsForOwner(
   const credentials = await getByokCredentials(fromDb, owner, providerIds);
   return credentials.length === 0
     ? null
-    : credentials.map(({ decryptedAPIKey, providerId }) => ({ decryptedAPIKey, providerId }));
+    : credentials.map(({ decryptedAPIKey, providerId, priority }) => ({
+        decryptedAPIKey,
+        providerId,
+        ...(priority !== undefined && { priority }),
+      }));
 }
 
 export async function getBYOKforUser(

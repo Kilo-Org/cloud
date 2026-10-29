@@ -235,16 +235,17 @@ type DirectByokCatalogCandidate<K> = DirectByokCatalogModel & {
 };
 
 /**
- * The owner's keys for the providers that serve a catalog id, in `DIRECT_BYOK_PROVIDERS` order,
- * with whether each can take the request. The first `serves` candidate takes it. Routing passes
- * decrypted credentials and the preview passes key metadata, so the decision never needs a key.
+ * The owner's keys for the providers that serve a catalog id, with whether each can take the
+ * request. Prioritized keys come first in the owner's order, then the rest in
+ * `DIRECT_BYOK_PROVIDERS` order. The first `serves` candidate takes it. Routing passes decrypted
+ * credentials and the preview passes key metadata, so the decision never needs a key.
  */
 function rankDirectByokCatalogKeys<K extends ByokKeyState>(
   catalogModels: readonly DirectByokCatalogModel[],
   keys: readonly K[],
   apiKind: GatewayChatApiKind
 ): DirectByokCatalogCandidate<K>[] {
-  return catalogModels.flatMap(({ provider, model }) => {
+  const candidates = catalogModels.flatMap(({ provider, model }) => {
     const key = keys.find(candidate => candidate.providerId === provider.id);
     if (!key) return [];
     const decision: DirectByokCatalogKeyDecision = !key.isEnabled
@@ -256,6 +257,10 @@ function rankDirectByokCatalogKeys<K extends ByokKeyState>(
           : 'unsupported-api-kind';
     return [{ provider, model, key, decision }];
   });
+  return candidates.toSorted(
+    (a, b) =>
+      (a.key.priority ?? Number.MAX_SAFE_INTEGER) - (b.key.priority ?? Number.MAX_SAFE_INTEGER)
+  );
 }
 
 async function isEligibleForCustomLlm(

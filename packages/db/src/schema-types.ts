@@ -2498,9 +2498,12 @@ export type ReasoningOption = z.infer<typeof ReasoningOptionSchema>;
  * Per-key BYOK settings. Every field is optional so new settings need no backfill.
  * `serve_catalog_models` (catalog mode): a direct BYOK key that serves only Kilo catalog model
  * ids, so organization model policies apply to it.
+ * `priority`: the owner's chosen position of the key, lowest first, among keys that can serve the
+ * same request. Keys without one keep their default order after every prioritized key.
  */
 export const ByokApiKeySettingsSchema = z.object({
   serve_catalog_models: z.boolean().optional(),
+  priority: z.number().int().nonnegative().optional(),
 });
 
 export type ByokApiKeySettings = z.infer<typeof ByokApiKeySettingsSchema>;

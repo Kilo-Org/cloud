@@ -24,6 +24,8 @@ export type ProviderId =
 export type BYOKResult = {
   decryptedAPIKey: string;
   providerId: UserByokProviderId;
+  /** Set when the owner reordered their keys; see `BYOK_KEY_ORDER`. */
+  priority?: number;
 };
 
 export type TransformRequestContext = {

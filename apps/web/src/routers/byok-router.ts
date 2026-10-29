@@ -15,7 +15,7 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { sentryLogger } from '@kilocode/web-shared/lib/utils.server';
 import { byok_api_keys, MODELS_BY_PROVIDER_ADMIN_URL } from '@kilocode/db/schema';
-import { eq, sql } from 'drizzle-orm';
+import { and, eq, ne, sql } from 'drizzle-orm';
 import { encryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
 import { BYOK_ENCRYPTION_KEY } from '@kilocode/web-shared/lib/config.server';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
@@ -26,6 +26,7 @@ import {
   SetBYOKKeyEnabledInputSchema,
   SetBYOKKeyCatalogModeInputSchema,
   ListBYOKKeysInputSchema,
+  ReorderBYOKKeysInputSchema,
   TestBYOKKeyInputSchema,
   PreviewBYOKRoutingInputSchema,
   BYOKApiKeyResponseSchema,
@@ -51,6 +52,7 @@ import { OPENROUTER } from '@kilocode/web-shared/lib/ai-gateway/providers/defini
 import { ATTRIBUTION_HEADERS } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/attribution-headers';
 import { getVercelInferenceProviderConfigForUserByok } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel';
 import {
+  BYOK_KEY_ORDER,
   byokOwner,
   decryptByokRow,
   getByokKmsContext,
@@ -71,12 +73,14 @@ import {
 import { parseAwsBedrockCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/bedrock-byok';
 import { parseGcpVertexCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/vertex-byok';
 import { isExperimentalByokEnabled } from '@/lib/byok/experimental-byok';
+import { OPENAI_CHATGPT_PROVIDER_ID } from '@kilocode/web-shared/lib/ai-gateway/openai-chatgpt/provider-id';
 
 const GENERIC_TEST_FAILURE_MESSAGE = 'API key test failed. Check the credential and try again.';
 const KEY_DECRYPTION_FAILURE_MESSAGE =
   'API key test failed: the stored key could not be read. Try again later.';
 const VERCEL_AI_GATEWAY_KEY_REJECTED_MESSAGE =
   'API key test failed: Vercel AI Gateway rejected this API key. Check that the key is correct and has not been revoked.';
+const KEYS_CHANGED_MESSAGE = 'Your API keys changed. Reload the page and try again.';
 const MANAGED_KEY_READ_ONLY_MESSAGE =
   'This key is managed by your coding plan and is read-only. Cancel the coding plan to remove it.';
 const logByokWarning = sentryLogger('byok-key-test', 'warning');
@@ -291,10 +295,50 @@ export const byokRouter = createTRPCRouter({
           organizationId
             ? eq(byok_api_keys.organization_id, organizationId)
             : eq(byok_api_keys.kilo_user_id, ctx.user.id)
-        );
+        )
+        .orderBy(...BYOK_KEY_ORDER);
 
       // Map provider_id to provider_name (will be enhanced in UI with actual provider names)
       return Promise.all(keys.map(key => toBYOKApiKeyResponse(key, organizationRole)));
+    }),
+
+  /**
+   * Sets the priority of every personal key, so routing tries them in the given order wherever
+   * several can serve a request. The ChatGPT connection is not a listed key and keeps its own step.
+   */
+  reorder: baseProcedure
+    .input(ReorderBYOKKeysInputSchema)
+    .output(z.array(BYOKApiKeyResponseSchema))
+    .mutation(async ({ input, ctx }): Promise<BYOKApiKeyResponse[]> => {
+      const ownedByCaller = and(
+        eq(byok_api_keys.kilo_user_id, ctx.user.id),
+        ne(byok_api_keys.provider_id, OPENAI_CHATGPT_PROVIDER_ID)
+      );
+      const keys = await db.transaction(async tx => {
+        const owned = await tx
+          .select({ id: byok_api_keys.id })
+          .from(byok_api_keys)
+          .where(ownedByCaller)
+          .for('update');
+        const ownedIds = new Set(owned.map(key => key.id));
+        if (owned.length !== input.keyIds.length || input.keyIds.some(id => !ownedIds.has(id))) {
+          throw new TRPCError({ code: 'CONFLICT', message: KEYS_CHANGED_MESSAGE });
+        }
+        for (const [priority, id] of input.keyIds.entries()) {
+          await tx
+            .update(byok_api_keys)
+            .set({
+              settings: sql`${byok_api_keys.settings} || ${JSON.stringify({ priority })}::jsonb`,
+            })
+            .where(and(eq(byok_api_keys.id, id), ownedByCaller));
+        }
+        return tx
+          .select(BYOK_KEY_COLUMNS)
+          .from(byok_api_keys)
+          .where(eq(byok_api_keys.kilo_user_id, ctx.user.id))
+          .orderBy(...BYOK_KEY_ORDER);
+      });
+      return Promise.all(keys.map(key => toBYOKApiKeyResponse(key, null)));
     }),
 
   /**

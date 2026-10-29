@@ -311,9 +311,15 @@ export async function applyVercelSettings(
     // https://anaconda.slack.com/archives/C0BQLEKUCV9/p1792652138592319
     // Request-level data handling preferences travel with the request on every routing path,
     // so upstream providers receive the caller's retention and training choices consistently.
+    // `userByok` follows `BYOK_KEY_ORDER`, so once the owner reorders their keys Vercel tries the
+    // providers in that order, falling back to the next one. Without a chosen order Vercel keeps
+    // picking the provider itself. Session affinity can still keep a conversation on the provider
+    // holding its prompt cache.
+    const ownerChoseOrder = userByok.some(byok => byok.priority !== undefined);
     requestToMutate.body.providerOptions = {
       gateway: {
         only: Object.keys(byokProviders),
+        order: ownerChoseOrder ? Object.keys(byokProviders) : undefined,
         sort: convertProviderSort(requestToMutate.body.provider?.sort),
         byok: byokProviders,
         models: requestToMutate.body.models,

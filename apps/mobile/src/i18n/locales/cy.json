@@ -4008,6 +4008,7 @@
     "keyLabel": "Allwedd",
     "keyTooLong": "Rhaid i'r allwedd fod yn 256 nod neu lai",
     "keyDuplicate": "Mae'r allwedd hon eisoes yn bodoli yn y proffil",
+    "keyWillBeSavedAs": "Bydd yn cael ei gadw fel {{key}}",
     "valueLabel": "Gwerth",
     "valueRequired": "Rhowch werth",
     "tooLong": "Defnyddiwch ddim fwy na {{max}} nod",

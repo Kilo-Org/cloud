@@ -3808,6 +3808,7 @@
     "keyLabel": "Gakoa",
     "keyTooLong": "Gakoak 256 karaktere edo gutxiago izan behar ditu",
     "keyDuplicate": "Gako hau jada badago profilean",
+    "keyWillBeSavedAs": "{{key}} gisa gordeko da",
     "valueLabel": "Balioa",
     "valueRequired": "Sartu balioa",
     "tooLong": "Erabili gehienez {{max}} karaktere",

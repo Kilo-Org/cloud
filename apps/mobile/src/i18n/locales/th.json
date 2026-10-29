@@ -3808,6 +3808,7 @@
     "keyLabel": "คีย์",
     "keyTooLong": "คีย์ต้องมี 256 อักขระหรือน้อยกว่า",
     "keyDuplicate": "คีย์นี้มีอยู่ในโปรไฟล์แล้ว",
+    "keyWillBeSavedAs": "จะถูกบันทึกเป็น {{key}}",
     "valueLabel": "ค่า",
     "valueRequired": "ป้อนค่า",
     "tooLong": "ใช้ได้สูงสุด {{max}} อักขระ",

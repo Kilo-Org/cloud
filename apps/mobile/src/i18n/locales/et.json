@@ -3808,6 +3808,7 @@
     "keyLabel": "Võti",
     "keyTooLong": "Võti võib olla kuni 256 tähemärki",
     "keyDuplicate": "See võti on profiilis juba olemas",
+    "keyWillBeSavedAs": "Salvestatakse kui {{key}}",
     "valueLabel": "Väärtus",
     "valueRequired": "Sisestage väärtus",
     "tooLong": "Kasutage kuni {{max}} tähemärki",

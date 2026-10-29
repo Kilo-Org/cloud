@@ -3808,6 +3808,7 @@
     "keyLabel": "Nøkkel",
     "keyTooLong": "Nøkkelen kan ha høyst 256 tegn",
     "keyDuplicate": "Denne nøkkelen finnes allerede i profilen",
+    "keyWillBeSavedAs": "Blir lagret som {{key}}",
     "valueLabel": "Verdi",
     "valueRequired": "Skriv inn en verdi",
     "tooLong": "Bruk høyst {{max}} tegn",

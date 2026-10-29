@@ -3808,6 +3808,7 @@
     "keyLabel": "Sleutel",
     "keyTooLong": "Sleutel moet 256 karakters of minder wees",
     "keyDuplicate": "Hierdie sleutel bestaan reeds in die profiel",
+    "keyWillBeSavedAs": "Sal as {{key}} gestoor word",
     "valueLabel": "Waarde",
     "valueRequired": "Voer 'n waarde in",
     "tooLong": "Gebruik hoogstens {{max}} karakters",

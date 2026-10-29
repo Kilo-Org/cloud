@@ -3808,6 +3808,7 @@
     "keyLabel": "Bọtini",
     "keyTooLong": "Bọtini gbọdọ̀ jẹ́ 256 àmì tàbí kéré sí i",
     "keyDuplicate": "Bọtini yii ti wà tẹ́lẹ̀ nínú profaili",
+    "keyWillBeSavedAs": "Yóò fi pamọ́ sí {{key}}",
     "valueLabel": "Iye",
     "valueRequired": "Tẹ iye kan sii",
     "tooLong": "Lo {{max}} àmì tàbí kéré sí i",

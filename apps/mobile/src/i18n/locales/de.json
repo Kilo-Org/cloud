@@ -3808,6 +3808,7 @@
     "keyLabel": "Schlüssel",
     "keyTooLong": "Der Schlüssel darf höchstens 256 Zeichen lang sein",
     "keyDuplicate": "Dieser Schlüssel ist bereits im Profil vorhanden",
+    "keyWillBeSavedAs": "Wird als {{key}} gespeichert",
     "valueLabel": "Wert",
     "valueRequired": "Geben Sie einen Wert ein",
     "tooLong": "Verwenden Sie höchstens {{max}} Zeichen",

@@ -164,6 +164,65 @@ describe('ProfileVariablesScreen', () => {
     unmount();
   });
 
+  it('names the key it will store when a typed key would be normalized', async () => {
+    h.query.data = testProfile();
+    h.query.isPending = false;
+    h.mutations.setVar.mutateAsync.mockResolvedValue({ success: true });
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    changeText(renderer.root, 'Key', 'API_की');
+    changeText(renderer.root, 'Value', 'https://api.example.com/v1');
+
+    // The two Devanagari characters become underscores in the stored key, so the
+    // form says so before the reader taps Save.
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
+      'Will be saved as API___'
+    );
+
+    pressButton(renderer.root, 'Save');
+
+    await waitFor(() => h.mutations.setVar.mutateAsync.mock.calls.length > 0);
+    // The hint and the payload cannot disagree: both come from the same helper.
+    expect(h.mutations.setVar.mutateAsync.mock.calls[0]?.[0]).toEqual({
+      profileId: 'profile-1',
+      key: 'API___',
+      value: 'https://api.example.com/v1',
+      isSecret: false,
+    });
+
+    unmount();
+  });
+
+  it('stays quiet about a key that saves unchanged', async () => {
+    h.query.data = testProfile();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    changeText(renderer.root, 'Key', 'API_KEY');
+
+    const texts = findAll(renderer.root, 'Text').map(node => node.props.children);
+    expect(texts).not.toContain('Will be saved as API_KEY');
+
+    unmount();
+  });
+
+  it('names the upper-cased key when only the letter case would change', async () => {
+    h.query.data = testProfile();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    changeText(renderer.root, 'Key', 'api_key');
+
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
+      'Will be saved as API_KEY'
+    );
+
+    unmount();
+  });
+
   it('non-retryable: an empty key is refused, and an over-long key names the length', async () => {
     h.query.data = testProfile();
     h.query.isPending = false;

@@ -3808,6 +3808,7 @@
     "keyLabel": "Chìa khóa",
     "keyTooLong": "Khóa phải có 256 ký tự hoặc ít hơn",
     "keyDuplicate": "Khóa này đã tồn tại trong hồ sơ",
+    "keyWillBeSavedAs": "Sẽ được lưu thành {{key}}",
     "valueLabel": "Giá trị",
     "valueRequired": "Nhập giá trị",
     "tooLong": "Sử dụng tối đa {{max}} ký tự",

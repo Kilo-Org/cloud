@@ -3808,6 +3808,7 @@
     "keyLabel": "Kle",
     "keyTooLong": "Kle a dwe gen 256 karaktè oswa mwens",
     "keyDuplicate": "Kle sa a deja egziste nan pwofil la",
+    "keyWillBeSavedAs": "Ap sove kòm {{key}}",
     "valueLabel": "Valè",
     "valueRequired": "Antre yon valè",
     "tooLong": "Sèvi ak {{max}} karaktè oswa mwens",

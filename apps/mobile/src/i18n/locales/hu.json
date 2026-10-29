@@ -3808,6 +3808,7 @@
     "keyLabel": "Kulcs",
     "keyTooLong": "A kulcs legfeljebb 256 karakter lehet",
     "keyDuplicate": "Ez a kulcs már létezik a profilban",
+    "keyWillBeSavedAs": "{{key}} néven lesz elmentve",
     "valueLabel": "Érték",
     "valueRequired": "Adjon meg egy értéket",
     "tooLong": "Legfeljebb {{max}} karakter használható",

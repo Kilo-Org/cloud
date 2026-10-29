@@ -4008,6 +4008,7 @@
     "keyLabel": "مفتاح",
     "keyTooLong": "يجب ألا يزيد المفتاح عن 256 حرفًا",
     "keyDuplicate": "هذا المفتاح موجود بالفعل في الملف الشخصي",
+    "keyWillBeSavedAs": "سيُحفظ باسم {{key}}",
     "valueLabel": "قيمة",
     "valueRequired": "أدخل قيمة",
     "tooLong": "استخدم {{max}} حرفًا على الأكثر",

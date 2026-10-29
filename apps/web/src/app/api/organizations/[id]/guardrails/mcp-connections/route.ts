@@ -6,7 +6,7 @@ import {
   evaluateAndRecordMcpConnections,
   MCP_CONNECT_CLIENTS,
   type McpConnectionResult,
-} from '@/lib/organizations/addons/mcp-connections';
+} from '@/lib/organizations/guardrails/mcp-connections';
 
 export const MAX_MCP_CONNECTIONS_PER_REQUEST = 50;
 

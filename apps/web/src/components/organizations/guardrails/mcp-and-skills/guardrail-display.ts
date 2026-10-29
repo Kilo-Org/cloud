@@ -1,43 +1,43 @@
 import type {
-  OrganizationAddonConfig,
-  OrganizationAddonSource,
-  OrganizationAddonType,
+  OrganizationGuardrailConfig,
+  OrganizationGuardrailSource,
+  OrganizationGuardrailType,
   OrganizationMcpConnectDecision,
   OrganizationMcpConnectTarget,
 } from '@kilocode/db/schema-types';
 
-export const ADDON_TYPE_LABELS = {
+export const GUARDRAIL_TYPE_LABELS = {
   mcp: 'MCP server',
-} satisfies Record<OrganizationAddonType, string>;
+} satisfies Record<OrganizationGuardrailType, string>;
 
-export const ADDON_TYPE_OPTIONS = (
-  Object.entries(ADDON_TYPE_LABELS) as [OrganizationAddonType, string][]
+export const GUARDRAIL_TYPE_OPTIONS = (
+  Object.entries(GUARDRAIL_TYPE_LABELS) as [OrganizationGuardrailType, string][]
 ).map(([value, label]) => ({ value, label }));
 
 const SOURCE_LABELS = {
   kilo_marketplace: 'Kilo registry',
   mcp_registry: 'MCP registry',
   custom: 'Custom',
-} satisfies Record<OrganizationAddonSource['registry'], string>;
+} satisfies Record<OrganizationGuardrailSource['registry'], string>;
 
-export function sourceLabel(source: OrganizationAddonSource): string {
+export function sourceLabel(source: OrganizationGuardrailSource): string {
   return SOURCE_LABELS[source.registry];
 }
 
 export function configKindLabel(
-  config: OrganizationAddonConfig | OrganizationMcpConnectTarget
+  config: OrganizationGuardrailConfig | OrganizationMcpConnectTarget
 ): string {
   if (config.kind === 'remote') return 'Remote';
   return config.ecosystem === 'npm' ? 'npm' : 'PyPI';
 }
 
 export function configIdentity(
-  config: OrganizationAddonConfig | OrganizationMcpConnectTarget
+  config: OrganizationGuardrailConfig | OrganizationMcpConnectTarget
 ): string {
   return config.kind === 'remote' ? config.url : config.identifier;
 }
 
-export function minVersionLabel(config: OrganizationAddonConfig): string {
+export function minVersionLabel(config: OrganizationGuardrailConfig): string {
   if (config.kind === 'remote') return 'Not applicable';
   return config.min_version ?? 'Any version';
 }

@@ -4,7 +4,7 @@ import { getAuthorizedOrgContext } from '@/lib/organizations/organization-auth';
 import {
   getOrganizationGuardrailsPolicy,
   type OrganizationGuardrailsPolicy,
-} from '@/lib/organizations/addons/guardrails-policy';
+} from '@/lib/organizations/guardrails/guardrails-policy';
 
 /**
  * The organization's guardrails for its clients to apply: the MCP allow list and enforcement

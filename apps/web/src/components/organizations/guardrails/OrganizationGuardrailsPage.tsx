@@ -20,8 +20,8 @@ import { useRoleTesting } from '@/contexts/RoleTestingContext';
 import { useTRPC } from '@/lib/trpc/utils';
 import { cn } from '@/lib/utils';
 import { OrganizationPageHeader } from '../OrganizationPageHeader';
-import { AddonsSection } from './addons/AddonsSection';
-import { useDebouncedValue } from './addons/use-debounced-value';
+import { McpSkillGuardrailsSection } from './mcp-and-skills/McpSkillGuardrailsSection';
+import { useDebouncedValue } from './mcp-and-skills/use-debounced-value';
 import { EnkryptDetectorList, type UpdateEnkryptDetector } from './EnkryptDetectorList';
 import {
   applyKiloDefaultPreset,
@@ -71,7 +71,7 @@ export function OrganizationGuardrailsPage({
       {canManageOrganization(currentRole) ? (
         <div className="flex flex-col gap-6">
           <GuardrailsLoader organizationId={organizationId} />
-          <AddonsSection organizationId={organizationId} />
+          <McpSkillGuardrailsSection organizationId={organizationId} />
         </div>
       ) : (
         <Alert variant="destructive">

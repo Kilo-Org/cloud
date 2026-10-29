@@ -10,7 +10,7 @@ import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTRPC } from '@/lib/trpc/utils';
-import type { McpBrowseItem, McpBrowseVariant } from './addon-types';
+import type { McpBrowseItem, McpBrowseVariant } from './guardrail-types';
 import { useDebouncedValue } from './use-debounced-value';
 
 export type McpRegistrySource = 'kilo_marketplace' | 'mcp_registry';
@@ -62,7 +62,7 @@ export function McpRegistryPicker({
   const query = useDebouncedValue(search.trim(), 300);
 
   const browseQuery = useInfiniteQuery(
-    trpc.organizations.addons.browse.infiniteQueryOptions(
+    trpc.organizations.mcpGuardrails.browse.infiniteQueryOptions(
       { organizationId, type: 'mcp', source, query },
       { getNextPageParam: page => page.nextCursor ?? undefined }
     )

@@ -10,16 +10,16 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { useTRPC } from '@/lib/trpc/utils';
-import type { OrganizationAddonRow } from './addon-types';
+import type { OrganizationGuardrailRow } from './guardrail-types';
 import { CustomMcpForm } from './CustomMcpForm';
 
-export function EditAddonDialog({
+export function EditMcpGuardrailDialog({
   organizationId,
-  addon,
+  guardrail,
   onClose,
 }: {
   organizationId: string;
-  addon: OrganizationAddonRow;
+  guardrail: OrganizationGuardrailRow;
   onClose: () => void;
 }) {
   const trpc = useTRPC();
@@ -37,11 +37,11 @@ export function EditAddonDialog({
         </DialogHeader>
         <CustomMcpForm
           organizationId={organizationId}
-          addon={addon}
+          guardrail={guardrail}
           onCancel={onClose}
           onSaved={async () => {
             await queryClient.invalidateQueries({
-              queryKey: trpc.organizations.addons.list.queryKey({ organizationId }),
+              queryKey: trpc.organizations.mcpGuardrails.list.queryKey({ organizationId }),
             });
             toast.success('MCP server saved.');
             onClose();

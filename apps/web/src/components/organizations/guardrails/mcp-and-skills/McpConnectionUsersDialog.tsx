@@ -20,7 +20,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { useTRPC } from '@/lib/trpc/utils';
-import { clientLabel, decisionLabel } from './addon-display';
+import { clientLabel, decisionLabel } from './guardrail-display';
 import { formatConnectTime } from './format-connect-time';
 
 export function McpConnectionUsersDialog({
@@ -40,7 +40,7 @@ export function McpConnectionUsersDialog({
 }) {
   const trpc = useTRPC();
   const usersQuery = useQuery(
-    trpc.organizations.addons.connectionUsers.queryOptions({
+    trpc.organizations.mcpGuardrails.connectionUsers.queryOptions({
       organizationId,
       identityKey,
       decision,

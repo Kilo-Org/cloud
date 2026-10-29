@@ -1,6 +1,6 @@
 import { describe, expect, test } from '@jest/globals';
 import { NextRequest, NextResponse } from 'next/server';
-import { organization_addons, organization_mcp_connect_events } from '@kilocode/db/schema';
+import { organization_guardrails, organization_mcp_connect_events } from '@kilocode/db/schema';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
@@ -23,9 +23,9 @@ async function setup(enforcement: 'off' | 'shadow' | 'enforce', kiloEncrypt = tr
   const user = await insertTestUser();
   const organization = await createTestOrganization('MCP connections', user.id, 0, {
     kilo_encrypt: kiloEncrypt,
-    addon_guardrails: { mcp: { enforcement } },
+    guardrails: { mcp: { enforcement } },
   });
-  await db.insert(organization_addons).values({
+  await db.insert(organization_guardrails).values({
     organization_id: organization.id,
     type: 'mcp',
     identity_key: 'npm:@acme/server',

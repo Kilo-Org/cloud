@@ -3,7 +3,7 @@
 import { useId, type ReactNode } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import type { OrganizationAddonEnforcement } from '@kilocode/db/schema-types';
+import type { OrganizationGuardrailEnforcement } from '@kilocode/db/schema-types';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useConfirm } from '@/components/ui/confirm';
 import { Switch } from '@/components/ui/switch';
@@ -13,10 +13,10 @@ function useSaveAccess(organizationId: string) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   return useMutation(
-    trpc.organizations.addons.setEnforcement.mutationOptions({
+    trpc.organizations.mcpGuardrails.setEnforcement.mutationOptions({
       onSuccess: async () => {
         await queryClient.invalidateQueries({
-          queryKey: trpc.organizations.addons.list.queryKey({ organizationId }),
+          queryKey: trpc.organizations.mcpGuardrails.list.queryKey({ organizationId }),
         });
         toast.success('Access saved.');
       },
@@ -34,7 +34,7 @@ export function McpGuardrailsCard({
   children,
 }: {
   organizationId: string;
-  enforcement: OrganizationAddonEnforcement;
+  enforcement: OrganizationGuardrailEnforcement;
   allowedCount: number;
   children: ReactNode;
 }) {
@@ -52,7 +52,7 @@ export function McpGuardrailsCard({
   const enabled = current !== 'off';
   const auditMode = current === 'shadow';
 
-  const save = (next: OrganizationAddonEnforcement) =>
+  const save = (next: OrganizationGuardrailEnforcement) =>
     mutation.mutate({ organizationId, type: 'mcp', enforcement: next });
 
   const setAuditMode = async (nextAuditMode: boolean) => {

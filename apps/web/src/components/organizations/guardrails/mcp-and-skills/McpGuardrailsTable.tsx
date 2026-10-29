@@ -16,22 +16,22 @@ import {
 } from '@/components/ui/table';
 import { useTRPC } from '@/lib/trpc/utils';
 import {
-  ADDON_TYPE_LABELS,
+  GUARDRAIL_TYPE_LABELS,
   configIdentity,
   configKindLabel,
   minVersionLabel,
   sourceLabel,
-} from './addon-display';
-import type { OrganizationAddonRow } from './addon-types';
+} from './guardrail-display';
+import type { OrganizationGuardrailRow } from './guardrail-types';
 
-export function AddonsTable({
+export function McpGuardrailsTable({
   organizationId,
-  addons,
+  guardrails,
   onEdit,
 }: {
   organizationId: string;
-  addons: OrganizationAddonRow[];
-  onEdit: (addon: OrganizationAddonRow) => void;
+  guardrails: OrganizationGuardrailRow[];
+  onEdit: (guardrail: OrganizationGuardrailRow) => void;
 }) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
@@ -39,11 +39,11 @@ export function AddonsTable({
 
   const invalidate = () =>
     queryClient.invalidateQueries({
-      queryKey: trpc.organizations.addons.list.queryKey({ organizationId }),
+      queryKey: trpc.organizations.mcpGuardrails.list.queryKey({ organizationId }),
     });
 
   const deleteMutation = useMutation(
-    trpc.organizations.addons.delete.mutationOptions({
+    trpc.organizations.mcpGuardrails.delete.mutationOptions({
       onSuccess: async () => {
         await invalidate();
         toast.success('MCP server removed.');
@@ -54,15 +54,15 @@ export function AddonsTable({
     })
   );
 
-  const deleteAddon = async (addon: OrganizationAddonRow) => {
+  const deleteGuardrail = async (guardrail: OrganizationGuardrailRow) => {
     const confirmed = await confirm({
-      title: `Stop allowing ${addon.name}?`,
+      title: `Stop allowing ${guardrail.name}?`,
       description:
         'While MCP guardrails are on, members can no longer use it, unless another entry allows it.',
       confirmLabel: 'Remove MCP server',
       destructive: true,
     });
-    if (confirmed) deleteMutation.mutate({ organizationId, addonId: addon.id });
+    if (confirmed) deleteMutation.mutate({ organizationId, guardrailId: guardrail.id });
   };
 
   return (
@@ -80,39 +80,39 @@ export function AddonsTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {addons.map(addon => {
+          {guardrails.map(guardrail => {
             const removePending =
-              deleteMutation.isPending && deleteMutation.variables?.addonId === addon.id;
+              deleteMutation.isPending && deleteMutation.variables?.guardrailId === guardrail.id;
             return (
-              <TableRow key={addon.id}>
+              <TableRow key={guardrail.id}>
                 <TableCell className="max-w-sm">
                   <div className="grid gap-1">
-                    <span className="truncate font-medium">{addon.name}</span>
+                    <span className="truncate font-medium">{guardrail.name}</span>
                     <span className="flex items-center gap-2">
-                      <Badge variant="outline">{configKindLabel(addon.config)}</Badge>
+                      <Badge variant="outline">{configKindLabel(guardrail.config)}</Badge>
                       <code className="text-muted-foreground truncate font-mono text-xs">
-                        {configIdentity(addon.config)}
+                        {configIdentity(guardrail.config)}
                       </code>
                     </span>
-                    {addon.description && (
+                    {guardrail.description && (
                       <span className="text-muted-foreground line-clamp-1 text-xs">
-                        {addon.description}
+                        {guardrail.description}
                       </span>
                     )}
                   </div>
                 </TableCell>
-                <TableCell>{ADDON_TYPE_LABELS[addon.type]}</TableCell>
-                <TableCell>{sourceLabel(addon.source)}</TableCell>
-                <TableCell className="tabular-nums">{minVersionLabel(addon.config)}</TableCell>
+                <TableCell>{GUARDRAIL_TYPE_LABELS[guardrail.type]}</TableCell>
+                <TableCell>{sourceLabel(guardrail.source)}</TableCell>
+                <TableCell className="tabular-nums">{minVersionLabel(guardrail.config)}</TableCell>
                 <TableCell>
                   <div className="flex justify-end">
-                    {addon.source.registry === 'custom' && (
+                    {guardrail.source.registry === 'custom' && (
                       <Button
                         type="button"
                         variant="ghost"
                         size="icon-sm"
-                        aria-label={`Edit ${addon.name}`}
-                        onClick={() => onEdit(addon)}
+                        aria-label={`Edit ${guardrail.name}`}
+                        onClick={() => onEdit(guardrail)}
                       >
                         <Pencil />
                       </Button>
@@ -122,8 +122,8 @@ export function AddonsTable({
                       variant="ghost"
                       size="icon-sm"
                       disabled={removePending}
-                      aria-label={`Remove ${addon.name}`}
-                      onClick={() => void deleteAddon(addon)}
+                      aria-label={`Remove ${guardrail.name}`}
+                      onClick={() => void deleteGuardrail(guardrail)}
                     >
                       <Trash2 />
                     </Button>

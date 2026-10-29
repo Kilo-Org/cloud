@@ -4,8 +4,8 @@ import { useId, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { AlertCircle, Plus, Search } from 'lucide-react';
 import type {
-  OrganizationAddonEnforcement,
-  OrganizationAddonType,
+  OrganizationGuardrailEnforcement,
+  OrganizationGuardrailType,
 } from '@kilocode/db/schema-types';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -19,19 +19,21 @@ import {
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useTRPC } from '@/lib/trpc/utils';
-import { ADDON_TYPE_OPTIONS, configIdentity } from './addon-display';
-import type { OrganizationAddonRow } from './addon-types';
-import { AddAddonDialog } from './AddAddonDialog';
-import { McpGuardrailsCard, SkillGuardrailsCard } from './AddonAccessCards';
-import { AddonsTable } from './AddonsTable';
-import { EditAddonDialog } from './EditAddonDialog';
+import { GUARDRAIL_TYPE_OPTIONS, configIdentity } from './guardrail-display';
+import type { OrganizationGuardrailRow } from './guardrail-types';
+import { AddMcpGuardrailDialog } from './AddMcpGuardrailDialog';
+import { McpGuardrailsCard, SkillGuardrailsCard } from './McpSkillGuardrailsCards';
+import { McpGuardrailsTable } from './McpGuardrailsTable';
+import { EditMcpGuardrailDialog } from './EditMcpGuardrailDialog';
 import { McpAuditLog } from './McpAuditLog';
 
 const ALL_TYPES = 'all';
 
-export function AddonsSection({ organizationId }: { organizationId: string }) {
+export function McpSkillGuardrailsSection({ organizationId }: { organizationId: string }) {
   const trpc = useTRPC();
-  const listQuery = useQuery(trpc.organizations.addons.list.queryOptions({ organizationId }));
+  const listQuery = useQuery(
+    trpc.organizations.mcpGuardrails.list.queryOptions({ organizationId })
+  );
 
   if (listQuery.isPending) {
     return (
@@ -62,44 +64,44 @@ export function AddonsSection({ organizationId }: { organizationId: string }) {
     );
   }
   return (
-    <AddonsContent
+    <McpSkillGuardrailsContent
       organizationId={organizationId}
       enforcement={listQuery.data.enforcement}
-      addons={listQuery.data.addons}
+      guardrails={listQuery.data.guardrails}
     />
   );
 }
 
-function matchesSearch(addon: OrganizationAddonRow, search: string): boolean {
+function matchesSearch(guardrail: OrganizationGuardrailRow, search: string): boolean {
   const needle = search.trim().toLowerCase();
   if (needle === '') return true;
-  return [addon.name, addon.description ?? '', configIdentity(addon.config)].some(field =>
-    field.toLowerCase().includes(needle)
+  return [guardrail.name, guardrail.description ?? '', configIdentity(guardrail.config)].some(
+    field => field.toLowerCase().includes(needle)
   );
 }
 
-function AddonsContent({
+function McpSkillGuardrailsContent({
   organizationId,
   enforcement,
-  addons,
+  guardrails,
 }: {
   organizationId: string;
   enforcement: {
-    mcp: OrganizationAddonEnforcement;
+    mcp: OrganizationGuardrailEnforcement;
     skill: { enabled: boolean; scanBeforeUse: boolean };
   };
-  addons: OrganizationAddonRow[];
+  guardrails: OrganizationGuardrailRow[];
 }) {
   return (
     <div className="flex max-w-5xl flex-col gap-6">
       <McpGuardrailsCard
         organizationId={organizationId}
         enforcement={enforcement.mcp}
-        allowedCount={addons.length}
+        allowedCount={guardrails.length}
       >
         <AllowedMcpServers
           organizationId={organizationId}
-          addons={addons}
+          guardrails={guardrails}
           auditMode={enforcement.mcp === 'shadow'}
         />
         <McpAuditLog organizationId={organizationId} />
@@ -112,31 +114,34 @@ function AddonsContent({
 
 function AllowedMcpServers({
   organizationId,
-  addons,
+  guardrails,
   auditMode,
 }: {
   organizationId: string;
-  addons: OrganizationAddonRow[];
+  guardrails: OrganizationGuardrailRow[];
   auditMode: boolean;
 }) {
   const titleId = useId();
   const [search, setSearch] = useState('');
-  const [typeFilter, setTypeFilter] = useState<OrganizationAddonType | typeof ALL_TYPES>(ALL_TYPES);
+  const [typeFilter, setTypeFilter] = useState<OrganizationGuardrailType | typeof ALL_TYPES>(
+    ALL_TYPES
+  );
   const [adding, setAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
 
-  const visibleAddons = useMemo(
+  const visibleGuardrails = useMemo(
     () =>
-      addons.filter(
-        addon =>
-          (typeFilter === ALL_TYPES || addon.type === typeFilter) && matchesSearch(addon, search)
+      guardrails.filter(
+        guardrail =>
+          (typeFilter === ALL_TYPES || guardrail.type === typeFilter) &&
+          matchesSearch(guardrail, search)
       ),
-    [addons, search, typeFilter]
+    [guardrails, search, typeFilter]
   );
 
-  const editing = addons.find(addon => addon.id === editingId) ?? null;
-  const showToolbar = addons.length > 0;
-  const showTypeFilter = ADDON_TYPE_OPTIONS.length > 1;
+  const editing = guardrails.find(guardrail => guardrail.id === editingId) ?? null;
+  const showToolbar = guardrails.length > 0;
+  const showTypeFilter = GUARDRAIL_TYPE_OPTIONS.length > 1;
 
   return (
     <section aria-labelledby={titleId} className="grid gap-4">
@@ -177,14 +182,14 @@ function AllowedMcpServers({
           {showTypeFilter && (
             <Select
               value={typeFilter}
-              onValueChange={value => setTypeFilter(value as OrganizationAddonType | 'all')}
+              onValueChange={value => setTypeFilter(value as OrganizationGuardrailType | 'all')}
             >
               <SelectTrigger className="w-full sm:w-44" aria-label="Filter by type">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value={ALL_TYPES}>All types</SelectItem>
-                {ADDON_TYPE_OPTIONS.map(option => (
+                {GUARDRAIL_TYPE_OPTIONS.map(option => (
                   <SelectItem key={option.value} value={option.value}>
                     {option.label}s
                   </SelectItem>
@@ -195,28 +200,28 @@ function AllowedMcpServers({
         </div>
       )}
 
-      {addons.length === 0 ? (
+      {guardrails.length === 0 ? (
         <FirstRunState auditMode={auditMode} onAdd={() => setAdding(true)} />
-      ) : visibleAddons.length === 0 ? (
+      ) : visibleGuardrails.length === 0 ? (
         <EmptyState title="No matches" description="No allowed MCP servers match your search." />
       ) : (
-        <AddonsTable
+        <McpGuardrailsTable
           organizationId={organizationId}
-          addons={visibleAddons}
-          onEdit={addon => setEditingId(addon.id)}
+          guardrails={visibleGuardrails}
+          onEdit={guardrail => setEditingId(guardrail.id)}
         />
       )}
 
       {editing && (
-        <EditAddonDialog
+        <EditMcpGuardrailDialog
           key={editing.id}
           organizationId={organizationId}
-          addon={editing}
+          guardrail={editing}
           onClose={() => setEditingId(null)}
         />
       )}
       {adding && (
-        <AddAddonDialog organizationId={organizationId} onClose={() => setAdding(false)} />
+        <AddMcpGuardrailDialog organizationId={organizationId} onClose={() => setAdding(false)} />
       )}
     </section>
   );

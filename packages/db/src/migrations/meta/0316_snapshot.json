@@ -1,5 +1,5 @@
 {
-  "id": "3ec59462-f0b4-4e12-87a5-cdb219f72e21",
+  "id": "a566b782-07a8-4466-90d8-b167e9e72222",
   "prevId": "09f37330-0925-4ed5-bcc7-4ec3b879f34d",
   "version": "7",
   "dialect": "postgresql",
@@ -24991,136 +24991,6 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
-    "public.organization_addons": {
-      "name": "organization_addons",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "organization_id": {
-          "name": "organization_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "type": {
-          "name": "type",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "identity_key": {
-          "name": "identity_key",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "name": {
-          "name": "name",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "description": {
-          "name": "description",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "status": {
-          "name": "status",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "'enabled'"
-        },
-        "config": {
-          "name": "config",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "source": {
-          "name": "source",
-          "type": "jsonb",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_by_kilo_user_id": {
-          "name": "created_by_kilo_user_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        },
-        "updated_at": {
-          "name": "updated_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "organization_addons_organization_id_organizations_id_fk": {
-          "name": "organization_addons_organization_id_organizations_id_fk",
-          "tableFrom": "organization_addons",
-          "tableTo": "organizations",
-          "columnsFrom": [
-            "organization_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "UQ_organization_addons_organization_id_type_identity_key": {
-          "name": "UQ_organization_addons_organization_id_type_identity_key",
-          "nullsNotDistinct": false,
-          "columns": [
-            "organization_id",
-            "type",
-            "identity_key"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {
-        "organization_addons_type_check": {
-          "name": "organization_addons_type_check",
-          "value": "\"organization_addons\".\"type\" IN ('mcp')"
-        },
-        "organization_addons_status_check": {
-          "name": "organization_addons_status_check",
-          "value": "\"organization_addons\".\"status\" IN ('enabled', 'disabled')"
-        },
-        "organization_addons_name_check": {
-          "name": "organization_addons_name_check",
-          "value": "char_length(btrim(\"organization_addons\".\"name\")) BETWEEN 1 AND 120"
-        },
-        "organization_addons_description_check": {
-          "name": "organization_addons_description_check",
-          "value": "\"organization_addons\".\"description\" IS NULL OR char_length(\"organization_addons\".\"description\") <= 500"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.organization_audit_logs": {
       "name": "organization_audit_logs",
       "schema": "",
@@ -25553,6 +25423,136 @@
         "organization_groups_description_check": {
           "name": "organization_groups_description_check",
           "value": "\"organization_groups\".\"description\" IS NULL OR char_length(\"organization_groups\".\"description\") <= 500"
+        }
+      },
+      "isRLSEnabled": false
+    },
+    "public.organization_guardrails": {
+      "name": "organization_guardrails",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "pg_catalog.gen_random_uuid()"
+        },
+        "organization_id": {
+          "name": "organization_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "type": {
+          "name": "type",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "identity_key": {
+          "name": "identity_key",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "name": {
+          "name": "name",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "description": {
+          "name": "description",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'enabled'"
+        },
+        "config": {
+          "name": "config",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source": {
+          "name": "source",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_by_kilo_user_id": {
+          "name": "created_by_kilo_user_id",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "organization_guardrails_organization_id_organizations_id_fk": {
+          "name": "organization_guardrails_organization_id_organizations_id_fk",
+          "tableFrom": "organization_guardrails",
+          "tableTo": "organizations",
+          "columnsFrom": [
+            "organization_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "UQ_organization_guardrails_organization_id_type_identity_key": {
+          "name": "UQ_organization_guardrails_organization_id_type_identity_key",
+          "nullsNotDistinct": false,
+          "columns": [
+            "organization_id",
+            "type",
+            "identity_key"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {
+        "organization_guardrails_type_check": {
+          "name": "organization_guardrails_type_check",
+          "value": "\"organization_guardrails\".\"type\" IN ('mcp')"
+        },
+        "organization_guardrails_status_check": {
+          "name": "organization_guardrails_status_check",
+          "value": "\"organization_guardrails\".\"status\" IN ('enabled', 'disabled')"
+        },
+        "organization_guardrails_name_check": {
+          "name": "organization_guardrails_name_check",
+          "value": "char_length(btrim(\"organization_guardrails\".\"name\")) BETWEEN 1 AND 120"
+        },
+        "organization_guardrails_description_check": {
+          "name": "organization_guardrails_description_check",
+          "value": "\"organization_guardrails\".\"description\" IS NULL OR char_length(\"organization_guardrails\".\"description\") <= 500"
         }
       },
       "isRLSEnabled": false

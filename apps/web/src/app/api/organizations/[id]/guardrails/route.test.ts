@@ -1,6 +1,6 @@
 import { describe, expect, test } from '@jest/globals';
 import { NextRequest, NextResponse } from 'next/server';
-import { organization_addons } from '@kilocode/db/schema';
+import { organization_guardrails } from '@kilocode/db/schema';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import { getOrganizationById } from '@kilocode/web-shared/lib/organizations/organizations';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';
@@ -29,7 +29,7 @@ async function addMcp(
   identifier: string,
   status: 'enabled' | 'disabled' = 'enabled'
 ) {
-  await db.insert(organization_addons).values({
+  await db.insert(organization_guardrails).values({
     organization_id: organizationId,
     type: 'mcp',
     identity_key: `npm:${identifier}`,
@@ -65,7 +65,7 @@ describe('GET /api/organizations/[id]/guardrails', () => {
   test('returns everything off, without the allow list, when AI Guardrails is not granted', async () => {
     const user = await insertTestUser();
     const organization = await createTestOrganization('No guardrails', user.id, 0, {
-      addon_guardrails: {
+      guardrails: {
         mcp: { enforcement: 'enforce' },
         skill: { enabled: true, scan_before_use: true },
       },
@@ -86,7 +86,7 @@ describe('GET /api/organizations/[id]/guardrails', () => {
     const user = await insertTestUser();
     const organization = await createTestOrganization('Guardrails', user.id, 0, {
       kilo_encrypt: true,
-      addon_guardrails: {
+      guardrails: {
         mcp: { enforcement: 'enforce' },
         skill: { enabled: true, scan_before_use: false },
       },

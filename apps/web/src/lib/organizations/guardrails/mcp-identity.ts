@@ -1,4 +1,4 @@
-import type { OrganizationMcpAddonConfig } from '@kilocode/db/schema-types';
+import type { OrganizationMcpGuardrailConfig } from '@kilocode/db/schema-types';
 
 export type McpPackageEcosystem = 'npm' | 'pypi';
 
@@ -67,7 +67,7 @@ export function mcpIdentityKey(target: McpTarget): string {
   return `pypi:${target.identifier.toLowerCase().replace(/[-_.]+/g, '-')}`;
 }
 
-export function mcpTargetFromConfig(config: OrganizationMcpAddonConfig): McpTarget {
+export function mcpTargetFromConfig(config: OrganizationMcpGuardrailConfig): McpTarget {
   return config.kind === 'remote'
     ? { kind: 'remote', url: config.url }
     : { kind: 'package', ecosystem: config.ecosystem, identifier: config.identifier };
@@ -76,6 +76,6 @@ export function mcpTargetFromConfig(config: OrganizationMcpAddonConfig): McpTarg
 export function mcpConfigFromTarget(
   target: McpTarget,
   minVersion: string | null
-): OrganizationMcpAddonConfig {
+): OrganizationMcpGuardrailConfig {
   return target.kind === 'remote' ? target : { ...target, min_version: minVersion };
 }

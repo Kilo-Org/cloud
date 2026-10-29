@@ -27,7 +27,7 @@ describe('resolveGuardrailsSettings', () => {
     expect(
       resolveGuardrailsSettings(
         organization({
-          addon_guardrails: {
+          guardrails: {
             mcp: { enforcement: 'enforce' },
             skill: { enabled: true, scan_before_use: true },
           },
@@ -53,7 +53,7 @@ describe('resolveGuardrailsSettings', () => {
       resolveGuardrailsSettings(
         organization({
           kilo_encrypt: true,
-          addon_guardrails: {
+          guardrails: {
             mcp: { enforcement: 'shadow' },
             skill: { enabled: true, scan_before_use: false },
           },

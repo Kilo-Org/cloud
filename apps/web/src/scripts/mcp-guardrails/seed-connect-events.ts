@@ -15,7 +15,7 @@ import type {
   OrganizationMcpConnectTarget,
 } from '@kilocode/db/schema-types';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { mcpIdentityKey } from '@/lib/organizations/addons/mcp-identity';
+import { mcpIdentityKey } from '@/lib/organizations/guardrails/mcp-identity';
 import { eq } from 'drizzle-orm';
 
 const DEFAULT_EVENT_COUNT = 60;

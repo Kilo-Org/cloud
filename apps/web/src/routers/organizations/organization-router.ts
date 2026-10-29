@@ -83,7 +83,7 @@ import { organizationKiloPassRouter } from '@/routers/organizations/organization
 import { organizationGroupsRouter } from '@/routers/organizations/organization-groups-router';
 import { organizationSubOrganizationsRouter } from '@/routers/organizations/organization-sub-organizations-router';
 import { organizationSalesDemoRouter } from '@/routers/organizations/organization-sales-demo-router';
-import { organizationAddonsRouter } from './organization-addons-router';
+import { organizationMcpGuardrailsRouter } from './organization-mcp-guardrails-router';
 import { organizationGuardrailsRouter } from '@/routers/organizations/organization-guardrails-router';
 import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/organizations/organization-groups';
 import { createChildOrganization } from '@/lib/organizations/organization-hierarchy';
@@ -160,7 +160,7 @@ export const organizationsRouter = createTRPCRouter({
   subOrganizations: organizationSubOrganizationsRouter,
   salesDemo: organizationSalesDemoRouter,
   guardrails: organizationGuardrailsRouter,
-  addons: organizationAddonsRouter,
+  mcpGuardrails: organizationMcpGuardrailsRouter,
 
   list: baseProcedure.query(async opts => {
     const { user } = opts.ctx;

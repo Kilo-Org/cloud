@@ -14,8 +14,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useTRPC } from '@/lib/trpc/utils';
-import { configIdentity } from './addon-display';
-import type { OrganizationAddonRow } from './addon-types';
+import { configIdentity } from './guardrail-display';
+import type { OrganizationGuardrailRow } from './guardrail-types';
 
 type CustomKind = 'remote' | 'npm' | 'pypi';
 
@@ -42,19 +42,19 @@ const VALUE_COPY = {
   },
 } satisfies Record<CustomKind, { label: string; placeholder: string; help?: string }>;
 
-function initialKind(addon: OrganizationAddonRow | undefined): CustomKind {
-  if (!addon || addon.config.kind === 'remote') return 'remote';
-  return addon.config.ecosystem;
+function initialKind(guardrail: OrganizationGuardrailRow | undefined): CustomKind {
+  if (!guardrail || guardrail.config.kind === 'remote') return 'remote';
+  return guardrail.config.ecosystem;
 }
 
 export function CustomMcpForm({
   organizationId,
-  addon,
+  guardrail,
   onSaved,
   onCancel,
 }: {
   organizationId: string;
-  addon?: OrganizationAddonRow;
+  guardrail?: OrganizationGuardrailRow;
   onSaved: () => void;
   onCancel: () => void;
 }) {
@@ -65,23 +65,23 @@ export function CustomMcpForm({
   const nameId = useId();
   const minVersionId = useId();
   const errorId = useId();
-  const [kind, setKind] = useState<CustomKind>(() => initialKind(addon));
-  const [value, setValue] = useState(() => (addon ? configIdentity(addon.config) : ''));
-  const [name, setName] = useState(addon?.name ?? '');
+  const [kind, setKind] = useState<CustomKind>(() => initialKind(guardrail));
+  const [value, setValue] = useState(() => (guardrail ? configIdentity(guardrail.config) : ''));
+  const [name, setName] = useState(guardrail?.name ?? '');
   const [minVersion, setMinVersion] = useState(
-    addon?.config.kind === 'package' ? (addon.config.min_version ?? '') : ''
+    guardrail?.config.kind === 'package' ? (guardrail.config.min_version ?? '') : ''
   );
   const copy: { label: string; placeholder: string; help?: string } = VALUE_COPY[kind];
   const hasHelp = copy.help !== undefined;
   const canSubmit = value.trim().length > 0;
 
   const addMutation = useMutation(
-    trpc.organizations.addons.add.mutationOptions({ onSuccess: onSaved })
+    trpc.organizations.mcpGuardrails.add.mutationOptions({ onSuccess: onSaved })
   );
   const updateMutation = useMutation(
-    trpc.organizations.addons.update.mutationOptions({ onSuccess: onSaved })
+    trpc.organizations.mcpGuardrails.update.mutationOptions({ onSuccess: onSaved })
   );
-  const mutation = addon ? updateMutation : addMutation;
+  const mutation = guardrail ? updateMutation : addMutation;
 
   const submit = () => {
     const trimmedName = name.trim();
@@ -95,8 +95,8 @@ export function CustomMcpForm({
       target,
       ...(kind === 'remote' ? {} : { minVersion }),
     };
-    if (addon) {
-      updateMutation.mutate({ ...common, addonId: addon.id });
+    if (guardrail) {
+      updateMutation.mutate({ ...common, guardrailId: guardrail.id });
     } else {
       addMutation.mutate({ ...common, type: 'mcp', source: 'custom' });
     }
@@ -188,7 +188,7 @@ export function CustomMcpForm({
           Cancel
         </Button>
         <Button type="submit" disabled={!canSubmit || mutation.isPending}>
-          {addon
+          {guardrail
             ? mutation.isPending
               ? 'Saving…'
               : 'Save server'

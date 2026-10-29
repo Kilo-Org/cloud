@@ -6,7 +6,7 @@ import {
   getOrganizationById,
 } from '@kilocode/web-shared/lib/organizations/organizations';
 import {
-  organization_addons,
+  organization_guardrails,
   organization_audit_logs,
   organization_mcp_connect_events,
   type NewOrganizationMcpConnectEvent,
@@ -14,13 +14,13 @@ import {
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, desc, eq } from 'drizzle-orm';
-import type { McpCatalogItem } from '@/lib/organizations/addons/catalog';
+import type { McpCatalogItem } from '@/lib/organizations/guardrails/catalog';
 
 const mockBrowse = jest.fn();
 const mockResolve = jest.fn();
 const mockFindMatch = jest.fn();
 
-jest.mock('@/lib/organizations/addons/catalog', () => ({
+jest.mock('@/lib/organizations/guardrails/catalog', () => ({
   browseMcpCatalog: (...args: unknown[]) => mockBrowse(...args),
   resolveMcpCatalogItem: (...args: unknown[]) => mockResolve(...args),
   findMcpCatalogMatch: (...args: unknown[]) => mockFindMatch(...args),
@@ -68,20 +68,20 @@ async function latestAuditLog() {
   return auditLog;
 }
 
-describe('organization addons router', () => {
+describe('organization guardrails router', () => {
   beforeAll(async () => {
     owner = await insertTestUser({
-      google_user_email: 'owner-addons@example.com',
-      google_user_name: 'Owner Addons',
+      google_user_email: 'owner-guardrails@example.com',
+      google_user_name: 'Owner Guardrails',
       is_admin: false,
     });
     member = await insertTestUser({
-      google_user_email: 'member-addons@example.com',
-      google_user_name: 'Member Addons',
+      google_user_email: 'member-guardrails@example.com',
+      google_user_name: 'Member Guardrails',
       is_admin: false,
     });
     const organization = await createTestOrganization(
-      'Addons Org',
+      'Guardrails Org',
       owner.id,
       0,
       { kilo_encrypt: true },
@@ -90,7 +90,13 @@ describe('organization addons router', () => {
     organizationId = organization.id;
     await addUserToOrganization(organizationId, member.id, 'member');
     otherOrganizationId = (
-      await createTestOrganization('Other Addons Org', owner.id, 0, { kilo_encrypt: true }, false)
+      await createTestOrganization(
+        'Other Guardrails Org',
+        owner.id,
+        0,
+        { kilo_encrypt: true },
+        false
+      )
     ).id;
     plainOrganizationId = (await createTestOrganization('Plain Org', owner.id, 0, {}, false)).id;
   });
@@ -103,23 +109,23 @@ describe('organization addons router', () => {
       .delete(organization_mcp_connect_events)
       .where(eq(organization_mcp_connect_events.organization_id, organizationId));
     await db
-      .delete(organization_addons)
-      .where(eq(organization_addons.organization_id, organizationId));
+      .delete(organization_guardrails)
+      .where(eq(organization_guardrails.organization_id, organizationId));
   });
 
   describe('access', () => {
     it('rejects members', async () => {
       const caller = await createCallerForUser(member.id);
-      await expect(caller.organizations.addons.list({ organizationId })).rejects.toThrow();
+      await expect(caller.organizations.mcpGuardrails.list({ organizationId })).rejects.toThrow();
     });
 
     it('rejects organizations without AI Guardrails access', async () => {
       const caller = await createCallerForUser(owner.id);
       await expect(
-        caller.organizations.addons.list({ organizationId: plainOrganizationId })
+        caller.organizations.mcpGuardrails.list({ organizationId: plainOrganizationId })
       ).rejects.toThrow('AI Guardrails is not available for this organization.');
       await expect(
-        caller.organizations.addons.add({
+        caller.organizations.mcpGuardrails.add({
           organizationId: plainOrganizationId,
           type: 'mcp',
           source: 'custom',
@@ -132,31 +138,31 @@ describe('organization addons router', () => {
   describe('enforcement', () => {
     it('defaults to allowing everything', async () => {
       const caller = await createCallerForUser(owner.id);
-      const result = await caller.organizations.addons.list({ organizationId });
+      const result = await caller.organizations.mcpGuardrails.list({ organizationId });
       expect(result.enforcement).toEqual({
         mcp: 'off',
         skill: { enabled: false, scanBeforeUse: true },
       });
-      expect(result.addons).toEqual([]);
+      expect(result.guardrails).toEqual([]);
     });
 
     it('persists the MCP mode, keeps other settings, and audits it', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      await caller.organizations.addons.setEnforcement({
+      await caller.organizations.mcpGuardrails.setEnforcement({
         organizationId,
         type: 'mcp',
         enforcement: 'shadow',
       });
 
-      const result = await caller.organizations.addons.list({ organizationId });
+      const result = await caller.organizations.mcpGuardrails.list({ organizationId });
       expect(result.enforcement.mcp).toBe('shadow');
       expect(result.enforcement.skill).toEqual({ enabled: false, scanBeforeUse: true });
       const organization = await getOrganizationById(organizationId);
       expect(organization?.settings).toEqual(
         expect.objectContaining({
           kilo_encrypt: true,
-          addon_guardrails: { mcp: { enforcement: 'shadow' } },
+          guardrails: { mcp: { enforcement: 'shadow' } },
         })
       );
       const auditLog = await latestAuditLog();
@@ -166,26 +172,26 @@ describe('organization addons router', () => {
 
     it('persists the skill guardrails independently of the MCP mode', async () => {
       const caller = await createCallerForUser(owner.id);
-      await caller.organizations.addons.setEnforcement({
+      await caller.organizations.mcpGuardrails.setEnforcement({
         organizationId,
         type: 'mcp',
         enforcement: 'enforce',
       });
 
-      await caller.organizations.addons.setEnforcement({
+      await caller.organizations.mcpGuardrails.setEnforcement({
         organizationId,
         type: 'skill',
         enabled: true,
         scanBeforeUse: false,
       });
 
-      const result = await caller.organizations.addons.list({ organizationId });
+      const result = await caller.organizations.mcpGuardrails.list({ organizationId });
       expect(result.enforcement).toEqual({
         mcp: 'enforce',
         skill: { enabled: true, scanBeforeUse: false },
       });
       const organization = await getOrganizationById(organizationId);
-      expect(organization?.settings.addon_guardrails).toEqual({
+      expect(organization?.settings.guardrails).toEqual({
         mcp: { enforcement: 'enforce' },
         skill: { enabled: true, scan_before_use: false },
       });
@@ -196,14 +202,14 @@ describe('organization addons router', () => {
     it('rejects an unknown mode', async () => {
       const caller = await createCallerForUser(owner.id);
       await expect(
-        caller.organizations.addons.setEnforcement({
+        caller.organizations.mcpGuardrails.setEnforcement({
           organizationId,
           type: 'mcp',
           enforcement: 'block' as 'off',
         })
       ).rejects.toThrow();
       await expect(
-        caller.organizations.addons.setEnforcement({
+        caller.organizations.mcpGuardrails.setEnforcement({
           organizationId,
           type: 'skill',
           enabled: 'yes' as unknown as boolean,
@@ -217,7 +223,7 @@ describe('organization addons router', () => {
     it('adds a custom remote server with a normalized URL', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      const added = await caller.organizations.addons.add({
+      const added = await caller.organizations.mcpGuardrails.add({
         organizationId,
         type: 'mcp',
         source: 'custom',
@@ -234,7 +240,7 @@ describe('organization addons router', () => {
       });
       expect(JSON.stringify(added)).not.toContain('secret');
       const auditLog = await latestAuditLog();
-      expect(auditLog.action).toBe('organization.addon.add');
+      expect(auditLog.action).toBe('organization.guardrail.add');
       expect(auditLog.message).toBe(
         'Added MCP server mcp.example.com (remote:https://mcp.example.com/mcp)'
       );
@@ -243,7 +249,7 @@ describe('organization addons router', () => {
     it('adds a custom package with a minimum version', async () => {
       const caller = await createCallerForUser(owner.id);
 
-      const added = await caller.organizations.addons.add({
+      const added = await caller.organizations.mcpGuardrails.add({
         organizationId,
         type: 'mcp',
         source: 'custom',
@@ -276,7 +282,7 @@ describe('organization addons router', () => {
     ] as const)('rejects custom target %j', async target => {
       const caller = await createCallerForUser(owner.id);
       await expect(
-        caller.organizations.addons.add({
+        caller.organizations.mcpGuardrails.add({
           organizationId,
           type: 'mcp',
           source: 'custom',
@@ -288,7 +294,7 @@ describe('organization addons router', () => {
     it('rejects an invalid minimum version', async () => {
       const caller = await createCallerForUser(owner.id);
       await expect(
-        caller.organizations.addons.add({
+        caller.organizations.mcpGuardrails.add({
           organizationId,
           type: 'mcp',
           source: 'custom',
@@ -300,7 +306,7 @@ describe('organization addons router', () => {
 
     it('rejects a duplicate identity, including the same PyPI package spelled differently', async () => {
       const caller = await createCallerForUser(owner.id);
-      await caller.organizations.addons.add({
+      await caller.organizations.mcpGuardrails.add({
         organizationId,
         type: 'mcp',
         source: 'custom',
@@ -308,7 +314,7 @@ describe('organization addons router', () => {
       });
 
       await expect(
-        caller.organizations.addons.add({
+        caller.organizations.mcpGuardrails.add({
           organizationId,
           type: 'mcp',
           source: 'custom',
@@ -320,14 +326,14 @@ describe('organization addons router', () => {
     it('allows the same identity in different organizations', async () => {
       const caller = await createCallerForUser(owner.id);
       const target = { kind: 'remote', url: 'https://mcp.example.com/mcp' } as const;
-      await caller.organizations.addons.add({
+      await caller.organizations.mcpGuardrails.add({
         organizationId,
         type: 'mcp',
         source: 'custom',
         target,
       });
       await expect(
-        caller.organizations.addons.add({
+        caller.organizations.mcpGuardrails.add({
           organizationId: otherOrganizationId,
           type: 'mcp',
           source: 'custom',
@@ -340,7 +346,7 @@ describe('organization addons router', () => {
       mockResolve.mockResolvedValue(registryItem);
       const caller = await createCallerForUser(owner.id);
 
-      const added = await caller.organizations.addons.add({
+      const added = await caller.organizations.mcpGuardrails.add({
         organizationId,
         type: 'mcp',
         source: 'mcp_registry',
@@ -366,7 +372,7 @@ describe('organization addons router', () => {
       mockResolve.mockResolvedValue(registryItem);
       const caller = await createCallerForUser(owner.id);
 
-      const added = await caller.organizations.addons.add({
+      const added = await caller.organizations.mcpGuardrails.add({
         organizationId,
         type: 'mcp',
         source: 'mcp_registry',
@@ -383,7 +389,7 @@ describe('organization addons router', () => {
       const caller = await createCallerForUser(owner.id);
 
       await expect(
-        caller.organizations.addons.add({
+        caller.organizations.mcpGuardrails.add({
           organizationId,
           type: 'mcp',
           source: 'mcp_registry',
@@ -398,7 +404,7 @@ describe('organization addons router', () => {
       const caller = await createCallerForUser(owner.id);
 
       await expect(
-        caller.organizations.addons.add({
+        caller.organizations.mcpGuardrails.add({
           organizationId,
           type: 'mcp',
           source: 'kilo_marketplace',
@@ -413,7 +419,7 @@ describe('organization addons router', () => {
       const caller = await createCallerForUser(owner.id);
 
       await expect(
-        caller.organizations.addons.add({
+        caller.organizations.mcpGuardrails.add({
           organizationId,
           type: 'mcp',
           source: 'mcp_registry',
@@ -430,7 +436,7 @@ describe('organization addons router', () => {
   describe('browse', () => {
     it('flags variants that are already on the list', async () => {
       const caller = await createCallerForUser(owner.id);
-      await caller.organizations.addons.add({
+      await caller.organizations.mcpGuardrails.add({
         organizationId,
         type: 'mcp',
         source: 'custom',
@@ -438,7 +444,7 @@ describe('organization addons router', () => {
       });
       mockBrowse.mockResolvedValue({ items: [registryItem], nextCursor: 'next' });
 
-      const page = await caller.organizations.addons.browse({
+      const page = await caller.organizations.mcpGuardrails.browse({
         organizationId,
         type: 'mcp',
         source: 'mcp_registry',
@@ -465,7 +471,7 @@ describe('organization addons router', () => {
       mockBrowse.mockRejectedValue(new Error('boom'));
       const caller = await createCallerForUser(owner.id);
       await expect(
-        caller.organizations.addons.browse({
+        caller.organizations.mcpGuardrails.browse({
           organizationId,
           type: 'mcp',
           source: 'kilo_marketplace',
@@ -478,7 +484,7 @@ describe('organization addons router', () => {
   describe('update, status and delete', () => {
     async function addPackage() {
       const caller = await createCallerForUser(owner.id);
-      const added = await caller.organizations.addons.add({
+      const added = await caller.organizations.mcpGuardrails.add({
         organizationId,
         type: 'mcp',
         source: 'custom',
@@ -491,9 +497,9 @@ describe('organization addons router', () => {
     it('updates the name, description and minimum version', async () => {
       const { caller, added } = await addPackage();
 
-      const updated = await caller.organizations.addons.update({
+      const updated = await caller.organizations.mcpGuardrails.update({
         organizationId,
-        addonId: added.id,
+        guardrailId: added.id,
         name: 'Renamed',
         description: 'Why we allow it',
         minVersion: '2.0.0',
@@ -505,14 +511,14 @@ describe('organization addons router', () => {
         config: { kind: 'package', identifier: 'pkg', min_version: '2.0.0' },
         identityKey: 'npm:pkg',
       });
-      expect((await latestAuditLog()).action).toBe('organization.addon.update');
+      expect((await latestAuditLog()).action).toBe('organization.guardrail.update');
     });
 
     it('clears the minimum version', async () => {
       const { caller, added } = await addPackage();
-      const updated = await caller.organizations.addons.update({
+      const updated = await caller.organizations.mcpGuardrails.update({
         organizationId,
-        addonId: added.id,
+        guardrailId: added.id,
         minVersion: '',
       });
       expect(updated.config).toMatchObject({ min_version: null });
@@ -520,76 +526,76 @@ describe('organization addons router', () => {
 
     it('rejects a minimum version on a remote server', async () => {
       const caller = await createCallerForUser(owner.id);
-      const added = await caller.organizations.addons.add({
+      const added = await caller.organizations.mcpGuardrails.add({
         organizationId,
         type: 'mcp',
         source: 'custom',
         target: { kind: 'remote', url: 'https://mcp.example.com/mcp' },
       });
       await expect(
-        caller.organizations.addons.update({
+        caller.organizations.mcpGuardrails.update({
           organizationId,
-          addonId: added.id,
+          guardrailId: added.id,
           minVersion: '1.0.0',
         })
       ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     });
 
-    it('disables and re-enables an add-on and audits each change', async () => {
+    it('disables and re-enables an guardrail and audits each change', async () => {
       const { caller, added } = await addPackage();
 
-      const disabled = await caller.organizations.addons.setStatus({
+      const disabled = await caller.organizations.mcpGuardrails.setStatus({
         organizationId,
-        addonId: added.id,
+        guardrailId: added.id,
         status: 'disabled',
       });
       expect(disabled.status).toBe('disabled');
       expect((await latestAuditLog()).message).toBe('Disabled MCP server pkg (npm:pkg)');
 
-      const enabled = await caller.organizations.addons.setStatus({
+      const enabled = await caller.organizations.mcpGuardrails.setStatus({
         organizationId,
-        addonId: added.id,
+        guardrailId: added.id,
         status: 'enabled',
       });
       expect(enabled.status).toBe('enabled');
       expect((await latestAuditLog()).message).toBe('Enabled MCP server pkg (npm:pkg)');
     });
 
-    it('deletes an add-on and audits it', async () => {
+    it('deletes an guardrail and audits it', async () => {
       const { caller, added } = await addPackage();
 
-      await caller.organizations.addons.delete({ organizationId, addonId: added.id });
+      await caller.organizations.mcpGuardrails.delete({ organizationId, guardrailId: added.id });
 
       const rows = await db
         .select()
-        .from(organization_addons)
-        .where(and(eq(organization_addons.id, added.id)));
+        .from(organization_guardrails)
+        .where(and(eq(organization_guardrails.id, added.id)));
       expect(rows).toEqual([]);
-      expect((await latestAuditLog()).action).toBe('organization.addon.remove');
+      expect((await latestAuditLog()).action).toBe('organization.guardrail.remove');
     });
 
-    it('does not let an admin touch another organization’s add-on', async () => {
+    it('does not let an admin touch another organization’s guardrail', async () => {
       const { caller, added } = await addPackage();
 
       await expect(
-        caller.organizations.addons.delete({
+        caller.organizations.mcpGuardrails.delete({
           organizationId: otherOrganizationId,
-          addonId: added.id,
+          guardrailId: added.id,
         })
       ).rejects.toMatchObject({ code: 'NOT_FOUND' });
       await expect(
-        caller.organizations.addons.setStatus({
+        caller.organizations.mcpGuardrails.setStatus({
           organizationId: otherOrganizationId,
-          addonId: added.id,
+          guardrailId: added.id,
           status: 'disabled',
         })
       ).rejects.toMatchObject({ code: 'NOT_FOUND' });
     });
 
-    it('lists add-ons sorted by name, ignoring case', async () => {
+    it('lists guardrails sorted by name, ignoring case', async () => {
       const caller = await createCallerForUser(owner.id);
       for (const name of ['Zed', 'alpha', 'Mid']) {
-        await caller.organizations.addons.add({
+        await caller.organizations.mcpGuardrails.add({
           organizationId,
           type: 'mcp',
           source: 'custom',
@@ -597,8 +603,8 @@ describe('organization addons router', () => {
           target: { kind: 'package', ecosystem: 'npm', identifier: `pkg-${name.toLowerCase()}` },
         });
       }
-      const result = await caller.organizations.addons.list({ organizationId });
-      expect(result.addons.map(addon => addon.name)).toEqual(['alpha', 'Mid', 'Zed']);
+      const result = await caller.organizations.mcpGuardrails.list({ organizationId });
+      expect(result.guardrails.map(guardrail => guardrail.name)).toEqual(['alpha', 'Mid', 'Zed']);
     });
   });
 
@@ -655,7 +661,7 @@ describe('organization addons router', () => {
       await seedEvents();
       const caller = await createCallerForUser(owner.id);
 
-      const result = await caller.organizations.addons.listConnections({ organizationId });
+      const result = await caller.organizations.mcpGuardrails.listConnections({ organizationId });
 
       expect(result.nextCursor).toBeNull();
       expect(result.connections).toEqual([
@@ -685,7 +691,7 @@ describe('organization addons router', () => {
       await seedEvents();
       const caller = await createCallerForUser(owner.id);
 
-      const denied = await caller.organizations.addons.listConnections({
+      const denied = await caller.organizations.mcpGuardrails.listConnections({
         organizationId,
         decision: 'denied',
       });
@@ -694,7 +700,7 @@ describe('organization addons router', () => {
         expect.objectContaining({ allowedUsers: 0, deniedUsers: 2, clients: ['cli', 'vscode'] })
       );
 
-      const allowed = await caller.organizations.addons.listConnections({
+      const allowed = await caller.organizations.mcpGuardrails.listConnections({
         organizationId,
         decision: 'allowed',
       });
@@ -703,7 +709,7 @@ describe('organization addons router', () => {
         expect.objectContaining({ allowedUsers: 1, deniedUsers: 0, clients: ['cloud_agent'] })
       );
 
-      const vscode = await caller.organizations.addons.listConnections({
+      const vscode = await caller.organizations.mcpGuardrails.listConnections({
         organizationId,
         client: 'vscode',
       });
@@ -715,7 +721,7 @@ describe('organization addons router', () => {
       await seedEvents();
       const caller = await createCallerForUser(owner.id);
 
-      const result = await caller.organizations.addons.connectionUsers({
+      const result = await caller.organizations.mcpGuardrails.connectionUsers({
         organizationId,
         identityKey: 'remote:https://mcp.example.com/mcp',
         decision: 'denied',
@@ -724,15 +730,15 @@ describe('organization addons router', () => {
       expect(result.users).toEqual([
         expect.objectContaining({
           userId: member.id,
-          name: 'Member Addons',
-          email: 'member-addons@example.com',
+          name: 'Member Guardrails',
+          email: 'member-guardrails@example.com',
           client: 'vscode',
           decision: 'denied',
           connects: 1,
         }),
         expect.objectContaining({
           userId: owner.id,
-          name: 'Owner Addons',
+          name: 'Owner Guardrails',
           client: 'cli',
           decision: 'denied',
           connects: 2,
@@ -745,12 +751,12 @@ describe('organization addons router', () => {
         .insert(organization_mcp_connect_events)
         .values(event({ decision: 'denied', organization_id: otherOrganizationId }));
       const caller = await createCallerForUser(owner.id);
-      const result = await caller.organizations.addons.listConnections({ organizationId });
+      const result = await caller.organizations.mcpGuardrails.listConnections({ organizationId });
       expect(result.connections).toEqual([]);
 
       const memberCaller = await createCallerForUser(member.id);
       await expect(
-        memberCaller.organizations.addons.listConnections({ organizationId })
+        memberCaller.organizations.mcpGuardrails.listConnections({ organizationId })
       ).rejects.toThrow();
     });
 
@@ -759,14 +765,14 @@ describe('organization addons router', () => {
       mockFindMatch.mockResolvedValue({ item: registryItem, versionHint: null });
       const caller = await createCallerForUser(owner.id);
 
-      const result = await caller.organizations.addons.approveConnection({
+      const result = await caller.organizations.mcpGuardrails.approveConnection({
         organizationId,
         identityKey: 'remote:https://mcp.example.com/mcp',
       });
 
       expect(mockFindMatch).toHaveBeenCalledWith(remoteTarget);
       expect(result.matchedRegistry).toBe('mcp_registry');
-      expect(result.addon).toEqual(
+      expect(result.guardrail).toEqual(
         expect.objectContaining({
           identityKey: 'remote:https://mcp.example.com/mcp',
           name: 'Example Server',
@@ -774,9 +780,9 @@ describe('organization addons router', () => {
         })
       );
       const auditLog = await latestAuditLog();
-      expect(auditLog.action).toBe('organization.addon.add');
+      expect(auditLog.action).toBe('organization.guardrail.add');
       expect(auditLog.message).toMatch(/^Approved MCP server Example Server/);
-      const listed = await caller.organizations.addons.listConnections({ organizationId });
+      const listed = await caller.organizations.mcpGuardrails.listConnections({ organizationId });
       expect(
         listed.connections.find(row => row.identityKey === 'remote:https://mcp.example.com/mcp')
           ?.isOnAllowedList
@@ -788,13 +794,13 @@ describe('organization addons router', () => {
       mockFindMatch.mockResolvedValue(null);
       const caller = await createCallerForUser(owner.id);
 
-      const result = await caller.organizations.addons.approveConnection({
+      const result = await caller.organizations.mcpGuardrails.approveConnection({
         organizationId,
         identityKey: 'npm:left-pad-mcp',
       });
 
       expect(result.matchedRegistry).toBeNull();
-      expect(result.addon).toEqual(
+      expect(result.guardrail).toEqual(
         expect.objectContaining({
           name: 'left-pad-mcp',
           source: { registry: 'custom', id: null },
@@ -821,12 +827,12 @@ describe('organization addons router', () => {
       mockFindMatch.mockResolvedValue(null);
       const caller = await createCallerForUser(owner.id);
 
-      const result = await caller.organizations.addons.approveConnection({
+      const result = await caller.organizations.mcpGuardrails.approveConnection({
         organizationId,
         identityKey: 'npm:left-pad-mcp',
       });
 
-      expect(result.addon.name).toBe('left-pad-mcp');
+      expect(result.guardrail.name).toBe('left-pad-mcp');
     });
 
     it('rejects approving an unknown or already allowed server', async () => {
@@ -835,18 +841,18 @@ describe('organization addons router', () => {
       const caller = await createCallerForUser(owner.id);
 
       await expect(
-        caller.organizations.addons.approveConnection({
+        caller.organizations.mcpGuardrails.approveConnection({
           organizationId,
           identityKey: 'npm:never-seen',
         })
       ).rejects.toThrow('No connections found for this server.');
 
-      await caller.organizations.addons.approveConnection({
+      await caller.organizations.mcpGuardrails.approveConnection({
         organizationId,
         identityKey: 'npm:left-pad-mcp',
       });
       await expect(
-        caller.organizations.addons.approveConnection({
+        caller.organizations.mcpGuardrails.approveConnection({
           organizationId,
           identityKey: 'npm:left-pad-mcp',
         })

@@ -1,18 +1,18 @@
 import {
-  ORGANIZATION_ADDON_STATUSES,
+  ORGANIZATION_GUARDRAIL_STATUSES,
   ORGANIZATION_MCP_CONNECT_DECISIONS,
-  OrganizationAddonEnforcementSchema,
-  type OrganizationAddonConfig,
-  type OrganizationAddonSource,
-  type OrganizationAddonType,
+  OrganizationGuardrailEnforcementSchema,
+  type OrganizationGuardrailConfig,
+  type OrganizationGuardrailSource,
+  type OrganizationGuardrailType,
   type OrganizationMcpConnectDecision,
   type OrganizationMcpConnectTarget,
 } from '@kilocode/db/schema-types';
 import {
   kilocode_users,
-  organization_addons,
+  organization_guardrails,
   organization_mcp_connect_events,
-  type OrganizationAddon,
+  type OrganizationGuardrail,
 } from '@kilocode/db/schema';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
@@ -32,7 +32,7 @@ import {
   findMcpCatalogMatch,
   resolveMcpCatalogItem,
   type McpCatalogSource,
-} from '@/lib/organizations/addons/catalog';
+} from '@/lib/organizations/guardrails/catalog';
 import {
   mcpConfigFromTarget,
   mcpIdentityKey,
@@ -41,19 +41,19 @@ import {
   normalizePackageIdentifier,
   normalizeRemoteMcpUrl,
   type McpTarget,
-} from '@/lib/organizations/addons/mcp-identity';
+} from '@/lib/organizations/guardrails/mcp-identity';
 import { requireGuardrailsOrganization } from '@/lib/organizations/require-guardrails-organization';
 
-export const MAX_ORGANIZATION_ADDONS = 500;
+export const MAX_ORGANIZATION_GUARDRAILS = 500;
 
-const AddonStatusSchema = z.enum(ORGANIZATION_ADDON_STATUSES);
+const GuardrailStatusSchema = z.enum(ORGANIZATION_GUARDRAIL_STATUSES);
 const McpCatalogSourceSchema = z.enum(['kilo_marketplace', 'mcp_registry']);
 
-const AddonNameSchema = z.string().trim().min(1).max(120);
-const AddonDescriptionSchema = z.string().trim().max(500);
+const GuardrailNameSchema = z.string().trim().min(1).max(120);
+const GuardrailDescriptionSchema = z.string().trim().max(500);
 const MinVersionInputSchema = z.string().max(64).nullable().optional();
 
-const AddonIdInputSchema = OrganizationIdInputSchema.extend({ addonId: z.uuid() });
+const GuardrailIdInputSchema = OrganizationIdInputSchema.extend({ guardrailId: z.uuid() });
 
 const AddFromRegistryInputSchema = OrganizationIdInputSchema.extend({
   type: z.literal('mcp'),
@@ -66,7 +66,7 @@ const AddFromRegistryInputSchema = OrganizationIdInputSchema.extend({
 const AddCustomInputSchema = OrganizationIdInputSchema.extend({
   type: z.literal('mcp'),
   source: z.literal('custom'),
-  name: AddonNameSchema.optional(),
+  name: GuardrailNameSchema.optional(),
   target: z.discriminatedUnion('kind', [
     z.object({ kind: z.literal('remote'), url: z.string().max(2048) }),
     z.object({
@@ -86,7 +86,7 @@ const AddInputSchema = z.discriminatedUnion('source', [
 
 type Actor = { id: string; google_user_email: string; google_user_name: string };
 
-function serializeAddon(row: OrganizationAddon) {
+function serializeGuardrail(row: OrganizationGuardrail) {
   return {
     id: row.id,
     type: row.type,
@@ -144,7 +144,7 @@ async function resolveAddInput(input: z.infer<typeof AddInputSchema>): Promise<{
   target: McpTarget;
   name: string;
   description: string | null;
-  source: OrganizationAddonSource;
+  source: OrganizationGuardrailSource;
 }> {
   if (input.source === 'custom') {
     const target = targetFromCustomInput(input.target);
@@ -178,7 +178,7 @@ async function loadCatalogItem(source: McpCatalogSource, sourceId: string) {
   try {
     item = await resolveMcpCatalogItem({ source, sourceId });
   } catch (error) {
-    captureException(error, { tags: { source: 'organization-addons-catalog' } });
+    captureException(error, { tags: { source: 'organization-mcp-guardrails-catalog' } });
     throw new TRPCError({
       code: 'BAD_GATEWAY',
       message: 'The registry couldn’t be reached. Try again.',
@@ -193,27 +193,32 @@ async function loadCatalogItem(source: McpCatalogSource, sourceId: string) {
   return item;
 }
 
-async function findAddon(organizationId: string, addonId: string): Promise<OrganizationAddon> {
-  const [addon] = await db
+async function findGuardrail(
+  organizationId: string,
+  guardrailId: string
+): Promise<OrganizationGuardrail> {
+  const [guardrail] = await db
     .select()
-    .from(organization_addons)
+    .from(organization_guardrails)
     .where(
       and(
-        eq(organization_addons.organization_id, organizationId),
-        eq(organization_addons.id, addonId)
+        eq(organization_guardrails.organization_id, organizationId),
+        eq(organization_guardrails.id, guardrailId)
       )
     )
     .limit(1);
-  if (!addon) throw new TRPCError({ code: 'NOT_FOUND', message: 'Add-on not found' });
-  return addon;
+  if (!guardrail) throw new TRPCError({ code: 'NOT_FOUND', message: 'Guardrail not found' });
+  return guardrail;
 }
 
-function describeAddonType(type: OrganizationAddonType): string {
+function describeGuardrailType(type: OrganizationGuardrailType): string {
   return type === 'mcp' ? 'MCP server' : type;
 }
 
-function describeAddon(addon: Pick<OrganizationAddon, 'type' | 'name' | 'identity_key'>): string {
-  return `${describeAddonType(addon.type)} ${addon.name} (${addon.identity_key})`;
+function describeGuardrail(
+  guardrail: Pick<OrganizationGuardrail, 'type' | 'name' | 'identity_key'>
+): string {
+  return `${describeGuardrailType(guardrail.type)} ${guardrail.name} (${guardrail.identity_key})`;
 }
 
 function auditEntry(ctx: { user: Actor }, organizationId: string) {
@@ -226,20 +231,20 @@ function auditEntry(ctx: { user: Actor }, organizationId: string) {
 }
 
 function configWithMinVersion(
-  config: OrganizationAddonConfig,
+  config: OrganizationGuardrailConfig,
   minVersion: string | null
-): OrganizationAddonConfig {
+): OrganizationGuardrailConfig {
   return mcpConfigFromTarget(mcpTargetFromConfig(config), minVersion);
 }
 
-async function createAddon(params: {
+async function createGuardrail(params: {
   ctx: { user: Actor };
   organizationId: string;
-  type: OrganizationAddonType;
+  type: OrganizationGuardrailType;
   target: McpTarget;
   name: string;
   description: string | null;
-  source: OrganizationAddonSource;
+  source: OrganizationGuardrailSource;
   minVersion: string | null;
   auditVerb: 'Added' | 'Approved';
 }) {
@@ -247,13 +252,13 @@ async function createAddon(params: {
   return await db.transaction(async tx => {
     const [{ total }] = await tx
       .select({ total: count() })
-      .from(organization_addons)
-      .where(eq(organization_addons.organization_id, params.organizationId));
-    if (total >= MAX_ORGANIZATION_ADDONS) {
-      badRequest(`An organization can have at most ${MAX_ORGANIZATION_ADDONS} add-ons.`);
+      .from(organization_guardrails)
+      .where(eq(organization_guardrails.organization_id, params.organizationId));
+    if (total >= MAX_ORGANIZATION_GUARDRAILS) {
+      badRequest(`An organization can have at most ${MAX_ORGANIZATION_GUARDRAILS} guardrails.`);
     }
     const [created] = await tx
-      .insert(organization_addons)
+      .insert(organization_guardrails)
       .values({
         organization_id: params.organizationId,
         type: params.type,
@@ -273,12 +278,12 @@ async function createAddon(params: {
       });
     }
     await createAuditLog({
-      action: 'organization.addon.add',
+      action: 'organization.guardrail.add',
       ...auditEntry(params.ctx, params.organizationId),
-      message: `${params.auditVerb} ${describeAddon(created)}`,
+      message: `${params.auditVerb} ${describeGuardrail(created)}`,
       tx,
     });
-    return serializeAddon(created);
+    return serializeGuardrail(created);
   });
 }
 
@@ -305,23 +310,23 @@ function toIsoString(value: string | Date): string {
   return new Date(value).toISOString();
 }
 
-export const organizationAddonsRouter = createTRPCRouter({
+export const organizationMcpGuardrailsRouter = createTRPCRouter({
   list: organizationAdminProcedure.query(async ({ input }) => {
     const organization = await requireGuardrailsOrganization(input.organizationId);
     const rows = await db
       .select()
-      .from(organization_addons)
-      .where(eq(organization_addons.organization_id, input.organizationId))
-      .orderBy(asc(sql`lower(${organization_addons.name})`), asc(organization_addons.id));
+      .from(organization_guardrails)
+      .where(eq(organization_guardrails.organization_id, input.organizationId))
+      .orderBy(asc(sql`lower(${organization_guardrails.name})`), asc(organization_guardrails.id));
     return {
       enforcement: {
-        mcp: organization.settings.addon_guardrails?.mcp?.enforcement ?? ('off' as const),
+        mcp: organization.settings.guardrails?.mcp?.enforcement ?? ('off' as const),
         skill: {
-          enabled: organization.settings.addon_guardrails?.skill?.enabled ?? false,
-          scanBeforeUse: organization.settings.addon_guardrails?.skill?.scan_before_use ?? true,
+          enabled: organization.settings.guardrails?.skill?.enabled ?? false,
+          scanBeforeUse: organization.settings.guardrails?.skill?.scan_before_use ?? true,
         },
       },
-      addons: rows.map(serializeAddon),
+      guardrails: rows.map(serializeGuardrail),
     };
   }),
 
@@ -330,7 +335,7 @@ export const organizationAddonsRouter = createTRPCRouter({
       z.discriminatedUnion('type', [
         OrganizationIdInputSchema.extend({
           type: z.literal('mcp'),
-          enforcement: OrganizationAddonEnforcementSchema,
+          enforcement: OrganizationGuardrailEnforcementSchema,
         }),
         OrganizationIdInputSchema.extend({
           type: z.literal('skill'),
@@ -346,8 +351,8 @@ export const organizationAddonsRouter = createTRPCRouter({
           input.organizationId,
           organization => ({
             ...organization.settings,
-            addon_guardrails: {
-              ...organization.settings.addon_guardrails,
+            guardrails: {
+              ...organization.settings.guardrails,
               ...(input.type === 'mcp'
                 ? { mcp: { enforcement: input.enforcement } }
                 : { skill: { enabled: input.enabled, scan_before_use: input.scanBeforeUse } }),
@@ -382,12 +387,12 @@ export const organizationAddonsRouter = createTRPCRouter({
     .query(async ({ input }) => {
       await requireGuardrailsOrganization(input.organizationId);
       const existing = await db
-        .select({ identityKey: organization_addons.identity_key })
-        .from(organization_addons)
+        .select({ identityKey: organization_guardrails.identity_key })
+        .from(organization_guardrails)
         .where(
           and(
-            eq(organization_addons.organization_id, input.organizationId),
-            eq(organization_addons.type, input.type)
+            eq(organization_guardrails.organization_id, input.organizationId),
+            eq(organization_guardrails.type, input.type)
           )
         );
       const addedKeys = new Set(existing.map(row => row.identityKey));
@@ -399,7 +404,7 @@ export const organizationAddonsRouter = createTRPCRouter({
           cursor: input.cursor ?? null,
         });
       } catch (error) {
-        captureException(error, { tags: { source: 'organization-addons-catalog' } });
+        captureException(error, { tags: { source: 'organization-mcp-guardrails-catalog' } });
         throw new TRPCError({
           code: 'BAD_GATEWAY',
           message: 'The registry couldn’t be reached. Try again.',
@@ -421,7 +426,7 @@ export const organizationAddonsRouter = createTRPCRouter({
   add: organizationAdminMutationProcedure.input(AddInputSchema).mutation(async ({ input, ctx }) => {
     await requireGuardrailsOrganization(input.organizationId);
     const resolved = await resolveAddInput(input);
-    return await createAddon({
+    return await createGuardrail({
       ctx,
       organizationId: input.organizationId,
       type: input.type,
@@ -436,36 +441,36 @@ export const organizationAddonsRouter = createTRPCRouter({
 
   update: organizationAdminMutationProcedure
     .input(
-      AddonIdInputSchema.extend({
-        name: AddonNameSchema.optional(),
-        description: AddonDescriptionSchema.nullable().optional(),
+      GuardrailIdInputSchema.extend({
+        name: GuardrailNameSchema.optional(),
+        description: GuardrailDescriptionSchema.nullable().optional(),
         minVersion: MinVersionInputSchema,
         target: AddCustomInputSchema.shape.target.optional(),
       })
     )
     .mutation(async ({ input, ctx }) => {
       await requireGuardrailsOrganization(input.organizationId);
-      const addon = await findAddon(input.organizationId, input.addonId);
-      let config = addon.config;
-      let identityKey = addon.identity_key;
+      const guardrail = await findGuardrail(input.organizationId, input.guardrailId);
+      let config = guardrail.config;
+      let identityKey = guardrail.identity_key;
       let defaultName: string | null = null;
       if (input.target) {
-        if (addon.source.registry !== 'custom') {
+        if (guardrail.source.registry !== 'custom') {
           badRequest('Only custom MCP servers can be changed.');
         }
         const target = targetFromCustomInput(input.target);
         config = mcpConfigFromTarget(target, minVersionForTarget(target, input.minVersion));
         identityKey = mcpIdentityKey(target);
         defaultName = defaultCustomName(target);
-        if (identityKey !== addon.identity_key) {
+        if (identityKey !== guardrail.identity_key) {
           const [duplicate] = await db
-            .select({ id: organization_addons.id })
-            .from(organization_addons)
+            .select({ id: organization_guardrails.id })
+            .from(organization_guardrails)
             .where(
               and(
-                eq(organization_addons.organization_id, input.organizationId),
-                eq(organization_addons.type, addon.type),
-                eq(organization_addons.identity_key, identityKey)
+                eq(organization_guardrails.organization_id, input.organizationId),
+                eq(organization_guardrails.type, guardrail.type),
+                eq(organization_guardrails.identity_key, identityKey)
               )
             )
             .limit(1);
@@ -477,48 +482,48 @@ export const organizationAddonsRouter = createTRPCRouter({
           }
         }
       } else if (input.minVersion !== undefined) {
-        if (addon.config.kind === 'remote')
+        if (guardrail.config.kind === 'remote')
           badRequest('Remote servers don’t have a minimum version.');
         const normalized = normalizeMinVersion(input.minVersion);
         if (!normalized.ok) badRequest(normalized.reason);
-        config = configWithMinVersion(addon.config, normalized.value);
+        config = configWithMinVersion(guardrail.config, normalized.value);
       }
       const [updated] = await db
-        .update(organization_addons)
+        .update(organization_guardrails)
         .set({
-          name: input.name ?? defaultName ?? addon.name,
+          name: input.name ?? defaultName ?? guardrail.name,
           description:
-            input.description === undefined ? addon.description : input.description || null,
+            input.description === undefined ? guardrail.description : input.description || null,
           identity_key: identityKey,
           config,
         })
-        .where(eq(organization_addons.id, addon.id))
+        .where(eq(organization_guardrails.id, guardrail.id))
         .returning();
       await createAuditLog({
-        action: 'organization.addon.update',
+        action: 'organization.guardrail.update',
         ...auditEntry(ctx, input.organizationId),
-        message: `Updated ${describeAddon(updated)}`,
+        message: `Updated ${describeGuardrail(updated)}`,
       });
-      return serializeAddon(updated);
+      return serializeGuardrail(updated);
     }),
 
   setStatus: organizationAdminMutationProcedure
-    .input(AddonIdInputSchema.extend({ status: AddonStatusSchema }))
+    .input(GuardrailIdInputSchema.extend({ status: GuardrailStatusSchema }))
     .mutation(async ({ input, ctx }) => {
       await requireGuardrailsOrganization(input.organizationId);
-      const addon = await findAddon(input.organizationId, input.addonId);
-      if (addon.status === input.status) return serializeAddon(addon);
+      const guardrail = await findGuardrail(input.organizationId, input.guardrailId);
+      if (guardrail.status === input.status) return serializeGuardrail(guardrail);
       const [updated] = await db
-        .update(organization_addons)
+        .update(organization_guardrails)
         .set({ status: input.status })
-        .where(eq(organization_addons.id, addon.id))
+        .where(eq(organization_guardrails.id, guardrail.id))
         .returning();
       await createAuditLog({
-        action: 'organization.addon.update',
+        action: 'organization.guardrail.update',
         ...auditEntry(ctx, input.organizationId),
-        message: `${input.status === 'enabled' ? 'Enabled' : 'Disabled'} ${describeAddon(updated)}`,
+        message: `${input.status === 'enabled' ? 'Enabled' : 'Disabled'} ${describeGuardrail(updated)}`,
       });
-      return serializeAddon(updated);
+      return serializeGuardrail(updated);
     }),
 
   listConnections: organizationAdminProcedure
@@ -555,14 +560,14 @@ export const organizationAddonsRouter = createTRPCRouter({
         page.length === 0
           ? []
           : await db
-              .select({ identityKey: organization_addons.identity_key })
-              .from(organization_addons)
+              .select({ identityKey: organization_guardrails.identity_key })
+              .from(organization_guardrails)
               .where(
                 and(
-                  eq(organization_addons.organization_id, input.organizationId),
-                  eq(organization_addons.type, 'mcp'),
+                  eq(organization_guardrails.organization_id, input.organizationId),
+                  eq(organization_guardrails.type, 'mcp'),
                   inArray(
-                    organization_addons.identity_key,
+                    organization_guardrails.identity_key,
                     page.map(row => row.identityKey)
                   )
                 )
@@ -641,7 +646,7 @@ export const organizationAddonsRouter = createTRPCRouter({
 
       const target = latest.target;
       const match = await findMcpCatalogMatch(target);
-      const addon = await createAddon({
+      const guardrail = await createGuardrail({
         ctx,
         organizationId: input.organizationId,
         type: 'mcp',
@@ -654,23 +659,25 @@ export const organizationAddonsRouter = createTRPCRouter({
         minVersion: null,
         auditVerb: 'Approved',
       });
-      return { addon, matchedRegistry: match ? match.item.source : null };
+      return { guardrail, matchedRegistry: match ? match.item.source : null };
     }),
 
   delete: organizationAdminMutationProcedure
-    .input(AddonIdInputSchema)
+    .input(GuardrailIdInputSchema)
     .mutation(async ({ input, ctx }) => {
       await requireGuardrailsOrganization(input.organizationId);
-      const addon = await findAddon(input.organizationId, input.addonId);
+      const guardrail = await findGuardrail(input.organizationId, input.guardrailId);
       await db.transaction(async tx => {
-        await tx.delete(organization_addons).where(eq(organization_addons.id, addon.id));
+        await tx
+          .delete(organization_guardrails)
+          .where(eq(organization_guardrails.id, guardrail.id));
         await createAuditLog({
-          action: 'organization.addon.remove',
+          action: 'organization.guardrail.remove',
           ...auditEntry(ctx, input.organizationId),
-          message: `Removed ${describeAddon(addon)}`,
+          message: `Removed ${describeGuardrail(guardrail)}`,
           tx,
         });
       });
-      return { id: addon.id };
+      return { id: guardrail.id };
     }),
 });

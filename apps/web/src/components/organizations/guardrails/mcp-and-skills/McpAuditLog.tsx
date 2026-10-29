@@ -29,7 +29,7 @@ import {
   clientLabel,
   configIdentity,
   configKindLabel,
-} from './addon-display';
+} from './guardrail-display';
 import { formatConnectTime } from './format-connect-time';
 import { McpConnectionUsersDialog } from './McpConnectionUsersDialog';
 
@@ -59,7 +59,7 @@ export function McpAuditLog({ organizationId }: { organizationId: string }) {
   };
 
   const connectionsQuery = useInfiniteQuery(
-    trpc.organizations.addons.listConnections.infiniteQueryOptions(
+    trpc.organizations.mcpGuardrails.listConnections.infiniteQueryOptions(
       { organizationId, ...filters },
       { getNextPageParam: page => page.nextCursor ?? undefined }
     )
@@ -68,14 +68,14 @@ export function McpAuditLog({ organizationId }: { organizationId: string }) {
   const details = connections.find(connection => connection.identityKey === detailsKey) ?? null;
 
   const approveMutation = useMutation(
-    trpc.organizations.addons.approveConnection.mutationOptions({
+    trpc.organizations.mcpGuardrails.approveConnection.mutationOptions({
       onSuccess: async result => {
         await Promise.all([
           queryClient.invalidateQueries({
-            queryKey: trpc.organizations.addons.list.queryKey({ organizationId }),
+            queryKey: trpc.organizations.mcpGuardrails.list.queryKey({ organizationId }),
           }),
           queryClient.invalidateQueries({
-            queryKey: trpc.organizations.addons.listConnections.pathKey(),
+            queryKey: trpc.organizations.mcpGuardrails.listConnections.pathKey(),
           }),
         ]);
         const source =
@@ -84,7 +84,7 @@ export function McpAuditLog({ organizationId }: { organizationId: string }) {
             : result.matchedRegistry === 'mcp_registry'
               ? 'from the MCP registry'
               : 'as a custom server';
-        toast.success(`Allowed ${result.addon.name} ${source}.`);
+        toast.success(`Allowed ${result.guardrail.name} ${source}.`);
       },
       onError: error => {
         toast.error(error.message || 'The MCP server couldn’t be approved. Try again.');

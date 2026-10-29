@@ -145,12 +145,12 @@ import { KILOCLAW_PRICE_VERSIONS, type KiloClawPriceVersion } from './kiloclaw-p
 import type {
   OrganizationModeConfig,
   OrganizationGroupPolicies,
-  OrganizationAddonConfig,
-  OrganizationAddonSource,
+  OrganizationGuardrailConfig,
+  OrganizationGuardrailSource,
   OrganizationMcpConnectDecision,
   OrganizationMcpConnectTarget,
-  OrganizationAddonStatus,
-  OrganizationAddonType,
+  OrganizationGuardrailStatus,
+  OrganizationGuardrailType,
   OrganizationPlan,
   OrganizationRole,
   OrganizationSettings,
@@ -3932,20 +3932,20 @@ export const organization_groups = pgTable(
   ]
 );
 
-export const organization_addons = pgTable(
-  'organization_addons',
+export const organization_guardrails = pgTable(
+  'organization_guardrails',
   {
     id: idPrimaryKeyColumn,
     organization_id: uuid()
       .notNull()
       .references(() => organizations.id, { onDelete: 'cascade' }),
-    type: text().$type<OrganizationAddonType>().notNull(),
+    type: text().$type<OrganizationGuardrailType>().notNull(),
     identity_key: text().notNull(),
     name: text().notNull(),
     description: text(),
-    status: text().$type<OrganizationAddonStatus>().default('enabled').notNull(),
-    config: jsonb().$type<OrganizationAddonConfig>().notNull(),
-    source: jsonb().$type<OrganizationAddonSource>().notNull(),
+    status: text().$type<OrganizationGuardrailStatus>().default('enabled').notNull(),
+    config: jsonb().$type<OrganizationGuardrailConfig>().notNull(),
+    source: jsonb().$type<OrganizationGuardrailSource>().notNull(),
     created_by_kilo_user_id: text(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -3954,26 +3954,26 @@ export const organization_addons = pgTable(
       .$onUpdateFn(() => sql`now()`),
   },
   table => [
-    unique('UQ_organization_addons_organization_id_type_identity_key').on(
+    unique('UQ_organization_guardrails_organization_id_type_identity_key').on(
       table.organization_id,
       table.type,
       table.identity_key
     ),
-    check('organization_addons_type_check', sql`${table.type} IN ('mcp')`),
-    check('organization_addons_status_check', sql`${table.status} IN ('enabled', 'disabled')`),
+    check('organization_guardrails_type_check', sql`${table.type} IN ('mcp')`),
+    check('organization_guardrails_status_check', sql`${table.status} IN ('enabled', 'disabled')`),
     check(
-      'organization_addons_name_check',
+      'organization_guardrails_name_check',
       sql`char_length(btrim(${table.name})) BETWEEN 1 AND 120`
     ),
     check(
-      'organization_addons_description_check',
+      'organization_guardrails_description_check',
       sql`${table.description} IS NULL OR char_length(${table.description}) <= 500`
     ),
   ]
 );
 
-export type OrganizationAddon = typeof organization_addons.$inferSelect;
-export type NewOrganizationAddon = typeof organization_addons.$inferInsert;
+export type OrganizationGuardrail = typeof organization_guardrails.$inferSelect;
+export type NewOrganizationGuardrail = typeof organization_guardrails.$inferInsert;
 
 /**
  * One MCP connect attempt by a member's client. Only connects are recorded, not tool calls. The

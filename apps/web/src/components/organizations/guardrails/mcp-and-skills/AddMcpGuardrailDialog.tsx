@@ -24,7 +24,7 @@ import {
 
 type AddTab = McpRegistrySource | 'custom';
 
-export function AddAddonDialog({
+export function AddMcpGuardrailDialog({
   organizationId,
   onClose,
 }: {
@@ -38,14 +38,16 @@ export function AddAddonDialog({
   const [isAdding, setIsAdding] = useState(false);
   const selectedEntries = Object.values(selection);
 
-  const addMutation = useMutation(trpc.organizations.addons.add.mutationOptions());
+  const addMutation = useMutation(trpc.organizations.mcpGuardrails.add.mutationOptions());
 
   const refresh = async () => {
     await Promise.all([
       queryClient.invalidateQueries({
-        queryKey: trpc.organizations.addons.list.queryKey({ organizationId }),
+        queryKey: trpc.organizations.mcpGuardrails.list.queryKey({ organizationId }),
       }),
-      queryClient.invalidateQueries({ queryKey: trpc.organizations.addons.browse.pathKey() }),
+      queryClient.invalidateQueries({
+        queryKey: trpc.organizations.mcpGuardrails.browse.pathKey(),
+      }),
     ]);
   };
 

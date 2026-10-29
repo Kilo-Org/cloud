@@ -1,10 +1,10 @@
 import type {
-  OrganizationAddonEnforcement,
-  OrganizationMcpAddonConfig,
+  OrganizationGuardrailEnforcement,
+  OrganizationMcpGuardrailConfig,
   OrganizationMcpConnectDecision,
 } from '@kilocode/db/schema-types';
-import type { Organization, OrganizationAddon } from '@kilocode/db/schema';
-import { organization_addons } from '@kilocode/db/schema';
+import type { Organization, OrganizationGuardrail } from '@kilocode/db/schema';
+import { organization_guardrails } from '@kilocode/db/schema';
 import { resolveEnkryptInputGuardrail } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { and, asc, eq } from 'drizzle-orm';
@@ -23,13 +23,13 @@ export type AllowedMcpServer = {
   identityKey: string;
   name: string;
   description: string | null;
-  config: OrganizationMcpAddonConfig;
+  config: OrganizationMcpGuardrailConfig;
 };
 
 export type OrganizationGuardrailsPolicy = {
   inputScan: { enabled: boolean; scanToolResults: boolean };
   mcp: {
-    enforcement: OrganizationAddonEnforcement;
+    enforcement: OrganizationGuardrailEnforcement;
     allowedServers: AllowedMcpServer[];
   };
   skill: { enabled: boolean; scanBeforeUse: boolean };
@@ -44,7 +44,7 @@ type GuardrailSettingsOrganization = Pick<Organization, 'id' | 'settings'>;
  */
 export function resolveGuardrailsSettings(organization: GuardrailSettingsOrganization): {
   inputScan: OrganizationGuardrailsPolicy['inputScan'];
-  mcpEnforcement: OrganizationAddonEnforcement;
+  mcpEnforcement: OrganizationGuardrailEnforcement;
   skill: OrganizationGuardrailsPolicy['skill'];
 } {
   if (!isKiloEncryptEnabled(organization.settings)) {
@@ -54,23 +54,23 @@ export function resolveGuardrailsSettings(organization: GuardrailSettingsOrganiz
       skill: { enabled: false, scanBeforeUse: false },
     };
   }
-  const addonGuardrails = organization.settings.addon_guardrails;
+  const guardrailsSettings = organization.settings.guardrails;
   const inputGuardrail = resolveEnkryptInputGuardrail(organization.id, organization.settings);
   return {
     inputScan: {
       enabled: inputGuardrail !== null,
       scanToolResults: inputGuardrail?.scanToolResults ?? false,
     },
-    mcpEnforcement: addonGuardrails?.mcp?.enforcement ?? 'off',
+    mcpEnforcement: guardrailsSettings?.mcp?.enforcement ?? 'off',
     skill: {
-      enabled: addonGuardrails?.skill?.enabled ?? false,
-      scanBeforeUse: addonGuardrails?.skill?.scan_before_use ?? true,
+      enabled: guardrailsSettings?.skill?.enabled ?? false,
+      scanBeforeUse: guardrailsSettings?.skill?.scan_before_use ?? true,
     },
   };
 }
 
 function toAllowedMcpServer(
-  row: Pick<OrganizationAddon, 'identity_key' | 'name' | 'description' | 'config'>
+  row: Pick<OrganizationGuardrail, 'identity_key' | 'name' | 'description' | 'config'>
 ): AllowedMcpServer {
   return {
     identityKey: row.identity_key,
@@ -84,15 +84,15 @@ function toAllowedMcpServer(
 export async function listAllowedMcpServers(organizationId: string): Promise<AllowedMcpServer[]> {
   const rows = await db
     .select()
-    .from(organization_addons)
+    .from(organization_guardrails)
     .where(
       and(
-        eq(organization_addons.organization_id, organizationId),
-        eq(organization_addons.type, 'mcp'),
-        eq(organization_addons.status, 'enabled')
+        eq(organization_guardrails.organization_id, organizationId),
+        eq(organization_guardrails.type, 'mcp'),
+        eq(organization_guardrails.status, 'enabled')
       )
     )
-    .orderBy(asc(organization_addons.name), asc(organization_addons.id));
+    .orderBy(asc(organization_guardrails.name), asc(organization_guardrails.id));
   return rows.map(toAllowedMcpServer);
 }
 

@@ -1307,15 +1307,19 @@ export const OrganizationEnkryptSettingsSchema = z.object({
   input_guardrail: EnkryptInputGuardrailSettingsSchema.optional(),
 });
 
-export const ORGANIZATION_ADDON_TYPES = ['mcp'] as const;
-export type OrganizationAddonType = (typeof ORGANIZATION_ADDON_TYPES)[number];
+export const ORGANIZATION_GUARDRAIL_TYPES = ['mcp'] as const;
+export type OrganizationGuardrailType = (typeof ORGANIZATION_GUARDRAIL_TYPES)[number];
 
-export const ORGANIZATION_ADDON_STATUSES = ['enabled', 'disabled'] as const;
-export type OrganizationAddonStatus = (typeof ORGANIZATION_ADDON_STATUSES)[number];
+export const ORGANIZATION_GUARDRAIL_STATUSES = ['enabled', 'disabled'] as const;
+export type OrganizationGuardrailStatus = (typeof ORGANIZATION_GUARDRAIL_STATUSES)[number];
 
-export const ORGANIZATION_ADDON_ENFORCEMENT_MODES = ['off', 'shadow', 'enforce'] as const;
-export const OrganizationAddonEnforcementSchema = z.enum(ORGANIZATION_ADDON_ENFORCEMENT_MODES);
-export type OrganizationAddonEnforcement = z.infer<typeof OrganizationAddonEnforcementSchema>;
+export const ORGANIZATION_GUARDRAIL_ENFORCEMENT_MODES = ['off', 'shadow', 'enforce'] as const;
+export const OrganizationGuardrailEnforcementSchema = z.enum(
+  ORGANIZATION_GUARDRAIL_ENFORCEMENT_MODES
+);
+export type OrganizationGuardrailEnforcement = z.infer<
+  typeof OrganizationGuardrailEnforcementSchema
+>;
 
 export const OrganizationSkillGuardrailsSchema = z.object({
   enabled: z.boolean(),
@@ -1323,16 +1327,14 @@ export const OrganizationSkillGuardrailsSchema = z.object({
 });
 export type OrganizationSkillGuardrails = z.infer<typeof OrganizationSkillGuardrailsSchema>;
 
-export const OrganizationAddonGuardrailsSettingsSchema = z.object({
-  mcp: z.object({ enforcement: OrganizationAddonEnforcementSchema }).optional(),
+export const OrganizationGuardrailsSettingsSchema = z.object({
+  mcp: z.object({ enforcement: OrganizationGuardrailEnforcementSchema }).optional(),
   skill: OrganizationSkillGuardrailsSchema.optional(),
 });
 
-export type OrganizationAddonGuardrailsSettings = z.infer<
-  typeof OrganizationAddonGuardrailsSettingsSchema
->;
+export type OrganizationGuardrailsSettings = z.infer<typeof OrganizationGuardrailsSettingsSchema>;
 
-export type OrganizationMcpAddonConfig =
+export type OrganizationMcpGuardrailConfig =
   | { kind: 'remote'; url: string }
   | {
       kind: 'package';
@@ -1341,9 +1343,9 @@ export type OrganizationMcpAddonConfig =
       min_version: string | null;
     };
 
-export type OrganizationAddonConfig = OrganizationMcpAddonConfig;
+export type OrganizationGuardrailConfig = OrganizationMcpGuardrailConfig;
 
-export type OrganizationAddonSource = {
+export type OrganizationGuardrailSource = {
   registry: 'kilo_marketplace' | 'mcp_registry' | 'custom';
   id: string | null;
 };
@@ -1398,7 +1400,7 @@ const OrganizationSettingsSchema = z.object({
   // Set by Kilo admins: lets the organization configure Enkrypt AI guardrails in Kilo Cloud
   kilo_encrypt: z.boolean().optional(),
   enkrypt: OrganizationEnkryptSettingsSchema.optional(),
-  addon_guardrails: OrganizationAddonGuardrailsSettingsSchema.optional(),
+  guardrails: OrganizationGuardrailsSettingsSchema.optional(),
 });
 
 export type OrganizationSettings = z.infer<typeof OrganizationSettingsSchema>;
@@ -1598,9 +1600,9 @@ export const AuditLogAction = z.enum([
   'organization.created', // ✅
   'organization.token.generate', // ✅
   'organization.funds.distribute_to_children', // ✅
-  'organization.addon.add',
-  'organization.addon.update',
-  'organization.addon.remove',
+  'organization.guardrail.add',
+  'organization.guardrail.update',
+  'organization.guardrail.remove',
 ]);
 
 // --- EncryptedData ---

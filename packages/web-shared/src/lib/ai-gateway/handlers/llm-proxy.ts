@@ -23,7 +23,12 @@ import {
 import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
-import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
+  createDirectByokReferenceResolver,
+  getDirectByokModel,
+  supportsCatalogMode,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import { byokOwner, isInferenceProviderUserByok } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { sendUpstreamAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-attempt';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
@@ -72,6 +77,8 @@ import {
   inferenceProvidersNotAllowedResponse,
   modelDoesNotExistOnOpenRouterResponse,
   chatGptReconnectResponse,
+  directByokCatalogOnlyMessage,
+  directByokCatalogOnlyResponse,
   lastUserPromptText,
   requestedLogprobs,
   requestedSamples,
@@ -148,6 +155,7 @@ import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/uti
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
 import {
+  allowsInferenceProviderUserByok,
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
   type EffectiveOrganizationModelPolicy,
@@ -224,6 +232,26 @@ async function resolveFreeModelRateLimitSubject(
   return user && !authFailedResponse
     ? { kind: 'account', kiloUserId: user.id }
     : { kind: 'ip', ipAddress };
+}
+
+/**
+ * The catalog id that replaces an auto-routed bespoke direct BYOK id when the caller's key for it
+ * is in catalog mode. Null when the id needs no replacement or has no catalog id; an unmapped id
+ * then gets the catalog-only error from `getProvider`.
+ */
+async function catalogModeModelForRoutedModel(
+  model: string,
+  authPromise: ReturnType<typeof getUserFromAuth>
+): Promise<string | null> {
+  const { provider } = await getDirectByokModel(model.toLowerCase());
+  if (!provider || !supportsCatalogMode(provider.id)) return null;
+  const { user, authFailedResponse, organizationId } = await authPromise;
+  if (!user || authFailedResponse) return null;
+  const resolveReference = await createDirectByokReferenceResolver(
+    byokOwner(user.id, organizationId)
+  );
+  const resolved = await resolveReference(model);
+  return resolved === model ? null : resolved;
 }
 
 export async function handleLlmProxyRequest(
@@ -620,6 +648,16 @@ export async function handleLlmProxyRequest(
     routingTarget = autoResult.kind === 'ok' ? (autoResult.routingTarget ?? null) : null;
   }
 
+  if (autoModel) {
+    // A router entry stored with a bespoke id keeps working when its key switches to catalog mode;
+    // the catalog id then goes through the organization policy check below.
+    const catalogModelId = await catalogModeModelForRoutedModel(
+      requestBodyParsed.body.model,
+      authPromise
+    );
+    if (catalogModelId) requestBodyParsed.body.model = catalogModelId;
+  }
+
   const effectiveModelIdLowerCased = requestBodyParsed.body.model.toLowerCase();
   const customLlm = await findCustomLlm(effectiveModelIdLowerCased);
   const isPrivateCustomLlm = customLlm !== null && !isPublicCustomLlm(customLlm.definition);
@@ -818,10 +856,13 @@ export async function handleLlmProxyRequest(
     const providerConfig = getOrganizationProviderPrivacy(settings);
     let effectiveProviderConfig = providerConfig;
     let groupModelAllowed = true;
+    let groupModelAllowedForInferenceProviderUserByok = true;
     let groupProvidersAllowed = true;
     if (groupPolicy) {
       const groupDecision = await getEffectiveModelDecision(groupPolicy, modelId);
       groupModelAllowed = groupDecision.allowed;
+      groupModelAllowedForInferenceProviderUserByok =
+        allowsInferenceProviderUserByok(groupDecision);
       if (groupDecision.eligibleProviderRoutes) {
         const only = withoutVirtualProvider([...groupDecision.eligibleProviderRoutes]);
         groupProvidersAllowed = only.length > 0;
@@ -835,6 +876,7 @@ export async function handleLlmProxyRequest(
         ? { ...effectiveProviderConfig, ...effectivePrivacy }
         : undefined,
       groupModelAllowed,
+      groupModelAllowedForInferenceProviderUserByok,
       groupProvidersAllowed,
       settings,
     };
@@ -885,6 +927,19 @@ export async function handleLlmProxyRequest(
     // Same response as an unknown model id, so callers cannot probe for custom LLMs.
     return modelDoesNotExistOnOpenRouterResponse(effectiveModelIdLowerCased);
   }
+  if (providerResult.kind === 'direct-byok-catalog-only') {
+    // Falling through to the managed gateway would fail later with a misleading unknown-model error.
+    const message = directByokCatalogOnlyMessage({
+      model: effectiveModelIdLowerCased,
+      providerId: providerResult.providerId,
+      catalogModelId: providerResult.catalogModelId,
+    });
+    return autoModel === ORG_AUTO_MODEL.id && routingTarget
+      ? organizationAutoConfigurationResponse(
+          `Organization Auto route target '${routingTarget}' is unavailable: ${message}`
+        )
+      : directByokCatalogOnlyResponse(message);
+  }
   const effectiveProviderContext = providerResult;
 
   if (autoModel === ORG_AUTO_MODEL.id && routingTarget) {
@@ -905,7 +960,10 @@ export async function handleLlmProxyRequest(
   if (!effectiveProviderContext.provider.supportedChatApis.includes(requestBodyParsed.kind)) {
     return apiKindNotSupportedResponse(
       requestBodyParsed.kind,
-      effectiveProviderContext.provider.supportedChatApis
+      effectiveProviderContext.provider.supportedChatApis,
+      effectiveProviderContext.provider.id === 'direct-byok'
+        ? effectiveProviderContext.userByok?.[0]?.providerId
+        : undefined
     );
   }
 
@@ -931,6 +989,7 @@ export async function handleLlmProxyRequest(
       balanceLimitedByUserAllowance,
       effectiveProviderConfig,
       groupModelAllowed,
+      groupModelAllowedForInferenceProviderUserByok,
       groupProvidersAllowed,
     } = await accessCheckResolver.get();
 
@@ -948,7 +1007,10 @@ export async function handleLlmProxyRequest(
       });
     }
 
-    if (!groupModelAllowed) {
+    const modelAllowed = isInferenceProviderUserByok(effectiveProviderContext.userByok)
+      ? groupModelAllowedForInferenceProviderUserByok
+      : groupModelAllowed;
+    if (!modelAllowed) {
       return isAutoRoutedRequest ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
     }
     if (!groupProvidersAllowed) return modelNotAllowedResponse();

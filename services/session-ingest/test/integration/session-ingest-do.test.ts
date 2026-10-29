@@ -14,6 +14,7 @@ import {
   MAX_KILO_SDK_HISTORY_MATERIALIZATION_BYTES,
   MAX_KILO_SDK_SESSION_SNAPSHOT_BYTES,
 } from '../../src/dos/kilo-sdk-materialization';
+import { BRIEFING_MAX_EXCERPT_SOURCE_ROWS } from '../../src/ingest/briefing-excerpt';
 import { INGEST_CHUNK_MAX_BYTES, MAX_INGEST_ITEM_BYTES } from '../../src/util/ingest-limits';
 
 const encoder = new TextEncoder();
@@ -823,6 +824,47 @@ describe('SessionIngestDO integration', () => {
         { item_id: 'message/msg_a', item_type: 'message' },
         { item_id: 'part/msg_a/prt_1', item_type: 'part' },
       ]);
+    });
+
+    it('keeps briefing text beside an oversized inline reasoning part but omits oversized text', async () => {
+      const sessionId = 'ses_briefing_oversized_part_01';
+      const stub = getStub(kiloUserId, sessionId);
+      const completed = {
+        id: 'msg_final',
+        role: 'assistant',
+        finish: 'stop',
+        time: { completed: 3000 },
+      };
+      const textPart = (id: string, text: string) => ({
+        id,
+        messageID: 'msg_final',
+        type: 'text',
+        text,
+        time: { start: 1000, end: 3000 },
+      });
+      const excerpts = await runInDurableObject(stub, (instance, state) => {
+        const insert = (itemId: string, itemType: string, data: unknown) =>
+          state.storage.sql.exec(
+            'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+            itemId,
+            itemType,
+            JSON.stringify(data),
+            1000
+          );
+        insert('message/msg_final', 'message', completed);
+        insert('part/msg_final/prt_reasoning', 'part', {
+          id: 'prt_reasoning',
+          messageID: 'msg_final',
+          type: 'reasoning',
+          text: 'x'.repeat(16 * 1024),
+        });
+        insert('part/msg_final/prt_text', 'part', textPart('prt_text', 'Final response.'));
+        const batch = [{ type: 'message' as const, data: completed }];
+        const withReasoning = instance['latestBriefingExcerpt'](batch);
+        insert('part/msg_final/prt_large', 'part', textPart('prt_large', 'y'.repeat(16 * 1024)));
+        return [withReasoning?.text, instance['latestBriefingExcerpt'](batch)];
+      });
+      expect(excerpts).toEqual(['Final response.', undefined]);
     });
 
     it('returns an older-layout part row with its message', async () => {
@@ -3357,6 +3399,191 @@ describe('SessionIngestDO integration', () => {
       expect(excerpt).toMatch(/^First line\. x+\.\.\.$/);
     });
 
+    it('reads a bounded number of part rows for a turn with many parts', async () => {
+      const partCount = 3000;
+
+      async function seedTurn(sessionId: string, completed: boolean, partText: string) {
+        const stub = getStub(kiloUserId, sessionId);
+        await ingestBusyStatus(stub, sessionId);
+        await stub.ingest(
+          [
+            {
+              type: 'message',
+              data: {
+                id: 'msg_many',
+                role: 'assistant',
+                time: completed ? { created: 1, completed: 2 } : { created: 1 },
+              },
+            },
+          ],
+          kiloUserId,
+          sessionId,
+          1
+        );
+        await runInDurableObject(stub, async (_instance, state) => {
+          for (let index = 0; index < partCount; index += 1) {
+            const partId = `prt_${String(index).padStart(5, '0')}`;
+            state.storage.sql.exec(
+              'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+              `part/msg_many/${partId}`,
+              'part',
+              JSON.stringify({
+                id: partId,
+                messageID: 'msg_many',
+                type: 'text',
+                text: partText,
+              }),
+              1000 + index
+            );
+          }
+        });
+      }
+
+      async function idleIngest(sessionId: string) {
+        return runInDurableObject(getStub(kiloUserId, sessionId), async (instance, state) => {
+          const sqlStorage: SqlStorage = Object.getPrototypeOf(state.storage.sql);
+          const exec = sqlStorage.exec;
+          // The excerpt derivation parses each part body it takes from the database, so counting
+          // those parses measures the part bodies the read consumes.
+          const jsonParse = JSON.parse;
+          const cursors: Array<{ rowsRead: number }> = [];
+          let parsedParts = 0;
+          sqlStorage.exec = function (this: SqlStorage, ...args: Parameters<SqlStorage['exec']>) {
+            const cursor = exec.apply(this, args);
+            cursors.push(cursor);
+            return cursor;
+          };
+          JSON.parse = ((text: string, ...rest: unknown[]) => {
+            if (typeof text === 'string' && text.includes('"messageID":"msg_many"'))
+              parsedParts += 1;
+            return (jsonParse as (value: string, ...args: unknown[]) => unknown)(text, ...rest);
+          }) as typeof JSON.parse;
+          try {
+            const result = await instance.ingest(
+              [{ type: 'session_status', data: { status: 'idle' } }],
+              kiloUserId,
+              sessionId,
+              1
+            );
+            return {
+              rowsRead: cursors.reduce((sum, cursor) => sum + cursor.rowsRead, 0),
+              parsedParts,
+              attentionSignals: result.accepted ? result.attentionSignals : [],
+            };
+          } finally {
+            sqlStorage.exec = exec;
+            JSON.parse = jsonParse;
+          }
+        });
+      }
+
+      // One-character parts never fill the excerpt on their own, so the source-row limit decides
+      // how many of them the read consumes.
+      const cappedSessionId = 'ses_attention_many_parts_capped';
+      const unfinishedSessionId = 'ses_attention_many_parts_unfinished';
+      // Long parts fill the excerpt after a few rows, so the read stops before the row limit.
+      const settledSessionId = 'ses_attention_many_parts_settled';
+      await seedTurn(cappedSessionId, true, 'x');
+      const capped = await idleIngest(cappedSessionId);
+      await seedTurn(unfinishedSessionId, false, 'x');
+      const unfinished = await idleIngest(unfinishedSessionId);
+      await seedTurn(settledSessionId, true, 'Response text. ');
+      const settled = await idleIngest(settledSessionId);
+
+      expect(capped.attentionSignals).toEqual([
+        {
+          signalId: 'msg_many',
+          kind: 'completed',
+          messageExcerpt: 'x'.repeat(BRIEFING_MAX_EXCERPT_SOURCE_ROWS),
+        },
+      ]);
+      // A session without a finished turn builds no excerpt, so the completed session's parsed
+      // part bodies are the excerpt read itself, once per part body it takes from the database.
+      expect(unfinished.attentionSignals).toEqual([]);
+      expect(unfinished.parsedParts).toBe(0);
+      expect(capped.parsedParts).toBe(BRIEFING_MAX_EXCERPT_SOURCE_ROWS);
+      // The excerpt read stays within one ordered range pass over the stored parts.
+      expect(capped.rowsRead - unfinished.rowsRead).toBeLessThan(10_000);
+      expect(settled.attentionSignals).toEqual([
+        {
+          signalId: 'msg_many',
+          kind: 'completed',
+          messageExcerpt: `${'Response text. '.repeat(6)}Respons...`,
+        },
+      ]);
+      expect(settled.parsedParts).toBe(7);
+    });
+
+    it('keeps the excerpt of a turn whose text follows many non-text parts', async () => {
+      const sessionId = 'ses_attention_after_tools_0001';
+      const stub = getStub(kiloUserId, sessionId);
+      await ingestBusyStatus(stub, sessionId);
+
+      const toolParts = Array.from({ length: 60 }, (_, index) => ({
+        type: 'part' as const,
+        data: {
+          id: `tool_${String(index).padStart(3, '0')}`,
+          messageID: 'msg_tools',
+          type: 'tool',
+          tool: 'bash',
+          state: { status: 'completed', output: 'Command output. '.repeat(10) },
+        },
+      }));
+      const result = await stub.ingest(
+        [
+          ...toolParts,
+          {
+            type: 'part',
+            data: { id: 'text_final', messageID: 'msg_tools', type: 'text', text: 'Final answer.' },
+          },
+          {
+            type: 'message',
+            data: { id: 'msg_tools', role: 'assistant', time: { created: 1, completed: 2 } },
+          },
+          { type: 'session_status', data: { status: 'idle' } },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      expect(result.attentionSignals).toEqual([
+        { signalId: 'msg_tools', kind: 'completed', messageExcerpt: 'Final answer.' },
+      ]);
+    });
+
+    it('keeps the snippet of a single large inline text part', async () => {
+      const sessionId = 'ses_attention_large_part_000001';
+      const stub = getStub(kiloUserId, sessionId);
+      await ingestBusyStatus(stub, sessionId);
+
+      const result = await stub.ingest(
+        [
+          {
+            type: 'part',
+            data: {
+              id: 'long_text',
+              messageID: 'msg_large',
+              type: 'text',
+              text: `${'z'.repeat(20_000)} tail`,
+            },
+          },
+          {
+            type: 'message',
+            data: { id: 'msg_large', role: 'assistant', time: { created: 1, completed: 2 } },
+          },
+          { type: 'session_status', data: { status: 'idle' } },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      expect(result.attentionSignals).toEqual([
+        { signalId: 'msg_large', kind: 'completed', messageExcerpt: `${'z'.repeat(97)}...` },
+      ]);
+    });
+
     it('does not emit a completed signal when the assistant message has not finished', async () => {
       const sessionId = 'ses_attention_incomplete_001';
       const stub = getStub(kiloUserId, sessionId);
@@ -3724,6 +3951,121 @@ describe('SessionIngestDO integration', () => {
 
       expect(snapshot.info).toEqual({ title: 'R2 Diff Test' });
       expect(snapshot.sessionDiff).toEqual(diffs);
+    });
+  });
+
+  describe('session cost aggregate', () => {
+    function assistantMessage(id: string, cost: number) {
+      return {
+        type: 'message' as const,
+        data: {
+          id,
+          role: 'assistant',
+          time: { created: 1000 },
+          tokens: { input: 1, output: 1, reasoning: 0, cache: { read: 0, write: 0 } },
+          cost,
+        },
+      };
+    }
+
+    function readStoredTotal(state: DurableObjectState): number {
+      const rows = [
+        ...state.storage.sql.exec<{ value: string }>(
+          "SELECT value FROM ingest_meta WHERE key = 'runningAssistantCostUsd'"
+        ),
+      ];
+      return Number(rows[0]?.value);
+    }
+
+    function readRowCosts(state: DurableObjectState) {
+      return [
+        ...state.storage.sql.exec<{ item_id: string; cost_usd: number | null }>(
+          'SELECT item_id, cost_usd FROM ingest_items WHERE item_type = ? ORDER BY item_id',
+          'message'
+        ),
+      ];
+    }
+
+    it('stores each message contribution beside its row and keeps the total equal to the rows', async () => {
+      const sessionId = 'ses_cost_aggregate_versions_1';
+      const stub = getStub(kiloUserId, sessionId);
+
+      await stub.ingest([assistantMessage('msg_a', 0.25)], kiloUserId, sessionId, 1, 1_000);
+      await stub.ingest([assistantMessage('msg_a', 0.5)], kiloUserId, sessionId, 1, 2_000);
+      await stub.ingest([assistantMessage('msg_b', 0.125)], kiloUserId, sessionId, 1, 3_000);
+
+      await runInDurableObject(stub, async (_instance, state) => {
+        expect(readRowCosts(state)).toEqual([
+          { item_id: 'message/msg_a', cost_usd: 0.5 },
+          { item_id: 'message/msg_b', cost_usd: 0.125 },
+        ]);
+        const [recomputed] = [
+          ...state.storage.sql.exec<{ total: number | null }>(
+            "SELECT SUM(json_extract(item_data, '$.cost')) AS total FROM ingest_items " +
+              "WHERE item_type = 'message' AND item_data_r2_key IS NULL"
+          ),
+        ];
+        expect(readStoredTotal(state)).toBeCloseTo(recomputed.total ?? 0, 10);
+        expect(readStoredTotal(state)).toBeCloseTo(0.625, 10);
+      });
+
+      await stub.clear();
+    });
+
+    it('moves the total by the stored contribution, not by the body of the row it replaces', async () => {
+      const sessionId = 'ses_cost_aggregate_stored_2';
+      const stub = getStub(kiloUserId, sessionId);
+
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at, cost_usd) ' +
+            'VALUES (?, ?, ?, ?, ?)',
+          'message/msg_c',
+          'message',
+          JSON.stringify(assistantMessage('msg_c', 0.9).data),
+          1_000,
+          0.1
+        );
+        state.storage.sql.exec(
+          "INSERT INTO ingest_meta (key, value) VALUES ('runningAssistantCostUsd', '0.1')"
+        );
+      });
+
+      await stub.ingest([assistantMessage('msg_c', 0.2)], kiloUserId, sessionId, 1, 2_000);
+
+      await runInDurableObject(stub, async (_instance, state) => {
+        expect(readStoredTotal(state)).toBeCloseTo(0.2, 10);
+        expect(readRowCosts(state)).toEqual([{ item_id: 'message/msg_c', cost_usd: 0.2 }]);
+      });
+
+      await stub.clear();
+    });
+
+    it('reads a row stored before the column and keeps the total equal to the rows', async () => {
+      const sessionId = 'ses_cost_aggregate_legacy_3';
+      const stub = getStub(kiloUserId, sessionId);
+
+      await runInDurableObject(stub, async (_instance, state) => {
+        state.storage.sql.exec(
+          'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+          'message/msg_legacy',
+          'message',
+          JSON.stringify(assistantMessage('msg_legacy', 0.25).data),
+          1_000
+        );
+        state.storage.sql.exec(
+          "INSERT INTO ingest_meta (key, value) VALUES ('runningAssistantCostUsd', '0.25')"
+        );
+      });
+
+      await stub.ingest([assistantMessage('msg_legacy', 0.5)], kiloUserId, sessionId, 1, 2_000);
+
+      await runInDurableObject(stub, async (_instance, state) => {
+        expect(readStoredTotal(state)).toBeCloseTo(0.5, 10);
+        expect(readRowCosts(state)).toEqual([{ item_id: 'message/msg_legacy', cost_usd: 0.5 }]);
+      });
+
+      await stub.clear();
     });
   });
 

@@ -52,10 +52,7 @@ const text = JSON.stringify(descriptor);
 const interactiveOrgId = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
 const otherOrgId = '11111111-1111-4111-8111-111111111111';
 const isolatedSandboxId = `sbx-${'c'.repeat(48)}`;
-const webRoute = {
-  createdOnPlatform: 'cloud-agent-web',
-  orgId: interactiveOrgId,
-};
+const orgRoute = { orgId: interactiveOrgId };
 const scopedEnv = {
   RUNTIME_STARTUP_MODE: 'downloaded',
   NATIVE_RUNTIME_IMAGE: 'runtime-free',
@@ -63,7 +60,7 @@ const scopedEnv = {
   RUNTIME_INTERACTIVE_ORG_IDS: interactiveOrgId,
 } as const;
 const isolatedCohort = {
-  preparingRoutes: [webRoute],
+  preparingRoutes: [orgRoute],
   sandboxId: isolatedSandboxId,
   sandboxKind: 'isolated' as const,
 };
@@ -129,25 +126,25 @@ describe('startup selection and preflight', () => {
       )
     ).toEqual(scopedDownloaded);
   });
-  it('selects the configured target only for an exact isolated interactive web cohort', () => {
+  it('selects the configured target for an isolated cohort of any origin', () => {
     expect(selectStartup(scopedEnv, 'cloudflare-containers', isolatedCohort)).toEqual(
       scopedDownloaded
     );
     expect(
       selectStartup(scopedEnv, 'cloudflare-containers', {
-        preparingRoutes: [webRoute],
+        preparingRoutes: [orgRoute],
         sandboxId: `ses-${'a'.repeat(48)}`,
       })
     ).toEqual(scopedDownloaded);
     expect(
       selectStartup(scopedEnv, 'cloudflare-containers', {
-        preparingRoutes: [webRoute],
+        preparingRoutes: [orgRoute],
         sandboxId: `istd-${'b'.repeat(48)}`,
       })
     ).toEqual(scopedDownloaded);
     expect(
       selectStartup(scopedEnv, 'cloudflare-containers', {
-        preparingRoutes: [webRoute],
+        preparingRoutes: [orgRoute],
         sandboxId: `sbx-${'d'.repeat(48)}`,
         sandboxKind: 'isolated-standard',
       })
@@ -157,23 +154,7 @@ describe('startup selection and preflight', () => {
     [
       'another organization',
       {
-        preparingRoutes: [{ ...webRoute, orgId: otherOrgId }],
-        sandboxId: isolatedSandboxId,
-        sandboxKind: 'isolated' as const,
-      },
-    ],
-    [
-      'a non-web platform',
-      {
-        preparingRoutes: [{ ...webRoute, createdOnPlatform: 'cloud-agent' }],
-        sandboxId: isolatedSandboxId,
-        sandboxKind: 'isolated' as const,
-      },
-    ],
-    [
-      'a missing platform',
-      {
-        preparingRoutes: [{ orgId: interactiveOrgId }],
+        preparingRoutes: [{ ...orgRoute, orgId: otherOrgId }],
         sandboxId: isolatedSandboxId,
         sandboxKind: 'isolated' as const,
       },
@@ -181,7 +162,7 @@ describe('startup selection and preflight', () => {
     [
       'a missing organization',
       {
-        preparingRoutes: [{ createdOnPlatform: 'cloud-agent-web' }],
+        preparingRoutes: [{}],
         sandboxId: isolatedSandboxId,
         sandboxKind: 'isolated' as const,
       },
@@ -189,43 +170,35 @@ describe('startup selection and preflight', () => {
     [
       'mixed organizations',
       {
-        preparingRoutes: [webRoute, { ...webRoute, orgId: otherOrgId }],
+        preparingRoutes: [orgRoute, { ...orgRoute, orgId: otherOrgId }],
         sandboxId: isolatedSandboxId,
         sandboxKind: 'isolated' as const,
       },
     ],
     [
       'a shared sandbox',
-      { preparingRoutes: [webRoute], sandboxId: isolatedSandboxId, sandboxKind: 'shared' as const },
+      { preparingRoutes: [orgRoute], sandboxId: isolatedSandboxId, sandboxKind: 'shared' as const },
     ],
     [
       'a code-review sandbox',
       {
-        preparingRoutes: [webRoute],
+        preparingRoutes: [orgRoute],
         sandboxId: isolatedSandboxId,
         sandboxKind: 'code-review' as const,
       },
     ],
     [
-      'mixed platforms',
-      {
-        preparingRoutes: [webRoute, { ...webRoute, createdOnPlatform: 'cloud-agent' }],
-        sandboxId: isolatedSandboxId,
-        sandboxKind: 'isolated' as const,
-      },
-    ],
-    [
       'a sandbox without a kind or legacy isolation',
-      { preparingRoutes: [webRoute], sandboxId: 'shared-owner' },
+      { preparingRoutes: [orgRoute], sandboxId: 'shared-owner' },
     ],
     [
       'a placed sandbox without a stored kind',
-      { preparingRoutes: [webRoute], sandboxId: isolatedSandboxId },
+      { preparingRoutes: [orgRoute], sandboxId: isolatedSandboxId },
     ],
     [
       'a legacy sandbox with a stored kind',
       {
-        preparingRoutes: [webRoute],
+        preparingRoutes: [orgRoute],
         sandboxId: `ses-${'e'.repeat(48)}`,
         sandboxKind: 'isolated' as const,
       },
@@ -243,7 +216,7 @@ describe('startup selection and preflight', () => {
         { ...scopedEnv, RUNTIME_RELEASE_DESCRIPTOR: undefined },
         'cloudflare-containers',
         {
-          preparingRoutes: [{ ...webRoute, orgId: otherOrgId }],
+          preparingRoutes: [{ ...orgRoute, orgId: otherOrgId }],
           sandboxId: isolatedSandboxId,
           sandboxKind: 'isolated',
         }
@@ -261,12 +234,12 @@ describe('startup selection and preflight', () => {
     expect(selectStartup(scopedEnv, 'cloudflare', isolatedCohort)).toEqual(baseline);
   });
   it('applies the organization scope to Vercel without native isolation', () => {
-    expect(selectStartup(scopedEnv, 'vercel', { preparingRoutes: [webRoute] })).toEqual(
+    expect(selectStartup(scopedEnv, 'vercel', { preparingRoutes: [orgRoute] })).toEqual(
       scopedDownloaded
     );
     expect(selectStartup(scopedEnv, 'vercel', {})).toEqual(baseline);
     expect(
-      selectStartup(scopedEnv, 'vercel', { preparingRoutes: [{ ...webRoute, orgId: otherOrgId }] })
+      selectStartup(scopedEnv, 'vercel', { preparingRoutes: [{ ...orgRoute, orgId: otherOrgId }] })
     ).toEqual(baseline);
   });
   it('ignores an invalid interactive scope before native downloaded startup is selected', () => {

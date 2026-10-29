@@ -3,6 +3,7 @@ import { Pressable } from 'react-native';
 
 import { RadioGroup, radioItemA11y } from '@/components/ui/radio-group';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 type SegmentedControlOption<T extends string> = { value: T; label: string };
@@ -47,10 +48,11 @@ export function SegmentedControl<T extends string>({
               // clipped instead of wrapping. Stretching the child to the segment
               // width is what lets the label wrap inside the pill.
               //
-              // `py-2` (with `min-h-11`) leaves a one-line segment at 44dp and a
-              // two-line segment at 56dp, so a wrapped label keeps its vertical
-              // insets instead of touching the edges.
-              'min-h-11 flex-1 justify-center rounded-md px-2 py-2 active:opacity-70',
+              // A one-line segment now fills the shared row floor. A
+              // wrapped label grows past it and keeps its vertical insets
+              // instead of touching the edges.
+              ROW_TARGET_CLASS,
+              'flex-1 justify-center rounded-md px-2 py-2 active:opacity-70',
               selected && 'bg-background'
             )}
           >

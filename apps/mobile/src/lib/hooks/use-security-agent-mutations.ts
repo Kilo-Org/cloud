@@ -18,8 +18,8 @@ import {
   type SecurityAgentConfigPatch,
 } from '@/lib/security-agent';
 import {
-  isSecuritySyncRetryable,
   mapSecuritySyncOperationError,
+  securityRetainsOperationKey,
   securitySyncIntentFingerprint,
 } from '@/lib/security-agent-ledger';
 import { trpcClient, useTRPC } from '@/lib/trpc';
@@ -232,12 +232,13 @@ export function useTriggerSecuritySync(scope: string) {
         await removeOutboxRow(fingerprint);
         return result;
       } catch (error) {
-        if (!isSecuritySyncRetryable(error)) {
+        if (!securityRetainsOperationKey(error)) {
           rotateKey();
           await removeOutboxRow(fingerprint);
         }
-        // A retryable (ambiguous) failure keeps the row: the server may have
-        // accepted the command, so a relaunch must reconcile, not re-POST.
+        // A retryable failure whose key survives is ambiguous: the server may
+        // have accepted the command, so a relaunch must reconcile, not re-POST.
+        // A settled intent keeps no row — its key can never be replayed.
         throw mapSecuritySyncOperationError(error);
       }
     },

@@ -16,7 +16,6 @@ export type StartupSelection =
   | { mode: 'downloaded'; image: NativeRuntimeImage; descriptor: string };
 
 export type StartupRouteIdentity = {
-  createdOnPlatform?: string;
   orgId?: string;
 };
 
@@ -52,8 +51,8 @@ function isIsolatedNativeSandbox(cohort: StartupCohortContext | undefined): bool
 }
 
 /**
- * Every preparing route must be an exact interactive web route for one
- * configured organization. Mixed or missing identity stays on the baseline.
+ * Every preparing route must belong to one configured organization, whatever
+ * its origin. Mixed or missing identity stays on the baseline.
  */
 function isScopedCohort(
   cohort: StartupCohortContext | undefined,
@@ -64,7 +63,6 @@ function isScopedCohort(
   if (routes.length === 0) return false;
   let orgId: string | undefined;
   for (const route of routes) {
-    if (route.createdOnPlatform !== 'cloud-agent-web') return false;
     if (route.orgId === undefined || route.orgId === '') return false;
     if (orgId !== undefined && route.orgId !== orgId) return false;
     orgId = route.orgId;

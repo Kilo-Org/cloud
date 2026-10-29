@@ -61,7 +61,7 @@ jobs:
     needs: check-changes
     if: needs.check-changes.outputs.should_deploy == 'true'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
-    timeout-minutes: 15
+    timeout-minutes: 45
     environment: production
 
     env:

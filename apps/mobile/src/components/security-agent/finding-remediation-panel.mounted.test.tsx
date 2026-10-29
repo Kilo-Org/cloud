@@ -11,6 +11,7 @@ import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { AnalysisRerunAction } from '@/components/security-agent/analysis-rerun-action';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { act, TestRenderer } from '@/test/renderer';
@@ -45,6 +46,9 @@ vi.mock('@/components/ui/icons', () => ({
 }));
 vi.mock('@/components/security-agent/collapsible-section', () => ({
   CollapsibleSection: (props: { children?: unknown }) => props.children ?? null,
+}));
+vi.mock('@/components/security-agent/analysis-rerun-action', () => ({
+  AnalysisRerunAction: 'AnalysisRerunAction',
 }));
 vi.mock('@/components/security-agent/finding-status-badge', () => ({
   FindingStatusBadge: () => null,
@@ -330,5 +334,71 @@ describe('FindingRemediationPanel pull request navigation', () => {
     expect(mocks.routerPush).toHaveBeenNthCalledWith(1, '/(app)/pr-review/kilo/kilo/123');
     expect(mocks.routerPush).toHaveBeenNthCalledWith(2, '/(app)/pr-review/kilo/kilo/456');
     expect(mocks.openExternalUrl).not.toHaveBeenCalled();
+  });
+});
+
+describe('FindingRemediationPanel stale analysis action', () => {
+  const staleCapability = {
+    canStart: false,
+    startReason: 'stale_analysis',
+    canRetry: false,
+    retryReason: 'stale_analysis',
+    canCancel: false,
+    cancelAttemptId: null,
+  };
+
+  beforeEach(() => {
+    texts.items = [];
+  });
+
+  it('offers the rerun action the blocker copy asks for', () => {
+    const tree = renderPanel(analysisFixture({ remediationCapability: staleCapability }));
+
+    expect(texts.items).toContain(
+      'Finding changed after analysis. Rerun analysis before starting remediation.'
+    );
+    expect(tree.root.findAllByType(AnalysisRerunAction)).toHaveLength(1);
+  });
+
+  it.each([
+    {
+      remediationAttempts: [
+        { id: 'attempt-1', status: 'failed', origin: 'manual', updatedAt: '2026-04-29T02:00:00Z' },
+      ],
+    },
+    { remediationSummary: { status: 'failed', latestAttemptId: 'attempt-1' } },
+  ])('keeps the action off a finding that already ran remediation: %j', content => {
+    const tree = renderPanel(
+      analysisFixture({ remediationCapability: staleCapability, ...content })
+    );
+
+    expect(tree.root.findAllByType(AnalysisRerunAction)).toHaveLength(0);
+  });
+
+  it.each([
+    { startReason: 'not_exploitable', retryReason: 'not_exploitable' },
+    { startReason: 'analysis_required', retryReason: 'analysis_required' },
+  ])('leaves the action to the blocker that names it: %j', reasons => {
+    const tree = renderPanel(
+      analysisFixture({
+        remediationCapability: { ...staleCapability, ...reasons },
+      })
+    );
+
+    expect(tree.root.findAllByType(AnalysisRerunAction)).toHaveLength(0);
+  });
+
+  it('offers it on the retry reason when only the retry is stale', () => {
+    const tree = renderPanel(
+      analysisFixture({
+        remediationCapability: {
+          ...staleCapability,
+          startReason: 'not_exploitable',
+          retryReason: 'stale_analysis',
+        },
+      })
+    );
+
+    expect(tree.root.findAllByType(AnalysisRerunAction)).toHaveLength(1);
   });
 });

@@ -125,6 +125,39 @@ export function reconcileCommandStatuses(args: {
 }
 
 /**
+ * The remediation fields the stale-analysis action reads, so both detail panels
+ * can pass their `getAnalysis` response without reshaping it.
+ */
+type SecurityRemediationSignal = Pick<
+  SecurityAnalysis,
+  'remediationAttempts' | 'remediationCapability' | 'remediationSummary'
+>;
+
+/** The server's own record that a remediation attempt already exists. */
+function hasRegisteredRemediationAttempt(analysis: SecurityRemediationSignal): boolean {
+  return (
+    analysis.remediationAttempts.length > 0 ||
+    Boolean(
+      analysis.remediationSummary?.latestAttemptId ?? analysis.remediationSummary?.latestAttempt?.id
+    )
+  );
+}
+
+/**
+ * Whether a stale analysis is the only thing blocking remediation, mirroring
+ * FindingDetailDialog.tsx's `remediationNeedsAnalysisRefresh`: a finding that
+ * never registered an attempt, whose capability rejects the start or the retry
+ * because the finding changed after the analysis that produced it.
+ */
+export function remediationNeedsAnalysisRefresh(analysis: SecurityRemediationSignal): boolean {
+  return (
+    !hasRegisteredRemediationAttempt(analysis) &&
+    (analysis.remediationCapability.startReason === 'stale_analysis' ||
+      analysis.remediationCapability.retryReason === 'stale_analysis')
+  );
+}
+
+/**
  * Whether the finding's row offers the Analyze action: an open finding that was
  * never analyzed or whose analysis failed, and whose remediation has not opened
  * a PR (that row shows View PR instead). Eligibility only — whether the action

@@ -27,7 +27,7 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
-  useAgentProfile: () => ({ ...h.query, refetch: h.refetch }),
+  useAgentProfileOverview: () => ({ ...h.query, refetch: h.refetch }),
   useAgentProfileMutations: () => ({
     update: { mutateAsync: vi.fn(), isPending: false },
     deleteProfile: { mutateAsync: vi.fn(), isPending: false },

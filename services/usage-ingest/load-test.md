@@ -104,7 +104,7 @@ Consumer `usage_ingest_processing` events additionally expose:
   Staging uses batch size 2 and parallelism 2, allowing two messages to start
   concurrently. `USAGE_INGEST_PARALLELISM=1` keeps batch size 2 but processes it
   serially, so the second message's value includes waiting for the first message
-  to settle. Production uses batch size 2, two writer slots
+  to settle. Production uses batch size 4, two writer slots
   and invocation cap 200 (up to 400 concurrent writer calls). Its deployment and activation are subject to the
   [production readiness gates](eu-queues.md#production-merge-gate); this staging recipe
   does not activate it. An ACK follows a matching recorded/duplicate writer response only.

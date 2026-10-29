@@ -121,7 +121,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     isLoading: isOpenRouterLoading,
   } = useOpenRouterModelsAndProviders();
 
-  const { state, actions, selectors } = useProvidersAndModelsAllowListsState({
+  const { state, actions, selectors, dispatch } = useProvidersAndModelsAllowListsState({
     openRouterModels,
     openRouterProviders,
   });
@@ -507,6 +507,9 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
               enabledProviderSlugs={enabledProviderSlugs}
               filteredModelRows={filteredModelRows}
               onToggleModelAllowed={handleToggleModelAllowed}
+              onSetModelsAllowed={(modelIds, nextAllowed) => {
+                if (canEdit) dispatch({ type: 'SET_MODELS_ALLOWED', modelIds, nextAllowed });
+              }}
               onOpenModelDetails={actions.setInfoModelId}
             />
           </TabsContent>
@@ -530,6 +533,10 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
               onProviderRetainsPromptsFilterChange={actions.setProviderRetainsPromptsFilter}
               onProviderLocationsFilterChange={actions.setProviderLocationsFilter}
               onToggleProviderEnabled={handleToggleProviderEnabled}
+              onSetProvidersEnabled={(providerSlugs, nextEnabled) => {
+                if (canEdit)
+                  dispatch({ type: 'SET_PROVIDERS_ENABLED', providerSlugs, nextEnabled });
+              }}
               onOpenProviderDetails={actions.setInfoProviderSlug}
             />
           </TabsContent>

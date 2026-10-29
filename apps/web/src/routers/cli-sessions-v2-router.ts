@@ -118,6 +118,45 @@ function isSessionNotFoundError(err: unknown): boolean {
   return false;
 }
 
+const TRANSIENT_TRPC_CODES = new Set(['SERVICE_UNAVAILABLE', 'TIMEOUT']);
+const TRANSIENT_HTTP_STATUSES = new Set([503, 504]);
+const TRANSPORT_ERROR_NAMES = new Set([
+  'HeadersTimeoutError',
+  'BodyTimeoutError',
+  'ConnectTimeoutError',
+  'AbortError',
+  'TimeoutError',
+]);
+
+function isTransportFailure(cause: unknown, depth = 0): boolean {
+  if (!(cause instanceof Error) || depth > 3) return false;
+  if (TRANSPORT_ERROR_NAMES.has(cause.name)) return true;
+  if (cause instanceof TypeError && cause.message === 'fetch failed') return true;
+  return isTransportFailure(cause.cause, depth + 1);
+}
+
+/** Worker outages, timeouts, and network failures that a later retry may resolve. */
+function isTransientRuntimeError(err: unknown): boolean {
+  if (!(err instanceof TRPCClientError)) return false;
+  const data = err.data as
+    | { code?: string; httpStatus?: number; clientError?: { retryable?: unknown } }
+    | undefined;
+  const shape = err.shape as
+    | {
+        data?: { code?: string; httpStatus?: number; clientError?: { retryable?: unknown } };
+      }
+    | undefined;
+  const code = data?.code ?? shape?.data?.code;
+  if (code && TRANSIENT_TRPC_CODES.has(code)) return true;
+  const httpStatus = data?.httpStatus ?? shape?.data?.httpStatus;
+  if (httpStatus && TRANSIENT_HTTP_STATUSES.has(httpStatus)) return true;
+  const retryable = (data?.clientError ?? shape?.data?.clientError)?.retryable === true;
+  // The Worker marks its generic 500 envelope retryable; keep defects as internal errors.
+  if (retryable && code !== undefined && code !== 'INTERNAL_SERVER_ERROR') return true;
+  if (data === undefined && shape === undefined) return isTransportFailure(err.cause);
+  return false;
+}
+
 const privateTranscriptPathFields = new Set([
   'path',
   'file',
@@ -1848,6 +1887,16 @@ export const cliSessionsV2Router = createTRPCRouter({
               `Session ${session_id} not found in cloud-agent DO - treating as legacy session`
             );
             // runtimeState stays null
+          } else if (isTransientRuntimeError(error)) {
+            console.error(
+              `Session runtime state temporarily unavailable for session ${session_id}:`,
+              error instanceof Error ? error.message : error
+            );
+            throw new TRPCError({
+              code: 'SERVICE_UNAVAILABLE',
+              message: 'Session runtime state is temporarily unavailable',
+              cause: error,
+            });
           } else {
             console.error(
               `Failed to fetch runtime state for session ${session_id}:`,

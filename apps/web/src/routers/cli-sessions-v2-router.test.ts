@@ -2094,6 +2094,100 @@ describe('cli-sessions-v2-router', () => {
         });
       }
     );
+
+    function workerTrpcError(code: string, httpStatus: number, retryable: boolean) {
+      return new TRPCClientError(`Worker ${code}`, {
+        result: {
+          error: {
+            code: -32603,
+            message: `Worker ${code}`,
+            data: { code, httpStatus, clientError: { code, message: code, retryable } },
+          },
+        },
+      });
+    }
+
+    async function insertWorkspaceSession() {
+      await db.insert(cli_sessions_v2).values({
+        session_id: sessionId,
+        kilo_user_id: regularUser.id,
+        created_on_platform: 'cloud-agent',
+        cloud_agent_session_id: 'workspace_11111111-1111-4111-8111-111111111111',
+      });
+    }
+
+    const headersTimeout = Object.assign(new Error('Headers Timeout Error'), {
+      name: 'HeadersTimeoutError',
+    });
+
+    it.each([
+      [
+        'a worker SERVICE_UNAVAILABLE envelope',
+        () => workerTrpcError('SERVICE_UNAVAILABLE', 503, true),
+      ],
+      ['a worker TIMEOUT envelope', () => workerTrpcError('TIMEOUT', 408, true)],
+      ['a worker 504 response', () => workerTrpcError('UNKNOWN', 504, false)],
+      [
+        'a fetch failure',
+        () => TRPCClientError.from(new TypeError('fetch failed', { cause: headersTimeout })),
+      ],
+      ['a headers timeout', () => TRPCClientError.from(headersTimeout)],
+    ])('reports %s as temporarily unavailable', async (_label, createError) => {
+      await insertWorkspaceSession();
+      mockGetSession.mockRejectedValue(createError());
+      const caller = await createCallerForUser(regularUser.id);
+      await expect(
+        caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionId })
+      ).rejects.toMatchObject({
+        code: 'SERVICE_UNAVAILABLE',
+        message: 'Session runtime state is temporarily unavailable',
+      });
+    });
+
+    it.each([
+      [
+        'a worker INTERNAL_SERVER_ERROR envelope',
+        () => workerTrpcError('INTERNAL_SERVER_ERROR', 500, true),
+      ],
+      [
+        'an unparseable worker response',
+        () =>
+          TRPCClientError.from(
+            Object.assign(new Error('Unable to transform response from server'), {
+              name: 'TransformResultError',
+            })
+          ),
+      ],
+    ])('keeps %s as an internal error', async (_label, createError) => {
+      await insertWorkspaceSession();
+      mockGetSession.mockRejectedValue(createError());
+      const caller = await createCallerForUser(regularUser.id);
+      await expect(
+        caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionId })
+      ).rejects.toMatchObject({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'Failed to fetch session runtime state',
+      });
+    });
+
+    it('returns metadata without runtime state when the worker reports NOT_FOUND', async () => {
+      await insertWorkspaceSession();
+      mockGetSession.mockRejectedValue(workerTrpcError('NOT_FOUND', 404, false));
+      const caller = await createCallerForUser(regularUser.id);
+      await expect(
+        caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionId })
+      ).resolves.toMatchObject({ session_id: sessionId, runtimeState: null });
+    });
+
+    it('checks ownership before reading runtime state', async () => {
+      await insertWorkspaceSession();
+      mockGetSession.mockRejectedValue(workerTrpcError('SERVICE_UNAVAILABLE', 503, true));
+      const caller = await createCallerForUser(otherUser.id);
+      await expect(
+        caller.cliSessionsV2.getWithRuntimeState({ session_id: sessionId })
+      ).rejects.toMatchObject({ code: 'NOT_FOUND' });
+      expect(mockGetSession).not.toHaveBeenCalled();
+    });
   });
 
   describe('getWithRuntimeState associatedPr', () => {

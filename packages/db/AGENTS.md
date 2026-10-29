@@ -33,6 +33,16 @@ concurrent build fails, first inspect the index state; recover an invalid index
 explicitly with `DROP INDEX CONCURRENTLY` or `REINDEX INDEX CONCURRENTLY` as
 appropriate before retrying. `IF NOT EXISTS` can mask an invalid index.
 
+A second exception covers a long concurrent build on a large table. The
+production server sets a default `statement_timeout` that cancels such a build.
+Add `SET statement_timeout = 0;` after `COMMIT;` and `RESET statement_timeout;`
+before `BEGIN;`. A cancelled build still commits the migration's first
+transaction without recording the migration, so a retry must not fail on DDL
+that already applied. You can wrap that transaction's unchanged generated DDL in
+a `DO` block that skips it when its first created object exists, as
+`0314_scheduled_briefing_snapshots.sql` does. Precede the build with
+`DROP INDEX CONCURRENTLY IF EXISTS`. Leave the snapshot and journal untouched.
+
 Prefer `timestamp({ withTimezone: true })` over timestamps without time zone.
 Review generated migrations for data loss. Prefer additive or staged schema
 changes over destructive operations; when generated DDL is unsafe, revise the
@@ -46,7 +56,7 @@ above, you can hand-write this case:
 drop each foreign key in its own transaction (`COMMIT;` / `BEGIN;`), then drop
 the tables and columns. Set `SET LOCAL lock_timeout` in each transaction, use
 `IF EXISTS` on every statement so a partial run can be retried, and leave the
-snapshot and journal as generated. See `0316_drop_briefing_legacy_objects.sql`.
+snapshot and journal as generated. See `0317_drop_briefing_legacy_objects.sql`.
 
 Only intentional `UPDATE` or `INSERT` data backfills may be appended after the
 generated DDL, separated with the exact marker `-->  statement-breakpoint`.

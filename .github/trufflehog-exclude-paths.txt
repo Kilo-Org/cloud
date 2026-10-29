@@ -26,3 +26,15 @@ services/cloud-agent-next/wrapper/src/control/git-credentials\.test\.ts
 # in branch history. Exclude the fixture path so the historical commit does not
 # fail the scan.
 apps/mobile/src/lib/telemetry/sentry-scrub-message-redaction\.test\.ts
+
+# MCP guardrail fixtures. These tests assert that an MCP server URL with embedded
+# credentials ("user:secret@mcp.example.com") is rejected or denied without being
+# recorded. The commit that added them stays in branch history, so exclude the
+# fixture paths so the synthetic credential URLs do not fail the scan. The first two
+# paths are where earlier commits kept these files before they were renamed.
+apps/web/src/lib/organizations/addons/mcp-identity\.test\.ts
+apps/web/src/lib/organizations/addons/guardrails-policy\.test\.ts
+apps/web/src/lib/organizations/guardrails/mcp-identity\.test\.ts
+apps/web/src/lib/organizations/guardrails/guardrails-policy\.test\.ts
+apps/web/src/routers/organizations/organization-mcp-guardrails-router\.test\.ts
+apps/web/src/app/api/organizations/\[id\]/guardrails/mcp-connections/route\.test\.ts

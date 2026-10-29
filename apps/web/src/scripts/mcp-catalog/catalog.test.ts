@@ -155,6 +155,23 @@ describe('mcp-catalog catalog', () => {
       }
     });
 
+    it('withholds every MCP guardrail policy mutation', () => {
+      const mutations = collectCatalogLeaves(rootRouter).filter(
+        leaf => leaf.path.startsWith('organizations.mcpGuardrails.') && leaf.type === 'mutation'
+      );
+      expect(mutations.map(leaf => leaf.path).sort()).toEqual([
+        'organizations.mcpGuardrails.add',
+        'organizations.mcpGuardrails.approveConnection',
+        'organizations.mcpGuardrails.delete',
+        'organizations.mcpGuardrails.setEnforcement',
+        'organizations.mcpGuardrails.setStatus',
+        'organizations.mcpGuardrails.update',
+      ]);
+      for (const leaf of mutations) {
+        expect(isDenylistedPath(leaf.path)).toBe(true);
+      }
+    });
+
     it('withholds paid scheduling consent while exposing scheduled report reads', () => {
       const leaves = collectCatalogLeaves(rootRouter).filter(leaf =>
         leaf.path.startsWith('agentBriefing.')

@@ -81,22 +81,35 @@ export async function getAvailableModelsForOrganization(
 
   const filteredModels = [];
   const allowedProvidersByModel = new Map<string, ReadonlySet<string>>();
+  const inferenceCheck = { checked: 0, withoutProviders: 0 };
   for (const model of restrictionCandidates) {
     const decision = await getEffectiveModelDecision(policy, model.id);
-    if (
-      decision.allowed ||
-      (allowsInferenceProviderUserByok(decision) &&
-        (await hasInferenceProviderUserByokForModel(
-          model.id,
-          byokProviderIds,
-          directByokCatalogModelIds
-        )))
-    ) {
-      filteredModels.push(model);
-      if (decision.eligibleProviderRoutes) {
-        allowedProvidersByModel.set(model.id, decision.eligibleProviderRoutes);
+    if (!decision.allowed) {
+      if (!allowsInferenceProviderUserByok(decision)) {
+        continue;
+      }
+      inferenceCheck.checked += 1;
+      const hasInferenceProviderByok = await hasInferenceProviderUserByokForModel(
+        model.id,
+        byokProviderIds,
+        directByokCatalogModelIds
+      );
+      if (!hasInferenceProviderByok) {
+        inferenceCheck.withoutProviders += 1;
+        continue;
       }
     }
+    filteredModels.push(model);
+    if (decision.eligibleProviderRoutes) {
+      allowedProvidersByModel.set(model.id, decision.eligibleProviderRoutes);
+    }
+  }
+  // One record per pass: this loop touches every catalog model, so a per-model
+  // record would grow with the catalog rather than with the request.
+  if (inferenceCheck.withoutProviders > 0) {
+    console.debug(
+      `[getModelUserByokProviders] no user byok providers for ${inferenceCheck.withoutProviders} of ${inferenceCheck.checked} models`
+    );
   }
 
   let availableModels = addDirectByokCatalogAvailability(

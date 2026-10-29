@@ -30,6 +30,7 @@ import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/provider
 import {
   addDirectByokCatalogAvailability,
   addUserByokAvailability,
+  getModelInferenceUserByokProviders,
   getModelUserByokProviders,
   hasInferenceProviderUserByokForModel,
   isInferenceProviderUserByok,
@@ -137,6 +138,27 @@ describe('addUserByokAvailability', () => {
       }
     }
   );
+
+  test('logs one aggregated record per pass instead of one per model', async () => {
+    mockedGetVercelModelsMetadata.mockResolvedValue(metadata);
+    const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
+    try {
+      await addUserByokAvailability(
+        [
+          makeModel('anthropic/claude-fixture'),
+          makeModel('openai/gpt-fixture'),
+          makeModel('absent/model'),
+          makeModel('absent/second-model'),
+        ],
+        ['anthropic']
+      );
+
+      expect(debug).toHaveBeenCalledTimes(1);
+      expect(debug.mock.calls[0]?.[0]).toContain('2 of 4 models');
+    } finally {
+      debug.mockRestore();
+    }
+  });
 
   test('marks catalog models served by a catalog-mode direct BYOK key', async () => {
     const models = [makeModel('moonshotai/kimi-k2.6'), makeModel('openai/gpt-fixture')].map(
@@ -256,5 +278,28 @@ describe('getModelUserByokProviders', () => {
     mockedGetVercelModelsMetadata.mockResolvedValue({});
 
     await expect(getModelUserByokProviders('anthropic/claude-fixture')).resolves.toEqual([]);
+  });
+
+  test('logs one record per lookup when a model has no Vercel provider', async () => {
+    mockedGetVercelModelsMetadata.mockResolvedValue(metadata);
+    const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
+    try {
+      await getModelInferenceUserByokProviders('absent/model');
+      expect(debug).toHaveBeenCalledTimes(1);
+
+      debug.mockClear();
+      await getModelInferenceUserByokProviders('anthropic/claude-fixture');
+      expect(debug).not.toHaveBeenCalled();
+
+      debug.mockClear();
+      await getModelUserByokProviders('absent/model');
+      expect(debug).toHaveBeenCalledTimes(1);
+
+      debug.mockClear();
+      await getModelUserByokProviders('anthropic/claude-fixture');
+      expect(debug).not.toHaveBeenCalled();
+    } finally {
+      debug.mockRestore();
+    }
   });
 });

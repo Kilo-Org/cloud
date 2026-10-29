@@ -5,6 +5,7 @@ import { renderProfileRowBody } from '@/components/agents/new-session-profile-ro
 import { type EffectiveAgentProfile } from '@/components/agents/use-effective-agent-profile';
 import { ChevronDown } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { formatProfileCountItems, profileCountItems } from '@/lib/profile-count-labels';
 import { cn } from '@/lib/utils';
@@ -25,8 +26,10 @@ export type NewSessionProfileRowProps = {
  * card rather than on the tappable branch, so loading, failure and every
  * settled profile occupy the same box.
  */
-const ENVIRONMENT_ROW_CARD =
-  'min-h-11 flex-row items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5';
+const ENVIRONMENT_ROW_CARD = cn(
+  ROW_TARGET_CLASS,
+  'flex-row items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5'
+);
 
 /**
  * The new-session Environment row: a tappable summary of the effective profile.

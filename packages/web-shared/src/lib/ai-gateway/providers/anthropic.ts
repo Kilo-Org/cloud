@@ -23,7 +23,6 @@ export function applyAnthropicModelSettings(
 
   normalizeToolCallIds(
     requestToMutate,
-    toolCallId => !ANTHROPIC_TOOL_CALL_ID_PATTERN.test(toolCallId),
-    undefined
+    toolCallId => !ANTHROPIC_TOOL_CALL_ID_PATTERN.test(toolCallId)
   );
 }

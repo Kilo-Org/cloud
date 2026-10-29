@@ -7,9 +7,7 @@ export function OrganizationGuardrailsCard({ organizationId }: { organizationId:
     <Card>
       <CardHeader>
         <CardTitle>AI Guardrails</CardTitle>
-        <CardDescription>
-          Check members&apos; inputs with Enkrypt AI before they reach a model.
-        </CardDescription>
+        <CardDescription>Add oversight and protections for AI usage</CardDescription>
       </CardHeader>
       <CardContent>
         <Button asChild variant="outline">

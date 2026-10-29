@@ -95,7 +95,7 @@ function AgentRowView({
         <Pressable
           className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
           accessibilityRole="button"
-          accessibilityLabel={t('profiles.agents.edit')}
+          accessibilityLabel={t('profiles.agents.edit', { name })}
           onPress={onEdit}
         >
           <Pencil size={18} color={colors.mutedForeground} />
@@ -105,7 +105,7 @@ function AgentRowView({
         <Pressable
           className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
           accessibilityRole="button"
-          accessibilityLabel={t('common.delete')}
+          accessibilityLabel={t('profiles.agents.delete', { name })}
           onPress={onDelete}
         >
           <Trash2 size={18} color={colors.destructive} />

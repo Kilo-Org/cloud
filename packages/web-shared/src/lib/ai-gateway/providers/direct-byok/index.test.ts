@@ -40,7 +40,7 @@ jest.mock('./direct-byok-definitions', () => ({
   default: [
     {
       id: 'chutes-byok',
-      resolveUpstream: jest.requireActual<typeof DirectByokTypes>('./types').apiKeyUpstream({
+      ...jest.requireActual<typeof DirectByokTypes>('./types').apiKeyUpstream({
         apiUrl: 'https://chutes.example.com/v1',
         supportedChatApis: ['chat_completions'],
         responseTransforms: 'reasoning-content',
@@ -66,7 +66,7 @@ jest.mock('./direct-byok-definitions', () => ({
     },
     {
       id: 'orcarouter',
-      resolveUpstream: jest.requireActual<typeof DirectByokTypes>('./types').apiKeyUpstream({
+      ...jest.requireActual<typeof DirectByokTypes>('./types').apiKeyUpstream({
         apiUrl: 'https://orcarouter.example.com/v1',
         supportedChatApis: ['chat_completions'],
         responseTransforms: 'reasoning-content',
@@ -169,6 +169,7 @@ describe('createAiSdkProvider resolved upstream', () => {
   function providerWith(upstream: DirectByokUpstream): DirectByokProvider {
     return {
       id: 'chutes-byok',
+      supportedChatApis: upstream.supportedChatApis,
       resolveUpstream: async () => upstream,
       transformRequest() {},
       models: async () => [],

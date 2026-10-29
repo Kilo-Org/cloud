@@ -21,6 +21,7 @@ import { PrAvatar } from '@/components/pr-review/pr-review-overview-parts';
 import { Text } from '@/components/ui/text';
 import { type ThemeColors, useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { type PrOverviewDto } from '@/lib/pr-review/merge/merge-blocked-reasons';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
 import {
   buildPrTimeline,
   labelChipColors,
@@ -70,8 +71,12 @@ function SectionHeading({ icon: Icon, label }: Readonly<{ icon?: LucideIcon; lab
 /** "Opened 3 days ago · Updated 2 hours ago" — one line, always present. */
 function PrTimelineLine({ overview }: Readonly<{ overview: PrOverviewDto }>) {
   const { t } = useTranslation();
+  const now = useRelativeTimeNow();
   const parts = buildPrTimeline(overview).map(entry =>
-    t(entry.labelKey, { time: timeAgo(parseTimestamp(entry.iso)), login: entry.login ?? '' })
+    t(entry.labelKey, {
+      time: timeAgo(parseTimestamp(entry.iso), undefined, now),
+      login: entry.login ?? '',
+    })
   );
   return (
     <Text variant="muted" className="text-sm">

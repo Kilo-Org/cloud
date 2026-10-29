@@ -3,9 +3,11 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
 import {
+  savedVariableKey,
   validateVariableInput,
   type VariableEdit,
   type VariableInputError,
+  variableKeyPreview,
   type VariableRow,
 } from '@/components/profiles/profile-variables-model';
 import { Button } from '@/components/ui/button';
@@ -14,9 +16,8 @@ import { Eye, EyeOff, Lock, Trash2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
-import { cleanVariableKey } from '@/lib/agent-profile-forms';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { ICON_TARGET_BOX_CLASS } from '@/lib/a11y/tap-target';
+import { ICON_TARGET_BOX_CLASS, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
 /** Content-shaped rows in the same slot and height as a loaded variable row. */
@@ -141,7 +142,7 @@ export function VariableRowView({
         <Pressable
           className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
           accessibilityRole="button"
-          accessibilityLabel={t('common.delete')}
+          accessibilityLabel={t('profiles.deleteVariable', { key: row.key })}
           disabled={isDeleting}
           accessibilityState={{ disabled: isDeleting }}
           onPress={onDelete}
@@ -185,7 +186,9 @@ type VariableEditFormProps = Readonly<{
  * `requireValue` is set, Save refuses a blank value and says so under the Value
  * field instead of leaving a disabled button that reports nothing; a stored
  * secret's masked `***` is never seeded, so a secret edit needs a new value. A
- * failed save leaves the form mounted with the typed values.
+ * failed save leaves the form mounted with the typed values. A new key is
+ * normalized on save (upper case, `A-Z0-9_` only), so the form names the key it
+ * will store under the field whenever that differs from what was typed.
  */
 export function VariableEditForm({
   isNew,
@@ -204,6 +207,9 @@ export function VariableEditForm({
   const [isSecret, setIsSecret] = useState(initial.isSecret);
   const [revealed, setRevealed] = useState(false);
   const [error, setError] = useState<VariableInputError | null>(null);
+  // The key a save will store, when it differs from what the field holds. An
+  // edit keeps its stored key, so only an add can change it.
+  const [keyPreview, setKeyPreview] = useState<string | null>(null);
 
   const valuePlaceholder = valueFieldPlaceholder(t, isSecret, isNew);
   // An edit's key is stored, so only an add can collide with the profile's keys.
@@ -219,7 +225,7 @@ export function VariableEditForm({
     }
     setError(null);
     await onSave({
-      key: isNew ? cleanVariableKey(key.trim()) : initial.key,
+      key: isNew ? savedVariableKey(key) : initial.key,
       value: valueRef.current,
       isSecret,
     });
@@ -227,25 +233,35 @@ export function VariableEditForm({
 
   return (
     <View className="gap-3 rounded-lg border border-border bg-card p-3">
-      <FormField
-        label={t('profiles.keyLabel')}
-        defaultValue={initial.key}
-        disabled={!isNew}
-        required
-        autoCapitalize="characters"
-        autoCorrect={false}
-        error={
-          error === null || error === 'value-required'
-            ? undefined
-            : variableInputErrorMessage(t, error)
-        }
-        onChangeText={value => {
-          keyRef.current = value;
-          if (error !== null && error !== 'value-required') {
-            setError(validate(value, valueRef.current));
+      <View className="gap-1.5">
+        <FormField
+          label={t('profiles.keyLabel')}
+          defaultValue={initial.key}
+          disabled={!isNew}
+          required
+          autoCapitalize="characters"
+          autoCorrect={false}
+          error={
+            error === null || error === 'value-required'
+              ? undefined
+              : variableInputErrorMessage(t, error)
           }
-        }}
-      />
+          onChangeText={value => {
+            keyRef.current = value;
+            if (isNew) {
+              setKeyPreview(variableKeyPreview(value));
+            }
+            if (error !== null && error !== 'value-required') {
+              setError(validate(value, valueRef.current));
+            }
+          }}
+        />
+        {keyPreview === null ? null : (
+          <Text className="text-xs text-muted-foreground">
+            {t('profiles.keyWillBeSavedAs', { key: keyPreview })}
+          </Text>
+        )}
+      </View>
       <FormField
         label={t('profiles.valueLabel')}
         placeholder={valuePlaceholder}
@@ -264,7 +280,10 @@ export function VariableEditForm({
       />
       {isSecret ? (
         <Pressable
-          className="min-h-11 flex-row items-center gap-2 self-start px-1 active:opacity-70"
+          className={cn(
+            ROW_TARGET_CLASS,
+            'flex-row items-center gap-2 self-start px-1 active:opacity-70'
+          )}
           accessibilityRole="button"
           accessibilityLabel={t('profiles.secrets.reveal')}
           accessibilityState={{ selected: revealed }}
@@ -280,7 +299,9 @@ export function VariableEditForm({
           <Text className="text-sm text-muted-foreground">{t('profiles.secrets.reveal')}</Text>
         </Pressable>
       ) : null}
-      <View className="min-h-11 flex-row items-center gap-3 rounded-lg bg-secondary p-3">
+      <View
+        className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 rounded-lg bg-secondary p-3')}
+      >
         <Lock size={18} color={colors.secondaryForeground} />
         <Text className="flex-1 text-sm font-medium text-foreground">
           {t('profiles.secrets.markSecret')}

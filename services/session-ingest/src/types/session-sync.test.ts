@@ -278,6 +278,71 @@ describe('SessionItemSchema session_status validation', () => {
       data: { status: 'scheduled', scheduledAt: null },
     });
   });
+
+  // A status label is a short token; the length bound keeps the value set open while
+  // stopping one field from dominating the item (and its RPC projection).
+  it('accepts an unknown status label at the length bound', () => {
+    const status = 'x'.repeat(256);
+    expect(SessionItemSchema.safeParse({ type: 'session_status', data: { status } }).success).toBe(
+      true
+    );
+  });
+
+  it('rejects a status label past the length bound', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'session_status',
+        data: { status: 'x'.repeat(257) },
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects a previous status past the length bound', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'session_status',
+        data: { status: 'idle', previousStatus: 'x'.repeat(257) },
+      }).success
+    ).toBe(false);
+  });
+
+  it('rejects a wake time past the length bound', () => {
+    expect(
+      SessionItemSchema.safeParse({
+        type: 'session_status',
+        data: { status: 'scheduled', scheduledAt: 'x'.repeat(65) },
+      }).success
+    ).toBe(false);
+  });
+});
+
+describe('SessionItemSchema kilo_meta validation', () => {
+  it('parses the producer metadata tuple', () => {
+    const item = {
+      type: 'kilo_meta',
+      data: {
+        platform: 'cloud-agent-web',
+        orgId: '11111111-1111-4111-8111-111111111111',
+        gitUrl: 'https://github.com/acme/widgets',
+        gitBranch: 'main',
+      },
+    };
+    expect(SessionItemSchema.parse(item)).toEqual(item);
+  });
+
+  it('accepts a platform label at the length bound', () => {
+    expect(
+      SessionItemSchema.safeParse({ type: 'kilo_meta', data: { platform: 'x'.repeat(256) } })
+        .success
+    ).toBe(true);
+  });
+
+  it('rejects a platform label past the length bound', () => {
+    expect(
+      SessionItemSchema.safeParse({ type: 'kilo_meta', data: { platform: 'x'.repeat(257) } })
+        .success
+    ).toBe(false);
+  });
 });
 
 describe('SessionItemSchema storage key identity', () => {

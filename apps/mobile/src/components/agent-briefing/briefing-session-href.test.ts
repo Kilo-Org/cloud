@@ -14,15 +14,15 @@ const REPORT = {
           id: 'status:one',
           sessionId: 'ses_root',
           kind: 'activity' as const,
-          title: 'Session status changed',
+          title: 'Session state',
           occurredAt: '2026-10-20T02:59:00.000Z',
           url: '/cloud/sessions/ses_root',
         },
         {
-          id: 'usage:charge',
+          id: 'artifact:plan',
           sessionId: 'ses_root',
-          kind: 'cost' as const,
-          title: 'Recorded usage charge',
+          kind: 'artifact' as const,
+          title: 'Session plan',
           occurredAt: '2026-10-20T03:32:00.000Z',
           url: '/cloud/sessions/ses_root',
         },
@@ -51,7 +51,7 @@ describe('briefingSessionHref', () => {
 describe('briefingSourceHref', () => {
   it('opens the root session of the group an evidence row was recorded under', () => {
     expect(
-      briefingSourceHref(REPORT, { id: 'usage:charge', sessionId: 'ses_child', kind: 'cost' })
+      briefingSourceHref(REPORT, { id: 'artifact:plan', sessionId: 'ses_child', kind: 'artifact' })
     ).toBe(`/(app)/agent-chat/ses_root?organizationId=${ORG_ID}`);
   });
 
@@ -59,6 +59,12 @@ describe('briefingSourceHref', () => {
     expect(
       briefingSourceHref(REPORT, { id: 'status:gone', sessionId: 'ses_child', kind: 'activity' })
     ).toBe(`/(app)/agent-chat/ses_child?organizationId=${ORG_ID}`);
+  });
+
+  it('opens blockers in the same report context', () => {
+    expect(
+      briefingSourceHref(REPORT, { id: 'blocker:one', sessionId: 'ses_root', kind: 'blocker' })
+    ).toBe(`/(app)/agent-chat/ses_root?organizationId=${ORG_ID}`);
   });
 
   it('leaves an external-link row to the caller', () => {

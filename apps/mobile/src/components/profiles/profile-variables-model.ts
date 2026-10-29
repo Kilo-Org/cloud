@@ -87,6 +87,29 @@ export function validateVariableInput(
   return null;
 }
 
+/**
+ * The key the server stores for what was typed: upper case, with everything
+ * outside `A-Z0-9_` replaced by `_`. The form saves this value and shows it, so
+ * the saved row never differs from the key the reader saw.
+ */
+export function savedVariableKey(typed: string): string {
+  return cleanVariableKey(typed.trim());
+}
+
+/**
+ * The key a save will store, when that differs from what was typed; `null` when
+ * the typed key saves unchanged or the field is blank. The form renders this
+ * under the key field, so a normalization is never silent.
+ */
+export function variableKeyPreview(typed: string): string | null {
+  const trimmed = typed.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+  const saved = savedVariableKey(trimmed);
+  return saved === trimmed ? null : saved;
+}
+
 /** A saved environment variable, as the screen sends it to `setVar`. */
 export type VariableEdit = Readonly<{ key: string; value: string; isSecret: boolean }>;
 

@@ -185,6 +185,21 @@ async function flushMicrotasks(turns = 10) {
   for (let turn = 0; turn < turns; turn++) await Promise.resolve();
 }
 
+/** Proves whether the owner lock is held right now without throwing on a held lock. */
+async function probeOwnerLock(
+  owner: User
+): Promise<{ free: true } | { free: false; error: string }> {
+  try {
+    await db.transaction(async tx => {
+      await tx.execute(sql`SET LOCAL statement_timeout = '500ms'`);
+      await lockOwner(tx, { type: 'user', id: owner.id });
+    });
+    return { free: true };
+  } catch (error) {
+    return { free: false, error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 describe('/api/auto-routing/custom-routers', () => {
   let user: User;
 
@@ -1595,6 +1610,96 @@ describe('/api/auto-routing/custom-routers', () => {
       expect(mockedGetPlatformMeasurements).not.toHaveBeenCalled();
       const [row] = await db.select().from(auto_routing_custom_routers);
       expect(row?.entries).toEqual([{ ...linked, variants: ['think'] }]);
+    });
+
+    test('looks the link up before the owner lock, so no connection waits on it', async () => {
+      await create(routerBody());
+      const lookupStarted = Promise.withResolvers<void>();
+      const releaseLookup = Promise.withResolvers<void>();
+      mockedGetPlatformMeasurements.mockImplementationOnce(async () => {
+        lookupStarted.resolve();
+        await releaseLookup.promise;
+        return {
+          status: 200,
+          body: { baseRouter: 'efficient', models: [{ model: SONNET, variants: [null] }] },
+        };
+      });
+      const linked = { ...clientEntry('local-sonnet'), measuredAs: SONNET };
+
+      const pending = registerClientEntry(
+        request('/user/coding/client-entries', { method: 'POST', body: { entry: linked } }),
+        params('user', 'coding')
+      );
+      await lookupStarted.promise;
+
+      const lockWhileLookingUp = await probeOwnerLock(user);
+      const [unwritten] = await db.select().from(auto_routing_custom_routers);
+      releaseLookup.resolve();
+      const response = await pending;
+
+      expect(lockWhileLookingUp).toEqual({ free: true });
+      expect(unwritten?.entries).toEqual([gateway(SONNET)]);
+      expect(response.status).toBe(200);
+      const [row] = await db.select().from(auto_routing_custom_routers);
+      expect(row?.entries).toEqual([gateway(SONNET), linked]);
+    });
+
+    test('refuses a link the benchmark difficulty changed away from during the lookup', async () => {
+      await create(routerBody());
+      const lookupStarted = Promise.withResolvers<void>();
+      const releaseLookup = Promise.withResolvers<void>();
+      mockedGetPlatformMeasurements.mockImplementationOnce(async () => {
+        lookupStarted.resolve();
+        await releaseLookup.promise;
+        return {
+          status: 200,
+          body: { baseRouter: 'efficient', models: [{ model: SONNET, variants: [null] }] },
+        };
+      });
+      const linked = { ...clientEntry('local-sonnet'), measuredAs: SONNET };
+
+      const pending = registerClientEntry(
+        request('/user/coding/client-entries', { method: 'POST', body: { entry: linked } }),
+        params('user', 'coding')
+      );
+      await lookupStarted.promise;
+      await db
+        .update(auto_routing_custom_routers)
+        .set({ base_router: 'frontier' })
+        .where(eq(auto_routing_custom_routers.owned_by_user_id, user.id));
+      releaseLookup.resolve();
+
+      const refused = await errorOf(await pending);
+      expect(refused.status).toBe(400);
+      expect(refused.body).toMatchObject({
+        error: { code: 'invalid_request', message: expect.stringContaining('baseRouter') },
+      });
+      const [row] = await db.select().from(auto_routing_custom_routers);
+      expect(row?.base_router).toBe('frontier');
+      expect(row?.entries).toEqual([gateway(SONNET)]);
+    });
+
+    test('rejects a registered link the platform has no measurement for', async () => {
+      await create(routerBody());
+      mockedGetPlatformMeasurements.mockResolvedValue({
+        status: 200,
+        body: { baseRouter: 'efficient', models: [] },
+      });
+
+      const refused = await errorOf(
+        await registerClientEntry(
+          request('/user/coding/client-entries', {
+            method: 'POST',
+            body: { entry: { ...clientEntry('local-sonnet'), measuredAs: SONNET } },
+          }),
+          params('user', 'coding')
+        )
+      );
+
+      expect(refused.status).toBe(400);
+      expect(refused.body).toMatchObject({ error: { code: 'invalid_request' } });
+      const [row] = await db.select().from(auto_routing_custom_routers);
+      expect(row?.entries).toEqual([gateway(SONNET)]);
     });
 
     test('refuses to remove the default entry and to exceed the entry cap', async () => {

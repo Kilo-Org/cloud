@@ -119,7 +119,7 @@ export const BYTEPLUS_CODING_MODEL_IDS = BYTEPLUS_CODING_MODELS.map(
 
 export default {
   id: BYTEPLUS_CODING_PROVIDER_ID,
-  resolveUpstream: apiKeyUpstream({
+  ...apiKeyUpstream({
     apiUrl: 'https://ark.ap-southeast.bytepluses.com/api/coding/v3',
     supportedChatApis: ['chat_completions'],
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,

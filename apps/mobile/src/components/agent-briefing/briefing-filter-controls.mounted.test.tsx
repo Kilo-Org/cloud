@@ -8,6 +8,7 @@ import { BriefingFilterControls } from './briefing-filter-controls';
 vi.mock('react-native', () => ({
   ActivityIndicator: 'ActivityIndicator',
   I18nManager: { isRTL: false },
+  Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
   Text: 'Text',
@@ -86,8 +87,10 @@ it('announces the active briefing tab and context filter as selected', () => {
     throw new Error('Controls are not mounted');
   }
   expect(root.root.findAll(node => node.props.accessibilityRole === 'tablist')).toHaveLength(1);
+  // The mocked platform is iOS, where a strip entry is typed as a button so
+  // VoiceOver gives it a control trait (see lib/a11y/tab-entry).
   for (const label of ['agentBriefing.available', 'agentBriefing.history']) {
-    expect(optionByText(root.root, label).props.role).toBe('tab');
+    expect(optionByText(root.root, label).props.role).toBe('button');
   }
   expect(selectedOf(root.root, 'agentBriefing.available')).toBe(true);
   expect(selectedOf(root.root, 'agentBriefing.history')).toBe(false);

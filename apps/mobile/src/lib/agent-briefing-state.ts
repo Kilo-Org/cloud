@@ -32,7 +32,6 @@ export function visibleHomeBriefing(
   return reports.find(
     report =>
       report.context.organizationId === organizationId &&
-      report.kind !== 'one_off' &&
       isBriefingVisible(report, now) &&
       Date.parse(report.morningEndAt) > now &&
       !dismissedReportIds.includes(report.id)
@@ -42,7 +41,7 @@ export function visibleHomeBriefing(
 export function briefingSummaryStatusKey(status: string): string {
   switch (status) {
     case 'disabled': {
-      return 'agentBriefing.summaryDisabled';
+      return 'agentBriefing.summaryUnavailable';
     }
     case 'pending':
     case 'running': {
@@ -52,10 +51,7 @@ export function briefingSummaryStatusKey(status: string): string {
       return 'agentBriefing.summary';
     }
     case 'failed': {
-      return 'agentBriefing.summaryFailed';
-    }
-    case 'outdated': {
-      return 'agentBriefing.summaryOutdated';
+      return 'agentBriefing.snapshotSummaryFailed';
     }
     default: {
       return 'agentBriefing.summaryUnavailable';
@@ -79,7 +75,7 @@ export function briefingEstimateUnavailableKey(reason: string | null | undefined
       return 'agentBriefing.estimateSpendLimitTooLow';
     }
     case 'input_too_large': {
-      return 'agentBriefing.estimateInputTooLarge';
+      return 'agentBriefing.snapshotEstimateInputTooLarge';
     }
     case 'permission_unavailable': {
       return 'agentBriefing.estimatePermissionUnavailable';

@@ -164,7 +164,7 @@ describe('ProfileMcpScreen', () => {
     h.mutations.updateMcp.mutateAsync.mockResolvedValue({ success: true });
 
     const { renderer, unmount } = await mountScreen();
-    pressPressable(renderer.root, 'Edit MCP server');
+    pressPressable(renderer.root, 'Edit MCP server docs');
 
     expect(findField(renderer.root, 'Server name').props.defaultValue).toBe('docs');
     expect(findField(renderer.root, 'Command line').props.defaultValue).toBe('npx @example/mcp');
@@ -198,7 +198,7 @@ describe('ProfileMcpScreen', () => {
     h.query.isPending = false;
     h.mutations.updateMcp.mutateAsync.mockResolvedValue({ success: true });
     const { renderer, unmount } = await mountScreen();
-    pressPressable(renderer.root, 'Edit MCP server');
+    pressPressable(renderer.root, 'Edit MCP server docs');
     expect(findAll(renderer.root, 'SegmentedControl')).toHaveLength(0);
     pressSheetDone(renderer.root);
     await waitFor(() => h.mutations.updateMcp.mutateAsync.mock.calls.length > 0);
@@ -314,14 +314,36 @@ describe('ProfileMcpScreen', () => {
     const { renderer, unmount } = await mountScreen();
 
     const badge = findAll(renderer.root, 'View').find(node =>
-      String(node.props.accessibilityLabel ?? '').startsWith('Secret count:')
+      /^\d+ secrets?$/.test(String(node.props.accessibilityLabel ?? ''))
     );
-    expect(badge?.props.accessibilityLabel).toBe('Secret count: 1');
+    expect(badge?.props.accessibilityLabel).toBe('1 secret');
     expect(badge?.props.accessible).toBe(true);
     expect(findOne(renderer.root, 'Lock').parent?.props).toMatchObject({
       accessibilityElementsHidden: true,
       importantForAccessibility: 'no-hide-descendants',
     });
+
+    unmount();
+  });
+
+  it('a11y: the secret badge names the count in the plural form', async () => {
+    h.query.data = testProfile([
+      testServer({
+        type: 'remote',
+        config: {
+          url: 'https://example.com/mcp',
+          headers: { API_KEY: '••••', TEAM: '••••', REGION: 'eu' },
+        },
+      }),
+    ]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    const badge = findAll(renderer.root, 'View').find(node =>
+      /^\d+ secrets?$/.test(String(node.props.accessibilityLabel ?? ''))
+    );
+    expect(badge?.props.accessibilityLabel).toBe('3 secrets');
 
     unmount();
   });
@@ -332,7 +354,7 @@ describe('ProfileMcpScreen', () => {
     h.mutations.deleteMcp.mutateAsync.mockResolvedValue({ success: true });
 
     const { renderer, unmount } = await mountScreen();
-    pressPressable(renderer.root, 'Delete');
+    pressPressable(renderer.root, 'Delete MCP server docs');
     await act(async () => {
       confirmRequest(h.confirm);
       await Promise.resolve();
@@ -353,7 +375,7 @@ describe('ProfileMcpScreen', () => {
     h.mutations.deleteMcp.mutateAsync.mockRejectedValue(new Error(' '));
 
     const { renderer, unmount } = await mountScreen();
-    pressPressable(renderer.root, 'Delete');
+    pressPressable(renderer.root, 'Delete MCP server docs');
     await act(async () => {
       confirmRequest(h.confirm);
       await Promise.resolve();

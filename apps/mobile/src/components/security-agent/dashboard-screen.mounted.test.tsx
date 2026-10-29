@@ -491,10 +491,15 @@ describe('buildLocalizedMetrics', () => {
         notAnalyzed: 1,
         failed: 1,
       },
-      severity: { critical: 2, high: 3 },
+      severity: { critical: 2, high: 3, medium: 1, low: 0 },
       sla: {
-        overall: { total: 10, withinSla: 7, overdue: 3 },
-        bySeverity: { critical: { overdue: 1 }, high: { overdue: 2 } },
+        overall: { total: 10, withinSla: 7, overdue: 5 },
+        bySeverity: {
+          critical: { overdue: 1 },
+          high: { overdue: 2 },
+          medium: { overdue: 1 },
+          low: { overdue: 1 },
+        },
         dueSoon: { total: 4, exploitable: 2 },
         untrackedCount: 5,
       },
@@ -522,12 +527,56 @@ describe('buildLocalizedMetrics', () => {
       'noDeadline',
     ]);
     expect(analysisMetrics[0]?.value).toBe('1.234');
+    // The open-findings and overdue tiles both break the medium and low counts
+    // into one bucket, so every part of the tile's number is named.
+    expect(analysisMetrics[0]?.detail).toBe('2 kritisch, 3 hoch, 1 mittel und niedrig');
+    expect(slaMetrics[1]?.detail).toBe('1 kritisch, 2 hoch, 2 mittel und niedrig');
     expect(slaMetrics[0]?.value).toMatch(/^70[\s\u00A0\u202F]*%$/);
     expect(analysisMetrics.every(item => item.label.length > 0 && item.detail.length > 0)).toBe(
       true
     );
     expect(slaMetrics.every(item => item.label.length > 0 && item.detail.length > 0)).toBe(true);
     await i18n.changeLanguage('en');
+  });
+
+  it('omits the medium & low bucket while no medium or low finding is counted', () => {
+    const data: Parameters<typeof buildLocalizedMetrics>[0] = {
+      analysis: {
+        total: 4,
+        exploitable: 0,
+        needsReview: 0,
+        triageComplete: 0,
+        analyzing: 0,
+        notAnalyzed: 0,
+        failed: 0,
+      },
+      severity: { critical: 2, high: 3, medium: 0, low: 0 },
+      sla: {
+        overall: { total: 10, withinSla: 7, overdue: 3 },
+        bySeverity: {
+          critical: { overdue: 1 },
+          high: { overdue: 2 },
+          medium: { overdue: 0 },
+          low: { overdue: 0 },
+        },
+        dueSoon: { total: 0, exploitable: 0 },
+        untrackedCount: 0,
+      },
+    };
+
+    sharedMetrics.build.mockReturnValueOnce(
+      ['openFindings', 'exploitable', 'needsReview', 'analysisIncomplete'].map(id =>
+        dashboardMetric(id)
+      )
+    );
+    const analysisMetrics = buildLocalizedMetrics(data, false);
+    sharedMetrics.build.mockReturnValueOnce(
+      ['slaCompliance', 'deadlinePassed', 'dueSoon', 'noDeadline'].map(id => dashboardMetric(id))
+    );
+    const slaMetrics = buildLocalizedMetrics(data, true);
+
+    expect(analysisMetrics[0]?.detail).toBe('2 critical, 3 high');
+    expect(slaMetrics[1]?.detail).toBe('1 critical, 2 high');
   });
 });
 
@@ -709,10 +758,15 @@ describe('DashboardScreen pending stats', () => {
       notAnalyzed: 0,
       failed: 0,
     },
-    severity: { critical: 1, high: 1 },
+    severity: { critical: 1, high: 1, medium: 0, low: 0 },
     sla: {
       overall: { total: 0, withinSla: 0, overdue: 0 },
-      bySeverity: { critical: { overdue: 0 }, high: { overdue: 0 } },
+      bySeverity: {
+        critical: { overdue: 0 },
+        high: { overdue: 0 },
+        medium: { overdue: 0 },
+        low: { overdue: 0 },
+      },
       dueSoon: { total: 0, exploitable: 0 },
       untrackedCount: 0,
     },

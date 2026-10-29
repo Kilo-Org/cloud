@@ -44,7 +44,9 @@ export const NON_RETRYABLE_ASSISTANT_ERRORS: readonly string[] = [
  * An unknown name has no line of its own: the title already states that the
  * response failed, so the footer adds no detail rather than repeating the title
  * in a sentence (`messageFailure.assistantFailed` is the fixed footer's line,
- * not the message row's). Never surfaces `error.data` or provider message text.
+ * not the message row's). `UnknownError` is the name with nothing more to say:
+ * its only content is provider text, so the title is the most specific safe
+ * statement. Never surfaces `error.data` or provider message text.
  */
 function assistantDetailKey(errorName: string): string | null {
   switch (errorName) {
@@ -56,6 +58,17 @@ function assistantDetailKey(errorName: string): string | null {
     }
     case 'ContextOverflowError': {
       return 'agentChat.messageFailure.assistantContextOverflow';
+    }
+    case 'APIError': {
+      // One line for every provider API failure: the status code and the
+      // retryability are provider metadata, not something the row states.
+      return 'agentChat.messageFailure.assistantProviderError';
+    }
+    case 'MessageOutputLengthError': {
+      return 'agentChat.messageFailure.assistantOutputLimit';
+    }
+    case 'StructuredOutputError': {
+      return 'agentChat.messageFailure.assistantStructuredOutput';
     }
     default: {
       return null;

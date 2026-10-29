@@ -214,7 +214,7 @@ export function TodoListsScreen({ tabHeader }: Readonly<{ tabHeader: ReactNode }
         title={t('common.agents')}
         size="large"
         showBackButton={false}
-        className="px-[22px]"
+        className="px-[22px] pb-0"
         inlineActions={
           <View className="min-w-0 shrink flex-row items-center">
             <View className="min-w-0 shrink">
@@ -233,7 +233,7 @@ export function TodoListsScreen({ tabHeader }: Readonly<{ tabHeader: ReactNode }
         allowInlineActionsStacking={false}
       />
       <View style={sideInsetStyle}>
-        <View className="flex-row items-center border-b border-border px-[22px]">
+        <View className="mx-[22px] min-h-[48px] flex-row items-center justify-between border-b border-border">
           {tabHeader}
           {context.isReady ? (
             <IconButton onPress={openNewList} accessibilityLabel={t('todos.lists.newList')}>

@@ -6,6 +6,11 @@ import {
   kiloExclusiveModelFixture,
   useKiloExclusiveModel,
 } from '@kilocode/web-shared/tests/helpers/kilo-exclusive-models.helper';
+import {
+  deleteCustomLlmForTest,
+  insertCustomLlmForTest,
+  publicCustomLlmDefinition,
+} from '@kilocode/web-shared/tests/helpers/custom-llm.helper';
 
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache', () => ({
   getVercelModelsMetadataFromDatabase: jest.fn(),
@@ -23,8 +28,11 @@ import {
 } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 import { mapModelIdToVercel } from '@kilocode/web-shared/lib/ai-gateway/providers/vercel/mapModelIdToVercel';
 import {
+  addDirectByokCatalogAvailability,
   addUserByokAvailability,
   getModelUserByokProviders,
+  hasInferenceProviderUserByokForModel,
+  isInferenceProviderUserByok,
 } from '@kilocode/web-shared/lib/ai-gateway/byok';
 
 const EXCLUSIVE_MODEL_ID = kiloExclusiveModelFixture.public_id;
@@ -103,6 +111,128 @@ describe('addUserByokAvailability', () => {
 
     expect(mockedGetVercelModelsMetadata).toHaveBeenCalledTimes(1);
     expect(result.map(model => model.hasUserByokAvailable)).toEqual([false, false]);
+  });
+
+  test.each(['vercel-ai-gateway', 'openrouter', 'anthropic'] as const)(
+    'does not mark an id a custom LLM owns for a %s key, since routing serves the custom LLM',
+    async providerId => {
+      mockedGetVercelModelsMetadata.mockResolvedValue(metadata);
+      jest
+        .mocked(getVercelModelsFromDatabase)
+        .mockResolvedValue(new Set(['anthropic/claude-fixture']));
+      jest.mocked(isValidOpenRouterModelId).mockResolvedValue(true);
+      const models = [makeModel('anthropic/claude-fixture')];
+      const [beforeCustomLlm] = await addUserByokAvailability(models, [providerId]);
+      expect(beforeCustomLlm?.hasUserByokAvailable).toBe(true);
+
+      await insertCustomLlmForTest(
+        'anthropic/claude-fixture',
+        publicCustomLlmDefinition(['custom-provider'])
+      );
+      try {
+        const [owned] = await addUserByokAvailability(models, [providerId]);
+        expect(owned?.hasUserByokAvailable).toBe(false);
+      } finally {
+        await deleteCustomLlmForTest('anthropic/claude-fixture');
+      }
+    }
+  );
+
+  test('marks catalog models served by a catalog-mode direct BYOK key', async () => {
+    const models = [makeModel('moonshotai/kimi-k2.6'), makeModel('openai/gpt-fixture')].map(
+      model => ({ ...model, hasUserByokAvailable: false })
+    );
+
+    const result = addDirectByokCatalogAvailability(models, new Set(['moonshotai/kimi-k2.6']));
+
+    expect(result.map(model => [model.id, model.hasUserByokAvailable])).toEqual([
+      ['moonshotai/kimi-k2.6', true],
+      ['openai/gpt-fixture', false],
+    ]);
+  });
+});
+
+describe('hasInferenceProviderUserByokForModel', () => {
+  const noCatalogModels: ReadonlySet<string> = new Set();
+
+  test('counts an enabled provider key sent through Vercel', async () => {
+    mockedGetVercelModelsMetadata.mockResolvedValue(metadata);
+
+    await expect(
+      hasInferenceProviderUserByokForModel('anthropic/claude-fixture', ['bedrock'], noCatalogModels)
+    ).resolves.toBe(true);
+    await expect(
+      hasInferenceProviderUserByokForModel('openai/gpt-fixture', ['bedrock'], noCatalogModels)
+    ).resolves.toBe(false);
+  });
+
+  test('counts a catalog-mode direct BYOK key without reading the Vercel metadata', async () => {
+    await expect(
+      hasInferenceProviderUserByokForModel(
+        'moonshotai/kimi-k2.6',
+        [],
+        new Set(['moonshotai/kimi-k2.6'])
+      )
+    ).resolves.toBe(true);
+    expect(mockedGetVercelModelsMetadata).not.toHaveBeenCalled();
+  });
+
+  test('does not count gateway keys', async () => {
+    await expect(
+      hasInferenceProviderUserByokForModel(
+        'anthropic/claude-fixture',
+        ['openrouter', 'vercel-ai-gateway'],
+        noCatalogModels
+      )
+    ).resolves.toBe(false);
+    expect(mockedGetVercelModelsMetadata).not.toHaveBeenCalled();
+  });
+
+  test('keeps Kilo-exclusive models on Kilo accounts', async () => {
+    mockedGetVercelModelsMetadata.mockResolvedValue(metadata);
+
+    await expect(
+      hasInferenceProviderUserByokForModel(EXCLUSIVE_MODEL_ID, ['anthropic'], noCatalogModels)
+    ).resolves.toBe(false);
+  });
+
+  test('does not count keys for an id a custom LLM owns, which routing serves first', async () => {
+    mockedGetVercelModelsMetadata.mockResolvedValue(metadata);
+    await insertCustomLlmForTest(
+      'anthropic/claude-fixture',
+      publicCustomLlmDefinition(['custom-provider'])
+    );
+    try {
+      await expect(
+        hasInferenceProviderUserByokForModel(
+          'anthropic/claude-fixture',
+          ['anthropic'],
+          new Set(['anthropic/claude-fixture'])
+        )
+      ).resolves.toBe(false);
+    } finally {
+      await deleteCustomLlmForTest('anthropic/claude-fixture');
+    }
+  });
+});
+
+describe('isInferenceProviderUserByok', () => {
+  test.each([
+    [
+      'a provider key sent through Vercel',
+      [{ decryptedAPIKey: 'key', providerId: 'anthropic' }],
+      true,
+    ],
+    ['a direct BYOK key', [{ decryptedAPIKey: 'key', providerId: 'synthetic' }], true],
+    ['an OpenRouter key', [{ decryptedAPIKey: 'key', providerId: 'openrouter' }], false],
+    [
+      'a Vercel AI Gateway key',
+      [{ decryptedAPIKey: 'key', providerId: 'vercel-ai-gateway' }],
+      false,
+    ],
+    ['no key', null, false],
+  ] as const)('classifies %s', (_name, userByok, expected) => {
+    expect(isInferenceProviderUserByok(userByok)).toBe(expected);
   });
 });
 

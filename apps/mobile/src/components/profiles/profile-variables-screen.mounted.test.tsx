@@ -164,6 +164,65 @@ describe('ProfileVariablesScreen', () => {
     unmount();
   });
 
+  it('names the key it will store when a typed key would be normalized', async () => {
+    h.query.data = testProfile();
+    h.query.isPending = false;
+    h.mutations.setVar.mutateAsync.mockResolvedValue({ success: true });
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    changeText(renderer.root, 'Key', 'API_की');
+    changeText(renderer.root, 'Value', 'https://api.example.com/v1');
+
+    // The two Devanagari characters become underscores in the stored key, so the
+    // form says so before the reader taps Save.
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
+      'Will be saved as API___'
+    );
+
+    pressButton(renderer.root, 'Save');
+
+    await waitFor(() => h.mutations.setVar.mutateAsync.mock.calls.length > 0);
+    // The hint and the payload cannot disagree: both come from the same helper.
+    expect(h.mutations.setVar.mutateAsync.mock.calls[0]?.[0]).toEqual({
+      profileId: 'profile-1',
+      key: 'API___',
+      value: 'https://api.example.com/v1',
+      isSecret: false,
+    });
+
+    unmount();
+  });
+
+  it('stays quiet about a key that saves unchanged', async () => {
+    h.query.data = testProfile();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    changeText(renderer.root, 'Key', 'API_KEY');
+
+    const texts = findAll(renderer.root, 'Text').map(node => node.props.children);
+    expect(texts).not.toContain('Will be saved as API_KEY');
+
+    unmount();
+  });
+
+  it('names the upper-cased key when only the letter case would change', async () => {
+    h.query.data = testProfile();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    changeText(renderer.root, 'Key', 'api_key');
+
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
+      'Will be saved as API_KEY'
+    );
+
+    unmount();
+  });
+
   it('non-retryable: an empty key is refused, and an over-long key names the length', async () => {
     h.query.data = testProfile();
     h.query.isPending = false;
@@ -328,13 +387,30 @@ describe('ProfileVariablesScreen', () => {
     unmount();
   });
 
+  it('names each row delete control after the variable it removes', async () => {
+    h.query.data = testProfile([
+      { key: 'API_KEY', value: '1', isSecret: false },
+      { key: 'STRIPE_SECRET_KEY', value: '****', isSecret: true },
+    ]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    const deleteLabels = findAll(renderer.root, 'Pressable')
+      .map(node => node.props.accessibilityLabel as string)
+      .filter(label => label.startsWith('Delete'));
+    expect(deleteLabels).toEqual(['Delete variable API_KEY', 'Delete variable STRIPE_SECRET_KEY']);
+
+    unmount();
+  });
+
   it('read-only: rows render without edit or delete controls', async () => {
     h.canManage = false;
     h.query.data = testProfile([{ key: 'API_KEY', value: '1', isSecret: false }]);
     h.query.isPending = false;
     const { renderer, unmount } = await mountScreen();
-    const rowActions = findAll(renderer.root, 'Pressable').filter(
-      node => node.props.accessibilityLabel === 'Delete'
+    const rowActions = findAll(renderer.root, 'Pressable').filter(node =>
+      String(node.props.accessibilityLabel).startsWith('Delete variable')
     );
     expect(rowActions).toHaveLength(0);
     unmount();
@@ -345,7 +421,7 @@ describe('ProfileVariablesScreen', () => {
     h.query.isPending = false;
     h.mutations.deleteVar.mutateAsync.mockResolvedValue({ success: true });
     const { renderer, unmount } = await mountScreen();
-    pressPressable(renderer.root, 'Delete');
+    pressPressable(renderer.root, 'Delete variable API_KEY');
     await act(async () => {
       confirmRequest(h.confirm as TestConfirmMock);
       await Promise.resolve();
@@ -367,7 +443,7 @@ describe('ProfileVariablesScreen', () => {
     h.mutations.deleteVar.mutateAsync.mockRejectedValueOnce(undefined);
 
     const { renderer, unmount } = await mountScreen();
-    pressPressable(renderer.root, 'Delete');
+    pressPressable(renderer.root, 'Delete variable API_KEY');
     await act(async () => {
       confirmRequest(h.confirm as TestConfirmMock);
       await Promise.resolve();
@@ -388,7 +464,7 @@ describe('ProfileVariablesScreen', () => {
     h.mutations.deleteVar.mutateAsync.mockRejectedValueOnce(new Error('Permission denied'));
 
     const { renderer, unmount } = await mountScreen();
-    pressPressable(renderer.root, 'Delete');
+    pressPressable(renderer.root, 'Delete variable API_KEY');
     await act(async () => {
       confirmRequest(h.confirm as TestConfirmMock);
       await Promise.resolve();
@@ -408,15 +484,15 @@ describe('ProfileVariablesScreen', () => {
     act(() => {
       rerenderScreen(renderer, queryClient);
     });
-    expect(findPressable(renderer.root, 'Delete').props.disabled).toBe(true);
-    pressPressable(renderer.root, 'Delete');
+    expect(findPressable(renderer.root, 'Delete variable API_KEY').props.disabled).toBe(true);
+    pressPressable(renderer.root, 'Delete variable API_KEY');
     expect(h.confirm).not.toHaveBeenCalled();
     h.mutations.deleteVar.isPending = false;
     act(() => {
       rerenderScreen(renderer, queryClient);
     });
-    expect(findPressable(renderer.root, 'Delete').props.disabled).toBe(false);
-    pressPressable(renderer.root, 'Delete');
+    expect(findPressable(renderer.root, 'Delete variable API_KEY').props.disabled).toBe(false);
+    pressPressable(renderer.root, 'Delete variable API_KEY');
     expect(h.confirm).toHaveBeenCalledTimes(1);
     unmount();
   });

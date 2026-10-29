@@ -179,7 +179,12 @@ export function buildGcpVertexUpstream(
   stream: boolean
 ): DirectByokUpstream {
   const endpoint = getGcpVertexEndpoint(model);
-  const auth = { apiKey: accessToken, apiKeyHeader: null, apiUrlOverrides: {} } as const;
+  const auth = {
+    apiKey: accessToken,
+    apiKeyHeader: null,
+    apiUrlOverrides: {},
+    supportedChatApis: [GCP_VERTEX_ENDPOINTS[endpoint]],
+  } as const;
   const baseUrl = getGcpVertexBaseUrl(credentials);
   if (endpoint === 'anthropic') {
     if (!MODEL_ID_PATTERN.test(model.id)) throw new Error('Invalid Vertex AI model id');
@@ -187,7 +192,6 @@ export function buildGcpVertexUpstream(
       ...auth,
       apiUrl: `${baseUrl}/publishers/anthropic/models/${model.id}:${stream ? 'streamRawPredict' : 'rawPredict'}`,
       disableUrlSuffix: true,
-      supportedChatApis: ['messages'],
       responseTransforms: null,
     };
   }
@@ -199,7 +203,6 @@ export function buildGcpVertexUpstream(
       ...auth,
       apiUrl: `${mistralBaseUrl}/publishers/mistralai/models/${model.id}:${stream ? 'streamRawPredict' : 'rawPredict'}`,
       disableUrlSuffix: true,
-      supportedChatApis: ['chat_completions'],
       responseTransforms: null,
     };
   }
@@ -208,7 +211,6 @@ export function buildGcpVertexUpstream(
       ...auth,
       apiUrl: `${baseUrl}/endpoints/openapi`,
       disableUrlSuffix: false,
-      supportedChatApis: ['responses'],
       responseTransforms: null,
     };
   }
@@ -216,7 +218,6 @@ export function buildGcpVertexUpstream(
     ...auth,
     apiUrl: `${baseUrl}/endpoints/openapi`,
     disableUrlSuffix: false,
-    supportedChatApis: ['chat_completions'],
     // Gemini returns thoughts in Google's extra content; the managed open models in `reasoning_content`.
     responseTransforms: isGeminiModel(model.id)
       ? ReasoningDetailsTransform.GeminiThought

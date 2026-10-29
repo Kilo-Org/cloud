@@ -12,7 +12,7 @@ import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-g
 export default {
   id: 'zai-coding',
   models_dev_id: 'zai-coding-plan',
-  resolveUpstream: apiKeyUpstream({
+  ...apiKeyUpstream({
     apiUrl: 'https://api.z.ai/api/coding/paas/v4',
     supportedChatApis: ['chat_completions'],
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,

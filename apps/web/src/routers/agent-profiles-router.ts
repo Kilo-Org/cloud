@@ -362,6 +362,43 @@ export const agentProfilesRouter = createTRPCRouter({
     }),
 
   /**
+   * Get a single profile's metadata and collection counts.
+   *
+   * The profile editor's Overview renders metadata and six counts, so it reads
+   * this rather than `get`: a profile may carry every skill's markdown and
+   * companion files, and transferring those to render counts alone spends the
+   * client's request budget on bytes the screen never reads.
+   */
+  overview: baseProcedure
+    .input(ProfileIdSchema.extend({ organizationId: z.uuid().optional() }))
+    .output(ProfileSummarySchema)
+    .query(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      return profileService.getProfileOverview(db, input.profileId, owner);
+    }),
+
+  /**
+   * List a single profile's agents.
+   *
+   * The session's role picker maps custom modes from these agents, so it reads
+   * this rather than `get`: the rest of the profile (every skill's markdown and
+   * companion files) is not part of that decision.
+   */
+  agents: baseProcedure
+    .input(ProfileIdSchema.extend({ organizationId: z.uuid().optional() }))
+    .output(z.array(ProfileAgentResponseSchema))
+    .query(async ({ ctx, input }) => {
+      if (input.organizationId) {
+        await ensureOrganizationAccess(ctx, input.organizationId);
+      }
+      const owner = getOwner(input.organizationId, ctx.user.id);
+      return profileAgentsService.getProfileAgents(db, input.profileId, owner);
+    }),
+
+  /**
    * Create a new profile.
    */
   create: baseProcedure

@@ -20,7 +20,9 @@ export async function readUnavailableModelIds(): Promise<string[]> {
   return GatewayModelListConfigSchema.parse(row.unavailable_models).models;
 }
 
-const getConfiguredUnavailableModelIds = createCachedFetch(readUnavailableModelIds, 60_000, []);
+const getConfiguredUnavailableModelIds = createCachedFetch(readUnavailableModelIds, 60_000, [], {
+  name: 'unavailableModelIds',
+});
 
 export async function getUnavailableModelIds(): Promise<ReadonlySet<string>> {
   return new Set([

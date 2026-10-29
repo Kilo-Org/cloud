@@ -125,11 +125,14 @@ test('contains upload failures without logging metadata or upstream error text',
   );
 });
 
-test('contains scheduling failures', () => {
-  mockedAfter.mockImplementationOnce(() => {
+test('attempts registration and reports scheduling failures only once per response', () => {
+  mockedAfter.mockImplementation(() => {
     throw new Error('after unavailable');
   });
   const capture = createVercelProviderMetadataCapture();
   expect(() => capture?.({ gateway: {} }, 'gen_test')).not.toThrow();
+  expect(() => capture?.(undefined, 'gen_test')).not.toThrow();
+  expect(() => capture?.({ gateway: { cost: '0.1' } }, 'gen_test')).not.toThrow();
+  expect(mockedAfter).toHaveBeenCalledTimes(1);
   expect(errorExceptInTest).toHaveBeenCalledTimes(1);
 });

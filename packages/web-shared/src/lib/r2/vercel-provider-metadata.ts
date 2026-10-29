@@ -16,7 +16,7 @@ export function createVercelProviderMetadataCapture(): VercelProviderMetadataCap
 
   let capturedMetadata: object | undefined;
   let capturedGenerationId: string | undefined;
-  let scheduled = false;
+  let registrationAttempted = false;
 
   return (metadata, generationId) => {
     if (typeof generationId === 'string' && generationId.length > 0) {
@@ -25,7 +25,7 @@ export function createVercelProviderMetadataCapture(): VercelProviderMetadataCap
     if (typeof metadata === 'object' && metadata !== null && !Array.isArray(metadata)) {
       capturedMetadata = metadata;
     }
-    if (scheduled || !capturedMetadata || !capturedGenerationId) return;
+    if (registrationAttempted || !capturedMetadata || !capturedGenerationId) return;
 
     const reportFailure = (error: unknown) =>
       errorExceptInTest('[vercel-provider-metadata] failed to archive metadata', {
@@ -33,6 +33,7 @@ export function createVercelProviderMetadataCapture(): VercelProviderMetadataCap
         errorType: error instanceof Error ? error.name : 'unknown',
       });
 
+    registrationAttempted = true;
     try {
       after(async () => {
         try {
@@ -49,7 +50,6 @@ export function createVercelProviderMetadataCapture(): VercelProviderMetadataCap
           reportFailure(error);
         }
       });
-      scheduled = true;
     } catch (error) {
       reportFailure(error);
     }

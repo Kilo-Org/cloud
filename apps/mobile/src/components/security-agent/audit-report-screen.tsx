@@ -211,7 +211,7 @@ function AuditReportView({
               <Text variant="muted" className="text-center">
                 {t('securityAgent.auditReport.noActivityDescription', period)}
               </Text>
-              <Text variant="muted" className="text-center">
+              <Text variant="muted" className="text-xs text-center">
                 {t('securityAgent.auditReport.periodUtc', period)}
               </Text>
             </View>

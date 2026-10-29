@@ -3835,6 +3835,7 @@
     "commandLabel": "Umarni",
     "commandLabelPosition": "Umarni {{position}}",
     "commandPlaceholder": "misali pnpm install",
+    "commandAtLimit": "An iyakance umurnin zuwa haruffa {{max}}",
     "commandsEmpty": "Babu umarnin saitin tukuna",
     "commandsSaveFailed": "An kasa ajiye umarnin saitin",
     "moveUp": "Matsa sama",

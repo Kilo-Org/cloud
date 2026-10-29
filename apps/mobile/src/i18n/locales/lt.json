@@ -3935,6 +3935,7 @@
     "commandLabel": "Komanda",
     "commandLabelPosition": "Komanda {{position}}",
     "commandPlaceholder": "pvz. pnpm install",
+    "commandAtLimit": "Komandos ilgis ribojamas iki {{max}} simbolių",
     "commandsEmpty": "Dar nėra sąrankos komandų",
     "commandsSaveFailed": "Nepavyko išsaugoti sąrankos komandų",
     "moveUp": "Judėti aukštyn",

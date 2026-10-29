@@ -3835,6 +3835,7 @@
     "commandLabel": "Əmr",
     "commandLabelPosition": "Əmr {{position}}",
     "commandPlaceholder": "məs. pnpm install",
+    "commandAtLimit": "Əmr {{max}} simvolla məhduddur",
     "commandsEmpty": "Hələ quraşdırma əmrləri yoxdur",
     "commandsSaveFailed": "Quraşdırma əmrlərini saxlamaq mümkün olmadı",
     "moveUp": "Yuxarı hərəkət edin",

@@ -3835,6 +3835,7 @@
     "commandLabel": "បញ្ជា",
     "commandLabelPosition": "បញ្ជា {{position}}",
     "commandPlaceholder": "ឧ. pnpm install",
+    "commandAtLimit": "ពាក្យបញ្ជាមានកំណត់ត្រឹម {{max}} តួអក្សរ",
     "commandsEmpty": "មិនទាន់មានពាក្យបញ្ជាដំឡើងនៅឡើយទេ",
     "commandsSaveFailed": "មិនអាចរក្សាទុកពាក្យបញ្ជាដំឡើងបានទេ។",
     "moveUp": "ផ្លាស់ទីឡើងលើ",

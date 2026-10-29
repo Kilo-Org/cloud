@@ -3835,6 +3835,7 @@
     "commandLabel": "கட்டளை",
     "commandLabelPosition": "கட்டளை {{position}}",
     "commandPlaceholder": "எ.கா. pnpm install",
+    "commandAtLimit": "கட்டளை {{max}} எழுத்துகள் வரை மட்டுப்படுத்தப்பட்டுள்ளது",
     "commandsEmpty": "இதுவரை அமைவு கட்டளைகள் இல்லை",
     "commandsSaveFailed": "அமைவு கட்டளைகளைச் சேமிக்க முடியவில்லை",
     "moveUp": "மேலே செல்லவும்",

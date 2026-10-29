@@ -3835,6 +3835,7 @@
     "commandLabel": "ନିର୍ଦ୍ଦେଶ",
     "commandLabelPosition": "ନିର୍ଦ୍ଦେଶ {{position}}",
     "commandPlaceholder": "ଉଦା. pnpm install",
+    "commandAtLimit": "ନିର୍ଦ୍ଦେଶଟି {{max}} ଅକ୍ଷରରେ ସୀମିତ।",
     "commandsEmpty": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ସେଟଅପ୍ ନିର୍ଦ୍ଦେଶ ନାହିଁ।",
     "commandsSaveFailed": "ସେଟଅପ୍ କମାଣ୍ଡ୍ ସଞ୍ଚୟ କରିପାରିଲା ନାହିଁ।",
     "moveUp": "ଉପରକୁ ଯାଅ।",

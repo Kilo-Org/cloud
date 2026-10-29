@@ -3835,6 +3835,7 @@
     "commandLabel": "Iwu",
     "commandLabelPosition": "Iwu {{position}}",
     "commandPlaceholder": "dịka pnpm install",
+    "commandAtLimit": "Iwu ahụ nwere oke mkpụrụedemede {{max}}",
     "commandsEmpty": "Enweghị iwu ntọlite ka",
     "commandsSaveFailed": "Enweghị ike ichekwa iwu ntọala",
     "moveUp": "Bulie elu",

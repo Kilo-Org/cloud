@@ -3935,6 +3935,7 @@
     "commandLabel": "Ukaz",
     "commandLabelPosition": "Ukaz {{position}}",
     "commandPlaceholder": "npr. pnpm install",
+    "commandAtLimit": "Ukaz je omejen na {{max}} znakov",
     "commandsEmpty": "Ni še nobenih ukazov za nastavitev",
     "commandsSaveFailed": "Nastavitvenih ukazov ni bilo mogoče shraniti",
     "moveUp": "Premakni se navzgor",

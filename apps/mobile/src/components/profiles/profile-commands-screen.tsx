@@ -8,7 +8,6 @@ import {
   addCommand,
   commandPosition,
   commandRowA11yLabel,
-  MAX_SETUP_COMMAND_LENGTH,
   MAX_SETUP_COMMANDS,
   moveCommand,
   nonBlankCommands,
@@ -16,11 +15,11 @@ import {
   replaceCommand,
   sameCommands,
 } from '@/components/profiles/profile-commands-model';
+import { SetupCommandField } from '@/components/profiles/setup-command-field';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
-import { FormField } from '@/components/ui/form-field';
 import { ChevronDown, ChevronUp, Terminal, Trash2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -195,15 +194,9 @@ export function ProfileCommandsScreen({
     const rowHint = position === null ? undefined : commandRowA11yLabel(position - 1, commandTotal);
     return (
       <View key={`${generation}-${index}`} className="gap-3 rounded-lg bg-secondary p-3">
-        <FormField
+        <SetupCommandField
+          command={command}
           label={commandLabel}
-          defaultValue={command}
-          placeholder={t('profiles.commandPlaceholder')}
-          className="min-h-[44px] leading-[normal]"
-          maxLength={MAX_SETUP_COMMAND_LENGTH}
-          autoCapitalize="none"
-          autoCorrect={false}
-          returnKeyType="done"
           accessibilityHint={rowHint}
           disabled={!canManage}
           onChangeText={value => {

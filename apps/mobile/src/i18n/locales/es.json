@@ -3885,6 +3885,7 @@
     "commandLabel": "Comando",
     "commandLabelPosition": "Comando {{position}}",
     "commandPlaceholder": "p. ej. pnpm install",
+    "commandAtLimit": "El comando está limitado a {{max}} caracteres",
     "commandsEmpty": "Aún no hay comandos de configuración",
     "commandsSaveFailed": "No se pudieron guardar los comandos de configuración",
     "moveUp": "Subir",

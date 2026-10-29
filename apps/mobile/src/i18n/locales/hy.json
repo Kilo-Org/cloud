@@ -3835,6 +3835,7 @@
     "commandLabel": "Հրաման",
     "commandLabelPosition": "Հրաման {{position}}",
     "commandPlaceholder": "օր. pnpm install",
+    "commandAtLimit": "Հրամանը սահմանափակված է {{max}} նիշով",
     "commandsEmpty": "Կարգավորման հրամաններ դեռ չկան",
     "commandsSaveFailed": "Չհաջողվեց պահել կարգավորումների հրամանները",
     "moveUp": "Շարժվեք վերև",

@@ -3835,6 +3835,7 @@
     "commandLabel": "Skipun",
     "commandLabelPosition": "Skipun {{position}}",
     "commandPlaceholder": "t.d. pnpm install",
+    "commandAtLimit": "Skipunin er takmörkuð við {{max}} stafi",
     "commandsEmpty": "Engar uppsetningarskipanir ennþá",
     "commandsSaveFailed": "Gat ekki vistað uppsetningarskipanir",
     "moveUp": "Færðu þig upp",

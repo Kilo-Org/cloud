@@ -3835,6 +3835,7 @@
     "commandLabel": "Aṣẹ",
     "commandLabelPosition": "Aṣẹ {{position}}",
     "commandPlaceholder": "fun apẹẹrẹ pnpm install",
+    "commandAtLimit": "Pipaṣẹ naa ní ààlà {{max}} àmì",
     "commandsEmpty": "Ko si awọn pipaṣẹ iṣeto sibẹsibẹ",
     "commandsSaveFailed": "Ko le fi awọn pipaṣẹ iṣeto pamọ",
     "moveUp": "Gbe soke",

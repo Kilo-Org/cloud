@@ -3935,6 +3935,7 @@
     "commandLabel": "Příkaz",
     "commandLabelPosition": "Příkaz {{position}}",
     "commandPlaceholder": "např. pnpm install",
+    "commandAtLimit": "Příkaz je omezen na {{max}} znaků",
     "commandsEmpty": "Zatím žádné příkazy k nastavení",
     "commandsSaveFailed": "Příkazy nastavení se nepodařilo uložit",
     "moveUp": "Posuňte se nahoru",

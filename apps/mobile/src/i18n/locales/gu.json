@@ -3835,6 +3835,7 @@
     "commandLabel": "આદેશ",
     "commandLabelPosition": "આદેશ {{position}}",
     "commandPlaceholder": "દા.ત. pnpm install",
+    "commandAtLimit": "આદેશ {{max}} અક્ષરો સુધી મર્યાદિત છે",
     "commandsEmpty": "હજુ સુધી કોઈ સેટઅપ આદેશો નથી",
     "commandsSaveFailed": "સેટઅપ આદેશો સાચવી શકાયા નથી",
     "moveUp": "ઉપર ખસેડો",

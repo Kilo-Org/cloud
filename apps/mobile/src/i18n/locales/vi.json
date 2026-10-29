@@ -3835,6 +3835,7 @@
     "commandLabel": "Lệnh",
     "commandLabelPosition": "Lệnh {{position}}",
     "commandPlaceholder": "ví dụ: pnpm install",
+    "commandAtLimit": "Lệnh được giới hạn tối đa {{max}} ký tự",
     "commandsEmpty": "Chưa có lệnh thiết lập nào",
     "commandsSaveFailed": "Không thể lưu lệnh thiết lập",
     "moveUp": "Di chuyển lên",

@@ -3835,6 +3835,7 @@
     "commandLabel": "အမိန့်",
     "commandLabelPosition": "အမိန့် {{position}}",
     "commandPlaceholder": "ဥပမာ pnpm install",
+    "commandAtLimit": "အမိန့်ကို စာလုံး {{max}} လုံးအထိ ကန့်သတ်ထားသည်။",
     "commandsEmpty": "စနစ်ထည့်သွင်းရန် အမိန့်များမရှိသေးပါ။",
     "commandsSaveFailed": "စနစ်ထည့်သွင်းမှု အမိန့်များကို မသိမ်းဆည်းနိုင်ခဲ့ပါ။",
     "moveUp": "အပေါ်ကိုရွှေ့ပါ။",

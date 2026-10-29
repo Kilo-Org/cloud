@@ -3835,6 +3835,7 @@
     "commandLabel": "คำสั่ง",
     "commandLabelPosition": "คำสั่ง {{position}}",
     "commandPlaceholder": "เช่น pnpm install",
+    "commandAtLimit": "คำสั่งจำกัดไว้ที่ {{max}} อักขระ",
     "commandsEmpty": "ยังไม่มีคำสั่งการตั้งค่า",
     "commandsSaveFailed": "ไม่สามารถบันทึกคำสั่งการตั้งค่าได้",
     "moveUp": "เลื่อนขึ้น",

@@ -3901,6 +3901,7 @@
     "commandLabel": "Command",
     "commandLabelPosition": "Command {{position}}",
     "commandPlaceholder": "e.g. pnpm install",
+    "commandAtLimit": "The command is limited to {{max}} characters",
     "commandsEmpty": "No setup commands yet",
     "commandsSaveFailed": "Couldn't save setup commands",
     "moveUp": "Move up",

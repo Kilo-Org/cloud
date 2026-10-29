@@ -3935,6 +3935,7 @@
     "commandLabel": "Rozkaz",
     "commandLabelPosition": "Rozkaz {{position}}",
     "commandPlaceholder": "np. pnpm install",
+    "commandAtLimit": "Polecenie może mieć maksymalnie {{max}} znaków",
     "commandsEmpty": "Nie ma jeszcze żadnych poleceń konfiguracyjnych",
     "commandsSaveFailed": "Nie udało się zapisać poleceń konfiguracyjnych",
     "moveUp": "Podnieść",

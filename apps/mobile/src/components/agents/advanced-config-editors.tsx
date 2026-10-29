@@ -6,7 +6,6 @@ import {
   addCommand,
   commandPosition,
   commandRowA11yLabel,
-  MAX_SETUP_COMMAND_LENGTH,
   MAX_SETUP_COMMANDS,
   moveCommand,
   removeCommand,
@@ -18,8 +17,8 @@ import {
   variableRows,
 } from '@/components/profiles/profile-variables-model';
 import { VariableEditForm, VariableRowView } from '@/components/profiles/profile-variables-rows';
+import { SetupCommandField } from '@/components/profiles/setup-command-field';
 import { Button } from '@/components/ui/button';
-import { FormField } from '@/components/ui/form-field';
 import { ChevronDown, ChevronUp, Plus, Trash2 } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
 import { MAX_SESSION_ENV_VAR_VALUE_LENGTH } from '@/lib/agent-profile-forms';
@@ -172,16 +171,10 @@ export function ManualSetupCommandsEditor({
             : t('profiles.commandLabelPosition', { position });
         return (
           <View key={`${generation}-${index}`} className="gap-3 rounded-lg bg-secondary p-3">
-            <FormField
+            <SetupCommandField
+              command={command}
               label={commandLabel}
-              defaultValue={command}
-              placeholder={t('profiles.commandPlaceholder')}
-              className="min-h-[44px] leading-[normal]"
               disabled={disabled}
-              maxLength={MAX_SETUP_COMMAND_LENGTH}
-              autoCapitalize="none"
-              autoCorrect={false}
-              returnKeyType="done"
               accessibilityHint={rowHint}
               onChangeText={value => {
                 onChange(replaceCommand(commands, index, value));

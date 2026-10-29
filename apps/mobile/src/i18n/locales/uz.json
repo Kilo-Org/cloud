@@ -3835,6 +3835,7 @@
     "commandLabel": "Buyruq",
     "commandLabelPosition": "{{position}}-raqamli buyruq",
     "commandPlaceholder": "mas. pnpm install",
+    "commandAtLimit": "Buyruq {{max}} ta belgi bilan cheklangan",
     "commandsEmpty": "Hozircha sozlash buyruqlari yo'q",
     "commandsSaveFailed": "Sozlash buyruqlarini saqlab bo‘lmadi",
     "moveUp": "Yuqoriga siljiting",

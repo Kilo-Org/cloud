@@ -3835,6 +3835,7 @@
     "commandLabel": "Amri",
     "commandLabelPosition": "Amri {{position}}",
     "commandPlaceholder": "kmf. pnpm install",
+    "commandAtLimit": "Amri ina kikomo cha vibambo {{max}}",
     "commandsEmpty": "Bado hakuna amri za usanidi",
     "commandsSaveFailed": "Haikuweza kuhifadhi amri za usanidi",
     "moveUp": "Sogeza juu",

@@ -3835,6 +3835,7 @@
     "commandLabel": "Baiko",
     "commandLabelPosition": "Baiko {{position}}",
     "commandPlaceholder": "oh. pnpm install",
+    "commandAtLimit": "Ny baiko dia voafetra ho {{max}} tarehintsoratra",
     "commandsEmpty": "Tsy mbola misy baiko fanamboarana",
     "commandsSaveFailed": "Tsy afaka mitahiry baiko fanamboarana",
     "moveUp": "Miakatra",

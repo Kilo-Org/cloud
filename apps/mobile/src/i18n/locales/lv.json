@@ -3885,6 +3885,7 @@
     "commandLabel": "Komanda",
     "commandLabelPosition": "Komanda {{position}}",
     "commandPlaceholder": "piem. pnpm install",
+    "commandAtLimit": "Komanda ir ierobežota līdz {{max}} rakstzīmēm",
     "commandsEmpty": "Vēl nav nevienas iestatīšanas komandas",
     "commandsSaveFailed": "Nevarēja saglabāt iestatīšanas komandas",
     "moveUp": "Pārvietojieties uz augšu",

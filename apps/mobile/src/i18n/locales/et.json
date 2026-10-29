@@ -3835,6 +3835,7 @@
     "commandLabel": "Käsk",
     "commandLabelPosition": "Käsk {{position}}",
     "commandPlaceholder": "nt pnpm install",
+    "commandAtLimit": "Käsu pikkus on piiratud {{max}} tähemärgiga",
     "commandsEmpty": "Seadistuskäske pole veel",
     "commandsSaveFailed": "Seadistuskäske ei saanud salvestada",
     "moveUp": "Liigu üles",

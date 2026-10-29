@@ -3835,6 +3835,7 @@
     "commandLabel": "فەرمان",
     "commandLabelPosition": "فەرمانی {{position}}",
     "commandPlaceholder": "بۆ نموونە pnpm install",
+    "commandAtLimit": "فەرمانەکە بە {{max}} نووسە سنووردارە",
     "commandsEmpty": "هێشتا هیچ فەرمانێکی ڕێکخستن نییە",
     "commandsSaveFailed": "نەتوانرا فەرمانەکانی ڕێکخستن پاشەکەوت بکرێت",
     "moveUp": "بەرەو سەرەوە بڕۆ",

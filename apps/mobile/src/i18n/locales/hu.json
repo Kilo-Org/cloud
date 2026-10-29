@@ -3835,6 +3835,7 @@
     "commandLabel": "Parancs",
     "commandLabelPosition": "{{position}}. parancs",
     "commandPlaceholder": "pl. pnpm install",
+    "commandAtLimit": "A parancs legfeljebb {{max}} karakter lehet",
     "commandsEmpty": "Még nincsenek beállítási parancsok",
     "commandsSaveFailed": "Nem sikerült menteni a beállítási parancsokat",
     "moveUp": "Mozgassa fel",

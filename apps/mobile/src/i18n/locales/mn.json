@@ -3835,6 +3835,7 @@
     "commandLabel": "Тушаал",
     "commandLabelPosition": "Тушаал {{position}}",
     "commandPlaceholder": "жишээ нь pnpm install",
+    "commandAtLimit": "Команд нь {{max}} тэмдэгтээр хязгаарлагдана",
     "commandsEmpty": "Одоогоор тохируулах команд алга",
     "commandsSaveFailed": "Тохируулгын командуудыг хадгалж чадсангүй",
     "moveUp": "Дээш хөдөл",

@@ -212,6 +212,17 @@ function texts(renderer: TestRenderer.ReactTestRenderer): string[] {
     .filter((child): child is string => typeof child === 'string');
 }
 
+/** The remaining-characters counter nodes, which carry the counted label. */
+function counterTexts(renderer: TestRenderer.ReactTestRenderer) {
+  return renderer.root
+    .findAllByType('Text' as never)
+    .filter(
+      node =>
+        typeof node.props.accessibilityLabel === 'string' &&
+        node.props.accessibilityLabel.includes('characters remaining')
+    );
+}
+
 function field(renderer: TestRenderer.ReactTestRenderer, label: string) {
   const node = renderer.root
     .findAllByType('FormField' as never)
@@ -384,6 +395,22 @@ describe('AdvancedConfigPanel', () => {
     // A 21st row is refused even if the disabled control is pressed.
     press(buttonByText(renderer, 'Add command'));
     expect(commandFields()).toHaveLength(MAX_SETUP_COMMANDS);
+  });
+
+  it('counts the characters left on a setup command and names the bound', () => {
+    const renderer = mount();
+    press(byLabel(renderer, 'Advanced Configuration'));
+
+    press(buttonByText(renderer, 'Add command'));
+    typeInto(renderer, 'Command', 'a'.repeat(470));
+    expect(counterTexts(renderer).map(node => node.props.children)).toEqual([30]);
+    expect(texts(renderer)).not.toContain('The command is limited to 500 characters');
+
+    // At the bound the sentence replaces the count, so only one line is present.
+    // At 470 characters the row is a command, so its label carries its position.
+    typeInto(renderer, 'Command 1', 'a'.repeat(500));
+    expect(counterTexts(renderer)).toEqual([]);
+    expect(texts(renderer)).toContain('The command is limited to 500 characters');
   });
 
   it('caps a manual env-var value at the 256-character session bound', () => {

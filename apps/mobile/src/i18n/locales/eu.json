@@ -3835,6 +3835,7 @@
     "commandLabel": "Agindua",
     "commandLabelPosition": "{{position}}. agindua",
     "commandPlaceholder": "adib. pnpm install",
+    "commandAtLimit": "Komandoa {{max}} karakteretara mugatuta dago",
     "commandsEmpty": "Oraindik ez dago konfigurazio komandorik",
     "commandsSaveFailed": "Ezin izan dira gorde konfigurazio komandoak",
     "moveUp": "Gora",

@@ -3835,6 +3835,7 @@
     "commandLabel": "Commando",
     "commandLabelPosition": "Commando {{position}}",
     "commandPlaceholder": "bijv. pnpm install",
+    "commandAtLimit": "Het commando is beperkt tot {{max}} tekens",
     "commandsEmpty": "Nog geen installatieopdrachten",
     "commandsSaveFailed": "Kan installatieopdrachten niet opslaan",
     "moveUp": "Ga omhoog",

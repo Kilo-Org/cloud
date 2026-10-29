@@ -3835,6 +3835,7 @@
     "commandLabel": "ຄໍາສັ່ງ",
     "commandLabelPosition": "ຄໍາສັ່ງ {{position}}",
     "commandPlaceholder": "ຕົວຢ່າງ: pnpm install",
+    "commandAtLimit": "ຄຳສັ່ງຈຳກັດບໍ່ເກີນ {{max}} ຕົວອັກສອນ",
     "commandsEmpty": "ບໍ່ມີຄຳສັ່ງຕັ້ງຄ່າເທື່ອ",
     "commandsSaveFailed": "ບໍ່ສາມາດບັນທຶກຄຳສັ່ງຕັ້ງຄ່າໄດ້",
     "moveUp": "ຍ້າຍຂຶ້ນ",

@@ -4035,6 +4035,7 @@
     "commandLabel": "Gorchymyn",
     "commandLabelPosition": "Gorchymyn {{position}}",
     "commandPlaceholder": "e.e. pnpm install",
+    "commandAtLimit": "Mae'r gorchymyn wedi'i gyfyngu i {{max}} nod",
     "commandsEmpty": "Dim gorchmynion gosod eto",
     "commandsSaveFailed": "Ni fu modd cadw'r gorchmynion gosod",
     "moveUp": "Symud i fyny",

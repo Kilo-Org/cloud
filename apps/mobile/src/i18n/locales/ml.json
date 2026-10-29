@@ -3835,6 +3835,7 @@
     "commandLabel": "കമാൻഡ്",
     "commandLabelPosition": "കമാൻഡ് {{position}}",
     "commandPlaceholder": "ഉദാ. pnpm install",
+    "commandAtLimit": "കമാൻഡ് {{max}} അക്ഷരങ്ങളിൽ പരിമിതപ്പെടുത്തിയിരിക്കുന്നു",
     "commandsEmpty": "ഇതുവരെ സജ്ജീകരണ കമാൻഡുകൾ ഒന്നുമില്ല",
     "commandsSaveFailed": "സജ്ജീകരണ കമാൻഡുകൾ സംരക്ഷിക്കാനായില്ല",
     "moveUp": "മുകളിലേക്ക് നീങ്ങുക",

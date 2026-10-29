@@ -3835,6 +3835,7 @@
     "commandLabel": "Kòmandman",
     "commandLabelPosition": "Kòmandman {{position}}",
     "commandPlaceholder": "pa ekzanp pnpm install",
+    "commandAtLimit": "Kòmandman an limite a {{max}} karaktè",
     "commandsEmpty": "Pa gen lòd konfigirasyon ankò",
     "commandsSaveFailed": "Pa t 'kapab sove lòd konfigirasyon",
     "moveUp": "Deplase moute",

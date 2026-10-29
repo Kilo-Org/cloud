@@ -3835,6 +3835,7 @@
     "commandLabel": "命令",
     "commandLabelPosition": "命令 {{position}}",
     "commandPlaceholder": "例如 pnpm install",
+    "commandAtLimit": "命令最多使用 {{max}} 个字符",
     "commandsEmpty": "还没有设置命令",
     "commandsSaveFailed": "无法保存设置命令",
     "moveUp": "向上移动",

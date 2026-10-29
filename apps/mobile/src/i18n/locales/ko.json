@@ -3835,6 +3835,7 @@
     "commandLabel": "명령",
     "commandLabelPosition": "명령 {{position}}",
     "commandPlaceholder": "예: pnpm install",
+    "commandAtLimit": "명령은 최대 {{max}}자로 제한됩니다",
     "commandsEmpty": "아직 설정 명령이 없습니다.",
     "commandsSaveFailed": "설정 명령을 저장할 수 없습니다.",
     "moveUp": "위로 이동",

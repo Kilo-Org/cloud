@@ -3835,6 +3835,7 @@
     "commandLabel": "Пәрмен",
     "commandLabelPosition": "{{position}} пәрмен",
     "commandPlaceholder": "мыс. pnpm install",
+    "commandAtLimit": "Пәрмен {{max}} таңбамен шектелген",
     "commandsEmpty": "Орнату пәрмендері әлі жоқ",
     "commandsSaveFailed": "Орнату пәрмендерін сақтау мүмкін болмады",
     "moveUp": "Жоғары жылжытыңыз",

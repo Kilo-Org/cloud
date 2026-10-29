@@ -3835,6 +3835,7 @@
     "commandLabel": "指示",
     "commandLabelPosition": "指示{{position}}",
     "commandPlaceholder": "例: pnpm install",
+    "commandAtLimit": "コマンドは{{max}}文字以内です",
     "commandsEmpty": "セットアップ コマンドはまだありません",
     "commandsSaveFailed": "セットアップコマンドを保存できませんでした",
     "moveUp": "上に移動",

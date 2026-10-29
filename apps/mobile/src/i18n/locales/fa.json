@@ -3835,6 +3835,7 @@
     "commandLabel": "فرمان",
     "commandLabelPosition": "فرمان {{position}}",
     "commandPlaceholder": "مثلاً pnpm install",
+    "commandAtLimit": "دستور به {{max}} نویسه محدود است",
     "commandsEmpty": "هنوز دستور راه اندازی وجود ندارد",
     "commandsSaveFailed": "دستورات راه اندازی ذخیره نشد",
     "moveUp": "حرکت به بالا",

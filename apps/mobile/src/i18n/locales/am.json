@@ -3835,6 +3835,7 @@
     "commandLabel": "ትዕዛዝ",
     "commandLabelPosition": "ትዕዛዝ {{position}}",
     "commandPlaceholder": "ለምሳሌ pnpm install",
+    "commandAtLimit": "ትዕዛዙ በ{{max}} ቁምፊዎች የተገደበ ነው",
     "commandsEmpty": "እስካሁን ምንም የማዋቀር ትዕዛዞች የሉም",
     "commandsSaveFailed": "የማዋቀር ትዕዛዞችን ማስቀመጥ አልተቻለም",
     "moveUp": "ወደ ላይ ተንቀሳቀስ",

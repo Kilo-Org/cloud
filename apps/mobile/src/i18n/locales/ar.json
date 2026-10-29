@@ -4035,6 +4035,7 @@
     "commandLabel": "الأمر",
     "commandLabelPosition": "الأمر {{position}}",
     "commandPlaceholder": "مثال: pnpm install",
+    "commandAtLimit": "يقتصر الأمر على {{max}} حرفًا",
     "commandsEmpty": "لا توجد أوامر الإعداد حتى الآن",
     "commandsSaveFailed": "تعذر حفظ أوامر الإعداد",
     "moveUp": "تحرك للأعلى",

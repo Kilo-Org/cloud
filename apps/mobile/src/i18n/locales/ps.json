@@ -3835,6 +3835,7 @@
     "commandLabel": "امر",
     "commandLabelPosition": "امر {{position}}",
     "commandPlaceholder": "لکه pnpm install",
+    "commandAtLimit": "امر تر {{max}} توري پورې محدود دی",
     "commandsEmpty": "تر اوسه د تنظیم کولو امرونه ندي",
     "commandsSaveFailed": "د ترتیب کولو کمانډونه خوندي نشو کولی",
     "moveUp": "پورته لاړ شه",

@@ -3835,6 +3835,7 @@
     "commandLabel": "Perintah",
     "commandLabelPosition": "Perintah {{position}}",
     "commandPlaceholder": "cth. pnpm install",
+    "commandAtLimit": "Perintah dihadkan kepada {{max}} aksara",
     "commandsEmpty": "Tiada arahan persediaan lagi",
     "commandsSaveFailed": "Tidak dapat menyimpan arahan persediaan",
     "moveUp": "Bergerak ke atas",

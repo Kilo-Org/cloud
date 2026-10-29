@@ -3885,6 +3885,7 @@
     "commandLabel": "פקודה",
     "commandLabelPosition": "פקודה {{position}}",
     "commandPlaceholder": "למשל pnpm install",
+    "commandAtLimit": "הפקודה מוגבלת ל-{{max}} תווים",
     "commandsEmpty": "אין עדיין פקודות הגדרה",
     "commandsSaveFailed": "לא ניתן לשמור פקודות הגדרה",
     "moveUp": "לזוז למעלה",

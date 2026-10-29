@@ -3835,6 +3835,7 @@
     "commandLabel": "ბრძანება",
     "commandLabelPosition": "ბრძანება {{position}}",
     "commandPlaceholder": "მაგ. pnpm install",
+    "commandAtLimit": "ბრძანება შემოიფარგლება {{max}} სიმბოლოთი",
     "commandsEmpty": "დაყენების ბრძანებები ჯერ არ არის",
     "commandsSaveFailed": "დაყენების ბრძანებების შენახვა ვერ მოხერხდა",
     "moveUp": "ზევით გადაადგილება",

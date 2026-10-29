@@ -3835,6 +3835,7 @@
     "commandLabel": "ಆಜ್ಞೆ",
     "commandLabelPosition": "ಆಜ್ಞೆ {{position}}",
     "commandPlaceholder": "ಉದಾ. pnpm install",
+    "commandAtLimit": "ಆಜ್ಞೆಯು {{max}} ಅಕ್ಷರಗಳಿಗೆ ಸೀಮಿತವಾಗಿದೆ",
     "commandsEmpty": "ಇನ್ನೂ ಯಾವುದೇ ಸೆಟಪ್ ಆದೇಶಗಳಿಲ್ಲ",
     "commandsSaveFailed": "ಸೆಟಪ್ ಕಮಾಂಡ್‌ಗಳನ್ನು ಉಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
     "moveUp": "ಮೇಲಕ್ಕೆ ಸರಿಸಿ",

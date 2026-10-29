@@ -3835,6 +3835,7 @@
     "commandLabel": "Umyalo",
     "commandLabelPosition": "Umyalo {{position}}",
     "commandPlaceholder": "isb. pnpm install",
+    "commandAtLimit": "Umyalo ulinganiselwe ezinhlamvini ezingu-{{max}}",
     "commandsEmpty": "Ayikho imiyalo yokusetha okwamanje",
     "commandsSaveFailed": "Ayikwazanga ukulondoloza imiyalo yokusetha",
     "moveUp": "Hamba uyephezulu",

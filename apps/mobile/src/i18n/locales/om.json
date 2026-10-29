@@ -3835,6 +3835,7 @@
     "commandLabel": "Ajaja",
     "commandLabelPosition": "Ajaja {{position}}",
     "commandPlaceholder": "fakkeenyaaf pnpm install",
+    "commandAtLimit": "Ajajni arfiilee {{max}}tti daangeffama",
     "commandsEmpty": "Ajajni setup hanga ammaatti hin jiru",
     "commandsSaveFailed": "Ajajoota saaguu qusachuu hin dandeenye",
     "moveUp": "Ol socho'aa",

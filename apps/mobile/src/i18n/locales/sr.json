@@ -3885,6 +3885,7 @@
     "commandLabel": "Komanda",
     "commandLabelPosition": "Komanda {{position}}",
     "commandPlaceholder": "npr. pnpm install",
+    "commandAtLimit": "Komanda je ograničena na {{max}} znakova",
     "commandsEmpty": "Još nema komandi za podešavanje",
     "commandsSaveFailed": "Nije moguće sačuvati komande za podešavanje",
     "moveUp": "Pomeri se gore",

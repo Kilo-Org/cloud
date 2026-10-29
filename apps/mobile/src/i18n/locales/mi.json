@@ -3835,6 +3835,7 @@
     "commandLabel": "Whakahau",
     "commandLabelPosition": "Whakahau {{position}}",
     "commandPlaceholder": "hei tauira pnpm install",
+    "commandAtLimit": "Ka whakawhāitihia te whakahau ki te {{max}} pūāhua",
     "commandsEmpty": "Kare ano he tono tatūnga",
     "commandsSaveFailed": "Kāore i taea te tiaki i ngā tono tatūnga",
     "moveUp": "Neke ki runga",

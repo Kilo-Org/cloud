@@ -3935,6 +3935,7 @@
     "commandLabel": "Команда",
     "commandLabelPosition": "Команда {{position}}",
     "commandPlaceholder": "напр. pnpm install",
+    "commandAtLimit": "Команда обмежена до {{max}} символів",
     "commandsEmpty": "Ще немає команд налаштування",
     "commandsSaveFailed": "Не вдалося зберегти команди налаштування",
     "moveUp": "Рухатися вгору",

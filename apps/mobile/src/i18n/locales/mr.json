@@ -3835,6 +3835,7 @@
     "commandLabel": "आज्ञा",
     "commandLabelPosition": "आज्ञा {{position}}",
     "commandPlaceholder": "उदा. pnpm install",
+    "commandAtLimit": "आदेश {{max}} अक्षरांपुरता मर्यादित आहे",
     "commandsEmpty": "अद्याप सेटअप आदेश नाहीत",
     "commandsSaveFailed": "सेटअप कमांड सेव्ह करू शकलो नाही",
     "moveUp": "वर हलवा",

@@ -3835,6 +3835,7 @@
     "commandLabel": "Befehl",
     "commandLabelPosition": "Befehl {{position}}",
     "commandPlaceholder": "z. B. pnpm install",
+    "commandAtLimit": "Der Befehl ist auf {{max}} Zeichen beschränkt",
     "commandsEmpty": "Noch keine Setup-Befehle",
     "commandsSaveFailed": "Setup-Befehle konnten nicht gespeichert werden",
     "moveUp": "Nach oben verschieben",

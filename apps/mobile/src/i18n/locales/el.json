@@ -3835,6 +3835,7 @@
     "commandLabel": "Εντολή",
     "commandLabelPosition": "Εντολή {{position}}",
     "commandPlaceholder": "π.χ. pnpm install",
+    "commandAtLimit": "Η εντολή περιορίζεται σε {{max}} χαρακτήρες",
     "commandsEmpty": "Δεν υπάρχουν ακόμη εντολές ρύθμισης",
     "commandsSaveFailed": "Δεν ήταν δυνατή η αποθήκευση εντολών ρύθμισης",
     "moveUp": "Μετακινηθείτε προς τα πάνω",

@@ -3835,6 +3835,7 @@
     "commandLabel": "Komut",
     "commandLabelPosition": "Komut {{position}}",
     "commandPlaceholder": "örn. pnpm install",
+    "commandAtLimit": "Komut {{max}} karakterle sınırlıdır",
     "commandsEmpty": "Henüz kurulum komutu yok",
     "commandsSaveFailed": "Kurulum komutları kaydedilemedi",
     "moveUp": "Yukarı taşı",

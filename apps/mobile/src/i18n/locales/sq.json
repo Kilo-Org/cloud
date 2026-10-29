@@ -3835,6 +3835,7 @@
     "commandLabel": "Komanda",
     "commandLabelPosition": "Komanda {{position}}",
     "commandPlaceholder": "p.sh. pnpm install",
+    "commandAtLimit": "Komanda është e kufizuar në {{max}} karaktere",
     "commandsEmpty": "Nuk ka ende komanda konfigurimi",
     "commandsSaveFailed": "Komandat e konfigurimit nuk mund të ruheshin",
     "moveUp": "Lëvizni lart",

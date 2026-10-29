@@ -3835,6 +3835,7 @@
     "commandLabel": "Bevel",
     "commandLabelPosition": "Bevel {{position}}",
     "commandPlaceholder": "bv. pnpm install",
+    "commandAtLimit": "Die opdrag is beperk tot {{max}} karakters",
     "commandsEmpty": "Nog geen opstelopdragte nie",
     "commandsSaveFailed": "Kon nie opstellingopdragte stoor nie",
     "moveUp": "Beweeg op",

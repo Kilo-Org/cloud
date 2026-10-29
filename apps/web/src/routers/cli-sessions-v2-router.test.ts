@@ -2000,6 +2000,14 @@ describe('cli-sessions-v2-router', () => {
       expect(parseGitHubOwnerRepo('https://github.com/kilo/repo/tree/main')).toBeNull();
       expect(parseGitHubOwnerRepo('not-a-url')).toBeNull();
     });
+    it('rejects owner and repo values outside GitHub name charset for every URL form', () => {
+      expect(parseGitHubOwnerRepo('https://github.com/acme.corp/repo')).toBeNull();
+      expect(parseGitHubOwnerRepo('https://github.com/kilo/repo[1]')).toBeNull();
+      expect(parseGitHubOwnerRepo('git@github.com:acme corp/repo.git')).toBeNull();
+      expect(parseGitHubOwnerRepo('git@github.com:kilo/repo;1.git')).toBeNull();
+      expect(parseGitHubOwnerRepo('ssh://git@github.com/acme.corp/repo.git')).toBeNull();
+      expect(parseGitHubOwnerRepo('ssh://git@github.com/kilo/repo[1].git')).toBeNull();
+    });
   });
 
   describe('parseGitHubPrUrl', () => {
@@ -2038,6 +2046,12 @@ describe('cli-sessions-v2-router', () => {
       expect(parseGitHubPrUrl('https://gitlab.com/kilo/repo/pull/42')).toBeNull();
       expect(parseGitHubPrUrl('https://github.com/kilo/repo/pull/abc')).toBeNull();
       expect(parseGitHubPrUrl('not-a-url')).toBeNull();
+    });
+    it('rejects owner and repo values outside GitHub name charset', () => {
+      expect(parseGitHubPrUrl('https://github.com/acme.corp/repo/pull/42')).toBeNull();
+      expect(parseGitHubPrUrl('https://github.com/kilo/repo[1]/pull/42')).toBeNull();
+      expect(parseGitHubPrUrl('git@github.com:acme corp/repo/pull/42')).toBeNull();
+      expect(parseGitHubPrUrl('https://github.com/kilo/re po/pull/42')).toBeNull();
     });
   });
 

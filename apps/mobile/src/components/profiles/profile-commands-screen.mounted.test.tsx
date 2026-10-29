@@ -188,20 +188,31 @@ describe('ProfileCommandsScreen', () => {
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
+    const counterTexts = () =>
+      findAll(renderer.root, 'Text').filter(
+        node =>
+          typeof node.props.accessibilityLabel === 'string' &&
+          node.props.accessibilityLabel.includes('characters remaining')
+      );
     const hintTexts = () =>
       findAll(renderer.root, 'Text')
         .map(node => node.props.children)
         .filter((child): child is string => typeof child === 'string');
 
     // An ordinary command is far from the server bound, so the row stays quiet.
-    expect(hintTexts().filter(text => text.includes('characters remaining'))).toEqual([]);
+    expect(counterTexts()).toEqual([]);
 
+    // Near the bound the row counts the room left, as the bare numeral the chat
+    // composer and the new-session prompt show, with the counted sentence as its
+    // accessible name.
     changeRowText(renderer.root, 0, 'a'.repeat(470));
-    expect(hintTexts()).toContain('30 characters remaining');
+    expect(counterTexts().map(node => node.props.children)).toEqual([30]);
+    expect(counterTexts()[0]?.props.accessibilityLabel).toBe('30 characters remaining');
     expect(hintTexts()).not.toContain('The command is limited to 500 characters');
 
+    // At the bound the sentence replaces the count: a zero count would restate it.
     changeRowText(renderer.root, 0, 'a'.repeat(500));
-    expect(hintTexts()).toContain('0 characters remaining');
+    expect(counterTexts()).toEqual([]);
     expect(hintTexts()).toContain('The command is limited to 500 characters');
 
     unmount();
@@ -213,10 +224,10 @@ describe('ProfileCommandsScreen', () => {
 
     const { renderer, unmount } = await mountScreen();
 
+    expect(findAll(renderer.root, 'Text').filter(node => node.props.children === 0)).toEqual([]);
     const hintTexts = findAll(renderer.root, 'Text')
       .map(node => node.props.children)
       .filter((child): child is string => typeof child === 'string');
-    expect(hintTexts).toContain('0 characters remaining');
     expect(hintTexts).toContain('The command is limited to 500 characters');
 
     unmount();

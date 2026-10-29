@@ -106,17 +106,27 @@ describe('classifier input normalization', () => {
     // window of a few tens of kilobytes fails here.
     const budgetMs = 2000;
     const userText = 'Refactor the billing retry path and add a regression test.';
-    const block = `<environment_details>\n${'src/app/page.tsx\n'.repeat(58_000)}</environment_details>`;
-    expect(block.length).toBeGreaterThan(900_000);
+    const content = `${userText}\n<environment_details>\n${'src/app/page.tsx\n'.repeat(58_000)}</environment_details>`;
+    expect(content.length).toBeGreaterThan(900_000);
 
     const started = performance.now();
-    const result = normalizeClassifierInput('chat_completions', {
+    const chat = normalizeClassifierInput('chat_completions', {
       model: 'anthropic/claude-sonnet-4',
-      messages: [{ role: 'user', content: `${userText}\n${block}` }],
+      messages: [{ role: 'user', content }],
+    });
+    const responses = normalizeClassifierInput('responses', {
+      model: 'openai/gpt-5-mini',
+      input: [{ role: 'user', content }],
+    });
+    const messages = normalizeClassifierInput('messages', {
+      model: 'anthropic/claude-sonnet-4',
+      messages: [{ role: 'user', content }],
     });
     const elapsed = performance.now() - started;
 
-    expect(result?.userPromptPrefix).toBe(userText);
+    expect(chat?.userPromptPrefix).toBe(userText);
+    expect(responses?.userPromptPrefix).toBe(userText);
+    expect(messages?.userPromptPrefix).toBe(userText);
     expect(elapsed).toBeLessThan(budgetMs);
   });
 

@@ -3961,7 +3961,11 @@
       "pinnedToast": "Angeheftet an „{{repo}}“",
       "pinFailed": "Repo konnte nicht angeheftet werden",
       "unboundToast": "Repo ungebunden",
-      "unbindFailed": "Repo konnte nicht entbunden werden"
+      "unbindFailed": "Repo konnte nicht entbunden werden",
+      "repoValue": "Repository: {{name}}",
+      "profileValue": "Profil: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Erstelle ein Organisationsprofil, um Umgebungsvariablen, Setup-Befehle und Fähigkeiten sitzungsübergreifend wiederzuverwenden.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Organisationsinhaber oder -administratoren können ein Organisationsprofil erstellen."
     },
     "variablesDeleteFailed": "Die Variable konnte nicht gelöscht werden",
     "deleteVariable": "Variable {{key}} löschen",

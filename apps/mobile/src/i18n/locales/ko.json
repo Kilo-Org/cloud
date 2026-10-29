@@ -3961,7 +3961,11 @@
       "pinnedToast": "\"{{repo}}\"에 고정됨",
       "pinFailed": "저장소를 고정할 수 없습니다.",
       "unboundToast": "레포 언바운드",
-      "unbindFailed": "저장소를 바인딩 해제할 수 없습니다."
+      "unbindFailed": "저장소를 바인딩 해제할 수 없습니다.",
+      "repoValue": "저장소: {{name}}",
+      "profileValue": "프로필: {{name}}",
+      "pickerEmptyDescriptionOrganization": "세션 전체에서 환경 변수, 설정 명령 및 기술을 재사용하기 위한 조직 프로필을 만듭니다.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "조직 소유자 또는 관리자는 조직 프로필을 만들 수 있습니다."
     },
     "variablesDeleteFailed": "변수를 삭제할 수 없습니다",
     "deleteVariable": "변수 {{key}}을(를) 삭제",

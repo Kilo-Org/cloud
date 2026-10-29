@@ -4165,7 +4165,11 @@
       "pinnedToast": "Wedi'i binio i \"{{repo}}\"",
       "pinFailed": "Methu pinio repo",
       "unboundToast": "Repo heb ei rwymo",
-      "unbindFailed": "Ni fu modd dadrwymo repo"
+      "unbindFailed": "Ni fu modd dadrwymo repo",
+      "repoValue": "Ystorfa: {{name}}",
+      "profileValue": "Proffil: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Creu proffil sefydliad i ailddefnyddio newidynnau amgylchedd, gorchmynion gosod, a sgiliau ar draws sesiynau.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Gall perchennog sefydliad neu weinyddwr greu proffil sefydliad."
     },
     "variablesDeleteFailed": "Ni fu modd dileu'r newidyn",
     "deleteVariable": "Dileu newidyn {{key}}",

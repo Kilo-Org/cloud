@@ -4063,7 +4063,11 @@
       "pinnedToast": "Przypięty do „{{repo}}”",
       "pinFailed": "Nie udało się przypiąć repozytorium",
       "unboundToast": "Repo niezwiązane",
-      "unbindFailed": "Nie można odłączyć repozytorium"
+      "unbindFailed": "Nie można odłączyć repozytorium",
+      "repoValue": "Repozytorium: {{name}}",
+      "profileValue": "Profil: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Utwórz profil organizacji, aby ponownie używać zmiennych środowiskowych, poleceń konfiguracyjnych i umiejętności w różnych sesjach.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Właściciel lub administrator organizacji może utworzyć profil organizacji."
     },
     "variablesDeleteFailed": "Nie udało się usunąć zmiennej",
     "deleteVariable": "Usuń zmienną {{key}}",

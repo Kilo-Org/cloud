@@ -4012,7 +4012,11 @@
       "pinnedToast": "הוצמד אל \"{{repo}}\"",
       "pinFailed": "לא ניתן היה להצמיד ריפו",
       "unboundToast": "ריפו לא כבול",
-      "unbindFailed": "לא ניתן היה לבטל את קשירת המאגר"
+      "unbindFailed": "לא ניתן היה לבטל את קשירת המאגר",
+      "repoValue": "מאגר: {{name}}",
+      "profileValue": "פרופיל: {{name}}",
+      "pickerEmptyDescriptionOrganization": "צור פרופיל ארגוני לשימוש חוזר במשתני סביבה, פקודות הגדרה ומיומנויות בפעילויות שונות.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "בעלים של ארגון או מנהל יכולים ליצור פרופיל ארגוני."
     },
     "variablesDeleteFailed": "לא ניתן למחוק את המשתנה",
     "deleteVariable": "מחק את המשתנה {{key}}",

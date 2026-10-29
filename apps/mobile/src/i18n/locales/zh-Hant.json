@@ -3961,7 +3961,11 @@
       "pinnedToast": "固定到“{{repo}}”",
       "pinFailed": "無法固定儲存庫",
       "unboundToast": "倉庫已解除綁定",
-      "unbindFailed": "無法解除倉庫綁定"
+      "unbindFailed": "無法解除倉庫綁定",
+      "repoValue": "存儲庫: {{name}}",
+      "profileValue": "個人資料: {{name}}",
+      "pickerEmptyDescriptionOrganization": "建立組織設定檔以跨會話重複使用環境變數、設定命令和技能。",
+      "pickerEmptyDescriptionOrganizationReadOnly": "組織擁有者或管理員可以建立組織設定檔。"
     },
     "variablesDeleteFailed": "無法刪除變數",
     "deleteVariable": "刪除變數 {{key}}",

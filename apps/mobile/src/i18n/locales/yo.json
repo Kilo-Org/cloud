@@ -3961,7 +3961,11 @@
       "pinnedToast": "Ti so mọ \"{{repo}}\"",
       "pinFailed": "Ko le pin repo",
       "unboundToast": "A ti tú repo sílẹ̀",
-      "unbindFailed": "Ko le yọkuro repo"
+      "unbindFailed": "Ko le yọkuro repo",
+      "repoValue": "Ibi ipamọ: {{name}}",
+      "profileValue": "Profaili: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Ṣẹda profaili ajọ kan lati tun lo awọn oniyipada ayika, awọn pipaṣẹ iṣeto, ati awọn ọgbọn kọja awọn akoko.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Olukilani ajọ tabi olùṣàkoso ajọ le ṣẹda profaili ajọ kan."
     },
     "variablesDeleteFailed": "Ko le paarẹ oniyipada",
     "deleteVariable": "Pa oniyipada {{key}} rẹ́",

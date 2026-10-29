@@ -3961,7 +3961,11 @@
       "pinnedToast": "\"{{repo}}\" मा पिन गरियो",
       "pinFailed": "रिपो पिन गर्न सकिएन",
       "unboundToast": "रिपो अनबाउन्ड",
-      "unbindFailed": "रिपो अनबाइन्ड गर्न सकेन"
+      "unbindFailed": "रिपो अनबाइन्ड गर्न सकेन",
+      "repoValue": "भण्डार: {{name}}",
+      "profileValue": "प्रोफाइल: {{name}}",
+      "pickerEmptyDescriptionOrganization": "वातावरण चरहरू, सेटअप आदेशहरू, र सत्रहरूमा सीपहरू पुन: प्रयोग गर्न संगठन प्रोफाइल सिर्जना गर्नुहोस्।",
+      "pickerEmptyDescriptionOrganizationReadOnly": "संगठनको मालिक वा प्रशासकले संगठन प्रोफाइल सिर्जना गर्न सक्छ।"
     },
     "variablesDeleteFailed": "चर मेटाउन सकिएन",
     "deleteVariable": "चर {{key}} मेट्नुहोस्",

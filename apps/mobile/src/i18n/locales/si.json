@@ -3961,7 +3961,11 @@
       "pinnedToast": "\"{{repo}}\" වෙත අමුණන ලදී",
       "pinFailed": "repo පින් කිරීමට නොහැකි විය",
       "unboundToast": "Repo නොබැඳි",
-      "unbindFailed": "repo බැඳීම ඉවත් කළ නොහැකි විය"
+      "unbindFailed": "repo බැඳීම ඉවත් කළ නොහැකි විය",
+      "repoValue": "ගබඩාව: {{name}}",
+      "profileValue": "පැතිකඩ: {{name}}",
+      "pickerEmptyDescriptionOrganization": "සැසි හරහා පරිසර විචල්‍ය, සැකසුම් විධාන සහ කුසලතා නැවත භාවිතා කිරීමට සංවිධාන පැතිකඩක් සාදන්න.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "සංවිධාන හිමිකරුවෙකුට හෝ පරිපාලකයෙකුට සංවිධාන පැතිකඩක් සෑදිය හැක."
     },
     "variablesDeleteFailed": "විචල්‍යය මකා දැමීමට නොහැකි විය",
     "deleteVariable": "විචල්‍යය {{key}} මකන්න",

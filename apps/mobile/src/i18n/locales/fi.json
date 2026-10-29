@@ -3961,7 +3961,11 @@
       "pinnedToast": "Kiinnitetty kohtaan \"{{repo}}\"",
       "pinFailed": "Koodivarastoa ei voitu kiinnittää",
       "unboundToast": "Koodivaraston sidonta purettu",
-      "unbindFailed": "Koodivaraston sidontaa ei voitu purkaa"
+      "unbindFailed": "Koodivaraston sidontaa ei voitu purkaa",
+      "repoValue": "Koodivarasto: {{name}}",
+      "profileValue": "Profiili: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Luo organisaatioprofiili käyttääksesi uudelleen ympäristömuuttujia, asetuskomentoja ja taitoja istuntojen aikana.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Organisaation omistaja tai ylläpitäjä voi luoda organisaatioprofiilin."
     },
     "variablesDeleteFailed": "Muuttujaa ei voitu poistaa",
     "deleteVariable": "Poista muuttuja {{key}}",

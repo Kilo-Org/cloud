@@ -3961,7 +3961,11 @@
       "pinnedToast": "Voafandrika amin'ny \"{{repo}}\"",
       "pinFailed": "Tsy afaka nametaka repo",
       "unboundToast": "Repo tsy voafatotra",
-      "unbindFailed": "Tsy afaka namaha ny repo"
+      "unbindFailed": "Tsy afaka namaha ny repo",
+      "repoValue": "Tahiry: {{name}}",
+      "profileValue": "Mombamomba: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Mamorona mombamomba momba ny fikambanana hampiasaina indray ny fari-piainan'ny tontolo iainana, baiko fanamboarana ary fahaiza-manao mandritra ny fotoam-pivoriana.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Ny tompon'ny fikambanana na ny mpandrindra dia afaka mamorona mombamomba momba ny fikambanana."
     },
     "variablesDeleteFailed": "Tsy afaka namafa ny ova",
     "deleteVariable": "Fafao miovaova {{key}}",

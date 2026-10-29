@@ -3961,7 +3961,11 @@
       "pinnedToast": "\"{{repo}}\" पर पिन किया गया",
       "pinFailed": "रेपो पिन नहीं किया जा सका",
       "unboundToast": "रेपो अनबाउंड",
-      "unbindFailed": "रेपो को अनबाइंड नहीं किया जा सका"
+      "unbindFailed": "रेपो को अनबाइंड नहीं किया जा सका",
+      "repoValue": "रिपॉजिटरी: {{name}}",
+      "profileValue": "प्रोफ़ाइल: {{name}}",
+      "pickerEmptyDescriptionOrganization": "सभी सत्रों में पर्यावरण चर, सेटअप कमांड और कौशल का पुन: उपयोग करने के लिए एक संगठन प्रोफ़ाइल बनाएं।",
+      "pickerEmptyDescriptionOrganizationReadOnly": "संगठन स्वामी या व्यवस्थापक एक संगठन प्रोफ़ाइल बना सकता है।"
     },
     "variablesDeleteFailed": "वेरिएबल हटाया नहीं जा सका",
     "deleteVariable": "वेरिएबल {{key}} हटाएँ",

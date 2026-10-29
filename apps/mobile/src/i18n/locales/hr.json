@@ -4012,7 +4012,11 @@
       "pinnedToast": "Prikvačeno na \"{{repo}}\"",
       "pinFailed": "Nije moguće prikvačiti repo",
       "unboundToast": "Repo bez veza",
-      "unbindFailed": "Nije moguće odvezati repo"
+      "unbindFailed": "Nije moguće odvezati repo",
+      "repoValue": "Spremište: {{name}}",
+      "profileValue": "Profil: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Izradite profil organizacije za ponovno korištenje varijabli okoline, naredbi za postavljanje i vještina u više sesija.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Vlasnik ili administrator organizacije može izraditi profil organizacije."
     },
     "variablesDeleteFailed": "Nije moguće izbrisati varijablu",
     "deleteVariable": "Obriši varijablu {{key}}",

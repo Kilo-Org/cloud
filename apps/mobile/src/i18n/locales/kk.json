@@ -3961,7 +3961,11 @@
       "pinnedToast": "\"{{repo}}\" қалтасына бекітілген",
       "pinFailed": "Репо бекіту мүмкін болмады",
       "unboundToast": "Репо шектелмеген",
-      "unbindFailed": "Репоны ажырату мүмкін болмады"
+      "unbindFailed": "Репоны ажырату мүмкін болмады",
+      "repoValue": "Репозиторий: {{name}}",
+      "profileValue": "Профиль: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Орташа айнымалы мәндерді, орнату пәрмендерін және сеанстардағы дағдыларды қайта пайдалану үшін ұйым профилін жасаңыз.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Ұйым иесі немесе әкімшісі ұйым профилін жасай алады."
     },
     "variablesDeleteFailed": "Айнымалы мәнді өшіру мүмкін болмады",
     "deleteVariable": "{{key}} айнымалысын жою",

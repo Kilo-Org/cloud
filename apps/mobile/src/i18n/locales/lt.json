@@ -4063,7 +4063,11 @@
       "pinnedToast": "Prisegta prie „{{repo}}“",
       "pinFailed": "Nepavyko prisegti atpirkimo sandorio",
       "unboundToast": "Atpirkimas neapribotas",
-      "unbindFailed": "Nepavyko atsieti atpirkimo sandorio"
+      "unbindFailed": "Nepavyko atsieti atpirkimo sandorio",
+      "repoValue": "Saugykla: {{name}}",
+      "profileValue": "Profilis: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Sukurkite organizacijos profilį, kad seansų metu pakartotinai naudotumėte aplinkos kintamuosius, sąrankos komandas ir įgūdžius.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Organizacijos savininkas arba administratorius gali sukurti organizacijos profilį."
     },
     "variablesDeleteFailed": "Nepavyko ištrinti kintamojo",
     "deleteVariable": "Ištrinti kintamąjį {{key}}",

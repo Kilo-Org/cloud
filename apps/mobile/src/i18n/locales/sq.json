@@ -3961,7 +3961,11 @@
       "pinnedToast": "Gozhduar te \"{{repo}}\"",
       "pinFailed": "Depo nuk mund të gozhdohej",
       "unboundToast": "Repo e palidhur",
-      "unbindFailed": "Repo nuk mund të shkëputej"
+      "unbindFailed": "Repo nuk mund të shkëputej",
+      "repoValue": "Depoja: {{name}}",
+      "profileValue": "Profili: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Krijo një profil organizate për të ripërdorur variablat e mjedisit, komandat e konfigurimit dhe aftësitë nëpër sesione.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Pronari i organizatës ose një administrator mund të krijojë një profil organizate."
     },
     "variablesDeleteFailed": "Variabla nuk mund të fshihej",
     "deleteVariable": "Fshi variablin {{key}}",

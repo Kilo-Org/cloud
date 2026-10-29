@@ -3961,7 +3961,11 @@
       "pinnedToast": "Fastgjort til \"{{repo}}\"",
       "pinFailed": "Repo kunne ikke fastgøres",
       "unboundToast": "Repo ubundet",
-      "unbindFailed": "Repo kunne ikke ophæves"
+      "unbindFailed": "Repo kunne ikke ophæves",
+      "repoValue": "Lager: {{name}}",
+      "profileValue": "Profil: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Opret en organisationsprofil for at genbruge miljøvariabler, opsætningskommandoer og færdigheder på tværs af sessioner.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "En organisationsejer eller administrator kan oprette en organisationsprofil."
     },
     "variablesDeleteFailed": "Variablen kunne ikke slettes",
     "deleteVariable": "Slet variabel {{key}}",

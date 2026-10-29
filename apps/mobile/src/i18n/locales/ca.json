@@ -4012,7 +4012,11 @@
       "pinnedToast": "Fixat a \"{{repo}}\"",
       "pinFailed": "No s'ha pogut fixar el repo",
       "unboundToast": "Repo no lligat",
-      "unbindFailed": "No s'ha pogut desenllaçar el repo"
+      "unbindFailed": "No s'ha pogut desenllaçar el repo",
+      "repoValue": "Repositori: {{name}}",
+      "profileValue": "Perfil: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Creeu un perfil d'organització per reutilitzar variables d'entorn, ordres de configuració i habilitats entre sessions.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Un propietari o administrador de l'organització pot crear un perfil d'organització."
     },
     "variablesDeleteFailed": "No s'ha pogut suprimir la variable",
     "deleteVariable": "Elimina la variable {{key}}",

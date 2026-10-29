@@ -3961,7 +3961,11 @@
       "pinnedToast": "Rögzítve a következő adattárhoz: „{{repo}}”",
       "pinFailed": "Nem sikerült rögzíteni az adattárat",
       "unboundToast": "Az adattár kötése feloldva",
-      "unbindFailed": "Nem sikerült feloldani az adattár kötését"
+      "unbindFailed": "Nem sikerült feloldani az adattár kötését",
+      "repoValue": "Adattár: {{name}}",
+      "profileValue": "Profil: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Hozzon létre egy szervezeti profilt a környezeti változók, a beállítási parancsok és a készségek munkamenetek közötti újrafelhasználásához.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Szervezeti profilt a szervezet tulajdonosa vagy rendszergazdája hozhat létre."
     },
     "variablesDeleteFailed": "Nem sikerült törölni a változót",
     "deleteVariable": "{{key}} változó törlése",

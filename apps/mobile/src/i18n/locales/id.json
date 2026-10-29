@@ -3961,7 +3961,11 @@
       "pinnedToast": "Disematkan ke \"{{repo}}\"",
       "pinFailed": "Tidak dapat menyematkan repo",
       "unboundToast": "Repo tidak terikat",
-      "unbindFailed": "Tidak dapat melepaskan ikatan repo"
+      "unbindFailed": "Tidak dapat melepaskan ikatan repo",
+      "repoValue": "Repositori: {{name}}",
+      "profileValue": "Profil: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Buat profil organisasi untuk menggunakan kembali variabel lingkungan, perintah pengaturan, dan keterampilan di seluruh sesi.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Pemilik atau admin organisasi dapat membuat profil organisasi."
     },
     "variablesDeleteFailed": "Tidak dapat menghapus variabel",
     "deleteVariable": "Hapus variabel {{key}}",

@@ -4012,7 +4012,11 @@
       "pinnedToast": "Épinglé sur \"{{repo}}\"",
       "pinFailed": "Impossible d'épingler le dépôt",
       "unboundToast": "Dépôt non lié",
-      "unbindFailed": "Impossible de dissocier le dépôt"
+      "unbindFailed": "Impossible de dissocier le dépôt",
+      "repoValue": "Référentiel : {{name}}",
+      "profileValue": "Profil : {{name}}",
+      "pickerEmptyDescriptionOrganization": "Créez un profil d'organisation pour réutiliser les variables d'environnement, les commandes de configuration et les compétences au fil des sessions.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Un propriétaire ou un administrateur d'organisation peut créer un profil d'organisation."
     },
     "variablesDeleteFailed": "Impossible de supprimer la variable",
     "deleteVariable": "Supprimer la variable {{key}}",

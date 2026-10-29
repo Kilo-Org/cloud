@@ -3961,7 +3961,11 @@
       "pinnedToast": "Akọnyere na \"{{repo}}\"",
       "pinFailed": "Enweghị ike itinye repo",
       "unboundToast": "Repo ewepụghị",
-      "unbindFailed": "Enweghị ike iwepụ repo"
+      "unbindFailed": "Enweghị ike iwepụ repo",
+      "repoValue": "Ebe nchekwa: {{name}}",
+      "profileValue": "Profaịlụ: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Mepụta profaịlụ otumobi iji megharịa mgbanwe gburugburu ebe obibi, iwu ntọlite na nka n'ofe oge.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Onye nwe otumobi ma ọ bụ onye nchịkwa nwere ike mepụta profaịlụ otumobi."
     },
     "variablesDeleteFailed": "Enweghị ike ihichapụ mgbanwe",
     "deleteVariable": "Hichapụ mgbanwe {{key}}",

@@ -3961,7 +3961,11 @@
       "pinnedToast": "「{{repo}}」に固定されています",
       "pinFailed": "リポジトリを固定できませんでした",
       "unboundToast": "バインドされていないリポジトリ",
-      "unbindFailed": "リポジトリのバインドを解除できませんでした"
+      "unbindFailed": "リポジトリのバインドを解除できませんでした",
+      "repoValue": "リポジトリ: {{name}}",
+      "profileValue": "プロフィール: {{name}}",
+      "pickerEmptyDescriptionOrganization": "組織プロフィールを作成して、セッション間で環境変数、セットアップ コマンド、スキルを再利用します。",
+      "pickerEmptyDescriptionOrganizationReadOnly": "組織のオーナーまたは管理者が組織プロフィールを作成できます。"
     },
     "variablesDeleteFailed": "変数を削除できませんでした",
     "deleteVariable": "変数{{key}}を削除",

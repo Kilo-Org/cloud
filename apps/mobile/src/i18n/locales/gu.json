@@ -3961,7 +3961,11 @@
       "pinnedToast": "\"{{repo}}\" પર પિન કરેલ",
       "pinFailed": "રેપો પિન કરી શકાયું નથી",
       "unboundToast": "રેપો અનબાઉન્ડ",
-      "unbindFailed": "રેપોને અનબાઇન્ડ કરી શકાયું નથી"
+      "unbindFailed": "રેપોને અનબાઇન્ડ કરી શકાયું નથી",
+      "repoValue": "રીપોઝીટરી: {{name}}",
+      "profileValue": "પ્રોફાઇલ: {{name}}",
+      "pickerEmptyDescriptionOrganization": "સમગ્ર સત્રોમાં પર્યાવરણ ચલો, સેટઅપ કમાન્ડ અને કૌશલ્યોનો ફરીથી ઉપયોગ કરવા માટે સંસ્થા પ્રોફાઇલ બનાવો.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "સંસ્થા માલિક અથવા એડમિન સંસ્થા પ્રોફાઇલ બનાવી શકે છે."
     },
     "variablesDeleteFailed": "ચલ ડિલીટ કરી શકાયું નથી",
     "deleteVariable": "ચલ {{key}} કાઢી નાખો",

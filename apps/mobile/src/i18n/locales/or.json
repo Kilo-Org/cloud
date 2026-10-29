@@ -3961,7 +3961,11 @@
       "pinnedToast": "\"{{repo}}\" କୁ ପିନ୍ କରାଯାଇଛି",
       "pinFailed": "ରେପୋ ପିନ୍ କରିପାରିଲା ନାହିଁ।",
       "unboundToast": "ରେପୋ ଅନ୍ବାଉଣ୍ଡ୍।",
-      "unbindFailed": "ରେପୋ ଅନ୍ବିଣ୍ଡ କରିପାରିବ ନାହିଁ।"
+      "unbindFailed": "ରେପୋ ଅନ୍ବିଣ୍ଡ କରିପାରିବ ନାହିଁ।",
+      "repoValue": "ସଂଗ୍ରହାଳୟ: {{name}}",
+      "profileValue": "ପ୍ରୋଫାଇଲ୍: {{name}}",
+      "pickerEmptyDescriptionOrganization": "ପରିବେଶ ଭେରିଏବଲ୍, ସେଟଅପ୍ କମାଣ୍ଡ, ଏବଂ ଅଧିବେଶନରେ କୌଶଳ ପୁନଃ ବ୍ୟବହାର କରିବାକୁ ଏକ ସଂଗଠନ ପ୍ରୋଫାଇଲ୍ ସୃଷ୍ଟି କରନ୍ତୁ।",
+      "pickerEmptyDescriptionOrganizationReadOnly": "ଏକ ସଂଗଠନ ମାଲିକ କିମ୍ବା ଆଡମିନ୍ ଏକ ସଂଗଠନ ପ୍ରୋଫାଇଲ୍ ସୃଷ୍ଟି କରିପାରିବେ।"
     },
     "variablesDeleteFailed": "ଭେରିଏବଲ୍ ଡିଲିଟ୍ କରିପାରିଲା ନାହିଁ।",
     "deleteVariable": "ଭେରିଏବଲ୍ {{key}} ବିଲୋପ କରନ୍ତୁ",

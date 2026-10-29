@@ -4012,7 +4012,11 @@
       "pinnedToast": "Fissato a \"{{repo}}\"",
       "pinFailed": "Impossibile bloccare il repository",
       "unboundToast": "Repo non vincolato",
-      "unbindFailed": "Impossibile scollegare il repository"
+      "unbindFailed": "Impossibile scollegare il repository",
+      "repoValue": "Archivio: {{name}}",
+      "profileValue": "Profilo: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Crea un profilo dell'organizzazione per riutilizzare variabili di ambiente, comandi di configurazione e competenze tra le sessioni.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Un proprietario o un amministratore dell'organizzazione può creare un profilo dell'organizzazione."
     },
     "variablesDeleteFailed": "Impossibile eliminare la variabile",
     "deleteVariable": "Elimina la variabile {{key}}",

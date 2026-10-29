@@ -3961,7 +3961,11 @@
       "pinnedToast": "\"{{repo}}\" သို့ ပင်ထိုးပြီးပါပြီ။",
       "pinFailed": "repo ကို ပင်ထိုး၍မရပါ။",
       "unboundToast": "Repo ချိတ်ဆက်မှုကို ဖြုတ်ပြီးပါပြီ။",
-      "unbindFailed": "repo ကို ပြန်တွဲ၍ မရပါ။"
+      "unbindFailed": "repo ကို ပြန်တွဲ၍ မရပါ။",
+      "repoValue": "သိုလှောင်မှု: {{name}}",
+      "profileValue": "ပရိုဖိုင်: {{name}}",
+      "pickerEmptyDescriptionOrganization": "စက်ရှင်များတစ်လျှောက် ပတ်ဝန်းကျင် variable များ၊ စနစ်ထည့်သွင်းရန် ညွှန်ကြားချက်များနှင့် ကျွမ်းကျင်မှုများကို ပြန်လည်အသုံးပြုရန် အဖွဲ့အစည်း ပရိုဖိုင်တစ်ခု ဖန်တီးပါ။",
+      "pickerEmptyDescriptionOrganizationReadOnly": "အဖွဲ့အစည်း ပိုင်ရှင် သို့မဟုတ် စီမံခန့်ခွဲသူတစ်ဦးက အဖွဲ့အစည်း ပရိုဖိုင်ကို ဖန်တီးနိုင်ပါသည်။"
     },
     "variablesDeleteFailed": "ကိန်းရှင်ကို ဖျက်၍မရပါ။",
     "deleteVariable": "ကိန်းရှင် {{key}} ကို ဖျက်ပါ",

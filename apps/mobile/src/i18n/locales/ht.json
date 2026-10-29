@@ -3961,7 +3961,11 @@
       "pinnedToast": "Mete sou \"{{repo}}\"",
       "pinFailed": "Pa t 'kapab pin repo",
       "unboundToast": "Depo demare",
-      "unbindFailed": "Pa t 'kapab dezole repo"
+      "unbindFailed": "Pa t 'kapab dezole repo",
+      "repoValue": "Depo: {{name}}",
+      "profileValue": "Pwofil: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Kreye yon pwofil òganizasyon pou reitilize varyab anviwònman yo, lòd konfigirasyon, ak ladrès atravè sesyon yo.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Yon pwopriyetè oswa administratè òganizasyon ka kreye yon pwofil òganizasyon."
     },
     "variablesDeleteFailed": "Pa t 'kapab efase varyab",
     "deleteVariable": "Efase varyab {{key}}",

@@ -3961,7 +3961,11 @@
       "pinnedToast": "Vasgespeld aan \"{{repo}}\"",
       "pinFailed": "Kon nie repo vasspeld nie",
       "unboundToast": "Repo ongebonde",
-      "unbindFailed": "Kon nie repo ontbind nie"
+      "unbindFailed": "Kon nie repo ontbind nie",
+      "repoValue": "Bewaarplek: {{name}}",
+      "profileValue": "Profiel: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Skep 'n organisasieprofiel om omgewingsveranderlikes, opstelopdragte en vaardighede oor sessies te hergebruik.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Die eienaar of admin van 'n organisasie kan 'n organisasieprofiel skep."
     },
     "variablesDeleteFailed": "Kon nie veranderlike verwyder nie",
     "deleteVariable": "Skrap veranderlike {{key}}",

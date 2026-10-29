@@ -11,25 +11,26 @@ KiloClaw reaches end of life in December 2026, and every subscription needs to s
 
 ## Evidence
 
-- apps/web/src/routers/admin-router.ts:1488-1760 has cancelKiloClawSubscription. Its period_end branch requires status 'active' both before the Stripe call and again during reconciliation (the 'local row was no longer active' check). If a Stripe subscription exists, it releases the schedule and calls stripe subscriptions.update(cancel_at_period_end: true). It then reconciles in a transaction: it sets cancel_at_period_end=true, clears the schedule and scheduled-plan fields, writes a change log with reason 'admin_cancel_at_period_end', and writes an admin audit row 'kiloclaw.subscription.admin_cancel'.
+- apps/web/src/routers/admin-router.ts:1488-1760 has cancelKiloClawSubscription. Its period_end branch requires status 'active' both before the Stripe call and again during reconciliation. If a Stripe subscription exists, it releases the schedule and calls stripe subscriptions.update with only { cancel_at_period_end: true }. The local update (lines 1675-1690) writes only cancel_at_period_end=true and clears stripe_schedule_id, scheduled_plan and scheduled_by. It does not touch status, current_period_end, credit_renewal_at, commit_ends_at, past_due_since, suspended_at or destruction_deadline. Date changes happen only in the separate 'immediate' branch (current_period_end = now, credit_renewal_at = now, trial_ends_at = now).
 - admin-router.ts:196-300 defines KiloClawCancelAuditMetadata and the file-local lock, audit-state and desired-state helpers.
 - Today a period_end call that fails before reconciliation writes no audit row.
-- .specs/kiloclaw-billing.md 'Cancellation and Reactivation' rules 1-6 say Stripe-funded rows need the flag set in both Stripe and the DB, and pure-credit rows need the local flag only. Access continues until the period ends.
-- services/kiloclaw-billing/src/lifecycle.ts:2400-2410: the credit renewal sweep selects pure-credit rows with status active or past_due. Credit Renewal rule 5 says a row with cancel_at_period_end set is moved to canceled without a deduction, so past_due pure-credit rows with the flag stop retrying payment at their next boundary. lifecycle.ts:4551 has a separate past-due cleanup that suspends rows more than 14 days overdue.
-- services/kiloclaw-billing/src/provision-bootstrap-shared.ts:444-452: organization-managed rows are inserted as plan 'standard', status 'active', payment_source 'credits', with no Stripe subscription and no credit_renewal_at or current_period_end. They never renew, so cancel_at_period_end alone never moves them to canceled.
-- .specs/kiloclaw-billing.md:519-525: a trial grants access only while trial_ends_at is in the future, and expiry does not move the user to another plan. Trials are 7 days for personal and 14 days for org (alignment-script tests). Trialing rows therefore end on their own.
+- .specs/kiloclaw-billing.md 'Cancellation and Reactivation' rule 4 says cancellation must not end access immediately; access continues until the current billing period ends. Rules 5-6 require the flag in both Stripe and the DB for Stripe-funded rows, and in the DB only for pure-credit rows.
+- services/kiloclaw-billing/src/lifecycle.ts:2400-2410: the credit renewal sweep selects pure-credit rows with status active or past_due. Credit Renewal rule 5 says that for a flagged row the sweep skips the deduction, sets status to canceled, and keeps the existing current_period_end. lifecycle.ts:4551 has a separate past-due cleanup that suspends rows more than 14 days overdue.
+- services/kiloclaw-billing/src/provision-bootstrap-shared.ts:444-452: organization-managed rows are inserted as 'standard', 'active', 'credits', with no Stripe subscription and no credit_renewal_at or current_period_end. They never renew, so the cancel flag alone never moves them to canceled.
+- .specs/kiloclaw-billing.md:519-525: a trial grants access only while trial_ends_at is in the future, and expiry does not move the user to another plan. Trials are 7 days (personal) or 14 days (org).
 - packages/db/src/schema-types.ts:825 defines the KiloClawAdminAuditAction enum. The column is plain text, so no migration is needed.
 - apps/web/src/app/api/trpc/[trpc]/route.ts sets maxDuration = 800s. The operator says there are about 300 subscriptions.
 
 ## Desired outcome
 
-On the KiloClaw admin page, an admin sees how many subscriptions are eligible and confirms a single 'Stop renewal for all subscriptions' action. In one call, every current active or past-due KiloClaw subscription, personal and organization-managed, is set to cancel at its period end in both Stripe (where applicable) and the local DB. Access continues until each period ends. The audit log gets one summary row plus one row per subscription for every outcome. The admin sees updated, skipped and failed counts. Running it again only processes rows that are still eligible.
+On the KiloClaw admin page, an admin sees how many subscriptions are eligible and confirms a single 'Stop renewal for all subscriptions' action. In one call, every current active or past-due KiloClaw subscription, personal and organization-managed, is marked not to renew: cancel_at_period_end is set in Stripe (where applicable) and in the local DB. No existing end date, status or lifecycle timestamp changes, in our DB or in Stripe. A past-due row keeps its past_due_since and period end, and a suspended row keeps its suspension and destruction deadline. Access continues until each existing period ends. The audit log gets one summary row plus one row per subscription for every outcome. The admin sees updated, skipped and failed counts. Running it again only processes rows that are still eligible.
 
 ## Scope
 
 - In admin-router.ts, move the existing period_end branch and its reconcile code into a file-local function with an `allowedStatuses` parameter. The existing per-user mutation passes ['active'] and behaves exactly as today. The bulk mutation passes ['active','past_due'].
 - Eligibility: status IN ('active','past_due'), cancel_at_period_end=false, and transferred_to_subscription_id IS NULL. Personal and organization-managed rows are both included.
-- Add an admin query, previewBulkCancelKiloClawSubscriptions, that returns eligible counts by status (active/past_due), ownership (personal/org) and funding (Stripe-backed/pure credit), plus the count of rows with no renewal period.
+- Preserve all dates. The local write is limited to cancel_at_period_end plus clearing the pending schedule fields (stripe_schedule_id, scheduled_plan, scheduled_by). The Stripe call is limited to { cancel_at_period_end: true }: no cancel_at, billing_cycle_anchor, proration or trial_end parameters.
+- Add an admin query, previewBulkCancelKiloClawSubscriptions, that returns eligible counts by status, ownership and funding, plus the count of rows with no renewal period.
 - Add an admin mutation, bulkCancelKiloClawSubscriptions. It requires a confirmation literal, processes all eligible rows in one call with small concurrency, isolates failures per row, and returns {total, updated, skipped, failed: [...]}.
 - Audit: one summary 'kiloclaw.subscription.bulk_cancel_at_period_end' row per run, plus a per-subscription 'kiloclaw.subscription.admin_cancel' row for every processed subscription (updated, skipped and failed), linked by bulkRunId.
 - Add a UI control on KiloclawInstancesPage: the preview breakdown, typed confirmation, and a result dialog.
@@ -38,6 +39,7 @@ On the KiloClaw admin page, an admin sees how many subscriptions are eligible an
 ## Exclusions
 
 - Trialing subscriptions. Trials end on their own within 7 days (personal) or 14 days (org) and never auto-convert to paid, so there is nothing to stop.
+- Changing any existing end date or lifecycle timestamp (current_period_end, credit_renewal_at, commit_ends_at, trial_ends_at, past_due_since, suspended_at, destruction_deadline), or any status. The bulk path never uses the existing 'immediate' branch for rows that already have a period.
 - Immediate cancellation, refunds, and any suspension or destruction of instances in the default plan. The existing period-end, past-due cleanup and expiry sweeps stay as they are. Handling for org rows with no renewal period is pending an operator answer.
 - Blocking enrollment or reactivation, and any persistent EOL flag.
 - Client-driven batching or limit inputs.
@@ -46,13 +48,13 @@ On the KiloClaw admin page, an admin sees how many subscriptions are eligible an
 
 ## Approach
 
-- 1. In admin-router.ts, lift the period_end branch and its reconcile transaction into a file-local `cancelKiloClawSubscriptionAtPeriodEnd({ userId, subscriptionId, actor, allowedStatuses, bulkRunId? })`. Both the status check before the Stripe call and the reconcile check (currently `localSubscription.status !== 'active'`) use allowedStatuses. The existing mutation passes ['active'], so its errors and messages stay the same. The function returns 'updated' | 'already_desired' | 'local_row_changed_after_stripe' and throws as today.
-- 2. Next to it, add `previewBulkCancelKiloClawSubscriptions` (query) and `bulkCancelKiloClawSubscriptions` (mutation, input { confirm: z.literal('STOP RENEWALS') }). The eligibility query left-joins kiloclaw_instances, which is only needed for the preview's ownership breakdown. The mutation generates a bulkRunId and runs the function over all eligible rows with a concurrency of about 5, passing allowedStatuses ['active','past_due']. It maps the outcomes to updated, skipped and failed.
-- 3. Past-due behavior: for Stripe-backed past_due rows, cancel_at_period_end goes to Stripe exactly as for active rows. Stripe's existing dunning may still collect the open invoice, but there is no new renewal after that. Pure-credit past_due rows get the local flag, and the credit renewal sweep then moves them to canceled at the next boundary instead of retrying. The 14-day past-due cleanup is unchanged.
-- 4. Organization-managed rows go through the same period_end path. Default handling, pending the operator's answer: if the row has no current_period_end or credit_renewal_at, the flag is still set and the row is counted in the result and audit metadata as 'no_renewal_period', so the admin can see that it will not cancel by itself. If the operator chooses immediate cancellation for these rows, the bulk loop calls the existing immediate branch only for them.
+- 1. In admin-router.ts, lift the period_end branch and its reconcile transaction into a file-local `cancelKiloClawSubscriptionAtPeriodEnd({ userId, subscriptionId, actor, allowedStatuses, bulkRunId? })`. Both the status check before the Stripe call and the reconcile check use allowedStatuses. The existing mutation passes ['active'], so its errors stay the same. The function keeps today's narrow writes: Stripe gets only { cancel_at_period_end: true }, and the DB set clause includes only cancel_at_period_end and the three pending-schedule fields. It returns 'updated' | 'already_desired' | 'local_row_changed_after_stripe'.
+- 2. Next to it, add `previewBulkCancelKiloClawSubscriptions` (query) and `bulkCancelKiloClawSubscriptions` (mutation, input { confirm: z.literal('STOP RENEWALS') }). The mutation generates a bulkRunId and runs the function over all eligible rows with a concurrency of about 5, passing allowedStatuses ['active','past_due']. It maps the outcomes to updated, skipped and failed.
+- 3. Past-due rows keep status 'past_due', past_due_since and current_period_end. Suspended rows keep suspended_at and destruction_deadline. For Stripe-backed rows, Stripe cancels at the end of its existing current period. Its dunning may still collect the open invoice, but nothing renews after that. Pure-credit rows are moved to canceled by the credit renewal sweep at their existing boundary, and the sweep keeps current_period_end. The 14-day past-due cleanup is unchanged.
+- 4. Organization-managed rows go through the same period_end path. Default handling, pending the operator's answer: if a row has no current_period_end or credit_renewal_at, the flag is still set and the row is reported as 'no_renewal_period'. Only rows without any end date would ever get one, and only if the operator picks immediate cancellation for them.
 - 5. Audit: rows that fail before reconciliation get their own 'kiloclaw.subscription.admin_cancel' row ({ bulkRunId, subscriptionId, outcome: 'failed', error }). Updated and skipped rows get their audit row from the function, with bulkRunId attached. After the loop, one 'kiloclaw.subscription.bulk_cancel_at_period_end' summary row records the counts and failed IDs. Add that action to KiloClawAdminAuditAction (text only, no migration).
 - 6. UI: add a StopAllRenewalsButton on KiloclawInstancesPage, not gated to development. It shows the preview breakdown, requires the typed phrase, makes one mutation call, and shows a result dialog in the DevNukeAllButton style.
-- 7. Tests: a mixed fleet (active Stripe with a schedule, active pure-credit, past_due Stripe, past_due pure-credit, org-managed active, trialing, canceled, already-canceling, transferred) gets only the active and past_due current rows updated. One injected Stripe failure is reported, audited, and does not stop the others. A second run is a no-op. The existing single-cancel tests, including the rejection of non-active rows, stay unchanged.
+- 7. Tests: a mixed fleet (active Stripe with a schedule, active pure-credit, past_due Stripe, past_due pure-credit, suspended past_due with a destruction deadline, org-managed active, trialing, canceled, already-canceling, transferred) gets only the active and past_due current rows flagged. A before/after snapshot shows every date and status field unchanged. The Stripe mock asserts the update payload is exactly { cancel_at_period_end: true }. One injected Stripe failure is reported, audited, and does not stop the others. A second run is a no-op. The existing single-cancel tests stay unchanged.
 
 ## Affected areas
 
@@ -72,7 +74,7 @@ On the KiloClaw admin page, an admin sees how many subscriptions are eligible an
 
 **Verification:** Code review
 
-### ac-14: Access is not ended by the bulk action. Processed rows keep their existing status ('active' or 'past_due') and their current_period_end, credit_renewal_at and past_due_since unchanged.
+### ac-18: No existing end date or lifecycle state changes. For every row the bulk action processes, these fields are byte-for-byte identical before and after: status, current_period_start, current_period_end, credit_renewal_at, commit_ends_at, trial_ends_at, past_due_since, suspended_at and destruction_deadline. The local write is limited to cancel_at_period_end and the three pending-schedule fields. The Stripe update payload is exactly { cancel_at_period_end: true }, with no cancel_at, billing_cycle_anchor, proration_behavior or trial_end. Tests snapshot these fields for active, past_due and suspended past_due rows and assert the exact Stripe payload.
 
 **Verification:** Code review
 
@@ -117,16 +119,18 @@ On the KiloClaw admin page, an admin sees how many subscriptions are eligible an
 - Running the action in production affects real billing across the fleet. The mitigations are typed confirmation, the preview breakdown, per-row audit entries, and reversibility through the existing reactivation flows.
 - Organization-managed bootstrap rows have no renewal period, so the cancel flag alone never cancels them. This is surfaced as 'no_renewal_period' and the handling is pending the operator's answer.
 - For Stripe-backed past_due rows, Stripe dunning may still collect the outstanding invoice before the period ends. That payment is for the current period, not a renewal.
+- If a future refactor routes bulk rows through the 'immediate' branch or adds Stripe parameters, end dates could change. The snapshot test and the exact-payload assertion guard against this.
 - Stripe can succeed while the local reconcile fails. These cases are reported as failures with audit rows for manual review.
 - A single request processes all rows. At about 300 rows this is well under 800s, and re-running after a cut-off request is safe.
 - Hybrid rows must still go through Stripe. Eligibility for the Stripe call is based on stripe_subscription_id, not payment_source.
-- As with the single cancel, this clears a pending scheduled_plan, including a Commit-to-Standard continuation.
+- As with the single cancel, this clears a pending scheduled_plan, including a Commit-to-Standard continuation. It does not change commit_ends_at.
 - Users can still reactivate afterwards, so this is not a permanent lock.
 
 ## Assumptions
 
 - About 300 subscriptions, essentially single-use.
 - Trialing rows need no action because they expire on their own without converting to paid.
+- Releasing a pending Stripe subscription schedule leaves the subscription's current period unchanged. The existing per-user cancel already relies on this.
 - No user notification email is needed.
 - Configured verification commands could not be established from the pinned checkout, so criteria use code/source review and one manual check.
 
@@ -171,5 +175,11 @@ On the KiloClaw admin page, an admin sees how many subscriptions are eligible an
 ### d-7: How should organization-managed rows with no renewal period be handled?
 
 **Answer:** Provisional default: set the flag and report the row as 'no_renewal_period'. This is pending the operator's answer to the open question, which may change it to immediate cancellation or exclusion.
+
+**Blocking:** no
+
+### d-8: Can the bulk action change existing end dates or lifecycle timestamps?
+
+**Answer:** No. It only sets the non-renewal flag (and clears pending plan schedules). Existing period ends, renewal dates, commit ends, past-due and suspension timestamps, destruction deadlines and status are preserved in both the DB and Stripe.
 
 **Blocking:** no

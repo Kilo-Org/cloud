@@ -9,8 +9,10 @@ import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { RadioGroup } from '@/components/ui/radio-group';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { usePopWhenFocused } from '@/lib/navigation/pop-when-focused';
+import { cn } from '@/lib/utils';
 
 type OptionListProps<T extends string, TSaveResult> = {
   title: string;
@@ -93,7 +95,7 @@ export function OptionList<T extends string, TSaveResult>({
             <Button
               variant="outline"
               size="sm"
-              className="mt-3 self-start"
+              className={cn(STATE_ACTION_CLASS, 'mt-3 self-start')}
               accessibilityLabel={t('common.retry')}
               onPress={() => {
                 void handleSelect(failedOption);

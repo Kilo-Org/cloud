@@ -9,6 +9,7 @@ import { Newspaper } from '@/components/ui/icons';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { type BriefingPreferences, useBriefingPreferences } from '@/lib/agent-briefing';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useOfflineBannerState } from '@/lib/hooks/use-offline-banner-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useTRPC } from '@/lib/trpc';
@@ -132,7 +133,7 @@ export function BriefingNotificationCategoryRow({ disabled }: Readonly<{ disable
           <Button
             variant="ghost"
             size="sm"
-            className="self-start px-0"
+            className={cn(STATE_ACTION_CLASS, 'self-start px-0')}
             onPress={() => {
               void preferences.refetch();
             }}

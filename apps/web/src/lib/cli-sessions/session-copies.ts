@@ -375,6 +375,103 @@ export async function deleteSharedSessionCopies(copyIds: string[]): Promise<void
   }
 }
 
+/** Attempts at deleting a link's objects before the deletion reports failure. */
+const SHARE_BLOB_DELETE_ATTEMPTS = 3;
+
+async function deleteShareBlobsWithRetry(copyIds: string[]): Promise<void> {
+  let lastError: unknown;
+
+  for (let attempt = 0; attempt < SHARE_BLOB_DELETE_ATTEMPTS; attempt += 1) {
+    try {
+      await deleteSharedSessionCopies(copyIds);
+      return;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw lastError;
+}
+
+/** Attempts at removing one link row while publications of it keep landing. */
+const SHARE_ROW_DELETE_ATTEMPTS = 3;
+
+/**
+ * Remove one published link together with every copy folder it can point at.
+ * A short transaction under the owner lock records the row's folders in
+ * pending_copy_ids, the objects are deleted outside any transaction, and a
+ * second short transaction deletes the row only when no publication recorded a
+ * folder in between. Otherwise the new folder is taken over and the deletion
+ * repeats, so no folder a live row references is left behind. A failing object
+ * deletion leaves the row and its pending ids for a later retry.
+ */
+export async function deleteSharedSessionCopyRow(shareId: string): Promise<void> {
+  const [identified] = await db
+    .select({ kilo_user_id: sharedCliSessions.kilo_user_id })
+    .from(sharedCliSessions)
+    .where(eq(sharedCliSessions.share_id, shareId))
+    .limit(1);
+
+  if (!identified) return;
+
+  const kiloUserId = identified.kilo_user_id;
+  let knownCopyIds: string[] = [];
+
+  for (let attempt = 0; attempt < SHARE_ROW_DELETE_ATTEMPTS; attempt += 1) {
+    const recordedCopyIds = await db.transaction(async tx => {
+      await lockOwnerCopies(tx, kiloUserId);
+
+      const [locked] = await tx
+        .select(sharedSessionCopyColumns)
+        .from(sharedCliSessions)
+        .where(eq(sharedCliSessions.share_id, shareId))
+        .limit(1)
+        .for('update');
+
+      if (!locked) return null;
+
+      const copyIds = sharedSessionCopyIds(locked);
+      await tx
+        .update(sharedCliSessions)
+        .set({ pending_copy_ids: copyIds })
+        .where(eq(sharedCliSessions.share_id, shareId));
+
+      return copyIds;
+    });
+
+    if (!recordedCopyIds) return;
+
+    knownCopyIds = [...new Set([...knownCopyIds, ...recordedCopyIds])];
+    await deleteShareBlobsWithRetry(knownCopyIds);
+
+    const removed = await db.transaction(async tx => {
+      await lockOwnerCopies(tx, kiloUserId);
+
+      const [locked] = await tx
+        .select(sharedSessionCopyColumns)
+        .from(sharedCliSessions)
+        .where(eq(sharedCliSessions.share_id, shareId))
+        .limit(1)
+        .for('update');
+
+      if (!locked) return true;
+      if (sharedSessionCopyIds(locked).some(copyId => !knownCopyIds.includes(copyId))) {
+        return false;
+      }
+
+      await tx.delete(sharedCliSessions).where(eq(sharedCliSessions.share_id, shareId));
+      return true;
+    });
+
+    if (removed) return;
+  }
+
+  throw new TRPCError({
+    code: 'CONFLICT',
+    message: 'The shared session changed while it was being deleted. Try deleting it again.',
+  });
+}
+
 async function clearPendingSharedSessionCopy(shareId: string, copyId: string): Promise<void> {
   await db.transaction(async tx => {
     const [share] = await tx

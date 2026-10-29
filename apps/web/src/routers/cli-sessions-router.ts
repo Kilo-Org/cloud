@@ -29,13 +29,12 @@ import {
 import {
   blobUrlColumns,
   copySessionBlobs,
-  deleteSharedSessionCopies,
+  deleteSharedSessionCopyRow,
   discardReservedFork,
   publishSharedSessionCopy,
   reserveForkedSession,
   sessionBlobRefs,
   sharedSessionCopyColumns,
-  sharedSessionCopyIds,
   sharedSessionCurrentCopyId,
   sharedSessionCurrentCopyIds,
   withOwnerCopyTurn,
@@ -46,22 +45,6 @@ import { getCodeReviewById } from '@/lib/code-reviews/db/code-reviews';
 import { KNOWN_PLATFORMS } from '@kilocode/app-shared/platforms';
 
 const PAGE_SIZE = 10;
-const SHARE_BLOB_DELETE_ATTEMPTS = 3;
-
-async function deleteShareBlobsWithRetry(copyIds: string[]): Promise<void> {
-  let lastError: unknown;
-
-  for (let attempt = 0; attempt < SHARE_BLOB_DELETE_ATTEMPTS; attempt += 1) {
-    try {
-      await deleteSharedSessionCopies(copyIds);
-      return;
-    } catch (error) {
-      lastError = error;
-    }
-  }
-
-  throw lastError;
-}
 
 const commonSessionFields = {
   session_id: cliSessions.session_id,
@@ -618,25 +601,7 @@ export const cliSessionsRouter = createTRPCRouter({
       .from(sharedCliSessions)
       .where(eq(sharedCliSessions.session_id, session_id));
     for (const share of shares) {
-      await db.transaction(async tx => {
-        const [lockedShare] = await tx
-          .select({
-            share_id: sharedCliSessions.share_id,
-            api_conversation_history_blob_url: sharedCliSessions.api_conversation_history_blob_url,
-            task_metadata_blob_url: sharedCliSessions.task_metadata_blob_url,
-            ui_messages_blob_url: sharedCliSessions.ui_messages_blob_url,
-            git_state_blob_url: sharedCliSessions.git_state_blob_url,
-            pending_copy_ids: sharedCliSessions.pending_copy_ids,
-          })
-          .from(sharedCliSessions)
-          .where(eq(sharedCliSessions.share_id, share.share_id))
-          .for('update');
-
-        if (!lockedShare) return;
-
-        await deleteShareBlobsWithRetry(sharedSessionCopyIds(lockedShare));
-        await tx.delete(sharedCliSessions).where(eq(sharedCliSessions.share_id, share.share_id));
-      });
+      await deleteSharedSessionCopyRow(share.share_id);
     }
 
     await deleteBlobs(session_id, sessionBlobRefs('sessions'));

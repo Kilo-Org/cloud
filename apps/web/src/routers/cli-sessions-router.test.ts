@@ -1601,6 +1601,90 @@ describe('cli-sessions-router', () => {
       expect(calls).toEqual([shareId, deleteSessionId]);
     });
 
+    it('holds no owner copy lock while it deletes the link objects', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const { deleteBlobs } = await import('@/lib/r2/cli-sessions');
+      await insertShare(deleteSessionId, regularUser.id);
+      const locksDuringDelete: number[] = [];
+
+      jest.mocked(deleteBlobs).mockImplementation(async (_folderId, blobs) => {
+        if (blobs.some(blob => blob.folderName === 'shared-sessions')) {
+          locksDuringDelete.push(await heldOwnerCopyLocks());
+        }
+      });
+
+      await expect(caller.cliSessions.delete({ session_id: deleteSessionId })).resolves.toEqual({
+        success: true,
+        session_id: deleteSessionId,
+      });
+
+      expect(locksDuringDelete).toEqual([0]);
+      jest.mocked(deleteBlobs).mockReset().mockResolvedValue(undefined);
+    });
+
+    it('removes a folder published while the earlier copy is being deleted', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const { copyBlobs, deleteBlobs } = await import('@/lib/r2/cli-sessions');
+
+      jest
+        .mocked(copyBlobs)
+        .mockResolvedValueOnce({
+          ui_messages_blob_url: 'shared-sessions/first-fold/ui_messages.json',
+        });
+      await caller.cliSessions.share({
+        session_id: deleteSessionId,
+        shared_state: CliSessionSharedState.Public,
+      });
+
+      const firstDeleteStarted = Promise.withResolvers<void>();
+      const releaseFirstDelete = Promise.withResolvers<void>();
+      const deletedFolders: string[] = [];
+
+      jest.mocked(deleteBlobs).mockReset();
+      jest.mocked(deleteBlobs).mockImplementation(async (folderId, blobs) => {
+        if (!blobs.some(blob => blob.folderName === 'shared-sessions')) return;
+        deletedFolders.push(folderId);
+        if (deletedFolders.length === 1) {
+          firstDeleteStarted.resolve();
+          await releaseFirstDelete.promise;
+        }
+      });
+
+      const pendingDelete = caller.cliSessions.delete({ session_id: deleteSessionId });
+      await firstDeleteStarted.promise;
+
+      jest.mocked(copyBlobs).mockResolvedValueOnce({
+        ui_messages_blob_url: 'shared-sessions/second-fold/ui_messages.json',
+      });
+      const republished = await caller.cliSessions.share({
+        session_id: deleteSessionId,
+        shared_state: CliSessionSharedState.Public,
+      });
+
+      releaseFirstDelete.resolve();
+      await expect(pendingDelete).resolves.toEqual({
+        success: true,
+        session_id: deleteSessionId,
+      });
+
+      expect(republished.share_id).toBeDefined();
+      expect(deletedFolders).toContain('second-fold');
+
+      const remainingShares = await db
+        .select({ share_id: sharedCliSessions.share_id })
+        .from(sharedCliSessions)
+        .where(eq(sharedCliSessions.session_id, deleteSessionId));
+      expect(remainingShares).toHaveLength(0);
+
+      const remainingSessions = await db
+        .select({ session_id: cliSessions.session_id })
+        .from(cliSessions)
+        .where(eq(cliSessions.session_id, deleteSessionId));
+      expect(remainingSessions).toHaveLength(0);
+
+      jest.mocked(deleteBlobs).mockReset().mockResolvedValue(undefined);
+    });
+
     it('should keep shares when a non-owner attempts deletion', async () => {
       const shareId = await insertShare(deleteSessionId, otherUser.id);
       const caller = await createCallerForUser(otherUser.id);

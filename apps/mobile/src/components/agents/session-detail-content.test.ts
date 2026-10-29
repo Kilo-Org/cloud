@@ -1935,6 +1935,9 @@ describe('session detail assistant response retry', () => {
       ['msg-prompt', ROOT_ID],
     ]);
     expect(occurrencesOf(view.renderer.root, prompt)).toBe(1);
+    // The replaced response is gone, not merely outnumbered by the retry's row.
+    expect(renderedText(view.renderer.root)).not.toContain('Partial answer');
+    expect(renderedText(view.renderer.root)).not.toContain('Response failed');
   });
 
   it('restores the failed response and its Retry when the re-send is rejected', async () => {
@@ -4289,7 +4292,11 @@ describe('session detail duplicate failure state', () => {
 
   function rootFailedAssistantMessage(text: string): StoredMessage {
     const message = assistantMessage(ASSISTANT_ID);
-    message.info = { ...message.info, sessionID: ROOT_ID };
+    const info = message.info;
+    if (info.role !== 'assistant') {
+      throw new Error('fixture must be an assistant message');
+    }
+    message.info = { ...info, sessionID: ROOT_ID, parentID: USER_ID };
     (message.info as { error?: { name: string; data: unknown } }).error = {
       name: 'APIError',
       data: { message: 'raw provider text' },

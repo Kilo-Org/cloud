@@ -86,14 +86,14 @@ export async function retryFailedMessage(input: {
 /**
  * The rows a Retry tap replaces, and the prompt to re-send. A user delivery
  * failure re-sends the row's own first human-authored text part and replaces
- * that row; an assistant failure re-sends the newest preceding user row's text
- * and replaces both the failed response and the user row it re-sends. Returns
- * null when there is no human text (e.g. a file-only row) or no preceding user
- * row, which suppresses Retry.
+ * that row; an assistant failure re-sends the text of the user row it answers
+ * and replaces the failed response plus, when the re-send reproduces it
+ * exactly, that user row. Returns null when no prompt can be identified or
+ * resolved, which suppresses Retry.
  */
 export type RetryTarget = {
   prompt: string;
-  /** The failed row first, then the user row whose prompt it re-sends. */
+  /** The failed row first, then the user row when the re-send reproduces it. */
   replacedMessageIds: readonly string[];
 };
 
@@ -105,21 +105,54 @@ export function resolveRetryTarget(
     const text = firstHumanText(message.parts);
     return text === '' ? null : { prompt: text, replacedMessageIds: [message.info.id] };
   }
-  const index = messages.findIndex(candidate => candidate.info.id === message.info.id);
-  for (let i = index - 1; i >= 0; i -= 1) {
-    const candidate = messages[i];
-    if (candidate?.info.role === 'user') {
-      const text = firstHumanText(candidate.parts);
-      if (text === '') {
-        return null;
-      }
-      return {
-        prompt: text,
-        replacedMessageIds: [message.info.id, candidate.info.id],
-      };
-    }
+  const promptRow = repliedToUserRow(message, messages);
+  if (promptRow === null) {
+    return null;
   }
-  return null;
+  const prompt = firstHumanText(promptRow.parts);
+  if (prompt === '') {
+    return null;
+  }
+  // The re-send is the prompt text alone. Hiding a user row that carries more
+  // than that (an attachment, a second text part) would drop content the retry
+  // never sends, with no other surface left to show it, so the row stays and
+  // only the failed response is replaced.
+  return {
+    prompt,
+    replacedMessageIds: carriesOnlyPromptText(promptRow, prompt)
+      ? [message.info.id, promptRow.info.id]
+      : [message.info.id],
+  };
+}
+
+/**
+ * The user row an assistant message answers: its `parentID`, which is the
+ * authoritative link (`AssistantMessage.parentID`), not merely the nearest
+ * preceding user row. Order alone can pair a failed response with another
+ * prompt: a session can materialise a second user row before the first turn's
+ * assistant row exists. A parent that is not a loaded user row (an older page,
+ * or data without the link) has no prompt this tap can re-send, so Retry is
+ * suppressed rather than re-sending an unrelated row.
+ */
+function repliedToUserRow(
+  message: StoredMessage,
+  messages: readonly StoredMessage[]
+): StoredMessage | null {
+  if (message.info.role !== 'assistant') {
+    return null;
+  }
+  const parentId = message.info.parentID;
+  const parent = messages.find(candidate => candidate.info.id === parentId);
+  return parent?.info.role === 'user' ? parent : null;
+}
+
+/**
+ * Whether a user row renders nothing but the prompt text a retry re-sends: one
+ * text part and no other part whose content the re-send would omit.
+ */
+function carriesOnlyPromptText(message: StoredMessage, prompt: string): boolean {
+  const [part, ...rest] = message.parts;
+  return rest.length === 0 && part?.type === 'text' && part.text === prompt;
 }
 
 /**

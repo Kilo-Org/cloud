@@ -69,9 +69,17 @@ const repositories = vi.hoisted(() => ({
 }));
 const capability = vi.hoisted(() => ({
   canManage: false,
+  status: 'allowed' as 'loading' | 'error' | 'denied' | 'allowed',
   isLoading: false,
   isError: false,
   refetch: vi.fn(),
+}));
+const settingsRecovery = vi.hoisted(() => ({
+  retry: vi.fn(),
+  isRetrying: false,
+}));
+const recoveryStatus = vi.hoisted(() => ({
+  renders: [] as { message?: string; isRetrying: boolean; onRetry: () => void }[],
 }));
 const dismissFailures = vi.hoisted(() => ({
   failures: [] as { findingId: string; lastError: string; retryable: boolean | null }[],
@@ -161,6 +169,7 @@ vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentLastSyncTime: () => lastSync,
   useSecurityAgentRepositories: () => repositories,
   useTriggerSecuritySync: () => triggerSync,
+  useRetrySecurityAgentSettings: () => settingsRecovery,
 }));
 vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
   useSecurityDismissFailures: () => dismissFailures,
@@ -168,6 +177,16 @@ vi.mock('@/lib/hooks/use-security-dismiss-draft', () => ({
 }));
 vi.mock('@/lib/persist/use-mutation-outbox', () => ({
   useMutationOutbox: () => outbox,
+}));
+vi.mock('@/components/security-agent/settings-recovery-status', () => ({
+  SettingsRecoveryStatus: (props: {
+    message?: string;
+    isRetrying: boolean;
+    onRetry: () => void;
+  }) => {
+    recoveryStatus.renders.push(props);
+    return null;
+  },
 }));
 vi.mock('@/components/security-agent/security-command-retry-card', () => ({
   SecurityCommandRetryCard: (props: {
@@ -386,6 +405,35 @@ describe('DashboardScreen sync control terminal states', () => {
       { repoFullName: undefined },
       expect.objectContaining({ onSuccess: expect.any(Function) })
     );
+  });
+});
+
+describe('DashboardScreen capability recovery', () => {
+  beforeEach(() => {
+    capability.status = 'allowed';
+    settingsRecovery.isRetrying = false;
+    settingsRecovery.retry.mockClear();
+    recoveryStatus.renders = [];
+  });
+
+  it('surfaces a failed role read with Retry instead of only dropping the controls', () => {
+    // The entry renders this dashboard from the cached config without waiting for
+    // the role read, so a manager whose read failed must be told why the audit
+    // action is missing rather than reading it as lost access.
+    capability.status = 'error';
+    renderScreen();
+
+    expect(recoveryStatus.renders).toHaveLength(1);
+    expect(recoveryStatus.renders[0]?.message).toBe(
+      i18n.t('securityAgent.settingsOverview.couldNotLoadPermissions')
+    );
+    act(() => recoveryStatus.renders[0]?.onRetry());
+    expect(settingsRecovery.retry).toHaveBeenCalledTimes(1);
+  });
+
+  it('stays silent once the role read resolves', () => {
+    renderScreen();
+    expect(recoveryStatus.renders).toHaveLength(0);
   });
 });
 

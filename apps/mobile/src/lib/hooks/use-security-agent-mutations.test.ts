@@ -441,6 +441,15 @@ describe('useSaveSecurityAgentConfig (generation guard + scope)', () => {
     expect(announced).not.toBe('securityAgent.settingsSave.saved');
   });
 
+  it('leaves the confirmation to a caller that has a more specific outcome', () => {
+    // Automation announces the queued count itself; two toasts for one save
+    // would read as two outcomes.
+    useSaveSecurityAgentConfig('personal', { announceSaved: false });
+    lastCapturedOptions?.onSuccess?.({ existingFindingsQueuedCount: 2 }, { slaEnabled: false });
+
+    expect(announcingSuccessMock).not.toHaveBeenCalled();
+  });
+
   it('scopes the mutation to serialize against a toggle on the same config', () => {
     useSaveSecurityAgentConfig('personal');
     expect(lastCapturedOptions?.scope).toEqual({ id: 'security-agent-config:personal' });

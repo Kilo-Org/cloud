@@ -8,6 +8,7 @@ import {
   type MobileRouter,
 } from '@kilocode/trpc/mobile';
 import { type Href } from 'expo-router';
+import { z } from 'zod';
 
 import { parseParam } from '@/lib/route-params';
 
@@ -34,8 +35,7 @@ export function getSecurityAgentPath(scope: string, suffix = ''): Href {
   return (suffix ? `${path}/${suffix}` : path) as Href;
 }
 
-const ORGANIZATION_SCOPE_PATTERN =
-  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ORGANIZATION_SCOPE_SCHEMA = z.uuid();
 
 /**
  * Runtime validation for the `[scope]` segment shared by every Security Agent
@@ -46,7 +46,7 @@ const ORGANIZATION_SCOPE_PATTERN =
  * never succeed. That state is reachable without a hand-built link — a
  * navigation that lost its param serializes it as the literal `undefined`.
  *
- * A scope is the personal scope or an organization uuid.
+ * A scope is the personal scope or an organization id.
  */
 export function parseSecurityScope(rawScope: string | string[] | undefined): string | null {
   const scope = parseParam(rawScope);
@@ -56,7 +56,7 @@ export function parseSecurityScope(rawScope: string | string[] | undefined): str
   if (isPersonalSecurityScope(scope)) {
     return scope;
   }
-  return ORGANIZATION_SCOPE_PATTERN.test(scope) ? scope : null;
+  return ORGANIZATION_SCOPE_SCHEMA.safeParse(scope).success ? scope : null;
 }
 
 // The server batch procedure is bounded to 100 ids. The recovery source is

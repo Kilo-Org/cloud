@@ -358,18 +358,23 @@ describe('ScopeEntryScreen dashboard first mount', () => {
 });
 
 describe('ScopeEntryScreen cached destination', () => {
-  it.each(['personal', 'org_123'])(
-    'renders the enabled destination while the organization role read fails for %s',
-    async scope => {
-      // The config already names the destination; a failed role read only
-      // affects which controls the screens behind it offer.
-      configData.isEnabled = true;
-      failingProcedures = new Set(['organizations.list']);
-      const root = await mount(scope);
-      expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
-      expect(host(root, 'DashboardScreen')).toHaveLength(1);
-    }
-  );
+  it('renders the enabled destination while the organization role read fails', async () => {
+    // The config already names the destination; a failed role read only affects
+    // which controls the screens behind it offer.
+    configData.isEnabled = true;
+    failingProcedures = new Set(['list']);
+    const root = await mount('org_123');
+    // The role read really failed; the cached config still names the
+    // destination, so the dashboard renders beside that failure.
+    expect(
+      queryClient
+        .getQueryCache()
+        .findAll()
+        .some(query => query.state.status === 'error')
+    ).toBe(true);
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
+    expect(host(root, 'DashboardScreen')).toHaveLength(1);
+  });
 
   it('keeps the cached destination while connectivity pauses its reads', async () => {
     // A save on a flaky connection can land here with every read paused. The

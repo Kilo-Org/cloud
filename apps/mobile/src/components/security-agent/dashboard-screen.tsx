@@ -20,6 +20,7 @@ import { QueryError } from '@/components/query-error';
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
 import { ScreenHeader } from '@/components/screen-header';
 import { DashboardSections } from '@/components/security-agent/dashboard-sections';
+import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
 import { IconButton } from '@/components/ui/icon-button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -29,6 +30,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
 import { formatNumber, formatPercent } from '@/lib/format';
 import {
+  useRetrySecurityAgentSettings,
   useSecurityAgentCapability,
   useSecurityAgentConfig,
   useSecurityAgentDashboardStats,
@@ -174,7 +176,12 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const dashboardStats = useSecurityAgentDashboardStats(scope, repoFullName);
   const lastSync = useSecurityAgentLastSyncTime(scope, repoFullName);
   const repositories = useSecurityAgentRepositories(scope);
-  const canManage = useSecurityAgentCapability(scope).canManage;
+  const capability = useSecurityAgentCapability(scope);
+  const canManage = capability.canManage;
+  // The entry renders this dashboard without waiting for the role read when the
+  // config is already cached, so a failed read must say so here: otherwise a
+  // manager sees the audit action silently missing and reads it as lost access.
+  const capabilityRecovery = useRetrySecurityAgentSettings(scope);
   const triggerSync = useTriggerSecuritySync(scope);
   const dismissFailures = useSecurityDismissFailures(scope);
   const { refresh: refreshDismissFailures } = dismissFailures;
@@ -306,6 +313,13 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
+        {capability.status === 'error' ? (
+          <SettingsRecoveryStatus
+            message={t('securityAgent.settingsOverview.couldNotLoadPermissions')}
+            isRetrying={capabilityRecovery.isRetrying}
+            onRetry={() => void capabilityRecovery.retry()}
+          />
+        ) : null}
         <View className="flex-row items-center justify-between gap-3">
           <Pressable
             onPress={openRepoFilter}

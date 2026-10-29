@@ -35,7 +35,10 @@ function useSecurityAgentConfigQueryKey(scope: string) {
     : trpc.organizations.securityAgent.getConfig.queryKey({ organizationId: scope });
 }
 
-export function useSaveSecurityAgentConfig(scope: string) {
+export function useSaveSecurityAgentConfig(
+  scope: string,
+  { announceSaved = true }: Readonly<{ announceSaved?: boolean }> = {}
+) {
   const trpc = useTRPC();
   const queryClient = useQueryClient();
   const configQueryKey = useSecurityAgentConfigQueryKey(scope);
@@ -83,7 +86,12 @@ export function useSaveSecurityAgentConfig(scope: string) {
       // Saving pops the settings screen, and the screen it returns to can fail
       // to load on a flaky connection. Confirming the write here keeps a
       // persisted save from reading as a lost one wherever the navigation lands.
-      announcingToast.success(i18n.t('securityAgent.settingsSave.saved'));
+      // A screen with a more specific outcome of its own (Automation's queued
+      // count) turns this off and announces in its place, so one save is one
+      // confirmation.
+      if (announceSaved) {
+        announcingToast.success(i18n.t('securityAgent.settingsSave.saved'));
+      }
       if (result.existingRemediationCommandId) {
         trackSecurityAgentCommand(queryClient, scope, result.existingRemediationCommandId);
       }

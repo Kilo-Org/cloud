@@ -265,6 +265,23 @@ describe('InstructionsRoute editor', () => {
     expect(fieldHandle.setSelection).not.toHaveBeenCalled();
   });
 
+  // The alignment belongs to the stored value's opening state. A mount whose
+  // empty field reported no content size must not let the reader's own first
+  // edit trigger it and move their caret back to the start.
+  it('does not move the caret once the draft has been edited', () => {
+    config.data = { customInstructions: '' };
+    mount();
+
+    const input = latestInput();
+    act(() => {
+      input.onLayout?.({ nativeEvent: { layout: { height: 196.19 } } });
+      input.onChangeText('pasted draft');
+    });
+    measureField(input, 1264.76);
+
+    expect(fieldHandle.setSelection).not.toHaveBeenCalled();
+  });
+
   it('lets a clean screen back out with no confirmation', () => {
     config.data = { customInstructions: STORED };
     const renderer = mount();

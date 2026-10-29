@@ -59,13 +59,25 @@ function InstructionsEditor({
   // symptom #7892 removed for a field that grew with its value. Once the field
   // and its content have both been measured, put the caret on the first line
   // for a value that overflows. A value that fits keeps the platform caret.
+  //
+  // This is the stored value's opening state only: once the reader has edited
+  // the draft, a content measurement must never move their caret. Both
+  // platforms report a content size for the empty field at mount, so the
+  // alignment is normally spent before any edit; the edit guard keeps a mount
+  // that reports none (a recycled view) from yanking the caret mid-paste.
   const fieldRef = useRef<TextInputInstance | null>(null);
   const fieldHeightRef = useRef(0);
   const contentHeightRef = useRef<number | null>(null);
   const alignedRef = useRef(false);
+  const editedRef = useRef(false);
   const alignFirstLineIfOverflowing = () => {
     const contentHeight = contentHeightRef.current;
-    if (alignedRef.current || contentHeight == null || fieldHeightRef.current === 0) {
+    if (
+      alignedRef.current ||
+      editedRef.current ||
+      contentHeight == null ||
+      fieldHeightRef.current === 0
+    ) {
       return;
     }
     alignedRef.current = true;
@@ -107,6 +119,7 @@ function InstructionsEditor({
         placeholder={t('codeReviewer.instructions.placeholder')}
         defaultValue={initial}
         onChangeText={text => {
+          editedRef.current = true;
           draftRef.current = text;
           onDirty(text);
         }}

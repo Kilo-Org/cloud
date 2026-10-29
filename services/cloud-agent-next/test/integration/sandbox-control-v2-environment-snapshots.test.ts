@@ -17,8 +17,10 @@ import type {
   ProviderLaunchOptions,
   ProviderLaunchResult,
   ProviderStartSource,
+  ProviderStartupCommand,
   StopResult,
 } from '../../src/sandbox-control/provider.js';
+import { RUNTIME_BASE_ABI } from '../../src/sandbox-control/runtime-release.js';
 import type { ControlPlaneRouteSpec } from '../../src/shared/control-plane-protocol.js';
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
 import {
@@ -47,7 +49,11 @@ const REFERENCE: SessionEnvironmentReference = {
   configurationRevision: 2,
   repository: { platform: 'github', repoFullName: 'acme/widgets' },
 };
-const SNAPSHOT = { snapshotId: 'snap-env', baseImage: 'registry.example/app:1' };
+const SNAPSHOT = {
+  snapshotId: 'snap-env',
+  baseImage: 'registry.example/app:1',
+  provider: 'cloudflare-containers' as const,
+};
 const RESOLVED: SnapshotResolution = {
   snapshot: {
     ...SNAPSHOT,
@@ -64,15 +70,44 @@ const MISSING: SnapshotResolution = {
   reason: 'missing',
   admission: { status: 'active', buildId: '77777777-7777-4777-8777-777777777777' },
 };
-
+const VERCEL_SNAPSHOT = { ...SNAPSHOT, provider: 'vercel' as const };
+const RESOLVED_VERCEL: SnapshotResolution = {
+  ...RESOLVED,
+  snapshot: { ...RESOLVED.snapshot!, ...VERCEL_SNAPSHOT },
+};
+const BYOC = {
+  credentialId: '88888888-8888-4888-8888-888888888888',
+  organizationId: REFERENCE.owner.id,
+};
+const VERCEL_SELECTION = { provider: 'vercel' as const, byoc: BYOC };
+const RUNTIME_DESCRIPTOR = JSON.stringify({
+  format: 1,
+  bootstrap: 1,
+  platform: { os: 'linux', arch: 'x64', libc: 'glibc', cpu: 'baseline' },
+  abi: RUNTIME_BASE_ABI,
+  cliVersion: '7.8.1',
+  cliExecutable: 'package/bin/kilo',
+  wrapperSdkVersion: '7.8.1',
+  protocol: '1',
+  artifacts: [
+    { role: 'cli', sha256: 'a'.repeat(64), transferBytes: 1, expandedBytes: 1, fileCount: 1 },
+    { role: 'control', sha256: 'b'.repeat(64), transferBytes: 1, expandedBytes: 1, fileCount: 1 },
+  ],
+  caps: { maxTransferBytes: 100, maxExpandedBytes: 100, maxFileCount: 10 },
+  inventory: [
+    ['cli', 'package/bin/kilo', 0o755, 1, 'a'.repeat(64)],
+    ['control', 'usr/local/bin/wrapper', 0o755, 1, 'b'.repeat(64)],
+  ],
+});
 /** A coordinator namespace that answers every lookup with one resolution and records it. */
-function fakeEnvironmentBuild(resolution: SnapshotResolution = RESOLVED) {
+function fakeEnvironmentBuild(resolution: SnapshotResolution = RESOLVED, events?: string[]) {
   const lookups: unknown[] = [];
   return {
     lookups,
     namespace: {
       getByName: () => ({
         resolveSnapshot: async (input: unknown) => {
+          events?.push('lookup');
           lookups.push(input);
           return resolution;
         },
@@ -82,6 +117,28 @@ function fakeEnvironmentBuild(resolution: SnapshotResolution = RESOLVED) {
 }
 const WITH_SNAPSHOT = { ENVIRONMENT_BUILD: fakeEnvironmentBuild().namespace };
 const WITHOUT_SNAPSHOT = { ENVIRONMENT_BUILD: fakeEnvironmentBuild(MISSING).namespace };
+const VERCEL_ENV = {
+  ...WITH_SNAPSHOT,
+  RUNTIME_RELEASE_DESCRIPTOR: RUNTIME_DESCRIPTOR,
+  RUNTIME_RELEASE_BUCKET: {
+    async head() {
+      return { size: 1 };
+    },
+  },
+  // Vercel has no outbound credential proxy, so a managed repository token is resolved directly.
+  GIT_TOKEN_SERVICE: {
+    ...createFakeCredentialBroker(),
+    async getTokenForRepo() {
+      return {
+        success: true as const,
+        token: 'ghs_fake_installation_token',
+        installationId: '1',
+        accountLogin: 'acme',
+        appType: 'standard' as const,
+      };
+    },
+  },
+};
 // The Durable Object shares one env object across tests, so every test states the env it
 // needs and the Worker secret a previous test removed is put back.
 const WORKER_SECRET = (env as unknown as { NEXTAUTH_SECRET: unknown }).NEXTAUTH_SECRET;
@@ -92,13 +149,20 @@ const sandboxNamespace = (env as unknown as { SANDBOX_CONTROL: SandboxControlNam
 
 type FakeProvider = {
   adapter: ProviderAdapter;
+  adapterFor: (allocationName: string) => ProviderAdapter;
+  createIntents: ProviderCreateIntent[];
+  createdRefs: string[];
   launchEnvs: Record<string, string>[];
+  launchCommands: ProviderStartupCommand[];
   launchOptions: Array<ProviderLaunchOptions | undefined>;
   launchDeadlines: Array<number | undefined>;
   launchRefs: string[];
   stopRefs: Array<string | null>;
+  stopMismatches: Array<{ boundName: string; ref: string | null }>;
   launchHold: boolean;
   releaseLaunch: () => void;
+  createHoldIndex: number | undefined;
+  releaseCreate: () => void;
   stopHold: boolean;
   releaseStop: () => void;
 };
@@ -108,35 +172,65 @@ function createFakeProvider(
     snapshots?: boolean;
     startSource?: ProviderStartSource;
     holdLaunch?: boolean;
+    holdCreateIndex?: number;
     holdStop?: boolean;
     launchError?: Error;
     launches?: Array<ProviderLaunchResult | Error>;
+    creates?: Array<{ snapshotFailed?: true } | { unresolved: true } | undefined>;
+    /** Physical refs include the allocation name, like the real Vercel provider. */
+    vercel?: boolean;
+    events?: string[];
     stopResult?: StopResult;
     stopDelayMs?: number;
   } = {}
 ): FakeProvider {
   let releaseLaunch: () => void = () => undefined;
+  let releaseCreate: () => void = () => undefined;
   let releaseStop: () => void = () => undefined;
   const provider: FakeProvider = {
     adapter: null as unknown as ProviderAdapter,
+    adapterFor: () => null as unknown as ProviderAdapter,
+    createIntents: [],
+    createdRefs: [],
     launchEnvs: [],
+    launchCommands: [],
     launchOptions: [],
     launchDeadlines: [],
     launchRefs: [],
     stopRefs: [],
+    stopMismatches: [],
     launchHold: options.holdLaunch ?? false,
     releaseLaunch: () => releaseLaunch(),
+    createHoldIndex: options.holdCreateIndex,
+    releaseCreate: () => releaseCreate(),
     stopHold: options.holdStop ?? false,
     releaseStop: () => releaseStop(),
   };
   provider.adapter = {
     async ensureBillingAdmission() {},
     async create(intent: ProviderCreateIntent) {
-      return { providerRef: `mem_${intent.intentId}` };
+      options.events?.push('create');
+      const createIndex = provider.createIntents.length;
+      provider.createIntents.push(intent);
+      if (provider.createHoldIndex === createIndex) {
+        await new Promise<void>(resolve => {
+          releaseCreate = resolve;
+        });
+      }
+      const configured = options.creates?.[createIndex];
+      if (configured !== undefined && 'unresolved' in configured) return configured;
+      const providerRef = options.vercel
+        ? `mem_${intent.allocationName}_${intent.intentId}`
+        : `mem_${intent.intentId}`;
+      provider.createdRefs.push(providerRef);
+      return configured?.snapshotFailed === true
+        ? { providerRef, snapshotFailed: true as const }
+        : { providerRef };
     },
-    async launch(ref, { env: launchEnv }, launchOptions) {
+    async launch(ref, { env: launchEnv, command }, launchOptions) {
       const launchIndex = provider.launchEnvs.length;
       provider.launchEnvs.push({ ...launchEnv });
+      provider.launchCommands.push(command);
       const { deadlineAt, ...recordedOptions } = launchOptions ?? {};
       provider.launchOptions.push(launchOptions === undefined ? undefined : recordedOptions);
       provider.launchDeadlines.push(deadlineAt);
@@ -170,8 +264,22 @@ function createFakeProvider(
     async logs() {
       return '';
     },
+    ...(options.vercel ? { applyContainedCredentials: async () => {} } : {}),
     ...(options.snapshots === false ? {} : { environmentSnapshots: true as const }),
   };
+  provider.adapterFor = allocationName =>
+    options.vercel
+      ? {
+          ...provider.adapter,
+          async stop(ref, intent) {
+            if (ref !== null && !ref.startsWith(`mem_${allocationName}_`)) {
+              provider.stopMismatches.push({ boundName: allocationName, ref });
+              return 'retryable';
+            }
+            return provider.adapter.stop(ref, intent);
+          },
+        }
+      : provider.adapter;
   return provider;
 }
 
@@ -240,7 +348,8 @@ async function setup(
       return identity;
     });
     Object.assign(instance, {
-      createProviderAdapter: () => provider.adapter,
+      createProviderAdapter: (pin: { allocationName?: string }) =>
+        provider.adapterFor(pin.allocationName ?? ''),
       provider: provider.adapter,
       sessionPeerFor: (_ownerId: string, id: string) => peer.forSession(id),
     });
@@ -254,6 +363,14 @@ function readLaunchRecord(stub: DurableObjectStub<SandboxControlV2>) {
 
 function putLaunchRecord(stub: DurableObjectStub<SandboxControlV2>, record: unknown) {
   return runInDurableObject(stub, (_instance, state) => state.storage.put(LAUNCH_KEY, record));
+}
+
+function readProviderPin(stub: DurableObjectStub<SandboxControlV2>) {
+  return runInDurableObject(stub, async (_instance, state) => {
+    const db = drizzle(state.storage, { logger: false });
+    const [row] = await db.select({ pin: allocationTable.provider_pin }).from(allocationTable);
+    return typeof row?.pin === 'string' ? JSON.parse(row.pin) : null;
+  });
 }
 
 async function connect(sandboxId: string, provider: FakeProvider, launchCount = 1) {
@@ -563,6 +680,9 @@ describe('environment snapshot launch', () => {
     const provider = createFakeProvider({
       launches: [{ startSource: 'repository', snapshotFailed: true }],
       stopDelayMs: 300,
+      // A snapshot-capable provider gets the wider repository start budget, which
+      // would override the short create timer this test depends on.
+      snapshots: false,
     });
     const { stub } = await setup('sbx__repo_launch_fallback_expired', provider);
     await runInDurableObject(stub, instance => {
@@ -1303,4 +1423,234 @@ describe('environment snapshot preparation fallback', () => {
       expect(provider.launchEnvs).toHaveLength(1);
     }
   );
+});
+
+describe('Vercel BYOC environment snapshot restore', () => {
+  it('looks up and passes the selected snapshot in the create intent before Vercel starts', async () => {
+    const sandboxId = 'sbx__vercel_snapshot_intent';
+    const events: string[] = [];
+    const lookups = fakeEnvironmentBuild(RESOLVED_VERCEL, events);
+    const provider = createFakeProvider({ startSource: 'repository', vercel: true, events });
+    const { stub } = await setup(sandboxId, provider, {
+      ...VERCEL_ENV,
+      ENVIRONMENT_BUILD: lookups.namespace,
+    });
+    await stub.prepare({ ...prepareInput(), sandboxSelection: VERCEL_SELECTION });
+    const { wrapper, allocationId } = await connect(sandboxId, provider);
+    await prepareFrameOf(wrapper);
+
+    expect(events).toEqual(['lookup', 'create']);
+    expect(lookups.lookups).toEqual([{ reference: REFERENCE, actorUserId: 'user_123' }]);
+    expect(provider.createIntents).toHaveLength(1);
+    expect(provider.createIntents[0]?.allocationName).toMatch(/^sbx-[0-9a-f]{32}$/);
+    expect(provider.createIntents[0]).toMatchObject({ snapshot: VERCEL_SNAPSHOT });
+    expect(provider.launchOptions).toEqual([{ snapshot: VERCEL_SNAPSHOT }]);
+    // Vercel always downloads its own runtime, including a restore from a snapshot.
+    const command = provider.launchCommands[0]!;
+    expect(command.argv.some(value => value.includes('package/bin/kilo'))).toBe(true);
+    expect(command.argv.some(value => value.includes('https://worker.example.com'))).toBe(true);
+    expect(await readLaunchRecord(stub)).toEqual({
+      allocationId,
+      startupMode: 'downloaded',
+      startSource: 'repository',
+      confirmed: true,
+    });
+    expect((await stub.getAllocationState()).provider).toBe('vercel');
+  });
+
+  it('falls back to the clean base once when provider create reports a missing snapshot', async () => {
+    const sandboxId = 'sbx__vercel_snapshot_create_missing';
+    const provider = createFakeProvider({
+      startSource: 'image',
+      vercel: true,
+      creates: [{ snapshotFailed: true }],
+    });
+    const { stub, peer } = await setup(sandboxId, provider, {
+      ...VERCEL_ENV,
+      ENVIRONMENT_BUILD: fakeEnvironmentBuild(RESOLVED_VERCEL).namespace,
+    });
+    await stub.prepare({ ...prepareInput(), sandboxSelection: VERCEL_SELECTION });
+    const { wrapper } = await connect(sandboxId, provider);
+    await prepareFrameOf(wrapper);
+
+    expect(provider.createIntents).toHaveLength(1);
+    expect(provider.createIntents[0]?.snapshot).toEqual(VERCEL_SNAPSHOT);
+    expect(provider.launchEnvs).toHaveLength(1);
+    expect(provider.launchRefs).toEqual(provider.createdRefs);
+    expect(await readLaunchRecord(stub)).toEqual({
+      allocationId: provider.launchEnvs[0]!.CONTROL_PLANE_ALLOCATION_ID,
+      startupMode: 'downloaded',
+      startSource: 'image',
+      confirmed: true,
+    });
+    await waitFor(() =>
+      expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
+        state: 'preparing',
+        attemptId: expect.any(String),
+        step: 'snapshot_fallback',
+        detail: 'Snapshot restore failed. Starting from the clean base.',
+      })
+    );
+    expect(
+      peer
+        .routeUpdatesFor(SESSION)
+        .some(update => update.detail === 'Snapshot startup failed. Retrying without a snapshot.')
+    ).toBe(false);
+  });
+
+  it('drops a snapshot captured by a different provider and stays pinned to Vercel', async () => {
+    const sandboxId = 'sbx__vercel_snapshot_provider_mismatch';
+    const lookups = fakeEnvironmentBuild(RESOLVED);
+    const provider = createFakeProvider({ startSource: 'image', vercel: true });
+    const { stub, peer } = await setup(sandboxId, provider, {
+      ...VERCEL_ENV,
+      ENVIRONMENT_BUILD: lookups.namespace,
+    });
+    await stub.prepare({ ...prepareInput(), sandboxSelection: VERCEL_SELECTION });
+    const { wrapper } = await connect(sandboxId, provider);
+    await prepareFrameOf(wrapper);
+
+    expect(lookups.lookups).toHaveLength(1);
+    expect(provider.createIntents).toHaveLength(1);
+    expect(provider.createIntents[0]).not.toHaveProperty('snapshot');
+    expect(provider.launchOptions).toEqual([{}]);
+    expect((await stub.getAllocationState()).provider).toBe('vercel');
+    await waitFor(() =>
+      expect(peer.routeUpdatesFor(SESSION)).toContainEqual({
+        state: 'preparing',
+        attemptId: expect.any(String),
+        step: 'environment_snapshot',
+        detail: 'Starting without an environment snapshot; a replacement build was started',
+      })
+    );
+    expect(
+      peer.routeUpdatesFor(SESSION).some(update => update.detail?.startsWith('Using snapshot'))
+    ).toBe(false);
+  });
+
+  it('recreates once under a new name, rejects the old hello, and keeps the pin after eviction', async () => {
+    const sandboxId = 'sbx__vercel_snapshot_recreate';
+    const provider = createFakeProvider({
+      vercel: true,
+      holdLaunch: true,
+      holdStop: true,
+      launches: [{ startSource: 'repository', snapshotFailed: true }, { startSource: 'image' }],
+    });
+    const { stub } = await setup(sandboxId, provider, {
+      ...VERCEL_ENV,
+      ENVIRONMENT_BUILD: fakeEnvironmentBuild(RESOLVED_VERCEL).namespace,
+    });
+    await stub.prepare({ ...prepareInput(), sandboxSelection: VERCEL_SELECTION });
+    await waitFor(() => expect(provider.launchEnvs).toHaveLength(1));
+
+    const oldCredential = provider.launchEnvs[0]!.SANDBOX_CONTROL_CREDENTIAL;
+    const oldAllocationId = provider.launchEnvs[0]!.CONTROL_PLANE_ALLOCATION_ID;
+    const oldWrapper = await FakeWrapper.connect({ sandboxId, credential: oldCredential });
+    await releaseHeld(stub, () => {
+      provider.launchHold = false;
+      provider.releaseLaunch();
+    });
+    await waitFor(() => expect(provider.stopRefs).toHaveLength(1));
+
+    expect(await oldWrapper.hello({ wrapperId: 'wr_old', allocationId: oldAllocationId })).toEqual({
+      type: 'shutdown',
+      reason: 'hello_rejected',
+    });
+    expect(await oldWrapper.waitForClose()).toBe(1008);
+
+    await releaseHeld(stub, () => provider.releaseStop());
+    const { wrapper, allocationId } = await connect(sandboxId, provider, 2);
+    await prepareFrameOf(wrapper);
+
+    const initialName = provider.createIntents[0]?.allocationName;
+    expect(initialName).toMatch(/^sbx-[0-9a-f]{32}$/);
+    expect(provider.createIntents.map(intent => intent.allocationName)).toEqual([
+      initialName,
+      `${initialName}-image`,
+    ]);
+    expect(provider.createIntents[0]?.snapshot).toEqual(VERCEL_SNAPSHOT);
+    expect(provider.createIntents[1]).not.toHaveProperty('snapshot');
+    expect(provider.createIntents).toHaveLength(2);
+    expect(provider.launchEnvs).toHaveLength(2);
+    expect(provider.createdRefs[1]).not.toBe(provider.createdRefs[0]);
+    expect(provider.launchRefs).toEqual(provider.createdRefs);
+    expect(provider.stopRefs).toEqual([provider.createdRefs[0]]);
+    expect(provider.launchEnvs[1]!.SANDBOX_CONTROL_CREDENTIAL).not.toBe(oldCredential);
+    expect((await stub.getAllocationState()).providerRef).toBe(provider.createdRefs[1]);
+    expect(await readLaunchRecord(stub)).toEqual({
+      allocationId,
+      startupMode: 'downloaded',
+      startSource: 'image',
+      confirmed: true,
+    });
+
+    await evictAllDurableObjects();
+    const { stub: rebuilt } = await setup(sandboxId, provider, VERCEL_ENV);
+    expect(await rebuilt.getAllocationState()).toMatchObject({
+      allocationId,
+      provider: 'vercel',
+      providerRef: provider.createdRefs[1],
+    });
+    expect(await readProviderPin(rebuilt)).toMatchObject({
+      provider: 'vercel',
+      allocationName: `${initialName}-image`,
+    });
+  });
+
+  it('keeps the original pin through a held replacement create and stops the late replacement', async () => {
+    const sandboxId = 'sbx__vercel_snapshot_stop_during_create';
+    const provider = createFakeProvider({
+      vercel: true,
+      holdCreateIndex: 1,
+      launches: [{ startSource: 'repository', snapshotFailed: true }],
+    });
+    const { stub } = await setup(sandboxId, provider, {
+      ...VERCEL_ENV,
+      ENVIRONMENT_BUILD: fakeEnvironmentBuild(RESOLVED_VERCEL).namespace,
+    });
+    await stub.prepare({ ...prepareInput(), sandboxSelection: VERCEL_SELECTION });
+    await waitFor(() => expect(provider.createIntents).toHaveLength(2));
+
+    const originalName = provider.createIntents[0]?.allocationName;
+    const oldRef = provider.createdRefs[0]!;
+    expect(provider.createIntents[1]?.allocationName).toBe(`${originalName}-image`);
+    expect(provider.stopRefs).toEqual([oldRef]);
+    expect(await stub.getAllocationState()).toMatchObject({
+      kind: 'creating',
+      allocationId: provider.launchEnvs[0]!.CONTROL_PLANE_ALLOCATION_ID,
+      providerRef: oldRef,
+    });
+    expect(await readProviderPin(stub)).toMatchObject({
+      provider: 'vercel',
+      allocationName: originalName,
+    });
+
+    await runInDurableObject(stub, instance =>
+      (
+        instance as unknown as {
+          applyEvent(event: { type: 'stop-requested'; at: number; reason: string }): Promise<void>;
+        }
+      ).applyEvent({ type: 'stop-requested', at: Date.now(), reason: 'sandbox_stopped' })
+    );
+    await waitFor(async () => expect((await stub.getAllocationState()).kind).toBe('stopped'), {
+      timeout: 2_500,
+    });
+    expect(provider.stopMismatches).toEqual([]);
+    expect(provider.stopRefs).toEqual([oldRef, oldRef]);
+
+    // Remove the preparing route so completing the held create cannot immediately reallocate.
+    await stub.release({ sessionId: SESSION });
+    await releaseHeld(stub, () => provider.releaseCreate());
+    await waitFor(() => expect(provider.stopRefs).toHaveLength(3));
+    expect(provider.createdRefs[1]).toBeDefined();
+    expect(provider.createdRefs[1]).not.toBe(oldRef);
+    expect(provider.stopRefs[2]).toBe(provider.createdRefs[1]);
+    expect(provider.stopMismatches).toEqual([]);
+    expect(provider.launchRefs).toEqual([oldRef]);
+    expect(provider.launchEnvs).toHaveLength(1);
+    expect(await readProviderPin(stub)).toMatchObject({
+      provider: 'vercel',
+      allocationName: originalName,
+    });
+  });
 });

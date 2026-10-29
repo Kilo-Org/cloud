@@ -31,6 +31,7 @@ const providerRefSchema = z
   .object({
     sandboxName: z.string().min(1),
     sessionId: z.string().min(1),
+    startSource: z.literal('repository').optional(),
     metadata: z
       .object({
         region: z.string().min(1).max(128),
@@ -93,6 +94,7 @@ function encodeVercelSessionProviderRef(
   return encodeVercelProviderRef({
     sandboxName: runtime.sandboxName,
     sessionId: runtime.sessionId,
+    ...(runtime.startSource === undefined ? {} : { startSource: runtime.startSource }),
     ...(metadata.success ? { metadata: metadata.data } : {}),
   });
 }
@@ -174,6 +176,7 @@ export function createVercelProviderAdapter(deps: {
   };
 
   return {
+    environmentSnapshots: true,
     ensureBillingAdmission,
     describeRuntime(ref) {
       const parsed = decodeOwnedProviderRef(ref);
@@ -204,7 +207,10 @@ export function createVercelProviderAdapter(deps: {
           name: intent.allocationName ?? deps.sandboxName,
           operationId: intent.intentId,
           runtimeBuildId: config.runtimeBuildId,
-          source: { type: 'snapshot', snapshotId: config.snapshotId },
+          source: {
+            type: 'snapshot',
+            snapshotId: intent.snapshot?.snapshotId ?? config.snapshotId,
+          },
           runtime: config.runtime,
           timeoutMs: config.initialTimeoutMs,
           ...(config.resources === undefined ? {} : { resources: config.resources }),
@@ -219,7 +225,13 @@ export function createVercelProviderAdapter(deps: {
           }
           throw error;
         });
-      const providerRef = encodeVercelSessionProviderRef(created.runtime, created.session);
+      const providerRef = encodeVercelSessionProviderRef(
+        {
+          ...created.runtime,
+          ...(intent.snapshot === undefined ? {} : { startSource: 'repository' as const }),
+        },
+        created.session
+      );
       return { providerRef };
     },
     async launch(ref, { command, env }) {
@@ -227,19 +239,25 @@ export function createVercelProviderAdapter(deps: {
       if (!parsed) throw new ProviderCreationError('invalid_configuration');
       const [executable, ...args] = command.argv;
       if (!executable) throw new ProviderCreationError('invalid_configuration');
-      await restClient.executeCommand(parsed.sessionId, {
-        command: executable,
-        args,
-        cwd: '/',
-        env: {
-          ...env,
-          PROVIDER_INSTANCE_ID: ref,
-          WRAPPER_LOG_PATH: CONTROL_WRAPPER_LOG_PATH,
-        },
-        sudo: command.user === 'root',
-        wait: false,
-      });
-      return { startSource: 'image' };
+      try {
+        await restClient.executeCommand(parsed.sessionId, {
+          command: executable,
+          args,
+          cwd: '/',
+          env: {
+            ...env,
+            PROVIDER_INSTANCE_ID: ref,
+            WRAPPER_LOG_PATH: CONTROL_WRAPPER_LOG_PATH,
+          },
+          sudo: command.user === 'root',
+          wait: false,
+        });
+      } catch (error) {
+        if (parsed.startSource === 'repository')
+          return { startSource: 'repository', snapshotFailed: true };
+        throw error;
+      }
+      return { startSource: parsed.startSource ?? 'image' };
     },
     async observe(ref, intent) {
       const parsed = decodeOwnedProviderRef(ref);

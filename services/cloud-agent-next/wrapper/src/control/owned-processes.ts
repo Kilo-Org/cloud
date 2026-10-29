@@ -80,6 +80,12 @@ export type OwnedProcessScope = {
   captureBaseline(allowed: (argv: string[]) => boolean, deadlineAt?: number): Promise<void>;
   verify(baseline?: boolean, deadlineAt?: number): Promise<boolean>;
   stop(deadlineAt: number): Promise<boolean>;
+  /**
+   * Stop only process groups this scope spawned. Unlike `stop`, this does not
+   * require cgroup delegation or proof over the whole container, so it is safe
+   * for a dedicated builder that runs as an exec process rather than PID 1.
+   */
+  stopSpawned(deadlineAt: number): Promise<boolean>;
   latestSnapshot(): WorkloadSnapshot | undefined;
 };
 
@@ -655,6 +661,7 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
   };
   let workloadSnapshot: WorkloadSnapshot | undefined;
   const children = new Set<OwnedChild>();
+  const spawnedGroups = new Set<number>();
   const baseline = new Set<string>();
   const observations = new Set<Deadline>();
   const workloadReporter = placement?.report ? createWorkloadReporter(placement.report) : undefined;
@@ -906,6 +913,51 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
     }
   };
 
+  const liveSpawnedGroups = async (deadline: Deadline): Promise<Set<number>> => {
+    if (spawnedGroups.size === 0) return new Set();
+    let names: string[];
+    try {
+      names = await deadline.wait(() => readdir('/proc'));
+    } catch {
+      return new Set(spawnedGroups);
+    }
+    const live = new Set<number>();
+    await Promise.all(
+      names
+        .filter(name => /^\d+$/.test(name))
+        .map(async name => {
+          try {
+            const stat = await readText(`/proc/${name}/stat`, deadline);
+            const after = stat
+              .slice(stat.lastIndexOf(')') + 2)
+              .trim()
+              .split(/\s+/);
+            const group = Number(after[2]);
+            if (spawnedGroups.has(group)) live.add(group);
+          } catch {
+            // The process exited between readdir and stat.
+          }
+        })
+    );
+    return live;
+  };
+
+  const signalSpawnedGroups = async (signal: NodeJS.Signals, deadline: Deadline): Promise<void> => {
+    for (const group of spawnedGroups) {
+      deadline.check();
+      // A detached child is its own group leader. Never target the builder's
+      // own group or an uninspectable special group.
+      if (group <= 1 || group === process.pid) continue;
+      try {
+        process.kill(-group, signal);
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code !== 'ESRCH') {
+          console.warn('Owned process group signal failed; cleanup requires verification');
+        }
+      }
+    }
+  };
+
   const scope: OwnedProcessScope = {
     spawn(command, args, options) {
       if (sealed) throw new Error('Owned process admission is closed');
@@ -958,6 +1010,8 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
         });
         if (child.pid !== undefined) {
           used = true;
+          // `detached: true` makes this child its own process-group leader.
+          spawnedGroups.add(child.pid);
           try {
             const fresh = processIdentity(
               child.pid,
@@ -1027,6 +1081,7 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
         } catch {
           console.warn('Owned process gated child kill failed; continuing unmanaged');
         }
+        if (record.process.pid !== undefined) spawnedGroups.delete(record.process.pid);
         return spawnChild(false).process;
       }
       startSweep();
@@ -1248,6 +1303,54 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
         })
         .catch(() => false)
         .then(result => {
+          stopResult = result;
+          return result;
+        })
+        .finally(() => deadline.close());
+      return stopping;
+    },
+    stopSpawned(deadlineAt) {
+      sealed = true;
+      stopSweep();
+      for (const observation of observations) observation.shorten(deadlineAt);
+      if (stopping) {
+        if (!stopped) stopDeadline?.shorten(deadlineAt);
+        return stopping;
+      }
+      const deadline = createDeadline(deadlineAt);
+      stopDeadline = deadline;
+      const run = async (): Promise<boolean> => {
+        if (spawnedGroups.size === 0) return true;
+        await signalSpawnedGroups('SIGTERM', deadline);
+        if ((await liveSpawnedGroups(deadline)).size > 0) {
+          const graceMs = Math.min(250, Math.max(0, (deadline.deadlineAt - Date.now()) / 2));
+          await deadline.wait(signal => delay(graceMs, undefined, { signal })).catch(() => false);
+        }
+        await signalSpawnedGroups('SIGKILL', deadline);
+        while (true) {
+          if ((await liveSpawnedGroups(deadline)).size === 0) return true;
+          await deadline.wait(signal => delay(25, undefined, { signal }));
+        }
+      };
+      stopping = deadline
+        .wait(run)
+        .catch(() => false)
+        .then(result => {
+          if (result) {
+            stopped = true;
+            children.clear();
+            spawnedGroups.clear();
+            if (group && !removed && !cgroupRemoval) {
+              const removalDeadline = createDeadline(deadline.deadlineAt);
+              cgroupRemoval = removeCgroupBeforeDeadline(group, removalDeadline)
+                .catch(() => false)
+                .then(removedNow => {
+                  if (removedNow) removed = true;
+                  return removedNow;
+                })
+                .finally(() => removalDeadline.close());
+            }
+          }
           stopResult = result;
           return result;
         })

@@ -13,7 +13,10 @@ import type {
 } from '../../src/environment-build/builder-provider.js';
 import type { BuildStore } from '../../src/environment-build/store.js';
 import type { NativeCaptureResult } from '../../src/sandbox-containers/native-capture.js';
+import { BuilderRetryableError } from '../../src/environment-build/builder-errors.js';
 import { MAX_BUILD_LOG_BYTES } from '../../src/environment-build/policy.js';
+import type { BuildTargetResolution } from '../../src/environment-build/target.js';
+import { vercelSnapshotBaseImage } from '../../src/byoc/vercel-snapshot-compatibility.js';
 import { isEnvironmentSnapshotsEnabled } from '../../src/environment-build/enrollment.js';
 
 const OWNER = { type: 'organization' as const, id: '22222222-2222-4222-8222-222222222222' };
@@ -34,6 +37,8 @@ type Harness = {
   captureResult: (captureId: string) => NativeCaptureResult;
   stopResult: 'terminal' | 'retryable';
   launchError: Error | null;
+  target: BuildTargetResolution;
+  capacity: 'ok' | 'limit_reached';
   /** The image a container would start from now; null when it cannot be read. */
   currentImage: string | null;
   alarms: number[];
@@ -73,6 +78,11 @@ async function setup(): Promise<Harness> {
     }),
     stopResult: 'terminal',
     launchError: null,
+    target: {
+      ok: true,
+      target: { provider: 'cloudflare-containers', instance: 'standard-4' },
+    },
+    capacity: 'ok',
     currentImage: 'registry.example/runtime-free:1',
     alarms: [],
     snapshotOrgIds: OWNER.id,
@@ -125,6 +135,7 @@ async function setup(): Promise<Harness> {
                 repoFullName: 'acme/widgets',
                 commands: ['pnpm install'],
                 plainVars: { PLAIN: 'value' },
+                sandboxAllocation: null,
                 encryptedSecrets: {
                   TOKEN: {
                     encryptedData: 'x',
@@ -134,6 +145,7 @@ async function setup(): Promise<Harness> {
                   },
                 },
               },
+        buildTarget: async () => harness.target,
         actorAccess: async () => harness.environment.access,
         gitSource: async () =>
           harness.gitUnavailable
@@ -146,9 +158,14 @@ async function setup(): Promise<Harness> {
                   platform: 'github',
                 },
               },
-        capacity: async () => 'ok',
+        capacity: async () => harness.capacity,
       },
       provider,
+      lifecycle: () => ({
+        get: async () => null,
+        set: async () => undefined,
+        clear: async () => undefined,
+      }),
       runnerUrl: (environment, build) =>
         `https://worker.test/environment-build/${environment}/${build}`,
       runnerCredential: async claims => `cred:${claims.buildId}:${claims.allocationId}`,
@@ -842,5 +859,56 @@ describe('environment snapshot resolution', () => {
       status: 'accepted',
       created: true,
     });
+  });
+
+  it('pins a Vercel target, publishes its base identity and bypasses native capacity', async () => {
+    const harness = await setup();
+    const target = {
+      provider: 'vercel' as const,
+      credentialId: '44444444-4444-4444-8444-444444444444',
+      teamId: 'team-1',
+      projectId: 'project-1',
+      runtimeBuildId: 'runtime-1',
+      baseSnapshotId: 'snap-base',
+      resources: { vcpus: 2 as const, memory: 4096 as const },
+    };
+    harness.target = { ok: true, target };
+    harness.capacity = 'limit_reached';
+
+    const { auth } = await readyBuild(harness);
+    expect(harness.launches.at(-1)?.allocation).toMatchObject({ provider: 'vercel', target });
+
+    await harness.stub.runnerResult(auth, {
+      outcome: 'ready',
+      commit: 'a'.repeat(40),
+      branch: 'main',
+      setupDurationMs: 1,
+    });
+    await drive(harness);
+
+    await expect(
+      harness.stub.resolveSnapshot({
+        reference: sessionReference(harness, 1),
+        actorUserId: 'user-1',
+      })
+    ).resolves.toMatchObject({
+      reason: 'eligible',
+      snapshot: { provider: 'vercel', baseImage: vercelSnapshotBaseImage(target) },
+    });
+  });
+
+  it('retries a retryable Vercel builder launch instead of failing the build', async () => {
+    const harness = await setup();
+    harness.launchError = new BuilderRetryableError('lost');
+    const accepted = await manualBuild(harness);
+    if (accepted.status !== 'accepted') throw new Error('not accepted');
+
+    await tick(harness);
+    expect(harness.launches).toHaveLength(0);
+    expect((await status(harness)).activeBuild?.state).toBe('preparing');
+
+    harness.launchError = null;
+    await tick(harness);
+    expect(harness.launches).toHaveLength(1);
   });
 });

@@ -119,7 +119,11 @@ export async function lookupEnvironmentSnapshot(input: {
 export function snapshotStart(resolution: SnapshotResolution): ProviderSnapshotStart | undefined {
   return resolution.snapshot === null
     ? undefined
-    : { snapshotId: resolution.snapshot.snapshotId, baseImage: resolution.snapshot.baseImage };
+    : {
+        snapshotId: resolution.snapshot.snapshotId,
+        baseImage: resolution.snapshot.baseImage,
+        provider: resolution.snapshot.provider,
+      };
 }
 
 function admissionText(admission: SnapshotAdmission): string | null {

@@ -24,6 +24,7 @@ import { fetchPreviewPort, previewNotRunningResponse } from '../preview/containe
 import { isReservedPreviewPort } from '../shared/reserved-ports.js';
 import {
   ENVIRONMENT_BUILD_RUNNER_DELIVERY_SCRIPT,
+  ENVIRONMENT_BUILD_RUNNER_ENV,
   type EnvironmentBuildRunner,
 } from '../shared/environment-build-protocol.js';
 import {
@@ -94,7 +95,7 @@ export type ContainersLaunchInput = {
  * only builders, from the image, with internet egress and no interception: the
  * builder holds a build-scoped repository credential, not contained aliases.
  */
-const BUILDER_RUNNER_ENV = 'KILO_BUILDER_RUNNER';
+const BUILDER_RUNNER_ENV = ENVIRONMENT_BUILD_RUNNER_ENV;
 /** Atomic, owner-only write of the runner file; the value comes from exec env. */
 
 export type ContainersBuilderLaunchInput = {

@@ -2217,7 +2217,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
     const previous = await this.readAllocation();
     const timers = { ...this.sandboxTimers() };
     if (
-      this.currentProvider() === 'cloudflare-containers' &&
+      this.provider.environmentSnapshots === true &&
       (event.type === 'ensure' || event.type === 'tick')
     ) {
       // A start that may restore an environment snapshot gets the snapshot
@@ -4257,11 +4257,18 @@ export class SandboxControlV2 extends DurableObject<Env> {
           });
         }
 
+        const selectedLaunch =
+          pin.provider === 'vercel'
+            ? await this.environmentSnapshotLaunch(state, allocationId, createDeadline)
+            : undefined;
         const intent: ProviderCreateIntent = {
           intentId: allocationId,
           createdAt: Date.now(),
           allocationName: pin.allocationName ?? this.sandboxId,
           containment: this.resolvedContainment(),
+          ...(selectedLaunch?.options.snapshot === undefined
+            ? {}
+            : { snapshot: selectedLaunch.options.snapshot }),
           ...(pin.billing === null ? {} : { billing: pin.billing }),
         };
         // N2: create and launch share one bound (the create deadline).
@@ -4311,11 +4318,19 @@ export class SandboxControlV2 extends DurableObject<Env> {
           return;
         }
         const launchDeadline = current.createDeadlineAt ?? createDeadline;
-        const launch = await this.environmentSnapshotLaunch(current, allocationId, launchDeadline);
+        const launch =
+          selectedLaunch ??
+          (await this.environmentSnapshotLaunch(current, allocationId, launchDeadline));
         // Persist a placeholder before the launch so a `hello` accepted while it
         // runs confirms this allocation, and that confirmation outlives the
         // allocation stopping before the launch resolves.
         await beginRepositoryLaunch(this.ctx.storage, allocationId, launch.skipped, selection.mode);
+        if (created.snapshotFailed) {
+          await notifyPreparingRoutes(this.routeContext(current), {
+            step: 'snapshot_fallback',
+            detail: 'Snapshot restore failed. Starting from the clean base.',
+          });
+        }
         if (Date.now() >= launchDeadline) throw new Error('Sandbox launch timed out');
         const launchOptions: ProviderLaunchOptions = {
           ...launch.options,
@@ -4375,6 +4390,42 @@ export class SandboxControlV2 extends DurableObject<Env> {
             step: 'sandbox_start',
             detail: 'Starting sandbox without a snapshot',
           });
+          if (pin.provider === 'vercel') {
+            const fallbackPin = {
+              ...pin,
+              allocationName: `${intent.allocationName}-image`,
+            };
+            const fallbackProvider = this.createProviderAdapter(fallbackPin);
+            const { snapshot: _snapshot, ...baseIntent } = intent;
+            const replacement = await withTimeout(
+              fallbackProvider.create({
+                ...baseIntent,
+                allocationName: fallbackPin.allocationName,
+              }),
+              remainingMs(launchDeadline),
+              'Sandbox fallback create timed out'
+            );
+            if ('unresolved' in replacement) throw new Error('Sandbox fallback create unresolved');
+            createdRef = replacement.providerRef;
+            const ownsFallback = await this.enqueue(async () => {
+              const latest = await this.readAllocation();
+              if (latest.kind !== 'creating' || latest.allocationId !== allocationId) return false;
+              await this.writeProviderPin(fallbackPin);
+              this.providerPin = fallbackPin;
+              this.provider = fallbackProvider;
+              await this.applyEvent({
+                type: 'provider-ref',
+                at: Date.now(),
+                allocationId,
+                providerRef: replacement.providerRef,
+              });
+              return true;
+            });
+            if (!ownsFallback) {
+              await fallbackProvider.stop(replacement.providerRef, baseIntent);
+              return;
+            }
+          }
           launched = await withTimeout(
             this.provider.launch(
               createdRef,
@@ -4491,11 +4542,22 @@ export class SandboxControlV2 extends DurableObject<Env> {
       });
       return { options: {}, skipped: true };
     }
-    const lookup = await lookupEnvironmentSnapshot({
+    let lookup = await lookupEnvironmentSnapshot({
       namespace: this.env.ENVIRONMENT_BUILD,
       candidate,
       launchDeadlineAt,
     });
+    if (
+      lookup.kind === 'resolved' &&
+      lookup.resolution.snapshot !== null &&
+      lookup.resolution.snapshot.provider !==
+        (this.currentProvider() === 'vercel' ? 'vercel' : 'cloudflare-containers')
+    ) {
+      lookup = {
+        kind: 'resolved',
+        resolution: { ...lookup.resolution, snapshot: null, reason: 'incompatible' },
+      };
+    }
     const snapshot = lookup.kind === 'resolved' ? snapshotStart(lookup.resolution) : undefined;
     log({
       reason: lookup.kind === 'resolved' ? lookup.resolution.reason : lookup.kind,

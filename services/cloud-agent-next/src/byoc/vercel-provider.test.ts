@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Env } from '../types.js';
 import type * as CredentialResolverModule from './vercel-credential-resolver.js';
+import { vercelSnapshotBaseImage } from './vercel-snapshot-compatibility.js';
 import {
   VERCEL_CLOUD_AGENT_CREATE_OPERATION_TAG,
   VERCEL_CLOUD_AGENT_RESOURCE_TAG,
@@ -61,7 +62,7 @@ function adapter() {
   });
 }
 
-function createdSandbox() {
+function createdSandbox(snapshotId = config.snapshotId) {
   return {
     sandbox: {
       name: sandboxName,
@@ -80,7 +81,7 @@ function createdSandbox() {
       id: 'sbox_customer',
       sourceSandboxName: sandboxName,
       projectId: config.projectId,
-      sourceSnapshotId: config.snapshotId,
+      sourceSnapshotId: snapshotId,
       runtime: config.runtime,
       status: 'running',
       memory: 4096,
@@ -112,6 +113,109 @@ afterEach(() => {
 });
 
 describe('BYOC Vercel provider on the current control plane', () => {
+  const environmentSnapshot = {
+    snapshotId: 'snap_environment',
+    provider: 'vercel' as const,
+    baseImage: vercelSnapshotBaseImage({
+      ...config,
+      credentialId: source.credentialId,
+      baseSnapshotId: config.snapshotId,
+    }),
+  };
+
+  it('creates from the compatible environment snapshot and retains its start source', async () => {
+    const request = vi
+      .fn<typeof fetch>()
+      .mockResolvedValue(Response.json(createdSandbox(environmentSnapshot.snapshotId)));
+    vi.stubGlobal('fetch', request);
+    const created = await adapter().create({ ...intent, snapshot: environmentSnapshot });
+    expect(created).toMatchObject({
+      providerRef: expect.stringContaining('"startSource":"repository"'),
+    });
+    const init = request.mock.calls[0]?.[1];
+    expect(JSON.parse(String(init?.body))).toMatchObject({
+      source: { type: 'snapshot', snapshotId: environmentSnapshot.snapshotId },
+    });
+    expect(projectByocVercelSnapshotMissing).not.toHaveBeenCalled();
+  });
+
+  it.each([400, 404, 410])(
+    'falls back once from an unavailable environment snapshot (%s)',
+    async status => {
+      const snapshots: string[] = [];
+      vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {
+        const body = JSON.parse(String(init.body));
+        snapshots.push(body.source.snapshotId);
+        return body.source.snapshotId === environmentSnapshot.snapshotId
+          ? new Response('', { status })
+          : Response.json(createdSandbox());
+      });
+      const created = await adapter().create({ ...intent, snapshot: environmentSnapshot });
+      expect(created).toMatchObject({ snapshotFailed: true });
+      expect(snapshots).toEqual([environmentSnapshot.snapshotId, config.snapshotId]);
+      expect(projectByocVercelSnapshotMissing).not.toHaveBeenCalled();
+    }
+  );
+
+  it.each([
+    { ...environmentSnapshot, provider: 'cloudflare-containers' as const },
+    {
+      ...environmentSnapshot,
+      baseImage: vercelSnapshotBaseImage({
+        ...config,
+        credentialId: 'other-account',
+        baseSnapshotId: config.snapshotId,
+      }),
+    },
+    {
+      ...environmentSnapshot,
+      baseImage: vercelSnapshotBaseImage({
+        ...config,
+        credentialId: source.credentialId,
+        projectId: 'other-project',
+        baseSnapshotId: config.snapshotId,
+      }),
+    },
+    {
+      ...environmentSnapshot,
+      baseImage: vercelSnapshotBaseImage({
+        ...config,
+        credentialId: source.credentialId,
+        runtimeBuildId: 'other-base',
+        baseSnapshotId: config.snapshotId,
+      }),
+    },
+    {
+      ...environmentSnapshot,
+      baseImage: vercelSnapshotBaseImage({
+        ...config,
+        credentialId: source.credentialId,
+        baseSnapshotId: 'replaced-base',
+      }),
+    },
+  ])('never restores a snapshot from another provider, account or base', async snapshot => {
+    const snapshots: string[] = [];
+    vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {
+      snapshots.push(JSON.parse(String(init.body)).source.snapshotId);
+      return Response.json(createdSandbox());
+    });
+    await expect(adapter().create({ ...intent, snapshot })).resolves.toMatchObject({
+      snapshotFailed: true,
+    });
+    expect(snapshots).toEqual([config.snapshotId]);
+    expect(projectByocVercelSnapshotMissing).not.toHaveBeenCalled();
+  });
+
+  it('does not invalidate the base or issue a second create after an ambiguous restore', async () => {
+    const request = vi.fn<typeof fetch>().mockRejectedValue(new Error('network unavailable'));
+    vi.stubGlobal('fetch', request);
+    await expect(
+      adapter().create({ ...intent, snapshot: environmentSnapshot })
+    ).rejects.toMatchObject({ kind: 'request_failed' });
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(projectByocVercelSnapshotMissing).not.toHaveBeenCalled();
+  });
+
   it('creates with the customer token, project, and snapshot instead of platform credentials', async () => {
     const requests: { url: string; authorization: string | null; body: unknown }[] = [];
     vi.stubGlobal('fetch', async (url: string, init: RequestInit) => {

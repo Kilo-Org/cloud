@@ -1,5 +1,6 @@
 import fs from 'node:fs/promises';
 import { appendFileSync } from 'node:fs';
+import { spawn } from 'node:child_process';
 import {
   ENVIRONMENT_BUILD_LOG_PATH,
   type EnvironmentBuildResult,
@@ -9,11 +10,12 @@ import {
   SETUP_COMMAND_INACTIVITY_TIMEOUT_MS,
   createRepositoryPreparation,
 } from '../control-plane/repository-preparation.js';
+import { createOwnedProcessScope } from '../control/owned-processes.js';
 import { writeWorkspaceStamp } from '../control-plane/workspace-stamp.js';
-import { git } from '../utils.js';
+import { git, type ProcessSpawn } from '../utils.js';
 import { runSetupScript } from '../setup-script.js';
 import { BuilderRefusedError, createBuilderClient } from './client.js';
-import { removeBuildCredentials, stopOtherProcesses } from './cleanup.js';
+import { removeBuildCredentials, stopOtherProcesses, stopOwnedProcesses } from './cleanup.js';
 import { createBuildReporter } from './reporter.js';
 import { runEnvironmentBuild } from './run.js';
 import { takeRunner } from './runner-file.js';
@@ -109,19 +111,36 @@ async function main(): Promise<void> {
   });
 
   let result: EnvironmentBuildResult;
-  try {
-    result = await runEnvironmentBuild({
+  // A container builder is PID 1 and may use kill(-1). A Vercel builder is an
+  // exec process, so it records the children it starts and stops only those.
+  const ownedScope = process.pid === 1 ? undefined : createOwnedProcessScope();
+  let ownedStopped = false;
+  const outsideScope: ProcessSpawn = (command, args, options) => spawn(command, args, options);
+  const runGit = (args: string[], options?: Parameters<typeof git>[1]) =>
+    git(args, ownedStopped ? { ...options, spawn: outsideScope } : options);
+  const run = () =>
+    runEnvironmentBuild({
       input,
       reporter,
       repository,
-      runGit: (args, options) => git(args, options),
-      stopProcesses: () => stopOtherProcesses(),
+      runGit,
+      stopProcesses: async () => {
+        if (ownedScope === undefined) {
+          await stopOtherProcesses();
+          return;
+        }
+        await stopOwnedProcesses(ownedScope);
+        // Cleanup's short Git reads must not re-enter the sealed scope.
+        ownedStopped = true;
+      },
       cleanup: removeBuildCredentials,
       writeStamp: (directory, stamp) => writeWorkspaceStamp(directory, true, stamp),
       signal: controller.signal,
       inherited,
       logPath,
     });
+  try {
+    result = await (ownedScope === undefined ? run() : ownedScope.run(run));
   } finally {
     clearTimeout(deadline);
   }

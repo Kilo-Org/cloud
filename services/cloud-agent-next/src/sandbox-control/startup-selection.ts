@@ -84,6 +84,15 @@ export function selectStartup(
   provider: AgentSandboxProvider,
   cohort?: StartupCohortContext
 ): StartupSelection {
+  // BYOC Vercel always runs the split image and downloads its own runtime.
+  if (provider === 'vercel') {
+    if (!env.RUNTIME_RELEASE_DESCRIPTOR) throw new ProviderCreationError('invalid_configuration');
+    return {
+      mode: 'downloaded',
+      image: 'runtime-free',
+      descriptor: env.RUNTIME_RELEASE_DESCRIPTOR,
+    };
+  }
   const selected = runtimeStartupConfigSchema.safeParse({
     mode: env.RUNTIME_STARTUP_MODE ?? 'preinstalled',
     image: env.NATIVE_RUNTIME_IMAGE ?? 'all-in-one',

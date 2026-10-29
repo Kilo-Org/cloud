@@ -24,6 +24,7 @@ export const ENVIRONMENT_BUILD_LOG_PATH = '/tmp/kilocode-environment-builder.log
  */
 export const ENVIRONMENT_BUILD_RUNNER_DIR = '/run/kilocode-environment-build';
 export const ENVIRONMENT_BUILD_RUNNER_PATH = `${ENVIRONMENT_BUILD_RUNNER_DIR}/runner.json`;
+export const ENVIRONMENT_BUILD_RUNNER_ENV = 'KILO_BUILDER_RUNNER';
 
 export const ENVIRONMENT_BUILD_RUNNER_DELIVERY_SCRIPT = [
   'umask 077',

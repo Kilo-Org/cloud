@@ -41,6 +41,7 @@ const RESOLVED: SnapshotResolution = {
   snapshot: {
     snapshotId: 'snap-1',
     baseImage: 'registry.example/app:1',
+    provider: 'cloudflare-containers',
     revision: 1,
     capturedAt: Date.parse('2026-10-24T21:32:19Z'),
     buildId: '22222222-2222-4222-8222-222222222222',
@@ -122,6 +123,7 @@ describe('environment snapshot lookup', () => {
     expect(snapshotStart(RESOLVED)).toEqual({
       snapshotId: 'snap-1',
       baseImage: 'registry.example/app:1',
+      provider: 'cloudflare-containers',
     });
   });
 

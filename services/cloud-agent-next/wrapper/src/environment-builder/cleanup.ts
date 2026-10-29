@@ -1,6 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { clearGitCredentialRecord } from '../control/git-credentials.js';
+import type { OwnedProcessScope } from '../control/owned-processes.js';
 import {
   stripGitCredentials,
   truncateWrapperLog,
@@ -54,6 +55,27 @@ export async function stopOtherProcesses(
   signalAll('SIGTERM');
   await sleep(STOP_GRACE_MS);
   signalAll('SIGKILL');
+}
+
+/** Grace beyond the owned scope's own stop deadline before cleanup reports failure. */
+export const OWNED_STOP_DEADLINE_MS = 15_000;
+
+/**
+ * Stop only the processes this builder started. A Vercel builder is an exec
+ * process, not PID 1, so `kill(-1)` is not available and cgroup delegation may
+ * be absent. The owned-process scope records each setup child, which is spawned
+ * detached as its own process-group leader, and this signals only those groups.
+ */
+export async function stopOwnedProcesses(
+  scope: Pick<OwnedProcessScope, 'stopSpawned' | 'dispose' | 'releaseAbandoned'>,
+  deadlineAt = Date.now() + OWNED_STOP_DEADLINE_MS
+): Promise<void> {
+  const stopped = await scope.stopSpawned(deadlineAt);
+  if (!stopped) {
+    scope.releaseAbandoned();
+    throw new Error('Setup processes could not be stopped');
+  }
+  scope.dispose();
 }
 
 export type CleanupInput = {

@@ -23,11 +23,9 @@ import {
   resolveByocVercelAccessConfig,
   type ByocVercelCredential,
 } from '../byoc/vercel-credential-resolver.js';
-import { getVercelRuntimeArtifacts } from '../byoc/vercel-runtime-artifacts.js';
 import {
   getVercelRuntimeIdentity,
   VERCEL_RUNTIME_BUN_VERSION,
-  VERCEL_RUNTIME_KILO_CLI_VERSION,
 } from '../byoc/vercel-runtime-identity.js';
 import {
   VERCEL_CLOUD_AGENT_CREATE_OPERATION_TAG,
@@ -41,7 +39,6 @@ import {
   type VercelSandboxCreateEnvelope,
   type VercelSandboxSnapshot,
 } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
-import { WRAPPER_VERSION } from '../shared/wrapper-version.js';
 import { logger } from '../logger.js';
 import { getSandboxControlStub } from '../sandbox-control/stub.js';
 import {
@@ -54,7 +51,9 @@ import { encodeVercelProviderRef } from '../sandbox-control/vercel-provider.js';
 import type { VercelSandboxRuntimeConfig } from '../agent-sandbox/vercel/vercel-runtime-config.js';
 import { resolveSecret } from '../auth.js';
 import { CONTROL_PLANE_ALLOCATION_ID_ENV } from '../shared/control-plane-protocol.js';
-import { CONTROL_SUPERVISOR_PATH } from '../sandbox-control/container-paths.js';
+import { downloadedStartup } from '../sandbox-control/downloaded-startup.js';
+import { ProviderCreationError } from '../sandbox-control/provider.js';
+import { selectStartup } from '../sandbox-control/startup-selection.js';
 import { VERCEL_BASE_SYSTEM_SETUP, VERCEL_BASE_NODE_SETUP } from '../byoc/vercel-runtime-base.js';
 import { withDORetry } from '../utils/do-retry.js';
 
@@ -65,7 +64,6 @@ const MAX_RETRIES = RETRY_DELAY_MS.length;
 const BUILDER_TIMEOUT_MS = 10 * 60_000;
 const SNAPSHOT_EXPIRATION_MS = 30 * 24 * 60 * 60 * 1_000;
 const PINNED_BUN_VERSION = VERCEL_RUNTIME_BUN_VERSION;
-const PINNED_KILO_VERSION = VERCEL_RUNTIME_KILO_CLI_VERSION;
 
 const SnapshotBuildOwnerSchema = byocVercelOwnerSchema;
 
@@ -89,8 +87,6 @@ const BuildStepSchema = z.enum([
   'create_builder',
   'install_system_dependencies',
   'install_node_dependencies',
-  'upload_runtime_artifacts',
-  'verify_runtime_artifacts',
   'snapshot_builder',
   'create_validator',
   'launch_validator_wrapper',
@@ -541,7 +537,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
       const identity = terminalConfirmed
         ? await this.external(ownershipFromRow(next), async () => {
             try {
-              return await getVercelRuntimeIdentity(this.env);
+              return await getVercelRuntimeIdentity();
             } catch {
               return undefined;
             }
@@ -661,48 +657,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
         );
         await this.runCommand(state, client, builderSessionId, 'bash', [
           '-lc',
-          `${VERCEL_BASE_NODE_SETUP}; sudo npm install -g @kilocode/cli@${PINNED_KILO_VERSION}; test "$(bun --version)" = ${JSON.stringify(PINNED_BUN_VERSION)}; case "$(node --version)" in v24.*) ;; *) exit 1 ;; esac; git --version >/dev/null; kilo --version >/dev/null`,
-        ]);
-        return this.next(state, { step: 'upload_runtime_artifacts' });
-      }
-      case 'upload_runtime_artifacts': {
-        const builderSessionId = requiredBuildField(
-          state.builder_session_id,
-          'builder_session_missing'
-        );
-        const artifacts = await this.external(state, () => getVercelRuntimeArtifacts());
-        const controlWrapper = artifacts.find(
-          artifact => artifact.path === 'usr/local/bin/kilocode-control-plane-wrapper.js'
-        );
-        const supervisor = artifacts.find(
-          artifact => artifact.path === 'usr/local/bin/kilocode-control-plane-supervisor.sh'
-        );
-        if (!controlWrapper || !supervisor) throw new Error('runtime_artifact_missing');
-        const manifest = JSON.stringify({
-          runtimeBuildId: state.runtime_build_id,
-          wrapperVersion: WRAPPER_VERSION,
-          runtime: 'node24',
-          bunVersion: PINNED_BUN_VERSION,
-          controlWrapperSha256: controlWrapper.sha256,
-          controlPlaneSupervisorSha256: supervisor.sha256,
-        });
-        await this.external(state, () =>
-          client.writeFiles(builderSessionId, '/tmp', [
-            { path: 'kilocode-control-plane-wrapper.js', content: controlWrapper.bytes },
-            { path: 'kilocode-control-plane-supervisor.sh', content: supervisor.bytes },
-            { path: 'kilo-runtime-manifest.json', content: manifest },
-          ])
-        );
-        return this.next(state, { step: 'verify_runtime_artifacts' });
-      }
-      case 'verify_runtime_artifacts': {
-        const builderSessionId = requiredBuildField(
-          state.builder_session_id,
-          'builder_session_missing'
-        );
-        await this.runCommand(state, client, builderSessionId, 'bash', [
-          '-lc',
-          `set -euo pipefail; sudo install -m 0755 /tmp/kilocode-control-plane-wrapper.js /usr/local/bin/kilocode-control-plane-wrapper.js; sudo install -m 0755 /tmp/kilocode-control-plane-supervisor.sh /usr/local/bin/kilocode-control-plane-supervisor.sh; sudo install -m 0644 /tmp/kilo-runtime-manifest.json /usr/local/share/kilo/runtime-manifest.json; test -f /usr/local/bin/kilocode-control-plane-wrapper.js; test "$(bun --version)" = ${JSON.stringify(PINNED_BUN_VERSION)}; test "$(node --version | cut -c1-3)" = "v24"; control_hash="$(sha256sum /usr/local/bin/kilocode-control-plane-wrapper.js | cut -d' ' -f1)"; jq -e --arg build ${JSON.stringify(state.runtime_build_id)} --arg bun ${JSON.stringify(PINNED_BUN_VERSION)} --arg control "$control_hash" '.runtimeBuildId == $build and .bunVersion == $bun and .controlWrapperSha256 == $control' /usr/local/share/kilo/runtime-manifest.json >/dev/null`,
+          `${VERCEL_BASE_NODE_SETUP}; test "$(bun --version)" = ${JSON.stringify(PINNED_BUN_VERSION)}; case "$(node --version)" in v24.*) ;; *) exit 1 ;; esac; git --version >/dev/null`,
         ]);
         return this.next(state, {
           step: 'snapshot_builder',
@@ -793,6 +748,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
           sandboxName: state.validator_name,
           sessionId: validatorSessionId,
         });
+        const expiresAt = (session.startedAt ?? session.requestedAt) + session.timeout;
         const prepared = this.next(state, { validator_control_id: validatorControlId });
         if (!this.save(prepared)) throw new SnapshotBuildOwnershipLostError();
         await this.external(prepared, () =>
@@ -815,22 +771,41 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
                     runtime: 'node24',
                   },
                   createdAt: session.requestedAt,
-                  expiresAt: (session.startedAt ?? session.requestedAt) + session.timeout,
+                  expiresAt,
                 },
                 credentialHash,
               }),
             'seedByocValidatorControl'
           )
         );
+        const selection = selectStartup(this.env, 'vercel');
+        if (selection.mode !== 'downloaded') throw new Error('provider_configuration_failed');
+        const startup = await this.external(prepared, async () => {
+          try {
+            return await downloadedStartup({
+              env: this.env,
+              descriptor: selection.descriptor,
+              sandboxId: validatorControlId,
+              allocationId,
+              deadlineAt: expiresAt,
+            });
+          } catch (error) {
+            if (error instanceof ProviderCreationError)
+              throw new Error('provider_configuration_failed');
+            throw error;
+          }
+        });
+        const [startupCommand, ...startupArgs] = startup.argv;
+        if (!startupCommand || startupArgs.length === 0)
+          throw new Error('provider_configuration_failed');
+        const launchedArgs = [...startupArgs];
+        launchedArgs[launchedArgs.length - 1] += `\n# byoc-call-home:${state.build_generation}`;
         const intent = this.next(prepared, { validator_wrapper_requested: 1 });
         if (!this.save(intent)) throw new SnapshotBuildOwnershipLostError();
         const command = await this.external(intent, () =>
           client.executeCommand(validatorSessionId, {
-            command: 'sh',
-            args: [
-              '-lc',
-              `exec ${CONTROL_SUPERVISOR_PATH} # byoc-call-home:${state.build_generation}`,
-            ],
+            command: startupCommand,
+            args: launchedArgs,
             cwd: '/',
             env: {
               ...buildControlWrapperLaunchEnv({
@@ -842,7 +817,7 @@ export class VercelSnapshotBuild extends DurableObject<Env> {
               PROVIDER_INSTANCE_ID: providerRef,
               [CONTROL_PLANE_ALLOCATION_ID_ENV]: allocationId,
             },
-            sudo: false,
+            sudo: startup.user === 'root',
             wait: false,
           })
         );

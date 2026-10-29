@@ -14,7 +14,6 @@ import {
   getContainerCapacityFailureReason,
 } from '../container-concurrency.js';
 import { isCloudAgentContainerBillingEnabled } from '../container-billing-rollout.js';
-import { isCloudflareContainersEnrolled } from '../agent-sandbox/cloudflare-containers/cloudflare-containers-runtime-config.js';
 import { getPgDb } from '../db/pg.js';
 import { logger } from '../logger.js';
 import { mergeEnvVarsWithSecrets, type EncryptedSecrets } from '../utils/encryption.js';
@@ -32,11 +31,8 @@ import type {
   EnvironmentBuildStatus,
 } from '../shared/environment-build-status.js';
 import { environmentActorAccess, resolveBuilderGitSource } from './access.js';
-import {
-  builderRuntimeUnsupportedReason,
-  builderSandboxId,
-  createBuilderProvider,
-} from './builder-provider.js';
+import { builderSandboxId, createBuilderProvider } from './builder-provider.js';
+import { resolveEnvironmentBuildTarget, snapshotsRuntimeUnsupportedReason } from './target.js';
 import {
   EnvironmentBuildCoordinator,
   type CoordinatorDeps,
@@ -129,6 +125,15 @@ export class EnvironmentBuild extends DurableObject<Env> {
         buildInput: id => loadEnvironmentBuildInput(getPgDb(env), id),
         actorAccess: (owner, userId) => environmentActorAccess(getPgDb(env), owner, userId),
         gitSource: input => resolveBuilderGitSource(env, input),
+        buildTarget: input =>
+          resolveEnvironmentBuildTarget({
+            env,
+            db: getPgDb(env),
+            reference: input.reference,
+            repoFullName: input.repoFullName,
+            commands: input.commands,
+            sandboxAllocation: input.sandboxAllocation,
+          }),
         capacity: async (owner, instanceId, actorUserId) => {
           try {
             await assertContainerCapacity(env, {
@@ -149,6 +154,18 @@ export class EnvironmentBuild extends DurableObject<Env> {
         containers: env.SANDBOX_CONTAINERS,
         env,
       }),
+      lifecycle: buildId => {
+        const key = `environment-build:lifecycle:v1:${buildId}`;
+        return {
+          get: () => storage.get(key),
+          set: async value => {
+            await storage.put(key, value);
+          },
+          clear: async () => {
+            await storage.delete(key);
+          },
+        };
+      },
       runnerUrl: (environmentId, buildId) => {
         const base = env.WORKER_URL?.replace(/\/$/, '');
         return base ? `${base}/environment-build/${environmentId}/${buildId}` : null;
@@ -186,16 +203,7 @@ export class EnvironmentBuild extends DurableObject<Env> {
         if (!isEnvironmentSnapshotsEnabled(env, owner)) {
           return 'Snapshots are not enabled for this organization';
         }
-        if (!env.SANDBOX_CONTAINERS) return 'Native containers are not configured';
-        if (
-          !isCloudflareContainersEnrolled(
-            env,
-            owner.type === 'organization' ? { orgId: owner.id } : {}
-          )
-        ) {
-          return 'Cloudflare containers are not enabled for this account';
-        }
-        return builderRuntimeUnsupportedReason(env);
+        return snapshotsRuntimeUnsupportedReason(env);
       },
       log: (message, fields) => logger.withFields(fields).info(message),
     };

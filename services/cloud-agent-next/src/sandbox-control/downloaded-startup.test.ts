@@ -71,9 +71,10 @@ const baseline = { mode: 'preinstalled', image: 'all-in-one' } as const;
 const scopedDownloaded = { mode: 'downloaded', image: 'runtime-free', descriptor: text } as const;
 
 describe('startup selection and preflight', () => {
-  it('preserves absent configuration for each provider', () => {
-    for (const provider of ['cloudflare', 'cloudflare-containers', 'vercel'] as const)
+  it('preserves absent configuration for each non-Vercel provider', () => {
+    for (const provider of ['cloudflare', 'cloudflare-containers'] as const)
       expect(selectStartup({}, provider)).toEqual({ mode: 'preinstalled', image: 'all-in-one' });
+    expect(() => selectStartup({}, 'vercel')).toThrow('configuration');
   });
   it.each([
     [{ RUNTIME_STARTUP_MODE: 'invalid' }, 'cloudflare-containers'],
@@ -91,13 +92,16 @@ describe('startup selection and preflight', () => {
         ).mode
       ).toBe('preinstalled');
   });
-  it('selects downloaded startup for Vercel and requires its release descriptor', () => {
-    expect(
-      selectStartup(
-        { RUNTIME_STARTUP_MODE: 'downloaded', RUNTIME_RELEASE_DESCRIPTOR: text },
-        'vercel'
-      )
-    ).toMatchObject({ mode: 'downloaded', descriptor: text });
+  it('always selects the downloaded runtime-free image for Vercel', () => {
+    for (const env of [
+      {},
+      { RUNTIME_STARTUP_MODE: 'preinstalled' },
+      { RUNTIME_STARTUP_MODE: 'invalid', NATIVE_RUNTIME_IMAGE: 'all-in-one' },
+      { RUNTIME_STARTUP_MODE: 'downloaded', NATIVE_RUNTIME_IMAGE: 'all-in-one' },
+    ] as const)
+      expect(selectStartup({ ...env, RUNTIME_RELEASE_DESCRIPTOR: text }, 'vercel')).toEqual(
+        scopedDownloaded
+      );
     expect(() => selectStartup({ RUNTIME_STARTUP_MODE: 'downloaded' }, 'vercel')).toThrow(
       'configuration'
     );
@@ -260,14 +264,17 @@ describe('startup selection and preflight', () => {
   it('keeps SDK pins on the baseline even for a matching cohort', () => {
     expect(selectStartup(scopedEnv, 'cloudflare', isolatedCohort)).toEqual(baseline);
   });
-  it('applies the organization scope to Vercel without native isolation', () => {
+  it('ignores the native cohort and configured scope for Vercel', () => {
     expect(selectStartup(scopedEnv, 'vercel', { preparingRoutes: [webRoute] })).toEqual(
       scopedDownloaded
     );
-    expect(selectStartup(scopedEnv, 'vercel', {})).toEqual(baseline);
+    expect(selectStartup(scopedEnv, 'vercel', {})).toEqual(scopedDownloaded);
     expect(
       selectStartup(scopedEnv, 'vercel', { preparingRoutes: [{ ...webRoute, orgId: otherOrgId }] })
-    ).toEqual(baseline);
+    ).toEqual(scopedDownloaded);
+    expect(
+      selectStartup({ ...scopedEnv, RUNTIME_INTERACTIVE_ORG_IDS: '*' }, 'vercel', isolatedCohort)
+    ).toEqual(scopedDownloaded);
   });
   it('ignores an invalid interactive scope before native downloaded startup is selected', () => {
     for (const [env, provider] of [

@@ -1,7 +1,4 @@
-import {
-  CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE,
-  type CloudflareContainersInstance,
-} from '@kilocode/worker-utils/sandbox-allocation';
+import type { CloudflareContainersInstance } from '@kilocode/worker-utils/sandbox-allocation';
 import { hashToSandboxId } from '../sandbox-id.js';
 import type { EnvironmentBuildRunner } from '../shared/environment-build-protocol.js';
 import type { SandboxBillingInput } from '../container-usage-context.js';
@@ -17,24 +14,57 @@ import type {
   SandboxContainers,
 } from '../sandbox-containers/SandboxContainers.js';
 import type { ProviderAdapter } from '../sandbox-control/provider.js';
+import type { EnvironmentReference } from '@kilocode/cloud-agent-profile';
+import { builderInstance, builderRuntimeUnsupportedReason } from './target.js';
+import type { VercelBuildTarget } from './target.js';
+import {
+  captureVercelBuilder,
+  launchVercelBuilder,
+  openVercelBuilder,
+  stopVercelBuilder,
+} from './vercel-builder.js';
+import { ByocCredentialMissingError } from '../byoc/vercel-credential-resolver.js';
+import {
+  BuilderRetryableError,
+  BuilderStateInvalidError,
+  BuilderTargetMismatchError,
+} from './builder-errors.js';
 
 /**
- * Physical builder lifecycle over the native Containers primitives (plan "Use a
- * dedicated builder runner ... Reuse ... provider lifecycle primitives"). The
- * builder container DO is named for its environment, so a builder can never
- * share a container DO with a session. Billing admission, stop and lease reuse
- * the session provider adapter; only the start uses the builder entry point.
+ * Physical builder lifecycle over the native Containers primitives and the
+ * Vercel BYOC sandbox API. The builder for an environment is named per build,
+ * so two builds can never share a sandbox, and the environment-level native
+ * container DO keeps its existing name.
  */
 
-export type BuilderAllocation = {
+export type NativeBuilderAllocation = {
+  provider: 'cloudflare-containers';
   /** The container DO name and the billing sandbox key (`sbx-` placed key, isolated kind). */
   sandboxId: string;
   allocationId: string;
   instance: CloudflareContainersInstance;
 };
 
+export type VercelBuilderAllocation = {
+  provider: 'vercel';
+  /** Deterministic Vercel sandbox name derived from the build id. */
+  sandboxId: string;
+  allocationId: string;
+  owner: EnvironmentReference['owner'];
+  target: VercelBuildTarget;
+};
+
+export type BuilderAllocation = NativeBuilderAllocation | VercelBuilderAllocation;
+
+/** Mutable, non-secret Vercel lifecycle state kept outside the immutable build input. */
+export type BuilderLifecycleState = {
+  get(): Promise<unknown>;
+  set(value: unknown): Promise<void>;
+  clear(): Promise<void>;
+};
+
 export type BuilderLaunch = {
-  /** Delivered to the running builder by exec, never as container start env. */
+  /** Delivered to the running builder by exec or write, never as image environment. */
   runner: EnvironmentBuildRunner;
   deadlineAt: number;
 };
@@ -43,27 +73,41 @@ export type BuilderProvider = {
   /** Container billing admission and attribution; throws `ProviderCreationError` when refused. */
   admitBilling(allocation: BuilderAllocation, billing: SandboxBillingInput): Promise<void>;
   /** Start or confirm the builder with the deployment startup selection. */
-  launch(allocation: BuilderAllocation, launch: BuilderLaunch): Promise<void>;
-  capture(allocation: BuilderAllocation, captureId: string): Promise<NativeCaptureResult>;
-  stop(allocation: BuilderAllocation): Promise<'terminal' | 'retryable'>;
-  renewLease(allocation: BuilderAllocation): Promise<void>;
+  launch(
+    allocation: BuilderAllocation,
+    launch: BuilderLaunch,
+    state: BuilderLifecycleState
+  ): Promise<void>;
+  capture(
+    allocation: BuilderAllocation,
+    captureId: string,
+    state: BuilderLifecycleState
+  ): Promise<NativeCaptureResult>;
+  stop(
+    allocation: BuilderAllocation,
+    state: BuilderLifecycleState
+  ): Promise<'terminal' | 'retryable'>;
+  renewLease(allocation: BuilderAllocation, state: BuilderLifecycleState): Promise<void>;
   /** SHA-256 of the runtime release descriptor, or null when unavailable. */
   runtimeReleaseId(): Promise<string | null>;
-  /** The image a container in `sandboxId` starts from now, or null when unreadable. */
+  /** The image a native container in `sandboxId` starts from now, or null when unreadable. */
   currentImage(sandboxId: string): Promise<string | null>;
 };
+
+export { builderInstance, builderRuntimeUnsupportedReason };
+export { BuilderRetryableError };
 
 /** The one builder container DO name for an environment. */
 export function builderSandboxId(environmentId: string): Promise<string> {
   return hashToSandboxId(`environment-build:v1:${environmentId}`, 'sbx');
 }
 
-/** `standard-4` when setup commands exist, otherwise the default native instance. */
-export function builderInstance(commands: readonly string[]): CloudflareContainersInstance {
-  return commands.length > 0 ? 'standard-4' : CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE;
+/** A deterministic, provider-valid builder sandbox name for one build. */
+export function vercelBuilderSandboxName(buildId: string): string {
+  return `ses-envbuild-${buildId.replaceAll('-', '').slice(0, 40)}`;
 }
 
-function providerRef(allocation: BuilderAllocation): string {
+function providerRef(allocation: NativeBuilderAllocation): string {
   return encodeCloudflareProviderRef({
     sandboxId: allocation.sandboxId,
     containment: false,
@@ -86,34 +130,54 @@ type BuilderRuntimeEnv = Pick<
   | 'RUNTIME_RELEASE_BUCKET'
 >;
 
-/** Snapshot enrollment is separate from the interactive session runtime cohort. */
-export function builderRuntimeUnsupportedReason(env: BuilderRuntimeEnv): string | null {
-  return env.RUNTIME_STARTUP_MODE === 'downloaded' &&
-    env.NATIVE_RUNTIME_IMAGE === 'runtime-free' &&
-    env.RUNTIME_RELEASE_DESCRIPTOR &&
-    env.RUNTIME_RELEASE_BUCKET
-    ? null
-    : 'Environment snapshots require the downloaded runtime-free image and runtime release';
-}
+type BuilderProviderEnv = BuilderRuntimeEnv & Parameters<typeof openVercelBuilder>[0];
 
 export function createBuilderProvider(deps: {
   containers: DurableObjectNamespace<SandboxContainers>;
-  env: BuilderRuntimeEnv;
+  env: BuilderProviderEnv;
+  now?: () => number;
+  fetch?: typeof fetch;
 }): BuilderProvider {
-  const adapterFor = (allocation: BuilderAllocation): ProviderAdapter =>
+  const adapterFor = (allocation: NativeBuilderAllocation): ProviderAdapter =>
     createCloudflareContainersProviderAdapter({
       logicalSandboxId: allocation.sandboxId,
       allocationName: allocation.sandboxId,
       instance: allocation.instance,
       getContainer: id => deps.containers.getByName(id),
     });
-  const stub = (allocation: BuilderAllocation) => deps.containers.getByName(allocation.sandboxId);
+  const stub = (allocation: NativeBuilderAllocation) =>
+    deps.containers.getByName(allocation.sandboxId);
 
   return {
     async admitBilling(allocation, billing) {
+      if (allocation.provider === 'vercel') return;
       await adapterFor(allocation).ensureBillingAdmission(providerRef(allocation), billing);
     },
-    async launch(allocation, launch) {
+    async launch(allocation, launch, state) {
+      if (allocation.provider === 'vercel') {
+        const descriptor = deps.env.RUNTIME_RELEASE_DESCRIPTOR;
+        if (!descriptor) throw new ProviderCreationError('invalid_configuration');
+        const opened = await openVercelBuilder(deps.env, allocation, deps.fetch);
+        const command = await downloadedStartup({
+          env: deps.env,
+          descriptor,
+          sandboxId: allocation.sandboxId,
+          allocationId: allocation.allocationId,
+          deadlineAt: launch.deadlineAt,
+          mainProcess: 'environment-builder',
+        });
+        await launchVercelBuilder({
+          allocation,
+          launch,
+          state,
+          client: opened.client,
+          command,
+          runtime: opened.runtime,
+          initialTimeoutMs: opened.initialTimeoutMs,
+          now: deps.now,
+        });
+        return;
+      }
       const descriptor = deps.env.RUNTIME_RELEASE_DESCRIPTOR;
       if (builderRuntimeUnsupportedReason(deps.env) !== null || !descriptor) {
         throw new ProviderCreationError('invalid_configuration');
@@ -136,13 +200,61 @@ export function createBuilderProvider(deps: {
       });
       await stub(allocation).ensureLeaseAtLeast(ref, leaseAtLeastMs());
     },
-    capture(allocation, captureId) {
+    async capture(allocation, captureId, state) {
+      if (allocation.provider === 'vercel') {
+        let opened;
+        try {
+          opened = await openVercelBuilder(deps.env, allocation, deps.fetch);
+        } catch (error) {
+          if (
+            error instanceof ByocCredentialMissingError ||
+            error instanceof BuilderTargetMismatchError
+          ) {
+            return { status: 'failed', reason: 'snapshot_failed' };
+          }
+          throw error;
+        }
+        try {
+          return await captureVercelBuilder({
+            allocation,
+            captureId,
+            state,
+            client: opened.client,
+            runtime: opened.runtime,
+            now: deps.now,
+          });
+        } catch (error) {
+          if (error instanceof BuilderStateInvalidError) {
+            return { status: 'failed', reason: 'snapshot_failed' };
+          }
+          throw error;
+        }
+      }
       return stub(allocation).captureSnapshot(providerRef(allocation), captureId);
     },
-    stop(allocation) {
+    async stop(allocation, state) {
+      if (allocation.provider === 'vercel') {
+        try {
+          const opened = await openVercelBuilder(deps.env, allocation, deps.fetch);
+          return await stopVercelBuilder({
+            allocation,
+            state,
+            client: opened.client,
+            runtime: opened.runtime,
+            now: deps.now,
+          });
+        } catch (error) {
+          if (error instanceof BuilderRetryableError) return 'retryable';
+          throw error;
+        }
+      }
       return adapterFor(allocation).stop(providerRef(allocation));
     },
     async renewLease(allocation) {
+      // Native containers need a lease extension. A Vercel builder's initial
+      // timeout already covers the build deadline and extending it would only
+      // outlive the build.
+      if (allocation.provider === 'vercel') return;
       await adapterFor(allocation).ensureLeaseAtLeast(providerRef(allocation), leaseAtLeastMs());
     },
     async runtimeReleaseId() {

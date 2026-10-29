@@ -12,21 +12,22 @@ images from the catalog. Manual mode, descriptor, cohort or image drift fails be
 | downloaded | runtime-free | Separate `runtime-free` named image with verified immutable base digest, exact-SHA runtime descriptor |
 
 The runtime-free/preinstalled pair is invalid in the shared configuration schema and the Worker.
-Downloaded startup supports native Cloudflare Containers and BYOC Vercel. SDK pins keep preinstalled startup.
+Native Cloudflare Containers select downloaded startup through the catalog. BYOC Vercel always uses
+downloaded startup and requires a published runtime release. SDK pins keep preinstalled startup.
 
 BYOC Vercel uses its customer-owned snapshot as the base. The snapshot setup provides the fixed Node
 path and Bun version required by the bootstrap. Downloaded startup installs the selected immutable CLI
 and control release as root. The base digest covers the ABI, Node major, Bun, and base setup commands;
 CLI and wrapper changes do not change that digest or require a new snapshot. Existing allocations keep
 their installed release until a new allocation starts. Base dependency changes still require a snapshot
-upgrade. Upgrade older BYOC snapshots once before enabling downloaded mode, so they have the required
-fixed Node path. Native image selection does not change the Vercel snapshot.
+upgrade. BYOC base snapshots contain no CLI or wrapper. Native image selection and interactive runtime
+cohorts do not affect Vercel startup.
 
 A downloaded target can scope its startup to an `interactiveOrgIds` list. Production uses it for one test organization.
 Deployment renders this list as `RUNTIME_INTERACTIVE_ORG_IDS`.
 A new allocation selects it only when all its preparing routes belong to one listed organization and have
-`createdOnPlatform: cloud-agent-web`. Native allocations must also be isolated; Vercel allocations use
-the same organization rule. Other organizations, personal sessions, non-web sessions, code reviews and
+`createdOnPlatform: cloud-agent-web`. Native allocations must also be isolated. Other organizations,
+personal sessions, non-web sessions, code reviews and
 shared native sandboxes retain preinstalled startup on the unchanged `app` image. SDK pins always stay
 preinstalled. A missing or mixed route identity stays on the baseline. These identity values are rollout
 metadata, not an authorization boundary.
@@ -36,9 +37,12 @@ are used together, including snapshot fallback. Existing allocations keep their 
 An absent `interactiveOrgIds` means deployment-wide startup selection; an empty catalog list is
 rejected. For a complete rollback, remove the production override so it inherits the preinstalled default.
 
-Environment snapshot builders use only `runtime-free` with downloaded startup. Snapshot enrollment
+Environment snapshot builders use downloaded startup over a runtime-free base. Snapshot enrollment
 remains controlled by `ENVIRONMENT_SNAPSHOT_ORG_IDS`, independently of the interactive runtime cohort.
-Builds require a downloaded runtime-free deployment and a published runtime release. Existing
+Native builds require a downloaded runtime-free deployment. Vercel builds use the saved allocation's
+customer-owned base snapshot and require a published runtime release, not native container enrollment.
+Vercel compatibility includes the credential, project and exact base snapshot; runtime-only updates do
+not invalidate it. A failed restore retries once from the clean base. Existing
 all-in-one environment snapshots are incompatible and trigger replacement builds. Sessions on `app`
 start from the image instead of restoring split-image snapshots. Runtime-only updates retain snapshot
 compatibility when the runtime-free base image and ABI stay unchanged.

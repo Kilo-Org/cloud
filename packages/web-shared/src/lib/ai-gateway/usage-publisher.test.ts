@@ -617,33 +617,45 @@ describe('enqueueUsage transient retries', () => {
 });
 
 describe('bounded CF confirmation policy', () => {
-  test('a real confirmation after three seconds succeeds on the first attempt', async () => {
-    let requests = 0;
-    const server = createServer((_request, response) => {
-      requests++;
-      setTimeout(() => {
-        response.writeHead(202);
-        response.end();
-      }, 3_000);
+  test('waits beyond the single-attempt window for the first confirmation', async () => {
+    jest.useFakeTimers();
+    const confirmationMs = USAGE_ENQUEUE_TIMEOUT_MS + 1_000;
+    expect(confirmationMs).toBeLessThan(USAGE_ENQUEUE_RETRY_TIMEOUT_MS);
+    const timeouts = jest.spyOn(AbortSignal, 'timeout').mockImplementation(ms => {
+      const controller = new AbortController();
+      setTimeout(() => controller.abort(), ms);
+      return controller.signal;
     });
-    try {
-      await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
-      const address = server.address();
-      if (!address || typeof address === 'string') throw new Error('Missing fixture port');
-      config.USAGE_INGEST_URL = `http://127.0.0.1:${address.port}/usage`;
-      mockFetch.mockImplementation(nativeFetch);
-      expect(await enqueueUsage(payload, { retryTransientFailures: true })).toEqual({
-        kind: 'accepted',
-      });
-      expect(requests).toBe(1);
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-      expect(warn).not.toHaveBeenCalled();
-    } finally {
-      server.closeAllConnections();
-      await new Promise<void>((resolve, reject) =>
-        server.close(error => (error ? reject(error) : resolve()))
-      );
-    }
+    mockFetch.mockImplementation(
+      (_url, init) =>
+        new Promise((resolve, reject) => {
+          const confirmation = setTimeout(
+            () => resolve(new Response(null, { status: 202 })),
+            confirmationMs
+          );
+          init?.signal?.addEventListener(
+            'abort',
+            () => {
+              clearTimeout(confirmation);
+              reject(new Error('synthetic timeout'));
+            },
+            { once: true }
+          );
+        })
+    );
+    let settled = false;
+    const result = enqueueUsage(payload, { retryTransientFailures: true }).then(outcome => {
+      settled = true;
+      return outcome;
+    });
+    await jest.advanceTimersByTimeAsync(USAGE_ENQUEUE_TIMEOUT_MS);
+    expect(settled).toBe(false);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(confirmationMs - USAGE_ENQUEUE_TIMEOUT_MS);
+    expect(await result).toEqual({ kind: 'accepted' });
+    expect(timeouts.mock.calls).toEqual([[5_000]]);
+    expect(mockFetch).toHaveBeenCalledTimes(1);
+    expect(warn).not.toHaveBeenCalled();
   });
 
   test('recovers on the fourth attempt and never issues a fifth', async () => {

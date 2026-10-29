@@ -876,6 +876,7 @@ describe('production SFO queued accounting', () => {
     async status => {
       if (status === 503) jest.spyOn(Math, 'random').mockReturnValue(0);
       configureQueueEnvironment();
+      const timeouts = jest.spyOn(AbortSignal, 'timeout');
       const lifetime = requestLifetime();
       const generation = Promise.withResolvers<void>();
       const accepted = Promise.withResolvers<Response>();
@@ -912,7 +913,7 @@ describe('production SFO queued accounting', () => {
       await new Promise(resolve => setImmediate(resolve));
       expect(drained).toBe(false);
       config.USAGE_QUEUE_SFO_CONFIG = { enabled: false, exposure: 0, userIds: null };
-      if (status === 202) await new Promise(resolve => setTimeout(resolve, 3_000));
+      expect(timeouts).toHaveBeenCalledWith(publisher.USAGE_ENQUEUE_RETRY_TIMEOUT_MS);
       accepted.resolve(new Response(null, { status }));
       await drain;
       expect(result).toEqual(status === 202 ? expect.objectContaining({ status: 'queued' }) : null);
@@ -1338,46 +1339,65 @@ describe('queued usage accounting', () => {
   test.each(['fra1', 'sfo1'])(
     '%s accounting lifetime includes retry backoff and the next publication',
     async region => {
-      jest.spyOn(Math, 'random').mockReturnValue(0);
-      config.USAGE_QUEUE_ONLY_ENABLED = true;
-      process.env.VERCEL_REGION = region;
-      const secondAttempt = Promise.withResolvers<void>();
+      jest.useFakeTimers({ doNotFake: ['nextTick', 'setImmediate'] });
       const accepted = Promise.withResolvers<Response>();
-      jest.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 503 }));
-      jest.mocked(fetch).mockImplementation(() => {
-        secondAttempt.resolve();
-        return accepted.promise;
-      });
-      const lifecycle = requestLifetime();
-      let result: Awaited<ReturnType<typeof processTokenData>> = null;
-      lifecycle.run(() =>
-        after(async () => {
-          result = await processTokenData({ ...stats }, { ...context });
-        })
-      );
-      lifecycle.close();
-      let drained = false;
-      const drain = lifecycle.drain().then(() => {
-        drained = true;
-      });
-      await secondAttempt.promise;
-      expect(fetch).toHaveBeenCalledTimes(2);
-      expect(result).toBeNull();
-      expect(drained).toBe(false);
-      expect(info).not.toHaveBeenCalled();
-      expect(error).not.toHaveBeenCalled();
-      accepted.resolve(new Response(null, { status: 202 }));
-      await drain;
-      expect(result).toMatchObject({ status: 'queued' });
-      const payload = jest.mocked(publisher.enqueueUsage).mock.calls[0][0];
-      expect(jest.mocked(fetch).mock.calls.map(([, init]) => init?.body)).toEqual([
-        JSON.stringify(payload),
-        JSON.stringify(payload),
-      ]);
-      expect(writer).not.toHaveBeenCalled();
-      expect(db.transaction).not.toHaveBeenCalled();
-      expect(outbox.enqueueBouncerUsageEvent).not.toHaveBeenCalled();
-      expect(lifecycle.errors).toEqual([]);
+      let drain: Promise<void> | undefined;
+      try {
+        jest.spyOn(Math, 'random').mockReturnValue(0.5);
+        config.USAGE_QUEUE_ONLY_ENABLED = true;
+        process.env.VERCEL_REGION = region;
+        const secondAttempt = Promise.withResolvers<void>();
+        jest.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 503 }));
+        jest.mocked(fetch).mockImplementation(() => {
+          secondAttempt.resolve();
+          return accepted.promise;
+        });
+        const lifecycle = requestLifetime();
+        let result: Awaited<ReturnType<typeof processTokenData>> = null;
+        lifecycle.run(() =>
+          after(async () => {
+            result = await processTokenData({ ...stats }, { ...context });
+          })
+        );
+        lifecycle.close();
+        let drained = false;
+        drain = lifecycle.drain().then(() => {
+          drained = true;
+        });
+        await jest.advanceTimersByTimeAsync(0);
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(drained).toBe(false);
+        await jest.advanceTimersByTimeAsync(249);
+        expect(fetch).toHaveBeenCalledTimes(1);
+        expect(drained).toBe(false);
+        await jest.advanceTimersByTimeAsync(1);
+        await secondAttempt.promise;
+        expect(fetch).toHaveBeenCalledTimes(2);
+        expect(result).toBeNull();
+        expect(drained).toBe(false);
+        expect(info).not.toHaveBeenCalled();
+        expect(error).not.toHaveBeenCalled();
+        accepted.resolve(new Response(null, { status: 202 }));
+        await drain;
+        expect(result).toMatchObject({ status: 'queued' });
+        const payload = jest.mocked(publisher.enqueueUsage).mock.calls[0][0];
+        expect(jest.mocked(fetch).mock.calls.map(([, init]) => init?.body)).toEqual([
+          JSON.stringify(payload),
+          JSON.stringify(payload),
+        ]);
+        expect(writer).not.toHaveBeenCalled();
+        expect(db.transaction).not.toHaveBeenCalled();
+        expect(outbox.enqueueBouncerUsageEvent).not.toHaveBeenCalled();
+        expect(lifecycle.errors).toEqual([]);
+      } finally {
+        accepted.resolve(new Response(null, { status: 202 }));
+        try {
+          await jest.runAllTimersAsync();
+          await drain;
+        } finally {
+          jest.useRealTimers();
+        }
+      }
     }
   );
 

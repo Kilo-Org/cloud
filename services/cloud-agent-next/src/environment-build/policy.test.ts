@@ -44,7 +44,7 @@ function published(overrides: Partial<PublishedSnapshot> = {}): PublishedSnapsho
     publishedAt: NOW - HOUR,
     setupDurationMs: 1_000,
     ...overrides,
-  };
+  } as PublishedSnapshot;
 }
 
 describe('snapshotEligibility', () => {
@@ -74,6 +74,55 @@ describe('snapshotEligibility', () => {
       staleReason: 'revision',
     });
     expect(replacementNeeded(published({ revision: 1 }), 2, NOW, CURRENT)).toBe(true);
+  });
+
+  describe('a V2 environment', () => {
+    const member = (repoFullName: string) => ({
+      identity: { platform: 'github' as const, repoFullName },
+      repoFullName,
+      leaf: repoFullName.split('/')[1] ?? repoFullName,
+      branch: 'main',
+    });
+    const v2Reference = (names: string[], revision: number): SessionEnvironmentReference => ({
+      environmentId: REFERENCE.environmentId,
+      owner: REFERENCE.owner,
+      configurationRevision: revision,
+      repositories: names.map(member),
+    });
+    const v2Published = (names: string[], revision: number) =>
+      published({
+        revision,
+        repository: undefined,
+        sourceCommit: null,
+        sourceBranch: null,
+        repositories: names.map(repoFullName => ({
+          repoFullName,
+          commit: 'b'.repeat(40),
+          branch: 'main',
+        })),
+      });
+
+    it('does not use a snapshot built before a membership change', () => {
+      expect(
+        snapshotEligibility(
+          v2Published(['acme/api'], 1),
+          v2Reference(['acme/api', 'acme/web'], 2),
+          NOW,
+          CURRENT
+        )
+      ).toEqual({ eligible: false, reason: 'scope_mismatch' });
+    });
+
+    it('keeps an older revision with the same members usable while marking it stale', () => {
+      expect(
+        snapshotEligibility(
+          v2Published(['acme/api', 'acme/web'], 1),
+          v2Reference(['acme/api', 'acme/web'], 2),
+          NOW,
+          CURRENT
+        )
+      ).toEqual({ eligible: true, stale: true, staleReason: 'revision' });
+    });
   });
 
   it('keeps an age-stale snapshot usable and asks for a refresh', () => {

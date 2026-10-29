@@ -2849,6 +2849,86 @@ describe('workspace Git credentials', () => {
   });
 });
 
+describe('workspace Git credentials of a V2 environment', () => {
+  const GITLAB_PROJECT = 'https://gitlab.com/group/sub/project.git';
+  const record = (host: string, username: string, password: string) =>
+    `protocol=https\nhost=${host}\nusername=${username}\npassword=${password}\n`;
+
+  it('records one alias for each host at preparation, for the helper to answer by host', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-git-credentials-'));
+    try {
+      const harness = createHarness(FAST_TIMERS, { homeRoot: root });
+      const spec = routeSpec({
+        git: { url: 'https://github.com/acme/repo.git', token: 'alias-github', platform: 'github' },
+      });
+
+      await harness.manager.prepare(spec, {
+        sessionId: spec.sessionId,
+        git: { token: 'alias-github', platform: 'github' },
+        gitCredentials: [{ url: GITLAB_PROJECT, token: 'alias-gitlab', platform: 'gitlab' }],
+        kilo: { token: 'kilo-token' },
+      });
+
+      expect(await fs.readFile(recordPath(root, spec), 'utf8')).toBe(
+        `${record('github.com', 'x-access-token', 'alias-github')}\n${record('gitlab.com', 'oauth2', 'alias-gitlab')}`
+      );
+      for (const args of harness.gitCalls) expect(args.join(' ')).not.toContain('alias-');
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('rewrites every host record on a credential renewal', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-git-credentials-'));
+    try {
+      const harness = createHarness(FAST_TIMERS, { homeRoot: root });
+      const spec = routeSpec({
+        git: { url: 'https://github.com/acme/repo.git', token: 'alias-github', platform: 'github' },
+      });
+      await harness.manager.prepare(spec, {
+        sessionId: spec.sessionId,
+        git: { token: 'alias-github', platform: 'github' },
+        gitCredentials: [{ url: GITLAB_PROJECT, token: 'alias-gitlab', platform: 'gitlab' }],
+        kilo: { token: 'kilo-token' },
+      });
+
+      await harness.manager.installCredentials({
+        sessionId: spec.sessionId,
+        git: { token: 'alias-github-2', platform: 'github' },
+        gitCredentials: [{ url: GITLAB_PROJECT, token: 'alias-gitlab-2', platform: 'gitlab' }],
+        kilo: { token: 'kilo-token-2' },
+      });
+
+      expect(await fs.readFile(recordPath(root, spec), 'utf8')).toBe(
+        `${record('github.com', 'x-access-token', 'alias-github-2')}\n${record('gitlab.com', 'oauth2', 'alias-gitlab-2')}`
+      );
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+
+  it('keeps the V1 record when the credentials carry no extra host', async () => {
+    const root = await fs.mkdtemp(path.join(os.tmpdir(), 'prepare-git-credentials-'));
+    try {
+      const harness = createHarness(FAST_TIMERS, { homeRoot: root });
+      const spec = routeSpec({
+        git: { url: 'https://github.com/acme/repo.git', token: 'alias-github', platform: 'github' },
+      });
+      await harness.manager.prepare(spec, {
+        sessionId: spec.sessionId,
+        git: { token: 'alias-github', platform: 'github' },
+        kilo: { token: 'kilo-token' },
+      });
+
+      expect(await fs.readFile(recordPath(root, spec), 'utf8')).toBe(
+        record('github.com', 'x-access-token', 'alias-github')
+      );
+    } finally {
+      await fs.rm(root, { recursive: true, force: true });
+    }
+  });
+});
+
 describe('control-plane runtime profiles', () => {
   it('installs the trusted GitHub publisher and retains its target and denies on credential refresh', async () => {
     const harness = createHarness(FAST_TIMERS);

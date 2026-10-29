@@ -42,6 +42,13 @@ const mockGetSandboxSelectionOptions = jest.fn(async (input: GetSandboxSelection
   offerAll(input)
 );
 
+const mockIsFeatureFlagEnabled = jest.fn(async (_flag: string, _distinctId?: string) => false);
+
+jest.mock('@kilocode/web-shared/lib/posthog-feature-flags', () => ({
+  isFeatureFlagEnabled: (flag: string, distinctId?: string) =>
+    mockIsFeatureFlagEnabled(flag, distinctId),
+}));
+
 jest.mock('@/lib/auth/resource-delegation', () => ({
   createControlTokenForRequest: jest.fn(async () => ({ token: 'cloud-agent-token' })),
 }));
@@ -89,6 +96,8 @@ describe('cloudEnvironmentsRouter', () => {
 
   afterEach(async () => {
     mockGetSandboxSelectionOptions.mockImplementation(async input => offerAll(input));
+    mockIsFeatureFlagEnabled.mockReset();
+    mockIsFeatureFlagEnabled.mockResolvedValue(false);
     await cleanupDbForTest();
   });
 
@@ -522,11 +531,14 @@ describe('cloudEnvironmentsRouter', () => {
       'https://GIT.example:8443/gitlab/group/repo.git'
     );
     expect(sessionCloneUrl).not.toBeNull();
-    const resolved = await loadEnvironmentForSession(db, {
+    const resolution = await loadEnvironmentForSession(db, {
       owner: { type: 'user', id: selfHosted.id },
       repository: { platform: 'gitlab', cloneUrl: sessionCloneUrl ?? '' },
     });
-    expect(resolved?.reference.environmentId).toBe(id);
+    expect(resolution.status).toBe('match');
+    expect(
+      resolution.status === 'match' ? resolution.environment.reference.environmentId : null
+    ).toBe(id);
 
     const comList = await gitlabComCaller.cloudEnvironments.list({
       repository: { platform: 'gitlab', projectPath: 'group/repo' },
@@ -696,5 +708,280 @@ describe('cloudEnvironmentsRouter', () => {
       .from(cloud_agent_environments)
       .where(eq(cloud_agent_environments.owned_by_organization_id, organization.id));
     expect(rows).toEqual([]);
+  });
+  describe('multi-repository (V2) environments', () => {
+    const FLAG = 'cloud-agent-multi-repository-environments';
+    const widgets = { platform: 'github' as const, fullName: GITHUB_REPO };
+    const api = { platform: 'github' as const, fullName: 'acme/api' };
+
+    test('multiRepositoryEnabled reports the flag of the owner, never of the viewer', async () => {
+      const owner = await insertTestUser();
+      const organization = await createTestOrganization('V2 query org', owner.id, 0);
+      const caller = await createCallerForUser(owner.id);
+
+      expect(await caller.cloudEnvironments.multiRepositoryEnabled({})).toBe(false);
+      expect(mockIsFeatureFlagEnabled).toHaveBeenLastCalledWith(FLAG, owner.id);
+
+      mockIsFeatureFlagEnabled.mockImplementation(async (_flag, id) => id === organization.id);
+      expect(
+        await caller.cloudEnvironments.multiRepositoryEnabled({ organizationId: organization.id })
+      ).toBe(true);
+      expect(await caller.cloudEnvironments.multiRepositoryEnabled({})).toBe(false);
+    });
+
+    test('multiRepositoryEnabled is not readable by a non-member of the organization', async () => {
+      const owner = await insertTestUser();
+      const outsider = await insertTestUser();
+      const organization = await createTestOrganization('V2 query org 2', owner.id, 0);
+      const caller = await createCallerForUser(outsider.id);
+
+      await expect(
+        caller.cloudEnvironments.multiRepositoryEnabled({ organizationId: organization.id })
+      ).rejects.toMatchObject({ code: 'UNAUTHORIZED' });
+    });
+
+    test('create requires the flag, checked for the user id of a personal owner', async () => {
+      const owner = await insertTestUser();
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.cloudEnvironments.create({ name: 'multi', repositories: [widgets, api] })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(mockIsFeatureFlagEnabled).toHaveBeenCalledWith(FLAG, owner.id);
+      expect(await db.select().from(cloud_agent_environments)).toEqual([]);
+    });
+
+    test('create checks the flag for the organization id of an organization owner', async () => {
+      const owner = await insertTestUser();
+      const organization = await createTestOrganization('V2 flag org', owner.id, 0);
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.cloudEnvironments.create({
+          organizationId: organization.id,
+          name: 'multi',
+          repositories: [widgets],
+        })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      expect(mockIsFeatureFlagEnabled).toHaveBeenCalledWith(FLAG, organization.id);
+    });
+
+    test('create rejects both repository and repositories, and neither', async () => {
+      const owner = await insertTestUser();
+      mockIsFeatureFlagEnabled.mockResolvedValue(true);
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.cloudEnvironments.create({
+          name: 'both',
+          repository: widgets,
+          repositories: [widgets],
+        })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      await expect(caller.cloudEnvironments.create({ name: 'neither' })).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+      });
+    });
+
+    test('with the flag on, create stores repositories, builds the GitLab clone URL, and lists by containment', async () => {
+      const owner = await insertTestUser();
+      mockIsFeatureFlagEnabled.mockResolvedValue(true);
+      const caller = await createCallerForUser(owner.id);
+
+      const { id } = await caller.cloudEnvironments.create({
+        name: 'multi',
+        repositories: [widgets, { platform: 'gitlab', projectPath: 'Group/Tool' }],
+      });
+
+      expect(await caller.cloudEnvironments.get({ environmentId: id })).toMatchObject({
+        repositories: [
+          { platform: 'github', repoFullName: GITHUB_REPO },
+          {
+            platform: 'gitlab',
+            repoFullName: 'group/tool',
+            gitlabCloneUrl: 'https://gitlab.com/Group/Tool.git',
+          },
+        ],
+      });
+      const listed = await caller.cloudEnvironments.list({
+        repository: { platform: 'gitlab', projectPath: 'Group/Tool' },
+      });
+      expect(listed.map(environment => environment.id)).toEqual([id]);
+      // A V1 environment for the same repository does not collide with it.
+      await expect(
+        caller.cloudEnvironments.create({ name: 'single', repository: widgets })
+      ).resolves.toMatchObject({ id: expect.any(String) });
+    });
+
+    test('a GitLab entry created by the router matches the identity a session computes', async () => {
+      const owner = await insertTestUser();
+      mockIsFeatureFlagEnabled.mockResolvedValue(true);
+      const caller = await createCallerForUser(owner.id);
+      const { id } = await caller.cloudEnvironments.create({
+        name: 'multi',
+        repositories: [widgets, { platform: 'gitlab', projectPath: 'Group/Tool' }],
+      });
+
+      const cloneUrl = canonicalGitLabCloneUrl('https://gitlab.com/Group/Tool.git');
+      expect(cloneUrl).not.toBeNull();
+      const resolution = await loadEnvironmentForSession(db, {
+        owner: { type: 'user', id: owner.id },
+        repository: { platform: 'gitlab', cloneUrl: cloneUrl ?? '' },
+      });
+      expect(resolution.status).toBe('match');
+      expect(
+        resolution.status === 'match' ? resolution.environment.reference.environmentId : null
+      ).toBe(id);
+    });
+
+    test('a self-hosted GitLab entry created by the router matches the identity a session computes', async () => {
+      const owner = await insertTestUser();
+      await db.insert(platform_integrations).values({
+        owned_by_user_id: owner.id,
+        platform: 'gitlab',
+        integration_type: 'oauth',
+        integration_status: 'active',
+        metadata: { gitlab_instance_url: 'https://git.example:8443/gitlab' },
+      });
+      mockIsFeatureFlagEnabled.mockResolvedValue(true);
+      const caller = await createCallerForUser(owner.id);
+      const { id } = await caller.cloudEnvironments.create({
+        name: 'multi',
+        repositories: [widgets, { platform: 'gitlab', projectPath: 'group/repo' }],
+      });
+
+      const cloneUrl = canonicalGitLabCloneUrl('https://GIT.example:8443/gitlab/group/repo.git');
+      expect(cloneUrl).not.toBeNull();
+      const resolution = await loadEnvironmentForSession(db, {
+        owner: { type: 'user', id: owner.id },
+        repository: { platform: 'gitlab', cloneUrl: cloneUrl ?? '' },
+      });
+      expect(resolution.status).toBe('match');
+      expect(
+        resolution.status === 'match' ? resolution.environment.reference.environmentId : null
+      ).toBe(id);
+    });
+
+    test('create rejects a duplicate leaf with a message that names both repositories', async () => {
+      const owner = await insertTestUser();
+      mockIsFeatureFlagEnabled.mockResolvedValue(true);
+      const caller = await createCallerForUser(owner.id);
+
+      await expect(
+        caller.cloudEnvironments.create({
+          name: 'same-leaf',
+          repositories: [widgets, { platform: 'github', fullName: 'other/Widgets' }],
+        })
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('acme/widgets and other/widgets'),
+      });
+    });
+
+    test.each(['cloudflare-shared', 'vercel-small'] as const)(
+      'create rejects the %s allocation and accepts an isolated one',
+      async allocation => {
+        const owner = await insertTestUser();
+        mockIsFeatureFlagEnabled.mockResolvedValue(true);
+        const caller = await createCallerForUser(owner.id);
+
+        await expect(
+          caller.cloudEnvironments.create({
+            name: 'multi',
+            repositories: [widgets],
+            sandboxAllocation: allocation,
+          })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+        await expect(
+          caller.cloudEnvironments.create({
+            name: 'multi',
+            repositories: [widgets],
+            sandboxAllocation: 'cloudflare-containers-standard-3',
+          })
+        ).resolves.toMatchObject({ id: expect.any(String) });
+      }
+    );
+
+    test('update replaces repositories behind the flag and advances the revision', async () => {
+      const owner = await insertTestUser();
+      mockIsFeatureFlagEnabled.mockResolvedValue(true);
+      const caller = await createCallerForUser(owner.id);
+      const { id } = await caller.cloudEnvironments.create({
+        name: 'multi',
+        repositories: [widgets],
+      });
+
+      mockIsFeatureFlagEnabled.mockResolvedValue(false);
+      await expect(
+        caller.cloudEnvironments.update({ environmentId: id, repositories: [widgets, api] })
+      ).rejects.toMatchObject({ code: 'FORBIDDEN' });
+      // An edit that leaves the repositories alone does not need the flag.
+      await expect(
+        caller.cloudEnvironments.update({ environmentId: id, name: 'renamed' })
+      ).resolves.toMatchObject({ configurationRevision: 1 });
+
+      mockIsFeatureFlagEnabled.mockResolvedValue(true);
+      await expect(
+        caller.cloudEnvironments.update({ environmentId: id, repositories: [widgets, api] })
+      ).resolves.toMatchObject({ configurationRevision: 2 });
+      expect(
+        (await caller.cloudEnvironments.get({ environmentId: id })).repositories?.map(
+          repository => repository.repoFullName
+        )
+      ).toEqual([GITHUB_REPO, 'acme/api']);
+    });
+
+    test.each(['cloudflare-shared', 'vercel-small'] as const)(
+      'update rejects the %s allocation on a V2 environment and accepts it on a V1 one',
+      async allocation => {
+        const owner = await insertTestUser();
+        mockIsFeatureFlagEnabled.mockResolvedValue(true);
+        const caller = await createCallerForUser(owner.id);
+        const multi = await caller.cloudEnvironments.create({
+          name: 'multi',
+          repositories: [widgets, api],
+        });
+        const single = await caller.cloudEnvironments.create({
+          name: 'single',
+          repository: widgets,
+        });
+
+        await expect(
+          caller.cloudEnvironments.update({
+            environmentId: multi.id,
+            sandboxAllocation: allocation,
+          })
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+        await expect(
+          caller.cloudEnvironments.update({
+            environmentId: single.id,
+            sandboxAllocation: allocation,
+          })
+        ).resolves.toMatchObject({ success: true });
+        expect(
+          (await caller.cloudEnvironments.get({ environmentId: single.id })).sandboxAllocation
+        ).toBe(allocation);
+        expect(
+          (await caller.cloudEnvironments.get({ environmentId: multi.id })).sandboxAllocation
+        ).toBeNull();
+      }
+    );
+
+    test('update rejects repositories for a V1 environment', async () => {
+      const owner = await insertTestUser();
+      mockIsFeatureFlagEnabled.mockResolvedValue(true);
+      const caller = await createCallerForUser(owner.id);
+      const { id } = await caller.cloudEnvironments.create({
+        name: 'single',
+        repository: widgets,
+      });
+
+      await expect(
+        caller.cloudEnvironments.update({ environmentId: id, repositories: [widgets, api] })
+      ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+      expect(await caller.cloudEnvironments.get({ environmentId: id })).toMatchObject({
+        repoFullName: GITHUB_REPO,
+      });
+    });
   });
 });

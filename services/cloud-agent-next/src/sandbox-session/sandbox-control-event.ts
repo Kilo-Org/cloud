@@ -125,6 +125,17 @@ function publicEventProperties({
   };
 }
 
+/**
+ * One completion for each repository of a multi-repository turn shares the
+ * assistant message, so each is stored under its own key. Without a repository
+ * there is one completion for the message, as before.
+ */
+function autocommitEntityId(messageId: string, repository: unknown): string {
+  return typeof repository === 'string'
+    ? `autocommit/${messageId}/${repository}`
+    : `autocommit/${messageId}`;
+}
+
 export function persistSandboxControlSessionEvent(params: {
   sessionId: string;
   payload: SandboxControlSessionEventInput;
@@ -171,7 +182,10 @@ export function persistSandboxControlSessionEvent(params: {
   const entityId =
     params.payload.type === 'autocommit_completed' &&
     typeof params.payload.properties.messageId === 'string'
-      ? `autocommit/${params.payload.properties.messageId}`
+      ? autocommitEntityId(
+          params.payload.properties.messageId,
+          params.payload.properties.repository
+        )
       : extractEntityId(params.payload.type, { properties: params.payload.properties });
   let eventId: EventId = 0;
   if (entityId) {

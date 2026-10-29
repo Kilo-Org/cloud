@@ -128,6 +128,57 @@ describe('cloud agent worktree changes contracts', () => {
     );
   });
 
+  describe('repositories of a multi-repository snapshot', () => {
+    const repository = (path: string, repoFullName: string) => ({
+      path,
+      repoFullName,
+      comparison: snapshot.comparison,
+      truncated: false,
+    });
+
+    it('keeps the per-repository comparison, and a snapshot without it stays as it is', () => {
+      const repositories = [repository('web', 'acme/web'), repository('api', 'acme/api')];
+      expect(
+        worktreeChangesSnapshotSchema.parse({ ...snapshot, repositories }).repositories
+      ).toEqual(repositories);
+      expect(worktreeChangesSnapshotSchema.parse(snapshot)).not.toHaveProperty('repositories');
+    });
+
+    it('accepts the session directory itself as a repository path', () => {
+      expect(
+        worktreeChangesSnapshotSchema.safeParse({
+          ...snapshot,
+          repositories: [repository('', 'acme/web')],
+        }).success
+      ).toBe(true);
+    });
+
+    it('is strict about the entries, their paths and their number', () => {
+      const parse = (repositories: unknown) =>
+        worktreeChangesSnapshotSchema.safeParse({ ...snapshot, repositories }).success;
+      expect(parse([])).toBe(false);
+      expect(parse([{ ...repository('web', 'acme/web'), extra: true }])).toBe(false);
+      expect(parse([repository('../web', 'acme/web')])).toBe(false);
+      expect(parse([repository('/web', 'acme/web')])).toBe(false);
+      expect(parse([repository('web', 'acme/web'), repository('web', 'acme/other')])).toBe(false);
+    });
+
+    it('counts the repositories against the saved size limit', () => {
+      const repositories = [repository('web', 'acme/web')];
+      const files = Array.from({ length: 1_000 }, (_, index) => ({
+        ...file,
+        revision: 1,
+        path: `${index}/${'x'.repeat(240)}`,
+      }));
+      const saved = worktreeChangesSnapshotSchema.parse({ ...snapshot, files, repositories });
+      expect(saved.repositories).toEqual(repositories);
+      expect(saved.truncated).toBe(true);
+      expect(new TextEncoder().encode(JSON.stringify(saved)).byteLength).toBeLessThanOrEqual(
+        MAX_WORKTREE_CHANGES_BYTES
+      );
+    });
+  });
+
   it('trims whole trailing escaped multibyte entries from near-limit v1 and v2 manifests', () => {
     const files = Array.from({ length: 1_000 }, (_, index) => ({
       ...file,

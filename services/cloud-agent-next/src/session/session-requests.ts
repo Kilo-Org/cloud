@@ -7,7 +7,7 @@ import type {
   SessionFinalization,
 } from '../execution/types.js';
 import type { SessionProfileBundle } from '../session-profile.js';
-import type { SessionEnvironmentReference } from '../environment-build/reference.js';
+import type { EnvironmentScope } from '../environment-build/reference.js';
 
 export type ProfileOverrides = {
   envVars?: Record<string, string>;
@@ -74,12 +74,31 @@ export type SessionCreateRequest = {
     cloneUpToMessageId?: string;
   };
   /**
-   * The authorized reference of the repository's environment, set only by
-   * preflight after it resolved the environment from the owner and the
-   * repository. Persisted on session metadata and carried DO-private to the
-   * Sandbox DO for snapshot selection.
+   * The environment the client selected, copied raw from the request. The client
+   * cannot supply a resolved environment; preflight resolves `id` against the
+   * owner and the launch repository, and checks that each of `repositories` is an
+   * additional member of it. `repositories` carries the branch of an additional
+   * repository; the launch repository's branch is `repository.branch`.
    */
-  environment?: SessionEnvironmentReference;
+  requestedEnvironment?: {
+    id: string;
+    repositories?: { repoFullName: string; branch?: string }[];
+  };
+  /**
+   * Set only by a client that can ask its user to choose an environment. When
+   * several environments contain the repository and `requestedEnvironment` names
+   * none, preflight then fails with a conflict that names them. Without it, the
+   * session runs with no environment.
+   */
+  requireEnvironmentChoice?: true;
+  /**
+   * The authorized scope of the repository's environment, set only by preflight
+   * after it resolved the environment from the owner and the repository.
+   * Session registration adds the branch of each V2 repository and persists the
+   * result on session metadata, which carries it DO-private to the Sandbox DO
+   * for snapshot selection.
+   */
+  environment?: EnvironmentScope;
   /**
    * The environment's saved allocation key, set only by preflight and never by
    * a client. It is the first saved candidate; eligibility is checked when the

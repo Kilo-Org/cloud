@@ -350,6 +350,28 @@ export const sendMessageNextSendPayloadSchema = z.discriminatedUnion('type', [
 ]);
 
 /**
+ * The environment the user selected, and the branch of each additional
+ * repository of a multi-repository environment. The worker checks both against
+ * the owner and the launch repository, and validates each branch.
+ */
+const requestedEnvironmentSchema = z
+  .object({
+    id: z.uuid(),
+    repositories: z
+      .array(
+        z
+          .object({
+            repoFullName: z.string().min(1).max(500),
+            branch: z.string().min(1).max(255).optional(),
+          })
+          .strict()
+      )
+      .max(100)
+      .optional(),
+  })
+  .strict();
+
+/**
  * Shared fields for prepareSession. Discriminated on `cloneFromKiloSessionId`:
  * the non-clone variant keeps the required `prompt` and the current optional
  * initial fields, while the clone-only variant requires the source session,
@@ -403,6 +425,15 @@ const PrepareSessionSharedFields = {
     .max(50)
     .regex(/^[a-zA-Z]+$/)
     .optional(),
+
+  /** The repository environment the user selected, with branches for its additional repositories. */
+  requestedEnvironment: requestedEnvironmentSchema.optional(),
+  /**
+   * Set by a client that shows an environment picker. When several environments
+   * contain the repository and none is selected, the start then fails and names
+   * them; without it, the session runs with no environment.
+   */
+  requireEnvironmentChoice: z.literal(true).optional(),
 
   /**
    * Optional environment profile id. When omitted, the effective default

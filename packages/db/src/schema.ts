@@ -8080,11 +8080,18 @@ export const cloud_agent_environments = pgTable(
     created_by_user_id: text(), // Audit trail: the user who created this environment.
 
     name: text().notNull(),
-    platform: text({ enum: ['github', 'gitlab', 'bitbucket'] }).notNull(),
-    repo_full_name: text().notNull(),
+    // Nullable since multi-repository environments: a V2 row stores its members in
+    // `repositories` and no identity here. See the identity check.
+    platform: text({ enum: ['github', 'gitlab', 'bitbucket'] }),
+    repo_full_name: text(),
     gitlab_clone_url: text(),
     bitbucket_workspace_uuid: uuid(),
     bitbucket_repository_uuid: uuid(),
+    // V2 environments: the ordered members, each validated by the repository entry
+    // schema in `@kilocode/cloud-agent-profile` on every write and every read.
+    // Null for V1 environments, which keep their one repository in the identity
+    // columns above.
+    repositories: jsonb(),
 
     // Ordered setup commands run after clone. Array order is the run order.
     commands: text().array().default([]).notNull(),
@@ -8136,37 +8143,48 @@ export const cloud_agent_environments = pgTable(
         (${table.owned_by_user_id} IS NULL AND ${table.owned_by_organization_id} IS NOT NULL)
       )`
     ),
-    check(
-      'cloud_agent_environments_platform_check',
-      sql`${table.platform} IN ('github', 'gitlab', 'bitbucket')`
+    // `jsonb_path_ops` serves the `@>` containment lookup, which is the only use.
+    index('IDX_cloud_agent_environments_repositories').using(
+      'gin',
+      table.repositories.op('jsonb_path_ops')
     ),
+    // Exactly one alternative. V1: no `repositories` and the whole identity of
+    // one platform. V2: a non-empty `repositories` and no identity column. `platform
+    // IS NOT NULL` is explicit: `platform = 'github'` is UNKNOWN for a null
+    // platform, and a check constraint accepts UNKNOWN.
     check(
-      'cloud_agent_environments_github_identity_check',
+      'cloud_agent_environments_identity_check',
       sql`(
-        (${table.platform} = 'github') = (
+        (
+          ${table.repositories} IS NULL AND
+          ${table.platform} IS NOT NULL AND
+          ${table.repo_full_name} IS NOT NULL AND (
+            (
+              ${table.platform} = 'github' AND
+              ${table.gitlab_clone_url} IS NULL AND
+              ${table.bitbucket_workspace_uuid} IS NULL AND
+              ${table.bitbucket_repository_uuid} IS NULL
+            ) OR (
+              ${table.platform} = 'gitlab' AND
+              ${table.gitlab_clone_url} IS NOT NULL AND
+              ${table.bitbucket_workspace_uuid} IS NULL AND
+              ${table.bitbucket_repository_uuid} IS NULL
+            ) OR (
+              ${table.platform} = 'bitbucket' AND
+              ${table.bitbucket_workspace_uuid} IS NOT NULL AND
+              ${table.bitbucket_repository_uuid} IS NOT NULL AND
+              ${table.gitlab_clone_url} IS NULL
+            )
+          )
+        ) OR (
+          ${table.repositories} IS NOT NULL AND
+          jsonb_typeof(${table.repositories}) = 'array' AND
+          ${table.repositories} <> '[]'::jsonb AND
+          ${table.platform} IS NULL AND
+          ${table.repo_full_name} IS NULL AND
           ${table.gitlab_clone_url} IS NULL AND
           ${table.bitbucket_workspace_uuid} IS NULL AND
           ${table.bitbucket_repository_uuid} IS NULL
-        )
-      )`
-    ),
-    check(
-      'cloud_agent_environments_gitlab_identity_check',
-      sql`(
-        (${table.platform} = 'gitlab') = (
-          ${table.gitlab_clone_url} IS NOT NULL AND
-          ${table.bitbucket_workspace_uuid} IS NULL AND
-          ${table.bitbucket_repository_uuid} IS NULL
-        )
-      )`
-    ),
-    check(
-      'cloud_agent_environments_bitbucket_identity_check',
-      sql`(
-        (${table.platform} = 'bitbucket') = (
-          ${table.bitbucket_workspace_uuid} IS NOT NULL AND
-          ${table.bitbucket_repository_uuid} IS NOT NULL AND
-          ${table.gitlab_clone_url} IS NULL
         )
       )`
     ),

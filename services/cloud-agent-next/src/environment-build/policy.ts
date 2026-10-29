@@ -3,8 +3,9 @@ import {
   environmentOwnerSchema,
   environmentRepositoryIdentitySchema,
   sameEnvironmentScope,
-  type SessionEnvironmentReference,
+  type EnvironmentScope,
 } from './reference.js';
+import { environmentBuildMemberPinSchema } from '../shared/environment-build-protocol.js';
 
 /**
  * Build and snapshot policy (plan "Ownership and data", "Build admission and
@@ -41,27 +42,48 @@ export const PREPARING_TICK_MS = 30_000;
 export const CLEANUP_RETRY_MAX_MS = 5 * 60_000;
 export const CLEANUP_ATTEMPTS_BEFORE_FAILURE = 5;
 
-export const publishedSnapshotSchema = z
-  .object({
-    buildId: z.string().uuid(),
-    environmentId: z.string().uuid(),
-    owner: environmentOwnerSchema,
-    revision: z.number().int().positive(),
-    repository: environmentRepositoryIdentitySchema,
-    sourceCommit: z.string().regex(/^[0-9a-f]{40}$/),
-    sourceBranch: z.string().min(1).max(256),
-    provider: z.literal('cloudflare-containers'),
-    baseImage: z.string().min(1),
-    runtimeAbi: z.string().min(1),
-    runtimeRelease: z.string().min(1).nullable(),
-    builderInstance: z.string().min(1),
-    snapshotId: z.string().min(1),
-    size: z.number().nonnegative().optional(),
-    capturedAt: z.number().int().nonnegative(),
-    publishedAt: z.number().int().nonnegative(),
-    setupDurationMs: z.number().int().nonnegative(),
-  })
-  .strict();
+const publishedSnapshotCommonSchema = z.object({
+  buildId: z.string().uuid(),
+  environmentId: z.string().uuid(),
+  owner: environmentOwnerSchema,
+  revision: z.number().int().positive(),
+  provider: z.literal('cloudflare-containers'),
+  baseImage: z.string().min(1),
+  runtimeAbi: z.string().min(1),
+  runtimeRelease: z.string().min(1).nullable(),
+  builderInstance: z.string().min(1),
+  snapshotId: z.string().min(1),
+  size: z.number().nonnegative().optional(),
+  capturedAt: z.number().int().nonnegative(),
+  publishedAt: z.number().int().nonnegative(),
+  setupDurationMs: z.number().int().nonnegative(),
+});
+
+/**
+ * A published descriptor has two exclusive alternatives. A singleton descriptor
+ * stores `repository`, `sourceCommit`, and `sourceBranch`. A V2 descriptor
+ * stores one pin for each repository and leaves `sourceCommit` and
+ * `sourceBranch` null; it does not copy one repository into `repository` or
+ * `sourceCommit`.
+ */
+export const publishedSnapshotSchema = z.union([
+  publishedSnapshotCommonSchema
+    .extend({
+      repository: environmentRepositoryIdentitySchema,
+      sourceCommit: z.string().regex(/^[0-9a-f]{40}$/),
+      sourceBranch: z.string().min(1).max(256),
+      repositories: z.undefined().optional(),
+    })
+    .strict(),
+  publishedSnapshotCommonSchema
+    .extend({
+      repositories: z.array(environmentBuildMemberPinSchema).min(1),
+      repository: z.undefined().optional(),
+      sourceCommit: z.null().optional(),
+      sourceBranch: z.null().optional(),
+    })
+    .strict(),
+]);
 export type PublishedSnapshot = z.infer<typeof publishedSnapshotSchema>;
 
 /**
@@ -105,7 +127,7 @@ export type SnapshotEligibility =
  */
 export function snapshotEligibility(
   published: PublishedSnapshot | null,
-  reference: SessionEnvironmentReference,
+  reference: EnvironmentScope,
   now: number,
   current: SnapshotCompatibility
 ): SnapshotEligibility {

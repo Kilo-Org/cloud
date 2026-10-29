@@ -276,7 +276,8 @@ export async function authorizeCloudAgentGitHubRepo(
     githubRepo: string;
     userId: string;
     orgId?: string;
-    expectedIntegrationId: string;
+    /** Omitted for an environment member, which carries no integration pin. */
+    expectedIntegrationId?: string;
     accessPurpose?: 'workflow' | 'agent';
   }
 ): Promise<{ success: true } | { success: false; error: ResolveGitHubTokenError }> {

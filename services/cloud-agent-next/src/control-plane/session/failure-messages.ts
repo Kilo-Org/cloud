@@ -12,6 +12,8 @@ const CONTROL_REASON_MESSAGES: Record<ControlPlaneFailureReason, string> = {
   preparation_timeout: 'Environment preparation timed out',
   workspace_setup_failed: 'Workspace setup failed',
   credential_upgrade_required: SESSION_CREDENTIAL_UPGRADE_REQUIRED_MESSAGE,
+  repository_access_failed:
+    'A repository of this environment could not be accessed. Check that the integration covers every repository of the environment.',
   agent_unavailable: 'The agent became unavailable',
   billing_blocked: 'Sandbox billing requires additional credits',
   billing_unavailable:

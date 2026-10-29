@@ -445,6 +445,7 @@ export async function runControlPlaneWrapper(
   worktreeChangesRef.current = createControlPlaneWorktreeChanges({
     emit: frame => connection.send(frame),
     isPrepared: sessionId => preparationRef.current?.isPrepared(sessionId) ?? false,
+    roots: sessionId => preparationRef.current?.preparedRoute(sessionId)?.roots,
     log: logToFile,
   });
   worktreeDeletionRef.current = createControlPlaneWorktreeDeletion({

@@ -40,6 +40,7 @@ import {
   formatWorktreeChangesBaseBranch,
   getWorktreeChangesTotals,
   groupWorktreeChangesByDirectory,
+  groupWorktreeChangesByRepository,
   preserveNewerWorktreeChanges,
   resolveWorktreeChangesSelection,
   worktreeChangesMessages,
@@ -358,6 +359,45 @@ function ChangedFile({
   );
 }
 
+function ChangedFileGroups({
+  groups,
+  onSelectFile,
+  activePath,
+  commentCounts,
+}: {
+  groups: { directory: string; files: WorktreeChangesFile[] }[];
+  onSelectFile: (path: string) => void;
+  activePath?: string;
+  commentCounts?: ReadonlyMap<string, number>;
+}) {
+  if (groups.length === 0) return null;
+  return (
+    <ul aria-label="Changed files" className="space-y-2">
+      {groups.map(({ directory, files }) => (
+        <li key={directory}>
+          <h3 className="text-muted-foreground flex min-w-0 items-center gap-2 px-2 py-1 text-xs font-normal">
+            <span className="min-w-0 flex-1 truncate" title={directory || 'Repository root'}>
+              {directory || 'Repository root'}
+            </span>
+            <span className="shrink-0 font-mono tabular-nums">{files.length}</span>
+          </h3>
+          <ul aria-label={`Files in ${directory || 'repository root'}`}>
+            {files.map(file => (
+              <ChangedFile
+                key={file.path}
+                file={file}
+                onSelectFile={onSelectFile}
+                active={file.path === activePath}
+                commentCount={commentCounts?.get(file.path) ?? 0}
+              />
+            ))}
+          </ul>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 function ChangedFileTree({
   nodes,
   onSelectFile,
@@ -475,6 +515,7 @@ function WorktreeChanges({
     () => groupWorktreeChangesByDirectory(snapshot?.files ?? []),
     [snapshot?.files]
   );
+  const repositoryGroups = useMemo(() => groupWorktreeChangesByRepository(snapshot), [snapshot]);
   const tree = useMemo(() => buildWorktreeChangesTree(snapshot?.files ?? []), [snapshot?.files]);
   const messages = worktreeChangesMessages({
     snapshot,
@@ -534,33 +575,41 @@ function WorktreeChanges({
           </p>
         )}
         <TabsContent value="flat" className="m-0">
-          {groups.length > 0 && (
-            <ul aria-label="Changed files" className="space-y-2">
-              {groups.map(({ directory, files }) => (
-                <li key={directory}>
-                  <h3 className="text-muted-foreground flex min-w-0 items-center gap-2 px-2 py-1 text-xs font-normal">
-                    <span
-                      className="min-w-0 flex-1 truncate"
-                      title={directory || 'Repository root'}
-                    >
-                      {directory || 'Repository root'}
+          {repositoryGroups ? (
+            <div className="space-y-3">
+              {repositoryGroups.map(group => (
+                <section key={group.repoFullName} aria-label={group.repoFullName}>
+                  <h3
+                    className="flex min-w-0 items-center gap-2 px-2 py-1 text-xs font-medium"
+                    title={`Working tree changes since the merge base with ${group.baseRef}`}
+                  >
+                    <GitBranch aria-hidden="true" className="size-3 shrink-0" />
+                    <span className="min-w-0 flex-1 truncate">{group.repoFullName}</span>
+                    <span className="text-muted-foreground shrink-0 font-mono font-normal tabular-nums">
+                      {group.files.length}
                     </span>
-                    <span className="shrink-0 font-mono tabular-nums">{files.length}</span>
                   </h3>
-                  <ul aria-label={`Files in ${directory || 'repository root'}`}>
-                    {files.map(file => (
-                      <ChangedFile
-                        key={file.path}
-                        file={file}
-                        onSelectFile={onSelectFile}
-                        active={file.path === activePath}
-                        commentCount={commentCounts?.get(file.path) ?? 0}
-                      />
-                    ))}
-                  </ul>
-                </li>
+                  {group.truncated && (
+                    <p className="text-muted-foreground px-2 text-xs">
+                      Partial summary · some files omitted.
+                    </p>
+                  )}
+                  <ChangedFileGroups
+                    groups={groupWorktreeChangesByDirectory(group.files)}
+                    onSelectFile={onSelectFile}
+                    activePath={activePath}
+                    commentCounts={commentCounts}
+                  />
+                </section>
               ))}
-            </ul>
+            </div>
+          ) : (
+            <ChangedFileGroups
+              groups={groups}
+              onSelectFile={onSelectFile}
+              activePath={activePath}
+              commentCounts={commentCounts}
+            />
           )}
         </TabsContent>
         <TabsContent value="tree" className="m-0">
@@ -582,12 +631,18 @@ function WorktreeChanges({
           {snapshot && (
             <div className="flex min-w-0 items-center gap-2">
               <GitBranch aria-hidden="true" className="size-3 shrink-0" />
-              <code
-                className="min-w-0 flex-1 truncate"
-                title={`Working tree changes since the merge base with ${snapshot.comparison.baseRef}.\nCaptured HEAD: ${snapshot.comparison.head}\nMerge base: ${snapshot.comparison.mergeBase}`}
-              >
-                Working tree → {formatWorktreeChangesBaseBranch(snapshot.comparison.baseRef)}
-              </code>
+              {repositoryGroups ? (
+                <span className="min-w-0 flex-1 truncate">
+                  Working tree · {repositoryGroups.length} repositories
+                </span>
+              ) : (
+                <code
+                  className="min-w-0 flex-1 truncate"
+                  title={`Working tree changes since the merge base with ${snapshot.comparison.baseRef}.\nCaptured HEAD: ${snapshot.comparison.head}\nMerge base: ${snapshot.comparison.mergeBase}`}
+                >
+                  Working tree → {formatWorktreeChangesBaseBranch(snapshot.comparison.baseRef)}
+                </code>
+              )}
               <time
                 className="shrink-0 whitespace-nowrap"
                 dateTime={snapshot.capturedAt}

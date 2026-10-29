@@ -89,6 +89,7 @@ import { getWorktreeWorkspacePath } from '../workspace.js';
 import {
   cloudflareSandboxSmallNativeReplacement,
   recordedSandboxAllocationMatchesRequest,
+  credentialContainmentEnabled,
   resolveNewSessionSandboxAllocation,
   type SandboxSelection,
 } from '../sandbox-id.js';
@@ -108,6 +109,7 @@ import {
   recordCloudAgentSessionFailure,
 } from '../telemetry/session-reports.js';
 import { createMessageId } from './message-id.js';
+import { canonicalRequestedEnvironment } from './requested-environment-intent.js';
 import { isPolicyBearingAuthToken } from './policy-bearing-token.js';
 import type { MessageResultRPCResponse } from './message-result.js';
 import type {
@@ -118,6 +120,7 @@ import type {
 import { throwAdmissionError } from './queue-message.js';
 import {
   allocationCapabilityFor,
+  assertEnvironmentSupportsSandbox,
   requestedSandboxAllocation,
   withSavedSandboxAllocation,
 } from './sandbox-allocation-resolution.js';
@@ -768,6 +771,17 @@ async function allocateNewSession(
     createdOnPlatform: input.options?.createdOnPlatform,
     billingOrigin: options?.billingOrigin,
   });
+  try {
+    assertEnvironmentSupportsSandbox({
+      environment: input.environment,
+      allocation: sandboxAllocation,
+      contained: credentialContainmentEnabled(ctx.env),
+    });
+  } catch (error) {
+    // A saved allocation resolved after admission can still fail here; the ledger
+    // row must settle failed so a retry does not wait on its lease.
+    rethrowAllocationFailure(ledger, 'sandbox', error);
+  }
   assertCloudAgentIsolatedAllocation(
     input.allowSubagentSessions === true || input.parentCloudAgentSessionId !== undefined,
     sandboxAllocation
@@ -1230,7 +1244,12 @@ function buildSessionRegistrationCommand(
     },
     repository: input.repository,
     profile: input.profile?.resolved,
-    ...(input.environment ? { environment: input.environment } : {}),
+    ...(input.environment
+      ? {
+          environment: input.environment,
+          requestedEnvironmentRepositories: input.requestedEnvironment?.repositories ?? [],
+        }
+      : {}),
     finalization: input.finalization,
     callback: input.options?.callbackTarget ? { target: input.options.callbackTarget } : undefined,
     workspace: {
@@ -1803,6 +1822,11 @@ export async function sessionCreateIntentFingerprint(
         appendSystemPrompt: input.profile?.overrides?.appendSystemPrompt || undefined,
       },
       repository: repositoryCreateIntent(input.repository),
+      // Only a client-sent selection is part of the intent; an implicit match is
+      // not, so its fingerprint is unchanged. A different selection is a
+      // different intent, so a same-key retry conflicts.
+      requestedEnvironment: canonicalRequestedEnvironment(input.requestedEnvironment),
+      requireEnvironmentChoice: input.requireEnvironmentChoice,
       finalization: input.finalization,
       runtime:
         input.runtime?.sandboxAllocation || input.runtime?.egressMode === 'allowlist'
@@ -1950,6 +1974,13 @@ export async function createSessionWithLedger(
       }
     }
   }
+  // A V2 environment that no allocation can serve fails before the ledger admits
+  // the create, so the client sees the reason and no row waits on a lease.
+  assertEnvironmentSupportsSandbox({
+    environment: input.environment,
+    allocation: requestedSandboxAllocation(input),
+    contained: credentialContainmentEnabled(ctx.env),
+  });
   const initialWorktreeEnabled = isEligibleFirstWorktreeSession(input, ctx);
   const initialEffectiveInput = effectiveSessionRegistrationInput(input, initialWorktreeEnabled, 2);
   const savedSandboxAllocation = input.savedSandboxAllocation;

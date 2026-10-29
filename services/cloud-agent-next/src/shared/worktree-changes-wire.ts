@@ -19,6 +19,12 @@ export const MAX_WORKTREE_PATCH_LINES = 10_000;
 export const MAX_WORKTREE_CONTENT_BYTES = 100 * 1024;
 export const MAX_WORKTREE_CONTENT_LINES = 10_000;
 
+/** The comparison ref of a branch somebody asked for. No branch means the repository's default. */
+export function worktreeChangesBaseRef(branch: string | undefined): string | undefined {
+  if (branch === undefined) return undefined;
+  return `refs/remotes/origin/${branch}`;
+}
+
 const repositoryRelativePathSchema = z
   .string()
   .min(1)

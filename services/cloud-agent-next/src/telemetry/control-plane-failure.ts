@@ -101,6 +101,7 @@ export function classifyControlPlaneFailure(
     case 'workspace_setup_failed':
       return { stage: 'pre_dispatch', code: 'workspace_setup_failed' };
     case 'credential_upgrade_required':
+    case 'repository_access_failed':
       return { stage: 'pre_dispatch', code: 'workspace_setup_failed' };
     case 'billing_blocked':
       return { stage: 'pre_dispatch', code: 'payment_required' };

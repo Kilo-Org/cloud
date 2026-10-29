@@ -1572,6 +1572,177 @@ describe('explicit sandbox session creation', () => {
     expectNoAllocation(doStub);
   });
 
+  describe('environment with several repositories', () => {
+    const member = (repoFullName: string) => ({
+      identity: { platform: 'github' as const, repoFullName },
+      repoFullName,
+      leaf: repoFullName.split('/')[1] ?? repoFullName,
+    });
+    const v2Environment = {
+      environmentId: '123e4567-e89b-12d3-a456-426614174099',
+      owner: { type: 'organization' as const, id: orgId },
+      configurationRevision: 1,
+      repositories: [member('acme/repo'), member('acme/api')],
+    };
+    const v1Environment = {
+      environmentId: v2Environment.environmentId,
+      owner: v2Environment.owner,
+      configurationRevision: 1,
+      repository: { platform: 'github' as const, repoFullName: 'acme/repo' },
+    };
+    const environmentRequest = (
+      environment: SessionCreateRequest['environment'],
+      sandboxAllocation?: SandboxAllocation,
+      environmentSandboxAllocation?: SandboxAllocation
+    ) =>
+      makeRequest({
+        ...(environment ? { environment } : {}),
+        ...(environmentSandboxAllocation ? { environmentSandboxAllocation } : {}),
+        ...(sandboxAllocation ? { runtime: { sandboxAllocation } } : {}),
+        options: { kilocodeOrganizationId: orgId, operationKey: OPERATION_KEY },
+      });
+
+    it.each([
+      ['the shared sandbox', 'cloudflare-shared', 'shared sandbox'],
+      ['a Vercel sandbox', 'vercel-small', 'Vercel sandbox'],
+    ] as const)(
+      'fails a ledger create on %s before admission',
+      async (_name, allocation, reason) => {
+        const doStub = makeDoStub();
+        const ctx = selectedContext(doStub);
+        ctx.env.BYOC_VERCEL_IDS = orgId;
+        getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], []]));
+
+        await expect(
+          runCreate(ctx, environmentRequest(v2Environment, allocation))
+        ).rejects.toMatchObject({ code: 'BAD_REQUEST', message: expect.stringContaining(reason) });
+        expect(admitOperationMock).not.toHaveBeenCalled();
+        expectNoAllocation(doStub);
+      }
+    );
+
+    it("fails a ledger create whose environment's saved allocation is shared, before admission", async () => {
+      const doStub = makeDoStub();
+      getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], []]));
+
+      await expect(
+        createSessionWithLedger(
+          environmentRequest(v2Environment, undefined, 'cloudflare-shared'),
+          selectedContext(doStub),
+          {
+            ...CREATE_OPTIONS,
+            resolveSavedAllocationBeforeAdmission: true,
+          }
+        )
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('shared sandbox'),
+      });
+      expect(admitOperationMock).not.toHaveBeenCalled();
+      expectNoAllocation(doStub);
+    });
+
+    it("settles the ledger row failed when the environment's saved shared allocation resolves after admission", async () => {
+      const doStub = makeDoStub();
+
+      // No `resolveSavedAllocationBeforeAdmission`: the row is admitted first.
+      await expect(
+        runCreate(
+          selectedContext(doStub),
+          environmentRequest(v2Environment, undefined, 'cloudflare-shared')
+        )
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('shared sandbox'),
+      });
+
+      expect(admitOperationMock).toHaveBeenCalledOnce();
+      expect(settleOperationMock).toHaveBeenCalledOnce();
+      expect(settleOptions(0)?.outboxEvent).toMatchObject({
+        properties: { outcome: 'failed' },
+      });
+      expect(doStub.registerSession).not.toHaveBeenCalled();
+      expect(doStub.createSessionWithInitialAdmission).not.toHaveBeenCalled();
+    });
+
+    it('fails a ledger create whose credentials would be direct, before admission', async () => {
+      const doStub = makeDoStub();
+      const ctx = selectedContext(doStub);
+      ctx.env.CREDENTIAL_CONTAINMENT_ENABLED = 'false';
+      getPgDbMock.mockReturnValue(makeDb([[{ id: 'member' }], []]));
+
+      await expect(runCreate(ctx, environmentRequest(v2Environment))).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('contained credentials'),
+      });
+      expect(admitOperationMock).not.toHaveBeenCalled();
+      expectNoAllocation(doStub);
+    });
+
+    it('fails a split registration on the shared sandbox before it allocates', async () => {
+      const doStub = makeDoStub();
+
+      await expect(
+        registerNewSession(
+          environmentRequest(v2Environment, 'cloudflare-shared'),
+          selectedContext(doStub)
+        )
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('shared sandbox'),
+      });
+      // The late check runs once the allocation is final; nothing is registered.
+      expect(recordSandboxIdentityMock).not.toHaveBeenCalled();
+      expect(createCliSessionMock).not.toHaveBeenCalled();
+      expect(doStub.registerSession).not.toHaveBeenCalled();
+      expect(doStub.registerSessionFromMetadata).not.toHaveBeenCalled();
+    });
+
+    it('starts on an isolated sandbox', async () => {
+      const doStub = makeDoStub();
+
+      await expect(
+        runCreate(
+          selectedContext(doStub),
+          environmentRequest(v2Environment, 'cloudflare-containers-standard-3')
+        )
+      ).resolves.toMatchObject({ cloudAgentSessionId: WORKSPACE_SESSION_ID });
+    });
+
+    it('skips a shared owner default and starts a V2 environment on an isolated sandbox', async () => {
+      getSandboxAllocationCandidatesMock.mockResolvedValue({
+        contextAllocation: 'cloudflare-shared',
+      });
+      const doStub = makeDoStub();
+
+      await expect(
+        runCreate(selectedContext(doStub), environmentRequest(v2Environment))
+      ).resolves.toMatchObject({ cloudAgentSessionId: WORKSPACE_SESSION_ID });
+      expect(settleOptions(0)?.outboxEvent).toMatchObject({
+        properties: { outcome: 'completed' },
+      });
+    });
+
+    it('still starts a V1 environment on a shared owner default', async () => {
+      getSandboxAllocationCandidatesMock.mockResolvedValue({
+        contextAllocation: 'cloudflare-shared',
+      });
+      const doStub = makeDoStub();
+
+      await expect(
+        runCreate(selectedContext(doStub), environmentRequest(v1Environment))
+      ).resolves.toMatchObject({ cloudAgentSessionId: WORKSPACE_SESSION_ID });
+    });
+
+    it('still starts a V1 environment on the shared sandbox', async () => {
+      const doStub = makeDoStub();
+
+      await expect(
+        runCreate(selectedContext(doStub), environmentRequest(v1Environment, 'cloudflare-shared'))
+      ).resolves.toMatchObject({ cloudAgentSessionId: WORKSPACE_SESSION_ID });
+    });
+  });
+
   it('rejects a fresh explicit Vercel allocation for a security-remediation origin before admission', async () => {
     const doStub = makeDoStub();
     const ctx = selectedContext(doStub);
@@ -1766,6 +1937,49 @@ describe('explicit sandbox session creation', () => {
     expect(createdMetadata(doStub)?.workspace?.sandboxAllocation).toBe(
       'cloudflare-containers-standard-3'
     );
+  });
+
+  it('records no environment in the ledger and registers the reference with branches', async () => {
+    const request = requestForPreset('cloudflare-single');
+    const repositoryOf = (repoFullName: string) => ({
+      identity: { platform: 'github' as const, repoFullName },
+      repoFullName,
+      leaf: repoFullName.split('/')[1],
+    });
+    request.environment = {
+      environmentId: '11111111-1111-4111-8111-111111111111',
+      owner: { type: 'organization', id: orgId },
+      configurationRevision: 2,
+      repositories: [repositoryOf('acme/repo'), repositoryOf('acme/api')],
+    };
+    request.requestedEnvironment = {
+      id: '11111111-1111-4111-8111-111111111111',
+      repositories: [{ repoFullName: 'acme/api', branch: 'feature/api' }],
+    };
+    const doStub = makeDoStub();
+    admitOperationMock.mockImplementationOnce(
+      async (_db: unknown, admitted: { initialCanonicalResult: Record<string, unknown> }) => ({
+        admission: 'admitted' as const,
+        row: makeLedgerRow({
+          organization_id: orgId,
+          canonical_result: admitted.initialCanonicalResult,
+        }),
+      })
+    );
+
+    await runCreate(selectedContext(doStub), request);
+
+    const admitted = admitOperationMock.mock.calls[0]?.[1] as {
+      initialCanonicalResult: Record<string, unknown>;
+    };
+    expect(admitted.initialCanonicalResult).not.toHaveProperty('environment');
+    const metadata = createdMetadata(doStub);
+    expect(
+      metadata?.environment?.repositories?.map(entry => [entry.repoFullName, entry.branch])
+    ).toEqual([
+      ['acme/repo', metadata?.workspace?.generatedBranchName],
+      ['acme/api', 'feature/api'],
+    ]);
   });
 
   it.each([
@@ -7095,5 +7309,59 @@ describe('prepareInputToSessionCreateRequest clone mapping', () => {
     });
 
     expect(request.runtime).toEqual({ sandboxAllocation: 'isolated-standard' });
+  });
+});
+
+describe('prepareInputToSessionCreateRequest environment selection', () => {
+  const ENVIRONMENT_ID = '11111111-1111-4111-8111-111111111111';
+  const parse = (extra: Record<string, unknown>) =>
+    PrepareSessionInput.parse({
+      prompt: 'hello',
+      mode: 'code',
+      model: 'claude-3',
+      githubRepo: 'acme/repo',
+      ...extra,
+    });
+
+  it('carries the selected environment, its additional branches and the choice marker', () => {
+    const requestedEnvironment = {
+      id: ENVIRONMENT_ID,
+      repositories: [{ repoFullName: 'acme/api', branch: 'feature/api' }],
+    };
+
+    const request = prepareInputToSessionCreateRequest(
+      parse({ requestedEnvironment, requireEnvironmentChoice: true })
+    );
+
+    expect(request.requestedEnvironment).toEqual(requestedEnvironment);
+    expect(request.requireEnvironmentChoice).toBe(true);
+  });
+
+  it('adds neither field when the client sent neither', () => {
+    const request = prepareInputToSessionCreateRequest(parse({}));
+
+    expect(request).not.toHaveProperty('requestedEnvironment');
+    expect(request).not.toHaveProperty('requireEnvironmentChoice');
+  });
+
+  it.each([
+    { name: 'a non-UUID id', value: { id: 'not-a-uuid' } },
+    {
+      name: 'an unsafe branch',
+      value: { id: ENVIRONMENT_ID, repositories: [{ repoFullName: 'a/b', branch: '-x' }] },
+    },
+    { name: 'an unknown key', value: { id: ENVIRONMENT_ID, extra: true } },
+  ])('rejects $name in the selection', ({ value }) => {
+    expect(() => parse({ requestedEnvironment: value })).toThrow();
+  });
+
+  it('rejects a marker that is not true', () => {
+    expect(() => parse({ requireEnvironmentChoice: false })).toThrow();
+  });
+
+  it('does not accept the old requestedEnvironmentId field', () => {
+    expect(
+      prepareInputToSessionCreateRequest(parse({ requestedEnvironmentId: ENVIRONMENT_ID }))
+    ).not.toHaveProperty('requestedEnvironment');
   });
 });

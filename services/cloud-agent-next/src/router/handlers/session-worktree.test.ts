@@ -623,6 +623,55 @@ describe('createWorktreeChat request validation and authorization', () => {
     });
     expect(generateSessionIdMock).toHaveBeenCalledWith();
   });
+
+  it.each([
+    {
+      name: 'a V1 environment',
+      environment: {
+        environmentId: '11111111-1111-4111-8111-111111111111',
+        owner: { type: 'user' as const, id: USER_ID },
+        configurationRevision: 3,
+        repository: { platform: 'github' as const, repoFullName: 'acme/repo' },
+      },
+    },
+    {
+      name: 'a V2 environment with the branch of each repository',
+      environment: {
+        environmentId: '11111111-1111-4111-8111-111111111111',
+        owner: { type: 'user' as const, id: USER_ID },
+        configurationRevision: 3,
+        repositories: [
+          {
+            identity: { platform: 'github' as const, repoFullName: 'acme/repo' },
+            repoFullName: 'acme/repo',
+            leaf: 'repo',
+            branch: 'feature/shared',
+          },
+          {
+            identity: { platform: 'github' as const, repoFullName: 'acme/api' },
+            repoFullName: 'acme/api',
+            leaf: 'api',
+            branch: 'feature/api',
+          },
+        ],
+      },
+    },
+  ])('copies $name and the generated branch to the sibling', async ({ environment }) => {
+    const metadata = sourceMetadata();
+    metadata.environment = environment;
+    metadata.workspace = { ...metadata.workspace, generatedBranchName: 'kilo/quiet-river-abc' };
+    const { caller, input, destinationStub } = fixture({ metadata });
+
+    await caller.createWorktreeChat(input);
+
+    const registered = parseSessionMetadata({
+      ...destinationStub.registerSessionFromMetadata.mock.calls[0]?.[0]?.metadata,
+      metadataSchemaVersion: 2,
+      lifecycle: { version: 1, timestamp: 1 },
+    });
+    expect(registered.environment).toEqual(environment);
+    expect(registered.workspace?.generatedBranchName).toBe('kilo/quiet-river-abc');
+  });
 });
 
 describe('createWorktreeChat sandbox preset inheritance', () => {

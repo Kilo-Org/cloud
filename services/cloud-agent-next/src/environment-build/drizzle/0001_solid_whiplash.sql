@@ -1,0 +1,1 @@
+ALTER TABLE `builds` ADD `pin_group` text;

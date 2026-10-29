@@ -71,10 +71,10 @@ import {
   hasRuntimeCredentialProxy,
   prepareCredentialGrant,
   resolveSessionCredential,
-  SessionCredentialUpgradeRequiredError,
   sessionCredentialsPayloadFromGrant,
   type SessionCredentialGrant,
 } from '../../sandbox-control/session-credentials.js';
+import { grantScmAliases } from '../../sandbox-control/session-credential-members.js';
 import { providerUsesOutboundCredentialProxy } from '../../agent-sandbox/capabilities.js';
 import { getManagedOutboundContainerId } from '../../sandbox-id.js';
 import {
@@ -124,7 +124,6 @@ import {
 } from './scope-handle-rotation.js';
 import { isActiveScopeMember } from './scope-view.js';
 import {
-  admissionFailureStage,
   canonicalMintKey,
   CanonicalHandleMinter,
   clearRuntimeProxyMembers,
@@ -232,6 +231,7 @@ import {
   failCurrentAttempt,
   failExpiredRoutes,
   failReadyRoutesForScope,
+  grantIssueFailure,
   isCurrentPreparingAttempt,
   listRoutes,
   notifyPreparingRoutes,
@@ -2279,9 +2279,9 @@ export class SandboxControlV2 extends DurableObject<Env> {
           payload: await this.withContainer(update, state),
         });
       },
-      issueGrant: (spec, source, diagnostic) =>
+      issueGrant: (spec, source, environment, diagnostic) =>
         withTimeout(
-          this.issueRouteGrant(spec, source, diagnostic),
+          this.issueRouteGrant(spec, source, environment, diagnostic),
           this.grantIssueTimeoutMs(),
           'Credential grant issuance timed out',
           diagnostic?.markTimeout
@@ -2448,6 +2448,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
   private async issueRouteGrant(
     spec: ControlPlaneRouteSpec,
     source: ControlPlaneCredentialSource,
+    environment: SessionEnvironmentReference | null,
     diagnostic?: GrantDiagnostic
   ): Promise<RouteGrantIssue> {
     const provider = this.currentProvider();
@@ -2496,6 +2497,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         scopeId,
         payload: base,
         leaseMs: this.sandboxTimers().credentialGrantMs,
+        ...(environment ? { environment } : {}),
         ...(existing === undefined ? {} : { existing }),
         refreshBacking: existing !== undefined && this.grantNeedsReissue(existing),
         ...(outboundContainerId === undefined ? {} : { outboundContainerId }),
@@ -2625,6 +2627,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
       env: payload.env ?? {},
       ...(payload.setupCommands === undefined ? {} : { setupCommands: payload.setupCommands }),
       ...(payload.git === undefined ? {} : { git: payload.git }),
+      // The roots hold no credential; the wrapper takes each root's alias by host.
+      ...(spec.roots === undefined ? {} : { roots: spec.roots }),
       kilo: payload.kilo,
     };
   }
@@ -2748,7 +2752,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       // Bound the token-service round trip so a warm-route `deliver` cannot
       // hang forever; the grant-issue bound is the provider-stop bound.
       issued = await withTimeout(
-        this.issueRouteGrant(route.spec, source),
+        this.issueRouteGrant(route.spec, source, route.environment),
         this.grantIssueTimeoutMs(),
         'Credential grant re-issue timed out'
       );
@@ -3109,10 +3113,15 @@ export class SandboxControlV2 extends DurableObject<Env> {
   ): Promise<boolean> {
     const alias = parseControlPlaneCredential(credential);
     if (alias === null) return false;
-    const expected = alias.purpose === 'kilo' ? grant.kilo.alias : grant.scm?.alias;
-    if (expected === undefined) return false;
+    const expected = alias.purpose === 'kilo' ? [grant.kilo.alias] : grantScmAliases(grant);
     // Constant-time comparison of a secret-bearing alias (B3 review 5).
-    return sandboxCredentialMatchesHash(credential, await hashSandboxCredential(expected));
+    for (const candidate of expected) {
+      if (candidate === undefined) continue;
+      if (await sandboxCredentialMatchesHash(credential, await hashSandboxCredential(candidate))) {
+        return true;
+      }
+    }
+    return false;
   }
 
   /**
@@ -3265,7 +3274,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         if (route.credentialSource === null) continue;
         try {
           const issued = await withTimeout(
-            this.issueRouteGrant(route.spec, route.credentialSource),
+            this.issueRouteGrant(route.spec, route.credentialSource, route.environment),
             this.grantIssueTimeoutMs(),
             'Credential binding timed out'
           );
@@ -3273,15 +3282,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
             throw new Error('Credential policy unavailable');
           this.publishRouteGrant({ ...route, ...issued });
         } catch (error) {
-          const upgradeRequired = error instanceof SessionCredentialUpgradeRequiredError;
+          const failure = grantIssueFailure(error, 'runtime_proxy_bind_failed');
           await failCurrentAttempt(
             this.routeContext(next),
             route.sessionId,
             route.attemptId,
-            upgradeRequired ? 'credential_upgrade_required' : 'workspace_setup_failed',
-            upgradeRequired
-              ? 'credential_upgrade_required'
-              : admissionFailureStage(error, 'runtime_proxy_bind_failed')
+            failure.reason,
+            failure.stage
           );
         }
       }

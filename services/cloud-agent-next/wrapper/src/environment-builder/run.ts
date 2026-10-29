@@ -1,6 +1,7 @@
 import path from 'node:path';
 import {
   CONTROL_RUNTIME_RESERVED_ENV_VARS,
+  MULTI_MEMBER_GIT_CREDENTIAL_ENV,
   RESERVED_ENV_VAR_PREFIXES,
   SYSTEM_GIT_CONFIG_ENV,
   isStrippedGitConfigEnvVar,
@@ -10,6 +11,7 @@ import {
   type ControlPlaneSetupEvent,
 } from '../../../src/shared/control-plane-protocol.js';
 import type {
+  EnvironmentBuildGit,
   EnvironmentBuildInput,
   EnvironmentBuildResult,
   EnvironmentBuildRunnerFailure,
@@ -19,6 +21,7 @@ import {
   clearGitCredentialRecord,
   credentialFreeGitUrl,
   writeGitCredentialRecord,
+  writeGitCredentialRecordSet,
 } from '../control/git-credentials.js';
 import { WrapperBootstrapError } from '../bootstrap-error.js';
 import { createSecretRedactor } from '../redact-output.js';
@@ -48,6 +51,8 @@ export function builderSetupEnvironment(input: {
   vars: Record<string, string>;
   home: string;
   directory: string;
+  /** A V2 build can hold a different token for each repository of one host, so Git must send the request path. */
+  isV2: boolean;
 }): Record<string, string> {
   const reserved = new Set<string>(CONTROL_RUNTIME_RESERVED_ENV_VARS);
   const runtimeOwned = (name: string): boolean =>
@@ -74,6 +79,7 @@ export function builderSetupEnvironment(input: {
     XDG_CACHE_HOME: path.join(input.home, '.cache'),
     XDG_STATE_HOME: path.join(input.home, '.local', 'state'),
     ...SYSTEM_GIT_CONFIG_ENV,
+    ...(input.isV2 ? MULTI_MEMBER_GIT_CREDENTIAL_ENV : {}),
     GIT_TERMINAL_PROMPT: '0',
   };
 }
@@ -126,58 +132,128 @@ function setupFailureReason(error: unknown): EnvironmentBuildRunnerFailure {
     : 'setup_failed';
 }
 
+/** One repository a build checks out: its clone source and its target directory. */
+type BuildTarget = {
+  directory: string;
+  url: string;
+  token: string | undefined;
+  platform: EnvironmentBuildGit['platform'];
+  /** Present only for a V2 build. */
+  repoFullName: string | undefined;
+};
+
 /** Run one build. Never throws: every outcome is a result the coordinator records. */
 export async function runEnvironmentBuild(deps: BuildRunDeps): Promise<EnvironmentBuildResult> {
   const { input, reporter, repository, signal } = deps;
   const now = deps.now ?? Date.now;
   const directory = input.directory;
   const home = directoryHome(directory, deps.homeRoot);
+  // A V1 build serves the `git` shape at the isolated directory. A V2 build
+  // serves `members`, each with the directory a session gives it, and `directory`
+  // is the session cwd. Every repository is cloned at its default branch and
+  // stamped, and setup runs once at the cwd, as in a session.
+  const membersInput = input.members;
+  const gitInput = input.git;
+  const isV2 = membersInput !== undefined;
+  const targets: BuildTarget[] = membersInput
+    ? membersInput.map(member => ({
+        directory: member.directory,
+        url: member.url,
+        token: member.token,
+        platform: member.platform,
+        repoFullName: member.repoFullName,
+      }))
+    : gitInput
+      ? [
+          {
+            directory,
+            url: gitInput.url,
+            token: gitInput.token,
+            platform: gitInput.platform,
+            repoFullName: undefined,
+          },
+        ]
+      : [];
+  if (targets.length === 0) return failure('clone', 'clone_failed', 'no repository to clone');
+  const issuedTokens = targets.flatMap(target =>
+    target.token === undefined ? [] : [target.token]
+  );
   const env = builderSetupEnvironment({
     inherited: deps.inherited,
     vars: input.env,
     home,
     directory,
+    isV2,
   });
   const redact = createSecretRedactor(
     {},
     [
       Object.fromEntries(input.secretKeys.map(key => [key, input.env[key]])),
-      { GIT_TOKEN: input.git.token },
+      ...targets.map((target, index) => ({ [`GIT_TOKEN_${index}`]: target.token })),
     ],
     input.secretKeys
   );
-  const git = { ...input.git };
   const startedAt = now();
 
   let step: EnvironmentBuildRunnerStep = 'clone';
   try {
     reporter.setStep('clone');
-    await writeGitCredentialRecord({
-      home,
-      url: credentialFreeGitUrl(git.url),
-      token: git.token,
-      platform: git.platform,
-    });
-    await repository.cloneRepository({
-      git,
-      directory,
-      env,
-      redact,
-      signal,
-      onProgress: detail => reporter.line(detail ?? 'Cloning the default branch'),
-    });
-    signal.throwIfAborted();
-    const commit = await repository.headCommit(directory, env);
-    const branchResult = await deps.runGit(['rev-parse', '--abbrev-ref', 'HEAD'], {
-      cwd: directory,
-      env,
-      inheritEnv: false,
-    });
-    const branch = branchResult.exitCode === 0 ? branchResult.stdout.trim() : '';
-    if (!/^[0-9a-f]{40}$/.test(commit) || branch.length === 0 || branch === 'HEAD') {
-      return failure('clone', 'clone_failed', 'default branch could not be resolved');
+    if (isV2) {
+      await writeGitCredentialRecordSet({
+        home,
+        entries: targets.flatMap(target =>
+          target.token === undefined || target.repoFullName === undefined
+            ? []
+            : [
+                {
+                  url: credentialFreeGitUrl(target.url),
+                  token: target.token,
+                  platform: target.platform,
+                },
+              ]
+        ),
+      });
+    } else {
+      const first = targets[0];
+      if (first === undefined) return failure('clone', 'clone_failed', 'no repository to clone');
+      await writeGitCredentialRecord({
+        home,
+        url: credentialFreeGitUrl(first.url),
+        token: first.token,
+        platform: first.platform,
+      });
     }
-    reporter.line(`Default branch ${branch} at ${commit}`);
+    const pinned: { directory: string; commit: string; branch: string }[] = [];
+    const multiPins: { repoFullName: string; commit: string; branch: string }[] = [];
+    for (const target of targets) {
+      await repository.cloneRepository({
+        git: { url: target.url, token: target.token, platform: target.platform },
+        directory: target.directory,
+        env,
+        redact,
+        signal,
+        onProgress: detail =>
+          reporter.line(detail ?? `Cloning ${target.repoFullName ?? 'the default branch'}`),
+      });
+      signal.throwIfAborted();
+      const commit = await repository.headCommit(target.directory, env);
+      const branchResult = await deps.runGit(['rev-parse', '--abbrev-ref', 'HEAD'], {
+        cwd: target.directory,
+        env,
+        inheritEnv: false,
+      });
+      const branch = branchResult.exitCode === 0 ? branchResult.stdout.trim() : '';
+      if (!/^[0-9a-f]{40}$/.test(commit) || branch.length === 0 || branch === 'HEAD') {
+        return failure('clone', 'clone_failed', 'default branch could not be resolved');
+      }
+      pinned.push({ directory: target.directory, commit, branch });
+      if (target.repoFullName !== undefined) {
+        multiPins.push({ repoFullName: target.repoFullName, commit, branch });
+      }
+    }
+    const firstPin = pinned[0];
+    if (firstPin === undefined) return failure('clone', 'clone_failed', 'no repository to clone');
+    if (!isV2) reporter.line(`Default branch ${firstPin.branch} at ${firstPin.commit}`);
 
     step = 'setup';
     reporter.setStep('setup');
@@ -200,20 +276,35 @@ export async function runEnvironmentBuild(deps: BuildRunDeps): Promise<Environme
     reporter.setStep('cleanup');
     signal.throwIfAborted();
     await deps.stopProcesses();
-    const cleanupFailure = await deps.cleanup({
-      git: args => deps.runGit(args, { cwd: directory, env, inheritEnv: false }),
-      directory,
-      home,
-      bareUrl: credentialFreeGitUrl(input.git.url),
-      canaries: input.git.token === undefined ? [] : [input.git.token],
-      logPath: deps.logPath,
-    });
-    if (cleanupFailure !== null) return failure('cleanup', 'cleanup_failed', cleanupFailure);
-    // The builder's own allocation: a session restored from this snapshot sees a
-    // foreign stamp and adopts the workspace instead of trusting it.
-    await deps.writeStamp(directory, { allocationId: input.allocationId, commit });
+    for (const target of targets) {
+      const cleanupFailure = await deps.cleanup({
+        git: args => deps.runGit(args, { cwd: target.directory, env, inheritEnv: false }),
+        directory: target.directory,
+        home,
+        bareUrl: credentialFreeGitUrl(target.url),
+        canaries: issuedTokens,
+        logPath: deps.logPath,
+      });
+      if (cleanupFailure !== null) return failure('cleanup', 'cleanup_failed', cleanupFailure);
+    }
+    // One stamp per repository, with its own commit. The cwd of several
+    // repositories is not a git root and is never stamped.
+    for (const entry of pinned) {
+      await deps.writeStamp(entry.directory, {
+        allocationId: input.allocationId,
+        commit: entry.commit,
+      });
+    }
     reporter.line('Workspace prepared; waiting for the snapshot');
-    return { outcome: 'ready', commit, branch, setupDurationMs };
+    if (isV2) {
+      return { outcome: 'ready', members: { members: multiPins }, setupDurationMs };
+    }
+    return {
+      outcome: 'ready',
+      commit: firstPin.commit,
+      branch: firstPin.branch,
+      setupDurationMs,
+    };
   } catch (error) {
     if (signal.aborted) return failure(step, 'canceled');
     if (step === 'clone') return failure('clone', 'clone_failed');

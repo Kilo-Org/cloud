@@ -17,6 +17,30 @@ import {
 } from './assistant-failure.js';
 
 describe('prepareIngestFrame', () => {
+  it.each(['autocommit_started', 'autocommit_completed'] as const)(
+    'keeps the repository of a %s event through compaction, so two repositories stay apart',
+    streamEventType => {
+      const frame = prepareIngestFrame({
+        streamEventType,
+        timestamp: '2026-04-14T08:00:00.000Z',
+        data: {
+          messageId: 'msg_1',
+          success: true,
+          message: 'acme/web: committed',
+          commitMessage: 'x'.repeat(2_000_000),
+          repository: 'acme/web',
+        },
+      });
+      expect(frame.kind).toBe('send');
+      if (frame.kind !== 'send') return;
+      expect(frame.compacted).toBe(true);
+      expect(JSON.parse(frame.serialized).data).toMatchObject({
+        messageId: 'msg_1',
+        repository: 'acme/web',
+      });
+    }
+  );
+
   it('passes small events through unchanged', () => {
     const event: IngestEvent = {
       streamEventType: 'kilocode',

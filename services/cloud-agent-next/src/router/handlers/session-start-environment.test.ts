@@ -6,7 +6,16 @@ import type { TRPCContext } from '../../types.js';
 import { createSessionStartHandlers } from './session-start.js';
 
 function environmentLoad(layer: Record<string, unknown>, sandboxAllocation: string | null = null) {
-  return { layer, sandboxAllocation };
+  return {
+    layer,
+    sandboxAllocation,
+    reference: {
+      environmentId: '123e4567-e89b-12d3-a456-426614174099',
+      owner: { type: 'user' as const, id: 'user-123' },
+      configurationRevision: 3,
+      repository: { platform: 'github' as const, repoFullName: 'acme/repo' },
+    },
+  };
 }
 
 const {
@@ -18,7 +27,7 @@ const {
   startNewSessionMock,
 } = vi.hoisted(() => ({
   mergeProfileConfigurationMock: vi.fn().mockResolvedValue({}),
-  loadEnvironmentForSessionMock: vi.fn().mockResolvedValue(null),
+  loadEnvironmentForSessionMock: vi.fn().mockResolvedValue({ status: 'none' }),
   assertKiloModelAvailableMock: vi.fn().mockResolvedValue(undefined),
   assertRepositoryAccessMock: vi.fn().mockResolvedValue(undefined),
   assertOrganizationMembershipMock: vi.fn().mockResolvedValue(undefined),
@@ -53,6 +62,7 @@ vi.mock('../../model-validation.js', () => ({
 
 vi.mock('../../session/validate-repository-access.js', () => ({
   assertRepositoryAccessBeforeSessionCreation: assertRepositoryAccessMock,
+  assertEnvironmentRepositoriesAccess: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('./organization-membership.js', () => ({
@@ -81,7 +91,7 @@ describe('startSession environment propagation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mergeProfileConfigurationMock.mockResolvedValue({});
-    loadEnvironmentForSessionMock.mockResolvedValue(null);
+    loadEnvironmentForSessionMock.mockResolvedValue({ status: 'none' });
     assertRepositoryAccessMock.mockResolvedValue(undefined);
     assertOrganizationMembershipMock.mockResolvedValue(undefined);
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
@@ -99,9 +109,10 @@ describe('startSession environment propagation', () => {
 
   it('carries the repository environment and its allocation to the grouped create request', async () => {
     const layer = { envVars: { ENV_ONLY: 'from-environment' }, setupCommands: ['env-setup'] };
-    loadEnvironmentForSessionMock.mockResolvedValueOnce(
-      environmentLoad(layer, 'cloudflare-containers-standard-4')
-    );
+    loadEnvironmentForSessionMock.mockResolvedValueOnce({
+      status: 'match',
+      environment: environmentLoad(layer, 'cloudflare-containers-standard-4'),
+    });
     mergeProfileConfigurationMock.mockResolvedValueOnce(layer);
     const caller = router.createCaller(createContext());
 

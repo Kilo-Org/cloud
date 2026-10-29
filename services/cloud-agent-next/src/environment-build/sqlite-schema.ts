@@ -72,6 +72,8 @@ export const builds = sqliteTable(
     capture_id: text('capture_id'),
     /** JSON of the stored capture result. */
     capture_result: text('capture_result'),
+    /** JSON of a V2 build: the commit and branch each repository was cloned at, for display. */
+    pin_group: text('pin_group'),
     cleanup_attempts: integer('cleanup_attempts').notNull(),
     cleanup_error: text('cleanup_error'),
     next_cleanup_at: integer('next_cleanup_at'),

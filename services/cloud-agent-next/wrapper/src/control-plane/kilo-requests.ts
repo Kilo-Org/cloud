@@ -8,15 +8,16 @@ import {
   CONTROL_PLANE_KILO_RESULT_MAX_BYTES,
 } from '../../../src/shared/control-plane-protocol.js';
 import type { WrapperKiloClient } from '../kilo-api.js';
-import type { SnapshotFileDiff } from '@kilocode/sdk/v2';
+import { rootPathPrefix } from '../../../src/shared/environment-workspace.js';
 import {
-  worktreeSnapshotCaptureSchema,
   type SessionGitSummaryPayload,
   type WorktreeSnapshotCapture,
 } from '../../../src/shared/worktree-changes-wire.js';
 import { collectWorktreeSnapshot } from '../control/worktree-changes.js';
 import { WorktreeFileCaptureError } from '../control/worktree-file-capture.js';
 import { runDirectoryOperation } from '../control/worktree-operations.js';
+import { captureRootSnapshots, snapshotFileDiffs } from './root-changes.js';
+import { hasEnvironmentRoots, type RouteRoot } from './workspace-roots.js';
 
 /**
  * Handles the Sandbox DO's allowlisted native read requests inside the
@@ -33,7 +34,9 @@ export const KILO_REQUEST_TIMEOUT_MS = 20_000;
 export type ControlPlaneKiloRequestsDeps = {
   emit: (frame: ControlPlaneWrapperFrame) => void;
   /** Runtime identity of a prepared route, or null while it is not attached. */
-  preparedRoute: (sessionId: string) => { runtimeKey: string; directory: string } | null;
+  preparedRoute: (
+    sessionId: string
+  ) => { runtimeKey: string; directory: string; roots?: readonly RouteRoot[] } | null;
   /** The live native client for one runtime key, or null when it is gone. */
   clientFor: (runtimeKey: string) => WrapperKiloClient | null;
   captureSnapshot?: (
@@ -79,7 +82,8 @@ export function createControlPlaneKiloRequests(deps: ControlPlaneKiloRequestsDep
     directory: string,
     kiloSessionId: string,
     operation: ControlPlaneNativeOperation,
-    signal: AbortSignal
+    signal: AbortSignal,
+    roots: readonly RouteRoot[] | undefined
   ): Promise<unknown> {
     switch (operation.name) {
       case 'session.get':
@@ -100,25 +104,21 @@ export function createControlPlaneKiloRequests(deps: ControlPlaneKiloRequestsDep
         if (nativeDiff.length > 0) return nativeDiff;
         // Cloud runtimes disable Kilo snapshots; reuse the bounded worktree patches instead.
         return runDirectoryOperation(directory, async () => {
-          const snapshot = worktreeSnapshotCaptureSchema.parse(
-            await captureSnapshot(directory, { revision: 1, baseRef: operation.baseRef }, signal)
+          if (roots !== undefined && hasEnvironmentRoots(roots)) {
+            // A V2 route compares each repository with its own base; the base of the request is the launch repository's.
+            const { repositories } = await captureRootSnapshots({
+              roots,
+              revision: 1,
+              capture: (rootDirectory, payload) => captureSnapshot(rootDirectory, payload, signal),
+            });
+            return repositories.flatMap(({ directory: rootDirectory, capture }) =>
+              snapshotFileDiffs(capture, rootPathPrefix(directory, rootDirectory))
+            );
+          }
+          return snapshotFileDiffs(
+            await captureSnapshot(directory, { revision: 1, baseRef: operation.baseRef }, signal),
+            ''
           );
-          if (snapshot.summary.truncated) throw new WorktreeFileCaptureError('too_large');
-          const records = new Map(snapshot.files.map(file => [file.path, file]));
-          return snapshot.summary.files.map((file): SnapshotFileDiff => {
-            const record = records.get(file.path);
-            if (!record) throw new Error('Worktree diff is incomplete');
-            if (record.diff.status === 'omitted' && record.diff.reason !== 'binary') {
-              throw new WorktreeFileCaptureError(record.diff.reason);
-            }
-            return {
-              file: file.path,
-              additions: file.additions,
-              deletions: file.deletions,
-              status: file.status,
-              patch: record.diff.status === 'available' ? record.diff.patch : '',
-            };
-          });
         });
       }
       case 'question.list': {
@@ -148,7 +148,7 @@ export function createControlPlaneKiloRequests(deps: ControlPlaneKiloRequestsDep
     try {
       const result = bounded(
         operation,
-        await run(client, route.directory, session.kiloSessionId, operation, signal)
+        await run(client, route.directory, session.kiloSessionId, operation, signal, route.roots)
       );
       const bytes = new TextEncoder().encode(JSON.stringify(result)).length;
       if (bytes > CONTROL_PLANE_KILO_RESULT_MAX_BYTES) {

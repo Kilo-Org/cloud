@@ -1,5 +1,9 @@
 import type { EnvironmentSummary } from '@kilocode/cloud-agent-profile';
-import type { EnvironmentRepository } from '@/hooks/useCloudAgentEnvironments';
+import {
+  environmentMembers,
+  type EnvironmentMemberResponse,
+  type EnvironmentRepository,
+} from '@/hooks/useCloudAgentEnvironments';
 
 /** Compact "3 vars · 2 cmds" summary, or an empty string when the environment is empty. */
 export function formatEnvironmentCounts(environment: EnvironmentSummary): string {
@@ -12,29 +16,30 @@ export function formatEnvironmentCounts(environment: EnvironmentSummary): string
     .join(' · ');
 }
 
-/**
- * The owner's environment for a repository, matched the way the server stores
- * it: lowercased GitHub and GitLab paths, and the Bitbucket UUID pair.
- */
-export function findRepositoryEnvironment(
-  environments: readonly EnvironmentSummary[],
+/** Whether one environment member is the repository, matched as the server stores it. */
+export function memberMatchesRepository(
+  member: EnvironmentMemberResponse,
   repository: EnvironmentRepository
-): EnvironmentSummary | undefined {
+): boolean {
   if (repository.platform === 'bitbucket') {
-    const workspaceUuid = repository.workspaceUuid.toLowerCase();
-    const repositoryUuid = repository.repositoryUuid.toLowerCase();
-    return environments.find(
-      environment =>
-        environment.platform === 'bitbucket' &&
-        environment.bitbucketWorkspaceUuid === workspaceUuid &&
-        environment.bitbucketRepositoryUuid === repositoryUuid
+    return (
+      member.platform === 'bitbucket' &&
+      member.bitbucketWorkspaceUuid?.toLowerCase() === repository.workspaceUuid.toLowerCase() &&
+      member.bitbucketRepositoryUuid?.toLowerCase() === repository.repositoryUuid.toLowerCase()
     );
   }
   const fullName = (
     repository.platform === 'gitlab' ? repository.projectPath : repository.fullName
   ).toLowerCase();
-  return environments.find(
-    environment =>
-      environment.platform === repository.platform && environment.repoFullName === fullName
+  return member.platform === repository.platform && member.repoFullName.toLowerCase() === fullName;
+}
+
+/** Every environment of the owner that contains the repository. */
+export function findRepositoryEnvironments(
+  environments: readonly EnvironmentSummary[],
+  repository: EnvironmentRepository
+): EnvironmentSummary[] {
+  return environments.filter(environment =>
+    environmentMembers(environment).some(member => memberMatchesRepository(member, repository))
   );
 }

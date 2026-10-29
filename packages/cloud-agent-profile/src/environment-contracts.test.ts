@@ -4,6 +4,7 @@ import {
   assertValidEnvironmentKey,
   isReservedEnvironmentKey,
   resolveEnvironmentIdentity,
+  sameRepositoryIdentity,
   validateEnvironmentCommands,
   validateEnvironmentName,
   validateEnvironmentPlainVars,
@@ -147,5 +148,57 @@ describe('resolveEnvironmentIdentity', () => {
         bitbucketWorkspaceUuid: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
       })
     ).toThrow();
+  });
+});
+
+describe('sameRepositoryIdentity', () => {
+  const bitbucket = (workspaceUuid: string, repositoryUuid: string) => ({
+    platform: 'bitbucket' as const,
+    workspaceUuid,
+    repositoryUuid,
+  });
+
+  it('compares GitHub repositories without regard to case', () => {
+    const left = { platform: 'github' as const, repoFullName: 'Acme/Widgets' };
+    expect(sameRepositoryIdentity(left, { ...left, repoFullName: 'acme/widgets' })).toBe(true);
+    expect(sameRepositoryIdentity(left, { ...left, repoFullName: 'acme/other' })).toBe(false);
+  });
+
+  it('compares GitLab repositories by their trimmed clone URL', () => {
+    const left = { platform: 'gitlab' as const, cloneUrl: 'https://gitlab.com/g/p.git' };
+    expect(
+      sameRepositoryIdentity(left, { ...left, cloneUrl: ' https://gitlab.com/g/p.git ' })
+    ).toBe(true);
+    expect(sameRepositoryIdentity(left, { ...left, cloneUrl: 'https://gitlab.com/g/q.git' })).toBe(
+      false
+    );
+  });
+
+  it('compares Bitbucket repositories by both UUIDs without regard to case', () => {
+    const left = bitbucket(
+      'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb'
+    );
+    expect(
+      sameRepositoryIdentity(
+        left,
+        bitbucket('AAAAAAAA-AAAA-4AAA-8AAA-AAAAAAAAAAAA', 'BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB')
+      )
+    ).toBe(true);
+    expect(
+      sameRepositoryIdentity(
+        left,
+        bitbucket('aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', 'cccccccc-cccc-4ccc-8ccc-cccccccccccc')
+      )
+    ).toBe(false);
+  });
+
+  it('never matches repositories of different platforms', () => {
+    expect(
+      sameRepositoryIdentity(
+        { platform: 'github', repoFullName: 'g/p' },
+        { platform: 'gitlab', cloneUrl: 'g/p' }
+      )
+    ).toBe(false);
   });
 });

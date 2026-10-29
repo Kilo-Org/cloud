@@ -6,7 +6,6 @@ import {
   worktreeChangesSnapshotSchema,
   worktreeFileQuerySchema,
   worktreeFileRecordSchema,
-  worktreeSnapshotCaptureSchema,
   type GetWorktreeChangesOutput,
   type GetWorktreeFileOutput,
   type RefreshWorktreeChangesOutput,
@@ -18,7 +17,15 @@ import {
 import type { SessionMetadata } from '../persistence/session-metadata.js';
 import { getSandboxProvider } from '../persistence/session-metadata.js';
 import type { AgentSandboxProvider } from '../types.js';
-import { WORKTREE_CHANGED_EVENT } from '../shared/worktree-changes-wire.js';
+import { sameRepositoryIdentity } from '@kilocode/cloud-agent-profile';
+import { launchRepositoryIdentity } from '../session/environment-launch.js';
+import {
+  ISOLATED_CONTAINER_WORKSPACE_PATH,
+  environmentWorkspace,
+  isMultiRepositoryEnvironment,
+} from '../shared/environment-workspace.js';
+import { WORKTREE_CHANGED_EVENT, worktreeChangesBaseRef } from '../shared/worktree-changes-wire.js';
+import { parseReportedSnapshot, type RouteRepository } from '../shared/worktree-groups.js';
 import {
   MAX_WORKTREE_CHANGES_BYTES,
   worktreeRecoverySchema,
@@ -43,6 +50,8 @@ export type WorktreeChangesContext = {
   providerRuntime?: NonNullable<SessionMetadata['workspace']>['providerRuntime'];
   repository: { type: string; source: string };
   baseRef?: string;
+  /** The repositories of a V2 route, which is what its wrapper reports on. Absent for a V1 route. */
+  roots?: RouteRepository[];
 };
 
 type CaptureTrigger = { generation: number; context?: WorktreeChangesContext };
@@ -72,9 +81,25 @@ type WorktreeChangesDependencies = {
 
 const idleStatusSchema = z.object({ status: z.object({ type: z.literal('idle') }) });
 
-export function worktreeChangesBaseRef(branch: string | undefined): string | undefined {
-  if (branch === undefined) return undefined;
-  return `refs/remotes/origin/${branch}`;
+function environmentRoots(metadata: SessionMetadata): RouteRepository[] | undefined {
+  if (!isMultiRepositoryEnvironment(metadata.environment)) return undefined;
+  const launch =
+    metadata.repository === undefined ? undefined : launchRepositoryIdentity(metadata.repository);
+  return environmentWorkspace({
+    sessionDirectory: ISOLATED_CONTAINER_WORKSPACE_PATH,
+    environment: metadata.environment,
+    isLaunch: member => launch !== undefined && sameRepositoryIdentity(member.identity, launch),
+  }).roots.flatMap(root =>
+    root.repository === null
+      ? []
+      : [
+          {
+            directory: root.directory,
+            repoFullName: root.repository.repoFullName,
+            launch: root.launch,
+          },
+        ]
+  );
 }
 
 export function worktreeChangesContext(
@@ -85,6 +110,7 @@ export function worktreeChangesContext(
   const kiloSessionId = metadata.auth.kiloSessionId;
   const repository = metadata.repository;
   if (!sandboxId || !kiloSessionId || !repository || !directory) return null;
+  const roots = environmentRoots(metadata);
   return {
     session: { sessionId: metadata.identity.sessionId, kiloSessionId, directory },
     ownerId: metadata.identity.userId,
@@ -97,7 +123,11 @@ export function worktreeChangesContext(
       type: repository.type,
       source: repository.type === 'github' ? repository.repo : repository.url,
     },
-    baseRef: worktreeChangesBaseRef(repository.upstreamBranch),
+    // A V2 route compares each repository with its own base, which the wrapper chooses.
+    baseRef: isMultiRepositoryEnvironment(metadata.environment)
+      ? undefined
+      : worktreeChangesBaseRef(repository.upstreamBranch),
+    ...(roots === undefined ? {} : { roots }),
   };
 }
 
@@ -203,14 +233,20 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
         return { status: outcome.code === 'not_ready' ? 'offline' : 'failed', snapshot };
       }
       let captured: WorktreeSnapshotCapture;
+      let repositories: WorktreeChangesSnapshot['repositories'];
       if (legacy) {
         const parsed = worktreeChangesCaptureSchema.safeParse(outcome.result);
         if (!parsed.success) return { status: 'failed', snapshot };
         captured = { summary: parsed.data, files: [] };
       } else {
-        const parsed = worktreeSnapshotCaptureSchema.safeParse(outcome.result);
-        if (!parsed.success) return { status: 'failed', snapshot };
-        captured = parsed.data;
+        const reported = parseReportedSnapshot(
+          outcome.result,
+          context.session.directory,
+          context.roots
+        );
+        if (reported === null) return { status: 'failed', snapshot };
+        captured = reported.capture;
+        repositories = reported.repositories;
       }
       if (
         captured.summary.revision !== requestedRevision ||
@@ -246,6 +282,7 @@ export function createWorktreeChanges(deps: WorktreeChangesDependencies) {
         schemaVersion: WORKTREE_CHANGES_SCHEMA_VERSION,
         capturedAt: new Date().toISOString(),
         files: selectedFiles,
+        ...(repositories === undefined ? {} : { repositories }),
       });
       if (!saved) return { status: 'failed', snapshot };
       const retainedRevisions = new Map(saved.files.map(file => [file.path, file.revision]));

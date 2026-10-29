@@ -2,6 +2,7 @@ import { SETUP_SCRIPT_LIMITS } from './setup-script';
 import * as z from 'zod';
 import { TRPCError } from '@trpc/server';
 import type { EncryptedEnvelope } from '@kilocode/encryption';
+import type { EnvironmentRepositoryEntry } from './environment-repository-entry';
 import { MASKED_SECRET_VALUE, type ProfileOwner } from './types';
 
 export const ENVIRONMENT_SECRET_PLACEHOLDER = '<unchanged>';
@@ -73,6 +74,27 @@ export type EnvironmentRepositoryIdentity =
   | { platform: 'gitlab'; cloneUrl: string }
   | { platform: 'bitbucket'; workspaceUuid: string; repositoryUuid: string };
 
+/**
+ * One repository of a V2 environment as a session sees it: the provider identity
+ * used for matching and authorization, the canonical path the clone URL is built
+ * from (a Bitbucket identity holds only UUIDs), and the directory the repository
+ * checks out at under `/workspace`.
+ */
+export type EnvironmentReferenceRepository = {
+  identity: EnvironmentRepositoryIdentity;
+  repoFullName: string;
+  leaf: string;
+};
+
+/** The identity a V1 environment is created with. */
+export type EnvironmentIdentityInput = {
+  platform: EnvironmentPlatform;
+  repoFullName: string;
+  gitlabCloneUrl?: string | null;
+  bitbucketWorkspaceUuid?: string | null;
+  bitbucketRepositoryUuid?: string | null;
+};
+
 /** Normalized identity columns as stored on `cloud_agent_environments`. */
 export type EnvironmentIdentityColumns = {
   repo_full_name: string;
@@ -81,21 +103,36 @@ export type EnvironmentIdentityColumns = {
   bitbucket_repository_uuid: string | null;
 };
 
-export type EnvironmentCreateInput = {
+type EnvironmentCreateInputBase = {
   owner: EnvironmentOwner;
   createdByUserId: string;
   name: string;
-  platform: EnvironmentPlatform;
-  repoFullName: string;
-  gitlabCloneUrl?: string | null;
-  bitbucketWorkspaceUuid?: string | null;
-  bitbucketRepositoryUuid?: string | null;
   plainVars?: Record<string, string>;
   secrets?: Record<string, string>;
   commands?: string[];
   /** Saved sandbox allocation key; null or absent uses the owner's default. */
   sandboxAllocation?: string | null;
 };
+
+/** A V1 environment: one repository, stored in the identity columns. */
+export type EnvironmentV1CreateInput = EnvironmentCreateInputBase &
+  EnvironmentIdentityInput & { repositories?: never };
+
+/** A V2 environment: one or more repositories, stored in `repositories`. */
+export type EnvironmentV2CreateInput = EnvironmentCreateInputBase & {
+  repositories: EnvironmentRepositoryEntry[];
+  platform?: never;
+  repoFullName?: never;
+  gitlabCloneUrl?: never;
+  bitbucketWorkspaceUuid?: never;
+  bitbucketRepositoryUuid?: never;
+};
+
+/**
+ * Exactly one alternative. A caller that bypasses the types with neither or both
+ * gets a bad-request error from `createEnvironment`.
+ */
+export type EnvironmentCreateInput = EnvironmentV1CreateInput | EnvironmentV2CreateInput;
 
 export type EnvironmentSecretChange =
   | { key: string; value: string }
@@ -105,6 +142,8 @@ export type EnvironmentUpdateInput = {
   owner: EnvironmentOwner;
   environmentId: string;
   name?: string;
+  /** V2 only. Present replaces the stored repositories; absent preserves them. */
+  repositories?: EnvironmentRepositoryEntry[];
   plainVars?: Record<string, string>;
   secrets?: EnvironmentSecretChange[];
   commands?: string[];
@@ -117,21 +156,27 @@ export type EnvironmentSessionLayer = {
   envVars?: Record<string, string>;
   encryptedSecrets?: Record<string, EncryptedEnvelope>;
   setupCommands?: string[];
+  /** Present for a V2 environment only: its repositories. Absence means V1. */
+  repositories?: EnvironmentReferenceRepository[];
+};
+
+type EnvironmentReferenceBase = {
+  environmentId: string;
+  owner: EnvironmentOwner;
+  configurationRevision: number;
 };
 
 /**
  * The authorized identity of the environment a session admitted: who owns it,
- * which repository it belongs to, and the configuration revision whose values
- * the session merged. It travels beside the merged configuration so snapshot
- * selection can check ownership, repository and revision without re-reading
- * the environment.
+ * its repository or repositories, and the configuration revision whose values
+ * the session merged. A V1 reference stores `repository`; a V2 reference stores
+ * `repositories`. Exactly one alternative.
  */
-export type EnvironmentReference = {
-  environmentId: string;
-  owner: EnvironmentOwner;
-  configurationRevision: number;
-  repository: EnvironmentRepositoryIdentity;
-};
+export type EnvironmentReference = EnvironmentReferenceBase &
+  (
+    | { repository: EnvironmentRepositoryIdentity; repositories?: never }
+    | { repositories: EnvironmentReferenceRepository[]; repository?: never }
+  );
 
 /** What session preflight loads for the environment of a session's repository. */
 export type EnvironmentForSession = {
@@ -141,19 +186,25 @@ export type EnvironmentForSession = {
   sandboxAllocation: string | null;
 };
 
-/**
- * The immutable inputs of one environment build, read consistently from the
- * environment row and its variable rows. Secrets stay encrypted envelopes until
- * the builder needs them. `repoFullName` is the display path the clone URL is
- * built from for GitHub and Bitbucket.
- */
-export type EnvironmentBuildInput = {
+type EnvironmentBuildInputBase = {
   reference: EnvironmentReference;
-  repoFullName: string;
   commands: string[];
   plainVars: Record<string, string>;
   encryptedSecrets: Record<string, EncryptedEnvelope>;
 };
+
+/**
+ * The immutable inputs of one environment build, read consistently from the
+ * environment row and its variable rows. Secrets stay encrypted envelopes until
+ * the builder needs them. A V1 build stores `repoFullName`, the display path the
+ * clone URL is built from. A V2 build stores every repository and has no launch
+ * repository. Exactly one alternative.
+ */
+export type EnvironmentBuildInput = EnvironmentBuildInputBase &
+  (
+    | { repoFullName: string; repositories?: never }
+    | { repositories: EnvironmentReferenceRepository[]; repoFullName?: never }
+  );
 
 export type EnvironmentPlainVarResponse = {
   key: string;
@@ -162,14 +213,33 @@ export type EnvironmentPlainVarResponse = {
   updatedAt: string;
 };
 
-export type EnvironmentResponse = {
-  id: string;
-  name: string;
+export type EnvironmentV1IdentityResponse = {
   platform: EnvironmentPlatform;
   repoFullName: string;
   gitlabCloneUrl: string | null;
   bitbucketWorkspaceUuid: string | null;
   bitbucketRepositoryUuid: string | null;
+  repositories?: never;
+};
+
+export type EnvironmentV2IdentityResponse = {
+  repositories: EnvironmentRepositoryEntry[];
+  platform?: never;
+  repoFullName?: never;
+  gitlabCloneUrl?: never;
+  bitbucketWorkspaceUuid?: never;
+  bitbucketRepositoryUuid?: never;
+};
+
+/** The repository part of a response, V1 or V2. */
+export type EnvironmentIdentityResponse =
+  | EnvironmentV1IdentityResponse
+  | EnvironmentV2IdentityResponse;
+
+/** A V1 response carries the identity scalars; a V2 response carries `repositories`. */
+export type EnvironmentResponse = {
+  id: string;
+  name: string;
   createdAt: string;
   updatedAt: string;
   plainVars: EnvironmentPlainVarResponse[];
@@ -178,16 +248,12 @@ export type EnvironmentResponse = {
   sandboxAllocation: string | null;
   /** Secret key names only. Values and envelopes are never returned. */
   secretKeys: string[];
-};
+} & EnvironmentIdentityResponse;
 
+/** A V1 summary carries the identity scalars; a V2 summary carries `repositories`. */
 export type EnvironmentSummary = {
   id: string;
   name: string;
-  platform: EnvironmentPlatform;
-  repoFullName: string;
-  gitlabCloneUrl: string | null;
-  bitbucketWorkspaceUuid: string | null;
-  bitbucketRepositoryUuid: string | null;
   createdAt: string;
   updatedAt: string;
   plainVarCount: number;
@@ -195,7 +261,7 @@ export type EnvironmentSummary = {
   commandCount: number;
   configurationRevision: number;
   sandboxAllocation: string | null;
-};
+} & EnvironmentIdentityResponse;
 
 function badRequest(message: string): TRPCError {
   return new TRPCError({ code: 'BAD_REQUEST', message });
@@ -285,18 +351,87 @@ export function normalizeRepoFullName(repoFullName: string): string {
   return repoFullName.trim().toLowerCase();
 }
 
+/** GitLab identity is the clone URL, trimmed before comparison. */
+export function normalizeGitlabCloneUrl(cloneUrl: string): string {
+  return cloneUrl.trim();
+}
+
 /** Bitbucket UUID identity is lowercased before storage and comparison. */
 export function normalizeBitbucketUuid(uuid: string): string {
   return uuid.toLowerCase();
 }
 
-export function resolveEnvironmentIdentity(input: {
-  platform: EnvironmentPlatform;
-  repoFullName: string;
-  gitlabCloneUrl?: string | null;
-  bitbucketWorkspaceUuid?: string | null;
-  bitbucketRepositoryUuid?: string | null;
-}): EnvironmentIdentityColumns {
+/**
+ * Whether two repository identities name the same repository, after the
+ * normalization the V1 identity columns use.
+ */
+export function sameRepositoryIdentity(
+  left: EnvironmentRepositoryIdentity,
+  right: EnvironmentRepositoryIdentity
+): boolean {
+  switch (left.platform) {
+    case 'github':
+      return (
+        right.platform === 'github' &&
+        normalizeRepoFullName(left.repoFullName) === normalizeRepoFullName(right.repoFullName)
+      );
+    case 'gitlab':
+      return (
+        right.platform === 'gitlab' &&
+        normalizeGitlabCloneUrl(left.cloneUrl) === normalizeGitlabCloneUrl(right.cloneUrl)
+      );
+    case 'bitbucket':
+      return (
+        right.platform === 'bitbucket' &&
+        normalizeBitbucketUuid(left.workspaceUuid) ===
+          normalizeBitbucketUuid(right.workspaceUuid) &&
+        normalizeBitbucketUuid(left.repositoryUuid) === normalizeBitbucketUuid(right.repositoryUuid)
+      );
+  }
+}
+
+/**
+ * The directory a repository checks out at under `/workspace`: the last path
+ * segment of `repoFullName`. A trailing slash gives an empty leaf, which is
+ * unsafe.
+ */
+export function repositoryLeaf(repoFullName: string): string {
+  return repoFullName.slice(repoFullName.lastIndexOf('/') + 1);
+}
+
+/** The clone URL of a Bitbucket Cloud repository, from its `workspace/slug` name. */
+export function bitbucketCloneUrl(repoFullName: string): string {
+  return `https://bitbucket.org/${repoFullName}.git`;
+}
+
+// An unsafe leaf is one that does not name one ordinary directory directly under
+// `/workspace`. These are unsafe:
+// - an empty leaf, `.` and `..`;
+// - a leaf with a path separator, whitespace, a control character or a non-ASCII
+//   character: the allowlist is ASCII letters, digits, `_`, `.` and `-`, which is
+//   every character a GitHub, GitLab or Bitbucket repository name uses;
+// - a leaf that starts with `-`, which a command could read as an option;
+// - `.git`, in any case: a member checked out at `/workspace/.git` would turn the
+//   multi-member workspace root into a repository that runs that member's config;
+// - a leaf over 255 characters, the longest directory name a file system allows.
+// `.github` and similar names stay valid.
+const MAX_REPOSITORY_LEAF_LENGTH = 255;
+const SAFE_REPOSITORY_LEAF = /^[A-Za-z0-9_.][A-Za-z0-9_.-]*$/;
+
+/** Whether a leaf names one ordinary directory under `/workspace`. */
+export function isSafeRepositoryLeaf(leaf: string): boolean {
+  return (
+    leaf.length <= MAX_REPOSITORY_LEAF_LENGTH &&
+    leaf !== '.' &&
+    leaf !== '..' &&
+    leaf.toLowerCase() !== '.git' &&
+    SAFE_REPOSITORY_LEAF.test(leaf)
+  );
+}
+
+export function resolveEnvironmentIdentity(
+  input: EnvironmentIdentityInput
+): EnvironmentIdentityColumns {
   const repoFullName = normalizeRepoFullName(input.repoFullName);
   if (repoFullName.length === 0) throw badRequest('Repository name is required');
 
@@ -309,7 +444,7 @@ export function resolveEnvironmentIdentity(input: {
         bitbucket_repository_uuid: null,
       };
     case 'gitlab': {
-      const cloneUrl = input.gitlabCloneUrl?.trim() ?? '';
+      const cloneUrl = normalizeGitlabCloneUrl(input.gitlabCloneUrl ?? '');
       if (cloneUrl.length === 0) throw badRequest('GitLab clone URL is required');
       return {
         repo_full_name: repoFullName,

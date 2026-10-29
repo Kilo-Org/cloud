@@ -19,9 +19,11 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { EnvironmentDeleteDialog } from './EnvironmentDeleteDialog';
+import { allocationSupportsMultiRepository } from '@kilocode/worker-utils/sandbox-allocation';
 import {
   useCloudAgentEnvironment,
   useCloudAgentEnvironmentMutations,
+  useMultiRepositoryEnvironmentsEnabled,
   type EnvironmentRepository,
   type EnvironmentResponse,
 } from '@/hooks/useCloudAgentEnvironments';
@@ -37,6 +39,8 @@ import {
   formatEnvironmentVariables,
 } from './environment-variables';
 import { describeEnvironmentProfileImpact } from './environment-profile-impact';
+import { EnvironmentRepositoriesField } from './EnvironmentRepositoriesField';
+import { entryToRepository, repositoryName, sameRepositories } from './environment-repositories';
 import { EnvironmentSandboxField } from './EnvironmentSandboxField';
 import { EnvironmentScriptsEditor } from './EnvironmentScriptsEditor';
 import { EnvironmentVariablesEditor } from './EnvironmentVariablesEditor';
@@ -112,27 +116,46 @@ function EnvironmentForm({
   const { createEnvironment, updateEnvironment, deleteEnvironment } =
     useCloudAgentEnvironmentMutations();
   const [page, setPage] = useState<EditorPage>('overview');
+  const multiRepository = useMultiRepositoryEnvironmentsEnabled(organizationId);
+  // Save waits for the flag: a new environment's kind cannot change after it is saved.
+  const kindPending = !existing && multiRepository.isPending;
+  // With the flag on, a new environment is multi-repository, so it can gain
+  // repositories later. A saved environment keeps the kind it was created with.
+  const isMultiRepository = existing
+    ? existing.repositories !== undefined
+    : multiRepository.enabled;
+  const [initialRepositories] = useState<EnvironmentRepository[]>(() =>
+    existing?.repositories
+      ? existing.repositories.map(entryToRepository)
+      : repository
+        ? [repository]
+        : []
+  );
+  const [repositories, setRepositories] = useState(initialRepositories);
+  const repositoriesChanged = !sameRepositories(initialRepositories, repositories);
   const fullName =
-    existing?.repoFullName ??
-    repositoryLabel ??
-    (repository?.platform === 'gitlab' ? repository.projectPath : repository?.fullName) ??
-    '';
+    (isMultiRepository ? repositories.map(repositoryName).join(', ') : undefined) ||
+    existing?.repoFullName ||
+    repositoryLabel ||
+    (repository ? repositoryName(repository) : '');
+  const launchName = repositories[0] ? repositoryName(repositories[0]) : fullName;
   const name =
     existing?.name ??
-    splitRepositoryName(fullName).name.slice(0, ENVIRONMENT_LIMITS.MAX_NAME_LENGTH);
+    splitRepositoryName(launchName).name.slice(0, ENVIRONMENT_LIMITS.MAX_NAME_LENGTH);
   const [initialSandboxAllocation] = useState(() =>
     toSelectableAllocation(existing?.sandboxAllocation ?? null)
   );
   const [sandboxAllocation, setSandboxAllocation] = useState(initialSandboxAllocation);
-  const sandboxRepository = existing
-    ? { platform: existing.platform, fullName }
-    : repository
-      ? { platform: repository.platform, fullName }
+  const sandboxRepository = existing?.platform
+    ? { platform: existing.platform, fullName: existing.repoFullName }
+    : repositories[0]
+      ? { platform: repositories[0].platform, fullName: repositoryName(repositories[0]) }
       : undefined;
   const profileQuery = useEnvironmentProfiles({
     organizationId,
     repository: sandboxRepository,
     selectedProfileId,
+    environment: isMultiRepository ? { repositories } : null,
   });
   const [initialScript] = useState(() => toEnvironmentScript(existing?.commands ?? []));
   const [script, setScript] = useState(initialScript);
@@ -147,14 +170,15 @@ function EnvironmentForm({
     formatEnvironmentVariables(savedVariables.plainVars, savedVariables.secretKeys)
   );
   const [variablesText, setVariablesText] = useState(initialVariablesText);
-  const hasUnsavedChanges = hasEnvironmentFormChanges(
-    {
-      script: initialScript,
-      variablesText: initialVariablesText,
-      sandboxAllocation: initialSandboxAllocation,
-    },
-    { script, variablesText, sandboxAllocation }
-  );
+  const hasUnsavedChanges =
+    hasEnvironmentFormChanges(
+      {
+        script: initialScript,
+        variablesText: initialVariablesText,
+        sandboxAllocation: initialSandboxAllocation,
+      },
+      { script, variablesText, sandboxAllocation }
+    ) || repositoriesChanged;
   const [error, setError] = useState<string | null>(null);
   let variables: ReturnType<typeof buildEnvironmentVariableChanges> | undefined;
   let variablesError: string | null = null;
@@ -188,6 +212,7 @@ function EnvironmentForm({
         await updateEnvironment.mutateAsync({
           organizationId,
           environmentId: existing.id,
+          repositories: isMultiRepository && repositoriesChanged ? repositories : undefined,
           plainVars: variables.plainVars,
           secrets: variables.secrets,
           commands,
@@ -195,7 +220,7 @@ function EnvironmentForm({
         });
         onSaved(existing.id);
       } else {
-        if (!repository) {
+        if (repositories.length === 0) {
           setError('Select a repository first.');
           return;
         }
@@ -207,7 +232,7 @@ function EnvironmentForm({
         const created = await createEnvironment.mutateAsync({
           organizationId,
           name,
-          repository,
+          ...(isMultiRepository ? { repositories } : { repository: repositories[0] }),
           plainVars: variables.plainVars,
           secrets,
           commands,
@@ -263,6 +288,13 @@ function EnvironmentForm({
         <fieldset disabled={isSaving || deleteEnvironment.isPending} className="min-w-0 space-y-5">
           {page === 'overview' && (
             <>
+              {isMultiRepository && (
+                <EnvironmentRepositoriesField
+                  organizationId={organizationId}
+                  repositories={repositories}
+                  onChange={setRepositories}
+                />
+              )}
               {sandboxRepository && (
                 <EnvironmentSandboxField
                   organizationId={organizationId}
@@ -270,6 +302,7 @@ function EnvironmentForm({
                   value={sandboxAllocation}
                   disabled={isSaving}
                   onChange={setSandboxAllocation}
+                  isAllowed={isMultiRepository ? allocationSupportsMultiRepository : undefined}
                 />
               )}
               <div className="space-y-3">
@@ -389,6 +422,7 @@ function EnvironmentForm({
             disabled={
               isSaving ||
               deleteEnvironment.isPending ||
+              kindPending ||
               profileQuery.isLoading ||
               profileQuery.isError
             }

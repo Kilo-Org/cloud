@@ -22,7 +22,7 @@ import {
   getInstructionsForSession,
   type InstructionForSession,
 } from './profile-instructions-service';
-import { resolveProfileLayers } from './profile-resolution';
+import { appliesImplicitProfiles, resolveProfileLayers } from './profile-resolution';
 import { buildOwnershipCondition } from './profile-utils';
 import { encryptedEnvelopeSchema, type EnvironmentSessionLayer } from './environment-contracts';
 import type { ProfileOwner } from './types';
@@ -354,10 +354,15 @@ export async function mergeProfileConfiguration(
   args: MergeProfileConfigurationArgs
 ): Promise<MergeProfileConfigurationResult> {
   const { profileId, owner, userId, repoFullName, platform } = args;
+  // A V2 environment applies only an explicitly selected profile; the repository
+  // binding and the implicit default are not resolved.
+  const resolvesImplicitProfiles = appliesImplicitProfiles(args.environment);
 
   // Look up the inputs to resolution.
   const repoBindingProfileId =
-    repoFullName && platform ? await getBindingForRepo(db, owner, repoFullName, platform) : null;
+    resolvesImplicitProfiles && repoFullName && platform
+      ? await getBindingForRepo(db, owner, repoFullName, platform)
+      : null;
 
   let explicitOverrideProfileId: string | null = null;
   if (profileId) {
@@ -369,9 +374,11 @@ export async function mergeProfileConfiguration(
   // repo binding is also present, in which case the default layers on top.
   const effectiveDefaultProfileId = explicitOverrideProfileId
     ? null
-    : owner.type === 'organization' && userId
-      ? await getEffectiveDefaultProfileId(db, userId, owner.id)
-      : ((await getDefaultProfile(db, owner))?.id ?? null);
+    : !resolvesImplicitProfiles
+      ? null
+      : owner.type === 'organization' && userId
+        ? await getEffectiveDefaultProfileId(db, userId, owner.id)
+        : ((await getDefaultProfile(db, owner))?.id ?? null);
 
   const { base, top } = resolveProfileLayers({
     repoBindingProfileId,

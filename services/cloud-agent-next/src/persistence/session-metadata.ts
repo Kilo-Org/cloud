@@ -310,6 +310,13 @@ const MetadataWorkspaceSchema = egressPolicySchema
     workspacePath: z.string().optional(),
     sessionHome: z.string().optional(),
     branchName: z.string().optional(),
+    /**
+     * The generated `kilo/<slug>` branch of a session on a V2 environment. The
+     * launch repository can run on `repository.branch` instead, so `branchName`
+     * is not always this value. A repository of the environment without a
+     * requested branch uses it.
+     */
+    generatedBranchName: branchNameSchema.optional(),
     shallow: z.boolean().optional(),
     credentialContainment: CredentialContainmentSchema.optional(),
     managedScmContainment: z.boolean().optional(),

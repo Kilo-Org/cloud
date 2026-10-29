@@ -1,7 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useState } from 'react';
 import {
   Boxes,
   GitBranch,
@@ -43,15 +42,20 @@ import {
   CommandItem,
   CommandList,
 } from '@/components/ui/command';
-import { useTRPC } from '@/lib/trpc/utils';
 import {
+  useEnvironmentRepositoryChoices,
+  type EnvironmentRepositoryChoice,
+} from '@/hooks/useEnvironmentRepositoryChoices';
+import {
+  environmentMembers,
   useCloudAgentEnvironmentMutations,
   useCloudAgentEnvironmentsForOwner,
+  useMultiRepositoryEnvironmentsEnabled,
   useEnvironmentBuildStatus,
   type EnvironmentRepository,
   type EnvironmentSummary,
 } from '@/hooks/useCloudAgentEnvironments';
-import { findRepositoryEnvironment, formatEnvironmentCounts } from '../environment-display';
+import { findRepositoryEnvironments, formatEnvironmentCounts } from '../environment-display';
 import { EnvironmentDialog } from '../EnvironmentDialog';
 import { useEnvironmentBuildControl } from '../EnvironmentBuildPanel';
 import { buildAction, snapshotBadge } from '../environment-build-display';
@@ -61,14 +65,7 @@ type EnvironmentsSectionProps = {
   canManage: boolean;
 };
 
-type RepoChoice = {
-  platform: 'github' | 'gitlab' | 'bitbucket';
-  label: string;
-  repository: EnvironmentRepository;
-};
-
 export function EnvironmentsSection({ organizationId, canManage }: EnvironmentsSectionProps) {
-  const trpc = useTRPC();
   const query = useCloudAgentEnvironmentsForOwner({ organizationId });
   const { deleteEnvironment } = useCloudAgentEnvironmentMutations();
 
@@ -78,59 +75,12 @@ export function EnvironmentsSection({ organizationId, canManage }: EnvironmentsS
   const [dialogRepository, setDialogRepository] = useState<EnvironmentRepository | undefined>();
   const [pendingDelete, setPendingDelete] = useState<EnvironmentSummary | null>(null);
 
-  const { data: githubRepoData } = useQuery(
-    organizationId
-      ? trpc.organizations.cloudAgentNext.listGitHubRepositories.queryOptions({
-          organizationId,
-          forceRefresh: false,
-        })
-      : trpc.cloudAgentNext.listGitHubRepositories.queryOptions({ forceRefresh: false })
-  );
-  const { data: gitlabRepoData } = useQuery(
-    organizationId
-      ? trpc.organizations.cloudAgentNext.listGitLabRepositories.queryOptions({
-          organizationId,
-          forceRefresh: false,
-        })
-      : trpc.cloudAgentNext.listGitLabRepositories.queryOptions({ forceRefresh: false })
-  );
-  const { data: bitbucketRepoData } = useQuery({
-    ...trpc.organizations.cloudAgentNext.listBitbucketRepositories.queryOptions({
-      organizationId: organizationId ?? '',
-      forceRefresh: false,
-    }),
-    enabled: !!organizationId,
-  });
-
-  const repoChoices = useMemo<RepoChoice[]>(() => {
-    const github = (githubRepoData?.repositories ?? []).map(repo => ({
-      platform: 'github' as const,
-      label: repo.fullName,
-      repository: { platform: 'github' as const, fullName: repo.fullName },
-    }));
-    const gitlab = (gitlabRepoData?.repositories ?? []).map(repo => ({
-      platform: 'gitlab' as const,
-      label: repo.fullName,
-      repository: { platform: 'gitlab' as const, projectPath: repo.fullName },
-    }));
-    const bitbucket = (
-      bitbucketRepoData?.status === 'available' ? bitbucketRepoData.repositories : []
-    ).map(repo => ({
-      platform: 'bitbucket' as const,
-      label: repo.fullName,
-      repository: {
-        platform: 'bitbucket' as const,
-        fullName: repo.fullName,
-        workspaceUuid: repo.workspaceUuid,
-        repositoryUuid: String(repo.id),
-      },
-    }));
-    return [...github, ...gitlab, ...bitbucket];
-  }, [githubRepoData, gitlabRepoData, bitbucketRepoData]);
+  const repoChoices = useEnvironmentRepositoryChoices(organizationId);
+  const { enabled: multiRepositoryEnabled } = useMultiRepositoryEnvironmentsEnabled(organizationId);
 
   const environments = query.data ?? [];
 
-  const openCreate = (choice: RepoChoice) => {
+  const openCreate = (choice: EnvironmentRepositoryChoice) => {
     setDialogEnvironmentId(null);
     setDialogRepository(choice.repository);
     setPickerOpen(false);
@@ -161,8 +111,9 @@ export function EnvironmentsSection({ organizationId, canManage }: EnvironmentsS
         <div>
           <h3 className="text-sm font-medium">Environments</h3>
           <p className="text-muted-foreground text-xs">
-            Each repository can have one environment: setup commands, variables, secrets, and a
-            sandbox size. New sessions in the repository use it automatically.
+            Setup commands, variables, secrets, and a sandbox size for a repository
+            {multiRepositoryEnabled ? ' or a group of repositories' : ''}. New sessions use the
+            environment that contains their repository. When several do, you choose one.
           </p>
         </div>
         {canManage && (
@@ -193,11 +144,14 @@ export function EnvironmentsSection({ organizationId, canManage }: EnvironmentsS
                         }
                       >
                         {choices.map(choice => {
-                          // A repository has one environment, so choosing it again edits it.
-                          const existing = findRepositoryEnvironment(
-                            environments,
-                            choice.repository
-                          );
+                          // A single-repository environment is the repository's only one, so
+                          // choosing it again edits it. With multi-repository environments on,
+                          // choosing a repository starts a new environment.
+                          const existing = multiRepositoryEnabled
+                            ? undefined
+                            : findRepositoryEnvironments(environments, choice.repository).find(
+                                environment => environment.repositories === undefined
+                              );
                           return (
                             <CommandItem
                               key={`${platform}:${choice.label}`}
@@ -317,6 +271,9 @@ function EnvironmentRow({
   const meta = formatEnvironmentCounts(environment);
   const { data: buildStatus } = useEnvironmentBuildStatus(environment.id, { organizationId });
   const badge = snapshotBadge(buildStatus, Date.now());
+  const members = environmentMembers(environment);
+  const primary = members[0];
+  const repositoryList = members.map(member => member.repoFullName).join(', ');
   return (
     <div className="flex items-start gap-2 rounded-lg border px-3 py-2.5">
       <Boxes className="text-muted-foreground mt-0.5 h-4 w-4 shrink-0" />
@@ -326,16 +283,21 @@ function EnvironmentRow({
             {environment.name}
           </span>
           <Badge variant="secondary" className="shrink-0 text-[10px]">
-            {platformLabel(environment.platform)}
+            {platformLabel(primary?.platform ?? 'github')}
           </Badge>
+          {members.length > 1 && (
+            <Badge variant="outline" className="shrink-0 text-[10px]">
+              {members.length} repos
+            </Badge>
+          )}
           {badge && (
             <Badge variant="outline" className="shrink-0 text-[10px]">
               {badge}
             </Badge>
           )}
         </div>
-        <p className="text-muted-foreground truncate text-xs" title={environment.repoFullName}>
-          {environment.repoFullName}
+        <p className="text-muted-foreground truncate text-xs" title={repositoryList}>
+          {repositoryList}
         </p>
         {meta && <p className="text-muted-foreground text-xs">{meta}</p>}
       </div>
@@ -422,6 +384,6 @@ function repositoryLabel(repository: EnvironmentRepository): string {
   return repository.platform === 'gitlab' ? repository.projectPath : repository.fullName;
 }
 
-function platformLabel(platform: EnvironmentSummary['platform']): string {
+function platformLabel(platform: 'github' | 'gitlab' | 'bitbucket'): string {
   return platform === 'gitlab' ? 'GL' : platform === 'bitbucket' ? 'BB' : 'GH';
 }

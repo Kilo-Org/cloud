@@ -1,6 +1,9 @@
 import { env, reset, runInDurableObject } from 'cloudflare:test';
 import { afterEach, describe, expect, it } from 'vitest';
-import type { EnvironmentReference } from '@kilocode/cloud-agent-profile';
+import type {
+  EnvironmentReference,
+  EnvironmentReferenceRepository,
+} from '@kilocode/cloud-agent-profile';
 import {
   EnvironmentBuildCoordinator,
   type CoordinatorDeps,
@@ -27,6 +30,8 @@ type Harness = {
   environmentId: string;
   stub: DurableObjectStub<EnvironmentBuild>;
   environment: { revision: number; deleted: boolean; access: 'manage' | 'read' | 'none' };
+  /** The repositories of a multi-repository environment; null for a one-repository one. */
+  repositories: EnvironmentReferenceRepository[] | null;
   launches: Array<{ allocation: BuilderAllocation; runner: { url: string; credential: string } }>;
   captures: Array<{ captureId: string }>;
   snapshotsTaken: Map<string, number>;
@@ -42,12 +47,23 @@ type Harness = {
   snapshotOrgIds: string;
 };
 
+/** The profile package's reference, the shape `readEnvironmentReference` returns. */
 function reference(harness: Harness): EnvironmentReference {
-  return {
+  const base = {
     environmentId: harness.environmentId,
     owner: OWNER,
     configurationRevision: harness.environment.revision,
-    repository: REPOSITORY,
+  };
+  return harness.repositories === null
+    ? { ...base, repository: REPOSITORY }
+    : { ...base, repositories: harness.repositories };
+}
+
+function referenceRepository(repoFullName: string): EnvironmentReferenceRepository {
+  return {
+    identity: { platform: 'github', repoFullName },
+    repoFullName,
+    leaf: repoFullName.split('/')[1] ?? repoFullName,
   };
 }
 
@@ -59,6 +75,7 @@ async function setup(): Promise<Harness> {
     environmentId,
     stub,
     environment: { revision: 1, deleted: false, access: 'manage' },
+    repositories: null,
     launches: [],
     captures: [],
     snapshotsTaken: new Map(),
@@ -122,7 +139,9 @@ async function setup(): Promise<Harness> {
             ? null
             : {
                 reference: reference(harness),
-                repoFullName: 'acme/widgets',
+                ...(harness.repositories === null
+                  ? { repoFullName: 'acme/widgets' }
+                  : { repositories: harness.repositories }),
                 commands: ['pnpm install'],
                 plainVars: { PLAIN: 'value' },
                 encryptedSecrets: {
@@ -488,6 +507,109 @@ describe('environment build lifecycle', () => {
     });
     expect(after.published).toBeNull();
     expect(harness.stops).toHaveLength(1);
+  });
+
+  describe('multi-repository environment', () => {
+    const members = [referenceRepository('acme/api'), referenceRepository('acme/web')];
+
+    it('admits a queued build whose environment reference carries repositories', async () => {
+      const harness = await setup();
+      harness.repositories = members;
+      const accepted = await manualBuild(harness);
+      if (accepted.status !== 'accepted') throw new Error('not accepted');
+      await tick(harness);
+
+      expect(harness.launches).toHaveLength(1);
+      const { activeBuild } = await status(harness);
+      expect(activeBuild).toMatchObject({ buildId: accepted.buildId, state: 'preparing' });
+    });
+
+    it.each([
+      ['one repository', ['acme/api'], '/workspace/api', ['/workspace/api']],
+      [
+        'several repositories',
+        ['acme/api', 'acme/web'],
+        '/workspace',
+        ['/workspace/api', '/workspace/web'],
+      ],
+    ])(
+      'builds %s at the layout a session has, publishes one commit each and restores it',
+      async (_label, names, cwd, directories) => {
+        const harness = await setup();
+        harness.repositories = names.map(referenceRepository);
+        const { buildId, auth } = await readyBuild(harness);
+
+        const input = await harness.stub.runnerInput(auth);
+        expect(input).toMatchObject({
+          directory: cwd,
+          members: directories.map((directory, index) => ({
+            directory,
+            repoFullName: names[index],
+          })),
+        });
+        expect(input).not.toHaveProperty('git');
+
+        const commits = names.map((_name, index) => String(index + 1).repeat(40));
+        await harness.stub.runnerResult(auth, {
+          outcome: 'ready',
+          members: {
+            members: names.map((repoFullName, index) => ({
+              repoFullName,
+              commit: commits[index] ?? '',
+              branch: 'main',
+            })),
+          },
+          setupDurationMs: 1,
+        });
+        await drive(harness);
+
+        const done = await status(harness);
+        expect(done.latestBuild).toMatchObject({
+          buildId,
+          state: 'succeeded',
+          sourceCommit: null,
+          sourceBranch: null,
+        });
+        expect(done.published).toMatchObject({
+          buildId,
+          sourceCommit: null,
+          sourceBranch: null,
+          repositories: names.map((repoFullName, index) => ({
+            repoFullName,
+            commit: commits[index],
+          })),
+        });
+        const session = {
+          environmentId: harness.environmentId,
+          owner: OWNER,
+          configurationRevision: harness.environment.revision,
+          repositories: harness.repositories.map(repository => ({
+            ...repository,
+            branch: 'kilo/session',
+          })),
+        };
+        expect(
+          (await harness.stub.resolveSnapshot({ reference: session, actorUserId: 'user-1' }))
+            .snapshot
+        ).toMatchObject({ buildId });
+      }
+    );
+
+    it('makes a queued build obsolete when a repository is removed', async () => {
+      const harness = await setup();
+      harness.repositories = members;
+      const accepted = await manualBuild(harness);
+      if (accepted.status !== 'accepted') throw new Error('not accepted');
+      harness.repositories = members.slice(0, 1);
+      await tick(harness);
+
+      expect(harness.launches).toHaveLength(0);
+      expect((await status(harness)).latestBuild).toMatchObject({
+        buildId: accepted.buildId,
+        state: 'obsolete',
+        failureReason: 'configuration_changed',
+      });
+    });
   });
 
   it('stops a build when the environment is deleted and refuses new admission', async () => {

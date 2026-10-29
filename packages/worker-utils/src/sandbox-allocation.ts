@@ -202,6 +202,17 @@ export function getSandboxAllocationProvider(allocation: SandboxAllocation) {
 }
 
 /**
+ * A multi-repository environment keeps every repository in one workspace, so it
+ * needs a sandbox that one session owns. The shared Cloudflare sandbox and Vercel
+ * cannot give it one.
+ */
+export function allocationSupportsMultiRepository(allocation: SandboxAllocation): boolean {
+  return (
+    allocation !== 'cloudflare-shared' && getSandboxAllocationProvider(allocation) !== 'vercel'
+  );
+}
+
+/**
  * Vercel and DO-managed Cloudflare containers exist only on the control plane, so
  * their allocations force a control-plane session. Cloudflare allocations pick the
  * sandbox shape only and leave the plane decision to the session origin.

@@ -253,8 +253,19 @@ function BuildStatusDetail({
               {published.stale !== null && <Badge variant="secondary">Stale</Badge>}
             </p>
             <p className="text-muted-foreground break-all">
-              <span className="font-mono">{published.sourceBranch}</span> ·{' '}
-              <span className="font-mono">{published.sourceCommit.slice(0, 8)}</span>
+              {published.repositories !== undefined ? (
+                published.repositories.map(repository => (
+                  <span key={repository.repoFullName} className="block">
+                    <span className="font-mono">{repository.repoFullName}</span> ·{' '}
+                    <span className="font-mono">{repository.commit.slice(0, 8)}</span>
+                  </span>
+                ))
+              ) : (
+                <>
+                  <span className="font-mono">{published.sourceBranch}</span> ·{' '}
+                  <span className="font-mono">{published.sourceCommit?.slice(0, 8)}</span>
+                </>
+              )}
             </p>
           </div>
           <Popover>

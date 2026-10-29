@@ -12,6 +12,7 @@ import { SYSTEM_GIT_CONFIG_ENV } from '../../../src/shared/runtime-environment.j
 import { CONTROL_PLANE_SETUP_EVENTS } from '../../../src/shared/control-plane-protocol.js';
 import type {
   EnvironmentBuildEvents,
+  EnvironmentBuildGit,
   EnvironmentBuildInput,
 } from '../../../src/shared/environment-build-protocol.js';
 import { createRepositoryPreparation } from '../control-plane/repository-preparation.js';
@@ -62,7 +63,9 @@ afterEach(async () => {
   await fs.rm(root, { recursive: true, force: true });
 });
 
-function buildInput(overrides: Partial<EnvironmentBuildInput> = {}): EnvironmentBuildInput {
+type SingleBuildInput = Extract<EnvironmentBuildInput, { git: EnvironmentBuildGit }>;
+
+function buildInput(overrides: Partial<SingleBuildInput> = {}): SingleBuildInput {
   return {
     environmentId: '11111111-1111-4111-8111-111111111111',
     buildId: '22222222-2222-4222-8222-222222222222',
@@ -77,10 +80,57 @@ function buildInput(overrides: Partial<EnvironmentBuildInput> = {}): Environment
   };
 }
 
+/** The protocol fixes every path under `/workspace`; tests run the same layout under a temp root. */
+function underTempRoot(input: EnvironmentBuildInput): EnvironmentBuildInput {
+  const move = (value: string): string => path.join(root, value);
+  const moved = { ...input, directory: move(input.directory) };
+  return (
+    input.members === undefined
+      ? moved
+      : {
+          ...moved,
+          members: input.members.map(member => ({ ...member, directory: move(member.directory) })),
+        }
+  ) as EnvironmentBuildInput;
+}
+
+/** Two repositories with one commit each; the first is `origin`. */
+async function secondOrigin(): Promise<{ url: string; tip: string }> {
+  const bare = path.join(root, 'origin-two.git');
+  const author = path.join(root, 'author-two');
+  execFileSync('git', ['init', '-q', '--bare', '-b', 'main', bare], { env: GIT_ENV });
+  execFileSync('git', ['clone', '-q', bare, author], { env: GIT_ENV, stdio: 'ignore' });
+  await fs.writeFile(path.join(author, 'README'), 'two');
+  gitIn(author, 'add', 'README');
+  gitIn(author, 'commit', '-q', '-m', 'first');
+  gitIn(author, 'push', '-q', 'origin', 'HEAD:main');
+  return { url: pathToFileURL(bare).toString(), tip: gitIn(author, 'rev-parse', 'HEAD') };
+}
+
+function v2Input(
+  directory: string,
+  members: Array<{ url: string; directory: string; repoFullName: string; token?: string }>,
+  commands: string[] = []
+): EnvironmentBuildInput {
+  return environmentBuildInputSchema.parse({
+    environmentId: '11111111-1111-4111-8111-111111111111',
+    buildId: '22222222-2222-4222-8222-222222222222',
+    allocationId: '33333333-3333-4333-8333-333333333333',
+    members,
+    directory,
+    commands,
+    env: {},
+    secretKeys: [],
+    deadlineAt: Date.now() + 60_000,
+  });
+}
+
 function harness(
   options: {
     cleanup?: typeof removeBuildCredentials;
     onClone?: (home: string) => Promise<void>;
+    /** Real HTTPS remote URL to the local repository that stands in for it. */
+    remotes?: Record<string, string>;
   } = {}
 ) {
   const lines: string[] = [];
@@ -105,22 +155,32 @@ function harness(
       ),
     log: () => undefined,
   });
-  const runRepository = options.onClone
+  const runRepository = options.remotes
     ? {
         ...repository,
-        cloneRepository: async (cloneInput: Parameters<typeof repository.cloneRepository>[0]) => {
-          await options.onClone?.(directoryHome(directory, homeRoot));
+        cloneRepository: (cloneInput: Parameters<typeof repository.cloneRepository>[0]) => {
+          const remote = cloneInput.git;
           return repository.cloneRepository({
             ...cloneInput,
-            git: { ...cloneInput.git, url: pathToFileURL(origin).toString() },
+            git: remote && { ...remote, url: options.remotes?.[remote.url] ?? remote.url },
           });
         },
       }
-    : repository;
+    : options.onClone
+      ? {
+          ...repository,
+          cloneRepository: async (cloneInput: Parameters<typeof repository.cloneRepository>[0]) => {
+            await options.onClone?.(directoryHome(directory, homeRoot));
+            return repository.cloneRepository({
+              ...cloneInput,
+              git: { ...cloneInput.git, url: pathToFileURL(origin).toString() },
+            });
+          },
+        }
+      : repository;
   const run = (input: EnvironmentBuildInput, signal = new AbortController().signal) =>
     runEnvironmentBuild({
-      // The workspace path is fixed in the protocol; tests run it under a temp root.
-      input: { ...input, directory } as EnvironmentBuildInput,
+      input: underTempRoot(input),
       reporter: { setStep: step => steps.push(step), line: line => lines.push(line) },
       repository: runRepository,
       runGit: (args, opts) => git(args, opts),
@@ -180,6 +240,129 @@ describe('environment build run', () => {
     expect(h.lines.join('\n')).not.toContain('secret-canary-value');
     expect(h.lines).toContain('token is [REDACTED]');
     expect(h.lines).toContain(`Default branch main at ${tip}`);
+  });
+
+  it('clones every repository of a V2 build, runs setup once at the cwd and stamps each root', async () => {
+    const second = await secondOrigin();
+    const input = v2Input(
+      '/workspace',
+      [
+        {
+          url: pathToFileURL(origin).toString(),
+          directory: '/workspace/one',
+          repoFullName: 'acme/one',
+        },
+        { url: second.url, directory: '/workspace/two', repoFullName: 'acme/two' },
+      ],
+      ['pwd > parent-pwd.txt']
+    );
+
+    const h = harness();
+    const result = await h.run(input);
+
+    expect(result).toEqual({
+      outcome: 'ready',
+      members: {
+        members: [
+          { repoFullName: 'acme/one', commit: tip, branch: 'main' },
+          { repoFullName: 'acme/two', commit: second.tip, branch: 'main' },
+        ],
+      },
+      setupDurationMs: expect.any(Number),
+    });
+    const cwd = path.join(root, 'workspace');
+    expect(await fs.readFile(path.join(cwd, 'parent-pwd.txt'), 'utf8')).toBe(`${cwd}\n`);
+    for (const [leaf, commit, readme] of [
+      ['one', tip, 'one'],
+      ['two', second.tip, 'two'],
+    ] as const) {
+      const child = path.join(cwd, leaf);
+      expect(await fs.readFile(path.join(child, 'README'), 'utf8')).toBe(readme);
+      expect(await readWorkspaceStamp(child, true)).toEqual({
+        allocationId: '33333333-3333-4333-8333-333333333333',
+        commit,
+      });
+    }
+    // The cwd of several repositories is not a git root and is never stamped.
+    expect(await readWorkspaceStamp(cwd, true)).toBeNull();
+  });
+
+  it('builds a one-repository V2 environment at /workspace/<leaf>, the cwd and home a session has', async () => {
+    const input = v2Input(
+      '/workspace/widgets',
+      [
+        {
+          url: pathToFileURL(origin).toString(),
+          directory: '/workspace/widgets',
+          repoFullName: 'acme/widgets',
+        },
+      ],
+      ['pwd > pwd.txt && echo "$XDG_CACHE_HOME" > cache.txt']
+    );
+    const cwd = path.join(root, 'workspace', 'widgets');
+
+    const result = await harness().run(input);
+
+    expect(result).toMatchObject({
+      outcome: 'ready',
+      members: { members: [{ repoFullName: 'acme/widgets', commit: tip, branch: 'main' }] },
+    });
+    expect(await fs.readFile(path.join(cwd, 'pwd.txt'), 'utf8')).toBe(`${cwd}\n`);
+    expect(await fs.readFile(path.join(cwd, 'cache.txt'), 'utf8')).toBe(
+      `${path.join(directoryHome(cwd, homeRoot), '.cache')}\n`
+    );
+    expect(await readWorkspaceStamp(cwd, true)).toEqual({
+      allocationId: '33333333-3333-4333-8333-333333333333',
+      commit: tip,
+    });
+  });
+
+  it('removes every repository token from every root, and a token that remains fails the build', async () => {
+    const second = await secondOrigin();
+    const tokens = ['gho_firstbuildtokencanary12345', 'gho_secondbuildtokencanary6789'];
+    const members = (commands: string[]) =>
+      v2Input(
+        '/workspace',
+        [
+          {
+            url: 'https://github.com/acme/one.git',
+            directory: '/workspace/one',
+            repoFullName: 'acme/one',
+            token: tokens[0],
+          },
+          {
+            url: 'https://github.com/acme/two.git',
+            directory: '/workspace/two',
+            repoFullName: 'acme/two',
+            token: tokens[1],
+          },
+        ],
+        commands
+      );
+    const cwd = path.join(root, 'workspace');
+    const remotes = {
+      'https://github.com/acme/one.git': pathToFileURL(origin).toString(),
+      'https://github.com/acme/two.git': second.url,
+    };
+    const metadata = ['one', 'two'].map(leaf => path.join(cwd, leaf, '.git', 'config'));
+
+    expect((await harness({ remotes }).run(members([]))).outcome).toBe('ready');
+    for (const file of metadata) {
+      const text = await fs.readFile(file, 'utf8');
+      for (const token of tokens) expect(text).not.toContain(token);
+    }
+
+    await fs.rm(path.join(root, 'workspace'), { recursive: true, force: true });
+    // Setup leaves the first token in the second root, where cleanup must find it.
+    const leaked = members([
+      `git -C two config remote.origin.pushurl https://x:${tokens[0]}@host/two`,
+    ]);
+    expect(await harness({ remotes }).run(leaked)).toEqual({
+      outcome: 'failed',
+      step: 'cleanup',
+      reason: 'cleanup_failed',
+      detail: 'a credential remained in Git metadata',
+    });
   });
 
   it('removes the repository credential before it reports ready', async () => {
@@ -309,6 +492,7 @@ describe('builder setup environment', () => {
       },
       home: '/home/abc',
       directory: '/workspace/app',
+      isV2: false,
     });
 
     expect(env).toEqual({

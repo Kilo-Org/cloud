@@ -29,7 +29,7 @@ const {
   assertKiloModelAvailableMock: vi.fn(),
   getSandboxAllocationCandidatesMock: vi.fn(),
   // Approved origins look up the repository environment; these tests have none.
-  loadEnvironmentForSessionMock: vi.fn().mockResolvedValue(null),
+  loadEnvironmentForSessionMock: vi.fn().mockResolvedValue({ status: 'none' }),
 }));
 
 vi.mock('@kilocode/cloud-agent-profile', async importActual => {

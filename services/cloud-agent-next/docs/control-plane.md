@@ -593,22 +593,35 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
 
 ### Preparation (`session.prepare`, idempotent per session)
 
-The wrapper owns the step timeouts and retries:
+The route `directory` is the working directory (cwd): where Kilo starts and setup runs. The frame's
+optional `roots` list the git roots, one for each repository of a V2 environment
+(`{ directory, repoFullName, git: { url, platform }, branch, branchMode? }`, no credential). Every
+root is the route directory or a path under it. A frame without `roots` (every V1 route, and any
+frame from an older Worker) has one root at `directory`. With one root the cwd is that root. With
+several, the cwd is `/workspace`, which is not itself a git root: it is never emptied, stamped or
+checked out. Setup runs there and can write into it.
+
+The wrapper owns the step timeouts and retries. Clone, checkout, restore and stamp run once for
+each root, in order. The clone and restore bounds are totals for the whole preparation, not for each
+root, so a slow second repository still fails with its own subtype before the Sandbox DO's route
+attempt deadline:
 
 | Step | Bound | Retry |
 |---|---|---|
-| Clone or fetch | 6 min total | Network errors: 3 attempts with backoff |
-| Use a prepared repository (`restore`) | 2 min | Network errors: 3 attempts; any other failure falls back to a clone |
+| Clone or fetch | 6 min total for all roots | Network errors: 3 attempts with backoff |
+| Use a prepared repository (`restore`) | 2 min total for all roots | Network errors: 3 attempts; any other failure falls back to a clone |
 | Checkout, branch restore | In the clone budget | No |
-| Setup commands | Current per-command limits | No; a failure fails preparation |
+| Setup commands | Current per-command limits; once, at the route directory, after every root is in place | No; a failure fails preparation |
 | Kilo runtime start | 2 min | 1 retry |
 | Kilo session: use the one Kilo has on disk; if missing (new sandbox), restore from the snapshot; else create | 2 min | 1 retry |
 
-Each step sends progress. Long steps also send a short, throttled `detail` line within the step
-(git clone and checkout percentages, clone retries, session history loading); the detail is display
-text, not route state. A route already prepared in this process (checkout present, Kilo session
-open) returns `session.ready` at once. A `session.prepare` for a failed route starts fresh,
-including a new Kilo restart budget.
+Each step sends progress. With several roots, the `detail` of a clone, checkout or restore line
+starts with the repository (`acme/web: ...`). A failure is logged with the repository name, while
+the `session.failed` frame keeps its closed step and subtype. Long steps also send a short,
+throttled `detail` line within the step (git clone and checkout percentages, clone retries, session
+history loading); the detail is display text, not route state. A route already prepared in this
+process (checkout present, Kilo session open) returns `session.ready` at once. A `session.prepare`
+for a failed route starts fresh, including a new Kilo restart budget.
 
 Every in-sandbox git process authenticates through the platform's read-only credential helper
 (`scripts/kilo-git-credential`, pinned by `SYSTEM_GIT_CONFIG_ENV`), which reads the per-session
@@ -634,9 +647,10 @@ The options are command arguments, not Git config.
 
 #### Workspace stamp
 
-A prepared workspace carries `.git/kilo-workspace.json` (`{ allocationId, commit }`; beside the
-directory when there is no repository). The reader also accepts the older `capturedAt` and
-`generation` fields. At `session.prepare` the wrapper decides from the filesystem alone:
+Every root of a prepared workspace carries `.git/kilo-workspace.json` (`{ allocationId, commit }`;
+beside the root when there is no repository). The route directory of several roots has none. The
+reader also accepts the older `capturedAt` and `generation` fields. At `session.prepare` the wrapper
+decides from the filesystem alone, for each root:
 
 | Found | Meaning | Work |
 |---|---|---|
@@ -645,7 +659,13 @@ directory when there is no repository). The reader also accepts the older `captu
 | Stamp from this allocation | A sibling session or a wrapper restart | Nothing |
 | Stamp from another allocation | A restored environment snapshot | **Adopt** |
 
-Adopt makes the snapshot equal to a fresh clone, then runs the ordinary steps:
+The workspace is `same` (`session.ready` reports `workspace: 'same'`, with no setup) only when every
+root has a stamp from this allocation. Otherwise a `same` root is left as it is, the others are
+cloned, checked out or adopted, and setup runs once, at the route directory, for the whole
+workspace. The stamps are written after setup, one for each root, so a root cloned before a later failure has
+none and the retry reuses its clone.
+
+Adopt makes each snapshot root equal to a fresh clone, then runs the ordinary steps:
 
 1. Point `origin` at this route's canonical, credential-free URL.
 2. `fetch --prune`, then refresh the remote default branch.
@@ -654,14 +674,16 @@ Adopt makes the snapshot equal to a fresh clone, then runs the ordinary steps:
    `origin/<branch>`.
 5. Check out this route's branch (working branch, explicit branch or review ref) and set the git
    author, as after a clone.
-6. Run the setup commands, then write the stamp.
+6. Run the setup commands once for the workspace, then write the stamp of each root.
 
-Any failure empties the directory and clones. The Kilo session step is unchanged: the builder
-starts no Kilo runtime, so nothing stale shadows the restore from session-ingest. HOME of a
-`worktree` runtime is `/home/<sha256(directory)>`, the same path the builder uses, so caches that
-setup wrote (`~/.cache`, toolchains) are present after restore. An allocation that keeps
-`runtimeIsolation: per-session` keeps its per-session HOME under `$TMPDIR/kilo-worktrees`; the log
-uploader reads both roots. `session.ready` reports
+Any failure empties that root's directory and clones it; the other roots keep their adoption. The
+Kilo session step is unchanged: the builder starts no Kilo runtime, so nothing stale shadows the
+restore from session-ingest. HOME of a `worktree` runtime is `/home/<sha256(directory)>`. The
+builder uses the same path for any environment (`environmentWorkspace` decides it for both, so a
+one-repository V2 build and session both run at `/workspace/<leaf>`), so caches that setup wrote
+(`~/.cache`, toolchains) are present after restore. An
+allocation that keeps `runtimeIsolation: per-session` keeps its per-session HOME under
+`$TMPDIR/kilo-worktrees`; the log uploader reads both roots. `session.ready` reports
 `workspace: 'cloned' | 'same' | 'adopted'`.
 
 Before starting Kilo, materialize the session's profile skills (including companion files) into
@@ -1294,6 +1316,7 @@ failure monitors keep working.
 |---|---|
 | `preparation_timeout` | `pre_dispatch` / `wrapper_start_failed` |
 | `workspace_setup_failed` with the failed step's subtype | `pre_dispatch` / `workspace_setup_failed` |
+| `repository_access_failed` (a repository of a multi-repository environment cannot be issued a credential; the route diagnostic stage `member_credential_failed:<repository>` names it) | `pre_dispatch` / `workspace_setup_failed` |
 | `billing_blocked` (actual compute credit denial) | `pre_dispatch` / `payment_required` |
 | `billing_unavailable` (existing Vercel admission failure) | `pre_dispatch` / `admission_billing_unavailable` |
 | `invalid_configuration` (proven provider configuration failure) | `pre_dispatch` / `sandbox_connect_failed` |

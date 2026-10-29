@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { CONTROL_PLANE_GIT_PLATFORMS } from './control-plane-protocol.js';
+import { ISOLATED_CONTAINER_WORKSPACE_PATH } from './environment-workspace.js';
 
 /**
  * Environment builder <-> Worker protocol (plan "Build admission and
@@ -11,8 +12,8 @@ import { CONTROL_PLANE_GIT_PLATFORMS } from './control-plane-protocol.js';
  * Shared by the wrapper bundle and the Worker, so it imports nothing Worker-only.
  */
 
-/** The fixed isolated workspace a builder prepares; the same path every session uses. */
-export const ENVIRONMENT_BUILD_WORKSPACE = '/workspace/app';
+/** The directory a V1 builder prepares; the same path every V1 session uses. */
+export const ENVIRONMENT_BUILD_WORKSPACE = ISOLATED_CONTAINER_WORKSPACE_PATH;
 
 export const ENVIRONMENT_BUILD_LOG_PATH = '/tmp/kilocode-environment-builder.log';
 
@@ -54,22 +55,75 @@ export const environmentBuildGitSchema = z
     platform: z.enum(CONTROL_PLANE_GIT_PLATFORMS).optional(),
   })
   .strict();
+export type EnvironmentBuildGit = z.infer<typeof environmentBuildGitSchema>;
 
-/** What the builder fetches once it starts. Secrets are decrypted only into this reply. */
-export const environmentBuildInputSchema = z
+/**
+ * One repository of a V2 build: its clone source and the directory it is cloned
+ * to. `environmentWorkspace` decides the directory, as it does for a session.
+ */
+export const environmentBuildMemberSchema = z
   .object({
-    environmentId: z.string().uuid(),
-    buildId: z.string().uuid(),
-    allocationId: z.string().uuid(),
-    git: environmentBuildGitSchema,
-    directory: z.literal(ENVIRONMENT_BUILD_WORKSPACE),
-    commands: z.array(z.string().min(1).max(16_000)).max(20),
-    env: z.record(z.string().min(1).max(128), z.string().max(10_000)),
-    /** Names of the secret entries in `env`, so the builder redacts their values. */
-    secretKeys: z.array(z.string().min(1).max(128)).max(50),
-    deadlineAt: z.number().int().positive(),
+    url: z.string().min(1).max(2048),
+    token: z.string().min(1).max(4096).optional(),
+    platform: z.enum(CONTROL_PLANE_GIT_PLATFORMS).optional(),
+    directory: z.string().regex(/^\/workspace\/[^/]+$/),
+    repoFullName: z.string().min(1).max(500),
   })
   .strict();
+export type EnvironmentBuildMember = z.infer<typeof environmentBuildMemberSchema>;
+
+/** One repository the builder reports: the commit it cloned and its branch. */
+export const environmentBuildMemberPinSchema = z
+  .object({
+    repoFullName: z.string().min(1).max(500),
+    commit: z.string().regex(/^[0-9a-f]{40}$/),
+    branch: z.string().min(1).max(256),
+  })
+  .strict();
+
+/** The commit of each repository of a V2 build, for display only. */
+export const environmentBuildPinGroupSchema = z
+  .object({ members: z.array(environmentBuildMemberPinSchema).min(1) })
+  .strict();
+export type EnvironmentBuildPinGroup = z.infer<typeof environmentBuildPinGroupSchema>;
+
+/**
+ * What the builder fetches once it starts. Secrets are decrypted only into this
+ * reply. A V1 build serves the `git` shape at the isolated directory. A V2 build
+ * serves its `members`, and `directory` is the cwd a session of that environment
+ * would have: `/workspace/<leaf>` for one repository, `/workspace` for several.
+ */
+export const environmentBuildInputSchema = z.union([
+  z
+    .object({
+      environmentId: z.string().uuid(),
+      buildId: z.string().uuid(),
+      allocationId: z.string().uuid(),
+      git: environmentBuildGitSchema,
+      members: z.undefined().optional(),
+      directory: z.literal(ENVIRONMENT_BUILD_WORKSPACE),
+      commands: z.array(z.string().min(1).max(16_000)).max(20),
+      env: z.record(z.string().min(1).max(128), z.string().max(10_000)),
+      /** Names of the secret entries in `env`, so the builder redacts their values. */
+      secretKeys: z.array(z.string().min(1).max(128)).max(50),
+      deadlineAt: z.number().int().positive(),
+    })
+    .strict(),
+  z
+    .object({
+      environmentId: z.string().uuid(),
+      buildId: z.string().uuid(),
+      allocationId: z.string().uuid(),
+      members: z.array(environmentBuildMemberSchema).min(1),
+      git: z.undefined().optional(),
+      directory: z.string().regex(/^\/workspace(\/[^/]+)?$/),
+      commands: z.array(z.string().min(1).max(16_000)).max(20),
+      env: z.record(z.string().min(1).max(128), z.string().max(10_000)),
+      secretKeys: z.array(z.string().min(1).max(128)).max(50),
+      deadlineAt: z.number().int().positive(),
+    })
+    .strict(),
+]);
 export type EnvironmentBuildInput = z.infer<typeof environmentBuildInputSchema>;
 
 /** Steps the builder reports; the coordinator's own states wrap them. */
@@ -107,13 +161,24 @@ export const ENVIRONMENT_BUILD_RUNNER_FAILURES = [
 ] as const;
 export type EnvironmentBuildRunnerFailure = (typeof ENVIRONMENT_BUILD_RUNNER_FAILURES)[number];
 
-export const environmentBuildResultSchema = z.discriminatedUnion('outcome', [
+export const environmentBuildResultSchema = z.union([
   z
     .object({
       outcome: z.literal('ready'),
       /** The exact default-branch commit the workspace was prepared at. */
       commit: z.string().regex(/^[0-9a-f]{40}$/),
       branch: z.string().min(1).max(256),
+      members: z.undefined().optional(),
+      setupDurationMs: z.number().int().nonnegative(),
+    })
+    .strict(),
+  z
+    .object({
+      outcome: z.literal('ready'),
+      /** One entry per repository, reported after every clone and before cleanup. */
+      members: environmentBuildPinGroupSchema,
+      commit: z.undefined().optional(),
+      branch: z.undefined().optional(),
       setupDurationMs: z.number().int().nonnegative(),
     })
     .strict(),

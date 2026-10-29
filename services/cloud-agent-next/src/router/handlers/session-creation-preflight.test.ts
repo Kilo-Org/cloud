@@ -11,6 +11,7 @@ const {
   loadEnvironmentForSessionMock,
   assertKiloModelAvailableMock,
   assertRepositoryAccessMock,
+  assertEnvironmentRepositoriesAccessMock,
   assertOrganizationMembershipMock,
   parentRuntimeTokenMock,
   balanceMock,
@@ -20,6 +21,7 @@ const {
   loadEnvironmentForSessionMock: vi.fn(),
   assertKiloModelAvailableMock: vi.fn(),
   assertRepositoryAccessMock: vi.fn(),
+  assertEnvironmentRepositoriesAccessMock: vi.fn(),
   assertOrganizationMembershipMock: vi.fn(),
   parentRuntimeTokenMock: vi.fn(),
   balanceMock: vi.fn(),
@@ -44,6 +46,7 @@ vi.mock('../../model-validation.js', () => ({
 
 vi.mock('../../session/validate-repository-access.js', () => ({
   assertRepositoryAccessBeforeSessionCreation: assertRepositoryAccessMock,
+  assertEnvironmentRepositoriesAccess: assertEnvironmentRepositoriesAccessMock,
 }));
 
 vi.mock('./organization-membership.js', () => ({
@@ -98,9 +101,10 @@ describe('session creation preflight', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mergeProfileConfigurationMock.mockResolvedValue({});
-    loadEnvironmentForSessionMock.mockResolvedValue(null);
+    loadEnvironmentForSessionMock.mockResolvedValue({ status: 'none' });
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
     assertRepositoryAccessMock.mockResolvedValue(undefined);
+    assertEnvironmentRepositoriesAccessMock.mockResolvedValue(undefined);
     assertOrganizationMembershipMock.mockResolvedValue(undefined);
     parentRuntimeTokenMock.mockResolvedValue('trusted-parent-model-token');
     balanceMock.mockResolvedValue({ success: true });
@@ -442,9 +446,10 @@ describe('session creation preflight', () => {
 
     it('resolves the repository environment on an approved origin and merges it under the profile layers', async () => {
       const layer = { envVars: { FROM_ENV: 'env' }, setupCommands: ['env-command'] };
-      loadEnvironmentForSessionMock.mockResolvedValueOnce(
-        environmentLoad(layer, environmentId, 'cloudflare-containers-standard-4')
-      );
+      loadEnvironmentForSessionMock.mockResolvedValueOnce({
+        status: 'match',
+        environment: environmentLoad(layer, environmentId, 'cloudflare-containers-standard-4'),
+      });
       mergeProfileConfigurationMock.mockResolvedValueOnce({
         envVars: { FROM_ENV: 'env' },
         setupCommands: ['env-command'],
@@ -470,7 +475,10 @@ describe('session creation preflight', () => {
     });
 
     it('omits the allocation when the environment has none', async () => {
-      loadEnvironmentForSessionMock.mockResolvedValueOnce(environmentLoad({}, environmentId));
+      loadEnvironmentForSessionMock.mockResolvedValueOnce({
+        status: 'match',
+        environment: environmentLoad({}, environmentId),
+      });
 
       const resolved = await preflightSessionCreation(
         request({ repository: githubRepository, options: webOptions }),
@@ -538,6 +546,320 @@ describe('session creation preflight', () => {
         expect.objectContaining({ environment: undefined })
       );
       expect(resolved.environment).toBeUndefined();
+    });
+
+    describe('several environments contain the repository', () => {
+      const conflict = {
+        status: 'conflict' as const,
+        environments: [
+          { id: '123e4567-e89b-12d3-a456-426614174001', name: 'Frontend' },
+          { id: '123e4567-e89b-12d3-a456-426614174002', name: 'Full stack' },
+        ],
+      };
+
+      it('fails a start that requires a choice, and names the environments', async () => {
+        loadEnvironmentForSessionMock.mockResolvedValueOnce(conflict);
+
+        const error = await preflightSessionCreation(
+          request({
+            repository: githubRepository,
+            options: webOptions,
+            requireEnvironmentChoice: true,
+          }),
+          context,
+          'prepareSession'
+        ).catch((caught: unknown) => caught);
+
+        expect(error).toMatchObject({ code: 'CONFLICT' });
+        expect((error as Error).message).toContain(
+          '"Frontend" (123e4567-e89b-12d3-a456-426614174001)'
+        );
+        expect((error as Error).message).toContain(
+          '"Full stack" (123e4567-e89b-12d3-a456-426614174002)'
+        );
+        expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
+      });
+
+      it.each([
+        { name: 'a browser web start', options: { ...webOptions, clientProvenance: 'browser' } },
+        { name: 'a mobile web start', options: { ...webOptions, clientProvenance: 'mobile' } },
+        { name: 'a web start without provenance', options: webOptions },
+      ] as const)('resolves no environment for $name without the marker', async ({ options }) => {
+        loadEnvironmentForSessionMock.mockResolvedValueOnce(conflict);
+
+        const resolved = await preflightSessionCreation(
+          request({ repository: githubRepository, options }),
+          context,
+          'prepareSession'
+        );
+
+        expect(resolved.environment).toBeUndefined();
+        expect(mergeProfileConfigurationMock).toHaveBeenCalledWith(
+          db,
+          expect.objectContaining({ environment: undefined })
+        );
+      });
+
+      it.each(['slack', 'github', 'linear', 'discord', 'webhook', 'scheduled'])(
+        'fails a start that requires a choice for the automatic origin %s',
+        async origin => {
+          loadEnvironmentForSessionMock.mockResolvedValueOnce(conflict);
+
+          await expect(
+            preflightSessionCreation(
+              request({
+                repository: githubRepository,
+                options: { createdOnPlatform: origin },
+                requireEnvironmentChoice: true,
+              }),
+              context,
+              'prepareSession'
+            )
+          ).rejects.toMatchObject({ code: 'CONFLICT' });
+          expect(mergeProfileConfigurationMock).not.toHaveBeenCalled();
+        }
+      );
+
+      it('resolves the selected environment, with no conflict, when an id is sent', async () => {
+        loadEnvironmentForSessionMock.mockResolvedValueOnce({
+          status: 'match',
+          environment: environmentLoad({ envVars: { A: '1' } }, environmentId),
+        });
+
+        const resolved = await preflightSessionCreation(
+          request({
+            repository: githubRepository,
+            options: webOptions,
+            requestedEnvironment: { id: environmentId },
+            requireEnvironmentChoice: true,
+          }),
+          context,
+          'prepareSession'
+        );
+
+        expect(loadEnvironmentForSessionMock).toHaveBeenCalledWith(
+          db,
+          expect.objectContaining({ environmentId })
+        );
+        expect(resolved.environment).toMatchObject({ environmentId });
+      });
+
+      it.each(['slack', 'github', 'linear', 'discord', 'webhook', 'scheduled'])(
+        'resolves no environment for the automatic origin %s',
+        async origin => {
+          loadEnvironmentForSessionMock.mockResolvedValueOnce(conflict);
+
+          const resolved = await preflightSessionCreation(
+            request({ repository: githubRepository, options: { createdOnPlatform: origin } }),
+            context,
+            'prepareSession'
+          );
+
+          expect(resolved.environment).toBeUndefined();
+          expect(mergeProfileConfigurationMock).toHaveBeenCalledWith(
+            db,
+            expect.objectContaining({ environment: undefined })
+          );
+        }
+      );
+    });
+
+    it('fails with a specific error when the requested environment is not found', async () => {
+      loadEnvironmentForSessionMock.mockResolvedValueOnce({ status: 'requested-not-found' });
+
+      await expect(
+        preflightSessionCreation(
+          request({
+            repository: githubRepository,
+            options: webOptions,
+            requestedEnvironment: { id: environmentId },
+          }),
+          context,
+          'prepareSession'
+        )
+      ).rejects.toMatchObject({
+        code: 'NOT_FOUND',
+        message: 'The selected environment was not found',
+      });
+    });
+
+    it('fails with a specific error when the requested environment lacks the repository', async () => {
+      loadEnvironmentForSessionMock.mockResolvedValueOnce({
+        status: 'requested-without-repository',
+      });
+
+      await expect(
+        preflightSessionCreation(
+          request({
+            repository: githubRepository,
+            options: webOptions,
+            requestedEnvironment: { id: environmentId },
+          }),
+          context,
+          'prepareSession'
+        )
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: 'The selected environment does not contain this repository',
+      });
+    });
+
+    describe('additional repositories of the selected environment', () => {
+      const repositoryOf = (repoFullName: string) => ({
+        identity: { platform: 'github' as const, repoFullName },
+        repoFullName,
+        leaf: repoFullName.split('/')[1],
+      });
+      const v2Match = {
+        status: 'match' as const,
+        environment: {
+          layer: {},
+          sandboxAllocation: null,
+          reference: {
+            environmentId,
+            owner: { type: 'user' as const, id: 'user-123' },
+            configurationRevision: 3,
+            repositories: [repositoryOf('acme/repo'), repositoryOf('acme/api')],
+          },
+        },
+      };
+      const preflight = (requestedEnvironment: SessionCreateRequest['requestedEnvironment']) =>
+        preflightSessionCreation(
+          request({ repository: githubRepository, options: webOptions, requestedEnvironment }),
+          context,
+          'prepareSession'
+        );
+
+      it('accepts a member that is not the launch repository and keeps the selection', async () => {
+        loadEnvironmentForSessionMock.mockResolvedValueOnce(v2Match);
+        const requestedEnvironment = {
+          id: environmentId,
+          repositories: [{ repoFullName: 'Acme/API', branch: 'feature/api' }],
+        };
+
+        const resolved = await preflight(requestedEnvironment);
+
+        expect(resolved.requestedEnvironment).toEqual(requestedEnvironment);
+        expect(resolved.environment?.repositories?.map(entry => entry.repoFullName)).toEqual([
+          'acme/repo',
+          'acme/api',
+        ]);
+      });
+
+      it('authorizes the members of the resolved environment against the launch repository', async () => {
+        loadEnvironmentForSessionMock.mockResolvedValueOnce(v2Match);
+
+        await preflight(undefined);
+
+        expect(assertEnvironmentRepositoriesAccessMock).toHaveBeenCalledWith(
+          expect.objectContaining({
+            userId: 'user-123',
+            repository: { type: 'github', repo: 'acme/repo' },
+            environment: expect.objectContaining({
+              repositories: [
+                expect.objectContaining({ repoFullName: 'acme/repo' }),
+                expect.objectContaining({ repoFullName: 'acme/api' }),
+              ],
+            }),
+          })
+        );
+      });
+
+      it('fails the start before the endpoint check when a member is not authorized', async () => {
+        loadEnvironmentForSessionMock.mockResolvedValueOnce(v2Match);
+        const endpointValidator = vi.fn();
+        assertEnvironmentRepositoriesAccessMock.mockRejectedValueOnce(
+          new TRPCError({ code: 'BAD_REQUEST', message: 'Repository acme/api: not installed' })
+        );
+
+        await expect(
+          preflightSessionCreation(
+            request({ repository: githubRepository, options: webOptions }),
+            context,
+            'start',
+            endpointValidator
+          )
+        ).rejects.toMatchObject({
+          code: 'BAD_REQUEST',
+          message: expect.stringContaining('acme/api'),
+        });
+
+        expect(endpointValidator).not.toHaveBeenCalled();
+        expect(assertKiloModelAvailableMock).not.toHaveBeenCalled();
+      });
+
+      it('rejects a repository that is not a member and names it', async () => {
+        loadEnvironmentForSessionMock.mockResolvedValueOnce(v2Match);
+
+        await expect(
+          preflight({ id: environmentId, repositories: [{ repoFullName: 'acme/other' }] })
+        ).rejects.toMatchObject({
+          code: 'BAD_REQUEST',
+          message: expect.stringContaining('acme/other'),
+        });
+      });
+
+      it('rejects the launch repository and names it', async () => {
+        loadEnvironmentForSessionMock.mockResolvedValueOnce(v2Match);
+
+        await expect(
+          preflight({ id: environmentId, repositories: [{ repoFullName: 'acme/repo' }] })
+        ).rejects.toMatchObject({
+          code: 'BAD_REQUEST',
+          message: expect.stringContaining('acme/repo'),
+        });
+      });
+
+      it('rejects a repository that is listed twice and names it', async () => {
+        loadEnvironmentForSessionMock.mockResolvedValueOnce(v2Match);
+
+        await expect(
+          preflight({
+            id: environmentId,
+            repositories: [{ repoFullName: 'acme/api' }, { repoFullName: 'ACME/api' }],
+          })
+        ).rejects.toMatchObject({
+          code: 'BAD_REQUEST',
+          message: expect.stringContaining('ACME/api'),
+        });
+      });
+
+      it('rejects an entry for a V1 environment and names the repository', async () => {
+        loadEnvironmentForSessionMock.mockResolvedValueOnce({
+          status: 'match',
+          environment: environmentLoad({}, environmentId),
+        });
+
+        await expect(
+          preflight({ id: environmentId, repositories: [{ repoFullName: 'acme/api' }] })
+        ).rejects.toMatchObject({
+          code: 'BAD_REQUEST',
+          message: expect.stringContaining('acme/api'),
+        });
+      });
+
+      it('rejects an entry when no environment resolved and names the repository', async () => {
+        await expect(
+          preflight({ id: environmentId, repositories: [{ repoFullName: 'acme/api' }] })
+        ).rejects.toMatchObject({
+          code: 'BAD_REQUEST',
+          message: expect.stringContaining('acme/api'),
+        });
+      });
+
+      it('accepts a selection with no additional repositories for either environment kind', async () => {
+        loadEnvironmentForSessionMock.mockResolvedValueOnce(v2Match);
+        await expect(preflight({ id: environmentId })).resolves.toMatchObject({
+          environment: { environmentId },
+        });
+        loadEnvironmentForSessionMock.mockResolvedValueOnce({
+          status: 'match',
+          environment: environmentLoad({}, environmentId),
+        });
+        await expect(preflight({ id: environmentId, repositories: [] })).resolves.toMatchObject({
+          environment: { environmentId },
+        });
+      });
     });
 
     it('looks up an organization launch under the organization owner', async () => {
@@ -631,9 +953,10 @@ describe('session creation preflight', () => {
 
     it('rejects an over-limit merged plaintext value with a fixed message and no value', async () => {
       const longValue = 'x'.repeat(300);
-      loadEnvironmentForSessionMock.mockResolvedValueOnce(
-        environmentLoad({ envVars: { LONG_PLAINTEXT: longValue } }, environmentId)
-      );
+      loadEnvironmentForSessionMock.mockResolvedValueOnce({
+        status: 'match',
+        environment: environmentLoad({ envVars: { LONG_PLAINTEXT: longValue } }, environmentId),
+      });
       mergeProfileConfigurationMock.mockResolvedValueOnce({
         envVars: { LONG_PLAINTEXT: longValue },
       });
@@ -653,9 +976,10 @@ describe('session creation preflight', () => {
 
     it('rejects more than 20 concatenated setup commands', async () => {
       const setupCommands = Array.from({ length: 21 }, (_, index) => `command ${index}`);
-      loadEnvironmentForSessionMock.mockResolvedValueOnce(
-        environmentLoad({ setupCommands }, environmentId)
-      );
+      loadEnvironmentForSessionMock.mockResolvedValueOnce({
+        status: 'match',
+        environment: environmentLoad({ setupCommands }, environmentId),
+      });
       mergeProfileConfigurationMock.mockResolvedValueOnce({ setupCommands });
 
       await expect(

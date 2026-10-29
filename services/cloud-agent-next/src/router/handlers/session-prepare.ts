@@ -158,6 +158,8 @@ export function prepareInputToSessionCreateRequest(input: PrepareInput): Session
       condenseOnComplete: input.condenseOnComplete,
       gateThreshold: input.gateThreshold,
     },
+    ...(input.requestedEnvironment ? { requestedEnvironment: input.requestedEnvironment } : {}),
+    ...(input.requireEnvironmentChoice ? { requireEnvironmentChoice: true as const } : {}),
     options: {
       callbackTarget: input.callbackTarget,
       kilocodeOrganizationId: input.kilocodeOrganizationId,

@@ -701,7 +701,7 @@ describe('database schema', () => {
   });
 
   describe('cloud agent repository environments', () => {
-    it('enforces ownership XOR and platform identity consistency', async () => {
+    it('enforces ownership XOR and V1 platform identity consistency', async () => {
       const userId = `schema-env-${crypto.randomUUID()}`;
       await schemaTestDb.db.insert(schema.kilocode_users).values({
         id: userId,
@@ -751,7 +751,7 @@ describe('database schema', () => {
               (${userId}, 'bad-platform', 'gitea', 'acme/widgets', 'https://gitlab.com/group/project.git', ${workspaceUuid}::uuid)
           `)
         ).rejects.toMatchObject({
-          cause: { constraint: 'cloud_agent_environments_platform_check' },
+          cause: { constraint: 'cloud_agent_environments_identity_check' },
         });
 
         await expect(
@@ -763,7 +763,7 @@ describe('database schema', () => {
             gitlab_clone_url: 'https://gitlab.com/group/project.git',
           })
         ).rejects.toMatchObject({
-          cause: { constraint: 'cloud_agent_environments_github_identity_check' },
+          cause: { constraint: 'cloud_agent_environments_identity_check' },
         });
 
         await expect(
@@ -772,12 +772,9 @@ describe('database schema', () => {
             name: 'gitlab-without-url',
             platform: 'gitlab',
             repo_full_name: 'group/project',
-            // A non-null identity keeps the GitHub check satisfied, so the
-            // GitLab check is the one that rejects this row.
-            bitbucket_workspace_uuid: workspaceUuid,
           })
         ).rejects.toMatchObject({
-          cause: { constraint: 'cloud_agent_environments_gitlab_identity_check' },
+          cause: { constraint: 'cloud_agent_environments_identity_check' },
         });
 
         await expect(
@@ -789,8 +786,80 @@ describe('database schema', () => {
             bitbucket_workspace_uuid: workspaceUuid,
           })
         ).rejects.toMatchObject({
-          cause: { constraint: 'cloud_agent_environments_bitbucket_identity_check' },
+          cause: { constraint: 'cloud_agent_environments_identity_check' },
         });
+
+        // V1 rows with exactly one column that breaks the rule. Each term of the
+        // V1 alternative needs its own case, because removing a single term must
+        // fail a test. `repo_full_name` is nullable only for V2 rows.
+        const gitlabUrl = 'https://gitlab.com/group/project.git';
+        const brokenV1Rows = [
+          ['github-no-repo-name', { platform: 'github' }],
+          [
+            'github-workspace-uuid',
+            {
+              platform: 'github',
+              repo_full_name: 'acme/widgets',
+              bitbucket_workspace_uuid: workspaceUuid,
+            },
+          ],
+          [
+            'github-repository-uuid',
+            {
+              platform: 'github',
+              repo_full_name: 'acme/widgets',
+              bitbucket_repository_uuid: repositoryUuid,
+            },
+          ],
+          [
+            'gitlab-workspace-uuid',
+            {
+              platform: 'gitlab',
+              repo_full_name: 'group/project',
+              gitlab_clone_url: gitlabUrl,
+              bitbucket_workspace_uuid: workspaceUuid,
+            },
+          ],
+          [
+            'gitlab-repository-uuid',
+            {
+              platform: 'gitlab',
+              repo_full_name: 'group/project',
+              gitlab_clone_url: gitlabUrl,
+              bitbucket_repository_uuid: repositoryUuid,
+            },
+          ],
+          [
+            'bitbucket-no-workspace-uuid',
+            {
+              platform: 'bitbucket',
+              repo_full_name: 'team/repo',
+              bitbucket_repository_uuid: repositoryUuid,
+            },
+          ],
+          [
+            'bitbucket-with-gitlab-url',
+            {
+              platform: 'bitbucket',
+              repo_full_name: 'team/repo',
+              bitbucket_workspace_uuid: workspaceUuid,
+              bitbucket_repository_uuid: repositoryUuid,
+              gitlab_clone_url: gitlabUrl,
+            },
+          ],
+        ] as const satisfies readonly (readonly [
+          string,
+          Partial<typeof schema.cloud_agent_environments.$inferInsert>,
+        ])[];
+        for (const [name, columns] of brokenV1Rows) {
+          await expect(
+            schemaTestDb.db
+              .insert(schema.cloud_agent_environments)
+              .values({ owned_by_user_id: userId, name, ...columns })
+          ).rejects.toMatchObject({
+            cause: { constraint: 'cloud_agent_environments_identity_check' },
+          });
+        }
 
         await schemaTestDb.db.insert(schema.cloud_agent_environments).values({
           owned_by_user_id: userId,
@@ -816,6 +885,145 @@ describe('database schema', () => {
         await schemaTestDb.db
           .delete(schema.organizations)
           .where(eq(schema.organizations.id, organization.id));
+        await schemaTestDb.db
+          .delete(schema.kilocode_users)
+          .where(eq(schema.kilocode_users.id, userId));
+      }
+    });
+
+    it('accepts exactly one of the V1 and V2 identity alternatives', async () => {
+      const userId = `schema-env-v2-${crypto.randomUUID()}`;
+      await schemaTestDb.db.insert(schema.kilocode_users).values({
+        id: userId,
+        google_user_email: `${userId}@example.com`,
+        google_user_name: 'Schema env V2 test',
+        google_user_image_url: '',
+        stripe_customer_id: `cus_${crypto.randomUUID()}`,
+      });
+      const members = [
+        { platform: 'github', repoFullName: 'acme/widgets' },
+        { platform: 'github', repoFullName: 'acme/gadgets' },
+      ];
+      const workspaceUuid = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+      const repositoryUuid = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
+      const identityCheck = { cause: { constraint: 'cloud_agent_environments_identity_check' } };
+
+      try {
+        // V1: no repositories and the whole identity.
+        await schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+          owned_by_user_id: userId,
+          name: 'v1',
+          platform: 'github',
+          repo_full_name: 'acme/widgets',
+        });
+
+        // V2: repositories and no identity column.
+        await schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+          owned_by_user_id: userId,
+          name: 'v2',
+          repositories: members,
+        });
+
+        // A V2 environment may contain a repository that also has a V1 environment,
+        // and a second V2 environment may repeat the same members.
+        await schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+          owned_by_user_id: userId,
+          name: 'v2-again',
+          repositories: members,
+        });
+
+        // Neither alternative: an all-null row.
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            owned_by_user_id: userId,
+            name: 'neither',
+          })
+        ).rejects.toMatchObject(identityCheck);
+
+        // V1 with a null platform: `platform = 'github'` would be UNKNOWN, so the
+        // check must test `platform IS NOT NULL` explicitly.
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            owned_by_user_id: userId,
+            name: 'v1-null-platform',
+            repo_full_name: 'acme/widgets',
+          })
+        ).rejects.toMatchObject(identityCheck);
+
+        // Both alternatives at once.
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            owned_by_user_id: userId,
+            name: 'both',
+            platform: 'github',
+            repo_full_name: 'acme/widgets',
+            repositories: members,
+          })
+        ).rejects.toMatchObject(identityCheck);
+
+        // V2 with an empty list.
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            owned_by_user_id: userId,
+            name: 'v2-empty',
+            repositories: [],
+          })
+        ).rejects.toMatchObject(identityCheck);
+
+        // V2 whose value is not an array.
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            owned_by_user_id: userId,
+            name: 'v2-object',
+            repositories: { platform: 'github', repoFullName: 'acme/widgets' },
+          })
+        ).rejects.toMatchObject(identityCheck);
+
+        // V2 with any one identity column set. Each column needs its own case:
+        // dropping one `IS NULL` term from the V2 alternative must fail one case.
+        const strayIdentityColumns = [
+          { platform: 'github' },
+          { repo_full_name: 'acme/widgets' },
+          { gitlab_clone_url: 'https://gitlab.com/group/project.git' },
+          { bitbucket_workspace_uuid: workspaceUuid },
+          { bitbucket_repository_uuid: repositoryUuid },
+        ] satisfies Partial<typeof schema.cloud_agent_environments.$inferInsert>[];
+        for (const stray of strayIdentityColumns) {
+          await expect(
+            schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+              owned_by_user_id: userId,
+              name: `v2-stray-${Object.keys(stray)[0]}`,
+              repositories: members,
+              ...stray,
+            })
+          ).rejects.toMatchObject(identityCheck);
+        }
+
+        // The V1 unique indexes cover V1 rows only: a second V1 row for the same
+        // repository is still rejected.
+        await expect(
+          schemaTestDb.db.insert(schema.cloud_agent_environments).values({
+            owned_by_user_id: userId,
+            name: 'v1-again',
+            platform: 'github',
+            repo_full_name: 'acme/widgets',
+          })
+        ).rejects.toMatchObject({
+          cause: { constraint: 'UQ_cloud_agent_environments_github_user' },
+        });
+
+        // The containment lookup the GIN index serves.
+        const matches = await schemaTestDb.db
+          .select({ name: schema.cloud_agent_environments.name })
+          .from(schema.cloud_agent_environments)
+          .where(
+            sql`${schema.cloud_agent_environments.owned_by_user_id} = ${userId} AND ${schema.cloud_agent_environments.repositories} @> ${JSON.stringify([members[1]])}::jsonb`
+          );
+        expect(matches.map(row => row.name).sort()).toEqual(['v2', 'v2-again']);
+      } finally {
+        await schemaTestDb.db
+          .delete(schema.cloud_agent_environments)
+          .where(eq(schema.cloud_agent_environments.owned_by_user_id, userId));
         await schemaTestDb.db
           .delete(schema.kilocode_users)
           .where(eq(schema.kilocode_users.id, userId));

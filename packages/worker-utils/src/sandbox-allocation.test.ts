@@ -4,6 +4,7 @@ import {
   CLOUDFLARE_CONTAINERS_DEFAULT_INSTANCE,
   CLOUDFLARE_SANDBOX_SMALL_NATIVE_ALLOCATION,
   SELECTABLE_SANDBOX_ALLOCATIONS,
+  allocationSupportsMultiRepository,
   getSandboxAllocationInstance,
   getSandboxAllocationProvider,
   getSandboxAllocationResources,
@@ -225,5 +226,20 @@ describe('sandbox allocation contract', () => {
         options: [{ allocation: 'vercel-small' }],
       }).success
     ).toBe(false);
+  });
+});
+
+describe('multi-repository allocation support', () => {
+  const unsupported = ['cloudflare-shared', 'vercel-small', 'vercel-large'];
+
+  it.each(SELECTABLE_SANDBOX_ALLOCATIONS)('%s', allocation => {
+    expect(allocationSupportsMultiRepository(allocation)).toBe(!unsupported.includes(allocation));
+  });
+
+  it('rejects exactly the shared Cloudflare sandbox and Vercel', () => {
+    const rejected = SELECTABLE_SANDBOX_ALLOCATIONS.filter(
+      allocation => !allocationSupportsMultiRepository(allocation)
+    );
+    expect(rejected).toEqual(unsupported);
   });
 });

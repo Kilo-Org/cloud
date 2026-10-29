@@ -399,6 +399,10 @@ describe('/cloud-agent-fork/review/[reviewId]', () => {
         autoCommit: false,
       });
       expect(mockOrganizationPrepareSession).not.toHaveBeenCalled();
+      // This page has no environment picker, so it must not ask for a choice.
+      expect(mockPersonalPrepareSession.mock.calls[0]?.[0]).not.toHaveProperty(
+        'requireEnvironmentChoice'
+      );
 
       const prompt = sessionPrompt();
       expect(prompt).toContain(`GitHub PR URL: ${PR_URL}`);

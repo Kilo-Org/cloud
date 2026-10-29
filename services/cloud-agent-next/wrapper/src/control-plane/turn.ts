@@ -18,6 +18,8 @@ import type { ControlDiagnosticReporter } from '../../../src/shared/control-diag
 import type { ControlPlaneTimers } from '../../../src/shared/control-plane-timers.js';
 import { slashCommandCatalogStatus } from '../../../src/shared/slash-commands.js';
 import { runAutoCommit } from '../auto-commit.js';
+import { autoCommitFailure, autoCommitRoots } from './auto-commit-roots.js';
+import { isEnvironmentRoot, routeRoots, type RouteRoot } from './workspace-roots.js';
 import {
   DEFAULT_CONDENSE_TIMEOUT_MS,
   summarizeWithTimeout,
@@ -159,6 +161,8 @@ type TurnRoute = {
   sessionId: string;
   kiloSessionId: string;
   directory: string;
+  /** The git roots: one at the directory, or one for each repository of a V2 environment. */
+  roots: RouteRoot[];
   runtimeKey: string;
   createdOnPlatform?: string;
   githubReviewTarget?: ControlPlaneRouteSpec['githubReviewTarget'];
@@ -835,9 +839,10 @@ export function createTurnManager(deps: TurnManagerDeps) {
     const runtime = deps.runtimes.get(turn.route.runtimeKey);
     if (runtime === undefined) return;
     const sessionId = turn.route.sessionId;
-    try {
-      await autoCommit({
-        workspacePath: turn.route.directory,
+    const outcomes = await autoCommitRoots({
+      roots: turn.route.roots,
+      autoCommit,
+      options: {
         kiloClient: runtime.client,
         messageId: turn.assistantMessageId ?? lastReceivedMessageId(turn),
         userMessageId: lastReceivedMessageId(turn),
@@ -855,12 +860,14 @@ export function createTurnManager(deps: TurnManagerDeps) {
             },
           ]);
         },
-      });
-    } catch (error) {
-      emitWarning(
-        sessionId,
-        `Auto-commit failed: ${error instanceof Error ? error.message : String(error)}`
-      );
+      },
+    });
+    for (const outcome of outcomes) {
+      const failure = autoCommitFailure(outcome);
+      if (failure === undefined) continue;
+      const { root } = outcome;
+      const repository = isEnvironmentRoot(root) ? ` (${root.repoFullName})` : '';
+      emitWarning(sessionId, `Auto-commit failed${repository}: ${failure}`);
     }
   }
 
@@ -1142,6 +1149,7 @@ export function createTurnManager(deps: TurnManagerDeps) {
         sessionId: spec.sessionId,
         kiloSessionId: spec.kiloSessionId,
         directory: spec.directory,
+        roots: routeRoots(spec),
         runtimeKey: runtimeKey(spec),
         createdOnPlatform: spec.createdOnPlatform,
         githubReviewTarget: spec.githubReviewTarget,

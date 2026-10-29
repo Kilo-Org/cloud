@@ -67,6 +67,18 @@ describe('cloudAgentFileLabel', () => {
     );
   });
 
+  it('keeps the leaf of a multi-repository environment path', () => {
+    expect(cloudAgentFileLabel('/workspace/web/src/a.ts')).toBe('/workspace/web/src/a.ts');
+    expect(cloudAgentFileLabel('/workspace/web/src/a.ts')).toContain('web/src/a.ts');
+    expect(cloudAgentFileLabel('/workspace/api/x')).toContain('api/x');
+  });
+
+  it('does not relabel paths outside a session directory', () => {
+    expect(cloudAgentFileLabel('/workspace')).toBe('/workspace');
+    expect(cloudAgentFileLabel('/workspace/user-1/.cache/x')).toBe('/workspace/user-1/.cache/x');
+    expect(cloudAgentFileLabel('/workspace/tmp/x')).toBe('/workspace/tmp/x');
+  });
+
   it('labels workspace roots as the repo root', () => {
     expect(cloudAgentFileLabel('/workspace/user-1/sessions/ses_abc')).toBe('.');
     expect(cloudAgentFileLabel('/workspace/org-1/user-1/worktrees/worktree_9b1deb4d')).toBe('.');

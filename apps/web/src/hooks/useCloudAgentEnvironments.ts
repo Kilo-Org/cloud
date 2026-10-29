@@ -4,6 +4,7 @@
 import { useRef } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import type {
+  EnvironmentPlatform,
   EnvironmentResponse,
   EnvironmentSecretChange,
   EnvironmentSummary,
@@ -11,6 +12,43 @@ import type {
 import { useTRPC } from '@/lib/trpc/utils';
 
 export type { EnvironmentResponse, EnvironmentSecretChange, EnvironmentSummary };
+
+/** One repository of an environment, as the settings UI shows it. */
+export type EnvironmentMemberResponse = {
+  platform: EnvironmentPlatform;
+  repoFullName: string;
+  gitlabCloneUrl: string | null;
+  bitbucketWorkspaceUuid: string | null;
+  bitbucketRepositoryUuid: string | null;
+};
+
+/**
+ * The repositories of an environment: the V2 list, or the V1 identity as one
+ * repository. A stored environment always has at least one.
+ */
+export function environmentMembers(
+  environment: EnvironmentSummary | EnvironmentResponse
+): EnvironmentMemberResponse[] {
+  if (environment.repositories !== undefined) {
+    return environment.repositories.map(entry => ({
+      platform: entry.platform,
+      repoFullName: entry.repoFullName,
+      gitlabCloneUrl: entry.platform === 'gitlab' ? entry.gitlabCloneUrl : null,
+      bitbucketWorkspaceUuid: entry.platform === 'bitbucket' ? entry.bitbucketWorkspaceUuid : null,
+      bitbucketRepositoryUuid:
+        entry.platform === 'bitbucket' ? entry.bitbucketRepositoryUuid : null,
+    }));
+  }
+  return [
+    {
+      platform: environment.platform,
+      repoFullName: environment.repoFullName,
+      gitlabCloneUrl: environment.gitlabCloneUrl,
+      bitbucketWorkspaceUuid: environment.bitbucketWorkspaceUuid,
+      bitbucketRepositoryUuid: environment.bitbucketRepositoryUuid,
+    },
+  ];
+}
 
 /** The selected repository, in the shape the picker and dialog need. */
 export type EnvironmentRepository =
@@ -66,20 +104,40 @@ export function useCloudAgentEnvironments(options: UseEnvironmentsOptions) {
 }
 
 /**
- * The repository's environment: null when it has none, undefined while the
- * answer is unknown. A repository has at most one environment per owner.
+ * The environments that match the selected repository. `matches` is undefined
+ * while loading and after a failed load; `isLoading` tells them apart. The same
+ * repository may match several environments.
  */
-export function useRepositoryEnvironment(
-  options: UseEnvironmentsOptions
-): EnvironmentSummary | null | undefined {
-  const { data } = useCloudAgentEnvironments(options);
-  return data ? (data[0] ?? null) : undefined;
+export function useRepositoryEnvironments(options: UseEnvironmentsOptions): {
+  matches: EnvironmentSummary[] | undefined;
+  isLoading: boolean;
+} {
+  const { data, isLoading } = useCloudAgentEnvironments(options);
+  return { matches: data, isLoading };
 }
 
 type UseEnvironmentOptions = {
   organizationId?: string;
   enabled?: boolean;
 };
+
+/**
+ * Whether the owner can create multi-repository environments. The server
+ * evaluates the flag for the owner, so the answer matches what it accepts.
+ */
+export function useMultiRepositoryEnvironmentsEnabled(organizationId?: string): {
+  enabled: boolean;
+  isPending: boolean;
+} {
+  const trpc = useTRPC();
+  const { data, isPending } = useQuery(
+    trpc.cloudEnvironments.multiRepositoryEnabled.queryOptions(
+      { organizationId },
+      { staleTime: 5 * 60_000 }
+    )
+  );
+  return { enabled: data === true, isPending };
+}
 
 /** Every environment for the owner, across repositories (settings view). */
 export function useCloudAgentEnvironmentsForOwner(options: UseEnvironmentOptions) {

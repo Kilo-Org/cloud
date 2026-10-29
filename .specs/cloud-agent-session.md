@@ -20,7 +20,8 @@ status contract alongside shared worktree navigation and durability; revised
 revised 2026-10-07 to add the optional repository environment; revised
 2026-10-21 to apply the repository environment automatically and move the
 sandbox size into it; revised 2026-10-22 to simplify environment editing and
-show profile conflicts before saving.
+show profile conflicts before saving; revised 2026-10-29 to allow several
+repositories in one environment.
 
 ## Conventions
 
@@ -33,9 +34,16 @@ they appear in all capitals, as shown here.
 
 - **Session**: one chat bound to one repository and one environment.
 - **Environment**: the isolated workspace where the agent runs.
-- **Repository environment**: an optional saved setup for one repository --
-  setup commands, plaintext variables, secrets, and a sandbox size -- distinct
-  from the sandbox Environment. An owner has at most one per repository.
+- **Repository environment**: an optional saved setup for one or several
+  repositories -- setup commands, plaintext variables, secrets, and a sandbox
+  size -- distinct from the sandbox Environment. A repository MAY belong to
+  several environments of one owner.
+- **Multi-repository environment** (V2): a repository environment that lists its
+  repositories. Only an owner with the flag
+  `cloud-agent-multi-repository-environments` can create or change one. While
+  the flag is on, the editor creates every new environment as V2, also with one
+  repository. A saved V2 environment still applies when the flag is off. An environment
+  without a list (V1) belongs to one repository and behaves as before.
 - **Environment snapshot**: a prepared copy of a repository environment's
   default branch after its saved setup, built from the base image on request
   or for a session, that later sessions of that environment start from.
@@ -71,10 +79,12 @@ repository.
 5. An over-long prompt, or an attachment still uploading, MUST block submission.
 6. A session started from Cloud Agent web, Slack, GitHub, Linear, Discord,
    a webhook, or a schedule MUST use the owner's repository environment
-   for the chosen repository when one exists. The user does not select it. Code
+   for the chosen repository when one exists. With one match, the user does not
+   select it. Code
    review and security sessions MUST NOT use it. A repository without one
    launches unchanged. Its setup commands MUST run as preparation steps and
-   MUST NOT reveal secret values.
+   MUST NOT reveal secret values. When several environments contain the
+   repository, rules 14 to 16 decide.
 7. While a repository environment applies, profile setup commands MUST NOT run.
    Profile variables, and variables and commands sent with the request, still
    apply over the environment.
@@ -107,6 +117,32 @@ repository.
     pipeline failure without requiring `set -e` in the script. A failed script
     MUST stop preparation and show the failure. Each script MAY contain up to
     16,000 characters.
+14. A repository matches every environment that contains it. When exactly one
+    matches, it MUST apply with no choice.
+15. When several match, the new-session form in the web UI MUST require the user
+    to choose one and MUST NOT start the session until they do. A request that
+    marks the choice as required and names no environment MUST fail with a
+    conflict that names the matching environments. A request that names an
+    environment that does not contain the repository MUST fail.
+16. When several match and the request does not mark the choice as required, the
+    session MUST start with no environment. This covers the mobile app, the
+    extension, fork and review-fix routes, continuing in Cloud Agent, and every
+    automatic origin. On an origin that applies no environment, a request that
+    names one is ignored, but a request that lists additional repositories MUST
+    fail.
+17. A session on a multi-repository environment MUST ignore the repository's
+    profile binding and the implicit default profile. A profile the user
+    selects explicitly MUST still apply. The new-session form MUST show the same
+    profiles that will apply.
+18. A session on a multi-repository environment MUST run in an isolated sandbox.
+    One repository MUST run at `/workspace/<name>`. Several MUST each be cloned
+    at `/workspace/<name>`, and the agent and setup MUST start at `/workspace`.
+    Setup MUST run once. Each additional repository MAY have its own branch;
+    otherwise it MUST use the session's generated branch.
+19. Saving a multi-repository environment with the shared or a Vercel sandbox
+    MUST fail, and so MUST a session request for one. A saved default of that
+    kind (repository or owner) MUST be skipped, and the session MUST start on
+    another sandbox.
 
 ### Preparation
 
@@ -143,7 +179,9 @@ repository.
 2. A session that uses a repository environment MAY start from that
    environment's published snapshot when the owner, repository, sandbox image
    and runtime match and the snapshot revision is not newer than the
-   session's configuration revision. Otherwise, and when the lookup is unavailable, it MUST start from
+   session's configuration revision. For a multi-repository environment, the
+   environment, owner and the same list of repositories MUST match instead of
+   one repository. Otherwise, and when the lookup is unavailable, it MUST start from
    the base image. The lookup MUST NOT delay the start by more than 15 seconds
    and MUST NOT wait for a build.
 3. A session that starts from a snapshot MUST still run setup with the
@@ -508,7 +546,31 @@ The following use SHOULD and are not enforced today:
    path currently logs the failure and continues, so the same session can look
    ready with setup half-done.)
 
+4. A session on a multi-repository environment has these gaps:
+   - A GitHub repository that is reachable only through a connection that is
+     restricted to agents is not found.
+   - GraphQL requests in the additional repositories use the access of the
+     launch repository.
+   - A repository on another git platform than the launch repository gets no
+     CLI token.
+   - A repository that cannot be authorized fails the start with a generic
+     message that does not name it. A timeout while authorizing fails as a
+     workspace setup failure.
+   - The sandbox picker does not know the environment. It can show a shared
+     default that the session skips.
+   - With several repositories, the agent runs at `/workspace` and does not
+     load the `AGENTS.md` or skills of each repository.
+
 ## Changelog
+
+### 2026-10-29 -- Multi-repository environments
+
+- An environment can contain several repositories, and a repository can be in
+  several environments. One match applies; several need a choice in the web UI
+  and give no environment elsewhere.
+- Multi-repository environments ignore the repository binding and the implicit
+  default profile, run in an isolated sandbox under `/workspace`, and start only
+  from a snapshot of the same repositories.
 
 ### 2026-10-22 -- Environment editor and profile transition
 

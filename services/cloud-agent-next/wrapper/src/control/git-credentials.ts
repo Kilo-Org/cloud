@@ -91,6 +91,39 @@ function repositoryCredentialRecord(credential: RepositoryCredential & { token: 
   return `protocol=https\nhost=${repositoryUrl.host}\nusername=${username}\npassword=${credential.token}\n`;
 }
 
+/**
+ * One repository of a V2 build: the same fields as a host record. The record is
+ * qualified by the path of `url`, which is the path Git sends back when
+ * `credential.useHttpPath` is true, with its case as the clone URL has it.
+ * Only the environment builder writes these, because it holds a real token for
+ * each repository; a session writes one record for each host.
+ */
+export type GitCredentialSetEntry = {
+  url: string;
+  token: string;
+  platform: GitCredentialPlatform | undefined;
+};
+
+function credentialSetRecord(entry: GitCredentialSetEntry): string {
+  let repositoryUrl: URL;
+  try {
+    repositoryUrl = new URL(entry.url);
+  } catch {
+    throw new Error('Repository Git credentials require a valid URL');
+  }
+  if (repositoryUrl.protocol !== 'https:' || !repositoryUrl.host) {
+    throw new Error('Repository Git credentials require an HTTPS URL');
+  }
+  const username = gitCredentialUsername(entry.platform);
+  const recordPath = repositoryUrl.pathname.replace(/^\/+/, '').replace(/\.git$/, '');
+  if (recordPath === '') throw new Error('Repository Git credentials require a repository path');
+  const values = [entry.token, username, repositoryUrl.host, recordPath];
+  if (values.some(value => value.includes('\r') || value.includes('\n') || value.includes('\0'))) {
+    throw new Error('Repository Git credentials contain invalid characters');
+  }
+  return `protocol=https\nhost=${repositoryUrl.host}\npath=${recordPath}\nusername=${username}\npassword=${entry.token}\n`;
+}
+
 async function replaceCredentialRecord(home: string, record: string): Promise<void> {
   const recordPath = gitCredentialRecordPath(home);
   const directory = path.dirname(recordPath);
@@ -127,29 +160,61 @@ export async function clearGitCredentialRecord(home: string): Promise<boolean> {
 }
 
 /**
- * Install the token this route may use for its repository host, or remove a stale
- * record when it has none (a sibling in the same home may have left one). The
- * helper authenticates every later `git fetch`/`push` in the worktree, including
- * the agent's own, so origin can stay credential-free.
+ * Install the token this route may use for each repository host, or remove a
+ * stale record when it has none (a sibling in the same home may have left one).
+ * The helper authenticates every later `git fetch`/`push` in the worktree,
+ * including the agent's own, so origin can stay credential-free.
+ *
+ * One record serves one host: the token is the same for every repository of a
+ * host, so a V2 environment writes one record for each host it uses and never a
+ * record for each repository. A V1 route passes one entry.
  *
  * A workspace remote may legitimately be HTTP or SSH; those carry no credential, so
  * only an HTTPS remote gets a record. `requireGitCredentialRecord` is the strict
  * form for a caller that has already rejected an authenticated non-HTTPS repository.
  */
-export async function writeGitCredentialRecord(
+export async function writeGitCredentialRecords(input: {
+  home: string;
+  credentials: readonly RepositoryCredential[];
+}): Promise<void> {
+  const records: string[] = [];
+  for (const credential of input.credentials) {
+    if (!credential.token) continue;
+    try {
+      records.push(repositoryCredentialRecord({ ...credential, token: credential.token }));
+    } catch {
+      // A non-HTTPS remote has no record.
+    }
+  }
+  if (records.length === 0) {
+    if (input.credentials.every(credential => !credential.token)) {
+      await fs.rm(gitCredentialRecordPath(input.home), { force: true });
+    }
+    return;
+  }
+  await replaceCredentialRecord(input.home, records.join('\n'));
+}
+
+/**
+ * The credentials of the hosts a V2 environment uses besides the launch
+ * repository's host, as `writeGitCredentialRecords` takes them.
+ */
+export function additionalHostCredentials(
+  entries:
+    | ReadonlyArray<{ url: string; token: string; platform: GitCredentialPlatform }>
+    | undefined
+): RepositoryCredential[] {
+  return (entries ?? []).map(entry => ({
+    url: credentialFreeGitUrl(entry.url),
+    token: entry.token,
+    platform: entry.platform,
+  }));
+}
+
+export function writeGitCredentialRecord(
   input: RepositoryCredential & { home: string }
 ): Promise<void> {
-  if (!input.token) {
-    await fs.rm(gitCredentialRecordPath(input.home), { force: true });
-    return;
-  }
-  let record: string;
-  try {
-    record = repositoryCredentialRecord({ ...input, token: input.token });
-  } catch {
-    return;
-  }
-  await replaceCredentialRecord(input.home, record);
+  return writeGitCredentialRecords({ home: input.home, credentials: [input] });
 }
 
 /**
@@ -168,6 +233,24 @@ export async function requireGitCredentialRecord(
     input.home,
     repositoryCredentialRecord({ ...input, token: input.token })
   );
+}
+
+/**
+ * Replace the whole credential set with one path-qualified record per
+ * repository, or clear it when none is left. A path query never falls back to a
+ * host record, so an empty set must not leave a stale one behind. A renew
+ * rewrites the whole file.
+ */
+export async function writeGitCredentialRecordSet(input: {
+  home: string;
+  entries: readonly GitCredentialSetEntry[];
+}): Promise<void> {
+  if (input.entries.length === 0) {
+    await clearGitCredentialRecord(input.home);
+    return;
+  }
+  const records = input.entries.map(credentialSetRecord);
+  await replaceCredentialRecord(input.home, records.join('\n'));
 }
 
 /**

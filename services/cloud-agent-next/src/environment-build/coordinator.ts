@@ -1,17 +1,23 @@
 import type {
   EnvironmentBuildInput as ProfileBuildInput,
   EnvironmentReference,
+  EnvironmentReferenceRepository,
 } from '@kilocode/cloud-agent-profile';
+import { repositoryLeaf } from '@kilocode/cloud-agent-profile';
 import type { SandboxBillingInput } from '../container-usage-context.js';
 import { ProviderCreationError } from '../sandbox-control/provider.js';
 import { RUNTIME_BASE_ABI } from '../sandbox-control/runtime-release.js';
 import {
   ENVIRONMENT_BUILD_WORKSPACE,
+  environmentBuildPinGroupSchema,
   type EnvironmentBuildEvents,
   type EnvironmentBuildEventsReply,
   type EnvironmentBuildInput,
+  type EnvironmentBuildMember,
+  type EnvironmentBuildPinGroup,
   type EnvironmentBuildResult,
 } from '../shared/environment-build-protocol.js';
+import { environmentWorkspace } from '../shared/environment-workspace.js';
 import type {
   EnvironmentBuildCancelResult,
   EnvironmentBuildLogs,
@@ -42,7 +48,7 @@ import {
   type SnapshotCompatibility,
   type PublishedSnapshot,
 } from './policy.js';
-import { sameEnvironmentScope, type SessionEnvironmentReference } from './reference.js';
+import { sameEnvironmentScope, type EnvironmentScope } from './reference.js';
 import type { BuildOutcome, BuildState, BuildTrigger } from './sqlite-schema.js';
 import {
   isTerminal,
@@ -70,8 +76,8 @@ export type CoordinatorEnvironment = {
     userId: string
   ): Promise<EnvironmentActorAccess>;
   gitSource(input: {
-    reference: SessionEnvironmentReference;
-    repoFullName: string;
+    reference: EnvironmentScope;
+    member: EnvironmentReferenceRepository;
     actorUserId: string;
   }): Promise<BuilderGitSource>;
   /** Owner-level container concurrency, the limit sessions use. */
@@ -171,6 +177,30 @@ const ACTIVE_RUNNER_STATES: readonly BuildState[] = ['preparing'];
 const CAPTURE_POLL_MS = 15_000;
 const LEASE_RENEW_INTERVAL_MS = 60_000;
 
+/**
+ * The repositories a stored build input authorizes and clones. A V1 input stores
+ * its path beside the reference; a V2 input carries every repository in the
+ * reference.
+ */
+function buildInputMembers(record: BuildInputRecord): EnvironmentReferenceRepository[] {
+  if (record.repoFullName === undefined) return [...record.reference.repositories];
+  return [
+    {
+      identity: record.reference.repository,
+      repoFullName: record.repoFullName,
+      leaf: repositoryLeaf(record.repoFullName),
+    },
+  ];
+}
+
+/** The stored input JSON for a profile build input: one path, or the V2 repositories. */
+function buildInputRecordOf(input: ProfileBuildInput): BuildInputRecord {
+  const { reference, commands, plainVars } = input;
+  if (reference.repositories !== undefined) return { reference, commands, plainVars };
+  if (input.repoFullName === undefined) throw new Error('A V1 build input has no repository path');
+  return { reference, repoFullName: input.repoFullName, commands, plainVars };
+}
+
 export class EnvironmentBuildCoordinator {
   private lastLeaseRenewalAt = 0;
 
@@ -206,7 +236,7 @@ export class EnvironmentBuildCoordinator {
       }
       return { status: 'conflict', reason: 'build_in_progress', buildId: active.id };
     }
-    const reference = await this.deps.environment.reference(this.environmentId);
+    const reference = await this.currentReference();
     if (reference === null) {
       store.markDeleted(this.deps.now());
       return { status: 'rejected', reason: 'not_found' };
@@ -258,12 +288,7 @@ export class EnvironmentBuildCoordinator {
   ): Promise<string | null> {
     const now = this.deps.now();
     const buildId = this.deps.uuid();
-    const record: BuildInputRecord = {
-      reference: input.reference,
-      repoFullName: input.repoFullName,
-      commands: input.commands,
-      plainVars: input.plainVars,
-    };
+    const record: BuildInputRecord = buildInputRecordOf(input);
     const runtimeRelease = await this.deps.provider.runtimeReleaseId();
     const admitted = this.deps.transaction(() => {
       if (this.deps.store.activeBuild() !== null) return false;
@@ -307,7 +332,7 @@ export class EnvironmentBuildCoordinator {
    * may admit one background build; it never waits for build execution.
    */
   async resolveSnapshot(request: {
-    reference: SessionEnvironmentReference;
+    reference: EnvironmentScope;
     actorUserId: string;
   }): Promise<SnapshotResolution> {
     if (this.deps.unsupportedReason(request.reference.owner) !== null) {
@@ -354,7 +379,7 @@ export class EnvironmentBuildCoordinator {
   }
 
   private async admitAutomatic(
-    reference: SessionEnvironmentReference,
+    reference: EnvironmentScope,
     actorUserId: string
   ): Promise<SnapshotAdmission> {
     const { store } = this.deps;
@@ -373,7 +398,7 @@ export class EnvironmentBuildCoordinator {
       this.deps.now()
     );
     if (!backoff.admit) return { status: 'skipped', reason: 'backoff', retryAt: backoff.retryAt };
-    const current = await this.deps.environment.reference(this.environmentId);
+    const current = await this.currentReference();
     if (current === null) {
       store.markDeleted(this.deps.now());
       return { status: 'skipped', reason: 'environment_deleted' };
@@ -415,6 +440,11 @@ export class EnvironmentBuildCoordinator {
   }
 
   // --- reads -----------------------------------------------------------------
+
+  /** The environment's current scope, the shape the stored build records use. */
+  private async currentReference(): Promise<EnvironmentScope | null> {
+    return this.deps.environment.reference(this.environmentId);
+  }
 
   /** The image and runtime ABI a session would start with now. */
   private async compatibility(): Promise<SnapshotCompatibility> {
@@ -510,7 +540,7 @@ export class EnvironmentBuildCoordinator {
   async environmentDeleted(): Promise<void> {
     const { store } = this.deps;
     store.bindEnvironment(this.environmentId);
-    if ((await this.deps.environment.reference(this.environmentId)) !== null) return;
+    if ((await this.currentReference()) !== null) return;
     store.markDeleted(this.deps.now());
     const active = store.activeBuild();
     if (active === null) return;
@@ -553,14 +583,9 @@ export class EnvironmentBuildCoordinator {
     const build = await this.authorizeRunner(auth, ACTIVE_RUNNER_STATES);
     if ('refused' in build) return build;
     const input = parseBuildInput(build);
-    const git = await this.deps.environment.gitSource({
-      reference: input.reference,
-      repoFullName: input.repoFullName,
-      actorUserId: build.actor_user_id,
-    });
-    if (!git.ok) {
-      if (git.reason === 'unavailable') return { refused: 'unavailable' };
-      await this.failRunning(build.id, 'repository_unauthorized');
+    const members = buildInputMembers(input);
+    if (members.length === 0) {
+      await this.failRunning(build.id, 'input_unavailable', 'build has no repository');
       return { refused: 'gone' };
     }
     let secrets: Record<string, string>;
@@ -575,17 +600,55 @@ export class EnvironmentBuildCoordinator {
       await this.failRunning(build.id, 'input_unavailable', 'secrets could not be decrypted');
       return { refused: 'gone' };
     }
-    return {
+    const common = {
       environmentId: this.environmentId,
       buildId: build.id,
       allocationId: auth.allocationId,
-      git: git.git,
-      directory: ENVIRONMENT_BUILD_WORKSPACE,
       commands: input.commands,
       env: { ...input.plainVars, ...secrets },
       secretKeys: Object.keys(secrets),
       deadlineAt: build.deadline_at,
     };
+    // The layout comes from the same owner a session asks: the build's directory,
+    // and the directory of each repository, are where a session would have them.
+    const workspace = environmentWorkspace({
+      sessionDirectory: ENVIRONMENT_BUILD_WORKSPACE,
+      environment: input.reference,
+    });
+    if (input.reference.repositories !== undefined) {
+      const sources: EnvironmentBuildMember[] = [];
+      for (const [index, member] of members.entries()) {
+        const git = await this.deps.environment.gitSource({
+          reference: input.reference,
+          member,
+          actorUserId: build.actor_user_id,
+        });
+        if (!git.ok) {
+          if (git.reason === 'unavailable') return { refused: 'unavailable' };
+          await this.failRunning(build.id, 'repository_unauthorized');
+          return { refused: 'gone' };
+        }
+        sources.push({
+          url: git.git.url,
+          ...(git.git.token === undefined ? {} : { token: git.git.token }),
+          ...(git.git.platform === undefined ? {} : { platform: git.git.platform }),
+          directory: workspace.roots[index]?.directory ?? '',
+          repoFullName: member.repoFullName,
+        });
+      }
+      return { ...common, members: sources, directory: workspace.cwd };
+    }
+    const git = await this.deps.environment.gitSource({
+      reference: input.reference,
+      member: members[0],
+      actorUserId: build.actor_user_id,
+    });
+    if (!git.ok) {
+      if (git.reason === 'unavailable') return { refused: 'unavailable' };
+      await this.failRunning(build.id, 'repository_unauthorized');
+      return { refused: 'gone' };
+    }
+    return { ...common, git: git.git, directory: ENVIRONMENT_BUILD_WORKSPACE };
   }
 
   async runnerEvents(
@@ -629,10 +692,17 @@ export class EnvironmentBuildCoordinator {
     if (build.state !== 'preparing') return 'ok';
     const now = this.deps.now();
     if (result.outcome === 'ready') {
+      const ready =
+        result.members !== undefined
+          ? {
+              source_commit: null,
+              source_branch: null,
+              pin_group: JSON.stringify(result.members),
+            }
+          : { source_commit: result.commit, source_branch: result.branch };
       const captured = this.deps.store.transition(build.id, ['preparing'], {
         state: 'capturing',
-        source_commit: result.commit,
-        source_branch: result.branch,
+        ...ready,
         setup_duration_ms: result.setupDurationMs,
         capture_id: this.deps.uuid(),
         last_heartbeat_at: now,
@@ -733,6 +803,24 @@ export class EnvironmentBuildCoordinator {
     });
   }
 
+  /** Authorize every member before any builder work; one failure fails the build. */
+  private async authorizeBuildMembers(
+    input: BuildInputRecord,
+    actorUserId: string
+  ): Promise<'ok' | 'unavailable' | 'unauthorized'> {
+    const members = buildInputMembers(input);
+    if (members.length === 0) return 'unauthorized';
+    for (const member of members) {
+      const git = await this.deps.environment.gitSource({
+        reference: input.reference,
+        member,
+        actorUserId,
+      });
+      if (!git.ok) return git.reason === 'unavailable' ? 'unavailable' : 'unauthorized';
+    }
+    return 'ok';
+  }
+
   /** Execution order steps 1 to 4: recheck, persist the allocation intent, start the builder. */
   private async advanceQueued(build: BuildRow): Promise<void> {
     const now = this.deps.now();
@@ -742,7 +830,7 @@ export class EnvironmentBuildCoordinator {
       return this.terminalWithoutAllocation(build, 'obsolete', 'environment_deleted');
     }
     const input = parseBuildInput(build);
-    const reference = await this.deps.environment.reference(this.environmentId);
+    const reference = await this.currentReference();
     if (reference === null) {
       this.deps.store.markDeleted(now);
       return this.terminalWithoutAllocation(build, 'obsolete', 'environment_deleted');
@@ -764,13 +852,9 @@ export class EnvironmentBuildCoordinator {
     ) {
       return this.terminalWithoutAllocation(build, 'failed', 'container_limit_reached');
     }
-    const git = await this.deps.environment.gitSource({
-      reference: input.reference,
-      repoFullName: input.repoFullName,
-      actorUserId: build.actor_user_id,
-    });
-    if (!git.ok) {
-      if (git.reason === 'unavailable') return; // The next alarm retries within the deadline.
+    const authorization = await this.authorizeBuildMembers(input, build.actor_user_id);
+    if (authorization !== 'ok') {
+      if (authorization === 'unavailable') return; // The next alarm retries within the deadline.
       return this.terminalWithoutAllocation(build, 'failed', 'repository_unauthorized');
     }
     const allocation: BuilderAllocation = {
@@ -858,7 +942,7 @@ export class EnvironmentBuildCoordinator {
       await this.launch(build);
       return;
     }
-    const reference = await this.deps.environment.reference(this.environmentId);
+    const reference = await this.currentReference();
     if (reference === null) {
       this.deps.store.markDeleted(now);
       this.beginStopping(build.id, ['preparing'], 'obsolete', { reason: 'environment_deleted' });
@@ -924,7 +1008,7 @@ export class EnvironmentBuildCoordinator {
       return;
     }
     const input = parseBuildInput(build);
-    const reference = await this.deps.environment.reference(this.environmentId);
+    const reference = await this.currentReference();
     if (reference === null) {
       this.deps.store.markDeleted(now);
       this.beginStopping(build.id, ['publishing'], 'obsolete', { reason: 'environment_deleted' });
@@ -942,40 +1026,28 @@ export class EnvironmentBuildCoordinator {
       this.beginStopping(build.id, ['publishing'], 'failed', { reason: 'actor_unauthorized' });
       return;
     }
-    const git = await this.deps.environment.gitSource({
-      reference: input.reference,
-      repoFullName: input.repoFullName,
-      actorUserId: build.actor_user_id,
-    });
-    if (!git.ok) {
-      if (git.reason === 'unavailable' && now < build.deadline_at) return;
+    const authorization = await this.authorizeBuildMembers(input, build.actor_user_id);
+    if (authorization !== 'ok') {
+      if (authorization === 'unavailable' && now < build.deadline_at) return;
       this.beginStopping(build.id, ['publishing'], 'failed', { reason: 'repository_unauthorized' });
       return;
     }
     const capture = parseCaptureResult(build.capture_result);
-    if (capture === null || build.source_commit === null || build.source_branch === null) {
+    if (capture === null) {
       this.beginStopping(build.id, ['publishing'], 'failed', { reason: 'capture_failed' });
       return;
     }
-    const descriptor: PublishedSnapshot = {
-      buildId: build.id,
+    const descriptor = buildPublishedDescriptor({
+      build,
       environmentId: this.environmentId,
-      owner: input.reference.owner,
-      revision: build.revision,
-      repository: input.reference.repository,
-      sourceCommit: build.source_commit,
-      sourceBranch: build.source_branch,
-      provider: 'cloudflare-containers',
-      baseImage: capture.baseImage,
-      runtimeAbi: RUNTIME_BASE_ABI,
-      runtimeRelease: build.runtime_release,
-      builderInstance: build.instance,
-      snapshotId: capture.snapshotId,
-      ...(capture.size === undefined ? {} : { size: capture.size }),
-      capturedAt: capture.capturedAt,
-      publishedAt: now,
-      setupDurationMs: build.setup_duration_ms ?? 0,
-    };
+      reference: input.reference,
+      capture,
+      now,
+    });
+    if (descriptor === null) {
+      this.beginStopping(build.id, ['publishing'], 'failed', { reason: 'capture_failed' });
+      return;
+    }
     const published = this.deps.transaction(() => {
       const stopping = this.beginStopping(build.id, ['publishing'], 'succeeded', {});
       if (stopping === null) return false;
@@ -1102,6 +1174,59 @@ type StoredCapture = {
   baseImage: string;
 };
 
+function parsePinGroup(value: string | null): EnvironmentBuildPinGroup | null {
+  if (value === null) return null;
+  try {
+    const parsed = environmentBuildPinGroupSchema.safeParse(JSON.parse(value) as unknown);
+    return parsed.success ? parsed.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The published descriptor for one finished build. A V2 build stores one commit
+ * for each repository, only for display, and leaves `sourceCommit` and
+ * `sourceBranch` null. Null refuses publication.
+ */
+function buildPublishedDescriptor(args: {
+  build: BuildRow;
+  environmentId: string;
+  reference: EnvironmentScope;
+  capture: StoredCapture;
+  now: number;
+}): PublishedSnapshot | null {
+  const { build, environmentId, reference, capture, now } = args;
+  const common = {
+    buildId: build.id,
+    environmentId,
+    owner: reference.owner,
+    revision: build.revision,
+    provider: 'cloudflare-containers' as const,
+    baseImage: capture.baseImage,
+    runtimeAbi: RUNTIME_BASE_ABI,
+    runtimeRelease: build.runtime_release,
+    builderInstance: build.instance,
+    snapshotId: capture.snapshotId,
+    ...(capture.size === undefined ? {} : { size: capture.size }),
+    capturedAt: capture.capturedAt,
+    publishedAt: now,
+    setupDurationMs: build.setup_duration_ms ?? 0,
+  };
+  if (reference.repositories !== undefined) {
+    const pins = parsePinGroup(build.pin_group);
+    return pins === null ? null : { ...common, repositories: pins.members };
+  }
+  if (reference.repository === undefined) return null;
+  if (build.source_commit === null || build.source_branch === null) return null;
+  return {
+    ...common,
+    repository: reference.repository,
+    sourceCommit: build.source_commit,
+    sourceBranch: build.source_branch,
+  };
+}
+
 function parseCaptureResult(value: string | null): StoredCapture | null {
   if (value === null) return null;
   try {
@@ -1172,8 +1297,16 @@ function summarizeSnapshot(
   return {
     buildId: published.buildId,
     revision: published.revision,
-    sourceCommit: published.sourceCommit,
-    sourceBranch: published.sourceBranch,
+    sourceCommit: published.sourceCommit ?? null,
+    sourceBranch: published.sourceBranch ?? null,
+    ...(published.repositories === undefined
+      ? {}
+      : {
+          repositories: published.repositories.map(({ repoFullName, commit }) => ({
+            repoFullName,
+            commit,
+          })),
+        }),
     capturedAt: published.capturedAt,
     size: published.size ?? null,
     setupDurationMs: published.setupDurationMs,

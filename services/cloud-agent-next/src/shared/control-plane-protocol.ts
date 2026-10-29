@@ -107,6 +107,7 @@ export const CONTROL_PLANE_FAILURE_REASON_VALUES = [
   'preparation_timeout',
   'workspace_setup_failed',
   'credential_upgrade_required',
+  'repository_access_failed',
   'agent_unavailable',
   'billing_blocked',
   'billing_unavailable',
@@ -288,6 +289,25 @@ export const controlPlaneRouteKiloSchema = z
 export const CONTROL_PLANE_WORKSPACE_OUTCOMES = ['cloned', 'same', 'adopted'] as const;
 export type ControlPlaneWorkspaceOutcome = (typeof CONTROL_PLANE_WORKSPACE_OUTCOMES)[number];
 
+/** One repository checkout of a V2 session workspace. */
+export const controlPlaneWorkspaceRootSchema = z
+  .object({
+    /** The git root: `/workspace/<leaf>`. */
+    directory: z.string().min(1).max(1024),
+    repoFullName: z.string().min(1).max(500),
+    git: z
+      .object({
+        url: z.string().min(1).max(2048),
+        platform: z.enum(CONTROL_PLANE_GIT_PLATFORMS),
+      })
+      .strict(),
+    branch: z.string().min(1).max(256),
+    /** The branch is the session's generated one: create it when the remote has none. */
+    branchMode: z.literal('working').optional(),
+  })
+  .strict();
+export type ControlPlaneWorkspaceRoot = z.infer<typeof controlPlaneWorkspaceRootSchema>;
+
 export const controlPlaneRouteSpecSchema = z
   .object({
     sessionId: z.string().min(1),
@@ -316,6 +336,14 @@ export const controlPlaneRouteSpecSchema = z
     branchMode: z.literal('working').optional(),
     worktreeRecovery: worktreeRecoverySchema.optional(),
     git: controlPlaneRouteGitSchema.optional(),
+    /**
+     * The git roots of a V2 environment session: each repository checkout
+     * and the branch it runs on. `directory` is the cwd. Only a V2 route carries
+     * this; a route without it has one root at `directory` and clones `git`, as
+     * every route did before V2. It holds no credential: each root's alias comes
+     * from the grant by host.
+     */
+    roots: z.array(controlPlaneWorkspaceRootSchema).min(1).max(100).optional(),
     kilo: controlPlaneRouteKiloSchema.optional(),
     env: z.record(z.string().max(256), z.string().max(10000)).optional(),
     /**
@@ -349,7 +377,20 @@ export const controlPlaneRouteSpecSchema = z
      */
     secretEnvKeys: z.array(z.string().min(1).max(128)).max(50).optional(),
   })
-  .strict();
+  .strict()
+  .superRefine((spec, context) => {
+    // The wrapper empties and clones into a root, so a root must lie inside the cwd.
+    const outside = spec.roots?.findIndex(
+      root => root.directory !== spec.directory && !root.directory.startsWith(`${spec.directory}/`)
+    );
+    if (outside !== undefined && outside >= 0) {
+      context.addIssue({
+        code: 'custom',
+        path: ['roots', outside, 'directory'],
+        message: 'workspace root must be the route directory or inside it',
+      });
+    }
+  });
 
 /**
  * Route spec accepted at the registration boundary. `secretEnvKeys` is
@@ -724,6 +765,20 @@ export const controlPlaneStatusResultSchema = z
   })
   .strict();
 
+/**
+ * The Git credential of one host that a V2 environment adds to the launch
+ * repository's host. The wrapper writes one record for each host: the alias is
+ * the same for every repository of a host, and the proxy tells repositories
+ * apart by the request path.
+ */
+export const controlPlaneGitHostCredentialSchema = z
+  .object({
+    url: z.string().min(1).max(2048),
+    token: z.string().min(1).max(4096),
+    platform: z.enum(CONTROL_PLANE_GIT_PLATFORMS),
+  })
+  .strict();
+
 export const controlPlaneSessionCredentialsPayloadSchema = z
   .object({
     sessionId: z.string().min(1),
@@ -734,6 +789,11 @@ export const controlPlaneSessionCredentialsPayloadSchema = z
       })
       .strict()
       .optional(),
+    /**
+     * The credential of each host a V2 environment uses besides the launch
+     * repository's host, which `git` serves.
+     */
+    gitCredentials: z.array(controlPlaneGitHostCredentialSchema).min(1).optional(),
     kilo: z.object({ token: z.string().min(1).max(4096) }).strict(),
     cloudAgentMcp: z
       .object({

@@ -3258,3 +3258,539 @@ describe('SandboxControlV2 placed sandbox keys', () => {
     );
   });
 });
+
+describe('SandboxControlV2 environment repository credentials', () => {
+  const ENVIRONMENT_ID = '33333333-3333-4333-8333-333333333333';
+  const WIDGETS = 'acme/widgets';
+  const GADGETS = 'acme/gadgets';
+  const LIBRARY = 'Other/Lib';
+
+  function environmentOf(repositories: string[]) {
+    return {
+      environmentId: ENVIRONMENT_ID,
+      owner: { type: 'user' as const, id: 'user_123' },
+      configurationRevision: 1,
+      repositories: repositories.map(repoFullName => ({
+        identity: { platform: 'github' as const, repoFullName },
+        repoFullName,
+        leaf: repoFullName.slice(repoFullName.indexOf('/') + 1),
+        branch: 'kilo/session',
+      })),
+    };
+  }
+
+  /** The prepare input of a V2 session that launches on `acme/widgets`. */
+  function environmentInput(repositories: string[]): ControlPlanePrepareInput {
+    return {
+      ...prepareInput(SESSION),
+      environment: environmentOf(repositories),
+    } as ControlPlanePrepareInput;
+  }
+
+  async function readGrant(stub: DurableObjectStub<SandboxControlV2>) {
+    return JSON.parse((await readRouteRow(stub, SESSION))?.grant ?? '{}') as {
+      scm: { alias: string; capability: { credential: string; outboundContainerId: string } };
+      additionalRepositories?: Array<{
+        repository: { type: string; repo: string };
+        scm: { alias: string; capability: { credential: string; outboundContainerId: string } };
+      }>;
+    };
+  }
+
+  function redeem(
+    stub: DurableObjectStub<SandboxControlV2>,
+    alias: string,
+    url: string,
+    outboundContainerId = OUTBOUND_CONTAINER_ID
+  ) {
+    return stub.resolveCredential({ credential: alias, outboundContainerId, url, method: 'GET' });
+  }
+
+  it('names every member in the grant and holds one alias for the host', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setup(provider, broker);
+    const { prepareFrame } = await prepareWarmRoute(
+      stub,
+      provider,
+      environmentInput([WIDGETS, GADGETS, LIBRARY])
+    );
+
+    const grant = await readGrant(stub);
+    expect(grant.additionalRepositories?.map(entry => entry.repository.repo)).toEqual([
+      GADGETS,
+      LIBRARY,
+    ]);
+    // One alias for the purpose, and a different capability for each member.
+    for (const entry of grant.additionalRepositories ?? []) {
+      expect(entry.scm.alias).toBe(grant.scm.alias);
+    }
+    const capabilities = [
+      grant.scm.capability.credential,
+      ...(grant.additionalRepositories ?? []).map(entry => entry.scm.capability.credential),
+    ];
+    expect(new Set(capabilities).size).toBe(3);
+    expect([...capabilities].map(c => broker.githubCapabilityRepositories().get(c))).toEqual([
+      WIDGETS,
+      GADGETS,
+      LIBRARY,
+    ]);
+    // The wrapper receives the alias for the launch host only: the other
+    // members share that host, so no second record is needed.
+    if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare frame');
+    expect(prepareFrame.credentials.git?.token).toBe(grant.scm.alias);
+    expect(prepareFrame.credentials.gitCredentials).toBeUndefined();
+    expect(JSON.stringify(prepareFrame)).not.toContain('kgh2.');
+  });
+
+  it('delivers the roots in the frame and grants at the route directory, which is the cwd', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setup(provider, broker);
+    const input = environmentInput([WIDGETS, GADGETS]);
+    const roots = [WIDGETS, GADGETS].map(repoFullName => ({
+      directory: `/workspace/${repoFullName.slice(repoFullName.indexOf('/') + 1)}`,
+      repoFullName,
+      git: { url: `https://github.com/${repoFullName}.git`, platform: 'github' as const },
+      branch: 'kilo/session',
+      branchMode: 'working' as const,
+    }));
+    const { prepareFrame } = await prepareWarmRoute(stub, provider, {
+      ...input,
+      spec: { ...input.spec, directory: '/workspace', roots },
+    });
+
+    if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare frame');
+    expect(prepareFrame.spec.directory).toBe('/workspace');
+    expect(prepareFrame.spec.roots).toEqual(roots);
+    // A root names a repository and its branch; it holds no credential.
+    expect(JSON.stringify(prepareFrame.spec.roots)).not.toMatch(/token|alias/i);
+    const row = await readRouteRow(stub, SESSION);
+    expect(JSON.parse(row?.grant ?? '{}')).toMatchObject({ directory: '/workspace' });
+  });
+
+  it('grants a one-repository V2 route at its repository directory, which is the cwd', async () => {
+    const provider = createFakeProvider();
+    const stub = await setup(provider, createFakeCredentialBroker());
+    const input = environmentInput([WIDGETS]);
+    const roots = [
+      {
+        directory: '/workspace/widgets',
+        repoFullName: WIDGETS,
+        git: { url: 'https://github.com/acme/widgets.git', platform: 'github' as const },
+        branch: 'kilo/session',
+        branchMode: 'working' as const,
+      },
+    ];
+    const { prepareFrame } = await prepareWarmRoute(stub, provider, {
+      ...input,
+      spec: { ...input.spec, directory: '/workspace/widgets', roots },
+    });
+
+    if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare frame');
+    expect(prepareFrame.spec.directory).toBe('/workspace/widgets');
+    expect(prepareFrame.spec.roots).toEqual(roots);
+    const row = await readRouteRow(stub, SESSION);
+    expect(JSON.parse(row?.grant ?? '{}')).toMatchObject({ directory: '/workspace/widgets' });
+  });
+
+  it('sends a V1 route a frame with no roots, at its own directory', async () => {
+    const provider = createFakeProvider();
+    const stub = await setup(provider, createFakeCredentialBroker());
+    const { prepareFrame } = await prepareWarmRoute(stub, provider, prepareInput(SESSION));
+
+    if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare frame');
+    expect('roots' in prepareFrame.spec).toBe(false);
+    expect(prepareFrame.spec.directory).toBe(`/workspace/${SESSION}`);
+    const row = await readRouteRow(stub, SESSION);
+    expect(JSON.parse(row?.grant ?? '{}')).toMatchObject({ directory: `/workspace/${SESSION}` });
+  });
+
+  it('redeems the capability of the member that the request URL names', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setup(provider, broker);
+    await prepareWarmRoute(stub, provider, environmentInput([WIDGETS, GADGETS, LIBRARY]));
+    const { scm } = await readGrant(stub);
+    const repositoryOf = async (url: string) => {
+      const resolved = await redeem(stub, scm.alias, url);
+      return resolved ? broker.githubCapabilityRepositories().get(resolved.credential) : null;
+    };
+
+    expect(await repositoryOf('https://github.com/acme/gadgets.git/info/refs')).toBe(GADGETS);
+    expect(await repositoryOf('https://github.com/acme/gadgets/git-receive-pack')).toBe(GADGETS);
+    // Case and the `.git` suffix do not matter.
+    expect(await repositoryOf('https://github.com/OTHER/lib.git/info/refs')).toBe(LIBRARY);
+    expect(await repositoryOf('https://api.github.com/repos/Acme/Gadgets/pulls')).toBe(GADGETS);
+    // The launch repository, and every request that names no member, use the
+    // launch capability.
+    expect(await repositoryOf('https://github.com/acme/widgets.git/info/refs')).toBe(WIDGETS);
+    expect(await repositoryOf('https://api.github.com/graphql')).toBe(WIDGETS);
+    expect(await repositoryOf('https://github.com/acme/unknown.git/info/refs')).toBe(WIDGETS);
+    // A name that only starts like a member is not that member.
+    expect(await repositoryOf('https://github.com/acme/gadgets-extra.git/info/refs')).toBe(WIDGETS);
+    // Selection changes nothing about who may redeem.
+    expect(await redeem(stub, scm.alias + 'x', 'https://github.com/acme/gadgets.git/')).toBeNull();
+    expect(
+      await redeem(stub, scm.alias, 'https://github.com/acme/gadgets.git/', 'other-container')
+    ).toBeNull();
+    // No redeem issued a new capability: the cached ones served every request.
+    expect(broker.githubIssued()).toBe(3);
+  });
+
+  it('renews only the member whose capability names another container', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setup(provider, broker);
+    await prepareWarmRoute(stub, provider, environmentInput([WIDGETS, GADGETS, LIBRARY]));
+    const before = await readGrant(stub);
+    await patchGrant(stub, SESSION, grant => {
+      const entries = grant.additionalRepositories as Array<{
+        scm: { capability: Record<string, unknown> };
+      }>;
+      const [first, ...rest] = entries;
+      if (!first) throw new Error('missing additional member');
+      return {
+        ...grant,
+        additionalRepositories: [
+          {
+            ...first,
+            scm: {
+              ...first.scm,
+              capability: { ...first.scm.capability, outboundContainerId: 'old' },
+            },
+          },
+          ...rest,
+        ],
+      };
+    });
+
+    const resolved = await redeem(stub, before.scm.alias, 'https://github.com/acme/gadgets.git/');
+    expect(resolved?.credential).not.toBe(
+      before.additionalRepositories?.[0]?.scm.capability.credential
+    );
+    expect(broker.githubCapabilityRepositories().get(resolved?.credential ?? '')).toBe(GADGETS);
+    expect(broker.githubIssued()).toBe(4);
+
+    const after = await readGrant(stub);
+    expect(after.additionalRepositories?.[0]?.scm.capability).toMatchObject({
+      credential: resolved?.credential,
+      outboundContainerId: OUTBOUND_CONTAINER_ID,
+    });
+    expect(after.scm.capability).toEqual(before.scm.capability);
+    expect(after.additionalRepositories?.[1]).toEqual(before.additionalRepositories?.[1]);
+  });
+
+  it('re-issues every member under the same alias before the grant expires', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setup(provider, broker);
+    const { wrapper } = await prepareWarmRoute(
+      stub,
+      provider,
+      environmentInput([WIDGETS, GADGETS, LIBRARY])
+    );
+    const before = await readGrant(stub);
+
+    await setGrantExpiry(stub, SESSION, Date.now() + TIMERS.credentialGrantReissueBelowMs / 2);
+    expect(await stub.deliver({ sessionId: SESSION, messages: [promptPayload('m1')] })).toBe(
+      'sent'
+    );
+    expect((await wrapper.next())?.type).toBe('session.credentials');
+
+    const after = await readGrant(stub);
+    expect(after.scm.alias).toBe(before.scm.alias);
+    expect(after.additionalRepositories?.map(entry => entry.scm.alias)).toEqual([
+      before.scm.alias,
+      before.scm.alias,
+    ]);
+    expect(broker.githubIssued()).toBe(6);
+    expect(after.scm.capability.credential).not.toBe(before.scm.capability.credential);
+    for (const [index, entry] of (after.additionalRepositories ?? []).entries()) {
+      expect(entry.scm.capability.credential).not.toBe(
+        before.additionalRepositories?.[index]?.scm.capability.credential
+      );
+    }
+  });
+
+  it('sends one alias for each purpose and one credential for each extra host', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setup(provider, broker);
+    let gitlabIssued = 0;
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance.env, {
+        GIT_TOKEN_SERVICE: {
+          ...broker,
+          async issueGitLabSessionCapability() {
+            gitlabIssued += 1;
+            return {
+              success: true,
+              capability: `kgl2.${gitlabIssued}`,
+              instanceOrigin: 'https://gitlab.com',
+              instanceHost: 'gitlab.com',
+              projectPath: 'group/sub/project',
+              integrationId: 'integration-1',
+              authType: 'pat',
+              identity: { accountId: null, accountLogin: null },
+              glabIsOAuth2: false,
+            };
+          },
+        },
+      });
+    });
+    const input = {
+      ...prepareInput(SESSION),
+      environment: {
+        ...environmentOf([WIDGETS]),
+        repositories: [
+          ...environmentOf([WIDGETS]).repositories,
+          {
+            identity: {
+              platform: 'gitlab' as const,
+              cloneUrl: 'https://gitlab.com/group/sub/project.git',
+            },
+            repoFullName: 'group/sub/project',
+            leaf: 'project',
+            branch: 'kilo/session',
+          },
+        ],
+      },
+    } as ControlPlanePrepareInput;
+    const { prepareFrame } = await prepareWarmRoute(stub, provider, input);
+
+    const grant = await readGrant(stub);
+    const project = grant.additionalRepositories?.[0];
+    expect(project?.scm.alias).toMatch(/^kcp1\..*\.gitlab\./);
+    expect(project?.scm.alias).not.toBe(grant.scm.alias);
+    if (prepareFrame?.type !== 'session.prepare') throw new Error('missing prepare frame');
+    // The launch host keeps `git`; the other host gets one credential, with the
+    // alias and never a capability.
+    expect(prepareFrame.credentials.git?.token).toBe(grant.scm.alias);
+    expect(prepareFrame.credentials.gitCredentials).toEqual([
+      {
+        url: 'https://gitlab.com/group/sub/project.git',
+        token: project?.scm.alias,
+        platform: 'gitlab',
+      },
+    ]);
+    // Provider CLI tokens carry the launch alias only; the GitLab CLI has none.
+    expect(prepareFrame.spec.env?.GH_TOKEN).toBe(grant.scm.alias);
+    expect(prepareFrame.spec.env?.GITLAB_TOKEN).toBeUndefined();
+    expect(JSON.stringify(prepareFrame)).not.toMatch(/kgh2\.|kgl2\./);
+
+    // Each alias redeems only for its own purpose.
+    const gitlab = await redeem(
+      stub,
+      project?.scm.alias ?? '',
+      'https://gitlab.com/api/v4/projects/group%2Fsub%2Fproject/merge_requests'
+    );
+    expect(gitlab?.credential).toBe('kgl2.1');
+    const github = await redeem(
+      stub,
+      grant.scm.alias,
+      'https://github.com/acme/widgets.git/info/refs'
+    );
+    expect(github?.credential).toBe(grant.scm.capability.credential);
+  });
+
+  it('keeps a V1 grant to one repository that serves every request', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setup(provider, broker);
+    await prepareWarmRoute(stub, provider);
+    const grant = await readGrant(stub);
+    expect(grant.additionalRepositories).toBeUndefined();
+
+    const resolved = await redeem(stub, grant.scm.alias, 'https://github.com/acme/gadgets.git/');
+    expect(resolved?.credential).toBe(grant.scm.capability.credential);
+    expect(broker.githubIssued()).toBe(1);
+  });
+
+  it('issues a member capability without the launch integration pin', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setup(provider, broker);
+    const issued: Array<Record<string, unknown>> = [];
+    const authorized: Array<Record<string, unknown>> = [];
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance.env, {
+        GIT_TOKEN_SERVICE: {
+          ...broker,
+          async issueGitHubSessionCapability(params: Record<string, unknown>) {
+            issued.push(params);
+            return broker.issueGitHubSessionCapability(params);
+          },
+          async authorizeCloudAgentGitHubRepo(params: Record<string, unknown>) {
+            authorized.push(params);
+            return { success: true };
+          },
+        },
+      });
+    });
+    // The launch repository is pinned to one installation; the member may live in another.
+    const input = {
+      ...environmentInput([WIDGETS, GADGETS]),
+      credentials: credentialsSource(SESSION, {
+        repository: {
+          type: 'github',
+          repo: WIDGETS,
+          githubIntegrationId: GITHUB_INTEGRATION_ID,
+          githubAccessPurpose: 'agent',
+        },
+      }),
+    } as ControlPlanePrepareInput;
+    await prepareWarmRoute(stub, provider, input);
+
+    const forRepo = (repo: string) => issued.find(params => params.githubRepo === repo);
+    expect(forRepo(WIDGETS)).toMatchObject({
+      expectedIntegrationId: GITHUB_INTEGRATION_ID,
+      accessPurpose: 'agent',
+    });
+    expect(forRepo(GADGETS)).toMatchObject({ accessPurpose: 'agent' });
+    expect(forRepo(GADGETS)).not.toHaveProperty('expectedIntegrationId');
+    // Only the pinned launch repository is authorized against its installation.
+    expect(authorized.map(params => params.githubRepo)).toEqual([WIDGETS]);
+    expect(
+      (await readGrant(stub)).additionalRepositories?.map(entry => entry.repository.repo)
+    ).toEqual([GADGETS]);
+  });
+
+  it('fails the start with the repository that lost access after preflight', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const issue = broker.issueGitHubSessionCapability.bind(broker);
+    broker.issueGitHubSessionCapability = params =>
+      params?.githubRepo === GADGETS
+        ? (Promise.resolve({
+            success: false,
+            error: { reason: 'no_installation_found' },
+          }) as ReturnType<typeof issue>)
+        : issue(params);
+    const stub = await setup(provider, broker);
+    const capture = captureRouteFailed();
+    const view = await stub.prepare(environmentInput([WIDGETS, GADGETS, LIBRARY]));
+    const events = capture.forAttempt(failedAttemptId(view));
+    capture.restore();
+
+    expect(view).toMatchObject({ state: 'failed', reason: 'repository_access_failed' });
+    expect(events[0]).toMatchObject({
+      stage: 'member_credential_failed:acme_gadgets',
+      grantPhase: 'broker_issuance',
+    });
+    // The launch capability was issued, but a failed grant persists nothing.
+    expect(broker.githubIssued()).toBeGreaterThan(0);
+    expect((await readRouteRow(stub, SESSION))?.grant).toBeNull();
+    expect(provider.intents).toHaveLength(0);
+  });
+
+  it('fails the start with the GitLab project that the integration cannot reach', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setup(provider, broker);
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance.env, {
+        GIT_TOKEN_SERVICE: {
+          ...broker,
+          async issueGitLabSessionCapability() {
+            return { success: false, reason: 'no_integration_found' };
+          },
+        },
+      });
+    });
+    const input = {
+      ...prepareInput(SESSION),
+      environment: {
+        ...environmentOf([WIDGETS]),
+        repositories: [
+          ...environmentOf([WIDGETS]).repositories,
+          {
+            identity: {
+              platform: 'gitlab' as const,
+              cloneUrl: 'https://gitlab.com/group/sub/project.git',
+            },
+            repoFullName: 'group/sub/project',
+            leaf: 'project',
+            branch: 'kilo/session',
+          },
+        ],
+      },
+    } as ControlPlanePrepareInput;
+    const capture = captureRouteFailed();
+    const view = await stub.prepare(input);
+    const events = capture.forAttempt(failedAttemptId(view));
+    capture.restore();
+
+    expect(view).toMatchObject({ state: 'failed', reason: 'repository_access_failed' });
+    expect(events[0]).toMatchObject({
+      stage: 'member_credential_failed:group_sub_project',
+      grantPhase: 'broker_issuance',
+    });
+    expect((await readRouteRow(stub, SESSION))?.grant).toBeNull();
+  });
+
+  it('keeps the generic failure for a launch repository that cannot be issued', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    broker.issueGitHubSessionCapability = () =>
+      Promise.reject(new Error('git-token-service unavailable'));
+    const stub = await setup(provider, broker);
+    const capture = captureRouteFailed();
+    const view = await stub.prepare(environmentInput([WIDGETS, GADGETS]));
+    const events = capture.forAttempt(failedAttemptId(view));
+    capture.restore();
+
+    expect(view).toMatchObject({ state: 'failed', reason: 'workspace_setup_failed' });
+    expect(events[0]).toMatchObject({ stage: 'credential_grant_failed' });
+  });
+
+  it('fails a V2 start whose grant would be direct, before the sandbox starts', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setup(provider, broker, {
+      CREDENTIAL_CONTAINMENT_ENABLED: 'false',
+      WORKER_URL: 'https://api.kilo.ai',
+    });
+    const capture = captureRouteFailed();
+    const view = await stub.prepare({
+      ...environmentInput([WIDGETS, GADGETS]),
+      sandboxSelection: {
+        provider: 'cloudflare' as const,
+        containment: { kilocode: false, github: false },
+      },
+    });
+    const events = capture.forAttempt(failedAttemptId(view));
+    capture.restore();
+
+    expect(events[0]).toMatchObject({
+      stage: 'credential_grant_failed',
+      grantPhase: 'validation',
+      grantFailureReason: 'invalid_grant',
+    });
+    expect(broker.githubIssued()).toBe(0);
+    expect(provider.intents).toHaveLength(0);
+  });
+
+  it('fails a V2 start on a Vercel sandbox and still starts a V1 session there', async () => {
+    const provider = createFakeProvider();
+    const broker = createFakeCredentialBroker();
+    const stub = await setupVercel(provider, broker);
+    const capture = captureRouteFailed();
+    const view = await stub.prepare(environmentInput([WIDGETS, GADGETS]));
+    const events = capture.forAttempt(failedAttemptId(view));
+    capture.restore();
+
+    expect(events[0]).toMatchObject({
+      grantPhase: 'validation',
+      grantFailureReason: 'invalid_grant',
+      provider: 'vercel',
+    });
+    expect(broker.githubIssued()).toBe(0);
+    // The same sandbox serves a V1 session.
+    expect(
+      await stub.prepare(prepareInput(SESSION_NEXT, vercelSource(SESSION_NEXT)))
+    ).toMatchObject({
+      state: 'preparing',
+    });
+  });
+});

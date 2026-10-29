@@ -2404,6 +2404,92 @@ describe('turn finalization', () => {
     });
   });
 
+  it('auto-commits each root of a multi-repository route and warns for the one that fails', async () => {
+    const calls: Array<{ workspacePath: string; upstreamBranch?: string }> = [];
+    const h = createHarness({
+      runAutoCommit: (async (opts: { workspacePath: string; upstreamBranch?: string }) => {
+        calls.push(opts);
+        if (opts.workspacePath === '/workspace/web') throw new Error('hook failed');
+        return { success: true };
+      }) as never,
+    });
+    h.registerRoute(
+      routeSpec({
+        directory: '/workspace',
+        roots: [
+          {
+            directory: '/workspace/web',
+            repoFullName: 'acme/web',
+            git: { url: 'https://github.com/acme/web.git', platform: 'github' },
+            branch: 'release',
+          },
+          {
+            directory: '/workspace/api',
+            repoFullName: 'acme/api',
+            git: { url: 'https://github.com/acme/api.git', platform: 'github' },
+            branch: 'kilo/work',
+            branchMode: 'working',
+          },
+        ],
+      })
+    );
+    h.manager.submit(SESSION_ID, promptPayload('m1', { finalization: { autoCommit: true } }));
+    await settle();
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+
+    expect(calls.map(call => [call.workspacePath, call.upstreamBranch])).toEqual([
+      ['/workspace/web', 'release'],
+      ['/workspace/api', undefined],
+    ]);
+    const events = h.frames.flatMap(frame => (frame.type === 'session.events' ? frame.events : []));
+    expect(JSON.stringify(events)).toContain('Auto-commit failed (acme/web): hook failed');
+    expect(outcomeFrames(h.frames)).toHaveLength(1);
+  });
+
+  it('warns for a reported commit failure of a multi-repository root even when a later root succeeds', async () => {
+    const h = createHarness({
+      runAutoCommit: (async (opts: { workspacePath: string }) =>
+        opts.workspacePath === '/workspace/web'
+          ? { success: false, error: 'git commit failed' }
+          : { success: true }) as never,
+    });
+    h.registerRoute(
+      routeSpec({
+        directory: '/workspace',
+        roots: ['web', 'api'].map(leaf => ({
+          directory: `/workspace/${leaf}`,
+          repoFullName: `acme/${leaf}`,
+          git: { url: `https://github.com/acme/${leaf}.git`, platform: 'github' as const },
+          branch: 'kilo/work',
+          branchMode: 'working' as const,
+        })),
+      })
+    );
+    h.manager.submit(SESSION_ID, promptPayload('m1', { finalization: { autoCommit: true } }));
+    await settle();
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+
+    const events = h.frames.flatMap(frame => (frame.type === 'session.events' ? frame.events : []));
+    expect(JSON.stringify(events)).toContain('Auto-commit failed (acme/web): git commit failed');
+    expect(JSON.stringify(events)).not.toContain('Auto-commit failed (acme/api)');
+  });
+
+  it('does not add a warning for the reported commit failure of a V1 route', async () => {
+    const h = createHarness({
+      runAutoCommit: (async () => ({ success: false, error: 'git commit failed' })) as never,
+    });
+    h.registerRoute(routeSpec({}));
+    h.manager.submit(SESSION_ID, promptPayload('m1', { finalization: { autoCommit: true } }));
+    await settle();
+    h.manager.observeKiloEvent(completedKiloTurn());
+    await settle();
+
+    const events = h.frames.flatMap(frame => (frame.type === 'session.events' ? frame.events : []));
+    expect(JSON.stringify(events)).not.toContain('Auto-commit failed');
+  });
+
   it('falls back to the user message ID, passes runtime env and named secret keys, and aborts auto-commit on abort', async () => {
     const autoCommitCalls: Array<{
       env?: unknown;

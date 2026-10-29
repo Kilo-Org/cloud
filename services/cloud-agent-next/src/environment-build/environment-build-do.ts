@@ -41,7 +41,7 @@ import {
   type SnapshotResolution,
 } from './coordinator.js';
 import { mintRunnerCredential } from './runner-credential.js';
-import type { SessionEnvironmentReference } from './reference.js';
+import type { EnvironmentScope } from './reference.js';
 import type { BuildTrigger } from './sqlite-schema.js';
 import { BuildStore } from './store.js';
 import migrations from './drizzle/migrations';
@@ -248,7 +248,7 @@ export class EnvironmentBuild extends DurableObject<Env> {
   // --- session launch (Sandbox DO) --------------------------------------------
 
   async resolveSnapshot(input: {
-    reference: SessionEnvironmentReference;
+    reference: EnvironmentScope;
     actorUserId: string;
   }): Promise<SnapshotResolution> {
     return (await this.coordinatorFor(input.reference.environmentId)).resolveSnapshot(input);

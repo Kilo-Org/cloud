@@ -581,7 +581,7 @@ function encodedBytes(value: unknown): number {
   return Buffer.byteLength(JSON.stringify(value));
 }
 
-function omittedRecord(
+export function omittedRecord(
   revision: number,
   path: string,
   reason: FileOmissionReason

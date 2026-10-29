@@ -22,6 +22,10 @@ import {
 } from '../../sandbox-control/session-credentials.js';
 import { logControlDiagnostic } from '../../sandbox-control/diagnostics.js';
 import {
+  EnvironmentMemberCredentialError,
+  memberCredentialFailureStage,
+} from '../../sandbox-control/session-credential-members.js';
+import {
   createGrantDiagnostic,
   pickGrantDiagnosticFields,
   type GrantDiagnostic,
@@ -98,6 +102,7 @@ export type RouteContext = {
   issueGrant: (
     spec: ControlPlaneRouteSpec,
     source: ControlPlaneCredentialSource,
+    environment: SessionEnvironmentReference | null,
     diagnostic?: GrantDiagnostic
   ) => Promise<RouteGrantIssue>;
   /**
@@ -346,6 +351,25 @@ export async function failCurrentAttempt(
 const ATTEMPT_POLICY_ATTEMPTS = 2;
 
 /**
+ * The failure reason and diagnostic stage for an error that grant issuance
+ * threw. A repository of the environment that cannot be accessed has its own
+ * reason, and its stage names the repository; the other errors keep the generic
+ * workspace failure with the caller's stage.
+ */
+export function grantIssueFailure(
+  error: unknown,
+  fallbackStage: string
+): { reason: ControlPlaneFailureReason; stage: string } {
+  if (error instanceof SessionCredentialUpgradeRequiredError) {
+    return { reason: 'credential_upgrade_required', stage: 'credential_upgrade_required' };
+  }
+  if (error instanceof EnvironmentMemberCredentialError) {
+    return { reason: 'repository_access_failed', stage: memberCredentialFailureStage(error) };
+  }
+  return { reason: 'workspace_setup_failed', stage: admissionFailureStage(error, fallbackStage) };
+}
+
+/**
  * Starts and persists a new preparation attempt: the one place an attempt is
  * created (spec §6). The stored spec carries the attempt id the wrapper sees.
  * When a credential source is present the DO mints a fresh grant and the stored
@@ -379,17 +403,15 @@ export async function startAttempt(
   const diagnostic = createGrantDiagnostic();
   let issued: RouteGrantIssue;
   try {
-    issued = await ctx.issueGrant(attemptSpec, source, diagnostic);
+    issued = await ctx.issueGrant(attemptSpec, source, environment, diagnostic);
   } catch (error) {
-    const upgradeRequired = error instanceof SessionCredentialUpgradeRequiredError;
+    const failure = grantIssueFailure(error, 'credential_grant_failed');
     return failRoute(
       ctx,
       attemptSpec,
       attemptId,
-      upgradeRequired ? 'credential_upgrade_required' : 'workspace_setup_failed',
-      upgradeRequired
-        ? 'credential_upgrade_required'
-        : admissionFailureStage(error, 'credential_grant_failed'),
+      failure.reason,
+      failure.stage,
       diagnostic.snapshot()
     );
   }

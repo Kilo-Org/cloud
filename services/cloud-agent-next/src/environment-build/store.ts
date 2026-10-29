@@ -18,7 +18,7 @@ import {
   type AutoAttempt,
   type PublishedSnapshot,
 } from './policy.js';
-import { environmentReferenceSchema } from './reference.js';
+import { environmentScopeV1Schema, environmentScopeV2Schema } from './reference.js';
 
 /**
  * Synchronous Durable SQLite access for one `EnvironmentBuild` DO. Every write
@@ -46,14 +46,30 @@ export function isTerminal(state: BuildState): state is BuildOutcome {
   return (TERMINAL_STATES as readonly string[]).includes(state);
 }
 
-export const buildInputRecordSchema = z
-  .object({
-    reference: environmentReferenceSchema,
-    repoFullName: z.string().min(1),
-    commands: z.array(z.string()),
-    plainVars: z.record(z.string(), z.string()),
-  })
-  .strict();
+/**
+ * The stored build input JSON. The reference is the environment scope, because a
+ * builder clones every repository at its default branch. A V1 build stores
+ * `repoFullName`, the path the clone URL is built from. A V2 build stores its
+ * repositories in the reference. Exactly one alternative.
+ */
+export const buildInputRecordSchema = z.union([
+  z
+    .object({
+      reference: environmentScopeV1Schema,
+      repoFullName: z.string().min(1),
+      commands: z.array(z.string()),
+      plainVars: z.record(z.string(), z.string()),
+    })
+    .strict(),
+  z
+    .object({
+      reference: environmentScopeV2Schema,
+      repoFullName: z.undefined().optional(),
+      commands: z.array(z.string()),
+      plainVars: z.record(z.string(), z.string()),
+    })
+    .strict(),
+]);
 export type BuildInputRecord = z.infer<typeof buildInputRecordSchema>;
 
 const LOG_TRUNCATED_MARKER = '[build log truncated: later output was not kept]';

@@ -1,8 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { WorkerDb } from '@kilocode/db/client';
+import type * as CloudAgentProfileModule from '@kilocode/cloud-agent-profile';
 import type * as ByocCredentialResolverModule from '../byoc/vercel-credential-resolver.js';
 import type { Env } from '../types.js';
 import {
+  assertEnvironmentSupportsSandbox,
   requestedSandboxAllocation,
   resolveSavedSandboxAllocation,
   withSavedSandboxAllocation,
@@ -18,7 +20,8 @@ const { fetchByocVercelEnrollmentMock, fetchByocVercelEnrollmentForUserMock } = 
   fetchByocVercelEnrollmentForUserMock: vi.fn(),
 }));
 
-vi.mock('@kilocode/cloud-agent-profile', () => ({
+vi.mock('@kilocode/cloud-agent-profile', async importOriginal => ({
+  ...(await importOriginal<typeof CloudAgentProfileModule>()),
   getSandboxAllocationCandidates: getSandboxAllocationCandidatesMock,
 }));
 vi.mock('../byoc/vercel-credential-resolver.js', async importActual => {
@@ -51,12 +54,37 @@ const enrolledEnv = { ...selectionEnv, CLOUDFLARE_CONTAINERS_ORG_IDS: 'org-id' }
 const withoutVercelEnv = { SANDBOX_SELECTION_IDS: 'org-id' } as Env;
 const disabledEnv = {} as Env;
 
+const v1 = {
+  environmentId: '123e4567-e89b-12d3-a456-426614174099',
+  owner: { type: 'user' as const, id: 'user-1' },
+  configurationRevision: 1,
+  repository: { platform: 'github' as const, repoFullName: 'acme/repo' },
+};
+const v2 = {
+  environmentId: v1.environmentId,
+  owner: v1.owner,
+  configurationRevision: 1,
+  repositories: [
+    {
+      identity: { platform: 'github' as const, repoFullName: 'acme/repo' },
+      repoFullName: 'acme/repo',
+      leaf: 'repo',
+    },
+    {
+      identity: { platform: 'github' as const, repoFullName: 'acme/api' },
+      repoFullName: 'acme/api',
+      leaf: 'api',
+    },
+  ],
+};
+
 function resolve(
   args: {
     env?: Env;
     repositoryType?: 'github' | 'gitlab' | 'bitbucket';
     capability?: 'review' | 'remediation';
     environmentAllocation?: string;
+    environment?: typeof v1 | typeof v2;
     readiness?: { vercelUnavailableReason?: string };
   } = {}
 ) {
@@ -67,6 +95,7 @@ function resolve(
     repositoryType: args.repositoryType ?? 'github',
     ...(args.capability ? { capability: args.capability } : {}),
     ...(args.environmentAllocation ? { environmentAllocation: args.environmentAllocation } : {}),
+    environment: args.environment ?? null,
     ...(args.readiness ? { readiness: args.readiness } : {}),
   });
 }
@@ -287,6 +316,56 @@ describe('resolveSavedSandboxAllocation', () => {
       undefined
     );
   });
+
+  describe('for an environment with several repositories', () => {
+    it('skips a shared owner default and resolves the next isolated candidate', async () => {
+      getSandboxAllocationCandidatesMock.mockResolvedValue({
+        repositoryAllocation: 'cloudflare-shared',
+        contextAllocation: 'cloudflare-single',
+      });
+
+      await expect(resolve({ env: enrolledEnv, environment: v2 })).resolves.toBe(
+        'cloudflare-single'
+      );
+    });
+
+    it('resolves nothing when every owner default is shared or Vercel', async () => {
+      getSandboxAllocationCandidatesMock.mockResolvedValue({
+        repositoryAllocation: 'vercel-small',
+        contextAllocation: 'cloudflare-shared',
+      });
+
+      await expect(resolve({ env: enrolledEnv, environment: v2 })).resolves.toBeUndefined();
+    });
+
+    it('does not skip the environment allocation, so the start fails with the reason', async () => {
+      getSandboxAllocationCandidatesMock.mockResolvedValue({
+        contextAllocation: 'cloudflare-single',
+      });
+
+      const allocation = await resolve({
+        env: enrolledEnv,
+        environment: v2,
+        environmentAllocation: 'cloudflare-shared',
+      });
+
+      expect(allocation).toBe('cloudflare-shared');
+      expect(() =>
+        assertEnvironmentSupportsSandbox({ environment: v2, allocation, contained: true })
+      ).toThrowError(expect.objectContaining({ code: 'BAD_REQUEST' }));
+    });
+
+    it('keeps a shared owner default for a V1 environment', async () => {
+      getSandboxAllocationCandidatesMock.mockResolvedValue({
+        repositoryAllocation: 'cloudflare-shared',
+        contextAllocation: 'cloudflare-single',
+      });
+
+      await expect(resolve({ env: enrolledEnv, environment: v1 })).resolves.toBe(
+        'cloudflare-shared'
+      );
+    });
+  });
 });
 
 describe('withSavedSandboxAllocation', () => {
@@ -343,6 +422,44 @@ describe('withSavedSandboxAllocation', () => {
     expect(getSandboxAllocationCandidatesMock).not.toHaveBeenCalled();
   });
 
+  it('skips a shared owner default for an environment with several repositories', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      contextAllocation: 'cloudflare-shared',
+    });
+
+    const resolved = await withSavedSandboxAllocation(request({ environment: v2 }), args);
+
+    expect(requestedSandboxAllocation(resolved)).toBeUndefined();
+  });
+
+  it('keeps an explicit shared request for the start to reject', async () => {
+    const explicit = request({
+      environment: v2,
+      runtime: { sandboxAllocation: 'cloudflare-shared' },
+    });
+
+    const resolved = await withSavedSandboxAllocation(explicit, args);
+
+    expect(requestedSandboxAllocation(resolved)).toBe('cloudflare-shared');
+    expect(() =>
+      assertEnvironmentSupportsSandbox({
+        environment: v2,
+        allocation: requestedSandboxAllocation(resolved),
+        contained: true,
+      })
+    ).toThrowError(expect.objectContaining({ code: 'BAD_REQUEST' }));
+  });
+
+  it('keeps a shared owner default for a V1 environment', async () => {
+    getSandboxAllocationCandidatesMock.mockResolvedValue({
+      contextAllocation: 'cloudflare-shared',
+    });
+
+    const resolved = await withSavedSandboxAllocation(request({ environment: v1 }), args);
+
+    expect(requestedSandboxAllocation(resolved)).toBe('cloudflare-shared');
+  });
+
   it('ignores saved settings for a code review origin', async () => {
     getSandboxAllocationCandidatesMock.mockResolvedValue({
       repositoryAllocation: 'vercel-small',
@@ -357,5 +474,62 @@ describe('withSavedSandboxAllocation', () => {
     expect(resolved.savedSandboxAllocation).toBeNull();
     expect(requestedSandboxAllocation(resolved)).toBeUndefined();
     expect(getSandboxAllocationCandidatesMock).not.toHaveBeenCalled();
+  });
+});
+
+describe('assertEnvironmentSupportsSandbox', () => {
+  it.each([
+    ['the default isolated sandbox', undefined],
+    ['isolated Cloudflare containers', 'cloudflare-containers-standard-3'],
+    ['larger isolated Cloudflare containers', 'cloudflare-containers-standard-4'],
+    ['a Cloudflare sandbox', 'cloudflare-single'],
+  ] as const)(
+    'lets a V2 environment start on %s with contained credentials',
+    (_name, allocation) => {
+      expect(() =>
+        assertEnvironmentSupportsSandbox({ environment: v2, allocation, contained: true })
+      ).not.toThrow();
+    }
+  );
+
+  it.each([
+    ['the shared sandbox', 'cloudflare-shared', 'shared sandbox'],
+    ['a small Vercel sandbox', 'vercel-small', 'Vercel sandbox'],
+    ['a large Vercel sandbox', 'vercel-large', 'Vercel sandbox'],
+  ] as const)(
+    'fails a V2 environment on %s with a specific reason',
+    (_name, allocation, reason) => {
+      expect(() =>
+        assertEnvironmentSupportsSandbox({ environment: v2, allocation, contained: true })
+      ).toThrowError(
+        expect.objectContaining({ code: 'BAD_REQUEST', message: expect.stringContaining(reason) })
+      );
+    }
+  );
+
+  it('fails a V2 environment whose credentials would be direct', () => {
+    expect(() =>
+      assertEnvironmentSupportsSandbox({ environment: v2, allocation: undefined, contained: false })
+    ).toThrowError(
+      expect.objectContaining({
+        code: 'BAD_REQUEST',
+        message: expect.stringContaining('contained credentials'),
+      })
+    );
+  });
+
+  it.each([
+    undefined,
+    'cloudflare-shared',
+    'vercel-small',
+    'cloudflare-containers-standard-3',
+  ] as const)('never restricts a V1 environment or no environment (allocation %s)', allocation => {
+    for (const environment of [v1, undefined]) {
+      for (const contained of [true, false]) {
+        expect(() =>
+          assertEnvironmentSupportsSandbox({ environment, allocation, contained })
+        ).not.toThrow();
+      }
+    }
   });
 });

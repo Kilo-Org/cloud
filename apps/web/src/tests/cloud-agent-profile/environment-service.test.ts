@@ -31,6 +31,7 @@ import {
   MASKED_SECRET_VALUE,
   type EnvironmentCreateInput,
   type EnvironmentOwner,
+  type EnvironmentForSession,
   type EnvironmentRepositoryIdentity,
   type EnvironmentUpdateInput,
 } from '@kilocode/cloud-agent-profile';
@@ -41,6 +42,16 @@ const publicKeyBase64 = Buffer.from(publicKey.export({ type: 'spki', format: 'pe
 );
 
 const SECRET_PLAINTEXT = 'swordfish-secret-value';
+
+/** The matched environment of a resolution, or null for none; throws on a conflict. */
+async function loadMatchedEnvironment(
+  database: Parameters<typeof loadEnvironmentForSession>[0],
+  input: Parameters<typeof loadEnvironmentForSession>[1]
+): Promise<EnvironmentForSession | null> {
+  const resolution = await loadEnvironmentForSession(database, input);
+  if (resolution.status === 'conflict') throw new Error('unexpected environment conflict');
+  return resolution.status === 'match' ? resolution.environment : null;
+}
 
 async function createEnv(input: EnvironmentCreateInput): Promise<string> {
   return db.transaction(async tx => {
@@ -780,14 +791,14 @@ describe('repository environment service', () => {
             return value.bind(target);
           },
         });
-      const loaded = await loadEnvironmentForSession(instrument(db), {
+      const loaded = await loadMatchedEnvironment(instrument(db), {
         owner,
         repository: { platform: 'github', repoFullName: 'acme/consistent' },
       });
       expect(edited).toBe(true);
       expect(loaded?.reference.configurationRevision).toBe(1);
       expect(loaded?.layer.envVars).toEqual({ VALUE: 'before' });
-      const current = await loadEnvironmentForSession(db, {
+      const current = await loadMatchedEnvironment(db, {
         owner,
         repository: { platform: 'github', repoFullName: 'acme/consistent' },
       });
@@ -809,7 +820,7 @@ describe('repository environment service', () => {
         sandboxAllocation: 'cloudflare-shared',
       });
 
-      const environment = await loadEnvironmentForSession(db, {
+      const environment = await loadMatchedEnvironment(db, {
         owner: userOwner(user.id),
         repository: { platform: 'github', repoFullName: 'ACME/widgets' },
       });
@@ -842,10 +853,10 @@ describe('repository environment service', () => {
           owner: userOwner(user.id),
           repository: { platform: 'github', repoFullName: 'acme/other' },
         })
-      ).resolves.toBeNull();
+      ).resolves.toEqual({ status: 'none' });
       await expect(
         loadEnvironmentForSession(db, { owner: userOwner(other.id), repository })
-      ).resolves.toBeNull();
+      ).resolves.toEqual({ status: 'none' });
 
       const organization = await createTestOrganization('Loader org', user.id, 0);
       const orgOwner: EnvironmentOwner = { type: 'organization', id: organization.id };
@@ -858,15 +869,15 @@ describe('repository environment service', () => {
       });
       await expect(
         loadEnvironmentForSession(db, { owner: orgOwner, repository })
-      ).resolves.not.toBeNull();
+      ).resolves.toMatchObject({ status: 'match' });
       await db
         .update(organizations)
         .set({ deleted_at: new Date().toISOString() })
         .where(eq(organizations.id, organization.id));
 
-      await expect(
-        loadEnvironmentForSession(db, { owner: orgOwner, repository })
-      ).resolves.toBeNull();
+      await expect(loadEnvironmentForSession(db, { owner: orgOwner, repository })).resolves.toEqual(
+        { status: 'none' }
+      );
     });
 
     test('matches GitLab by the canonical clone URL and Bitbucket by UUID pair', async () => {
@@ -891,7 +902,7 @@ describe('repository environment service', () => {
         bitbucketRepositoryUuid: 'BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB',
       });
 
-      const gitlab = await loadEnvironmentForSession(db, {
+      const gitlab = await loadMatchedEnvironment(db, {
         owner,
         repository: { platform: 'gitlab', cloneUrl: 'https://gitlab.com/group/project.git' },
       });
@@ -902,10 +913,10 @@ describe('repository environment service', () => {
           owner,
           repository: { platform: 'gitlab', cloneUrl: 'https://gitlab.com/group/other.git' },
         })
-      ).resolves.toBeNull();
+      ).resolves.toEqual({ status: 'none' });
 
       // The session path was renamed; the UUID pair still matches.
-      const bitbucket = await loadEnvironmentForSession(db, {
+      const bitbucket = await loadMatchedEnvironment(db, {
         owner,
         repository: {
           platform: 'bitbucket',
@@ -924,7 +935,7 @@ describe('repository environment service', () => {
             repositoryUuid: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
           },
         })
-      ).resolves.toBeNull();
+      ).resolves.toEqual({ status: 'none' });
     });
   });
 
@@ -994,7 +1005,7 @@ describe('repository environment service', () => {
       await updateEnv({ owner, environmentId: id, commands: ['install\nbuild'] });
 
       const reference = (
-        await loadEnvironmentForSession(db, {
+        await loadMatchedEnvironment(db, {
           owner,
           repository: { platform: 'github', repoFullName: 'Acme/Widgets' },
         })

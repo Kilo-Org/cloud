@@ -69,6 +69,47 @@ export function getWorktreeChangesTotals(
   return { fileCount: snapshot.files.length, additions, deletions, countsComplete };
 }
 
+export type WorktreeChangesRepositoryGroup = {
+  repoFullName: string;
+  baseRef: string;
+  truncated: boolean;
+  files: WorktreeChangesFile[];
+};
+
+/**
+ * The files of a multi-repository snapshot, grouped by repository. A file
+ * belongs to the repository with the longest `path` that prefixes it. Returns
+ * null when the snapshot has fewer than two repositories (V1 or a single V2
+ * repository) or a file belongs to none, so the caller shows the plain list.
+ */
+export function groupWorktreeChangesByRepository(
+  snapshot: WorktreeChangesSnapshot | null | undefined
+): WorktreeChangesRepositoryGroup[] | null {
+  const repositories = snapshot?.repositories;
+  if (!snapshot || !repositories || repositories.length < 2) return null;
+
+  const byLongestPath = [...repositories].sort((a, b) => b.path.length - a.path.length);
+  const groups = new Map<string, WorktreeChangesRepositoryGroup>(
+    repositories.map(repository => [
+      repository.path,
+      {
+        repoFullName: repository.repoFullName,
+        baseRef: repository.comparison.baseRef,
+        truncated: repository.truncated,
+        files: [],
+      },
+    ])
+  );
+  for (const file of snapshot.files) {
+    const owner = byLongestPath.find(
+      repository => repository.path === '' || file.path.startsWith(`${repository.path}/`)
+    );
+    if (!owner) return null;
+    groups.get(owner.path)?.files.push(file);
+  }
+  return [...groups.values()];
+}
+
 export function deserializeWorktreeChangesViewMode(value: string): WorktreeChangesViewMode {
   try {
     const mode: unknown = JSON.parse(value);

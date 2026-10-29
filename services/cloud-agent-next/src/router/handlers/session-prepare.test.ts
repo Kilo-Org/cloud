@@ -51,7 +51,7 @@ const {
   parentRuntimeTokenMock,
 } = vi.hoisted(() => ({
   mergeProfileConfigurationMock: vi.fn().mockResolvedValue({}),
-  loadEnvironmentForSessionMock: vi.fn().mockResolvedValue(null),
+  loadEnvironmentForSessionMock: vi.fn().mockResolvedValue({ status: 'none' }),
   parentRuntimeTokenMock: vi.fn().mockResolvedValue('trusted-parent-model-token'),
   assertKiloModelAvailableMock: vi.fn().mockResolvedValue(undefined),
   assertBitbucketRepositoryAccessMock: vi.fn().mockResolvedValue(undefined),
@@ -104,6 +104,7 @@ vi.mock('../../model-validation.js', () => ({
 
 vi.mock('../../session/validate-repository-access.js', () => ({
   assertRepositoryAccessBeforeSessionCreation: assertBitbucketRepositoryAccessMock,
+  assertEnvironmentRepositoriesAccess: vi.fn().mockResolvedValue(undefined),
 }));
 
 vi.mock('./organization-membership.js', () => ({
@@ -160,7 +161,7 @@ describe('prepareSession operation-ledger admission gate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mergeProfileConfigurationMock.mockResolvedValue({});
-    loadEnvironmentForSessionMock.mockResolvedValue(null);
+    loadEnvironmentForSessionMock.mockResolvedValue({ status: 'none' });
     assertKiloModelAvailableMock.mockResolvedValue(undefined);
     assertBitbucketRepositoryAccessMock.mockResolvedValue(undefined);
     assertOrganizationMembershipMock.mockResolvedValue(undefined);
@@ -867,7 +868,10 @@ describe('prepareSession operation-ledger admission gate', () => {
     const caller = router.createCaller(createContext());
     const environmentId = '123e4567-e89b-12d3-a456-426614174099';
     const layer = { envVars: { ENV_ONLY: 'from-environment' }, setupCommands: ['env-setup'] };
-    loadEnvironmentForSessionMock.mockResolvedValueOnce(environmentLoad(layer, environmentId));
+    loadEnvironmentForSessionMock.mockResolvedValueOnce({
+      status: 'match',
+      environment: environmentLoad(layer, environmentId),
+    });
     mergeProfileConfigurationMock.mockResolvedValueOnce(layer);
 
     await caller.prepareSession({

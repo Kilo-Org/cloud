@@ -8,33 +8,36 @@ import {
   type EnvironmentForSession,
   type EnvironmentInlineArgs,
   type EnvironmentOwner,
-  type EnvironmentRepositoryIdentity,
   type EnvironmentSessionLayer,
   type InlineAgentInput,
   type MergeProfileConfigurationResult,
   type ProfileOwner,
 } from '@kilocode/cloud-agent-profile';
-import { canonicalGitLabCloneUrl, repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
+import { repoFullNameFromGitUrl } from '@kilocode/worker-utils/git-url';
 import { getPgDb } from '../../db/pg.js';
 import { assertKiloModelAvailable } from '../../model-validation.js';
 import { SessionProfileBundleSchema } from '../../persistence/schemas.js';
 import type { SessionProfileBundle } from '../../session-profile.js';
-import type {
-  SessionCreateRequest,
-  SessionRepositoryRequest,
-} from '../../session/session-requests.js';
+import type { SessionCreateRequest } from '../../session/session-requests.js';
+import { launchRepositoryIdentity } from '../../session/environment-launch.js';
 import { isPolicyBearingAuthToken } from '../../session/policy-bearing-token.js';
-import { assertRepositoryAccessBeforeSessionCreation } from '../../session/validate-repository-access.js';
+import {
+  assertEnvironmentRepositoriesAccess,
+  assertRepositoryAccessBeforeSessionCreation,
+} from '../../session/validate-repository-access.js';
 import type { TRPCContext } from '../../types.js';
 import { isBuiltinMode } from '../schemas.js';
 import { assertOrganizationMembership } from './organization-membership.js';
+import { assertRequestedRepositories } from './requested-environment-repositories.js';
 import { getSandboxSessionStub } from '../../sandbox-session/session-stub.js';
 import { withDORetry } from '../../utils/do-retry.js';
 import { validateBalanceOnly } from '../../balance-validation.js';
 import { timingSafeEqual } from '@kilocode/encryption';
 
+const WEB_ORIGIN = 'cloud-agent-web';
+
 const IMPLICIT_PROFILE_RESOLUTION_ORIGINS: ReadonlySet<string> = new Set([
-  'cloud-agent-web',
+  WEB_ORIGIN,
   'slack',
   'github',
   'linear',
@@ -77,32 +80,15 @@ function environmentOwnerForSession(
     : { type: 'user', id: ctx.userId };
 }
 
-/** The identity an environment is keyed by; none for a generic git repository. */
-function environmentRepositoryIdentity(
-  repository: SessionRepositoryRequest
-): EnvironmentRepositoryIdentity | undefined {
-  switch (repository.type) {
-    case 'github':
-      return { platform: 'github', repoFullName: repository.repo };
-    case 'gitlab': {
-      const cloneUrl = canonicalGitLabCloneUrl(repository.url);
-      return cloneUrl ? { platform: 'gitlab', cloneUrl } : undefined;
-    }
-    case 'bitbucket':
-      return {
-        platform: 'bitbucket',
-        workspaceUuid: repository.workspaceUuid,
-        repositoryUuid: repository.repositoryUuid,
-      };
-    case 'git':
-      return undefined;
-  }
-}
-
 /**
  * The environment of the session's repository. It applies on the same origins
  * as the implicit profile defaults; other origins (for example code review and
  * the security agent) run without it.
+ *
+ * Several environments can contain the repository. A client that selected one
+ * names it in `requestedEnvironment`. Without a selection, a client that marks
+ * `requireEnvironmentChoice` gets a conflict that names the environments, and
+ * every other client runs with no environment.
  */
 async function resolveEnvironment(
   ctx: Pick<TRPCContext, 'env' | 'userId'>,
@@ -111,13 +97,35 @@ async function resolveEnvironment(
   db?: WorkerDb
 ): Promise<EnvironmentForSession | null> {
   if (policy.defaultProfileResolution !== 'include-web-defaults') return null;
-  const repository = environmentRepositoryIdentity(input.repository);
+  const repository = launchRepositoryIdentity(input.repository);
   if (!repository) return null;
 
-  return loadEnvironmentForSession(db ?? getPgDb(ctx.env), {
+  const resolution = await loadEnvironmentForSession(db ?? getPgDb(ctx.env), {
     owner: environmentOwnerForSession(ctx, input),
     repository,
+    ...(input.requestedEnvironment ? { environmentId: input.requestedEnvironment.id } : {}),
   });
+  switch (resolution.status) {
+    case 'match':
+      return resolution.environment;
+    case 'none':
+      return null;
+    case 'requested-not-found':
+      throw new TRPCError({ code: 'NOT_FOUND', message: 'The selected environment was not found' });
+    case 'requested-without-repository':
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'The selected environment does not contain this repository',
+      });
+    case 'conflict':
+      if (input.requireEnvironmentChoice !== true) return null;
+      throw new TRPCError({
+        code: 'CONFLICT',
+        message: `Several environments contain this repository: ${resolution.environments
+          .map(environment => `"${environment.name}" (${environment.id})`)
+          .join(', ')}. Select one.`,
+      });
+  }
 }
 
 function inlineOverridesForResolution(input: SessionCreateRequest): EnvironmentInlineArgs {
@@ -240,6 +248,11 @@ export async function resolveEffectiveSessionConfiguration(
   db?: WorkerDb
 ): Promise<SessionCreateRequest> {
   const environment = await resolveEnvironment(ctx, input, policy, db);
+  assertRequestedRepositories({
+    environment: environment?.reference ?? null,
+    launch: launchRepositoryIdentity(input.repository),
+    requested: input.requestedEnvironment,
+  });
   // An environment resolves only under the implicit-defaults policy, so the
   // profile path always runs when one exists.
   const resolved = shouldResolveProfile(input, policy)
@@ -347,6 +360,15 @@ export async function preflightSessionCreation(
 
   const policy = profileResolutionPolicyForSessionCreateOrigin(request.options?.createdOnPlatform);
   const resolvedRequest = await resolveEffectiveSessionConfiguration(ctx, request, policy, db);
+  // The environment resolves here, so its members are authorized after it.
+  await assertEnvironmentRepositoriesAccess({
+    env: ctx.env,
+    userId: ctx.userId,
+    orgId: organizationId,
+    createdOnPlatform: resolvedRequest.options?.createdOnPlatform,
+    repository: resolvedRequest.repository,
+    environment: resolvedRequest.environment,
+  });
   assertModeAvailableForProfile(
     resolvedRequest.agent.mode,
     resolvedRequest.profile?.resolved ?? {}

@@ -6400,6 +6400,47 @@
               "maxLength": 50,
               "pattern": "^[a-zA-Z]+$"
             },
+            "requestedEnvironment": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "repositories": {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "repoFullName": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500
+                      },
+                      "branch": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 255
+                      }
+                    },
+                    "required": [
+                      "repoFullName"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "additionalProperties": false
+            },
+            "requireEnvironmentChoice": {
+              "type": "boolean",
+              "const": true
+            },
             "profileId": {
               "type": "string",
               "format": "uuid",
@@ -7029,6 +7070,47 @@
               "type": "string",
               "maxLength": 50,
               "pattern": "^[a-zA-Z]+$"
+            },
+            "requestedEnvironment": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "format": "uuid",
+                  "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                },
+                "repositories": {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "repoFullName": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 500
+                      },
+                      "branch": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 255
+                      }
+                    },
+                    "required": [
+                      "repoFullName"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "id"
+              ],
+              "additionalProperties": false
+            },
+            "requireEnvironmentChoice": {
+              "type": "boolean",
+              "const": true
             },
             "profileId": {
               "type": "string",
@@ -8166,7 +8248,7 @@
   "cloudEnvironments.create": {
     "path": "cloudEnvironments.create",
     "kind": "mutation",
-    "summary": "Create the Cloud Agent environment for a repository: setup commands, variables, secrets, and sandbox size. A repository can have only one.",
+    "summary": "Create the Cloud Agent environment for a repository: setup commands, variables, secrets, and sandbox size. A repository can be in several environments.",
     "inputSchema": {
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "type": "object",
@@ -8251,6 +8333,81 @@
             }
           ]
         },
+        "repositories": {
+          "minItems": 1,
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "platform": {
+                    "type": "string",
+                    "const": "github"
+                  },
+                  "fullName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "platform",
+                  "fullName"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "platform": {
+                    "type": "string",
+                    "const": "gitlab"
+                  },
+                  "projectPath": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "platform",
+                  "projectPath"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "platform": {
+                    "type": "string",
+                    "const": "bitbucket"
+                  },
+                  "fullName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "workspaceUuid": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "repositoryUuid": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "platform",
+                  "fullName",
+                  "workspaceUuid",
+                  "repositoryUuid"
+                ]
+              }
+            ]
+          }
+        },
         "plainVars": {
           "type": "object",
           "propertyNames": {
@@ -8304,8 +8461,7 @@
         }
       },
       "required": [
-        "name",
-        "repository"
+        "name"
       ]
     },
     "tags": [
@@ -8314,12 +8470,13 @@
       "organizationid",
       "name",
       "repository",
+      "repositories",
       "plainvars",
       "secrets",
       "commands",
       "sandboxallocation"
     ],
-    "searchBlob": "cloudEnvironments.create Create the Cloud Agent environment for a repository: setup commands, variables, secrets, and sandbox size. A repository can have only one. cloudenvironments create organizationid name repository plainvars secrets commands sandboxallocation organizationId name repository plainVars secrets commands sandboxAllocation"
+    "searchBlob": "cloudEnvironments.create Create the Cloud Agent environment for a repository: setup commands, variables, secrets, and sandbox size. A repository can be in several environments. cloudenvironments create organizationid name repository repositories plainvars secrets commands sandboxallocation organizationId name repository repositories plainVars secrets commands sandboxAllocation"
   },
   "cloudEnvironments.delete": {
     "path": "cloudEnvironments.delete",
@@ -8495,6 +8652,28 @@
     ],
     "searchBlob": "cloudEnvironments.listAll List every Cloud Agent repository environment for the user or organization, across all repositories. cloudenvironments listall organizationid organizationId"
   },
+  "cloudEnvironments.multiRepositoryEnabled": {
+    "path": "cloudEnvironments.multiRepositoryEnabled",
+    "kind": "query",
+    "summary": "Check whether multi-repository cloud environments are enabled for a user or an organization. Returns true if the feature flag is on for the owner.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      }
+    },
+    "tags": [
+      "cloudenvironments",
+      "multirepositoryenabled",
+      "organizationid"
+    ],
+    "searchBlob": "cloudEnvironments.multiRepositoryEnabled Check whether multi-repository cloud environments are enabled for a user or an organization. Returns true if the feature flag is on for the owner. cloudenvironments multirepositoryenabled organizationid organizationId"
+  },
   "cloudEnvironments.update": {
     "path": "cloudEnvironments.update",
     "kind": "mutation",
@@ -8517,6 +8696,81 @@
           "type": "string",
           "minLength": 1,
           "maxLength": 100
+        },
+        "repositories": {
+          "minItems": 1,
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "platform": {
+                    "type": "string",
+                    "const": "github"
+                  },
+                  "fullName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "platform",
+                  "fullName"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "platform": {
+                    "type": "string",
+                    "const": "gitlab"
+                  },
+                  "projectPath": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "required": [
+                  "platform",
+                  "projectPath"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "platform": {
+                    "type": "string",
+                    "const": "bitbucket"
+                  },
+                  "fullName": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  },
+                  "workspaceUuid": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  },
+                  "repositoryUuid": {
+                    "type": "string",
+                    "format": "uuid",
+                    "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                  }
+                },
+                "required": [
+                  "platform",
+                  "fullName",
+                  "workspaceUuid",
+                  "repositoryUuid"
+                ]
+              }
+            ]
+          }
         },
         "plainVars": {
           "type": "object",
@@ -8611,12 +8865,13 @@
       "organizationid",
       "environmentid",
       "name",
+      "repositories",
       "plainvars",
       "secrets",
       "commands",
       "sandboxallocation"
     ],
-    "searchBlob": "cloudEnvironments.update Update a Cloud Agent repository environment: rename it, change setup commands, variables, secrets, or sandbox size. cloudenvironments update organizationid environmentid name plainvars secrets commands sandboxallocation organizationId environmentId name plainVars secrets commands sandboxAllocation"
+    "searchBlob": "cloudEnvironments.update Update a Cloud Agent repository environment: rename it, change setup commands, variables, secrets, or sandbox size. cloudenvironments update organizationid environmentid name repositories plainvars secrets commands sandboxallocation organizationId environmentId name repositories plainVars secrets commands sandboxAllocation"
   },
   "codeIndexing.delete": {
     "path": "codeIndexing.delete",
@@ -17381,6 +17636,47 @@
                   "maxLength": 50,
                   "pattern": "^[a-zA-Z]+$"
                 },
+                "requestedEnvironment": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "repositories": {
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "repoFullName": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "branch": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 255
+                          }
+                        },
+                        "required": [
+                          "repoFullName"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                },
+                "requireEnvironmentChoice": {
+                  "type": "boolean",
+                  "const": true
+                },
                 "profileId": {
                   "type": "string",
                   "format": "uuid",
@@ -18016,6 +18312,47 @@
                   "type": "string",
                   "maxLength": 50,
                   "pattern": "^[a-zA-Z]+$"
+                },
+                "requestedEnvironment": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "format": "uuid",
+                      "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+                    },
+                    "repositories": {
+                      "maxItems": 100,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "repoFullName": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 500
+                          },
+                          "branch": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 255
+                          }
+                        },
+                        "required": [
+                          "repoFullName"
+                        ],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": [
+                    "id"
+                  ],
+                  "additionalProperties": false
+                },
+                "requireEnvironmentChoice": {
+                  "type": "boolean",
+                  "const": true
                 },
                 "profileId": {
                   "type": "string",

@@ -12,6 +12,10 @@ jest.mock('@kilocode/worker-utils/scheduled-job-observability', () => ({
   emitScheduledJobEvent: jest.fn(),
 }));
 
+// The cap case inserts more than the per-run delete budget, so a single test
+// case needs more than the default 5s budget.
+jest.setTimeout(30_000);
+
 import { organization_mcp_connect_events } from '@kilocode/db/schema';
 import { db, cleanupDbForTest } from '@kilocode/web-shared/lib/drizzle';
 import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organization.helper';

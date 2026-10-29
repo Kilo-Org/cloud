@@ -26,7 +26,7 @@ export type TestMcpServer = {
 };
 
 export function testProfile(mcpServers: TestMcpServer[] = []) {
-  return { id: 'profile-1', mcpServers };
+  return mcpServers;
 }
 
 export function testServer(overrides: Partial<TestMcpServer> = {}): TestMcpServer {

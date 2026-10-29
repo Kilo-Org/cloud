@@ -13,8 +13,8 @@ import {
   pressSheetDone,
   rerenderScreen,
   type TestConfirmMock,
-  testProfile,
   testSkill,
+  testSkills,
 } from '@/components/profiles/profile-skills-screen.test-helpers';
 import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
@@ -44,7 +44,7 @@ vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
 }));
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
-  useAgentProfile: () => h.query,
+  useAgentProfileSkills: () => h.query,
   useAgentProfileMutations: () => h.mutations,
 }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
@@ -123,7 +123,7 @@ describe('ProfileSkillsScreen', () => {
   });
 
   it('empty: shows skillsEmpty and the add CTA opens the sheet', async () => {
-    h.query.data = testProfile();
+    h.query.data = testSkills();
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
@@ -136,7 +136,7 @@ describe('ProfileSkillsScreen', () => {
   });
 
   it('happy: a row shows the name and source type; the switch toggles', async () => {
-    h.query.data = testProfile([testSkill()]);
+    h.query.data = testSkills([testSkill()]);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
@@ -161,7 +161,7 @@ describe('ProfileSkillsScreen', () => {
   });
 
   it('hides the edit control for skills.sh references but keeps the toggle and delete', async () => {
-    h.query.data = testProfile([testSkill({ sourceType: 'skills-sh', rawMarkdown: '' })]);
+    h.query.data = testSkills([testSkill({ sourceType: 'skills-sh', rawMarkdown: '' })]);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
@@ -177,7 +177,7 @@ describe('ProfileSkillsScreen', () => {
   });
 
   it('happy: the edit control opens the sheet seeded with the skill', async () => {
-    h.query.data = testProfile([testSkill()]);
+    h.query.data = testSkills([testSkill()]);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
@@ -190,7 +190,7 @@ describe('ProfileSkillsScreen', () => {
   });
 
   it('clears the stored description when frontmatter description is removed', async () => {
-    h.query.data = testProfile([
+    h.query.data = testSkills([
       testSkill({
         rawMarkdown: '---\nname: code-review\ndescription: Old description\n---\nBody',
       }),
@@ -210,7 +210,7 @@ describe('ProfileSkillsScreen', () => {
   });
 
   it('happy: a valid add saves through createCustomSkill and closes the sheet', async () => {
-    h.query.data = testProfile();
+    h.query.data = testSkills();
     h.query.isPending = false;
     h.mutations.createCustomSkill.mutateAsync.mockResolvedValue({ id: 'skill-2' });
 
@@ -232,7 +232,7 @@ describe('ProfileSkillsScreen', () => {
   });
 
   it('happy: frontmatter in the content prefills the name field', async () => {
-    h.query.data = testProfile();
+    h.query.data = testSkills();
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
@@ -249,7 +249,7 @@ describe('ProfileSkillsScreen', () => {
   });
 
   it('non-retryable: an empty name is refused and nothing persists', async () => {
-    h.query.data = testProfile();
+    h.query.data = testSkills();
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
@@ -264,7 +264,7 @@ describe('ProfileSkillsScreen', () => {
   });
 
   it('retryable: a failure with no message toasts the fallback and keeps the sheet', async () => {
-    h.query.data = testProfile();
+    h.query.data = testSkills();
     h.query.isPending = false;
     const error = new Error('placeholder');
     error.message = '';
@@ -284,7 +284,7 @@ describe('ProfileSkillsScreen', () => {
   });
 
   it('happy: confirming delete calls deleteSkill', async () => {
-    h.query.data = testProfile([testSkill()]);
+    h.query.data = testSkills([testSkill()]);
     h.query.isPending = false;
     h.mutations.deleteSkill.mutateAsync.mockResolvedValue({ success: true });
 
@@ -305,7 +305,7 @@ describe('ProfileSkillsScreen', () => {
   });
 
   it('keeps the rows while a refetch is in flight', async () => {
-    h.query.data = testProfile([testSkill()]);
+    h.query.data = testSkills([testSkill()]);
     h.query.isPending = false;
 
     const { renderer, queryClient, unmount } = await mountScreen();

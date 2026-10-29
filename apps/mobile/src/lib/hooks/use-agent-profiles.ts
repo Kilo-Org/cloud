@@ -131,22 +131,13 @@ const PROFILE_READ_OPTIONS = {
   refetchOnReconnect: 'always',
 } as const;
 
-/** A single profile with its variables, commands, MCP servers, skills and agents. */
-export function useAgentProfile(profileId: string, organizationId?: string) {
-  const trpc = useTRPC();
-  return useQuery({
-    ...trpc.agentProfiles.get.queryOptions({ profileId, organizationId }),
-    ...PROFILE_READ_OPTIONS,
-  });
-}
-
 /**
  * A single profile's metadata and collection counts.
  *
  * The Overview screen renders metadata and six counts and nothing else, so it
- * reads this instead of `useAgentProfile`: a profile may carry every skill's
- * markdown and companion files, and the caps allow those to dwarf the response
- * that renders six numbers.
+ * reads this instead of `get`: a profile may carry every skill's markdown and
+ * companion files, and the caps allow those to dwarf the response that renders
+ * six numbers.
  */
 export function useAgentProfileOverview(profileId: string, organizationId?: string) {
   const trpc = useTRPC();
@@ -157,14 +148,59 @@ export function useAgentProfileOverview(profileId: string, organizationId?: stri
 }
 
 /**
- * A single profile's agents, for the role picker's custom modes. Reading the
- * agents alone keeps every skill's markdown and companion files out of that
- * decision's request.
+ * The profile-editor section reads. Each screen renders one collection, so it
+ * reads that collection alone: the whole-profile `get` validates seven
+ * collections at once, and one row outside a contract in a collection the
+ * screen never renders would otherwise fail the screen for good.
+ */
+export function useAgentProfileVars(profileId: string, organizationId?: string) {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.agentProfiles.vars.queryOptions({ profileId, organizationId }),
+    ...PROFILE_READ_OPTIONS,
+  });
+}
+
+export function useAgentProfileCommands(profileId: string, organizationId?: string) {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.agentProfiles.commands.queryOptions({ profileId, organizationId }),
+    ...PROFILE_READ_OPTIONS,
+  });
+}
+
+export function useAgentProfileMcpServers(profileId: string, organizationId?: string) {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.agentProfiles.mcpServers.queryOptions({ profileId, organizationId }),
+    ...PROFILE_READ_OPTIONS,
+  });
+}
+
+export function useAgentProfileSkills(profileId: string, organizationId?: string) {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.agentProfiles.skills.queryOptions({ profileId, organizationId }),
+    ...PROFILE_READ_OPTIONS,
+  });
+}
+
+export function useAgentProfileKiloCommands(profileId: string, organizationId?: string) {
+  const trpc = useTRPC();
+  return useQuery({
+    ...trpc.agentProfiles.kiloCommands.queryOptions({ profileId, organizationId }),
+    ...PROFILE_READ_OPTIONS,
+  });
+}
+
+/**
+ * A single profile's agents, for the profile-editor Agents screen. The role
+ * picker has its own scoped read below.
  */
 export function useAgentProfileAgents(
   profileId: string,
   organizationId: string | undefined,
-  enabled: boolean
+  enabled = true
 ) {
   const trpc = useTRPC();
   return useQuery({

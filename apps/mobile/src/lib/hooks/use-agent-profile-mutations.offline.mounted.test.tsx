@@ -5,7 +5,7 @@ import { type ReactNode } from 'react';
 import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { useAgentProfile, useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
+import { useAgentProfileMutations, useAgentProfileVars } from '@/lib/hooks/use-agent-profiles';
 import { trpcClient, TRPCProvider } from '@/lib/trpc';
 import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
 
@@ -34,7 +34,7 @@ vi.mock('sonner-native', () => ({ toast: { error: vi.fn(), success: vi.fn() } })
 
 const responses: Record<string, unknown> = {
   'agentProfiles.list': [],
-  'agentProfiles.get': {
+  'agentProfiles.vars': {
     id: 'profile-1',
     name: 'Backend',
     description: null,
@@ -65,7 +65,7 @@ type UpdateProfile = (input: { profileId: string; name: string }) => Promise<unk
 
 /** The overview screen's detail query plus the metadata save mutation. */
 function ProfileSaveProbe({ holder }: { holder: { current: UpdateProfile | null } }) {
-  useAgentProfile('profile-1');
+  useAgentProfileVars('profile-1');
   holder.current = useAgentProfileMutations().update.mutateAsync;
   return null;
 }
@@ -110,7 +110,7 @@ describe('offline profile save', () => {
       queryClient,
       wrapper,
     });
-    await waitFor(() => callsTo('agentProfiles.get') === 1);
+    await waitFor(() => callsTo('agentProfiles.vars') === 1);
 
     await act(async () => {
       await holder.current?.({ profileId: 'profile-1', name: 'Backend' });

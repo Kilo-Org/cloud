@@ -2206,6 +2206,13 @@
       "when": 1793214084646,
       "tag": "0314_scheduled_briefing_snapshots",
       "breakpoints": true
+    },
+    {
+      "idx": 315,
+      "version": "7",
+      "when": 1793264832628,
+      "tag": "0315_restore_briefing_legacy_objects",
+      "breakpoints": true
     }
   ]
 }

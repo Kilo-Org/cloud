@@ -46,6 +46,7 @@ beforeEach(() => {
   mockGetModelUserByokProviders.mockResolvedValue([]);
   mockGetUserByokProviderIds.mockResolvedValue([]);
   mockGetOrganizationByokProviderIds.mockResolvedValue([]);
+  mockResolveOrganizationMemberModelDecision.mockResolvedValue({ decision: { allowed: true } });
 });
 
 describe('computeCloudAgentNextBalanceCheckEligibility', () => {
@@ -223,12 +224,51 @@ describe('computeCloudAgentNextBalanceCheckEligibility', () => {
       expect(mockCanRouteToVercel).not.toHaveBeenCalled();
     });
 
-    it('skips the policy lookup when the Vercel AI Gateway key does not serve the model', async () => {
+    it('does not count the key when it does not serve the model', async () => {
       mockGetModelUserByokProviders.mockResolvedValue(['openrouter']);
       mockGetOrganizationByokProviderIds.mockResolvedValue(['vercel-ai-gateway']);
 
       expect(await eligibility()).toEqual({ isFree: false, hasUserByokAvailable: false });
-      expect(mockResolveOrganizationMemberModelDecision).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('organization provider key sent through Vercel', () => {
+    beforeEach(() => {
+      mockGetModelUserByokProviders.mockResolvedValue(['bedrock']);
+      mockGetOrganizationByokProviderIds.mockResolvedValue(['bedrock']);
+    });
+
+    async function eligibility() {
+      return computeCloudAgentNextBalanceCheckEligibility({
+        fromDb: fakeDb,
+        user: fakeUser,
+        modelId: NON_EXCLUSIVE_MODEL,
+        organizationId: 'org-1',
+      });
+    }
+
+    it('counts a key the provider allow-list admits', async () => {
+      mockResolveOrganizationMemberModelDecision.mockResolvedValue({
+        decision: { allowed: true, eligibleProviderRoutes: new Set(['amazon-bedrock']) },
+      });
+
+      expect(await eligibility()).toEqual({ isFree: false, hasUserByokAvailable: true });
+    });
+
+    it('does not count a key outside the provider allow-list', async () => {
+      mockResolveOrganizationMemberModelDecision.mockResolvedValue({
+        decision: { allowed: true, eligibleProviderRoutes: new Set(['anthropic']) },
+      });
+
+      expect(await eligibility()).toEqual({ isFree: false, hasUserByokAvailable: false });
+    });
+
+    it('does not count a key when no allowed provider serves the model', async () => {
+      mockResolveOrganizationMemberModelDecision.mockResolvedValue({
+        decision: { allowed: false, denialSource: 'organization_provider' },
+      });
+
+      expect(await eligibility()).toEqual({ isFree: false, hasUserByokAvailable: false });
     });
   });
 });

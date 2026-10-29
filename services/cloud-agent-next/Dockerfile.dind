@@ -15,7 +15,7 @@ ARG VCS_REF=""
 ARG KILOCODE_CLI_VERSION="7.8.17"
 ARG BUN_VERSION="1.4.4"
 ARG PNPM_VERSION="12.14.0"
-ARG GH_VERSION="2.103.3"
+ARG GH_VERSION="2.102.0"
 ARG GLAB_VERSION="1.124.0"
 
 # Cloudflare Containers run without root privileges, so Docker must run in

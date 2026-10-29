@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Canje-canje",
-    "organizationTrialEnded": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Mai mallakar ƙungiyar zai iya sabunta lissafin kuɗi a kilo.ai, sannan ya sake gwadawa."
+    "organizationTrialEnded": "Gwajin ƙungiyar ya ƙare kuma ba ta da wani shiri mai aiki. Mai mallakar ƙungiyar zai iya sabunta lissafin kuɗi a kilo.ai, sannan ya sake gwadawa.",
+    "privateRepositoryA11y": "{{name}}, ma'ajiya na sirri"
   },
   "language": {
     "restarting": "Ana sake kunnawa don amfani da harshen da aka zaɓa",
@@ -3950,7 +3951,6 @@
       "repo": "Zaɓi wurin ajiya…",
       "profile": "Zaɓi bayanin martaba",
       "remove": "Cire daurin",
-      "private": "Na sirri",
       "search": "Bincika wuraren ajiya…",
       "addedToast": "An saita tsoffin bayanan martaba don \"{{repo}}\"",
       "addFailed": "An kasa saita bayanan martaba na asali",

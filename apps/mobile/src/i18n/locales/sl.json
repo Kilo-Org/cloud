@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Spremembe",
-    "organizationTrialEnded": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Lastnik organizacije lahko posodobi obračun na kilo.ai, nato poskusi znova."
+    "organizationTrialEnded": "Preizkusna doba organizacije se je končala in nima aktivnega načrta. Lastnik organizacije lahko posodobi obračun na kilo.ai, nato poskusi znova.",
+    "privateRepositoryA11y": "{{name}}, zasebno skladišče"
   },
   "language": {
     "restarting": "Ponovni zagon za spremembo jezika",
@@ -4052,7 +4053,6 @@
       "repo": "Izberite repozitorij ...",
       "profile": "Izberite profil",
       "remove": "Odveži",
-      "private": "Zasebno",
       "search": "Iskanje po skladiščih ...",
       "addedToast": "Privzeti profil nastavljen za \"{{repo}}\"",
       "addFailed": "Privzetega profila ni bilo mogoče nastaviti",

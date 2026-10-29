@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Ændringer",
-    "organizationTrialEnded": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. En ejer af organisationen kan opdatere betalingen på kilo.ai og derefter prøve igen."
+    "organizationTrialEnded": "Organisationens prøveperiode er udløbet, og den har ingen aktiv plan. En ejer af organisationen kan opdatere betalingen på kilo.ai og derefter prøve igen.",
+    "privateRepositoryA11y": "{{name}}, privat repository"
   },
   "language": {
     "restarting": "Genstarter for at skifte sprog",
@@ -3950,7 +3951,6 @@
       "repo": "Vælg lager...",
       "profile": "Vælg profil",
       "remove": "Afbind",
-      "private": "Privat",
       "search": "Søg i lagre...",
       "addedToast": "Standardprofilen er indstillet til \"{{repo}}\"",
       "addFailed": "Standardprofilen kunne ikke indstilles",

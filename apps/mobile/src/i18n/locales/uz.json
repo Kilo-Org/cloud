@@ -148,7 +148,8 @@
     "durationMinuteShort": "daq",
     "durationHourShort": "soat",
     "changes": "O'zgarishlar",
-    "organizationTrialEnded": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Tashkilot egasi kilo.ai saytida hisob-kitobni yangilab, so'ng qayta urinib ko'rishi mumkin."
+    "organizationTrialEnded": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Tashkilot egasi kilo.ai saytida hisob-kitobni yangilab, so'ng qayta urinib ko'rishi mumkin.",
+    "privateRepositoryA11y": "{{name}}, shaxsiy repozitoriya"
   },
   "language": {
     "restarting": "Tilni qo'llash uchun qayta ishga tushirilmoqda",
@@ -3950,7 +3951,6 @@
       "repo": "Repozitoriyni tanlang…",
       "profile": "Profilni tanlang",
       "remove": "Bog'lash",
-      "private": "Shaxsiy",
       "search": "Repozitariylarni qidirish…",
       "addedToast": "“{{repo}}” uchun birlamchi profil oʻrnatilgan",
       "addFailed": "Standart profilni o‘rnatib bo‘lmadi",

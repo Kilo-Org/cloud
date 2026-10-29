@@ -25,6 +25,7 @@ let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 type RowProps = {
   label?: string;
   description?: string;
+  accessibleName?: string;
   selected: boolean;
   busy?: boolean;
   multi?: boolean;
@@ -101,6 +102,23 @@ describe('ChoiceRow accessible name', () => {
     );
 
     expect(control.props.accessibilityLabel).toBeUndefined();
+  });
+
+  it('uses a supplied name for custom content and keeps the checked state', () => {
+    // The row's children spell out only part of what it means, so the caller
+    // supplies the whole name; the state must still reach the screen reader.
+    const control = rowControl(
+      renderRow({
+        selected: true,
+        multi: true,
+        accessibleName: 'acme/api, private repository',
+        children: createElement('Text', null, 'acme/api'),
+      })
+    );
+
+    expect(control.props.accessibilityLabel).toBe('acme/api, private repository');
+    expect(control.props.accessibilityRole).toBe('checkbox');
+    expect(control.props.accessibilityState).toEqual({ checked: true, disabled: false });
   });
 
   it('reports a multi-select row as a checkbox and a single choice as a radio', () => {

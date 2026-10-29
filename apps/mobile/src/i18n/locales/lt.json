@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Pakeitimai",
-    "organizationTrialEnded": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Organizacijos savininkas gali atnaujinti atsiskaitymo duomenis adresu kilo.ai, tada bandykite dar kartą."
+    "organizationTrialEnded": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Organizacijos savininkas gali atnaujinti atsiskaitymo duomenis adresu kilo.ai, tada bandykite dar kartą.",
+    "privateRepositoryA11y": "{{name}}, privati saugykla"
   },
   "language": {
     "restarting": "Paleidžiama iš naujo, kad būtų pakeista kalba",
@@ -4052,7 +4053,6 @@
       "repo": "Pasirinkite saugyklą…",
       "profile": "Pasirinkite profilį",
       "remove": "Atsieti",
-      "private": "Privatus",
       "search": "Ieškoti saugyklų…",
       "addedToast": "Numatytasis profilis nustatytas „{{repo}}“",
       "addFailed": "Nepavyko nustatyti numatytojo profilio",

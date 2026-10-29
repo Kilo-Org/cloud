@@ -148,7 +148,8 @@
     "durationMinuteShort": "daq",
     "durationHourShort": "saac",
     "changes": "Isbeddellada",
-    "organizationTrialEnded": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Milkiilaha ururku wuxuu cusboonaysiin karaa biilasha kilo.ai, ka dibna isku day mar kale."
+    "organizationTrialEnded": "Tijaabadii ururku way dhamaatay, mana laha qorshe firfircoon. Milkiilaha ururku wuxuu cusboonaysiin karaa biilasha kilo.ai, ka dibna isku day mar kale.",
+    "privateRepositoryA11y": "{{name}}, kaydka gaar ah"
   },
   "language": {
     "restarting": "Dib ayaa loo bilaabayaa si luqadda loo adeegsado",
@@ -3950,7 +3951,6 @@
       "repo": "Dooro kaydka…",
       "profile": "Dooro astaanta",
       "remove": "Ka fur",
-      "private": "Gaar ah",
       "search": "Raadi meelaha kaydka ah…",
       "addedToast": "Astaanta asalka ah waxaa loo dejiyay \"{{repo}}\"",
       "addFailed": "Waa la dejin kari waayay astaanta guud",

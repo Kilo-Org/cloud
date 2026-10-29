@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Newidiadau",
-    "organizationTrialEnded": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol. Gall perchennog sefydliad ddiweddaru bilio ar kilo.ai, ac yna rhoi cynnig arall arni."
+    "organizationTrialEnded": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol. Gall perchennog sefydliad ddiweddaru bilio ar kilo.ai, ac yna rhoi cynnig arall arni.",
+    "privateRepositoryA11y": "{{name}}, yn repositori preifat"
   },
   "language": {
     "restarting": "Yn ailgychwyn i newid yr iaith",
@@ -4154,7 +4155,6 @@
       "repo": "Dewiswch ystorfa…",
       "profile": "Dewiswch broffil",
       "remove": "Dadrwymo",
-      "private": "Preifat",
       "search": "Chwilio cadwrfeydd…",
       "addedToast": "Gosod proffil rhagosodedig ar gyfer \"{{repo}}\"",
       "addFailed": "Methu gosod y proffil rhagosodedig",

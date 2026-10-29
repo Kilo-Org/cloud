@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Perubahan",
-    "organizationTrialEnded": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif. Pemilik organisasi boleh mengemas kini bil di kilo.ai, kemudian cuba lagi."
+    "organizationTrialEnded": "Percubaan organisasi telah tamat dan ia tidak mempunyai pelan aktif. Pemilik organisasi boleh mengemas kini bil di kilo.ai, kemudian cuba lagi.",
+    "privateRepositoryA11y": "{{name}}, repositori persendirian"
   },
   "language": {
     "restarting": "Memulakan semula apl untuk menukar bahasa",
@@ -3950,7 +3951,6 @@
       "repo": "Pilih repositori…",
       "profile": "Pilih profil",
       "remove": "Buka ikatan",
-      "private": "Persendirian",
       "search": "Cari repositori…",
       "addedToast": "Profil lalai ditetapkan untuk \"{{repo}}\"",
       "addFailed": "Tidak dapat menetapkan profil lalai",

@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Modifiche",
-    "organizationTrialEnded": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Il proprietario dell'organizzazione può aggiornare la fatturazione su kilo.ai, poi riprova."
+    "organizationTrialEnded": "Il periodo di prova dell'organizzazione è terminato e non è presente alcun piano attivo. Il proprietario dell'organizzazione può aggiornare la fatturazione su kilo.ai, poi riprova.",
+    "privateRepositoryA11y": "{{name}}, repository privato"
   },
   "language": {
     "restarting": "Riavvio per applicare la lingua selezionata",
@@ -4001,7 +4002,6 @@
       "repo": "Seleziona archivio...",
       "profile": "Seleziona profilo",
       "remove": "Slegare",
-      "private": "Privato",
       "search": "Cerca repository...",
       "addedToast": "Profilo predefinito impostato per \"{{repo}}\"",
       "addFailed": "Impossibile impostare il profilo predefinito",

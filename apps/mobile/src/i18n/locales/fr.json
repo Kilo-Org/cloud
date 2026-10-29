@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Modifications",
-    "organizationTrialEnded": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Le propriétaire de l'organisation peut mettre à jour la facturation sur kilo.ai, puis réessayer."
+    "organizationTrialEnded": "L'essai de l'organisation a pris fin et elle ne dispose d'aucun forfait actif. Le propriétaire de l'organisation peut mettre à jour la facturation sur kilo.ai, puis réessayer.",
+    "privateRepositoryA11y": "{{name}}, dépôt privé"
   },
   "language": {
     "restarting": "Redémarrage pour changer de langue",
@@ -4001,7 +4002,6 @@
       "repo": "Sélectionnez le référentiel…",
       "profile": "Sélectionnez un profil",
       "remove": "Délier",
-      "private": "Privé",
       "search": "Rechercher des référentiels…",
       "addedToast": "Profil par défaut défini pour \"{{repo}}\"",
       "addFailed": "Impossible de définir le profil par défaut",

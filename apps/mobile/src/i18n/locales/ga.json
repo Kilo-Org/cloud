@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Athruithe",
-    "organizationTrialEnded": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir le húinéir eagraíochta an billeáil a nuashonrú ag kilo.ai agus ansin triail a bhaint as arís."
+    "organizationTrialEnded": "Tá tréimhse trialach na heagraíochta thart agus níl aon phlean gníomhach aici. Is féidir le húinéir eagraíochta an billeáil a nuashonrú ag kilo.ai agus ansin triail a bhaint as arís.",
+    "privateRepositoryA11y": "{{name}}, stór príobháideach"
   },
   "language": {
     "restarting": "Ag atosú chun an teanga a chur i bhfeidhm",
@@ -4103,7 +4104,6 @@
       "repo": "Roghnaigh stór…",
       "profile": "Roghnaigh próifíl",
       "remove": "Dícheangail",
-      "private": "Príobháideach",
       "search": "Cuardaigh stórtha…",
       "addedToast": "Socraíodh próifíl réamhshocraithe do \"{{repo}}\"",
       "addFailed": "Níorbh fhéidir an phróifíl réamhshocraithe a shocrú",

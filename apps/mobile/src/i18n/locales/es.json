@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Cambios",
-    "organizationTrialEnded": "La prueba de la organización ha finalizado y no tiene ningún plan activo. El propietario de la organización puede actualizar la facturación en kilo.ai y, después, volver a intentarlo."
+    "organizationTrialEnded": "La prueba de la organización ha finalizado y no tiene ningún plan activo. El propietario de la organización puede actualizar la facturación en kilo.ai y, después, volver a intentarlo.",
+    "privateRepositoryA11y": "{{name}}, repositorio privado"
   },
   "language": {
     "restarting": "Reiniciando para aplicar el idioma",
@@ -4001,7 +4002,6 @@
       "repo": "Seleccionar repositorio…",
       "profile": "Seleccionar perfil",
       "remove": "Desatar",
-      "private": "Privado",
       "search": "Buscar repositorios…",
       "addedToast": "Perfil predeterminado establecido para \"{{repo}}\"",
       "addFailed": "No se pudo establecer el perfil predeterminado",

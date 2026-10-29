@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Izmaiņas",
-    "organizationTrialEnded": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Organizācijas īpašnieks var atjaunināt norēķinu informāciju vietnē kilo.ai un pēc tam mēģināt vēlreiz."
+    "organizationTrialEnded": "Organizācijas izmēģinājuma periods ir beidzies, un tai nav aktīva plāna. Organizācijas īpašnieks var atjaunināt norēķinu informāciju vietnē kilo.ai un pēc tam mēģināt vēlreiz.",
+    "privateRepositoryA11y": "{{name}}, privāts repozitorijs"
   },
   "language": {
     "restarting": "Notiek restartēšana, lai lietotu izvēlēto valodu",
@@ -4001,7 +4002,6 @@
       "repo": "Atlasīt repozitoriju…",
       "profile": "Izvēlieties profilu",
       "remove": "Atsaistīt",
-      "private": "Privāts",
       "search": "Meklēt repozitorijās…",
       "addedToast": "Noklusējuma profils iestatīts uz \"{{repo}}\"",
       "addFailed": "Nevarēja iestatīt noklusējuma profilu",

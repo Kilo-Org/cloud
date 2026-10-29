@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Aldaketak",
-    "organizationTrialEnded": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Erakundearen jabe batek fakturazioa egunera dezake kilo.ai-n, eta gero berriro saiatu."
+    "organizationTrialEnded": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Erakundearen jabe batek fakturazioa egunera dezake kilo.ai-n, eta gero berriro saiatu.",
+    "privateRepositoryA11y": "{{name}}, biltegi pribatua"
   },
   "language": {
     "restarting": "Hizkuntza aplikatzeko berrabiarazten",
@@ -3950,7 +3951,6 @@
       "repo": "Hautatu biltegia…",
       "profile": "Hautatu profila",
       "remove": "Askatu",
-      "private": "Pribatua",
       "search": "Bilatu biltegiak...",
       "addedToast": "\"{{repo}}\"-ren profil lehenetsia ezarri da",
       "addFailed": "Ezin izan da profil lehenetsia ezarri",

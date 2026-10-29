@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Muudatused",
-    "organizationTrialEnded": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Organisatsiooni omanik saab arveldust kilo.ai keskkonnas uuendada ja seejärel uuesti proovida."
+    "organizationTrialEnded": "Organisatsiooni prooviperiood on lõppenud ja sellel pole aktiivset paketti. Organisatsiooni omanik saab arveldust kilo.ai keskkonnas uuendada ja seejärel uuesti proovida.",
+    "privateRepositoryA11y": "{{name}}, privaatne repositoorium"
   },
   "language": {
     "restarting": "Keele vahetamiseks taaskäivitatakse rakendus",
@@ -3950,7 +3951,6 @@
       "repo": "Valige hoidla…",
       "profile": "Valige profiil",
       "remove": "Vabasta sidumine",
-      "private": "Privaatne",
       "search": "Otsi hoidlaid…",
       "addedToast": "Vaikeprofiil on seatud \"{{repo}}\" jaoks",
       "addFailed": "Vaikeprofiili ei saanud määrata",

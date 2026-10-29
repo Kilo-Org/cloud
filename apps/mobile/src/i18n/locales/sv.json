@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Ändringar",
-    "organizationTrialEnded": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. En organisationsägare kan uppdatera faktureringen på kilo.ai och sedan försöka igen."
+    "organizationTrialEnded": "Organisationens provperiod har löpt ut och den har ingen aktiv plan. En organisationsägare kan uppdatera faktureringen på kilo.ai och sedan försöka igen.",
+    "privateRepositoryA11y": "{{name}}, privat kodarkiv"
   },
   "language": {
     "restarting": "Startar om för att byta språk",
@@ -3950,7 +3951,6 @@
       "repo": "Välj kodarkiv…",
       "profile": "Välj profil",
       "remove": "Koppla från",
-      "private": "Privat",
       "search": "Sök kodarkiv…",
       "addedToast": "Standardprofil inställd för \"{{repo}}\"",
       "addFailed": "Det gick inte att ange standardprofil",

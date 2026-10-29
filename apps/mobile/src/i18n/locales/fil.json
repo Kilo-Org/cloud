@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Mga pagbabago",
-    "organizationTrialEnded": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update ng may-ari ng organisasyon ang billing sa kilo.ai, pagkatapos ay subukan muli."
+    "organizationTrialEnded": "Natapos na ang trial ng organisasyon at wala itong aktibong plano. Maaaring i-update ng may-ari ng organisasyon ang billing sa kilo.ai, pagkatapos ay subukan muli.",
+    "privateRepositoryA11y": "{{name}}, pribadong repositoryo"
   },
   "language": {
     "restarting": "Ini-restart para ilapat ang wika",
@@ -3950,7 +3951,6 @@
       "repo": "Pumili ng repositoryo...",
       "profile": "Pumili ng profile",
       "remove": "Alisin ang pagkakatali",
-      "private": "Pribado",
       "search": "Maghanap ng mga repositoryo...",
       "addedToast": "Itinakda ang default na profile para sa \"{{repo}}\"",
       "addFailed": "Hindi maitakda ang default na profile",

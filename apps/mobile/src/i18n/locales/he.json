@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "שינויים",
-    "organizationTrialEnded": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. בעל הארגון יכול לעדכן את החיוב ב-kilo.ai, ואז לנסות שוב."
+    "organizationTrialEnded": "הסתיימה תקופת הניסיון של הארגון ואין לו תוכנית פעילה. בעל הארגון יכול לעדכן את החיוב ב-kilo.ai, ואז לנסות שוב.",
+    "privateRepositoryA11y": "{{name}}, מאגר פרטי"
   },
   "language": {
     "restarting": "האפליקציה מופעלת מחדש לשינוי השפה",
@@ -4001,7 +4002,6 @@
       "repo": "בחר מאגר...",
       "profile": "בחר פרופיל",
       "remove": "לְהַתִיר",
-      "private": "פְּרָטִי",
       "search": "חפש במאגרים...",
       "addedToast": "פרופיל ברירת המחדל הוגדר עבור \"{{repo}}\"",
       "addFailed": "לא ניתן להגדיר פרופיל ברירת מחדל",

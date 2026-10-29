@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "更改",
-    "organizationTrialEnded": "组织的试用期已结束，且没有生效的套餐。组织所有者可以在 kilo.ai 更新账单信息，然后重试。"
+    "organizationTrialEnded": "组织的试用期已结束，且没有生效的套餐。组织所有者可以在 kilo.ai 更新账单信息，然后重试。",
+    "privateRepositoryA11y": "{{name}}，私有仓库"
   },
   "language": {
     "restarting": "正在重启以应用语言设置",
@@ -3950,7 +3951,6 @@
       "repo": "选择仓库…",
       "profile": "选择配置文件",
       "remove": "解绑",
-      "private": "私有",
       "search": "搜索仓库…",
       "addedToast": "已为“{{repo}}”设置默认配置文件",
       "addFailed": "无法设置默认配置文件",

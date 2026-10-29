@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Változtatások",
-    "organizationTrialEnded": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. A szervezet tulajdonosa frissítheti a számlázást a kilo.ai oldalon, majd próbálja újra."
+    "organizationTrialEnded": "A szervezet próbaidőszaka lejárt, és nincs aktív csomagja. A szervezet tulajdonosa frissítheti a számlázást a kilo.ai oldalon, majd próbálja újra.",
+    "privateRepositoryA11y": "{{name}}, magán adattár"
   },
   "language": {
     "restarting": "Újraindítás a nyelv beállításához",
@@ -3950,7 +3951,6 @@
       "repo": "Adattár kiválasztása…",
       "profile": "Profil kiválasztása",
       "remove": "Kötés feloldása",
-      "private": "Magán",
       "search": "Adattárak keresése…",
       "addedToast": "Alapértelmezett profil beállítva az adattárhoz: „{{repo}}”",
       "addFailed": "Nem sikerült beállítani az alapértelmezett profilt",

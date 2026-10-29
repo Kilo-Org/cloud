@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "orë",
     "changes": "Ndryshimet",
-    "organizationTrialEnded": "Periudha e provës e organizatës ka përfunduar dhe nuk ka asnjë plan aktiv. Një pronar i organizatës mund të përditësojë faturimin në kilo.ai dhe më pas të provojë përsëri."
+    "organizationTrialEnded": "Periudha e provës e organizatës ka përfunduar dhe nuk ka asnjë plan aktiv. Një pronar i organizatës mund të përditësojë faturimin në kilo.ai dhe më pas të provojë përsëri.",
+    "privateRepositoryA11y": "{{name}}, repozitor privat"
   },
   "language": {
     "restarting": "Po riniset për të zbatuar ndryshimin e gjuhës",
@@ -3950,7 +3951,6 @@
       "repo": "Zgjidhni depo…",
       "profile": "Zgjidhni profilin",
       "remove": "Çlidhe",
-      "private": "Privat",
       "search": "Kërko në depo…",
       "addedToast": "Profili i parazgjedhur është caktuar për \"{{repo}}\"",
       "addFailed": "Profili i parazgjedhur nuk mund të caktohet",

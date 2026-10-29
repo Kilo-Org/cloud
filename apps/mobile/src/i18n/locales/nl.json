@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Wijzigingen",
-    "organizationTrialEnded": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement. Een eigenaar van de organisatie kan de facturering bijwerken op kilo.ai en het daarna opnieuw proberen."
+    "organizationTrialEnded": "De proefperiode van de organisatie is afgelopen en er is geen actief abonnement. Een eigenaar van de organisatie kan de facturering bijwerken op kilo.ai en het daarna opnieuw proberen.",
+    "privateRepositoryA11y": "{{name}}, privé repository"
   },
   "language": {
     "restarting": "Opnieuw starten om de taal in te stellen",
@@ -3950,7 +3951,6 @@
       "repo": "Selecteer opslagplaats…",
       "profile": "Selecteer profiel",
       "remove": "Ontbinden",
-      "private": "Privé",
       "search": "Zoek opslagplaatsen…",
       "addedToast": "Standaardprofiel ingesteld op \"{{repo}}\"",
       "addFailed": "Kan standaardprofiel niet instellen",

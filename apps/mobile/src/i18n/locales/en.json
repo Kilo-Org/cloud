@@ -214,7 +214,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Changes",
-    "organizationTrialEnded": "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again."
+    "organizationTrialEnded": "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again.",
+    "privateRepositoryA11y": "{{name}}, private repository"
   },
   "language": {
     "restarting": "Restarting to apply language",
@@ -4016,7 +4017,6 @@
       "repo": "Select repository…",
       "profile": "Select profile",
       "remove": "Unbind",
-      "private": "Private",
       "search": "Search repositories…",
       "addedToast": "Default profile set for \"{{repo}}\"",
       "addFailed": "Couldn't set default profile",

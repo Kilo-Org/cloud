@@ -3398,6 +3398,164 @@ describe('SessionIngestDO integration', () => {
       expect(excerpt).toMatch(/^First line\. x+\.\.\.$/);
     });
 
+    it('reads a bounded number of part rows for a turn with many parts', async () => {
+      const partCount = 3000;
+
+      async function seedTurn(sessionId: string, completed: boolean) {
+        const stub = getStub(kiloUserId, sessionId);
+        await ingestBusyStatus(stub, sessionId);
+        await stub.ingest(
+          [
+            {
+              type: 'message',
+              data: {
+                id: 'msg_many',
+                role: 'assistant',
+                time: completed ? { created: 1, completed: 2 } : { created: 1 },
+              },
+            },
+          ],
+          kiloUserId,
+          sessionId,
+          1
+        );
+        await runInDurableObject(stub, async (_instance, state) => {
+          for (let index = 0; index < partCount; index += 1) {
+            const partId = `prt_${String(index).padStart(5, '0')}`;
+            state.storage.sql.exec(
+              'INSERT INTO ingest_items (item_id, item_type, item_data, ingested_at) VALUES (?, ?, ?, ?)',
+              `part/msg_many/${partId}`,
+              'part',
+              JSON.stringify({
+                id: partId,
+                messageID: 'msg_many',
+                type: 'text',
+                text: 'Response text. ',
+              }),
+              1000 + index
+            );
+          }
+        });
+      }
+
+      async function idleIngest(sessionId: string) {
+        return runInDurableObject(getStub(kiloUserId, sessionId), async (instance, state) => {
+          const sqlStorage: SqlStorage = Object.getPrototypeOf(state.storage.sql);
+          const exec = sqlStorage.exec;
+          const cursors: Array<{ rowsRead: number }> = [];
+          sqlStorage.exec = function (this: SqlStorage, ...args: Parameters<SqlStorage['exec']>) {
+            const cursor = exec.apply(this, args);
+            cursors.push(cursor);
+            return cursor;
+          };
+          try {
+            const result = await instance.ingest(
+              [{ type: 'session_status', data: { status: 'idle' } }],
+              kiloUserId,
+              sessionId,
+              1
+            );
+            return {
+              rowsRead: cursors.reduce((sum, cursor) => sum + cursor.rowsRead, 0),
+              attentionSignals: result.accepted ? result.attentionSignals : [],
+            };
+          } finally {
+            sqlStorage.exec = exec;
+          }
+        });
+      }
+
+      const completedSessionId = 'ses_attention_many_parts_completed';
+      const unfinishedSessionId = 'ses_attention_many_parts_unfinished';
+      await seedTurn(completedSessionId, true);
+      const completed = await idleIngest(completedSessionId);
+      await seedTurn(unfinishedSessionId, false);
+      const unfinished = await idleIngest(unfinishedSessionId);
+
+      expect(completed.attentionSignals).toEqual([
+        {
+          signalId: 'msg_many',
+          kind: 'completed',
+          messageExcerpt: `${'Response text. '.repeat(6)}Respons...`,
+        },
+      ]);
+      // A turn without a finished message has no excerpt to build, so the difference between the
+      // two runs is the excerpt read for a message holding 3000 stored parts.
+      expect(unfinished.attentionSignals).toEqual([]);
+      // The excerpt read stays within one ordered range pass over the stored parts.
+      expect(completed.rowsRead - unfinished.rowsRead).toBeLessThan(10_000);
+    });
+
+    it('keeps the excerpt of a turn whose text follows many non-text parts', async () => {
+      const sessionId = 'ses_attention_after_tools_0001';
+      const stub = getStub(kiloUserId, sessionId);
+      await ingestBusyStatus(stub, sessionId);
+
+      const toolParts = Array.from({ length: 60 }, (_, index) => ({
+        type: 'part' as const,
+        data: {
+          id: `tool_${String(index).padStart(3, '0')}`,
+          messageID: 'msg_tools',
+          type: 'tool',
+          tool: 'bash',
+          state: { status: 'completed', output: 'Command output. '.repeat(10) },
+        },
+      }));
+      const result = await stub.ingest(
+        [
+          ...toolParts,
+          {
+            type: 'part',
+            data: { id: 'text_final', messageID: 'msg_tools', type: 'text', text: 'Final answer.' },
+          },
+          {
+            type: 'message',
+            data: { id: 'msg_tools', role: 'assistant', time: { created: 1, completed: 2 } },
+          },
+          { type: 'session_status', data: { status: 'idle' } },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      expect(result.attentionSignals).toEqual([
+        { signalId: 'msg_tools', kind: 'completed', messageExcerpt: 'Final answer.' },
+      ]);
+    });
+
+    it('keeps the snippet of a single large inline text part', async () => {
+      const sessionId = 'ses_attention_large_part_000001';
+      const stub = getStub(kiloUserId, sessionId);
+      await ingestBusyStatus(stub, sessionId);
+
+      const result = await stub.ingest(
+        [
+          {
+            type: 'part',
+            data: {
+              id: 'long_text',
+              messageID: 'msg_large',
+              type: 'text',
+              text: `${'z'.repeat(20_000)} tail`,
+            },
+          },
+          {
+            type: 'message',
+            data: { id: 'msg_large', role: 'assistant', time: { created: 1, completed: 2 } },
+          },
+          { type: 'session_status', data: { status: 'idle' } },
+        ],
+        kiloUserId,
+        sessionId,
+        1
+      );
+
+      expect(result.attentionSignals).toEqual([
+        { signalId: 'msg_large', kind: 'completed', messageExcerpt: `${'z'.repeat(97)}...` },
+      ]);
+    });
+
     it('does not emit a completed signal when the assistant message has not finished', async () => {
       const sessionId = 'ses_attention_incomplete_001';
       const stub = getStub(kiloUserId, sessionId);

@@ -1,10 +1,14 @@
 import { describe, it, expect } from 'vitest';
 import {
+  adjustRunningAssistantCostUsd,
+  assistantMessageCostUsd,
   clampAssistantCostUsd,
   computeRunningAssistantCostUsd,
   computeSessionMetrics,
   decideLivePersist,
   MAX_ASSISTANT_COST_USD,
+  runningAssistantCostMicrodollars,
+  storedAssistantMessageCostUsd,
   type DecideLivePersistArgs,
 } from '../dos/session-metrics';
 
@@ -492,6 +496,89 @@ describe('computeRunningAssistantCostUsd', () => {
   it('converts to microdollars with the close-path formula (0.15 USD → 150_000)', () => {
     const usd = computeRunningAssistantCostUsd([assistantMessage(0.15)]);
     expect(Math.max(0, Math.round(usd * 1_000_000))).toBe(150_000);
+  });
+});
+
+describe('storedAssistantMessageCostUsd', () => {
+  it('reads an inline assistant message body', () => {
+    expect(
+      storedAssistantMessageCostUsd({ ...assistantMessage(0.15), item_data_r2_key: null })
+    ).toBeCloseTo(0.15);
+  });
+
+  it('contributes nothing for an offloaded body', () => {
+    expect(
+      storedAssistantMessageCostUsd({ item_data: '{}', item_data_r2_key: 'items/blob' })
+    ).toBe(0);
+  });
+
+  it('contributes nothing for a missing, user or malformed row', () => {
+    expect(storedAssistantMessageCostUsd(undefined)).toBe(0);
+    expect(
+      storedAssistantMessageCostUsd({
+        item_data: JSON.stringify({ role: 'user', time: { created: 1000 } }),
+        item_data_r2_key: null,
+      })
+    ).toBe(0);
+    expect(storedAssistantMessageCostUsd({ item_data: 'not json', item_data_r2_key: null })).toBe(0);
+  });
+
+  it('applies the same clamp as the full recomputation', () => {
+    const row = { ...assistantMessage(1e308), item_data_r2_key: null };
+    expect(storedAssistantMessageCostUsd(row)).toBe(MAX_ASSISTANT_COST_USD);
+    expect(computeRunningAssistantCostUsd([row])).toBe(MAX_ASSISTANT_COST_USD);
+  });
+});
+
+describe('assistantMessageCostUsd', () => {
+  it('reads the cost of an in-memory assistant message', () => {
+    expect(assistantMessageCostUsd(JSON.parse(assistantMessage(0.4).item_data))).toBeCloseTo(0.4);
+  });
+
+  it('contributes nothing for other item shapes', () => {
+    expect(assistantMessageCostUsd({ role: 'user', time: { created: 1000 } })).toBe(0);
+    expect(assistantMessageCostUsd(undefined)).toBe(0);
+  });
+});
+
+describe('adjustRunningAssistantCostUsd', () => {
+  it('replaces the previous contribution with the next one', () => {
+    expect(adjustRunningAssistantCostUsd(0.5, 0.25, 0.4)).toBeCloseTo(0.65);
+  });
+
+  it('subtracts a removed contribution and never goes negative', () => {
+    expect(adjustRunningAssistantCostUsd(0.25, 0.25, 0)).toBe(0);
+    expect(adjustRunningAssistantCostUsd(0.1, 0.5, 0)).toBe(0);
+  });
+
+  it('matches a full recomputation across replacements', () => {
+    const rows = new Map<string, number>([
+      ['a', 0.25],
+      ['b', 0.125],
+    ]);
+    let running = computeRunningAssistantCostUsd(
+      [...rows.values()].map(cost => ({ item_data: assistantMessage(cost).item_data }))
+    );
+    for (const [id, cost] of [
+      ['a', 0.5],
+      ['b', 0.0625],
+      ['c', 0.25],
+    ] as const) {
+      const previous = rows.get(id) ?? 0;
+      rows.set(id, cost);
+      running = adjustRunningAssistantCostUsd(running, previous, cost);
+    }
+    const recomputed = computeRunningAssistantCostUsd(
+      [...rows.values()].map(cost => ({ item_data: assistantMessage(cost).item_data }))
+    );
+    expect(running).toBeCloseTo(recomputed, 10);
+  });
+});
+
+describe('runningAssistantCostMicrodollars', () => {
+  it('converts a running USD total to the stored column value', () => {
+    expect(runningAssistantCostMicrodollars(0.15)).toBe(150_000);
+    expect(runningAssistantCostMicrodollars(-1)).toBe(0);
   });
 });
 

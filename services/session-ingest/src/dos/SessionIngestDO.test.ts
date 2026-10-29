@@ -787,6 +787,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
       item_type: 'message',
       item_data: row.item_data,
     }));
+
     // item rows keyed by item_id for stale-guard lookups during ingest loop
     const itemRows = new Map<
       string,
@@ -799,6 +800,19 @@ describe('SessionIngestDO live activity + cost persist', () => {
         item_data_r2_key: string | null;
       }
     >();
+    // Seeded message rows are stored rows: the full cost scan projects them like any other
+    // inline message row, so it stays a true recomputation of what the DO holds.
+    messageRows.forEach((row, index) => {
+      const itemId = `message/seed-${index}`;
+      itemRows.set(itemId, {
+        id: index + 1,
+        item_id: itemId,
+        item_type: 'message',
+        item_data: row.item_data,
+        ingested_at: null,
+        item_data_r2_key: null,
+      });
+    });
     let costScanCount = 0;
 
     type SelectKind =
@@ -870,8 +884,12 @@ describe('SessionIngestDO live activity + cost persist', () => {
           ];
         }
         if (selectKind === 'message_cost') {
+          // The bounded newest-first lookup for the completed turn is not the cost scan.
+          if (selectLimit !== Infinity) return messageRows;
           costScanCount += 1;
-          return messageRows;
+          return [...itemRows.values()]
+            .filter(row => row.item_type === 'message' && row.item_data_r2_key === null)
+            .map(row => ({ item_data: row.item_data }));
         }
         return [];
       }),
@@ -929,9 +947,6 @@ describe('SessionIngestDO live activity + cost persist', () => {
                     ingested_at: values.ingested_at ?? null,
                     item_data_r2_key: values.item_data_r2_key ?? null,
                   });
-                  if (values.item_type === 'message' && values.item_data) {
-                    messageRows.push({ item_data: values.item_data });
-                  }
                 }
               }),
             })),
@@ -1994,10 +2009,146 @@ describe('SessionIngestDO live activity + cost persist', () => {
     );
     await harness.settle();
 
-    // cost scan runs at least once (attention path may also select message rows)
-    expect(harness.costScanCount).toBeGreaterThanOrEqual(1);
+    // No stored total yet: the idle transition seeds it with the one full read.
+    expect(harness.costScanCount).toBe(1);
     expect(harness.pgCallCount).toBe(1);
     expect(sqlFragmentText(harness.lastPgSet!.total_cost_microdollars)).toContain('250000');
+    expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('250000');
+  });
+
+  it('keeps the running cost equal to a full recomputation across message versions', async () => {
+    const harness = makeLiveHarness();
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.25)],
+      'usr_live',
+      'ses_live',
+      1,
+      1_000
+    );
+    await harness.settle();
+    // First persist of a session without a stored total seeds it from the stored rows.
+    expect(harness.costScanCount).toBe(1);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.25');
+
+    // A newer version of the same message replaces its contribution: no history read, and
+    // the 30s window keeps this batch from persisting.
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.5)],
+      'usr_live',
+      'ses_live',
+      1,
+      2_000
+    );
+    await harness.settle();
+    expect(harness.costScanCount).toBe(1);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.5');
+
+    // The idle transition forces the persist and reads the stored total.
+    await harness.durableObject.ingest(
+      [{ type: 'session_status', data: { status: 'idle' } }],
+      'usr_live',
+      'ses_live',
+      1,
+      3_000
+    );
+    await harness.settle();
+    expect(harness.costScanCount).toBe(1);
+    expect(sqlFragmentText(harness.lastPgSet!.total_cost_microdollars)).toContain('500000');
+    expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('500000');
+  });
+
+  it('persists a stored total without reading the message history', async () => {
+    const priorCost = JSON.stringify(assistantItem('prior', 0.5).data);
+    const harness = makeLiveHarness({
+      seedMeta: {
+        status: 'busy',
+        runningAssistantCostUsd: '0.5',
+        lastCostPersistedMicrodollars: '100000',
+        lastCostPersistedAtMs: String(Date.now()),
+      },
+      seedMessageRows: [{ item_data: priorCost }],
+    });
+
+    await harness.durableObject.ingest(
+      [{ type: 'session_status', data: { status: 'idle' } }],
+      'usr_live',
+      'ses_live',
+      1,
+      Date.now()
+    );
+    await harness.settle();
+
+    expect(harness.costScanCount).toBe(0);
+    expect(sqlFragmentText(harness.lastPgSet!.total_cost_microdollars)).toContain('500000');
+    expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('500000');
+  });
+
+  it('seeds a session without a stored total once', async () => {
+    const harness = makeLiveHarness({
+      seedMeta: { status: 'busy' },
+      seedMessageRows: [
+        { item_data: JSON.stringify(assistantItem('m1', 0.25).data) },
+        { item_data: JSON.stringify(assistantItem('m2', 0.25).data) },
+      ],
+    });
+    const idle = [{ type: 'session_status' as const, data: { status: 'idle' } }];
+
+    await harness.durableObject.ingest(idle, 'usr_live', 'ses_live', 1, 1_000);
+    await harness.settle();
+    expect(harness.costScanCount).toBe(1);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.5');
+    expect(sqlFragmentText(harness.lastPgSet!.total_cost_microdollars)).toContain('500000');
+
+    await harness.durableObject.ingest(
+      [{ type: 'session_status', data: { status: 'busy' } }],
+      'usr_live',
+      'ses_live',
+      1,
+      2_000
+    );
+    await harness.settle();
+    await harness.durableObject.ingest(idle, 'usr_live', 'ses_live', 1, 3_000);
+    await harness.settle();
+
+    expect(harness.costScanCount).toBe(1);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.5');
+  });
+
+  it('drops an offloaded message body from the running total', async () => {
+    const harness = makeLiveHarness();
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.25)],
+      'usr_live',
+      'ses_live',
+      1,
+      1_000
+    );
+    await harness.settle();
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.25');
+
+    // The same message now stores its body in R2, where the cost sum does not read it.
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.25)],
+      'usr_live',
+      'ses_live',
+      1,
+      2_000,
+      { 'message/m1': 'items/m1-blob' }
+    );
+    await harness.settle();
+    expect(harness.costScanCount).toBe(1);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0');
+
+    // Nothing to persist: the stored total did not grow.
+    await harness.durableObject.ingest(
+      [{ type: 'session_status', data: { status: 'idle' } }],
+      'usr_live',
+      'ses_live',
+      1,
+      3_000
+    );
+    await harness.settle();
+    expect(harness.costScanCount).toBe(1);
     expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('250000');
   });
 
@@ -2037,7 +2188,8 @@ describe('SessionIngestDO live activity + cost persist', () => {
   });
 
   it('decreased recomputed cost does not move lastCostPersistedMicrodollars backward (KB-7)', async () => {
-    // Prior persist was 200000; R2 offload left '{}' so recompute yields 0 → gate closed.
+    // Prior persist was 200000; R2 offload left '{}' so the recomputation yields only the
+    // 0.01 inline upsert → gate closed.
     const harness = makeLiveHarness({
       seedMeta: {
         lastCostPersistedMicrodollars: '200000',
@@ -2592,6 +2744,34 @@ describe('SessionIngestDO clone primitives', () => {
       })
     ).toMatchObject({ status: 'complete' });
     expect(harness.items).toHaveLength(2);
+  });
+
+  it('drops a destination running cost when staged rows are written', () => {
+    const harness = makeCloneHarness();
+    harness.meta.set('runningAssistantCostUsd', '0.5');
+    harness.meta.set('cloneSourceSessionId', 'src');
+
+    harness.durableObject.stageCloneBatch({
+      sourceSessionId: 'src',
+      destinationSessionId: 'dst',
+      rows: [
+        {
+          itemId: 'message/a',
+          itemType: 'message' as const,
+          itemData: JSON.stringify({ role: 'assistant', cost: 0.25 }),
+          itemDataR2Key: null,
+          ingestedAt: 1,
+        },
+      ],
+      nextCursor: { ingestedAt: 1, id: 1 },
+      rollingDigest: 'digest-1',
+      copiedItemCount: 1,
+    });
+
+    // The staged rows now describe the cost; the destination recomputes it from them.
+    expect(harness.meta.has('runningAssistantCostUsd')).toBe(false);
+    expect(harness.meta.get('cloneSourceSessionId')).toBe('src');
+    expect(harness.items.map(row => row.item_id)).toEqual(['message/a']);
   });
 
   it('resumes an incomplete same-source stage with the persisted next cursor', async () => {

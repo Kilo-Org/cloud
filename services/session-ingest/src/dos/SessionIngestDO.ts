@@ -62,12 +62,17 @@ import {
   type AttentionSignal,
 } from './session-ingest-attention';
 import {
+  adjustRunningAssistantCostUsd,
+  assistantMessageCostUsd,
   computeRunningAssistantCostUsd,
   computeSessionMetrics,
   COST_PERSIST_THROTTLE_MS,
   decideLivePersist,
   INACTIVITY_TIMEOUT_MS,
   POST_CLOSE_DRAIN_MS,
+  RUNNING_ASSISTANT_COST_META_KEY,
+  runningAssistantCostMicrodollars,
+  storedAssistantMessageCostUsd,
   type TerminationReason,
 } from './session-metrics';
 import migrations from '../../drizzle/migrations';
@@ -115,6 +120,8 @@ type LiveThrottleMetaKey =
 
 type AlarmMetaKey = 'metricsAlarmAt';
 
+type NumericMetaKey = LiveThrottleMetaKey | AlarmMetaKey | typeof RUNNING_ASSISTANT_COST_META_KEY;
+
 type IngestMetaKey =
   | ExtractableMetaKey
   | 'kiloUserId'
@@ -126,8 +133,7 @@ type IngestMetaKey =
   | 'sessionReadyNotified'
   | 'liveSummaryState'
   | 'lastLiveSummaryPersisted'
-  | LiveThrottleMetaKey
-  | AlarmMetaKey
+  | NumericMetaKey
   | ShareInfoMetaKey;
 
 export const SHARE_INFO_TOO_LARGE_ERROR = 'Share snapshot is too large';
@@ -214,10 +220,7 @@ function readLiveSummaryPersisted(db: DrizzleSqliteDODatabase): SessionLiveSumma
   return parsed.success ? parsed.data : null;
 }
 
-function readIngestMetaNumber(
-  db: DrizzleSqliteDODatabase,
-  key: LiveThrottleMetaKey | AlarmMetaKey
-): number | null {
+function readIngestMetaNumber(db: DrizzleSqliteDODatabase, key: NumericMetaKey): number | null {
   const row = db
     .select({ value: ingestMeta.value })
     .from(ingestMeta)
@@ -228,11 +231,7 @@ function readIngestMetaNumber(
   return Number.isFinite(n) ? n : null;
 }
 
-function writeIngestMetaNumber(
-  db: DrizzleSqliteDODatabase,
-  key: LiveThrottleMetaKey | AlarmMetaKey,
-  value: number
-): void {
+function writeIngestMetaNumber(db: DrizzleSqliteDODatabase, key: NumericMetaKey, value: number): void {
   const serialized = String(value);
   db.insert(ingestMeta)
     .values({ key, value: serialized })
@@ -608,6 +607,10 @@ export class SessionIngestDO extends DurableObject<Env> {
     // Executed upserts only (not stale-skipped). Activity = message|part; cost gate = message.
     let wroteActivityItem = false;
     let wroteAssistantMessageItem = false;
+    // Sums of the message-row costs this batch replaces and stores, in USD. The running
+    // session cost moves by (added - replaced) instead of re-reading the whole history.
+    let replacedMessageCostUsd = 0;
+    let addedMessageCostUsd = 0;
     // §4.10: in-batch {notificationId -> message} so the post-loop signal builder can
     // re-emit on replay without re-reading item_data from SQLite.
     const pendingAgentNotifications = new Map<string, string>();
@@ -621,17 +624,38 @@ export class SessionIngestDO extends DurableObject<Env> {
     for (const item of payload) {
       const { item_id, item_type } = getItemIdentity(item);
 
+      // The row this item replaces. A message row's body decides its cost contribution, so
+      // message items read it with the body; other items read only what the stale guard needs.
+      const replacedMessageRow =
+        item.type === 'message'
+          ? this.db
+              .select({
+                ingested_at: ingestItems.ingested_at,
+                item_data: ingestItems.item_data,
+                item_data_r2_key: ingestItems.item_data_r2_key,
+              })
+              .from(ingestItems)
+              .where(eq(ingestItems.item_id, item_id))
+              .get()
+          : undefined;
+      const replacedItemRow =
+        item.type === 'message' || ingestedAt === undefined
+          ? undefined
+          : this.db
+              .select({
+                ingested_at: ingestItems.ingested_at,
+                item_data_r2_key: ingestItems.item_data_r2_key,
+              })
+              .from(ingestItems)
+              .where(eq(ingestItems.item_id, item_id))
+              .get();
+      const replacedRow = replacedMessageRow ?? replacedItemRow;
+
       // Check timestamp guard: skip if existing row has a newer ingested_at.
       // Also read the existing R2 key so we can clean up orphaned blobs.
       if (ingestedAt !== undefined) {
-        const existing = this.db
-          .select({
-            ingested_at: ingestItems.ingested_at,
-            item_data_r2_key: ingestItems.item_data_r2_key,
-          })
-          .from(ingestItems)
-          .where(eq(ingestItems.item_id, item_id))
-          .get();
+        const existingIngestedAt = replacedRow?.ingested_at;
+        const existingR2Key = replacedRow?.item_data_r2_key;
         const previousItem =
           item.type === 'part'
             ? this.db
@@ -649,9 +673,9 @@ export class SessionIngestDO extends DurableObject<Env> {
                 .get()
             : undefined;
         const existingIsNewer =
-          existing?.ingested_at !== null &&
-          existing?.ingested_at !== undefined &&
-          existing.ingested_at > ingestedAt;
+          existingIngestedAt !== null &&
+          existingIngestedAt !== undefined &&
+          existingIngestedAt > ingestedAt;
         const previousIsNewer =
           previousItem?.ingested_at !== null &&
           previousItem?.ingested_at !== undefined &&
@@ -664,8 +688,8 @@ export class SessionIngestDO extends DurableObject<Env> {
         }
         // If the existing row pointed to a different R2 blob, it will be orphaned after upsert
         const newR2Key = r2References?.[item_id] ?? null;
-        if (existing?.item_data_r2_key && existing.item_data_r2_key !== newR2Key) {
-          orphanedR2Keys.push(existing.item_data_r2_key);
+        if (existingR2Key && existingR2Key !== newR2Key) {
+          orphanedR2Keys.push(existingR2Key);
         }
       }
 
@@ -725,6 +749,12 @@ export class SessionIngestDO extends DurableObject<Env> {
       // data is looseObject — role is optional at the type level; cheap property check, no parse.
       if (item.type === 'message' && (item.data as { role?: unknown }).role === 'assistant') {
         wroteAssistantMessageItem = true;
+      }
+      // An offloaded body is not scanned, so it contributes nothing — the same rule the
+      // full recomputation applies to a stored row.
+      if (item.type === 'message') {
+        replacedMessageCostUsd += storedAssistantMessageCostUsd(replacedMessageRow);
+        addedMessageCostUsd += itemDataR2Key === null ? assistantMessageCostUsd(item.data) : 0;
       }
 
       // §4.10: agent_notification items carry no state transition, so the DO durably tracks
@@ -947,7 +977,7 @@ export class SessionIngestDO extends DurableObject<Env> {
       lastPersistedAtMs: readIngestMetaNumber(this.db, 'lastLiveSummaryPersistedAtMs'),
     });
 
-    // Only scan all inline messages when the cost-persist window is open (KB-3).
+    // Only read the stored cost total when the cost-persist window is open (KB-3).
     // Window needs no cost value: idle forces (D17), else assistant upsert + 30s throttle.
     const nowMs = Date.now();
     const lastCostPersistedAtMs = readIngestMetaNumber(this.db, 'lastCostPersistedAtMs');
@@ -957,16 +987,33 @@ export class SessionIngestDO extends DurableObject<Env> {
         (lastCostPersistedAtMs === null ||
           nowMs - lastCostPersistedAtMs >= COST_PERSIST_THROTTLE_MS));
 
-    let currentCostMicrodollars: number | null = null;
-    if (costWindowOpen) {
-      const messageRows = this.db
-        .select({ item_data: ingestItems.item_data })
-        .from(ingestItems)
-        .where(and(eq(ingestItems.item_type, 'message'), isNull(ingestItems.item_data_r2_key)))
-        .all();
-      const usd = computeRunningAssistantCostUsd(messageRows);
-      currentCostMicrodollars = Math.max(0, Math.round(usd * 1_000_000));
+    // The running cost is maintained from the items each batch stores, so a persist reads a
+    // stored total instead of the session's message history. A session without one — created
+    // before the aggregate, or a clone destination — seeds it from its stored rows once.
+    let runningCostUsd = readIngestMetaNumber(this.db, RUNNING_ASSISTANT_COST_META_KEY);
+    if (runningCostUsd === null) {
+      if (costWindowOpen) {
+        const messageRows = this.db
+          .select({ item_data: ingestItems.item_data })
+          .from(ingestItems)
+          .where(and(eq(ingestItems.item_type, 'message'), isNull(ingestItems.item_data_r2_key)))
+          .all();
+        runningCostUsd = computeRunningAssistantCostUsd(messageRows);
+        writeIngestMetaNumber(this.db, RUNNING_ASSISTANT_COST_META_KEY, runningCostUsd);
+      }
+    } else if (replacedMessageCostUsd !== addedMessageCostUsd) {
+      runningCostUsd = adjustRunningAssistantCostUsd(
+        runningCostUsd,
+        replacedMessageCostUsd,
+        addedMessageCostUsd
+      );
+      writeIngestMetaNumber(this.db, RUNNING_ASSISTANT_COST_META_KEY, runningCostUsd);
     }
+
+    const currentCostMicrodollars =
+      costWindowOpen && runningCostUsd !== null
+        ? runningAssistantCostMicrodollars(runningCostUsd)
+        : null;
 
     const lastActivityValueMs = ingestedAt ?? nowMs;
     const decision = decideLivePersist({
@@ -2265,6 +2312,12 @@ export class SessionIngestDO extends DurableObject<Env> {
 
     writeCloneMeta(this.db, 'cloneSourceSessionId', params.sourceSessionId);
     writeCloneMeta(this.db, 'cloneDestinationSessionId', params.destinationSessionId);
+    // Staged rows are written here, outside the ingest loop, so the running cost no longer
+    // describes them: drop it and let the destination seed from its copied rows once.
+    this.db
+      .delete(ingestMeta)
+      .where(eq(ingestMeta.key, RUNNING_ASSISTANT_COST_META_KEY))
+      .run();
     // Keep "no cut key <=> full clone" true on every write, without relying on
     // resets wiping the whole meta table.
     if (params.upToMessageId !== undefined) {

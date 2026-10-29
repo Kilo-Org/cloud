@@ -192,7 +192,9 @@ type SubstitutionHop = {
 };
 
 // Substitution lookups recurse with the substitutions map unchanged, so a name that is already
-// in flight would repeat the same lookup; re-entering it returns the neutral result instead.
+// in flight in the same map would repeat the same lookup; re-entering it returns the neutral
+// result instead. Callers reset the set when an alias expansion installs a new substitutions map,
+// because that map can bind the same name to a different type.
 function nextSubstitution(
   name: string,
   substitutions: TypeAliasEnvironment,
@@ -293,7 +295,7 @@ function unsafeDirectValue(
     environment,
     nextSubstitutions,
     nextResolving,
-    resolvingSubstitutions
+    new Set()
   );
 }
 
@@ -377,7 +379,7 @@ function dictionaryValueTypes(
     environment,
     nextSubstitutions,
     nextResolving,
-    resolvingSubstitutions
+    new Set()
   );
 }
 
@@ -573,7 +575,7 @@ function classifyAliasBroadTarget(
     environment,
     nextSubstitutions,
     nextResolving,
-    resolvingSubstitutions
+    new Set()
   );
 }
 

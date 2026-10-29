@@ -17,6 +17,11 @@ type Forwarded = Forward<Key<string>>;
 type Table<Keys extends string> = { readonly [K in Keys]: string };
 type Tabled = Table<Keys<'third'>>;
 
+// Dictionary value reached through a nested alias that binds the same parameter name.
+type Inner<X> = X;
+type LookupInner<X> = { readonly [key: string]: X };
+export type Nested = LookupInner<Inner<unknown>>;
+
 export const forwarded: Forwarded = { key: 'a' };
 export const tabled: Tabled = { first: 'a', second: 'b', third: 'c' };
 

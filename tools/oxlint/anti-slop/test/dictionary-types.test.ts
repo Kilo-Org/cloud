@@ -46,6 +46,7 @@ test('classifies alias types across substitution layers and reports the control 
   assert.deepEqual(report.diagnostics.map(diagnostic => diagnostic.code).sort(), [
     'anti-slop(no-known-value-widening)',
     'anti-slop(no-unsafe-dictionary-type)',
+    'anti-slop(no-unsafe-dictionary-type)',
   ]);
   assert.equal(exitCode, 1);
 });

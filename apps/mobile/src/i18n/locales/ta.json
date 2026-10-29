@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "உங்கள் சூழலை ஏற்ற முடியவில்லை.",
       "retryLoadingEnvironment": "சூழலை மீண்டும் ஏற்ற முயற்சிக்கவும்",
       "defaultEnvironment": "இயல்புநிலை சூழல்",
+      "environmentAccessibility": "சுயவிவரத்தைத் தேர்ந்தெடுக்கவும்: {{label}}",
+      "environmentAccessibilityNeedsAttention": "சுயவிவரத்தைத் தேர்ந்தெடுக்கவும்: {{label}}. {{attention}}",
       "leaveChanges": "அப்படியே விடவும்",
       "commitAndPush": "கமிட் செய்து புஷ் செய்யவும்",
       "startSession": "அமர்வைத் தொடங்கவும்",

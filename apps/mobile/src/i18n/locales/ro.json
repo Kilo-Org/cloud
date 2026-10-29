@@ -2347,6 +2347,8 @@
       "couldNotLoadEnvironment": "Nu s-a putut încărca mediul tău.",
       "retryLoadingEnvironment": "Reîncearcă încărcarea mediului",
       "defaultEnvironment": "Mediu implicit",
+      "environmentAccessibility": "Alegeți un profil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Alegeți un profil: {{label}}. {{attention}}",
       "leaveChanges": "Păstrează modificările",
       "commitAndPush": "Fă commit și trimite",
       "startSession": "Începe sesiunea",

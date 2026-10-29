@@ -1792,6 +1792,8 @@
       "couldNotLoadEnvironment": "无法加载你的环境。",
       "retryLoadingEnvironment": "重新加载环境",
       "defaultEnvironment": "默认环境",
+      "environmentAccessibility": "选择配置文件：{{label}}",
+      "environmentAccessibilityNeedsAttention": "选择配置文件：{{label}}。{{attention}}",
       "leaveChanges": "保留更改",
       "commitAndPush": "提交并推送",
       "startSession": "开始会话",

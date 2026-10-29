@@ -1706,6 +1706,8 @@
       "couldNotLoadEnvironment": "Impossible de charger votre environnement.",
       "retryLoadingEnvironment": "Réessayer de charger l'environnement",
       "defaultEnvironment": "Environnement par défaut",
+      "environmentAccessibility": "Choisissez un profil : {{label}}",
+      "environmentAccessibilityNeedsAttention": "Choisissez un profil : {{label}}. {{attention}}",
       "leaveChanges": "Conserver en l'état",
       "commitAndPush": "Valider et envoyer",
       "startSession": "Démarrer la session",

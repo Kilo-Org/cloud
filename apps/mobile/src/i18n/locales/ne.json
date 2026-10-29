@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "तपाईंको वातावरण लोड गर्न सकिएन।",
       "retryLoadingEnvironment": "वातावरण लोड गर्न पुनः प्रयास गर्नुहोस्",
       "defaultEnvironment": "पूर्वनिर्धारित वातावरण",
+      "environmentAccessibility": "प्रोफाइल छान्नुहोस्: {{label}}",
+      "environmentAccessibilityNeedsAttention": "प्रोफाइल छान्नुहोस्: {{label}}। {{attention}}",
       "leaveChanges": "परिवर्तन यथावत्",
       "commitAndPush": "कमिट र पुश",
       "startSession": "सत्र सुरु गर्नुहोस्",

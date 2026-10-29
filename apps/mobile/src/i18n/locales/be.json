@@ -2378,6 +2378,8 @@
       "couldNotLoadEnvironment": "Не ўдалося загрузіць ваша асяроддзе.",
       "retryLoadingEnvironment": "Паўтарыць загрузку асяроддзя",
       "defaultEnvironment": "Прадвызначанае асяроддзе",
+      "environmentAccessibility": "Выберыце профіль: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Выберыце профіль: {{label}}. {{attention}}",
       "leaveChanges": "Пакінуць змены",
       "commitAndPush": "Закаміціць і адправіць",
       "startSession": "Пачаць сеанс",

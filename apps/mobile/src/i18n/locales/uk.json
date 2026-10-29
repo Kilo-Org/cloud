@@ -1816,6 +1816,8 @@
       "couldNotLoadEnvironment": "Не вдалося завантажити ваше середовище.",
       "retryLoadingEnvironment": "Повторити завантаження середовища",
       "defaultEnvironment": "Типове середовище",
+      "environmentAccessibility": "Виберіть профіль: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Виберіть профіль: {{label}}. {{attention}}",
       "leaveChanges": "Залишити зміни",
       "commitAndPush": "Закомітити та надіслати",
       "startSession": "Розпочати сеанс",

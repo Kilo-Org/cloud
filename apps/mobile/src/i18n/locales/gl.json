@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Non se puido cargar o teu contorno.",
       "retryLoadingEnvironment": "Volver tentar cargar o contorno",
       "defaultEnvironment": "Contorno predeterminado",
+      "environmentAccessibility": "Escolle un perfil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Escolle un perfil: {{label}}. {{attention}}",
       "leaveChanges": "Manter cambios",
       "commitAndPush": "Confirmar e enviar",
       "startSession": "Iniciar sesión",

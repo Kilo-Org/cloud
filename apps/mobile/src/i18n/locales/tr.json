@@ -1792,6 +1792,8 @@
       "couldNotLoadEnvironment": "Ortamın yüklenemedi.",
       "retryLoadingEnvironment": "Ortamı yüklemeyi tekrar dene",
       "defaultEnvironment": "Varsayılan ortam",
+      "environmentAccessibility": "Bir profil seç: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Bir profil seç: {{label}}. {{attention}}",
       "leaveChanges": "Değişiklikleri koru",
       "commitAndPush": "İşle ve gönder",
       "startSession": "Oturumu başlat",

@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Naannoo kee fe'uu hin danda'amne.",
       "retryLoadingEnvironment": "Naannoo fe'uuf deebi'ii yaali",
       "defaultEnvironment": "Naannoo durtii",
+      "environmentAccessibility": "Profaayila tokko filadhu: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Profaayila tokko filadhu: {{label}}. {{attention}}",
       "leaveChanges": "Jijjiiramoota dhiisi",
       "commitAndPush": "Galmeessiitii ol ergi",
       "startSession": "Turtii jalqabi",

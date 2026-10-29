@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Nuk u ngarkua mjedisi yt.",
       "retryLoadingEnvironment": "Provo ta ngarkosh përsëri mjedisin",
       "defaultEnvironment": "Mjedisi i parazgjedhur",
+      "environmentAccessibility": "Zgjidh një profil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Zgjidh një profil: {{label}}. {{attention}}",
       "leaveChanges": "Lër ndryshimet",
       "commitAndPush": "Regjistro dhe dërgo",
       "startSession": "Nis seancën",

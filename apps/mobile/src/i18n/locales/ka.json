@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "თქვენი გარემოს ჩატვირთვა ვერ მოხერხდა.",
       "retryLoadingEnvironment": "გარემოს ხელახლა ჩატვირთვა",
       "defaultEnvironment": "ნაგულისხმევი გარემო",
+      "environmentAccessibility": "აირჩიეთ პროფილი: {{label}}",
+      "environmentAccessibilityNeedsAttention": "აირჩიეთ პროფილი: {{label}}. {{attention}}",
       "leaveChanges": "ცვლილებების დატოვება",
       "commitAndPush": "კომიტი და ატვირთვა",
       "startSession": "სესიის დაწყება",

@@ -2409,6 +2409,8 @@
       "couldNotLoadEnvironment": "Ma setax jitgħabba l-ambjent tiegħek.",
       "retryLoadingEnvironment": "Erġa' pprova tgħabbi l-ambjent",
       "defaultEnvironment": "Ambjent prestabbilit",
+      "environmentAccessibility": "Agħżel profil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Agħżel profil: {{label}}. {{attention}}",
       "leaveChanges": "Ħalli l-bidliet",
       "commitAndPush": "Irreġistra u tella'",
       "startSession": "Ibda s-sessjoni",

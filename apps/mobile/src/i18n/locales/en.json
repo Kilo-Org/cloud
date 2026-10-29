@@ -2382,6 +2382,8 @@
       "couldNotLoadEnvironment": "Couldn't load your environment",
       "retryLoadingEnvironment": "Retry loading environment",
       "defaultEnvironment": "Default environment",
+      "environmentAccessibility": "Pick a profile: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Pick a profile: {{label}}. {{attention}}",
       "leaveChanges": "Leave changes",
       "commitAndPush": "Commit and push",
       "startSession": "Start session",

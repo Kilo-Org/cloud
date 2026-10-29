@@ -1792,6 +1792,8 @@
       "couldNotLoadEnvironment": "आपका एनवायरनमेंट लोड नहीं हो सका।",
       "retryLoadingEnvironment": "एनवायरनमेंट फिर से लोड करें",
       "defaultEnvironment": "डिफ़ॉल्ट एनवायरनमेंट",
+      "environmentAccessibility": "एक प्रोफ़ाइल चुनें: {{label}}",
+      "environmentAccessibilityNeedsAttention": "एक प्रोफ़ाइल चुनें: {{label}}। {{attention}}",
       "leaveChanges": "बदलाव रहने दें",
       "commitAndPush": "कमिट और पुश करें",
       "startSession": "सत्र शुरू करें",

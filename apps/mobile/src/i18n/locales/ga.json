@@ -2409,6 +2409,8 @@
       "couldNotLoadEnvironment": "Níorbh fhéidir do thimpeallacht a lódáil.",
       "retryLoadingEnvironment": "Bain triail as an timpeallacht a lódáil arís",
       "defaultEnvironment": "Timpeallacht réamhshocraithe",
+      "environmentAccessibility": "Roghnaigh próifíl: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Roghnaigh próifíl: {{label}}. {{attention}}",
       "leaveChanges": "Fág athruithe",
       "commitAndPush": "Taifead agus brúigh",
       "startSession": "Tosaigh seisiún",

@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "तुमचा कार्यपरिसर लोड करता आला नाही.",
       "retryLoadingEnvironment": "कार्यपरिसर लोड करण्याचा पुन्हा प्रयत्न करा",
       "defaultEnvironment": "डीफॉल्ट कार्यपरिसर",
+      "environmentAccessibility": "प्रोफाइल निवडा: {{label}}",
+      "environmentAccessibilityNeedsAttention": "प्रोफाइल निवडा: {{label}}. {{attention}}",
       "leaveChanges": "बदल ठेवा",
       "commitAndPush": "कमिट आणि पुश करा",
       "startSession": "सत्र सुरू करा",

@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Kāore i taea te uta i tō taiao.",
       "retryLoadingEnvironment": "Whakamātau anō ki te uta i te taiao",
       "defaultEnvironment": "Te taiao taunoa",
+      "environmentAccessibility": "Tīpakohia he kōtaha: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Tīpakohia he kōtaha: {{label}}. {{attention}}",
       "leaveChanges": "Waiho ngā huringa",
       "commitAndPush": "Whakapūmau, pana",
       "startSession": "Tīmataria te wātū",

@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "የሥራ አካባቢዎን መጫን አልተቻለም።",
       "retryLoadingEnvironment": "የሥራ አካባቢውን ለመጫን እንደገና ይሞክሩ",
       "defaultEnvironment": "ነባሪ የሥራ አካባቢ",
+      "environmentAccessibility": "መገለጫ ይምረጡ፦ {{label}}",
+      "environmentAccessibilityNeedsAttention": "መገለጫ ይምረጡ፦ {{label}}። {{attention}}",
       "leaveChanges": "ለውጦችን ይተዉ",
       "commitAndPush": "መዝግበው ይላኩ",
       "startSession": "ክፍለ ጊዜውን ያስጀምሩ",

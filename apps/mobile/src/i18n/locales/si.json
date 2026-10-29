@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "ඔබේ පරිසරය පූරණය කළ නොහැකි විය.",
       "retryLoadingEnvironment": "පරිසරය පූරණය කිරීමට නැවත උත්සාහ කරන්න",
       "defaultEnvironment": "පෙරනිමි පරිසරය",
+      "environmentAccessibility": "පැතිකඩක් තෝරන්න: {{label}}",
+      "environmentAccessibilityNeedsAttention": "පැතිකඩක් තෝරන්න: {{label}}. {{attention}}",
       "leaveChanges": "වෙනස්කම් තබන්න",
       "commitAndPush": "කමිට් කර පුෂ් කරන්න",
       "startSession": "සැසිය ආරම්භ කරන්න",

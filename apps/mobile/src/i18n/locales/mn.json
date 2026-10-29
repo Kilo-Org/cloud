@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Таны орчныг ачаалж чадсангүй.",
       "retryLoadingEnvironment": "Орчныг дахин ачаалах",
       "defaultEnvironment": "Үндсэн орчин",
+      "environmentAccessibility": "Профайл сонгоно уу: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Профайл сонгоно уу: {{label}}. {{attention}}",
       "leaveChanges": "Өөрчлөлтүүдийг үлдээх",
       "commitAndPush": "Коммит хийж илгээх",
       "startSession": "Сессийг эхлүүлэх",

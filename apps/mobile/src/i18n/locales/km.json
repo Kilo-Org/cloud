@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "មិនអាចផ្ទុកបរិស្ថានដំណើរការរបស់អ្នកបានទេ។",
       "retryLoadingEnvironment": "ព្យាយាមផ្ទុកបរិស្ថានដំណើរការម្តងទៀត",
       "defaultEnvironment": "បរិស្ថានដំណើរការលំនាំដើម",
+      "environmentAccessibility": "ជ្រើសរើសកម្រងព័ត៌មាន: {{label}}",
+      "environmentAccessibilityNeedsAttention": "ជ្រើសរើសកម្រងព័ត៌មាន: {{label}}. {{attention}}",
       "leaveChanges": "ទុកការផ្លាស់ប្តូរ",
       "commitAndPush": "កត់ត្រា និងបញ្ជូនកូដ",
       "startSession": "ចាប់ផ្តើមវគ្គ",

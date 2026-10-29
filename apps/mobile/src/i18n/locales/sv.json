@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Det gick inte att läsa in din miljö.",
       "retryLoadingEnvironment": "Försök läsa in miljön igen",
       "defaultEnvironment": "Standardmiljö",
+      "environmentAccessibility": "Välj en profil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Välj en profil: {{label}}. {{attention}}",
       "leaveChanges": "Behåll ändringar",
       "commitAndPush": "Committa och pusha",
       "startSession": "Starta session",

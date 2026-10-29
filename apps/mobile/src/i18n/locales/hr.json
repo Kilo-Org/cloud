@@ -3890,6 +3890,8 @@
     "skillSourceMarketplace": "Trgovina",
     "skillsHint": "Zalijepite SKILL.md i popunite njegovo ime; dodajte vještinu sa svog telefona bez povlačenja i ispuštanja.",
     "skillEditTitle": "Uredi vještinu",
+    "skillEdit": "Uredi vještinu {{name}}",
+    "skillDelete": "Obriši vještinu {{name}}",
     "mcp": {
       "title": "MCP poslužitelji",
       "add": "Dodajte MCP poslužitelj",
@@ -3919,7 +3921,8 @@
       "jsonInvalid": "Unesite važeći JSON — objekt vrijednosti niza",
       "jsonTooLarge": "Koristite najviše 50 unosa, ključevi do 128 i vrijednosti do 4096 znakova",
       "timeoutInvalid": "Istek mora biti cijeli broj milisekundi",
-      "edit": "Uredi MCP poslužitelj",
+      "edit": "Uredi MCP poslužitelj {{name}}",
+      "delete": "Obriši MCP poslužitelj {{name}}",
       "saveFailed": "Nije moguće spremiti MCP poslužitelj",
       "deleteFailed": "Nije moguće izbrisati MCP poslužitelj",
       "updateFailed": "Nije moguće ažurirati MCP poslužitelj"
@@ -3957,7 +3960,8 @@
       "slugRequired": "Unesite agenta",
       "slugInvalid": "Puž mora započeti malim ASCII slovom i smije sadržavati samo mala ASCII slova, znamenke i crtice, najviše 50 znakova",
       "slugConflict": "Taj slug već koristi ugrađeni agent ili drugi agent u ovom profilu",
-      "edit": "Uredi agenta"
+      "edit": "Uredi agenta {{name}}",
+      "delete": "Obriši agenta {{name}}"
     },
     "slashCommands": {
       "title": "Naredbe kose crte",
@@ -3970,7 +3974,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Objasnite $ARGUMENTS",
       "subtask": "Pokreni kao podzadatak",
-      "edit": "Naredba za uređivanje kose crte",
+      "edit": "Uredi naredbu kose crte {{name}}",
+      "delete": "Obriši naredbu kose crte {{name}}",
+      "moveUp": "Premjesti naredbu kose crte {{name}} gore",
+      "moveDown": "Premjesti naredbu kose crte {{name}} dolje",
       "saveFailed": "Nije moguće spremiti naredbu",
       "deleteFailed": "Nije moguće izbrisati naredbu",
       "nameRequired": "Unesite naziv naredbe",
@@ -4002,6 +4009,7 @@
       "unbindFailed": "Nije moguće odvezati repo"
     },
     "variablesDeleteFailed": "Nije moguće izbrisati varijablu",
+    "deleteVariable": "Obriši varijablu {{key}}",
     "deleteCommand": "Obriši naredbu {{position}}"
   },
   "credits": {

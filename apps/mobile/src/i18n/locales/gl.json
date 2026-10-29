@@ -3840,6 +3840,8 @@
     "skillSourceMarketplace": "Mercado",
     "skillsHint": "Pega un SKILL.md e o seu nome énchese; engade unha habilidade desde o teu teléfono sen arrastrar e soltar.",
     "skillEditTitle": "Editar habilidade",
+    "skillEdit": "Editar habilidade {{name}}",
+    "skillDelete": "Eliminar a habilidade {{name}}",
     "mcp": {
       "title": "Servidores MCP",
       "add": "Engadir servidor MCP",
@@ -3869,7 +3871,8 @@
       "jsonInvalid": "Introduce un JSON válido: un obxecto de valores de cadea",
       "jsonTooLarge": "Usa como máximo 50 entradas, chaves de ata 128 e valores de ata 4096 caracteres",
       "timeoutInvalid": "O tempo de espera debe ser dun número enteiro de milisegundos",
-      "edit": "Editar servidor MCP",
+      "edit": "Editar servidor MCP {{name}}",
+      "delete": "Eliminar o servidor MCP {{name}}",
       "saveFailed": "Non se puido gardar o servidor MCP",
       "deleteFailed": "Non se puido eliminar o servidor MCP",
       "updateFailed": "Non se puido actualizar o servidor MCP"
@@ -3907,7 +3910,8 @@
       "slugRequired": "Introduza unha babosa de axente",
       "slugInvalid": "Slug debe comezar cunha letra ASCII minúscula e usar só letras ASCII minúsculas, díxitos e guións, ata 50 caracteres",
       "slugConflict": "Ese slug xa o usa un axente integrado ou outro axente deste perfil",
-      "edit": "Editar axente"
+      "edit": "Editar axente {{name}}",
+      "delete": "Eliminar o axente {{name}}"
     },
     "slashCommands": {
       "title": "Comandos de barra",
@@ -3920,7 +3924,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explica $ARGUMENTS",
       "subtask": "Executar como subtarefa",
-      "edit": "Comando de edición de barra",
+      "edit": "Editar comando {{name}}",
+      "delete": "Eliminar o comando {{name}}",
+      "moveUp": "Mover o comando {{name}} cara arriba",
+      "moveDown": "Mover o comando {{name}} cara abaixo",
       "saveFailed": "Non se puido gardar o comando",
       "deleteFailed": "Non se puido eliminar o comando",
       "nameRequired": "Introduza un nome de comando",
@@ -3952,6 +3959,7 @@
       "unbindFailed": "Non se puido desvincular o repositorio"
     },
     "variablesDeleteFailed": "Non se puido eliminar a variable",
+    "deleteVariable": "Eliminar a variable {{key}}",
     "deleteCommand": "Eliminar o comando {{position}}"
   },
   "credits": {

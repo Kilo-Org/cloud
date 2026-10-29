@@ -3840,6 +3840,8 @@
     "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Bir SKILL.md yapıştırın ve adı doldurun; Sürükleyip bırakmadan telefonunuzdan bir beceri ekleyin.",
     "skillEditTitle": "Beceriyi düzenle",
+    "skillEdit": "{{name}} becerisini düzenle",
+    "skillDelete": "{{name}} becerisini sil",
     "mcp": {
       "title": "MCP sunucuları",
       "add": "MCP sunucusu ekle",
@@ -3869,7 +3871,8 @@
       "jsonInvalid": "Geçerli JSON girin — dize değerlerinden oluşan bir nesne",
       "jsonTooLarge": "En fazla 50 giriş, 128'e kadar anahtar ve 4096 karaktere kadar değer kullanın",
       "timeoutInvalid": "Zaman aşımı tam sayı milisaniye olmalıdır",
-      "edit": "MCP sunucusunu düzenle",
+      "edit": "{{name}} MCP sunucusunu düzenle",
+      "delete": "{{name}} MCP sunucusunu sil",
       "saveFailed": "MCP sunucusu kaydedilemedi",
       "deleteFailed": "MCP sunucusu silinemedi",
       "updateFailed": "MCP sunucusu güncellenemedi"
@@ -3907,7 +3910,8 @@
       "slugRequired": "Bir temsilci bilgisi girin",
       "slugInvalid": "Bilgi bir küçük ASCII harfiyle başlamalı ve yalnızca ASCII küçük harfleri, rakamlar ve kısa çizgiler kullanmalıdır, en fazla 50 karakter",
       "slugConflict": "Bu slug, yerleşik bir ajan veya bu profildeki başka bir ajan tarafından zaten kullanılıyor",
-      "edit": "Temsilciyi düzenle"
+      "edit": "{{name}} temsilcisini düzenle",
+      "delete": "{{name}} temsilcisini sil"
     },
     "slashCommands": {
       "title": "Eğik çizgi komutları",
@@ -3920,7 +3924,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS'ı açıklayın",
       "subtask": "Alt görev olarak çalıştır",
-      "edit": "Eğik çizgi komutunu düzenle",
+      "edit": "{{name}} eğik çizgi komutunu düzenle",
+      "delete": "{{name}} eğik çizgi komutunu sil",
+      "moveUp": "{{name}} eğik çizgi komutunu yukarı taşı",
+      "moveDown": "{{name}} eğik çizgi komutunu aşağı taşı",
       "saveFailed": "Komut kaydedilemedi",
       "deleteFailed": "Komut silinemedi",
       "nameRequired": "Bir komut adı girin",
@@ -3952,6 +3959,7 @@
       "unbindFailed": "Deponun bağlantısı kaldırılamadı"
     },
     "variablesDeleteFailed": "Değişken silinemedi",
+    "deleteVariable": "{{key}} değişkenini sil",
     "deleteCommand": "{{position}}. komutu sil"
   },
   "credits": {

@@ -3890,6 +3890,8 @@
     "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Collez un SKILL.md et son nom est renseigné ; ajoutez une compétence depuis votre téléphone sans glisser-déposer.",
     "skillEditTitle": "Modifier la compétence",
+    "skillEdit": "Modifier la compétence {{name}}",
+    "skillDelete": "Supprimer la compétence {{name}}",
     "mcp": {
       "title": "Serveurs MCP",
       "add": "Ajouter un serveur MCP",
@@ -3919,7 +3921,8 @@
       "jsonInvalid": "Entrez un JSON valide - un objet de valeurs de chaîne",
       "jsonTooLarge": "Utilisez au maximum 50 entrées, des clés jusqu'à 128 et des valeurs jusqu'à 4096 caractères",
       "timeoutInvalid": "Le délai d'attente doit être un nombre entier de millisecondes",
-      "edit": "Modifier le serveur MCP",
+      "edit": "Modifier le serveur MCP {{name}}",
+      "delete": "Supprimer le serveur MCP {{name}}",
       "saveFailed": "Impossible de sauvegarder le serveur MCP",
       "deleteFailed": "Impossible de supprimer le serveur MCP",
       "updateFailed": "Impossible de mettre à jour le serveur MCP"
@@ -3957,7 +3960,8 @@
       "slugRequired": "Entrez un slug d'agent",
       "slugInvalid": "Slug doit commencer par une lettre ASCII minuscule et utiliser uniquement des lettres ASCII minuscules, des chiffres et des tirets, jusqu'à 50 caractères.",
       "slugConflict": "Ce slug est déjà utilisé par un agent intégré ou un autre agent de ce profil",
-      "edit": "Modifier l'agent"
+      "edit": "Modifier l'agent {{name}}",
+      "delete": "Supprimer l'agent {{name}}"
     },
     "slashCommands": {
       "title": "Commandes barre oblique",
@@ -3970,7 +3974,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Expliquez $ARGUMENTS",
       "subtask": "Exécuter en tant que sous-tâche",
-      "edit": "Modifier la commande barre oblique",
+      "edit": "Modifier la commande barre oblique {{name}}",
+      "delete": "Supprimer la commande barre oblique {{name}}",
+      "moveUp": "Déplacer la commande barre oblique {{name}} vers le haut",
+      "moveDown": "Déplacer la commande barre oblique {{name}} vers le bas",
       "saveFailed": "Impossible d'enregistrer la commande",
       "deleteFailed": "Impossible de supprimer la commande",
       "nameRequired": "Entrez un nom de commande",
@@ -4002,6 +4009,7 @@
       "unbindFailed": "Impossible de dissocier le dépôt"
     },
     "variablesDeleteFailed": "Impossible de supprimer la variable",
+    "deleteVariable": "Supprimer la variable {{key}}",
     "deleteCommand": "Supprimer la commande {{position}}"
   },
   "credits": {

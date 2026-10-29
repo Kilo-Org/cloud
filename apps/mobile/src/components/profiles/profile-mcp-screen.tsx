@@ -106,7 +106,7 @@ function McpServerRowView({
         <Pressable
           className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
           accessibilityRole="button"
-          accessibilityLabel={t('profiles.mcp.edit')}
+          accessibilityLabel={t('profiles.mcp.edit', { name: server.name })}
           onPress={onEdit}
         >
           <Pencil size={18} color={colors.mutedForeground} />
@@ -116,7 +116,7 @@ function McpServerRowView({
         <Pressable
           className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
           accessibilityRole="button"
-          accessibilityLabel={t('common.delete')}
+          accessibilityLabel={t('profiles.mcp.delete', { name: server.name })}
           onPress={onDelete}
         >
           <Trash2 size={18} color={colors.destructive} />

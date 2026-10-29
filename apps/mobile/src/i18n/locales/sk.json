@@ -3940,6 +3940,8 @@
     "skillSourceMarketplace": "Obchod",
     "skillsHint": "Vložte súbor SKILL.md a jeho názov sa vyplní; pridajte zručnosť zo svojho telefónu bez presúvania myšou.",
     "skillEditTitle": "Upraviť zručnosť",
+    "skillEdit": "Upraviť zručnosť {{name}}",
+    "skillDelete": "Odstrániť zručnosť {{name}}",
     "mcp": {
       "title": "servery MCP",
       "add": "Pridajte server MCP",
@@ -3969,7 +3971,8 @@
       "jsonInvalid": "Zadajte platný JSON — objekt reťazcových hodnôt",
       "jsonTooLarge": "Použite najviac 50 položiek, kľúče do 128 a hodnoty do 4096 znakov",
       "timeoutInvalid": "Časový limit musí byť celý počet milisekúnd",
-      "edit": "Upravte server MCP",
+      "edit": "Upraviť server MCP {{name}}",
+      "delete": "Odstrániť server MCP {{name}}",
       "saveFailed": "Server MCP sa nepodarilo uložiť",
       "deleteFailed": "Server MCP sa nepodarilo vymazať",
       "updateFailed": "Server MCP sa nepodarilo aktualizovať"
@@ -4007,7 +4010,8 @@
       "slugRequired": "Zadajte agenta slimáka",
       "slugInvalid": "Slug musí začínať malým písmenom ASCII a používať iba malé písmená ASCII, číslice a pomlčky, maximálne 50 znakov",
       "slugConflict": "Tento slug už používa vstavaný agent alebo iný agent v tomto profile",
-      "edit": "Upraviť zástupcu"
+      "edit": "Upraviť agenta {{name}}",
+      "delete": "Odstrániť agenta {{name}}"
     },
     "slashCommands": {
       "title": "Príkazy lomka",
@@ -4020,7 +4024,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Vysvetlite $ARGUMENTS",
       "subtask": "Spustiť ako podúlohu",
-      "edit": "Príkaz na úpravu lomky",
+      "edit": "Upraviť príkaz {{name}}",
+      "delete": "Odstrániť príkaz {{name}}",
+      "moveUp": "Presunúť príkaz {{name}} nahor",
+      "moveDown": "Presunúť príkaz {{name}} nadol",
       "saveFailed": "Príkaz sa nepodarilo uložiť",
       "deleteFailed": "Príkaz sa nepodarilo vymazať",
       "nameRequired": "Zadajte názov príkazu",
@@ -4052,6 +4059,7 @@
       "unbindFailed": "Nepodarilo sa odpojiť repo"
     },
     "variablesDeleteFailed": "Premennú sa nepodarilo vymazať",
+    "deleteVariable": "Odstrániť premennú {{key}}",
     "deleteCommand": "Odstrániť príkaz {{position}}"
   },
   "credits": {

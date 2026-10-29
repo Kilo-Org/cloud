@@ -3840,6 +3840,8 @@
     "skillSourceMarketplace": "بازار",
     "skillsHint": "یک SKILL.md قرار دهید و نام آن پر می شود. یک مهارت از تلفن خود بدون کشیدن و رها کردن اضافه کنید.",
     "skillEditTitle": "مهارت ویرایش",
+    "skillEdit": "مهارت {{name}} را ویرایش کنید",
+    "skillDelete": "مهارت {{name}} را حذف کنید",
     "mcp": {
       "title": "سرورهای MCP",
       "add": "سرور MCP را اضافه کنید",
@@ -3869,7 +3871,8 @@
       "jsonInvalid": "JSON معتبر وارد کنید - یک شی از مقادیر رشته",
       "jsonTooLarge": "حداکثر 50 ورودی، کلیدها تا 128 و مقادیر تا 4096 نویسه استفاده کنید",
       "timeoutInvalid": "تایم اوت باید چندین میلی ثانیه باشد",
-      "edit": "ویرایش سرور MCP",
+      "edit": "سرور MCP {{name}} را ویرایش کنید",
+      "delete": "سرور MCP {{name}} را حذف کنید",
       "saveFailed": "سرور MCP ذخیره نشد",
       "deleteFailed": "سرور MCP حذف نشد",
       "updateFailed": "سرور MCP به‌روزرسانی نشد"
@@ -3907,7 +3910,8 @@
       "slugRequired": "یک اسلاگ عامل را وارد کنید",
       "slugInvalid": "Slug باید با یک حرف کوچک ASCII شروع شود و فقط از حروف کوچک ASCII، اعداد و خط تیره استفاده کند و حداکثر 50 نویسه باشد",
       "slugConflict": "این اسلاگ قبلاً توسط عامل داخلی یا عامل دیگری در این پروفایل استفاده شده است",
-      "edit": "عامل ویرایش"
+      "edit": "عامل {{name}} را ویرایش کنید",
+      "delete": "عامل {{name}} را حذف کنید"
     },
     "slashCommands": {
       "title": "دستورات اسلش",
@@ -3920,7 +3924,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS را توضیح دهید",
       "subtask": "به عنوان وظیفه فرعی اجرا شود",
-      "edit": "ویرایش دستور اسلش",
+      "edit": "فرمان اسلش {{name}} را ویرایش کنید",
+      "delete": "فرمان اسلش {{name}} را حذف کنید",
+      "moveUp": "فرمان اسلش {{name}} را به بالا منتقل کنید",
+      "moveDown": "فرمان اسلش {{name}} را به پایین منتقل کنید",
       "saveFailed": "فرمان ذخیره نشد",
       "deleteFailed": "فرمان حذف نشد",
       "nameRequired": "یک نام فرمان وارد کنید",
@@ -3952,6 +3959,7 @@
       "unbindFailed": "Repo لغو پیوند نشد"
     },
     "variablesDeleteFailed": "متغیر حذف نشد",
+    "deleteVariable": "متغیر {{key}} را حذف کنید",
     "deleteCommand": "فرمان {{position}} را حذف کنید"
   },
   "credits": {

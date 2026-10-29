@@ -141,7 +141,7 @@ export function VariableRowView({
         <Pressable
           className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
           accessibilityRole="button"
-          accessibilityLabel={t('common.delete')}
+          accessibilityLabel={t('profiles.deleteVariable', { key: row.key })}
           disabled={isDeleting}
           accessibilityState={{ disabled: isDeleting }}
           onPress={onDelete}

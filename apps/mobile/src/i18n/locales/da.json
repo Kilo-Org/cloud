@@ -3840,6 +3840,8 @@
     "skillSourceMarketplace": "Markedsplads",
     "skillsHint": "Indsæt en SKILL.md og dens navn udfyldes; tilføje en færdighed fra din telefon uden træk og slip.",
     "skillEditTitle": "Rediger færdighed",
+    "skillEdit": "Rediger færdighed {{name}}",
+    "skillDelete": "Slet færdighed {{name}}",
     "mcp": {
       "title": "MCP-servere",
       "add": "Tilføj MCP-server",
@@ -3869,7 +3871,8 @@
       "jsonInvalid": "Indtast gyldig JSON - et objekt med strengværdier",
       "jsonTooLarge": "Brug højst 50 poster, nøgler op til 128 og værdier op til 4096 tegn",
       "timeoutInvalid": "Timeout skal være et helt antal millisekunder",
-      "edit": "Rediger MCP-server",
+      "edit": "Rediger MCP-server {{name}}",
+      "delete": "Slet MCP-server {{name}}",
       "saveFailed": "MCP-serveren kunne ikke gemmes",
       "deleteFailed": "MCP-serveren kunne ikke slettes",
       "updateFailed": "MCP-serveren kunne ikke opdateres"
@@ -3907,7 +3910,8 @@
       "slugRequired": "Indtast en agentsnegl",
       "slugInvalid": "Slug skal starte med et lille ASCII-bogstav og kun bruge små ASCII-bogstaver, cifre og bindestreger, højst 50 tegn",
       "slugConflict": "Det slug bruges allerede af en indbygget agent eller en anden agent i denne profil",
-      "edit": "Rediger agent"
+      "edit": "Rediger agent {{name}}",
+      "delete": "Slet agent {{name}}"
     },
     "slashCommands": {
       "title": "Slash-kommandoer",
@@ -3920,7 +3924,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Forklar $ARGUMENTS",
       "subtask": "Kør som underopgave",
-      "edit": "Rediger skråstreg kommando",
+      "edit": "Rediger slash-kommando {{name}}",
+      "delete": "Slet slash-kommando {{name}}",
+      "moveUp": "Flyt slash-kommando {{name}} op",
+      "moveDown": "Flyt slash-kommando {{name}} ned",
       "saveFailed": "Kommandoen kunne ikke gemmes",
       "deleteFailed": "Kommandoen kunne ikke slettes",
       "nameRequired": "Indtast et kommandonavn",
@@ -3952,6 +3959,7 @@
       "unbindFailed": "Repo kunne ikke ophæves"
     },
     "variablesDeleteFailed": "Variablen kunne ikke slettes",
+    "deleteVariable": "Slet variabel {{key}}",
     "deleteCommand": "Slet kommando {{position}}"
   },
   "credits": {

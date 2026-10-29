@@ -3840,6 +3840,8 @@
     "skillSourceMarketplace": "Mache",
     "skillsHint": "Kole yon SKILL.md epi non li ranpli; ajoute yon konpetans nan telefòn ou san yo pa trennen ak gout.",
     "skillEditTitle": "Edit konpetans",
+    "skillEdit": "Edit konpetans {{name}}",
+    "skillDelete": "Efase konpetans {{name}}",
     "mcp": {
       "title": "MCP serveurs",
       "add": "Ajoute sèvè MCP",
@@ -3869,7 +3871,8 @@
       "jsonInvalid": "Antre JSON valab - yon objè ki gen valè fisèl",
       "jsonTooLarge": "Sèvi ak pa plis pase 50 antre, kle jiska 128 ak valè jiska 4096 karaktè",
       "timeoutInvalid": "Timeout dwe yon kantite antye milisgond",
-      "edit": "Edit sèvè MCP",
+      "edit": "Edit sèvè MCP {{name}}",
+      "delete": "Efase sèvè MCP {{name}}",
       "saveFailed": "Pa t 'kapab sove sèvè MCP",
       "deleteFailed": "Pa t 'kapab efase sèvè MCP",
       "updateFailed": "Pa t 'kapab mete sèvè MCP ajou"
@@ -3907,7 +3910,8 @@
       "slugRequired": "Antre yon slug ajan",
       "slugInvalid": "Slug dwe kòmanse ak yon lèt miniskil ASCII epi sèvi ak sèlman lèt miniskil ASCII, chif, ak tire, jiska 50 karaktè",
       "slugConflict": "Slug sa a deja yon ajan entegre oswa yon lòt ajnan nan pwofil sa a ap itilize",
-      "edit": "Edit ajan"
+      "edit": "Edit ajan {{name}}",
+      "delete": "Efase ajan {{name}}"
     },
     "slashCommands": {
       "title": "Koupe kòmandman",
@@ -3920,7 +3924,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Eksplike $ARGUMENTS",
       "subtask": "Kouri kòm subtach",
-      "edit": "Edit lòd koupe",
+      "edit": "Edit kòmandman {{name}}",
+      "delete": "Efase kòmandman {{name}}",
+      "moveUp": "Deplase kòmandman {{name}} anwo",
+      "moveDown": "Deplase kòmandman {{name}} anba",
       "saveFailed": "Pa t 'kapab sove lòd",
       "deleteFailed": "Pa t 'kapab efase lòd",
       "nameRequired": "Antre yon non kòmand",
@@ -3952,6 +3959,7 @@
       "unbindFailed": "Pa t 'kapab dezole repo"
     },
     "variablesDeleteFailed": "Pa t 'kapab efase varyab",
+    "deleteVariable": "Efase varyab {{key}}",
     "deleteCommand": "Efase kòmandman {{position}}"
   },
   "credits": {

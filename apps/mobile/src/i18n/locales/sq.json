@@ -3840,6 +3840,8 @@
     "skillSourceMarketplace": "Tregu",
     "skillsHint": "Ngjit një SKILL.md dhe emri i saj plotëson; shtoni një aftësi nga telefoni juaj pa zvarritje dhe lëshim.",
     "skillEditTitle": "Shkathtësia e redaktimit",
+    "skillEdit": "Redakto aftësinë {{name}}",
+    "skillDelete": "Fshi aftësinë {{name}}",
     "mcp": {
       "title": "serverët MCP",
       "add": "Shto server MCP",
@@ -3869,7 +3871,8 @@
       "jsonInvalid": "Fut JSON të vlefshëm - një objekt vlerash vargu",
       "jsonTooLarge": "Përdor maksimumi 50 hyrje, çelësa deri në 128 dhe vlera deri në 4096 karaktere",
       "timeoutInvalid": "Kohëzgjatja duhet të jetë një numër i plotë milisekondash",
-      "edit": "Ndrysho serverin MCP",
+      "edit": "Redakto serverin MCP {{name}}",
+      "delete": "Fshi serverin MCP {{name}}",
       "saveFailed": "Serveri MCP nuk mund të ruhej",
       "deleteFailed": "Serveri MCP nuk mund të fshihej",
       "updateFailed": "Serveri MCP nuk mund të përditësohej"
@@ -3907,7 +3910,8 @@
       "slugRequired": "Fut një slug agjenti",
       "slugInvalid": "Slug duhet të fillojë me një shkronjë të vogël ASCII dhe të përdorë vetëm shkronja të vogla ASCII, shifra dhe viza, deri në 50 karaktere",
       "slugConflict": "Ai slug është tashmë në përdorim nga një agjent i integruar ose një agjent tjetër në këtë profil",
-      "edit": "Përpunoni agjent"
+      "edit": "Redakto agjentin {{name}}",
+      "delete": "Fshi agjentin {{name}}"
     },
     "slashCommands": {
       "title": "Komandat me prerje",
@@ -3920,7 +3924,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Shpjegoni $ARGUMENTS",
       "subtask": "Ekzekuto si nëndetyrë",
-      "edit": "Redakto komandën e pjerrët",
+      "edit": "Redakto komandën me prerje {{name}}",
+      "delete": "Fshi komandën me prerje {{name}}",
+      "moveUp": "Zhvendos komandën me prerje {{name}} lart",
+      "moveDown": "Zhvendos komandën me prerje {{name}} poshtë",
       "saveFailed": "Komanda nuk mund të ruhej",
       "deleteFailed": "Komanda nuk mund të fshihej",
       "nameRequired": "Futni një emër komande",
@@ -3952,6 +3959,7 @@
       "unbindFailed": "Repo nuk mund të shkëputej"
     },
     "variablesDeleteFailed": "Variabla nuk mund të fshihej",
+    "deleteVariable": "Fshi variablin {{key}}",
     "deleteCommand": "Fshi komandën {{position}}"
   },
   "credits": {

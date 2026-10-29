@@ -3840,6 +3840,8 @@
     "skillSourceMarketplace": "Markplek",
     "skillsHint": "Plak 'n SKILL.md en sy naam vul in; voeg 'n vaardigheid vanaf jou foon by sonder om te sleep en te laat val.",
     "skillEditTitle": "Wysig vaardigheid",
+    "skillEdit": "Wysig vaardigheid {{name}}",
+    "skillDelete": "Skrap vaardigheid {{name}}",
     "mcp": {
       "title": "MCP-bedieners",
       "add": "Voeg MCP-bediener by",
@@ -3869,7 +3871,8 @@
       "jsonInvalid": "Voer geldige JSON in - 'n objek van stringwaardes",
       "jsonTooLarge": "Gebruik hoogstens 50 inskrywings, sleutels tot 128 en waardes tot 4096 karakters",
       "timeoutInvalid": "Uitteltyd moet 'n hele aantal millisekondes wees",
-      "edit": "Wysig MCP-bediener",
+      "edit": "Wysig MCP-bediener {{name}}",
+      "delete": "Skrap MCP-bediener {{name}}",
       "saveFailed": "Kon nie MCP-bediener stoor nie",
       "deleteFailed": "Kon nie MCP-bediener verwyder nie",
       "updateFailed": "Kon nie MCP-bediener opdateer nie"
@@ -3907,7 +3910,8 @@
       "slugRequired": "Voer 'n agentslak in",
       "slugInvalid": "Slak moet met 'n ASCII-kleinletter begin en slegs ASCII-kleinletters, syfers en strepe tot 50 karakters gebruik",
       "slugConflict": "Daardie slak word deur 'n ingeboude agent of 'n ander agent in hierdie profiel gebruik",
-      "edit": "Wysig agent"
+      "edit": "Wysig agent {{name}}",
+      "delete": "Skrap agent {{name}}"
     },
     "slashCommands": {
       "title": "Slash opdragte",
@@ -3920,7 +3924,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Verduidelik $ARGUMENTS",
       "subtask": "Hardloop as subtaak",
-      "edit": "Wysig skuinsstreep opdrag",
+      "edit": "Wysig slash opdrag {{name}}",
+      "delete": "Skrap slash opdrag {{name}}",
+      "moveUp": "Skuif slash opdrag {{name}} op",
+      "moveDown": "Skuif slash opdrag {{name}} af",
       "saveFailed": "Kon nie opdrag stoor nie",
       "deleteFailed": "Kon nie opdrag verwyder nie",
       "nameRequired": "Voer 'n opdragnaam in",
@@ -3952,6 +3959,7 @@
       "unbindFailed": "Kon nie repo ontbind nie"
     },
     "variablesDeleteFailed": "Kon nie veranderlike verwyder nie",
+    "deleteVariable": "Skrap veranderlike {{key}}",
     "deleteCommand": "Skrap bevel {{position}}"
   },
   "credits": {

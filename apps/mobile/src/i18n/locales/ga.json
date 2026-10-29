@@ -3990,6 +3990,8 @@
     "skillSourceMarketplace": "Margadh",
     "skillsHint": "Greamaigh SKILL.md agus líonann a ainm isteach; cuir scil ó do ghuthán gan tarraing agus scaoil.",
     "skillEditTitle": "Cuir scil in eagar",
+    "skillEdit": "Cuir scil {{name}} in eagar",
+    "skillDelete": "Scrios scil {{name}}",
     "mcp": {
       "title": "Freastalaithe MCP",
       "add": "Cuir freastalaí MCP leis",
@@ -4019,7 +4021,8 @@
       "jsonInvalid": "Iontráil JSON bailí — réad teaghluachanna",
       "jsonTooLarge": "Úsáid 50 iontráil ar a mhéad, eochracha suas le 128 agus luachanna suas le 4096 carachtar",
       "timeoutInvalid": "Caithfidh teorainn ama a bheith ina iomlán de na milleasoicindí",
-      "edit": "Cuir freastalaí MCP in eagar",
+      "edit": "Cuir freastalaí MCP {{name}} in eagar",
+      "delete": "Scrios freastalaí MCP {{name}}",
       "saveFailed": "Níorbh fhéidir an freastalaí MCP a shábháil",
       "deleteFailed": "Níorbh fhéidir an freastalaí MCP a scriosadh",
       "updateFailed": "Níorbh fhéidir an freastalaí MCP a nuashonrú"
@@ -4057,7 +4060,8 @@
       "slugRequired": "Cuir isteach seilide gníomhaire",
       "slugInvalid": "Caithfidh sluga tosú le litir bheag ASCII agus gan ach litreacha beaga ASCII, digití agus daiseanna a úsáid, suas le 50 carachtar",
       "slugConflict": "Tá an slug sin in úsáid cheana ag gníomhaire ionsuite nó ag gníomhaire eile sa phróifíl seo",
-      "edit": "Cuir gníomhaire in eagar"
+      "edit": "Cuir gníomhaire {{name}} in eagar",
+      "delete": "Scrios gníomhaire {{name}}"
     },
     "slashCommands": {
       "title": "Orduithe Slais",
@@ -4070,7 +4074,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Mínigh $ARGUMENTS",
       "subtask": "Rith mar fhothasc",
-      "edit": "Cuir ordú slais in eagar",
+      "edit": "Cuir ordú slais {{name}} in eagar",
+      "delete": "Scrios ordú slais {{name}}",
+      "moveUp": "Bog ordú slais {{name}} suas",
+      "moveDown": "Bog ordú slais {{name}} síos",
       "saveFailed": "Níorbh fhéidir an t-ordú a shábháil",
       "deleteFailed": "Níorbh fhéidir an t-ordú a scriosadh",
       "nameRequired": "Cuir isteach ainm ordaithe",
@@ -4102,6 +4109,7 @@
       "unbindFailed": "Níorbh fhéidir repo a dhícheangal"
     },
     "variablesDeleteFailed": "Níorbh fhéidir an athróg a scriosadh",
+    "deleteVariable": "Scrios athróg {{key}}",
     "deleteCommand": "Scrios ordú {{position}}"
   },
   "credits": {

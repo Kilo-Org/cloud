@@ -3840,6 +3840,8 @@
     "skillSourceMarketplace": "Turg",
     "skillsHint": "Kleepige fail SKILL.md ja selle nimi täidetakse; lisage oma telefonist oskusi ilma lohistamata.",
     "skillEditTitle": "Muuda oskusi",
+    "skillEdit": "Muuda oskust {{name}}",
+    "skillDelete": "Kustuta oskus {{name}}",
     "mcp": {
       "title": "MCP-serverid",
       "add": "Lisage MCP-server",
@@ -3869,7 +3871,8 @@
       "jsonInvalid": "Sisestage kehtiv JSON – stringiväärtuste objekt",
       "jsonTooLarge": "Kasuta kõige rohkem 50 kirjet, võtmed kuni 128 ja väärtused kuni 4096 tähemärki",
       "timeoutInvalid": "Aegumine peab olema täisarv millisekundeid",
-      "edit": "Redigeeri MCP-serverit",
+      "edit": "Muuda MCP-serverit {{name}}",
+      "delete": "Kustuta MCP-server {{name}}",
       "saveFailed": "MCP-serverit ei saanud salvestada",
       "deleteFailed": "MCP-serverit ei õnnestunud kustutada",
       "updateFailed": "MCP-serverit ei õnnestunud värskendada"
@@ -3907,7 +3910,8 @@
       "slugRequired": "Sisestage agent nälkjas",
       "slugInvalid": "Slug peab algama ASCII väiketähega ja kasutama ainult ASCII väiketähti, numbreid ja sidekriipse, kuni 50 tähemärki",
       "slugConflict": "Seda slugi kasutab juba sisseehitatud agent või muu agent selles profiilis",
-      "edit": "Redigeeri agenti"
+      "edit": "Muuda agenti {{name}}",
+      "delete": "Kustuta agent {{name}}"
     },
     "slashCommands": {
       "title": "Kaldkriipsuga käsud",
@@ -3920,7 +3924,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Selgitage $ARGUMENTS",
       "subtask": "Käivita alamülesandena",
-      "edit": "Muuda kaldkriipsu käsku",
+      "edit": "Muuda käsku {{name}}",
+      "delete": "Kustuta käsk {{name}}",
+      "moveUp": "Liiguta käsk {{name}} üles",
+      "moveDown": "Liiguta käsk {{name}} alla",
       "saveFailed": "Käsku ei saanud salvestada",
       "deleteFailed": "Käsku ei õnnestunud kustutada",
       "nameRequired": "Sisestage käsu nimi",
@@ -3952,6 +3959,7 @@
       "unbindFailed": "Repot ei saanud lahti siduda"
     },
     "variablesDeleteFailed": "Muutujat ei õnnestunud kustutada",
+    "deleteVariable": "Kustuta muutuja {{key}}",
     "deleteCommand": "Kustuta käsk {{position}}"
   },
   "credits": {

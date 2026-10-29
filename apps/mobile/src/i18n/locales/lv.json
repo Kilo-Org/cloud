@@ -3890,6 +3890,8 @@
     "skillSourceMarketplace": "Tirgus",
     "skillsHint": "Ielīmējiet failu SKILL.md, un tā nosaukums tiks aizpildīts; pievienojiet prasmi no sava tālruņa bez vilkšanas un nomešanas.",
     "skillEditTitle": "Rediģēt prasmi",
+    "skillEdit": "Rediģēt prasmi {{name}}",
+    "skillDelete": "Dzēst prasmi {{name}}",
     "mcp": {
       "title": "MCP serveri",
       "add": "Pievienojiet MCP serveri",
@@ -3919,7 +3921,8 @@
       "jsonInvalid": "Ievadiet derīgu JSON — virknes vērtību objektu",
       "jsonTooLarge": "Izmantojiet ne vairāk kā 50 ierakstus, atslēgas līdz 128 un vērtības līdz 4096 rakstzīmēm",
       "timeoutInvalid": "Taimautai ir jābūt veselam milisekunžu skaitam",
-      "edit": "Rediģēt MCP serveri",
+      "edit": "Rediģēt MCP serveri {{name}}",
+      "delete": "Dzēst MCP serveri {{name}}",
       "saveFailed": "Nevarēja saglabāt MCP serveri",
       "deleteFailed": "Nevarēja izdzēst MCP serveri",
       "updateFailed": "Nevarēja atjaunināt MCP serveri"
@@ -3957,7 +3960,8 @@
       "slugRequired": "Ievadiet aģenta lodes",
       "slugInvalid": "Slug jāsākas ar mazo ASCII burtu un jāizmanto tikai mazie ASCII burti, cipari un domuzīmes, līdz 50 rakstzīmēm",
       "slugConflict": "Šo slug jau izmanto iebūvēts aģents vai cits aģents šajā profilā",
-      "edit": "Rediģēt aģentu"
+      "edit": "Rediģēt aģentu {{name}}",
+      "delete": "Dzēst aģentu {{name}}"
     },
     "slashCommands": {
       "title": "Svītru komandas",
@@ -3970,7 +3974,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Izskaidrojiet $ARGUMENTS",
       "subtask": "Palaist kā apakšuzdevumu",
-      "edit": "Rediģēt slīpsvītras komandu",
+      "edit": "Rediģēt svītru komandu {{name}}",
+      "delete": "Dzēst svītru komandu {{name}}",
+      "moveUp": "Pārvietot svītru komandu {{name}} uz augšu",
+      "moveDown": "Pārvietot svītru komandu {{name}} uz leju",
       "saveFailed": "Nevarēja saglabāt komandu",
       "deleteFailed": "Nevarēja izdzēst komandu",
       "nameRequired": "Ievadiet komandas nosaukumu",
@@ -4002,6 +4009,7 @@
       "unbindFailed": "Nevarēja atsaistīt repo"
     },
     "variablesDeleteFailed": "Nevarēja izdzēst mainīgo",
+    "deleteVariable": "Dzēst mainīgo {{key}}",
     "deleteCommand": "Dzēst komandu {{position}}"
   },
   "credits": {

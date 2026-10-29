@@ -3890,6 +3890,8 @@
     "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Cole um SKILL.md e seu nome será preenchido; adicione uma habilidade do seu telefone sem arrastar e soltar.",
     "skillEditTitle": "Editar habilidade",
+    "skillEdit": "Editar a habilidade {{name}}",
+    "skillDelete": "Excluir a habilidade {{name}}",
     "mcp": {
       "title": "Servidores MCP",
       "add": "Adicionar servidor MCP",
@@ -3919,7 +3921,8 @@
       "jsonInvalid": "Insira JSON válido – um objeto de valores de string",
       "jsonTooLarge": "Use no máximo 50 entradas, chaves de até 128 e valores de até 4096 caracteres",
       "timeoutInvalid": "O tempo limite deve ser um número inteiro de milissegundos",
-      "edit": "Editar servidor MCP",
+      "edit": "Editar o servidor MCP {{name}}",
+      "delete": "Excluir o servidor MCP {{name}}",
       "saveFailed": "Não foi possível salvar o servidor MCP",
       "deleteFailed": "Não foi possível excluir o servidor MCP",
       "updateFailed": "Não foi possível atualizar o servidor MCP"
@@ -3957,7 +3960,8 @@
       "slugRequired": "Insira um slug de agente",
       "slugInvalid": "Slug deve começar com uma letra ASCII minúscula e usar apenas letras ASCII minúsculas, dígitos e travessões, com até 50 caracteres",
       "slugConflict": "Esse slug já é usado por um agente integrado ou por outro agente neste perfil",
-      "edit": "Editar agente"
+      "edit": "Editar o agente {{name}}",
+      "delete": "Excluir o agente {{name}}"
     },
     "slashCommands": {
       "title": "Comandos de barra",
@@ -3970,7 +3974,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explique $ARGUMENTS",
       "subtask": "Executar como subtarefa",
-      "edit": "Editar comando de barra",
+      "edit": "Editar o comando de barra {{name}}",
+      "delete": "Excluir o comando de barra {{name}}",
+      "moveUp": "Mover o comando de barra {{name}} para cima",
+      "moveDown": "Mover o comando de barra {{name}} para baixo",
       "saveFailed": "Não foi possível salvar o comando",
       "deleteFailed": "Não foi possível excluir o comando",
       "nameRequired": "Digite um nome de comando",
@@ -4002,6 +4009,7 @@
       "unbindFailed": "Não foi possível desvincular o repositório"
     },
     "variablesDeleteFailed": "Não foi possível excluir a variável",
+    "deleteVariable": "Excluir a variável {{key}}",
     "deleteCommand": "Excluir o comando {{position}}"
   },
   "credits": {

@@ -3890,6 +3890,8 @@
     "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Zalijepite SKILL.md i njegovo ime se popunjava; dodajte vještinu sa svog telefona bez povlačenja i ispuštanja.",
     "skillEditTitle": "Uredi vještinu",
+    "skillEdit": "Uredi vještinu {{name}}",
+    "skillDelete": "Obriši vještinu {{name}}",
     "mcp": {
       "title": "MCP serveri",
       "add": "Dodajte MCP server",
@@ -3919,7 +3921,8 @@
       "jsonInvalid": "Unesite važeći JSON — objekt vrijednosti niza",
       "jsonTooLarge": "Koristite najviše 50 unosa, ključevi do 128 i vrijednosti do 4096 znakova",
       "timeoutInvalid": "Vremensko ograničenje mora biti cijeli broj milisekundi",
-      "edit": "Uredite MCP server",
+      "edit": "Uredi MCP server {{name}}",
+      "delete": "Obriši MCP server {{name}}",
       "saveFailed": "Nije moguće sačuvati MCP server",
       "deleteFailed": "Nije moguće izbrisati MCP server",
       "updateFailed": "Nije moguće ažurirati MCP server"
@@ -3957,7 +3960,8 @@
       "slugRequired": "Unesite puž agenta",
       "slugInvalid": "Slug mora početi malim ASCII slovom i koristiti samo mala ASCII slova, cifre i crtice, najviše 50 znakova",
       "slugConflict": "Taj slug već koristi ugrađeni agent ili drugi agent u ovom profilu",
-      "edit": "Uredi agenta"
+      "edit": "Uredi agenta {{name}}",
+      "delete": "Obriši agenta {{name}}"
     },
     "slashCommands": {
       "title": "Slash komande",
@@ -3970,7 +3974,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Objasnite $ARGUMENTS",
       "subtask": "Pokreni kao podzadatak",
-      "edit": "Uredi naredbu kose crte",
+      "edit": "Uredi naredbu {{name}}",
+      "delete": "Obriši naredbu {{name}}",
+      "moveUp": "Premjesti naredbu {{name}} gore",
+      "moveDown": "Premjesti naredbu {{name}} dolje",
       "saveFailed": "Nije moguće sačuvati naredbu",
       "deleteFailed": "Nije moguće izbrisati naredbu",
       "nameRequired": "Unesite naziv komande",
@@ -4002,6 +4009,7 @@
       "unbindFailed": "Nije moguće poništiti vezivanje repo"
     },
     "variablesDeleteFailed": "Nije moguće izbrisati varijablu",
+    "deleteVariable": "Obriši varijablu {{key}}",
     "deleteCommand": "Obriši naredbu {{position}}"
   },
   "credits": {

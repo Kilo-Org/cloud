@@ -4040,6 +4040,8 @@
     "skillSourceMarketplace": "المتجر",
     "skillsHint": "الصق SKILL.md وسيملأ اسمه؛ أضف مهارة من هاتفك دون السحب والإفلات.",
     "skillEditTitle": "تحرير المهارة",
+    "skillEdit": "تحرير المهارة {{name}}",
+    "skillDelete": "احذف المهارة {{name}}",
     "mcp": {
       "title": "خوادم MCP",
       "add": "إضافة خادم MCP",
@@ -4069,7 +4071,8 @@
       "jsonInvalid": "أدخل JSON صالحًا — كائن ذو قيم سلسلة",
       "jsonTooLarge": "استخدم 50 إدخالًا كحد أقصى، بمفاتيح حتى 128 وقيم حتى 4096 حرفًا",
       "timeoutInvalid": "يجب أن تكون المهلة عددًا صحيحًا من المللي ثانية",
-      "edit": "تحرير خادم MCP",
+      "edit": "تحرير خادم MCP {{name}}",
+      "delete": "احذف خادم MCP {{name}}",
       "saveFailed": "تعذر حفظ خادم MCP",
       "deleteFailed": "تعذر حذف خادم MCP",
       "updateFailed": "تعذر تحديث خادم MCP"
@@ -4107,7 +4110,8 @@
       "slugRequired": "أدخل سبيكة وكيل",
       "slugInvalid": "يجب أن يبدأ الرمز بحرف ASCII صغير ويستخدم فقط أحرف ASCII الصغيرة والأرقام والشرطات، بحد أقصى 50 حرفًا",
       "slugConflict": "هذا المعرّف محجوز بواسطة وكيل مدمج أو وكيل آخر في هذا الملف الشخصي",
-      "edit": "تحرير الوكيل"
+      "edit": "تحرير الوكيل {{name}}",
+      "delete": "احذف الوكيل {{name}}"
     },
     "slashCommands": {
       "title": "أوامر القطع",
@@ -4120,7 +4124,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "شرح $ARGUMENTS",
       "subtask": "تشغيل كمهمة فرعية",
-      "edit": "تحرير أمر الشرطة المائلة",
+      "edit": "تحرير الأمر {{name}}",
+      "delete": "احذف الأمر {{name}}",
+      "moveUp": "انقل الأمر {{name}} لأعلى",
+      "moveDown": "انقل الأمر {{name}} لأسفل",
       "saveFailed": "تعذر حفظ الأمر",
       "deleteFailed": "تعذر حذف الأمر",
       "nameRequired": "أدخل اسم الأمر",
@@ -4152,6 +4159,7 @@
       "unbindFailed": "تعذر إلغاء ربط الريبو"
     },
     "variablesDeleteFailed": "تعذر حذف المتغير",
+    "deleteVariable": "احذف المتغير {{key}}",
     "deleteCommand": "احذف الأمر {{position}}"
   },
   "credits": {

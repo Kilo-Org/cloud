@@ -3840,6 +3840,8 @@
     "skillSourceMarketplace": "መደብር",
     "skillsHint": "SKILL.md ይለጥፉ እና ስሙ ይሞላል; ሳይጎትቱ እና መጣል ሳይኖር ከስልክዎ ላይ ችሎታ ይጨምሩ።",
     "skillEditTitle": "ችሎታን ያርትዑ",
+    "skillEdit": "ችሎታ {{name}} ያርትዑ",
+    "skillDelete": "ችሎታ {{name}} ሰርዝ",
     "mcp": {
       "title": "MCP አገልጋዮች",
       "add": "የኤምሲፒ አገልጋይ አክል",
@@ -3869,7 +3871,8 @@
       "jsonInvalid": "የሚሰራ JSON ያስገቡ - የሕብረቁምፊ እሴቶች ነገር",
       "jsonTooLarge": "ቢበዛ 50 ግቤቶችን ይጠቀሙ፣ ቁልፎች እስከ 128 እና እሴቶች እስከ 4096 ቁምፊ",
       "timeoutInvalid": "ጊዜው ያለፈበት ሙሉ የሚሊሰከንዶች ቁጥር መሆን አለበት።",
-      "edit": "የMCP አገልጋይ ያርትዑ",
+      "edit": "MCP አገልጋይ {{name}} ያርትዑ",
+      "delete": "MCP አገልጋይ {{name}} ሰርዝ",
       "saveFailed": "የMCP አገልጋይን ማስቀመጥ አልተቻለም",
       "deleteFailed": "የMCP አገልጋይን ማጥፋት አልተቻለም",
       "updateFailed": "የMCP አገልጋይን ማዘመን አልተቻለም"
@@ -3907,7 +3910,8 @@
       "slugRequired": "የወኪል ማሰሪያ አስገባ",
       "slugInvalid": "ስሉግ በትንንሽ ASCII ፊደል መጀመር እና በትንንሽ ASCII ሆሄያት፣ አሃዞች እና ሰረዞች ብቻ መጠቀም አለበት፣ እስከ 50 ቁምፊዎች።",
       "slugConflict": "ያ ስሉግ በአንድ አብሮ በተሰራ ወኪል ወይም በሌላ ወኪል በዚህ መገለጫ ውስጥ ጥቅም ላይ ውሏል።",
-      "edit": "ወኪል አርትዕ"
+      "edit": "ወኪል {{name}} ያርትዑ",
+      "delete": "ወኪል {{name}} ሰርዝ"
     },
     "slashCommands": {
       "title": "Slash ትዕዛዞች",
@@ -3920,7 +3924,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS ያብራሩ",
       "subtask": "እንደ ንዑስ ተግባር ያሂዱ",
-      "edit": "የጭረት ትእዛዝን ያርትዑ",
+      "edit": "Slash ትዕዛዝ {{name}} ያርትዑ",
+      "delete": "Slash ትዕዛዝ {{name}} ሰርዝ",
+      "moveUp": "Slash ትዕዛዝ {{name}} ወደ ላይ አንቀሳቅስ",
+      "moveDown": "Slash ትዕዛዝ {{name}} ወደ ታች አንቀሳቅስ",
       "saveFailed": "ትዕዛዝ ማስቀመጥ አልተቻለም",
       "deleteFailed": "ትዕዛዝ ማጥፋት አልተቻለም",
       "nameRequired": "የትእዛዝ ስም ያስገቡ",
@@ -3952,6 +3959,7 @@
       "unbindFailed": "ሪፖን ማላቀቅ አልተቻለም"
     },
     "variablesDeleteFailed": "ተለዋዋጭ ማጥፋት አልተቻለም",
+    "deleteVariable": "ተለዋዋጭ {{key}} ሰርዝ",
     "deleteCommand": "ትዕዛዝ {{position}} ሰርዝ"
   },
   "credits": {

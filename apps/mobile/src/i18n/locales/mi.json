@@ -3840,6 +3840,8 @@
     "skillSourceMarketplace": "Mākete",
     "skillsHint": "Whakapiria he SKILL.md ka whakakiia tona ingoa; taapirihia he pukenga mai i to waea me te kore toia me te maturuturu.",
     "skillEditTitle": "Pukenga whakatika",
+    "skillEdit": "Whakatika pukenga {{name}}",
+    "skillDelete": "Muku pukenga {{name}}",
     "mcp": {
       "title": "MCP tūmau",
       "add": "Tāpiri tūmau MCP",
@@ -3869,7 +3871,8 @@
       "jsonInvalid": "Whakauruhia JSON whaimana - he ahanoa o nga uara aho",
       "jsonTooLarge": "Whakamahia kia 50 ngā tāurunga, kī tae atu ki 128 me ngā uara tae atu ki 4096 pūāhua",
       "timeoutInvalid": "Ko te wa poto me he maha katoa o nga manomano",
-      "edit": "Whakatika tūmau MCP",
+      "edit": "Whakatika tūmau MCP {{name}}",
+      "delete": "Muku tūmau MCP {{name}}",
       "saveFailed": "Kāore i taea te tiaki i te tūmau MCP",
       "deleteFailed": "Kāore i taea te muku i te tūmau MCP",
       "updateFailed": "Kāore i taea te whakahou i te tūmau MCP"
@@ -3907,7 +3910,8 @@
       "slugRequired": "Whakauruhia he slug māngai",
       "slugInvalid": "Me timata te Slug ki te reta ASCII iti me te whakamahi i nga reta ASCII iti, nga mati, me nga tohu (-) anake, ki te 50 pūāhua iti iho rānei",
       "slugConflict": "Kei te whakamahia tērā slug e tētahi ahatanga o roto, e tētahi ahatanga kē rānei o tēnei kōtaha",
-      "edit": "Whakatikatika māngai"
+      "edit": "Whakatika māngai {{name}}",
+      "delete": "Muku māngai {{name}}"
     },
     "slashCommands": {
       "title": "Nga whakahau rītaha",
@@ -3920,7 +3924,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Whakamaramahia $ARGUMENTS",
       "subtask": "Whakahaerehia hei mahi iti",
-      "edit": "Whakatika whakahau rītaha",
+      "edit": "Whakatika whakahau rītaha {{name}}",
+      "delete": "Muku whakahau rītaha {{name}}",
+      "moveUp": "Neke whakahau rītaha {{name}} ki runga",
+      "moveDown": "Neke whakahau rītaha {{name}} ki raro",
       "saveFailed": "Kāore i taea te tiaki tono",
       "deleteFailed": "Kāore i taea te muku tono",
       "nameRequired": "Whakauruhia he ingoa whakahau",
@@ -3952,6 +3959,7 @@
       "unbindFailed": "Kaore i taea te wete i te repo"
     },
     "variablesDeleteFailed": "Kāore i taea te muku taurangi",
+    "deleteVariable": "Muku taurangi {{key}}",
     "deleteCommand": "Muku whakahau {{position}}"
   },
   "credits": {

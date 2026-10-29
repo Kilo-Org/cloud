@@ -3840,6 +3840,8 @@
     "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Tampal SKILL.md dan namanya diisi; tambah kemahiran daripada telefon anda tanpa seret dan lepas.",
     "skillEditTitle": "Kemahiran mengedit",
+    "skillEdit": "Edit kemahiran {{name}}",
+    "skillDelete": "Padam kemahiran {{name}}",
     "mcp": {
       "title": "pelayan MCP",
       "add": "Tambahkan pelayan MCP",
@@ -3869,7 +3871,8 @@
       "jsonInvalid": "Masukkan JSON yang sah — objek nilai rentetan",
       "jsonTooLarge": "Gunakan paling banyak 50 entri, kunci sehingga 128 dan nilai sehingga 4096 aksara",
       "timeoutInvalid": "Tamat masa mestilah bilangan keseluruhan milisaat",
-      "edit": "Edit pelayan MCP",
+      "edit": "Edit pelayan MCP {{name}}",
+      "delete": "Padam pelayan MCP {{name}}",
       "saveFailed": "Tidak dapat menyimpan pelayan MCP",
       "deleteFailed": "Tidak dapat memadam pelayan MCP",
       "updateFailed": "Tidak dapat mengemas kini pelayan MCP"
@@ -3907,7 +3910,8 @@
       "slugRequired": "Masukkan slug ejen",
       "slugInvalid": "Slug mesti bermula dengan huruf kecil ASCII dan hanya menggunakan huruf kecil ASCII, digit dan sempang, sehingga 50 aksara",
       "slugConflict": "Slug itu sudah digunakan oleh ejen terbina dalam atau ejen lain dalam profil ini",
-      "edit": "Edit ejen"
+      "edit": "Edit ejen {{name}}",
+      "delete": "Padam ejen {{name}}"
     },
     "slashCommands": {
       "title": "Perintah tebas",
@@ -3920,7 +3924,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Terangkan $ARGUMENTS",
       "subtask": "Jalankan sebagai subtugas",
-      "edit": "Edit arahan slash",
+      "edit": "Edit arahan {{name}}",
+      "delete": "Padam arahan {{name}}",
+      "moveUp": "Alihkan arahan {{name}} ke atas",
+      "moveDown": "Alihkan arahan {{name}} ke bawah",
       "saveFailed": "Tidak dapat menyimpan arahan",
       "deleteFailed": "Tidak dapat memadam arahan",
       "nameRequired": "Masukkan nama arahan",
@@ -3952,6 +3959,7 @@
       "unbindFailed": "Tidak dapat menyahikat repo"
     },
     "variablesDeleteFailed": "Tidak dapat memadam pembolehubah",
+    "deleteVariable": "Padam pembolehubah {{key}}",
     "deleteCommand": "Padam arahan {{position}}"
   },
   "credits": {

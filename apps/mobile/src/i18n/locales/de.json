@@ -3840,6 +3840,8 @@
     "skillSourceMarketplace": "Marktplatz",
     "skillsHint": "Füge eine SKILL.md ein und der Name wird ausgefüllt. Füge einen Skill von deinem Telefon aus ohne Drag & Drop hinzu.",
     "skillEditTitle": "Fertigkeit bearbeiten",
+    "skillEdit": "Fertigkeit {{name}} bearbeiten",
+    "skillDelete": "Fertigkeit {{name}} löschen",
     "mcp": {
       "title": "MCP-Server",
       "add": "MCP-Server hinzufügen",
@@ -3869,7 +3871,8 @@
       "jsonInvalid": "Gib gültiges JSON ein – ein Objekt mit Zeichenfolgenwerten",
       "jsonTooLarge": "Verwende höchstens 50 Einträge, Schlüssel bis 128 und Werte bis 4096 Zeichen",
       "timeoutInvalid": "Das Zeitlimit muss eine ganze Zahl von Millisekunden betragen",
-      "edit": "Bearbeite den MCP-Server",
+      "edit": "MCP-Server {{name}} bearbeiten",
+      "delete": "MCP-Server {{name}} löschen",
       "saveFailed": "Der MCP-Server konnte nicht gespeichert werden",
       "deleteFailed": "Der MCP-Server konnte nicht gelöscht werden",
       "updateFailed": "Der MCP-Server konnte nicht aktualisiert werden"
@@ -3907,7 +3910,8 @@
       "slugRequired": "Gib einen Agenten-Slug ein",
       "slugInvalid": "Slug muss mit einem ASCII-Kleinbuchstaben beginnen und darf nur ASCII-Kleinbuchstaben, Ziffern und Bindestriche enthalten, höchstens 50 Zeichen",
       "slugConflict": "Dieser Slug wird bereits von einem integrierten Agenten oder einem anderen Agenten in diesem Profil verwendet",
-      "edit": "Agent bearbeiten"
+      "edit": "Agent {{name}} bearbeiten",
+      "delete": "Agent {{name}} löschen"
     },
     "slashCommands": {
       "title": "Slash-Befehle",
@@ -3920,7 +3924,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Erkläre $ARGUMENTS",
       "subtask": "Als Unteraufgabe ausführen",
-      "edit": "Slash-Befehl bearbeiten",
+      "edit": "Slash-Befehl {{name}} bearbeiten",
+      "delete": "Slash-Befehl {{name}} löschen",
+      "moveUp": "Slash-Befehl {{name}} nach oben verschieben",
+      "moveDown": "Slash-Befehl {{name}} nach unten verschieben",
       "saveFailed": "Der Befehl konnte nicht gespeichert werden",
       "deleteFailed": "Der Befehl konnte nicht gelöscht werden",
       "nameRequired": "Gib einen Befehlsnamen ein",
@@ -3952,6 +3959,7 @@
       "unbindFailed": "Repo konnte nicht entbunden werden"
     },
     "variablesDeleteFailed": "Die Variable konnte nicht gelöscht werden",
+    "deleteVariable": "Variable {{key}} löschen",
     "deleteCommand": "Befehl {{position}} löschen"
   },
   "credits": {

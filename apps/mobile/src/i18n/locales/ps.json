@@ -3840,6 +3840,8 @@
     "skillSourceMarketplace": "بازار",
     "skillsHint": "یو SKILL.md پیسټ کړئ او نوم یې ډک شي؛ پرته له ډریګ او ډراپ خپل تلیفون څخه مهارت اضافه کړئ.",
     "skillEditTitle": "د ترمیم مهارت",
+    "skillEdit": "د {{name}} مهارت ترمیم کړئ",
+    "skillDelete": "د {{name}} مهارت ړنګ کړئ",
     "mcp": {
       "title": "د MCP سرورونه",
       "add": "د MCP سرور اضافه کړئ",
@@ -3869,7 +3871,8 @@
       "jsonInvalid": "د اعتبار وړ JSON داخل کړئ - د تار ارزښتونو څیز",
       "jsonTooLarge": "تر 50 پورې ننوتنې وکاروئ، کلیدونه تر 128 او ارزښتونه تر 4096 تورو پورې",
       "timeoutInvalid": "د وخت پای باید د ملی ثانیو بشپړ شمیر وي",
-      "edit": "د MCP سرور ترمیم کړئ",
+      "edit": "د {{name}} MCP سرور ترمیم کړئ",
+      "delete": "د {{name}} MCP سرور ړنګ کړئ",
       "saveFailed": "د MCP سرور خوندي نه شو",
       "deleteFailed": "د MCP سرور ړنګول نشو کړای",
       "updateFailed": "د MCP سرور نه سو تازه کړای"
@@ -3907,7 +3910,8 @@
       "slugRequired": "د اجنټ سلګ داخل کړئ",
       "slugInvalid": "سلګ باید د یوه کوچني ASCII توري سره پیل شي او یوازې د ASCII کوچني توري، عددونه او ډیشونه وکاروي، تر 50 توري پورې",
       "slugConflict": "دغه slug لا دمخکې د یوه داخلي عامل یا په دې پروفایل کې بل عامل لخوا کارول کیږي",
-      "edit": "د ایجنټ ترمیم"
+      "edit": "د {{name}} اجنټ ترمیم کړئ",
+      "delete": "د {{name}} اجنټ ړنګ کړئ"
     },
     "slashCommands": {
       "title": "د سلیش امرونه",
@@ -3920,7 +3924,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS تشریح کړئ",
       "subtask": "د فرعي دندې په توګه چلول",
-      "edit": "د سلیش کمانډ ایډیټ کړئ",
+      "edit": "د {{name}} سلیش امر ترمیم کړئ",
+      "delete": "د {{name}} سلیش امر ړنګ کړئ",
+      "moveUp": "د {{name}} سلیش امر پورته کړئ",
+      "moveDown": "د {{name}} سلیش امر لاندې کړئ",
       "saveFailed": "کمانډ خوندي نشو کړای",
       "deleteFailed": "کمانډ ړنګول نشو کړای",
       "nameRequired": "د کمانډ نوم دننه کړئ",
@@ -3952,6 +3959,7 @@
       "unbindFailed": "د ریپو بندول نشو کولی"
     },
     "variablesDeleteFailed": "متغیر ړنګول نشو کړای",
+    "deleteVariable": "د {{key}} متغیر ړنګ کړئ",
     "deleteCommand": "{{position}} امر ړنګ کړئ"
   },
   "credits": {

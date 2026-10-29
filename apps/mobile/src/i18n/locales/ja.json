@@ -3840,6 +3840,8 @@
     "skillSourceMarketplace": "マーケットプレイス",
     "skillsHint": "SKILL.md を貼り付けると、その名前が入力されます。ドラッグ アンド ドロップせずにスマートフォンからスキルを追加します。",
     "skillEditTitle": "エディットスキル",
+    "skillEdit": "スキル{{name}}を編集",
+    "skillDelete": "スキル{{name}}を削除",
     "mcp": {
       "title": "MCPサーバー",
       "add": "MCPサーバーの追加",
@@ -3869,7 +3871,8 @@
       "jsonInvalid": "有効な JSON (文字列値のオブジェクト) を入力してください",
       "jsonTooLarge": "最大50件のエントリ（キーは128文字、値は4096文字まで）を使用してください",
       "timeoutInvalid": "タイムアウトはミリ秒単位の整数でなければなりません",
-      "edit": "MCPサーバーの編集",
+      "edit": "MCPサーバー{{name}}を編集",
+      "delete": "MCPサーバー{{name}}を削除",
       "saveFailed": "MCP サーバーを保存できませんでした",
       "deleteFailed": "MCP サーバーを削除できませんでした",
       "updateFailed": "MCP サーバーを更新できませんでした"
@@ -3907,7 +3910,8 @@
       "slugRequired": "エージェントスラッグを入力してください",
       "slugInvalid": "スラグはASCII小文字で始まり、ASCII小文字、数字、ダッシュのみを50文字以内で使用してください",
       "slugConflict": "そのスラッグは組み込みエージェントまたはこのプロフィールの別のエージェントが既に使用しています",
-      "edit": "エージェントの編集"
+      "edit": "エージェント{{name}}を編集",
+      "delete": "エージェント{{name}}を削除"
     },
     "slashCommands": {
       "title": "スラッシュコマンド",
@@ -3920,7 +3924,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS の説明",
       "subtask": "サブタスクとして実行",
-      "edit": "スラッシュコマンドの編集",
+      "edit": "スラッシュコマンド{{name}}を編集",
+      "delete": "スラッシュコマンド{{name}}を削除",
+      "moveUp": "スラッシュコマンド{{name}}を上に移動",
+      "moveDown": "スラッシュコマンド{{name}}を下に移動",
       "saveFailed": "コマンドを保存できませんでした",
       "deleteFailed": "コマンドを削除できませんでした",
       "nameRequired": "コマンド名を入力してください",
@@ -3952,6 +3959,7 @@
       "unbindFailed": "リポジトリのバインドを解除できませんでした"
     },
     "variablesDeleteFailed": "変数を削除できませんでした",
+    "deleteVariable": "変数{{key}}を削除",
     "deleteCommand": "コマンド{{position}}を削除"
   },
   "credits": {

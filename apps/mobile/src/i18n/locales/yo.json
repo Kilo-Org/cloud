@@ -3840,6 +3840,8 @@
     "skillSourceMarketplace": "Ọjà",
     "skillsHint": "Lẹẹmọ SKILL.md ati orukọ rẹ kun; ṣafikun ọgbọn lati inu foonu rẹ laisi fa ati ju silẹ.",
     "skillEditTitle": "Olorijori Ṣatunkọ",
+    "skillEdit": "Ṣatunkọ ogbon {{name}}",
+    "skillDelete": "Pa ogbon {{name}} rẹ́",
     "mcp": {
       "title": "Awọn olupin MCP",
       "add": "Fi olupin MCP kun",
@@ -3869,7 +3871,8 @@
       "jsonInvalid": "Tẹ JSON ti o tọ sii - ohun kan ti awọn iye okun",
       "jsonTooLarge": "Lo kò ju 50 àkọsílẹ̀ lọ, bọtini tó 128 àti iye tó 4096 àmì",
       "timeoutInvalid": "Akoko ipari gbọdọ jẹ gbogbo nọmba ti milliseconds",
-      "edit": "Ṣatunkọ olupin MCP",
+      "edit": "Ṣatunkọ olupin MCP {{name}}",
+      "delete": "Pa olupin MCP {{name}} rẹ́",
       "saveFailed": "Ko le fi olupin MCP pamọ",
       "deleteFailed": "Ko le paarẹ olupin MCP",
       "updateFailed": "Ko le ṣe imudojuiwọn olupin MCP"
@@ -3907,7 +3910,8 @@
       "slugRequired": "Tẹ slug oluranlowo",
       "slugInvalid": "Slug gbọdọ bẹrẹ pẹlu lẹta ASCII kekere kan ki o si lo awọn lẹta ASCII kekere, awọn nọmba, ati dashes nikan, titi di 50 àmì",
       "slugConflict": "Slug yẹn ti wa ni lilo pẹlu aṣojú ti a fi sori ẹrọ tabi aṣojú miiran ninu profaili yii",
-      "edit": "Aṣoju Ṣatunkọ"
+      "edit": "Ṣatunkọ aṣoju {{name}}",
+      "delete": "Pa aṣoju {{name}} rẹ́"
     },
     "slashCommands": {
       "title": "Awọn pipaṣẹ idinku",
@@ -3920,7 +3924,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Ṣe alaye $ARGUMENTS",
       "subtask": "Ṣiṣe bi iṣẹ-ṣiṣe",
-      "edit": "Ṣatunkọ pipaṣẹ idinku",
+      "edit": "Ṣatunkọ pipaṣẹ idinku {{name}}",
+      "delete": "Pa pipaṣẹ idinku {{name}} rẹ́",
+      "moveUp": "Gbe pipaṣẹ idinku {{name}} sókè",
+      "moveDown": "Gbe pipaṣẹ idinku {{name}} sílẹ̀",
       "saveFailed": "Ko le fi aṣẹ pamọ",
       "deleteFailed": "Ko le paarẹ aṣẹ",
       "nameRequired": "Tẹ orukọ aṣẹ sii",
@@ -3952,6 +3959,7 @@
       "unbindFailed": "Ko le yọkuro repo"
     },
     "variablesDeleteFailed": "Ko le paarẹ oniyipada",
+    "deleteVariable": "Pa oniyipada {{key}} rẹ́",
     "deleteCommand": "Pa òfin {{position}} rẹ́"
   },
   "credits": {

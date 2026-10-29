@@ -46,7 +46,7 @@ export function OptionList<T extends string, TSaveResult>({
   const { t } = useTranslation();
   const [pending, setPending] = useState<T | null>(null);
   const [failure, setFailure] = useState<(ReviewerConfigSaveFailure & { option: T }) | null>(null);
-  const retryInFlight = failure !== null && pending === failure.option;
+  const retryInFlight = failure?.option === pending;
 
   const handleSelect = async (option: T) => {
     setPending(option);

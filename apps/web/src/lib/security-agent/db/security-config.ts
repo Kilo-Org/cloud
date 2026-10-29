@@ -117,6 +117,12 @@ function toCommandOwner(owner: SecurityReviewOwner): SecurityAgentCommandOwner {
  * non-null expectedRevision updates only when the stored revision still
  * matches; zero affected rows means a concurrent writer won, so it conflicts.
  *
+ * `isEnabled` is the only way this write moves the stored enable flag, and only
+ * the guarded `setEnabled` path supplies it. Omitted, the update leaves the
+ * column out of the SET list, so the stored value survives the save and a
+ * concurrent disable is not overwritten by a stale settings write; a first
+ * insert starts disabled.
+ *
  * Returns the new revision.
  */
 async function writeSecurityAgentConfigWithRevision(
@@ -127,6 +133,7 @@ async function writeSecurityAgentConfigWithRevision(
     createdBy: string;
     expectedRevision: number | null;
     platform: string;
+    isEnabled?: boolean;
   }
 ): Promise<number> {
   if (params.platform === 'github') {
@@ -145,7 +152,7 @@ async function writeSecurityAgentConfigWithRevision(
         agent_type: AGENT_TYPE,
         platform: params.platform,
         config: params.fullConfig,
-        is_enabled: true,
+        is_enabled: params.isEnabled ?? false,
         created_by: params.createdBy,
         config_revision: 1,
       })
@@ -167,7 +174,7 @@ async function writeSecurityAgentConfigWithRevision(
     .update(agent_configs)
     .set({
       config: params.fullConfig,
-      is_enabled: true,
+      ...(params.isEnabled === undefined ? {} : { is_enabled: params.isEnabled }),
       updated_at: new Date().toISOString(),
       config_revision: params.expectedRevision + 1,
     })
@@ -199,6 +206,11 @@ export type SecurityConfigSaveOutcome = {
  * remediation command creation all share one transaction: if any step throws,
  * the config change rolls back, and no worker can claim a queued backlog row
  * before the boundary it is judged against exists.
+ *
+ * A settings save passes no `isEnabled`, so the stored enable flag is not part
+ * of the write: preferences change, the agent's enabled state does not.
+ * Enabling is the guarded `setEnabled` transition, which passes `isEnabled:
+ * true` so the flag commits with the selection it was validated against.
  */
 export async function saveSecurityAgentConfigWithRevision(params: {
   owner: Owner;
@@ -206,6 +218,7 @@ export async function saveSecurityAgentConfigWithRevision(params: {
   createdBy: string;
   expectedRevision: number | null;
   platform?: string;
+  isEnabled?: boolean;
   enqueueAnalysis?: { owner: SecurityReviewOwner; minSeverity: AutoAnalysisMinSeverity };
   enqueueRemediation?: { owner: SecurityReviewOwner };
 }): Promise<SecurityConfigSaveOutcome> {
@@ -226,6 +239,7 @@ export async function saveSecurityAgentConfigWithRevision(params: {
       createdBy: params.createdBy,
       expectedRevision: params.expectedRevision,
       platform,
+      isEnabled: params.isEnabled,
     });
 
     // Record the activation boundary in the same transaction as the enqueue

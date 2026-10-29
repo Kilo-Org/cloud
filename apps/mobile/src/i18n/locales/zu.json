@@ -1932,6 +1932,7 @@
     },
     "settingsSave": {
       "saveChanges": "Londoloza izinguquko",
+      "saved": "Izilungiselelo zilondoloziwe",
       "unsavedTitle": "Izinguquko ezingalondoloziwe",
       "unsavedMessage": "Ulondoloze izinguquko zakho ngaphambi kokuphuma kulesi sikrini?",
       "unsavedInvalidMessage": "Lezi zinguquko azikakwazi ukulondolozwa. Zilungise ukuze zilondolozwe, noma uzilahe ukuze uphume."

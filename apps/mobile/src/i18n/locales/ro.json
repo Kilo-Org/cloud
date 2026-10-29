@@ -1958,6 +1958,7 @@
     },
     "settingsSave": {
       "saveChanges": "Salvează modificările",
+      "saved": "Setări salvate",
       "unsavedTitle": "Modificări nesalvate",
       "unsavedMessage": "Salvezi modificările înainte de a părăsi acest ecran?",
       "unsavedInvalidMessage": "Aceste modificări nu pot fi încă salvate. Corectează-le pentru a salva sau renunță la ele pentru a pleca."

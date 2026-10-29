@@ -58,18 +58,21 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
     errors: [permission.error, config.error, repositories.error],
   });
 
-  // Pending includes uncached queries paused by NetInfo. Cached query errors
-  // must not replace usable settings or a resolved capability with an error screen.
-  const isLoading = permission.isPending || config.isPending || capability.status === 'loading';
-  // The GitHub status read is the only input that decides between the connect
-  // and re-authorize setup screens, so its failure is fatal unless the enabled
-  // destination is already known from the config read.
-  const isGithubStatusUnknown = !permission.data && permission.isError;
+  // The config decides the destination. Once it is cached its owner is known,
+  // so the GitHub status and role reads only refine the setup gates and the
+  // controls — a pending, paused or failed one must not replace a destination
+  // that renders fine. Those reads are still fatal while the config itself is
+  // unread, or while the setup gates genuinely depend on them (agent disabled).
+  const configSettled = config.data !== undefined;
   const isEnabledResolved = config.data?.isEnabled ?? false;
-  const isError =
-    (!config.data && config.isError) ||
-    capability.status === 'error' ||
-    (isGithubStatusUnknown && !isEnabledResolved);
+  const isGithubStatusResolved = permission.data !== undefined;
+  const isLoading =
+    config.isPending ||
+    (!isEnabledResolved && (permission.isPending || capability.status === 'loading'));
+  const isError = configSettled
+    ? !isEnabledResolved &&
+      ((!isGithubStatusResolved && permission.isError) || capability.status === 'error')
+    : config.isError || capability.status === 'error' || permission.isError;
   const isPaused =
     permission.fetchStatus === 'paused' ||
     config.fetchStatus === 'paused' ||
@@ -83,7 +86,7 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
     isLoading,
     isError,
     isDenied: access !== 'granted',
-    isGithubStatusUnknown,
+    isGithubStatusResolved,
     hasIntegration,
     hasPermissions,
     isEnabled,
@@ -181,8 +184,14 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
     );
   }
 
+  // A settled, enabled config already names the destination, so a paused or
+  // failing secondary read only delays its chrome and must never replace it.
+  // Without that destination the setup gates do depend on those reads, so a
+  // paused one stays the retriable failure it describes.
+  const isDestinationKnown = configSettled && isEnabledResolved;
   const isLoadFailureView =
-    view === 'error' || (isLoading && (isError || (isPaused && isConnectivityKnown)));
+    view === 'error' ||
+    (!isDestinationKnown && isLoading && (isError || (isPaused && isConnectivityKnown)));
 
   if (isLoadFailureView) {
     // A retry in flight must be visible: the failure screen is swapped for the

@@ -1932,6 +1932,7 @@
     },
     "settingsSave": {
       "saveChanges": "O'zgarishlarni saqlash",
+      "saved": "Sozlamalar saqlandi",
       "unsavedTitle": "Saqlanmagan o'zgarishlar",
       "unsavedMessage": "Bu ekrandan chiqishdan oldin o'zgarishlar saqlansinmi?",
       "unsavedInvalidMessage": "Bu o'zgarishlarni hali saqlab bo'lmaydi. Saqlash uchun ularni tuzating yoki chiqish uchun bekor qiling."

@@ -80,6 +80,10 @@ export function useSaveSecurityAgentConfig(scope: string) {
       announcingToast.error(error.message);
     },
     onSuccess: result => {
+      // Saving pops the settings screen, and the screen it returns to can fail
+      // to load on a flaky connection. Confirming the write here keeps a
+      // persisted save from reading as a lost one wherever the navigation lands.
+      announcingToast.success(i18n.t('securityAgent.settingsSave.saved'));
       if (result.existingRemediationCommandId) {
         trackSecurityAgentCommand(queryClient, scope, result.existingRemediationCommandId);
       }

@@ -357,6 +357,45 @@ describe('ScopeEntryScreen dashboard first mount', () => {
   });
 });
 
+describe('ScopeEntryScreen cached destination', () => {
+  it.each(['personal', 'org_123'])(
+    'renders the enabled destination while the organization role read fails for %s',
+    async scope => {
+      // The config already names the destination; a failed role read only
+      // affects which controls the screens behind it offer.
+      configData.isEnabled = true;
+      failingProcedures = new Set(['organizations.list']);
+      const root = await mount(scope);
+      expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
+      expect(host(root, 'DashboardScreen')).toHaveLength(1);
+    }
+  );
+
+  it('keeps the cached destination while connectivity pauses its reads', async () => {
+    // A save on a flaky connection can land here with every read paused. The
+    // cached config still renders the dashboard, so the screen must not report
+    // a load failure the user would read as a lost save.
+    configData.isEnabled = true;
+    onlineManager.setOnline(false);
+    const trpc = createTRPCOptionsProxy<MobileRouter>({ client: trpcClient, queryClient });
+    queryClient.setQueryData(
+      trpc.organizations.securityAgent.getConfig.queryKey({ organizationId: 'org_123' }),
+      configData
+    );
+    const root = await mount('org_123');
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
+    expect(host(root, 'DashboardScreen')).toHaveLength(1);
+  });
+
+  it('keeps the load-error screen when the paused reads cannot name a destination', async () => {
+    // No cached config: the setup gates genuinely need the paused reads.
+    onlineManager.setOnline(false);
+    const root = await mount('personal');
+    expect(host(root, 'PlatformErrorScreen')).toHaveLength(1);
+    expect(host(root, 'DashboardScreen')).toHaveLength(0);
+  });
+});
+
 describe('ScopeEntryScreen organization access', () => {
   it('shows the no-access state instead of the setup when the organization denies access', async () => {
     // The organization still appears in the cached membership list — the state

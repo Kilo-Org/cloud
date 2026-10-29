@@ -1464,6 +1464,7 @@
     },
     "settingsSave": {
       "saveChanges": "Simpan perubahan",
+      "saved": "Pengaturan disimpan",
       "unsavedMessage": "Simpan perubahan sebelum meninggalkan layar ini?",
       "unsavedInvalidMessage": "Perubahan ini belum dapat disimpan. Perbaiki untuk menyimpan, atau buang untuk meninggalkan.",
       "unsavedTitle": "Perubahan belum disimpan"

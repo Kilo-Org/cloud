@@ -1932,6 +1932,7 @@
     },
     "settingsSave": {
       "saveChanges": "Anrejistre chanjman yo",
+      "saved": "Paramèt anrejistre",
       "unsavedTitle": "Chanjman ki pa anrejistre",
       "unsavedMessage": "Anrejistre chanjman ou yo anvan ou kite ekran sa a?",
       "unsavedInvalidMessage": "Chanjman sa yo poko ka anrejistre. Korije yo pou anrejistre, oswa jete yo pou kite."

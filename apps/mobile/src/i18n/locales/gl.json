@@ -1932,6 +1932,7 @@
     },
     "settingsSave": {
       "saveChanges": "Gardar cambios",
+      "saved": "Axustes gardados",
       "unsavedTitle": "Cambios sen gardar",
       "unsavedMessage": "Queres gardar os cambios antes de saír desta pantalla?",
       "unsavedInvalidMessage": "Estes cambios aínda non se poden gardar. Corríxeos para gardalos ou descártaos para saír."

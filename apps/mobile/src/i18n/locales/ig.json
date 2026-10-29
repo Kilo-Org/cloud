@@ -1932,6 +1932,7 @@
     },
     "settingsSave": {
       "saveChanges": "Chekwaa mgbanwe",
+      "saved": "Echekwara ntọala",
       "unsavedTitle": "Mgbanwe echekwaghị",
       "unsavedMessage": "Chekwaa mgbanwe gị tupu ịhapụ ihuenyo a?",
       "unsavedInvalidMessage": "Enweghị ike ichekwa mgbanwe ndị a ugbu a. Dozie ha iji chekwaa, ma ọ bụ tụfuo ha iji pụọ."

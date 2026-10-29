@@ -1958,6 +1958,7 @@
     },
     "settingsSave": {
       "saveChanges": "Guardar alterações",
+      "saved": "Definições guardadas",
       "unsavedTitle": "Alterações não guardadas",
       "unsavedMessage": "Guardar as alterações antes de sair deste ecrã?",
       "unsavedInvalidMessage": "Estas alterações ainda não podem ser guardadas. Corrija-as para guardar ou descarte-as para sair."

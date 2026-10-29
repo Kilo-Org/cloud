@@ -1464,6 +1464,7 @@
     },
     "settingsSave": {
       "saveChanges": "Lưu thay đổi",
+      "saved": "Đã lưu cài đặt",
       "unsavedMessage": "Bạn có muốn lưu thay đổi trước khi rời màn hình này không?",
       "unsavedInvalidMessage": "Những thay đổi này chưa thể lưu. Hãy sửa chúng để lưu, hoặc hủy bỏ chúng để rời đi.",
       "unsavedTitle": "Thay đổi chưa lưu"

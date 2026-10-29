@@ -1984,6 +1984,7 @@
     },
     "settingsSave": {
       "saveChanges": "Išsaugoti pakeitimus",
+      "saved": "Nustatymai išsaugoti",
       "unsavedTitle": "Neišsaugoti pakeitimai",
       "unsavedMessage": "Išsaugoti pakeitimus prieš išeinant iš šio ekrano?",
       "unsavedInvalidMessage": "Šių pakeitimų dar negalima išsaugoti. Ištaisykite juos, kad išsaugotumėte, arba atmeskite juos, kad išeitumėte."

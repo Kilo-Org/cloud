@@ -1984,6 +1984,7 @@
     },
     "settingsSave": {
       "saveChanges": "Shrani spremembe",
+      "saved": "Nastavitve shranjene",
       "unsavedTitle": "Neshranjene spremembe",
       "unsavedMessage": "Želiš shraniti spremembe, preden zapustiš ta zaslon?",
       "unsavedInvalidMessage": "Teh sprememb še ni mogoče shraniti. Popravi jih, da jih shraniš, ali jih zavrzi, da zapustiš."

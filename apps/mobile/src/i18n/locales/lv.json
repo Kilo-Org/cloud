@@ -1958,6 +1958,7 @@
     },
     "settingsSave": {
       "saveChanges": "Saglabāt izmaiņas",
+      "saved": "Iestatījumi saglabāti",
       "unsavedTitle": "Nesaglabātas izmaiņas",
       "unsavedMessage": "Saglabāt izmaiņas pirms šī ekrāna aizvēršanas?",
       "unsavedInvalidMessage": "Šīs izmaiņas vēl nevar saglabāt. Izlabojiet tās, lai saglabātu, vai atmetiet, lai aizietu."

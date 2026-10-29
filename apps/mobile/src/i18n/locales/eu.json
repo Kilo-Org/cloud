@@ -1932,6 +1932,7 @@
     },
     "settingsSave": {
       "saveChanges": "Gorde aldaketak",
+      "saved": "Ezarpenak gorde dira",
       "unsavedTitle": "Gorde gabeko aldaketak",
       "unsavedMessage": "Aldaketak gorde nahi dituzu pantaila honetatik irten aurretik?",
       "unsavedInvalidMessage": "Aldaketa hauek ezin dira oraindik gorde. Zuzendu itzazu gordetzeko, edo baztertu irteteko."

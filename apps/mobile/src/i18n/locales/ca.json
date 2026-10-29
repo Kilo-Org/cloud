@@ -1958,6 +1958,7 @@
     },
     "settingsSave": {
       "saveChanges": "Desa els canvis",
+      "saved": "Configuració desada",
       "unsavedTitle": "Canvis sense desar",
       "unsavedMessage": "Vols desar els canvis abans de sortir d'aquesta pantalla?",
       "unsavedInvalidMessage": "Aquests canvis encara no es poden desar. Corregeix-los per desar-los o descarta'ls per sortir."

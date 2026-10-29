@@ -1984,6 +1984,7 @@
     },
     "settingsSave": {
       "saveChanges": "Uložiť zmeny",
+      "saved": "Nastavenia uložené",
       "unsavedTitle": "Neuložené zmeny",
       "unsavedMessage": "Uložiť zmeny pred opustením tejto obrazovky?",
       "unsavedInvalidMessage": "Tieto zmeny zatiaľ nemožno uložiť. Oprav ich, aby si ich mohol uložiť, alebo ich zahoď, aby si mohol odísť."

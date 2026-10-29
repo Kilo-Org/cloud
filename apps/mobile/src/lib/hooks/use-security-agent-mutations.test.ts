@@ -97,6 +97,7 @@ const setQueryDataMock = vi.fn();
 const cancelQueriesMock = vi.fn();
 const toastErrorMock = vi.fn();
 const trackCommandMock = vi.hoisted(() => vi.fn());
+const announcingSuccessMock = vi.hoisted(() => vi.fn());
 
 vi.mock('@tanstack/react-query', () => ({
   useMutation: (opts: MutationOptions) => {
@@ -141,7 +142,7 @@ vi.mock('@/lib/trpc', () => ({
 vi.mock('@/lib/a11y/announcing-toast', () => ({
   announcingToast: {
     error: (msg: string) => toastErrorMock(msg),
-    success: vi.fn(),
+    success: (msg: string) => announcingSuccessMock(msg),
     warning: vi.fn(),
   },
 }));
@@ -424,6 +425,20 @@ describe('useSaveSecurityAgentConfig (generation guard + scope)', () => {
     setQueryDataMock.mockReset();
     cancelQueriesMock.mockReset();
     toastErrorMock.mockReset();
+    announcingSuccessMock.mockReset();
+  });
+
+  it('confirms a successful save instead of relying on the screen it returns to', () => {
+    // The save pops the settings screen, and on a flaky connection that screen
+    // can fail to load. Without this confirmation a persisted save reads as a
+    // lost one.
+    useSaveSecurityAgentConfig('personal');
+    lastCapturedOptions?.onSuccess?.({}, { slaEnabled: false });
+
+    expect(announcingSuccessMock).toHaveBeenCalledTimes(1);
+    const announced = announcingSuccessMock.mock.calls[0]?.[0] as string;
+    expect(announced).toBeTruthy();
+    expect(announced).not.toBe('securityAgent.settingsSave.saved');
   });
 
   it('scopes the mutation to serialize against a toggle on the same config', () => {

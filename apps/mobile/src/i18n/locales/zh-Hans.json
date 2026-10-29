@@ -1464,6 +1464,7 @@
     },
     "settingsSave": {
       "saveChanges": "保存更改",
+      "saved": "设置已保存",
       "unsavedMessage": "离开此页面前，要保存更改吗？",
       "unsavedInvalidMessage": "这些更改暂时无法保存。请修正后再保存，或放弃更改以离开。",
       "unsavedTitle": "未保存的更改"

@@ -9,6 +9,8 @@ import { ToolCardShell } from './ToolCardShell';
 import type { ToolPart } from './types';
 import type { QuestionInfo } from '@/types/opencode.gen';
 
+export type ReadOnlyQuestionState = { isStreaming: boolean; hasActiveQuestion: boolean };
+
 type QuestionInput = {
   questions: QuestionInfo[];
 };
@@ -84,9 +86,26 @@ function QuestionSummaryCard({
  * This component has NO interactive elements — the interactive question UI
  * lives in the dock area (CloudChatPage).
  */
-export function QuestionToolStatus({ toolPart }: { toolPart: ToolPart }) {
+export function QuestionToolStatus({
+  toolPart,
+  presentation,
+  readOnlyState,
+}: {
+  toolPart: ToolPart;
+  presentation?: 'live' | 'historical';
+  readOnlyState?: ReadOnlyQuestionState;
+}) {
   const manager = useOptionalManager();
   if (!manager) {
+    if (
+      presentation === 'live' &&
+      (toolPart.state.status === 'pending' || toolPart.state.status === 'running')
+    )
+      return readOnlyState?.isStreaming || readOnlyState?.hasActiveQuestion ? (
+        <QuestionWaitingStatus />
+      ) : (
+        <QuestionInterruptedStatus toolPart={toolPart} />
+      );
     return <QuestionToolStatusSnapshot toolPart={toolPart} />;
   }
   return <QuestionToolStatusLive toolPart={toolPart} manager={manager} />;
@@ -130,37 +149,13 @@ function QuestionToolStatusLive({
   const { status } = toolPart.state;
   const activeQuestion = useAtomValue(manager.atoms.activeQuestion);
   const isStreaming = useAtomValue(manager.atoms.isStreaming);
-  const questions = questionsFrom(toolPart);
-
   if (status === 'pending' || status === 'running') {
     // Only treat as interrupted when the session is idle — during streaming the
     // question.asked event may not have propagated to activeQuestionAtom yet.
     if (!activeQuestion && !isStreaming) {
-      return (
-        <ToolCardShell
-          icon={MessageCircleQuestion}
-          title="Questions"
-          subtitle="Question interrupted"
-          status="error"
-        >
-          {questions.length > 0 && (
-            <div className="space-y-2">
-              {questions.map((q, idx) => (
-                <div key={idx} className="text-xs">
-                  <div className="text-muted-foreground font-medium">{q.question}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </ToolCardShell>
-      );
+      return <QuestionInterruptedStatus toolPart={toolPart} />;
     }
-    return (
-      <div className="border-muted bg-muted/30 flex items-center gap-2 rounded-md border px-3 py-2">
-        <Clock className="text-muted-foreground h-4 w-4 shrink-0 animate-pulse" />
-        <span className="text-muted-foreground text-sm">Waiting for answer…</span>
-      </div>
-    );
+    return <QuestionWaitingStatus />;
   }
 
   if (status === 'error') {
@@ -176,5 +171,27 @@ function QuestionToolStatusLive({
       subtitle={`${answeredCount} answered`}
       status="completed"
     />
+  );
+}
+
+function QuestionWaitingStatus() {
+  return (
+    <div className="border-muted bg-muted/30 flex items-center gap-2 rounded-md border px-3 py-2">
+      <Clock className="text-muted-foreground h-4 w-4 shrink-0 animate-pulse" />
+      <span className="text-muted-foreground text-sm">Waiting for answer…</span>
+    </div>
+  );
+}
+
+function QuestionInterruptedStatus({ toolPart }: { toolPart: ToolPart }) {
+  return (
+    <ToolCardShell
+      icon={MessageCircleQuestion}
+      title="Questions"
+      subtitle="Question interrupted"
+      status="error"
+    >
+      <QuestionAnswerList questions={questionsFrom(toolPart)} answers={[]} />
+    </ToolCardShell>
   );
 }

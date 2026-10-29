@@ -1,16 +1,8 @@
 import React from 'react';
+Object.assign(globalThis, { React });
 import { renderToStaticMarkup } from 'react-dom/server';
 import type { StoredMessage } from '@/components/cloud-agent-next/types';
 import { SharedSessionTranscript } from './shared-session-transcript';
-
-jest.mock('@/components/cloud-agent-next/MessageBubble', () => ({
-  MessageBubble: ({ message }: { message: { info: { id: string } } }) =>
-    React.createElement('div', { 'data-user-message': message.info.id }),
-}));
-jest.mock('@/components/cloud-agent-next/PartRenderer', () => ({
-  PartRenderer: ({ part }: { part: { id: string; type: string; text?: string; tool?: string } }) =>
-    React.createElement('div', { 'data-part': part.id }, part.text ?? part.tool),
-}));
 
 function makeUserMessage(): StoredMessage {
   return {
@@ -103,7 +95,7 @@ describe('SharedSessionTranscript', () => {
       })
     );
 
-    expect(html).toContain('data-user-message="user_1"');
+    expect(html).toContain('data-message-id="user_1"');
     expect(html).toContain('The file looks fine.');
     expect(html).toContain('Worked for 4s');
     expect(html).toContain('1 tool call');
@@ -126,3 +118,13 @@ describe('SharedSessionTranscript', () => {
     expect(html).not.toContain('This session has no messages yet.');
   });
 });
+
+jest.mock('@/components/cloud-agent-next/worktree-review', () => ({
+  parseWorktreeReviewMessage: () => null,
+}));
+jest.mock('react-markdown', () => ({
+  __esModule: true,
+  default: ({ children }: { children: React.ReactNode }) =>
+    React.createElement('p', null, children),
+}));
+jest.mock('remark-gfm', () => ({ __esModule: true, default: () => undefined }));

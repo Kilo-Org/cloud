@@ -84,3 +84,74 @@ describe('QuestionToolStatus without CloudAgentProvider', () => {
     expect(html).not.toContain('Waiting for answer');
   });
 });
+
+it.each(['pending', 'running'] as const)(
+  'preserves %s waiting in a live read-only transcript',
+  status => {
+    const pending = makeQuestionPart('pending');
+    const part: ToolPart =
+      status === 'running'
+        ? {
+            ...pending,
+            state: { status: 'running', input: pending.state.input, time: { start: 1 } },
+          }
+        : pending;
+    const html = renderToStaticMarkup(
+      React.createElement(QuestionToolStatus, {
+        toolPart: part,
+        presentation: 'live',
+        readOnlyState: { isStreaming: true, hasActiveQuestion: false },
+      })
+    );
+    expect(html).toContain('Waiting for answer');
+    expect(html).not.toContain('asked');
+    expect(html).not.toContain('<button');
+    expect(html).not.toContain('<input');
+  }
+);
+
+it('retains terminal summaries for live read-only questions', () => {
+  const completed = renderToStaticMarkup(
+    React.createElement(QuestionToolStatus, {
+      toolPart: makeQuestionPart('completed'),
+      presentation: 'live',
+      readOnlyState: { isStreaming: true, hasActiveQuestion: false },
+    })
+  );
+  const failed = renderToStaticMarkup(
+    React.createElement(QuestionToolStatus, {
+      toolPart: makeQuestionPart('error'),
+      presentation: 'live',
+      readOnlyState: { isStreaming: true, hasActiveQuestion: false },
+    })
+  );
+  expect(completed).toContain('1 answered');
+  expect(completed).not.toContain('Waiting for answer');
+  expect(failed).toContain('Questions dismissed');
+  expect(failed).not.toContain('Waiting for answer');
+});
+
+it('uses owner activity changes with an unchanged running question and no mutation controls', () => {
+  const pending = makeQuestionPart('pending');
+  const part: ToolPart = {
+    ...pending,
+    state: { status: 'running', input: pending.state.input, time: { start: 1 } },
+  };
+  for (const [state, label] of [
+    [{ isStreaming: true, hasActiveQuestion: false }, 'Waiting for answer'],
+    [{ isStreaming: false, hasActiveQuestion: false }, 'Question interrupted'],
+    [{ isStreaming: false, hasActiveQuestion: true }, 'Waiting for answer'],
+    [{ isStreaming: true, hasActiveQuestion: false }, 'Waiting for answer'],
+  ] as const) {
+    const html = renderToStaticMarkup(
+      React.createElement(QuestionToolStatus, {
+        toolPart: part,
+        presentation: 'live',
+        readOnlyState: state,
+      })
+    );
+    expect(html).toContain(label);
+    expect(html).not.toContain('<button');
+    expect(html).not.toContain('<input');
+  }
+});

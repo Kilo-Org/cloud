@@ -13,8 +13,8 @@ import {
 } from '@/components/ui/sheet';
 import type { ChildSessionHydrationState, OlderMessagesError } from '@kilocode/cloud-agent-sdk';
 import { useManager } from './CloudAgentProvider';
-import { MessageBubble } from './MessageBubble';
-import { MessageErrorBoundary } from './MessageErrorBoundary';
+import { isMessageStreaming } from './types';
+import { CloudReadOnlyThread } from './assistant-ui/CloudThread';
 import type { ChildSessionDrawerEntry, OpenChildSession } from './ChildSessionSection';
 import { OlderMessagesHeader } from './OlderMessagesHeader';
 import {
@@ -58,6 +58,8 @@ export function ChildSessionDrawer({
   portalContainer,
 }: ChildSessionDrawerProps) {
   const manager = useManager();
+  const useStreaming = useAtomValue(manager.atoms.isStreaming);
+  const activeQuestion = useAtomValue(manager.atoms.activeQuestion);
   const getChildMessages = useAtomValue(manager.atoms.childMessages);
   const getChildSessionHydrationState = useAtomValue(manager.atoms.childSessionHydrationState);
   const selectedEntry = stack[stack.length - 1];
@@ -372,15 +374,18 @@ export function ChildSessionDrawer({
 
               {hasMessages ? (
                 <div>
-                  {messages.map(message => (
-                    <MessageErrorBoundary key={message.info.id}>
-                      <MessageBubble
-                        message={message}
-                        getChildMessages={getChildMessages}
-                        onOpenChildSession={onOpenChildSession}
-                      />
-                    </MessageErrorBoundary>
-                  ))}
+                  <CloudReadOnlyThread
+                    messages={messages}
+                    isStreaming={messages.some(isMessageStreaming)}
+                    messageGroups={messages.map(message => [message])}
+                    getChildMessages={getChildMessages}
+                    onOpenChildSession={onOpenChildSession}
+                    presentationMode="live"
+                    questionState={{
+                      isStreaming: useStreaming,
+                      hasActiveQuestion: Boolean(activeQuestion),
+                    }}
+                  />
                 </div>
               ) : hydrationState.status === 'loading' ||
                 hydrationState.status === 'error' ? null : (

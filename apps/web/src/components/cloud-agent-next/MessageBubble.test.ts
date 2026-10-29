@@ -4,14 +4,15 @@ import type { AssistantMessage } from '@/types/opencode.gen';
 import type { StoredMessage } from './types';
 import { WORKTREE_REVIEW_PROMPT_INTRO, type WorktreeReviewComment } from './worktree-review';
 
-jest.mock('./PartRenderer', () => ({ PartRenderer: () => null }));
 jest.mock('@/components/shared/TimeAgo', () => ({ TimeAgo: () => null }));
 jest.mock('@/components/shared/CopyMessageButton', () => ({ CopyMessageButton: () => null }));
 jest.mock('../../../node_modules/@pierre/diffs/dist/utils/iterateOverDiff.js', () => ({
   iterateOverDiff: () => [],
 }));
 
-import { MessageBubble } from './MessageBubble';
+import { MessageBubble } from './assistant-ui/test-renderers';
+import { CloudChatRuntimeProvider } from './assistant-ui/CloudChatRuntimeProvider';
+import { CloudThread } from './assistant-ui/CloudThread';
 
 const reviewComment: WorktreeReviewComment = {
   id: 'comment-1',
@@ -70,6 +71,41 @@ function userMessage(text: string): StoredMessage {
 }
 
 describe('MessageBubble', () => {
+  it('keeps one resume anchor for a compaction-only group', () => {
+    const message = userMessage('');
+    message.parts = [
+      {
+        id: 'compaction-part',
+        sessionID: 'ses-1',
+        messageID: message.info.id,
+        type: 'compaction',
+        auto: true,
+      },
+    ];
+    const html = renderToStaticMarkup(React.createElement(MessageBubble, { message }));
+    expect(html).toContain('Context compacted');
+    expect(html.match(/data-message-id="msg-review"/g)).toHaveLength(1);
+  });
+
+  it('renders SDK rows while upstream adds its temporary running placeholder', () => {
+    const html = renderToStaticMarkup(
+      React.createElement(CloudChatRuntimeProvider, {
+        projection: { messages: [userMessage('Waiting for the SDK response')], isStreaming: true },
+        state: {
+          isLoading: false,
+          isRunning: true,
+          isReadOnly: false,
+          isSendDisabled: false,
+          canInterrupt: true,
+        },
+        onNew: async () => {},
+        children: React.createElement(CloudThread),
+      })
+    );
+    expect(html).toContain('Waiting for the SDK response');
+    expect(html.match(/data-message-role=/g)).toHaveLength(1);
+  });
+
   it('renders a sanitized string assistant error', () => {
     const info: AssistantMessage = {
       id: 'msg-1',
@@ -235,3 +271,10 @@ describe('MessageBubble', () => {
     expect(ordinaryHtml).toContain('Please inspect this file.');
   });
 });
+
+jest.mock('react-markdown', () => ({
+  __esModule: true,
+  default: ({ children }: { children: React.ReactNode }) =>
+    React.createElement('p', null, children),
+}));
+jest.mock('remark-gfm', () => ({ __esModule: true, default: () => undefined }));

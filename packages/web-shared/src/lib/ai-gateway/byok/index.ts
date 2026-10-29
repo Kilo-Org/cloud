@@ -4,6 +4,7 @@ import { ByokApiKeySettingsSchema } from '@kilocode/db/schema-types';
 import { and, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import type { BYOKApiKeyEnvelope, EncryptedData } from '@kilocode/db/schema-types';
+import { claimFailureReport } from '@kilocode/web-shared/lib/ai-gateway/byok/failure-reports';
 import {
   decryptByokEnvelope,
   getByokKmsClientConfig,
@@ -422,11 +423,17 @@ async function queryByokCredentials(
 
   const credentials: ByokCredential[] = [];
   const failures: unknown[] = [];
-  for (const result of results) {
-    if (result.status === 'fulfilled') credentials.push(result.value);
-    else failures.push(result.reason);
+  for (const [index, result] of results.entries()) {
+    if (result.status === 'fulfilled') {
+      credentials.push(result.value);
+      continue;
+    }
+    failures.push(result.reason);
+    // A key that stays undecryptable reports once per window instead of once per lookup.
+    if (claimFailureReport(rows[index].id, Date.now())) {
+      captureException(result.reason, { tags: { source: 'byok_decrypt' } });
+    }
   }
-  for (const failure of failures) captureException(failure);
 
   // Fail closed when no key could be decrypted so the request never falls back to Kilo-paid routing.
   if (credentials.length === 0 && failures.length > 0) throw failures[0];

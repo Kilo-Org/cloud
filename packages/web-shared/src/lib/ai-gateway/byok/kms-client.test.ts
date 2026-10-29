@@ -6,6 +6,7 @@ import {
   encryptByokForStorage,
   encryptByokWithDataKey,
   getByokKmsClientConfig,
+  KMS_MAX_ATTEMPTS,
   type ByokKmsContext,
 } from '@kilocode/web-shared/lib/ai-gateway/byok/kms-client';
 import { decryptApiKey } from '@kilocode/web-shared/lib/ai-gateway/byok/encryption';
@@ -236,15 +237,101 @@ describe('byok kms client', () => {
     ).rejects.toThrow('32 bytes');
   });
 
-  test('fails on non-2xx and passes an abort signal', async () => {
+  test('fails on a 4xx answer without retrying and passes an abort signal', async () => {
+    const fetchMock = jest.fn(async () => new Response('nope', { status: 403 }));
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(
+      encryptByokForStorage({ apiKey: 'sk-test', context, actorUserId })
+    ).rejects.toThrow('status 403');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const init = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(init[1].signal).toBeInstanceOf(AbortSignal);
+  });
+
+  test('retries a transient 5xx answer and returns the successful result', async () => {
+    const dataKey = randomBytes(32).toString('base64');
+    let calls = 0;
+    const fetchMock = jest.fn(async () => {
+      calls += 1;
+      if (calls === 1) return new Response('{}', { status: 503 });
+      if (calls === 2) return new Response('{}', { status: 502 });
+      return Response.json({
+        data_key: dataKey,
+        wrapped_dek: 'wrapped-after-retries',
+        kms_key_id: 'alias/test',
+        kms_key_version: '1',
+      });
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });
+
+    expect(envelope?.wrapped_dek).toBe('wrapped-after-retries');
+    expect(fetchMock).toHaveBeenCalledTimes(KMS_MAX_ATTEMPTS);
+  });
+
+  test('gives up after the last attempt and throws the final status', async () => {
     const fetchMock = jest.fn(async () => new Response('nope', { status: 503 }));
     global.fetch = fetchMock as unknown as typeof fetch;
 
     await expect(
       encryptByokForStorage({ apiKey: 'sk-test', context, actorUserId })
-    ).rejects.toThrow('503');
-    const init = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(init[1].signal).toBeInstanceOf(AbortSignal);
+    ).rejects.toThrow('status 503');
+    expect(fetchMock).toHaveBeenCalledTimes(KMS_MAX_ATTEMPTS);
+  });
+
+  test('retries a timeout and a network failure before returning a data key', async () => {
+    const dataKey = randomBytes(32).toString('base64');
+    let calls = 0;
+    const fetchMock = jest.fn(async () => {
+      calls += 1;
+      if (calls === 1) throw new DOMException('The operation timed out.', 'TimeoutError');
+      if (calls === 2) throw new TypeError('fetch failed');
+      return Response.json({
+        data_key: dataKey,
+        wrapped_dek: 'wrapped-after-transport-errors',
+        kms_key_id: 'alias/test',
+        kms_key_version: '1',
+      });
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });
+
+    expect(envelope?.wrapped_dek).toBe('wrapped-after-transport-errors');
+    expect(calls).toBe(KMS_MAX_ATTEMPTS);
+  });
+
+  test('does not retry a failure that is not a transport error', async () => {
+    const fetchMock = jest.fn(async () => {
+      throw new Error('malformed request');
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(
+      encryptByokForStorage({ apiKey: 'sk-test', context, actorUserId })
+    ).rejects.toThrow('malformed request');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  test('stops retrying once the time budget is spent', async () => {
+    let clock = 1_000;
+    const nowSpy = jest.spyOn(Date, 'now').mockImplementation(() => clock);
+    const fetchMock = jest.fn(async () => {
+      clock += 60_000;
+      throw new DOMException('The operation timed out.', 'TimeoutError');
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    try {
+      await expect(
+        encryptByokForStorage({ apiKey: 'sk-test', context, actorUserId })
+      ).rejects.toThrow('The operation timed out.');
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+    } finally {
+      nowSpy.mockRestore();
+    }
   });
 
   test('envelope decrypt fails when the service is not configured', async () => {

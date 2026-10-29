@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 
+import { computeDatabaseUrl } from '@kilocode/db';
 import {
   agent_configs,
   kilocode_users,
@@ -41,6 +42,22 @@ const REPOSITORIES = [
 /** Fixed so a rerun replaces the same organization, integration and configs. */
 const ORGANIZATION_ID = '5d0f6b21-8f3c-4a19-9a74-2c6e1b0d8f53';
 
+/** Refuses to touch anything but a loopback database, whatever the env says. */
+function assertLocalDatabaseTarget(): string {
+  if (process.env.USE_PRODUCTION_DB === 'true') {
+    throw new Error('The repository picker seed refuses to run with USE_PRODUCTION_DB=true.');
+  }
+
+  const databaseUrl = new URL(computeDatabaseUrl());
+  if (!['localhost', '127.0.0.1', '::1', '[::1]'].includes(databaseUrl.hostname)) {
+    throw new Error(
+      `The repository picker seed requires a loopback database host; received ${databaseUrl.hostname}.`
+    );
+  }
+
+  return databaseUrl.hostname;
+}
+
 function printUsage(): void {
   console.log(`Usage: pnpm dev:seed app:mobile-repository-picker ${usage}`);
   console.log('');
@@ -48,7 +65,7 @@ function printUsage(): void {
   console.log('one public repository, with both pickers set to "selected" so their rows');
   console.log('render immediately. Used to check how the repository rows are announced.');
   console.log('');
-  console.log('Requires a localhost database and SKIP_STRIPE_API=true; never calls GitHub.');
+  console.log('Refuses non-loopback databases and USE_PRODUCTION_DB=true; never calls GitHub.');
   console.log('Sign the mobile development client in as the returned account, then open the');
   console.log('returned deep links.');
 }
@@ -65,15 +82,7 @@ export async function run(...args: string[]): Promise<SeedResult | void> {
     throw new Error('Provide one owned fake email matching <name>@example.com.');
   }
 
-  const databaseUrl = new URL(process.env.POSTGRES_URL ?? '');
-  if (
-    !['localhost', '127.0.0.1', '[::1]'].includes(databaseUrl.hostname) ||
-    process.env.NODE_ENV === 'production' ||
-    process.env.SKIP_STRIPE_API !== 'true'
-  ) {
-    throw new Error('This fixture requires a local development database and SKIP_STRIPE_API=true.');
-  }
-
+  assertLocalDatabaseTarget();
   const db = getSeedDb();
   const userId = `dev-seed:mobile-repository-picker:${email}`;
   const [existing] = await db

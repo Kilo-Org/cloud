@@ -111,9 +111,10 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
     !reposLoading && !reposError && !bitbucketNotReady && repoRows.length === 0;
   const resyncPlatform: SyncedRepoPlatform = platform === 'gitlab' ? 'gitlab' : 'github';
   const { resync, resyncing } = useReviewerRepositoriesResync(scope, resyncPlatform);
-  const openManageAccess = useManageRepositoryAccess(scope, platform);
-  // Set when the user leaves for the provider's settings page: the return trip
-  // is the moment installation access may have widened, so it forces a sync.
+  // Set on the way to the provider's settings page, where installation access
+  // may have widened. Two signals report the return and only the first syncs:
+  // the awaited browser dismissal (the only one iOS reports, since its page
+  // opens in-app) and the next foreground (Android).
   const pendingAccessChange = useRef(false);
   const navigation = useNavigation();
   const flushPendingSync = useCallback(() => {
@@ -123,21 +124,12 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
     pendingAccessChange.current = false;
     void resync();
   }, [resync]);
-  const manageAccess = openManageAccess
-    ? () => {
-        pendingAccessChange.current = true;
-        // Two return signals reach here and only the first one syncs: the
-        // awaited browser dismissal (the only one iOS reports, because its
-        // settings page opens in-app) and the next foreground (Android).
-        void (async () => {
-          try {
-            await openManageAccess();
-          } finally {
-            flushPendingSync();
-          }
-        })();
-      }
-    : undefined;
+  const manageAccess = useManageRepositoryAccess(scope, platform, {
+    onOpen: () => {
+      pendingAccessChange.current = true;
+    },
+    onReturn: flushPendingSync,
+  });
   const refreshing = platform === 'bitbucket' ? reposFetching : resyncing;
   const refreshRepositories = () => {
     if (platform === 'bitbucket') {
@@ -229,7 +221,13 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
         description={emptyStateCopy.description}
         action={
           manageAccess ? (
-            <Button className={STATE_ACTION_CLASS} variant="outline" onPress={manageAccess}>
+            <Button
+              className={STATE_ACTION_CLASS}
+              variant="outline"
+              loading={manageAccess.pending}
+              disabled={manageAccess.pending}
+              onPress={manageAccess.handlePress}
+            >
               <Text>{t('codeReviewer.repos.manageAccess')}</Text>
             </Button>
           ) : undefined

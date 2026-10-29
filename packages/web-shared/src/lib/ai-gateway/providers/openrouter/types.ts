@@ -105,6 +105,8 @@ export type GatewayResponsesRequest = SharedGatewayRequestProperties &
 // https://platform.claude.com/docs/en/build-with-claude/preserved-thinking
 export type ThinkingBlockBinding = {
   prefix_mismatch_behavior?: 'error' | 'drop_block';
+  /** Deprecated alias of `prefix_mismatch_behavior`; sending both is rejected. */
+  mismatch_behavior?: 'error' | 'drop_block';
 };
 
 export type GatewayMessagesRequest = SharedGatewayRequestProperties &

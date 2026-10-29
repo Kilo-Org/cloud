@@ -58,17 +58,26 @@ describe('dropThinkingBlocksOnPrefixMismatch', () => {
     );
   });
 
-  it("keeps the caller's mismatch behavior", () => {
-    const { body, extraHeaders } = apply('anthropic/claude-opus-5.5', {
-      type: 'adaptive',
-      block_binding: { prefix_mismatch_behavior: 'error' },
-    });
+  it.each([{ prefix_mismatch_behavior: 'error' }, { mismatch_behavior: 'error' }] as const)(
+    "keeps the caller's mismatch behavior %o",
+    blockBinding => {
+      const { body, extraHeaders } = apply('anthropic/claude-opus-5.5', {
+        type: 'adaptive',
+        block_binding: blockBinding,
+      });
+
+      expect(body.thinking).toEqual({ type: 'adaptive', block_binding: blockBinding });
+      expect(extraHeaders['anthropic-beta']).toBe('thinking-binding-controls-2026-08-01');
+    }
+  );
+
+  it('fills in the mismatch behavior of an empty block_binding', () => {
+    const { body } = apply('anthropic/claude-opus-5.5', { type: 'adaptive', block_binding: {} });
 
     expect(body.thinking).toEqual({
       type: 'adaptive',
-      block_binding: { prefix_mismatch_behavior: 'error' },
+      block_binding: { prefix_mismatch_behavior: 'drop_block' },
     });
-    expect(extraHeaders['anthropic-beta']).toBe('thinking-binding-controls-2026-08-01');
   });
 
   it.each([

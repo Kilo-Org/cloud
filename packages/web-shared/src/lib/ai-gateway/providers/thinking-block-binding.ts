@@ -25,6 +25,9 @@ export function dropThinkingBlocksOnPrefixMismatch({
   const thinking = request.body.thinking;
   // block_binding is rejected with enabled or disabled thinking.
   if (thinking?.type !== 'adaptive') return;
-  thinking.block_binding ??= { prefix_mismatch_behavior: 'drop_block' };
+  const binding = thinking.block_binding ?? {};
+  if (binding.prefix_mismatch_behavior === undefined && binding.mismatch_behavior === undefined) {
+    thinking.block_binding = { ...binding, prefix_mismatch_behavior: 'drop_block' };
+  }
   appendAnthropicBetaHeader(extraHeaders, THINKING_BINDING_BETA);
 }

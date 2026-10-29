@@ -16,6 +16,24 @@ const TRUNCATED_KEY = '[truncated]';
 // consumed per visited node and per object property, and traversal stops
 // (with a truncation sentinel) the moment it runs out.
 const PROVIDER_HINTS_MAX_NODES = 512;
+// Message content, and the Responses input, are client-supplied JSON of
+// unbounded depth: no schema below `content: z.unknown()` constrains their
+// shape. Every walk this module does over them stays inside a fixed amount of
+// work on the synchronous request path, the way the provider-hint copy does. A
+// walk that reaches its limit keeps what it gathered and answers with the
+// documented null or partial result.
+//
+// The node and length budgets cover the text walk, which runs per message and
+// stops as soon as it has the prefix. The two body-wide walks (modalities and
+// the token estimate) run over the whole body, which the request size already
+// bounds, so they are bounded by depth alone and keep reporting every message.
+const PROMPT_WALK_MAX_NODES = 1024;
+const PROMPT_WALK_MAX_DEPTH = 64;
+// Cleaning runs before the stored prefix is taken and is linear in the text it
+// receives, so text is gathered up to this window and no further: sixty-four
+// times the stored prefix, which is well past the point where the prefix can
+// draw on it. Text inside the window is cleaned exactly as before.
+const PROMPT_TEXT_MAX_LENGTH = TEXT_PREFIX_MAX_LENGTH * 64;
 // Credential keys are matched on token boundaries: key names split at
 // separators, digits, and camelCase humps into tokens, and a credential token
 // matches exactly, so ordinary words that merely contain those letters stay
@@ -50,6 +68,9 @@ const SENSITIVE_KEY_QUALIFIERS = [
   'signing',
   'subscription',
 ];
+// A qualifier only counts when it ends immediately before a credential word, so
+// the scan before each occurrence never needs more than the longest qualifier.
+const MAX_QUALIFIER_LENGTH = Math.max(...SENSITIVE_KEY_QUALIFIERS.map(q => q.length));
 const REDUNDANT_CONTENT_TYPES = new Set([
   'function_call_output',
   'tool_call_output',
@@ -242,6 +263,8 @@ function firstAndLatestPromptPrefix(
 }
 
 function textPrefix(value: unknown): string | null {
+  // Cleaning is linear in the text it receives, so the walk stops at the
+  // window and only that much text reaches it.
   const text = cleanPromptText(textFromValue(value));
 
   if (text.length === 0) {
@@ -349,32 +372,94 @@ function cleanPromptText(text: string): string {
     .trim();
 }
 
+// Explicit-stack walk over a client-supplied content value: an array
+// contributes the non-empty text of its children joined by `\n`, an object
+// contributes `text`, then a string `content`, then the text of its own
+// `content`, and a redundant tool-result part contributes nothing. The walk
+// keeps its own stack because a content value can nest arbitrarily deep; the
+// node and depth budgets end it, and the length budget stops it at the window
+// the cleaning passes receive.
+type TextWalkFrame =
+  // `children` is how many child values were pushed, in document order.
+  { kind: 'join'; children: number } | { kind: 'value'; value: unknown; depth: number };
+
 function textFromValue(value: unknown): string {
-  if (typeof value === 'string') {
-    return value;
+  const work: TextWalkFrame[] = [{ kind: 'value', value, depth: 0 }];
+  // Text of the completed frames; a frame pops what its children pushed.
+  const results: string[] = [];
+  let remainingNodes = PROMPT_WALK_MAX_NODES;
+  let remainingChars = PROMPT_TEXT_MAX_LENGTH;
+
+  // Keeps at most the remaining window of one text value.
+  const keep = (text: string) => {
+    const kept = text.slice(0, remainingChars);
+    remainingChars -= kept.length;
+    results.push(kept);
+  };
+
+  for (let frame = work.pop(); frame; frame = work.pop()) {
+    if (frame.kind === 'join') {
+      const parts: string[] = [];
+      // Results were pushed in document order, so pop back-to-front.
+      for (let index = 0; index < frame.children; index++) {
+        parts.push(results.pop() ?? '');
+      }
+      results.push(parts.filter(Boolean).reverse().join('\n'));
+      continue;
+    }
+
+    if (remainingNodes <= 0 || frame.depth > PROMPT_WALK_MAX_DEPTH) {
+      results.push('');
+      continue;
+    }
+    remainingNodes -= 1;
+
+    const node = frame.value;
+
+    if (typeof node === 'string') {
+      keep(node);
+      continue;
+    }
+
+    if (Array.isArray(node)) {
+      // Push children back-to-front so they are visited in document order, and
+      // only as many as the node budget still allows.
+      const pushed = Math.min(node.length, remainingNodes);
+      if (pushed === 0) {
+        results.push('');
+        continue;
+      }
+      work.push({ kind: 'join', children: pushed });
+      for (let index = pushed - 1; index >= 0; index--) {
+        work.push({ kind: 'value', value: node[index], depth: frame.depth + 1 });
+      }
+      continue;
+    }
+
+    if (!isRecord(node)) {
+      results.push('');
+      continue;
+    }
+
+    if (typeof node.type === 'string' && REDUNDANT_CONTENT_TYPES.has(node.type)) {
+      results.push('');
+      continue;
+    }
+
+    if (typeof node.text === 'string') {
+      keep(node.text);
+      continue;
+    }
+
+    if (typeof node.content === 'string') {
+      keep(node.content);
+      continue;
+    }
+
+    work.push({ kind: 'value', value: node.content, depth: frame.depth + 1 });
   }
 
-  if (Array.isArray(value)) {
-    return value.map(textFromValue).filter(Boolean).join('\n');
-  }
-
-  if (!isRecord(value)) {
-    return '';
-  }
-
-  if (typeof value.type === 'string' && REDUNDANT_CONTENT_TYPES.has(value.type)) {
-    return '';
-  }
-
-  if (typeof value.text === 'string') {
-    return value.text;
-  }
-
-  if (typeof value.content === 'string') {
-    return value.content;
-  }
-
-  return textFromValue(value.content);
+  return results.pop() ?? '';
 }
 
 function hasTools(tools: unknown[] | undefined) {
@@ -451,8 +536,11 @@ function isSensitiveToken(token: string) {
     for (let index = token.indexOf(word); index !== -1; index = token.indexOf(word, index + 1)) {
       // A token that starts with a credential word is a credential key.
       if (index === 0) return true;
-      const prefix = token.slice(0, index);
-      if (SENSITIVE_KEY_QUALIFIERS.some(qualifier => prefix.endsWith(qualifier))) return true;
+      // A qualifier counts only when it ends immediately before the occurrence,
+      // so the last MAX_QUALIFIER_LENGTH characters are the whole window that
+      // can match one.
+      const window = token.slice(Math.max(0, index - MAX_QUALIFIER_LENGTH), index);
+      if (SENSITIVE_KEY_QUALIFIERS.some(qualifier => window.endsWith(qualifier))) return true;
     }
   }
   return false;
@@ -473,7 +561,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 // are silently ignored; the caller treats an empty result as "text only".
 export function detectRequiredInputModalities(body: unknown): string[] {
   const found = new Set<string>();
-  collectModalities(body, found);
+  collectModalities(body, found, 0);
 
   if (found.size === 0) {
     return [];
@@ -482,12 +570,20 @@ export function detectRequiredInputModalities(body: unknown): string[] {
   return [...found].sort();
 }
 
-function collectModalities(value: unknown, out: Set<string>): void {
+// The same body reaches this walk as reaches the text walk, with the same
+// unbounded nesting. Its work is already linear in the parsed body, which the
+// request size bounds, and every level costs one node per message, so the
+// walk is bounded by depth alone: a node count would stop it inside a long
+// conversation and silently drop a modality from the newest turn. A value
+// nested past the depth limit keeps what was found before it, which is the
+// documented "malformed shapes are ignored" result.
+function collectModalities(value: unknown, out: Set<string>, depth: number): void {
   if (value === null || value === undefined) return;
+  if (depth > PROMPT_WALK_MAX_DEPTH) return;
 
   if (Array.isArray(value)) {
     for (const item of value) {
-      collectModalities(item, out);
+      collectModalities(item, out, depth + 1);
     }
     return;
   }
@@ -503,7 +599,7 @@ function collectModalities(value: unknown, out: Set<string>): void {
   // tools, metadata, and provider hints — only into the known structural
   // containers.
   for (const key of MODALITY_CONTAINER_KEYS) {
-    collectModalities(value[key], out);
+    collectModalities(value[key], out, depth + 1);
   }
 
   // Typed content parts: OpenAI Responses `input_image` / `input_file`,
@@ -549,7 +645,7 @@ const MODALITY_CONTAINER_KEYS = ['messages', 'input', 'content', 'parts', 'syste
 export function estimateRoutingTokens(body: unknown): number {
   if (!isRecord(body)) return 0;
 
-  const textChars = sumBodyTextChars(body);
+  const textChars = sumBodyTextChars(body, 0);
   const reservation = readOutputReservation(body);
   const raw = textChars / 4 + reservation;
 
@@ -561,13 +657,18 @@ export function estimateRoutingTokens(body: unknown): number {
 // Walks known container structures (messages, input, system, instructions)
 // and extracts text from content parts. Does NOT recurse into arbitrary
 // object fields — that would count `model`, `role`, tool definitions, etc.
-function sumBodyTextChars(body: Record<string, unknown>): number {
+// The nesting it follows is client-supplied, so it is bounded by depth like
+// the modality walk: a node count would stop counting partway through a long
+// conversation and under-report the context the request needs.
+function sumBodyTextChars(body: Record<string, unknown>, depth: number): number {
+  if (depth > PROMPT_WALK_MAX_DEPTH) return 0;
+
   let total = 0;
 
   // OpenAI chat completions / Anthropic messages: messages[]
   if (Array.isArray(body.messages)) {
     for (const msg of body.messages) {
-      total += sumMessageTextChars(msg);
+      total += sumMessageTextChars(msg, depth + 1);
     }
   }
 
@@ -577,7 +678,7 @@ function sumBodyTextChars(body: Record<string, unknown>): number {
     total += system.length;
   } else if (Array.isArray(system)) {
     for (const part of system) {
-      total += sumContentPartTextChars(part);
+      total += sumContentPartTextChars(part, depth + 1);
     }
   }
 
@@ -586,14 +687,15 @@ function sumBodyTextChars(body: Record<string, unknown>): number {
     total += body.instructions.length;
   }
   if ('input' in body) {
-    total += sumResponsesInputChars(body.input);
+    total += sumResponsesInputChars(body.input, depth + 1);
   }
 
   return total;
 }
 
-function sumMessageTextChars(msg: unknown): number {
+function sumMessageTextChars(msg: unknown, depth: number): number {
   if (!isRecord(msg)) return 0;
+  if (depth > PROMPT_WALK_MAX_DEPTH) return 0;
 
   let total = 0;
 
@@ -603,10 +705,10 @@ function sumMessageTextChars(msg: unknown): number {
     total += content.length;
   } else if (Array.isArray(content)) {
     for (const part of content) {
-      total += sumContentPartTextChars(part);
+      total += sumContentPartTextChars(part, depth + 1);
     }
   } else if (isRecord(content)) {
-    total += sumContentPartTextChars(content);
+    total += sumContentPartTextChars(content, depth + 1);
   }
 
   // OpenAI assistant tool_calls: count function.arguments strings
@@ -621,9 +723,10 @@ function sumMessageTextChars(msg: unknown): number {
   return total;
 }
 
-function sumContentPartTextChars(part: unknown): number {
+function sumContentPartTextChars(part: unknown, depth: number): number {
   if (typeof part === 'string') return part.length;
   if (!isRecord(part)) return 0;
+  if (depth > PROMPT_WALK_MAX_DEPTH) return 0;
 
   const type = part.type;
 
@@ -663,7 +766,10 @@ function sumContentPartTextChars(part: unknown): number {
           : part.content;
       if (typeof text === 'string') return text.length;
       if (Array.isArray(text)) {
-        return text.reduce((sum: number, p: unknown) => sum + sumContentPartTextChars(p), 0);
+        return text.reduce(
+          (sum: number, p: unknown) => sum + sumContentPartTextChars(p, depth + 1),
+          0
+        );
       }
       return 0;
     }
@@ -673,15 +779,20 @@ function sumContentPartTextChars(part: unknown): number {
   if (typeof part.text === 'string') return part.text.length;
   if (typeof part.content === 'string') return part.content.length;
   if (Array.isArray(part.content)) {
-    return part.content.reduce((sum: number, p: unknown) => sum + sumContentPartTextChars(p), 0);
+    return part.content.reduce(
+      (sum: number, p: unknown) => sum + sumContentPartTextChars(p, depth + 1),
+      0
+    );
   }
 
   return 0;
 }
 
 // Responses API input: string, array of messages/parts, or object
-function sumResponsesInputChars(input: unknown): number {
+function sumResponsesInputChars(input: unknown, depth: number): number {
   if (typeof input === 'string') return input.length;
+  if (depth > PROMPT_WALK_MAX_DEPTH) return 0;
+
   if (Array.isArray(input)) {
     let total = 0;
     for (const item of input) {
@@ -694,7 +805,7 @@ function sumResponsesInputChars(input: unknown): number {
           typeof type === 'string' &&
           (type === 'function_call_output' || type === 'tool_call_output')
         ) {
-          total += sumContentPartTextChars(item);
+          total += sumContentPartTextChars(item, depth + 1);
         } else if (typeof type === 'string' && type === 'function_call') {
           // Responses API function_call: count arguments string
           if (typeof item.arguments === 'string') {
@@ -702,7 +813,7 @@ function sumResponsesInputChars(input: unknown): number {
           }
         } else {
           // Message-like object with role and content
-          total += sumMessageTextChars(item);
+          total += sumMessageTextChars(item, depth + 1);
         }
       }
     }
@@ -710,7 +821,7 @@ function sumResponsesInputChars(input: unknown): number {
   }
   if (isRecord(input)) {
     // Single message-like object
-    return sumMessageTextChars(input);
+    return sumMessageTextChars(input, depth + 1);
   }
   return 0;
 }

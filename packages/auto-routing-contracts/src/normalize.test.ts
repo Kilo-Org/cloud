@@ -49,6 +49,100 @@ describe('classifier input normalization', () => {
     expect(elapsed).toBeLessThan(budgetMs);
   });
 
+  it('normalizes a content value nested far deeper than any client needs', () => {
+    // Content is accepted as `z.unknown()`, so its nesting is whatever the
+    // caller sent. Every walk over it stays inside its budget, so a deeply
+    // nested value answers with the documented empty result.
+    const budgetMs = 2000;
+    const nested = (levels: number): unknown => {
+      let value: unknown = 'nested prompt text';
+      for (let level = 0; level < levels; level++) {
+        value = { content: [value] };
+      }
+      return value;
+    };
+
+    const started = performance.now();
+
+    expect(
+      normalizeClassifierInput('chat_completions', {
+        model: 'anthropic/claude-sonnet-4',
+        messages: [{ role: 'user', content: nested(20_000) }],
+      })
+    ).toMatchObject({ userPromptPrefix: null });
+    expect(
+      normalizeClassifierInput('responses', {
+        model: 'openai/gpt-5-mini',
+        input: [{ role: 'user', content: nested(20_000) }],
+      })
+    ).toMatchObject({ userPromptPrefix: null });
+    expect(
+      normalizeClassifierInput('messages', {
+        model: 'anthropic/claude-sonnet-4',
+        messages: [{ role: 'user', content: nested(20_000) }],
+      })
+    ).toMatchObject({ userPromptPrefix: null });
+
+    // The same body reaches the modality and token-estimate walks.
+    const deep = { model: 'm', messages: [{ role: 'user', content: nested(20_000) }] };
+    expect(detectRequiredInputModalities(deep)).toEqual([]);
+    expect(estimateRoutingTokens(deep)).toBe(0);
+
+    // Nesting a plausible shape well inside the budget is unaffected.
+    expect(
+      normalizeClassifierInput('chat_completions', {
+        model: 'anthropic/claude-sonnet-4',
+        messages: [{ role: 'user', content: nested(20) }],
+      })
+    ).toMatchObject({ userPromptPrefix: 'nested prompt text' });
+
+    expect(performance.now() - started).toBeLessThan(budgetMs);
+  });
+
+  it('keeps the leading prefix of a message larger than the gathering window', () => {
+    const budgetMs = 2000;
+    const huge =
+      'Add a regression test for the timeout path. ' +
+      'lorem ipsum dolor sit amet '.repeat(200_000);
+
+    const started = performance.now();
+    const result = normalizeClassifierInput('chat_completions', {
+      model: 'anthropic/claude-sonnet-4',
+      messages: [{ role: 'user', content: huge }],
+    });
+    const elapsed = performance.now() - started;
+
+    expect(result?.userPromptPrefix).toBe(huge.slice(0, 1000));
+    expect(elapsed).toBeLessThan(budgetMs);
+  });
+
+  it('keeps a late image and the full text count in a long conversation', () => {
+    // The body-wide walks are linear in the parsed body and bounded by depth,
+    // so a multi-hundred-turn history still reports the modality and text of
+    // its newest turns instead of stopping partway through the array.
+    const history = Array.from({ length: 300 }, (_, index) => ({
+      role: index % 2 === 0 ? 'user' : 'assistant',
+      content: 'x'.repeat(1000),
+    }));
+    const body = {
+      model: 'anthropic/claude-sonnet-4',
+      messages: [
+        ...history,
+        {
+          role: 'user',
+          content: [
+            { type: 'text', text: 'What is in this screenshot?' },
+            { type: 'image_url', image_url: { url: 'https://example.com/diagram.png' } },
+          ],
+        },
+      ],
+    };
+
+    expect(detectRequiredInputModalities(body)).toEqual(['image']);
+    // 300 history messages x 1000 chars, plus the 28-char text part, over chars/4.
+    expect(estimateRoutingTokens(body)).toBe(Math.floor((300_000 + 28) / 4));
+  });
+
   it('strips redundant tool result content from prompt prefixes', () => {
     expect(
       normalizeClassifierInput('chat_completions', {
@@ -178,6 +272,22 @@ describe('classifier input normalization', () => {
       provider: { order: ['openai'], [key]: '[REDACTED]' },
       providerOptions: { openrouter: { sort: 'price', [key]: '[REDACTED]' } },
     });
+  });
+
+  it('redacts credential keys beside a long property name', () => {
+    // Every property name is scanned within the same fixed window, so a very
+    // long one still leaves its neighbours' redaction intact.
+    const budgetMs = 2000;
+    const repeated = 'a' + 'key'.repeat(200_000);
+    const provider = { order: ['openai'], api_key: 'sk-secret', [repeated]: 'value' };
+
+    const started = performance.now();
+    const hints = redactProviderHints({ provider, providerOptions: undefined });
+    const elapsed = performance.now() - started;
+
+    expect(hints.provider).toMatchObject({ api_key: '[REDACTED]' });
+    expect((hints.provider as Record<string, unknown>)[repeated]).toBe('value');
+    expect(elapsed).toBeLessThan(budgetMs);
   });
 
   it('redacts credential-bearing keys nested in provider option arrays', () => {

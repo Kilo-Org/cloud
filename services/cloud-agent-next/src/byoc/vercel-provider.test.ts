@@ -133,7 +133,8 @@ describe('BYOC Vercel provider on the current control plane', () => {
       providerRef: expect.stringContaining('"startSource":"repository"'),
     });
     const init = request.mock.calls[0]?.[1];
-    expect(JSON.parse(String(init?.body))).toMatchObject({
+    if (typeof init?.body !== 'string') throw new Error('Expected a JSON request body');
+    expect(JSON.parse(init.body)).toMatchObject({
       source: { type: 'snapshot', snapshotId: environmentSnapshot.snapshotId },
     });
     expect(projectByocVercelSnapshotMissing).not.toHaveBeenCalled();
@@ -144,7 +145,8 @@ describe('BYOC Vercel provider on the current control plane', () => {
     async status => {
       const snapshots: string[] = [];
       vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {
-        const body = JSON.parse(String(init.body));
+        if (typeof init.body !== 'string') throw new Error('Expected a JSON request body');
+        const body = JSON.parse(init.body);
         snapshots.push(body.source.snapshotId);
         return body.source.snapshotId === environmentSnapshot.snapshotId
           ? new Response('', { status })
@@ -196,7 +198,8 @@ describe('BYOC Vercel provider on the current control plane', () => {
   ])('never restores a snapshot from another provider, account or base', async snapshot => {
     const snapshots: string[] = [];
     vi.stubGlobal('fetch', async (_url: string, init: RequestInit) => {
-      snapshots.push(JSON.parse(String(init.body)).source.snapshotId);
+      if (typeof init.body !== 'string') throw new Error('Expected a JSON request body');
+      snapshots.push(JSON.parse(init.body).source.snapshotId);
       return Response.json(createdSandbox());
     });
     await expect(adapter().create({ ...intent, snapshot })).resolves.toMatchObject({

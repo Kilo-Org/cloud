@@ -133,6 +133,11 @@ function pressDone(root: ReactTestInstance): void {
   });
 }
 
+/** A field stub's inline error, read from the renderer's untyped props. */
+function fieldError(root: ReactTestInstance, label: string): unknown {
+  return findAll(root, 'FormField').find(node => node.props.label === label)?.props.error;
+}
+
 // eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
 function mountSheet(
   options: {
@@ -240,10 +245,7 @@ describe('McpFormSheet refused save', () => {
     pressDone(renderer.root);
 
     expect(h.onSave).not.toHaveBeenCalled();
-    expect(
-      findAll(renderer.root, 'FormField').find(node => node.props.label === 'Server name')?.props
-        .error
-    ).toBe(i18n.t('profiles.mcp.nameConflict'));
+    expect(fieldError(renderer.root, 'Server name')).toBe(i18n.t('profiles.mcp.nameConflict'));
     expect(h.scrollTo).toHaveBeenCalledWith({ y: 408, animated: true });
 
     unmount();
@@ -251,12 +253,18 @@ describe('McpFormSheet refused save', () => {
 
   it('shows a name conflict the server reported on the name field', async () => {
     const { renderer, unmount } = await mountSheet({ nameConflictFromServer: true });
-    changeText(renderer.root, 'Server name', 'docs');
 
-    expect(
-      findAll(renderer.root, 'FormField').find(node => node.props.label === 'Server name')?.props
-        .error
-    ).toBe(i18n.t('profiles.mcp.nameConflict'));
+    expect(fieldError(renderer.root, 'Server name')).toBe(i18n.t('profiles.mcp.nameConflict'));
+
+    unmount();
+  });
+
+  it('clears a server-reported name conflict once the name changes', async () => {
+    const { renderer, unmount } = await mountSheet({ nameConflictFromServer: true });
+
+    changeText(renderer.root, 'Server name', 'another-name');
+
+    expect(fieldError(renderer.root, 'Server name')).toBeUndefined();
 
     unmount();
   });

@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -103,6 +103,14 @@ export function McpFormSheet({
   const [type, setType] = useState<McpFormType>(initial.type);
   const [enabled, setEnabled] = useState(initial.enabled);
   const [error, setError] = useState<McpFormError | null>(null);
+  // The screen raises the server-reported conflict after a refused save; it stays
+  // up until the name changes, so it never outlives the input it describes.
+  const [serverConflict, setServerConflict] = useState(nameConflictFromServer);
+  useEffect(() => {
+    if (nameConflictFromServer) {
+      setServerConflict(true);
+    }
+  }, [nameConflictFromServer]);
   const { scrollRef, fieldLayout, scrollToField } = useFormFieldScroll<
     'name' | 'command' | 'url' | 'config' | 'timeout'
   >();
@@ -140,7 +148,7 @@ export function McpFormSheet({
   };
 
   const nameError =
-    error === 'name-conflict' || (error === null && nameConflictFromServer)
+    error === 'name-conflict' || (error === null && serverConflict)
       ? t(ERROR_KEYS['name-conflict'])
       : errorKeyFor(t, error, ['name-required', 'name-invalid']);
 
@@ -193,6 +201,7 @@ export function McpFormSheet({
           onChangeText={value => {
             nameRef.current = value;
             setError(null);
+            setServerConflict(false);
           }}
         />
 

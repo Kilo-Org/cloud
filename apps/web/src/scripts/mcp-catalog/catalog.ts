@@ -59,6 +59,15 @@ const NATIVE_ONLY_PATHS: Record<string, true> = {
   'organizations.vercelCompute.remove': true,
   'organizations.vercelCompute.retrySetup': true,
   'organizations.vercelCompute.upgradeRuntime': true,
+  // Org admins set MCP guardrail policy in the app only. Clients read the policy and report
+  // connections through /api/organizations/[id]/guardrails, which is not part of the tRPC catalog.
+  'organizations.mcpGuardrails.add': true,
+  'organizations.mcpGuardrails.update': true,
+  'organizations.mcpGuardrails.setStatus': true,
+  'organizations.mcpGuardrails.setEnforcement': true,
+  'organizations.mcpGuardrails.approveConnection': true,
+  'organizations.mcpGuardrails.delete': true,
+  'organizations.guardrails.update': true,
   'activeSessions.widgetCredential': true,
   'agentBriefing.updateContextPreferences': true,
 };

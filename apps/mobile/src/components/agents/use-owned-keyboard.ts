@@ -1,3 +1,4 @@
+import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useKeyboardState } from 'react-native-keyboard-controller';
 
@@ -9,7 +10,9 @@ import { useKeyboardState } from 'react-native-keyboard-controller';
  * centered content moved down after the back transition. The screen owns the
  * keyboard only while its own input holds focus, so a keyboard another screen
  * raised is never read, and a hide and re-show that keeps the input focused
- * (Android Back, then a tap on the field) stays owned.
+ * (Android Back, then a tap on the field) stays owned. Leaving the screen also
+ * releases the claim, because the input can keep focus without emitting blur;
+ * iOS emits focus again when it restores the field on return.
  */
 export function useOwnedKeyboard() {
   const { isVisible, height } = useKeyboardState();
@@ -20,6 +23,7 @@ export function useOwnedKeyboard() {
   const handleInputBlur = useCallback(() => {
     setOwned(false);
   }, []);
+  useFocusEffect(useCallback(() => handleInputBlur, [handleInputBlur]));
   return {
     owned,
     occlusion: owned && isVisible ? height : 0,

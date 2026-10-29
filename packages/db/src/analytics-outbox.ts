@@ -31,8 +31,6 @@ import type { LedgerDatabase } from './operation-ledger';
 import { OPERATION_NON_TERMINAL_STATUSES } from './operation-ledger';
 import { analytics_event_outbox, operation_ledgers, type AnalyticsEventOutboxRow } from './schema';
 
-// ----- constants -----------------------------------------------------------
-
 /** A row fails terminally after this many send attempts. */
 export const OUTBOX_MAX_ATTEMPTS = 8;
 
@@ -50,8 +48,6 @@ export const OUTBOX_FAILED_RETENTION_DAYS = 30;
 /** Outcome code written by the cron backstop for expired non-terminal rows. */
 export const EXPIRED_UNSETTLED_OUTCOME_CODE = 'expired_unsettled';
 
-// ----- result types -----------------------------------------------------------
-
 export type OutboxRetryResult =
   | { outcome: 'retried'; row: AnalyticsEventOutboxRow }
   | { outcome: 'failed'; row: AnalyticsEventOutboxRow };
@@ -61,8 +57,6 @@ export type PurgeExpiredResult = {
   outboxFailedPurged: number;
   expiredUnsettledLedgerSettled: number;
 };
-
-// ----- claim ------------------------------------------------------------------
 
 /**
  * Claims due `pending` rows in a bounded batch: transitions them to `sending`
@@ -91,8 +85,6 @@ export async function claimDueOutboxEvents(
     )`)
     .returning();
 }
-
-// ----- terminal marks -----------------------------------------------------------
 
 /**
  * Marks a claimed event delivered. The update is fenced on the claim token
@@ -206,8 +198,6 @@ export async function markOutboxFailed(
   return updated ?? null;
 }
 
-// ----- reclaim -----------------------------------------------------------------
-
 /**
  * Reclaims `sending` rows whose claim is older than
  * `OUTBOX_STALE_SENDING_WINDOW_MS`: they return to `pending` and become due
@@ -228,8 +218,6 @@ export async function reclaimStaleSendingEvents(
     )
     .returning();
 }
-
-// ----- purge and backstop ---------------------------------------------------------
 
 /**
  * Enforces DEC-01 retention and runs the `expired_unsettled` ledger backstop:

@@ -28,8 +28,6 @@ import {
   type BouncerUsageEventOutboxRow,
 } from './schema';
 
-// ----- constants -----------------------------------------------------------
-
 /** A row fails terminally after this many delivery attempts. */
 export const BOUNCER_USAGE_EVENT_OUTBOX_MAX_ATTEMPTS = 8;
 
@@ -50,12 +48,8 @@ export const BOUNCER_USAGE_EVENT_OUTBOX_MAX_RETRY_BACKOFF_MS = 10 * 60 * 1000;
 export const BOUNCER_USAGE_EVENT_OUTBOX_DELIVERED_RETENTION_DAYS = 1;
 export const BOUNCER_USAGE_EVENT_OUTBOX_FAILED_RETENTION_DAYS = 7;
 
-// ----- connection types -----------------------------------------------------
-
 /** Accepts either a `NodePgDatabase` or an open transaction. */
 export type BouncerUsageEventOutboxDatabase = BouncerCreditEventOutboxDatabase;
-
-// ----- result types -----------------------------------------------------------
 
 export type BouncerUsageEventOutboxRetryResult =
   | { outcome: 'retried'; row: BouncerUsageEventOutboxRow }
@@ -65,8 +59,6 @@ export type PurgeBouncerUsageEventOutboxResult = {
   deliveredPurged: number;
   failedPurged: number;
 };
-
-// ----- enqueue ------------------------------------------------------------------
 
 /**
  * Enqueues one usage event, idempotently on `request_id`. Passing the usage-write transaction makes
@@ -81,8 +73,6 @@ export async function enqueueBouncerUsageEvent(
     .values({ request_id: input.requestId, user_id: input.userId, payload: input.payload })
     .onConflictDoNothing({ target: bouncer_usage_event_outbox.request_id });
 }
-
-// ----- claim ------------------------------------------------------------------
 
 /**
  * Claims due `pending` rows in a bounded batch, oldest first, `FOR UPDATE SKIP LOCKED` so
@@ -150,8 +140,6 @@ export async function bouncerUsageEventInFlight(
     .limit(1);
   return row !== undefined;
 }
-
-// ----- terminal marks -----------------------------------------------------------
 
 function claimFence(input: { id: string; claimedAt: string }) {
   return and(
@@ -233,8 +221,6 @@ export async function deleteBouncerUsageEvent(
   return deleted.length > 0;
 }
 
-// ----- reclaim -----------------------------------------------------------------
-
 /** Returns `sending` claims older than the stale window to `pending`. */
 export async function reclaimStaleBouncerUsageEvents(
   database: BouncerUsageEventOutboxDatabase,
@@ -257,8 +243,6 @@ export async function reclaimStaleBouncerUsageEvents(
     )`)
     .returning();
 }
-
-// ----- purge and retention -------------------------------------------------------
 
 /** Deletes terminal rows past their retention window. */
 export async function purgeExpiredBouncerUsageEvents(

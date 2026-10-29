@@ -1,6 +1,7 @@
 import { describe, test, expect, afterEach } from '@jest/globals';
 import { db, sql } from '@kilocode/web-shared/lib/drizzle';
 import {
+  agent_briefing_context_preferences,
   organizations,
   organization_invitations,
   organization_memberships,
@@ -95,6 +96,37 @@ describe('Organizations', () => {
       const organization = await createOrganization('Membership of another user', user.id);
 
       await expect(isOrganizationMember(db, organization.id, nonMember.id)).resolves.toBe(false);
+    });
+  });
+
+  describe('markOrganizationAsDeleted', () => {
+    test('disables only the deleted organization briefing context', async () => {
+      const user = await insertTestUser();
+      const organization = await createOrganization('Deleted briefing context', user.id);
+      await db.insert(agent_briefing_context_preferences).values([
+        { kilo_user_id: user.id, context_key: 'personal', enabled: true, model: 'test/model' },
+        {
+          kilo_user_id: user.id,
+          context_key: organization.id,
+          organization_id: organization.id,
+          enabled: true,
+          model: 'test/model',
+        },
+      ]);
+
+      await markOrganizationAsDeleted(organization.id);
+
+      const contexts = await db
+        .select({
+          key: agent_briefing_context_preferences.context_key,
+          enabled: agent_briefing_context_preferences.enabled,
+        })
+        .from(agent_briefing_context_preferences)
+        .where(eq(agent_briefing_context_preferences.kilo_user_id, user.id));
+      expect(Object.fromEntries(contexts.map(context => [context.key, context.enabled]))).toEqual({
+        personal: true,
+        [organization.id]: false,
+      });
     });
   });
 

@@ -319,20 +319,8 @@ export async function restoreSalesDemoOrganization(args: {
   const demoIds = await ensureSalesDemoUsers(txn);
 
   await txn
-    .delete(organization_memberships)
-    .where(eq(organization_memberships.organization_id, organizationId));
-
-  await txn
     .delete(organization_user_limits)
     .where(eq(organization_user_limits.organization_id, organizationId));
-
-  if (ownerId) {
-    await addUserToOrganization(organizationId, ownerId, 'owner', txn);
-  }
-
-  for (const demoId of demoIds) {
-    await addUserToOrganization(organizationId, demoId, 'member', txn);
-  }
 
   const [reloadedOrg] = await txn
     .select()

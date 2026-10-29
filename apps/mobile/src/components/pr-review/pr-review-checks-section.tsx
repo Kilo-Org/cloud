@@ -23,6 +23,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { reviewerPlatformLabel } from '@/lib/code-reviewer-config';
 import { formatNumber } from '@/lib/format';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -234,9 +235,10 @@ export function PrReviewChecksSection({
 
   // Loading (first time, no cached data): reserve the loaded card's shape so
   // the swap cannot move the page. The loaded card is a header strip
-  // (`border-b-[0.5px] border-hair-soft px-4 py-2`) plus one `min-h-11` group
-  // row per present status, and STATUS_ORDER holds exactly four statuses with
-  // no row for an absent one, so the card tops out at four rows. Reserving
+  // (`border-b-[0.5px] border-hair-soft px-4 py-2`) plus one row per present
+  // status at the shared row floor, and STATUS_ORDER holds exactly four
+  // statuses with no row for an absent one, so the card tops out at four rows.
+  // Reserving
   // four means a mixed-status PR (the case this feature targets) is shift-free
   // and the Review button, PrMergeSection and the head line below never get
   // pushed down while the user is on the page; an empty or single-status card
@@ -264,7 +266,7 @@ export function PrReviewChecksSection({
           </View>
           {STATUS_ORDER.map((status, rowIndex) => (
             <View key={status}>
-              <View className="min-h-11 flex-row items-center gap-3 px-4 py-3">
+              <View className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-3 px-4 py-3')}>
                 <Skeleton className="h-4 w-4 rounded-full bg-muted-soft" />
                 <View className="flex-1">
                   <Skeleton className="h-3.5 w-24 rounded-md bg-muted-soft" />

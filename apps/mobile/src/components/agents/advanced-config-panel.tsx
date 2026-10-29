@@ -20,8 +20,10 @@ import { type VariableEdit } from '@/components/profiles/profile-variables-model
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronUp } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useAgentProfileList, useAgentProfileMutations } from '@/lib/hooks/use-agent-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
 
 /** Structural view of a list row, so both the personal and combined shapes fit. */
 type ProfileListRow = Readonly<{
@@ -203,7 +205,10 @@ export function AdvancedConfigPanel({
   return (
     <View className="mt-5">
       <Pressable
-        className="min-h-11 flex-row items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2.5 active:opacity-70"
+        className={cn(
+          ROW_TARGET_CLASS,
+          'flex-row items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2.5 active:opacity-70'
+        )}
         onPress={() => {
           setIsExpanded(current => !current);
         }}

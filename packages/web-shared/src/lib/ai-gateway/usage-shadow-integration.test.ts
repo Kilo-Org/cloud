@@ -13,7 +13,7 @@ import type { SQL } from 'drizzle-orm';
 import type { MicrodollarUsageContext, MicrodollarUsageStats } from './processUsage.types';
 import type { UsageRecordRequest } from '@kilocode/usage-contracts';
 import type { UserForBalance } from '@kilocode/web-shared/lib/user/balance-types';
-import type { UsageQueueSfoConfig } from './usage-queue-config';
+import type { UsageQueueFraConfig, UsageQueueSfoConfig } from './usage-queue-config';
 
 const nativeFetch = globalThis.fetch;
 const nativeDateNow = Date.now;
@@ -37,6 +37,7 @@ jest.mock('@kilocode/web-shared/lib/drizzle', () => ({
 jest.mock('@kilocode/web-shared/lib/config.server', () => ({
   USAGE_QUEUE_ONLY_ENABLED: false,
   USAGE_QUEUE_SFO_CONFIG: { enabled: false, exposure: 0, userIds: null },
+  USAGE_QUEUE_FRA_CONFIG: { enabled: false, exposure: 0 },
   USAGE_INGEST_URL: 'http://usage.example.test/usage',
   USAGE_INGEST_PUBLISH_SECRET: 'synthetic-local-secret',
 }));
@@ -68,12 +69,9 @@ jest.mock('@kilocode/web-shared/lib/kilo-pass-org/consumption', () => ({}));
 jest.mock('@kilocode/web-shared/lib/utils.server', () => ({
   sentryLogger: () => () => {},
   logExceptInTest: () => {},
+  warnExceptInTest: () => {},
 }));
 jest.mock('./providers/upstream-request', () => ({ fetchGeneration: jest.fn() }));
-jest.mock('./kilo-exclusive-models', () => ({
-  findKiloExclusiveModel: () => undefined,
-  shouldRedactModelNameInMicrodollarUsage: () => false,
-}));
 jest.mock('./custom-pricing', () => ({ calculateCustomCost_mUsd: () => undefined }));
 jest.mock('@kilocode/web-shared/lib/bouncer/client', () => ({
   normalizeJa4: () => null,
@@ -114,6 +112,7 @@ const publisher = jest.requireMock<typeof UsagePublisher>('./usage-publisher');
 const config = jest.requireMock<{
   USAGE_QUEUE_ONLY_ENABLED: boolean;
   USAGE_QUEUE_SFO_CONFIG: UsageQueueSfoConfig;
+  USAGE_QUEUE_FRA_CONFIG: UsageQueueFraConfig;
   USAGE_INGEST_URL: string;
   USAGE_INGEST_PUBLISH_SECRET: string;
 }>('@kilocode/web-shared/lib/config.server');
@@ -259,6 +258,7 @@ beforeEach(() => {
 
   config.USAGE_QUEUE_ONLY_ENABLED = false;
   config.USAGE_QUEUE_SFO_CONFIG = { enabled: false, exposure: 0, userIds: null };
+  config.USAGE_QUEUE_FRA_CONFIG = { enabled: false, exposure: 0 };
   bouncer.deliverBouncerUsageEventNow.mockResolvedValue(true);
   config.USAGE_INGEST_URL = 'http://usage.example.test/usage';
   config.USAGE_INGEST_PUBLISH_SECRET = 'synthetic-local-secret';
@@ -323,6 +323,7 @@ function configureQueueEnvironment(overrides: Record<string, string | undefined>
     for (const [key, value] of Object.entries({
       USAGE_QUEUE_ONLY_ENABLED: 'true',
       USAGE_QUEUE_SFO_EXPOSURE: '1',
+      USAGE_QUEUE_FRA_EXPOSURE: undefined,
       USAGE_QUEUE_SFO_USER_IDS: '',
       VERCEL_ENV: 'production',
       VERCEL_TARGET_ENV: 'production',
@@ -339,6 +340,7 @@ function configureQueueEnvironment(overrides: Record<string, string | undefined>
       );
       config.USAGE_QUEUE_ONLY_ENABLED = actual.USAGE_QUEUE_ONLY_ENABLED;
       config.USAGE_QUEUE_SFO_CONFIG = actual.USAGE_QUEUE_SFO_CONFIG;
+      config.USAGE_QUEUE_FRA_CONFIG = actual.USAGE_QUEUE_FRA_CONFIG;
     });
   } finally {
     process.env = original;
@@ -364,6 +366,194 @@ const personalContext: MicrodollarUsageContext = {
   ...context,
   bouncer: personalBouncer,
 };
+
+describe('production FRA queued accounting', () => {
+  function configureFra(overrides: Record<string, string | undefined> = {}) {
+    configureQueueEnvironment({
+      VERCEL_REGION: 'fra1',
+      USAGE_QUEUE_SFO_EXPOSURE: '0',
+      USAGE_QUEUE_FRA_EXPOSURE: '1',
+      ...overrides,
+    });
+  }
+
+  test.each([
+    { name: 'unset', env: { USAGE_QUEUE_FRA_EXPOSURE: undefined }, queued: false },
+    {
+      name: 'SFO full exposure cannot enable FRA',
+      env: { USAGE_QUEUE_FRA_EXPOSURE: undefined, USAGE_QUEUE_SFO_EXPOSURE: '1' },
+      queued: false,
+    },
+    { name: 'empty', env: { USAGE_QUEUE_FRA_EXPOSURE: '' }, queued: false },
+    { name: 'zero', env: { USAGE_QUEUE_FRA_EXPOSURE: '0' }, queued: false },
+    { name: 'malformed', env: { USAGE_QUEUE_FRA_EXPOSURE: 'bad' }, queued: false },
+    { name: 'hex', env: { USAGE_QUEUE_FRA_EXPOSURE: '0x1' }, queued: false },
+    { name: 'nonfinite', env: { USAGE_QUEUE_FRA_EXPOSURE: 'Infinity' }, queued: false },
+    { name: 'out of range', env: { USAGE_QUEUE_FRA_EXPOSURE: '1.01' }, queued: false },
+    { name: 'negative', env: { USAGE_QUEUE_FRA_EXPOSURE: '-0.1' }, queued: false },
+    { name: 'master off', env: { USAGE_QUEUE_ONLY_ENABLED: 'false' }, queued: false },
+    { name: 'master missing', env: { USAGE_QUEUE_ONLY_ENABLED: undefined }, queued: false },
+    { name: 'master malformed', env: { USAGE_QUEUE_ONLY_ENABLED: 'TRUE' }, queued: false },
+    { name: 'outside cohort', env: { USAGE_QUEUE_FRA_EXPOSURE: '0.8961' }, queued: false },
+    { name: 'inside cohort', env: { USAGE_QUEUE_FRA_EXPOSURE: '0.8962' }, queued: true },
+    { name: 'all FRA', env: {}, queued: true },
+    { name: 'SFO allowlist ignored', env: { USAGE_QUEUE_SFO_USER_IDS: '[]' }, queued: true },
+    { name: 'SFO malformed list ignored', env: { USAGE_QUEUE_SFO_USER_IDS: 'bad' }, queued: true },
+    { name: 'SFO', env: { VERCEL_REGION: 'sfo1' }, queued: false },
+    { name: 'unknown region', env: { VERCEL_REGION: 'iad1' }, queued: false },
+    { name: 'absent region', env: { VERCEL_REGION: undefined }, queued: false },
+    { name: 'empty region', env: { VERCEL_REGION: '' }, queued: false },
+    { name: 'missing environment', env: { VERCEL_ENV: undefined }, queued: false },
+    { name: 'missing target', env: { VERCEL_TARGET_ENV: undefined }, queued: false },
+    {
+      name: 'preview',
+      env: { VERCEL_ENV: 'preview', VERCEL_TARGET_ENV: 'preview' },
+      queued: false,
+    },
+    {
+      name: 'development',
+      env: { VERCEL_ENV: 'development', VERCEL_TARGET_ENV: 'development' },
+      queued: false,
+    },
+    {
+      name: 'production with staging target',
+      env: { VERCEL_TARGET_ENV: 'staging' },
+      queued: false,
+    },
+    { name: 'preview with production target', env: { VERCEL_ENV: 'preview' }, queued: false },
+    {
+      name: 'staging preserved',
+      env: { VERCEL_ENV: 'preview', VERCEL_TARGET_ENV: 'staging', USAGE_QUEUE_FRA_EXPOSURE: '0' },
+      queued: true,
+    },
+  ])('$name uses exactly one existing accounting path', async ({ env, queued }) => {
+    configureFra(env);
+    const lifecycle = requestLifetime();
+    const record = await lifecycle.run(() =>
+      logMicrodollarUsage({ ...stats }, { ...personalContext })
+    );
+    lifecycle.close();
+    await lifecycle.drain();
+    expect(record?.status).toBe(queued ? 'queued' : 'recorded');
+    expect(publisher.enqueueUsage).toHaveBeenCalledTimes(queued ? 1 : 0);
+    expect(fetch).toHaveBeenCalledTimes(queued ? 1 : 0);
+    expect(writer).toHaveBeenCalledTimes(!queued && process.env.VERCEL_REGION === 'sfo1' ? 1 : 0);
+    expect(db.transaction).toHaveBeenCalledTimes(
+      !queued && process.env.VERCEL_REGION !== 'sfo1' ? 1 : 0
+    );
+    if (queued) expect(sent[0].core.id).toBe(record?.usageId);
+    expect(lifecycle.errors).toEqual([]);
+  });
+
+  test.each(['0', '1'])('FRA exposure %s preserves SFO cohort and allowlist', async exposure => {
+    for (const [sfoExposure, userIds, queued] of [
+      ['0.3', '', false],
+      ['0.31', '', true],
+      ['1', '[]', false],
+    ] as const) {
+      jest.clearAllMocks();
+      configureQueueEnvironment({
+        USAGE_QUEUE_FRA_EXPOSURE: exposure,
+        USAGE_QUEUE_SFO_EXPOSURE: sfoExposure,
+        USAGE_QUEUE_SFO_USER_IDS: userIds,
+      });
+      const lifecycle = requestLifetime();
+      const result = await lifecycle.run(() =>
+        logMicrodollarUsage({ ...stats }, { ...personalContext })
+      );
+      lifecycle.close();
+      await lifecycle.drain();
+      expect(result?.status).toBe(queued ? 'queued' : 'recorded');
+      expect(publisher.enqueueUsage).toHaveBeenCalledTimes(queued ? 1 : 0);
+      expect(writer).toHaveBeenCalledTimes(queued ? 0 : 1);
+      expect(db.transaction).not.toHaveBeenCalled();
+    }
+  });
+
+  test.each([
+    { organizationId: 'a1b2c3d4-e5f6-47a8-9b0c-d1e2f3a4b5c6' },
+    { user_byok: true },
+    { is_free: true },
+    { bouncer: undefined },
+    { bouncer: { ...personalBouncer, spendWatch: true } },
+    { botId: 'synthetic-bot' },
+  ])('FRA selection remains transport-only for %j', async change => {
+    configureFra();
+    const lifecycle = requestLifetime();
+    const result = await lifecycle.run(() =>
+      logMicrodollarUsage({ ...stats }, { ...personalContext, ...change })
+    );
+    lifecycle.close();
+    await lifecycle.drain();
+    expect(result?.status).toBe('queued');
+    expect(publisher.enqueueUsage).toHaveBeenCalledTimes(1);
+    expect(db.transaction).not.toHaveBeenCalled();
+    expect(writer).not.toHaveBeenCalled();
+  });
+
+  test('FRA publication rejection does not fall back to direct accounting', async () => {
+    configureFra();
+    jest.mocked(fetch).mockResolvedValue(new Response(null, { status: 401 }));
+    const lifecycle = requestLifetime();
+    const result = await lifecycle.run(() =>
+      logMicrodollarUsage({ ...stats }, { ...personalContext })
+    );
+    lifecycle.close();
+    await lifecycle.drain();
+    expect(result).toBeNull();
+    expect(fetch).toHaveBeenCalledTimes(1);
+    expect(publisher.enqueueUsage).toHaveBeenCalledTimes(1);
+    expect(db.transaction).not.toHaveBeenCalled();
+    expect(writer).not.toHaveBeenCalled();
+  });
+
+  test.each(['publisher_not_configured', 'registration_failed'])(
+    'FRA retains pre-I/O direct fallback for %s',
+    async reason => {
+      configureFra();
+      jest.mocked(publisher.enqueueUsage).mockResolvedValue({ kind: 'unavailable', reason });
+      const lifecycle = requestLifetime();
+      const result = await lifecycle.run(() =>
+        logMicrodollarUsage({ ...stats }, { ...personalContext })
+      );
+      lifecycle.close();
+      await lifecycle.drain();
+      expect(result?.status).toBe('recorded');
+      expect(fetch).not.toHaveBeenCalled();
+      expect(db.transaction).toHaveBeenCalledTimes(1);
+      expect(writer).not.toHaveBeenCalled();
+    }
+  );
+
+  test('FRA internal writer does not enqueue even when its payer is selected', async () => {
+    configureFra();
+    const lifecycle = requestLifetime();
+    const queued = await lifecycle.run(() =>
+      logMicrodollarUsage({ ...stats }, { ...personalContext })
+    );
+    lifecycle.close();
+    await lifecycle.drain();
+    const payload = sent[0];
+    expect(payload.core.id).toBe(queued?.usageId);
+    jest.clearAllMocks();
+    const endpoint = requestLifetime();
+    await endpoint.run(() =>
+      saveUsageRelatedDataLocally(
+        payload.core,
+        payload.metadata,
+        payload.prior_microdollar_usage,
+        null,
+        payload.bouncer_usage_event,
+        { entrypoint: 'writer_endpoint', writer_caller: 'queue' }
+      )
+    );
+    endpoint.close();
+    await endpoint.drain();
+    expect(publisher.enqueueUsage).not.toHaveBeenCalled();
+    expect(fetch).not.toHaveBeenCalled();
+    expect(db.transaction).toHaveBeenCalledTimes(1);
+  });
+});
 
 describe('production SFO queued accounting', () => {
   test.each([

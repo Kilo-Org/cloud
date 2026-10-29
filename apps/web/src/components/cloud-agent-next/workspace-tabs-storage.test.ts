@@ -72,6 +72,30 @@ describe('parseWorkspaceTabsByScope', () => {
     expect(parseWorkspaceTabsByScope(JSON.stringify(state))).toEqual(state.tabsByScope);
   });
 
+  it('round-trips scoped file selection and modes alongside unchanged legacy file tabs', () => {
+    const state = tabs({
+      activeTabId: fileTabId('src/main.ts', 'against-base-branch'),
+      files: [
+        { path: 'src/main.ts', mode: 'preview' },
+        { path: 'src/main.ts', scope: 'uncommitted', mode: 'expanded' },
+        { path: 'src/main.ts', scope: 'against-base-branch', mode: 'diff' },
+      ],
+    });
+    const raw = JSON.stringify({
+      tabsByScope: { 'worktree:wt-1': { ...state, files: [...state.files, ...state.files] } },
+    });
+    expect(parseWorkspaceTabsByScope(raw)['worktree:wt-1']).toEqual(state);
+  });
+
+  it('rejects invalid saved file scopes rather than silently restoring an unscoped tab', () => {
+    const raw = JSON.stringify({
+      tabsByScope: { 'worktree:wt-1': tabs({ files: [{ path: 'a.ts' }] }) },
+    });
+    expect(
+      parseWorkspaceTabsByScope(raw.replace('"path":"a.ts"', '"path":"a.ts","scope":"committed"'))
+    ).toEqual({});
+  });
+
   it('drops malformed scopes and duplicate tabs', () => {
     const validScopeTabs = tabs({
       terminals: [

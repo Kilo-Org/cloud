@@ -3,6 +3,7 @@ import { createElement } from 'react';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import * as z from 'zod';
 
 import { createTestQueryClient, renderWithProviders, waitFor } from '@/test/render-with-providers';
 import {
@@ -19,11 +20,15 @@ const mocks = vi.hoisted(() => ({
     list: vi.fn(),
     listCombined: vi.fn(),
     get: vi.fn(),
+    overview: vi.fn(),
+    agents: vi.fn(),
   },
   queryInputs: {
     list: undefined as unknown,
     listCombined: undefined as unknown,
     get: undefined as unknown,
+    overview: undefined as unknown,
+    agents: undefined as unknown,
   },
   mutations: {
     create: vi.fn(),
@@ -47,6 +52,7 @@ vi.mock('@/lib/trpc', () => {
     return {
       pathFilter: () => ({ queryKey: ['agentProfiles', path] }),
       queryKey: (input: unknown) => ['agentProfiles', path, input],
+      queryFilter: (input: unknown) => ({ queryKey: ['agentProfiles', path, input] }),
       queryOptions: (input: unknown) => {
         mocks.queryInputs[name] = input;
         return {
@@ -72,6 +78,8 @@ vi.mock('@/lib/trpc', () => {
       list: queryProcedure('list', 'list'),
       listCombined: queryProcedure('listCombined', 'listCombined'),
       get: queryProcedure('get', 'get'),
+      overview: queryProcedure('overview', 'overview'),
+      agents: queryProcedure('agents', 'agents'),
       create: mutationProcedure('create', 'create'),
       update: mutationProcedure('update', 'update'),
       delete: mutationProcedure('delete', 'delete'),
@@ -322,6 +330,50 @@ describe('useAgentProfileMutations', () => {
     unmount();
   });
 
+  /**
+   * The delete path invalidates the whole namespace but must not refetch the
+   * deleted profile's own reads: their only possible answer is NOT_FOUND, which
+   * the mounted screens would render as a failure over a profile the user just
+   * removed. Parsed with zod because the spy's arguments are untyped.
+   */
+  it("delete invalidates the namespace without refetching the deleted profile's reads", async () => {
+    const holder: { current: MutationsResult | null } = { current: null };
+    const { queryClient, unmount } = await renderWithProviders(
+      createElement(MutationsProbe, { holder })
+    );
+    const invalidateSpy = vi.spyOn(queryClient, 'invalidateQueries');
+    const invalidateArg = z.object({
+      predicate: z.custom<(query: { queryKey: readonly unknown[] }) => boolean>(
+        value => typeof value === 'function'
+      ),
+    });
+
+    await act(async () => {
+      await current(holder).deleteProfile.mutateAsync({ profileId: 'profile-1' });
+    });
+
+    const parsed = invalidateSpy.mock.calls
+      .map(([arg]) => invalidateArg.safeParse(arg))
+      .find(result => result.success);
+    const predicate = parsed?.data.predicate;
+    expect(predicate).toBeDefined();
+    if (predicate === undefined) {
+      throw new Error('delete did not invalidate with a predicate');
+    }
+    for (const path of ['get', 'overview', 'agents']) {
+      expect(predicate({ queryKey: ['agentProfiles', path, { profileId: 'profile-1' }] })).toBe(
+        false
+      );
+    }
+    expect(predicate({ queryKey: ['agentProfiles', 'get', { profileId: 'profile-2' }] })).toBe(
+      true
+    );
+    expect(predicate({ queryKey: ['agentProfiles', 'agents', { profileId: 'profile-3' }] })).toBe(
+      true
+    );
+    unmount();
+  });
+
   it('leaves organizationId off personal-context input', async () => {
     const holder: { current: MutationsResult | null } = { current: null };
     const { unmount } = await renderWithProviders(createElement(MutationsProbe, { holder }));
@@ -449,9 +501,18 @@ describe('useAgentProfileMutations', () => {
       const listKey = ['agentProfiles', 'list', { organizationId }];
       const untouchedListKey = ['agentProfiles', 'list', { organizationId: 'org-2' }];
       const detailKey = ['agentProfiles', 'get', { profileId: 'other', organizationId: 'org-2' }];
+      const ownId = organizationId ? 'org' : 'personal';
+      const overviewKey = ['agentProfiles', 'overview', { profileId: ownId, organizationId }];
+      const siblingOverviewKey = [
+        'agentProfiles',
+        'overview',
+        { profileId: 'sibling', organizationId },
+      ];
       queryClient.setQueryData(listKey, [organizationId ? org : personal]);
       queryClient.setQueryData(untouchedListKey, [summary({ id: 'other', isDefault: true })]);
       queryClient.setQueryData(detailKey, summary({ id: 'other', isDefault: true }));
+      queryClient.setQueryData(overviewKey, summary({ id: ownId, isDefault: true }));
+      queryClient.setQueryData(siblingOverviewKey, summary({ id: 'sibling', isDefault: true }));
       await act(async () => {
         await (clear
           ? current(holder).clearDefault.mutateAsync({
@@ -468,6 +529,10 @@ describe('useAgentProfileMutations', () => {
       });
       expect(queryClient.getQueryData(untouchedListKey)).toMatchObject([{ isDefault: true }]);
       expect(queryClient.getQueryData(detailKey)).toMatchObject({ isDefault: true });
+      // The Overview renders `isDefault` from the counts read, so the toggle
+      // must move there too, and only inside this owner's scope.
+      expect(queryClient.getQueryData(overviewKey)).toMatchObject({ isDefault: !clear });
+      expect(queryClient.getQueryData(siblingOverviewKey)).toMatchObject({ isDefault: clear });
       expect(queryClient.getQueryData(otherKey)).toMatchObject({
         orgProfiles: [{ isDefault: true }],
         personalProfiles: [{ isDefault: organizationId ? true : personalDefault }],

@@ -16,7 +16,8 @@ instructions and Durable Objects/Workers skills for those.
 
 Change `packages/db/src/schema.ts` first, then generate migrations with
 `pnpm drizzle generate`. Do not hand-write or edit generated DDL, snapshots, or
-journal entries. If generated DDL is wrong, correct the schema and regenerate.
+journal entries, except in the cases that this section lists. If generated DDL
+is wrong, correct the schema and regenerate.
 
 For an index declared with Drizzle's `.concurrently()`, the generated SQL may
 receive only the transaction boundaries needed by this repository's
@@ -32,10 +33,30 @@ concurrent build fails, first inspect the index state; recover an invalid index
 explicitly with `DROP INDEX CONCURRENTLY` or `REINDEX INDEX CONCURRENTLY` as
 appropriate before retrying. `IF NOT EXISTS` can mask an invalid index.
 
+A second exception covers a long concurrent build on a large table. The
+production server sets a default `statement_timeout` that cancels such a build.
+Add `SET statement_timeout = 0;` after `COMMIT;` and `RESET statement_timeout;`
+before `BEGIN;`. A cancelled build still commits the migration's first
+transaction without recording the migration, so a retry must not fail on DDL
+that already applied. You can wrap that transaction's unchanged generated DDL in
+a `DO` block that skips it when its first created object exists, as
+`0314_scheduled_briefing_snapshots.sql` does. Precede the build with
+`DROP INDEX CONCURRENTLY IF EXISTS`. Leave the snapshot and journal untouched.
+
 Prefer `timestamp({ withTimezone: true })` over timestamps without time zone.
 Review generated migrations for data loss. Prefer additive or staged schema
 changes over destructive operations; when generated DDL is unsafe, revise the
 schema and regenerate rather than editing generated artifacts.
+
+Drop a table or column only after the deployed code no longer uses it. If a
+dropped table has foreign keys to busy tables, the generated `DROP TABLE ...
+CASCADE` locks the dropped table and every referenced table in one
+transaction. That can deadlock with live writers. As an exception to the rules
+above, you can hand-write this case:
+drop each foreign key in its own transaction (`COMMIT;` / `BEGIN;`), then drop
+the tables and columns. Set `SET LOCAL lock_timeout` in each transaction, use
+`IF EXISTS` on every statement so a partial run can be retried, and leave the
+snapshot and journal as generated. See `0317_drop_briefing_legacy_objects.sql`.
 
 Only intentional `UPDATE` or `INSERT` data backfills may be appended after the
 generated DDL, separated with the exact marker `-->  statement-breakpoint`.

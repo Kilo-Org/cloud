@@ -868,6 +868,11 @@ context; schemas live in `@kilocode/auto-routing-contracts`. Errors use
 - A case repetition reuses its stored score only after exit code 0, no timeout, and nonempty
   output. Nonzero exits, timeouts, and empty output remain in the plan; a new upload replaces
   the failed attempt.
+- A judged upload grades under a per-case claim (`client_case_grading_claims`, one row per
+  profile, case and repetition). The claim holder runs the judge; a parallel upload of the
+  same case returns the stored score once the holder finishes, and otherwise fails with
+  `internal_error` instead of starting a second grading. The claim is released when its
+  grading ends, and a lease lets the next upload take over one left by a vanished request.
 
 Rollout: apply the additive D1 migration (new tables and the `profile_request_events.router`
 column, defaulting existing rows to `efficient`) with the deploy; no queue pause is needed.

@@ -9,10 +9,7 @@ import {
 import { readStoredEnkryptDetectors } from '@kilocode/web-shared/lib/ai-gateway/enkrypt-guardrail/settings';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import { createAuditLog } from '@kilocode/web-shared/lib/organizations/organization-audit-logs';
-import {
-  getOrganizationById,
-  mutateOrganizationSettings,
-} from '@kilocode/web-shared/lib/organizations/organizations';
+import { mutateOrganizationSettings } from '@kilocode/web-shared/lib/organizations/organizations';
 import { createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import {
   OrganizationIdInputSchema,
@@ -21,7 +18,7 @@ import {
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { TRPCError } from '@trpc/server';
 import * as z from 'zod';
-import { isKiloEncryptEnabled } from '@/lib/organizations/kilo-encrypt';
+import { requireGuardrailsOrganization } from '@/lib/organizations/require-guardrails-organization';
 
 const OrganizationGuardrailsConfigSchema = z.object({
   enabled: z.boolean(),
@@ -39,20 +36,6 @@ export type OrganizationGuardrailsConfig = z.infer<typeof OrganizationGuardrails
 const OrganizationGuardrailsResponseSchema = OrganizationGuardrailsConfigSchema.extend({
   invalid_saved_detectors: z.boolean(),
 });
-
-async function requireGuardrailsOrganization(organizationId: string) {
-  const organization = await getOrganizationById(organizationId);
-  if (!organization) {
-    throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
-  }
-  if (!isKiloEncryptEnabled(organization.settings)) {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'AI Guardrails is not available for this organization.',
-    });
-  }
-  return organization;
-}
 
 /** Describes a saved configuration for the audit log without keywords, topics, or policy text. */
 export function describeGuardrailsConfig(config: OrganizationGuardrailsConfig): string {

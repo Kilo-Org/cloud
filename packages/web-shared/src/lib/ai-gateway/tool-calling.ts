@@ -14,8 +14,8 @@ const BINARY_DATA_REPLACEMENT =
   'skip it, or use a tool appropriate for its format (for example, image or ' +
   'PDF tools) instead.';
 
-function normalizeToolCallId(toolCallId: string, maxIdLength: number | undefined) {
-  return crypto.hash('sha256', toolCallId).slice(0, maxIdLength);
+function normalizeToolCallId(toolCallId: string) {
+  return crypto.hash('sha256', toolCallId);
 }
 
 export function dropToolStrictProperties(requestToMutate: OpenRouterChatCompletionRequest) {
@@ -28,11 +28,14 @@ export function dropToolStrictProperties(requestToMutate: OpenRouterChatCompleti
 
 export function normalizeToolCallIds(
   requestToMutate: GatewayRequest,
-  filter: (toolCallId: string) => boolean,
-  maxIdLength: number | undefined
+  filter: (toolCallId: string) => boolean
 ) {
-  const normalize = (toolCallId: string) =>
-    filter(toolCallId) ? normalizeToolCallId(toolCallId, maxIdLength) : toolCallId;
+  const normalizedIds = new Set<string>();
+  const normalize = (toolCallId: string) => {
+    if (!filter(toolCallId)) return toolCallId;
+    normalizedIds.add(toolCallId);
+    return normalizeToolCallId(toolCallId);
+  };
 
   if (requestToMutate.kind === 'chat_completions') {
     normalizeChatCompletionsToolCallIds(requestToMutate.body, normalize);
@@ -40,6 +43,17 @@ export function normalizeToolCallIds(
     normalizeResponsesToolCallIds(requestToMutate.body, normalize);
   } else {
     normalizeMessagesToolCallIds(requestToMutate.body, normalize);
+  }
+
+  // One line per request, not per id: histories are resent every turn.
+  const [exampleId] = normalizedIds;
+  if (exampleId !== undefined) {
+    console.warn('[normalizeToolCallIds] normalized tool call ids', {
+      kind: requestToMutate.kind,
+      model: requestToMutate.body.model,
+      normalizedIdCount: normalizedIds.size,
+      exampleId: exampleId.slice(0, 64),
+    });
   }
 }
 

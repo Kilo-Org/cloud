@@ -3,7 +3,7 @@ import { VercelModelIdOverridesConfigSchema } from '@kilocode/db/schema-types';
 import { eq } from 'drizzle-orm';
 import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
-import { kiloExclusiveModels } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
+import { findKiloExclusiveModel } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
 import { resolveOpenRouterModelAlias } from '@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache';
 
 export type VercelModelIdOverrides = ReadonlyMap<string, string>;
@@ -31,17 +31,13 @@ export async function readVercelModelIdOverrides(): Promise<VercelModelIdOverrid
 export const getVercelModelIdOverrides = createCachedFetch<VercelModelIdOverrides>(
   readVercelModelIdOverrides,
   60_000,
-  new Map()
+  new Map(),
+  { name: 'vercelModelIdOverrides' }
 );
 
 /** The Vercel model ID derived from the built-in rules, ignoring admin overrides. */
 export function mapResolvedModelIdToVercelWithoutOverrides(modelId: string): string {
-  const internalId =
-    kiloExclusiveModels.find(
-      m =>
-        m.public_id === modelId &&
-        (m.provider.id === 'vercel' || m.flags.includes('vercel-routing'))
-    )?.internal_id ?? modelId;
+  const internalId = findKiloExclusiveModel(modelId)?.internal_id ?? modelId;
 
   const slashIndex = internalId.indexOf('/');
   if (slashIndex < 0) {

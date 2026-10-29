@@ -23,8 +23,9 @@ it.each([
   locale.language = language;
   const report: BriefingReport = {
     id: 'report-1',
-    kind: 'scheduled',
     createdAt: '2026-10-20T08:00:00Z',
+    capturedAt: '2026-10-20T08:00:00Z',
+    truncated: false,
     localDate: '2026-10-20',
     nightStartAt: '2026-10-19T22:00:00Z',
     cutoffAt: '2026-10-20T08:00:00Z',
@@ -34,16 +35,13 @@ it.each([
     publishedAt: '2026-10-20T08:00:00Z',
     updatedAt: '2026-10-20T08:00:00Z',
     expiresAt: '2026-10-20T12:00:00Z',
-    revision: 1,
-    revised: false,
     readAt: null,
     dismissedAt: null,
-    scorecard: { sessions: 0, pullRequests: 0, blockers: 0, spendMicrodollars: 0 },
+    scorecard: { sessions: 0, pullRequests: 0, blockers: 0 },
     coverage: {
-      activity: 'complete',
-      pullRequests: 'complete',
-      blockers: 'complete',
-      spend: 'complete',
+      activity: 'partial',
+      pullRequests: 'partial',
+      blockers: 'partial',
     },
     sessions: [],
     sources: [],
@@ -57,7 +55,6 @@ it.each([
       startedAt: null,
       finishedAt: null,
       error: null,
-      canRetry: false,
     },
   };
   const holder: { renderer?: TestRenderer.ReactTestRenderer } = {};

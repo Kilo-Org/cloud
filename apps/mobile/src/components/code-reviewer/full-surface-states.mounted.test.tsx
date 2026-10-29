@@ -139,6 +139,7 @@ vi.mock('@/lib/config', () => ({ WEB_BASE_URL: 'https://example.test' }));
 vi.mock('@/lib/external-link', () => ({ openExternalUrl: state.openExternalUrl }));
 vi.mock('@/lib/pr-review/connect-gate-platform', () => ({
   openAuthorizationAndWaitForReturn: (url: string) => state.openExternalUrl(url),
+  reportLateLaunchFailure: vi.fn(),
 }));
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({

@@ -3,6 +3,7 @@ import { ScrollView, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { tabEntryA11y } from '@/lib/a11y/tab-entry';
 
 type BriefingOrganizationFilter = {
   organizationId: string;
@@ -39,13 +40,12 @@ export function BriefingFilterControls({
   return (
     <>
       {/* `Button` pins role="button" and `role` takes precedence over
-          `accessibilityRole`, so the tabs pass `role` to replace it. */}
+          `accessibilityRole`, so the tabs pass the entry's own role. */}
       <View accessibilityRole="tablist" className="flex-row flex-wrap gap-2">
         <Button
-          role="tab"
+          {...tabEntryA11y({ selected: !history })}
           variant={history ? 'ghost' : 'secondary'}
           size="sm"
-          accessibilityState={{ selected: !history }}
           onPress={() => {
             onSelectHistory(false);
           }}
@@ -53,10 +53,9 @@ export function BriefingFilterControls({
           <Text>{t('agentBriefing.available')}</Text>
         </Button>
         <Button
-          role="tab"
+          {...tabEntryA11y({ selected: history })}
           variant={history ? 'secondary' : 'ghost'}
           size="sm"
-          accessibilityState={{ selected: history }}
           onPress={() => {
             onSelectHistory(true);
           }}

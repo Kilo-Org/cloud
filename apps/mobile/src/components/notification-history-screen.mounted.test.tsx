@@ -89,6 +89,7 @@ vi.mock('@shopify/flash-list', () => ({
 }));
 
 vi.mock('react-native', () => ({
+  Platform: { OS: 'ios' },
   View: 'View',
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
@@ -362,7 +363,9 @@ describe('NotificationHistoryScreen', () => {
 
     const chip = withText(byType('Button'), 'Chat messages');
     expect(chipProps(chip)).toMatchObject({
-      role: 'tab',
+      // iOS is the mocked platform: a chip is typed as a button there so
+      // VoiceOver gives it a control trait (see lib/a11y/tab-entry).
+      role: 'button',
       accessibilityState: { selected: false },
     });
 

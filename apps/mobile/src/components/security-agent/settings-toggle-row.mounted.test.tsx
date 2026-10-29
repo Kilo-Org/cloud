@@ -98,11 +98,28 @@ describe('<ToggleRow>', () => {
   });
 
   it('keeps a disabled row from toggling and reports it as disabled', () => {
+    haptics.selectionAsync.mockClear();
     const onValueChange = vi.fn<(next: boolean) => void>();
-    const props = rowProps(renderRow({ disabled: true, onValueChange }));
+    const renderer = renderRow({ disabled: true, onValueChange });
+    const props = rowProps(renderer);
+
+    act(() => {
+      pressRow(renderer);
+    });
 
     expect(props.disabled).toBe(true);
     expect(props.accessibilityState?.disabled).toBe(true);
+    expect(onValueChange).not.toHaveBeenCalled();
+    expect(haptics.selectionAsync).not.toHaveBeenCalled();
+  });
+
+  it('gives the subtitle to assistive technology as the hint', () => {
+    const props = rowProps(renderRow());
+
+    // The row is one node, so its text children are not read on their own; the
+    // name carries the title and the hint carries the subtitle.
+    expect(props.accessibilityLabel).toBe('Enable auto-analysis');
+    expect(props.accessibilityHint).toBe('Analyze findings as they are synced.');
   });
 
   it('leaves the visual switch inert and out of the accessibility tree', () => {

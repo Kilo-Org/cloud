@@ -15,11 +15,12 @@ import { cn } from '@/lib/utils';
  * The row itself is the control. Assistive technology and the touch surface
  * both take the whole row: its node carries the switch role, the name and the
  * checked/disabled state, and a tap anywhere on the title or subtitle flips the
- * value. The native `Switch` stays as the visual, but it is inert — it takes no
- * touch (`pointerEvents="none"` on its wrapper) and it leaves the accessibility
- * tree (`accessible={false}`), so a screen reader announces one switch per row
- * instead of a small thumb beside a plain label, and a tap can only reach the
- * row's single toggle path.
+ * value. The native `Switch` stays as the visual, but it is inert — its wrapper
+ * takes no touch (`pointerEvents="none"`) and hides its whole subtree from
+ * assistive technology (`accessibilityElementsHidden` on iOS,
+ * `importantForAccessibility="no-hide-descendants"` on Android), so a screen
+ * reader announces one switch per row instead of a small thumb beside a plain
+ * label, and a tap can only reach the row's single toggle path.
  */
 export function ToggleRow({
   title,
@@ -38,6 +39,9 @@ export function ToggleRow({
   onValueChange: (value: boolean) => void;
 }>) {
   const toggle = () => {
+    if (disabled) {
+      return;
+    }
     void Haptics.selectionAsync();
     onValueChange(!value);
   };
@@ -46,6 +50,10 @@ export function ToggleRow({
     <Pressable
       accessibilityRole="switch"
       accessibilityLabel={accessibilityLabel ?? title}
+      // The name above is the title alone, so the subtitle rides along as the
+      // hint: the row is one accessibility node now, and its text children are
+      // no longer read on their own.
+      accessibilityHint={subtitle}
       accessibilityState={{ checked: value, disabled }}
       disabled={disabled}
       onPress={toggle}

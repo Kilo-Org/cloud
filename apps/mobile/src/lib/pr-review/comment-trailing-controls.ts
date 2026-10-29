@@ -57,8 +57,7 @@ export const COMMENT_ACTIONS_HIT_SLOP = {
  * The author row is as tall as that frame, so the views around the row trim
  * their spacing by this band instead of drawing it as visible padding.
  */
-export const COMMENT_AUTHOR_ROW_SLACK_DP =
-  (COMMENT_ACTIONS_FRAME_DP - COMMENT_ACTIONS_VISUAL_DP) / 2;
+const COMMENT_AUTHOR_ROW_SLACK_DP = (COMMENT_ACTIONS_FRAME_DP - COMMENT_ACTIONS_VISUAL_DP) / 2;
 
 /** The gap between a comment's author row, body, and reactions, in dp. */
 export const COMMENT_ROW_GAP_DP = 8.75;

@@ -293,6 +293,41 @@ describe('byok kms client', () => {
     expect(fetchMock).toHaveBeenCalledTimes(KMS_MAX_ATTEMPTS);
   });
 
+  test('waits for the Retry-After hint before retrying a 429', async () => {
+    const dataKey = randomBytes(32).toString('base64');
+    let calls = 0;
+    const fetchMock = jest.fn(async () => {
+      calls += 1;
+      if (calls === 1) return new Response('{}', { status: 429, headers: { 'retry-after': '1' } });
+      return Response.json({
+        data_key: dataKey,
+        wrapped_dek: 'wrapped-after-hint',
+        kms_key_id: 'alias/test',
+        kms_key_version: '1',
+      });
+    });
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    const started = Date.now();
+    const envelope = await encryptByokForStorage({ apiKey: 'sk-secret', context, actorUserId });
+
+    expect(envelope?.wrapped_dek).toBe('wrapped-after-hint');
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(Date.now() - started).toBeGreaterThanOrEqual(900);
+  });
+
+  test('fails at once when Retry-After asks for longer than the time budget', async () => {
+    const fetchMock = jest.fn(
+      async () => new Response('{}', { status: 429, headers: { 'retry-after': '30' } })
+    );
+    global.fetch = fetchMock as unknown as typeof fetch;
+
+    await expect(
+      encryptByokForStorage({ apiKey: 'sk-test', context, actorUserId })
+    ).rejects.toThrow('status 429');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   test('gives up after the last attempt and throws the final status', async () => {
     const fetchMock = jest.fn(async () => new Response('nope', { status: 503 }));
     global.fetch = fetchMock as unknown as typeof fetch;

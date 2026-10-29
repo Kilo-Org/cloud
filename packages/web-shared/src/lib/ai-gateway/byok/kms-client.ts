@@ -57,6 +57,15 @@ type KmsAttempt =
   | { kind: 'response'; response: Response }
   | { kind: 'error'; error: unknown; retryable: boolean };
 
+/** The wait a `Retry-After` header asks for, in ms; a date is measured from `now`. */
+function retryAfterMs(response: Response, now: number): number | null {
+  const header = response.headers.get('retry-after')?.trim();
+  if (!header) return null;
+  if (/^\d+$/.test(header)) return Number(header) * 1000;
+  const at = Date.parse(header);
+  return Number.isNaN(at) ? null : Math.max(0, at - now);
+}
+
 async function attemptKmsRequest(
   config: ByokKmsClientConfig,
   url: string,
@@ -85,6 +94,7 @@ async function sendToKms(config: ByokKmsClientConfig, url: string, init: Request
 
     let error: unknown;
     let retryable: boolean;
+    let retryAfter: number | null = null;
     if (outcome.kind === 'response') {
       if (outcome.response.ok) return outcome.response.json();
       const { status } = outcome.response;
@@ -94,11 +104,17 @@ async function sendToKms(config: ByokKmsClientConfig, url: string, init: Request
       // 408 and 429 are the 4xx answers a lagging or rate-limited KMS returns; every other 4xx
       // rejects the request itself, so a repeat would only add latency.
       retryable = status === 408 || status === 429 || status >= 500;
+      if (retryable) retryAfter = retryAfterMs(outcome.response, Date.now());
     } else {
       ({ error, retryable } = outcome);
     }
 
-    const delayMs = KMS_RETRY_BASE_DELAY_MS * attempt + Math.random() * KMS_RETRY_BASE_DELAY_MS;
+    // A rate-limited service can ask for a specific wait; sleeping shorter gains nothing, and a
+    // hint that reaches past the budget fails the call now instead of after another attempt.
+    const delayMs = Math.max(
+      KMS_RETRY_BASE_DELAY_MS * attempt + Math.random() * KMS_RETRY_BASE_DELAY_MS,
+      retryAfter ?? 0
+    );
     if (!retryable || attempt >= KMS_MAX_ATTEMPTS || Date.now() + delayMs >= deadline) throw error;
     const { promise: slept, resolve } = Promise.withResolvers<void>();
     setTimeout(resolve, delayMs);

@@ -15,6 +15,13 @@ const BINDS_THINKING_TO_PREFIX = /claude-(?:fable-5[.-]1|(?:opus|sonnet|haiku)-5
 /**
  * Drops invalidated thinking blocks instead of failing the request. Only call this for upstreams
  * verified to forward the beta flag, since `block_binding` without it is rejected.
+ *
+ * Kilo and opencode clients change the prefix of a running session in normal use:
+ * - Context compaction keeps the most recent turns verbatim, including their thinking, after the
+ *   summary, so the history those turns were created with is gone.
+ * - After compaction, clients clear old tool outputs and replace earlier media with placeholders.
+ * - The system prompt changes on agent switches and AGENTS.md edits, and it includes the date.
+ * - The tools list changes on agent switches, permission changes, and MCP server updates.
  */
 export function dropThinkingBlocksOnPrefixMismatch({
   model,

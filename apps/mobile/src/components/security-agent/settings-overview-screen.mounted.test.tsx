@@ -282,7 +282,7 @@ describe.each([
       }
       await retry(root);
       expect(host(root, 'Switch')[0]?.props.disabled).toBe(false);
-      expect(host(root, 'Pressable')[0]).toBe(retryButton);
+      expect(root.findByProps({ role: 'button', accessibilityLabel: 'Retry' })).toBe(retryButton);
       expect(retryButton.props.disabled).toBe(true);
       expect(retryButton.props.accessibilityState).toEqual({ disabled: true, busy: true });
       expect(host(root, 'ActivityIndicator')).toHaveLength(1);
@@ -290,7 +290,7 @@ describe.each([
       await advanceBy();
       expect(host(root, 'Switch')[0]?.props.disabled).toBe(false);
       expect(host(root, 'PlatformErrorScreen')).toHaveLength(0);
-      expect(host(root, 'Pressable')[0]).toBe(retryButton);
+      expect(root.findByProps({ role: 'button', accessibilityLabel: 'Retry' })).toBe(retryButton);
       expect(retryButton.props.disabled).toBe(false);
       expect(retryButton.props.accessibilityState).toEqual({ disabled: false, busy: false });
       const status = host(root, 'Text').find(node => node.props.children === message);
@@ -301,7 +301,9 @@ describe.each([
       await retry(root);
       expect(host(root, 'Switch')[0]?.props.disabled).toBe(false);
       expect(texts(root)).not.toContain(message);
-      expect(host(root, 'Pressable')).toHaveLength(0);
+      expect(
+        host(root, 'Pressable').filter(node => node.props.accessibilityLabel === 'Retry')
+      ).toHaveLength(0);
       expect(active.every(query => query.state.status === 'success')).toBe(true);
       expect(onlineManager.isOnline()).toBe(false);
     }

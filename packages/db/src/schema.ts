@@ -11469,7 +11469,6 @@ export const agent_briefing_context_preferences = pgTable(
     context_key: text().notNull(),
     organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
     enabled: boolean().notNull().default(false),
-    ai_enabled: boolean().notNull().default(false),
     model: text().notNull(),
     max_duration_seconds: integer().notNull().default(600),
     max_spend_microdollars: bigint({ mode: 'number' }).notNull().default(2_000_000),
@@ -11536,86 +11535,6 @@ export const agent_briefing_snapshots = pgTable(
     index('agent_briefing_snapshots_running_deadline')
       .on(table.generation_deadline_at)
       .where(sql`${table.summary}->>'status' = 'running'`),
-  ]
-);
-
-export const agent_briefing_events = pgTable(
-  'agent_briefing_events',
-  {
-    id: text().primaryKey(),
-    kilo_user_id: text().notNull(),
-    session_id: text().notNull(),
-    organization_id: uuid(),
-    kind: text().notNull(),
-    occurred_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-    recorded_at: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
-    status: text(),
-    title: text(),
-    url: text(),
-    payload: jsonb().$type<Record<string, unknown>>(),
-  },
-  table => [
-    foreignKey({
-      columns: [table.session_id, table.kilo_user_id],
-      foreignColumns: [cli_sessions_v2.session_id, cli_sessions_v2.kilo_user_id],
-      name: 'agent_briefing_events_session_fk',
-    }).onDelete('cascade'),
-    index('agent_briefing_events_user_window').on(table.kilo_user_id, table.occurred_at),
-    index('agent_briefing_events_session_window').on(
-      table.session_id,
-      table.kilo_user_id,
-      table.occurred_at
-    ),
-  ]
-);
-
-export const agent_briefing_reports = pgTable(
-  'agent_briefing_reports',
-  {
-    id: uuid().primaryKey().defaultRandom(),
-    kilo_user_id: text()
-      .notNull()
-      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
-    context_key: text().notNull(),
-    organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
-    kind: text().$type<'scheduled' | 'one_off'>().notNull().default('scheduled'),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
-    timezone: text(),
-    language: text(),
-    evidence_recorded_before: timestamp({ withTimezone: true, mode: 'string' }),
-    // NULL leaves one-off reports outside the scheduled uniqueness key.
-    local_date: text(),
-    night_start_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-    cutoff_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-    morning_end_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-    published_at: timestamp({ withTimezone: true, mode: 'string' }),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
-    next_refresh_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
-    next_charge_check_at: timestamp({ withTimezone: true, mode: 'string' }),
-    read_at: timestamp({ withTimezone: true, mode: 'string' }),
-    dismissed_at: timestamp({ withTimezone: true, mode: 'string' }),
-    revision: integer().notNull().default(1),
-    evidence_hash: text().notNull(),
-    facts: jsonb().notNull().$type<Record<string, unknown>>(),
-    summary: jsonb().notNull().$type<Record<string, unknown>>(),
-    generation_id: text(),
-    generation_started_at: timestamp({ withTimezone: true, mode: 'string' }),
-    generation_finished_at: timestamp({ withTimezone: true, mode: 'string' }),
-    generation_deadline_at: timestamp({ withTimezone: true, mode: 'string' }),
-    generation_revision: integer(),
-    generation_max_cost: bigint({ mode: 'number' }),
-    notification_sent_at: timestamp({ withTimezone: true, mode: 'string' }),
-  },
-  table => [
-    uniqueIndex('agent_briefing_reports_window').on(
-      table.kilo_user_id,
-      table.context_key,
-      table.local_date
-    ),
-    index('agent_briefing_reports_user_history').on(table.kilo_user_id, table.cutoff_at),
-    index('agent_briefing_reports_active').on(table.morning_end_at),
-    index('agent_briefing_reports_refresh_due').on(table.next_refresh_at),
-    index('agent_briefing_reports_charge_due').on(table.next_charge_check_at),
   ]
 );
 

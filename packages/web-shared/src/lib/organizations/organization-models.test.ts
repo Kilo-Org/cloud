@@ -579,4 +579,29 @@ describe('organization model producer publication', () => {
     const getAllowedProviders = mockAvailability.mock.calls[0][2];
     expect(getAllowedProviders?.('provider/ceiling-inference')).toBeUndefined();
   });
+
+  it('logs one aggregated record for a catalog wider than the allowed models', async () => {
+    mockCatalog = {
+      ...mockCatalog,
+      data: [
+        catalogModel('provider/allowed'),
+        catalogModel('provider/ceiling-inference'),
+        catalogModel('provider/ceiling-gateway'),
+        catalogModel('provider/ungranted-inference'),
+      ],
+    };
+    const debug = jest.spyOn(console, 'debug').mockImplementation(() => {});
+
+    const result = await resultFor();
+
+    expect(result.data.map(model => model.id)).toEqual([
+      'provider/allowed',
+      'provider/ceiling-inference',
+      'morph-byok/private',
+      'kilo-internal/private',
+    ]);
+    expect(mockInferenceProviderUserByok).toHaveBeenCalledTimes(2);
+    expect(debug).toHaveBeenCalledTimes(1);
+    expect(debug.mock.calls[0]?.[0]).toContain('1 of 2 models');
+  });
 });

@@ -22,5 +22,6 @@ export async function readPreferredProviderOrderConfig(): Promise<PreferredProvi
 export const getPreferredProviderOrderConfig = createCachedFetch(
   readPreferredProviderOrderConfig,
   60_000,
-  EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG
+  EMPTY_PREFERRED_PROVIDER_ORDER_CONFIG,
+  { name: 'preferredProviderOrderConfig' }
 );

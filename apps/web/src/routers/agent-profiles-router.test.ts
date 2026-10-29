@@ -826,6 +826,84 @@ describe('Agent Profiles Router', () => {
         expect(result.kiloCommands.map(command => command.id)).toEqual([second.id, first.id]);
       });
     });
+
+    describe('mcpServers', () => {
+      test('refuses a second server under a name the profile already uses', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'MCP Duplicate Test' });
+
+        const server = {
+          name: 'docs',
+          type: 'remote',
+          enabled: true,
+          config: { url: 'https://docs.example.com/mcp' },
+        } as const;
+
+        await caller.agentProfiles.createMcp({ profileId, server });
+
+        await expect(caller.agentProfiles.createMcp({ profileId, server })).rejects.toMatchObject({
+          code: 'CONFLICT',
+        });
+
+        const result = await caller.agentProfiles.get({ profileId });
+        expect(result.mcpServers.map(item => item.name)).toEqual(['docs']);
+      });
+
+      test('refuses a rename onto a name another server owns and keeps the old name', async () => {
+        const caller = await createCallerForUser(ownerUser.id);
+        const { id: profileId } = await caller.agentProfiles.create({ name: 'MCP Rename Test' });
+
+        const { id: mcpServerId } = await caller.agentProfiles.createMcp({
+          profileId,
+          server: {
+            name: 'docs',
+            type: 'remote',
+            enabled: true,
+            config: { url: 'https://docs.example.com/mcp' },
+          },
+        });
+        const { id: otherId } = await caller.agentProfiles.createMcp({
+          profileId,
+          server: {
+            name: 'search',
+            type: 'remote',
+            enabled: true,
+            config: { url: 'https://search.example.com/mcp' },
+          },
+        });
+
+        await expect(
+          caller.agentProfiles.updateMcp({
+            profileId,
+            mcpServerId,
+            server: {
+              name: 'search',
+              type: 'remote',
+              enabled: true,
+              config: { url: 'https://docs.example.com/mcp' },
+            },
+          })
+        ).rejects.toMatchObject({ code: 'CONFLICT' });
+
+        // Saving a server under its own name stays allowed.
+        await caller.agentProfiles.updateMcp({
+          profileId,
+          mcpServerId,
+          server: {
+            name: 'docs',
+            type: 'remote',
+            enabled: true,
+            config: { url: 'https://docs.example.com/v2' },
+          },
+        });
+
+        const result = await caller.agentProfiles.get({ profileId });
+        expect(result.mcpServers.map(item => [item.id, item.name])).toEqual([
+          [mcpServerId, 'docs'],
+          [otherId, 'search'],
+        ]);
+      });
+    });
   });
 
   describe('Organization Profiles', () => {

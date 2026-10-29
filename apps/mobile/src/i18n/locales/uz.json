@@ -3838,6 +3838,8 @@
     "skillSourceMarketplace": "Bozor",
     "skillsHint": "SKILL.md-ni joylashtiring va uning nomi kiritiladi; sudrab tashlamasdan telefoningizdan mahorat qo'shing.",
     "skillEditTitle": "Tahrirlash mahorati",
+    "skillEdit": "{{name}} koʻnikmasini tahrirlang",
+    "skillDelete": "{{name}} koʻnikmasini oʻchiring",
     "mcp": {
       "title": "MCP serverlari",
       "add": "MCP serverini qo'shing",
@@ -3867,7 +3869,8 @@
       "jsonInvalid": "To'g'ri JSON kiriting - satr qiymatlari ob'ekti",
       "jsonTooLarge": "Ko'pi bilan 50 ta yozuv, kalitlar 128 tagacha va qiymatlar 4096 belgigacha foydalaning",
       "timeoutInvalid": "Vaqt tugashi butun son millisekund bo'lishi kerak",
-      "edit": "MCP serverini tahrirlash",
+      "edit": "{{name}} MCP serverini tahrirlang",
+      "delete": "{{name}} MCP serverini oʻchiring",
       "saveFailed": "MCP serverini saqlab boʻlmadi",
       "deleteFailed": "MCP serverini oʻchirib boʻlmadi",
       "updateFailed": "MCP serverini yangilab boʻlmadi"
@@ -3905,7 +3908,8 @@
       "slugRequired": "Agent slug'ini kiriting",
       "slugInvalid": "Slug kichik ASCII harfi bilan boshlanishi va faqat kichik ASCII harflar, raqamlar va tirelardan foydalanishi, jami 50 ta belgidan oshmasligi kerak",
       "slugConflict": "Bu slug allaqachon ichki agent yoki bu profildagi boshqa agent tomonidan ishlatilgan",
-      "edit": "Agentni tahrirlash"
+      "edit": "{{name}} agentini tahrirlang",
+      "delete": "{{name}} agentini oʻchiring"
     },
     "slashCommands": {
       "title": "Slash buyruqlari",
@@ -3918,7 +3922,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS ni tushuntiring",
       "subtask": "Quyi vazifa sifatida ishga tushirish",
-      "edit": "Slash buyrug'ini tahrirlash",
+      "edit": "{{name}} slash buyrugʻini tahrirlang",
+      "delete": "{{name}} slash buyrugʻini oʻchiring",
+      "moveUp": "{{name}} slash buyrugʻini yuqoriga siljiting",
+      "moveDown": "{{name}} slash buyrugʻini pastga siljiting",
       "saveFailed": "Buyruq saqlanmadi",
       "deleteFailed": "Buyruq oʻchirilmadi",
       "nameRequired": "Buyruq nomini kiriting",
@@ -3950,6 +3957,7 @@
       "unbindFailed": "Reponi ajratib boʻlmadi"
     },
     "variablesDeleteFailed": "Oʻzgaruvchi oʻchirilmadi",
+    "deleteVariable": "{{key}} oʻzgaruvchisini oʻchiring",
     "deleteCommand": "{{position}}-raqamli buyruqni o‘chiring"
   },
   "credits": {

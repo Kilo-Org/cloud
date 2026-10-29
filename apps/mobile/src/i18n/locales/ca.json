@@ -3888,6 +3888,8 @@
     "skillSourceMarketplace": "Mercat",
     "skillsHint": "Enganxeu un SKILL.md i el seu nom s'omple; afegeix una habilitat des del teu telèfon sense arrossegar i deixar anar.",
     "skillEditTitle": "Edita l'habilitat",
+    "skillEdit": "Edita l'habilitat {{name}}",
+    "skillDelete": "Elimina l'habilitat {{name}}",
     "mcp": {
       "title": "Servidors MCP",
       "add": "Afegeix un servidor MCP",
@@ -3917,7 +3919,8 @@
       "jsonInvalid": "Introduïu JSON vàlid: un objecte de valors de cadena",
       "jsonTooLarge": "Utilitzeu com a màxim 50 entrades, claus de fins a 128 i valors de fins a 4096 caràcters",
       "timeoutInvalid": "El temps d'espera ha de ser un nombre sencer de mil·lisegons",
-      "edit": "Edita el servidor MCP",
+      "edit": "Edita el servidor MCP {{name}}",
+      "delete": "Elimina el servidor MCP {{name}}",
       "saveFailed": "No s'ha pogut desar el servidor MCP",
       "deleteFailed": "No s'ha pogut suprimir el servidor MCP",
       "updateFailed": "No s'ha pogut actualitzar el servidor MCP"
@@ -3955,7 +3958,8 @@
       "slugRequired": "Introduïu un llimac d'agent",
       "slugInvalid": "Slug ha de començar amb una lletra ASCII minúscula i utilitzar només lletres ASCII minúscules, dígits i guions, fins a 50 caràcters",
       "slugConflict": "Aquest slug ja l'utilitza un agent integrat o un altre agent d'aquest perfil",
-      "edit": "Edita l'agent"
+      "edit": "Edita l'agent {{name}}",
+      "delete": "Elimina l'agent {{name}}"
     },
     "slashCommands": {
       "title": "Comandes de barra",
@@ -3968,7 +3972,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explica $ARGUMENTS",
       "subtask": "Executar com a subtasca",
-      "edit": "Edita l'ordre de barra inclinada",
+      "edit": "Edita l'ordre {{name}}",
+      "delete": "Elimina l'ordre {{name}}",
+      "moveUp": "Mou l'ordre {{name}} amunt",
+      "moveDown": "Mou l'ordre {{name}} avall",
       "saveFailed": "No s'ha pogut desar l'ordre",
       "deleteFailed": "No s'ha pogut suprimir l'ordre",
       "nameRequired": "Introduïu un nom d'ordre",
@@ -4000,6 +4007,7 @@
       "unbindFailed": "No s'ha pogut desenllaçar el repo"
     },
     "variablesDeleteFailed": "No s'ha pogut suprimir la variable",
+    "deleteVariable": "Elimina la variable {{key}}",
     "deleteCommand": "Elimina l'ordre {{position}}"
   },
   "credits": {

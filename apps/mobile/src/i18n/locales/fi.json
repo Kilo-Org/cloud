@@ -3838,6 +3838,8 @@
     "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Liitä SKILL.md ja sen nimi täyttyy; lisää taito puhelimestasi ilman vetämistä ja pudotusta.",
     "skillEditTitle": "Muokkaa taitoa",
+    "skillEdit": "Muokkaa taitoa {{name}}",
+    "skillDelete": "Poista taito {{name}}",
     "mcp": {
       "title": "MCP-palvelimet",
       "add": "Lisää MCP-palvelin",
@@ -3867,7 +3869,8 @@
       "jsonInvalid": "Anna kelvollinen JSON — merkkijonoarvojen objekti",
       "jsonTooLarge": "Käytä enintään 50 merkintää, avaimet enintään 128 ja arvot enintään 4096 merkkiä",
       "timeoutInvalid": "Aikakatkaisun on oltava millisekuntien kokonaisluku",
-      "edit": "Muokkaa MCP-palvelinta",
+      "edit": "Muokkaa MCP-palvelinta {{name}}",
+      "delete": "Poista MCP-palvelin {{name}}",
       "saveFailed": "MCP-palvelinta ei voitu tallentaa",
       "deleteFailed": "MCP-palvelinta ei voitu poistaa",
       "updateFailed": "MCP-palvelinta ei voitu päivittää"
@@ -3905,7 +3908,8 @@
       "slugRequired": "Syötä agentin slug",
       "slugInvalid": "Slugin tulee alkaa pienellä ASCII-kirjaimella ja käyttää vain pieniä ASCII-kirjaimia, numeroita ja väliviivoja, enintään 50 merkkiä",
       "slugConflict": "Tuo slug on jo käytössä sisäänrakennetulla agentilla tai toisella agentilla tässä profiilissa",
-      "edit": "Muokkaa agenttia"
+      "edit": "Muokkaa agenttia {{name}}",
+      "delete": "Poista agentti {{name}}"
     },
     "slashCommands": {
       "title": "Vinoviivakomennot",
@@ -3918,7 +3922,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Selitä $ARGUMENTS",
       "subtask": "Suorita alitehtävänä",
-      "edit": "Muokkaa vinoviivakomentoa",
+      "edit": "Muokkaa vinoviivakomentoa {{name}}",
+      "delete": "Poista vinoviivakomento {{name}}",
+      "moveUp": "Siirrä vinoviivakomento {{name}} ylös",
+      "moveDown": "Siirrä vinoviivakomento {{name}} alas",
       "saveFailed": "Komentoa ei voitu tallentaa",
       "deleteFailed": "Komentoa ei voitu poistaa",
       "nameRequired": "Anna komennon nimi",
@@ -3950,6 +3957,7 @@
       "unbindFailed": "Koodivaraston sidontaa ei voitu purkaa"
     },
     "variablesDeleteFailed": "Muuttujaa ei voitu poistaa",
+    "deleteVariable": "Poista muuttuja {{key}}",
     "deleteCommand": "Poista komento {{position}}"
   },
   "credits": {

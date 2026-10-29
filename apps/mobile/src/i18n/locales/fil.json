@@ -3838,6 +3838,8 @@
     "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Mag-paste ng SKILL.md at mapunan ang pangalan nito; magdagdag ng kasanayan mula sa iyong telepono nang walang drag at drop.",
     "skillEditTitle": "Mag-edit ng kasanayan",
+    "skillEdit": "I-edit ang kasanayan {{name}}",
+    "skillDelete": "Burahin ang kasanayan {{name}}",
     "mcp": {
       "title": "Mga MCP server",
       "add": "Magdagdag ng MCP server",
@@ -3867,7 +3869,8 @@
       "jsonInvalid": "Maglagay ng wastong JSON — isang bagay ng mga halaga ng string",
       "jsonTooLarge": "Gumamit ng hindi hihigit sa 50 entry, mga key hanggang 128 at mga value hanggang 4096 character",
       "timeoutInvalid": "Ang timeout ay dapat na isang buong bilang ng mga millisecond",
-      "edit": "I-edit ang MCP server",
+      "edit": "I-edit ang MCP server {{name}}",
+      "delete": "Burahin ang MCP server {{name}}",
       "saveFailed": "Hindi ma-save ang MCP server",
       "deleteFailed": "Hindi ma-delete ang MCP server",
       "updateFailed": "Hindi ma-update ang MCP server"
@@ -3905,7 +3908,8 @@
       "slugRequired": "Maglagay ng agent slug",
       "slugInvalid": "Ang slug ay dapat magsimula sa isang maliliit na ASCII na titik at gumamit lamang ng maliliit na ASCII na titik, digit, at gitling, hanggang 50 na character",
       "slugConflict": "Ginagamit na ng isang built-in na agent o iba pang agent sa profile na ito ang slug na iyon",
-      "edit": "I-edit ang ahente"
+      "edit": "I-edit ang ahente {{name}}",
+      "delete": "Burahin ang ahente {{name}}"
     },
     "slashCommands": {
       "title": "Mga utos ng slash",
@@ -3918,7 +3922,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Ipaliwanag ang $ARGUMENTS",
       "subtask": "Patakbuhin bilang subtask",
-      "edit": "I-edit ang slash command",
+      "edit": "I-edit ang utos ng slash {{name}}",
+      "delete": "Burahin ang utos ng slash {{name}}",
+      "moveUp": "Ilipat ang utos ng slash {{name}} pataas",
+      "moveDown": "Ilipat ang utos ng slash {{name}} pababa",
       "saveFailed": "Hindi ma-save ang command",
       "deleteFailed": "Hindi ma-delete ang command",
       "nameRequired": "Maglagay ng command name",
@@ -3950,6 +3957,7 @@
       "unbindFailed": "Hindi ma-unbind ang repo"
     },
     "variablesDeleteFailed": "Hindi ma-delete ang variable",
+    "deleteVariable": "Burahin ang variable {{key}}",
     "deleteCommand": "Burahin ang utos {{position}}"
   },
   "credits": {

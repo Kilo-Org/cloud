@@ -3988,6 +3988,8 @@
     "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Pasta SKILL.md u isimha jimla; żid ħila mit-telefon tiegħek mingħajr drag and drop.",
     "skillEditTitle": "Edit ħiliet",
+    "skillEdit": "Edit il-ħila {{name}}",
+    "skillDelete": "Ħassar il-ħila {{name}}",
     "mcp": {
       "title": "servers MCP",
       "add": "Żid server MCP",
@@ -4017,7 +4019,8 @@
       "jsonInvalid": "Daħħal JSON validu — oġġett ta' valuri ta' string",
       "jsonTooLarge": "Uża mhux aktar minn 50 entrata, ewlenin sa 128 u valuri sa 4096 karattru",
       "timeoutInvalid": "Timeout għandu jkun numru sħiħ ta' millisekondi",
-      "edit": "Editja server MCP",
+      "edit": "Edit is-server MCP {{name}}",
+      "delete": "Ħassar is-server MCP {{name}}",
       "saveFailed": "Ma setax isalva server MCP",
       "deleteFailed": "Ma setax jħassar is-server MCP",
       "updateFailed": "Ma setax jaġġorna s-server MCP"
@@ -4055,7 +4058,8 @@
       "slugRequired": "Daħħal aġent slug",
       "slugInvalid": "Slug għandu jibda b'ittra żgħira ASCII u juża biss ittri żgħar ASCII, ċifri u sings, sa 50 karattru",
       "slugConflict": "Dak is-slug diġà qed jintuża minn aġent integrat jew aġent ieħor f'dan il-profil",
-      "edit": "Editja l-aġent"
+      "edit": "Edit l-aġent {{name}}",
+      "delete": "Ħassar l-aġent {{name}}"
     },
     "slashCommands": {
       "title": "Slash jikkmanda",
@@ -4068,7 +4072,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Spjega $ARGUMENTS",
       "subtask": "Mexxi bħala subtask",
-      "edit": "Editja kmand slash",
+      "edit": "Edit il-kmand slash {{name}}",
+      "delete": "Ħassar il-kmand slash {{name}}",
+      "moveUp": "Mexxi l-kmand slash {{name}} 'l fuq",
+      "moveDown": "Mexxi l-kmand slash {{name}} 'l isfel",
       "saveFailed": "Ma setax isalva l-kmand",
       "deleteFailed": "Ma setax jħassar il-kmand",
       "nameRequired": "Daħħal isem tal-kmand",
@@ -4100,6 +4107,7 @@
       "unbindFailed": "Ma setgħetx tħoll repo"
     },
     "variablesDeleteFailed": "Ma setax jħassar il-varjabbli",
+    "deleteVariable": "Ħassar il-varjabbli {{key}}",
     "deleteCommand": "Ħassar l-kmand {{position}}"
   },
   "credits": {

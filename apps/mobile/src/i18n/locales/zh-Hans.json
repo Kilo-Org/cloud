@@ -3838,6 +3838,8 @@
     "skillSourceMarketplace": "市场",
     "skillsHint": "粘贴一个SKILL.md并填写其名称；从手机添加技能，无需拖放。",
     "skillEditTitle": "编辑技能",
+    "skillEdit": "编辑技能 {{name}}",
+    "skillDelete": "删除技能 {{name}}",
     "mcp": {
       "title": "MCP 服务器",
       "add": "添加 MCP 服务器",
@@ -3867,7 +3869,8 @@
       "jsonInvalid": "输入有效的 JSON — 字符串值的对象",
       "jsonTooLarge": "最多使用 50 个条目，键最多 128 个字符，值最多 4096 个字符",
       "timeoutInvalid": "超时必须是整数毫秒",
-      "edit": "编辑 MCP 服务器",
+      "edit": "编辑 MCP 服务器 {{name}}",
+      "delete": "删除 MCP 服务器 {{name}}",
       "saveFailed": "无法保存 MCP 服务器",
       "deleteFailed": "无法删除 MCP 服务器",
       "updateFailed": "无法更新 MCP 服务器"
@@ -3905,7 +3908,8 @@
       "slugRequired": "输入代理标识符",
       "slugInvalid": "代理标识符必须以 ASCII 小写字母开头，只能使用 ASCII 小写字母、数字和连字符，最多 50 个字符",
       "slugConflict": "该代理标识符已被内置代理或此配置文件中的另一个代理使用",
-      "edit": "编辑代理"
+      "edit": "编辑代理 {{name}}",
+      "delete": "删除代理 {{name}}"
     },
     "slashCommands": {
       "title": "斜杠命令",
@@ -3918,7 +3922,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "解释$ARGUMENTS",
       "subtask": "作为子任务运行",
-      "edit": "编辑斜杠命令",
+      "edit": "编辑斜杠命令 {{name}}",
+      "delete": "删除斜杠命令 {{name}}",
+      "moveUp": "上移斜杠命令 {{name}}",
+      "moveDown": "下移斜杠命令 {{name}}",
       "saveFailed": "无法保存命令",
       "deleteFailed": "无法删除命令",
       "nameRequired": "输入命令名称",
@@ -3950,6 +3957,7 @@
       "unbindFailed": "无法解除仓库绑定"
     },
     "variablesDeleteFailed": "无法删除变量",
+    "deleteVariable": "删除变量 {{key}}",
     "deleteCommand": "删除命令 {{position}}"
   },
   "credits": {

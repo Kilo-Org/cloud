@@ -3838,6 +3838,8 @@
     "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Dán SKILL.md và điền tên của nó vào; thêm kỹ năng từ điện thoại của bạn mà không cần kéo và thả.",
     "skillEditTitle": "Chỉnh sửa kỹ năng",
+    "skillEdit": "Chỉnh sửa kỹ năng {{name}}",
+    "skillDelete": "Xóa kỹ năng {{name}}",
     "mcp": {
       "title": "máy chủ MCP",
       "add": "Thêm máy chủ MCP",
@@ -3867,7 +3869,8 @@
       "jsonInvalid": "Nhập JSON hợp lệ - một đối tượng có giá trị chuỗi",
       "jsonTooLarge": "Dùng tối đa 50 mục, khóa tối đa 128 và giá trị tối đa 4096 ký tự",
       "timeoutInvalid": "Thời gian chờ phải là số nguyên mili giây",
-      "edit": "Chỉnh sửa máy chủ MCP",
+      "edit": "Chỉnh sửa máy chủ MCP {{name}}",
+      "delete": "Xóa máy chủ MCP {{name}}",
       "saveFailed": "Không thể lưu máy chủ MCP",
       "deleteFailed": "Không thể xóa máy chủ MCP",
       "updateFailed": "Không thể cập nhật máy chủ MCP"
@@ -3905,7 +3908,8 @@
       "slugRequired": "Nhập sên đại lý",
       "slugInvalid": "Slug phải bắt đầu bằng một chữ cái ASCII viết thường và chỉ sử dụng chữ cái ASCII viết thường, chữ số và dấu gạch ngang, tối đa 50 ký tự",
       "slugConflict": "Slug đó đã được một tác nhân tích hợp sẵn hoặc tác nhân khác trong hồ sơ này sử dụng",
-      "edit": "Chỉnh sửa đại lý"
+      "edit": "Chỉnh sửa đại lý {{name}}",
+      "delete": "Xóa đại lý {{name}}"
     },
     "slashCommands": {
       "title": "Lệnh gạch chéo",
@@ -3918,7 +3922,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Giải thích $ARGUMENTS",
       "subtask": "Chạy dưới dạng nhiệm vụ phụ",
-      "edit": "Chỉnh sửa lệnh gạch chéo",
+      "edit": "Chỉnh sửa lệnh {{name}}",
+      "delete": "Xóa lệnh {{name}}",
+      "moveUp": "Di chuyển lệnh {{name}} lên",
+      "moveDown": "Di chuyển lệnh {{name}} xuống",
       "saveFailed": "Không thể lưu lệnh",
       "deleteFailed": "Không thể xóa lệnh",
       "nameRequired": "Nhập tên lệnh",
@@ -3950,6 +3957,7 @@
       "unbindFailed": "Không thể hủy liên kết repo"
     },
     "variablesDeleteFailed": "Không thể xóa biến",
+    "deleteVariable": "Xóa biến {{key}}",
     "deleteCommand": "Xóa lệnh {{position}}"
   },
   "credits": {

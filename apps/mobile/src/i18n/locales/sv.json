@@ -3838,6 +3838,8 @@
     "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Klistra in en SKILL.md och dess namn fylls i; lägg till en färdighet från din telefon utan att dra och släppa.",
     "skillEditTitle": "Redigera färdighet",
+    "skillEdit": "Redigera färdighet {{name}}",
+    "skillDelete": "Ta bort färdighet {{name}}",
     "mcp": {
       "title": "MCP-servrar",
       "add": "Lägg till MCP-server",
@@ -3867,7 +3869,8 @@
       "jsonInvalid": "Ange giltig JSON — ett objekt med strängvärden",
       "jsonTooLarge": "Använd högst 50 poster, nycklar upp till 128 och värden upp till 4096 tecken",
       "timeoutInvalid": "Timeout måste vara ett helt antal millisekunder",
-      "edit": "Redigera MCP-server",
+      "edit": "Redigera MCP-server {{name}}",
+      "delete": "Ta bort MCP-server {{name}}",
       "saveFailed": "Det gick inte att spara MCP-servern",
       "deleteFailed": "Det gick inte att ta bort MCP-servern",
       "updateFailed": "Det gick inte att uppdatera MCP-servern"
@@ -3905,7 +3908,8 @@
       "slugRequired": "Ange agentens slug",
       "slugInvalid": "Slug måste börja med en liten ASCII-bokstav och endast använda små ASCII-bokstäver, siffror och bindestreck, upp till 50 tecken",
       "slugConflict": "Den slugen används redan av en inbyggd agent eller en annan agent i den här profilen",
-      "edit": "Redigera agent"
+      "edit": "Redigera agent {{name}}",
+      "delete": "Ta bort agent {{name}}"
     },
     "slashCommands": {
       "title": "Snedstreckskommandon",
@@ -3918,7 +3922,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Förklara $ARGUMENTS",
       "subtask": "Kör som deluppgift",
-      "edit": "Redigera snedstreckskommando",
+      "edit": "Redigera kommando {{name}}",
+      "delete": "Ta bort kommando {{name}}",
+      "moveUp": "Flytta kommando {{name}} uppåt",
+      "moveDown": "Flytta kommando {{name}} nedåt",
       "saveFailed": "Det gick inte att spara kommandot",
       "deleteFailed": "Det gick inte att ta bort kommandot",
       "nameRequired": "Ange ett kommandonamn",
@@ -3950,6 +3957,7 @@
       "unbindFailed": "Det gick inte att koppla från kodarkivet"
     },
     "variablesDeleteFailed": "Det gick inte att ta bort variabeln",
+    "deleteVariable": "Ta bort variabel {{key}}",
     "deleteCommand": "Ta bort kommando {{position}}"
   },
   "credits": {

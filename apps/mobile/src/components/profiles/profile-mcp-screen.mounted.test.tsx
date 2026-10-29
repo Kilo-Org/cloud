@@ -164,7 +164,7 @@ describe('ProfileMcpScreen', () => {
     h.mutations.updateMcp.mutateAsync.mockResolvedValue({ success: true });
 
     const { renderer, unmount } = await mountScreen();
-    pressPressable(renderer.root, 'Edit MCP server');
+    pressPressable(renderer.root, 'Edit MCP server docs');
 
     expect(findField(renderer.root, 'Server name').props.defaultValue).toBe('docs');
     expect(findField(renderer.root, 'Command line').props.defaultValue).toBe('npx @example/mcp');
@@ -198,7 +198,7 @@ describe('ProfileMcpScreen', () => {
     h.query.isPending = false;
     h.mutations.updateMcp.mutateAsync.mockResolvedValue({ success: true });
     const { renderer, unmount } = await mountScreen();
-    pressPressable(renderer.root, 'Edit MCP server');
+    pressPressable(renderer.root, 'Edit MCP server docs');
     expect(findAll(renderer.root, 'SegmentedControl')).toHaveLength(0);
     pressSheetDone(renderer.root);
     await waitFor(() => h.mutations.updateMcp.mutateAsync.mock.calls.length > 0);
@@ -332,7 +332,7 @@ describe('ProfileMcpScreen', () => {
     h.mutations.deleteMcp.mutateAsync.mockResolvedValue({ success: true });
 
     const { renderer, unmount } = await mountScreen();
-    pressPressable(renderer.root, 'Delete');
+    pressPressable(renderer.root, 'Delete MCP server docs');
     await act(async () => {
       confirmRequest(h.confirm);
       await Promise.resolve();
@@ -353,7 +353,7 @@ describe('ProfileMcpScreen', () => {
     h.mutations.deleteMcp.mutateAsync.mockRejectedValue(new Error(' '));
 
     const { renderer, unmount } = await mountScreen();
-    pressPressable(renderer.root, 'Delete');
+    pressPressable(renderer.root, 'Delete MCP server docs');
     await act(async () => {
       confirmRequest(h.confirm);
       await Promise.resolve();

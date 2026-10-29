@@ -3938,6 +3938,8 @@
     "skillSourceMarketplace": "Parduotuvė",
     "skillsHint": "Įklijuokite SKILL.md ir užpildysite jo pavadinimą; pridėkite įgūdžių iš savo telefono nevilkdami ir numesdami.",
     "skillEditTitle": "Redaguoti įgūdžius",
+    "skillEdit": "Redaguoti įgūdį {{name}}",
+    "skillDelete": "Ištrinti įgūdį {{name}}",
     "mcp": {
       "title": "MCP serveriai",
       "add": "Pridėti MCP serverį",
@@ -3967,7 +3969,8 @@
       "jsonInvalid": "Įveskite galiojantį JSON – eilutės reikšmių objektą",
       "jsonTooLarge": "Naudokite ne daugiau kaip 50 įrašų, raktai iki 128 ir reikšmės iki 4096 simbolių",
       "timeoutInvalid": "Skirtasis laikas turi būti sveikas milisekundžių skaičius",
-      "edit": "Redaguoti MCP serverį",
+      "edit": "Redaguoti MCP serverį {{name}}",
+      "delete": "Ištrinti MCP serverį {{name}}",
       "saveFailed": "Nepavyko išsaugoti MCP serverio",
       "deleteFailed": "Nepavyko ištrinti MCP serverio",
       "updateFailed": "Nepavyko atnaujinti MCP serverio"
@@ -4005,7 +4008,8 @@
       "slugRequired": "Įveskite agento šliužą",
       "slugInvalid": "Slug turi prasidėti mažąja ASCII raide ir naudoti tik mažąsias ASCII raides, skaitmenis ir brūkšnius, iki 50 simbolių",
       "slugConflict": "Tą slug jau naudoja įmontuotas agentas arba kitas agentas šiame profilyje",
-      "edit": "Redaguoti agentą"
+      "edit": "Redaguoti agentą {{name}}",
+      "delete": "Ištrinti agentą {{name}}"
     },
     "slashCommands": {
       "title": "Pasvirosios komandos",
@@ -4018,7 +4022,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Paaiškinkite $ARGUMENTS",
       "subtask": "Vykdyti kaip papildomą užduotį",
-      "edit": "Redaguoti pasvirojo brūkšnio komandą",
+      "edit": "Redaguoti pasvirąją komandą {{name}}",
+      "delete": "Ištrinti pasvirąją komandą {{name}}",
+      "moveUp": "Perkelti pasvirąją komandą {{name}} aukštyn",
+      "moveDown": "Perkelti pasvirąją komandą {{name}} žemyn",
       "saveFailed": "Nepavyko išsaugoti komandos",
       "deleteFailed": "Nepavyko ištrinti komandos",
       "nameRequired": "Įveskite komandos pavadinimą",
@@ -4050,6 +4057,7 @@
       "unbindFailed": "Nepavyko atsieti atpirkimo sandorio"
     },
     "variablesDeleteFailed": "Nepavyko ištrinti kintamojo",
+    "deleteVariable": "Ištrinti kintamąjį {{key}}",
     "deleteCommand": "Ištrinti komandą {{position}}"
   },
   "credits": {

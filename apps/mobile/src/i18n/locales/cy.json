@@ -4038,6 +4038,8 @@
     "skillSourceMarketplace": "Marchnad",
     "skillsHint": "Gludwch SKILL.md ac mae ei enw yn llenwi; ychwanegu sgil o'ch ffôn heb lusgo a gollwng.",
     "skillEditTitle": "Sgil golygu",
+    "skillEdit": "Golygu sgil {{name}}",
+    "skillDelete": "Dileu sgil {{name}}",
     "mcp": {
       "title": "gweinyddwyr MCP",
       "add": "Ychwanegu gweinydd MCP",
@@ -4067,7 +4069,8 @@
       "jsonInvalid": "Rhowch JSON dilys - gwrthrych o werthoedd llinynnol",
       "jsonTooLarge": "Defnyddiwch 50 cofnod ar y mwyaf, allweddi hyd at 128 a gwerthoedd hyd at 4096 nod",
       "timeoutInvalid": "Rhaid i'r terfyn amser fod yn nifer gyfan o filieiliadau",
-      "edit": "Golygu gweinydd MCP",
+      "edit": "Golygu gweinydd MCP {{name}}",
+      "delete": "Dileu gweinydd MCP {{name}}",
       "saveFailed": "Methu â chadw gweinydd MCP",
       "deleteFailed": "Methu â dileu gweinydd MCP",
       "updateFailed": "Methu â ddiweddaru gweinydd MCP"
@@ -4105,7 +4108,8 @@
       "slugRequired": "Rhowch wlithen asiant",
       "slugInvalid": "Rhaid i wlithen ddechrau gyda llythyren fach ASCII a defnyddio llythrennau bach ASCII, digidau a llinellau toriad yn unig, hyd at 50 nod",
       "slugConflict": "Mae'r slug hwnnw eisoes yn cael ei ddefnyddio gan asiant adeiledig neu asiant arall yn y proffil hwn",
-      "edit": "Golygu asiant"
+      "edit": "Golygu asiant {{name}}",
+      "delete": "Dileu asiant {{name}}"
     },
     "slashCommands": {
       "title": "Gorchmynion slaes",
@@ -4118,7 +4122,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Eglurwch $ARGUMENTS",
       "subtask": "Rhedeg fel is-dasg",
-      "edit": "Golygu gorchymyn slaes",
+      "edit": "Golygu gorchymyn slaes {{name}}",
+      "delete": "Dileu gorchymyn slaes {{name}}",
+      "moveUp": "Symud gorchymyn slaes {{name}} i fyny",
+      "moveDown": "Symud gorchymyn slaes {{name}} i lawr",
       "saveFailed": "Ni fu modd cadw'r gorchymyn",
       "deleteFailed": "Ni fu modd dileu'r gorchymyn",
       "nameRequired": "Rhowch enw gorchymyn",
@@ -4150,6 +4157,7 @@
       "unbindFailed": "Ni fu modd dadrwymo repo"
     },
     "variablesDeleteFailed": "Ni fu modd dileu'r newidyn",
+    "deleteVariable": "Dileu newidyn {{key}}",
     "deleteCommand": "Dileu gorchymyn {{position}}"
   },
   "credits": {

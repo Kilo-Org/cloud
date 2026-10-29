@@ -3938,6 +3938,8 @@
     "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Vložte SKILL.md a jeho název se vyplní; přidejte dovednost z telefonu bez přetahování.",
     "skillEditTitle": "Upravit dovednost",
+    "skillEdit": "Upravit dovednost {{name}}",
+    "skillDelete": "Smazat dovednost {{name}}",
     "mcp": {
       "title": "MCP servery",
       "add": "Přidat MCP server",
@@ -3967,7 +3969,8 @@
       "jsonInvalid": "Zadejte platný JSON — objekt řetězcových hodnot",
       "jsonTooLarge": "Použijte nejvýše 50 položek, klíče do 128 a hodnoty do 4096 znaků",
       "timeoutInvalid": "Časový limit musí být celý počet milisekund",
-      "edit": "Upravit server MCP",
+      "edit": "Upravit server MCP {{name}}",
+      "delete": "Smazat server MCP {{name}}",
       "saveFailed": "Server MCP se nepodařilo uložit",
       "deleteFailed": "Server MCP se nepodařilo smazat",
       "updateFailed": "Server MCP se nepodařilo aktualizovat"
@@ -4005,7 +4008,8 @@
       "slugRequired": "Zadejte agenta slimáka",
       "slugInvalid": "Slug musí začínat malým písmenem ASCII a používat pouze malá písmena ASCII, číslice a pomlčky, maximálně 50 znaků",
       "slugConflict": "Tento slug už používá vestavěný agent nebo jiný agent v tomto profilu",
-      "edit": "Upravit agenta"
+      "edit": "Upravit agenta {{name}}",
+      "delete": "Smazat agenta {{name}}"
     },
     "slashCommands": {
       "title": "Příkazy lomítka",
@@ -4018,7 +4022,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Vysvětlete $ARGUMENTS",
       "subtask": "Spustit jako dílčí úkol",
-      "edit": "Příkaz upravit lomítko",
+      "edit": "Upravit příkaz lomítka {{name}}",
+      "delete": "Smazat příkaz lomítka {{name}}",
+      "moveUp": "Přesunout příkaz {{name}} nahoru",
+      "moveDown": "Přesunout příkaz {{name}} dolů",
       "saveFailed": "Příkaz se nepodařilo uložit",
       "deleteFailed": "Příkaz se nepodařilo smazat",
       "nameRequired": "Zadejte název příkazu",
@@ -4050,6 +4057,7 @@
       "unbindFailed": "Repo se nepodařilo zrušit"
     },
     "variablesDeleteFailed": "Proměnnou se nepodařilo smazat",
+    "deleteVariable": "Smazat proměnnou {{key}}",
     "deleteCommand": "Smazat příkaz {{position}}"
   },
   "credits": {

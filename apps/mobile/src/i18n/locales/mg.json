@@ -3838,6 +3838,8 @@
     "skillSourceMarketplace": "Tsena",
     "skillsHint": "Apetaho ny SKILL.md ary fenoy ny anarany; ampio fahaiza-manao avy amin'ny findainao tsy misy drag and drop.",
     "skillEditTitle": "Ahitsio fahaizana",
+    "skillEdit": "Ahitsio fahaizana {{name}}",
+    "skillDelete": "Fafao fahaizana {{name}}",
     "mcp": {
       "title": "Mpizara MCP",
       "add": "Ampio mpizara MCP",
@@ -3867,7 +3869,8 @@
       "jsonInvalid": "Ampidiro JSON manan-kery - zavatra misy soatoavin'ny tady",
       "jsonTooLarge": "Ampiasao farafahabetsany 50 fidirana, fanalahidy hatramin'ny 128 ary sanda hatramin'ny 4096 tarehintsoratra",
       "timeoutInvalid": "Tokony ho milisegondra iray manontolo ny fotoana fiatoana",
-      "edit": "Ahitsio MCP server",
+      "edit": "Ahitsio mpizara MCP {{name}}",
+      "delete": "Fafao mpizara MCP {{name}}",
       "saveFailed": "Tsy afaka nitahiry mpizara MCP",
       "deleteFailed": "Tsy afaka namafa mpizara MCP",
       "updateFailed": "Tsy afaka nanavao mpizara MCP"
@@ -3905,7 +3908,8 @@
       "slugRequired": "Ampidiro ny slug mpandraharaha",
       "slugInvalid": "Ny slug dia tsy maintsy manomboka amin'ny litera kely ASCII ary tsy mampiasa afa-tsy litera kely ASCII, isa ary tsipiho, hatramin'ny 50 tarehintsoratra",
       "slugConflict": "Etra io slug io efa ampiasain'ny azy ao anatiny na azy hafa amin'ity profil ity",
-      "edit": "Ahitsio mpandraharaha"
+      "edit": "Ahitsio mpandraharaha {{name}}",
+      "delete": "Fafao mpandraharaha {{name}}"
     },
     "slashCommands": {
       "title": "baiko slash",
@@ -3918,7 +3922,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Hazavao ny $ARGUMENTS",
       "subtask": "Mihazakazaka toy ny subtask",
-      "edit": "Ahitsio slash command",
+      "edit": "Ahitsio baiko slash {{name}}",
+      "delete": "Fafao baiko slash {{name}}",
+      "moveUp": "Afindra baiko slash {{name}} miakatra",
+      "moveDown": "Afindra baiko slash {{name}} midina",
       "saveFailed": "Tsy afaka mitahiry baiko",
       "deleteFailed": "Tsy afaka namafa baiko",
       "nameRequired": "Ampidiro anarana baiko",
@@ -3950,6 +3957,7 @@
       "unbindFailed": "Tsy afaka namaha ny repo"
     },
     "variablesDeleteFailed": "Tsy afaka namafa ny ova",
+    "deleteVariable": "Fafao miovaova {{key}}",
     "deleteCommand": "Fafao baiko {{position}}"
   },
   "credits": {

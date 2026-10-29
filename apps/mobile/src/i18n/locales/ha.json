@@ -3838,6 +3838,8 @@
     "skillSourceMarketplace": "Kasuwa",
     "skillsHint": "Manna SKILL.md kuma sunansa ya cika; ƙara fasaha daga wayarka ba tare da ja da sauke ba.",
     "skillEditTitle": "Gyara fasaha",
+    "skillEdit": "Gyara fasaha {{name}}",
+    "skillDelete": "Share fasaha {{name}}",
     "mcp": {
       "title": "Sabar MCP",
       "add": "Ƙara uwar garken MCP",
@@ -3867,7 +3869,8 @@
       "jsonInvalid": "Shigar da ingantacciyar JSON - abu na ƙimar kirtani",
       "jsonTooLarge": "Yi amfani da bai fi shigarwa 50 ba, maɓallai har 128 da ƙimomi har haruffa 4096",
       "timeoutInvalid": "Ƙayyadaddun lokaci dole ne ya zama cikakken adadin millise seconds",
-      "edit": "Shirya uwar garken MCP",
+      "edit": "Gyara uwar garken MCP {{name}}",
+      "delete": "Share uwar garken MCP {{name}}",
       "saveFailed": "An kasa ajiye uwar garken MCP",
       "deleteFailed": "An kasa share uwar garken MCP",
       "updateFailed": "An kasa sabunta uwar garken MCP"
@@ -3905,7 +3908,8 @@
       "slugRequired": "Shigar da slug wakili",
       "slugInvalid": "Slug dole ne ya fara da ƙaramin harfin ASCII kuma ya yi amfani da ƙananun haruffan ASCII, lambobi, da dashes kawai, har zuwa haruffa 50",
       "slugConflict": "Wannan slug riga wani ginannen wakili ko wata wakili a cikin wannan bayani ke amfani da shi",
-      "edit": "Wakilin gyara"
+      "edit": "Gyara wakili {{name}}",
+      "delete": "Share wakili {{name}}"
     },
     "slashCommands": {
       "title": "Slash umarni",
@@ -3918,7 +3922,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Yi bayani $ARGUMENTS",
       "subtask": "Gudu azaman ƙaramin aiki",
-      "edit": "Gyara umarnin slash",
+      "edit": "Gyara umarni {{name}}",
+      "delete": "Share umarni {{name}}",
+      "moveUp": "Matsar da umarni {{name}} sama",
+      "moveDown": "Matsar da umarni {{name}} ƙasa",
       "saveFailed": "An kasa ajiye umarni",
       "deleteFailed": "An kasa share umarni",
       "nameRequired": "Shigar da sunan umarni",
@@ -3950,6 +3957,7 @@
       "unbindFailed": "An kasa kwance repo"
     },
     "variablesDeleteFailed": "An kasa share canji",
+    "deleteVariable": "Share canji {{key}}",
     "deleteCommand": "Share umarni {{position}}"
   },
   "credits": {

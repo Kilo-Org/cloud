@@ -3838,6 +3838,8 @@
     "skillSourceMarketplace": "Merkatua",
     "skillsHint": "Itsatsi SKILL.md bat eta bere izena beteko da; gehitu trebetasun bat telefonotik arrastatu eta jaregin gabe.",
     "skillEditTitle": "Editatu trebetasuna",
+    "skillEdit": "Editatu trebetasuna {{name}}",
+    "skillDelete": "Ezabatu trebetasuna {{name}}",
     "mcp": {
       "title": "MCP zerbitzariak",
       "add": "Gehitu MCP zerbitzaria",
@@ -3867,7 +3869,8 @@
       "jsonInvalid": "Sartu baliozko JSON - kate-balioen objektua",
       "jsonTooLarge": "Erabili gehienez 50 sarrera, gakoak 128 arte eta balioak 4096 karaktere arte",
       "timeoutInvalid": "Denbora-mugak milisegundo kopuru osoa izan behar du",
-      "edit": "Editatu MCP zerbitzaria",
+      "edit": "Editatu MCP zerbitzaria {{name}}",
+      "delete": "Ezabatu MCP zerbitzaria {{name}}",
       "saveFailed": "Ezin izan da MCP zerbitzaria gorde",
       "deleteFailed": "Ezin izan da MCP zerbitzaria ezabatu",
       "updateFailed": "Ezin izan da MCP zerbitzaria eguneratu"
@@ -3905,7 +3908,8 @@
       "slugRequired": "Sartu agente bare bat",
       "slugInvalid": "Slug-ek ASCII letra xehe batekin hasi behar du eta ASCII letra xeheak, zifrak eta marratxoak soilik erabili behar ditu, gehienez 50 karaktere",
       "slugConflict": "Slug hori dagoeneko erabiltzen du agenta integratu batek edo profil honetako beste agente batek",
-      "edit": "Editatu agentea"
+      "edit": "Editatu agentea {{name}}",
+      "delete": "Ezabatu agentea {{name}}"
     },
     "slashCommands": {
       "title": "Barra komandoak",
@@ -3918,7 +3922,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Azaldu $ARGUMENTS",
       "subtask": "Exekutatu azpizeregin gisa",
-      "edit": "Editatu barra komandoa",
+      "edit": "Editatu komandoa {{name}}",
+      "delete": "Ezabatu komandoa {{name}}",
+      "moveUp": "Mugitu {{name}} komandoa gora",
+      "moveDown": "Mugitu {{name}} komandoa behera",
       "saveFailed": "Ezin izan da gorde komandoa",
       "deleteFailed": "Ezin izan da komandoa ezabatu",
       "nameRequired": "Sartu komando-izen bat",
@@ -3950,6 +3957,7 @@
       "unbindFailed": "Ezin izan da biltegia deslotu"
     },
     "variablesDeleteFailed": "Ezin izan da aldagaia ezabatu",
+    "deleteVariable": "Ezabatu aldagaia {{key}}",
     "deleteCommand": "Ezabatu {{position}}. komandoa"
   },
   "credits": {

@@ -3938,6 +3938,8 @@
     "skillSourceMarketplace": "Tržnica",
     "skillsHint": "Prilepite SKILL.md in njegovo ime se izpolni; dodajte veščino iz telefona brez povleci in spusti.",
     "skillEditTitle": "Spretnost urejanja",
+    "skillEdit": "Uredi spretnost {{name}}",
+    "skillDelete": "Izbriši spretnost {{name}}",
     "mcp": {
       "title": "MCP strežniki",
       "add": "Dodajte strežnik MCP",
@@ -3967,7 +3969,8 @@
       "jsonInvalid": "Vnesite veljaven JSON — objekt vrednosti niza",
       "jsonTooLarge": "Uporabite največ 50 vnosov, ključi do 128 in vrednosti do 4096 znakov",
       "timeoutInvalid": "Časovna omejitev mora biti celo število milisekund",
-      "edit": "Uredi strežnik MCP",
+      "edit": "Uredi strežnik MCP {{name}}",
+      "delete": "Izbriši strežnik MCP {{name}}",
       "saveFailed": "Strežnika MCP ni bilo mogoče shraniti",
       "deleteFailed": "Strežnika MCP ni bilo mogoče izbrisati",
       "updateFailed": "Strežnika MCP ni bilo mogoče posodobiti"
@@ -4005,7 +4008,8 @@
       "slugRequired": "Vnesite polža agenta",
       "slugInvalid": "Polž se mora začeti z malo ASCII črko in uporabljati samo male ASCII črke, številke in pomišljaje, največ 50 znakov",
       "slugConflict": "Ta slug že uporablja vgrajeni agent ali drug agent v tem profilu",
-      "edit": "Uredi agenta"
+      "edit": "Uredi agenta {{name}}",
+      "delete": "Izbriši agenta {{name}}"
     },
     "slashCommands": {
       "title": "Ukazi za poševnico",
@@ -4018,7 +4022,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Pojasnite $ARGUMENTS",
       "subtask": "Zaženi kot podopravilo",
-      "edit": "Uredi ukaz za poševnico",
+      "edit": "Uredi ukaz za poševnico {{name}}",
+      "delete": "Izbriši ukaz za poševnico {{name}}",
+      "moveUp": "Premakni ukaz za poševnico {{name}} navzgor",
+      "moveDown": "Premakni ukaz za poševnico {{name}} navzdol",
       "saveFailed": "Ukaza ni bilo mogoče shraniti",
       "deleteFailed": "Ukaza ni bilo mogoče izbrisati",
       "nameRequired": "Vnesite ime ukaza",
@@ -4050,6 +4057,7 @@
       "unbindFailed": "Ni bilo mogoče razvezati repoja"
     },
     "variablesDeleteFailed": "Spremenljivke ni bilo mogoče izbrisati",
+    "deleteVariable": "Izbriši spremenljivko {{key}}",
     "deleteCommand": "Izbriši ukaz {{position}}"
   },
   "credits": {

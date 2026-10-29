@@ -3838,6 +3838,8 @@
     "skillSourceMarketplace": "Ahịa",
     "skillsHint": "Tapawa SKILL.md na aha ya juputara; tinye nka na ekwentị gị na-adọkpụrụghị na dobe.",
     "skillEditTitle": "Dezie nka",
+    "skillEdit": "Dezie nka {{name}}",
+    "skillDelete": "Hichapụ nka {{name}}",
     "mcp": {
       "title": "Sava MCP",
       "add": "Tinye ihe nkesa MCP",
@@ -3867,7 +3869,8 @@
       "jsonInvalid": "Tinye JSON bara uru - ihe nwere ụkpụrụ eriri",
       "jsonTooLarge": "Ejila ihe karịrị ndenye 50, igodo ruo 128 na uru ruo mkpụrụedemede 4096",
       "timeoutInvalid": "Oge ngwụcha ga-abụrịrị ọnụ ọgụgụ millisekọnd dum",
-      "edit": "Dezie ihe nkesa MCP",
+      "edit": "Dezie ihe nkesa MCP {{name}}",
+      "delete": "Hichapụ ihe nkesa MCP {{name}}",
       "saveFailed": "Enweghị ike ichekwa ihe nkesa MCP",
       "deleteFailed": "Enweghị ike ihichapụ ihe nkesa MCP",
       "updateFailed": "Enweghị ike melite ihe nkesa MCP"
@@ -3905,7 +3908,8 @@
       "slugRequired": "Tinye ihe nnọchite slug",
       "slugInvalid": "Slug ga-amalite na obere mkpụrụedemede ASCII ma jiri naanị obere mkpụrụedemede ASCII, mkpụrụọnụọgụgụ, na dashes, ruru mkpụrụedemede 50",
       "slugConflict": "Ahụ slug ahụ na ndị omume obibi ma ọ bụ ndị omume ọzọ na profaịlụ a na-eji ya ugbu a",
-      "edit": "Onye ọrụ dezie"
+      "edit": "Dezie onye nnọchi anya {{name}}",
+      "delete": "Hichapụ onye nnọchi anya {{name}}"
     },
     "slashCommands": {
       "title": "Iwu slash",
@@ -3918,7 +3922,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Kọwaa $ARGUMENTS",
       "subtask": "Gbaa ọsọ dị ka obere ọrụ",
-      "edit": "Dezie slash iwu",
+      "edit": "Dezie iwu slash {{name}}",
+      "delete": "Hichapụ iwu slash {{name}}",
+      "moveUp": "Bufee iwu slash {{name}} elu",
+      "moveDown": "Bufee iwu slash {{name}} ala",
       "saveFailed": "Enweghị ike ịchekwa iwu",
       "deleteFailed": "Enweghị ike ihichapụ iwu",
       "nameRequired": "Tinye aha iwu",
@@ -3950,6 +3957,7 @@
       "unbindFailed": "Enweghị ike iwepụ repo"
     },
     "variablesDeleteFailed": "Enweghị ike ihichapụ mgbanwe",
+    "deleteVariable": "Hichapụ mgbanwe {{key}}",
     "deleteCommand": "Hichapụ iwu {{position}}"
   },
   "credits": {

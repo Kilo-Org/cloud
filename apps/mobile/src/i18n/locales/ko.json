@@ -3838,6 +3838,8 @@
     "skillSourceMarketplace": "마켓플레이스",
     "skillsHint": "SKILL.md를 붙여넣으면 이름이 채워집니다. 드래그 앤 드롭 없이 휴대폰에서 스킬을 추가하세요.",
     "skillEditTitle": "스킬 편집",
+    "skillEdit": "스킬 {{name}}을(를) 편집",
+    "skillDelete": "스킬 {{name}}을(를) 삭제",
     "mcp": {
       "title": "MCP 서버",
       "add": "MCP 서버 추가",
@@ -3867,7 +3869,8 @@
       "jsonInvalid": "유효한 JSON을 입력하세요 - 문자열 값의 객체",
       "jsonTooLarge": "최대 50개의 항목(키는 128자, 값은 4096자까지)을 사용하세요.",
       "timeoutInvalid": "제한시간은 정수 밀리초여야 합니다.",
-      "edit": "MCP 서버 편집",
+      "edit": "MCP 서버 {{name}}을(를) 편집",
+      "delete": "MCP 서버 {{name}}을(를) 삭제",
       "saveFailed": "MCP 서버를 저장할 수 없습니다.",
       "deleteFailed": "MCP 서버를 삭제할 수 없습니다.",
       "updateFailed": "MCP 서버를 업데이트할 수 없습니다."
@@ -3905,7 +3908,8 @@
       "slugRequired": "에이전트 슬러그를 입력하세요",
       "slugInvalid": "슬러그는 ASCII 소문자로 시작해야 하며 ASCII 소문자, 숫자, 대시만 사용할 수 있습니다(최대 50자).",
       "slugConflict": "해당 슬러그는 내장 에이전트 또는 이 프로필의 다른 에이전트가 이미 사용 중입니다",
-      "edit": "에이전트 편집"
+      "edit": "에이전트 {{name}}을(를) 편집",
+      "delete": "에이전트 {{name}}을(를) 삭제"
     },
     "slashCommands": {
       "title": "슬래시 명령",
@@ -3918,7 +3922,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS 설명",
       "subtask": "하위 작업으로 실행",
-      "edit": "슬래시 명령 편집",
+      "edit": "슬래시 명령 {{name}}을(를) 편집",
+      "delete": "슬래시 명령 {{name}}을(를) 삭제",
+      "moveUp": "슬래시 명령 {{name}}을(를) 위로 이동",
+      "moveDown": "슬래시 명령 {{name}}을(를) 아래로 이동",
       "saveFailed": "명령을 저장할 수 없습니다",
       "deleteFailed": "명령을 삭제할 수 없습니다",
       "nameRequired": "명령 이름을 입력하세요.",
@@ -3950,6 +3957,7 @@
       "unbindFailed": "저장소를 바인딩 해제할 수 없습니다."
     },
     "variablesDeleteFailed": "변수를 삭제할 수 없습니다",
+    "deleteVariable": "변수 {{key}}을(를) 삭제",
     "deleteCommand": "명령 {{position}}을(를) 삭제"
   },
   "credits": {

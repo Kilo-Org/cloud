@@ -3888,6 +3888,8 @@
     "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Pegue un SKILL.md y su nombre se completará; agregue una habilidad desde su teléfono sin arrastrar y soltar.",
     "skillEditTitle": "Editar habilidad",
+    "skillEdit": "Editar la habilidad {{name}}",
+    "skillDelete": "Eliminar la habilidad {{name}}",
     "mcp": {
       "title": "Servidores MCP",
       "add": "Agregar servidor MCP",
@@ -3917,7 +3919,8 @@
       "jsonInvalid": "Ingrese JSON válido: un objeto de valores de cadena",
       "jsonTooLarge": "Usa como máximo 50 entradas, claves de hasta 128 y valores de hasta 4096 caracteres",
       "timeoutInvalid": "El tiempo de espera debe ser un número entero de milisegundos.",
-      "edit": "Editar servidor MCP",
+      "edit": "Editar el servidor MCP {{name}}",
+      "delete": "Eliminar el servidor MCP {{name}}",
       "saveFailed": "No se pudo guardar el servidor MCP",
       "deleteFailed": "No se pudo eliminar el servidor MCP",
       "updateFailed": "No se pudo actualizar el servidor MCP"
@@ -3955,7 +3958,8 @@
       "slugRequired": "Introduzca una babosa de agente",
       "slugInvalid": "Slug debe comenzar con una letra ASCII minúscula y usar solo letras ASCII minúsculas, dígitos y guiones, hasta 50 caracteres.",
       "slugConflict": "Ese slug ya lo usa un agente integrado u otro agente de este perfil",
-      "edit": "Editar agente"
+      "edit": "Editar al agente {{name}}",
+      "delete": "Eliminar al agente {{name}}"
     },
     "slashCommands": {
       "title": "Comandos de barra diagonal",
@@ -3968,7 +3972,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explique $ARGUMENTS",
       "subtask": "Ejecutar como subtarea",
-      "edit": "Editar comando de barra diagonal",
+      "edit": "Editar el comando de barra diagonal {{name}}",
+      "delete": "Eliminar el comando de barra diagonal {{name}}",
+      "moveUp": "Mover el comando de barra diagonal {{name}} hacia arriba",
+      "moveDown": "Mover el comando de barra diagonal {{name}} hacia abajo",
       "saveFailed": "No se pudo guardar el comando",
       "deleteFailed": "No se pudo eliminar el comando",
       "nameRequired": "Introduzca un nombre de comando",
@@ -4000,6 +4007,7 @@
       "unbindFailed": "No se pudo desvincular el repositorio"
     },
     "variablesDeleteFailed": "No se pudo eliminar la variable",
+    "deleteVariable": "Eliminar la variable {{key}}",
     "deleteCommand": "Eliminar el comando {{position}}"
   },
   "credits": {

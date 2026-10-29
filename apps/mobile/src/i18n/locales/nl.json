@@ -3838,6 +3838,8 @@
     "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Plak een SKILL.md en de naam wordt ingevuld; voeg een vaardigheid toe vanaf je telefoon zonder slepen en neerzetten.",
     "skillEditTitle": "Vaardigheid bewerken",
+    "skillEdit": "Vaardigheid {{name}} bewerken",
+    "skillDelete": "Vaardigheid {{name}} verwijderen",
     "mcp": {
       "title": "MCP-servers",
       "add": "MCP-server toevoegen",
@@ -3867,7 +3869,8 @@
       "jsonInvalid": "Voer geldige JSON in: een object met tekenreekswaarden",
       "jsonTooLarge": "Gebruik maximaal 50 vermeldingen, sleutels tot 128 en waarden tot 4096 tekens",
       "timeoutInvalid": "De time-out moet een geheel aantal milliseconden bedragen",
-      "edit": "MCP-server bewerken",
+      "edit": "MCP-server {{name}} bewerken",
+      "delete": "MCP-server {{name}} verwijderen",
       "saveFailed": "Kan MCP-server niet opslaan",
       "deleteFailed": "Kan MCP-server niet verwijderen",
       "updateFailed": "Kan MCP-server niet bijwerken"
@@ -3905,7 +3908,8 @@
       "slugRequired": "Voer een agentenslak in",
       "slugInvalid": "Slug moet beginnen met een kleine ASCII-letter en mag alleen kleine ASCII-letters, cijfers en streepjes gebruiken, tot maximaal 50 tekens",
       "slugConflict": "Die slug is al in gebruik door een ingebouwde agent of een andere agent in dit profiel",
-      "edit": "Agent bewerken"
+      "edit": "Agent {{name}} bewerken",
+      "delete": "Agent {{name}} verwijderen"
     },
     "slashCommands": {
       "title": "Slash-opdrachten",
@@ -3918,7 +3922,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Leg $ARGUMENTS uit",
       "subtask": "Uitvoeren als subtaak",
-      "edit": "Bewerk de slash-opdracht",
+      "edit": "Slash-opdracht {{name}} bewerken",
+      "delete": "Slash-opdracht {{name}} verwijderen",
+      "moveUp": "Slash-opdracht {{name}} omhoog verplaatsen",
+      "moveDown": "Slash-opdracht {{name}} omlaag verplaatsen",
       "saveFailed": "Kan opdracht niet opslaan",
       "deleteFailed": "Kan opdracht niet verwijderen",
       "nameRequired": "Voer een opdrachtnaam in",
@@ -3950,6 +3957,7 @@
       "unbindFailed": "Kan repository niet ongedaan maken"
     },
     "variablesDeleteFailed": "Kan variabele niet verwijderen",
+    "deleteVariable": "Variabele {{key}} verwijderen",
     "deleteCommand": "Commando {{position}} verwijderen"
   },
   "credits": {

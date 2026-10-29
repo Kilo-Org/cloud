@@ -169,8 +169,8 @@ describe('ProfileSkillsScreen', () => {
     const pressableLabels = findAll(renderer.root, 'Pressable').map(
       node => node.props.accessibilityLabel
     );
-    expect(pressableLabels).not.toContain('Edit skill');
-    expect(pressableLabels).toContain('Delete');
+    expect(pressableLabels).not.toContain('Edit skill code-review');
+    expect(pressableLabels).toContain('Delete skill code-review');
     expect(findOne(renderer.root, 'Switch').props.accessibilityLabel).toBe('code-review');
 
     unmount();
@@ -181,7 +181,7 @@ describe('ProfileSkillsScreen', () => {
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
-    pressPressable(renderer.root, 'Edit skill');
+    pressPressable(renderer.root, 'Edit skill code-review');
 
     expect(findField(renderer.root, 'Skill name').props.defaultValue).toBe('code-review');
     expect(findField(renderer.root, 'Skill content').props.defaultValue).toBe('Body');
@@ -198,7 +198,7 @@ describe('ProfileSkillsScreen', () => {
     h.query.isPending = false;
     h.mutations.updateSkill.mutateAsync.mockResolvedValue({ success: true });
     const { renderer, unmount } = await mountScreen();
-    pressPressable(renderer.root, 'Edit skill');
+    pressPressable(renderer.root, 'Edit skill code-review');
     changeText(renderer.root, 'Skill content', '---\nname: code-review\n---\nBody');
     pressSheetDone(renderer.root);
     await waitFor(() => h.mutations.updateSkill.mutateAsync.mock.calls.length > 0);
@@ -289,7 +289,7 @@ describe('ProfileSkillsScreen', () => {
     h.mutations.deleteSkill.mutateAsync.mockResolvedValue({ success: true });
 
     const { renderer, unmount } = await mountScreen();
-    pressPressable(renderer.root, 'Delete');
+    pressPressable(renderer.root, 'Delete skill code-review');
     await act(async () => {
       confirmRequest(h.confirm as TestConfirmMock);
       await Promise.resolve();

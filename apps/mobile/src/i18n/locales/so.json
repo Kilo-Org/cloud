@@ -3838,6 +3838,8 @@
     "skillSourceMarketplace": "Suuqa",
     "skillsHint": "Ku dheji SKILL.md oo magaciisa ayaa buuxiya; ku dar xirfad taleefankaaga adigoon jiidin oo tuurin.",
     "skillEditTitle": "Xirfadda wax ka beddel",
+    "skillEdit": "Wax ka beddel xirfadda {{name}}",
+    "skillDelete": "Tirtir xirfadda {{name}}",
     "mcp": {
       "title": "Adeegayaasha MCP",
       "add": "Kudar server-ka MCP",
@@ -3867,7 +3869,8 @@
       "jsonInvalid": "Geli JSON sax ah - waa shay qiimayaal xadhig ah",
       "jsonTooLarge": "Isticmaal ugu badnaan 50 gelin, furaha ilaa 128 iyo qiimaha ilaa 4096 xaraf",
       "timeoutInvalid": "Wakhtiga kama dambaysta ahi waa inuu noqdaa tiro dhan oo millise seconds",
-      "edit": "Wax ka beddel serverka MCP",
+      "edit": "Wax ka beddel seerfarka MCP {{name}}",
+      "delete": "Tirtir seerfarka MCP {{name}}",
       "saveFailed": "Waa la kaydin kari waayay seerfarka MCP",
       "deleteFailed": "Waa la tirtiri kari waayay seerfarka MCP",
       "updateFailed": "Waa la cusboonaysii kari waayay seerfarka MCP"
@@ -3905,7 +3908,8 @@
       "slugRequired": "Geli slug wakiilka",
       "slugInvalid": "Slug waa in uu ku bilaabmaa xaraf ASCII oo yar oo waa in uu isticmaalo kaliya xarfo ASCII yaryar, lambaro, iyo dashes, ugu badnaan 50 xaraf",
       "slugConflict": "Slug-gaas horey waa la isticmaalay wakheel gudbiyey ama wakheel kale oo xiriirkan",
-      "edit": "Wakiilka wax ka beddel"
+      "edit": "Wax ka beddel wakiilka {{name}}",
+      "delete": "Tirtir wakiilka {{name}}"
     },
     "slashCommands": {
       "title": "Amarada jarista",
@@ -3918,7 +3922,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Sharax $ARGUMENTS",
       "subtask": "U orda sidii shaqo-hoosaad",
-      "edit": "Tafatir amarka slash",
+      "edit": "Wax ka beddel amarka jarista {{name}}",
+      "delete": "Tirtir amarka jarista {{name}}",
+      "moveUp": "U rari amarka jarista {{name}} kor",
+      "moveDown": "U rari amarka jarista {{name}} hoos",
       "saveFailed": "Way kaydsan kari wayday amarka",
       "deleteFailed": "Way tirtiran kari wayday amarka",
       "nameRequired": "Geli magaca amarka",
@@ -3950,6 +3957,7 @@
       "unbindFailed": "Waa la furi waayay repo"
     },
     "variablesDeleteFailed": "Way tirtiran kari wayday doorsoomaha",
+    "deleteVariable": "Tirtir doorsoomaha {{key}}",
     "deleteCommand": "Tirtir taliska {{position}}"
   },
   "credits": {

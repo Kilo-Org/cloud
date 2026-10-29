@@ -3838,6 +3838,8 @@
     "skillSourceMarketplace": "Marketpleys",
     "skillsHint": "SKILL.md yapışdırın və onun adı doldurulur; sürükləyib buraxmadan telefonunuzdan bacarıq əlavə edin.",
     "skillEditTitle": "Bacarıqları redaktə edin",
+    "skillEdit": "{{name}} bacarığını redaktə edin",
+    "skillDelete": "{{name}} bacarığını sil",
     "mcp": {
       "title": "MCP serverləri",
       "add": "MCP server əlavə edin",
@@ -3867,7 +3869,8 @@
       "jsonInvalid": "Etibarlı JSON daxil edin — sətir dəyərlərinin obyekti",
       "jsonTooLarge": "Ən çoxu 50 giriş, 128-ə qədər açar və 4096 simvola qədər dəyər istifadə edin",
       "timeoutInvalid": "Taymout tam sayda millisaniyə olmalıdır",
-      "edit": "MCP serverini redaktə edin",
+      "edit": "{{name}} MCP serverini redaktə edin",
+      "delete": "{{name}} MCP serverini sil",
       "saveFailed": "MCP serverini saxlamaq mümkün olmadı",
       "deleteFailed": "MCP serverini silmək mümkün olmadı",
       "updateFailed": "MCP serverini yeniləmək mümkün olmadı"
@@ -3905,7 +3908,8 @@
       "slugRequired": "Agent slug daxil edin",
       "slugInvalid": "Slug kiçik ASCII hərfi ilə başlamalı və yalnız kiçik ASCII hərflərindən, rəqəmlərdən və tirelərdən istifadə etməlidir, maksimum 50 simvol",
       "slugConflict": "Bu şlak daxili agent və ya bu profildəki başqa bir agent tərəfindən istifadə olunur",
-      "edit": "Agenti redaktə edin"
+      "edit": "{{name}} agentini redaktə edin",
+      "delete": "{{name}} agentini sil"
     },
     "slashCommands": {
       "title": "Slash əmrləri",
@@ -3918,7 +3922,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS-i izah edin",
       "subtask": "Alt tapşırıq kimi işləyin",
-      "edit": "Slash əmrini redaktə edin",
+      "edit": "{{name}} slash əmrini redaktə edin",
+      "delete": "{{name}} slash əmrini sil",
+      "moveUp": "{{name}} slash əmrini yuxarı köçür",
+      "moveDown": "{{name}} slash əmrini aşağı köçür",
       "saveFailed": "Komandanı saxlamaq mümkün olmadı",
       "deleteFailed": "Komandanı silmək mümkün olmadı",
       "nameRequired": "Komanda adını daxil edin",
@@ -3950,6 +3957,7 @@
       "unbindFailed": "Repo bağlamaq mümkün olmadı"
     },
     "variablesDeleteFailed": "Dəyişəni silmək mümkün olmadı",
+    "deleteVariable": "{{key}} dəyişənini sil",
     "deleteCommand": "{{position}} nömrəli əmri sil"
   },
   "credits": {

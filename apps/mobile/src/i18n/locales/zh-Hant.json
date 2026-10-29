@@ -3838,6 +3838,8 @@
     "skillSourceMarketplace": "市集",
     "skillsHint": "貼上一個SKILL.md並填寫其名稱；從手機添加技能，無需拖放。",
     "skillEditTitle": "編輯技能",
+    "skillEdit": "編輯技能 {{name}}",
+    "skillDelete": "刪除技能 {{name}}",
     "mcp": {
       "title": "MCP伺服器",
       "add": "新增MCP伺服器",
@@ -3867,7 +3869,8 @@
       "jsonInvalid": "輸入有效的 JSON — 字串值的對象",
       "jsonTooLarge": "最多使用 50 個項目，鍵最多 128 個字元，值最多 4096 個字元",
       "timeoutInvalid": "超時必須是整數毫秒",
-      "edit": "編輯 MCP 伺服器",
+      "edit": "編輯 MCP 伺服器 {{name}}",
+      "delete": "刪除 MCP 伺服器 {{name}}",
       "saveFailed": "無法保存 MCP 伺服器",
       "deleteFailed": "無法刪除 MCP 伺服器",
       "updateFailed": "無法更新 MCP 伺服器"
@@ -3905,7 +3908,8 @@
       "slugRequired": "輸入代理 slug",
       "slugInvalid": "Slug 必須以小寫 ASCII 字母開頭，且只能使用小寫 ASCII 字母、數字和連字符，最多 50 個字元",
       "slugConflict": "該 slug 已被內建代理或此設定檔中的另一個代理使用",
-      "edit": "編輯代理"
+      "edit": "編輯代理 {{name}}",
+      "delete": "刪除代理 {{name}}"
     },
     "slashCommands": {
       "title": "斜槓命令",
@@ -3918,7 +3922,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "解釋$ARGUMENTS",
       "subtask": "作為子任務運行",
-      "edit": "編輯斜槓命令",
+      "edit": "編輯命令 {{name}}",
+      "delete": "刪除命令 {{name}}",
+      "moveUp": "上移命令 {{name}}",
+      "moveDown": "下移命令 {{name}}",
       "saveFailed": "無法保存命令",
       "deleteFailed": "無法刪除命令",
       "nameRequired": "輸入命令名稱",
@@ -3950,6 +3957,7 @@
       "unbindFailed": "無法解除倉庫綁定"
     },
     "variablesDeleteFailed": "無法刪除變數",
+    "deleteVariable": "刪除變數 {{key}}",
     "deleteCommand": "刪除命令 {{position}}"
   },
   "credits": {

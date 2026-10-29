@@ -3838,6 +3838,8 @@
     "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Tempelkan SKILL.md dan isikan namanya; tambahkan keterampilan dari ponsel Anda tanpa drag and drop.",
     "skillEditTitle": "Mengedit keterampilan",
+    "skillEdit": "Edit keterampilan {{name}}",
+    "skillDelete": "Hapus keterampilan {{name}}",
     "mcp": {
       "title": "server MCP",
       "add": "Tambahkan server MCP",
@@ -3867,7 +3869,8 @@
       "jsonInvalid": "Masukkan JSON yang valid — objek nilai string",
       "jsonTooLarge": "Gunakan maksimal 50 entri, kunci hingga 128 dan nilai hingga 4096 karakter",
       "timeoutInvalid": "Batas waktu harus berupa bilangan bulat dalam milidetik",
-      "edit": "Sunting server MCP",
+      "edit": "Edit server MCP {{name}}",
+      "delete": "Hapus server MCP {{name}}",
       "saveFailed": "Tidak dapat menyimpan server MCP",
       "deleteFailed": "Tidak dapat menghapus server MCP",
       "updateFailed": "Tidak dapat memperbarui server MCP"
@@ -3905,7 +3908,8 @@
       "slugRequired": "Masukkan siput agen",
       "slugInvalid": "Siput harus dimulai dengan huruf ASCII kecil dan hanya menggunakan huruf kecil ASCII, angka, dan tanda hubung, maksimal 50 karakter",
       "slugConflict": "Slug tersebut sudah digunakan oleh agen bawaan atau agen lain di profil ini",
-      "edit": "Sunting agen"
+      "edit": "Edit agen {{name}}",
+      "delete": "Hapus agen {{name}}"
     },
     "slashCommands": {
       "title": "Perintah garis miring",
@@ -3918,7 +3922,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Jelaskan $ARGUMENTS",
       "subtask": "Jalankan sebagai subtugas",
-      "edit": "Edit perintah garis miring",
+      "edit": "Edit perintah garis miring {{name}}",
+      "delete": "Hapus perintah garis miring {{name}}",
+      "moveUp": "Pindahkan perintah garis miring {{name}} ke atas",
+      "moveDown": "Pindahkan perintah garis miring {{name}} ke bawah",
       "saveFailed": "Tidak dapat menyimpan perintah",
       "deleteFailed": "Tidak dapat menghapus perintah",
       "nameRequired": "Masukkan nama perintah",
@@ -3950,6 +3957,7 @@
       "unbindFailed": "Tidak dapat melepaskan ikatan repo"
     },
     "variablesDeleteFailed": "Tidak dapat menghapus variabel",
+    "deleteVariable": "Hapus variabel {{key}}",
     "deleteCommand": "Hapus perintah {{position}}"
   },
   "credits": {

@@ -3904,6 +3904,8 @@
     "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Paste a SKILL.md and its name fills in; add a skill from your phone without drag and drop.",
     "skillEditTitle": "Edit skill",
+    "skillEdit": "Edit skill {{name}}",
+    "skillDelete": "Delete skill {{name}}",
     "mcp": {
       "title": "MCP servers",
       "add": "Add MCP server",
@@ -3933,7 +3935,8 @@
       "jsonInvalid": "Enter valid JSON — an object of string values",
       "jsonTooLarge": "Use at most 50 entries, keys up to 128 and values up to 4096 characters",
       "timeoutInvalid": "Timeout must be a whole number of milliseconds",
-      "edit": "Edit MCP server",
+      "edit": "Edit MCP server {{name}}",
+      "delete": "Delete MCP server {{name}}",
       "saveFailed": "Couldn't save MCP server",
       "deleteFailed": "Couldn't delete MCP server",
       "updateFailed": "Couldn't update MCP server"
@@ -3971,7 +3974,8 @@
       "slugRequired": "Enter an agent slug",
       "slugInvalid": "Slug must start with a lowercase ASCII letter and use only ASCII lowercase letters, digits, and dashes, up to 50 characters",
       "slugConflict": "That slug is already taken by a built-in or another agent in this profile",
-      "edit": "Edit agent"
+      "edit": "Edit agent {{name}}",
+      "delete": "Delete agent {{name}}"
     },
     "slashCommands": {
       "title": "Slash commands",
@@ -3984,7 +3988,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explain $ARGUMENTS",
       "subtask": "Run as subtask",
-      "edit": "Edit slash command",
+      "edit": "Edit slash command {{name}}",
+      "delete": "Delete slash command {{name}}",
+      "moveUp": "Move slash command {{name}} up",
+      "moveDown": "Move slash command {{name}} down",
       "saveFailed": "Couldn't save command",
       "deleteFailed": "Couldn't delete command",
       "nameRequired": "Enter a command name",
@@ -4016,6 +4023,7 @@
       "unbindFailed": "Couldn't unbind repo"
     },
     "variablesDeleteFailed": "Couldn't delete variable",
+    "deleteVariable": "Delete variable {{key}}",
     "deleteCommand": "Delete command {{position}}"
   },
   "credits": {

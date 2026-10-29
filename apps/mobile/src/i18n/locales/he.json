@@ -3888,6 +3888,8 @@
     "skillSourceMarketplace": "חנות",
     "skillsHint": "הדבק SKILL.md ושמו ימלא; הוסף מיומנות מהטלפון שלך ללא גרירה ושחרור.",
     "skillEditTitle": "ערוך מיומנות",
+    "skillEdit": "ערוך מיומנות {{name}}",
+    "skillDelete": "מחק את המיומנות {{name}}",
     "mcp": {
       "title": "שרתי MCP",
       "add": "הוסף שרת MCP",
@@ -3917,7 +3919,8 @@
       "jsonInvalid": "הזן JSON חוקי - אובייקט של ערכי מחרוזת",
       "jsonTooLarge": "השתמש בעד 50 ערכים, מפתחות עד 128 וערכים עד 4096 תווים",
       "timeoutInvalid": "הזמן הקצוב חייב להיות מספר שלם של אלפיות שניות",
-      "edit": "ערוך שרת MCP",
+      "edit": "ערוך שרת MCP {{name}}",
+      "delete": "מחק את שרת MCP {{name}}",
       "saveFailed": "לא ניתן לשמור את שרת MCP",
       "deleteFailed": "לא ניתן למחוק את שרת MCP",
       "updateFailed": "לא ניתן לעדכן את שרת MCP"
@@ -3955,7 +3958,8 @@
       "slugRequired": "הזן שבלול סוכן",
       "slugInvalid": "Slug חייב להתחיל באות קטנה באנגלית (ASCII) ולהשתמש רק באותיות קטנות באנגלית (ASCII), ספרות ומקפים, עד 50 תווים",
       "slugConflict": "הסלאג הזה כבר בשימוש על ידי סוכן מובנה או סוכן אחר בפרופיל הזה",
-      "edit": "ערוך סוכן"
+      "edit": "ערוך סוכן {{name}}",
+      "delete": "מחק את הסוכן {{name}}"
     },
     "slashCommands": {
       "title": "פקודות סלאש",
@@ -3968,7 +3972,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "הסבר $ARGUMENTS",
       "subtask": "הפעל כתת-מטלת",
-      "edit": "ערוך פקודת נטוי",
+      "edit": "ערוך פקודת סלאש {{name}}",
+      "delete": "מחק את פקודת הסלאש {{name}}",
+      "moveUp": "העבר את פקודת הסלאש {{name}} למעלה",
+      "moveDown": "העבר את פקודת הסלאש {{name}} למטה",
       "saveFailed": "לא ניתן לשמור את הפקודה",
       "deleteFailed": "לא ניתן למחוק את הפקודה",
       "nameRequired": "הזן שם פקודה",
@@ -4000,6 +4007,7 @@
       "unbindFailed": "לא ניתן היה לבטל את קשירת המאגר"
     },
     "variablesDeleteFailed": "לא ניתן למחוק את המשתנה",
+    "deleteVariable": "מחק את המשתנה {{key}}",
     "deleteCommand": "מחק את הפקודה {{position}}"
   },
   "credits": {

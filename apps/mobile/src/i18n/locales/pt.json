@@ -3888,6 +3888,8 @@
     "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Cole um SKILL.md e o nome é preenchido automaticamente; adicione uma competência a partir do telemóvel, sem arrastar e largar.",
     "skillEditTitle": "Editar competência",
+    "skillEdit": "Editar competência {{name}}",
+    "skillDelete": "Eliminar a competência {{name}}",
     "mcp": {
       "title": "Servidores MCP",
       "add": "Adicionar servidor MCP",
@@ -3917,7 +3919,8 @@
       "jsonInvalid": "Introduza JSON válido — um objeto de cadeias de caracteres",
       "jsonTooLarge": "Utilize no máximo 50 entradas, chaves até 128 e valores até 4096 caracteres",
       "timeoutInvalid": "O tempo limite deve ser um número inteiro de milissegundos",
-      "edit": "Editar servidor MCP",
+      "edit": "Editar servidor MCP {{name}}",
+      "delete": "Eliminar o servidor MCP {{name}}",
       "saveFailed": "Não foi possível guardar o servidor MCP",
       "deleteFailed": "Não foi possível eliminar o servidor MCP",
       "updateFailed": "Não foi possível atualizar o servidor MCP"
@@ -3955,7 +3958,8 @@
       "slugRequired": "Introduza um slug de agente",
       "slugInvalid": "O slug deve começar por uma letra minúscula ASCII e usar apenas letras minúsculas ASCII, dígitos e hífenes, até 50 caracteres",
       "slugConflict": "Esse slug já é usado por um agente integrado ou por outro agente neste perfil",
-      "edit": "Editar agente"
+      "edit": "Editar agente {{name}}",
+      "delete": "Eliminar o agente {{name}}"
     },
     "slashCommands": {
       "title": "Comandos de barra",
@@ -3968,7 +3972,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explica $ARGUMENTS",
       "subtask": "Executar como subtarefa",
-      "edit": "Editar comando de barra",
+      "edit": "Editar comando de barra {{name}}",
+      "delete": "Eliminar o comando de barra {{name}}",
+      "moveUp": "Mover o comando de barra {{name}} para cima",
+      "moveDown": "Mover o comando de barra {{name}} para baixo",
       "saveFailed": "Não foi possível guardar o comando",
       "deleteFailed": "Não foi possível eliminar o comando",
       "nameRequired": "Introduza um nome de comando",
@@ -4000,6 +4007,7 @@
       "unbindFailed": "Não foi possível desvincular o repositório"
     },
     "variablesDeleteFailed": "Não foi possível eliminar a variável",
+    "deleteVariable": "Eliminar a variável {{key}}",
     "deleteCommand": "Eliminar o comando {{position}}"
   },
   "credits": {

@@ -3838,6 +3838,8 @@
     "skillSourceMarketplace": "Imakethe",
     "skillsHint": "Namathisela i-SKILL.md futhi igama layo ligcwalise; engeza ikhono kusuka kufoni yakho ngaphandle kokuhudula nokuwisa.",
     "skillEditTitle": "Hlela ikhono",
+    "skillEdit": "Hlela ikhono {{name}}",
+    "skillDelete": "Susa ikhono {{name}}",
     "mcp": {
       "title": "Amaseva e-MCP",
       "add": "Engeza iseva ye-MCP",
@@ -3867,7 +3869,8 @@
       "jsonInvalid": "Faka i-JSON evumelekile — into enamanani eyunithi yezinhlamvu",
       "jsonTooLarge": "Sebenzisa okufakiwe okungu-50 noma ngaphansi, okhiye kufika ku-128 kanye namavelu kufika ezinhlamvu ezingu-4096",
       "timeoutInvalid": "Isikhathi sokuvala kufanele sibe inani eliphelele lama-millisecond",
-      "edit": "Hlela iseva ye-MCP",
+      "edit": "Hlela iseva ye-MCP {{name}}",
+      "delete": "Susa iseva ye-MCP {{name}}",
       "saveFailed": "Ayikwazanga ukulondoloza iseva ye-MCP",
       "deleteFailed": "Ayikwazanga ukususa iseva ye-MCP",
       "updateFailed": "Ayikwazanga ukubuyekeza iseva ye-MCP"
@@ -3905,7 +3908,8 @@
       "slugRequired": "Faka i-ejenti ye-slug",
       "slugInvalid": "I-slug kufanele siqale ngohlamvu oluncane le-ASCII futhi sisebenzise kuphela izinhlamvu ezincane ze-ASCII, amadijithi, namadeshi, kufike ezinhlamvini ezingu-50",
       "slugConflict": "Le slug isetshenziswa ngumklanyo owakhelwe ngaphakathi noma omunye umklanyo kule phrofayela",
-      "edit": "Hlela umenzeli"
+      "edit": "Hlela umenzeli {{name}}",
+      "delete": "Susa umenzeli {{name}}"
     },
     "slashCommands": {
       "title": "Imiyalo ye-Slash",
@@ -3918,7 +3922,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Chaza $ARGUMENTS",
       "subtask": "Qalisa njengomsebenzi ongaphansi",
-      "edit": "Hlela umyalo we-slash",
+      "edit": "Hlela umyalo we-Slash {{name}}",
+      "delete": "Susa umyalo we-Slash {{name}}",
+      "moveUp": "Hambisa umyalo we-Slash {{name}} phezulu",
+      "moveDown": "Hambisa umyalo we-Slash {{name}} phansi",
       "saveFailed": "Ayikwazanga ukulondoloza umyalo",
       "deleteFailed": "Ayikwazanga ukususa umyalo",
       "nameRequired": "Faka igama lomyalo",
@@ -3950,6 +3957,7 @@
       "unbindFailed": "Ayikwazanga ukukhulula i-repo"
     },
     "variablesDeleteFailed": "Ayikwazanga ukususa okuguquguqukayo",
+    "deleteVariable": "Susa okuguquguqukayo {{key}}",
     "deleteCommand": "Susa umyalo {{position}}"
   },
   "credits": {

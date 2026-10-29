@@ -3838,6 +3838,8 @@
     "skillSourceMarketplace": "Gabaa",
     "skillsHint": "SKILL.md tokko maxxansi maqaan isaa ni guuta; bilbila keessan irraa ogummaa tokko osoo harkisuu fi hin gadi dhiisin itti dabalaa.",
     "skillEditTitle": "Dandeettii gulaaluu",
+    "skillEdit": "Dandeettii {{name}} gulaali",
+    "skillDelete": "Dandeettii {{name}} balleessi",
     "mcp": {
       "title": "Sarvaroota MCP",
       "add": "Sarvarii MCP itti dabali",
@@ -3867,7 +3869,8 @@
       "jsonInvalid": "JSON sirrii galchi — wanta gatiiwwan dhangii",
       "jsonTooLarge": "Galmee 50 ol fayyadami, furtuu hanga 128 fi gatii hanga arfii 4096",
       "timeoutInvalid": "Yeroon xumuraa lakkoofsa milisekondii guutuu ta'uu qaba",
-      "edit": "Sarvarii MCP gulaali",
+      "edit": "Sarvarii MCP {{name}} gulaali",
+      "delete": "Sarvarii MCP {{name}} balleessi",
       "saveFailed": "Sarvarii MCP qusachuu hin dandeenye",
       "deleteFailed": "Sarvarii MCP haquu hin dandeenye",
       "updateFailed": "Sarvarii MCP fooyyessuu hin dandeenye"
@@ -3905,7 +3908,8 @@
       "slugRequired": "Slug ergamaa galchi",
       "slugInvalid": "Slug qubee xixiqqaa ASCII irraa jalqabuu fi qubee xixiqqaa ASCII, dijiitota fi daash qofa fayyadamuu qaba, arfiilee 50 ykn isaa gadi",
       "slugConflict": "slug kana dura dhaabbataa ykn agensiin biraawuzii kana keessatti fayyadamaa jira",
-      "edit": "Bakka bu'aa gulaaluu"
+      "edit": "Bakka bu'aa {{name}} gulaali",
+      "delete": "Bakka bu'aa {{name}} balleessi"
     },
     "slashCommands": {
       "title": "Ajajoota cirracha",
@@ -3918,7 +3922,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "$ARGUMENTS ibsi",
       "subtask": "Akka hojii xiqqaatti fiigi",
-      "edit": "Ajaja slash gulaali",
+      "edit": "Ajaja cirracha {{name}} gulaali",
+      "delete": "Ajaja cirracha {{name}} balleessi",
+      "moveUp": "Ajaja cirracha {{name}} ol sochoosi",
+      "moveDown": "Ajaja cirracha {{name}} gad sochoosi",
       "saveFailed": "Ajaja qusachuu hin dandeenye",
       "deleteFailed": "Ajaja haquu hin dandeenye",
       "nameRequired": "Maqaa ajaja galchi",
@@ -3950,6 +3957,7 @@
       "unbindFailed": "Repo hiikuu hin dandeenye"
     },
     "variablesDeleteFailed": "Jijjiiramaa haquu hin dandeenye",
+    "deleteVariable": "Jijjiiramaa {{key}} balleessi",
     "deleteCommand": "Ajaja {{position}} balleessi"
   },
   "credits": {

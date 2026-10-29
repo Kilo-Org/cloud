@@ -3888,6 +3888,8 @@
     "skillSourceMarketplace": "Marketplace",
     "skillsHint": "Lipiți un SKILL.md și numele acestuia se completează; adăugați o abilitate de pe telefon fără glisare și plasare.",
     "skillEditTitle": "Editați abilitate",
+    "skillEdit": "Editați abilitatea {{name}}",
+    "skillDelete": "Șterge abilitatea {{name}}",
     "mcp": {
       "title": "servere MCP",
       "add": "Adăugați server MCP",
@@ -3917,7 +3919,8 @@
       "jsonInvalid": "Introduceți JSON valid — un obiect cu valori de șir",
       "jsonTooLarge": "Folosiți cel mult 50 de intrări, chei de până la 128 și valori de până la 4096 de caractere",
       "timeoutInvalid": "Timeout trebuie să fie un număr întreg de milisecunde",
-      "edit": "Editați serverul MCP",
+      "edit": "Editați serverul MCP {{name}}",
+      "delete": "Șterge serverul MCP {{name}}",
       "saveFailed": "Serverul MCP nu a putut fi salvat",
       "deleteFailed": "Serverul MCP nu a putut fi șters",
       "updateFailed": "Serverul MCP nu a putut fi actualizat"
@@ -3955,7 +3958,8 @@
       "slugRequired": "Introduceți un melc de agent",
       "slugInvalid": "Slug trebuie să înceapă cu o literă mică ASCII și să folosească numai litere mici ASCII, cifre și liniuțe, până la 50 de caractere",
       "slugConflict": "Acel slug este deja folosit de un agent integrat sau de un alt agent din acest profil",
-      "edit": "Editați agentul"
+      "edit": "Editați agentul {{name}}",
+      "delete": "Șterge agentul {{name}}"
     },
     "slashCommands": {
       "title": "Comenzi Slash",
@@ -3968,7 +3972,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Explicați $ARGUMENTS",
       "subtask": "Rulați ca subsarcină",
-      "edit": "Comanda Editați slash",
+      "edit": "Editați comanda slash {{name}}",
+      "delete": "Șterge comanda slash {{name}}",
+      "moveUp": "Mută comanda slash {{name}} în sus",
+      "moveDown": "Mută comanda slash {{name}} în jos",
       "saveFailed": "Comanda nu a putut fi salvată",
       "deleteFailed": "Comanda nu a putut fi ștearsă",
       "nameRequired": "Introduceți un nume de comandă",
@@ -4000,6 +4007,7 @@
       "unbindFailed": "Nu s-a putut dezlega repo"
     },
     "variablesDeleteFailed": "Variabila nu a putut fi ștearsă",
+    "deleteVariable": "Șterge variabila {{key}}",
     "deleteCommand": "Șterge comanda {{position}}"
   },
   "credits": {

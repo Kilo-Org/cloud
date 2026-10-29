@@ -3838,6 +3838,8 @@
     "skillSourceMarketplace": "ຕະຫຼາດ",
     "skillsHint": "ວາງ SKILL.md ແລະຊື່ຂອງມັນຕື່ມໃສ່; ເພີ່ມທັກສະຈາກໂທລະສັບຂອງທ່ານໂດຍບໍ່ຕ້ອງລາກແລະວາງ.",
     "skillEditTitle": "ແກ້ໄຂທັກສະ",
+    "skillEdit": "ແກ້ໄຂທັກສະ {{name}}",
+    "skillDelete": "ລຶບທັກສະ {{name}}",
     "mcp": {
       "title": "ເຊີບເວີ MCP",
       "add": "ເພີ່ມເຊີບເວີ MCP",
@@ -3867,7 +3869,8 @@
       "jsonInvalid": "ໃສ່ JSON ທີ່ຖືກຕ້ອງ — ວັດຖຸຂອງຄ່າສະຕຣິງ",
       "jsonTooLarge": "ໃຊ້ລາຍການສູງສຸດ 50 ລາຍການ ກະແຈສູງສຸດ 128 ແລະ ຄ່າສູງສຸດ 4096 ຕົວອັກສອນ",
       "timeoutInvalid": "ໝົດເວລາຕ້ອງເປັນຈຳນວນທັງໝົດຂອງມິນລີວິນາທີ",
-      "edit": "ແກ້ໄຂເຊີບເວີ MCP",
+      "edit": "ແກ້ໄຂເຊີບເວີ MCP {{name}}",
+      "delete": "ລຶບເຊີບເວີ MCP {{name}}",
       "saveFailed": "ບໍ່ສາມາດບັນທຶກເຊີບເວີ MCP ໄດ້",
       "deleteFailed": "ບໍ່ສາມາດລຶບເຊີບເວີ MCP ໄດ້",
       "updateFailed": "ບໍ່ສາມາດອັບເດດເຊີບເວີ MCP ໄດ້"
@@ -3905,7 +3908,8 @@
       "slugRequired": "ໃສ່ຕົວແທນ slug",
       "slugInvalid": "Slug ຈະຕ້ອງເລີ່ມຕົ້ນດ້ວຍຕົວອັກສອນພິມນ້ອຍ ASCII ແລະໃຊ້ແຕ່ຕົວອັກສອນພິມນ້ອຍ ASCII, ຕົວເລກ, ແລະ dashes, ໄດ້ສູງສຸດ 50 ຕົວອັກສອນ",
       "slugConflict": "slug ນັ້ນຖືກໃຊ້ແລ້ວໂດຍ agent ໃນຕົວ ຫຼື agent ອື່ນໃນໂປຼໄຟລ໌ນີ້",
-      "edit": "ແກ້ໄຂຕົວແທນ"
+      "edit": "ແກ້ໄຂຕົວແທນ {{name}}",
+      "delete": "ລຶບຕົວແທນ {{name}}"
     },
     "slashCommands": {
       "title": "ຄຳສັ່ງ Slash",
@@ -3918,7 +3922,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "ອະທິບາຍ $ARGUMENTS",
       "subtask": "ດໍາເນີນການເປັນວຽກຍ່ອຍ",
-      "edit": "ແກ້ໄຂຄໍາສັ່ງ slash",
+      "edit": "ແກ້ໄຂຄຳສັ່ງ Slash {{name}}",
+      "delete": "ລຶບຄຳສັ່ງ Slash {{name}}",
+      "moveUp": "ຍ້າຍຄຳສັ່ງ Slash {{name}} ຂຶ້ນ",
+      "moveDown": "ຍ້າຍຄຳສັ່ງ Slash {{name}} ລົງ",
       "saveFailed": "ບໍ່ສາມາດບັນທຶກຄຳສັ່ງໄດ້",
       "deleteFailed": "ບໍ່ສາມາດລຶບຄຳສັ່ງໄດ້",
       "nameRequired": "ໃສ່ຊື່ຄໍາສັ່ງ",
@@ -3950,6 +3957,7 @@
       "unbindFailed": "ບໍ່ສາມາດຍົກເລີກການຜູກມັດ repo ໄດ້"
     },
     "variablesDeleteFailed": "ບໍ່ສາມາດລຶບຕົວແປໄດ້",
+    "deleteVariable": "ລຶບຕົວແປ {{key}}",
     "deleteCommand": "ລຶບຄໍາສັ່ງ {{position}}"
   },
   "credits": {

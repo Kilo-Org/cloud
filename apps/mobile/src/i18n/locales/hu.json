@@ -3838,6 +3838,8 @@
     "skillSourceMarketplace": "Piactér",
     "skillsHint": "Illesszen be egy SKILL.md fájlt, és a neve automatikusan kitöltődik; töltsön fel egy készséget a telefonjáról húzás nélkül.",
     "skillEditTitle": "Készség szerkesztése",
+    "skillEdit": "{{name}} készség szerkesztése",
+    "skillDelete": "{{name}} készség törlése",
     "mcp": {
       "title": "MCP szerverek",
       "add": "MCP szerver hozzáadása",
@@ -3867,7 +3869,8 @@
       "jsonInvalid": "Írjon be érvényes JSON-t – karakterlánc-értékekből álló objektumot",
       "jsonTooLarge": "Legfeljebb 50 bejegyzést használjon, kulcsok 128-ig és értékek 4096 karakterig",
       "timeoutInvalid": "Az időtúllépésnek egész számú ezredmásodpercnek kell lennie",
-      "edit": "MCP szerver szerkesztése",
+      "edit": "{{name}} MCP szerver szerkesztése",
+      "delete": "{{name}} MCP szerver törlése",
       "saveFailed": "Nem sikerült menteni az MCP szervert",
       "deleteFailed": "Nem sikerült törölni az MCP szervert",
       "updateFailed": "Nem sikerült frissíteni az MCP szervert"
@@ -3905,7 +3908,8 @@
       "slugRequired": "Adjon meg egy ügynök-slugot",
       "slugInvalid": "A Slug-nak kisbetűs ASCII betűvel kell kezdődnie, és csak ASCII kisbetűket, számjegyeket és kötőjeleket használhat, legfeljebb 50 karakter lehet",
       "slugConflict": "Ezt a slugot már használja egy beépített ügynök vagy egy másik ügynök ebben a profilban",
-      "edit": "Ügynök szerkesztése"
+      "edit": "{{name}} ügynök szerkesztése",
+      "delete": "{{name}} ügynök törlése"
     },
     "slashCommands": {
       "title": "Slash parancsok",
@@ -3918,7 +3922,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Magyarázza el $ARGUMENTS",
       "subtask": "Futtassa részfeladatként",
-      "edit": "Szerkessze a perjel parancsot",
+      "edit": "{{name}} slash parancs szerkesztése",
+      "delete": "{{name}} slash parancs törlése",
+      "moveUp": "{{name}} slash parancs áthelyezése feljebb",
+      "moveDown": "{{name}} slash parancs áthelyezése lejjebb",
       "saveFailed": "Nem sikerült menteni a parancsot",
       "deleteFailed": "Nem sikerült törölni a parancsot",
       "nameRequired": "Adja meg a parancs nevét",
@@ -3950,6 +3957,7 @@
       "unbindFailed": "Nem sikerült feloldani az adattár kötését"
     },
     "variablesDeleteFailed": "Nem sikerült törölni a változót",
+    "deleteVariable": "{{key}} változó törlése",
     "deleteCommand": "{{position}}. parancs törlése"
   },
   "credits": {

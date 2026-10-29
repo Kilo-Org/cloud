@@ -3838,6 +3838,8 @@
     "skillSourceMarketplace": "Markaður",
     "skillsHint": "Límdu SKILL.md og nafn þess fyllir út; bættu við færni úr símanum þínum án þess að draga og sleppa.",
     "skillEditTitle": "Breyta færni",
+    "skillEdit": "Breyta færni {{name}}",
+    "skillDelete": "Eyða færni {{name}}",
     "mcp": {
       "title": "MCP netþjóna",
       "add": "Bættu við MCP netþjóni",
@@ -3867,7 +3869,8 @@
       "jsonInvalid": "Sláðu inn gilt JSON - hlut með strengjagildum",
       "jsonTooLarge": "Notaðu að hámarki 50 færslur, lyklar upp að 128 og gildi upp að 4096 stafir",
       "timeoutInvalid": "Tímamörk verða að vera heil tala af millisekúndum",
-      "edit": "Breyta MCP miðlara",
+      "edit": "Breyta MCP netþjóni {{name}}",
+      "delete": "Eyða MCP netþjóni {{name}}",
       "saveFailed": "Gat ekki vistað MCP þjón",
       "deleteFailed": "Gat ekki eytt MCP þjóni",
       "updateFailed": "Gat ekki uppfært MCP þjón"
@@ -3905,7 +3908,8 @@
       "slugRequired": "Sláðu inn umboðssnigl",
       "slugInvalid": "Snigl verður að byrja á lágstaf (ASCII) og má aðeins innihalda ASCII-lágstafi, tölustafi og strik, allt að 50 stafir",
       "slugConflict": "Þetta slug er þegar í notkun hjá innbyggðum umboðsmanni eða öðrum umboðsmanni í þessu prófíli",
-      "edit": "Breyta umboðsmanni"
+      "edit": "Breyta umboðsmanni {{name}}",
+      "delete": "Eyða umboðsmanni {{name}}"
     },
     "slashCommands": {
       "title": "Slash skipanir",
@@ -3918,7 +3922,10 @@
       "agentPlaceholder": "reviewer",
       "templatePlaceholder": "Útskýrðu $ARGUMENTS",
       "subtask": "Keyra sem undirverkefni",
-      "edit": "Breyta skástrik skipun",
+      "edit": "Breyta slash skipun {{name}}",
+      "delete": "Eyða slash skipun {{name}}",
+      "moveUp": "Færa slash skipun {{name}} upp",
+      "moveDown": "Færa slash skipun {{name}} niður",
       "saveFailed": "Ekki tókst að vista skipunina",
       "deleteFailed": "Ekki tókst að eyða skipuninni",
       "nameRequired": "Sláðu inn heiti skipunar",
@@ -3950,6 +3957,7 @@
       "unbindFailed": "Ekki tókst að aftengja geymslu"
     },
     "variablesDeleteFailed": "Ekki tókst að eyða breytunni",
+    "deleteVariable": "Eyða breytu {{key}}",
     "deleteCommand": "Eyða skipun {{position}}"
   },
   "credits": {

@@ -3808,6 +3808,7 @@
     "keyLabel": "চাবি",
     "keyTooLong": "কী 256টি অক্ষর বা তার কম হতে হবে",
     "keyDuplicate": "এই কীটি ইতিমধ্যে প্রোফাইলে বিদ্যমান",
+    "keyWillBeSavedAs": "{{key}} হিসেবে সংরক্ষিত হবে",
     "valueLabel": "মান",
     "valueRequired": "একটি মান লিখুন",
     "tooLong": "সর্বাধিক {{max}}টি অক্ষর ব্যবহার করুন",

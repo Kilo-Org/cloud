@@ -3808,6 +3808,7 @@
     "keyLabel": "ቁልፍ",
     "keyTooLong": "ቁልፉ 256 ቁምፊዎች ወይም ከዚያ ያነሰ መሆን አለበት",
     "keyDuplicate": "ይህ ቁልፍ አስቀድሞ በመገለጫው ውስጥ አለ",
+    "keyWillBeSavedAs": "እንደ {{key}} ይቀመጣል",
     "valueLabel": "ዋጋ",
     "valueRequired": "ዋጋ አስገባ",
     "tooLong": "እስከ {{max}} ቁምፊዎች ብቻ ይጠቀሙ",

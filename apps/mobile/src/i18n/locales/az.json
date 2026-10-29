@@ -3808,6 +3808,7 @@
     "keyLabel": "Açar",
     "keyTooLong": "Açar 256 simvol və ya daha az olmalıdır",
     "keyDuplicate": "Bu açar artıq profildə mövcuddur",
+    "keyWillBeSavedAs": "{{key}} kimi yadda saxlanacaq",
     "valueLabel": "Dəyər",
     "valueRequired": "Dəyəri daxil edin",
     "tooLong": "Ən çox {{max}} simvoldan istifadə edin",

@@ -3858,6 +3858,7 @@
     "keyLabel": "Atslēga",
     "keyTooLong": "Atslēgai jābūt 256 rakstzīmēm vai mazāk",
     "keyDuplicate": "Šī atslēga jau ir profilā",
+    "keyWillBeSavedAs": "Tiks saglabāts kā {{key}}",
     "valueLabel": "Vērtība",
     "valueRequired": "Ievadiet vērtību",
     "tooLong": "Izmantojiet ne vairāk kā {{max}} rakstzīmes",

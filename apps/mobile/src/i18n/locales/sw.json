@@ -3808,6 +3808,7 @@
     "keyLabel": "Ufunguo",
     "keyTooLong": "Ufunguo lazima uwe na vibambo 256 au chini yake",
     "keyDuplicate": "Ufunguo huu tayari upo katika wasifu",
+    "keyWillBeSavedAs": "Itahifadhiwa kama {{key}}",
     "valueLabel": "Thamani",
     "valueRequired": "Ingiza thamani",
     "tooLong": "Tumia vibambo {{max}} au chini yake",

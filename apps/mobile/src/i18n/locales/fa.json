@@ -3808,6 +3808,7 @@
     "keyLabel": "کلید",
     "keyTooLong": "کلید باید 256 نویسه یا کمتر باشد",
     "keyDuplicate": "این کلید از قبل در نمایه وجود دارد",
+    "keyWillBeSavedAs": "به‌صورت {{key}} ذخیره خواهد شد",
     "valueLabel": "ارزش",
     "valueRequired": "ارزش را وارد کنید",
     "tooLong": "حداکثر {{max}} نویسه استفاده کنید",

@@ -3808,6 +3808,7 @@
     "keyLabel": "Кілт",
     "keyTooLong": "Кілт 256 таңбадан аспауы керек",
     "keyDuplicate": "Бұл кілт профильде бұрыннан бар",
+    "keyWillBeSavedAs": "{{key}} ретінде сақталады",
     "valueLabel": "Мән",
     "valueRequired": "Мәнді енгізіңіз",
     "tooLong": "Көп дегенде {{max}} таңба пайдаланыңыз",

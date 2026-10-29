@@ -3808,6 +3808,7 @@
     "keyLabel": "Anahtar",
     "keyTooLong": "Anahtar en fazla 256 karakter olmalıdır",
     "keyDuplicate": "Bu anahtar profilde zaten var",
+    "keyWillBeSavedAs": "{{key}} olarak kaydedilecek",
     "valueLabel": "Değer",
     "valueRequired": "Bir değer girin",
     "tooLong": "En fazla {{max}} karakter kullanın",

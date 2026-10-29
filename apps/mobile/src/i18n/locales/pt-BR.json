@@ -3858,6 +3858,7 @@
     "keyLabel": "Chave",
     "keyTooLong": "A chave deve ter 256 caracteres ou menos",
     "keyDuplicate": "Esta chave já existe no perfil",
+    "keyWillBeSavedAs": "Será salva como {{key}}",
     "valueLabel": "Valor",
     "valueRequired": "Insira um valor",
     "tooLong": "Use no máximo {{max}} caracteres",

@@ -3808,6 +3808,7 @@
     "keyLabel": "Igodo",
     "keyTooLong": "Igodo ga-abụ mkpụrụedemede 256 ma ọ bụ obere",
     "keyDuplicate": "Igodo a dịworị na profaịlụ",
+    "keyWillBeSavedAs": "A ga-echekwa ya dị ka {{key}}",
     "valueLabel": "Uru",
     "valueRequired": "Tinye uru",
     "tooLong": "Jiri mkpụrụedemede {{max}} ma ọ bụ obere",

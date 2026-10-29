@@ -3808,6 +3808,7 @@
     "keyLabel": "ກະແຈ",
     "keyTooLong": "ກະແຈຕ້ອງມີ 256 ຕົວອັກສອນ ຫຼື ໜ້ອຍກວ່າ",
     "keyDuplicate": "ກະແຈນີ້ມີຢູ່ໃນໂປຣໄຟລ໌ແລ້ວ",
+    "keyWillBeSavedAs": "ຈະຖືກບັນທຶກເປັນ {{key}}",
     "valueLabel": "ມູນຄ່າ",
     "valueRequired": "ໃສ່ມູນຄ່າ",
     "tooLong": "ຕ້ອງມີ {{max}} ຕົວອັກສອນ ຫຼື ໜ້ອຍກວ່າ",

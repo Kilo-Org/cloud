@@ -3858,6 +3858,7 @@
     "keyLabel": "clau",
     "keyTooLong": "La clau ha de tenir 256 caràcters o menys",
     "keyDuplicate": "Aquesta clau ja existeix al perfil",
+    "keyWillBeSavedAs": "Es desarà com a {{key}}",
     "valueLabel": "Valor",
     "valueRequired": "Introduïu un valor",
     "tooLong": "Utilitzeu com a màxim {{max}} caràcters",

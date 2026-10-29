@@ -1310,6 +1310,7 @@
       "noDeadlineData": "अभी किसी समस्या के लिए SLA की समय सीमा तय नहीं है",
       "deadlinePassed": "समय सीमा बीत गई",
       "deadlinePassedDetail": "{{critical}} अति गंभीर, {{high}} उच्च",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} अति गंभीर, {{high}} उच्च, {{mediumLow}} मध्यम और निम्न",
       "dueThisWeek": "अंतिम तारीख इस सप्ताह",
       "dueThisWeekDetail": "इनमें से {{exploitable}} का फ़ायदा उठाकर हमला संभव होने की पुष्टि",
       "noDeadline": "कोई समय सीमा नहीं",

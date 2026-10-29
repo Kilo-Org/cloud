@@ -1783,6 +1783,7 @@
       "noDeadlineData": "କୌଣସି ଚିହ୍ନଟ ସମସ୍ୟା ପାଇଁ ଏପର୍ଯ୍ୟନ୍ତ SLA ସମୟସୀମା ଧାର୍ଯ୍ୟ ହୋଇନାହିଁ",
       "deadlinePassed": "ସମୟସୀମା ପାର ହୋଇଛି",
       "deadlinePassedDetail": "{{critical}} ଗୁରୁତର, {{high}} ଉଚ୍ଚ",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} ଗୁରୁତର, {{high}} ଉଚ୍ଚ, {{mediumLow}} ମଧ୍ୟମ ଓ ନିମ୍ନ",
       "dueThisWeek": "ଏହି ସପ୍ତାହରେ ସମୟସୀମା ଶେଷ",
       "dueThisWeekDetail": "ଏହା ମଧ୍ୟରୁ {{exploitable}}ଟି ଆକ୍ରମଣରେ ବ୍ୟବହାରଯୋଗ୍ୟ ବୋଲି ନିଶ୍ଚିତ",
       "noDeadline": "କୌଣସି ସମୟସୀମା ନାହିଁ",

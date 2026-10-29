@@ -1783,6 +1783,7 @@
       "noDeadlineData": "ఇంకా ఏ సమస్యకూ SLA గడువు లేదు",
       "deadlinePassed": "గడువు దాటిపోయింది",
       "deadlinePassedDetail": "అత్యంత తీవ్రమైనవి {{critical}}, అధిక తీవ్రత గలవి {{high}}",
+      "deadlinePassedDetailWithMediumLow": "అత్యంత తీవ్రమైనవి {{critical}}, అధిక తీవ్రత గలవి {{high}}, మధ్యస్థ, తక్కువ తీవ్రత గలవి {{mediumLow}}",
       "dueThisWeek": "ఈ వారం గడువు",
       "dueThisWeekDetail": "వీటిలో {{exploitable}} సమస్యల్లో దుర్వినియోగానికి అవకాశం ఉందని నిర్ధారణ అయింది",
       "noDeadline": "గడువు లేదు",

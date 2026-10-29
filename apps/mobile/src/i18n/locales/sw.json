@@ -1783,6 +1783,7 @@
       "noDeadlineData": "Bado hakuna matatizo yaliyowekewa muda wa mwisho wa SLA",
       "deadlinePassed": "Muda wa mwisho umepita",
       "deadlinePassedDetail": "Hatari sana: {{critical}}, juu: {{high}}",
+      "deadlinePassedDetailWithMediumLow": "Hatari sana: {{critical}}, juu: {{high}}, kati na chini: {{mediumLow}}",
       "dueThisWeek": "Muda unaisha wiki hii",
       "dueThisWeekDetail": "{{exploitable}} ya matatizo haya yamethibitishwa kuwa yanaweza kutumiwa vibaya",
       "noDeadline": "Hakuna muda wa mwisho",

@@ -1833,6 +1833,7 @@
       "noDeadlineData": "Žádný nález zatím nemá stanovený termín SLA",
       "deadlinePassed": "Termín uplynul",
       "deadlinePassedDetail": "Kritické: {{critical}}, vysoké: {{high}}",
+      "deadlinePassedDetailWithMediumLow": "Kritické: {{critical}}, vysoké: {{high}}, střední a nízké: {{mediumLow}}",
       "dueThisWeek": "Termín tento týden",
       "dueThisWeekDetail": "{{exploitable}} z nich je potvrzeně zneužitelných",
       "noDeadline": "Bez termínu",

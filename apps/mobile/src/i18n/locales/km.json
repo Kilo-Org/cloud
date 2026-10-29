@@ -1783,6 +1783,7 @@
       "noDeadlineData": "មិនទាន់មានបញ្ហាដែលរកឃើញណាមួយមានកាលកំណត់ SLA ទេ",
       "deadlinePassed": "បានហួសកាលកំណត់",
       "deadlinePassedDetail": "ធ្ងន់ធ្ងរ {{critical}} និងខ្ពស់ {{high}}",
+      "deadlinePassedDetailWithMediumLow": "ធ្ងន់ធ្ងរ {{critical}} និងខ្ពស់ {{high}} និងមធ្យម និងទាប {{mediumLow}}",
       "dueThisWeek": "ដល់កំណត់សប្តាហ៍នេះ",
       "dueThisWeekDetail": "ក្នុងចំណោមទាំងនេះ មាន {{exploitable}} ត្រូវបានបញ្ជាក់ថាអាចត្រូវបានកេងប្រវ័ញ្ច",
       "noDeadline": "គ្មានកាលកំណត់",

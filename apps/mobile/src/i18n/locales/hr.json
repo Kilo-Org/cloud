@@ -1808,6 +1808,7 @@
       "noDeadlineData": "Nijedan nalaz još nema rok prema SLA-u",
       "deadlinePassed": "Rok istekao",
       "deadlinePassedDetail": "Kritično: {{critical}}, visoko: {{high}}",
+      "deadlinePassedDetailWithMediumLow": "Kritično: {{critical}}, visoko: {{high}}, srednje i nisko: {{mediumLow}}",
       "dueThisWeek": "Dospijeva ovaj tjedan",
       "dueThisWeekDetail": "Od njih je {{exploitable}} potvrđeno iskoristivih",
       "noDeadline": "Bez roka",

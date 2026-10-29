@@ -1808,6 +1808,7 @@
       "noDeadlineData": "Konstatējumiem vēl nav SLA termiņa",
       "deadlinePassed": "Termiņš beidzies",
       "deadlinePassedDetail": "Kritiski: {{critical}}, ar augstu riska līmeni: {{high}}",
+      "deadlinePassedDetailWithMediumLow": "Kritiski: {{critical}}, ar augstu riska līmeni: {{high}}, vidēja un zema pakāpe: {{mediumLow}}",
       "dueThisWeek": "Termiņš šonedēļ",
       "dueThisWeekDetail": "{{exploitable}} no tiem ir apstiprināti izmantojami uzbrukumā",
       "noDeadline": "Nav termiņa",

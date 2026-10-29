@@ -1783,6 +1783,7 @@
       "noDeadlineData": "कोणत्याही निष्कर्षाला अजून SLA मुदत नाही",
       "deadlinePassed": "मुदत संपली",
       "deadlinePassedDetail": "{{critical}} गंभीर, {{high}} उच्च",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} गंभीर, {{high}} उच्च, {{mediumLow}} मध्यम व कमी",
       "dueThisWeek": "या आठवड्यात मुदत",
       "dueThisWeekDetail": "{{exploitable}} यापैकी गैरफायदा घेता येत असल्याचे निश्चित",
       "noDeadline": "मुदत नाही",

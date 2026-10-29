@@ -1338,6 +1338,7 @@
       "noDeadlineData": "لم يُحدَّد موعد نهائي حسب SLA لأي نتيجة بعد",
       "deadlinePassed": "انقضى الموعد النهائي",
       "deadlinePassedDetail": "مستوى حرج: {{critical}}، مستوى عالٍ: {{high}}",
+      "deadlinePassedDetailWithMediumLow": "مستوى حرج: {{critical}}، مستوى عالٍ: {{high}}، مستوى متوسط ومنخفض: {{mediumLow}}",
       "dueThisWeek": "مستحقة هذا الأسبوع",
       "dueThisWeekDetail": "منها {{exploitable}} مؤكدة القابلية للاستغلال",
       "noDeadline": "لا يوجد موعد نهائي",

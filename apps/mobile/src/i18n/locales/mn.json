@@ -1783,6 +1783,7 @@
       "noDeadlineData": "Илэрсэн асуудалд SLA эцсийн хугацаа хараахан тогтоогоогүй",
       "deadlinePassed": "Хугацаа дууссан",
       "deadlinePassedDetail": "{{critical}} ноцтой, {{high}} өндөр",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} ноцтой, {{high}} өндөр, {{mediumLow}} дунд ба бага",
       "dueThisWeek": "Эцсийн хугацаа энэ долоо хоногт",
       "dueThisWeekDetail": "Тэдгээрээс {{exploitable}} асуудлыг халдлагад ашиглах боломжтой нь батлагдсан",
       "noDeadline": "Хугацаагүй",

@@ -1783,6 +1783,7 @@
       "noDeadlineData": "تر اوسه د هېڅ موندنې لپاره د SLA وروستۍ نېټه نه ده ټاکل شوې",
       "deadlinePassed": "مهلت تېر شوی",
       "deadlinePassedDetail": "{{critical}} خورا جدي، {{high}} لوړ",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} خورا جدي، {{high}} لوړ، {{mediumLow}} منځني او ټیټ",
       "dueThisWeek": "مهلت یې دا اوونۍ پای ته رسېږي",
       "dueThisWeekDetail": "له دې څخه {{exploitable}} موندنو کې د ناوړه ګټې اخیستنې امکان تایید شوی",
       "noDeadline": "وروستۍ نېټه نشته",

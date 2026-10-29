@@ -1783,6 +1783,7 @@
       "noDeadlineData": "Әзірге ешбір мәселеге SLA мерзімі белгіленбеген",
       "deadlinePassed": "Мерзім өтті",
       "deadlinePassedDetail": "{{critical}} өте жоғары, {{high}} жоғары",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} өте жоғары, {{high}} жоғары, {{mediumLow}} орташа және төмен",
       "dueThisWeek": "Мерзімі осы аптада",
       "dueThisWeekDetail": "Осы мәселелердің {{exploitable}}-і шабуылға пайдалануға болатыны расталды",
       "noDeadline": "Мерзім жоқ",

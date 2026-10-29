@@ -1783,6 +1783,7 @@
       "noDeadlineData": "எந்தச் சிக்கலுக்கும் இன்னும் SLA காலக்கெடு இல்லை",
       "deadlinePassed": "காலக்கெடு கடந்துவிட்டது",
       "deadlinePassedDetail": "{{critical}} மிகக் கடுமை, {{high}} அதிகம்",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} மிகக் கடுமை, {{high}} அதிகம், {{mediumLow}} நடுத்தர மற்றும் குறைந்த",
       "dueThisWeek": "இந்த வாரம் காலக்கெடு",
       "dueThisWeekDetail": "இவற்றில் {{exploitable}} சிக்கல்கள் தாக்குதலுக்குப் பயன்படுத்த முடியும் என உறுதிசெய்யப்பட்டவை",
       "noDeadline": "காலக்கெடு இல்லை",

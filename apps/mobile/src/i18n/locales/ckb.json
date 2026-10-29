@@ -1783,6 +1783,7 @@
       "noDeadlineData": "هێشتا بۆ هیچ دۆزینەوەیەک مۆڵەتی SLA دیاری نەکراوە",
       "deadlinePassed": "مۆڵەت تێپەڕیوە",
       "deadlinePassedDetail": "{{critical}} زۆر مەترسیدار، {{high}} بەرز",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} زۆر مەترسیدار، {{high}} بەرز، {{mediumLow}} ناوەند و نزم",
       "dueThisWeek": "مۆڵەتیان ئەم هەفتەیە تەواو دەبێت",
       "dueThisWeekDetail": "{{exploitable}} لە ئەمانە خراپ بەکارهێنانیان پشتڕاست کراوەتەوە",
       "noDeadline": "مۆڵەت نییە",

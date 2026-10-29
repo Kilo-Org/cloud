@@ -1783,6 +1783,7 @@
       "noDeadlineData": "Hələ heç bir tapıntının SLA müddəti yoxdur",
       "deadlinePassed": "Müddət başa çatıb",
       "deadlinePassedDetail": "{{critical}} kritik, {{high}} yüksək",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} kritik, {{high}} yüksək, {{mediumLow}} orta və aşağı",
       "dueThisWeek": "Bu həftə bitir",
       "dueThisWeekDetail": "Bunlardan {{exploitable}} tapıntının istismar edilə bildiyi təsdiqlənib",
       "noDeadline": "Müddət yoxdur",

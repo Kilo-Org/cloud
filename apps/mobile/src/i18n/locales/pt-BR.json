@@ -1285,6 +1285,7 @@
       "noDeadlineData": "Ainda não há ocorrências com prazo de SLA definido",
       "deadlinePassed": "Prazo vencido",
       "deadlinePassedDetail": "{{critical}} críticos, {{high}} de nível alto",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} críticos, {{high}} de nível alto, {{mediumLow}} médias e baixas",
       "dueThisWeek": "Vence esta semana",
       "dueThisWeekDetail": "{{exploitable}} destas confirmadas como exploráveis",
       "noDeadline": "Sem prazo",

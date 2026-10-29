@@ -1310,6 +1310,7 @@
       "noDeadlineData": "尚未为任何安全问题设置 SLA 截止时间",
       "deadlinePassed": "截止时间已过",
       "deadlinePassedDetail": "严重：{{critical}} 个，高危：{{high}} 个",
+      "deadlinePassedDetailWithMediumLow": "严重：{{critical}} 个，高危：{{high}} 个，中低危：{{mediumLow}} 个",
       "dueThisWeek": "本周到期",
       "dueThisWeekDetail": "其中 {{exploitable}} 个已确认可利用",
       "noDeadline": "无截止时间",

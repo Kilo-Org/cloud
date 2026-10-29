@@ -1783,6 +1783,7 @@
       "noDeadlineData": "Δεν έχει οριστεί ακόμη προθεσμία SLA για κανένα εύρημα",
       "deadlinePassed": "Η προθεσμία έληξε",
       "deadlinePassedDetail": "{{critical}} κρίσιμης, {{high}} υψηλής σοβαρότητας",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} κρίσιμης, {{high}} υψηλής σοβαρότητας, {{mediumLow}} μέτριας και χαμηλής σοβαρότητας",
       "dueThisWeek": "Λήγουν αυτή την εβδομάδα",
       "dueThisWeekDetail": "Από αυτά, επιβεβαιωμένα εκμεταλλεύσιμα: {{exploitable}}",
       "noDeadline": "Χωρίς προθεσμία",

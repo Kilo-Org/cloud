@@ -1783,6 +1783,7 @@
       "noDeadlineData": "Ниту еден наод сè уште нема рок според SLA",
       "deadlinePassed": "Рокот помина",
       "deadlinePassedDetail": "{{critical}} со критична, {{high}} со висока сериозност",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} со критична, {{high}} со висока сериозност, {{mediumLow}} со средна и ниска сериозност",
       "dueThisWeek": "Со рок оваа недела",
       "dueThisWeekDetail": "Од нив за {{exploitable}} е потврдено дека можат да се искористат за напад",
       "noDeadline": "Нема рок",

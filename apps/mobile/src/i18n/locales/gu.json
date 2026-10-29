@@ -1783,6 +1783,7 @@
       "noDeadlineData": "હજુ કોઈ તારણ માટે SLA ની સમયમર્યાદા નક્કી કરેલી નથી",
       "deadlinePassed": "સમયમર્યાદા વટાવી",
       "deadlinePassedDetail": "{{critical}} ગંભીર, {{high}} ઉચ્ચ",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} ગંભીર, {{high}} ઉચ્ચ, {{mediumLow}} મધ્યમ અને ઓછી",
       "dueThisWeek": "આ અઠવાડિયે સમયમર્યાદા",
       "dueThisWeekDetail": "આમાંથી {{exploitable}} તારણોમાં દુરુપયોગ શક્ય હોવાની પુષ્ટિ થઈ",
       "noDeadline": "કોઈ સમયમર્યાદા નથી",

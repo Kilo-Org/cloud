@@ -1783,6 +1783,7 @@
       "noDeadlineData": "هنوز هیچ یافته‌ای مهلت SLA ندارد",
       "deadlinePassed": "مهلت گذشته است",
       "deadlinePassedDetail": "{{critical}} بحرانی، {{high}} بالا",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} بحرانی، {{high}} بالا، {{mediumLow}} متوسط و پایین",
       "dueThisWeek": "سررسید این هفته",
       "dueThisWeekDetail": "{{exploitable}} مورد از این‌ها با قابلیت بهره‌برداری تأییدشده",
       "noDeadline": "بدون مهلت",

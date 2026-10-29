@@ -1783,6 +1783,7 @@
       "noDeadlineData": "ഒരു കണ്ടെത്തലിനും ഇതുവരെ SLA സമയപരിധി നൽകിയിട്ടില്ല",
       "deadlinePassed": "സമയപരിധി കഴിഞ്ഞു",
       "deadlinePassedDetail": "{{critical}} ഗുരുതരം, {{high}} ഉയർന്നത്",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} ഗുരുതരം, {{high}} ഉയർന്നത്, {{mediumLow}} ഇടത്തരം, കുറഞ്ഞത്",
       "dueThisWeek": "ഈ ആഴ്ച സമയപരിധി അവസാനിക്കുന്നവ",
       "dueThisWeekDetail": "ഇവയിൽ {{exploitable}} എണ്ണം ചൂഷണം ചെയ്യാവുന്നതെന്ന് സ്ഥിരീകരിച്ചു",
       "noDeadline": "സമയപരിധിയില്ല",

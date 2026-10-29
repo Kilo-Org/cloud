@@ -1858,6 +1858,7 @@
       "noDeadlineData": "Għadha ma ġiet assenjata skadenza tas-SLA lill-ebda sejba",
       "deadlinePassed": "L-iskadenza għaddiet",
       "deadlinePassedDetail": "{{critical}} kritiċi, {{high}} għoljin",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} kritiċi, {{high}} għoljin, {{mediumLow}} medji u baxxi",
       "dueThisWeek": "Jiskadu din il-ġimgħa",
       "dueThisWeekDetail": "{{exploitable}} minn dawn ikkonfermati li jistgħu jiġu sfruttati",
       "noDeadline": "L-ebda skadenza",

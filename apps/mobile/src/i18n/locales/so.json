@@ -1783,6 +1783,7 @@
       "noDeadlineData": "Weli ma jiraan natiijooyin loo cayimay waqtiga kama dambaysta ah ee SLA",
       "deadlinePassed": "Waqtiga kama dambaysta ah wuu dhaafay",
       "deadlinePassedDetail": "{{critical}} halis daran, {{high}} sare",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} halis daran, {{high}} sare, {{mediumLow}} dhexdhexaad iyo hoose",
       "dueThisWeek": "Waqtigoodu wuxuu dhammaanayaa toddobaadkan",
       "dueThisWeekDetail": "{{exploitable}} ka mid ah kuwaas ayaa la xaqiijiyay in weerar lagu adeegsan karo",
       "noDeadline": "Ma jiro waqti kama-dambays ah",

@@ -1310,6 +1310,7 @@
       "noDeadlineData": "Henüz SLA son tarihi olan bulgu yok",
       "deadlinePassed": "Son tarih geçti",
       "deadlinePassedDetail": "{{critical}} kritik, {{high}} yüksek",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} kritik, {{high}} yüksek, {{mediumLow}} orta ve düşük",
       "dueThisWeek": "Süresi bu hafta doluyor",
       "dueThisWeekDetail": "Bunlardan {{exploitable}} bulgunun istismar edilebilirliği doğrulandı",
       "noDeadline": "Son tarih yok",

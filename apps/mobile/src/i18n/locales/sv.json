@@ -1783,6 +1783,7 @@
       "noDeadlineData": "Inga fynd har en SLA-tidsfrist ännu",
       "deadlinePassed": "Tidsfristen har passerat",
       "deadlinePassedDetail": "Kritisk: {{critical}}, Hög: {{high}}",
+      "deadlinePassedDetailWithMediumLow": "Kritisk: {{critical}}, Hög: {{high}}, Medel och låg: {{mediumLow}}",
       "dueThisWeek": "Tidsfristen löper ut denna vecka",
       "dueThisWeekDetail": "{{exploitable}} av dessa har bekräftats kunna utnyttjas",
       "noDeadline": "Ingen tidsfrist",

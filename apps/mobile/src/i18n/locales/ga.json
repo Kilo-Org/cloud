@@ -1858,6 +1858,7 @@
       "noDeadlineData": "Níl spriocdháta SLA ag aon toradh fós",
       "deadlinePassed": "Spriocdháta rite",
       "deadlinePassedDetail": "{{critical}} criticiúil, {{high}} ard",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} criticiúil, {{high}} ard, {{mediumLow}} meánach agus íseal",
       "dueThisWeek": "Dlite an tseachtain seo",
       "dueThisWeekDetail": "{{exploitable}} den chuid seo deimhnithe mar inshaothraithe",
       "noDeadline": "Gan spriocdháta",

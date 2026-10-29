@@ -1783,6 +1783,7 @@
       "noDeadlineData": "अझै कुनै सुरक्षा समस्याको SLA म्याद तोकिएको छैन",
       "deadlinePassed": "म्याद नाघेको",
       "deadlinePassedDetail": "{{critical}} अति गम्भीर, {{high}} उच्च",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} अति गम्भीर, {{high}} उच्च, {{mediumLow}} मध्यम र न्यून",
       "dueThisWeek": "यस हप्ता म्याद सकिने",
       "dueThisWeekDetail": "यसमध्ये {{exploitable}} वटा दुरुपयोग हुन सक्ने पुष्टि भएका",
       "noDeadline": "म्याद छैन",

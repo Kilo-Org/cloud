@@ -1808,6 +1808,7 @@
       "noDeadlineData": "Nicio constatare nu are încă un termen limită SLA",
       "deadlinePassed": "Termenul limită a expirat",
       "deadlinePassedDetail": "{{critical}} critice, {{high}} cu severitate ridicată",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} critice, {{high}} cu severitate ridicată, {{mediumLow}} cu gravitate medie și scăzută",
       "dueThisWeek": "Cu termen săptămâna aceasta",
       "dueThisWeekDetail": "{{exploitable}} dintre acestea confirmate ca exploatabile",
       "noDeadline": "Fără termen limită",

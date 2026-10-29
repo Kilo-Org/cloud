@@ -1783,6 +1783,7 @@
       "noDeadlineData": "Geen bevindings het nog 'n SLA-sperdatum nie",
       "deadlinePassed": "Sperdatum verby",
       "deadlinePassedDetail": "{{critical}} krities, {{high}} hoog",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} krities, {{high}} hoog, {{mediumLow}} matig en laag",
       "dueThisWeek": "Sperdatum hierdie week",
       "dueThisWeekDetail": "{{exploitable}} hiervan is bevestig as uitbuitbaar",
       "noDeadline": "Geen sperdatum nie",

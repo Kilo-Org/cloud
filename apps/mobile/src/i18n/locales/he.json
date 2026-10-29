@@ -1317,6 +1317,7 @@
       "noDeadlineData": "עדיין לא נקבעו לממצאים מועדים אחרונים לפי SLA",
       "deadlinePassed": "המועד האחרון חלף",
       "deadlinePassedDetail": "{{critical}} בדרגת חומרה קריטית, {{high}} בדרגת חומרה גבוהה",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} בדרגת חומרה קריטית, {{high}} בדרגת חומרה גבוהה, {{mediumLow}} בדרגת חומרה בינונית ונמוכה",
       "dueThisWeek": "המועד האחרון חל השבוע",
       "dueThisWeekDetail": "{{exploitable}} מהם אושרו כניתנים לניצול",
       "noDeadline": "אין מועד אחרון",

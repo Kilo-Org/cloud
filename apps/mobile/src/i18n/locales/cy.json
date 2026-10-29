@@ -1883,6 +1883,7 @@
       "noDeadlineData": "Nid oes gan unrhyw ganfyddiad ddyddiad terfyn SLA eto",
       "deadlinePassed": "Dyddiad terfyn wedi mynd heibio",
       "deadlinePassedDetail": "{{critical}} critigol, {{high}} uchel",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} critigol, {{high}} uchel, {{mediumLow}} canolig ac isel",
       "dueThisWeek": "I'w cwblhau'r wythnos hon",
       "dueThisWeekDetail": "{{exploitable}} o'r rhain y cadarnhawyd y gellir manteisio arnynt",
       "noDeadline": "Dim dyddiad terfyn",

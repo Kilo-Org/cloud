@@ -1783,6 +1783,7 @@
       "noDeadlineData": "Kò sí àbùkù tó ní ọjọ́ ìparí SLA síbẹ̀",
       "deadlinePassed": "Ọjọ́ ìparí ti kọjá",
       "deadlinePassedDetail": "{{critical}} tó le jù lọ, {{high}} tó ga",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} tó le jù lọ, {{high}} tó ga, {{mediumLow}} ewu àárín àti kékeré",
       "dueThisWeek": "Ọjọ́ ìparí dé lọ́sẹ̀ yìí",
       "dueThisWeekDetail": "{{exploitable}} nínú wọn ni a ti jẹ́rìí pé a lè lo fún ìkọlù",
       "noDeadline": "Kò sí ọjọ́ ìparí",

@@ -1324,6 +1324,7 @@
       "noDeadlineData": "Для жодної проблеми ще не встановлено термін за SLA",
       "deadlinePassed": "Термін минув",
       "deadlinePassedDetail": "Критичний рівень: {{critical}}, високий: {{high}}",
+      "deadlinePassedDetailWithMediumLow": "Критичний рівень: {{critical}}, високий: {{high}}, середній та низький: {{mediumLow}}",
       "dueThisWeek": "Термін спливає цього тижня",
       "dueThisWeekDetail": "З них {{exploitable}} з підтвердженою можливістю атаки",
       "noDeadline": "Терміну немає",

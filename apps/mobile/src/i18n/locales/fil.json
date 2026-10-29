@@ -1783,6 +1783,7 @@
       "noDeadlineData": "Wala pang natukoy na isyung may takdang petsa ng SLA",
       "deadlinePassed": "Lampas na sa takdang petsa",
       "deadlinePassedDetail": "{{critical}} na kritikal, {{high}} na mataas",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} na kritikal, {{high}} na mataas, {{mediumLow}} na katamtaman at mababa",
       "dueThisWeek": "Takdang petsa ngayong linggo",
       "dueThisWeekDetail": "{{exploitable}} sa mga ito ang kumpirmadong maaaring samantalahin",
       "noDeadline": "Walang takdang petsa",

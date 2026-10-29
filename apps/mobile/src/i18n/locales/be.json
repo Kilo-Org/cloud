@@ -1833,6 +1833,7 @@
       "noDeadlineData": "Яшчэ ні для адной праблемы не зададзены тэрмін SLA",
       "deadlinePassed": "Тэрмін мінуў",
       "deadlinePassedDetail": "Крытычны ўзровень: {{critical}}, высокі: {{high}}",
+      "deadlinePassedDetailWithMediumLow": "Крытычны ўзровень: {{critical}}, высокі: {{high}}, сярэдні і нізкі: {{mediumLow}}",
       "dueThisWeek": "Тэрмін на гэтым тыдні",
       "dueThisWeekDetail": "З гэтых праблем {{exploitable}} можна выкарыстаць у атацы",
       "noDeadline": "Няма тэрміну",

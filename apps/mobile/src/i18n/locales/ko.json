@@ -1310,6 +1310,7 @@
       "noDeadlineData": "아직 SLA 마감일이 지정된 문제 없음",
       "deadlinePassed": "마감일 지남",
       "deadlinePassedDetail": "치명적 {{critical}}건, 높음 {{high}}건",
+      "deadlinePassedDetailWithMediumLow": "치명적 {{critical}}건, 높음 {{high}}건, 중간·낮음 {{mediumLow}}건",
       "dueThisWeek": "이번 주 마감",
       "dueThisWeekDetail": "이 중 악용 가능성이 확인된 문제 {{exploitable}}건",
       "noDeadline": "마감일 없음",

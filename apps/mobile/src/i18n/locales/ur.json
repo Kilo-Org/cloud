@@ -1783,6 +1783,7 @@
       "noDeadlineData": "ابھی کسی مسئلے کے لیے SLA کی آخری تاریخ مقرر نہیں",
       "deadlinePassed": "آخری تاریخ گزر گئی",
       "deadlinePassedDetail": "{{critical}} سنگین، {{high}} زیادہ",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} سنگین، {{high}} زیادہ، {{mediumLow}} درمیانی اور کم",
       "dueThisWeek": "اس ہفتے مہلت ختم ہو گی",
       "dueThisWeekDetail": "ان میں سے {{exploitable}} مسائل سے حملہ آوروں کے فائدہ اٹھانے کی تصدیق",
       "noDeadline": "کوئی آخری تاریخ نہیں",

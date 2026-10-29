@@ -1783,6 +1783,7 @@
       "noDeadlineData": "ຍັງບໍ່ມີບັນຫາໃດທີ່ຕັ້ງວັນຄົບກຳນົດ SLA ໄວ້",
       "deadlinePassed": "ເກີນກຳນົດແລ້ວ",
       "deadlinePassedDetail": "ຮ້າຍແຮງ {{critical}}, ສູງ {{high}}",
+      "deadlinePassedDetailWithMediumLow": "ຮ້າຍແຮງ {{critical}}, ສູງ {{high}}, ປານກາງ ແລະ ຕ່ຳ {{mediumLow}}",
       "dueThisWeek": "ຄົບກຳນົດອາທິດນີ້",
       "dueThisWeekDetail": "ໃນນັ້ນ ຢືນຢັນແລ້ວວ່ານຳໄປໃຊ້ໂຈມຕີໄດ້ {{exploitable}} ລາຍການ",
       "noDeadline": "ບໍ່ມີວັນຄົບກຳນົດ",

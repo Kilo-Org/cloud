@@ -1783,6 +1783,7 @@
       "noDeadlineData": "Engin frávik hafa enn fengið SLA-frest",
       "deadlinePassed": "Frestur liðinn",
       "deadlinePassedDetail": "{{critical}} á bráðalvarlegu stigi, {{high}} á háu stigi",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} á bráðalvarlegu stigi, {{high}} á háu stigi, {{mediumLow}} á miðlungs og lágu stigi",
       "dueThisWeek": "Frestur rennur út í vikunni",
       "dueThisWeekDetail": "{{exploitable}} af þessum er staðfest að hægt sé að misnota",
       "noDeadline": "Enginn frestur",

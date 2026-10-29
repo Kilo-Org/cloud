@@ -1783,6 +1783,7 @@
       "noDeadlineData": "Ոչ մի խնդրի համար դեռ SLA-ի վերջնաժամկետ սահմանված չէ",
       "deadlinePassed": "Ժամկետը լրացել է",
       "deadlinePassedDetail": "{{critical}} կրիտիկական, {{high}} բարձր",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} կրիտիկական, {{high}} բարձր, {{mediumLow}} միջին և ցածր",
       "dueThisWeek": "Վերջնաժամկետն այս շաբաթ է",
       "dueThisWeekDetail": "Դրանցից {{exploitable}} խնդիր հաստատված է որպես հարձակման համար օգտագործելի",
       "noDeadline": "Վերջնաժամկետ չկա",

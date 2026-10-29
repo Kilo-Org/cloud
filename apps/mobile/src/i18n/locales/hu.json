@@ -1783,6 +1783,7 @@
       "noDeadlineData": "Még egyetlen találatnak sincs SLA-határideje",
       "deadlinePassed": "Határidő lejárt",
       "deadlinePassedDetail": "{{critical}} kritikus, {{high}} magas",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} kritikus, {{high}} magas, {{mediumLow}} közepes és alacsony",
       "dueThisWeek": "Ezen a héten esedékes",
       "dueThisWeekDetail": "ezek közül {{exploitable}} igazoltan kihasználható",
       "noDeadline": "Nincs határidő",

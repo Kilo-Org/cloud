@@ -1783,6 +1783,7 @@
       "noDeadlineData": "Kāore anō kia whakaritea he wā kati SLA mō ngā kitenga",
       "deadlinePassed": "Kua hipa te wā kati",
       "deadlinePassedDetail": "{{critical}} tino kino, {{high}} teitei",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} tino kino, {{high}} teitei, {{mediumLow}} waenga me te iti",
       "dueThisWeek": "Me whakatutuki i tēnei wiki",
       "dueThisWeekDetail": "{{exploitable}} o ēnei kua whakaūngia ka taea te whakamahi kino",
       "noDeadline": "Kāore he wā kati",

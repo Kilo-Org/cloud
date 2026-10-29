@@ -1310,6 +1310,7 @@
       "noDeadlineData": "Nog geen bevindingen met een SLA-deadline",
       "deadlinePassed": "Deadline verstreken",
       "deadlinePassedDetail": "{{critical}} kritiek, {{high}} hoog",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} kritiek, {{high}} hoog, {{mediumLow}} gemiddeld en laag",
       "dueThisWeek": "Deadline deze week",
       "dueThisWeekDetail": "Waarvan misbruik bevestigd bij {{exploitable}} bevindingen",
       "noDeadline": "Geen deadline",

@@ -1783,6 +1783,7 @@
       "noDeadlineData": "Ammaaf argamni guyyaan xumuraa SLA ramadameef hin jiru",
       "deadlinePassed": "Guyyaan xumuraa darbeera",
       "deadlinePassedDetail": "baay'ee hamaa {{critical}}, olaanaa {{high}}",
+      "deadlinePassedDetailWithMediumLow": "baay'ee hamaa {{critical}}, olaanaa {{high}}, giddu galeessaa fi gadi aanaa {{mediumLow}}",
       "dueThisWeek": "Torban kana xumuramuu qabu",
       "dueThisWeekDetail": "Kana keessaa {{exploitable}} haleellaaf saaxilamuu isaanii mirkanaa'e",
       "noDeadline": "Guyyaan xumuraa hin jiru",

@@ -1783,6 +1783,7 @@
       "noDeadlineData": "E debeghị oge njedebe SLA maka ihe achọpụtara ọ bụla",
       "deadlinePassed": "Oge njedebe agafeela",
       "deadlinePassedDetail": "{{critical}} dị oké njọ, {{high}} dị elu",
+      "deadlinePassedDetailWithMediumLow": "{{critical}} dị oké njọ, {{high}} dị elu, {{mediumLow}} dị n'etiti ma ọ bụ ala",
       "dueThisWeek": "Oge ga-eru n'izu a",
       "dueThisWeekDetail": "{{exploitable}} n'ime ha ka e kwadoro na a pụrụ iji ya wakpo sistemụ",
       "noDeadline": "Enweghị oge njedebe",

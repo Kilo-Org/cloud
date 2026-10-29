@@ -1029,7 +1029,9 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
 
         // Compare-and-set save: the config write, the include-existing analysis
         // enqueue, and the include-existing remediation command all commit in one
-        // transaction. A stale revision or an enqueue failure rolls back.
+        // transaction. A stale revision or an enqueue failure rolls back. The
+        // save carries no enable flag, so a settings save leaves the stored
+        // enabled state exactly as it is.
         const saveOutcome = await saveSecurityAgentConfigWithRevision({
           owner,
           config: {
@@ -1253,12 +1255,16 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         let initialSyncAdmissionFailed = false;
 
         if (input.isEnabled) {
+          // The enable flag is written in the same CAS transaction as the
+          // selection above it: enabling is this guarded transition, never a
+          // settings save.
           const { newRevision } = await saveSecurityAgentConfigWithRevision({
             owner,
             config: {
               repository_selection_mode: selectionMode,
               selected_repository_ids: selectedIds,
             },
+            isEnabled: true,
             createdBy: ctx.user.id,
             expectedRevision: existingConfig?.configRevision ?? null,
           });

@@ -36,6 +36,7 @@ import {
   organization_groups,
   organization_group_memberships,
   organization_group_policy_settings,
+  organization_guardrails,
   byoc_connections,
   organization_user_limits,
   organization_user_usage,
@@ -995,6 +996,8 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * - personal byoc_connections rows (organization-owned
  *   credentials are retained)
  * - organization_audit_logs (actor PII nulled)
+ * - organization_guardrails (org-owned policy retained; created_by_kilo_user_id nulled)
+ * - organization_mcp_connect_events (retained; user ID reference only, no PII, deleted after 90 days)
  * - kiloclaw_admin_audit_logs (actor PII nulled, target_user_id anonymized)
  * - admin_action_audit_logs (actor PII nulled, user target_id anonymized)
  * - model_eval_ingestions (promoter email anonymized)
@@ -1763,6 +1766,11 @@ export async function anonymizeCloudUserData(
     .update(organization_group_policy_settings)
     .set({ updated_by_kilo_user_id: null })
     .where(eq(organization_group_policy_settings.updated_by_kilo_user_id, userId));
+  // Guardrails are org-owned policy, so they stay; only the creator reference is cleared.
+  await tx
+    .update(organization_guardrails)
+    .set({ created_by_kilo_user_id: null })
+    .where(eq(organization_guardrails.created_by_kilo_user_id, userId));
 
   // Security audit logs: keep org-owned entries, strip actor PII
   // (user-owned entries are cascade-deleted via owned_by_user_id FK)

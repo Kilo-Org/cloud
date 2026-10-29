@@ -15,6 +15,7 @@ import {
 } from '@/components/security-agent/finding-tone';
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
 import { DISMISSAL_REASON_PHRASE_KEYS } from '@/components/security-agent/dismissal-reason-keys';
+import { storedText } from '@/components/security-agent/stored-text';
 import { getDeadlineCopy } from '@/lib/security-agent-copy';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
 import { KvRow } from '@/components/ui/kv-row';
@@ -54,18 +55,19 @@ function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | un
 }
 
 function getDismissalReasonLabel(reason: string | null): string {
-  if (!reason) {
+  const code = storedText(reason);
+  if (code === null) {
     return i18n.t('securityAgent.findingDetails.reasonAfterReview');
   }
-  const key = lookup(DISMISSAL_REASON_PHRASE_KEYS, reason);
-  return key ? i18n.t(key) : reason.replaceAll('_', ' ');
+  const key = lookup(DISMISSAL_REASON_PHRASE_KEYS, code);
+  return key ? i18n.t(key) : code.replaceAll('_', ' ');
 }
 
 function getFindingSourceLabel(source: string): string {
   if (source === 'dependabot') {
     return i18n.t('securityAgent.findingDetails.sourceDependabot');
   }
-  return source.replaceAll('_', ' ');
+  return storedText(source)?.replaceAll('_', ' ') ?? i18n.t('common.unknown');
 }
 
 function DismissalOrSupersessionNote({

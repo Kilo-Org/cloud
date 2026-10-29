@@ -23,6 +23,7 @@ vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({ useThemeColors: () => ({}) }));
 vi.mock('@/lib/pr-review/connect-gate-platform', () => ({
   openAuthorizationAndWaitForReturn: authorization,
+  reportLateLaunchFailure: vi.fn(),
 }));
 
 let mounted: Awaited<ReturnType<typeof renderWithProviders>> | undefined = undefined;

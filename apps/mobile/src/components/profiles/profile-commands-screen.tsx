@@ -24,7 +24,7 @@ import { FormField } from '@/components/ui/form-field';
 import { ChevronDown, ChevronUp, Terminal, Trash2 } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
-import { useAgentProfile } from '@/lib/hooks/use-agent-profiles';
+import { useAgentProfileCommands } from '@/lib/hooks/use-agent-profiles';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useProfileCommandsSave } from '@/lib/hooks/use-profile-commands-save';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -60,11 +60,10 @@ export function ProfileCommandsScreen({
   const { t } = useTranslation();
   const router = useRouter();
   const colors = useThemeColors();
-  const profileQuery = useAgentProfile(profileId, organizationId);
+  const commandsQuery = useAgentProfileCommands(profileId, organizationId);
   const canManage = useCanManageOrganizationProfiles(organizationId);
 
-  const profile = profileQuery.data;
-  const serverRows = profile?.commands ?? NO_COMMAND_ROWS;
+  const serverRows: readonly CommandRow[] = commandsQuery.data ?? NO_COMMAND_ROWS;
   const serverCommands = useMemo(() => serverRows.map(row => row.command), [serverRows]);
 
   // The screen owns the ordered list — `setCommands` replaces the whole list,
@@ -187,11 +186,17 @@ export function ProfileCommandsScreen({
       position === null ? t('profiles.moveDown') : t('profiles.moveCommandDown', { position });
     const deleteLabel =
       position === null ? t('common.delete') : t('profiles.deleteCommand', { position });
+    // The field's label is also its accessible name, so it carries the same
+    // position the row's move and delete controls announce.
+    const commandLabel =
+      position === null
+        ? t('profiles.commandLabel')
+        : t('profiles.commandLabelPosition', { position });
     const rowHint = position === null ? undefined : commandRowA11yLabel(position - 1, commandTotal);
     return (
       <View key={`${generation}-${index}`} className="gap-3 rounded-lg bg-secondary p-3">
         <FormField
-          label={t('profiles.commandLabel')}
+          label={commandLabel}
           defaultValue={command}
           placeholder={t('profiles.commandPlaceholder')}
           className="min-h-[44px] leading-[normal]"
@@ -255,17 +260,17 @@ export function ProfileCommandsScreen({
   };
 
   let content: ReactNode = null;
-  if (profileQuery.isError) {
+  if (commandsQuery.isError) {
     content = (
       <QueryError
         variant="server"
         placement="top"
         title={t('profiles.loadFailed')}
-        onRetry={() => void profileQuery.refetch()}
-        isRetrying={profileQuery.isRefetching}
+        onRetry={() => void commandsQuery.refetch()}
+        isRetrying={commandsQuery.isRefetching}
       />
     );
-  } else if (profileQuery.isPending) {
+  } else if (commandsQuery.isPending) {
     content = <CommandsSkeleton />;
   } else if (commands.length === 0) {
     content = (

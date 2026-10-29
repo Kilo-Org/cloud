@@ -9,7 +9,10 @@ import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
 import { CenteredState } from '@/components/centered-state';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { openAuthorizationAndWaitForReturn } from '@/lib/pr-review/connect-gate-platform';
+import {
+  openAuthorizationAndWaitForReturn,
+  reportLateLaunchFailure,
+} from '@/lib/pr-review/connect-gate-platform';
 
 type SecurityAgentSetupProps<T> = {
   title: string;
@@ -51,7 +54,14 @@ export function SecurityAgentSetup<T>({
         toast.error(t('securityAgent.scopeEntry.setupFailed'));
         return;
       }
-      await openAuthorizationAndWaitForReturn(openUrl);
+      const wait = await openAuthorizationAndWaitForReturn(openUrl);
+      // A launch that fails after the app's own return edge ended the wait never
+      // reaches the catch below.
+      reportLateLaunchFailure(wait, {
+        onFailure: () => {
+          toast.error(t('securityAgent.setup.couldNotOpenGithub'));
+        },
+      });
       await onConnected();
     } catch {
       toast.error(t('securityAgent.setup.couldNotOpenGithub'));

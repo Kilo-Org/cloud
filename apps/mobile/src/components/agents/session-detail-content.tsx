@@ -10,6 +10,7 @@ import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { MessageSquare } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
 import { Platform, type TextInstance, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -1435,7 +1436,7 @@ export function SessionDetailContent({
           message: feedback,
           attempt,
         });
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        notificationHaptic(Haptics.NotificationFeedbackType.Error);
       };
       try {
         let dropped = false;
@@ -1485,7 +1486,7 @@ export function SessionDetailContent({
             ? t('agentChat.session.cancelQueuedRestoreAvailable')
             : t('agentChat.session.cancelQueuedRestored')
         );
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        notificationHaptic(Haptics.NotificationFeedbackType.Success);
       } finally {
         inFlight.delete(messageId);
         if (inFlight === cancelingQueuedIdsRef.current) {
@@ -1512,7 +1513,7 @@ export function SessionDetailContent({
       });
       setCancelQueuedStatus(null);
       announceForA11y(t('agentChat.session.cancelQueuedRestored'));
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      notificationHaptic(Haptics.NotificationFeedbackType.Success);
     },
     [canceledQueuedMessages, t]
   );
@@ -2402,7 +2403,7 @@ export function SessionDetailContent({
               onAutoApproveChange={enabled => {
                 // Selection haptic for the commit: a capability iOS and Android
                 // both have, served here by the one cross-platform call.
-                void Haptics.selectionAsync();
+                selectionHaptic();
                 setSessionAutoApproveEnabled(sessionId, enabled);
               }}
               onClose={() => {

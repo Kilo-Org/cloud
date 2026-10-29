@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Wysigings",
-    "organizationTrialEnded": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. 'n Organisasie-eienaar kan die fakturering by kilo.ai opdateer en dan weer probeer."
+    "organizationTrialEnded": "Die organisasie se proeftydperk het geëindig en dit het geen aktiewe plan nie. 'n Organisasie-eienaar kan die fakturering by kilo.ai opdateer en dan weer probeer.",
+    "privateRepositoryA11y": "{{name}}, privaat bewaarplek"
   },
   "language": {
     "restarting": "Herbegin om die taal toe te pas",
@@ -1513,7 +1514,13 @@
         "change_request_failed": "PR het misluk",
         "superseded": "Reeds teenwoordig"
       },
-      "noProposalsDescription": "Voorstelle uit die hersieningsgeheue verskyn hier nadat Kilo instandhouers se antwoorde ontleed het."
+      "noProposalsDescription": "Voorstelle uit die hersieningsgeheue verskyn hier nadat Kilo instandhouers se antwoorde ontleed het.",
+      "changeRequestInProgress": "Kilo maak reeds 'n pull request vir hierdie voorstel oop. Probeer weer oor 'n oomblik.",
+      "changeRequestNotActionable": "Hierdie voorstel kan nie meer goedgekeur word nie. Sluit dit en verfris die lys.",
+      "changeRequestNoGitHubAccess": "Geen GitHub-verbinding het toegang tot hierdie bewaarplek nie. Herverbind GitHub met toegang daartoe en probeer dan weer.",
+      "changeRequestMissingPermissions": "Kilo se GitHub-app kan nie pull requests in hierdie bewaarplek oopmaak nie. 'n Eienaar van die bewaarplek moet die app skryftoegang tot inhoud en pull requests gee en dan weer probeer.",
+      "changeRequestFailed": "Kilo kon nie die pull request oopmaak nie. Probeer weer oor 'n oomblik.",
+      "offAction": "Die hersieningsgeheue is af. Skakel dit aan en probeer dan weer."
     },
     "manualReview": {
       "title": "Handmatige hersiening",
@@ -3808,6 +3815,7 @@
     "keyLabel": "Sleutel",
     "keyTooLong": "Sleutel moet 256 karakters of minder wees",
     "keyDuplicate": "Hierdie sleutel bestaan reeds in die profiel",
+    "keyWillBeSavedAs": "Sal as {{key}} gestoor word",
     "valueLabel": "Waarde",
     "valueRequired": "Voer 'n waarde in",
     "tooLong": "Gebruik hoogstens {{max}} karakters",
@@ -3823,6 +3831,7 @@
     "commandsTitle": "Stel opdragte op",
     "addCommand": "Voeg opdrag by",
     "commandLabel": "Bevel",
+    "commandLabelPosition": "Bevel {{position}}",
     "commandPlaceholder": "bv. pnpm install",
     "commandsEmpty": "Nog geen opstelopdragte nie",
     "commandsSaveFailed": "Kon nie opstellingopdragte stoor nie",
@@ -3841,6 +3850,7 @@
     "skillSaveFailed": "Kon nie vaardigheid red nie",
     "skillSourceCustom": "Pasgemaak",
     "skillSourceMarketplace": "Markplek",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Plak 'n SKILL.md en sy naam vul in; voeg 'n vaardigheid vanaf jou foon by sonder om te sleep en te laat val.",
     "skillEditTitle": "Wysig vaardigheid",
     "skillEdit": "Wysig vaardigheid {{name}}",
@@ -3867,6 +3877,7 @@
       "headersHint": "Waardes wat as •••• vertoon word, behou hul gestoorde geheim; vervang 'n waarde om dit te roteer. Wanneer die URL verander word, word elke waarde weer vereis",
       "nameRequired": "Voer 'n bedienernaam in",
       "nameInvalid": "Naam kan slegs ASCII-letters, syfers, onderstrepe en strepe tot 100 karakters gebruik",
+      "nameConflict": "'n Bediener met hierdie naam bestaan reeds",
       "commandRequired": "Voer 'n opdrag in",
       "commandTooLong": "Gebruik hoogstens 50 argumente van 500 karakters elk",
       "urlRequired": "Voer 'n URL in",
@@ -3886,7 +3897,7 @@
       "add": "Voeg agent by",
       "empty": "Nog geen agente nie",
       "name": "Agent naam",
-      "slug": "Agent slak",
+      "slug": "Agent-identifiseerder",
       "description": "Agent beskrywing",
       "model": "Model ignoreer",
       "modelPlaceholder": "Gebruik sessie verstek",
@@ -3911,9 +3922,9 @@
       "saveFailed": "Kon nie agent stoor nie",
       "deleteFailed": "Kon nie agent verwyder nie",
       "nameRequired": "Voer 'n agentnaam in",
-      "slugRequired": "Voer 'n agentslak in",
-      "slugInvalid": "Slak moet met 'n ASCII-kleinletter begin en slegs ASCII-kleinletters, syfers en strepe tot 50 karakters gebruik",
-      "slugConflict": "Daardie slak word deur 'n ingeboude agent of 'n ander agent in hierdie profiel gebruik",
+      "slugRequired": "Voer 'n agent-identifiseerder in",
+      "slugInvalid": "Die agent-identifiseerder moet met 'n ASCII-kleinletter begin en slegs ASCII-kleinletters, syfers en strepe tot 50 karakters gebruik",
+      "slugConflict": "Daardie agent-identifiseerder word deur 'n ingeboude agent of 'n ander agent in hierdie profiel gebruik",
       "edit": "Wysig agent {{name}}",
       "delete": "Skrap agent {{name}}"
     },
@@ -3947,7 +3958,6 @@
       "repo": "Kies bewaarplek …",
       "profile": "Kies profiel",
       "remove": "Ontbind",
-      "private": "Privaat",
       "search": "Soek bewaarplekke …",
       "addedToast": "Verstekprofiel gestel vir \"{{repo}}\"",
       "addFailed": "Kon nie verstekprofiel stel nie",
@@ -3960,7 +3970,11 @@
       "pinnedToast": "Vasgespeld aan \"{{repo}}\"",
       "pinFailed": "Kon nie repo vasspeld nie",
       "unboundToast": "Repo ongebonde",
-      "unbindFailed": "Kon nie repo ontbind nie"
+      "unbindFailed": "Kon nie repo ontbind nie",
+      "repoValue": "Bewaarplek: {{name}}",
+      "profileValue": "Profiel: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Skep 'n organisasieprofiel om omgewingsveranderlikes, opstelopdragte en vaardighede oor sessies te hergebruik.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Die eienaar of admin van 'n organisasie kan 'n organisasieprofiel skep."
     },
     "variablesDeleteFailed": "Kon nie veranderlike verwyder nie",
     "deleteVariable": "Skrap veranderlike {{key}}",

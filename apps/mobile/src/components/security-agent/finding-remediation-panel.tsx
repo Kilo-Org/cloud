@@ -12,6 +12,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { AnalysisRerunAction } from '@/components/security-agent/analysis-rerun-action';
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
+import { storedText } from '@/components/security-agent/stored-text';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { Button } from '@/components/ui/button';
@@ -432,7 +433,11 @@ export function FindingRemediationPanel({
                   />
                   <KvRow
                     label={t('securityAgent.remediation.startedBy')}
-                    value={originKey ? t(originKey) : attempt.origin.replaceAll('_', ' ')}
+                    value={
+                      originKey
+                        ? t(originKey)
+                        : (storedText(attempt.origin)?.replaceAll('_', ' ') ?? t('common.unknown'))
+                    }
                   />
                   <KvRow
                     label={t('common.model')}

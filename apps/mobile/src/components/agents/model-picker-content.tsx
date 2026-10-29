@@ -1,5 +1,5 @@
 import { FlashList, type FlashListRef } from '@shopify/flash-list';
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { AlertCircle, Info, Search, SearchX, X } from '@/components/ui/icons';
 import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
@@ -134,7 +134,7 @@ export function ModelPickerContent() {
 
   const handleSelectVariant = useCallback(
     (variant: string) => {
-      void Haptics.selectionAsync();
+      selectionHaptic();
       selectionChangedRef.current = true;
       selectedVariantRef.current = variant;
       setSelectedVariant(variant);
@@ -155,7 +155,7 @@ export function ModelPickerContent() {
       if (option.unavailable || !bridge) {
         return;
       }
-      void Haptics.selectionAsync();
+      selectionHaptic();
       const selection = resolveModelPickerSelection(bridge, option.id, selectedVariantRef.current);
       if (!selection) {
         return;

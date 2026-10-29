@@ -145,6 +145,12 @@ import { KILOCLAW_PRICE_VERSIONS, type KiloClawPriceVersion } from './kiloclaw-p
 import type {
   OrganizationModeConfig,
   OrganizationGroupPolicies,
+  OrganizationGuardrailConfig,
+  OrganizationGuardrailSource,
+  OrganizationMcpConnectDecision,
+  OrganizationMcpConnectTarget,
+  OrganizationGuardrailStatus,
+  OrganizationGuardrailType,
   OrganizationPlan,
   OrganizationRole,
   OrganizationSettings,
@@ -3925,6 +3931,86 @@ export const organization_groups = pgTable(
     ),
   ]
 );
+
+export const organization_guardrails = pgTable(
+  'organization_guardrails',
+  {
+    id: idPrimaryKeyColumn,
+    organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    type: text().$type<OrganizationGuardrailType>().notNull(),
+    identity_key: text().notNull(),
+    name: text().notNull(),
+    description: text(),
+    status: text().$type<OrganizationGuardrailStatus>().default('enabled').notNull(),
+    config: jsonb().$type<OrganizationGuardrailConfig>().notNull(),
+    source: jsonb().$type<OrganizationGuardrailSource>().notNull(),
+    created_by_kilo_user_id: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+    updated_at: timestamp({ withTimezone: true, mode: 'string' })
+      .defaultNow()
+      .notNull()
+      .$onUpdateFn(() => sql`now()`),
+  },
+  table => [
+    unique('UQ_organization_guardrails_organization_id_type_identity_key').on(
+      table.organization_id,
+      table.type,
+      table.identity_key
+    ),
+    check('organization_guardrails_type_check', sql`${table.type} IN ('mcp')`),
+    check('organization_guardrails_status_check', sql`${table.status} IN ('enabled', 'disabled')`),
+    check(
+      'organization_guardrails_name_check',
+      sql`char_length(btrim(${table.name})) BETWEEN 1 AND 500`
+    ),
+    check(
+      'organization_guardrails_description_check',
+      sql`${table.description} IS NULL OR char_length(${table.description}) <= 500`
+    ),
+  ]
+);
+
+export type OrganizationGuardrail = typeof organization_guardrails.$inferSelect;
+export type NewOrganizationGuardrail = typeof organization_guardrails.$inferInsert;
+
+/**
+ * One MCP connect attempt by a member's client. Only connects are recorded, not tool calls. The
+ * user is referenced by ID only; names are joined at read time. Rows are deleted after 90 days.
+ */
+export const organization_mcp_connect_events = pgTable(
+  'organization_mcp_connect_events',
+  {
+    id: idPrimaryKeyColumn,
+    organization_id: uuid()
+      .notNull()
+      .references(() => organizations.id, { onDelete: 'cascade' }),
+    kilo_user_id: text().notNull(),
+    client: text().notNull(),
+    decision: text().$type<OrganizationMcpConnectDecision>().notNull(),
+    identity_key: text().notNull(),
+    target: jsonb().$type<OrganizationMcpConnectTarget>().notNull(),
+    server_name: text(),
+    created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
+  },
+  table => [
+    index('IDX_org_mcp_connect_events_org_identity').on(
+      table.organization_id,
+      table.identity_key,
+      table.created_at
+    ),
+    index('IDX_org_mcp_connect_events_org_created').on(table.organization_id, table.created_at),
+    index('IDX_org_mcp_connect_events_created_at').on(table.created_at),
+    check(
+      'organization_mcp_connect_events_decision_check',
+      sql`${table.decision} IN ('allowed', 'denied')`
+    ),
+  ]
+);
+
+export type OrganizationMcpConnectEvent = typeof organization_mcp_connect_events.$inferSelect;
+export type NewOrganizationMcpConnectEvent = typeof organization_mcp_connect_events.$inferInsert;
 
 export type OrganizationGroup = typeof organization_groups.$inferSelect;
 export type NewOrganizationGroup = typeof organization_groups.$inferInsert;
@@ -11383,7 +11469,6 @@ export const agent_briefing_context_preferences = pgTable(
     context_key: text().notNull(),
     organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
     enabled: boolean().notNull().default(false),
-    ai_enabled: boolean().notNull().default(false),
     model: text().notNull(),
     max_duration_seconds: integer().notNull().default(600),
     max_spend_microdollars: bigint({ mode: 'number' }).notNull().default(2_000_000),
@@ -11450,86 +11535,6 @@ export const agent_briefing_snapshots = pgTable(
     index('agent_briefing_snapshots_running_deadline')
       .on(table.generation_deadline_at)
       .where(sql`${table.summary}->>'status' = 'running'`),
-  ]
-);
-
-export const agent_briefing_events = pgTable(
-  'agent_briefing_events',
-  {
-    id: text().primaryKey(),
-    kilo_user_id: text().notNull(),
-    session_id: text().notNull(),
-    organization_id: uuid(),
-    kind: text().notNull(),
-    occurred_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-    recorded_at: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
-    status: text(),
-    title: text(),
-    url: text(),
-    payload: jsonb().$type<Record<string, unknown>>(),
-  },
-  table => [
-    foreignKey({
-      columns: [table.session_id, table.kilo_user_id],
-      foreignColumns: [cli_sessions_v2.session_id, cli_sessions_v2.kilo_user_id],
-      name: 'agent_briefing_events_session_fk',
-    }).onDelete('cascade'),
-    index('agent_briefing_events_user_window').on(table.kilo_user_id, table.occurred_at),
-    index('agent_briefing_events_session_window').on(
-      table.session_id,
-      table.kilo_user_id,
-      table.occurred_at
-    ),
-  ]
-);
-
-export const agent_briefing_reports = pgTable(
-  'agent_briefing_reports',
-  {
-    id: uuid().primaryKey().defaultRandom(),
-    kilo_user_id: text()
-      .notNull()
-      .references(() => kilocode_users.id, { onDelete: 'cascade' }),
-    context_key: text().notNull(),
-    organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
-    kind: text().$type<'scheduled' | 'one_off'>().notNull().default('scheduled'),
-    created_at: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
-    timezone: text(),
-    language: text(),
-    evidence_recorded_before: timestamp({ withTimezone: true, mode: 'string' }),
-    // NULL leaves one-off reports outside the scheduled uniqueness key.
-    local_date: text(),
-    night_start_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-    cutoff_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-    morning_end_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
-    published_at: timestamp({ withTimezone: true, mode: 'string' }),
-    updated_at: timestamp({ withTimezone: true, mode: 'string' }).notNull().defaultNow(),
-    next_refresh_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow(),
-    next_charge_check_at: timestamp({ withTimezone: true, mode: 'string' }),
-    read_at: timestamp({ withTimezone: true, mode: 'string' }),
-    dismissed_at: timestamp({ withTimezone: true, mode: 'string' }),
-    revision: integer().notNull().default(1),
-    evidence_hash: text().notNull(),
-    facts: jsonb().notNull().$type<Record<string, unknown>>(),
-    summary: jsonb().notNull().$type<Record<string, unknown>>(),
-    generation_id: text(),
-    generation_started_at: timestamp({ withTimezone: true, mode: 'string' }),
-    generation_finished_at: timestamp({ withTimezone: true, mode: 'string' }),
-    generation_deadline_at: timestamp({ withTimezone: true, mode: 'string' }),
-    generation_revision: integer(),
-    generation_max_cost: bigint({ mode: 'number' }),
-    notification_sent_at: timestamp({ withTimezone: true, mode: 'string' }),
-  },
-  table => [
-    uniqueIndex('agent_briefing_reports_window').on(
-      table.kilo_user_id,
-      table.context_key,
-      table.local_date
-    ),
-    index('agent_briefing_reports_user_history').on(table.kilo_user_id, table.cutoff_at),
-    index('agent_briefing_reports_active').on(table.morning_end_at),
-    index('agent_briefing_reports_refresh_due').on(table.next_refresh_at),
-    index('agent_briefing_reports_charge_due').on(table.next_charge_check_at),
   ]
 );
 

@@ -214,7 +214,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Changes",
-    "organizationTrialEnded": "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again."
+    "organizationTrialEnded": "The organization's trial has ended and it has no active plan. An organization owner can update billing at kilo.ai, then try again.",
+    "privateRepositoryA11y": "{{name}}, private repository"
   },
   "language": {
     "restarting": "Restarting to apply language",
@@ -1579,7 +1580,13 @@
         "change_request_failed": "PR failed",
         "superseded": "Already present"
       },
-      "noProposalsDescription": "Review memory proposals appear here after Kilo analyzes maintainer replies."
+      "noProposalsDescription": "Review memory proposals appear here after Kilo analyzes maintainer replies.",
+      "changeRequestInProgress": "Kilo is already opening a pull request for this proposal. Try again in a moment.",
+      "changeRequestNotActionable": "This proposal can no longer be approved. Close it and refresh the list.",
+      "changeRequestNoGitHubAccess": "No GitHub connection has access to this repository. Reconnect GitHub with access to it, then try again.",
+      "changeRequestMissingPermissions": "Kilo's GitHub App cannot open pull requests in this repository. A repository owner must give the app write access to contents and pull requests, then try again.",
+      "changeRequestFailed": "Kilo could not open the pull request. Try again in a moment.",
+      "offAction": "Review memory is off. Turn it on, then try again."
     },
     "manualReview": {
       "title": "Manual review",
@@ -3874,6 +3881,7 @@
     "keyLabel": "Key",
     "keyTooLong": "Key must be 256 characters or fewer",
     "keyDuplicate": "This key already exists in the profile",
+    "keyWillBeSavedAs": "Will be saved as {{key}}",
     "valueLabel": "Value",
     "valueRequired": "Enter a value",
     "tooLong": "Use at most {{max}} characters",
@@ -3889,6 +3897,7 @@
     "commandsTitle": "Setup commands",
     "addCommand": "Add command",
     "commandLabel": "Command",
+    "commandLabelPosition": "Command {{position}}",
     "commandPlaceholder": "e.g. pnpm install",
     "commandsEmpty": "No setup commands yet",
     "commandsSaveFailed": "Couldn't save setup commands",
@@ -3907,6 +3916,7 @@
     "skillSaveFailed": "Couldn't save skill",
     "skillSourceCustom": "Custom",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Paste a SKILL.md and its name fills in; add a skill from your phone without drag and drop.",
     "skillEditTitle": "Edit skill",
     "skillEdit": "Edit skill {{name}}",
@@ -3933,6 +3943,7 @@
       "headersHint": "Values shown as •••• keep their stored secret; replace a value to rotate it. Changing the URL requires every value again",
       "nameRequired": "Enter a server name",
       "nameInvalid": "Name can use only ASCII letters, numbers, underscores, and dashes, up to 100 characters",
+      "nameConflict": "A server with this name already exists",
       "commandRequired": "Enter a command",
       "commandTooLong": "Use at most 50 arguments of 500 characters each",
       "urlRequired": "Enter a URL",
@@ -4013,7 +4024,6 @@
       "repo": "Select repository…",
       "profile": "Select profile",
       "remove": "Unbind",
-      "private": "Private",
       "search": "Search repositories…",
       "addedToast": "Default profile set for \"{{repo}}\"",
       "addFailed": "Couldn't set default profile",
@@ -4026,7 +4036,11 @@
       "pinnedToast": "Pinned to \"{{repo}}\"",
       "pinFailed": "Couldn't pin repo",
       "unboundToast": "Repo unbound",
-      "unbindFailed": "Couldn't unbind repo"
+      "unbindFailed": "Couldn't unbind repo",
+      "repoValue": "Repository: {{name}}",
+      "profileValue": "Profile: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Create an organization profile to reuse environment variables, setup commands, and skills across sessions.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "An organization owner or admin can create an organization profile."
     },
     "variablesDeleteFailed": "Couldn't delete variable",
     "deleteVariable": "Delete variable {{key}}",

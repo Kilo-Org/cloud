@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Bidliet",
-    "organizationTrialEnded": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Sid l-organizzazzjoni jista' jaġġorna l-fatturazzjoni fuq kilo.ai, imbagħad jerġa' jipprova."
+    "organizationTrialEnded": "Il-prova tal-organizzazzjoni ntemmet u m'għandhiex pjan attiv. Sid l-organizzazzjoni jista' jaġġorna l-fatturazzjoni fuq kilo.ai, imbagħad jerġa' jipprova.",
+    "privateRepositoryA11y": "{{name}}, repositorju privat"
   },
   "language": {
     "restarting": "L-app qed terġa' tibda biex tapplika l-lingwa",
@@ -1579,7 +1580,13 @@
         "change_request_failed": "Il-PR falliet",
         "superseded": "Diġà preżenti"
       },
-      "noProposalsDescription": "Il-proposti tal-memorja tar-reviżjoni jidhru hawn wara li Kilo janalizza t-tweġibiet tal-manutenturi."
+      "noProposalsDescription": "Il-proposti tal-memorja tar-reviżjoni jidhru hawn wara li Kilo janalizza t-tweġibiet tal-manutenturi.",
+      "changeRequestInProgress": "Kilo diġà qed jiftaħ pull request għal din il-proposta. Erġa' pprova fi ftit mument.",
+      "changeRequestNotActionable": "Din il-proposta ma tistax tiġi approvata aktar. Agħlaqha u aġġorna l-lista.",
+      "changeRequestNoGitHubAccess": "L-ebda konnessjoni ta' GitHub m'għandha aċċess għal dan ir-repożitorju. Erġa' qabbad GitHub b'aċċess għalih, imbagħad erġa' pprova.",
+      "changeRequestMissingPermissions": "L-App GitHub ta' Kilo ma tistax tiftaħ pull requests f'dan ir-repożitorju. Sid ir-repożitorju jrid jagħti lill-app aċċess tal-kitba għall-kontenut u l-pull requests, imbagħad erġa' pprova.",
+      "changeRequestFailed": "Kilo ma setax jiftaħ il-pull request. Erġa' pprova fi ftit mument.",
+      "offAction": "Il-memorja tar-reviżjoni hija diżattivata. Attivaha, mbagħad erġa' pprova."
     },
     "manualReview": {
       "title": "Reviżjoni manwali",
@@ -3958,6 +3965,7 @@
     "keyLabel": "Ewlenin",
     "keyTooLong": "L-ewlenin irid ikun 256 karattru jew inqas",
     "keyDuplicate": "Dan l-ewlenin diġà jeżisti fil-profil",
+    "keyWillBeSavedAs": "Se jiġi salvat bħala {{key}}",
     "valueLabel": "Valur",
     "valueRequired": "Daħħal valur",
     "tooLong": "Uża {{max}} karattru jew inqas",
@@ -3973,6 +3981,7 @@
     "commandsTitle": "Setup kmandi",
     "addCommand": "Żid kmand",
     "commandLabel": "Kmand",
+    "commandLabelPosition": "Kmand {{position}}",
     "commandPlaceholder": "eż. pnpm install",
     "commandsEmpty": "S'issa l-ebda kmand tas-setup",
     "commandsSaveFailed": "Ma setgħetx tissejvja l-kmandi tas-setup",
@@ -3991,6 +4000,7 @@
     "skillSaveFailed": "Ma setgħetx tiffranka l-ħiliet",
     "skillSourceCustom": "Personalizzat",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Pasta SKILL.md u isimha jimla; żid ħila mit-telefon tiegħek mingħajr drag and drop.",
     "skillEditTitle": "Edit ħiliet",
     "skillEdit": "Edit il-ħila {{name}}",
@@ -4020,6 +4030,7 @@
       "headersHint": "Il-valuri murija bħala •••• iżommu s-sigriet maħżun tagħhom; sostitwixxi valur biex iddawru. Il-bdil tal-URL jeħtieġ kull valur mill-ġdid",
       "nameRequired": "Daħħal isem server",
       "nameInvalid": "Isem jista' juża biss ittri ASCII, numri, underscores, u sings, sa 100 karattru",
+      "nameConflict": "Diġà jeżisti server b'dan l-isem",
       "commandRequired": "Daħħal kmand",
       "commandTooLong": "Uża mhux aktar minn 50 argument, kull wieħed 500 karattru",
       "urlRequired": "Daħħal URL",
@@ -4100,7 +4111,6 @@
       "repo": "Agħżel repożitorju...",
       "profile": "Agħżel il-profil",
       "remove": "Ħoll",
-      "private": "Privat",
       "search": "Fittex repożitorji...",
       "addedToast": "Profil default issettjat għal \"{{repo}}\"",
       "addFailed": "Ma setax jissettja l-profil default",
@@ -4113,7 +4123,11 @@
       "pinnedToast": "Imqabbad ma' \"{{repo}}\"",
       "pinFailed": "Repo ma setgħetx",
       "unboundToast": "Repo mhux marbut",
-      "unbindFailed": "Ma setgħetx tħoll repo"
+      "unbindFailed": "Ma setgħetx tħoll repo",
+      "repoValue": "Repożitorju: {{name}}",
+      "profileValue": "Profil: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Oħloq profil ta' organizzazzjoni biex tuża mill-ġdid il-varjabbli ambjentali, il-kmandi tas-setup, u l-ħiliet matul is-sessjonijiet.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Sid jew amministratur ta' organizzazzjoni jista' joħloq profil ta' organizzazzjoni."
     },
     "variablesDeleteFailed": "Ma setax jħassar il-varjabbli",
     "deleteVariable": "Ħassar il-varjabbli {{key}}",

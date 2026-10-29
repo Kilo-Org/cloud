@@ -16,6 +16,7 @@ import { Brain } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useReviewerPermission, useSetReviewMemoryEnabled } from '@/lib/hooks/use-code-reviewer';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { reviewMemoryOwnerInput } from '@/lib/hooks/use-review-memory';
@@ -81,6 +82,7 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
         <Button
           size="sm"
           variant="outline"
+          className={STATE_ACTION_CLASS}
           onPress={() => void proposalsQuery.fetchNextPage()}
           accessibilityLabel={t('common.retryLoadingMore')}
         >

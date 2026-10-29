@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Izmjene",
-    "organizationTrialEnded": "Probno razdoblje organizacije je završilo i organizacija nema aktivan plan. Vlasnik organizacije može ažurirati naplatu na kilo.ai i zatim pokušati ponovno."
+    "organizationTrialEnded": "Probno razdoblje organizacije je završilo i organizacija nema aktivan plan. Vlasnik organizacije može ažurirati naplatu na kilo.ai i zatim pokušati ponovno.",
+    "privateRepositoryA11y": "{{name}}, privatni repozitorij"
   },
   "language": {
     "restarting": "Ponovno pokretanje radi promjene jezika",
@@ -1535,7 +1536,13 @@
         "change_request_failed": "Otvaranje PR-a nije uspjelo",
         "superseded": "Već postoji"
       },
-      "noProposalsDescription": "Prijedlozi memorije pregleda pojavit će se ovdje nakon što Kilo analizira odgovore održavatelja."
+      "noProposalsDescription": "Prijedlozi memorije pregleda pojavit će se ovdje nakon što Kilo analizira odgovore održavatelja.",
+      "changeRequestInProgress": "Kilo već otvara zahtjev za povlačenje za ovaj prijedlog. Pokušajte ponovno za koji trenutak.",
+      "changeRequestNotActionable": "Ovaj prijedlog više nije moguće odobriti. Zatvorite ga i osvježite popis.",
+      "changeRequestNoGitHubAccess": "Nijedna veza s GitHubom nema pristup ovom repozitoriju. Ponovno povežite GitHub s pristupom ovom repozitoriju, zatim pokušajte ponovno.",
+      "changeRequestMissingPermissions": "Kilo-ova GitHub aplikacija ne može otvoriti zahtjeve za povlačenje u ovom repozitoriju. Vlasnik repozitorija mora aplikaciji dati pravo pisanja za sadržaj i zahtjeve za povlačenje, zatim pokušajte ponovno.",
+      "changeRequestFailed": "Kilo nije mogao otvoriti zahtjev za povlačenje. Pokušajte ponovno za koji trenutak.",
+      "offAction": "Memorija pregleda je isključena. Uključi je pa pokušaj ponovno."
     },
     "manualReview": {
       "title": "Ručni pregled",
@@ -3858,6 +3865,7 @@
     "keyLabel": "Ključ",
     "keyTooLong": "Ključ može imati najviše 256 znakova",
     "keyDuplicate": "Ovaj ključ već postoji u profilu",
+    "keyWillBeSavedAs": "Spremit će se kao {{key}}",
     "valueLabel": "Vrijednost",
     "valueRequired": "Unesite vrijednost",
     "tooLong": "Koristite najviše {{max}} znakova",
@@ -3873,6 +3881,7 @@
     "commandsTitle": "Naredbe za postavljanje",
     "addCommand": "Dodaj naredbu",
     "commandLabel": "Naredba",
+    "commandLabelPosition": "Naredba {{position}}",
     "commandPlaceholder": "npr. pnpm install",
     "commandsEmpty": "Još nema naredbi za postavljanje",
     "commandsSaveFailed": "Nije moguće spremiti naredbe za postavljanje",
@@ -3891,6 +3900,7 @@
     "skillSaveFailed": "Nije moguće spremiti vještinu",
     "skillSourceCustom": "Prilagođeno",
     "skillSourceMarketplace": "Trgovina",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Zalijepite SKILL.md i popunite njegovo ime; dodajte vještinu sa svog telefona bez povlačenja i ispuštanja.",
     "skillEditTitle": "Uredi vještinu",
     "skillEdit": "Uredi vještinu {{name}}",
@@ -3918,6 +3928,7 @@
       "headersHint": "Vrijednosti prikazane kao •••• zadržavaju svoju pohranjenu tajnu; zamijenite vrijednost da biste je rotirali. Promjena URL-a ponovno zahtijeva svaku vrijednost",
       "nameRequired": "Unesite naziv poslužitelja",
       "nameInvalid": "Ime može sadržavati samo ASCII slova, brojeve, podvlake i crtice, najviše 100 znakova",
+      "nameConflict": "Poslužitelj s ovim nazivom već postoji",
       "commandRequired": "Unesite naredbu",
       "commandTooLong": "Koristite najviše 50 argumenata od po 500 znakova",
       "urlRequired": "Unesite URL",
@@ -3937,7 +3948,7 @@
       "add": "Dodaj agenta",
       "empty": "Još nema agenata",
       "name": "Ime agenta",
-      "slug": "Agent puž",
+      "slug": "Slug agenta",
       "description": "Opis agenta",
       "model": "Nadjačavanje modela",
       "modelPlaceholder": "Koristi zadanu vrijednost sesije",
@@ -3962,8 +3973,8 @@
       "saveFailed": "Nije moguće spremiti agenta",
       "deleteFailed": "Nije moguće izbrisati agenta",
       "nameRequired": "Unesite ime agenta",
-      "slugRequired": "Unesite agenta",
-      "slugInvalid": "Puž mora započeti malim ASCII slovom i smije sadržavati samo mala ASCII slova, znamenke i crtice, najviše 50 znakova",
+      "slugRequired": "Unesite slug agenta",
+      "slugInvalid": "Slug agenta mora započeti malim ASCII slovom i smije sadržavati samo mala ASCII slova, znamenke i crtice, najviše 50 znakova",
       "slugConflict": "Taj slug već koristi ugrađeni agent ili drugi agent u ovom profilu",
       "edit": "Uredi agenta {{name}}",
       "delete": "Obriši agenta {{name}}"
@@ -3998,7 +4009,6 @@
       "repo": "Odaberite spremište…",
       "profile": "Odaberite profil",
       "remove": "Odvezati",
-      "private": "Privatno",
       "search": "Pretraži spremišta…",
       "addedToast": "Zadani profil postavljen za \"{{repo}}\"",
       "addFailed": "Nije moguće postaviti zadani profil",
@@ -4011,7 +4021,11 @@
       "pinnedToast": "Prikvačeno na \"{{repo}}\"",
       "pinFailed": "Nije moguće prikvačiti repo",
       "unboundToast": "Repo bez veza",
-      "unbindFailed": "Nije moguće odvezati repo"
+      "unbindFailed": "Nije moguće odvezati repo",
+      "repoValue": "Spremište: {{name}}",
+      "profileValue": "Profil: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Izradite profil organizacije za ponovno korištenje varijabli okoline, naredbi za postavljanje i vještina u više sesija.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Vlasnik ili administrator organizacije može izraditi profil organizacije."
     },
     "variablesDeleteFailed": "Nije moguće izbrisati varijablu",
     "deleteVariable": "Obriši varijablu {{key}}",

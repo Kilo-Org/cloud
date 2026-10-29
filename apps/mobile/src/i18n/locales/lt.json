@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Pakeitimai",
-    "organizationTrialEnded": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Organizacijos savininkas gali atnaujinti atsiskaitymo duomenis adresu kilo.ai, tada bandykite dar kartą."
+    "organizationTrialEnded": "Organizacijos bandomasis laikotarpis baigėsi ir ji neturi aktyvaus plano. Organizacijos savininkas gali atnaujinti atsiskaitymo duomenis adresu kilo.ai, tada bandykite dar kartą.",
+    "privateRepositoryA11y": "{{name}}, privati saugykla"
   },
   "language": {
     "restarting": "Paleidžiama iš naujo, kad būtų pakeista kalba",
@@ -1557,7 +1558,13 @@
         "change_request_failed": "Nepavyko atidaryti PR",
         "superseded": "Jau yra"
       },
-      "noProposalsDescription": "Peržiūros atminties pasiūlymai bus rodomi čia, kai Kilo išanalizuos prižiūrėtojų atsakymus."
+      "noProposalsDescription": "Peržiūros atminties pasiūlymai bus rodomi čia, kai Kilo išanalizuos prižiūrėtojų atsakymus.",
+      "changeRequestInProgress": "Kilo jau atidaro šio pasiūlymo PR. Bandyk dar kartą po akimirkos.",
+      "changeRequestNotActionable": "Šio pasiūlymo nebegalima patvirtinti. Uždaryk jį ir atnaujink sąrašą.",
+      "changeRequestNoGitHubAccess": "Nė vienas GitHub prisijungimas neturi prieigos prie šios saugyklos. Iš naujo prijunk GitHub, kad jis turėtų prieigą prie jos, tada bandyk dar kartą.",
+      "changeRequestMissingPermissions": "Kilo GitHub programėlė negali atidaryti PR šioje saugykloje. Saugyklos savininkas turi suteikti programėlei rašymo prieigą prie turinio ir PR, tada bandyk dar kartą.",
+      "changeRequestFailed": "Kilo nepavyko atidaryti PR. Bandyk dar kartą po akimirkos.",
+      "offAction": "Peržiūros atmintis išjungta. Įjunk ją, tada bandyk dar kartą."
     },
     "manualReview": {
       "title": "Rankinė peržiūra",
@@ -3908,6 +3915,7 @@
     "keyLabel": "Raktas",
     "keyTooLong": "Raktas gali būti ne ilgesnis kaip 256 simboliai",
     "keyDuplicate": "Šis raktas jau yra profilyje",
+    "keyWillBeSavedAs": "Bus išsaugota kaip {{key}}",
     "valueLabel": "Vertė",
     "valueRequired": "Įveskite reikšmę",
     "tooLong": "Naudokite ne daugiau kaip {{max}} simbolių",
@@ -3922,7 +3930,8 @@
     "variablesSaveFailed": "Nepavyko išsaugoti kintamojo",
     "commandsTitle": "Sąrankos komandos",
     "addCommand": "Pridėti komandą",
-    "commandLabel": "komandą",
+    "commandLabel": "Komanda",
+    "commandLabelPosition": "Komanda {{position}}",
     "commandPlaceholder": "pvz. pnpm install",
     "commandsEmpty": "Dar nėra sąrankos komandų",
     "commandsSaveFailed": "Nepavyko išsaugoti sąrankos komandų",
@@ -3941,6 +3950,7 @@
     "skillSaveFailed": "Nepavyko išsaugoti įgūdžių",
     "skillSourceCustom": "Pasirinktinis",
     "skillSourceMarketplace": "Parduotuvė",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Įklijuokite SKILL.md ir užpildysite jo pavadinimą; pridėkite įgūdžių iš savo telefono nevilkdami ir numesdami.",
     "skillEditTitle": "Redaguoti įgūdžius",
     "skillEdit": "Redaguoti įgūdį {{name}}",
@@ -3969,6 +3979,7 @@
       "headersHint": "Reikšmės, rodomos kaip ••••, išlaiko savo saugomą paslaptį; pakeiskite reikšmę, kad ją rotuotumėte. Pakeitus URL, visos reikšmės vėl yra būtinos",
       "nameRequired": "Įveskite serverio pavadinimą",
       "nameInvalid": "Varde gali būti naudojamos tik ASCII raidės, skaičiai, apatiniai brūkšniai ir brūkšniai, iki 100 simbolių",
+      "nameConflict": "Serveris tokiu pavadinimu jau egzistuoja",
       "commandRequired": "Įveskite komandą",
       "commandTooLong": "Naudokite ne daugiau kaip 50 argumentų, kurių kiekvienas 500 simbolių",
       "urlRequired": "Įveskite URL",
@@ -3988,7 +3999,7 @@
       "add": "Pridėti agentą",
       "empty": "Agentų dar nėra",
       "name": "Agento vardas",
-      "slug": "Agentinis šliužas",
+      "slug": "Agento slug",
       "description": "Agento aprašymas",
       "model": "Modelio nepaisymas",
       "modelPlaceholder": "Naudoti numatytuosius seansus",
@@ -4013,7 +4024,7 @@
       "saveFailed": "Nepavyko išsaugoti agento",
       "deleteFailed": "Nepavyko ištrinti agento",
       "nameRequired": "Įveskite agento pavadinimą",
-      "slugRequired": "Įveskite agento šliužą",
+      "slugRequired": "Įveskite agento slug",
       "slugInvalid": "Slug turi prasidėti mažąja ASCII raide ir naudoti tik mažąsias ASCII raides, skaitmenis ir brūkšnius, iki 50 simbolių",
       "slugConflict": "Tą slug jau naudoja įmontuotas agentas arba kitas agentas šiame profilyje",
       "edit": "Redaguoti agentą {{name}}",
@@ -4049,7 +4060,6 @@
       "repo": "Pasirinkite saugyklą…",
       "profile": "Pasirinkite profilį",
       "remove": "Atsieti",
-      "private": "Privatus",
       "search": "Ieškoti saugyklų…",
       "addedToast": "Numatytasis profilis nustatytas „{{repo}}“",
       "addFailed": "Nepavyko nustatyti numatytojo profilio",
@@ -4062,7 +4072,11 @@
       "pinnedToast": "Prisegta prie „{{repo}}“",
       "pinFailed": "Nepavyko prisegti atpirkimo sandorio",
       "unboundToast": "Atpirkimas neapribotas",
-      "unbindFailed": "Nepavyko atsieti atpirkimo sandorio"
+      "unbindFailed": "Nepavyko atsieti atpirkimo sandorio",
+      "repoValue": "Saugykla: {{name}}",
+      "profileValue": "Profilis: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Sukurkite organizacijos profilį, kad seansų metu pakartotinai naudotumėte aplinkos kintamuosius, sąrankos komandas ir įgūdžius.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Organizacijos savininkas arba administratorius gali sukurti organizacijos profilį."
     },
     "variablesDeleteFailed": "Nepavyko ištrinti kintamojo",
     "deleteVariable": "Ištrinti kintamąjį {{key}}",

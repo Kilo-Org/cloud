@@ -18,6 +18,7 @@ import { toast } from 'sonner-native';
 
 import { QueryError } from '@/components/query-error';
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
+import { Button } from '@/components/ui/button';
 import { ScreenHeader } from '@/components/screen-header';
 import { DashboardSections } from '@/components/security-agent/dashboard-sections';
 import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
@@ -48,6 +49,10 @@ import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
+
+// The input one sync attempt carries: the repository filter it was started
+// under, and the operation key a reconcile row replays.
+type SyncIntent = { repoFullName?: string; operationKey?: string };
 
 const METRIC_TONE_CLASS = {
   danger: 'text-destructive',
@@ -248,6 +253,34 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   // disable and the inline copy below explains the state.
   const syncBlocked = triggerSync.isError && !isSecuritySyncRetryable(triggerSync.error);
   const syncDisabled = triggerSync.isPending || syncBlocked;
+  // React Query clears a mutation's error when the next attempt starts, so the
+  // failure copy and the retry under it blink out for the length of the retry —
+  // the screen looked like the tap did nothing. Hold the failure being retried,
+  // together with the intent that produced it, until that attempt reports its
+  // own outcome: a retry must resubmit the failed intent, not whatever filter
+  // the reader switched to meanwhile.
+  const [lastSyncAttempt, setLastSyncAttempt] = useState<{
+    error: Error | null;
+    intent: SyncIntent;
+  } | null>(null);
+  const syncFailure = triggerSync.error ?? lastSyncAttempt?.error ?? null;
+  const syncRetryable = syncFailure !== null && isSecuritySyncRetryable(syncFailure);
+
+  // One submit path for every control that starts a sync — the header button,
+  // the empty-state action, the retry beside the failure copy, and a
+  // reconcile-row retry — so their handlers cannot drift apart.
+  const startSync = (intent: SyncIntent) => {
+    setLastSyncAttempt({ error: triggerSync.error, intent });
+    triggerSync.mutate(intent, {
+      onSuccess: () => {
+        setLastSyncAttempt(null);
+        toast.success(t('securityAgent.dashboard.syncQueued'));
+      },
+      onSettled: () => {
+        refreshOutbox();
+      },
+    });
+  };
 
   const openRepoFilter = () => {
     if (repoFilterUnavailable) {
@@ -324,17 +357,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           </Pressable>
           <IconButton
             onPress={() => {
-              triggerSync.mutate(
-                { repoFullName },
-                {
-                  onSuccess: () => {
-                    toast.success(t('securityAgent.dashboard.syncQueued'));
-                  },
-                  onSettled: () => {
-                    refreshOutbox();
-                  },
-                }
-              );
+              startSync({ repoFullName });
             }}
             disabled={syncDisabled}
             accessibilityLabel={t('securityAgent.dashboard.syncNow')}
@@ -364,8 +387,40 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           <Text className="text-xs text-warn">{t('securityAgent.dashboard.refreshFailed')}</Text>
         ) : null}
 
-        {triggerSync.isError ? (
-          <Text className="text-xs text-destructive">{triggerSync.error.message}</Text>
+        {syncFailure ? (
+          <View className="flex-row items-center gap-3">
+            {/* While a retry runs this sentence is the failure being retried,
+                not a fresh one, so it steps back from error red — to the warn
+                tone this screen already gives its other degraded state — while
+                the control reports the attempt. */}
+            <Text
+              className={cn(
+                'flex-1 text-xs',
+                triggerSync.isPending ? 'text-warn' : 'text-destructive'
+              )}
+            >
+              {syncFailure.message}
+            </Text>
+            {syncRetryable ? (
+              // The retry sits beside the sentence it retries and reports its
+              // own progress: a failed sync can settle in a blink, so the
+              // header icon's flash alone read as "nothing happened".
+              <Button
+                size="sm"
+                variant="ghost"
+                loading={triggerSync.isPending}
+                // A busy non-primary control dims itself, spinner included,
+                // which left the control the reader just pressed fainter than
+                // the header icon spinning beside it.
+                className={cn(triggerSync.isPending && 'opacity-100')}
+                onPress={() => {
+                  startSync(lastSyncAttempt?.intent ?? { repoFullName });
+                }}
+              >
+                <Text>{t('common.retry')}</Text>
+              </Button>
+            ) : null}
+          </View>
         ) : null}
 
         {dismissFailures.failures.map(failure => (
@@ -389,17 +444,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             retryable
             onRetry={() => {
               const input = row.input as { repoFullName?: string };
-              triggerSync.mutate(
-                { repoFullName: input.repoFullName, operationKey: row.operationKey },
-                {
-                  onSuccess: () => {
-                    toast.success(t('securityAgent.dashboard.syncQueued'));
-                  },
-                  onSettled: () => {
-                    refreshOutbox();
-                  },
-                }
-              );
+              startSync({ repoFullName: input.repoFullName, operationKey: row.operationKey });
             }}
             onDiscard={() => {
               void removeOutboxRow(row.fingerprint);
@@ -441,17 +486,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           <View className="flex-row items-center gap-4">
             <Pressable
               onPress={() => {
-                triggerSync.mutate(
-                  { repoFullName },
-                  {
-                    onSuccess: () => {
-                      toast.success(t('securityAgent.dashboard.syncQueued'));
-                    },
-                    onSettled: () => {
-                      refreshOutbox();
-                    },
-                  }
-                );
+                startSync({ repoFullName });
               }}
               disabled={syncDisabled}
               accessibilityRole="button"

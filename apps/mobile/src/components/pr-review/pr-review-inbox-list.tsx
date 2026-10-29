@@ -24,6 +24,7 @@ import { Clock, GitPullRequest, Inbox } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useOrganization } from '@/lib/organization-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
@@ -299,6 +300,7 @@ function LoadMoreRetry({ onRetry }: Readonly<{ onRetry: () => void }>) {
       <Button
         size="sm"
         variant="outline"
+        className={STATE_ACTION_CLASS}
         onPress={onRetry}
         accessibilityLabel={t('common.retryLoadingMore')}
       >

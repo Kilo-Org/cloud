@@ -75,10 +75,6 @@ Every failure that cloud-agent-next returns on `/trpc/*`, including failures bef
 
 **Verification:** Source review
 
-### ac-5: After deployment, new occurrences caused by worker pre-adapter failures no longer appear under KILOCODE-WEB-27RK ('Unable to transform response from server') for endpoint getSession. Any recurrence of a worker DB outage shows a SERVICE_UNAVAILABLE cause instead of TransformResultError.
-
-**Verification:** Manual: after release, check Sentry groups KILOCODE-WEB-27S8 and KILOCODE-WEB-27RK and Axiom cloudflare-logpush for /trpc/getSession 5xx bodies and cause
-
 ## Risks
 
 - Failure-UX effects. Spurious-failure side: a transient worker outage is now labeled retryable/temporarily-unavailable and its real cause is visible, but the request still fails during the outage (no added retry), so users still see the retry state for its duration. Genuine-failure side: no added wait, because there are no new retries or timeouts and genuine defects still return 500 immediately.

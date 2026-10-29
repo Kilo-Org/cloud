@@ -23,6 +23,7 @@ import {
   organization_groups,
   organization_group_memberships,
   organization_group_policy_settings,
+  organization_guardrails,
   byoc_connections,
   organization_invitations,
   organization_recommendation_dismissals,
@@ -4606,6 +4607,41 @@ describe('User', () => {
       expect(storedGroup.created_by_kilo_user_id).toBeNull();
       expect(storedAssignment.assigned_by_kilo_user_id).toBeNull();
       expect(storedSettings.updated_by_kilo_user_id).toBeNull();
+    });
+
+    it('should clear the creator of organization guardrails but keep the policy', async () => {
+      const actor = await insertTestUser();
+      const [organization] = await db
+        .insert(organizations)
+        .values({ name: 'Guardrail attribution org', plan: 'enterprise' })
+        .returning();
+      const [guardrail] = await db
+        .insert(organization_guardrails)
+        .values({
+          organization_id: organization.id,
+          type: 'mcp',
+          identity_key: 'npm:example-server',
+          name: 'Example server',
+          config: {
+            kind: 'package',
+            ecosystem: 'npm',
+            identifier: 'example-server',
+            min_version: null,
+          },
+          source: { registry: 'custom', id: null },
+          created_by_kilo_user_id: actor.id,
+        })
+        .returning();
+
+      await softDeleteUser(actor.id);
+
+      const [stored] = await db
+        .select()
+        .from(organization_guardrails)
+        .where(eq(organization_guardrails.id, guardrail.id));
+      expect(stored.created_by_kilo_user_id).toBeNull();
+      expect(stored.identity_key).toBe('npm:example-server');
+      expect(stored.name).toBe('Example server');
     });
 
     it('should anonymize security audit logs where user is actor', async () => {

@@ -190,18 +190,21 @@ function GuardrailsForm({
     saveMutation.mutate({ organizationId, ...fromDraft(toSave) });
   };
 
-  // Saves run one at a time. Invalid drafts wait for a fix, and a failed draft is not retried
-  // until it changes or the user asks.
+  // Saves run one at a time. Only a settled draft is saved: while `debouncedDraft` lags `draft`,
+  // it can hold edits the user has since undone or a configuration a refetch just replaced, and
+  // saving it would overwrite newer settings. Invalid drafts wait for a fix, and a failed draft
+  // is not retried until it changes or the user asks.
   const { isPending, mutate } = saveMutation;
   useEffect(() => {
     if (isPending) return;
+    if (!draftsEqual(debouncedDraft, draft)) return;
     if (draftsEqual(debouncedDraft, savedDraft)) return;
     if (getEnkryptGuardrailsIssues(debouncedDraft).size > 0) return;
     const key = configKey(fromDraft(debouncedDraft));
     if (key === failedKey.current) return;
     attemptedKey.current = key;
     mutate({ organizationId, ...fromDraft(debouncedDraft) });
-  }, [debouncedDraft, savedDraft, isPending, mutate, organizationId]);
+  }, [debouncedDraft, draft, savedDraft, isPending, mutate, organizationId]);
 
   const updateDetector: UpdateEnkryptDetector = (id, patch) =>
     setDraft(current => ({

@@ -12,6 +12,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 
 const RETENTION_DAYS = 90;
 const BATCH_SIZE = 2_500;
+const MAX_BATCHES_PER_RUN = 10;
 
 export const maxDuration = 300;
 
@@ -56,12 +57,16 @@ export async function GET(request: Request) {
     let hasMore = false;
     let batchesRun = 0;
 
-    do {
+    for (let batch = 0; batch < MAX_BATCHES_PER_RUN; batch++) {
       const result = await deleteExpiredBatch(cutoffDate);
       deletedCount += result.deletedCount;
-      hasMore = result.hasMore && result.deletedCount > 0;
+      hasMore = result.hasMore;
       batchesRun++;
-    } while (hasMore);
+
+      if (!hasMore || result.deletedCount === 0) {
+        break;
+      }
+    }
 
     emitScheduledJobEvent(
       buildScheduledJobSuccessEvent(run, {

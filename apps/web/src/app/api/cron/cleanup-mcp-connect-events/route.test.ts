@@ -20,6 +20,8 @@ import { emitScheduledJobEvent } from '@kilocode/worker-utils/scheduled-job-obse
 import { GET, maxDuration } from './route';
 
 const mockEmitScheduledJobEvent = jest.mocked(emitScheduledJobEvent);
+const BATCH_SIZE = 2_500;
+const MAX_BATCHES_PER_RUN = 10;
 
 function daysAgo(days: number): string {
   return new Date(Date.now() - days * 24 * 60 * 60 * 1_000).toISOString();
@@ -79,7 +81,43 @@ describe('GET /api/cron/cleanup-mcp-connect-events', () => {
     expect(remaining.map(row => row.identity_key)).toEqual(['npm:server-89']);
   });
 
-  it('keeps deleting until every expired event is gone', async () => {
+  it('stops at the per-run batch cap and reports hasMore', async () => {
+    const user = await insertTestUser();
+    const organization = await createTestOrganization('MCP cleanup capped org', user.id, 0);
+    const expiredCount = BATCH_SIZE * MAX_BATCHES_PER_RUN + 1;
+    const rows = Array.from({ length: expiredCount }, () => ({
+      organization_id: organization.id,
+      kilo_user_id: user.id,
+      client: 'cli',
+      decision: 'denied' as const,
+      identity_key: 'npm:backlog',
+      target: { kind: 'package' as const, ecosystem: 'npm' as const, identifier: 'backlog' },
+      created_at: daysAgo(100),
+    }));
+    for (let i = 0; i < rows.length; i += 5_000) {
+      await db.insert(organization_mcp_connect_events).values(rows.slice(i, i + 5_000));
+    }
+
+    const response = await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
+    const body = await response.json();
+
+    expect(body.deletedCount).toBe(BATCH_SIZE * MAX_BATCHES_PER_RUN);
+    expect(body.batchesRun).toBe(MAX_BATCHES_PER_RUN);
+    expect(body.hasMore).toBe(true);
+    expect(mockEmitScheduledJobEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ has_more: true, batches_run: MAX_BATCHES_PER_RUN })
+    );
+    expect(await db.select().from(organization_mcp_connect_events)).toHaveLength(1);
+
+    const nextResponse = await GET(makeRequest({ authorization: 'Bearer cron-secret' }));
+    const nextBody = await nextResponse.json();
+
+    expect(nextBody.deletedCount).toBe(1);
+    expect(nextBody.hasMore).toBe(false);
+    expect(await db.select().from(organization_mcp_connect_events)).toHaveLength(0);
+  });
+
+  it('keeps deleting until every expired event is gone within the cap', async () => {
     const user = await insertTestUser();
     const organization = await createTestOrganization('MCP cleanup backlog org', user.id, 0);
     const expiredCount = 7_001;

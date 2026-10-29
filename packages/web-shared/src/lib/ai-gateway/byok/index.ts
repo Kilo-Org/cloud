@@ -50,7 +50,6 @@ async function deriveModelInferenceUserByokProviders(
     ),
   ];
   if (providers.length === 0) {
-    console.debug(`[getModelUserByokProviders] no user byok providers for ${modelId}`);
     return [];
   }
   if (isCodestralModel(modelId)) {
@@ -99,9 +98,14 @@ export async function getModelInferenceUserByokProviders(
   modelId: string
 ): Promise<UserByokProviderId[]> {
   const vercelModelMetadata = await getVercelModelMetadata('getModelInferenceUserByokProviders');
-  return vercelModelMetadata
-    ? deriveModelInferenceUserByokProviders(modelId, vercelModelMetadata)
-    : [];
+  if (!vercelModelMetadata) {
+    return [];
+  }
+  const providers = await deriveModelInferenceUserByokProviders(modelId, vercelModelMetadata);
+  if (providers.length === 0) {
+    console.debug(`[getModelUserByokProviders] no user byok providers for ${modelId}`);
+  }
+  return providers;
 }
 
 /**
@@ -240,7 +244,8 @@ export async function addUserByokAvailability(
     ? await getVercelModelMetadata('addUserByokAvailability')
     : null;
   const hasGatewayKey = enabled.some(isGatewayUserByokProviderId);
-  return Promise.all(
+  const derived = { examined: 0, withoutInferenceProviders: 0 };
+  const modelsWithAvailability = await Promise.all(
     models.map(async model => {
       if (
         enabledProviders.size === 0 ||
@@ -249,10 +254,17 @@ export async function addUserByokAvailability(
       ) {
         return { ...model, hasUserByokAvailable: false };
       }
+      const inferenceProviders = vercelModelMetadata
+        ? await deriveModelInferenceUserByokProviders(model.id, vercelModelMetadata)
+        : [];
+      if (vercelModelMetadata) {
+        derived.examined += 1;
+        if (inferenceProviders.length === 0) {
+          derived.withoutInferenceProviders += 1;
+        }
+      }
       const modelProviders = [
-        ...(vercelModelMetadata
-          ? await deriveModelInferenceUserByokProviders(model.id, vercelModelMetadata)
-          : []),
+        ...inferenceProviders,
         ...(hasGatewayKey ? await getModelGatewayUserByokProviders(model.id) : []),
       ];
       const hasUserByokAvailable = await hasEnabledUserByokForModel({
@@ -264,6 +276,14 @@ export async function addUserByokAvailability(
       return { ...model, hasUserByokAvailable };
     })
   );
+  // One record per pass: the availability pass touches every catalog model, so a
+  // per-model record would grow with the catalog rather than with the request.
+  if (derived.withoutInferenceProviders > 0) {
+    console.debug(
+      `[getModelUserByokProviders] no user byok providers for ${derived.withoutInferenceProviders} of ${derived.examined} models`
+    );
+  }
+  return modelsWithAvailability;
 }
 
 /**

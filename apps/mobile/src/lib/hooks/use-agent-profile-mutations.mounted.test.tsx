@@ -27,7 +27,15 @@ vi.mock('sonner-native', () => ({ toast: { error: vi.fn() } }));
 
 const responses: Record<string, unknown> = {
   'agentProfiles.list': [],
-  'agentProfiles.vars': { id: 'profile-1', name: 'Backend' },
+  'agentProfiles.vars': [
+    {
+      key: 'API_BASE',
+      value: 'http://localhost:3000',
+      isSecret: false,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    },
+  ],
   'agentProfiles.delete': { success: true },
 };
 

@@ -194,8 +194,9 @@ export function useAgentProfileKiloCommands(profileId: string, organizationId?: 
 }
 
 /**
- * A single profile's agents, for the profile-editor Agents screen. The role
- * picker has its own scoped read below.
+ * A single profile's agents. Both the profile-editor Agents screen and the role
+ * picker's custom modes read this one hook; the picker scopes it with `enabled`
+ * until the profile's ownership lookup resolves.
  */
 export function useAgentProfileAgents(
   profileId: string,

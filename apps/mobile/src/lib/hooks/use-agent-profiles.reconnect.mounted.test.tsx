@@ -33,21 +33,15 @@ vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
 vi.mock('sonner-native', () => ({ toast: { error: vi.fn(), success: vi.fn() } }));
 
 const responses: Record<string, unknown> = {
-  'agentProfiles.vars': {
-    id: 'profile-1',
-    name: 'Backend',
-    description: null,
-    isDefault: false,
-    createdAt: '2026-01-01T00:00:00.000Z',
-    updatedAt: '2026-01-01T00:00:00.000Z',
-    vars: [],
-    commands: [],
-    mcpServers: [],
-    skills: [],
-    agents: [],
-    kiloCommands: [],
-    instructions: [],
-  },
+  'agentProfiles.vars': [
+    {
+      key: 'API_BASE',
+      value: 'http://localhost:3000',
+      isSecret: false,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      updatedAt: '2026-01-01T00:00:00.000Z',
+    },
+  ],
 };
 
 function procedureOf(input: RequestInfo | URL): string {

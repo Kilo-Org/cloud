@@ -4,13 +4,29 @@ import type { TransformRequestContext } from '@kilocode/web-shared/lib/ai-gatewa
 const THINKING_BINDING_BETA = 'thinking-binding-controls-2026-08-01';
 
 /**
- * These models bind each thinking block to the system prompt, tools, and earlier messages it was
- * created with. Provider accounts created on or after 2026-08-31 reject a replayed block whose
- * prefix changed, failing the whole turn. Older models are excluded: OpenRouter's Bedrock route
- * rewrites adaptive thinking for Claude Sonnet 4.5 into a form that rejects `block_binding`.
+ * Matches `claude-opus-5.5`, `claude-opus-5-5@20261005`, and `claude-haiku-4-5-20251001-v1:0`.
+ * A minor version has at most two digits, so a date suffix is not read as one.
+ */
+const CLAUDE_FAMILY_AND_VERSION = /claude-([a-z]+)-(\d+)(?:[.-](\d{1,2})(?!\d))?/;
+
+/**
+ * Claude Fable 5.1 and later, and Claude Opus, Sonnet, and Haiku 5.5 and later, bind each thinking
+ * block to the system prompt, tools, and earlier messages it was created with. Provider accounts
+ * created on or after 2026-08-31 reject a replayed block whose prefix changed, failing the whole
+ * turn. Newer models are assumed to keep binding thinking. Older models are excluded: OpenRouter's
+ * Bedrock route rewrites adaptive thinking for Claude Sonnet 4.5 into a form that rejects
+ * `block_binding`.
  * https://platform.claude.com/docs/en/build-with-claude/preserved-thinking
  */
-const BINDS_THINKING_TO_PREFIX = /claude-(?:fable-5[.-]1|(?:opus|sonnet|haiku)-5[.-]5)(?!\d)/;
+function bindsThinkingToPrefix(model: string) {
+  const match = CLAUDE_FAMILY_AND_VERSION.exec(model);
+  if (!match) return false;
+  const [, family, major, minor = '0'] = match;
+  const [firstMajor, firstMinor] = family === 'fable' ? [5, 1] : [5, 5];
+  return (
+    Number(major) > firstMajor || (Number(major) === firstMajor && Number(minor) >= firstMinor)
+  );
+}
 
 /**
  * Drops invalidated thinking blocks instead of failing the request. Only call this for upstreams
@@ -36,7 +52,7 @@ export function dropThinkingBlocksOnPrefixMismatch({
   request,
   extraHeaders,
 }: Pick<TransformRequestContext, 'model' | 'request' | 'extraHeaders'>) {
-  if (request.kind !== 'messages' || !BINDS_THINKING_TO_PREFIX.test(model)) return;
+  if (request.kind !== 'messages' || !bindsThinkingToPrefix(model)) return;
   const thinking = request.body.thinking;
   // block_binding is rejected with enabled or disabled thinking.
   if (thinking?.type !== 'adaptive') return;

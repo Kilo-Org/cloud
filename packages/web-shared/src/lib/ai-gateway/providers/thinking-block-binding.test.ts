@@ -27,6 +27,11 @@ describe('dropThinkingBlocksOnPrefixMismatch', () => {
     'anthropic/claude-fable-5.1',
     'bedrock-byok/global.anthropic.claude-sonnet-5-5',
     'claude-haiku-5-5@20261005',
+    'anthropic/claude-fable-5.2',
+    'anthropic/claude-sonnet-5.6',
+    'anthropic/claude-opus-6',
+    'global.anthropic.claude-haiku-6-1-20270101-v1:0',
+    'anthropic/claude-newfamily-6',
   ])('drops mismatched thinking blocks for %s', model => {
     const { body, extraHeaders } = apply(model, { type: 'adaptive' });
 
@@ -99,6 +104,10 @@ describe('dropThinkingBlocksOnPrefixMismatch', () => {
     'anthropic/claude-sonnet-4.6',
     'anthropic/claude-opus-5',
     'anthropic/claude-fable-5',
+    'anthropic/claude-mythos-5.1',
+    'global.anthropic.claude-haiku-4-5-20251001-v1:0',
+    'claude-sonnet-5@20260601',
+    'anthropic/claude-3.5-sonnet',
     'openai/gpt-5.5',
   ])('leaves %s untouched', model => {
     const { body, extraHeaders } = apply(model, { type: 'adaptive' });

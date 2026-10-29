@@ -28,10 +28,6 @@ CREATE TABLE "agent_briefing_snapshots" (
 	"expires_at" timestamp with time zone NOT NULL
 );
 --> statement-breakpoint
-ALTER TABLE "agent_briefing_events" DISABLE ROW LEVEL SECURITY;--> statement-breakpoint
-ALTER TABLE "agent_briefing_reports" DISABLE ROW LEVEL SECURITY;--> statement-breakpoint
-DROP TABLE "agent_briefing_events" CASCADE;--> statement-breakpoint
-DROP TABLE "agent_briefing_reports" CASCADE;--> statement-breakpoint
 ALTER TABLE "agent_briefing_context_preferences" ADD COLUMN "enabled" boolean DEFAULT false NOT NULL;--> statement-breakpoint
 ALTER TABLE "cli_sessions_v2" ADD COLUMN "briefing_excerpt" jsonb;--> statement-breakpoint
 ALTER TABLE "cli_sessions_v2" ADD COLUMN "briefing_excerpt_scope_changed_at" timestamp with time zone;--> statement-breakpoint
@@ -48,5 +44,3 @@ COMMIT;
 --> statement-breakpoint
 CREATE INDEX CONCURRENTLY "IDX_cli_sessions_v2_briefing_activity" ON "cli_sessions_v2" USING btree ("kilo_user_id","organization_id","last_activity_at" DESC NULLS LAST,"session_id");--> statement-breakpoint
 BEGIN;
---> statement-breakpoint
-ALTER TABLE "agent_briefing_context_preferences" DROP COLUMN "ai_enabled";

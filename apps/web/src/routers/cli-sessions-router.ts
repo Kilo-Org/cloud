@@ -294,20 +294,28 @@ async function createForkedSessionCopy(params: {
           ? await sharedSessionPublishedCopyId(params.sourceShareId)
           : params.sourceId;
 
-        const blobUrls = await copySessionBlobs(
-          sourceId,
-          params.sourceFolder,
-          sessionId,
-          'sessions'
-        );
+        let blobUrls: CopiedSessionBlobUrls | null = null;
+        try {
+          blobUrls = await copySessionBlobs(sourceId, params.sourceFolder, sessionId, 'sessions');
+        } catch (error) {
+          // A link that publishes a new folder deletes the old one, which can
+          // interrupt a copy already reading it. Take the link's folder again.
+          const retryable =
+            params.sourceShareId !== undefined &&
+            attempt < FORK_COPY_ATTEMPTS &&
+            !(error instanceof TRPCError);
+          if (!retryable) throw error;
+        }
 
-        const attached = await attachForkedSessionCopy(
-          sessionId,
-          blobUrls,
-          params.sourceShareId,
-          sourceId
-        );
-        if (attached) return attached;
+        if (blobUrls) {
+          const attached = await attachForkedSessionCopy(
+            sessionId,
+            blobUrls,
+            params.sourceShareId,
+            sourceId
+          );
+          if (attached) return attached;
+        }
 
         await deleteBlobs(sessionId, sessionBlobRefs('sessions'));
       }

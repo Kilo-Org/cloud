@@ -321,11 +321,24 @@ export async function publishSharedSessionCopy({
         }
 
         const previousCopyIds = publishedShareCopyIds(stored);
+        const cleanedPendingCopyIds = admitted?.pending_copy_ids ?? [];
+        const pendingCopyIds = [
+          ...new Set([
+            // Folders this publish did not delete itself stay recorded so their
+            // deletion is retried, even when another request recorded them
+            // after this publish read the row.
+            ...stored.pending_copy_ids.filter(
+              pendingId => pendingId !== copyId && !cleanedPendingCopyIds.includes(pendingId)
+            ),
+            ...previousCopyIds,
+          ]),
+        ];
+
         await tx
           .update(sharedCliSessions)
           .set({
             ...blobUrlColumns(copiedBlobs),
-            pending_copy_ids: previousCopyIds,
+            pending_copy_ids: pendingCopyIds,
           })
           .where(eq(sharedCliSessions.share_id, stored.share_id));
 

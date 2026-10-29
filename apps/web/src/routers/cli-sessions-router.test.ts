@@ -1626,11 +1626,9 @@ describe('cli-sessions-router', () => {
       const caller = await createCallerForUser(regularUser.id);
       const { copyBlobs, deleteBlobs } = await import('@/lib/r2/cli-sessions');
 
-      jest
-        .mocked(copyBlobs)
-        .mockResolvedValueOnce({
-          ui_messages_blob_url: 'shared-sessions/first-fold/ui_messages.json',
-        });
+      jest.mocked(copyBlobs).mockResolvedValueOnce({
+        ui_messages_blob_url: 'shared-sessions/first-fold/ui_messages.json',
+      });
       await caller.cliSessions.share({
         session_id: deleteSessionId,
         shared_state: CliSessionSharedState.Public,
@@ -2228,6 +2226,56 @@ describe('cli-sessions-router', () => {
       }
     });
 
+    it('keeps a pending copy folder another request recorded while it copied', async () => {
+      const caller = await createCallerForUser(regularUser.id);
+      const { copyBlobs } = await import('@/lib/r2/cli-sessions');
+      const copyStarted = Promise.withResolvers<void>();
+      const releaseCopy = Promise.withResolvers<void>();
+      let recordedCopyId = '';
+
+      jest.mocked(copyBlobs).mockImplementationOnce(async (_sourceId, _sourceFolder, copyId) => {
+        recordedCopyId = copyId;
+        copyStarted.resolve();
+        await releaseCopy.promise;
+        return { ui_messages_blob_url: `shared-sessions/${copyId}/ui_messages.json` };
+      });
+
+      const pendingPublish = caller.cliSessions.share({
+        session_id: shareSessionId,
+        shared_state: CliSessionSharedState.Public,
+      });
+      await copyStarted.promise;
+
+      const [created] = await db
+        .insert(sharedCliSessions)
+        .values({
+          session_id: shareSessionId,
+          kilo_user_id: regularUser.id,
+          shared_state: CliSessionSharedState.Public,
+          pending_copy_ids: ['other-fold'],
+        })
+        .returning({ share_id: sharedCliSessions.share_id });
+
+      releaseCopy.resolve();
+      const published = await pendingPublish;
+
+      expect(published.share_id).toBe(created.share_id);
+      expect(recordedCopyId).not.toBe('');
+
+      const [stored] = await db
+        .select({
+          ui_messages_blob_url: sharedCliSessions.ui_messages_blob_url,
+          pending_copy_ids: sharedCliSessions.pending_copy_ids,
+        })
+        .from(sharedCliSessions)
+        .where(eq(sharedCliSessions.share_id, created.share_id));
+
+      expect(stored.ui_messages_blob_url).toBe(
+        `shared-sessions/${recordedCopyId}/ui_messages.json`
+      );
+      expect(stored.pending_copy_ids).toEqual(['other-fold']);
+    });
+
     it('refuses a share when the account already holds its share allowance', async () => {
       const shareOwner = await insertTestUser();
       const [session] = await db
@@ -2451,6 +2499,38 @@ describe('cli-sessions-router', () => {
         .select({ ui_messages_blob_url: cliSessions.ui_messages_blob_url })
         .from(cliSessions)
         .where(eq(cliSessions.session_id, forked.session_id));
+      expect(stored.ui_messages_blob_url).toBe(`sessions/${forked.session_id}/ui_messages.json`);
+    });
+
+    it('retries a fork copy that fails while the link changes its folder', async () => {
+      const caller = await createCallerForUser(otherUser.id);
+      const { copyBlobs } = await import('@/lib/r2/cli-sessions');
+      const copyIds: string[] = [];
+
+      jest
+        .mocked(copyBlobs)
+        .mockImplementationOnce(async () => {
+          throw new Error('NoSuchKey');
+        })
+        .mockImplementationOnce(async (_sourceId, _sourceFolder, destinationId) => {
+          copyIds.push(destinationId);
+          return {
+            ui_messages_blob_url: `sessions/${destinationId}/ui_messages.json`,
+          };
+        });
+
+      const forked = await caller.cliSessions.fork({
+        share_or_session_id: sharedSessionId,
+        created_on_platform: 'vscode',
+      });
+
+      expect(copyIds).toEqual([forked.session_id]);
+
+      const [stored] = await db
+        .select({ ui_messages_blob_url: cliSessions.ui_messages_blob_url })
+        .from(cliSessions)
+        .where(eq(cliSessions.session_id, forked.session_id));
+
       expect(stored.ui_messages_blob_url).toBe(`sessions/${forked.session_id}/ui_messages.json`);
     });
 

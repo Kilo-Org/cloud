@@ -101,6 +101,7 @@ jobs:
               - 'packages/web-shared/**'
               - 'packages/worker-utils/**'
               - 'services/session-ingest/**'
+              - 'tools/oxlint/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
             cloud_agent_next:
@@ -145,6 +146,7 @@ jobs:
               - 'packages/web-shared/**'
               - 'packages/worker-utils/**'
               - 'services/session-ingest/**'
+              - 'tools/oxlint/**'
               - 'package.json'
               - 'pnpm-lock.yaml'
             cloud_agent_next:

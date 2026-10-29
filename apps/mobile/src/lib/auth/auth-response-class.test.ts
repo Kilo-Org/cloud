@@ -147,6 +147,32 @@ describe('terminal failure reporting', () => {
     expect(events).toHaveLength(2);
   });
 
+  it('files the stored credential expiry as a warning and every other terminal refusal as an error', () => {
+    const events: TelemetryEvent[] = [];
+    setTelemetrySink(event => {
+      events.push(event);
+    });
+
+    reportAuthTerminalFailure('/api/auth/native/refresh', 401);
+    reportAuthTerminalFailure('/api/auth/native/refresh', 400);
+    reportAuthTerminalFailure('/api/auth/native/token', 401);
+
+    // The expiry is the expected end of a session; the other two name defects.
+    expect(events.map(event => event.level)).toEqual(['warning', 'error', 'error']);
+    // Same event identity either way: one route and status keeps one issue.
+    expect(events[0]?.tags).toEqual({
+      'error.subsystem': 'auth',
+      'auth.outcome': 'terminal',
+      'auth.route': '/api/auth/native/refresh',
+      'http.status': 401,
+    });
+    expect(events.map(event => event.fingerprint)).toEqual([
+      ['auth-terminal', '/api/auth/native/refresh', '401'],
+      ['auth-terminal', '/api/auth/native/refresh', '400'],
+      ['auth-terminal', '/api/auth/native/token', '401'],
+    ]);
+  });
+
   it('reports nothing when no sink is installed', () => {
     expect(() => {
       reportAuthTerminalFailure('/api/auth/native/token', 401);

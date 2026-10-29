@@ -10,6 +10,7 @@ import { ScreenHeader } from '@/components/screen-header';
 import { IconButton } from '@/components/ui/icon-button';
 import { Search } from '@/components/ui/icons';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
 
 type SessionListHeaderProps = {
   title: string;
@@ -64,7 +65,12 @@ export function SessionListHeader({
         allowInlineActionsStacking={false}
       />
       <View style={sidePadding}>
-        <View className="min-h-[48px] flex-row items-center justify-between border-b border-border">
+        <View
+          className={cn(
+            'min-h-[48px] flex-row items-center justify-between',
+            onOpenSearch && 'border-b border-border'
+          )}
+        >
           {onOpenSearch ? tabHeader : search}
           <View className="shrink-0 flex-row items-center">
             {onOpenSearch ? (

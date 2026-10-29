@@ -1779,6 +1779,43 @@ describe('security operation ledger (P1-A-08e)', () => {
     );
   });
 
+  it('settles a dismissal failed when the Worker was never reached and surfaces the marker', async () => {
+    mockGetSecurityFindingById.mockResolvedValue({
+      id: findingId,
+      source: 'dependabot',
+      severity: 'high',
+    });
+    mockAdmitOperation.mockResolvedValue({
+      admission: 'admitted',
+      row: ledgerRow({
+        intent: 'dismiss_finding',
+        resource_key: `security:dismiss_finding:org:aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa:${findingId}:not_used:`,
+      }),
+    });
+    mockSubmitManualFindingDismissal.mockRejectedValue(
+      new TRPCError({ code: 'PRECONDITION_FAILED', message: 'Security service is unavailable' })
+    );
+
+    await expect(
+      createHandlers().dismissFinding.handler({
+        ctx: context,
+        input: { findingId, reason: 'not_used', operationKey },
+      })
+    ).rejects.toMatchObject({
+      code: 'PRECONDITION_FAILED',
+      message: 'Security service is unavailable',
+    });
+
+    // Nothing was enqueued, so the row settles instead of promising a
+    // reconciliation a same-key retry would only replay into a dead end.
+    expect(mockMarkReconcilePending).not.toHaveBeenCalled();
+    expect(mockSettleOperation.mock.calls[0]?.[1]).toMatchObject({
+      rowId: 'ledger-row-id',
+      status: 'failed',
+      outcomeCode: 'pre_acceptance_rejected',
+    });
+  });
+
   it('replays a settled dismissal without re-triggering the GitHub call', async () => {
     mockGetSecurityFindingById.mockResolvedValue({
       id: findingId,

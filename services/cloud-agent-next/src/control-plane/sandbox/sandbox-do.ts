@@ -4223,10 +4223,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
         const selection = selectStartup(this.env, pin.provider, {
           preparingRoutes: (await listRoutes(this.db))
             .filter(route => route.state === 'preparing')
-            .map(route => ({
-              createdOnPlatform: route.credentialSource?.createdOnPlatform,
-              orgId: route.credentialSource?.orgId,
-            })),
+            .map(route => ({ orgId: route.credentialSource?.orgId })),
           sandboxKind: pin.sandboxKind,
           sandboxId: this.sandboxId,
         });

@@ -4,6 +4,8 @@ import { TestRenderer } from '@/test/renderer';
 
 import { NewSessionProfileRow } from './new-session-environment-row';
 
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+
 import '@/i18n';
 
 vi.mock('react-native', () => ({ Pressable: 'Pressable', View: 'View' }));
@@ -42,8 +44,7 @@ const EMPTY_PROFILE = {
   agentCount: 0,
 };
 
-const CARD_CHROME =
-  'min-h-11 flex-row items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5';
+const CARD_CHROME = `${ROW_TARGET_CLASS} flex-row items-center gap-3 rounded-lg border border-border bg-card px-3 py-2.5`;
 
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 

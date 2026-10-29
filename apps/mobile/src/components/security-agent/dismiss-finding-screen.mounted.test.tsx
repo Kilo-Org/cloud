@@ -34,6 +34,10 @@ const CONFIGURATION_ERROR_MESSAGE = vi.hoisted(() => 'Security service is not co
 const CONFIGURATION_COPY = vi.hoisted(
   () => 'Security service is not configured. Resubmitting cannot succeed until this is fixed.'
 );
+const SERVICE_UNAVAILABLE_MESSAGE = vi.hoisted(() => 'Security service is unavailable');
+const SERVICE_UNAVAILABLE_COPY = vi.hoisted(
+  () => 'The security service is unavailable. Try again.'
+);
 
 const routerBack = vi.hoisted(() => vi.fn());
 const dismiss = vi.hoisted(() => ({
@@ -329,6 +333,20 @@ describe('DismissFindingScreen dismissal CTA states', () => {
     expect(renderedTexts(root.root)).not.toContain(CONFIGURATION_ERROR_MESSAGE);
   });
 
+  it('keeps the dismissal CTA enabled after an unreachable service and shows retry copy', () => {
+    dismiss.isError = true;
+    dismiss.error = mapSecurityDismissOperationError(new Error(SERVICE_UNAVAILABLE_MESSAGE));
+    const root = renderScreen();
+    selectReason();
+
+    expect(buttonDisabled(root.root)).toBe(false);
+    expect(renderedTexts(root.root)).toContain(SERVICE_UNAVAILABLE_COPY);
+    // The old ambiguous sentence must not be what the reader is told.
+    expect(renderedTexts(root.root)).not.toContain(
+      "Couldn't confirm — check the security review before retrying."
+    );
+  });
+
   it('disables the dismissal CTA while the dismissal is pending', () => {
     dismiss.isPending = true;
     const root = renderScreen();
@@ -407,6 +425,30 @@ describe('DismissFindingScreen dismissal CTA states', () => {
       comment: '',
       lastError: IN_PROGRESS_COPY,
       lastErrorKey: 'securityAgent.mutations.dismissalInProgress',
+      retryable: true,
+    });
+  });
+
+  it('persists retry copy and a retryable draft when the Worker was unreachable', () => {
+    const root = renderScreen();
+    selectReason();
+
+    act(() => {
+      (findDismissButton(root.root).props.onPress as () => void)();
+    });
+
+    const options = dismiss.mutate.mock.calls[0]?.[1] as {
+      onError?: (error: Error) => void;
+    };
+    act(() => {
+      options.onError?.(mapSecurityDismissOperationError(new Error(SERVICE_UNAVAILABLE_MESSAGE)));
+    });
+
+    expect(dismissDraft.persist).toHaveBeenLastCalledWith({
+      reason: 'not_used',
+      comment: '',
+      lastError: SERVICE_UNAVAILABLE_COPY,
+      lastErrorKey: 'securityAgent.mutations.serviceUnavailable',
       retryable: true,
     });
   });

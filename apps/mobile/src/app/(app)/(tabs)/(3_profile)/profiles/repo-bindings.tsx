@@ -7,5 +7,10 @@ export default function RepoBindingsRoute() {
   const { organizationId: rawOrganizationId } = useLocalSearchParams<{
     organizationId?: string;
   }>();
-  return <RepoBindingsScreen organizationId={parseParam(rawOrganizationId) ?? undefined} />;
+  return (
+    <RepoBindingsScreen
+      organizationId={parseParam(rawOrganizationId) ?? undefined}
+      stack="profileTab"
+    />
+  );
 }

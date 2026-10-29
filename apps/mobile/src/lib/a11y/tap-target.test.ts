@@ -30,6 +30,7 @@ import {
   LEGAL_LINK_SENTENCE_BOX_CLASS,
   LEGAL_LINK_SENTENCE_CANCEL_DP,
   MIN_TAP_TARGET_DP,
+  ROW_TARGET_CLASS,
   STATE_ACTION_CLASS,
   STATE_ACTION_TARGET_DP,
   tapTargetReachDp,
@@ -133,6 +134,18 @@ describe('shared tap-target geometry', () => {
     expect(STATE_ACTION_CLASS).toContain('min-h-[48px]');
     // The compiled value is what the layout uses, through the app's pipeline.
     expect(await compiledDp(STATE_ACTION_CLASS, 'minHeight')).toBe(STATE_ACTION_TARGET_DP);
+  });
+
+  it('renders an interactive row frame tall enough for both platforms', async () => {
+    // The regression this guards: a selection or menu row whose only child is
+    // one label line reports that line's height plus its padding as its own
+    // rect, and a row sized that way landed under the target on device.
+    // `min-h-11` is under the floor here; `hitSlop` would widen the touch region
+    // without moving the rect an audit reads, so the floor has to be the row's
+    // own class.
+    const height = await compiledDp(ROW_TARGET_CLASS, 'minHeight');
+    expect(height).toBe(ICON_TARGET_DP);
+    expect(height).toBeGreaterThanOrEqual(TOUCH_TARGET_DP);
   });
 
   it('reaches the design touch target with the compact box plus its slop', () => {

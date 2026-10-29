@@ -17,6 +17,7 @@ import {
   getBlockingCardPresentationForKind,
 } from '@/components/agents/blocking-card-state';
 import { announceForA11y, requestA11yFocus } from '@/lib/a11y/announce';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { cn } from '@/lib/utils';
 
@@ -315,7 +316,8 @@ export function QuestionCard({
                           customInputRefs.current[qIndex]?.focus();
                         }}
                         className={cn(
-                          'min-h-11 flex-row items-center justify-between rounded-md border px-3',
+                          ROW_TARGET_CLASS,
+                          'flex-row items-center justify-between rounded-md border px-3',
                           isCustomActive
                             ? 'border-primary bg-primary'
                             : 'border-border bg-background dark:border-neutral-700 dark:bg-secondary',

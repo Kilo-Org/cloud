@@ -3,7 +3,7 @@ import type { OrganizationSettings } from '@kilocode/db/schema-types';
 import { simHash64 } from '@kilocode/web-shared/lib/bouncer/simhash';
 import { randomUUID } from 'crypto';
 import { eq } from 'drizzle-orm';
-import { agent_briefing_reports, api_request_log, type User } from '@kilocode/db/schema';
+import { agent_briefing_snapshots, api_request_log, type User } from '@kilocode/db/schema';
 import { BRIEFING_SETTLEMENT_HEADER } from '@kilocode/web-shared/lib/agent-briefing-usage';
 import type { UsageAccountingResult } from '@kilocode/web-shared/lib/ai-gateway/processUsage.types';
 import { insertTestUser } from '@kilocode/web-shared/tests/helpers/user.helper';
@@ -23,7 +23,10 @@ import {
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
 import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight';
-import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import {
+  getProvider,
+  type GetProviderProviderResult,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { upstreamRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import {
   getOpenRouterModelsFromDatabase,
@@ -58,7 +61,11 @@ import {
 import { logMicrodollarUsage } from '@kilocode/web-shared/lib/ai-gateway/processUsage';
 import { applyResolvedAutoModel } from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
 import type * as AutoModelResolution from '@kilocode/web-shared/lib/ai-gateway/auto-model/resolution';
-import { getDirectByokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import {
+  createDirectByokReferenceResolver,
+  getDirectByokModel,
+  supportsCatalogMode,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import {
   logUnrewrittenResponse,
   rewriteModelResponse,
@@ -154,6 +161,9 @@ jest.mock(
   })
 );
 jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
+  allowsInferenceProviderUserByok: jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/organizations/effective-model-access.server'
+  ).allowsInferenceProviderUserByok,
   evaluateEffectiveModelAccessPolicy: jest.fn().mockReturnValue({}),
   getEffectiveModelDecision: jest.fn().mockResolvedValue({ allowed: true }),
 }));
@@ -163,6 +173,8 @@ jest.mock('@kilocode/web-shared/lib/organizations/non-trial-enterprise', () => (
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/get-provider');
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
   getDirectByokModel: jest.fn(async () => ({ provider: null, model: null })),
+  supportsCatalogMode: jest.fn(() => false),
+  createDirectByokReferenceResolver: jest.fn(async () => async (modelId: string) => modelId),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/upstream-request');
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache');
@@ -275,6 +287,8 @@ const mockedCollectDataCollectionRequiredAutoRoutingModelIds = jest.mocked(
 const mockedLogMicrodollarUsage = jest.mocked(logMicrodollarUsage);
 const mockedApplyResolvedAutoModel = jest.mocked(applyResolvedAutoModel);
 const mockedGetDirectByokModel = jest.mocked(getDirectByokModel);
+const mockedSupportsCatalogMode = jest.mocked(supportsCatalogMode);
+const mockedCreateDirectByokReferenceResolver = jest.mocked(createDirectByokReferenceResolver);
 const mockedRewriteModelResponse = jest.mocked(rewriteModelResponse);
 const mockedLogUnrewrittenResponse = jest.mocked(logUnrewrittenResponse);
 const mockedGetDynamicRequestLoggingMode = jest.mocked(getDynamicRequestLoggingMode);
@@ -1352,6 +1366,120 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect((await getRoutingProviderConfig?.())?.only).toEqual(['google']);
   });
 
+  describe('organization BYOK keys and the organization provider allow-list', () => {
+    type ByokRoute =
+      | 'a catalog-mode direct BYOK key'
+      | 'a Vercel BYOK inference provider key'
+      | 'an OpenRouter key'
+      | 'a Vercel AI Gateway key'
+      | 'no BYOK key';
+    const byokRoutes: Record<
+      ByokRoute,
+      Pick<GetProviderProviderResult, 'provider' | 'userByok'>
+    > = {
+      'a catalog-mode direct BYOK key': {
+        provider: { ...provider, id: 'direct-byok' },
+        userByok: [{ decryptedAPIKey: 'key', providerId: 'synthetic' }],
+      },
+      'a Vercel BYOK inference provider key': {
+        provider: { ...provider, id: 'vercel' },
+        userByok: [{ decryptedAPIKey: 'key', providerId: 'moonshotai' }],
+      },
+      'an OpenRouter key': {
+        provider: { ...provider, id: 'openrouter' },
+        userByok: [{ decryptedAPIKey: 'key', providerId: 'openrouter' }],
+      },
+      'a Vercel AI Gateway key': {
+        provider: { ...provider, id: 'vercel' },
+        userByok: [{ decryptedAPIKey: 'key', providerId: 'vercel-ai-gateway' }],
+      },
+      'no BYOK key': { provider, userByok: null },
+    };
+
+    async function sendThrough(
+      route: ByokRoute,
+      decision: Awaited<ReturnType<typeof getEffectiveModelDecision>>
+    ) {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: {
+          id: 'user-123',
+          google_user_email: 'test@example.com',
+          microdollars_used: 0,
+        } as User,
+        authFailedResponse: null,
+        organizationId: 'org-1',
+      });
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({
+        balance: 1000,
+        settings: { provider_allow_list: ['anthropic'] },
+        plan: 'enterprise',
+      });
+      mockedGetEffectiveModelDecision.mockResolvedValue(decision);
+      mockedGetProvider.mockResolvedValue({
+        kind: 'provider',
+        ...byokRoutes[route],
+        isFree: false,
+        bypassAccessCheck: false,
+      });
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      return handleLlmProxyRequest(makeRequest(makeBody('moonshotai/kimi-k2.6')) as never);
+    }
+
+    afterEach(() => {
+      mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
+    });
+
+    it.each(['a catalog-mode direct BYOK key', 'a Vercel BYOK inference provider key'] as const)(
+      'serves a model whose providers are all disallowed through %s',
+      async route => {
+        const response = await sendThrough(route, {
+          allowed: false,
+          denialSource: 'organization_provider',
+        });
+
+        expect(response.status).toBe(200);
+        expect(mockedUpstreamRequest).toHaveBeenCalled();
+        expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider?.only).toBeUndefined();
+      }
+    );
+
+    it.each(['an OpenRouter key', 'a Vercel AI Gateway key', 'no BYOK key'] as const)(
+      'keeps denying a model whose providers are all disallowed through %s',
+      async route => {
+        const response = await sendThrough(route, {
+          allowed: false,
+          denialSource: 'organization_provider',
+        });
+
+        expect(response.status).toBe(404);
+        expect(await response.json()).toMatchObject({ error_type: 'model_not_allowed' });
+        expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each([
+      ['the organization model deny list', 'organization_model'],
+      ['a missing group grant', 'no_grant'],
+      ['a group model restriction', 'group_model'],
+      ['a group provider restriction', 'group_provider'],
+    ] as const)(
+      'keeps denying a model excluded by %s through an inference provider key',
+      async (_name, denialSource) => {
+        for (const route of [
+          'a catalog-mode direct BYOK key',
+          'a Vercel BYOK inference provider key',
+        ] as const) {
+          mockedUpstreamRequest.mockClear();
+          const response = await sendThrough(route, { allowed: false, denialSource });
+
+          expect(response.status).toBe(404);
+          expect(await response.json()).toMatchObject({ error_type: 'model_not_allowed' });
+          expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+        }
+      }
+    );
+  });
+
   it('returns 404 when the OpenRouter model id is unknown', async () => {
     mockedIsValidOpenRouterModelId.mockResolvedValue(false);
 
@@ -1827,6 +1955,8 @@ describe('kilo-auto/efficient classifier billing', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockedGetDirectByokModel.mockResolvedValue({ provider: null, model: null });
+    mockedSupportsCatalogMode.mockReturnValue(false);
+    mockedCreateDirectByokReferenceResolver.mockResolvedValue(async modelId => modelId);
     setUserAuth();
 
     mockedGetProvider.mockResolvedValue({
@@ -2077,6 +2207,167 @@ describe('kilo-auto/efficient classifier billing', () => {
       error_type: 'organization_auto_configuration',
       message: expect.stringContaining('does not have an enabled BYOK credential for martian'),
     });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('rejects a bespoke direct BYOK id whose key serves catalog ids, naming the catalog id', async () => {
+    mockedGetProvider.mockResolvedValue({
+      kind: 'direct-byok-catalog-only',
+      providerId: 'synthetic',
+      catalogModelId: 'moonshotai/kimi-k2.6',
+    });
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('synthetic/hf:moonshotai/kimi-k2.6')) as never
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error_type: 'direct_byok_catalog_only',
+      message:
+        "'synthetic/hf:moonshotai/kimi-k2.6' is disabled because the Synthetic key uses Kilo catalog model IDs. Use 'moonshotai/kimi-k2.6' instead.",
+    });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('names the BYOK key when it cannot serve the API kind', async () => {
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider: { ...provider, id: 'direct-byok', supportedChatApis: ['responses'] },
+      userByok: [{ decryptedAPIKey: 'key', providerId: 'synthetic' }],
+      isFree: false,
+      bypassAccessCheck: false,
+    });
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('moonshotai/kimi-k2.6')) as never
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error_type: 'api_kind_not_supported',
+      message:
+        'This model does not support the chat_completions API through your Synthetic key, please use any of: responses',
+    });
+    expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+  });
+
+  it('explains an unmapped bespoke id when the key serves catalog ids', async () => {
+    mockedGetProvider.mockResolvedValue({
+      kind: 'direct-byok-catalog-only',
+      providerId: 'synthetic',
+      catalogModelId: null,
+    });
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('synthetic/hf:example/finetune')) as never
+    );
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error_type: 'direct_byok_catalog_only',
+      message: expect.stringContaining('This model has no catalog ID'),
+    });
+  });
+
+  it('reports an unmapped Organization Auto target of a catalog-mode key as a configuration error', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 0,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-1',
+    });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: {
+        default_model: 'kilo-auto/org',
+        org_auto_model: { routes: {}, fallback_model: 'kilo-auto/balanced' },
+      },
+      plan: 'enterprise',
+    });
+    mockedApplyResolvedAutoModel.mockImplementation(async (_params, request) => {
+      request.body.model = 'synthetic/hf:example/finetune';
+      return {
+        kind: 'ok',
+        resolved: { model: 'synthetic/hf:example/finetune' },
+        routingTarget: 'synthetic/hf:example/finetune',
+      };
+    });
+    mockedGetProvider.mockResolvedValue({
+      kind: 'direct-byok-catalog-only',
+      providerId: 'synthetic',
+      catalogModelId: null,
+    });
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(makeRequest(makeBody('kilo-auto/org')) as never);
+
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({
+      error_type: 'organization_auto_configuration',
+      message: expect.stringContaining(
+        "Organization Auto route target 'synthetic/hf:example/finetune' is unavailable"
+      ),
+    });
+  });
+
+  it('serves an auto-routed bespoke id of a catalog-mode key under its catalog id and policy', async () => {
+    mockedGetUserFromAuth.mockResolvedValue({
+      user: {
+        id: 'user-123',
+        google_user_email: 'test@example.com',
+        microdollars_used: 0,
+      } as User,
+      authFailedResponse: null,
+      organizationId: 'org-1',
+    });
+    mockedApplyResolvedAutoModel.mockImplementation(async (_params, request) => {
+      request.body.model = 'synthetic/hf:moonshotai/kimi-k2.6';
+      return { kind: 'ok', resolved: { model: 'synthetic/hf:moonshotai/kimi-k2.6' } };
+    });
+    mockedGetDirectByokModel.mockResolvedValue({
+      provider: { id: 'synthetic' } as never,
+      model: {} as never,
+    });
+    mockedSupportsCatalogMode.mockReturnValue(true);
+    mockedCreateDirectByokReferenceResolver.mockResolvedValue(async () => 'moonshotai/kimi-k2.6');
+    mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: false });
+    mockedGetBalanceAndOrgSettings.mockResolvedValue({
+      balance: 1000,
+      settings: {},
+      plan: 'enterprise',
+    });
+    mockedGetProvider.mockResolvedValue({
+      kind: 'provider',
+      provider: { ...provider, id: 'direct-byok' },
+      userByok: [{ decryptedAPIKey: 'key', providerId: 'synthetic' }],
+      isFree: false,
+      bypassAccessCheck: false,
+    });
+
+    const { handleLlmProxyRequest } = await import('./llm-proxy');
+    const response = await handleLlmProxyRequest(
+      makeRequest(makeBody('kilo-auto/efficient')) as never
+    );
+
+    expect(mockedCreateDirectByokReferenceResolver).toHaveBeenCalledWith({
+      type: 'organization',
+      id: 'org-1',
+    });
+    expect(mockedGetProvider).toHaveBeenCalledWith(
+      expect.objectContaining({ requestedModel: 'moonshotai/kimi-k2.6' })
+    );
+    expect(mockedGetEffectiveModelDecision).toHaveBeenCalledWith(
+      expect.anything(),
+      'moonshotai/kimi-k2.6'
+    );
+    expect(response.status).toBe(503);
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();
   });
 
@@ -3249,15 +3540,18 @@ describe('briefing gateway accounting receipts', () => {
       },
     };
     const [report] = await db
-      .insert(agent_briefing_reports)
+      .insert(agent_briefing_snapshots)
       .values({
         kilo_user_id: user.id,
         context_key: 'personal',
-        kind: 'one_off',
+        local_date: now.slice(0, 10),
+        timezone: 'UTC',
+        language: 'en',
+        captured_at: now,
+        expires_at: new Date(Date.now() + 86_400_000).toISOString(),
         night_start_at: now,
         cutoff_at: now,
         morning_end_at: now,
-        evidence_hash: 'gateway-receipt-test',
         facts: {},
         summary,
         generation_id: generationId,
@@ -3281,9 +3575,9 @@ describe('briefing gateway accounting receipts', () => {
 
   async function persistedSummary(reportId: string) {
     const [report] = await db
-      .select({ summary: agent_briefing_reports.summary })
-      .from(agent_briefing_reports)
-      .where(eq(agent_briefing_reports.id, reportId));
+      .select({ summary: agent_briefing_snapshots.summary })
+      .from(agent_briefing_snapshots)
+      .where(eq(agent_briefing_snapshots.id, reportId));
     if (!report) throw new Error('Report fixture was not found');
     return report.summary;
   }

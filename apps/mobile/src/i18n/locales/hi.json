@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "कौशल सहेजा नहीं जा सका",
     "skillSourceCustom": "कस्टम",
     "skillSourceMarketplace": "मार्केटप्लेस",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "एक SKILL.md चिपकाएँ और उसका नाम भरें; अपने फ़ोन से बिना खींचें और छोड़े एक कौशल जोड़ें।",
     "skillEditTitle": "कौशल संपादित करें",
     "skillEdit": "कौशल {{name}} संपादित करें",

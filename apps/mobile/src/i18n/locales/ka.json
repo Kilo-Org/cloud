@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "უნარების შენახვა ვერ მოხერხდა",
     "skillSourceCustom": "საკუთარი",
     "skillSourceMarketplace": "ბაზარი",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "ჩასვით SKILL.md და ივსება მისი სახელი; დაამატეთ უნარი თქვენი ტელეფონიდან გადათრევის გარეშე.",
     "skillEditTitle": "რედაქტირების უნარი",
     "skillEdit": "დაარედაქტირე უნარი {{name}}",

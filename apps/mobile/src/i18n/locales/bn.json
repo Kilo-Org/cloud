@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "দক্ষতা বাঁচাতে পারেনি",
     "skillSourceCustom": "কাস্টম",
     "skillSourceMarketplace": "মার্কেটপ্লেস",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "একটি SKILL.md পেস্ট করুন এবং এর নামটি পূরণ করুন; ড্র্যাগ এবং ড্রপ ছাড়াই আপনার ফোন থেকে একটি দক্ষতা যোগ করুন।",
     "skillEditTitle": "দক্ষতা সম্পাদনা করুন",
     "skillEdit": "দক্ষতা {{name}} সম্পাদনা করুন",

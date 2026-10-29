@@ -3894,6 +3894,7 @@
     "skillSaveFailed": "Não foi possível guardar a competência",
     "skillSourceCustom": "Personalizado",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Cole um SKILL.md e o nome é preenchido automaticamente; adicione uma competência a partir do telemóvel, sem arrastar e largar.",
     "skillEditTitle": "Editar competência",
     "skillEdit": "Editar competência {{name}}",

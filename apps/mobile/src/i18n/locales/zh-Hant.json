@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "無法保存技能",
     "skillSourceCustom": "自訂",
     "skillSourceMarketplace": "市集",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "貼上一個SKILL.md並填寫其名稱；從手機添加技能，無需拖放。",
     "skillEditTitle": "編輯技能",
     "skillEdit": "編輯技能 {{name}}",

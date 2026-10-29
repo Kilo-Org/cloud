@@ -4044,6 +4044,7 @@
     "skillSaveFailed": "Methu arbed sgil",
     "skillSourceCustom": "Personol",
     "skillSourceMarketplace": "Marchnad",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Gludwch SKILL.md ac mae ei enw yn llenwi; ychwanegu sgil o'ch ffôn heb lusgo a gollwng.",
     "skillEditTitle": "Sgil golygu",
     "skillEdit": "Golygu sgil {{name}}",

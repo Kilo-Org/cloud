@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "Oskust ei õnnestunud salvestada",
     "skillSourceCustom": "Kohandatud",
     "skillSourceMarketplace": "Turg",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Kleepige fail SKILL.md ja selle nimi täidetakse; lisage oma telefonist oskusi ilma lohistamata.",
     "skillEditTitle": "Muuda oskusi",
     "skillEdit": "Muuda oskust {{name}}",

@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "Kan vaardigheid niet opslaan",
     "skillSourceCustom": "Aangepast",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Plak een SKILL.md en de naam wordt ingevuld; voeg een vaardigheid toe vanaf je telefoon zonder slepen en neerzetten.",
     "skillEditTitle": "Vaardigheid bewerken",
     "skillEdit": "Vaardigheid {{name}} bewerken",

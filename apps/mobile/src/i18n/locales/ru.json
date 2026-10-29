@@ -3944,6 +3944,7 @@
     "skillSaveFailed": "Не удалось сохранить навык",
     "skillSourceCustom": "Собственный",
     "skillSourceMarketplace": "Магазин",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Вставьте SKILL.md, и его имя заполнится; добавьте навык со своего телефона без перетаскивания.",
     "skillEditTitle": "Изменить навык",
     "skillEdit": "Изменить навык {{name}}",

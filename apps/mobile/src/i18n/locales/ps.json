@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "مهارت نه شو ژغورلی",
     "skillSourceCustom": "دودیز",
     "skillSourceMarketplace": "بازار",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "یو SKILL.md پیسټ کړئ او نوم یې ډک شي؛ پرته له ډریګ او ډراپ خپل تلیفون څخه مهارت اضافه کړئ.",
     "skillEditTitle": "د ترمیم مهارت",
     "skillEdit": "د {{name}} مهارت ترمیم کړئ",

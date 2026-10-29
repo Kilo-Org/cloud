@@ -3944,6 +3944,7 @@
     "skillSaveFailed": "Spretnosti ni bilo mogoče shraniti",
     "skillSourceCustom": "Po meri",
     "skillSourceMarketplace": "Tržnica",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Prilepite SKILL.md in njegovo ime se izpolni; dodajte veščino iz telefona brez povleci in spusti.",
     "skillEditTitle": "Spretnost urejanja",
     "skillEdit": "Uredi spretnost {{name}}",

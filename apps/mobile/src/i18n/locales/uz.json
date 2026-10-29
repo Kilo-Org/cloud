@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "Mahorat saqlanmadi",
     "skillSourceCustom": "Maxsus",
     "skillSourceMarketplace": "Bozor",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "SKILL.md-ni joylashtiring va uning nomi kiritiladi; sudrab tashlamasdan telefoningizdan mahorat qo'shing.",
     "skillEditTitle": "Tahrirlash mahorati",
     "skillEdit": "{{name}} koʻnikmasini tahrirlang",

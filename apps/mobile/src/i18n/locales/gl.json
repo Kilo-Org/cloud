@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "Non se puido gardar a habilidade",
     "skillSourceCustom": "Personalizada",
     "skillSourceMarketplace": "Mercado",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Pega un SKILL.md e o seu nome énchese; engade unha habilidade desde o teu teléfono sen arrastrar e soltar.",
     "skillEditTitle": "Editar habilidade",
     "skillEdit": "Editar habilidade {{name}}",

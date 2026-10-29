@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "ਹੁਨਰ ਨੂੰ ਬਚਾ ਨਹੀਂ ਸਕਿਆ",
     "skillSourceCustom": "ਕਸਟਮ",
     "skillSourceMarketplace": "ਮਾਰਕੀਟਪਲੇਸ",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "ਇੱਕ SKILL.md ਪੇਸਟ ਕਰੋ ਅਤੇ ਇਸਦਾ ਨਾਮ ਭਰੋ; ਬਿਨਾਂ ਡਰੈਗ ਐਂਡ ਡ੍ਰੌਪ ਦੇ ਆਪਣੇ ਫ਼ੋਨ ਤੋਂ ਹੁਨਰ ਸ਼ਾਮਲ ਕਰੋ।",
     "skillEditTitle": "ਹੁਨਰ ਨੂੰ ਸੋਧੋ",
     "skillEdit": "ਹੁਨਰ {{name}} ਨੂੰ ਸੋਧੋ",

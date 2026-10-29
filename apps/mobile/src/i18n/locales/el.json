@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "Δεν ήταν δυνατή η αποθήκευση της δεξιότητας",
     "skillSourceCustom": "Προσαρμοσμένο",
     "skillSourceMarketplace": "Αγορά",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Επικολλήστε ένα SKILL.md και το όνομά του συμπληρώνεται. Προσθέστε μια δεξιότητα από το τηλέφωνό σας χωρίς μεταφορά και απόθεση.",
     "skillEditTitle": "Επεξεργασία δεξιότητας",
     "skillEdit": "Επεξεργασία δεξιότητας {{name}}",

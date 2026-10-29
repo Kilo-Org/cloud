@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "Bacarıq saxlamaq mümkün olmadı",
     "skillSourceCustom": "Fərdi",
     "skillSourceMarketplace": "Marketpleys",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "SKILL.md yapışdırın və onun adı doldurulur; sürükləyib buraxmadan telefonunuzdan bacarıq əlavə edin.",
     "skillEditTitle": "Bacarıqları redaktə edin",
     "skillEdit": "{{name}} bacarığını redaktə edin",

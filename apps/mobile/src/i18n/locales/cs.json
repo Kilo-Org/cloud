@@ -3944,6 +3944,7 @@
     "skillSaveFailed": "Nepodařilo se zachránit dovednost",
     "skillSourceCustom": "Vlastní",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Vložte SKILL.md a jeho název se vyplní; přidejte dovednost z telefonu bez přetahování.",
     "skillEditTitle": "Upravit dovednost",
     "skillEdit": "Upravit dovednost {{name}}",

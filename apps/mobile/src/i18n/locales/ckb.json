@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "نەیتوانی لێهاتوویی ڕزگار بکات",
     "skillSourceCustom": "دەستکرد",
     "skillSourceMarketplace": "بازاڕ",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "SKILL.md ێک لێبدە و ناوەکەی پڕ دەبێتەوە؛ لە مۆبایلەکەتەوە کارامەیییەک زیاد بکە بەبێ ڕاکێشان و دابەزاندن.",
     "skillEditTitle": "لێهاتوویی دەستکاریکردن",
     "skillEdit": "لێهاتوویی {{name}} دەستکاری بکە",

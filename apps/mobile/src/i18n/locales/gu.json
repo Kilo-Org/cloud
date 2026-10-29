@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "કૌશલ્ય બચાવી શક્યા નથી",
     "skillSourceCustom": "કસ્ટમ",
     "skillSourceMarketplace": "માર્કેટપ્લેસ",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "એક SKILL.md પેસ્ટ કરો અને તેનું નામ ભરે છે; ખેંચો અને છોડો વગર તમારા ફોનમાંથી કુશળતા ઉમેરો.",
     "skillEditTitle": "કૌશલ્ય સંપાદિત કરો",
     "skillEdit": "કૌશલ્ય {{name}} સંપાદિત કરો",

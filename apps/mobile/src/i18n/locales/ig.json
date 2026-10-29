@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "Enweghị ike ichekwa nka",
     "skillSourceCustom": "Nke onwe",
     "skillSourceMarketplace": "Ahịa",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Tapawa SKILL.md na aha ya juputara; tinye nka na ekwentị gị na-adọkpụrụghị na dobe.",
     "skillEditTitle": "Dezie nka",
     "skillEdit": "Dezie nka {{name}}",

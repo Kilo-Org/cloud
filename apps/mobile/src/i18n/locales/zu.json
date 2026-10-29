@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "Ayikwazanga ukulondoloza ikhono",
     "skillSourceCustom": "Ngokwezifiso",
     "skillSourceMarketplace": "Imakethe",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Namathisela i-SKILL.md futhi igama layo ligcwalise; engeza ikhono kusuka kufoni yakho ngaphandle kokuhudula nokuwisa.",
     "skillEditTitle": "Hlela ikhono",
     "skillEdit": "Hlela ikhono {{name}}",

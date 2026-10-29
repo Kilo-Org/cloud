@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "Ogummaa qusachuu hin dandeenye",
     "skillSourceCustom": "Dhuunfaa",
     "skillSourceMarketplace": "Gabaa",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "SKILL.md tokko maxxansi maqaan isaa ni guuta; bilbila keessan irraa ogummaa tokko osoo harkisuu fi hin gadi dhiisin itti dabalaa.",
     "skillEditTitle": "Dandeettii gulaaluu",
     "skillEdit": "Dandeettii {{name}} gulaali",

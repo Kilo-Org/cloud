@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "مهارت ذخیره نشد",
     "skillSourceCustom": "سفارشی",
     "skillSourceMarketplace": "بازار",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "یک SKILL.md قرار دهید و نام آن پر می شود. یک مهارت از تلفن خود بدون کشیدن و رها کردن اضافه کنید.",
     "skillEditTitle": "مهارت ویرایش",
     "skillEdit": "مهارت {{name}} را ویرایش کنید",

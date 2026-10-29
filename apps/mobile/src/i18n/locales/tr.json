@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "Beceri kaydedilemedi",
     "skillSourceCustom": "Özel",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Bir SKILL.md yapıştırın ve adı doldurun; Sürükleyip bırakmadan telefonunuzdan bir beceri ekleyin.",
     "skillEditTitle": "Beceriyi düzenle",
     "skillEdit": "{{name}} becerisini düzenle",

@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "スキルを保存できませんでした",
     "skillSourceCustom": "カスタム",
     "skillSourceMarketplace": "マーケットプレイス",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "SKILL.md を貼り付けると、その名前が入力されます。ドラッグ アンド ドロップせずにスマートフォンからスキルを追加します。",
     "skillEditTitle": "エディットスキル",
     "skillEdit": "スキル{{name}}を編集",

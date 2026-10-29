@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "ችሎታ ማዳን አልተቻለም",
     "skillSourceCustom": "ብጁ",
     "skillSourceMarketplace": "መደብር",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "SKILL.md ይለጥፉ እና ስሙ ይሞላል; ሳይጎትቱ እና መጣል ሳይኖር ከስልክዎ ላይ ችሎታ ይጨምሩ።",
     "skillEditTitle": "ችሎታን ያርትዑ",
     "skillEdit": "ችሎታ {{name}} ያርትዑ",

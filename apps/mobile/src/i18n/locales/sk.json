@@ -3944,6 +3944,7 @@
     "skillSaveFailed": "Nepodarilo sa zachrániť zručnosť",
     "skillSourceCustom": "Vlastné",
     "skillSourceMarketplace": "Obchod",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Vložte súbor SKILL.md a jeho názov sa vyplní; pridajte zručnosť zo svojho telefónu bez presúvania myšou.",
     "skillEditTitle": "Upraviť zručnosť",
     "skillEdit": "Upraviť zručnosť {{name}}",

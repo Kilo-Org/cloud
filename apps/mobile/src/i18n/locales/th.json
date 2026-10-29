@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "ไม่สามารถบันทึกทักษะได้",
     "skillSourceCustom": "กำหนดเอง",
     "skillSourceMarketplace": "ตลาด",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "วาง SKILL.md แล้วชื่อจะถูกกรอกให้อัตโนมัติ เพิ่มทักษะจากโทรศัพท์ของคุณโดยไม่ต้องลากและวาง",
     "skillEditTitle": "แก้ไขทักษะ",
     "skillEdit": "แก้ไขทักษะ {{name}}",

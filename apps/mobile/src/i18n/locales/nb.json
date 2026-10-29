@@ -3844,6 +3844,7 @@
     "skillSaveFailed": "Kunne ikke lagre ferdigheter",
     "skillSourceCustom": "Egendefinert",
     "skillSourceMarketplace": "Markedsplass",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Lim inn en SKILL.md og navnet fylles ut; legg til en ferdighet fra telefonen din uten å dra og slipp.",
     "skillEditTitle": "Rediger ferdighet",
     "skillEdit": "Rediger ferdighet {{name}}",

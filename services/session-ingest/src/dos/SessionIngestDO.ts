@@ -1316,10 +1316,12 @@ export class SessionIngestDO extends DurableObject<Env> {
   /**
    * Builds a text excerpt for a completed assistant message from its already-ingested text parts.
    *
-   * The excerpt is a prefix of the message text, so this read is bounded like
-   * `latestBriefingExcerpt`: at most `BRIEFING_MAX_EXCERPT_SOURCE_ROWS` text-part rows,
-   * `BRIEFING_MAX_INLINE_BYTES` of text, and it stops as soon as the excerpt can no longer change.
-   * The excerpt is then built from the text that was read.
+   * This runs inside the status-change ingest request, so it is bounded like
+   * `latestBriefingExcerpt`: at most `BRIEFING_MAX_EXCERPT_SOURCE_ROWS` text-part rows and
+   * `BRIEFING_MAX_INLINE_BYTES` of text, and it stops as soon as the excerpt is complete. A
+   * message may hold an arbitrary number of parts, and the push only ever shows the start of its
+   * text, so a capped read still returns the excerpt of the text read so far: the caps drop only
+   * text the snippet would not have shown.
    */
   private buildAssistantExcerptForMessage(messageId: string): string {
     const encoder = new TextEncoder();
@@ -1350,7 +1352,8 @@ export class SessionIngestDO extends DurableObject<Env> {
               // Parts offloaded to R2 (oversized items) store '{}' inline; skip them rather than
               // fetching from R2 — this is a best-effort excerpt, not a full transcript.
               isNull(ingestItems.item_data_r2_key),
-              // Only text parts feed the excerpt, so the query selects them directly.
+              // Only text parts carry excerpt text. Filtering them in SQL keeps every other part
+              // body (tool arguments, tool output) out of the row cap and out of the DO's memory.
               sql`json_extract(${ingestItems.item_data}, '$.type') = 'text'`,
               after
                 ? afterIngestOrderCursor({ ingestedAt: after.ingested_at, id: after.id })

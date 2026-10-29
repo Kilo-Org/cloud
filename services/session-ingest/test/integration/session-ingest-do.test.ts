@@ -14,6 +14,7 @@ import {
   MAX_KILO_SDK_HISTORY_MATERIALIZATION_BYTES,
   MAX_KILO_SDK_SESSION_SNAPSHOT_BYTES,
 } from '../../src/dos/kilo-sdk-materialization';
+import { BRIEFING_MAX_EXCERPT_SOURCE_ROWS } from '../../src/ingest/briefing-excerpt';
 import { INGEST_CHUNK_MAX_BYTES, MAX_INGEST_ITEM_BYTES } from '../../src/util/ingest-limits';
 
 const encoder = new TextEncoder();
@@ -3442,12 +3443,20 @@ describe('SessionIngestDO integration', () => {
         return runInDurableObject(getStub(kiloUserId, sessionId), async (instance, state) => {
           const sqlStorage: SqlStorage = Object.getPrototypeOf(state.storage.sql);
           const exec = sqlStorage.exec;
+          // The excerpt derivation parses each part body it takes from the database, so counting
+          // those parses measures the part bodies the read consumes.
+          const jsonParse = JSON.parse;
           const cursors: Array<{ rowsRead: number }> = [];
+          let parsedParts = 0;
           sqlStorage.exec = function (this: SqlStorage, ...args: Parameters<SqlStorage['exec']>) {
             const cursor = exec.apply(this, args);
             cursors.push(cursor);
             return cursor;
           };
+          JSON.parse = ((text: string, ...rest: unknown[]) => {
+            if (typeof text === 'string' && text.includes('"messageID":"msg_many"')) parsedParts += 1;
+            return (jsonParse as (value: string, ...args: unknown[]) => unknown)(text, ...rest);
+          }) as typeof JSON.parse;
           try {
             const result = await instance.ingest(
               [{ type: 'session_status', data: { status: 'idle' } }],
@@ -3457,10 +3466,12 @@ describe('SessionIngestDO integration', () => {
             );
             return {
               rowsRead: cursors.reduce((sum, cursor) => sum + cursor.rowsRead, 0),
+              parsedParts,
               attentionSignals: result.accepted ? result.attentionSignals : [],
             };
           } finally {
             sqlStorage.exec = exec;
+            JSON.parse = jsonParse;
           }
         });
       }
@@ -3479,9 +3490,12 @@ describe('SessionIngestDO integration', () => {
           messageExcerpt: `${'Response text. '.repeat(6)}Respons...`,
         },
       ]);
-      // A turn without a finished message has no excerpt to build, so the difference between the
-      // two runs is the excerpt read for a message holding 3000 stored parts.
+      // A session without a finished turn builds no excerpt, so the completed session's parsed
+      // part bodies are the excerpt read itself, once per part body it takes from the database.
       expect(unfinished.attentionSignals).toEqual([]);
+      expect(unfinished.parsedParts).toBe(0);
+      expect(completed.parsedParts).toBeGreaterThan(0);
+      expect(completed.parsedParts).toBeLessThanOrEqual(BRIEFING_MAX_EXCERPT_SOURCE_ROWS);
       // The excerpt read stays within one ordered range pass over the stored parts.
       expect(completed.rowsRead - unfinished.rowsRead).toBeLessThan(10_000);
     });

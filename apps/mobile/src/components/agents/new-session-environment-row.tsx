@@ -52,15 +52,19 @@ export function NewSessionProfileRow({
     : '';
   const hasSummary = profileSummary.length > 0;
   // The card is one accessible control, so its label has to carry what it
-  // shows: the active choice (the picked profile or the default environment)
-  // and the attention line, which a child Text would not be read as.
+  // shows and what it does: the pick purpose (Android ignores
+  // `accessibilityHint`, so the purpose lives here), the active choice (the
+  // picked profile or the default environment) and the attention line, which
+  // a child Text would not be read as.
+  const purpose = t('agentChat.newSession.pickProfile');
   const selectedLabel = profile?.name ?? t('agentChat.newSession.defaultEnvironment');
   const accessibilityLabel = overrideNeedsAttention
     ? t('agentChat.newSession.environmentAccessibilityNeedsAttention', {
+        purpose,
         label: selectedLabel,
         attention: t('agentChat.newSession.configNeedsAttention'),
       })
-    : t('agentChat.newSession.environmentAccessibility', { label: selectedLabel });
+    : t('agentChat.newSession.environmentAccessibility', { purpose, label: selectedLabel });
   const attention = overrideNeedsAttention ? (
     <Text className="text-sm text-warn">{t('agentChat.newSession.configNeedsAttention')}</Text>
   ) : null;
@@ -83,7 +87,6 @@ export function NewSessionProfileRow({
           onPress={onOpenProfilePicker}
           accessibilityRole="button"
           accessibilityLabel={accessibilityLabel}
-          accessibilityHint={t('agentChat.newSession.pickProfile')}
         >
           <View className="min-w-0 flex-1 gap-1">
             {attention}

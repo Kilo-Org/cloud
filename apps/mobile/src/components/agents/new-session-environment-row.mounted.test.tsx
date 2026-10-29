@@ -79,13 +79,16 @@ function renderRow(overrides: Partial<RowProps> = {}) {
 }
 
 describe('new-session environment row accessible name', () => {
-  it('names the picked profile and keeps the pick action as its hint', () => {
+  it('names the picked profile after its pick purpose', () => {
     const control = renderRow({ profile: PROFILE }).findAllByType('Pressable')[0];
 
     expect(control?.props.accessibilityLabel).toBe(
-      i18n.t('agentChat.newSession.environmentAccessibility', { label: 'Production' })
+      i18n.t('agentChat.newSession.environmentAccessibility', {
+        purpose: i18n.t('agentChat.newSession.pickProfile'),
+        label: 'Production',
+      })
     );
-    expect(control?.props.accessibilityHint).toBe(i18n.t('agentChat.newSession.pickProfile'));
+    expect(control?.props.accessibilityHint).toBeUndefined();
   });
 
   it('keeps a non-Latin profile name in the accessible name', () => {
@@ -101,6 +104,7 @@ describe('new-session environment row accessible name', () => {
 
     expect(control?.props.accessibilityLabel).toBe(
       i18n.t('agentChat.newSession.environmentAccessibility', {
+        purpose: i18n.t('agentChat.newSession.pickProfile'),
         label: i18n.t('agentChat.newSession.defaultEnvironment'),
       })
     );
@@ -113,6 +117,7 @@ describe('new-session environment row accessible name', () => {
 
     expect(control?.props.accessibilityLabel).toBe(
       i18n.t('agentChat.newSession.environmentAccessibilityNeedsAttention', {
+        purpose: i18n.t('agentChat.newSession.pickProfile'),
         label: 'Production',
         attention: i18n.t('agentChat.newSession.configNeedsAttention'),
       })

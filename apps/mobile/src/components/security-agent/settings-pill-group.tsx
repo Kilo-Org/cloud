@@ -1,4 +1,4 @@
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { Check } from '@/components/ui/icons';
 import { Pressable, View } from 'react-native';
 
@@ -47,7 +47,7 @@ export function PillGroup<T extends string>({
                 disabled && 'opacity-50'
               )}
               onPress={() => {
-                void Haptics.selectionAsync();
+                selectionHaptic();
                 onChange(option.value);
               }}
               {...radioItemA11y({ label: option.label, checked: active, disabled })}

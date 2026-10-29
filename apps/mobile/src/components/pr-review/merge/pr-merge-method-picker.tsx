@@ -1,4 +1,4 @@
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
@@ -37,7 +37,7 @@ export function MethodPicker({
               key={option.value}
               disabled={isDisabled}
               onPress={() => {
-                void Haptics.selectionAsync();
+                selectionHaptic();
                 onChange(option.value);
               }}
               {...radioItemA11y({

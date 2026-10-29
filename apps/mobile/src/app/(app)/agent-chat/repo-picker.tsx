@@ -1,5 +1,5 @@
 import { useFocusEffect, useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { Check, Info, Lock, Search, SearchX, Unlock } from '@/components/ui/icons';
 import { useCallback, useDeferredValue, useMemo, useRef, useState } from 'react';
 import { Pressable, View } from 'react-native';
@@ -92,7 +92,7 @@ export default function RepoPickerScreen() {
 
   const handleSelect = useCallback(
     (repo: string) => {
-      void Haptics.selectionAsync();
+      selectionHaptic();
       bridgeRef.current?.onSelect(repo);
       repoPickerSlot.clear(UNFENCED_ROUTE_KEY);
       bridgeRef.current = undefined;

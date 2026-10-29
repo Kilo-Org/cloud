@@ -83,10 +83,7 @@ describe('new-session environment row accessible name', () => {
     const control = renderRow({ profile: PROFILE }).findAllByType('Pressable')[0];
 
     expect(control?.props.accessibilityLabel).toBe(
-      i18n.t('agentChat.newSession.environmentAccessibility', {
-        purpose: i18n.t('agentChat.newSession.pickProfile'),
-        label: 'Production',
-      })
+      i18n.t('agentChat.newSession.environmentAccessibility', { label: 'Production' })
     );
     expect(control?.props.accessibilityHint).toBeUndefined();
   });
@@ -104,7 +101,6 @@ describe('new-session environment row accessible name', () => {
 
     expect(control?.props.accessibilityLabel).toBe(
       i18n.t('agentChat.newSession.environmentAccessibility', {
-        purpose: i18n.t('agentChat.newSession.pickProfile'),
         label: i18n.t('agentChat.newSession.defaultEnvironment'),
       })
     );
@@ -117,7 +113,6 @@ describe('new-session environment row accessible name', () => {
 
     expect(control?.props.accessibilityLabel).toBe(
       i18n.t('agentChat.newSession.environmentAccessibilityNeedsAttention', {
-        purpose: i18n.t('agentChat.newSession.pickProfile'),
         label: 'Production',
         attention: i18n.t('agentChat.newSession.configNeedsAttention'),
       })

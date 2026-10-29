@@ -55,16 +55,16 @@ export function NewSessionProfileRow({
   // shows and what it does: the pick purpose (Android ignores
   // `accessibilityHint`, so the purpose lives here), the active choice (the
   // picked profile or the default environment) and the attention line, which
-  // a child Text would not be read as.
-  const purpose = t('agentChat.newSession.pickProfile');
+  // a child Text would not be read as. The purpose is part of each catalog's
+  // sentence, not an interpolated label of its own, because several locales
+  // write that action as a full sentence with its own terminal mark.
   const selectedLabel = profile?.name ?? t('agentChat.newSession.defaultEnvironment');
   const accessibilityLabel = overrideNeedsAttention
     ? t('agentChat.newSession.environmentAccessibilityNeedsAttention', {
-        purpose,
         label: selectedLabel,
         attention: t('agentChat.newSession.configNeedsAttention'),
       })
-    : t('agentChat.newSession.environmentAccessibility', { purpose, label: selectedLabel });
+    : t('agentChat.newSession.environmentAccessibility', { label: selectedLabel });
   const attention = overrideNeedsAttention ? (
     <Text className="text-sm text-warn">{t('agentChat.newSession.configNeedsAttention')}</Text>
   ) : null;

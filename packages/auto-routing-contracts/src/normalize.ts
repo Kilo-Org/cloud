@@ -32,10 +32,11 @@ const PROMPT_WALK_MAX_DEPTH = 64;
 // Cleaning runs before the stored prefix is taken and is linear in the text it
 // receives, so text is gathered up to this window and no further. The window has
 // to be larger than any single block the cleaning passes strip, because a block
-// whose closer falls outside it is kept as ordinary text: real agent prompts
-// carry environment_details and file blocks of hundreds of kilobytes, and 1 MiB
-// covers them while still bounding one message's cleaning to a few tens of
-// milliseconds.
+// whose closer falls outside the gathered text is kept as ordinary text: real
+// agent prompts carry environment_details and file blocks of hundreds of
+// kilobytes, and 1 MiB covers them while still bounding one message's cleaning
+// to a few tens of milliseconds. One mebibyte is the documented limit for a
+// single block; past it the prefix is the block's own opening text.
 const PROMPT_TEXT_MAX_LENGTH = TEXT_PREFIX_MAX_LENGTH * 1024;
 // Credential keys are matched on token boundaries: key names split at
 // separators, digits, and camelCase humps into tokens, and a credential token

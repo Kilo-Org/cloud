@@ -99,18 +99,25 @@ describe('classifier input normalization', () => {
     expect(performance.now() - started).toBeLessThan(budgetMs);
   });
 
-  it('keeps the user text ahead of a large stripped block', () => {
-    // The gathering window has to clear whole agent blocks: the strip passes
-    // see a block's closer only when it falls inside the window.
+  it('keeps the user text ahead of a stripped block near the window size', () => {
+    // The gathering window has to clear a whole agent block, because the strip
+    // passes see a block's closer only when it falls inside the gathered text.
+    // This block is close to a mebibyte with its closer inside the window, so a
+    // window of a few tens of kilobytes fails here.
+    const budgetMs = 2000;
     const userText = 'Refactor the billing retry path and add a regression test.';
-    const block = `<environment_details>\n${'src/app/page.tsx\n'.repeat(12_000)}</environment_details>`;
+    const block = `<environment_details>\n${'src/app/page.tsx\n'.repeat(58_000)}</environment_details>`;
+    expect(block.length).toBeGreaterThan(900_000);
 
-    expect(
-      normalizeClassifierInput('chat_completions', {
-        model: 'anthropic/claude-sonnet-4',
-        messages: [{ role: 'user', content: `${userText}\n${block}` }],
-      })
-    ).toMatchObject({ userPromptPrefix: userText });
+    const started = performance.now();
+    const result = normalizeClassifierInput('chat_completions', {
+      model: 'anthropic/claude-sonnet-4',
+      messages: [{ role: 'user', content: `${userText}\n${block}` }],
+    });
+    const elapsed = performance.now() - started;
+
+    expect(result?.userPromptPrefix).toBe(userText);
+    expect(elapsed).toBeLessThan(budgetMs);
   });
 
   it('keeps the leading prefix of a message larger than the gathering window', () => {

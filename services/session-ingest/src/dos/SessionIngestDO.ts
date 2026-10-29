@@ -625,216 +625,235 @@ export class SessionIngestDO extends DurableObject<Env> {
     // old running state of a tool that already finished would revive its step).
     const storedItems: IngestBatch[number][] = [];
 
-    for (const item of payload) {
-      const { item_id, item_type } = getItemIdentity(item);
+    // The stored rows and the running cost total commit together. A request that fails after
+    // storing rows must not leave their contributions missing from the total: a retried batch
+    // replaces identical rows, so it moves nothing, and a total that exists is never re-seeded.
+    this.ctx.storage.transactionSync(() => {
+      for (const item of payload) {
+        const { item_id, item_type } = getItemIdentity(item);
 
-      // The row this item replaces. A message row's body decides its cost contribution, so
-      // message items read it with the body; other items read only what the stale guard needs.
-      const replacedMessageRow =
-        item.type === 'message'
-          ? this.db
-              .select({
-                ingested_at: ingestItems.ingested_at,
-                item_data: ingestItems.item_data,
-                item_data_r2_key: ingestItems.item_data_r2_key,
-              })
-              .from(ingestItems)
-              .where(eq(ingestItems.item_id, item_id))
-              .get()
-          : undefined;
-      const replacedItemRow =
-        item.type === 'message' || ingestedAt === undefined
-          ? undefined
-          : this.db
-              .select({
-                ingested_at: ingestItems.ingested_at,
-                item_data_r2_key: ingestItems.item_data_r2_key,
-              })
-              .from(ingestItems)
-              .where(eq(ingestItems.item_id, item_id))
-              .get();
-      const replacedRow = replacedMessageRow ?? replacedItemRow;
-
-      // Check timestamp guard: skip if existing row has a newer ingested_at.
-      // Also read the existing R2 key so we can clean up orphaned blobs.
-      if (ingestedAt !== undefined) {
-        const existingIngestedAt = replacedRow?.ingested_at;
-        const existingR2Key = replacedRow?.item_data_r2_key;
-        const previousItem =
-          item.type === 'part'
+        // The row this item replaces. A message row's body decides its cost contribution, so
+        // message items read it with the body; other items read only what the stale guard needs.
+        const replacedMessageRow =
+          item.type === 'message'
             ? this.db
-                .select({ ingested_at: ingestItems.ingested_at })
+                .select({
+                  ingested_at: ingestItems.ingested_at,
+                  item_data: ingestItems.item_data,
+                  item_data_r2_key: ingestItems.item_data_r2_key,
+                })
                 .from(ingestItems)
-                .where(
-                  and(
-                    eq(
-                      ingestItems.item_id,
-                      getPreviousPartItemIdentity(item.data.messageID, item.data.id)
-                    ),
-                    eq(ingestItems.item_type, 'part')
-                  )
-                )
+                .where(eq(ingestItems.item_id, item_id))
                 .get()
             : undefined;
-        const existingIsNewer =
-          existingIngestedAt !== null &&
-          existingIngestedAt !== undefined &&
-          existingIngestedAt > ingestedAt;
-        const previousIsNewer =
-          previousItem?.ingested_at !== null &&
-          previousItem?.ingested_at !== undefined &&
-          previousItem.ingested_at > ingestedAt;
-        if (existingIsNewer || previousIsNewer) {
-          // Item is stale — if the caller wrote an R2 blob for it, that blob is orphaned
-          const newR2Key = r2References?.[item_id];
-          if (newR2Key) orphanedR2Keys.push(newR2Key);
-          continue;
-        }
-        // If the existing row pointed to a different R2 blob, it will be orphaned after upsert
-        const newR2Key = r2References?.[item_id] ?? null;
-        if (existingR2Key && existingR2Key !== newR2Key) {
-          orphanedR2Keys.push(existingR2Key);
-        }
-      }
+        const replacedItemRow =
+          item.type === 'message' || ingestedAt === undefined
+            ? undefined
+            : this.db
+                .select({
+                  ingested_at: ingestItems.ingested_at,
+                  item_data_r2_key: ingestItems.item_data_r2_key,
+                })
+                .from(ingestItems)
+                .where(eq(ingestItems.item_id, item_id))
+                .get();
+        const replacedRow = replacedMessageRow ?? replacedItemRow;
 
-      const r2Key = r2References?.[item_id];
-      const itemDataJson = r2Key ? '{}' : JSON.stringify(item.data);
-      const itemDataR2Key = r2Key ?? null;
+        // Check timestamp guard: skip if existing row has a newer ingested_at.
+        // Also read the existing R2 key so we can clean up orphaned blobs.
+        if (ingestedAt !== undefined) {
+          const existingIngestedAt = replacedRow?.ingested_at;
+          const existingR2Key = replacedRow?.item_data_r2_key;
+          const previousItem =
+            item.type === 'part'
+              ? this.db
+                  .select({ ingested_at: ingestItems.ingested_at })
+                  .from(ingestItems)
+                  .where(
+                    and(
+                      eq(
+                        ingestItems.item_id,
+                        getPreviousPartItemIdentity(item.data.messageID, item.data.id)
+                      ),
+                      eq(ingestItems.item_type, 'part')
+                    )
+                  )
+                  .get()
+              : undefined;
+          const existingIsNewer =
+            existingIngestedAt !== null &&
+            existingIngestedAt !== undefined &&
+            existingIngestedAt > ingestedAt;
+          const previousIsNewer =
+            previousItem?.ingested_at !== null &&
+            previousItem?.ingested_at !== undefined &&
+            previousItem.ingested_at > ingestedAt;
+          if (existingIsNewer || previousIsNewer) {
+            // Item is stale — if the caller wrote an R2 blob for it, that blob is orphaned
+            const newR2Key = r2References?.[item_id];
+            if (newR2Key) orphanedR2Keys.push(newR2Key);
+            continue;
+          }
+          // If the existing row pointed to a different R2 blob, it will be orphaned after upsert
+          const newR2Key = r2References?.[item_id] ?? null;
+          if (existingR2Key && existingR2Key !== newR2Key) {
+            orphanedR2Keys.push(existingR2Key);
+          }
+        }
 
-      this.db
-        .insert(ingestItems)
-        .values({
-          item_id,
-          item_type,
-          item_data: itemDataJson,
-          item_data_r2_key: itemDataR2Key,
-          ingested_at: ingestedAt ?? null,
-        })
-        .onConflictDoUpdate({
-          target: ingestItems.item_id,
-          set: {
+        const r2Key = r2References?.[item_id];
+        const itemDataJson = r2Key ? '{}' : JSON.stringify(item.data);
+        const itemDataR2Key = r2Key ?? null;
+
+        this.db
+          .insert(ingestItems)
+          .values({
+            item_id,
             item_type,
             item_data: itemDataJson,
             item_data_r2_key: itemDataR2Key,
             ingested_at: ingestedAt ?? null,
-          },
-        })
-        .run();
-      if (item.type === 'part') {
-        // A part row can also exist under the older `<messageID>/<partID>` id. The row just
-        // written supersedes it, so remove it to leave one row per part; the item-type and
-        // timestamp guards keep the delete on a superseded copy of the same part.
-        const superseded = this.db
-          .delete(ingestItems)
-          .where(
-            and(
-              eq(
-                ingestItems.item_id,
-                getPreviousPartItemIdentity(item.data.messageID, item.data.id)
-              ),
-              eq(ingestItems.item_type, 'part'),
-              ingestedAt === undefined
-                ? undefined
-                : or(isNull(ingestItems.ingested_at), lte(ingestItems.ingested_at, ingestedAt))
+          })
+          .onConflictDoUpdate({
+            target: ingestItems.item_id,
+            set: {
+              item_type,
+              item_data: itemDataJson,
+              item_data_r2_key: itemDataR2Key,
+              ingested_at: ingestedAt ?? null,
+            },
+          })
+          .run();
+        if (item.type === 'part') {
+          // A part row can also exist under the older `<messageID>/<partID>` id. The row just
+          // written supersedes it, so remove it to leave one row per part; the item-type and
+          // timestamp guards keep the delete on a superseded copy of the same part.
+          const superseded = this.db
+            .delete(ingestItems)
+            .where(
+              and(
+                eq(
+                  ingestItems.item_id,
+                  getPreviousPartItemIdentity(item.data.messageID, item.data.id)
+                ),
+                eq(ingestItems.item_type, 'part'),
+                ingestedAt === undefined
+                  ? undefined
+                  : or(isNull(ingestItems.ingested_at), lte(ingestItems.ingested_at, ingestedAt))
+              )
             )
-          )
-          .returning({ item_data_r2_key: ingestItems.item_data_r2_key })
-          .all();
-        for (const row of superseded) {
-          if (row.item_data_r2_key) orphanedR2Keys.push(row.item_data_r2_key);
+            .returning({ item_data_r2_key: ingestItems.item_data_r2_key })
+            .all();
+          for (const row of superseded) {
+            if (row.item_data_r2_key) orphanedR2Keys.push(row.item_data_r2_key);
+          }
         }
-      }
-      storedItems.push(item);
+        storedItems.push(item);
 
-      if (item.type === 'message' || item.type === 'part') {
-        wroteActivityItem = true;
-      }
-      // Cost gate is assistant-only (computeRunningAssistantCostUsd sums role:assistant).
-      // data is looseObject — role is optional at the type level; cheap property check, no parse.
-      if (item.type === 'message' && (item.data as { role?: unknown }).role === 'assistant') {
-        wroteAssistantMessageItem = true;
-      }
-      // An offloaded body is not scanned, so it contributes nothing — the same rule the
-      // full recomputation applies to a stored row.
-      if (item.type === 'message') {
-        replacedMessageCostUsd += storedAssistantMessageCostUsd(replacedMessageRow);
-        addedMessageCostUsd += itemDataR2Key === null ? assistantMessageCostUsd(item.data) : 0;
-      }
+        if (item.type === 'message' || item.type === 'part') {
+          wroteActivityItem = true;
+        }
+        // Cost gate is assistant-only (computeRunningAssistantCostUsd sums role:assistant).
+        // data is looseObject — role is optional at the type level; cheap property check, no parse.
+        if (item.type === 'message' && (item.data as { role?: unknown }).role === 'assistant') {
+          wroteAssistantMessageItem = true;
+        }
+        // An offloaded body is not scanned, so it contributes nothing — the same rule the
+        // full recomputation applies to a stored row.
+        if (item.type === 'message') {
+          replacedMessageCostUsd += storedAssistantMessageCostUsd(replacedMessageRow);
+          addedMessageCostUsd += itemDataR2Key === null ? assistantMessageCostUsd(item.data) : 0;
+        }
 
-      // §4.10: agent_notification items carry no state transition, so the DO durably tracks
-      // per-identity dispatch state alongside the item. Insert-if-absent keeps replays from
-      // re-arming an already-pending identity; the row is only flipped to `dispatched` after
-      // the caller reports a terminal local decision. The ingest response will emit the
-      // signal below whenever this row's state is `pending`.
-      if (item.type === 'agent_notification') {
-        const identity = `agent_notification/${item.data.id}`;
-        const inserted = this.db
-          .insert(agentNotificationDispatch)
-          .values({ identity, state: 'pending', created_at: Date.now() })
-          .onConflictDoNothing({ target: agentNotificationDispatch.identity })
-          .returning({ state: agentNotificationDispatch.state })
-          .get();
-        // Insert-if-absent: only a fresh row (returning populated) is `pending` for this batch.
-        // A replay where the row was already `dispatched` must not re-emit the signal.
-        if (inserted) {
-          pendingAgentNotifications.set(item.data.id, item.data.message);
-        } else {
-          const existing = this.db
-            .select({ state: agentNotificationDispatch.state })
-            .from(agentNotificationDispatch)
-            .where(eq(agentNotificationDispatch.identity, identity))
+        // §4.10: agent_notification items carry no state transition, so the DO durably tracks
+        // per-identity dispatch state alongside the item. Insert-if-absent keeps replays from
+        // re-arming an already-pending identity; the row is only flipped to `dispatched` after
+        // the caller reports a terminal local decision. The ingest response will emit the
+        // signal below whenever this row's state is `pending`.
+        if (item.type === 'agent_notification') {
+          const identity = `agent_notification/${item.data.id}`;
+          const inserted = this.db
+            .insert(agentNotificationDispatch)
+            .values({ identity, state: 'pending', created_at: Date.now() })
+            .onConflictDoNothing({ target: agentNotificationDispatch.identity })
+            .returning({ state: agentNotificationDispatch.state })
             .get();
-          if (existing?.state === 'pending') {
+          // Insert-if-absent: only a fresh row (returning populated) is `pending` for this batch.
+          // A replay where the row was already `dispatched` must not re-emit the signal.
+          if (inserted) {
             pendingAgentNotifications.set(item.data.id, item.data.message);
+          } else {
+            const existing = this.db
+              .select({ state: agentNotificationDispatch.state })
+              .from(agentNotificationDispatch)
+              .where(eq(agentNotificationDispatch.identity, identity))
+              .get();
+            if (existing?.state === 'pending') {
+              pendingAgentNotifications.set(item.data.id, item.data.message);
+            }
+          }
+        }
+
+        const olderThanIncomingStatus =
+          item.type === 'session_status' &&
+          precedesStatusTransition(
+            {
+              occurredAt: item.data.occurredAt ?? null,
+              transitionId: item.data.transitionId ?? null,
+            },
+            {
+              occurredAt: incomingByKey.statusOccurredAt ?? null,
+              transitionId: incomingByKey.statusTransitionId ?? null,
+            }
+          );
+        for (const extractor of INGEST_META_EXTRACTORS) {
+          if (
+            olderThanIncomingStatus &&
+            (extractor.key === 'status' ||
+              extractor.key === 'statusOccurredAt' ||
+              extractor.key === 'statusTransitionId')
+          )
+            continue;
+          const maybeValue = extractor.extract(item);
+          if (maybeValue !== undefined) {
+            incomingByKey[extractor.key] = maybeValue;
+          }
+        }
+
+        // session_pr_link emits the whole tuple atomically (or nothing), so the change
+        // map always receives all five keys together.
+        const prLink = extractSessionPrLink(item);
+        if (prLink !== undefined) {
+          incomingByKey.prPlatform = prLink.prPlatform;
+          incomingByKey.prUrl = prLink.prUrl;
+          incomingByKey.prNumber = prLink.prNumber;
+          incomingByKey.prHeadRef = prLink.prHeadRef;
+          incomingByKey.prHeadSha = prLink.prHeadSha;
+        }
+
+        if (ingestVersion >= 1) {
+          if (item.type === 'session_open') {
+            lifecycleEvents.push({ type: 'session_open' });
+          } else if (item.type === 'session_close') {
+            lifecycleEvents.push({ type: 'session_close', reason: item.data.reason });
           }
         }
       }
 
-      const olderThanIncomingStatus =
-        item.type === 'session_status' &&
-        precedesStatusTransition(
-          {
-            occurredAt: item.data.occurredAt ?? null,
-            transitionId: item.data.transitionId ?? null,
-          },
-          {
-            occurredAt: incomingByKey.statusOccurredAt ?? null,
-            transitionId: incomingByKey.statusTransitionId ?? null,
-          }
+      // Same transaction as the rows, so the total cannot miss a stored contribution.
+      const priorRunningCostUsd = readIngestMetaNumber(this.db, RUNNING_ASSISTANT_COST_META_KEY);
+      if (priorRunningCostUsd !== null && replacedMessageCostUsd !== addedMessageCostUsd) {
+        writeIngestMetaNumber(
+          this.db,
+          RUNNING_ASSISTANT_COST_META_KEY,
+          adjustRunningAssistantCostUsd(
+            priorRunningCostUsd,
+            replacedMessageCostUsd,
+            addedMessageCostUsd
+          )
         );
-      for (const extractor of INGEST_META_EXTRACTORS) {
-        if (
-          olderThanIncomingStatus &&
-          (extractor.key === 'status' ||
-            extractor.key === 'statusOccurredAt' ||
-            extractor.key === 'statusTransitionId')
-        )
-          continue;
-        const maybeValue = extractor.extract(item);
-        if (maybeValue !== undefined) {
-          incomingByKey[extractor.key] = maybeValue;
-        }
       }
-
-      // session_pr_link emits the whole tuple atomically (or nothing), so the change
-      // map always receives all five keys together.
-      const prLink = extractSessionPrLink(item);
-      if (prLink !== undefined) {
-        incomingByKey.prPlatform = prLink.prPlatform;
-        incomingByKey.prUrl = prLink.prUrl;
-        incomingByKey.prNumber = prLink.prNumber;
-        incomingByKey.prHeadRef = prLink.prHeadRef;
-        incomingByKey.prHeadSha = prLink.prHeadSha;
-      }
-
-      if (ingestVersion >= 1) {
-        if (item.type === 'session_open') {
-          lifecycleEvents.push({ type: 'session_open' });
-        } else if (item.type === 'session_close') {
-          lifecycleEvents.push({ type: 'session_close', reason: item.data.reason });
-        }
-      }
-    }
+    });
 
     // Lifecycle side effects (metrics alarm, open/close meta) run before any incoming
     // metadata is committed, so a failed alarm write leaves that metadata unreported.
@@ -991,26 +1010,17 @@ export class SessionIngestDO extends DurableObject<Env> {
         (lastCostPersistedAtMs === null ||
           nowMs - lastCostPersistedAtMs >= COST_PERSIST_THROTTLE_MS));
 
-    // The running cost is maintained from the items each batch stores, so a persist reads a
-    // stored total instead of the session's message history. A session without one — created
-    // before the aggregate, or a clone destination — seeds it from its stored rows once.
+    // The running cost is committed with the rows, so a persist reads a stored total instead
+    // of the session's message history. A session without one — created before the total
+    // existed, or a clone destination — seeds it from its stored rows once.
     let runningCostUsd = readIngestMetaNumber(this.db, RUNNING_ASSISTANT_COST_META_KEY);
-    if (runningCostUsd === null) {
-      if (costWindowOpen) {
-        const messageRows = this.db
-          .select({ item_data: ingestItems.item_data })
-          .from(ingestItems)
-          .where(and(eq(ingestItems.item_type, 'message'), isNull(ingestItems.item_data_r2_key)))
-          .all();
-        runningCostUsd = computeRunningAssistantCostUsd(messageRows);
-        writeIngestMetaNumber(this.db, RUNNING_ASSISTANT_COST_META_KEY, runningCostUsd);
-      }
-    } else if (replacedMessageCostUsd !== addedMessageCostUsd) {
-      runningCostUsd = adjustRunningAssistantCostUsd(
-        runningCostUsd,
-        replacedMessageCostUsd,
-        addedMessageCostUsd
-      );
+    if (runningCostUsd === null && costWindowOpen) {
+      const messageRows = this.db
+        .select({ item_data: ingestItems.item_data })
+        .from(ingestItems)
+        .where(and(eq(ingestItems.item_type, 'message'), isNull(ingestItems.item_data_r2_key)))
+        .all();
+      runningCostUsd = computeRunningAssistantCostUsd(messageRows);
       writeIngestMetaNumber(this.db, RUNNING_ASSISTANT_COST_META_KEY, runningCostUsd);
     }
 

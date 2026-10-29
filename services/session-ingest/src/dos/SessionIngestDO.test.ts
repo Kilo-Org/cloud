@@ -76,6 +76,7 @@ describe('SessionIngestDO ingest ordering', () => {
         setAlarm: vi.fn(async () => {
           operations.push('alarm');
         }),
+        transactionSync: (fn: () => unknown) => fn(),
       },
       blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
     } as unknown as DurableObjectState;
@@ -142,7 +143,7 @@ describe('SessionIngestDO ingest ordering', () => {
 
     const waitUntilPromises: Promise<unknown>[] = [];
     const state = {
-      storage: { setAlarm: vi.fn() },
+      storage: { setAlarm: vi.fn(), transactionSync: (fn: () => unknown) => fn() },
       waitUntil: vi.fn((promise: Promise<unknown>) => {
         operations.push('waitUntil');
         waitUntilPromises.push(promise);
@@ -216,6 +217,7 @@ describe('SessionIngestDO ingest ordering', () => {
         setAlarm: vi.fn(async () => {
           throw new Error('alarm failed');
         }),
+        transactionSync: (fn: () => unknown) => fn(),
       },
       blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
     } as unknown as DurableObjectState;
@@ -262,7 +264,7 @@ describe('SessionIngestDO ingest ordering', () => {
     drizzleMocks.db = db;
 
     const state = {
-      storage: { setAlarm: vi.fn() },
+      storage: { setAlarm: vi.fn(), transactionSync: (fn: () => unknown) => fn() },
       blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
     } as unknown as DurableObjectState;
     const env = { SESSION_INGEST_R2: { delete: vi.fn() } } as never;
@@ -352,7 +354,7 @@ describe('SessionIngestDO session-ready push', () => {
 
     const waitUntilPromises: Promise<unknown>[] = [];
     const state = {
-      storage: { setAlarm: vi.fn() },
+      storage: { setAlarm: vi.fn(), transactionSync: (fn: () => unknown) => fn() },
       waitUntil: vi.fn((promise: Promise<unknown>) => waitUntilPromises.push(promise)),
       blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
     } as unknown as DurableObjectState;
@@ -625,7 +627,7 @@ describe('SessionIngestDO emitSessionMetrics cost persist ordering', () => {
       operations.push('deleteAlarm');
     });
     const state = {
-      storage: { setAlarm: vi.fn(), deleteAlarm },
+      storage: { setAlarm: vi.fn(), deleteAlarm, transactionSync: (fn: () => unknown) => fn() },
       blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
     } as unknown as DurableObjectState;
 
@@ -783,10 +785,6 @@ describe('SessionIngestDO live activity + cost persist', () => {
   function makeLiveHarness(options: LiveHarnessOptions = {}) {
     const meta = new Map<string, string | null>(Object.entries(options.seedMeta ?? {}));
     const messageRows = options.seedMessageRows ?? [];
-    const metricsSeedRows = messageRows.map(row => ({
-      item_type: 'message',
-      item_data: row.item_data,
-    }));
 
     // item rows keyed by item_id for stale-guard lookups during ingest loop
     const itemRows = new Map<
@@ -878,18 +876,20 @@ describe('SessionIngestDO live activity + cost persist', () => {
           return rows;
         }
         if (selectKind === 'metrics_items') {
-          return [
-            ...metricsSeedRows,
-            ...[...itemRows.values()].filter(row => row.item_type !== 'session_diff'),
-          ];
+          return [...itemRows.values()].filter(row => row.item_type !== 'session_diff');
         }
         if (selectKind === 'message_cost') {
-          // The bounded newest-first lookup for the completed turn is not the cost scan.
-          if (selectLimit !== Infinity) return messageRows;
-          costScanCount += 1;
-          return [...itemRows.values()]
+          const rows = [...itemRows.values()]
             .filter(row => row.item_type === 'message' && row.item_data_r2_key === null)
+            .sort(
+              (left, right) =>
+                (right.ingested_at ?? 0) - (left.ingested_at ?? 0) || right.id - left.id
+            )
             .map(row => ({ item_data: row.item_data }));
+          // The completed-turn lookup is newest-first and bounded; the cost scan is not.
+          if (selectLimit !== Infinity) return rows.slice(0, selectLimit);
+          costScanCount += 1;
+          return rows;
         }
         return [];
       }),
@@ -938,6 +938,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
               run: vi.fn(() => {
                 if (values.key !== undefined) {
                   meta.set(values.key, values.value ?? null);
+                  if (inTransaction) metaWritesInTransaction.add(values.key);
                 } else if (values.item_id !== undefined) {
                   itemRows.set(values.item_id, {
                     id: itemRows.get(values.item_id)?.id ?? itemRows.size + 1,
@@ -979,6 +980,8 @@ describe('SessionIngestDO live activity + cost persist', () => {
       waitUntilPromises.push(promise);
     });
     let alarmAt: number | null = null;
+    let inTransaction = false;
+    const metaWritesInTransaction = new Set<string>();
     const storage = {
       setAlarm: vi.fn(async (at: number) => {
         alarmAt = at;
@@ -986,6 +989,14 @@ describe('SessionIngestDO live activity + cost persist', () => {
       getAlarm: vi.fn(async () => alarmAt),
       deleteAlarm: vi.fn(async () => {
         alarmAt = null;
+      }),
+      transactionSync: vi.fn((fn: () => unknown) => {
+        inTransaction = true;
+        try {
+          return fn();
+        } finally {
+          inTransaction = false;
+        }
       }),
     };
     const state = {
@@ -1058,6 +1069,7 @@ describe('SessionIngestDO live activity + cost persist', () => {
       get costScanCount() {
         return costScanCount;
       },
+      metaWritesInTransaction,
       pgSet,
       pgWhere,
       getWorkerDb: dbClientMocks.getWorkerDb,
@@ -2152,6 +2164,31 @@ describe('SessionIngestDO live activity + cost persist', () => {
     expect(harness.meta.get('lastCostPersistedMicrodollars')).toBe('250000');
   });
 
+  it('commits the running total in the same transaction as the stored rows', async () => {
+    const harness = makeLiveHarness();
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.25)],
+      'usr_live',
+      'ses_live',
+      1,
+      1_000
+    );
+    await harness.settle();
+    // The first batch has no total yet, so the seeding write runs after the transaction.
+    expect(harness.metaWritesInTransaction.has('runningAssistantCostUsd')).toBe(false);
+
+    await harness.durableObject.ingest(
+      [assistantItem('m1', 0.5)],
+      'usr_live',
+      'ses_live',
+      1,
+      2_000
+    );
+    await harness.settle();
+    expect(harness.metaWritesInTransaction.has('runningAssistantCostUsd')).toBe(true);
+    expect(harness.meta.get('runningAssistantCostUsd')).toBe('0.5');
+  });
+
   it('user-only message batch does not open cost persist (KB-4)', async () => {
     const harness = makeLiveHarness({
       seedMeta: {
@@ -2324,7 +2361,12 @@ describe('SessionIngestDO live activity + cost persist', () => {
       waitUntilPromises.push(promise);
     });
     const state = {
-      storage: { setAlarm: vi.fn(), getAlarm: vi.fn(async () => null), deleteAlarm: vi.fn() },
+      storage: {
+        setAlarm: vi.fn(),
+        getAlarm: vi.fn(async () => null),
+        deleteAlarm: vi.fn(),
+        transactionSync: (fn: () => unknown) => fn(),
+      },
       waitUntil,
       blockConcurrencyWhile: vi.fn((fn: () => void) => fn()),
     } as unknown as DurableObjectState;

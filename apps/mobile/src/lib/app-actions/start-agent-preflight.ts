@@ -79,10 +79,11 @@ export function preflightStartAgent(input: {
   repository?: string | undefined;
 }): StartAgentPreflight {
   // A session start continues the session it names; only one that names neither
-  // has nothing to run. A prompt of only invisible characters is no prompt: the
-  // URL form and the JSON payload both reach this classification, so both
-  // report the same `empty-prompt` refusal instead of starting a billed session
-  // on a blank message.
+  // has nothing to run. A prompt of only invisible characters is no prompt, the
+  // reading of blank `buildRequest` applies too: a URL that names no session and
+  // carries such a prompt is no request at all, while the JSON payload that does
+  // reach this classification is refused instead of starting a billed session on
+  // a blank message.
   if (!hasVisibleComposerText(input.prompt) && nonBlank(input.sessionId) === null) {
     return {
       ok: false,

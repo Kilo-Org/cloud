@@ -23,7 +23,10 @@ import {
 import { getBalanceAndOrgSettings } from '@kilocode/web-shared/lib/organizations/organization-usage';
 import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
 import { isAutoTopUpInFlight } from '@kilocode/web-shared/lib/autoTopUpInFlight';
-import { getProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
+import {
+  getProvider,
+  type GetProviderProviderResult,
+} from '@kilocode/web-shared/lib/ai-gateway/providers/get-provider';
 import { upstreamRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-request';
 import {
   getOpenRouterModelsFromDatabase,
@@ -158,6 +161,9 @@ jest.mock(
   })
 );
 jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server', () => ({
+  allowsInferenceProviderUserByok: jest.requireActual<Record<string, unknown>>(
+    '@kilocode/web-shared/lib/organizations/effective-model-access.server'
+  ).allowsInferenceProviderUserByok,
   evaluateEffectiveModelAccessPolicy: jest.fn().mockReturnValue({}),
   getEffectiveModelDecision: jest.fn().mockResolvedValue({ allowed: true }),
 }));
@@ -1358,6 +1364,120 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     expect(response.status).toBe(200);
     const getRoutingProviderConfig = mockedGetProvider.mock.calls[0]?.[0].getRoutingProviderConfig;
     expect((await getRoutingProviderConfig?.())?.only).toEqual(['google']);
+  });
+
+  describe('organization BYOK keys and the organization provider allow-list', () => {
+    type ByokRoute =
+      | 'a catalog-mode direct BYOK key'
+      | 'a Vercel BYOK inference provider key'
+      | 'an OpenRouter key'
+      | 'a Vercel AI Gateway key'
+      | 'no BYOK key';
+    const byokRoutes: Record<
+      ByokRoute,
+      Pick<GetProviderProviderResult, 'provider' | 'userByok'>
+    > = {
+      'a catalog-mode direct BYOK key': {
+        provider: { ...provider, id: 'direct-byok' },
+        userByok: [{ decryptedAPIKey: 'key', providerId: 'synthetic' }],
+      },
+      'a Vercel BYOK inference provider key': {
+        provider: { ...provider, id: 'vercel' },
+        userByok: [{ decryptedAPIKey: 'key', providerId: 'moonshotai' }],
+      },
+      'an OpenRouter key': {
+        provider: { ...provider, id: 'openrouter' },
+        userByok: [{ decryptedAPIKey: 'key', providerId: 'openrouter' }],
+      },
+      'a Vercel AI Gateway key': {
+        provider: { ...provider, id: 'vercel' },
+        userByok: [{ decryptedAPIKey: 'key', providerId: 'vercel-ai-gateway' }],
+      },
+      'no BYOK key': { provider, userByok: null },
+    };
+
+    async function sendThrough(
+      route: ByokRoute,
+      decision: Awaited<ReturnType<typeof getEffectiveModelDecision>>
+    ) {
+      mockedGetUserFromAuth.mockResolvedValue({
+        user: {
+          id: 'user-123',
+          google_user_email: 'test@example.com',
+          microdollars_used: 0,
+        } as User,
+        authFailedResponse: null,
+        organizationId: 'org-1',
+      });
+      mockedGetBalanceAndOrgSettings.mockResolvedValue({
+        balance: 1000,
+        settings: { provider_allow_list: ['anthropic'] },
+        plan: 'enterprise',
+      });
+      mockedGetEffectiveModelDecision.mockResolvedValue(decision);
+      mockedGetProvider.mockResolvedValue({
+        kind: 'provider',
+        ...byokRoutes[route],
+        isFree: false,
+        bypassAccessCheck: false,
+      });
+      const { handleLlmProxyRequest } = await import('./llm-proxy');
+      return handleLlmProxyRequest(makeRequest(makeBody('moonshotai/kimi-k2.6')) as never);
+    }
+
+    afterEach(() => {
+      mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
+    });
+
+    it.each(['a catalog-mode direct BYOK key', 'a Vercel BYOK inference provider key'] as const)(
+      'serves a model whose providers are all disallowed through %s',
+      async route => {
+        const response = await sendThrough(route, {
+          allowed: false,
+          denialSource: 'organization_provider',
+        });
+
+        expect(response.status).toBe(200);
+        expect(mockedUpstreamRequest).toHaveBeenCalled();
+        expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider?.only).toBeUndefined();
+      }
+    );
+
+    it.each(['an OpenRouter key', 'a Vercel AI Gateway key', 'no BYOK key'] as const)(
+      'keeps denying a model whose providers are all disallowed through %s',
+      async route => {
+        const response = await sendThrough(route, {
+          allowed: false,
+          denialSource: 'organization_provider',
+        });
+
+        expect(response.status).toBe(404);
+        expect(await response.json()).toMatchObject({ error_type: 'model_not_allowed' });
+        expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      }
+    );
+
+    it.each([
+      ['the organization model deny list', 'organization_model'],
+      ['a missing group grant', 'no_grant'],
+      ['a group model restriction', 'group_model'],
+      ['a group provider restriction', 'group_provider'],
+    ] as const)(
+      'keeps denying a model excluded by %s through an inference provider key',
+      async (_name, denialSource) => {
+        for (const route of [
+          'a catalog-mode direct BYOK key',
+          'a Vercel BYOK inference provider key',
+        ] as const) {
+          mockedUpstreamRequest.mockClear();
+          const response = await sendThrough(route, { allowed: false, denialSource });
+
+          expect(response.status).toBe(404);
+          expect(await response.json()).toMatchObject({ error_type: 'model_not_allowed' });
+          expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+        }
+      }
+    );
   });
 
   it('returns 404 when the OpenRouter model id is unknown', async () => {

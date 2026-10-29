@@ -1,0 +1,24 @@
+import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import {
+  getOrganizationByokProviderIds,
+  hasInferenceProviderUserByokForModel,
+} from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { getDirectByokCatalogModelIds } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+
+/** The models among `modelIds` that the organization's inference provider keys serve. */
+export async function modelsServedByOrganizationInferenceProviderUserByok(
+  organizationId: string,
+  modelIds: readonly string[]
+): Promise<string[]> {
+  if (modelIds.length === 0) return [];
+  const [providerIds, catalogModelIds] = await Promise.all([
+    getOrganizationByokProviderIds(readDb, organizationId),
+    getDirectByokCatalogModelIds({ type: 'organization', id: organizationId }),
+  ]);
+  const served = await Promise.all(
+    modelIds.map(modelId =>
+      hasInferenceProviderUserByokForModel(modelId, providerIds, catalogModelIds)
+    )
+  );
+  return modelIds.filter((_modelId, index) => served[index]);
+}

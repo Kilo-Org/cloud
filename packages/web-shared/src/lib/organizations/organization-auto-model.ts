@@ -4,7 +4,9 @@ import { getEnhancedOpenRouterModels } from '@kilocode/web-shared/lib/ai-gateway
 import {
   createAllowPredicateFromRestrictions,
   hasActiveModelRestrictions,
+  type ModelRestrictions,
 } from '@kilocode/web-shared/lib/model-allow.server';
+import { modelsServedByOrganizationInferenceProviderUserByok } from '@kilocode/web-shared/lib/ai-gateway/byok/organization-inference-provider-user-byok';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { isCustomLlm } from '@kilocode/web-shared/lib/ai-gateway/custom-llm/custom-llm-catalog';
 import {
@@ -87,6 +89,28 @@ export function getOrganizationAutoSettings(
   organization: Organization
 ): OrganizationAutoModelSettings | undefined {
   return organization.settings.org_auto_model;
+}
+
+/**
+ * Like the organization model list, the provider allow-list does not exclude a model that one of
+ * the organization's inference provider keys serves (see `allowsInferenceProviderUserByok`).
+ */
+async function isAllowedAutoTarget(
+  organizationId: string,
+  restrictions: ModelRestrictions,
+  modelId: string
+): Promise<boolean> {
+  if (await createAllowPredicateFromRestrictions(restrictions)(modelId)) return true;
+  if (!restrictions.providerAllowList) return false;
+  const isAllowedWithoutProviderAllowList = createAllowPredicateFromRestrictions({
+    ...restrictions,
+    providerAllowList: undefined,
+  });
+  return (
+    (await isAllowedWithoutProviderAllowList(modelId)) &&
+    (await modelsServedByOrganizationInferenceProviderUserByok(organizationId, [modelId])).length >
+      0
+  );
 }
 
 export type OrganizationAutoTargetValidationResult =
@@ -236,8 +260,7 @@ export async function validateOrganizationAutoTarget(
     };
   }
 
-  const isAllowed = createAllowPredicateFromRestrictions(restrictions);
-  if (!(await isAllowed(catalogModel.id))) {
+  if (!(await isAllowedAutoTarget(organization.id, restrictions, catalogModel.id))) {
     return {
       kind: 'error',
       message: `Organization Auto route target '${targetModelId}' is not allowed by the organization's model policy.`,

@@ -28,7 +28,7 @@ import {
   getDirectByokModel,
   supportsCatalogMode,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
-import { byokOwner } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { byokOwner, isInferenceProviderUserByok } from '@kilocode/web-shared/lib/ai-gateway/byok';
 import { sendUpstreamAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-attempt';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
@@ -155,6 +155,7 @@ import { errorExceptInTest, logExceptInTest } from '@kilocode/web-shared/lib/uti
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getOrganizationGroupPolicyContext } from '@kilocode/web-shared/lib/organizations/organization-group-policy-context.server';
 import {
+  allowsInferenceProviderUserByok,
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
   type EffectiveOrganizationModelPolicy,
@@ -855,10 +856,13 @@ export async function handleLlmProxyRequest(
     const providerConfig = getOrganizationProviderPrivacy(settings);
     let effectiveProviderConfig = providerConfig;
     let groupModelAllowed = true;
+    let groupModelAllowedForInferenceProviderUserByok = true;
     let groupProvidersAllowed = true;
     if (groupPolicy) {
       const groupDecision = await getEffectiveModelDecision(groupPolicy, modelId);
       groupModelAllowed = groupDecision.allowed;
+      groupModelAllowedForInferenceProviderUserByok =
+        allowsInferenceProviderUserByok(groupDecision);
       if (groupDecision.eligibleProviderRoutes) {
         const only = withoutVirtualProvider([...groupDecision.eligibleProviderRoutes]);
         groupProvidersAllowed = only.length > 0;
@@ -872,6 +876,7 @@ export async function handleLlmProxyRequest(
         ? { ...effectiveProviderConfig, ...effectivePrivacy }
         : undefined,
       groupModelAllowed,
+      groupModelAllowedForInferenceProviderUserByok,
       groupProvidersAllowed,
       settings,
     };
@@ -984,6 +989,7 @@ export async function handleLlmProxyRequest(
       balanceLimitedByUserAllowance,
       effectiveProviderConfig,
       groupModelAllowed,
+      groupModelAllowedForInferenceProviderUserByok,
       groupProvidersAllowed,
     } = await accessCheckResolver.get();
 
@@ -1001,7 +1007,10 @@ export async function handleLlmProxyRequest(
       });
     }
 
-    if (!groupModelAllowed) {
+    const modelAllowed = isInferenceProviderUserByok(effectiveProviderContext.userByok)
+      ? groupModelAllowedForInferenceProviderUserByok
+      : groupModelAllowed;
+    if (!modelAllowed) {
       return isAutoRoutedRequest ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
     }
     if (!groupProvidersAllowed) return modelNotAllowedResponse();

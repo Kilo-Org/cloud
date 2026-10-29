@@ -62,8 +62,8 @@ async function deriveModelInferenceUserByokProviders(
 /**
  * Kilo-exclusive and free models stay on Kilo's own accounts: they are served
  * through Kilo-specific routes or paid for by Kilo, so a gateway key must not
- * take them over. Custom LLMs are never in the gateway catalogs, so the
- * built-in free rules suffice.
+ * take them over. A custom LLM can share an id with a gateway catalog model, so
+ * callers that may see custom LLM ids exclude them separately.
  */
 export function isGatewayUserByokEligibleModel(modelId: string): boolean {
   return !isKiloExclusiveModel(modelId) && !isFreeModelExcludingCustomLlms(modelId);
@@ -226,7 +226,8 @@ export async function getOrganizationByokProviderIds(
 
 /**
  * `getAllowedProviders` returns the organization's allowed providers for a
- * model, or undefined when every provider is allowed.
+ * model, or undefined when every provider is allowed. No key serves an id a
+ * custom LLM owns, because `getProvider` serves the custom LLM first.
  */
 export async function addUserByokAvailability(
   models: OpenRouterModel[],
@@ -241,7 +242,11 @@ export async function addUserByokAvailability(
   const hasGatewayKey = enabled.some(isGatewayUserByokProviderId);
   return Promise.all(
     models.map(async model => {
-      if (enabledProviders.size === 0 || isKiloExclusiveModel(model.id)) {
+      if (
+        enabledProviders.size === 0 ||
+        isKiloExclusiveModel(model.id) ||
+        (await isCustomLlm(model.id))
+      ) {
         return { ...model, hasUserByokAvailable: false };
       }
       const modelProviders = [

@@ -50,6 +50,9 @@ vi.mock('@/lib/form-sheet', () => ({
   }),
 }));
 
+// Organization scopes are organization ids; the layout rejects any other segment.
+const ORG_SCOPE = 'c0a8012e-9a3b-4f5c-8d1e-2b3c4d5e6f70';
+
 let renderer: TestRenderer.ReactTestRenderer | undefined = undefined;
 
 beforeEach(() => {
@@ -87,7 +90,7 @@ function declaredScopeRoutes(): string[] {
   });
 }
 
-describe.each(['personal', 'org-example'])('security notification routes (%s)', scope => {
+describe.each(['personal', ORG_SCOPE])('security notification routes (%s)', scope => {
   it.each([
     { type: 'security_finding' },
     { type: 'security_lifecycle', event: 'analysis_completed' },
@@ -112,7 +115,7 @@ describe.each(['personal', 'org-example'])('security notification routes (%s)', 
   });
 });
 
-it.each(['personal', 'org-example'])('mounts one command observer for scope %s', scope => {
+it.each(['personal', ORG_SCOPE])('mounts one command observer for scope %s', scope => {
   const tree = mountScope(scope);
   const observers = tree.root.findAll(
     node => (node.type as string) === 'SecurityAgentCommandObserver'
@@ -121,8 +124,13 @@ it.each(['personal', 'org-example'])('mounts one command observer for scope %s',
   expect(observers[0]?.props.scope).toBe(scope);
 });
 
-it.each([{ scope: undefined }, { scope: '' }, { scope: ['personal', 'org-example'] }])(
-  'rejects invalid scope $scope before mounting the Stack',
+it.each([
+  { scope: undefined },
+  { scope: '' },
+  { scope: ['personal', ORG_SCOPE] },
+  { scope: 'undefined' },
+  { scope: 'not-a-scope' },
+])('rejects invalid scope $scope before mounting the Stack',
   ({ scope }) => {
     const tree = mountScope(scope);
     expect(tree.root.findByType(InvalidRouteState).props).toMatchObject({

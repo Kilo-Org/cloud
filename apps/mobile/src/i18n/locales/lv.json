@@ -1535,7 +1535,12 @@
         "change_request_failed": "Neizdevās atvērt PR",
         "superseded": "Jau ir pievienots"
       },
-      "noProposalsDescription": "Koda pārskatīšanas atmiņas priekšlikumi būs redzami šeit pēc tam, kad Kilo būs analizējis uzturētāju atbildes."
+      "noProposalsDescription": "Koda pārskatīšanas atmiņas priekšlikumi būs redzami šeit pēc tam, kad Kilo būs analizējis uzturētāju atbildes.",
+      "changeRequestInProgress": "Kilo jau atver PR šim priekšlikumam. Mēģini vēlreiz pēc brīža.",
+      "changeRequestNotActionable": "Šo priekšlikumu vairs nevar apstiprināt. Aizver to un atjauno sarakstu.",
+      "changeRequestNoGitHubAccess": "Nevienam GitHub savienojumam nav piekļuves šim repozitorijam. Pievieno GitHub no jauna ar piekļuvi tam un mēģini vēlreiz.",
+      "changeRequestMissingPermissions": "Kilo GitHub lietotne nevar atvērt PR šajā repozitorijā. Repozitorija īpašniekam ir jāpiešķir lietotnei rakstīšanas piekļuve saturam un PR, pēc tam mēģini vēlreiz.",
+      "changeRequestFailed": "Kilo neizdevās atvērt PR. Mēģini vēlreiz pēc brīža."
     },
     "manualReview": {
       "title": "Manuāla koda pārskatīšana",

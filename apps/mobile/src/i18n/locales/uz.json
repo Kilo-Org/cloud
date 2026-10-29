@@ -1513,7 +1513,12 @@
         "change_request_failed": "PR ochilmadi",
         "superseded": "Allaqachon mavjud"
       },
-      "noProposalsDescription": "Kilo loyiha mas'ullarining javoblarini tahlil qilgach, ko'rib chiqish xotirasining takliflari shu yerda ko'rsatiladi."
+      "noProposalsDescription": "Kilo loyiha mas'ullarining javoblarini tahlil qilgach, ko'rib chiqish xotirasining takliflari shu yerda ko'rsatiladi.",
+      "changeRequestInProgress": "Kilo bu taklif uchun allaqachon pull request ochmoqda. Bir ozdan so'ng qayta urinib ko'ring.",
+      "changeRequestNotActionable": "Bu taklifni endi tasdiqlab bo'lmaydi. Uni yoping va ro'yxatni yangilang.",
+      "changeRequestNoGitHubAccess": "Hech bir GitHub ulanishi bu repozitoriyga kira olmaydi. GitHubni bu repozitoriyga kirish huquqi bilan qayta ulang, so'ng qayta urinib ko'ring.",
+      "changeRequestMissingPermissions": "Kilo'ning GitHub ilovasi bu repozitoriyada pull request ocholmaydi. Repozitoriya egasi ilovaga kontent va pull requestlar uchun yozish huquqini berishi kerak, so'ng qayta urinib ko'ring.",
+      "changeRequestFailed": "Kilo pull requestni ocholmadi. Bir ozdan so'ng qayta urinib ko'ring."
     },
     "manualReview": {
       "title": "Qo'lda ko'rib chiqish",

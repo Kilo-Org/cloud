@@ -2,6 +2,8 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { i18n } from '@/i18n';
+
 import { useSetReviewMemoryEnabled } from './use-review-memory';
 
 const state = vi.hoisted(() => ({
@@ -88,11 +90,23 @@ describe('useSetReviewMemoryEnabled', () => {
     });
   });
 
-  it('reports a failed update', () => {
+  it('reports a failed update with localized copy, never the server sentence', () => {
     const options = mount('personal');
 
     options.onError?.(new Error('nope'));
 
-    expect(state.toast.error).toHaveBeenCalledWith('nope');
+    expect(state.toast.error).toHaveBeenCalledWith(i18n.t('common.somethingWentWrong'));
+  });
+
+  it('explains a known rejection with its own copy', () => {
+    const options = mount('personal');
+
+    options.onError?.(
+      Object.assign(new Error('Review memory is disabled for this platform.'), {
+        data: { code: 'FORBIDDEN', message: 'Review memory is disabled for this platform.' },
+      }) as unknown as Error
+    );
+
+    expect(state.toast.error).toHaveBeenCalledWith(i18n.t('codeReviewer.reviewMemory.off'));
   });
 });

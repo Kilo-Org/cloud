@@ -1513,7 +1513,12 @@
         "change_request_failed": "เปิด PR ไม่สำเร็จ",
         "superseded": "มีอยู่แล้ว"
       },
-      "noProposalsDescription": "ข้อเสนอจากความจำในการตรวจสอบจะแสดงที่นี่หลังจาก Kilo วิเคราะห์คำตอบของผู้ดูแล"
+      "noProposalsDescription": "ข้อเสนอจากความจำในการตรวจสอบจะแสดงที่นี่หลังจาก Kilo วิเคราะห์คำตอบของผู้ดูแล",
+      "changeRequestInProgress": "Kilo กำลังเปิด Pull Request สำหรับข้อเสนอนี้อยู่แล้ว โปรดลองอีกครั้งในอีกสักครู่",
+      "changeRequestNotActionable": "ไม่สามารถอนุมัติข้อเสนอนี้ได้อีกต่อไป ปิดข้อเสนอนี้แล้วรีเฟรชรายการ",
+      "changeRequestNoGitHubAccess": "ไม่มีการเชื่อมต่อ GitHub ใดที่เข้าถึงที่เก็บนี้ได้ โปรดเชื่อมต่อ GitHub ใหม่ด้วยบัญชีที่เข้าถึงที่เก็บนี้ได้ แล้วลองอีกครั้ง",
+      "changeRequestMissingPermissions": "แอป GitHub ของ Kilo ไม่สามารถเปิด Pull Request ในที่เก็บนี้ได้ เจ้าของที่เก็บต้องให้สิทธิ์การเขียนเนื้อหาและ Pull Request แก่แอป แล้วลองอีกครั้ง",
+      "changeRequestFailed": "Kilo ไม่สามารถเปิด Pull Request ได้ โปรดลองอีกครั้งในอีกสักครู่"
     },
     "manualReview": {
       "title": "การตรวจสอบที่เริ่มด้วยตนเอง",

@@ -1535,7 +1535,12 @@
         "change_request_failed": "Deschiderea PR-ului a eșuat",
         "superseded": "Există deja"
       },
-      "noProposalsDescription": "Propunerile memoriei de revizuire apar aici după ce Kilo analizează răspunsurile responsabililor de proiect."
+      "noProposalsDescription": "Propunerile memoriei de revizuire apar aici după ce Kilo analizează răspunsurile responsabililor de proiect.",
+      "changeRequestInProgress": "Kilo deschide deja un pull request pentru această propunere. Încearcă din nou în câteva momente.",
+      "changeRequestNotActionable": "Această propunere nu mai poate fi aprobată. Închide-o și reîncarcă lista.",
+      "changeRequestNoGitHubAccess": "Nicio conexiune GitHub nu are acces la acest depozit. Reconectează GitHub cu acces la acest depozit, apoi încearcă din nou.",
+      "changeRequestMissingPermissions": "Aplicația GitHub a Kilo nu poate deschide pull request-uri în acest depozit. Un proprietar al depozitului trebuie să acorde aplicației acces de scriere la conținut și la pull request-uri, apoi încearcă din nou.",
+      "changeRequestFailed": "Kilo nu a putut deschide pull request-ul. Încearcă din nou în câteva momente."
     },
     "manualReview": {
       "title": "Revizuire manuală",

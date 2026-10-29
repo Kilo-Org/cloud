@@ -1535,7 +1535,12 @@
         "change_request_failed": "La PR ha fallat",
         "superseded": "Ja hi és"
       },
-      "noProposalsDescription": "Les propostes de la memòria de revisió apareixeran aquí quan Kilo hagi analitzat les respostes dels mantenidors."
+      "noProposalsDescription": "Les propostes de la memòria de revisió apareixeran aquí quan Kilo hagi analitzat les respostes dels mantenidors.",
+      "changeRequestInProgress": "Kilo ja està obrint una pull request per a aquesta proposta. Torna-ho a provar d'aquí a un moment.",
+      "changeRequestNotActionable": "Aquesta proposta ja no es pot aprovar. Tanca-la i actualitza la llista.",
+      "changeRequestNoGitHubAccess": "Cap connexió de GitHub té accés a aquest repositori. Torna a connectar GitHub amb accés a aquest repositori i torna-ho a provar.",
+      "changeRequestMissingPermissions": "L'aplicació GitHub de Kilo no pot obrir pull requests en aquest repositori. Un propietari del repositori ha de donar a l'aplicació accés d'escriptura als continguts i a les pull requests, i després tornar-ho a provar.",
+      "changeRequestFailed": "Kilo no ha pogut obrir la pull request. Torna-ho a provar d'aquí a un moment."
     },
     "manualReview": {
       "title": "Revisió manual",

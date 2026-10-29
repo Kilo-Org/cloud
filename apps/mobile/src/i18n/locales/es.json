@@ -1047,6 +1047,11 @@
         "superseded": "Ya existe"
       },
       "noProposalsDescription": "Las propuestas de la memoria de revisión aparecen aquí después de que Kilo analice las respuestas de los responsables del mantenimiento.",
+      "changeRequestInProgress": "Kilo ya está abriendo una pull request para esta propuesta. Inténtalo de nuevo en un momento.",
+      "changeRequestNotActionable": "Esta propuesta ya no se puede aprobar. Ciérrala y actualiza la lista.",
+      "changeRequestNoGitHubAccess": "Ninguna conexión de GitHub tiene acceso a este repositorio. Vuelve a conectar GitHub con acceso a él y luego inténtalo de nuevo.",
+      "changeRequestMissingPermissions": "La aplicación de GitHub de Kilo no puede abrir pull requests en este repositorio. Un propietario del repositorio debe dar a la aplicación acceso de escritura al contenido y a las pull requests, y luego inténtalo de nuevo.",
+      "changeRequestFailed": "Kilo no pudo abrir la pull request. Inténtalo de nuevo en un momento.",
       "off": "La memoria de revisión está desactivada.",
       "on": "La memoria de revisión está activada.",
       "offDescription": "Actívala para que Kilo aprenda de las respuestas de los responsables del mantenimiento y proponga directrices para REVIEW.md.",

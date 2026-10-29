@@ -1513,7 +1513,12 @@
         "change_request_failed": "PR မအောင်မြင်ပါ",
         "superseded": "ရှိပြီးသား"
       },
-      "noProposalsDescription": "ပရောဂျက်ထိန်းသိမ်းသူများ၏ ပြန်ကြားချက်များကို Kilo ခွဲခြမ်းစိတ်ဖြာပြီးနောက် စစ်ဆေးမှုမှတ်ဉာဏ်မှ အဆိုပြုချက်များ ဤနေရာတွင် ပေါ်လာမည်။"
+      "noProposalsDescription": "ပရောဂျက်ထိန်းသိမ်းသူများ၏ ပြန်ကြားချက်များကို Kilo ခွဲခြမ်းစိတ်ဖြာပြီးနောက် စစ်ဆေးမှုမှတ်ဉာဏ်မှ အဆိုပြုချက်များ ဤနေရာတွင် ပေါ်လာမည်။",
+      "changeRequestInProgress": "Kilo က ဒီအဆိုပြုချက်အတွက် pull request ကို ဖွင့်နေပြီ။ ခဏနေရင် ထပ်ကြိုးစားကြည့်ပါ။",
+      "changeRequestNotActionable": "ဤအဆိုပြုချက်ကို အတည်ပြု၍ မရတော့ပါ။ ၎င်းကို ပိတ်ပြီး စာရင်းကို ပြန်လည်စတင်ပါ။",
+      "changeRequestNoGitHubAccess": "ဤ repository သို့ ဝင်ရောက်ခွင့်ရှိသော GitHub ချိတ်ဆက်မှု မရှိပါ။ ၎င်းသို့ ဝင်ရောက်ခွင့်ရှိသော GitHub ကို ပြန်လည်ချိတ်ဆက်ပြီး ထပ်မံကြိုးစားပါ။",
+      "changeRequestMissingPermissions": "Kilo ၏ GitHub App သည် ဤ repository တွင် Pull Request များ ဖွင့်၍မရပါ။ repository ပိုင်ရှင်တစ်ဦးသည် app အား အကြောင်းအရာများနှင့် Pull Request များအတွက် write access ပေးပြီးမှ ထပ်မံကြိုးစားရန် လိုအပ်ပါသည်။",
+      "changeRequestFailed": "Kilo သည် pull request ကို ဖွင့်၍ မရပါ။ ခဏအကြာတွင် ထပ်မံကြိုးစားပါ။"
     },
     "manualReview": {
       "title": "ကိုယ်တိုင် စတင်သည့် စစ်ဆေးမှု",

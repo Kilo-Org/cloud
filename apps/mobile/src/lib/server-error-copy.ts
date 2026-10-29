@@ -6,6 +6,8 @@
 // sentences, matched whole; anything unrecognized falls back to the localized
 // generic line, and a raw server sentence never reaches a screen.
 
+import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-reviews';
+
 import { i18n } from '@/i18n';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
@@ -87,6 +89,27 @@ function copyKeyFor(message: string): string | undefined {
     }
     case ORGANIZATION_INVITE_MISSING_MESSAGE: {
       return 'queryError.notFoundDescription';
+    }
+    case REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.proposal_not_found: {
+      return 'queryError.notFoundDescription';
+    }
+    case REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.review_memory_disabled: {
+      return 'codeReviewer.reviewMemory.off';
+    }
+    case REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.change_request_in_progress: {
+      return 'codeReviewer.reviewMemory.changeRequestInProgress';
+    }
+    case REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.proposal_not_actionable: {
+      return 'codeReviewer.reviewMemory.changeRequestNotActionable';
+    }
+    case REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.no_github_integration: {
+      return 'codeReviewer.reviewMemory.changeRequestNoGitHubAccess';
+    }
+    case REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.missing_github_app_permissions: {
+      return 'codeReviewer.reviewMemory.changeRequestMissingPermissions';
+    }
+    case REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.change_request_failed: {
+      return 'codeReviewer.reviewMemory.changeRequestFailed';
     }
     default: {
       return undefined;

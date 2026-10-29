@@ -1513,7 +1513,12 @@
         "change_request_failed": "PR-ის გახსნა ვერ მოხერხდა",
         "superseded": "უკვე არსებობს"
       },
-      "noProposalsDescription": "შემოწმების მეხსიერების წინადადებები აქ გამოჩნდება მას შემდეგ, რაც Kilo პროექტის მომვლელების პასუხებს გააანალიზებს."
+      "noProposalsDescription": "შემოწმების მეხსიერების წინადადებები აქ გამოჩნდება მას შემდეგ, რაც Kilo პროექტის მომვლელების პასუხებს გააანალიზებს.",
+      "changeRequestInProgress": "Kilo უკვე ხსნის pull request-ს ამ წინადადებისთვის. სცადე ცოტა ხანში.",
+      "changeRequestNotActionable": "ამ წინადადების დამტკიცება ვეღარ შეიძლება. დახურე ის და განაახლე სია.",
+      "changeRequestNoGitHubAccess": "არცერთ GitHub კავშირს არ აქვს წვდომა ამ რეპოზიტორიაზე. ხელახლა დააკავშირე GitHub, რომელსაც აქვს მასზე წვდომა, და შემდეგ სცადე ისევ.",
+      "changeRequestMissingPermissions": "Kilo-ს GitHub App-ს არ შეუძლია ამ რეპოზიტორიაში pull request-ების გახსნა. რეპოზიტორიის მფლობელმა აპს უნდა მისცეს შიგთავსზე და pull request-ებზე ჩაწერის წვდომა, შემდეგ სცადე ისევ.",
+      "changeRequestFailed": "Kilo-მ pull request-ის გახსნა ვერ მოახერხა. სცადე ცოტა ხანში."
     },
     "manualReview": {
       "title": "ხელით შემოწმება",

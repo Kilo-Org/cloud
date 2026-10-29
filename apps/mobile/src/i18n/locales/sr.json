@@ -1535,7 +1535,12 @@
         "change_request_failed": "PR nije uspeo",
         "superseded": "Već postoji"
       },
-      "noProposalsDescription": "Predlozi iz memorije pregleda pojaviće se ovde kada Kilo analizira odgovore osoba koje održavaju repozitorijum."
+      "noProposalsDescription": "Predlozi iz memorije pregleda pojaviće se ovde kada Kilo analizira odgovore osoba koje održavaju repozitorijum.",
+      "changeRequestInProgress": "Kilo već otvara pull request za ovaj predlog. Pokušajte ponovo za trenutak.",
+      "changeRequestNotActionable": "Ovaj predlog više ne može biti odobren. Zatvorite ga i osvežite listu.",
+      "changeRequestNoGitHubAccess": "Nijedna GitHub veza nema pristup ovom repozitorijumu. Ponovo povežite GitHub sa pristupom tom repozitorijumu, pa pokušajte ponovo.",
+      "changeRequestMissingPermissions": "Kilo GitHub aplikacija ne može da otvori pull request-ove u ovom repozitorijumu. Vlasnik repozitorijuma mora dati aplikaciji pravo pisanja nad sadržajem i pull request-ovima, a zatim pokušati ponovo.",
+      "changeRequestFailed": "Kilo nije mogao da otvori pull request. Pokušajte ponovo za trenutak."
     },
     "manualReview": {
       "title": "Ručni pregled",

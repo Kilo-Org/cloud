@@ -1513,7 +1513,12 @@
         "change_request_failed": "Erro ao abrir a PR",
         "superseded": "Xa existe"
       },
-      "noProposalsDescription": "As propostas da memoria de revisión aparecerán aquí despois de que Kilo analice as respostas dos responsables do mantemento."
+      "noProposalsDescription": "As propostas da memoria de revisión aparecerán aquí despois de que Kilo analice as respostas dos responsables do mantemento.",
+      "changeRequestInProgress": "Kilo xa está a abrir unha solicitude de incorporación para esta proposta. Téntao de novo dentro dun intre.",
+      "changeRequestNotActionable": "Xa non se pode aprobar esta proposta. Péchaa e actualiza a lista.",
+      "changeRequestNoGitHubAccess": "Ningunha conexión de GitHub ten acceso a este repositorio. Volve conectar GitHub cunha conta que teña acceso a el e téntao de novo.",
+      "changeRequestMissingPermissions": "A aplicación de GitHub de Kilo non pode abrir solicitudes de incorporación neste repositorio. Un propietario do repositorio debe darlle á aplicación permiso de escritura sobre os contidos e as solicitudes de incorporación e, despois, téntao de novo.",
+      "changeRequestFailed": "Kilo non puido abrir a solicitude de incorporación. Téntao de novo dentro dun intre."
     },
     "manualReview": {
       "title": "Revisión manual",

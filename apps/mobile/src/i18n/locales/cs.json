@@ -1557,7 +1557,12 @@
         "change_request_failed": "PR selhal",
         "superseded": "Již existuje"
       },
-      "noProposalsDescription": "Návrhy z paměti kontrol se zde zobrazí, jakmile Kilo analyzuje odpovědi správců."
+      "noProposalsDescription": "Návrhy z paměti kontrol se zde zobrazí, jakmile Kilo analyzuje odpovědi správců.",
+      "changeRequestInProgress": "Kilo již otevírá pull request pro tento návrh. Zkuste to znovu za chvíli.",
+      "changeRequestNotActionable": "Tento návrh již nelze schválit. Zavřete ho a obnovte seznam.",
+      "changeRequestNoGitHubAccess": "Žádné připojení k GitHubu nemá přístup k tomuto repozitáři. Znovu připojte GitHub s přístupem k tomuto repozitáři a poté to zkuste znovu.",
+      "changeRequestMissingPermissions": "GitHub App od Kilo nemůže v tomto repozitáři otevírat pull requesty. Vlastník repozitáře musí aplikaci udělit přístup pro zápis k obsahu a pull requestům. Poté to zkuste znovu.",
+      "changeRequestFailed": "Kilo nedokázalo otevřít pull request. Zkuste to znovu za chvíli."
     },
     "manualReview": {
       "title": "Ruční kontrola",

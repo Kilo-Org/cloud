@@ -1535,7 +1535,12 @@
         "change_request_failed": "Falha ao abrir PR",
         "superseded": "Já existe"
       },
-      "noProposalsDescription": "As propostas da memória de revisão aparecem aqui depois de o Kilo analisar as respostas dos responsáveis pelo projeto."
+      "noProposalsDescription": "As propostas da memória de revisão aparecem aqui depois de o Kilo analisar as respostas dos responsáveis pelo projeto.",
+      "changeRequestInProgress": "O Kilo já está a abrir um pull request para esta proposta. Tenta novamente dentro de momentos.",
+      "changeRequestNotActionable": "Esta proposta já não pode ser aprovada. Fecha-a e atualiza a lista.",
+      "changeRequestNoGitHubAccess": "Nenhuma ligação ao GitHub tem acesso a este repositório. Volta a ligar o GitHub com acesso ao mesmo e tenta novamente.",
+      "changeRequestMissingPermissions": "A aplicação GitHub do Kilo não consegue abrir pull requests neste repositório. Um proprietário do repositório tem de conceder à aplicação acesso de escrita a conteúdos e pull requests; depois, tenta novamente.",
+      "changeRequestFailed": "O Kilo não conseguiu abrir o pull request. Tenta novamente dentro de momentos."
     },
     "manualReview": {
       "title": "Revisão manual",

@@ -1579,7 +1579,12 @@
         "change_request_failed": "Theip ar an PR",
         "superseded": "Ann cheana féin"
       },
-      "noProposalsDescription": "Beidh moltaí ón gcuimhne athbhreithnithe le feiceáil anseo tar éis do Kilo anailís a dhéanamh ar fhreagraí na gcothaitheoirí."
+      "noProposalsDescription": "Beidh moltaí ón gcuimhne athbhreithnithe le feiceáil anseo tar éis do Kilo anailís a dhéanamh ar fhreagraí na gcothaitheoirí.",
+      "changeRequestInProgress": "Tá Kilo cheana féin ag oscailt iarratas tarraingthe don togra seo. Bain triail eile as ar ball.",
+      "changeRequestNotActionable": "Ní féidir ceadú a thabhairt don togra seo a thuilleadh. Dún é agus athnuaigh an liosta.",
+      "changeRequestNoGitHubAccess": "Níl aon nasc GitHub a bhfuil rochtain aige ar an stór seo. Athnasc GitHub le rochtain air, ansin bain triail eile as.",
+      "changeRequestMissingPermissions": "Ní féidir le hAip GitHub Kilo iarratais tarraingthe a oscailt sa stór seo. Caithfidh úinéir an stóir rochtain scríofa ar ábhair agus ar iarratais tarraingthe a thabhairt don aip, ansin bain triail eile as.",
+      "changeRequestFailed": "Níorbh fhéidir le Kilo an t-iarratas tarraingthe a oscailt. Bain triail eile as ar ball."
     },
     "manualReview": {
       "title": "Athbhreithniú de láimh",

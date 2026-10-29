@@ -1513,7 +1513,12 @@
         "change_request_failed": "Kāore i taea te whakatuwhera i te PR",
         "superseded": "Kei roto kē"
       },
-      "noProposalsDescription": "Ka puta ngā tono mahara arotake ki konei i muri i te tātari a Kilo i ngā whakautu a ngā kaitiaki."
+      "noProposalsDescription": "Ka puta ngā tono mahara arotake ki konei i muri i te tātari a Kilo i ngā whakautu a ngā kaitiaki.",
+      "changeRequestInProgress": "Kei te whakatuwhera kē a Kilo i tētahi PR mō tēnei tono. Whakamātauria anō ā te wā poto nei.",
+      "changeRequestNotActionable": "Kāore e taea tēnei tono te whakaae anō. Katia, whakahoungia hoki te rārangi.",
+      "changeRequestNoGitHubAccess": "Kāore he hononga GitHub e whai āheitanga ana ki tēnei pātaka. Hono anōtia a GitHub kia whai āheitanga ki a ia, kātahi ka whakamātauria anō.",
+      "changeRequestMissingPermissions": "Kāore e taea e te GitHub App a Kilo te whakatuwhera PR i tēnei pātaka. Me hoatu e te kaipupuri o te pātaka te āheitanga tuhi ki ngā ihirangi me ngā PR, kātahi ka whakamātauria anō.",
+      "changeRequestFailed": "Kāore i taea e Kilo te whakatuwhera i te PR. Whakamātauria anō ā te wā poto nei."
     },
     "manualReview": {
       "title": "Te arotake ā-ringa",

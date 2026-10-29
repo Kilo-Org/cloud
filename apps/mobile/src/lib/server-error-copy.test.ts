@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
+import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-reviews';
 import { i18n } from '@/i18n';
 import {
   knownServerErrorMessage,
@@ -73,6 +74,25 @@ describe('knownServerErrorMessage', () => {
         makeError('FORBIDDEN', `Prefix ${ORGANIZATION_TRIAL_EXPIRED_MESSAGE}`)
       )
     ).toBeNull();
+  });
+
+  // The expected mapping is read from the shared table instead of a fixture, so
+  // a review-memory reason added there fails this test until the app maps it.
+  it.each(Object.entries(REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY))(
+    'explains the review memory rejection %s',
+    (_reason, sentence) => {
+      const copy = knownServerErrorMessage(makeError('BAD_REQUEST', sentence));
+      expect(copy).not.toBeNull();
+      expect(copy).not.toBe(i18n.t('common.somethingWentWrong'));
+      expect(copy).not.toBe(sentence);
+    }
+  );
+
+  it('keeps each review memory reason distinct', () => {
+    const copies = Object.values(REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY).map(sentence =>
+      knownServerErrorMessage(makeError('BAD_REQUEST', sentence))
+    );
+    expect(new Set(copies).size).toBeGreaterThanOrEqual(5);
   });
 });
 

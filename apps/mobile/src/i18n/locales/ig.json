@@ -1513,7 +1513,12 @@
         "change_request_failed": "Imepe PR akụrụ afọ n'ala",
         "superseded": "Ọ dịlarị"
       },
-      "noProposalsDescription": "Aro ebe nchekwa nyocha ga-apụta ebe a mgbe Kilo nyochachara nzaghachi ndị na-elekọta."
+      "noProposalsDescription": "Aro ebe nchekwa nyocha ga-apụta ebe a mgbe Kilo nyochachara nzaghachi ndị na-elekọta.",
+      "changeRequestInProgress": "Kilo na-emeghere aro a pull request ugbu a. Nwaa ọzọ n'oge na-adịghị anya.",
+      "changeRequestNotActionable": "Enweghịzi ike ịkwado aro a. Mechie ya ma melite ndepụta ahụ.",
+      "changeRequestNoGitHubAccess": "Ọnweghị njikọ GitHub nwere ohere ịnweta ebe nchekwa a. Jikọọ GitHub ọzọ nke nwere ohere ịnweta ya, wee nwaa ọzọ.",
+      "changeRequestMissingPermissions": "Ngwa GitHub nke Kilo enweghị ike imepe pull request na ebe nchekwa a. Onye nwe ebe nchekwa ga-enyerịrị ngwa ahụ ikike ide ihe na pull request, wee nwaa ọzọ.",
+      "changeRequestFailed": "Kilo enweghị ike imepe pull request. Nwaa ọzọ n'oge na-adịghị anya."
     },
     "manualReview": {
       "title": "Nyocha a na-amalite n'aka",

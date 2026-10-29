@@ -18,6 +18,7 @@ import { detectRepositoryPlatform } from '@/components/agents/new-session-reposi
 import { getAgentSessionPath } from '@/components/agents/session-detail-routes';
 import { parseProviderPrUrl } from '@/lib/pr-review/provider-pr-url';
 import { providerPrRoutePath } from '@/lib/pr-review/provider-pr-ref';
+import { hasVisibleComposerText } from '@/lib/composer-text';
 import { shouldShowNeedsInput } from '@/lib/session-attention';
 
 /** The four actions, in the order the OS surfaces list them. */
@@ -374,10 +375,11 @@ function buildRequest(id: AppActionId, read: FieldReader): AppActionRequest | nu
     return pullRequest === null ? null : { action: 'OpenPullRequest', pullRequest };
   }
   // `prompt` is the plain start form; `sessionId` without a prompt is the
-  // "start from a session" form. One of the two must be present.
+  // "start from a session" form. One of the two must be present, and a prompt
+  // of only invisible characters is no prompt at all.
   const prompt = read('prompt') ?? '';
   const sessionId = nonBlank(read('sessionId'));
-  if (prompt.trim().length === 0 && sessionId === null) {
+  if (!hasVisibleComposerText(prompt) && sessionId === null) {
     return null;
   }
   const repository = nonBlank(read('repository'));

@@ -1,3 +1,5 @@
+import { hasVisibleComposerText } from '@/lib/composer-text';
+
 type NewSessionPromptControlInput = {
   attachmentsCount: number;
   attachmentMax: number;
@@ -9,7 +11,7 @@ type NewSessionPromptControlInput = {
 type NewSessionPromptControlState = {
   /** Mirrors the "Start session" button's disabled state. */
   createDisabled: boolean;
-  /** Whether the prompt has non-whitespace text — the upstream canCreate gate. */
+  /** Whether the prompt has text a reader can see — the upstream canCreate gate. */
   hasPrompt: boolean;
   /**
    * Whether the controls that mutate the draft or the payload — the paste
@@ -28,17 +30,19 @@ type NewSessionPromptControlState = {
 /**
  * Validates the live, post-settlement prompt value for `createSession`.
  * Returns the trimmed prompt when the user has something to send, or `null`
- * when the live draft is empty or whitespace-only — for example when an
- * interim voice transcript was replaced by an empty final transcript (no
- * speech recognized). Returning `null` lets the caller no-op without
- * firing prepareSession, surfacing a toast, or navigating. The empty case
- * is its own supported state: the voice controller has already presented
- * its own "no speech" feedback, so the composer should preserve the
- * user's draft and screen state.
+ * when the live draft holds nothing a reader can see — only whitespace,
+ * zero-width or control characters, which is what an interim voice transcript
+ * replaced by an empty final transcript leaves (no speech recognized), and
+ * what a draft padded with invisible characters would otherwise send as an
+ * empty prompt on a billed session. Returning `null` lets the caller no-op
+ * without firing prepareSession, surfacing a toast, or navigating. The empty
+ * case is its own supported state: the voice controller has already presented
+ * its own "no speech" feedback, so the composer should preserve the user's
+ * draft and screen state.
  */
 export function resolveNewSessionPromptForCreate(rawPrompt: string): string | null {
   const trimmed = rawPrompt.trim();
-  return trimmed.length > 0 ? trimmed : null;
+  return hasVisibleComposerText(rawPrompt) ? trimmed : null;
 }
 
 /**
@@ -64,7 +68,7 @@ export function resolveNewSessionPromptControlState(
   input: NewSessionPromptControlInput
 ): NewSessionPromptControlState {
   const { attachmentsCount, attachmentMax, isCreating, rawPrompt, voiceInputActive } = input;
-  const hasPrompt = rawPrompt.trim().length > 0;
+  const hasPrompt = hasVisibleComposerText(rawPrompt);
   const createDisabled = isCreating;
   const voiceDisabled = isCreating;
   const paperclipDisabled = isCreating || voiceInputActive || attachmentsCount >= attachmentMax;

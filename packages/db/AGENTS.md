@@ -16,7 +16,8 @@ instructions and Durable Objects/Workers skills for those.
 
 Change `packages/db/src/schema.ts` first, then generate migrations with
 `pnpm drizzle generate`. Do not hand-write or edit generated DDL, snapshots, or
-journal entries. If generated DDL is wrong, correct the schema and regenerate.
+journal entries, except in the cases that this section lists. If generated DDL
+is wrong, correct the schema and regenerate.
 
 For an index declared with Drizzle's `.concurrently()`, the generated SQL may
 receive only the transaction boundaries needed by this repository's
@@ -40,7 +41,8 @@ schema and regenerate rather than editing generated artifacts.
 Drop a table or column only after the deployed code no longer uses it. If a
 dropped table has foreign keys to busy tables, the generated `DROP TABLE ...
 CASCADE` locks the dropped table and every referenced table in one
-transaction. That can deadlock with live writers. You can hand-write this case:
+transaction. That can deadlock with live writers. As an exception to the rules
+above, you can hand-write this case:
 drop each foreign key in its own transaction (`COMMIT;` / `BEGIN;`), then drop
 the tables and columns. Set `SET LOCAL lock_timeout` in each transaction, use
 `IF EXISTS` on every statement so a partial run can be retried, and leave the

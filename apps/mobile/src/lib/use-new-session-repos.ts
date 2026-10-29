@@ -21,7 +21,10 @@ import { i18n } from '@/i18n';
 import { WEB_BASE_URL } from '@/lib/config';
 import { useRecentAgentRepositories } from '@/lib/hooks/use-agent-sessions';
 import { getBitbucketIntegrationUrl, getGitLabIntegrationUrl } from '@/lib/integration-urls';
-import { openAuthorizationAndWaitForReturn } from '@/lib/pr-review/connect-gate-platform';
+import {
+  openAuthorizationAndWaitForReturn,
+  reportLateLaunchFailure,
+} from '@/lib/pr-review/connect-gate-platform';
 import { classifyProviderErrorCode } from '@/lib/code-reviewer-status';
 import { useGitHubReposRefresh } from '@/lib/use-github-repos-refresh';
 import { trpcClient, useTRPC } from '@/lib/trpc';
@@ -326,9 +329,14 @@ export function useNewSessionRepos({
   const openGitLabIntegration = useCallback(() => {
     void (async () => {
       try {
-        await openAuthorizationAndWaitForReturn(
+        const wait = await openAuthorizationAndWaitForReturn(
           getGitLabIntegrationUrl(WEB_BASE_URL, organizationId)
         );
+        reportLateLaunchFailure(wait, {
+          onFailure: () => {
+            toast.error(i18n.t('codeReviewer.providerConnect.gitlabError'));
+          },
+        });
         await forceFreshGitLab();
       } catch {
         toast.error(i18n.t('codeReviewer.providerConnect.gitlabError'));
@@ -342,9 +350,14 @@ export function useNewSessionRepos({
     }
     void (async () => {
       try {
-        await openAuthorizationAndWaitForReturn(
+        const wait = await openAuthorizationAndWaitForReturn(
           getBitbucketIntegrationUrl(WEB_BASE_URL, organizationId)
         );
+        reportLateLaunchFailure(wait, {
+          onFailure: () => {
+            toast.error(i18n.t('codeReviewer.providerConnect.bitbucketError'));
+          },
+        });
         await forceFreshBitbucket();
       } catch {
         toast.error(i18n.t('codeReviewer.providerConnect.bitbucketError'));

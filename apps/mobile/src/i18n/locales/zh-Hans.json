@@ -3867,6 +3867,7 @@
       "headersHint": "显示为 •••• 的值会保留其已存储的密钥；替换某个值即可轮换。更改网址后，所有值都需重新填写",
       "nameRequired": "输入服务器名称",
       "nameInvalid": "名称只能使用 ASCII 字母、数字、下划线和连字符，最多 100 个字符",
+      "nameConflict": "已存在同名服务器",
       "commandRequired": "输入命令",
       "commandTooLong": "最多使用 50 个参数，每个参数 500 个字符",
       "urlRequired": "输入网址",

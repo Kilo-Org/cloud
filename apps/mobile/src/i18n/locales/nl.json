@@ -3867,6 +3867,7 @@
       "headersHint": "Waarden weergegeven als •••• behouden hun opgeslagen geheim; vervang een waarde om deze te roteren. Het wijzigen van de URL vereist opnieuw elke waarde",
       "nameRequired": "Voer een servernaam in",
       "nameInvalid": "De naam mag alleen ASCII-letters, cijfers, onderstrepingstekens en streepjes bevatten, tot maximaal 100 tekens",
+      "nameConflict": "Er bestaat al een server met deze naam",
       "commandRequired": "Voer een opdracht in",
       "commandTooLong": "Gebruik maximaal 50 argumenten van elk 500 tekens",
       "urlRequired": "Voer een URL in",

@@ -14,6 +14,7 @@ import {
   validateMcpForm,
 } from '@/components/profiles/profile-mcp-model';
 import { SheetHeader } from '@/components/sheet-header';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { FormField } from '@/components/ui/form-field';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Switch } from '@/components/ui/switch';
@@ -25,6 +26,7 @@ import { useFormFieldScroll } from '@/lib/hooks/use-form-field-scroll';
 const ERROR_KEYS = {
   'name-required': 'profiles.mcp.nameRequired',
   'name-invalid': 'profiles.mcp.nameInvalid',
+  'name-conflict': 'profiles.mcp.nameConflict',
   'command-required': 'profiles.mcp.commandRequired',
   'command-too-long': 'profiles.mcp.commandTooLong',
   'url-required': 'profiles.mcp.urlRequired',
@@ -39,6 +41,7 @@ const ERROR_KEYS = {
 const FIELD_FOR_ERROR = {
   'name-required': 'name',
   'name-invalid': 'name',
+  'name-conflict': 'name',
   'command-required': 'command',
   'command-too-long': 'command',
   'url-required': 'url',
@@ -60,6 +63,8 @@ function errorKeyFor(
 type McpFormSheetProps = Readonly<{
   /** The server being edited, or `null` when adding one. */
   server: McpServerSource | null;
+  /** Names of the profile's other servers, so a duplicate fails validation inline. */
+  existingNames: readonly string[];
   isSaving: boolean;
   onClose: () => void;
   /**
@@ -67,6 +72,10 @@ type McpFormSheetProps = Readonly<{
    * the sheet on success; on failure it returns with the sheet still open.
    */
   onSave: (payload: McpServerPayload) => void;
+  /** A server-side name conflict, shown on the name field like a validation error. */
+  nameConflictFromServer?: boolean;
+  /** A failure the caller cannot name, shown inside the sheet instead of only a toast. */
+  saveFailure?: string | null;
 }>;
 
 /**
@@ -74,7 +83,15 @@ type McpFormSheetProps = Readonly<{
  * fresh fields from the server it edits. Text fields are uncontrolled (refs),
  * per the app's iOS text-input rule; the type and enabled controls are state.
  */
-export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<McpFormSheetProps>) {
+export function McpFormSheet({
+  server,
+  existingNames,
+  isSaving,
+  onClose,
+  onSave,
+  nameConflictFromServer = false,
+  saveFailure = null,
+}: Readonly<McpFormSheetProps>) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const initial = initialMcpFormState(server ?? undefined);
@@ -112,7 +129,7 @@ export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<Mcp
       configJson: configRef.current,
       timeout: timeoutRef.current,
     };
-    const problem = validateMcpForm(state);
+    const problem = validateMcpForm(state, existingNames);
     if (problem !== null) {
       setError(problem);
       scrollToField(FIELD_FOR_ERROR[problem]);
@@ -121,6 +138,11 @@ export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<Mcp
     setError(null);
     onSave(buildMcpServerPayload(state));
   };
+
+  const nameError =
+    error === 'name-conflict' || (error === null && nameConflictFromServer)
+      ? t(ERROR_KEYS['name-conflict'])
+      : errorKeyFor(t, error, ['name-required', 'name-invalid']);
 
   const typeOptions = [
     { value: 'local' as const, label: t('profiles.mcp.localType') },
@@ -145,6 +167,7 @@ export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<Mcp
         automaticallyAdjustKeyboardInsets
         showsVerticalScrollIndicator={false}
       >
+        <AccessibleStatus message={saveFailure} className="text-sm" />
         {server === null ? (
           <View className="gap-1.5">
             <Text className="text-sm font-medium text-foreground">{t('profiles.mcp.type')}</Text>
@@ -160,7 +183,7 @@ export function McpFormSheet({ server, isSaving, onClose, onSave }: Readonly<Mcp
         <FormField
           label={t('profiles.mcp.name')}
           defaultValue={initial.name}
-          error={errorKeyFor(t, error, ['name-required', 'name-invalid'])}
+          error={nameError}
           disabled={isSaving}
           required
           autoCapitalize="none"

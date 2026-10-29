@@ -3867,6 +3867,7 @@
       "headersHint": "Thamani zinazoonyeshwa kama •••• huhifadhi siri zake zilizohifadhiwa; badilisha thamani ili kuizungusha. Kubadilisha URL kunahitaji kila thamani tena",
       "nameRequired": "Ingiza jina la seva",
       "nameInvalid": "Jina linaweza kutumia herufi za ASCII, nambari, mistari chini na deshi pekee, hadi vibambo 100",
+      "nameConflict": "Seva yenye jina hili tayari ipo",
       "commandRequired": "Ingiza amri",
       "commandTooLong": "Tumia hoja 50 au chini, kila moja vibambo 500",
       "urlRequired": "Weka URL",

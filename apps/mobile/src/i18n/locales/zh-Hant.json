@@ -3867,6 +3867,7 @@
       "headersHint": "顯示為 •••• 的值會保留已儲存的密鑰；替換值即可輪換。變更網址時必須重新輸入所有值",
       "nameRequired": "輸入伺服器名稱",
       "nameInvalid": "名稱只能使用 ASCII 字母、數字、底線和連字符，最多 100 個字元",
+      "nameConflict": "此名稱的伺服器已存在",
       "commandRequired": "輸入命令",
       "commandTooLong": "最多使用 50 個引數，每個引數 500 個字元",
       "urlRequired": "輸入網址",

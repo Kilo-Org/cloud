@@ -3969,6 +3969,7 @@
       "headersHint": "Hodnoty zobrazené ako •••• si zachovávajú uloženú tajnú hodnotu; nahradením hodnoty ju obnovíte. Pri zmene URL je potrebné znova zadať všetky hodnoty",
       "nameRequired": "Zadajte názov servera",
       "nameInvalid": "Názov môže používať iba písmená ASCII, čísla, podčiarkovníky a pomlčky, maximálne 100 znakov",
+      "nameConflict": "Server s týmto názvom už existuje",
       "commandRequired": "Zadajte príkaz",
       "commandTooLong": "Použite najviac 50 argumentov s 500 znakmi",
       "urlRequired": "Zadajte adresu URL",

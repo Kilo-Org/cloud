@@ -3918,6 +3918,7 @@
       "headersHint": "Les valeurs affichées sous la forme •••• conservent leur secret stocké ; remplacez une valeur pour le renouveler. La modification de l'URL exige à nouveau toutes les valeurs",
       "nameRequired": "Entrez un nom de serveur",
       "nameInvalid": "Le nom ne peut utiliser que des lettres ASCII, des chiffres, des traits de soulignement et des tirets, jusqu'à 100 caractères.",
+      "nameConflict": "Un serveur portant ce nom existe déjà",
       "commandRequired": "Entrez une commande",
       "commandTooLong": "Utilisez au maximum 50 arguments de 500 caractères chacun",
       "urlRequired": "Entrez une URL",

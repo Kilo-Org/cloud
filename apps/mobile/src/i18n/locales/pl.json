@@ -3969,6 +3969,7 @@
       "headersHint": "Wartości wyświetlane jako •••• zachowują zapisany sekret; zastąp wartość, aby go zmienić. Zmiana adresu URL wymaga ponownego podania wszystkich wartości",
       "nameRequired": "Wprowadź nazwę serwera",
       "nameInvalid": "W nazwie można używać wyłącznie liter ASCII, cyfr, podkreśleń i myślników, maksymalnie 100 znaków",
+      "nameConflict": "Serwer o tej nazwie już istnieje",
       "commandRequired": "Wprowadź polecenie",
       "commandTooLong": "Użyj maksymalnie 50 argumentów po 500 znaków",
       "urlRequired": "Wpisz adres URL",

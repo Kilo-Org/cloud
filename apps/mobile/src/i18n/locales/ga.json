@@ -4020,6 +4020,7 @@
       "headersHint": "Coinníonn luachanna a thaispeántar mar •••• a rún stóráilte; athchuir luach chun é a rothlú. Teastaíonn gach luach arís nuair a athraítear an URL",
       "nameRequired": "Cuir isteach ainm freastalaí",
       "nameInvalid": "Ní féidir le hainm ach litreacha ASCII, uimhreacha, béimeanna agus daiseanna a úsáid, suas le 100 carachtar",
+      "nameConflict": "Tá freastalaí leis an ainm seo ann cheana",
       "commandRequired": "Cuir isteach ordú",
       "commandTooLong": "Úsáid 50 argóint ar a mhéad, 500 carachtar sa cheann",
       "urlRequired": "Cuir isteach URL",

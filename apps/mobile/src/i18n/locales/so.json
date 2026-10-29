@@ -3867,6 +3867,7 @@
       "headersHint": "Qiimayaasha lagu muujiyay •••• waxay sii hayaan sirta kaydsan; beddel qiime si aad u rogto. Beddelidda URL-ka waxay u baahan tahay qiimayaasha oo dhan mar kale",
       "nameRequired": "Geli magaca adeegaha",
       "nameInvalid": "Magaca wuxuu isticmaali karaa kaliya xarfo ASCII, lambaro, hoosta, iyo xariijimaha, ugu badnaan 100 xaraf",
+      "nameConflict": "Adeeg magacaan leh horey ayaa jira",
       "commandRequired": "Gali amar",
       "commandTooLong": "Isticmaal ugu badnaan 50 doodood oo mid kastaa 500 xaraf",
       "urlRequired": "Gali URL",

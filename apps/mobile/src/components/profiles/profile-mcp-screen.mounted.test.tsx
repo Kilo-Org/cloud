@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- one mounted case per MCP screen state: loading, error, empty, row toggle, edit, add, validation, failure fallbacks, and delete */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import {
   changeText,
   confirmRequest,
@@ -9,6 +9,7 @@ import {
   findField,
   findOne,
   mountScreen,
+  pressAddButton,
   pressEmptyAction,
   pressPressable,
   pressSheetDone,
@@ -287,12 +288,10 @@ describe('ProfileMcpScreen', () => {
     unmount();
   });
 
-  it('retryable: a failure with no message toasts the fallback and keeps the sheet', async () => {
+  it('retryable: a save failure shows its message inside the sheet and keeps the sheet open', async () => {
     h.query.data = testProfile();
     h.query.isPending = false;
-    const error = new Error('placeholder');
-    error.message = '';
-    h.mutations.createMcp.mutateAsync.mockRejectedValue(error);
+    h.mutations.createMcp.mutateAsync.mockRejectedValue(new Error('Internal server error'));
 
     const { renderer, unmount } = await mountScreen();
     pressEmptyAction(renderer);
@@ -300,9 +299,80 @@ describe('ProfileMcpScreen', () => {
     changeText(renderer.root, 'Command line', 'npx some-mcp');
     pressSheetDone(renderer.root);
 
-    await waitFor(() => h.error.mock.calls.length > 0);
-    expect(h.error).toHaveBeenCalledWith("Couldn't save MCP server");
+    await waitFor(() =>
+      findAll(renderer.root, 'Text').some(
+        node => node.props.children === i18n.t('profiles.mcp.saveFailed')
+      )
+    );
     expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
+
+    unmount();
+  });
+
+  it('refuses a name a loaded server already uses, without calling the server', async () => {
+    h.query.data = testProfile([testServer()]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    pressAddButton(renderer);
+    changeText(renderer.root, 'Server name', 'docs');
+    changeText(renderer.root, 'Command line', 'npx some-mcp');
+    pressSheetDone(renderer.root);
+    expect(findField(renderer.root, 'Server name').props.error).toBe(
+      i18n.t('profiles.mcp.nameConflict')
+    );
+    expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
+
+    unmount();
+  });
+
+  it('lets an edit keep its own name and refuses one another server owns', async () => {
+    h.query.data = testProfile([
+      testServer(),
+      testServer({ id: 'mcp-2', name: 'search', config: { command: ['npx', '@example/search'] } }),
+    ]);
+    h.query.isPending = false;
+    h.mutations.updateMcp.mutateAsync.mockResolvedValue({ success: true });
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'Edit MCP server docs');
+    expect(findField(renderer.root, 'Server name').props.error).toBeUndefined();
+
+    changeText(renderer.root, 'Server name', 'search');
+    pressSheetDone(renderer.root);
+
+    expect(h.mutations.updateMcp.mutateAsync).not.toHaveBeenCalled();
+    expect(findField(renderer.root, 'Server name').props.error).toBe(
+      i18n.t('profiles.mcp.nameConflict')
+    );
+
+    unmount();
+  });
+
+  it("shows the server's name conflict on the name field, not only a toast", async () => {
+    h.query.data = testProfile();
+    h.query.isPending = false;
+    h.mutations.createMcp.mutateAsync.mockRejectedValue(
+      Object.assign(new Error('An MCP server with this name already exists in this profile'), {
+        data: { code: 'CONFLICT' },
+      })
+    );
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    changeText(renderer.root, 'Server name', 'new-server');
+    changeText(renderer.root, 'Command line', 'npx some-mcp');
+    pressSheetDone(renderer.root);
+
+    await waitFor(() =>
+      findAll(renderer.root, 'FormField').some(
+        node => node.props.label === 'Server name' && node.props.error !== undefined
+      )
+    );
+    expect(findField(renderer.root, 'Server name').props.error).toBe(
+      i18n.t('profiles.mcp.nameConflict')
+    );
+    expect(h.error).not.toHaveBeenCalled();
 
     unmount();
   });

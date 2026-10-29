@@ -3867,6 +3867,7 @@
       "headersHint": "Amanani aboniswa njenge-•••• agcina imfihlo yawo egciniwe; shintsha inani ukuze imfihlo ishintshwe. Ukushintsha i-URL kudinga wonke amanani kabusha",
       "nameRequired": "Faka igama leseva",
       "nameInvalid": "Igama lingasebenzisa kuphela izinhlamvu ze-ASCII, izinombolo, ama-underscore, namadeshi, kufike ezinhlamvini ezingu-100",
+      "nameConflict": "Iseva enaleli gama isivele ikhona",
       "commandRequired": "Faka umyalo",
       "commandTooLong": "Sebenzisa ama-agumenti angu-50 noma ngaphansi, ngalinye izinhlamvu ezingu-500",
       "urlRequired": "Faka i-URL",

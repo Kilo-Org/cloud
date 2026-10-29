@@ -3867,6 +3867,7 @@
       "headersHint": "Ƙimomin da aka nuna a matsayin •••• suna riƙe sirrin da aka adana; maye gurbin ƙima don canza sirrin. Canza URL yana buƙatar sake shigar da kowane ƙima",
       "nameRequired": "Shigar da sunan uwar garke",
       "nameInvalid": "Sunan zai iya amfani da haruffan ASCII kawai, lambobi, ƙararraki, da dashes, har zuwa haruffa 100",
+      "nameConflict": "Uwar garken da wannan sunan ta riga ta kasance",
       "commandRequired": "Shigar da umarni",
       "commandTooLong": "Yi amfani da bai fi hujjoji 50 ba, kowanne haruffa 500",
       "urlRequired": "Shigar da URL",

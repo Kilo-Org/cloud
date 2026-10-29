@@ -3969,6 +3969,7 @@
       "headersHint": "Hodnoty zobrazené jako •••• si ponechávají své uložené tajemství; nahrazením hodnoty ji obměníte. Změna URL vyžaduje znovu všechny hodnoty",
       "nameRequired": "Zadejte název serveru",
       "nameInvalid": "Název může používat pouze písmena ASCII, číslice, podtržítka a pomlčky, maximálně 100 znaků",
+      "nameConflict": "Server MCP s tímto názvem již existuje",
       "commandRequired": "Zadejte příkaz",
       "commandTooLong": "Použijte nejvýše 50 argumentů o 500 znacích",
       "urlRequired": "Zadejte adresu URL",

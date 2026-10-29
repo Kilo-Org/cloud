@@ -4071,6 +4071,7 @@
       "headersHint": "Mae gwerthoedd a ddangosir fel •••• yn cadw eu cyfrinach storio; disodlwch werth i'w gylchdroi. Mae newid yr URL yn gofyn am bob gwerth eto",
       "nameRequired": "Rhowch enw gweinydd",
       "nameInvalid": "Dim ond llythrennau ASCII, rhifau, tanlinellau a llinellau toriad y gall enw eu defnyddio, hyd at 100 nod",
+      "nameConflict": "Mae gweinydd gyda'r enw hwn eisoes yn bodoli",
       "commandRequired": "Rhowch orchymyn",
       "commandTooLong": "Defnyddiwch 50 dadl ar y mwyaf, pob un yn 500 nod",
       "urlRequired": "Rhowch URL",

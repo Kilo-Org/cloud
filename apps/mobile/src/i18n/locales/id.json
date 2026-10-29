@@ -3867,6 +3867,7 @@
       "headersHint": "Nilai yang ditampilkan sebagai •••• tetap menyimpan rahasianya; ganti nilai untuk merotasinya. Mengubah URL mengharuskan semua nilai dimasukkan ulang",
       "nameRequired": "Masukkan nama server",
       "nameInvalid": "Nama hanya boleh menggunakan huruf ASCII, angka, garis bawah, dan tanda hubung, maksimal 100 karakter",
+      "nameConflict": "Server dengan nama ini sudah ada",
       "commandRequired": "Masukkan perintah",
       "commandTooLong": "Gunakan maksimal 50 argumen yang masing-masing 500 karakter",
       "urlRequired": "Masukkan URL",

@@ -3867,6 +3867,7 @@
       "headersHint": "Gildi sem birtast sem •••• varðveita geymt leyndarmál sitt; skiptu um gildi til að endurnýja það. Breyting á URL krefst þess að öll gildi séu slegin inn aftur",
       "nameRequired": "Sláðu inn nafn netþjóns",
       "nameInvalid": "Nafn má aðeins innihalda ASCII-bókstafi, tölustafi, undirstrik og strik, allt að 100 stafir",
+      "nameConflict": "Netþjónn með þessu nafni er þegar til",
       "commandRequired": "Sláðu inn skipun",
       "commandTooLong": "Notaðu að hámarki 50 rök, hvert 500 stafir",
       "urlRequired": "Sláðu inn vefslóð",

@@ -3867,6 +3867,7 @@
       "headersHint": "A ••••-ként megjelenő értékek megőrzik a tárolt titkot; egy érték cseréjével rotálhatja azt. Az URL módosítása minden érték ismételt megadását igényli",
       "nameRequired": "Adja meg a szerver nevét",
       "nameInvalid": "A név csak ASCII betűket, számokat, aláhúzásjeleket és kötőjeleket tartalmazhat, legfeljebb 100 karakter lehet",
+      "nameConflict": "Már létezik ilyen nevű szerver",
       "commandRequired": "Írjon be egy parancsot",
       "commandTooLong": "Legfeljebb 50 argumentumot használjon, egyenként 500 karakterrel",
       "urlRequired": "Adjon meg egy URL-t",

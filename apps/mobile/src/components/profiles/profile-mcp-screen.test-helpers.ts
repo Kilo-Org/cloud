@@ -85,6 +85,19 @@ export function pressEmptyAction(renderer: ReactTestRenderer): void {
   });
 }
 
+/** Press the list's Add MCP server button, the only one a populated list renders. */
+export function pressAddButton(renderer: ReactTestRenderer): void {
+  const onPress: unknown = findOne(renderer.root, 'Button').props.onPress;
+  if (typeof onPress !== 'function') {
+    throw new TypeError('the add button has no press handler');
+  }
+  // Checked to be a function above; the stub props carry no call signature.
+  const press = onPress as () => void;
+  act(() => {
+    press();
+  });
+}
+
 export function changeText(root: ReactTestInstance, label: string, value: string): void {
   act(() => {
     (findField(root, label).props as { onChangeText: (v: string) => void }).onChangeText(value);

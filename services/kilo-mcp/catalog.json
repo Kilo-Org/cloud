@@ -3863,6 +3863,36 @@
     ],
     "searchBlob": "byok.previewRouting Preview which route and BYOK provider key a given model request would use before making it, showing the ordered routing steps and why each key is used or skipped. Use this to check or debug how a model resolves under your or your organization's bring-your-own-key setup. byok previewrouting organizationid modelid apikind organizationId modelId apiKind"
   },
+  "byok.reorder": {
+    "path": "byok.reorder",
+    "kind": "mutation",
+    "summary": "Reorder the user's saved bring-your-own API keys to change their priority or fallback order, returning the updated key list.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "keyIds": {
+          "minItems": 1,
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        }
+      },
+      "required": [
+        "keyIds"
+      ]
+    },
+    "tags": [
+      "byok",
+      "reorder",
+      "keyids"
+    ],
+    "searchBlob": "byok.reorder Reorder the user's saved bring-your-own API keys to change their priority or fallback order, returning the updated key list. byok reorder keyids keyIds"
+  },
   "byok.setCatalogMode": {
     "path": "byok.setCatalogMode",
     "kind": "mutation",
@@ -15476,7 +15506,10 @@
               "organization.group.policy_type.disable",
               "organization.created",
               "organization.token.generate",
-              "organization.funds.distribute_to_children"
+              "organization.funds.distribute_to_children",
+              "organization.guardrail.add",
+              "organization.guardrail.update",
+              "organization.guardrail.remove"
             ]
           }
         },
@@ -20083,321 +20116,6 @@
     ],
     "searchBlob": "organizations.guardrails.get Get an organization's Enkrypt AI input guardrail settings: whether it is enabled, whether tool results are scanned, and the configured detectors. Owners and admins only. organizations guardrails get organizationid organizationId"
   },
-  "organizations.guardrails.update": {
-    "path": "organizations.guardrails.update",
-    "kind": "mutation",
-    "summary": "Save an organization's Enkrypt AI input guardrail settings: enable or disable it, choose whether tool results are scanned, and configure detectors. Owners and admins only.",
-    "inputSchema": {
-      "$schema": "https://json-schema.org/draft/2020-12/schema",
-      "type": "object",
-      "properties": {
-        "organizationId": {
-          "type": "string",
-          "format": "uuid",
-          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
-        },
-        "enabled": {
-          "type": "boolean"
-        },
-        "scan_tool_results": {
-          "type": "boolean"
-        },
-        "detectors": {
-          "type": "object",
-          "properties": {
-            "injection_attack": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "type": "boolean"
-                }
-              },
-              "required": [
-                "enabled"
-              ],
-              "additionalProperties": false
-            },
-            "pii": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "type": "boolean"
-                },
-                "action": {
-                  "type": "string",
-                  "enum": [
-                    "log",
-                    "block"
-                  ]
-                },
-                "entities": {
-                  "maxItems": 4,
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "enum": [
-                      "pii",
-                      "secrets",
-                      "ip_address",
-                      "url"
-                    ]
-                  }
-                }
-              },
-              "required": [
-                "enabled",
-                "action",
-                "entities"
-              ],
-              "additionalProperties": false
-            },
-            "keyword_detector": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "type": "boolean"
-                },
-                "action": {
-                  "type": "string",
-                  "enum": [
-                    "log",
-                    "block"
-                  ]
-                },
-                "banned_keywords": {
-                  "maxItems": 200,
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 100
-                  }
-                }
-              },
-              "required": [
-                "enabled",
-                "action",
-                "banned_keywords"
-              ],
-              "additionalProperties": false
-            },
-            "topic_detector": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "type": "boolean"
-                },
-                "topic": {
-                  "maxItems": 50,
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "minLength": 1,
-                    "maxLength": 100
-                  }
-                }
-              },
-              "required": [
-                "enabled",
-                "topic"
-              ],
-              "additionalProperties": false
-            },
-            "policy_violation": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "type": "boolean"
-                },
-                "format": {
-                  "type": "string",
-                  "enum": [
-                    "policy_text",
-                    "rules"
-                  ]
-                },
-                "policy_text": {
-                  "type": "string",
-                  "maxLength": 10000
-                },
-                "rules": {
-                  "maxItems": 50,
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 64,
-                        "pattern": "^[A-Za-z0-9._-]+$"
-                      },
-                      "display_text": {
-                        "type": "string",
-                        "maxLength": 120
-                      },
-                      "text": {
-                        "type": "string",
-                        "minLength": 1,
-                        "maxLength": 1000
-                      },
-                      "risk_category": {
-                        "type": "string",
-                        "enum": [
-                          "security_fraud",
-                          "safety_harm",
-                          "privacy_data_protection",
-                          "brand_reputation_trust",
-                          "bias_fairness_ethical",
-                          "legal_ip_liability",
-                          "product_misuse_abuse",
-                          "performance_reliability_quality"
-                        ]
-                      },
-                      "applicability": {
-                        "type": "string",
-                        "enum": [
-                          "user",
-                          "user_assistant"
-                        ]
-                      },
-                      "severity": {
-                        "type": "string",
-                        "enum": [
-                          "critical",
-                          "high",
-                          "medium",
-                          "low"
-                        ]
-                      },
-                      "frameworks": {
-                        "maxItems": 8,
-                        "type": "array",
-                        "items": {
-                          "type": "string",
-                          "enum": [
-                            "hipaa",
-                            "finra",
-                            "gdpr",
-                            "ccpa",
-                            "owasp_llm_2025",
-                            "nist_ai_rmf",
-                            "eu_ai_act",
-                            "iso_42001"
-                          ]
-                        }
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "display_text",
-                      "text",
-                      "risk_category",
-                      "applicability",
-                      "severity",
-                      "frameworks"
-                    ],
-                    "additionalProperties": false
-                  }
-                }
-              },
-              "required": [
-                "enabled",
-                "format",
-                "policy_text",
-                "rules"
-              ],
-              "additionalProperties": false
-            },
-            "toxicity": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "type": "boolean"
-                }
-              },
-              "required": [
-                "enabled"
-              ],
-              "additionalProperties": false
-            },
-            "nsfw": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "type": "boolean"
-                }
-              },
-              "required": [
-                "enabled"
-              ],
-              "additionalProperties": false
-            },
-            "bias": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "type": "boolean"
-                },
-                "action": {
-                  "type": "string",
-                  "enum": [
-                    "log",
-                    "block"
-                  ]
-                }
-              },
-              "required": [
-                "enabled",
-                "action"
-              ],
-              "additionalProperties": false
-            },
-            "sponge_attack": {
-              "type": "object",
-              "properties": {
-                "enabled": {
-                  "type": "boolean"
-                }
-              },
-              "required": [
-                "enabled"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "required": [
-            "injection_attack",
-            "pii",
-            "keyword_detector",
-            "topic_detector",
-            "policy_violation",
-            "toxicity",
-            "nsfw",
-            "bias",
-            "sponge_attack"
-          ],
-          "additionalProperties": false
-        }
-      },
-      "required": [
-        "organizationId",
-        "enabled",
-        "scan_tool_results",
-        "detectors"
-      ]
-    },
-    "tags": [
-      "organizations",
-      "guardrails",
-      "update",
-      "organizationid",
-      "enabled",
-      "scan_tool_results",
-      "detectors"
-    ],
-    "searchBlob": "organizations.guardrails.update Save an organization's Enkrypt AI input guardrail settings: enable or disable it, choose whether tool results are scanned, and configure detectors. Owners and admins only. organizations guardrails update organizationid enabled scan_tool_results detectors organizationId enabled scan_tool_results detectors"
-  },
   "organizations.invoices": {
     "path": "organizations.invoices",
     "kind": "query",
@@ -23450,6 +23168,185 @@
       "list"
     ],
     "searchBlob": "organizations.list List the organizations the current user belongs to along with any inherited child organizations. organizations list"
+  },
+  "organizations.mcpGuardrails.browse": {
+    "path": "organizations.mcpGuardrails.browse",
+    "kind": "query",
+    "summary": "Browse a searchable MCP server catalog or registry to find servers an admin can add to the organization's allowed list. Results flag which entries are already added; supports pagination.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "type": {
+          "type": "string",
+          "const": "mcp"
+        },
+        "source": {
+          "type": "string",
+          "enum": [
+            "kilo_marketplace",
+            "mcp_registry"
+          ]
+        },
+        "query": {
+          "type": "string",
+          "maxLength": 100
+        },
+        "cursor": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 500
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "organizationId",
+        "type",
+        "source",
+        "query"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "mcpguardrails",
+      "browse",
+      "organizationid",
+      "type",
+      "source",
+      "query",
+      "cursor"
+    ],
+    "searchBlob": "organizations.mcpGuardrails.browse Browse a searchable MCP server catalog or registry to find servers an admin can add to the organization's allowed list. Results flag which entries are already added; supports pagination. organizations mcpguardrails browse organizationid type source query cursor organizationId type source query cursor"
+  },
+  "organizations.mcpGuardrails.connectionUsers": {
+    "path": "organizations.mcpGuardrails.connectionUsers",
+    "kind": "query",
+    "summary": "Show which users attempted to connect to a specific MCP server, including their name, email, client, allow/deny decision, connect count, and last seen time.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "allowed",
+            "denied"
+          ]
+        },
+        "client": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50
+        },
+        "identityKey": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500
+        }
+      },
+      "required": [
+        "organizationId",
+        "identityKey"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "mcpguardrails",
+      "connectionusers",
+      "organizationid",
+      "decision",
+      "client",
+      "identitykey"
+    ],
+    "searchBlob": "organizations.mcpGuardrails.connectionUsers Show which users attempted to connect to a specific MCP server, including their name, email, client, allow/deny decision, connect count, and last seen time. organizations mcpguardrails connectionusers organizationid decision client identitykey organizationId decision client identityKey"
+  },
+  "organizations.mcpGuardrails.list": {
+    "path": "organizations.mcpGuardrails.list",
+    "kind": "query",
+    "summary": "List an organization's MCP guardrails (allowed MCP servers) along with the current MCP enforcement mode and skill scanning settings. Use this to see which MCP servers are approved for an organization.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "mcpguardrails",
+      "list",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.mcpGuardrails.list List an organization's MCP guardrails (allowed MCP servers) along with the current MCP enforcement mode and skill scanning settings. Use this to see which MCP servers are approved for an organization. organizations mcpguardrails list organizationid organizationId"
+  },
+  "organizations.mcpGuardrails.listConnections": {
+    "path": "organizations.mcpGuardrails.listConnections",
+    "kind": "query",
+    "summary": "List MCP server connections attempted by users in the organization, showing each server's name, clients used, number of allowed and denied users, last seen time, and whether it's on the allowed list.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "decision": {
+          "type": "string",
+          "enum": [
+            "allowed",
+            "denied"
+          ]
+        },
+        "client": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50
+        },
+        "cursor": {
+          "default": 0,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "mcpguardrails",
+      "listconnections",
+      "organizationid",
+      "decision",
+      "client",
+      "cursor"
+    ],
+    "searchBlob": "organizations.mcpGuardrails.listConnections List MCP server connections attempted by users in the organization, showing each server's name, clients used, number of allowed and denied users, last seen time, and whether it's on the allowed list. organizations mcpguardrails listconnections organizationid decision client cursor organizationId decision client cursor"
   },
   "organizations.members.deleteInvite": {
     "path": "organizations.members.deleteInvite",

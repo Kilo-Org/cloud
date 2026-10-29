@@ -10,11 +10,12 @@ const THINKING_BINDING_BETA = 'thinking-binding-controls-2026-08-01';
 const CLAUDE_VERSION = /claude-[a-z]+-(\d+)(?:[.-](\d{1,2})(?!\d))?/;
 
 /**
- * Claude 5.1 and later (Fable 5.1, Opus, Sonnet, and Haiku 5.5) bind each thinking block to the
- * system prompt, tools, and earlier messages it was created with. Provider accounts created on or
- * after 2026-08-31 reject a replayed block whose prefix changed, failing the whole turn. Newer
- * models are assumed to keep binding thinking. Older models are excluded: OpenRouter's Bedrock
- * route rewrites adaptive thinking for Claude Sonnet 4.5 into a form that rejects `block_binding`.
+ * Claude models of every family from version 5.1 on are matched. The models known to bind each
+ * thinking block to the system prompt, tools, and earlier messages it was created with are Fable
+ * 5.1 and Opus, Sonnet, and Haiku 5.5, and newer models are assumed to keep doing so. Provider
+ * accounts created on or after 2026-08-31 reject a replayed block whose prefix changed, failing the
+ * whole turn. Older models are excluded: OpenRouter's Bedrock route rewrites adaptive thinking for
+ * Claude Sonnet 4.5 into a form that rejects `block_binding`.
  * https://platform.claude.com/docs/en/build-with-claude/preserved-thinking
  */
 function bindsThinkingToPrefix(model: string) {

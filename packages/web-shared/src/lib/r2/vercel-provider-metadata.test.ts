@@ -32,6 +32,7 @@ beforeEach(() => {
     R2_VERCEL_PROVIDER_METADATA_SECRET_ACCESS_KEY: 'test-metadata-secret-key',
   });
   mockedAfter.mockReset();
+  jest.spyOn(console, 'debug').mockImplementation(() => {});
   jest.mocked(errorExceptInTest).mockClear();
   fakeR2.objects.clear();
 });
@@ -46,6 +47,7 @@ test.each([
   delete process.env[name];
   expect(createVercelProviderMetadataCapture()).toBeUndefined();
   expect(mockedAfter).not.toHaveBeenCalled();
+  expect(console.debug).not.toHaveBeenCalled();
 });
 
 test('uploads the latest metadata once, after the response, keyed by generation ID', async () => {
@@ -69,8 +71,13 @@ test('uploads the latest metadata once, after the response, keyed by generation 
 
   capture?.({ gateway: { cost: '0.1' } }, 'gen_test');
   capture?.(metadata);
+  capture?.(undefined, 'gen_test');
   expect(mockedAfter).toHaveBeenCalledTimes(1);
   expect(fakeR2.objects.size).toBe(0);
+  expect(console.debug).toHaveBeenCalledTimes(1);
+  expect(console.debug).toHaveBeenLastCalledWith('[vercel-provider-metadata] scheduling archive', {
+    generationId: 'gen_test',
+  });
 
   await runScheduledUpload();
 
@@ -81,6 +88,10 @@ test('uploads the latest metadata once, after the response, keyed by generation 
   expect([...fakeR2.objects]).toEqual([
     ['test-provider-metadata/gen_test.json', JSON.stringify(metadata)],
   ]);
+  expect(console.debug).toHaveBeenCalledTimes(2);
+  expect(console.debug).toHaveBeenLastCalledWith('[vercel-provider-metadata] archived metadata', {
+    generationId: 'gen_test',
+  });
 });
 
 test('retains metadata received before the generation ID', async () => {
@@ -88,6 +99,7 @@ test('retains metadata received before the generation ID', async () => {
   const metadata = { gateway: { cost: '0.1' } };
   capture?.(metadata);
   expect(mockedAfter).not.toHaveBeenCalled();
+  expect(console.debug).not.toHaveBeenCalled();
 
   capture?.(undefined, 'gen_late_id');
   await runScheduledUpload();
@@ -123,6 +135,10 @@ test('contains upload failures without logging metadata or upstream error text',
   expect(JSON.stringify(jest.mocked(errorExceptInTest).mock.calls)).not.toMatch(
     /sensitive upstream|private metadata/
   );
+  expect(console.debug).toHaveBeenCalledTimes(1);
+  expect(JSON.stringify(jest.mocked(console.debug).mock.calls)).not.toMatch(
+    /sensitive upstream|private metadata/
+  );
 });
 
 test('attempts registration and reports scheduling failures only once per response', () => {
@@ -135,4 +151,5 @@ test('attempts registration and reports scheduling failures only once per respon
   expect(() => capture?.({ gateway: { cost: '0.1' } }, 'gen_test')).not.toThrow();
   expect(mockedAfter).toHaveBeenCalledTimes(1);
   expect(errorExceptInTest).toHaveBeenCalledTimes(1);
+  expect(console.debug).toHaveBeenCalledTimes(1);
 });

@@ -35,6 +35,9 @@ export function createVercelProviderMetadataCapture(): VercelProviderMetadataCap
 
     registrationAttempted = true;
     try {
+      console.debug('[vercel-provider-metadata] scheduling archive', {
+        generationId: capturedGenerationId,
+      });
       after(async () => {
         try {
           client ??= createR2Client({ accessKeyId, secretAccessKey });
@@ -46,6 +49,9 @@ export function createVercelProviderMetadataCapture(): VercelProviderMetadataCap
               ContentType: 'application/json',
             })
           );
+          console.debug('[vercel-provider-metadata] archived metadata', {
+            generationId: capturedGenerationId,
+          });
         } catch (error) {
           reportFailure(error);
         }

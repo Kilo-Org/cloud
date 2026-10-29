@@ -959,11 +959,16 @@ export function NewSessionScreenBody() {
   const autoFocusPrompt = shouldAutoFocusNewSessionPrompt({
     sharePrefilled: Boolean(shareId),
     hasSelectedRepository: selectedRepo !== '',
-    // Only a prefill that resolves to a row in the loaded list counts. A prefill
-    // whose repository is gone, or whose provider list failed, leaves the form
-    // exactly as unconfigured as the plain entry: taking focus then would raise
-    // the keyboard over the same configuration this decision exists to show.
+    // Only a prefill the screen actually applies counts: the same condition
+    // `useNewSessionPrefillTargets` applies it under (`reposSettled`, and the
+    // repository is in the loaded list). A prefill whose repository is gone, or
+    // whose provider list failed, leaves the form as unconfigured as the plain
+    // entry, and taking focus then would raise the keyboard over the same
+    // configuration this decision exists to show. `reposSettled` is false while
+    // any provider is still loading or errored, so a cached list beside a
+    // failing provider does not count either.
     hasRepositoryPrefill:
+      reposSettled &&
       resolvePrefillRepoSelection(repositories, { mode, repo: routePrefillRepo }) !== null,
   });
   // Clone CLI-capability gate: a full clone is optimistic (only an explicit

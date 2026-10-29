@@ -894,5 +894,19 @@ describe('runNeedsInputInteraction', () => {
       expect(outcome).toBe('retryable');
       expect(createManager).not.toHaveBeenCalled();
     });
+
+    it('returns retryable for a reply of only invisible characters, before building a manager', async () => {
+      const createManager = vi.fn();
+
+      const outcome = await runNeedsInputInteraction({
+        kiloSessionId: SESSION_ID,
+        action: 'reply',
+        text: '\u200B\u200B',
+        deps: { createManager },
+      });
+
+      expect(outcome).toBe('retryable');
+      expect(createManager).not.toHaveBeenCalled();
+    });
   });
 });

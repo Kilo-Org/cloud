@@ -314,14 +314,36 @@ describe('ProfileMcpScreen', () => {
     const { renderer, unmount } = await mountScreen();
 
     const badge = findAll(renderer.root, 'View').find(node =>
-      String(node.props.accessibilityLabel ?? '').startsWith('Secret count:')
+      /^\d+ secrets?$/.test(String(node.props.accessibilityLabel ?? ''))
     );
-    expect(badge?.props.accessibilityLabel).toBe('Secret count: 1');
+    expect(badge?.props.accessibilityLabel).toBe('1 secret');
     expect(badge?.props.accessible).toBe(true);
     expect(findOne(renderer.root, 'Lock').parent?.props).toMatchObject({
       accessibilityElementsHidden: true,
       importantForAccessibility: 'no-hide-descendants',
     });
+
+    unmount();
+  });
+
+  it('a11y: the secret badge names the count in the plural form', async () => {
+    h.query.data = testProfile([
+      testServer({
+        type: 'remote',
+        config: {
+          url: 'https://example.com/mcp',
+          headers: { API_KEY: '••••', TEAM: '••••', REGION: 'eu' },
+        },
+      }),
+    ]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    const badge = findAll(renderer.root, 'View').find(node =>
+      /^\d+ secrets?$/.test(String(node.props.accessibilityLabel ?? ''))
+    );
+    expect(badge?.props.accessibilityLabel).toBe('3 secrets');
 
     unmount();
   });

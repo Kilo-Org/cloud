@@ -70,7 +70,7 @@ describe('runtime distribution packaging', () => {
     expect(RUNTIME_DISTRIBUTION.bun).toBe('1.4.4');
     expect(RUNTIME_DISTRIBUTION.pnpm).toBe('12.14.0');
     expect(RUNTIME_DISTRIBUTION.glab).toBe('1.124.0');
-    expect(RUNTIME_DISTRIBUTION.gh).toBe('2.102.0');
+    expect(RUNTIME_DISTRIBUTION.gh).toBe('2.103.3');
     expect(RUNTIME_DISTRIBUTION.nodeMajor).toBe('24');
   });
 

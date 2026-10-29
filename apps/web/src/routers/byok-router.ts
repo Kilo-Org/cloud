@@ -180,10 +180,12 @@ async function fetchCatalogModeSupportedModels(): Promise<Record<string, string[
   for (const provider of DIRECT_BYOK_PROVIDERS) {
     const entries = await listDirectByokCatalogModels(provider.id);
     if (entries.length === 0) continue;
-    result[provider.id] = entries.map(({ catalogModelId, model }) => {
-      const name = openRouterModelMetadata[catalogModelId]?.name ?? model.name;
-      return `${name} (${catalogModelId})`;
-    });
+    result[provider.id] = entries
+      .map(({ catalogModelId, model }) => {
+        const name = openRouterModelMetadata[catalogModelId]?.name ?? model.name;
+        return `${name} (${catalogModelId})`;
+      })
+      .sort();
   }
   return result;
 }

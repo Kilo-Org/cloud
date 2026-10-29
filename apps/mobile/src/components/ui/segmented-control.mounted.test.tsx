@@ -83,9 +83,8 @@ describe('SegmentedControl mounted layout', () => {
     const onUnhandledRejection = (reason: unknown) => {
       unhandledRejections.push(reason);
     };
-    process.on('unhandledRejection', onUnhandledRejection);
-
     try {
+      process.on('unhandledRejection', onUnhandledRejection);
       const options = renderControl(onChange).findAllByType('Pressable' as ElementType);
       const target = options[1];
       if (target === undefined) {

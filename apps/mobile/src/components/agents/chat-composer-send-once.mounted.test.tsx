@@ -327,9 +327,9 @@ describe('ChatComposer send — one tap sends exactly once', () => {
     const onUnhandledRejection = (reason: unknown) => {
       unhandledRejections.push(reason);
     };
-    process.on('unhandledRejection', onUnhandledRejection);
     const renderer = await mountComposer(baseProps({ onSend }));
 
+    process.on('unhandledRejection', onUnhandledRejection);
     try {
       await typeIntoComposer(renderer, 'sent with no haptics');
 

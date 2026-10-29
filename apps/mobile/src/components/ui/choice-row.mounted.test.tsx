@@ -122,9 +122,8 @@ describe('ChoiceRow selection haptic', () => {
     const onUnhandledRejection = (reason: unknown) => {
       unhandledRejections.push(reason);
     };
-    process.on('unhandledRejection', onUnhandledRejection);
-
     try {
+      process.on('unhandledRejection', onUnhandledRejection);
       const control = rowControl(renderRow({ label: 'Balanced', selected: false, onPress }));
       act(() => {
         (control.props.onPress as () => void)();

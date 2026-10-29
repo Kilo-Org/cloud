@@ -23,9 +23,8 @@ describe('haptics', () => {
     const onUnhandledRejection = (reason: unknown) => {
       unhandledRejections.push(reason);
     };
-    process.on('unhandledRejection', onUnhandledRejection);
-
     try {
+      process.on('unhandledRejection', onUnhandledRejection);
       expect(() => {
         selectionHaptic();
       }).not.toThrow();

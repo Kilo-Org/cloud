@@ -16,12 +16,20 @@ const BINDS_THINKING_TO_PREFIX = /claude-(?:fable-5[.-]1|(?:opus|sonnet|haiku)-5
  * Drops invalidated thinking blocks instead of failing the request. Only call this for upstreams
  * verified to forward the beta flag, since `block_binding` without it is rejected.
  *
- * Kilo and opencode clients change the prefix of a running session in normal use:
- * - Context compaction keeps the most recent turns verbatim, including their thinking, after the
- *   summary, so the history those turns were created with is gone.
- * - After compaction, clients clear old tool outputs and replace earlier media with placeholders.
- * - The system prompt changes on agent switches and AGENTS.md edits, and it includes the date.
- * - The tools list changes on agent switches, permission changes, and MCP server updates.
+ * Kilo and opencode clients change the prefix of a running session in normal use. The 400 error
+ * names what changed; from most to least common in production:
+ * - "The `system` prompt differs": the system prompt changes on agent switches and AGENTS.md
+ *   edits, and it includes the date.
+ * - "Content before this block differs from when it was created, first at `messages.N...`": most
+ *   likely because clients clear old tool outputs and replace earlier media with placeholders
+ *   after compaction.
+ * - "The `tools` list differs": the tools list changes on agent switches, permission changes, and
+ *   MCP server updates.
+ * - "Content that preceded this block when it was created is missing": context compaction keeps
+ *   the most recent turns verbatim, including their thinking, after the summary, so the history
+ *   those turns were created with is gone.
+ * - "This block was created as the first `thinking` block after its prompt, but another one now
+ *   precedes it": thinking blocks were reordered or inserted, which is rare.
  */
 export function dropThinkingBlocksOnPrefixMismatch({
   model,

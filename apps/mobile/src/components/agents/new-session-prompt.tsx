@@ -130,6 +130,7 @@ export function NewSessionPrompt({
   belowCardHeight = 0,
   onStartSession,
   isCloneEntry = false,
+  autoFocusOnMount = true,
 }: Readonly<NewSessionPromptComponentProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -493,9 +494,11 @@ export function NewSessionPrompt({
           submitBehavior={returnSendsMessage ? 'submit' : 'newline'}
           onSubmitEditing={returnSendsMessage ? handleReturnSubmit : undefined}
           maxFontSizeMultiplier={1}
-          // A shared payload prefills this input, so raising the keyboard on
-          // arrival hides the attachment strip and the Start button.
-          autoFocus={shareId === undefined || shareId === ''}
+          // Focus on arrival only when the form has nothing left to configure
+          // (the host resolves this): the keyboard it raises would otherwise
+          // shrink the frame past the repository, Environment and Advanced
+          // sections the session still needs before it can start.
+          autoFocus={autoFocusOnMount}
           // Android's IME swaps the app for its full-screen extract editor in a
           // landscape window; IME_FLAG_NO_FULLSCREEN keeps the field in place.
           disableFullscreenUI

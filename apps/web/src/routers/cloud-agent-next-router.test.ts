@@ -42,6 +42,7 @@ import { getHTTPStatusCodeFromError } from '@trpc/server/http';
 import type { verifyUserOwnsSessionV2ByCloudAgentId } from '@/lib/cloud-agent/session-ownership';
 import type * as StreamTicketModule from '@/lib/cloud-agent/stream-ticket';
 import type { releaseRefusedSend } from '@/lib/cloud-agent-next/release-refused-send';
+import type * as ReleaseRefusedSendModule from '@/lib/cloud-agent-next/release-refused-send';
 
 type AttachmentReference = { path: string; files: string[] };
 
@@ -934,6 +935,122 @@ describe('cloudAgentNextRouter send attachment ledger', () => {
 
     expect(mockSendMessage).not.toHaveBeenCalled();
     expect(await readStatus()).toBe('pending');
+  });
+});
+
+describe('cloudAgentNextRouter prepare attachment ledger', () => {
+  const userId = `oauth/ledger-prepare-${crypto.randomUUID()}`;
+  const messageUuid = '22345678-1234-4234-9234-123456789abc';
+  const attachmentId = '97654321-4321-4321-8321-cba987654321';
+  const file = `${attachmentId}.pdf`;
+  const attachments = { path: messageUuid, files: [file] };
+  const objectKey = `${userId}/cloud-agent/${messageUuid}/${file}`;
+  const future = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+  const prepareInput = {
+    prompt: 'Summarize the attachment',
+    mode: 'code',
+    model: 'kilo/test-model',
+    githubRepo: 'acme/repo',
+    attachments,
+  };
+  // This suite asserts on the ledger records themselves, so it runs the real
+  // helper instead of the module mock the send suite asserts on.
+  const realReleaseRefusedSend =
+    jest.requireActual<typeof ReleaseRefusedSendModule>(
+      '@/lib/cloud-agent-next/release-refused-send'
+    ).releaseRefusedSend;
+
+  function workerRefusal(code: string, httpStatus: number, message: string) {
+    return new TRPCClientError(message, {
+      result: { error: { code: -32000, message, data: { code, httpStatus } } },
+    });
+  }
+
+  async function readStatus(): Promise<string | undefined> {
+    const rows = await db
+      .select({ status: cloud_agent_pending_uploads.status })
+      .from(cloud_agent_pending_uploads)
+      .where(eq(cloud_agent_pending_uploads.object_key, objectKey));
+    return rows[0]?.status;
+  }
+
+  beforeEach(async () => {
+    jest.clearAllMocks();
+    mockPrepareSession.mockReset();
+    mockPrepareSession.mockResolvedValue({
+      cloudAgentSessionId: 'agent_123',
+      kiloSessionId: 'ses_12345678901234567890123456',
+    });
+    mockReleaseRefusedSend.mockReset();
+    mockReleaseRefusedSend.mockImplementation(realReleaseRefusedSend);
+    mockComputeCloudAgentNextBalanceCheckEligibility.mockResolvedValue({
+      isFree: false,
+      hasUserByokAvailable: false,
+    });
+    await db
+      .delete(cloud_agent_pending_uploads)
+      .where(eq(cloud_agent_pending_uploads.object_key, objectKey));
+    await db.insert(cloud_agent_pending_uploads).values({
+      id: crypto.randomUUID(),
+      kilo_user_id: userId,
+      object_key: objectKey,
+      message_uuid: messageUuid,
+      attachment_id: attachmentId,
+      byte_size: 42,
+      status: 'pending',
+      expires_at: future,
+    });
+  });
+
+  afterAll(async () => {
+    mockReleaseRefusedSend.mockReset();
+    await db
+      .delete(cloud_agent_pending_uploads)
+      .where(eq(cloud_agent_pending_uploads.object_key, objectKey));
+  });
+
+  it('keeps the ledger rows accounted while a prepare the worker declines does not dispatch', async () => {
+    const refusal = workerRefusal(
+      'BAD_REQUEST',
+      400,
+      'Selected model is not available for this cloud agent session'
+    );
+    mockPrepareSession.mockRejectedValueOnce(refusal);
+    const caller = createCaller({ user: { id: userId, is_admin: false } as User });
+
+    await expect(caller.prepareSession(prepareInput)).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+      message: 'Selected model is not available for this cloud agent session',
+    });
+
+    expect(mockReleaseRefusedSend).toHaveBeenCalledWith({
+      attachments,
+      error: refusal,
+      kiloUserId: userId,
+      linkedObjectKeys: [objectKey],
+    });
+    expect(await readStatus()).toBe('pending');
+  });
+
+  it('keeps the attachment rows linked for an accepted prepare', async () => {
+    const caller = createCaller({ user: { id: userId, is_admin: false } as User });
+
+    await expect(caller.prepareSession(prepareInput)).resolves.toMatchObject({
+      cloudAgentSessionId: 'agent_123',
+    });
+
+    expect(mockPrepareSession).toHaveBeenCalledWith(expect.objectContaining({ attachments }));
+    expect(mockReleaseRefusedSend).not.toHaveBeenCalled();
+    expect(await readStatus()).toBe('linked');
+  });
+
+  it('keeps the attachment rows linked when the prepare outcome is unknown', async () => {
+    mockPrepareSession.mockRejectedValueOnce(new TRPCClientError('worker unavailable'));
+    const caller = createCaller({ user: { id: userId, is_admin: false } as User });
+
+    await expect(caller.prepareSession(prepareInput)).rejects.toThrow('worker unavailable');
+
+    expect(await readStatus()).toBe('linked');
   });
 });
 

@@ -529,6 +529,37 @@
     ],
     "searchBlob": "agentProfiles.clearDefault Clear the default status from an agent profile. agentprofiles cleardefault profileid organizationid profileId organizationId"
   },
+  "agentProfiles.commands": {
+    "path": "agentProfiles.commands",
+    "kind": "query",
+    "summary": "List one environment profile's setup commands in their stored order. Pass profileId and, for an organization-owned profile, organizationId.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "profileId"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "commands",
+      "profileid",
+      "organizationid"
+    ],
+    "searchBlob": "agentProfiles.commands List one environment profile's setup commands in their stored order. Pass profileId and, for an organization-owned profile, organizationId. agentprofiles commands profileid organizationid profileId organizationId"
+  },
   "agentProfiles.create": {
     "path": "agentProfiles.create",
     "kind": "mutation",
@@ -1931,6 +1962,37 @@
     ],
     "searchBlob": "agentProfiles.get Fetch a single agent profile's full details by ID, scoped to the current user or an organization. agentprofiles get profileid organizationid profileId organizationId"
   },
+  "agentProfiles.kiloCommands": {
+    "path": "agentProfiles.kiloCommands",
+    "kind": "query",
+    "summary": "List one environment profile's custom slash commands in display order. Pass profileId and, for an organization-owned profile, organizationId.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "profileId"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "kilocommands",
+      "profileid",
+      "organizationid"
+    ],
+    "searchBlob": "agentProfiles.kiloCommands List one environment profile's custom slash commands in display order. Pass profileId and, for an organization-owned profile, organizationId. agentprofiles kilocommands profileid organizationid profileId organizationId"
+  },
   "agentProfiles.list": {
     "path": "agentProfiles.list",
     "kind": "query",
@@ -1999,6 +2061,37 @@
       "organizationid"
     ],
     "searchBlob": "agentProfiles.listRepoBindings List repository bindings that associate repos with agent profiles for the current user or an organization. agentprofiles listrepobindings organizationid organizationId"
+  },
+  "agentProfiles.mcpServers": {
+    "path": "agentProfiles.mcpServers",
+    "kind": "query",
+    "summary": "List one environment profile's MCP servers, with secret environment and header values masked. Pass profileId and, for an organization-owned profile, organizationId.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "profileId"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "mcpservers",
+      "profileid",
+      "organizationid"
+    ],
+    "searchBlob": "agentProfiles.mcpServers List one environment profile's MCP servers, with secret environment and header values masked. Pass profileId and, for an organization-owned profile, organizationId. agentprofiles mcpservers profileid organizationid profileId organizationId"
   },
   "agentProfiles.overview": {
     "path": "agentProfiles.overview",
@@ -2402,6 +2495,37 @@
       "issecret"
     ],
     "searchBlob": "agentProfiles.setVar Set or update an environment variable on an agent profile. Mark a value as secret to have it stored encrypted. agentprofiles setvar profileid organizationid key value issecret profileId organizationId key value isSecret"
+  },
+  "agentProfiles.skills": {
+    "path": "agentProfiles.skills",
+    "kind": "query",
+    "summary": "List one environment profile's skills, including each skill's markdown and companion files. Pass profileId and, for an organization-owned profile, organizationId.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "profileId"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "skills",
+      "profileid",
+      "organizationid"
+    ],
+    "searchBlob": "agentProfiles.skills List one environment profile's skills, including each skill's markdown and companion files. Pass profileId and, for an organization-owned profile, organizationId. agentprofiles skills profileid organizationid profileId organizationId"
   },
   "agentProfiles.unbindRepo": {
     "path": "agentProfiles.unbindRepo",
@@ -3564,6 +3688,37 @@
       "enabled"
     ],
     "searchBlob": "agentProfiles.updateSkill Edit an existing skill on an agent profile, including its name, description, markdown, or files. agentprofiles updateskill profileid organizationid skillid name description rawmarkdown files enabled profileId organizationId skillId name description rawMarkdown files enabled"
+  },
+  "agentProfiles.vars": {
+    "path": "agentProfiles.vars",
+    "kind": "query",
+    "summary": "List one environment profile's environment variables, with secret values masked. Pass profileId and, for an organization-owned profile, organizationId.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "profileId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "profileId"
+      ]
+    },
+    "tags": [
+      "agentprofiles",
+      "vars",
+      "profileid",
+      "organizationid"
+    ],
+    "searchBlob": "agentProfiles.vars List one environment profile's environment variables, with secret values masked. Pass profileId and, for an organization-owned profile, organizationId. agentprofiles vars profileid organizationid profileId organizationId"
   },
   "appReportedMessages.createReport": {
     "path": "appReportedMessages.createReport",

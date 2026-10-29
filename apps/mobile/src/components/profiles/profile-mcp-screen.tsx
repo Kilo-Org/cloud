@@ -21,7 +21,7 @@ import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import {
   type AgentProfileDetail,
-  useAgentProfile,
+  useAgentProfileMcpServers,
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
@@ -144,12 +144,12 @@ export function ProfileMcpScreen({
 }: Readonly<{ profileId: string; organizationId?: string }>) {
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
-  const profileQuery = useAgentProfile(profileId, organizationId);
+  const profileQuery = useAgentProfileMcpServers(profileId, organizationId);
   const { createMcp, updateMcp, deleteMcp, setMcpEnabled } =
     useAgentProfileSectionMutations(organizationId);
   const canManage = useCanManageOrganizationProfiles(organizationId);
 
-  const servers = profileQuery.data?.mcpServers ?? NO_MCP_SERVERS;
+  const servers = profileQuery.data ?? NO_MCP_SERVERS;
   const rows = mcpServerRows(servers);
   // `null` = closed, `{ server: null }` = add, `{ server }` = edit that server.
   const [form, setForm] = useState<{ server: McpServerSource | null } | null>(null);

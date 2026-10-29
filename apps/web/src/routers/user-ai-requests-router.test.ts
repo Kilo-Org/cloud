@@ -90,6 +90,24 @@ describe('buildAiRequestsQuery', () => {
       CTX_USER,
       ListAiRequestsInputSchema.parse(range)
     );
+    const selectList = statement.slice('SELECT '.length, statement.indexOf('\nFROM'));
+    expect(selectList).toBe(
+      [
+        'ID',
+        `TO_VARCHAR(CREATED_AT, 'YYYY-MM-DD"T"HH24:MI:SS.FF6"Z"')`,
+        'MODEL',
+        'REQUESTED_MODEL',
+        'COALESCE(INFERENCE_PROVIDER, PROVIDER)',
+        'FEATURE',
+        'INPUT_TOKENS',
+        'OUTPUT_TOKENS',
+        'CACHE_WRITE_TOKENS',
+        'CACHE_HIT_TOKENS',
+        'COST',
+        'IS_USER_BYOK',
+        'HAS_ERROR',
+      ].join(', ')
+    );
     for (const column of ['PROMPT', 'HTTP_IP', 'SESSION_ID', 'MACHINE_ID', 'COUNTRY']) {
       expect(statement).not.toContain(column);
     }

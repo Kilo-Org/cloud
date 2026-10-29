@@ -283,7 +283,7 @@ export function AiRequestsClient() {
         <CardContent className="p-0">
           {query.isPending ? (
             <LoadingRows />
-          ) : query.isError && !query.isFetchNextPageError ? (
+          ) : !query.data ? (
             <div
               role="alert"
               className="flex min-h-48 flex-col items-center justify-center gap-3 p-6 text-center"
@@ -322,6 +322,11 @@ export function AiRequestsClient() {
             {query.isFetchingNextPage ? 'Loading…' : 'Load more'}
           </Button>
         </div>
+      )}
+      {query.isError && query.data && !query.isFetchNextPageError && (
+        <p role="alert" className="text-muted-foreground text-center text-sm">
+          Requests could not be refreshed. Showing the last loaded results.
+        </p>
       )}
       {query.isFetchNextPageError && (
         <p role="alert" className="text-muted-foreground text-center text-sm">

@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { toast } from 'sonner-native';
 
@@ -15,6 +15,16 @@ import { trpcClient } from '@/lib/trpc';
 import { readTrpcErrorField } from '@/lib/trpc-error';
 
 import { isPersonal } from './use-code-reviewer';
+
+/**
+ * The longest the control draws its own busy state. The install state is one
+ * request and the launch is local, so this bounds only a platform that drops the
+ * browser's report after the page opened: the wait keeps running and still
+ * resyncs on its own return edge, but the control must not stay disabled on
+ * the user's screen, which would be the inert-control symptom this action is
+ * fixing, made permanent.
+ */
+const HANDOFF_WATCHDOG_MS = 20_000;
 
 /**
  * The picker's Manage access control: the tap handler plus the busy state the
@@ -64,7 +74,21 @@ export function useManageRepositoryAccess(
   const orgScope = isPersonal(scope) ? undefined : scope;
   const [pending, setPending] = useState(false);
   const inFlight = useRef(false);
+  const watchdog = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Identifies the attempt that owns the busy state: the watchdog lets the
+  // control go while a wait is still running, so a slow attempt must not clear
+  // the state of a newer one when it finally settles.
+  const attempt = useRef(0);
   const { onOpen, onReturn } = handlers;
+
+  useEffect(
+    () => () => {
+      if (watchdog.current) {
+        clearTimeout(watchdog.current);
+      }
+    },
+    []
+  );
 
   const open = useCallback(async () => {
     const label = t('codeReviewer.repos.repositoryAccess');
@@ -122,12 +146,25 @@ export function useManageRepositoryAccess(
     inFlight.current = true;
     setPending(true);
     onOpen?.();
+    attempt.current += 1;
+    const id = attempt.current;
+    const release = () => {
+      if (attempt.current !== id) {
+        return;
+      }
+      if (watchdog.current) {
+        clearTimeout(watchdog.current);
+        watchdog.current = null;
+      }
+      inFlight.current = false;
+      setPending(false);
+    };
+    watchdog.current = setTimeout(release, HANDOFF_WATCHDOG_MS);
     void (async () => {
       try {
         await open();
       } finally {
-        inFlight.current = false;
-        setPending(false);
+        release();
         onReturn?.();
       }
     })();

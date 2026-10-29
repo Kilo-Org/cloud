@@ -179,6 +179,79 @@ describe('useManageRepositoryAccess', () => {
     });
   });
 
+  it('returns to idle when the browser report never arrives', async () => {
+    vi.useFakeTimers();
+    try {
+      const pendingLaunch = Promise.withResolvers<unknown>();
+      mocks.launch.mockReturnValue(pendingLaunch.promise);
+      const resultRef = mountHook('personal', 'github');
+
+      await act(async () => {
+        requireHook(resultRef).handlePress();
+        await Promise.resolve();
+      });
+      expect(requireHook(resultRef).pending).toBe(true);
+
+      // A platform that drops the browser's report cannot leave the control
+      // disabled on the user's screen.
+      await act(() => {
+        vi.advanceTimersByTime(20_000);
+      });
+      expect(requireHook(resultRef).pending).toBe(false);
+      expect(mocks.toastError).not.toHaveBeenCalled();
+
+      // And it is genuinely usable again, not just painted that way.
+      await act(async () => {
+        requireHook(resultRef).handlePress();
+        await Promise.resolve();
+      });
+      expect(mocks.mintInstallState).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('keeps a newer attempt busy when an older one settles', async () => {
+    vi.useFakeTimers();
+    try {
+      const firstLaunch = Promise.withResolvers<unknown>();
+      const secondLaunch = Promise.withResolvers<unknown>();
+      mocks.launch
+        .mockReturnValueOnce(firstLaunch.promise)
+        .mockReturnValueOnce(secondLaunch.promise);
+      const resultRef = mountHook('personal', 'github');
+
+      await act(async () => {
+        requireHook(resultRef).handlePress();
+        await Promise.resolve();
+      });
+      await act(() => {
+        vi.advanceTimersByTime(20_000);
+      });
+      expect(requireHook(resultRef).pending).toBe(false);
+
+      // The control is offered again while the first wait is still open.
+      await act(async () => {
+        requireHook(resultRef).handlePress();
+        await Promise.resolve();
+      });
+      expect(requireHook(resultRef).pending).toBe(true);
+
+      // The superseded attempt settling must not clear the new one's state.
+      await act(async () => {
+        firstLaunch.resolve({
+          reported: Promise.resolve({ type: 'dismiss' }),
+          settledByLaunch: true,
+        });
+        await Promise.resolve();
+        await Promise.resolve();
+      });
+      expect(requireHook(resultRef).pending).toBe(true);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it('starts no second launch from a repeated tap while a launch is pending', async () => {
     const pendingLaunch = Promise.withResolvers<unknown>();
     mocks.launch.mockReturnValue(pendingLaunch.promise);

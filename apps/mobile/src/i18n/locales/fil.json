@@ -3912,7 +3912,7 @@
       "saveFailed": "Hindi ma-save ang ahente",
       "deleteFailed": "Hindi ma-delete ang ahente",
       "nameRequired": "Maglagay ng pangalan ng ahente",
-      "slugRequired": "Maglagay ng agent slug",
+      "slugRequired": "Maglagay ng slug ng ahente",
       "slugInvalid": "Ang slug ay dapat magsimula sa isang maliliit na ASCII na titik at gumamit lamang ng maliliit na ASCII na titik, digit, at gitling, hanggang 50 na character",
       "slugConflict": "Ginagamit na ng isang built-in na agent o iba pang agent sa profile na ito ang slug na iyon",
       "edit": "I-edit ang ahente {{name}}",

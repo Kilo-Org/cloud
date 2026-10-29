@@ -3856,7 +3856,7 @@
       "remoteType": "Fagoo",
       "command": "Sarara ajajaa",
       "url": "URL",
-      "environment": "Naannoo (JSON) .",
+      "environment": "Naannoo (JSON)",
       "headers": "Mata dureewwan (JSON) .",
       "timeout": "Yeroon xumuraa",
       "secretCount_one": "{{count}} icciti",

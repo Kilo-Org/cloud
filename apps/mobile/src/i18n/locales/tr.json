@@ -1195,7 +1195,7 @@
       "eventsCount_other": "{{displayCount}} olay",
       "generated": "Raporun oluşturulma zamanı: {{generatedAt}}.",
       "noActivity": "Kayıtlı etkinlik yok",
-      "noActivityDescription": "Kilo'da bu dönemde raporlanabilecek güvenlik bulgularıyla ilgili bir etkinlik yok.",
+      "noActivityDescription": "Kilo'da bu dönemde raporlanabilecek bir güvenlik bulgusu etkinliği yok.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "Rapor sorgusu tamamlanmadı. Tekrar dene.",
       "repositoryNotRecorded": "Depo kaydedilmedi",

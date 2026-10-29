@@ -4,6 +4,7 @@ import { Pressable, View } from 'react-native';
 
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { tabEntryA11y } from '@/lib/a11y/tab-entry';
 import { formatNumber } from '@/lib/format';
 import { cn } from '@/lib/utils';
 
@@ -56,8 +57,7 @@ export function PrReviewTabSelector({
         return (
           <Pressable
             key={tab.id}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: active, disabled }}
+            {...tabEntryA11y({ selected: active, disabled })}
             disabled={disabled}
             onPress={() => {
               if (active) {

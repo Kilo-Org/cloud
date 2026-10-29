@@ -32,30 +32,14 @@ vi.mock('@/lib/utils', () => ({
   cn: (...classes: (string | undefined)[]) => classes.filter(Boolean).join(' '),
 }));
 
-type Coverage = Parameters<typeof BriefingScorecard>[0]['report']['coverage'];
 type Scorecard = Parameters<typeof BriefingScorecard>[0]['report']['scorecard'];
 
-const complete: Coverage = {
-  activity: 'complete',
-  spend: 'complete',
-  blockers: 'complete',
-  pullRequests: 'complete',
-};
-const partial: Coverage = {
-  activity: 'partial',
-  spend: 'unavailable',
-  blockers: 'partial',
-  pullRequests: 'partial',
-};
-
-function renderScorecard(scorecard: Scorecard, coverage: Coverage): ReactTestRenderer {
+function renderScorecard(scorecard: Scorecard): ReactTestRenderer {
   const ref: { current: ReactTestRenderer | undefined } = { current: undefined };
   act(() => {
     ref.current = TestRenderer.create(
       <BriefingScorecard
-        report={
-          { scorecard, coverage } as unknown as Parameters<typeof BriefingScorecard>[0]['report']
-        }
+        report={{ scorecard } as unknown as Parameters<typeof BriefingScorecard>[0]['report']}
       />
     );
   });
@@ -76,43 +60,21 @@ function renderedScorecard(renderer: ReactTestRenderer): { values: string[]; lab
 }
 
 describe('BriefingScorecard', () => {
-  it('shows proven zeros for a collected quiet night', () => {
+  it('shows the selected snapshot counts, including zero', () => {
     const rendered = renderedScorecard(
-      renderScorecard({ sessions: 0, pullRequests: 0, blockers: 0, spendMicrodollars: 0 }, complete)
+      renderScorecard({ sessions: 0, pullRequests: 0, blockers: 0 })
     );
-    expect(rendered.values).toEqual(['0', '0', '0', '$0.00']);
+    expect(rendered.values).toEqual(['0', '0', '0']);
     expect(rendered.labels).toEqual([
-      'agentBriefing.sessions',
-      'agentBriefing.pullRequests',
-      'agentBriefing.blockers',
-      'agentBriefing.spend',
+      'agentBriefing.selectedSessions',
+      'agentBriefing.snapshotPullRequests',
+      'agentBriefing.snapshotBlockers',
     ]);
   });
 
-  it('keeps unknown for values the evidence cannot prove', () => {
+  it('renders selected counts without historical-total or spend claims', () => {
     expect(
-      renderedScorecard(
-        renderScorecard(
-          { sessions: 0, pullRequests: 0, blockers: 0, spendMicrodollars: 0 },
-          partial
-        )
-      ).values
-    ).toEqual(['common.unknown', 'common.unknown', 'common.unknown', 'common.unknown']);
-  });
-
-  it('marks a positive count as a lower bound while coverage is partial', () => {
-    expect(
-      renderedScorecard(
-        renderScorecard(
-          { sessions: 3, pullRequests: 1, blockers: 0, spendMicrodollars: 0 },
-          partial
-        )
-      ).values
-    ).toEqual([
-      'agentBriefing.atLeast:3',
-      'agentBriefing.atLeast:1',
-      'common.unknown',
-      'common.unknown',
-    ]);
+      renderedScorecard(renderScorecard({ sessions: 3, pullRequests: 1, blockers: 0 })).values
+    ).toEqual(['3', '1', '0']);
   });
 });

@@ -54,7 +54,10 @@ vi.mock('@/lib/a11y/motion', () => ({
   selectReducedMotionEntrance: <T,>(reducedMotion: boolean, entrance: T) =>
     reducedMotion ? undefined : entrance,
 }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+  useFocusEffect: () => undefined,
+}));
 vi.mock('expo-haptics', () => ({ selectionAsync: vi.fn() }));
 vi.mock('@/components/agents/model-selector', () => ({ openModelPicker: vi.fn() }));
 vi.mock('@/components/code-reviewer/bitbucket-connect-form', () => ({

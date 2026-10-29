@@ -56,6 +56,10 @@ vi.mock('@/lib/hooks/use-repo-bindings', () => ({
   useRepoBindingMutations: () => h.mutations,
   useRepoOptions: () => h.repoOptions,
 }));
+vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn<(href: string) => void>() }) }));
+vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
+  useOrganizationProfilePermission: () => 'allowed',
+}));
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileList: () => h.profileList,
 }));
@@ -95,6 +99,7 @@ vi.mock('@/components/ui/icons', () => ({
   Lock: 'Lock',
   Search: 'Search',
   SearchX: 'SearchX',
+  SlidersHorizontal: 'SlidersHorizontal',
   Trash2: 'Trash2',
   Unlock: 'Unlock',
 }));

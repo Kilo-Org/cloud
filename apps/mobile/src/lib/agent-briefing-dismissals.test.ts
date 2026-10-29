@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { BRIEFING_DISMISSALS_KEY, readBriefingDismissals } from './agent-briefing-dismissals';
+import { readCacheScope } from '@/lib/persist/cache-scope';
 
 const auth = vi.hoisted(() => ({ epoch: 1, signingOut: false }));
 const storage = vi.hoisted(() => ({
@@ -11,9 +12,6 @@ vi.mock('@/lib/auth/auth-epoch', () => ({
 }));
 vi.mock('@/lib/auth/sign-out-state', () => ({ isSignOutActive: () => auth.signingOut }));
 vi.mock('@/lib/persist/encrypted-kv', () => storage);
-vi.mock('@/lib/persist/read-cache', () => ({
-  readCacheScope: (userId: string) => `cache:${userId}:1`,
-}));
 
 const dismissal = {
   reportId: 'report-1',
@@ -34,7 +32,7 @@ describe('briefing dismissal read boundary', () => {
 
   it('reads validated dismissals from the current account encrypted scope', async () => {
     await expect(readBriefingDismissals('user-1', 1)).resolves.toEqual([dismissal]);
-    expect(storage.getItem).toHaveBeenCalledWith('cache:user-1:1', BRIEFING_DISMISSALS_KEY);
+    expect(storage.getItem).toHaveBeenCalledWith(readCacheScope('user-1'), BRIEFING_DISMISSALS_KEY);
   });
 
   it('refuses disk reads after sign-out starts or an account epoch changes', async () => {
@@ -67,7 +65,10 @@ describe('briefing dismissal read boundary', () => {
   it('drops malformed or expired persisted records', async () => {
     storage.getItem.mockResolvedValueOnce('{');
     await expect(readBriefingDismissals('user-1', 1)).resolves.toEqual([]);
-    expect(storage.removeItem).toHaveBeenCalledWith('cache:user-1:1', BRIEFING_DISMISSALS_KEY);
+    expect(storage.removeItem).toHaveBeenCalledWith(
+      readCacheScope('user-1'),
+      BRIEFING_DISMISSALS_KEY
+    );
     storage.getItem.mockResolvedValueOnce(
       JSON.stringify([{ ...dismissal, expiresAt: '2000-01-01T00:00:00.000Z' }])
     );

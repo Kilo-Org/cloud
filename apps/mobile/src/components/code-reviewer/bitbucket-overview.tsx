@@ -11,6 +11,7 @@ import {
   buildOverviewRows,
   resolveRowOnPress,
 } from '@/components/code-reviewer/platform-overview-rows';
+import { useSinglePushRoute } from '@/components/code-reviewer/use-single-push-route';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';
@@ -50,6 +51,7 @@ export function BitbucketOverview({
   permissionLoading: boolean;
 }>) {
   const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const readiness = useBitbucketReadiness(scope);
   const save = useSaveReviewConfig(scope, 'bitbucket');
@@ -120,7 +122,7 @@ export function BitbucketOverview({
   }
 
   const pushField = (field: string) => {
-    router.push(`/(app)/code-reviewer/${scope}/bitbucket/${field}` as Href);
+    pushOnce(`/(app)/code-reviewer/${scope}/bitbucket/${field}` as Href);
   };
 
   const data = config.data;

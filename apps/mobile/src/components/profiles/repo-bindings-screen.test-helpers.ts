@@ -86,7 +86,7 @@ export async function changeSearch(root: ReactTestInstance, value: string): Prom
 
 // eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
 export function mountScreen(organizationId?: string) {
-  return renderWithProviders(createElement(RepoBindingsScreen, { organizationId }));
+  return renderWithProviders(createElement(RepoBindingsScreen, { organizationId, stack: 'app' }));
 }
 
 /** Re-render the mounted screen against fresh mock data, keeping the providers. */
@@ -99,7 +99,7 @@ export function rerenderScreen(
     createElement(
       QueryClientProvider,
       { client: queryClient },
-      createElement(RepoBindingsScreen, { organizationId })
+      createElement(RepoBindingsScreen, { organizationId, stack: 'app' })
     )
   );
 }

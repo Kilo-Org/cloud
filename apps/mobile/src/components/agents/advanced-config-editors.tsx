@@ -4,6 +4,7 @@ import { Pressable, View } from 'react-native';
 
 import {
   addCommand,
+  commandPosition,
   commandRowA11yLabel,
   MAX_SETUP_COMMAND_LENGTH,
   MAX_SETUP_COMMANDS,
@@ -153,6 +154,16 @@ export function ManualSetupCommandsEditor({
       {commands.map((command, index) => {
         const isFirst = index === 0;
         const isLast = index === commands.length - 1;
+        const position = commandPosition(commands, index);
+        const rowHint = commandRowA11yLabel(index, commands.length);
+        // A blank draft row is not a command, so it keeps the plain labels
+        // rather than claiming a number the saved list does not hold.
+        const upLabel =
+          position === null ? t('profiles.moveUp') : t('profiles.moveCommandUp', { position });
+        const downLabel =
+          position === null ? t('profiles.moveDown') : t('profiles.moveCommandDown', { position });
+        const deleteLabel =
+          position === null ? t('common.delete') : t('profiles.deleteCommand', { position });
         return (
           <View key={`${generation}-${index}`} className="gap-3 rounded-lg bg-secondary p-3">
             <FormField
@@ -165,7 +176,7 @@ export function ManualSetupCommandsEditor({
               autoCapitalize="none"
               autoCorrect={false}
               returnKeyType="done"
-              accessibilityHint={commandRowA11yLabel(index, commands.length)}
+              accessibilityHint={rowHint}
               onChangeText={value => {
                 onChange(replaceCommand(commands, index, value));
               }}
@@ -175,7 +186,8 @@ export function ManualSetupCommandsEditor({
                 className={controlClass(isFirst)}
                 disabled={isFirst}
                 accessibilityRole="button"
-                accessibilityLabel={t('profiles.moveUp')}
+                accessibilityLabel={upLabel}
+                accessibilityHint={rowHint}
                 onPress={() => {
                   onChange(moveCommand(commands, index, -1));
                   setGeneration(current => current + 1);
@@ -187,7 +199,8 @@ export function ManualSetupCommandsEditor({
                 className={controlClass(isLast)}
                 disabled={isLast}
                 accessibilityRole="button"
-                accessibilityLabel={t('profiles.moveDown')}
+                accessibilityLabel={downLabel}
+                accessibilityHint={rowHint}
                 onPress={() => {
                   onChange(moveCommand(commands, index, 1));
                   setGeneration(current => current + 1);
@@ -198,7 +211,8 @@ export function ManualSetupCommandsEditor({
               <Pressable
                 className={cn(ICON_TARGET_BOX_CLASS, 'active:opacity-70')}
                 accessibilityRole="button"
-                accessibilityLabel={t('common.delete')}
+                accessibilityLabel={deleteLabel}
+                accessibilityHint={rowHint}
                 onPress={() => {
                   onChange(removeCommand(commands, index));
                   setGeneration(current => current + 1);

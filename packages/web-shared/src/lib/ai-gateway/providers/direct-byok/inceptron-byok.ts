@@ -8,7 +8,7 @@ import {
 export default {
   id: 'inceptron-byok',
   models_dev_id: 'inceptron',
-  resolveUpstream: apiKeyUpstream({
+  ...apiKeyUpstream({
     apiUrl: 'https://api.inceptron.io/v1',
     supportedChatApis: ['chat_completions'],
     responseTransforms: ReasoningDetailsTransform.ReasoningContent,

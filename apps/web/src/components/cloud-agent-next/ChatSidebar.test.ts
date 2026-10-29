@@ -403,7 +403,7 @@ describe('ChatSidebar row rendering', () => {
     ['failed', 'Last run failed'],
     ['system_interrupted', 'Last run stopped unexpectedly'],
   ] as const)(
-    'renders a hidden %s sibling on its worktree during search',
+    'shows a %s warning during search only when the latest sibling has issues',
     (latestRunFailureKind, label) => {
       const visible = makeSession(0, { worktreeId: 'worktree_shared', sessionStatus: 'idle' });
       const hidden = makeSession(1, {
@@ -414,7 +414,6 @@ describe('ChatSidebar row rendering', () => {
       const props = {
         sessions: [visible],
         searchQuery: visible.prompt,
-        activeSessions: [activeSession(hidden)],
         worktreeDetails: {
           worktree_shared: {
             name: 'Shared worktree',
@@ -427,21 +426,42 @@ describe('ChatSidebar row rendering', () => {
       renderSidebar(props);
 
       const row = dom.container.querySelector('[data-worktree-id="worktree_shared"]');
-      expect(row?.querySelector(`[role="img"][aria-label="${label}"]`)).not.toBeNull();
-      expect(row?.querySelector('[data-time-ago]')).toBeNull();
+      expect(row).not.toBeNull();
+      expect(row?.querySelector(`[role="img"][aria-label="${label}"]`)).toBeNull();
+      expect(row?.querySelector('[data-time-ago]')).not.toBeNull();
       expect(row?.textContent).not.toContain(hidden.prompt);
       expect(dom.container.querySelector(`[data-session-pr="${hidden.sessionId}"]`)).toBeNull();
+
+      renderSidebar({ ...props, activeSessions: [activeSession(hidden)] });
+      expect(row?.querySelector(`[role="img"][aria-label="${label}"]`)).toBeNull();
+
+      const latest = {
+        ...hidden,
+        updatedAt: new Date(new Date(visible.updatedAt).getTime() + 1_000).toISOString(),
+      };
+      renderSidebar({
+        ...props,
+        worktreeDetails: {
+          worktree_shared: {
+            ...props.worktreeDetails.worktree_shared,
+            sessions: [visible, latest],
+          },
+        },
+      });
+      expect(row?.querySelector(`[role="img"][aria-label="${label}"]`)).not.toBeNull();
+      expect(row?.querySelector('[data-time-ago]')).toBeNull();
 
       renderSidebar({
         ...props,
         worktreeDetails: {
           worktree_shared: {
             ...props.worktreeDetails.worktree_shared,
-            sessions: [visible, { ...hidden, latestRunFailureKind: null }],
+            sessions: [visible, { ...latest, latestRunFailureKind: null }],
           },
         },
       });
       expect(dom.container.querySelector(`[aria-label="${label}"]`)).toBeNull();
+      expect(row?.querySelector('[data-time-ago]')).not.toBeNull();
     }
   );
 

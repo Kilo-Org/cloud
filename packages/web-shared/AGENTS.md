@@ -43,6 +43,13 @@ work, work after the upstream request starts, and exceptional paths may use it.
 - `readDb` falls back to the primary when `POSTGRES_REPLICA_US_URL` is unset, so
   that variable must stay set on the `kilocode-ai-gateway` Vercel project.
 
+## BYOK routing preview
+
+`previewByokRouting` in `src/lib/ai-gateway/providers/get-provider.ts` shows the BYOK settings
+page the route order of `getProvider`, from key metadata only. When changing `getProvider`'s step
+order or key decisions, update the preview in the same change and keep
+`get-provider.preview.test.ts` passing. The preview must never decrypt keys or call KMS.
+
 ## Data collection versus ZDR
 
 `provider.data_collection: 'deny'` only excludes providers that store prompts

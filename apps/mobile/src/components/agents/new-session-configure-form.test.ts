@@ -9,6 +9,7 @@ import {
   type RepositoryGroup,
 } from '@/components/agents/new-session-repository-state';
 import { type InstancePickerInstance } from '@/lib/picker-bridge';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { remoteSpawnInstanceDisconnectedNote } from '@/lib/remote-submit-outcome';
 
 import { NewSessionProfileRow } from './new-session-environment-row';
@@ -815,7 +816,7 @@ describe('NewSessionConfigureForm', () => {
   });
 
   it('renders every Environment row state inside the same card', () => {
-    const chrome = 'min-h-11 flex-row items-center gap-3 rounded-lg border border-border bg-card';
+    const chrome = `${ROW_TARGET_CLASS} flex-row items-center gap-3 rounded-lg border border-border bg-card`;
 
     for (const row of [
       renderRow({ isProfileLoading: true }),

@@ -1558,6 +1558,7 @@ describe('AgentSessionListScreen live filtering', () => {
     expect(requireNode('KeyboardAvoidingView').props.behavior).toBe('padding');
     expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
 
+    openSearch();
     act(() => {
       showKeyboard(320);
     });
@@ -1586,6 +1587,7 @@ describe('AgentSessionListScreen live filtering', () => {
     const listStyle = () => nodes('FlashList')[0]?.props.style as { marginBottom: number };
     const fabBand = state.tabBarHeight + FAB_SIZE + FAB_MARGIN;
 
+    openSearch();
     act(() => {
       showKeyboard(100);
     });
@@ -1599,6 +1601,48 @@ describe('AgentSessionListScreen live filtering', () => {
     act(() => {
       hideKeyboard();
     });
+    expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
+  });
+
+  it('ignores a keyboard another screen raised, so the rows and centered states stay put', async () => {
+    // A pushed screen's keyboard is still closing when the tab regains focus;
+    // reading it padded the body for the length of the close, and the centered
+    // empty state moved down once the keyboard finished hiding.
+    state.platform.OS = 'android';
+    state.live.activeSessions = [row];
+    await renderScreen();
+    const listStyle = () => nodes('FlashList')[0]?.props.style as { marginBottom: number };
+
+    act(() => {
+      showKeyboard(320);
+    });
+    expect(requireNode('KeyboardAvoidingView').props.enabled).toBe(false);
+    expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
+
+    act(() => {
+      hideKeyboard();
+    });
+    openSearch();
+    act(() => {
+      showKeyboard(320);
+    });
+    expect(requireNode('KeyboardAvoidingView').props.enabled).toBe(true);
+    expect(listStyle()).toEqual({ marginBottom: 0 });
+
+    // Android Back hides the IME while the field keeps focus; a tap on the
+    // field reopens it without a new focus event, and the lift must follow.
+    act(() => {
+      hideKeyboard();
+    });
+    act(() => {
+      showKeyboard(320);
+    });
+    expect(listStyle()).toEqual({ marginBottom: 0 });
+
+    act(() => {
+      (requireNode('SessionListSearchHeader').props.onBlur as () => void)();
+    });
+    expect(requireNode('KeyboardAvoidingView').props.enabled).toBe(false);
     expect(listStyle()).toEqual({ marginBottom: state.tabBarHeight });
   });
 

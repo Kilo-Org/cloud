@@ -19,6 +19,7 @@ const membership = vi.hoisted(() => ({
   organizations: [] as { organizationId: string; organizationName: string }[],
 }));
 const status = vi.hoisted(() => ({ error: undefined as unknown }));
+const router = vi.hoisted(() => ({ push: vi.fn() }));
 
 const denial = { data: { code: 'UNAUTHORIZED', httpStatus: 401 } };
 
@@ -48,7 +49,10 @@ vi.mock('@tanstack/react-query', () => ({
   }),
 }));
 
-vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn(), replace: vi.fn() }) }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ push: router.push, replace: vi.fn() }),
+  useFocusEffect: () => undefined,
+}));
 
 vi.mock('@/lib/trpc', () => ({
   useTRPC: () => ({
@@ -71,8 +75,8 @@ vi.mock('@/components/screen-header', () => ({
 }));
 
 vi.mock('@/components/ui/configure-row', () => ({
-  ConfigureRow: (props: { title?: string }) =>
-    createElement('ConfigureRowMock', { title: props.title }),
+  ConfigureRow: (props: { title?: string; onPress?: () => void }) =>
+    createElement('ConfigureRowMock', { title: props.title, onPress: props.onPress }),
 }));
 
 vi.mock('@/components/ui/text', () => ({
@@ -108,6 +112,7 @@ function findByType(root: TestRenderer.ReactTestInstance, type: string) {
 
 beforeEach(() => {
   status.error = undefined;
+  router.push.mockClear();
   membership.organizations = [{ organizationId: 'org-lost', organizationName: 'Drain Labs' }];
   for (const refetch of Object.values(refetchMocks)) {
     refetch.mockReset();
@@ -171,6 +176,52 @@ describe('PlatformListScreen organization access', () => {
 
     expect(findByType(renderer.root, 'ScopeAccessDeniedScreenMock')).toHaveLength(0);
     expect(findByType(renderer.root, 'ConfigureRowMock').length).toBeGreaterThan(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+});
+
+describe('PlatformListScreen double tap', () => {
+  it('opens the platform overview once when its row is double tapped', () => {
+    const renderer = mountScreen();
+    const row = findByType(renderer.root, 'ConfigureRowMock').find(
+      candidate => candidate.props.title === 'GitHub'
+    );
+    if (!row) {
+      throw new Error('the GitHub row did not render');
+    }
+
+    act(() => {
+      (row.props.onPress as () => void)();
+      (row.props.onPress as () => void)();
+    });
+
+    expect(router.push).toHaveBeenCalledTimes(1);
+    expect(router.push).toHaveBeenCalledWith('/(app)/code-reviewer/org-lost/github');
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('opens the review list once when its row is double tapped', () => {
+    const renderer = mountScreen();
+    const row = findByType(renderer.root, 'ConfigureRowMock').find(
+      candidate => candidate.props.title === 'Recent reviews'
+    );
+    if (!row) {
+      throw new Error('the reviews row did not render');
+    }
+
+    act(() => {
+      (row.props.onPress as () => void)();
+      (row.props.onPress as () => void)();
+    });
+
+    expect(router.push).toHaveBeenCalledTimes(1);
+    expect(router.push).toHaveBeenCalledWith('/(app)/code-reviewer/org-lost/reviews');
 
     act(() => {
       renderer.unmount();

@@ -140,6 +140,25 @@ describe('submitManualSecuritySync', () => {
     expect((captured as TRPCError).message).not.toContain('test-internal-secret');
   });
 
+  it('classifies a refused connection as a definitive pre-acceptance rejection', async () => {
+    mockFetch.mockRejectedValue(
+      new TypeError('fetch failed', {
+        cause: Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' }),
+      })
+    );
+
+    await expect(
+      submitManualSecuritySync({
+        owner: { organizationId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa' },
+        actor: { id: 'user-123' },
+      })
+    ).rejects.toMatchObject({
+      name: 'TRPCError',
+      code: 'PRECONDITION_FAILED',
+      message: 'Security service is unavailable',
+    });
+  });
+
   it('throws a TRPCError when the response body is not valid JSON (e.g. gateway HTML)', async () => {
     mockFetch.mockResolvedValue({
       ok: false,

@@ -31,3 +31,14 @@ export function hasVisibleComposerText(value: string): boolean {
   }
   return false;
 }
+
+/**
+ * The prompt a composer draft stands for: its text without the surrounding
+ * whitespace, or the empty string when the draft holds nothing a reader can
+ * see. The send path admits on this and the clear-after-send guard compares
+ * with it, so a draft of invisible characters is the same empty prompt in both
+ * places instead of a value that can never match what was sent.
+ */
+export function composerPromptText(value: string): string {
+  return hasVisibleComposerText(value) ? value.trim() : '';
+}

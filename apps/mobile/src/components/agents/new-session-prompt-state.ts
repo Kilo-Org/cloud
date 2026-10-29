@@ -1,4 +1,4 @@
-import { hasVisibleComposerText } from '@/lib/composer-text';
+import { composerPromptText, hasVisibleComposerText } from '@/lib/composer-text';
 
 type NewSessionPromptControlInput = {
   attachmentsCount: number;
@@ -41,8 +41,8 @@ type NewSessionPromptControlState = {
  * draft and screen state.
  */
 export function resolveNewSessionPromptForCreate(rawPrompt: string): string | null {
-  const trimmed = rawPrompt.trim();
-  return hasVisibleComposerText(rawPrompt) ? trimmed : null;
+  const prompt = composerPromptText(rawPrompt);
+  return prompt === '' ? null : prompt;
 }
 
 /**

@@ -106,7 +106,7 @@ import {
 import { type LocalImage } from '@/lib/agent-attachments/local-image';
 import { describeClassificationFailure } from '@/lib/agent-attachments/validate';
 import { useAndroidPendingPickerRecovery } from '@/lib/agent-attachments/use-android-pending-picker-recovery';
-import { hasVisibleComposerText } from '@/lib/composer-text';
+import { composerPromptText, hasVisibleComposerText } from '@/lib/composer-text';
 import {
   clipboardPasteEmptyMessage,
   useClipboardPaste,
@@ -1024,7 +1024,7 @@ export function ChatComposer({
     // Trim alone keeps zero-width and control characters, which draw nothing:
     // a draft of them must send exactly what an empty one sends, so the prompt
     // below is empty even though the input still holds them.
-    const trimmed = hasVisibleComposerText(textRef.current) ? textRef.current.trim() : '';
+    const trimmed = composerPromptText(textRef.current);
     // Decide admission from live values, not render-time `control.canSend`,
     // which can lag behind a same-frame edit. An empty prompt with no sendable
     // attachment is never sent. "Sendable" counts non-terminal chips: upload is
@@ -1139,7 +1139,7 @@ export function ChatComposer({
                   // keyboard is left exactly where the person had it — dismissing
                   // it here took the focused input away on every send (video V1
                   // ~4.4s and ~18.9s).
-                  if (textRef.current.trim() === trimmed) {
+                  if (composerPromptText(textRef.current) === trimmed) {
                     clearDraft();
                   }
                   upload.clearOptimistic();

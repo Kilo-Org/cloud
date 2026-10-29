@@ -9,6 +9,7 @@
 import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 
 import { i18n } from '@/i18n';
+import { hasVisibleComposerText } from '@/lib/composer-text';
 
 import {
   type AppActionResult,
@@ -78,8 +79,11 @@ export function preflightStartAgent(input: {
   repository?: string | undefined;
 }): StartAgentPreflight {
   // A session start continues the session it names; only one that names neither
-  // has nothing to run.
-  if (nonBlank(input.prompt) === null && nonBlank(input.sessionId) === null) {
+  // has nothing to run. A prompt of only invisible characters is no prompt: the
+  // URL form and the JSON payload both reach this classification, so both
+  // report the same `empty-prompt` refusal instead of starting a billed session
+  // on a blank message.
+  if (!hasVisibleComposerText(input.prompt) && nonBlank(input.sessionId) === null) {
     return {
       ok: false,
       result: startAgentFailure('empty-prompt', i18n.t('appActions.start.promptRequired')),

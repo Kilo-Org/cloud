@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { hasVisibleComposerText } from './composer-text';
+import { composerPromptText, hasVisibleComposerText } from './composer-text';
 
 describe('hasVisibleComposerText', () => {
   it.each([
@@ -44,4 +44,21 @@ describe('hasVisibleComposerText', () => {
   ])('treats %s as text', (_case, value) => {
     expect(hasVisibleComposerText(value)).toBe(true);
   });
+});
+
+describe('composerPromptText', () => {
+  it('sends the trimmed visible text', () => {
+    expect(composerPromptText('  fix the build \n')).toBe('fix the build');
+  });
+
+  it('keeps invisible characters inside a message that also has visible text', () => {
+    expect(composerPromptText(' fix\u200B this ')).toBe('fix\u200B this');
+  });
+
+  it.each(['', '   ', '\u200B\u200B', '\u00A0\u0301'])(
+    'normalizes a draft that draws nothing (%j) to the empty prompt',
+    value => {
+      expect(composerPromptText(value)).toBe('');
+    }
+  );
 });

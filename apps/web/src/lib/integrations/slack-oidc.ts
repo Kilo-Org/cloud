@@ -56,8 +56,22 @@ const userInfoResponseSchema = z.object({
   [USER_ID_CLAIM]: z.string().min(1).optional(),
 });
 
-export function isSlackOidcConfigured(): boolean {
-  return Boolean(SLACK_CLIENT_ID && SLACK_CLIENT_SECRET);
+/**
+ * The Sign in with Slack client credential. Both halves are required: an
+ * authorization code issued to a client without a secret cannot be redeemed, so
+ * a request must fail before the browser leaves the app rather than after the
+ * user has completed the round trip.
+ */
+export function requireSlackOidcClientCredentials(
+  config: { clientId: string | undefined; clientSecret: string | undefined } = {
+    clientId: SLACK_CLIENT_ID,
+    clientSecret: SLACK_CLIENT_SECRET,
+  }
+): { clientId: string; clientSecret: string } {
+  if (!config.clientId || !config.clientSecret) {
+    throw new SlackOidcNotConfiguredError();
+  }
+  return { clientId: config.clientId, clientSecret: config.clientSecret };
 }
 
 export function getSlackOidcRedirectUri(): string {
@@ -69,13 +83,11 @@ export function getSlackOidcRedirectUri(): string {
  * state; Slack returns it unchanged to `getSlackOidcRedirectUri()`.
  */
 export function getSlackOidcAuthorizeUrl(state: string): string {
-  if (!SLACK_CLIENT_ID) {
-    throw new SlackOidcNotConfiguredError();
-  }
+  const { clientId } = requireSlackOidcClientCredentials();
 
   const params = new URLSearchParams({
     response_type: 'code',
-    client_id: SLACK_CLIENT_ID,
+    client_id: clientId,
     scope: 'openid',
     redirect_uri: getSlackOidcRedirectUri(),
     state,
@@ -125,9 +137,7 @@ async function slackRequest(
  * who approved the request.
  */
 export async function exchangeSlackOidcCode(code: string): Promise<string> {
-  if (!SLACK_CLIENT_ID || !SLACK_CLIENT_SECRET) {
-    throw new SlackOidcNotConfiguredError();
-  }
+  const { clientId, clientSecret } = requireSlackOidcClientCredentials();
 
   const body = await slackRequest(
     SLACK_OIDC_TOKEN_URL,
@@ -135,8 +145,8 @@ export async function exchangeSlackOidcCode(code: string): Promise<string> {
       method: 'POST',
       headers: { 'content-type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({
-        client_id: SLACK_CLIENT_ID,
-        client_secret: SLACK_CLIENT_SECRET,
+        client_id: clientId,
+        client_secret: clientSecret,
         code,
         redirect_uri: getSlackOidcRedirectUri(),
       }).toString(),

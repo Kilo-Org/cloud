@@ -16,6 +16,7 @@ import {
   fetchSlackIdentity,
   getSlackOidcAuthorizeUrl,
   getSlackOidcRedirectUri,
+  requireSlackOidcClientCredentials,
   revokeSlackOidcToken,
   SlackOidcError,
 } from './slack-oidc';
@@ -37,6 +38,18 @@ afterEach(() => {
 });
 
 describe('getSlackOidcAuthorizeUrl', () => {
+  test('refuses to start the round trip without both client credentials', () => {
+    expect(() =>
+      requireSlackOidcClientCredentials({ clientId: 'client-id', clientSecret: undefined })
+    ).toThrow('Account linking is not available right now.');
+    expect(() =>
+      requireSlackOidcClientCredentials({ clientId: undefined, clientSecret: 'client-secret' })
+    ).toThrow('Account linking is not available right now.');
+    expect(
+      requireSlackOidcClientCredentials({ clientId: 'client-id', clientSecret: 'client-secret' })
+    ).toEqual({ clientId: 'client-id', clientSecret: 'client-secret' });
+  });
+
   test('requests only the openid scope and returns to the registered Slack callback', () => {
     const url = new URL(getSlackOidcAuthorizeUrl('signed-state'));
 

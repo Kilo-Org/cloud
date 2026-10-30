@@ -199,6 +199,7 @@
     "graphql": "16.14.2",
     "jest": "30.3.0",
     "knip": "6.39.0",
+    "linkedom": "0.18.12",
     "postcss": "8.5.23",
     "tailwindcss": "4.2.4",
     "tsconfig-paths": "4.2.0",

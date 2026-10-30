@@ -284,9 +284,9 @@ describe('ProfileSkillsScreen', () => {
     pressSheetDone(renderer.root);
 
     expect(h.mutations.createCustomSkill.mutateAsync).not.toHaveBeenCalled();
-    expect(
-      findAll(renderer.root, 'Text').map(node => node.props.children)
-    ).toContain(i18n.t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS }));
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
+      i18n.t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS })
+    );
     expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
     expect(findField(renderer.root, 'Skill name').props.disabled).toBe(false);
 
@@ -361,9 +361,9 @@ describe('ProfileSkillsScreen', () => {
         node => node.props.children === i18n.t('profiles.skillSaveFailed')
       )
     );
-    expect(
-      findAll(renderer.root, 'Text').map(node => node.props.children)
-    ).not.toContain(i18n.t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS }));
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).not.toContain(
+      i18n.t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS })
+    );
 
     unmount();
   });

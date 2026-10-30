@@ -102,6 +102,85 @@ describe('moderation-router', () => {
     ).rejects.toBeInstanceOf(TRPCError);
   });
 
+  it('refuses report metadata longer than its bound and stores nothing', async () => {
+    const caller = await createCallerForUser(user.id);
+    const base = {
+      surface: 'ai_output' as const,
+      targetKind: 'message' as const,
+      targetId: 'msg-123',
+      reason: 'other' as const,
+      context: { platform: 'mobile' },
+    };
+
+    const oversizedCalls = [
+      () => caller.moderation.reportContent({ ...base, targetId: 't'.repeat(256) }),
+      () => caller.moderation.reportContent({ ...base, modelId: 'm'.repeat(201) }),
+      () => caller.moderation.reportContent({ ...base, sessionId: 's'.repeat(256) }),
+      () => caller.moderation.reportContent({ ...base, context: { platform: 'p'.repeat(65) } }),
+      () =>
+        caller.moderation.reportContent({
+          ...base,
+          context: { platform: 'mobile', storefront: 'f'.repeat(65) },
+        }),
+      () => caller.moderation.reportUser({ targetId: 'u'.repeat(256), reason: 'other' }),
+    ];
+
+    for (const call of oversizedCalls) {
+      await expect(call()).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    }
+
+    const rows = await db
+      .select()
+      .from(content_moderation_reports)
+      .where(eq(content_moderation_reports.kilo_user_id, user.id));
+    expect(rows).toHaveLength(0);
+  });
+
+  it('accepts report metadata at the bound and stores it unchanged', async () => {
+    const caller = await createCallerForUser(user.id);
+    const targetId = 't'.repeat(255);
+    const modelId = 'm'.repeat(200);
+    const sessionId = 's'.repeat(255);
+    const platform = 'p'.repeat(64);
+    const storefront = 'f'.repeat(64);
+
+    const { receiptId } = await caller.moderation.reportContent({
+      surface: 'ai_output',
+      targetKind: 'message',
+      targetId,
+      modelId,
+      sessionId,
+      reason: 'other',
+      context: { platform, storefront },
+    });
+
+    const [row] = await db
+      .select()
+      .from(content_moderation_reports)
+      .where(eq(content_moderation_reports.receipt_id, receiptId));
+    expect(row.target_id).toBe(targetId);
+    expect(row.model_id).toBe(modelId);
+    expect(row.session_id).toBe(sessionId);
+    expect(row.context_json).toEqual({ platform, storefront });
+
+    const nulled = await caller.moderation.reportContent({
+      surface: 'ai_output',
+      targetKind: 'message',
+      targetId: 'msg-null',
+      modelId: null,
+      sessionId: null,
+      reason: 'other',
+      context: { platform: 'mobile' },
+    });
+    const [nullRow] = await db
+      .select()
+      .from(content_moderation_reports)
+      .where(eq(content_moderation_reports.receipt_id, nulled.receiptId));
+    expect(nullRow.model_id).toBeNull();
+    expect(nullRow.session_id).toBeNull();
+    expect(nullRow.context_json).toEqual({ platform: 'mobile' });
+  });
+
   it('rejects blocking the caller own GitHub login', async () => {
     await db.insert(user_github_app_tokens).values({
       kilo_user_id: user.id,

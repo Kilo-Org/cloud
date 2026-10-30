@@ -1525,6 +1525,7 @@
       "changeRequestNoGitHubAccess": "Walang koneksyon sa GitHub na may access sa repositoryong ito. I-reconnect ang GitHub na may access dito, pagkatapos ay subukan ulit.",
       "changeRequestMissingPermissions": "Hindi makapagbukas ng pull request ang GitHub App ng Kilo sa repositoryong ito. Kailangang bigyan ng may-ari ng repositoryo ang app ng write access sa contents at pull requests, pagkatapos ay subukan ulit.",
       "changeRequestFailed": "Hindi nabuksan ng Kilo ang pull request. Subukan ulit sa ilang sandali.",
+      "proposalConflict": "Aktibo pa ang isa pang mungkahi sa memorya ng pagsusuri para sa repositoryong ito, kaya hindi pa ito mai-save.",
       "offAction": "Hindi pinagana ang memorya ng pagsusuri. Paganahin ito, pagkatapos subukan ulit."
     },
     "manualReview": {

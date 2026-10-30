@@ -1050,6 +1050,7 @@
       "changeRequestNoGitHubAccess": "Keine GitHub-Verbindung hat Zugriff auf dieses Repository. Verbinde GitHub erneut mit Zugriff darauf und versuche es dann noch einmal.",
       "changeRequestMissingPermissions": "Kilos GitHub App kann in diesem Repository keine Pull-Requests öffnen. Ein Repository-Inhaber muss der App Schreibzugriff auf Inhalte und Pull-Requests geben und es dann noch einmal versuchen.",
       "changeRequestFailed": "Kilo konnte den Pull-Request nicht öffnen. Versuche es gleich noch einmal.",
+      "proposalConflict": "Ein weiterer Vorschlag für dieses Repository ist noch aktiv.",
       "offAction": "Gespeicherte Prüfhinweise sind deaktiviert. Aktiviere sie und versuche es dann erneut.",
       "off": "Gespeicherte Prüfhinweise sind deaktiviert.",
       "on": "Gespeicherte Prüfhinweise sind aktiviert.",

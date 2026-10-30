@@ -1525,6 +1525,7 @@
       "changeRequestNoGitHubAccess": "Engin GitHub-tenging hefur aðgang að þessu hugbúnaðarsafni. Tengdu GitHub aftur með aðgangi að því og reyndu svo aftur.",
       "changeRequestMissingPermissions": "GitHub-app Kilo getur ekki opnað samrunabeiðnir í þessu hugbúnaðarsafni. Eigandi hugbúnaðarsafnsins verður að veita appinu skrifaðgang að efni og samrunabeiðnum og reyna svo aftur.",
       "changeRequestFailed": "Kilo tókst ekki að opna samrunabeiðnina. Reyndu aftur eftir smástund.",
+      "proposalConflict": "Önnur tillaga fyrir þetta hugbúnaðarsafn er enn virk.",
       "offAction": "Slökkt er á yfirferðarminni. Kveiktu á því og reyndu aftur."
     },
     "manualReview": {

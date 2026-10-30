@@ -1050,6 +1050,7 @@
       "changeRequestNoGitHubAccess": "沒有任何 GitHub 連線可存取此儲存庫。請重新連線具有此儲存庫存取權的 GitHub，然後再試一次。",
       "changeRequestMissingPermissions": "Kilo 的 GitHub App 無法在此儲存庫開啟提取請求。儲存庫擁有者必須授予該應用程式內容與提取請求的寫入權限，然後再試一次。",
       "changeRequestFailed": "Kilo 無法開啟提取請求。請稍後再試。",
+      "proposalConflict": "此儲存庫已有另一個審查記憶提案仍在進行中，因此目前無法儲存此提案。",
       "offAction": "審查記憶已關閉。請啟用後再試一次。",
       "off": "審查記憶已關閉。",
       "on": "審查記憶已開啟。",

@@ -1050,6 +1050,7 @@
       "changeRequestNoGitHubAccess": "Không có kết nối GitHub nào có quyền truy cập vào kho lưu trữ này. Hãy kết nối lại GitHub với quyền truy cập vào kho lưu trữ, sau đó thử lại.",
       "changeRequestMissingPermissions": "Ứng dụng GitHub của Kilo không thể mở pull request trong kho lưu trữ này. Chủ sở hữu kho lưu trữ phải cấp cho ứng dụng quyền ghi vào nội dung và pull request, sau đó thử lại.",
       "changeRequestFailed": "Kilo không thể mở pull request. Vui lòng thử lại sau giây lát.",
+      "proposalConflict": "Một đề xuất bộ nhớ rà soát khác cho kho lưu trữ này vẫn đang hoạt động.",
       "offAction": "Bộ nhớ rà soát đang tắt. Bật tính năng này rồi thử lại.",
       "off": "Bộ nhớ rà soát đang tắt.",
       "on": "Bộ nhớ rà soát đang bật.",

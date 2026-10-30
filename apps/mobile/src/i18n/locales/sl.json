@@ -1569,6 +1569,7 @@
       "changeRequestNoGitHubAccess": "Nobena povezava z GitHub nima dostopa do tega repozitorija. Ponovno povežite GitHub z dostopom do njega in poskusite znova.",
       "changeRequestMissingPermissions": "Kiloova aplikacija GitHub ne more odpirati zahtevkov za združitev v tem repozitoriju. Lastnik repozitorija mora aplikaciji dati pravico pisanja do vsebine in zahtevkov za združitev, nato poskusite znova.",
       "changeRequestFailed": "Kilu ni uspelo odpreti zahtevka za združitev. Poskusite znova čez trenutek.",
+      "proposalConflict": "Drug predlog za ta repozitorij je še vedno aktiven.",
       "offAction": "Pomnjenje pregledov je izklopljeno. Vklopi ga, nato poskusi znova."
     },
     "manualReview": {

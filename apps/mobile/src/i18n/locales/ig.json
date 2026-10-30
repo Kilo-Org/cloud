@@ -1525,6 +1525,7 @@
       "changeRequestNoGitHubAccess": "Ọnweghị njikọ GitHub nwere ohere ịnweta ebe nchekwa a. Jikọọ GitHub ọzọ nke nwere ohere ịnweta ya, wee nwaa ọzọ.",
       "changeRequestMissingPermissions": "Ngwa GitHub nke Kilo enweghị ike imepe pull request na ebe nchekwa a. Onye nwe ebe nchekwa ga-enyerịrị ngwa ahụ ikike ide ihe na pull request, wee nwaa ọzọ.",
       "changeRequestFailed": "Kilo enweghị ike imepe pull request. Nwaa ọzọ n'oge na-adịghị anya.",
+      "proposalConflict": "Aro ọzọ maka ebe nchekwa a ka na-aga n'ihu, yabụ enweghị ike ichekwa nke a ugbu a.",
       "offAction": "A gbanyụrụ ebe nchekwa nyocha. Gbanye ya, wee nwaa ọzọ."
     },
     "manualReview": {

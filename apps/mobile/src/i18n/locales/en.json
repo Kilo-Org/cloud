@@ -1591,6 +1591,7 @@
       "changeRequestNoGitHubAccess": "No GitHub connection has access to this repository. Reconnect GitHub with access to it, then try again.",
       "changeRequestMissingPermissions": "Kilo's GitHub App cannot open pull requests in this repository. A repository owner must give the app write access to contents and pull requests, then try again.",
       "changeRequestFailed": "Kilo could not open the pull request. Try again in a moment.",
+      "proposalConflict": "Another proposal for this repository is still active.",
       "offAction": "Review memory is off. Turn it on, then try again."
     },
     "manualReview": {

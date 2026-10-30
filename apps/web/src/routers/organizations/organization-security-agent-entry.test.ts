@@ -29,7 +29,7 @@ import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organ
 
 import { createCallerForUser } from '@/routers/test-utils';
 
-const BACKFILL_MIGRATION = '0320_github_connection_role_org_backfill.sql';
+const BACKFILL_MIGRATION = '0321_github_connection_role_org_backfill.sql';
 
 async function applyConnectionRoleBackfill() {
   const migration = readFileSync(

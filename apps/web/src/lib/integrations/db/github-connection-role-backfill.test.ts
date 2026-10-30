@@ -15,7 +15,7 @@ import {
 
 const ownerId = 'oauth/github-role-backfill-owner';
 
-const BACKFILL_MIGRATION = '0320_github_connection_role_org_backfill.sql';
+const BACKFILL_MIGRATION = '0321_github_connection_role_org_backfill.sql';
 
 async function applyConnectionRoleBackfill() {
   const migration = readFileSync(

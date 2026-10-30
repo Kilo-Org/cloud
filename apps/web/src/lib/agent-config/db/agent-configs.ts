@@ -92,25 +92,6 @@ export async function setAgentEnabled(
 }
 
 /**
- * Deletes agent configuration
- */
-export async function deleteAgentConfig(
-  organizationId: string,
-  agentType: string,
-  platform: string
-) {
-  await db
-    .delete(agent_configs)
-    .where(
-      and(
-        eq(agent_configs.owned_by_organization_id, organizationId),
-        eq(agent_configs.agent_type, agentType),
-        eq(agent_configs.platform, platform)
-      )
-    );
-}
-
-/**
  * Gets agent configuration for an owner (organization or personal user)
  * Supports both organization and personal user ownership
  */

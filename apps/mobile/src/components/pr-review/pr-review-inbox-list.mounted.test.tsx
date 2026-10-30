@@ -346,4 +346,13 @@ describe('PrReviewInboxList row metadata and reconnect state', () => {
     // member's own inbox.
     expect(renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
   });
+
+  // A pending first read that is not fetching (offline, paused, cancelled)
+  // never settles on its own: it falls back to the empty state, not a skeleton.
+  it('settles a paused first read on the empty state', () => {
+    inboxState.items = [];
+    inboxState.query.isPending = true;
+    inboxState.query.isFetching = false;
+    expect(mountInboxList().root.findAll(n => String(n.type) === 'EmptyState')).toHaveLength(1);
+  });
 });

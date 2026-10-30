@@ -63,7 +63,8 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
   };
   const reconnectOnly = inbox.githubNeedsReconnect && !inbox.isPending && inbox.items.length === 0;
   const view = selectPrInboxView({
-    isLoading: inbox.isPending,
+    isPending: inbox.isPending,
+    isFetching: inbox.isFetching,
     itemCount: inbox.items.length,
     firstPageErrorState:
       inbox.firstPageErrorState ?? (reconnectOnly ? { kind: 'reconnect' } : null),

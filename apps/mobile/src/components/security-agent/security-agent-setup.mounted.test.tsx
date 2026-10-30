@@ -101,10 +101,14 @@ it('shows the setup failure in the body and stays mounted when no URL can be res
   expect(button.props.disabled).toBe(false);
 });
 
-it('reports a launch that never opened and clears the line on the next press', async () => {
+it('keeps a reported launch failure through the next attempt and clears it when a page opens', async () => {
   // The wait settles on the foreground edge while the browser's own report is
   // still pending; a late failure arrives after `onConnected` already ran.
-  authorization.mockResolvedValue({
+  const secondOpen = Promise.withResolvers<{
+    reported: Promise<undefined>;
+    settledByLaunch: boolean;
+  }>();
+  authorization.mockResolvedValueOnce({
     reported: new Promise<undefined>(() => undefined),
     settledByLaunch: false,
   });
@@ -124,7 +128,8 @@ it('reports a launch that never opened and clears the line on the next press', a
   );
   const body = mounted.renderer.root.findByType(CenteredState);
   const button = body.findByType(Button);
-  expect(body.findAllByType('AccessibleStatus' as ElementType)[0]?.props.message).toBeNull();
+  const failureLine = () => body.findAllByType('AccessibleStatus' as ElementType)[0]?.props.message;
+  expect(failureLine()).toBeNull();
   act(button.props.onPress as () => void);
   await act(async () => {
     await Promise.resolve();
@@ -133,12 +138,20 @@ it('reports a launch that never opened and clears the line on the next press', a
   act(() => {
     onLateFailure?.();
   });
-  expect(body.findByType('AccessibleStatus' as ElementType).props.message).toBe(
-    'securityAgent.setup.couldNotOpenGithub'
-  );
+  expect(failureLine()).toBe('securityAgent.setup.couldNotOpenGithub');
+  // The retry is in flight: the body must not drop the line and re-add it, or
+  // the centred block slides under the button the reader is pressing.
+  authorization.mockReturnValueOnce(secondOpen.promise);
   act(button.props.onPress as () => void);
-  expect(body.findByType('AccessibleStatus' as ElementType).props.message).toBeNull();
+  expect(failureLine()).toBe('securityAgent.setup.couldNotOpenGithub');
+  // This attempt did open the page, so the stale line goes.
   await act(async () => {
+    secondOpen.resolve({
+      reported: new Promise<undefined>(() => undefined),
+      settledByLaunch: false,
+    });
+    await secondOpen.promise;
     await Promise.resolve();
   });
+  expect(failureLine()).toBeNull();
 });

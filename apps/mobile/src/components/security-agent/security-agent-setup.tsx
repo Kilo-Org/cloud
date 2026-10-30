@@ -43,15 +43,17 @@ export function SecurityAgentSetup<T>({
   const [connecting, setConnecting] = useState(false);
   /**
    * Why the last press could not continue. Rendered in this body and kept
-   * until the next press: an app-root toast is not a visible outcome here — a
-   * sheet-hosted or backgrounded setup screen leaves the reader staring at an
-   * unchanged button.
+   * until a press reaches a new outcome: an app-root toast is not a visible
+   * outcome here — a sheet-hosted or backgrounded setup screen leaves the
+   * reader staring at an unchanged button. The body is centred on its content
+   * height, so dropping the line for the length of an attempt would slide the
+   * button under the finger and back; it stays until there is something truer
+   * to show.
    */
   const [failure, setFailure] = useState<string | null>(null);
   const { t } = useTranslation();
 
   const connect = async () => {
-    setFailure(null);
     setConnecting(true);
     try {
       // The screen may mount without a minted URL (failed or still-pending
@@ -63,6 +65,9 @@ export function SecurityAgentSetup<T>({
         return;
       }
       const wait = await openAuthorizationAndWaitForReturn(openUrl);
+      // The page opened, so the previous failure no longer describes this
+      // screen; the session itself decides what comes next.
+      setFailure(null);
       // A launch that fails after the app's own return edge ended the wait never
       // reaches the catch below.
       reportLateLaunchFailure(wait, {

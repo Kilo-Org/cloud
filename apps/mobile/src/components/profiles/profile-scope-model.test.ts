@@ -5,31 +5,33 @@ import { isProfileScopeStale, staleProfileScopeExit } from './profile-scope-mode
 const ORG_A = 'org-a';
 const ORG_B = 'org-b';
 
+/** A screen opened under `ORG_A`, with the app still showing it. */
+const openedUnderA = {
+  isLoaded: true,
+  activeOrganizationId: ORG_A,
+  openedUnderOrganizationId: ORG_A,
+};
+
 describe('isProfileScopeStale', () => {
   it('leaves an unresolved account alone, whatever the route carries', () => {
     expect(
       isProfileScopeStale({
         isLoaded: false,
         activeOrganizationId: ORG_B,
+        openedUnderOrganizationId: undefined,
         routeOrganizationId: ORG_A,
       })
     ).toBe(false);
   });
 
-  it('keeps a profile opened under the account the app shows', () => {
-    expect(
-      isProfileScopeStale({
-        isLoaded: true,
-        activeOrganizationId: ORG_A,
-        routeOrganizationId: ORG_A,
-      })
-    ).toBe(false);
+  it('keeps a profile opened under the account the app still shows', () => {
+    expect(isProfileScopeStale({ ...openedUnderA, routeOrganizationId: ORG_A })).toBe(false);
   });
 
-  it('goes stale when the route names an organization the account is no longer', () => {
+  it('goes stale when the account switched away from the organization the route names', () => {
     expect(
       isProfileScopeStale({
-        isLoaded: true,
+        ...openedUnderA,
         activeOrganizationId: ORG_B,
         routeOrganizationId: ORG_A,
       })
@@ -39,17 +41,42 @@ describe('isProfileScopeStale', () => {
   it('goes stale when the account switched to Personal', () => {
     expect(
       isProfileScopeStale({
-        isLoaded: true,
+        ...openedUnderA,
         activeOrganizationId: null,
         routeOrganizationId: ORG_A,
       })
     ).toBe(true);
   });
 
-  it('keeps a personal profile in every account, because the list shows it in every account', () => {
+  it('keeps an organization-scoped screen opened for a scope the account never showed', () => {
+    // An agent session of another organization, or the composer's explicit
+    // scope: the route's organization is not the selection from the start, and
+    // no switch has happened while this screen was mounted.
     expect(
       isProfileScopeStale({
         isLoaded: true,
+        activeOrganizationId: ORG_A,
+        openedUnderOrganizationId: ORG_A,
+        routeOrganizationId: ORG_B,
+      })
+    ).toBe(false);
+  });
+
+  it('keeps a screen while the selection has not resolved for it yet', () => {
+    expect(
+      isProfileScopeStale({
+        isLoaded: true,
+        activeOrganizationId: ORG_B,
+        openedUnderOrganizationId: undefined,
+        routeOrganizationId: ORG_A,
+      })
+    ).toBe(false);
+  });
+
+  it('keeps a personal profile in every account, because the list shows it in every account', () => {
+    expect(
+      isProfileScopeStale({
+        ...openedUnderA,
         activeOrganizationId: ORG_B,
         routeOrganizationId: undefined,
       })
@@ -58,6 +85,7 @@ describe('isProfileScopeStale', () => {
       isProfileScopeStale({
         isLoaded: true,
         activeOrganizationId: null,
+        openedUnderOrganizationId: null,
         routeOrganizationId: undefined,
       })
     ).toBe(false);

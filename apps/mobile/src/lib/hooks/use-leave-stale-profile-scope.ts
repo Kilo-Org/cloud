@@ -1,5 +1,5 @@
 import { useNavigation, useRouter } from 'expo-router';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import {
   isProfileScopeStale,
@@ -40,9 +40,20 @@ export function useLeaveStaleProfileScope(
   const navigation = useNavigation<StackNavigation>();
   const routeFocused = useRouteFocused();
   const { organizationId, isLoaded } = useOrganization();
+  // The account this screen was opened under. A screen may legitimately carry
+  // an organization that is not the selection — an agent session's own
+  // organization, or the composer's explicit scope — so only a change of
+  // account makes the route stale.
+  const [openedUnder, setOpenedUnder] = useState<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (openedUnder === undefined && isLoaded) {
+      setOpenedUnder(organizationId);
+    }
+  }, [isLoaded, openedUnder, organizationId]);
   const stale = isProfileScopeStale({
     isLoaded,
     activeOrganizationId: organizationId,
+    openedUnderOrganizationId: openedUnder,
     routeOrganizationId,
   });
 

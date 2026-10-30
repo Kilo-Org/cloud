@@ -4,6 +4,7 @@ import { act } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import AppStackProfileOverviewRoute from '@/app/(app)/profile-management/[profileId]';
+import AppStackRepoBindingsRoute from '@/app/(app)/profile-management/repo-bindings';
 import ProfileOverviewRoute from '@/app/(app)/(tabs)/(3_profile)/profiles/[profileId]';
 import { getProfilesPath } from '@/lib/profile-agent-navigation';
 import { OrganizationProvider, useOrganization } from '@/lib/organization-context';
@@ -15,15 +16,18 @@ import {
 } from '@/test/render-with-providers';
 
 /**
- * A profile detail opened under one account must not survive a switch to
- * another. The route carries its organization as a param and the account lives
- * in the organization provider, so these tests mount the real provider, switch
- * the account the way the Conversa chip does (`setOrganizationId`), and assert
- * the route leaves.
+ * A profile screen opened under one account must not survive a switch to
+ * another, and must survive being opened for a scope the account never showed
+ * (an agent session's own organization, or the composer's explicit scope). The
+ * route carries its organization as a param and the account lives in the
+ * organization provider, so these tests mount the real provider, switch the
+ * account the way the account chip does (`setOrganizationId`), and assert what
+ * the route does.
  */
 
 const ORG_A = 'org-a';
 const ORG_B = 'org-b';
+const ORG_C = 'org-c';
 const PROFILE_A = 'profile-a';
 
 type RouteParams = { profileId?: string; organizationId?: string };
@@ -80,6 +84,9 @@ vi.mock('@/components/invalid-route-state', () => ({ InvalidRouteState: 'Invalid
 vi.mock('@/components/profiles/profile-overview-screen', () => ({
   ProfileOverviewScreen: 'ProfileOverviewScreen',
 }));
+vi.mock('@/components/profiles/repo-bindings-screen', () => ({
+  RepoBindingsScreen: 'RepoBindingsScreen',
+}));
 
 function AccountSwitchProbe() {
   account.switchTo = useOrganization().setOrganizationId;
@@ -99,6 +106,7 @@ beforeEach(() => {
   list.mockReset().mockResolvedValue([
     { organizationId: ORG_A, organizationName: 'Consultoria', role: 'owner' },
     { organizationId: ORG_B, organizationName: 'Client Co', role: 'member' },
+    { organizationId: ORG_C, organizationName: 'Client Co Two', role: 'member' },
   ]);
   account.switchTo = () => undefined;
 });
@@ -109,17 +117,17 @@ afterEach(() => {
   }
 });
 
-function detailsOnScreen(ui: RenderWithProvidersResult): number {
-  return ui.renderer.root.findAllByType('ProfileOverviewScreen' as never).length;
+function screensOnScreen(ui: RenderWithProvidersResult, screen: string): number {
+  return ui.renderer.root.findAllByType(screen as never).length;
 }
 
-async function mountRoute(route: () => ReactElement | null) {
+async function mountRoute(route: () => ReactElement | null, screen = 'ProfileOverviewScreen') {
   const ui = await renderWithProviders(
     createElement(Fragment, null, createElement(AccountSwitchProbe), createElement(route)),
     { wrapper: OrganizationProvider }
   );
   mounted.push(ui);
-  await waitFor(() => detailsOnScreen(ui) > 0);
+  await waitFor(() => screensOnScreen(ui, screen) > 0);
   return ui;
 }
 
@@ -132,7 +140,7 @@ async function switchAccountTo(organizationId: string | null): Promise<void> {
 describe('a profile detail after an account switch', () => {
   it('leaves the previous account profile for the profiles list of the Profile tab', async () => {
     const ui = await mountRoute(ProfileOverviewRoute);
-    expect(detailsOnScreen(ui)).toBe(1);
+    expect(screensOnScreen(ui, 'ProfileOverviewScreen')).toBe(1);
 
     await switchAccountTo(ORG_B);
 
@@ -140,7 +148,7 @@ describe('a profile detail after an account switch', () => {
     expect(router.back).not.toHaveBeenCalled();
     // The previous account's profile is not on screen even for the frame the
     // dismissal takes, so its editor cannot be tapped.
-    expect(detailsOnScreen(ui)).toBe(0);
+    expect(screensOnScreen(ui, 'ProfileOverviewScreen')).toBe(0);
   });
 
   it('goes back when the root stack opened the detail with no list beneath it', async () => {
@@ -149,13 +157,13 @@ describe('a profile detail after an account switch', () => {
       { name: 'profile-management/[profileId]/index' },
     ];
     const ui = await mountRoute(AppStackProfileOverviewRoute);
-    expect(detailsOnScreen(ui)).toBe(1);
+    expect(screensOnScreen(ui, 'ProfileOverviewScreen')).toBe(1);
 
     await switchAccountTo(ORG_B);
 
     expect(router.back).toHaveBeenCalledTimes(1);
     expect(router.dismissTo).not.toHaveBeenCalled();
-    expect(detailsOnScreen(ui)).toBe(0);
+    expect(screensOnScreen(ui, 'ProfileOverviewScreen')).toBe(0);
   });
 
   it('stays when the account did not change', async () => {
@@ -165,7 +173,7 @@ describe('a profile detail after an account switch', () => {
 
     expect(router.dismissTo).not.toHaveBeenCalled();
     expect(router.back).not.toHaveBeenCalled();
-    expect(detailsOnScreen(ui)).toBe(1);
+    expect(screensOnScreen(ui, 'ProfileOverviewScreen')).toBe(1);
   });
 
   it('keeps a personal profile open, which every account reads', async () => {
@@ -176,7 +184,46 @@ describe('a profile detail after an account switch', () => {
 
     expect(router.dismissTo).not.toHaveBeenCalled();
     expect(router.back).not.toHaveBeenCalled();
-    expect(detailsOnScreen(ui)).toBe(1);
+    expect(screensOnScreen(ui, 'ProfileOverviewScreen')).toBe(1);
+  });
+
+  it('keeps a session profile editor open for the session organization the account never showed', async () => {
+    // A session of another organization renders while the selection is this
+    // account, and its profile chip opens that organization's profile.
+    params.value = { profileId: PROFILE_A, organizationId: ORG_B };
+    stack.routes = [
+      { name: 'agent-chat/[session-id]' },
+      { name: 'profile-management/[profileId]/index' },
+    ];
+    const ui = await mountRoute(AppStackProfileOverviewRoute);
+
+    expect(router.dismissTo).not.toHaveBeenCalled();
+    expect(router.back).not.toHaveBeenCalled();
+    expect(screensOnScreen(ui, 'ProfileOverviewScreen')).toBe(1);
+  });
+
+  it('keeps repo defaults open for the composer scope while the account shows another', async () => {
+    params.value = { organizationId: ORG_B };
+    stack.routes = [{ name: 'agent-chat/new' }, { name: 'profile-management/repo-bindings' }];
+    const ui = await mountRoute(AppStackRepoBindingsRoute, 'RepoBindingsScreen');
+
+    expect(router.dismissTo).not.toHaveBeenCalled();
+    expect(router.back).not.toHaveBeenCalled();
+    expect(screensOnScreen(ui, 'RepoBindingsScreen')).toBe(1);
+  });
+
+  it('leaves repo defaults once the account switches while they are open', async () => {
+    params.value = { organizationId: ORG_A };
+    stack.routes = [
+      { name: 'profile-management/index' },
+      { name: 'profile-management/repo-bindings' },
+    ];
+    const ui = await mountRoute(AppStackRepoBindingsRoute, 'RepoBindingsScreen');
+
+    await switchAccountTo(ORG_C);
+
+    expect(router.dismissTo).toHaveBeenCalledWith(getProfilesPath('app'));
+    expect(screensOnScreen(ui, 'RepoBindingsScreen')).toBe(0);
   });
 
   it('reads the stored account before deciding, so a cold start never dismisses', async () => {
@@ -200,6 +247,6 @@ describe('a profile detail after an account switch', () => {
 
     expect(storage.read).toHaveBeenCalledWith(ORGANIZATION_STORAGE_KEY);
     expect(router.dismissTo).not.toHaveBeenCalled();
-    expect(detailsOnScreen(ui)).toBe(1);
+    expect(screensOnScreen(ui, 'ProfileOverviewScreen')).toBe(1);
   });
 });

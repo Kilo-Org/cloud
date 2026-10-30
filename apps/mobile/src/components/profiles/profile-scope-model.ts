@@ -12,24 +12,44 @@
  */
 
 /**
- * Whether the profile scope a route carries belongs to an account the app is no
- * longer showing. Only a route that names an organization can go stale: a
- * personal profile has no organization id and stays readable in every context,
- * exactly as the profiles list shows personal profiles inside an organization
- * context (`profile-owner-model.ts`, `splitProfilesByOwner`). An unresolved
- * selection is never stale — the stored account has not been read yet.
+ * Whether the profile route has lost its account: the account the app shows
+ * changed away from the one this screen was opened under, and the route still
+ * names an organization that is not the new account.
+ *
+ * Only a route that names an organization can go stale: a personal profile has
+ * no organization id and stays readable in every context, exactly as the
+ * profiles list shows personal profiles inside an organization context
+ * (`profile-owner-model.ts`, `splitProfilesByOwner`).
+ *
+ * A screen mounted under one account is not stale because its route names
+ * another one. Organization-scoped profile screens are legitimately opened for
+ * a scope that is not the persisted selection — an agent session renders and
+ * opens the profile of its own organization (`session-detail-content.tsx`), and
+ * the new-session composer can carry an organization the selection does not
+ * (`new-session-organization.ts`). Those screens must keep working; the defect
+ * is a screen that outlives a switch made while it was mounted.
  */
 export function isProfileScopeStale({
   isLoaded,
   activeOrganizationId,
+  openedUnderOrganizationId,
   routeOrganizationId,
 }: Readonly<{
   isLoaded: boolean;
   activeOrganizationId: string | null;
+  /** The active account the first time the selection resolved for this screen. */
+  openedUnderOrganizationId: string | null | undefined;
   routeOrganizationId: string | undefined;
 }>): boolean {
+  if (!isLoaded || routeOrganizationId === undefined) {
+    return false;
+  }
+  if (openedUnderOrganizationId === undefined) {
+    return false;
+  }
   return (
-    isLoaded && routeOrganizationId !== undefined && routeOrganizationId !== activeOrganizationId
+    activeOrganizationId !== openedUnderOrganizationId &&
+    routeOrganizationId !== activeOrganizationId
   );
 }
 

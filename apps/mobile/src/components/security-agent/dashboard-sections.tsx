@@ -257,12 +257,16 @@ function CoverageSection({ scope, data, slaEnabled, repoFullName }: SectionProps
           onPress={() => {
             router.push(row.href);
           }}
-          // The row is a link to the findings list; without the shared row
-          // frame its node measured the KvRow content alone (~40 dp). The
-          // frame lifts it to the touch floor and centres that content.
-          className={cn(ROW_TARGET_CLASS, 'justify-center active:opacity-70')}
+          className="active:opacity-70"
         >
+          {/* The frame sits on KvRow's own box, not on the wrapper: the
+              divider is that box's bottom edge, so a frame around it would
+              hold the rule above the row's bottom while the next row's
+              padding stacked below — visibly lopsided. With the frame on the
+              row, the padding above and below the label stays even and the
+              pressable still measures the full 48 dp target. */}
           <KvRow
+            className={ROW_TARGET_CLASS}
             label={row.label}
             value={formatNumber(row.value, i18n.language)}
             valueTone="muted"

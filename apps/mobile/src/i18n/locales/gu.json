@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "તમારું કાર્યપરિસર લોડ કરી શકાયું નહીં.",
       "retryLoadingEnvironment": "કાર્યપરિસર લોડ કરવા ફરી પ્રયાસ કરો",
       "defaultEnvironment": "ડિફોલ્ટ કાર્યપરિસર",
+      "environmentAccessibility": "પ્રોફાઇલ ચૂંટો: {{label}}",
+      "environmentAccessibilityNeedsAttention": "પ્રોફાઇલ ચૂંટો: {{label}}. {{attention}}",
       "leaveChanges": "ફેરફારો રાખો",
       "commitAndPush": "કમિટ અને પુશ કરો",
       "startSession": "સત્ર શરૂ કરો",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "પ્રોફાઇલ મેનેજ કરો",
       "noProfiles": "હજુ સુધી કોઈ પ્રોફાઇલ નથી. પર્યાવરણ ચલો, MCP સર્વર અને કુશળતા ઉમેરવા માટે એક બનાવો.",
       "advancedConfig": "અદ્યતન રૂપરેખાંકન",
-      "advancedConfigDescription": "સાચવેલ રૂપરેખાંકનો લોડ કરવા માટે પ્રોફાઇલ પસંદ કરો, અને વધારાના પર્યાવરણ ચલો અને સેટઅપ આદેશોને મેન્યુઅલી ગોઠવો",
+      "advancedConfigDescription": "આ સેશન પર લાગુ પડે છે. પ્રોફાઇલ તરીકે સાચવવાથી તે આગલી વખતે માટે રહે છે.",
       "saveAsProfile": "પ્રોફાઇલ તરીકે સાચવો",
       "saveProfileDescription": "વર્તમાન પર્યાવરણ ચલો અને સેટઅપ આદેશોને ફરીથી વાપરી શકાય તેવી પ્રોફાઇલ તરીકે સાચવો.",
       "profileSummary": "{{vars}} પર્યાવરણ ચલો · {{commands}} સેટઅપ આદેશો",
@@ -2978,7 +2980,9 @@
     "permissionDescription": "તમને આ જોવાની મંજૂરી નથી.",
     "notFoundDescription": "આ વસ્તુ દૂર કરવામાં આવી હોઈ શકે છે અથવા હવે ઉપલબ્ધ નથી.",
     "serverTitle": "લોડ કરી શકાયું નહીં.",
-    "serverDescription": "અમારી તરફ કોઈ સમસ્યા થઈ. કૃપા કરીને ફરી પ્રયાસ કરો."
+    "serverDescription": "અમારી તરફ કોઈ સમસ્યા થઈ. કૃપા કરીને ફરી પ્રયાસ કરો.",
+    "timeoutTitle": "સર્વરને વધુ સમય લાગી રહ્યો છે",
+    "timeoutDescription": "વિનંતી પૂરી થાય તે પહેલાં જ સમય સમાપ્ત થઈ ગયો. કૃપા કરીને ફરી પ્રયાસ કરો."
   },
   "screenHeader": {
     "openMenu": "મેનૂ ખોલો",
@@ -3833,6 +3837,7 @@
     "commandLabel": "આદેશ",
     "commandLabelPosition": "આદેશ {{position}}",
     "commandPlaceholder": "દા.ત. pnpm install",
+    "commandAtLimit": "આદેશ {{max}} અક્ષરો સુધી મર્યાદિત છે",
     "commandsEmpty": "હજુ સુધી કોઈ સેટઅપ આદેશો નથી",
     "commandsSaveFailed": "સેટઅપ આદેશો સાચવી શકાયા નથી",
     "moveUp": "ઉપર ખસેડો",

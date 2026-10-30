@@ -42,7 +42,7 @@
     "mergeRequest": "merge request",
     "notConnected": "မချိတ်ဆက်ထား",
     "notifications": "အသိပေးချက်များ",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "ကုဒ်သိုလှောင်ရာများ",
     "securityAgent": "လုံခြုံရေးအေးဂျင့်",
     "unknown": "မသိရ",
@@ -2181,7 +2181,7 @@
       "dollar_other": "ဒေါ်လာ",
       "costSpoken": "ကုန်ကျစရိတ် {{cost}}",
       "costSpokenWithTime": "ကုန်ကျစရိတ် {{cost}}၊ {{time}}",
-      "pullRequest": "pR အမှတ် {{number}}",
+      "pullRequest": "PR အမှတ် {{number}}",
       "spokenJoiner": "နှင့်"
     },
     "githubInstall": {
@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "သင့်လုပ်ဆောင်မှုပတ်ဝန်းကျင်ကို ရယူ၍မရပါ။",
       "retryLoadingEnvironment": "လုပ်ဆောင်မှုပတ်ဝန်းကျင်ကို ထပ်ရယူကြည့်ပါ",
       "defaultEnvironment": "မူလလုပ်ဆောင်မှုပတ်ဝန်းကျင်",
+      "environmentAccessibility": "ပရိုဖိုင်ကို ရွေးရန်: {{label}}",
+      "environmentAccessibilityNeedsAttention": "ပရိုဖိုင်ကို ရွေးရန်: {{label}}။ {{attention}}",
       "leaveChanges": "မပြောင်းဘဲထား",
       "commitAndPush": "မှတ်တမ်းတင်ပြီး တင်ပို့",
       "startSession": "စက်ရှင် စတင်ပါ",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "ပရိုဖိုင်များကို စီမံပါ။",
       "noProfiles": "ပရိုဖိုင်များ မရှိသေးပါ။ ပတ်ဝန်းကျင်ပြောင်းလဲမှုများ၊ MCP ဆာဗာများနှင့် ကျွမ်းကျင်မှုများကို ထည့်သွင်းရန် တစ်ခုဖန်တီးပါ။",
       "advancedConfig": "အဆင့်မြင့်ဖွဲ့စည်းမှု",
-      "advancedConfigDescription": "သိမ်းဆည်းထားသော ဖွဲ့စည်းမှုပုံစံများကို တင်ရန် ပရိုဖိုင်ကို ရွေးချယ်ပြီး အပိုဆောင်းပတ်ဝန်းကျင် ကိန်းရှင်များနှင့် စနစ်ထည့်သွင်းမှု ညွှန်ကြားချက်များကို ကိုယ်တိုင် စီစဉ်သတ်မှတ်ပါ",
+      "advancedConfigDescription": "ဤစက်ရှင်အတွက် သက်ဆိုင်ပါသည်။ Profile အဖြစ် သိမ်းဆည်းပါက နောက်တစ်ကြိမ်အတွက် ကျန်ရှိပါမည်။",
       "saveAsProfile": "Profile အဖြစ် သိမ်းဆည်းပါ။",
       "saveProfileDescription": "လက်ရှိပတ်ဝန်းကျင် ကိန်းရှင်များနှင့် ပြန်လည်အသုံးပြုနိုင်သော ပရိုဖိုင်အဖြစ် သတ်မှတ်ခြင်းဆိုင်ရာ အမိန့်များကို သိမ်းဆည်းပါ။",
       "profileSummary": "{{vars}} ပတ်၀န်းကျင် ကိန်းရှင်များ · {{commands}} စနစ်ထည့်သွင်းမှု အမိန့်များ",
@@ -2868,10 +2870,10 @@
       "unavailable": "ဤစက်ရှင်သည် ခွင့်ပြုချက် တောင်းဆိုမှုများကို လက်ခံနိုင်မည်မဟုတ်ပါ။"
     },
     "prBadge": {
-      "open": "pR ဖွင့်",
+      "open": "PR ဖွင့်",
       "closed": "ပိတ်ထားသော PR",
       "merged": "ပေါင်းစည်းပြီးသော PR",
-      "draft": "pR မူကြမ်း",
+      "draft": "PR မူကြမ်း",
       "updating": "နောက်ဆုံးအခြေအနေကို ရယူနေသည်၊ {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2978,7 +2980,9 @@
     "permissionDescription": "ဒီအရာကို ကြည့်ရှုခွင့် မရှိပါ။",
     "notFoundDescription": "ဒီအရာကို ဖယ်ရှားထားခြင်း သို့မဟုတ် မရရှိနိုင်တော့ခြင်း ဖြစ်နိုင်ပါသည်။",
     "serverTitle": "ဒေတာကို ရယူ၍ မရပါ။",
-    "serverDescription": "ကျွန်ုပ်တို့ဘက်တွင် တစ်စုံတစ်ရာ မှားယွင်းသွားသည်။ ထပ်ကြိုးစားပါ။"
+    "serverDescription": "ကျွန်ုပ်တို့ဘက်တွင် တစ်စုံတစ်ရာ မှားယွင်းသွားသည်။ ထပ်ကြိုးစားပါ။",
+    "timeoutTitle": "ဆာဗာဘက်မှ တုံ့ပြန်မှု နှေးကွေးနေသည်",
+    "timeoutDescription": "တောင်းဆိုချက်သည် မပြီးဆုံးမီ အချိန်ကုန်သွားပါသည်။ ထပ်ကြိုးစားပါ။"
   },
   "screenHeader": {
     "openMenu": "မီနူးကို ဖွင့်ပါ",
@@ -3833,6 +3837,7 @@
     "commandLabel": "အမိန့်",
     "commandLabelPosition": "အမိန့် {{position}}",
     "commandPlaceholder": "ဥပမာ pnpm install",
+    "commandAtLimit": "အမိန့်ကို စာလုံး {{max}} လုံးအထိ ကန့်သတ်ထားသည်။",
     "commandsEmpty": "စနစ်ထည့်သွင်းရန် အမိန့်များမရှိသေးပါ။",
     "commandsSaveFailed": "စနစ်ထည့်သွင်းမှု အမိန့်များကို မသိမ်းဆည်းနိုင်ခဲ့ပါ။",
     "moveUp": "အပေါ်ကိုရွှေ့ပါ။",

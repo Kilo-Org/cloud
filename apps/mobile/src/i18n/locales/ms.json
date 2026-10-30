@@ -42,7 +42,7 @@
     "mergeRequest": "permintaan gabungan",
     "notConnected": "Tidak disambungkan",
     "notifications": "Pemberitahuan",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repositori",
     "securityAgent": "Ejen keselamatan",
     "unknown": "Tidak diketahui",
@@ -743,7 +743,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Sunting komen belum dihantar yang merujuk kepada komit lama pada {{location}}",
       "editA11y": "Sunting komen belum dihantar pada {{location}}",
-      "staleHint": "pR telah dikemas kini sejak anda menulis komen ini.",
+      "staleHint": "PR telah dikemas kini sejak anda menulis komen ini.",
       "deleteA11y": "Padam komen belum dihantar pada {{location}}",
       "deletedAnnouncement": "Komen belum dihantar telah dipadam",
       "noCommentsQueued": "Tiada komen dalam senarai menunggu. Semakan akan dihantar dengan jenis semakan yang dipilih di atas sahaja.",
@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Tidak dapat memuatkan persekitaran anda.",
       "retryLoadingEnvironment": "Cuba muatkan semula persekitaran",
       "defaultEnvironment": "Persekitaran lalai",
+      "environmentAccessibility": "Pilih profil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Pilih profil: {{label}}. {{attention}}",
       "leaveChanges": "Biarkan perubahan",
       "commitAndPush": "Komit dan hantar",
       "startSession": "Mulakan sesi",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "Urus profil",
       "noProfiles": "Tiada profil lagi. Buat satu untuk menambah pembolehubah persekitaran, pelayan MCP dan kemahiran.",
       "advancedConfig": "Konfigurasi Lanjutan",
-      "advancedConfigDescription": "Pilih profil untuk memuatkan konfigurasi yang disimpan dan konfigurasikan pembolehubah persekitaran tambahan dan arahan persediaan secara manual",
+      "advancedConfigDescription": "Terpakai untuk sesi ini. Menyimpannya sebagai profil mengekalkannya untuk kali seterusnya.",
       "saveAsProfile": "Simpan sebagai Profil",
       "saveProfileDescription": "Simpan pembolehubah persekitaran semasa dan arahan persediaan sebagai profil boleh guna semula.",
       "profileSummary": "{{vars}} pembolehubah persekitaran · {{commands}} arahan persediaan",
@@ -2871,7 +2873,7 @@
       "open": "buka PR",
       "closed": "permintaan tarik yang ditutup",
       "merged": "permintaan tarik yang digabungkan",
-      "draft": "pR draf",
+      "draft": "PR draf",
       "updating": "Mengemas kini, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2978,7 +2980,9 @@
     "permissionDescription": "Anda tidak mempunyai kebenaran untuk melihat ini.",
     "notFoundDescription": "Item ini mungkin telah dibuang atau tidak lagi tersedia.",
     "serverTitle": "Tidak dapat memuatkan data.",
-    "serverDescription": "Ralat berlaku pada sistem kami. Sila cuba lagi."
+    "serverDescription": "Ralat berlaku pada sistem kami. Sila cuba lagi.",
+    "timeoutTitle": "Pelayan terlalu lambat bertindak balas",
+    "timeoutDescription": "Permintaan tamat masa sebelum selesai. Sila cuba lagi."
   },
   "screenHeader": {
     "openMenu": "Buka menu",
@@ -3833,6 +3837,7 @@
     "commandLabel": "Perintah",
     "commandLabelPosition": "Perintah {{position}}",
     "commandPlaceholder": "cth. pnpm install",
+    "commandAtLimit": "Perintah dihadkan kepada {{max}} aksara",
     "commandsEmpty": "Tiada arahan persediaan lagi",
     "commandsSaveFailed": "Tidak dapat menyimpan arahan persediaan",
     "moveUp": "Bergerak ke atas",

@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "तपाईंको वातावरण लोड गर्न सकिएन।",
       "retryLoadingEnvironment": "वातावरण लोड गर्न पुनः प्रयास गर्नुहोस्",
       "defaultEnvironment": "पूर्वनिर्धारित वातावरण",
+      "environmentAccessibility": "प्रोफाइल छान्नुहोस्: {{label}}",
+      "environmentAccessibilityNeedsAttention": "प्रोफाइल छान्नुहोस्: {{label}}। {{attention}}",
       "leaveChanges": "परिवर्तन यथावत्",
       "commitAndPush": "कमिट र पुश",
       "startSession": "सत्र सुरु गर्नुहोस्",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "प्रोफाइलहरू प्रबन्ध गर्नुहोस्",
       "noProfiles": "अहिलेसम्म कुनै प्रोफाइल छैन। वातावरणीय चरहरू, MCP सर्भरहरू, र सीपहरू थप्न एउटा सिर्जना गर्नुहोस्।",
       "advancedConfig": "उन्नत कन्फिगरेसन",
-      "advancedConfigDescription": "बचत गरिएका कन्फिगरेसनहरू लोड गर्न प्रोफाइल चयन गर्नुहोस्, र अतिरिक्त वातावरण चरहरू र सेटअप आदेशहरू म्यानुअल रूपमा कन्फिगर गर्नुहोस्।",
+      "advancedConfigDescription": "यो सत्रमा लागू हुन्छ। प्रोफाइलको रूपमा बचत गर्दा यो अर्को पटकका लागि रहन्छ।",
       "saveAsProfile": "प्रोफाइलको रूपमा बचत गर्नुहोस्",
       "saveProfileDescription": "पुन: प्रयोज्य प्रोफाइलको रूपमा हालको वातावरण चर र सेटअप आदेशहरू बचत गर्नुहोस्।",
       "profileSummary": "{{vars}} वातावरण चर · {{commands}} सेटअप आदेशहरू",
@@ -2978,7 +2980,9 @@
     "permissionDescription": "तपाईंसँग यो हेर्ने अनुमति छैन।",
     "notFoundDescription": "यो सामग्री हटाइएको हुन सक्छ वा अब उपलब्ध छैन।",
     "serverTitle": "लोड गर्न सकिएन।",
-    "serverDescription": "हाम्रो प्रणालीमा समस्या आयो। कृपया फेरि प्रयास गर्नुहोस्।"
+    "serverDescription": "हाम्रो प्रणालीमा समस्या आयो। कृपया फेरि प्रयास गर्नुहोस्।",
+    "timeoutTitle": "सर्भरले धेरै समय लिँदैछ",
+    "timeoutDescription": "अनुरोध समय सकिनुअघि पूरा भएन। कृपया फेरि प्रयास गर्नुहोस्।"
   },
   "screenHeader": {
     "openMenu": "मेनु खोल्नुहोस्",
@@ -3833,6 +3837,7 @@
     "commandLabel": "आदेश",
     "commandLabelPosition": "आदेश {{position}}",
     "commandPlaceholder": "जस्तै pnpm install",
+    "commandAtLimit": "आदेश {{max}} अक्षरहरूमा सीमित छ",
     "commandsEmpty": "अहिलेसम्म कुनै सेटअप आदेशहरू छैनन्",
     "commandsSaveFailed": "सेटअप आदेशहरू बचत गर्न सकिएन",
     "moveUp": "माथि सार्नुहोस्",

@@ -743,7 +743,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Ṣàtúnṣe àsọyé àtijọ́ tó ń dúró lórí {{location}}",
       "editA11y": "Ṣàtúnṣe àsọyé tó ń dúró lórí {{location}}",
-      "staleHint": "pR ti yí padà láti ìgbà tí o ti kọ èyí.",
+      "staleHint": "PR ti yí padà láti ìgbà tí o ti kọ èyí.",
       "deleteA11y": "Pa àsọyé tó ń dúró lórí {{location}} rẹ́",
       "deletedAnnouncement": "A ti pa àsọyé tó ń dúró rẹ́",
       "noCommentsQueued": "Kò sí àsọyé tó ń dúró. A ó fi àtúnyẹ̀wò ránṣẹ́ pẹ̀lú ìgbésẹ̀ tó wà lókè nìkan.",
@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "A kò lè gbé àyíká iṣẹ́ rẹ wọlé.",
       "retryLoadingEnvironment": "Gbìyànjú láti tún àyíká iṣẹ́ gbé wọlé",
       "defaultEnvironment": "Àyíká iṣẹ́ àiyípadà",
+      "environmentAccessibility": "Yan profaili kan: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Yan profaili kan: {{label}}. {{attention}}",
       "leaveChanges": "Fi àyípadà sílẹ̀",
       "commitAndPush": "Ṣe àkọsílẹ̀, firánṣẹ́",
       "startSession": "Bẹ̀rẹ̀ ìgbà iṣẹ́",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "Ṣakoso awọn profaili",
       "noProfiles": "Ko si awọn profaili sibẹsibẹ. Ṣẹda ọkan lati ṣafikun awọn oniyipada ayika, awọn olupin MCP, ati awọn ọgbọn.",
       "advancedConfig": "To ti ni ilọsiwaju iṣeto ni",
-      "advancedConfigDescription": "Yan profaili kan lati kojọpọ awọn atunto ti o fipamọ, ati pẹlu ọwọ tunto awọn oniyipada agbegbe afikun ati awọn pipaṣẹ iṣeto",
+      "advancedConfigDescription": "Ó kan ìpàdé yìí. Fífipamọ́ gẹ́gẹ́ bi profaili yóò pa á mọ́ fún ìgbà tó ń bọ̀.",
       "saveAsProfile": "Fipamọ bi Profaili",
       "saveProfileDescription": "Ṣafipamọ awọn oniyipada ayika lọwọlọwọ ati awọn pipaṣẹ iṣeto bi profaili atunlo.",
       "profileSummary": "{{vars}} awọn oniyipada ayika · {{commands}} Awọn aṣẹ iṣeto",
@@ -2978,7 +2980,9 @@
     "permissionDescription": "O kò ní àṣẹ láti wo èyí.",
     "notFoundDescription": "Ó ṣeé ṣe kí a ti yọ ohun yìí kúrò tàbí kí ó má sí mọ́.",
     "serverTitle": "A kò lè gbé dátà wọlé.",
-    "serverDescription": "Ìṣòro kan wáyé ní ọ̀dọ̀ wa. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i."
+    "serverDescription": "Ìṣòro kan wáyé ní ọ̀dọ̀ wa. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
+    "timeoutTitle": "Ìdáhùn náà ń gbà jù",
+    "timeoutDescription": "Ìbéèrè náà kò parí rí kí àkókò rẹ̀ tó tán. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i."
   },
   "screenHeader": {
     "openMenu": "Ṣí àkójọ àṣàyàn",
@@ -3833,6 +3837,7 @@
     "commandLabel": "Aṣẹ",
     "commandLabelPosition": "Aṣẹ {{position}}",
     "commandPlaceholder": "fun apẹẹrẹ pnpm install",
+    "commandAtLimit": "Pipaṣẹ naa ní ààlà {{max}} àmì",
     "commandsEmpty": "Ko si awọn pipaṣẹ iṣeto sibẹsibẹ",
     "commandsSaveFailed": "Ko le fi awọn pipaṣẹ iṣeto pamọ",
     "moveUp": "Gbe soke",

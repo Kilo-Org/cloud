@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "ไม่สามารถโหลดสภาพแวดล้อมของคุณได้",
       "retryLoadingEnvironment": "ลองโหลดสภาพแวดล้อมใหม่",
       "defaultEnvironment": "สภาพแวดล้อมเริ่มต้น",
+      "environmentAccessibility": "เลือกโปรไฟล์: {{label}}",
+      "environmentAccessibilityNeedsAttention": "เลือกโปรไฟล์: {{label}} {{attention}}",
       "leaveChanges": "เก็บการแก้ไขไว้",
       "commitAndPush": "คอมมิตและพุช",
       "startSession": "เริ่มเซสชัน",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "จัดการโปรไฟล์",
       "noProfiles": "ยังไม่มีโปรไฟล์ สร้างโปรไฟล์เพื่อเพิ่มตัวแปรสภาพแวดล้อม เซิร์ฟเวอร์ MCP และทักษะ",
       "advancedConfig": "การกำหนดค่าขั้นสูง",
-      "advancedConfigDescription": "เลือกโปรไฟล์เพื่อโหลดการกำหนดค่าที่บันทึกไว้ และกำหนดค่าตัวแปรสภาพแวดล้อมเพิ่มเติมและคำสั่งการตั้งค่าด้วยตนเอง",
+      "advancedConfigDescription": "ใช้กับเซสชันนี้ การบันทึกเป็นโปรไฟล์จะเก็บไว้ใช้ครั้งถัดไป",
       "saveAsProfile": "บันทึกเป็นโปรไฟล์",
       "saveProfileDescription": "บันทึกตัวแปรสภาพแวดล้อมปัจจุบันและคำสั่งการตั้งค่าเป็นโปรไฟล์ที่นำมาใช้ซ้ำได้",
       "profileSummary": "ตัวแปรสภาพแวดล้อม {{vars}} · คำสั่งการตั้งค่า {{commands}}",
@@ -2978,7 +2980,9 @@
     "permissionDescription": "คุณไม่มีสิทธิ์ดูข้อมูลนี้",
     "notFoundDescription": "รายการนี้อาจถูกลบหรือใช้งานไม่ได้แล้ว",
     "serverTitle": "โหลดไม่สำเร็จ",
-    "serverDescription": "ระบบของเราเกิดข้อผิดพลาด กรุณาลองอีกครั้ง"
+    "serverDescription": "ระบบของเราเกิดข้อผิดพลาด กรุณาลองอีกครั้ง",
+    "timeoutTitle": "ระบบตอบสนองช้าเกินไป",
+    "timeoutDescription": "คำขอใช้เวลานานเกินกำหนด กรุณาลองอีกครั้ง"
   },
   "screenHeader": {
     "openMenu": "เปิดเมนู",
@@ -3833,6 +3837,7 @@
     "commandLabel": "คำสั่ง",
     "commandLabelPosition": "คำสั่ง {{position}}",
     "commandPlaceholder": "เช่น pnpm install",
+    "commandAtLimit": "คำสั่งจำกัดไว้ที่ {{max}} อักขระ",
     "commandsEmpty": "ยังไม่มีคำสั่งการตั้งค่า",
     "commandsSaveFailed": "ไม่สามารถบันทึกคำสั่งการตั้งค่าได้",
     "moveUp": "เลื่อนขึ้น",

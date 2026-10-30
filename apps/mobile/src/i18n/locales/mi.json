@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Kāore i taea te uta i tō taiao.",
       "retryLoadingEnvironment": "Whakamātau anō ki te uta i te taiao",
       "defaultEnvironment": "Te taiao taunoa",
+      "environmentAccessibility": "Tīpakohia he kōtaha: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Tīpakohia he kōtaha: {{label}}. {{attention}}",
       "leaveChanges": "Waiho ngā huringa",
       "commitAndPush": "Whakapūmau, pana",
       "startSession": "Tīmataria te wātū",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "Whakahaere pūkete",
       "noProfiles": "Karekau he pūkete. Waihangahia tetahi hei taapiri i nga taurangi taiao, nga tūmau MCP, me nga pukenga.",
       "advancedConfig": "Whirihoranga Arā Atu Anō",
-      "advancedConfigDescription": "Tīpakohia he kōtaha hei uta i ngā whirihoranga kua tiakina, me te whirihora ā-ringa i etahi atu taurangi taiao me nga whakahau tatūnga",
+      "advancedConfigDescription": "E hāngai ana ki tēnei wātū. Mā te tiaki hei kōtaha ka pupuri mō tērā wā.",
       "saveAsProfile": "Tiaki hei Kōtaha",
       "saveProfileDescription": "Tiakina nga taurangi taiao o naianei me nga whakahau tatūnga hei kōtaha ka taea te whakamahi.",
       "profileSummary": "{{vars}} taurangi taiao · {{commands}} whakahau tatūnga",
@@ -2978,7 +2980,9 @@
     "permissionDescription": "Kāore koe e whakaaetia kia tiro ki tēnei.",
     "notFoundDescription": "Kua tangohia pea tēnei mea, kua kore rānei e wātea.",
     "serverTitle": "Kāore i taea te uta.",
-    "serverDescription": "I puta he hapa i tō mātou taha. Whakamātau anō."
+    "serverDescription": "I puta he hapa i tō mātou taha. Whakamātau anō.",
+    "timeoutTitle": "Kua roa rawa te tūmau",
+    "timeoutDescription": "Kua taka te wā o te tono i tehe mai i tōna otinga. Whakamātau anō."
   },
   "screenHeader": {
     "openMenu": "Whakatuwheratia te tahua",
@@ -3833,6 +3837,7 @@
     "commandLabel": "Whakahau",
     "commandLabelPosition": "Whakahau {{position}}",
     "commandPlaceholder": "hei tauira pnpm install",
+    "commandAtLimit": "Ka whakawhāitihia te whakahau ki te {{max}} pūāhua",
     "commandsEmpty": "Kare ano he tono tatūnga",
     "commandsSaveFailed": "Kāore i taea te tiaki i ngā tono tatūnga",
     "moveUp": "Neke ki runga",

@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "আপনার পরিবেশ লোড করা যায়নি।",
       "retryLoadingEnvironment": "পরিবেশ লোড করার জন্য আবার চেষ্টা করুন",
       "defaultEnvironment": "ডিফল্ট পরিবেশ",
+      "environmentAccessibility": "একটি প্রোফাইল বাছাই করুন: {{label}}",
+      "environmentAccessibilityNeedsAttention": "একটি প্রোফাইল বাছাই করুন: {{label}}। {{attention}}",
       "leaveChanges": "পরিবর্তন রেখে দিন",
       "commitAndPush": "কমিট ও পুশ করুন",
       "startSession": "সেশন শুরু করুন",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "প্রোফাইল পরিচালনা করুন",
       "noProfiles": "এখনো কোনো প্রোফাইল নেই. পরিবেশ ভেরিয়েবল, MCP সার্ভার এবং দক্ষতা যোগ করতে একটি তৈরি করুন।",
       "advancedConfig": "উন্নত কনফিগারেশন",
-      "advancedConfigDescription": "সংরক্ষিত কনফিগারেশন লোড করতে একটি প্রোফাইল নির্বাচন করুন এবং অতিরিক্ত পরিবেশ ভেরিয়েবল এবং সেটআপ কমান্ড ম্যানুয়ালি কনফিগার করুন",
+      "advancedConfigDescription": "এই সেশনের জন্য প্রযোজ্য। প্রোফাইল হিসেবে সংরক্ষণ করলে এটি পরের বারের জন্য থাকে।",
       "saveAsProfile": "প্রোফাইল হিসাবে সংরক্ষণ করুন",
       "saveProfileDescription": "একটি পুনঃব্যবহারযোগ্য প্রোফাইল হিসাবে বর্তমান পরিবেশ ভেরিয়েবল এবং সেটআপ কমান্ড সংরক্ষণ করুন।",
       "profileSummary": "{{vars}} পরিবেশ ভেরিয়েবল · {{commands}} সেটআপ কমান্ড",
@@ -2978,7 +2980,9 @@
     "permissionDescription": "এটি দেখার অনুমতি আপনার নেই।",
     "notFoundDescription": "এই আইটেমটি হয়তো সরিয়ে ফেলা হয়েছে বা এখন আর পাওয়া যাচ্ছে না।",
     "serverTitle": "লোড করা যায়নি।",
-    "serverDescription": "আমাদের দিকে একটি সমস্যা হয়েছে। আবার চেষ্টা করুন।"
+    "serverDescription": "আমাদের দিকে একটি সমস্যা হয়েছে। আবার চেষ্টা করুন।",
+    "timeoutTitle": "সার্ভার বেশি সময় নিচ্ছে",
+    "timeoutDescription": "অনুরোধটি শেষ হওয়ার আগেই সময় শেষ হয়ে গেছে। আবার চেষ্টা করুন।"
   },
   "screenHeader": {
     "openMenu": "মেনু খুলুন",
@@ -3833,6 +3837,7 @@
     "commandLabel": "আদেশ",
     "commandLabelPosition": "আদেশ {{position}}",
     "commandPlaceholder": "যেমন pnpm install",
+    "commandAtLimit": "কমান্ডটি সর্বাধিক {{max}}টি অক্ষরের মধ্যে সীমাবদ্ধ",
     "commandsEmpty": "এখনো কোনো সেটআপ কমান্ড নেই",
     "commandsSaveFailed": "সেটআপ কমান্ড সংরক্ষণ করা যায়নি",
     "moveUp": "উপরে সরান",

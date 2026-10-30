@@ -743,7 +743,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Muuda aegunud ootel kommentaari asukohas {{location}}",
       "editA11y": "Muuda ootel kommentaari asukohas {{location}}",
-      "staleHint": "pR on pärast selle kommentaari kirjutamist muutunud.",
+      "staleHint": "PR on pärast selle kommentaari kirjutamist muutunud.",
       "deleteA11y": "Kustuta ootel kommentaar asukohas {{location}}",
       "deletedAnnouncement": "Ootel kommentaar kustutati",
       "noCommentsQueued": "Järjekorras pole kommentaare. Ülevaatus esitatakse ainult ülal valitud toiminguga.",
@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Sinu keskkonna laadimine ebaõnnestus.",
       "retryLoadingEnvironment": "Proovi keskkonna laadimist uuesti",
       "defaultEnvironment": "Vaikekeskkond",
+      "environmentAccessibility": "Valige profiil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Valige profiil: {{label}}. {{attention}}",
       "leaveChanges": "Jäta alles",
       "commitAndPush": "Kinnista ja saada",
       "startSession": "Alusta seanssi",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "Profiilide haldamine",
       "noProfiles": "Profiilid veel puuduvad. Looge see keskkonnamuutujate, MCP-serverite ja oskuste lisamiseks.",
       "advancedConfig": "Täpsem konfiguratsioon",
-      "advancedConfigDescription": "Valige salvestatud konfiguratsioonide laadimiseks profiil ja konfigureerige käsitsi täiendavaid keskkonnamuutujaid ja häälestuskäske",
+      "advancedConfigDescription": "Kehtib selle seansi kohta. Profiilina salvestamine jätab selle järgmiseks korraks alles.",
       "saveAsProfile": "Salvesta profiilina",
       "saveProfileDescription": "Salvestage praegused keskkonnamuutujad ja häälestuskäsud korduvkasutatava profiilina.",
       "profileSummary": "{{vars}} keskkonnamuutujad · {{commands}} häälestuskäsud",
@@ -2978,7 +2980,9 @@
     "permissionDescription": "Sul pole õigust seda vaadata.",
     "notFoundDescription": "See on kas eemaldatud või pole enam saadaval.",
     "serverTitle": "Laadimine ei õnnestunud.",
-    "serverDescription": "Meie poolel tekkis viga. Proovi uuesti."
+    "serverDescription": "Meie poolel tekkis viga. Proovi uuesti.",
+    "timeoutTitle": "Server vastab liiga aeglaselt",
+    "timeoutDescription": "Päring ei jõudnud õigeaegselt lõpule. Proovi uuesti."
   },
   "screenHeader": {
     "openMenu": "Ava menüü",
@@ -3833,6 +3837,7 @@
     "commandLabel": "Käsk",
     "commandLabelPosition": "Käsk {{position}}",
     "commandPlaceholder": "nt pnpm install",
+    "commandAtLimit": "Käsu pikkus on piiratud {{max}} tähemärgiga",
     "commandsEmpty": "Seadistuskäske pole veel",
     "commandsSaveFailed": "Seadistuskäske ei saanud salvestada",
     "moveUp": "Liigu üles",

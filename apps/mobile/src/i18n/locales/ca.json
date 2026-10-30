@@ -42,7 +42,7 @@
     "mergeRequest": "sol·licitud de fusió",
     "notConnected": "No connectat",
     "notifications": "Notificacions",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repositoris",
     "securityAgent": "Agent de seguretat",
     "unknown": "Desconegut",
@@ -2347,6 +2347,8 @@
       "couldNotLoadEnvironment": "No s'ha pogut carregar el teu entorn.",
       "retryLoadingEnvironment": "Torna a provar de carregar l'entorn",
       "defaultEnvironment": "Entorn predeterminat",
+      "environmentAccessibility": "Tria un perfil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Tria un perfil: {{label}}. {{attention}}",
       "leaveChanges": "Deixa els canvis",
       "commitAndPush": "Consigna i envia",
       "startSession": "Inicia la sessió",
@@ -2381,7 +2383,7 @@
       "manageProfiles": "Gestionar perfils",
       "noProfiles": "Encara no hi ha perfils. Creeu-ne un per afegir variables d'entorn, servidors MCP i habilitats.",
       "advancedConfig": "Configuració avançada",
-      "advancedConfigDescription": "Seleccioneu un perfil per carregar configuracions desades i configureu manualment variables d'entorn addicionals i ordres de configuració",
+      "advancedConfigDescription": "S’aplica a aquesta sessió. Desar-ho com a perfil ho conserva per a la propera vegada.",
       "saveAsProfile": "Desa com a perfil",
       "saveProfileDescription": "Deseu les variables d'entorn actuals i configureu les ordres com a perfil reutilitzable.",
       "profileSummary": "{{vars}} variables d'entorn · {{commands}} ordres de configuració",
@@ -2909,10 +2911,10 @@
       "unavailable": "Aquesta sessió no pot rebre sol·licituds de permís."
     },
     "prBadge": {
-      "open": "pR oberta",
+      "open": "PR oberta",
       "closed": "sol·licitud d'integració tancada",
       "merged": "sol·licitud d'integració fusionada",
-      "draft": "pR en esborrany",
+      "draft": "PR en esborrany",
       "updating": "Actualitzant, {{label}} #{{number}}",
       "label": "{{label}} núm. {{number}}"
     },
@@ -3020,7 +3022,9 @@
     "permissionDescription": "No tens permís per veure aquest contingut.",
     "notFoundDescription": "Pot ser que s'hagi eliminat aquest element o que ja no estigui disponible.",
     "serverTitle": "No s'ha pogut carregar.",
-    "serverDescription": "S'ha produït un error al nostre sistema. Torna-ho a provar."
+    "serverDescription": "S'ha produït un error al nostre sistema. Torna-ho a provar.",
+    "timeoutTitle": "El servidor triga massa",
+    "timeoutDescription": "La sol·licitud ha esgotat el temps d'espera. Torna-ho a provar."
   },
   "screenHeader": {
     "openMenu": "Obre el menú",
@@ -3883,6 +3887,7 @@
     "commandLabel": "Comandament",
     "commandLabelPosition": "Comandament {{position}}",
     "commandPlaceholder": "p. ex. pnpm install",
+    "commandAtLimit": "El comandament està limitat a {{max}} caràcters",
     "commandsEmpty": "Encara no hi ha ordres de configuració",
     "commandsSaveFailed": "No s'han pogut desar les ordres de configuració",
     "moveUp": "Mou cap amunt",

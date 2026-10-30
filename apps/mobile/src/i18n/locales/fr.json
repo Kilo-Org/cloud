@@ -1706,6 +1706,8 @@
       "couldNotLoadEnvironment": "Impossible de charger votre environnement.",
       "retryLoadingEnvironment": "Réessayer de charger l'environnement",
       "defaultEnvironment": "Environnement par défaut",
+      "environmentAccessibility": "Choisissez un profil : {{label}}",
+      "environmentAccessibilityNeedsAttention": "Choisissez un profil : {{label}}. {{attention}}",
       "leaveChanges": "Conserver en l'état",
       "commitAndPush": "Valider et envoyer",
       "startSession": "Démarrer la session",
@@ -1740,7 +1742,7 @@
       "manageProfiles": "Gérer les profils",
       "noProfiles": "Aucun profil pour l'instant. Créez-en un pour ajouter des variables d'environnement, des serveurs MCP et des compétences.",
       "advancedConfig": "Configuration avancée",
-      "advancedConfigDescription": "Sélectionnez un profil pour charger les configurations enregistrées et configurez manuellement des variables d'environnement et des commandes de configuration supplémentaires.",
+      "advancedConfigDescription": "S’applique à cette session. L’enregistrer comme profil le conserve pour la prochaine fois.",
       "saveAsProfile": "Enregistrer en tant que profil",
       "saveProfileDescription": "Enregistrez les variables d'environnement et les commandes de configuration actuelles en tant que profil réutilisable.",
       "profileSummary": "{{vars}} variables d'environnement · {{commands}} commandes de configuration",
@@ -2269,9 +2271,9 @@
     },
     "prBadge": {
       "open": "ouverture de la PR",
-      "closed": "pR fermée",
-      "merged": "pR fusionnée",
-      "draft": "pR en brouillon",
+      "closed": "PR fermée",
+      "merged": "PR fusionnée",
+      "draft": "PR en brouillon",
       "updating": "Mise à jour en cours, {{label}} n° {{number}}",
       "label": "{{label}} n° {{number}}"
     },
@@ -2407,7 +2409,9 @@
     "permissionDescription": "Vous n'avez pas l'autorisation de consulter ce contenu.",
     "notFoundDescription": "Cet élément a peut-être été supprimé ou n'est plus disponible.",
     "serverTitle": "Impossible de charger les données.",
-    "serverDescription": "Une erreur s'est produite de notre côté. Réessayez."
+    "serverDescription": "Une erreur s'est produite de notre côté. Réessayez.",
+    "timeoutTitle": "Le serveur met trop de temps à répondre",
+    "timeoutDescription": "La demande a mis trop de temps à aboutir. Réessayez."
   },
   "screenHeader": {
     "openMenu": "Ouvrir le menu",
@@ -3883,6 +3887,7 @@
     "commandLabel": "Commande",
     "commandLabelPosition": "Commande {{position}}",
     "commandPlaceholder": "p. ex. pnpm install",
+    "commandAtLimit": "La commande est limitée à {{max}} caractères",
     "commandsEmpty": "Aucune commande de configuration pour l'instant",
     "commandsSaveFailed": "Impossible d'enregistrer les commandes de configuration",
     "moveUp": "Monter",

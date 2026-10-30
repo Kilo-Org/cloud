@@ -8709,6 +8709,7 @@
           }
         },
         "secrets": {
+          "maxItems": 100,
           "type": "array",
           "items": {
             "anyOf": [

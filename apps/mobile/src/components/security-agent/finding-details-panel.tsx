@@ -23,6 +23,7 @@ import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { getSecurityAgentPath, type SecurityFinding } from '@/lib/security-agent';
 import { openFindingLink } from '@/lib/security-agent-link';
 import { cn, firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';
@@ -75,7 +76,7 @@ function DismissalOrSupersessionNote({
   scope,
   supersedingFindingId,
 }: Readonly<{ finding: SecurityFinding; scope: string; supersedingFindingId: string | null }>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const colors = useThemeColors();
 
@@ -84,7 +85,7 @@ function DismissalOrSupersessionNote({
       <Pressable
         className="gap-1 rounded-lg bg-secondary p-3 active:opacity-70"
         onPress={() => {
-          router.push(getSecurityAgentPath(scope, `findings/${supersedingFindingId}`));
+          pushOnce(getSecurityAgentPath(scope, `findings/${supersedingFindingId}`));
         }}
       >
         <View className="flex-row items-center gap-2">

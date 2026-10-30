@@ -24,19 +24,34 @@ export type PrInboxView = {
 };
 
 export function selectPrInboxView(args: {
-  isLoading: boolean;
+  /**
+   * No rows have arrived and no first-page failure was reported yet. This is
+   * the query's pending status, not `isLoading`: a paused, offline or
+   * cancelled first read is pending without fetching.
+   */
+  isPending: boolean;
+  /** A first-page read is in flight right now. */
+  isFetching: boolean;
   itemCount: number;
   firstPageErrorState: PrReviewQueryState | null;
   laterPageError: boolean;
 }): PrInboxView {
-  const { isLoading, itemCount, firstPageErrorState, laterPageError } = args;
+  const { isPending, isFetching, itemCount, firstPageErrorState, laterPageError } = args;
 
+  // A failure is always its own state, whether or not a retry is in flight:
+  // the view carries the reason and the Retry that recovers it.
   if (firstPageErrorState) {
     return { kind: firstPageErrorState.kind, showLoadMoreRetry: false };
   }
 
-  if (isLoading) {
-    return { kind: 'loading', showLoadMoreRetry: false };
+  // The skeleton is only honest while a read is actually in flight. A first
+  // page that is pending without fetching — paused because the device reports
+  // itself offline, cancelled, or never started — would otherwise keep the
+  // skeleton up forever with nothing to press. It never settles on its own, so
+  // it takes the retryable body: nothing has loaded, nothing was reported
+  // empty, and the user gets the Retry that restarts the read.
+  if (isPending) {
+    return { kind: isFetching ? 'loading' : 'retryable', showLoadMoreRetry: false };
   }
 
   if (itemCount === 0) {

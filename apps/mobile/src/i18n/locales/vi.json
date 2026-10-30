@@ -1657,7 +1657,7 @@
       "dollar_other": "đô la",
       "costSpoken": "chi phí {{cost}}",
       "costSpokenWithTime": "chi phí {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}",
+      "pullRequest": "PR {{number}}",
       "spokenJoiner": "và"
     },
     "githubInstall": {
@@ -1792,6 +1792,8 @@
       "couldNotLoadEnvironment": "Không thể tải môi trường của bạn.",
       "retryLoadingEnvironment": "Thử tải lại môi trường",
       "defaultEnvironment": "Môi trường mặc định",
+      "environmentAccessibility": "Chọn một hồ sơ: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Chọn một hồ sơ: {{label}}. {{attention}}",
       "leaveChanges": "Giữ thay đổi",
       "commitAndPush": "Ghi nhận và đẩy",
       "startSession": "Bắt đầu phiên",
@@ -1826,7 +1828,7 @@
       "manageProfiles": "Quản lý hồ sơ",
       "noProfiles": "Chưa có hồ sơ nào. Tạo một cái để thêm các biến môi trường, máy chủ MCP và kỹ năng.",
       "advancedConfig": "Cấu hình nâng cao",
-      "advancedConfigDescription": "Chọn một cấu hình để tải các cấu hình đã lưu và định cấu hình thủ công các biến môi trường và lệnh thiết lập bổ sung",
+      "advancedConfigDescription": "Áp dụng cho phiên này. Lưu làm hồ sơ sẽ giữ lại cho lần sau.",
       "saveAsProfile": "Lưu làm hồ sơ",
       "saveProfileDescription": "Lưu các biến môi trường hiện tại và các lệnh thiết lập dưới dạng cấu hình có thể sử dụng lại.",
       "profileSummary": "{{vars}} biến môi trường · {{commands}} lệnh thiết lập",
@@ -2454,7 +2456,9 @@
     "permissionDescription": "Bạn không có quyền xem nội dung này.",
     "notFoundDescription": "Mục này có thể đã bị xóa hoặc không còn truy cập được.",
     "serverTitle": "Không thể tải dữ liệu.",
-    "serverDescription": "Hệ thống của chúng tôi gặp lỗi. Vui lòng thử lại."
+    "serverDescription": "Hệ thống của chúng tôi gặp lỗi. Vui lòng thử lại.",
+    "timeoutTitle": "Máy chủ phản hồi quá chậm",
+    "timeoutDescription": "Yêu cầu đã quá thời gian chờ. Vui lòng thử lại."
   },
   "screenHeader": {
     "openMenu": "Mở trình đơn",
@@ -3045,7 +3049,7 @@
       "editA11y": "Chỉnh sửa bình luận chờ gửi tại {{location}}",
       "editOutdatedA11y": "Chỉnh sửa bình luận chờ gửi không còn cập nhật tại {{location}}",
       "noCommentsQueued": "Không có bình luận nào chờ gửi. Bản đánh giá sẽ được gửi theo hình thức đã chọn ở trên mà không kèm bình luận.",
-      "staleHint": "pR đã thay đổi kể từ khi bạn viết bình luận này.",
+      "staleHint": "PR đã thay đổi kể từ khi bạn viết bình luận này.",
       "staleQueueHint": "Các bình luận gắn với bản ghi cũ hơn sẽ không được gửi. Chúng vẫn nằm trong danh sách chờ gửi để bạn chỉnh sửa hoặc xóa.",
       "summaryA11y": "Tóm tắt đánh giá",
       "summaryPlaceholder": "Tóm tắt đánh giá (không bắt buộc)"
@@ -3833,6 +3837,7 @@
     "commandLabel": "Lệnh",
     "commandLabelPosition": "Lệnh {{position}}",
     "commandPlaceholder": "ví dụ: pnpm install",
+    "commandAtLimit": "Lệnh được giới hạn tối đa {{max}} ký tự",
     "commandsEmpty": "Chưa có lệnh thiết lập nào",
     "commandsSaveFailed": "Không thể lưu lệnh thiết lập",
     "moveUp": "Di chuyển lên",

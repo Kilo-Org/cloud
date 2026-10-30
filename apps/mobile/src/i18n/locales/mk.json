@@ -42,7 +42,7 @@
     "mergeRequest": "merge барање",
     "notConnected": "Неповрзано",
     "notifications": "Известувања",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Репозиториуми",
     "securityAgent": "Безбедносен агент",
     "unknown": "Непознато",
@@ -743,7 +743,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Уреди го застарениот коментар на чекање за {{location}}",
       "editA11y": "Уреди го коментарот на чекање за {{location}}",
-      "staleHint": "pR е ажуриран откако го напиша ова.",
+      "staleHint": "PR е ажуриран откако го напиша ова.",
       "deleteA11y": "Избриши го коментарот на чекање за {{location}}",
       "deletedAnnouncement": "Коментарот на чекање е избришан",
       "noCommentsQueued": "Нема коментари за испраќање. Прегледот ќе се испрати само со дејството избрано погоре.",
@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Не успеа вчитувањето на твојата околина.",
       "retryLoadingEnvironment": "Повторно вчитај ја околината",
       "defaultEnvironment": "Стандардна околина",
+      "environmentAccessibility": "Изберете профил: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Изберете профил: {{label}}. {{attention}}",
       "leaveChanges": "Остави ги промените",
       "commitAndPush": "Комитирај и испрати",
       "startSession": "Започни сесија",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "Управувајте со профилите",
       "noProfiles": "Сè уште нема профили. Создадете една за да додадете променливи на животната средина, MCP сервери и вештини.",
       "advancedConfig": "Напредна конфигурација",
-      "advancedConfigDescription": "Изберете профил за да ги вчитате зачуваните конфигурации и рачно конфигурирајте дополнителни променливи на околината и команди за поставување",
+      "advancedConfigDescription": "Важи за оваа сесија. Зачувувањето како профил го задржува за следниот пат.",
       "saveAsProfile": "Зачувај како профил",
       "saveProfileDescription": "Зачувајте ги тековните променливи на околината и командите за поставување како профил за повеќекратна употреба.",
       "profileSummary": "{{vars}} променливи на околината · {{commands}} наредби за поставување",
@@ -2871,7 +2873,7 @@
       "open": "отворен PR",
       "closed": "затворено барање за спојување",
       "merged": "споено барање за спојување",
-      "draft": "pR во нацрт",
+      "draft": "PR во нацрт",
       "updating": "Се ажурира, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2978,7 +2980,9 @@
     "permissionDescription": "Немаш дозвола да го видиш ова.",
     "notFoundDescription": "Оваа ставка можеби е отстранета или повеќе не е достапна.",
     "serverTitle": "Вчитувањето не е можно.",
-    "serverDescription": "Се појави проблем од наша страна. Обиди се повторно."
+    "serverDescription": "Се појави проблем од наша страна. Обиди се повторно.",
+    "timeoutTitle": "Серверот одговара премногу бавно",
+    "timeoutDescription": "Барањето истече пред да заврши. Обиди се повторно."
   },
   "screenHeader": {
     "openMenu": "Отвори мени",
@@ -3833,6 +3837,7 @@
     "commandLabel": "Команда",
     "commandLabelPosition": "Команда {{position}}",
     "commandPlaceholder": "пр. pnpm install",
+    "commandAtLimit": "Командата е ограничена на {{max}} знаци",
     "commandsEmpty": "Сè уште нема команди за поставување",
     "commandsSaveFailed": "Не може да се зачуваат командите за поставување",
     "moveUp": "Движете се нагоре",

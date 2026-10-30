@@ -16,5 +16,5 @@ export type TodoQueryErrorView = {
 
 export function selectTodoQueryErrorView(error: unknown): TodoQueryErrorView {
   const code = readTrpcErrorField(error, 'code');
-  return { variant: trpcErrorVariant(code), showRetry: !isTerminalTrpcCode(code) };
+  return { variant: trpcErrorVariant(error), showRetry: !isTerminalTrpcCode(code) };
 }

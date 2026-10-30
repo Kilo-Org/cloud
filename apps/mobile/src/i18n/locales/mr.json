@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "तुमचा कार्यपरिसर लोड करता आला नाही.",
       "retryLoadingEnvironment": "कार्यपरिसर लोड करण्याचा पुन्हा प्रयत्न करा",
       "defaultEnvironment": "डीफॉल्ट कार्यपरिसर",
+      "environmentAccessibility": "प्रोफाइल निवडा: {{label}}",
+      "environmentAccessibilityNeedsAttention": "प्रोफाइल निवडा: {{label}}. {{attention}}",
       "leaveChanges": "बदल ठेवा",
       "commitAndPush": "कमिट आणि पुश करा",
       "startSession": "सत्र सुरू करा",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "प्रोफाइल व्यवस्थापित करा",
       "noProfiles": "अद्याप कोणतेही प्रोफाइल नाहीत. पर्यावरण व्हेरिएबल्स, MCP सर्व्हर आणि कौशल्ये जोडण्यासाठी एक तयार करा.",
       "advancedConfig": "प्रगत कॉन्फिगरेशन",
-      "advancedConfigDescription": "सेव्ह केलेले कॉन्फिगरेशन लोड करण्यासाठी प्रोफाइल निवडा आणि अतिरिक्त पर्यावरण व्हेरिएबल्स आणि सेटअप कमांड मॅन्युअली कॉन्फिगर करा",
+      "advancedConfigDescription": "हे या सत्रावर लागू होते. प्रोफाइल म्हणून सेव्ह केल्यास ते पुढील वेळेसाठी राहते.",
       "saveAsProfile": "प्रोफाइल म्हणून सेव्ह करा",
       "saveProfileDescription": "वर्तमान पर्यावरण व्हेरिएबल्स आणि सेटअप कमांड्स पुन्हा वापरता येण्याजोग्या प्रोफाइल म्हणून जतन करा.",
       "profileSummary": "{{vars}} पर्यावरण चल · {{commands}} सेटअप आदेश",
@@ -2978,7 +2980,9 @@
     "permissionDescription": "तुम्हाला हे पाहण्याची परवानगी नाही.",
     "notFoundDescription": "ही बाब काढून टाकली असू शकते किंवा आता उपलब्ध नाही.",
     "serverTitle": "लोड करता आले नाही.",
-    "serverDescription": "आमच्याकडे काहीतरी समस्या आली. कृपया पुन्हा प्रयत्न करा."
+    "serverDescription": "आमच्याकडे काहीतरी समस्या आली. कृपया पुन्हा प्रयत्न करा.",
+    "timeoutTitle": "सर्व्हरला खूप वेळ लागत आहे",
+    "timeoutDescription": "विनंती पूर्ण होण्यापूर्वी वेळ संपली. कृपया पुन्हा प्रयत्न करा."
   },
   "screenHeader": {
     "openMenu": "मेनू उघडा",
@@ -3833,6 +3837,7 @@
     "commandLabel": "आज्ञा",
     "commandLabelPosition": "आज्ञा {{position}}",
     "commandPlaceholder": "उदा. pnpm install",
+    "commandAtLimit": "आदेश {{max}} अक्षरांपुरता मर्यादित आहे",
     "commandsEmpty": "अद्याप सेटअप आदेश नाहीत",
     "commandsSaveFailed": "सेटअप कमांड सेव्ह करू शकलो नाही",
     "moveUp": "वर हलवा",

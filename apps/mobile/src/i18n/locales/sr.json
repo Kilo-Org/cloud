@@ -2347,6 +2347,8 @@
       "couldNotLoadEnvironment": "Učitavanje tvog okruženja nije uspelo.",
       "retryLoadingEnvironment": "Pokušaj ponovo da učitaš okruženje",
       "defaultEnvironment": "Podrazumevano okruženje",
+      "environmentAccessibility": "Izaberite profil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Izaberite profil: {{label}}. {{attention}}",
       "leaveChanges": "Ostavi izmene",
       "commitAndPush": "Komituj i pošalji",
       "startSession": "Pokreni sesiju",
@@ -2381,7 +2383,7 @@
       "manageProfiles": "Upravljajte profilima",
       "noProfiles": "Još nema profila. Napravite jedan da biste dodali promenljive okruženja, MCP servere i veštine.",
       "advancedConfig": "Napredna konfiguracija",
-      "advancedConfigDescription": "Izaberite profil za učitavanje sačuvanih konfiguracija i ručno konfigurišite dodatne promenljive okruženja i komande za podešavanje",
+      "advancedConfigDescription": "Važi za ovu sesiju. Čuvanje kao profil ostaje za sledeći put.",
       "saveAsProfile": "Sačuvaj kao profil",
       "saveProfileDescription": "Sačuvajte trenutne promenljive okruženja i komande za podešavanje kao profil za višekratnu upotrebu.",
       "profileSummary": "{{vars}} promenljivih okruženja · {{commands}} komandi za podešavanje",
@@ -3020,7 +3022,9 @@
     "permissionDescription": "Nemaš dozvolu za prikaz ovog sadržaja.",
     "notFoundDescription": "Ova stavka je možda uklonjena ili više nije dostupna.",
     "serverTitle": "Nije moguće učitati podatke.",
-    "serverDescription": "Došlo je do greške na našoj strani. Pokušaj ponovo."
+    "serverDescription": "Došlo je do greške na našoj strani. Pokušaj ponovo.",
+    "timeoutTitle": "Server ne odgovara na vreme",
+    "timeoutDescription": "Zahtev nije završen na vreme. Pokušaj ponovo."
   },
   "screenHeader": {
     "openMenu": "Otvori meni",
@@ -3883,6 +3887,7 @@
     "commandLabel": "Komanda",
     "commandLabelPosition": "Komanda {{position}}",
     "commandPlaceholder": "npr. pnpm install",
+    "commandAtLimit": "Komanda je ograničena na {{max}} znakova",
     "commandsEmpty": "Još nema komandi za podešavanje",
     "commandsSaveFailed": "Nije moguće sačuvati komande za podešavanje",
     "moveUp": "Pomeri se gore",

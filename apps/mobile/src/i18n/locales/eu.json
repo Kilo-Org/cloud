@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Ezin izan da zure ingurunea kargatu.",
       "retryLoadingEnvironment": "Saiatu berriro ingurunea kargatzen",
       "defaultEnvironment": "Ingurune lehenetsia",
+      "environmentAccessibility": "Aukeratu profil bat: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Aukeratu profil bat: {{label}}. {{attention}}",
       "leaveChanges": "Utzi aldaketak",
       "commitAndPush": "Egin commit eta igo",
       "startSession": "Hasi saioa",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "Kudeatu profilak",
       "noProfiles": "Oraindik ez dago profilik. Sortu bat ingurune-aldagaiak, MCP zerbitzariak eta trebetasunak gehitzeko.",
       "advancedConfig": "Konfigurazio aurreratua",
-      "advancedConfigDescription": "Hautatu profil bat gordetako konfigurazioak kargatzeko eta eskuz konfiguratu ingurune-aldagai gehigarriak eta konfigurazio komandoak",
+      "advancedConfigDescription": "Saio honetarako balio du. Profil gisa gordez gero, hurrengorako gordeko da.",
       "saveAsProfile": "Gorde profil gisa",
       "saveProfileDescription": "Gorde uneko ingurune-aldagaiak eta konfiguratu komandoak profil berrerabilgarri gisa.",
       "profileSummary": "{{vars}} ingurune-aldagaiak · {{commands}} konfigurazio komandoak",
@@ -2978,7 +2980,9 @@
     "permissionDescription": "Ez duzu baimenik hau ikusteko.",
     "notFoundDescription": "Baliteke elementu hau kendu izana edo jada eskuragarri ez egotea.",
     "serverTitle": "Ezin izan da kargatu.",
-    "serverDescription": "Errore bat gertatu da gure sisteman. Saiatu berriro."
+    "serverDescription": "Errore bat gertatu da gure sisteman. Saiatu berriro.",
+    "timeoutTitle": "Zerbitzariak denbora gehiegi behar du",
+    "timeoutDescription": "Eskaera amaitu aurretik iraungi da. Saiatu berriro."
   },
   "screenHeader": {
     "openMenu": "Ireki menua",
@@ -3833,6 +3837,7 @@
     "commandLabel": "Agindua",
     "commandLabelPosition": "{{position}}. agindua",
     "commandPlaceholder": "adib. pnpm install",
+    "commandAtLimit": "Komandoa {{max}} karakteretara mugatuta dago",
     "commandsEmpty": "Oraindik ez dago konfigurazio komandorik",
     "commandsSaveFailed": "Ezin izan dira gorde konfigurazio komandoak",
     "moveUp": "Gora",

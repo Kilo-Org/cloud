@@ -779,7 +779,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Рэдагаваць састарэлы неадпраўлены каментар: {{location}}",
       "editA11y": "Рэдагаваць неадпраўлены каментар: {{location}}",
-      "staleHint": "pR змяніўся пасля напісання гэтага каментара.",
+      "staleHint": "PR змяніўся пасля напісання гэтага каментара.",
       "deleteA11y": "Выдаліць неадпраўлены каментар: {{location}}",
       "deletedAnnouncement": "Неадпраўлены каментар выдалены",
       "noCommentsQueued": "У чарзе няма каментароў. Праверка кода будзе адпраўлена толькі з выбраным вышэй вынікам.",
@@ -2378,6 +2378,8 @@
       "couldNotLoadEnvironment": "Не ўдалося загрузіць ваша асяроддзе.",
       "retryLoadingEnvironment": "Паўтарыць загрузку асяроддзя",
       "defaultEnvironment": "Прадвызначанае асяроддзе",
+      "environmentAccessibility": "Выберыце профіль: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Выберыце профіль: {{label}}. {{attention}}",
       "leaveChanges": "Пакінуць змены",
       "commitAndPush": "Закаміціць і адправіць",
       "startSession": "Пачаць сеанс",
@@ -2412,7 +2414,7 @@
       "manageProfiles": "Кіраванне профілямі",
       "noProfiles": "Профіляў пакуль няма. Стварыце яго, каб дадаць зменныя асяроддзя, серверы MCP і навыкі.",
       "advancedConfig": "Пашыраная канфігурацыя",
-      "advancedConfigDescription": "Выберыце профіль для загрузкі захаваных канфігурацый і ўручную наладзьце дадатковыя зменныя асяроддзя і каманды ўстаноўкі",
+      "advancedConfigDescription": "Дзейнічае для гэтай сесіі. Калі захаваць як профіль, ён застанецца на наступны раз.",
       "saveAsProfile": "Захаваць як профіль",
       "saveProfileDescription": "Захавайце бягучыя зменныя асяроддзя і каманды наладкі як шматразовы профіль.",
       "profileSummary": "{{vars}} зменныя асяроддзя · {{commands}} каманды наладкі",
@@ -3062,7 +3064,9 @@
     "permissionDescription": "У цябе няма дазволу на прагляд.",
     "notFoundDescription": "Магчыма, гэты элемент быў выдалены або больш недаступны.",
     "serverTitle": "Не атрымалася загрузіць даныя.",
-    "serverDescription": "На нашым баку ўзнікла памылка. Паспрабуйце яшчэ раз."
+    "serverDescription": "На нашым баку ўзнікла памылка. Паспрабуйце яшчэ раз.",
+    "timeoutTitle": "Сервер адказвае надта доўга",
+    "timeoutDescription": "Запыт не паспеў выканацца ў адведзены час. Паспрабуйце яшчэ раз."
   },
   "screenHeader": {
     "openMenu": "Адкрыць меню",
@@ -3933,6 +3937,7 @@
     "commandLabel": "Каманда",
     "commandLabelPosition": "Каманда {{position}}",
     "commandPlaceholder": "напр. pnpm install",
+    "commandAtLimit": "Каманда абмежавана {{max}} сімваламі",
     "commandsEmpty": "Пакуль няма каманд наладкі",
     "commandsSaveFailed": "Не ўдалося захаваць каманды наладкі",
     "moveUp": "Рухайцеся ўверх",

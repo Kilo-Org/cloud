@@ -42,7 +42,7 @@
     "mergeRequest": "בקשת מיזוג",
     "notConnected": "לא מחובר",
     "notifications": "התראות",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "מאגרים",
     "securityAgent": "סוכן אבטחה",
     "unknown": "לא ידוע",
@@ -1804,6 +1804,8 @@
       "couldNotLoadEnvironment": "לא ניתן היה לטעון את הסביבה שלך.",
       "retryLoadingEnvironment": "ניסיון נוסף לטעון את הסביבה",
       "defaultEnvironment": "סביבת ברירת מחדל",
+      "environmentAccessibility": "בחר פרופיל: {{label}}",
+      "environmentAccessibilityNeedsAttention": "בחר פרופיל: {{label}}. {{attention}}",
       "leaveChanges": "השארת השינויים",
       "commitAndPush": "קומיט ודחיפה",
       "startSession": "התחלת סשן",
@@ -1838,7 +1840,7 @@
       "manageProfiles": "נהל פרופילים",
       "noProfiles": "עדיין אין פרופילים. צור אחד כדי להוסיף משתני סביבה, שרתי MCP ומיומנויות.",
       "advancedConfig": "תצורה מתקדמת",
-      "advancedConfigDescription": "בחר פרופיל כדי לטעון תצורות שמורות, ולהגדיר באופן ידני משתני סביבה ופקודות הגדרה נוספות",
+      "advancedConfigDescription": "חל על ההפעלה הזו. שמירה כפרופיל שומרת אותו לפעם הבאה.",
       "saveAsProfile": "שמור כפרופיל",
       "saveProfileDescription": "שמור את משתני הסביבה הנוכחיים ואת פקודות ההגדרה כפרופיל לשימוש חוזר.",
       "profileSummary": "{{vars}} משתני סביבה · {{commands}} פקודות הגדרה",
@@ -2366,7 +2368,7 @@
       "unavailable": "הפעלה זו אינה יכולה לקבל בקשות הרשאה."
     },
     "prBadge": {
-      "open": "pR פתוח",
+      "open": "PR פתוח",
       "closed": "בקשת משיכה שנסגרה",
       "merged": "בקשת משיכה שמוזגה",
       "draft": "טיוטת PR",
@@ -2477,7 +2479,9 @@
     "permissionDescription": "אין לך הרשאה לצפות בזה.",
     "notFoundDescription": "ייתכן שהפריט הזה הוסר או שאינו זמין עוד.",
     "serverTitle": "לא ניתן לטעון את הנתונים.",
-    "serverDescription": "משהו השתבש אצלנו. נסה שוב."
+    "serverDescription": "משהו השתבש אצלנו. נסה שוב.",
+    "timeoutTitle": "השרת לוקח זמן רב מדי",
+    "timeoutDescription": "הבקשה לא הספיקה להסתיים בזמן. נסה שוב."
   },
   "screenHeader": {
     "openMenu": "פתיחת התפריט",
@@ -3883,6 +3887,7 @@
     "commandLabel": "פקודה",
     "commandLabelPosition": "פקודה {{position}}",
     "commandPlaceholder": "למשל pnpm install",
+    "commandAtLimit": "הפקודה מוגבלת ל-{{max}} תווים",
     "commandsEmpty": "אין עדיין פקודות הגדרה",
     "commandsSaveFailed": "לא ניתן לשמור פקודות הגדרה",
     "moveUp": "לזוז למעלה",

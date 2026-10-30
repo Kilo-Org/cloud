@@ -743,7 +743,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Breyta úreltri athugasemd í bið við {{location}}",
       "editA11y": "Breyta athugasemd í bið við {{location}}",
-      "staleHint": "pR-beiðnin hefur breyst síðan þú skrifaðir þetta.",
+      "staleHint": "PR-beiðnin hefur breyst síðan þú skrifaðir þetta.",
       "deleteA11y": "Eyða athugasemd í bið við {{location}}",
       "deletedAnnouncement": "Athugasemd í bið eytt",
       "noCommentsQueued": "Engar athugasemdir eru í bið. Yfirferðin verður send með þeirri tegund sem valin er hér að ofan, án athugasemda.",
@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Ekki tókst að hlaða umhverfinu þínu.",
       "retryLoadingEnvironment": "Reyna að hlaða umhverfinu aftur",
       "defaultEnvironment": "Sjálfgefið umhverfi",
+      "environmentAccessibility": "Veldu prófíl: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Veldu prófíl: {{label}}. {{attention}}",
       "leaveChanges": "Halda breytingum",
       "commitAndPush": "Skrá og senda",
       "startSession": "Byrja lotu",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "Stjórna prófílum",
       "noProfiles": "Engir prófílar ennþá. Búðu til einn til að bæta við umhverfisbreytum, MCP netþjónum og færni.",
       "advancedConfig": "Ítarleg stilling",
-      "advancedConfigDescription": "Veldu snið til að hlaða vistuðum stillingum og stilltu handvirkt viðbótarumhverfisbreytur og uppsetningarskipanir",
+      "advancedConfigDescription": "Gildir fyrir þessa lotu. Að vista sem prófíl varðveitir það fyrir næsta skipti.",
       "saveAsProfile": "Vista sem prófíl",
       "saveProfileDescription": "Vistaðu núverandi umhverfisbreytur og uppsetningarskipanir sem endurnýtanlegt snið.",
       "profileSummary": "{{vars}} umhverfisbreytur · {{commands}} uppsetningarskipanir",
@@ -2978,7 +2980,9 @@
     "permissionDescription": "Þú hefur ekki heimild til að skoða þetta.",
     "notFoundDescription": "Efnið hefur hugsanlega verið fjarlægt eða er ekki lengur tiltækt.",
     "serverTitle": "Ekki tókst að sækja gögn.",
-    "serverDescription": "Eitthvað fór úrskeiðis hjá okkur. Reyndu aftur."
+    "serverDescription": "Eitthvað fór úrskeiðis hjá okkur. Reyndu aftur.",
+    "timeoutTitle": "Netþjónninn er að taka of langan tíma",
+    "timeoutDescription": "Beiðnin rann út á tíma áður en hún kláraðist. Reyndu aftur."
   },
   "screenHeader": {
     "openMenu": "Opna valmynd",
@@ -3833,6 +3837,7 @@
     "commandLabel": "Skipun",
     "commandLabelPosition": "Skipun {{position}}",
     "commandPlaceholder": "t.d. pnpm install",
+    "commandAtLimit": "Skipunin er takmörkuð við {{max}} stafi",
     "commandsEmpty": "Engar uppsetningarskipanir ennþá",
     "commandsSaveFailed": "Gat ekki vistað uppsetningarskipanir",
     "moveUp": "Færðu þig upp",

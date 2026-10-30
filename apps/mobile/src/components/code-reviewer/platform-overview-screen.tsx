@@ -15,7 +15,7 @@ import {
   resolveRowOnPress,
 } from '@/components/code-reviewer/platform-overview-rows';
 import { ProviderConnectCard } from '@/components/code-reviewer/provider-connect-card';
-import { useSinglePushRoute } from '@/components/code-reviewer/use-single-push-route';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { PlatformOverviewSkeleton } from '@/components/code-reviewer/platform-overview-skeleton';
 import { ScreenHeader } from '@/components/screen-header';

@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Не успяхме да заредим средата ти.",
       "retryLoadingEnvironment": "Опитай отново да заредиш средата",
       "defaultEnvironment": "Среда по подразбиране",
+      "environmentAccessibility": "Изберете профил: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Изберете профил: {{label}}. {{attention}}",
       "leaveChanges": "Остави промените",
       "commitAndPush": "Комитни и изпрати",
       "startSession": "Започни сесия",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "Управление на профили",
       "noProfiles": "Все още няма профили. Създайте такъв, за да добавите променливи на средата, MCP сървъри и умения.",
       "advancedConfig": "Разширена конфигурация",
-      "advancedConfigDescription": "Изберете профил за зареждане на запазени конфигурации и ръчно конфигурирайте допълнителни променливи на средата и команди за настройка",
+      "advancedConfigDescription": "Вали за тази сесия. Запазването като профил го запазва за следващия път.",
       "saveAsProfile": "Запази като профил",
       "saveProfileDescription": "Запазете текущите променливи на средата и командите за настройка като профил за многократна употреба.",
       "profileSummary": "{{vars}} променливи на средата · {{commands}} команди за настройка",
@@ -2978,7 +2980,9 @@
     "permissionDescription": "Нямаш разрешение да видиш това.",
     "notFoundDescription": "Този елемент може да е премахнат или вече да не е наличен.",
     "serverTitle": "Не успяхме да заредим данните.",
-    "serverDescription": "Възникна проблем от наша страна. Опитай отново."
+    "serverDescription": "Възникна проблем от наша страна. Опитай отново.",
+    "timeoutTitle": "Сървърът отговаря твърде бавно",
+    "timeoutDescription": "Заявката не приключи в определеното време. Опитай отново."
   },
   "screenHeader": {
     "openMenu": "Отвори менюто",
@@ -3833,6 +3837,7 @@
     "commandLabel": "Команда",
     "commandLabelPosition": "Команда {{position}}",
     "commandPlaceholder": "напр. pnpm install",
+    "commandAtLimit": "Командата е ограничена до {{max}} знака",
     "commandsEmpty": "Все още няма команди за настройка",
     "commandsSaveFailed": "Командите за настройка не можаха да бъдат запазени",
     "moveUp": "Придвижете се нагоре",

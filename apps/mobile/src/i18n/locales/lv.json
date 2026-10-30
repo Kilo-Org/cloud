@@ -2347,6 +2347,8 @@
       "couldNotLoadEnvironment": "Neizdevās ielādēt tavu vidi.",
       "retryLoadingEnvironment": "Mēģināt ielādēt vidi vēlreiz",
       "defaultEnvironment": "Noklusējuma vide",
+      "environmentAccessibility": "Izvēlieties profilu: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Izvēlieties profilu: {{label}}. {{attention}}",
       "leaveChanges": "Atstāt izmaiņas",
       "commitAndPush": "Fiksēt un nosūtīt",
       "startSession": "Sākt sesiju",
@@ -2381,7 +2383,7 @@
       "manageProfiles": "Pārvaldīt profilus",
       "noProfiles": "Vēl nav neviena profila. Izveidojiet vienu, lai pievienotu vides mainīgos, MCP serverus un prasmes.",
       "advancedConfig": "Papildu konfigurācija",
-      "advancedConfigDescription": "Atlasiet profilu, lai ielādētu saglabātās konfigurācijas, un manuāli konfigurējiet papildu vides mainīgos un iestatīšanas komandas",
+      "advancedConfigDescription": "Attiecas uz šo sesiju. Saglabājot kā profilu, tas paliks nākamajai reizei.",
       "saveAsProfile": "Saglabāt kā profilu",
       "saveProfileDescription": "Saglabājiet pašreizējos vides mainīgos un iestatīšanas komandas kā atkārtoti lietojamu profilu.",
       "profileSummary": "{{vars}} vides mainīgie · {{commands}} iestatīšanas komandas",
@@ -3020,7 +3022,9 @@
     "permissionDescription": "Tev nav atļaujas to skatīt.",
     "notFoundDescription": "Iespējams, šis vienums ir noņemts vai vairs nav pieejams.",
     "serverTitle": "Neizdevās ielādēt.",
-    "serverDescription": "Mūsu pusē radās kļūda. Lūdzu, mēģini vēlreiz."
+    "serverDescription": "Mūsu pusē radās kļūda. Lūdzu, mēģini vēlreiz.",
+    "timeoutTitle": "Serveris pārāk ilgi neatbild",
+    "timeoutDescription": "Pieprasījums tika pārtraukts, jo netika pabeigts laikā. Lūdzu, mēģini vēlreiz."
   },
   "screenHeader": {
     "openMenu": "Atvērt izvēlni",
@@ -3883,6 +3887,7 @@
     "commandLabel": "Komanda",
     "commandLabelPosition": "Komanda {{position}}",
     "commandPlaceholder": "piem. pnpm install",
+    "commandAtLimit": "Komanda ir ierobežota līdz {{max}} rakstzīmēm",
     "commandsEmpty": "Vēl nav nevienas iestatīšanas komandas",
     "commandsSaveFailed": "Nevarēja saglabāt iestatīšanas komandas",
     "moveUp": "Pārvietojieties uz augšu",

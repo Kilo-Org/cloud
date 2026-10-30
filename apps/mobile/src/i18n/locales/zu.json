@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Asikwazanga ukulayisha indawo yakho yokusebenza.",
       "retryLoadingEnvironment": "Zama ukulayisha indawo yokusebenza futhi",
       "defaultEnvironment": "Indawo yokusebenza ezenzakalelayo",
+      "environmentAccessibility": "Khetha iphrofayela: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Khetha iphrofayela: {{label}}. {{attention}}",
       "leaveChanges": "Shiya izinguquko",
       "commitAndPush": "Qopha bese uthumela",
       "startSession": "Qala iseshini",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "Phatha amaphrofayili",
       "noProfiles": "Awekho amaphrofayela okwamanje. Dala eyodwa ukuze wengeze okuguquguqukayo kwendawo, amaseva e-MCP, namakhono.",
       "advancedConfig": "Ukucushwa Okuthuthukile",
-      "advancedConfigDescription": "Khetha iphrofayili ukuze ulayishe ukucupha okulondoloziwe, futhi ulungiselele ngokwakho okuguquguqukayo kwemvelo okwengeziwe kanye nemiyalo yokusetha",
+      "advancedConfigDescription": "Kusebenza kulesi sikhathi. Ukulondoloza njengephrofayela kukugcina okwesikhathi esizayo.",
       "saveAsProfile": "Londoloza Njengephrofayela",
       "saveProfileDescription": "Londoloza okuguquguqukayo kwendawo yamanje kanye nemiyalelo yokusetha njengephrofayili esebenziseka kabusha.",
       "profileSummary": "{{vars}} okuguquguqukayo kwemvelo · {{commands}} imiyalo yokusetha",
@@ -2978,7 +2980,9 @@
     "permissionDescription": "Awunayo imvume yokubuka lokhu.",
     "notFoundDescription": "Le nto kungenzeka isusiwe noma ayisatholakali.",
     "serverTitle": "Asikwazanga ukulayisha.",
-    "serverDescription": "Kukhona okungahambanga kahle kithi. Sicela uzame futhi."
+    "serverDescription": "Kukhona okungahambanga kahle kithi. Sicela uzame futhi.",
+    "timeoutTitle": "Isiphakeli sithatha isikhathi eside",
+    "timeoutDescription": "Isicelo siphelelwe yisikhathi ngaphambi kokuqedwa. Sicela uzame futhi."
   },
   "screenHeader": {
     "openMenu": "Vula imenyu",
@@ -3833,6 +3837,7 @@
     "commandLabel": "Umyalo",
     "commandLabelPosition": "Umyalo {{position}}",
     "commandPlaceholder": "isb. pnpm install",
+    "commandAtLimit": "Umyalo ulinganiselwe ezinhlamvini ezingu-{{max}}",
     "commandsEmpty": "Ayikho imiyalo yokusetha okwamanje",
     "commandsSaveFailed": "Ayikwazanga ukulondoloza imiyalo yokusetha",
     "moveUp": "Hamba uyephezulu",

@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Det gick inte att läsa in din miljö.",
       "retryLoadingEnvironment": "Försök läsa in miljön igen",
       "defaultEnvironment": "Standardmiljö",
+      "environmentAccessibility": "Välj en profil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Välj en profil: {{label}}. {{attention}}",
       "leaveChanges": "Behåll ändringar",
       "commitAndPush": "Committa och pusha",
       "startSession": "Starta session",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "Hantera profiler",
       "noProfiles": "Inga profiler än. Skapa en för att lägga till miljövariabler, MCP-servrar och färdigheter.",
       "advancedConfig": "Avancerad konfiguration",
-      "advancedConfigDescription": "Välj en profil för att ladda sparade konfigurationer och manuellt konfigurera ytterligare miljövariabler och inställningskommandon",
+      "advancedConfigDescription": "Gäller för den här sessionen. Sparas den som profil finns den kvar nästa gång.",
       "saveAsProfile": "Spara som profil",
       "saveProfileDescription": "Spara de aktuella miljövariablerna och inställningskommandona som en återanvändbar profil.",
       "profileSummary": "{{vars}} miljövariabler · {{commands}} inställningskommandon",
@@ -2978,7 +2980,9 @@
     "permissionDescription": "Du har inte behörighet att se det här.",
     "notFoundDescription": "Det här objektet kan ha tagits bort eller är inte längre tillgängligt.",
     "serverTitle": "Kunde inte läsa in innehållet.",
-    "serverDescription": "Något gick fel hos oss. Försök igen."
+    "serverDescription": "Något gick fel hos oss. Försök igen.",
+    "timeoutTitle": "Servern tar för lång tid",
+    "timeoutDescription": "Begäran tog för lång tid att slutföras. Försök igen."
   },
   "screenHeader": {
     "openMenu": "Öppna menyn",
@@ -3833,6 +3837,7 @@
     "commandLabel": "Kommando",
     "commandLabelPosition": "Kommando {{position}}",
     "commandPlaceholder": "t.ex. pnpm install",
+    "commandAtLimit": "Kommandot är begränsat till {{max}} tecken",
     "commandsEmpty": "Inga installationskommandon ännu",
     "commandsSaveFailed": "Det gick inte att spara installationskommandon",
     "moveUp": "Flytta upp",

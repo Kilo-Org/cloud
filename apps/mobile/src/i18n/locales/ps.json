@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "ستاسو چاپېریال بار نه شو.",
       "retryLoadingEnvironment": "د چاپېریال بارولو بیا هڅه کړئ",
       "defaultEnvironment": "تلواله چاپېریال",
+      "environmentAccessibility": "یو پروفایل غوره کړئ: {{label}}",
+      "environmentAccessibilityNeedsAttention": "یو پروفایل غوره کړئ: {{label}}، {{attention}}",
       "leaveChanges": "بدلونونه پرېږدئ",
       "commitAndPush": "کمیټ او پش کړئ",
       "startSession": "ناسته پیل کړئ",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "پروفایلونه اداره کړئ",
       "noProfiles": "تراوسه هیڅ پروفایل نشته. د چاپیریال متغیرونو، MCP سرورونو، او مهارتونو اضافه کولو لپاره یو جوړ کړئ.",
       "advancedConfig": "پرمختللی ترتیب",
-      "advancedConfigDescription": "د خوندي شوي تشکیلاتو بارولو لپاره پروفایل غوره کړئ ، او په لاسي ډول د چاپیریال اضافي تغیرات او تنظیم کولو کمانډونه تنظیم کړئ",
+      "advancedConfigDescription": "دا دې غونډې ته پلي کېږي. د پروفایل په توګه خوندي کول یې د بل ځل لپاره ساتي.",
       "saveAsProfile": "د پروفایل په توګه خوندي کړئ",
       "saveProfileDescription": "د اوسني چاپیریال متغیرات او د تنظیم کولو کمانډونه د بیا کارونې وړ پروفایل په توګه خوندي کړئ.",
       "profileSummary": "{{vars}} د چاپیریال تغیرات · {{commands}} د ترتیب کولو امرونه",
@@ -2978,7 +2980,9 @@
     "permissionDescription": "تاسو د دې د لیدلو اجازه نه لرئ.",
     "notFoundDescription": "ښايي دا توکی لرې شوی وي یا نور شتون ونه لري.",
     "serverTitle": "بار نه شو.",
-    "serverDescription": "زموږ په سیسټم کې ستونزه رامنځته شوه. مهرباني وکړئ بیا هڅه وکړئ."
+    "serverDescription": "زموږ په سیسټم کې ستونزه رامنځته شوه. مهرباني وکړئ بیا هڅه وکړئ.",
+    "timeoutTitle": "برسېرونکی ډېر وخت نیسي",
+    "timeoutDescription": "غوښتنه له بشپړېدو دمخه ودرېده. مهرباني وکړئ بیا هڅه وکړئ."
   },
   "screenHeader": {
     "openMenu": "مینو پرانیزئ",
@@ -3833,6 +3837,7 @@
     "commandLabel": "امر",
     "commandLabelPosition": "امر {{position}}",
     "commandPlaceholder": "لکه pnpm install",
+    "commandAtLimit": "امر تر {{max}} توري پورې محدود دی",
     "commandsEmpty": "تر اوسه د تنظیم کولو امرونه ندي",
     "commandsSaveFailed": "د ترتیب کولو کمانډونه خوندي نشو کولی",
     "moveUp": "پورته لاړ شه",

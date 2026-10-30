@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Nem sikerült betölteni a környezetedet.",
       "retryLoadingEnvironment": "Környezet betöltésének újrapróbálása",
       "defaultEnvironment": "Alapértelmezett környezet",
+      "environmentAccessibility": "Válassz egy profilt: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Válassz egy profilt: {{label}}. {{attention}}",
       "leaveChanges": "Változtatások megtartása",
       "commitAndPush": "Véglegesítés és feltöltés",
       "startSession": "Munkamenet indítása",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "Profilok kezelése",
       "noProfiles": "Még nincsenek profilok. Hozz létre egyet a környezeti változók, MCP-kiszolgálók és készségek hozzáadásához.",
       "advancedConfig": "Speciális konfiguráció",
-      "advancedConfigDescription": "Válassz egy profilt a mentett konfigurációk betöltéséhez, és manuálisan konfiguráld a további környezeti változókat és beállítási parancsokat",
+      "advancedConfigDescription": "Erre a munkamenetre érvényes. Profilként mentve a következő alkalomra is megmarad.",
       "saveAsProfile": "Mentés profilként",
       "saveProfileDescription": "Mentsd el az aktuális környezeti változókat és a beállítási parancsokat újrafelhasználható profilként.",
       "profileSummary": "{{vars}} környezeti változó · {{commands}} beállítási parancs",
@@ -2978,7 +2980,9 @@
     "permissionDescription": "Nincs jogosultságod ennek a megtekintéséhez.",
     "notFoundDescription": "Lehet, hogy ezt az elemet eltávolították, vagy már nem érhető el.",
     "serverTitle": "Nem sikerült betölteni",
-    "serverDescription": "Nálunk hiba történt. Próbáld újra."
+    "serverDescription": "Nálunk hiba történt. Próbáld újra.",
+    "timeoutTitle": "A szerver túl sokáig tart",
+    "timeoutDescription": "A kérés túllépte az időkorlátot, mielőtt befejeződött volna. Próbáld újra."
   },
   "screenHeader": {
     "openMenu": "Menü megnyitása",
@@ -3833,6 +3837,7 @@
     "commandLabel": "Parancs",
     "commandLabelPosition": "{{position}}. parancs",
     "commandPlaceholder": "pl. pnpm install",
+    "commandAtLimit": "A parancs legfeljebb {{max}} karakter lehet",
     "commandsEmpty": "Még nincsenek beállítási parancsok",
     "commandsSaveFailed": "Nem sikerült menteni a beállítási parancsokat",
     "moveUp": "Mozgassa fel",

@@ -42,7 +42,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Nepřipojeno",
     "notifications": "Oznámení",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repozitáře",
     "securityAgent": "Bezpečnostní agent",
     "unknown": "Neznámé",
@@ -2243,7 +2243,7 @@
       "dollar_many": "dolaru",
       "costSpoken": "náklady {{cost}}",
       "costSpokenWithTime": "náklady {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}",
+      "pullRequest": "PR {{number}}",
       "spokenJoiner": "a"
     },
     "githubInstall": {
@@ -2378,6 +2378,8 @@
       "couldNotLoadEnvironment": "Vaše prostředí se nepodařilo načíst.",
       "retryLoadingEnvironment": "Znovu načíst prostředí",
       "defaultEnvironment": "Výchozí prostředí",
+      "environmentAccessibility": "Vyberte profil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Vyberte profil: {{label}}. {{attention}}",
       "leaveChanges": "Ponechat změny",
       "commitAndPush": "Vytvořit commit a odeslat",
       "startSession": "Spustit relaci",
@@ -2412,7 +2414,7 @@
       "manageProfiles": "Správa profilů",
       "noProfiles": "Zatím žádné profily. Vytvořte jeden a přidejte proměnné prostředí, servery MCP a dovednosti.",
       "advancedConfig": "Pokročilá konfigurace",
-      "advancedConfigDescription": "Vyberte profil pro načtení uložených konfigurací a ručně nakonfigurujte další proměnné prostředí a příkazy nastavení",
+      "advancedConfigDescription": "Platí pro toto sezení. Uložením jako profil zůstane i pro příště.",
       "saveAsProfile": "Uložit jako profil",
       "saveProfileDescription": "Uložte aktuální proměnné prostředí a příkazy nastavení jako opakovaně použitelný profil.",
       "profileSummary": "Proměnné prostředí {{vars}} · Příkazy nastavení {{commands}}",
@@ -3062,7 +3064,9 @@
     "permissionDescription": "Nemáš oprávnění k zobrazení tohoto obsahu.",
     "notFoundDescription": "Tato položka mohla být odebrána nebo již není k dispozici.",
     "serverTitle": "Načtení se nepodařilo.",
-    "serverDescription": "Na naší straně se něco pokazilo. Zkuste to prosím znovu."
+    "serverDescription": "Na naší straně se něco pokazilo. Zkuste to prosím znovu.",
+    "timeoutTitle": "Server odpovídá příliš dlouho",
+    "timeoutDescription": "Požadavek vypršel dříve, než se dokončil. Zkuste to prosím znovu."
   },
   "screenHeader": {
     "openMenu": "Otevřít nabídku",
@@ -3933,6 +3937,7 @@
     "commandLabel": "Příkaz",
     "commandLabelPosition": "Příkaz {{position}}",
     "commandPlaceholder": "např. pnpm install",
+    "commandAtLimit": "Příkaz je omezen na {{max}} znaků",
     "commandsEmpty": "Zatím žádné příkazy k nastavení",
     "commandsSaveFailed": "Příkazy nastavení se nepodařilo uložit",
     "moveUp": "Posuňte se nahoru",

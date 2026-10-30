@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "თქვენი გარემოს ჩატვირთვა ვერ მოხერხდა.",
       "retryLoadingEnvironment": "გარემოს ხელახლა ჩატვირთვა",
       "defaultEnvironment": "ნაგულისხმევი გარემო",
+      "environmentAccessibility": "აირჩიეთ პროფილი: {{label}}",
+      "environmentAccessibilityNeedsAttention": "აირჩიეთ პროფილი: {{label}}. {{attention}}",
       "leaveChanges": "ცვლილებების დატოვება",
       "commitAndPush": "კომიტი და ატვირთვა",
       "startSession": "სესიის დაწყება",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "პროფილების მართვა",
       "noProfiles": "ჯერ არ არის პროფილები. შექმენით ერთი გარემოს ცვლადების, MCP სერვერების და უნარების დასამატებლად.",
       "advancedConfig": "გაფართოებული კონფიგურაცია",
-      "advancedConfigDescription": "აირჩიეთ პროფილი შენახული კონფიგურაციების ჩასატვირთად და ხელით დააკონფიგურიროთ გარემოს დამატებითი ცვლადები და დაყენების ბრძანებები",
+      "advancedConfigDescription": "ვრცელდება ამ სესიაზე. პროფილად შენახვისას ის შემდეგ ჯერზეც დარჩება.",
       "saveAsProfile": "პროფილად შენახვა",
       "saveProfileDescription": "შეინახეთ მიმდინარე გარემოს ცვლადები და დაყენების ბრძანებები, როგორც მრავალჯერადი გამოყენებადი პროფილი.",
       "profileSummary": "{{vars}} გარემოს ცვლადები · {{commands}} დაყენების ბრძანებები",
@@ -2978,7 +2980,9 @@
     "permissionDescription": "ამის ნახვის უფლება არ გაქვს.",
     "notFoundDescription": "შესაძლოა, ეს ელემენტი წაიშალა ან აღარ არის ხელმისაწვდომი.",
     "serverTitle": "ჩატვირთვა ვერ მოხერხდა.",
-    "serverDescription": "ჩვენს მხარეს შეცდომა მოხდა. სცადე ხელახლა."
+    "serverDescription": "ჩვენს მხარეს შეცდომა მოხდა. სცადე ხელახლა.",
+    "timeoutTitle": "სერვერი დიდხანს არ პასუხობს",
+    "timeoutDescription": "მოთხოვნა ვერ დასრულდა დროზე. სცადე ხელახლა."
   },
   "screenHeader": {
     "openMenu": "მენიუს გახსნა",
@@ -3833,6 +3837,7 @@
     "commandLabel": "ბრძანება",
     "commandLabelPosition": "ბრძანება {{position}}",
     "commandPlaceholder": "მაგ. pnpm install",
+    "commandAtLimit": "ბრძანება შემოიფარგლება {{max}} სიმბოლოთი",
     "commandsEmpty": "დაყენების ბრძანებები ჯერ არ არის",
     "commandsSaveFailed": "დაყენების ბრძანებების შენახვა ვერ მოხერხდა",
     "moveUp": "ზევით გადაადგილება",

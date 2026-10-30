@@ -11,7 +11,7 @@ import {
   buildOverviewRows,
   resolveRowOnPress,
 } from '@/components/code-reviewer/platform-overview-rows';
-import { useSinglePushRoute } from '@/components/code-reviewer/use-single-push-route';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Button } from '@/components/ui/button';

@@ -743,7 +743,7 @@
     "pendingComment": {
       "editOutdatedA11y": "ویرایش نظر در انتظار ارسال دربارهٔ نسخهٔ قبلی {{location}}",
       "editA11y": "ویرایش نظر در انتظار ارسال دربارهٔ {{location}}",
-      "staleHint": "pR پس از نوشتن این نظر تغییر کرده است.",
+      "staleHint": "PR پس از نوشتن این نظر تغییر کرده است.",
       "deleteA11y": "حذف نظر در انتظار ارسال دربارهٔ {{location}}",
       "deletedAnnouncement": "نظر در انتظار ارسال حذف شد",
       "noCommentsQueued": "هیچ نظری در صف نیست. بازبینی فقط با رویداد بالا ارسال می‌شود.",
@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "بارگذاری محیط شما ممکن نشد.",
       "retryLoadingEnvironment": "تلاش دوباره برای بارگذاری محیط",
       "defaultEnvironment": "محیط پیش‌فرض",
+      "environmentAccessibility": "یک نمایه انتخاب کنید: {{label}}",
+      "environmentAccessibilityNeedsAttention": "یک نمایه انتخاب کنید: {{label}}. {{attention}}",
       "leaveChanges": "حفظ تغییرات",
       "commitAndPush": "کامیت و پوش",
       "startSession": "شروع نشست",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "مدیریت پروفایل ها",
       "noProfiles": "هنوز پروفایلی وجود ندارد یکی برای اضافه کردن متغیرهای محیطی، سرورهای MCP و مهارت‌ها ایجاد کنید.",
       "advancedConfig": "پیکربندی پیشرفته",
-      "advancedConfigDescription": "یک نمایه را برای بارگیری تنظیمات ذخیره شده انتخاب کنید و متغیرهای محیط اضافی و دستورات راه اندازی را به صورت دستی پیکربندی کنید.",
+      "advancedConfigDescription": "برای این نشست اعمال می‌شود. ذخیره به عنوان نمایه آن را برای بار بعدی نگه می‌دارد.",
       "saveAsProfile": "ذخیره به عنوان نمایه",
       "saveProfileDescription": "متغیرهای محیط فعلی و دستورات راه اندازی را به عنوان یک نمایه قابل استفاده مجدد ذخیره کنید.",
       "profileSummary": "{{vars}} متغیرهای محیطی · دستورات تنظیم {{commands}}",
@@ -2978,7 +2980,9 @@
     "permissionDescription": "اجازه مشاهده این مورد را ندارید.",
     "notFoundDescription": "این مورد ممکن است حذف شده باشد یا دیگر در دسترس نباشد.",
     "serverTitle": "بارگذاری ممکن نشد.",
-    "serverDescription": "مشکلی در سامانه ما پیش آمد. لطفاً دوباره تلاش کنید."
+    "serverDescription": "مشکلی در سامانه ما پیش آمد. لطفاً دوباره تلاش کنید.",
+    "timeoutTitle": "سرور پاسخ نمی‌دهد",
+    "timeoutDescription": "درخواست پیش از تکمیل، منقضی شد. لطفاً دوباره تلاش کنید."
   },
   "screenHeader": {
     "openMenu": "باز کردن منو",
@@ -3833,6 +3837,7 @@
     "commandLabel": "فرمان",
     "commandLabelPosition": "فرمان {{position}}",
     "commandPlaceholder": "مثلاً pnpm install",
+    "commandAtLimit": "دستور به {{max}} نویسه محدود است",
     "commandsEmpty": "هنوز دستور راه اندازی وجود ندارد",
     "commandsSaveFailed": "دستورات راه اندازی ذخیره نشد",
     "moveUp": "حرکت به بالا",

@@ -743,7 +743,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Hariri maoni yaliyopitwa na wakati yanayosubiri kutumwa kwenye {{location}}",
       "editA11y": "Hariri maoni yanayosubiri kutumwa kwenye {{location}}",
-      "staleHint": "pR imebadilika tangu ulipoandika maoni haya.",
+      "staleHint": "PR imebadilika tangu ulipoandika maoni haya.",
       "deleteA11y": "Futa maoni yanayosubiri kutumwa kwenye {{location}}",
       "deletedAnnouncement": "Maoni yanayosubiri kutumwa yamefutwa",
       "noCommentsQueued": "Hakuna maoni kwenye foleni. Ukaguzi utawasilishwa pamoja na tukio lililo hapo juu pekee.",
@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Imeshindikana kupakia mazingira yako.",
       "retryLoadingEnvironment": "Jaribu tena kupakia mazingira",
       "defaultEnvironment": "Mazingira chaguomsingi",
+      "environmentAccessibility": "Chagua wasifu: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Chagua wasifu: {{label}}. {{attention}}",
       "leaveChanges": "Acha mabadiliko",
       "commitAndPush": "Hifadhi na utume",
       "startSession": "Anza kikao",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "Dhibiti wasifu",
       "noProfiles": "Bado hakuna wasifu. Unda moja ili kuongeza vigezo vya mazingira, seva za MCP na ujuzi.",
       "advancedConfig": "Usanidi wa hali ya juu",
-      "advancedConfigDescription": "Teua wasifu ili kupakia usanidi uliohifadhiwa, na usanidi mwenyewe vigeu vya ziada vya mazingira na amri za usanidi",
+      "advancedConfigDescription": "Inatumika kwa kipindi hiki. Kuihifadhi kama wasifu huihifadhi kwa mara ijayo.",
       "saveAsProfile": "Hifadhi kama Wasifu",
       "saveProfileDescription": "Hifadhi vigezo vya sasa vya mazingira na amri za usanidi kama wasifu unaoweza kutumika tena.",
       "profileSummary": "{{vars}} vigezo vya mazingira · {{commands}} amri za usanidi",
@@ -2978,7 +2980,9 @@
     "permissionDescription": "Huna ruhusa ya kuona maudhui haya.",
     "notFoundDescription": "Kipengele hiki huenda kiliondolewa au hakipatikani tena.",
     "serverTitle": "Imeshindikana kupakia.",
-    "serverDescription": "Hitilafu imetokea upande wetu. Tafadhali jaribu tena."
+    "serverDescription": "Hitilafu imetokea upande wetu. Tafadhali jaribu tena.",
+    "timeoutTitle": "Seva inachukua muda mrefu sana",
+    "timeoutDescription": "Ombi limeisha muda kabla ya kutimizwa. Tafadhali jaribu tena."
   },
   "screenHeader": {
     "openMenu": "Fungua menyu",
@@ -3833,6 +3837,7 @@
     "commandLabel": "Amri",
     "commandLabelPosition": "Amri {{position}}",
     "commandPlaceholder": "kmf. pnpm install",
+    "commandAtLimit": "Amri ina kikomo cha vibambo {{max}}",
     "commandsEmpty": "Bado hakuna amri za usanidi",
     "commandsSaveFailed": "Haikuweza kuhifadhi amri za usanidi",
     "moveUp": "Sogeza juu",

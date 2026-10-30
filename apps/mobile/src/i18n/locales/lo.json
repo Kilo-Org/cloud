@@ -743,7 +743,7 @@
     "pendingComment": {
       "editOutdatedA11y": "ແກ້ໄຂຄຳເຫັນທີ່ລໍສົ່ງແລະອ້າງອີງໂຄດເກົ່າຢູ່ {{location}}",
       "editA11y": "ແກ້ໄຂຄຳເຫັນທີ່ລໍສົ່ງຢູ່ {{location}}",
-      "staleHint": "pR ມີການອັບເດດຫຼັງຈາກທ່ານຂຽນຄຳເຫັນນີ້.",
+      "staleHint": "PR ມີການອັບເດດຫຼັງຈາກທ່ານຂຽນຄຳເຫັນນີ້.",
       "deleteA11y": "ລຶບຄຳເຫັນທີ່ລໍສົ່ງຢູ່ {{location}}",
       "deletedAnnouncement": "ລຶບຄຳເຫັນທີ່ລໍສົ່ງແລ້ວ",
       "noCommentsQueued": "ບໍ່ມີຄຳເຫັນໃນຄິວ. ລະບົບຈະສົ່ງຜົນການກວດທານຕາມປະເພດທີ່ເລືອກຂ້າງເທິງເທົ່ານັ້ນ.",
@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "ບໍ່ສາມາດໂຫຼດສະພາບແວດລ້ອມຂອງເຈົ້າໄດ້.",
       "retryLoadingEnvironment": "ລອງໂຫຼດສະພາບແວດລ້ອມໃໝ່",
       "defaultEnvironment": "ສະພາບແວດລ້ອມມາດຕະຖານ",
+      "environmentAccessibility": "ເລືອກໂປຣໄຟລ໌: {{label}}",
+      "environmentAccessibilityNeedsAttention": "ເລືອກໂປຣໄຟລ໌: {{label}}. {{attention}}",
       "leaveChanges": "ປະການປ່ຽນແປງໄວ້",
       "commitAndPush": "ບັນທຶກແລະສົ່ງຂຶ້ນ",
       "startSession": "ເລີ່ມເຊດຊັນ",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "ຈັດການໂປຣໄຟລ໌",
       "noProfiles": "ບໍ່ມີໂປຣໄຟລ໌ເທື່ອ. ສ້າງອັນໜຶ່ງເພື່ອເພີ່ມຕົວແປສະພາບແວດລ້ອມ, ເຊີບເວີ MCP ແລະທັກສະ.",
       "advancedConfig": "ການຕັ້ງຄ່າຂັ້ນສູງ",
-      "advancedConfigDescription": "ເລືອກໂປຣໄຟລ໌ເພື່ອໂຫຼດການຕັ້ງຄ່າທີ່ບັນທຶກໄວ້, ແລະກຳນົດຄ່າຕົວແປສະພາບແວດລ້ອມເພີ່ມເຕີມ ແລະຄຳສັ່ງການຕັ້ງຄ່າດ້ວຍຕົນເອງ",
+      "advancedConfigDescription": "ໃຊ້ກັບເຊສຊັນນີ້. ການບັນທຶກເປັນໂປຣໄຟລ໌ຈະເກັບໄວ້ສຳລັບຄັ້ງຕໍ່ໄປ.",
       "saveAsProfile": "ບັນທຶກເປັນໂປຣໄຟລ໌",
       "saveProfileDescription": "ບັນທຶກຕົວແປສະພາບແວດລ້ອມປັດຈຸບັນ ແລະຄໍາສັ່ງຕັ້ງຄ່າເປັນໂປຣໄຟລ໌ທີ່ສາມາດໃຊ້ຄືນໄດ້.",
       "profileSummary": "{{vars}} ຕົວແປສະພາບແວດລ້ອມ · {{commands}} ຄຳສັ່ງຕັ້ງຄ່າ",
@@ -2869,8 +2871,8 @@
     },
     "prBadge": {
       "open": "ເປີດຄຳຂໍລວມໂຄ້ດ",
-      "closed": "pR ທີ່ປິດແລ້ວ",
-      "merged": "pR ທີ່ລວມໂຄ້ດແລ້ວ",
+      "closed": "PR ທີ່ປິດແລ້ວ",
+      "merged": "PR ທີ່ລວມໂຄ້ດແລ້ວ",
       "draft": "ຄຳຂໍລວມໂຄ້ດສະບັບຮ່າງ",
       "updating": "ກຳລັງອັບເດດ, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
@@ -2978,7 +2980,9 @@
     "permissionDescription": "ທ່ານບໍ່ມີສິດເບິ່ງລາຍການນີ້.",
     "notFoundDescription": "ລາຍການນີ້ອາດຖືກລຶບ ຫຼື ບໍ່ມີອີກແລ້ວ.",
     "serverTitle": "ບໍ່ສາມາດໂຫຼດໄດ້.",
-    "serverDescription": "ເກີດຂໍ້ຜິດພາດໃນລະບົບຂອງເຮົາ. ກະລຸນາລອງອີກຄັ້ງ."
+    "serverDescription": "ເກີດຂໍ້ຜິດພາດໃນລະບົບຂອງເຮົາ. ກະລຸນາລອງອີກຄັ້ງ.",
+    "timeoutTitle": "ເຊີບເວີຕອບສະໜອງຊ້າເກີນໄປ",
+    "timeoutDescription": "ຄຳຮ້ອງຂໍໃຊ້ເວລາເກີນກຳນົດໂດຍບໍ່ສຳເລັດ. ກະລຸນາລອງອີກຄັ້ງ."
   },
   "screenHeader": {
     "openMenu": "ເປີດເມນູ",
@@ -3833,6 +3837,7 @@
     "commandLabel": "ຄໍາສັ່ງ",
     "commandLabelPosition": "ຄໍາສັ່ງ {{position}}",
     "commandPlaceholder": "ຕົວຢ່າງ: pnpm install",
+    "commandAtLimit": "ຄຳສັ່ງຈຳກັດບໍ່ເກີນ {{max}} ຕົວອັກສອນ",
     "commandsEmpty": "ບໍ່ມີຄຳສັ່ງຕັ້ງຄ່າເທື່ອ",
     "commandsSaveFailed": "ບໍ່ສາມາດບັນທຶກຄຳສັ່ງຕັ້ງຄ່າໄດ້",
     "moveUp": "ຍ້າຍຂຶ້ນ",

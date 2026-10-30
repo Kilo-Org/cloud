@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "ଆପଣଙ୍କ ପରିବେଶ ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
       "retryLoadingEnvironment": "ପରିବେଶ ପୁଣି ଲୋଡ୍ କରନ୍ତୁ",
       "defaultEnvironment": "ଡିଫଲ୍ଟ ପରିବେଶ",
+      "environmentAccessibility": "ପ୍ରୋଫାଇଲ୍ ବାଛନ୍ତୁ: {{label}}",
+      "environmentAccessibilityNeedsAttention": "ପ୍ରୋଫାଇଲ୍ ବାଛନ୍ତୁ: {{label}}। {{attention}}",
       "leaveChanges": "ପରିବର୍ତ୍ତନ ରଖନ୍ତୁ",
       "commitAndPush": "କମିଟ୍ ଓ ପୁଶ୍ କରନ୍ତୁ",
       "startSession": "ସେସନ୍ ଆରମ୍ଭ କରନ୍ତୁ",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "ପ୍ରୋଫାଇଲ୍ ପରିଚାଳନା କରନ୍ତୁ।",
       "noProfiles": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ପ୍ରୋଫାଇଲ୍ ନାହିଁ। ପରିବେଶ ଭେରିଏବଲ୍, MCP ସର୍ଭର, ଏବଂ କୌଶଳ ଯୋଗ କରିବାକୁ ଗୋଟିଏ ସୃଷ୍ଟି କରନ୍ତୁ।",
       "advancedConfig": "ଉନ୍ନତ ବିନ୍ୟାସ",
-      "advancedConfigDescription": "ସଞ୍ଚିତ ସଂରଚନାଗୁଡ଼ିକୁ ଲୋଡ୍ କରିବା ପାଇଁ ଏକ ପ୍ରୋଫାଇଲ୍ ଚୟନ କରନ୍ତୁ, ଏବଂ ଅତିରିକ୍ତ ପରିବେଶ ଭେରିଏବଲ୍ ଏବଂ ସେଟଅପ୍ କମାଣ୍ଡଗୁଡ଼ିକୁ ହସ୍ତକୃତ ଭାବରେ ବିନ୍ୟାସ କରନ୍ତୁ।",
+      "advancedConfigDescription": "ଏହା ଏହି ସେସନ୍ ପାଇଁ ପ୍ରଯୁଜ୍ୟ। ପ୍ରୋଫାଇଲ୍ ଭାବରେ ସେଭ୍ କଲେ ଏହା ପରବର୍ତ୍ତୀ ଥର ପାଇଁ ରହେ।",
       "saveAsProfile": "ପ୍ରୋଫାଇଲ୍ ଭାବରେ ସେଭ୍ କରନ୍ତୁ।",
       "saveProfileDescription": "ପୁନଃ ବ୍ୟବହାର ଯୋଗ୍ୟ ପ୍ରୋଫାଇଲ୍ ଭାବରେ ସାମ୍ପ୍ରତିକ ପରିବେଶ ଭେରିଏବଲ୍ ଏବଂ ସେଟଅପ୍ କମାଣ୍ଡଗୁଡ଼ିକୁ ସେଭ୍ କରନ୍ତୁ।",
       "profileSummary": "{{vars}} ପରିବେଶ ଭେରିଏବଲ୍ · {{commands}} ସେଟଅପ୍ କମାଣ୍ଡ।",
@@ -2978,7 +2980,9 @@
     "permissionDescription": "ଏହା ଦେଖିବାକୁ ଆପଣଙ୍କର ଅନୁମତି ନାହିଁ।",
     "notFoundDescription": "ଏହି ଆଇଟମ୍‌ଟି ହଟାଯାଇଥାଇପାରେ କିମ୍ବା ଆଉ ଉପଲବ୍ଧ ନାହିଁ।",
     "serverTitle": "ଲୋଡ୍ ହୋଇପାରିଲା ନାହିଁ।",
-    "serverDescription": "ଆମ ପଟେ କିଛି ସମସ୍ୟା ହୋଇଛି। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
+    "serverDescription": "ଆମ ପଟେ କିଛି ସମସ୍ୟା ହୋଇଛି। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।",
+    "timeoutTitle": "ସର୍ଭର ଅଧିକ ସମୟ ନେଉଛି",
+    "timeoutDescription": "ଅନୁରୋଧ ସମୟ ପୂର୍ବରୁ ସମାପ୍ତ ହୋଇଯାଇଛି। ପୁଣି ଚେଷ୍ଟା କରନ୍ତୁ।"
   },
   "screenHeader": {
     "openMenu": "ମେନୁ ଖୋଲନ୍ତୁ",
@@ -3833,6 +3837,7 @@
     "commandLabel": "ନିର୍ଦ୍ଦେଶ",
     "commandLabelPosition": "ନିର୍ଦ୍ଦେଶ {{position}}",
     "commandPlaceholder": "ଉଦା. pnpm install",
+    "commandAtLimit": "ନିର୍ଦ୍ଦେଶଟି {{max}} ଅକ୍ଷରରେ ସୀମିତ।",
     "commandsEmpty": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ସେଟଅପ୍ ନିର୍ଦ୍ଦେଶ ନାହିଁ।",
     "commandsSaveFailed": "ସେଟଅପ୍ କମାଣ୍ଡ୍ ସଞ୍ଚୟ କରିପାରିଲା ନାହିଁ।",
     "moveUp": "ଉପରକୁ ଯାଅ।",

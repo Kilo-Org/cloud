@@ -614,7 +614,7 @@
       "openAccessibility": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಅಥವಾ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ತೆರೆಯಿರಿ",
       "clearLink": "ಲಿಂಕ್ ತೆಗೆದುಹಾಕಿ",
       "pasteLink": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್ ಅಥವಾ ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಲಿಂಕ್ ಅನ್ನು ಅಂಟಿಸಿ",
-      "open": "ಓಪನ್"
+      "open": "ತೆರೆಯಿರಿ"
     },
     "checks": {
       "title": "ತಪಾಸಣೆಗಳು",
@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "ನಿಮ್ಮ ಪರಿಸರವನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
       "retryLoadingEnvironment": "ಪರಿಸರವನ್ನು ಲೋಡ್ ಮಾಡಲು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ",
       "defaultEnvironment": "ಡೀಫಾಲ್ಟ್ ಪರಿಸರ",
+      "environmentAccessibility": "ಪ್ರೊಫೈಲ್ ಆರಿಸಿ: {{label}}",
+      "environmentAccessibilityNeedsAttention": "ಪ್ರೊಫೈಲ್ ಆರಿಸಿ: {{label}}. {{attention}}",
       "leaveChanges": "ಹಾಗೆಯೇ ಬಿಡಿ",
       "commitAndPush": "ಕಮಿಟ್ ಮಾಡಿ, ಪುಶ್ ಮಾಡಿ",
       "startSession": "ಸೆಶನ್ ಪ್ರಾರಂಭಿಸಿ",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "ಪ್ರೊಫೈಲ್‌ಗಳನ್ನು ನಿರ್ವಹಿಸಿ",
       "noProfiles": "ಇನ್ನೂ ಯಾವುದೇ ಪ್ರೊಫೈಲ್‌ಗಳಿಲ್ಲ. ಪರಿಸರ ವೇರಿಯಬಲ್‌ಗಳು, MCP ಸರ್ವರ್‌ಗಳು ಮತ್ತು ಕೌಶಲ್ಯಗಳನ್ನು ಸೇರಿಸಲು ಒಂದನ್ನು ರಚಿಸಿ.",
       "advancedConfig": "ಸುಧಾರಿತ ಸಂರಚನೆ",
-      "advancedConfigDescription": "ಉಳಿಸಿದ ಕಾನ್ಫಿಗರೇಶನ್‌ಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಪ್ರೊಫೈಲ್ ಆಯ್ಕೆಮಾಡಿ ಮತ್ತು ಹೆಚ್ಚುವರಿ ಪರಿಸರ ವೇರಿಯಬಲ್‌ಗಳು ಮತ್ತು ಸೆಟಪ್ ಆಜ್ಞೆಗಳನ್ನು ಹಸ್ತಚಾಲಿತವಾಗಿ ಕಾನ್ಫಿಗರ್ ಮಾಡಿ",
+      "advancedConfigDescription": "ಇದು ಈ ಅಧಿವೇಶನಕ್ಕೆ ಅನ್ವಯಿಸುತ್ತದೆ. ಪ್ರೊಫೈಲ್ ಆಗಿ ಉಳಿಸಿದರೆ ಅದು ಮುಂದಿನ ಬಾರಿಗೂ ಉಳಿಯುತ್ತದೆ.",
       "saveAsProfile": "ಪ್ರೊಫೈಲ್ ಆಗಿ ಉಳಿಸಿ",
       "saveProfileDescription": "ಪ್ರಸ್ತುತ ಪರಿಸರ ವೇರಿಯಬಲ್‌ಗಳು ಮತ್ತು ಸೆಟಪ್ ಆಜ್ಞೆಗಳನ್ನು ಮರುಬಳಕೆ ಮಾಡಬಹುದಾದ ಪ್ರೊಫೈಲ್‌ನಂತೆ ಉಳಿಸಿ.",
       "profileSummary": "{{vars}} ಪರಿಸರ ವೇರಿಯಬಲ್‌ಗಳು · {{commands}} ಸೆಟಪ್ ಆಜ್ಞೆಗಳು",
@@ -2887,7 +2889,7 @@
       "invalidLink": "ಈ ಲಿಂಕ್ ತೆರೆಯಲು ಸಾಧ್ಯವಿಲ್ಲ.",
       "hostConfirmTitle": "ಬಾಹ್ಯ ಲಿಂಕ್ ತೆರೆಯಬೇಕೆ?",
       "hostConfirmMessage": "ಈ ಲಿಂಕ್ ನಿಮ್ಮ ಬ್ರೌಸರ್‌ನಲ್ಲಿ {{host}} ಅನ್ನು ತೆರೆಯುತ್ತದೆ.",
-      "open": "ಓಪನ್",
+      "open": "ತೆರೆಯಿರಿ",
       "trustThisHost": "ಈ ಹೋಸ್ಟ್ ಅನ್ನು ನಂಬಿ"
     },
     "folderPicker": {
@@ -2978,7 +2980,9 @@
     "permissionDescription": "ಇದನ್ನು ನೋಡಲು ನಿಮಗೆ ಅನುಮತಿ ಇಲ್ಲ.",
     "notFoundDescription": "ಇದನ್ನು ತೆಗೆದುಹಾಕಿರಬಹುದು ಅಥವಾ ಇದು ಈಗ ಲಭ್ಯವಿಲ್ಲ.",
     "serverTitle": "ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
-    "serverDescription": "ನಮ್ಮ ಕಡೆಯಿಂದ ದೋಷ ಉಂಟಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+    "serverDescription": "ನಮ್ಮ ಕಡೆಯಿಂದ ದೋಷ ಉಂಟಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    "timeoutTitle": "ಸರ್ವರ್‌ಗೆ ತುಂಬಾ ಸಮಯ ತೆಗೆದುಕೊಳ್ಳುತ್ತಿದೆ",
+    "timeoutDescription": "ವಿನಂತಿ ಪೂರ್ಣಗೊಳ್ಳುವ ಮೊದಲೇ ಸಮಯ ಮುಗಿದಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
   },
   "screenHeader": {
     "openMenu": "ಮೆನು ತೆರೆಯಿರಿ",
@@ -3833,6 +3837,7 @@
     "commandLabel": "ಆಜ್ಞೆ",
     "commandLabelPosition": "ಆಜ್ಞೆ {{position}}",
     "commandPlaceholder": "ಉದಾ. pnpm install",
+    "commandAtLimit": "ಆಜ್ಞೆಯು {{max}} ಅಕ್ಷರಗಳಿಗೆ ಸೀಮಿತವಾಗಿದೆ",
     "commandsEmpty": "ಇನ್ನೂ ಯಾವುದೇ ಸೆಟಪ್ ಆದೇಶಗಳಿಲ್ಲ",
     "commandsSaveFailed": "ಸೆಟಪ್ ಕಮಾಂಡ್‌ಗಳನ್ನು ಉಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
     "moveUp": "ಮೇಲಕ್ಕೆ ಸರಿಸಿ",

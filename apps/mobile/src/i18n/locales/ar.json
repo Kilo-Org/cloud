@@ -1840,6 +1840,8 @@
       "couldNotLoadEnvironment": "تعذّر تحميل بيئتك.",
       "retryLoadingEnvironment": "إعادة محاولة تحميل البيئة",
       "defaultEnvironment": "البيئة الافتراضية",
+      "environmentAccessibility": "اختر ملفًا شخصيًا: {{label}}",
+      "environmentAccessibilityNeedsAttention": "اختر ملفًا شخصيًا: {{label}}. {{attention}}",
       "leaveChanges": "إبقاء التغييرات",
       "commitAndPush": "إيداع ودفع",
       "startSession": "بدء الجلسة",
@@ -1874,7 +1876,7 @@
       "manageProfiles": "إدارة الملفات الشخصية",
       "noProfiles": "لا توجد ملفات شخصية حتى الآن. قم بإنشاء واحد لإضافة متغيرات البيئة وخوادم MCP والمهارات.",
       "advancedConfig": "التكوين المتقدم",
-      "advancedConfigDescription": "حدد ملفًا شخصيًا لتحميل التكوينات المحفوظة، وقم بتكوين متغيرات البيئة الإضافية وأوامر الإعداد يدويًا",
+      "advancedConfigDescription": "يُطبق على هذه الجلسة. حفظه كملف شخصي يبقيه للمرة القادمة.",
       "saveAsProfile": "حفظ كملف شخصي",
       "saveProfileDescription": "احفظ متغيرات البيئة الحالية وأوامر الإعداد كملف شخصي قابل لإعادة الاستخدام.",
       "profileSummary": "{{vars}} متغيرات البيئة · أوامر الإعداد {{commands}}",
@@ -2546,7 +2548,9 @@
     "permissionDescription": "لا تملك صلاحية عرض هذا المحتوى.",
     "notFoundDescription": "ربما تمت إزالة هذا العنصر أو لم يعد متاحًا.",
     "serverTitle": "تعذّر التحميل.",
-    "serverDescription": "حدث خطأ من جانبنا. حاول مرة أخرى."
+    "serverDescription": "حدث خطأ من جانبنا. حاول مرة أخرى.",
+    "timeoutTitle": "يستغرق الخادم وقتًا طويلًا",
+    "timeoutDescription": "انتهت مهلة الطلب قبل اكتماله. أعد المحاولة."
   },
   "screenHeader": {
     "openMenu": "فتح القائمة",
@@ -4033,6 +4037,7 @@
     "commandLabel": "الأمر",
     "commandLabelPosition": "الأمر {{position}}",
     "commandPlaceholder": "مثال: pnpm install",
+    "commandAtLimit": "يقتصر الأمر على {{max}} حرفًا",
     "commandsEmpty": "لا توجد أوامر الإعداد حتى الآن",
     "commandsSaveFailed": "تعذر حفظ أوامر الإعداد",
     "moveUp": "تحرك للأعلى",

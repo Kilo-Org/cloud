@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Non se puido cargar o teu contorno.",
       "retryLoadingEnvironment": "Volver tentar cargar o contorno",
       "defaultEnvironment": "Contorno predeterminado",
+      "environmentAccessibility": "Escolle un perfil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Escolle un perfil: {{label}}. {{attention}}",
       "leaveChanges": "Manter cambios",
       "commitAndPush": "Confirmar e enviar",
       "startSession": "Iniciar sesión",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "Xestionar perfís",
       "noProfiles": "Aínda non hai perfís. Crea un para engadir variables de ambiente, servidores MCP e habilidades.",
       "advancedConfig": "Configuración avanzada",
-      "advancedConfigDescription": "Seleccione un perfil para cargar configuracións gardadas e configure manualmente variables de ambiente adicionais e comandos de configuración",
+      "advancedConfigDescription": "Aplícase a esta sesión. Gardalo como perfil consérvao para a próxima vez.",
       "saveAsProfile": "Gardar como perfil",
       "saveProfileDescription": "Garda as variables de ambiente actuais e os comandos de configuración como perfil reutilizable.",
       "profileSummary": "{{vars}} variables de ambiente · {{commands}} comandos de configuración",
@@ -2978,7 +2980,9 @@
     "permissionDescription": "Non tes permiso para ver isto.",
     "notFoundDescription": "É posible que este elemento fose eliminado ou que xa non estea dispoñible.",
     "serverTitle": "Non se puido cargar.",
-    "serverDescription": "Produciuse un erro no noso sistema. Téntao de novo."
+    "serverDescription": "Produciuse un erro no noso sistema. Téntao de novo.",
+    "timeoutTitle": "O servidor está tardando demasiado",
+    "timeoutDescription": "A solicitude excedeu o tempo de espera antes de rematar. Téntao de novo."
   },
   "screenHeader": {
     "openMenu": "Abrir o menú",
@@ -3833,6 +3837,7 @@
     "commandLabel": "Comando",
     "commandLabelPosition": "Comando {{position}}",
     "commandPlaceholder": "p. ex. pnpm install",
+    "commandAtLimit": "O comando está limitado a {{max}} caracteres",
     "commandsEmpty": "Aínda non hai comandos de configuración",
     "commandsSaveFailed": "Non se puideron gardar os comandos de configuración",
     "moveUp": "Moverse cara arriba",

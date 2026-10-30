@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "نەتوانرا ژینگەکەت بار بکرێت.",
       "retryLoadingEnvironment": "دووبارە هەوڵدان بۆ بارکردنی ژینگە",
       "defaultEnvironment": "ژینگەی بنەڕەتی",
+      "environmentAccessibility": "پڕۆفایلی هەڵبژێرە: {{label}}",
+      "environmentAccessibilityNeedsAttention": "پڕۆفایلی هەڵبژێرە: {{label}}. {{attention}}",
       "leaveChanges": "جێهێشتنی گۆڕانکارییەکان",
       "commitAndPush": "کۆمیت و ناردن",
       "startSession": "دەستپێکردنی سێشن",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "بەڕێوەبردنی پڕۆفایلی",
       "noProfiles": "هێشتا هیچ پڕۆفایلی نییە. یەکێکیان دروست بکە بۆ زیادکردنی گۆڕاوە ژینگەییەکان، سێرڤەرەکانی MCP و کارامەییەکان.",
       "advancedConfig": "ڕێکخستنی پێشکەوتوو",
-      "advancedConfigDescription": "پرۆفایلی هەڵبژێرە بۆ بارکردنی ڕێکخستنە پاشەکەوتکراوەکان، و بە دەست گۆڕاوە ژینگەییەکانی زیادە و فەرمانەکانی ڕێکخستن ڕێکبخە",
+      "advancedConfigDescription": "بۆ ئەم دانیشتنە جێبەجێ دەبێت. پاشەکەوتکردن وەک پڕۆفایل بۆ جارێکی داهاتوو دەیپارێزێت.",
       "saveAsProfile": "وەک پڕۆفایلی پاشەکەوت بکە",
       "saveProfileDescription": "گۆڕاوە ژینگەییەکانی ئێستا و فەرمانەکانی ڕێکخستن وەک پرۆفایلی دووبارە بەکارهێنەرەوە هەڵبگرە.",
       "profileSummary": "{{vars}} گۆڕاوە ژینگەییەکان · {{commands}} فەرمانەکانی ڕێکخستن",
@@ -2978,7 +2980,9 @@
     "permissionDescription": "ڕێگەپێدراو نیت ئەمە ببینیت.",
     "notFoundDescription": "ڕەنگە ئەم بڕگەیە لابرابێت یان چیتر بەردەست نەبێت.",
     "serverTitle": "نەتوانرا بار بکرێت.",
-    "serverDescription": "لە لای ئێمەوە هەڵەیەک ڕوویدا. تکایە دووبارە هەوڵ بدە."
+    "serverDescription": "لە لای ئێمەوە هەڵەیەک ڕوویدا. تکایە دووبارە هەوڵ بدە.",
+    "timeoutTitle": "ڕاژە زۆر درەنگ وەڵام دەداتەوە",
+    "timeoutDescription": "داواکارییەکە پێش تەواوبوونی ماوەکەی تەواو بوو. تکایە دووبارە هەوڵ بدە."
   },
   "screenHeader": {
     "openMenu": "مێنۆ بکەرەوە",
@@ -3833,6 +3837,7 @@
     "commandLabel": "فەرمان",
     "commandLabelPosition": "فەرمانی {{position}}",
     "commandPlaceholder": "بۆ نموونە pnpm install",
+    "commandAtLimit": "فەرمانەکە بە {{max}} نووسە سنووردارە",
     "commandsEmpty": "هێشتا هیچ فەرمانێکی ڕێکخستن نییە",
     "commandsSaveFailed": "نەتوانرا فەرمانەکانی ڕێکخستن پاشەکەوت بکرێت",
     "moveUp": "بەرەو سەرەوە بڕۆ",

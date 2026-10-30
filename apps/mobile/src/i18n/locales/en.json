@@ -2382,6 +2382,8 @@
       "couldNotLoadEnvironment": "Couldn't load your environment",
       "retryLoadingEnvironment": "Retry loading environment",
       "defaultEnvironment": "Default environment",
+      "environmentAccessibility": "Pick a profile: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Pick a profile: {{label}}. {{attention}}",
       "leaveChanges": "Leave changes",
       "commitAndPush": "Commit and push",
       "startSession": "Start session",
@@ -2416,7 +2418,7 @@
       "manageProfiles": "Manage profiles",
       "noProfiles": "No profiles yet. Create one to add environment variables, MCP servers, and skills.",
       "advancedConfig": "Advanced Configuration",
-      "advancedConfigDescription": "Select a profile to load saved configurations, and manually configure additional environment variables and setup commands",
+      "advancedConfigDescription": "Applies to this session. Saving a profile keeps it for next time.",
       "saveAsProfile": "Save as Profile",
       "saveProfileDescription": "Save the current environment variables and setup commands as a reusable profile.",
       "profileSummary": "{{vars}} environment variables · {{commands}} setup commands",
@@ -3057,7 +3059,9 @@
     "permissionDescription": "You don't have permission to view this.",
     "notFoundDescription": "This item may have been removed or is no longer available.",
     "serverTitle": "Could not load",
-    "serverDescription": "Something went wrong on our end. Please try again."
+    "serverDescription": "Something went wrong on our end. Please try again.",
+    "timeoutTitle": "The server is taking too long",
+    "timeoutDescription": "The request timed out before it finished. Try again."
   },
   "screenHeader": {
     "openMenu": "Open menu",
@@ -3899,6 +3903,7 @@
     "commandLabel": "Command",
     "commandLabelPosition": "Command {{position}}",
     "commandPlaceholder": "e.g. pnpm install",
+    "commandAtLimit": "The command is limited to {{max}} characters",
     "commandsEmpty": "No setup commands yet",
     "commandsSaveFailed": "Couldn't save setup commands",
     "moveUp": "Move up",

@@ -42,7 +42,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Sem ligação",
     "notifications": "Notificações",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repositórios",
     "securityAgent": "Agente de segurança",
     "unknown": "Desconhecido",
@@ -2212,7 +2212,7 @@
       "dollar_many": "dólares",
       "costSpoken": "custo de {{cost}}",
       "costSpokenWithTime": "custo de {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}",
+      "pullRequest": "PR {{number}}",
       "spokenJoiner": "e"
     },
     "githubInstall": {
@@ -2347,6 +2347,8 @@
       "couldNotLoadEnvironment": "Não foi possível carregar o seu ambiente.",
       "retryLoadingEnvironment": "Tentar carregar o ambiente novamente",
       "defaultEnvironment": "Ambiente predefinido",
+      "environmentAccessibility": "Escolha um perfil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Escolha um perfil: {{label}}. {{attention}}",
       "leaveChanges": "Manter alterações",
       "commitAndPush": "Confirmar e enviar",
       "startSession": "Iniciar sessão",
@@ -2381,7 +2383,7 @@
       "manageProfiles": "Gerir perfis",
       "noProfiles": "Ainda não há perfis. Crie um para adicionar variáveis de ambiente, servidores MCP e competências.",
       "advancedConfig": "Configuração avançada",
-      "advancedConfigDescription": "Selecione um perfil para carregar configurações guardadas e configure manualmente variáveis de ambiente e comandos de configuração adicionais",
+      "advancedConfigDescription": "Aplica-se a esta sessão. Guardar como perfil mantém-no para a próxima vez.",
       "saveAsProfile": "Guardar como perfil",
       "saveProfileDescription": "Guarde as variáveis de ambiente e os comandos de configuração atuais como um perfil reutilizável.",
       "profileSummary": "{{vars}} variáveis de ambiente · {{commands}} comandos de configuração",
@@ -2910,9 +2912,9 @@
     },
     "prBadge": {
       "open": "abrir PR",
-      "closed": "pR fechado",
-      "merged": "pR integrado",
-      "draft": "pR em rascunho",
+      "closed": "PR fechado",
+      "merged": "PR integrado",
+      "draft": "PR em rascunho",
       "updating": "A atualizar, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -3020,7 +3022,9 @@
     "permissionDescription": "Não tens permissão para ver este conteúdo.",
     "notFoundDescription": "Este item pode ter sido removido ou já não está disponível.",
     "serverTitle": "Não foi possível carregar os dados.",
-    "serverDescription": "Ocorreu um problema do nosso lado. Tenta novamente."
+    "serverDescription": "Ocorreu um problema do nosso lado. Tenta novamente.",
+    "timeoutTitle": "O servidor está muito lento",
+    "timeoutDescription": "O pedido não terminou a tempo. Tenta novamente."
   },
   "screenHeader": {
     "openMenu": "Abrir menu",
@@ -3883,6 +3887,7 @@
     "commandLabel": "Comando",
     "commandLabelPosition": "Comando {{position}}",
     "commandPlaceholder": "p. ex. pnpm install",
+    "commandAtLimit": "O comando está limitado a {{max}} caracteres",
     "commandsEmpty": "Ainda não há comandos de configuração",
     "commandsSaveFailed": "Não foi possível guardar os comandos de configuração",
     "moveUp": "Mover para cima",

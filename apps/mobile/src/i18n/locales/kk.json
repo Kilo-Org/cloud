@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Ортаңызды жүктеу мүмкін болмады.",
       "retryLoadingEnvironment": "Ортаны жүктеуді қайталау",
       "defaultEnvironment": "Әдепкі орта",
+      "environmentAccessibility": "Профиль таңдаңыз: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Профиль таңдаңыз: {{label}}. {{attention}}",
       "leaveChanges": "Өзгерістерді қалдыру",
       "commitAndPush": "Коммит жасап, жіберу",
       "startSession": "Сессияны бастау",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "Профильдерді басқару",
       "noProfiles": "Әзірге профильдер жоқ. Айнымалы ортаны, MCP серверлерін және дағдыларды қосу үшін біреуін жасаңыз.",
       "advancedConfig": "Кеңейтілген конфигурация",
-      "advancedConfigDescription": "Сақталған конфигурацияларды жүктеу үшін профильді таңдаңыз және қосымша орта айнымалыларын және орнату пәрмендерін қолмен конфигурациялаңыз",
+      "advancedConfigDescription": "Осы сеансқа қолданылады. Профиль ретінде сақтасаңыз, ол келесі жолы да қалады.",
       "saveAsProfile": "Профиль ретінде сақтау",
       "saveProfileDescription": "Ағымдағы орта айнымалы мәндерін және орнату пәрмендерін қайта пайдалануға болатын профиль ретінде сақтаңыз.",
       "profileSummary": "{{vars}} ортаның айнымалы мәндері · {{commands}} орнату пәрмендері",
@@ -2978,7 +2980,9 @@
     "permissionDescription": "Мұны көруге рұқсатыңыз жоқ.",
     "notFoundDescription": "Бұл элемент жойылған немесе енді қолжетімсіз болуы мүмкін.",
     "serverTitle": "Жүктеу мүмкін болмады.",
-    "serverDescription": "Біздің жүйеде қате орын алды. Қайталап көріңіз."
+    "serverDescription": "Біздің жүйеде қате орын алды. Қайталап көріңіз.",
+    "timeoutTitle": "Сервер тым кешігіп жатыр",
+    "timeoutDescription": "Сұраныс аяқталмай уақыты бітті. Қайталап көріңіз."
   },
   "screenHeader": {
     "openMenu": "Мәзірді ашу",
@@ -3833,6 +3837,7 @@
     "commandLabel": "Пәрмен",
     "commandLabelPosition": "{{position}} пәрмен",
     "commandPlaceholder": "мыс. pnpm install",
+    "commandAtLimit": "Пәрмен {{max}} таңбамен шектелген",
     "commandsEmpty": "Орнату пәрмендері әлі жоқ",
     "commandsSaveFailed": "Орнату пәрмендерін сақтау мүмкін болмады",
     "moveUp": "Жоғары жылжытыңыз",

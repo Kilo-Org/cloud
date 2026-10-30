@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "មិនអាចផ្ទុកបរិស្ថានដំណើរការរបស់អ្នកបានទេ។",
       "retryLoadingEnvironment": "ព្យាយាមផ្ទុកបរិស្ថានដំណើរការម្តងទៀត",
       "defaultEnvironment": "បរិស្ថានដំណើរការលំនាំដើម",
+      "environmentAccessibility": "ជ្រើសរើសកម្រងព័ត៌មាន: {{label}}",
+      "environmentAccessibilityNeedsAttention": "ជ្រើសរើសកម្រងព័ត៌មាន: {{label}}. {{attention}}",
       "leaveChanges": "ទុកការផ្លាស់ប្តូរ",
       "commitAndPush": "កត់ត្រា និងបញ្ជូនកូដ",
       "startSession": "ចាប់ផ្តើមវគ្គ",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "គ្រប់គ្រងកម្រងព័ត៌មាន",
       "noProfiles": "មិនទាន់មានកម្រងព័ត៌មានទេ។ បង្កើតមួយដើម្បីបន្ថែមអថេរបរិស្ថាន ម៉ាស៊ីនមេ MCP និងជំនាញ។",
       "advancedConfig": "ការកំណត់រចនាសម្ព័ន្ធកម្រិតខ្ពស់",
-      "advancedConfigDescription": "ជ្រើសរើសកម្រងព័ត៌មានដើម្បីផ្ទុកការកំណត់រចនាសម្ព័ន្ធដែលបានរក្សាទុក ហើយកំណត់រចនាសម្ព័ន្ធអថេរបរិស្ថានបន្ថែម និងពាក្យបញ្ជាដំឡើងដោយដៃ",
+      "advancedConfigDescription": "អនុវត្តចំពោះវគ្គនេះ។ ការរក្សាទុកជាកម្រងព័ត៌មាននឹងរក្សាទុកវាសម្រាប់លើកក្រោយ។",
       "saveAsProfile": "រក្សាទុកជាកម្រងព័ត៌មាន",
       "saveProfileDescription": "រក្សាទុកអថេរបរិស្ថានបច្ចុប្បន្ន និងពាក្យបញ្ជាដំឡើងជាកម្រងព័ត៌មានដែលអាចប្រើឡើងវិញបាន។",
       "profileSummary": "អថេរបរិស្ថាន {{vars}} · ពាក្យបញ្ជាដំឡើង {{commands}}",
@@ -2978,7 +2980,9 @@
     "permissionDescription": "អ្នកមិនមានសិទ្ធិមើលធាតុនេះទេ។",
     "notFoundDescription": "ធាតុនេះអាចត្រូវបានដកចេញ ឬលែងមានទៀតហើយ។",
     "serverTitle": "មិនអាចផ្ទុកបានទេ",
-    "serverDescription": "មានអ្វីមួយខុសប្រក្រតីនៅខាងយើង។ សូមព្យាយាមម្តងទៀត។"
+    "serverDescription": "មានអ្វីមួយខុសប្រក្រតីនៅខាងយើង។ សូមព្យាយាមម្តងទៀត។",
+    "timeoutTitle": "ម៉ាស៊ីនបម្រើកំពុងយឺតយ៉ាវពេក",
+    "timeoutDescription": "សំណើបានហួសពេលមុននឹងបញ្ចប់។ សូមព្យាយាមម្តងទៀត។"
   },
   "screenHeader": {
     "openMenu": "បើកម៉ឺនុយ",
@@ -3833,6 +3837,7 @@
     "commandLabel": "បញ្ជា",
     "commandLabelPosition": "បញ្ជា {{position}}",
     "commandPlaceholder": "ឧ. pnpm install",
+    "commandAtLimit": "ពាក្យបញ្ជាមានកំណត់ត្រឹម {{max}} តួអក្សរ",
     "commandsEmpty": "មិនទាន់មានពាក្យបញ្ជាដំឡើងនៅឡើយទេ",
     "commandsSaveFailed": "មិនអាចរក្សាទុកពាក្យបញ្ជាដំឡើងបានទេ។",
     "moveUp": "ផ្លាស់ទីឡើងលើ",

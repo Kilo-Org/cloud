@@ -41,6 +41,7 @@ vi.mock('expo-router', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
 vi.mock('react-native', () => ({
+  Platform: { OS: 'android' },
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
@@ -111,6 +112,20 @@ describe('ProfileCommandsScreen without the manage role', () => {
     const { renderer, unmount } = await mountScreen('org-1');
 
     expect(findOne(renderer.root, 'EmptyState').props.action).toBeNull();
+
+    unmount();
+  });
+
+  it('shows no length counter on a command a member cannot edit', async () => {
+    h.query.data = testCommands(['a'.repeat(499)]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen('org-1');
+
+    const texts = findAll(renderer.root, 'Text')
+      .map(node => node.props.children)
+      .filter((child): child is string => typeof child === 'string');
+    expect(texts.filter(text => text.includes('character'))).toEqual([]);
 
     unmount();
   });

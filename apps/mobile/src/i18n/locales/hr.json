@@ -761,7 +761,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Uredi zastarjeli komentar na čekanju na lokaciji {{location}}",
       "editA11y": "Uredi komentar na čekanju na lokaciji {{location}}",
-      "staleHint": "pR je ažuriran nakon pisanja ovog komentara.",
+      "staleHint": "PR je ažuriran nakon pisanja ovog komentara.",
       "deleteA11y": "Izbriši komentar na čekanju na lokaciji {{location}}",
       "deletedAnnouncement": "Komentar na čekanju je izbrisan",
       "noCommentsQueued": "Nema komentara na čekanju. Pregled koda poslat će se samo s gore odabranom vrstom.",
@@ -2347,6 +2347,8 @@
       "couldNotLoadEnvironment": "Nije moguće učitati tvoje okruženje.",
       "retryLoadingEnvironment": "Pokušaj ponovno učitati okruženje",
       "defaultEnvironment": "Zadano okruženje",
+      "environmentAccessibility": "Odaberite profil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Odaberite profil: {{label}}. {{attention}}",
       "leaveChanges": "Ostavi izmjene",
       "commitAndPush": "Potvrdi i pošalji",
       "startSession": "Započni sesiju",
@@ -2381,7 +2383,7 @@
       "manageProfiles": "Upravljanje profilima",
       "noProfiles": "Još nema profila. Stvorite jedan za dodavanje varijabli okoline, MCP poslužitelja i vještina.",
       "advancedConfig": "Napredna konfiguracija",
-      "advancedConfigDescription": "Odaberite profil za učitavanje spremljenih konfiguracija i ručno konfigurirajte dodatne varijable okruženja i naredbe za postavljanje",
+      "advancedConfigDescription": "Vrijedi za ovu sesiju. Spremanjem kao profil ostaje za sljedeći put.",
       "saveAsProfile": "Spremi kao profil",
       "saveProfileDescription": "Spremite trenutne varijable okruženja i naredbe za postavljanje kao profil za višekratnu upotrebu.",
       "profileSummary": "{{vars}} varijable okruženja · {{commands}} naredbe za postavljanje",
@@ -3020,7 +3022,9 @@
     "permissionDescription": "Nemaš dopuštenje za pregled ovog sadržaja.",
     "notFoundDescription": "Ova je stavka možda uklonjena ili više nije dostupna.",
     "serverTitle": "Učitavanje nije moguće.",
-    "serverDescription": "Došlo je do pogreške na našoj strani. Pokušaj ponovno."
+    "serverDescription": "Došlo je do pogreške na našoj strani. Pokušaj ponovno.",
+    "timeoutTitle": "Poslužitelj predugo odgovara",
+    "timeoutDescription": "Zahtjev je istekao prije nego što je završio. Pokušaj ponovo."
   },
   "screenHeader": {
     "openMenu": "Otvori izbornik",
@@ -3883,6 +3887,7 @@
     "commandLabel": "Naredba",
     "commandLabelPosition": "Naredba {{position}}",
     "commandPlaceholder": "npr. pnpm install",
+    "commandAtLimit": "Naredba je ograničena na {{max}} znakova",
     "commandsEmpty": "Još nema naredbi za postavljanje",
     "commandsSaveFailed": "Nije moguće spremiti naredbe za postavljanje",
     "moveUp": "Pomakni se gore",

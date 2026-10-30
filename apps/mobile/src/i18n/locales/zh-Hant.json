@@ -1792,6 +1792,8 @@
       "couldNotLoadEnvironment": "無法載入你的環境。",
       "retryLoadingEnvironment": "重新載入環境",
       "defaultEnvironment": "預設環境",
+      "environmentAccessibility": "選擇個人資料：{{label}}",
+      "environmentAccessibilityNeedsAttention": "選擇個人資料：{{label}}。{{attention}}",
       "leaveChanges": "保留變更",
       "commitAndPush": "提交並推送",
       "startSession": "開始工作階段",
@@ -1826,7 +1828,7 @@
       "manageProfiles": "管理個人資料",
       "noProfiles": "還沒有個人資料。建立一個以新增環境變數、MCP 伺服器和技能。",
       "advancedConfig": "進階配置",
-      "advancedConfigDescription": "選擇一個設定檔以載入已儲存的配置，並手動配置其他環境變數和設定命令",
+      "advancedConfigDescription": "僅對本次工作階段生效。另存為設定檔可供下次使用。",
       "saveAsProfile": "另存為設定檔",
       "saveProfileDescription": "將目前環境變數和設定命令儲存為可重複使用的設定檔。",
       "profileSummary": "{{vars}} 環境變數 · {{commands}} 設定指令",
@@ -2454,7 +2456,9 @@
     "permissionDescription": "你沒有權限查看這個內容。",
     "notFoundDescription": "這個項目可能已移除，或已無法使用。",
     "serverTitle": "無法載入。",
-    "serverDescription": "我們的服務發生錯誤。請再試一次。"
+    "serverDescription": "我們的服務發生錯誤。請再試一次。",
+    "timeoutTitle": "伺服器回應時間過長",
+    "timeoutDescription": "請求逾時，未能完成。請再試一次。"
   },
   "screenHeader": {
     "openMenu": "開啟選單",
@@ -3833,6 +3837,7 @@
     "commandLabel": "命令",
     "commandLabelPosition": "命令 {{position}}",
     "commandPlaceholder": "例如 pnpm install",
+    "commandAtLimit": "命令最多為 {{max}} 個字元",
     "commandsEmpty": "還沒有設定命令",
     "commandsSaveFailed": "無法儲存設定命令",
     "moveUp": "向上移動",

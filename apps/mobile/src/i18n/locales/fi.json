@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Ympäristöäsi ei voitu ladata.",
       "retryLoadingEnvironment": "Yritä ladata ympäristö uudelleen",
       "defaultEnvironment": "Oletusympäristö",
+      "environmentAccessibility": "Valitse profiili: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Valitse profiili: {{label}}. {{attention}}",
       "leaveChanges": "Jätä muutokset ennalleen",
       "commitAndPush": "Tee muutostallennus ja pushaa",
       "startSession": "Aloita istunto",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "Hallitse profiileja",
       "noProfiles": "Ei vielä profiileja. Luo sellainen, jonka avulla voit lisätä ympäristömuuttujia, MCP-palvelimia ja taitoja.",
       "advancedConfig": "Lisäasetukset",
-      "advancedConfigDescription": "Valitse profiili ladataksesi tallennetut kokoonpanot ja määritä manuaalisesti lisäympäristömuuttujat ja asennuskomennot",
+      "advancedConfigDescription": "Koskee tätä istuntoa. Profiilina tallentaminen säilyttää sen seuraavaa kertaa varten.",
       "saveAsProfile": "Tallenna profiilina",
       "saveProfileDescription": "Tallenna nykyiset ympäristömuuttujat ja asetuskomennot uudelleen käytettäväksi profiiliksi.",
       "profileSummary": "{{vars}} ympäristömuuttujat · {{commands}} asennuskomennot",
@@ -2978,7 +2980,9 @@
     "permissionDescription": "Sinulla ei ole oikeutta tarkastella tätä.",
     "notFoundDescription": "Tämä kohde on saatettu poistaa tai se ei ole enää käytettävissä.",
     "serverTitle": "Lataaminen ei onnistunut",
-    "serverDescription": "Palvelussamme tapahtui virhe. Yritä uudelleen."
+    "serverDescription": "Palvelussamme tapahtui virhe. Yritä uudelleen.",
+    "timeoutTitle": "Palvelin vastaa hitaasti",
+    "timeoutDescription": "Pyyntö ei valmistunut ajassa. Yritä uudelleen."
   },
   "screenHeader": {
     "openMenu": "Avaa valikko",
@@ -3833,6 +3837,7 @@
     "commandLabel": "Komento",
     "commandLabelPosition": "Komento {{position}}",
     "commandPlaceholder": "esim. pnpm install",
+    "commandAtLimit": "Komento saa olla enintään {{max}} merkkiä",
     "commandsEmpty": "Ei vielä asennuskomentoja",
     "commandsSaveFailed": "Asennuskomentoja ei voitu tallentaa",
     "moveUp": "Siirrä ylös",

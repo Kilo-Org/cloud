@@ -743,7 +743,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Dezie okwu ochie na-eche iziga na {{location}}",
       "editA11y": "Dezie okwu na-eche iziga na {{location}}",
-      "staleHint": "pR ahụ agbanweela kemgbe ị dere nke a.",
+      "staleHint": "PR ahụ agbanweela kemgbe ị dere nke a.",
       "deleteA11y": "Hichapụ okwu na-eche iziga na {{location}}",
       "deletedAnnouncement": "Ehichapụla okwu na-eche iziga",
       "noCommentsQueued": "Enweghị okwu na-eche iziga. A ga-eziga nyocha ahụ naanị na omume dị n'elu.",
@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Enweghị ike ibudata ebe ọrụ gị.",
       "retryLoadingEnvironment": "Nwaa ibudata ebe ọrụ ọzọ",
       "defaultEnvironment": "Ebe ọrụ ndabara",
+      "environmentAccessibility": "Họrọ profaịlụ: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Họrọ profaịlụ: {{label}}. {{attention}}",
       "leaveChanges": "Hapụ mgbanwe",
       "commitAndPush": "Chekwaa ma bulite",
       "startSession": "Malite nnọkọ",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "Jikwaa profaịlụ",
       "noProfiles": "Enweghị profaịlụ. Mepụta otu iji gbakwunye mgbanwe gburugburu ebe obibi, sava MCP, na nka.",
       "advancedConfig": "Nhazi dị elu",
-      "advancedConfigDescription": "Họrọ profaịlụ iji buo nhazi echekwara, wee jiri aka hazie mgbanwe gburugburu ebe obibi na iwu ntọala",
+      "advancedConfigDescription": "Ọ metụtara nnọkọ a. Ịchekwa ya dị ka profaịlụ na-edebe ya maka oge ọzọ.",
       "saveAsProfile": "Chekwa dị ka profaịlụ",
       "saveProfileDescription": "Chekwaa mgbanwe gburugburu ebe obibi ugbu a yana iwu ntọlite dị ka profaịlụ enwere ike ijikwa ya.",
       "profileSummary": "{{vars}} mgbanwe gburugburu · {{commands}} iwu nhazi",
@@ -2978,7 +2980,9 @@
     "permissionDescription": "Ị nweghị ikike ile nke a.",
     "notFoundDescription": "O nwere ike ịbụ na ewepụla ihe a ma ọ bụ na ọ dịkwaghị.",
     "serverTitle": "Enweghị ike ibudata ya.",
-    "serverDescription": "Enwere nsogbu n'akụkụ anyị. Biko nwaa ọzọ."
+    "serverDescription": "Enwere nsogbu n'akụkụ anyị. Biko nwaa ọzọ.",
+    "timeoutTitle": "Ọ na-ewe oge karịa akarị",
+    "timeoutDescription": "Arịrịọ ahụ enweghị ike imecha tupu oge ya agwụ. Biko nwaa ọzọ."
   },
   "screenHeader": {
     "openMenu": "Mepee ndepụta nhọrọ",
@@ -3833,6 +3837,7 @@
     "commandLabel": "Iwu",
     "commandLabelPosition": "Iwu {{position}}",
     "commandPlaceholder": "dịka pnpm install",
+    "commandAtLimit": "Iwu ahụ nwere oke mkpụrụedemede {{max}}",
     "commandsEmpty": "Enweghị iwu ntọlite ka",
     "commandsSaveFailed": "Enweghị ike ichekwa iwu ntọala",
     "moveUp": "Bulie elu",

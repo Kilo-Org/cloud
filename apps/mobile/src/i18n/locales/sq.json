@@ -743,7 +743,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Redakto komentin e vjetëruar në pritje te {{location}}",
       "editA11y": "Redakto komentin në pritje te {{location}}",
-      "staleHint": "pR-ja ka ndryshuar që kur e shkrove këtë koment.",
+      "staleHint": "PR-ja ka ndryshuar që kur e shkrove këtë koment.",
       "deleteA11y": "Fshi komentin në pritje te {{location}}",
       "deletedAnnouncement": "Komenti në pritje u fshi",
       "noCommentsQueued": "Nuk ka komente në radhë. Rishikimi do të dërgohet vetëm me llojin e zgjedhur më sipër.",
@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Nuk u ngarkua mjedisi yt.",
       "retryLoadingEnvironment": "Provo ta ngarkosh përsëri mjedisin",
       "defaultEnvironment": "Mjedisi i parazgjedhur",
+      "environmentAccessibility": "Zgjidh një profil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Zgjidh një profil: {{label}}. {{attention}}",
       "leaveChanges": "Lër ndryshimet",
       "commitAndPush": "Regjistro dhe dërgo",
       "startSession": "Nis seancën",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "Menaxho profilet",
       "noProfiles": "Nuk ka ende profile. Krijo një për të shtuar variabla mjedisi, serverë MCP dhe aftësi.",
       "advancedConfig": "Konfigurimi i avancuar",
-      "advancedConfigDescription": "Zgjidhni një profil për të ngarkuar konfigurimet e ruajtura dhe konfiguroni manualisht variablat shtesë të mjedisit dhe komandat e konfigurimit",
+      "advancedConfigDescription": "Vlen për këtë sesion. Ruajtja si profil e mban për herën tjetër.",
       "saveAsProfile": "Ruaje si profil",
       "saveProfileDescription": "Ruani variablat aktuale të mjedisit dhe komandat e konfigurimit si një profil të ripërdorshëm.",
       "profileSummary": "{{vars}} variablat e mjedisit · {{commands}} komandat e konfigurimit",
@@ -2978,7 +2980,9 @@
     "permissionDescription": "Nuk ke leje për ta parë këtë.",
     "notFoundDescription": "Ky element mund të jetë hequr ose të mos jetë më i disponueshëm.",
     "serverTitle": "Nuk u krye ngarkimi.",
-    "serverDescription": "Ndodhi një gabim nga ana jonë. Provo përsëri."
+    "serverDescription": "Ndodhi një gabim nga ana jonë. Provo përsëri.",
+    "timeoutTitle": "Serveri po vonon shumë",
+    "timeoutDescription": "Kërkesa skadoi përpara se të përfundonte. Provo përsëri."
   },
   "screenHeader": {
     "openMenu": "Hap menunë",
@@ -3833,6 +3837,7 @@
     "commandLabel": "Komanda",
     "commandLabelPosition": "Komanda {{position}}",
     "commandPlaceholder": "p.sh. pnpm install",
+    "commandAtLimit": "Komanda është e kufizuar në {{max}} karaktere",
     "commandsEmpty": "Nuk ka ende komanda konfigurimi",
     "commandsSaveFailed": "Komandat e konfigurimit nuk mund të ruheshin",
     "moveUp": "Lëvizni lart",

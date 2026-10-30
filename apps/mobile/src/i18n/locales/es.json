@@ -1669,7 +1669,7 @@
       "dollar_many": "dólares",
       "costSpoken": "coste de {{cost}}",
       "costSpokenWithTime": "coste {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}",
+      "pullRequest": "PR {{number}}",
       "spokenJoiner": "y"
     },
     "githubInstall": {
@@ -1804,6 +1804,8 @@
       "couldNotLoadEnvironment": "No se pudo cargar tu entorno.",
       "retryLoadingEnvironment": "Reintentar la carga del entorno",
       "defaultEnvironment": "Entorno predeterminado",
+      "environmentAccessibility": "Elige un perfil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Elige un perfil: {{label}}. {{attention}}",
       "leaveChanges": "Conservar cambios",
       "commitAndPush": "Confirmar y subir",
       "startSession": "Empezar sesión",
@@ -1838,7 +1840,7 @@
       "manageProfiles": "Administrar perfiles",
       "noProfiles": "Aún no hay perfiles. Cree uno para agregar variables de entorno, servidores MCP y habilidades.",
       "advancedConfig": "Configuración avanzada",
-      "advancedConfigDescription": "Seleccione un perfil para cargar configuraciones guardadas y configure manualmente variables de entorno adicionales y comandos de configuración",
+      "advancedConfigDescription": "Se aplica a esta sesión. Guardarlo como perfil lo conserva para la próxima vez.",
       "saveAsProfile": "Guardar como perfil",
       "saveProfileDescription": "Guarde las variables de entorno actuales y los comandos de configuración como un perfil reutilizable.",
       "profileSummary": "{{vars}} variables de entorno · {{commands}} comandos de configuración",
@@ -2366,10 +2368,10 @@
       "unavailable": "Esta sesión no puede recibir solicitudes de permiso."
     },
     "prBadge": {
-      "open": "pR abierta",
+      "open": "PR abierta",
       "closed": "solicitud de incorporación de cambios cerrada",
       "merged": "solicitud de incorporación de cambios fusionada",
-      "draft": "pR en borrador",
+      "draft": "PR en borrador",
       "updating": "Actualizando, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2477,7 +2479,9 @@
     "permissionDescription": "No tienes permiso para ver esto.",
     "notFoundDescription": "Es posible que este elemento se haya eliminado o ya no esté disponible.",
     "serverTitle": "No se pudo cargar el contenido.",
-    "serverDescription": "Se produjo un error en nuestro sistema. Inténtalo de nuevo."
+    "serverDescription": "Se produjo un error en nuestro sistema. Inténtalo de nuevo.",
+    "timeoutTitle": "El servidor está tardando demasiado",
+    "timeoutDescription": "La solicitud se agotó antes de completarse. Inténtalo de nuevo."
   },
   "screenHeader": {
     "openMenu": "Abrir menú",
@@ -3883,6 +3887,7 @@
     "commandLabel": "Comando",
     "commandLabelPosition": "Comando {{position}}",
     "commandPlaceholder": "p. ej. pnpm install",
+    "commandAtLimit": "El comando está limitado a {{max}} caracteres",
     "commandsEmpty": "Aún no hay comandos de configuración",
     "commandsSaveFailed": "No se pudieron guardar los comandos de configuración",
     "moveUp": "Subir",

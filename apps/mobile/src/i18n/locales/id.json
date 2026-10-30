@@ -42,7 +42,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Tidak terhubung",
     "notifications": "Notifikasi",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repositori",
     "securityAgent": "Agen keamanan",
     "unknown": "Tidak diketahui",
@@ -1657,7 +1657,7 @@
       "dollar_other": "dolar",
       "costSpoken": "biaya {{cost}}",
       "costSpokenWithTime": "biaya {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}",
+      "pullRequest": "PR {{number}}",
       "spokenJoiner": ", dan"
     },
     "githubInstall": {
@@ -1792,6 +1792,8 @@
       "couldNotLoadEnvironment": "Tidak dapat memuat lingkunganmu.",
       "retryLoadingEnvironment": "Coba muat ulang lingkungan",
       "defaultEnvironment": "Lingkungan bawaan",
+      "environmentAccessibility": "Pilih profil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Pilih profil: {{label}}. {{attention}}",
       "leaveChanges": "Biarkan perubahan",
       "commitAndPush": "Commit dan kirim",
       "startSession": "Mulai sesi",
@@ -1826,7 +1828,7 @@
       "manageProfiles": "Kelola profil",
       "noProfiles": "Belum ada profil. Buat satu untuk menambahkan variabel lingkungan, server MCP, dan keterampilan.",
       "advancedConfig": "Konfigurasi Lanjutan",
-      "advancedConfigDescription": "Pilih profil untuk memuat konfigurasi tersimpan, dan konfigurasikan variabel lingkungan tambahan dan perintah pengaturan secara manual",
+      "advancedConfigDescription": "Berlaku untuk sesi ini. Menyimpannya sebagai profil akan menyimpannya untuk lain kali.",
       "saveAsProfile": "Simpan sebagai Profil",
       "saveProfileDescription": "Simpan variabel lingkungan saat ini dan perintah pengaturan sebagai profil yang dapat digunakan kembali.",
       "profileSummary": "{{vars}} variabel lingkungan · {{commands}} perintah pengaturan",
@@ -2345,8 +2347,8 @@
     },
     "prBadge": {
       "open": "buka PR",
-      "closed": "pR yang ditutup",
-      "merged": "pR yang digabungkan",
+      "closed": "PR yang ditutup",
+      "merged": "PR yang digabungkan",
       "draft": "draf PR",
       "updating": "Memperbarui, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
@@ -2454,7 +2456,9 @@
     "permissionDescription": "Kamu tidak punya izin untuk melihat ini.",
     "notFoundDescription": "Item ini mungkin telah dihapus atau tidak lagi tersedia.",
     "serverTitle": "Tidak dapat memuat.",
-    "serverDescription": "Terjadi kesalahan di pihak kami. Coba lagi."
+    "serverDescription": "Terjadi kesalahan di pihak kami. Coba lagi.",
+    "timeoutTitle": "Server terlalu lama merespons",
+    "timeoutDescription": "Permintaan melebihi batas waktu sebelum selesai. Coba lagi."
   },
   "screenHeader": {
     "openMenu": "Buka menu",
@@ -3045,7 +3049,7 @@
       "editA11y": "Ubah komentar dalam antrean di {{location}}",
       "editOutdatedA11y": "Ubah komentar dalam antrean yang sudah tidak sesuai di {{location}}",
       "noCommentsQueued": "Tidak ada komentar dalam antrean. Tinjauan akan dikirim hanya dengan jenis tinjauan yang dipilih di atas.",
-      "staleHint": "pR sudah berubah sejak kamu menulis komentar ini.",
+      "staleHint": "PR sudah berubah sejak kamu menulis komentar ini.",
       "staleQueueHint": "Komentar yang merujuk ke commit lama tidak dikirim. Komentar tersebut tetap ada di antreanmu agar bisa kamu ubah atau hapus.",
       "summaryA11y": "Ringkasan tinjauan",
       "summaryPlaceholder": "Ringkasan opsional untuk tinjauan"
@@ -3833,6 +3837,7 @@
     "commandLabel": "Perintah",
     "commandLabelPosition": "Perintah {{position}}",
     "commandPlaceholder": "mis. pnpm install",
+    "commandAtLimit": "Perintah dibatasi hingga {{max}} karakter",
     "commandsEmpty": "Belum ada perintah pengaturan",
     "commandsSaveFailed": "Tidak dapat menyimpan perintah penyiapan",
     "moveUp": "Naik",

@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "የሥራ አካባቢዎን መጫን አልተቻለም።",
       "retryLoadingEnvironment": "የሥራ አካባቢውን ለመጫን እንደገና ይሞክሩ",
       "defaultEnvironment": "ነባሪ የሥራ አካባቢ",
+      "environmentAccessibility": "መገለጫ ይምረጡ፦ {{label}}",
+      "environmentAccessibilityNeedsAttention": "መገለጫ ይምረጡ፦ {{label}}። {{attention}}",
       "leaveChanges": "ለውጦችን ይተዉ",
       "commitAndPush": "መዝግበው ይላኩ",
       "startSession": "ክፍለ ጊዜውን ያስጀምሩ",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "መገለጫዎችን ያስተዳድሩ",
       "noProfiles": "እስካሁን ምንም መገለጫዎች የሉም። የአካባቢ ተለዋዋጮችን፣ MCP አገልጋዮችን እና ክህሎቶችን ለመጨመር አንድ ይፍጠሩ።",
       "advancedConfig": "የላቀ ውቅር",
-      "advancedConfigDescription": "የተቀመጡ ውቅሮችን ለመጫን መገለጫ ይምረጡ እና ተጨማሪ የአካባቢ ተለዋዋጮችን እና የማዋቀር ትዕዛዞችን በእጅ ያዋቅሩ",
+      "advancedConfigDescription": "ለዚህ ክፍለ ጊዜ ብቻ ነው። እንደ መገለጫ ካስቀመጥከው ለሚቀጥለው ጊዜ ይቆያል።",
       "saveAsProfile": "እንደ መገለጫ አስቀምጥ",
       "saveProfileDescription": "የአሁኑን የአካባቢ ተለዋዋጮች እና የማዋቀር ትዕዛዞችን እንደ እንደገና ጥቅም ላይ ሊውል የሚችል መገለጫ ያስቀምጡ።",
       "profileSummary": "{{vars}} የአካባቢ ተለዋዋጮች · {{commands}} የማዋቀር ትዕዛዞች",
@@ -2978,7 +2980,9 @@
     "permissionDescription": "ይህን ለማየት ፈቃድ የለህም።",
     "notFoundDescription": "ይህ ንጥል ተወግዶ ሊሆን ይችላል፣ ወይም ከእንግዲህ አይገኝም።",
     "serverTitle": "መጫን አልተቻለም።",
-    "serverDescription": "በእኛ በኩል የሆነ ችግር ተከስቷል። እባክዎ እንደገና ይሞክሩ።"
+    "serverDescription": "በእኛ በኩል የሆነ ችግር ተከስቷል። እባክዎ እንደገና ይሞክሩ።",
+    "timeoutTitle": "ሰርቨሩ በጣም እየዘገየ ነው",
+    "timeoutDescription": "ጥያቄው ከመጠናቀቁ በፊት ጊዜው አልቋል። እባክዎ እንደገና ይሞክሩ።"
   },
   "screenHeader": {
     "openMenu": "ምናሌ ይክፈቱ",
@@ -3833,6 +3837,7 @@
     "commandLabel": "ትዕዛዝ",
     "commandLabelPosition": "ትዕዛዝ {{position}}",
     "commandPlaceholder": "ለምሳሌ pnpm install",
+    "commandAtLimit": "ትዕዛዙ በ{{max}} ቁምፊዎች የተገደበ ነው",
     "commandsEmpty": "እስካሁን ምንም የማዋቀር ትዕዛዞች የሉም",
     "commandsSaveFailed": "የማዋቀር ትዕዛዞችን ማስቀመጥ አልተቻለም",
     "moveUp": "ወደ ላይ ተንቀሳቀስ",

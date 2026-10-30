@@ -743,7 +743,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Wax ka beddel faallada duugoobay ee sugaysa dirista kuna taal {{location}}",
       "editA11y": "Wax ka beddel faallada sugaysa dirista ee ku taal {{location}}",
-      "staleHint": "pR-ka waa la beddelay tan iyo markii aad tan qortay.",
+      "staleHint": "PR-ka waa la beddelay tan iyo markii aad tan qortay.",
       "deleteA11y": "Tirtir faallada sugaysa dirista ee ku taal {{location}}",
       "deletedAnnouncement": "Faalladii sugaysay dirista waa la tirtiray",
       "noCommentsQueued": "Ma jiraan faallooyin safka ku jira. Dib-u-eegista waxaa lagu gudbin doonaa oo keliya falka kor ku xusan.",
@@ -2316,6 +2316,8 @@
       "couldNotLoadEnvironment": "Deegaankaaga lama soo shubi karin.",
       "retryLoadingEnvironment": "Mar kale isku day inaad soo shubto deegaanka",
       "defaultEnvironment": "Deegaanka caadiga ah",
+      "environmentAccessibility": "Dooro profile: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Dooro profile: {{label}}. {{attention}}",
       "leaveChanges": "Ka tag isbeddellada",
       "commitAndPush": "Diiwaangeli oo dir",
       "startSession": "Bilow kalfadhiga",
@@ -2350,7 +2352,7 @@
       "manageProfiles": "Maamul profiles",
       "noProfiles": "Weli profiles ma jiraan Abuur mid lagu daro doorsoomayaasha deegaanka, adeegayaasha MCP, iyo xirfadaha.",
       "advancedConfig": "Habaynta Sare",
-      "advancedConfigDescription": "Dooro astaanta si aad ugu shubto qaabaynta kaydsan, oo gacanta ku habayso doorsoomayaal deegaan oo dheeri ah iyo amarrada dejinta",
+      "advancedConfigDescription": "Waxay khusaysaa fadhigan. Kaydinta Profile ahaan waxay u hayn doontaa marka xigta.",
       "saveAsProfile": "U keydi sidii Profile ahaan",
       "saveProfileDescription": "Keydi doorsoomayaasha deegaanka ee hadda jira iyo amarrada dejinta sidii muuqaal dib loo isticmaali karo.",
       "profileSummary": "{{vars}} doorsoomayaasha deegaanka · {{commands}} amarrada dejinta",
@@ -2978,7 +2980,9 @@
     "permissionDescription": "Ma haysatid oggolaansho aad tan ku aragto.",
     "notFoundDescription": "Waxaa dhici karta in shaygan la saaray ama aan mar dambe la heli karin.",
     "serverTitle": "Lama soo dejin karin.",
-    "serverDescription": "Khalad ayaa ka dhacay dhankayaga. Fadlan mar kale isku day."
+    "serverDescription": "Khalad ayaa ka dhacay dhankayaga. Fadlan mar kale isku day.",
+    "timeoutTitle": "Adeegaha wuu waqti dheer qaaday",
+    "timeoutDescription": "Codsigu wuu waqtiga ka baxay ka hor inta uu dhammaado. Fadlan mar kale isku day."
   },
   "screenHeader": {
     "openMenu": "Fur liiska",
@@ -3833,6 +3837,7 @@
     "commandLabel": "Taliska",
     "commandLabelPosition": "Taliska {{position}}",
     "commandPlaceholder": "tus. pnpm install",
+    "commandAtLimit": "Amarku wuxuu ku xaddidan yahay {{max}} xaraf",
     "commandsEmpty": "Ma jiro amar dejin weli",
     "commandsSaveFailed": "Ma kaydin kari waayay amarrada dejinta",
     "moveUp": "Kor u dhaqaaq",

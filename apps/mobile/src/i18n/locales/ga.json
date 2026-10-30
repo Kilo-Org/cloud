@@ -2409,6 +2409,8 @@
       "couldNotLoadEnvironment": "Níorbh fhéidir do thimpeallacht a lódáil.",
       "retryLoadingEnvironment": "Bain triail as an timpeallacht a lódáil arís",
       "defaultEnvironment": "Timpeallacht réamhshocraithe",
+      "environmentAccessibility": "Roghnaigh próifíl: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Roghnaigh próifíl: {{label}}. {{attention}}",
       "leaveChanges": "Fág athruithe",
       "commitAndPush": "Taifead agus brúigh",
       "startSession": "Tosaigh seisiún",
@@ -2443,7 +2445,7 @@
       "manageProfiles": "Bainistigh próifílí",
       "noProfiles": "Níl próifílí ann fós. Cruthaigh ceann chun athróga timpeallachta, freastalaithe MCP, agus scileanna a chur leis.",
       "advancedConfig": "Cumraíocht Casta",
-      "advancedConfigDescription": "Roghnaigh próifíl chun cumraíochtaí sábháilte a luchtú, agus de láimh athróga timpeallachta breise agus orduithe socraithe a chumrú",
+      "advancedConfigDescription": "Baineann sé leis an seisiún seo. Má shábháiltear mar phróifíl é, fanann sé don chéad uair eile.",
       "saveAsProfile": "Sábháil mar Phróifíl",
       "saveProfileDescription": "Sábháil na hathróga timpeallachta reatha agus na horduithe socraithe mar phróifíl ath-inúsáidte.",
       "profileSummary": "{{vars}} athróga timpeallachta · {{commands}} orduithe socraithe",
@@ -3104,7 +3106,9 @@
     "permissionDescription": "Níl cead agat é seo a fheiceáil.",
     "notFoundDescription": "Seans gur baineadh an mhír seo nó nach bhfuil sí ar fáil a thuilleadh.",
     "serverTitle": "Níorbh fhéidir an t-ábhar a lódáil.",
-    "serverDescription": "Tharla fadhb ar ár dtaobh féin. Bain triail as arís."
+    "serverDescription": "Tharla fadhb ar ár dtaobh féin. Bain triail as arís.",
+    "timeoutTitle": "Tá an freastalaí ag glacadh rófhada",
+    "timeoutDescription": "Níor chríochnaigh an t-iarratas in am. Bain triail as arís."
   },
   "screenHeader": {
     "openMenu": "Oscail roghchlár",
@@ -3983,6 +3987,7 @@
     "commandLabel": "Ordú",
     "commandLabelPosition": "Ordú {{position}}",
     "commandPlaceholder": "m.sh. pnpm install",
+    "commandAtLimit": "Tá an t-ordú teoranta do {{max}} carachtar",
     "commandsEmpty": "Níl aon orduithe socraithe fós",
     "commandsSaveFailed": "Níorbh fhéidir na horduithe socraithe a shábháil",
     "moveUp": "Bog suas",

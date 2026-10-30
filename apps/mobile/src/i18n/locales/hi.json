@@ -1792,6 +1792,8 @@
       "couldNotLoadEnvironment": "आपका एनवायरनमेंट लोड नहीं हो सका।",
       "retryLoadingEnvironment": "एनवायरनमेंट फिर से लोड करें",
       "defaultEnvironment": "डिफ़ॉल्ट एनवायरनमेंट",
+      "environmentAccessibility": "एक प्रोफ़ाइल चुनें: {{label}}",
+      "environmentAccessibilityNeedsAttention": "एक प्रोफ़ाइल चुनें: {{label}}। {{attention}}",
       "leaveChanges": "बदलाव रहने दें",
       "commitAndPush": "कमिट और पुश करें",
       "startSession": "सत्र शुरू करें",
@@ -1826,7 +1828,7 @@
       "manageProfiles": "प्रोफ़ाइल प्रबंधित करें",
       "noProfiles": "अभी तक कोई प्रोफ़ाइल नहीं। पर्यावरण चर, एमसीपी सर्वर और कौशल जोड़ने के लिए एक बनाएं।",
       "advancedConfig": "उन्नत विन्यास",
-      "advancedConfigDescription": "सहेजे गए कॉन्फ़िगरेशन को लोड करने के लिए एक प्रोफ़ाइल का चयन करें, और अतिरिक्त पर्यावरण चर और सेटअप कमांड को मैन्युअल रूप से कॉन्फ़िगर करें",
+      "advancedConfigDescription": "यह इस सत्र पर लागू होता है। प्रोफ़ाइल के रूप में सहेजने पर यह अगली बार के लिए रहता है।",
       "saveAsProfile": "प्रोफ़ाइल के रूप में सहेजें",
       "saveProfileDescription": "वर्तमान परिवेश चर और सेटअप कमांड को पुन: प्रयोज्य प्रोफ़ाइल के रूप में सहेजें।",
       "profileSummary": "{{vars}} पर्यावरण चर · {{commands}} सेटअप आदेश",
@@ -2363,7 +2365,7 @@
       "invalidLink": "यह लिंक नहीं खोला जा सकता।",
       "hostConfirmTitle": "बाहरी लिंक खोलें?",
       "hostConfirmMessage": "यह लिंक आपके ब्राउज़र में {{host}} खोलता है।",
-      "open": "ओपन",
+      "open": "खोलें",
       "trustThisHost": "इस होस्ट पर भरोसा करें"
     },
     "folderPicker": {
@@ -2454,7 +2456,9 @@
     "permissionDescription": "आपको इसे देखने की अनुमति नहीं है।",
     "notFoundDescription": "हो सकता है कि यह आइटम हटा दिया गया हो या अब उपलब्ध न हो।",
     "serverTitle": "डेटा लोड नहीं हो सका।",
-    "serverDescription": "हमारी ओर से कुछ गड़बड़ हो गई। कृपया फिर से कोशिश करें।"
+    "serverDescription": "हमारी ओर से कुछ गड़बड़ हो गई। कृपया फिर से कोशिश करें।",
+    "timeoutTitle": "सर्वर को बहुत ज़्यादा समय लग रहा है",
+    "timeoutDescription": "अनुरोध पूरा होने से पहले ही समय समाप्त हो गया। कृपया फिर से कोशिश करें।"
   },
   "screenHeader": {
     "openMenu": "मेनू खोलें",
@@ -2815,7 +2819,7 @@
       "openAccessibility": "पुल रिक्वेस्ट या मर्ज रिक्वेस्ट खोलें",
       "clearLink": "लिंक हटाएँ",
       "pasteLink": "पुल रिक्वेस्ट या मर्ज रिक्वेस्ट का लिंक पेस्ट करें",
-      "open": "ओपन"
+      "open": "खोलें"
     },
     "eventChips": {
       "comment": "टिप्पणी करें",
@@ -3812,17 +3816,17 @@
     "deletedToast": "प्रोफ़ाइल \"{{name}}\" हटा दी गई",
     "variablesTitle": "पर्यावरण चर",
     "addVariable": "वेरिएबल जोड़ें",
-    "keyLabel": "चाबी",
+    "keyLabel": "कुंजी",
     "keyTooLong": "कुंजी 256 अक्षरों या उससे कम की होनी चाहिए",
     "keyDuplicate": "यह कुंजी पहले से ही प्रोफ़ाइल में मौजूद है",
     "keyWillBeSavedAs": "{{key}} के रूप में सहेजा जाएगा",
-    "valueLabel": "कीमत",
+    "valueLabel": "मान",
     "valueRequired": "एक मान दर्ज करें",
     "tooLong": "अधिकतम {{max}} अक्षरों का उपयोग करें",
     "secrets": {
       "markSecret": "रहस्य के रूप में चिह्नित करें",
-      "masked": "छिपा हुआ मूल्य",
-      "reveal": "मूल्य प्रकट करें",
+      "masked": "छिपा हुआ मान",
+      "reveal": "मान प्रकट करें",
       "newValuePlaceholder": "नया गुप्त मान दर्ज करें",
       "valuePlaceholder": "गुप्त मान (एन्क्रिप्टेड)"
     },
@@ -3833,6 +3837,7 @@
     "commandLabel": "आज्ञा",
     "commandLabelPosition": "आज्ञा {{position}}",
     "commandPlaceholder": "उदा. pnpm install",
+    "commandAtLimit": "आदेश {{max}} अक्षरों तक सीमित है",
     "commandsEmpty": "अभी तक कोई सेटअप आदेश नहीं",
     "commandsSaveFailed": "सेटअप आदेश सहेजे नहीं जा सके",
     "moveUp": "बढ़ाना",
@@ -3862,7 +3867,7 @@
       "name": "सर्वर का नाम",
       "type": "सर्वर प्रकार",
       "localType": "स्थानीय",
-      "remoteType": "दूर",
+      "remoteType": "दूरस्थ",
       "command": "कमांड लाइन",
       "url": "यूआरएल",
       "environment": "पर्यावरण (JSON)",

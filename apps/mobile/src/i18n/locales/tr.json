@@ -1792,6 +1792,8 @@
       "couldNotLoadEnvironment": "Ortamın yüklenemedi.",
       "retryLoadingEnvironment": "Ortamı yüklemeyi tekrar dene",
       "defaultEnvironment": "Varsayılan ortam",
+      "environmentAccessibility": "Bir profil seç: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Bir profil seç: {{label}}. {{attention}}",
       "leaveChanges": "Değişiklikleri koru",
       "commitAndPush": "İşle ve gönder",
       "startSession": "Oturumu başlat",
@@ -1826,7 +1828,7 @@
       "manageProfiles": "Profilleri yönet",
       "noProfiles": "Henüz profil yok. Ortam değişkenleri, MCP sunucuları ve beceriler eklemek için bir tane oluşturun.",
       "advancedConfig": "Gelişmiş Yapılandırma",
-      "advancedConfigDescription": "Kaydedilen yapılandırmaları yüklemek için bir profil seçin ve ek ortam değişkenlerini ve kurulum komutlarını manuel olarak yapılandırın",
+      "advancedConfigDescription": "Bu oturum için geçerlidir. Profil olarak kaydetmek bir sonraki sefer için saklar.",
       "saveAsProfile": "Profil olarak kaydet",
       "saveProfileDescription": "Geçerli ortam değişkenlerini ve kurulum komutlarını yeniden kullanılabilir bir profil olarak kaydedin.",
       "profileSummary": "{{vars}} ortam değişkenleri · {{commands}} kurulum komutları",
@@ -2454,7 +2456,9 @@
     "permissionDescription": "Bunu görüntüleme iznin yok.",
     "notFoundDescription": "Bu öğe kaldırılmış veya artık kullanılamıyor olabilir.",
     "serverTitle": "Yüklenemedi.",
-    "serverDescription": "Bizim tarafımızda bir sorun oluştu. Lütfen tekrar dene."
+    "serverDescription": "Bizim tarafımızda bir sorun oluştu. Lütfen tekrar dene.",
+    "timeoutTitle": "Sunucu çok uzun sürüyor",
+    "timeoutDescription": "İstek tamamlanmadan zaman aşımına uğradı. Lütfen tekrar dene."
   },
   "screenHeader": {
     "openMenu": "Menüyü aç",
@@ -3833,6 +3837,7 @@
     "commandLabel": "Komut",
     "commandLabelPosition": "Komut {{position}}",
     "commandPlaceholder": "örn. pnpm install",
+    "commandAtLimit": "Komut {{max}} karakterle sınırlıdır",
     "commandsEmpty": "Henüz kurulum komutu yok",
     "commandsSaveFailed": "Kurulum komutları kaydedilemedi",
     "moveUp": "Yukarı taşı",

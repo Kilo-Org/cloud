@@ -186,7 +186,7 @@ describe('reconcileFirstPage', () => {
     unsubscribe();
   });
 
-  it('marks an entry no list is showing stale without fetching it', async () => {
+  it('drops the pages of an entry no list is showing and fetches nothing', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const calls: number[] = [];
     // eslint-disable-next-line require-await -- the recipe pins an async queryFn; the body needs no await.
@@ -207,13 +207,50 @@ describe('reconcileFirstPage', () => {
 
     await reconcileFirstPage(queryClient, prefix);
 
+    // Nothing renders these rows, so they are dropped: the next mount fetches
+    // page one instead of fanning out over every retained page.
     expect(calls).toEqual([]);
     expect(queryClient.getQueryState(fullKey)?.isInvalidated).toBe(true);
+    expect(queryClient.getQueryData(fullKey)).toEqual({ pages: [], pageParams: [] });
+    observer.destroy();
+  });
+
+  it('does not run a read its observer has not enabled', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const calls: number[] = [];
+    // eslint-disable-next-line require-await -- the recipe pins an async queryFn; the body needs no await.
+    const queryFn = async ({ pageParam }: { pageParam: number }): Promise<Page> => {
+      calls.push(pageParam);
+      return page([{ id: `p${pageParam}`, title: `p${pageParam}` }]);
+    };
+    const observer = new InfiniteQueryObserver(queryClient, {
+      queryKey: fullKey,
+      queryFn,
+      initialPageParam: 0,
+      getNextPageParam: (_lastPage: Page, _pages: Page[], lastPageParam: number) =>
+        lastPageParam + 1,
+      // The screen waits on filters or an organization before it reads.
+      enabled: false,
+    });
+    queryClient.setQueryData(fullKey, {
+      pages: [page([{ id: 'a', title: 'a' }])],
+      pageParams: [0],
+    });
+    // eslint-disable-next-line no-empty-function -- a real listener is required to activate the observer; the body is intentionally empty.
+    const unsubscribe = observer.subscribe(() => {});
+
+    await reconcileFirstPage(queryClient, prefix);
+
+    // `query.fetch` ignores `enabled`, so the reconcile has to respect it: the
+    // app has not loaded what the read depends on yet.
+    expect(calls).toEqual([]);
+    // The rows stay, because the mounted list is only waiting to enable.
     expect(queryClient.getQueryData(fullKey)).toEqual({
       pages: [page([{ id: 'a', title: 'a' }])],
       pageParams: [0],
     });
-    observer.destroy();
+
+    unsubscribe();
   });
 
   it('marks the prefix stale without refetching it', async () => {

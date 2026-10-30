@@ -87,13 +87,19 @@ async function refetchFirstPage(query: Query): Promise<void> {
  * Re-anchor one entry's start cursor and start its page-one refetch.
  *
  * Returns the in-flight refetch, or null when the entry is not a mounted
- * infinite query: a non-infinite entry has no pages to reconcile, and one no
- * list is showing refetches on its next mount instead.
+ * infinite query, or when nothing may fetch it.
  */
 function reconcileEntry(query: Query): Promise<void> | null {
   const data = infiniteQueryDataSchema.safeParse(query.state.data);
   const initialPageParam = readInitialPageParam(query);
   if (!data.success || !initialPageParam.present) {
+    return null;
+  }
+  if (query.observers.length === 0) {
+    // Nothing renders these rows, so dropping them costs no visible state and
+    // keeps the one-page refetch cost: the next mount fetches page one instead
+    // of fanning out over every retained page.
+    query.setState({ data: { pages: [], pageParams: [] } });
     return null;
   }
   if (data.data.pageParams.length > 0 && data.data.pageParams[0] !== initialPageParam.value) {
@@ -106,7 +112,10 @@ function reconcileEntry(query: Query): Promise<void> | null {
       },
     });
   }
-  return query.observers.length > 0 ? refetchFirstPage(query) : null;
+  // A read its observer has not enabled yet (the screen waits on filters, on an
+  // organization, or on a session) must not run: `query.fetch` ignores
+  // `enabled`, unlike the refetch an invalidation would have started.
+  return query.isDisabled() ? null : refetchFirstPage(query);
 }
 
 /**
@@ -131,8 +140,11 @@ function reconcileEntry(query: Query): Promise<void> | null {
  *   and replace the newest rows with it.
  * - The prefix is marked stale without refetching it, so an entry no list is
  *   showing refetches on its next mount.
- * - Each mounted entry fetches page one from the start; the pages are replaced
- *   only when that page is delivered.
+ * - Each mounted, enabled entry fetches page one from the start; the pages are
+ *   replaced only when that page is delivered.
+ * - An entry no list is showing has nothing to keep on screen, so its pages are
+ *   dropped and its next mount fetches page one rather than fanning out over
+ *   every retained page.
  *
  * The returned promise settles once the page-one fetches settle, so a caller
  * that needs the refresh finished (pull-to-refresh, foreground resume) can

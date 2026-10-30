@@ -12,9 +12,11 @@ it.each([undefined, 'all'])(
   async diagnostics => {
     const calls: unknown[] = [];
     let statuses: (number | 'recorded' | 'duplicate' | 'admission')[] = [];
+    let fullBatchStatuses: Map<string, (typeof statuses)[number]> | undefined;
     let mixedStatus: number | 'admission' | undefined;
     let heldFirst: ReturnType<typeof Promise.withResolvers<void>> | undefined;
     let heldSecond: ReturnType<typeof Promise.withResolvers<void>> | undefined;
+    let heldThird: ReturnType<typeof Promise.withResolvers<void>> | undefined;
     let active = 0;
     let peak = 0;
     const writer = createServer(async (request, response) => {
@@ -26,12 +28,16 @@ it.each([undefined, 'all'])(
       response.once('finish', () => active--);
       const status =
         mixedStatus === undefined
-          ? statuses.shift()
+          ? fullBatchStatuses
+            ? fullBatchStatuses.get(event.core.id)
+            : statuses.shift()
           : event.core.id.endsWith('3300')
             ? 'recorded'
             : mixedStatus;
+      fullBatchStatuses?.delete(event.core.id);
       if (heldFirst && event.core.id.endsWith('3300')) await heldFirst.promise;
       if (heldSecond && event.core.id.endsWith('3301')) await heldSecond.promise;
+      if (heldThird && event.core.id.endsWith('3302')) await heldThird.promise;
       if (status === 'admission') {
         response.writeHead(429, { 'content-type': 'application/json' });
         response.end(JSON.stringify({ error: 'Usage writer overloaded', reason: 'queue_limit' }));
@@ -110,18 +116,25 @@ it.each([undefined, 'all'])(
         attempts: 2,
         body,
       }));
-      // Hold both writer slots: the other four items must wait inside this full batch.
+      // Hold all three writer slots: the fourth item cannot start until a slot is released.
       statuses = ['recorded', 'duplicate', 'recorded', 'duplicate', 'recorded', 'duplicate'];
+      fullBatchStatuses = new Map(events.map((event, index) => [event.core.id, statuses[index]]));
       heldFirst = Promise.withResolvers<void>();
       heldSecond = Promise.withResolvers<void>();
+      heldThird = Promise.withResolvers<void>();
       let succeeded = false;
       const successfulBatch = entrypoint.queue('local-usage', messages).then(result => {
         succeeded = true;
         return result;
       });
-      await vi.waitFor(() => expect(calls).toHaveLength(2));
-      expect(active).toBe(2);
-      expect(peak).toBe(2);
+      await vi.waitFor(() => expect(calls).toHaveLength(3));
+      expect(active).toBe(3);
+      expect(peak).toBe(3);
+      expect(succeeded).toBe(false);
+      // Reuse the third slot for all remaining items while its two peers stay pending.
+      heldThird.resolve();
+      heldThird = undefined;
+      await vi.waitFor(() => expect(calls).toHaveLength(6));
       expect(succeeded).toBe(false);
       heldFirst.resolve();
       heldSecond.resolve();
@@ -138,10 +151,12 @@ it.each([undefined, 'all'])(
         'queue-5',
       ]);
       expect(successfulResult.retryMessages).toEqual([]);
-      expect(calls).toEqual(events);
-      expect(peak).toBe(2);
-      expect(statuses).toEqual([]);
+      expect(calls).toEqual(expect.arrayContaining(events));
+      expect(peak).toBe(3);
+      expect(fullBatchStatuses.size).toBe(0);
+      fullBatchStatuses = undefined;
       for (const status of [400, 429, 503, 'admission'] as const) {
+        peak = 0;
         mixedStatus = status;
         heldFirst = Promise.withResolvers<void>();
         const priorCalls = calls.length;
@@ -163,11 +178,13 @@ it.each([undefined, 'all'])(
         const delay = result.retryMessages[0].delaySeconds;
         expect(delay).toBeGreaterThanOrEqual(status === 'admission' ? 2 : 60);
         expect(delay).toBeLessThanOrEqual(status === 'admission' ? 4 : 120);
-        expect(calls.slice(-2)).toEqual(events.slice(0, 2));
+        expect(calls.slice(-2)).toEqual(expect.arrayContaining(events.slice(0, 2)));
       }
       mixedStatus = undefined;
       for (const status of [429, 503, 'admission'] as const) {
+        peak = 0;
         statuses = ['recorded', status, 400, 'duplicate', 'recorded', 'duplicate'];
+        fullBatchStatuses = new Map(events.map((event, index) => [event.core.id, statuses[index]]));
         heldFirst = Promise.withResolvers<void>();
         const priorCalls = calls.length;
         let finished = false;
@@ -177,7 +194,7 @@ it.each([undefined, 'all'])(
         });
         await vi.waitFor(() => expect(calls).toHaveLength(priorCalls + 6));
         expect(finished).toBe(false);
-        expect(peak).toBe(2);
+        expect(peak).toBeLessThanOrEqual(3);
         heldFirst.resolve();
         heldFirst = undefined;
         const result = await work;
@@ -189,9 +206,13 @@ it.each([undefined, 'all'])(
           'queue-4',
           'queue-5',
         ]);
-        expect(result.retryMessages.map(message => message.msgId)).toEqual(['queue-1', 'queue-2']);
-        expect(calls.slice(-6)).toEqual(events);
-        expect(statuses).toEqual([]);
+        expect(result.retryMessages.map(message => message.msgId).toSorted()).toEqual([
+          'queue-1',
+          'queue-2',
+        ]);
+        expect(calls.slice(-6)).toEqual(expect.arrayContaining(events));
+        expect(fullBatchStatuses.size).toBe(0);
+        fullBatchStatuses = undefined;
         // A later delivery retains the usage identity and can settle as a duplicate.
         statuses = ['duplicate'];
         const replay = await entrypoint.queue('local-usage', [{ ...messages[1], attempts: 3 }]);
@@ -223,6 +244,7 @@ it.each([undefined, 'all'])(
     } finally {
       heldFirst?.resolve();
       heldSecond?.resolve();
+      heldThird?.resolve();
       try {
         await worker?.dispose();
       } finally {

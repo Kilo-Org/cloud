@@ -11,7 +11,7 @@
   "observability": { "enabled": true },
   // Production merge/deployment prerequisites: eu-queues.md.
   "vars": {
-    "USAGE_INGEST_PARALLELISM": "2",
+    "USAGE_INGEST_PARALLELISM": "3",
     "USAGE_WRITER_URL": "https://app.kilo.ai/api/internal/usage/record",
   },
   "queues": {

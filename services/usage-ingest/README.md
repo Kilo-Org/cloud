@@ -36,15 +36,16 @@ Unrelated paths return 404; other methods on `/usage` return 405.
 | Production (top-level config) | `usage-ingest` | `usage-ingest-processing-eu` | `usage-ingest-processing-dlq-eu` |
 | Staging (`env.staging`) | `usage-ingest-staging` | `usage-ingest-processing-staging-eu` | `usage-ingest-processing-dlq-staging-eu` |
 
-Each environment connects only its EU pair. Production uses batch6/parallelism2/cap200 (up to 400 writer calls);
+Each environment connects only its EU pair. Production uses batch6/parallelism3/cap200 (up to 600 writer HTTP calls);
 staging keeps one consumer capped at200, batch size2. Old global queues remain intact
 for a paused/drained routing rollback. See [EU preparation and cutover](eu-queues.md).
 
 ## Processing
 
 Production writes to `https://app.kilo.ai/api/internal/usage/record`; staging uses
-`https://staging-app.kilo.ai/api/internal/usage/record`. Both use direct HTTP and
-`USAGE_INGEST_PARALLELISM=2`: at most two concurrent writes per invocation. Absent
+`https://staging-app.kilo.ai/api/internal/usage/record`. Both use direct HTTP.
+Production uses `USAGE_INGEST_PARALLELISM=3` for at most three concurrent writes
+per invocation; staging keeps `2` for at most two. Absent
 or unrecognized parallelism uses one slot; there is no receipt fallback.
 Every slot settles before the invocation returns or rejects. Only the successful
 message is ACKed; an unavailable/invalid message retries individually. Successful
@@ -91,7 +92,7 @@ settings, comparable aggregates and read-only database snapshots.
 
 | Processing configuration | Value |
 |---|---|
-| `USAGE_INGEST_PARALLELISM` | `2` for two processing slots; all other or absent values use one |
+| `USAGE_INGEST_PARALLELISM` | Exact `3` for three processing slots, `2` for two; all other or absent values use one |
 | `USAGE_WRITER_URL` | Full Frankfurt writer URL ending in `/api/internal/usage/record` |
 | `USAGE_WRITER_SECRET` | Writer's existing `INTERNAL_API_SECRET`, sent as `x-internal-api-key` |
 | `USAGE_WRITER_PROTECTION_BYPASS` | Optional Vercel automation bypass secret |
@@ -193,14 +194,14 @@ reconcile against persisted usage rows when exact completeness matters.
 
 ## Queue policy
 
-Production uses batch size 6 and staging keeps batch size 2. Both allow at most
-two writer slots per invocation:
+Production uses batch size 6 with three writer slots per invocation; staging keeps
+batch size 2 with two slots:
 
 | Consumer setting | Value | Purpose |
 |---|---|---|
 | `max_batch_size` | `6` in production, `2` in staging | Maximum messages delivered per invocation. |
 | `max_batch_timeout` | `0` seconds | No intentional wait to fill a batch. |
-| `max_concurrency` | `200` in both environments | Parallelism 2 allows at most `200 × 2 = 400` concurrent queue writer calls per environment. |
+| `max_concurrency` | `200` in both environments | At most `200 × min(6, 3) = 600` concurrent writer HTTP calls in production; staging stays at `200 × min(2, 2) = 400`. |
 | `max_retries` | `20` | Initial delivery plus up to twenty retries, shared across failure classes. |
 | `retry_delay` | `60` seconds | Fallback for implicit/unexpected failures; handled failures use per-message jitter below. |
 | `dead_letter_queue` | Environment-specific name above | Retain exhausted failures separately from the source queue. |
@@ -317,8 +318,8 @@ reserved connections** or a measured global capacity bound. Other traffic can
 compete after the snapshot, a writer may perform several database operations,
 background work can outlive the awaited call, and each runtime instance has its
 own counter/pool. An admitted call can still wait. The pool maximum stays at 10,
-consumer concurrency at 200, parallelism at 2, and batch size at 6 in production and
-2 in staging; retry settings also stay unchanged.
+consumer concurrency at 200. Production uses batch6/parallelism3; staging keeps
+batch2/parallelism2. Retry settings also stay unchanged.
 There is no new environment knob; merging this change activates queue rejection
 when the normal automatic deployment reaches the writer.
 
@@ -339,7 +340,7 @@ do not establish hosted throughput, spare capacity, or latency improvements.
 Staging uses the single EU queue `usage-ingest-processing-staging-eu`
 and its EU DLQ `usage-ingest-processing-dlq-staging-eu`. It allows at most 400 concurrent writer calls with batch 2,
 parallelism 2 and invocation cap 200. Production selects processing at cap 200
-with batch 6 and two slots, subject to the [production merge gates](eu-queues.md#production-merge-gate).
+with batch 6 and three slots, subject to the [production merge gates](eu-queues.md#production-merge-gate).
 
 `USAGE_INGEST_PARALLELISM` is the simple serial/parallel experiment control:
 
@@ -357,11 +358,11 @@ this is not a live per-request switch. No additional experiment framework or
 request-controlled switch is introduced.
 
 With timeout zero, actual batches may still contain one message. A full production
-batch shares two writer slots among six messages; later messages can wait inside the
+batch shares three writer slots among six messages; later messages can wait inside the
 invocation. Increasing batch size is a scheduling hypothesis; local tests do not establish
-batch fill or delivery-tail improvement. The 400-writer setting is a doubled
-upper bound versus the prior batch-1/cap-200 configuration, not a guarantee of
-throughput. Compare measured batch sizes, handler entry times, full writer-call
+batch fill or delivery-tail improvement. The production HTTP concurrency ceiling
+increases from 400 to 600; this is not an RPS target, a global DB bound or a
+guarantee of throughput. Compare measured batch sizes, handler entry times, full writer-call
 duration, accounting age, backlog/retries/DLQ and writer/DB pressure before
 attributing any hosted latency effect.
 
@@ -369,8 +370,8 @@ The first test sequence is diagnostics → EU → batching. Diagnostics and EU a
 already on main; staging-host middleware remains deferred. This refresh preserves
 the sole selected EU source/DLQ, its preparation and routing rollback behavior,
 both diagnostics and parallelism variables, and the writer target. Keep one
-consumer per environment at cap 200 / parallelism 2, with production batch 6 and
-staging batch 2 (at most 400 writer calls each); do not reconnect a
+consumer per environment at cap 200, with production batch6/parallelism3 (at most
+600 writer HTTP calls) and staging batch2/parallelism2 (at most400); do not reconnect a
 legacy consumer or split the cap. The queue-budget and direct runtime tests pin
 the actual EU queue names and policy. Verify the refreshed source and those
 checks before merge. Historical four-PR compatibility results do not validate
@@ -399,7 +400,7 @@ attempts disable Wrangler's global auto-provisioning for EU selections. Staging
 continues direct HTTP to its writer; production also uses its direct Frankfurt writer. The preparation step also detaches the obsolete
 environment consumer before Wrangler attaches the selected source; it preserves both queue pairs.
 See [deployment-driven cutover and routing rollback](eu-queues.md).
-Production uses its EU pair with batch6/parallelism2/cap200 and the existing retry policy.
+Production uses its EU pair with batch6/parallelism3/cap200 and the existing retry policy.
 Historical global production revisions retain normal provisioning; see the helper capability notes in [EU setup](eu-queues.md).
 `USAGE_INGEST_QUEUE` binds the source and `USAGE_INGEST_DLQ` binds its matching DLQ;
 only the source has a consumer. Exhausted failures route to that DLQ.

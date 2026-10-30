@@ -56,6 +56,6 @@ it.each([undefined, 'staging'])(
             : 'usage-ingest-processing-dlq-eu',
       }),
     ]);
-    expect(config.vars.USAGE_INGEST_PARALLELISM).toBe('2');
+    expect(config.vars.USAGE_INGEST_PARALLELISM).toBe(env === 'staging' ? '2' : '3');
   }
 );

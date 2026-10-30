@@ -1581,7 +1581,12 @@ describe('fetchMRInlineComments authorship', () => {
 
     const comments = await fetchMRInlineComments('prat-token', 'group/project', 10);
 
-    expect(comments.map(c => [c.id, c.authoredByKilo, c.user.username])).toEqual([
+    // Comments come back newest first, so compare by note id rather than arrival order.
+    expect(
+      comments
+        .map(c => [c.id, c.authoredByKilo, c.user.username] as [number, boolean, string])
+        .sort((left, right) => left[0] - right[0])
+    ).toEqual([
       [1, true, 'project_42_bot'],
       [2, false, 'contributor'],
     ]);

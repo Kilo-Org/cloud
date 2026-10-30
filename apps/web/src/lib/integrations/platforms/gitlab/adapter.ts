@@ -1459,7 +1459,8 @@ export async function hasMRNoteWithMarker(
  *
  * Each retained body is sliced to the rendered length and counted against
  * MAX_MR_NOTE_BODY_BYTES; paging stops when that budget is reached, so the
- * result is the newest comments within the budget rather than the full history.
+ * result is the newest comments within the budget rather than the full history,
+ * ordered newest first like the GitHub adapter.
  */
 export async function fetchMRInlineComments(
   accessToken: string,
@@ -1563,8 +1564,9 @@ export async function fetchMRInlineComments(
   }
 
   // GitLab lists merge-request discussions oldest first and accepts no ordering parameter, so the
-  // read starts at the last page and walks back. That keeps the newest comments when the budget
-  // ends the read, as the GitHub adapter does with its newest-first request.
+  // read starts at the last page and walks back, consuming each page newest first. That keeps the
+  // newest comments when the budget ends the read, as the GitHub adapter does with its
+  // newest-first request, and the returned comments are ordered newest first.
   const oldestPage = await readDiscussionPage(1);
   checkGitLabPaginationBounds(totalPages, oldestPage.length, 'MR discussion listing');
   for (let page = totalPages; page >= 2 && !reachedByteLimit; page--) {
@@ -1572,7 +1574,7 @@ export async function fetchMRInlineComments(
     retainDiscussions([...data].reverse());
   }
   if (!reachedByteLimit) {
-    retainDiscussions(oldestPage);
+    retainDiscussions([...oldestPage].reverse());
   }
 
   // Attribution is best-effort: a failed lookup leaves the comments unattributed for this

@@ -29,6 +29,33 @@ const DISCORD_BOT_PERMISSIONS = '277025770560';
 const DISCORD_REDIRECT_URI = getPlatformOAuthCallbackUrl(PLATFORM.DISCORD);
 
 /**
+ * Raised when the Discord server selected in the OAuth consent belongs to a
+ * different Kilo owner. Event routing resolves an installation by server id, so
+ * one server cannot act for two owners.
+ */
+export class DiscordGuildAlreadyConnectedError extends Error {
+  constructor(guildName: string) {
+    super(
+      `The Discord server ${guildName} is already connected to a different Kilo account. Disconnect it there before connecting it here.`
+    );
+    this.name = 'DiscordGuildAlreadyConnectedError';
+  }
+}
+
+/**
+ * Raised when a connection would move an organization's Discord integration to
+ * a different server without the authorization that replacement requires.
+ */
+export class DiscordGuildRebindNotAllowedError extends Error {
+  constructor() {
+    super(
+      'This organization is already connected to a different Discord server. Disconnect it before connecting another server.'
+    );
+    this.name = 'DiscordGuildRebindNotAllowedError';
+  }
+}
+
+/**
  * Discord OAuth2 token response shape
  */
 export type DiscordOAuth2Response = {
@@ -149,6 +176,35 @@ export async function getInstallationByGuildId(
 }
 
 /**
+ * Find a Discord installation for `guildId` that belongs to a different Kilo
+ * owner. Callers use this before persisting a connection so a server owned
+ * elsewhere is rejected without touching either row.
+ */
+export async function getConflictingDiscordInstallation(
+  owner: Owner,
+  guildId: string
+): Promise<PlatformIntegration | null> {
+  const integrations = await db
+    .select()
+    .from(platform_integrations)
+    .where(
+      and(
+        eq(platform_integrations.platform, PLATFORM.DISCORD),
+        eq(platform_integrations.platform_installation_id, guildId)
+      )
+    )
+    .limit(2);
+
+  return integrations.find(integration => !isOwnedBy(integration, owner)) ?? null;
+}
+
+function isOwnedBy(integration: PlatformIntegration, owner: Owner): boolean {
+  return owner.type === 'user'
+    ? integration.owned_by_user_id === owner.id && integration.owned_by_organization_id === null
+    : integration.owned_by_organization_id === owner.id && integration.owned_by_user_id === null;
+}
+
+/**
  * Get the owner information from a Discord installation
  */
 export function getOwnerFromInstallation(integration: PlatformIntegration): Owner | null {
@@ -163,10 +219,16 @@ export function getOwnerFromInstallation(integration: PlatformIntegration): Owne
 
 /**
  * Persist the selected Discord installation while preserving owner configuration.
+ *
+ * A server bound to a different Kilo owner is refused outright. An organization
+ * connection holds a shared bot token and model policy, so moving it to another
+ * server requires `allowGuildRebind`, which callers set only after verifying the
+ * organization role that controls the integration.
  */
 export async function upsertDiscordInstallation(
   owner: Owner,
-  oauthResponse: DiscordOAuth2Response
+  oauthResponse: DiscordOAuth2Response,
+  { allowGuildRebind = false }: { allowGuildRebind?: boolean } = {}
 ): Promise<PlatformIntegration> {
   if (!oauthResponse.guild?.id) {
     throw new Error(
@@ -174,10 +236,29 @@ export async function upsertDiscordInstallation(
     );
   }
 
-  const existing = await getInstallation(owner);
-
   const guildId = parseDiscordSnowflake(oauthResponse.guild.id, 'guild ID');
   const guildName = oauthResponse.guild.name || 'Unknown Server';
+
+  const conflicting = await getConflictingDiscordInstallation(owner, guildId);
+  if (conflicting) {
+    throw new DiscordGuildAlreadyConnectedError(guildName);
+  }
+
+  const existing = await getInstallation(owner);
+
+  // Rows created before 80a295f26 recorded the server only in `platform_account_id`.
+  const boundGuildId = existing?.platform_installation_id ?? existing?.platform_account_id ?? null;
+
+  if (
+    existing &&
+    !allowGuildRebind &&
+    owner.type === 'org' &&
+    boundGuildId &&
+    boundGuildId !== guildId
+  ) {
+    throw new DiscordGuildRebindNotAllowedError();
+  }
+
   const scopes = oauthResponse.scope?.split(' ') || null;
 
   // Note: We intentionally do NOT store the OAuth2 access_token or refresh_token.

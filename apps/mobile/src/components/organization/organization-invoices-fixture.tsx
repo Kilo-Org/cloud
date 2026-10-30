@@ -30,6 +30,12 @@ type InvoicesPage = RouterOutputs['organizations']['invoicesPage'];
 type OrganizationList = RouterOutputs['organizations']['list'];
 type FixtureReadData = InvoicesPage | OrganizationList;
 
+/**
+ * Sample rows. Each `created` is noon UTC on the first of the month its
+ * description names: the screen formats it in the device's own zone, so a
+ * midnight value would print the last day of the previous month anywhere west
+ * of UTC.
+ */
 const INVOICES: InvoicesPage['entries'] = [
   {
     id: 'in_fixture_open',
@@ -37,7 +43,7 @@ const INVOICES: InvoicesPage['entries'] = [
     status: 'open',
     amount_due: 4900,
     currency: 'usd',
-    created: 1_780_272_000,
+    created: Date.parse('2026-06-01T12:00:00Z') / 1000,
     hosted_invoice_url: 'https://billing.example.com/in_fixture_open',
     invoice_pdf: null,
     invoice_type: 'seats',
@@ -49,7 +55,7 @@ const INVOICES: InvoicesPage['entries'] = [
     status: 'paid',
     amount_due: 4900,
     currency: 'usd',
-    created: 1_777_593_600,
+    created: Date.parse('2026-05-01T12:00:00Z') / 1000,
     hosted_invoice_url: 'https://billing.example.com/in_fixture_paid',
     invoice_pdf: 'https://billing.example.com/in_fixture_paid.pdf',
     invoice_type: 'seats',
@@ -61,7 +67,7 @@ const INVOICES: InvoicesPage['entries'] = [
     status: 'void',
     amount_due: 1900,
     currency: 'usd',
-    created: 1_775_001_600,
+    created: Date.parse('2026-04-01T12:00:00Z') / 1000,
     hosted_invoice_url: null,
     invoice_pdf: null,
     invoice_type: 'topup',

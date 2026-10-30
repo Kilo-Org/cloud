@@ -1548,6 +1548,7 @@
       "changeRequestNoGitHubAccess": "Cap connexió de GitHub té accés a aquest repositori. Torna a connectar GitHub amb accés a aquest repositori i torna-ho a provar.",
       "changeRequestMissingPermissions": "L'aplicació GitHub de Kilo no pot obrir pull requests en aquest repositori. Un propietari del repositori ha de donar a l'aplicació accés d'escriptura als continguts i a les pull requests, i després tornar-ho a provar.",
       "changeRequestFailed": "Kilo no ha pogut obrir la pull request. Torna-ho a provar d'aquí a un moment.",
+      "proposalConflict": "Una altra proposta de memòria de revisió per a aquest repositori encara està activa, de manera que aquesta encara no es pot desar.",
       "offAction": "La memòria de revisió està desactivada. Activa-la i torna-ho a provar."
     },
     "manualReview": {

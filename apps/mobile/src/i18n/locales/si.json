@@ -1526,6 +1526,7 @@
       "changeRequestNoGitHubAccess": "මෙම ගබඩාවට ප්‍රවේශය ඇති GitHub සම්බන්ධතාවයක් නොමැත. එයට ප්‍රවේශය සහිතව GitHub නැවත සම්බන්ධ කර නැවත උත්සාහ කරන්න.",
       "changeRequestMissingPermissions": "Kilo හි GitHub App ට මෙම ගබඩාව තුළ pull request විවෘත කළ නොහැක. ගබඩා හිමිකරුවෙකු විසින් යෙදුමට contents සහ pull requests සඳහා ලිවීමේ ප්‍රවේශය ලබා දිය යුතුය, පසුව නැවත උත්සාහ කරන්න.",
       "changeRequestFailed": "Kilo ට pull request විවෘත කළ නොහැකි විය. මොහොතකින් නැවත උත්සාහ කරන්න.",
+      "proposalConflict": "මෙම ගබඩාව සඳහා තවත් සමාලෝචන මතක යෝජනාවක් තවමත් සක්‍රීයව පවතී. එබැවින් මෙය තවමත් සුරැකිය නොහැක.",
       "offAction": "සමාලෝචන මතකය අක්‍රීයයි. එය සක්‍රීය කර නැවත උත්සාහ කරන්න."
     },
     "manualReview": {

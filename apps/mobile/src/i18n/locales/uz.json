@@ -1526,6 +1526,7 @@
       "changeRequestNoGitHubAccess": "Hech bir GitHub ulanishi bu repozitoriyga kira olmaydi. GitHubni bu repozitoriyga kirish huquqi bilan qayta ulang, so'ng qayta urinib ko'ring.",
       "changeRequestMissingPermissions": "Kilo'ning GitHub ilovasi bu repozitoriyada pull request ocholmaydi. Repozitoriya egasi ilovaga kontent va pull requestlar uchun yozish huquqini berishi kerak, so'ng qayta urinib ko'ring.",
       "changeRequestFailed": "Kilo pull requestni ocholmadi. Bir ozdan so'ng qayta urinib ko'ring.",
+      "proposalConflict": "Bu repozitoriya uchun yana bir ko'rib chiqish xotirasi taklifi hali ham faol.",
       "offAction": "Ko'rib chiqish xotirasi o'chiq. Uni yoqing, so'ng qayta urinib ko'ring."
     },
     "manualReview": {

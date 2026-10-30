@@ -1548,6 +1548,7 @@
       "changeRequestNoGitHubAccess": "Nijedna veza s GitHubom nema pristup ovom repozitoriju. Ponovno povežite GitHub s pristupom ovom repozitoriju, zatim pokušajte ponovno.",
       "changeRequestMissingPermissions": "Kilo-ova GitHub aplikacija ne može otvoriti zahtjeve za povlačenje u ovom repozitoriju. Vlasnik repozitorija mora aplikaciji dati pravo pisanja za sadržaj i zahtjeve za povlačenje, zatim pokušajte ponovno.",
       "changeRequestFailed": "Kilo nije mogao otvoriti zahtjev za povlačenje. Pokušajte ponovno za koji trenutak.",
+      "proposalConflict": "Drugi prijedlog za ovaj repozitorij još je aktivan.",
       "offAction": "Memorija pregleda je isključena. Uključi je pa pokušaj ponovno."
     },
     "manualReview": {

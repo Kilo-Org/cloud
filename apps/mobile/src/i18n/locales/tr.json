@@ -1051,6 +1051,7 @@
       "changeRequestNoGitHubAccess": "Bu depoya erişimi olan hiçbir GitHub bağlantısı yok. GitHub'ı depoya erişimi olacak şekilde yeniden bağla, sonra tekrar dene.",
       "changeRequestMissingPermissions": "Kilo'nun GitHub App uygulaması bu depoda pull request açamıyor. Bir depo sahibinin uygulamaya içerikler ve pull request'ler için yazma erişimi vermesi gerekiyor, sonra tekrar dene.",
       "changeRequestFailed": "Kilo pull request'i açamadı. Bir an sonra tekrar dene.",
+      "proposalConflict": "Bu depo için başka bir öneri hâlâ etkin olduğundan bu öneri henüz kaydedilemez.",
       "offAction": "İnceleme belleği kapalı. Aç, sonra tekrar dene.",
       "off": "İnceleme belleği kapalı.",
       "on": "İnceleme belleği açık.",

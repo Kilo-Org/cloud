@@ -1526,6 +1526,7 @@
       "changeRequestNoGitHubAccess": "Ningunha conexión de GitHub ten acceso a este repositorio. Volve conectar GitHub cunha conta que teña acceso a el e téntao de novo.",
       "changeRequestMissingPermissions": "A aplicación de GitHub de Kilo non pode abrir solicitudes de incorporación neste repositorio. Un propietario do repositorio debe darlle á aplicación permiso de escritura sobre os contidos e as solicitudes de incorporación e, despois, téntao de novo.",
       "changeRequestFailed": "Kilo non puido abrir a solicitude de incorporación. Téntao de novo dentro dun intre.",
+      "proposalConflict": "Outra proposta de memoria de revisión para este repositorio aínda está activa.",
       "offAction": "A memoria de revisión está desactivada. Actívaa e téntao de novo."
     },
     "manualReview": {

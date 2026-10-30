@@ -1054,6 +1054,7 @@
       "changeRequestNoGitHubAccess": "Ninguna conexión de GitHub tiene acceso a este repositorio. Vuelve a conectar GitHub con acceso a él y luego inténtalo de nuevo.",
       "changeRequestMissingPermissions": "La aplicación de GitHub de Kilo no puede abrir pull requests en este repositorio. Un propietario del repositorio debe dar a la aplicación acceso de escritura al contenido y a las pull requests, y luego inténtalo de nuevo.",
       "changeRequestFailed": "Kilo no pudo abrir la pull request. Inténtalo de nuevo en un momento.",
+      "proposalConflict": "Otra propuesta para este repositorio sigue activa, así que esta todavía no se puede guardar.",
       "offAction": "La memoria de revisión está desactivada. Actívala y vuelve a intentarlo.",
       "off": "La memoria de revisión está desactivada.",
       "on": "La memoria de revisión está activada.",

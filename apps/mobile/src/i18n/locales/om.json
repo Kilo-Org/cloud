@@ -1526,6 +1526,7 @@
       "changeRequestNoGitHubAccess": "Walitti hidhinnni GitHub tokko illee repository kanaaf dhaqqabama hin qabu. GitHub repository kanaaf dhaqqabamaan walitti deebi'ii hidhi, sana booda irra deebi'ii yaali.",
       "changeRequestMissingPermissions": "Appiin GitHub Kilo repository kana keessatti pull request banuu hin danda'u. Abbaan repository appii sanatti qabeenyaa fi pull request irratti afoomicha barreessuu kennuu qaba, sana booda irra deebi'ii yaali.",
       "changeRequestFailed": "Kilo pull request banuu hin dandeenye. Yeroo gabaabaa booda irra deebi'ii yaali.",
+      "proposalConflict": "Yaadni biraa repository kanaaf amma illee hojiirra jira.",
       "offAction": "Yaadannoon sakatta'aa cufameera. Isa bani, sana booda irra deebi'ii yaali."
     },
     "manualReview": {

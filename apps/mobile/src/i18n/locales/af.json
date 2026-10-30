@@ -1526,6 +1526,7 @@
       "changeRequestNoGitHubAccess": "Geen GitHub-verbinding het toegang tot hierdie bewaarplek nie. Herverbind GitHub met toegang daartoe en probeer dan weer.",
       "changeRequestMissingPermissions": "Kilo se GitHub-app kan nie pull requests in hierdie bewaarplek oopmaak nie. 'n Eienaar van die bewaarplek moet die app skryftoegang tot inhoud en pull requests gee en dan weer probeer.",
       "changeRequestFailed": "Kilo kon nie die pull request oopmaak nie. Probeer weer oor 'n oomblik.",
+      "proposalConflict": "Nog 'n voorstel vir hierdie bewaarplek is steeds aktief.",
       "offAction": "Die hersieningsgeheue is af. Skakel dit aan en probeer dan weer."
     },
     "manualReview": {

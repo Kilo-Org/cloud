@@ -1051,6 +1051,7 @@
       "changeRequestNoGitHubAccess": "Tidak ada koneksi GitHub yang memiliki akses ke repositori ini. Hubungkan ulang GitHub dengan akses ke repositori ini, lalu coba lagi.",
       "changeRequestMissingPermissions": "Aplikasi GitHub milik Kilo tidak dapat membuka pull request di repositori ini. Pemilik repositori harus memberikan akses tulis aplikasi ke konten dan pull request, lalu coba lagi.",
       "changeRequestFailed": "Kilo tidak dapat membuka pull request. Coba lagi sebentar.",
+      "proposalConflict": "Usulan memori tinjauan lain untuk repositori ini masih aktif, jadi usulan ini belum dapat disimpan.",
       "offAction": "Memori tinjauan nonaktif. Aktifkan, lalu coba lagi.",
       "off": "Memori tinjauan nonaktif.",
       "on": "Memori tinjauan aktif.",

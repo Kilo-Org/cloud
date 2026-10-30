@@ -1526,6 +1526,7 @@
       "changeRequestNoGitHubAccess": "Ingen GitHub-anslutning har åtkomst till det här arkivet. Anslut GitHub igen med åtkomst till det och försök sedan igen.",
       "changeRequestMissingPermissions": "Kilos GitHub-app kan inte öppna pull requests i det här arkivet. En arkivägare måste ge appen skrivåtkomst till innehåll och pull requests och sedan försöka igen.",
       "changeRequestFailed": "Kilo kunde inte öppna pull requesten. Försök igen om en stund.",
+      "proposalConflict": "Ett annat förslag för det här arkivet är fortfarande aktivt, så det här kan inte sparas ännu.",
       "offAction": "Granskningsminnet är avstängt. Aktivera det och försök igen."
     },
     "manualReview": {

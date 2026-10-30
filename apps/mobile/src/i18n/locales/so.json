@@ -1526,6 +1526,7 @@
       "changeRequestNoGitHubAccess": "Ma jiro xiriir GitHub oo heli kara kaydkan. Dib u xiri GitHub oo leh helitaanka kaydka, kadibna isku day mar kale.",
       "changeRequestMissingPermissions": "App-ka GitHub ee Kilo ma furi karo pull request-yo kaydkan. Milkiilaha kaydku waa inuu app-ka siiyo helitaan qoraal ah oo ku saabsan waxa ku jira iyo pull request-yada, kadibna isku day mar kale.",
       "changeRequestFailed": "Kilo ma furi karin pull request-ka. Isku day mar kale wax yar kadib.",
+      "proposalConflict": "Soo-jeedin kale oo ku saabsan xusuusta dib-u-eegista ee kaydkan ayaa weli firfircoon.",
       "offAction": "Xusuusta dib-u-eegistu way dansan tahay. Shid, ka dibna isku day mar kale."
     },
     "manualReview": {

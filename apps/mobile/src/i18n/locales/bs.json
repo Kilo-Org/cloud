@@ -1548,6 +1548,7 @@
       "changeRequestNoGitHubAccess": "Nijedna GitHub veza nema pristup ovom repozitoriju. Ponovo povežite GitHub s pristupom ovom repozitoriju, pa pokušajte ponovo.",
       "changeRequestMissingPermissions": "Kilo-ova GitHub aplikacija ne može otvoriti pull requestove u ovom repozitoriju. Vlasnik repozitorija mora aplikaciji dati pravo pisanja za sadržaj i pull requestove, pa pokušajte ponovo.",
       "changeRequestFailed": "Kilo nije mogao otvoriti pull request. Pokušajte ponovo za trenutak.",
+      "proposalConflict": "Drugi prijedlog za ovaj repozitorij je još uvijek aktivan.",
       "offAction": "Memorija pregleda je isključena. Uključi je, pa pokušaj ponovo."
     },
     "manualReview": {

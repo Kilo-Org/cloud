@@ -1526,6 +1526,7 @@
       "changeRequestNoGitHubAccess": "ဤ repository သို့ ဝင်ရောက်ခွင့်ရှိသော GitHub ချိတ်ဆက်မှု မရှိပါ။ ၎င်းသို့ ဝင်ရောက်ခွင့်ရှိသော GitHub ကို ပြန်လည်ချိတ်ဆက်ပြီး ထပ်မံကြိုးစားပါ။",
       "changeRequestMissingPermissions": "Kilo ၏ GitHub App သည် ဤ repository တွင် Pull Request များ ဖွင့်၍မရပါ။ repository ပိုင်ရှင်တစ်ဦးသည် app အား အကြောင်းအရာများနှင့် Pull Request များအတွက် write access ပေးပြီးမှ ထပ်မံကြိုးစားရန် လိုအပ်ပါသည်။",
       "changeRequestFailed": "Kilo သည် pull request ကို ဖွင့်၍ မရပါ။ ခဏအကြာတွင် ထပ်မံကြိုးစားပါ။",
+      "proposalConflict": "ဤ repository အတွက် အခြား စစ်ဆေးမှုမှတ်ဉာဏ် အဆိုပြုချက်တစ်ခု သက်ဝင်နေသေးသည်။",
       "offAction": "စစ်ဆေးမှုမှတ်ဉာဏ်ကို ပိတ်ထားသည်။ ဖွင့်ပြီးနောက် ထပ်မံကြိုးစားပါ။"
     },
     "manualReview": {

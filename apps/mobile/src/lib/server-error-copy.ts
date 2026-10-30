@@ -113,6 +113,9 @@ function copyKeyFor(message: string): string | undefined {
     case REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.change_request_failed: {
       return 'codeReviewer.reviewMemory.changeRequestFailed';
     }
+    case REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.proposal_conflict: {
+      return 'codeReviewer.reviewMemory.proposalConflict';
+    }
     default: {
       return undefined;
     }

@@ -1526,6 +1526,7 @@
       "changeRequestNoGitHubAccess": "Ingen GitHub-forbindelse har adgang til dette repository. Genopret forbindelsen til GitHub med adgang til repositoryet, og prøv derefter igen.",
       "changeRequestMissingPermissions": "Kilos GitHub App kan ikke åbne pull requests i dette repository. En ejer af repositoryet skal give appen skriveadgang til indhold og pull requests. Prøv derefter igen.",
       "changeRequestFailed": "Kilo kunne ikke åbne pull requesten. Prøv igen om et øjeblik.",
+      "proposalConflict": "Endnu et forslag til hukommelsen for gennemgange i dette repository er stadig aktivt, så dette forslag kan ikke gemmes endnu.",
       "offAction": "Hukommelsen for gennemgange er slået fra. Slå den til, og prøv igen."
     },
     "manualReview": {

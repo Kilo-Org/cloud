@@ -138,9 +138,11 @@ vi.mock('react-native-safe-area-context', () => ({
 }));
 vi.mock('expo-router', () => ({
   useNavigation: () => ({ isFocused: () => true }),
+  useNavigationContainerRef: () => ({ addListener: () => () => undefined }),
   useFocusEffect: () => undefined,
   useLocalSearchParams: () => ({}),
   useRouter: () => ({
+    canGoBack: () => false,
     push: () => undefined,
     replace: () => undefined,
     setParams: () => undefined,

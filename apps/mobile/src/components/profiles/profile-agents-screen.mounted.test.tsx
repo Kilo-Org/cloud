@@ -8,7 +8,7 @@ import { renderWithProviders } from '@/test/render-with-providers';
 
 const h = vi.hoisted(() => ({
   query: {
-    data: undefined as { id: string; agents: AgentSource[] } | undefined,
+    data: undefined as AgentSource[] | undefined,
     isError: false,
     isPending: false,
     isRefetching: false,
@@ -22,7 +22,7 @@ const h = vi.hoisted(() => ({
 }));
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
-  useAgentProfile: () => h.query,
+  useAgentProfileAgents: () => h.query,
   useAgentProfileSectionMutations: () => h.mutations,
 }));
 vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
@@ -61,10 +61,7 @@ function agent(id: string, mode: AgentSource['config']['mode']): AgentSource {
 describe('ProfileAgentsScreen mode badge', () => {
   it('renders the localized short label for every visibility mode', async () => {
     await i18n.changeLanguage('hi');
-    h.query.data = {
-      id: 'profile-1',
-      agents: [agent('alpha', 'primary'), agent('beta', 'subagent'), agent('gamma', 'all')],
-    };
+    h.query.data = [agent('alpha', 'primary'), agent('beta', 'subagent'), agent('gamma', 'all')];
     const { renderer, unmount } = await renderWithProviders(
       createElement(ProfileAgentsScreen, { profileId: 'profile-1' })
     );
@@ -88,7 +85,7 @@ describe('ProfileAgentsScreen mode badge', () => {
 
   it('falls back to the primary mode label when the config carries none', async () => {
     await i18n.changeLanguage('hi');
-    h.query.data = { id: 'profile-1', agents: [agent('alpha', undefined)] };
+    h.query.data = [agent('alpha', undefined)];
     const { renderer, unmount } = await renderWithProviders(
       createElement(ProfileAgentsScreen, { profileId: 'profile-1' })
     );

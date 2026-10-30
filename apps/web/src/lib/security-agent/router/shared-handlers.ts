@@ -11,7 +11,10 @@ import {
   updateRepositoriesForIntegration,
 } from '@/lib/integrations/db/platform-integrations';
 import { fetchGitHubRepositories } from '@/lib/integrations/platforms/github/adapter';
-import { type PlatformRepository } from '@/lib/integrations/core/types';
+import {
+  shouldSyncProviderRepositories,
+  type PlatformRepository,
+} from '@/lib/integrations/core/types';
 import {
   getSecurityAgentConfigWithStatus,
   saveSecurityAgentConfigWithRevision,
@@ -576,7 +579,8 @@ async function executeSecurityCommandSubmit(args: {
  * re-submit (the Worker owns the sync state, so reconciliation is a re-enqueue
  * under the same key); `duplicate_settled` replays the canonical result;
  * in-flight admissions conflict. Cross-intent key reuse is rejected before any
- * outcome is honored.
+ * outcome is honored, as is a row admitted in another organization scope
+ * (`organization_mismatch`).
  */
 async function runSecurityLedgerSubmit(args: {
   ctx: TRPCContext;
@@ -602,6 +606,12 @@ async function runSecurityLedgerSubmit(args: {
     // While an `admitted` row holds this lease, same-key retries conflict.
     leaseSeconds: 120,
   });
+
+  // A row stored in another organization scope belongs to a different
+  // operation, so it is refused before any outcome is honored.
+  if (admission.admission === 'organization_mismatch') {
+    throw new TRPCError({ code: 'CONFLICT', message: 'operation_key_reuse_mismatch' });
+  }
 
   if (admission.row.intent !== args.intent || admission.row.resource_key !== args.resourceKey) {
     throw new TRPCError({ code: 'CONFLICT', message: 'operation_key_reuse_mismatch' });
@@ -1029,7 +1039,9 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
 
         // Compare-and-set save: the config write, the include-existing analysis
         // enqueue, and the include-existing remediation command all commit in one
-        // transaction. A stale revision or an enqueue failure rolls back.
+        // transaction. A stale revision or an enqueue failure rolls back. The
+        // save carries no enable flag, so a settings save leaves the stored
+        // enabled state exactly as it is.
         const saveOutcome = await saveSecurityAgentConfigWithRevision({
           owner,
           config: {
@@ -1253,12 +1265,16 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
         let initialSyncAdmissionFailed = false;
 
         if (input.isEnabled) {
+          // The enable flag is written in the same CAS transaction as the
+          // selection above it: enabling is this guarded transition, never a
+          // settings save.
           const { newRevision } = await saveSecurityAgentConfigWithRevision({
             owner,
             config: {
               repository_selection_mode: selectionMode,
               selected_repository_ids: selectedIds,
             },
+            isEnabled: true,
             createdBy: ctx.user.id,
             expectedRevision: existingConfig?.configRevision ?? null,
           });
@@ -1337,12 +1353,20 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
 
       const snapshot = readRepositorySnapshot(owner, integration);
       let repos = snapshot.repositories;
-      // A dropped entry is a snapshot this router cannot fully read, so refetch
-      // and rewrite it the same way as one it read as empty: otherwise the
-      // dropped repositories stay invisible in every repository picker.
+      // A snapshot this router cannot fully read is rebuilt from the provider, so
+      // the dropped repositories do not stay invisible in every repository
+      // picker. Otherwise the shared snapshot policy decides: a synchronized
+      // snapshot answers the list as-is, including an empty one, and only a
+      // snapshot that was never synchronized is read from the provider.
+      const cachedRepositories = integration.repositories ? snapshot.repositories : null;
       if (
         integration.platform_installation_id &&
-        (repos.length === 0 || snapshot.unreadableCount > 0)
+        (snapshot.unreadableCount > 0 ||
+          shouldSyncProviderRepositories({
+            forceRefresh: false,
+            cachedRepositories,
+            repositoriesSyncedAt: integration.repositories_synced_at ?? null,
+          }))
       ) {
         const readableCount = repos.length;
         try {

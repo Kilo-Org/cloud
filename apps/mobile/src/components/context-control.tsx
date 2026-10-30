@@ -10,10 +10,12 @@ import { ChevronDown } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { type OrgListEntry } from '@/lib/hooks/use-organization-queries';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useOrganization } from '@/lib/organization-context';
 import { useTRPC } from '@/lib/trpc';
+import { cn } from '@/lib/utils';
 
 export type ContextDisplayScope = { organizationId: string | null; isResolved: boolean };
 
@@ -187,7 +189,7 @@ export function ContextControl({
           accessibilityRole="text"
           accessibilityLabel={label}
           accessibilityState={{ busy: pending }}
-          className="min-h-11 justify-center"
+          className={cn(ROW_TARGET_CLASS, 'justify-center')}
         >
           {content}
         </View>
@@ -199,7 +201,7 @@ export function ContextControl({
           accessibilityState={{ busy: pickerBusy, disabled }}
           disabled={disabled}
           onPress={openPicker}
-          className="min-h-11 flex-row items-center gap-1 active:opacity-70"
+          className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-1 active:opacity-70')}
         >
           {content}
           <View className="size-5 shrink-0 items-center justify-center">
@@ -221,7 +223,7 @@ export function ContextControl({
           accessibilityState={{ busy: retryBusy, disabled: retryBusy }}
           disabled={retryBusy}
           onPress={retry}
-          className="min-h-11 flex-row items-center gap-2 active:opacity-70"
+          className={cn(ROW_TARGET_CLASS, 'flex-row items-center gap-2 active:opacity-70')}
         >
           <Text className="text-sm text-primary">{t('common.retry')}</Text>
           {retryBusy && <ActivityIndicator size="small" color={colors.mutedForeground} />}

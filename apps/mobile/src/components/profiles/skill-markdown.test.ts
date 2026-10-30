@@ -27,6 +27,7 @@ describe('skillRowSubtitle', () => {
   it('maps each server source type to its copy key', () => {
     expect(skillRowSubtitle({ sourceType: 'custom' })).toBe('profiles.skillSourceCustom');
     expect(skillRowSubtitle({ sourceType: 'marketplace' })).toBe('profiles.skillSourceMarketplace');
+    expect(skillRowSubtitle({ sourceType: 'skills-sh' })).toBe('profiles.skillSourceSkillsSh');
   });
 
   it('returns null for a source type without copy', () => {

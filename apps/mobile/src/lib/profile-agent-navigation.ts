@@ -1,6 +1,8 @@
 import { PERSONAL_SECURITY_SCOPE } from '@kilocode/app-shared/security-agent';
 import { type Href } from 'expo-router';
 
+import { type ProfileOwnerChoice } from '@/components/profiles/profile-owner-model';
+
 type ProfileOrganization = { organizationId: string };
 
 /**
@@ -25,6 +27,17 @@ export type ProfileManagementStack = 'app' | 'profileTab';
 const PROFILE_ROOTS = {
   app: '/(app)/profile-management',
   profileTab: '/(app)/(tabs)/(3_profile)/profiles',
+} as const;
+
+/**
+ * The name the profiles list registers under inside each Stack. Expo Router
+ * names a screen after its file below the layout that declares it, and an
+ * `index.tsx` keeps the `index` segment, the same shape the layouts rely on
+ * (`unstable_settings.initialRouteName: 'index'`).
+ */
+const PROFILE_LIST_ROUTE_NAMES = {
+  app: 'profile-management/index',
+  profileTab: 'profiles/index',
 } as const;
 
 export function getProfileAgentScope(
@@ -71,6 +84,11 @@ export function getProfilesPath(stack: ProfileManagementStack = 'profileTab'): H
   return PROFILE_ROOTS[stack] as Href;
 }
 
+/** The route name the profiles list registers under in the given Stack. */
+export function getProfilesRouteName(stack: ProfileManagementStack = 'profileTab'): string {
+  return PROFILE_LIST_ROUTE_NAMES[stack];
+}
+
 /** The repo-to-profile default bindings screen. */
 export function getRepoBindingsPath(
   organizationId?: string,
@@ -79,9 +97,41 @@ export function getRepoBindingsPath(
   return `${PROFILE_ROOTS[stack]}/repo-bindings${profileContextQuery(organizationId)}` as Href;
 }
 
+/** What the create screen does after it saves, besides opening the new profile. */
+export type NewProfileReturn = 'back';
+
+/** The returns the create route accepts: `back` hands the form back to its caller. */
+export const NEW_PROFILE_RETURNS: readonly NewProfileReturn[] = ['back'];
+
+/** The owner and the return a caller of the create screen asks for. */
+export type NewProfilePathOptions = {
+  /** The owner the form starts on. The user can still switch it. */
+  owner?: ProfileOwnerChoice;
+  /** `back` returns to the caller instead of opening the new profile. */
+  returnTo?: NewProfileReturn;
+  /**
+   * The organization the caller is scoped to. The form resolves its boundary
+   * from it, so a caller whose scope is not the active account still creates
+   * the profile in the organization whose list it showed.
+   */
+  organizationId?: string;
+};
+
 /** The profile editor's create screen. */
-export function getNewProfilePath(stack: ProfileManagementStack = 'profileTab'): Href {
-  return `${PROFILE_ROOTS[stack]}/new` as Href;
+export function getNewProfilePath(
+  stack: ProfileManagementStack = 'profileTab',
+  options: NewProfilePathOptions = {}
+): Href {
+  const query = [
+    options.owner === undefined ? '' : `owner=${options.owner}`,
+    options.returnTo === undefined ? '' : `returnTo=${options.returnTo}`,
+    options.organizationId === undefined
+      ? ''
+      : `organizationId=${encodeURIComponent(options.organizationId)}`,
+  ]
+    .filter(part => part.length > 0)
+    .join('&');
+  return `${PROFILE_ROOTS[stack]}/new${query.length > 0 ? `?${query}` : ''}` as Href;
 }
 
 /** The profile editor's Overview tab (the profile's own route). */

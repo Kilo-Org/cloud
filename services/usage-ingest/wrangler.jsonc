@@ -23,9 +23,9 @@
     "consumers": [
       {
         "queue": "usage-ingest-processing-eu",
-        "max_batch_size": 2,
+        "max_batch_size": 6,
         "max_batch_timeout": 0,
-        "max_retries": 3,
+        "max_retries": 20,
         "retry_delay": 60,
         "max_concurrency": 200,
         "dead_letter_queue": "usage-ingest-processing-dlq-eu",
@@ -51,7 +51,7 @@
             "queue": "usage-ingest-processing-staging-eu",
             "max_batch_size": 2,
             "max_batch_timeout": 0,
-            "max_retries": 3,
+            "max_retries": 20,
             "retry_delay": 60,
             "max_concurrency": 200,
             "dead_letter_queue": "usage-ingest-processing-dlq-staging-eu",

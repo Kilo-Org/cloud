@@ -226,6 +226,12 @@ server-generated key derived from the owner and the committed config revision,
 so one configuration revision produces at most one sync command; an enable that
 matches the stored configuration returns without writing or submitting.
 
+The enable flag belongs to this transition alone: `saveConfig` writes the
+preferences and leaves the stored enabled state untouched, and a first settings
+save inserts a disabled row. Only `setEnabled` passes the flag to the
+compare-and-set write, so the permission check, the non-empty repository scope
+and the initial sync above are the only way an owner becomes enabled.
+
 ### Automated Sync (cron)
 
 The cron job at `/api/cron/sync-security-alerts` runs every 6 hours and:

@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic } from '@/lib/haptics';
 import { type TFunction } from 'i18next';
 import { type ProviderPrPlatform } from '@kilocode/app-shared/provider-review';
 import { type RefObject, useEffect, useMemo, useState } from 'react';
@@ -185,7 +186,7 @@ export function usePrMergeSubmit({
         celebrate = true;
       }
       if (celebrate) {
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        notificationHaptic(Haptics.NotificationFeedbackType.Success);
         await onRefetch();
         clearMergeDraft();
         onDismiss();

@@ -1,4 +1,4 @@
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -15,6 +15,7 @@ import {
   resolveRowOnPress,
 } from '@/components/code-reviewer/platform-overview-rows';
 import { ProviderConnectCard } from '@/components/code-reviewer/provider-connect-card';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { PlatformOverviewSkeleton } from '@/components/code-reviewer/platform-overview-skeleton';
 import { ScreenHeader } from '@/components/screen-header';
@@ -25,6 +26,9 @@ import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
+import { canConnectProvider } from '@/lib/code-reviewer-status';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
 import { useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
 import {
@@ -45,6 +49,7 @@ export function PlatformOverviewScreen({
   platform,
 }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
   const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const colors = useThemeColors();
   const capabilities = PLATFORM_CAPABILITIES[platform];
@@ -139,11 +144,15 @@ export function PlatformOverviewScreen({
 
   const handleConnected = status.refetch;
   if (!isLoading && !connected) {
+    // The connect card installs the provider's app for the scope, which is a
+    // narrower capability than editing the reviewer settings (see
+    // `canConnectProvider`): the card must follow the install rule, not `canEdit`.
+    const canConnect = canConnectProvider(platform, permission);
     return (
       <View className="flex-1 bg-background">
         <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
         <CenteredState contentContainerClassName="px-6">
-          {canEdit ? (
+          {canConnect ? (
             <ProviderConnectCard scope={scope} platform={platform} onConnected={handleConnected} />
           ) : (
             <Text className="text-center text-xs text-muted-foreground">
@@ -156,7 +165,7 @@ export function PlatformOverviewScreen({
   }
 
   const pushField = (field: string) => {
-    router.push(`/(app)/code-reviewer/${scope}/${platform}/${field}` as Href);
+    pushOnce(`/(app)/code-reviewer/${scope}/${platform}/${field}` as Href);
   };
 
   // The classification owns the body state, so the rows are built from the
@@ -195,7 +204,7 @@ export function PlatformOverviewScreen({
           onOpenReviewMemory:
             platform === 'github'
               ? () => {
-                  router.push(`/(app)/code-reviewer/${scope}/review-memory` as Href);
+                  pushOnce(`/(app)/code-reviewer/${scope}/review-memory` as Href);
                 }
               : undefined,
         });
@@ -226,7 +235,7 @@ export function PlatformOverviewScreen({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="flex-row gap-2"
+                    className={cn(STATE_ACTION_CLASS, 'flex-row gap-2')}
                     disabled={save.isPending}
                     onPress={() => {
                       save.mutate({});
@@ -245,9 +254,7 @@ export function PlatformOverviewScreen({
                   scope={scope}
                   reason={data.actionRequired.reason}
                   canEdit={canEdit}
-                  onRefreshConfig={() => {
-                    void config.refetch();
-                  }}
+                  onRefreshConfig={() => void config.refetch()}
                   onOpenModelPicker={openReviewerModelPicker}
                 />
               )}
@@ -267,7 +274,7 @@ export function PlatformOverviewScreen({
                       !canEdit || toggle.isPending || (!hasRepoSelection && !data.isEnabled)
                     }
                     onValueChange={value => {
-                      void Haptics.selectionAsync();
+                      selectionHaptic();
                       toggle.mutate({ isEnabled: value });
                     }}
                   />

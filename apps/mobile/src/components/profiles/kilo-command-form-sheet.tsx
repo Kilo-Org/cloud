@@ -56,9 +56,11 @@ type KiloCommandFormSheetProps = Readonly<{
  * (refs), per the app's iOS text-input rule; the subtask flag is state.
  *
  * Save validates through `validateKiloCommandForm`; a refused input shows the
- * matching `profiles.slashCommands.*` message under the field at fault. Create
- * omits empty optional fields so the DB default applies; update sends `null` so
- * an emptied field clears.
+ * matching `profiles.slashCommands.*` message under the field at fault. The
+ * name field keeps exactly what was typed, so a name outside the server's
+ * pattern is refused under the field rather than rewritten into a shorter one
+ * the reader never chose. Create omits empty optional fields so the DB default
+ * applies; update sends `null` so an emptied field clears.
  */
 export function KiloCommandFormSheet({
   command,
@@ -147,7 +149,7 @@ export function KiloCommandFormSheet({
           placeholder={t('profiles.slashCommands.namePlaceholder')}
           containerOnLayout={fieldLayout('name')}
           onChangeText={value => {
-            nameRef.current = value.toLowerCase().replaceAll(/[^a-z0-9-]/g, '');
+            nameRef.current = value;
             setError(null);
           }}
         />

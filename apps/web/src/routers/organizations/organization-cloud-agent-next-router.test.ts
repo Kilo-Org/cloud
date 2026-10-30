@@ -859,7 +859,12 @@ describe('organizationCloudAgentNextRouter worktree changes access', () => {
       function call(user: User, input: { organizationId: string; cloudAgentSessionId: string }) {
         const caller = createCaller({ user });
         return procedure === 'getWorktreeFile'
-          ? caller.getWorktreeFile({ ...input, path: 'src/exact\nfile.ts', expectedRevision: 7 })
+          ? caller.getWorktreeFile({
+              ...input,
+              path: 'src/exact\nfile.ts',
+              scope: 'against-base-branch',
+              expectedRevision: 7,
+            })
           : caller[procedure](input);
       }
 
@@ -882,6 +887,7 @@ describe('organizationCloudAgentNextRouter worktree changes access', () => {
           expect(mockGetWorktreeFile).toHaveBeenCalledWith({
             cloudAgentSessionId: orgSessionId,
             path: 'src/exact\nfile.ts',
+            scope: 'against-base-branch',
             expectedRevision: 7,
           });
         }
@@ -1930,6 +1936,81 @@ describe('organizationCloudAgentNextRouter.prepareSession', () => {
     expect(mockPrepareSession).toHaveBeenCalledWith(
       expect.not.objectContaining({ githubIntegrationId: expect.anything() })
     );
+  });
+
+  it('passes the rows this dispatch linked to the shared refusal helper', async () => {
+    const attachments = {
+      path: '12345678-1234-4234-9234-123456789abc',
+      files: ['87654321-4321-4321-8321-cba987654321.md'],
+    };
+    const releaseRefusedSend = jest.mocked(
+      jest.requireMock<{
+        releaseRefusedSend: (input: unknown) => Promise<void>;
+      }>('@/lib/cloud-agent-next/release-refused-send').releaseRefusedSend
+    );
+    mockPrepareSession.mockRejectedValueOnce(
+      new TRPCClientError('refused', {
+        result: { error: { code: -32600, message: 'refused', data: { httpStatus: 400 } } },
+      })
+    );
+    const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
+
+    await expect(caller.prepareSession({ ...sandboxInput, attachments })).rejects.toThrow(
+      'refused'
+    );
+
+    expect(releaseRefusedSend).toHaveBeenCalledWith({
+      attachments,
+      error: expect.any(TRPCClientError),
+      kiloUserId: 'member',
+      linkedObjectKeys: ['user-1/cloud-agent/linked/a.md'],
+    });
+  });
+
+  it('keeps the rows linked for an accepted prepare', async () => {
+    const attachments = {
+      path: '12345678-1234-4234-9234-123456789abc',
+      files: ['87654321-4321-4321-8321-cba987654321.md'],
+    };
+    const releaseRefusedSend = jest.mocked(
+      jest.requireMock<{
+        releaseRefusedSend: (input: unknown) => Promise<void>;
+      }>('@/lib/cloud-agent-next/release-refused-send').releaseRefusedSend
+    );
+    const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
+
+    await caller.prepareSession({ ...sandboxInput, attachments });
+
+    expect(mockPrepareSession).toHaveBeenCalledWith(expect.objectContaining({ attachments }));
+    expect(releaseRefusedSend).not.toHaveBeenCalled();
+  });
+
+  it('does not dispatch a prepare whose link rejects the message', async () => {
+    const attachments = {
+      path: '12345678-1234-4234-9234-123456789abc',
+      files: ['87654321-4321-4321-8321-cba987654321.md'],
+    };
+    const pendingUploads = jest.requireMock<typeof PendingUploadsModule>(
+      '@/lib/r2/cloud-agent-pending-uploads'
+    );
+    jest
+      .mocked(pendingUploads.linkAttachmentsForDispatch)
+      .mockRejectedValueOnce(
+        new TRPCError({ code: 'BAD_REQUEST', message: 'Attachment upload expired.' })
+      );
+    const releaseRefusedSend = jest.mocked(
+      jest.requireMock<{
+        releaseRefusedSend: (input: unknown) => Promise<void>;
+      }>('@/lib/cloud-agent-next/release-refused-send').releaseRefusedSend
+    );
+    const caller = createCaller({ user: { id: 'member', is_admin: false } as User });
+
+    await expect(caller.prepareSession({ ...sandboxInput, attachments })).rejects.toMatchObject({
+      code: 'BAD_REQUEST',
+    });
+
+    expect(mockPrepareSession).not.toHaveBeenCalled();
+    expect(releaseRefusedSend).not.toHaveBeenCalled();
   });
 
   describe('GitLab project resolution', () => {

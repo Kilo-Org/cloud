@@ -5,6 +5,7 @@ import { AppState, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { CenteredState } from '@/components/centered-state';
+import { repositoryEmptyCopy } from '@/components/code-reviewer/repository-empty-copy';
 import { RepositorySyncFooter } from '@/components/code-reviewer/repository-sync-footer';
 import { EmptyState } from '@/components/empty-state';
 import { InvalidRouteState } from '@/components/invalid-route-state';
@@ -36,8 +37,10 @@ import {
 } from '@/lib/hooks/use-code-reviewer-repo-sync';
 import { useRepoSelectionToggle } from '@/lib/hooks/use-code-reviewer-repo-selection';
 import { useNowTicker } from '@/lib/hooks/use-now-ticker';
+import { reviewConfigFailure, useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
 import { useReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
 import { getBitbucketIntegrationUrl } from '@/lib/integration-urls';
+import { isRetryableTrpcError, trpcErrorVariant } from '@/lib/trpc-error';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
 
 export default function ReposRoute() {
@@ -49,7 +52,10 @@ export default function ReposRoute() {
 }
 
 function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
-  const { data } = useReviewConfig(scope, platform);
+  const config = useReviewConfig(scope, platform);
+  const configBody = useReviewConfigBody(config);
+  const { data } = config;
+  const configFailure = reviewConfigFailure(configBody, config.isFetching);
   const save = useSaveReviewConfig(scope, platform);
   const toggleRepo = useRepoSelectionToggle(scope, platform);
   const { t } = useTranslation();
@@ -68,41 +74,27 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
       : [];
   const reposByPlatform = {
     github: {
-      isLoading: githubRepos.isLoading,
-      isError: githubRepos.isError,
-      isFetching: githubRepos.isFetching,
-      refetch: () => void githubRepos.refetch(),
-      // The cached snapshot's sync time still answers the "how old is this
-      // list" question, so a read that did not force a provider call shows it.
+      query: githubRepos,
       syncedAt: githubRepos.data?.syncedAt ?? null,
       rows: githubRepos.data?.repositories ?? [],
     },
     gitlab: {
-      isLoading: gitlabRepos.isLoading,
-      isError: gitlabRepos.isError,
-      isFetching: gitlabRepos.isFetching,
-      refetch: () => void gitlabRepos.refetch(),
+      query: gitlabRepos,
       syncedAt: gitlabRepos.data?.syncedAt ?? null,
       rows: gitlabRepos.data?.repositories ?? [],
     },
     bitbucket: {
-      isLoading: bitbucketReadiness.isLoading,
-      isError: bitbucketReadiness.isError,
-      isFetching: bitbucketReadiness.isFetching,
-      refetch: () => void bitbucketReadiness.refetch(),
-      // Bitbucket's workspace snapshot carries no sync timestamp.
+      query: bitbucketReadiness,
       syncedAt: null,
       rows: bitbucketRepos,
     },
   };
-  const {
-    isLoading: reposLoading,
-    isError: reposError,
-    isFetching: reposFetching,
-    refetch: refetchRepos,
-    rows: repoRows,
-    syncedAt,
-  } = reposByPlatform[platform];
+  const { query: reposQuery, rows: repoRows, syncedAt } = reposByPlatform[platform];
+  const reposLoading = reposQuery.isLoading;
+  const reposError = reposQuery.isError;
+  const reposFetching = reposQuery.isFetching;
+  const refetchRepos = () => void reposQuery.refetch();
+
   const selectedIds = data?.selectedRepositoryIds ?? [];
   const configDisabled = data == null;
   const bitbucketNotReady =
@@ -111,9 +103,10 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
     !reposLoading && !reposError && !bitbucketNotReady && repoRows.length === 0;
   const resyncPlatform: SyncedRepoPlatform = platform === 'gitlab' ? 'gitlab' : 'github';
   const { resync, resyncing } = useReviewerRepositoriesResync(scope, resyncPlatform);
-  const openManageAccess = useManageRepositoryAccess(scope, platform);
-  // Set when the user leaves for the provider's settings page: the return trip
-  // is the moment installation access may have widened, so it forces a sync.
+  // Set on the way to the provider's settings page, where installation access
+  // may have widened. Two signals report the return and only the first syncs:
+  // the awaited browser dismissal (the only one iOS reports, since its page
+  // opens in-app) and the next foreground (Android).
   const pendingAccessChange = useRef(false);
   const navigation = useNavigation();
   const flushPendingSync = useCallback(() => {
@@ -123,28 +116,19 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
     pendingAccessChange.current = false;
     void resync();
   }, [resync]);
-  const manageAccess = openManageAccess
-    ? () => {
-        pendingAccessChange.current = true;
-        // Two return signals reach here and only the first one syncs: the
-        // awaited browser dismissal (the only one iOS reports, because its
-        // settings page opens in-app) and the next foreground (Android).
-        void (async () => {
-          try {
-            await openManageAccess();
-          } finally {
-            flushPendingSync();
-          }
-        })();
-      }
-    : undefined;
+  const manageAccess = useManageRepositoryAccess(scope, platform, {
+    onOpen: () => {
+      pendingAccessChange.current = true;
+    },
+    onReturn: flushPendingSync,
+  });
   const refreshing = platform === 'bitbucket' ? reposFetching : resyncing;
   const refreshRepositories = () => {
     if (platform === 'bitbucket') {
       refetchRepos();
-      return;
+    } else {
+      void resync();
     }
-    void resync();
   };
   // The label is relative, so it must be derived from a clock the render
   // traces: a live `Date.now()` read inside render is memoized with unchanged
@@ -155,21 +139,7 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
         time: timeAgo(parseTimestamp(syncedAt), undefined, now),
       })
     : null;
-  const emptyStateCopyByPlatform = {
-    github: {
-      title: t('codeReviewer.repos.installGithubApp'),
-      description: t('codeReviewer.repos.installGithubAppDescription'),
-    },
-    gitlab: {
-      title: t('common.noRepositoriesFound'),
-      description: t('codeReviewer.repos.gitlabNoRepositoriesDescription'),
-    },
-    bitbucket: {
-      title: t('common.noRepositoriesFound'),
-      description: t('codeReviewer.repos.bitbucketNoRepositoriesDescription'),
-    },
-  } satisfies Record<ReviewerPlatform, { title: string; description: string }>;
-  const emptyStateCopy = emptyStateCopyByPlatform[platform];
+  const emptyStateCopy = repositoryEmptyCopy(platform, t);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextState => {
@@ -187,15 +157,29 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
     save.mutate({ repositorySelectionMode: nextMode });
   };
 
-  const fullBodyState = !capabilities.selectionModePicker && !reposLoading && repoRows.length === 0;
+  // The config read owns the body: without it the selection is unusable, so
+  // its failure paints the whole surface and the repositories read stays below.
+  const fullBodyState =
+    configFailure != null ||
+    (!capabilities.selectionModePicker && !reposLoading && repoRows.length === 0);
   let repoState: ReactNode = null;
-  if (!reposLoading && reposError) {
+  if (configFailure) {
     repoState = (
       <QueryError
-        variant="server"
+        variant={configFailure.variant}
+        onRetry={() => {
+          configFailure.onRetry();
+        }}
+        isRetrying={configFailure.isRetrying}
+      />
+    );
+  } else if (!reposLoading && reposError) {
+    repoState = (
+      <QueryError
+        variant={trpcErrorVariant(reposQuery.error)}
         placement={fullBodyState ? 'center' : 'top'}
         title={t('common.couldNotLoadRepositories')}
-        onRetry={refetchRepos}
+        onRetry={isRetryableTrpcError(reposQuery.error) ? refetchRepos : undefined}
         isRetrying={reposFetching}
       />
     );
@@ -229,7 +213,13 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
         description={emptyStateCopy.description}
         action={
           manageAccess ? (
-            <Button className={STATE_ACTION_CLASS} variant="outline" onPress={manageAccess}>
+            <Button
+              className={STATE_ACTION_CLASS}
+              variant="outline"
+              loading={manageAccess.pending}
+              disabled={manageAccess.pending}
+              onPress={manageAccess.handlePress}
+            >
               <Text>{t('codeReviewer.repos.manageAccess')}</Text>
             </Button>
           ) : undefined

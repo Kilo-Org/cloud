@@ -16,6 +16,7 @@ import { Brain } from '@/components/ui/icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useReviewerPermission, useSetReviewMemoryEnabled } from '@/lib/hooks/use-code-reviewer';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { reviewMemoryOwnerInput } from '@/lib/hooks/use-review-memory';
@@ -25,6 +26,7 @@ import {
   type ReviewMemoryProposal,
 } from '@/lib/review-memory-proposals';
 import { useTRPC } from '@/lib/trpc';
+import { isRetryableTrpcError, trpcErrorVariant } from '@/lib/trpc-error';
 
 const PAGE_SIZE = 20;
 
@@ -81,6 +83,7 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
         <Button
           size="sm"
           variant="outline"
+          className={STATE_ACTION_CLASS}
           onPress={() => void proposalsQuery.fetchNextPage()}
           accessibilityLabel={t('common.retryLoadingMore')}
         >
@@ -115,9 +118,11 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
   } else if (summaryError) {
     body = (
       <QueryError
-        variant="server"
+        variant={trpcErrorVariant(summaryQuery.error)}
         title={t('codeReviewer.reviewMemory.couldNotLoad')}
-        onRetry={() => void summaryQuery.refetch()}
+        onRetry={
+          isRetryableTrpcError(summaryQuery.error) ? () => void summaryQuery.refetch() : undefined
+        }
         isRetrying={summaryQuery.isFetching}
       />
     );
@@ -152,9 +157,13 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
   } else if (firstPageError) {
     body = (
       <QueryError
-        variant="server"
+        variant={trpcErrorVariant(proposalsQuery.error)}
         title={t('codeReviewer.reviewMemory.couldNotLoadProposals')}
-        onRetry={() => void proposalsQuery.refetch()}
+        onRetry={
+          isRetryableTrpcError(proposalsQuery.error)
+            ? () => void proposalsQuery.refetch()
+            : undefined
+        }
         isRetrying={proposalsQuery.isFetching}
       />
     );
@@ -225,25 +234,20 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
         <View className="px-6 pt-4">
           <View className="rounded-lg bg-secondary p-4">
             <View className="flex-row items-center justify-between gap-3">
-              {/* One named control with a 44pt target: the label is what a tap
-                  names, so it moves the value, and the native Switch stays out
-                  of the accessibility tree the way PreferenceRow does it. */}
+              {/* One named control with a 44pt target: the sentence is what a
+                  tap moves, and the native Switch carries the name, hint and
+                  state. The text cannot be a switch of its own: Android ignores
+                  `accessible={false}` on a native switch, so both controls would
+                  reach the screen reader, one of them unnamed. PreferenceRow
+                  lays out the same shape. */}
               <Pressable
                 className="min-h-11 min-w-0 flex-1 justify-center active:opacity-70"
                 disabled={!canToggle}
                 onPress={() => {
                   setEnabled.mutate(!enabled);
                 }}
-                accessibilityRole="switch"
-                accessibilityLabel={t('codeReviewer.reviewMemory.title')}
-                accessibilityHint={
-                  readOnly ? t('codeReviewer.reviewMemory.readOnlyDescription') : undefined
-                }
-                accessibilityState={{
-                  disabled: !canToggle,
-                  busy: setEnabled.isPending,
-                  checked: enabled,
-                }}
+                accessible={false}
+                importantForAccessibility="no-hide-descendants"
               >
                 <Text
                   accessible={false}
@@ -256,9 +260,15 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
               <Switch
                 value={enabled}
                 disabled={!canToggle}
-                accessible={false}
-                importantForAccessibility="no"
-                accessibilityElementsHidden
+                accessibilityLabel={t('codeReviewer.reviewMemory.title')}
+                accessibilityHint={
+                  readOnly ? t('codeReviewer.reviewMemory.readOnlyDescription') : undefined
+                }
+                accessibilityState={{
+                  disabled: !canToggle,
+                  busy: setEnabled.isPending,
+                  checked: enabled,
+                }}
                 onValueChange={value => {
                   setEnabled.mutate(value);
                 }}

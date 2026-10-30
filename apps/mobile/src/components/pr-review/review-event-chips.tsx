@@ -1,7 +1,7 @@
 // Horizontal event chips for the review-submit sheet. A vertical PillGroup
 // is too tall for the half-detent, so these render as a wrapping row.
 
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
@@ -35,7 +35,7 @@ export function ReviewEventChips(props: {
               key={option.value}
               disabled={props.disabled}
               onPress={() => {
-                void Haptics.selectionAsync();
+                selectionHaptic();
                 props.onChange(option.value);
               }}
               {...radioItemA11y({

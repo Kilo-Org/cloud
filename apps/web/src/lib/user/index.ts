@@ -36,6 +36,7 @@ import {
   organization_groups,
   organization_group_memberships,
   organization_group_policy_settings,
+  organization_guardrails,
   byoc_connections,
   organization_user_limits,
   organization_user_usage,
@@ -130,10 +131,10 @@ import {
   user_moderation_blocks,
   user_moderation_mutes,
   user_terms_acceptances,
-  agent_briefing_reports,
-  agent_briefing_events,
+  agent_briefing_snapshots,
   agent_briefing_context_preferences,
   agent_briefing_preferences,
+  cli_sessions_v2,
 } from '@kilocode/db/schema';
 import { eq, and, inArray, isNotNull, isNull, sql, or, ne, notExists } from 'drizzle-orm';
 import { allow_fake_login, IS_DEVELOPMENT } from '@kilocode/web-shared/lib/constants';
@@ -995,6 +996,8 @@ export async function assertUserCanBeSoftDeleted(userId: string): Promise<void> 
  * - personal byoc_connections rows (organization-owned
  *   credentials are retained)
  * - organization_audit_logs (actor PII nulled)
+ * - organization_guardrails (org-owned policy retained; created_by_kilo_user_id nulled)
+ * - organization_mcp_connect_events (retained; user ID reference only, no PII, deleted after 90 days)
  * - kiloclaw_admin_audit_logs (actor PII nulled, target_user_id anonymized)
  * - admin_action_audit_logs (actor PII nulled, user target_id anonymized)
  * - model_eval_ingestions (promoter email anonymized)
@@ -1606,8 +1609,13 @@ export async function anonymizeCloudUserData(
   // Recorded pushes hold the content that was sent to this account's devices
   // (titles, bodies, i18n params, payloads), so they go with the account.
   await tx.delete(user_notification_history).where(eq(user_notification_history.user_id, userId));
-  await tx.delete(agent_briefing_reports).where(eq(agent_briefing_reports.kilo_user_id, userId));
-  await tx.delete(agent_briefing_events).where(eq(agent_briefing_events.kilo_user_id, userId));
+  await tx
+    .update(cli_sessions_v2)
+    .set({ briefing_excerpt: null, briefing_excerpt_scope_changed_at: sql`now()` })
+    .where(eq(cli_sessions_v2.kilo_user_id, userId));
+  await tx
+    .delete(agent_briefing_snapshots)
+    .where(eq(agent_briefing_snapshots.kilo_user_id, userId));
   await tx
     .delete(agent_briefing_context_preferences)
     .where(eq(agent_briefing_context_preferences.kilo_user_id, userId));
@@ -1758,6 +1766,11 @@ export async function anonymizeCloudUserData(
     .update(organization_group_policy_settings)
     .set({ updated_by_kilo_user_id: null })
     .where(eq(organization_group_policy_settings.updated_by_kilo_user_id, userId));
+  // Guardrails are org-owned policy, so they stay; only the creator reference is cleared.
+  await tx
+    .update(organization_guardrails)
+    .set({ created_by_kilo_user_id: null })
+    .where(eq(organization_guardrails.created_by_kilo_user_id, userId));
 
   // Security audit logs: keep org-owned entries, strip actor PII
   // (user-owned entries are cascade-deleted via owned_by_user_id FK)

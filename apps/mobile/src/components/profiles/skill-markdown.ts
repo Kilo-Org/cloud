@@ -40,6 +40,9 @@ export function skillRowSubtitle(skill: SkillRowSource): string | null {
     case 'marketplace': {
       return 'profiles.skillSourceMarketplace';
     }
+    case 'skills-sh': {
+      return 'profiles.skillSourceSkillsSh';
+    }
     default: {
       return null;
     }

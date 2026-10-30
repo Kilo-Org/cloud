@@ -571,6 +571,28 @@ export const clientCaseResults = sqliteTable(
 );
 
 /**
+ * Judged grading claim for one client upload. A case identity has at most one row, and only
+ * the holder of its `token` runs the paid judge, so parallel uploads of the same case cannot
+ * each pay for a grading the usage ledger records once. An expired lease is taken over by
+ * the next upload; the holder removes its row when its grading ends.
+ */
+export const clientCaseGradingClaims = sqliteTable(
+  'client_case_grading_claims',
+  {
+    profile_id: text('profile_id')
+      .notNull()
+      .references(() => clientProfiles.id, { onDelete: 'cascade' }),
+    case_id: text('case_id').notNull(),
+    rep: integer('rep').notNull(),
+    token: text('token').notNull(),
+    // Epoch milliseconds after which a vanished holder's claim no longer blocks a retry.
+    lease_until: integer('lease_until').notNull(),
+    created_at: text('created_at').notNull(),
+  },
+  table => [primaryKey({ columns: [table.profile_id, table.case_id, table.rep] })]
+);
+
+/**
  * Lane-death ledger: one row per benchmark queue message that exhausted its
  * retries and dead-lettered. Written by the DLQ consumer; read by run
  * finalization so a dead lane no longer wedges its run — profile runs complete

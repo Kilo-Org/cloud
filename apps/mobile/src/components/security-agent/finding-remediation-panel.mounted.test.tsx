@@ -11,6 +11,7 @@ import { CenteredState } from '@/components/centered-state';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { AnalysisRerunAction } from '@/components/security-agent/analysis-rerun-action';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { act, TestRenderer } from '@/test/renderer';
@@ -20,6 +21,7 @@ import { FindingRemediationPanel } from './finding-remediation-panel';
 import { type SecurityAnalysis } from '@/lib/security-agent';
 
 const texts = vi.hoisted(() => ({ items: [] as string[] }));
+const kvRows = vi.hoisted(() => ({ rows: [] as { label: string; value: unknown }[] }));
 const mocks = vi.hoisted(() => ({
   routerPush: vi.fn(),
   openExternalUrl: vi.fn(),
@@ -46,6 +48,9 @@ vi.mock('@/components/ui/icons', () => ({
 vi.mock('@/components/security-agent/collapsible-section', () => ({
   CollapsibleSection: (props: { children?: unknown }) => props.children ?? null,
 }));
+vi.mock('@/components/security-agent/analysis-rerun-action', () => ({
+  AnalysisRerunAction: 'AnalysisRerunAction',
+}));
 vi.mock('@/components/security-agent/finding-status-badge', () => ({
   FindingStatusBadge: () => null,
 }));
@@ -54,7 +59,12 @@ vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrol
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
-vi.mock('@/components/ui/kv-row', () => ({ KvRow: () => null }));
+vi.mock('@/components/ui/kv-row', () => ({
+  KvRow: (props: { label: string; value: unknown }) => {
+    kvRows.rows.push({ label: props.label, value: props.value });
+    return null;
+  },
+}));
 vi.mock('@/components/ui/skeleton', () => ({ Skeleton: () => null }));
 vi.mock('@/components/ui/text', () => ({
   Text: (props: { children?: unknown }) => {
@@ -331,4 +341,100 @@ describe('FindingRemediationPanel pull request navigation', () => {
     expect(mocks.routerPush).toHaveBeenNthCalledWith(2, '/(app)/pr-review/kilo/kilo/456');
     expect(mocks.openExternalUrl).not.toHaveBeenCalled();
   });
+});
+
+describe('FindingRemediationPanel stale analysis action', () => {
+  const staleCapability = {
+    canStart: false,
+    startReason: 'stale_analysis',
+    canRetry: false,
+    retryReason: 'stale_analysis',
+    canCancel: false,
+    cancelAttemptId: null,
+  };
+
+  beforeEach(() => {
+    texts.items = [];
+  });
+
+  it('offers the rerun action the blocker copy asks for', () => {
+    const tree = renderPanel(analysisFixture({ remediationCapability: staleCapability }));
+
+    expect(texts.items).toContain(
+      'Finding changed after analysis. Rerun analysis before starting remediation.'
+    );
+    expect(tree.root.findAllByType(AnalysisRerunAction)).toHaveLength(1);
+  });
+
+  it.each([
+    {
+      remediationAttempts: [
+        { id: 'attempt-1', status: 'failed', origin: 'manual', updatedAt: '2026-04-29T02:00:00Z' },
+      ],
+    },
+    { remediationSummary: { status: 'failed', latestAttemptId: 'attempt-1' } },
+  ])('keeps the action off a finding that already ran remediation: %j', content => {
+    const tree = renderPanel(
+      analysisFixture({ remediationCapability: staleCapability, ...content })
+    );
+
+    expect(tree.root.findAllByType(AnalysisRerunAction)).toHaveLength(0);
+  });
+
+  it.each([
+    { startReason: 'not_exploitable', retryReason: 'not_exploitable' },
+    { startReason: 'analysis_required', retryReason: 'analysis_required' },
+  ])('leaves the action to the blocker that names it: %j', reasons => {
+    const tree = renderPanel(
+      analysisFixture({
+        remediationCapability: { ...staleCapability, ...reasons },
+      })
+    );
+
+    expect(tree.root.findAllByType(AnalysisRerunAction)).toHaveLength(0);
+  });
+
+  it('offers it on the retry reason when only the retry is stale', () => {
+    const tree = renderPanel(
+      analysisFixture({
+        remediationCapability: {
+          ...staleCapability,
+          startReason: 'not_exploitable',
+          retryReason: 'stale_analysis',
+        },
+      })
+    );
+
+    expect(tree.root.findAllByType(AnalysisRerunAction)).toHaveLength(1);
+  });
+});
+
+describe('FindingRemediationPanel stored payload tolerance', () => {
+  const attempt = {
+    id: 'attempt-1',
+    status: 'failed',
+    attemptNumber: 1,
+    remediationModelSlug: 'kilo-auto/balanced',
+    branchName: 'security-remediation/fix-1',
+    updatedAt: '2026-04-29T02:00:00.000Z',
+  };
+
+  beforeEach(() => {
+    texts.items = [];
+    kvRows.rows = [];
+  });
+
+  // The attempt row reads the origin off a stored record, so a record written
+  // before the field existed reaches the panel without it.
+  it.each([{ origin: undefined }, { origin: null }, { origin: 7 }])(
+    'labels an unusable attempt origin (%j) as unknown',
+    origin => {
+      const tree = renderPanel(
+        analysisFixture({ remediationAttempts: [{ ...attempt, ...origin }] })
+      );
+
+      expect(tree.root.findAllByType(TabScreenScrollView)).toHaveLength(1);
+      expect(kvRows.rows.find(row => row.label === 'Started by')?.value).toBe('Unknown');
+    }
+  );
 });

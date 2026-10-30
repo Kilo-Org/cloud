@@ -10,6 +10,7 @@ import { useAtomValue, useSetAtom, useStore } from 'jotai';
 import { MessageSquare } from '@/components/ui/icons';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
 import { Platform, type TextInstance, View } from 'react-native';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanimated';
@@ -109,6 +110,7 @@ import {
   countInFlightMessages,
   lastVisibleMessageFailure,
   resolveRetryPrompt,
+  resolveRetryTarget,
   restoreCanceledQueuedMessages,
   retryFailedMessage,
 } from '@/components/agents/session-detail-content-helpers';
@@ -1326,55 +1328,55 @@ export function SessionDetailContent({
 
   const handleRetryMessage = useCallback(
     (message: StoredMessage) => {
-      const prompt = resolveRetryPrompt(message, messagesRef.current);
-      if (prompt === null) {
+      const target = resolveRetryTarget(message, messagesRef.current);
+      if (target === null) {
         return;
       }
-      // Only a user row may be superseded: `retryFailedMessage` never clears an
-      // assistant failure, so an assistant row added here would be hidden
-      // permanently (its preparation attempts are tied to a user
-      // `triggerMessageId`, but the row itself is not).
-      const messageId = message.info.id;
-      const isUser = message.info.role === 'user';
+      const { prompt, replacedMessageIds } = target;
+      // A retry is a new user turn: the server never re-admits a final message
+      // id, so the re-send adds its own row. Every row it replaces — the
+      // failed row and, for an assistant failure, the user row whose prompt is
+      // re-sent — is hidden for the lifetime of the re-send instead, so the
+      // transcript never shows the prompt twice.
       // Same guard handleSend opens with: when no model resolves, run the send
       // anyway (the user gets the existing toast) and keep the failed row.
       if (requiresModel && !(pinned.model ?? currentModel)) {
         void handleSend(prompt);
         return;
       }
-      // The re-send is a new submission; `retryFailedMessage` clears the
-      // original delivery failure once it is accepted so the row stops showing
-      // as failed. It is cleared against this screen's session — the one that
-      // owns the row and that the manager opened — because the await above can
+      // The retry's re-send is a new submission; `retryFailedMessage` resolves
+      // every replaced row once it is accepted so the rows stop showing as
+      // failed. They are resolved against this screen's session — the one that
+      // owns them and that the manager opened — because the await above can
       // outlive it: switching sessions while the re-send is in flight must not
       // record this resolution under the session the user switched to.
       const ownerSessionId = sessionId;
       // The manager records the supersede against the session that owns the
-      // row. The re-send is awaited, so the user can switch sessions while it
+      // rows. The re-send is awaited, so the user can switch sessions while it
       // is in flight; a write under the switched-to session would put another
-      // transcript's id in its set, and a screen-local record would be lost
+      // transcript's ids in its set, and a screen-local record would be lost
       // with the screen that hosted the retry.
       void retryFailedMessage({
-        message,
+        replacedMessageIds,
         send: async () => {
           try {
-            // Hide the original row in the same tap as the retry. The re-send
+            // Hide the replaced rows in the same tap as the retry. The re-send
             // inserts its own optimistic row before the transport round-trip
             // (and fires this hook right after), so waiting for the send to
             // settle would render the prompt twice for the whole round-trip.
             await handleSend(prompt, {
               onOptimisticSend: () => {
-                if (isUser) {
-                  manager.markMessageSuperseded(messageId, ownerSessionId);
+                for (const replacedId of replacedMessageIds) {
+                  manager.markMessageSuperseded(replacedId, ownerSessionId);
                 }
               },
             });
           } catch (retryError) {
-            // A rejected re-send restored nothing: bring the original failed row
-            // and its Retry control back. `retryFailedMessage` swallows the
-            // rejection, so its contract is unchanged.
-            if (isUser) {
-              manager.unmarkMessageSuperseded(messageId, ownerSessionId);
+            // A rejected re-send restored nothing: bring the replaced rows and
+            // the failed row's Retry control back. `retryFailedMessage`
+            // swallows the rejection, so its contract is unchanged.
+            for (const replacedId of replacedMessageIds) {
+              manager.unmarkMessageSuperseded(replacedId, ownerSessionId);
             }
             throw retryError;
           }
@@ -1383,7 +1385,7 @@ export function SessionDetailContent({
           // The manager records the resolution for the owning session and
           // republishes it on `atoms.resolvedDeliveryFailures`, which already
           // feeds the transcript filter. An accepted re-send therefore needs no
-          // local write, and the accepted id stays hidden across a switch-back
+          // local write, and the accepted ids stay hidden across a switch-back
           // and a relaunch.
           manager.clearFailedMessage(clearedMessageId, ownerSessionId);
         },
@@ -1434,7 +1436,7 @@ export function SessionDetailContent({
           message: feedback,
           attempt,
         });
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+        notificationHaptic(Haptics.NotificationFeedbackType.Error);
       };
       try {
         let dropped = false;
@@ -1484,7 +1486,7 @@ export function SessionDetailContent({
             ? t('agentChat.session.cancelQueuedRestoreAvailable')
             : t('agentChat.session.cancelQueuedRestored')
         );
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        notificationHaptic(Haptics.NotificationFeedbackType.Success);
       } finally {
         inFlight.delete(messageId);
         if (inFlight === cancelingQueuedIdsRef.current) {
@@ -1511,7 +1513,7 @@ export function SessionDetailContent({
       });
       setCancelQueuedStatus(null);
       announceForA11y(t('agentChat.session.cancelQueuedRestored'));
-      void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      notificationHaptic(Haptics.NotificationFeedbackType.Success);
     },
     [canceledQueuedMessages, t]
   );
@@ -2401,7 +2403,7 @@ export function SessionDetailContent({
               onAutoApproveChange={enabled => {
                 // Selection haptic for the commit: a capability iOS and Android
                 // both have, served here by the one cross-platform call.
-                void Haptics.selectionAsync();
+                selectionHaptic();
                 setSessionAutoApproveEnabled(sessionId, enabled);
               }}
               onClose={() => {

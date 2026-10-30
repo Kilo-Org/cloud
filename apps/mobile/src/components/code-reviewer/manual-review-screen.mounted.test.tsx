@@ -21,6 +21,14 @@ const BOTTOM_INSET = 24;
 const TAB_SCREEN_BOTTOM_GAP = 16;
 
 const platformState = vi.hoisted(() => ({ OS: 'android' }));
+// The empty state's connect action is the provider app install, which only an
+// organization-manage role may run; `canManage` is that role, `canEdit` the
+// wider settings capability the sibling screens use.
+const permissionState = vi.hoisted(() => ({
+  status: 'ready' as 'loading' | 'error' | 'ready',
+  canEdit: true,
+  canManage: true,
+}));
 const status = vi.hoisted(() => ({
   connected: true,
   loading: false,
@@ -116,7 +124,10 @@ vi.mock('expo-haptics', () => ({
   selectionAsync: vi.fn(),
   NotificationFeedbackType: { Success: 'success' },
 }));
-vi.mock('expo-router', () => ({ useRouter: () => ({ replace: vi.fn(), push: status.push }) }));
+vi.mock('expo-router', () => ({
+  useRouter: () => ({ replace: vi.fn(), push: status.push }),
+  useFocusEffect: () => undefined,
+}));
 vi.mock('@/components/agents/model-selector', () => ({ ModelSelector: 'ModelSelector' }));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
@@ -148,6 +159,21 @@ vi.mock('@/lib/hooks/use-theme-colors', () => ({
   }),
 }));
 vi.mock('@/lib/hooks/use-reviewer-models', () => ({ useReviewerModels: () => ({ models: [] }) }));
+/** The permission the screen reads, driven per test through `permissionState`. */
+function reviewerPermission() {
+  if (permissionState.status === 'loading') {
+    return { status: 'loading' as const };
+  }
+  if (permissionState.status === 'error') {
+    return { status: 'error' as const, refetch: vi.fn(), isRetrying: false };
+  }
+  return {
+    status: 'ready' as const,
+    canEdit: permissionState.canEdit,
+    canManage: permissionState.canManage,
+  };
+}
+
 vi.mock('@/lib/hooks/use-code-reviewer', () => ({
   PERSONAL_SCOPE: 'personal',
   useGitHubStatus: () => ({
@@ -167,6 +193,7 @@ vi.mock('@/lib/hooks/use-code-reviewer', () => ({
     refetch: status.refetch,
   }),
   useReviewConfig: () => ({ data: { modelSlug: 'model-x', thinkingEffort: null } }),
+  useReviewerPermission: reviewerPermission,
 }));
 vi.mock('@/lib/hooks/use-code-reviews', () => ({
   useCreateManualReview: () => ({ mutate: status.mutate, isPending: status.pending }),
@@ -184,39 +211,39 @@ function only<T>(items: T[], what: string): T {
   return item;
 }
 
-async function renderScreen() {
+async function renderScreen(scope = 'personal') {
   // The root stack publishes `null`: no tab bar under this screen.
   const { renderer, unmount } = await renderWithProviders(
-    createElement(
-      TabBarLabelContext,
-      { value: null },
-      createElement(ManualReviewScreen, { scope: 'personal' })
-    )
+    createElement(TabBarLabelContext, { value: null }, createElement(ManualReviewScreen, { scope }))
   );
   return { renderer, unmount };
 }
 
 const PR_URL_PLACEHOLDER = 'https://github.com/owner/repo/pull/123';
 const GITHUB_PR_URL = 'https://github.com/drain-e2e-labs/notes/pull/42';
-const SERVER_NOT_FOUND = 'GitHub could not find that pull request.';
+const SERVER_RATE_LIMITED = 'GitHub is rate limiting this installation.';
 
 /**
- * The sentence the screen renders for a NOT_FOUND start failure. Read from the
- * catalog at call time, because this suite asserts where and for how long the
- * failure stays on screen; the code-to-copy mapping has its own suite
- * (`manual-review-start-failure.mounted.test.tsx`).
+ * The sentence the screen renders for a retryable (TOO_MANY_REQUESTS) start
+ * failure. Read from the catalog at call time, because this suite asserts where
+ * and for how long the failure and its retry stay on screen; the code-to-copy
+ * mapping has its own suite (`manual-review-start-failure.mounted.test.tsx`).
  */
 function startFailureText(): string {
-  return i18n.t('codeReviewer.manualReview.startNotFound', {
+  return i18n.t('codeReviewer.manualReview.startRateLimited', {
     provider: 'GitHub',
     requestNoun: i18n.t('common.pullRequest'),
   });
 }
 
-/** A failed call as the tRPC client reports it: a code plus the server's message. */
+/**
+ * A failed call as the tRPC client reports it: a code plus the server's
+ * message. Rate limiting is the retryable case, so the recovery control these
+ * tests follow is on screen.
+ */
 function startFailure() {
-  return Object.assign(new Error(SERVER_NOT_FOUND), {
-    data: { code: 'NOT_FOUND', message: SERVER_NOT_FOUND },
+  return Object.assign(new Error(SERVER_RATE_LIMITED), {
+    data: { code: 'TOO_MANY_REQUESTS', message: SERVER_RATE_LIMITED },
   });
 }
 
@@ -266,6 +293,9 @@ function paddingBottomsAbove(node: TestRenderer.ReactTestInstance): number[] {
 
 beforeEach(() => {
   keyboardStore.setHeight(0);
+  permissionState.status = 'ready';
+  permissionState.canEdit = true;
+  permissionState.canManage = true;
   status.connected = true;
   status.loading = false;
   status.errorCode = null;
@@ -416,6 +446,79 @@ describe('ManualReviewScreen connect provider CTA', () => {
   });
 });
 
+describe('ManualReviewScreen empty state role gate', () => {
+  const ORG_SCOPE = 'org-1';
+
+  /** The sentence the read-only notice renders, read from the catalog. */
+  function readOnlyNotice(): string {
+    return i18n.t('codeReviewer.notConnectedReadOnly', { platform: 'GitHub' });
+  }
+
+  it('tells an organization member only owners and admins can connect, with no action', async () => {
+    status.connected = false;
+    permissionState.canEdit = false;
+    permissionState.canManage = false;
+    const { renderer, unmount } = await renderScreen(ORG_SCOPE);
+
+    const empty = only(findAllOfType(renderer.root, 'EmptyState'), 'empty state');
+    expect(propOf(empty, 'description')).toBe(readOnlyNotice());
+    expect(propOf(empty, 'action')).toBeUndefined();
+    expect(findAllOfType(renderer.root, 'Button')).toHaveLength(0);
+    // It must not offer the copy that instructs a member to connect.
+    expect(renderedTexts(renderer.root)).not.toContain(
+      i18n.t('codeReviewer.manualReview.connectProviderDescription')
+    );
+
+    unmount();
+  });
+
+  it('withholds the action from a billing manager, who cannot install the provider app', async () => {
+    status.connected = false;
+    permissionState.canEdit = true;
+    permissionState.canManage = false;
+    const { renderer, unmount } = await renderScreen(ORG_SCOPE);
+
+    const empty = only(findAllOfType(renderer.root, 'EmptyState'), 'empty state');
+    expect(propOf(empty, 'description')).toBe(readOnlyNotice());
+    expect(propOf(empty, 'action')).toBeUndefined();
+
+    unmount();
+  });
+
+  it('keeps the connect action for an owner or admin', async () => {
+    status.connected = false;
+    permissionState.canManage = true;
+    const { renderer, unmount } = await renderScreen(ORG_SCOPE);
+
+    const empty = only(findAllOfType(renderer.root, 'EmptyState'), 'empty state');
+    const action = propOf(empty, 'action') as ReactElement<{ onPress: () => void }>;
+    expect(action).toBeDefined();
+    act(() => {
+      action.props.onPress();
+    });
+    expect(status.push).toHaveBeenCalledWith(`/(app)/code-reviewer/${ORG_SCOPE}/github`);
+
+    unmount();
+  });
+
+  it.each(['loading', 'error'] as const)(
+    'keeps the connect action while the permission is %s',
+    async state => {
+      status.connected = false;
+      permissionState.status = state;
+      const { renderer, unmount } = await renderScreen(ORG_SCOPE);
+
+      const empty = only(findAllOfType(renderer.root, 'EmptyState'), 'empty state');
+      expect(propOf(empty, 'description')).toBe(
+        i18n.t('codeReviewer.manualReview.connectProviderDescription')
+      );
+      expect(propOf(empty, 'action')).toBeDefined();
+
+      unmount();
+    }
+  );
+});
+
 describe('ManualReviewScreen failed start', () => {
   it('keeps the form and withdraws the failure when the URL is cleared', async () => {
     status.mutate.mockImplementationOnce(
@@ -439,7 +542,7 @@ describe('ManualReviewScreen failed start', () => {
     expect(findAllOfType(renderer.root, 'TextInput')).toHaveLength(2);
     expect(findAllOfType(renderer.root, 'ModelSelector')).toHaveLength(1);
     expect(renderedTexts(renderer.root)).toContain(startFailureText());
-    expect(renderedTexts(renderer.root)).not.toContain(SERVER_NOT_FOUND);
+    expect(renderedTexts(renderer.root)).not.toContain(SERVER_RATE_LIMITED);
     expect(findAllOfType(renderer.root, 'Button').map(node => propOf(node, 'variant'))).toContain(
       'outline'
     );

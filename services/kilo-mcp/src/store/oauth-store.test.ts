@@ -3,7 +3,7 @@ import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { NewPendingAuthorization } from './oauth-store';
 import { getOAuthApi, type OAuthProviderOptions } from '@cloudflare/workers-oauth-provider';
-import { hashRefreshToken } from '../oauth/refresh-reuse';
+import { TOKEN_REQUEST_MAX_BYTES, hashRefreshToken } from '../oauth/refresh-reuse';
 
 // `cloudflare:workers` does not exist under plain node vitest; the DO under
 // test only extends its DurableObject base, so a stub base class is enough.
@@ -536,16 +536,18 @@ describe('production token routing (real provider + DO SQLite)', () => {
         clientId: client.client_id,
       },
     });
-    const post = (body: Record<string, string>) =>
+    const postForm = (body: URLSearchParams) =>
       worker.fetch(
         new Request('https://kilo-mcp.test/token', {
           method: 'POST',
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-          body: new URLSearchParams({ client_id: client.client_id, ...body }),
+          body: body.toString(),
         }),
         env,
         context as unknown as ExecutionContext
       );
+    const post = (body: Record<string, string>) =>
+      postForm(new URLSearchParams({ client_id: client.client_id, ...body }));
     const exchange = (code: string) =>
       post({
         grant_type: 'authorization_code',
@@ -646,10 +648,14 @@ describe('production token routing (real provider + DO SQLite)', () => {
       db,
       env,
       getByName,
+      clientId: client.client_id,
       initial,
       refresh,
       exchange,
       signIn,
+      postForm,
+      fetchToken: (request: Request) =>
+        worker.fetch(request, env, context as unknown as ExecutionContext),
       recreate: () => {
         store = new KiloMcpOAuthStore(context as unknown as DurableObjectState, env);
       },
@@ -937,6 +943,121 @@ describe('production token routing (real provider + DO SQLite)', () => {
           error: 'invalid_grant',
           error_description: 'Refresh token reuse detected; the grant has been revoked.',
         });
+      } finally {
+        h.db.close();
+      }
+    });
+  });
+
+  describe('token request handling (real provider + DO SQLite)', () => {
+    const deferred = () => {
+      let resolve = () => {};
+      const promise = new Promise<void>(settle => {
+        resolve = settle;
+      });
+      return { promise, resolve };
+    };
+
+    const endlessBody = (chunkSize: number): ReadableStream<Uint8Array> => {
+      let pulled = 0;
+      return new ReadableStream<Uint8Array>({
+        pull(controller) {
+          if (pulled >= 1) return new Promise<void>(() => {});
+          pulled += 1;
+          controller.enqueue(new Uint8Array(chunkSize).fill(0x61));
+        },
+      });
+    };
+
+    const streamed = (body: ReadableStream<Uint8Array>, headers: Record<string, string> = {}) =>
+      new Request('https://kilo-mcp.test/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded', ...headers },
+        body,
+        duplex: 'half',
+      } as RequestInit & { duplex: 'half' });
+
+    it('answers 413 and keeps exchange, rotation and bearer use working', async () => {
+      const h = await harness();
+      try {
+        const declared = await h.fetchToken(
+          streamed(endlessBody(4096), {
+            'Content-Length': String(TOKEN_REQUEST_MAX_BYTES + 1),
+          })
+        );
+        expect(declared.status).toBe(413);
+        expect(await declared.json()).toEqual({
+          error: 'invalid_request',
+          error_description: `Request body must be at most ${TOKEN_REQUEST_MAX_BYTES} bytes.`,
+        });
+
+        const streamedPast = await h.fetchToken(streamed(endlessBody(TOKEN_REQUEST_MAX_BYTES + 1)));
+        expect(streamedPast.status).toBe(413);
+
+        const refreshed = await h.refresh(h.initial.refresh_token);
+        expect(refreshed.status).toBe(200);
+        const rotated = (await refreshed.json()) as {
+          refresh_token: string;
+          access_token: string;
+        };
+        expect((await h.mcp(rotated.access_token)).status).toBe(200);
+        expect((await h.refresh(rotated.refresh_token)).status).toBe(200);
+      } finally {
+        h.db.close();
+      }
+    });
+
+    it('rotates a refresh carrying extension parameters and repeated resources', async () => {
+      const h = await harness();
+      try {
+        const form = (token: string) =>
+          new URLSearchParams([
+            ['client_id', h.clientId],
+            ['grant_type', 'refresh_token'],
+            ['refresh_token', token],
+            ['resource', 'https://kilo-mcp.test/mcp'],
+            ['resource', 'https://kilo-mcp.test/mcp'],
+            ['scope', 'mcp'],
+            ['unknown_extension', 'value'],
+          ]);
+        const rotated = await h.postForm(form(h.initial.refresh_token));
+        expect(rotated.status).toBe(200);
+        const next = (await rotated.json()) as { refresh_token: string; access_token: string };
+        expect((await h.mcp(next.access_token)).status).toBe(200);
+
+        const replay = await h.postForm(form(h.initial.refresh_token));
+        expect(replay.status).toBe(400);
+        expect(await replay.json()).toMatchObject({
+          error: 'invalid_grant',
+          error_description: 'Refresh token reuse detected; the grant has been revoked.',
+        });
+        expect((await h.postForm(form(next.refresh_token))).status).toBe(400);
+      } finally {
+        h.db.close();
+      }
+    });
+
+    it('completes a real refresh after other requests are served', async () => {
+      const h = await harness();
+      try {
+        const arriving = deferred();
+        const slow = h.fetchToken(
+          streamed(
+            new ReadableStream<Uint8Array>({
+              async pull(controller) {
+                await arriving.promise;
+                controller.enqueue(new TextEncoder().encode('grant_type=refresh_token'));
+                controller.close();
+              },
+            })
+          )
+        );
+        const refreshed = await h.refresh(h.initial.refresh_token);
+        expect(refreshed.status).toBe(200);
+        const rotated = (await refreshed.json()) as { access_token: string };
+        expect((await h.mcp(rotated.access_token)).status).toBe(200);
+        arriving.resolve();
+        expect((await slow).status).toBeGreaterThanOrEqual(400);
       } finally {
         h.db.close();
       }

@@ -381,7 +381,7 @@ describe('parseMessagesMicrodollarUsageFromStream', () => {
   test('records message_start input tokens when the stream ends before message_delta', async () => {
     const stream = streamFromText(
       'event: message_start\n' +
-        'data: {"type":"message_start","message":{"id":"generation-id","type":"message","role":"assistant","content":[],"model":"anthropic/claude-sonnet-4-6:optimized","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":1200,"cache_creation_input_tokens":300,"cache_read_input_tokens":500,"output_tokens":1}}}\n\n' +
+        'data: {"type":"message_start","message":{"id":"generation-id","type":"message","role":"assistant","content":[],"model":"anthropic/claude-sonnet-4-6","stop_reason":null,"stop_sequence":null,"usage":{"input_tokens":1200,"cache_creation_input_tokens":300,"cache_read_input_tokens":500,"output_tokens":1}}}\n\n' +
         'event: content_block_delta\n' +
         'data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"Hello"}}\n\n' +
         'event: content_block_stop\n' +

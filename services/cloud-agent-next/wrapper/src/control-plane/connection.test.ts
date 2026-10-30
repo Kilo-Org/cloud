@@ -1,6 +1,8 @@
 import {
   WORKTREE_RUNTIME_HEADER,
   WORKTREE_RUNTIME_VERSION,
+  WORKSPACE_CONFIGURATION_HEADER,
+  WORKSPACE_CONFIGURATION_VERSION,
 } from '../../../src/shared/control-plane-runtime-contract.js';
 import { describe, expect, it } from 'bun:test';
 import {
@@ -151,6 +153,9 @@ it('advertises worktree support without changing the strict legacy hello', () =>
     connection.start();
     const socket = TestSocket.instances[0];
     expect(socket.options?.headers?.[WORKTREE_RUNTIME_HEADER]).toBe(WORKTREE_RUNTIME_VERSION);
+    expect(socket.options?.headers?.[WORKSPACE_CONFIGURATION_HEADER]).toBe(
+      WORKSPACE_CONFIGURATION_VERSION
+    );
     socket.onopen?.();
     expect(socket.frames[0]).toEqual({
       type: 'hello',

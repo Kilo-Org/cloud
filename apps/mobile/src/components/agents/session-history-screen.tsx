@@ -6,7 +6,7 @@ import { useFocusEffect, useNavigation } from 'expo-router';
 
 import { SessionFilterModal } from '@/components/agents/platform-filter-modal';
 import { AgentSessionListContent } from '@/components/agents/session-list-content';
-import { SessionListHeaderActions } from '@/components/agents/session-list-header-actions';
+import { SessionListHeader } from '@/components/agents/session-list-header';
 import { selectSessionListIsLoading } from '@/components/agents/session-list-loading';
 import { selectShowSearchBusy } from '@/components/agents/session-list-search-busy';
 import { SessionListSearchHeader } from '@/components/agents/session-list-search-header';
@@ -14,8 +14,7 @@ import { useAgentSessionListData } from '@/components/agents/use-agent-session-l
 import { useAgentSessionNavigator } from '@/components/agents/use-agent-session-navigator';
 import { useNewSessionNavigator } from '@/components/agents/use-new-session-navigator';
 import { useSessionSearchInput } from '@/components/agents/use-session-search-input';
-import { ContextControl } from '@/components/context-control';
-import { ScreenHeader } from '@/components/screen-header';
+import { useOwnedKeyboard } from '@/components/agents/use-owned-keyboard';
 import { shouldLoadMoreSessions } from '@/lib/agent-session-pages';
 import { usePersistedAgentSessionFilters } from '@/lib/hooks/use-persisted-agent-session-filters';
 import { SESSION_FILTERS_KEY } from '@/lib/storage-keys';
@@ -70,6 +69,7 @@ export function SessionHistoryScreen() {
     restoredQuery: searchDraftState.value,
     restoreSettled: searchDraftState.settled,
   });
+  const keyboard = useOwnedKeyboard();
 
   const ready = filtersLoaded && orgLoaded;
 
@@ -192,13 +192,6 @@ export function SessionHistoryScreen() {
     storedIsPending,
   });
 
-  // Reserve the search header through the initial load too: the cold-open
-  // skeletons must sit in the same space the rows will land in, so the header
-  // (and the search input) cannot appear above the list only when the first
-  // rows arrive — that shifts the whole reserved area mid-swap. A genuinely
-  // empty account still drops the header once loading settles.
-  const showSearchHeader = hasAnySessions || isLoading;
-
   // One permanently mounted body inside one keyboard container: the empty-state
   // subtitle, the rows, the skeletons and the reserved refresh band all lift
   // with the keyboard, so the no-match copy is never drawn half-behind it. The
@@ -231,56 +224,45 @@ export function SessionHistoryScreen() {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
-        title={t('common.agents')}
-        className="pb-2"
+      <SessionListHeader
+        title={t('agents.sessionList.pastSessions')}
         showBackButton
-        headerRight={
-          <SessionListHeaderActions
-            activeFilterCount={activeFilterCount}
-            showNewSession={false}
-            onNewSession={handleCreateSession}
-            onOpenFilters={() => {
-              // The search field sits above this button; without the dismissal
-              // the keyboard stays up and covers the sheet’s Apply row.
-              Keyboard.dismiss();
-              setShowFilterModal(true);
-            }}
+        backFallback="/(app)/(tabs)/(2_agents)"
+        searchOpen
+        activeFilterCount={activeFilterCount}
+        onOpenFilters={() => {
+          Keyboard.dismiss();
+          setShowFilterModal(true);
+        }}
+        search={
+          <SessionListSearchHeader
+            inputRef={searchInputRef}
+            hasText={hasText}
+            showSearchBusy={showSearchBusy}
+            onChangeText={handleSearchInputChange}
+            onClearSearch={handleClearSearchInput}
+            onFocus={keyboard.handleInputFocus}
+            onBlur={keyboard.handleInputBlur}
+            defaultValue={searchDefaultValue}
+            inputKey={searchInputKey}
+            compact
+            inline
           />
         }
       />
-      {/* The stored list is scoped to the selected account, so the scope is
-          named above it (and above the search field it filters) instead of
-          only in an empty-state sentence. `ContextControl` is the same
-          switchable control the Agents tab and Home carry. */}
-      <View className="px-4">
-        <ContextControl />
-      </View>
-      {showSearchHeader ? (
-        <SessionListSearchHeader
-          inputRef={searchInputRef}
-          hasText={hasText}
-          showSearchBusy={showSearchBusy}
-          onChangeText={handleSearchInputChange}
-          onClearSearch={handleClearSearchInput}
-          defaultValue={searchDefaultValue}
-          inputKey={searchInputKey}
-        />
-      ) : null}
-      <KeyboardAvoidingView className="flex-1" behavior="padding">
+      <KeyboardAvoidingView className="flex-1" behavior="padding" enabled={keyboard.owned}>
         {sessionListBody}
       </KeyboardAvoidingView>
-      {showFilterModal && (
-        <SessionFilterModal
-          selectedPlatforms={platformFilter}
-          selectedProjects={projectFilter}
-          projectOptions={projectOptions}
-          onClose={() => {
-            setShowFilterModal(false);
-          }}
-          onApply={setFilters}
-        />
-      )}
+      <SessionFilterModal
+        visible={showFilterModal}
+        selectedPlatforms={platformFilter}
+        selectedProjects={projectFilter}
+        projectOptions={projectOptions}
+        onClose={() => {
+          setShowFilterModal(false);
+        }}
+        onApply={setFilters}
+      />
     </View>
   );
 }

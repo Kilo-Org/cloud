@@ -8,7 +8,7 @@ import {
   isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
 import { useActionSheet } from '@expo/react-native-action-sheet';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { RefreshCw, Settings, ShieldAlert } from '@/components/ui/icons';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -18,8 +18,10 @@ import { toast } from 'sonner-native';
 
 import { QueryError } from '@/components/query-error';
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
+import { Button } from '@/components/ui/button';
 import { ScreenHeader } from '@/components/screen-header';
 import { DashboardSections } from '@/components/security-agent/dashboard-sections';
+import { SettingsRecoveryStatus } from '@/components/security-agent/settings-recovery-status';
 import { SecurityCommandRetryCard } from '@/components/security-agent/security-command-retry-card';
 import { IconButton } from '@/components/ui/icon-button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -27,8 +29,10 @@ import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber, formatPercent } from '@/lib/format';
 import {
+  useRetrySecurityAgentSettings,
   useSecurityAgentCapability,
   useSecurityAgentConfig,
   useSecurityAgentDashboardStats,
@@ -43,10 +47,16 @@ import {
 } from '@/lib/hooks/use-security-dismiss-draft';
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
+
+// The input one sync attempt carries: the repository filter it was started
+// under, and the operation key a reconcile row replays.
+type SyncIntent = { repoFullName?: string; operationKey?: string };
 
 const METRIC_TONE_CLASS = {
   danger: 'text-destructive',
@@ -57,6 +67,19 @@ const METRIC_TONE_CLASS = {
 export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean) {
   const metrics = buildSecurityDashboardMetrics(data, slaEnabled);
   const number = (value: number) => formatNumber(value, i18n.language);
+  // The tile value counts every severity, so the detail line names every
+  // severity: medium and low share one bucket, which disappears while empty.
+  // Mirrors severityBreakdownDetail in @kilocode/app-shared.
+  const breakdownDetail = (counts: DashboardStats['severity']) => {
+    const parts = { critical: number(counts.critical), high: number(counts.high) };
+    const mediumLow = counts.medium + counts.low;
+    return mediumLow > 0
+      ? i18n.t('securityAgent.dashboardMetrics.deadlinePassedDetailWithMediumLow', {
+          ...parts,
+          mediumLow: number(mediumLow),
+        })
+      : i18n.t('securityAgent.dashboardMetrics.deadlinePassedDetail', parts);
+  };
 
   return metrics.map(metric => {
     switch (metric.id) {
@@ -64,10 +87,7 @@ export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean)
         return Object.assign(metric, {
           label: i18n.t('securityAgent.dashboardMetrics.openFindings'),
           value: number(data.analysis.total),
-          detail: i18n.t('securityAgent.dashboardMetrics.deadlinePassedDetail', {
-            critical: number(data.severity.critical),
-            high: number(data.severity.high),
-          }),
+          detail: breakdownDetail(data.severity),
         });
       }
       case 'exploitable': {
@@ -111,12 +131,15 @@ export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean)
         });
       }
       case 'deadlinePassed': {
+        const overdue = data.sla.bySeverity;
         return Object.assign(metric, {
           label: i18n.t('securityAgent.dashboardMetrics.deadlinePassed'),
           value: number(data.sla.overall.overdue),
-          detail: i18n.t('securityAgent.dashboardMetrics.deadlinePassedDetail', {
-            critical: number(data.sla.bySeverity.critical.overdue),
-            high: number(data.sla.bySeverity.high.overdue),
+          detail: breakdownDetail({
+            critical: overdue.critical.overdue,
+            high: overdue.high.overdue,
+            medium: overdue.medium.overdue,
+            low: overdue.low.overdue,
           }),
         });
       }
@@ -147,7 +170,7 @@ export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean)
 }
 
 export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { t } = useTranslation();
   const themedSheet = useThemedActionSheetOptions();
@@ -160,7 +183,12 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const dashboardStats = useSecurityAgentDashboardStats(scope, repoFullName);
   const lastSync = useSecurityAgentLastSyncTime(scope, repoFullName);
   const repositories = useSecurityAgentRepositories(scope);
-  const canManage = useSecurityAgentCapability(scope).canManage;
+  const capability = useSecurityAgentCapability(scope);
+  const canManage = capability.canManage;
+  // The entry renders this dashboard without waiting for the role read when the
+  // config is already cached, so a failed read must say so here: otherwise a
+  // manager sees the audit action silently missing and reads it as lost access.
+  const capabilityRecovery = useRetrySecurityAgentSettings(scope);
   const triggerSync = useTriggerSecuritySync(scope);
   const dismissFailures = useSecurityDismissFailures(scope);
   const { refresh: refreshDismissFailures } = dismissFailures;
@@ -193,12 +221,13 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const metrics = data ? buildLocalizedMetrics(data, slaEnabled) : [];
 
   const lastSyncTime = lastSync.data?.lastSyncTime;
+  const now = useRelativeTimeNow();
   let lastSyncLabel = t('securityAgent.dashboard.notYetSynced');
   if (lastSync.isError) {
     lastSyncLabel = t('securityAgent.dashboard.syncStatusUnavailable');
   } else if (lastSyncTime) {
     lastSyncLabel = t('securityAgent.dashboard.lastSynced', {
-      time: timeAgo(parseTimestamp(lastSyncTime)),
+      time: timeAgo(parseTimestamp(lastSyncTime), undefined, now),
     });
   }
 
@@ -233,6 +262,34 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   // disable and the inline copy below explains the state.
   const syncBlocked = triggerSync.isError && !isSecuritySyncRetryable(triggerSync.error);
   const syncDisabled = triggerSync.isPending || syncBlocked;
+  // React Query clears a mutation's error when the next attempt starts, so the
+  // failure copy and the retry under it blink out for the length of the retry —
+  // the screen looked like the tap did nothing. Hold the failure being retried,
+  // together with the intent that produced it, until that attempt reports its
+  // own outcome: a retry must resubmit the failed intent, not whatever filter
+  // the reader switched to meanwhile.
+  const [lastSyncAttempt, setLastSyncAttempt] = useState<{
+    error: Error | null;
+    intent: SyncIntent;
+  } | null>(null);
+  const syncFailure = triggerSync.error ?? lastSyncAttempt?.error ?? null;
+  const syncRetryable = syncFailure !== null && isSecuritySyncRetryable(syncFailure);
+
+  // One submit path for every control that starts a sync — the header button,
+  // the empty-state action, the retry beside the failure copy, and a
+  // reconcile-row retry — so their handlers cannot drift apart.
+  const startSync = (intent: SyncIntent) => {
+    setLastSyncAttempt({ error: triggerSync.error, intent });
+    triggerSync.mutate(intent, {
+      onSuccess: () => {
+        setLastSyncAttempt(null);
+        toast.success(t('securityAgent.dashboard.syncQueued'));
+      },
+      onSettled: () => {
+        refreshOutbox();
+      },
+    });
+  };
 
   const openRepoFilter = () => {
     if (repoFilterUnavailable) {
@@ -267,7 +324,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           <View className="flex-row items-center gap-2">
             <IconButton
               onPress={() => {
-                router.push(getSecurityAgentPath(scope, 'findings'));
+                pushOnce(getSecurityAgentPath(scope, 'findings'));
               }}
               accessibilityLabel={t('common.findings')}
             >
@@ -275,7 +332,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             </IconButton>
             <IconButton
               onPress={() => {
-                router.push(getSecurityAgentPath(scope, 'settings'));
+                pushOnce(getSecurityAgentPath(scope, 'settings'));
               }}
               accessibilityLabel={t('securityAgent.dashboard.settings')}
             >
@@ -291,11 +348,27 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
+        {capability.status === 'error' ? (
+          <SettingsRecoveryStatus
+            message={t('securityAgent.settingsOverview.couldNotLoadPermissions')}
+            isRetrying={capabilityRecovery.isRetrying}
+            onRetry={() => void capabilityRecovery.retry()}
+          />
+        ) : null}
         <View className="flex-row items-center justify-between gap-3">
+          {/* The row's height comes from the 48 dp sync button beside the
+              filter, so the filter's own node carried only its two text lines
+              (~32 dp) and a tap on the row's padding missed it. The shared row
+              frame lifts the filter to the whole row; `justify-center` keeps
+              the lines where they already sat. */}
           <Pressable
             onPress={openRepoFilter}
             disabled={repoFilterUnavailable}
-            className={cn('flex-1 active:opacity-70', repoFilterUnavailable && 'opacity-50')}
+            className={cn(
+              ROW_TARGET_CLASS,
+              'flex-1 justify-center active:opacity-70',
+              repoFilterUnavailable && 'opacity-50'
+            )}
             accessibilityRole="button"
             accessibilityLabel={t('securityAgent.dashboard.filterByRepository')}
             accessibilityState={{ disabled: repoFilterUnavailable }}
@@ -309,17 +382,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           </Pressable>
           <IconButton
             onPress={() => {
-              triggerSync.mutate(
-                { repoFullName },
-                {
-                  onSuccess: () => {
-                    toast.success(t('securityAgent.dashboard.syncQueued'));
-                  },
-                  onSettled: () => {
-                    refreshOutbox();
-                  },
-                }
-              );
+              startSync({ repoFullName });
             }}
             disabled={syncDisabled}
             accessibilityLabel={t('securityAgent.dashboard.syncNow')}
@@ -349,8 +412,40 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           <Text className="text-xs text-warn">{t('securityAgent.dashboard.refreshFailed')}</Text>
         ) : null}
 
-        {triggerSync.isError ? (
-          <Text className="text-xs text-destructive">{triggerSync.error.message}</Text>
+        {syncFailure ? (
+          <View className="flex-row items-center gap-3">
+            {/* While a retry runs this sentence is the failure being retried,
+                not a fresh one, so it steps back from error red — to the warn
+                tone this screen already gives its other degraded state — while
+                the control reports the attempt. */}
+            <Text
+              className={cn(
+                'flex-1 text-xs',
+                triggerSync.isPending ? 'text-warn' : 'text-destructive'
+              )}
+            >
+              {syncFailure.message}
+            </Text>
+            {syncRetryable ? (
+              // The retry sits beside the sentence it retries and reports its
+              // own progress: a failed sync can settle in a blink, so the
+              // header icon's flash alone read as "nothing happened".
+              <Button
+                size="sm"
+                variant="ghost"
+                loading={triggerSync.isPending}
+                // A busy non-primary control dims itself, spinner included,
+                // which left the control the reader just pressed fainter than
+                // the header icon spinning beside it.
+                className={cn(triggerSync.isPending && 'opacity-100')}
+                onPress={() => {
+                  startSync(lastSyncAttempt?.intent ?? { repoFullName });
+                }}
+              >
+                <Text>{t('common.retry')}</Text>
+              </Button>
+            ) : null}
+          </View>
         ) : null}
 
         {dismissFailures.failures.map(failure => (
@@ -359,7 +454,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             lastError={securityDismissFailureCopy(failure)}
             retryable={failure.retryable === true}
             onRetry={() => {
-              router.push(getSecurityAgentPath(scope, `dismiss/${failure.findingId}`));
+              pushOnce(getSecurityAgentPath(scope, `dismiss/${failure.findingId}`));
             }}
             onDiscard={() => {
               dismissFailures.clear(failure.findingId);
@@ -374,17 +469,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             retryable
             onRetry={() => {
               const input = row.input as { repoFullName?: string };
-              triggerSync.mutate(
-                { repoFullName: input.repoFullName, operationKey: row.operationKey },
-                {
-                  onSuccess: () => {
-                    toast.success(t('securityAgent.dashboard.syncQueued'));
-                  },
-                  onSettled: () => {
-                    refreshOutbox();
-                  },
-                }
-              );
+              startSync({ repoFullName: input.repoFullName, operationKey: row.operationKey });
             }}
             onDiscard={() => {
               void removeOutboxRow(row.fingerprint);
@@ -424,19 +509,13 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
 
         {slaEnabled && data && data.sla.overall.total === 0 ? (
           <View className="flex-row items-center gap-4">
+            {/* Both actions take the shared row frame: `min-h-11` measured
+                38.5 dp here (NativeWind's rem is 14 pt), under the touch
+                floor, and the row only grows to the frame the header's icon
+                buttons already use. */}
             <Pressable
               onPress={() => {
-                triggerSync.mutate(
-                  { repoFullName },
-                  {
-                    onSuccess: () => {
-                      toast.success(t('securityAgent.dashboard.syncQueued'));
-                    },
-                    onSettled: () => {
-                      refreshOutbox();
-                    },
-                  }
-                );
+                startSync({ repoFullName });
               }}
               disabled={syncDisabled}
               accessibilityRole="button"
@@ -446,7 +525,8 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                 busy: triggerSync.isPending,
               }}
               className={cn(
-                'min-h-11 flex-row items-center gap-1.5 active:opacity-70',
+                ROW_TARGET_CLASS,
+                'flex-row items-center gap-1.5 active:opacity-70',
                 syncBlocked && 'opacity-50'
               )}
             >
@@ -459,11 +539,11 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             </Pressable>
             <Pressable
               onPress={() => {
-                router.push(getSecurityAgentPath(scope, 'settings/repositories'));
+                pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
               }}
               accessibilityRole="button"
               accessibilityLabel={t('securityAgent.dashboard.manageRepositories')}
-              className="min-h-11 justify-center active:opacity-70"
+              className={cn(ROW_TARGET_CLASS, 'justify-center active:opacity-70')}
             >
               <Text className="text-xs font-medium text-primary">
                 {t('securityAgent.dashboard.manageRepositories')}

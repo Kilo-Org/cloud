@@ -1,40 +1,28 @@
 import { z } from 'zod';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { TRPCError } from '@trpc/server';
-import { after } from 'next/server';
 import { baseProcedure, createTRPCRouter } from '@kilocode/web-shared/lib/trpc/init';
 import { db } from '@kilocode/web-shared/lib/drizzle';
-import { agent_briefing_context_preferences, agent_briefing_reports } from '@kilocode/db/schema';
+import {
+  agent_briefing_context_preferences,
+  agent_briefing_preferences,
+  agent_briefing_snapshots,
+  cli_sessions_v2,
+} from '@kilocode/db/schema';
 import {
   briefingPreferencesSchema,
   briefingReportSchema,
-  briefingEstimateSchema,
+  DEFAULT_BRIEFING_SCHEDULE,
 } from '@kilocode/app-shared/agent-briefing';
 import {
   briefingContextSettings,
-  briefingReportRow,
+  getBriefingReport,
   getBriefingPreferences,
-  getOneOffBriefingPreferences,
   listBriefings,
-  prepareOneOffBriefing,
   saveBriefingPreferences,
-  serializeBriefing,
 } from '@/lib/agent-briefing/store';
-import {
-  listOneOffBriefingDrafts,
-  oneOffBriefingDraftRow,
-  oneOffBriefingDraftSchema,
-  startOneOffBriefingPreparation,
-  runOneOffBriefingPreparation,
-} from '@/lib/agent-briefing/preparation';
-import {
-  estimateBriefingSummary,
-  createOneOffBriefing,
-  queueBriefingSummary,
-  reconcileBriefingCharge,
-  verifyBriefingEstimate,
-  runBriefingSummary,
-} from '@/lib/agent-briefing/summary';
+import { estimateBriefingSummary, verifyBriefingEstimate } from '@/lib/agent-briefing/summary';
+import { nextBriefingTime } from '@/lib/agent-briefing/schedule';
 
 const timezoneSchema = z
   .string()
@@ -69,19 +57,6 @@ export const agentBriefingRouter = createTRPCRouter({
     .query(({ ctx, input }) =>
       getBriefingPreferences(ctx.user.id, input?.timezone, input?.language)
     ),
-  oneOffPreferences: baseProcedure
-    .input(
-      z
-        .object({
-          timezone: timezoneSchema.optional(),
-          language: z.string().min(1).max(35).optional(),
-        })
-        .optional()
-    )
-    .output(briefingPreferencesSchema)
-    .query(({ ctx, input }) =>
-      getOneOffBriefingPreferences(ctx.user.id, input?.timezone, input?.language)
-    ),
   updatePreferences: baseProcedure
     .input(
       z.object({
@@ -99,7 +74,9 @@ export const agentBriefingRouter = createTRPCRouter({
     .input(
       z.object({
         organizationId: z.uuid().optional(),
-        aiEnabled: z.boolean(),
+        enabled: z.boolean(),
+        timezone: timezoneSchema.optional(),
+        language: z.string().min(1).max(35).optional(),
         ...safeguardInput,
         estimateToken: z.string().optional(),
       })
@@ -110,11 +87,11 @@ export const agentBriefingRouter = createTRPCRouter({
       const model = input.model ?? current.model;
       const maxSpendMicrodollars = input.maxSpendMicrodollars ?? current.maxSpendMicrodollars;
       const maxDurationSeconds = input.maxDurationSeconds ?? current.maxDurationSeconds;
-      if (input.aiEnabled) {
+      if (input.enabled) {
         if (!input.estimateToken)
           throw new TRPCError({
             code: 'BAD_REQUEST',
-            message: 'Review the cost estimate before enabling AI',
+            message: 'Review the cost estimate before enabling scheduled summaries',
           });
         verifyBriefingEstimate(input.estimateToken, {
           userId: ctx.user.id,
@@ -122,9 +99,6 @@ export const agentBriefingRouter = createTRPCRouter({
           model,
           maxSpendMicrodollars,
           maxDurationSeconds,
-          reportId: null,
-          revision: null,
-          priorCost: 0,
         });
         const estimate = await estimateBriefingSummary(ctx.user, {
           organizationId: input.organizationId,
@@ -138,116 +112,61 @@ export const agentBriefingRouter = createTRPCRouter({
             message: estimate.unavailableReason ?? 'Summary unavailable',
           });
       }
-      const values = {
-        kilo_user_id: ctx.user.id,
-        context_key: current.context.id,
-        organization_id: input.organizationId ?? null,
-        ai_enabled: input.aiEnabled,
-        model,
-        max_spend_microdollars: maxSpendMicrodollars,
-        max_duration_seconds: maxDurationSeconds,
-      };
-      await db
-        .insert(agent_briefing_context_preferences)
-        .values(values)
-        .onConflictDoUpdate({
-          target: [
-            agent_briefing_context_preferences.kilo_user_id,
-            agent_briefing_context_preferences.context_key,
-          ],
-          set: values,
-        });
+      await db.transaction(async tx => {
+        if (input.enabled) {
+          const timezone = input.timezone ?? 'UTC';
+          await tx
+            .insert(agent_briefing_preferences)
+            .values({
+              kilo_user_id: ctx.user.id,
+              timezone,
+              language: input.language ?? 'en',
+              next_run_at: nextBriefingTime(
+                DEFAULT_BRIEFING_SCHEDULE.morningStart,
+                timezone,
+                new Date()
+              ).toISOString(),
+            })
+            .onConflictDoNothing();
+        }
+        const values = {
+          kilo_user_id: ctx.user.id,
+          context_key: current.context.id,
+          organization_id: input.organizationId ?? null,
+          enabled: input.enabled,
+          model,
+          max_spend_microdollars: maxSpendMicrodollars,
+          max_duration_seconds: maxDurationSeconds,
+        };
+        await tx
+          .insert(agent_briefing_context_preferences)
+          .values(values)
+          .onConflictDoUpdate({
+            target: [
+              agent_briefing_context_preferences.kilo_user_id,
+              agent_briefing_context_preferences.context_key,
+            ],
+            set: values,
+          });
+        if (!input.enabled) {
+          await tx
+            .update(cli_sessions_v2)
+            .set({ briefing_excerpt: null })
+            .where(
+              and(
+                eq(cli_sessions_v2.kilo_user_id, ctx.user.id),
+                input.organizationId
+                  ? eq(cli_sessions_v2.organization_id, input.organizationId)
+                  : isNull(cli_sessions_v2.organization_id)
+              )
+            );
+        }
+      });
       return getBriefingPreferences(ctx.user.id);
     }),
   estimateSummary: baseProcedure
-    .input(
-      z.object({
-        organizationId: z.uuid().optional(),
-        ...safeguardInput,
-        reportId: z.uuid().optional(),
-      })
-    )
+    .input(z.object({ organizationId: z.uuid().optional(), ...safeguardInput }))
     .query(({ ctx, input }) => estimateBriefingSummary(ctx.user, input)),
-  prepareOneOff: baseProcedure
-    .input(
-      z.object({
-        requestId: z.uuid(),
-        organizationId: z.uuid().optional(),
-        startAt: z.string().datetime({ offset: true }),
-        endAt: z.string().datetime({ offset: true }),
-        timezone: timezoneSchema,
-        language: z.string().min(1).max(35),
-      })
-    )
-    .output(z.object({ report: briefingReportSchema, estimate: briefingEstimateSchema.nullable() }))
-    .mutation(async ({ ctx, input }) => {
-      const report = await serializeBriefing(await prepareOneOffBriefing(ctx.user.id, input));
-      const estimate =
-        report.scorecard.sessions === 0
-          ? null
-          : await estimateBriefingSummary(ctx.user, {
-              organizationId: input.organizationId,
-              reportId: report.id,
-            });
-      return { report, estimate };
-    }),
-  startOneOffPreparation: baseProcedure
-    .input(
-      z.object({
-        requestId: z.uuid(),
-        organizationId: z.uuid().optional(),
-        startAt: z.string().datetime({ offset: true }),
-        endAt: z.string().datetime({ offset: true }),
-        timezone: timezoneSchema,
-        language: z.string().min(1).max(35),
-      })
-    )
-    .output(oneOffBriefingDraftSchema)
-    .mutation(async ({ ctx, input }) => {
-      const draft = await startOneOffBriefingPreparation(ctx.user.id, input);
-      if (draft.status === 'pending') after(() => runOneOffBriefingPreparation(draft.id));
-      return draft;
-    }),
-  oneOffDrafts: baseProcedure
-    .input(
-      z.object({ cursor: z.uuid().optional(), limit: z.number().int().min(1).max(100).default(20) })
-    )
-    .output(
-      z.object({ drafts: z.array(oneOffBriefingDraftSchema), nextCursor: z.string().nullable() })
-    )
-    .query(({ ctx, input }) => listOneOffBriefingDrafts(ctx.user.id, input)),
-  oneOffPreparation: baseProcedure
-    .input(reportInput)
-    .output(
-      z.object({
-        draft: oneOffBriefingDraftSchema,
-        prepared: z
-          .object({ report: briefingReportSchema, estimate: briefingEstimateSchema.nullable() })
-          .nullable(),
-      })
-    )
-    .query(async ({ ctx, input }) => {
-      const { row, draft } = await oneOffBriefingDraftRow(ctx.user.id, input.reportId);
-      if (draft.status === 'pending') after(() => runOneOffBriefingPreparation(draft.id));
-      if (draft.status !== 'ready') return { draft, prepared: null };
-      const report = await serializeBriefing(await briefingReportRow(ctx.user.id, row.id));
-      const estimate =
-        report.scorecard.sessions === 0
-          ? null
-          : await estimateBriefingSummary(ctx.user, {
-              organizationId: row.organization_id ?? undefined,
-              reportId: report.id,
-            });
-      return { draft, prepared: { report, estimate } };
-    }),
-  createOneOff: baseProcedure
-    .input(reportInput.extend({ estimateToken: z.string().optional() }))
-    .output(briefingReportSchema)
-    .mutation(async ({ ctx, input }) => {
-      const report = await createOneOffBriefing(ctx.user, input.reportId, input.estimateToken);
-      if (report.summary.status === 'pending') after(() => runBriefingSummary(report.id));
-      return report;
-    }),
   list: baseProcedure
     .input(
       z
@@ -269,63 +188,31 @@ export const agentBriefingRouter = createTRPCRouter({
   get: baseProcedure
     .input(reportInput)
     .output(briefingReportSchema)
-    .query(async ({ ctx, input }) =>
-      serializeBriefing(
-        await reconcileBriefingCharge(await briefingReportRow(ctx.user.id, input.reportId))
-      )
-    ),
+    .query(({ ctx, input }) => getBriefingReport(ctx.user.id, input.reportId)),
   read: baseProcedure.input(reportInput).mutation(async ({ ctx, input }) => {
-    await briefingReportRow(ctx.user.id, input.reportId);
+    await getBriefingReport(ctx.user.id, input.reportId);
     await db
-      .update(agent_briefing_reports)
+      .update(agent_briefing_snapshots)
       .set({ read_at: new Date().toISOString() })
       .where(
         and(
-          eq(agent_briefing_reports.id, input.reportId),
-          eq(agent_briefing_reports.kilo_user_id, ctx.user.id)
+          eq(agent_briefing_snapshots.id, input.reportId),
+          eq(agent_briefing_snapshots.kilo_user_id, ctx.user.id)
         )
       );
     return { success: true as const };
   }),
   dismiss: baseProcedure.input(reportInput).mutation(async ({ ctx, input }) => {
-    await briefingReportRow(ctx.user.id, input.reportId);
+    await getBriefingReport(ctx.user.id, input.reportId);
     await db
-      .update(agent_briefing_reports)
+      .update(agent_briefing_snapshots)
       .set({ dismissed_at: new Date().toISOString() })
       .where(
         and(
-          eq(agent_briefing_reports.id, input.reportId),
-          eq(agent_briefing_reports.kilo_user_id, ctx.user.id)
+          eq(agent_briefing_snapshots.id, input.reportId),
+          eq(agent_briefing_snapshots.kilo_user_id, ctx.user.id)
         )
       );
     return { success: true as const };
   }),
-  generateSummary: baseProcedure
-    .input(reportInput.extend({ estimateToken: z.string() }))
-    .output(briefingReportSchema)
-    .mutation(async ({ ctx, input }) => {
-      const report = await queueBriefingSummary(
-        ctx.user,
-        input.reportId,
-        input.estimateToken,
-        false
-      );
-      if (report.kind === 'one_off' && report.summary.status === 'pending')
-        after(() => runBriefingSummary(report.id));
-      return report;
-    }),
-  retrySummary: baseProcedure
-    .input(reportInput.extend({ estimateToken: z.string() }))
-    .output(briefingReportSchema)
-    .mutation(async ({ ctx, input }) => {
-      const report = await queueBriefingSummary(
-        ctx.user,
-        input.reportId,
-        input.estimateToken,
-        true
-      );
-      if (report.kind === 'one_off' && report.summary.status === 'pending')
-        after(() => runBriefingSummary(report.id));
-      return report;
-    }),
 });

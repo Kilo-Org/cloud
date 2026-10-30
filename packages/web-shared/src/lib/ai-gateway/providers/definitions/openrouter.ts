@@ -1,5 +1,6 @@
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
+import { dropThinkingBlocksOnPrefixMismatch } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/thinking-block-binding';
 
 export const OPENROUTER = {
   id: 'openrouter',
@@ -10,5 +11,11 @@ export const OPENROUTER = {
   apiKeyHeader: null,
   supportedChatApis: ['chat_completions', 'messages', 'responses'],
   responseTransforms: null,
-  async transformRequest() {},
+  async transformRequest(context) {
+    dropThinkingBlocksOnPrefixMismatch(context);
+  },
 } as const satisfies Provider;
+
+export function createUserOpenRouterProvider(apiKey: string): Provider {
+  return { ...OPENROUTER, apiKey };
+}

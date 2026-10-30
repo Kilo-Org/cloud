@@ -133,12 +133,26 @@ function pressDone(root: ReactTestInstance): void {
   });
 }
 
+/** A field stub's inline error, read from the renderer's untyped props. */
+function fieldError(root: ReactTestInstance, label: string): unknown {
+  return findAll(root, 'FormField').find(node => node.props.label === label)?.props.error;
+}
+
 // eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
-function mountSheet() {
+function mountSheet(
+  options: {
+    existingNames?: readonly string[];
+    nameConflictFromServer?: boolean;
+    saveFailure?: string | null;
+  } = {}
+) {
   return renderWithProviders(
     createElement(McpFormSheet, {
       server: null,
+      existingNames: options.existingNames ?? [],
       isSaving: false,
+      nameConflictFromServer: options.nameConflictFromServer ?? false,
+      saveFailure: options.saveFailure ?? null,
       onClose: () => {
         h.onClose();
       },
@@ -218,6 +232,51 @@ describe('McpFormSheet refused save', () => {
 
     expect(h.scrollTo).toHaveBeenCalledWith({ y: 768, animated: true });
     expect(h.onSave).not.toHaveBeenCalled();
+
+    unmount();
+  });
+
+  it('refuses a name another server already has, under the name field', async () => {
+    const { renderer, unmount } = await mountSheet({ existingNames: ['docs'] });
+    changeText(renderer.root, 'Server name', 'docs');
+    changeText(renderer.root, 'Command line', 'node server.js');
+    layoutField(renderer.root, 'Server name', 420);
+
+    pressDone(renderer.root);
+
+    expect(h.onSave).not.toHaveBeenCalled();
+    expect(fieldError(renderer.root, 'Server name')).toBe(i18n.t('profiles.mcp.nameConflict'));
+    expect(h.scrollTo).toHaveBeenCalledWith({ y: 408, animated: true });
+
+    unmount();
+  });
+
+  it('shows a name conflict the server reported on the name field', async () => {
+    const { renderer, unmount } = await mountSheet({ nameConflictFromServer: true });
+
+    expect(fieldError(renderer.root, 'Server name')).toBe(i18n.t('profiles.mcp.nameConflict'));
+
+    unmount();
+  });
+
+  it('clears a server-reported name conflict once the name changes', async () => {
+    const { renderer, unmount } = await mountSheet({ nameConflictFromServer: true });
+
+    changeText(renderer.root, 'Server name', 'another-name');
+
+    expect(fieldError(renderer.root, 'Server name')).toBeUndefined();
+
+    unmount();
+  });
+
+  it('renders a failed save inside the sheet', async () => {
+    const { renderer, unmount } = await mountSheet({
+      saveFailure: i18n.t('profiles.mcp.saveFailed'),
+    });
+
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
+      i18n.t('profiles.mcp.saveFailed')
+    );
 
     unmount();
   });

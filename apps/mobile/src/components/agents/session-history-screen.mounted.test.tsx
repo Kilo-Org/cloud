@@ -1,5 +1,5 @@
 /* eslint-disable max-lines -- test-renderer is the DOM-free renderer used to mount React/RN trees under vitest; max-lines holds the focus and foreground refetch tests beside the existing render-branch assertions in one mount test. */
-import { createElement, type ReactElement } from 'react';
+import { createElement, type ReactNode } from 'react';
 import { act, type TestRenderer } from '@/test/renderer';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -113,6 +113,7 @@ vi.mock('@/components/ui/icons', () => ({
   Check: 'Check',
   X: 'X',
   ChevronDown: 'ChevronDown',
+  Search: 'Search',
 }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
@@ -134,9 +135,10 @@ vi.mock('expo-router', () => ({
 vi.mock('@/components/agents/session-list-content', () => ({
   AgentSessionListContent: 'AgentSessionListContent',
 }));
-vi.mock('@/components/agents/session-list-header-actions', () => ({
-  SessionListHeaderActions: 'SessionListHeaderActions',
+vi.mock('@/components/agents/session-filter-button', () => ({
+  SessionFilterButton: 'SessionFilterButton',
 }));
+vi.mock('@/components/ui/icon-button', () => ({ IconButton: 'IconButton' }));
 vi.mock('@/components/agents/session-list-search-header', () => ({
   SessionListSearchHeader: 'SessionListSearchHeader',
 }));
@@ -148,7 +150,8 @@ vi.mock('@/components/agents/active-now-section', () => ({
   ActiveNowSection: 'ActiveNowSection',
 }));
 vi.mock('@/components/screen-header', () => ({
-  ScreenHeader: 'ScreenHeader',
+  ScreenHeader: (props: { inlineActions?: ReactNode }) =>
+    createElement('ScreenHeader', props, props.inlineActions),
 }));
 vi.mock('@/components/agents/use-session-search-input', () => ({
   useSessionSearchInput: () => ({
@@ -282,13 +285,11 @@ function findNodeByType(
 }
 
 function historyHeaderActions(renderer: TestRenderer.ReactTestRenderer) {
-  const header = findNodeByType(renderer, 'ScreenHeader');
-  return (
-    header.props.headerRight as ReactElement<{
-      activeFilterCount: number;
-      onOpenFilters: () => void;
-    }>
-  ).props;
+  const filter = findNodeByType(renderer, 'SessionFilterButton');
+  return {
+    activeFilterCount: filter.props.activeCount as number,
+    onOpenFilters: filter.props.onPress as () => void,
+  };
 }
 
 function applyFilters(
@@ -304,7 +305,7 @@ function applyFilters(
     (modal.props.onApply as (filters: unknown) => void)({ projectFilter, platformFilter });
     (modal.props.onClose as () => void)();
   });
-  expect(findNodesByType(renderer, 'SessionFilterModal')).toHaveLength(0);
+  expect(modal.props.visible).toBe(false);
 }
 
 function storedSessionIds(renderer: TestRenderer.ReactTestRenderer) {
@@ -426,10 +427,6 @@ describe('SessionHistoryScreen', () => {
       expect(storedSessionIds(renderer)).toEqual(step.ids);
       expect(findNodesByType(renderer, 'ScrollView')).toHaveLength(0);
       expect(findNodeByType(renderer, 'SessionListSearchHeader')).toBe(searchHeader);
-      const tree = renderer.toJSON() as TestRenderer.ReactTestRendererJSON;
-      expect(
-        tree.children.slice(0, 4).map(child => (typeof child === 'string' ? child : child.type))
-      ).toEqual(['ScreenHeader', 'View', 'SessionListSearchHeader', 'KeyboardAvoidingView']);
     }
   });
 
@@ -718,16 +715,6 @@ describe('SessionHistoryScreen', () => {
         node => node.props.accessibilityHint === 'Select account'
       )
     ).toHaveLength(1);
-    // The scope sits directly under the header, before the list body.
-    const header = findNodeByType(renderer, 'ScreenHeader');
-    const scopeControl = findNodesByType(renderer, 'Pressable').find(
-      node => node.props.accessibilityHint === 'Select account'
-    );
-    const screen = header.parent;
-    const index = screen?.children.findIndex(
-      child => typeof child !== 'string' && child.findAll(node => node === scopeControl).length > 0
-    );
-    expect(index).toBe(1);
   });
 
   // Regression: the empty state ("No past sessions") must not flash on the
@@ -774,21 +761,22 @@ describe('SessionHistoryScreen', () => {
     expect(content.props.hasAnySessions).toBe(false);
   });
 
-  it('renders the agents title with a back button and default header size', async () => {
+  it('names history and keeps back navigation available for direct entry', async () => {
     const renderer = await renderScreen();
     const header = findNodeByType(renderer, 'ScreenHeader');
 
-    expect(header.props.title).toBe(i18n.t('common.agents'));
-    expect(header.props.size).toBeUndefined();
+    expect(header.props.title).toBe(i18n.t('agents.sessionList.pastSessions'));
     expect(header.props.showBackButton).toBe(true);
+    expect(header.props.backFallback).toBe('/(app)/(tabs)/(2_agents)');
   });
 
-  it('hides the new-session header action', async () => {
+  it('does not offer new-session creation in the header', async () => {
     const renderer = await renderScreen();
-    const header = findNodeByType(renderer, 'ScreenHeader');
-    const headerRight = header.props.headerRight as ReactElement<{ showNewSession: boolean }>;
-
-    expect(headerRight.props.showNewSession).toBe(false);
+    expect(
+      findNodesByType(renderer, 'Pressable').filter(
+        node => node.props.accessibilityLabel === i18n.t('common.newSession')
+      )
+    ).toHaveLength(0);
   });
 
   it('never renders the active tray or the new-session FAB', async () => {
@@ -800,23 +788,42 @@ describe('SessionHistoryScreen', () => {
     ).toBe(0);
   });
 
-  it('keeps the search header unmounted when there are no stored rows and no active query', async () => {
-    const renderer = await renderScreen();
-
-    expect(findNodesByType(renderer, 'SessionListSearchHeader').length).toBe(0);
-  });
-
-  it('reserves the search header while the first stored page loads', async () => {
-    // Cold open: no rows yet, first page in flight. The header must occupy its
-    // final space now so the loading skeletons sit where the rows will land
-    // instead of shifting down when the header appears with the rows. The
-    // merged loading decision keys "no data yet" off `storedIsPending`.
-    listState.storedIsPending = true;
-    listState.storedLoadedPageCount = 0;
+  it('keeps search available when there are no stored rows and no active query', async () => {
     const renderer = await renderScreen();
 
     expect(findNodesByType(renderer, 'SessionListSearchHeader').length).toBe(1);
-    expect(findNodeByType(renderer, 'AgentSessionListContent').props.isLoading).toBe(true);
+  });
+
+  it('keeps the same search field and keyboard container as history loads, empties, and is searched', async () => {
+    listState.storedIsPending = true;
+    listState.storedLoadedPageCount = 0;
+    const queryClient = createTestQueryClient();
+    const renderer = await renderScreen(queryClient);
+    const searchHeader = findNodeByType(renderer, 'SessionListSearchHeader');
+    const container = findNodeByType(renderer, 'KeyboardAvoidingView');
+    for (const state of [
+      { storedIsPending: false, isSearching: false, storedSessions: [] },
+      {
+        storedIsPending: false,
+        isSearching: false,
+        storedSessions: [{ session_id: 'stored-1', organization_id: null }],
+      },
+      { storedIsPending: false, isSearching: true, storedSessions: [] },
+      { storedIsPending: false, isSearching: false, storedSessions: [] },
+    ]) {
+      Object.assign(listState, state);
+      act(() => {
+        renderer.update(
+          createElement(
+            QueryClientProvider,
+            { client: queryClient },
+            createElement(SessionHistoryScreen)
+          )
+        );
+      });
+      expect(findNodeByType(renderer, 'SessionListSearchHeader')).toBe(searchHeader);
+      expect(findNodeByType(renderer, 'KeyboardAvoidingView')).toBe(container);
+    }
   });
 
   it('mounts the search header once stored rows exist', async () => {

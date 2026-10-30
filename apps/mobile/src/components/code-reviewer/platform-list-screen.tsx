@@ -1,9 +1,10 @@
 import { useQuery } from '@tanstack/react-query';
-import { type Href, useRouter } from 'expo-router';
+import { type Href } from 'expo-router';
 import { CirclePlus, GitBranch, GitMerge, GitPullRequest, History } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { ScopeAccessDeniedScreen } from '@/components/organization/scope-access-denied-screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
@@ -49,7 +50,7 @@ function connectionSubtitle(status: {
 }
 
 export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const trpc = useTRPC();
   const isPersonal = scope === PERSONAL_SCOPE;
@@ -140,7 +141,7 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
                   subtitle={connectionSubtitle(status)}
                   last={index === platforms.length - 1}
                   onPress={() => {
-                    router.push(`/(app)/code-reviewer/${scope}/${platform}` as Href);
+                    pushOnce(`/(app)/code-reviewer/${scope}/${platform}` as Href);
                   }}
                 />
               );
@@ -157,7 +158,7 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
               icon={History}
               title={t('codeReviewer.reviewList.title')}
               onPress={() => {
-                router.push(`/(app)/code-reviewer/${scope}/reviews` as Href);
+                pushOnce(`/(app)/code-reviewer/${scope}/reviews` as Href);
               }}
             />
             <ConfigureRow
@@ -165,7 +166,7 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
               title={t('codeReviewer.manualReview.title')}
               last
               onPress={() => {
-                router.push(`/(app)/code-reviewer/${scope}/manual-review` as Href);
+                pushOnce(`/(app)/code-reviewer/${scope}/manual-review` as Href);
               }}
             />
           </View>

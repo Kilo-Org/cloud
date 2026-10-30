@@ -1,4 +1,3 @@
-import type { SandboxSessionV2 } from '../control-plane/session/session-do.js';
 import type { CloudStatusType } from '../shared/protocol.js';
 import {
   SandboxStatusSnapshotSchema,
@@ -6,8 +5,8 @@ import {
 } from '../shared/sandbox-status.js';
 import { getSandboxSessionStub } from '../sandbox-session/session-stub.js';
 import type { Env } from '../types.js';
-import { withDORetry } from '../utils/do-retry.js';
 import { logger } from '../logger.js';
+import { openSessionStreamSocket } from './session-stream-socket.js';
 import { projectPublicCloudAgentExtensionEvent } from './cloud-agent-extension-events.js';
 import {
   projectPublicStructuredPaths,
@@ -135,60 +134,23 @@ export type SystemFeedUpstreamFactory = (params: {
   onEnd: (channel: SystemFeedChannel) => void;
 }) => Promise<SystemFeedUpstream>;
 
-function parseFrame(json: string): unknown {
-  try {
-    return JSON.parse(json);
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Opens one upstream `/stream` WebSocket on the session DO. A DO may use a
- * WebSocket as a client to another DO; the returned socket is the client end.
- */
-async function openSessionStreamSocket(params: {
-  stub: DurableObjectStub<SandboxSessionV2>;
+async function openUpstream(params: {
+  env: Env;
+  userId: string;
+  cloudAgentSessionId: string;
   search: string;
   operationName: string;
   onMessage: (payload: unknown) => void;
   onEnd: () => void;
 }): Promise<SystemFeedUpstream | null> {
-  let response: Response;
-  try {
-    response = await withDORetry(
-      () => params.stub,
-      current =>
-        current.fetch(
-          new Request(`https://session.internal/stream${params.search}`, {
-            headers: { Upgrade: 'websocket' },
-          })
-        ),
-      params.operationName
-    );
-  } catch {
-    logger.withFields({ operation: params.operationName }).warn('System feed upstream open failed');
-    return null;
-  }
-  const socket = response.webSocket;
-  if (!socket) return null;
-  socket.addEventListener('message', event => {
-    if (typeof event.data !== 'string') return;
-    const payload = parseFrame(event.data);
-    if (payload !== null) params.onMessage(payload);
+  const result = await openSessionStreamSocket({
+    stub: getSandboxSessionStub(params.env, params.userId, params.cloudAgentSessionId),
+    search: params.search,
+    operationName: params.operationName,
+    onMessage: params.onMessage,
+    onEnd: params.onEnd,
   });
-  socket.addEventListener('close', () => params.onEnd());
-  socket.addEventListener('error', () => params.onEnd());
-  socket.accept();
-  return {
-    close() {
-      try {
-        socket.close(1000, 'System feed closed');
-      } catch {
-        // The socket is already closed.
-      }
-    },
-  };
+  return result.kind === 'open' ? result.socket : null;
 }
 
 /**
@@ -196,18 +158,21 @@ async function openSessionStreamSocket(params: {
  * sandbox status channel. Both are reads that never wake compute.
  */
 export const defaultSystemFeedUpstream: SystemFeedUpstreamFactory = async params => {
-  const stub = getSandboxSessionStub(params.env, params.userId, params.cloudAgentSessionId);
   const opened: SystemFeedUpstream[] = [];
   const [events, sandbox] = await Promise.all([
-    openSessionStreamSocket({
-      stub,
+    openUpstream({
+      env: params.env,
+      userId: params.userId,
+      cloudAgentSessionId: params.cloudAgentSessionId,
       search: `?eventTypes=${SYSTEM_FEED_EVENT_TYPES}`,
       operationName: 'systemFeedEvents',
       onMessage: payload => params.onFrame({ channel: 'events', payload }),
       onEnd: () => params.onEnd('events'),
     }),
-    openSessionStreamSocket({
-      stub,
+    openUpstream({
+      env: params.env,
+      userId: params.userId,
+      cloudAgentSessionId: params.cloudAgentSessionId,
       search: '?sandboxStatus=true',
       operationName: 'systemFeedSandboxStatus',
       onMessage: payload => params.onFrame({ channel: 'sandbox', payload }),

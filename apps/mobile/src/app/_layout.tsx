@@ -1,8 +1,4 @@
 /* eslint-disable max-lines -- root layout bootstrap: auth/consent/update gating, notification wiring, theme readiness gate, and Sentry error-boundary wrap are kept together */
-// Must run before the first view mounts: allowRTL(true) makes the native
-// direction known before any layout pass (see src/i18n/rtl.ts).
-// eslint-disable-next-line import/no-duplicates -- the side effect must run here, before the named import below
-import '@/i18n/rtl';
 import '../global.css';
 import '@/lib/cloud-agent-runtime';
 // Enter the local Android Live Update module's JS in the main process on both
@@ -53,6 +49,7 @@ import { AnimatedSplashOverlay } from '@/components/animated-splash-overlay';
 import { AppRootProviders } from '@/components/app-root-providers';
 import { BootstrapErrorScreen } from '@/components/bootstrap-error-screen';
 import { BootstrapLoadingSurface } from '@/components/bootstrap-loading-surface';
+import { DesignGateProbe } from '@/components/design-gate-probe';
 import { OfflineBannerSpaceGate } from '@/components/offline-banner';
 import { StateSurface } from '@/components/centered-state-surface';
 import { LanguageReloadErrorScreen } from '@/components/language-reload-error-screen';
@@ -1386,6 +1383,7 @@ function RootLayout() {
           <OfflineBannerSpaceGate>
             <AppRootProviders languageReady={languageReady}>
               <StatusBar style="auto" />
+              {__DEV__ ? <DesignGateProbe /> : null}
               <AppContentReveal>
                 <StateSurface className="flex-1">
                   <RootLayoutNav

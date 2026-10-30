@@ -140,6 +140,13 @@ function createMessage(): SecurityDismissMessage {
   };
 }
 
+function githubResponse(
+  status: number,
+  options: { headers?: Record<string, string>; body?: string } = {}
+): Response {
+  return new Response(options.body ?? null, { status, headers: options.headers });
+}
+
 describe('processSecurityFindingDismissal', () => {
   it.each(['../wrangler.jsonc', '../../git-token-service/wrangler.jsonc'])(
     'preserves custom RPC error names with the compatibility flags in %s',
@@ -166,7 +173,7 @@ describe('processSecurityFindingDismissal', () => {
 
   it('updates local finding state and audit only after upstream Dependabot dismissal succeeds', async () => {
     const { db, updates, auditRows } = createDb();
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200 }));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(githubResponse(200)));
 
     await expect(
       processSecurityFindingDismissal({
@@ -218,7 +225,7 @@ describe('processSecurityFindingDismissal', () => {
         isAdmin: true,
       },
     });
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200 }));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(githubResponse(200)));
 
     await processSecurityFindingDismissal({
       db,
@@ -248,7 +255,7 @@ describe('processSecurityFindingDismissal', () => {
         { integrations: [integration] }
       );
       const getToken = vi.fn().mockResolvedValue('github-token');
-      vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200 }));
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(githubResponse(200)));
 
       await expect(
         processSecurityFindingDismissal({
@@ -328,7 +335,7 @@ describe('processSecurityFindingDismissal', () => {
 
   it('preserves local state when upstream Dependabot dismissal fails transiently', async () => {
     const { db, updates, auditRows } = createDb();
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 503 }));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(githubResponse(503)));
 
     await expect(
       processSecurityFindingDismissal({
@@ -342,9 +349,181 @@ describe('processSecurityFindingDismissal', () => {
     expect(auditRows).toHaveLength(0);
   });
 
+  it.each([
+    ['401', 401, 'GITHUB_AUTH_INVALID'],
+    ['404', 404, 'GITHUB_ALERT_UNAVAILABLE'],
+    ['410', 410, 'GITHUB_ALERT_UNAVAILABLE'],
+    ['non-rate-limit 403', 403, 'GITHUB_DISMISSAL_PERMISSION_DENIED'],
+    ['400', 400, 'GITHUB_DISMISSAL_REQUEST_REJECTED'],
+  ] as const)(
+    'classifies GitHub %s as a terminal dismissal failure without local changes',
+    async (_name, status, resultCode) => {
+      const { db, updates, auditRows } = createDb();
+      vi.stubGlobal('fetch', vi.fn().mockResolvedValue(githubResponse(status)));
+
+      await expect(
+        processSecurityFindingDismissal({
+          db,
+          gitTokenService: { getToken: async () => 'github-token' } as GitTokenService,
+          message: createMessage(),
+        })
+      ).resolves.toMatchObject({
+        dismissed: false,
+        findingSource: 'dependabot',
+        commandStatus: 'failed',
+        resultCode,
+        lastErrorRedacted: expect.any(String),
+      });
+
+      expect(updates).toHaveLength(0);
+      expect(auditRows).toHaveLength(0);
+    }
+  );
+
+  it('explains that an unavailable alert may require restoring repository access', async () => {
+    const { db } = createDb();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(githubResponse(404)));
+
+    const result = await processSecurityFindingDismissal({
+      db,
+      gitTokenService: { getToken: async () => 'github-token' } as GitTokenService,
+      message: createMessage(),
+    });
+
+    expect(result.lastErrorRedacted).toContain('or the GitHub App cannot access it');
+    expect(result.lastErrorRedacted).toContain('not dismissed locally');
+  });
+
+  it('does not expose the GitHub response message in a terminal failure', async () => {
+    const { db } = createDb();
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        githubResponse(403, {
+          body: JSON.stringify({ message: 'body-secret-marker' }),
+        })
+      )
+    );
+
+    const result = await processSecurityFindingDismissal({
+      db,
+      gitTokenService: { getToken: async () => 'github-token' } as GitTokenService,
+      message: createMessage(),
+    });
+
+    expect(result).toMatchObject({
+      commandStatus: 'failed',
+      resultCode: 'GITHUB_DISMISSAL_PERMISSION_DENIED',
+    });
+    expect(result.lastErrorRedacted).not.toContain('body-secret-marker');
+  });
+
+  it.each([
+    ['429', 429, {}],
+    ['500', 500, {}],
+    ['503', 503, {}],
+    ['409', 409, {}],
+    ['422', 422, { body: JSON.stringify({ message: 'Validation Failed' }) }],
+    ['403 with retry-after', 403, { headers: { 'retry-after': '60' } }],
+    ['403 with exhausted primary limit', 403, { headers: { 'x-ratelimit-remaining': '0' } }],
+    [
+      '403 with a primary rate limit message',
+      403,
+      { body: JSON.stringify({ message: 'API rate limit exceeded for installation.' }) },
+    ],
+    [
+      '403 with a secondary rate limit message',
+      403,
+      { body: JSON.stringify({ message: 'You have exceeded a secondary rate limit.' }) },
+    ],
+    [
+      '403 with an abuse detection message',
+      403,
+      {
+        body: JSON.stringify({
+          message:
+            'You have triggered an abuse detection mechanism. Please wait a few minutes before you try again.',
+        }),
+      },
+    ],
+  ] as const)('retries GitHub %s', async (_name, status, options) => {
+    const { db, updates, auditRows } = createDb();
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(githubResponse(status, options)));
+
+    await expect(
+      processSecurityFindingDismissal({
+        db,
+        gitTokenService: { getToken: async () => 'github-token' } as GitTokenService,
+        message: createMessage(),
+      })
+    ).rejects.toThrow(`GitHub Dependabot dismissal failed with ${status}`);
+
+    expect(updates).toHaveLength(0);
+    expect(auditRows).toHaveLength(0);
+  });
+
+  it('retries a network failure without local changes', async () => {
+    const { db, updates, auditRows } = createDb();
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new TypeError('fetch failed')));
+
+    await expect(
+      processSecurityFindingDismissal({
+        db,
+        gitTokenService: { getToken: async () => 'github-token' } as GitTokenService,
+        message: createMessage(),
+      })
+    ).rejects.toThrow('fetch failed');
+
+    expect(updates).toHaveLength(0);
+    expect(auditRows).toHaveLength(0);
+  });
+
+  it('logs safe GitHub diagnostics without response bodies, tokens, comments, or headers', async () => {
+    const { db, updates, auditRows } = createDb();
+    const info = vi.spyOn(console, 'info').mockImplementation(() => {});
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    const message = { ...createMessage(), comment: 'customer-confidential-comment' };
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        githubResponse(403, {
+          headers: {
+            'x-github-request-id': 'request-correlation-id',
+            'x-private-header': 'header-secret-marker',
+          },
+          body: JSON.stringify({
+            message: 'You have exceeded a secondary rate limit. body-secret-marker',
+            documentation_url: 'https://docs.github.com/body-secret-marker',
+          }),
+        })
+      )
+    );
+
+    await expect(
+      processSecurityFindingDismissal({
+        db,
+        gitTokenService: { getToken: async () => 'github-token-secret' } as GitTokenService,
+        message,
+      })
+    ).rejects.toThrow('GitHub Dependabot dismissal failed with 403');
+
+    const logged = JSON.stringify([...info.mock.calls, ...warn.mock.calls, ...error.mock.calls]);
+    expect(logged).toContain('403');
+    expect(logged).toContain('request-correlation-id');
+    expect(logged).toContain('rate_limited');
+    expect(logged).not.toContain('github-token-secret');
+    expect(logged).not.toContain('customer-confidential-comment');
+    expect(logged).not.toContain('body-secret-marker');
+    expect(logged).not.toContain('header-secret-marker');
+    expect(logged).not.toContain('secondary rate limit');
+    expect(updates).toHaveLength(0);
+    expect(auditRows).toHaveLength(0);
+  });
+
   it('rolls back the local finding update when audit insert fails', async () => {
     const { db, updates, auditRows } = createDb(finding, { failAuditInsert: true });
-    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: true, status: 200 }));
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(githubResponse(200)));
 
     await expect(
       processSecurityFindingDismissal({

@@ -28,6 +28,104 @@ type FindingDismissalResult = {
   lastErrorRedacted?: string;
 };
 
+type GitHubDismissalResponseClassification =
+  | { outcome: 'succeeded' }
+  | { outcome: 'retryable'; reason: string }
+  | { outcome: 'failed'; resultCode: string; lastErrorRedacted: string };
+
+type GitHubDismissalResponseContext = {
+  commandId: string;
+  findingId: string;
+  runId: string;
+};
+
+function isRateLimitMessage(body: unknown): boolean {
+  if (typeof body !== 'object' || body === null || !('message' in body)) return false;
+  const message = body.message;
+  if (typeof message !== 'string') return false;
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes('secondary rate limit') ||
+    normalized.includes('rate limit exceeded') ||
+    normalized.includes('abuse detection')
+  );
+}
+
+async function isRateLimitedForbiddenResponse(response: Response): Promise<boolean> {
+  if (response.headers.get('retry-after')?.trim()) return true;
+  if (response.headers.get('x-ratelimit-remaining')?.trim() === '0') return true;
+  try {
+    return isRateLimitMessage(await response.json());
+  } catch {
+    return false;
+  }
+}
+
+async function classifyGitHubDismissalResponse(
+  response: Response
+): Promise<GitHubDismissalResponseClassification> {
+  if (response.ok) return { outcome: 'succeeded' };
+  if (response.status === 429) return { outcome: 'retryable', reason: 'rate_limited' };
+  if (response.status >= 500) return { outcome: 'retryable', reason: 'server_error' };
+  if (response.status === 409) return { outcome: 'retryable', reason: 'conflict' };
+  if (response.status === 422) return { outcome: 'retryable', reason: 'validation_or_abuse' };
+  if (response.status === 403) {
+    return (await isRateLimitedForbiddenResponse(response))
+      ? { outcome: 'retryable', reason: 'rate_limited' }
+      : {
+          outcome: 'failed',
+          resultCode: 'GITHUB_DISMISSAL_PERMISSION_DENIED',
+          lastErrorRedacted:
+            'GitHub denied permission to dismiss this Dependabot alert. Verify the GitHub App can write vulnerability alerts, then retry.',
+        };
+  }
+  if (response.status === 401) {
+    return {
+      outcome: 'failed',
+      resultCode: 'GITHUB_AUTH_INVALID',
+      lastErrorRedacted:
+        'GitHub authentication failed while dismissing this Dependabot alert. Re-authorize the GitHub App, then retry.',
+    };
+  }
+  if (response.status === 404 || response.status === 410) {
+    return {
+      outcome: 'failed',
+      resultCode: 'GITHUB_ALERT_UNAVAILABLE',
+      lastErrorRedacted:
+        'GitHub could not find this Dependabot alert, or the GitHub App cannot access it. The finding was not dismissed locally. Refresh findings and repository access, then retry.',
+    };
+  }
+  if (response.status === 400) {
+    return {
+      outcome: 'failed',
+      resultCode: 'GITHUB_DISMISSAL_REQUEST_REJECTED',
+      lastErrorRedacted:
+        'GitHub rejected the Dependabot dismissal request. Refresh the finding, then retry.',
+    };
+  }
+  return { outcome: 'retryable', reason: 'unclassified_status' };
+}
+
+async function reportGitHubDismissalResponse(
+  response: Response,
+  context: GitHubDismissalResponseContext
+): Promise<GitHubDismissalResponseClassification> {
+  const classification = await classifyGitHubDismissalResponse(response);
+  if (classification.outcome !== 'succeeded') {
+    console.warn('GitHub Dependabot dismissal response classified', {
+      http_status: response.status,
+      outcome: classification.outcome,
+      ...(classification.outcome === 'retryable' ? { retry_reason: classification.reason } : {}),
+      ...(classification.outcome === 'failed' ? { result_code: classification.resultCode } : {}),
+      github_request_id: response.headers.get('x-github-request-id') ?? undefined,
+      command_id: context.commandId,
+      finding_id: context.findingId,
+      run_id: context.runId,
+    });
+  }
+  return classification;
+}
+
 type FindingOwner = {
   owned_by_organization_id: string | null;
   owned_by_user_id: string | null;
@@ -365,12 +463,20 @@ export async function processSecurityFindingDismissal(params: {
         }
       );
 
-      if (!response.ok) {
+      const classification = await reportGitHubDismissalResponse(response, stageContext);
+      if (classification.outcome === 'succeeded') return null;
+      if (classification.outcome === 'retryable') {
         throw new Error(
           `GitHub Dependabot dismissal failed with ${response.status} for finding ${finding.id}`
         );
       }
-      return null;
+      return {
+        dismissed: false,
+        findingSource: finding.source,
+        commandStatus: 'failed' as const,
+        resultCode: classification.resultCode,
+        lastErrorRedacted: classification.lastErrorRedacted,
+      };
     });
     if (writeback) return writeback;
     resolvedIntegrationId = integration.id;

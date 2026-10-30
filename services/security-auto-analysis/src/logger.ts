@@ -3,6 +3,7 @@ import { WorkersLogger } from 'workers-tagged-logger';
 export type DispatcherStage =
   | 'stale_analysis_queue_reconciliation'
   | 'stale_command_reconciliation'
+  | 'stale_remediation_launch_reconciliation'
   | 'retained_command_deletion'
   | 'due_owner_discovery'
   | 'owner_queue_sends'
@@ -26,6 +27,9 @@ export type SecurityAutoAnalysisLogTags = {
   failed_running_count?: number;
   stale_accepted_command_count?: number;
   stale_running_command_count?: number;
+  requeued_stale_remediation_launch_count?: number;
+  failed_stale_remediation_launch_count?: number;
+  cancelled_stale_remediation_launch_count?: number;
   deleted_terminal_command_count?: number;
   discovered_owner_count?: number;
   enqueued_owner_message_count?: number;

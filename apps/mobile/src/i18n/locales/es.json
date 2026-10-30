@@ -984,7 +984,7 @@
       "retryMessage": "Se volverá a ejecutar la revisión de código.",
       "retryReview": "Reintentar revisión",
       "retryNeedsSettings": "El Revisor de código está desactivado o su configuración requiere atención. Corrige la configuración y luego reintenta esta revisión.",
-      "retryNotStarted": "No se pudo iniciar el reintento. La revisión no ha cambiado.",
+      "retryNotStarted": "No se pudo iniciar el reintento.",
       "fixSettings": "Corregir la configuración",
       "retryTitle": "¿Reintentar la revisión?",
       "showMore": "Mostrar más",

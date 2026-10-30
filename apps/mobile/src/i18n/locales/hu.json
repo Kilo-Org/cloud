@@ -1440,7 +1440,7 @@
       "retryMessage": "Ez újra lefuttatja a kódellenőrzést.",
       "retryReview": "Kódellenőrzés újrapróbálása",
       "retryNeedsSettings": "A Kódellenőrző ki van kapcsolva, vagy a beállításai figyelmet igényelnek. Javítsd a beállításokat, majd próbáld újra ezt a kódellenőrzést.",
-      "retryNotStarted": "Az újrapróbálás nem indult el. A kódellenőrzés változatlan maradt.",
+      "retryNotStarted": "Az újrapróbálás nem indult el.",
       "fixSettings": "Beállítások javítása",
       "couldNotLoad": "Nem sikerült betölteni a kódellenőrzést.",
       "couldNotGetLatest": "Nem sikerült lekérni a legfrissebb adatokat.",

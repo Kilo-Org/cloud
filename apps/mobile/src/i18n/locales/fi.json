@@ -1440,7 +1440,7 @@
       "retryMessage": "Tämä suorittaa koodikatselmoinnin uudelleen.",
       "retryReview": "Yritä katselmointia uudelleen",
       "retryNeedsSettings": "Koodikatselmoija on poissa käytöstä tai sen asetukset vaativat huomiota. Korjaa asetukset ja yritä sitten tätä katselmointia uudelleen.",
-      "retryNotStarted": "Uudelleenyritys ei käynnistynyt. Katselmointi on ennallaan.",
+      "retryNotStarted": "Uudelleenyritystä ei aloitettu.",
       "fixSettings": "Korjaa asetukset",
       "couldNotLoad": "Katselmointia ei voitu ladata.",
       "couldNotGetLatest": "Uusimpia tietoja ei voitu hakea.",

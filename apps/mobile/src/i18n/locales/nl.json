@@ -981,7 +981,7 @@
       "retryMessage": "Dit voert de codereview opnieuw uit.",
       "retryReview": "Review opnieuw proberen",
       "retryNeedsSettings": "De Codebeoordelaar staat uit of de instellingen vragen aandacht. Herstel de instellingen en probeer deze review daarna opnieuw.",
-      "retryNotStarted": "De nieuwe poging is niet gestart. De review is ongewijzigd.",
+      "retryNotStarted": "De nieuwe poging is niet gestart.",
       "fixSettings": "Instellingen herstellen",
       "retryTitle": "Review opnieuw proberen?",
       "showMore": "Meer tonen",

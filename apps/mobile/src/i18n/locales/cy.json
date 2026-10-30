@@ -1528,7 +1528,7 @@
       "retryMessage": "Bydd hyn yn rhedeg yr adolygiad cod eto.",
       "retryReview": "Rhoi cynnig arall ar yr adolygiad",
       "retryNeedsSettings": "Mae'r Adolygydd cod wedi'i ddiffodd neu mae angen sylw ar ei osodiadau. Trwsiwch y gosodiadau, yna rhowch gynnig arall ar yr adolygiad hwn.",
-      "retryNotStarted": "Ni chychwynnodd y cynnig arall. Nid yw'r adolygiad wedi newid.",
+      "retryNotStarted": "Ni ddechreuodd yr ail gynnig.",
       "fixSettings": "Trwsio'r gosodiadau",
       "couldNotLoad": "Ni ellid llwytho'r adolygiad.",
       "couldNotGetLatest": "Ni ellid cael y data diweddaraf.",

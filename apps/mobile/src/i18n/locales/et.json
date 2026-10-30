@@ -1440,7 +1440,7 @@
       "retryMessage": "See käivitab koodi ülevaatuse uuesti.",
       "retryReview": "Proovi ülevaatust uuesti",
       "retryNeedsSettings": "Koodiülevaataja on välja lülitatud või selle seaded vajavad tähelepanu. Paranda seaded ja proovi seejärel seda ülevaatust uuesti.",
-      "retryNotStarted": "Uuesti proovimine ei käivitunud. Ülevaatus jäi muutumatuks.",
+      "retryNotStarted": "Uuestiproovimist ei õnnestunud alustada.",
       "fixSettings": "Paranda seaded",
       "couldNotLoad": "Ülevaatust ei õnnestunud laadida.",
       "couldNotGetLatest": "Uusimaid andmeid ei õnnestunud laadida.",

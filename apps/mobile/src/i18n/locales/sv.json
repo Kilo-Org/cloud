@@ -1440,7 +1440,7 @@
       "retryMessage": "Detta kör kodgranskningen igen.",
       "retryReview": "Gör om granskningen",
       "retryNeedsSettings": "Code Reviewer är avstängd eller så behöver dess inställningar åtgärdas. Åtgärda inställningarna och gör sedan om den här granskningen.",
-      "retryNotStarted": "Omförsöket kunde inte startas. Granskningen är oförändrad.",
+      "retryNotStarted": "Omförsöket startade inte.",
       "fixSettings": "Åtgärda inställningarna",
       "couldNotLoad": "Kunde inte läsa in granskningen",
       "couldNotGetLatest": "Kunde inte hämta de senaste uppgifterna.",

@@ -1440,7 +1440,7 @@
       "retryMessage": "Ka whakahaere anō tēnei i te arotake waehere.",
       "retryReview": "Whakamātau anō i te arotake",
       "retryNeedsSettings": "Kua weto te Kaiarotake waehere, kei te hiahiatia rānei he aro ki ōna tautuhinga. Whakatikahia ngā tautuhinga, kātahi ka whakamātau anō i tēnei arotake.",
-      "retryNotStarted": "Kāore i tīmata te whakamātau anō. Kei te noho tonu te arotake.",
+      "retryNotStarted": "Kāore i tīmata te whakamātau anō.",
       "fixSettings": "Whakatikahia ngā tautuhinga",
       "couldNotLoad": "Kāore i taea te uta i te arotake.",
       "couldNotGetLatest": "Kāore i taea te tiki i ngā mōhiohio hou rawa.",

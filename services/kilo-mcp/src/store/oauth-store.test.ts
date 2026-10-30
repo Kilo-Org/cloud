@@ -1,7 +1,11 @@
 /// <reference types="node" />
 import { DatabaseSync } from 'node:sqlite';
 import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
-import { PENDING_PURGE_BATCH_SIZE, type NewPendingAuthorization } from './oauth-store';
+import {
+  PENDING_PURGE_BATCHES_PER_RUN,
+  PENDING_PURGE_BATCH_SIZE,
+  type NewPendingAuthorization,
+} from './oauth-store';
 import { getOAuthApi, type OAuthProviderOptions } from '@cloudflare/workers-oauth-provider';
 import { hashRefreshToken } from '../oauth/refresh-reuse';
 
@@ -495,6 +499,67 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       for (const statement of recorder.statements) {
         expect(statement.params.length).toBeLessThanOrEqual(100);
       }
+    });
+
+    it('finishes a set larger than one run over successive runs', async () => {
+      const cappedDb = new DatabaseSync(':memory:');
+      const recorder: FakeDoStateRecorder = { statements: [], alarms: [] };
+      const cappedState = createFakeDoState(cappedDb, recorder);
+      const cappedStore = new KiloMcpOAuthStore(cappedState as never, {} as never);
+      await cappedState.whenReady();
+      const expiredCount = PENDING_PURGE_BATCH_SIZE * (PENDING_PURGE_BATCHES_PER_RUN + 2);
+      for (let index = 0; index < expiredCount; index += 1) {
+        await cappedStore.createPendingAuthorization(
+          pendingInput({
+            id: `pa-capped-${index}`,
+            deviceAuthCode: `PAIR-CAPPED-${index}`,
+            createdAt: EXPIRED,
+            expiresAt: EXPIRED,
+          })
+        );
+      }
+      const countPending = () =>
+        Number(
+          cappedDb.prepare('SELECT count(*) AS n FROM oauth_pending_authorizations').get()?.n ?? -1
+        );
+      recorder.alarms.length = 0;
+
+      await cappedStore.alarm();
+      expect(countPending()).toBe(PENDING_PURGE_BATCH_SIZE * 2);
+      const early = recorder.alarms[0];
+      expect(early).toBeGreaterThan(Date.now() + 4 * 60 * 1000);
+      expect(early).toBeLessThan(Date.now() + 6 * 60 * 1000);
+
+      await cappedStore.alarm();
+      expect(countPending()).toBe(0);
+      expect(recorder.alarms).toHaveLength(2);
+      const periodic = recorder.alarms[1];
+      expect(periodic).toBeGreaterThan(Date.now() + 5 * 60 * 60 * 1000);
+      expect(periodic).toBeLessThan(Date.now() + 7 * 60 * 60 * 1000);
+    });
+
+    it('deletes expired history and protected-request rows on its own run', async () => {
+      const tablesDb = new DatabaseSync(':memory:');
+      const recorder: FakeDoStateRecorder = { statements: [], alarms: [] };
+      const tablesState = createFakeDoState(tablesDb, recorder);
+      const tablesStore = new KiloMcpOAuthStore(tablesState as never, {} as never);
+      await tablesState.whenReady();
+      await tablesStore.rememberRefreshToken('table-row', { userId: 'u', grantId: 'g' }, EXPIRED);
+      tablesDb
+        .prepare(
+          `INSERT INTO mcp_protected_requests
+             (id, session_id, kilo_user_id, client_id, path, kind, status, created_at, expires_at)
+           VALUES ('pr-row', 's', 'u', 'c', '/x', 'admin', 'pending', ?, ?)`
+        )
+        .run(EXPIRED, EXPIRED);
+      recorder.alarms.length = 0;
+
+      await tablesStore.alarm();
+
+      expect(
+        tablesDb.prepare('SELECT count(*) AS n FROM oauth_refresh_token_history').get()?.n
+      ).toBe(0);
+      expect(tablesDb.prepare('SELECT count(*) AS n FROM mcp_protected_requests').get()?.n).toBe(0);
     });
 
     it('sets an alarm on each run', async () => {

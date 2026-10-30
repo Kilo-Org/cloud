@@ -50,6 +50,13 @@ const PURGE_RETRY_INTERVAL_MS = 5 * 60 * 1000;
 export const PENDING_PURGE_BATCH_SIZE = 90;
 
 /**
+ * Batches one housekeeping run removes. A run stays short enough to leave the
+ * single store Durable Object responsive to the rest of the OAuth traffic; an
+ * expired set larger than this is finished by the early follow-up run.
+ */
+export const PENDING_PURGE_BATCHES_PER_RUN = 10;
+
+/**
  * Newest refresh-token hashes kept per grant. The provider accepts the current
  * and the immediately previous refresh token, so eight rotations is the margin
  * that keeps both of them — and only a bounded number of older hashes — for
@@ -349,6 +356,18 @@ export class KiloMcpOAuthStore
   }
 
   async purgeExpired(nowIso: string): Promise<number> {
+    return (await this.purgeExpiredWithProgress(nowIso)).deleted;
+  }
+
+  /**
+   * Every expired-row delete housekeeping performs, in up to
+   * `PENDING_PURGE_BATCHES_PER_RUN` batches for the pending records. Reports
+   * whether expired pending rows are left, so the caller can finish a large set
+   * over successive runs while keeping each one short.
+   */
+  private async purgeExpiredWithProgress(
+    nowIso: string
+  ): Promise<{ deleted: number; moreRemaining: boolean }> {
     this.db
       .delete(oauthRefreshTokenHistory)
       .where(lt(oauthRefreshTokenHistory.expires_at, nowIso))
@@ -357,8 +376,16 @@ export class KiloMcpOAuthStore
     // retains it. Authenticator rows are long-lived and never purged: the
     // recorded single-use step must outlive the requests it guarded.
     this.db.delete(mcpProtectedRequests).where(lt(mcpProtectedRequests.expires_at, nowIso)).run();
-    let expiredPendingAuthorizations = 0;
-    for (;;) {
+    return this.drainExpiredPending(nowIso, PENDING_PURGE_BATCHES_PER_RUN);
+  }
+
+  /** Delete expired pending-authorization rows in at most `maxBatches` batches. */
+  private async drainExpiredPending(
+    nowIso: string,
+    maxBatches: number
+  ): Promise<{ deleted: number; moreRemaining: boolean }> {
+    let deleted = 0;
+    for (let batch = 0; batch < maxBatches; batch += 1) {
       const expiredIds = this.db
         .select({ id: oauthPendingAuthorizations.id })
         .from(oauthPendingAuthorizations)
@@ -366,7 +393,7 @@ export class KiloMcpOAuthStore
         .limit(PENDING_PURGE_BATCH_SIZE)
         .all()
         .map(row => row.id);
-      if (expiredIds.length === 0) break;
+      if (expiredIds.length === 0) return { deleted, moreRemaining: false };
       this.db
         .delete(oauthPendingAuthorizations)
         .where(
@@ -376,10 +403,16 @@ export class KiloMcpOAuthStore
           )
         )
         .run();
-      expiredPendingAuthorizations += expiredIds.length;
-      if (expiredIds.length < PENDING_PURGE_BATCH_SIZE) break;
+      deleted += expiredIds.length;
+      if (expiredIds.length < PENDING_PURGE_BATCH_SIZE) return { deleted, moreRemaining: false };
     }
-    return expiredPendingAuthorizations;
+    const next = this.db
+      .select({ id: oauthPendingAuthorizations.id })
+      .from(oauthPendingAuthorizations)
+      .where(lt(oauthPendingAuthorizations.expires_at, nowIso))
+      .limit(1)
+      .all();
+    return { deleted, moreRemaining: next.length > 0 };
   }
 
   /**
@@ -790,20 +823,28 @@ export class KiloMcpOAuthStore
       .run();
   }
 
-  /** One alarm per DO: purge rows past their own expiry, then reschedule. */
+  /**
+   * One alarm per DO: purge rows past their own expiry, then reschedule. The
+   * next run is scheduled on every path: the periodic interval once no expired
+   * row is left, the early interval while more remain or the purge did not
+   * finish.
+   */
   async alarm(): Promise<void> {
+    let moreRemaining: boolean;
     try {
-      await this.purgeExpired(new Date().toISOString());
+      const progress = await this.purgeExpiredWithProgress(new Date().toISOString());
+      moreRemaining = progress.moreRemaining;
     } catch (error) {
       console.warn(
         `[kilo-mcp] oauth store housekeeping incomplete; next run scheduled shortly: ${
           error instanceof Error ? error.message : String(error)
         }`
       );
-      await this.ctx.storage.setAlarm(Date.now() + PURGE_RETRY_INTERVAL_MS);
-      return;
+      moreRemaining = true;
     }
-    await this.ctx.storage.setAlarm(Date.now() + PURGE_INTERVAL_MS);
+    await this.ctx.storage.setAlarm(
+      Date.now() + (moreRemaining ? PURGE_RETRY_INTERVAL_MS : PURGE_INTERVAL_MS)
+    );
   }
 }
 

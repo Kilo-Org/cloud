@@ -1,10 +1,10 @@
 import { connection, NextResponse } from 'next/server';
-import { MODELS_BY_PROVIDER_ADMIN_URL, modelsByProvider } from '@kilocode/db/schema';
-import { desc } from 'drizzle-orm';
+import { MODELS_BY_PROVIDER_ADMIN_URL } from '@kilocode/db/schema';
 import { readDb } from '@kilocode/web-shared/lib/drizzle';
 import { getUserFromAuth } from '@kilocode/web-shared/lib/user/server';
 import { KILO_GATEWAY_AUDIENCE } from '@kilocode/worker-utils/internal-service-token-audiences';
 import { getSnapshotModelVariantId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
+import { getModelsByProviderSnapshot } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-snapshot.server';
 import {
   isModelRouteAllowed,
   resolveOrganizationMemberModelPolicy,
@@ -13,13 +13,11 @@ import {
 export async function handleModelsByProviderRequest() {
   await connection();
 
-  const result = await readDb
-    .select()
-    .from(modelsByProvider)
-    .orderBy(desc(modelsByProvider.id))
-    .limit(1);
+  // Served from the shared snapshot cache: one database read per TTL, not one
+  // per request.
+  const snapshot = await getModelsByProviderSnapshot();
 
-  if (!result || result.length === 0) {
+  if (snapshot === null) {
     throw new Error(
       'No models data found in database. Use the admin panel at ' + MODELS_BY_PROVIDER_ADMIN_URL
     );
@@ -41,7 +39,7 @@ export async function handleModelsByProviderRequest() {
       fromDb: readDb,
     });
     const providers = [];
-    for (const provider of result[0].data.providers) {
+    for (const provider of snapshot.providers) {
       const models = [];
       for (const model of provider.models) {
         // Evaluate the variant this provider actually serves (e.g. `x/y:free`),
@@ -56,7 +54,7 @@ export async function handleModelsByProviderRequest() {
     // Per-caller body: must never populate a shared cache entry.
     return NextResponse.json(
       {
-        ...result[0].data,
+        ...snapshot,
         providers,
         total_providers: providers.length,
         total_models: providers.reduce((total, provider) => total + provider.models.length, 0),
@@ -68,7 +66,7 @@ export async function handleModelsByProviderRequest() {
   // The response now varies by authenticated organization, so a shared-cache
   // entry could otherwise be served to an org member and bypass filtering.
   // Keep this catalog per-client rather than shared (`s-maxage`).
-  return NextResponse.json(result[0].data, {
+  return NextResponse.json(snapshot, {
     headers: { 'Cache-Control': 'private, max-age=0, must-revalidate' },
   });
 }

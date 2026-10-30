@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Newidiadau",
-    "organizationTrialEnded": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol. Gall perchennog sefydliad ddiweddaru bilio ar kilo.ai, ac yna rhoi cynnig arall arni."
+    "organizationTrialEnded": "Mae treial y sefydliad wedi dod i ben ac nid oes ganddo gynllun gweithredol. Gall perchennog sefydliad ddiweddaru bilio ar kilo.ai, ac yna rhoi cynnig arall arni.",
+    "privateRepositoryA11y": "{{name}}, yn repositori preifat"
   },
   "language": {
     "restarting": "Yn ailgychwyn i newid yr iaith",
@@ -704,7 +705,12 @@
       "loading": "Yn llwytho'r blwch derbyn",
       "noReviewRequests": "Dim ceisiadau adolygu",
       "noReviewRequestsDescription": "Mae ceisiadau tynnu sy'n aros am eich adolygiad yn ymddangos yma. Gallwch barhau i ludo unrhyw ddolen PR uchod.",
-      "couldNotLoad": "Ni lwyddwyd i lwytho'r blwch derbyn."
+      "couldNotLoad": "Ni lwyddwyd i lwytho'r blwch derbyn.",
+      "accessLostTitle": "Dim mynediad i'r sefydliad hwn",
+      "accessLostDescription": "Nid ydych yn aelod o'r sefydliad hwn mwyach, felly nid oes modd llwytho'i geisiadau adolygu. Parhewch yn eich cyfrif personol i barhau i adolygu.",
+      "organizationUnavailableTitle": "Nid yw'r sefydliad hwn yn bodoli mwyach",
+      "organizationUnavailableDescription": "Dilëwyd y sefydliad hwn, felly nid oes modd llwytho'i geisiadau adolygu. Parhewch yn eich cyfrif personol i barhau i adolygu.",
+      "continueInPersonal": "Parhau yn y cyfrif personol"
     },
     "composer": {
       "commentBodyPlaceholder": "Eich sylw",
@@ -1601,7 +1607,13 @@
         "change_request_failed": "PR wedi methu",
         "superseded": "Eisoes yn bodoli"
       },
-      "noProposalsDescription": "Bydd cynigion y cof adolygu yn ymddangos yma ar ôl i Kilo ddadansoddi ymatebion y cynhalwyr."
+      "noProposalsDescription": "Bydd cynigion y cof adolygu yn ymddangos yma ar ôl i Kilo ddadansoddi ymatebion y cynhalwyr.",
+      "changeRequestInProgress": "Mae Kilo eisoes yn agor cais tynnu ar gyfer y cynnig hwn. Rhowch gynnig arall arni mewn munud.",
+      "changeRequestNotActionable": "Ni ellir cymeradwyo'r cynnig hwn mwyach. Caewch ef a diweddarwch y rhestr.",
+      "changeRequestNoGitHubAccess": "Nid oes gan unrhyw gysylltiad GitHub fynediad at y gofrestrfa hon. Ailgysylltwch GitHub gyda mynediad ati, yna rhowch gynnig arall arni.",
+      "changeRequestMissingPermissions": "Ni all ap GitHub Kilo agor ceisiadau tynnu yn y gofrestrfa hon. Rhaid i berchennog y gofrestrfa roi mynediad ysgrifennu i'r ap at gynnwys a cheisiadau tynnu, yna rhowch gynnig arall arni.",
+      "changeRequestFailed": "Ni allai Kilo agor y cais tynnu. Rhowch gynnig arall arni mewn munud.",
+      "offAction": "Mae'r cof adolygu wedi'i ddiffodd. Trowch ef ymlaen, yna rhowch gynnig arall arni."
     },
     "manualReview": {
       "title": "Adolygiad â llaw",
@@ -2036,6 +2048,7 @@
     },
     "settingsSave": {
       "saveChanges": "Cadw newidiadau",
+      "saved": "Gosodiadau wedi'u cadw",
       "unsavedTitle": "Newidiadau heb eu cadw",
       "unsavedMessage": "Cadw eich newidiadau cyn gadael y sgrin hon?",
       "unsavedInvalidMessage": "Ni ellir cadw'r newidiadau hyn eto. Trwsiwch nhw i gadw, neu eu gwaredu i adael."
@@ -2433,6 +2446,8 @@
       "couldNotLoadEnvironment": "Methu llwytho'ch amgylchedd.",
       "retryLoadingEnvironment": "Ceisio llwytho'r amgylchedd eto",
       "defaultEnvironment": "Amgylchedd diofyn",
+      "environmentAccessibility": "Dewiswch broffil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Dewiswch broffil: {{label}}. {{attention}}",
       "leaveChanges": "Gadael newidiadau",
       "commitAndPush": "Cyflwyno a gwthio",
       "startSession": "Dechrau sesiwn",
@@ -2467,7 +2482,7 @@
       "manageProfiles": "Rheoli proffiliau",
       "noProfiles": "Dim proffiliau eto. Creu un i ychwanegu newidynnau amgylchedd, gweinyddwyr MCP, a sgiliau.",
       "advancedConfig": "Ffurfweddiad Uwch",
-      "advancedConfigDescription": "Dewiswch broffil i lwytho ffurfweddiadau sydd wedi'u cadw, a ffurfweddu â llaw newidynnau amgylchedd ychwanegol a gorchmynion gosod",
+      "advancedConfigDescription": "Yn berthnasol i’r sesiwn hon. Mae cadw fel proffil yn ei gadw ar gyfer y tro nesaf.",
       "saveAsProfile": "Cadw fel Proffil",
       "saveProfileDescription": "Arbedwch y newidynnau amgylchedd cyfredol a'r gorchmynion gosod fel proffil y gellir ei ailddefnyddio.",
       "profileSummary": "{{vars}} newidynnau amgylchedd · {{commands}} gorchmynion gosod",
@@ -3139,7 +3154,9 @@
     "permissionDescription": "Nid oes gen ti ganiatâd i weld hyn.",
     "notFoundDescription": "Efallai bod yr eitem hon wedi'i thynnu neu nad yw ar gael mwyach.",
     "serverTitle": "Ni ellid llwytho'r data.",
-    "serverDescription": "Aeth rhywbeth o'i le ar ein hochr ni. Ceisiwch eto."
+    "serverDescription": "Aeth rhywbeth o'i le ar ein hochr ni. Ceisiwch eto.",
+    "timeoutTitle": "Mae'r gweinydd yn cymryd gormod o amser",
+    "timeoutDescription": "Daeth amser y cais i ben cyn iddo orffen. Ceisiwch eto."
   },
   "screenHeader": {
     "openMenu": "Agor y ddewislen",
@@ -4024,7 +4041,9 @@
     "commandsTitle": "Gosod gorchmynion",
     "addCommand": "Ychwanegu gorchymyn",
     "commandLabel": "Gorchymyn",
+    "commandLabelPosition": "Gorchymyn {{position}}",
     "commandPlaceholder": "e.e. pnpm install",
+    "commandAtLimit": "Mae'r gorchymyn wedi'i gyfyngu i {{max}} nod",
     "commandsEmpty": "Dim gorchmynion gosod eto",
     "commandsSaveFailed": "Ni fu modd cadw'r gorchmynion gosod",
     "moveUp": "Symud i fyny",
@@ -4042,6 +4061,7 @@
     "skillSaveFailed": "Methu arbed sgil",
     "skillSourceCustom": "Personol",
     "skillSourceMarketplace": "Marchnad",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Gludwch SKILL.md ac mae ei enw yn llenwi; ychwanegu sgil o'ch ffôn heb lusgo a gollwng.",
     "skillEditTitle": "Sgil golygu",
     "skillEdit": "Golygu sgil {{name}}",
@@ -4058,7 +4078,7 @@
       "url": "URL",
       "environment": "Amgylchedd (JSON)",
       "headers": "Penawdau (JSON)",
-      "timeout": "Goramser",
+      "timeout": "Terfyn amser",
       "secretCount_zero": "{{count}} cyfrinach",
       "secretCount_one": "{{count}} cyfrinach",
       "secretCount_two": "{{count}} cyfrinach",
@@ -4072,6 +4092,7 @@
       "headersHint": "Mae gwerthoedd a ddangosir fel •••• yn cadw eu cyfrinach storio; disodlwch werth i'w gylchdroi. Mae newid yr URL yn gofyn am bob gwerth eto",
       "nameRequired": "Rhowch enw gweinydd",
       "nameInvalid": "Dim ond llythrennau ASCII, rhifau, tanlinellau a llinellau toriad y gall enw eu defnyddio, hyd at 100 nod",
+      "nameConflict": "Mae gweinydd gyda'r enw hwn eisoes yn bodoli",
       "commandRequired": "Rhowch orchymyn",
       "commandTooLong": "Defnyddiwch 50 dadl ar y mwyaf, pob un yn 500 nod",
       "urlRequired": "Rhowch URL",
@@ -4091,7 +4112,7 @@
       "add": "Ychwanegu asiant",
       "empty": "Dim asiantau eto",
       "name": "Enw asiant",
-      "slug": "Gwlithen asiant",
+      "slug": "Slug asiant",
       "description": "Disgrifiad asiant",
       "model": "Diystyru'r model",
       "modelPlaceholder": "Defnyddio rhagosodiad sesiwn",
@@ -4116,8 +4137,8 @@
       "saveFailed": "Ni fu modd cadw'r asiant",
       "deleteFailed": "Ni fu modd dileu'r asiant",
       "nameRequired": "Rhowch enw asiant",
-      "slugRequired": "Rhowch wlithen asiant",
-      "slugInvalid": "Rhaid i wlithen ddechrau gyda llythyren fach ASCII a defnyddio llythrennau bach ASCII, digidau a llinellau toriad yn unig, hyd at 50 nod",
+      "slugRequired": "Rhowch slug asiant",
+      "slugInvalid": "Rhaid i’r slug ddechrau gyda llythyren fach ASCII a defnyddio llythrennau bach ASCII, digidau a llinellau toriad yn unig, hyd at 50 nod",
       "slugConflict": "Mae'r slug hwnnw eisoes yn cael ei ddefnyddio gan asiant adeiledig neu asiant arall yn y proffil hwn",
       "edit": "Golygu asiant {{name}}",
       "delete": "Dileu asiant {{name}}"
@@ -4152,7 +4173,6 @@
       "repo": "Dewiswch ystorfa…",
       "profile": "Dewiswch broffil",
       "remove": "Dadrwymo",
-      "private": "Preifat",
       "search": "Chwilio cadwrfeydd…",
       "addedToast": "Gosod proffil rhagosodedig ar gyfer \"{{repo}}\"",
       "addFailed": "Methu gosod y proffil rhagosodedig",

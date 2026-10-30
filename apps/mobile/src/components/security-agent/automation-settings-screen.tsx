@@ -2,7 +2,7 @@ import { getSettingsDirtyState } from '@kilocode/app-shared/security-agent';
 import { useEffect, useRef, useState } from 'react';
 import { Alert, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
-import { toast } from 'sonner-native';
+import { announcingToast } from '@/lib/a11y/announcing-toast';
 
 import { PillGroup } from '@/components/security-agent/settings-pill-group';
 import { SettingsSaveButton } from '@/components/security-agent/settings-save-button';
@@ -70,7 +70,9 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
   }));
   const canManage = useSecurityAgentCapability(scope).canManage;
   const config = useSecurityAgentConfig(scope);
-  const save = useSaveSecurityAgentConfig(scope);
+  // This screen announces the outcome itself: the queued count when the save
+  // schedules existing findings, the generic confirmation otherwise.
+  const save = useSaveSecurityAgentConfig(scope, { announceSaved: false });
   const trackInteraction = useTrackSecurityAgentInteraction(scope);
 
   const [autoAnalysisEnabled, setAutoAnalysisEnabled] = useState(false);
@@ -141,15 +143,15 @@ export function AutomationSettingsScreen({ scope }: Readonly<{ scope: string }>)
   const handleSave = async () => {
     const result = await save.mutateAsync(patch);
     setBaseline(previous => ({ ...previous, ...patch }));
-    if (result.existingFindingsQueuedCount) {
-      const count = result.existingFindingsQueuedCount;
-      toast.success(
-        t('securityAgent.automation.queued', {
-          count,
-          displayCount: formatNumber(count, i18n.language),
-        })
-      );
-    }
+    const queuedCount = result.existingFindingsQueuedCount;
+    announcingToast.success(
+      queuedCount
+        ? t('securityAgent.automation.queued', {
+            count: queuedCount,
+            displayCount: formatNumber(queuedCount, i18n.language),
+          })
+        : t('securityAgent.settingsSave.saved')
+    );
   };
 
   // Enabling auto-remediation is destructive: it opens PRs without a human in

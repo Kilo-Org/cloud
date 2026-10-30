@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Aldaketak",
-    "organizationTrialEnded": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Erakundearen jabe batek fakturazioa egunera dezake kilo.ai-n, eta gero berriro saiatu."
+    "organizationTrialEnded": "Erakundearen probaldia amaitu da eta ez du plan aktiborik. Erakundearen jabe batek fakturazioa egunera dezake kilo.ai-n, eta gero berriro saiatu.",
+    "privateRepositoryA11y": "{{name}}, biltegi pribatua"
   },
   "language": {
     "restarting": "Hizkuntza aplikatzeko berrabiarazten",
@@ -644,7 +645,12 @@
       "loading": "Sarrera-ontzia kargatzen",
       "noReviewRequests": "Ez dago berrikuspen-eskaerarik",
       "noReviewRequestsDescription": "Zure berrikuspenaren zain dauden bateratze-eskaerak hemen agertzen dira. Nahi duzun PR esteka ere itsats dezakezu goian.",
-      "couldNotLoad": "Ezin izan da sarrera-ontzia kargatu."
+      "couldNotLoad": "Ezin izan da sarrera-ontzia kargatu.",
+      "accessLostTitle": "Ez duzu jada erakunde honetarako sarbiderik",
+      "accessLostDescription": "Jada ez zara erakunde honetako kidea, beraz haren berrikuspen-eskaerak ezin dira kargatu. Jarraitu zure kontu pertsonalean berrikusten jarraitzeko.",
+      "organizationUnavailableTitle": "Erakunde hau jada ez da existitzen",
+      "organizationUnavailableDescription": "Erakunde hau ezabatu egin da, beraz haren berrikuspen-eskaerak ezin dira kargatu. Jarraitu zure kontu pertsonalean berrikusten jarraitzeko.",
+      "continueInPersonal": "Jarraitu kontu pertsonalean"
     },
     "composer": {
       "commentBodyPlaceholder": "Zure iruzkina",
@@ -1513,7 +1519,13 @@
         "change_request_failed": "PRak huts egin du",
         "superseded": "Dagoeneko badago"
       },
-      "noProposalsDescription": "Berrikuspen-memoriaren proposamenak hemen agertuko dira Kilok mantentzaileen erantzunak aztertu ondoren."
+      "noProposalsDescription": "Berrikuspen-memoriaren proposamenak hemen agertuko dira Kilok mantentzaileen erantzunak aztertu ondoren.",
+      "changeRequestInProgress": "Kilo dagoeneko pull request bat irekitzen ari da proposamen honetarako. Saiatu berriro une bat barru.",
+      "changeRequestNotActionable": "Proposamen hau ezin da jada onartu. Itxi eta freskatu zerrenda.",
+      "changeRequestNoGitHubAccess": "GitHub konexio batek ere ez du biltegi honetarako sarbiderik. Berraskonektatu GitHub biltegi honetarako sarbidearekin eta saiatu berriro.",
+      "changeRequestMissingPermissions": "Kiloren GitHub App-ak ezin ditu pull requestak ireki biltegi honetan. Biltegiko jabe batek eduki eta pull requestetarako idazteko baimena eman behar dio aplikazioari eta saiatu berriro.",
+      "changeRequestFailed": "Kilok ezin izan du pull requesta ireki. Saiatu berriro une bat barru.",
+      "offAction": "Berrikuspen-memoria desgaituta dago. Gaitu, eta saiatu berriro."
     },
     "manualReview": {
       "title": "Eskuzko berrikuspena",
@@ -1932,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Gorde aldaketak",
+      "saved": "Ezarpenak gorde dira",
       "unsavedTitle": "Gorde gabeko aldaketak",
       "unsavedMessage": "Aldaketak gorde nahi dituzu pantaila honetatik irten aurretik?",
       "unsavedInvalidMessage": "Aldaketa hauek ezin dira oraindik gorde. Zuzendu itzazu gordetzeko, edo baztertu irteteko."
@@ -2309,6 +2322,8 @@
       "couldNotLoadEnvironment": "Ezin izan da zure ingurunea kargatu.",
       "retryLoadingEnvironment": "Saiatu berriro ingurunea kargatzen",
       "defaultEnvironment": "Ingurune lehenetsia",
+      "environmentAccessibility": "Aukeratu profil bat: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Aukeratu profil bat: {{label}}. {{attention}}",
       "leaveChanges": "Utzi aldaketak",
       "commitAndPush": "Egin commit eta igo",
       "startSession": "Hasi saioa",
@@ -2343,7 +2358,7 @@
       "manageProfiles": "Kudeatu profilak",
       "noProfiles": "Oraindik ez dago profilik. Sortu bat ingurune-aldagaiak, MCP zerbitzariak eta trebetasunak gehitzeko.",
       "advancedConfig": "Konfigurazio aurreratua",
-      "advancedConfigDescription": "Hautatu profil bat gordetako konfigurazioak kargatzeko eta eskuz konfiguratu ingurune-aldagai gehigarriak eta konfigurazio komandoak",
+      "advancedConfigDescription": "Saio honetarako balio du. Profil gisa gordez gero, hurrengorako gordeko da.",
       "saveAsProfile": "Gorde profil gisa",
       "saveProfileDescription": "Gorde uneko ingurune-aldagaiak eta konfiguratu komandoak profil berrerabilgarri gisa.",
       "profileSummary": "{{vars}} ingurune-aldagaiak · {{commands}} konfigurazio komandoak",
@@ -2971,7 +2986,9 @@
     "permissionDescription": "Ez duzu baimenik hau ikusteko.",
     "notFoundDescription": "Baliteke elementu hau kendu izana edo jada eskuragarri ez egotea.",
     "serverTitle": "Ezin izan da kargatu.",
-    "serverDescription": "Errore bat gertatu da gure sisteman. Saiatu berriro."
+    "serverDescription": "Errore bat gertatu da gure sisteman. Saiatu berriro.",
+    "timeoutTitle": "Zerbitzariak denbora gehiegi behar du",
+    "timeoutDescription": "Eskaera amaitu aurretik iraungi da. Saiatu berriro."
   },
   "screenHeader": {
     "openMenu": "Ireki menua",
@@ -3824,7 +3841,9 @@
     "commandsTitle": "Konfiguratu komandoak",
     "addCommand": "Gehitu komandoa",
     "commandLabel": "Agindua",
+    "commandLabelPosition": "{{position}}. agindua",
     "commandPlaceholder": "adib. pnpm install",
+    "commandAtLimit": "Komandoa {{max}} karakteretara mugatuta dago",
     "commandsEmpty": "Oraindik ez dago konfigurazio komandorik",
     "commandsSaveFailed": "Ezin izan dira gorde konfigurazio komandoak",
     "moveUp": "Gora",
@@ -3842,6 +3861,7 @@
     "skillSaveFailed": "Ezin izan da trebetasuna gorde",
     "skillSourceCustom": "Pertsonalizatua",
     "skillSourceMarketplace": "Merkatua",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Itsatsi SKILL.md bat eta bere izena beteko da; gehitu trebetasun bat telefonotik arrastatu eta jaregin gabe.",
     "skillEditTitle": "Editatu trebetasuna",
     "skillEdit": "Editatu trebetasuna {{name}}",
@@ -3856,7 +3876,7 @@
       "remoteType": "Urrunekoa",
       "command": "Komando-lerroa",
       "url": "URLa",
-      "environment": "Ingurumena (JSON)",
+      "environment": "Ingurunea (JSON)",
       "headers": "Goiburuak (JSON)",
       "timeout": "Denbora-muga",
       "secretCount_one": "{{count}} sekretu",
@@ -3868,6 +3888,7 @@
       "headersHint": "•••• gisa erakutsitako balioek gordetako sekretua mantentzen dute; ordeztu balio bat biratzeko. URLa aldatzeak balio guztiak berriro eskatzen ditu",
       "nameRequired": "Sartu zerbitzariaren izena",
       "nameInvalid": "Izenak ASCII hizkiak, zenbakiak, azpimarra eta marra soilik erabil ditzake, gehienez 100 karaktere",
+      "nameConflict": "Badago izen hori duen zerbitzari bat lehendik",
       "commandRequired": "Sartu komando bat",
       "commandTooLong": "Erabili gehienez 50 argumentu, bakoitza 500 karakterekoa",
       "urlRequired": "Sartu URL bat",
@@ -3887,7 +3908,7 @@
       "add": "Gehitu agentea",
       "empty": "Agenterik ez oraindik",
       "name": "Agentearen izena",
-      "slug": "Agente barea",
+      "slug": "Agentearen slug-a",
       "description": "Agentearen deskribapena",
       "model": "Eredua gainidaztea",
       "modelPlaceholder": "Erabili saioa lehenetsia",
@@ -3912,7 +3933,7 @@
       "saveFailed": "Ezin izan da agentea gorde",
       "deleteFailed": "Ezin izan da agentea ezabatu",
       "nameRequired": "Sartu agentearen izena",
-      "slugRequired": "Sartu agente bare bat",
+      "slugRequired": "Sartu agentearen slug-a",
       "slugInvalid": "Slug-ek ASCII letra xehe batekin hasi behar du eta ASCII letra xeheak, zifrak eta marratxoak soilik erabili behar ditu, gehienez 50 karaktere",
       "slugConflict": "Slug hori dagoeneko erabiltzen du agenta integratu batek edo profil honetako beste agente batek",
       "edit": "Editatu agentea {{name}}",
@@ -3948,7 +3969,6 @@
       "repo": "Hautatu biltegia…",
       "profile": "Hautatu profila",
       "remove": "Askatu",
-      "private": "Pribatua",
       "search": "Bilatu biltegiak...",
       "addedToast": "\"{{repo}}\"-ren profil lehenetsia ezarri da",
       "addFailed": "Ezin izan da profil lehenetsia ezarri",

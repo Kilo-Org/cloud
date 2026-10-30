@@ -2,6 +2,7 @@ import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { type SecurityAnalysisCapacityState } from '@/lib/security-analysis-capacity';
 import { cn } from '@/lib/utils';
 
@@ -47,8 +48,8 @@ export function AnalysisCapacityNotice({
           accessibilityLabel={t('common.retry')}
           // React Native clips hit slop to the parent's bounds, and the notice
           // row is only as tall as its text, so the control carries the app's
-          // 44px floor itself instead of relying on a slop it cannot use.
-          className="min-h-[44px] items-center justify-center px-2"
+          // 48px floor itself instead of relying on a slop it cannot use.
+          className={cn(STATE_ACTION_CLASS, 'items-center justify-center px-2')}
         >
           <Text className="text-xs font-medium text-primary">{t('common.retry')}</Text>
         </Pressable>

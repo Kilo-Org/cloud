@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Ngā huringa",
-    "organizationTrialEnded": "Kua mutu te whakamātautau o te whakahaerenga, ā, kāore ōna mahere kaha. Ka taea e te rangatira o te whakahaerenga te whakahou i te nama i kilo.ai, kātahi ka whakamātau anō."
+    "organizationTrialEnded": "Kua mutu te whakamātautau o te whakahaerenga, ā, kāore ōna mahere kaha. Ka taea e te rangatira o te whakahaerenga te whakahou i te nama i kilo.ai, kātahi ka whakamātau anō.",
+    "privateRepositoryA11y": "{{name}}, tahua tūmataiti"
   },
   "language": {
     "restarting": "Kei te tīmata anō hei whakamahi i te reo",
@@ -644,7 +645,12 @@
       "loading": "Kei te utaina te pouakauru",
       "noReviewRequests": "Kāore he tono arotake",
       "noReviewRequestsDescription": "Ka puta i konei ngā tono kume e tatari ana kia arotakehia e koe. Ka taea tonu e koe te whakapiri i tētahi hono PR ki runga.",
-      "couldNotLoad": "Kāore i taea te uta i te pouakauru."
+      "couldNotLoad": "Kāore i taea te uta i te pouakauru.",
+      "accessLostTitle": "Kāore he uru ki tēnei rōpū",
+      "accessLostDescription": "Kāore koe he mema o tēnei rōpū ināianei, nō reira kāore e taea te uta i ōna tono arotake. Haere tonu i tō pūkete whaiaro kia haere tonu te arotake.",
+      "organizationUnavailableTitle": "Kāore tēnei rōpū e ora ana",
+      "organizationUnavailableDescription": "Kua tangohia tēnei rōpū, nō reira kāore e taea te uta i ōna tono arotake. Haere tonu i tō pūkete whaiaro kia haere tonu te arotake.",
+      "continueInPersonal": "Haere tonu i te pūkete whaiaro"
     },
     "composer": {
       "commentBodyPlaceholder": "He kōrero…",
@@ -1513,7 +1519,13 @@
         "change_request_failed": "Kāore i taea te whakatuwhera i te PR",
         "superseded": "Kei roto kē"
       },
-      "noProposalsDescription": "Ka puta ngā tono mahara arotake ki konei i muri i te tātari a Kilo i ngā whakautu a ngā kaitiaki."
+      "noProposalsDescription": "Ka puta ngā tono mahara arotake ki konei i muri i te tātari a Kilo i ngā whakautu a ngā kaitiaki.",
+      "changeRequestInProgress": "Kei te whakatuwhera kē a Kilo i tētahi PR mō tēnei tono. Whakamātauria anō ā te wā poto nei.",
+      "changeRequestNotActionable": "Kāore e taea tēnei tono te whakaae anō. Katia, whakahoungia hoki te rārangi.",
+      "changeRequestNoGitHubAccess": "Kāore he hononga GitHub e whai āheitanga ana ki tēnei pātaka. Hono anōtia a GitHub kia whai āheitanga ki a ia, kātahi ka whakamātauria anō.",
+      "changeRequestMissingPermissions": "Kāore e taea e te GitHub App a Kilo te whakatuwhera PR i tēnei pātaka. Me hoatu e te kaipupuri o te pātaka te āheitanga tuhi ki ngā ihirangi me ngā PR, kātahi ka whakamātauria anō.",
+      "changeRequestFailed": "Kāore i taea e Kilo te whakatuwhera i te PR. Whakamātauria anō ā te wā poto nei.",
+      "offAction": "Kua monoa te mahara arotake. Whakahohea, kātahi ka whakamātauria anō."
     },
     "manualReview": {
       "title": "Te arotake ā-ringa",
@@ -1932,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Tiakina ngā huringa",
+      "saved": "Kua tiakina ngā tautuhinga",
       "unsavedTitle": "Ngā huringa kāore i tiakina",
       "unsavedMessage": "Me tiaki ō huringa i mua i te wehe atu i tēnei mata?",
       "unsavedInvalidMessage": "Kāore anō ēnei huringa e taea te tiaki. Whakatikahia kia tiakina ai, whakarere rānei kia wehe atu ai."
@@ -2309,6 +2322,8 @@
       "couldNotLoadEnvironment": "Kāore i taea te uta i tō taiao.",
       "retryLoadingEnvironment": "Whakamātau anō ki te uta i te taiao",
       "defaultEnvironment": "Te taiao taunoa",
+      "environmentAccessibility": "Tīpakohia he kōtaha: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Tīpakohia he kōtaha: {{label}}. {{attention}}",
       "leaveChanges": "Waiho ngā huringa",
       "commitAndPush": "Whakapūmau, pana",
       "startSession": "Tīmataria te wātū",
@@ -2343,7 +2358,7 @@
       "manageProfiles": "Whakahaere pūkete",
       "noProfiles": "Karekau he pūkete. Waihangahia tetahi hei taapiri i nga taurangi taiao, nga tūmau MCP, me nga pukenga.",
       "advancedConfig": "Whirihoranga Arā Atu Anō",
-      "advancedConfigDescription": "Tīpakohia he kōtaha hei uta i ngā whirihoranga kua tiakina, me te whirihora ā-ringa i etahi atu taurangi taiao me nga whakahau tatūnga",
+      "advancedConfigDescription": "E hāngai ana ki tēnei wātū. Mā te tiaki hei kōtaha ka pupuri mō tērā wā.",
       "saveAsProfile": "Tiaki hei Kōtaha",
       "saveProfileDescription": "Tiakina nga taurangi taiao o naianei me nga whakahau tatūnga hei kōtaha ka taea te whakamahi.",
       "profileSummary": "{{vars}} taurangi taiao · {{commands}} whakahau tatūnga",
@@ -2971,7 +2986,9 @@
     "permissionDescription": "Kāore koe e whakaaetia kia tiro ki tēnei.",
     "notFoundDescription": "Kua tangohia pea tēnei mea, kua kore rānei e wātea.",
     "serverTitle": "Kāore i taea te uta.",
-    "serverDescription": "I puta he hapa i tō mātou taha. Whakamātau anō."
+    "serverDescription": "I puta he hapa i tō mātou taha. Whakamātau anō.",
+    "timeoutTitle": "Kua roa rawa te tūmau",
+    "timeoutDescription": "Kua taka te wā o te tono i tehe mai i tōna otinga. Whakamātau anō."
   },
   "screenHeader": {
     "openMenu": "Whakatuwheratia te tahua",
@@ -3824,7 +3841,9 @@
     "commandsTitle": "Tatūnga whakahau",
     "addCommand": "Tāpiri whakahau",
     "commandLabel": "Whakahau",
+    "commandLabelPosition": "Whakahau {{position}}",
     "commandPlaceholder": "hei tauira pnpm install",
+    "commandAtLimit": "Ka whakawhāitihia te whakahau ki te {{max}} pūāhua",
     "commandsEmpty": "Kare ano he tono tatūnga",
     "commandsSaveFailed": "Kāore i taea te tiaki i ngā tono tatūnga",
     "moveUp": "Neke ki runga",
@@ -3842,6 +3861,7 @@
     "skillSaveFailed": "Kaore i taea te penapena pukenga",
     "skillSourceCustom": "Whaiaro",
     "skillSourceMarketplace": "Mākete",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Whakapiria he SKILL.md ka whakakiia tona ingoa; taapirihia he pukenga mai i to waea me te kore toia me te maturuturu.",
     "skillEditTitle": "Pukenga whakatika",
     "skillEdit": "Whakatika pukenga {{name}}",
@@ -3858,7 +3878,7 @@
       "url": "URL",
       "environment": "Taiao (JSON)",
       "headers": "Pane (JSON)",
-      "timeout": "Wā wā",
+      "timeout": "Wā tatari",
       "secretCount_one": "{{count}} muna",
       "secretCount_other": "{{count}} muna",
       "namePlaceholder": "my-server",
@@ -3868,6 +3888,7 @@
       "headersHint": "Ka pupuri tonu ngā uara e whakaaturia ana hei •••• i tō rātou muna kua tiakina; whakakapihia tētahi uara kia hurihia ai. E hiahiatia ana ngā uara katoa ina hurihia te URL",
       "nameRequired": "Whakauruhia he ingoa tūmau",
       "nameInvalid": "Ka taea e te ingoa te whakamahi i nga reta ASCII, nga nama, nga tohu raro (_), me nga tohu (-) anake, ki te 100 pūāhua iti iho rānei",
+      "nameConflict": "Kei te noho kētia he tūmau whai tēnei ingoa",
       "commandRequired": "Whakauruhia he whakahau",
       "commandTooLong": "Whakamahia kia 50 ngā tautohe, 500 pūāhua ia",
       "urlRequired": "Whakauruhia he URL",
@@ -3875,7 +3896,7 @@
       "urlTooLong": "Kia 2048 pūāhua iti iho rānei te URL",
       "jsonInvalid": "Whakauruhia JSON whaimana - he ahanoa o nga uara aho",
       "jsonTooLarge": "Whakamahia kia 50 ngā tāurunga, kī tae atu ki 128 me ngā uara tae atu ki 4096 pūāhua",
-      "timeoutInvalid": "Ko te wa poto me he maha katoa o nga manomano",
+      "timeoutInvalid": "Ko te wā tatari me he tau katoa o ngā manomano",
       "edit": "Whakatika tūmau MCP {{name}}",
       "delete": "Muku tūmau MCP {{name}}",
       "saveFailed": "Kāore i taea te tiaki i te tūmau MCP",
@@ -3948,7 +3969,6 @@
       "repo": "Tīpakohia te rokiroki…",
       "profile": "Tīpakohia te kōtaha",
       "remove": "Wewetehia",
-      "private": "Tūmataiti",
       "search": "Rapua nga putunga…",
       "addedToast": "Kotaha taunoa kua tautuhia mo \"{{repo}}\"",
       "addFailed": "Kāore i taea te tautuhi kōtaha taunoa",

@@ -7,6 +7,7 @@ import {
 } from './notification-events';
 import { NEEDS_INPUT_ATTENTION_KINDS } from './needs-input-actions';
 import { pushDataSchema, cloudAgentSessionCategorySchema } from './push-data';
+import { refineSpendAlertScope } from './spend-alert-scope';
 
 // ── sendPushForConversation ─────────────────────────────────────────
 
@@ -358,22 +359,7 @@ export const internalDispatchSpendAlertRequestSchema = z
     thresholdUsd: z.number().nonnegative(),
     dedupeKey: z.string().min(1),
   })
-  .superRefine((data, ctx) => {
-    if (data.scope === 'organization' && data.organizationId === undefined) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['organizationId'],
-        message: 'an organization-scope alert names its organization',
-      });
-    }
-    if (data.scope === 'personal' && data.organizationId !== undefined) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['organizationId'],
-        message: 'a personal-scope alert carries no organization id',
-      });
-    }
-  });
+  .superRefine(refineSpendAlertScope);
 export type InternalDispatchSpendAlertRequest = z.infer<
   typeof internalDispatchSpendAlertRequestSchema
 >;

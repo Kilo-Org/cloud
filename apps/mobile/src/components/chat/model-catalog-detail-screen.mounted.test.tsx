@@ -12,9 +12,6 @@ import { ModelCatalogDetailScreen } from './model-catalog-detail-screen';
 const detail = vi.hoisted(() => ({ current: undefined as HfModelDetail | undefined }));
 
 vi.mock('@/lib/chat/use-hf-catalog', () => ({
-  HfRequestError: class HfRequestError extends Error {
-    readonly status = 0;
-  },
   useDeviceBudget: () => ({ memoryBytes: 8_000_000_000, freeBytes: 4_000_000_000 }),
   useHfModelDetail: () => ({ data: detail.current, isError: false, isPending: false }),
 }));

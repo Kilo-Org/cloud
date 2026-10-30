@@ -105,6 +105,16 @@ function AppWideFreshnessMount() {
   return null;
 }
 
+export const unstable_settings = {
+  // The anchor a `withAnchor` navigation into `(app)` starts from (the relaunch
+  // repair and the pending-deep-link navigator both use it). Without it those
+  // navigations build the target as the group's only route, so the restored
+  // screen has no back stack: no back control in its header and no tab to
+  // return to. `/` itself resolves straight to this anchor: it seeds the tab
+  // navigator, so the group needs no `index` redirect of its own.
+  anchor: '(tabs)',
+};
+
 export default function AppLayout() {
   const colors = useThemeColors();
   const sheetOptions = useFormSheetScreenOptions();

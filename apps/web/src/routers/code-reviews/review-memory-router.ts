@@ -27,6 +27,7 @@ import {
 } from '@/lib/code-reviews/review-memory/change-request';
 import { getAgentConfigForOwner } from '@/lib/agent-config/db/agent-configs';
 import { ORGANIZATION_BILLING_ROLES } from '@kilocode/app-shared/organizations';
+import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-reviews';
 import { ensureOrganizationAccess } from '@kilocode/web-shared/routers/organizations/utils';
 import type { OrganizationRole } from '@kilocode/web-shared/lib/organizations/organization-types';
 import { REVIEW_MEMORY_PROPOSAL_STATUSES } from '@kilocode/db/schema-types';
@@ -51,7 +52,7 @@ async function assertEnabled(owner: ReviewMemoryOwner, platform: 'github') {
   if (!(await isReviewMemoryEnabled({ owner, platform }))) {
     throw new TRPCError({
       code: 'FORBIDDEN',
-      message: 'Review memory is disabled for this platform.',
+      message: REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.review_memory_disabled,
     });
   }
 }
@@ -157,7 +158,12 @@ export const reviewMemoryRouter = createTRPCRouter({
         rationale: input.rationale,
         proposedMarkdown: input.proposedMarkdown,
       });
-      if (!proposal) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposal not found.' });
+      if (!proposal) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.proposal_not_found,
+        });
+      }
       return proposal;
     }),
 
@@ -167,7 +173,12 @@ export const reviewMemoryRouter = createTRPCRouter({
       const owner = await ownerFromInput(ctx, input, ORGANIZATION_BILLING_ROLES);
       await assertEnabled(owner, input.platform);
       const proposal = await rejectProposal({ owner, proposalId: input.proposalId });
-      if (!proposal) throw new TRPCError({ code: 'NOT_FOUND', message: 'Proposal not found.' });
+      if (!proposal) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.proposal_not_found,
+        });
+      }
       return proposal;
     }),
 

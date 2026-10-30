@@ -3051,6 +3051,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
   auto_model: text(),
   reasoning_setting: text(),
   market_cost: bigint({ mode: 'number' }),
+  non_inference_cost: bigint({ mode: 'number' }),
   is_free: boolean(),
   abuse_delay: integer(),
   abuse_downgraded_from: text(),
@@ -3106,6 +3107,7 @@ export const microdollar_usage_view = pgView('microdollar_usage_view', {
     am.auto_model,
     rs.reasoning_setting,
     meta.market_cost,
+    meta.non_inference_cost,
     meta.is_free,
     meta.abuse_delay,
     meta.abuse_downgraded_from

@@ -10,6 +10,7 @@ import {
   OrganizationIdInputSchema,
   organizationBillingMutationProcedure,
   organizationAdminMutationProcedure,
+  organizationMemberProcedure,
 } from '@kilocode/web-shared/routers/organizations/utils';
 import { listAvailableModelsProcedure } from '@kilocode/web-shared/routers/organizations/organization-available-models-procedure';
 import { TRPCError } from '@trpc/server';
@@ -22,6 +23,11 @@ import { bumpOrganizationGroupPolicyRevision } from '@kilocode/web-shared/lib/or
 import { getEffectiveModelRestrictions } from '@/lib/organizations/model-restrictions';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { db, type DrizzleTransaction } from '@kilocode/web-shared/lib/drizzle';
+import { OrganizationDataRegionSchema } from '@kilocode/db/schema-types';
+import {
+  isOrganizationFeatureEnabled,
+  readOrganizationFeatures,
+} from '@kilocode/web-shared/lib/ai-gateway/organization-features';
 import { ORG_AUTO_MODEL } from '@kilocode/web-shared/lib/ai-gateway/auto-model';
 import {
   DEFAULT_ORGANIZATION_AUTO_MODEL_SETTINGS,
@@ -309,8 +315,128 @@ const SettingsResponseSchema = z.object({
   settings: z.custom<OrganizationSettings>(),
 });
 
+const UpdateGatewaySettingsInputSchema = OrganizationIdInputSchema.extend({
+  disable_openrouter: z.boolean().optional(),
+  disable_vercel_ai_gateway: z.boolean().optional(),
+  data_region: OrganizationDataRegionSchema.nullable().optional(),
+});
+
+const GatewaySettingsResponseSchema = z.object({
+  features: z.object({
+    gateway_disable_toggles: z.boolean(),
+    data_region: z.boolean(),
+  }),
+  disable_openrouter: z.boolean(),
+  disable_vercel_ai_gateway: z.boolean(),
+  data_region: OrganizationDataRegionSchema.nullable(),
+});
+
+async function getGatewayFeatures(organizationId: string) {
+  const features = await readOrganizationFeatures(db);
+  return {
+    gateway_disable_toggles: isOrganizationFeatureEnabled(
+      features,
+      'gateway_disable_toggles',
+      organizationId
+    ),
+    data_region: isOrganizationFeatureEnabled(features, 'data_region', organizationId),
+  };
+}
+
+const DATA_REGION_NAMES = { eu: 'EU', us: 'US' } as const;
+
+function createGatewaySettingsDiffMessage(
+  oldSettings: OrganizationSettings,
+  newSettings: OrganizationSettings
+): string {
+  const changes: string[] = [];
+  if (!!oldSettings.disable_openrouter !== !!newSettings.disable_openrouter) {
+    changes.push(`OpenRouter ${newSettings.disable_openrouter ? 'disabled' : 'enabled'}`);
+  }
+  if (!!oldSettings.disable_vercel_ai_gateway !== !!newSettings.disable_vercel_ai_gateway) {
+    changes.push(
+      `Vercel AI Gateway ${newSettings.disable_vercel_ai_gateway ? 'disabled' : 'enabled'}`
+    );
+  }
+  if ((oldSettings.data_region ?? null) !== (newSettings.data_region ?? null)) {
+    changes.push(
+      `Data region: ${newSettings.data_region ? DATA_REGION_NAMES[newSettings.data_region] : 'Global'}`
+    );
+  }
+  return changes.length > 0
+    ? `Updated gateway settings: ${changes.join('; ')}`
+    : 'Updated gateway settings: no changes';
+}
+
 export const organizationsSettingsRouter = createTRPCRouter({
   listAvailableModels: listAvailableModelsProcedure,
+
+  getGatewaySettings: organizationMemberProcedure
+    .output(GatewaySettingsResponseSchema)
+    .query(async ({ input }) => {
+      const organization = await getOrganizationById(input.organizationId);
+      if (!organization) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Organization not found' });
+      }
+      return {
+        features: await getGatewayFeatures(input.organizationId),
+        disable_openrouter: organization.settings.disable_openrouter ?? false,
+        disable_vercel_ai_gateway: organization.settings.disable_vercel_ai_gateway ?? false,
+        data_region: organization.settings.data_region ?? null,
+      };
+    }),
+
+  updateGatewaySettings: organizationAdminMutationProcedure
+    .input(UpdateGatewaySettingsInputSchema)
+    .output(SettingsResponseSchema)
+    .mutation(async ({ input, ctx }) => {
+      const { organizationId, disable_openrouter, disable_vercel_ai_gateway, data_region } = input;
+      const features = await getGatewayFeatures(organizationId);
+      const changesGatewayToggles =
+        disable_openrouter !== undefined || disable_vercel_ai_gateway !== undefined;
+      if (
+        (changesGatewayToggles && !features.gateway_disable_toggles) ||
+        (data_region !== undefined && !features.data_region)
+      ) {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'This gateway setting is not available for this organization.',
+        });
+      }
+
+      const updatedSettings = await db.transaction(async tx => {
+        let previousSettings: OrganizationSettings = {};
+        const settings = await mutateOrganizationSettings(
+          organizationId,
+          async organization => {
+            previousSettings = organization.settings;
+            const settingsUpdate: OrganizationSettings = { ...organization.settings };
+            if (disable_openrouter !== undefined) {
+              settingsUpdate.disable_openrouter = disable_openrouter;
+            }
+            if (disable_vercel_ai_gateway !== undefined) {
+              settingsUpdate.disable_vercel_ai_gateway = disable_vercel_ai_gateway;
+            }
+            if (data_region !== undefined) {
+              settingsUpdate.data_region = data_region;
+            }
+            return settingsUpdate;
+          },
+          tx
+        );
+        await createAuditLog({
+          action: 'organization.settings.change',
+          actor_email: ctx.user.google_user_email,
+          actor_id: ctx.user.id,
+          actor_name: ctx.user.google_user_name,
+          message: createGatewaySettingsDiffMessage(previousSettings, settings),
+          organization_id: organizationId,
+          tx,
+        });
+        return settings;
+      });
+      return { settings: updatedSettings };
+    }),
 
   updateAllowLists: organizationAdminMutationProcedure
     .input(UpdateAllowListsInputSchema)

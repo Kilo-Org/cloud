@@ -3,6 +3,8 @@ import {
   GatewayRoutingConfigSchema,
   GatewayConfigSchema,
   GatewayConfigInputSchema,
+  GatewayOrganizationFeaturesConfigSchema,
+  OrganizationFeaturesInputSchema,
   NOTE_MAX_LENGTH,
   VERCEL_ROUTING_OPT_OUT_MODEL_MAX_LENGTH,
   VERCEL_ROUTING_OPT_OUT_MODELS_MAX_COUNT,
@@ -226,5 +228,51 @@ describe('GatewayConfigInputSchema', () => {
     expect(
       GatewayRoutingConfigSchema.parse(JSON.parse(storedJson)).vercel_routing_opt_out_models
     ).toEqual(['moonshotai/kimi-k3', 'openai/gpt-6']);
+  });
+});
+
+describe('GatewayOrganizationFeaturesConfigSchema', () => {
+  test('enables no feature for a configuration without organization features', () => {
+    expect(
+      GatewayOrganizationFeaturesConfigSchema.parse({ vercel_routing_enabled: true })
+        .organization_features
+    ).toEqual({ experimental_byok: [], gateway_disable_toggles: [], data_region: [] });
+  });
+
+  test('fills features missing from a saved configuration', () => {
+    expect(
+      GatewayOrganizationFeaturesConfigSchema.parse({
+        organization_features: { experimental_byok: ['00000000-0000-4000-8000-000000000001'] },
+      }).organization_features
+    ).toEqual({
+      experimental_byok: ['00000000-0000-4000-8000-000000000001'],
+      gateway_disable_toggles: [],
+      data_region: [],
+    });
+  });
+});
+
+describe('OrganizationFeaturesInputSchema', () => {
+  test('lowercases and deduplicates organization IDs', () => {
+    expect(
+      OrganizationFeaturesInputSchema.parse({
+        experimental_byok: [
+          '9D278969-5453-4AE3-A51F-A8D2274A7B56',
+          '9d278969-5453-4ae3-a51f-a8d2274a7b56',
+        ],
+        gateway_disable_toggles: [],
+        data_region: [],
+      }).experimental_byok
+    ).toEqual(['9d278969-5453-4ae3-a51f-a8d2274a7b56']);
+  });
+
+  test('rejects an entry that is not an organization ID', () => {
+    expect(
+      OrganizationFeaturesInputSchema.safeParse({
+        experimental_byok: ['kilo'],
+        gateway_disable_toggles: [],
+        data_region: [],
+      }).success
+    ).toBe(false);
   });
 });

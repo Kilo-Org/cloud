@@ -43,6 +43,9 @@ import {
 import { getOfferingPricing } from '@/components/organizations/providers-and-models/offeringPricing';
 import { useCustomPricingConfig } from '@/components/organizations/providers-and-models/useCustomPricingConfig';
 import { canManageOrganization } from '@kilocode/app-shared/organizations';
+import { useQuery } from '@tanstack/react-query';
+import { useTRPC } from '@/lib/trpc/utils';
+import { GatewaysTab } from '@/components/organizations/providers-and-models/GatewaysTab';
 
 type Props = {
   organizationId: string;
@@ -115,6 +118,16 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
   const availableModels = useOrganizationAvailableModels(organizationId, {
     enabled: organizationData?.plan === 'enterprise',
   });
+  const trpc = useTRPC();
+  const { data: gatewaySettings } = useQuery(
+    trpc.organizations.settings.getGatewaySettings.queryOptions(
+      { organizationId },
+      { enabled: organizationData?.plan === 'enterprise' }
+    )
+  );
+  const showGatewaysTab =
+    gatewaySettings !== undefined &&
+    (gatewaySettings.features.gateway_disable_toggles || gatewaySettings.features.data_region);
   const {
     models: openRouterModels,
     providers: openRouterProviders,
@@ -490,6 +503,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
             <TabsTrigger value="models">Models</TabsTrigger>
             <TabsTrigger value="providers">Providers</TabsTrigger>
             <TabsTrigger value="auto-routing">Auto routing</TabsTrigger>
+            {showGatewaysTab && <TabsTrigger value="gateways">Gateways</TabsTrigger>}
           </TabsList>
 
           <TabsContent value="models" className="mt-6">
@@ -542,6 +556,16 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
             <AutoRoutingModeCard organizationId={organizationId} readonly={!canEditAutoRouting} />
             <CustomRoutersCard organizationId={organizationId} readonly={!canEditAutoRouting} />
           </TabsContent>
+
+          {showGatewaysTab && (
+            <TabsContent value="gateways" className="mt-6">
+              <GatewaysTab
+                organizationId={organizationId}
+                canEdit={canEdit}
+                settings={gatewaySettings}
+              />
+            </TabsContent>
+          )}
         </Tabs>
 
         <ModelDetailsDialog

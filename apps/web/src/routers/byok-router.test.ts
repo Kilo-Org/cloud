@@ -30,6 +30,7 @@ import { createTestOrganization } from '@kilocode/web-shared/tests/helpers/organ
 import { addUserToOrganization } from '@kilocode/web-shared/lib/organizations/organizations';
 import { db } from '@kilocode/web-shared/lib/drizzle';
 import {
+  ai_gateway_config,
   byok_api_keys,
   coding_plan_key_inventory,
   coding_plan_subscriptions,
@@ -1376,19 +1377,30 @@ describe('BYOK Router', () => {
   });
 
   describe('direct cloud providers', () => {
-    const originalTargetEnv = process.env.VERCEL_TARGET_ENV;
+    async function enableExperimentalByok(organizationIds: string[]) {
+      await db
+        .insert(ai_gateway_config)
+        .values({ config: { organization_features: { experimental_byok: organizationIds } } })
+        .onConflictDoUpdate({
+          target: ai_gateway_config.id,
+          set: { config: { organization_features: { experimental_byok: organizationIds } } },
+        });
+    }
 
-    afterEach(() => {
-      if (originalTargetEnv === undefined) delete process.env.VERCEL_TARGET_ENV;
-      else process.env.VERCEL_TARGET_ENV = originalTargetEnv;
+    afterEach(async () => {
+      await db.delete(ai_gateway_config).where(eq(ai_gateway_config.id, 1));
     });
 
-    test('creates direct Bedrock and Vertex keys outside production', async () => {
+    test('creates direct Bedrock and Vertex keys for an organization with the feature', async () => {
+      await enableExperimentalByok([organizationA.id]);
       const caller = await createCallerForUser(ownerUser.id);
 
-      await expect(caller.byok.experimentalByokEnabled({})).resolves.toBe(true);
+      await expect(
+        caller.byok.experimentalByokEnabled({ organizationId: organizationA.id })
+      ).resolves.toBe(true);
       await expect(
         caller.byok.create({
+          organizationId: organizationA.id,
           provider_id: 'bedrock-byok',
           api_key: JSON.stringify(BEDROCK_IAM_CREDENTIALS),
         })
@@ -1408,24 +1420,39 @@ describe('BYOK Router', () => {
     });
 
     test('rejects malformed direct cloud credentials', async () => {
+      await enableExperimentalByok([organizationA.id]);
       const caller = await createCallerForUser(ownerUser.id);
 
       await expect(
-        caller.byok.create({ provider_id: 'bedrock-byok', api_key: '{"accessKeyId":"AKIA"}' })
+        caller.byok.create({
+          organizationId: organizationA.id,
+          provider_id: 'bedrock-byok',
+          api_key: '{"accessKeyId":"AKIA"}',
+        })
       ).rejects.toThrow('Invalid credentials for provider: bedrock-byok');
       await expect(
-        caller.byok.create({ provider_id: 'vertex-byok', api_key: '{"project_id":"p"}' })
+        caller.byok.create({
+          organizationId: organizationA.id,
+          provider_id: 'vertex-byok',
+          api_key: '{"project_id":"p"}',
+        })
       ).rejects.toThrow('Invalid credentials for provider: vertex-byok');
     });
 
-    test('rejects direct cloud keys in production outside the Kilo organization', async () => {
-      process.env.VERCEL_TARGET_ENV = 'production';
+    test('rejects direct cloud keys for personal accounts and organizations without the feature', async () => {
+      await enableExperimentalByok([organizationB.id]);
       const caller = await createCallerForUser(ownerUser.id);
 
       await expect(caller.byok.experimentalByokEnabled({})).resolves.toBe(false);
       await expect(
         caller.byok.experimentalByokEnabled({ organizationId: organizationA.id })
       ).resolves.toBe(false);
+      await expect(
+        caller.byok.create({
+          provider_id: 'bedrock-byok',
+          api_key: JSON.stringify(BEDROCK_IAM_CREDENTIALS),
+        })
+      ).rejects.toThrow('Provider bedrock-byok is not available yet.');
       await expect(
         caller.byok.create({
           organizationId: organizationA.id,

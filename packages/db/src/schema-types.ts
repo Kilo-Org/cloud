@@ -1360,6 +1360,9 @@ export type OrganizationMcpConnectTarget =
   | { kind: 'remote'; url: string }
   | { kind: 'package'; ecosystem: 'npm' | 'pypi'; identifier: string };
 
+export const OrganizationDataRegionSchema = z.enum(['eu', 'us']);
+export type OrganizationDataRegion = z.infer<typeof OrganizationDataRegionSchema>;
+
 const OrganizationSettingsSchema = z.object({
   provider_allow_list: z.array(z.string()).optional(),
 
@@ -1404,6 +1407,11 @@ const OrganizationSettingsSchema = z.object({
   kilo_encrypt: z.boolean().optional(),
   enkrypt: OrganizationEnkryptSettingsSchema.optional(),
   guardrails: OrganizationGuardrailsSettingsSchema.optional(),
+  // Apply only while the `gateway_disable_toggles` organization feature is enabled in the gateway configuration
+  disable_openrouter: z.boolean().optional(),
+  disable_vercel_ai_gateway: z.boolean().optional(),
+  // Applies only while the `data_region` organization feature is enabled; null or absent routes globally
+  data_region: OrganizationDataRegionSchema.nullable().optional(),
 });
 
 export type OrganizationSettings = z.infer<typeof OrganizationSettingsSchema>;

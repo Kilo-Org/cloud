@@ -75,4 +75,56 @@ describe('adminGatewayConfigRouter', () => {
     ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
     expect(await db.select().from(ai_gateway_config)).toEqual([]);
   });
+
+  it('keeps organization features when the routing configuration is saved', async () => {
+    const caller = await createCallerForUser(admin.id);
+    const organizationId = '00000000-0000-4000-8000-000000000001';
+
+    await caller.admin.gatewayConfig.setOrganizationFeatures({
+      experimental_byok: [organizationId.toUpperCase()],
+      gateway_disable_toggles: [],
+      data_region: [organizationId],
+    });
+    await caller.admin.gatewayConfig.set(input);
+
+    await expect(caller.admin.gatewayConfig.getOrganizationFeatures()).resolves.toEqual({
+      experimental_byok: [organizationId],
+      gateway_disable_toggles: [],
+      data_region: [organizationId],
+    });
+    await expect(caller.admin.gatewayConfig.get()).resolves.toMatchObject({
+      vercel_routing_enabled: false,
+      vercel_routing_opt_out_models: normalizedOptOutModels,
+    });
+  });
+
+  it('keeps the routing configuration when organization features are saved', async () => {
+    const caller = await createCallerForUser(admin.id);
+
+    await caller.admin.gatewayConfig.set(input);
+    await caller.admin.gatewayConfig.setOrganizationFeatures({
+      experimental_byok: [],
+      gateway_disable_toggles: ['00000000-0000-4000-8000-000000000001'],
+      data_region: [],
+    });
+
+    await expect(caller.admin.gatewayConfig.get()).resolves.toMatchObject({
+      vercel_routing_enabled: false,
+      vercel_routing_opt_out_models: normalizedOptOutModels,
+      note: 'Holding opt-outs',
+    });
+  });
+
+  it('rejects an organization feature entry that is not an organization ID', async () => {
+    const caller = await createCallerForUser(admin.id);
+
+    await expect(
+      caller.admin.gatewayConfig.setOrganizationFeatures({
+        experimental_byok: ['not-an-id'],
+        gateway_disable_toggles: [],
+        data_region: [],
+      })
+    ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    expect(await db.select().from(ai_gateway_config)).toEqual([]);
+  });
 });

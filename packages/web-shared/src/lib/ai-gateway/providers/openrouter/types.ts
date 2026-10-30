@@ -45,6 +45,8 @@ export type VercelProviderConfig = {
     // https://vercel.com/docs/ai-gateway/models-and-providers/session-affinity
     sessionId?: string;
     sessionAffinity?: boolean;
+    // https://vercel.com/docs/ai-gateway/security-and-compliance/regional-inference
+    inferenceRegion?: { scope: 'zone'; geoRegion: 'us' | 'eu' | 'au' | 'jp' } | { scope: 'global' };
   };
   anthropic?: AnthropicProviderOptions;
 };

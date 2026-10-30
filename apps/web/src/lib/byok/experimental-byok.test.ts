@@ -1,31 +1,31 @@
 import { afterEach, describe, expect, test } from '@jest/globals';
-import { KILO_ORGANIZATION_ID } from '@kilocode/web-shared/lib/organizations/constants';
+import { ai_gateway_config } from '@kilocode/db/schema';
+import { db } from '@kilocode/web-shared/lib/drizzle';
+import { eq } from 'drizzle-orm';
 import { isExperimentalByokEnabled } from './experimental-byok';
 
-describe('isExperimentalByokEnabled', () => {
-  const originalTargetEnv = process.env.VERCEL_TARGET_ENV;
+const enabledOrganizationId = '00000000-0000-4000-8000-000000000001';
+const otherOrganizationId = '00000000-0000-4000-8000-000000000002';
 
-  afterEach(() => {
-    if (originalTargetEnv === undefined) delete process.env.VERCEL_TARGET_ENV;
-    else process.env.VERCEL_TARGET_ENV = originalTargetEnv;
+describe('isExperimentalByokEnabled', () => {
+  afterEach(async () => {
+    await db.delete(ai_gateway_config).where(eq(ai_gateway_config.id, 1));
   });
 
-  test.each([undefined, 'preview', 'staging', 'development'])(
-    'is available to everyone when the target environment is %s',
-    targetEnv => {
-      if (targetEnv === undefined) delete process.env.VERCEL_TARGET_ENV;
-      else process.env.VERCEL_TARGET_ENV = targetEnv;
+  test('is unavailable when the gateway configuration does not exist', async () => {
+    await expect(isExperimentalByokEnabled(enabledOrganizationId)).resolves.toBe(false);
+  });
 
-      expect(isExperimentalByokEnabled(undefined)).toBe(true);
-      expect(isExperimentalByokEnabled('00000000-0000-4000-8000-000000000001')).toBe(true);
-    }
-  );
+  test('is available only to organizations listed for the feature', async () => {
+    await db.insert(ai_gateway_config).values({
+      config: { organization_features: { experimental_byok: [enabledOrganizationId] } },
+    });
 
-  test('is available only to the Kilo organization in production', () => {
-    process.env.VERCEL_TARGET_ENV = 'production';
-
-    expect(isExperimentalByokEnabled(KILO_ORGANIZATION_ID)).toBe(true);
-    expect(isExperimentalByokEnabled('00000000-0000-4000-8000-000000000001')).toBe(false);
-    expect(isExperimentalByokEnabled(undefined)).toBe(false);
+    await expect(isExperimentalByokEnabled(enabledOrganizationId)).resolves.toBe(true);
+    await expect(isExperimentalByokEnabled(enabledOrganizationId.toUpperCase())).resolves.toBe(
+      true
+    );
+    await expect(isExperimentalByokEnabled(otherOrganizationId)).resolves.toBe(false);
+    await expect(isExperimentalByokEnabled(undefined)).resolves.toBe(false);
   });
 });

@@ -241,6 +241,7 @@ export async function resolveGcpVertexUpstream(
 
 export default {
   id: 'vertex-byok',
+  openrouter_inference_provider_id: 'google-vertex',
   models_dev_id: 'google-vertex',
   transformRequest(context) {
     const { request } = context;

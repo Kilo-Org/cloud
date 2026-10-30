@@ -71,6 +71,8 @@ import {
 import { parseAwsBedrockCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/bedrock-byok';
 import { parseGcpVertexCredentials } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/vertex-byok';
 import { isExperimentalByokEnabled } from '@/lib/byok/experimental-byok';
+import { getDirectByokPolicyProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/policy-providers';
+import { getModelsByProviderSnapshot } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-snapshot.server';
 
 const GENERIC_TEST_FAILURE_MESSAGE = 'API key test failed. Check the credential and try again.';
 const KEY_DECRYPTION_FAILURE_MESSAGE =
@@ -127,7 +129,7 @@ type BYOKKeyRow = Omit<
 > & { settings: unknown };
 
 /**
- * Catalog mode decides whether organization model policies apply to the key, so on organization
+ * Catalog mode decides whether organization model and provider policies apply to the key, so on organization
  * keys only the roles that edit those policies may change it.
  */
 function canChangeCatalogMode(organizationRole: OrganizationRole | null) {
@@ -261,6 +263,12 @@ export const byokRouter = createTRPCRouter({
   listCatalogModeSupportedModels: baseProcedure
     .output(z.record(z.string(), z.array(z.string())))
     .query(fetchCatalogModeSupportedModels),
+
+  /** Direct BYOK providers the provider policy screens list beside the models-by-provider snapshot. */
+  listPolicyProviders: baseProcedure.query(async () => {
+    const snapshot = await getModelsByProviderSnapshot();
+    return snapshot ? await getDirectByokPolicyProviders(snapshot) : [];
+  }),
 
   /** Whether keys for experimental BYOK providers, currently direct Amazon Bedrock and Google Vertex AI, can be added. */
   experimentalByokEnabled: baseProcedure

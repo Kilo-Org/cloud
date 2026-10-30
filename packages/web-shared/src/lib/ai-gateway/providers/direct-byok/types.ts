@@ -7,6 +7,7 @@ import type {
   TransformRequestContext,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 import type { DirectByokModel, OpenRouterProvider } from '@kilocode/db/schema-types';
+import type { OpenRouterInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 
 export {
   DirectByokModelFlagSchema,
@@ -17,9 +18,9 @@ export {
 } from '@kilocode/db/schema-types';
 
 /**
- * Entry for the `/api/v1/providers` list, named after `DIRECT_BYOK_PROVIDERS_META`.
- * Data policy flags describe the whole request path, including any upstream
- * providers the service routes to.
+ * Entry for the `/api/v1/providers` list and the provider policy screens, named after
+ * `DIRECT_BYOK_PROVIDERS_META`. Data policy flags describe the whole request path, including any
+ * upstream providers the service routes to.
  */
 export type DirectByokProviderListing = {
   dataPolicy: Required<OpenRouterProvider['dataPolicy']>;
@@ -52,8 +53,6 @@ type DirectByokProviderBase = {
   models_dev_id?: string;
   models: () => Promise<ReadonlyArray<DirectByokModel>>;
   transformRequest(context: TransformRequestContext): void;
-  /** Omitted when the general provider list already has a corresponding provider. */
-  provider_listing?: DirectByokProviderListing;
   /**
    * Builds the upstream for a request from the stored credential. Most providers
    * use `apiKeyUpstream`; cloud providers can derive regions or signed requests.
@@ -63,10 +62,27 @@ type DirectByokProviderBase = {
 };
 
 /**
+ * The provider that organization provider allow-lists name for this service. A provider the
+ * general provider list already has names it; any other provider gets its own listing under its
+ * id, so allow-lists can name every direct BYOK provider.
+ */
+type DirectByokProviderPolicyName =
+  | {
+      /** The general provider list entry for the same service. */
+      openrouter_inference_provider_id: OpenRouterInferenceProviderId;
+      provider_listing?: undefined;
+    }
+  | {
+      openrouter_inference_provider_id?: undefined;
+      provider_listing: DirectByokProviderListing;
+    };
+
+/**
  * The chat APIs are known without the credential, so routing can choose between keys, and the
  * BYOK routing preview can explain the choice, without decrypting any key.
  */
 export type DirectByokProvider = DirectByokProviderBase &
+  DirectByokProviderPolicyName &
   (
     | {
         /** The chat APIs the upstream serves every model over. */

@@ -13,6 +13,7 @@ import {
   type OpenRouterModel,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import * as z from 'zod';
+import { useTRPC } from '@/lib/trpc/utils';
 import {
   organizationModelsPath,
   type OrganizationModelAudience,
@@ -134,7 +135,13 @@ export function useModelSelectorList(
   };
 }
 
+/**
+ * The models-by-provider snapshot, plus the direct BYOK providers that provider allow-lists can
+ * name although the snapshot lacks them.
+ */
 export function useOpenRouterModelsAndProviders() {
+  const trpc = useTRPC();
+  const directByokProvidersQuery = useQuery(trpc.byok.listPolicyProviders.queryOptions());
   const query = useQuery({
     queryKey: ['openrouter-models-and-providers'],
     queryFn: async (): Promise<Pick<OpenRouterData, 'providers'>> => {
@@ -150,12 +157,21 @@ export function useOpenRouterModelsAndProviders() {
     },
   });
 
+  const allProviders = useMemo(() => {
+    if (!query.data) return [];
+    const snapshotSlugs = new Set(query.data.providers.map(provider => provider.slug));
+    return [
+      ...query.data.providers,
+      ...(directByokProvidersQuery.data ?? []).filter(
+        provider => !snapshotSlugs.has(provider.slug)
+      ),
+    ];
+  }, [query.data, directByokProvidersQuery.data]);
+
   // Extract providers and models from the simplified structure
   const providers = useMemo((): OpenRouterProvider[] => {
-    if (!query.data) return [];
-
     // Convert the simplified provider structure to the expected OpenRouterProvider format
-    return query.data.providers.map(provider => ({
+    return allProviders.map(provider => ({
       name: provider.name,
       displayName: provider.displayName,
       slug: provider.slug,
@@ -177,7 +193,7 @@ export function useOpenRouterModelsAndProviders() {
       ignoredProviderModels: [],
       models: provider.models, // Include all models, filtering will happen in the UI hook
     }));
-  }, [query.data]);
+  }, [allProviders]);
 
   // Extract all models from all providers for backward compatibility (only models with endpoints)
   const models = useMemo((): OpenRouterModel[] => {
@@ -202,7 +218,8 @@ export function useOpenRouterModelsAndProviders() {
   return {
     models,
     providers,
-    isLoading: query.isLoading,
-    error: query.error,
+    // An allow-list initialized before the direct BYOK providers load would leave them out.
+    isLoading: query.isLoading || directByokProvidersQuery.isLoading,
+    error: query.error ?? directByokProvidersQuery.error,
   };
 }

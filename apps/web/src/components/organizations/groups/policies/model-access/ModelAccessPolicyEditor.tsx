@@ -277,7 +277,8 @@ export function ModelAccessPolicyEditor({
           </Tabs>
         )}
         <p className="type-label text-muted-foreground">
-          Direct BYOK models remain available organization-wide.
+          Direct BYOK models with a provider prefix remain available organization-wide. Keys that
+          use Kilo catalog model IDs follow this policy.
         </p>
       </div>
       <PolicyEditorFooter

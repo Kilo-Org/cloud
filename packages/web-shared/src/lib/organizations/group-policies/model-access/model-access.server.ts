@@ -11,6 +11,7 @@ import { and, desc, eq, isNull } from 'drizzle-orm';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { normalizeInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
+import { withDirectByokPolicyProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/policy-providers';
 import {
   VIRTUAL_PROVIDER,
   withoutVirtualProvider,
@@ -236,15 +237,33 @@ export async function getEffectiveModelDecision(
 }
 
 /**
- * Whether `decision` admits a request served by one of the organization's own inference provider
- * keys that the provider allow-list cannot restrict: a direct BYOK key in catalog mode, or a
- * provider key sent through Vercel whose provider has no OpenRouter slug. Such a key names a
- * provider the organization configured itself, so only the model restrictions and grants apply.
- * Routing drops Vercel provider keys that the allow-list can name but does not admit (see
- * `isVercelUserByokProviderAllowed`).
+ * Whether `decision` admits a request served by one of the organization's provider keys sent
+ * through Vercel that the provider allow-list cannot restrict, because the key's provider has no
+ * OpenRouter slug. Such a key names a provider the organization configured itself, so only the
+ * model restrictions and grants apply. Routing drops Vercel provider keys that the allow-list can
+ * name but does not admit (see `isVercelUserByokProviderAllowed`). Catalog-mode direct BYOK keys
+ * are decided per provider instead (see `isModelAllowedForProviderKey`).
  */
 export function allowsInferenceProviderUserByok(decision: EffectiveModelDecision): boolean {
   return decision.allowed || decision.denialSource === 'organization_provider';
+}
+
+/**
+ * Whether the policy admits `modelId` served by the organization's own key for `providerSlug`, as
+ * a catalog-mode direct BYOK key serves it. The key's provider is the only route, whichever
+ * providers the snapshot lists for the model, so provider allow-lists and grants are checked
+ * against it alone. A policy that requires the model in the current snapshot still does.
+ */
+export async function isModelAllowedForProviderKey(
+  policy: EffectiveOrganizationModelPolicy,
+  modelId: string,
+  providerSlug: string,
+  providerLookup: ProviderLookup = getProviderSlugsForModel
+): Promise<boolean> {
+  const decision = await getEffectiveModelDecision(policy, modelId, async lookupModelId =>
+    (await providerLookup(lookupModelId)).size > 0 ? new Set([providerSlug]) : new Set()
+  );
+  return decision.allowed;
 }
 
 export async function isModelRouteAllowed(
@@ -399,6 +418,6 @@ export async function getModelAccessPolicyEditorData(organizationId: string) {
   }
   return {
     policyType: 'model_access' as const,
-    catalog: catalog.data,
+    catalog: await withDirectByokPolicyProviders(catalog.data),
   };
 }

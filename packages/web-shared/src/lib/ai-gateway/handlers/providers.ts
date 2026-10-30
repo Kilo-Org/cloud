@@ -10,7 +10,8 @@ type ProviderListEntry = z.infer<typeof OpenRouterProvidersResponseSchema>['data
 
 /**
  * Appends direct BYOK providers that the snapshot lacks. They stay out of the
- * snapshot so they do not appear in the provider policy UI.
+ * snapshot because Kilo's own routes use it; the provider policy screens add
+ * them separately (see `getDirectByokPolicyProviders`).
  */
 export function withDirectByokProviders(
   providers: ReadonlyArray<ProviderListEntry>,

@@ -25,7 +25,9 @@ import { getIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/provide
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import {
   createDirectByokReferenceResolver,
+  findDirectByokProvider,
   getDirectByokModel,
+  getDirectByokPolicyProviderId,
   supportsCatalogMode,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { byokOwner, isInferenceProviderUserByok } from '@kilocode/web-shared/lib/ai-gateway/byok';
@@ -159,6 +161,7 @@ import {
   allowsInferenceProviderUserByok,
   evaluateEffectiveModelAccessPolicy,
   getEffectiveModelDecision,
+  isModelAllowedForProviderKey,
   type EffectiveOrganizationModelPolicy,
 } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { withoutVirtualProvider } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/virtual-models';
@@ -903,6 +906,18 @@ export async function handleLlmProxyRequest(
 
   const accessCheckResolver = createAccessCheckResolver(effectiveModelIdLowerCased);
 
+  async function isDirectByokProviderAllowed(policyProviderId: string): Promise<boolean> {
+    const groupPolicy = await organizationGroupPolicyPromise;
+    return (
+      !groupPolicy ||
+      (await isModelAllowedForProviderKey(
+        groupPolicy,
+        effectiveModelIdLowerCased,
+        policyProviderId
+      ))
+    );
+  }
+
   async function resolveIsNonTrialEnterprise(): Promise<boolean> {
     if (!organizationId) return false;
     const { plan } = await balanceAndSettingsPromise;
@@ -925,6 +940,7 @@ export async function handleLlmProxyRequest(
     getRoutingProviderConfig: async () =>
       (await accessCheckResolver.getRoutingProviderConfig?.()) ?? requestBodyParsed.body.provider,
     getAllowedProviders: accessCheckResolver.getAllowedProviders,
+    isDirectByokProviderAllowed,
     kiloIgnoredProviders: ignoredProviders,
   });
   if (providerResult.kind === 'chatgpt-reconnect') {
@@ -1017,20 +1033,34 @@ export async function handleLlmProxyRequest(
       });
     }
 
-    const modelAllowed = isInferenceProviderUserByok(effectiveProviderContext.userByok)
-      ? groupModelAllowedForInferenceProviderUserByok
-      : groupModelAllowed;
-    if (!modelAllowed) {
-      return isAutoRoutedRequest ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
-    }
-    if (!groupProvidersAllowed) return modelNotAllowedResponse();
-    if (
-      effectiveProviderContext.provider.id === 'vercel' &&
-      effectiveProviderContext.userByok?.some(
-        byok => !isVercelUserByokProviderAllowed(byok.providerId, allowedProviders)
-      )
-    ) {
-      return modelNotAllowedResponse();
+    if (effectiveProviderContext.provider.id === 'direct-byok') {
+      // A catalog-mode direct BYOK key is the request's only route, so the policy is checked
+      // against the key's provider alone. Routing already skips keys it rejects.
+      const directByokProvider = findDirectByokProvider(
+        effectiveProviderContext.userByok?.[0]?.providerId ?? ''
+      );
+      if (
+        !directByokProvider ||
+        !(await isDirectByokProviderAllowed(getDirectByokPolicyProviderId(directByokProvider)))
+      ) {
+        return isAutoRoutedRequest ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
+      }
+    } else {
+      const modelAllowed = isInferenceProviderUserByok(effectiveProviderContext.userByok)
+        ? groupModelAllowedForInferenceProviderUserByok
+        : groupModelAllowed;
+      if (!modelAllowed) {
+        return isAutoRoutedRequest ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
+      }
+      if (!groupProvidersAllowed) return modelNotAllowedResponse();
+      if (
+        effectiveProviderContext.provider.id === 'vercel' &&
+        effectiveProviderContext.userByok?.some(
+          byok => !isVercelUserByokProviderAllowed(byok.providerId, allowedProviders)
+        )
+      ) {
+        return modelNotAllowedResponse();
+      }
     }
 
     if (effectiveProviderConfig) {

@@ -230,7 +230,9 @@ function CatalogModeSetting({
         <p className="text-muted-foreground text-xs">
           Turn this on to serve catalog models such as moonshotai/kimi-k2.6 with this key, including
           for Auto models and custom routers.
-          {isOrganizationKey ? ' Organization model restrictions then apply to this key.' : ''}
+          {isOrganizationKey
+            ? ' Organization model and provider restrictions then apply to this key.'
+            : ''}
         </p>
       ) : null}
       {enabled && isOrganizationKey ? (
@@ -503,12 +505,12 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
       serve_catalog_models
         ? {
             title: `Use Kilo catalog model IDs for the ${apiKeyObjectLabel(providerName)}?`,
-            description: `The key will serve catalog models such as moonshotai/kimi-k2.6, and model IDs that start with ${prefix} stop working with it. Models without a catalog ID are no longer available through this key. For the catalog models it serves, this key is used, and pays, ahead of a ChatGPT connection and other BYOK keys.${organizationId ? ' Organization model restrictions apply to every request through this key.' : ''}`,
+            description: `The key will serve catalog models such as moonshotai/kimi-k2.6, and model IDs that start with ${prefix} stop working with it. Models without a catalog ID are no longer available through this key. For the catalog models it serves, this key is used, and pays, ahead of a ChatGPT connection and other BYOK keys.${organizationId ? ' Organization model and provider restrictions apply to every request through this key.' : ''}`,
             confirmLabel: 'Use catalog model IDs',
           }
         : {
             title: `Use provider model IDs for the ${apiKeyObjectLabel(providerName)}?`,
-            description: `The key will stop serving Kilo catalog models and serve model IDs that start with ${prefix} instead.${organizationId ? ' Organization model restrictions no longer apply to requests through this key.' : ''}`,
+            description: `The key will stop serving Kilo catalog models and serve model IDs that start with ${prefix} instead.${organizationId ? ' Organization model and provider restrictions no longer apply to requests through this key.' : ''}`,
             confirmLabel: 'Use provider model IDs',
             destructive: !!organizationId,
           }
@@ -1057,7 +1059,9 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                           </p>
                           {organizationId ? (
                             <p className="mt-2">
-                              Organization model restrictions apply to requests through this key.
+                              Organization model and provider restrictions apply to requests through
+                              this key. The key is not used when the provider allow-list excludes
+                              this provider.
                             </p>
                           ) : null}
                         </AlertDescription>

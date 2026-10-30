@@ -66,6 +66,7 @@ import {
   getDirectByokModel,
   supportsCatalogMode,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
+import type * as directByokModule from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import {
   logUnrewrittenResponse,
   rewriteModelResponse,
@@ -78,7 +79,10 @@ import type { FakeR2ClientModule } from '@kilocode/web-shared/tests/helpers/fake
 import { db, readDb } from '@kilocode/web-shared/lib/drizzle';
 import { isFreeModelRateLimited } from '@kilocode/web-shared/lib/ai-gateway/free-model-rate-limit';
 import { gemma_4_26b_a4b_it_free_model } from '@kilocode/web-shared/lib/ai-gateway/kilo-exclusive-models';
-import { getEffectiveModelDecision } from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
+import {
+  getEffectiveModelDecision,
+  isModelAllowedForProviderKey,
+} from '@kilocode/web-shared/lib/organizations/effective-model-access.server';
 import { isNonTrialEnterpriseOrganization } from '@kilocode/web-shared/lib/organizations/non-trial-enterprise';
 import type { OpenRouterProviderConfig } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
 import {
@@ -166,16 +170,24 @@ jest.mock('@kilocode/web-shared/lib/organizations/effective-model-access.server'
   ).allowsInferenceProviderUserByok,
   evaluateEffectiveModelAccessPolicy: jest.fn().mockReturnValue({}),
   getEffectiveModelDecision: jest.fn().mockResolvedValue({ allowed: true }),
+  isModelAllowedForProviderKey: jest.fn().mockResolvedValue(true),
 }));
 jest.mock('@kilocode/web-shared/lib/organizations/non-trial-enterprise', () => ({
   isNonTrialEnterpriseOrganization: jest.fn(async () => false),
 }));
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/get-provider');
-jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => ({
-  getDirectByokModel: jest.fn(async () => ({ provider: null, model: null })),
-  supportsCatalogMode: jest.fn(() => false),
-  createDirectByokReferenceResolver: jest.fn(async () => async (modelId: string) => modelId),
-}));
+jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/direct-byok', () => {
+  const actual = jest.requireActual<typeof directByokModule>(
+    '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok'
+  );
+  return {
+    getDirectByokModel: jest.fn(async () => ({ provider: null, model: null })),
+    supportsCatalogMode: jest.fn(() => false),
+    createDirectByokReferenceResolver: jest.fn(async () => async (modelId: string) => modelId),
+    findDirectByokProvider: actual.findDirectByokProvider,
+    getDirectByokPolicyProviderId: actual.getDirectByokPolicyProviderId,
+  };
+});
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/upstream-request');
 jest.mock('@kilocode/web-shared/lib/ai-gateway/providers/gateway-models-cache');
 jest.mock('@kilocode/web-shared/lib/ai-gateway/o11y/api-metrics.server', () => ({
@@ -295,6 +307,7 @@ const mockedGetDynamicRequestLoggingMode = jest.mocked(getDynamicRequestLoggingM
 const mockedIsFreeModelRateLimited = jest.mocked(isFreeModelRateLimited);
 const mockedIsCustomLlm = jest.mocked(isCustomLlm);
 const mockedGetEffectiveModelDecision = jest.mocked(getEffectiveModelDecision);
+const mockedIsModelAllowedForProviderKey = jest.mocked(isModelAllowedForProviderKey);
 const mockedDecide = jest.mocked(decide);
 const mockedIsNonTrialEnterpriseOrganization = jest.mocked(isNonTrialEnterpriseOrganization);
 const mockedFindCustomLlm = jest.mocked(findCustomLlm);
@@ -1379,7 +1392,7 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
     > = {
       'a catalog-mode direct BYOK key': {
         provider: { ...provider, id: 'direct-byok' },
-        userByok: [{ decryptedAPIKey: 'key', providerId: 'synthetic' }],
+        userByok: [{ decryptedAPIKey: 'key', providerId: 'zai-coding' }],
       },
       'a Vercel BYOK inference provider key': {
         provider: { ...provider, id: 'vercel' },
@@ -1427,9 +1440,10 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
 
     afterEach(() => {
       mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: true });
+      mockedIsModelAllowedForProviderKey.mockResolvedValue(true);
     });
 
-    it('serves a model whose providers are all disallowed through a catalog-mode direct BYOK key', async () => {
+    it('serves a catalog-mode direct BYOK key whose provider the policy admits, whatever Kilo routes may use', async () => {
       const response = await sendThrough('a catalog-mode direct BYOK key', {
         allowed: false,
         denialSource: 'organization_provider',
@@ -1438,6 +1452,44 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       expect(response.status).toBe(200);
       expect(mockedUpstreamRequest).toHaveBeenCalled();
       expect(mockedUpstreamRequest.mock.calls[0]?.[0].body.provider?.only).toBeUndefined();
+      expect(mockedIsModelAllowedForProviderKey).toHaveBeenCalledWith(
+        expect.anything(),
+        'moonshotai/kimi-k2.6',
+        'z-ai'
+      );
+    });
+
+    it.each([
+      ['allowed on Kilo routes', { allowed: true }],
+      ['denied on Kilo routes', { allowed: false, denialSource: 'organization_provider' }],
+    ] as const)(
+      'denies a catalog-mode direct BYOK key whose provider the policy does not admit (%s)',
+      async (_name, decision) => {
+        mockedIsModelAllowedForProviderKey.mockResolvedValue(false);
+
+        const response = await sendThrough('a catalog-mode direct BYOK key', decision);
+
+        expect(response.status).toBe(404);
+        expect(await response.json()).toMatchObject({ error_type: 'model_not_allowed' });
+        expect(mockedUpstreamRequest).not.toHaveBeenCalled();
+      }
+    );
+
+    it('lets routing skip catalog-mode direct BYOK keys whose provider the policy does not admit', async () => {
+      mockedIsModelAllowedForProviderKey.mockImplementation(
+        async (_policy, _modelId, providerSlug) => providerSlug === 'z-ai'
+      );
+      await sendThrough('no BYOK key', { allowed: true });
+
+      const isDirectByokProviderAllowed =
+        mockedGetProvider.mock.calls[0]?.[0].isDirectByokProviderAllowed;
+      expect(await isDirectByokProviderAllowed?.('z-ai')).toBe(true);
+      expect(await isDirectByokProviderAllowed?.('synthetic')).toBe(false);
+      expect(mockedIsModelAllowedForProviderKey).toHaveBeenCalledWith(
+        expect.anything(),
+        'moonshotai/kimi-k2.6',
+        'synthetic'
+      );
     });
 
     it('lets routing skip every Vercel provider key when no allowed provider serves the model', async () => {
@@ -1503,19 +1555,16 @@ describe('POST /api/openrouter/v1/chat/completions request handling', () => {
       ['a group model restriction', 'group_model'],
       ['a group provider restriction', 'group_provider'],
     ] as const)(
-      'keeps denying a model excluded by %s through an inference provider key',
+      'keeps denying a model excluded by %s through a Vercel BYOK inference provider key',
       async (_name, denialSource) => {
-        for (const route of [
-          'a catalog-mode direct BYOK key',
-          'a Vercel BYOK inference provider key',
-        ] as const) {
-          mockedUpstreamRequest.mockClear();
-          const response = await sendThrough(route, { allowed: false, denialSource });
+        const response = await sendThrough('a Vercel BYOK inference provider key', {
+          allowed: false,
+          denialSource,
+        });
 
-          expect(response.status).toBe(404);
-          expect(await response.json()).toMatchObject({ error_type: 'model_not_allowed' });
-          expect(mockedUpstreamRequest).not.toHaveBeenCalled();
-        }
+        expect(response.status).toBe(404);
+        expect(await response.json()).toMatchObject({ error_type: 'model_not_allowed' });
+        expect(mockedUpstreamRequest).not.toHaveBeenCalled();
       }
     );
   });
@@ -2377,7 +2426,7 @@ describe('kilo-auto/efficient classifier billing', () => {
     });
     mockedSupportsCatalogMode.mockReturnValue(true);
     mockedCreateDirectByokReferenceResolver.mockResolvedValue(async () => 'moonshotai/kimi-k2.6');
-    mockedGetEffectiveModelDecision.mockResolvedValue({ allowed: false });
+    mockedIsModelAllowedForProviderKey.mockResolvedValueOnce(false);
     mockedGetBalanceAndOrgSettings.mockResolvedValue({
       balance: 1000,
       settings: {},
@@ -2403,9 +2452,10 @@ describe('kilo-auto/efficient classifier billing', () => {
     expect(mockedGetProvider).toHaveBeenCalledWith(
       expect.objectContaining({ requestedModel: 'moonshotai/kimi-k2.6' })
     );
-    expect(mockedGetEffectiveModelDecision).toHaveBeenCalledWith(
+    expect(mockedIsModelAllowedForProviderKey).toHaveBeenCalledWith(
       expect.anything(),
-      'moonshotai/kimi-k2.6'
+      'moonshotai/kimi-k2.6',
+      'synthetic'
     );
     expect(response.status).toBe(503);
     expect(mockedUpstreamRequest).not.toHaveBeenCalled();

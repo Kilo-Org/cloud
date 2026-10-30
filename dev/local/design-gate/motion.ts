@@ -112,7 +112,9 @@ export function motionEvidence(times: readonly number[], detected: readonly Moti
   const note = [
     ...(rate.reliable ? [] : [unreliableNote(rate.fps)]),
     ...(segments.some(segment => segment.samplingAmbiguous)
-      ? ['A segment has fewer than 3 source frames: an instantaneous jump and undersampling cannot be distinguished.']
+      ? [
+          'A segment has fewer than 3 source frames: an instantaneous jump and undersampling cannot be distinguished.',
+        ]
       : []),
     'Abrupt segments are frame-difference candidates, not proven visual jank; layout-shift findings are primary evidence.',
   ].join(' ');

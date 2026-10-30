@@ -198,7 +198,8 @@ export function resolveTargets(
       typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed) && 'targets' in parsed
         ? parsed.targets
         : parsed;
-    if (!Array.isArray(list)) throw new UsageError('--targets file must contain a JSON array of {id, link}');
+    if (!Array.isArray(list))
+      throw new UsageError('--targets file must contain a JSON array of {id, link}');
     for (const entry of list) {
       if (typeof entry === 'string') {
         entries.push({ link: entry });
@@ -250,7 +251,9 @@ export function installAbortRestore(deps: Pick<CliDeps, 'onSignal' | 'exit' | 'w
       deps.clock.sleep(ABORT_RESTORE_TIMEOUT_MS).then(() => false),
     ]);
     if (!restored) {
-      deps.warn(`design-gate: restore exceeded ${ABORT_RESTORE_TIMEOUT_MS} ms; language restoration may be incomplete`);
+      deps.warn(
+        `design-gate: restore exceeded ${ABORT_RESTORE_TIMEOUT_MS} ms; language restoration may be incomplete`
+      );
     }
     deps.exit(SIGNAL_EXIT_CODES[signal]);
   };

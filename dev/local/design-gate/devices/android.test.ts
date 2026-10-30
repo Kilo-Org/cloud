@@ -133,10 +133,16 @@ test('recording stop signals only its remote PID, is idempotent, and cleans up a
     },
     spawn: (binary, args) => {
       calls.push([binary, ...args]);
-      return { signal: () => assert.fail('must signal the remote PID, not adb'), exited: exited.promise };
+      return {
+        signal: () => assert.fail('must signal the remote PID, not adb'),
+        exited: exited.promise,
+      };
     },
   });
-  const recording = device.record(path.join(os.tmpdir(), 'design-gate-recorder-test', 'video.mp4'), 180);
+  const recording = device.record(
+    path.join(os.tmpdir(), 'design-gate-recorder-test', 'video.mp4'),
+    180
+  );
   const first = recording.stop();
   assert.equal(recording.stop(), first);
   await assert.rejects(first, /pull failed/);

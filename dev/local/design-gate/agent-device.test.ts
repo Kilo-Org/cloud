@@ -135,17 +135,34 @@ test('agent-device snapshot without Android density is an infra failure', () => 
 });
 
 test('system bars establish safe insets before their nodes are filtered', () => {
-  const dump = agentDeviceToProbeDump(JSON.stringify({
-    data: {
-      androidSnapshot: { pixelDensity: 2 },
-      viewport: { width: 800, height: 1600 },
-      nodes: [
-        { index: 0, bundleId: 'com.android.systemui', systemBar: 'status', rect: { x: 0, y: 0, width: 800, height: 48 } },
-        { index: 1, bundleId: 'com.android.systemui', systemBar: 'navigation', rect: { x: 0, y: 1552, width: 800, height: 48 } },
-        { index: 2, bundleId: APP, type: 'android.view.View', rect: { x: 0, y: 0, width: 800, height: 1600 } },
-      ],
-    },
-  }));
+  const dump = agentDeviceToProbeDump(
+    JSON.stringify({
+      data: {
+        androidSnapshot: { pixelDensity: 2 },
+        viewport: { width: 800, height: 1600 },
+        nodes: [
+          {
+            index: 0,
+            bundleId: 'com.android.systemui',
+            systemBar: 'status',
+            rect: { x: 0, y: 0, width: 800, height: 48 },
+          },
+          {
+            index: 1,
+            bundleId: 'com.android.systemui',
+            systemBar: 'navigation',
+            rect: { x: 0, y: 1552, width: 800, height: 48 },
+          },
+          {
+            index: 2,
+            bundleId: APP,
+            type: 'android.view.View',
+            rect: { x: 0, y: 0, width: 800, height: 1600 },
+          },
+        ],
+      },
+    })
+  );
   assert.equal(dump.env.safeAreaKnown, true);
   assert.deepEqual(dump.env.safeArea, { top: 24, bottom: 24, left: 0, right: 0 });
   assert.equal(dump.nodes.length, 2);

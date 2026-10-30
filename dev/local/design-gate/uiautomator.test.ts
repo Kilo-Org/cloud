@@ -81,11 +81,14 @@ test('scrollable attributes convey known axes or conservative unknown axes', () 
     language: 'en',
     osVersion: '15',
   });
-  assert.deepEqual(dump.nodes.slice(1).map(node => node.scrollAxes), [
-    { x: true, y: true },
-    { x: true, y: true },
-    { x: true, y: false },
-    { x: false, y: true },
-  ]);
+  assert.deepEqual(
+    dump.nodes.slice(1).map(node => node.scrollAxes),
+    [
+      { x: true, y: true },
+      { x: true, y: true },
+      { x: true, y: false },
+      { x: false, y: true },
+    ]
+  );
   assert.equal(dump.env.safeAreaKnown, false);
 });

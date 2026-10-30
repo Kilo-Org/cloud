@@ -11,7 +11,6 @@ import { and, desc, eq, isNull } from 'drizzle-orm';
 import { normalizeModelId } from '@kilocode/web-shared/lib/ai-gateway/model-utils';
 import { normalizeInferenceProviderId } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { getProviderSlugsForModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-index.server';
-import { withDirectByokPolicyProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/policy-providers';
 import {
   VIRTUAL_PROVIDER,
   withoutVirtualProvider,
@@ -418,6 +417,6 @@ export async function getModelAccessPolicyEditorData(organizationId: string) {
   }
   return {
     policyType: 'model_access' as const,
-    catalog: await withDirectByokPolicyProviders(catalog.data),
+    catalog: catalog.data,
   };
 }

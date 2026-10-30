@@ -3966,17 +3966,6 @@
     ],
     "searchBlob": "byok.listCatalogModeSupportedModels List which AI models each direct BYOK provider supports when running in catalog mode, grouped by provider and returned as model names with catalog ids. Use to discover available catalog-mode models per provider. byok listcatalogmodesupportedmodels"
   },
-  "byok.listPolicyProviders": {
-    "path": "byok.listPolicyProviders",
-    "kind": "query",
-    "summary": "List the direct BYOK providers, such as Synthetic or Eden AI, that organization provider allow-lists can name beyond the standard provider list, with their data policies and the catalog models their keys serve. Use when choosing providers for an organization or group model access policy.",
-    "inputSchema": {},
-    "tags": [
-      "byok",
-      "listpolicyproviders"
-    ],
-    "searchBlob": "byok.listPolicyProviders List the direct BYOK providers, such as Synthetic or Eden AI, that organization provider allow-lists can name beyond the standard provider list, with their data policies and the catalog models their keys serve. Use when choosing providers for an organization or group model access policy. byok listpolicyproviders"
-  },
   "byok.listSupportedModels": {
     "path": "byok.listSupportedModels",
     "kind": "query",

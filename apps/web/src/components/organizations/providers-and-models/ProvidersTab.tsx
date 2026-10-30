@@ -7,7 +7,11 @@ import { LockableContainer } from '@/components/organizations/LockableContainer'
 import { CollapsibleFilterSection } from '@/components/models/CollapsibleFilterSection';
 import { CollapsibleCheckboxFilter } from '@/components/models/CollapsibleCheckboxFilter';
 import { Info } from 'lucide-react';
-import { ProviderPolicyTag } from '@/components/organizations/providers-and-models/PolicyPills';
+import {
+  BYOK_ONLY_DESCRIPTION,
+  ByokOnlyTag,
+  ProviderPolicyTag,
+} from '@/components/organizations/providers-and-models/PolicyPills';
 import type { ProviderRow } from '@/components/organizations/providers-and-models/providersAndModels.types';
 import type { ProviderPolicyFilter } from '@/components/organizations/providers-and-models/useProvidersAndModelsAllowListsState';
 
@@ -77,6 +81,9 @@ export function ProvidersTab({
           Provider policy badges and filters reflect provider defaults. Training and prompt
           retention policies can differ for individual models.
         </p>
+        {filteredProviderRows.some(row => row.byokOnly) ? (
+          <p>BYOK only: {BYOK_ONLY_DESCRIPTION}</p>
+        ) : null}
       </div>
 
       {isLoading ? (
@@ -193,6 +200,7 @@ export function ProvidersTab({
                                 <div className="min-w-0 truncate text-sm font-medium">
                                   {row.providerDisplayName}
                                 </div>
+                                <ByokOnlyTag value={row.byokOnly} />
                                 <ProviderPolicyTag value={row.trains} variant="trains" />
                                 <ProviderPolicyTag
                                   value={row.retainsPrompts}

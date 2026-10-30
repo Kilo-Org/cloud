@@ -292,6 +292,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         providerIconUrl: provider.icon?.url ? normalizeProviderIconUrl(provider.icon.url) : null,
         trains: modelTrains(model, provider.dataPolicy.training),
         retainsPrompts: modelRetainsPrompts(model, provider.dataPolicy.retainsPrompts),
+        byokOnly: provider.byokOnly,
         ...getOfferingPricing(
           customPricingConfig,
           getSnapshotModelVariantId(model),
@@ -321,6 +322,14 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
     return map;
   }, [allowedModelIds, openRouterProviders]);
 
+  const byokOnlyProviderSlugs = useMemo(
+    () =>
+      new Set(
+        openRouterProviders.filter(provider => provider.byokOnly).map(provider => provider.slug)
+      ),
+    [openRouterProviders]
+  );
+
   const providerRows = useMemo((): ProviderRow[] => {
     const rows: ProviderRow[] = [];
     for (const provider of openRouterProviders) {
@@ -338,6 +347,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
         retainsPrompts: provider.dataPolicy.retainsPrompts,
         headquarters: provider.headquarters,
         datacenters: provider.datacenters,
+        byokOnly: provider.byokOnly,
       });
     }
 
@@ -505,6 +515,7 @@ export function OrganizationProvidersAndModelsPage({ organizationId, role }: Pro
                 availableModels.isError ? undefined : (availableModels.data?.data.length ?? null)
               }
               enabledProviderSlugs={enabledProviderSlugs}
+              byokOnlyProviderSlugs={byokOnlyProviderSlugs}
               filteredModelRows={filteredModelRows}
               onToggleModelAllowed={handleToggleModelAllowed}
               onOpenModelDetails={actions.setInfoModelId}

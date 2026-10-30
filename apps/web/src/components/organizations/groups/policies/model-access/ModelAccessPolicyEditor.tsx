@@ -116,6 +116,7 @@ export function ModelAccessPolicyEditor({
         retainsPrompts: provider.dataPolicy.retainsPrompts,
         headquarters: provider.headquarters,
         datacenters: provider.datacenters,
+        byokOnly: provider.byokOnly,
       }))
       .filter(provider => provider.modelCount > 0)
       .sort((a, b) => a.providerDisplayName.localeCompare(b.providerDisplayName));

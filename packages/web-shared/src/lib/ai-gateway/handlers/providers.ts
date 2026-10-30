@@ -9,9 +9,9 @@ import { getDirectByokProviderListings } from '@kilocode/web-shared/lib/ai-gatew
 type ProviderListEntry = z.infer<typeof OpenRouterProvidersResponseSchema>['data'][number];
 
 /**
- * Appends direct BYOK providers that the snapshot lacks. They stay out of the
- * snapshot because Kilo's own routes use it; the provider policy screens add
- * them separately (see `getDirectByokPolicyProviders`).
+ * Appends direct BYOK providers that the snapshot lacks. The snapshot lists a
+ * direct BYOK provider as BYOK-only only while it serves catalog models (see
+ * `injectDirectByokProviders`), so the others are added here.
  */
 export function withDirectByokProviders(
   providers: ReadonlyArray<ProviderListEntry>,

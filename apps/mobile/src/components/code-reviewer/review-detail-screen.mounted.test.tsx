@@ -1067,11 +1067,17 @@ describe('ReviewDetailScreen transcript sheet', () => {
     const texts = collectText(renderer.toJSON());
     const transcriptIndex = texts.indexOf('Session transcript');
     const titleIndex = texts.indexOf('Fix login');
+    const detailsIndex = texts.indexOf('Details');
+    const primaryIndex = texts.indexOf('Open pull request');
 
+    // A missing label is `-1`, which every ordering check below would satisfy,
+    // so each reference is asserted present before the order is compared.
     expect(titleIndex).toBeGreaterThanOrEqual(0);
+    expect(detailsIndex).toBeGreaterThanOrEqual(0);
+    expect(primaryIndex).toBeGreaterThanOrEqual(0);
     expect(transcriptIndex).toBeGreaterThan(titleIndex);
-    expect(transcriptIndex).toBeGreaterThan(texts.indexOf('Details'));
-    expect(transcriptIndex).toBeGreaterThan(texts.indexOf('Open pull request'));
+    expect(transcriptIndex).toBeGreaterThan(detailsIndex);
+    expect(transcriptIndex).toBeGreaterThan(primaryIndex);
   });
 
   it.each(['ios', 'android'])(

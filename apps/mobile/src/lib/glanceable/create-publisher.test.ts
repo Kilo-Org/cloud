@@ -5,12 +5,18 @@ import {
   buildOpaqueScopeKey,
   type GlanceableAgentsSnapshot,
 } from '@kilocode/app-shared/glanceable-agents-snapshot';
+import { EMPTY_HOME_WIDGET_DETAILS } from '@kilocode/app-shared/home-widget';
 
 import { ACTIVE_USER_ID_KEY } from '@/lib/storage-keys';
 
 import { writeSignedOutSnapshotAndEnd } from './cleanup';
 import { createGlanceablePublisher } from './create-publisher';
-import { getHomeWidgetDataForSnapshot, getLastHomeWidgetData } from './home-widget-data';
+import {
+  _resetHomeWidgetDataForTests,
+  getHomeWidgetDataForSnapshot,
+  getLastHomeWidgetData,
+  rememberHomeWidgetData,
+} from './home-widget-data';
 import {
   _flushGlanceableMirrorForTests,
   _resetGlanceablePersistForTests,
@@ -77,6 +83,7 @@ describe('createGlanceablePublisher', () => {
   beforeEach(() => {
     _resetWaitingAskForTests();
     _resetGlanceablePersistForTests();
+    _resetHomeWidgetDataForTests();
     _setSecureStoreForTests(secureStoreMock);
     store.clear();
     vi.clearAllMocks();
@@ -86,6 +93,7 @@ describe('createGlanceablePublisher', () => {
     vi.useRealTimers();
     _resetWaitingAskForTests();
     _resetGlanceablePersistForTests();
+    _resetHomeWidgetDataForTests();
     store.clear();
   });
 
@@ -200,16 +208,17 @@ describe('createGlanceablePublisher', () => {
     _setPersistSecureStoreForTests(secureStoreMock);
     store.set(ACTIVE_USER_ID_KEY, 'u1');
     const first = buildGlanceableSnapshot({
-      sessions: [
-        { status: 'busy', title: 'Quarterly migration', updatedAt: new Date(NOW).toISOString() },
-        { status: 'permission' },
-      ],
+      sessions: [{ status: 'busy' }, { status: 'permission' }],
       userId: 'u1',
       organizationId: null,
       now: NOW,
       previousRevision: 3,
     });
     persistGlanceableSink.publish(first);
+    rememberHomeWidgetData({
+      snapshot: first,
+      details: { ...EMPTY_HOME_WIDGET_DETAILS, primaryTitle: 'Quarterly migration' },
+    });
     await _flushGlanceableMirrorForTests();
 
     // The terminal blank meets a keystore that refuses the write.
@@ -223,6 +232,7 @@ describe('createGlanceablePublisher', () => {
     // A restart: no in-memory state, the stored record as the failed write left
     // it, and the signed-in identity of the context below.
     _resetGlanceablePersistForTests();
+    _resetHomeWidgetDataForTests();
     _setPersistSecureStoreForTests(secureStoreMock);
     secureStoreMock.setItemAsync.mockImplementation(defaultSetItem);
     store.set(ACTIVE_USER_ID_KEY, 'u2');

@@ -87,8 +87,36 @@ let restoresInFlight = 0;
 // to land resumes it instead of dropping the work.
 let settleWaiters: (() => void)[] = [];
 
+// Whether the record this process restored belongs to the signed-in scope.
+// `null` means nothing was restored, so only frames written in this process are
+// in memory. The restore decides it from the same reads that fill the state, so
+// a caller can ask the question synchronously instead of re-reading the keychain
+// on every surface write.
+let restoredScopeVerified: boolean | null = null;
+
+// True once this process wrote the in-memory snapshot itself. A frame it wrote
+// is already fenced by the context that produced it; only a restored record
+// needs `restoredScopeVerified` before a surface may draw it.
+let snapshotWrittenInProcess = false;
+
 export function getLastGlanceableSnapshot(): GlanceableAgentsSnapshot | null {
   return lastSnapshot;
+}
+
+/**
+ * The snapshot a surface may draw: the frame this process wrote, or a restored
+ * record only when it belongs to the signed-in scope. Sinks and republish paths
+ * read this instead of {@link getLastGlanceableSnapshot}, whose value also feeds
+ * the revision floor and the ownership questions a null must not answer.
+ */
+export function getGlanceableSnapshotForSignedInScope(): GlanceableAgentsSnapshot | null {
+  if (lastSnapshot === null) {
+    return null;
+  }
+  if (snapshotWrittenInProcess) {
+    return lastSnapshot;
+  }
+  return restoredScopeVerified === true ? lastSnapshot : null;
 }
 
 /**
@@ -160,6 +188,7 @@ async function mirrorSnapshotAfter(previous: Promise<void> | null, raw: string):
 /** In-memory write plus a fire-and-forget SecureStore mirror. */
 function persistSnapshot(snapshot: GlanceableAgentsSnapshot): void {
   persistEpoch += 1;
+  snapshotWrittenInProcess = true;
   lastSnapshot = snapshot;
   localScopeKey = snapshot.scopeKey;
   mirrorWrite = mirrorSnapshotAfter(mirrorWrite, JSON.stringify(snapshot));
@@ -220,18 +249,22 @@ export async function restorePersistedGlanceable(): Promise<void> {
     // A remount keeps the module alive, so a logout or privacy blank written
     // before restore owns the state and must not be clobbered by a stale disk
     // record from the prior session.
+    const authenticatedScopeKey = await getAuthenticatedGlanceableScopeKey();
     if (stored === null) {
       // No usable record: a scope key the previous release wrote on its own
       // still names the scope, the same way it did before this record existed.
       const legacyScopeKey = await getSecureStore().getItemAsync(GLANCEABLE_LEGACY_SCOPE_KEY);
       localScopeKey ??= legacyScopeKey;
+      restoredScopeVerified = null;
     } else {
       lastSnapshot ??= stored;
       // The record carries its own scope key, so the restored snapshot and the
       // restored scope always come from the same publish.
       localScopeKey ??= stored.scopeKey;
+      // The record's own scope key says which context wrote it, not which one
+      // holds the device now, so a surface may draw it only on a match.
+      restoredScopeVerified = stored.scopeKey === authenticatedScopeKey;
     }
-    const authenticatedScopeKey = await getAuthenticatedGlanceableScopeKey();
     await restoreHomeWidgetData(authenticatedScopeKey);
   } catch (error) {
     // A malformed mirror is treated as absent; the publisher repopulates it.
@@ -281,6 +314,10 @@ export function _setLastGlanceableSnapshotForTests(
 ): void {
   persistEpoch += 1;
   lastSnapshot = snapshot;
+  // Callers seed a completed restore, so the record is the state this process
+  // acts on rather than a record still to be verified.
+  snapshotWrittenInProcess = snapshot !== null;
+  restoredScopeVerified = null;
   localScopeKey = snapshot?.scopeKey ?? null;
   // Seeding the mirror models a completed restore: callers act on this state as
   // the read's result, the same way `restorePersistedGlanceable` would.
@@ -300,6 +337,8 @@ export function _resetGlanceablePersistForTests(): void {
   persistEpoch = 0;
   mirrorWrite = null;
   lastSnapshot = null;
+  restoredScopeVerified = null;
+  snapshotWrittenInProcess = false;
   localScopeKey = null;
   restoreUnavailable = false;
   restoresInFlight = 0;

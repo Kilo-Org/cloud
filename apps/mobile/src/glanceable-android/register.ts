@@ -26,7 +26,7 @@ import {
 } from '@/lib/glanceable/live-activity-switch';
 import {
   getAuthenticatedGlanceableScopeKey,
-  getLastGlanceableSnapshot,
+  getGlanceableSnapshotForSignedInScope,
   restorePersistedGlanceable,
 } from '@/lib/glanceable/persist';
 import { registerGlanceableSink } from '@/lib/glanceable/sink-registry';
@@ -224,11 +224,9 @@ export async function handleWidgetTask(task: WidgetTaskHandlerProps): Promise<vo
   if (props === null) {
     // Migrate the existing mirror when this installation has no native snapshot
     // yet. The restore above already adopted the Home-only record for the
-    // signed-in scope, and the mirror record is adopted on the same scope.
+    // signed-in scope, and the mirror record is drawn on the same scope.
     await restorePersistedGlanceable();
-    const authenticatedScopeKey = await getAuthenticatedGlanceableScopeKey();
-    const record = getLastGlanceableSnapshot();
-    const restored = record?.scopeKey === authenticatedScopeKey ? record : null;
+    const restored = getGlanceableSnapshotForSignedInScope();
     if (restored !== null && getCurrentWidgetProps() === null) {
       setWidgetSnapshot(restored);
     }

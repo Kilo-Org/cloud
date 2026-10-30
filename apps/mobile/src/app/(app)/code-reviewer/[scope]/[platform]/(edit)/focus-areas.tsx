@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
+import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { Text } from '@/components/ui/text';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -67,7 +67,7 @@ function FocusAreasScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('codeReviewer.focusAreas.title')} />
+      <ReviewerHeader title={t('codeReviewer.focusAreas.title')} />
       {failure ? (
         // A config read that failed, or one that stayed pending with nothing
         // in flight even after its automatic restart, would otherwise leave

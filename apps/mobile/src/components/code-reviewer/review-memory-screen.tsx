@@ -9,7 +9,7 @@ import { CenteredState } from '@/components/centered-state';
 import { ReviewMemoryProposalSheet } from '@/components/code-reviewer/review-memory-proposal-sheet';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
+import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { Brain } from '@/components/ui/icons';
@@ -226,7 +226,7 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
+      <ReviewerHeader
         title={t('codeReviewer.reviewMemory.title')}
         eyebrow={t('common.codeReviewer')}
       />

@@ -469,6 +469,21 @@ export const DYNAMIC_COUNTED_KEYS = new Map([
         'STATUS_LABEL_KEY map in pr-review-checks-status-row.tsx; passed, failed and skipped use plural families; pending remains invariant',
     },
   ],
+  [
+    'BUCKET_KEYS[bucket]',
+    {
+      keys: [
+        'securityAgent.dashboard.repoSummaryOpen',
+        'securityAgent.dashboard.repoSummaryCritical',
+        'securityAgent.dashboard.repoSummaryHigh',
+        'securityAgent.dashboardMetrics.breakdownCritical',
+        'securityAgent.dashboardMetrics.breakdownHigh',
+        'securityAgent.dashboardMetrics.breakdownMediumLow',
+      ],
+      reason:
+        'BUCKET_KEYS map in severity-count-phrase.ts; each bucket of a dashboard line agrees with its own count',
+    },
+  ],
 ]);
 
 /** Flatten a catalog to dotted keys, the same shape check-catalogs.mjs uses. */

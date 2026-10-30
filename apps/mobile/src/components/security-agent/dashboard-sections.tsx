@@ -8,6 +8,7 @@ import { Pressable, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { EmptyState } from '@/components/empty-state';
+import { severityCountPhrase } from '@/components/security-agent/severity-count-phrase';
 import { KvRow } from '@/components/ui/kv-row';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
@@ -318,9 +319,9 @@ function RepoHealthSection({ scope, data, slaEnabled }: SectionProps) {
             </Text>
             <Text variant="muted" className="mt-0.5 text-xs">
               {t('securityAgent.dashboard.repoSummary', {
-                open: formatNumber(repo.open, i18n.language),
-                critical: formatNumber(repo.critical, i18n.language),
-                high: formatNumber(repo.high, i18n.language),
+                open: severityCountPhrase('repoOpen', repo.open),
+                critical: severityCountPhrase('repoCritical', repo.critical),
+                high: severityCountPhrase('repoHigh', repo.high),
               })}
             </Text>
           </View>

@@ -112,6 +112,14 @@ const TWO_SENSE_COPY = new Map([
   ['files', 'the files in a pull request, versus the iOS Files app in the attachment picker'],
   ['plan', 'a billing plan, versus the agent plan mode'],
   ['copied', 'a file copied in a diff, versus the toast after a copy to the clipboard'],
+  [
+    '{{displaycount}} critical',
+    "the repository row's bucket phrase, which agrees with the wording that row already uses, versus the deadline breakdown line's bucket phrase, which agrees with its own",
+  ],
+  [
+    '{{displaycount}} high',
+    "the repository row's bucket phrase, which agrees with the wording that row already uses, versus the deadline breakdown line's bucket phrase, which agrees with its own",
+  ],
 ]);
 
 /**
@@ -199,6 +207,21 @@ const ENGLISH_IDENTICAL_ALLOWLIST = new Set([
   // from localized placeholders, with no translatable words.
   'agentBriefing.atLeast',
   'agentBriefing.window',
+]);
+
+/**
+ * Counted bucket phrases that two dashboard lines render. The repository row
+ * and the deadline breakdown name the same bucket in their own wording (pt-BR
+ * says "críticas" on the row and "críticos" in the breakdown), so those keys
+ * carry the same English string on purpose and a catalog may translate the two
+ * apart. Every other pair of keys holding one English string still has to
+ * agree.
+ */
+const PER_LINE_BUCKET_PHRASES = new Set([
+  'securityAgent.dashboard.repoSummaryCritical',
+  'securityAgent.dashboardMetrics.breakdownCritical',
+  'securityAgent.dashboard.repoSummaryHigh',
+  'securityAgent.dashboardMetrics.breakdownHigh',
 ]);
 
 /** The supported tags, read from the one source of truth. */
@@ -946,11 +969,17 @@ for (const catalog of CATALOGS) {
     // One wording per English string.
     const exceptions = new Set(WORDING_EXCEPTIONS[tag] ?? []);
     for (const [source, keys] of sharedWordings) {
-      if (exceptions.has(source)) {
+      if (
+        exceptions.has(source) ||
+        keys.every(key => PER_LINE_BUCKET_PHRASES.has(pluralBaseKey(key)))
+      ) {
         continue;
       }
       const variants = new Map();
-      for (const key of keys) {
+      // A plural family's own categories carry this language's forms for the
+      // counts it distinguishes, so they differ by design: the family's flat
+      // base key speaks for the family here.
+      for (const key of keys.filter(key => pluralParts(key) === null)) {
         const value = translated.get(key);
         if (value === undefined) {
           continue;

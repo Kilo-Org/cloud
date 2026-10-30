@@ -755,7 +755,9 @@ describe('ManualReviewScreen instructions field', () => {
     // draft. The name now comes from the same catalog key the heading renders.
     const heading = i18n.t('codeReviewer.manualReview.instructions');
     only(
-      renderer.root.findAll(node => String(node.type) === 'Text' && node.props.children === heading),
+      renderer.root.findAll(
+        node => String(node.type) === 'Text' && node.props.children === heading
+      ),
       'instructions heading'
     );
     const instructions = only(

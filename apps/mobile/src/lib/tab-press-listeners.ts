@@ -1,6 +1,10 @@
 import { selectionHaptic } from '@/lib/haptics';
 
-import { planProfileTabPress, type TabPressNavigation } from '@/lib/tab-press';
+import {
+  planProfileTabPress,
+  type PressedTabRoute,
+  type TabPressNavigation,
+} from '@/lib/tab-press';
 import {
   scheduleTabSwitchSettle,
   TAB_SWITCH_ACTIVE_TAB_SETTLE_MS,
@@ -21,10 +25,42 @@ function settleFocusedTabPress(navigation: TabFocus): void {
   }
 }
 
+/**
+ * The press selects its own tab through the navigation queue, and leaves the
+ * bar's own press handling in place beside it.
+ *
+ * The navigator moves the tab only when its bar does not already consider the
+ * pressed entry focused, and the bar reads that from the last render. A burst of
+ * presses outruns those renders: the queue applies each press to the latest
+ * route state while the bar still renders an earlier one, so the bar can see the
+ * pressed tab as focused and drop a press that is a real move — eight rapid taps
+ * ending on Profile left Chat selected that way (explorer finding
+ * `xmvveh9nv34`). `JUMP_TO` is the tab router's "focus this tab": dispatched
+ * here it reaches the same route state the earlier presses reached, so the last
+ * tab tapped wins, and for the tab that is already focused it changes nothing,
+ * which keeps a re-press — and the navigator's pop to that tab's root for it —
+ * exactly as it was. The default press is not prevented, so the navigator, the
+ * focused tab's automatic pop to its root and the Profile re-press plan below
+ * all still run.
+ */
+function selectPressedTab(navigation: TabPressNavigation, route: PressedTabRoute): void {
+  navigation.dispatch({
+    type: 'JUMP_TO',
+    payload: { name: route.name, params: route.params },
+  });
+}
+
 /** The plain tab press: the same feedback for every tab without its own move. */
-export function tabPressListeners({ navigation }: { navigation: TabFocus }) {
+export function tabPressListeners({
+  navigation,
+  route,
+}: {
+  navigation: TabFocus & TabPressNavigation;
+  route: PressedTabRoute;
+}) {
   return {
     tabPress: () => {
+      selectPressedTab(navigation, route);
       settleFocusedTabPress(navigation);
       selectionHaptic();
     },
@@ -39,13 +75,20 @@ export function tabPressListeners({ navigation }: { navigation: TabFocus }) {
  * unsaved-changes guard can intercept and replay it.
  */
 export function profileTabPressListeners(segments: readonly string[]) {
-  return ({ navigation }: { navigation: TabFocus & TabPressNavigation }) => ({
+  return ({
+    navigation,
+    route,
+  }: {
+    navigation: TabFocus & TabPressNavigation;
+    route: PressedTabRoute;
+  }) => ({
     tabPress: (event: TabPressEvent) => {
+      selectPressedTab(navigation, route);
       settleFocusedTabPress(navigation);
       selectionHaptic();
       const profileStack = navigation
         .getState()
-        ?.routes.find(route => route.name === '(3_profile)')?.state;
+        ?.routes.find(tabRoute => tabRoute.name === '(3_profile)')?.state;
       // The typed route union does not carry the tab group for every route; the
       // check is a plain segment membership test.
       const plan = planProfileTabPress({

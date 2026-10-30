@@ -187,13 +187,16 @@ function motionFixture(options: { press: string; tapAdb: boolean }) {
     startSampling: async () => {
       beforeTap = dump();
     },
-    stopSampling: async () =>
-      beforeTap === undefined
-        ? []
-        : [
-            { t: 0, repeat: 3, dump: beforeTap },
-            { t: 360, repeat: 5, dump: dump() },
-          ],
+    stopSampling: async () => ({
+      truncated: false,
+      samples:
+        beforeTap === undefined
+          ? []
+          : [
+              { t: 0, repeat: 3, dump: beforeTap },
+              { t: 360, repeat: 5, dump: dump() },
+            ],
+    }),
     disconnect: () => undefined,
   };
   const device: Device = {

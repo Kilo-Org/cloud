@@ -25,11 +25,38 @@ type Shift = {
   animated: boolean;
 };
 
+// A transition moves a whole subtree by one vector, so the element has not moved within its parent.
+function movedWithAncestor(
+  to: LayoutNode,
+  dx: number,
+  dy: number,
+  geometry: readonly ReadonlyMap<string, Rect>[],
+  from: number,
+  sample: number
+): boolean {
+  const previous = geometry[from];
+  const current = geometry[sample];
+  if (previous === undefined || current === undefined) return false;
+  for (let parent = to.parent; parent !== undefined; parent = parent.parent) {
+    const before = previous.get(parent.structuralPath);
+    const after = current.get(parent.structuralPath);
+    if (before === undefined || after === undefined) continue;
+    if (
+      Math.abs(after[0] - before[0] - dx) <= TOLERANCE_DP &&
+      Math.abs(after[1] - before[1] - dy) <= TOLERANCE_DP
+    ) {
+      return true;
+    }
+  }
+  return false;
+}
+
 function largestShift(
   byKey: readonly ReadonlyMap<string, LayoutNode>[],
   routes: readonly string[],
   key: string,
-  intervalMs: number
+  intervalMs: number,
+  geometry: readonly ReadonlyMap<string, Rect>[]
 ) {
   let rest: { node: LayoutNode; sample: number; end: number } | undefined;
   let run = 0;
@@ -54,7 +81,9 @@ function largestShift(
       const dy = y1 - y0;
       const delta = Math.max(Math.abs(dx), Math.abs(dy));
       const resized = Math.abs(w1 - w0) > TOLERANCE_DP || Math.abs(h1 - h0) > TOLERANCE_DP;
-      if (!resized && delta > TOLERANCE_DP && (!worst || delta > worst.delta)) {
+      // An out-of-flow overlay moves on purpose, and motion shared with an ancestor is a transition.
+      const ignored = node.absolute || movedWithAncestor(node, dx, dy, geometry, rest.end, sample);
+      if (!ignored && !resized && delta > TOLERANCE_DP && (!worst || delta > worst.delta)) {
         const arrival = sample - 1;
         const transitionMs = (arrival - (rest.end + 1)) * intervalMs;
         worst = {
@@ -97,12 +126,16 @@ export function checkShift(timeline: readonly LayoutTree[], intervalMs: number):
     });
     return new Map(unique);
   });
+  const geometry = timeline.map(
+    tree => new Map(tree.nodes.map(node => [node.structuralPath, node.rect] as const))
+  );
   const shifts = [...new Set(byKey.flatMap(nodes => [...nodes.keys()]))].flatMap(key => {
     const shift = largestShift(
       byKey,
       timeline.map(tree => tree.env.route),
       key,
-      intervalMs
+      intervalMs,
+      geometry
     );
     return shift ? [shift] : [];
   });

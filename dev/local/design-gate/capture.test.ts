@@ -141,18 +141,21 @@ function fakeProbe(state: ProbeState): ProbeClient {
     lastOutcome: async () => 'openLink kiloapp://dead: failed (no route)',
     press: async () => 'not-found',
     startSampling: async () => undefined,
-    stopSampling: async () => [
-      {
-        t: 0,
-        repeat: 3,
-        dump: dumpWith({
-          isRTL: state.language === 'ar',
-          language: state.language,
-          route: state.route,
-          text: state.text,
-        }),
-      },
-    ],
+    stopSampling: async () => ({
+      truncated: false,
+      samples: [
+        {
+          t: 0,
+          repeat: 3,
+          dump: dumpWith({
+            isRTL: state.language === 'ar',
+            language: state.language,
+            route: state.route,
+            text: state.text,
+          }),
+        },
+      ],
+    }),
     disconnect: () => undefined,
   };
 }

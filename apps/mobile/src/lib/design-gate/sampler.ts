@@ -12,9 +12,12 @@ type Layout = Readonly<{
 
 export type Sample<T> = Readonly<{ t: number; repeat: number; dump: T }>;
 
+const MAX_SAMPLES = 400;
+
 export function createSampler<T extends Layout>(snapshot: () => T) {
   let samples: Sample<T>[] = [];
   let stopTimers: (() => void) | undefined = undefined;
+  let truncated = false;
 
   const stop = (): readonly Sample<T>[] => {
     stopTimers?.();
@@ -26,6 +29,7 @@ export function createSampler<T extends Layout>(snapshot: () => T) {
 
   const start = (intervalMs: number, maxMs: number) => {
     stop();
+    truncated = false;
     let last = '';
     const tick = () => {
       const dump = snapshot();
@@ -35,6 +39,11 @@ export function createSampler<T extends Layout>(snapshot: () => T) {
         samples[samples.length - 1] = { ...previous, repeat: previous.repeat + 1 };
       } else {
         last = key;
+        // Keep the newest layouts so a late transition survives; the evicted head is reported.
+        if (samples.length >= MAX_SAMPLES) {
+          samples.shift();
+          truncated = true;
+        }
         samples.push({ t: Date.now(), repeat: 1, dump });
       }
     };
@@ -50,5 +59,5 @@ export function createSampler<T extends Layout>(snapshot: () => T) {
     };
   };
 
-  return { start, stop };
+  return { start, stop, truncated: () => truncated };
 }

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import type { Rect } from '../tree';
+import type { ProbeNode, Rect } from '../tree';
 import { checkShift } from './index';
 import { tree } from './test-dump';
 
@@ -123,6 +123,57 @@ test('layout-shift: text-only identities repeated within a sample are not tracke
   );
   assert.deepEqual(
     checkShift([sample(10, true), sample(10, true), sample(40, true), sample(40, true)], 120),
+    []
+  );
+});
+
+test('layout-shift: an overlay or motion shared with an ancestor is not a layout shift', () => {
+  // A push transition moves the container and its child by the same vector.
+  const moving = (y: number) => [
+    { parent: 0, tag: 'View', rect: [0, y, 400, 200] as Rect },
+    {
+      parent: 1,
+      tag: 'Paragraph',
+      rect: [0, y + 10, 100, 20] as Rect,
+      text: 'Title',
+      testID: 'title',
+    },
+  ];
+  assert.deepEqual(
+    checkShift(
+      [moving(0), moving(0), moving(300), moving(300)].map(nodes => tree(nodes)),
+      120
+    ),
+    []
+  );
+  // The child moves inside a container that stays put, which is a real shift.
+  const inside = (y: number) => [
+    { parent: 0, tag: 'View', rect: [0, 0, 400, 200] as Rect },
+    { parent: 1, tag: 'Paragraph', rect: [0, y, 100, 20] as Rect, text: 'Title', testID: 'title' },
+  ];
+  assert.equal(
+    checkShift(
+      [inside(10), inside(10), inside(40), inside(40)].map(nodes => tree(nodes)),
+      120
+    ).length,
+    1
+  );
+  // An out-of-flow overlay moves on purpose.
+  const overlay = (y: number) => [
+    {
+      parent: 0,
+      tag: 'View',
+      rect: [0, y, 300, 60] as Rect,
+      text: 'Footer',
+      testID: 'footer',
+      style: { position: 'absolute' },
+    },
+  ];
+  assert.deepEqual(
+    checkShift(
+      [overlay(10), overlay(10), overlay(200), overlay(200)].map(nodes => tree(nodes)),
+      120
+    ),
     []
   );
 });

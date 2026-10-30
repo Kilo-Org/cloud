@@ -15,7 +15,8 @@ test('sampling retains late transitions without merging non-adjacent layouts', c
   position = 399;
   context.mock.timers.tick(120);
   const samples = sampler.stop();
-  assert.equal(samples.length, 403);
+  assert.equal(samples.length, 400);
+  assert.equal(sampler.truncated(), true);
   assert.deepEqual(
     samples.slice(-3).map(sample => [sample.dump.nodes[0]?.rect[0], sample.repeat]),
     [

@@ -866,6 +866,31 @@ describe('ReviewDetailScreen pull request destination', () => {
     expect(githubAuthorization.enabled).toContain(false);
   });
 
+  it('decides on the URL provider when the row column disagrees', () => {
+    // The row says gitlab but its URL is a github.com pull request. The button
+    // and the connection read both follow the URL, so a connected user still
+    // reads in the app.
+    detail.data = {
+      success: true,
+      review: makeReview({
+        platform: 'gitlab',
+        pr_url: 'https://github.com/org/repo/pull/42',
+      }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+    githubAuthorization.data = { connected: true };
+    mountScreen();
+    expect(githubAuthorization.enabled).toContain(true);
+
+    const button = buttons.rendered.find(
+      candidate => buttonText(candidate) === i18n.t('common.openPullRequest')
+    );
+    expect(button?.onPress).toBeDefined();
+    act(() => button?.onPress?.());
+    expect(routerMock.push).toHaveBeenCalledWith('/(app)/pr-review/org/repo/42');
+    expect(openExternalUrl).not.toHaveBeenCalled();
+  });
+
   it('keeps the personal browser fallback for unrecognized URLs', () => {
     const prUrl = 'https://github.example.com/org/repo/pull/42';
     detail.data = {

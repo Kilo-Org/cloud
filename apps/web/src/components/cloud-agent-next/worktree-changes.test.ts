@@ -378,12 +378,23 @@ describe('saved worktree changes cache', () => {
 
   it('serves nothing to another user for the same session, worktree and organization', () => {
     queryClient.setQueryData(queryKey, { snapshot });
+    const aliceFileKey = getWorktreeFileQueryKey({
+      ...scope,
+      path: 'src/file.ts',
+      expectedRevision: snapshot.revision,
+    });
+    queryClient.setQueryDefaults(aliceFileKey, { structuralSharing: true });
+    queryClient.setQueryData(aliceFileKey, { revision: snapshot.revision, text: 'saved file' });
     for (const other of [
       { ...scope, userId: 'user-bob' },
       { ...scope, userId: 'user-bob', organizationId: 'organization-a' },
     ]) {
       expect(queryClient.getQueryData(getWorktreeChangesQueryKey(other))).toBeUndefined();
     }
+    expect(queryClient.getQueryData(aliceFileKey)).toEqual({
+      revision: snapshot.revision,
+      text: 'saved file',
+    });
     expect(
       queryClient.getQueryData(
         getWorktreeFileQueryKey({

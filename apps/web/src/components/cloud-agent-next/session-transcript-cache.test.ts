@@ -155,6 +155,17 @@ describe('web session transcript cache', () => {
     expect(other.read('ses-1' as KiloSessionId)).not.toBeNull();
   });
 
+  it('keeps a queued write in the scope that issued it', async () => {
+    const cache = cacheFor(alice);
+    cache.write(page('ses-1', 1, 'alice text'));
+    await Promise.resolve(); // writes land in a microtask
+
+    expect(textOf(cacheFor(alice).read('ses-1' as KiloSessionId))).toMatchObject({
+      text: 'alice text',
+    });
+    expect(cacheFor(bob).read('ses-1' as KiloSessionId)).toBeNull();
+  });
+
   it('follows the current user instead of the one it was created with', async () => {
     let scope = alice;
     const cache = createWebSessionTranscriptCache(queryClient, () => scope);

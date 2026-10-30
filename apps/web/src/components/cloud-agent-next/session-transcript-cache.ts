@@ -35,8 +35,8 @@ export function toCachedTranscriptPage(page: CachedSessionSnapshotPage): CachedS
 }
 
 /**
- * The scope is read on every access: a session manager created before the
- * signed-in user changed must not touch the previous user's pages.
+ * `read` resolves the scope each time it is called; `write` resolves it once,
+ * when the write is called, before the page is queued.
  */
 export function createWebSessionTranscriptCache(
   queryClient: QueryClient,
@@ -55,10 +55,10 @@ export function createWebSessionTranscriptCache(
       ) ?? null,
     write: (page: CachedSessionSnapshotPage): void => {
       const snapshot = toCachedTranscriptPage(page);
+      const scope = currentScope();
       const updatedAt = Date.now();
       queueMicrotask(() => {
         try {
-          const scope = currentScope();
           const queryKey = transcriptScopePrefix(scope);
           if (JSON.stringify(snapshot).length > 1_000_000) {
             queryClient.removeQueries({ queryKey: [...queryKey, page.info.id], exact: true });

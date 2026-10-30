@@ -19,7 +19,11 @@ export default async function OrgCloudAgentLayout({
   const preferences = await readSidebarPreferences(user.id);
 
   return (
-    <CloudAgentProvider userId={user.id} organizationId={organizationId}>
+    <CloudAgentProvider
+      key={`${user.id}:${organizationId}`}
+      userId={user.id}
+      organizationId={organizationId}
+    >
       <PrefetchedCloudSidebar
         userId={user.id}
         organizationId={organizationId}

@@ -1,13 +1,8 @@
-import { appendAnthropicBetaHeader } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import { appendAnthropicBetaHeader } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/beta-header';
+import { getClaudeVersion } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import type { TransformRequestContext } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
 
 const THINKING_BINDING_BETA = 'thinking-binding-controls-2026-08-01';
-
-/**
- * Matches `claude-opus-5.5`, `claude-opus-5-5@20261005`, and `claude-haiku-4-5-20251001-v1:0`.
- * A minor version has at most two digits, so a date suffix is not read as one.
- */
-const CLAUDE_VERSION = /claude-[a-z]+-(\d+)(?:[.-](\d{1,2})(?!\d))?/;
 
 /**
  * Claude models of every family from version 5.1 on are matched. The models known to bind each
@@ -19,10 +14,9 @@ const CLAUDE_VERSION = /claude-[a-z]+-(\d+)(?:[.-](\d{1,2})(?!\d))?/;
  * https://platform.claude.com/docs/en/build-with-claude/preserved-thinking
  */
 function bindsThinkingToPrefix(model: string) {
-  const match = CLAUDE_VERSION.exec(model);
-  if (!match) return false;
-  const [, major, minor = '0'] = match;
-  return Number(major) > 5 || (Number(major) === 5 && Number(minor) >= 1);
+  const version = getClaudeVersion(model);
+  if (!version) return false;
+  return version.major > 5 || (version.major === 5 && version.minor >= 1);
 }
 
 /**

@@ -6,6 +6,7 @@ import { i18n } from '@/i18n';
 import { ProfileKiloCommandsScreen } from '@/components/profiles/profile-kilo-commands-screen';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders, waitFor } from '@/test/render-with-providers';
+import { COMPACT_CONTROL_HIT_SLOP_DP } from '@/lib/a11y/tap-target';
 
 const h = vi.hoisted(() => ({
   confirm: vi.fn(),
@@ -61,8 +62,15 @@ vi.mock('react-native', async () => {
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
+const THEME = vi.hoisted(() => ({
+  mutedForeground: '#000000',
+  destructive: '#FF0000',
+  mutedSoft: '#A9A39A',
+  primary: '#4F5A10',
+  primaryForeground: '#FFFFFF',
+}));
 vi.mock('@/lib/hooks/use-theme-colors', () => ({
-  useThemeColors: () => ({ mutedForeground: '#000000', destructive: '#FF0000' }),
+  useThemeColors: () => THEME,
 }));
 vi.mock('@/components/ui/dialog', () => ({
   useConfirmDialog: () => ({ confirm: h.confirm, dialog: null }),
@@ -317,6 +325,43 @@ describe('ProfileKiloCommandsScreen save refusals', () => {
     expect(findField(renderer.root, 'Command name').props.error).toBe(
       i18n.t('profiles.slashCommands.duplicateName')
     );
+
+    unmount();
+  });
+});
+
+describe('ProfileKiloCommandsScreen row controls', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.assign(h.query, { data: [testCommand()], isPending: false, isError: false });
+    permissionState.canManage = true;
+  });
+
+  // The platform `Switch` falls back to its own accent tint, which drew the on
+  // state in Material teal and read as disabled against the card.
+  it('tints the enable switch from theme tokens instead of the platform accent', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    const toggle = findOne(renderer.root, 'Switch').props as {
+      trackColor?: { false?: string; true?: string };
+      thumbColor?: string;
+    };
+    expect(toggle.trackColor).toEqual({ false: THEME.mutedSoft, true: THEME.primary });
+    expect(toggle.thumbColor).toBe(THEME.primaryForeground);
+
+    unmount();
+  });
+
+  it('gives every row action a slop that carries its icon box to the touch target', async () => {
+    const { renderer, unmount } = await mountScreen();
+
+    const actions = findAll(renderer.root, 'Pressable').filter(node =>
+      String(node.props.accessibilityLabel).startsWith('Move slash command')
+    );
+    expect(actions).toHaveLength(2);
+    for (const action of actions) {
+      expect(action.props.hitSlop).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
+    }
 
     unmount();
   });

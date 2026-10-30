@@ -89,17 +89,19 @@ async function refetchFirstPage(query: Query): Promise<void> {
  * Returns the in-flight refetch, or null when the entry is not a mounted
  * infinite query, or when nothing may fetch it.
  */
-function reconcileEntry(query: Query): Promise<void> | null {
+function reconcileEntry(queryClient: QueryClient, query: Query): Promise<void> | null {
   const data = infiniteQueryDataSchema.safeParse(query.state.data);
   const initialPageParam = readInitialPageParam(query);
   if (!data.success || !initialPageParam.present) {
     return null;
   }
   if (query.observers.length === 0) {
-    // Nothing renders these rows, so dropping them costs no visible state and
-    // keeps the one-page refetch cost: the next mount fetches page one instead
-    // of fanning out over every retained page.
-    query.setState({ data: { pages: [], pageParams: [] } });
+    // Nothing renders these rows, so the entry goes rather than keeping pages
+    // whose next mount would fan out over all of them. Dropping it, instead of
+    // emptying its pages, matters: a zero-page success reads as "loaded, and
+    // there is nothing" to every consumer, and the read cache would persist
+    // that snapshot. A removed entry is simply not loaded until its next mount.
+    queryClient.removeQueries({ queryKey: query.queryKey, exact: true });
     return null;
   }
   if (data.data.pageParams.length > 0 && data.data.pageParams[0] !== initialPageParam.value) {
@@ -142,9 +144,10 @@ function reconcileEntry(query: Query): Promise<void> | null {
  *   showing refetches on its next mount.
  * - Each mounted, enabled entry fetches page one from the start; the pages are
  *   replaced only when that page is delivered.
- * - An entry no list is showing has nothing to keep on screen, so its pages are
- *   dropped and its next mount fetches page one rather than fanning out over
- *   every retained page.
+ * - An entry no list is showing has nothing to keep on screen, so it is removed
+ *   and its next mount fetches page one rather than fanning out over every
+ *   retained page. Removing it, rather than emptying its pages, keeps "no rows
+ *   yet" distinct from "loaded, and empty".
  *
  * The returned promise settles once the page-one fetches settle, so a caller
  * that needs the refresh finished (pull-to-refresh, foreground resume) can
@@ -162,7 +165,7 @@ export async function reconcileFirstPage(
   const refetches: Promise<void>[] = [];
 
   for (const query of entries) {
-    const refetch = reconcileEntry(query);
+    const refetch = reconcileEntry(queryClient, query);
     if (refetch !== null) {
       refetches.push(refetch);
     }

@@ -186,7 +186,7 @@ describe('reconcileFirstPage', () => {
     unsubscribe();
   });
 
-  it('drops the pages of an entry no list is showing and fetches nothing', async () => {
+  it('removes an entry no list is showing so its next mount starts unloaded', async () => {
     const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
     const calls: number[] = [];
     // eslint-disable-next-line require-await -- the recipe pins an async queryFn; the body needs no await.
@@ -207,11 +207,12 @@ describe('reconcileFirstPage', () => {
 
     await reconcileFirstPage(queryClient, prefix);
 
-    // Nothing renders these rows, so they are dropped: the next mount fetches
-    // page one instead of fanning out over every retained page.
+    // Nothing renders these rows, so the entry goes: its next mount fetches page
+    // one instead of fanning out over every retained page, and a zero-page
+    // success is never stored (that shape reads as "loaded and empty").
     expect(calls).toEqual([]);
-    expect(queryClient.getQueryState(fullKey)?.isInvalidated).toBe(true);
-    expect(queryClient.getQueryData(fullKey)).toEqual({ pages: [], pageParams: [] });
+    expect(queryClient.getQueryState(fullKey)).toBeUndefined();
+    expect(queryClient.getQueryData(fullKey)).toBeUndefined();
     observer.destroy();
   });
 

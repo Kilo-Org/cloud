@@ -324,6 +324,7 @@
     "remediation blocked",
     "remediation failed",
     "superseded",
+    "{{count}} open",
     "{{loaded}} of {{total}} files loaded"
   ],
   "he": [

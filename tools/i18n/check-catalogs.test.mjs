@@ -669,8 +669,7 @@ const PULL_REQUEST_TERM = {
   agents: { title: 'Agents' },
   manualReview: { startNotFound: 'Could not read that PR from GitHub.' },
 };
-const PULL_REQUEST_TERM_SOURCE =
-  "t('agents.title');\nt('manualReview.startNotFound');";
+const PULL_REQUEST_TERM_SOURCE = "t('agents.title');\nt('manualReview.startNotFound');";
 
 test('accepts the pull-request term capitalized in a catalog', context => {
   const result = runChecker(context, {

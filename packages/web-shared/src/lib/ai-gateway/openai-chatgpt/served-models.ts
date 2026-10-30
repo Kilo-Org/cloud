@@ -35,6 +35,25 @@ let cacheExpiresAt = 0;
 let failureExpiresAt = 0;
 let inFlight: Promise<Set<string> | null> | null = null;
 
+/**
+ * The served ids in a `/models` body, or null when the body carries no usable
+ * list. A 200 whose shape is unrecognizable — an error envelope, a proxy stub, a
+ * body without `data` — is a failed lookup, not an empty catalog: caching it as
+ * an empty set would hide every model, and with it the delegated route, for the
+ * whole `CACHE_TTL_SECONDS`. Entries without a string id are skipped, so a
+ * partially readable list still answers for the ids it did list.
+ */
+function readServedModelIds(body: unknown): Set<string> | null {
+  if (typeof body !== 'object' || body === null || !('data' in body)) return null;
+  const { data } = body;
+  if (!Array.isArray(data) || data.length === 0) return null;
+
+  const ids = data
+    .map(model => (typeof model?.id === 'string' ? model.id : null))
+    .filter((id): id is string => id !== null);
+  return ids.length === 0 ? null : new Set(ids);
+}
+
 async function fetchServedModelIds(apiKey: string): Promise<Set<string> | null> {
   try {
     const response = await fetch(MODELS_URL, {
@@ -45,11 +64,7 @@ async function fetchServedModelIds(apiKey: string): Promise<Set<string> | null> 
     });
     if (!response.ok) return null;
 
-    const body = (await response.json()) as { data?: Array<{ id?: unknown }> };
-    const ids = (body.data ?? [])
-      .map(model => (typeof model?.id === 'string' ? model.id : null))
-      .filter((id): id is string => id !== null);
-    return new Set(ids);
+    return readServedModelIds(await response.json());
   } catch {
     return null;
   }
@@ -58,10 +73,12 @@ async function fetchServedModelIds(apiKey: string): Promise<Set<string> | null> 
 /**
  * True when the project behind `apiKey` can serve `modelId`.
  *
- * A missing key, a failed request, or an unreadable body returns true: a
- * transient problem must not hide the route, and the upstream then answers
- * exactly as it does today. A failure is remembered for `FAILURE_TTL_MS` so a
- * burst of eligible requests does not each pay the lookup and its timeout.
+ * A missing key, a failed request, a 200 without a usable list, or an unreadable
+ * body returns true: a transient problem must not hide the route, and the
+ * upstream then answers exactly as it does today. A failure is remembered for
+ * `FAILURE_TTL_MS` so a burst of eligible requests does not each pay the lookup
+ * and its timeout, and the lookup is retried long before the hour a good list is
+ * reused for.
  */
 export async function isOpenAiModelServed(apiKey: string, modelId: string): Promise<boolean> {
   if (apiKey.trim().length === 0) return true;

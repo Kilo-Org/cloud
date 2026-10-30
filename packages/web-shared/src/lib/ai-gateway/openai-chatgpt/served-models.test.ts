@@ -68,6 +68,52 @@ describe('isOpenAiModelServed', () => {
     await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna-pro')).resolves.toBe(true);
   });
 
+  it.each([
+    ['no data field', { object: 'list' }],
+    ['an empty list', { object: 'list', data: [] }],
+    ['entries without ids', { object: 'list', data: [{ object: 'model' }, {}] }],
+  ])('treats a 200 with %s as a failed lookup', async (_label, payload) => {
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify(payload), {
+        status: 200,
+        headers: { 'content-type': 'application/json' },
+      })
+    );
+
+    await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna-pro')).resolves.toBe(true);
+    // The unusable answer is remembered for the short failure window, not cached
+    // as an empty catalog for the hour a real list is reused for.
+    await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna-pro')).resolves.toBe(true);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('re-asks after the failure window instead of hiding the route for an hour', async () => {
+    const now = jest.spyOn(Date, 'now').mockReturnValue(1_000_000);
+    fetchMock
+      .mockResolvedValueOnce(new Response(JSON.stringify({ object: 'list' }), { status: 200 }))
+      .mockResolvedValueOnce(modelsResponse(['gpt-5.6-luna']));
+
+    await isOpenAiModelServed('partner-key', 'gpt-5.6-luna');
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+
+    now.mockReturnValue(1_000_000 + 30_000);
+    await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna')).resolves.toBe(true);
+    // The recovered list is authoritative again and rejects the unserved slug.
+    await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna-pro')).resolves.toBe(false);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+  });
+
+  it('serves the ids it could read from a partially malformed list', async () => {
+    fetchMock.mockResolvedValue(
+      new Response(JSON.stringify({ object: 'list', data: [{ id: 'gpt-5.6-luna' }, { id: 7 }] }), {
+        status: 200,
+      })
+    );
+
+    await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna')).resolves.toBe(true);
+    await expect(isOpenAiModelServed('partner-key', 'gpt-5.6-luna-pro')).resolves.toBe(false);
+  });
+
   it('remembers a failed lookup instead of retrying it per request', async () => {
     fetchMock.mockResolvedValue(new Response('nope', { status: 500 }));
 

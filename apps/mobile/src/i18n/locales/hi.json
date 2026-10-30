@@ -1204,7 +1204,6 @@
       "eventsCount_other": "{{displayCount}} घटनाएँ",
       "generated": "रिपोर्ट तैयार हुई: {{generatedAt}}।",
       "noActivity": "कोई गतिविधि दर्ज नहीं",
-      "noActivityDescription": "{{start}} से {{end}} तक Kilo में सुरक्षा समस्याओं से जुड़ी कोई गतिविधि नहीं है जिसे रिपोर्ट में शामिल किया जा सके।",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "रिपोर्ट क्वेरी पूरी नहीं हुई। फिर से कोशिश करें।",
       "repositoryNotRecorded": "रिपॉज़िटरी दर्ज नहीं",

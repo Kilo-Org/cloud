@@ -1993,7 +1993,6 @@
       "eventsCount_other": "{{displayCount}} esdeveniments",
       "generated": "L'informe s'ha generat el {{generatedAt}}.",
       "noActivity": "Cap activitat registrada",
-      "noActivityDescription": "Kilo no té activitat d'incidències de seguretat per incloure a l'informe del període de {{start}} a {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Repositori no registrat",
       "reasonUnknown": "Motiu no reconegut",

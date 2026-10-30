@@ -1993,7 +1993,6 @@
       "eventsCount_other": "{{displayCount}} evenimente",
       "generated": "Raport generat la {{generatedAt}}.",
       "noActivity": "Nicio activitate înregistrată",
-      "noActivityDescription": "Kilo nu are activități de raportat privind constatările de securitate pentru perioada {{start}} – {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Depozit neînregistrat",
       "reasonUnknown": "Motiv necunoscut",

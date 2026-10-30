@@ -1966,7 +1966,6 @@
       "eventsCount_other": "{{displayCount}} پېښې",
       "generated": "په {{generatedAt}} جوړ شو.",
       "noActivity": "هېڅ ثبت شوی فعالیت نشته",
-      "noActivityDescription": "Kilo له {{start}} څخه تر {{end}} پورې د امنیتي موندنو په اړه د راپور وړ هېڅ فعالیت نه لري.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "ذخیره ثبت شوې نه ده",
       "reasonUnknown": "ناتپېژندل شوی دلیل",

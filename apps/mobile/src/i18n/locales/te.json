@@ -1966,7 +1966,6 @@
       "eventsCount_other": "{{displayCount}} సంఘటనలు",
       "generated": "రూపొందించిన సమయం: {{generatedAt}}.",
       "noActivity": "కార్యాచరణ ఏదీ నమోదు కాలేదు",
-      "noActivityDescription": "{{start}} నుంచి {{end}} వరకు భద్రతా సమస్యలకు సంబంధించి నివేదించదగిన కార్యాచరణ Kiloలో లేదు.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "రిపోజిటరీ నమోదు కాలేదు",
       "reasonUnknown": "గుర్తించబడని కారణం",

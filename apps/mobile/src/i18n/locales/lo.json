@@ -1966,7 +1966,6 @@
       "eventsCount_other": "{{displayCount}} ເຫດການ",
       "generated": "ສ້າງເມື່ອ {{generatedAt}}.",
       "noActivity": "ບໍ່ມີກິດຈະກຳທີ່ບັນທຶກໄວ້",
-      "noActivityDescription": "Kilo ບໍ່ມີກິດຈະກຳກ່ຽວກັບບັນຫາຄວາມປອດໄພທີ່ກວດພົບທີ່ສາມາດລາຍງານໄດ້ ຕັ້ງແຕ່ {{start}} ຫາ {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "ບໍ່ໄດ້ບັນທຶກຄັງໂຄ້ດ",
       "reasonUnknown": "ເຫດຜົນທີ່ບໍ່ຮູ້ຈັກ",

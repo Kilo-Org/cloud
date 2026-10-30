@@ -2047,7 +2047,6 @@
       "eventsCount_other": "{{displayCount}} avvenimenti",
       "generated": "Ir-rapport ġie ġġenerat {{generatedAt}}.",
       "noActivity": "L-ebda attività rreġistrata",
-      "noActivityDescription": "Kilo m'għandux attività dwar sejbiet tas-sigurtà x'jirrapporta għall-perjodu minn {{start}} sa {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Repożitorju mhux irreġistrat",
       "reasonUnknown": "Raġuni mhux rikonoxxuta",

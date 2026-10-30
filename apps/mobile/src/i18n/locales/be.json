@@ -2020,7 +2020,6 @@
       "eventsCount_other": "{{displayCount}} падзеі",
       "generated": "Справаздача створана: {{generatedAt}}.",
       "noActivity": "Няма зарэгістраваных дзеянняў",
-      "noActivityDescription": "У Kilo няма дзеянняў з праблемамі бяспекі для ўключэння ў справаздачу за перыяд з {{start}} да {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Рэпазіторый не запісаны",
       "reasonUnknown": "Нераспазнаная прычына",

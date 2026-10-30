@@ -1966,7 +1966,6 @@
       "eventsCount_other": "{{displayCount}} ngjarje",
       "generated": "Raporti u gjenerua më {{generatedAt}}.",
       "noActivity": "Asnjë aktivitet i regjistruar",
-      "noActivityDescription": "Kilo nuk ka aktivitet për të raportuar për gjetjet e sigurisë nga {{start}} deri më {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Depoja nuk është regjistruar",
       "reasonUnknown": "Arsye e panjohur",

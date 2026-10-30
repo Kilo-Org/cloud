@@ -1966,7 +1966,6 @@
       "eventsCount_other": "{{displayCount}} gebeurtenisse",
       "generated": "Die verslag is op {{generatedAt}} gegenereer.",
       "noActivity": "Geen aangetekende aktiwiteit nie",
-      "noActivityDescription": "Kilo het geen rapporteerbare aktiwiteit oor sekuriteitsbevindings van {{start}} tot {{end}} nie.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Bewaarplek nie aangeteken nie",
       "reasonUnknown": "Onherkende rede",

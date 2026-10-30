@@ -1966,7 +1966,6 @@
       "eventsCount_other": "{{displayCount}} ਘਟਨਾਵਾਂ",
       "generated": "{{generatedAt}} ਨੂੰ ਤਿਆਰ ਕੀਤੀ ਗਈ।",
       "noActivity": "ਕੋਈ ਗਤੀਵਿਧੀ ਦਰਜ ਨਹੀਂ",
-      "noActivityDescription": "Kilo ਵਿੱਚ {{start}} ਤੋਂ {{end}} ਤੱਕ ਸੁਰੱਖਿਆ ਸਮੱਸਿਆਵਾਂ ਬਾਰੇ ਰਿਪੋਰਟ ਕਰਨ ਯੋਗ ਕੋਈ ਗਤੀਵਿਧੀ ਨਹੀਂ ਹੈ।",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "ਰਿਪੋਜ਼ਟਰੀ ਰਿਕਾਰਡ ਨਹੀਂ ਕੀਤੀ ਗਈ",
       "reasonUnknown": "ਅਣਪਛਾਤਾ ਕਾਰਨ",

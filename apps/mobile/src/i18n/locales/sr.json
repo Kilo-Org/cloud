@@ -1993,7 +1993,6 @@
       "eventsCount_other": "{{displayCount}} događaja",
       "generated": "Izveštaj je generisan {{generatedAt}}.",
       "noActivity": "Nema zabeležene aktivnosti",
-      "noActivityDescription": "Kilo nema aktivnosti u vezi sa bezbednosnim nalazima za izveštaj u periodu od {{start}} do {{end}}.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "Repozitorijum nije zabeležen",
       "reasonUnknown": "Neprepoznat razlog",

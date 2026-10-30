@@ -1966,7 +1966,6 @@
       "eventsCount_other": "{{displayCount}} მოვლენა",
       "generated": "შექმნის დრო: {{generatedAt}}.",
       "noActivity": "აქტივობა არ დაფიქსირებულა",
-      "noActivityDescription": "{{start}}-დან {{end}}-მდე Kilo-ში უსაფრთხოების მიგნებებთან დაკავშირებული აქტივობა არ დაფიქსირებულა, რომელიც ანგარიშში აისახებოდა.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "repositoryNotRecorded": "რეპოზიტორი არ არის ჩაწერილი",
       "reasonUnknown": "ამოუცნობი მიზეზი",

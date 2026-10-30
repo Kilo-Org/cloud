@@ -1204,7 +1204,6 @@
       "eventsCount_other": "{{displayCount}} Ereignisse",
       "generated": "Der Bericht wurde am {{generatedAt}} erstellt.",
       "noActivity": "Keine Aktivitäten erfasst",
-      "noActivityDescription": "Kilo hat vom {{start}} bis zum {{end}} keine Aktivitäten zu Sicherheitsbefunden erfasst, die in den Bericht aufgenommen werden können.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "Die Berichtsanfrage wurde nicht abgeschlossen. Versuche es erneut.",
       "repositoryNotRecorded": "Repository nicht erfasst",

@@ -1212,7 +1212,6 @@
       "eventsCount_other": "{{displayCount}} zdarzenia",
       "generated": "Wygenerowano {{generatedAt}}.",
       "noActivity": "Brak zarejestrowanej aktywności",
-      "noActivityDescription": "W okresie od {{start}} do {{end}} Kilo nie zarejestrowało zdarzeń dotyczących problemów z bezpieczeństwem, które można uwzględnić w raporcie.",
       "periodUtc": "{{start}} – {{end}} · UTC",
       "queryFailed": "Nie udało się pobrać danych do raportu. Spróbuj ponownie.",
       "repositoryNotRecorded": "Nie zapisano repozytorium",

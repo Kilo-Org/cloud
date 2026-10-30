@@ -1,6 +1,6 @@
 import { DurableObject } from 'cloudflare:workers';
 import type { AuthRequest } from '@cloudflare/workers-oauth-provider';
-import { and, desc, eq, gt, isNotNull, isNull, lt, notInArray, sql } from 'drizzle-orm';
+import { and, desc, eq, gt, inArray, isNotNull, isNull, lt, notInArray, sql } from 'drizzle-orm';
 import { drizzle, type DrizzleSqliteDODatabase } from 'drizzle-orm/durable-sqlite';
 import { migrate } from 'drizzle-orm/durable-sqlite/migrator';
 import migrations from '../../drizzle/migrations';
@@ -42,6 +42,12 @@ const STORE_INSTANCE_NAME = 'kilo-mcp-oauth';
 
 /** Interval between expired-row purges (DO alarm). */
 const PURGE_INTERVAL_MS = 6 * 60 * 60 * 1000;
+
+/** Interval for the early housekeeping run that `alarm` schedules. */
+const PURGE_RETRY_INTERVAL_MS = 5 * 60 * 1000;
+
+/** Rows one housekeeping delete statement removes. */
+export const PENDING_PURGE_BATCH_SIZE = 90;
 
 /**
  * Newest refresh-token hashes kept per grant. The provider accepts the current
@@ -351,11 +357,28 @@ export class KiloMcpOAuthStore
     // retains it. Authenticator rows are long-lived and never purged: the
     // recorded single-use step must outlive the requests it guarded.
     this.db.delete(mcpProtectedRequests).where(lt(mcpProtectedRequests.expires_at, nowIso)).run();
-    const expiredPendingAuthorizations = this.db
-      .delete(oauthPendingAuthorizations)
-      .where(lt(oauthPendingAuthorizations.expires_at, nowIso))
-      .returning({ id: oauthPendingAuthorizations.id })
-      .all().length;
+    let expiredPendingAuthorizations = 0;
+    for (;;) {
+      const expiredIds = this.db
+        .select({ id: oauthPendingAuthorizations.id })
+        .from(oauthPendingAuthorizations)
+        .where(lt(oauthPendingAuthorizations.expires_at, nowIso))
+        .limit(PENDING_PURGE_BATCH_SIZE)
+        .all()
+        .map(row => row.id);
+      if (expiredIds.length === 0) break;
+      this.db
+        .delete(oauthPendingAuthorizations)
+        .where(
+          and(
+            lt(oauthPendingAuthorizations.expires_at, nowIso),
+            inArray(oauthPendingAuthorizations.id, expiredIds)
+          )
+        )
+        .run();
+      expiredPendingAuthorizations += expiredIds.length;
+      if (expiredIds.length < PENDING_PURGE_BATCH_SIZE) break;
+    }
     return expiredPendingAuthorizations;
   }
 
@@ -769,7 +792,17 @@ export class KiloMcpOAuthStore
 
   /** One alarm per DO: purge rows past their own expiry, then reschedule. */
   async alarm(): Promise<void> {
-    await this.purgeExpired(new Date().toISOString());
+    try {
+      await this.purgeExpired(new Date().toISOString());
+    } catch (error) {
+      console.warn(
+        `[kilo-mcp] oauth store housekeeping incomplete; next run scheduled shortly: ${
+          error instanceof Error ? error.message : String(error)
+        }`
+      );
+      await this.ctx.storage.setAlarm(Date.now() + PURGE_RETRY_INTERVAL_MS);
+      return;
+    }
     await this.ctx.storage.setAlarm(Date.now() + PURGE_INTERVAL_MS);
   }
 }

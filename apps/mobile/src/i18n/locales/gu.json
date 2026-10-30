@@ -1468,7 +1468,7 @@
       "gate": "પાસ થવાની શરત",
       "gateNone": "કંઈ નહીં",
       "gateHidden": "છુપાયેલ",
-      "checkRun": "તપાસનો પ્રયાસ",
+      "checkRun": "ચેક રન",
       "threshold": "ન્યૂનતમ સ્તર",
       "transcriptWaiting": "સમીક્ષાની લેખિત નોંધની રાહ જોવાઈ રહી છે.",
       "transcriptEmpty": "આ સમીક્ષાની કોઈ લેખિત નોંધ નથી.",
@@ -1584,7 +1584,7 @@
     "platformList": {
       "checking": "તપાસ થઈ રહી છે…",
       "statusUnavailable": "સ્થિતિ ઉપલબ્ધ નથી",
-      "platforms": "પ્લેટફોર્મ",
+      "platforms": "પ્લેટફોર્મ્સ",
       "activity": "પ્રવૃત્તિ"
     },
     "providerConnect": {
@@ -1606,7 +1606,7 @@
     },
     "decision": {
       "pass": "પાસ",
-      "block": "બ્લોક કરો",
+      "block": "બ્લોક",
       "noDecision": "કોઈ નિર્ણય નથી",
       "noResult": "કોઈ પરિણામ નથી"
     },

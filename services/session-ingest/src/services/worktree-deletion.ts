@@ -1,4 +1,4 @@
-import { and, eq, gt, gte, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
 import { getWorkerDb, type WorkerDb } from '@kilocode/db/client';
 import {
@@ -10,8 +10,6 @@ import {
   cloudAgentWorktreeDeletionManifestSchema,
   cloudAgentWorktreeLocationSchema,
   cloudAgentWorktreeIdSchema,
-  containedKiloSessionIdSchema,
-  kiloSdkSessionSnapshotOutcomeSchema,
   WORKTREE_RUNTIME_HISTORY_UNAVAILABLE,
   type CanDestroyCloudAgentWorktreeSandboxResult,
   type UnresolvedCloudAgentSandboxOwner,
@@ -210,6 +208,7 @@ export async function isWorktreeSessionDeleting(
 }
 
 const memberSchema = cloudAgentWorktreeDeletionManifestSchema.shape.sessions.element.extend({
+  userId: z.string(),
   organizationId: z.uuid().nullable(),
   worktreeId: cloudAgentWorktreeIdSchema.nullable(),
   cloudAgentSessionScopeId: z.string().nullable(),
@@ -217,23 +216,13 @@ const memberSchema = cloudAgentWorktreeDeletionManifestSchema.shape.sessions.ele
 
 async function discoverMembers(db: WorktreeDb, params: CloudAgentWorktreeDeletionParams) {
   const result = await db.execute(sql`
-    WITH RECURSIVE members AS (
-      SELECT session_id, cloud_agent_session_id, organization_id,
-        cloud_agent_worktree_id, cloud_agent_session_scope_id
-      FROM ${cli_sessions_v2}
-      WHERE cloud_agent_worktree_id = ${params.worktreeId} AND kilo_user_id = ${params.kiloUserId}
-      UNION
-      SELECT child.session_id, child.cloud_agent_session_id, child.organization_id,
-        child.cloud_agent_worktree_id, child.cloud_agent_session_scope_id
-      FROM ${cli_sessions_v2} child
-      INNER JOIN members parent ON child.parent_session_id = parent.session_id
-        OR child.cloud_agent_session_scope_id = parent.cloud_agent_session_id
-      WHERE child.kilo_user_id = ${params.kiloUserId}
-    )
     SELECT session_id AS "sessionId", cloud_agent_session_id AS "cloudAgentSessionId",
+      kilo_user_id AS "userId",
       organization_id AS "organizationId", cloud_agent_worktree_id AS "worktreeId",
       cloud_agent_session_scope_id AS "cloudAgentSessionScopeId"
-    FROM members ORDER BY session_id
+    FROM ${cli_sessions_v2}
+    WHERE kilo_user_id = ${params.kiloUserId} AND cloud_agent_worktree_id = ${params.worktreeId}
+    ORDER BY session_id
   `);
   const rows = z.array(memberSchema).parse(result.rows);
   const rootScopes = new Set<string>(
@@ -246,8 +235,10 @@ async function discoverMembers(db: WorktreeDb, params: CloudAgentWorktreeDeletio
   if (
     rows.some(
       row =>
+        row.userId !== params.kiloUserId ||
         row.organizationId !== (params.organizationId ?? null) ||
-        (row.worktreeId !== null && row.worktreeId !== params.worktreeId) ||
+        row.worktreeId !== params.worktreeId ||
+        (row.cloudAgentSessionId === null && row.cloudAgentSessionScopeId === null) ||
         (row.cloudAgentSessionScopeId !== null && !rootScopes.has(row.cloudAgentSessionScopeId)) ||
         (row.cloudAgentSessionId !== null && !rootScopes.has(row.cloudAgentSessionId))
     )
@@ -282,35 +273,6 @@ async function beginWorktreeDeletionOn(
   tx: WorktreeDb,
   params: CloudAgentWorktreeDeletionParams
 ): Promise<CloudAgentWorktreeDeletionState> {
-  const owners = await tx
-    .select({
-      userId: cli_sessions_v2.kilo_user_id,
-      organizationId: cli_sessions_v2.organization_id,
-      createdAt: cli_sessions_v2.created_at,
-    })
-    .from(cli_sessions_v2)
-    .where(eq(cli_sessions_v2.cloud_agent_worktree_id, params.worktreeId))
-    .orderBy(cli_sessions_v2.created_at);
-  if (
-    owners.some(
-      row =>
-        row.userId !== params.kiloUserId || row.organizationId !== (params.organizationId ?? null)
-    )
-  ) {
-    throw new Error(WORKTREE_ACCESS_DENIED);
-  }
-  const firstOwner = owners[0];
-  if (firstOwner) {
-    await tx
-      .insert(cloud_agent_worktrees)
-      .values({
-        worktree_id: params.worktreeId,
-        kilo_user_id: params.kiloUserId,
-        organization_id: params.organizationId ?? null,
-        created_at: firstOwner.createdAt,
-      })
-      .onConflictDoNothing({ target: cloud_agent_worktrees.worktree_id });
-  }
   const row = await lockWorktree(tx, params);
   if (row.deletion_completed_at !== null) return deletionState(row);
   let manifest: CloudAgentWorktreeDeletionState['manifest'];
@@ -323,26 +285,11 @@ async function beginWorktreeDeletionOn(
       sessions: await discoverMembers(tx, params),
     });
   }
-  const runtimeLocations = locations(row);
-  if (runtimeLocations.length === 0) {
-    const cloudAgentSessionId = firstWorktreeSessionId(params.worktreeId);
-    const allocations = await readSessionAllocations(tx, params.kiloUserId, [cloudAgentSessionId]);
-    const source = manifest.sessions.find(
-      session => session.cloudAgentSessionId === cloudAgentSessionId
-    );
-    const recovered = allocationLocation(allocations, {
-      cloudAgentSessionId,
-      sessionId: source?.sessionId ?? null,
-      organizationId: params.organizationId ?? null,
-    });
-    if (recovered) runtimeLocations.push(recovered);
-  }
   const [updated] = await tx
     .update(cloud_agent_worktrees)
     .set({
       deletion_started_at: row.deletion_started_at ?? new Date().toISOString(),
       deletion_manifest: manifest,
-      runtime_locations: runtimeLocations,
     })
     .where(eq(cloud_agent_worktrees.worktree_id, params.worktreeId))
     .returning();
@@ -425,149 +372,10 @@ export async function retireWorktreeIfSoleMember(
   });
 }
 
-const childSnapshotSchema = z.object({
-  id: containedKiloSessionIdSchema,
-  parentID: containedKiloSessionIdSchema,
-  directory: z.string(),
-});
-
-async function inferChildSessionLineage(
-  env: Env,
-  db: WorktreeDb,
-  params: RecordCloudAgentWorktreeCleanupParams
-): Promise<NonNullable<RecordCloudAgentWorktreeCleanupParams['childSessions']>> {
-  if (!params.directory) return [];
-  const [row] = await db
-    .select()
-    .from(cloud_agent_worktrees)
-    .where(eq(cloud_agent_worktrees.worktree_id, params.worktreeId));
-  const worktree = await authorize(db, row, params);
-  if (worktree.deletion_started_at === null) throw new Error('worktree_deletion_not_started');
-  const state = deletionState(worktree);
-  if (state.completed) return [];
-  const parents = new Map<string, `workspace_${string}`>(
-    state.manifest.sessions.flatMap(session =>
-      session.cloudAgentSessionId ? [[session.sessionId, session.cloudAgentSessionId] as const] : []
-    )
-  );
-  const rootScopes = new Set<string>(parents.values());
-  if (state.manifest.sessions.length > 0) {
-    const owned = await db
-      .select({
-        sessionId: cli_sessions_v2.session_id,
-        cloudAgentSessionScopeId: cli_sessions_v2.cloud_agent_session_scope_id,
-        organizationId: cli_sessions_v2.organization_id,
-        worktreeId: cli_sessions_v2.cloud_agent_worktree_id,
-      })
-      .from(cli_sessions_v2)
-      .where(
-        and(
-          eq(cli_sessions_v2.kilo_user_id, params.kiloUserId),
-          inArray(
-            cli_sessions_v2.session_id,
-            state.manifest.sessions.map(session => session.sessionId)
-          )
-        )
-      );
-    for (const session of owned) {
-      if (
-        session.organizationId === (params.organizationId ?? null) &&
-        session.cloudAgentSessionScopeId &&
-        rootScopes.has(session.cloudAgentSessionScopeId) &&
-        (session.worktreeId === null || session.worktreeId === params.worktreeId)
-      ) {
-        const root = state.manifest.sessions.find(
-          item => item.cloudAgentSessionId === session.cloudAgentSessionScopeId
-        );
-        if (root?.cloudAgentSessionId) parents.set(session.sessionId, root.cloudAgentSessionId);
-      }
-    }
-  }
-  let seeded = true;
-  while (seeded) {
-    seeded = false;
-    for (const child of params.childSessions ?? []) {
-      if (
-        !parents.has(child.sessionId) &&
-        parents.get(child.parentSessionId) === child.cloudAgentSessionId
-      ) {
-        parents.set(child.sessionId, child.cloudAgentSessionId);
-        seeded = true;
-      }
-    }
-  }
-  const candidates = new Map<string, z.infer<typeof childSnapshotSchema>>();
-  let cursor: string | undefined;
-  while (true) {
-    const page = await db
-      .select({ sessionId: cli_sessions_v2.session_id })
-      .from(cli_sessions_v2)
-      .where(
-        and(
-          eq(cli_sessions_v2.kilo_user_id, params.kiloUserId),
-          params.organizationId
-            ? eq(cli_sessions_v2.organization_id, params.organizationId)
-            : isNull(cli_sessions_v2.organization_id),
-          isNull(cli_sessions_v2.cloud_agent_session_id),
-          isNull(cli_sessions_v2.cloud_agent_session_scope_id),
-          isNull(cli_sessions_v2.cloud_agent_worktree_id),
-          isNull(cli_sessions_v2.parent_session_id),
-          gte(cli_sessions_v2.created_at, worktree.created_at),
-          cursor ? gt(cli_sessions_v2.session_id, cursor) : undefined
-        )
-      )
-      .orderBy(cli_sessions_v2.session_id)
-      .limit(100);
-    if (page.length === 0) break;
-    for (const candidate of page) {
-      const rawSnapshot = await withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
-        () =>
-          getSessionIngestDO(env, {
-            kiloUserId: params.kiloUserId,
-            sessionId: candidate.sessionId,
-          }),
-        stub => stub.readKiloSdkSessionSnapshot(),
-        'SessionIngestDO.readKiloSdkSessionSnapshot'
-      );
-      const outcome = kiloSdkSessionSnapshotOutcomeSchema.safeParse(rawSnapshot);
-      if (!outcome.success) continue;
-      const snapshot = outcome.data;
-      if (snapshot.kind === 'retryable_failure')
-        throw new Error('worktree_child_snapshot_unavailable');
-      if (snapshot.kind !== 'value') continue;
-      const parsed = childSnapshotSchema.safeParse(snapshot.info);
-      if (
-        parsed.success &&
-        parsed.data.id === candidate.sessionId &&
-        parsed.data.directory === params.directory &&
-        parsed.data.parentID !== candidate.sessionId
-      )
-        candidates.set(candidate.sessionId, parsed.data);
-    }
-    cursor = page.at(-1)?.sessionId;
-    if (page.length < 100) break;
-  }
-  const recovered: NonNullable<RecordCloudAgentWorktreeCleanupParams['childSessions']> = [];
-  let progress = true;
-  while (progress) {
-    progress = false;
-    for (const [id, candidate] of candidates) {
-      const cloudAgentSessionId = parents.get(candidate.parentID);
-      if (!cloudAgentSessionId) continue;
-      recovered.push({ sessionId: id, parentSessionId: candidate.parentID, cloudAgentSessionId });
-      parents.set(id, cloudAgentSessionId);
-      candidates.delete(id);
-      progress = true;
-    }
-  }
-  return recovered;
-}
-
-async function recoverChildSessionLineage(
+async function journalRuntimeChildSessions(
   db: WorktreeDb,
   params: RecordCloudAgentWorktreeCleanupParams,
-  sessions: Map<string, CloudAgentWorktreeDeletionState['manifest']['sessions'][number]>,
-  inferredSessionIds: ReadonlySet<string>
+  sessions: Map<string, CloudAgentWorktreeDeletionState['manifest']['sessions'][number]>
 ): Promise<void> {
   if (!params.childSessions?.length) return;
   const roots = new Map(
@@ -593,6 +401,7 @@ async function recoverChildSessionLineage(
   const rows = await db
     .select({
       sessionId: cli_sessions_v2.session_id,
+      userId: cli_sessions_v2.kilo_user_id,
       cloudAgentSessionId: cli_sessions_v2.cloud_agent_session_id,
       cloudAgentSessionScopeId: cli_sessions_v2.cloud_agent_session_scope_id,
       organizationId: cli_sessions_v2.organization_id,
@@ -601,30 +410,33 @@ async function recoverChildSessionLineage(
     })
     .from(cli_sessions_v2)
     .where(
-      and(
-        eq(cli_sessions_v2.kilo_user_id, params.kiloUserId),
-        inArray(cli_sessions_v2.session_id, [
-          ...new Set([
-            ...sessions.keys(),
-            ...pending.keys(),
-            ...params.childSessions.map(child => child.parentSessionId),
-          ]),
-        ])
-      )
+      inArray(cli_sessions_v2.session_id, [...new Set([...sessions.keys(), ...pending.keys()])])
     )
     .orderBy(cli_sessions_v2.session_id)
     .for('update');
-  const owned = new Map(rows.map(row => [row.sessionId, row]));
+  if (rows.some(row => pending.has(row.sessionId) && row.userId !== params.kiloUserId))
+    throw new Error('worktree_child_lineage_conflict');
+  const owned = new Map(
+    rows.filter(row => row.userId === params.kiloUserId).map(row => [row.sessionId, row])
+  );
   const parents = new Map<string, string>(roots);
-  for (const row of rows) {
-    if (
-      sessions.has(row.sessionId) &&
-      row.organizationId === (params.organizationId ?? null) &&
-      row.cloudAgentSessionScopeId &&
-      rootScopes.has(row.cloudAgentSessionScopeId) &&
-      (row.worktreeId === null || row.worktreeId === params.worktreeId)
-    )
-      parents.set(row.sessionId, row.cloudAgentSessionScopeId);
+  let seeded = true;
+  while (seeded) {
+    seeded = false;
+    for (const row of owned.values()) {
+      if (
+        !parents.has(row.sessionId) &&
+        sessions.has(row.sessionId) &&
+        row.organizationId === (params.organizationId ?? null) &&
+        row.cloudAgentSessionScopeId &&
+        row.worktreeId === params.worktreeId &&
+        row.parentSessionId !== null &&
+        parents.get(row.parentSessionId) === row.cloudAgentSessionScopeId
+      ) {
+        parents.set(row.sessionId, row.cloudAgentSessionScopeId);
+        seeded = true;
+      }
+    }
   }
   while (pending.size > 0) {
     let progress = false;
@@ -636,34 +448,12 @@ async function recoverChildSessionLineage(
         parentScope !== child.cloudAgentSessionId ||
         (row &&
           (row.cloudAgentSessionId !== null ||
-            (inferredSessionIds.has(child.sessionId) &&
-              row.organizationId !== (params.organizationId ?? null)) ||
-            (row.organizationId !== null &&
-              row.organizationId !== (params.organizationId ?? null)) ||
-            (row.cloudAgentSessionScopeId != null &&
-              row.cloudAgentSessionScopeId !== parentScope) ||
-            (row.worktreeId !== null && row.worktreeId !== params.worktreeId) ||
-            (row.parentSessionId !== null &&
-              row.parentSessionId !== child.parentSessionId &&
-              row.cloudAgentSessionScopeId !== parentScope)))
+            row.organizationId !== (params.organizationId ?? null) ||
+            row.cloudAgentSessionScopeId !== parentScope ||
+            row.worktreeId !== params.worktreeId ||
+            row.parentSessionId !== child.parentSessionId))
       )
         throw new Error('worktree_child_lineage_conflict');
-      if (row) {
-        await db
-          .update(cli_sessions_v2)
-          .set({
-            parent_session_id: row.parentSessionId ?? child.parentSessionId,
-            cloud_agent_session_scope_id: parentScope,
-            cloud_agent_worktree_id: params.worktreeId,
-            organization_id: params.organizationId ?? null,
-          })
-          .where(
-            and(
-              eq(cli_sessions_v2.session_id, child.sessionId),
-              eq(cli_sessions_v2.kilo_user_id, params.kiloUserId)
-            )
-          );
-      }
       sessions.set(child.sessionId, { sessionId: child.sessionId, cloudAgentSessionId: null });
       parents.set(child.sessionId, parentScope);
       pending.delete(child.sessionId);
@@ -679,9 +469,6 @@ export async function recordWorktreeCleanup(
 ) {
   return deletionDiagnostic('record_cleanup', params, async timing => {
     const db = getWorkerDb(env.HYPERDRIVE.connectionString);
-    timing.setStage('lineageInference');
-    const inferred = await inferChildSessionLineage(env, db, params);
-    const childSessions = [...(params.childSessions ?? []), ...inferred];
     timing.setStage('sqlTransaction');
     const result = await db.transaction(async tx => {
       const row = await lockWorktree(tx, params);
@@ -692,78 +479,20 @@ export async function recordWorktreeCleanup(
       const sessions = new Map(
         state.manifest.sessions.map(session => [session.sessionId, session])
       );
-      await recoverChildSessionLineage(
-        tx,
-        { ...params, childSessions },
-        sessions,
-        new Set(inferred.map(child => child.sessionId))
-      );
-      const discovered = await discoverMembers(tx, params);
-      if (discovered.length > 0) {
-        const ids = discovered.map(session => session.sessionId);
-        const rootScopes = new Set<string>(
-          [...sessions.values()].flatMap(session =>
-            session.cloudAgentSessionId ? [session.cloudAgentSessionId] : []
-          )
-        );
-        await tx
-          .update(cli_sessions_v2)
-          .set({ cloud_agent_worktree_id: params.worktreeId })
-          .where(
-            and(
-              eq(cli_sessions_v2.kilo_user_id, params.kiloUserId),
-              inArray(cli_sessions_v2.session_id, ids),
-              isNull(cli_sessions_v2.cloud_agent_worktree_id),
-              params.organizationId
-                ? eq(cli_sessions_v2.organization_id, params.organizationId)
-                : isNull(cli_sessions_v2.organization_id),
-              or(
-                isNull(cli_sessions_v2.cloud_agent_session_scope_id),
-                inArray(cli_sessions_v2.cloud_agent_session_scope_id, [...rootScopes])
-              )
-            )
-          );
-        const fenced = await tx
-          .select({
-            organizationId: cli_sessions_v2.organization_id,
-            worktreeId: cli_sessions_v2.cloud_agent_worktree_id,
-            cloudAgentSessionScopeId: cli_sessions_v2.cloud_agent_session_scope_id,
-          })
-          .from(cli_sessions_v2)
-          .where(
-            and(
-              eq(cli_sessions_v2.kilo_user_id, params.kiloUserId),
-              inArray(cli_sessions_v2.session_id, ids)
-            )
-          )
-          .orderBy(cli_sessions_v2.session_id)
-          .for('update');
-        if (
-          fenced.some(
-            session =>
-              session.organizationId !== (params.organizationId ?? null) ||
-              session.worktreeId !== params.worktreeId ||
-              (session.cloudAgentSessionScopeId != null &&
-                !rootScopes.has(session.cloudAgentSessionScopeId))
-          )
-        )
-          throw new Error('worktree_child_lineage_conflict');
-        for (const session of discovered) sessions.set(session.sessionId, session);
-      }
-      const extraIds = [...new Set(params.sessionIds ?? [])].filter(id => !sessions.has(id));
+      const registered = await discoverMembers(tx, params);
+      for (const session of registered) sessions.set(session.sessionId, session);
+      await journalRuntimeChildSessions(tx, params, sessions);
+      const registeredIds = new Set(registered.map(session => session.sessionId));
+      const extraIds = [...new Set(params.sessionIds ?? [])].filter(id => !registeredIds.has(id));
       if (extraIds.length > 0) {
         const existing = await tx
           .select({ sessionId: cli_sessions_v2.session_id })
           .from(cli_sessions_v2)
-          .where(
-            and(
-              eq(cli_sessions_v2.kilo_user_id, params.kiloUserId),
-              inArray(cli_sessions_v2.session_id, extraIds)
-            )
-          );
+          .where(inArray(cli_sessions_v2.session_id, extraIds));
         if (existing.length > 0) throw new Error('worktree_cleanup_session_conflict');
         for (const sessionId of extraIds)
-          sessions.set(sessionId, { sessionId, cloudAgentSessionId: null });
+          if (!sessions.has(sessionId))
+            sessions.set(sessionId, { sessionId, cloudAgentSessionId: null });
       }
       const runtimeLocations = state.runtimeLocations;
       for (const location of params.runtimeLocations ?? []) {

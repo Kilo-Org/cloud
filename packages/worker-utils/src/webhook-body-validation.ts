@@ -269,8 +269,9 @@ function childSchemas(node: Record<string, unknown>): [string, Record<string, un
       if (isSchemaObject(child)) children.push([`${keyword}/${index}`, child]);
     });
   }
-  if (isSchemaObject(node.properties)) {
-    for (const [name, child] of Object.entries(node.properties)) {
+  const properties = node['properties'];
+  if (isSchemaObject(properties)) {
+    for (const [name, child] of Object.entries(properties)) {
       if (isSchemaObject(child)) children.push([`properties/${name}`, child]);
     }
   }
@@ -284,7 +285,8 @@ function childSchemas(node: Record<string, unknown>): [string, Record<string, un
 export function unsupportedPatternPaths(schema: WebhookBodySchema): string[] {
   const paths: string[] = [];
   const walk = (node: Record<string, unknown>, pointer: string) => {
-    if (typeof node.pattern === 'string' && patternSafetyIssue(node.pattern) !== null) {
+    const source = node['pattern'];
+    if (typeof source === 'string' && patternSafetyIssue(source) !== null) {
       paths.push(`${pointer}/pattern`);
     }
     for (const [path, child] of childSchemas(node)) walk(child, `${pointer}/${path}`);
@@ -308,8 +310,9 @@ function withoutUnsupportedPatterns(node: Record<string, unknown>): Record<strin
     });
   };
 
-  if (typeof node.pattern === 'string' && patternSafetyIssue(node.pattern) !== null) {
-    delete editable().pattern;
+  const source = node['pattern'];
+  if (typeof source === 'string' && patternSafetyIssue(source) !== null) {
+    delete editable()['pattern'];
   }
   for (const keyword of SUBSCHEMA_KEYWORDS) {
     const child = node[keyword];
@@ -330,7 +333,7 @@ function withoutUnsupportedPatterns(node: Record<string, unknown>): Record<strin
     });
     if (replaced) put(keyword, replaced);
   }
-  const properties = node.properties;
+  const properties = node['properties'];
   if (isSchemaObject(properties)) {
     let replaced: Record<string, unknown> | null = null;
     for (const [name, child] of Object.entries(properties)) {

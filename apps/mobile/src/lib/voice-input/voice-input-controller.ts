@@ -258,6 +258,7 @@ export function createVoiceInputController(native: VoiceInputNative) {
       onDraftChange: options.onDraftChange,
       onFeedback: options.onFeedback,
       owner: options.owner,
+      started: false,
       terminalPromise: terminal.promise,
       terminalResolve: terminal.resolve,
       terminalized: false,

@@ -463,8 +463,15 @@ export function createGatewayVoiceInputEngine(deps: GatewayVoiceInputEngineDeps)
         await previous;
         await uploadSegment(current, uri);
       } catch {
-        // `uploadSegment` already terminalized the session when it knew why;
-        // the chain only has to keep the next link and the drain alive.
+        // `uploadSegment` handles its own known failures, so reaching this
+        // catch means an unexpected defect. Keep the chain alive for the next
+        // segment and the drain in `finalizeStop`, but never drop a segment
+        // silently: the event name alone is reported, never the recording.
+        captureTelemetry({
+          level: 'error',
+          message: 'voice-input segment upload threw',
+          tags: { 'error.subsystem': 'voice-input', 'error.operation': 'segment-upload' },
+        });
       }
     })();
   };

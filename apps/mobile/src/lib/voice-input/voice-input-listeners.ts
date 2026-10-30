@@ -14,6 +14,12 @@ export type VoiceInputSession = {
   onDraftChange: (nextDraft: string) => void;
   onFeedback: (feedback: VoiceInputFeedback) => void;
   owner: string;
+  /**
+   * True once this session received its own `start`. A recognizer cannot
+   * report a transcript before it started, so anything that arrives earlier
+   * belongs to a session the controller already abandoned.
+   */
+  started: boolean;
   terminalPromise: Promise<boolean>;
   terminalResolve: (ok: boolean) => void;
   terminalized: boolean;
@@ -42,13 +48,14 @@ export function installVoiceInputListeners(
     if (!current || current.terminalized || current.expectedAbort) {
       return;
     }
+    current.started = true;
     controller.setStatus('listening');
     controller.notify();
   };
 
   const onTranscribing: (event: VoiceInputNativeEvent['transcribing']) => void = () => {
     const current = controller.getSession();
-    if (!current || current.terminalized || current.expectedAbort) {
+    if (!current || current.terminalized || current.expectedAbort || !current.started) {
       return;
     }
     controller.setStatus('transcribing');
@@ -57,7 +64,7 @@ export function installVoiceInputListeners(
 
   const onResult: (event: VoiceInputNativeEvent['result']) => void = event => {
     const current = controller.getSession();
-    if (!current || current.terminalized || current.expectedAbort) {
+    if (!current || current.terminalized || current.expectedAbort || !current.started) {
       return;
     }
     const first = event.results[0];

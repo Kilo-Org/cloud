@@ -96,4 +96,37 @@ describe('createVoiceInputController - bounded terminal wait', () => {
       vi.useRealTimers();
     }
   });
+
+  it('ignores a transcript that arrives before the new session reported its own start', async () => {
+    vi.useFakeTimers();
+    try {
+      const { harness, controller } = build();
+      const { feedback, onFeedback } = recordFeedback();
+      const drafts: string[] = [];
+      await controller.start(makeStartOptions({ owner: 'A' }));
+      harness.emit('start', null);
+
+      const next = controller.start(
+        makeStartOptions({
+          owner: 'B',
+          onDraftChange: draft => {
+            drafts.push(draft);
+          },
+          onFeedback,
+        })
+      );
+      await vi.advanceTimersByTimeAsync(BOUND_MS);
+      await expect(next).resolves.toBe(true);
+
+      // A stalled recognizer can deliver the abandoned session's transcript
+      // after the bound released it. It cannot belong to B, which has not
+      // reported its own start yet, so it must not reach B's draft.
+      harness.emitResult('stale words', true);
+      expect(drafts).toEqual([]);
+      expect(controller.getSnapshot().status).toBe('starting');
+      expect(feedback).toEqual([]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

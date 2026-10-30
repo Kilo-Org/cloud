@@ -13,7 +13,7 @@ import { ModelSelector } from '@/components/agents/model-selector';
 import { EmptyState } from '@/components/empty-state';
 import { KeyboardAvoidingView } from 'react-native-keyboard-controller';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
+import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { formFieldA11y } from '@/components/ui/form-field-a11y';
@@ -193,7 +193,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
     const { permanent, variant } = classifyProviderErrorCode(statusErrorCode);
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader
+        <ReviewerHeader
           title={t('codeReviewer.manualReview.title')}
           eyebrow={t('common.codeReviewer')}
         />
@@ -227,7 +227,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
     const canConnect = permission.status !== 'ready' || canConnectProvider('github', permission);
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader
+        <ReviewerHeader
           title={t('codeReviewer.manualReview.title')}
           eyebrow={t('common.codeReviewer')}
         />
@@ -262,7 +262,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
+      <ReviewerHeader
         title={t('codeReviewer.manualReview.title')}
         eyebrow={t('common.codeReviewer')}
       />

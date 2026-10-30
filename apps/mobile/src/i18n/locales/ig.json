@@ -1445,6 +1445,7 @@
       "retryMessage": "Nke a ga-eme nyocha koodu ahụ ọzọ.",
       "retryReview": "Nwaa nyocha ọzọ",
       "retryNeedsSettings": "Onye nyocha koodu agbanyụọla ma ọ bụ ntọala ya chọrọ nlebara anya. Dozie ntọala ndị ahụ, wee nwaa nyocha a ọzọ.",
+      "retryNotStarted": "Nwagharị ahụ ebidoghị.",
       "fixSettings": "Dozie ntọala",
       "couldNotLoad": "Enweghị ike ibudata nyocha.",
       "couldNotGetLatest": "Enweghị ike ịnweta nke kachasị ọhụrụ.",
@@ -1525,6 +1526,7 @@
       "changeRequestNoGitHubAccess": "Ọnweghị njikọ GitHub nwere ohere ịnweta ebe nchekwa a. Jikọọ GitHub ọzọ nke nwere ohere ịnweta ya, wee nwaa ọzọ.",
       "changeRequestMissingPermissions": "Ngwa GitHub nke Kilo enweghị ike imepe pull request na ebe nchekwa a. Onye nwe ebe nchekwa ga-enyerịrị ngwa ahụ ikike ide ihe na pull request, wee nwaa ọzọ.",
       "changeRequestFailed": "Kilo enweghị ike imepe pull request. Nwaa ọzọ n'oge na-adịghị anya.",
+      "proposalConflict": "Aro ọzọ maka ebe nchekwa a ka na-aga n'ihu, yabụ enweghị ike ichekwa nke a ugbu a.",
       "offAction": "A gbanyụrụ ebe nchekwa nyocha. Gbanye ya, wee nwaa ọzọ."
     },
     "manualReview": {

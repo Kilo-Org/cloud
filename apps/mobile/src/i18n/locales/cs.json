@@ -1489,6 +1489,7 @@
       "retryMessage": "Kontrola kódu se spustí znovu.",
       "retryReview": "Opakovat kontrolu",
       "retryNeedsSettings": "Kontrola kódu je vypnutá nebo její nastavení vyžaduje pozornost. Opravte nastavení a potom tuto kontrolu zopakujte.",
+      "retryNotStarted": "Opakování se nepodařilo spustit.",
       "fixSettings": "Opravit nastavení",
       "couldNotLoad": "Kontrolu se nepodařilo načíst.",
       "couldNotGetLatest": "Aktuální stav se nepodařilo načíst.",
@@ -1569,6 +1570,7 @@
       "changeRequestNoGitHubAccess": "Žádné připojení k GitHubu nemá přístup k tomuto repozitáři. Znovu připojte GitHub s přístupem k tomuto repozitáři a poté to zkuste znovu.",
       "changeRequestMissingPermissions": "GitHub App od Kilo nemůže v tomto repozitáři otevírat pull requesty. Vlastník repozitáře musí aplikaci udělit přístup pro zápis k obsahu a pull requestům. Poté to zkuste znovu.",
       "changeRequestFailed": "Kilo nedokázalo otevřít pull request. Zkuste to znovu za chvíli.",
+      "proposalConflict": "Pro tento repozitář je stále aktivní jiný návrh paměti kontrol, takže tento zatím nelze uložit.",
       "offAction": "Paměť kontrol je vypnutá. Zapněte ji a zkuste to znovu."
     },
     "manualReview": {

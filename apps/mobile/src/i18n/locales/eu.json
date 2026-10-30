@@ -1445,6 +1445,7 @@
       "retryMessage": "Kode-berrikuspena berriro exekutatuko da.",
       "retryReview": "Egin berrikuspena berriro",
       "retryNeedsSettings": "Kode-berrikuslea desaktibatuta dago edo haren ezarpenek arreta behar dute. Konpondu ezarpenak eta egin berrikuspen hau berriro.",
+      "retryNotStarted": "Berriro saiatzea ez da abiarazi.",
       "fixSettings": "Konpondu ezarpenak",
       "couldNotLoad": "Ezin izan da berrikuspena kargatu.",
       "couldNotGetLatest": "Ezin izan da azken egoera lortu.",
@@ -1525,6 +1526,7 @@
       "changeRequestNoGitHubAccess": "GitHub konexio batek ere ez du biltegi honetarako sarbiderik. Berraskonektatu GitHub biltegi honetarako sarbidearekin eta saiatu berriro.",
       "changeRequestMissingPermissions": "Kiloren GitHub App-ak ezin ditu pull requestak ireki biltegi honetan. Biltegiko jabe batek eduki eta pull requestetarako idazteko baimena eman behar dio aplikazioari eta saiatu berriro.",
       "changeRequestFailed": "Kilok ezin izan du pull requesta ireki. Saiatu berriro une bat barru.",
+      "proposalConflict": "Beste berrikuspen-memoria proposamen bat oraindik aktibo dago biltegi honetarako.",
       "offAction": "Berrikuspen-memoria desgaituta dago. Gaitu, eta saiatu berriro."
     },
     "manualReview": {

@@ -1445,6 +1445,7 @@
       "retryMessage": "See käivitab koodi ülevaatuse uuesti.",
       "retryReview": "Proovi ülevaatust uuesti",
       "retryNeedsSettings": "Koodiülevaataja on välja lülitatud või selle seaded vajavad tähelepanu. Paranda seaded ja proovi seejärel seda ülevaatust uuesti.",
+      "retryNotStarted": "Uuestiproovimist ei õnnestunud alustada.",
       "fixSettings": "Paranda seaded",
       "couldNotLoad": "Ülevaatust ei õnnestunud laadida.",
       "couldNotGetLatest": "Uusimaid andmeid ei õnnestunud laadida.",
@@ -1525,6 +1526,7 @@
       "changeRequestNoGitHubAccess": "Ühelgi GitHubi ühendusel ei ole sellele hoidlale juurdepääsu. Ühenda GitHub uuesti nii, et sellel on juurdepääs sellele hoidlale, ja proovi seejärel uuesti.",
       "changeRequestMissingPermissions": "Kilo GitHubi rakendus ei saa selles hoidlas tõmbetaotlusi avada. Hoidla omanik peab andma rakendusele kirjutamisõiguse sisule ja tõmbetaotlustele, seejärel proovi uuesti.",
       "changeRequestFailed": "Kilol ei õnnestunud tõmbetaotlust avada. Proovi hetke pärast uuesti.",
+      "proposalConflict": "Selle sama hoidla jaoks on veel üks ülevaatuste mälu ettepanek endiselt aktiivne, mistõttu ei saa seda veel salvestada.",
       "offAction": "Ülevaatuste mälu on välja lülitatud. Lülita see sisse ja proovi uuesti."
     },
     "manualReview": {

@@ -1445,6 +1445,7 @@
       "retryMessage": "Wannan zai sake gudanar da bitar lambar shirin.",
       "retryReview": "Sake gwada bita",
       "retryNeedsSettings": "Mai bitar lambar shiri a kashe yake ko saitunansa suna bukatar kulawa. Gyara saitunan, sannan ka sake gwada wannan bita.",
+      "retryNotStarted": "Ba a fara sake gwadawa ba.",
       "fixSettings": "Gyara saituna",
       "couldNotLoad": "An kasa loda bitar.",
       "couldNotGetLatest": "An kasa samun sabbin bayanai.",
@@ -1525,6 +1526,7 @@
       "changeRequestNoGitHubAccess": "Babu haɗin GitHub da ke da damar shiga wannan ajiya. Sake haɗa GitHub da ke da damar shiga ta, sannan sake gwadawa.",
       "changeRequestMissingPermissions": "Aplikashin GitHub na Kilo ba zai iya buɗe pull request a cikin wannan ajiya ba. Dole mai ajiyar ya ba app ɗin damar rubutu ga abubuwan ciki da pull request, sannan sake gwadawa.",
       "changeRequestFailed": "Kilo ya kasa buɗe pull request ɗin. Sake gwadawa nan da ɗan lokaci.",
+      "proposalConflict": "Wata shawara don wannan ajiya har yanzu tana aiki.",
       "offAction": "An kashe ƙwaƙwalwar bita. Kunna ta, sannan sake gwadawa."
     },
     "manualReview": {

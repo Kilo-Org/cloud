@@ -30,7 +30,7 @@ import {
   MetaRow,
 } from '@/components/code-reviewer/review-detail-sections';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
+import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -129,7 +129,7 @@ export function ReviewDetailScreen({
   if (isLoading) {
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('codeReviewer.reviewDetail.title')} />
+        <ReviewerHeader title={t('codeReviewer.reviewDetail.title')} />
         <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
           <Animated.View exiting={FadeOut.duration(150)} className="gap-3">
             <Skeleton className="h-14 w-full rounded-lg" />
@@ -151,7 +151,7 @@ export function ReviewDetailScreen({
     if (errorCode === 'NOT_FOUND' || errorCode === 'FORBIDDEN' || errorCode === 'UNAUTHORIZED') {
       return (
         <View className="flex-1 bg-background">
-          <ScreenHeader title={t('codeReviewer.reviewDetail.title')} />
+          <ReviewerHeader title={t('codeReviewer.reviewDetail.title')} />
           <QueryError variant={errorCode === 'NOT_FOUND' ? 'not-found' : 'permission'} />
           {dialog}
         </View>
@@ -159,7 +159,7 @@ export function ReviewDetailScreen({
     }
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={t('codeReviewer.reviewDetail.title')} />
+        <ReviewerHeader title={t('codeReviewer.reviewDetail.title')} />
         <QueryError
           variant={trpcErrorVariant(error)}
           title={t('codeReviewer.reviewDetail.couldNotLoad')}
@@ -209,7 +209,10 @@ export function ReviewDetailScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('codeReviewer.reviewDetail.title')} eyebrow={review.repo_full_name} />
+      <ReviewerHeader
+        title={t('codeReviewer.reviewDetail.title')}
+        eyebrow={review.repo_full_name}
+      />
       <ReviewSpectatorSheet
         key={reviewId}
         visible={transcriptReviewId === reviewId}

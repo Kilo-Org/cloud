@@ -1511,6 +1511,7 @@
       "retryMessage": "Dan se jerġa' jwettaq ir-reviżjoni tal-kodiċi.",
       "retryReview": "Erġa' pprova r-reviżjoni",
       "retryNeedsSettings": "Ir-Reviżur tal-kodiċi mitfi jew is-settings tiegħu jeħtieġu attenzjoni. Irranġa s-settings, imbagħad erġa' pprova din ir-reviżjoni.",
+      "retryNotStarted": "L-erġa' pprova ma nbeda xejn.",
       "fixSettings": "Irranġa s-settings",
       "couldNotLoad": "Ma setgħetx titgħabba r-reviżjoni.",
       "couldNotGetLatest": "Ma setgħetx tinkiseb l-aħħar dejta.",
@@ -1591,6 +1592,7 @@
       "changeRequestNoGitHubAccess": "L-ebda konnessjoni ta' GitHub m'għandha aċċess għal dan ir-repożitorju. Erġa' qabbad GitHub b'aċċess għalih, imbagħad erġa' pprova.",
       "changeRequestMissingPermissions": "L-App GitHub ta' Kilo ma tistax tiftaħ pull requests f'dan ir-repożitorju. Sid ir-repożitorju jrid jagħti lill-app aċċess tal-kitba għall-kontenut u l-pull requests, imbagħad erġa' pprova.",
       "changeRequestFailed": "Kilo ma setax jiftaħ il-pull request. Erġa' pprova fi ftit mument.",
+      "proposalConflict": "Proposta oħra għal dan ir-repożitorju għadha attiva.",
       "offAction": "Il-memorja tar-reviżjoni hija diżattivata. Attivaha, mbagħad erġa' pprova."
     },
     "manualReview": {

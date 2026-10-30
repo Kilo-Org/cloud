@@ -1445,6 +1445,7 @@
       "retryMessage": "Bu, kod yoxlamasını yenidən başladacaq.",
       "retryReview": "Yoxlamanı təkrarla",
       "retryNeedsSettings": "Kod yoxlayıcısı söndürülüb və ya onun ayarları diqqət tələb edir. Ayarları düzəldin, sonra bu yoxlamanı təkrarlayın.",
+      "retryNotStarted": "Yenidən cəhd başlamadı.",
       "fixSettings": "Ayarları düzəlt",
       "couldNotLoad": "Kod yoxlamasını yükləmək mümkün olmadı.",
       "couldNotGetLatest": "Ən son məlumatları almaq mümkün olmadı.",
@@ -1525,6 +1526,7 @@
       "changeRequestNoGitHubAccess": "Heç bir GitHub bağlantısının bu repozitoriyaya girişi yoxdur. GitHub-u ona girişlə yenidən qoş, sonra yenidən cəhd et.",
       "changeRequestMissingPermissions": "Kilo-nun GitHub Tətbiqi bu repozitoriyada pull sorğusu aça bilmir. Repozitoriya sahibi tətbiqə məzmun və pull sorğuları üçün yazma icazəsi verməlidir, sonra yenidən cəhd et.",
       "changeRequestFailed": "Kilo pull sorğusunu aça bilmədi. Bir azdan yenidən cəhd et.",
+      "proposalConflict": "Bu repozitoriya üçün başqa bir təklif hələ də aktivdir.",
       "offAction": "Kod yoxlaması yaddaşı deaktivdir. Onu aktivləşdir, sonra yenidən cəhd et."
     },
     "manualReview": {

@@ -37,7 +37,19 @@ export function useModelPreferences(organizationId: string | undefined) {
 
   const input = useMemo(() => (organizationId ? { organizationId } : undefined), [organizationId]);
 
-  const query = useQuery(trpc.modelPreferences.get.queryOptions(input));
+  const query = useQuery({
+    ...trpc.modelPreferences.get.queryOptions(input),
+    // The server preference must settle even while the online manager reports
+    // offline: NetInfo can hold the device offline while the backend is
+    // reachable, and a paused read keeps the saved model and favorites out of
+    // the picker until a connectivity edge that may never come. See
+    // `use-current-user-id`.
+    networkMode: 'always',
+    // `networkMode: 'always'` also disables the derived reconnect refetch
+    // (`@tanstack/query-core` sets `refetchOnReconnect = networkMode !==
+    // 'always'` when it is undefined), so ask for it explicitly.
+    refetchOnReconnect: true,
+  });
 
   // Partial key (no input) so org-scoped and org-less caches both refresh.
   const invalidate = useCallback(async () => {

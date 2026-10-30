@@ -1489,6 +1489,7 @@
       "retryMessage": "To bo znova zagnalo pregled kode.",
       "retryReview": "Znova zaženi pregled",
       "retryNeedsSettings": "Pregledovalec kode je izklopljen ali njegove nastavitve zahtevajo pozornost. Popravite nastavitve, nato znova zaženite ta pregled.",
+      "retryNotStarted": "Znova zagnati ni bilo mogoče.",
       "fixSettings": "Popravi nastavitve",
       "couldNotLoad": "Pregleda ni bilo mogoče naložiti.",
       "couldNotGetLatest": "Najnovejših podatkov ni bilo mogoče pridobiti.",
@@ -1569,6 +1570,7 @@
       "changeRequestNoGitHubAccess": "Nobena povezava z GitHub nima dostopa do tega repozitorija. Ponovno povežite GitHub z dostopom do njega in poskusite znova.",
       "changeRequestMissingPermissions": "Kiloova aplikacija GitHub ne more odpirati zahtevkov za združitev v tem repozitoriju. Lastnik repozitorija mora aplikaciji dati pravico pisanja do vsebine in zahtevkov za združitev, nato poskusite znova.",
       "changeRequestFailed": "Kilu ni uspelo odpreti zahtevka za združitev. Poskusite znova čez trenutek.",
+      "proposalConflict": "Drug predlog za ta repozitorij je še vedno aktiven.",
       "offAction": "Pomnjenje pregledov je izklopljeno. Vklopi ga, nato poskusi znova."
     },
     "manualReview": {

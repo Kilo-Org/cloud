@@ -1445,6 +1445,7 @@
       "retryMessage": "Dette kjører kodegjennomgangen på nytt.",
       "retryReview": "Prøv gjennomgang på nytt",
       "retryNeedsSettings": "Kodegjennomgang er slått av, eller innstillingene trenger oppmerksomhet. Rett innstillingene, og prøv deretter denne gjennomgangen på nytt.",
+      "retryNotStarted": "Forsøket på nytt ble ikke startet.",
       "fixSettings": "Rett innstillingene",
       "couldNotLoad": "Kunne ikke laste inn gjennomgangen.",
       "couldNotGetLatest": "Kunne ikke hente de nyeste opplysningene.",
@@ -1525,6 +1526,7 @@
       "changeRequestNoGitHubAccess": "Ingen GitHub-tilkobling har tilgang til dette repositoriet. Koble til GitHub på nytt med tilgang til det, og prøv igjen.",
       "changeRequestMissingPermissions": "Kilos GitHub App kan ikke åpne pull requests i dette repositoriet. En eier av repositoriet må gi appen skrivetilgang til innhold og pull requests, og deretter prøve igjen.",
       "changeRequestFailed": "Kilo kunne ikke åpne pull requesten. Prøv igjen om et øyeblikk.",
+      "proposalConflict": "Et annet forslag for dette repositoriet er fortsatt aktivt.",
       "offAction": "Minnet for kodegjennomganger er deaktivert. Aktiver det, og prøv igjen."
     },
     "manualReview": {

@@ -630,6 +630,22 @@ describe('ScreenHeader mounted', () => {
     expect(backPressableCount(explicitlyHidden.root)).toBe(0);
   });
 
+  it('keeps the back control reachable from its fallback while the stack is unsettled', () => {
+    // A restored screen renders before its stack holds the parent, so the only
+    // thing that can answer Back is the declared fallback: the control must
+    // paint from that first render, not wait for the navigation commit.
+    routerState.canGoBack.mockReturnValue(false);
+    const renderer = renderHeader({ title: 'Code Reviewer', backFallback: AGENTS_SESSIONS_HREF });
+    expect(backPressableCount(renderer.root)).toBe(1);
+
+    act(() => {
+      (findBackPressable(renderer.root).props.onPress as () => void)();
+    });
+    expect(routerState.dismissTo).toHaveBeenLastCalledWith(AGENTS_SESSIONS_HREF);
+    expect(routerState.back).not.toHaveBeenCalled();
+    renderer.unmount();
+  });
+
   it('shows the back control when a later navigation commit supplies the history', () => {
     // The relaunch restore renders its screen before the navigator tree above
     // it holds the parents, so the first read is false; the header must not

@@ -418,10 +418,13 @@ export function useCancelReview(scope: string) {
 
 export async function retriggerReviewMutationFn(vars: { reviewId: string }) {
   // Same typed-error pattern as cancelReviewMutationFn: a domain failure throws
-  // so React Query runs onError (toast) rather than onSuccess (haptic).
+  // so React Query runs onError (toast) rather than onSuccess (haptic). The
+  // server answers `{success:false}` when dispatch marked the review failed
+  // again, so the toast says the retry did not start instead of echoing a
+  // server sentence. The detail screen owns the reason, localized from the row.
   const result = await trpcClient.codeReviews.retrigger.mutate({ reviewId: vars.reviewId });
   if (!result.success) {
-    throw new Error(result.error);
+    throw new Error(i18n.t('codeReviewer.reviewDetail.retryNotStarted'));
   }
   return result;
 }
@@ -434,7 +437,11 @@ export function useRetriggerReview(scope: string) {
     onSuccess: (_data, vars) => {
       invalidateReviews(vars.reviewId);
     },
-    onError: error => {
+    onError: (error, vars) => {
+      // A retry that fails to start still rewrote the row (status, end time,
+      // reason) and a terminal review never refetches on its own, so the
+      // screen would keep the pre-retry row next to the toast.
+      invalidateReviews(vars.reviewId);
       announcingToast.error(error.message);
     },
   });

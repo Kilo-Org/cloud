@@ -1489,6 +1489,7 @@
       "retryMessage": "Kontrola kódu sa spustí znova.",
       "retryReview": "Zopakovať kontrolu",
       "retryNeedsSettings": "Agent na kontrolu kódu je vypnutý alebo jeho nastavenia vyžadujú pozornosť. Opravte nastavenia a potom túto kontrolu zopakujte.",
+      "retryNotStarted": "Opakovanie sa nepodarilo spustiť.",
       "fixSettings": "Opraviť nastavenia",
       "couldNotLoad": "Kontrolu sa nepodarilo načítať.",
       "couldNotGetLatest": "Najnovšie údaje sa nepodarilo načítať.",
@@ -1569,6 +1570,7 @@
       "changeRequestNoGitHubAccess": "Žiadne pripojenie GitHub nemá prístup k tomuto úložisku. Znova pripojte GitHub s prístupom k nemu a potom to skúste znova.",
       "changeRequestMissingPermissions": "Aplikácia Kilo na GitHube nemôže v tomto úložisku otvárať pull requesty. Vlastník úložiska musí aplikácii udeliť prístup na zápis k obsahu a pull requestom a potom to skúste znova.",
       "changeRequestFailed": "Kilo nemohlo otvoriť pull request. Skúste to o chvíľu znova.",
+      "proposalConflict": "Ďalší návrh pre toto úložisko je stále aktívny, takže tento zatiaľ nemožno uložiť.",
       "offAction": "Pamäť kontrol je vypnutá. Zapnite ju a skúste to znova."
     },
     "manualReview": {

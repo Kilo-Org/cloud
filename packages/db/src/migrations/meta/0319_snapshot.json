@@ -1,5 +1,5 @@
 {
-  "id": "0e197aa8-8d99-4ded-9ce4-c3ef7f9ce771",
+  "id": "a243b2a2-320f-4051-8dd4-88d75bb0e7d3",
   "prevId": "78526b5b-2e91-4c89-b913-1ab241684acc",
   "version": "7",
   "dialect": "postgresql",
@@ -8935,7 +8935,7 @@
             }
           ],
           "isUnique": true,
-          "where": "\"code_review_memory_proposals\".\"owned_by_organization_id\" IS NOT NULL AND \"code_review_memory_proposals\".\"status\" IN ('open', 'edited', 'opening_change_request')",
+          "where": "\"code_review_memory_proposals\".\"owned_by_organization_id\" IS NOT NULL AND \"code_review_memory_proposals\".\"status\" IN ('open', 'edited', 'opening_change_request', 'change_request_failed')",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -8963,7 +8963,7 @@
             }
           ],
           "isUnique": true,
-          "where": "\"code_review_memory_proposals\".\"owned_by_user_id\" IS NOT NULL AND \"code_review_memory_proposals\".\"status\" IN ('open', 'edited', 'opening_change_request')",
+          "where": "\"code_review_memory_proposals\".\"owned_by_user_id\" IS NOT NULL AND \"code_review_memory_proposals\".\"status\" IN ('open', 'edited', 'opening_change_request', 'change_request_failed')",
           "concurrently": false,
           "method": "btree",
           "with": {}
@@ -24151,126 +24151,6 @@
         "native_attested_keys_platform_check": {
           "name": "native_attested_keys_platform_check",
           "value": "\"native_attested_keys\".\"platform\" IN ('ios', 'android')"
-        }
-      },
-      "isRLSEnabled": false
-    },
-    "public.oauth_refresh_exchange_leases": {
-      "name": "oauth_refresh_exchange_leases",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "platform_oauth_credential_id": {
-          "name": "platform_oauth_credential_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "user_github_app_token_id": {
-          "name": "user_github_app_token_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "attempt_id": {
-          "name": "attempt_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "UQ_oauth_refresh_exchange_leases_platform_oauth_credential_id": {
-          "name": "UQ_oauth_refresh_exchange_leases_platform_oauth_credential_id",
-          "columns": [
-            {
-              "expression": "platform_oauth_credential_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"oauth_refresh_exchange_leases\".\"platform_oauth_credential_id\" is not null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_oauth_refresh_exchange_leases_user_github_app_token_id": {
-          "name": "UQ_oauth_refresh_exchange_leases_user_github_app_token_id",
-          "columns": [
-            {
-              "expression": "user_github_app_token_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"oauth_refresh_exchange_leases\".\"user_github_app_token_id\" is not null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "oauth_refresh_exchange_leases_platform_oauth_credential_id_platform_oauth_credentials_id_fk": {
-          "name": "oauth_refresh_exchange_leases_platform_oauth_credential_id_platform_oauth_credentials_id_fk",
-          "tableFrom": "oauth_refresh_exchange_leases",
-          "tableTo": "platform_oauth_credentials",
-          "columnsFrom": [
-            "platform_oauth_credential_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "oauth_refresh_exchange_leases_user_github_app_token_id_user_github_app_tokens_id_fk": {
-          "name": "oauth_refresh_exchange_leases_user_github_app_token_id_user_github_app_tokens_id_fk",
-          "tableFrom": "oauth_refresh_exchange_leases",
-          "tableTo": "user_github_app_tokens",
-          "columnsFrom": [
-            "user_github_app_token_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "oauth_refresh_exchange_leases_owner_check": {
-          "name": "oauth_refresh_exchange_leases_owner_check",
-          "value": "num_nonnulls(\"oauth_refresh_exchange_leases\".\"platform_oauth_credential_id\", \"oauth_refresh_exchange_leases\".\"user_github_app_token_id\") = 1"
-        },
-        "oauth_refresh_exchange_leases_attempt_id_check": {
-          "name": "oauth_refresh_exchange_leases_attempt_id_check",
-          "value": "\"oauth_refresh_exchange_leases\".\"attempt_id\" <> ''"
         }
       },
       "isRLSEnabled": false

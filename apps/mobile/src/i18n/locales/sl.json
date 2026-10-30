@@ -714,6 +714,7 @@
       "gitlabDescription": "Poveži svoj račun GitLab, da lahko pregleduješ merge requeste na mobilni napravi.",
       "bitbucketDescription": "Poveži Bitbucket s to organizacijo, da lahko pregleduješ zahtevke za združitev na mobilni napravi.",
       "bitbucketOrgOnlyDescription": "Preklopi zgornji račun na organizacijo, da lahko pregleduješ njene zahtevke za združitev na Bitbucktu.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Ta račun še nima nobenih organizacij. Zahtevke za združitev na Bitbucktu boš lahko pregledoval, ko ustvariš organizacijo ali se ji pridružiš.",
       "contextLine": "Za {{organization}}",
       "contextLinePersonal": "Za osebni račun"
     },
@@ -739,10 +740,9 @@
     },
     "reconnectNotice": {
       "title": "Povezava z računom GitHub je potekla.",
-      "message": "Tvoja povezava z GitHubom ni več veljavna. Znova jo preveri. Po potrebi te bomo pozvali k ponovni povezavi.",
+      "message": "Znova jo preveri. Po potrebi te bomo pozvali k ponovni povezavi.",
       "gitlabTitle": "Povezava z računom GitLab je potekla.",
-      "bitbucketTitle": "Povezava z računom Bitbucket je potekla.",
-      "providerMessage": "Tvoja povezava z {{provider}}om ni več veljavna. Znova jo preveri. Po potrebi te bomo pozvali k ponovni povezavi."
+      "bitbucketTitle": "Povezava z računom Bitbucket je potekla."
     },
     "eventChips": {
       "comment": "Komentar",
@@ -853,7 +853,7 @@
     "terms": {
       "pullRequest": "Zahteva za združitev",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Deli merge request",
       "viewOnProvider": "Poglej na {{provider}}",
       "mergeRequestUnavailable": "Merge request ni na voljo",
@@ -2355,9 +2355,9 @@
       "couldNotLoadGithubRepositories": "Skladišč na GitHub ni bilo mogoče naložiti.",
       "couldNotLoadGitlabRepositories": "Skladišč na GitLab ni bilo mogoče naložiti.",
       "couldNotLoadBitbucketRepositories": "Skladišč na Bitbucket ni bilo mogoče naložiti.",
-      "connectGithubDescription": "Poveži GitHub v brskalniku, nato se vrni sem in izberi skladišče.",
-      "connectGitlabDescription": "Poveži GitLab v brskalniku, nato se vrni sem in izberi skladišče.",
-      "connectBitbucketDescription": "Poveži Bitbucket v brskalniku, nato se vrni sem in izberi skladišče.",
+      "connectGithubDescription": "Prijavi se v brskalniku, nato se vrni sem in izberi skladišče GitHub.",
+      "connectGitlabDescription": "Prijavi se v brskalniku, nato se vrni sem in izberi skladišče GitLab.",
+      "connectBitbucketDescription": "Prijavi se v brskalniku, nato se vrni sem in izberi skladišče Bitbucket.",
       "openGithub": "Odpri GitHub",
       "openGitlab": "Odpri GitLab",
       "openBitbucket": "Odpri Bitbucket",
@@ -3947,8 +3947,6 @@
     "commandAtLimit": "Ukaz je omejen na {{max}} znakov",
     "commandsEmpty": "Ni še nobenih ukazov za nastavitev",
     "commandsSaveFailed": "Nastavitvenih ukazov ni bilo mogoče shraniti",
-    "moveUp": "Premakni se navzgor",
-    "moveDown": "Premakni se navzdol",
     "moveCommandUp": "Premakni ukaz {{position}} navzgor",
     "moveCommandDown": "Premakni ukaz {{position}} navzdol",
     "skillsTitle": "Spretnosti",
@@ -3959,7 +3957,10 @@
     "skillNameRequired": "Vnesite ime spretnosti",
     "skillNameInvalid": "Ime spretnosti se mora začeti s črko ali številko in uporabljati samo male črke, številke in pomišljaje",
     "skillContentRequired": "Potrebna je vsebina spretnosti",
-    "skillSaveFailed": "Spretnosti ni bilo mogoče shraniti",
+    "skillSaveFailed": "Spretnosti ni bilo mogoče shraniti. Poskusite znova.",
+    "skillDeleteFailed": "Spretnosti ni bilo mogoče izbrisati. Poskusite znova.",
+    "skillToggleFailed": "Spretnosti ni bilo mogoče posodobiti. Poskusite znova.",
+    "skillLimitReached": "Profil lahko vsebuje največ {{max}} spretnosti. Izbrišite eno, da dodate drugo.",
     "skillSourceCustom": "Po meri",
     "skillSourceMarketplace": "Tržnica",
     "skillSourceSkillsSh": "skills.sh",

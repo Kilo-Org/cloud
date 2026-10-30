@@ -281,22 +281,31 @@ describe('ProfileCommandsScreen', () => {
     unmount();
   });
 
-  it('keeps the plain delete label on a blank draft row', async () => {
+  it('names a blank draft row after the command slot it occupies', async () => {
     h.query.data = testCommands(['a']);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
     pressButton(renderer.root);
 
-    // A blank row is not a command, so it claims no position — the same
-    // fallback the move controls use.
+    // The draft row is the second slot in the list, so its controls name
+    // command 2 and carry that place, exactly like the saved row above it.
     expect(findAll(renderer.root, 'Pressable').map(node => node.props.accessibilityLabel)).toEqual([
       'Move command 1 up',
       'Move command 1 down',
       'Delete command 1',
-      'Move up',
-      'Move down',
-      'Delete',
+      'Move command 2 up',
+      'Move command 2 down',
+      'Delete command 2',
+    ]);
+    expect(
+      findAll(renderer.root, 'Pressable')
+        .filter(node => String(node.props.accessibilityLabel).startsWith('Delete'))
+        .map(node => node.props.accessibilityHint)
+    ).toEqual(['1 / 2', '2 / 2']);
+    expect(findFields(renderer.root).map(node => node.props.label)).toEqual([
+      'Command 1',
+      'Command 2',
     ]);
 
     unmount();
@@ -454,7 +463,7 @@ describe('ProfileCommandsScreen', () => {
     unmount();
   });
 
-  it('counts each saved row in its label and leaves a blank draft unnumbered', async () => {
+  it('numbers every row, including a blank draft row', async () => {
     h.query.data = testCommands(['pnpm install', 'pnpm build']);
     h.query.isPending = false;
 
@@ -469,7 +478,7 @@ describe('ProfileCommandsScreen', () => {
     expect(findFields(renderer.root).map(field => field.props.label)).toEqual([
       'Command 1',
       'Command 2',
-      'Command',
+      'Command 3',
     ]);
 
     unmount();

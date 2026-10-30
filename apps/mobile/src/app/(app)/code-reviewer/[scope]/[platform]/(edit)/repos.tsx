@@ -215,7 +215,6 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
           manageAccess ? (
             <Button
               className={STATE_ACTION_CLASS}
-              variant="outline"
               loading={manageAccess.pending}
               disabled={manageAccess.pending}
               onPress={manageAccess.handlePress}
@@ -267,9 +266,6 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
 
           {(!capabilities.selectionModePicker || mode === 'selected') && (
             <View className={capabilities.selectionModePicker ? 'mt-6' : undefined}>
-              <Text variant="small" className="mb-1 uppercase tracking-wide text-muted-foreground">
-                {t('common.repositories')}
-              </Text>
               {reposLoading && (
                 <View className="gap-3 pt-2">
                   <Skeleton className="h-12 w-full rounded-lg" />

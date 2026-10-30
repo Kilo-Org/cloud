@@ -684,6 +684,7 @@
       "gitlabDescription": "Koble til GitLab-kontoen din for å gå gjennom merge requests på mobilen.",
       "bitbucketDescription": "Koble Bitbucket til denne organisasjonen for å gå gjennom PR-er på mobilen.",
       "bitbucketOrgOnlyDescription": "Bytt kontoen over til en organisasjon for å gå gjennom dens PR-er på Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Denne kontoen har ingen organisasjoner ennå. Du kan gå gjennom PR-er på Bitbucket når du oppretter eller blir med i en organisasjon.",
       "contextLine": "For {{organization}}",
       "contextLinePersonal": "For personlig konto"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub-tilkoblingen er utløpt.",
-      "message": "GitHub-tilkoblingen din er ikke lenger gyldig. Sjekk den på nytt. Du blir bedt om å koble til igjen ved behov.",
+      "message": "Sjekk den på nytt. Du blir bedt om å koble til igjen ved behov.",
       "gitlabTitle": "GitLab-tilkoblingen er utløpt.",
-      "bitbucketTitle": "Bitbucket-tilkoblingen er utløpt.",
-      "providerMessage": "{{provider}}-tilkoblingen din er ikke lenger gyldig. Sjekk den på nytt. Du blir bedt om å koble til igjen ved behov."
+      "bitbucketTitle": "Bitbucket-tilkoblingen er utløpt."
     },
     "eventChips": {
       "comment": "Kommenter",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Del merge request",
       "viewOnProvider": "Vis på {{provider}}",
       "mergeRequestUnavailable": "Merge request er utilgjengelig",
@@ -2293,9 +2293,9 @@
       "couldNotLoadGithubRepositories": "Kunne ikke laste inn kodelagre fra GitHub.",
       "couldNotLoadGitlabRepositories": "Kunne ikke laste inn kodelagre fra GitLab.",
       "couldNotLoadBitbucketRepositories": "Kunne ikke laste inn kodelagre fra Bitbucket.",
-      "connectGithubDescription": "Koble til GitHub i nettleseren. Gå deretter tilbake hit for å velge et kodelager.",
-      "connectGitlabDescription": "Koble til GitLab i nettleseren. Gå deretter tilbake hit for å velge et kodelager.",
-      "connectBitbucketDescription": "Koble til Bitbucket i nettleseren. Gå deretter tilbake hit for å velge et kodelager.",
+      "connectGithubDescription": "Logg inn fra nettleseren. Gå deretter tilbake hit for å velge et GitHub-kodelager.",
+      "connectGitlabDescription": "Logg inn fra nettleseren. Gå deretter tilbake hit for å velge et GitLab-kodelager.",
+      "connectBitbucketDescription": "Logg inn fra nettleseren. Gå deretter tilbake hit for å velge et Bitbucket-kodelager.",
       "openGithub": "Åpne GitHub",
       "openGitlab": "Åpne GitLab",
       "openBitbucket": "Åpne Bitbucket",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Kommandoen er begrenset til {{max}} tegn",
     "commandsEmpty": "Ingen oppsettkommandoer ennå",
     "commandsSaveFailed": "Kunne ikke lagre oppsettkommandoer",
-    "moveUp": "Flytt opp",
-    "moveDown": "Flytt ned",
     "moveCommandUp": "Flytt kommando {{position}} opp",
     "moveCommandDown": "Flytt kommando {{position}} ned",
     "skillsTitle": "Ferdigheter",
@@ -3859,7 +3857,10 @@
     "skillNameRequired": "Skriv inn et ferdighetsnavn",
     "skillNameInvalid": "Ferdighetsnavn må starte med en bokstav eller et siffer og kun bruke små bokstaver, sifre og bindestreker",
     "skillContentRequired": "Ferdighetsinnhold kreves",
-    "skillSaveFailed": "Kunne ikke lagre ferdigheter",
+    "skillSaveFailed": "Kunne ikke lagre ferdigheter. Prøv igjen.",
+    "skillDeleteFailed": "Kunne ikke slette ferdigheter. Prøv igjen.",
+    "skillToggleFailed": "Kunne ikke oppdatere ferdigheter. Prøv igjen.",
+    "skillLimitReached": "En profil kan ha opptil {{max}} ferdigheter. Slett én for å legge til en ny.",
     "skillSourceCustom": "Egendefinert",
     "skillSourceMarketplace": "Markedsplass",
     "skillSourceSkillsSh": "skills.sh",

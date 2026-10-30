@@ -750,6 +750,7 @@
       "gitlabDescription": "Connect your GitLab account to review merge requests on mobile.",
       "bitbucketDescription": "Connect Bitbucket to this organization to review pull requests on mobile.",
       "bitbucketOrgOnlyDescription": "Switch the account above to an organization to review its Bitbucket pull requests.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "This account has no organizations yet. Bitbucket pull requests can be reviewed once you create or join an organization.",
       "contextLine": "For {{organization}}",
       "contextLinePersonal": "For your personal account"
     },
@@ -773,10 +774,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub connection expired",
-      "message": "Your GitHub connection is no longer valid. Re-check your connection — you'll be prompted to reconnect if needed.",
+      "message": "Re-check your connection — you'll be prompted to reconnect if needed.",
       "gitlabTitle": "GitLab connection expired",
-      "bitbucketTitle": "Bitbucket connection expired",
-      "providerMessage": "Your {{provider}} connection is no longer valid. Re-check your connection — you'll be prompted to reconnect if needed."
+      "bitbucketTitle": "Bitbucket connection expired"
     },
     "eventChips": {
       "comment": "Comment",
@@ -1491,8 +1491,8 @@
       "manageAccess": "Manage access",
       "bitbucketNoRepositoriesDescription": "No repositories are available in this Bitbucket workspace.",
       "gitlabNoRepositoriesDescription": "You may need to grant access to more groups or projects on GitLab.",
-      "installGithubApp": "Install the GitHub app on repositories",
-      "installGithubAppDescription": "Grant the Kilo GitHub App access to the repositories you want reviewed.",
+      "installGithubApp": "Install the GitHub app",
+      "installGithubAppDescription": "Grant it access to the repositories you want reviewed.",
       "repositoryAccess": "repository access"
     },
     "style": {
@@ -2359,9 +2359,9 @@
       "couldNotLoadGithubRepositories": "Couldn't load GitHub repositories",
       "couldNotLoadGitlabRepositories": "Couldn't load GitLab repositories",
       "couldNotLoadBitbucketRepositories": "Couldn't load Bitbucket repositories",
-      "connectGithubDescription": "Connect GitHub in your browser, then return here to pick a repository.",
-      "connectGitlabDescription": "Connect GitLab in your browser, then return here to pick a repository.",
-      "connectBitbucketDescription": "Connect Bitbucket in your browser, then return here to pick a repository.",
+      "connectGithubDescription": "Sign in from your browser, then return here to pick a GitHub repository.",
+      "connectGitlabDescription": "Sign in from your browser, then return here to pick a GitLab repository.",
+      "connectBitbucketDescription": "Sign in from your browser, then return here to pick a Bitbucket repository.",
       "openGithub": "Open GitHub",
       "openGitlab": "Open GitLab",
       "openBitbucket": "Open Bitbucket",
@@ -3913,8 +3913,6 @@
     "commandAtLimit": "The command is limited to {{max}} characters",
     "commandsEmpty": "No setup commands yet",
     "commandsSaveFailed": "Couldn't save setup commands",
-    "moveUp": "Move up",
-    "moveDown": "Move down",
     "moveCommandUp": "Move command {{position}} up",
     "moveCommandDown": "Move command {{position}} down",
     "skillsTitle": "Skills",
@@ -3925,7 +3923,10 @@
     "skillNameRequired": "Enter a skill name",
     "skillNameInvalid": "Skill name must start with a letter or digit and use only lowercase letters, digits, and dashes",
     "skillContentRequired": "Skill content is required",
-    "skillSaveFailed": "Couldn't save skill",
+    "skillSaveFailed": "Couldn't save skill. Try again.",
+    "skillDeleteFailed": "Couldn't delete skill. Try again.",
+    "skillToggleFailed": "Couldn't update skill. Try again.",
+    "skillLimitReached": "A profile can hold up to {{max}} skills. Delete one to add another.",
     "skillSourceCustom": "Custom",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

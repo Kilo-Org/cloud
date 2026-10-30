@@ -684,6 +684,7 @@
       "gitlabDescription": "Միացրեք Ձեր GitLab հաշիվը՝ միաձուլման հարցումները բջջայինում վերանայելու համար։",
       "bitbucketDescription": "Միացրեք Bitbucket-ը այս կազմակերպությանը՝ միավորման հարցումները բջջայինում վերանայելու համար։",
       "bitbucketOrgOnlyDescription": "Վերեւի հաշիվը փոխեք կազմակերպության՝ դրա Bitbucket-ի միավորման հարցումները վերանայելու համար։",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Այս հաշիվն առայժմ չունի որեւէ կազմակերպություն։ Bitbucket-ի միավորման հարցումները հնարավոր կլինի վերանայել, երբ ստեղծեք կամ միանաք կազմակերպության։",
       "contextLine": "{{organization}}-ի համար",
       "contextLinePersonal": "Անձնական հաշվի համար"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub-ի հետ կապի ժամկետը լրացել է։",
-      "message": "GitHub-ի հետ կապդ այլևս վավեր չէ։ Կրկին ստուգիր կապը։ Անհրաժեշտության դեպքում քեզ կառաջարկվի նորից միանալ։",
+      "message": "Կրկին ստուգիր կապը։ Անհրաժեշտության դեպքում քեզ կառաջարկվի նորից միանալ։",
       "gitlabTitle": "GitLab-ի հետ կապի ժամկետը լրացել է։",
-      "bitbucketTitle": "Bitbucket-ի հետ կապի ժամկետը լրացել է։",
-      "providerMessage": "{{provider}}-ի հետ կապդ այլևս վավեր չէ։ Կրկին ստուգիր կապը։ Անհրաժեշտության դեպքում քեզ կառաջարկվի նորից միանալ։"
+      "bitbucketTitle": "Bitbucket-ի հետ կապի ժամկետը լրացել է։"
     },
     "eventChips": {
       "comment": "Մեկնաբանություն",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Միավորման հարցում",
       "mergeRequest": "Միաձուլման հարցում",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Միաձուլման հարցում !{{number}}",
       "shareMergeRequest": "Կիսվել միաձուլման հարցմամբ",
       "viewOnProvider": "Դիտել {{provider}}-ում",
       "mergeRequestUnavailable": "Միաձուլման հարցումը հասանելի չէ",
@@ -2293,9 +2293,9 @@
       "couldNotLoadGithubRepositories": "Չհաջողվեց բեռնել GitHub-ի պահոցները։",
       "couldNotLoadGitlabRepositories": "Չհաջողվեց բեռնել GitLab-ի պահոցները։",
       "couldNotLoadBitbucketRepositories": "Չհաջողվեց բեռնել Bitbucket-ի պահոցները։",
-      "connectGithubDescription": "Միացրեք GitHub-ը ձեր զննարկչում, ապա վերադարձեք այստեղ՝ պահոց ընտրելու համար։",
-      "connectGitlabDescription": "Միացրեք GitLab-ը ձեր զննարկչում, ապա վերադարձեք այստեղ՝ պահոց ընտրելու համար։",
-      "connectBitbucketDescription": "Միացրեք Bitbucket-ը ձեր զննարկչում, ապա վերադարձեք այստեղ՝ պահոց ընտրելու համար։",
+      "connectGithubDescription": "Մուտք գործեք ձեր զննարկչից, ապա վերադարձեք այստեղ՝ GitHub պահոց ընտրելու համար։",
+      "connectGitlabDescription": "Մուտք գործեք ձեր զննարկչից, ապա վերադարձեք այստեղ՝ GitLab պահոց ընտրելու համար։",
+      "connectBitbucketDescription": "Մուտք գործեք ձեր զննարկչից, ապա վերադարձեք այստեղ՝ Bitbucket պահոց ընտրելու համար։",
       "openGithub": "Բացել GitHub-ը",
       "openGitlab": "Բացել GitLab-ը",
       "openBitbucket": "Բացել Bitbucket-ը",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Հրամանը սահմանափակված է {{max}} նիշով",
     "commandsEmpty": "Կարգավորման հրամաններ դեռ չկան",
     "commandsSaveFailed": "Չհաջողվեց պահել կարգավորումների հրամանները",
-    "moveUp": "Շարժվեք վերև",
-    "moveDown": "Տեղափոխեք ներքև",
     "moveCommandUp": "Տեղափոխել {{position}} հրամանը վերև",
     "moveCommandDown": "Տեղափոխել {{position}} հրամանը ներքև",
     "skillsTitle": "Հմտություններ",
@@ -3859,7 +3857,10 @@
     "skillNameRequired": "Մուտքագրեք հմտության անուն",
     "skillNameInvalid": "Հմտության անունը պետք է սկսվի տառով կամ թվանշանով և օգտագործի միայն փոքրատառեր, թվանշաններ և գծիկներ",
     "skillContentRequired": "Հմտությունների բովանդակությունը պարտադիր է",
-    "skillSaveFailed": "Չհաջողվեց պահպանել հմտությունը",
+    "skillSaveFailed": "Չհաջողվեց պահպանել հմտությունը։ Փորձեք կրկին։",
+    "skillDeleteFailed": "Չհաջողվեց ջնջել հմտությունը։ Փորձեք կրկին։",
+    "skillToggleFailed": "Չհաջողվեց թարմացնել հմտությունը։ Փորձեք կրկին։",
+    "skillLimitReached": "Պրոֆիլում կարող է լինել մինչև {{max}} հմտություն։ Ջնջեք մեկը՝ մյուսն ավելացնելու համար։",
     "skillSourceCustom": "սեփական",
     "skillSourceMarketplace": "շուկա",
     "skillSourceSkillsSh": "skills.sh",

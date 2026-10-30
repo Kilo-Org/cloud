@@ -68,6 +68,9 @@ const NATIVE_ONLY_PATHS: Record<string, true> = {
   'organizations.mcpGuardrails.approveConnection': true,
   'organizations.mcpGuardrails.delete': true,
   'organizations.guardrails.update': true,
+  // Disabling a gateway or pinning a data region changes routing for every member, so org admins
+  // set it in the app only.
+  'organizations.settings.updateGatewaySettings': true,
   'activeSessions.widgetCredential': true,
   'agentBriefing.updateContextPreferences': true,
 };

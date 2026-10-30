@@ -3850,7 +3850,7 @@
     "skillNameRequired": "ໃສ່ຊື່ທັກສະ",
     "skillNameInvalid": "ຊື່ທັກສະຕ້ອງເລີ່ມຕົ້ນດ້ວຍຕົວອັກສອນ ຫຼືຕົວເລກ ແລະໃຊ້ແຕ່ຕົວພິມນ້ອຍ, ຕົວເລກ, ແລະເຄື່ອງໝາຍຂີດ",
     "skillContentRequired": "ເນື້ອຫາທັກສະແມ່ນຕ້ອງການ",
-    "skillSaveFailed": "ບໍ່ສາມາດບັນທຶກທັກສະໄດ້",
+    "skillSaveFailed": "ບໍ່ສາມາດບັນທຶກທັກສະໄດ້ ກະລຸນາລອງໃໝ່ອີກຄັ້ງ",
     "skillLimitReached": "ໂປຣໄຟລ໌ສາມາດມີທັກສະໄດ້ສູງສຸດ {{max}} ທັກສະ. ລຶບໜຶ່ງອັນເພື່ອເພີ່ມອັນອື່ນ.",
     "skillSourceCustom": "ກຳນົດເອງ",
     "skillSourceMarketplace": "ຕະຫຼາດ",

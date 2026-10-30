@@ -3850,7 +3850,7 @@
     "skillNameRequired": "Bacarıq adı daxil edin",
     "skillNameInvalid": "Bacarıq adı hərf və ya rəqəmlə başlamalı və yalnız kiçik hərflər, rəqəmlər və tirelərdən istifadə etməlidir",
     "skillContentRequired": "Bacarıq məzmunu tələb olunur",
-    "skillSaveFailed": "Bacarıq saxlamaq mümkün olmadı",
+    "skillSaveFailed": "Bacarıq saxlamaq mümkün olmadı. Yenidən cəhd edin.",
     "skillLimitReached": "Profil maksimum {{max}} bacarıq saxlaya bilər. Başqa bir bacarıq əlavə etmək üçün birini silin.",
     "skillSourceCustom": "Fərdi",
     "skillSourceMarketplace": "Marketpleys",

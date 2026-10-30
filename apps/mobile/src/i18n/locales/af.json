@@ -3850,7 +3850,7 @@
     "skillNameRequired": "Voer 'n vaardigheidsnaam in",
     "skillNameInvalid": "Vaardigheidsnaam moet met 'n letter of syfer begin en slegs kleinletters, syfers en strepies gebruik",
     "skillContentRequired": "Vaardigheidsinhoud word vereis",
-    "skillSaveFailed": "Kon nie vaardigheid red nie",
+    "skillSaveFailed": "Kon nie vaardigheid red nie. Probeer weer.",
     "skillLimitReached": "'n Profiel kan tot {{max}} vaardighede hou. Verwyder een om nog een by te voeg.",
     "skillSourceCustom": "Pasgemaak",
     "skillSourceMarketplace": "Markplek",

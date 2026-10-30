@@ -3850,7 +3850,7 @@
     "skillNameRequired": "कौशल नाम प्रविष्ट गर्नुहोस्",
     "skillNameInvalid": "सीपको नाम अक्षर वा अंकबाट सुरु हुनुपर्छ र सानो अक्षर, अंक र ड्यास मात्र प्रयोग गर्नुपर्छ।",
     "skillContentRequired": "सीप सामग्री आवश्यक छ",
-    "skillSaveFailed": "कौशल बचाउन सकेन",
+    "skillSaveFailed": "कौशल बचाउन सकेन। फेरि प्रयास गर्नुहोस्।",
     "skillLimitReached": "प्रोफाइलमा बढीमा {{max}} सीपहरू राख्न सकिन्छ। अर्को थप्न एउटा मेटाउनुहोस्।",
     "skillSourceCustom": "कस्टम",
     "skillSourceMarketplace": "मार्केटप्लेस",

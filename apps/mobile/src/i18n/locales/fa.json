@@ -3850,7 +3850,7 @@
     "skillNameRequired": "یک نام مهارت وارد کنید",
     "skillNameInvalid": "نام مهارت باید با یک حرف یا رقم شروع شود و فقط از حروف کوچک، ارقام و خط تیره استفاده کند.",
     "skillContentRequired": "محتوای مهارتی مورد نیاز است",
-    "skillSaveFailed": "مهارت ذخیره نشد",
+    "skillSaveFailed": "مهارت ذخیره نشد. دوباره امتحان کنید.",
     "skillLimitReached": "هر پروفایل می‌تواند تا {{max}} مهارت داشته باشد. برای افزودن مهارت دیگر، یکی را حذف کنید.",
     "skillSourceCustom": "سفارشی",
     "skillSourceMarketplace": "بازار",

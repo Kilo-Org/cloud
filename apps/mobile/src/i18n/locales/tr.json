@@ -3850,7 +3850,7 @@
     "skillNameRequired": "Bir beceri adı girin",
     "skillNameInvalid": "Beceri adı bir harf veya rakamla başlamalı ve yalnızca küçük harfler, rakamlar ve kısa çizgiler kullanmalıdır",
     "skillContentRequired": "Beceri içeriği gerekli",
-    "skillSaveFailed": "Beceri kaydedilemedi",
+    "skillSaveFailed": "Beceri kaydedilemedi. Tekrar deneyin.",
     "skillLimitReached": "Bir profil en fazla {{max}} beceri barındırabilir. Bir tane daha eklemek için birini silin.",
     "skillSourceCustom": "Özel",
     "skillSourceMarketplace": "Marketplace",

@@ -9,6 +9,7 @@ import { SkillFormSheet, type SkillFormSubmission } from '@/components/profiles/
 import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { TabScreenScrollView } from '@/components/tab-screen';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { useConfirmDialog } from '@/components/ui/dialog';
 import { Pencil, Sparkles, Trash2 } from '@/components/ui/icons';
@@ -32,6 +33,9 @@ const NO_SKILLS: AgentProfileDetail['skills'] = [];
 
 /** The skill the sheet edits; `null` opens the sheet in add mode. */
 type SkillTarget = { id: string; name: string; rawMarkdown: string };
+
+/** A refused save, and whether it is a failure or an expected limit. */
+type SaveFailure = { message: string; tone: 'error' | 'warn' };
 
 type SkillRowProps = Readonly<{
   skill: AgentProfileDetail['skills'][number];
@@ -122,11 +126,13 @@ export function ProfileSkillsScreen({
   const canManage = useCanManageOrganizationProfiles(organizationId);
 
   const skills = profileQuery.data ?? NO_SKILLS;
+  const atSkillCap = skills.length >= MAX_PROFILE_SKILLS;
   // `null` = closed, `{ skill: null }` = add, `{ skill }` = edit that skill.
   const [form, setForm] = useState<{ skill: SkillTarget | null } | null>(null);
-  // The message the open sheet shows for a refused save. The mutation hook's
-  // toast sits behind the sheet, so the reason is rendered inside it instead.
-  const [saveFailure, setSaveFailure] = useState<string | null>(null);
+  // The message the open sheet shows for a refused save, and whether it is a
+  // failure or an expected limit. The mutation hook's toast sits behind the
+  // sheet, so the reason is rendered inside it instead.
+  const [saveFailure, setSaveFailure] = useState<SaveFailure | null>(null);
   // Bumped by every open and close, so a save that settles after its own form is
   // gone cannot write its message into, or close, the form opened since.
   const formGeneration = useRef(0);
@@ -146,13 +152,18 @@ export function ProfileSkillsScreen({
     setForm(null);
   };
 
+  const skillLimitFailure = (): SaveFailure => ({
+    message: t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS }),
+    tone: 'warn',
+  });
+
   const saveSkill = async (target: SkillTarget | null, submission: SkillFormSubmission) => {
     const generation = formGeneration.current;
     setSaveFailure(null);
     // The server counts every skill row of the profile, so a full list cannot
     // take another create: name the cap here instead of round-tripping for it.
-    if (target === null && skills.length >= MAX_PROFILE_SKILLS) {
-      setSaveFailure(t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS }));
+    if (target === null && atSkillCap) {
+      setSaveFailure(skillLimitFailure());
       return;
     }
     try {
@@ -174,9 +185,7 @@ export function ProfileSkillsScreen({
       const limited =
         target === null && readTrpcErrorField(error, 'code') === 'PRECONDITION_FAILED';
       setSaveFailure(
-        limited
-          ? t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS })
-          : t('profiles.skillSaveFailed')
+        limited ? skillLimitFailure() : { message: t('profiles.skillSaveFailed'), tone: 'error' }
       );
       return;
     }
@@ -283,9 +292,18 @@ export function ProfileSkillsScreen({
           />
         ))}
         {canManage ? (
-          <Button onPress={startAdd}>
-            <Text>{t('profiles.addSkill')}</Text>
-          </Button>
+          <>
+            <Button onPress={startAdd}>
+              <Text>{t('profiles.addSkill')}</Text>
+            </Button>
+            {atSkillCap ? (
+              <AccessibleStatus
+                message={t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS })}
+                tone="warn"
+                className="text-sm"
+              />
+            ) : null}
+          </>
         ) : null}
       </>
     );
@@ -308,7 +326,8 @@ export function ProfileSkillsScreen({
         <SkillFormSheet
           skill={form.skill}
           isSaving={createCustomSkill.isPending || updateSkill.isPending}
-          saveFailure={saveFailure}
+          saveFailure={saveFailure?.message ?? null}
+          saveFailureTone={saveFailure?.tone}
           onClose={closeForm}
           onSave={submission => {
             void saveSkill(form.skill, submission);

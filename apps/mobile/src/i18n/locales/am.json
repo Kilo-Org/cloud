@@ -3850,7 +3850,7 @@
     "skillNameRequired": "የክህሎት ስም አስገባ",
     "skillNameInvalid": "የክህሎት ስም በፊደል ወይም ዲጂት መጀመር አለበት እና ትንሽ ሆሄያትን፣ አሃዞችን እና ሰረዞችን ብቻ መጠቀም አለበት።",
     "skillContentRequired": "የክህሎት ይዘት ያስፈልጋል",
-    "skillSaveFailed": "ችሎታ ማዳን አልተቻለም",
+    "skillSaveFailed": "ችሎታ ማዳን አልተቻለም። እንደገና ይሞክሩ።",
     "skillLimitReached": "አንድ መገለጫ እስከ {{max}} ችሎታዎች ሊይዝ ይችላል። ሌላ ለመጨመር አንዱን ሰርዝ።",
     "skillSourceCustom": "ብጁ",
     "skillSourceMarketplace": "መደብር",

@@ -20,8 +20,17 @@ import {
 } from '@/components/profiles/profile-skills-screen.test-helpers';
 import { i18n } from '@/i18n';
 import { MAX_PROFILE_SKILLS } from '@/lib/agent-profile-forms';
-import { act } from '@/test/renderer';
+import { act, type ReactTestInstance } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
+
+/** The rendered text node whose content is exactly `copy`. */
+function lineWith(root: ReactTestInstance, copy: string): ReactTestInstance {
+  const node = findAll(root, 'Text').find(candidate => candidate.props.children === copy);
+  if (!node) {
+    throw new Error(`no line renders ${copy}`);
+  }
+  return node;
+}
 
 const h = vi.hoisted(() => ({
   confirm: vi.fn(),
@@ -279,6 +288,11 @@ describe('ProfileSkillsScreen', () => {
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
+    const limitCopy = i18n.t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS });
+
+    // The list names the cap under the add control, before any authoring.
+    expect(String(lineWith(renderer.root, limitCopy).props.className)).toContain('text-warn');
+
     pressAddButton(renderer.root);
     changeText(renderer.root, 'Skill name', 'one-more');
     changeText(renderer.root, 'Skill content', 'Body');
@@ -337,6 +351,9 @@ describe('ProfileSkillsScreen', () => {
         node => node.props.children === i18n.t('profiles.skillSaveFailed')
       )
     );
+    expect(
+      String(lineWith(renderer.root, i18n.t('profiles.skillSaveFailed')).props.className)
+    ).toContain('text-destructive');
     expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
 
     unmount();

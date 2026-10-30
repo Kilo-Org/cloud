@@ -3850,7 +3850,7 @@
     "skillNameRequired": "Whakauruhia he ingoa pukenga",
     "skillNameInvalid": "Me timata te ingoa pukenga ki te reta, mati ranei me te whakamahi i nga reta iti, mati, me nga tohu",
     "skillContentRequired": "Kei te hiahiatia nga ihirangi pukenga",
-    "skillSaveFailed": "Kaore i taea te penapena pukenga",
+    "skillSaveFailed": "Kaore i taea te penapena pukenga. Whakamātauria anō.",
     "skillLimitReached": "Ka taea e tētahi kōtaha te pupuri tae atu ki te {{max}} pūkenga. Mukua tētahi kia tāpirihia ai tētahi atu.",
     "skillSourceCustom": "Whaiaro",
     "skillSourceMarketplace": "Mākete",

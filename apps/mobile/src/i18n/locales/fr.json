@@ -3900,7 +3900,7 @@
     "skillNameRequired": "Entrez un nom de compétence",
     "skillNameInvalid": "Le nom de la compétence doit commencer par une lettre ou un chiffre et utiliser uniquement des lettres minuscules, des chiffres et des tirets.",
     "skillContentRequired": "Un contenu de compétence est requis",
-    "skillSaveFailed": "Impossible de sauvegarder la compétence",
+    "skillSaveFailed": "Impossible de sauvegarder la compétence. Réessayez.",
     "skillLimitReached": "Un profil peut contenir jusqu'à {{max}} compétences. Supprimez-en une pour en ajouter une autre.",
     "skillSourceCustom": "Personnalisé",
     "skillSourceMarketplace": "Marketplace",

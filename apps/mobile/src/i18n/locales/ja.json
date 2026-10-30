@@ -3850,7 +3850,7 @@
     "skillNameRequired": "スキル名を入力してください",
     "skillNameInvalid": "スキル名は文字または数字で始まり、小文字、数字、ダッシュのみを使用する必要があります",
     "skillContentRequired": "スキル内容は必須です",
-    "skillSaveFailed": "スキルを保存できませんでした",
+    "skillSaveFailed": "スキルを保存できませんでした。もう一度お試しください。",
     "skillLimitReached": "プロフィールには最大 {{max}} 件のスキルを登録できます。別のスキルを追加するには 1 件削除してください。",
     "skillSourceCustom": "カスタム",
     "skillSourceMarketplace": "マーケットプレイス",

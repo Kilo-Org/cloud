@@ -3950,7 +3950,7 @@
     "skillNameRequired": "Zadejte název dovednosti",
     "skillNameInvalid": "Název dovednosti musí začínat písmenem nebo číslicí a používat pouze malá písmena, číslice a pomlčky",
     "skillContentRequired": "Je vyžadován obsah dovedností",
-    "skillSaveFailed": "Nepodařilo se zachránit dovednost",
+    "skillSaveFailed": "Nepodařilo se zachránit dovednost. Zkuste to znovu.",
     "skillLimitReached": "Profil může obsahovat až {{max}} dovedností. Chcete-li přidat další, smažte jednu.",
     "skillSourceCustom": "Vlastní",
     "skillSourceMarketplace": "Marketplace",

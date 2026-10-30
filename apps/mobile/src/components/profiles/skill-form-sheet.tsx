@@ -36,6 +36,11 @@ type SkillFormSheetProps = Readonly<{
   onSave: (submission: SkillFormSubmission) => void;
   /** A refused save, shown inside the sheet instead of only a toast it covers. */
   saveFailure?: string | null;
+  /**
+   * Whether that failure is an error or an expected limit. A limit is a
+   * warning, not a failure, so the two read differently on screen.
+   */
+  saveFailureTone?: 'error' | 'warn';
 }>;
 
 /**
@@ -58,6 +63,7 @@ export function SkillFormSheet({
   onClose,
   onSave,
   saveFailure = null,
+  saveFailureTone = 'error',
 }: Readonly<SkillFormSheetProps>) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -87,6 +93,11 @@ export function SkillFormSheet({
       return;
     }
     setError(null);
+    // A refusal that is already on screen stays mounted, so its layout does not
+    // fire again; scroll it back into view for this attempt.
+    if (saveFailure !== null) {
+      scrollToField('status');
+    }
     onSave({
       name: nameRef.current.trim(),
       rawMarkdown: contentRef.current,
@@ -119,7 +130,7 @@ export function SkillFormSheet({
               scrollToField('status');
             }}
           >
-            <AccessibleStatus message={saveFailure} className="text-sm" />
+            <AccessibleStatus message={saveFailure} tone={saveFailureTone} className="text-sm" />
           </View>
         )}
         <Text variant="muted">{t('profiles.skillsHint')}</Text>

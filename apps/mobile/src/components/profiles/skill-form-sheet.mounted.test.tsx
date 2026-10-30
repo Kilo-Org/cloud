@@ -1,3 +1,4 @@
+/* eslint-disable max-lines -- one mounted case per sheet state: dismissal, name fill, refused save, and save failure */
 import { createElement, type ReactNode, type Ref } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -144,13 +145,14 @@ function nameField(root: ReactTestInstance): ReactTestInstance {
 // eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
 function mountSheet(
   skill: { name: string; rawMarkdown: string } | null = null,
-  options: { saveFailure?: string | null } = {}
+  options: { saveFailure?: string | null; saveFailureTone?: 'error' | 'warn' } = {}
 ) {
   return renderWithProviders(
     createElement(SkillFormSheet, {
       skill,
       isSaving: false,
       saveFailure: options.saveFailure ?? null,
+      saveFailureTone: options.saveFailureTone,
       onClose: () => {
         h.onClose();
       },
@@ -357,6 +359,48 @@ describe('SkillFormSheet save failure', () => {
     });
 
     expect(h.scrollTo).toHaveBeenCalledWith({ y: 138, animated: true });
+
+    unmount();
+  });
+
+  it('paints an expected limit as a warning and a refusal as an error', async () => {
+    const limit = await mountSheet(null, {
+      saveFailure: i18n.t('profiles.skillLimitReached', { max: 50 }),
+      saveFailureTone: 'warn',
+    });
+    expect(String(findAll(statusBlock(limit.renderer.root), 'Text')[0]?.props.className)).toContain(
+      'text-warn'
+    );
+    limit.unmount();
+
+    const refusal = await mountSheet(null, {
+      saveFailure: i18n.t('profiles.skillSaveFailed'),
+    });
+    expect(
+      String(findAll(statusBlock(refusal.renderer.root), 'Text')[0]?.props.className)
+    ).toContain('text-destructive');
+    refusal.unmount();
+  });
+
+  it('scrolls back to a failure that stayed on screen when Save is pressed again', async () => {
+    const { renderer, unmount } = await mountSheet(null, {
+      saveFailure: i18n.t('profiles.skillSaveFailed'),
+    });
+    const onLayout = statusBlock(renderer.root).props.onLayout as ContainerLayout | undefined;
+    if (typeof onLayout !== 'function') {
+      throw new TypeError('the status block has no layout handler');
+    }
+    act(() => {
+      onLayout({ nativeEvent: { layout: { y: 150 } } });
+    });
+    h.scrollTo.mockClear();
+
+    changeText(renderer.root, 'Skill name', 'my-skill');
+    changeText(renderer.root, 'Skill content', 'Body');
+    pressDone(renderer.root);
+
+    expect(h.scrollTo).toHaveBeenCalledWith({ y: 138, animated: true });
+    expect(h.onSave).toHaveBeenCalledWith({ name: 'my-skill', rawMarkdown: 'Body' });
 
     unmount();
   });

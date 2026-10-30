@@ -3900,7 +3900,7 @@
     "skillNameRequired": "Ingrese un nombre de habilidad",
     "skillNameInvalid": "El nombre de la habilidad debe comenzar con una letra o un dígito y usar solo letras minúsculas, dígitos y guiones.",
     "skillContentRequired": "Se requiere contenido de habilidad",
-    "skillSaveFailed": "No se pudo guardar la habilidad",
+    "skillSaveFailed": "No se pudo guardar la habilidad. Inténtalo de nuevo.",
     "skillLimitReached": "Un perfil puede tener hasta {{max}} habilidades. Elimine una para agregar otra.",
     "skillSourceCustom": "Personalizada",
     "skillSourceMarketplace": "Marketplace",

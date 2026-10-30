@@ -3950,7 +3950,7 @@
     "skillNameRequired": "Vnesite ime spretnosti",
     "skillNameInvalid": "Ime spretnosti se mora začeti s črko ali številko in uporabljati samo male črke, številke in pomišljaje",
     "skillContentRequired": "Potrebna je vsebina spretnosti",
-    "skillSaveFailed": "Spretnosti ni bilo mogoče shraniti",
+    "skillSaveFailed": "Spretnosti ni bilo mogoče shraniti. Poskusite znova.",
     "skillLimitReached": "Profil lahko vsebuje največ {{max}} spretnosti. Izbrišite eno, da dodate drugo.",
     "skillSourceCustom": "Po meri",
     "skillSourceMarketplace": "Tržnica",

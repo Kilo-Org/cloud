@@ -3950,7 +3950,7 @@
     "skillNameRequired": "Įveskite įgūdžių pavadinimą",
     "skillNameInvalid": "Įgūdžio pavadinimas turi prasidėti raide arba skaitmeniu ir naudoti tik mažąsias raides, skaitmenis ir brūkšnelius",
     "skillContentRequired": "Reikalingas įgūdžių turinys",
-    "skillSaveFailed": "Nepavyko išsaugoti įgūdžių",
+    "skillSaveFailed": "Nepavyko išsaugoti įgūdžių. Bandykite dar kartą.",
     "skillLimitReached": "Profilis gali turėti iki {{max}} įgūdžių. Ištrinkite vieną, kad pridėtumėte kitą.",
     "skillSourceCustom": "Pasirinktinis",
     "skillSourceMarketplace": "Parduotuvė",

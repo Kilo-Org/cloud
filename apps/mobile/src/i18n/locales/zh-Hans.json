@@ -3850,7 +3850,7 @@
     "skillNameRequired": "输入技能名称",
     "skillNameInvalid": "技能名称必须以字母或数字开头，并且只能使用小写字母、数字和连字符",
     "skillContentRequired": "技能内容为必填项",
-    "skillSaveFailed": "无法保存技能",
+    "skillSaveFailed": "无法保存技能，请重试。",
     "skillLimitReached": "一个配置文件最多可包含 {{max}} 个技能。删除一个才能添加另一个。",
     "skillSourceCustom": "自定义",
     "skillSourceMarketplace": "市场",

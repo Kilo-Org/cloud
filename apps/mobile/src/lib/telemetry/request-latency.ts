@@ -235,7 +235,11 @@ function instrumentBodyRead(args: {
       return;
     }
     settled = true;
-    buffer.record({ ...sample, ttfbMs, totalMs: now() - startedAt });
+    try {
+      buffer.record({ ...sample, ttfbMs, totalMs: now() - startedAt });
+    } catch {
+      // Telemetry must never replace the caller's own read with a throw.
+    }
   };
 
   const readJson = response.json.bind(response);

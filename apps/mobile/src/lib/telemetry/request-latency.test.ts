@@ -430,6 +430,23 @@ describe('createLatencyFetch', () => {
     expect(recorded).toHaveLength(1);
   });
 
+  it('does not fail the caller read when the buffer throws', async () => {
+    const buffer: LatencyBuffer = {
+      record: () => {
+        throw new Error('scheduler unavailable');
+      },
+      flush: () => {
+        // The fetch tests never flush.
+      },
+    };
+    const response = new Response('{"result":1}', { status: 200 });
+    const { base } = capturingFetch(response);
+    const wrapped = createLatencyFetch(base, buffer, { now: () => 0, newId: () => 'id' });
+
+    const result = await wrapped('https://api.kilo.ai/api/trpc/user.getMe');
+    await expect(result.json()).resolves.toEqual({ result: 1 });
+  });
+
   it('records status and ok for success, mixed-batch, and failure responses', async () => {
     expect(await recordStatus(200)).toMatchObject({ status: 200, ok: true });
     // 207 is a 2xx, but a mixed batch carries an error the app reports, so it

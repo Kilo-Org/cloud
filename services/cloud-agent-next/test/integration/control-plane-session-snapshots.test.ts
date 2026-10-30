@@ -22,6 +22,8 @@ import {
 } from './helpers/fake-credentials.js';
 import { installFakeRuntimeProxyPeer } from './helpers/fake-session-peer.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
+import { readRoute, writeRoute } from '../../src/control-plane/sandbox/routes.js';
+import { DEADLINE_MS } from '../../src/sandbox-control/deadlines.js';
 import { waitFor } from './wait-for.js';
 
 const sandboxes = (env as unknown as { SANDBOX_CONTROL: DurableObjectNamespace<SandboxControlV2> })
@@ -44,7 +46,13 @@ const prompt = (messageId: string) => ({
 });
 
 async function setup(
-  options: { enabled?: boolean; capability?: boolean; directory?: string; shared?: boolean } = {}
+  options: {
+    enabled?: boolean;
+    capability?: boolean;
+    directory?: string;
+    shared?: boolean;
+    origin?: string;
+  } = {}
 ) {
   const sessionId = `workspace_${crypto.randomUUID()}`;
   const sandboxId = `sbx-${crypto.randomUUID().replaceAll('-', '')}${'a'.repeat(16)}`;
@@ -111,7 +119,7 @@ async function setup(
     },
     credentials: {
       userId: USER,
-      createdOnPlatform: 'cloud-agent-web',
+      createdOnPlatform: options.origin ?? 'cloud-agent-web',
       orgId: 'snapshot-org',
       kiloSessionId: KILO,
       kiloToken: FAKE_RUNTIME_AUTHORIZED_KILO_TOKEN,
@@ -153,12 +161,13 @@ async function setup(
     });
   }
   async function idle(wrapper: FakeWrapper, age = SESSION_SNAPSHOT_IDLE_MS + 1) {
+    await runInDurableObject(sandbox, async instance => {
+      const state = await instance.getAllocationState();
+      await instance['writeAllocation']({ ...state, lastFrameAt: 0 }, state);
+    });
     wrapper.heartbeat(false);
     await waitFor(async () => {
-      const disk = await runInDurableObject(sandbox, (_instance, state) =>
-        state.storage.kv.get<{ idleConnectionId?: string }>(SESSION_SNAPSHOT_ALLOCATION_KEY)
-      );
-      expect(disk?.idleConnectionId).toBeTruthy();
+      expect((await sandbox.getAllocationState()).lastFrameAt).toBeGreaterThan(0);
     });
     await runInDurableObject(sandbox, async instance => {
       const state = await instance.getAllocationState();
@@ -228,29 +237,34 @@ afterEach(async () => {
 });
 
 describe('idle session disk checkpoint', () => {
-  it('captures after the two-minute idle delay, once per idle period', async () => {
-    const test = await setup();
-    const wrapper = await test.start();
-    await test.idle(wrapper, SESSION_SNAPSHOT_IDLE_MS - 10_000);
-    await test.alarm();
-    expect(test.captures).toHaveLength(0);
-    await test.idle(wrapper);
-    await test.alarm();
-    expect(await test.snapshot()).toMatchObject({ snapshotId: 'session-snapshot' });
-    await test.alarm();
-    expect(test.captures).toHaveLength(1);
-    test.wrappers.forEach(wrapper => wrapper.close());
-  });
+  it.each(['cloud-agent-web', 'desktop', 'agent-manager'])(
+    'captures %s after the two-minute idle delay, once per idle period',
+    async origin => {
+      const test = await setup({ origin });
+      const wrapper = await test.start();
+      await test.idle(wrapper, SESSION_SNAPSHOT_IDLE_MS - 10_000);
+      await test.alarm();
+      expect(test.captures).toHaveLength(0);
+      await test.idle(wrapper);
+      await test.alarm();
+      expect(await test.snapshot()).toMatchObject({ snapshotId: 'session-snapshot' });
+      await test.alarm();
+      expect(test.captures).toHaveLength(1);
+      test.wrappers.forEach(wrapper => wrapper.close());
+    }
+  );
 
   it.each([
     { enabled: false },
     { capability: false },
     { directory: '/workspace/other' },
     { shared: true },
+    { origin: 'code-review' },
+    { origin: 'scheduled' },
   ])('excludes unsupported allocation %j', async options => {
     const test = await setup(options);
     const wrapper = await test.start();
-    wrapper.heartbeat(false);
+    await test.idle(wrapper);
     await test.alarm();
     expect(test.captures).toHaveLength(0);
     expect(await test.snapshot()).toBeUndefined();
@@ -319,6 +333,52 @@ describe('idle session disk checkpoint', () => {
     await test.session.send(prompt('m2'));
     await test.messageState('m2', 'accepted');
     expect(await test.snapshot()).toBeUndefined();
+    test.wrappers.forEach(wrapper => wrapper.close());
+  });
+
+  it('keeps the checkpoint when the prompt write fails', async () => {
+    const test = await setup();
+    await test.checkpoint();
+    const checkpoint = await test.snapshot();
+    await runInDurableObject(test.sandbox, async instance => {
+      const send = instance['trySendFrame'];
+      instance['trySendFrame'] = () => false;
+      try {
+        expect(
+          await instance.deliver({ sessionId: test.sessionId, messages: [prompt('m2')] })
+        ).toBe('not_ready');
+      } finally {
+        instance['trySendFrame'] = send;
+      }
+    });
+    expect(await test.snapshot()).toEqual(checkpoint);
+    test.wrappers.forEach(wrapper => wrapper.close());
+  });
+
+  it('does not consume an idle period while its route is preparing', async () => {
+    const test = await setup();
+    const wrapper = await test.start();
+    await test.idle(wrapper);
+    await runInDurableObject(test.sandbox, async instance => {
+      const route = await readRoute(instance['db'], test.sessionId);
+      if (!route) throw new Error('Missing route');
+      writeRoute(instance['db'], {
+        ...route,
+        state: 'preparing',
+        attemptDeadlineAt: Date.now() + 60_000,
+      });
+      await instance['captureIdleSessionSnapshot']();
+      expect(await instance['ctx'].storage.getAlarm()).toBeGreaterThan(Date.now());
+    });
+    expect(test.captures).toHaveLength(0);
+    await runInDurableObject(test.sandbox, async instance => {
+      const route = await readRoute(instance['db'], test.sessionId);
+      if (!route) throw new Error('Missing route');
+      writeRoute(instance['db'], { ...route, state: 'ready' });
+    });
+    await test.alarm();
+    expect(test.captures).toHaveLength(1);
+    expect(await test.snapshot()).toMatchObject({ snapshotId: 'session-snapshot' });
     test.wrappers.forEach(wrapper => wrapper.close());
   });
 
@@ -417,6 +477,23 @@ describe('idle session disk checkpoint', () => {
     wrapper.send({ type: 'session.ready', sessionId: test.sessionId });
     await test.messageState('m2', 'accepted');
     expect(await test.snapshot()).toBeUndefined();
+    test.wrappers.forEach(wrapper => wrapper.close());
+  });
+
+  it('gives an environment-less session disk restore the repository startup budget', async () => {
+    const test = await setup();
+    await test.checkpoint();
+    await test.cold();
+    const held = Promise.withResolvers<ProviderLaunchResult>();
+    test.controls.launch = () => held.promise;
+    await test.session.send(prompt('m2'));
+    await waitFor(() => expect(test.launchOptions).toHaveLength(2));
+    const state = await test.sandbox.getAllocationState();
+    const budget = (state.createDeadlineAt ?? 0) - Date.now();
+    held.resolve({ startSource: 'repository' });
+    await test.connect(1);
+    expect(budget).toBeGreaterThan(DEADLINE_MS.repositoryStartup - 10_000);
+    expect(budget).toBeLessThanOrEqual(DEADLINE_MS.repositoryStartup);
     test.wrappers.forEach(wrapper => wrapper.close());
   });
 

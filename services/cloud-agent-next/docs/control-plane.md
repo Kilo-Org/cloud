@@ -568,7 +568,8 @@ Session snapshots are private root-filesystem checkpoints, not reusable environm
 `SESSION_SNAPSHOT_ORG_IDS` and `SESSION_SNAPSHOT_USER_IDS` are independent comma-separated explicit
 allowlists; both default empty and neither accepts `*`. Removing enrollment prevents capture and
 restore. The first rollout supports only isolated native `cloudflare-containers` allocations at
-`/workspace/app` with one session throughout the allocation's lifetime. Shared worktrees and other
+`/workspace/app` with one interactive session (`cloud-agent-web`, `desktop` or `agent-manager`)
+throughout the allocation's lifetime. Unattended sessions, shared worktrees and other
 providers retain their current recovery behavior.
 
 - **Capture.** `src/control-plane/sandbox/session-snapshot.ts` owns checkpoint metadata, capture

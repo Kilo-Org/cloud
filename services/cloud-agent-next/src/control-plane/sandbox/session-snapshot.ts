@@ -160,10 +160,6 @@ export async function captureIdleSessionSnapshot(input: {
         Date.now() < state.lastActivityAt + input.idleMs
       )
         return null;
-      input.storage.put(SESSION_SNAPSHOT_ALLOCATION_KEY, {
-        ...disk,
-        attemptedIdleAt: state.lastActivityAt,
-      });
     }
     if (
       disk.contaminated ||
@@ -183,6 +179,11 @@ export async function captureIdleSessionSnapshot(input: {
       )
     )
       return null;
+    if (attempt)
+      input.storage.put(SESSION_SNAPSHOT_ALLOCATION_KEY, {
+        ...disk,
+        attemptedIdleAt: state.lastActivityAt,
+      });
     return { state, disk, route, providerRef: state.providerRef };
   };
   const fence = await input.enqueue(() => candidate(true));

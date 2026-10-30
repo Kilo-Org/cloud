@@ -180,7 +180,8 @@ repository.
    delay turn completion or Stop and MUST run at most once per idle period.
 3. A snapshot MUST belong to exactly one session, Kilo session, sandbox, and
    owner. Only isolated, single-session native Cloudflare Containers at
-   `/workspace/app` MAY capture or restore. Allocations that hosted another
+   `/workspace/app` with an interactive origin (`cloud-agent-web`, `desktop` or
+   `agent-manager`) MAY capture or restore. Allocations that hosted another
    session MUST NOT produce a session snapshot.
 4. Capture publication MUST reject changed allocation, connection, preparation,
    activity or session identity. Active heartbeats, new delivery, Stop and

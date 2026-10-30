@@ -948,6 +948,7 @@ export class SandboxControlV2 extends DurableObject<Env> {
       this.currentProvider() !== 'cloudflare-containers' ||
       route.credentialSource === null ||
       !sessionSnapshotsEnabled(this.env, route.credentialSource) ||
+      sandboxIdlePolicyForOrigins([route.credentialSource.createdOnPlatform]) !== 'interactive' ||
       route.spec.directory !== ISOLATED_CONTAINER_WORKSPACE_PATH ||
       (route.credentialSource.scopeId !== undefined &&
         route.credentialSource.scopeId !== route.sessionId)
@@ -2298,10 +2299,12 @@ export class SandboxControlV2 extends DurableObject<Env> {
       this.currentProvider() === 'cloudflare-containers' &&
       (event.type === 'ensure' || event.type === 'tick')
     ) {
-      // A start that may restore an environment snapshot gets the snapshot
-      // startup budget; selection itself happens in the create.
+      const routes = await listRoutes(this.db);
       if (
-        'candidate' in environmentLaunchCandidate(await listRoutes(this.db)) &&
+        ('candidate' in environmentLaunchCandidate(routes) ||
+          (routes.length === 1 &&
+            this.sessionSnapshotRouteEligible(routes[0]) &&
+            this.ctx.storage.kv.get(SESSION_SNAPSHOT_KEY) !== undefined)) &&
         !previousSnapshotStartFailed(await readRepositoryLaunch(this.ctx.storage))
       ) {
         timers.providerCreateMs = DEADLINE_MS.repositoryStartup;
@@ -2827,13 +2830,13 @@ export class SandboxControlV2 extends DurableObject<Env> {
     if (adopted) await this.ensureRouteCredentialsCurrent(payload.sessionId, state);
 
     for (const message of payload.messages) {
-      this.invalidateSessionSnapshot();
       const sent = this.trySendFrame(socket, {
         type: 'session.prompt',
         sessionId: payload.sessionId,
         payload: message,
       });
       if (!sent) return 'not_ready';
+      this.invalidateSessionSnapshot();
     }
     await this.touchActivity(Date.now());
     return 'sent';
@@ -5605,6 +5608,8 @@ export class SandboxControlV2 extends DurableObject<Env> {
         ? Date.now() + this.sandboxTimers().providerCreateRetryMs
         : null;
     const disk = readSessionSnapshotAllocation(this.ctx.storage.kv);
+    const snapshotRoutes = disk === undefined ? [] : await listRoutes(this.db);
+    const snapshotSocket = this.boundWrapperSocket(state);
     const snapshotAt =
       this.provider.sessionSnapshots !== undefined &&
       !this.sessionSnapshotCapturePending &&
@@ -5613,6 +5618,11 @@ export class SandboxControlV2 extends DurableObject<Env> {
       disk?.allocationId === state.allocationId &&
       disk.idleConnectionId === state.connectionId &&
       !disk.contaminated &&
+      snapshotRoutes.length === 1 &&
+      snapshotRoutes[0].state === 'ready' &&
+      this.sessionSnapshotRouteEligible(snapshotRoutes[0]) &&
+      snapshotSocket !== null &&
+      this.readAttachment(snapshotSocket)?.sessionSnapshots === true &&
       disk.attemptedIdleAt !== state.lastActivityAt
         ? state.lastActivityAt + this.sessionSnapshotIdleMs
         : null;

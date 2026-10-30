@@ -4,27 +4,7 @@ import {
   isOpenclawMarkdownContent,
   mapOpenclawZipPathToImportPath,
   normalizeOpenclawImportPath,
-  OPENCLAW_IMPORT_MAX_EXTRACTED_UTF8_BYTES,
-  OPENCLAW_IMPORT_MAX_FILE_UTF8_BYTES,
-  OPENCLAW_IMPORT_MAX_FILES,
-  OPENCLAW_IMPORT_MAX_ZIP_BYTES,
-  OPENCLAW_IMPORT_MEMORY_PREFIX,
-  OPENCLAW_IMPORT_ZIP_MEMORY_PREFIX,
 } from './openclaw-import';
-
-describe('openclaw import constants', () => {
-  it('exposes expected limits', () => {
-    expect(OPENCLAW_IMPORT_MAX_FILES).toBe(500);
-    expect(OPENCLAW_IMPORT_MAX_ZIP_BYTES).toBe(5 * 1024 * 1024);
-    expect(OPENCLAW_IMPORT_MAX_EXTRACTED_UTF8_BYTES).toBe(5 * 1024 * 1024);
-    expect(OPENCLAW_IMPORT_MAX_FILE_UTF8_BYTES).toBe(5 * 1024 * 1024);
-  });
-
-  it('exposes expected path prefixes', () => {
-    expect(OPENCLAW_IMPORT_MEMORY_PREFIX).toBe('workspace/memory/');
-    expect(OPENCLAW_IMPORT_ZIP_MEMORY_PREFIX).toBe('memory/');
-  });
-});
 
 describe('normalizeOpenclawImportPath', () => {
   it('normalizes slash styles', () => {

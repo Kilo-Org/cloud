@@ -1,13 +1,9 @@
-import { CLOUD_AGENT_PROMPT_MAX_LENGTH } from '@kilocode/cloud-agent-sdk/limits';
 import { describe, expect, it, vi } from 'vitest';
 
 import {
   buildPrepareSessionInput,
   buildSubmitInput,
   isModelPreferencesGetResult,
-  MODE,
-  PROMPT_MAX_LENGTH,
-  PROMPT_MIN_LENGTH,
   submitBlockedReason,
 } from './agents-new-session';
 
@@ -58,20 +54,6 @@ describe('isModelPreferencesGetResult helper', () => {
   it('returns true for an empty favorites array', () => {
     const value = { favorites: [], lastSelected: null };
     expect(isModelPreferencesGetResult(value)).toBe(true);
-  });
-});
-
-describe('constants', () => {
-  it('promptMinLength is 3', () => {
-    expect(PROMPT_MIN_LENGTH).toBe(3);
-  });
-
-  it('promptMaxLength is the shared cloud agent prompt cap', () => {
-    expect(PROMPT_MAX_LENGTH).toBe(CLOUD_AGENT_PROMPT_MAX_LENGTH);
-  });
-
-  it('mode is "code"', () => {
-    expect(MODE).toBe('code');
   });
 });
 

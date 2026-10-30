@@ -269,10 +269,7 @@ export function AdvancedConfigPanel({
         // start-side rule and one indent step keep its headings from reading as
         // the composer's own top-level sections. Logical properties, so the
         // nesting mirrors with the writing direction.
-        <View
-          className="mt-3 gap-4 border-s-2 border-border ps-3"
-          onLayout={handleExpandedLayout}
-        >
+        <View className="mt-3 gap-4 border-s-2 border-border ps-3" onLayout={handleExpandedLayout}>
           <AccessibleStatus
             message={t('agentChat.newSession.advancedConfigDescription')}
             tone="status"

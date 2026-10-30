@@ -213,7 +213,11 @@ function layout(node: TestRenderer.ReactTestInstance, y: number) {
  */
 function layoutView(renderer: TestRenderer.ReactTestRenderer, token: string) {
   const found = renderer.root
-    .findAll(node => String(node.props.className ?? '').split(' ').includes(token))
+    .findAll(node =>
+      String(node.props.className ?? '')
+        .split(' ')
+        .includes(token)
+    )
     .find(node => typeof node.props.onLayout === 'function');
   if (!found) {
     throw new Error(`no view with layout class ${token}`);

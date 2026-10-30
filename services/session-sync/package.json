@@ -1,0 +1,35 @@
+{
+  "name": "cloudflare-session-sync",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "staging:config": "node scripts/render-staging-config.mjs \"$SESSION_SYNC_STAGING_RESOURCES\"",
+    "staging:dry-run": "pnpm run staging:config && wrangler deploy --config .wrangler/wrangler.staging.json --dry-run --outdir .wrangler/staging-dry-run",
+    "test": "vitest run",
+    "test:postgres": "vitest run --config vitest.postgres.config.ts",
+    "test:watch": "vitest",
+    "typecheck": "tsgo --noEmit",
+    "lint": "pnpm -w exec oxlint --config .oxlintrc.json services/session-sync/src services/session-sync/test services/session-sync/scripts"
+  },
+  "dependencies": {
+    "@kilocode/app-shared": "workspace:*",
+    "@kilocode/db": "workspace:*",
+    "@kilocode/worker-utils": "workspace:*",
+    "drizzle-orm": "catalog:",
+    "hono": "catalog:",
+    "jose": "catalog:",
+    "zod": "catalog:"
+  },
+  "devDependencies": {
+    "@cloudflare/vitest-pool-workers": "catalog:",
+    "@cloudflare/workers-types": "catalog:",
+    "@types/node": "catalog:",
+    "@typescript/native-preview": "catalog:",
+    "drizzle-kit": "catalog:",
+    "jsonc-parser": "3.3.1",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "wrangler": "catalog:"
+  }
+}

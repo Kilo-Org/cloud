@@ -1,0 +1,56 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  // Local development configuration. Production bindings are not provisioned yet;
+  // deploy-workers.yml excludes this service until they are. See README.md.
+  "name": "session-sync",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-05-15",
+  "compatibility_flags": ["nodejs_compat"],
+  "dev": {
+    "port": 8817,
+    "local_protocol": "http",
+    "ip": "0.0.0.0",
+  },
+  "rules": [
+    {
+      "type": "Text",
+      "globs": ["**/*.sql"],
+      "fallthrough": true,
+    },
+  ],
+  "observability": {
+    "enabled": true,
+  },
+  "vars": {
+    "ENVIRONMENT": "development",
+  },
+  // NEXTAUTH_SECRET and SESSION_SYNC_SECRET come from .dev.vars locally.
+  "hyperdrive": [
+    {
+      "binding": "HYPERDRIVE",
+      // Local-only placeholder, not a provisioned Hyperdrive configuration.
+      "id": "session-sync-local",
+      "localConnectionString": "postgres://postgres:postgres@localhost:5432/postgres",
+    },
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "SESSION_SYNC_DO",
+        "class_name": "SessionSyncDO",
+      },
+    ],
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["SessionSyncDO"],
+    },
+  ],
+  "r2_buckets": [
+    {
+      "binding": "SESSION_SYNC_R2",
+      "bucket_name": "session-sync-local",
+    },
+  ],
+}

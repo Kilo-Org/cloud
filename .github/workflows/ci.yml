@@ -37,6 +37,8 @@ jobs:
       ai_gateway_secure_proxy: ${{ steps.filter_secure_proxy.outputs.ai_gateway_secure_proxy || steps.filter_secure_proxy_retry.outputs.ai_gateway_secure_proxy }}
       # The diagram host document and its browser checks, also their own pair.
       mobile_diagram_host: ${{ steps.filter_diagram.outputs.mobile_diagram_host || steps.filter_diagram_retry.outputs.mobile_diagram_host }}
+      # The session-sync account database suite, also its own pair.
+      session_sync: ${{ steps.filter_session_sync.outputs.session_sync || steps.filter_session_sync_retry.outputs.session_sync }}
       workspace_matrix: ${{ steps.workspaces.outputs.matrix }}
       # JSON from scripts/affected-workspaces.mjs, and the typecheck and lint
       # groups and cloud-agent-next parts it needs.
@@ -231,6 +233,30 @@ jobs:
               - 'apps/web/tests/mobile-mermaid-host/**'
               - 'apps/web/playwright.mobile-mermaid.config.ts'
               - 'apps/web/package.json'
+              - '.github/workflows/ci.yml'
+              - 'pnpm-lock.yaml'
+      - name: Detect session-sync changes
+        id: filter_session_sync
+        continue-on-error: true
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        with:
+          filters: |
+            session_sync:
+              - 'services/session-sync/**'
+              - 'packages/db/**'
+              - 'packages/worker-utils/**'
+              - '.github/workflows/ci.yml'
+              - 'pnpm-lock.yaml'
+      - name: Detect session-sync changes (retry)
+        id: filter_session_sync_retry
+        if: steps.filter_session_sync.outcome == 'failure'
+        uses: dorny/paths-filter@fbd0ab8f3e69293af611ebaee6363fc25e6d187d # v4.0.1
+        with:
+          filters: |
+            session_sync:
+              - 'services/session-sync/**'
+              - 'packages/db/**'
+              - 'packages/worker-utils/**'
               - '.github/workflows/ci.yml'
               - 'pnpm-lock.yaml'
       # Pull requests check only the workspaces a change can affect. Main
@@ -738,6 +764,7 @@ jobs:
       - drizzle-check
       - harness-sdk
       - mobile-diagram-host
+      - session-sync-postgres
       - build-ai-gateway
       - build-ai-gateway-secure-proxy
     if: ${{ !cancelled() }}
@@ -1067,6 +1094,51 @@ jobs:
 
       - name: Check the diagram host page in a browser
         run: pnpm --filter web run test:mobile-mermaid
+
+  session-sync-postgres:
+    needs: changes
+    if: needs.changes.outputs.session_sync == 'true'
+    runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
+    timeout-minutes: 15
+
+    services:
+      postgres:
+        image: pgvector/pgvector:pg16
+        env:
+          POSTGRES_HOST_AUTH_METHOD: trust
+        options: >-
+          --tmpfs /var/lib/postgresql/data
+          --health-cmd pg_isready
+          --health-interval 2s
+          --health-timeout 5s
+          --health-retries 25
+        ports:
+          - 5432:5432
+
+    env:
+      POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/postgres
+
+    steps:
+      - uses: useblacksmith/checkout@41cdeedae8edb2e684ba22896a5fd2a3cb85db6b # v1
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
+
+      - name: Mount pnpm store
+        uses: ./.github/actions/pnpm-store
+
+      - name: Setup Node
+        uses: actions/setup-node@53b83947a5a98c8d113130e565377fae1a50d02f # v6.3.0
+        with:
+          node-version-file: '.nvmrc'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The exchange suite reads the real account tables. Avoid the Jest worker
+      # suffix that computeDatabaseUrl adds whenever NODE_ENV=test.
+      - name: Run session-sync account database tests
+        run: NODE_ENV=development pnpm drizzle migrate && pnpm --filter cloudflare-session-sync test:postgres
 
   workspace-tests:
     needs: changes

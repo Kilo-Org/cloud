@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Ang utos ay limitado sa {{max}} na character",
     "commandsEmpty": "Wala pang setup command",
     "commandsSaveFailed": "Hindi ma-save ang mga command sa pag-setup",
-    "moveUp": "Umakyat",
-    "moveDown": "Ilipat pababa",
     "moveCommandUp": "Ilipat ang utos {{position}} pataas",
     "moveCommandDown": "Ilipat ang utos {{position}} pababa",
     "skillsTitle": "Mga kasanayan",

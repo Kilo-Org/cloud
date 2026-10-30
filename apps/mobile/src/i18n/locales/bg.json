@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Командата е ограничена до {{max}} знака",
     "commandsEmpty": "Все още няма команди за настройка",
     "commandsSaveFailed": "Командите за настройка не можаха да бъдат запазени",
-    "moveUp": "Придвижете се нагоре",
-    "moveDown": "Придвижете се надолу",
     "moveCommandUp": "Преместете команда {{position}} нагоре",
     "moveCommandDown": "Преместете команда {{position}} надолу",
     "skillsTitle": "Умения",

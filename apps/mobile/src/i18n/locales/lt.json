@@ -3947,8 +3947,6 @@
     "commandAtLimit": "Komandos ilgis ribojamas iki {{max}} simbolių",
     "commandsEmpty": "Dar nėra sąrankos komandų",
     "commandsSaveFailed": "Nepavyko išsaugoti sąrankos komandų",
-    "moveUp": "Judėti aukštyn",
-    "moveDown": "Judėti žemyn",
     "moveCommandUp": "Perkelti komandą {{position}} aukštyn",
     "moveCommandDown": "Perkelti komandą {{position}} žemyn",
     "skillsTitle": "Įgūdžiai",

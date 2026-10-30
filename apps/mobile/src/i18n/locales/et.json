@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Käsu pikkus on piiratud {{max}} tähemärgiga",
     "commandsEmpty": "Seadistuskäske pole veel",
     "commandsSaveFailed": "Seadistuskäske ei saanud salvestada",
-    "moveUp": "Liigu üles",
-    "moveDown": "Liigu alla",
     "moveCommandUp": "Liiguta käsk {{position}} üles",
     "moveCommandDown": "Liiguta käsk {{position}} alla",
     "skillsTitle": "Oskused",

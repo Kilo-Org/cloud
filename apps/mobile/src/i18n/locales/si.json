@@ -3847,8 +3847,6 @@
     "commandAtLimit": "විධානය අක්ෂර {{max}}කට සීමා වේ",
     "commandsEmpty": "තවමත් පිහිටුවීම් විධාන නොමැත",
     "commandsSaveFailed": "පිහිටුවීම් විධාන සුරැකීමට නොහැකි විය",
-    "moveUp": "ඉහළට ගමන් කරන්න",
-    "moveDown": "පහළට ගමන් කරන්න",
     "moveCommandUp": "විධානය {{position}} ඉහළට ගෙනයන්න",
     "moveCommandDown": "විධානය {{position}} පහළට ගෙනයන්න",
     "skillsTitle": "කුසලතා",

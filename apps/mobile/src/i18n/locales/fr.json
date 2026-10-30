@@ -3897,8 +3897,6 @@
     "commandAtLimit": "La commande est limitée à {{max}} caractères",
     "commandsEmpty": "Aucune commande de configuration pour l'instant",
     "commandsSaveFailed": "Impossible d'enregistrer les commandes de configuration",
-    "moveUp": "Monter",
-    "moveDown": "Descendre",
     "moveCommandUp": "Déplacer la commande {{position}} vers le haut",
     "moveCommandDown": "Déplacer la commande {{position}} vers le bas",
     "skillsTitle": "Compétences",

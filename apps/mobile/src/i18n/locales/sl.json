@@ -3947,8 +3947,6 @@
     "commandAtLimit": "Ukaz je omejen na {{max}} znakov",
     "commandsEmpty": "Ni še nobenih ukazov za nastavitev",
     "commandsSaveFailed": "Nastavitvenih ukazov ni bilo mogoče shraniti",
-    "moveUp": "Premakni se navzgor",
-    "moveDown": "Premakni se navzdol",
     "moveCommandUp": "Premakni ukaz {{position}} navzgor",
     "moveCommandDown": "Premakni ukaz {{position}} navzdol",
     "skillsTitle": "Spretnosti",

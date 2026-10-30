@@ -3847,8 +3847,6 @@
     "commandAtLimit": "ନିର୍ଦ୍ଦେଶଟି {{max}} ଅକ୍ଷରରେ ସୀମିତ।",
     "commandsEmpty": "ଏପର୍ଯ୍ୟନ୍ତ କୌଣସି ସେଟଅପ୍ ନିର୍ଦ୍ଦେଶ ନାହିଁ।",
     "commandsSaveFailed": "ସେଟଅପ୍ କମାଣ୍ଡ୍ ସଞ୍ଚୟ କରିପାରିଲା ନାହିଁ।",
-    "moveUp": "ଉପରକୁ ଯାଅ।",
-    "moveDown": "ତଳକୁ ଯାଅ।",
     "moveCommandUp": "ନିର୍ଦ୍ଦେଶ {{position}} ଉପରକୁ ଘୁଞ୍ଚାନ୍ତୁ",
     "moveCommandDown": "ନିର୍ଦ୍ଦେଶ {{position}} ତଳକୁ ଘୁଞ୍ଚାନ୍ତୁ",
     "skillsTitle": "ଦକ୍ଷତା।",

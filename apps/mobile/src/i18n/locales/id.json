@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Perintah dibatasi hingga {{max}} karakter",
     "commandsEmpty": "Belum ada perintah pengaturan",
     "commandsSaveFailed": "Tidak dapat menyimpan perintah penyiapan",
-    "moveUp": "Naik",
-    "moveDown": "Pindah ke bawah",
     "moveCommandUp": "Pindahkan perintah {{position}} ke atas",
     "moveCommandDown": "Pindahkan perintah {{position}} ke bawah",
     "skillsTitle": "Keterampilan",

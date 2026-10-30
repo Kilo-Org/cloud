@@ -3947,8 +3947,6 @@
     "commandAtLimit": "Příkaz je omezen na {{max}} znaků",
     "commandsEmpty": "Zatím žádné příkazy k nastavení",
     "commandsSaveFailed": "Příkazy nastavení se nepodařilo uložit",
-    "moveUp": "Posuňte se nahoru",
-    "moveDown": "Posuňte se dolů",
     "moveCommandUp": "Přesunout příkaz {{position}} nahoru",
     "moveCommandDown": "Přesunout příkaz {{position}} dolů",
     "skillsTitle": "Dovednosti",

@@ -3997,8 +3997,6 @@
     "commandAtLimit": "Tá an t-ordú teoranta do {{max}} carachtar",
     "commandsEmpty": "Níl aon orduithe socraithe fós",
     "commandsSaveFailed": "Níorbh fhéidir na horduithe socraithe a shábháil",
-    "moveUp": "Bog suas",
-    "moveDown": "Bog síos",
     "moveCommandUp": "Bog ordú {{position}} suas",
     "moveCommandDown": "Bog ordú {{position}} síos",
     "skillsTitle": "Scileanna",

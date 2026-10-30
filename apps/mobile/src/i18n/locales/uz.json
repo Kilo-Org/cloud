@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Buyruq {{max}} ta belgi bilan cheklangan",
     "commandsEmpty": "Hozircha sozlash buyruqlari yo'q",
     "commandsSaveFailed": "Sozlash buyruqlarini saqlab bo‘lmadi",
-    "moveUp": "Yuqoriga siljiting",
-    "moveDown": "Pastga siljiting",
     "moveCommandUp": "{{position}}-raqamli buyruqni yuqoriga siljiting",
     "moveCommandDown": "{{position}}-raqamli buyruqni pastga siljiting",
     "skillsTitle": "Ko'nikmalar",

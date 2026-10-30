@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Kòmandman an limite a {{max}} karaktè",
     "commandsEmpty": "Pa gen lòd konfigirasyon ankò",
     "commandsSaveFailed": "Pa t 'kapab sove lòd konfigirasyon",
-    "moveUp": "Deplase moute",
-    "moveDown": "Deplase desann",
     "moveCommandUp": "Deplase kòmandman {{position}} anwo",
     "moveCommandDown": "Deplase kòmandman {{position}} anba",
     "skillsTitle": "Konpetans",

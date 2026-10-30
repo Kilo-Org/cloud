@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Команд нь {{max}} тэмдэгтээр хязгаарлагдана",
     "commandsEmpty": "Одоогоор тохируулах команд алга",
     "commandsSaveFailed": "Тохируулгын командуудыг хадгалж чадсангүй",
-    "moveUp": "Дээш хөдөл",
-    "moveDown": "Доош хөдөл",
     "moveCommandUp": "{{position}} дугаар командыг дээш зөөх",
     "moveCommandDown": "{{position}} дугаар командыг доош зөөх",
     "skillsTitle": "Ур чадвар",

@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Amri ina kikomo cha vibambo {{max}}",
     "commandsEmpty": "Bado hakuna amri za usanidi",
     "commandsSaveFailed": "Haikuweza kuhifadhi amri za usanidi",
-    "moveUp": "Sogeza juu",
-    "moveDown": "Sogeza chini",
     "moveCommandUp": "Sogeza amri {{position}} juu",
     "moveCommandDown": "Sogeza amri {{position}} chini",
     "skillsTitle": "Ujuzi",

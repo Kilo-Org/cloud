@@ -3847,8 +3847,6 @@
     "commandAtLimit": "ពាក្យបញ្ជាមានកំណត់ត្រឹម {{max}} តួអក្សរ",
     "commandsEmpty": "មិនទាន់មានពាក្យបញ្ជាដំឡើងនៅឡើយទេ",
     "commandsSaveFailed": "មិនអាចរក្សាទុកពាក្យបញ្ជាដំឡើងបានទេ។",
-    "moveUp": "ផ្លាស់ទីឡើងលើ",
-    "moveDown": "ផ្លាស់ទីចុះក្រោម",
     "moveCommandUp": "ផ្លាស់ទីពាក្យបញ្ជា {{position}} ឡើងលើ",
     "moveCommandDown": "ផ្លាស់ទីពាក្យបញ្ជា {{position}} ចុះក្រោម",
     "skillsTitle": "ជំនាញ",

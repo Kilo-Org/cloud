@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Lệnh được giới hạn tối đa {{max}} ký tự",
     "commandsEmpty": "Chưa có lệnh thiết lập nào",
     "commandsSaveFailed": "Không thể lưu lệnh thiết lập",
-    "moveUp": "Di chuyển lên",
-    "moveDown": "Di chuyển xuống",
     "moveCommandUp": "Di chuyển lệnh {{position}} lên",
     "moveCommandDown": "Di chuyển lệnh {{position}} xuống",
     "skillsTitle": "Kỹ năng",

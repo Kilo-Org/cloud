@@ -3847,8 +3847,6 @@
     "commandAtLimit": "คำสั่งจำกัดไว้ที่ {{max}} อักขระ",
     "commandsEmpty": "ยังไม่มีคำสั่งการตั้งค่า",
     "commandsSaveFailed": "ไม่สามารถบันทึกคำสั่งการตั้งค่าได้",
-    "moveUp": "เลื่อนขึ้น",
-    "moveDown": "เลื่อนลง",
     "moveCommandUp": "ย้ายคำสั่ง {{position}} ขึ้น",
     "moveCommandDown": "ย้ายคำสั่ง {{position}} ลง",
     "skillsTitle": "ทักษะ",

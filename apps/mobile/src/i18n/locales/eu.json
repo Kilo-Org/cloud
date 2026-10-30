@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Komandoa {{max}} karakteretara mugatuta dago",
     "commandsEmpty": "Oraindik ez dago konfigurazio komandorik",
     "commandsSaveFailed": "Ezin izan dira gorde konfigurazio komandoak",
-    "moveUp": "Gora",
-    "moveDown": "Mugitu behera",
     "moveCommandUp": "Mugitu {{position}}. komandoa gora",
     "moveCommandDown": "Mugitu {{position}}. komandoa behera",
     "skillsTitle": "Trebetasunak",

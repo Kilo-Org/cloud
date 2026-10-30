@@ -3847,8 +3847,6 @@
     "commandAtLimit": "دستور به {{max}} نویسه محدود است",
     "commandsEmpty": "هنوز دستور راه اندازی وجود ندارد",
     "commandsSaveFailed": "دستورات راه اندازی ذخیره نشد",
-    "moveUp": "حرکت به بالا",
-    "moveDown": "به پایین حرکت کنید",
     "moveCommandUp": "فرمان {{position}} را به بالا منتقل کنید",
     "moveCommandDown": "فرمان {{position}} را به پایین منتقل کنید",
     "skillsTitle": "مهارت ها",

@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Пәрмен {{max}} таңбамен шектелген",
     "commandsEmpty": "Орнату пәрмендері әлі жоқ",
     "commandsSaveFailed": "Орнату пәрмендерін сақтау мүмкін болмады",
-    "moveUp": "Жоғары жылжытыңыз",
-    "moveDown": "Төмен жылжытыңыз",
     "moveCommandUp": "{{position}} пәрменін жоғары жылжыту",
     "moveCommandDown": "{{position}} пәрменін төмен жылжыту",
     "skillsTitle": "Дағдылар",

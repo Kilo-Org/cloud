@@ -3847,8 +3847,6 @@
     "commandAtLimit": "An iyakance umurnin zuwa haruffa {{max}}",
     "commandsEmpty": "Babu umarnin saitin tukuna",
     "commandsSaveFailed": "An kasa ajiye umarnin saitin",
-    "moveUp": "Matsa sama",
-    "moveDown": "Matsa ƙasa",
     "moveCommandUp": "Matsar da umarni {{position}} sama",
     "moveCommandDown": "Matsar da umarni {{position}} ƙasa",
     "skillsTitle": "Ƙwarewa",

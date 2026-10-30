@@ -3847,8 +3847,6 @@
     "commandAtLimit": "কমান্ডটি সর্বাধিক {{max}}টি অক্ষরের মধ্যে সীমাবদ্ধ",
     "commandsEmpty": "এখনো কোনো সেটআপ কমান্ড নেই",
     "commandsSaveFailed": "সেটআপ কমান্ড সংরক্ষণ করা যায়নি",
-    "moveUp": "উপরে সরান",
-    "moveDown": "নিচে সরান",
     "moveCommandUp": "কমান্ড {{position}} উপরে সরান",
     "moveCommandDown": "কমান্ড {{position}} নিচে সরান",
     "skillsTitle": "দক্ষতা",

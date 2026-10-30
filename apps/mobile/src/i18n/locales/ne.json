@@ -3847,8 +3847,6 @@
     "commandAtLimit": "आदेश {{max}} अक्षरहरूमा सीमित छ",
     "commandsEmpty": "अहिलेसम्म कुनै सेटअप आदेशहरू छैनन्",
     "commandsSaveFailed": "सेटअप आदेशहरू बचत गर्न सकिएन",
-    "moveUp": "माथि सार्नुहोस्",
-    "moveDown": "तल सार्नुहोस्",
     "moveCommandUp": "आदेश {{position}} माथि सार्नुहोस्",
     "moveCommandDown": "आदेश {{position}} तल सार्नुहोस्",
     "skillsTitle": "सीपहरू",

@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Ny baiko dia voafetra ho {{max}} tarehintsoratra",
     "commandsEmpty": "Tsy mbola misy baiko fanamboarana",
     "commandsSaveFailed": "Tsy afaka mitahiry baiko fanamboarana",
-    "moveUp": "Miakatra",
-    "moveDown": "Mandrosoa midina",
     "moveCommandUp": "Afindra baiko {{position}} miakatra",
     "moveCommandDown": "Afindra baiko {{position}} midina",
     "skillsTitle": "fahaiza-manao",

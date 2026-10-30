@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Командата е ограничена на {{max}} знаци",
     "commandsEmpty": "Сè уште нема команди за поставување",
     "commandsSaveFailed": "Не може да се зачуваат командите за поставување",
-    "moveUp": "Движете се нагоре",
-    "moveDown": "Движете се надолу",
     "moveCommandUp": "Премести команда {{position}} нагоре",
     "moveCommandDown": "Премести команда {{position}} надолу",
     "skillsTitle": "Вештини",

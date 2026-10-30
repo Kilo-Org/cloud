@@ -3947,8 +3947,6 @@
     "commandAtLimit": "Команда обмежена до {{max}} символів",
     "commandsEmpty": "Ще немає команд налаштування",
     "commandsSaveFailed": "Не вдалося зберегти команди налаштування",
-    "moveUp": "Рухатися вгору",
-    "moveDown": "Рухатися вниз",
     "moveCommandUp": "Перемістити команду {{position}} вгору",
     "moveCommandDown": "Перемістити команду {{position}} вниз",
     "skillsTitle": "Навички",

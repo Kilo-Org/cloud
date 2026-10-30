@@ -78,7 +78,7 @@ describe('adminGatewayConfigRouter', () => {
 
   it('keeps organization features when the routing configuration is saved', async () => {
     const caller = await createCallerForUser(admin.id);
-    const organizationId = '00000000-0000-4000-8000-000000000001';
+    const organizationId = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
 
     await caller.admin.gatewayConfig.setOrganizationFeatures({
       experimental_byok: [organizationId.toUpperCase()],

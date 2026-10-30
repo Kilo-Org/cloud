@@ -4,7 +4,7 @@ import { db } from '@kilocode/web-shared/lib/drizzle';
 import { eq } from 'drizzle-orm';
 import { isExperimentalByokEnabled } from './experimental-byok';
 
-const enabledOrganizationId = '00000000-0000-4000-8000-000000000001';
+const enabledOrganizationId = '9d278969-5453-4ae3-a51f-a8d2274a7b56';
 const otherOrganizationId = '00000000-0000-4000-8000-000000000002';
 
 describe('isExperimentalByokEnabled', () => {

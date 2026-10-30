@@ -14,7 +14,6 @@ const meta: Meta<typeof EnvVarsDialog> = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-// Wrapper component to handle state
 function EnvVarsDialogWrapper({ initialValue }: { initialValue: Record<string, string> }) {
   const [value, setValue] = useState(initialValue);
   return <EnvVarsDialog value={value} onChange={setValue} />;

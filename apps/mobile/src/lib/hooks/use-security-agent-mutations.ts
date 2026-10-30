@@ -43,6 +43,16 @@ export function useSaveSecurityAgentConfig(scope: string) {
   // onError policy: roll back the onMutate snapshot (latest generation only)
   // and toast error.message.
   return useMutation({
+    // Reachability is the save's outcome, not a precondition: the default
+    // `networkMode: 'online'` pauses the mutation while the connectivity
+    // manager reports the device offline, so the request is never sent, the
+    // caller's `mutateAsync` never settles (the header keeps Save disabled
+    // with its spinner up and the draft stays dirty, with no failure surface),
+    // and the queued save lands silently once the connection returns.
+    // Attempting the request instead lets it fail through the normal path:
+    // onError restores the snapshot and toasts the failure, so Save returns to
+    // an enabled retry state with the draft intact.
+    networkMode: 'always',
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (patch: Omit<SecurityAgentConfigPatch, 'expectedRevision'>) => {
       // The server rejects a save whose revision is stale, so send the revision
@@ -121,6 +131,11 @@ export function useSetSecurityAgentEnabled(scope: string) {
   // onError policy: roll back the onMutate snapshot (latest generation only)
   // and toast error.message.
   return useMutation({
+    // Same reason as the config save above: pausing while the connectivity
+    // manager reports offline keeps the switch in its optimistic position with
+    // no rollback and no toast, and the queued toggle lands silently after
+    // reconnecting. Attempting the request fails through the normal path.
+    networkMode: 'always',
     // eslint-disable-next-line typescript-eslint/promise-function-async -- conflicting require-await rule
     mutationFn: (vars: Parameters<typeof trpcClient.securityAgent.setEnabled.mutate>[0]) =>
       isPersonalSecurityScope(scope)
@@ -198,6 +213,14 @@ export function useTriggerSecuritySync(scope: string) {
   const { writeReconcileFirst, remove: removeOutboxRow, whenLoaded } = useMutationOutbox();
 
   return useMutation({
+    // A manual sync is a tap with a visible pending state, not a background
+    // job: pausing it while the connectivity manager reports offline leaves the
+    // dashboard's sync control spinning with no outcome until the connection
+    // returns. Attempting the request fails through the normal path, bounded by
+    // the transport deadline, and the reconcile-first row written above records
+    // the ambiguous outcome, so a relaunch offers the reconcile retry instead
+    // of blindly re-POSTing.
+    networkMode: 'always',
     mutationFn: async (
       vars: Parameters<typeof trpcClient.securityAgent.triggerSync.mutate>[0] = {}
     ) => {

@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest';
 
 import {
   applyVariableEdit,
+  savedVariableKey,
   SECRET_MASK,
   validateVariableInput,
+  variableKeyPreview,
   variableRows,
 } from '@/components/profiles/profile-variables-model';
 
@@ -27,6 +29,31 @@ describe('variableRows', () => {
         maskedValue: 'production',
       },
     ]);
+  });
+});
+
+describe('savedVariableKey', () => {
+  it('upper-cases the typed key and replaces everything outside A-Z0-9_', () => {
+    expect(savedVariableKey('  api key ')).toBe('API_KEY');
+    expect(savedVariableKey('API_की')).toBe('API___');
+    expect(savedVariableKey('a.b-c')).toBe('A_B_C');
+    expect(savedVariableKey('API_KEY')).toBe('API_KEY');
+  });
+});
+
+describe('variableKeyPreview', () => {
+  it('names the key a save will store when it differs from what was typed', () => {
+    // Two Devanagari characters become two underscores, so the reader must see
+    // the key the saved row will carry.
+    expect(variableKeyPreview('API_की')).toBe('API___');
+    expect(variableKeyPreview('api key')).toBe('API_KEY');
+  });
+
+  it('stays silent for a key that saves unchanged or a blank field', () => {
+    expect(variableKeyPreview('API_KEY')).toBeNull();
+    expect(variableKeyPreview('  API_KEY  ')).toBeNull();
+    expect(variableKeyPreview('')).toBeNull();
+    expect(variableKeyPreview('   ')).toBeNull();
   });
 });
 

@@ -4,7 +4,9 @@ import { useTranslation } from 'react-i18next';
 
 import { Button } from '@/components/ui/button';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { cn } from '@/lib/utils';
 
 /**
  * Durable failure card for a Security Agent command that failed before the
@@ -36,7 +38,7 @@ export function SecurityCommandRetryCard({
       </View>
       {retryable ? (
         <View className="flex-row gap-2">
-          <Button size="sm" className="flex-1" onPress={onRetry}>
+          <Button size="sm" className={cn(STATE_ACTION_CLASS, 'flex-1')} onPress={onRetry}>
             <Text>{t('common.retry')}</Text>
           </Button>
           {onDiscard ? (

@@ -25,7 +25,9 @@ vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
 vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn() }) }));
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+}));
 vi.mock('@shopify/flash-list', async () => {
   // A `vi.mock` factory is hoisted above the module imports, so React can only
   // be reached here through a dynamic import.
@@ -84,10 +86,17 @@ vi.mock('@/lib/pr-review/use-provider-inbox', () => ({
       fetchNextPage: vi.fn(),
     },
     githubNeedsReconnect: inboxState.githubNeedsReconnect,
+    isPending: false,
+    isFetching: false,
     retryFailedPages: vi.fn(),
     items: [
       {
-        ref: { platform: 'github' as const, owner: 'octocat', repo: 'hello-world', number: 7 },
+        ref: {
+          platform: 'github' as const,
+          owner: 'octocat',
+          repo: 'hello-world',
+          number: 7,
+        },
         key: 'octocat/hello-world#7',
         title: 'Fix the thing',
         isDraft: false,
@@ -106,7 +115,9 @@ vi.mock('@/lib/utils', () => ({
 }));
 
 function mountInboxList(): TestRenderer.ReactTestRenderer {
-  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+  const ref: { current: TestRenderer.ReactTestRenderer | undefined } = {
+    current: undefined,
+  };
   act(() => {
     ref.current = TestRenderer.create(
       createElement(PrReviewInboxList, { header: null, recents: null })
@@ -128,7 +139,9 @@ function accessError(renderer: TestRenderer.ReactTestRenderer) {
   return error;
 }
 
-type ActionElement = { props: { accessibilityLabel?: unknown; onPress?: unknown } };
+type ActionElement = {
+  props: { accessibilityLabel?: unknown; onPress?: unknown };
+};
 
 function isActionElement(value: unknown): value is ActionElement {
   return (

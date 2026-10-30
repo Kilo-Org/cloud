@@ -1,4 +1,5 @@
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic, selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { type ReactNode, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -108,7 +109,7 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
   const handleToggleDone = useCallback(
     (item: TodoItem) => {
       if (item.doneAt === null) {
-        void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+        notificationHaptic(Haptics.NotificationFeedbackType.Success);
       }
       update.mutate({ id: item.id, done: item.doneAt === null });
     },
@@ -202,7 +203,7 @@ export function TodoListScreen({ listId }: Readonly<{ listId: string }>) {
             ) {
               return;
             }
-            void Haptics.selectionAsync();
+            selectionHaptic();
             move.mutate({ id: key, beforeId, afterId });
           }}
         />

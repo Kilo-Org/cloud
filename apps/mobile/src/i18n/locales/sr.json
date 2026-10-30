@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Izmene",
-    "organizationTrialEnded": "Probni period organizacije je završen i ona nema aktivan plan. Vlasnik organizacije može da ažurira naplatu na kilo.ai, a zatim pokuša ponovo."
+    "organizationTrialEnded": "Probni period organizacije je završen i ona nema aktivan plan. Vlasnik organizacije može da ažurira naplatu na kilo.ai, a zatim pokuša ponovo.",
+    "privateRepositoryA11y": "{{name}}, privatno spremište"
   },
   "language": {
     "restarting": "Ponovno pokretanje radi promene jezika",
@@ -1540,7 +1541,13 @@
         "change_request_failed": "PR nije uspeo",
         "superseded": "Već postoji"
       },
-      "noProposalsDescription": "Predlozi iz memorije pregleda pojaviće se ovde kada Kilo analizira odgovore osoba koje održavaju repozitorijum."
+      "noProposalsDescription": "Predlozi iz memorije pregleda pojaviće se ovde kada Kilo analizira odgovore osoba koje održavaju repozitorijum.",
+      "changeRequestInProgress": "Kilo već otvara pull request za ovaj predlog. Pokušajte ponovo za trenutak.",
+      "changeRequestNotActionable": "Ovaj predlog više ne može biti odobren. Zatvorite ga i osvežite listu.",
+      "changeRequestNoGitHubAccess": "Nijedna GitHub veza nema pristup ovom repozitorijumu. Ponovo povežite GitHub sa pristupom tom repozitorijumu, pa pokušajte ponovo.",
+      "changeRequestMissingPermissions": "Kilo GitHub aplikacija ne može da otvori pull request-ove u ovom repozitorijumu. Vlasnik repozitorijuma mora dati aplikaciji pravo pisanja nad sadržajem i pull request-ovima, a zatim pokušati ponovo.",
+      "changeRequestFailed": "Kilo nije mogao da otvori pull request. Pokušajte ponovo za trenutak.",
+      "offAction": "Memorija pregleda je isključena. Uključi je, pa pokušaj ponovo."
     },
     "manualReview": {
       "title": "Ručni pregled",
@@ -2345,6 +2352,8 @@
       "couldNotLoadEnvironment": "Učitavanje tvog okruženja nije uspelo.",
       "retryLoadingEnvironment": "Pokušaj ponovo da učitaš okruženje",
       "defaultEnvironment": "Podrazumevano okruženje",
+      "environmentAccessibility": "Izaberite profil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Izaberite profil: {{label}}. {{attention}}",
       "leaveChanges": "Ostavi izmene",
       "commitAndPush": "Komituj i pošalji",
       "startSession": "Pokreni sesiju",
@@ -2379,7 +2388,7 @@
       "manageProfiles": "Upravljajte profilima",
       "noProfiles": "Još nema profila. Napravite jedan da biste dodali promenljive okruženja, MCP servere i veštine.",
       "advancedConfig": "Napredna konfiguracija",
-      "advancedConfigDescription": "Izaberite profil za učitavanje sačuvanih konfiguracija i ručno konfigurišite dodatne promenljive okruženja i komande za podešavanje",
+      "advancedConfigDescription": "Važi za ovu sesiju. Čuvanje kao profil ostaje za sledeći put.",
       "saveAsProfile": "Sačuvaj kao profil",
       "saveProfileDescription": "Sačuvajte trenutne promenljive okruženja i komande za podešavanje kao profil za višekratnu upotrebu.",
       "profileSummary": "{{vars}} promenljivih okruženja · {{commands}} komandi za podešavanje",
@@ -3863,6 +3872,7 @@
     "keyLabel": "Ključ",
     "keyTooLong": "Ključ može imati najviše 256 znakova",
     "keyDuplicate": "Ovaj ključ već postoji u profilu",
+    "keyWillBeSavedAs": "Biće sačuvano kao {{key}}",
     "valueLabel": "Vrednost",
     "valueRequired": "Unesite vrednost",
     "tooLong": "Koristite najviše {{max}} znakova",
@@ -3878,7 +3888,9 @@
     "commandsTitle": "Komande za podešavanje",
     "addCommand": "Dodaj komandu",
     "commandLabel": "Komanda",
+    "commandLabelPosition": "Komanda {{position}}",
     "commandPlaceholder": "npr. pnpm install",
+    "commandAtLimit": "Komanda je ograničena na {{max}} znakova",
     "commandsEmpty": "Još nema komandi za podešavanje",
     "commandsSaveFailed": "Nije moguće sačuvati komande za podešavanje",
     "moveUp": "Pomeri se gore",
@@ -3896,6 +3908,7 @@
     "skillSaveFailed": "Nije moguće sačuvati veštinu",
     "skillSourceCustom": "Prilagođeno",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Nalepite SKILL.md i njegovo ime se popuni; dodajte veštinu sa svog telefona bez prevlačenja i ispuštanja.",
     "skillEditTitle": "Uredi veštinu",
     "skillEdit": "Uredi veštinu {{name}}",
@@ -3923,6 +3936,7 @@
       "headersHint": "Vrednosti prikazane kao •••• zadržavaju sačuvanu tajnu; zamenite vrednost da biste je rotirali. Promena URL-a zahteva ponovni unos svih vrednosti",
       "nameRequired": "Unesite ime servera",
       "nameInvalid": "Ime može da koristi samo ASCII slova, brojeve, donje crte i crtice, najviše 100 znakova",
+      "nameConflict": "Server sa ovim imenom već postoji",
       "commandRequired": "Unesite komandu",
       "commandTooLong": "Koristite najviše 50 argumenata od po 500 znakova",
       "urlRequired": "Unesite URL",
@@ -4003,7 +4017,6 @@
       "repo": "Izaberite spremište…",
       "profile": "Izaberite profil",
       "remove": "Odveži",
-      "private": "Privatno",
       "search": "Pretražite spremišta…",
       "addedToast": "Podrazumevani profil je postavljen za \"{{repo}}\"",
       "addFailed": "Nije moguće postaviti podrazumevani profil",
@@ -4016,7 +4029,11 @@
       "pinnedToast": "Zakačeno za \"{{repo}}\"",
       "pinFailed": "Nije moguće zakačiti repo",
       "unboundToast": "Repo je odvezan",
-      "unbindFailed": "Nije moguće opozvati vezivanje repo-a"
+      "unbindFailed": "Nije moguće opozvati vezivanje repo-a",
+      "repoValue": "Spremište: {{name}}",
+      "profileValue": "Profil: {{name}}",
+      "pickerEmptyDescriptionOrganization": "Napravite profil organizacije da biste ponovo koristili promenljive okruženja, komande za podešavanje i veštine u svim sesijama.",
+      "pickerEmptyDescriptionOrganizationReadOnly": "Vlasnik ili administrator organizacije može da napravi profil organizacije."
     },
     "variablesDeleteFailed": "Nije moguće izbrisati promenljivu",
     "deleteVariable": "Obriši promenljivu {{key}}",

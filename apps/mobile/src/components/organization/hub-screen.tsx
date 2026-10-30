@@ -1,5 +1,7 @@
+/* eslint-disable max-lines -- The hub composes every organization row (money, members, Kilo Pass, rename) on one screen. */
 import { fromMicrodollars } from '@kilocode/app-shared/utils';
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { Bell, FileText, Pencil, Receipt, Users, Wallet } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
@@ -245,7 +247,7 @@ export function OrganizationHubScreen({ organizationIdOverride }: OrganizationHu
           initialValue={org.organizationName}
           onSave={async name => {
             await mutations.rename.mutateAsync({ name });
-            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            notificationHaptic(Haptics.NotificationFeedbackType.Success);
           }}
           onClose={() => {
             setRenameVisible(false);

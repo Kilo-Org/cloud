@@ -28,9 +28,9 @@ import { Clock, GitPullRequest, Inbox } from '@/components/ui/icons';
 import { DirectionalChevronRight } from '@/components/ui/directional-icons';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useOrganization } from '@/lib/organization-context';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
-import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import {
   type ProviderPrPlatform,
   providerPrRefLabel,
@@ -72,7 +72,8 @@ export function PrReviewInboxList({ header, recents }: Readonly<PrReviewInboxLis
   };
   const reconnectOnly = inbox.githubNeedsReconnect && !inbox.isPending && inbox.items.length === 0;
   const view = selectPrInboxView({
-    isLoading: inbox.isPending,
+    isPending: inbox.isPending,
+    isFetching: inbox.isFetching,
     itemCount: inbox.items.length,
     firstPageErrorState:
       inbox.firstPageErrorState ?? (reconnectOnly ? { kind: 'reconnect' } : null),
@@ -349,6 +350,7 @@ function LoadMoreRetry({ onRetry }: Readonly<{ onRetry: () => void }>) {
       <Button
         size="sm"
         variant="outline"
+        className={STATE_ACTION_CLASS}
         onPress={onRetry}
         accessibilityLabel={t('common.retryLoadingMore')}
       >

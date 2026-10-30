@@ -14,8 +14,8 @@ import {
   pressPressable,
   rerenderScreen,
   type TestConfirmMock,
-  testProfile,
-  type TestProfileDetail,
+  testVars,
+  type TestVars,
 } from '@/components/profiles/profile-variables-screen.test-helpers';
 import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
@@ -25,7 +25,7 @@ const h = vi.hoisted(() => ({
   error: vi.fn(),
   canManage: true,
   query: {
-    data: undefined as TestProfileDetail | undefined,
+    data: undefined as TestVars | undefined,
     isError: false,
     isPending: true,
     isRefetching: false,
@@ -42,7 +42,7 @@ vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
 }));
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
-  useAgentProfile: () => h.query,
+  useAgentProfileVars: () => h.query,
   useAgentProfileMutations: () => h.mutations,
 }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
@@ -127,7 +127,7 @@ describe('ProfileVariablesScreen', () => {
   });
 
   it('empty: shows variablesEmpty and the add CTA opens the form', async () => {
-    h.query.data = testProfile();
+    h.query.data = testVars();
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
@@ -140,7 +140,7 @@ describe('ProfileVariablesScreen', () => {
   });
 
   it('happy: an added variable is saved with a cleaned key and shown', async () => {
-    h.query.data = testProfile();
+    h.query.data = testVars();
     h.query.isPending = false;
     h.mutations.setVar.mutateAsync.mockResolvedValue({ success: true });
 
@@ -164,8 +164,67 @@ describe('ProfileVariablesScreen', () => {
     unmount();
   });
 
+  it('names the key it will store when a typed key would be normalized', async () => {
+    h.query.data = testVars();
+    h.query.isPending = false;
+    h.mutations.setVar.mutateAsync.mockResolvedValue({ success: true });
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    changeText(renderer.root, 'Key', 'API_की');
+    changeText(renderer.root, 'Value', 'https://api.example.com/v1');
+
+    // The two Devanagari characters become underscores in the stored key, so the
+    // form says so before the reader taps Save.
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
+      'Will be saved as API___'
+    );
+
+    pressButton(renderer.root, 'Save');
+
+    await waitFor(() => h.mutations.setVar.mutateAsync.mock.calls.length > 0);
+    // The hint and the payload cannot disagree: both come from the same helper.
+    expect(h.mutations.setVar.mutateAsync.mock.calls[0]?.[0]).toEqual({
+      profileId: 'profile-1',
+      key: 'API___',
+      value: 'https://api.example.com/v1',
+      isSecret: false,
+    });
+
+    unmount();
+  });
+
+  it('stays quiet about a key that saves unchanged', async () => {
+    h.query.data = testVars();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    changeText(renderer.root, 'Key', 'API_KEY');
+
+    const texts = findAll(renderer.root, 'Text').map(node => node.props.children);
+    expect(texts).not.toContain('Will be saved as API_KEY');
+
+    unmount();
+  });
+
+  it('names the upper-cased key when only the letter case would change', async () => {
+    h.query.data = testVars();
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    pressEmptyAction(renderer);
+    changeText(renderer.root, 'Key', 'api_key');
+
+    expect(findAll(renderer.root, 'Text').map(node => node.props.children)).toContain(
+      'Will be saved as API_KEY'
+    );
+
+    unmount();
+  });
+
   it('non-retryable: an empty key is refused, and an over-long key names the length', async () => {
-    h.query.data = testProfile();
+    h.query.data = testVars();
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
@@ -185,7 +244,7 @@ describe('ProfileVariablesScreen', () => {
   });
 
   it('non-retryable: a new key that cleans onto an existing one is refused', async () => {
-    h.query.data = testProfile([{ key: 'FOO_BAR', value: '1', isSecret: false }]);
+    h.query.data = testVars([{ key: 'FOO_BAR', value: '1', isSecret: false }]);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
@@ -205,7 +264,7 @@ describe('ProfileVariablesScreen', () => {
   });
 
   it('non-retryable: clearing an existing value shows the required message instead of doing nothing', async () => {
-    h.query.data = testProfile([{ key: 'API_KEY', value: '1', isSecret: false }]);
+    h.query.data = testVars([{ key: 'API_KEY', value: '1', isSecret: false }]);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
@@ -224,7 +283,7 @@ describe('ProfileVariablesScreen', () => {
   });
 
   it('non-retryable: a new variable needs a value', async () => {
-    h.query.data = testProfile();
+    h.query.data = testVars();
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
@@ -240,7 +299,7 @@ describe('ProfileVariablesScreen', () => {
   });
 
   it('retryable: a failure with no message toasts the fallback and keeps the form', async () => {
-    h.query.data = testProfile();
+    h.query.data = testVars();
     h.query.isPending = false;
     const error = new Error('placeholder');
     error.message = '';
@@ -260,7 +319,7 @@ describe('ProfileVariablesScreen', () => {
   });
 
   it('happy: tapping a row edits its value under the same key', async () => {
-    h.query.data = testProfile([{ key: 'API_KEY', value: '1', isSecret: false }]);
+    h.query.data = testVars([{ key: 'API_KEY', value: '1', isSecret: false }]);
     h.query.isPending = false;
     h.mutations.setVar.mutateAsync.mockResolvedValue({ success: true });
 
@@ -288,7 +347,7 @@ describe('ProfileVariablesScreen', () => {
   });
 
   it('happy: a secret row masks its value and never echoes the stored value', async () => {
-    h.query.data = testProfile([{ key: 'TOKEN', value: '***', isSecret: true }]);
+    h.query.data = testVars([{ key: 'TOKEN', value: '***', isSecret: true }]);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
@@ -302,7 +361,7 @@ describe('ProfileVariablesScreen', () => {
   });
 
   it('happy: a secret value can be revealed only while editing', async () => {
-    h.query.data = testProfile([{ key: 'TOKEN', value: '***', isSecret: true }]);
+    h.query.data = testVars([{ key: 'TOKEN', value: '***', isSecret: true }]);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
@@ -329,7 +388,7 @@ describe('ProfileVariablesScreen', () => {
   });
 
   it('names each row delete control after the variable it removes', async () => {
-    h.query.data = testProfile([
+    h.query.data = testVars([
       { key: 'API_KEY', value: '1', isSecret: false },
       { key: 'STRIPE_SECRET_KEY', value: '****', isSecret: true },
     ]);
@@ -347,7 +406,7 @@ describe('ProfileVariablesScreen', () => {
 
   it('read-only: rows render without edit or delete controls', async () => {
     h.canManage = false;
-    h.query.data = testProfile([{ key: 'API_KEY', value: '1', isSecret: false }]);
+    h.query.data = testVars([{ key: 'API_KEY', value: '1', isSecret: false }]);
     h.query.isPending = false;
     const { renderer, unmount } = await mountScreen();
     const rowActions = findAll(renderer.root, 'Pressable').filter(node =>
@@ -358,7 +417,7 @@ describe('ProfileVariablesScreen', () => {
   });
 
   it('happy: confirming delete calls deleteVar and drops the row', async () => {
-    h.query.data = testProfile([{ key: 'API_KEY', value: '1', isSecret: false }]);
+    h.query.data = testVars([{ key: 'API_KEY', value: '1', isSecret: false }]);
     h.query.isPending = false;
     h.mutations.deleteVar.mutateAsync.mockResolvedValue({ success: true });
     const { renderer, unmount } = await mountScreen();
@@ -379,7 +438,7 @@ describe('ProfileVariablesScreen', () => {
   });
 
   it('keeps the row and shows a delete-specific fallback for an unreadable error', async () => {
-    h.query.data = testProfile([{ key: 'API_KEY', value: '1', isSecret: false }]);
+    h.query.data = testVars([{ key: 'API_KEY', value: '1', isSecret: false }]);
     h.query.isPending = false;
     h.mutations.deleteVar.mutateAsync.mockRejectedValueOnce(undefined);
 
@@ -400,7 +459,7 @@ describe('ProfileVariablesScreen', () => {
   });
 
   it('keeps the row without duplicating the mutation toast for a readable delete error', async () => {
-    h.query.data = testProfile([{ key: 'API_KEY', value: '1', isSecret: false }]);
+    h.query.data = testVars([{ key: 'API_KEY', value: '1', isSecret: false }]);
     h.query.isPending = false;
     h.mutations.deleteVar.mutateAsync.mockRejectedValueOnce(new Error('Permission denied'));
 
@@ -418,7 +477,7 @@ describe('ProfileVariablesScreen', () => {
   });
 
   it('disables delete and refuses another confirmation while deletion is pending', async () => {
-    h.query.data = testProfile([{ key: 'API_KEY', value: '1', isSecret: false }]);
+    h.query.data = testVars([{ key: 'API_KEY', value: '1', isSecret: false }]);
     h.query.isPending = false;
     const { renderer, queryClient, unmount } = await mountScreen();
     h.mutations.deleteVar.isPending = true;
@@ -439,7 +498,7 @@ describe('ProfileVariablesScreen', () => {
   });
 
   it('keeps the rows while a refetch is in flight', async () => {
-    h.query.data = testProfile([{ key: 'API_KEY', value: '1', isSecret: false }]);
+    h.query.data = testVars([{ key: 'API_KEY', value: '1', isSecret: false }]);
     h.query.isPending = false;
     const { renderer, queryClient, unmount } = await mountScreen();
 

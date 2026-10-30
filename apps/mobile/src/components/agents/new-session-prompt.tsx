@@ -130,7 +130,13 @@ export function NewSessionPrompt({
   belowCardHeight = 0,
   onStartSession,
   isCloneEntry = false,
+  autoFocusOnMount = true,
 }: Readonly<NewSessionPromptComponentProps>) {
+  // The input never takes focus for a share payload, whatever the host decides:
+  // the payload prefills the composer, and raising the keyboard on arrival hides
+  // the attachment strip and Start. The veto stays here so a host that keeps the
+  // prop's default cannot lose it.
+  const takesFocusOnMount = autoFocusOnMount && (shareId === undefined || shareId === '');
   const colors = useThemeColors();
   const { t } = useTranslation();
   const { height: windowHeight } = useWindowDimensions();
@@ -493,9 +499,12 @@ export function NewSessionPrompt({
           submitBehavior={returnSendsMessage ? 'submit' : 'newline'}
           onSubmitEditing={returnSendsMessage ? handleReturnSubmit : undefined}
           maxFontSizeMultiplier={1}
-          // A shared payload prefills this input, so raising the keyboard on
-          // arrival hides the attachment strip and the Start button.
-          autoFocus={shareId === undefined || shareId === ''}
+          // Focus on arrival only when the form has nothing left to configure
+          // (the host resolves this) and no share payload prefills it: the
+          // keyboard it raises would otherwise shrink the frame past the
+          // repository, Environment and Advanced sections the session still
+          // needs before it can start.
+          autoFocus={takesFocusOnMount}
           // Android's IME swaps the app for its full-screen extract editor in a
           // landscape window; IME_FLAG_NO_FULLSCREEN keeps the field in place.
           disableFullscreenUI

@@ -5,6 +5,7 @@ import { AppState, View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { CenteredState } from '@/components/centered-state';
+import { repositoryEmptyCopy } from '@/components/code-reviewer/repository-empty-copy';
 import { RepositorySyncFooter } from '@/components/code-reviewer/repository-sync-footer';
 import { EmptyState } from '@/components/empty-state';
 import { InvalidRouteState } from '@/components/invalid-route-state';
@@ -36,6 +37,7 @@ import {
 } from '@/lib/hooks/use-code-reviewer-repo-sync';
 import { useRepoSelectionToggle } from '@/lib/hooks/use-code-reviewer-repo-selection';
 import { useNowTicker } from '@/lib/hooks/use-now-ticker';
+import { reviewConfigFailure, useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
 import { useReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
 import { getBitbucketIntegrationUrl } from '@/lib/integration-urls';
 import { parseTimestamp, timeAgo } from '@/lib/utils';
@@ -49,7 +51,10 @@ export default function ReposRoute() {
 }
 
 function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
-  const { data } = useReviewConfig(scope, platform);
+  const config = useReviewConfig(scope, platform);
+  const configBody = useReviewConfigBody(config);
+  const { data } = config;
+  const configFailure = reviewConfigFailure(configBody, config.isFetching);
   const save = useSaveReviewConfig(scope, platform);
   const toggleRepo = useRepoSelectionToggle(scope, platform);
   const { t } = useTranslation();
@@ -111,9 +116,10 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
     !reposLoading && !reposError && !bitbucketNotReady && repoRows.length === 0;
   const resyncPlatform: SyncedRepoPlatform = platform === 'gitlab' ? 'gitlab' : 'github';
   const { resync, resyncing } = useReviewerRepositoriesResync(scope, resyncPlatform);
-  const openManageAccess = useManageRepositoryAccess(scope, platform);
-  // Set when the user leaves for the provider's settings page: the return trip
-  // is the moment installation access may have widened, so it forces a sync.
+  // Set on the way to the provider's settings page, where installation access
+  // may have widened. Two signals report the return and only the first syncs:
+  // the awaited browser dismissal (the only one iOS reports, since its page
+  // opens in-app) and the next foreground (Android).
   const pendingAccessChange = useRef(false);
   const navigation = useNavigation();
   const flushPendingSync = useCallback(() => {
@@ -123,21 +129,12 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
     pendingAccessChange.current = false;
     void resync();
   }, [resync]);
-  const manageAccess = openManageAccess
-    ? () => {
-        pendingAccessChange.current = true;
-        // Two return signals reach here and only the first one syncs: the
-        // awaited browser dismissal (the only one iOS reports, because its
-        // settings page opens in-app) and the next foreground (Android).
-        void (async () => {
-          try {
-            await openManageAccess();
-          } finally {
-            flushPendingSync();
-          }
-        })();
-      }
-    : undefined;
+  const manageAccess = useManageRepositoryAccess(scope, platform, {
+    onOpen: () => {
+      pendingAccessChange.current = true;
+    },
+    onReturn: flushPendingSync,
+  });
   const refreshing = platform === 'bitbucket' ? reposFetching : resyncing;
   const refreshRepositories = () => {
     if (platform === 'bitbucket') {
@@ -155,21 +152,7 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
         time: timeAgo(parseTimestamp(syncedAt), undefined, now),
       })
     : null;
-  const emptyStateCopyByPlatform = {
-    github: {
-      title: t('codeReviewer.repos.installGithubApp'),
-      description: t('codeReviewer.repos.installGithubAppDescription'),
-    },
-    gitlab: {
-      title: t('common.noRepositoriesFound'),
-      description: t('codeReviewer.repos.gitlabNoRepositoriesDescription'),
-    },
-    bitbucket: {
-      title: t('common.noRepositoriesFound'),
-      description: t('codeReviewer.repos.bitbucketNoRepositoriesDescription'),
-    },
-  } satisfies Record<ReviewerPlatform, { title: string; description: string }>;
-  const emptyStateCopy = emptyStateCopyByPlatform[platform];
+  const emptyStateCopy = repositoryEmptyCopy(platform, t);
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextState => {
@@ -187,9 +170,24 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
     save.mutate({ repositorySelectionMode: nextMode });
   };
 
-  const fullBodyState = !capabilities.selectionModePicker && !reposLoading && repoRows.length === 0;
+  // The repository selection this screen draws is unusable without the
+  // config read, so its failure owns the whole body; the repositories query
+  // keeps its own error state below.
+  const fullBodyState =
+    configFailure != null ||
+    (!capabilities.selectionModePicker && !reposLoading && repoRows.length === 0);
   let repoState: ReactNode = null;
-  if (!reposLoading && reposError) {
+  if (configFailure) {
+    repoState = (
+      <QueryError
+        variant={configFailure.variant}
+        onRetry={() => {
+          configFailure.onRetry();
+        }}
+        isRetrying={configFailure.isRetrying}
+      />
+    );
+  } else if (!reposLoading && reposError) {
     repoState = (
       <QueryError
         variant="server"
@@ -229,7 +227,13 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
         description={emptyStateCopy.description}
         action={
           manageAccess ? (
-            <Button className={STATE_ACTION_CLASS} variant="outline" onPress={manageAccess}>
+            <Button
+              className={STATE_ACTION_CLASS}
+              variant="outline"
+              loading={manageAccess.pending}
+              disabled={manageAccess.pending}
+              onPress={manageAccess.handlePress}
+            >
               <Text>{t('codeReviewer.repos.manageAccess')}</Text>
             </Button>
           ) : undefined

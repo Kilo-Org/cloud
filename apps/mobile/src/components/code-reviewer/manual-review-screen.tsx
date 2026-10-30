@@ -1,8 +1,9 @@
 /* eslint-disable max-lines -- one form surface: platform choice, URL field with its validation, instructions, model choice, and the pinned action share the scroll body */
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { GitPullRequest } from '@/components/ui/icons';
-import { useSinglePushRoute } from '@/components/code-reviewer/use-single-push-route';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, type ScrollViewInstance, TextInput, View } from 'react-native';
@@ -148,7 +149,7 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
         {
           onSuccess: ({ reviewId }) => {
             settle(null);
-            void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+            notificationHaptic(Haptics.NotificationFeedbackType.Success);
             router.replace(`/(app)/code-reviewer/${scope}/reviews/${reviewId}` as Href);
           },
           onError: error => {

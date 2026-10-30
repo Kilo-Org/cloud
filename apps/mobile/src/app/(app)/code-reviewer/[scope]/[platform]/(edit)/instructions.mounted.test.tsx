@@ -21,7 +21,13 @@ const config = vi.hoisted(() => ({
   data: null as { customInstructions: string } | null,
   isLoading: false,
   isError: false,
+  isFetching: false,
+  fetchStatus: 'idle' as string,
   refetch: vi.fn(),
+}));
+const connectivity = vi.hoisted(() => ({ known: true }));
+const queryError = vi.hoisted(() => ({
+  props: [] as { variant?: string; onRetry?: () => void; isRetrying?: boolean }[],
 }));
 const save = vi.hoisted(() => ({ mutate: vi.fn(), mutateAsync: vi.fn(), isPending: false }));
 const router = vi.hoisted(() => ({ back: vi.fn(), push: vi.fn() }));
@@ -32,17 +38,27 @@ const preventRemove = vi.hoisted(() => ({
 }));
 // The TextInput records its props on render so the test drives a real edit
 // through the screen's own onChangeText, not a fabricated dirty flag.
+type RecordedInput = {
+  children?: ReactNode;
+  className?: string;
+  value?: string;
+  defaultValue?: string;
+  placeholder?: string;
+  accessibilityLabel?: string;
+  onChangeText: (text: string) => void;
+  multiline?: boolean;
+  ref?: { current: { setSelection: (start: number, end: number) => void } | null };
+  onLayout?: (event: { nativeEvent: { layout: { height: number } } }) => void;
+  onContentSizeChange?: (event: {
+    nativeEvent: { contentSize: { height: number; width: number } };
+  }) => void;
+};
 const textInputs = vi.hoisted(() => ({
-  inputs: [] as {
-    className?: string;
-    value?: string;
-    defaultValue?: string;
-    placeholder?: string;
-    accessibilityLabel?: string;
-    onChangeText: (text: string) => void;
-    multiline?: boolean;
-  }[],
+  inputs: [] as RecordedInput[],
 }));
+// The field's imperative handle, so the test can see the first-line alignment
+// the screen applies to a stored value taller than the capped field.
+const fieldHandle = vi.hoisted(() => ({ setSelection: vi.fn() }));
 const confirmDialog = vi.hoisted(() => ({
   current: null as {
     cancelLabel?: string;
@@ -71,16 +87,13 @@ vi.mock('react-native', () => ({
   Pressable: 'Pressable',
   InputAccessoryView: 'InputAccessoryView',
   Keyboard: { dismiss: vi.fn() },
-  TextInput: (props: {
-    children?: ReactNode;
-    className?: string;
-    value?: string;
-    defaultValue?: string;
-    placeholder?: string;
-    onChangeText: (text: string) => void;
-    multiline?: boolean;
-  }): ReactNode => {
+  TextInput: (props: RecordedInput): ReactNode => {
     textInputs.inputs.push(props);
+    // React 19 hands `ref` to a function component as a prop; the screen reads
+    // its imperative handle, so the stub publishes it.
+    if (props.ref) {
+      props.ref.current = fieldHandle;
+    }
     return props.children ?? null;
   },
 }));
@@ -91,6 +104,21 @@ vi.mock('react-native-reanimated', () => ({
   LinearTransition: { duration: () => ({}) },
 }));
 vi.mock('sonner-native', () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+vi.mock('@/lib/hooks/use-offline-banner-state', () => ({
+  useCommittedConnectivityStatus: () => (connectivity.known ? 'online' : 'unknown'),
+}));
+// Host stub: every rendered error state stays queryable, and its retry
+// callback is the one the screen handed it.
+vi.mock('@/components/query-error', () => ({
+  QueryError: (props: {
+    variant?: string;
+    onRetry?: () => void;
+    isRetrying?: boolean;
+  }): ReactNode => {
+    queryError.props.push(props);
+    return createElement('QueryError');
+  },
+}));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/sheet', () => ({ Sheet: 'Sheet' }));
 vi.mock('@/components/destructive-confirm-dialog', () => ({
@@ -186,6 +214,14 @@ beforeEach(() => {
   config.data = null;
   config.isLoading = false;
   config.isError = false;
+  config.isFetching = false;
+  // A fetch in flight never arms the idle-restart timer, so a test that leaves
+  // the read pending cannot fire one into a later test's refetch count. The
+  // idle tests opt in explicitly with fake timers.
+  config.fetchStatus = 'fetching';
+  config.refetch.mockReset();
+  connectivity.known = true;
+  queryError.props = [];
   save.isPending = false;
   save.mutate.mockReset();
   save.mutateAsync.mockReset();
@@ -197,6 +233,7 @@ beforeEach(() => {
   preventRemove.enabled = false;
   preventRemove.handler = undefined;
   textInputs.inputs = [];
+  fieldHandle.setSelection.mockReset();
   confirmDialog.current = null;
   invalidate = () => undefined;
 });
@@ -222,6 +259,56 @@ describe('InstructionsRoute editor', () => {
     const classes = (input.className ?? '').split(' ');
     expect(classes).toContain('min-h-32');
     expect(classes).not.toContain('h-32');
+    // The field grows with a short stored value but stops at ten lines and
+    // scrolls its own text: without the cap one long draft makes the page a
+    // single oversized text view and pushes the note and Save out of view.
+    expect(classes).toContain('max-h-[196px]');
+  });
+
+  // A stored value taller than the capped field would otherwise open scrolled
+  // to the platform caret at its end, with the first line out of sight.
+  function measureField(input: RecordedInput, contentHeight: number) {
+    act(() => {
+      input.onLayout?.({ nativeEvent: { layout: { height: 196.19 } } });
+      input.onContentSizeChange?.({
+        nativeEvent: { contentSize: { height: contentHeight, width: 369.5 } },
+      });
+    });
+  }
+
+  it('opens an overflowing stored value at its first line', () => {
+    config.data = { customInstructions: STORED.repeat(40) };
+    mount();
+
+    measureField(latestInput(), 1264.76);
+
+    expect(fieldHandle.setSelection).toHaveBeenCalledWith(0, 0);
+  });
+
+  it('keeps the platform caret for a stored value that fits the field', () => {
+    config.data = { customInstructions: STORED };
+    mount();
+
+    measureField(latestInput(), 105);
+
+    expect(fieldHandle.setSelection).not.toHaveBeenCalled();
+  });
+
+  // The alignment belongs to the stored value's opening state. A mount whose
+  // empty field reported no content size must not let the reader's own first
+  // edit trigger it and move their caret back to the start.
+  it('does not move the caret once the draft has been edited', () => {
+    config.data = { customInstructions: '' };
+    mount();
+
+    const input = latestInput();
+    act(() => {
+      input.onLayout?.({ nativeEvent: { layout: { height: 196.19 } } });
+      input.onChangeText('pasted draft');
+    });
+    measureField(input, 1264.76);
+
+    expect(fieldHandle.setSelection).not.toHaveBeenCalled();
   });
 
   it('lets a clean screen back out with no confirmation', () => {
@@ -427,5 +514,105 @@ describe('InstructionsRoute editor', () => {
     const input = latestInput();
     expect(input.accessibilityLabel).toBe(i18n.t('codeReviewer.instructions.title'));
     expect(input.accessibilityLabel).not.toBe('Custom instructions');
+  });
+});
+
+// The config read drives the whole body, so every state it can reach must
+// paint something the user can act on: a skeleton while the first load is in
+// flight, the editor once it lands, and a retryable error when it failed or
+// stopped with nothing in flight.
+describe('InstructionsRoute config read states', () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it('offers Retry instead of an endless skeleton when the load fails', () => {
+    config.isError = true;
+    const renderer = mount();
+
+    expect(findByHostType(renderer, 'Skeleton')).toHaveLength(0);
+    expect(textInputs.inputs).toHaveLength(0);
+    expect(queryError.props.at(-1)?.variant).toBe('server');
+    expect(config.refetch).not.toHaveBeenCalled();
+  });
+
+  it('retries the read when the error state Retry is pressed', () => {
+    config.isError = true;
+    mount();
+
+    act(() => {
+      queryError.props.at(-1)?.onRetry?.();
+    });
+
+    expect(config.refetch).toHaveBeenCalledTimes(1);
+  });
+
+  it('names the confirmed-offline pause as the reason the load stopped', () => {
+    config.fetchStatus = 'paused';
+    const renderer = mount();
+
+    expect(queryError.props.at(-1)?.variant).toBe('offline');
+    expect(findByHostType(renderer, 'Skeleton')).toHaveLength(0);
+  });
+
+  it('keeps waiting while the pause has no settled connectivity yet', () => {
+    connectivity.known = false;
+    config.fetchStatus = 'paused';
+    const renderer = mount();
+
+    expect(queryError.props).toHaveLength(0);
+    expect(findByHostType(renderer, 'Skeleton')).toHaveLength(2);
+  });
+
+  it('keeps the editor when a background refetch fails with cached config', () => {
+    config.data = { customInstructions: STORED };
+    config.isError = true;
+    mount();
+
+    expect(queryError.props).toHaveLength(0);
+    expect(latestInput().defaultValue).toBe(STORED);
+  });
+
+  it('restarts an idle read on its own and paints the editor once it lands', async () => {
+    vi.useFakeTimers();
+    config.fetchStatus = 'idle';
+    config.refetch.mockImplementation(() => {
+      config.data = { customInstructions: STORED };
+      return Promise.resolve();
+    });
+
+    const renderer = mount();
+    expect(findByHostType(renderer, 'Skeleton')).toHaveLength(2);
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2500);
+    });
+
+    expect(config.refetch).toHaveBeenCalledTimes(1);
+    expect(queryError.props).toHaveLength(0);
+    expect(latestInput().defaultValue).toBe(STORED);
+  });
+
+  it('offers Retry when the restart cannot revive the read, and Retry re-requests it', async () => {
+    vi.useFakeTimers();
+    config.fetchStatus = 'idle';
+    const renderer = mount();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(2500);
+    });
+
+    // The single automatic attempt did not get a fetch running, so the body
+    // stops waiting behind a skeleton and offers the action that can.
+    expect(config.refetch).toHaveBeenCalledTimes(1);
+    expect(queryError.props.at(-1)?.variant).toBe('server');
+    expect(findByHostType(renderer, 'Skeleton')).toHaveLength(0);
+
+    act(() => {
+      queryError.props.at(-1)?.onRetry?.();
+    });
+
+    expect(config.refetch).toHaveBeenCalledTimes(2);
+    expect(findByHostType(renderer, 'Skeleton')).toHaveLength(2);
   });
 });

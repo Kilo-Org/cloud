@@ -5,6 +5,7 @@
  * setup already live.
  */
 import { generateKeyPairSync } from 'node:crypto';
+import { decryptWithPrivateKey } from '@kilocode/encryption';
 import { cleanupDbForTest, db } from '@kilocode/web-shared/lib/drizzle';
 import {
   cloud_agent_environment_vars,
@@ -35,12 +36,27 @@ import {
   type EnvironmentUpdateInput,
 } from '@kilocode/cloud-agent-profile';
 
-const { publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
+const { publicKey, privateKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });
 const publicKeyBase64 = Buffer.from(publicKey.export({ type: 'spki', format: 'pem' })).toString(
   'base64'
 );
+const privateKeyPem = privateKey.export({ type: 'pkcs8', format: 'pem' }).toString();
 
 const SECRET_PLAINTEXT = 'swordfish-secret-value';
+
+/** Wrap a transaction so a test can see which statements the service built. */
+function recordStatements<T extends object>(tx: T, statements: string[]): T {
+  return new Proxy(tx, {
+    get(target, property) {
+      const value = Reflect.get(target, property);
+      if (typeof value === 'function') {
+        if (typeof property === 'string') statements.push(property);
+        return value.bind(target);
+      }
+      return value;
+    },
+  });
+}
 
 async function createEnv(input: EnvironmentCreateInput): Promise<string> {
   return db.transaction(async tx => {
@@ -1059,6 +1075,245 @@ describe('repository environment service', () => {
           secrets: { ONE_MORE: 'v' },
         })
       ).rejects.toMatchObject({ code: 'BAD_REQUEST' });
+    });
+
+    test('rejects an update that would exceed the cap before it issues any write', async () => {
+      const user = await insertTestUser();
+      const owner = userOwner(user.id);
+      const secrets = Object.fromEntries(
+        Array.from({ length: ENVIRONMENT_LIMITS.MAX_VARS - 10 }, (_, index) => [
+          `SECRET_${index}`,
+          SECRET_PLAINTEXT,
+        ])
+      );
+      const id = await createEnv({
+        owner,
+        createdByUserId: user.id,
+        name: 'at-limit',
+        platform: 'github',
+        repoFullName: 'acme/at-limit',
+        secrets,
+      });
+      const plainVars = Object.fromEntries(
+        Array.from({ length: 11 }, (_, index) => [`VAR_${index}`, 'value'])
+      );
+
+      const statements: string[] = [];
+      await expect(
+        db.transaction(tx =>
+          updateEnvironment(recordStatements(tx, statements), publicKeyBase64, {
+            owner,
+            environmentId: id,
+            name: 'renamed',
+            plainVars,
+          })
+        )
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: `Maximum ${ENVIRONMENT_LIMITS.MAX_VARS} variables and secrets allowed`,
+      });
+
+      expect(statements).toContain('select');
+      expect(statements.filter(statement => statement !== 'select')).toEqual([]);
+      const environment = await getEnvironment(db, id, owner);
+      expect(environment.name).toBe('at-limit');
+      expect(environment.plainVars).toEqual([]);
+      expect(environment.secretKeys).toHaveLength(ENVIRONMENT_LIMITS.MAX_VARS - 10);
+      expect(environment.configurationRevision).toBe(1);
+    });
+
+    test('rejects an oversized submission before it reads or writes', async () => {
+      const user = await insertTestUser();
+      const owner = userOwner(user.id);
+      const id = await createEnv({
+        owner,
+        createdByUserId: user.id,
+        name: 'oversized',
+        platform: 'github',
+        repoFullName: 'acme/oversized',
+        plainVars: { EXISTING: 'value' },
+      });
+      const plainVars = Object.fromEntries(
+        Array.from({ length: ENVIRONMENT_LIMITS.MAX_VARS + 1 }, (_, index) => [
+          `VAR_${index}`,
+          'value',
+        ])
+      );
+
+      const statements: string[] = [];
+      await expect(
+        db.transaction(tx =>
+          updateEnvironment(recordStatements(tx, statements), publicKeyBase64, {
+            owner,
+            environmentId: id,
+            plainVars,
+          })
+        )
+      ).rejects.toMatchObject({
+        code: 'BAD_REQUEST',
+        message: `Maximum ${ENVIRONMENT_LIMITS.MAX_VARS} variables and secrets allowed`,
+      });
+
+      expect(statements).toEqual([]);
+    });
+
+    test('applies an update at the cap and replaces the whole set', async () => {
+      const user = await insertTestUser();
+      const owner = userOwner(user.id);
+      const half = ENVIRONMENT_LIMITS.MAX_VARS / 2;
+      const plainVarsBefore = Object.fromEntries(
+        Array.from({ length: half }, (_, index) => [`PLAIN_${index}`, 'before'])
+      );
+      const secretsBefore = Object.fromEntries(
+        Array.from({ length: half }, (_, index) => [`SECRET_${index}`, 'before'])
+      );
+      const id = await createEnv({
+        owner,
+        createdByUserId: user.id,
+        name: 'cap-update',
+        platform: 'github',
+        repoFullName: 'acme/cap-update',
+        plainVars: plainVarsBefore,
+        secrets: secretsBefore,
+      });
+      const plainVars = {
+        ...Object.fromEntries(
+          Array.from({ length: half - 1 }, (_, index) => [`PLAIN_${index + 1}`, 'after'])
+        ),
+        PLAIN_NEW: 'after',
+      };
+      const secrets = [
+        ...Object.keys(secretsBefore).map(key => ({ key, delete: true as const })),
+        ...Array.from({ length: half }, (_, index) => ({
+          key: `REPLACEMENT_${index}`,
+          value: 'after',
+        })),
+      ];
+
+      const revision = await updateEnv({
+        owner,
+        environmentId: id,
+        plainVars,
+        secrets,
+      });
+
+      expect(revision).toBe(2);
+      const input = await loadEnvironmentBuildInput(db, id);
+      if (!input) throw new Error('expected a stored environment');
+      expect(input.plainVars).toEqual(plainVars);
+      const secretKeys = Object.keys(input.encryptedSecrets);
+      expect(secretKeys).toHaveLength(half);
+      expect(secretKeys).toEqual(
+        expect.arrayContaining(Array.from({ length: half }, (_, index) => `REPLACEMENT_${index}`))
+      );
+      expect(decryptWithPrivateKey(input.encryptedSecrets.REPLACEMENT_0, privateKeyPem)).toBe(
+        'after'
+      );
+    });
+
+    test('a repeated key in one change list keeps the last entry', async () => {
+      const user = await insertTestUser();
+      const owner = userOwner(user.id);
+      const id = await createEnv({
+        owner,
+        createdByUserId: user.id,
+        name: 'repeated-key',
+        platform: 'github',
+        repoFullName: 'acme/repeated-key',
+      });
+
+      await updateEnv({
+        owner,
+        environmentId: id,
+        secrets: [
+          { key: 'REPEATED', value: 'first' },
+          { key: 'REPEATED', value: 'second' },
+        ],
+      });
+      let input = await loadEnvironmentBuildInput(db, id);
+      if (!input) throw new Error('expected a stored environment');
+      expect(decryptWithPrivateKey(input.encryptedSecrets.REPEATED, privateKeyPem)).toBe('second');
+
+      await updateEnv({
+        owner,
+        environmentId: id,
+        secrets: [
+          { key: 'REPEATED', delete: true },
+          { key: 'REPEATED', value: 'third' },
+        ],
+      });
+      input = await loadEnvironmentBuildInput(db, id);
+      if (!input) throw new Error('expected a stored environment');
+      expect(decryptWithPrivateKey(input.encryptedSecrets.REPEATED, privateKeyPem)).toBe('third');
+
+      await updateEnv({
+        owner,
+        environmentId: id,
+        secrets: [
+          { key: 'REPEATED', value: 'fourth' },
+          { key: 'REPEATED', delete: true },
+        ],
+      });
+      input = await loadEnvironmentBuildInput(db, id);
+      if (!input) throw new Error('expected a stored environment');
+      expect(input.encryptedSecrets.REPEATED).toBeUndefined();
+    });
+
+    test('a secret added under a stored plaintext key converts it at the cap', async () => {
+      const user = await insertTestUser();
+      const owner = userOwner(user.id);
+      const id = await createEnv({
+        owner,
+        createdByUserId: user.id,
+        name: 'converted',
+        platform: 'github',
+        repoFullName: 'acme/converted',
+        plainVars: Object.fromEntries(
+          Array.from({ length: ENVIRONMENT_LIMITS.MAX_VARS }, (_, index) => [
+            `PLAIN_${index}`,
+            'before',
+          ])
+        ),
+      });
+
+      const revision = await updateEnv({
+        owner,
+        environmentId: id,
+        secrets: [{ key: 'PLAIN_0', value: 'converted' }],
+      });
+
+      expect(revision).toBe(2);
+      const environment = await getEnvironment(db, id, owner);
+      expect(environment.secretKeys).toEqual(['PLAIN_0']);
+      expect(environment.plainVars).toHaveLength(ENVIRONMENT_LIMITS.MAX_VARS - 1);
+      expect(environment.plainVars.map(variable => variable.key)).not.toContain('PLAIN_0');
+    });
+
+    test('a final delete of a repeated key leaves a plaintext variable in place', async () => {
+      const user = await insertTestUser();
+      const owner = userOwner(user.id);
+      const id = await createEnv({
+        owner,
+        createdByUserId: user.id,
+        name: 'repeated-delete',
+        platform: 'github',
+        repoFullName: 'acme/repeated-delete',
+        plainVars: { KEPT: 'plain' },
+      });
+
+      const revision = await updateEnv({
+        owner,
+        environmentId: id,
+        secrets: [
+          { key: 'KEPT', value: 'transient' },
+          { key: 'KEPT', delete: true },
+        ],
+      });
+
+      expect(revision).toBe(1);
+      const environment = await getEnvironment(db, id, owner);
+      expect(environment.secretKeys).toEqual([]);
+      expect(environment.plainVars.map(variable => variable.key)).toEqual(['KEPT']);
     });
   });
 });

@@ -19,6 +19,10 @@ import { waitFor } from '@/test/render-with-providers';
 type TestRepoOption = { platform: 'github' | 'gitlab'; fullName: string; private: boolean };
 type TestProfile = { id: string; name: string; isDefault: boolean };
 
+// The picker row for a private repository carries its privacy in the
+// accessible name, so it is matched by that name, never the bare full name.
+const PRIVATE_REPO_LABEL = 'acme/api, private repository';
+
 const h = vi.hoisted(() => ({
   success: vi.fn(),
   error: vi.fn(),
@@ -55,6 +59,10 @@ vi.mock('@/lib/hooks/use-repo-bindings', () => ({
   useRepoBindings: () => h.bindingsQuery,
   useRepoBindingMutations: () => h.mutations,
   useRepoOptions: () => h.repoOptions,
+}));
+vi.mock('expo-router', () => ({ useRouter: () => ({ push: vi.fn<(href: string) => void>() }) }));
+vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
+  useOrganizationProfilePermission: () => 'allowed',
 }));
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
   useAgentProfileList: () => h.profileList,
@@ -95,6 +103,7 @@ vi.mock('@/components/ui/icons', () => ({
   Lock: 'Lock',
   Search: 'Search',
   SearchX: 'SearchX',
+  SlidersHorizontal: 'SlidersHorizontal',
   Trash2: 'Trash2',
   Unlock: 'Unlock',
 }));
@@ -198,7 +207,7 @@ describe('RepoBindingsScreen', () => {
     expect(findButton(renderer.root, 'Add default').props.disabled).toBe(true);
 
     pressPressable(renderer.root, 'Select repository…');
-    pressPressable(renderer.root, 'acme/api');
+    pressPressable(renderer.root, PRIVATE_REPO_LABEL);
     expect(findButton(renderer.root, 'Add default').props.disabled).toBe(true);
 
     pressPressable(renderer.root, 'Select profile');
@@ -218,7 +227,7 @@ describe('RepoBindingsScreen', () => {
     pressPressable(renderer.root, 'Select repository…');
     expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(1);
 
-    pressPressable(renderer.root, 'acme/api');
+    pressPressable(renderer.root, PRIVATE_REPO_LABEL);
     expect(findAll(renderer.root, 'SessionPageSheet')).toHaveLength(0);
 
     pressPressable(renderer.root, 'Select profile');
@@ -258,7 +267,7 @@ describe('RepoBindingsScreen', () => {
     const { renderer, unmount } = await mountScreen();
     pressButton(renderer.root, 'Add default');
     pressPressable(renderer.root, 'Select repository…');
-    pressPressable(renderer.root, 'acme/api');
+    pressPressable(renderer.root, PRIVATE_REPO_LABEL);
     pressPressable(renderer.root, 'Select profile');
     pressPressable(renderer.root, 'Backend debugging');
     pressButton(renderer.root, 'Add default');
@@ -277,15 +286,21 @@ describe('RepoBindingsScreen', () => {
     pressPressable(renderer.root, 'Select repository…');
 
     expect(
-      findAll(renderer.root, 'Pressable').some(n => n.props.accessibilityLabel === 'acme/api')
+      findAll(renderer.root, 'Pressable').some(
+        n => n.props.accessibilityLabel === PRIVATE_REPO_LABEL
+      )
     ).toBe(true);
     await changeSearch(renderer.root, 'infra');
     await waitFor(
       () =>
-        !findAll(renderer.root, 'Pressable').some(n => n.props.accessibilityLabel === 'acme/api')
+        !findAll(renderer.root, 'Pressable').some(
+          n => n.props.accessibilityLabel === PRIVATE_REPO_LABEL
+        )
     );
     expect(
-      findAll(renderer.root, 'Pressable').some(n => n.props.accessibilityLabel === 'acme/api')
+      findAll(renderer.root, 'Pressable').some(
+        n => n.props.accessibilityLabel === PRIVATE_REPO_LABEL
+      )
     ).toBe(false);
     expect(
       findAll(renderer.root, 'Pressable').some(n => n.props.accessibilityLabel === 'acme/infra')

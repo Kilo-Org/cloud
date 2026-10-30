@@ -19,6 +19,16 @@ import { isFormSheetRoute } from '@/lib/form-sheet-routes';
 export type ProfileTabPressPlan = 'leave' | 'preserve' | 'reset-to-root';
 
 /**
+ * One navigation action a tab press dispatches: a targeted stack action
+ * (`target`) or the tab jump that selects the pressed entry (`payload`).
+ */
+export type TabPressAction = {
+  type: string;
+  target?: string;
+  payload?: { name: string; params?: object };
+};
+
+/**
  * The slice of the pressed tab's navigation object the tab press reads and
  * dispatches through: the tab navigator's state, to find the tab's nested
  * stack, and a dispatch that reaches that stack by key.
@@ -29,8 +39,15 @@ export type TabPressNavigation = {
         routes: { name: string; state?: { key?: string; index?: number } }[];
       }
     | undefined;
-  dispatch: (action: { type: string; target?: string }) => void;
+  dispatch: (action: TabPressAction) => void;
 };
+
+/**
+ * The route the pressed entry stands for. The tab navigator hands it to a
+ * screen's `listeners`, so a press knows which tab it belongs to without
+ * reading the route state, which lags a burst of presses.
+ */
+export type PressedTabRoute = { name: string; params?: object };
 
 export function planProfileTabPress({
   profileFocused,

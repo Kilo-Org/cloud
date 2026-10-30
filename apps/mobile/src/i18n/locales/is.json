@@ -3851,6 +3851,7 @@
     "skillNameInvalid": "Hæfniheiti verður að byrja á bókstaf eða tölustaf og nota aðeins lágstafi, tölustafi og bandstrik",
     "skillContentRequired": "Færniefni er krafist",
     "skillSaveFailed": "Ekki tókst að bjarga kunnáttu",
+    "skillLimitReached": "Prófíll getur haft allt að {{max}} færni. Eyddu einni til að bæta við annarri.",
     "skillSourceCustom": "Sérsniðið",
     "skillSourceMarketplace": "Markaður",
     "skillSourceSkillsSh": "skills.sh",

@@ -3851,6 +3851,7 @@
     "skillNameInvalid": "ಕೌಶಲ್ಯದ ಹೆಸರು ಅಕ್ಷರ ಅಥವಾ ಅಂಕೆಯೊಂದಿಗೆ ಪ್ರಾರಂಭವಾಗಬೇಕು ಮತ್ತು ಸಣ್ಣ ಅಕ್ಷರಗಳು, ಅಂಕೆಗಳು ಮತ್ತು ಡ್ಯಾಶ್‌ಗಳನ್ನು ಮಾತ್ರ ಬಳಸಬೇಕು",
     "skillContentRequired": "ಕೌಶಲ್ಯ ವಿಷಯದ ಅಗತ್ಯವಿದೆ",
     "skillSaveFailed": "ಕೌಶಲ್ಯವನ್ನು ಉಳಿಸಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ",
+    "skillLimitReached": "ಪ್ರೊಫೈಲ್ ಗರಿಷ್ಠ {{max}} ಕೌಶಲ್ಯಗಳನ್ನು ಹೊಂದಿರಬಹುದು. ಇನ್ನೊಂದನ್ನು ಸೇರಿಸಲು ಒಂದನ್ನು ಅಳಿಸಿ.",
     "skillSourceCustom": "ಕಸ್ಟಮ್",
     "skillSourceMarketplace": "ಮಾರುಕಟ್ಟೆ",
     "skillSourceSkillsSh": "skills.sh",

@@ -3901,6 +3901,7 @@
     "skillNameInvalid": "O nome da competência deve começar por uma letra ou dígito e usar apenas letras minúsculas, dígitos e hífenes",
     "skillContentRequired": "O conteúdo da competência é obrigatório",
     "skillSaveFailed": "Não foi possível guardar a competência",
+    "skillLimitReached": "Um perfil pode conter até {{max}} competências. Elimine uma para adicionar outra.",
     "skillSourceCustom": "Personalizado",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

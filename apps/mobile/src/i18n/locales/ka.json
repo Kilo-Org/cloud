@@ -3851,6 +3851,7 @@
     "skillNameInvalid": "უნარის სახელი უნდა დაიწყოს ასოთი ან ციფრით და გამოიყენოს მხოლოდ მცირე ასოები, ციფრები და ტირეები",
     "skillContentRequired": "საჭიროა უნარების შინაარსი",
     "skillSaveFailed": "უნარების შენახვა ვერ მოხერხდა",
+    "skillLimitReached": "პროფილს შეიძლება ჰქონდეს {{max}}-მდე უნარი. სხვის დასამატებლად წაშალეთ ერთი.",
     "skillSourceCustom": "საკუთარი",
     "skillSourceMarketplace": "ბაზარი",
     "skillSourceSkillsSh": "skills.sh",

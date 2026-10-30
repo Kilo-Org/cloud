@@ -3851,6 +3851,7 @@
     "skillNameInvalid": "Ny anaran'ny fahaiza-manao dia tsy maintsy manomboka amin'ny litera na tarehimarika ary tsy mampiasa afa-tsy litera kely, isa ary tsipiho",
     "skillContentRequired": "Ilaina ny votoatin'ny fahaiza-manao",
     "skillSaveFailed": "Tsy nahavonjy fahaizana",
+    "skillLimitReached": "Ny mombamomba dia afaka mitazona fahaiza-manao hatramin'ny {{max}}. Fafao ny iray mba hampiana iray hafa.",
     "skillSourceCustom": "Namboarinao",
     "skillSourceMarketplace": "Tsena",
     "skillSourceSkillsSh": "skills.sh",

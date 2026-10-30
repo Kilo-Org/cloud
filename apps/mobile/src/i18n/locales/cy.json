@@ -4051,6 +4051,7 @@
     "skillNameInvalid": "Rhaid i enw sgil ddechrau gyda llythyren neu ddigid a defnyddio llythrennau bach, digidau a llinellau llinellau yn unig",
     "skillContentRequired": "Mae angen cynnwys sgil",
     "skillSaveFailed": "Methu arbed sgil",
+    "skillLimitReached": "Gall proffil ddal hyd at {{max}} o sgiliau. Dilëwch un i ychwanegu un arall.",
     "skillSourceCustom": "Personol",
     "skillSourceMarketplace": "Marchnad",
     "skillSourceSkillsSh": "skills.sh",

@@ -3851,6 +3851,7 @@
     "skillNameInvalid": "Ferdighetsnavn må starte med en bokstav eller et siffer og kun bruke små bokstaver, sifre og bindestreker",
     "skillContentRequired": "Ferdighetsinnhold kreves",
     "skillSaveFailed": "Kunne ikke lagre ferdigheter",
+    "skillLimitReached": "En profil kan ha opptil {{max}} ferdigheter. Slett én for å legge til en ny.",
     "skillSourceCustom": "Egendefinert",
     "skillSourceMarketplace": "Markedsplass",
     "skillSourceSkillsSh": "skills.sh",

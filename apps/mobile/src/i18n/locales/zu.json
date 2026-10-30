@@ -3851,6 +3851,7 @@
     "skillNameInvalid": "Igama lekhono kufanele liqale ngohlamvu noma idijithi futhi lisebenzise kuphela izinhlamvu ezincane, amadijithi, namadeshi.",
     "skillContentRequired": "Okuqukethwe kwekhono kuyadingeka",
     "skillSaveFailed": "Ayikwazanga ukulondoloza ikhono",
+    "skillLimitReached": "Iphrofayela ingaba namakhono angafika ku-{{max}}. Susa elilodwa ukuze wengeze elinye.",
     "skillSourceCustom": "Ngokwezifiso",
     "skillSourceMarketplace": "Imakethe",
     "skillSourceSkillsSh": "skills.sh",

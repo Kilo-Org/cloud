@@ -3851,6 +3851,7 @@
     "skillNameInvalid": "ناوی کارامەیی دەبێت بە پیت یان ژمارەیەک دەست پێبکات و تەنها پیتی بچووک و ژمارە و هێڵکاری بەکاربهێنێت",
     "skillContentRequired": "ناوەڕۆکی لێهاتوویی پێویستە",
     "skillSaveFailed": "نەیتوانی لێهاتوویی ڕزگار بکات",
+    "skillLimitReached": "پرۆفایلێک دەتوانێت تا {{max}} کارامەیی هەڵبگرێت. یەکێک بسڕەوە بۆ زیادکردنی یەکێکی تر.",
     "skillSourceCustom": "دەستکرد",
     "skillSourceMarketplace": "بازاڕ",
     "skillSourceSkillsSh": "skills.sh",

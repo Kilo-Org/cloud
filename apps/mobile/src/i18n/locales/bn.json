@@ -3851,6 +3851,7 @@
     "skillNameInvalid": "দক্ষতার নাম অবশ্যই একটি অক্ষর বা অঙ্ক দিয়ে শুরু করতে হবে এবং শুধুমাত্র ছোট হাতের অক্ষর, সংখ্যা এবং ড্যাশ ব্যবহার করতে হবে",
     "skillContentRequired": "দক্ষতা বিষয়বস্তু প্রয়োজন",
     "skillSaveFailed": "দক্ষতা বাঁচাতে পারেনি",
+    "skillLimitReached": "একটি প্রোফাইলে সর্বোচ্চ {{max}}টি দক্ষতা রাখা যায়। আরেকটি যোগ করতে একটি মুছুন।",
     "skillSourceCustom": "কাস্টম",
     "skillSourceMarketplace": "মার্কেটপ্লেস",
     "skillSourceSkillsSh": "skills.sh",

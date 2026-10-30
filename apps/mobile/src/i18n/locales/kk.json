@@ -3851,6 +3851,7 @@
     "skillNameInvalid": "Дағды атауы әріптен немесе цифрдан басталып, тек кіші әріптерді, сандарды және сызықшаларды пайдалануы керек.",
     "skillContentRequired": "Біліктілік мазмұны қажет",
     "skillSaveFailed": "Шеберлікті сақтау мүмкін болмады",
+    "skillLimitReached": "Профиль {{max}} дағдыға дейін сақтай алады. Басқасын қосу үшін біреуін жойыңыз.",
     "skillSourceCustom": "Арнайы",
     "skillSourceMarketplace": "Market",
     "skillSourceSkillsSh": "skills.sh",

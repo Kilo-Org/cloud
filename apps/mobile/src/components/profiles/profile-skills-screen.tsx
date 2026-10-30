@@ -23,7 +23,9 @@ import {
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { MAX_PROFILE_SKILLS } from '@/lib/agent-profile-forms';
 import { cn } from '@/lib/utils';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_SKILLS: AgentProfileDetail['skills'] = [];
@@ -122,9 +124,14 @@ export function ProfileSkillsScreen({
   const skills = profileQuery.data ?? NO_SKILLS;
   // `null` = closed, `{ skill: null }` = add, `{ skill }` = edit that skill.
   const [form, setForm] = useState<{ skill: SkillTarget | null } | null>(null);
+  // The message the open sheet shows for a refused save. The mutation hook's
+  // toast sits behind the sheet, so the reason is rendered inside it instead.
+  // Reset when the form opens and each save starts.
+  const [saveFailure, setSaveFailure] = useState<string | null>(null);
 
   const startAdd = () => {
     setForm({ skill: null });
+    setSaveFailure(null);
   };
 
   const closeForm = () => {
@@ -132,6 +139,13 @@ export function ProfileSkillsScreen({
   };
 
   const saveSkill = async (target: SkillTarget | null, submission: SkillFormSubmission) => {
+    setSaveFailure(null);
+    // The server counts every skill row of the profile, so a full list cannot
+    // take another create: name the cap here instead of round-tripping for it.
+    if (target === null && skills.length >= MAX_PROFILE_SKILLS) {
+      setSaveFailure(t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS }));
+      return;
+    }
     try {
       await (target === null
         ? createCustomSkill.mutateAsync({ profileId, ...submission })
@@ -142,9 +156,16 @@ export function ProfileSkillsScreen({
             description: submission.description ?? null,
           }));
     } catch (error) {
-      if (!hasUsableMessage(error)) {
-        toast.error(t('profiles.skillSaveFailed'));
-      }
+      // A create the server refused at the cap, e.g. the list was stale; an
+      // update never hits the cap, so its PRECONDITION_FAILED (an unmodifiable
+      // skills.sh reference) keeps the generic message.
+      const limited =
+        target === null && readTrpcErrorField(error, 'code') === 'PRECONDITION_FAILED';
+      setSaveFailure(
+        limited
+          ? t('profiles.skillLimitReached', { max: MAX_PROFILE_SKILLS })
+          : t('profiles.skillSaveFailed')
+      );
       return;
     }
     closeForm();
@@ -229,6 +250,7 @@ export function ProfileSkillsScreen({
                     setForm({
                       skill: { id: skill.id, name: skill.name, rawMarkdown: skill.rawMarkdown },
                     });
+                    setSaveFailure(null);
                   }
                 : undefined
             }
@@ -271,6 +293,7 @@ export function ProfileSkillsScreen({
         <SkillFormSheet
           skill={form.skill}
           isSaving={createCustomSkill.isPending || updateSkill.isPending}
+          saveFailure={saveFailure}
           onClose={closeForm}
           onSave={submission => {
             void saveSkill(form.skill, submission);

@@ -3951,6 +3951,7 @@
     "skillNameInvalid": "Название навыка должно начинаться с буквы или цифры и содержать только строчные буквы, цифры и тире.",
     "skillContentRequired": "Требуется содержание навыков.",
     "skillSaveFailed": "Не удалось сохранить навык",
+    "skillLimitReached": "В одном профиле может храниться до {{max}} навыков. Удалите один, чтобы добавить ещё один.",
     "skillSourceCustom": "Собственный",
     "skillSourceMarketplace": "Магазин",
     "skillSourceSkillsSh": "skills.sh",

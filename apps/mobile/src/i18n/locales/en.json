@@ -3917,6 +3917,7 @@
     "skillNameInvalid": "Skill name must start with a letter or digit and use only lowercase letters, digits, and dashes",
     "skillContentRequired": "Skill content is required",
     "skillSaveFailed": "Couldn't save skill",
+    "skillLimitReached": "A profile can hold up to {{max}} skills. Delete one to add another.",
     "skillSourceCustom": "Custom",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

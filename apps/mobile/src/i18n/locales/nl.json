@@ -3851,6 +3851,7 @@
     "skillNameInvalid": "De naam van de vaardigheid moet beginnen met een letter of cijfer en mag alleen kleine letters, cijfers en streepjes bevatten",
     "skillContentRequired": "Vaardigheidsinhoud is vereist",
     "skillSaveFailed": "Kan vaardigheid niet opslaan",
+    "skillLimitReached": "Een profiel kan maximaal {{max}} vaardigheden bevatten. Verwijder er een om een andere toe te voegen.",
     "skillSourceCustom": "Aangepast",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

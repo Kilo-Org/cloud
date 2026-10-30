@@ -23,6 +23,7 @@ vi.mock('react-native', async () => {
     useImperativeHandle,
   } = await import('react');
   return {
+    Platform: { OS: 'ios' },
     View: 'View',
     ScrollView: forwardRef(function ScrollViewStub(
       props: { children?: ReactNode },
@@ -141,11 +142,15 @@ function nameField(root: ReactTestInstance): ReactTestInstance {
 }
 
 // eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
-function mountSheet(skill: { name: string; rawMarkdown: string } | null = null) {
+function mountSheet(
+  skill: { name: string; rawMarkdown: string } | null = null,
+  options: { saveFailure?: string | null } = {}
+) {
   return renderWithProviders(
     createElement(SkillFormSheet, {
       skill,
       isSaving: false,
+      saveFailure: options.saveFailure ?? null,
       onClose: () => {
         h.onClose();
       },
@@ -154,6 +159,15 @@ function mountSheet(skill: { name: string; rawMarkdown: string } | null = null) 
       },
     })
   );
+}
+
+/** The block the sheet puts above its fields, which carries a save failure's line. */
+function statusBlock(root: ReactTestInstance): ReactTestInstance {
+  const [block] = findOne(root, 'ScrollView').children;
+  if (block === undefined || typeof block === 'string') {
+    throw new TypeError('the sheet rendered no status block above its fields');
+  }
+  return block;
 }
 
 describe('SkillFormSheet dismissal', () => {
@@ -306,6 +320,60 @@ describe('SkillFormSheet refused save', () => {
 
     expect(h.scrollTo).not.toHaveBeenCalled();
     expect(h.onSave).toHaveBeenCalledWith({ name: 'my-skill', rawMarkdown: 'Body' });
+
+    unmount();
+  });
+});
+
+describe('SkillFormSheet save failure', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('shows the refused save above the fields and keeps the typed input', async () => {
+    const { renderer, unmount } = await mountSheet(null, {
+      saveFailure: i18n.t('profiles.skillSaveFailed'),
+    });
+
+    expect(findAll(statusBlock(renderer.root), 'Text').map(node => node.props.children)).toEqual([
+      i18n.t('profiles.skillSaveFailed'),
+    ]);
+    expect(findOne(renderer.root, 'SheetHeader').props.doneDisabled).toBe(false);
+
+    unmount();
+  });
+
+  it('scrolls the failure block into view once it lays out', async () => {
+    const { renderer, unmount } = await mountSheet(null, {
+      saveFailure: i18n.t('profiles.skillSaveFailed'),
+    });
+
+    const onLayout = statusBlock(renderer.root).props.onLayout as ContainerLayout | undefined;
+    if (typeof onLayout !== 'function') {
+      throw new TypeError('the status block has no layout handler');
+    }
+    act(() => {
+      onLayout({ nativeEvent: { layout: { y: 150 } } });
+    });
+
+    expect(h.scrollTo).toHaveBeenCalledWith({ y: 138, animated: true });
+
+    unmount();
+  });
+
+  it('renders nothing and does not scroll when no save failed', async () => {
+    const { renderer, unmount } = await mountSheet();
+
+    const block = statusBlock(renderer.root);
+    expect(findAll(block, 'Text')).toHaveLength(0);
+    const onLayout = block.props.onLayout as ContainerLayout | undefined;
+    if (typeof onLayout !== 'function') {
+      throw new TypeError('the status block has no layout handler');
+    }
+    act(() => {
+      onLayout({ nativeEvent: { layout: { y: 150 } } });
+    });
+    expect(h.scrollTo).not.toHaveBeenCalled();
 
     unmount();
   });

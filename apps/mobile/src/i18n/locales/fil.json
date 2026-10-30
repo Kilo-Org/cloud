@@ -3851,6 +3851,7 @@
     "skillNameInvalid": "Ang pangalan ng kasanayan ay dapat magsimula sa isang titik o digit at gumamit lamang ng maliliit na titik, digit, at gitling",
     "skillContentRequired": "Kinakailangan ang nilalaman ng kasanayan",
     "skillSaveFailed": "Hindi makapag-save ng kasanayan",
+    "skillLimitReached": "Maaaring maglaman ang isang profile ng hanggang {{max}} kasanayan. Mag-alis ng isa para makapagdagdag ng iba.",
     "skillSourceCustom": "Custom",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

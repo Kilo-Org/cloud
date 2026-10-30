@@ -3851,6 +3851,7 @@
     "skillNameInvalid": "Ур чадварын нэр нь үсэг эсвэл цифрээр эхэлж, зөвхөн жижиг үсэг, цифр, зураас ашиглана.",
     "skillContentRequired": "Ур чадварын агуулга шаардлагатай",
     "skillSaveFailed": "Ур чадвараа хадгалж чадсангүй",
+    "skillLimitReached": "Профайлд хамгийн ихдээ {{max}} ур чадвар байж болно. Өөр нэмэхийн тулд нэгийг нь устгана уу.",
     "skillSourceCustom": "Өөрийн",
     "skillSourceMarketplace": "Маркет",
     "skillSourceSkillsSh": "skills.sh",

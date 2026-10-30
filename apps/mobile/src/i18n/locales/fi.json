@@ -3851,6 +3851,7 @@
     "skillNameInvalid": "Taidon nimen tulee alkaa kirjaimella tai numerolla ja käyttää vain pieniä kirjaimia, numeroita ja väliviivoja",
     "skillContentRequired": "Taidon sisältö vaaditaan",
     "skillSaveFailed": "Taitoa ei voitu tallentaa",
+    "skillLimitReached": "Profiiliin mahtuu enintään {{max}} taitoa. Poista yksi, jotta voit lisätä toisen.",
     "skillSourceCustom": "Mukautettu",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

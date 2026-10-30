@@ -3851,6 +3851,7 @@
     "skillNameInvalid": "Nama kemahiran mesti bermula dengan huruf atau digit dan hanya menggunakan huruf kecil, angka dan sempang",
     "skillContentRequired": "Kandungan kemahiran diperlukan",
     "skillSaveFailed": "Tidak dapat menyelamatkan kemahiran",
+    "skillLimitReached": "Satu profil boleh menyimpan sehingga {{max}} kemahiran. Padam satu untuk menambah yang lain.",
     "skillSourceCustom": "Tersuai",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

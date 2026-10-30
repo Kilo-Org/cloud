@@ -33,6 +33,13 @@ const SKILL_NAME_PATTERN = /^[a-z0-9][a-z0-9-]*$/;
 /** Server bound: `contracts/skills.ts`'s `MAX_SKILL_NAME_LENGTH`. */
 const SKILL_NAME_MAX_LENGTH = 100;
 
+/**
+ * Server cap: `contracts/skills.ts`'s `MAX_PROFILE_SKILLS`. The server counts
+ * every row of a profile, enabled or not, so the screen compares the loaded
+ * list's length against it before a create goes out.
+ */
+export const MAX_PROFILE_SKILLS = 50;
+
 export type ProfileNameError = 'empty' | 'too-long';
 
 /**

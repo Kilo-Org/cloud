@@ -3901,6 +3901,7 @@
     "skillNameInvalid": "Prasmes nosaukumam jāsākas ar burtu vai ciparu, un tajā jāizmanto tikai mazie burti, cipari un domuzīmes.",
     "skillContentRequired": "Nepieciešams prasmju saturs",
     "skillSaveFailed": "Nevarēja saglabāt prasmi",
+    "skillLimitReached": "Profilā var saglabāt līdz {{max}} prasmēm. Dzēsiet vienu, lai pievienotu citu.",
     "skillSourceCustom": "Pielāgots",
     "skillSourceMarketplace": "Tirgus",
     "skillSourceSkillsSh": "skills.sh",

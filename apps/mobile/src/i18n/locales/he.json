@@ -3901,6 +3901,7 @@
     "skillNameInvalid": "שם המיומנות חייב להתחיל באות או ספרה ולהשתמש רק באותיות קטנות, ספרות ומקפים",
     "skillContentRequired": "נדרש תוכן מיומנות",
     "skillSaveFailed": "לא ניתן היה לשמור את המיומנות",
+    "skillLimitReached": "פרופיל יכול להכיל עד {{max}} מיומנויות. מחק אחת כדי להוסיף אחרת.",
     "skillSourceCustom": "מותאם אישית",
     "skillSourceMarketplace": "חנות",
     "skillSourceSkillsSh": "skills.sh",

@@ -3901,6 +3901,7 @@
     "skillNameInvalid": "Ime veštine mora da počinje slovom ili cifrom i koristi samo mala slova, cifre i crtice",
     "skillContentRequired": "Neophodan je sadržaj veština",
     "skillSaveFailed": "Nije moguće sačuvati veštinu",
+    "skillLimitReached": "Profil može da sadrži najviše {{max}} veština. Obrišite jednu da biste dodali drugu.",
     "skillSourceCustom": "Prilagođeno",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

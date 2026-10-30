@@ -84,6 +84,14 @@ export function pressEmptyAction(renderer: ReactTestRenderer): void {
   });
 }
 
+/** Press the add CTA a loaded, non-empty list renders as its last row. */
+export function pressAddButton(root: ReactTestInstance): void {
+  const button = findOne(root, 'Button');
+  act(() => {
+    (button.props as { onPress: () => void }).onPress();
+  });
+}
+
 export function changeText(root: ReactTestInstance, label: string, value: string): void {
   act(() => {
     (findField(root, label).props as { onChangeText: (v: string) => void }).onChangeText(value);

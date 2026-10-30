@@ -3851,6 +3851,7 @@
     "skillNameInvalid": "Το όνομα δεξιότητας πρέπει να ξεκινά με γράμμα ή ψηφίο και να χρησιμοποιεί μόνο πεζά γράμματα, ψηφία και παύλες",
     "skillContentRequired": "Απαιτείται περιεχόμενο δεξιότητας",
     "skillSaveFailed": "Δεν ήταν δυνατή η αποθήκευση της δεξιότητας",
+    "skillLimitReached": "Ένα προφίλ μπορεί να περιέχει έως {{max}} δεξιότητες. Διαγράψτε μία για να προσθέσετε άλλη.",
     "skillSourceCustom": "Προσαρμοσμένο",
     "skillSourceMarketplace": "Αγορά",
     "skillSourceSkillsSh": "skills.sh",

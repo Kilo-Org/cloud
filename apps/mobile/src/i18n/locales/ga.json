@@ -4001,6 +4001,7 @@
     "skillNameInvalid": "Ní mór tús a chur le hainm scile le litir nó le digit agus ní mór ach litreacha beaga, digití agus daiseanna a úsáid",
     "skillContentRequired": "Tá ábhar scile ag teastáil",
     "skillSaveFailed": "Níorbh fhéidir an scil a shábháil",
+    "skillLimitReached": "Is féidir le próifíl suas le {{max}} scil a choinneáil. Scrios ceann amháin chun scil eile a chur leis.",
     "skillSourceCustom": "Saincheaptha",
     "skillSourceMarketplace": "Margadh",
     "skillSourceSkillsSh": "skills.sh",

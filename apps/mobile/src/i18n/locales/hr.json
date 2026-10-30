@@ -3901,6 +3901,7 @@
     "skillNameInvalid": "Naziv vještine mora započeti slovom ili znamenkom i koristiti samo mala slova, znamenke i crtice",
     "skillContentRequired": "Potreban je sadržaj vještina",
     "skillSaveFailed": "Nije moguće spremiti vještinu",
+    "skillLimitReached": "Profil može sadržavati najviše {{max}} vještina. Izbrišite jednu da biste dodali drugu.",
     "skillSourceCustom": "Prilagođeno",
     "skillSourceMarketplace": "Trgovina",
     "skillSourceSkillsSh": "skills.sh",

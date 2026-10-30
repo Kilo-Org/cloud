@@ -3901,6 +3901,7 @@
     "skillNameInvalid": "Il nome della competenza deve iniziare con una lettera o un numero e utilizzare solo lettere minuscole, numeri e trattini",
     "skillContentRequired": "È richiesto il contenuto delle competenze",
     "skillSaveFailed": "Impossibile salvare l'abilità",
+    "skillLimitReached": "Un profilo può contenere fino a {{max}} abilità. Eliminane una per aggiungerne un'altra.",
     "skillSourceCustom": "Personalizzata",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

@@ -3951,6 +3951,7 @@
     "skillNameInvalid": "Nazwa umiejętności musi zaczynać się od litery lub cyfry i zawierać wyłącznie małe litery, cyfry i myślniki",
     "skillContentRequired": "Wymagane są umiejętności",
     "skillSaveFailed": "Nie udało się zapisać umiejętności",
+    "skillLimitReached": "Profil może zawierać maksymalnie {{max}} umiejętności. Usuń jedną, aby dodać kolejną.",
     "skillSourceCustom": "Własne",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

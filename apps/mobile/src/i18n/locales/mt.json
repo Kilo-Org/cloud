@@ -4001,6 +4001,7 @@
     "skillNameInvalid": "L-isem tal-ħiliet għandu jibda b'ittra jew ċifra u juża biss ittri żgħar, ċifri u sings",
     "skillContentRequired": "Il-kontenut tal-ħiliet huwa meħtieġ",
     "skillSaveFailed": "Ma setgħetx tiffranka l-ħiliet",
+    "skillLimitReached": "Profil jista' jżomm sa {{max}} ħiliet. Ħassar waħda biex iżżid oħra.",
     "skillSourceCustom": "Personalizzat",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

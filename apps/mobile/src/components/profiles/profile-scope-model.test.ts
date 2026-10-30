@@ -62,6 +62,20 @@ describe('isProfileScopeStale', () => {
     ).toBe(false);
   });
 
+  it('keeps a screen of another organization when an unrelated account is selected', () => {
+    // Opened under `ORG_A` for `ORG_B`'s profile, then the account moved to
+    // `ORG_C`: the screen shows a scope that never was the account, so nothing
+    // it displays became the previous account's.
+    expect(
+      isProfileScopeStale({
+        isLoaded: true,
+        activeOrganizationId: 'org-c',
+        openedUnderOrganizationId: ORG_A,
+        routeOrganizationId: ORG_B,
+      })
+    ).toBe(false);
+  });
+
   it('keeps a screen while the selection has not resolved for it yet', () => {
     expect(
       isProfileScopeStale({
@@ -132,13 +146,13 @@ describe('staleProfileScopeExit', () => {
     ).toBe('back');
   });
 
-  it('shows the list when the stale detail has nothing beneath it', () => {
+  it('pushes the list when the stale detail has nothing beneath it', () => {
     expect(
       staleProfileScopeExit({
         routes: [{ name: 'profile-management/[profileId]/index' }],
         currentIndex: 0,
         profilesRouteName: 'profile-management/index',
       })
-    ).toBe('profiles-list');
+    ).toBe('push-list');
   });
 });

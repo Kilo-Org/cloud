@@ -343,4 +343,62 @@ describe.each([
       ).toBe(true);
     }
   );
+
+  // A disabled agent whose GitHub App grant holds nothing accessible has no
+  // repository to select, and the enable rule (an effective repository) leaves
+  // the switch disabled. The picker stays the only route to widening the grant,
+  // so the CTA must survive the settled-empty repository list — hiding it there
+  // stranded the page with nothing to press and no way back on.
+  it.each(['all', 'selected'] as const)(
+    'offers the repository picker with an empty grant in %s mode',
+    async mode => {
+      configData.isEnabled = false;
+      configData.repositorySelectionMode = mode;
+      configData.selectedRepositoryIds = [];
+      repositoriesData = [];
+      const root = await mount('personal');
+      expect(host(root, 'Switch')[0]?.props.value).toBe(false);
+      expect(host(root, 'Switch')[0]?.props.disabled).toBe(true);
+      expect(texts(root)).toContain(emptyCopy);
+      const cta = host(root, 'ConfigureRow').find(node => node.props.title === 'Select repositories');
+      // The empty list makes "choose which repositories to monitor" untrue, so
+      // the row names the step that actually unblocks it.
+      expect(cta?.props.subtitle).toBe('Grant the Kilo GitHub App access to repositories');
+    }
+  );
+
+  it('keeps the generic picker subtitle once a repository is accessible', async () => {
+    configData.isEnabled = false;
+    configData.repositorySelectionMode = 'selected';
+    configData.selectedRepositoryIds = [];
+    const root = await mount('personal');
+    const cta = host(root, 'ConfigureRow').find(node => node.props.title === 'Select repositories');
+    expect(cta?.props.subtitle).toBe('Choose which repositories Security Agent monitors');
+  });
+
+  it('hides the picker CTA from a reader who cannot manage the agent', async () => {
+    roles = [{ organizationId: 'org_123', role: 'member' }];
+    configData.isEnabled = false;
+    repositoriesData = [];
+    const root = await mount('org_123');
+    expect(texts(root)).toContain(denialCopy);
+    expect(
+      host(root, 'ConfigureRow').some(node => node.props.title === 'Select repositories')
+    ).toBe(false);
+  });
+
+  it('hides the picker CTA once the agent is enabled', async () => {
+    configData.isEnabled = true;
+    const root = await mount('personal');
+    expect(
+      host(root, 'ConfigureRow').some(node => node.props.title === 'Select repositories')
+    ).toBe(false);
+    if (presentation === 'standalone') {
+      // The enabled settings page lists the repositories row instead; the
+      // inline presentation hands the enabled scope to the dashboard.
+      expect(host(root, 'ConfigureRow').some(node => node.props.title === 'Repositories')).toBe(
+        true
+      );
+    }
+  });
 });

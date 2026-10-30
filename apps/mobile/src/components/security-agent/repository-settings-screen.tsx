@@ -182,6 +182,36 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   // it is neither loading nor errored and `data` is still undefined, which is
   // not the settled "No repositories" state the Manage access CTA is for.
   const repositoriesEmpty = repositories.data?.length === 0;
+  // An empty grant is the one repository state that is not about the mode: with
+  // nothing accessible there is nothing to select and nothing to sync whichever
+  // mode is stored, and widening the app's access is the only way out. Naming it
+  // only in `selected` mode left the disabled agent's "Select repositories" row
+  // landing on a screen whose only controls were the two mode choices.
+  const showRepositorySection = showRepositoryStates || repositoriesEmpty;
+
+  // The GitHub settings page is where installation access is widened, and
+  // `openExternalUrl` resolves when that page closes — on both platforms it
+  // awaits the browser's own dismissal (a launch it could not open is toasted
+  // by that helper and still resolves). Reading the repository list again on
+  // that return edge is what makes a grant show up here: without it the cached
+  // empty answer stays fresh for the whole stale window, and the disabled
+  // agent's enable rule counts exactly these repositories.
+  const manageAccess = async () => {
+    const orgId = isPersonalSecurityScope(scope) ? undefined : scope;
+    try {
+      const { token } = await trpcClient.githubApps.mintInstallState.mutate({
+        organizationId: orgId ?? undefined,
+        returnTo: '/cloud/sessions',
+      });
+      await openExternalUrl(getGitHubIntegrationUrl(WEB_BASE_URL, orgId, token), {
+        label: t('securityAgent.repositories.githubAppSettings'),
+      });
+    } catch {
+      toast.error(t('prReview.couldNotOpenGitHubAppSettings'));
+      return;
+    }
+    await repositories.refetch();
+  };
 
   // Everything above the rows (permission note, mode choice, and — in selected
   // mode — the loading / error / empty branches) rides on the list header so
@@ -210,18 +240,18 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
         ))}
       </RadioGroup>
 
-      {showRepositoryStates && (
+      {showRepositorySection && (
         <View className="mt-6">
           <Text variant="small" className="mb-1 uppercase tracking-wide text-muted-foreground">
             {t('common.repositories')}
           </Text>
-          {repositories.isLoading && (
+          {showRepositoryStates && repositories.isLoading && (
             <View className="gap-3 pt-2">
               <Skeleton className="h-12 w-full rounded-lg" />
               <Skeleton className="h-12 w-full rounded-lg" />
             </View>
           )}
-          {repositories.isError && (
+          {showRepositoryStates && repositories.isError && (
             <QueryError
               variant="server"
               placement="top"
@@ -241,20 +271,7 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
                   className={STATE_ACTION_CLASS}
                   variant="outline"
                   onPress={() => {
-                    void (async () => {
-                      const orgId = isPersonalSecurityScope(scope) ? undefined : scope;
-                      try {
-                        const { token } = await trpcClient.githubApps.mintInstallState.mutate({
-                          organizationId: orgId ?? undefined,
-                          returnTo: '/cloud/sessions',
-                        });
-                        await openExternalUrl(getGitHubIntegrationUrl(WEB_BASE_URL, orgId, token), {
-                          label: t('securityAgent.repositories.githubAppSettings'),
-                        });
-                      } catch {
-                        toast.error(t('prReview.couldNotOpenGitHubAppSettings'));
-                      }
-                    })();
+                    void manageAccess();
                   }}
                 >
                   <Text>{t('securityAgent.repositories.manageAccess')}</Text>

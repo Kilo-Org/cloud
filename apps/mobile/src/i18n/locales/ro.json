@@ -3903,7 +3903,7 @@
     "skillSaveFailed": "Nu s-a putut salva calificarea. Încearcă din nou.",
     "skillDeleteFailed": "Nu s-a putut șterge calificarea. Încearcă din nou.",
     "skillToggleFailed": "Nu s-a putut actualiza calificarea. Încearcă din nou.",
-    "skillLimitReached": "Un profil poate conține până la {{max}} abilități. Ștergeți una pentru a adăuga alta.",
+    "skillLimitReached": "Un profil poate conține până la {{max}} abilități. Șterge una pentru a adăuga alta.",
     "skillSourceCustom": "Personalizat",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

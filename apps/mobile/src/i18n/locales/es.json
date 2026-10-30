@@ -3903,7 +3903,7 @@
     "skillSaveFailed": "No se pudo guardar la habilidad. Inténtalo de nuevo.",
     "skillDeleteFailed": "No se pudo eliminar la habilidad. Inténtalo de nuevo.",
     "skillToggleFailed": "No se pudo actualizar la habilidad. Inténtalo de nuevo.",
-    "skillLimitReached": "Un perfil puede tener hasta {{max}} habilidades. Elimine una para agregar otra.",
+    "skillLimitReached": "Un perfil puede tener hasta {{max}} habilidades. Elimina una para agregar otra.",
     "skillSourceCustom": "Personalizada",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

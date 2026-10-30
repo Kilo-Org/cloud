@@ -19,6 +19,7 @@ import {
 } from '@/components/profiles/profile-mcp-screen.test-helpers';
 import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
+import { resetFormDraftsForTests } from '@/lib/form-draft';
 
 const h = vi.hoisted(() => ({
   confirm: vi.fn(),
@@ -88,6 +89,7 @@ vi.mock('@/components/ui/icons', () => ({
 describe('ProfileMcpScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetFormDraftsForTests();
     Object.assign(h.query, {
       data: undefined,
       isError: false,
@@ -494,5 +496,43 @@ describe('ProfileMcpScreen', () => {
     expect(findOne(renderer.root, 'Switch').props.accessibilityLabel).toBe('docs');
 
     unmount();
+  });
+  it('reopens the add sheet with its typed fields after a remount', async () => {
+    h.query.data = testProfile();
+    h.query.isPending = false;
+
+    const first = await mountScreen();
+    pressEmptyAction(first.renderer);
+    changeText(first.renderer.root, 'Server name', 'portal-server');
+    changeText(first.renderer.root, 'Command line', 'npx portal-mcp');
+    first.unmount();
+
+    const second = await mountScreen();
+    expect(findOne(second.renderer.root, 'SheetHeader')).toBeTruthy();
+    expect(findField(second.renderer.root, 'Server name').props.defaultValue).toBe('portal-server');
+    expect(findField(second.renderer.root, 'Command line').props.defaultValue).toBe(
+      'npx portal-mcp'
+    );
+    second.unmount();
+  });
+
+  it('starts a later add empty once the draft was saved', async () => {
+    h.query.data = testProfile();
+    h.query.isPending = false;
+    h.mutations.createMcp.mutateAsync.mockResolvedValue({ id: 'mcp-2' });
+
+    const first = await mountScreen();
+    pressEmptyAction(first.renderer);
+    changeText(first.renderer.root, 'Server name', 'portal-server');
+    changeText(first.renderer.root, 'Command line', 'npx portal-mcp');
+    pressSheetDone(first.renderer.root);
+    await waitFor(() => h.mutations.createMcp.mutateAsync.mock.calls.length > 0);
+    first.unmount();
+
+    const second = await mountScreen();
+    expect(findAll(second.renderer.root, 'SheetHeader')).toHaveLength(0);
+    pressEmptyAction(second.renderer);
+    expect(findField(second.renderer.root, 'Server name').props.defaultValue).toBe('');
+    second.unmount();
   });
 });

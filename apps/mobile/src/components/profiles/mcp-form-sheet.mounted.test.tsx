@@ -5,6 +5,7 @@ import { McpFormSheet } from '@/components/profiles/mcp-form-sheet';
 import { i18n } from '@/i18n';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { renderWithProviders } from '@/test/render-with-providers';
+import { resetFormDraftsForTests } from '@/lib/form-draft';
 
 const h = vi.hoisted(() => ({
   onClose: vi.fn(),
@@ -166,6 +167,7 @@ function mountSheet(
 describe('McpFormSheet dismissal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetFormDraftsForTests();
   });
 
   it('closes an untouched sheet without asking', async () => {
@@ -207,6 +209,7 @@ describe('McpFormSheet dismissal', () => {
 describe('McpFormSheet refused save', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetFormDraftsForTests();
   });
 
   it('scrolls to the name field when it is missing', async () => {

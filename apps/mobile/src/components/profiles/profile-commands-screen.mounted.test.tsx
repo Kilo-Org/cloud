@@ -19,6 +19,7 @@ import {
 } from '@/components/profiles/profile-commands-screen.test-helpers';
 import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
+import { resetFormDraftsForTests } from '@/lib/form-draft';
 
 const h = vi.hoisted(() => ({
   error: vi.fn(),
@@ -103,6 +104,7 @@ function pressEmptyAction(renderer: Awaited<ReturnType<typeof mountScreen>>['ren
 describe('ProfileCommandsScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetFormDraftsForTests();
     Object.assign(h.query, {
       data: undefined,
       isError: false,
@@ -482,5 +484,21 @@ describe('ProfileCommandsScreen', () => {
     ]);
 
     unmount();
+  });
+  it('keeps a typed command when the screen is mounted again', async () => {
+    h.query.data = testCommands(['npm install']);
+    h.query.isPending = false;
+
+    const first = await mountScreen();
+    pressButton(first.renderer.root, 0);
+    changeRowText(first.renderer.root, 1, 'npm run build');
+    first.unmount();
+
+    const second = await mountScreen();
+    expect(findFields(second.renderer.root).map(field => field.props.defaultValue)).toEqual([
+      'npm install',
+      'npm run build',
+    ]);
+    second.unmount();
   });
 });

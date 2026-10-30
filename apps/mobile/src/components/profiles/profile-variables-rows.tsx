@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 
@@ -18,6 +18,7 @@ import { Switch } from '@/components/ui/switch';
 import { Text } from '@/components/ui/text';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { ICON_TARGET_BOX_CLASS, ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
+import { useFormDraftRef, useFormDraftState } from '@/lib/form-draft';
 import { cn } from '@/lib/utils';
 
 /** Content-shaped rows in the same slot and height as a loaded variable row. */
@@ -158,6 +159,13 @@ type VariableEditFormProps = Readonly<{
   isNew: boolean;
   initial: VariableEdit;
   /**
+   * The form draft the fields belong to (see `lib/form-draft`). A screen passes
+   * a scope scoped to its profile so the typed key, value and secret survive a
+   * remount; a caller that owns no draft leaves it out and gets fresh fields
+   * every mount.
+   */
+  draftScope?: string;
+  /**
    * The profile's stored keys, so a new key that cleans onto an existing one is
    * refused rather than silently overwriting it (the server upserts on
    * `(profile_id, key)`). Ignored for an edit, whose key is fixed.
@@ -193,6 +201,7 @@ type VariableEditFormProps = Readonly<{
 export function VariableEditForm({
   isNew,
   initial,
+  draftScope,
   existingKeys = [],
   isSaving,
   requireValue = false,
@@ -202,14 +211,20 @@ export function VariableEditForm({
 }: VariableEditFormProps) {
   const { t } = useTranslation();
   const colors = useThemeColors();
-  const keyRef = useRef(initial.key);
-  const valueRef = useRef(initial.value);
-  const [isSecret, setIsSecret] = useState(initial.isSecret);
-  const [revealed, setRevealed] = useState(false);
+  // A caller without a draft gets a scope of its own, so this form still reads
+  // through the same hooks and simply never finds stored text.
+  const instanceId = useId();
+  const scope = draftScope ?? `profiles:variables-form:${instanceId}`;
+  const keyRef = useFormDraftRef(scope, 'key', initial.key);
+  const valueRef = useFormDraftRef(scope, 'value', initial.value);
+  const [isSecret, setIsSecret] = useFormDraftState(scope, 'isSecret', initial.isSecret);
+  const [revealed, setRevealed] = useFormDraftState(scope, 'revealed', false);
   const [error, setError] = useState<VariableInputError | null>(null);
   // The key a save will store, when it differs from what the field holds. An
   // edit keeps its stored key, so only an add can change it.
-  const [keyPreview, setKeyPreview] = useState<string | null>(null);
+  const [keyPreview, setKeyPreview] = useState<string | null>(() =>
+    isNew ? variableKeyPreview(keyRef.current) : null
+  );
 
   const valuePlaceholder = valueFieldPlaceholder(t, isSecret, isNew);
   // An edit's key is stored, so only an add can collide with the profile's keys.
@@ -236,7 +251,7 @@ export function VariableEditForm({
       <View className="gap-1.5">
         <FormField
           label={t('profiles.keyLabel')}
-          defaultValue={initial.key}
+          defaultValue={keyRef.current}
           disabled={!isNew}
           required
           autoCapitalize="characters"
@@ -265,7 +280,7 @@ export function VariableEditForm({
       <FormField
         label={t('profiles.valueLabel')}
         placeholder={valuePlaceholder}
-        defaultValue={initial.value}
+        defaultValue={valueRef.current}
         maxLength={maxValueLength}
         secureTextEntry={isSecret && !revealed}
         autoCapitalize="none"

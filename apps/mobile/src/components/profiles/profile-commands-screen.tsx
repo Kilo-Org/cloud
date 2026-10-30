@@ -26,6 +26,7 @@ import { useAgentProfileCommands } from '@/lib/hooks/use-agent-profiles';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useProfileCommandsSave } from '@/lib/hooks/use-profile-commands-save';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { clearFormDraft, useFormDraftState } from '@/lib/form-draft';
 import { cn } from '@/lib/utils';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 
@@ -67,7 +68,14 @@ export function ProfileCommandsScreen({
   // The screen owns the ordered list — `setCommands` replaces the whole list,
   // so a move/delete/edit works on a local copy. Refetches may replace a clean
   // list, but must not discard a draft typed after the last submitted payload.
-  const [commands, setCommands] = useState<string[]>(serverCommands);
+  // The list itself is a draft (`lib/form-draft`), so the rows a remount would
+  // otherwise drop come back with the text that was typed into them.
+  const draftScope = `profiles:commands:${profileId}`;
+  const [commands, setCommands] = useFormDraftState<string[]>(
+    draftScope,
+    'commands',
+    serverCommands
+  );
   const [syncedCommands, setSyncedCommands] = useState<string[]>(serverCommands);
   const { save, persistedRef, isSaving } = useProfileCommandsSave({
     profileId,
@@ -84,7 +92,7 @@ export function ProfileCommandsScreen({
   const [leaveAllowed, setLeaveAllowed] = useState(false);
   // Remount uncontrolled fields for reorders and accepted server changes;
   // their text belongs to the position, not the input instance.
-  const [generation, setGeneration] = useState(0);
+  const [generation, setGeneration] = useFormDraftState(draftScope, 'generation', 0);
   if (serverCommands !== syncedCommands && !isSaving) {
     setSyncedCommands(serverCommands);
     if (sameCommands(commands, persistedRef.current) && !sameCommands(commands, serverCommands)) {
@@ -151,6 +159,9 @@ export function ProfileCommandsScreen({
         return;
       }
       if (sameCommands(nonBlankCommands(commandsRef.current), persistedRef.current)) {
+        // The list is server truth now, so the draft's job is done: the next
+        // mount seeds from the refetched list instead of replaying it.
+        clearFormDraft(draftScope);
         setLeaveAllowed(true);
         repeat();
         return;

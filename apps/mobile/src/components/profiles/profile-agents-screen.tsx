@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from 'react';
+import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -26,6 +26,8 @@ import {
 } from '@/lib/hooks/use-agent-profiles';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useFormDraftState } from '@/lib/form-draft';
+import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 
@@ -138,21 +140,20 @@ export function ProfileAgentsScreen({
 
   const agents = profileQuery.data ?? NO_AGENTS;
   const rows = agentRows(agents);
-  // `null` = closed, `{ source: null }` = add, `{ source }` = edit that agent.
-  const [form, setForm] = useState<{ source: AgentSource | null } | null>(null);
+  // `null` = closed, the add form, or the agent being edited. The form and the
+  // fields it holds are a draft (`lib/form-draft`), so a remount reopens it on
+  // what was typed instead of dropping it.
+  const draftScope = `profiles:agents:${profileId}`;
+  const form = useProfileFormDraft(draftScope, agents);
+  const { startAdd: handleStartAdd, close: handleClose } = form;
   // A save the server rejected on the slug shows the inline conflict message
   // instead of only a toast: the sheet stays open on the typed values, so the
   // user can rename without retyping the form.
-  const [serverSlugConflict, setServerSlugConflict] = useState(false);
-
-  const startAdd = () => {
-    setForm({ source: null });
-    setServerSlugConflict(false);
-  };
-
-  const closeForm = () => {
-    setForm(null);
-  };
+  const [serverSlugConflict, setServerSlugConflict] = useFormDraftState(
+    draftScope,
+    'slugConflict',
+    false
+  );
 
   const saveAgent = async (
     target: AgentSource | null,
@@ -172,7 +173,7 @@ export function ProfileAgentsScreen({
       }
       return;
     }
-    closeForm();
+    form.close();
   };
 
   const runDelete = async (agentId: string) => {
@@ -218,7 +219,7 @@ export function ProfileAgentsScreen({
         placement="top"
         action={
           canManage ? (
-            <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
+            <Button className={STATE_ACTION_CLASS} onPress={handleStartAdd}>
               <Text>{t('profiles.agents.add')}</Text>
             </Button>
           ) : null
@@ -244,8 +245,7 @@ export function ProfileAgentsScreen({
               onEdit={
                 canManage
                   ? () => {
-                      setForm({ source });
-                      setServerSlugConflict(false);
+                      form.startEdit(source);
                     }
                   : undefined
               }
@@ -260,7 +260,7 @@ export function ProfileAgentsScreen({
           );
         })}
         {canManage ? (
-          <Button onPress={startAdd}>
+          <Button onPress={handleStartAdd}>
             <Text>{t('profiles.agents.add')}</Text>
           </Button>
         ) : null}
@@ -281,18 +281,19 @@ export function ProfileAgentsScreen({
         {content}
       </TabScreenScrollView>
 
-      {form !== null ? (
+      {form.isOpen ? (
         <AgentFormSheet
-          agent={form.source}
+          draftScope={draftScope}
+          agent={form.editing}
           existingSlugs={agents
-            .filter(candidate => candidate.id !== form.source?.id)
+            .filter(candidate => candidate.id !== form.editing?.id)
             .map(candidate => candidate.slug)}
           organizationId={organizationId}
           isSaving={createAgent.isPending || updateAgent.isPending}
           slugConflictFromServer={serverSlugConflict}
-          onClose={closeForm}
+          onClose={handleClose}
           onSave={payload => {
-            void saveAgent(form.source, payload);
+            void saveAgent(form.editing, payload);
           }}
         />
       ) : null}

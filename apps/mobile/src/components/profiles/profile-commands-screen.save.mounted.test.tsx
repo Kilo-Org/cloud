@@ -14,6 +14,7 @@ import {
 } from '@/components/profiles/profile-commands-screen.test-helpers';
 import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
+import { resetFormDraftsForTests } from '@/lib/form-draft';
 
 const h = vi.hoisted(() => ({
   error: vi.fn(),
@@ -109,6 +110,7 @@ vi.mock('@/components/ui/icons', () => ({
 describe('ProfileCommandsScreen Back', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetFormDraftsForTests();
     h.guard.enabled = false;
     h.guard.callback = undefined;
     Object.assign(h.query, {

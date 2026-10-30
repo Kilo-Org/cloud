@@ -1,7 +1,9 @@
 import { createElement } from 'react';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { act } from '@/test/renderer';
 import { i18n } from '@/i18n';
+import { resetFormDraftsForTests } from '@/lib/form-draft';
 import { ProfileAgentsScreen } from '@/components/profiles/profile-agents-screen';
 import { type AgentSource } from '@/components/profiles/profile-agents-model';
 import { renderWithProviders } from '@/test/render-with-providers';
@@ -99,5 +101,83 @@ describe('ProfileAgentsScreen mode badge', () => {
 
     unmount();
     await i18n.changeLanguage('en');
+  });
+});
+
+type PressableProps = { onPress: () => void; onClose?: () => void };
+
+/** Fire one handler a host stub carries; the stubs keep props untyped. */
+function press(node: { props: unknown }): void {
+  const props = node.props as PressableProps;
+  act(() => {
+    props.onPress();
+  });
+}
+
+function pressClose(sheet: { props: unknown }): void {
+  const props = sheet.props as PressableProps;
+  const onClose = props.onClose;
+  if (typeof onClose !== 'function') {
+    throw new TypeError('the sheet rendered no onClose');
+  }
+  act(() => {
+    onClose();
+  });
+}
+
+describe('ProfileAgentsScreen form draft', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    resetFormDraftsForTests();
+  });
+
+  it('reopens the add sheet after a remount', async () => {
+    h.query.data = [agent('alpha', 'primary')];
+    const first = await renderWithProviders(
+      createElement(ProfileAgentsScreen, { profileId: 'profile-1' })
+    );
+    const addButton = first.renderer.root.findAll(node => String(node.type) === 'Button')[0];
+    if (!addButton) {
+      throw new Error('the add button was not rendered');
+    }
+    press(addButton);
+    expect(
+      first.renderer.root.findAll(node => String(node.type) === 'AgentFormSheet')
+    ).toHaveLength(1);
+    first.unmount();
+
+    const second = await renderWithProviders(
+      createElement(ProfileAgentsScreen, { profileId: 'profile-1' })
+    );
+    expect(
+      second.renderer.root.findAll(node => String(node.type) === 'AgentFormSheet')
+    ).toHaveLength(1);
+    second.unmount();
+  });
+
+  it('keeps the add sheet closed after the form was cancelled', async () => {
+    h.query.data = [agent('alpha', 'primary')];
+    const first = await renderWithProviders(
+      createElement(ProfileAgentsScreen, { profileId: 'profile-1' })
+    );
+    const addButton = first.renderer.root.findAll(node => String(node.type) === 'Button')[0];
+    if (!addButton) {
+      throw new Error('the add button was not rendered');
+    }
+    press(addButton);
+    const sheet = first.renderer.root.findAll(node => String(node.type) === 'AgentFormSheet')[0];
+    if (!sheet) {
+      throw new Error('the sheet was not rendered');
+    }
+    pressClose(sheet);
+    first.unmount();
+
+    const second = await renderWithProviders(
+      createElement(ProfileAgentsScreen, { profileId: 'profile-1' })
+    );
+    expect(
+      second.renderer.root.findAll(node => String(node.type) === 'AgentFormSheet')
+    ).toHaveLength(0);
+    second.unmount();
   });
 });

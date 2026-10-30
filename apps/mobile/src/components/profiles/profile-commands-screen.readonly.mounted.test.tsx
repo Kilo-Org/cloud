@@ -9,6 +9,7 @@ import {
   testCommands,
   type TestCommands,
 } from '@/components/profiles/profile-commands-screen.test-helpers';
+import { resetFormDraftsForTests } from '@/lib/form-draft';
 
 const h = vi.hoisted(() => ({
   error: vi.fn(),
@@ -83,6 +84,7 @@ vi.mock('@/components/ui/icons', () => ({
 describe('ProfileCommandsScreen without the manage role', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetFormDraftsForTests();
     permissionState.canManage = false;
     Object.assign(h.query, {
       data: undefined,

@@ -1,4 +1,4 @@
-import { type ReactNode, useState } from 'react';
+import { type ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -26,6 +26,8 @@ import {
 } from '@/lib/hooks/use-agent-profiles';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+import { useFormDraftState } from '@/lib/form-draft';
+import { useProfileFormDraft } from '@/lib/hooks/use-profile-form-draft';
 import { ICON_TARGET_BOX_CLASS, STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { cn } from '@/lib/utils';
 import { readTrpcErrorField } from '@/lib/trpc-error';
@@ -48,10 +50,8 @@ type McpServerRowProps = Readonly<{
 }>;
 
 /**
- * One MCP server row: the name in mono, its type, the command/URL summary, the
- * enabled switch and a lock badge with the masked env/header key count. The row
- * carries no container `accessibilityLabel`, so the switch's label stays the
- * only element a screen reader matches by the server's name.
+ * One MCP server row: the name, its type, the command/URL summary, the enabled
+ * switch, a lock with the masked key count, and its edit/delete controls.
  */
 function McpServerRowView({
   server,
@@ -148,43 +148,34 @@ export function ProfileMcpScreen({
   const { createMcp, updateMcp, deleteMcp, setMcpEnabled } =
     useAgentProfileSectionMutations(organizationId);
   const canManage = useCanManageOrganizationProfiles(organizationId);
-
   const servers = profileQuery.data ?? NO_MCP_SERVERS;
   const rows = mcpServerRows(servers);
-  // `null` = closed, `{ server: null }` = add, `{ server }` = edit that server.
-  const [form, setForm] = useState<{ server: McpServerSource | null } | null>(null);
-  // A save the server refused on the name index shows the inline conflict
-  // instead of a toast the open sheet covers; any other refusal shows one line
-  // inside the sheet. Both reset when the form opens and each save starts.
-  const [serverNameConflict, setServerNameConflict] = useState(false);
-  const [saveFailure, setSaveFailure] = useState<string | null>(null);
-
-  const startAdd = () => {
-    setForm({ server: null });
-    setServerNameConflict(false);
-    setSaveFailure(null);
-  };
-
-  const closeForm = () => {
-    setForm(null);
-  };
+  // The open form and its fields are a draft (`lib/form-draft`).
+  const draftScope = `profiles:mcp:${profileId}`;
+  const form = useProfileFormDraft(draftScope, servers);
+  const { startAdd: handleStartAdd, close: handleClose } = form;
+  // A save refused on the name index shows the inline conflict; any other
+  // refusal shows one line inside the sheet. Both reset on the next open.
+  const [saveNotes, setSaveNotes] = useFormDraftState<{
+    conflict: boolean;
+    failure: string | null;
+  }>(draftScope, 'saveNotes', { conflict: false, failure: null });
 
   const saveServer = async (target: McpServerSource | null, payload: McpServerPayload) => {
-    setServerNameConflict(false);
-    setSaveFailure(null);
+    setSaveNotes({ conflict: false, failure: null });
     try {
       await (target === null
         ? createMcp.mutateAsync({ profileId, server: payload })
         : updateMcp.mutateAsync({ profileId, mcpServerId: target.id, server: payload }));
     } catch (error) {
       if (readTrpcErrorField(error, 'code') === 'CONFLICT') {
-        setServerNameConflict(true);
+        setSaveNotes({ conflict: true, failure: null });
         return;
       }
-      setSaveFailure(t('profiles.mcp.saveFailed'));
+      setSaveNotes({ conflict: false, failure: t('profiles.mcp.saveFailed') });
       return;
     }
-    closeForm();
+    form.close();
   };
 
   const runDelete = async (mcpServerId: string) => {
@@ -230,7 +221,7 @@ export function ProfileMcpScreen({
         placement="top"
         action={
           canManage ? (
-            <Button className={STATE_ACTION_CLASS} onPress={startAdd}>
+            <Button className={STATE_ACTION_CLASS} onPress={handleStartAdd}>
               <Text>{t('profiles.mcp.add')}</Text>
             </Button>
           ) : null
@@ -270,9 +261,7 @@ export function ProfileMcpScreen({
               onEdit={
                 canManage
                   ? () => {
-                      setForm({ server });
-                      setServerNameConflict(false);
-                      setSaveFailure(null);
+                      form.startEdit(server);
                     }
                   : undefined
               }
@@ -287,7 +276,7 @@ export function ProfileMcpScreen({
           );
         })}
         {canManage ? (
-          <Button onPress={startAdd}>
+          <Button onPress={handleStartAdd}>
             <Text>{t('profiles.mcp.add')}</Text>
           </Button>
         ) : null}
@@ -308,18 +297,19 @@ export function ProfileMcpScreen({
         {content}
       </TabScreenScrollView>
 
-      {form !== null ? (
+      {form.isOpen ? (
         <McpFormSheet
-          server={form.server}
+          draftScope={draftScope}
+          server={form.editing}
           existingNames={servers
-            .filter(candidate => candidate.id !== form.server?.id)
+            .filter(candidate => candidate.id !== form.editing?.id)
             .map(candidate => candidate.name)}
           isSaving={createMcp.isPending || updateMcp.isPending}
-          nameConflictFromServer={serverNameConflict}
-          saveFailure={saveFailure}
-          onClose={closeForm}
+          nameConflictFromServer={saveNotes.conflict}
+          saveFailure={saveNotes.failure}
+          onClose={handleClose}
           onSave={payload => {
-            void saveServer(form.server, payload);
+            void saveServer(form.editing, payload);
           }}
         />
       ) : null}

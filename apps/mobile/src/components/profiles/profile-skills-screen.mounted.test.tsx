@@ -22,6 +22,7 @@ import { i18n } from '@/i18n';
 import { MAX_PROFILE_SKILLS } from '@/lib/agent-profile-forms';
 import { act, type ReactTestInstance } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
+import { resetFormDraftsForTests } from '@/lib/form-draft';
 
 /** The rendered text node whose content is exactly `copy`. */
 function lineWith(root: ReactTestInstance, copy: string): ReactTestInstance {
@@ -102,6 +103,7 @@ vi.mock('@/components/ui/icons', () => ({
 describe('ProfileSkillsScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetFormDraftsForTests();
     Object.assign(h.query, {
       data: undefined,
       isError: false,
@@ -526,5 +528,23 @@ describe('ProfileSkillsScreen', () => {
     expect(findOne(renderer.root, 'Switch').props.accessibilityLabel).toBe('code-review');
 
     unmount();
+  });
+  it('reopens the add sheet with its typed fields after a remount', async () => {
+    h.query.data = testSkills();
+    h.query.isPending = false;
+
+    const first = await mountScreen();
+    pressEmptyAction(first.renderer);
+    changeText(first.renderer.root, 'Skill name', 'portal-skill');
+    changeText(first.renderer.root, 'Skill content', 'Use the portal carefully.');
+    first.unmount();
+
+    const second = await mountScreen();
+    expect(findOne(second.renderer.root, 'SheetHeader')).toBeTruthy();
+    expect(findField(second.renderer.root, 'Skill name').props.defaultValue).toBe('portal-skill');
+    expect(findField(second.renderer.root, 'Skill content').props.defaultValue).toBe(
+      'Use the portal carefully.'
+    );
+    second.unmount();
   });
 });

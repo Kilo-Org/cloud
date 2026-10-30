@@ -160,19 +160,12 @@ export function validateAdmissionPayload(raw: unknown): AdmissionPayload | undef
   if (typeof raw !== 'object' || raw === null) return undefined;
   const obj = raw as Record<string, unknown>;
 
-  // platform: 'ios' | 'android'
   if (obj['platform'] !== 'ios' && obj['platform'] !== 'android') return undefined;
-
-  // kind: 'attestation' | 'assertion'
   if (obj['kind'] !== 'attestation' && obj['kind'] !== 'assertion') return undefined;
-
-  // challenge: non-empty string
   if (typeof obj['challenge'] !== 'string' || !obj['challenge']) return undefined;
-
   // payload: non-empty string (base64)
   if (typeof obj['payload'] !== 'string' || !obj['payload']) return undefined;
 
-  // keyId: optional string (required for iOS assertion)
   const kind = obj['kind'] as AdmissionKind;
   const platform = obj['platform'] as AdmissionPlatform;
   const keyId = obj['keyId'];

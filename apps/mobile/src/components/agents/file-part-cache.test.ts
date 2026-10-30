@@ -21,7 +21,7 @@ import {
 type FileInstance = {
   uri: string;
   written?: { content: string; encoding?: string };
-  writeSync: (content: string, options?: { encoding?: string }) => void;
+  write: (content: string, options?: { encoding?: string }) => Promise<void>;
   filename: string;
 };
 
@@ -41,8 +41,9 @@ const expoFileSystemMock = vi.hoisted(() => {
   const File = vi.fn(function FileMock(_directory: { name?: string }, filename: string) {
     const instance: FileInstance = {
       uri: `file:///cache/session-file-parts/${filename}`,
-      writeSync(content, options) {
+      write(content, options) {
         this.written = { content, encoding: options?.encoding };
+        return Promise.resolve();
       },
       filename,
     };
@@ -74,6 +75,13 @@ beforeEach(() => {
   fileInstances.length = 0;
   __resetFilePartCacheForTests();
 });
+
+/** Drain the fire-and-forget write continuations, for "nothing further landed" checks. */
+async function drainCacheWrites(): Promise<void> {
+  await Promise.resolve();
+  await Promise.resolve();
+  await Promise.resolve();
+}
 
 describe('cacheFilePart', () => {
   it('records url, mime, and filename for a part id', () => {
@@ -109,7 +117,7 @@ describe('cacheFilePart', () => {
     });
   });
 
-  it('writes a data: URL to disk and stores the file:// URI', () => {
+  it('writes a data: URL to disk and stores the file:// URI', async () => {
     cacheFilePart('part-1', {
       url: 'data:application/pdf;base64,QUJD',
       mime: 'application/pdf',
@@ -126,10 +134,12 @@ describe('cacheFilePart', () => {
     });
     const file = fileInstances[0];
     expect(file?.filename).toBe('part-1-report.pdf');
+    await vi.waitFor(() => {
+      expect(getFilePartCacheEntry('part-1')?.url).toBe(
+        'file:///cache/session-file-parts/part-1-report.pdf'
+      );
+    });
     expect(file?.written).toEqual({ content: 'QUJD', encoding: 'base64' });
-    expect(getFilePartCacheEntry('part-1')?.url).toBe(
-      'file:///cache/session-file-parts/part-1-report.pdf'
-    );
   });
 
   it('stores an http(s) URL as-is without writing to disk', () => {
@@ -143,7 +153,7 @@ describe('cacheFilePart', () => {
     expect(getFilePartCacheEntry('part-1')?.url).toBe('https://example.com/report.pdf');
   });
 
-  it('stores the raw URL when the data: prefix cannot be stripped', () => {
+  it('stores the raw URL when the data: prefix cannot be stripped', async () => {
     cacheFilePart('part-1', {
       url: 'data:text/plain,hello',
       mime: 'text/plain',
@@ -151,19 +161,19 @@ describe('cacheFilePart', () => {
     });
 
     expect(fileInstances).toHaveLength(0);
-    expect(getFilePartCacheEntry('part-1')?.url).toBe('data:text/plain,hello');
+    await vi.waitFor(() => {
+      expect(getFilePartCacheEntry('part-1')?.url).toBe('data:text/plain,hello');
+    });
   });
 
-  it('stores the raw URL when the disk write fails', () => {
+  it('stores the raw URL when the disk write fails', async () => {
     expoFileSystemMock.File.mockImplementationOnce(function FileFail(
       _directory: { name?: string },
       filename: string
     ) {
       const instance = {
         uri: `file:///cache/session-file-parts/${filename}`,
-        writeSync: vi.fn(() => {
-          throw new Error('disk full');
-        }),
+        write: vi.fn(() => Promise.reject(new Error('disk full'))),
         filename,
       };
       fileInstances.push(instance);
@@ -178,7 +188,9 @@ describe('cacheFilePart', () => {
       });
     }).not.toThrow();
 
-    expect(getFilePartCacheEntry('part-1')?.url).toBe('data:application/pdf;base64,QUJD');
+    await vi.waitFor(() => {
+      expect(getFilePartCacheEntry('part-1')?.url).toBe('data:application/pdf;base64,QUJD');
+    });
   });
 
   it('does not store a file:// URL', () => {
@@ -512,18 +524,54 @@ describe('useFilePartCache', () => {
     cacheFilePart('part-hook', { url: 'https://example.com/a.png', mime: 'image/png' });
     expect(getFilePartCacheEntry('part-hook')?.url).toBe('https://example.com/a.png');
   });
+
+  it('wakes only the subscribers of the part that changed', async () => {
+    const rendersA = vi.fn<() => void>();
+    const rendersB = vi.fn<() => void>();
+    const ref: { current: TestRenderer.ReactTestRenderer | undefined } = { current: undefined };
+    await act(async () => {
+      await Promise.resolve();
+      ref.current = TestRenderer.create(
+        createElement(
+          'View',
+          null,
+          createElement(CountingProbe, { partId: 'part-a', onRender: rendersA }),
+          createElement(CountingProbe, { partId: 'part-b', onRender: rendersB })
+        )
+      );
+    });
+    const renderer = ref.current;
+    if (!renderer) {
+      throw new Error('renderer was not created');
+    }
+    expect(rendersA).toHaveBeenCalledTimes(1);
+    expect(rendersB).toHaveBeenCalledTimes(1);
+
+    await act(async () => {
+      await Promise.resolve();
+      cacheFilePart('part-a', { url: 'https://example.com/a.png', mime: 'image/png' });
+    });
+
+    expect(rendersA).toHaveBeenCalledTimes(2);
+    expect(rendersB).toHaveBeenCalledTimes(1);
+    expect(getFilePartCacheEntry('part-b')).toBeUndefined();
+
+    renderer.unmount();
+  });
 });
 
 describe('clearFilePartCache', () => {
-  it('deletes the cache directory and resets in-memory entries', () => {
+  it('deletes the cache directory and resets in-memory entries', async () => {
     cacheFilePart('part-clear', {
       url: 'data:application/pdf;base64,QUJD',
       mime: 'application/pdf',
       filename: 'report.pdf',
     });
-    expect(getFilePartCacheEntry('part-clear')?.url).toBe(
-      'file:///cache/session-file-parts/part-clear-report.pdf'
-    );
+    await vi.waitFor(() => {
+      expect(getFilePartCacheEntry('part-clear')?.url).toBe(
+        'file:///cache/session-file-parts/part-clear-report.pdf'
+      );
+    });
 
     clearFilePartCache();
 
@@ -548,5 +596,66 @@ describe('clearFilePartCache', () => {
       clearFilePartCache();
     }).not.toThrow();
     expect(expoFileSystemMock.directoryDelete).not.toHaveBeenCalled();
+  });
+});
+
+describe('cacheFilePart write lifetime', () => {
+  it('returns before the write resolves and publishes the entry only afterwards', async () => {
+    const write = Promise.withResolvers<undefined>();
+    expoFileSystemMock.File.mockImplementationOnce(function FilePending(
+      _directory: { name?: string },
+      filename: string
+    ) {
+      const instance = {
+        uri: `file:///cache/session-file-parts/${filename}`,
+        write: vi.fn(() => write.promise),
+        filename,
+      };
+      fileInstances.push(instance);
+      return instance;
+    });
+
+    cacheFilePart('part-slow', {
+      url: 'data:application/pdf;base64,QUJD',
+      mime: 'application/pdf',
+      filename: 'report.pdf',
+    });
+
+    await drainCacheWrites();
+    expect(getFilePartCacheEntry('part-slow')).toBeUndefined();
+
+    write.resolve(undefined);
+    await vi.waitFor(() => {
+      expect(getFilePartCacheEntry('part-slow')?.url).toBe(
+        'file:///cache/session-file-parts/part-slow-report.pdf'
+      );
+    });
+  });
+
+  it('does not publish a write that resolves after a sign-out reset', async () => {
+    const write = Promise.withResolvers<undefined>();
+    expoFileSystemMock.File.mockImplementationOnce(function FilePending(
+      _directory: { name?: string },
+      filename: string
+    ) {
+      const instance = {
+        uri: `file:///cache/session-file-parts/${filename}`,
+        write: vi.fn(() => write.promise),
+        filename,
+      };
+      fileInstances.push(instance);
+      return instance;
+    });
+
+    cacheFilePart('part-late', {
+      url: 'data:application/pdf;base64,QUJD',
+      mime: 'application/pdf',
+      filename: 'report.pdf',
+    });
+    clearFilePartCache();
+    write.resolve(undefined);
+    await drainCacheWrites();
+
+    expect(getFilePartCacheEntry('part-late')).toBeUndefined();
   });
 });

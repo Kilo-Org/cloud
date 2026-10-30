@@ -17,7 +17,7 @@ import { __resetToolCardImageCacheForTests, cacheToolAttachment } from './tool-c
 type FileInstance = {
   exists: boolean;
   uri: string;
-  writeSync: (content: string) => void;
+  write: (content: string) => Promise<void>;
   filename: string;
 };
 
@@ -35,7 +35,7 @@ const expoFileSystemMock = vi.hoisted(() => {
     const instance = {
       exists: false,
       uri: `file:///cache/tool-card-images/${filename}`,
-      writeSync: vi.fn(),
+      write: vi.fn(() => Promise.resolve()),
       filename,
       directory,
     };

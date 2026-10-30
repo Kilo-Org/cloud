@@ -10,7 +10,7 @@ import { __resetToolCardImageCacheForTests, cacheToolAttachment } from './tool-c
 type FileInstance = {
   exists: boolean;
   uri: string;
-  writeSync: (content: string) => void;
+  write: (content: string) => Promise<void>;
   filename: string;
 };
 
@@ -28,7 +28,7 @@ const expoFileSystemMock = vi.hoisted(() => {
     const instance = {
       exists: false,
       uri: `file:///cache/tool-card-images/${filename}`,
-      writeSync: vi.fn(),
+      write: vi.fn(() => Promise.resolve()),
       filename,
       directory,
     };
@@ -237,20 +237,24 @@ describe('ToolCardImageAttachments mounted', () => {
   });
 
   it('clears a standalone decode failure when the cached URI changes', async () => {
-    seedImageCache();
+    await act(async () => {
+      await Promise.resolve();
+      seedImageCache();
+    });
     const renderer = await mount(makeToolPart([makeAttachment('att-1', 'image/png', '')]));
     const image = renderer.root.find(node => (node.type as string) === 'Image');
     act(() => {
       (image.props.onError as () => void)();
     });
     expect(texts(renderer.root)).toContain('Image unavailable');
-    act(() => {
+    await act(async () => {
       __resetToolCardImageCacheForTests();
       cacheToolAttachment('part-1', {
         mime: 'image/png',
         dataUrl: 'data:image/png;base64,QUJD',
         filename: 'replacement.png',
       });
+      await Promise.resolve();
     });
     expect(previewButtons(renderer.root)).toHaveLength(1);
     expect(texts(renderer.root)).not.toContain('Image unavailable');

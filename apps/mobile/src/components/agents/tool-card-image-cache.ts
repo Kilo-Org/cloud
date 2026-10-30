@@ -1,7 +1,9 @@
 import { Directory, File, Paths } from 'expo-file-system';
-import { useSyncExternalStore } from 'react';
+import { useCallback, useSyncExternalStore } from 'react';
 
 import { getSafeCacheFilename } from '@/lib/share-remote-file';
+
+import { createPartSubscriptions } from './part-subscriptions';
 
 const CACHE_DIR_NAME = 'tool-card-images';
 
@@ -10,34 +12,20 @@ const inFlightOrDone = new Set<string>();
 
 /** Reactive map of partId → file:// URI, updated only after a successful write. */
 const urisByPartId = new Map<string, string>();
-const listeners = new Set<() => void>();
-/** Bumped on every URI map mutation so useSyncExternalStore sees a new snapshot. */
-let urisVersion = 0;
+const subscriptions = createPartSubscriptions();
+/** Bumped by every reset; a write that started before a reset never publishes
+ *  its URI into the next account's map. */
+let cacheGeneration = 0;
 
 let cacheDirectory: Directory | undefined = undefined;
 
-function emitChange(): void {
-  urisVersion += 1;
-  for (const listener of listeners) {
-    listener();
-  }
-}
-
-function subscribe(listener: () => void): () => void {
-  listeners.add(listener);
-  return () => {
-    listeners.delete(listener);
-  };
-}
-
-function getVersionSnapshot(): number {
-  return urisVersion;
-}
-
 function ensureCacheDirectory(): Directory {
   if (!cacheDirectory) {
-    cacheDirectory = new Directory(Paths.cache, CACHE_DIR_NAME);
-    cacheDirectory.create({ idempotent: true, intermediates: true });
+    const directory = new Directory(Paths.cache, CACHE_DIR_NAME);
+    directory.create({ idempotent: true, intermediates: true });
+    // Assign only after create() returns: a directory whose creation threw must
+    // not be memoized, or every later attachment would inherit the failure.
+    cacheDirectory = directory;
   }
   return cacheDirectory;
 }
@@ -102,8 +90,11 @@ function cacheFilenameForAttachment(partId: string, mime: string, filename?: str
 }
 
 function recordUri(partId: string, uri: string): void {
+  if (urisByPartId.get(partId) === uri) {
+    return;
+  }
   urisByPartId.set(partId, uri);
-  emitChange();
+  subscriptions.notify(partId);
 }
 
 /**
@@ -111,6 +102,12 @@ function recordUri(partId: string, uri: string): void {
  * Never throws. First attachment wins for a multi-attachment part (no tool
  * emits multi-attachment parts today; documented, not handled specially beyond
  * the part-id Set which also covers that case).
+ *
+ * The part id is marked synchronously, then the directory, the exists check and
+ * the write run off the caller's turn: `File.write` is the asynchronous API, so
+ * the base64 decode and the disk write of an arbitrarily large attachment never
+ * hold the JS thread that is publishing the stream. The URI is published when
+ * the write resolves.
  *
  * When `filename` is provided (non-image attachments), the cache filename is
  * derived via `getSafeCacheFilename`. When absent (images), the legacy
@@ -121,34 +118,35 @@ export function cacheToolAttachment(
   partId: string,
   { mime, dataUrl, filename }: Readonly<{ mime: string; dataUrl: string; filename?: string }>
 ): void {
-  try {
-    if (inFlightOrDone.has(partId)) {
-      return;
-    }
-    // Mark synchronously so a live-stream pass and a history-replay pass
-    // cannot double-write the same part.
-    inFlightOrDone.add(partId);
-
-    const payload = stripDataUrlBase64Prefix(dataUrl, mime);
-    if (payload === undefined || payload.length === 0) {
-      inFlightOrDone.delete(partId);
-      return;
-    }
-
-    const directory = ensureCacheDirectory();
-    const cacheFilename = cacheFilenameForAttachment(partId, mime, filename);
-    const file = new File(directory, cacheFilename);
-
-    if (file.exists) {
-      recordUri(partId, file.uri);
-      return;
-    }
-
-    file.writeSync(payload, { encoding: 'base64' });
-    recordUri(partId, file.uri);
-  } catch {
-    inFlightOrDone.delete(partId);
+  if (inFlightOrDone.has(partId)) {
+    return;
   }
+  // Mark synchronously so a live-stream pass and a history-replay pass cannot
+  // double-write the same part.
+  inFlightOrDone.add(partId);
+
+  const payload = stripDataUrlBase64Prefix(dataUrl, mime);
+  if (payload === undefined || payload.length === 0) {
+    inFlightOrDone.delete(partId);
+    return;
+  }
+
+  const generation = cacheGeneration;
+  void (async () => {
+    try {
+      const directory = ensureCacheDirectory();
+      const file = new File(directory, cacheFilenameForAttachment(partId, mime, filename));
+      if (!file.exists) {
+        await file.write(payload, { encoding: 'base64' });
+      }
+      if (generation === cacheGeneration) {
+        recordUri(partId, file.uri);
+      }
+    } catch {
+      // A failed create or write clears the mark so the next pass retries.
+      inFlightOrDone.delete(partId);
+    }
+  })();
 }
 
 /**
@@ -169,17 +167,24 @@ export function getToolCardImageUri(partId: string): string | undefined {
 /**
  * Reactive lookup of a cached tool-card image URI.
  * Returns `undefined` until a successful write (or a pre-existing file) is
- * recorded for `partId`.
+ * recorded for `partId`. Each hook subscribes to its own part, so recording one
+ * attachment's URI re-renders only the cards mounted for that part.
  */
 export function useToolCardImageUri(partId: string): string | undefined {
-  useSyncExternalStore(subscribe, getVersionSnapshot, getVersionSnapshot);
-  return urisByPartId.get(partId);
+  const subscribe = useCallback(
+    (listener: () => void) => subscriptions.subscribe(partId, listener),
+    [partId]
+  );
+  const getSnapshot = useCallback(() => urisByPartId.get(partId), [partId]);
+  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
 }
 
 /**
  * Delete the on-disk cache directory (if present) and reset the in-memory
  * maps for sign-out or account switch. Best-effort: a delete failure never
- * throws and never blocks the teardown.
+ * throws. The modern file-system API only deletes synchronously, so this runs
+ * on the teardown's own turn; a write still in flight when it runs sees the
+ * bumped generation and records nothing.
  */
 export function clearToolCardImageCache(): void {
   try {
@@ -190,16 +195,18 @@ export function clearToolCardImageCache(): void {
   } catch {
     // Best-effort cache hygiene; ignore delete failures.
   }
+  cacheGeneration += 1;
   inFlightOrDone.clear();
   urisByPartId.clear();
   cacheDirectory = undefined;
-  emitChange();
+  subscriptions.notifyAll();
 }
 
 /** Test-only: clear in-memory state between cases. */
 export function __resetToolCardImageCacheForTests(): void {
+  cacheGeneration += 1;
   inFlightOrDone.clear();
   urisByPartId.clear();
   cacheDirectory = undefined;
-  emitChange();
+  subscriptions.notifyAll();
 }

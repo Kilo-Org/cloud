@@ -1615,6 +1615,22 @@ describe('security operation ledger (P1-A-08e)', () => {
     expect(mockSettleOperation).not.toHaveBeenCalled();
   });
 
+  it('refuses an admission stored in another organization scope', async () => {
+    mockAdmitOperation.mockResolvedValue({ admission: 'organization_mismatch' });
+
+    await expect(
+      createHandlers().triggerSync.handler({
+        ctx: context,
+        input: { repoFullName: 'kilo/repo', operationKey },
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'operation_key_reuse_mismatch',
+    });
+    expect(mockSubmitManualSecuritySync).not.toHaveBeenCalled();
+    expect(mockSettleOperation).not.toHaveBeenCalled();
+  });
+
   it('never returns a success receipt when the acceptance cannot be recorded', async () => {
     mockAdmitOperation.mockResolvedValue({ admission: 'admitted', row: ledgerRow() });
     mockSubmitManualSecuritySync.mockResolvedValue(accepted);

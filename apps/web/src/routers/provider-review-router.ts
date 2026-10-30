@@ -750,6 +750,8 @@ type ProviderLedgerMutationArgs<T> = ProviderLedgerBase & {
  * - `duplicate_in_flight` / `duplicate_reconcile_in_progress`: CONFLICT
  *   `operation_in_progress` (never re-execute).
  * - `takeover` / `duplicate_reconcile_pending`: reconcile before any effect.
+ * - `organization_mismatch`: CONFLICT `operation_key_reuse_mismatch`; the row
+ *   was admitted in another organization scope and carries no row.
  *
  * Before ANY outcome is honored, the row is compared against the request's
  * intent and resource identity (which embeds the provider-tagged request
@@ -767,6 +769,10 @@ async function runProviderLedgerMutation<T>(
     taxonomy: 'reconcile-first',
     leaseSeconds: PROVIDER_LEDGER_LEASE_SECONDS,
   });
+
+  if (admission.admission === 'organization_mismatch') {
+    throw new TRPCError({ code: 'CONFLICT', message: OPERATION_KEY_REUSE_MISMATCH_MESSAGE });
+  }
 
   if (admission.row.intent !== args.intent || admission.row.resource_key !== args.resourceKey) {
     throw new TRPCError({

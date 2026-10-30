@@ -579,7 +579,8 @@ async function executeSecurityCommandSubmit(args: {
  * re-submit (the Worker owns the sync state, so reconciliation is a re-enqueue
  * under the same key); `duplicate_settled` replays the canonical result;
  * in-flight admissions conflict. Cross-intent key reuse is rejected before any
- * outcome is honored.
+ * outcome is honored, as is a row admitted in another organization scope
+ * (`organization_mismatch`).
  */
 async function runSecurityLedgerSubmit(args: {
   ctx: TRPCContext;
@@ -605,6 +606,12 @@ async function runSecurityLedgerSubmit(args: {
     // While an `admitted` row holds this lease, same-key retries conflict.
     leaseSeconds: 120,
   });
+
+  // A row stored in another organization scope belongs to a different
+  // operation, so it is refused before any outcome is honored.
+  if (admission.admission === 'organization_mismatch') {
+    throw new TRPCError({ code: 'CONFLICT', message: 'operation_key_reuse_mismatch' });
+  }
 
   if (admission.row.intent !== args.intent || admission.row.resource_key !== args.resourceKey) {
     throw new TRPCError({ code: 'CONFLICT', message: 'operation_key_reuse_mismatch' });

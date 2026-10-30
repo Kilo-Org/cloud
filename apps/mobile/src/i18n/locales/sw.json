@@ -2352,7 +2352,7 @@
       "manageProfiles": "Dhibiti wasifu",
       "noProfiles": "Bado hakuna wasifu. Unda moja ili kuongeza vigezo vya mazingira, seva za MCP na ujuzi.",
       "advancedConfig": "Usanidi wa hali ya juu",
-      "advancedConfigDescription": "Teua wasifu ili kupakia usanidi uliohifadhiwa, na usanidi mwenyewe vigeu vya ziada vya mazingira na amri za usanidi",
+      "advancedConfigDescription": "Inatumika kwa kipindi hiki. Kuihifadhi kama wasifu huihifadhi kwa mara ijayo.",
       "saveAsProfile": "Hifadhi kama Wasifu",
       "saveProfileDescription": "Hifadhi vigezo vya sasa vya mazingira na amri za usanidi kama wasifu unaoweza kutumika tena.",
       "profileSummary": "{{vars}} vigezo vya mazingira · {{commands}} amri za usanidi",

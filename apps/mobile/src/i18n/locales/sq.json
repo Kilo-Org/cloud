@@ -2352,7 +2352,7 @@
       "manageProfiles": "Menaxho profilet",
       "noProfiles": "Nuk ka ende profile. Krijo një për të shtuar variabla mjedisi, serverë MCP dhe aftësi.",
       "advancedConfig": "Konfigurimi i avancuar",
-      "advancedConfigDescription": "Zgjidhni një profil për të ngarkuar konfigurimet e ruajtura dhe konfiguroni manualisht variablat shtesë të mjedisit dhe komandat e konfigurimit",
+      "advancedConfigDescription": "Vlen për këtë sesion. Ruajtja si profil e mban për herën tjetër.",
       "saveAsProfile": "Ruaje si profil",
       "saveProfileDescription": "Ruani variablat aktuale të mjedisit dhe komandat e konfigurimit si një profil të ripërdorshëm.",
       "profileSummary": "{{vars}} variablat e mjedisit · {{commands}} komandat e konfigurimit",

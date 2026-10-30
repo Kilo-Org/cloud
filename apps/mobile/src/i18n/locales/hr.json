@@ -2383,7 +2383,7 @@
       "manageProfiles": "Upravljanje profilima",
       "noProfiles": "Još nema profila. Stvorite jedan za dodavanje varijabli okoline, MCP poslužitelja i vještina.",
       "advancedConfig": "Napredna konfiguracija",
-      "advancedConfigDescription": "Odaberite profil za učitavanje spremljenih konfiguracija i ručno konfigurirajte dodatne varijable okruženja i naredbe za postavljanje",
+      "advancedConfigDescription": "Vrijedi za ovu sesiju. Spremanjem kao profil ostaje za sljedeći put.",
       "saveAsProfile": "Spremi kao profil",
       "saveProfileDescription": "Spremite trenutne varijable okruženja i naredbe za postavljanje kao profil za višekratnu upotrebu.",
       "profileSummary": "{{vars}} varijable okruženja · {{commands}} naredbe za postavljanje",

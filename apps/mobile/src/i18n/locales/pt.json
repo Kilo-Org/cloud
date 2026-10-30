@@ -2383,7 +2383,7 @@
       "manageProfiles": "Gerir perfis",
       "noProfiles": "Ainda não há perfis. Crie um para adicionar variáveis de ambiente, servidores MCP e competências.",
       "advancedConfig": "Configuração avançada",
-      "advancedConfigDescription": "Selecione um perfil para carregar configurações guardadas e configure manualmente variáveis de ambiente e comandos de configuração adicionais",
+      "advancedConfigDescription": "Aplica-se a esta sessão. Guardar como perfil mantém-no para a próxima vez.",
       "saveAsProfile": "Guardar como perfil",
       "saveProfileDescription": "Guarde as variáveis de ambiente e os comandos de configuração atuais como um perfil reutilizável.",
       "profileSummary": "{{vars}} variáveis de ambiente · {{commands}} comandos de configuração",

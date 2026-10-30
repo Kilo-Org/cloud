@@ -2352,7 +2352,7 @@
       "manageProfiles": "Profiilide haldamine",
       "noProfiles": "Profiilid veel puuduvad. Looge see keskkonnamuutujate, MCP-serverite ja oskuste lisamiseks.",
       "advancedConfig": "Täpsem konfiguratsioon",
-      "advancedConfigDescription": "Valige salvestatud konfiguratsioonide laadimiseks profiil ja konfigureerige käsitsi täiendavaid keskkonnamuutujaid ja häälestuskäske",
+      "advancedConfigDescription": "Kehtib selle seansi kohta. Profiilina salvestamine jätab selle järgmiseks korraks alles.",
       "saveAsProfile": "Salvesta profiilina",
       "saveProfileDescription": "Salvestage praegused keskkonnamuutujad ja häälestuskäsud korduvkasutatava profiilina.",
       "profileSummary": "{{vars}} keskkonnamuutujad · {{commands}} häälestuskäsud",

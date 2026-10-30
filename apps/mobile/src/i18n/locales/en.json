@@ -2418,7 +2418,7 @@
       "manageProfiles": "Manage profiles",
       "noProfiles": "No profiles yet. Create one to add environment variables, MCP servers, and skills.",
       "advancedConfig": "Advanced Configuration",
-      "advancedConfigDescription": "Select a profile to load saved configurations, and manually configure additional environment variables and setup commands",
+      "advancedConfigDescription": "Applies to this session. Saving a profile keeps it for next time.",
       "saveAsProfile": "Save as Profile",
       "saveProfileDescription": "Save the current environment variables and setup commands as a reusable profile.",
       "profileSummary": "{{vars}} environment variables · {{commands}} setup commands",

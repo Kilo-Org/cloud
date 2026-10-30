@@ -1808,7 +1808,7 @@
       "manageProfiles": "Gestisci i profili",
       "noProfiles": "Nessun profilo ancora. Creane uno per aggiungere variabili di ambiente, server MCP e competenze.",
       "advancedConfig": "Configurazione avanzata",
-      "advancedConfigDescription": "Seleziona un profilo per caricare le configurazioni salvate e configurare manualmente variabili di ambiente aggiuntive e comandi di configurazione",
+      "advancedConfigDescription": "Si applica a questa sessione. Salvarlo come profilo lo conserva per la prossima volta.",
       "saveAsProfile": "Salva come profilo",
       "saveProfileDescription": "Salva le variabili di ambiente correnti e i comandi di configurazione come profilo riutilizzabile.",
       "profileSummary": "{{vars}} variabili di ambiente · {{commands}} comandi di configurazione",

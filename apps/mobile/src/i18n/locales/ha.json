@@ -2352,7 +2352,7 @@
       "manageProfiles": "Sarrafa bayanan martaba",
       "noProfiles": "Babu bayanan martaba tukuna. Ƙirƙiri ɗaya don ƙara masu canjin yanayi, sabar MCP, da ƙwarewa.",
       "advancedConfig": "Babban Kanfigareshan",
-      "advancedConfigDescription": "Zaɓi bayanin martaba don loda ajiyayyun saituna, kuma da hannu saita ƙarin masu canjin yanayi da umarnin saitin",
+      "advancedConfigDescription": "Ya shafi wannan zaman. Ajiye shi azaman bayanan martaba yana kiyaye shi don gaba.",
       "saveAsProfile": "Ajiye azaman Bayanan martaba",
       "saveProfileDescription": "Ajiye masu canjin yanayi na yanzu da saitin umarni azaman bayanin martaba mai sake amfani da shi.",
       "profileSummary": "{{vars}} masu canjin yanayi · {{commands}} umarnin saitin",

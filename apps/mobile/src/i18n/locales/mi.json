@@ -2352,7 +2352,7 @@
       "manageProfiles": "Whakahaere pūkete",
       "noProfiles": "Karekau he pūkete. Waihangahia tetahi hei taapiri i nga taurangi taiao, nga tūmau MCP, me nga pukenga.",
       "advancedConfig": "Whirihoranga Arā Atu Anō",
-      "advancedConfigDescription": "Tīpakohia he kōtaha hei uta i ngā whirihoranga kua tiakina, me te whirihora ā-ringa i etahi atu taurangi taiao me nga whakahau tatūnga",
+      "advancedConfigDescription": "E hāngai ana ki tēnei wātū. Mā te tiaki hei kōtaha ka pupuri mō tērā wā.",
       "saveAsProfile": "Tiaki hei Kōtaha",
       "saveProfileDescription": "Tiakina nga taurangi taiao o naianei me nga whakahau tatūnga hei kōtaha ka taea te whakamahi.",
       "profileSummary": "{{vars}} taurangi taiao · {{commands}} whakahau tatūnga",

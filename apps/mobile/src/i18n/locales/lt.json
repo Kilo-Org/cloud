@@ -2414,7 +2414,7 @@
       "manageProfiles": "Tvarkyti profilius",
       "noProfiles": "Dar nėra profilių. Sukurkite vieną, kad pridėtumėte aplinkos kintamuosius, MCP serverius ir įgūdžius.",
       "advancedConfig": "Išplėstinė konfigūracija",
-      "advancedConfigDescription": "Pasirinkite profilį, kad įkeltumėte išsaugotas konfigūracijas, ir rankiniu būdu sukonfigūruokite papildomus aplinkos kintamuosius bei sąrankos komandas",
+      "advancedConfigDescription": "Taikoma šiai sesijai. Išsaugojus kaip profilį, jis išliks kitam kartui.",
       "saveAsProfile": "Išsaugoti kaip profilį",
       "saveProfileDescription": "Išsaugokite esamus aplinkos kintamuosius ir sąrankos komandas kaip pakartotinai naudojamą profilį.",
       "profileSummary": "{{vars}} aplinkos kintamieji · {{commands}} sąrankos komandos",

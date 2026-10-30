@@ -2352,7 +2352,7 @@
       "manageProfiles": "Kudeatu profilak",
       "noProfiles": "Oraindik ez dago profilik. Sortu bat ingurune-aldagaiak, MCP zerbitzariak eta trebetasunak gehitzeko.",
       "advancedConfig": "Konfigurazio aurreratua",
-      "advancedConfigDescription": "Hautatu profil bat gordetako konfigurazioak kargatzeko eta eskuz konfiguratu ingurune-aldagai gehigarriak eta konfigurazio komandoak",
+      "advancedConfigDescription": "Saio honetarako balio du. Profil gisa gordez gero, hurrengorako gordeko da.",
       "saveAsProfile": "Gorde profil gisa",
       "saveProfileDescription": "Gorde uneko ingurune-aldagaiak eta konfiguratu komandoak profil berrerabilgarri gisa.",
       "profileSummary": "{{vars}} ingurune-aldagaiak · {{commands}} konfigurazio komandoak",

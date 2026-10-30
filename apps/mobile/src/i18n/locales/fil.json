@@ -2352,7 +2352,7 @@
       "manageProfiles": "Pamahalaan ang mga profile",
       "noProfiles": "Wala pang mga profile. Gumawa ng isa upang magdagdag ng mga variable ng kapaligiran, mga server ng MCP, at mga kasanayan.",
       "advancedConfig": "Advanced na kompigurasyon",
-      "advancedConfigDescription": "Pumili ng profile upang i-load ang mga naka-save na configuration, at manu-manong i-configure ang mga karagdagang environment variable at setup command",
+      "advancedConfigDescription": "Nalalapat sa session na ito. Ang pag-save bilang profile ay nagpapanatili nito para sa susunod.",
       "saveAsProfile": "I-save bilang Profile",
       "saveProfileDescription": "I-save ang kasalukuyang mga variable ng kapaligiran at mga command sa pag-setup bilang isang reusable na profile.",
       "profileSummary": "{{vars}} variable ng kapaligiran · {{commands}} utos sa pag-setup",

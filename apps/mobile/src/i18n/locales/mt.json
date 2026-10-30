@@ -2445,7 +2445,7 @@
       "manageProfiles": "Immaniġġja profili",
       "noProfiles": "Għadu l-ebda profil. Oħloq wieħed biex iżżid varjabbli ambjentali, servers MCP, u ħiliet.",
       "advancedConfig": "Konfigurazzjoni Avvanzata",
-      "advancedConfigDescription": "Agħżel profil biex tagħbija konfigurazzjonijiet salvati, u kkonfigura manwalment varjabbli ambjentali addizzjonali u kmandi tas-setup",
+      "advancedConfigDescription": "Japplika għal din is-sessjoni. Is-salvataġġ bħala profil iżommu għall-ħin li jmiss.",
       "saveAsProfile": "Ħlief bħala Profil",
       "saveProfileDescription": "Issejvja l-varjabbli ambjentali attwali u l-kmandi tas-setup bħala profil li jista 'jerġa' jintuża.",
       "profileSummary": "{{vars}} varjabbli ambjentali · {{commands}} kmandi tas-setup",

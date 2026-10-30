@@ -3,7 +3,7 @@ import { createElement, type ReactNode, useState } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { AdvancedConfigPanel } from './advanced-config-panel';
 import { type ProfileSelectorProfile } from './profile-selector-model';
 import { MAX_SETUP_COMMANDS } from '@/components/profiles/profile-commands-model';
@@ -12,6 +12,8 @@ import { type VariableEdit } from '@/components/profiles/profile-variables-model
 const toast = vi.hoisted(() => ({ success: vi.fn(), error: vi.fn() }));
 vi.mock('sonner-native', () => ({ toast }));
 
+const announceForAccessibility = vi.hoisted(() => vi.fn());
+
 const listMock = vi.hoisted(() => ({
   useAgentProfileList: vi.fn(),
   useAgentProfileMutations: vi.fn(),
@@ -19,6 +21,7 @@ const listMock = vi.hoisted(() => ({
 vi.mock('@/lib/hooks/use-agent-profiles', () => listMock);
 
 vi.mock('react-native', () => ({
+  AccessibilityInfo: { announceForAccessibility },
   Platform: { OS: 'ios' },
   Pressable: 'Pressable',
   ScrollView: 'ScrollView',
@@ -128,10 +131,12 @@ function ControlledPanel({
   organizationId,
   initialSelectedProfileId,
   onSelectProfile,
+  onRequestReveal,
 }: {
   organizationId?: string;
   initialSelectedProfileId?: string | null;
   onSelectProfile?: (id: string | null) => void;
+  onRequestReveal?: (contentOffset: number) => void;
 }) {
   const [selectedProfileId, setSelectedProfileId] = useState<string | null>(
     initialSelectedProfileId ?? null
@@ -151,6 +156,7 @@ function ControlledPanel({
     manualCommands,
     onManualVarsChange: setManualVars,
     onManualCommandsChange: setManualCommands,
+    onRequestReveal,
   });
 }
 
@@ -161,6 +167,7 @@ function mount(
     organizationId?: string;
     selectedProfileId?: string | null;
     onSelectProfile?: (id: string | null) => void;
+    onRequestReveal?: (contentOffset: number) => void;
   } = {}
 ) {
   listMock.useAgentProfileList.mockReturnValue(listState(options.list));
@@ -172,6 +179,7 @@ function mount(
         organizationId: options.organizationId,
         initialSelectedProfileId: options.selectedProfileId,
         onSelectProfile: options.onSelectProfile,
+        onRequestReveal: options.onRequestReveal,
       })
     );
   });
@@ -186,6 +194,35 @@ function press(node: TestRenderer.ReactTestInstance | undefined) {
   act(() => {
     (node?.props.onPress as (() => void) | undefined)?.();
   });
+}
+
+/** Fire a layout event, the way the native view reports its frame. */
+function layout(node: TestRenderer.ReactTestInstance, y: number) {
+  act(() => {
+    (node.props.onLayout as (event: { nativeEvent: { layout: { y: number } } }) => void)({
+      nativeEvent: { layout: { y } },
+    });
+  });
+}
+
+/**
+ * The panel root, or the block it renders while expanded, found by the class
+ * token that identifies it inside the panel. Both are the views whose layout
+ * the reveal depends on. Matched by token, not by the whole class list, so a
+ * styling change to either view does not have to be mirrored here.
+ */
+function layoutView(renderer: TestRenderer.ReactTestRenderer, token: string) {
+  const found = renderer.root
+    .findAll(node =>
+      String(node.props.className ?? '')
+        .split(' ')
+        .includes(token)
+    )
+    .find(node => typeof node.props.onLayout === 'function');
+  if (!found) {
+    throw new Error(`no view with layout class ${token}`);
+  }
+  return found;
 }
 
 function byLabel(renderer: TestRenderer.ReactTestRenderer, label: string) {
@@ -271,6 +308,7 @@ function addSecretVariable(renderer: TestRenderer.ReactTestRenderer, key: string
 beforeEach(() => {
   toast.success.mockReset();
   toast.error.mockReset();
+  announceForAccessibility.mockReset();
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
 });
 
@@ -293,6 +331,74 @@ describe('AdvancedConfigPanel', () => {
     expect(texts(renderer)).toContain('Setup commands');
     // No manual config yet, so no Save as Profile.
     expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
+  });
+
+  it('nests the revealed body under the disclosure row it belongs to', () => {
+    const renderer = mount();
+    press(byLabel(renderer, 'Advanced Configuration'));
+
+    // Without the nesting the body's two headings read like the composer's own
+    // top-level sections: same type, same start column, same gap to its control.
+    const body = layoutView(renderer, 'mt-3');
+    expect(String(body.props.className)).toContain('border-s-2');
+    expect(String(body.props.className)).toContain('ps-3');
+  });
+
+  it('reports the disclosure as expanded once it is open', () => {
+    const renderer = mount();
+    expect(byLabel(renderer, 'Advanced Configuration')?.props.accessibilityState).toMatchObject({
+      expanded: false,
+    });
+
+    press(byLabel(renderer, 'Advanced Configuration'));
+
+    expect(byLabel(renderer, 'Advanced Configuration')?.props.accessibilityState).toMatchObject({
+      expanded: true,
+    });
+  });
+
+  it('announces the revealed guidance instead of only growing below the fold', () => {
+    const renderer = mount();
+    press(byLabel(renderer, 'Advanced Configuration'));
+
+    // The composer sits below the fold of the new-session scroll body, so the
+    // reveal rides the shared status channel: a polite live region on Android
+    // and this one announcement on iOS.
+    expect(announceForAccessibility).toHaveBeenCalledWith(
+      i18n.t('agentChat.newSession.advancedConfigDescription')
+    );
+  });
+
+  it('asks the host to reveal the panel once per expansion', () => {
+    const onRequestReveal = vi.fn<(contentOffset: number) => void>();
+    const renderer = mount({ onRequestReveal });
+
+    // The collapsed panel already reports where it sits in the scroll content.
+    layout(layoutView(renderer, 'mt-5'), 812);
+    press(byLabel(renderer, 'Advanced Configuration'));
+    // The reveal waits for the expanded block: a scroll issued at the tap would
+    // clamp against the collapsed content height and move nothing.
+    expect(onRequestReveal).not.toHaveBeenCalled();
+
+    layout(layoutView(renderer, 'mt-3'), 860);
+    expect(onRequestReveal).toHaveBeenCalledTimes(1);
+    expect(onRequestReveal).toHaveBeenCalledWith(812);
+
+    // A later in-panel layout, such as a new command row, must not scroll the
+    // composer under the reader again.
+    layout(layoutView(renderer, 'mt-3'), 900);
+    expect(onRequestReveal).toHaveBeenCalledTimes(1);
+
+    // Collapsing reveals nothing.
+    press(byLabel(renderer, 'Advanced Configuration'));
+    expect(onRequestReveal).toHaveBeenCalledTimes(1);
+
+    // Re-expanding reveals against the offset the panel last reported.
+    press(byLabel(renderer, 'Advanced Configuration'));
+    layout(layoutView(renderer, 'mt-5'), 640);
+    layout(layoutView(renderer, 'mt-3'), 690);
+    expect(onRequestReveal).toHaveBeenCalledTimes(2);
+    expect(onRequestReveal).toHaveBeenLastCalledWith(640);
   });
 
   it('only offers Save as Profile for commands that will be persisted', () => {

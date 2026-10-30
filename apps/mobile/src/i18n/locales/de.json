@@ -1828,7 +1828,7 @@
       "manageProfiles": "Profile verwalten",
       "noProfiles": "Noch keine Profile. Erstelle eins, um Umgebungsvariablen, MCP-Server und Fähigkeiten hinzuzufügen.",
       "advancedConfig": "Erweiterte Konfiguration",
-      "advancedConfigDescription": "Wähle ein Profil aus, um gespeicherte Konfigurationen zu laden und zusätzliche Umgebungsvariablen und Setup-Befehle manuell zu konfigurieren",
+      "advancedConfigDescription": "Gilt für diese Sitzung. Als Profil gespeichert bleibt sie für das nächste Mal erhalten.",
       "saveAsProfile": "Als Profil speichern",
       "saveProfileDescription": "Speichere die aktuellen Umgebungsvariablen und Setup-Befehle als wiederverwendbares Profil.",
       "profileSummary": "{{vars}} Umgebungsvariablen · {{commands}} Setup-Befehle",

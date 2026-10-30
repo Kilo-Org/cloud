@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
 import { toast } from 'sonner-native';
@@ -17,6 +17,7 @@ import {
   type SaveProfileSubmission,
 } from '@/components/agents/save-profile-sheet';
 import { type VariableEdit } from '@/components/profiles/profile-variables-model';
+import { AccessibleStatus } from '@/components/ui/accessible-status';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronUp } from '@/components/ui/icons';
 import { Text } from '@/components/ui/text';
@@ -73,6 +74,15 @@ type AdvancedConfigPanelProps = Readonly<{
   disabled?: boolean;
   /** Opens the repo default-profile bindings when that surface is available. */
   onRepoDefaults?: () => void;
+  /**
+   * Asks the host to scroll the shared composer so the expanded content comes
+   * into view; the argument is this panel's top offset inside that scroll
+   * content, measured from the panel's own layout. Reported once per
+   * expansion, after the expanded block has laid out: the panel sits at the
+   * bottom of a scroll body, so a scroll issued any earlier clamps against the
+   * pre-expansion content height and moves nothing.
+   */
+  onRequestReveal?: (contentOffset: number) => void;
 }>;
 
 /**
@@ -92,6 +102,7 @@ export function AdvancedConfigPanel({
   onManualCommandsChange,
   disabled = false,
   onRepoDefaults,
+  onRequestReveal,
 }: Readonly<AdvancedConfigPanelProps>) {
   const { t } = useTranslation();
   const colors = useThemeColors();
@@ -106,6 +117,13 @@ export function AdvancedConfigPanel({
   const [isExpanded, setIsExpanded] = useState(false);
   const [createdProfile, setCreatedProfile] = useState<ProfileSelectorProfile | null>(null);
   const [isSaveOpen, setIsSaveOpen] = useState(false);
+  // This panel's top inside the composer's scroll content, reported by its
+  // root's layout. Expanding never moves anything above the disclosure row, so
+  // the collapsed measurement still holds when the reveal is requested.
+  const contentOffsetRef = useRef(0);
+  // Set on expand, cleared by the reveal, so later in-panel layouts (a new
+  // variable or command row) never scroll the composer under the reader again.
+  const revealPendingRef = useRef(false);
 
   const orgProfiles = useMemo(() => {
     const base = (list.orgProfiles as readonly ProfileListRow[]).map(profile =>
@@ -202,16 +220,35 @@ export function AdvancedConfigPanel({
     }
   };
 
+  const toggleExpanded = () => {
+    const next = !isExpanded;
+    setIsExpanded(next);
+    revealPendingRef.current = next;
+  };
+  // The reveal runs from the expanded block's first layout, not from the tap:
+  // the block is what grows the scroll content, and a scroll issued before that
+  // layout clamps against the collapsed height and moves nothing.
+  const handleExpandedLayout = () => {
+    if (!revealPendingRef.current) {
+      return;
+    }
+    revealPendingRef.current = false;
+    onRequestReveal?.(contentOffsetRef.current);
+  };
+
   return (
-    <View className="mt-5">
+    <View
+      className="mt-5"
+      onLayout={event => {
+        contentOffsetRef.current = event.nativeEvent.layout.y;
+      }}
+    >
       <Pressable
         className={cn(
           ROW_TARGET_CLASS,
           'flex-row items-center justify-between gap-2 rounded-lg border border-border bg-card px-3 py-2.5 active:opacity-70'
         )}
-        onPress={() => {
-          setIsExpanded(current => !current);
-        }}
+        onPress={toggleExpanded}
         disabled={disabled}
         accessibilityRole="button"
         accessibilityLabel={t('agentChat.newSession.advancedConfig')}
@@ -228,10 +265,16 @@ export function AdvancedConfigPanel({
       </Pressable>
 
       {isExpanded ? (
-        <View className="mt-3 gap-4">
-          <Text className="text-xs text-muted-foreground">
-            {t('agentChat.newSession.advancedConfigDescription')}
-          </Text>
+        // The revealed body is nested under the disclosure row it belongs to: a
+        // start-side rule and one indent step keep its headings from reading as
+        // the composer's own top-level sections. Logical properties, so the
+        // nesting mirrors with the writing direction.
+        <View className="mt-3 gap-4 border-s-2 border-border ps-3" onLayout={handleExpandedLayout}>
+          <AccessibleStatus
+            message={t('agentChat.newSession.advancedConfigDescription')}
+            tone="status"
+            className="text-xs"
+          />
 
           {effectiveVars > 0 || effectiveCommands > 0 ? (
             <Text className="text-xs text-muted-foreground">

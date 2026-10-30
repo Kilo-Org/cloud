@@ -1828,7 +1828,7 @@
       "manageProfiles": "Beheer profielen",
       "noProfiles": "Nog geen profielen. Maak er een om omgevingsvariabelen, MCP-servers en vaardigheden toe te voegen.",
       "advancedConfig": "Geavanceerde configuratie",
-      "advancedConfigDescription": "Selecteer een profiel om opgeslagen configuraties te laden en configureer handmatig aanvullende omgevingsvariabelen en installatieopdrachten",
+      "advancedConfigDescription": "Geldt voor deze sessie. Opslaan als profiel bewaart het voor de volgende keer.",
       "saveAsProfile": "Opslaan als profiel",
       "saveProfileDescription": "Sla de huidige omgevingsvariabelen en installatieopdrachten op als een herbruikbaar profiel.",
       "profileSummary": "{{vars}} omgevingsvariabelen · {{commands}} installatieopdrachten",

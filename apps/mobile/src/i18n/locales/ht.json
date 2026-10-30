@@ -2352,7 +2352,7 @@
       "manageProfiles": "Jere pwofil yo",
       "noProfiles": "Pa gen pwofil ankò. Kreye youn pou ajoute varyab anviwònman, sèvè MCP, ak konpetans.",
       "advancedConfig": "Konfigirasyon avanse",
-      "advancedConfigDescription": "Chwazi yon pwofil pou chaje konfigirasyon ki sove yo, epi manyèlman konfigirasyon varyab anviwònman adisyonèl ak kòmandman konfigirasyon",
+      "advancedConfigDescription": "Sa aplike pou sesyon sa a. Sove l kòm pwofil kenbe l pou pwochen fwa.",
       "saveAsProfile": "Sove kòm pwofil",
       "saveProfileDescription": "Sove varyab anviwònman aktyèl yo ak kòmandman konfigirasyon kòm yon pwofil ki kapab itilize ankò.",
       "profileSummary": "{{vars}} varyab anviwònman · {{commands}} kòmandman konfigirasyon",

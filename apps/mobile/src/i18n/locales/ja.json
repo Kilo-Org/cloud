@@ -1828,7 +1828,7 @@
       "manageProfiles": "プロフィールの管理",
       "noProfiles": "まだプロフィールはありません。環境変数、MCP サーバー、スキルを追加するために作成します。",
       "advancedConfig": "高度な構成",
-      "advancedConfigDescription": "プロフィールを選択して保存された構成をロードし、追加の環境変数とセットアップ コマンドを手動で構成します",
+      "advancedConfigDescription": "このセッションに適用されます。プロフィールとして保存すると、次回も使えます。",
       "saveAsProfile": "プロフィールとして保存",
       "saveProfileDescription": "現在の環境変数とセットアップ コマンドを再利用可能なプロフィールとして保存します。",
       "profileSummary": "{{vars}} 環境変数 · {{commands}} セットアップ コマンド",

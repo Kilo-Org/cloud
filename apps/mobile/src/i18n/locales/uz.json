@@ -2352,7 +2352,7 @@
       "manageProfiles": "Profillarni boshqarish",
       "noProfiles": "Hozircha profil yo'q. Atrof-muhit o'zgaruvchilari, MCP serverlari va ko'nikmalarini qo'shish uchun bitta yarating.",
       "advancedConfig": "Kengaytirilgan konfiguratsiya",
-      "advancedConfigDescription": "Saqlangan konfiguratsiyalarni yuklash va qoʻshimcha muhit oʻzgaruvchilari va sozlash buyruqlarini qoʻlda sozlash uchun profilni tanlang",
+      "advancedConfigDescription": "Bu sessiya uchun amal qiladi. Profil sifatida saqlansa, keyingi safar uchun qoladi.",
       "saveAsProfile": "Profil sifatida saqlash",
       "saveProfileDescription": "Joriy muhit o'zgaruvchilari va sozlash buyruqlarini qayta foydalanish mumkin bo'lgan profil sifatida saqlang.",
       "profileSummary": "{{vars}} muhit o'zgaruvchilari · {{commands}} sozlash buyruqlari",

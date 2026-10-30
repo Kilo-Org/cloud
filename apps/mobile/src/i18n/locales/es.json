@@ -1840,7 +1840,7 @@
       "manageProfiles": "Administrar perfiles",
       "noProfiles": "Aún no hay perfiles. Cree uno para agregar variables de entorno, servidores MCP y habilidades.",
       "advancedConfig": "Configuración avanzada",
-      "advancedConfigDescription": "Seleccione un perfil para cargar configuraciones guardadas y configure manualmente variables de entorno adicionales y comandos de configuración",
+      "advancedConfigDescription": "Se aplica a esta sesión. Guardarlo como perfil lo conserva para la próxima vez.",
       "saveAsProfile": "Guardar como perfil",
       "saveProfileDescription": "Guarde las variables de entorno actuales y los comandos de configuración como un perfil reutilizable.",
       "profileSummary": "{{vars}} variables de entorno · {{commands}} comandos de configuración",

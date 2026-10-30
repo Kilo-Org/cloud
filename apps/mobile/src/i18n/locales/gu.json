@@ -389,7 +389,7 @@
       "expandLinesOfContext_other": "સંદર્ભની {{displayCount}} લીટીઓ બતાવો",
       "expandMoreLines_one": "વધુ {{displayCount}} લીટી બતાવો ({{start}}–{{end}})",
       "expandMoreLines_other": "વધુ {{displayCount}} લીટીઓ બતાવો ({{start}}–{{end}})",
-      "loadedOfTotalFiles_one": "{{total}}માંથી {{loaded}} ફાઇલો લોડ થઈ",
+      "loadedOfTotalFiles_one": "{{total}}માંથી {{loaded}} ફાઇલ લોડ થઈ",
       "loadedOfTotalFiles_other": "{{total}}માંથી {{loaded}} ફાઇલો લોડ થઈ"
     },
     "sideBySide": {
@@ -400,7 +400,7 @@
       "newOnly": "માત્ર નવું: {{text}}",
       "emptyDiffRow": "તફાવતની ખાલી પંક્તિ"
     },
-    "connectionExpired": "GitHub સાથેના જોડાણની મુદત પૂરી થઈ ગઈ છે.",
+    "connectionExpired": "GitHub કનેક્શનની મુદત પૂરી થઈ ગઈ છે.",
     "merge": {
       "merge": "મર્જ",
       "mergeNow": "હવે મર્જ કરો",
@@ -541,12 +541,12 @@
           "retryable": "આ વપરાશકર્તા વિશે ફરિયાદ કરી શકાઈ નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો."
         },
         "mute": {
-          "terminal": "આ વપરાશકર્તાને મ્યુટ કરી શકાતા નથી.",
-          "retryable": "આ વપરાશકર્તાને મ્યુટ કરી શકાયા નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો."
+          "terminal": "આ વપરાશકર્તાને મ્યુટ કરી શકાતો નથી.",
+          "retryable": "આ વપરાશકર્તાને મ્યુટ કરી શકાયો નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો."
         },
         "block": {
-          "terminal": "આ વપરાશકર્તાને બ્લોક કરી શકાતા નથી.",
-          "retryable": "આ વપરાશકર્તાને બ્લોક કરી શકાયા નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો."
+          "terminal": "આ વપરાશકર્તાને બ્લોક કરી શકાતો નથી.",
+          "retryable": "આ વપરાશકર્તાને બ્લોક કરી શકાયો નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો."
         }
       },
       "accessDeniedMessage": "તમને આ PRની ચર્ચા જોવાની પરવાનગી નથી.",
@@ -593,10 +593,10 @@
     },
     "couldNotOpenGitHubAppSettings": "GitHub ઍપનાં સેટિંગ્સ ખોલી શકાયાં નહીં.",
     "installKiloGitHubApp": "Kilo GitHub એપ ઇન્સ્ટોલ કરો",
-    "checkConnection": "જોડાણ તપાસો",
+    "checkConnection": "કનેક્શન તપાસો",
     "couldNotLoadPullRequest": "પુલ રિક્વેસ્ટ લોડ કરી શકાઈ નહીં.",
     "reviewServiceUnavailable": "સેવા અનુપલબ્ધ છે",
-    "reviewServiceUnavailableDescription": "સેવા કામટરપણે અનુપલબ્ધ છે. થોડી વારમાં ફરી પ્રયાસ કરો.",
+    "reviewServiceUnavailableDescription": "સેવા કામચલાઉ રૂપે અનુપલબ્ધ છે. થોડી વારમાં ફરી પ્રયાસ કરો.",
     "description": "વર્ણન",
     "noDescriptionProvided": "કોઈ વર્ણન આપવામાં આવ્યું નથી.",
     "review": "સમીક્ષા",
@@ -681,11 +681,11 @@
       "reconnectTitle": "GitHub સાથે ફરી કનેક્ટ કરો",
       "reconnectDescription": "તમારું GitHub કનેક્શન રદ થયું છે. મોબાઇલ પર પુલ રિક્વેસ્ટની સમીક્ષા ચાલુ રાખવા ફરી કનેક્ટ કરો.",
       "description": "મોબાઇલ પર પુલ રિક્વેસ્ટની સમીક્ષા કરવા તમારું GitHub એકાઉન્ટ કનેક્ટ કરો.",
-      "gitlabDescription": "મોબાઇલ પર મર્જ રિક્વેસ્ટની સમીક્ષા કરવા માટે તમારું GitLab ખાતું કનેક્ટ કરો.",
+      "gitlabDescription": "મોબાઇલ પર મર્જ રિક્વેસ્ટની સમીક્ષા કરવા માટે તમારું GitLab એકાઉન્ટ કનેક્ટ કરો.",
       "bitbucketDescription": "મોબાઇલ પર પુલ રિક્વેસ્ટની સમીક્ષા કરવા માટે આ સંસ્થાને Bitbucket સાથે કનેક્ટ કરો.",
-      "bitbucketOrgOnlyDescription": "તેની Bitbucket પુલ રિક્વેસ્ટની સમીક્ષા કરવા માટે ઉપરનું ખાતું સંસ્થામાં બદલો.",
+      "bitbucketOrgOnlyDescription": "તેની Bitbucket પુલ રિક્વેસ્ટની સમીક્ષા કરવા માટે ઉપરનું એકાઉન્ટ સંસ્થામાં બદલો.",
       "contextLine": "{{organization}} માટે",
-      "contextLinePersonal": "તમારા વ્યક્તિગત ખાતા માટે"
+      "contextLinePersonal": "તમારા વ્યક્તિગત એકાઉન્ટ માટે"
     },
     "screen": {
       "title": "#{{number}}",
@@ -701,15 +701,15 @@
       "pendingComment_other": "મોકલવાની બાકી ટિપ્પણીઓ",
       "submitCountOfTotal": "{{displayTotalCount}}માંથી {{displayFreshCount}} ટિપ્પણીઓ મોકલો",
       "submitReview": "સમીક્ષા મોકલો",
-      "partialPostedMessage": "{{displayFreshCount}} ટિપ્પણીઓ પોસ્ટ થઈ. {{displayStaleCount}} ટિપ્પણીઓ જૂના કમિટ સાથે જોડાયેલી હોવાથી તમારી કતારમાં જ રહી છે.",
+      "partialPostedMessage": "{{displayFreshCount}} ટિપ્પણી(ઓ) પોસ્ટ થઈ. {{displayStaleCount}} ટિપ્પણી(ઓ) જૂના કમિટ સાથે જોડાયેલી હોવાથી તમારી કતારમાં જ રહી છે.",
       "blockedRequestChanges": "ફેરફારો માંગવા માટે સારાંશ અથવા ઓછામાં ઓછી એક ટિપ્પણી ઉમેરો.",
       "blockedComment": "ટિપ્પણી સાથે સમીક્ષા મોકલવા માટે સારાંશ અથવા ઓછામાં ઓછી એક ટિપ્પણી ઉમેરો."
     },
     "reconnectNotice": {
-      "title": "GitHub સાથેના જોડાણની મુદત પૂરી થઈ ગઈ છે.",
+      "title": "GitHub કનેક્શનની મુદત પૂરી થઈ ગઈ છે.",
       "message": "તમારું GitHub કનેક્શન હવે માન્ય નથી. તમારું કનેક્શન ફરી તપાસો — જરૂર પડે તો તમને ફરી કનેક્ટ થવા કહેવામાં આવશે.",
-      "gitlabTitle": "GitLab સાથેના જોડાણની મુદત પૂરી થઈ ગઈ છે.",
-      "bitbucketTitle": "Bitbucket સાથેના જોડાણની મુદત પૂરી થઈ ગઈ છે.",
+      "gitlabTitle": "GitLab કનેક્શનની મુદત પૂરી થઈ ગઈ છે.",
+      "bitbucketTitle": "Bitbucket કનેક્શનની મુદત પૂરી થઈ ગઈ છે.",
       "providerMessage": "તમારું {{provider}} કનેક્શન હવે માન્ય નથી. તમારું કનેક્શન ફરી તપાસો — જરૂર પડે તો તમને ફરી કનેક્ટ થવા કહેવામાં આવશે."
     },
     "eventChips": {
@@ -722,7 +722,7 @@
       "stateOpenApproved": "ખુલ્લી · મંજૂર",
       "stateOpenChangesRequested": "ખુલ્લી · ફેરફારો માંગેલા",
       "stateOpenReviewRequired": "ખુલ્લી · સમીક્ષા જરૂરી",
-      "stateOpen": "ખોલો",
+      "stateOpen": "ખુલ્લી",
       "unknownAuthor": "અજાણ્યો લેખક",
       "commit_one": "કમિટ",
       "commit": "કમિટ",
@@ -781,7 +781,7 @@
     },
     "linkPasteClipboardEmpty": "ક્લિપબોર્ડ ખાલી છે.",
     "linkPasteDenied": "પેસ્ટ કરવાની ઍક્સેસ નકારી દેવામાં આવી. પેસ્ટની મંજૂરી આપો અને ફરી પ્રયત્ન કરો.",
-    "linkPasteNotAPullRequest": "આ પુલ રિક્વેસ્ટ કે મર્જ રિક્વેસ્ટનો લિંક નથી",
+    "linkPasteNotAPullRequest": "આ પુલ રિક્વેસ્ટ કે મર્જ રિક્વેસ્ટની લિંક નથી",
     "announce": {
       "commentPosted": "ટિપ્પણી પોસ્ટ થઈ",
       "commentUpdated": "ટિપ્પણી અપડેટ થઈ",
@@ -792,7 +792,7 @@
     "mutationError": {
       "commentNotPosted": "આ ટિપ્પણી પોસ્ટ કરી શકાતી નથી. કદાચ પસંદ કરેલી લીટી બદલાઈ છે અથવા PR અપડેટ થઈ છે.",
       "reviewNotSubmitted": "આ સમીક્ષા હાલની સ્થિતિમાં મોકલી શકાતી નથી. કદાચ PR બદલાઈ છે અથવા આ તમારી પોતાની પુલ રિક્વેસ્ટ છે, જેની તમે સમીક્ષા કરી શકતા નથી.",
-      "reviewNotSubmittedTerm": "આ સમીક્ષા એવીની એવી સબમિટ થઈ શકે નહીં. કદાચ {{term}} બદલાઈ ગઈ હોય, અથવા તમે તમારી પોતાની {{term}}ની સમીક્ષા કરી શકો નહીં.",
+      "reviewNotSubmittedTerm": "આ સમીક્ષા હાલની સ્થિતિમાં મોકલી શકાતી નથી. કદાચ {{term}} બદલાઈ ગઈ હોય, અથવા તમે તમારી પોતાની {{term}}ની સમીક્ષા કરી શકતા નથી.",
       "couldNotPostComment": "ટિપ્પણી પોસ્ટ કરી શકાઈ નહીં.",
       "couldNotSubmitReview": "સમીક્ષા મોકલી શકાઈ નહીં. તમારું કનેક્શન ચકાસો અને ફરી પ્રયત્ન કરો.",
       "rateLimited": "ઘણી બધી વિનંતીઓ થઈ રહી છે. કૃપા કરીને થોડા સમય પછી ફરી પ્રયાસ કરો.",

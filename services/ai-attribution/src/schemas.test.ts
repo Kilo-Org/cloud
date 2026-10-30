@@ -136,6 +136,30 @@ describe('AttributionsTrackRequestBody', () => {
     expect(() => AttributionsTrackRequestBody.parse(payload)).toThrow();
   });
 
+  it('accepts the placeholder hash the client sends for removed lines', () => {
+    const payload = {
+      ...validPayload(),
+      lines_added: [{ line_number: 3, line_hash: '9f2c0b7d1e4a5c6b8d0f1a2b3c4d5e6f7a8b9c0d' }],
+      lines_removed: [{ line_number: 7, line_hash: '' }],
+    };
+
+    expect(AttributionsTrackRequestBody.parse(payload)).toMatchObject({
+      lines_added: [{ line_number: 3, line_hash: '9f2c0b7d1e4a5c6b8d0f1a2b3c4d5e6f7a8b9c0d' }],
+      lines_removed: [{ line_number: 7, line_hash: '' }],
+    });
+  });
+
+  it('rejects a removed line_hash that is neither a digest nor the placeholder', () => {
+    for (const line_hash of ['constructor', 'a'.repeat(39), 'A'.repeat(40), ' x']) {
+      const payload = {
+        ...validPayload(),
+        lines_removed: [{ line_number: 7, line_hash }],
+      };
+
+      expect(() => AttributionsTrackRequestBody.parse(payload)).toThrow();
+    }
+  });
+
   it('rejects a negative line_number', () => {
     const payload = {
       ...validPayload(),

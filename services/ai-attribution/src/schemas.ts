@@ -2,10 +2,12 @@ import { z } from 'zod';
 
 // Named limits for attribution tracking request validation, sized from the
 // real client payloads: one entry per diff line, up to a whole rewritten file.
-// The line hash is the SHA-1 hex digest of the line, which is what both the
-// client and the web matcher compute.
+// An added line carries the SHA-1 hex digest of its content, which is what both
+// the client and the web matcher compute. A removed line has no content in the
+// new file, so the client sends an empty placeholder hash for it.
 export const MAX_TRACK_LINE_ENTRIES = 2048;
-const LINE_HASH_PATTERN = /^[0-9a-f]{40}$/;
+const ADDED_LINE_HASH_PATTERN = /^[0-9a-f]{40}$/;
+const REMOVED_LINE_HASH_PATTERN = /^(?:[0-9a-f]{40})?$/;
 export const MAX_TRACK_ID_LENGTH = 256;
 // The code-indexing storage layer accepts project identifiers up to this
 // length, so the track schema must admit the same values.
@@ -13,9 +15,16 @@ export const MAX_TRACK_PROJECT_ID_LENGTH = 512;
 export const MAX_TRACK_FILE_PATH_LENGTH = 1024;
 export const MAX_TRACK_BODY_BYTES = 256 * 1024;
 
-const trackLineSchema = z.object({
+const addedLineSchema = z.object({
   line_number: z.number().int().min(0),
-  line_hash: z.string().regex(LINE_HASH_PATTERN, 'Expected a SHA-1 hex line hash'),
+  line_hash: z.string().regex(ADDED_LINE_HASH_PATTERN, 'Expected a SHA-1 hex line hash'),
+});
+
+const removedLineSchema = z.object({
+  line_number: z.number().int().min(0),
+  line_hash: z
+    .string()
+    .regex(REMOVED_LINE_HASH_PATTERN, 'Expected a SHA-1 hex line hash or an empty placeholder'),
 });
 
 export type AttributionsTrackRequestBody = z.infer<typeof AttributionsTrackRequestBody>;
@@ -27,8 +36,8 @@ export const AttributionsTrackRequestBody = z.object({
   file_path: z.string().min(1).max(MAX_TRACK_FILE_PATH_LENGTH),
   status: z.enum(['accepted', 'rejected']),
   task_id: z.string().max(MAX_TRACK_ID_LENGTH).nullable(),
-  lines_added: trackLineSchema.array().max(MAX_TRACK_LINE_ENTRIES),
-  lines_removed: trackLineSchema.array().max(MAX_TRACK_LINE_ENTRIES),
+  lines_added: addedLineSchema.array().max(MAX_TRACK_LINE_ENTRIES),
+  lines_removed: removedLineSchema.array().max(MAX_TRACK_LINE_ENTRIES),
 });
 
 export type OrganizationJWTPayload = z.infer<typeof OrganizationJWTPayload>;

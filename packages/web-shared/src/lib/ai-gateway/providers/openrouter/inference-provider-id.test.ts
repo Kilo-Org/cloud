@@ -5,6 +5,7 @@ import {
   GatewayUserByokProviderIdSchema,
   getVercelUserByokProviderIdForEndpoint,
   isGatewayUserByokProviderId,
+  isVercelUserByokProviderAllowed,
   UserByokProviderIdSchema,
   normalizeVercelInferenceProviderIdForRouting,
   openRouterToVercelInferenceProviderId,
@@ -143,5 +144,35 @@ describe('inference provider ids', () => {
     expect(getVercelUserByokProviderIdForEndpoint('vertexAnthropic')).toBe('vertex');
     expect(getVercelUserByokProviderIdForEndpoint('vertex')).toBe('vertex');
     expect(getVercelUserByokProviderIdForEndpoint('unsupported')).toBeUndefined();
+  });
+});
+
+describe('isVercelUserByokProviderAllowed', () => {
+  test('admits every key when the policy does not restrict providers', () => {
+    expect(isVercelUserByokProviderAllowed('bedrock', undefined)).toBe(true);
+  });
+
+  test('matches keys against OpenRouter provider slugs', () => {
+    const allowed = new Set(['amazon-bedrock', 'google-vertex', 'z-ai', 'mistral']);
+    expect(isVercelUserByokProviderAllowed('bedrock', allowed)).toBe(true);
+    expect(isVercelUserByokProviderAllowed('vertex', allowed)).toBe(true);
+    expect(isVercelUserByokProviderAllowed('zai', allowed)).toBe(true);
+    expect(isVercelUserByokProviderAllowed('codestral', allowed)).toBe(true);
+    expect(isVercelUserByokProviderAllowed('anthropic', allowed)).toBe(false);
+    expect(isVercelUserByokProviderAllowed('moonshotai', new Set())).toBe(false);
+  });
+
+  test('every Vercel provider key can be named on the provider policy screen', () => {
+    for (const providerId of VercelUserByokInferenceProviderIdSchema.options) {
+      expect([providerId, isVercelUserByokProviderAllowed(providerId, new Set())]).toEqual([
+        providerId,
+        false,
+      ]);
+    }
+  });
+
+  test('does not restrict direct BYOK or gateway keys', () => {
+    expect(isVercelUserByokProviderAllowed('synthetic', new Set())).toBe(true);
+    expect(isVercelUserByokProviderAllowed('openrouter', new Set())).toBe(true);
   });
 });

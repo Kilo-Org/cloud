@@ -135,3 +135,35 @@ describe('getTranscriptionProvider', () => {
     expect(result.userByok).toBeNull();
   });
 });
+
+describe('getEmbeddingProvider with an organization provider allow-list', () => {
+  beforeEach(() => {
+    mockedGetModelInferenceUserByokProviders.mockResolvedValue(['openai']);
+    mockedGetBYOKforOrganization.mockResolvedValue([
+      { decryptedAPIKey: 'sk-org', providerId: 'openai' },
+    ]);
+  });
+
+  it('uses a key the allow-list admits', async () => {
+    const result = await getEmbeddingProvider(
+      'openai/text-embedding-3-small',
+      createTestUser(),
+      'org-123',
+      new Set(['openai'])
+    );
+
+    expect(result.provider).toBe(VERCEL_AI_GATEWAY);
+  });
+
+  it('routes to OpenRouter instead of a key outside the allow-list', async () => {
+    const result = await getEmbeddingProvider(
+      'openai/text-embedding-3-small',
+      createTestUser(),
+      'org-123',
+      new Set(['azure'])
+    );
+
+    expect(result.provider).toBe(OPENROUTER);
+    expect(result.userByok).toBeNull();
+  });
+});

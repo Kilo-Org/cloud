@@ -232,9 +232,11 @@ export async function getEffectiveModelDecision(
 
 /**
  * Whether `decision` admits a request served by one of the organization's own inference provider
- * keys: a direct BYOK key in catalog mode, or a provider key sent through Vercel. The organization
- * provider allow-list limits where Kilo's gateways may route prompts, but such a key names a
+ * keys that the provider allow-list cannot restrict: a direct BYOK key in catalog mode, or a
+ * provider key sent through Vercel whose provider has no OpenRouter slug. Such a key names a
  * provider the organization configured itself, so only the model restrictions and grants apply.
+ * Routing drops Vercel provider keys that the allow-list can name but does not admit (see
+ * `isVercelUserByokProviderAllowed`).
  */
 export function allowsInferenceProviderUserByok(decision: EffectiveModelDecision): boolean {
   return decision.allowed || decision.denialSource === 'organization_provider';

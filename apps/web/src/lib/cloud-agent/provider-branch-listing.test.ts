@@ -144,6 +144,18 @@ describe('listProviderRepositoryBranches (github refusals)', () => {
     ).rejects.toMatchObject({ code: 'BAD_GATEWAY' });
   });
 
+  it('keeps a 429 refusal retryable', async () => {
+    mockListGitHubBranches.mockRejectedValue(githubRefusal(429, 'Too Many Requests'));
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'github',
+        userId: 'user_1',
+        repositoryFullName: 'octocat/hello',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_GATEWAY' });
+  });
+
   it('maps a missing repository (404) to NOT_FOUND instead of a 500', async () => {
     mockListGitHubBranches.mockRejectedValue(githubRefusal(404, 'Not Found'));
 
@@ -257,5 +269,127 @@ describe('listProviderRepositoryBranches (gitlab refusals)', () => {
         repositoryFullName: 'group/repo',
       })
     ).rejects.toMatchObject({ code: 'BAD_GATEWAY' });
+  });
+});
+
+/** One healthy organization GitHub installation; `id` orders the walk. */
+function organizationInstallation(id: string, cachedRepository: string | null) {
+  return {
+    ...integrationRow,
+    id,
+    platform: 'github',
+    suspended_at: null,
+    auth_invalid_at: null,
+    repositories: cachedRepository
+      ? [{ id: 1, name: cachedRepository.split('/')[1], full_name: cachedRepository }]
+      : [],
+  } as unknown as PlatformIntegration;
+}
+
+describe('listProviderRepositoryBranches (organization github installations)', () => {
+  const listing = {
+    branches: [
+      { name: 'main', isDefault: true },
+      { name: 'release', isDefault: false },
+    ],
+  };
+
+  // The cache decides the order: the installation that lists the repository
+  // goes first, so an unchanged expectation on the first call pins the walk.
+  beforeEach(() => {
+    mockGetIntegrationsByOrganization.mockResolvedValue([
+      organizationInstallation('intg_first', 'octocat/hello'),
+      organizationInstallation('intg_second', null),
+    ]);
+  });
+
+  it('stops at the first installation when GitHub rate-limits the listing', async () => {
+    mockListGitHubBranches.mockRejectedValue(
+      githubRefusal(403, 'You have exceeded a secondary rate limit.')
+    );
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'github',
+        userId: 'user_1',
+        organizationId: 'org_1',
+        repositoryFullName: 'octocat/hello',
+      })
+    ).rejects.toMatchObject({
+      code: 'BAD_GATEWAY',
+      message: 'GitHub is limiting requests. Try again in a moment.',
+    });
+    expect(mockListGitHubBranches).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops at the first installation when the primary rate limit is exhausted', async () => {
+    mockListGitHubBranches.mockRejectedValue(
+      Object.assign(new Error('API rate limit exceeded'), {
+        status: 403,
+        response: { headers: { 'x-ratelimit-remaining': '0' } },
+      })
+    );
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'github',
+        userId: 'user_1',
+        organizationId: 'org_1',
+        repositoryFullName: 'octocat/hello',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_GATEWAY' });
+    expect(mockListGitHubBranches).toHaveBeenCalledTimes(1);
+  });
+
+  it('treats a 429 refusal as the retryable state, not an unreachable installation', async () => {
+    mockListGitHubBranches.mockRejectedValue(githubRefusal(429, 'Too Many Requests'));
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'github',
+        userId: 'user_1',
+        organizationId: 'org_1',
+        repositoryFullName: 'octocat/hello',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_GATEWAY' });
+    expect(mockListGitHubBranches).toHaveBeenCalledTimes(1);
+  });
+
+  it('still walks past a permission 403 and keeps the install message when every installation refuses', async () => {
+    mockListGitHubBranches.mockRejectedValue(githubRefusal(403, 'Repository access blocked'));
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'github',
+        userId: 'user_1',
+        organizationId: 'org_1',
+        repositoryFullName: 'octocat/hello',
+      })
+    ).rejects.toMatchObject({
+      code: 'NOT_FOUND',
+      message:
+        'This repository is not available in any connected GitHub installation. Install the GitHub App on the account that owns it.',
+    });
+    expect(mockListGitHubBranches).toHaveBeenCalledTimes(2);
+  });
+
+  it('still falls through a 404 to the installation that can list the repository', async () => {
+    mockListGitHubBranches
+      .mockRejectedValueOnce(githubRefusal(404, 'Not Found'))
+      .mockResolvedValueOnce(listing);
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'github',
+        userId: 'user_1',
+        organizationId: 'org_1',
+        repositoryFullName: 'octocat/hello',
+      })
+    ).resolves.toEqual({
+      defaultBranch: 'main',
+      branches: ['main', 'release'],
+      truncated: false,
+    });
+    expect(mockListGitHubBranches).toHaveBeenCalledTimes(2);
   });
 });

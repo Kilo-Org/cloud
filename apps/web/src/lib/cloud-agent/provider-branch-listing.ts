@@ -138,6 +138,19 @@ function refusalStatus(error: unknown): unknown {
   return (error as { status?: unknown } | null)?.status;
 }
 
+/**
+ * A GitHub rate limit, primary or secondary, is transient: it is never a
+ * statement about this installation's access, so it stops a branch listing
+ * instead of being read as a permanent refusal.
+ */
+function githubRateLimitTrpcError(error: unknown): TRPCError {
+  return new TRPCError({
+    code: 'BAD_GATEWAY',
+    message: 'GitHub is limiting requests. Try again in a moment.',
+    cause: error,
+  });
+}
+
 /** A refusal meaning "this installation cannot see that repository" — try the next one. */
 function isRepositoryUnreachable(error: unknown): boolean {
   if (error instanceof TRPCError) return error.code === 'NOT_FOUND' || error.code === 'FORBIDDEN';
@@ -189,6 +202,9 @@ async function listOrganizationGitHubBranches(
       );
       return toListing(branches);
     } catch (error) {
+      // Overloaded 403s arrive here too: a rate limit stops the walk at once
+      // rather than charging every installation and ending in NOT_FOUND.
+      if (isGitHubRateLimitError(error)) throw githubRateLimitTrpcError(error);
       if (!isRepositoryUnreachable(error)) throw error;
       lastError = error;
     }
@@ -219,16 +235,11 @@ async function listGitHubBranches(
   } catch (error) {
     // A blocked or missing repository is GitHub's own refusal, not a server
     // fault: surface it as 403/404 so the caller stops retrying a 500. 403 is
-    // overloaded — a rate-limited request is transient and stays retryable.
+    // overloaded — a rate-limited request is transient and stays retryable,
+    // whether GitHub answers 403 or 429.
+    if (isGitHubRateLimitError(error)) throw githubRateLimitTrpcError(error);
     const status = refusalStatus(error);
     if (status === 403) {
-      if (isGitHubRateLimitError(error)) {
-        throw new TRPCError({
-          code: 'BAD_GATEWAY',
-          message: 'GitHub is limiting requests. Try again in a moment.',
-          cause: error,
-        });
-      }
       throw new TRPCError({
         code: 'FORBIDDEN',
         message: githubRepositoryForbiddenMessage,

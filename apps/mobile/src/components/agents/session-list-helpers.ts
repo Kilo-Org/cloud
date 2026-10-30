@@ -88,11 +88,37 @@ export function normalisePlatformSelection(filter: readonly string[]): string[] 
   return [...new Set(filter.map(platform => knownPlatformBucket(platform) ?? platform))];
 }
 
+/**
+ * Decode every segment of a git URL path. Splitting before decoding keeps an
+ * encoded slash inside its own segment, so the path keeps the boundaries the
+ * raw URL had. A malformed escape (a lone `%` or a truncated sequence) cannot
+ * be decoded, and its raw segment is kept instead of throwing: one bad segment
+ * never blanks the label.
+ */
+function decodePathSegments(path: string): string {
+  return path
+    .split('/')
+    .map(segment => {
+      try {
+        return decodeURIComponent(segment);
+      } catch {
+        return segment;
+      }
+    })
+    .join('/');
+}
+
+/**
+ * Render a git URL as the `owner/repo` path its labels and filter keys show.
+ * Segments are percent-decoded because a session stores the encoded URL while
+ * the repository's own name is the decoded one, and each segment is decoded
+ * once: a name holding a literal `%` stays intact.
+ */
 export function formatGitUrlProject(gitUrl: string): string {
   const sshMatch = /^git@[^:]+:(.+?)(?:\.git)?$/.exec(gitUrl);
   const sshPath = sshMatch?.[1];
   if (sshPath) {
-    return stripGitSuffix(sshPath);
+    return stripGitSuffix(decodePathSegments(sshPath));
   }
 
   const protocolIndex = gitUrl.indexOf('://');
@@ -111,7 +137,7 @@ export function formatGitUrlProject(gitUrl: string): string {
   const projectParts = dashIndex >= 2 ? pathParts.slice(0, dashIndex) : pathParts;
 
   if (projectParts.length >= 2) {
-    return stripGitSuffix(projectParts.join('/'));
+    return stripGitSuffix(decodePathSegments(projectParts.join('/')));
   }
 
   return gitUrl;

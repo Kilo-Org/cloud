@@ -6,8 +6,24 @@
 function formatGitUrlProject(gitUrl: string): string {
   const stripGitSuffix = (value: string) => (value.endsWith('.git') ? value.slice(0, -4) : value);
 
+  // A session stores the encoded URL while a repository's own name is the
+  // decoded one, so each segment is decoded exactly once. Splitting first keeps
+  // an encoded slash inside its own segment, and a malformed escape keeps its
+  // raw segment instead of throwing.
+  const decodePathSegments = (path: string) =>
+    path
+      .split('/')
+      .map(segment => {
+        try {
+          return decodeURIComponent(segment);
+        } catch {
+          return segment;
+        }
+      })
+      .join('/');
+
   const sshPath = /^git@[^:]+:(.+?)(?:\.git)?$/.exec(gitUrl)?.[1];
-  if (sshPath) return stripGitSuffix(sshPath);
+  if (sshPath) return stripGitSuffix(decodePathSegments(sshPath));
 
   const protocolIndex = gitUrl.indexOf('://');
   if (protocolIndex === -1) return gitUrl;
@@ -20,7 +36,9 @@ function formatGitUrlProject(gitUrl: string): string {
   const dashIndex = pathParts.indexOf('-');
   const projectParts = dashIndex >= 2 ? pathParts.slice(0, dashIndex) : pathParts;
 
-  return projectParts.length >= 2 ? stripGitSuffix(projectParts.join('/')) : gitUrl;
+  return projectParts.length >= 2
+    ? stripGitSuffix(decodePathSegments(projectParts.join('/')))
+    : gitUrl;
 }
 
 export function sameGitProject(left: string, right: string): boolean {

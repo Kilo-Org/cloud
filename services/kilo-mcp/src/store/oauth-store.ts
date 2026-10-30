@@ -356,17 +356,18 @@ export class KiloMcpOAuthStore
   }
 
   async purgeExpired(nowIso: string): Promise<number> {
-    return (await this.purgeExpiredWithProgress(nowIso)).deleted;
+    const progress = await this.purgeExpiredWithProgress(nowIso, Number.POSITIVE_INFINITY);
+    return progress.deleted;
   }
 
   /**
-   * Every expired-row delete housekeeping performs, in up to
-   * `PENDING_PURGE_BATCHES_PER_RUN` batches for the pending records. Reports
-   * whether expired pending rows are left, so the caller can finish a large set
-   * over successive runs while keeping each one short.
+   * Every expired-row delete housekeeping performs, in at most `maxBatches`
+   * batches for the pending records. Reports whether expired pending rows are
+   * left, so a caller can keep its run short and finish the rest later.
    */
   private async purgeExpiredWithProgress(
-    nowIso: string
+    nowIso: string,
+    maxBatches: number
   ): Promise<{ deleted: number; moreRemaining: boolean }> {
     this.db
       .delete(oauthRefreshTokenHistory)
@@ -376,7 +377,7 @@ export class KiloMcpOAuthStore
     // retains it. Authenticator rows are long-lived and never purged: the
     // recorded single-use step must outlive the requests it guarded.
     this.db.delete(mcpProtectedRequests).where(lt(mcpProtectedRequests.expires_at, nowIso)).run();
-    return this.drainExpiredPending(nowIso, PENDING_PURGE_BATCHES_PER_RUN);
+    return this.drainExpiredPending(nowIso, maxBatches);
   }
 
   /** Delete expired pending-authorization rows in at most `maxBatches` batches. */
@@ -832,7 +833,10 @@ export class KiloMcpOAuthStore
   async alarm(): Promise<void> {
     let moreRemaining: boolean;
     try {
-      const progress = await this.purgeExpiredWithProgress(new Date().toISOString());
+      const progress = await this.purgeExpiredWithProgress(
+        new Date().toISOString(),
+        PENDING_PURGE_BATCHES_PER_RUN
+      );
       moreRemaining = progress.moreRemaining;
     } catch (error) {
       console.warn(

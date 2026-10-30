@@ -501,6 +501,30 @@ describe('KiloMcpOAuthStore (real drizzle durable-sqlite over node:sqlite)', () 
       }
     });
 
+    it('deletes a large expired set in one call', async () => {
+      const singleDb = new DatabaseSync(':memory:');
+      const recorder: FakeDoStateRecorder = { statements: [], alarms: [] };
+      const singleState = createFakeDoState(singleDb, recorder);
+      const singleStore = new KiloMcpOAuthStore(singleState as never, {} as never);
+      await singleState.whenReady();
+      const expiredCount = PENDING_PURGE_BATCH_SIZE * (PENDING_PURGE_BATCHES_PER_RUN + 2);
+      for (let index = 0; index < expiredCount; index += 1) {
+        await singleStore.createPendingAuthorization(
+          pendingInput({
+            id: `pa-single-${index}`,
+            deviceAuthCode: `PAIR-SINGLE-${index}`,
+            createdAt: EXPIRED,
+            expiresAt: EXPIRED,
+          })
+        );
+      }
+
+      expect(await singleStore.purgeExpired(NOW)).toBe(expiredCount);
+      expect(
+        singleDb.prepare('SELECT count(*) AS n FROM oauth_pending_authorizations').get()?.n
+      ).toBe(0);
+    });
+
     it('finishes a set larger than one run over successive runs', async () => {
       const cappedDb = new DatabaseSync(':memory:');
       const recorder: FakeDoStateRecorder = { statements: [], alarms: [] };

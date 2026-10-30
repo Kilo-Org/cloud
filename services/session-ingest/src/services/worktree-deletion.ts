@@ -40,6 +40,7 @@ type WorktreeDb = Pick<WorkerDb, 'select' | 'insert' | 'update' | 'delete' | 'ex
 
 export const WORKTREE_ACCESS_DENIED = 'worktree_access_denied';
 export const WORKTREE_DELETING = 'worktree_deleting';
+const ORPHAN_SNAPSHOT_READ_CONCURRENCY = 8;
 
 async function deletionDiagnostic<T>(
   operation: 'begin' | 'record_cleanup' | 'complete',
@@ -519,30 +520,37 @@ async function inferChildSessionLineage(
       .orderBy(cli_sessions_v2.session_id)
       .limit(100);
     if (page.length === 0) break;
-    for (const candidate of page) {
-      const rawSnapshot = await withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
-        () =>
-          getSessionIngestDO(env, {
-            kiloUserId: params.kiloUserId,
-            sessionId: candidate.sessionId,
-          }),
-        stub => stub.readKiloSdkSessionSnapshot(),
-        'SessionIngestDO.readKiloSdkSessionSnapshot'
+    for (let index = 0; index < page.length; index += ORPHAN_SNAPSHOT_READ_CONCURRENCY) {
+      const results = await Promise.allSettled(
+        page.slice(index, index + ORPHAN_SNAPSHOT_READ_CONCURRENCY).map(async candidate => {
+          const rawSnapshot = await withDORetry<ReturnType<typeof getSessionIngestDO>, unknown>(
+            () =>
+              getSessionIngestDO(env, {
+                kiloUserId: params.kiloUserId,
+                sessionId: candidate.sessionId,
+              }),
+            stub => stub.readKiloSdkSessionSnapshot(),
+            'SessionIngestDO.readKiloSdkSessionSnapshot'
+          );
+          const outcome = kiloSdkSessionSnapshotOutcomeSchema.safeParse(rawSnapshot);
+          if (!outcome.success) return null;
+          const snapshot = outcome.data;
+          if (snapshot.kind === 'retryable_failure')
+            throw new Error('worktree_child_snapshot_unavailable');
+          if (snapshot.kind !== 'value') return null;
+          const parsed = childSnapshotSchema.safeParse(snapshot.info);
+          return parsed.success &&
+            parsed.data.id === candidate.sessionId &&
+            parsed.data.directory === params.directory &&
+            parsed.data.parentID !== candidate.sessionId
+            ? parsed.data
+            : null;
+        })
       );
-      const outcome = kiloSdkSessionSnapshotOutcomeSchema.safeParse(rawSnapshot);
-      if (!outcome.success) continue;
-      const snapshot = outcome.data;
-      if (snapshot.kind === 'retryable_failure')
-        throw new Error('worktree_child_snapshot_unavailable');
-      if (snapshot.kind !== 'value') continue;
-      const parsed = childSnapshotSchema.safeParse(snapshot.info);
-      if (
-        parsed.success &&
-        parsed.data.id === candidate.sessionId &&
-        parsed.data.directory === params.directory &&
-        parsed.data.parentID !== candidate.sessionId
-      )
-        candidates.set(candidate.sessionId, parsed.data);
+      for (const result of results) {
+        if (result.status === 'rejected') throw result.reason;
+        if (result.value) candidates.set(result.value.id, result.value);
+      }
     }
     cursor = page.at(-1)?.sessionId;
     if (page.length < 100) break;

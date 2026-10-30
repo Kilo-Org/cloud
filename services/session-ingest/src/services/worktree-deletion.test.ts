@@ -859,7 +859,7 @@ describe('durable worktree deletion journal', () => {
     expect(f.members).toEqual([]);
   });
 
-  it('paginates all orphan snapshots and resolves nested lineage independently of row order', async () => {
+  it('bounds parallel orphan snapshot reads across pages and resolves out-of-order nested lineage', async () => {
     const f = database();
     const directory = `/workspace/owner/worktrees/${worktreeId}`;
     for (let index = 1; index <= 205; index++) {
@@ -879,12 +879,119 @@ describe('durable worktree deletion journal', () => {
       });
     }
     await beginWorktreeDeletion(env, params);
-    const recovered = await recordWorktreeCleanup(env, { ...params, directory });
-    expect(recovered.manifest.sessions).toHaveLength(206);
+    const ingest = mocks.ingest.getMockImplementation();
+    if (!ingest) throw new Error('Missing ingest mock');
+    let active = 0;
+    let maximumActive = 0;
+    mocks.ingest.mockImplementation((binding: Env, identity: { sessionId: string }) => {
+      const stub = ingest(binding, identity);
+      return {
+        ...stub,
+        readKiloSdkSessionSnapshot: async () => {
+          active++;
+          maximumActive = Math.max(maximumActive, active);
+          const index = Number(identity.sessionId.slice(4));
+          await new Promise(resolve => setTimeout(resolve, index % 2 === 0 ? 50 : 100));
+          active--;
+          return stub.readKiloSdkSessionSnapshot();
+        },
+      };
+    });
+    vi.useFakeTimers();
+    try {
+      const startedAt = Date.now();
+      const recording = recordWorktreeCleanup(env, { ...params, directory });
+      await vi.runAllTimersAsync();
+      const recovered = await recording;
+      expect(recovered.manifest.sessions).toHaveLength(206);
+      expect(maximumActive).toBe(8);
+      expect(active).toBe(0);
+      expect(Date.now() - startedAt).toBe(2_700);
+      expect(f.candidateQueries).toHaveLength(3);
+      expect(f.snapshotReads).toHaveLength(205);
+      expect(f.snapshotReads.indexOf(kiloId(2))).toBeLessThan(f.snapshotReads.indexOf(kiloId(1)));
+    } finally {
+      vi.useRealTimers();
+    }
     await completeWorktreeDeletion(env, params);
     expect(f.members).toEqual([]);
     expect(f.cleared.size).toBe(206);
   });
+
+  it.each(['rpc', 'snapshot'] as const)(
+    'drains in-flight snapshot reads after a %s failure without reading another batch or committing',
+    async failure => {
+      const f = database();
+      for (let index = 1; index <= 101; index++) {
+        f.members.push({
+          sessionId: kiloId(index),
+          cloudAgentSessionId: null,
+          organizationId: null,
+          worktreeId: null,
+          userId,
+          parentSessionId: null,
+        });
+      }
+      await beginWorktreeDeletion(env, params);
+      const events = [...f.events];
+      const manifest = structuredClone(f.worktrees[0].deletion_manifest);
+      const started: string[] = [];
+      let active = 0;
+      let finished = false;
+      mocks.ingest.mockImplementation((_env: Env, identity: { sessionId: string }) => ({
+        readKiloSdkSessionSnapshot: async () => {
+          started.push(identity.sessionId);
+          active++;
+          try {
+            const first = identity.sessionId === kiloId(1);
+            await new Promise(resolve => setTimeout(resolve, first ? 10 : 100));
+            if (first) {
+              if (failure === 'rpc') throw new Error('snapshot RPC unavailable');
+              return { kind: 'retryable_failure' };
+            }
+            return { kind: 'pending' };
+          } finally {
+            active--;
+          }
+        },
+      }));
+      vi.useFakeTimers();
+      try {
+        const recording = recordWorktreeCleanup(env, {
+          ...params,
+          directory: '/workspace/app',
+        }).then(
+          () => {
+            finished = true;
+            return null;
+          },
+          (error: unknown) => {
+            finished = true;
+            return error;
+          }
+        );
+        await vi.advanceTimersByTimeAsync(10);
+        expect(started).toEqual(Array.from({ length: 8 }, (_, index) => kiloId(index + 1)));
+        expect(active).toBe(7);
+        expect(finished).toBe(false);
+        expect(f.events).toEqual(events);
+        await vi.advanceTimersByTimeAsync(90);
+        expect(await recording).toEqual(
+          new Error(
+            failure === 'rpc' ? 'snapshot RPC unavailable' : 'worktree_child_snapshot_unavailable'
+          )
+        );
+        expect(active).toBe(0);
+        expect(started).toHaveLength(8);
+        expect(f.candidateQueries).toHaveLength(1);
+        expect(f.events).toEqual(events);
+        expect(f.worktrees[0].deletion_manifest).toEqual(manifest);
+        expect(f.worktrees[0].deletion_completed_at).toBeNull();
+      } finally {
+        vi.useRealTimers();
+      }
+    }
+  );
 
   it.each(['worktree', 'scope'])(
     'rejects an established foreign %s reached through a parent pointer',

@@ -51,7 +51,7 @@
     "close": "બંધ કરો",
     "codeReviewer": "કોડ સમીક્ષક",
     "connected": "જોડાયેલું",
-    "couldNotLoadModels": "મોડેલ લોડ કરી શકાયા નહીં.",
+    "couldNotLoadModels": "મોડેલો લોડ કરી શકાયા નહીં.",
     "couldNotLoadRepositories": "રિપોઝિટરીઓ લોડ કરી શકાઈ નહીં.",
     "noRepositoriesFound": "કોઈ રિપોઝિટરી મળી નહીં",
     "critical": "ગંભીર",
@@ -92,7 +92,7 @@
     "contentTruncated": "સામગ્રીનો અમુક ભાગ જ બતાવ્યો છે",
     "copyLink": "લિંક કૉપિ કરો",
     "couldNotLoadOrganizations": "સંસ્થાઓ લોડ કરી શકાઈ નહીં.",
-    "couldNotLoadSessions": "સત્રો લોડ કરી શકાયા નહીં.",
+    "couldNotLoadSessions": "સત્રો લોડ કરી શકાયાં નહીં.",
     "couldnTLoadMore": "વધુ લોડ કરી શકાયું નહીં.",
     "deviceSessions": "ઉપકરણનાં સત્રો",
     "disabled": "બંધ",
@@ -138,7 +138,7 @@
     "sessionExited": "સત્રમાંથી બહાર નીકળ્યા",
     "starting": "શરૂ થઈ રહ્યું છે…",
     "status": "સ્થિતિ",
-    "truncated": "અંશમાત્ર",
+    "truncated": "ટૂંકાવેલું",
     "updated": "અપડેટ થયું",
     "generating": "બનાવી રહ્યું છે…",
     "working": "કામ ચાલુ છે",
@@ -156,7 +156,7 @@
     "couldNotRestart": "ફરી શરૂ કરી શકાયું નહીં",
     "languageSaved": "તમારી ભાષા સાચવાઈ ગઈ છે.",
     "catalogLoadFailed": "ભાષા લોડ કરી શકાઈ નહીં. કૃપા કરીને ફરી પ્રયાસ કરો.",
-    "search": "ભાષાનું નામ",
+    "search": "ભાષાઓ શોધો",
     "noMatches": "કોઈ ભાષા મળી નથી",
     "deviceLanguage": "ઉપકરણની ભાષા",
     "current": "વર્તમાન",
@@ -2961,7 +2961,7 @@
     "agentSessions": "અત્યારે ચાલુ",
     "newCodingTask": "નવું કોડિંગ કાર્ય",
     "newTaskFromPicture": "ચિત્રમાંથી નવું કાર્ય",
-    "explore": "વધુ જાણો",
+    "explore": "અન્વેષણ",
     "seeAll": "બધા જુઓ",
     "noLiveSessions": "અત્યારે કંઈ ચાલી રહ્યું નથી"
   },
@@ -3750,7 +3750,7 @@
       "promptRequired": "એજન્ટ શરૂ કરવા માટે પ્રોમ્પ્ટ જરૂરી છે. પ્રોમ્પ્ટ ઉમેરો અને ફરી ચલાવો.",
       "repositoryRequired": "એજન્ટ શરૂ કરવા માટે રિપોઝિટરી જરૂરી છે. Kilo ખોલો અને એક પસંદ કરો, પછી તેને ફરી ચલાવો.",
       "repositoryUnknown": "Kilo {{repository}} ને GitHub કે GitLab રિપોઝિટરી તરીકે ઓળખતું નથી. Kilo માં બીજી રિપોઝિટરી પસંદ કરો.",
-      "repositoryUnsupported": "{{repository}} એ Bitbucket રિપોઝિટરી છે — એજન્ટ શરૂ કરો હજી તેનો ઉપયોગ કરી શકતું નથી. Kilo માં બીજી રિપોઝિટરી પસંદ કરો."
+      "repositoryUnsupported": "{{repository}} એ Bitbucket રિપોઝિટરી છે — એજન્ટ શરૂ કરવા માટે આ રિપોઝિટરી હજી વાપરી શકાતી નથી. Kilo માં બીજી રિપોઝિટરી પસંદ કરો."
     }
   },
   "launcher": {

@@ -26691,6 +26691,32 @@
     ],
     "searchBlob": "organizations.settings.configureOrganizationDefaultBehavior Configure the organization's default model behavior: a global default, a specific model, or Organization Auto with a fallback. Use to set how the organization picks models by default. organizations settings configureorganizationdefaultbehavior organizationid behavior fallback_model specific_model organizationId behavior fallback_model specific_model"
   },
+  "organizations.settings.getGatewaySettings": {
+    "path": "organizations.settings.getGatewaySettings",
+    "kind": "query",
+    "summary": "Get an organization's AI gateway settings, including whether OpenRouter or the Vercel AI Gateway are disabled and which data region is configured.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "settings",
+      "getgatewaysettings",
+      "organizationid"
+    ],
+    "searchBlob": "organizations.settings.getGatewaySettings Get an organization's AI gateway settings, including whether OpenRouter or the Vercel AI Gateway are disabled and which data region is configured. organizations settings getgatewaysettings organizationid organizationId"
+  },
   "organizations.settings.listAvailableModels": {
     "path": "organizations.settings.listAvailableModels",
     "kind": "query",
@@ -26882,6 +26908,55 @@
       "default_model"
     ],
     "searchBlob": "organizations.settings.updateDefaultModel Set the default model an organization's members use. Use to change the organization-wide default AI model. organizations settings updatedefaultmodel organizationid default_model organizationId default_model"
+  },
+  "organizations.settings.updateGatewaySettings": {
+    "path": "organizations.settings.updateGatewaySettings",
+    "kind": "mutation",
+    "summary": "Change an organization's AI gateway preferences, such as disabling OpenRouter or the Vercel AI Gateway or setting a data region, recording an audit log entry.",
+    "inputSchema": {
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "type": "object",
+      "properties": {
+        "organizationId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        },
+        "disable_openrouter": {
+          "type": "boolean"
+        },
+        "disable_vercel_ai_gateway": {
+          "type": "boolean"
+        },
+        "data_region": {
+          "anyOf": [
+            {
+              "type": "string",
+              "enum": [
+                "eu",
+                "us"
+              ]
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "organizationId"
+      ]
+    },
+    "tags": [
+      "organizations",
+      "settings",
+      "updategatewaysettings",
+      "organizationid",
+      "disable_openrouter",
+      "disable_vercel_ai_gateway",
+      "data_region"
+    ],
+    "searchBlob": "organizations.settings.updateGatewaySettings Change an organization's AI gateway preferences, such as disabling OpenRouter or the Vercel AI Gateway or setting a data region, recording an audit log entry. organizations settings updategatewaysettings organizationid disable_openrouter disable_vercel_ai_gateway data_region organizationId disable_openrouter disable_vercel_ai_gateway data_region"
   },
   "organizations.settings.updateMinimumBalanceAlert": {
     "path": "organizations.settings.updateMinimumBalanceAlert",

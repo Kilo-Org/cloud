@@ -21,10 +21,10 @@ import {
 } from '@kilocode/app-shared/moderation';
 
 /**
- * Length caps for the caller-supplied report metadata that is persisted as-is.
- * They match the longest identifiers the reporting clients can send: UUID
- * message ids, numeric discussion comment ids, provider-prefixed model ids,
- * cloud-agent session ids, and short client labels such as `mobile`/`apple`.
+ * Maximum lengths enforced on the report metadata this router stores. The caps
+ * cover the longest values the reporting clients send: UUID message ids,
+ * numeric discussion comment ids, provider-prefixed model ids, cloud-agent
+ * session ids, and short client labels such as `mobile`/`apple`.
  */
 const TARGET_ID_MAX_LENGTH = 255;
 const MODEL_ID_MAX_LENGTH = 200;

@@ -102,7 +102,7 @@ describe('moderation-router', () => {
     ).rejects.toBeInstanceOf(TRPCError);
   });
 
-  it('refuses report metadata longer than its bound and stores nothing', async () => {
+  it('refuses metadata longer than the declared maximum', async () => {
     const caller = await createCallerForUser(user.id);
     const base = {
       surface: 'ai_output' as const,
@@ -136,7 +136,7 @@ describe('moderation-router', () => {
     expect(rows).toHaveLength(0);
   });
 
-  it('accepts report metadata at the bound and stores it unchanged', async () => {
+  it('accepts metadata at the declared maximum', async () => {
     const caller = await createCallerForUser(user.id);
     const targetId = 't'.repeat(255);
     const modelId = 'm'.repeat(200);

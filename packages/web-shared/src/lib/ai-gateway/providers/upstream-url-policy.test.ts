@@ -84,6 +84,18 @@ describe('findUpstreamUrlViolation', () => {
     expect(failing).toHaveBeenCalledTimes(2);
   });
 
+  it('retries a resolver that throws before returning a promise', async () => {
+    let calls = 0;
+    const resolve = jest.fn((_hostname: string): Promise<string[]> => {
+      calls += 1;
+      if (calls === 1) throw new Error('getaddrinfo EAI_AGAIN');
+      return Promise.resolve(['104.18.2.115']);
+    });
+
+    await expect(check('https://llm.example.com/v1', resolve)).resolves.toBeNull();
+    expect(resolve).toHaveBeenCalledTimes(2);
+  });
+
   it('accepts a host whose first lookup fails transiently', async () => {
     const resolve = jest
       .fn(async (_hostname: string) => ['104.18.2.115'])
@@ -137,6 +149,15 @@ describe('findUpstreamUrlViolation', () => {
     ).rejects.toBe(reason);
     expect(resolve).not.toHaveBeenCalled();
   });
+
+  it('leaves no cached verdict for a host whose lookup reached the deadline', async () => {
+    const stalled = neverResolves();
+    await expect(check('https://slow.example.com/v1', stalled)).resolves.toBe('dns_lookup_failed');
+
+    const healthy = resolvesTo('104.18.2.115');
+    await expect(check('https://slow.example.com/v1', healthy)).resolves.toBeNull();
+    expect(healthy).toHaveBeenCalledTimes(1);
+  }, 10_000);
 
   it('reuses a public verdict but re-resolves a rejected host', async () => {
     const publicResolve = resolvesTo('104.18.2.115');

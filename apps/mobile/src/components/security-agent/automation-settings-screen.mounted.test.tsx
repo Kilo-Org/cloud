@@ -6,7 +6,7 @@ import { createElement } from 'react';
 import { act, TestRenderer } from '@/test/renderer';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { AutomationSettingsScreen } from './automation-settings-screen';
 
 const config = vi.hoisted(() => ({
@@ -21,6 +21,7 @@ const capability = vi.hoisted(() => ({
 const save = vi.hoisted(() => ({
   mutateAsync: vi.fn(),
   isPending: false,
+  options: undefined as { announceSaved?: boolean } | undefined,
 }));
 const trackInteraction = vi.hoisted(() => ({
   mutate: vi.fn(),
@@ -42,8 +43,9 @@ vi.mock('react-native', () => ({
   View: 'View',
   Alert: { alert: vi.fn() },
 }));
-vi.mock('sonner-native', () => ({
-  toast: { success: vi.fn(), error: vi.fn() },
+const toastSuccess = vi.hoisted(() => vi.fn());
+vi.mock('@/lib/a11y/announcing-toast', () => ({
+  announcingToast: { success: (message: string) => toastSuccess(message), error: vi.fn() },
 }));
 vi.mock('@kilocode/app-shared/security-agent', () => ({
   getSettingsDirtyState: () => 'clean',
@@ -51,7 +53,10 @@ vi.mock('@kilocode/app-shared/security-agent', () => ({
 vi.mock('@/lib/hooks/use-security-agent', () => ({
   useSecurityAgentCapability: () => capability,
   useSecurityAgentConfig: () => config,
-  useSaveSecurityAgentConfig: () => save,
+  useSaveSecurityAgentConfig: (_scope: string, options?: { announceSaved?: boolean }) => {
+    save.options = options;
+    return save;
+  },
   useTrackSecurityAgentInteraction: () => trackInteraction,
 }));
 vi.mock('@/lib/hooks/use-settings-back-guard', () => ({
@@ -149,6 +154,7 @@ describe('AutomationSettingsScreen approval gate', () => {
     trackInteraction.mutate.mockClear();
     toggleRows.rows = [];
     saveButton.onSave = null;
+    toastSuccess.mockClear();
   });
 
   it('hydrates the approval toggle from the loaded config', () => {
@@ -171,6 +177,27 @@ describe('AutomationSettingsScreen approval gate', () => {
 
     expect(save.mutateAsync).toHaveBeenCalledWith(
       expect.objectContaining({ autoRemediationRequireApproval: false })
+    );
+  });
+
+  it.each([
+    // The queued count is this screen's own outcome; without one the screen
+    // still confirms the save, so the shared hook must not announce as well.
+    [{ existingFindingsQueuedCount: 3 }, 'securityAgent.automation.queued'],
+    [{}, 'securityAgent.settingsSave.saved'],
+  ])('announces one confirmation for a save result of %j', async (result, expectedKey) => {
+    config.data = enabledConfig();
+    save.mutateAsync.mockResolvedValue(result);
+    renderScreen();
+
+    await act(async () => {
+      await saveButton.onSave?.();
+    });
+
+    expect(save.options?.announceSaved).toBe(false);
+    expect(toastSuccess).toHaveBeenCalledTimes(1);
+    expect(toastSuccess.mock.calls[0]?.[0]).toBe(
+      i18n.t(expectedKey, { count: 3, displayCount: '3' })
     );
   });
 

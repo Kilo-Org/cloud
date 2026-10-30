@@ -1,3 +1,5 @@
+import { hasVisibleComposerText } from '@/lib/composer-text';
+
 /**
  * The uncontrolled prompt input's remount seed. `pending` is the initial and
  * re-armed state while the identity-bound draft loads; `settled` means the
@@ -62,7 +64,7 @@ export function resolveNewSessionPromptSeedDecision(
   return {
     type: 'restore',
     prompt: initialPrompt,
-    hasPrompt: initialPrompt.trim().length > 0,
+    hasPrompt: hasVisibleComposerText(initialPrompt),
     // A share prefill already seeded the first render; only a stored draft
     // needs the remount.
     seed: initialPrompt === sharePrefillText ? 'settled' : 'restore',

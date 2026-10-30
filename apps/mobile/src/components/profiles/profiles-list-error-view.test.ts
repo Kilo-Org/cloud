@@ -1,3 +1,4 @@
+import { RequestDeadlineError } from '@kilocode/event-service';
 import { describe, expect, it } from 'vitest';
 
 import { selectProfilesListErrorView } from './profiles-list-error-view';
@@ -30,6 +31,23 @@ describe('selectProfilesListErrorView', () => {
         titleKey: 'profiles.loadFailed',
       });
     }
+  });
+
+  it('names a deadline abort as a retryable slow response under the list title', () => {
+    expect(
+      selectProfilesListErrorView({
+        error: new RequestDeadlineError(15_000),
+        connectivity: 'online',
+      })
+    ).toEqual({ variant: 'timeout', showRetry: true, titleKey: null });
+    expect(
+      selectProfilesListErrorView({
+        error: Object.assign(new Error('aborted'), {
+          cause: new RequestDeadlineError(15_000),
+        }),
+        connectivity: 'unknown',
+      })
+    ).toEqual({ variant: 'timeout', showRetry: true, titleKey: null });
   });
 
   it('treats a confirmed-offline device as connectivity even for a terminal code', () => {

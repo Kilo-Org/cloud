@@ -5,7 +5,7 @@
 import { isMuseModel } from '@kilocode/web-shared/lib/ai-gateway/providers/meta';
 import { isGeminiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/google';
 import { isGrokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/xai';
-import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import { isOpenAiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import type { AutoFreeModelConfig } from '@kilocode/db/schema-types';
 import { getRandomNumber } from '@kilocode/web-shared/lib/ai-gateway/getRandomNumber';

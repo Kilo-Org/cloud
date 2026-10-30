@@ -14,8 +14,8 @@ import {
   pressMove,
   pressPressable,
   rerenderScreen,
-  testProfile,
-  type TestProfileDetail,
+  testCommands,
+  type TestCommands,
 } from '@/components/profiles/profile-commands-screen.test-helpers';
 import { act } from '@/test/renderer';
 import { waitFor } from '@/test/render-with-providers';
@@ -23,7 +23,7 @@ import { waitFor } from '@/test/render-with-providers';
 const h = vi.hoisted(() => ({
   error: vi.fn(),
   query: {
-    data: undefined as TestProfileDetail | undefined,
+    data: undefined as TestCommands | undefined,
     isError: false,
     isPending: true,
     isRefetching: false,
@@ -42,7 +42,7 @@ vi.mock('@/lib/hooks/use-can-manage-profiles', () => ({
 }));
 
 vi.mock('@/lib/hooks/use-agent-profiles', () => ({
-  useAgentProfile: () => h.query,
+  useAgentProfileCommands: () => h.query,
   useAgentProfileMutations: () => h.mutations,
 }));
 vi.mock('expo-router', () => ({
@@ -51,6 +51,7 @@ vi.mock('expo-router', () => ({
 }));
 vi.mock('sonner-native', () => ({ toast: { error: h.error } }));
 vi.mock('react-native', () => ({
+  Platform: { OS: 'android' },
   View: 'View',
   ScrollView: 'ScrollView',
   Pressable: 'Pressable',
@@ -134,7 +135,7 @@ describe('ProfileCommandsScreen', () => {
   });
 
   it('empty: shows commandsEmpty and the add CTA opens an empty row', async () => {
-    h.query.data = testProfile();
+    h.query.data = testCommands();
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
@@ -147,7 +148,7 @@ describe('ProfileCommandsScreen', () => {
   });
 
   it('happy: a committed row persists the whole list', async () => {
-    h.query.data = testProfile();
+    h.query.data = testCommands();
     h.query.isPending = false;
     h.mutations.setCommands.mutateAsync.mockResolvedValue({ success: true });
 
@@ -166,7 +167,7 @@ describe('ProfileCommandsScreen', () => {
   });
 
   it('happy: moving a row persists the reordered list', async () => {
-    h.query.data = testProfile(['a', 'b']);
+    h.query.data = testCommands(['a', 'b']);
     h.query.isPending = false;
     h.mutations.setCommands.mutateAsync.mockResolvedValue({ success: true });
 
@@ -182,8 +183,58 @@ describe('ProfileCommandsScreen', () => {
     unmount();
   });
 
+  it('counts the characters left near the bound and names the bound at it', async () => {
+    h.query.data = testCommands(['pnpm install']);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+    const counterTexts = () =>
+      findAll(renderer.root, 'Text').filter(
+        node =>
+          typeof node.props.accessibilityLabel === 'string' &&
+          node.props.accessibilityLabel.includes('characters remaining')
+      );
+    const hintTexts = () =>
+      findAll(renderer.root, 'Text')
+        .map(node => node.props.children)
+        .filter((child): child is string => typeof child === 'string');
+
+    // An ordinary command is far from the server bound, so the row stays quiet.
+    expect(counterTexts()).toEqual([]);
+
+    // Near the bound the row counts the room left, as the bare numeral the chat
+    // composer and the new-session prompt show, with the counted sentence as its
+    // accessible name.
+    changeRowText(renderer.root, 0, 'a'.repeat(470));
+    expect(counterTexts().map(node => node.props.children)).toEqual([30]);
+    expect(counterTexts()[0]?.props.accessibilityLabel).toBe('30 characters remaining');
+    expect(hintTexts()).not.toContain('The command is limited to 500 characters');
+
+    // At the bound the sentence replaces the count: a zero count would restate it.
+    changeRowText(renderer.root, 0, 'a'.repeat(500));
+    expect(counterTexts()).toEqual([]);
+    expect(hintTexts()).toContain('The command is limited to 500 characters');
+
+    unmount();
+  });
+
+  it('names the bound for a saved command that already sits on it', async () => {
+    h.query.data = testCommands(['a'.repeat(500)]);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findAll(renderer.root, 'Text').filter(node => node.props.children === 0)).toEqual([]);
+    const hintTexts = findAll(renderer.root, 'Text')
+      .map(node => node.props.children)
+      .filter((child): child is string => typeof child === 'string');
+    expect(hintTexts).toContain('The command is limited to 500 characters');
+
+    unmount();
+  });
+
   it('names each reorder control by its one-based position', async () => {
-    h.query.data = testProfile(['a', 'b', 'c']);
+    h.query.data = testCommands(['a', 'b', 'c']);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
@@ -206,7 +257,7 @@ describe('ProfileCommandsScreen', () => {
   });
 
   it('names each delete control by its one-based position', async () => {
-    h.query.data = testProfile(['a', 'b', 'c']);
+    h.query.data = testCommands(['a', 'b', 'c']);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
@@ -231,7 +282,7 @@ describe('ProfileCommandsScreen', () => {
   });
 
   it('keeps the plain delete label on a blank draft row', async () => {
-    h.query.data = testProfile(['a']);
+    h.query.data = testCommands(['a']);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
@@ -252,7 +303,7 @@ describe('ProfileCommandsScreen', () => {
   });
 
   it('edge: the move buttons are disabled at both ends', async () => {
-    h.query.data = testProfile(['a', 'b', 'c']);
+    h.query.data = testCommands(['a', 'b', 'c']);
     h.query.isPending = false;
 
     const { renderer, unmount } = await mountScreen();
@@ -266,7 +317,7 @@ describe('ProfileCommandsScreen', () => {
   });
 
   it('happy: deleting a row persists the remaining list', async () => {
-    h.query.data = testProfile(['a', 'b']);
+    h.query.data = testCommands(['a', 'b']);
     h.query.isPending = false;
     h.mutations.setCommands.mutateAsync.mockResolvedValue({ success: true });
 
@@ -283,7 +334,7 @@ describe('ProfileCommandsScreen', () => {
   });
 
   it('never persists the blank draft row add() opens', async () => {
-    h.query.data = testProfile(['a']);
+    h.query.data = testCommands(['a']);
     h.query.isPending = false;
     h.mutations.setCommands.mutateAsync.mockResolvedValue({ success: true });
 
@@ -304,7 +355,7 @@ describe('ProfileCommandsScreen', () => {
   });
 
   it('retryable: a failure with no message toasts the fallback and keeps the edit', async () => {
-    h.query.data = testProfile(['a']);
+    h.query.data = testCommands(['a']);
     h.query.isPending = false;
     const error = new Error('placeholder');
     error.message = '';
@@ -322,14 +373,14 @@ describe('ProfileCommandsScreen', () => {
   });
 
   it('preserves edits typed while the saved list refetches', async () => {
-    h.query.data = testProfile(['a']);
+    h.query.data = testCommands(['a']);
     h.query.isPending = false;
     h.mutations.setCommands.mutateAsync.mockResolvedValue({ success: true });
     const { renderer, queryClient, unmount } = await mountScreen();
     changeRowText(renderer.root, 0, 'saved');
     commitRow(renderer.root, 0);
     changeRowText(renderer.root, 0, 'new draft');
-    h.query.data = testProfile(['saved']);
+    h.query.data = testCommands(['saved']);
     act(() => {
       rerenderScreen(renderer, queryClient);
     });
@@ -344,10 +395,10 @@ describe('ProfileCommandsScreen', () => {
   });
 
   it('remounts clean uncontrolled fields when refreshed server values change', async () => {
-    h.query.data = testProfile(['old']);
+    h.query.data = testCommands(['old']);
     h.query.isPending = false;
     const { renderer, queryClient, unmount } = await mountScreen();
-    h.query.data = testProfile(['remote edit']);
+    h.query.data = testCommands(['remote edit']);
     act(() => {
       rerenderScreen(renderer, queryClient);
     });
@@ -356,7 +407,7 @@ describe('ProfileCommandsScreen', () => {
   });
 
   it('ignores a stale refetch until a pending save settles without discarding newer text', async () => {
-    h.query.data = testProfile(['old']);
+    h.query.data = testCommands(['old']);
     h.query.isPending = false;
     const pending = Promise.withResolvers<{ success: boolean }>();
     h.mutations.setCommands.mutateAsync.mockReturnValueOnce(pending.promise);
@@ -364,7 +415,7 @@ describe('ProfileCommandsScreen', () => {
     changeRowText(renderer.root, 0, 'submitted');
     commitRow(renderer.root, 0);
     changeRowText(renderer.root, 0, 'newer draft');
-    h.query.data = testProfile(['old']);
+    h.query.data = testCommands(['old']);
     act(() => {
       rerenderScreen(renderer, queryClient);
     });
@@ -373,7 +424,7 @@ describe('ProfileCommandsScreen', () => {
       pending.resolve({ success: true });
       await pending.promise;
     });
-    h.query.data = testProfile(['submitted']);
+    h.query.data = testCommands(['submitted']);
     act(() => {
       rerenderScreen(renderer, queryClient);
     });
@@ -387,7 +438,7 @@ describe('ProfileCommandsScreen', () => {
   });
 
   it('keeps the rows while a refetch is in flight', async () => {
-    h.query.data = testProfile(['pnpm install']);
+    h.query.data = testCommands(['pnpm install']);
     h.query.isPending = false;
 
     const { renderer, queryClient, unmount } = await mountScreen();
@@ -399,6 +450,27 @@ describe('ProfileCommandsScreen', () => {
     });
 
     expect(findFields(renderer.root)[0]?.props.defaultValue).toBe('pnpm install');
+
+    unmount();
+  });
+
+  it('counts each saved row in its label and leaves a blank draft unnumbered', async () => {
+    h.query.data = testCommands(['pnpm install', 'pnpm build']);
+    h.query.isPending = false;
+
+    const { renderer, unmount } = await mountScreen();
+
+    expect(findFields(renderer.root).map(field => field.props.label)).toEqual([
+      'Command 1',
+      'Command 2',
+    ]);
+
+    pressButton(renderer.root);
+    expect(findFields(renderer.root).map(field => field.props.label)).toEqual([
+      'Command 1',
+      'Command 2',
+      'Command',
+    ]);
 
     unmount();
   });

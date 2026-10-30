@@ -1,4 +1,4 @@
-import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import { isOpenAiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/openai';
 import { isQwenModel } from '@kilocode/web-shared/lib/ai-gateway/providers/qwen';
 import { isGrokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/xai';

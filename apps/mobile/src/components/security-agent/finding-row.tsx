@@ -18,6 +18,7 @@ import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { useStartSecurityAnalysis } from '@/lib/hooks/use-security-findings';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import {
   getSecurityAgentPath,
@@ -184,7 +185,7 @@ export function FindingRow({
   slaEnabled,
   capacityState,
 }: Readonly<FindingRowProps>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { t } = useTranslation();
 
@@ -229,7 +230,7 @@ export function FindingRow({
         accessibilityRole="button"
         accessibilityLabel={accessibilityLabel}
         onPress={() => {
-          router.push(getSecurityAgentPath(scope, `findings/${finding.id}`));
+          pushOnce(getSecurityAgentPath(scope, `findings/${finding.id}`));
         }}
       >
         <Text

@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Cambios",
-    "organizationTrialEnded": "O período de proba da organización rematou e non ten ningún plan activo. Un propietario da organización pode actualizar a facturación en kilo.ai e despois tentalo de novo."
+    "organizationTrialEnded": "O período de proba da organización rematou e non ten ningún plan activo. Un propietario da organización pode actualizar a facturación en kilo.ai e despois tentalo de novo.",
+    "privateRepositoryA11y": "{{name}}, repositorio privado"
   },
   "language": {
     "restarting": "Reiniciando para aplicar o idioma",
@@ -644,7 +645,12 @@
       "loading": "Cargando a caixa de entrada",
       "noReviewRequests": "Non hai solicitudes de revisión",
       "noReviewRequestsDescription": "Aquí aparecen as solicitudes de integración que agardan pola túa revisión. Tamén podes pegar arriba unha ligazón a calquera PR.",
-      "couldNotLoad": "Non se puido cargar a caixa de entrada."
+      "couldNotLoad": "Non se puido cargar a caixa de entrada.",
+      "accessLostTitle": "Non tes acceso a esta organización",
+      "accessLostDescription": "Xa non es membro desta organización, polo que non se poden cargar as súas solicitudes de revisión. Continúa na túa conta persoal para seguir revisando.",
+      "organizationUnavailableTitle": "Esta organización xa non existe",
+      "organizationUnavailableDescription": "Esta organización foi eliminada, polo que non se poden cargar as súas solicitudes de revisión. Continúa na túa conta persoal para seguir revisando.",
+      "continueInPersonal": "Continuar na conta persoal"
     },
     "composer": {
       "commentBodyPlaceholder": "Comentario",
@@ -1513,7 +1519,13 @@
         "change_request_failed": "Erro ao abrir a PR",
         "superseded": "Xa existe"
       },
-      "noProposalsDescription": "As propostas da memoria de revisión aparecerán aquí despois de que Kilo analice as respostas dos responsables do mantemento."
+      "noProposalsDescription": "As propostas da memoria de revisión aparecerán aquí despois de que Kilo analice as respostas dos responsables do mantemento.",
+      "changeRequestInProgress": "Kilo xa está a abrir unha solicitude de incorporación para esta proposta. Téntao de novo dentro dun intre.",
+      "changeRequestNotActionable": "Xa non se pode aprobar esta proposta. Péchaa e actualiza a lista.",
+      "changeRequestNoGitHubAccess": "Ningunha conexión de GitHub ten acceso a este repositorio. Volve conectar GitHub cunha conta que teña acceso a el e téntao de novo.",
+      "changeRequestMissingPermissions": "A aplicación de GitHub de Kilo non pode abrir solicitudes de incorporación neste repositorio. Un propietario do repositorio debe darlle á aplicación permiso de escritura sobre os contidos e as solicitudes de incorporación e, despois, téntao de novo.",
+      "changeRequestFailed": "Kilo non puido abrir a solicitude de incorporación. Téntao de novo dentro dun intre.",
+      "offAction": "A memoria de revisión está desactivada. Actívaa e téntao de novo."
     },
     "manualReview": {
       "title": "Revisión manual",
@@ -1932,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Gardar cambios",
+      "saved": "Axustes gardados",
       "unsavedTitle": "Cambios sen gardar",
       "unsavedMessage": "Queres gardar os cambios antes de saír desta pantalla?",
       "unsavedInvalidMessage": "Estes cambios aínda non se poden gardar. Corríxeos para gardalos ou descártaos para saír."
@@ -2309,6 +2322,8 @@
       "couldNotLoadEnvironment": "Non se puido cargar o teu contorno.",
       "retryLoadingEnvironment": "Volver tentar cargar o contorno",
       "defaultEnvironment": "Contorno predeterminado",
+      "environmentAccessibility": "Escolle un perfil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Escolle un perfil: {{label}}. {{attention}}",
       "leaveChanges": "Manter cambios",
       "commitAndPush": "Confirmar e enviar",
       "startSession": "Iniciar sesión",
@@ -2343,7 +2358,7 @@
       "manageProfiles": "Xestionar perfís",
       "noProfiles": "Aínda non hai perfís. Crea un para engadir variables de ambiente, servidores MCP e habilidades.",
       "advancedConfig": "Configuración avanzada",
-      "advancedConfigDescription": "Seleccione un perfil para cargar configuracións gardadas e configure manualmente variables de ambiente adicionais e comandos de configuración",
+      "advancedConfigDescription": "Aplícase a esta sesión. Gardalo como perfil consérvao para a próxima vez.",
       "saveAsProfile": "Gardar como perfil",
       "saveProfileDescription": "Garda as variables de ambiente actuais e os comandos de configuración como perfil reutilizable.",
       "profileSummary": "{{vars}} variables de ambiente · {{commands}} comandos de configuración",
@@ -2971,7 +2986,9 @@
     "permissionDescription": "Non tes permiso para ver isto.",
     "notFoundDescription": "É posible que este elemento fose eliminado ou que xa non estea dispoñible.",
     "serverTitle": "Non se puido cargar.",
-    "serverDescription": "Produciuse un erro no noso sistema. Téntao de novo."
+    "serverDescription": "Produciuse un erro no noso sistema. Téntao de novo.",
+    "timeoutTitle": "O servidor está tardando demasiado",
+    "timeoutDescription": "A solicitude excedeu o tempo de espera antes de rematar. Téntao de novo."
   },
   "screenHeader": {
     "openMenu": "Abrir o menú",
@@ -3824,7 +3841,9 @@
     "commandsTitle": "Comandos de configuración",
     "addCommand": "Engadir comando",
     "commandLabel": "Comando",
+    "commandLabelPosition": "Comando {{position}}",
     "commandPlaceholder": "p. ex. pnpm install",
+    "commandAtLimit": "O comando está limitado a {{max}} caracteres",
     "commandsEmpty": "Aínda non hai comandos de configuración",
     "commandsSaveFailed": "Non se puideron gardar os comandos de configuración",
     "moveUp": "Moverse cara arriba",
@@ -3842,6 +3861,7 @@
     "skillSaveFailed": "Non se puido gardar a habilidade",
     "skillSourceCustom": "Personalizada",
     "skillSourceMarketplace": "Mercado",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Pega un SKILL.md e o seu nome énchese; engade unha habilidade desde o teu teléfono sen arrastrar e soltar.",
     "skillEditTitle": "Editar habilidade",
     "skillEdit": "Editar habilidade {{name}}",
@@ -3868,6 +3888,7 @@
       "headersHint": "Os valores mostrados como •••• conservan o seu segredo almacenado; substitúe un valor para rotalo. Cambiar a URL require cada valor de novo",
       "nameRequired": "Introduza un nome de servidor",
       "nameInvalid": "O nome só pode usar letras ASCII, números, guións baixos e guións, ata 100 caracteres",
+      "nameConflict": "Xa existe un servidor con este nome",
       "commandRequired": "Introduza un comando",
       "commandTooLong": "Usa como máximo 50 argumentos de 500 caracteres cada un",
       "urlRequired": "Introduza un URL",
@@ -3912,7 +3933,7 @@
       "saveFailed": "Non se puido gardar o axente",
       "deleteFailed": "Non se puido eliminar o axente",
       "nameRequired": "Introduza un nome de axente",
-      "slugRequired": "Introduza unha babosa de axente",
+      "slugRequired": "Introduza un slug de axente",
       "slugInvalid": "Slug debe comezar cunha letra ASCII minúscula e usar só letras ASCII minúsculas, díxitos e guións, ata 50 caracteres",
       "slugConflict": "Ese slug xa o usa un axente integrado ou outro axente deste perfil",
       "edit": "Editar axente {{name}}",
@@ -3948,7 +3969,6 @@
       "repo": "Seleccionar repositorio...",
       "profile": "Seleccione o perfil",
       "remove": "Desvincular",
-      "private": "Privado",
       "search": "Buscar repositorios...",
       "addedToast": "Perfil predeterminado definido para \"{{repo}}\"",
       "addFailed": "Non se puido establecer o perfil predeterminado",

@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Chanjman",
-    "organizationTrialEnded": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Yon pwopriyetè òganizasyon ka mete ajou faktirasyon sou kilo.ai, epi eseye ankò."
+    "organizationTrialEnded": "Esè òganizasyon an fini epi li pa gen okenn plan aktif. Yon pwopriyetè òganizasyon ka mete ajou faktirasyon sou kilo.ai, epi eseye ankò.",
+    "privateRepositoryA11y": "{{name}}, repòsitwa prive"
   },
   "language": {
     "restarting": "Ap rekòmanse pou itilize lang ou chwazi a",
@@ -644,7 +645,12 @@
       "loading": "Ap chaje bwat resepsyon an",
       "noReviewRequests": "Pa gen demann revizyon",
       "noReviewRequestsDescription": "Demann fizyon k ap tann revizyon ou yo parèt isit la. Ou ka toujou kole nenpòt lyen PR pi wo a.",
-      "couldNotLoad": "Pa t ka chaje bwat resepsyon an."
+      "couldNotLoad": "Pa t ka chaje bwat resepsyon an.",
+      "accessLostTitle": "Pa gen aksè nan òganizasyon sa a ankò",
+      "accessLostDescription": "Ou pa yon manb òganizasyon sa a ankò, kidonk demann revizyon li yo pa ka chaje. Kontinye nan kont pèsonèl ou pou w ka kontinye revize.",
+      "organizationUnavailableTitle": "Òganizasyon sa a pa egziste ankò",
+      "organizationUnavailableDescription": "Òganizasyon sa a efase, kidonk demann revizyon li yo pa ka chaje. Kontinye nan kont pèsonèl ou pou w ka kontinye revize.",
+      "continueInPersonal": "Kontinye nan kont pèsonèl la"
     },
     "composer": {
       "commentBodyPlaceholder": "Kòmantè ou",
@@ -742,7 +748,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Modifye kòmantè ki poko voye e ki pa ajou sou {{location}}",
       "editA11y": "Modifye kòmantè ki poko voye sou {{location}}",
-      "staleHint": "pR a chanje depi ou te ekri sa a.",
+      "staleHint": "PR a chanje depi ou te ekri sa a.",
       "deleteA11y": "Efase kòmantè ki poko voye sou {{location}}",
       "deletedAnnouncement": "Kòmantè ki t ap tann pou voye a efase",
       "noCommentsQueued": "Pa gen kòmantè nan lis atant lan. Revizyon an ap soumèt avèk sèlman aksyon revizyon ki pi wo a.",
@@ -1513,7 +1519,13 @@
         "change_request_failed": "Ouvèti PR la echwe",
         "superseded": "Deja prezan"
       },
-      "noProposalsDescription": "Pwopozisyon memwa revizyon an parèt isit la apre Kilo analize repons moun ki responsab antretyen kòd la."
+      "noProposalsDescription": "Pwopozisyon memwa revizyon an parèt isit la apre Kilo analize repons moun ki responsab antretyen kòd la.",
+      "changeRequestInProgress": "Kilo deja ap ouvri yon pull request pou pwopozisyon sa a. Eseye ankò nan yon ti moman.",
+      "changeRequestNotActionable": "Pwopozisyon sa a pa ka apwouve ankò. Fèmen li epi rafrechi lis la.",
+      "changeRequestNoGitHubAccess": "Okenn koneksyon GitHub pa gen aksè a depo sa a. Rekonekte GitHub ak aksè a li, epi eseye ankò.",
+      "changeRequestMissingPermissions": "Aplikasyon GitHub Kilo a pa ka ouvri pull request nan depo sa a. Yon pwopriyetè depo dwe bay aplikasyon an aksè ekriti sou kontni ak pull request, epi eseye ankò.",
+      "changeRequestFailed": "Kilo pa t ka ouvri pull request la. Eseye ankò nan yon ti moman.",
+      "offAction": "Memwa revizyon an dezaktive. Aktive li, epi eseye ankò."
     },
     "manualReview": {
       "title": "Revizyon manyèl",
@@ -1932,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Anrejistre chanjman yo",
+      "saved": "Paramèt anrejistre",
       "unsavedTitle": "Chanjman ki pa anrejistre",
       "unsavedMessage": "Anrejistre chanjman ou yo anvan ou kite ekran sa a?",
       "unsavedInvalidMessage": "Chanjman sa yo poko ka anrejistre. Korije yo pou anrejistre, oswa jete yo pou kite."
@@ -2309,6 +2322,8 @@
       "couldNotLoadEnvironment": "Nou pa t ka chaje anviwònman ou an.",
       "retryLoadingEnvironment": "Eseye chaje anviwònman an ankò",
       "defaultEnvironment": "Anviwònman pa defo",
+      "environmentAccessibility": "Chwazi yon pwofil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Chwazi yon pwofil: {{label}}. {{attention}}",
       "leaveChanges": "Kite chanjman yo",
       "commitAndPush": "Anrejistre epi voye",
       "startSession": "Kòmanse sesyon an",
@@ -2343,7 +2358,7 @@
       "manageProfiles": "Jere pwofil yo",
       "noProfiles": "Pa gen pwofil ankò. Kreye youn pou ajoute varyab anviwònman, sèvè MCP, ak konpetans.",
       "advancedConfig": "Konfigirasyon avanse",
-      "advancedConfigDescription": "Chwazi yon pwofil pou chaje konfigirasyon ki sove yo, epi manyèlman konfigirasyon varyab anviwònman adisyonèl ak kòmandman konfigirasyon",
+      "advancedConfigDescription": "Sa aplike pou sesyon sa a. Sove l kòm pwofil kenbe l pou pwochen fwa.",
       "saveAsProfile": "Sove kòm pwofil",
       "saveProfileDescription": "Sove varyab anviwònman aktyèl yo ak kòmandman konfigirasyon kòm yon pwofil ki kapab itilize ankò.",
       "profileSummary": "{{vars}} varyab anviwònman · {{commands}} kòmandman konfigirasyon",
@@ -2971,7 +2986,9 @@
     "permissionDescription": "Ou pa gen pèmisyon pou wè sa.",
     "notFoundDescription": "Yo ka retire eleman sa a, oswa li pa disponib ankò.",
     "serverTitle": "Nou pa t ka chaje done yo.",
-    "serverDescription": "Gen yon pwoblèm bò kote nou. Tanpri eseye ankò."
+    "serverDescription": "Gen yon pwoblèm bò kote nou. Tanpri eseye ankò.",
+    "timeoutTitle": "Sèvè a pran twò tan",
+    "timeoutDescription": "Demann lan te depase delè li. Tanpri eseye ankò."
   },
   "screenHeader": {
     "openMenu": "Louvri meni an",
@@ -3824,7 +3841,9 @@
     "commandsTitle": "Enstalasyon kòmandman yo",
     "addCommand": "Ajoute lòd",
     "commandLabel": "Kòmandman",
+    "commandLabelPosition": "Kòmandman {{position}}",
     "commandPlaceholder": "pa ekzanp pnpm install",
+    "commandAtLimit": "Kòmandman an limite a {{max}} karaktè",
     "commandsEmpty": "Pa gen lòd konfigirasyon ankò",
     "commandsSaveFailed": "Pa t 'kapab sove lòd konfigirasyon",
     "moveUp": "Deplase moute",
@@ -3842,6 +3861,7 @@
     "skillSaveFailed": "Pa t 'kapab sove konpetans",
     "skillSourceCustom": "Pèsonalize",
     "skillSourceMarketplace": "Mache",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Kole yon SKILL.md epi non li ranpli; ajoute yon konpetans nan telefòn ou san yo pa trennen ak gout.",
     "skillEditTitle": "Edit konpetans",
     "skillEdit": "Edit konpetans {{name}}",
@@ -3868,6 +3888,7 @@
       "headersHint": "Valè ki parèt kòm •••• kenbe sekrè ki sere yo; ranplase yon valè pou w renouvle l. Chanje URL la mande tout valè yo ankò",
       "nameRequired": "Antre yon non sèvè",
       "nameInvalid": "Non ka itilize sèlman lèt ASCII, nimewo, tirè ba ak tire, jiska 100 karaktè",
+      "nameConflict": "Yon sèvè ki gen non sa a deja egziste",
       "commandRequired": "Antre yon lòd",
       "commandTooLong": "Sèvi ak pa plis pase 50 agiman, chak 500 karaktè",
       "urlRequired": "Antre yon URL",
@@ -3875,7 +3896,7 @@
       "urlTooLong": "URL la dwe gen 2048 karaktè oswa mwens",
       "jsonInvalid": "Antre JSON valab - yon objè ki gen valè fisèl",
       "jsonTooLarge": "Sèvi ak pa plis pase 50 antre, kle jiska 128 ak valè jiska 4096 karaktè",
-      "timeoutInvalid": "Timeout dwe yon kantite antye milisgond",
+      "timeoutInvalid": "Delè a dwe yon nonb antye milisegond.",
       "edit": "Edit sèvè MCP {{name}}",
       "delete": "Efase sèvè MCP {{name}}",
       "saveFailed": "Pa t 'kapab sove sèvè MCP",
@@ -3948,7 +3969,6 @@
       "repo": "Chwazi depo...",
       "profile": "Chwazi pwofil",
       "remove": "Demare",
-      "private": "Prive",
       "search": "Chèche depo...",
       "addedToast": "Default pwofil mete pou \"{{repo}}\"",
       "addFailed": "Pa t 'kapab mete pwofil default",

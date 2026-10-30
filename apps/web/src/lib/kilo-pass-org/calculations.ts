@@ -113,6 +113,25 @@ export function bridgeRatio(
   return { numerator, denominator };
 }
 
+/**
+ * The pricing basis of an issuance window: the anchored agreement month it belongs to, and
+ * whether it covers that whole month. A narrower window is priced against the month.
+ */
+export function issuanceBasis(
+  anchor: Date,
+  window: IssuanceWindow
+): { kind: 'regular' | 'bridge'; prorationWindow: IssuanceWindow } {
+  if (window.end <= window.start) throw new Error('window must have a positive duration');
+  const prorationWindow = monthlyWindowContaining(anchor, window.start);
+  if (window.end > prorationWindow.end) {
+    throw new Error('issuance window is not within an agreement month');
+  }
+  const regular =
+    window.start.getTime() === prorationWindow.start.getTime() &&
+    window.end.getTime() === prorationWindow.end.getTime();
+  return { kind: regular ? 'regular' : 'bridge', prorationWindow };
+}
+
 export function roundHalfUpMicrodollars(
   value: number,
   numerator: number,

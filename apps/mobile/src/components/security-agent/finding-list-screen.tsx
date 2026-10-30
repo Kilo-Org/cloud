@@ -35,6 +35,7 @@ import {
 } from '@/lib/hooks/use-security-agent';
 import { useSecurityFindings } from '@/lib/hooks/use-security-findings';
 import { useRouteForegroundRefresh } from '@/lib/hooks/use-route-foreground-refresh';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { isSecurityFindingAnalyzable, type SecurityFinding } from '@/lib/security-agent';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
@@ -83,6 +84,7 @@ const FindingRowSeparator = () => <View className="h-3" />;
 
 export function FindingListScreen({ scope, routeParams }: Readonly<FindingListScreenProps>) {
   const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const paddingBottom = useTabBarBottomPadding();
   const { t } = useTranslation();
@@ -172,7 +174,7 @@ export function FindingListScreen({ scope, routeParams }: Readonly<FindingListSc
         headerRight={
           <IconButton
             onPress={() => {
-              router.push({
+              pushOnce({
                 pathname: '/(app)/security-agent/[scope]/filter',
                 params: { scope, ...toSecurityFindingParams(filters) },
               });

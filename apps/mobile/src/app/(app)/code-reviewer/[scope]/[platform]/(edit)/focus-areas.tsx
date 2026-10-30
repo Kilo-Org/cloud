@@ -3,6 +3,7 @@ import { View } from 'react-native';
 import { useTranslation } from 'react-i18next';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
+import { QueryError } from '@/components/query-error';
 import { ScreenHeader } from '@/components/screen-header';
 import { Text } from '@/components/ui/text';
 import { ChoiceRow } from '@/components/ui/choice-row';
@@ -13,6 +14,7 @@ import {
   useReviewConfigCacheReader,
   useSaveReviewConfig,
 } from '@/lib/hooks/use-code-reviewer';
+import { reviewConfigFailure, useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
 import { useReviewerRouteParams } from '@/lib/hooks/use-reviewer-route-params';
 
 export default function FocusAreasRoute() {
@@ -27,11 +29,14 @@ function FocusAreasScreen({
   scope,
   platform,
 }: Readonly<{ scope: string; platform: ReviewerPlatform }>) {
-  const { data } = useReviewConfig(scope, platform);
+  const config = useReviewConfig(scope, platform);
+  const configBody = useReviewConfigBody(config);
+  const { data } = config;
+  const failure = reviewConfigFailure(configBody, config.isFetching);
   const save = useSaveReviewConfig(scope, platform);
   const readConfig = useReviewConfigCacheReader(scope, platform);
   const selected = data?.focusAreas ?? [];
-  const disabled = data == null;
+  const disabled = configBody.body.status !== 'ready';
   const { t } = useTranslation();
   const areaLabels = {
     security: 'codeReviewer.focusArea.security',
@@ -63,37 +68,51 @@ function FocusAreasScreen({
   return (
     <View className="flex-1 bg-background">
       <ScreenHeader title={t('codeReviewer.focusAreas.title')} />
-      <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
-        <Text variant="muted" className="mb-2 text-xs">
-          {t('codeReviewer.focusAreas.hint')}
-        </Text>
-        {REVIEW_FOCUS_AREAS.map(area => (
-          <ChoiceRow
-            key={area}
-            label={t(areaLabels[area])}
-            multi
-            selected={selected.includes(area)}
-            disabled={disabled}
-            className="border-b-[0.5px] border-hair-soft"
-            onPress={() => {
-              toggleArea(area);
-            }}
-          />
-        ))}
-        {unknownAreas.map(area => (
-          <ChoiceRow
-            key={area}
-            label={t('codeReviewer.focusArea.unknown', { area })}
-            multi
-            selected
-            disabled={disabled}
-            className="border-b-[0.5px] border-hair-soft"
-            onPress={() => {
-              toggleArea(area);
-            }}
-          />
-        ))}
-      </TabScreenScrollView>
+      {failure ? (
+        // A config read that failed, or one that stayed pending with nothing
+        // in flight even after its automatic restart, would otherwise leave
+        // every row disabled with no explanation and no action that resolves
+        // it.
+        <QueryError
+          variant={failure.variant}
+          onRetry={() => {
+            failure.onRetry();
+          }}
+          isRetrying={failure.isRetrying}
+        />
+      ) : (
+        <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
+          <Text variant="muted" className="mb-2 text-xs">
+            {t('codeReviewer.focusAreas.hint')}
+          </Text>
+          {REVIEW_FOCUS_AREAS.map(area => (
+            <ChoiceRow
+              key={area}
+              label={t(areaLabels[area])}
+              multi
+              selected={selected.includes(area)}
+              disabled={disabled}
+              className="border-b-[0.5px] border-hair-soft"
+              onPress={() => {
+                toggleArea(area);
+              }}
+            />
+          ))}
+          {unknownAreas.map(area => (
+            <ChoiceRow
+              key={area}
+              label={t('codeReviewer.focusArea.unknown', { area })}
+              multi
+              selected
+              disabled={disabled}
+              className="border-b-[0.5px] border-hair-soft"
+              onPress={() => {
+                toggleArea(area);
+              }}
+            />
+          ))}
+        </TabScreenScrollView>
+      )}
     </View>
   );
 }

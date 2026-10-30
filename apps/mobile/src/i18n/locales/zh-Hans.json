@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "更改",
-    "organizationTrialEnded": "组织的试用期已结束，且没有生效的套餐。组织所有者可以在 kilo.ai 更新账单信息，然后重试。"
+    "organizationTrialEnded": "组织的试用期已结束，且没有生效的套餐。组织所有者可以在 kilo.ai 更新账单信息，然后重试。",
+    "privateRepositoryA11y": "{{name}}，私有仓库"
   },
   "language": {
     "restarting": "正在重启以应用语言设置",
@@ -1044,6 +1045,12 @@
         "superseded": "已包含"
       },
       "noProposalsDescription": "Kilo 分析维护者回复后，审查记忆建议会显示在这里。",
+      "changeRequestInProgress": "Kilo 已经在为这个建议创建拉取请求。请稍后再试。",
+      "changeRequestNotActionable": "此建议已无法批准。请关闭它并刷新列表。",
+      "changeRequestNoGitHubAccess": "没有可访问此仓库的 GitHub 连接。请重新连接具有此仓库访问权限的 GitHub，然后重试。",
+      "changeRequestMissingPermissions": "Kilo 的 GitHub App 无法在此仓库中创建拉取请求。仓库所有者必须授予该应用对内容和拉取请求的写入权限，然后重试。",
+      "changeRequestFailed": "Kilo 无法创建拉取请求。请稍后再试。",
+      "offAction": "审查记忆已关闭。请开启后重试。",
       "off": "审查记忆已关闭。",
       "on": "审查记忆已开启。",
       "offDescription": "启用审查记忆后，Kilo 可以从维护者的回复中学习，并为 REVIEW.md 提出审查准则建议。",
@@ -1464,6 +1471,7 @@
     },
     "settingsSave": {
       "saveChanges": "保存更改",
+      "saved": "设置已保存",
       "unsavedMessage": "离开此页面前，要保存更改吗？",
       "unsavedInvalidMessage": "这些更改暂时无法保存。请修正后再保存，或放弃更改以离开。",
       "unsavedTitle": "未保存的更改"
@@ -1785,6 +1793,8 @@
       "couldNotLoadEnvironment": "无法加载你的环境。",
       "retryLoadingEnvironment": "重新加载环境",
       "defaultEnvironment": "默认环境",
+      "environmentAccessibility": "选择配置文件：{{label}}",
+      "environmentAccessibilityNeedsAttention": "选择配置文件：{{label}}。{{attention}}",
       "leaveChanges": "保留更改",
       "commitAndPush": "提交并推送",
       "startSession": "开始会话",
@@ -1819,7 +1829,7 @@
       "manageProfiles": "管理配置文件",
       "noProfiles": "还没有配置文件。创建一个以添加环境变量、MCP 服务器和技能。",
       "advancedConfig": "高级配置",
-      "advancedConfigDescription": "选择一个配置文件以加载保存的配置，并手动配置其他环境变量和设置命令",
+      "advancedConfigDescription": "仅对本次会话生效。另存为配置文件可供下次使用。",
       "saveAsProfile": "另存为配置文件",
       "saveProfileDescription": "将当前环境变量和设置命令保存为可重复使用的配置文件。",
       "profileSummary": "{{vars}} 环境变量 · {{commands}} 设置命令",
@@ -2447,7 +2457,9 @@
     "permissionDescription": "你无权查看此内容。",
     "notFoundDescription": "此内容可能已被移除或已无法访问。",
     "serverTitle": "无法加载内容",
-    "serverDescription": "服务出现问题。请重试。"
+    "serverDescription": "服务出现问题。请重试。",
+    "timeoutTitle": "服务器响应缓慢",
+    "timeoutDescription": "请求超时，未能完成。请重试。"
   },
   "screenHeader": {
     "openMenu": "打开菜单",
@@ -2905,6 +2917,11 @@
     },
     "inbox": {
       "couldNotLoad": "无法加载收件箱",
+      "accessLostTitle": "无法访问此组织",
+      "accessLostDescription": "你已不再是此组织的成员，因此无法加载其审查请求。切换到个人账户继续审查。",
+      "organizationUnavailableTitle": "此组织已不存在",
+      "organizationUnavailableDescription": "此组织已被删除，因此无法加载其审查请求。切换到个人账户继续审查。",
+      "continueInPersonal": "继续使用个人账户",
       "loading": "正在加载收件箱",
       "noReviewRequests": "暂无审查请求",
       "noReviewRequestsDescription": "等待你审查的拉取请求会显示在这里。你也可以在上方粘贴任意 PR 链接。",
@@ -3824,7 +3841,9 @@
     "commandsTitle": "设置命令",
     "addCommand": "添加命令",
     "commandLabel": "命令",
+    "commandLabelPosition": "命令 {{position}}",
     "commandPlaceholder": "例如 pnpm install",
+    "commandAtLimit": "命令最多使用 {{max}} 个字符",
     "commandsEmpty": "还没有设置命令",
     "commandsSaveFailed": "无法保存设置命令",
     "moveUp": "向上移动",
@@ -3842,6 +3861,7 @@
     "skillSaveFailed": "无法保存技能",
     "skillSourceCustom": "自定义",
     "skillSourceMarketplace": "市场",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "粘贴一个SKILL.md并填写其名称；从手机添加技能，无需拖放。",
     "skillEditTitle": "编辑技能",
     "skillEdit": "编辑技能 {{name}}",
@@ -3868,6 +3888,7 @@
       "headersHint": "显示为 •••• 的值会保留其已存储的密钥；替换某个值即可轮换。更改网址后，所有值都需重新填写",
       "nameRequired": "输入服务器名称",
       "nameInvalid": "名称只能使用 ASCII 字母、数字、下划线和连字符，最多 100 个字符",
+      "nameConflict": "已存在同名服务器",
       "commandRequired": "输入命令",
       "commandTooLong": "最多使用 50 个参数，每个参数 500 个字符",
       "urlRequired": "输入网址",
@@ -3948,7 +3969,6 @@
       "repo": "选择仓库…",
       "profile": "选择配置文件",
       "remove": "解绑",
-      "private": "私有",
       "search": "搜索仓库…",
       "addedToast": "已为“{{repo}}”设置默认配置文件",
       "addFailed": "无法设置默认配置文件",

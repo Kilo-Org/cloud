@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "بدلونونه",
-    "organizationTrialEnded": "د سازمان آزموینه پای ته رسېدلې ده او هغه هیچ فعال پلان نه لري. د سازمان مالک کولی شي په kilo.ai کې بیلنګ تازه کړي، بیا یو ځل بیا هڅه وکړي."
+    "organizationTrialEnded": "د سازمان آزموینه پای ته رسېدلې ده او هغه هیچ فعال پلان نه لري. د سازمان مالک کولی شي په kilo.ai کې بیلنګ تازه کړي، بیا یو ځل بیا هڅه وکړي.",
+    "privateRepositoryA11y": "{{name}}، شخصي زیرمېنه"
   },
   "language": {
     "restarting": "د ژبې د پلي کولو لپاره بیا پیلېږي",
@@ -644,7 +645,12 @@
       "loading": "راغلې غوښتنې بارېږي",
       "noReviewRequests": "د بیاکتنې هېڅ غوښتنه نشته",
       "noReviewRequestsDescription": "هغه پل ریکویسټونه چې ستاسو بیاکتنې ته په تمه دي، دلته ښکاري. تاسو بیا هم پورته د هر PR لینک نښلولی شئ.",
-      "couldNotLoad": "راغلې غوښتنې بار نه شوې."
+      "couldNotLoad": "راغلې غوښتنې بار نه شوې.",
+      "accessLostTitle": "دې سازمان ته لاسرسی نشته",
+      "accessLostDescription": "تاسو نور د دې سازمان غړی نه یاست، نو د دې د بیاکتنې غوښتنې بار نه شوې. د بیاکتنې د دوام لپاره په خپل شخصي حساب کې دوام ورکړئ.",
+      "organizationUnavailableTitle": "دا سازمان نور شتون نه لري",
+      "organizationUnavailableDescription": "دا سازمان ړنګ شوی، نو د دې د بیاکتنې غوښتنې بار نه شوې. د بیاکتنې د دوام لپاره په خپل شخصي حساب کې دوام ورکړئ.",
+      "continueInPersonal": "په شخصي حساب کې دوام ورکړئ"
     },
     "composer": {
       "commentBodyPlaceholder": "د تبصرې متن",
@@ -1513,7 +1519,13 @@
         "change_request_failed": "PR پرانیستل نه شو",
         "superseded": "لا دمخه شته"
       },
-      "noProposalsDescription": "کله چې Kilo د ساتونکو ځوابونه تحلیل کړي، د بیاکتنې د حافظې وړاندیزونه به دلته ښکاره شي."
+      "noProposalsDescription": "کله چې Kilo د ساتونکو ځوابونه تحلیل کړي، د بیاکتنې د حافظې وړاندیزونه به دلته ښکاره شي.",
+      "changeRequestInProgress": "کیلو لا دمخه د دې وړاندیز لپاره پل ریکوېسټ پرانیزي. یوه شیبه وروسته بیا هڅه وکړئ.",
+      "changeRequestNotActionable": "دا وړاندیز نور نه شي تصویبېدلی. هغه بند کړئ او لیست بیا تازه کړئ.",
+      "changeRequestNoGitHubAccess": "هیڅ GitHub اړیکه پدې ذخیره کې لاسرسی نلري. GitHub بیا د دې ذخیرې لاسرسي سره ونښلوئ، بیا هڅه وکړئ.",
+      "changeRequestMissingPermissions": "د کیلو GitHub اپلیکیشن په دې ذخیره کې پل ریکوېسټونه نه شي پرانیستلی. د ذخیرې مالک باید اپلیکیشن ته د منځپانګې او پل ریکوېسټونو لپاره لیکلو لاسرسی ورکړي، بیا هڅه وکړئ.",
+      "changeRequestFailed": "کیلو پل ریکوېسټ پرانیستلی نشو. یوه شیبه وروسته بیا هڅه وکړئ.",
+      "offAction": "د بیاکتنې حافظه غیرفعاله ده. فعاله یې کړئ، بیا هڅه وکړئ."
     },
     "manualReview": {
       "title": "لاسي بیاکتنه",
@@ -1932,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "بدلونونه خوندي کړئ",
+      "saved": "امستنې خوندي شوې",
       "unsavedTitle": "خوندي نه شوي بدلونونه",
       "unsavedMessage": "له دې پردې څخه تر وتلو مخکې مو بدلونونه خوندي شي؟",
       "unsavedInvalidMessage": "دا بدلونونه لا تر اوسه خوندي کېدای نشي. د خوندي کولو لپاره یې سم کړئ، یا د وتلو لپاره یې لغوه کړئ."
@@ -2309,6 +2322,8 @@
       "couldNotLoadEnvironment": "ستاسو چاپېریال بار نه شو.",
       "retryLoadingEnvironment": "د چاپېریال بارولو بیا هڅه کړئ",
       "defaultEnvironment": "تلواله چاپېریال",
+      "environmentAccessibility": "یو پروفایل غوره کړئ: {{label}}",
+      "environmentAccessibilityNeedsAttention": "یو پروفایل غوره کړئ: {{label}}، {{attention}}",
       "leaveChanges": "بدلونونه پرېږدئ",
       "commitAndPush": "کمیټ او پش کړئ",
       "startSession": "ناسته پیل کړئ",
@@ -2343,7 +2358,7 @@
       "manageProfiles": "پروفایلونه اداره کړئ",
       "noProfiles": "تراوسه هیڅ پروفایل نشته. د چاپیریال متغیرونو، MCP سرورونو، او مهارتونو اضافه کولو لپاره یو جوړ کړئ.",
       "advancedConfig": "پرمختللی ترتیب",
-      "advancedConfigDescription": "د خوندي شوي تشکیلاتو بارولو لپاره پروفایل غوره کړئ ، او په لاسي ډول د چاپیریال اضافي تغیرات او تنظیم کولو کمانډونه تنظیم کړئ",
+      "advancedConfigDescription": "دا دې غونډې ته پلي کېږي. د پروفایل په توګه خوندي کول یې د بل ځل لپاره ساتي.",
       "saveAsProfile": "د پروفایل په توګه خوندي کړئ",
       "saveProfileDescription": "د اوسني چاپیریال متغیرات او د تنظیم کولو کمانډونه د بیا کارونې وړ پروفایل په توګه خوندي کړئ.",
       "profileSummary": "{{vars}} د چاپیریال تغیرات · {{commands}} د ترتیب کولو امرونه",
@@ -2971,7 +2986,9 @@
     "permissionDescription": "تاسو د دې د لیدلو اجازه نه لرئ.",
     "notFoundDescription": "ښايي دا توکی لرې شوی وي یا نور شتون ونه لري.",
     "serverTitle": "بار نه شو.",
-    "serverDescription": "زموږ په سیسټم کې ستونزه رامنځته شوه. مهرباني وکړئ بیا هڅه وکړئ."
+    "serverDescription": "زموږ په سیسټم کې ستونزه رامنځته شوه. مهرباني وکړئ بیا هڅه وکړئ.",
+    "timeoutTitle": "برسېرونکی ډېر وخت نیسي",
+    "timeoutDescription": "غوښتنه له بشپړېدو دمخه ودرېده. مهرباني وکړئ بیا هڅه وکړئ."
   },
   "screenHeader": {
     "openMenu": "مینو پرانیزئ",
@@ -3824,7 +3841,9 @@
     "commandsTitle": "امرونه تنظیم کړئ",
     "addCommand": "کمانډ اضافه کړئ",
     "commandLabel": "امر",
+    "commandLabelPosition": "امر {{position}}",
     "commandPlaceholder": "لکه pnpm install",
+    "commandAtLimit": "امر تر {{max}} توري پورې محدود دی",
     "commandsEmpty": "تر اوسه د تنظیم کولو امرونه ندي",
     "commandsSaveFailed": "د ترتیب کولو کمانډونه خوندي نشو کولی",
     "moveUp": "پورته لاړ شه",
@@ -3842,6 +3861,7 @@
     "skillSaveFailed": "مهارت نه شو ژغورلی",
     "skillSourceCustom": "دودیز",
     "skillSourceMarketplace": "بازار",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "یو SKILL.md پیسټ کړئ او نوم یې ډک شي؛ پرته له ډریګ او ډراپ خپل تلیفون څخه مهارت اضافه کړئ.",
     "skillEditTitle": "د ترمیم مهارت",
     "skillEdit": "د {{name}} مهارت ترمیم کړئ",
@@ -3856,9 +3876,9 @@
       "remoteType": "لرې",
       "command": "د قوماندې کرښه",
       "url": "URL",
-      "environment": "چاپیریال (JSON)",
+      "environment": "د چاپېریال متغیرات (JSON)",
       "headers": "سرلیکونه (JSON)",
-      "timeout": "وخت ختم شو",
+      "timeout": "د وخت پای",
       "secretCount_one": "{{count}} پټ",
       "secretCount_other": "{{count}} پټونه",
       "namePlaceholder": "my-server",
@@ -3868,6 +3888,7 @@
       "headersHint": "هغه ارزښتونه چې •••• ښودل شوي خپل زیرمه شوی پټ ساتي؛ د بدلولو لپاره ارزښت تبدیل کړئ. د URL بدلول بیا هر ارزښت ته اړتیا لري",
       "nameRequired": "د سرور نوم دننه کړئ",
       "nameInvalid": "نوم کولی شي یوازې د ASCII توري، عددونه، انډر سکورونه او ډشونه وکاروي، تر 100 توري پورې",
+      "nameConflict": "په دې نوم سرور له دمخه شتون لري",
       "commandRequired": "یو کمانډ دننه کړئ",
       "commandTooLong": "تر 50 پورې دلیلونه وکاروئ، هر یو 500 توري",
       "urlRequired": "یو URL داخل کړئ",
@@ -3948,7 +3969,6 @@
       "repo": "ذخیره غوره کړئ…",
       "profile": "پروفایل وټاکئ",
       "remove": "تړل",
-      "private": "شخصي",
       "search": "ذخیره لټونه…",
       "addedToast": "ډیفالټ پروفایل د \"{{repo}}\" لپاره ټاکل شوی",
       "addFailed": "ډیفالټ پروفایل نشي تنظیمولی",

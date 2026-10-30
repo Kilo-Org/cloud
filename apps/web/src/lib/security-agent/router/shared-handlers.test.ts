@@ -636,7 +636,7 @@ describe('setEnabled', () => {
 
     expect(mockSubmitManualSecuritySync).toHaveBeenCalledTimes(1);
     expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenCalledWith(
-      expect.objectContaining({ expectedRevision: 2 })
+      expect.objectContaining({ expectedRevision: 2, isEnabled: true })
     );
   });
 
@@ -681,7 +681,7 @@ describe('setEnabled', () => {
 
     expect(mockSubmitManualSecuritySync).toHaveBeenCalledTimes(1);
     expect(mockSaveSecurityAgentConfigWithRevision).toHaveBeenCalledWith(
-      expect.objectContaining({ expectedRevision: 2 })
+      expect.objectContaining({ expectedRevision: 2, isEnabled: true })
     );
   });
 
@@ -830,6 +830,25 @@ describe('saveConfig', () => {
         },
       })
     );
+  });
+
+  it('leaves the enabled state to the enable transition on a settings save', async () => {
+    mockGetSecurityAgentConfigWithStatus.mockResolvedValue({
+      isEnabled: false,
+      configRevision: 3,
+      storedConfig: {},
+      config: { sla_notification_min_severity: 'high' },
+    });
+    mockSaveSecurityAgentConfigWithRevision.mockResolvedValue({ newRevision: 4 });
+
+    await createHandlers().saveConfig.handler({
+      ctx: context,
+      input: { expectedRevision: 3, slaNotificationMinSeverity: 'critical' },
+    });
+
+    const [saveParams] = mockSaveSecurityAgentConfigWithRevision.mock.calls[0] ?? [];
+    expect(saveParams).not.toHaveProperty('isEnabled');
+    expect(mockSetSecurityAgentEnabled).not.toHaveBeenCalled();
   });
 
   it('propagates a stale-revision CONFLICT without a success receipt', async () => {
@@ -1582,6 +1601,22 @@ describe('security operation ledger (P1-A-08e)', () => {
       admission: 'admitted',
       row: ledgerRow({ intent: 'dismiss_finding' }),
     });
+
+    await expect(
+      createHandlers().triggerSync.handler({
+        ctx: context,
+        input: { repoFullName: 'kilo/repo', operationKey },
+      })
+    ).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'operation_key_reuse_mismatch',
+    });
+    expect(mockSubmitManualSecuritySync).not.toHaveBeenCalled();
+    expect(mockSettleOperation).not.toHaveBeenCalled();
+  });
+
+  it('refuses an admission stored in another organization scope', async () => {
+    mockAdmitOperation.mockResolvedValue({ admission: 'organization_mismatch' });
 
     await expect(
       createHandlers().triggerSync.handler({
@@ -2502,7 +2537,10 @@ describe('findings list DTO narrowing', () => {
 
 const ORGANIZATION_ID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
 
-function createHandlersWithRepositorySnapshot(repositories: unknown[]) {
+function createHandlersWithRepositorySnapshot(
+  repositories: unknown[] | null,
+  integrationFields: Record<string, unknown> = {}
+) {
   return createSecurityAgentHandlers({
     resolveOwner: () => ({ type: 'org', id: ORGANIZATION_ID, userId: 'user-123' }),
     resolveSecurityOwner: () => ({ organizationId: ORGANIZATION_ID }),
@@ -2515,6 +2553,7 @@ function createHandlersWithRepositorySnapshot(repositories: unknown[]) {
         platform_installation_id: 'installation-123',
         github_app_type: 'standard',
         repositories,
+        ...integrationFields,
       }) as never,
     trackingExtras: () => ({}),
   });
@@ -2650,6 +2689,39 @@ describe('cached repository snapshot', () => {
     expect(mockUpdateRepositoriesForIntegration).toHaveBeenCalledWith('integration-123', fetched);
     consoleError.mockRestore();
   });
+
+  it('answers a synchronized empty snapshot without a provider read or rewrite', async () => {
+    mockFetchGitHubRepositories.mockResolvedValue([]);
+    mockUpdateRepositoriesForIntegration.mockResolvedValue();
+
+    const repositories = await createHandlersWithRepositorySnapshot([], {
+      repositories_synced_at: '2026-01-01T00:00:00.000Z',
+    }).getRepositories({ ctx: context, input: {} });
+
+    expect(repositories).toEqual([]);
+    expect(mockFetchGitHubRepositories).not.toHaveBeenCalled();
+    expect(mockUpdateRepositoriesForIntegration).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    { snapshot: [] as unknown[], syncedAt: null },
+    { snapshot: null, syncedAt: null },
+    { snapshot: null, syncedAt: '2026-01-01T00:00:00.000Z' },
+  ])(
+    'synchronizes $snapshot with syncedAt $syncedAt because it was never synchronized',
+    async testCase => {
+      const fetched = [{ id: 9, full_name: 'kilo/late', name: 'late', private: false }];
+      mockFetchGitHubRepositories.mockResolvedValue(fetched);
+      mockUpdateRepositoriesForIntegration.mockResolvedValue();
+
+      const repositories = await createHandlersWithRepositorySnapshot(testCase.snapshot, {
+        repositories_synced_at: testCase.syncedAt,
+      }).getRepositories({ ctx: context, input: {} });
+
+      expect(repositories.map(repository => repository.fullName)).toEqual(['kilo/late']);
+      expect(mockUpdateRepositoriesForIntegration).toHaveBeenCalledWith('integration-123', fetched);
+    }
+  );
 });
 
 describe('cached repository snapshot with an unreadable id', () => {

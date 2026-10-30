@@ -20,13 +20,14 @@ import test from 'node:test';
 const REPO = realpathSync(new URL('../..', import.meta.url).pathname);
 const MOBILE_ROOT = join(REPO, 'apps/mobile');
 
-function runChecker(context, files) {
+function makeFixture(context, files) {
   const root = mkdtempSync(join(tmpdir(), 'check-classes-'));
   context.after(() => rmSync(root, { recursive: true, force: true }));
 
   // Both SOURCE_DIRS entries must exist, or readdirSync throws ENOENT.
   mkdirSync(join(root, 'packages/app-shared/src'), { recursive: true });
   mkdirSync(join(root, 'tools/nativewind'), { recursive: true });
+  mkdirSync(join(root, 'tools/lib'), { recursive: true });
   for (const [path, content] of Object.entries(files)) {
     const file = join(root, path);
     mkdirSync(dirname(file), { recursive: true });
@@ -36,9 +37,14 @@ function runChecker(context, files) {
     new URL('./check-classes.mjs', import.meta.url),
     join(root, 'tools/nativewind/check-classes.mjs')
   );
+  copyFileSync(new URL('../lib/js-scan.mjs', import.meta.url), join(root, 'tools/lib/js-scan.mjs'));
   copyFileSync(join(MOBILE_ROOT, 'src/global.css'), join(root, 'apps/mobile/src/global.css'));
   symlinkSync(join(MOBILE_ROOT, 'node_modules'), join(root, 'apps/mobile/node_modules'), 'dir');
+  return root;
+}
 
+function runChecker(context, files) {
+  const root = makeFixture(context, files);
   const result = spawnSync(process.execPath, [join(root, 'tools/nativewind/check-classes.mjs')], {
     cwd: root,
     encoding: 'utf8',
@@ -46,6 +52,24 @@ function runChecker(context, files) {
   });
   assert.ifError(result.error);
   return result;
+}
+
+/**
+ * A root holding only the checker and its shared scanner: no source tree, no
+ * global.css, no installed dependencies. Anything the module does beyond
+ * declaring its exports fails here.
+ */
+function importOnlyRoot(context) {
+  const root = mkdtempSync(join(tmpdir(), 'check-classes-import-'));
+  context.after(() => rmSync(root, { recursive: true, force: true }));
+  mkdirSync(join(root, 'tools/nativewind'), { recursive: true });
+  mkdirSync(join(root, 'tools/lib'), { recursive: true });
+  copyFileSync(
+    new URL('./check-classes.mjs', import.meta.url),
+    join(root, 'tools/nativewind/check-classes.mjs')
+  );
+  copyFileSync(new URL('../lib/js-scan.mjs', import.meta.url), join(root, 'tools/lib/js-scan.mjs'));
+  return root;
 }
 
 /** A component whose JSX body starts on line 3, one argument per line. */
@@ -312,4 +336,54 @@ test('accepts theme tokens without an opacity modifier', context => {
       'export const a = "bg-primary-disabled border-hair-soft bg-good-tile-bg";\n',
   });
   assert.equal(result.status, 0);
+});
+
+test('importing the module neither scans nor runs the compiler probes', context => {
+  const root = importOnlyRoot(context);
+  // A static import from a root with no source dirs, no global.css and no
+  // installed dependencies: a scan would throw ENOENT, the compiler probe
+  // cannot resolve react-native-css, and the audit would exit 1.
+  writeFileSync(join(root, 'probe.mjs'), "import './tools/nativewind/check-classes.mjs';\n");
+  const result = spawnSync(process.execPath, [join(root, 'probe.mjs')], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 30_000,
+  });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(result.stdout, '');
+  assert.equal(result.stderr, '');
+});
+
+test('checkSourceFile reports one file and keeps no state between calls', context => {
+  const root = makeFixture(context, {
+    'apps/mobile/src/screen.tsx': screen('<ScrollView className="px-4" />'),
+  });
+  const source = '<ScrollView className="px-4" />';
+  const absolute = join(root, 'apps/mobile/src/screen.tsx');
+  writeFileSync(
+    join(root, 'probe.mjs'),
+    [
+      "import { checkSourceFile } from './tools/nativewind/check-classes.mjs';",
+      `const source = ${JSON.stringify(source)};`,
+      `const absolute = ${JSON.stringify(absolute)};`,
+      'const first = checkSourceFile("screen.tsx", absolute, source);',
+      'const second = checkSourceFile("screen.tsx", absolute, source);',
+      'const clean = checkSourceFile("other.ts", absolute, "export const a = 1;");',
+      'console.log(JSON.stringify({ first, second, clean }));',
+    ].join('\n')
+  );
+  const result = spawnSync(process.execPath, [join(root, 'probe.mjs')], {
+    cwd: root,
+    encoding: 'utf8',
+    timeout: 30_000,
+  });
+  assert.ifError(result.error);
+  assert.equal(result.status, 0, result.stderr);
+  const { first, second, clean } = JSON.parse(result.stdout);
+  assert.equal(first.length, 1);
+  assert.match(first[0], /<ScrollView> carries "px-4" on its own className/);
+  // A second call sees this call's problems only, and a clean file sees none.
+  assert.deepEqual(second, first);
+  assert.deepEqual(clean, []);
 });

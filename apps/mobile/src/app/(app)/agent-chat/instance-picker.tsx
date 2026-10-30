@@ -1,7 +1,7 @@
 /* eslint-disable max-lines -- the picker's five presentations (expired, loading, error, zero instances, list) share one sheet chrome and one refetch, and the error and zero-instance actions both carry the shared state-action floor */
 import { FlashList, type ListRenderItemInfo } from '@shopify/flash-list';
 import { useFocusEffect, useRouter } from 'expo-router';
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { Check, Cloud, Server, Terminal } from '@/components/ui/icons';
 import { useQuery } from '@tanstack/react-query';
 import { useCallback, useMemo, useRef, useState } from 'react';
@@ -121,7 +121,7 @@ export default function InstancePickerScreen() {
   });
 
   const handleSelectCloudAgent = useCallback(() => {
-    void Haptics.selectionAsync();
+    selectionHaptic();
     bridgeRef.current?.onSelect(null);
     instancePickerSlot.clear(UNFENCED_ROUTE_KEY);
     bridgeRef.current = undefined;
@@ -130,7 +130,7 @@ export default function InstancePickerScreen() {
 
   const handleSelectInstance = useCallback(
     (instance: InstancePickerInstance) => {
-      void Haptics.selectionAsync();
+      selectionHaptic();
       bridgeRef.current?.onSelect(instance);
       instancePickerSlot.clear(UNFENCED_ROUTE_KEY);
       bridgeRef.current = undefined;

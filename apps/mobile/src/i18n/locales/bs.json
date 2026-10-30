@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Izmjene",
-    "organizationTrialEnded": "Probni period organizacije je završen i ona nema aktivan plan. Vlasnik organizacije može ažurirati naplatu na kilo.ai, a zatim pokušati ponovo."
+    "organizationTrialEnded": "Probni period organizacije je završen i ona nema aktivan plan. Vlasnik organizacije može ažurirati naplatu na kilo.ai, a zatim pokušati ponovo.",
+    "privateRepositoryA11y": "{{name}}, privatno spremište"
   },
   "language": {
     "restarting": "Ponovno pokretanje radi primjene jezika",
@@ -659,7 +660,12 @@
       "loading": "Učitavanje pristiglih poruka",
       "noReviewRequests": "Nema zahtjeva za pregled",
       "noReviewRequestsDescription": "Ovdje se pojavljuju zahtjevi za spajanje koji čekaju tvoj pregled. I dalje možeš zalijepiti bilo koju poveznicu na PR iznad.",
-      "couldNotLoad": "Učitavanje pristiglih poruka nije uspjelo."
+      "couldNotLoad": "Učitavanje pristiglih poruka nije uspjelo.",
+      "accessLostTitle": "Nemaš pristup ovoj organizaciji",
+      "accessLostDescription": "Više nisi član ove organizacije, pa se njeni zahtjevi za pregled ne mogu učitati. Nastavi u svom ličnom računu za nastavak pregleda.",
+      "organizationUnavailableTitle": "Ova organizacija više ne postoji",
+      "organizationUnavailableDescription": "Ova organizacija je izbrisana, pa se njeni zahtjevi za pregled ne mogu učitati. Nastavi u svom ličnom računu za nastavak pregleda.",
+      "continueInPersonal": "Nastavi u ličnom računu"
     },
     "composer": {
       "commentBodyPlaceholder": "Tekst komentara",
@@ -760,7 +766,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Uredi zastarjeli komentar na čekanju na {{location}}",
       "editA11y": "Uredi komentar na čekanju na {{location}}",
-      "staleHint": "pR je promijenjen nakon pisanja ovog komentara.",
+      "staleHint": "PR je promijenjen nakon pisanja ovog komentara.",
       "deleteA11y": "Obriši komentar na čekanju na {{location}}",
       "deletedAnnouncement": "Komentar na čekanju obrisan",
       "noCommentsQueued": "Nema komentara na čekanju. Poslat će se samo odabrana vrsta pregleda.",
@@ -1535,7 +1541,13 @@
         "change_request_failed": "PR nije uspio",
         "superseded": "Već postoji"
       },
-      "noProposalsDescription": "Prijedlozi iz memorije pregleda pojavit će se ovdje nakon što Kilo analizira odgovore održavatelja."
+      "noProposalsDescription": "Prijedlozi iz memorije pregleda pojavit će se ovdje nakon što Kilo analizira odgovore održavatelja.",
+      "changeRequestInProgress": "Kilo već otvara pull request za ovaj prijedlog. Pokušajte ponovo za trenutak.",
+      "changeRequestNotActionable": "Ovaj prijedlog više nije moguće odobriti. Zatvorite ga i osvježite listu.",
+      "changeRequestNoGitHubAccess": "Nijedna GitHub veza nema pristup ovom repozitoriju. Ponovo povežite GitHub s pristupom ovom repozitoriju, pa pokušajte ponovo.",
+      "changeRequestMissingPermissions": "Kilo-ova GitHub aplikacija ne može otvoriti pull requestove u ovom repozitoriju. Vlasnik repozitorija mora aplikaciji dati pravo pisanja za sadržaj i pull requestove, pa pokušajte ponovo.",
+      "changeRequestFailed": "Kilo nije mogao otvoriti pull request. Pokušajte ponovo za trenutak.",
+      "offAction": "Memorija pregleda je isključena. Uključi je, pa pokušaj ponovo."
     },
     "manualReview": {
       "title": "Ručni pregled",
@@ -1958,6 +1970,7 @@
     },
     "settingsSave": {
       "saveChanges": "Sačuvaj izmjene",
+      "saved": "Postavke sačuvane",
       "unsavedTitle": "Nesačuvane izmjene",
       "unsavedMessage": "Sačuvati izmjene prije napuštanja ovog ekrana?",
       "unsavedInvalidMessage": "Ove izmjene se još ne mogu sačuvati. Ispravi ih da bi sačuvao ili ih odbaci da bi otišao."
@@ -2340,6 +2353,8 @@
       "couldNotLoadEnvironment": "Nije moguće učitati tvoje okruženje.",
       "retryLoadingEnvironment": "Pokušaj ponovo učitati okruženje",
       "defaultEnvironment": "Zadano okruženje",
+      "environmentAccessibility": "Odaberite profil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Odaberite profil: {{label}}. {{attention}}",
       "leaveChanges": "Ostavi izmjene",
       "commitAndPush": "Potvrdi i pošalji",
       "startSession": "Započni sesiju",
@@ -2374,7 +2389,7 @@
       "manageProfiles": "Upravljajte profilima",
       "noProfiles": "Još nema profila. Napravite jedan za dodavanje varijabli okruženja, MCP servera i vještina.",
       "advancedConfig": "Napredna konfiguracija",
-      "advancedConfigDescription": "Odaberite profil za učitavanje sačuvanih konfiguracija i ručno konfigurirajte dodatne varijable okruženja i naredbe za postavljanje",
+      "advancedConfigDescription": "Vrijedi za ovu sesiju. Čuvanje kao profil zadržava ga za sljedeći put.",
       "saveAsProfile": "Sačuvaj kao profil",
       "saveProfileDescription": "Sačuvajte trenutne varijable okruženja i naredbe za podešavanje kao profil za višekratnu upotrebu.",
       "profileSummary": "{{vars}} varijable okruženja · {{commands}} naredbe za podešavanje",
@@ -3013,7 +3028,9 @@
     "permissionDescription": "Nemaš dozvolu da ovo pregledaš.",
     "notFoundDescription": "Ova stavka je možda uklonjena ili više nije dostupna.",
     "serverTitle": "Učitavanje nije moguće.",
-    "serverDescription": "Došlo je do greške na našoj strani. Pokušaj ponovo."
+    "serverDescription": "Došlo je do greške na našoj strani. Pokušaj ponovo.",
+    "timeoutTitle": "Serveru treba predugo vremena",
+    "timeoutDescription": "Zahtjev je istekao prije završetka. Pokušaj ponovo."
   },
   "screenHeader": {
     "openMenu": "Otvori meni",
@@ -3873,8 +3890,10 @@
     "variablesSaveFailed": "Nije moguće sačuvati varijablu",
     "commandsTitle": "Komande za podešavanje",
     "addCommand": "Dodaj naredbu",
-    "commandLabel": "Zapovjedi",
+    "commandLabel": "Naredba",
+    "commandLabelPosition": "Naredba {{position}}",
     "commandPlaceholder": "npr. pnpm install",
+    "commandAtLimit": "Naredba je ograničena na {{max}} znakova",
     "commandsEmpty": "Još nema naredbi za postavljanje",
     "commandsSaveFailed": "Nije moguće sačuvati naredbe za postavljanje",
     "moveUp": "Kreni gore",
@@ -3892,6 +3911,7 @@
     "skillSaveFailed": "Nije moguće sačuvati vještinu",
     "skillSourceCustom": "Prilagođeno",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Zalijepite SKILL.md i njegovo ime se popunjava; dodajte vještinu sa svog telefona bez povlačenja i ispuštanja.",
     "skillEditTitle": "Uredi vještinu",
     "skillEdit": "Uredi vještinu {{name}}",
@@ -3919,6 +3939,7 @@
       "headersHint": "Vrijednosti prikazane kao •••• čuvaju svoju pohranjenu tajnu; zamijenite vrijednost da biste je rotirali. Promjena URL-a zahtijeva ponovni unos svih vrijednosti",
       "nameRequired": "Unesite ime servera",
       "nameInvalid": "Ime može koristiti samo ASCII slova, brojeve, donje crte i crtice, najviše 100 znakova",
+      "nameConflict": "Server s ovim imenom već postoji",
       "commandRequired": "Unesite komandu",
       "commandTooLong": "Koristite najviše 50 argumenata od po 500 znakova",
       "urlRequired": "Unesite URL",
@@ -3938,7 +3959,7 @@
       "add": "Dodaj agenta",
       "empty": "Još nema agenata",
       "name": "Ime agenta",
-      "slug": "Agent puž",
+      "slug": "Agent slug",
       "description": "Opis agenta",
       "model": "Nadjačavanje modela",
       "modelPlaceholder": "Koristi zadanu sesiju",
@@ -3963,7 +3984,7 @@
       "saveFailed": "Nije moguće sačuvati agenta",
       "deleteFailed": "Nije moguće izbrisati agenta",
       "nameRequired": "Unesite ime agenta",
-      "slugRequired": "Unesite puž agenta",
+      "slugRequired": "Unesite slug agenta",
       "slugInvalid": "Slug mora početi malim ASCII slovom i koristiti samo mala ASCII slova, cifre i crtice, najviše 50 znakova",
       "slugConflict": "Taj slug već koristi ugrađeni agent ili drugi agent u ovom profilu",
       "edit": "Uredi agenta {{name}}",
@@ -3999,7 +4020,6 @@
       "repo": "Odaberite spremište…",
       "profile": "Odaberite profil",
       "remove": "Odveži",
-      "private": "Privatno",
       "search": "Pretražite spremišta…",
       "addedToast": "Zadani profil postavljen za \"{{repo}}\"",
       "addFailed": "Nije moguće postaviti zadani profil",

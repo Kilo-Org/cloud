@@ -87,12 +87,13 @@ let restoresInFlight = 0;
 // to land resumes it instead of dropping the work.
 let settleWaiters: (() => void)[] = [];
 
-// Whether the record this process restored belongs to the signed-in scope.
-// `null` means nothing was restored, so only frames written in this process are
-// in memory. The restore decides it from the same reads that fill the state, so
-// a caller can ask the question synchronously instead of re-reading the keychain
-// on every surface write.
-let restoredScopeVerified: boolean | null = null;
+// What the restore learned about the record it put in memory. `none` means it
+// restored no record, so only frames written in this process are in memory;
+// `unknown` means the identity read did not complete, which is not a mismatch.
+// Decided from the same reads that fill the state, so a caller asks
+// synchronously instead of re-reading the keychain on every surface write.
+type RestoredScope = 'none' | 'match' | 'mismatch' | 'unknown';
+let restoredScope: RestoredScope = 'none';
 
 // True once this process wrote the in-memory snapshot itself. A frame it wrote
 // is already fenced by the context that produced it; only a restored record
@@ -116,7 +117,9 @@ export function getGlanceableSnapshotForSignedInScope(): GlanceableAgentsSnapsho
   if (snapshotWrittenInProcess) {
     return lastSnapshot;
   }
-  return restoredScopeVerified === true ? lastSnapshot : null;
+  // A record the signed-in scope matched, or one whose scope could not be
+  // checked at all, is drawable; only a confirmed different scope is not.
+  return restoredScope === 'match' || restoredScope === 'unknown' ? lastSnapshot : null;
 }
 
 /**
@@ -194,6 +197,19 @@ function persistSnapshot(snapshot: GlanceableAgentsSnapshot): void {
   mirrorWrite = mirrorSnapshotAfter(mirrorWrite, JSON.stringify(snapshot));
 }
 
+/** How a record's scope key relates to the signed-in scope the restore read. */
+function scopeRelation(
+  recordScopeKey: string,
+  authenticated: AuthenticatedGlanceableScope
+): RestoredScope {
+  if (authenticated.status === 'unavailable') {
+    return 'unknown';
+  }
+  return authenticated.status === 'known' && authenticated.scopeKey === recordScopeKey
+    ? 'match'
+    : 'mismatch';
+}
+
 /** Parse a stored record with the shared schema; a malformed record is absent. */
 function parseStoredSnapshot(raw: string): GlanceableAgentsSnapshot | null {
   try {
@@ -206,23 +222,40 @@ function parseStoredSnapshot(raw: string): GlanceableAgentsSnapshot | null {
 }
 
 /**
- * The scope the signed-in account derives, read from the same store the auth
- * hints live in. The restored Home-widget record is adopted for this scope
- * only, never for the scope its own content names. A failed read is
- * "unknown", never a match.
+ * The signed-in scope, read from the same store the auth hints live in. The
+ * three outcomes are distinct: a known scope, no signed-in account, and a read
+ * that did not complete. Only the first can confirm a record, and an incomplete
+ * read is not a mismatch either.
  */
-export async function getAuthenticatedGlanceableScopeKey(): Promise<string | null> {
+type AuthenticatedGlanceableScope =
+  | { readonly status: 'known'; readonly scopeKey: string }
+  | { readonly status: 'absent' }
+  | { readonly status: 'unavailable' };
+
+async function readAuthenticatedGlanceableScope(): Promise<AuthenticatedGlanceableScope> {
   try {
     const { getItemAsync } = getSecureStore();
     const [userId, organizationId] = await Promise.all([
       getItemAsync(ACTIVE_USER_ID_KEY),
       getItemAsync(ORGANIZATION_STORAGE_KEY),
     ]);
-    return userId === null ? null : buildOpaqueScopeKey({ userId, organizationId });
+    return userId === null
+      ? { status: 'absent' }
+      : { status: 'known', scopeKey: buildOpaqueScopeKey({ userId, organizationId }) };
   } catch (error) {
     reportSecureStoreFailure('read', error);
-    return null;
+    return { status: 'unavailable' };
   }
+}
+
+/**
+ * The scope key of the signed-in account, or `null` when it is not known: no
+ * signed-in account or a read that did not complete. Callers that must not act
+ * on an unconfirmed scope treat `null` as a refusal.
+ */
+export async function getAuthenticatedGlanceableScopeKey(): Promise<string | null> {
+  const scope = await readAuthenticatedGlanceableScope();
+  return scope.status === 'known' ? scope.scopeKey : null;
 }
 
 /**
@@ -246,16 +279,21 @@ export async function restorePersistedGlanceable(): Promise<void> {
       return;
     }
     const stored = rawSnapshot === null ? null : parseStoredSnapshot(rawSnapshot);
-    // A remount keeps the module alive, so a logout or privacy blank written
-    // before restore owns the state and must not be clobbered by a stale disk
-    // record from the prior session.
-    const authenticatedScopeKey = await getAuthenticatedGlanceableScopeKey();
+    const authenticatedScope = await readAuthenticatedGlanceableScope();
+    // A live write that landed during the identity read owns the state, the
+    // same as one that landed during the record read: skip the fill rather than
+    // clobber it with what was read before it.
+    if (persistEpoch !== startEpoch) {
+      return;
+    }
+    const authenticatedScopeKey =
+      authenticatedScope.status === 'known' ? authenticatedScope.scopeKey : null;
     if (stored === null) {
       // No usable record: a scope key the previous release wrote on its own
       // still names the scope, the same way it did before this record existed.
       const legacyScopeKey = await getSecureStore().getItemAsync(GLANCEABLE_LEGACY_SCOPE_KEY);
       localScopeKey ??= legacyScopeKey;
-      restoredScopeVerified = null;
+      restoredScope = 'none';
     } else {
       lastSnapshot ??= stored;
       // The record carries its own scope key, so the restored snapshot and the
@@ -263,7 +301,7 @@ export async function restorePersistedGlanceable(): Promise<void> {
       localScopeKey ??= stored.scopeKey;
       // The record's own scope key says which context wrote it, not which one
       // holds the device now, so a surface may draw it only on a match.
-      restoredScopeVerified = stored.scopeKey === authenticatedScopeKey;
+      restoredScope = scopeRelation(stored.scopeKey, authenticatedScope);
     }
     await restoreHomeWidgetData(authenticatedScopeKey);
   } catch (error) {
@@ -317,7 +355,7 @@ export function _setLastGlanceableSnapshotForTests(
   // Callers seed a completed restore, so the record is the state this process
   // acts on rather than a record still to be verified.
   snapshotWrittenInProcess = snapshot !== null;
-  restoredScopeVerified = null;
+  restoredScope = 'none';
   localScopeKey = snapshot?.scopeKey ?? null;
   // Seeding the mirror models a completed restore: callers act on this state as
   // the read's result, the same way `restorePersistedGlanceable` would.
@@ -337,7 +375,7 @@ export function _resetGlanceablePersistForTests(): void {
   persistEpoch = 0;
   mirrorWrite = null;
   lastSnapshot = null;
-  restoredScopeVerified = null;
+  restoredScope = 'none';
   snapshotWrittenInProcess = false;
   localScopeKey = null;
   restoreUnavailable = false;

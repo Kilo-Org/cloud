@@ -16,6 +16,7 @@ import {
   _setGlanceableRestoreUnavailableForTests,
   _setLastGlanceableSnapshotForTests,
   _setSecureStoreForTests,
+  getGlanceableSnapshotForSignedInScope,
   getLastGlanceableSnapshot,
   getLocalScopeKey,
   isGlanceableRestoreSettled,
@@ -359,6 +360,23 @@ describe('restorePersistedGlanceable', () => {
     // fences the signed-in context verifies before it writes anything.
     expect(getLastGlanceableSnapshot()).toEqual(stored);
     expect(getLastHomeWidgetData()).toBeNull();
+  });
+
+  it('draws a record on the signed-in scope and only on the signed-in scope', async () => {
+    const stored = snapshotFor([{ status: 'busy' }]);
+    store.set(SNAPSHOT_KEY, JSON.stringify(stored));
+
+    store.set(ACTIVE_USER_ID_KEY, 'u1');
+    await restorePersistedGlanceable();
+    expect(getGlanceableSnapshotForSignedInScope()).toEqual(stored);
+
+    _resetGlanceablePersistForTests();
+    _setSecureStoreForTests(secureStoreMock);
+    store.set(ACTIVE_USER_ID_KEY, 'u2');
+    await restorePersistedGlanceable();
+    // The revision still seeds the next publisher, but no surface draws it.
+    expect(getLastGlanceableSnapshot()).toEqual(stored);
+    expect(getGlanceableSnapshotForSignedInScope()).toBeNull();
   });
 
   it('leaves the Home-widget record unadopted when the identity is unreadable', async () => {

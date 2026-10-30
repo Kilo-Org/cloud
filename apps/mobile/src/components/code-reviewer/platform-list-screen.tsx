@@ -6,7 +6,7 @@ import { View } from 'react-native';
 
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { ScopeAccessDeniedScreen } from '@/components/organization/scope-access-denied-screen';
-import { ScreenHeader } from '@/components/screen-header';
+import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { ConfigureRow } from '@/components/ui/configure-row';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
@@ -118,12 +118,11 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader
+      <ReviewerHeader
         title={scopeTitle}
         // An organization name is user prose, not a UI label, so it keeps a
         // second line for a natural break.
         titleNumberOfLines={2}
-        eyebrow={t('common.codeReviewer')}
       />
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         <View className="gap-3">

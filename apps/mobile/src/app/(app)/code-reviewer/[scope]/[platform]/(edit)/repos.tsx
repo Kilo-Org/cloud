@@ -11,7 +11,7 @@ import { EmptyState } from '@/components/empty-state';
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { QueryError } from '@/components/query-error';
 import { RepoToggleRow } from '@/components/repo-toggle-row';
-import { ScreenHeader } from '@/components/screen-header';
+import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { Button } from '@/components/ui/button';
 import { ChoiceRow } from '@/components/ui/choice-row';
 import { RadioGroup } from '@/components/ui/radio-group';
@@ -233,7 +233,7 @@ function ReposScreen({ scope, platform }: Readonly<{ scope: string; platform: Re
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('common.repositories')} />
+      <ReviewerHeader title={t('common.repositories')} />
       {fullBodyState ? (
         repoState
       ) : (

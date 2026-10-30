@@ -18,7 +18,7 @@ import { ProviderConnectCard } from '@/components/code-reviewer/provider-connect
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { PlatformOverviewSkeleton } from '@/components/code-reviewer/platform-overview-skeleton';
-import { ScreenHeader } from '@/components/screen-header';
+import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { ToggleRow } from '@/components/security-agent/settings-toggle-row';
 import { Button } from '@/components/ui/button';
 import { ConfigureRow } from '@/components/ui/configure-row';
@@ -150,7 +150,7 @@ export function PlatformOverviewScreen({
     const canConnect = canConnectProvider(platform, permission);
     return (
       <View className="flex-1 bg-background">
-        <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+        <ReviewerHeader title={capabilities.label} />
         <CenteredState contentContainerClassName="px-6">
           {canConnect ? (
             <ProviderConnectCard scope={scope} platform={platform} onConnected={handleConnected} />
@@ -211,7 +211,7 @@ export function PlatformOverviewScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
+      <ReviewerHeader title={capabilities.label} />
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         <Animated.View layout={LinearTransition}>
           {/* Every read state paints something: while connectivity is unsettled a

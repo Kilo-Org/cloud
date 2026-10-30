@@ -13,7 +13,7 @@ import Animated, { FadeIn, FadeOut, LinearTransition } from 'react-native-reanim
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
+import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
@@ -215,7 +215,7 @@ function InstructionsScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('codeReviewer.instructions.title')} onBack={onBack} />
+      <ReviewerHeader title={t('codeReviewer.instructions.title')} onBack={onBack} />
       {dialog}
       {failure ? (
         // A config read that failed, or one that stayed pending with nothing

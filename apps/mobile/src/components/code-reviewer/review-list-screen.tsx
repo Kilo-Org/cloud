@@ -11,7 +11,7 @@ import { type CodeReviewStatus, isCodeReviewStatus } from '@kilocode/app-shared/
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
-import { ScreenHeader } from '@/components/screen-header';
+import { ReviewerHeader } from '@/components/code-reviewer/reviewer-header';
 import { TabScreenScrollView, useTabBarBottomPadding } from '@/components/tab-screen';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -257,7 +257,7 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ScreenHeader title={t('codeReviewer.reviewList.title')} eyebrow={t('common.codeReviewer')} />
+      <ReviewerHeader title={t('codeReviewer.reviewList.title')} />
       {body}
     </View>
   );

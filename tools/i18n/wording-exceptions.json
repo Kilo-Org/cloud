@@ -322,6 +322,7 @@
     "pr opened",
     "remediation blocked",
     "remediation failed",
+    "stopped",
     "superseded",
     "{{count}} open",
     "{{loaded}} of {{total}} files loaded"

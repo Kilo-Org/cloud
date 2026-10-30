@@ -140,8 +140,8 @@ function refusalStatus(error: unknown): unknown {
 
 /**
  * A GitHub rate limit, primary or secondary, is transient: it is never a
- * statement about this installation's access, so it stops a branch listing
- * instead of being read as a permanent refusal.
+ * statement about an installation's access, so it may not be read as a
+ * permanent refusal.
  */
 function githubRateLimitTrpcError(error: unknown): TRPCError {
   return new TRPCError({
@@ -192,6 +192,7 @@ async function listOrganizationGitHubBranches(
     ...healthy.filter(integration => !cachesRepository(integration, repositoryFullName)),
   ];
   let lastError: unknown;
+  let rateLimitError: unknown;
   for (const integration of candidates) {
     try {
       const { branches } = await githubAppsService.listBranches(
@@ -202,13 +203,23 @@ async function listOrganizationGitHubBranches(
       );
       return toListing(branches);
     } catch (error) {
-      // Overloaded 403s arrive here too: a rate limit stops the walk at once
-      // rather than charging every installation and ending in NOT_FOUND.
-      if (isGitHubRateLimitError(error)) throw githubRateLimitTrpcError(error);
+      // Overloaded 403/429 answers arrive here too. Each installation has its
+      // own quota, so a rate limit says nothing about the remaining candidates
+      // and never ends the walk; it is remembered for the final refusal, which
+      // then stays retryable instead of claiming no installation can see the
+      // repository.
+      if (isGitHubRateLimitError(error)) {
+        rateLimitError ??= error;
+        continue;
+      }
       if (!isRepositoryUnreachable(error)) throw error;
       lastError = error;
     }
   }
+  // A transient refusal outranks a permission one: the caller must retry
+  // rather than show the install message for a repository a limited
+  // installation may well list once the limit clears.
+  if (rateLimitError) throw githubRateLimitTrpcError(rateLimitError);
   throw new TRPCError({
     code: 'NOT_FOUND',
     message:

@@ -303,7 +303,7 @@ describe('listProviderRepositoryBranches (organization github installations)', (
     ]);
   });
 
-  it('stops at the first installation when GitHub rate-limits the listing', async () => {
+  it('ends retryable when every installation is rate-limited', async () => {
     mockListGitHubBranches.mockRejectedValue(
       githubRefusal(403, 'You have exceeded a secondary rate limit.')
     );
@@ -319,10 +319,30 @@ describe('listProviderRepositoryBranches (organization github installations)', (
       code: 'BAD_GATEWAY',
       message: 'GitHub is limiting requests. Try again in a moment.',
     });
-    expect(mockListGitHubBranches).toHaveBeenCalledTimes(1);
+    expect(mockListGitHubBranches).toHaveBeenCalledTimes(2);
   });
 
-  it('stops at the first installation when the primary rate limit is exhausted', async () => {
+  it('recovers from a rate-limited installation that a later one can still list', async () => {
+    mockListGitHubBranches
+      .mockRejectedValueOnce(githubRefusal(403, 'You have exceeded a secondary rate limit.'))
+      .mockResolvedValueOnce(listing);
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'github',
+        userId: 'user_1',
+        organizationId: 'org_1',
+        repositoryFullName: 'octocat/hello',
+      })
+    ).resolves.toEqual({
+      defaultBranch: 'main',
+      branches: ['main', 'release'],
+      truncated: false,
+    });
+    expect(mockListGitHubBranches).toHaveBeenCalledTimes(2);
+  });
+
+  it('ends retryable when the primary rate limit is exhausted', async () => {
     mockListGitHubBranches.mockRejectedValue(
       Object.assign(new Error('API rate limit exceeded'), {
         status: 403,
@@ -338,7 +358,7 @@ describe('listProviderRepositoryBranches (organization github installations)', (
         repositoryFullName: 'octocat/hello',
       })
     ).rejects.toMatchObject({ code: 'BAD_GATEWAY' });
-    expect(mockListGitHubBranches).toHaveBeenCalledTimes(1);
+    expect(mockListGitHubBranches).toHaveBeenCalledTimes(2);
   });
 
   it('treats a 429 refusal as the retryable state, not an unreachable installation', async () => {
@@ -352,7 +372,23 @@ describe('listProviderRepositoryBranches (organization github installations)', (
         repositoryFullName: 'octocat/hello',
       })
     ).rejects.toMatchObject({ code: 'BAD_GATEWAY' });
-    expect(mockListGitHubBranches).toHaveBeenCalledTimes(1);
+    expect(mockListGitHubBranches).toHaveBeenCalledTimes(2);
+  });
+
+  it('prefers the retryable state over the install message when one installation is limited', async () => {
+    mockListGitHubBranches
+      .mockRejectedValueOnce(githubRefusal(404, 'Not Found'))
+      .mockRejectedValueOnce(githubRefusal(429, 'Too Many Requests'));
+
+    await expect(
+      listProviderRepositoryBranches({
+        platform: 'github',
+        userId: 'user_1',
+        organizationId: 'org_1',
+        repositoryFullName: 'octocat/hello',
+      })
+    ).rejects.toMatchObject({ code: 'BAD_GATEWAY' });
+    expect(mockListGitHubBranches).toHaveBeenCalledTimes(2);
   });
 
   it('still walks past a permission 403 and keeps the install message when every installation refuses', async () => {

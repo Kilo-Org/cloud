@@ -3960,7 +3960,8 @@
       "nameRequired": "Adja meg a parancs nevét",
       "nameInvalid": "A névnek kisbetűvel kell kezdődnie, és csak kisbetűket, számjegyeket és kötőjeleket kell használnia",
       "templateRequired": "Írjon be egy parancssablont",
-      "nameConflict": "Ezt a nevet egy beépített parancs foglalja le"
+      "nameConflict": "Ezt a nevet egy beépített parancs foglalja le",
+      "duplicateName": "Ezt a nevet már egy másik parancs használja ebben a profilban"
     },
     "repoBindings": {
       "title": "Alapértelmezett profilok adattárakhoz",

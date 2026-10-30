@@ -3960,7 +3960,8 @@
       "nameRequired": "Nhập tên lệnh",
       "nameInvalid": "Tên phải bắt đầu bằng chữ cái viết thường và chỉ sử dụng chữ cái viết thường, chữ số và dấu gạch ngang",
       "templateRequired": "Nhập mẫu lệnh",
-      "nameConflict": "Tên đó được bảo lưu bởi một lệnh tích hợp"
+      "nameConflict": "Tên đó được bảo lưu bởi một lệnh tích hợp",
+      "duplicateName": "Một lệnh có tên này đã tồn tại trong hồ sơ này"
     },
     "repoBindings": {
       "title": "Hồ sơ mặc định cho Repos",

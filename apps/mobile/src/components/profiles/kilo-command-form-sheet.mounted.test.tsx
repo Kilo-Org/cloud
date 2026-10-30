@@ -123,10 +123,17 @@ function confirmRequest(index: number): ConfirmRequest | undefined {
 }
 
 // eslint-disable-next-line typescript-eslint/promise-function-async -- returning the harness promise unchanged
-function mountSheet() {
+function mountSheet(
+  options: {
+    existingNames?: readonly string[];
+    nameConflictFromServer?: boolean;
+    saveFailure?: string | null;
+  } = {}
+) {
   return renderWithProviders(
     createElement(KiloCommandFormSheet, {
       command: null,
+      existingNames: options.existingNames ?? [],
       isSaving: false,
       onClose: () => {
         h.onClose();
@@ -135,6 +142,8 @@ function mountSheet() {
         h.onCreate(payload);
       },
       onUpdate: () => undefined,
+      nameConflictFromServer: options.nameConflictFromServer ?? false,
+      saveFailure: options.saveFailure ?? null,
     })
   );
 }
@@ -261,6 +270,65 @@ describe('KiloCommandFormSheet dismissal', () => {
       confirmRequest(1)?.onConfirm();
     });
     expect(h.onClose).toHaveBeenCalledTimes(1);
+
+    unmount();
+  });
+});
+
+describe('KiloCommandFormSheet duplicate name', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('refuses a loaded profile name under the field without calling the caller', async () => {
+    const { renderer, unmount } = await mountSheet({ existingNames: ['release-notes', 'deploy'] });
+    act(() => {
+      (findField(renderer.root, 'Command name').props.onChangeText as (v: string) => void)(
+        'release-notes'
+      );
+      (findField(renderer.root, 'Template').props.onChangeText as (v: string) => void)('x');
+    });
+    layoutField(renderer.root, 'Command name', 200);
+
+    callHandler(findOne(renderer.root, 'SheetHeader'), 'onDone');
+
+    expect(h.onCreate).not.toHaveBeenCalled();
+    expect(findField(renderer.root, 'Command name').props.error).toBe(
+      i18n.t('profiles.slashCommands.duplicateName')
+    );
+    expect(h.scrollTo).toHaveBeenCalledWith({ y: 188, animated: true });
+
+    unmount();
+  });
+
+  it('shows a conflict the server reported and drops it once the name changes', async () => {
+    const { renderer, unmount } = await mountSheet({ nameConflictFromServer: true });
+
+    expect(findField(renderer.root, 'Command name').props.error).toBe(
+      i18n.t('profiles.slashCommands.duplicateName')
+    );
+
+    act(() => {
+      (findField(renderer.root, 'Command name').props.onChangeText as (v: string) => void)(
+        'another-name'
+      );
+    });
+    expect(findField(renderer.root, 'Command name').props.error).toBeUndefined();
+
+    unmount();
+  });
+
+  it('shows a save failure the caller cannot name inside the sheet', async () => {
+    const { renderer, unmount } = await mountSheet({
+      saveFailure: i18n.t('profiles.slashCommands.saveFailed'),
+    });
+
+    expect(
+      findAll(renderer.root, 'Text').some(
+        node => node.props.children === i18n.t('profiles.slashCommands.saveFailed')
+      )
+    ).toBe(true);
+    expect(findOne(renderer.root, 'SheetHeader')).toBeTruthy();
 
     unmount();
   });

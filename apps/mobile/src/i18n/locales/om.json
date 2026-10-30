@@ -3960,7 +3960,8 @@
       "nameRequired": "Maqaa ajaja galchi",
       "nameInvalid": "Maqaan qubee xixiqqaatiin jalqabuu fi qubee xixiqqaa, dijiitii fi daash qofa fayyadamuu qaba",
       "templateRequired": "Unkaa ajaja galchi",
-      "nameConflict": "Maqaan sun ajaja keessaa ijaarameen eegama"
+      "nameConflict": "Maqaan sun ajaja keessaa ijaarameen eegama",
+      "duplicateName": "Ajajni maqaa kana qabu durseen profaayilii kana keessaa jira"
     },
     "repoBindings": {
       "title": "Profaayilota Durtii Repos",

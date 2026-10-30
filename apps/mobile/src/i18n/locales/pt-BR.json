@@ -4011,7 +4011,8 @@
       "nameRequired": "Digite um nome de comando",
       "nameInvalid": "O nome deve começar com uma letra minúscula e usar apenas letras minúsculas, dígitos e travessões",
       "templateRequired": "Insira um modelo de comando",
-      "nameConflict": "Esse nome é reservado por um comando interno"
+      "nameConflict": "Esse nome é reservado por um comando interno",
+      "duplicateName": "Esse nome já é usado por outro comando neste perfil"
     },
     "repoBindings": {
       "title": "Perfis padrão para repositórios",

@@ -4011,7 +4011,8 @@
       "nameRequired": "Unesite naziv komande",
       "nameInvalid": "Ime mora početi malim slovom i koristiti samo mala slova, cifre i crtice",
       "templateRequired": "Unesite predložak komande",
-      "nameConflict": "To ime je rezervisano ugrađenom komandom"
+      "nameConflict": "To ime je rezervisano ugrađenom komandom",
+      "duplicateName": "U ovom profilu već postoji komanda sa ovim imenom"
     },
     "repoBindings": {
       "title": "Zadani profili za Repos",

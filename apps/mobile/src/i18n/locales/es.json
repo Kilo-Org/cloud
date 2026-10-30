@@ -4011,7 +4011,8 @@
       "nameRequired": "Introduzca un nombre de comando",
       "nameInvalid": "El nombre debe comenzar con una letra minúscula y usar solo letras minúsculas, dígitos y guiones.",
       "templateRequired": "Ingrese una plantilla de comando",
-      "nameConflict": "Ese nombre está reservado mediante un comando integrado."
+      "nameConflict": "Ese nombre está reservado mediante un comando integrado.",
+      "duplicateName": "Ya existe un comando con ese nombre en este perfil."
     },
     "repoBindings": {
       "title": "Perfiles predeterminados para repositorios",

@@ -4011,7 +4011,8 @@
       "nameRequired": "Introduceți un nume de comandă",
       "nameInvalid": "Numele trebuie să înceapă cu o literă mică și să folosească numai litere mici, cifre și liniuțe",
       "templateRequired": "Introduceți un șablon de comandă",
-      "nameConflict": "Acest nume este rezervat printr-o comandă încorporată"
+      "nameConflict": "Acest nume este rezervat printr-o comandă încorporată",
+      "duplicateName": "O comandă cu acest nume există deja în acest profil"
     },
     "repoBindings": {
       "title": "Profiluri implicite pentru Repos",

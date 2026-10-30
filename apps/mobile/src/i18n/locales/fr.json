@@ -4011,7 +4011,8 @@
       "nameRequired": "Entrez un nom de commande",
       "nameInvalid": "Le nom doit commencer par une lettre minuscule et utiliser uniquement des lettres minuscules, des chiffres et des tirets.",
       "templateRequired": "Entrez un modèle de commande",
-      "nameConflict": "Ce nom est réservé par une commande intégrée"
+      "nameConflict": "Ce nom est réservé par une commande intégrée",
+      "duplicateName": "Une commande portant ce nom existe déjà dans ce profil"
     },
     "repoBindings": {
       "title": "Profils par défaut pour les dépôts",

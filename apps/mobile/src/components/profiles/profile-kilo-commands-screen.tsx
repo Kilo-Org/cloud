@@ -4,12 +4,10 @@ import { View } from 'react-native';
 import { toast } from 'sonner-native';
 
 import { EmptyState } from '@/components/empty-state';
-import {
-  KiloCommandFormSheet,
-  type KiloCommandSubmission,
-} from '@/components/profiles/kilo-command-form-sheet';
+import { KiloCommandFormSheet } from '@/components/profiles/kilo-command-form-sheet';
 import { KiloCommandRowView } from '@/components/profiles/kilo-command-row';
 import {
+  type KiloCommandCreatePayload,
   kiloCommandOrderAfterMove,
   kiloCommandRows,
   type KiloCommandSource,
@@ -30,6 +28,7 @@ import {
 } from '@/lib/hooks/use-agent-profiles';
 import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 
 /** Stable empty fallback so the derived list is not a new array each render. */
 const NO_COMMANDS: AgentProfileDetail['kiloCommands'] = [];
@@ -71,34 +70,55 @@ export function ProfileKiloCommandsScreen({
   const rows = kiloCommandRows(commands);
   // `null` = closed, `{ source: null }` = add, `{ source }` = edit that command.
   const [form, setForm] = useState<{ source: KiloCommandSource | null } | null>(null);
+  // A save the server refused on the name index shows the inline conflict
+  // instead of a toast the open sheet covers; any other refusal shows one line
+  // inside the sheet. Both reset when the form opens and each save starts.
+  const [serverNameConflict, setServerNameConflict] = useState(false);
+  const [saveFailure, setSaveFailure] = useState<string | null>(null);
 
   const startAdd = () => {
     setForm({ source: null });
+    setServerNameConflict(false);
+    setSaveFailure(null);
+  };
+
+  const startEdit = (source: KiloCommandSource) => {
+    setForm({ source });
+    setServerNameConflict(false);
+    setSaveFailure(null);
   };
 
   const closeForm = () => {
     setForm(null);
   };
 
-  const runCreate = async (payload: KiloCommandSubmission) => {
+  const reportRefusedSave = (error: unknown) => {
+    if (readTrpcErrorField(error, 'code') === 'CONFLICT') {
+      setServerNameConflict(true);
+      return;
+    }
+    setSaveFailure(t('profiles.slashCommands.saveFailed'));
+  };
+
+  const runCreate = async (payload: KiloCommandCreatePayload) => {
+    setServerNameConflict(false);
+    setSaveFailure(null);
     try {
       await createKiloCommand.mutateAsync({ profileId, ...payload });
     } catch (error) {
-      if (!hasUsableMessage(error)) {
-        toast.error(t('profiles.slashCommands.saveFailed'));
-      }
+      reportRefusedSave(error);
       return;
     }
     closeForm();
   };
 
   const runUpdate = async (commandId: string, payload: KiloCommandUpdatePayload) => {
+    setServerNameConflict(false);
+    setSaveFailure(null);
     try {
       await updateKiloCommand.mutateAsync({ profileId, commandId, ...payload });
     } catch (error) {
-      if (!hasUsableMessage(error)) {
-        toast.error(t('profiles.slashCommands.saveFailed'));
-      }
+      reportRefusedSave(error);
       return;
     }
     closeForm();
@@ -225,7 +245,7 @@ export function ProfileKiloCommandsScreen({
               onEdit={
                 canManage
                   ? () => {
-                      setForm({ source });
+                      startEdit(source);
                     }
                   : undefined
               }
@@ -264,14 +284,20 @@ export function ProfileKiloCommandsScreen({
       {form !== null ? (
         <KiloCommandFormSheet
           command={form.source}
+          existingNames={commands
+            .filter(candidate => candidate.id !== form.source?.id)
+            .map(candidate => candidate.name)}
           isSaving={createKiloCommand.isPending || updateKiloCommand.isPending}
+          nameConflictFromServer={serverNameConflict}
+          saveFailure={saveFailure}
           onClose={closeForm}
           onCreate={payload => {
             void runCreate(payload);
           }}
           onUpdate={payload => {
-            if (form.source !== null) {
-              void runUpdate(form.source.id, payload);
+            const source = form.source;
+            if (source !== null) {
+              void runUpdate(source.id, payload);
             }
           }}
         />

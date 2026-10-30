@@ -4011,7 +4011,8 @@
       "nameRequired": "Immettere un nome di comando",
       "nameInvalid": "Il nome deve iniziare con una lettera minuscola e utilizzare solo lettere minuscole, numeri e trattini",
       "templateRequired": "Immettere un modello di comando",
-      "nameConflict": "Quel nome è riservato da un comando integrato"
+      "nameConflict": "Quel nome è riservato da un comando integrato",
+      "duplicateName": "Un comando con questo nome esiste già in questo profilo"
     },
     "repoBindings": {
       "title": "Profili predefiniti per repository",

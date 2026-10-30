@@ -3960,7 +3960,8 @@
       "nameRequired": "Masukkan nama arahan",
       "nameInvalid": "Nama mesti bermula dengan huruf kecil dan hanya menggunakan huruf kecil, angka dan sempang",
       "templateRequired": "Masukkan templat arahan",
-      "nameConflict": "Nama itu dikhaskan oleh arahan terbina dalam"
+      "nameConflict": "Nama itu dikhaskan oleh arahan terbina dalam",
+      "duplicateName": "Arahan dengan nama ini telah wujud dalam profil ini"
     },
     "repoBindings": {
       "title": "Profil Lalai untuk Repos",

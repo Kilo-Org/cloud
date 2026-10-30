@@ -4062,7 +4062,8 @@
       "nameRequired": "Vnesite ime ukaza",
       "nameInvalid": "Ime se mora začeti z malo začetnico in uporabljati samo male črke, številke in pomišljaje",
       "templateRequired": "Vnesite predlogo ukaza",
-      "nameConflict": "To ime je rezervirano z vgrajenim ukazom"
+      "nameConflict": "To ime je rezervirano z vgrajenim ukazom",
+      "duplicateName": "Ukaz s tem imenom v tem profilu že obstaja"
     },
     "repoBindings": {
       "title": "Privzeti profili za skladišča",

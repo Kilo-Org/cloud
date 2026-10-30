@@ -3960,7 +3960,8 @@
       "nameRequired": "Skriv inn et kommandonavn",
       "nameInvalid": "Navnet må begynne med en liten bokstav og kun bruke små bokstaver, sifre og bindestreker",
       "templateRequired": "Skriv inn en kommandomal",
-      "nameConflict": "Dette navnet er reservert av en innebygd kommando"
+      "nameConflict": "Dette navnet er reservert av en innebygd kommando",
+      "duplicateName": "En kommando med dette navnet finnes allerede i denne profilen"
     },
     "repoBindings": {
       "title": "Standardprofiler for Repos",

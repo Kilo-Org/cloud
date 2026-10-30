@@ -3960,7 +3960,8 @@
       "nameRequired": "Voer 'n opdragnaam in",
       "nameInvalid": "Naam moet met 'n kleinletter begin en slegs kleinletters, syfers en strepe gebruik",
       "templateRequired": "Voer 'n opdragsjabloon in",
-      "nameConflict": "Daardie naam word gereserveer deur 'n ingeboude opdrag"
+      "nameConflict": "Daardie naam word gereserveer deur 'n ingeboude opdrag",
+      "duplicateName": "Daardie naam word reeds gebruik deur 'n ander opdrag in hierdie profiel"
     },
     "repoBindings": {
       "title": "Verstekprofiele vir Repos",

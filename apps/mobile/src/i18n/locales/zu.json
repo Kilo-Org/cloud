@@ -3960,7 +3960,8 @@
       "nameRequired": "Faka igama lomyalo",
       "nameInvalid": "Igama kufanele liqale ngohlamvu oluncane futhi lisebenzise kuphela izinhlamvu ezincane, amadijithi, namadeshi",
       "templateRequired": "Faka isifanekiso somyalo",
-      "nameConflict": "Lelo gama ligodliwe umyalo owakhelwe ngaphakathi"
+      "nameConflict": "Lelo gama ligodliwe umyalo owakhelwe ngaphakathi",
+      "duplicateName": "Umyalo ongalelo gama usukhona kuleli phrofayili"
     },
     "repoBindings": {
       "title": "Amaphrofayili Azenzakalelayo we-Repos",

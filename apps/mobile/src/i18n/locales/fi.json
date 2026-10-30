@@ -3960,7 +3960,8 @@
       "nameRequired": "Anna komennon nimi",
       "nameInvalid": "Nimen tulee alkaa pienellä kirjaimella ja käyttää vain pieniä kirjaimia, numeroita ja väliviivoja",
       "templateRequired": "Anna komentomalli",
-      "nameConflict": "Tämän nimen on varannut sisäänrakennettu komento"
+      "nameConflict": "Tämän nimen on varannut sisäänrakennettu komento",
+      "duplicateName": "Samanniminen komento on jo olemassa tässä profiilissa"
     },
     "repoBindings": {
       "title": "Koodivarastojen oletusprofiilit",

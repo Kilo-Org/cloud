@@ -4062,7 +4062,8 @@
       "nameRequired": "Zadajte názov príkazu",
       "nameInvalid": "Názov musí začínať malým písmenom a používať iba malé písmená, číslice a pomlčky",
       "templateRequired": "Zadajte šablónu príkazu",
-      "nameConflict": "Tento názov je rezervovaný vstavaným príkazom"
+      "nameConflict": "Tento názov je rezervovaný vstavaným príkazom",
+      "duplicateName": "Príkaz s týmto názvom už v tomto profile existuje"
     },
     "repoBindings": {
       "title": "Predvolené profily pre úložiská",

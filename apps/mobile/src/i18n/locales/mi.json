@@ -3960,7 +3960,8 @@
       "nameRequired": "Whakauruhia he ingoa whakahau",
       "nameInvalid": "Me timata te ingoa ki te reta iti me te whakamahi i nga reta iti, nga mati me nga tohu",
       "templateRequired": "Whakauruhia he tauira whakahau",
-      "nameConflict": "Ko taua ingoa kua rahuitia e tetahi tono whakauru"
+      "nameConflict": "Ko taua ingoa kua rahuitia e tetahi tono whakauru",
+      "duplicateName": "Kei te whakamahia tenei ingoa e tetahi atu tono i tenei profile"
     },
     "repoBindings": {
       "title": "Kōtaha Taunoa mō Repos",

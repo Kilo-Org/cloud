@@ -645,7 +645,12 @@
       "loading": "Kei te utaina te pouakauru",
       "noReviewRequests": "Kāore he tono arotake",
       "noReviewRequestsDescription": "Ka puta i konei ngā tono kume e tatari ana kia arotakehia e koe. Ka taea tonu e koe te whakapiri i tētahi hono PR ki runga.",
-      "couldNotLoad": "Kāore i taea te uta i te pouakauru."
+      "couldNotLoad": "Kāore i taea te uta i te pouakauru.",
+      "accessLostTitle": "Kāore he uru ki tēnei rōpū",
+      "accessLostDescription": "Kāore koe he mema o tēnei rōpū ināianei, nō reira kāore e taea te uta i ōna tono arotake. Haere tonu i tō pūkete whaiaro kia haere tonu te arotake.",
+      "organizationUnavailableTitle": "Kāore tēnei rōpū e ora ana",
+      "organizationUnavailableDescription": "Kua tangohia tēnei rōpū, nō reira kāore e taea te uta i ōna tono arotake. Haere tonu i tō pūkete whaiaro kia haere tonu te arotake.",
+      "continueInPersonal": "Haere tonu i te pūkete whaiaro"
     },
     "composer": {
       "commentBodyPlaceholder": "He kōrero…",
@@ -1939,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Tiakina ngā huringa",
+      "saved": "Kua tiakina ngā tautuhinga",
       "unsavedTitle": "Ngā huringa kāore i tiakina",
       "unsavedMessage": "Me tiaki ō huringa i mua i te wehe atu i tēnei mata?",
       "unsavedInvalidMessage": "Kāore anō ēnei huringa e taea te tiaki. Whakatikahia kia tiakina ai, whakarere rānei kia wehe atu ai."
@@ -2980,7 +2986,9 @@
     "permissionDescription": "Kāore koe e whakaaetia kia tiro ki tēnei.",
     "notFoundDescription": "Kua tangohia pea tēnei mea, kua kore rānei e wātea.",
     "serverTitle": "Kāore i taea te uta.",
-    "serverDescription": "I puta he hapa i tō mātou taha. Whakamātau anō."
+    "serverDescription": "I puta he hapa i tō mātou taha. Whakamātau anō.",
+    "timeoutTitle": "Kua roa rawa te tūmau",
+    "timeoutDescription": "Kua taka te wā o te tono i tehe mai i tōna otinga. Whakamātau anō."
   },
   "screenHeader": {
     "openMenu": "Whakatuwheratia te tahua",

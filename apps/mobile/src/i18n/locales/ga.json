@@ -690,7 +690,12 @@
       "loading": "Ag lódáil an bhosca ionphoist",
       "noReviewRequests": "Gan aon iarratas athbhreithnithe",
       "noReviewRequestsDescription": "Taispeántar anseo na hiarratais tarraingthe atá ag fanacht le d'athbhreithniú. Is féidir leat nasc PR ar bith a ghreamú thuas fós.",
-      "couldNotLoad": "Níorbh fhéidir an bosca ionphoist a lódáil."
+      "couldNotLoad": "Níorbh fhéidir an bosca ionphoist a lódáil.",
+      "accessLostTitle": "Gan rochtain ar an eagraíocht seo",
+      "accessLostDescription": "Ní ball den eagraíocht seo a thuilleadh, mar sin ní féidir na hiarratais athbhreithnithe a lódáil. Lean ar aghaidh i do chuntas pearsanta chun athbhreithniú a dhéanamh fós.",
+      "organizationUnavailableTitle": "Níl an eagraíocht seo ann a thuilleadh",
+      "organizationUnavailableDescription": "Scriosadh an eagraíocht seo, mar sin ní féidir na hiarratais athbhreithnithe a lódáil. Lean ar aghaidh i do chuntas pearsanta chun athbhreithniú a dhéanamh fós.",
+      "continueInPersonal": "Lean ar aghaidh sa chuntas pearsanta"
     },
     "composer": {
       "commentBodyPlaceholder": "Do thrácht…",
@@ -2017,6 +2022,7 @@
     },
     "settingsSave": {
       "saveChanges": "Sábháil athruithe",
+      "saved": "Socruithe sábháilte",
       "unsavedTitle": "Athruithe gan sábháil",
       "unsavedMessage": "Ar mhaith leat d'athruithe a shábháil sula bhfágann tú an scáileán seo?",
       "unsavedInvalidMessage": "Ní féidir na hathruithe seo a shábháil fós. Ceartaigh iad le sábháil, nó caith uait iad le fágáil."
@@ -3106,7 +3112,9 @@
     "permissionDescription": "Níl cead agat é seo a fheiceáil.",
     "notFoundDescription": "Seans gur baineadh an mhír seo nó nach bhfuil sí ar fáil a thuilleadh.",
     "serverTitle": "Níorbh fhéidir an t-ábhar a lódáil.",
-    "serverDescription": "Tharla fadhb ar ár dtaobh féin. Bain triail as arís."
+    "serverDescription": "Tharla fadhb ar ár dtaobh féin. Bain triail as arís.",
+    "timeoutTitle": "Tá an freastalaí ag glacadh rófhada",
+    "timeoutDescription": "Níor chríochnaigh an t-iarratas in am. Bain triail as arís."
   },
   "screenHeader": {
     "openMenu": "Oscail roghchlár",

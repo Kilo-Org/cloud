@@ -1471,6 +1471,7 @@
     },
     "settingsSave": {
       "saveChanges": "保存更改",
+      "saved": "设置已保存",
       "unsavedMessage": "离开此页面前，要保存更改吗？",
       "unsavedInvalidMessage": "这些更改暂时无法保存。请修正后再保存，或放弃更改以离开。",
       "unsavedTitle": "未保存的更改"
@@ -2456,7 +2457,9 @@
     "permissionDescription": "你无权查看此内容。",
     "notFoundDescription": "此内容可能已被移除或已无法访问。",
     "serverTitle": "无法加载内容",
-    "serverDescription": "服务出现问题。请重试。"
+    "serverDescription": "服务出现问题。请重试。",
+    "timeoutTitle": "服务器响应缓慢",
+    "timeoutDescription": "请求超时，未能完成。请重试。"
   },
   "screenHeader": {
     "openMenu": "打开菜单",
@@ -2914,6 +2917,11 @@
     },
     "inbox": {
       "couldNotLoad": "无法加载收件箱",
+      "accessLostTitle": "无法访问此组织",
+      "accessLostDescription": "你已不再是此组织的成员，因此无法加载其审查请求。切换到个人账户继续审查。",
+      "organizationUnavailableTitle": "此组织已不存在",
+      "organizationUnavailableDescription": "此组织已被删除，因此无法加载其审查请求。切换到个人账户继续审查。",
+      "continueInPersonal": "继续使用个人账户",
       "loading": "正在加载收件箱",
       "noReviewRequests": "暂无审查请求",
       "noReviewRequestsDescription": "等待你审查的拉取请求会显示在这里。你也可以在上方粘贴任意 PR 链接。",

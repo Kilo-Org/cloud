@@ -10,6 +10,7 @@ import {
   GatewayUserByokProviderIdSchema,
   UserByokProviderIdSchema,
   isGatewayUserByokProviderId,
+  isVercelUserByokProviderAllowed,
   type UserByokProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { withIgnoredProviders } from '@kilocode/web-shared/lib/ai-gateway/providers/apply-provider-specific-logic';
@@ -404,11 +405,21 @@ async function getGatewayRoutedByok(
   user: User | AnonymousUserContext,
   requestedModel: string,
   organizationId: string | undefined,
-  options: { includeGatewayKeys: boolean }
+  options: {
+    includeGatewayKeys: boolean;
+    getAllowedProviders: () => Promise<ReadonlySet<string> | undefined>;
+  }
 ): Promise<GatewayRoutedByok<BYOKResult>> {
   const none: GatewayRoutedByok<BYOKResult> = { inference: [], gateway: [] };
   if (isAnonymousContext(user)) return none;
-  const candidateProviders = await getGatewayRoutedByokCandidateProviders(requestedModel, options);
+  const allProviders = await getGatewayRoutedByokCandidateProviders(requestedModel, options);
+  if (allProviders.length === 0) return none;
+  // Keys for providers outside the organization allow-list are never loaded, so a later route that
+  // honors the allow-list takes the request, and an undecryptable allowed key still fails closed.
+  const allowedProviders = await options.getAllowedProviders();
+  const candidateProviders = allProviders.filter(providerId =>
+    isVercelUserByokProviderAllowed(providerId, allowedProviders)
+  );
   if (candidateProviders.length === 0) return none;
   const userByok =
     (organizationId
@@ -416,6 +427,8 @@ async function getGatewayRoutedByok(
       : await getBYOKforUser(readDb, user.id, candidateProviders)) ?? [];
   return splitGatewayRoutedByok(userByok, requestedModel);
 }
+
+const noProviderAllowList = async () => undefined;
 
 /**
  * Prefers the Vercel AI Gateway key when Vercel can serve the model under the
@@ -473,6 +486,10 @@ export type GetProviderInput = {
   /** Resolves organization/group provider policy only when selecting a managed
    * gateway. Direct BYOK and custom LLM routes do not use it. */
   getRoutingProviderConfig?: () => Promise<OpenRouterProviderConfig | undefined>;
+  /** The OpenRouter provider slugs the organization policy allows for the model, or undefined
+   * when it does not restrict providers. Provider keys sent through Vercel must honor it (see
+   * `isVercelUserByokProviderAllowed`). */
+  getAllowedProviders?: () => Promise<ReadonlySet<string> | undefined>;
   /** Kilo's own provider exclusions for the model (see `getIgnoredProviders`).
    * They apply to routes Kilo pays for, never to a user's own gateway key. */
   kiloIgnoredProviders?: string[];
@@ -498,6 +515,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
     organizationId,
     botId,
     getRoutingProviderConfig,
+    getAllowedProviders = noProviderAllowList,
     kiloIgnoredProviders = [],
     boundedSpending = false,
     countryCode = null,
@@ -558,6 +576,7 @@ export async function getProvider(input: GetProviderInput): Promise<GetProviderR
 
   const gatewayRoutedByok = await getGatewayRoutedByok(user, requestedModel, organizationId, {
     includeGatewayKeys: true,
+    getAllowedProviders,
   });
   if (gatewayRoutedByok.inference.length > 0) {
     return {
@@ -794,12 +813,14 @@ export async function previewByokRouting({
 export async function getEmbeddingProvider(
   requestedModel: string,
   user: User | AnonymousUserContext,
-  organizationId: string | undefined
+  organizationId: string | undefined,
+  allowedProviders?: ReadonlySet<string>
 ): Promise<{ provider: Provider; userByok: BYOKResult[] | null; isFree: boolean }> {
   const isFree = isFreeModelExcludingCustomLlms(requestedModel);
   // 1. BYOK check — route through Vercel AI Gateway when user has their own key
   const { inference } = await getGatewayRoutedByok(user, requestedModel, organizationId, {
     includeGatewayKeys: false,
+    getAllowedProviders: async () => allowedProviders,
   });
   if (inference.length > 0) {
     return { provider: VERCEL_AI_GATEWAY, userByok: inference, isFree };

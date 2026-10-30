@@ -42,7 +42,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Non collegato",
     "notifications": "Notifiche",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repository",
     "securityAgent": "Agente di sicurezza",
     "unknown": "Sconosciuto",
@@ -1447,6 +1447,7 @@
     },
     "settingsSave": {
       "saveChanges": "Salva le modifiche",
+      "saved": "Impostazioni salvate",
       "unsavedMessage": "Salvare le modifiche prima di uscire da questa schermata?",
       "unsavedInvalidMessage": "Queste modifiche non possono ancora essere salvate. Correggile per salvare o scartale per uscire.",
       "unsavedTitle": "Modifiche non salvate"
@@ -2479,7 +2480,9 @@
     "permissionDescription": "Non hai il permesso di visualizzare questo contenuto.",
     "notFoundDescription": "Questo elemento potrebbe essere stato rimosso o non essere più disponibile.",
     "serverTitle": "Impossibile caricare i dati.",
-    "serverDescription": "Si è verificato un problema nel nostro sistema. Riprova."
+    "serverDescription": "Si è verificato un problema nel nostro sistema. Riprova.",
+    "timeoutTitle": "Il server sta impiegando troppo tempo",
+    "timeoutDescription": "La richiesta è scaduta prima di essere completata. Riprova."
   },
   "screenHeader": {
     "openMenu": "Apri il menu",
@@ -2952,6 +2955,11 @@
     },
     "inbox": {
       "couldNotLoad": "Impossibile caricare la posta in arrivo.",
+      "accessLostTitle": "Nessun accesso a questa organizzazione",
+      "accessLostDescription": "Non fai più parte di questa organizzazione, quindi non è possibile caricarne le richieste di revisione. Continua con il tuo account personale per continuare a revisionare.",
+      "organizationUnavailableTitle": "Questa organizzazione non esiste più",
+      "organizationUnavailableDescription": "Questa organizzazione è stata eliminata, quindi non è possibile caricarne le richieste di revisione. Continua con il tuo account personale per continuare a revisionare.",
+      "continueInPersonal": "Continua con l'account personale",
       "loading": "Caricamento della posta in arrivo",
       "noReviewRequests": "Nessuna richiesta di revisione",
       "noReviewRequestsDescription": "Qui trovi le pull request in attesa della tua revisione. Puoi comunque incollare qui sopra il collegamento a qualsiasi PR.",

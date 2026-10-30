@@ -645,7 +645,12 @@
       "loading": "Na-ebudata igbe nnabata",
       "noReviewRequests": "Enweghị arịrịọ nyocha",
       "noReviewRequestsDescription": "Arịrịọ njikọta na-echere nyocha gị na-apụta ebe a. Ị ka nwere ike ịmado njikọ PR ọ bụla n'elu.",
-      "couldNotLoad": "Enweghị ike ibudata igbe nnabata."
+      "couldNotLoad": "Enweghị ike ibudata igbe nnabata.",
+      "accessLostTitle": "Enweghị mgbanye n'ụlọ ọrụ a",
+      "accessLostDescription": "Ị abụghịzi onye òtù ụlọ ọrụ a, ya mere enweghị ike ibudata arịrịọ nyocha ya. Gaa n'ihu na akaụntụ nkeonwe gị ka ị wee nwee ike ịga n'ihu na nyocha.",
+      "organizationUnavailableTitle": "Ụlọ ọrụ a adịkwaghị",
+      "organizationUnavailableDescription": "Ehichapụla ụlọ ọrụ a, ya mere enweghị ike ibudata arịrịọ nyocha ya. Gaa n'ihu na akaụntụ nkeonwe gị ka ị wee nwee ike ịga n'ihu na nyocha.",
+      "continueInPersonal": "Gaa n'ihu na akaụntụ nkeonwe"
     },
     "composer": {
       "commentBodyPlaceholder": "Okwu gị",
@@ -743,7 +748,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Dezie okwu ochie na-eche iziga na {{location}}",
       "editA11y": "Dezie okwu na-eche iziga na {{location}}",
-      "staleHint": "pR ahụ agbanweela kemgbe ị dere nke a.",
+      "staleHint": "PR ahụ agbanweela kemgbe ị dere nke a.",
       "deleteA11y": "Hichapụ okwu na-eche iziga na {{location}}",
       "deletedAnnouncement": "Ehichapụla okwu na-eche iziga",
       "noCommentsQueued": "Enweghị okwu na-eche iziga. A ga-eziga nyocha ahụ naanị na omume dị n'elu.",
@@ -1939,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Chekwaa mgbanwe",
+      "saved": "Echekwara ntọala",
       "unsavedTitle": "Mgbanwe echekwaghị",
       "unsavedMessage": "Chekwaa mgbanwe gị tupu ịhapụ ihuenyo a?",
       "unsavedInvalidMessage": "Enweghị ike ichekwa mgbanwe ndị a ugbu a. Dozie ha iji chekwaa, ma ọ bụ tụfuo ha iji pụọ."
@@ -2980,7 +2986,9 @@
     "permissionDescription": "Ị nweghị ikike ile nke a.",
     "notFoundDescription": "O nwere ike ịbụ na ewepụla ihe a ma ọ bụ na ọ dịkwaghị.",
     "serverTitle": "Enweghị ike ibudata ya.",
-    "serverDescription": "Enwere nsogbu n'akụkụ anyị. Biko nwaa ọzọ."
+    "serverDescription": "Enwere nsogbu n'akụkụ anyị. Biko nwaa ọzọ.",
+    "timeoutTitle": "Ọ na-ewe oge karịa akarị",
+    "timeoutDescription": "Arịrịọ ahụ enweghị ike imecha tupu oge ya agwụ. Biko nwaa ọzọ."
   },
   "screenHeader": {
     "openMenu": "Mepee ndepụta nhọrọ",

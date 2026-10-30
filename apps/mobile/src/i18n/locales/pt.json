@@ -42,7 +42,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Sem ligação",
     "notifications": "Notificações",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repositórios",
     "securityAgent": "Agente de segurança",
     "unknown": "Desconhecido",
@@ -660,7 +660,12 @@
       "loading": "A carregar a caixa de entrada",
       "noReviewRequests": "Sem pedidos de revisão",
       "noReviewRequestsDescription": "Os PRs que aguardam a tua revisão aparecem aqui. Também podes colar qualquer ligação de PR acima.",
-      "couldNotLoad": "Não foi possível carregar a caixa de entrada."
+      "couldNotLoad": "Não foi possível carregar a caixa de entrada.",
+      "accessLostTitle": "Sem acesso a esta organização",
+      "accessLostDescription": "Já não és membro desta organização, por isso não é possível carregar os seus pedidos de revisão. Continua na tua conta pessoal para continuares a rever.",
+      "organizationUnavailableTitle": "Esta organização já não existe",
+      "organizationUnavailableDescription": "Esta organização foi eliminada, por isso não é possível carregar os seus pedidos de revisão. Continua na tua conta pessoal para continuares a rever.",
+      "continueInPersonal": "Continuar na conta pessoal"
     },
     "composer": {
       "commentBodyPlaceholder": "O teu comentário",
@@ -1965,6 +1970,7 @@
     },
     "settingsSave": {
       "saveChanges": "Guardar alterações",
+      "saved": "Definições guardadas",
       "unsavedTitle": "Alterações não guardadas",
       "unsavedMessage": "Guardar as alterações antes de sair deste ecrã?",
       "unsavedInvalidMessage": "Estas alterações ainda não podem ser guardadas. Corrija-as para guardar ou descarte-as para sair."
@@ -2212,7 +2218,7 @@
       "dollar_many": "dólares",
       "costSpoken": "custo de {{cost}}",
       "costSpokenWithTime": "custo de {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}",
+      "pullRequest": "PR {{number}}",
       "spokenJoiner": "e"
     },
     "githubInstall": {
@@ -2912,9 +2918,9 @@
     },
     "prBadge": {
       "open": "abrir PR",
-      "closed": "pR fechado",
-      "merged": "pR integrado",
-      "draft": "pR em rascunho",
+      "closed": "PR fechado",
+      "merged": "PR integrado",
+      "draft": "PR em rascunho",
       "updating": "A atualizar, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -3022,7 +3028,9 @@
     "permissionDescription": "Não tens permissão para ver este conteúdo.",
     "notFoundDescription": "Este item pode ter sido removido ou já não está disponível.",
     "serverTitle": "Não foi possível carregar os dados.",
-    "serverDescription": "Ocorreu um problema do nosso lado. Tenta novamente."
+    "serverDescription": "Ocorreu um problema do nosso lado. Tenta novamente.",
+    "timeoutTitle": "O servidor está muito lento",
+    "timeoutDescription": "O pedido não terminou a tempo. Tenta novamente."
   },
   "screenHeader": {
     "openMenu": "Abrir menu",

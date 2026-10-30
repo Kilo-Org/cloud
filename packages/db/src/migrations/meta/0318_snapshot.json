@@ -1,5 +1,5 @@
 {
-  "id": "e61044d5-09c2-4065-849f-8674ef9044a4",
+  "id": "78526b5b-2e91-4c89-b913-1ab241684acc",
   "prevId": "d628e7c9-1f05-4e6c-a12e-3aef0ecc089c",
   "version": "7",
   "dialect": "postgresql",
@@ -24155,126 +24155,6 @@
       },
       "isRLSEnabled": false
     },
-    "public.oauth_refresh_exchange_leases": {
-      "name": "oauth_refresh_exchange_leases",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "uuid",
-          "primaryKey": true,
-          "notNull": true,
-          "default": "pg_catalog.gen_random_uuid()"
-        },
-        "platform_oauth_credential_id": {
-          "name": "platform_oauth_credential_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "user_github_app_token_id": {
-          "name": "user_github_app_token_id",
-          "type": "uuid",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "attempt_id": {
-          "name": "attempt_id",
-          "type": "text",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "expires_at": {
-          "name": "expires_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp with time zone",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {
-        "UQ_oauth_refresh_exchange_leases_platform_oauth_credential_id": {
-          "name": "UQ_oauth_refresh_exchange_leases_platform_oauth_credential_id",
-          "columns": [
-            {
-              "expression": "platform_oauth_credential_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"oauth_refresh_exchange_leases\".\"platform_oauth_credential_id\" is not null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "UQ_oauth_refresh_exchange_leases_user_github_app_token_id": {
-          "name": "UQ_oauth_refresh_exchange_leases_user_github_app_token_id",
-          "columns": [
-            {
-              "expression": "user_github_app_token_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": true,
-          "where": "\"oauth_refresh_exchange_leases\".\"user_github_app_token_id\" is not null",
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        }
-      },
-      "foreignKeys": {
-        "oauth_refresh_exchange_leases_platform_oauth_credential_id_platform_oauth_credentials_id_fk": {
-          "name": "oauth_refresh_exchange_leases_platform_oauth_credential_id_platform_oauth_credentials_id_fk",
-          "tableFrom": "oauth_refresh_exchange_leases",
-          "tableTo": "platform_oauth_credentials",
-          "columnsFrom": [
-            "platform_oauth_credential_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        },
-        "oauth_refresh_exchange_leases_user_github_app_token_id_user_github_app_tokens_id_fk": {
-          "name": "oauth_refresh_exchange_leases_user_github_app_token_id_user_github_app_tokens_id_fk",
-          "tableFrom": "oauth_refresh_exchange_leases",
-          "tableTo": "user_github_app_tokens",
-          "columnsFrom": [
-            "user_github_app_token_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {},
-      "policies": {},
-      "checkConstraints": {
-        "oauth_refresh_exchange_leases_owner_check": {
-          "name": "oauth_refresh_exchange_leases_owner_check",
-          "value": "num_nonnulls(\"oauth_refresh_exchange_leases\".\"platform_oauth_credential_id\", \"oauth_refresh_exchange_leases\".\"user_github_app_token_id\") = 1"
-        },
-        "oauth_refresh_exchange_leases_attempt_id_check": {
-          "name": "oauth_refresh_exchange_leases_attempt_id_check",
-          "value": "\"oauth_refresh_exchange_leases\".\"attempt_id\" <> ''"
-        }
-      },
-      "isRLSEnabled": false
-    },
     "public.openai_chatgpt_connections": {
       "name": "openai_chatgpt_connections",
       "schema": "",
@@ -40143,6 +40023,12 @@
           "primaryKey": false,
           "notNull": false
         },
+        "non_inference_cost": {
+          "name": "non_inference_cost",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
         "is_free": {
           "name": "is_free",
           "type": "boolean",
@@ -40162,7 +40048,7 @@
           "notNull": false
         }
       },
-      "definition": "\n  SELECT\n    mu.id,\n    mu.kilo_user_id,\n    meta.message_id,\n    mu.cost,\n    mu.input_tokens,\n    mu.output_tokens,\n    mu.cache_write_tokens,\n    mu.cache_hit_tokens,\n    mu.created_at,\n    ip.http_ip AS http_x_forwarded_for,\n    city.vercel_ip_city AS http_x_vercel_ip_city,\n    country.vercel_ip_country AS http_x_vercel_ip_country,\n    meta.vercel_ip_latitude AS http_x_vercel_ip_latitude,\n    meta.vercel_ip_longitude AS http_x_vercel_ip_longitude,\n    ja4.ja4_digest AS http_x_vercel_ja4_digest,\n    mu.provider,\n    mu.model,\n    mu.requested_model,\n    meta.user_prompt_prefix,\n    spp.system_prompt_prefix,\n    meta.system_prompt_length,\n    ua.http_user_agent,\n    mu.cache_discount,\n    meta.max_tokens,\n    meta.has_middle_out_transform,\n    mu.has_error,\n    mu.abuse_classification,\n    mu.organization_id,\n    mu.inference_provider,\n    mu.project_id,\n    meta.status_code,\n    meta.upstream_id,\n    frfr.finish_reason,\n    meta.latency,\n    meta.moderation_latency,\n    meta.generation_time,\n    meta.is_byok,\n    meta.is_user_byok,\n    meta.streamed,\n    meta.cancelled,\n    edit.editor_name,\n    ak.api_kind,\n    meta.has_tools,\n    meta.machine_id,\n    feat.feature,\n    meta.session_id,\n    md.mode,\n    am.auto_model,\n    rs.reasoning_setting,\n    meta.market_cost,\n    meta.is_free,\n    meta.abuse_delay,\n    meta.abuse_downgraded_from\n  FROM \"microdollar_usage\" mu\n  LEFT JOIN \"microdollar_usage_metadata\" meta ON mu.id = meta.id\n  LEFT JOIN \"http_ip\" ip ON meta.http_ip_id = ip.http_ip_id\n  LEFT JOIN \"vercel_ip_city\" city ON meta.vercel_ip_city_id = city.vercel_ip_city_id\n  LEFT JOIN \"vercel_ip_country\" country ON meta.vercel_ip_country_id = country.vercel_ip_country_id\n  LEFT JOIN \"ja4_digest\" ja4 ON meta.ja4_digest_id = ja4.ja4_digest_id\n  LEFT JOIN \"system_prompt_prefix\" spp ON meta.system_prompt_prefix_id = spp.system_prompt_prefix_id\n  LEFT JOIN \"http_user_agent\" ua ON meta.http_user_agent_id = ua.http_user_agent_id\n  LEFT JOIN \"finish_reason\" frfr ON meta.finish_reason_id = frfr.finish_reason_id\n  LEFT JOIN \"editor_name\" edit ON meta.editor_name_id = edit.editor_name_id\n  LEFT JOIN \"api_kind\" ak ON meta.api_kind_id = ak.api_kind_id\n  LEFT JOIN \"feature\" feat ON meta.feature_id = feat.feature_id\n  LEFT JOIN \"mode\" md ON meta.mode_id = md.mode_id\n  LEFT JOIN \"auto_model\" am ON meta.auto_model_id = am.auto_model_id\n  LEFT JOIN \"reasoning_setting\" rs ON meta.reasoning_setting_id = rs.reasoning_setting_id\n",
+      "definition": "\n  SELECT\n    mu.id,\n    mu.kilo_user_id,\n    meta.message_id,\n    mu.cost,\n    mu.input_tokens,\n    mu.output_tokens,\n    mu.cache_write_tokens,\n    mu.cache_hit_tokens,\n    mu.created_at,\n    ip.http_ip AS http_x_forwarded_for,\n    city.vercel_ip_city AS http_x_vercel_ip_city,\n    country.vercel_ip_country AS http_x_vercel_ip_country,\n    meta.vercel_ip_latitude AS http_x_vercel_ip_latitude,\n    meta.vercel_ip_longitude AS http_x_vercel_ip_longitude,\n    ja4.ja4_digest AS http_x_vercel_ja4_digest,\n    mu.provider,\n    mu.model,\n    mu.requested_model,\n    meta.user_prompt_prefix,\n    spp.system_prompt_prefix,\n    meta.system_prompt_length,\n    ua.http_user_agent,\n    mu.cache_discount,\n    meta.max_tokens,\n    meta.has_middle_out_transform,\n    mu.has_error,\n    mu.abuse_classification,\n    mu.organization_id,\n    mu.inference_provider,\n    mu.project_id,\n    meta.status_code,\n    meta.upstream_id,\n    frfr.finish_reason,\n    meta.latency,\n    meta.moderation_latency,\n    meta.generation_time,\n    meta.is_byok,\n    meta.is_user_byok,\n    meta.streamed,\n    meta.cancelled,\n    edit.editor_name,\n    ak.api_kind,\n    meta.has_tools,\n    meta.machine_id,\n    feat.feature,\n    meta.session_id,\n    md.mode,\n    am.auto_model,\n    rs.reasoning_setting,\n    meta.market_cost,\n    meta.non_inference_cost,\n    meta.is_free,\n    meta.abuse_delay,\n    meta.abuse_downgraded_from\n  FROM \"microdollar_usage\" mu\n  LEFT JOIN \"microdollar_usage_metadata\" meta ON mu.id = meta.id\n  LEFT JOIN \"http_ip\" ip ON meta.http_ip_id = ip.http_ip_id\n  LEFT JOIN \"vercel_ip_city\" city ON meta.vercel_ip_city_id = city.vercel_ip_city_id\n  LEFT JOIN \"vercel_ip_country\" country ON meta.vercel_ip_country_id = country.vercel_ip_country_id\n  LEFT JOIN \"ja4_digest\" ja4 ON meta.ja4_digest_id = ja4.ja4_digest_id\n  LEFT JOIN \"system_prompt_prefix\" spp ON meta.system_prompt_prefix_id = spp.system_prompt_prefix_id\n  LEFT JOIN \"http_user_agent\" ua ON meta.http_user_agent_id = ua.http_user_agent_id\n  LEFT JOIN \"finish_reason\" frfr ON meta.finish_reason_id = frfr.finish_reason_id\n  LEFT JOIN \"editor_name\" edit ON meta.editor_name_id = edit.editor_name_id\n  LEFT JOIN \"api_kind\" ak ON meta.api_kind_id = ak.api_kind_id\n  LEFT JOIN \"feature\" feat ON meta.feature_id = feat.feature_id\n  LEFT JOIN \"mode\" md ON meta.mode_id = md.mode_id\n  LEFT JOIN \"auto_model\" am ON meta.auto_model_id = am.auto_model_id\n  LEFT JOIN \"reasoning_setting\" rs ON meta.reasoning_setting_id = rs.reasoning_setting_id\n",
       "name": "microdollar_usage_view",
       "schema": "public",
       "isExisting": false,

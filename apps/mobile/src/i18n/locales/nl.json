@@ -42,7 +42,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Niet gekoppeld",
     "notifications": "Meldingen",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Coderepository's",
     "securityAgent": "Beveiligingsagent",
     "unknown": "Onbekend",
@@ -1471,6 +1471,7 @@
     },
     "settingsSave": {
       "saveChanges": "Wijzigingen opslaan",
+      "saved": "Instellingen opgeslagen",
       "unsavedMessage": "Je wijzigingen opslaan voordat je dit scherm verlaat?",
       "unsavedInvalidMessage": "Deze wijzigingen kunnen nog niet worden opgeslagen. Corrigeer ze om op te slaan, of verwerp ze om te vertrekken.",
       "unsavedTitle": "Niet-opgeslagen wijzigingen"
@@ -1657,7 +1658,7 @@
       "dollar_other": "dollar",
       "costSpoken": "kosten {{cost}}",
       "costSpokenWithTime": "kosten {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}",
+      "pullRequest": "PR {{number}}",
       "spokenJoiner": "en"
     },
     "githubInstall": {
@@ -2346,7 +2347,7 @@
       "unavailable": "Deze sessie kan geen toestemmingsverzoeken ontvangen."
     },
     "prBadge": {
-      "open": "pR openen",
+      "open": "PR openen",
       "closed": "gesloten PR",
       "merged": "samengevoegde PR",
       "draft": "concept-PR",
@@ -2456,7 +2457,9 @@
     "permissionDescription": "Je hebt geen toestemming om dit te bekijken.",
     "notFoundDescription": "Dit item is mogelijk verwijderd of is niet meer beschikbaar.",
     "serverTitle": "Het laden is mislukt.",
-    "serverDescription": "Er is aan onze kant iets misgegaan. Probeer het opnieuw."
+    "serverDescription": "Er is aan onze kant iets misgegaan. Probeer het opnieuw.",
+    "timeoutTitle": "De server doet er te lang over",
+    "timeoutDescription": "Het verzoek duurde te lang. Probeer het opnieuw."
   },
   "screenHeader": {
     "openMenu": "Menu openen",
@@ -2914,6 +2917,11 @@
     },
     "inbox": {
       "couldNotLoad": "Het postvak IN kon niet worden geladen.",
+      "accessLostTitle": "Geen toegang tot deze organisatie",
+      "accessLostDescription": "Je bent geen lid meer van deze organisatie, dus de beoordelingsverzoeken kunnen niet worden geladen. Ga door in je persoonlijke account om verder te gaan met beoordelen.",
+      "organizationUnavailableTitle": "Deze organisatie bestaat niet meer",
+      "organizationUnavailableDescription": "Deze organisatie is verwijderd, dus de beoordelingsverzoeken kunnen niet worden geladen. Ga door in je persoonlijke account om verder te gaan met beoordelen.",
+      "continueInPersonal": "Doorgaan in persoonlijk account",
       "loading": "Postvak IN laden",
       "noReviewRequests": "Geen beoordelingsverzoeken",
       "noReviewRequestsDescription": "Hier verschijnen PR's die op je beoordeling wachten. Je kunt hierboven ook een andere PR-koppeling plakken.",

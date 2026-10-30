@@ -4,6 +4,7 @@ import { ByokApiKeySettingsSchema } from '@kilocode/db/schema-types';
 import { and, eq, inArray, sql, type SQL } from 'drizzle-orm';
 import { captureException } from '@sentry/nextjs';
 import type { BYOKApiKeyEnvelope, EncryptedData } from '@kilocode/db/schema-types';
+import { claimFailureReport } from '@kilocode/web-shared/lib/ai-gateway/byok/failure-reports';
 import {
   decryptByokEnvelope,
   getByokKmsClientConfig,
@@ -16,6 +17,7 @@ import {
   UserByokProviderIdSchema,
   getVercelUserByokProviderIdForEndpoint,
   isGatewayUserByokProviderId,
+  isVercelUserByokProviderAllowed,
   type GatewayUserByokProviderId,
   type UserByokProviderId,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
@@ -299,11 +301,15 @@ export async function addUserByokAvailability(
   return modelsWithAvailability;
 }
 
+const NO_ALLOWED_PROVIDERS: ReadonlySet<string> = new Set();
+
 /**
- * Whether an inference provider key among `enabledProviderIds` serves `modelId`, as `getProvider`
- * routes it: a direct BYOK key in catalog mode (`directByokCatalogModelIds`), or a provider key
- * sent through Vercel. Gateway keys leave the choice of provider to the gateway, so they do not
- * count, and neither does any key for an id a custom LLM owns, which `getProvider` serves first.
+ * Whether an inference provider key among `enabledProviderIds` serves `modelId` although the
+ * organization provider allow-list admits none of its providers, as `getProvider` routes it: a
+ * direct BYOK key in catalog mode (`directByokCatalogModelIds`), or a provider key sent through
+ * Vercel whose provider the allow-list cannot name (see `isVercelUserByokProviderAllowed`).
+ * Gateway keys leave the choice of provider to the gateway, so they do not count, and neither does
+ * any key for an id a custom LLM owns, which `getProvider` serves first.
  * Catalog passes call this once per model, so it reads the lookup without writing a record.
  */
 export async function hasInferenceProviderUserByokForModel(
@@ -317,7 +323,11 @@ export async function hasInferenceProviderUserByokForModel(
     return false;
   }
   const modelProviders = (await lookupInferenceUserByokProviders(modelId)) ?? [];
-  return modelProviders.some(providerId => enabledProviderIds.includes(providerId));
+  return modelProviders.some(
+    providerId =>
+      enabledProviderIds.includes(providerId) &&
+      isVercelUserByokProviderAllowed(providerId, NO_ALLOWED_PROVIDERS)
+  );
 }
 
 /** Whether `userByok` are inference provider keys rather than a gateway key. */
@@ -456,11 +466,17 @@ async function queryByokCredentials(
 
   const credentials: ByokCredential[] = [];
   const failures: unknown[] = [];
-  for (const result of results) {
-    if (result.status === 'fulfilled') credentials.push(result.value);
-    else failures.push(result.reason);
+  for (const [index, result] of results.entries()) {
+    if (result.status === 'fulfilled') {
+      credentials.push(result.value);
+      continue;
+    }
+    failures.push(result.reason);
+    // A key that stays undecryptable reports once per window instead of once per lookup.
+    if (claimFailureReport(rows[index].id, Date.now())) {
+      captureException(result.reason, { tags: { source: 'byok_decrypt' } });
+    }
   }
-  for (const failure of failures) captureException(failure);
 
   // Fail closed when no key could be decrypted so the request never falls back to Kilo-paid routing.
   if (credentials.length === 0 && failures.length > 0) throw failures[0];

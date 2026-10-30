@@ -705,7 +705,12 @@
       "loading": "Yn llwytho'r blwch derbyn",
       "noReviewRequests": "Dim ceisiadau adolygu",
       "noReviewRequestsDescription": "Mae ceisiadau tynnu sy'n aros am eich adolygiad yn ymddangos yma. Gallwch barhau i ludo unrhyw ddolen PR uchod.",
-      "couldNotLoad": "Ni lwyddwyd i lwytho'r blwch derbyn."
+      "couldNotLoad": "Ni lwyddwyd i lwytho'r blwch derbyn.",
+      "accessLostTitle": "Dim mynediad i'r sefydliad hwn",
+      "accessLostDescription": "Nid ydych yn aelod o'r sefydliad hwn mwyach, felly nid oes modd llwytho'i geisiadau adolygu. Parhewch yn eich cyfrif personol i barhau i adolygu.",
+      "organizationUnavailableTitle": "Nid yw'r sefydliad hwn yn bodoli mwyach",
+      "organizationUnavailableDescription": "Dilëwyd y sefydliad hwn, felly nid oes modd llwytho'i geisiadau adolygu. Parhewch yn eich cyfrif personol i barhau i adolygu.",
+      "continueInPersonal": "Parhau yn y cyfrif personol"
     },
     "composer": {
       "commentBodyPlaceholder": "Eich sylw",
@@ -2043,6 +2048,7 @@
     },
     "settingsSave": {
       "saveChanges": "Cadw newidiadau",
+      "saved": "Gosodiadau wedi'u cadw",
       "unsavedTitle": "Newidiadau heb eu cadw",
       "unsavedMessage": "Cadw eich newidiadau cyn gadael y sgrin hon?",
       "unsavedInvalidMessage": "Ni ellir cadw'r newidiadau hyn eto. Trwsiwch nhw i gadw, neu eu gwaredu i adael."
@@ -3148,7 +3154,9 @@
     "permissionDescription": "Nid oes gen ti ganiatâd i weld hyn.",
     "notFoundDescription": "Efallai bod yr eitem hon wedi'i thynnu neu nad yw ar gael mwyach.",
     "serverTitle": "Ni ellid llwytho'r data.",
-    "serverDescription": "Aeth rhywbeth o'i le ar ein hochr ni. Ceisiwch eto."
+    "serverDescription": "Aeth rhywbeth o'i le ar ein hochr ni. Ceisiwch eto.",
+    "timeoutTitle": "Mae'r gweinydd yn cymryd gormod o amser",
+    "timeoutDescription": "Daeth amser y cais i ben cyn iddo orffen. Ceisiwch eto."
   },
   "screenHeader": {
     "openMenu": "Agor y ddewislen",

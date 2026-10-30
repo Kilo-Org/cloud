@@ -42,7 +42,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Não conectado",
     "notifications": "Notificações",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repositórios",
     "securityAgent": "Agente de segurança",
     "unknown": "Desconhecido",
@@ -1447,6 +1447,7 @@
     },
     "settingsSave": {
       "saveChanges": "Salvar alterações",
+      "saved": "Configurações salvas",
       "unsavedMessage": "Salvar suas alterações antes de sair desta tela?",
       "unsavedInvalidMessage": "Essas alterações ainda não podem ser salvas. Corrija-as para salvar ou descarte-as para sair.",
       "unsavedTitle": "Alterações não salvas"
@@ -1637,7 +1638,7 @@
       "dollar_many": "dólares",
       "costSpoken": "custo de {{cost}}",
       "costSpokenWithTime": "custo {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}",
+      "pullRequest": "PR {{number}}",
       "spokenJoiner": "e"
     },
     "githubInstall": {
@@ -2337,9 +2338,9 @@
     },
     "prBadge": {
       "open": "abrir PR",
-      "closed": "pR fechado",
-      "merged": "pR mesclado",
-      "draft": "pR em rascunho",
+      "closed": "PR fechado",
+      "merged": "PR mesclado",
+      "draft": "PR em rascunho",
       "updating": "Atualizando, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2479,7 +2480,9 @@
     "permissionDescription": "Você não tem permissão para ver este conteúdo.",
     "notFoundDescription": "Este item pode ter sido removido ou não está mais disponível.",
     "serverTitle": "Não foi possível carregar os dados.",
-    "serverDescription": "Ocorreu um problema no nosso sistema. Tente novamente."
+    "serverDescription": "Ocorreu um problema no nosso sistema. Tente novamente.",
+    "timeoutTitle": "O servidor está demorando demais",
+    "timeoutDescription": "A solicitação esgotou o tempo limite antes de ser concluída. Tente novamente."
   },
   "screenHeader": {
     "openMenu": "Abrir menu",
@@ -2952,6 +2955,11 @@
     },
     "inbox": {
       "couldNotLoad": "Não foi possível carregar a caixa de entrada.",
+      "accessLostTitle": "Sem acesso a esta organização",
+      "accessLostDescription": "Você não é mais membro desta organização, então as solicitações de revisão dela não podem ser carregadas. Continue na sua conta pessoal para seguir revisando.",
+      "organizationUnavailableTitle": "Esta organização não existe mais",
+      "organizationUnavailableDescription": "Esta organização foi excluída, então as solicitações de revisão dela não podem ser carregadas. Continue na sua conta pessoal para seguir revisando.",
+      "continueInPersonal": "Continuar na conta pessoal",
       "loading": "Carregando caixa de entrada",
       "noReviewRequests": "Nenhuma solicitação de revisão",
       "noReviewRequestsDescription": "Os pull requests que aguardam sua revisão aparecem aqui. Você também pode colar o link de qualquer PR acima.",

@@ -645,7 +645,12 @@
       "loading": "Laai inkas",
       "noReviewRequests": "Geen hersieningsversoeke nie",
       "noReviewRequestsDescription": "Trekversoeke wat op jou hersiening wag, verskyn hier. Jy kan steeds enige PR-skakel hierbo plak.",
-      "couldNotLoad": "Kon nie die inkas laai nie."
+      "couldNotLoad": "Kon nie die inkas laai nie.",
+      "accessLostTitle": "Geen toegang tot hierdie organisasie nie",
+      "accessLostDescription": "Jy is nie meer 'n lid van hierdie organisasie nie, so sy hersieningsversoeke kan nie laai nie. Gaan voort in jou persoonlike rekening om aan te gaan hersien.",
+      "organizationUnavailableTitle": "Hierdie organisasie bestaan nie meer nie",
+      "organizationUnavailableDescription": "Hierdie organisasie is geskrap, so sy hersieningsversoeke kan nie laai nie. Gaan voort in jou persoonlike rekening om aan te gaan hersien.",
+      "continueInPersonal": "Gaan voort in persoonlike rekening"
     },
     "composer": {
       "commentBodyPlaceholder": "Jou kommentaar…",
@@ -1939,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Stoor veranderinge",
+      "saved": "Instellings gestoor",
       "unsavedTitle": "Ongestoorde veranderinge",
       "unsavedMessage": "Stoor jou veranderinge voordat jy hierdie skerm verlaat?",
       "unsavedInvalidMessage": "Hierdie veranderinge kan nog nie gestoor word nie. Maak dit reg om te stoor, of gooi dit weg om te verlaat."
@@ -2980,7 +2986,9 @@
     "permissionDescription": "Jy het nie toestemming om dit te bekyk nie.",
     "notFoundDescription": "Hierdie item is moontlik verwyder of is nie meer beskikbaar nie.",
     "serverTitle": "Die inhoud kon nie gelaai word nie.",
-    "serverDescription": "Iets het aan ons kant verkeerd gegaan. Probeer asseblief weer."
+    "serverDescription": "Iets het aan ons kant verkeerd gegaan. Probeer asseblief weer.",
+    "timeoutTitle": "Die bediener neem te lank",
+    "timeoutDescription": "Die versoek het uitgeval voordat dit voltooi kon word. Probeer asseblief weer."
   },
   "screenHeader": {
     "openMenu": "Maak spyskaart oop",

@@ -42,7 +42,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Ikke tilkoblet",
     "notifications": "Varsler",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Kodelagre",
     "securityAgent": "Sikkerhetsagent",
     "unknown": "Ukjent",
@@ -645,7 +645,12 @@
       "loading": "Laster inn innboksen",
       "noReviewRequests": "Ingen forespørsler om kodegjennomgang",
       "noReviewRequestsDescription": "PR-er som venter på at du går gjennom dem, vises her. Du kan fortsatt lime inn en hvilken som helst PR-lenke ovenfor.",
-      "couldNotLoad": "Kunne ikke laste inn innboksen."
+      "couldNotLoad": "Kunne ikke laste inn innboksen.",
+      "accessLostTitle": "Ingen tilgang til denne organisasjonen",
+      "accessLostDescription": "Du er ikke lenger medlem av denne organisasjonen, så forespørslene om kodegjennomgang kan ikke lastes inn. Fortsett i den personlige kontoen din for å holde på med kodegjennomgang.",
+      "organizationUnavailableTitle": "Denne organisasjonen finnes ikke lenger",
+      "organizationUnavailableDescription": "Denne organisasjonen ble slettet, så forespørslene om kodegjennomgang kan ikke lastes inn. Fortsett i den personlige kontoen din for å holde på med kodegjennomgang.",
+      "continueInPersonal": "Fortsett i personlig konto"
     },
     "composer": {
       "commentBodyPlaceholder": "Kommentar…",
@@ -743,7 +748,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Rediger utdatert, usendt kommentar ved {{location}}",
       "editA11y": "Rediger usendt kommentar ved {{location}}",
-      "staleHint": "pR-en er endret siden du skrev dette.",
+      "staleHint": "PR-en er endret siden du skrev dette.",
       "deleteA11y": "Slett usendt kommentar ved {{location}}",
       "deletedAnnouncement": "Usendt kommentar slettet",
       "noCommentsQueued": "Ingen kommentarer ligger i kø. Kodegjennomgangen sendes inn med bare handlingen som er valgt ovenfor.",
@@ -1939,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Lagre endringer",
+      "saved": "Innstillinger lagret",
       "unsavedTitle": "Ulagrede endringer",
       "unsavedMessage": "Vil du lagre endringene før du går ut av dette skjermbildet?",
       "unsavedInvalidMessage": "Disse endringene kan ikke lagres ennå. Rett dem for å lagre, eller forkast dem for å gå ut."
@@ -2181,7 +2187,7 @@
       "dollar_other": "dollarer",
       "costSpoken": "kostnad {{cost}}",
       "costSpokenWithTime": "kostnad {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}",
+      "pullRequest": "PR {{number}}",
       "spokenJoiner": "og"
     },
     "githubInstall": {
@@ -2873,7 +2879,7 @@
       "open": "åpne PR",
       "closed": "lukket PR",
       "merged": "sammenslått PR",
-      "draft": "pR-utkast",
+      "draft": "PR-utkast",
       "updating": "Oppdaterer, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2980,7 +2986,9 @@
     "permissionDescription": "Du har ikke tillatelse til å se dette.",
     "notFoundDescription": "Dette elementet kan ha blitt fjernet eller er ikke lenger tilgjengelig.",
     "serverTitle": "Kunne ikke laste inn innholdet.",
-    "serverDescription": "Noe gikk galt hos oss. Prøv igjen."
+    "serverDescription": "Noe gikk galt hos oss. Prøv igjen.",
+    "timeoutTitle": "Serveren bruker for lang tid",
+    "timeoutDescription": "Forespørselen tok for lang tid og ble avbrutt. Prøv igjen."
   },
   "screenHeader": {
     "openMenu": "Åpne meny",

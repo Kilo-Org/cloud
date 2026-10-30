@@ -660,7 +660,12 @@
       "loading": "Učitavanje pristiglih poruka",
       "noReviewRequests": "Nema zahtjeva za pregled",
       "noReviewRequestsDescription": "Ovdje se pojavljuju zahtjevi za spajanje koji čekaju tvoj pregled. I dalje možeš zalijepiti bilo koju poveznicu na PR iznad.",
-      "couldNotLoad": "Učitavanje pristiglih poruka nije uspjelo."
+      "couldNotLoad": "Učitavanje pristiglih poruka nije uspjelo.",
+      "accessLostTitle": "Nemaš pristup ovoj organizaciji",
+      "accessLostDescription": "Više nisi član ove organizacije, pa se njeni zahtjevi za pregled ne mogu učitati. Nastavi u svom ličnom računu za nastavak pregleda.",
+      "organizationUnavailableTitle": "Ova organizacija više ne postoji",
+      "organizationUnavailableDescription": "Ova organizacija je izbrisana, pa se njeni zahtjevi za pregled ne mogu učitati. Nastavi u svom ličnom računu za nastavak pregleda.",
+      "continueInPersonal": "Nastavi u ličnom računu"
     },
     "composer": {
       "commentBodyPlaceholder": "Tekst komentara",
@@ -761,7 +766,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Uredi zastarjeli komentar na čekanju na {{location}}",
       "editA11y": "Uredi komentar na čekanju na {{location}}",
-      "staleHint": "pR je promijenjen nakon pisanja ovog komentara.",
+      "staleHint": "PR je promijenjen nakon pisanja ovog komentara.",
       "deleteA11y": "Obriši komentar na čekanju na {{location}}",
       "deletedAnnouncement": "Komentar na čekanju obrisan",
       "noCommentsQueued": "Nema komentara na čekanju. Poslat će se samo odabrana vrsta pregleda.",
@@ -1965,6 +1970,7 @@
     },
     "settingsSave": {
       "saveChanges": "Sačuvaj izmjene",
+      "saved": "Postavke sačuvane",
       "unsavedTitle": "Nesačuvane izmjene",
       "unsavedMessage": "Sačuvati izmjene prije napuštanja ovog ekrana?",
       "unsavedInvalidMessage": "Ove izmjene se još ne mogu sačuvati. Ispravi ih da bi sačuvao ili ih odbaci da bi otišao."
@@ -3022,7 +3028,9 @@
     "permissionDescription": "Nemaš dozvolu da ovo pregledaš.",
     "notFoundDescription": "Ova stavka je možda uklonjena ili više nije dostupna.",
     "serverTitle": "Učitavanje nije moguće.",
-    "serverDescription": "Došlo je do greške na našoj strani. Pokušaj ponovo."
+    "serverDescription": "Došlo je do greške na našoj strani. Pokušaj ponovo.",
+    "timeoutTitle": "Serveru treba predugo vremena",
+    "timeoutDescription": "Zahtjev je istekao prije završetka. Pokušaj ponovo."
   },
   "screenHeader": {
     "openMenu": "Otvori meni",

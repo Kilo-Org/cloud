@@ -1408,6 +1408,25 @@ async function runSiblingCreate(
     );
     throw error;
   });
+  // A row admitted in another organization scope belongs to a different
+  // operation, so it is refused before any stored state is honored.
+  if (admission.admission === 'organization_mismatch') {
+    logControlDiagnostic(
+      'worktree_chat_result',
+      {
+        operationKey,
+        intent,
+        worktreeId: source.worktreeId,
+        sourceCloudAgentSessionId: run.sourceSession?.cloudAgentSessionId,
+        sourceKiloSessionId: run.sourceSession?.kiloSessionId,
+        result: 'rejected',
+        stage: 'operation_identity',
+        durationMs: Date.now() - startedAt,
+      },
+      'warn'
+    );
+    throw operationConflict();
+  }
   const diagnostic = {
     operationKey,
     operationRowId: admission.row.id,

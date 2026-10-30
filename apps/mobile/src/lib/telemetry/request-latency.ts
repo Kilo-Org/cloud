@@ -3,9 +3,10 @@
  *
  * Pure and total: no React Native or Expo import, so the node vitest project
  * can import it — the same discipline as `network-errors.ts`. The app measures
- * `ttfbMs` (time to response headers) and `totalMs` (body read) for every tRPC
- * HTTP call, buffers the samples, and hands them to a `send` callback in
- * batches. The sample shape mirrors the `latency-ingest` worker's schema.
+ * `ttfbMs` (time to response headers) and `totalMs` (the caller's body read)
+ * for every tRPC HTTP call, buffers the samples, and hands them to a `send`
+ * callback in batches. The sample shape mirrors the `latency-ingest` worker's
+ * schema.
  *
  * The ingest endpoint is optional at the config boundary: a missing
  * `LATENCY_INGEST_URL` never fails a build — `lib/config.ts` resolves the
@@ -208,40 +209,77 @@ function headersWithRequestId(
 type LatencyTarget = Omit<LatencySample, 'ttfbMs' | 'totalMs'>;
 
 /**
- * Record one sample once the cloned body read settles. `createLatencyFetch`
- * deliberately does not await this promise, so the caller receives the
- * response while the body is still streaming; awaiting the clone read would
- * hold the response back for the whole download and drain the body ahead of
- * the caller. The original Response stays untouched for the caller, and a
- * failed read — including a body that can no longer be cloned — records
- * `totalMs` as `ttfbMs`.
+ * Record one sample when the caller's own body read settles. The response keeps
+ * its identity: `json` and `text` are wrapped on that instance, so the sampler
+ * observes the read the caller makes instead of making one of its own. React
+ * Native's fetch polyfill stores the body as a native Blob and decodes it on
+ * every read, so the previous `response.clone().text()` read and decoded the
+ * whole payload a second time — twice the CPU and the peak string memory for
+ * each call, including multi-megabyte transcript pages. `ttfbMs` still comes
+ * from the headers; `totalMs` is when the caller's read settled, a rejection
+ * included (the caller waited for that failure too). A response whose body the
+ * caller never reads records no sample: there is no body read to time.
  */
-async function recordWhenBodyRead(args: {
+function instrumentBodyRead(args: {
   response: Response;
   startedAt: number;
   ttfbMs: number;
   sample: LatencyTarget;
   now: () => number;
   buffer: LatencyBuffer;
-}): Promise<void> {
+}): void {
   const { response, startedAt, ttfbMs, sample, now, buffer } = args;
-  let totalMs = ttfbMs;
-  try {
-    await response.clone().text();
-    totalMs = now() - startedAt;
-  } catch {
-    totalMs = ttfbMs;
-  }
-  buffer.record({ ...sample, ttfbMs, totalMs });
+  let settled = false;
+  const settle = (): void => {
+    if (settled) {
+      return;
+    }
+    settled = true;
+    try {
+      buffer.record({ ...sample, ttfbMs, totalMs: now() - startedAt });
+    } catch {
+      // Telemetry must never replace the caller's own read with a throw.
+    }
+  };
+
+  const readJson = response.json.bind(response);
+  const readText = response.text.bind(response);
+
+  // `json` delegates to `text` in some fetch implementations, so both readers
+  // settle the same read; `settled` keeps that to one sample.
+  const measuredJson: Response['json'] = async () => {
+    try {
+      return await readJson();
+    } finally {
+      settle();
+    }
+  };
+  const measuredText: Response['text'] = async () => {
+    try {
+      return await readText();
+    } finally {
+      settle();
+    }
+  };
+
+  Object.defineProperty(response, 'json', {
+    configurable: true,
+    writable: true,
+    value: measuredJson,
+  });
+  Object.defineProperty(response, 'text', {
+    configurable: true,
+    writable: true,
+    value: measuredText,
+  });
 }
 
 /**
  * Wrap a fetch implementation so every `/api/trpc/` call records one latency
- * sample: `ttfbMs` when the response headers arrive and `totalMs` when a
- * `response.clone()` body read settles (falling back to `ttfbMs` when that
- * read fails). The original Response is returned unchanged and a rejection is
- * re-thrown unchanged with nothing recorded. The measurement is left to settle
- * on its own so it never delays the response the caller gets.
+ * sample: `ttfbMs` when the response headers arrive and `totalMs` when the
+ * caller's own body read settles. The response keeps its identity, only its
+ * body readers are wrapped (`instrumentBodyRead`), and a rejection is re-thrown
+ * unchanged with nothing recorded.
  */
 export function createLatencyFetch(
   baseFetch: typeof fetch,
@@ -261,7 +299,7 @@ export function createLatencyFetch(
     }
 
     const ttfbMs = now() - startedAt;
-    void recordWhenBodyRead({
+    instrumentBodyRead({
       response,
       startedAt,
       ttfbMs,

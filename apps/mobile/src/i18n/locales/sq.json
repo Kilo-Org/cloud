@@ -645,7 +645,12 @@
       "loading": "Po ngarkohet kutia hyrëse",
       "noReviewRequests": "Asnjë kërkesë rishikimi",
       "noReviewRequestsDescription": "Kërkesat për bashkim që presin rishikimin tënd shfaqen këtu. Mund të ngjitësh edhe lidhjen e çdo PR-je më sipër.",
-      "couldNotLoad": "Nuk u ngarkua kutia hyrëse."
+      "couldNotLoad": "Nuk u ngarkua kutia hyrëse.",
+      "accessLostTitle": "Nuk ke qasje në këtë organizatë",
+      "accessLostDescription": "Nuk je më anëtar i kësaj organizate, ndaj kërkesat e saj për rishikim nuk mund të ngarkohen. Vazhdo në llogarinë tënde personale për të vazhduar rishikimin.",
+      "organizationUnavailableTitle": "Kjo organizatë nuk ekziston më",
+      "organizationUnavailableDescription": "Kjo organizatë u fshi, ndaj kërkesat e saj për rishikim nuk mund të ngarkohen. Vazhdo në llogarinë tënde personale për të vazhduar rishikimin.",
+      "continueInPersonal": "Vazhdo në llogarinë personale"
     },
     "composer": {
       "commentBodyPlaceholder": "Komenti yt",
@@ -743,7 +748,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Redakto komentin e vjetëruar në pritje te {{location}}",
       "editA11y": "Redakto komentin në pritje te {{location}}",
-      "staleHint": "pR-ja ka ndryshuar që kur e shkrove këtë koment.",
+      "staleHint": "PR-ja ka ndryshuar që kur e shkrove këtë koment.",
       "deleteA11y": "Fshi komentin në pritje te {{location}}",
       "deletedAnnouncement": "Komenti në pritje u fshi",
       "noCommentsQueued": "Nuk ka komente në radhë. Rishikimi do të dërgohet vetëm me llojin e zgjedhur më sipër.",
@@ -1939,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Ruaj ndryshimet",
+      "saved": "Cilësimet u ruajtën",
       "unsavedTitle": "Ndryshime të paruajtura",
       "unsavedMessage": "Dëshiron t'i ruash ndryshimet përpara se të dalësh nga ky ekran?",
       "unsavedInvalidMessage": "Këto ndryshime ende nuk mund të ruhen. Rregulloji që t'i ruash, ose mos i ruaj që të dalësh."
@@ -2980,7 +2986,9 @@
     "permissionDescription": "Nuk ke leje për ta parë këtë.",
     "notFoundDescription": "Ky element mund të jetë hequr ose të mos jetë më i disponueshëm.",
     "serverTitle": "Nuk u krye ngarkimi.",
-    "serverDescription": "Ndodhi një gabim nga ana jonë. Provo përsëri."
+    "serverDescription": "Ndodhi një gabim nga ana jonë. Provo përsëri.",
+    "timeoutTitle": "Serveri po vonon shumë",
+    "timeoutDescription": "Kërkesa skadoi përpara se të përfundonte. Provo përsëri."
   },
   "screenHeader": {
     "openMenu": "Hap menunë",

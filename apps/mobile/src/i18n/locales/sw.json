@@ -645,7 +645,12 @@
       "loading": "Inapakia kikasha",
       "noReviewRequests": "Hakuna maombi ya ukaguzi",
       "noReviewRequestsDescription": "Maombi ya kuunganisha yanayosubiri ukaguzi wako yanaonekana hapa. Bado unaweza kubandika kiungo chochote cha PR hapo juu.",
-      "couldNotLoad": "Imeshindikana kupakia kikasha."
+      "couldNotLoad": "Imeshindikana kupakia kikasha.",
+      "accessLostTitle": "Huna ruhusa ya shirika hili",
+      "accessLostDescription": "Huwi tena mwanachama wa shirika hili, hivyo maombi yake ya ukaguzi hayawezi kupakiwa. Endelea kwenye akaunti yako ya binafsi ili uendelee kukagua.",
+      "organizationUnavailableTitle": "Shirika hili halipo tena",
+      "organizationUnavailableDescription": "Shirika hili lilifutwa, hivyo maombi yake ya ukaguzi hayawezi kupakiwa. Endelea kwenye akaunti yako ya binafsi ili uendelee kukagua.",
+      "continueInPersonal": "Endelea kwenye akaunti ya binafsi"
     },
     "composer": {
       "commentBodyPlaceholder": "Maoni yako",
@@ -743,7 +748,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Hariri maoni yaliyopitwa na wakati yanayosubiri kutumwa kwenye {{location}}",
       "editA11y": "Hariri maoni yanayosubiri kutumwa kwenye {{location}}",
-      "staleHint": "pR imebadilika tangu ulipoandika maoni haya.",
+      "staleHint": "PR imebadilika tangu ulipoandika maoni haya.",
       "deleteA11y": "Futa maoni yanayosubiri kutumwa kwenye {{location}}",
       "deletedAnnouncement": "Maoni yanayosubiri kutumwa yamefutwa",
       "noCommentsQueued": "Hakuna maoni kwenye foleni. Ukaguzi utawasilishwa pamoja na tukio lililo hapo juu pekee.",
@@ -1939,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Hifadhi mabadiliko",
+      "saved": "Mipangilio imehifadhiwa",
       "unsavedTitle": "Mabadiliko ambayo hayajahifadhiwa",
       "unsavedMessage": "Ungependa kuhifadhi mabadiliko yako kabla ya kuondoka kwenye skrini hii?",
       "unsavedInvalidMessage": "Mabadiliko haya bado hayawezi kuhifadhiwa. Yarekebishe ili kuhifadhi, au yatupe ili kuondoka."
@@ -2980,7 +2986,9 @@
     "permissionDescription": "Huna ruhusa ya kuona maudhui haya.",
     "notFoundDescription": "Kipengele hiki huenda kiliondolewa au hakipatikani tena.",
     "serverTitle": "Imeshindikana kupakia.",
-    "serverDescription": "Hitilafu imetokea upande wetu. Tafadhali jaribu tena."
+    "serverDescription": "Hitilafu imetokea upande wetu. Tafadhali jaribu tena.",
+    "timeoutTitle": "Seva inachukua muda mrefu sana",
+    "timeoutDescription": "Ombi limeisha muda kabla ya kutimizwa. Tafadhali jaribu tena."
   },
   "screenHeader": {
     "openMenu": "Fungua menyu",

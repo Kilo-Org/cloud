@@ -12,6 +12,8 @@ type FakeImage = {
 const manipulator = vi.hoisted(() => ({
   renders: [] as FakeImage[],
   resizes: [] as { width?: number; height?: number }[],
+  sources: [] as unknown[],
+  options: [] as (Record<string, number> | undefined)[],
 }));
 
 function makeImage(width: number, height: number, base64: string | undefined): FakeImage {
@@ -33,7 +35,9 @@ function makeImage(width: number, height: number, base64: string | undefined): F
 vi.mock('expo-image-manipulator', () => ({
   SaveFormat: { JPEG: 'jpeg' },
   ImageManipulator: {
-    manipulate: () => {
+    manipulate: (source: unknown, options?: Record<string, number>) => {
+      manipulator.sources.push(source);
+      manipulator.options.push(options);
       const context = {
         resize: (size: { width?: number; height?: number }) => {
           manipulator.resizes.push(size);
@@ -57,6 +61,8 @@ const { encodeLocalImage, LocalImageError } = await import('./local-image');
 beforeEach(() => {
   manipulator.renders.length = 0;
   manipulator.resizes.length = 0;
+  manipulator.sources.length = 0;
+  manipulator.options.length = 0;
 });
 
 describe('encodeLocalImage', () => {
@@ -67,6 +73,9 @@ describe('encodeLocalImage', () => {
       media: 'image/jpeg',
       data: 'AAAA',
     });
+    // The decoder is given the limit, so a camera-sized photo is never decoded
+    // at full resolution.
+    expect(manipulator.options).toEqual([{ maxWidth: 1568, maxHeight: 1568 }]);
     expect(manipulator.resizes).toEqual([]);
     expect(image.release).toHaveBeenCalledOnce();
   });
@@ -80,6 +89,9 @@ describe('encodeLocalImage', () => {
       data: 'BBBB',
     });
     expect(manipulator.resizes).toEqual([{ width: 1568, height: 1176 }]);
+    // The resize takes the image that is already decoded: reading the file
+    // again would hold a second full-resolution copy.
+    expect(manipulator.sources).toEqual(['file:///cache/b.png', source]);
     expect(source.release).toHaveBeenCalledOnce();
     expect(scaled.release).toHaveBeenCalledOnce();
   });

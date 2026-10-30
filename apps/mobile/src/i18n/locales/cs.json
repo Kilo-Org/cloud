@@ -42,7 +42,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Nepřipojeno",
     "notifications": "Oznámení",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repozitáře",
     "securityAgent": "Bezpečnostní agent",
     "unknown": "Neznámé",
@@ -675,7 +675,12 @@
       "loading": "Načítání doručených žádostí",
       "noReviewRequests": "Žádné žádosti o revizi",
       "noReviewRequestsDescription": "Tady se zobrazí PR, které čekají na tvou revizi. Do pole výše můžeš vložit odkaz na libovolný PR.",
-      "couldNotLoad": "Doručené žádosti se nepodařilo načíst."
+      "couldNotLoad": "Doručené žádosti se nepodařilo načíst.",
+      "accessLostTitle": "K této organizaci už nemáš přístup",
+      "accessLostDescription": "Už nejsi členem této organizace, takže její žádosti o revizi se nedají načíst. Přepni se na osobní účet a pokračuj v revizích.",
+      "organizationUnavailableTitle": "Tato organizace už neexistuje",
+      "organizationUnavailableDescription": "Tato organizace byla smazána, takže její žádosti o revizi se nedají načíst. Přepni se na osobní účet a pokračuj v revizích.",
+      "continueInPersonal": "Pokračovat v osobním účtu"
     },
     "composer": {
       "commentBodyPlaceholder": "Tvůj komentář",
@@ -1991,6 +1996,7 @@
     },
     "settingsSave": {
       "saveChanges": "Uložit změny",
+      "saved": "Nastavení uloženo",
       "unsavedTitle": "Neuložené změny",
       "unsavedMessage": "Uložit změny před opuštěním této obrazovky?",
       "unsavedInvalidMessage": "Tyto změny zatím nelze uložit. Oprav je, abys je mohl uložit, nebo je zahoď, abys mohl odejít."
@@ -2243,7 +2249,7 @@
       "dollar_many": "dolaru",
       "costSpoken": "náklady {{cost}}",
       "costSpokenWithTime": "náklady {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}",
+      "pullRequest": "PR {{number}}",
       "spokenJoiner": "a"
     },
     "githubInstall": {
@@ -3064,7 +3070,9 @@
     "permissionDescription": "Nemáš oprávnění k zobrazení tohoto obsahu.",
     "notFoundDescription": "Tato položka mohla být odebrána nebo již není k dispozici.",
     "serverTitle": "Načtení se nepodařilo.",
-    "serverDescription": "Na naší straně se něco pokazilo. Zkuste to prosím znovu."
+    "serverDescription": "Na naší straně se něco pokazilo. Zkuste to prosím znovu.",
+    "timeoutTitle": "Server odpovídá příliš dlouho",
+    "timeoutDescription": "Požadavek vypršel dříve, než se dokončil. Zkuste to prosím znovu."
   },
   "screenHeader": {
     "openMenu": "Otevřít nabídku",

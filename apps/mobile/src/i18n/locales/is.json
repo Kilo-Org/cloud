@@ -645,7 +645,12 @@
       "loading": "Hleð innhólfi",
       "noReviewRequests": "Engar beiðnir um yfirferð",
       "noReviewRequestsDescription": "Hér birtast sameiningarbeiðnir sem bíða eftir yfirferð þinni. Þú getur líka límt hvaða PR-tengil sem er hér að ofan.",
-      "couldNotLoad": "Ekki tókst að hlaða innhólfinu."
+      "couldNotLoad": "Ekki tókst að hlaða innhólfinu.",
+      "accessLostTitle": "Enginn aðgangur að þessu félagi",
+      "accessLostDescription": "Þú ert ekki lengur meðlimi þessa félags, svo ekki er hægt að sækja beiðnir þess um yfirferð. Haltu áfram í persónulega reikningnum þínum til að halda áfram að yfirfara.",
+      "organizationUnavailableTitle": "Þetta félag er ekki lengur til",
+      "organizationUnavailableDescription": "Þetta félag var eytt, svo ekki er hægt að sækja beiðnir þess um yfirferð. Haltu áfram í persónulega reikningnum þínum til að halda áfram að yfirfara.",
+      "continueInPersonal": "Halda áfram í persónulegum reikningi"
     },
     "composer": {
       "commentBodyPlaceholder": "Athugasemd",
@@ -743,7 +748,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Breyta úreltri athugasemd í bið við {{location}}",
       "editA11y": "Breyta athugasemd í bið við {{location}}",
-      "staleHint": "pR-beiðnin hefur breyst síðan þú skrifaðir þetta.",
+      "staleHint": "PR-beiðnin hefur breyst síðan þú skrifaðir þetta.",
       "deleteA11y": "Eyða athugasemd í bið við {{location}}",
       "deletedAnnouncement": "Athugasemd í bið eytt",
       "noCommentsQueued": "Engar athugasemdir eru í bið. Yfirferðin verður send með þeirri tegund sem valin er hér að ofan, án athugasemda.",
@@ -1939,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Vista breytingar",
+      "saved": "Stillingar vistaðar",
       "unsavedTitle": "Óvistaðar breytingar",
       "unsavedMessage": "Viltu vista breytingarnar áður en þú ferð af þessum skjá?",
       "unsavedInvalidMessage": "Ekki er hægt að vista þessar breytingar ennþá. Lagaðu þær til að vista eða fargaðu þeim til að fara."
@@ -2980,7 +2986,9 @@
     "permissionDescription": "Þú hefur ekki heimild til að skoða þetta.",
     "notFoundDescription": "Efnið hefur hugsanlega verið fjarlægt eða er ekki lengur tiltækt.",
     "serverTitle": "Ekki tókst að sækja gögn.",
-    "serverDescription": "Eitthvað fór úrskeiðis hjá okkur. Reyndu aftur."
+    "serverDescription": "Eitthvað fór úrskeiðis hjá okkur. Reyndu aftur.",
+    "timeoutTitle": "Netþjónninn er að taka of langan tíma",
+    "timeoutDescription": "Beiðnin rann út á tíma áður en hún kláraðist. Reyndu aftur."
   },
   "screenHeader": {
     "openMenu": "Opna valmynd",

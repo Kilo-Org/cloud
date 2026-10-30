@@ -62,6 +62,7 @@ import {
   useAgentAttachmentUpload,
 } from '@/lib/agent-attachments/use-agent-attachment-upload';
 import { useAndroidPendingPickerRecovery } from '@/lib/agent-attachments/use-android-pending-picker-recovery';
+import { hasVisibleComposerText } from '@/lib/composer-text';
 import { useAvailableModels } from '@/lib/hooks/use-available-models';
 import { useCliAgents } from '@/lib/hooks/use-cli-agents';
 import { useCurrentUserId } from '@/lib/hooks/use-current-user-id';
@@ -825,7 +826,7 @@ export function NewSessionScreenBody() {
   function handlePromptChange(text: string) {
     promptEditedRef.current = true;
     promptRef.current = text;
-    const nextHasPrompt = text.trim().length > 0;
+    const nextHasPrompt = hasVisibleComposerText(text);
     setHasPrompt(current => (current === nextHasPrompt ? current : nextHasPrompt));
     if (userId && !isCloneEntry) {
       saveDraft(userId, NEW_SESSION_DRAFT_KEY, text);

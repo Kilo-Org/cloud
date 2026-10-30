@@ -804,6 +804,24 @@ describe('createWorktreeChat sandbox preset inheritance', () => {
     expect(settleOperationMock).not.toHaveBeenCalled();
   });
 
+  it('refuses a ledger admission stored in another organization scope', async () => {
+    const metadata = sourceMetadataWithPreset('vercel-small');
+    const { caller, input, destinationStub } = fixture({
+      metadata,
+      organizationId: ORGANIZATION_ID,
+    });
+    admitOperationMock.mockResolvedValueOnce({ admission: 'organization_mismatch' });
+
+    await expect(caller.createWorktreeChat(input)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: 'operation_key_reuse_mismatch',
+    });
+
+    expect(createSessionForCloudAgentMock).not.toHaveBeenCalled();
+    expect(destinationStub.registerSessionFromMetadata).not.toHaveBeenCalled();
+    expect(settleOperationMock).not.toHaveBeenCalled();
+  });
+
   it.each(['purpose', 'association'] as const)(
     'retains trusted GitHub purpose in siblings and rejects recovered %s substitution',
     async mismatch => {

@@ -42,7 +42,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Neconectat",
     "notifications": "Notificări",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Depozite de cod",
     "securityAgent": "Agent de securitate",
     "unknown": "Necunoscut",
@@ -660,7 +660,12 @@
       "loading": "Se încarcă cererile primite",
       "noReviewRequests": "Nicio cerere de revizuire",
       "noReviewRequestsDescription": "Aici apar PR-urile care așteaptă revizuirea ta. Poți lipi mai sus și o legătură către orice alt PR.",
-      "couldNotLoad": "Nu s-au putut încărca cererile primite."
+      "couldNotLoad": "Nu s-au putut încărca cererile primite.",
+      "accessLostTitle": "Nu ai acces la această organizație",
+      "accessLostDescription": "Nu mai ești membru al acestei organizații, așa că cererile sale de revizuire nu se pot încărca. Continuă în contul personal pentru a continua revizuirile.",
+      "organizationUnavailableTitle": "Această organizație nu mai există",
+      "organizationUnavailableDescription": "Această organizație a fost ștearsă, așa că cererile sale de revizuire nu se pot încărca. Continuă în contul personal pentru a continua revizuirile.",
+      "continueInPersonal": "Continuă în contul personal"
     },
     "composer": {
       "commentBodyPlaceholder": "Comentariul tău",
@@ -761,7 +766,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Editează comentariul depășit, aflat în așteptare, de la {{location}}",
       "editA11y": "Editează comentariul în așteptare de la {{location}}",
-      "staleHint": "pR-ul s-a modificat de când ai scris acest comentariu.",
+      "staleHint": "PR-ul s-a modificat de când ai scris acest comentariu.",
       "deleteA11y": "Șterge comentariul în așteptare de la {{location}}",
       "deletedAnnouncement": "Comentariu în așteptare șters",
       "noCommentsQueued": "Nu există comentarii în așteptare. Revizuirea va fi trimisă doar cu tipul selectat mai sus.",
@@ -1965,6 +1970,7 @@
     },
     "settingsSave": {
       "saveChanges": "Salvează modificările",
+      "saved": "Setări salvate",
       "unsavedTitle": "Modificări nesalvate",
       "unsavedMessage": "Salvezi modificările înainte de a părăsi acest ecran?",
       "unsavedInvalidMessage": "Aceste modificări nu pot fi încă salvate. Corectează-le pentru a salva sau renunță la ele pentru a pleca."
@@ -2212,7 +2218,7 @@
       "dollar_few": "dolari",
       "costSpoken": "cost de {{cost}}",
       "costSpokenWithTime": "costul este {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}",
+      "pullRequest": "PR {{number}}",
       "spokenJoiner": "și"
     },
     "githubInstall": {
@@ -2912,9 +2918,9 @@
     },
     "prBadge": {
       "open": "deschidere PR",
-      "closed": "pR închis",
-      "merged": "pR integrat",
-      "draft": "pR în stadiu de ciornă",
+      "closed": "PR închis",
+      "merged": "PR integrat",
+      "draft": "PR în stadiu de ciornă",
       "updating": "Se actualizează, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -3022,7 +3028,9 @@
     "permissionDescription": "Nu ai permisiunea să vizualizezi acest conținut.",
     "notFoundDescription": "Este posibil ca acest element să fi fost eliminat sau să nu mai fie disponibil.",
     "serverTitle": "Nu s-au putut încărca datele.",
-    "serverDescription": "A apărut o problemă pe server. Încearcă din nou."
+    "serverDescription": "A apărut o problemă pe server. Încearcă din nou.",
+    "timeoutTitle": "Serverul răspunde prea încet",
+    "timeoutDescription": "Cererea a expirat înainte de a se finaliza. Încearcă din nou."
   },
   "screenHeader": {
     "openMenu": "Deschide meniul",

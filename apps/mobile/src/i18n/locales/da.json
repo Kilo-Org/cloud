@@ -42,7 +42,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Ikke tilknyttet",
     "notifications": "Notifikationer",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Kodelagre",
     "securityAgent": "Sikkerhedsagent",
     "unknown": "Ukendt",
@@ -645,7 +645,12 @@
       "loading": "Indlæser indbakke",
       "noReviewRequests": "Ingen anmodninger om gennemgang",
       "noReviewRequestsDescription": "Pull requests, der afventer din gennemgang, vises her. Du kan stadig indsætte et hvilket som helst PR-link ovenfor.",
-      "couldNotLoad": "Indbakken kunne ikke indlæses."
+      "couldNotLoad": "Indbakken kunne ikke indlæses.",
+      "accessLostTitle": "Ingen adgang til denne organisation",
+      "accessLostDescription": "Du er ikke længere medlem af denne organisation, så dens anmodninger om gennemgang kan ikke indlæses. Fortsæt i din personlige konto for at fortsætte med at gennemgå.",
+      "organizationUnavailableTitle": "Denne organisation findes ikke længere",
+      "organizationUnavailableDescription": "Denne organisation blev slettet, så dens anmodninger om gennemgang kan ikke indlæses. Fortsæt i din personlige konto for at fortsætte med at gennemgå.",
+      "continueInPersonal": "Fortsæt i personlig konto"
     },
     "composer": {
       "commentBodyPlaceholder": "Din kommentar",
@@ -743,7 +748,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Rediger forældet, ventende kommentar ved {{location}}",
       "editA11y": "Rediger ventende kommentar ved {{location}}",
-      "staleHint": "pR'en er blevet opdateret, siden du skrev dette.",
+      "staleHint": "PR'en er blevet opdateret, siden du skrev dette.",
       "deleteA11y": "Slet ventende kommentar ved {{location}}",
       "deletedAnnouncement": "Ventende kommentar slettet",
       "noCommentsQueued": "Der er ingen kommentarer i køen. Gennemgangen sendes kun med det valgte resultat ovenfor.",
@@ -1939,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Gem ændringer",
+      "saved": "Indstillinger gemt",
       "unsavedTitle": "Ugemte ændringer",
       "unsavedMessage": "Vil du gemme dine ændringer, før du forlader denne skærm?",
       "unsavedInvalidMessage": "Disse ændringer kan ikke gemmes endnu. Ret dem for at gemme, eller kassér dem for at forlade."
@@ -2181,7 +2187,7 @@
       "dollar_other": "dollar",
       "costSpoken": "pris {{cost}}",
       "costSpokenWithTime": "pris {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}",
+      "pullRequest": "PR {{number}}",
       "spokenJoiner": "og"
     },
     "githubInstall": {
@@ -2873,7 +2879,7 @@
       "open": "åben PR",
       "closed": "lukket PR",
       "merged": "flettet PR",
-      "draft": "pR-kladde",
+      "draft": "PR-kladde",
       "updating": "Opdaterer, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2980,7 +2986,9 @@
     "permissionDescription": "Du har ikke tilladelse til at se dette.",
     "notFoundDescription": "Indholdet er muligvis fjernet eller ikke længere tilgængeligt.",
     "serverTitle": "Indholdet kunne ikke indlæses.",
-    "serverDescription": "Der opstod en fejl hos os. Prøv igen."
+    "serverDescription": "Der opstod en fejl hos os. Prøv igen.",
+    "timeoutTitle": "Serveren svarer for langsomt",
+    "timeoutDescription": "Anmodningen fik timeout, før den blev gennemført. Prøv igen."
   },
   "screenHeader": {
     "openMenu": "Åbn menu",

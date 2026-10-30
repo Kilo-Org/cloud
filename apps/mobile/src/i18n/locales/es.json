@@ -1479,6 +1479,7 @@
     },
     "settingsSave": {
       "saveChanges": "Guardar cambios",
+      "saved": "Ajustes guardados",
       "unsavedMessage": "¿Guardar los cambios antes de salir de esta pantalla?",
       "unsavedInvalidMessage": "Estos cambios aún no se pueden guardar. Corrígelos para guardarlos o descártalos para salir.",
       "unsavedTitle": "Cambios sin guardar"
@@ -1669,7 +1670,7 @@
       "dollar_many": "dólares",
       "costSpoken": "coste de {{cost}}",
       "costSpokenWithTime": "coste {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}",
+      "pullRequest": "PR {{number}}",
       "spokenJoiner": "y"
     },
     "githubInstall": {
@@ -2368,10 +2369,10 @@
       "unavailable": "Esta sesión no puede recibir solicitudes de permiso."
     },
     "prBadge": {
-      "open": "pR abierta",
+      "open": "PR abierta",
       "closed": "solicitud de incorporación de cambios cerrada",
       "merged": "solicitud de incorporación de cambios fusionada",
-      "draft": "pR en borrador",
+      "draft": "PR en borrador",
       "updating": "Actualizando, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2479,7 +2480,9 @@
     "permissionDescription": "No tienes permiso para ver esto.",
     "notFoundDescription": "Es posible que este elemento se haya eliminado o ya no esté disponible.",
     "serverTitle": "No se pudo cargar el contenido.",
-    "serverDescription": "Se produjo un error en nuestro sistema. Inténtalo de nuevo."
+    "serverDescription": "Se produjo un error en nuestro sistema. Inténtalo de nuevo.",
+    "timeoutTitle": "El servidor está tardando demasiado",
+    "timeoutDescription": "La solicitud se agotó antes de completarse. Inténtalo de nuevo."
   },
   "screenHeader": {
     "openMenu": "Abrir menú",
@@ -2952,6 +2955,11 @@
     },
     "inbox": {
       "couldNotLoad": "No se pudo cargar la bandeja de entrada.",
+      "accessLostTitle": "Sin acceso a esta organización",
+      "accessLostDescription": "Ya no eres miembro de esta organización, así que no se pueden cargar sus solicitudes de revisión. Continúa en tu cuenta personal para seguir revisando.",
+      "organizationUnavailableTitle": "Esta organización ya no existe",
+      "organizationUnavailableDescription": "Esta organización fue eliminada, así que no se pueden cargar sus solicitudes de revisión. Continúa en tu cuenta personal para seguir revisando.",
+      "continueInPersonal": "Continuar en la cuenta personal",
       "loading": "Cargando la bandeja de entrada",
       "noReviewRequests": "No hay solicitudes de revisión",
       "noReviewRequestsDescription": "Aquí aparecen las PR pendientes de tu revisión. También puedes pegar cualquier enlace de PR arriba.",

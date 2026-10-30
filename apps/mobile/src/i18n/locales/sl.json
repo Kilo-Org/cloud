@@ -675,7 +675,12 @@
       "loading": "Nalaganje prejetih zahtevkov",
       "noReviewRequests": "Ni zahtevkov za pregled",
       "noReviewRequestsDescription": "Tukaj se prikažejo zahtevki za združitev, ki čakajo na tvoj pregled. Zgoraj lahko še vedno prilepiš poljubno povezavo do PR-ja.",
-      "couldNotLoad": "Prejetih zahtevkov ni bilo mogoče naložiti."
+      "couldNotLoad": "Prejetih zahtevkov ni bilo mogoče naložiti.",
+      "accessLostTitle": "Ni dostopa do te organizacije",
+      "accessLostDescription": "Nisi več član te organizacije, zato zahtevkov za pregled ni mogoče naložiti. Za nadaljevanje pregledovanja nadaljuj v svojem osebnem računu.",
+      "organizationUnavailableTitle": "Ta organizacija ne obstaja več",
+      "organizationUnavailableDescription": "Ta organizacija je bila izbrisana, zato zahtevkov za pregled ni mogoče naložiti. Za nadaljevanje pregledovanja nadaljuj v svojem osebnem računu.",
+      "continueInPersonal": "Nadaljuj v osebnem računu"
     },
     "composer": {
       "commentBodyPlaceholder": "Komentar",
@@ -779,7 +784,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Uredi zastareli čakajoči komentar na {{location}}",
       "editA11y": "Uredi čakajoči komentar na {{location}}",
-      "staleHint": "pR se je od nastanka tega komentarja spremenil.",
+      "staleHint": "PR se je od nastanka tega komentarja spremenil.",
       "deleteA11y": "Izbriši čakajoči komentar na {{location}}",
       "deletedAnnouncement": "Čakajoči komentar izbrisan",
       "noCommentsQueued": "Ni čakajočih komentarjev. Pregled bo oddan samo z zgoraj izbrano vrsto pregleda.",
@@ -1991,6 +1996,7 @@
     },
     "settingsSave": {
       "saveChanges": "Shrani spremembe",
+      "saved": "Nastavitve shranjene",
       "unsavedTitle": "Neshranjene spremembe",
       "unsavedMessage": "Želiš shraniti spremembe, preden zapustiš ta zaslon?",
       "unsavedInvalidMessage": "Teh sprememb še ni mogoče shraniti. Popravi jih, da jih shraniš, ali jih zavrzi, da zapustiš."
@@ -3064,7 +3070,9 @@
     "permissionDescription": "Za ogled te vsebine nimaš dovoljenja.",
     "notFoundDescription": "Ta element je bil morda odstranjen ali ni več na voljo.",
     "serverTitle": "Podatkov ni bilo mogoče naložiti.",
-    "serverDescription": "Na naši strani je prišlo do napake. Poskusi znova."
+    "serverDescription": "Na naši strani je prišlo do napake. Poskusi znova.",
+    "timeoutTitle": "Strežnik se odziva predolgo",
+    "timeoutDescription": "Odgovora strežnika nismo prejeli pravočasno. Poskusi znova."
   },
   "screenHeader": {
     "openMenu": "Odpri meni",

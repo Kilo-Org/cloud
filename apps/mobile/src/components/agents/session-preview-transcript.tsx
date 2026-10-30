@@ -5,14 +5,11 @@ import { useTranslation } from 'react-i18next';
 import { EmptyState } from '@/components/empty-state';
 import { QueryError } from '@/components/query-error';
 import { MessageCircle } from '@/components/ui/icons';
-import { isTerminalTrpcCode } from '@/lib/trpc-error';
+import { isTerminalTrpcCode, readTrpcErrorField, trpcErrorVariant } from '@/lib/trpc-error';
 
 import { MessageBubble } from './message-bubble';
 import { SessionMessageList } from './session-message-list';
 import { SessionSkeletonMessages } from './session-detail-skeleton';
-
-/** Same terminal classification `quick-chat-screen` uses for a history read. */
-const NON_RETRYABLE_ERROR_CODES = new Set(['NOT_FOUND', 'FORBIDDEN', 'UNAUTHORIZED']);
 
 // Message rows carry no preview state, so the renderer lives at module scope
 // and is never recreated per render — the same contract as `quick-chat-screen`.
@@ -28,8 +25,8 @@ export type SessionPreviewTranscriptState = {
   messages: readonly StoredMessage[];
   isLoading: boolean;
   isError: boolean;
-  /** tRPC error code from the failed read; undefined for an unknown failure. */
-  errorCode: string | undefined;
+  /** The failed read's error; undefined before the first failure. */
+  error: unknown;
   onRetry: () => void;
 };
 
@@ -44,7 +41,7 @@ export function SessionPreviewTranscript({
   messages,
   isLoading,
   isError,
-  errorCode,
+  error,
   onRetry,
 }: Readonly<SessionPreviewTranscriptState>) {
   const { t } = useTranslation();
@@ -56,22 +53,19 @@ export function SessionPreviewTranscript({
     return <SessionSkeletonMessages sessionId={sessionId} />;
   }
   if (isError && empty) {
-    const nonRetryable = errorCode !== undefined && NON_RETRYABLE_ERROR_CODES.has(errorCode);
-    if (nonRetryable) {
-      return (
-        <QueryError
-          variant={errorCode === 'NOT_FOUND' ? 'not-found' : 'permission'}
-          placement="static"
-          className="w-full"
-        />
-      );
-    }
-    // A terminal read failure — an oversized or invalid page — cannot succeed
-    // on retry, so it renders without the retry action.
-    if (isTerminalTrpcCode(errorCode)) {
-      return <QueryError variant="server" placement="static" className="w-full" />;
-    }
-    return <QueryError variant="server" placement="static" className="w-full" onRetry={onRetry} />;
+    // The variant names the cause: a denial or a missing page, an unexplained
+    // server fault, or a read that ran out its deadline. A terminal failure —
+    // an oversized or invalid page — cannot succeed on retry, so it renders
+    // without the retry action.
+    const retryable = !isTerminalTrpcCode(readTrpcErrorField(error, 'code'));
+    return (
+      <QueryError
+        variant={trpcErrorVariant(error)}
+        placement="static"
+        className="w-full"
+        onRetry={retryable ? onRetry : undefined}
+      />
+    );
   }
   if (empty) {
     return (

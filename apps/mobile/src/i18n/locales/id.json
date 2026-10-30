@@ -42,7 +42,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Tidak terhubung",
     "notifications": "Notifikasi",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repositori",
     "securityAgent": "Agen keamanan",
     "unknown": "Tidak diketahui",
@@ -1471,6 +1471,7 @@
     },
     "settingsSave": {
       "saveChanges": "Simpan perubahan",
+      "saved": "Pengaturan disimpan",
       "unsavedMessage": "Simpan perubahan sebelum meninggalkan layar ini?",
       "unsavedInvalidMessage": "Perubahan ini belum dapat disimpan. Perbaiki untuk menyimpan, atau buang untuk meninggalkan.",
       "unsavedTitle": "Perubahan belum disimpan"
@@ -1657,7 +1658,7 @@
       "dollar_other": "dolar",
       "costSpoken": "biaya {{cost}}",
       "costSpokenWithTime": "biaya {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}",
+      "pullRequest": "PR {{number}}",
       "spokenJoiner": ", dan"
     },
     "githubInstall": {
@@ -2347,8 +2348,8 @@
     },
     "prBadge": {
       "open": "buka PR",
-      "closed": "pR yang ditutup",
-      "merged": "pR yang digabungkan",
+      "closed": "PR yang ditutup",
+      "merged": "PR yang digabungkan",
       "draft": "draf PR",
       "updating": "Memperbarui, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
@@ -2456,7 +2457,9 @@
     "permissionDescription": "Kamu tidak punya izin untuk melihat ini.",
     "notFoundDescription": "Item ini mungkin telah dihapus atau tidak lagi tersedia.",
     "serverTitle": "Tidak dapat memuat.",
-    "serverDescription": "Terjadi kesalahan di pihak kami. Coba lagi."
+    "serverDescription": "Terjadi kesalahan di pihak kami. Coba lagi.",
+    "timeoutTitle": "Server terlalu lama merespons",
+    "timeoutDescription": "Permintaan melebihi batas waktu sebelum selesai. Coba lagi."
   },
   "screenHeader": {
     "openMenu": "Buka menu",
@@ -2914,6 +2917,11 @@
     },
     "inbox": {
       "couldNotLoad": "Tidak dapat memuat kotak masuk.",
+      "accessLostTitle": "Tidak ada akses ke organisasi ini",
+      "accessLostDescription": "Kamu bukan lagi anggota organisasi ini, jadi permintaan tinjauannya tidak dapat dimuat. Lanjutkan di akun pribadimu untuk terus meninjau.",
+      "organizationUnavailableTitle": "Organisasi ini tidak ada lagi",
+      "organizationUnavailableDescription": "Organisasi ini telah dihapus, jadi permintaan tinjauannya tidak dapat dimuat. Lanjutkan di akun pribadimu untuk terus meninjau.",
+      "continueInPersonal": "Lanjut di akun Pribadi",
       "loading": "Memuat kotak masuk",
       "noReviewRequests": "Tidak ada permintaan tinjauan",
       "noReviewRequestsDescription": "PR yang menunggu tinjauanmu muncul di sini. Kamu tetap dapat menempelkan tautan PR apa pun di atas.",
@@ -3047,7 +3055,7 @@
       "editA11y": "Ubah komentar dalam antrean di {{location}}",
       "editOutdatedA11y": "Ubah komentar dalam antrean yang sudah tidak sesuai di {{location}}",
       "noCommentsQueued": "Tidak ada komentar dalam antrean. Tinjauan akan dikirim hanya dengan jenis tinjauan yang dipilih di atas.",
-      "staleHint": "pR sudah berubah sejak kamu menulis komentar ini.",
+      "staleHint": "PR sudah berubah sejak kamu menulis komentar ini.",
       "staleQueueHint": "Komentar yang merujuk ke commit lama tidak dikirim. Komentar tersebut tetap ada di antreanmu agar bisa kamu ubah atau hapus.",
       "summaryA11y": "Ringkasan tinjauan",
       "summaryPlaceholder": "Ringkasan opsional untuk tinjauan"

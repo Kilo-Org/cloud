@@ -303,7 +303,7 @@ function RepoHealthSection({ scope, data, slaEnabled }: SectionProps) {
               })}
             </Text>
           </View>
-          <Text variant="mono" className="text-xs text-muted-foreground">
+          <Text className="text-xs text-muted-foreground tabular-nums">
             {repoTrailingLabel(repo, slaEnabled)}
           </Text>
           <DirectionalArrowRight size={14} color={colors.mutedForeground} />

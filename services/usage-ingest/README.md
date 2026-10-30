@@ -59,7 +59,7 @@ ID, delivery attempt count, and categorical outcome/reason.
 
 Writer HTTP 429 and 503 also reject the queue invocation after all messages in the
 batch have been handled. Each successful message keeps its explicit ACK; failed
-messages keep their explicit retry using the configured delay and retry/DLQ budget.
+messages keep their explicit retry using the per-message delay policy below and the shared retry/DLQ budget.
 There is no extra writer attempt within an invocation. Other failures retain
 per-message retries without being classified as overload. Overload retry logs add
 `writer_status` and `invocation_failure: "writer_overloaded"`.
@@ -201,9 +201,96 @@ two writer slots per invocation:
 | `max_batch_size` | `6` in production, `2` in staging | Maximum messages delivered per invocation. |
 | `max_batch_timeout` | `0` seconds | No intentional wait to fill a batch. |
 | `max_concurrency` | `200` in both environments | Parallelism 2 allows at most `200 × 2 = 400` concurrent queue writer calls per environment. |
-| `max_retries` | `3` | Initial delivery plus up to three retries. |
-| `retry_delay` | `60` seconds | Space failed deliveries by one minute rather than retrying immediately. |
+| `max_retries` | `20` | Initial delivery plus up to twenty retries, shared across failure classes. |
+| `retry_delay` | `60` seconds | Fallback for implicit/unexpected failures; handled failures use per-message jitter below. |
 | `dead_letter_queue` | Environment-specific name above | Retain exhausted failures separately from the source queue. |
+
+### Native congestion retries and launch budget
+
+Healthy events still make one HTTP call and ACK only a matching `recorded` or
+`duplicate` result, with no added delay. Failed items make no additional HTTP call
+inside the delivery: the consumer chooses a native `message.retry({delaySeconds})`
+for that item, freeing invocation slots while waiting for redelivery. Successful
+siblings retain their ACKs. Existing HTTP 429/503 overload feedback still rejects
+the invocation after all sibling processing and dispositions settle; other
+unavailable/configuration failures do not newly trigger that feedback.
+
+Fast retry requires a positively recognized admission 429. Under the existing
+160-second HTTP timeout, the shared writer client reads at most 4096 bytes and
+requires valid UTF-8/JSON with exactly `error: 'Usage writer overloaded'` and reason
+`queue_limit`, `pool_waiting`, or `pool_busy`. Unknown fields/reasons, generic 429,
+HTML, malformed/oversized/truncated bodies and body timeouts remain generic 429
+and use the conservative schedule. Other error bodies are not parsed. A recognized
+pre-write rejection describes this HTTP attempt only; an earlier delivery of the
+same usage ID may already have committed. Generic errors can include ambiguous
+writes, so stable IDs and idempotent persistence remain essential.
+
+For native attempt `a` (initial delivery 1), calculate
+`base = min(300, 2 ** min(a - 1, 9))`; for all failures except recognized
+admission 429, use `base = max(60, base)`. Choose an integer uniformly from
+`base` through `2 * base`, inclusive. Positive safe-integer attempts are capped
+at 21 before exponentiation; invalid metadata uses attempt 1. Mixed failure classes
+share the same native count; switching classes never resets it.
+
+| Native attempt | Recognized admission 429 | Other handled failure |
+|---|---|---|
+| 1 | 1–2 s | 60–120 s |
+| 2 | 2–4 s | 60–120 s |
+| 3 | 4–8 s | 60–120 s |
+| 4 | 8–16 s | 60–120 s |
+| 5 | 16–32 s | 60–120 s |
+| 6 | 32–64 s | 60–120 s |
+| 7 | 64–128 s | 64–128 s |
+| 8 | 128–256 s | 128–256 s |
+| 9 | 256–512 s | 256–512 s |
+| 10–20 | 300–600 s | 300–600 s |
+
+Processing logs add bounded `retry_class`, selected `retry_delay_seconds`, and
+recognized `admission_reason` to the existing usage ID/native-attempt fields.
+Selected delay is computed outside diagnostics, so logging failures cannot change
+disposition. Bodies, headers and secrets are never included.
+
+The invocation has an 840-second monotonic launch budget. A new HTTP call starts
+only with **at least 180 seconds remaining**, including equality at that boundary,
+leaving room for its full unchanged 160-second timeout and margin. Later unstarted
+valid items retry conservatively with reason `invocation_budget`; they are neither
+ACKed nor labelled writer overload. This covers parallelism 1 fallback and growing
+batches without shortening timeouts or abandoning in-flight writes. Current
+batch 6/par 2 has three 160-second waves (480 seconds of nominal HTTP allowance),
+so normal work stays unchanged. Scheduling/AbortSignal deadlines are cooperative,
+not hard guarantees against runtime stalls or the platform's 900-second wall limit.
+
+The budget increase is global to each CF consumer: a continually failing valid
+message can nominally make 21 HTTP attempts instead of 4; healthy traffic still
+needs one. At-least-once delivery and operator replay can add further attempts.
+Under sustained failure, polling eventually slows to **5–10 minutes** between
+eligible attempts, so recovery can still wait that long plus scheduling/backlog.
+For a new event receiving only recognized admission rejections, the 20 requested
+delays sum to 63m 31s–127m 02s; for only other handled failures, 68m 28s–136m 56s.
+These are conditional scheduled-delay sums, **not DLQ timing guarantees**, minimum
+recovery windows, or retention requirements. Processing, implicit 60-second
+retries, mixed histories, consumed attempts, scheduling and retention affect the
+actual lifecycle. Increasing the configured count does not reset existing attempts.
+
+Deploy and verify this retry consumer **before merging/deploying default-on
+writer admission PR #9241**. Merging both ahead of one deployment is insufficient:
+the production workflow promotes web before Workers. Keep pool 10, batch 6/par 2,
+consumer cap 200 and exposure unchanged initially; admission is per-runtime and
+does not establish aggregate database capacity for larger settings.
+
+Persistent failures still reach the configured DLQ after the finite retry budget;
+a DLQ is a recovery queue, not proof the payload is poison. Before guard rollout,
+verify actual source/DLQ retention, alerting, replay ownership, and a controlled
+stable-ID reconciliation/replay procedure. This change performs no hosted
+retention or DLQ readback. A safe rollback must **not lower retries back to 3 while
+higher-attempt messages remain outstanding**, because their next failure could
+immediately dead-letter them. Preserve stable IDs and reconcile ambiguous writes
+before replay; do not republish to reset attempts or discard accepted events.
+
+The isolated staging Vercel queue keeps its own retry settings; it shares only the
+bounded writer-response classification. No new environment knob or worker binding
+is introduced. This preparation does not claim a healthy-traffic p95 improvement
+or authorize a production rollout, capacity increase, or replay.
 
 ### Experiment control and verification
 
@@ -342,7 +429,7 @@ in both environments.
 Processing calls the configured Vercel writer directly. The shared writer client
 retains the internal key, optional Vercel protection bypass, stable usage identity,
 160-second timeout, redirect/response validation and recorded/duplicate ACK rule.
-Publisher/consumer timing diagnostics and the queue policy are unchanged.
+Direct writer transport and completion diagnostics remain in place; the native retry policy is described above.
 
 The retired Frankfurt relay source, service binding, diagnostics and deployment
 step have been removed. The existing private `usage-writer-relay-staging` Worker

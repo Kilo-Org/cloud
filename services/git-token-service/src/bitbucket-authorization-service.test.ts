@@ -548,6 +548,35 @@ describe('BitbucketAuthorizationService', () => {
     expect(database.updates.filter(update => 'credential_version' in update)).toEqual([]);
   });
 
+  it('takes the lease only after re-reading the row it will exchange', async () => {
+    // The claim can wait behind a holder that commits before releasing, so the
+    // attempt re-reads the row after it holds the lease and answers from
+    // storage when the generation already moved.
+    const candidate = activeRow(BITBUCKET_CLOUD_AGENT_MINIMUM_VALIDITY_MS - 1);
+    const winner = {
+      ...activeRow(BITBUCKET_CLOUD_AGENT_MINIMUM_VALIDITY_MS - 1),
+      credential: {
+        ...credential(2 * 60 * 60 * 1000),
+        credential_version: 2,
+        access_token_encrypted: encryptKeyedEnvelope(
+          'winner-token',
+          scheme,
+          { keyId: 'active', publicKeyPem },
+          aad('access')
+        ),
+      },
+    };
+    database.rows = [candidate, candidate, winner];
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      service().getAuthorization({ userId: 'user-1' }, BITBUCKET_CLOUD_AGENT_MINIMUM_VALIDITY_MS)
+    ).resolves.toMatchObject({ status: 'available', token: 'winner-token' });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(database.updates.filter(update => 'credential_version' in update)).toEqual([]);
+  });
+
   it('does not exchange the refresh token while another attempt holds the exchange lease', async () => {
     database.row = activeRow(-1);
     database.leaseDenied = true;

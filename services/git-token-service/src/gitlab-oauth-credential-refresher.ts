@@ -212,57 +212,86 @@ export class GitLabOAuthCredentialRefresher implements GitLabOAuthCredentialRefr
     return { credential, metadata, instanceUrl, integrationId: loaded.integrationId };
   }
 
+  private shouldRefresh(
+    credential: LoadedRefreshRow['credential'],
+    input: RefreshInput,
+    now: Date
+  ): boolean {
+    if (credential.credential_version !== input.credential.credential_version) return false;
+    const expiresAt = credential.access_token_expires_at;
+    return !expiresAt || new Date(expiresAt).getTime() - now.getTime() <= REFRESH_BUFFER_MS;
+  }
+
   private async readRefreshPhase(
     tx: WorkerTransaction,
     input: RefreshInput,
     now: Date,
     attemptId: string
   ): Promise<RefreshPhase> {
+    const lease = {
+      kind: 'platform-oauth-credential' as const,
+      credentialId: input.credential.id,
+    };
     const loaded = await this.loadRefreshRow(tx, input);
     if (!loaded) return { status: 'reconnect_required' };
-    const { credential, metadata, instanceUrl } = loaded;
-
-    if (
-      credential.credential_version !== input.credential.credential_version ||
-      (credential.access_token_expires_at &&
-        new Date(credential.access_token_expires_at).getTime() - now.getTime() > REFRESH_BUFFER_MS)
-    ) {
-      return this.readCurrentCredential(credential, input);
+    if (!this.shouldRefresh(loaded.credential, input, now)) {
+      return this.readCurrentCredential(loaded.credential, input);
     }
 
-    const refreshToken = credential.refresh_token_encrypted
-      ? await this.decryptOAuthSecret(credential, input, 'refresh')
-      : { status: 'unreadable' as const };
-    if (refreshToken.status === 'temporarily_unavailable') {
-      return { status: 'temporarily_unavailable' };
-    }
-    if (refreshToken.status !== 'available') return { status: 'reconnect_required' };
-
-    const clientId = metadata.client_id ?? (await resolveSecret(this.env.GITLAB_CLIENT_ID));
-    let clientSecret: string | null;
-    if (metadata.client_id) {
-      if (!credential.oauth_client_secret_encrypted) return { status: 'reconnect_required' };
-      const customSecret = await this.decryptOAuthSecret(credential, input, 'oauth-client-secret');
-      if (customSecret.status === 'temporarily_unavailable') {
-        return { status: 'temporarily_unavailable' };
-      }
-      if (customSecret.status !== 'available') return { status: 'reconnect_required' };
-      clientSecret = customSecret.token;
-    } else {
-      clientSecret = await resolveSecret(this.env.GITLAB_CLIENT_SECRET);
-    }
-    if (!clientId || !clientSecret) return { status: 'temporarily_unavailable' };
-
-    // Only the attempt that holds the exchange lease may use the rotating
-    // refresh token: a second concurrent exchange would make one of the two
-    // attempts look like a rejected credential.
+    // Only the attempt that holds the exchange lease may use the refresh token:
+    // a second concurrent exchange would make one of the two attempts look like
+    // a rejected credential.
     const claimed = await claimRefreshLease(tx, {
-      kind: 'platform-oauth-credential',
-      credentialId: credential.id,
+      ...lease,
       attemptId,
       providerRequestBudgetMs: GITLAB_OAUTH_REFRESH_TIMEOUT_MS,
     });
     if (!claimed) return { status: 'temporarily_unavailable' };
+
+    // The claim can wait for a holder that then commits, so re-read the row this
+    // exchange will use and give the lease back when it is no longer the row to
+    // refresh.
+    const current = await this.loadRefreshRow(tx, input);
+    if (!current || !this.shouldRefresh(current.credential, input, now)) {
+      await releaseRefreshLease(tx, { ...lease, attemptId });
+      return current
+        ? this.readCurrentCredential(current.credential, input)
+        : { status: 'reconnect_required' };
+    }
+
+    const { credential, metadata, instanceUrl } = current;
+    const refreshToken = credential.refresh_token_encrypted
+      ? await this.decryptOAuthSecret(credential, input, 'refresh')
+      : { status: 'unreadable' as const };
+    if (refreshToken.status !== 'available') {
+      await releaseRefreshLease(tx, { ...lease, attemptId });
+      return refreshToken.status === 'temporarily_unavailable'
+        ? { status: 'temporarily_unavailable' }
+        : { status: 'reconnect_required' };
+    }
+
+    const clientId = metadata.client_id ?? (await resolveSecret(this.env.GITLAB_CLIENT_ID));
+    let clientSecret: string | null;
+    if (metadata.client_id) {
+      if (!credential.oauth_client_secret_encrypted) {
+        await releaseRefreshLease(tx, { ...lease, attemptId });
+        return { status: 'reconnect_required' };
+      }
+      const customSecret = await this.decryptOAuthSecret(credential, input, 'oauth-client-secret');
+      if (customSecret.status !== 'available') {
+        await releaseRefreshLease(tx, { ...lease, attemptId });
+        return customSecret.status === 'temporarily_unavailable'
+          ? { status: 'temporarily_unavailable' }
+          : { status: 'reconnect_required' };
+      }
+      clientSecret = customSecret.token;
+    } else {
+      clientSecret = await resolveSecret(this.env.GITLAB_CLIENT_SECRET);
+    }
+    if (!clientId || !clientSecret) {
+      await releaseRefreshLease(tx, { ...lease, attemptId });
+      return { status: 'temporarily_unavailable' };
+    }
 
     return {
       status: 'refresh',
@@ -296,7 +325,12 @@ export class GitLabOAuthCredentialRefresher implements GitLabOAuthCredentialRefr
       credentialId: inputs.credential.id,
       attemptId,
     });
-    if (!holdsLease) return { status: 'temporarily_unavailable' };
+    if (!holdsLease) {
+      // The credential row may have been deleted while this exchange ran, which
+      // also removed its lease: report reconnecting instead of a retry loop.
+      const current = await this.loadRefreshRow(tx, input);
+      return current ? { status: 'temporarily_unavailable' } : { status: 'reconnect_required' };
+    }
     const loaded = await this.loadRefreshRow(tx, input);
     if (!loaded) return { status: 'reconnect_required' };
     const credential = loaded.credential;

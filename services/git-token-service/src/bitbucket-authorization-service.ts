@@ -353,21 +353,60 @@ export class BitbucketAuthorizationService {
     );
   }
 
+  private needsRefresh(
+    authorization: ActiveAuthorization,
+    candidate: ActiveAuthorization,
+    minimumValidityMs: number
+  ): boolean {
+    const expiresAt = authorization.credential.access_token_expires_at;
+    if (!expiresAt) return false;
+    return (
+      authorization.credential.credential_version === candidate.credential.credential_version &&
+      new Date(expiresAt).getTime() - Date.now() < minimumValidityMs
+    );
+  }
+
   private async readRefreshDecision(
     tx: WorkerTransaction,
     candidate: ActiveAuthorization,
     attemptId: string,
     minimumValidityMs: number
   ): Promise<{ status: 'refresh'; inputs: BitbucketRefreshInputs } | BitbucketRefreshOutcome> {
+    const lease = {
+      kind: 'platform-oauth-credential' as const,
+      credentialId: candidate.credential.id,
+    };
+    const loaded = await this.loadAuthorization(tx, candidate.owner);
+    if (loaded.status !== 'available') return loaded;
+    if (!loaded.authorization.credential.access_token_expires_at) {
+      return { status: 'reconnect_required' };
+    }
+    if (!this.needsRefresh(loaded.authorization, candidate, minimumValidityMs)) return loaded;
+
+    // Only the attempt that holds the exchange lease may use the refresh token:
+    // a second concurrent exchange would make one of the two attempts look like
+    // a rejected credential.
+    const claimed = await claimRefreshLease(tx, {
+      ...lease,
+      attemptId,
+      providerRequestBudgetMs: BITBUCKET_OAUTH_TOKEN_TIMEOUT_MS,
+    });
+    if (!claimed) return { status: 'temporarily_unavailable' };
+
+    // The claim can wait for a holder that then commits, so re-read the row this
+    // exchange will use and give the lease back when it is no longer the row to
+    // refresh.
     const current = await this.loadAuthorization(tx, candidate.owner);
-    if (current.status !== 'available') return current;
-    const currentExpiry = current.authorization.credential.access_token_expires_at;
-    if (!currentExpiry) return { status: 'reconnect_required' };
-    if (
-      current.authorization.credential.credential_version !==
-        candidate.credential.credential_version ||
-      new Date(currentExpiry).getTime() - Date.now() >= minimumValidityMs
-    ) {
+    if (current.status !== 'available') {
+      await releaseRefreshLease(tx, { ...lease, attemptId });
+      return current;
+    }
+    if (!current.authorization.credential.access_token_expires_at) {
+      await releaseRefreshLease(tx, { ...lease, attemptId });
+      return { status: 'reconnect_required' };
+    }
+    if (!this.needsRefresh(current.authorization, candidate, minimumValidityMs)) {
+      await releaseRefreshLease(tx, { ...lease, attemptId });
       return current;
     }
 
@@ -376,18 +415,12 @@ export class BitbucketAuthorizationService {
       resolveSecret(this.env.BITBUCKET_CLIENT_SECRET),
       this.decryptCredential(current.authorization, 'refresh'),
     ]);
-    if (!clientId || !clientSecret) return { status: 'temporarily_unavailable' };
-    if (!refreshToken) return { status: 'reconnect_required' };
-    // Only the attempt that holds the exchange lease may use the rotating
-    // refresh token: a second concurrent exchange would make one of the two
-    // attempts look like a rejected credential.
-    const claimed = await claimRefreshLease(tx, {
-      kind: 'platform-oauth-credential',
-      credentialId: candidate.credential.id,
-      attemptId,
-      providerRequestBudgetMs: BITBUCKET_OAUTH_TOKEN_TIMEOUT_MS,
-    });
-    if (!claimed) return { status: 'temporarily_unavailable' };
+    if (!clientId || !clientSecret || !refreshToken) {
+      await releaseRefreshLease(tx, { ...lease, attemptId });
+      return {
+        status: !clientId || !clientSecret ? 'temporarily_unavailable' : 'reconnect_required',
+      };
+    }
     return { status: 'refresh', inputs: { clientId, clientSecret, refreshToken } };
   }
 
@@ -459,7 +492,12 @@ export class BitbucketAuthorizationService {
       credentialId: candidate.credential.id,
       attemptId,
     });
-    if (!holdsLease) return { status: 'temporarily_unavailable' };
+    if (!holdsLease) {
+      // The credential row may have been deleted while this exchange ran, which
+      // also removed its lease: report that rather than a retry loop.
+      const reloaded = await this.loadAuthorization(tx, candidate.owner);
+      return reloaded.status === 'available' ? { status: 'temporarily_unavailable' } : reloaded;
+    }
     const current = await this.loadAuthorization(tx, candidate.owner);
     if (current.status !== 'available') return current;
     const authorization = current.authorization;

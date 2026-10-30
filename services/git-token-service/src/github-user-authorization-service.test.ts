@@ -1019,6 +1019,26 @@ describe('GitHubUserAuthorizationService.getUserAccessToken', () => {
     expect(database.updates).toHaveLength(0);
   });
 
+  it('takes the lease only after re-reading the row it will exchange', async () => {
+    // The claim can wait behind a holder that commits before releasing, so the
+    // attempt re-reads the row after it holds the lease and answers from
+    // storage when the generation already moved.
+    const rowV1 = makeRow();
+    rowV1.access_token_expires_at = new Date(Date.now() - 1000).toISOString();
+    const rowV2 = { ...makeRow(), credential_version: 2 };
+    // reads: outer getUserAccessToken read (v1), refresh decision (v1), re-read
+    // under the lease (v2), final reload after the refresh (v2).
+    database.selectSequence = [rowV1, rowV1, rowV2, rowV2];
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      makeService().getUserAccessToken('user_1', { op: 'fetch' })
+    ).resolves.toMatchObject({ connected: true, token: 'access-token', credentialVersion: 2 });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(database.updates).toEqual([]);
+  });
+
   it('does not exchange the refresh token while another attempt holds the exchange lease', async () => {
     const row = makeRow();
     row.access_token_expires_at = new Date(Date.now() - 1000).toISOString();

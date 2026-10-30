@@ -94,6 +94,9 @@ function grantedLeaseStubs() {
  * call never runs inside one.
  */
 function installDatabase(rows: Array<Record<string, unknown> | undefined>) {
+  // A single row models a credential that does not change across reads; several
+  // rows are served in order so a test can model a row that another request
+  // rotated between two reads.
   const state = {
     depth: 0,
     selectCount: 0,
@@ -136,6 +139,10 @@ function installDatabase(rows: Array<Record<string, unknown> | undefined>) {
         innerJoin: vi.fn(() => ({
           where: vi.fn(() => ({
             limit: vi.fn(async () => {
+              if (rows.length === 1) {
+                const only = rows[0];
+                return only === undefined ? [] : [only];
+              }
               const row = rows[state.selectCount];
               state.selectCount += 1;
               return row === undefined ? [] : [row];
@@ -430,7 +437,7 @@ describe('GitLabOAuthCredentialRefresher', () => {
   it('persists a refreshed credential after a single bounded token request', async () => {
     const input = refreshInput();
     const row = loadedRow(input);
-    const state = installDatabase([row, row]);
+    const state = installDatabase([row]);
     const crypto = new GitLabCredentialCrypto({});
     vi.spyOn(crypto, 'decrypt').mockResolvedValue({ status: 'available', token: 'refresh-token' });
     vi.spyOn(crypto, 'encrypt')
@@ -464,7 +471,7 @@ describe('GitLabOAuthCredentialRefresher', () => {
   it('classifies an unanswered token request as temporary unavailability', async () => {
     const input = refreshInput();
     const row = loadedRow(input);
-    const state = installDatabase([row, row]);
+    const state = installDatabase([row]);
     const crypto = new GitLabCredentialCrypto({});
     vi.spyOn(crypto, 'decrypt').mockResolvedValue({ status: 'available', token: 'refresh-token' });
     vi.spyOn(AbortSignal, 'timeout').mockImplementation(() => {
@@ -516,9 +523,12 @@ describe('GitLabOAuthCredentialRefresher', () => {
     });
     const state = installDatabase([candidate, winner]);
     const crypto = new GitLabCredentialCrypto({});
-    vi.spyOn(crypto, 'decrypt')
-      .mockResolvedValueOnce({ status: 'available', token: 'refresh-token' })
-      .mockResolvedValueOnce({ status: 'available', token: 'winner-token' });
+    // The refresh token is only read once the exchange already owns the
+    // credential, and here the winner's row replaces it before that.
+    vi.spyOn(crypto, 'decrypt').mockResolvedValueOnce({
+      status: 'available',
+      token: 'winner-token',
+    });
 
     await expect(
       new GitLabOAuthCredentialRefresher(
@@ -538,10 +548,50 @@ describe('GitLabOAuthCredentialRefresher', () => {
     expect(state.integrationUpdates).toEqual([]);
   });
 
+  it('takes the lease only after re-reading the row it will exchange', async () => {
+    // The claim can wait behind a holder that commits before releasing, so the
+    // attempt must re-read the credential after it holds the lease: a row whose
+    // version moved during the wait is answered from storage, never exchanged.
+    const input = refreshInput();
+    const candidate = loadedRow(input);
+    const winner = loadedRow(input, {
+      credential: {
+        credential_version: 2,
+        access_token_encrypted: 'winner-envelope',
+        access_token_expires_at: '2026-07-13T13:00:00.000Z',
+      },
+    });
+    const state = installDatabase([candidate, winner]);
+    const crypto = new GitLabCredentialCrypto({});
+    vi.spyOn(crypto, 'decrypt').mockResolvedValueOnce({
+      status: 'available',
+      token: 'winner-token',
+    });
+    const fetchMock = vi.fn();
+
+    await expect(
+      new GitLabOAuthCredentialRefresher(
+        {
+          HYPERDRIVE: { connectionString: 'postgres://test' } as Hyperdrive,
+          GITLAB_CLIENT_ID: 'client-id',
+          GITLAB_CLIENT_SECRET: 'client-secret',
+        },
+        {
+          crypto,
+          now: () => new Date('2026-07-13T12:00:00.000Z'),
+          fetch: fetchMock as unknown as typeof fetch,
+        }
+      ).refresh(input)
+    ).resolves.toEqual({ status: 'available', token: 'winner-token', credentialVersion: 2 });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(state.credentialUpdates).toEqual([]);
+    expect(state.leases.size).toBe(0);
+  });
+
   it('revokes the credential when the instance rejects the refresh token', async () => {
     const input = refreshInput();
     const row = loadedRow(input);
-    const state = installDatabase([row, row]);
+    const state = installDatabase([row]);
     const crypto = new GitLabCredentialCrypto({});
     vi.spyOn(crypto, 'decrypt').mockResolvedValue({ status: 'available', token: 'refresh-token' });
 
@@ -576,7 +626,7 @@ describe('GitLabOAuthCredentialRefresher', () => {
   it('keeps the credential usable when a refresh arrives while another attempt holds the lease', async () => {
     const input = refreshInput();
     const row = loadedRow(input);
-    const state = installDatabase([row, row, row]);
+    const state = installDatabase([row]);
     const crypto = new GitLabCredentialCrypto({});
     vi.spyOn(crypto, 'decrypt').mockResolvedValue({ status: 'available', token: 'refresh-token' });
     vi.spyOn(crypto, 'encrypt')
@@ -622,7 +672,7 @@ describe('GitLabOAuthCredentialRefresher', () => {
   it('does not revoke when another attempt took over the exchange lease', async () => {
     const input = refreshInput();
     const row = loadedRow(input);
-    const state = installDatabase([row, row]);
+    const state = installDatabase([row]);
     state.releaseDenied = true;
     const crypto = new GitLabCredentialCrypto({});
     vi.spyOn(crypto, 'decrypt').mockResolvedValue({ status: 'available', token: 'refresh-token' });

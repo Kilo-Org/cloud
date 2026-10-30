@@ -510,6 +510,48 @@ export class GitHubUserAuthorizationService {
     attemptId: string,
     options: { force?: boolean }
   ): Promise<{ status: 'refresh'; inputs: AuthorizationRefreshInputs } | RefreshResult> {
+    const lease = { kind: 'user-github-app-token' as const, credentialId: candidate.id };
+    const initial = await this.selectAuthorizationForRefresh(tx, candidate, options);
+    if (typeof initial !== 'object') return initial;
+
+    const clientId = this.env.GITHUB_APP_CLIENT_ID;
+    const clientSecret = this.env.GITHUB_APP_CLIENT_SECRET;
+    if (!clientId || !clientSecret) return 'transient_failure';
+    // Only the attempt that holds the exchange lease may use the refresh token:
+    // a second concurrent exchange would make one of the two attempts look like
+    // a rejected credential.
+    const claimed = await claimRefreshLease(tx, {
+      ...lease,
+      attemptId,
+      providerRequestBudgetMs: GITHUB_USER_AUTHORIZATION_REQUEST_TIMEOUT_MS,
+    });
+    if (!claimed) return 'transient_failure';
+
+    // The claim can wait for a holder that then commits, so re-read the row this
+    // exchange will use and give the lease back when it is no longer the row to
+    // refresh.
+    const current = await this.selectAuthorizationForRefresh(tx, candidate, options);
+    if (typeof current !== 'object') {
+      await releaseRefreshLease(tx, { ...lease, attemptId });
+      return current;
+    }
+
+    return {
+      status: 'refresh',
+      inputs: {
+        authorization: current.authorization,
+        clientId,
+        clientSecret,
+        refreshToken: this.decryptCredential(current.authorization, 'refresh'),
+      },
+    };
+  }
+
+  private async selectAuthorizationForRefresh(
+    tx: WorkerTransaction,
+    candidate: AuthorizationRow,
+    options: { force?: boolean }
+  ): Promise<{ authorization: AuthorizationRow } | RefreshResult> {
     const [authorization] = await tx
       .select()
       .from(user_github_app_tokens)
@@ -529,29 +571,7 @@ export class GitHubUserAuthorizationService {
     ) {
       return 'refreshed';
     }
-
-    const clientId = this.env.GITHUB_APP_CLIENT_ID;
-    const clientSecret = this.env.GITHUB_APP_CLIENT_SECRET;
-    if (!clientId || !clientSecret) return 'transient_failure';
-    // Only the attempt that holds the exchange lease may use the rotating
-    // refresh token: a second concurrent exchange would make one of the two
-    // attempts look like a rejected credential.
-    const claimed = await claimRefreshLease(tx, {
-      kind: 'user-github-app-token',
-      credentialId: authorization.id,
-      attemptId,
-      providerRequestBudgetMs: GITHUB_USER_AUTHORIZATION_REQUEST_TIMEOUT_MS,
-    });
-    if (!claimed) return 'transient_failure';
-    return {
-      status: 'refresh',
-      inputs: {
-        authorization,
-        clientId,
-        clientSecret,
-        refreshToken: this.decryptCredential(authorization, 'refresh'),
-      },
-    };
+    return { authorization };
   }
 
   private async requestAuthorizationRefresh(

@@ -9,6 +9,7 @@ import { useTranslation } from 'react-i18next';
 import { Eyebrow } from '@/components/ui/eyebrow';
 import { Text } from '@/components/ui/text';
 import { useOfflineBannerSpace } from '@/components/offline-banner-space';
+import { useHeaderBack } from '@/lib/hooks/use-header-back';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { offlineHeaderReservation } from '@/lib/offline-banner-state';
 import { useScreenInsets, useSideInsetStyle } from '@/lib/screen-insets';
@@ -269,13 +270,13 @@ export function ScreenHeader({
   className,
 }: Readonly<ScreenHeaderProps>) {
   const insets = useScreenInsets();
-  const router = useRouter();
   const colors = useThemeColors();
   const { t } = useTranslation();
   const { width: windowWidth } = useWindowDimensions();
   const fontScale = useLiveFontScale();
   const historyCanGoBack = useCanGoBack();
   const canGoBack = showBackButton ?? (historyCanGoBack || backFallback !== undefined);
+  const handleBack = useHeaderBack({ onBack, backFallback, canGoBack: historyCanGoBack });
   const isOfflineBannerVisible = useOfflineBannerSpace();
   // A window too narrow to hold the title beside its actions drops the actions
   // to their own row instead of squeezing the title into a single-letter
@@ -440,18 +441,7 @@ export function ScreenHeader({
   // `h-11` frame to Android's 48dp minimum.
   const backControl = canGoBack ? (
     <Pressable
-      onPress={() => {
-        if (onBack) {
-          onBack();
-        } else if (backFallback !== undefined && !router.canGoBack()) {
-          // POP_TO keeps the fallback's contract (land on this destination)
-          // while truncating any routes the app left above the destination;
-          // with no history it still creates the destination, as replace did.
-          router.dismissTo(backFallback);
-        } else {
-          router.back();
-        }
-      }}
+      onPress={handleBack}
       accessibilityRole="button"
       accessibilityLabel={resolvedBackIcon === 'close' ? t('common.close') : t('common.goBack')}
       className={cn(

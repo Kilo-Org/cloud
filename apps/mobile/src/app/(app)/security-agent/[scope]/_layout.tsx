@@ -3,6 +3,7 @@ import { appScreenLayout } from '@/components/app-screen-layout';
 
 import { InvalidRouteState } from '@/components/invalid-route-state';
 import { SecurityAgentCommandObserver } from '@/components/security-agent/security-agent-command-observer';
+import { SecurityAgentScopeProvider } from '@/components/security-agent/security-agent-scope-route';
 import { useFormSheetScreenOptions } from '@/lib/form-sheet';
 import { parseSecurityScope } from '@/lib/security-agent';
 
@@ -26,13 +27,13 @@ export default function SecurityAgentScopeLayout() {
   }
 
   return (
-    <>
+    <SecurityAgentScopeProvider scope={scope}>
       <SecurityAgentCommandObserver scope={scope} />
       <Stack screenLayout={appScreenLayout} screenOptions={{ headerShown: false }}>
         <Stack.Screen name="index" />
         <Stack.Screen name="dismiss/[id]" options={sheetOptions} />
         <Stack.Screen name="filter" options={sheetOptions} />
       </Stack>
-    </>
+    </SecurityAgentScopeProvider>
   );
 }

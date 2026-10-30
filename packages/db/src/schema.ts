@@ -5992,12 +5992,12 @@ export const code_review_memory_proposals = pgTable(
     uniqueIndex('UQ_code_review_memory_proposals_org_active_scope')
       .on(table.owned_by_organization_id, table.platform, table.repo_full_name)
       .where(
-        sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.status} IN ('open', 'edited', 'opening_change_request')`
+        sql`${table.owned_by_organization_id} IS NOT NULL AND ${table.status} IN ('open', 'edited', 'opening_change_request', 'change_request_failed')`
       ),
     uniqueIndex('UQ_code_review_memory_proposals_user_active_scope')
       .on(table.owned_by_user_id, table.platform, table.repo_full_name)
       .where(
-        sql`${table.owned_by_user_id} IS NOT NULL AND ${table.status} IN ('open', 'edited', 'opening_change_request')`
+        sql`${table.owned_by_user_id} IS NOT NULL AND ${table.status} IN ('open', 'edited', 'opening_change_request', 'change_request_failed')`
       ),
     check(
       'code_review_memory_proposals_owner_check',

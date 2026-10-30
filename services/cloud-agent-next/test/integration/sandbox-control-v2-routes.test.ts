@@ -1368,7 +1368,7 @@ describe('SandboxControlV2 routes and forwarding', () => {
       },
     };
     await stub.prepare(initial);
-    const { wrapper } = await connectAndHello(provider, 'wr_1');
+    const { wrapper, credential, allocationId } = await connectAndHello(provider, 'wr_1');
     await wrapper.next();
     wrapper.send({ type: 'session.ready', sessionId: SESSION });
     await waitFor(async () => expect((await readRouteRow(stub, SESSION))?.state).toBe('ready'));
@@ -1380,9 +1380,17 @@ describe('SandboxControlV2 routes and forwarding', () => {
     reprepare.spec = { ...reprepare.spec, worktreeRecovery: latest };
     await stub.prepare(reprepare);
     const row = await readRouteRow(stub, SESSION);
-    wrapper.close();
     expect(row).not.toBeNull();
     expect(JSON.parse(row?.spec ?? '{}').worktreeRecovery).toEqual(latest);
+
+    const wrapper2 = await FakeWrapper.connect({ sandboxId: SANDBOX_ID, credential });
+    await wrapper2.hello({ wrapperId: 'wr_2', allocationId });
+    const frame = await wrapper2.next();
+    expect(frame).toMatchObject({ type: 'session.prepare' });
+    if (frame?.type !== 'session.prepare') throw new Error('expected session.prepare');
+    expect(frame.spec.worktreeRecovery).toEqual(latest);
+    wrapper2.close();
+    wrapper.close();
   });
 
   it('re-notifies ready for the same wrapperId after a reconnect', async () => {

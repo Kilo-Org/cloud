@@ -1,5 +1,6 @@
-import { Switch as NativeSwitch, Platform, type SwitchProps, useColorScheme } from 'react-native';
+import { Switch as NativeSwitch, Platform, type SwitchProps } from 'react-native';
 
+import { isDarkPalette } from '@/lib/hooks/theme-palette';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 
 /**
@@ -27,7 +28,6 @@ export function Switch({
 }: SwitchProps) {
   const resolvedDisabled = disabled ?? accessibilityState?.disabled;
   const colors = useThemeColors();
-  const colorScheme = useColorScheme();
 
   // `thumbColor` is one value for both states, so the off track has to carry
   // the theme the thumb belongs to. The light palette's on-thumb ink is white
@@ -36,7 +36,7 @@ export function Switch({
   // control as one dim shape. The off track therefore takes the lighter
   // secondary ink in dark mode, which keeps the thumb and the outline of the
   // control visible against the card.
-  const offTrack = colorScheme === 'dark' ? colors.ink2 : colors.mutedForeground;
+  const offTrack = isDarkPalette(colors) ? colors.ink2 : colors.mutedForeground;
 
   return (
     <NativeSwitch

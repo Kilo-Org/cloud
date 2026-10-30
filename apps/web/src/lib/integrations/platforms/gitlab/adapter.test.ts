@@ -1747,6 +1747,50 @@ describe('merge request note reads', () => {
     expect(requestedDiscussionPages().slice(1)).not.toContain(oldestKeptPage - 1);
   });
 
+  it('returns inline comments newest first', async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          discussionWithNote({
+            discussionId: 'd1',
+            noteId: 1,
+            authorId: 300,
+            authorUsername: 'contributor',
+            body: 'oldest comment',
+          }),
+          discussionWithNote({
+            discussionId: 'd2',
+            noteId: 2,
+            authorId: 300,
+            authorUsername: 'contributor',
+            body: 'middle comment',
+          }),
+          discussionWithNote({
+            discussionId: 'd3',
+            noteId: 3,
+            authorId: 300,
+            authorUsername: 'contributor',
+            body: 'newest comment',
+          }),
+        ],
+        headers: { get: () => null },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: TOKEN_USER_ID, username: 'project_42_bot' }),
+        headers: { get: () => null },
+      });
+
+    const comments = await fetchMRInlineComments('prat-token', 'group/project', 10);
+
+    expect(comments.map(c => c.body)).toEqual([
+      'newest comment',
+      'middle comment',
+      'oldest comment',
+    ]);
+  });
+
   it('stores each inline note body at the rendered length', async () => {
     mockFetch
       .mockResolvedValueOnce({

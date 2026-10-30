@@ -13,6 +13,7 @@ import { lookup } from 'dns/promises';
 import { EventEmitter } from 'events';
 import * as https from 'https';
 import { PassThrough } from 'stream';
+import { MAX_INLINE_COMMENT_BODY_CHARS } from '@/lib/code-reviews/core/constants';
 import {
   buildGitLabOAuthUrl,
   exchangeGitLabOAuthCode,
@@ -40,6 +41,7 @@ import {
   revokeProjectAccessToken,
   updateProjectWebhook,
   fetchMRInlineComments,
+  MAX_MR_NOTE_BODY_BYTES,
 } from './adapter';
 
 // Mock fetch globally
@@ -1633,5 +1635,180 @@ describe('fetchMRInlineComments authorship', () => {
         user: { username: 'project_42_bot' },
       }),
     ]);
+  });
+});
+
+const TOKEN_USER_ID = 42;
+
+function discussionPage(page: number, body: string) {
+  return Array.from({ length: 100 }, (_, index) =>
+    discussionWithNote({
+      discussionId: `d${page}-${index}`,
+      noteId: page * 100 + index,
+      authorId: 300,
+      authorUsername: 'contributor',
+      body,
+    })
+  );
+}
+
+/**
+ * Answers every merge-request discussion page with a full page of one body and reports
+ * `totalPages`, so only the retained-byte budget can end the read.
+ */
+function mockEndlessDiscussionPages(body: string, totalPages: number) {
+  mockFetch.mockImplementation(async (url: string) => {
+    if (url.endsWith('/api/v4/user')) {
+      return {
+        ok: true,
+        json: async () => ({ id: TOKEN_USER_ID, username: 'project_42_bot' }),
+        headers: { get: () => null },
+      };
+    }
+    const page = Number(new URL(url).searchParams.get('page') ?? '1');
+    return {
+      ok: true,
+      json: async () => discussionPage(page, body),
+      headers: {
+        get: (name: string) => (name.toLowerCase() === 'x-total-pages' ? String(totalPages) : null),
+      },
+    };
+  });
+}
+
+function discussionFetchCount() {
+  return mockFetch.mock.calls.filter(([url]) => String(url).includes('/discussions')).length;
+}
+
+describe('merge request note reads', () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+  });
+
+  it('keeps the retained inline note text within the read budget', async () => {
+    const body = 'y'.repeat(200);
+    mockEndlessDiscussionPages(body, 100);
+    const expectedNotes = Math.ceil(MAX_MR_NOTE_BODY_BYTES / Buffer.byteLength(body));
+
+    const comments = await fetchMRInlineComments('prat-token', 'group/project', 10);
+
+    const totalBytes = comments.reduce((sum, c) => sum + Buffer.byteLength(c.body), 0);
+    expect(comments).toHaveLength(expectedNotes);
+    expect(totalBytes).toBeGreaterThanOrEqual(MAX_MR_NOTE_BODY_BYTES);
+    expect(discussionFetchCount()).toBe(Math.ceil(expectedNotes / 100));
+    expect(discussionFetchCount()).toBeLessThan(100);
+  });
+
+  it('ends a multi-byte inline note read before the page bound', async () => {
+    const body = '漢'.repeat(MAX_INLINE_COMMENT_BODY_CHARS + 100);
+    const bytesPerStoredBody = Buffer.byteLength(body.slice(0, MAX_INLINE_COMMENT_BODY_CHARS));
+    expect(bytesPerStoredBody).toBe(MAX_INLINE_COMMENT_BODY_CHARS * 3);
+    mockEndlessDiscussionPages(body, 100);
+    const expectedNotes = Math.ceil(MAX_MR_NOTE_BODY_BYTES / bytesPerStoredBody);
+
+    const comments = await fetchMRInlineComments('prat-token', 'group/project', 10);
+
+    expect(comments).toHaveLength(expectedNotes);
+    expect(discussionFetchCount()).toBe(Math.ceil(expectedNotes / 100));
+    expect(comments.every(c => c.body.length === MAX_INLINE_COMMENT_BODY_CHARS)).toBe(true);
+  });
+
+  it('stores each inline note body at the rendered length', async () => {
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [
+          discussionWithNote({
+            discussionId: 'd1',
+            noteId: 5,
+            authorId: 300,
+            authorUsername: 'contributor',
+            body: 'z'.repeat(MAX_INLINE_COMMENT_BODY_CHARS + 40) + '\nsecond line',
+          }),
+        ],
+        headers: { get: () => null },
+      })
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ id: TOKEN_USER_ID, username: 'project_42_bot' }),
+        headers: { get: () => null },
+      });
+
+    const comments = await fetchMRInlineComments('prat-token', 'group/project', 10);
+
+    expect(comments[0].body).toBe('z'.repeat(MAX_INLINE_COMMENT_BODY_CHARS));
+  });
+
+  it('does not count other accounts note text against the read budget', async () => {
+    mockTokenUser();
+    mockNotePageOf(
+      Array.from({ length: 100 }, (_, index) =>
+        makeNote({ id: 1000 + index, body: 'w'.repeat(10_000), authorId: 77 })
+      ),
+      2
+    );
+    mockNotePage([makeNote({ id: 2000, body: 'summary <!-- kilo-review -->', authorId: 42 })]);
+
+    const result = await findKiloReviewNote('test-token', 'group/project', 7);
+
+    expect(result).toEqual({ noteId: 2000, body: 'summary <!-- kilo-review -->' });
+    expect(mockFetch).toHaveBeenCalledTimes(3);
+  });
+
+  it('returns the summary note body whole for the provider update', async () => {
+    const body = `${'s'.repeat(MAX_INLINE_COMMENT_BODY_CHARS * 2)}<!-- kilo-review -->`;
+    mockTokenUser();
+    mockNotePage([makeNote({ id: 3000, body, authorId: 42 })]);
+
+    const result = await findKiloReviewNote('test-token', 'group/project', 7);
+
+    expect(result).toEqual({ noteId: 3000, body });
+  });
+
+  it('stops a summary note read once the retained bodies reach the budget', async () => {
+    const body = `${'s'.repeat(6000)}<!-- kilo-review -->`;
+    const keptNotes = Math.ceil(MAX_MR_NOTE_BODY_BYTES / Buffer.byteLength(body));
+    mockTokenUser();
+    mockNotePageOf(
+      Array.from({ length: 100 }, (_, index) =>
+        makeNote({
+          id: 4000 + index,
+          body,
+          authorId: 42,
+          updated_at: `2026-02-01T00:${String(Math.floor(index / 60)).padStart(2, '0')}:${String(
+            index % 60
+          ).padStart(2, '0')}Z`,
+        })
+      ),
+      2
+    );
+
+    const result = await findKiloReviewNote('test-token', 'group/project', 7);
+
+    expect(result).toEqual({ noteId: 4000 + keptNotes - 1, body });
+    expect(mockFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it('still refuses a note listing beyond the page bound', async () => {
+    mockTokenUser();
+    mockNotePageOf([makeNote({ id: 5000, body: 'note', authorId: 77 })], 101);
+
+    await expect(findKiloReviewNote('test-token', 'group/project', 7)).rejects.toThrow(
+      'GitLab pagination limit exceeded: MR note listing returned more than 100 pages'
+    );
+  });
+
+  it('still refuses a discussion listing beyond the page bound', async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => discussionPage(1, 'comment body'),
+      headers: {
+        get: (name: string) => (name.toLowerCase() === 'x-total-pages' ? '101' : null),
+      },
+    });
+
+    await expect(fetchMRInlineComments('prat-token', 'group/project', 10)).rejects.toThrow(
+      'GitLab pagination limit exceeded: MR discussion listing returned more than 100 pages'
+    );
   });
 });

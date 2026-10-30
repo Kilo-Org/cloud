@@ -539,7 +539,6 @@ export const kilocode_users = pgTable(
       .concurrently(),
     index('IDX_kilocode_users_blocked_at').on(table.blocked_at),
     index('IDX_kilocode_users_blocked_by_kilo_user_id').on(table.blocked_by_kilo_user_id),
-    // Prevent empty strings
     check('blocked_reason_not_empty', sql`length(blocked_reason) > 0`),
     check(
       'kilocode_users_is_super_admin_requires_admin_check',
@@ -4306,7 +4305,6 @@ export const enrichment_data = pgTable(
 
 export type EnrichmentData = typeof enrichment_data.$inferSelect;
 
-// vector size 1536
 export const source_embeddings = pgTable(
   'source_embeddings',
   {
@@ -4323,7 +4321,6 @@ export const source_embeddings = pgTable(
     file_hash: text(),
     start_line: integer().notNull(),
     end_line: integer().notNull(),
-    // Git branch support fields
     git_branch: text().notNull().default('main'),
     is_base_branch: boolean().notNull().default(true),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -4341,16 +4338,13 @@ export const source_embeddings = pgTable(
     index('IDX_source_embeddings_project_id').on(table.project_id),
     index('IDX_source_embeddings_created_at').on(table.created_at),
     index('IDX_source_embeddings_updated_at').on(table.updated_at),
-    // Case-insensitive index on filePath using lowercase
     index('IDX_source_embeddings_file_path_lower').on(sql`LOWER(${table.file_path})`),
-    // Git branch indexes for efficient branch-based queries
     index('IDX_source_embeddings_git_branch').on(table.git_branch),
     index('IDX_source_embeddings_org_project_branch').on(
       table.organization_id,
       table.project_id,
       table.git_branch
     ),
-    // Composite unique constraint for upsert operations
     unique('UQ_source_embeddings_org_project_branch_file_lines').on(
       table.organization_id,
       table.project_id,
@@ -4382,12 +4376,10 @@ export const platform_integrations = pgTable(
     // Integration type (examples: 'app', 'oauth', 'pat', 'service_account')
     integration_type: text().notNull(),
 
-    // Platform-specific identifiers
     platform_installation_id: text(),
     platform_account_id: text(),
     platform_account_login: text(),
 
-    // Permissions and scope
     permissions: jsonb().$type<IntegrationPermissions>(),
     scopes: text().array(),
 
@@ -4405,7 +4397,6 @@ export const platform_integrations = pgTable(
     kilo_requester_user_id: text(), // Kilo user ID who requested the installation
     platform_requester_account_id: text(), // Platform account ID (e.g., GitHub user ID) who requested
 
-    // Integration Status (Kilo's status tracking)
     integration_status: text(), // 'pending' | 'active' | 'suspended'
 
     suspended_at: timestamp({ withTimezone: true, mode: 'string' }),
@@ -4427,7 +4418,6 @@ export const platform_integrations = pgTable(
     github_authorized_user_id: text(),
     github_authorized_at: timestamp({ withTimezone: true, mode: 'string' }),
 
-    // Timestamps
     installed_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -4436,7 +4426,6 @@ export const platform_integrations = pgTable(
       .$onUpdateFn(() => sql`now()`),
   },
   table => [
-    // Allow multiple GitHub installations per org - removed old unique constraint on (org, platform)
     uniqueIndex('UQ_platform_integrations_owned_by_org_platform_inst')
       .on(table.owned_by_organization_id, table.platform, table.platform_installation_id)
       .where(isNotNull(table.owned_by_organization_id)),
@@ -4983,7 +4972,6 @@ export const agent_configs = pgTable(
   'agent_configs',
   {
     id: idPrimaryKeyColumn,
-    // Ownership: exactly one must be set (org OR user)
     owned_by_organization_id: uuid().references(() => organizations.id, {
       onDelete: 'cascade',
     }),
@@ -4997,23 +4985,13 @@ export const agent_configs = pgTable(
     // Platform (examples: 'github', 'gitlab', 'bitbucket', 'all')
     platform: text().notNull(),
 
-    // Agent configuration (JSONB for flexibility)
-    // Example for code_review:
-    // {
-    //   "review_style": "balanced",
-    //   "focus_areas": ["security", "performance"],
-    //   "model_slug": "anthropic/claude-4.5-sonnet",
-    //   "custom_instructions": "..."
-    // }
     config: jsonb().$type<CodeReviewAgentConfig | Record<string, unknown>>().notNull().default({}),
 
-    // Status
     is_enabled: boolean().notNull().default(true),
 
     // Generic runtime state (e.g. security_scan agents store { last_synced_at: string })
     runtime_state: jsonb().$type<Record<string, unknown>>().default({}),
 
-    // Metadata
     created_by: text().notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     updated_at: timestamp({ withTimezone: true, mode: 'string' })
@@ -5025,7 +5003,6 @@ export const agent_configs = pgTable(
     config_revision: integer().notNull().default(1),
   },
   table => [
-    // Unique constraints for org and user ownership
     unique('UQ_agent_configs_org_agent_platform').on(
       table.owned_by_organization_id,
       table.agent_type,
@@ -5036,12 +5013,10 @@ export const agent_configs = pgTable(
       table.agent_type,
       table.platform
     ),
-    // Indexes
     index('IDX_agent_configs_org_id').on(table.owned_by_organization_id),
     index('IDX_agent_configs_owned_by_user_id').on(table.owned_by_user_id),
     index('IDX_agent_configs_agent_type').on(table.agent_type),
     index('IDX_agent_configs_platform').on(table.platform),
-    // Owner check constraint (exactly one must be set)
     check(
       'agent_configs_owner_check',
       sql`(
@@ -5104,20 +5079,16 @@ export const webhook_events = pgTable(
     // Event action (examples: 'opened', 'synchronize', 'created', 'merged')
     event_action: text(),
 
-    // Event data
     payload: jsonb().notNull(),
     headers: jsonb().notNull(),
 
-    // Processing status
     processed: boolean().notNull().default(false),
     processed_at: timestamp({ withTimezone: true, mode: 'string' }),
     handlers_triggered: text().array().default([]).notNull(),
     errors: jsonb(),
 
-    // Deduplication
     event_signature: text().notNull(),
 
-    // Timestamp
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
@@ -5137,7 +5108,6 @@ export const webhook_events = pgTable(
   ]
 );
 
-// ============ WEBHOOK TRIGGERS ============
 // Registry for webhook triggers - PostgreSQL is listing/ownership index only
 // Authoritative config data lives in the worker's TriggerDO
 
@@ -5179,19 +5149,16 @@ export const cloud_agent_webhook_triggers = pgTable(
       .$onUpdateFn(() => sql`now()`),
   },
   table => [
-    // Unique indexes (partial) - trigger_id must be unique per user or per org
     uniqueIndex('UQ_cloud_agent_webhook_triggers_user_trigger')
       .on(table.user_id, table.trigger_id)
       .where(isNotNull(table.user_id)),
     uniqueIndex('UQ_cloud_agent_webhook_triggers_org_trigger')
       .on(table.organization_id, table.trigger_id)
       .where(isNotNull(table.organization_id)),
-    // Indexes
     index('IDX_cloud_agent_webhook_triggers_user').on(table.user_id),
     index('IDX_cloud_agent_webhook_triggers_org').on(table.organization_id),
     index('IDX_cloud_agent_webhook_triggers_active').on(table.is_active),
     index('IDX_cloud_agent_webhook_triggers_profile').on(table.profile_id),
-    // Owner check constraint - exactly one must be set
     check(
       'CHK_cloud_agent_webhook_triggers_owner',
       sql`(
@@ -5199,7 +5166,6 @@ export const cloud_agent_webhook_triggers = pgTable(
         (${table.user_id} IS NULL AND ${table.organization_id} IS NOT NULL)
       )`
     ),
-    // Cloud Agent triggers require github_repo
     check(
       'CHK_cloud_agent_webhook_triggers_cloud_agent_fields',
       sql`(
@@ -5207,7 +5173,6 @@ export const cloud_agent_webhook_triggers = pgTable(
         ${table.github_repo} IS NOT NULL
       )`
     ),
-    // KiloClaw Chat triggers require kiloclaw_instance_id
     check(
       'CHK_cloud_agent_webhook_triggers_kiloclaw_fields',
       sql`(
@@ -5215,7 +5180,6 @@ export const cloud_agent_webhook_triggers = pgTable(
         ${table.kiloclaw_instance_id} IS NOT NULL
       )`
     ),
-    // Scheduled triggers require cron_expression
     check(
       'CHK_cloud_agent_webhook_triggers_scheduled_fields',
       sql`(
@@ -5361,10 +5325,8 @@ export type NewPasskeySignInTicket = typeof passkey_sign_in_tickets.$inferInsert
 
 export type WebhookEvent = typeof webhook_events.$inferSelect;
 
-// ============ MODEL STATS ============
 // Cached model data from OpenRouter and external benchmarks
 
-// Zod schemas for runtime validation of JSONB data
 export const ModelStatsBenchmarksSchema = z
   .object({
     enkrypt: EnkryptBenchmarkSchema.optional(),
@@ -5435,7 +5397,6 @@ export const ModelStatsChartDataSchema = z
   })
   .optional();
 
-// TypeScript types inferred from Zod schemas
 export type ModelStatsBenchmarks = z.infer<typeof ModelStatsBenchmarksSchema>;
 export type ModelStatsChartData = z.infer<typeof ModelStatsChartDataSchema>;
 
@@ -5448,19 +5409,16 @@ export const modelStats = pgTable(
     isStealth: boolean('is_stealth').default(false).notNull(),
     isRecommended: boolean('is_recommended').default(false).notNull(),
 
-    // ============ IDENTIFIERS ============
     openrouterId: text('openrouter_id').notNull().unique(),
     slug: text('slug').unique(),
     aaSlug: text('aa_slug'),
 
-    // ============ CORE DISPLAY DATA ============
     name: text('name').notNull(),
     description: text('description'),
     modelCreator: text('model_creator'),
     creatorSlug: text('creator_slug'),
     releaseDate: date('release_date'),
 
-    // ============ DENORMALIZED FIELDS (for fast queries/sorts) ============
     // Pricing (from OpenRouter)
     priceInput: decimal('price_input', { precision: 10, scale: 6 }),
     priceOutput: decimal('price_output', { precision: 10, scale: 6 }),
@@ -5477,14 +5435,11 @@ export const modelStats = pgTable(
     maxOutputTokens: integer('max_output_tokens'),
     inputModalities: text('input_modalities').array(),
 
-    // ============ COMPLETE DATA BLOBS ============
     openrouterData: jsonb('openrouter_data').$type<OpenRouterModel>().notNull(),
     benchmarks: jsonb('benchmarks').$type<ModelStatsBenchmarks>(),
 
-    // ============ CHART DATA ============
     chartData: jsonb('chart_data').$type<ModelStatsChartData>(),
 
-    // ============ METADATA ============
     createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
       .defaultNow()
       .notNull(),
@@ -5494,13 +5449,11 @@ export const modelStats = pgTable(
       .$onUpdateFn(() => sql`now()`),
   },
   table => [
-    // Indexes for common queries
     index('IDX_model_stats_openrouter_id').on(table.openrouterId),
     index('IDX_model_stats_slug').on(table.slug),
     index('IDX_model_stats_is_active').on(table.isActive),
     index('IDX_model_stats_creator_slug').on(table.creatorSlug),
 
-    // Indexes for sorting/filtering
     index('IDX_model_stats_price_input').on(table.priceInput),
     index('IDX_model_stats_coding_index').on(table.codingIndex),
     index('IDX_model_stats_context_length').on(table.contextLength),
@@ -5768,7 +5721,6 @@ export const cloud_agent_code_reviews = pgTable(
   'cloud_agent_code_reviews',
   {
     id: idPrimaryKeyColumn,
-    // Ownership: exactly one must be set (org OR user)
     owned_by_organization_id: uuid().references(() => organizations.id, {
       onDelete: 'cascade',
     }),
@@ -5776,7 +5728,6 @@ export const cloud_agent_code_reviews = pgTable(
       onDelete: 'cascade',
     }),
 
-    // Platform integration (optional - for linking to integration)
     platform_integration_id: uuid().references(() => platform_integrations.id, {
       onDelete: 'set null',
     }),
@@ -5792,7 +5743,6 @@ export const cloud_agent_code_reviews = pgTable(
     // UI job-runs screen. Null for standard runs or before a council run completes.
     council_result: jsonb('council_result').$type<CodeReviewCouncilResult>(),
 
-    // PR information
     repo_full_name: text().notNull(), // e.g., "owner/repo"
     pr_number: integer().notNull(),
     pr_url: text().notNull(),
@@ -5809,11 +5759,9 @@ export const cloud_agent_code_reviews = pgTable(
     // Platform-specific project ID (e.g., GitLab numeric project ID)
     platform_project_id: integer(),
 
-    // Cloud agent session
     session_id: text(), // Cloud agent session ID (agent_xxx)
     cli_session_id: text(), // Kilo CLI session ID (ses_xxx from cli_sessions_v2, or legacy UUID from cli_sessions v1)
 
-    // Review status
     status: text().notNull().default('pending'), // 'pending' | 'queued' | 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted'
     dispatch_reservation_id: text(),
     error_message: text(),
@@ -5822,11 +5770,9 @@ export const cloud_agent_code_reviews = pgTable(
     // Which cloud agent backend executed this review: 'v1' (cloud-agent SSE) or 'v2' (cloud-agent-next)
     agent_version: text().default('v1'),
 
-    // PR gate check tracking
     // GitHub Check Run ID; null for GitLab or pre-feature reviews
     check_run_id: bigint({ mode: 'number' }),
 
-    // REVIEW.md usage metadata
     repository_review_instructions_used: boolean().notNull().default(false),
     repository_review_instructions_ref: text(),
     repository_review_instructions_truncated: boolean().notNull().default(false),
@@ -5836,13 +5782,11 @@ export const cloud_agent_code_reviews = pgTable(
     previous_summary_head_sha: text(),
     previous_summary_observed: boolean(),
 
-    // Usage tracking (populated on completion by orchestrator)
     model: text(), // LLM model slug used (e.g., 'anthropic/claude-sonnet-4.6')
     total_tokens_in: integer(), // Total input tokens across all LLM calls
     total_tokens_out: integer(), // Total output tokens across all LLM calls
     total_cost_musd: integer(), // Total cost in microdollars (for consistency with microdollar_usage)
 
-    // Timestamps
     started_at: timestamp({ withTimezone: true, mode: 'string' }),
     completed_at: timestamp({ withTimezone: true, mode: 'string' }),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -5862,19 +5806,14 @@ export const cloud_agent_code_reviews = pgTable(
     ).where(sql`${table.platform_integration_id} IS NOT NULL
         AND ${table.status} IN ('pending', 'queued', 'running')
         AND (${table.manual_config} IS NULL OR ${table.manual_config}->>'outputMode' = 'provider')`),
-    // Indexes for ownership lookups
     index('idx_cloud_agent_code_reviews_owned_by_org_id').on(table.owned_by_organization_id),
     index('idx_cloud_agent_code_reviews_owned_by_user_id').on(table.owned_by_user_id),
-    // Indexes for session and status lookups
     index('idx_cloud_agent_code_reviews_session_id').on(table.session_id),
     index('idx_cloud_agent_code_reviews_cli_session_id').on(table.cli_session_id),
     index('idx_cloud_agent_code_reviews_status').on(table.status),
-    // Indexes for repo and PR lookups
     index('idx_cloud_agent_code_reviews_repo').on(table.repo_full_name),
     index('idx_cloud_agent_code_reviews_pr_number').on(table.repo_full_name, table.pr_number),
-    // Index for sorting by creation date
     index('idx_cloud_agent_code_reviews_created_at').on(table.created_at),
-    // Index for GitHub ID lookups
     index('idx_cloud_agent_code_reviews_pr_author_github_id').on(table.pr_author_github_id),
     // Outcome-time windows and the start-latency sample each range-scan their own
     // timestamp; the missing-outcome-time aggregate matches only null completed_at
@@ -5900,7 +5839,6 @@ export const cloud_agent_code_reviews = pgTable(
       .where(
         sql`${table.status} IN ('completed', 'failed', 'cancelled', 'interrupted') AND ${table.completed_at} IS NULL`
       ),
-    // Owner check constraint (exactly one must be set)
     check(
       'cloud_agent_code_reviews_owner_check',
       sql`(
@@ -6447,7 +6385,6 @@ export const cli_sessions_v2 = pgTable(
       .on(table.kilo_user_id, table.cloud_agent_worktree_id, table.updated_at)
       .concurrently()
       .where(isNotNull(table.cloud_agent_worktree_id)),
-    // Supports session lookups by repository and branch.
     index('cli_sessions_v2_git_url_branch_idx').on(table.git_url, table.git_branch),
     // Supports the webhook verified-link gate, which updates sessions by
     // `(git_url, pr_number)`. Without this index that UPDATE can only use the
@@ -7072,10 +7009,8 @@ export const byok_api_keys = pgTable(
     created_by: text().notNull(),
   },
   table => [
-    // Unique constraints for org and user ownership
     unique('UQ_byok_api_keys_org_provider').on(table.organization_id, table.provider_id),
     unique('UQ_byok_api_keys_user_provider').on(table.kilo_user_id, table.provider_id),
-    // Indexes
     index('IDX_byok_api_keys_organization_id').on(table.organization_id),
     index('IDX_byok_api_keys_kilo_user_id').on(table.kilo_user_id),
     index('IDX_byok_api_keys_provider_id').on(table.provider_id),
@@ -7084,7 +7019,6 @@ export const byok_api_keys = pgTable(
       table.management_source,
       BYOKManagementSource
     ),
-    // Owner check constraint (exactly one must be set)
     check(
       'byok_api_keys_owner_check',
       sql`(
@@ -7169,13 +7103,11 @@ export const openai_chatgpt_connections = pgTable(
 
 export type OpenAiChatGptConnectionRow = typeof openai_chatgpt_connections.$inferSelect;
 
-// Security Reviews - Phase 1
 export const security_findings = pgTable(
   'security_findings',
   {
     id: idPrimaryKeyColumn,
 
-    // Ownership (same pattern as cloud_agent_code_reviews)
     owned_by_organization_id: uuid().references(() => organizations.id, {
       onDelete: 'cascade',
     }),
@@ -7183,46 +7115,36 @@ export const security_findings = pgTable(
       onDelete: 'cascade',
     }),
 
-    // Platform integration reference
     platform_integration_id: uuid().references(() => platform_integrations.id, {
       onDelete: 'set null',
     }),
 
-    // Repository
     repo_full_name: text().notNull(),
 
-    // Source identification
     source: text().notNull(), // 'dependabot' | 'pnpm_audit' | 'github_issue'
     source_id: text().notNull(), // Dependabot alert number as string
 
-    // Severity (normalized)
     severity: text().notNull(), // 'critical' | 'high' | 'medium' | 'low'
 
-    // Advisory info
     ghsa_id: text(),
     cve_id: text(),
 
-    // Package info
     package_name: text().notNull(),
     package_ecosystem: text().notNull(), // 'npm' | 'pip' | 'gem' | etc.
     vulnerable_version_range: text(),
     patched_version: text(),
     manifest_path: text(),
 
-    // Finding details
     title: text().notNull(),
     description: text(),
 
-    // Status
     status: text().notNull().default('open'), // 'open' | 'fixed' | 'ignored'
     ignored_reason: text(),
     ignored_by: text(),
     fixed_at: timestamp({ withTimezone: true, mode: 'string' }),
 
-    // SLA tracking
     sla_due_at: timestamp({ withTimezone: true, mode: 'string' }),
 
-    // Dependabot-specific
     dependabot_html_url: text(),
 
     // Additional metadata from source (denormalized for queries)
@@ -7230,7 +7152,6 @@ export const security_findings = pgTable(
     cvss_score: decimal({ precision: 3, scale: 1 }), // CVSS score (e.g., 9.8)
     dependency_scope: text(), // 'development' | 'runtime'
 
-    // Agent session tracking (for analysis workflow)
     session_id: text(), // Cloud agent session ID (agent_xxx)
     cli_session_id: text(), // Kilo CLI session ID (ses_xxx from cli_sessions_v2)
     analysis_status: text(), // 'pending' | 'running' | 'completed' | 'failed'
@@ -7238,13 +7159,10 @@ export const security_findings = pgTable(
     analysis_completed_at: timestamp({ withTimezone: true, mode: 'string' }),
     analysis_error: text(), // Error message if analysis failed
 
-    // LLM Analysis result - populated when analysis completes
     analysis: jsonb().$type<SecurityFindingAnalysis>(),
 
-    // Raw data for debugging/future use
     raw_data: jsonb().$type<DependabotAlertRaw>(),
 
-    // Timestamps
     first_detected_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     last_synced_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
@@ -7262,7 +7180,6 @@ export const security_findings = pgTable(
     uniqueIndex('uq_security_findings_org_source')
       .on(table.owned_by_organization_id, table.repo_full_name, table.source, table.source_id)
       .where(sql`${table.owned_by_organization_id} IS NOT NULL`),
-    // Indexes
     index('idx_security_findings_org_id').on(table.owned_by_organization_id),
     index('idx_security_findings_user_id').on(table.owned_by_user_id),
     index('idx_security_findings_repo').on(table.repo_full_name),
@@ -7270,7 +7187,6 @@ export const security_findings = pgTable(
     index('idx_security_findings_status').on(table.status),
     index('idx_security_findings_package').on(table.package_name),
     index('idx_security_findings_sla_due_at').on(table.sla_due_at),
-    // Agent session indexes
     index('idx_security_findings_session_id').on(table.session_id),
     index('idx_security_findings_cli_session_id').on(table.cli_session_id),
     index('idx_security_findings_analysis_status').on(table.analysis_status),
@@ -7280,7 +7196,6 @@ export const security_findings = pgTable(
     index('idx_security_findings_user_analysis_in_flight')
       .on(table.owned_by_user_id, table.analysis_status)
       .where(sql`${table.analysis_status} IN ('pending', 'running')`),
-    // Owner check constraint
     check(
       'security_findings_owner_check',
       sql`(
@@ -7986,7 +7901,6 @@ export const slack_bot_requests = pgTable(
   {
     id: idPrimaryKeyColumn,
 
-    // Ownership (from the platform_integration)
     owned_by_organization_id: uuid().references(() => organizations.id, {
       onDelete: 'cascade',
     }),
@@ -7994,49 +7908,39 @@ export const slack_bot_requests = pgTable(
       onDelete: 'cascade',
     }),
 
-    // Platform integration reference
     platform_integration_id: uuid().references(() => platform_integrations.id, {
       onDelete: 'set null',
     }),
 
-    // Slack identifiers
     slack_team_id: text().notNull(),
     slack_team_name: text(),
     slack_channel_id: text().notNull(),
     slack_user_id: text().notNull(),
     slack_thread_ts: text(),
 
-    // Event info
     event_type: text().notNull().$type<SlackBotEventType>(),
 
-    // Request details
     user_message: text().notNull(),
     user_message_truncated: text(), // First 200 chars for display
 
-    // Response details
     status: text().notNull().$type<SlackBotRequestStatus>(),
     error_message: text(),
     response_time_ms: integer(),
 
-    // Model and tool usage
     model_used: text(),
     tool_calls_made: text().array(), // e.g., ['spawn_cloud_agent']
 
-    // Cloud Agent session (if spawned)
     cloud_agent_session_id: text(),
 
-    // Timestamps
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
-    // Indexes for admin queries
     index('idx_slack_bot_requests_created_at').on(table.created_at),
     index('idx_slack_bot_requests_slack_team_id').on(table.slack_team_id),
     index('idx_slack_bot_requests_owned_by_org_id').on(table.owned_by_organization_id),
     index('idx_slack_bot_requests_owned_by_user_id').on(table.owned_by_user_id),
     index('idx_slack_bot_requests_status').on(table.status),
     index('idx_slack_bot_requests_event_type').on(table.event_type),
-    // Composite index for daily stats queries
     index('idx_slack_bot_requests_team_created').on(table.slack_team_id, table.created_at),
     // Owner check constraint (exactly one must be set, or both null for orphaned records)
     check(
@@ -8053,7 +7957,6 @@ export const slack_bot_requests = pgTable(
 export type SlackBotRequest = typeof slack_bot_requests.$inferSelect;
 export type NewSlackBotRequest = typeof slack_bot_requests.$inferInsert;
 
-// ============ AGENT ENVIRONMENT PROFILES ============
 // Profiles for storing reusable environment configurations for cloud-agent sessions
 
 export const agent_environment_profiles = pgTable(
@@ -8063,7 +7966,6 @@ export const agent_environment_profiles = pgTable(
       .default(sql`pg_catalog.gen_random_uuid()`)
       .primaryKey()
       .notNull(),
-    // Ownership: exactly one must be set (org OR user) - matches platform_integrations pattern
     owned_by_organization_id: uuid().references(() => organizations.id, { onDelete: 'cascade' }),
     owned_by_user_id: text().references(() => kilocode_users.id, { onDelete: 'cascade' }),
     created_by_user_id: text(), // Audit trail: the user who created this profile (useful for org-owned profiles)
@@ -8079,25 +7981,21 @@ export const agent_environment_profiles = pgTable(
       .$onUpdateFn(() => sql`now()`),
   },
   table => [
-    // Unique name per owner
     uniqueIndex('UQ_agent_env_profiles_org_name')
       .on(table.owned_by_organization_id, table.name)
       .where(isNotNull(table.owned_by_organization_id)),
     uniqueIndex('UQ_agent_env_profiles_user_name')
       .on(table.owned_by_user_id, table.name)
       .where(isNotNull(table.owned_by_user_id)),
-    // Only one default per owner (partial unique indexes)
     uniqueIndex('UQ_agent_env_profiles_org_default')
       .on(table.owned_by_organization_id)
       .where(sql`${table.is_default} = true AND ${table.owned_by_organization_id} IS NOT NULL`),
     uniqueIndex('UQ_agent_env_profiles_user_default')
       .on(table.owned_by_user_id)
       .where(sql`${table.is_default} = true AND ${table.owned_by_user_id} IS NOT NULL`),
-    // Indexes
     index('IDX_agent_env_profiles_org_id').on(table.owned_by_organization_id),
     index('IDX_agent_env_profiles_user_id').on(table.owned_by_user_id),
     index('IDX_agent_env_profiles_created_by_user_id').on(table.created_by_user_id),
-    // Owner check constraint (exactly one must be set)
     check(
       'agent_env_profiles_owner_check',
       sql`(
@@ -8160,7 +8058,6 @@ export const agent_environment_profile_commands = pgTable(
 
 export type AgentEnvironmentProfileCommand = typeof agent_environment_profile_commands.$inferSelect;
 
-// ============ CLOUD AGENT REPOSITORY ENVIRONMENTS ============
 // A repository environment is a saved, owner-scoped setup for one repository.
 // It is distinct from an agent environment profile: a profile holds personal
 // preferences, an environment holds how one repository is set up and shared.
@@ -8304,7 +8201,6 @@ export const cloud_agent_environment_vars = pgTable(
 
 export type CloudAgentEnvironmentVar = typeof cloud_agent_environment_vars.$inferSelect;
 
-// ============ AGENT ENVIRONMENT PROFILE REPO BINDINGS ============
 // Bind a single environment profile to a repository so sessions auto-inherit it
 
 export const agent_environment_profile_repo_bindings = pgTable(
@@ -8351,7 +8247,6 @@ export type AgentEnvironmentProfileRepoBinding =
 export type NewAgentEnvironmentProfileRepoBinding =
   typeof agent_environment_profile_repo_bindings.$inferInsert;
 
-// ============ CLOUD AGENT SANDBOX ALLOCATION SETTINGS ============
 // A context default (repository pair null) or a per-repository override that
 // selects the sandbox allocation for new Cloud Agent session allocations.
 
@@ -8416,7 +8311,6 @@ export type CloudAgentSandboxAllocationSetting =
 export type NewCloudAgentSandboxAllocationSetting =
   typeof cloud_agent_sandbox_allocation_settings.$inferInsert;
 
-// ============ AGENT ENVIRONMENT PROFILE MCP SERVERS ============
 // MCP servers configured on an environment profile. Materialized into the
 // CLI-native KILO_CONFIG_CONTENT.mcp block at session preparation time.
 
@@ -8455,7 +8349,6 @@ export const agent_environment_profile_mcp_servers = pgTable(
 export type AgentEnvironmentProfileMcpServer =
   typeof agent_environment_profile_mcp_servers.$inferSelect;
 
-// ============ AGENT ENVIRONMENT PROFILE SKILLS ============
 // Kilo Code skills attached to an environment profile. Materialized into
 // ${SESSION_HOME}/.kilocode/skills/<name>/SKILL.md at session preparation time.
 
@@ -8495,7 +8388,6 @@ export const agent_environment_profile_skills = pgTable(
 
 export type AgentEnvironmentProfileSkill = typeof agent_environment_profile_skills.$inferSelect;
 
-// ============ AGENT ENVIRONMENT PROFILE AGENTS ============
 // Kilo "agents" (the modern successor to legacy custom modes) attached to an
 // environment profile. Materialized into KILO_CONFIG_CONTENT.agent.<slug> at
 // session preparation time; the stored `config` jsonb already matches the
@@ -8533,7 +8425,6 @@ export const agent_environment_profile_agents = pgTable(
 
 export type AgentEnvironmentProfileAgent = typeof agent_environment_profile_agents.$inferSelect;
 
-// ============ AGENT ENVIRONMENT PROFILE KILO COMMANDS ============
 // Custom slash commands attached to an environment profile. Materialized into
 // KILO_CONFIG_CONTENT.command.<name> at session preparation time.
 
@@ -8570,7 +8461,6 @@ export const agent_environment_profile_kilo_commands = pgTable(
 export type AgentEnvironmentProfileKiloCommand =
   typeof agent_environment_profile_kilo_commands.$inferSelect;
 
-// ============ AGENT ENVIRONMENT PROFILE INSTRUCTIONS ============
 // Instruction files attached to an environment profile. Materialized into
 // ${SESSION_HOME}/.kilocode/rules/<name>.md at session preparation time as
 // additional rule files alongside the Cloud-Agent-owned cloud-agent.md.
@@ -8603,8 +8493,6 @@ export const agent_environment_profile_instructions = pgTable(
 
 export type AgentEnvironmentProfileInstruction =
   typeof agent_environment_profile_instructions.$inferSelect;
-
-// ============ CLOUD AGENT FEEDBACK ============
 
 export const cloud_agent_feedback = pgTable(
   'cloud_agent_feedback',
@@ -8639,8 +8527,6 @@ export const cloud_agent_feedback = pgTable(
 
 export type CloudAgentFeedback = typeof cloud_agent_feedback.$inferSelect;
 export type NewCloudAgentFeedback = typeof cloud_agent_feedback.$inferInsert;
-
-// ─── KiloClaw (multi-tenant sandbox instances) ──────────────────────
 
 export const kiloclaw_instances = pgTable(
   'kiloclaw_instances',
@@ -8823,8 +8709,6 @@ export const kiloclaw_inbound_email_aliases = pgTable(
 export type KiloClawInboundEmailAlias = typeof kiloclaw_inbound_email_aliases.$inferSelect;
 export type NewKiloClawInboundEmailAlias = typeof kiloclaw_inbound_email_aliases.$inferInsert;
 
-// KiloClaw Morning Briefing Configuration
-//
 // Denormalized read cache of which instances have the morning briefing
 // enabled and how it's configured (cron, timezone, interest topics). The
 // briefing plugin's local `config.json` on the instance remains the source
@@ -9057,17 +8941,13 @@ export const kiloclaw_image_catalog = pgTable(
 
 export type KiloClawImageCatalogEntry = typeof kiloclaw_image_catalog.$inferSelect;
 
-// Discord Gateway Listener coordination
 // Single-row table that tracks the currently active Gateway listener.
 // Used to ensure only one Gateway WebSocket connection is active at a time
 // across multiple serverless instances. New listeners atomically claim the
 // active slot, and existing listeners poll to detect they've been superseded.
 export const discord_gateway_listener = pgTable('discord_gateway_listener', {
-  // Singleton: always id = 1
   id: integer().primaryKey().default(1),
-  // Unique identifier for the currently active listener instance
   listener_id: text().notNull(),
-  // When this listener started
   started_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   // When this listener is expected to stop (started_at + duration)
   expires_at: timestamp({ withTimezone: true, mode: 'string' }).notNull(),
@@ -9101,8 +8981,6 @@ export const kiloclaw_version_pins = pgTable('kiloclaw_version_pins', {
 
 export type KiloClawVersionPin = typeof kiloclaw_version_pins.$inferSelect;
 
-// ─── Scheduled Admin Actions ───────────────────────────────────────────
-//
 // Generic scheduled-action framework with `action_type` discriminator.
 // First action type is `scheduled_restart` (no-op redeploy at a chosen
 // time). `version_change` lands in a follow-on PR. The discriminator lets
@@ -9705,8 +9583,6 @@ export const app_min_versions = pgTable('app_min_versions', {
 export type AppMinVersions = typeof app_min_versions.$inferSelect;
 export type NewBotRequest = typeof bot_requests.$inferInsert;
 
-// ─── Bot Request Cloud Agent Sessions ───────────────────────────────
-
 export type BotRequestCloudAgentSessionStatus =
   | 'prepared'
   | 'running'
@@ -9769,8 +9645,6 @@ export const bot_request_cloud_agent_sessions = pgTable(
 export type BotRequestCloudAgentSession = typeof bot_request_cloud_agent_sessions.$inferSelect;
 export type NewBotRequestCloudAgentSession = typeof bot_request_cloud_agent_sessions.$inferInsert;
 
-// ─── KiloClaw CLI Runs ──────────────────────────────────────────────
-
 export type KiloClawCliRunStatus = 'running' | 'completed' | 'failed' | 'cancelled';
 
 export const kiloclaw_cli_runs = pgTable(
@@ -9801,10 +9675,6 @@ export const kiloclaw_cli_runs = pgTable(
 
 export type KiloClawCliRun = typeof kiloclaw_cli_runs.$inferSelect;
 export type NewKiloClawCliRun = typeof kiloclaw_cli_runs.$inferInsert;
-
-// =============================================================================
-// Coding Plans
-// =============================================================================
 
 export const coding_plan_key_inventory = pgTable(
   'coding_plan_key_inventory',
@@ -9966,8 +9836,6 @@ export const coding_plan_availability_intents = pgTable(
 export type CodingPlanAvailabilityIntent = typeof coding_plan_availability_intents.$inferSelect;
 export type NewCodingPlanAvailabilityIntent = typeof coding_plan_availability_intents.$inferInsert;
 
-// ─── Push Notification Tokens ────────────────────────────────────────
-
 export const user_push_tokens = pgTable(
   'user_push_tokens',
   {
@@ -10000,8 +9868,6 @@ export const user_push_tokens = pgTable(
 export type UserPushToken = typeof user_push_tokens.$inferSelect;
 export type NewUserPushToken = typeof user_push_tokens.$inferInsert;
 
-// ─── Activity Tokens (Live Activity / push-to-start / Android ongoing) ──
-//
 // Tokens for glanceable surfaces (iOS Live Activity, push-to-start and WidgetKit,
 // Android ongoing notification). These are NOT Expo push tokens and never
 // share a table with `user_push_tokens`. `organization_id` is null for the
@@ -10077,8 +9943,6 @@ export const user_activity_tokens = pgTable(
 export type UserActivityToken = typeof user_activity_tokens.$inferSelect;
 export type NewUserActivityToken = typeof user_activity_tokens.$inferInsert;
 
-// ─── Notification Preferences ─────────────────────────────────────────
-
 export const user_notification_preferences = pgTable('user_notification_preferences', {
   user_id: text()
     .primaryKey()
@@ -10108,8 +9972,6 @@ export const user_notification_preferences = pgTable('user_notification_preferen
 export type UserNotificationPreference = typeof user_notification_preferences.$inferSelect;
 export type NewUserNotificationPreference = typeof user_notification_preferences.$inferInsert;
 
-// ─── Notification History ─────────────────────────────────────────────
-//
 // One row per accepted push, written by the notifications worker after the
 // provider (or the local push sink) accepts it. Rows are account-wide rather
 // than per device, so history survives a reinstall, and they hold the content
@@ -10181,7 +10043,6 @@ export const user_notification_history = pgTable(
 export type UserNotificationHistory = typeof user_notification_history.$inferSelect;
 export type NewUserNotificationHistory = typeof user_notification_history.$inferInsert;
 
-// ─── Spend Alerts ─────────────────────────────────────────────────────
 // Owner-scoped spend alert configuration, the hourly counter the sweep rolls
 // up, and the durable delivery outbox. `scope_key` is `user:<kilocode_users.id>`
 // or `org:<organizations.id>`; a settings row sets exactly one of the two
@@ -10330,7 +10191,6 @@ export const spend_alert_deliveries = pgTable(
 export type SpendAlertDelivery = typeof spend_alert_deliveries.$inferSelect;
 export type NewSpendAlertDelivery = typeof spend_alert_deliveries.$inferInsert;
 
-// ============ EXA USAGE TRACKING ============
 // Pre-aggregated monthly counter (hot path) + per-request audit log (partitioned)
 
 export const exa_monthly_usage = pgTable(
@@ -10421,7 +10281,6 @@ export const enkrypt_guardrail_charges = pgTable(
 
 export type EnkryptGuardrailCharge = typeof enkrypt_guardrail_charges.$inferSelect;
 
-// ============ SECURITY ADVISOR SCANS ============
 // Per-scan usage tracking for the security advisor feature.
 // Serves as both a rate-limiting table (COUNT in 24h window) and a usage/analytics ledger.
 
@@ -10439,25 +10298,20 @@ export const security_advisor_scans = pgTable(
     plugin_version: text(),
     openclaw_version: text(),
     public_ip: text(), // Client-reported public IP (validated as IP format). Metadata only, not used for rate limiting.
-    // Audit result counts for analytics
     findings_critical: integer().notNull().default(0),
     findings_warn: integer().notNull().default(0),
     findings_info: integer().notNull().default(0),
     created_at: timestamp({ withTimezone: true, mode: 'string' }).defaultNow().notNull(),
   },
   table => [
-    // Primary index for rate-limiting queries (user + time window)
     index('idx_security_advisor_scans_user_created_at').on(table.kilo_user_id, table.created_at),
-    // Analytics: scans over time
     index('idx_security_advisor_scans_created_at').on(table.created_at),
-    // Analytics: scans by source platform
     index('idx_security_advisor_scans_platform').on(table.source_platform),
   ]
 );
 
 export type SecurityAdvisorScan = typeof security_advisor_scans.$inferSelect;
 
-// ============ SECURITY ADVISOR CONTENT ============
 // Customer-visible report content for the security advisor feature.
 // Three tables are read together by a TTL-cached content loader and injected
 // into the report generator so copy changes (check descriptions, KiloClaw
@@ -10546,7 +10400,6 @@ export type NewSecurityAdvisorContent = typeof security_advisor_content.$inferIn
 
 export type NewSecurityAdvisorScan = typeof security_advisor_scans.$inferInsert;
 
-// ---------------------------------------------------------------------------
 export type UserModelPreferenceLastSelected = {
   model: string;
   variant?: string;

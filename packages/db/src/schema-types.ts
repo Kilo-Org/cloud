@@ -2,12 +2,6 @@ import { SecureProxyUpstreamUrlSchema } from '@kilocode/ai-gateway-secure-proxy-
 import { GATE_THRESHOLDS, REVIEW_STYLES } from '@kilocode/app-shared/code-review';
 import * as z from 'zod';
 
-// =============================================================================
-// A. Runtime Values (used in enumCheck() or .default())
-// =============================================================================
-
-// --- KiloPass enums ---
-
 export enum KiloPassTier {
   Tier19 = 'tier_19',
   Tier49 = 'tier_49',
@@ -100,8 +94,6 @@ export enum KiloPassScheduledChangeStatus {
   Canceled = 'canceled',
 }
 
-// --- Kilo Pass for Organizations enums ---
-
 export const KiloPassOrgAgreementState = {
   PendingPayment: 'pending_payment',
   Active: 'active',
@@ -159,8 +151,6 @@ export const KiloPassOrgIssuanceKind = {
 export type KiloPassOrgIssuanceKind =
   (typeof KiloPassOrgIssuanceKind)[keyof typeof KiloPassOrgIssuanceKind];
 
-// --- Feedback consts ---
-
 export const FeedbackFor = {
   Unknown: 'unknown',
   KiloPass: 'kilopass',
@@ -175,8 +165,6 @@ export const FeedbackSource = {
 } as const;
 
 export type FeedbackSource = (typeof FeedbackSource)[keyof typeof FeedbackSource];
-
-// --- CliSessionSharedState ---
 
 export enum CliSessionSharedState {
   Public = 'public',
@@ -203,8 +191,6 @@ export const TodoItemSessionOrigin = {
 
 export type TodoItemSessionOrigin =
   (typeof TodoItemSessionOrigin)[keyof typeof TodoItemSessionOrigin];
-
-// --- SecurityAuditLogAction ---
 
 /**
  * Actions logged in the security_audit_log table.
@@ -252,8 +238,6 @@ export enum SecurityAuditLogActorType {
   KiloAdmin = 'kilo_admin',
   System = 'system',
 }
-
-// --- KiloClaw enums ---
 
 export const KiloClawPlan = {
   Trial: 'trial',
@@ -785,8 +769,6 @@ export const ImpactAdvocateRewardRedemptionState = {
 export type ImpactAdvocateRewardRedemptionState =
   (typeof ImpactAdvocateRewardRedemptionState)[keyof typeof ImpactAdvocateRewardRedemptionState];
 
-// --- Coding Plan enums ---
-
 export const BYOKManagementSource = {
   User: 'user',
   CodingPlan: 'coding_plan',
@@ -908,8 +890,6 @@ export const AdminActionAuditTargetType = z.enum(['user', 'organization']);
 
 export type AdminActionAuditTargetType = z.infer<typeof AdminActionAuditTargetType>;
 
-// --- KiloClaw scheduled action status enums ---
-
 // Parent action status. Lifecycle:
 //   scheduled → running → completed (or failed if every target failed)
 //   scheduled or running → cancelled (by admin)
@@ -986,8 +966,6 @@ export type KiloClawScheduledActionNotificationKind = z.infer<
   typeof KiloClawScheduledActionNotificationKind
 >;
 
-// --- ContributorChampion enums ---
-
 export const ContributorChampionTier = {
   Contributor: 'contributor',
   Ambassador: 'ambassador',
@@ -996,12 +974,6 @@ export const ContributorChampionTier = {
 
 export type ContributorChampionTier =
   (typeof ContributorChampionTier)[keyof typeof ContributorChampionTier];
-
-// =============================================================================
-// B. Type-Only Definitions (used in $type<T>())
-// =============================================================================
-
-// --- Organization types ---
 
 export type OrganizationRole = 'owner' | 'admin' | 'member' | 'billing_manager';
 
@@ -1555,8 +1527,6 @@ export type AgentConfig = z.infer<typeof AgentConfigSchema>;
 
 export { OrganizationSettingsSchema };
 
-// --- AuditLogAction ---
-
 export type AuditLogAction = z.infer<typeof AuditLogAction>;
 
 // NOTE: (bmc) - do not change these action names.
@@ -1607,8 +1577,6 @@ export const AuditLogAction = z.enum([
   'organization.guardrail.update',
   'organization.guardrail.remove',
 ]);
-
-// --- EncryptedData ---
 
 export type EncryptedData = {
   iv: string;
@@ -1667,8 +1635,6 @@ export type VercelComputeSetupStep =
   | 'stop_validator'
   | 'confirm_terminal';
 
-// --- AuthProviderId ---
-
 export type AuthProviderId =
   | 'apple'
   | 'email'
@@ -1682,8 +1648,6 @@ export type AuthProviderId =
   | 'openai'
   | 'fake-login'
   | 'workos';
-
-// --- Integration types ---
 
 export type IntegrationPermissions = Record<string, string>;
 
@@ -1710,8 +1674,6 @@ export const REVIEW_MEMORY_PROPOSAL_STATUSES = [
 export type ReviewMemoryProposalStatus = (typeof REVIEW_MEMORY_PROPOSAL_STATUSES)[number];
 
 export type ReviewMemoryEvidenceItem = { excerpt: string; prNumber: number | null };
-
-// --- Code Reviewer analytics ---
 
 export const CODE_REVIEW_ANALYTICS_SCHEMA_VERSION = 1;
 export const CODE_REVIEW_ANALYTICS_TAXONOMY_VERSION = 1;
@@ -1821,8 +1783,6 @@ export const CodeReviewFindingSecurityClass = {
 
 export type CodeReviewFindingSecurityClass =
   (typeof CodeReviewFindingSecurityClass)[keyof typeof CodeReviewFindingSecurityClass];
-
-// --- CodeReviewAgentConfig ---
 
 export { CODE_REVIEW_PLATFORMS, type CodeReviewPlatform } from '@kilocode/app-shared/code-review';
 
@@ -2145,8 +2105,6 @@ export const ManualCodeReviewConfigSchema = z
 
 export type ManualCodeReviewConfig = z.infer<typeof ManualCodeReviewConfigSchema>;
 
-// --- Security types ---
-
 export const DependabotAlertState = {
   OPEN: 'open',
   FIXED: 'fixed',
@@ -2297,8 +2255,6 @@ export type SecurityFindingAnalysis = {
   triggeredByUserId?: string;
   correlationId?: string;
 };
-
-// --- OpenRouter types ---
 
 export type OpenRouterPricing = z.infer<typeof OpenRouterPricing>;
 export const OpenRouterPricing = z.object({
@@ -3044,8 +3000,6 @@ export const CustomPricingConfigSchema = z.object({
 
 export type CustomPricingConfig = z.infer<typeof CustomPricingConfigSchema>;
 
-// --- StoredModel ---
-
 export const ModelSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -3123,10 +3077,6 @@ export const StoredModelSchema = ModelSchema.and(
 
 export type StoredModel = z.infer<typeof StoredModelSchema>;
 
-// =============================================================================
-// C. Stripe type (inline)
-// =============================================================================
-
 // Stripe treats subscription statuses as an open set: the SDK types every
 // generated enum as its documented values plus an arbitrary string, because the
 // provider can return a value a pinned SDK version does not list. The column
@@ -3141,8 +3091,6 @@ export type StripeSubscriptionStatus =
   | 'unpaid'
   | 'paused'
   | (string & {});
-
-// --- Code review terminal reasons ---
 
 /**
  * Valid values for cloud_agent_code_reviews.terminal_reason.

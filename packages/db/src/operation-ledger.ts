@@ -39,8 +39,6 @@ import {
   type OperationLedgerRow,
 } from './schema';
 
-// ----- constants -----------------------------------------------------------
-
 /** Ledger rows are retained 30 days after admission (the dedupe window). */
 export const LEDGER_RETENTION_DAYS = 30;
 
@@ -73,8 +71,6 @@ export function isTerminalOperationStatus(status: string): status is TerminalOpe
   return (OPERATION_TERMINAL_STATUSES as readonly string[]).includes(status);
 }
 
-// ----- connection types ------------------------------------------------------
-
 export type LedgerTransaction = PgTransaction<
   NodePgQueryResultHKT,
   typeof schema,
@@ -83,8 +79,6 @@ export type LedgerTransaction = PgTransaction<
 
 /** Accepts either a `NodePgDatabase` or an open transaction. */
 export type LedgerDatabase = NodePgDatabase<typeof schema> | LedgerTransaction;
-
-// ----- public errors ---------------------------------------------------------
 
 /** Thrown when `canonical_result` would exceed 4096 serialized bytes. */
 export class CanonicalResultTooLargeError extends Error {
@@ -103,8 +97,6 @@ export class OutboxEventValidationError extends Error {
     this.name = 'OutboxEventValidationError';
   }
 }
-
-// ----- input / output types ---------------------------------------------------
 
 export type AdmitOperationInput = {
   /** The acting user. */
@@ -159,8 +151,6 @@ export type MarkReconcilePendingInput = {
   outboxEvent?: OutboxEventInput | null;
 };
 
-// ----- unit-of-work helpers ----------------------------------------------------
-
 /** True when `value` is a database instance rather than an open transaction. */
 function isDatabase(database: LedgerDatabase): database is NodePgDatabase<typeof schema> {
   // `drizzle()` attaches `$client` to database instances; transactions never have it.
@@ -198,8 +188,6 @@ function assertCanonicalResultSize(result: Record<string, unknown>): void {
     throw new CanonicalResultTooLargeError(bytes);
   }
 }
-
-// ----- admission ----------------------------------------------------------------
 
 function admissionInsertValues(input: AdmitOperationInput, now: Date): NewOperationLedgerRow {
   const canonicalResult = input.initialCanonicalResult ?? null;
@@ -390,8 +378,6 @@ async function evaluateExistingRow(
   return { admission: 'duplicate_settled', row };
 }
 
-// ----- progress and provider reference ------------------------------------------
-
 /**
  * Locks the row, merges `patch` into `canonical_result`, and writes it back
  * under a compare-and-set on non-terminal status. Optionally overwrites
@@ -477,8 +463,6 @@ export async function recordOperationAcceptance(
     providerRef: input.providerRef,
   });
 }
-
-// ----- terminal settle and reconcile ----------------------------------------------
 
 /**
  * Settles a row to a terminal status, CAS from `admitted | reconcile_pending`.
@@ -644,8 +628,6 @@ async function insertOutboxEvent(
     .returning();
   return inserted ?? null;
 }
-
-// ----- deterministic UUIDv5 ---------------------------------------------------------
 
 const NAMESPACE_BYTES = Uint8Array.from(
   EVENT_UUID_NAMESPACE.replace(/-/g, '').match(/../g) ?? [],

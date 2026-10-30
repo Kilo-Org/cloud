@@ -33,8 +33,6 @@ import {
   type ExternalSideEffectOutboxRow,
 } from './schema';
 
-// ----- constants -----------------------------------------------------------
-
 /** A row fails terminally after this many send attempts. */
 export const INVITE_EMAIL_OUTBOX_MAX_ATTEMPTS = 8;
 
@@ -45,8 +43,6 @@ export const INVITE_EMAIL_OUTBOX_STALE_SENDING_WINDOW_MS = 5 * 60 * 1000;
 export const INVITE_EMAIL_OUTBOX_INITIAL_RETRY_BACKOFF_MS = 60 * 1000;
 export const INVITE_EMAIL_OUTBOX_MAX_RETRY_BACKOFF_MS = 60 * 60 * 1000;
 
-// ----- connection types ------------------------------------------------------
-
 export type SideEffectOutboxTransaction = PgTransaction<
   NodePgQueryResultHKT,
   typeof schema,
@@ -56,13 +52,9 @@ export type SideEffectOutboxTransaction = PgTransaction<
 /** Accepts either a `NodePgDatabase` or an open transaction. */
 export type SideEffectOutboxDatabase = NodePgDatabase<typeof schema> | SideEffectOutboxTransaction;
 
-// ----- result types -----------------------------------------------------------
-
 export type InviteEmailOutboxRetryResult =
   | { outcome: 'retried'; row: ExternalSideEffectOutboxRow }
   | { outcome: 'failed'; row: ExternalSideEffectOutboxRow };
-
-// ----- enqueue ------------------------------------------------------------------
 
 /**
  * Enqueues one invite-email side effect. The unique `invitation_id` constraint
@@ -83,8 +75,6 @@ export async function enqueueInviteEmail(
     .returning();
   return row;
 }
-
-// ----- claim ------------------------------------------------------------------
 
 /**
  * Claims due `pending` rows in a bounded batch: transitions them to `sending`
@@ -128,8 +118,6 @@ export async function claimDueInviteEmails(
     )`)
     .returning();
 }
-
-// ----- terminal marks -----------------------------------------------------------
 
 /**
  * Marks a claimed row delivered. The update is fenced on the claim token
@@ -231,8 +219,6 @@ export async function markInviteEmailFailed(
   return updated ?? null;
 }
 
-// ----- reclaim -----------------------------------------------------------------
-
 /**
  * Reclaims `sending` rows whose claim is older than
  * `INVITE_EMAIL_OUTBOX_STALE_SENDING_WINDOW_MS`: they return to `pending` and
@@ -255,8 +241,6 @@ export async function reclaimStaleInviteEmails(
     )
     .returning();
 }
-
-// ----- resend -----------------------------------------------------------------
 
 /**
  * Resets the existing outbox row for a `resendInvite` mutation: returns it to

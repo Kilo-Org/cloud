@@ -43,8 +43,6 @@ import {
   type BouncerCreditEventOutboxRow,
 } from './schema';
 
-// ----- constants -----------------------------------------------------------
-
 /** A row fails terminally after this many delivery attempts. */
 export const BOUNCER_CREDIT_EVENT_OUTBOX_MAX_ATTEMPTS = 8;
 
@@ -63,8 +61,6 @@ export const BOUNCER_CREDIT_EVENT_OUTBOX_MAX_RETRY_BACKOFF_MS = 60 * 60 * 1000;
 export const BOUNCER_CREDIT_EVENT_OUTBOX_DELIVERED_RETENTION_DAYS = 30;
 export const BOUNCER_CREDIT_EVENT_OUTBOX_FAILED_RETENTION_DAYS = 30;
 
-// ----- connection types -----------------------------------------------------
-
 export type BouncerCreditEventOutboxTransaction = PgTransaction<
   NodePgQueryResultHKT,
   typeof schema,
@@ -75,8 +71,6 @@ export type BouncerCreditEventOutboxTransaction = PgTransaction<
 export type BouncerCreditEventOutboxDatabase =
   | NodePgDatabase<typeof schema>
   | BouncerCreditEventOutboxTransaction;
-
-// ----- result types -----------------------------------------------------------
 
 export type EnqueueBouncerCreditEventResult = {
   /** False when the unique `event_id` already had a row (an idempotent replay). */
@@ -91,8 +85,6 @@ export type PurgeBouncerCreditEventOutboxResult = {
   deliveredPurged: number;
   failedPurged: number;
 };
-
-// ----- enqueue ------------------------------------------------------------------
 
 /**
  * Enqueues one credit event, idempotently on the stable `event_id`. A replay of
@@ -149,8 +141,6 @@ export async function deleteBouncerCreditEvent(
   return deleted.length > 0;
 }
 
-// ----- claim ------------------------------------------------------------------
-
 /**
  * Claims due `pending` rows in a bounded batch: transitions them to `sending`
  * with `claimed_at`, ordered oldest-first, `FOR UPDATE SKIP LOCKED` so
@@ -202,8 +192,6 @@ export async function claimBouncerCreditEventByEventId(
     .returning();
   return row ?? null;
 }
-
-// ----- terminal marks -----------------------------------------------------------
 
 /**
  * Marks a claimed row delivered. The update is fenced on the claim token
@@ -306,8 +294,6 @@ export async function markBouncerCreditEventFailed(
   return updated ?? null;
 }
 
-// ----- reclaim -----------------------------------------------------------------
-
 /**
  * Reclaims `sending` rows whose claim is older than
  * `BOUNCER_CREDIT_EVENT_OUTBOX_STALE_SENDING_WINDOW_MS`: they return to
@@ -335,8 +321,6 @@ export async function reclaimStaleBouncerCreditEvents(
     )`)
     .returning();
 }
-
-// ----- purge and retention -------------------------------------------------------
 
 /**
  * Deletes terminal rows past their retention window, so the outbox cannot grow

@@ -21,9 +21,9 @@ import {
   composeSessionProvenanceSubtitle,
   composeStoredSessionSpokenMeta,
   composeStoredSessionVisibleMeta,
-  formatMeta,
   formatScheduledWake,
   formatSessionTotalCost,
+  sectionAwareTimeMeta,
   storedSessionEyebrowLabel,
 } from './session-list-helpers';
 import { sessionTranscriptQueryOptions } from './session-transcript-page';
@@ -108,6 +108,13 @@ type StoredSessionRowProps = {
    * `false` so existing call sites are unchanged.
    */
   metaWhileLive?: boolean;
+  /**
+   * Heading of the date section this row renders under, when it has one. A row
+   * whose relative label would restate that heading shows its clock time
+   * instead (see `sectionAwareTimeMeta`). Callers without date sections, such
+   * as the share sheet, omit it.
+   */
+  sectionTitle?: string | null;
 };
 
 export function StoredSessionRow({
@@ -120,6 +127,7 @@ export function StoredSessionRow({
   interactive = true,
   live = false,
   metaWhileLive = false,
+  sectionTitle = null,
 }: Readonly<StoredSessionRowProps>) {
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -200,16 +208,18 @@ export function StoredSessionRow({
   // "$0.12 · time" order). Needs-input sessions have no persisted cost. A
   // scheduled row shows `SCHEDULED · <wake>` instead, so its spoken meta is
   // the wake (null on a stored row, which carries none).
+  // A row under the section its relative label would restate (`YESTERDAY` under
+  // the Yesterday heading) shows its clock time instead, and speaks the same
+  // clock time rather than repeating the heading.
+  const timeMeta = sectionAwareTimeMeta(timestamp, sectionTitle);
   const visibleMeta = composeStoredSessionVisibleMeta(
     formatSessionTotalCost(session.total_cost_microdollars),
-    formatMeta(timestamp)
+    timeMeta.visible
   );
+  const spokenTime = timeMeta.clock ?? formatSpokenTimeAgo(timestamp);
   const storedSpokenMeta = needsInput
     ? null
-    : composeStoredSessionSpokenMeta(
-        formatSpokenCost(session.total_cost_microdollars),
-        formatSpokenTimeAgo(timestamp)
-      );
+    : composeStoredSessionSpokenMeta(formatSpokenCost(session.total_cost_microdollars), spokenTime);
   // A scheduled row shows `SCHEDULED · <wake>` instead of the timestamp meta,
   // so it speaks the wake (null on a stored row, which carries none).
   const spokenMeta = isScheduled ? scheduledWake : storedSpokenMeta;

@@ -163,7 +163,7 @@
     "allLanguages": "সব ভাষা"
   },
   "login": {
-    "welcome": "Kilo-তে স্বাগতম",
+    "welcome": "স্বাগতম",
     "retrySignIn": "আবার সাইন-ইন করার চেষ্টা করুন",
     "logo": "Kilo-র লোগো",
     "continuingSignIn": "আপনার সাইন-ইন চলছে।",
@@ -684,6 +684,7 @@
       "gitlabDescription": "মোবাইলে মার্জ রিকোয়েস্ট রিভিউ করতে আপনার GitLab অ্যাকাউন্ট সংযুক্ত করুন।",
       "bitbucketDescription": "মোবাইলে পুল রিকোয়েস্ট রিভিউ করতে এই অর্গানাইজেশনটিকে Bitbucket-এর সঙ্গে সংযুক্ত করুন।",
       "bitbucketOrgOnlyDescription": "উপরে থাকা অ্যাকাউন্ট একটি অর্গানাইজেশনে সুইচ করুন তার Bitbucket পুল রিকোয়েস্ট রিভিউ করতে।",
+      "bitbucketOrgOnlyNoOrganizationDescription": "এই অ্যাকাউন্টে এখনো কোনো অর্গানাইজেশন নেই। আপনি একটি অর্গানাইজেশন তৈরি করলে বা যুক্ত হলে Bitbucket পুল রিকোয়েস্ট রিভিউ করা যাবে।",
       "contextLine": "{{organization}}-এর জন্য",
       "contextLinePersonal": "আপনার ব্যক্তিগত অ্যাকাউন্টের জন্য"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub সংযোগের মেয়াদ শেষ হয়েছে।",
-      "message": "আপনার GitHub সংযোগের অনুমতি আর কার্যকর নেই। সংযোগ আবার পরীক্ষা করুন — প্রয়োজনে আপনাকে আবার সংযোগ করতে বলা হবে।",
+      "message": "সংযোগ আবার পরীক্ষা করুন — প্রয়োজনে আপনাকে আবার সংযোগ করতে বলা হবে।",
       "gitlabTitle": "GitLab সংযোগের মেয়াদ শেষ হয়েছে।",
-      "bitbucketTitle": "Bitbucket সংযোগের মেয়াদ শেষ হয়েছে।",
-      "providerMessage": "আপনার {{provider}} সংযোগের অনুমতি আর কার্যকর নেই। সংযোগ আবার পরীক্ষা করুন — প্রয়োজনে আপনাকে আবার সংযোগ করতে বলা হবে।"
+      "bitbucketTitle": "Bitbucket সংযোগের মেয়াদ শেষ হয়েছে।"
     },
     "eventChips": {
       "comment": "মন্তব্য",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "পুল রিকোয়েস্ট",
       "mergeRequest": "মার্জ রিকোয়েস্ট",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "মার্জ রিকোয়েস্ট !{{number}}",
       "shareMergeRequest": "মার্জ রিকোয়েস্ট শেয়ার করুন",
       "viewOnProvider": "{{provider}}-এ দেখুন",
       "mergeRequestUnavailable": "মার্জ রিকোয়েস্ট পাওয়া যাচ্ছে না",
@@ -2293,9 +2293,9 @@
       "couldNotLoadGithubRepositories": "GitHub রিপোজিটরি লোড করা যায়নি।",
       "couldNotLoadGitlabRepositories": "GitLab রিপোজিটরি লোড করা যায়নি।",
       "couldNotLoadBitbucketRepositories": "Bitbucket রিপোজিটরি লোড করা যায়নি।",
-      "connectGithubDescription": "আপনার ব্রাউজারে GitHub সংযুক্ত করুন, তারপর একটি রিপোজিটরি বেছে নিতে এখানে ফিরে আসুন।",
-      "connectGitlabDescription": "আপনার ব্রাউজারে GitLab সংযুক্ত করুন, তারপর একটি রিপোজিটরি বেছে নিতে এখানে ফিরে আসুন।",
-      "connectBitbucketDescription": "আপনার ব্রাউজারে Bitbucket সংযুক্ত করুন, তারপর একটি রিপোজিটরি বেছে নিতে এখানে ফিরে আসুন।",
+      "connectGithubDescription": "আপনার ব্রাউজার থেকে সাইন ইন করুন, তারপর একটি GitHub রিপোজিটরি বেছে নিতে এখানে ফিরে আসুন।",
+      "connectGitlabDescription": "আপনার ব্রাউজার থেকে সাইন ইন করুন, তারপর একটি GitLab রিপোজিটরি বেছে নিতে এখানে ফিরে আসুন।",
+      "connectBitbucketDescription": "আপনার ব্রাউজার থেকে সাইন ইন করুন, তারপর একটি Bitbucket রিপোজিটরি বেছে নিতে এখানে ফিরে আসুন।",
       "openGithub": "GitHub খুলুন",
       "openGitlab": "GitLab খুলুন",
       "openBitbucket": "Bitbucket খুলুন",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "কমান্ডটি সর্বাধিক {{max}}টি অক্ষরের মধ্যে সীমাবদ্ধ",
     "commandsEmpty": "এখনো কোনো সেটআপ কমান্ড নেই",
     "commandsSaveFailed": "সেটআপ কমান্ড সংরক্ষণ করা যায়নি",
-    "moveUp": "উপরে সরান",
-    "moveDown": "নিচে সরান",
     "moveCommandUp": "কমান্ড {{position}} উপরে সরান",
     "moveCommandDown": "কমান্ড {{position}} নিচে সরান",
     "skillsTitle": "দক্ষতা",
@@ -3859,7 +3857,10 @@
     "skillNameRequired": "একটি দক্ষতার নাম লিখুন",
     "skillNameInvalid": "দক্ষতার নাম অবশ্যই একটি অক্ষর বা অঙ্ক দিয়ে শুরু করতে হবে এবং শুধুমাত্র ছোট হাতের অক্ষর, সংখ্যা এবং ড্যাশ ব্যবহার করতে হবে",
     "skillContentRequired": "দক্ষতা বিষয়বস্তু প্রয়োজন",
-    "skillSaveFailed": "দক্ষতা বাঁচাতে পারেনি",
+    "skillSaveFailed": "দক্ষতা বাঁচাতে পারেনি। আবার চেষ্টা করুন।",
+    "skillDeleteFailed": "দক্ষতা মুছতে পারেনি। আবার চেষ্টা করুন।",
+    "skillToggleFailed": "দক্ষতা আপডেট করতে পারেনি। আবার চেষ্টা করুন।",
+    "skillLimitReached": "একটি প্রোফাইলে সর্বোচ্চ {{max}}টি দক্ষতা রাখা যায়। আরেকটি যোগ করতে একটি মুছুন।",
     "skillSourceCustom": "কাস্টম",
     "skillSourceMarketplace": "মার্কেটপ্লেস",
     "skillSourceSkillsSh": "skills.sh",

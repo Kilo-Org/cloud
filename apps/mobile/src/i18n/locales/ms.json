@@ -163,7 +163,7 @@
     "allLanguages": "Semua bahasa"
   },
   "login": {
-    "welcome": "Selamat datang ke Kilo",
+    "welcome": "Selamat datang",
     "retrySignIn": "Cuba log masuk semula",
     "logo": "Logo Kilo",
     "continuingSignIn": "Proses log masuk anda sedang diteruskan.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Sambungkan akaun GitLab anda untuk menyemak permintaan gabungan pada mudah alih.",
       "bitbucketDescription": "Sambungkan Bitbucket ke organisasi ini untuk menyemak permintaan tarik pada mudah alih.",
       "bitbucketOrgOnlyDescription": "Tukar akaun di atas kepada organisasi untuk menyemak permintaan tarik Bitbucket-nya.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Akaun ini belum mempunyai sebarang organisasi. Permintaan tarik Bitbucket boleh disemak setelah anda mencipta atau menyertai sebuah organisasi.",
       "contextLine": "Untuk {{organization}}",
       "contextLinePersonal": "Untuk akaun peribadi anda"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Sambungan GitHub telah tamat tempoh.",
-      "message": "Sambungan GitHub anda tidak lagi sah. Semak semula sambungan anda. Anda akan diminta menyambung semula jika perlu.",
+      "message": "Semak semula sambungan anda. Anda akan diminta menyambung semula jika perlu.",
       "gitlabTitle": "Sambungan GitLab telah tamat tempoh.",
-      "bitbucketTitle": "Sambungan Bitbucket telah tamat tempoh.",
-      "providerMessage": "Sambungan {{provider}} anda tidak lagi sah. Semak semula sambungan anda. Anda akan diminta menyambung semula jika perlu."
+      "bitbucketTitle": "Sambungan Bitbucket telah tamat tempoh."
     },
     "eventChips": {
       "comment": "Komen",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Permintaan gabungan",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Permintaan gabungan !{{number}}",
       "shareMergeRequest": "Kongsi permintaan gabungan",
       "viewOnProvider": "Lihat pada {{provider}}",
       "mergeRequestUnavailable": "Permintaan gabungan tidak tersedia",
@@ -2293,9 +2293,9 @@
       "couldNotLoadGithubRepositories": "Tidak dapat memuatkan repositori GitHub.",
       "couldNotLoadGitlabRepositories": "Tidak dapat memuatkan repositori GitLab.",
       "couldNotLoadBitbucketRepositories": "Tidak dapat memuatkan repositori Bitbucket.",
-      "connectGithubDescription": "Sambungkan GitHub dalam pelayar anda, kemudian kembali ke sini untuk memilih repositori.",
-      "connectGitlabDescription": "Sambungkan GitLab dalam pelayar anda, kemudian kembali ke sini untuk memilih repositori.",
-      "connectBitbucketDescription": "Sambungkan Bitbucket dalam pelayar anda, kemudian kembali ke sini untuk memilih repositori.",
+      "connectGithubDescription": "Log masuk melalui pelayar anda, kemudian kembali ke sini untuk memilih repositori GitHub.",
+      "connectGitlabDescription": "Log masuk melalui pelayar anda, kemudian kembali ke sini untuk memilih repositori GitLab.",
+      "connectBitbucketDescription": "Log masuk melalui pelayar anda, kemudian kembali ke sini untuk memilih repositori Bitbucket.",
       "openGithub": "Buka GitHub",
       "openGitlab": "Buka GitLab",
       "openBitbucket": "Buka Bitbucket",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Perintah dihadkan kepada {{max}} aksara",
     "commandsEmpty": "Tiada arahan persediaan lagi",
     "commandsSaveFailed": "Tidak dapat menyimpan arahan persediaan",
-    "moveUp": "Bergerak ke atas",
-    "moveDown": "Bergerak ke bawah",
     "moveCommandUp": "Alihkan arahan {{position}} ke atas",
     "moveCommandDown": "Alihkan arahan {{position}} ke bawah",
     "skillsTitle": "Kemahiran",
@@ -3859,7 +3857,10 @@
     "skillNameRequired": "Masukkan nama kemahiran",
     "skillNameInvalid": "Nama kemahiran mesti bermula dengan huruf atau digit dan hanya menggunakan huruf kecil, angka dan sempang",
     "skillContentRequired": "Kandungan kemahiran diperlukan",
-    "skillSaveFailed": "Tidak dapat menyelamatkan kemahiran",
+    "skillSaveFailed": "Tidak dapat menyelamatkan kemahiran. Cuba lagi.",
+    "skillDeleteFailed": "Tidak dapat memadam kemahiran. Cuba lagi.",
+    "skillToggleFailed": "Tidak dapat mengemas kini kemahiran. Cuba lagi.",
+    "skillLimitReached": "Satu profil boleh menyimpan sehingga {{max}} kemahiran. Padam satu untuk menambah yang lain.",
     "skillSourceCustom": "Tersuai",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

@@ -26,6 +26,7 @@ const statefulOAuthConnectRouteConfigEntries = [
       source: 'discord_oauth',
       loadBuildOAuthUrl: async () =>
         (await import('@/lib/integrations/discord-service')).getDiscordOAuthUrl,
+      organizationRoles: ORGANIZATION_BILLING_ROLES,
     },
   ],
   [

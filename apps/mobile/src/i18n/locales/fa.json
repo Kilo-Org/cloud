@@ -163,7 +163,7 @@
     "allLanguages": "همه زبان‌ها"
   },
   "login": {
-    "welcome": "به Kilo خوش آمدید",
+    "welcome": "خوش آمدید",
     "retrySignIn": "تلاش مجدد برای ورود",
     "logo": "نشان Kilo",
     "continuingSignIn": "فرایند ورود شما در حال ادامه است.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "حساب GitLab خود را وصل کنید تا درخواست‌های ادغام را در موبایل بازبینی کنید.",
       "bitbucketDescription": "Bitbucket را به این سازمان وصل کنید تا پول ریکوئست‌ها را در موبایل بازبینی کنید.",
       "bitbucketOrgOnlyDescription": "حساب بالا را به یک سازمان تغییر دهید تا پول ریکوئست‌های Bitbucket آن را بازبینی کنید.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "این حساب هنوز سازمانی ندارد. پول ریکوئست‌های Bitbucket را می‌توانید پس از ایجاد یک سازمان یا پیوستن به آن بازبینی کنید.",
       "contextLine": "برای {{organization}}",
       "contextLinePersonal": "برای حساب شخصی شما"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "اعتبار اتصال به GitHub تمام شده است.",
-      "message": "اتصال شما به GitHub دیگر معتبر نیست. آن را دوباره بررسی کنید. در صورت نیاز، از شما خواسته می‌شود دوباره متصل شوید.",
+      "message": "آن را دوباره بررسی کنید. در صورت نیاز، از شما خواسته می‌شود دوباره متصل شوید.",
       "gitlabTitle": "اعتبار اتصال به GitLab تمام شده است.",
-      "bitbucketTitle": "اعتبار اتصال به Bitbucket تمام شده است.",
-      "providerMessage": "اتصال شما به {{provider}} دیگر معتبر نیست. آن را دوباره بررسی کنید. در صورت نیاز، از شما خواسته می‌شود دوباره متصل شوید."
+      "bitbucketTitle": "اعتبار اتصال به Bitbucket تمام شده است."
     },
     "eventChips": {
       "comment": "نظر",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "پول ریکوئست",
       "mergeRequest": "درخواست ادغام",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "درخواست ادغام !{{number}}",
       "shareMergeRequest": "اشتراک‌گذاری درخواست ادغام",
       "viewOnProvider": "مشاهده در {{provider}}",
       "mergeRequestUnavailable": "درخواست ادغام در دسترس نیست",
@@ -2293,9 +2293,9 @@
       "couldNotLoadGithubRepositories": "بارگذاری مخزن‌های GitHub ممکن نشد.",
       "couldNotLoadGitlabRepositories": "بارگذاری مخزن‌های GitLab ممکن نشد.",
       "couldNotLoadBitbucketRepositories": "بارگذاری مخزن‌های Bitbucket ممکن نشد.",
-      "connectGithubDescription": "حساب GitHub خود را از طریق مرورگر متصل کنید، سپس برای انتخاب مخزن به اینجا برگردید.",
-      "connectGitlabDescription": "حساب GitLab خود را از طریق مرورگر متصل کنید، سپس برای انتخاب مخزن به اینجا برگردید.",
-      "connectBitbucketDescription": "حساب Bitbucket خود را از طریق مرورگر متصل کنید، سپس برای انتخاب مخزن به اینجا برگردید.",
+      "connectGithubDescription": "از طریق مرورگر وارد شوید، سپس برای انتخاب مخزن GitHub به اینجا برگردید.",
+      "connectGitlabDescription": "از طریق مرورگر وارد شوید، سپس برای انتخاب مخزن GitLab به اینجا برگردید.",
+      "connectBitbucketDescription": "از طریق مرورگر وارد شوید، سپس برای انتخاب مخزن Bitbucket به اینجا برگردید.",
       "openGithub": "باز کردن GitHub",
       "openGitlab": "باز کردن GitLab",
       "openBitbucket": "باز کردن Bitbucket",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "دستور به {{max}} نویسه محدود است",
     "commandsEmpty": "هنوز دستور راه اندازی وجود ندارد",
     "commandsSaveFailed": "دستورات راه اندازی ذخیره نشد",
-    "moveUp": "حرکت به بالا",
-    "moveDown": "به پایین حرکت کنید",
     "moveCommandUp": "فرمان {{position}} را به بالا منتقل کنید",
     "moveCommandDown": "فرمان {{position}} را به پایین منتقل کنید",
     "skillsTitle": "مهارت ها",
@@ -3859,7 +3857,10 @@
     "skillNameRequired": "یک نام مهارت وارد کنید",
     "skillNameInvalid": "نام مهارت باید با یک حرف یا رقم شروع شود و فقط از حروف کوچک، ارقام و خط تیره استفاده کند.",
     "skillContentRequired": "محتوای مهارتی مورد نیاز است",
-    "skillSaveFailed": "مهارت ذخیره نشد",
+    "skillSaveFailed": "مهارت ذخیره نشد. دوباره امتحان کنید.",
+    "skillDeleteFailed": "مهارت حذف نشد. دوباره امتحان کنید.",
+    "skillToggleFailed": "مهارت به‌روزرسانی نشد. دوباره امتحان کنید.",
+    "skillLimitReached": "هر پروفایل می‌تواند تا {{max}} مهارت داشته باشد. برای افزودن مهارت دیگر، یکی را حذف کنید.",
     "skillSourceCustom": "سفارشی",
     "skillSourceMarketplace": "بازار",
     "skillSourceSkillsSh": "skills.sh",

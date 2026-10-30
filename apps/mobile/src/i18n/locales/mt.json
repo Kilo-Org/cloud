@@ -163,7 +163,7 @@
     "allLanguages": "Il-lingwi kollha"
   },
   "login": {
-    "welcome": "Merħba f'Kilo",
+    "welcome": "Merħba",
     "retrySignIn": "Erġa' idħol",
     "logo": "Logo ta' Kilo",
     "continuingSignIn": "Il-proċess tad-dħul tiegħek qed ikompli.",
@@ -729,6 +729,7 @@
       "gitlabDescription": "Ikkonnettja l-kont GitLab tiegħek biex tirrevedi l-merge requests fuq il-mowbajl.",
       "bitbucketDescription": "Ikkonnettja Bitbucket ma' din l-organizzazzjoni biex tirrevedi l-PRs fuq il-mowbajl.",
       "bitbucketOrgOnlyDescription": "Ibdel il-kont ta' fuq għal organizzazzjoni biex tirrevedi l-PRs Bitbucket tagħha.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Dan il-kont m'għandux organizzazzjonijiet għadu. Tista' tirrevedi l-PRs Bitbucket ladarba toħloq organizzazzjoni jew tingħaqad ma' waħda.",
       "contextLine": "Għal {{organization}}",
       "contextLinePersonal": "Għall-kont personali tiegħek"
     },
@@ -755,10 +756,9 @@
     },
     "reconnectNotice": {
       "title": "Il-konnessjoni ma' GitHub skadiet.",
-      "message": "Il-konnessjoni tiegħek ma' GitHub m'għadhiex valida. Erġa' ċċekkja l-konnessjoni — jekk ikun hemm bżonn, tintalab terġa' tikkonnettja.",
+      "message": "Erġa' ċċekkja l-konnessjoni — jekk ikun hemm bżonn, tintalab terġa' tikkonnettja.",
       "gitlabTitle": "Il-konnessjoni ma' GitLab skadiet.",
-      "bitbucketTitle": "Il-konnessjoni ma' Bitbucket skadiet.",
-      "providerMessage": "Il-konnessjoni tiegħek ma' {{provider}} m'għadhiex valida. Erġa' ċċekkja l-konnessjoni — jekk ikun hemm bżonn, tintalab terġa' tikkonnettja."
+      "bitbucketTitle": "Il-konnessjoni ma' Bitbucket skadiet."
     },
     "eventChips": {
       "comment": "Kumment",
@@ -872,7 +872,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Aqsam il-merge request",
       "viewOnProvider": "Ara fuq {{provider}}",
       "mergeRequestUnavailable": "Il-merge request mhux disponibbli",
@@ -2386,9 +2386,9 @@
       "couldNotLoadGithubRepositories": "Ma setgħux jitgħabbew ir-repożitorji ta' GitHub.",
       "couldNotLoadGitlabRepositories": "Ma setgħux jitgħabbew ir-repożitorji ta' GitLab.",
       "couldNotLoadBitbucketRepositories": "Ma setgħux jitgħabbew ir-repożitorji ta' Bitbucket.",
-      "connectGithubDescription": "Qabbad GitHub fil-brawżer tiegħek, imbagħad erġa' lura hawn biex tagħżel repożitorju.",
-      "connectGitlabDescription": "Qabbad GitLab fil-brawżer tiegħek, imbagħad erġa' lura hawn biex tagħżel repożitorju.",
-      "connectBitbucketDescription": "Qabbad Bitbucket fil-brawżer tiegħek, imbagħad erġa' lura hawn biex tagħżel repożitorju.",
+      "connectGithubDescription": "Idħol mill-brawżer tiegħek, imbagħad erġa' lura hawn biex tagħżel repożitorju GitHub.",
+      "connectGitlabDescription": "Idħol mill-brawżer tiegħek, imbagħad erġa' lura hawn biex tagħżel repożitorju GitLab.",
+      "connectBitbucketDescription": "Idħol mill-brawżer tiegħek, imbagħad erġa' lura hawn biex tagħżel repożitorju Bitbucket.",
       "openGithub": "Iftaħ GitHub",
       "openGitlab": "Iftaħ GitLab",
       "openBitbucket": "Iftaħ Bitbucket",
@@ -3997,8 +3997,6 @@
     "commandAtLimit": "Il-kmand huwa limitat għal {{max}} karattru",
     "commandsEmpty": "S'issa l-ebda kmand tas-setup",
     "commandsSaveFailed": "Ma setgħetx tissejvja l-kmandi tas-setup",
-    "moveUp": "Nimxu 'l fuq",
-    "moveDown": "Nimxu 'l isfel",
     "moveCommandUp": "Mexxi l-kmand {{position}} 'l fuq",
     "moveCommandDown": "Mexxi l-kmand {{position}} 'l isfel",
     "skillsTitle": "Ħiliet",
@@ -4009,7 +4007,10 @@
     "skillNameRequired": "Daħħal isem tal-ħila",
     "skillNameInvalid": "L-isem tal-ħiliet għandu jibda b'ittra jew ċifra u juża biss ittri żgħar, ċifri u sings",
     "skillContentRequired": "Il-kontenut tal-ħiliet huwa meħtieġ",
-    "skillSaveFailed": "Ma setgħetx tiffranka l-ħiliet",
+    "skillSaveFailed": "Ma setgħetx tiffranka l-ħiliet. Erġa' pprova.",
+    "skillDeleteFailed": "Ma setgħetx tħassar il-ħila. Erġa' pprova.",
+    "skillToggleFailed": "Ma setgħetx taġġorna l-ħila. Erġa' pprova.",
+    "skillLimitReached": "Profil jista' jżomm sa {{max}} ħiliet. Ħassar waħda biex iżżid oħra.",
     "skillSourceCustom": "Personalizzat",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

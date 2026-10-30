@@ -163,7 +163,7 @@
     "allLanguages": "Barcha tillar"
   },
   "login": {
-    "welcome": "Kiloga xush kelibsiz",
+    "welcome": "Xush kelibsiz",
     "retrySignIn": "Qayta kirishga urinish",
     "logo": "Kilo logotipi",
     "continuingSignIn": "Kirish davom ettirilmoqda.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Telefonda merge so‘rovlarini ko‘rib chiqish uchun GitLab hisobingizni ulang.",
       "bitbucketDescription": "Telefonda PRlarni ko‘rib chiqish uchun Bitbucketni ushbu tashkilotga ulang.",
       "bitbucketOrgOnlyDescription": "Yuqoridagi hisobni tashkilotga oʻtkazing, uning Bitbucket PRlarini koʻrib chiqish uchun.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Bu hisobda hozircha hech qanday tashkilot yo‘q. Tashkilot yaratganingizdan yoki unga qo‘shilganingizdan so‘ng Bitbucket PRlarini ko‘rib chiqish mumkin.",
       "contextLine": "{{organization}} uchun",
       "contextLinePersonal": "Shaxsiy hisob uchun"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub bilan ulanish muddati tugadi.",
-      "message": "GitHub ulanishingiz endi amal qilmaydi. Ulanishingizni qayta tekshiring — kerak bo'lsa, qayta ulanish so'raladi.",
+      "message": "Ulanishingizni qayta tekshiring — kerak bo'lsa, qayta ulanish so'raladi.",
       "gitlabTitle": "GitLab bilan ulanish muddati tugadi.",
-      "bitbucketTitle": "Bitbucket bilan ulanish muddati tugadi.",
-      "providerMessage": "{{provider}} ulanishingiz endi amal qilmaydi. Ulanishingizni qayta tekshiring — kerak bo'lsa, qayta ulanish so'raladi."
+      "bitbucketTitle": "Bitbucket bilan ulanish muddati tugadi."
     },
     "eventChips": {
       "comment": "Izoh",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge so‘rovi",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge so‘rovi !{{number}}",
       "shareMergeRequest": "Merge so‘rovini ulashish",
       "viewOnProvider": "{{provider}}da ko'rish",
       "mergeRequestUnavailable": "Merge so‘rovi mavjud emas",
@@ -2293,9 +2293,9 @@
       "couldNotLoadGithubRepositories": "GitHub repozitoriyalarini yuklab bo'lmadi.",
       "couldNotLoadGitlabRepositories": "GitLab repozitoriyalarini yuklab bo'lmadi.",
       "couldNotLoadBitbucketRepositories": "Bitbucket repozitoriyalarini yuklab bo'lmadi.",
-      "connectGithubDescription": "Brauzerda GitHub hisobingizni ulang, so'ng repozitoriya tanlash uchun bu yerga qayting.",
-      "connectGitlabDescription": "Brauzerda GitLab hisobingizni ulang, so'ng repozitoriya tanlash uchun bu yerga qayting.",
-      "connectBitbucketDescription": "Brauzerda Bitbucket hisobingizni ulang, so'ng repozitoriya tanlash uchun bu yerga qayting.",
+      "connectGithubDescription": "Brauzerda hisobingizga kiring, so'ng GitHub repozitoriyasini tanlash uchun bu yerga qayting.",
+      "connectGitlabDescription": "Brauzerda hisobingizga kiring, so'ng GitLab repozitoriyasini tanlash uchun bu yerga qayting.",
+      "connectBitbucketDescription": "Brauzerda hisobingizga kiring, so'ng Bitbucket repozitoriyasini tanlash uchun bu yerga qayting.",
       "openGithub": "GitHub saytini ochish",
       "openGitlab": "GitLab saytini ochish",
       "openBitbucket": "Bitbucket saytini ochish",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Buyruq {{max}} ta belgi bilan cheklangan",
     "commandsEmpty": "Hozircha sozlash buyruqlari yo'q",
     "commandsSaveFailed": "Sozlash buyruqlarini saqlab bo‘lmadi",
-    "moveUp": "Yuqoriga siljiting",
-    "moveDown": "Pastga siljiting",
     "moveCommandUp": "{{position}}-raqamli buyruqni yuqoriga siljiting",
     "moveCommandDown": "{{position}}-raqamli buyruqni pastga siljiting",
     "skillsTitle": "Ko'nikmalar",
@@ -3859,7 +3857,10 @@
     "skillNameRequired": "Qobiliyat nomini kiriting",
     "skillNameInvalid": "Malaka nomi harf yoki raqam bilan boshlanishi va faqat kichik harflar, raqamlar va tirelardan foydalanishi kerak",
     "skillContentRequired": "Ko'nikma tarkibi talab qilinadi",
-    "skillSaveFailed": "Mahorat saqlanmadi",
+    "skillSaveFailed": "Mahorat saqlanmadi. Qayta urinib ko'ring.",
+    "skillDeleteFailed": "Mahorat o'chirilmadi. Qayta urinib ko'ring.",
+    "skillToggleFailed": "Mahorat yangilanmadi. Qayta urinib ko'ring.",
+    "skillLimitReached": "Profil {{max}} tagacha ko'nikmani saqlashi mumkin. Boshqasini qo'shish uchun bittasini o'chiring.",
     "skillSourceCustom": "Maxsus",
     "skillSourceMarketplace": "Bozor",
     "skillSourceSkillsSh": "skills.sh",

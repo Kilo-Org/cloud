@@ -163,7 +163,7 @@
     "allLanguages": "Барлық тілдер"
   },
   "login": {
-    "welcome": "Kilo-ға қош келдіңіз",
+    "welcome": "Қош келдіңіз",
     "retrySignIn": "Кіруді қайталау",
     "logo": "Kilo логотипі",
     "continuingSignIn": "Кіру жалғасуда.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Мобильдіде біріктіру сұрауларын қарау үшін GitLab тіркелгіңізді қосыңыз.",
       "bitbucketDescription": "Мобильдіде тарту сұрауларын қарау үшін Bitbucket-ты осы ұйымға қосыңыз.",
       "bitbucketOrgOnlyDescription": "Жоғарыдағы тіркелгіні ұйымға ауыстырыңыз, оның Bitbucket тарту сұрауларын қарау үшін.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Бұл тіркелгіде әзірге ешбір ұйым жоқ. Ұйым құрғаннан немесе оған қосылғаннан кейін Bitbucket тарту сұрауларын қарауға болады.",
       "contextLine": "{{organization}} үшін",
       "contextLinePersonal": "Жеке аккаунтыңыз үшін"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub қосылымының мерзімі аяқталды.",
-      "message": "GitHub қосылымыңыз енді жарамсыз. Қосылымды қайта тексеріңіз — қажет болса, қайта қосылу ұсынылады.",
+      "message": "Қосылымды қайта тексеріңіз — қажет болса, қайта қосылу ұсынылады.",
       "gitlabTitle": "GitLab қосылымының мерзімі аяқталды.",
-      "bitbucketTitle": "Bitbucket қосылымының мерзімі аяқталды.",
-      "providerMessage": "{{provider}} қосылымыңыз енді жарамсыз. Қосылымды қайта тексеріңіз — қажет болса, қайта қосылу ұсынылады."
+      "bitbucketTitle": "Bitbucket қосылымының мерзімі аяқталды."
     },
     "eventChips": {
       "comment": "Пікір жазу",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Біріктіру сұрауы",
       "mergeRequest": "Біріктіру сұрауы",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Біріктіру сұрауы !{{number}}",
       "shareMergeRequest": "Біріктіру сұрауымен бөлісу",
       "viewOnProvider": "{{provider}}-да қарау",
       "mergeRequestUnavailable": "Біріктіру сұрауы қолжетімсіз",
@@ -2293,9 +2293,9 @@
       "couldNotLoadGithubRepositories": "GitHub репозиторийлерін жүктеу мүмкін болмады.",
       "couldNotLoadGitlabRepositories": "GitLab репозиторийлерін жүктеу мүмкін болмады.",
       "couldNotLoadBitbucketRepositories": "Bitbucket репозиторийлерін жүктеу мүмкін болмады.",
-      "connectGithubDescription": "Браузерде GitHub тіркелгісін байланыстырып, репозиторий таңдау үшін осында оралыңыз.",
-      "connectGitlabDescription": "Браузерде GitLab тіркелгісін байланыстырып, репозиторий таңдау үшін осында оралыңыз.",
-      "connectBitbucketDescription": "Браузерде Bitbucket тіркелгісін байланыстырып, репозиторий таңдау үшін осында оралыңыз.",
+      "connectGithubDescription": "Браузерден тіркелгіге кіріп, GitHub репозиторийін таңдау үшін осында оралыңыз.",
+      "connectGitlabDescription": "Браузерден тіркелгіге кіріп, GitLab репозиторийін таңдау үшін осында оралыңыз.",
+      "connectBitbucketDescription": "Браузерден тіркелгіге кіріп, Bitbucket репозиторийін таңдау үшін осында оралыңыз.",
       "openGithub": "GitHub-ты ашу",
       "openGitlab": "GitLab-ты ашу",
       "openBitbucket": "Bitbucket-ті ашу",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Пәрмен {{max}} таңбамен шектелген",
     "commandsEmpty": "Орнату пәрмендері әлі жоқ",
     "commandsSaveFailed": "Орнату пәрмендерін сақтау мүмкін болмады",
-    "moveUp": "Жоғары жылжытыңыз",
-    "moveDown": "Төмен жылжытыңыз",
     "moveCommandUp": "{{position}} пәрменін жоғары жылжыту",
     "moveCommandDown": "{{position}} пәрменін төмен жылжыту",
     "skillsTitle": "Дағдылар",
@@ -3859,7 +3857,10 @@
     "skillNameRequired": "Дағды атын енгізіңіз",
     "skillNameInvalid": "Дағды атауы әріптен немесе цифрдан басталып, тек кіші әріптерді, сандарды және сызықшаларды пайдалануы керек.",
     "skillContentRequired": "Біліктілік мазмұны қажет",
-    "skillSaveFailed": "Шеберлікті сақтау мүмкін болмады",
+    "skillSaveFailed": "Шеберлікті сақтау мүмкін болмады. Қайталап көріңіз.",
+    "skillDeleteFailed": "Шеберлікті жою мүмкін болмады. Қайталап көріңіз.",
+    "skillToggleFailed": "Шеберлікті жаңарту мүмкін болмады. Қайталап көріңіз.",
+    "skillLimitReached": "Профиль {{max}} дағдыға дейін сақтай алады. Басқасын қосу үшін біреуін жойыңыз.",
     "skillSourceCustom": "Арнайы",
     "skillSourceMarketplace": "Market",
     "skillSourceSkillsSh": "skills.sh",

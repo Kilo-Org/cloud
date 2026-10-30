@@ -163,7 +163,7 @@
     "allLanguages": "Бүх хэл"
   },
   "login": {
-    "welcome": "Kilo-д тавтай морил",
+    "welcome": "Тавтай морилно уу",
     "retrySignIn": "Нэвтрэлтийг дахин оролдох",
     "logo": "Kilo лого",
     "continuingSignIn": "Таны нэвтрэлт үргэлжилж байна.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Гар утаснаас нэгтгэх хүсэлтүүдийг шалгахын тулд GitLab бүртгэлээ холбоно уу.",
       "bitbucketDescription": "Гар утаснаас татах хүсэлтүүдийг шалгахын тулд Bitbucket-ийг энэ байгууллагад холбоно уу.",
       "bitbucketOrgOnlyDescription": "Түүний Bitbucket татах хүсэлтүүдийг шалгахын тулд дээрх бүртгэлийг байгууллагад шилжүүлнэ үү.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Энэ бүртгэлд одоогоор ямар ч байгууллага алга. Байгууллага үүсгэсэн эсвэл нэгэнд нэгдсэний дараа Bitbucket татах хүсэлтийг шалгах боломжтой болно.",
       "contextLine": "{{organization}}-ийн хувьд",
       "contextLinePersonal": "Хувийн дансны хувьд"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub холболтын хугацаа дууссан.",
-      "message": "Таны GitHub холболт хүчингүй болсон. Холболтоо дахин шалгана уу. Шаардлагатай бол дахин холбох заавар гарна.",
+      "message": "Холболтоо дахин шалгана уу. Шаардлагатай бол дахин холбох заавар гарна.",
       "gitlabTitle": "GitLab холболтын хугацаа дууссан.",
-      "bitbucketTitle": "Bitbucket холболтын хугацаа дууссан.",
-      "providerMessage": "Таны {{provider}} холболт хүчингүй болсон. Холболтоо дахин шалгана уу. Шаардлагатай бол дахин холбох заавар гарна."
+      "bitbucketTitle": "Bitbucket холболтын хугацаа дууссан."
     },
     "eventChips": {
       "comment": "Сэтгэгдэл бичих",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Нэгтгэх хүсэлт",
       "mergeRequest": "Нэгтгэх хүсэлт",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Нэгтгэх хүсэлт !{{number}}",
       "shareMergeRequest": "Нэгтгэх хүсэлтийг хуваалцах",
       "viewOnProvider": "{{provider}} дээр харах",
       "mergeRequestUnavailable": "Нэгтгэх хүсэлтийг нээх боломжгүй",
@@ -2293,9 +2293,9 @@
       "couldNotLoadGithubRepositories": "GitHub-ийн кодын сангуудыг ачаалж чадсангүй.",
       "couldNotLoadGitlabRepositories": "GitLab-ийн кодын сангуудыг ачаалж чадсангүй.",
       "couldNotLoadBitbucketRepositories": "Bitbucket-ийн кодын сангуудыг ачаалж чадсангүй.",
-      "connectGithubDescription": "Хөтөч дээрээ GitHub-ыг холбоод, энд буцаж ирж кодын сангаа сонгоно уу.",
-      "connectGitlabDescription": "Хөтөч дээрээ GitLab-ыг холбоод, энд буцаж ирж кодын сангаа сонгоно уу.",
-      "connectBitbucketDescription": "Хөтөч дээрээ Bitbucket-ыг холбоод, энд буцаж ирж кодын сангаа сонгоно уу.",
+      "connectGithubDescription": "Хөтөч дээрээ нэвтэрч ород, энд буцаж ирж GitHub-ын кодын сангаа сонгоно уу.",
+      "connectGitlabDescription": "Хөтөч дээрээ нэвтэрч ород, энд буцаж ирж GitLab-ын кодын сангаа сонгоно уу.",
+      "connectBitbucketDescription": "Хөтөч дээрээ нэвтэрч ород, энд буцаж ирж Bitbucket-ын кодын сангаа сонгоно уу.",
       "openGithub": "GitHub-ыг нээх",
       "openGitlab": "GitLab-ыг нээх",
       "openBitbucket": "Bitbucket-ыг нээх",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Команд нь {{max}} тэмдэгтээр хязгаарлагдана",
     "commandsEmpty": "Одоогоор тохируулах команд алга",
     "commandsSaveFailed": "Тохируулгын командуудыг хадгалж чадсангүй",
-    "moveUp": "Дээш хөдөл",
-    "moveDown": "Доош хөдөл",
     "moveCommandUp": "{{position}} дугаар командыг дээш зөөх",
     "moveCommandDown": "{{position}} дугаар командыг доош зөөх",
     "skillsTitle": "Ур чадвар",
@@ -3859,7 +3857,10 @@
     "skillNameRequired": "Ур чадварын нэрийг оруулна уу",
     "skillNameInvalid": "Ур чадварын нэр нь үсэг эсвэл цифрээр эхэлж, зөвхөн жижиг үсэг, цифр, зураас ашиглана.",
     "skillContentRequired": "Ур чадварын агуулга шаардлагатай",
-    "skillSaveFailed": "Ур чадвараа хадгалж чадсангүй",
+    "skillSaveFailed": "Ур чадвараа хадгалж чадсангүй. Дахин оролдоно уу.",
+    "skillDeleteFailed": "Ур чадвараа устгаж чадсангүй. Дахин оролдоно уу.",
+    "skillToggleFailed": "Ур чадвараа шинэчлэж чадсангүй. Дахин оролдоно уу.",
+    "skillLimitReached": "Профайлд хамгийн ихдээ {{max}} ур чадвар байж болно. Өөр нэмэхийн тулд нэгийг нь устгана уу.",
     "skillSourceCustom": "Өөрийн",
     "skillSourceMarketplace": "Маркет",
     "skillSourceSkillsSh": "skills.sh",

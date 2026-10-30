@@ -163,7 +163,7 @@
     "allLanguages": "Duk harsuna"
   },
   "login": {
-    "welcome": "Barka da zuwa Kilo",
+    "welcome": "Barka da zuwa",
     "retrySignIn": "Sake gwada shiga",
     "logo": "Alamar Kilo",
     "continuingSignIn": "Ana ci gaba da shigarka.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "Haɗa asusun GitLab ɗinka don bita buƙatun haɗawa a wayar hannu.",
       "bitbucketDescription": "Haɗa Bitbucket da wannan ƙungiya don bita buƙatun haɗa canje-canje a wayar hannu.",
       "bitbucketOrgOnlyDescription": "Canja asusun da ke sama zuwa ƙungiya don bita buƙatun haɗa canje-canje na Bitbucket na ƙungiyar.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Wannan asusu ba shi da ƙungiyoyi har yanzu. Za a iya bita buƙatun haɗa canje-canje na Bitbucket idan ka ƙirƙiri ƙungiya ko ka shiga cikin wata.",
       "contextLine": "Don {{organization}}",
       "contextLinePersonal": "Don kashin kanka"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Wa'adin haɗin GitHub ya ƙare.",
-      "message": "Haɗinka na GitHub ya daina aiki. Sake duba haɗin — za a nemi ka sake haɗawa idan ana buƙata.",
+      "message": "Sake duba haɗin — za a nemi ka sake haɗawa idan ana buƙata.",
       "gitlabTitle": "Wa'adin haɗin GitLab ya ƙare.",
-      "bitbucketTitle": "Wa'adin haɗin Bitbucket ya ƙare.",
-      "providerMessage": "Haɗinka na {{provider}} ya daina aiki. Sake duba haɗin — za a nemi ka sake haɗawa idan ana buƙata."
+      "bitbucketTitle": "Wa'adin haɗin Bitbucket ya ƙare."
     },
     "eventChips": {
       "comment": "Yi tsokaci",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Buƙatar haɗa canje-canje",
       "mergeRequest": "Buƙatar haɗawa",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Buƙatar haɗawa !{{number}}",
       "shareMergeRequest": "Raba buƙatar haɗawa",
       "viewOnProvider": "Duba a {{provider}}",
       "mergeRequestUnavailable": "Buƙatar haɗawa ba ta samuwa",
@@ -2293,9 +2293,9 @@
       "couldNotLoadGithubRepositories": "An kasa loda ma'ajiyoyin GitHub.",
       "couldNotLoadGitlabRepositories": "An kasa loda ma'ajiyoyin GitLab.",
       "couldNotLoadBitbucketRepositories": "An kasa loda ma'ajiyoyin Bitbucket.",
-      "connectGithubDescription": "Haɗa GitHub a burauzarka, sannan ka dawo nan don zaɓar ma'ajiya.",
-      "connectGitlabDescription": "Haɗa GitLab a burauzarka, sannan ka dawo nan don zaɓar ma'ajiya.",
-      "connectBitbucketDescription": "Haɗa Bitbucket a burauzarka, sannan ka dawo nan don zaɓar ma'ajiya.",
+      "connectGithubDescription": "Shiga asusunka a burauzarka, sannan ka dawo nan don zaɓar ma'ajiya ta GitHub.",
+      "connectGitlabDescription": "Shiga asusunka a burauzarka, sannan ka dawo nan don zaɓar ma'ajiya ta GitLab.",
+      "connectBitbucketDescription": "Shiga asusunka a burauzarka, sannan ka dawo nan don zaɓar ma'ajiya ta Bitbucket.",
       "openGithub": "Buɗe GitHub",
       "openGitlab": "Buɗe GitLab",
       "openBitbucket": "Buɗe Bitbucket",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "An iyakance umurnin zuwa haruffa {{max}}",
     "commandsEmpty": "Babu umarnin saitin tukuna",
     "commandsSaveFailed": "An kasa ajiye umarnin saitin",
-    "moveUp": "Matsa sama",
-    "moveDown": "Matsa ƙasa",
     "moveCommandUp": "Matsar da umarni {{position}} sama",
     "moveCommandDown": "Matsar da umarni {{position}} ƙasa",
     "skillsTitle": "Ƙwarewa",
@@ -3859,7 +3857,10 @@
     "skillNameRequired": "Shigar da sunan fasaha",
     "skillNameInvalid": "Dole ne sunan gwani ya fara da harafi ko lambobi kuma yayi amfani da ƙananan haruffa kawai, lambobi, da dashes",
     "skillContentRequired": "Ana buƙatar abun ciki gwaninta",
-    "skillSaveFailed": "An kasa ajiye fasaha",
+    "skillSaveFailed": "An kasa ajiye fasaha. Sake gwadawa.",
+    "skillDeleteFailed": "An kasa share fasaha. Sake gwadawa.",
+    "skillToggleFailed": "An kasa sabunta fasaha. Sake gwadawa.",
+    "skillLimitReached": "Bayanan martaba na iya ɗaukar ƙwarewa har {{max}}. Share ɗaya don ƙara wata.",
     "skillSourceCustom": "Al'ada",
     "skillSourceMarketplace": "Kasuwa",
     "skillSourceSkillsSh": "skills.sh",

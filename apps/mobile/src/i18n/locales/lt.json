@@ -163,7 +163,7 @@
     "allLanguages": "Visos kalbos"
   },
   "login": {
-    "welcome": "Sveikas atvykęs į Kilo",
+    "welcome": "Sveikas atvykęs",
     "retrySignIn": "Bandyti prisijungti dar kartą",
     "logo": "Kilo logotipas",
     "continuingSignIn": "Tęsiamas prisijungimas.",
@@ -714,6 +714,7 @@
       "gitlabDescription": "Prijunk savo GitLab paskyrą, kad galėtum peržiūrėti merge requests mobiliajame įrenginyje.",
       "bitbucketDescription": "Prijunk Bitbucket prie šios organizacijos, kad galėtum peržiūrėti pakeitimų užklausas mobiliajame įrenginyje.",
       "bitbucketOrgOnlyDescription": "Perjunk aukščiau esančią paskyrą į organizaciją, kad galėtum peržiūrėti jos Bitbucket pakeitimų užklausas.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Ši paskyra dar neturi jokių organizacijų. Sukūręs arba prisijungęs prie organizacijos galėsi peržiūrėti Bitbucket pakeitimų užklausas.",
       "contextLine": "Skirta {{organization}}",
       "contextLinePersonal": "Skirta asmeninei paskyrai"
     },
@@ -739,10 +740,9 @@
     },
     "reconnectNotice": {
       "title": "Baigėsi GitHub prieigos galiojimas.",
-      "message": "Tavo GitHub ryšys nebegalioja. Patikrink ryšį dar kartą — prireikus bus paprašyta prisijungti iš naujo.",
+      "message": "Patikrink ryšį dar kartą — prireikus bus paprašyta prisijungti iš naujo.",
       "gitlabTitle": "Baigėsi GitLab prieigos galiojimas.",
-      "bitbucketTitle": "Baigėsi Bitbucket prieigos galiojimas.",
-      "providerMessage": "Tavo {{provider}} ryšys nebegalioja. Patikrink ryšį dar kartą — prireikus bus paprašyta prisijungti iš naujo."
+      "bitbucketTitle": "Baigėsi Bitbucket prieigos galiojimas."
     },
     "eventChips": {
       "comment": "Komentuoti",
@@ -853,7 +853,7 @@
     "terms": {
       "pullRequest": "Pakeitimų užklausa",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Bendrinti merge request",
       "viewOnProvider": "Peržiūrėti {{provider}}",
       "mergeRequestUnavailable": "Merge request nepasiekiamas",
@@ -2355,9 +2355,9 @@
       "couldNotLoadGithubRepositories": "Nepavyko įkelti GitHub saugyklų.",
       "couldNotLoadGitlabRepositories": "Nepavyko įkelti GitLab saugyklų.",
       "couldNotLoadBitbucketRepositories": "Nepavyko įkelti Bitbucket saugyklų.",
-      "connectGithubDescription": "Naršyklėje susiekite GitHub paskyrą, tada grįžkite čia ir pasirinkite saugyklą.",
-      "connectGitlabDescription": "Naršyklėje susiekite GitLab paskyrą, tada grįžkite čia ir pasirinkite saugyklą.",
-      "connectBitbucketDescription": "Naršyklėje susiekite Bitbucket paskyrą, tada grįžkite čia ir pasirinkite saugyklą.",
+      "connectGithubDescription": "Prisijunkite naršyklėje, tada grįžkite čia ir pasirinkite GitHub saugyklą.",
+      "connectGitlabDescription": "Prisijunkite naršyklėje, tada grįžkite čia ir pasirinkite GitLab saugyklą.",
+      "connectBitbucketDescription": "Prisijunkite naršyklėje, tada grįžkite čia ir pasirinkite Bitbucket saugyklą.",
       "openGithub": "Atidaryti GitHub",
       "openGitlab": "Atidaryti GitLab",
       "openBitbucket": "Atidaryti Bitbucket",
@@ -3947,8 +3947,6 @@
     "commandAtLimit": "Komandos ilgis ribojamas iki {{max}} simbolių",
     "commandsEmpty": "Dar nėra sąrankos komandų",
     "commandsSaveFailed": "Nepavyko išsaugoti sąrankos komandų",
-    "moveUp": "Judėti aukštyn",
-    "moveDown": "Judėti žemyn",
     "moveCommandUp": "Perkelti komandą {{position}} aukštyn",
     "moveCommandDown": "Perkelti komandą {{position}} žemyn",
     "skillsTitle": "Įgūdžiai",
@@ -3959,7 +3957,10 @@
     "skillNameRequired": "Įveskite įgūdžių pavadinimą",
     "skillNameInvalid": "Įgūdžio pavadinimas turi prasidėti raide arba skaitmeniu ir naudoti tik mažąsias raides, skaitmenis ir brūkšnelius",
     "skillContentRequired": "Reikalingas įgūdžių turinys",
-    "skillSaveFailed": "Nepavyko išsaugoti įgūdžių",
+    "skillSaveFailed": "Nepavyko išsaugoti įgūdžių. Bandykite dar kartą.",
+    "skillDeleteFailed": "Nepavyko ištrinti įgūdžio. Bandykite dar kartą.",
+    "skillToggleFailed": "Nepavyko atnaujinti įgūdžio. Bandykite dar kartą.",
+    "skillLimitReached": "Profilis gali turėti iki {{max}} įgūdžių. Ištrinkite vieną, kad pridėtumėte kitą.",
     "skillSourceCustom": "Pasirinktinis",
     "skillSourceMarketplace": "Parduotuvė",
     "skillSourceSkillsSh": "skills.sh",

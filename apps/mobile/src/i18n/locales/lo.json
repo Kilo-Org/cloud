@@ -163,7 +163,7 @@
     "allLanguages": "ທຸກພາສາ"
   },
   "login": {
-    "welcome": "ຍິນດີຕ້ອນຮັບສູ່ Kilo",
+    "welcome": "ຍິນດີຕ້ອນຮັບ",
     "retrySignIn": "ລອງເຂົ້າສູ່ລະບົບອີກຄັ້ງ",
     "logo": "ໂລໂກ້ Kilo",
     "continuingSignIn": "ກຳລັງສືບຕໍ່ການເຂົ້າສູ່ລະບົບຂອງທ່ານ.",
@@ -684,6 +684,7 @@
       "gitlabDescription": "ເຊື່ອມຕໍ່ບັນຊີ GitLab ຂອງທ່ານເພື່ອກວດທານ merge request ເທິງມືຖື",
       "bitbucketDescription": "ເຊື່ອມຕໍ່ Bitbucket ກັບອົງກອນນີ້ເພື່ອກວດທານຄຳຂໍລວມໂຄ້ດເທິງມືຖື",
       "bitbucketOrgOnlyDescription": "ປ່ຽນບັນຊີຂ້າງເທິງໄປຫາອົງກອນເພື່ອກວດທານຄຳຂໍລວມໂຄ້ດ Bitbucket ຂອງມັນ.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "ບັນຊີນີ້ຍັງບໍ່ມີອົງກອນ. ທ່ານສາມາດກວດທານຄຳຂໍລວມໂຄ້ດ Bitbucket ໄດ້ເມື່ອທ່ານສ້າງ ຫຼື ເຂົ້າຮ່ວມອົງກອນ.",
       "contextLine": "ສຳລັບ {{organization}}",
       "contextLinePersonal": "ສຳລັບບັນຊີສ່ວນຕົວຂອງທ່ານ"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "ການເຊື່ອມຕໍ່ GitHub ໝົດອາຍຸແລ້ວ.",
-      "message": "ການເຊື່ອມຕໍ່ GitHub ຂອງທ່ານໃຊ້ບໍ່ໄດ້ແລ້ວ. ກວດສອບການເຊື່ອມຕໍ່ອີກຄັ້ງ — ລະບົບຈະຂໍໃຫ້ເຊື່ອມຕໍ່ໃໝ່ຖ້າຈຳເປັນ.",
+      "message": "ກວດສອບການເຊື່ອມຕໍ່ອີກຄັ້ງ — ລະບົບຈະຂໍໃຫ້ເຊື່ອມຕໍ່ໃໝ່ຖ້າຈຳເປັນ.",
       "gitlabTitle": "ການເຊື່ອມຕໍ່ GitLab ໝົດອາຍຸແລ້ວ.",
-      "bitbucketTitle": "ການເຊື່ອມຕໍ່ Bitbucket ໝົດອາຍຸແລ້ວ.",
-      "providerMessage": "ການເຊື່ອມຕໍ່ {{provider}} ຂອງທ່ານໃຊ້ບໍ່ໄດ້ແລ້ວ. ກວດສອບການເຊື່ອມຕໍ່ອີກຄັ້ງ — ລະບົບຈະຂໍໃຫ້ເຊື່ອມຕໍ່ໃໝ່ຖ້າຈຳເປັນ."
+      "bitbucketTitle": "ການເຊື່ອມຕໍ່ Bitbucket ໝົດອາຍຸແລ້ວ."
     },
     "eventChips": {
       "comment": "ສະແດງຄຳເຫັນ",
@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "ຄຳຂໍລວມໂຄ້ດ",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "ແບ່ງປັນ merge request",
       "viewOnProvider": "ເບິ່ງເທິງ {{provider}}",
       "mergeRequestUnavailable": "ບໍ່ສາມາດເປີດ merge request",
@@ -2293,9 +2293,9 @@
       "couldNotLoadGithubRepositories": "ບໍ່ສາມາດໂຫຼດຄັງໂຄດຈາກ GitHub ໄດ້.",
       "couldNotLoadGitlabRepositories": "ບໍ່ສາມາດໂຫຼດຄັງໂຄດຈາກ GitLab ໄດ້.",
       "couldNotLoadBitbucketRepositories": "ບໍ່ສາມາດໂຫຼດຄັງໂຄດຈາກ Bitbucket ໄດ້.",
-      "connectGithubDescription": "ເຊື່ອມຕໍ່ GitHub ໃນບຣາວເຊີ ແລ້ວກັບມາທີ່ນີ້ເພື່ອເລືອກຄັງໂຄດ.",
-      "connectGitlabDescription": "ເຊື່ອມຕໍ່ GitLab ໃນບຣາວເຊີ ແລ້ວກັບມາທີ່ນີ້ເພື່ອເລືອກຄັງໂຄດ.",
-      "connectBitbucketDescription": "ເຊື່ອມຕໍ່ Bitbucket ໃນບຣາວເຊີ ແລ້ວກັບມາທີ່ນີ້ເພື່ອເລືອກຄັງໂຄດ.",
+      "connectGithubDescription": "ເຂົ້າສູ່ລະບົບຈາກບຣາວເຊີຂອງທ່ານ ແລ້ວກັບມາທີ່ນີ້ເພື່ອເລືອກຄັງໂຄດ GitHub.",
+      "connectGitlabDescription": "ເຂົ້າສູ່ລະບົບຈາກບຣາວເຊີຂອງທ່ານ ແລ້ວກັບມາທີ່ນີ້ເພື່ອເລືອກຄັງໂຄດ GitLab.",
+      "connectBitbucketDescription": "ເຂົ້າສູ່ລະບົບຈາກບຣາວເຊີຂອງທ່ານ ແລ້ວກັບມາທີ່ນີ້ເພື່ອເລືອກຄັງໂຄດ Bitbucket.",
       "openGithub": "ເປີດ GitHub",
       "openGitlab": "ເປີດ GitLab",
       "openBitbucket": "ເປີດ Bitbucket",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "ຄຳສັ່ງຈຳກັດບໍ່ເກີນ {{max}} ຕົວອັກສອນ",
     "commandsEmpty": "ບໍ່ມີຄຳສັ່ງຕັ້ງຄ່າເທື່ອ",
     "commandsSaveFailed": "ບໍ່ສາມາດບັນທຶກຄຳສັ່ງຕັ້ງຄ່າໄດ້",
-    "moveUp": "ຍ້າຍຂຶ້ນ",
-    "moveDown": "ຍ້າຍລົງ",
     "moveCommandUp": "ຍ້າຍຄໍາສັ່ງ {{position}} ຂຶ້ນ",
     "moveCommandDown": "ຍ້າຍຄໍາສັ່ງ {{position}} ລົງ",
     "skillsTitle": "ທັກສະ",
@@ -3859,7 +3857,10 @@
     "skillNameRequired": "ໃສ່ຊື່ທັກສະ",
     "skillNameInvalid": "ຊື່ທັກສະຕ້ອງເລີ່ມຕົ້ນດ້ວຍຕົວອັກສອນ ຫຼືຕົວເລກ ແລະໃຊ້ແຕ່ຕົວພິມນ້ອຍ, ຕົວເລກ, ແລະເຄື່ອງໝາຍຂີດ",
     "skillContentRequired": "ເນື້ອຫາທັກສະແມ່ນຕ້ອງການ",
-    "skillSaveFailed": "ບໍ່ສາມາດບັນທຶກທັກສະໄດ້",
+    "skillSaveFailed": "ບໍ່ສາມາດບັນທຶກທັກສະໄດ້ ກະລຸນາລອງໃໝ່ອີກຄັ້ງ",
+    "skillDeleteFailed": "ບໍ່ສາມາດລຶບທັກສະໄດ້ ກະລຸນາລອງໃໝ່ອີກຄັ້ງ",
+    "skillToggleFailed": "ບໍ່ສາມາດອັບເດດທັກສະໄດ້ ກະລຸນາລອງໃໝ່ອີກຄັ້ງ",
+    "skillLimitReached": "ໂປຣໄຟລ໌ສາມາດມີທັກສະໄດ້ສູງສຸດ {{max}} ທັກສະ. ລຶບໜຶ່ງອັນເພື່ອເພີ່ມອັນອື່ນ.",
     "skillSourceCustom": "ກຳນົດເອງ",
     "skillSourceMarketplace": "ຕະຫຼາດ",
     "skillSourceSkillsSh": "skills.sh",

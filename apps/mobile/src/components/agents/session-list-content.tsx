@@ -332,6 +332,7 @@ export function AgentSessionListContent({
         <StoredSessionRow
           session={item.session}
           sortBy={SESSION_LIST_SORT}
+          sectionTitle={item.sectionTitle}
           live={activeSessionIds.has(item.session.session_id)}
           metaWhileLive
           onPress={() => {

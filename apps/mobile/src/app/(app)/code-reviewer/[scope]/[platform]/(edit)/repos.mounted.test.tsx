@@ -265,6 +265,11 @@ describe('repository picker resync affordance', () => {
 
     expect(button(renderer, 'Refresh')).toBeUndefined();
     expect(button(renderer, 'Manage access')).toBeDefined();
+    // The list carries no heading of its own: the screen header names it, and a
+    // second name here labelled nothing but the empty state.
+    expect(
+      renderer.root.findAll(node => String(node.type) === 'Text').map(node => node.props.children)
+    ).not.toContain('Repositories');
     unmount();
   });
 

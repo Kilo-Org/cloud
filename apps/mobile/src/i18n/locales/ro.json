@@ -163,7 +163,7 @@
     "allLanguages": "Toate limbile"
   },
   "login": {
-    "welcome": "Bine ai venit la Kilo",
+    "welcome": "Bine ai venit",
     "retrySignIn": "Reîncearcă autentificarea",
     "logo": "Sigla Kilo",
     "continuingSignIn": "Se continuă autentificarea.",
@@ -699,6 +699,7 @@
       "gitlabDescription": "Conectează-ți contul GitLab pentru a revizui merge requesturi de pe mobil.",
       "bitbucketDescription": "Conectează Bitbucket la această organizație pentru a revizui PR-uri de pe mobil.",
       "bitbucketOrgOnlyDescription": "Comută contul de mai sus pe o organizație pentru a revizui PR-urile Bitbucket ale acesteia.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Acest cont nu are încă nicio organizație. PR-urile Bitbucket pot fi revizuite după ce creezi o organizație sau te alături uneia.",
       "contextLine": "Pentru {{organization}}",
       "contextLinePersonal": "Pentru contul personal"
     },
@@ -723,10 +724,9 @@
     },
     "reconnectNotice": {
       "title": "Conexiunea la GitHub a expirat.",
-      "message": "Conexiunea ta la GitHub nu mai este validă. Verifică din nou conexiunea — ți se va cere să te reconectezi dacă este necesar.",
+      "message": "Verifică din nou conexiunea — ți se va cere să te reconectezi dacă este necesar.",
       "gitlabTitle": "Conexiunea la GitLab a expirat.",
-      "bitbucketTitle": "Conexiunea la Bitbucket a expirat.",
-      "providerMessage": "Conexiunea ta la {{provider}} nu mai este validă. Verifică din nou conexiunea — ți se va cere să te reconectezi dacă este necesar."
+      "bitbucketTitle": "Conexiunea la Bitbucket a expirat."
     },
     "eventChips": {
       "comment": "Comentariu",
@@ -834,7 +834,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Distribuie merge request-ul",
       "viewOnProvider": "Vezi pe {{provider}}",
       "mergeRequestUnavailable": "Merge request indisponibil",
@@ -2324,9 +2324,9 @@
       "couldNotLoadGithubRepositories": "Nu s-au putut încărca depozitele GitHub.",
       "couldNotLoadGitlabRepositories": "Nu s-au putut încărca depozitele GitLab.",
       "couldNotLoadBitbucketRepositories": "Nu s-au putut încărca depozitele Bitbucket.",
-      "connectGithubDescription": "Conectează contul GitHub în browser, apoi revino aici pentru a alege un depozit.",
-      "connectGitlabDescription": "Conectează contul GitLab în browser, apoi revino aici pentru a alege un depozit.",
-      "connectBitbucketDescription": "Conectează contul Bitbucket în browser, apoi revino aici pentru a alege un depozit.",
+      "connectGithubDescription": "Autentifică-te din browser, apoi revino aici pentru a alege un depozit GitHub.",
+      "connectGitlabDescription": "Autentifică-te din browser, apoi revino aici pentru a alege un depozit GitLab.",
+      "connectBitbucketDescription": "Autentifică-te din browser, apoi revino aici pentru a alege un depozit Bitbucket.",
       "openGithub": "Deschide GitHub",
       "openGitlab": "Deschide GitLab",
       "openBitbucket": "Deschide Bitbucket",
@@ -3897,8 +3897,6 @@
     "commandAtLimit": "Comanda este limitată la {{max}} caractere",
     "commandsEmpty": "Încă nu există comenzi de configurare",
     "commandsSaveFailed": "Comenzile de configurare nu au putut fi salvate",
-    "moveUp": "Mișcă-te în sus",
-    "moveDown": "Deplasați-vă în jos",
     "moveCommandUp": "Mută comanda {{position}} în sus",
     "moveCommandDown": "Mută comanda {{position}} în jos",
     "skillsTitle": "Abilități",
@@ -3909,7 +3907,10 @@
     "skillNameRequired": "Introduceți un nume de abilitate",
     "skillNameInvalid": "Numele aptitudinii trebuie să înceapă cu o literă sau o cifră și să folosească numai litere mici, cifre și liniuțe",
     "skillContentRequired": "Conținutul de calificare este necesar",
-    "skillSaveFailed": "Nu s-a putut salva calificarea",
+    "skillSaveFailed": "Nu s-a putut salva calificarea. Încearcă din nou.",
+    "skillDeleteFailed": "Nu s-a putut șterge calificarea. Încearcă din nou.",
+    "skillToggleFailed": "Nu s-a putut actualiza calificarea. Încearcă din nou.",
+    "skillLimitReached": "Un profil poate conține până la {{max}} abilități. Șterge una pentru a adăuga alta.",
     "skillSourceCustom": "Personalizat",
     "skillSourceMarketplace": "Marketplace",
     "skillSourceSkillsSh": "skills.sh",

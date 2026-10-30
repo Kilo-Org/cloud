@@ -163,7 +163,7 @@
     "allLanguages": "सभी भाषाएँ"
   },
   "login": {
-    "welcome": "Kilo में आपका स्वागत है",
+    "welcome": "आपका स्वागत है",
     "retrySignIn": "फिर से साइन इन करें",
     "logo": "Kilo का लोगो",
     "continuingSignIn": "आपका साइन-इन जारी है।",
@@ -1764,9 +1764,9 @@
       "couldNotLoadGithubRepositories": "GitHub रिपॉज़िटरी लोड नहीं हो सकीं।",
       "couldNotLoadGitlabRepositories": "GitLab रिपॉज़िटरी लोड नहीं हो सकीं।",
       "couldNotLoadBitbucketRepositories": "Bitbucket रिपॉज़िटरी लोड नहीं हो सकीं।",
-      "connectGithubDescription": "अपने ब्राउज़र में GitHub कनेक्ट करें, फिर रिपॉज़िटरी चुनने के लिए यहाँ वापस आएँ।",
-      "connectGitlabDescription": "अपने ब्राउज़र में GitLab कनेक्ट करें, फिर रिपॉज़िटरी चुनने के लिए यहाँ वापस आएँ।",
-      "connectBitbucketDescription": "अपने ब्राउज़र में Bitbucket कनेक्ट करें, फिर रिपॉज़िटरी चुनने के लिए यहाँ वापस आएँ।",
+      "connectGithubDescription": "अपने ब्राउज़र से साइन इन करें, फिर GitHub रिपॉज़िटरी चुनने के लिए यहाँ वापस आएँ।",
+      "connectGitlabDescription": "अपने ब्राउज़र से साइन इन करें, फिर GitLab रिपॉज़िटरी चुनने के लिए यहाँ वापस आएँ।",
+      "connectBitbucketDescription": "अपने ब्राउज़र से साइन इन करें, फिर Bitbucket रिपॉज़िटरी चुनने के लिए यहाँ वापस आएँ।",
       "openGithub": "GitHub खोलें",
       "openGitlab": "GitLab खोलें",
       "openBitbucket": "Bitbucket खोलें",
@@ -2699,6 +2699,7 @@
       "gitlabDescription": "मोबाइल पर मर्ज रिक्वेस्ट समीक्षित करने के लिए अपना GitLab खाता कनेक्ट करें।",
       "bitbucketDescription": "मोबाइल पर पुल रिक्वेस्ट समीक्षित करने के लिए इस संगठन को Bitbucket से कनेक्ट करें।",
       "bitbucketOrgOnlyDescription": "इसके Bitbucket पुल रिक्वेस्ट समीक्षित करने के लिए ऊपर दिए गए खाते को एक संगठन में बदलें।",
+      "bitbucketOrgOnlyNoOrganizationDescription": "इस खाते में अभी तक कोई संगठन नहीं है। संगठन बनाने या किसी संगठन में शामिल होने के बाद ही Bitbucket पुल रिक्वेस्ट समीक्षित किए जा सकते हैं।",
       "contextLine": "{{organization}} के लिए",
       "contextLinePersonal": "आपके व्यक्तिगत खाते के लिए"
     },
@@ -3065,10 +3066,9 @@
     "pullRequestUnavailableDescription": "यह PR नहीं खोला जा सकता। हो सकता है कि इसे हटा दिया गया हो, रिपॉज़िटरी निजी हो या उसमें Kilo GitHub ऐप इंस्टॉल न हो।",
     "reconnectNotice": {
       "title": "GitHub कनेक्शन की अवधि समाप्त हो गई।",
-      "message": "आपका GitHub कनेक्शन अब मान्य नहीं है। अपना कनेक्शन फिर से जाँचें — ज़रूरत होने पर आपको फिर से कनेक्ट करने के लिए कहा जाएगा।",
+      "message": "अपना कनेक्शन फिर से जाँचें — ज़रूरत होने पर आपको फिर से कनेक्ट करने के लिए कहा जाएगा।",
       "gitlabTitle": "GitLab कनेक्शन की अवधि समाप्त हो गई।",
-      "bitbucketTitle": "Bitbucket कनेक्शन की अवधि समाप्त हो गई।",
-      "providerMessage": "आपका {{provider}} कनेक्शन अब मान्य नहीं है। अपना कनेक्शन फिर से जाँचें — ज़रूरत होने पर आपको फिर से कनेक्ट करने के लिए कहा जाएगा।"
+      "bitbucketTitle": "Bitbucket कनेक्शन की अवधि समाप्त हो गई।"
     },
     "review": "समीक्षा",
     "reviewPullRequest": "पुल रिक्वेस्ट की समीक्षा करें",
@@ -3156,7 +3156,7 @@
     "terms": {
       "pullRequest": "पुल रिक्वेस्ट",
       "mergeRequest": "मर्ज रिक्वेस्ट",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "मर्ज रिक्वेस्ट !{{number}}",
       "shareMergeRequest": "मर्ज रिक्वेस्ट साझा करें",
       "viewOnProvider": "{{provider}} पर देखें",
       "mergeRequestUnavailable": "मर्ज रिक्वेस्ट अनुपलब्ध",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "आदेश {{max}} अक्षरों तक सीमित है",
     "commandsEmpty": "अभी तक कोई सेटअप आदेश नहीं",
     "commandsSaveFailed": "सेटअप आदेश सहेजे नहीं जा सके",
-    "moveUp": "बढ़ाना",
-    "moveDown": "नीचे की ओर",
     "moveCommandUp": "आदेश {{position}} को ऊपर ले जाएँ",
     "moveCommandDown": "आदेश {{position}} को नीचे ले जाएँ",
     "skillsTitle": "कौशल",
@@ -3859,7 +3857,10 @@
     "skillNameRequired": "एक कौशल नाम दर्ज करें",
     "skillNameInvalid": "कौशल का नाम किसी अक्षर या अंक से शुरू होना चाहिए और केवल छोटे अक्षरों, अंकों और डैश का उपयोग करना चाहिए",
     "skillContentRequired": "कौशल सामग्री की आवश्यकता है",
-    "skillSaveFailed": "कौशल सहेजा नहीं जा सका",
+    "skillSaveFailed": "कौशल सहेजा नहीं जा सका। फिर से प्रयास करें।",
+    "skillDeleteFailed": "कौशल हटाया नहीं जा सका। फिर से प्रयास करें।",
+    "skillToggleFailed": "कौशल अद्यतन नहीं किया जा सका। फिर से प्रयास करें।",
+    "skillLimitReached": "एक प्रोफ़ाइल में अधिकतम {{max}} कौशल रखे जा सकते हैं। एक और जोड़ने के लिए एक हटाएँ।",
     "skillSourceCustom": "कस्टम",
     "skillSourceMarketplace": "मार्केटप्लेस",
     "skillSourceSkillsSh": "skills.sh",

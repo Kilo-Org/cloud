@@ -8,7 +8,11 @@ import {
   USAGE_QUEUE_SFO_CONFIG,
   USAGE_QUEUE_FRA_CONFIG,
 } from '@kilocode/web-shared/lib/config.server';
-import { enqueueUsage, type UsageEnqueueOutcome } from './usage-publisher';
+import {
+  enqueueUsage,
+  getUsagePublisherExecutionRegion,
+  type UsageEnqueueOutcome,
+} from './usage-publisher';
 import { isFraUsageQueueSelected, isSfoUsageQueueSelected } from './usage-queue-policy';
 import {
   describeDatabaseError,
@@ -380,7 +384,10 @@ async function logMicrodollarUsageWithTransport(
   if (transport === 'queue') {
     const outcome = await enqueueUsageWithinLifetime(payload);
     if (outcome.kind === 'accepted') {
-      console.info('usage accounting queued', { usageId: core.id });
+      console.info('usage accounting queued', {
+        usageId: core.id,
+        execution_region: getUsagePublisherExecutionRegion(),
+      });
       return { status: 'queued', usageId: core.id, createdAt: core.created_at };
     }
     if (outcome.reason === 'publisher_not_configured') {
@@ -388,6 +395,7 @@ async function logMicrodollarUsageWithTransport(
       reportPublisherNotConfigured(core.id);
       console.warn('usage accounting queue publisher not configured', {
         usageId: core.id,
+        execution_region: getUsagePublisherExecutionRegion(),
         fallback: 'direct',
       });
       return recordUsageDirectly(core, metadata, usageContext, bouncerUsageEvent);
@@ -397,6 +405,7 @@ async function logMicrodollarUsageWithTransport(
       // Nothing was published, so the direct write cannot duplicate it.
       console.warn('usage accounting queue unavailable without a request lifetime', {
         usageId: core.id,
+        execution_region: getUsagePublisherExecutionRegion(),
         reason: outcome.reason,
         fallback: 'direct',
       });
@@ -404,6 +413,7 @@ async function logMicrodollarUsageWithTransport(
     }
     console.error('usage accounting publication failed', {
       usageId: core.id,
+      execution_region: getUsagePublisherExecutionRegion(),
       reason: outcome.reason,
     });
     return null;

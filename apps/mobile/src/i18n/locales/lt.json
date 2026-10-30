@@ -1489,6 +1489,7 @@
       "retryMessage": "Kodo peržiūra bus atlikta dar kartą.",
       "retryReview": "Pakartoti peržiūrą",
       "retryNeedsSettings": "Kodo peržiūros agentas išjungtas arba jo nustatymams reikia dėmesio. Pataisykite nustatymus, tada pakartokite šią peržiūrą.",
+      "retryNotStarted": "Pakartojimas neprasidėjo.",
       "fixSettings": "Pataisyti nustatymus",
       "couldNotLoad": "Nepavyko įkelti peržiūros.",
       "couldNotGetLatest": "Nepavyko gauti naujausių duomenų.",
@@ -1569,6 +1570,7 @@
       "changeRequestNoGitHubAccess": "Nė vienas GitHub prisijungimas neturi prieigos prie šios saugyklos. Iš naujo prijunk GitHub, kad jis turėtų prieigą prie jos, tada bandyk dar kartą.",
       "changeRequestMissingPermissions": "Kilo GitHub programėlė negali atidaryti PR šioje saugykloje. Saugyklos savininkas turi suteikti programėlei rašymo prieigą prie turinio ir PR, tada bandyk dar kartą.",
       "changeRequestFailed": "Kilo nepavyko atidaryti PR. Bandyk dar kartą po akimirkos.",
+      "proposalConflict": "Kitas šios saugyklos pasiūlymas vis dar aktyvus.",
       "offAction": "Peržiūros atmintis išjungta. Įjunk ją, tada bandyk dar kartą."
     },
     "manualReview": {

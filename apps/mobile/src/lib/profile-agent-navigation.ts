@@ -66,6 +66,15 @@ export function getCodeReviewerProfilePath(scope: string): Href {
   return `/(app)/code-reviewer/${scope}` as Href;
 }
 
+/**
+ * Where the Code Reviewer screens land when they have no history: the Home
+ * tab's root, which holds the EXPLORE card that opens the reviewer. Both of the
+ * reviewer's entry points push its screens (the Home card and the Profile row),
+ * so a cold link or a relaunch restore that opened one on its own still has one
+ * place to return to.
+ */
+export const CODE_REVIEWER_HOME_PATH = '/(app)/(tabs)/(0_home)' as Href;
+
 export function getPrReviewEntryPath(): Href {
   return '/(app)/pr-review' as Href;
 }

@@ -28,25 +28,33 @@ export type CdpSession = {
 
 export type ProbeSample = { t: number; repeat: number; dump: ProbeDump };
 
-export function parseSamples(json: string): ProbeSample[] {
-  const samples = record(JSON.parse(json))?.samples;
+export function parseSamples(json: string): {
+  readonly samples: ProbeSample[];
+  readonly truncated: boolean;
+} {
+  const payload = record(JSON.parse(json));
+  const samples = payload?.samples;
   if (!Array.isArray(samples)) throw new InfraError('stopSampling() returned no samples array');
-  return samples.map(entry => {
-    const sample = record(entry);
-    const t = sample?.t;
-    const repeat = sample?.repeat;
-    if (
-      typeof t !== 'number' ||
-      typeof repeat !== 'number' ||
-      !Number.isInteger(repeat) ||
-      repeat < 1
-    ) {
-      throw new InfraError(
-        `stopSampling() returned a malformed sample: ${JSON.stringify(entry).slice(0, 200)}`
-      );
-    }
-    return { t, repeat, dump: parseDump(sample?.dump) };
-  });
+  const truncated = payload?.truncated === true;
+  return {
+    truncated,
+    samples: samples.map(entry => {
+      const sample = record(entry);
+      const t = sample?.t;
+      const repeat = sample?.repeat;
+      if (
+        typeof t !== 'number' ||
+        typeof repeat !== 'number' ||
+        !Number.isInteger(repeat) ||
+        repeat < 1
+      ) {
+        throw new InfraError(
+          `stopSampling() returned a malformed sample: ${JSON.stringify(entry).slice(0, 200)}`
+        );
+      }
+      return { t, repeat, dump: parseDump(sample?.dump) };
+    }),
+  };
 }
 
 export type ProbeClient = {
@@ -59,7 +67,7 @@ export type ProbeClient = {
   lastOutcome: () => Promise<string>;
   press: (query: string) => Promise<string>;
   startSampling: (intervalMs: number, maxMs: number) => Promise<void>;
-  stopSampling: () => Promise<ProbeSample[]>;
+  stopSampling: () => Promise<{ readonly samples: ProbeSample[]; readonly truncated: boolean }>;
   disconnect: () => void;
 };
 

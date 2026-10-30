@@ -11,8 +11,8 @@ it.each([undefined, 'all'])(
   'reports workerd overload and per-item decisions with diagnostics %s',
   async diagnostics => {
     const calls: unknown[] = [];
-    let statuses: (number | 'recorded' | 'duplicate')[] = [];
-    let mixedStatus: number | undefined;
+    let statuses: (number | 'recorded' | 'duplicate' | 'admission')[] = [];
+    let mixedStatus: number | 'admission' | undefined;
     let heldFirst: ReturnType<typeof Promise.withResolvers<void>> | undefined;
     let heldSecond: ReturnType<typeof Promise.withResolvers<void>> | undefined;
     let active = 0;
@@ -32,7 +32,10 @@ it.each([undefined, 'all'])(
             : mixedStatus;
       if (heldFirst && event.core.id.endsWith('3300')) await heldFirst.promise;
       if (heldSecond && event.core.id.endsWith('3301')) await heldSecond.promise;
-      if (typeof status === 'number') {
+      if (status === 'admission') {
+        response.writeHead(429, { 'content-type': 'application/json' });
+        response.end(JSON.stringify({ error: 'Usage writer overloaded', reason: 'queue_limit' }));
+      } else if (typeof status === 'number') {
         response.writeHead(status, { 'x-sensitive-header': 'synthetic-private-header' });
         response.end('synthetic-private-body');
       } else {
@@ -138,7 +141,7 @@ it.each([undefined, 'all'])(
       expect(calls).toEqual(events);
       expect(peak).toBe(2);
       expect(statuses).toEqual([]);
-      for (const status of [400, 429, 503]) {
+      for (const status of [400, 429, 503, 'admission'] as const) {
         mixedStatus = status;
         heldFirst = Promise.withResolvers<void>();
         const priorCalls = calls.length;
@@ -157,10 +160,13 @@ it.each([undefined, 'all'])(
         expect(result.ackAll).toBe(false);
         expect(result.explicitAcks).toEqual(['queue-0']);
         expect(result.retryMessages.map(message => message.msgId)).toEqual(['queue-1']);
+        const delay = result.retryMessages[0].delaySeconds;
+        expect(delay).toBeGreaterThanOrEqual(status === 'admission' ? 2 : 60);
+        expect(delay).toBeLessThanOrEqual(status === 'admission' ? 4 : 120);
         expect(calls.slice(-2)).toEqual(events.slice(0, 2));
       }
       mixedStatus = undefined;
-      for (const status of [429, 503]) {
+      for (const status of [429, 503, 'admission'] as const) {
         statuses = ['recorded', status, 400, 'duplicate', 'recorded', 'duplicate'];
         heldFirst = Promise.withResolvers<void>();
         const priorCalls = calls.length;
@@ -201,7 +207,7 @@ it.each([undefined, 'all'])(
         expect(result.explicitAcks).toEqual([]);
         expect(result.retryMessages.map(message => message.msgId)).toEqual(['queue-0']);
       }
-      expect(calls).toHaveLength(32);
+      expect(calls).toHaveLength(41);
       const serialized = JSON.stringify(logs);
       expect(serialized).toContain('usage_ingest_processing');
       expect(serialized).toContain('writer_overloaded');

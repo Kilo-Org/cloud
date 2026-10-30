@@ -84,7 +84,7 @@ export function ChoiceRow({
       }
     >
       {children ?? (
-        <View className="flex-1 pr-3">
+        <View className="flex-1 pe-3">
           <Text className="text-sm font-medium">{label}</Text>
           {description ? (
             <Text variant="muted" className="mt-0.5 text-xs">

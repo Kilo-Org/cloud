@@ -401,6 +401,9 @@ async function resumeMissingSessionDeletion(input: {
     taxonomy: 'safe-retry',
     leaseSeconds: DELETE_LEDGER_LEASE_SECONDS,
   });
+  if (admission.admission === 'organization_mismatch') {
+    throw new TRPCError({ code: 'CONFLICT', message: 'operation_key_reuse_mismatch' });
+  }
   assertSessionOperationIdentity(admission.row, {
     userId: input.userId,
     intent: 'delete_workspace_session',
@@ -544,6 +547,9 @@ const deleteHostedWorkspaceSessionHandler = protectedProcedure
       taxonomy: 'safe-retry',
       leaseSeconds: DELETE_LEDGER_LEASE_SECONDS,
     });
+    if (admission.admission === 'organization_mismatch') {
+      throw new TRPCError({ code: 'CONFLICT', message: 'operation_key_reuse_mismatch' });
+    }
     assertSessionOperationIdentity(admission.row, {
       userId: ctx.userId,
       intent: 'delete_workspace_session',

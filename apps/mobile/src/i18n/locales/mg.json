@@ -1445,6 +1445,7 @@
       "retryMessage": "Hamerina ny fanamarinana kaody izany.",
       "retryReview": "Andramo indray ny fanamarinana",
       "retryNeedsSettings": "Maty ny Mpandinika kaody na mila fiheverana ny fikirany. Amboary ny fikirana, dia andramo indray ity fanamarinana ity.",
+      "retryNotStarted": "Tsy nisy nanomboka ny fanandramana indray.",
       "fixSettings": "Amboary ny fikirana",
       "couldNotLoad": "Tsy nety nampidirina ny fanamarinana.",
       "couldNotGetLatest": "Tsy nety nalaina ny angona farany.",
@@ -1525,6 +1526,7 @@
       "changeRequestNoGitHubAccess": "Tsy misy fifandraisana GitHub manana fidirana amin'ity repositera ity. Avereno ampifandraisina amin'ny GitHub manana fidirana aminy, dia andramo indray.",
       "changeRequestMissingPermissions": "Tsy afaka manokatra PR ao amin'ity repositera ity ny GitHub App an'i Kilo. Tsy maintsy omen'ny tompon'ny repositera ny zo hanoratra amin'ny votoaty sy amin'ny PR ny app, dia andramo indray.",
       "changeRequestFailed": "Tsy nety nosokafan'i Kilo ny PR. Andramo indray afaka kelikely.",
+      "proposalConflict": "Mbola mavitrika ny soso-kevitra iray hafa ho an'ity repositera ity, ka tsy mbola azo tehirizina ity iray ity.",
       "offAction": "Tsy mandeha ny fitadidiana ny fanamarinana. Alefaso izany, dia andramo indray."
     },
     "manualReview": {

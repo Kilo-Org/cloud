@@ -1445,6 +1445,7 @@
       "retryMessage": "Lokhu kuzophinda kuqalise ukuhlolwa kwekhodi.",
       "retryReview": "Phinda uzame ukuhlola",
       "retryNeedsSettings": "Umhloli wekhodi uvaliwe noma izilungiselelo zakhe zidinga ukunakwa. Lungisa izilungiselelo, bese uphinda uzame lokhu kuhlola.",
+      "retryNotStarted": "Ukuphinda uzame akuzange kuqale.",
       "fixSettings": "Lungisa izilungiselelo",
       "couldNotLoad": "Asikwazanga ukulayisha ukuhlolwa.",
       "couldNotGetLatest": "Asikwazanga ukuthola imininingwane yakamuva.",
@@ -1525,6 +1526,7 @@
       "changeRequestNoGitHubAccess": "Akukho ukuxhumana kwe-GitHub okunokufinyelela kule rejistri. Xhuma kabusha i-GitHub enokufinyelela kuyo, bese uzama futhi.",
       "changeRequestMissingPermissions": "I-GitHub App ye-Kilo ayikwazi ukuvula ama-PR kule rejistri. Umnikazi we-rejistri kufanele anikeze i-app ilungelo lokubhala kokuqukethwe nakuma-PR, bese uzama futhi.",
       "changeRequestFailed": "I-Kilo ayikwazanga ukuvula i-PR. Zama futhi emva kwesikhashana.",
+      "proposalConflict": "Esinye isiphakamiso sale rejistri sisasebenza.",
       "offAction": "Inkumbulo yokuhlola ivaliwe. Yivule, bese uzama futhi."
     },
     "manualReview": {

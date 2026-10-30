@@ -1445,6 +1445,7 @@
       "retryMessage": "Ini akan menjalankan semula semakan kod.",
       "retryReview": "Cuba semakan semula",
       "retryNeedsSettings": "Penyemak kod dimatikan atau tetapannya memerlukan perhatian. Betulkan tetapan, kemudian cuba semakan ini semula.",
+      "retryNotStarted": "Percubaan semula tidak bermula.",
       "fixSettings": "Betulkan tetapan",
       "couldNotLoad": "Tidak dapat memuatkan semakan.",
       "couldNotGetLatest": "Tidak dapat mendapatkan maklumat terkini.",
@@ -1525,6 +1526,7 @@
       "changeRequestNoGitHubAccess": "Tiada sambungan GitHub yang mempunyai akses kepada repositori ini. Sambung semula GitHub dengan akses kepadanya, kemudian cuba lagi.",
       "changeRequestMissingPermissions": "Aplikasi GitHub Kilo tidak boleh membuka pull request dalam repositori ini. Pemilik repositori mesti memberikan aplikasi akses tulis kepada kandungan dan pull request, kemudian cuba lagi.",
       "changeRequestFailed": "Kilo tidak dapat membuka pull request. Cuba lagi sebentar.",
+      "proposalConflict": "Cadangan lain untuk repositori ini masih aktif, jadi cadangan ini belum boleh disimpan.",
       "offAction": "Memori semakan dinyahdayakan. Dayakannya, kemudian cuba lagi."
     },
     "manualReview": {

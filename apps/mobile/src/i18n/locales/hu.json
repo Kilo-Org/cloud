@@ -1445,6 +1445,7 @@
       "retryMessage": "Ez újra lefuttatja a kódellenőrzést.",
       "retryReview": "Kódellenőrzés újrapróbálása",
       "retryNeedsSettings": "A Kódellenőrző ki van kapcsolva, vagy a beállításai figyelmet igényelnek. Javítsd a beállításokat, majd próbáld újra ezt a kódellenőrzést.",
+      "retryNotStarted": "Az újrapróbálás nem indult el.",
       "fixSettings": "Beállítások javítása",
       "couldNotLoad": "Nem sikerült betölteni a kódellenőrzést.",
       "couldNotGetLatest": "Nem sikerült lekérni a legfrissebb adatokat.",
@@ -1525,6 +1526,7 @@
       "changeRequestNoGitHubAccess": "Egyetlen GitHub-kapcsolatnak sincs hozzáférése ehhez a tárolóhoz. Kapcsold újra a GitHubot úgy, hogy hozzáférjen ehhez a tárolóhoz, majd próbáld újra.",
       "changeRequestMissingPermissions": "A Kilo GitHub-alkalmazása nem tud pull requesteket nyitni ebben a tárolóban. A tároló tulajdonosának írási hozzáférést kell adnia az alkalmazásnak a tartalmakhoz és a pull requestekhez, majd próbáld újra.",
       "changeRequestFailed": "A Kilo nem tudta megnyitni a pull requestet. Próbáld újra egy pillanat múlva.",
+      "proposalConflict": "Ehhez a tárolóhoz egy másik javaslat is aktív, ezért ezt még nem lehet menteni.",
       "offAction": "A kódellenőrzési memória ki van kapcsolva. Kapcsold be, majd próbáld újra."
     },
     "manualReview": {

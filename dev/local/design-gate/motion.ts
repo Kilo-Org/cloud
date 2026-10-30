@@ -249,6 +249,7 @@ export type MotionResult = {
   note?: string;
   segments: MotionSegment[];
   findings: Finding[];
+  samplingTruncated: boolean;
 };
 
 const PRESS_FAILURES: Record<string, true> = { 'not-found': true, 'not-pressable': true };
@@ -280,19 +281,26 @@ export async function runMotion(
   const unregisterCleanup = ctx.registerCleanup?.(async () => {
     await Promise.allSettled([recording.stop(), ctx.probe.stopSampling()]);
   });
-  let samples: ProbeSample[];
+  let sampling: { readonly samples: ProbeSample[]; readonly truncated: boolean } | undefined;
   try {
     await ctx.clock.sleep(TAP_DELAY_MS - PRE_TAP_SAMPLE_MS);
     await ctx.probe.startSampling(SAMPLE_INTERVAL_MS, recordingMs);
     await ctx.clock.sleep(PRE_TAP_SAMPLE_MS);
     if (options.tap !== undefined) await tapElement(ctx, options.tap);
     await ctx.clock.sleep(recordingMs - TAP_DELAY_MS);
-    samples = await ctx.probe.stopSampling();
+    sampling = await ctx.probe.stopSampling();
   } finally {
     unregisterCleanup?.();
     await recording.stop();
   }
-  writeJson(path.join(ctx.out, 'motion-timeline.json'), { samples });
+  if (sampling === undefined) throw new InfraError('Sampling stopped without a layout series');
+  const { samples, truncated } = sampling;
+  writeJson(path.join(ctx.out, 'motion-timeline.json'), { samples, truncated });
+  if (truncated) {
+    ctx.log(
+      'design-gate: the interaction series kept only its newest layouts; older samples were dropped'
+    );
+  }
   const timeline = expandSamples(samples);
   const findings = checkShift(timeline.map(normalize), SAMPLE_INTERVAL_MS).map(finding => ({
     ...finding,
@@ -318,6 +326,7 @@ export async function runMotion(
     note,
     segments,
     findings,
+    samplingTruncated: truncated,
   };
   writeJson(path.join(ctx.out, 'motion.json'), {
     version: 1,

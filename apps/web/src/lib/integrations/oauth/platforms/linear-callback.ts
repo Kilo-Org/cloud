@@ -157,7 +157,7 @@ async function handleLinearBotLinkCallback(
     }
 
     await bot.initialize();
-    await linkKiloUser(
+    const linkResult = await linkKiloUser(
       bot.getState(),
       {
         platform: PLATFORM.LINEAR,
@@ -166,6 +166,15 @@ async function handleLinearBotLinkCallback(
       },
       user.id
     );
+
+    if (linkResult === 'conflict') {
+      return htmlPage(
+        'Already linked',
+        'This Linear account is already linked to a different Kilo account. No changes were made.<br>' +
+          'Sign in to the Kilo account that already holds it, then mention Kilo again.',
+        409
+      );
+    }
 
     return htmlPage(
       'Linear account linked',

@@ -349,7 +349,9 @@ describe('RepositorySettingsScreen repository picker', () => {
     repositories.isLoading = false;
     repositories.isError = true;
     const failed = await mount();
-    expect(failed.renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(0);
+    expect(failed.renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(
+      0
+    );
   });
 
   it('reads the repositories again when the GitHub settings page closes', async () => {

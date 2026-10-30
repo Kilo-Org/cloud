@@ -360,7 +360,9 @@ describe.each([
       expect(host(root, 'Switch')[0]?.props.value).toBe(false);
       expect(host(root, 'Switch')[0]?.props.disabled).toBe(true);
       expect(texts(root)).toContain(emptyCopy);
-      const cta = host(root, 'ConfigureRow').find(node => node.props.title === 'Select repositories');
+      const cta = host(root, 'ConfigureRow').find(
+        node => node.props.title === 'Select repositories'
+      );
       // The empty list makes "choose which repositories to monitor" untrue, so
       // the row names the step that actually unblocks it.
       expect(cta?.props.subtitle).toBe('Grant the Kilo GitHub App access to repositories');

@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Kërkesë bashkimi",
       "mergeRequest": "Kërkesë integrimi",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Kërkesë integrimi !{{number}}",
       "shareMergeRequest": "Ndaj kërkesën e integrimit",
       "viewOnProvider": "Shih te {{provider}}",
       "mergeRequestUnavailable": "Kërkesa e integrimit nuk është e disponueshme",

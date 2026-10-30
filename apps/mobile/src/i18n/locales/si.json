@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "පුල් ඉල්ලීම",
       "mergeRequest": "මර්ජ ඉල්ලීම",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "මර්ජ ඉල්ලීම !{{number}}",
       "shareMergeRequest": "මර්ජ ඉල්ලීම බෙදාගන්න",
       "viewOnProvider": "{{provider}} මත බලන්න",
       "mergeRequestUnavailable": "මර්ජ ඉල්ලීම ලබා ගත නොහැක",

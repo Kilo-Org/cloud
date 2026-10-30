@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Ibahagi ang merge request",
       "viewOnProvider": "Tingnan sa {{provider}}",
       "mergeRequestUnavailable": "Hindi mabuksan ang merge request",

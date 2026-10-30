@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Demann fizyon",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Pataje merge request la",
       "viewOnProvider": "Gade sou {{provider}}",
       "mergeRequestUnavailable": "Merge request la pa disponib",

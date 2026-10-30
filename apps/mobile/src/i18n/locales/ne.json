@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "पुल रिक्वेस्ट",
       "mergeRequest": "मर्ज रिक्वेस्ट",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "मर्ज रिक्वेस्ट !{{number}}",
       "shareMergeRequest": "मर्ज रिक्वेस्ट सेयर गर्नुहोस्",
       "viewOnProvider": "{{provider}} मा हेर्नुहोस्",
       "mergeRequestUnavailable": "मर्ज रिक्वेस्ट उपलब्ध छैन",

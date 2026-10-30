@@ -3199,7 +3199,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Partager le merge request",
       "viewOnProvider": "Voir sur {{provider}}",
       "mergeRequestUnavailable": "Merge request indisponible",

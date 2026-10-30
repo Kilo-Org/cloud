@@ -834,7 +834,7 @@
     "terms": {
       "pullRequest": "Zahtjev za spajanje",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Podijeli merge request",
       "viewOnProvider": "Pogledaj na {{provider}}",
       "mergeRequestUnavailable": "Merge request nije dostupan",

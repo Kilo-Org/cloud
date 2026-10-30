@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Ìbéèrè àkópọ̀",
       "mergeRequest": "Ìbéèrè ìṣọ̀kan",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Ìbéèrè ìṣọ̀kan !{{number}}",
       "shareMergeRequest": "Pín ìbéèrè ìṣọ̀kan",
       "viewOnProvider": "Wò ó lórí {{provider}}",
       "mergeRequestUnavailable": "Ìbéèrè ìṣọ̀kan kò sí",

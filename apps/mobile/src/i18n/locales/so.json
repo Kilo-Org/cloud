@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Codsi isku-darid",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "La wadaag merge request-ka",
       "viewOnProvider": "Kasoo eeg {{provider}}",
       "mergeRequestUnavailable": "Merge request-ka lama heli karo",

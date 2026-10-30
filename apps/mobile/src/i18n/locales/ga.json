@@ -872,7 +872,7 @@
     "terms": {
       "pullRequest": "Iarratas tarraingthe",
       "mergeRequest": "Iarratas cumaisc",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Iarratas cumaisc !{{number}}",
       "shareMergeRequest": "Comhroinn iarratas cumaisc",
       "viewOnProvider": "Amharc ar {{provider}}",
       "mergeRequestUnavailable": "Iarratas cumaisc gan fáil",

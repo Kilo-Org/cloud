@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Fangatahana fampiraisana",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Fangatahana fampiraisana !{{number}}",
       "shareMergeRequest": "Zarao ny fangatahana fampiraisana",
       "viewOnProvider": "Jereo amin'ny {{provider}}",
       "mergeRequestUnavailable": "Tsy azo sokafana ny fangatahana fampiraisana",

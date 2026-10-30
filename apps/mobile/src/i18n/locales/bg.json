@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Заявка за сливане",
       "mergeRequest": "Merge заявка",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge заявка !{{number}}",
       "shareMergeRequest": "Сподели merge заявка",
       "viewOnProvider": "Преглед в {{provider}}",
       "mergeRequestUnavailable": "Merge заявката е недостъпна",

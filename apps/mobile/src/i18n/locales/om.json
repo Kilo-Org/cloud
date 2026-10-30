@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Gaaffii walitti makuu",
       "mergeRequest": "Gaaffii walitti makuu",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Gaaffii walitti makuu !{{number}}",
       "shareMergeRequest": "Gaaffii walitti makuu qoodi",
       "viewOnProvider": "{{provider}} irratti ilaali",
       "mergeRequestUnavailable": "Gaaffiin walitti makuu hin argamu",

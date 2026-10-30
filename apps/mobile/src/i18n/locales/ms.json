@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Permintaan gabungan",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Permintaan gabungan !{{number}}",
       "shareMergeRequest": "Kongsi permintaan gabungan",
       "viewOnProvider": "Lihat pada {{provider}}",
       "mergeRequestUnavailable": "Permintaan gabungan tidak tersedia",

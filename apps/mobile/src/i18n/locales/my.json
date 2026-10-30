@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Merge request ကို မျှဝေပါ",
       "viewOnProvider": "{{provider}} တွင် ကြည့်ရန်",
       "mergeRequestUnavailable": "Merge request မရနိုင်ပါ",

@@ -3156,7 +3156,7 @@
     "terms": {
       "pullRequest": "Pull-Request",
       "mergeRequest": "Merge-Request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge-Request !{{number}}",
       "shareMergeRequest": "Merge-Request teilen",
       "viewOnProvider": "Auf {{provider}} ansehen",
       "mergeRequestUnavailable": "Merge-Request nicht verfügbar",

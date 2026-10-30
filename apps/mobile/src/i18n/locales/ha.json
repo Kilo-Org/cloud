@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "Buƙatar haɗa canje-canje",
       "mergeRequest": "Buƙatar haɗawa",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Buƙatar haɗawa !{{number}}",
       "shareMergeRequest": "Raba buƙatar haɗawa",
       "viewOnProvider": "Duba a {{provider}}",
       "mergeRequestUnavailable": "Buƙatar haɗawa ba ta samuwa",

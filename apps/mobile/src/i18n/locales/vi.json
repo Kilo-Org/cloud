@@ -3156,7 +3156,7 @@
     "terms": {
       "pullRequest": "Yêu cầu hợp nhất",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Chia sẻ merge request",
       "viewOnProvider": "Xem trên {{provider}}",
       "mergeRequestUnavailable": "Không thể truy cập merge request",

@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "ਪੁੱਲ ਰਿਕਵੈਸਟ",
       "mergeRequest": "ਮਰਜ਼ ਰਿਕਵੈਸਟ",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "ਮਰਜ਼ ਰਿਕਵੈਸਟ !{{number}}",
       "shareMergeRequest": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਸਾਂਝੀ ਕਰੋ",
       "viewOnProvider": "{{provider}} ਉੱਤੇ ਵੇਖੋ",
       "mergeRequestUnavailable": "ਮਰਜ਼ ਰਿਕਵੈਸਟ ਉਪਲਬਧ ਨਹੀਂ",

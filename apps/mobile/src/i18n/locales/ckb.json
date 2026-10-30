@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "داواکاری یەکخستن",
       "mergeRequest": "داواکاری تێکەڵکردن",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "داواکاری تێکەڵکردن !{{number}}",
       "shareMergeRequest": "داواکارییەکەی تێکەڵکردن هاوبەش بکە",
       "viewOnProvider": "بینین لە {{provider}}",
       "mergeRequestUnavailable": "داواکاری تێکەڵکردن بەردەست نییە",

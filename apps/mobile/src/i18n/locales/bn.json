@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "পুল রিকোয়েস্ট",
       "mergeRequest": "মার্জ রিকোয়েস্ট",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "মার্জ রিকোয়েস্ট !{{number}}",
       "shareMergeRequest": "মার্জ রিকোয়েস্ট শেয়ার করুন",
       "viewOnProvider": "{{provider}}-এ দেখুন",
       "mergeRequestUnavailable": "মার্জ রিকোয়েস্ট পাওয়া যাচ্ছে না",

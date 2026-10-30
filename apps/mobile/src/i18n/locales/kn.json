@@ -815,7 +815,7 @@
     "terms": {
       "pullRequest": "ಪುಲ್ ರಿಕ್ವೆಸ್ಟ್",
       "mergeRequest": "ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ !{{number}}",
       "shareMergeRequest": "ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಹಂಚಿ",
       "viewOnProvider": "{{provider}}ನಲ್ಲಿ ವೀಕ್ಷಿಸಿ",
       "mergeRequestUnavailable": "ಮರ್ಜ್ ರಿಕ್ವೆಸ್ಟ್ ಲಭ್ಯವಿಲ್ಲ",

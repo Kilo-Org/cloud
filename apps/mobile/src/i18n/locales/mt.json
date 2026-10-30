@@ -872,7 +872,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Aqsam il-merge request",
       "viewOnProvider": "Ara fuq {{provider}}",
       "mergeRequestUnavailable": "Il-merge request mhux disponibbli",

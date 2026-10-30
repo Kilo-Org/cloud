@@ -3156,7 +3156,7 @@
     "terms": {
       "pullRequest": "PR",
       "mergeRequest": "Merge request",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge request !{{number}}",
       "shareMergeRequest": "Bagikan merge request",
       "viewOnProvider": "Lihat di {{provider}}",
       "mergeRequestUnavailable": "Merge request tidak tersedia",

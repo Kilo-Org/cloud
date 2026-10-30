@@ -3242,7 +3242,7 @@
     "terms": {
       "pullRequest": "Запит на злиття",
       "mergeRequest": "Merge-запит",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Merge-запит !{{number}}",
       "shareMergeRequest": "Поділитися merge-запитом",
       "viewOnProvider": "Відкрити в {{provider}}",
       "mergeRequestUnavailable": "Merge-запит недоступний",

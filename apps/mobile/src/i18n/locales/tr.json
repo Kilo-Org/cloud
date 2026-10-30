@@ -3156,7 +3156,7 @@
     "terms": {
       "pullRequest": "Çekme isteği",
       "mergeRequest": "Birleştirme isteği",
-      "mergeRequestNumber": "!{{number}}",
+      "mergeRequestNumber": "Birleştirme isteği !{{number}}",
       "shareMergeRequest": "Birleştirme isteğini paylaş",
       "viewOnProvider": "{{provider}} üzerinde görüntüle",
       "mergeRequestUnavailable": "Birleştirme isteği kullanılamıyor",

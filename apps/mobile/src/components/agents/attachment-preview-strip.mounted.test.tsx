@@ -11,6 +11,8 @@ import {
 } from '@/lib/share-remote-file';
 
 import { type AgentAttachment } from '@/lib/agent-attachments/use-agent-attachment-upload';
+import type * as AttachmentChipDescription from '@/components/agents/attachment-chip-description';
+import { describeAttachmentChip } from '@/components/agents/attachment-chip-description';
 import { AttachmentPreviewStrip, dragTargetIndex } from './attachment-preview-strip';
 
 const expoFileSystemMock = vi.hoisted(() => {
@@ -77,6 +79,12 @@ const a11yMock = vi.hoisted(() => ({
   requestA11yFocus: vi.fn(),
 }));
 
+// The chip describes itself in its render body, so the call count is a direct
+// probe of whether the memoized chip rendered again.
+vi.mock('@/components/agents/attachment-chip-description', async importOriginal => {
+  const actual = await importOriginal<typeof AttachmentChipDescription>();
+  return { describeAttachmentChip: vi.fn(actual.describeAttachmentChip) };
+});
 vi.mock('@/components/centered-state', () => ({ CenteredState: 'CenteredState' }));
 vi.mock('@/components/centered-state-surface', () => ({ StateSurface: 'View' }));
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
@@ -1188,26 +1196,25 @@ describe('AttachmentPreviewStrip — chip render stability', () => {
     renderer.unmount();
   });
 
-  it('dispatches a chip control to the render-current handler', async () => {
+  it('dispatches a chip control to the render-current handler while the chip stays memoized out', async () => {
     const first = vi.fn<() => void>();
     const second = vi.fn<() => void>();
-    const renderer = await mount(
-      [makeAttachment({ status: 'error', terminal: false, progress: null })],
-      {
-        onRetry: first,
-      }
-    );
+    // The same attachment object on both renders: every chip prop is unchanged,
+    // so `memo` skips the chip's render body and only the caller's control is
+    // new — the case a chip that re-read its controls would miss.
+    const attachment = makeAttachment({ status: 'error', terminal: false, progress: null });
+    const renderer = await mount([attachment], { onRetry: first });
+    const rendersBefore = vi.mocked(describeAttachmentChip).mock.calls.length;
 
-    // The hook rebuilds its controls on every attachment change; a memoized chip
-    // must not keep calling the handler it mounted with.
     await act(async () => {
       await Promise.resolve();
-      renderer.update(
-        stripElement([makeAttachment({ status: 'error', terminal: false, progress: null })], {
-          onRetry: second,
-        })
-      );
+      renderer.update(stripElement([attachment], { onRetry: second }));
     });
+
+    // The chip body did not run again, so the control it dispatches through is
+    // the strip's stable dispatcher reading the current handler, not a prop it
+    // captured at mount.
+    expect(vi.mocked(describeAttachmentChip).mock.calls.length).toBe(rendersBefore);
 
     const retry = pressableByLabel(renderer.root, 'Retry uploading doc.pdf');
     if (!retry) {

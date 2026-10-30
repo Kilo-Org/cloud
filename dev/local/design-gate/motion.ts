@@ -249,6 +249,7 @@ export type MotionResult = {
   note?: string;
   segments: MotionSegment[];
   findings: Finding[];
+  samplingTruncated: boolean;
 };
 
 const PRESS_FAILURES: Record<string, true> = { 'not-found': true, 'not-pressable': true };
@@ -295,6 +296,11 @@ export async function runMotion(
   if (sampling === undefined) throw new InfraError('Sampling stopped without a layout series');
   const { samples, truncated } = sampling;
   writeJson(path.join(ctx.out, 'motion-timeline.json'), { samples, truncated });
+  if (truncated) {
+    ctx.log(
+      'design-gate: the interaction series kept only its newest layouts; older samples were dropped'
+    );
+  }
   const timeline = expandSamples(samples);
   const findings = checkShift(timeline.map(normalize), SAMPLE_INTERVAL_MS).map(finding => ({
     ...finding,
@@ -320,6 +326,7 @@ export async function runMotion(
     note,
     segments,
     findings,
+    samplingTruncated: truncated,
   };
   writeJson(path.join(ctx.out, 'motion.json'), {
     version: 1,

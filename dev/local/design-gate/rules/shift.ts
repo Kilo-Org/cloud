@@ -41,12 +41,15 @@ function movedWithAncestor(
     const before = previous.get(parent.structuralPath);
     const after = current.get(parent.structuralPath);
     if (before === undefined || after === undefined) continue;
-    if (
+    const shared =
       Math.abs(after[0] - before[0] - dx) <= TOLERANCE_DP &&
-      Math.abs(after[1] - before[1] - dy) <= TOLERANCE_DP
-    ) {
-      return true;
-    }
+      Math.abs(after[1] - before[1] - dy) <= TOLERANCE_DP;
+    if (!shared) continue;
+    // A rigid translation leaves every box the same size; content that appears or leaves resizes one.
+    const resized =
+      Math.abs(after[2] - before[2]) > TOLERANCE_DP ||
+      Math.abs(after[3] - before[3]) > TOLERANCE_DP;
+    return !resized;
   }
   return false;
 }
@@ -126,9 +129,23 @@ export function checkShift(timeline: readonly LayoutTree[], intervalMs: number):
     });
     return new Map(unique);
   });
-  const geometry = timeline.map(
-    tree => new Map(tree.nodes.map(node => [node.structuralPath, node.rect] as const))
-  );
+  // Only ancestors of tracked elements are compared, so the per-sample map stays small.
+  const ancestorPaths = new Set<string>();
+  for (const nodes of byKey) {
+    for (const node of nodes.values()) {
+      const segments = node.structuralPath.split('/');
+      for (let end = 1; end < segments.length; end += 1) {
+        ancestorPaths.add(segments.slice(0, end).join('/'));
+      }
+    }
+  }
+  const geometry = timeline.map(tree => {
+    const rects = new Map<string, Rect>();
+    for (const node of tree.nodes) {
+      if (ancestorPaths.has(node.structuralPath)) rects.set(node.structuralPath, node.rect);
+    }
+    return rects;
+  });
   const shifts = [...new Set(byKey.flatMap(nodes => [...nodes.keys()]))].flatMap(key => {
     const shift = largestShift(
       byKey,

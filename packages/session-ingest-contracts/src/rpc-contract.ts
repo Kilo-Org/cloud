@@ -466,12 +466,8 @@ export function decodeCloudAgentWorkspacesCursor(cursor: string): CloudAgentWork
   if (!/^[A-Za-z0-9_-]{1,256}$/.test(cursor)) {
     throw new Error('Invalid Cloud Agent workspaces cursor');
   }
-  const base64 = cursor.replace(/-/g, '+').replace(/_/g, '/');
-  const paddingLength = (4 - (base64.length % 4)) % 4;
-  const binary = atob(base64 + '='.repeat(paddingLength));
-  const bytes = Uint8Array.from(binary, character => character.charCodeAt(0));
   const parsed = cloudAgentWorkspacesCursorSchema.parse(
-    JSON.parse(new TextDecoder('utf-8', { fatal: true, ignoreBOM: false }).decode(bytes))
+    JSON.parse(decodeBase64Url(cursor, { fatalUtf8: true }))
   );
   if (encodeBase64Url(JSON.stringify(parsed)) !== cursor) {
     throw new Error('Invalid Cloud Agent workspaces cursor');

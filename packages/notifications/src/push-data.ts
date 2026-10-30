@@ -15,6 +15,7 @@ import {
   sessionLivePlanSchema,
   sessionLiveStepSchema,
 } from './session-live-content';
+import { refineSpendAlertScope } from './spend-alert-scope';
 
 const nonEmptyStringSchema = z.string().min(1);
 
@@ -124,22 +125,7 @@ export const pushDataSchema = z.discriminatedUnion('type', [
       scope: z.enum(['personal', 'organization']),
       organizationId: nonEmptyStringSchema.optional(),
     })
-    .superRefine((data, ctx) => {
-      if (data.scope === 'organization' && data.organizationId === undefined) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['organizationId'],
-          message: 'an organization-scope alert names its organization',
-        });
-      }
-      if (data.scope === 'personal' && data.organizationId !== undefined) {
-        ctx.addIssue({
-          code: 'custom',
-          path: ['organizationId'],
-          message: 'a personal-scope alert carries no organization id',
-        });
-      }
-    }),
+    .superRefine(refineSpendAlertScope),
   z.object({
     type: z.literal('security_finding'),
     findingId: nonEmptyStringSchema,

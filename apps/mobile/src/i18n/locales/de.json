@@ -42,7 +42,7 @@
     "mergeRequest": "Merge-Request",
     "notConnected": "Nicht verbunden",
     "notifications": "Benachrichtigungen",
-    "pullRequest": "pull-Request",
+    "pullRequest": "Pull-Request",
     "repositories": "Code-Repositories",
     "securityAgent": "Sicherheitsagent",
     "unknown": "Unbekannt",
@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Änderungen",
-    "organizationTrialEnded": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Ein Inhaber der Organisation kann die Abrechnung unter kilo.ai aktualisieren und es dann erneut versuchen."
+    "organizationTrialEnded": "Die Testphase der Organisation ist beendet und sie hat keinen aktiven Plan. Ein Inhaber der Organisation kann die Abrechnung unter kilo.ai aktualisieren und es dann erneut versuchen.",
+    "privateRepositoryA11y": "{{name}}, privates Repository"
   },
   "language": {
     "restarting": "Neustart zum Übernehmen der Sprache",
@@ -1030,12 +1031,12 @@
       "proposalDetails": "Vorschlagsdetails",
       "proposalTitle": "Vorschlagstitel",
       "rationale": "Begründung",
-      "saveFirst": "Speichere deine Änderungen, bevor du einen Pull Request öffnest.",
+      "saveFirst": "Speichere deine Änderungen, bevor du einen Pull-Request öffnest.",
       "proposalSaved": "Vorschlag gespeichert",
       "proposalDismissed": "Vorschlag verworfen",
       "dismissProposalTitle": "Vorschlag verwerfen?",
       "dismissProposalMessage": "Dieser Vorschlag wird aus der Liste der aktiven Vorschläge entfernt und kann nicht wiederhergestellt werden.",
-      "prOpened": "Pull Request für REVIEW.md geöffnet",
+      "prOpened": "Pull-Request für REVIEW.md geöffnet",
       "alreadyPresent": "Die Richtlinien sind bereits in REVIEW.md vorhanden",
       "status": {
         "edited": "Bearbeitet",
@@ -1044,6 +1045,12 @@
         "superseded": "Bereits vorhanden"
       },
       "noProposalsDescription": "Hier erscheinen Vorschläge zu den gespeicherten Prüfhinweisen, sobald Kilo die Antworten der Projektverantwortlichen analysiert hat.",
+      "changeRequestInProgress": "Kilo öffnet bereits einen Pull-Request für diesen Vorschlag. Versuche es gleich noch einmal.",
+      "changeRequestNotActionable": "Dieser Vorschlag kann nicht mehr genehmigt werden. Schließe ihn und aktualisiere die Liste.",
+      "changeRequestNoGitHubAccess": "Keine GitHub-Verbindung hat Zugriff auf dieses Repository. Verbinde GitHub erneut mit Zugriff darauf und versuche es dann noch einmal.",
+      "changeRequestMissingPermissions": "Kilos GitHub App kann in diesem Repository keine Pull-Requests öffnen. Ein Repository-Inhaber muss der App Schreibzugriff auf Inhalte und Pull-Requests geben und es dann noch einmal versuchen.",
+      "changeRequestFailed": "Kilo konnte den Pull-Request nicht öffnen. Versuche es gleich noch einmal.",
+      "offAction": "Gespeicherte Prüfhinweise sind deaktiviert. Aktiviere sie und versuche es dann erneut.",
       "off": "Gespeicherte Prüfhinweise sind deaktiviert.",
       "on": "Gespeicherte Prüfhinweise sind aktiviert.",
       "offDescription": "Aktiviere sie, damit Kilo aus den Antworten der Projektverantwortlichen lernt und Richtlinien für REVIEW.md vorschlägt.",
@@ -1464,6 +1471,7 @@
     },
     "settingsSave": {
       "saveChanges": "Änderungen speichern",
+      "saved": "Einstellungen gespeichert",
       "unsavedMessage": "Möchtest du deine Änderungen speichern, bevor du diesen Bildschirm verlässt?",
       "unsavedInvalidMessage": "Diese Änderungen können noch nicht gespeichert werden. Behebe sie, um zu speichern, oder verwirf sie, um den Bildschirm zu verlassen.",
       "unsavedTitle": "Ungespeicherte Änderungen"
@@ -1650,7 +1658,7 @@
       "dollar_other": "Dollar",
       "costSpoken": "kostet {{cost}}",
       "costSpokenWithTime": "kostet {{cost}}, {{time}}",
-      "pullRequest": "pull-Request {{number}}",
+      "pullRequest": "Pull-Request {{number}}",
       "spokenJoiner": ","
     },
     "githubInstall": {
@@ -1785,6 +1793,8 @@
       "couldNotLoadEnvironment": "Deine Umgebung konnte nicht geladen werden.",
       "retryLoadingEnvironment": "Umgebung erneut laden",
       "defaultEnvironment": "Standardumgebung",
+      "environmentAccessibility": "Wähle ein Profil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Wähle ein Profil: {{label}}. {{attention}}",
       "leaveChanges": "Änderungen beibehalten",
       "commitAndPush": "Committen und pushen",
       "startSession": "Sitzung starten",
@@ -1819,7 +1829,7 @@
       "manageProfiles": "Profile verwalten",
       "noProfiles": "Noch keine Profile. Erstelle eins, um Umgebungsvariablen, MCP-Server und Fähigkeiten hinzuzufügen.",
       "advancedConfig": "Erweiterte Konfiguration",
-      "advancedConfigDescription": "Wähle ein Profil aus, um gespeicherte Konfigurationen zu laden und zusätzliche Umgebungsvariablen und Setup-Befehle manuell zu konfigurieren",
+      "advancedConfigDescription": "Gilt für diese Sitzung. Als Profil gespeichert bleibt sie für das nächste Mal erhalten.",
       "saveAsProfile": "Als Profil speichern",
       "saveProfileDescription": "Speichere die aktuellen Umgebungsvariablen und Setup-Befehle als wiederverwendbares Profil.",
       "profileSummary": "{{vars}} Umgebungsvariablen · {{commands}} Setup-Befehle",
@@ -2337,10 +2347,10 @@
       "unavailable": "Diese Sitzung kann keine Berechtigungsanfragen empfangen."
     },
     "prBadge": {
-      "open": "pull-Request öffnen",
+      "open": "Pull-Request öffnen",
       "closed": "geschlossener Pull-Request",
       "merged": "zusammengeführter Pull-Request",
-      "draft": "pull-Request-Entwurf",
+      "draft": "Pull-Request-Entwurf",
       "updating": "Wird aktualisiert, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2447,7 +2457,9 @@
     "permissionDescription": "Du hast keine Berechtigung, diesen Inhalt anzusehen.",
     "notFoundDescription": "Dieses Element wurde möglicherweise entfernt oder ist nicht mehr verfügbar.",
     "serverTitle": "Die Daten konnten nicht geladen werden.",
-    "serverDescription": "Bei uns ist ein Fehler aufgetreten. Bitte versuche es erneut."
+    "serverDescription": "Bei uns ist ein Fehler aufgetreten. Bitte versuche es erneut.",
+    "timeoutTitle": "Der Server braucht zu lange",
+    "timeoutDescription": "Die Anfrage wurde nicht rechtzeitig abgeschlossen. Bitte versuche es erneut."
   },
   "screenHeader": {
     "openMenu": "Menü öffnen",
@@ -2905,6 +2917,11 @@
     },
     "inbox": {
       "couldNotLoad": "Der Posteingang konnte nicht geladen werden.",
+      "accessLostTitle": "Kein Zugriff auf diese Organisation",
+      "accessLostDescription": "Du bist kein Mitglied dieser Organisation mehr, deshalb können ihre Review-Anfragen nicht geladen werden. Fahre in deinem persönlichen Account fort, um weiter zu reviewen.",
+      "organizationUnavailableTitle": "Diese Organisation existiert nicht mehr",
+      "organizationUnavailableDescription": "Diese Organisation wurde gelöscht, deshalb können ihre Review-Anfragen nicht geladen werden. Fahre in deinem persönlichen Account fort, um weiter zu reviewen.",
+      "continueInPersonal": "Im persönlichen Account fortfahren",
       "loading": "Posteingang wird geladen",
       "noReviewRequests": "Keine Review-Anfragen",
       "noReviewRequestsDescription": "Hier erscheinen Pull-Requests, die auf dein Review warten. Du kannst oben auch einen beliebigen PR-Link einfügen.",
@@ -3413,7 +3430,7 @@
     "filesChanged": "Dateien geändert",
     "finishedIn": "Fertig in",
     "noActivityFor": "Keine Aktivität seit",
-    "prOpened": "Pull Request geöffnet",
+    "prOpened": "Pull-Request geöffnet",
     "permissionWants": "Möchte ausführen",
     "failure": {
       "provider": "Gestoppt: Anbieterfehler",
@@ -3824,7 +3841,9 @@
     "commandsTitle": "Setup-Befehle",
     "addCommand": "Befehl hinzufügen",
     "commandLabel": "Befehl",
+    "commandLabelPosition": "Befehl {{position}}",
     "commandPlaceholder": "z. B. pnpm install",
+    "commandAtLimit": "Der Befehl ist auf {{max}} Zeichen beschränkt",
     "commandsEmpty": "Noch keine Setup-Befehle",
     "commandsSaveFailed": "Setup-Befehle konnten nicht gespeichert werden",
     "moveUp": "Nach oben verschieben",
@@ -3842,6 +3861,7 @@
     "skillSaveFailed": "Fertigkeit konnte nicht gespeichert werden",
     "skillSourceCustom": "Benutzerdefiniert",
     "skillSourceMarketplace": "Marktplatz",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Füge eine SKILL.md ein und der Name wird ausgefüllt. Füge einen Skill von deinem Telefon aus ohne Drag & Drop hinzu.",
     "skillEditTitle": "Fertigkeit bearbeiten",
     "skillEdit": "Fertigkeit {{name}} bearbeiten",
@@ -3868,6 +3888,7 @@
       "headersHint": "Als •••• angezeigte Werte behalten ihr gespeichertes Geheimnis; ersetze einen Wert, um ihn zu rotieren. Eine Änderung der URL erfordert erneut alle Werte",
       "nameRequired": "Gib einen Servernamen ein",
       "nameInvalid": "Der Name darf nur ASCII-Buchstaben, Zahlen, Unterstriche und Bindestriche enthalten, höchstens 100 Zeichen",
+      "nameConflict": "Ein Server mit diesem Namen existiert bereits",
       "commandRequired": "Gib einen Befehl ein",
       "commandTooLong": "Verwende höchstens 50 Argumente mit je 500 Zeichen",
       "urlRequired": "Gib eine URL ein",
@@ -3948,7 +3969,6 @@
       "repo": "Repository auswählen…",
       "profile": "Profil auswählen",
       "remove": "Lösen",
-      "private": "Privat",
       "search": "Repositories durchsuchen…",
       "addedToast": "Standardprofil für „{{repo}}“ festgelegt",
       "addFailed": "Das Standardprofil konnte nicht festgelegt werden",

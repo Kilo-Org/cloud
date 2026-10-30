@@ -19,11 +19,11 @@ export type TestSkill = {
   rawMarkdown: string;
 };
 
-/** The profile detail the mocked `useAgentProfile` returns. */
-export type TestProfileDetail = { id: string; skills: TestSkill[] };
+/** The skill list the mocked `useAgentProfileSkills` returns. */
+export type TestSkills = TestSkill[];
 
-export function testProfile(skills: TestSkill[] = []): TestProfileDetail {
-  return { id: 'profile-1', skills };
+export function testSkills(skills: TestSkill[] = []): TestSkills {
+  return skills;
 }
 
 export function testSkill(overrides: Partial<TestSkill> = {}): TestSkill {

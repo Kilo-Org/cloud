@@ -133,6 +133,30 @@ describe('validateMeasuredShareFiles', () => {
     }
   });
 
+  it('invisible-only text is not usable, matching the composer send gate', () => {
+    const withRejectedFile = validateMeasuredShareFiles({
+      text: '\u200B\u200B\n',
+      files: [file('evil.exe', 10)],
+    });
+    expect(withRejectedFile.kind).toBe('all-rejected');
+
+    const alone = validateMeasuredShareFiles({ text: '\u200B\u200B', files: [] });
+    expect(alone.kind).toBe('all-rejected');
+    if (alone.kind === 'all-rejected') {
+      expect(alone.message).toBe('Nothing to share — no text or files were included.');
+    }
+
+    const withFile = validateMeasuredShareFiles({
+      text: '\u200B\u200B',
+      files: [file('good.png', 100)],
+    });
+    expect(withFile.kind).toBe('ok');
+    if (withFile.kind === 'ok') {
+      expect(withFile.usable).toBe(true);
+      expect(withFile.accepted.map(f => f.name)).toEqual(['good.png']);
+    }
+  });
+
   it('single rejection keeps describeClassificationFailure copy', () => {
     const result = validateMeasuredShareFiles({
       text: '',

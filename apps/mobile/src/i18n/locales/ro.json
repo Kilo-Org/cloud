@@ -42,7 +42,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Neconectat",
     "notifications": "Notificări",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Depozite de cod",
     "securityAgent": "Agent de securitate",
     "unknown": "Necunoscut",
@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Modificări",
-    "organizationTrialEnded": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Un proprietar al organizației poate actualiza facturarea pe kilo.ai, apoi poate încerca din nou."
+    "organizationTrialEnded": "Perioada de probă a organizației s-a încheiat și nu are un plan activ. Un proprietar al organizației poate actualiza facturarea pe kilo.ai, apoi poate încerca din nou.",
+    "privateRepositoryA11y": "{{name}}, repository privat"
   },
   "language": {
     "restarting": "Se repornește aplicația pentru a schimba limba",
@@ -659,7 +660,12 @@
       "loading": "Se încarcă cererile primite",
       "noReviewRequests": "Nicio cerere de revizuire",
       "noReviewRequestsDescription": "Aici apar PR-urile care așteaptă revizuirea ta. Poți lipi mai sus și o legătură către orice alt PR.",
-      "couldNotLoad": "Nu s-au putut încărca cererile primite."
+      "couldNotLoad": "Nu s-au putut încărca cererile primite.",
+      "accessLostTitle": "Nu ai acces la această organizație",
+      "accessLostDescription": "Nu mai ești membru al acestei organizații, așa că cererile sale de revizuire nu se pot încărca. Continuă în contul personal pentru a continua revizuirile.",
+      "organizationUnavailableTitle": "Această organizație nu mai există",
+      "organizationUnavailableDescription": "Această organizație a fost ștearsă, așa că cererile sale de revizuire nu se pot încărca. Continuă în contul personal pentru a continua revizuirile.",
+      "continueInPersonal": "Continuă în contul personal"
     },
     "composer": {
       "commentBodyPlaceholder": "Comentariul tău",
@@ -760,7 +766,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Editează comentariul depășit, aflat în așteptare, de la {{location}}",
       "editA11y": "Editează comentariul în așteptare de la {{location}}",
-      "staleHint": "pR-ul s-a modificat de când ai scris acest comentariu.",
+      "staleHint": "PR-ul s-a modificat de când ai scris acest comentariu.",
       "deleteA11y": "Șterge comentariul în așteptare de la {{location}}",
       "deletedAnnouncement": "Comentariu în așteptare șters",
       "noCommentsQueued": "Nu există comentarii în așteptare. Revizuirea va fi trimisă doar cu tipul selectat mai sus.",
@@ -1535,7 +1541,13 @@
         "change_request_failed": "Deschiderea PR-ului a eșuat",
         "superseded": "Există deja"
       },
-      "noProposalsDescription": "Propunerile memoriei de revizuire apar aici după ce Kilo analizează răspunsurile responsabililor de proiect."
+      "noProposalsDescription": "Propunerile memoriei de revizuire apar aici după ce Kilo analizează răspunsurile responsabililor de proiect.",
+      "changeRequestInProgress": "Kilo deschide deja un pull request pentru această propunere. Încearcă din nou în câteva momente.",
+      "changeRequestNotActionable": "Această propunere nu mai poate fi aprobată. Închide-o și reîncarcă lista.",
+      "changeRequestNoGitHubAccess": "Nicio conexiune GitHub nu are acces la acest depozit. Reconectează GitHub cu acces la acest depozit, apoi încearcă din nou.",
+      "changeRequestMissingPermissions": "Aplicația GitHub a Kilo nu poate deschide pull request-uri în acest depozit. Un proprietar al depozitului trebuie să acorde aplicației acces de scriere la conținut și la pull request-uri, apoi încearcă din nou.",
+      "changeRequestFailed": "Kilo nu a putut deschide pull request-ul. Încearcă din nou în câteva momente.",
+      "offAction": "Memoria de revizuire este dezactivată. Activeaz-o, apoi încearcă din nou."
     },
     "manualReview": {
       "title": "Revizuire manuală",
@@ -1958,6 +1970,7 @@
     },
     "settingsSave": {
       "saveChanges": "Salvează modificările",
+      "saved": "Setări salvate",
       "unsavedTitle": "Modificări nesalvate",
       "unsavedMessage": "Salvezi modificările înainte de a părăsi acest ecran?",
       "unsavedInvalidMessage": "Aceste modificări nu pot fi încă salvate. Corectează-le pentru a salva sau renunță la ele pentru a pleca."
@@ -2205,7 +2218,7 @@
       "dollar_few": "dolari",
       "costSpoken": "cost de {{cost}}",
       "costSpokenWithTime": "costul este {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}",
+      "pullRequest": "PR {{number}}",
       "spokenJoiner": "și"
     },
     "githubInstall": {
@@ -2340,6 +2353,8 @@
       "couldNotLoadEnvironment": "Nu s-a putut încărca mediul tău.",
       "retryLoadingEnvironment": "Reîncearcă încărcarea mediului",
       "defaultEnvironment": "Mediu implicit",
+      "environmentAccessibility": "Alegeți un profil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Alegeți un profil: {{label}}. {{attention}}",
       "leaveChanges": "Păstrează modificările",
       "commitAndPush": "Fă commit și trimite",
       "startSession": "Începe sesiunea",
@@ -2374,7 +2389,7 @@
       "manageProfiles": "Gestionați profilurile",
       "noProfiles": "Niciun profil încă. Creați unul pentru a adăuga variabile de mediu, servere MCP și abilități.",
       "advancedConfig": "Configurare avansată",
-      "advancedConfigDescription": "Selectați un profil pentru a încărca configurațiile salvate și configurați manual variabilele de mediu suplimentare și comenzile de configurare",
+      "advancedConfigDescription": "Se aplică acestei sesiuni. Salvarea ca profil îl păstrează pentru data viitoare.",
       "saveAsProfile": "Salvați ca profil",
       "saveProfileDescription": "Salvați variabilele de mediu curente și setați comenzile ca profil reutilizabil.",
       "profileSummary": "{{vars}} variabile de mediu · {{commands}} comenzi de configurare",
@@ -2903,9 +2918,9 @@
     },
     "prBadge": {
       "open": "deschidere PR",
-      "closed": "pR închis",
-      "merged": "pR integrat",
-      "draft": "pR în stadiu de ciornă",
+      "closed": "PR închis",
+      "merged": "PR integrat",
+      "draft": "PR în stadiu de ciornă",
       "updating": "Se actualizează, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -3013,7 +3028,9 @@
     "permissionDescription": "Nu ai permisiunea să vizualizezi acest conținut.",
     "notFoundDescription": "Este posibil ca acest element să fi fost eliminat sau să nu mai fie disponibil.",
     "serverTitle": "Nu s-au putut încărca datele.",
-    "serverDescription": "A apărut o problemă pe server. Încearcă din nou."
+    "serverDescription": "A apărut o problemă pe server. Încearcă din nou.",
+    "timeoutTitle": "Serverul răspunde prea încet",
+    "timeoutDescription": "Cererea a expirat înainte de a se finaliza. Încearcă din nou."
   },
   "screenHeader": {
     "openMenu": "Deschide meniul",
@@ -3874,7 +3891,9 @@
     "commandsTitle": "Configurați comenzi",
     "addCommand": "Adăugați comanda",
     "commandLabel": "Comanda",
+    "commandLabelPosition": "Comanda {{position}}",
     "commandPlaceholder": "de ex. pnpm install",
+    "commandAtLimit": "Comanda este limitată la {{max}} caractere",
     "commandsEmpty": "Încă nu există comenzi de configurare",
     "commandsSaveFailed": "Comenzile de configurare nu au putut fi salvate",
     "moveUp": "Mișcă-te în sus",
@@ -3892,6 +3911,7 @@
     "skillSaveFailed": "Nu s-a putut salva calificarea",
     "skillSourceCustom": "Personalizat",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Lipiți un SKILL.md și numele acestuia se completează; adăugați o abilitate de pe telefon fără glisare și plasare.",
     "skillEditTitle": "Editați abilitate",
     "skillEdit": "Editați abilitatea {{name}}",
@@ -3908,7 +3928,7 @@
       "url": "URL",
       "environment": "Mediu (JSON)",
       "headers": "Anteturi (JSON)",
-      "timeout": "Pauză",
+      "timeout": "Timeout",
       "secretCount_one": "{{count}} secret",
       "secretCount_few": "{{count}} secrete",
       "secretCount_other": "{{count}} secrete",
@@ -3919,6 +3939,7 @@
       "headersHint": "Valorile afișate ca •••• își păstrează secretul stocat; înlocuiți o valoare pentru a o rota. Modificarea URL-ului necesită din nou toate valorile",
       "nameRequired": "Introduceți un nume de server",
       "nameInvalid": "Numele poate folosi numai litere ASCII, cifre, litere de subliniere și liniuțe, până la 100 de caractere",
+      "nameConflict": "Există deja un server MCP cu acest nume",
       "commandRequired": "Introduceți o comandă",
       "commandTooLong": "Folosiți cel mult 50 de argumente de 500 de caractere fiecare",
       "urlRequired": "Introduceți o adresă URL",
@@ -3938,7 +3959,7 @@
       "add": "Adăugați agent",
       "empty": "Încă nu există agenți",
       "name": "Numele agentului",
-      "slug": "Agent melc",
+      "slug": "Agent slug",
       "description": "Descrierea agentului",
       "model": "Anularea modelului",
       "modelPlaceholder": "Utilizați sesiunea implicită",
@@ -3963,7 +3984,7 @@
       "saveFailed": "Agentul nu a putut fi salvat",
       "deleteFailed": "Agentul nu a putut fi șters",
       "nameRequired": "Introduceți un nume de agent",
-      "slugRequired": "Introduceți un melc de agent",
+      "slugRequired": "Introduceți un slug de agent",
       "slugInvalid": "Slug trebuie să înceapă cu o literă mică ASCII și să folosească numai litere mici ASCII, cifre și liniuțe, până la 50 de caractere",
       "slugConflict": "Acel slug este deja folosit de un agent integrat sau de un alt agent din acest profil",
       "edit": "Editați agentul {{name}}",
@@ -3999,7 +4020,6 @@
       "repo": "Selectați depozitul...",
       "profile": "Selectați profilul",
       "remove": "Desface",
-      "private": "Privat",
       "search": "Căutați în depozite...",
       "addedToast": "Profil implicit setat pentru „{{repo}}”",
       "addFailed": "Nu s-a putut seta profilul implicit",

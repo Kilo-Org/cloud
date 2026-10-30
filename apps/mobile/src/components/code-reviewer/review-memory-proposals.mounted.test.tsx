@@ -4,6 +4,8 @@ import { QueryClientProvider } from '@tanstack/react-query';
 import { createElement, Fragment, type ReactElement } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
+import { REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY } from '@kilocode/app-shared/code-reviews';
+
 import { ReviewMemoryScreen } from './review-memory-screen';
 import { collectText } from './review-memory-screen.test-helpers';
 import { i18n } from '@/i18n';
@@ -19,6 +21,7 @@ const h = vi.hoisted(() => {
     permission: permission as PermissionState,
     saveFailure: false,
     approveFailure: false,
+    approveFailureMessage: 'Opening unavailable',
     saveGate: null as Promise<undefined> | null,
     list: vi.fn(),
     summary: vi.fn(),
@@ -259,7 +262,9 @@ beforeEach(() => {
     };
     h.rows = [updated];
     if (h.approveFailure) {
-      throw new Error('Opening unavailable');
+      throw Object.assign(new Error(h.approveFailureMessage), {
+        data: { code: 'BAD_REQUEST', message: h.approveFailureMessage },
+      });
     }
     return updated;
   });
@@ -334,10 +339,11 @@ describe('review memory proposal interaction', () => {
     press(button(ui.renderer.root, 'common.save'));
     await waitFor(() =>
       hosts(ui.renderer.root, 'AccessibleStatus').some(
-        node => node.props.message === 'Save unavailable'
+        node => node.props.message === i18n.t('common.somethingWentWrong')
       )
     );
-    expect(h.error).toHaveBeenCalledWith('Save unavailable');
+    expect(collectText(ui.renderer.toJSON())).not.toContain('Save unavailable');
+    expect(h.error).toHaveBeenCalledWith(i18n.t('common.somethingWentWrong'));
     expect(hosts(ui.renderer.root, 'FormField')[0]?.props.defaultValue).toBe(
       'Keep operation context'
     );
@@ -403,16 +409,23 @@ describe('review memory proposal interaction', () => {
 
   it('refreshes failed approval status and allows recovery', async () => {
     h.approveFailure = true;
+    h.approveFailureMessage =
+      REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.missing_github_app_permissions;
     const ui = await mountOpen();
     press(button(ui.renderer.root, 'common.openPullRequest'));
     await waitFor(
       () =>
         hosts(ui.renderer.root, 'AccessibleStatus').some(
-          node => node.props.message === 'Opening unavailable'
+          node =>
+            node.props.message ===
+            i18n.t('codeReviewer.reviewMemory.changeRequestMissingPermissions')
         ) &&
         collectText(ui.renderer.toJSON()).includes(
           i18n.t('codeReviewer.reviewMemory.status.change_request_failed')
         )
+    );
+    expect(collectText(ui.renderer.toJSON())).not.toContain(
+      REVIEW_MEMORY_CHANGE_REQUEST_ERROR_COPY.missing_github_app_permissions
     );
     h.approveFailure = false;
     press(button(ui.renderer.root, 'common.retry'));

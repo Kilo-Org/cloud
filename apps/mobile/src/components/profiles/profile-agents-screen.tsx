@@ -21,7 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import {
   type AgentProfileDetail,
-  useAgentProfile,
+  useAgentProfileAgents,
   useAgentProfileSectionMutations,
 } from '@/lib/hooks/use-agent-profiles';
 import { useCanManageOrganizationProfiles } from '@/lib/hooks/use-can-manage-profiles';
@@ -132,11 +132,11 @@ export function ProfileAgentsScreen({
 }: Readonly<{ profileId: string; organizationId?: string }>) {
   const { t } = useTranslation();
   const { confirm, dialog } = useConfirmDialog();
-  const profileQuery = useAgentProfile(profileId, organizationId);
+  const profileQuery = useAgentProfileAgents(profileId, organizationId);
   const { createAgent, updateAgent, deleteAgent } = useAgentProfileSectionMutations(organizationId);
   const canManage = useCanManageOrganizationProfiles(organizationId);
 
-  const agents = profileQuery.data?.agents ?? NO_AGENTS;
+  const agents = profileQuery.data ?? NO_AGENTS;
   const rows = agentRows(agents);
   // `null` = closed, `{ source: null }` = add, `{ source }` = edit that agent.
   const [form, setForm] = useState<{ source: AgentSource | null } | null>(null);

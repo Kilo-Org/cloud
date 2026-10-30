@@ -2008,6 +2008,11 @@ export async function createSessionWithLedger(
         : {}),
     },
   });
+  // A row admitted in another organization scope belongs to a different
+  // operation, so it is refused before any stored state is honored.
+  if (admission.admission === 'organization_mismatch') {
+    throw new TRPCError({ code: 'CONFLICT', message: 'operation_key_reuse_mismatch' });
+  }
   assertSessionOperationIdentity(admission.row, {
     userId: ctx.userId,
     intent: 'create_cloud',

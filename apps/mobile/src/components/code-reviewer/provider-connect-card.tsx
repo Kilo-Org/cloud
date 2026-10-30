@@ -12,7 +12,10 @@ import { WEB_BASE_URL } from '@/lib/config';
 import { PERSONAL_SCOPE } from '@/lib/hooks/use-code-reviewer';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getGitLabIntegrationUrl } from '@/lib/integration-urls';
-import { openAuthorizationAndWaitForReturn } from '@/lib/pr-review/connect-gate-platform';
+import {
+  openAuthorizationAndWaitForReturn,
+  reportLateLaunchFailure,
+} from '@/lib/pr-review/connect-gate-platform';
 import { trpcClient } from '@/lib/trpc';
 
 const PLATFORM_CONFIG = {
@@ -58,7 +61,14 @@ export function ProviderConnectCard<T>({
         });
         url = getGitHubIntegrationUrl(WEB_BASE_URL, orgId, result.token);
       }
-      await openAuthorizationAndWaitForReturn(url);
+      const wait = await openAuthorizationAndWaitForReturn(url);
+      // A launch that fails after the app's own return edge ended the wait never
+      // reaches the catch below.
+      reportLateLaunchFailure(wait, {
+        onFailure: () => {
+          toast.error(t(errorMessage));
+        },
+      });
       await onConnected();
     } catch {
       toast.error(t(errorMessage));

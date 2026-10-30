@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Àwọn àyípadà",
-    "organizationTrialEnded": "Àkókò ìdánwò àjọ náà ti parí, kò sì ní ètò tó ń ṣiṣẹ́. Ẹnìkan tí ó ni àjọ lè ṣe àtúnṣe ìsanwó ní kilo.ai, kí ó sì tún gbìyànjú."
+    "organizationTrialEnded": "Àkókò ìdánwò àjọ náà ti parí, kò sì ní ètò tó ń ṣiṣẹ́. Ẹnìkan tí ó ni àjọ lè ṣe àtúnṣe ìsanwó ní kilo.ai, kí ó sì tún gbìyànjú.",
+    "privateRepositoryA11y": "{{name}}, ibi ìpamọ́ kòòdù ikọkọ"
   },
   "language": {
     "restarting": "A ń tún bẹ̀rẹ̀ láti lo èdè tí o yàn",
@@ -644,7 +645,12 @@
       "loading": "Ń ṣàkójọ àpótí ìwọlé",
       "noReviewRequests": "Kò sí ìbéèrè àtúnyẹ̀wò",
       "noReviewRequestsDescription": "Àwọn ìbéèrè ìṣọ̀kan tó ń dúró de àtúnyẹ̀wò rẹ yóò hàn níbí. O ṣì lè lẹ ọ̀nà àsopọ̀ PR èyíkéyìí mọ́ lókè.",
-      "couldNotLoad": "A kò lè ṣàkójọ àpótí ìwọlé."
+      "couldNotLoad": "A kò lè ṣàkójọ àpótí ìwọlé.",
+      "accessLostTitle": "Kò sí àṣẹ sí àjọ yìí mọ́",
+      "accessLostDescription": "O kò ṣe ọmọ ẹgbẹ́ àjọ yìí mọ́, nítorí náà a kò lè ṣàkójọ àwọn ìbéèrè àtúnyẹ̀wò rẹ̀. Tẹ̀síwájú nínú àkáńtì ti ara rẹ láti tẹ̀síwájú pẹ̀lú àtúnyẹ̀wò.",
+      "organizationUnavailableTitle": "Àjọ yìí kò sí mọ́",
+      "organizationUnavailableDescription": "A ti pa àjọ yìí rẹ́, nítorí náà a kò lè ṣàkójọ àwọn ìbéèrè àtúnyẹ̀wò rẹ̀. Tẹ̀síwájú nínú àkáńtì ti ara rẹ láti tẹ̀síwájú pẹ̀lú àtúnyẹ̀wò.",
+      "continueInPersonal": "Tẹ̀síwájú nínú àkáńtì ti ara ẹni"
     },
     "composer": {
       "commentBodyPlaceholder": "Àsọyé rẹ",
@@ -742,7 +748,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Ṣàtúnṣe àsọyé àtijọ́ tó ń dúró lórí {{location}}",
       "editA11y": "Ṣàtúnṣe àsọyé tó ń dúró lórí {{location}}",
-      "staleHint": "pR ti yí padà láti ìgbà tí o ti kọ èyí.",
+      "staleHint": "PR ti yí padà láti ìgbà tí o ti kọ èyí.",
       "deleteA11y": "Pa àsọyé tó ń dúró lórí {{location}} rẹ́",
       "deletedAnnouncement": "A ti pa àsọyé tó ń dúró rẹ́",
       "noCommentsQueued": "Kò sí àsọyé tó ń dúró. A ó fi àtúnyẹ̀wò ránṣẹ́ pẹ̀lú ìgbésẹ̀ tó wà lókè nìkan.",
@@ -1513,7 +1519,13 @@
         "change_request_failed": "Ṣíṣí PR kùnà",
         "superseded": "Ó ti wà tẹ́lẹ̀"
       },
-      "noProposalsDescription": "Àwọn àbá ìrántí àtúnyẹ̀wò yóò hàn níbí lẹ́yìn tí Kilo bá ṣe ìtúpalẹ̀ àwọn ìdáhùn olùtọ́jú."
+      "noProposalsDescription": "Àwọn àbá ìrántí àtúnyẹ̀wò yóò hàn níbí lẹ́yìn tí Kilo bá ṣe ìtúpalẹ̀ àwọn ìdáhùn olùtọ́jú.",
+      "changeRequestInProgress": "Kilo ti ń ṣí PR fún àbá yìí. Gbìyànjú lẹ́ẹ̀kan si lẹ́yìn ìgbà díẹ̀.",
+      "changeRequestNotActionable": "A kò lè fọwọ́ sí àbá yìí mọ́. Pa á, kí o sì sọ àkọsílẹ̀ náà di tuntun.",
+      "changeRequestNoGitHubAccess": "Kò sí ìsopọ̀ GitHub kankan tó ní àǹfààní sí ibi ìpamọ́ yìí. Tún GitHub so pọ̀ pẹ̀lú àǹfààní sí ibi ìpamọ́ yìí, kí o sì gbìyànjú lẹ́ẹ̀kan si.",
+      "changeRequestMissingPermissions": "GitHub App ti Kilo kò lè ṣí PR nínú ibi ìpamọ́ yìí. Ẹni tó ni ibi ìpamọ́ gbọ́dọ̀ fún app náà ní àǹfààní kíkọ sí àwọn àkóónú àti àwọn PR, kí o sì gbìyànjú lẹ́ẹ̀kan si.",
+      "changeRequestFailed": "Kilo kò lè ṣí PR náà. Gbìyànjú lẹ́ẹ̀kan si lẹ́yìn ìgbà díẹ̀.",
+      "offAction": "A ti pa ìrántí àtúnyẹ̀wò. Mú un ṣiṣẹ́, kí o sì gbìyànjú lẹ́ẹ̀kan si."
     },
     "manualReview": {
       "title": "Àtúnyẹ̀wò tí o bẹ̀rẹ̀ fúnra rẹ",
@@ -1932,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Fi àwọn àyípadà pamọ́",
+      "saved": "A ti fi àwọn ètò pamọ́",
       "unsavedTitle": "Àwọn àyípadà tí a kò tíì fi pamọ́",
       "unsavedMessage": "Ṣé o fẹ́ fi àwọn àyípadà rẹ pamọ́ kí o tó kúrò lójú ìbòjú yìí?",
       "unsavedInvalidMessage": "Àwọn àyípadà yìí kò tíì lè fi pamọ́. Tún wọn ṣe láti fi pamọ́, tàbí jù wọ́n sílẹ̀ láti kúrò."
@@ -2309,6 +2322,8 @@
       "couldNotLoadEnvironment": "A kò lè gbé àyíká iṣẹ́ rẹ wọlé.",
       "retryLoadingEnvironment": "Gbìyànjú láti tún àyíká iṣẹ́ gbé wọlé",
       "defaultEnvironment": "Àyíká iṣẹ́ àiyípadà",
+      "environmentAccessibility": "Yan profaili kan: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Yan profaili kan: {{label}}. {{attention}}",
       "leaveChanges": "Fi àyípadà sílẹ̀",
       "commitAndPush": "Ṣe àkọsílẹ̀, firánṣẹ́",
       "startSession": "Bẹ̀rẹ̀ ìgbà iṣẹ́",
@@ -2343,7 +2358,7 @@
       "manageProfiles": "Ṣakoso awọn profaili",
       "noProfiles": "Ko si awọn profaili sibẹsibẹ. Ṣẹda ọkan lati ṣafikun awọn oniyipada ayika, awọn olupin MCP, ati awọn ọgbọn.",
       "advancedConfig": "To ti ni ilọsiwaju iṣeto ni",
-      "advancedConfigDescription": "Yan profaili kan lati kojọpọ awọn atunto ti o fipamọ, ati pẹlu ọwọ tunto awọn oniyipada agbegbe afikun ati awọn pipaṣẹ iṣeto",
+      "advancedConfigDescription": "Ó kan ìpàdé yìí. Fífipamọ́ gẹ́gẹ́ bi profaili yóò pa á mọ́ fún ìgbà tó ń bọ̀.",
       "saveAsProfile": "Fipamọ bi Profaili",
       "saveProfileDescription": "Ṣafipamọ awọn oniyipada ayika lọwọlọwọ ati awọn pipaṣẹ iṣeto bi profaili atunlo.",
       "profileSummary": "{{vars}} awọn oniyipada ayika · {{commands}} Awọn aṣẹ iṣeto",
@@ -2971,7 +2986,9 @@
     "permissionDescription": "O kò ní àṣẹ láti wo èyí.",
     "notFoundDescription": "Ó ṣeé ṣe kí a ti yọ ohun yìí kúrò tàbí kí ó má sí mọ́.",
     "serverTitle": "A kò lè gbé dátà wọlé.",
-    "serverDescription": "Ìṣòro kan wáyé ní ọ̀dọ̀ wa. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i."
+    "serverDescription": "Ìṣòro kan wáyé ní ọ̀dọ̀ wa. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i.",
+    "timeoutTitle": "Ìdáhùn náà ń gbà jù",
+    "timeoutDescription": "Ìbéèrè náà kò parí rí kí àkókò rẹ̀ tó tán. Jọ̀wọ́ gbìyànjú lẹ́ẹ̀kan sí i."
   },
   "screenHeader": {
     "openMenu": "Ṣí àkójọ àṣàyàn",
@@ -3823,14 +3840,16 @@
     "variablesSaveFailed": "Ko le fi oniyipada pamọ",
     "commandsTitle": "Awọn aṣẹ iṣeto",
     "addCommand": "Fi aṣẹ kun",
-    "commandLabel": "Òfin",
+    "commandLabel": "Aṣẹ",
+    "commandLabelPosition": "Aṣẹ {{position}}",
     "commandPlaceholder": "fun apẹẹrẹ pnpm install",
+    "commandAtLimit": "Pipaṣẹ naa ní ààlà {{max}} àmì",
     "commandsEmpty": "Ko si awọn pipaṣẹ iṣeto sibẹsibẹ",
     "commandsSaveFailed": "Ko le fi awọn pipaṣẹ iṣeto pamọ",
     "moveUp": "Gbe soke",
     "moveDown": "Yi lọ si isalẹ",
-    "moveCommandUp": "Gbe òfin {{position}} sókè",
-    "moveCommandDown": "Gbe òfin {{position}} sílẹ̀",
+    "moveCommandUp": "Gbe aṣẹ {{position}} sókè",
+    "moveCommandDown": "Gbe aṣẹ {{position}} sílẹ̀",
     "skillsTitle": "Awọn ogbon",
     "addSkill": "Fi ogbon kun",
     "skillNameLabel": "Orukọ ogbon",
@@ -3842,6 +3861,7 @@
     "skillSaveFailed": "Ko le fi ogbon pamọ",
     "skillSourceCustom": "Ti ara rẹ",
     "skillSourceMarketplace": "Ọjà",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Lẹẹmọ SKILL.md ati orukọ rẹ kun; ṣafikun ọgbọn lati inu foonu rẹ laisi fa ati ju silẹ.",
     "skillEditTitle": "Olorijori Ṣatunkọ",
     "skillEdit": "Ṣatunkọ ogbon {{name}}",
@@ -3856,9 +3876,9 @@
       "remoteType": "Latọna jijin",
       "command": "Laini aṣẹ",
       "url": "URL",
-      "environment": "Ayika (JSON)",
+      "environment": "Ayika iṣẹ́ (JSON)",
       "headers": "Awọn akọle (JSON)",
-      "timeout": "Duro na",
+      "timeout": "Akoko ipari",
       "secretCount_one": "{{count}} aṣiri",
       "secretCount_other": "{{count}} aṣiri",
       "namePlaceholder": "my-server",
@@ -3868,6 +3888,7 @@
       "headersHint": "Awọn iye ti o han bi •••• tọju aṣiri ti a fi pamọ wọn; rọpo iye kan lati yi i pada. Yiyipada URL nilo gbogbo iye lẹẹkansi",
       "nameRequired": "Tẹ orukọ olupin sii",
       "nameInvalid": "Orukọ le lo awọn lẹta ASCII, awọn nọmba, awọn abẹlẹ, ati dashes nikan, titi di 100 àmì",
+      "nameConflict": "Olupin pẹlu orukọ yii ti wa tẹlẹ",
       "commandRequired": "Tẹ aṣẹ sii",
       "commandTooLong": "Lo kò ju 50 àríyànjiyàn lọ, ọ̀kọ̀ọ̀kan 500 àmì",
       "urlRequired": "Tẹ URL kan sii",
@@ -3948,7 +3969,6 @@
       "repo": "Yan ibi ipamọ…",
       "profile": "Yan profaili",
       "remove": "Yọọ",
-      "private": "Ikọkọ",
       "search": "Ṣewadii awọn ibi ipamọ…",
       "addedToast": "Eto profaili aiyipada fun \"{{repo}}\"",
       "addFailed": "Ko le ṣeto profaili aiyipada",
@@ -3969,7 +3989,7 @@
     },
     "variablesDeleteFailed": "Ko le paarẹ oniyipada",
     "deleteVariable": "Pa oniyipada {{key}} rẹ́",
-    "deleteCommand": "Pa òfin {{position}} rẹ́"
+    "deleteCommand": "Pa aṣẹ {{position}} rẹ́"
   },
   "credits": {
     "title": "Ra kírẹ́dítì",

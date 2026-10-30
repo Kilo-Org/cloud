@@ -4,7 +4,7 @@ import { CirclePlus, GitBranch, GitMerge, GitPullRequest, History } from '@/comp
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
-import { useSinglePushRoute } from '@/components/code-reviewer/use-single-push-route';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { ScopeAccessDeniedScreen } from '@/components/organization/scope-access-denied-screen';
 import { ScreenHeader } from '@/components/screen-header';
 import { ConfigureRow } from '@/components/ui/configure-row';

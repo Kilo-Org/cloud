@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Izinguquko",
-    "organizationTrialEnded": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo. Umnikazi wenhlangano angabuyekeza ukukhokhela ku-kilo.ai, bese ezama futhi."
+    "organizationTrialEnded": "Isilingo senhlangano siphelile futhi ayinayo uhlelo olusebenzayo. Umnikazi wenhlangano angabuyekeza ukukhokhela ku-kilo.ai, bese ezama futhi.",
+    "privateRepositoryA11y": "{{name}}, inqolobane yekhodi eyimfihlo"
   },
   "language": {
     "restarting": "Kuqaliswa kabusha ukuze kusetshenziswe ulimi olukhethiwe",
@@ -644,7 +645,12 @@
       "loading": "Kulayishwa ibhokisi lokungenayo",
       "noReviewRequests": "Azikho izicelo zokubuyekeza",
       "noReviewRequestsDescription": "Izicelo zokuhlanganisa ezilinde ukubuyekezwa nguwe zivela lapha. Usengakwazi ukunamathisela noma yisiphi isixhumanisi se-PR ngenhla.",
-      "couldNotLoad": "Asikwazanga ukulayisha ibhokisi lokungenayo."
+      "couldNotLoad": "Asikwazanga ukulayisha ibhokisi lokungenayo.",
+      "accessLostTitle": "Awunakho ukufinyelela kule nhlangano",
+      "accessLostDescription": "Awusaseyilungu le nhlangano, ngakho-ke izicelo zokubuyekeza zayo azikwazi ukulayisha. Qhubeka ku-akhawunti yakho oyisisebenzisi siqu ukuze uqhubeke nokubuyekeza.",
+      "organizationUnavailableTitle": "Le nhlangano ayisasikhona",
+      "organizationUnavailableDescription": "Le nhlangano isuswe, ngakho-ke izicelo zokubuyekeza zayo azikwazi ukulayisha. Qhubeka ku-akhawunti yakho oyisisebenzisi siqu ukuze uqhubeke nokubuyekeza.",
+      "continueInPersonal": "Qhubeka ku-akhawunti oyisisebenzisi siqu"
     },
     "composer": {
       "commentBodyPlaceholder": "Amazwana akho",
@@ -1513,7 +1519,13 @@
         "change_request_failed": "I-PR yehlulekile",
         "superseded": "Isivele ikhona"
       },
-      "noProposalsDescription": "Iziphakamiso zenkumbulo yokuhlola zivela lapha ngemva kokuba i-Kilo ihlaziye izimpendulo zabagcini bekhodi."
+      "noProposalsDescription": "Iziphakamiso zenkumbulo yokuhlola zivela lapha ngemva kokuba i-Kilo ihlaziye izimpendulo zabagcini bekhodi.",
+      "changeRequestInProgress": "I-Kilo isivele ivula i-PR yalesi siphakamiso. Zama futhi emva kwesikhashana.",
+      "changeRequestNotActionable": "Lesi siphakamiso asisakwazi ukugunyazwa. Vala futhi uvuselele uhlu.",
+      "changeRequestNoGitHubAccess": "Akukho ukuxhumana kwe-GitHub okunokufinyelela kule rejistri. Xhuma kabusha i-GitHub enokufinyelela kuyo, bese uzama futhi.",
+      "changeRequestMissingPermissions": "I-GitHub App ye-Kilo ayikwazi ukuvula ama-PR kule rejistri. Umnikazi we-rejistri kufanele anikeze i-app ilungelo lokubhala kokuqukethwe nakuma-PR, bese uzama futhi.",
+      "changeRequestFailed": "I-Kilo ayikwazanga ukuvula i-PR. Zama futhi emva kwesikhashana.",
+      "offAction": "Inkumbulo yokuhlola ivaliwe. Yivule, bese uzama futhi."
     },
     "manualReview": {
       "title": "Ukuhlola okuqalwa nguwe",
@@ -1932,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "Londoloza izinguquko",
+      "saved": "Izilungiselelo zilondoloziwe",
       "unsavedTitle": "Izinguquko ezingalondoloziwe",
       "unsavedMessage": "Ulondoloze izinguquko zakho ngaphambi kokuphuma kulesi sikrini?",
       "unsavedInvalidMessage": "Lezi zinguquko azikakwazi ukulondolozwa. Zilungise ukuze zilondolozwe, noma uzilahe ukuze uphume."
@@ -2309,6 +2322,8 @@
       "couldNotLoadEnvironment": "Asikwazanga ukulayisha indawo yakho yokusebenza.",
       "retryLoadingEnvironment": "Zama ukulayisha indawo yokusebenza futhi",
       "defaultEnvironment": "Indawo yokusebenza ezenzakalelayo",
+      "environmentAccessibility": "Khetha iphrofayela: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Khetha iphrofayela: {{label}}. {{attention}}",
       "leaveChanges": "Shiya izinguquko",
       "commitAndPush": "Qopha bese uthumela",
       "startSession": "Qala iseshini",
@@ -2343,7 +2358,7 @@
       "manageProfiles": "Phatha amaphrofayili",
       "noProfiles": "Awekho amaphrofayela okwamanje. Dala eyodwa ukuze wengeze okuguquguqukayo kwendawo, amaseva e-MCP, namakhono.",
       "advancedConfig": "Ukucushwa Okuthuthukile",
-      "advancedConfigDescription": "Khetha iphrofayili ukuze ulayishe ukucupha okulondoloziwe, futhi ulungiselele ngokwakho okuguquguqukayo kwemvelo okwengeziwe kanye nemiyalo yokusetha",
+      "advancedConfigDescription": "Kusebenza kulesi sikhathi. Ukulondoloza njengephrofayela kukugcina okwesikhathi esizayo.",
       "saveAsProfile": "Londoloza Njengephrofayela",
       "saveProfileDescription": "Londoloza okuguquguqukayo kwendawo yamanje kanye nemiyalelo yokusetha njengephrofayili esebenziseka kabusha.",
       "profileSummary": "{{vars}} okuguquguqukayo kwemvelo · {{commands}} imiyalo yokusetha",
@@ -2971,7 +2986,9 @@
     "permissionDescription": "Awunayo imvume yokubuka lokhu.",
     "notFoundDescription": "Le nto kungenzeka isusiwe noma ayisatholakali.",
     "serverTitle": "Asikwazanga ukulayisha.",
-    "serverDescription": "Kukhona okungahambanga kahle kithi. Sicela uzame futhi."
+    "serverDescription": "Kukhona okungahambanga kahle kithi. Sicela uzame futhi.",
+    "timeoutTitle": "Isiphakeli sithatha isikhathi eside",
+    "timeoutDescription": "Isicelo siphelelwe yisikhathi ngaphambi kokuqedwa. Sicela uzame futhi."
   },
   "screenHeader": {
     "openMenu": "Vula imenyu",
@@ -3824,7 +3841,9 @@
     "commandsTitle": "Setha imiyalo",
     "addCommand": "Engeza umyalo",
     "commandLabel": "Umyalo",
+    "commandLabelPosition": "Umyalo {{position}}",
     "commandPlaceholder": "isb. pnpm install",
+    "commandAtLimit": "Umyalo ulinganiselwe ezinhlamvini ezingu-{{max}}",
     "commandsEmpty": "Ayikho imiyalo yokusetha okwamanje",
     "commandsSaveFailed": "Ayikwazanga ukulondoloza imiyalo yokusetha",
     "moveUp": "Hamba uyephezulu",
@@ -3842,6 +3861,7 @@
     "skillSaveFailed": "Ayikwazanga ukulondoloza ikhono",
     "skillSourceCustom": "Ngokwezifiso",
     "skillSourceMarketplace": "Imakethe",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Namathisela i-SKILL.md futhi igama layo ligcwalise; engeza ikhono kusuka kufoni yakho ngaphandle kokuhudula nokuwisa.",
     "skillEditTitle": "Hlela ikhono",
     "skillEdit": "Hlela ikhono {{name}}",
@@ -3856,9 +3876,9 @@
       "remoteType": "Kude",
       "command": "Umugqa womyalo",
       "url": "I-URL",
-      "environment": "Imvelo (JSON)",
+      "environment": "Isimo sokusebenza (JSON)",
       "headers": "Izihloko (JSON)",
-      "timeout": "Isikhathi siphelile",
+      "timeout": "Isikhathi sokulinda",
       "secretCount_one": "{{count}} imfihlo",
       "secretCount_other": "{{count}} izimfihlo",
       "namePlaceholder": "my-server",
@@ -3868,6 +3888,7 @@
       "headersHint": "Amanani aboniswa njenge-•••• agcina imfihlo yawo egciniwe; shintsha inani ukuze imfihlo ishintshwe. Ukushintsha i-URL kudinga wonke amanani kabusha",
       "nameRequired": "Faka igama leseva",
       "nameInvalid": "Igama lingasebenzisa kuphela izinhlamvu ze-ASCII, izinombolo, ama-underscore, namadeshi, kufike ezinhlamvini ezingu-100",
+      "nameConflict": "Iseva enaleli gama isivele ikhona",
       "commandRequired": "Faka umyalo",
       "commandTooLong": "Sebenzisa ama-agumenti angu-50 noma ngaphansi, ngalinye izinhlamvu ezingu-500",
       "urlRequired": "Faka i-URL",
@@ -3875,7 +3896,7 @@
       "urlTooLong": "I-URL kufanele ibe yizinhlamvu ezingu-2048 noma ngaphansi",
       "jsonInvalid": "Faka i-JSON evumelekile — into enamanani eyunithi yezinhlamvu",
       "jsonTooLarge": "Sebenzisa okufakiwe okungu-50 noma ngaphansi, okhiye kufika ku-128 kanye namavelu kufika ezinhlamvu ezingu-4096",
-      "timeoutInvalid": "Isikhathi sokuvala kufanele sibe inani eliphelele lama-millisecond",
+      "timeoutInvalid": "Isikhathi sokulinda kufanele sibe inani eliphelele lama-millisecond.",
       "edit": "Hlela iseva ye-MCP {{name}}",
       "delete": "Susa iseva ye-MCP {{name}}",
       "saveFailed": "Ayikwazanga ukulondoloza iseva ye-MCP",
@@ -3948,7 +3969,6 @@
       "repo": "Khetha inqolobane...",
       "profile": "Khetha iphrofayela",
       "remove": "Khipha",
-      "private": "Okuyimfihlo",
       "search": "Sesha amaqoqo...",
       "addedToast": "Iphrofayela ezenzakalelayo isethelwe \"{{repo}}\"",
       "addFailed": "Ayikwazanga ukusetha iphrofayela ezenzakalelayo",

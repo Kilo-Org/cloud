@@ -1,5 +1,6 @@
 import { BottomSheet } from '@expo/ui/community/bottom-sheet';
 import { type ReactNode, useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { BackHandler, Platform, View } from 'react-native';
 
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
@@ -79,6 +80,11 @@ export function Sheet({
   children,
 }: Readonly<SheetProps>) {
   const colors = useThemeColors();
+  // The native sheet paints a few strings of its own — the backdrop's dismiss
+  // label, the drag handle and the sheet's pane title. They resolve against the
+  // device locale unless it is told the app's, so a device in Portuguese
+  // announced Portuguese controls inside an Arabic app.
+  const { i18n } = useTranslation();
   // Stay mounted through the dismiss animation. `index` -1 starts the animation
   // and the native dismiss event ends it, so unmounting here would cut the sheet
   // off mid-flight.
@@ -154,6 +160,7 @@ export function Sheet({
       enablePanDownToClose
       dismissGestures={dismissGestures}
       onRequestDismiss={onRequestDismiss}
+      locale={i18n.language}
       onClose={() => {
         // A dismissal the caller already reopened past must not close the sheet
         // again through the caller's own handler. A self-dismissal (backdrop,

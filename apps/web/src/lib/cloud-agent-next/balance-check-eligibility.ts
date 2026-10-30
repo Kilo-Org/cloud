@@ -65,19 +65,22 @@ export async function computeCloudAgentNextBalanceCheckEligibility(params: {
   const modelProviders = await getModelUserByokProviders(params.modelId, enabled);
   // Callers authorize organization access first, which also admits Kilo admins
   // and parent-organization owners who hold no membership row.
-  const allowedProviders =
-    params.organizationId &&
-    enabled.has('vercel-ai-gateway') &&
-    modelProviders.includes('vercel-ai-gateway')
-      ? (
-          await resolveOrganizationMemberModelDecision({
-            organizationId: params.organizationId,
-            kiloUserId: params.user.id,
-            allowNonMember: true,
-            modelId: params.modelId,
-          })
-        ).decision.eligibleProviderRoutes
-      : undefined;
+  const decision = params.organizationId
+    ? (
+        await resolveOrganizationMemberModelDecision({
+          organizationId: params.organizationId,
+          kiloUserId: params.user.id,
+          allowNonMember: true,
+          modelId: params.modelId,
+        })
+      ).decision
+    : undefined;
+  // Like routing, a denial leaves no allowed provider for the model.
+  const allowedProviders = decision
+    ? decision.allowed
+      ? decision.eligibleProviderRoutes
+      : new Set<string>()
+    : undefined;
   const hasUserByokAvailable = await hasEnabledUserByokForModel({
     modelId: params.modelId,
     modelProviders,

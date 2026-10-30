@@ -13,11 +13,11 @@ import { renderWithProviders } from '@/test/render-with-providers';
 
 type TestVar = { key: string; value: string; isSecret: boolean };
 
-/** The profile detail the mocked `useAgentProfile` returns. */
-export type TestProfileDetail = { id: string; vars: TestVar[] };
+/** The variable list the mocked `useAgentProfileVars` returns. */
+export type TestVars = TestVar[];
 
-export function testProfile(vars: TestVar[] = []): TestProfileDetail {
-  return { id: 'profile-1', vars };
+export function testVars(vars: TestVar[] = []): TestVars {
+  return vars;
 }
 
 export function findAll(root: ReactTestInstance, type: string): ReactTestInstance[] {

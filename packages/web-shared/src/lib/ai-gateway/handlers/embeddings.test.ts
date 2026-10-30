@@ -243,6 +243,24 @@ describe('POST /api/gateway/embeddings provider privacy', () => {
     expect(getUpstreamBody().provider).toEqual({ only: ['azure'], data_collection: 'allow' });
   });
 
+  it('limits organization BYOK keys to the allowed providers', async () => {
+    setUserAuth({ data_collection: 'allow', provider_allow_list: ['openai'] });
+    const eligibleProviderRoutes = new Set(['openai']);
+    mockedResolveModelDecision.mockResolvedValue({
+      ...allowedModelDecision,
+      decision: { allowed: true, eligibleProviderRoutes },
+    });
+    const { handleEmbeddingsRequest } = await import('./embeddings');
+    await handleEmbeddingsRequest(makeRequest());
+
+    expect(mockedGetEmbeddingProvider).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.anything(),
+      expect.any(String),
+      eligibleProviderRoutes
+    );
+  });
+
   it('preserves request zdr through group provider overrides', async () => {
     setUserAuth({ data_collection: 'allow', provider_allow_list: ['openai', 'azure'] });
     mockedResolveModelDecision.mockResolvedValue({

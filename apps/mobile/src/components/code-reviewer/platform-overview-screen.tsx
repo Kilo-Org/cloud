@@ -1,4 +1,4 @@
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { type Href, useRouter } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
@@ -15,7 +15,7 @@ import {
   resolveRowOnPress,
 } from '@/components/code-reviewer/platform-overview-rows';
 import { ProviderConnectCard } from '@/components/code-reviewer/provider-connect-card';
-import { useSinglePushRoute } from '@/components/code-reviewer/use-single-push-route';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { PlatformOverviewSkeleton } from '@/components/code-reviewer/platform-overview-skeleton';
 import { ScreenHeader } from '@/components/screen-header';
@@ -27,6 +27,8 @@ import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { PLATFORM_CAPABILITIES, type ReviewerPlatform } from '@/lib/code-reviewer-config';
 import { canConnectProvider } from '@/lib/code-reviewer-status';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
+import { cn } from '@/lib/utils';
 import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
 import { useReviewConfigBody } from '@/lib/hooks/use-review-config-body';
 import {
@@ -233,7 +235,7 @@ export function PlatformOverviewScreen({
                   <Button
                     variant="outline"
                     size="sm"
-                    className="flex-row gap-2"
+                    className={cn(STATE_ACTION_CLASS, 'flex-row gap-2')}
                     disabled={save.isPending}
                     onPress={() => {
                       save.mutate({});
@@ -252,9 +254,7 @@ export function PlatformOverviewScreen({
                   scope={scope}
                   reason={data.actionRequired.reason}
                   canEdit={canEdit}
-                  onRefreshConfig={() => {
-                    void config.refetch();
-                  }}
+                  onRefreshConfig={() => void config.refetch()}
                   onOpenModelPicker={openReviewerModelPicker}
                 />
               )}
@@ -274,7 +274,7 @@ export function PlatformOverviewScreen({
                       !canEdit || toggle.isPending || (!hasRepoSelection && !data.isEnabled)
                     }
                     onValueChange={value => {
-                      void Haptics.selectionAsync();
+                      selectionHaptic();
                       toggle.mutate({ isEnabled: value });
                     }}
                   />

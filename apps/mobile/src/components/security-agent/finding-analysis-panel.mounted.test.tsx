@@ -38,6 +38,7 @@ const startAnalysis = vi.hoisted(() => ({
 
 const kvRows = vi.hoisted(() => ({
   labels: [] as string[],
+  values: new Map<string, unknown>(),
 }));
 
 vi.mock('@/components/ui/activity-indicator', () => ({ ActivityIndicator: 'ActivityIndicator' }));
@@ -49,6 +50,7 @@ vi.mock('react-native', () => ({
 }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: vi.fn() }),
+  useFocusEffect: () => undefined,
 }));
 vi.mock('@/components/ui/icons', () => ({
   ExternalLink: 'ExternalLink',
@@ -80,8 +82,9 @@ vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/query-error', () => ({ QueryError: 'QueryError' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/kv-row', () => ({
-  KvRow: (props: { label: string }) => {
+  KvRow: (props: { label: string; value: unknown }) => {
     kvRows.labels.push(props.label);
+    kvRows.values.set(props.label, props.value);
     return null;
   },
 }));
@@ -157,6 +160,7 @@ function renderPanel(
 describe('FindingAnalysisPanel completion-copy gate', () => {
   beforeEach(() => {
     kvRows.labels = [];
+    kvRows.values.clear();
     capacity.runningCount = 0;
     capacity.concurrencyLimit = 3;
     capacity.isLoading = false;
@@ -319,6 +323,45 @@ describe('FindingAnalysisPanel completion-copy gate', () => {
     );
 
     expect(kvRows.labels).toContain('Triage confidence');
+  });
+
+  // `security_findings.analysis` is jsonb with a compile-time type only, so a
+  // stored analysis written before a field existed (or seeded) reaches the
+  // panel without it. The panel renders the rows it has and labels the rest as
+  // not recorded instead of throwing into the panel's error boundary.
+  it.each<{ name: string; analysis: Record<string, unknown>; expected: [string, string][] }>([
+    {
+      name: 'triage without confidence or suggested action',
+      analysis: { triage: { needsSandboxReasoning: 'Runtime dependency.' } },
+      expected: [
+        ['Triage confidence', i18n.t('securityAgent.analysis.notRecorded')],
+        ['Suggested action', i18n.t('securityAgent.analysis.notRecorded')],
+      ],
+    },
+    {
+      name: 'sandbox without suggested action',
+      analysis: {
+        sandboxAnalysis: {
+          isExploitable: 'unknown',
+          exploitabilityReasoning: 'Needs review.',
+          summary: 'Needs review.',
+          suggestedFix: 'Upgrade it.',
+          analysisAt: '2026-06-17T11:44:59.000Z',
+        },
+      },
+      expected: [
+        ['Exploitable', i18n.t('common.unknown')],
+        ['Suggested action', i18n.t('securityAgent.analysis.notRecorded')],
+      ],
+    },
+  ])('renders an analysis whose $name', ({ analysis, expected }) => {
+    const tree = renderPanel(analysisFixture({ status: 'completed', analysis }));
+
+    expect(tree.root.findAllByType(TabScreenScrollView)).toHaveLength(1);
+    expect(kvRows.labels).toEqual(expect.arrayContaining(expected.map(([label]) => label)));
+    for (const [label, value] of expected) {
+      expect(kvRows.values.get(label)).toBe(value);
+    }
   });
 });
 

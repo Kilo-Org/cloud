@@ -75,6 +75,13 @@ export type NewSessionConfigureFormProps = {
   runOnInlineNote?: string | null;
   /** True for the Continue clone entry: hides Changes and Environment. */
   isCloneEntry?: boolean;
+  /**
+   * Whether the composer takes focus when the screen opens. The screen body
+   * resolves it from the run target and the current repository selection
+   * (`shouldAutoFocusNewSessionPrompt`), so an entry that still needs a
+   * repository keeps the keyboard down.
+   */
+  autoFocusPrompt?: boolean;
   // Repository (Cloud Agent only).
   groups: RepositoryGroup[];
   isRetrying: boolean;

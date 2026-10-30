@@ -1,8 +1,8 @@
-import { useRouter } from 'expo-router';
 import { MoreHorizontal } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 
 import { IconButton } from '@/components/ui/icon-button';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 
@@ -14,14 +14,14 @@ import { getSecurityAgentPath } from '@/lib/security-agent';
  * it only when the viewer can manage Security Agent for this scope.
  */
 export function AuditReportButton({ scope }: Readonly<{ scope: string }>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { t } = useTranslation();
 
   return (
     <IconButton
       onPress={() => {
-        router.push(getSecurityAgentPath(scope, 'audit-report'));
+        pushOnce(getSecurityAgentPath(scope, 'audit-report'));
       }}
       accessibilityLabel={t('securityAgent.auditReportButton.viewA11y')}
     >

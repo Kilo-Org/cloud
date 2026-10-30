@@ -1060,6 +1060,20 @@ describe('ReviewDetailScreen transcript sheet', () => {
     expect(spectatorStream.createReviewSpectatorStream).not.toHaveBeenCalled();
   });
 
+  it('follows the review content and the primary action instead of leading the screen', () => {
+    // The transcript is a secondary way to read the review: the title and the
+    // outcome lead, and the entry sits among the actions after Open pull request.
+    const renderer = mountScreen();
+    const texts = collectText(renderer.toJSON());
+    const transcriptIndex = texts.indexOf('Session transcript');
+    const titleIndex = texts.indexOf('Fix login');
+
+    expect(titleIndex).toBeGreaterThanOrEqual(0);
+    expect(transcriptIndex).toBeGreaterThan(titleIndex);
+    expect(transcriptIndex).toBeGreaterThan(texts.indexOf('Details'));
+    expect(transcriptIndex).toBeGreaterThan(texts.indexOf('Open pull request'));
+  });
+
   it.each(['ios', 'android'])(
     'opens and closes the native transcript sheet on %s',
     async platform => {

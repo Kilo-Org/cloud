@@ -246,19 +246,6 @@ export function ReviewDetailScreen({
         statusLabel={meta.label}
       />
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 gap-4 pt-4">
-        {/* The transcript entry is the first row of the content, not a pinned band
-            above the list: a fixed trigger between the header and the scroll view
-            leaves a strip where a vertical drag never reaches the content. */}
-        <Button
-          variant="secondary"
-          accessibilityLabel={t('agentChat.session.transcriptAccessibility')}
-          onPress={() => {
-            setTranscriptReviewId(reviewId);
-          }}
-        >
-          <Text>{t('agentChat.session.transcriptAccessibility')}</Text>
-        </Button>
-
         {/* A background poll failure must not blank out an already-loaded review. */}
         {isError && (
           <Text variant="muted" className="text-center text-xs">
@@ -301,9 +288,13 @@ export function ReviewDetailScreen({
         <View className="gap-2">
           <Text className="text-sm font-medium">{t('common.findings')}</Text>
           {visibleFindings.length === 0 ? (
-            <Text variant="muted" className="text-xs">
-              {t(findingsEmptyCopyKey(review.status))}
-            </Text>
+            // The empty result sits in the same card as every other section's
+            // body, so an ended review reads as a filled section, not a caption.
+            <View className="rounded-lg bg-secondary p-4">
+              <Text variant="muted" className="text-xs">
+                {t(findingsEmptyCopyKey(review.status))}
+              </Text>
+            </View>
           ) : (
             <View className="gap-2">
               {visibleFindings.map((finding, index) => (
@@ -405,6 +396,18 @@ export function ReviewDetailScreen({
             {/* i18n-dup-ok: agentChat.prBadge.open names a pull request's open state;
                 this key is the verb CTA — cs/pl/be translate the two apart. */}
             <Text>{t('common.openPullRequest')}</Text>
+          </Button>
+
+          {/* The transcript is a secondary way to read the same review, so it
+              sits beside the primary action and never above the title. */}
+          <Button
+            variant="secondary"
+            accessibilityLabel={t('agentChat.session.transcriptAccessibility')}
+            onPress={() => {
+              setTranscriptReviewId(reviewId);
+            }}
+          >
+            <Text>{t('agentChat.session.transcriptAccessibility')}</Text>
           </Button>
 
           {canCancel ? (

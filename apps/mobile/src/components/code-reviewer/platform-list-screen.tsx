@@ -123,6 +123,7 @@ export function PlatformListScreen({ scope }: Readonly<{ scope: string }>) {
         // An organization name is user prose, not a UI label, so it keeps a
         // second line for a natural break.
         titleNumberOfLines={2}
+        eyebrow={t('common.codeReviewer')}
       />
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         <View className="gap-3">

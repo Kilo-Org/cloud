@@ -257,7 +257,10 @@ export function ReviewListScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ReviewerHeader title={t('codeReviewer.reviewList.title')} />
+      <ReviewerHeader
+        title={t('codeReviewer.reviewList.title')}
+        eyebrow={t('common.codeReviewer')}
+      />
       {body}
     </View>
   );

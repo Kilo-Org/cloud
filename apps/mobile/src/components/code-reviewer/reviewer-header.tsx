@@ -1,5 +1,4 @@
 import { type Href } from 'expo-router';
-import { useTranslation } from 'react-i18next';
 
 import { ScreenHeader } from '@/components/screen-header';
 import { CODE_REVIEWER_HOME_PATH } from '@/lib/profile-agent-navigation';
@@ -25,19 +24,22 @@ export function ReviewerHeader({
   title: string;
   /** Raise the title's line cap for prose that may wrap; the default is one. */
   titleNumberOfLines?: number;
-  /** Override the mono line above the title, which names the product. */
+  /**
+   * The mono line above the title. Screens that name the product pass
+   * `t('common.codeReviewer')`; a screen whose title already is the product
+   * name leaves it out instead of repeating itself.
+   */
   eyebrow?: string;
   /** Where Back lands when the screen has no history to pop. */
   backFallback?: Href;
   /** Run this instead of navigating, e.g. while a form confirms a discard. */
   onBack?: () => void;
 }>) {
-  const { t } = useTranslation();
   return (
     <ScreenHeader
       title={title}
       titleNumberOfLines={titleNumberOfLines}
-      eyebrow={eyebrow ?? t('common.codeReviewer')}
+      eyebrow={eyebrow}
       backFallback={backFallback}
       onBack={onBack}
     />

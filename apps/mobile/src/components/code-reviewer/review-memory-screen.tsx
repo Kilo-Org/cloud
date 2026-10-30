@@ -226,7 +226,10 @@ export function ReviewMemoryScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ReviewerHeader title={t('codeReviewer.reviewMemory.title')} />
+      <ReviewerHeader
+        title={t('codeReviewer.reviewMemory.title')}
+        eyebrow={t('common.codeReviewer')}
+      />
       {enabled ? (
         <View className="px-6 pt-4">
           <View className="rounded-lg bg-secondary p-4">

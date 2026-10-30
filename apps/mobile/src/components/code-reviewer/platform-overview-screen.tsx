@@ -150,7 +150,7 @@ export function PlatformOverviewScreen({
     const canConnect = canConnectProvider(platform, permission);
     return (
       <View className="flex-1 bg-background">
-        <ReviewerHeader title={capabilities.label} />
+        <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
         <CenteredState contentContainerClassName="px-6">
           {canConnect ? (
             <ProviderConnectCard scope={scope} platform={platform} onConnected={handleConnected} />
@@ -211,7 +211,7 @@ export function PlatformOverviewScreen({
 
   return (
     <View className="flex-1 bg-background">
-      <ReviewerHeader title={capabilities.label} />
+      <ReviewerHeader title={capabilities.label} eyebrow={t('common.codeReviewer')} />
       <TabScreenScrollView className="flex-1" contentContainerClassName="px-6 pt-4">
         <Animated.View layout={LinearTransition}>
           {/* Every read state paints something: while connectivity is unsettled a

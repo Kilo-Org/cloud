@@ -193,7 +193,10 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
     const { permanent, variant } = classifyProviderErrorCode(statusErrorCode);
     return (
       <View className="flex-1 bg-background">
-        <ReviewerHeader title={t('codeReviewer.manualReview.title')} />
+        <ReviewerHeader
+          title={t('codeReviewer.manualReview.title')}
+          eyebrow={t('common.codeReviewer')}
+        />
         <QueryError
           variant={variant}
           title={permanent ? undefined : t('codeReviewer.manualReview.couldNotCheckProviderStatus')}
@@ -224,7 +227,10 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
     const canConnect = permission.status !== 'ready' || canConnectProvider('github', permission);
     return (
       <View className="flex-1 bg-background">
-        <ReviewerHeader title={t('codeReviewer.manualReview.title')} />
+        <ReviewerHeader
+          title={t('codeReviewer.manualReview.title')}
+          eyebrow={t('common.codeReviewer')}
+        />
         <EmptyState
           icon={GitPullRequest}
           title={t('common.connectProvider')}
@@ -256,7 +262,10 @@ export function ManualReviewScreen({ scope }: Readonly<{ scope: string }>) {
 
   return (
     <View className="flex-1 bg-background">
-      <ReviewerHeader title={t('codeReviewer.manualReview.title')} />
+      <ReviewerHeader
+        title={t('codeReviewer.manualReview.title')}
+        eyebrow={t('common.codeReviewer')}
+      />
       <KeyboardAvoidingView className="flex-1" behavior="padding">
         <ScrollView
           ref={scrollRef}

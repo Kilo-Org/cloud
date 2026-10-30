@@ -50,6 +50,11 @@ export type SettingsBackGuardResult = {
   dialog: ReactNode;
 };
 
+/** What a guarded save settled: `declined` means the caller asked its own
+ * destructive question and the reader backed out of it, so the draft stays
+ * unsaved and the screen stays where it is. */
+export type SettingsBackGuardSaveOutcome = 'saved' | 'declined';
+
 /**
  * Shared dirty-screen back handling for Security Agent settings screens.
  * Registers a predictive-Back-safe guard via `usePreventRemove`, which
@@ -73,11 +78,6 @@ export type SettingsBackGuardResult = {
  * confirmation and replays the captured navigation action once the user has
  * resolved it.
  */
-/** What a guarded save settled: `declined` means the caller asked its own
- * destructive question and the reader backed out of it, so the draft stays
- * unsaved and the screen stays where it is. */
-export type SettingsBackGuardSaveOutcome = 'saved' | 'declined';
-
 export function useSettingsBackGuard({
   dirty,
   valid,

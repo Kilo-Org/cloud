@@ -162,7 +162,7 @@ export function classifyStartupError(
     return {
       error:
         gatewayMessage ??
-        'Kilo gateway rejected the initial prompt because the selected model is rate limited.',
+        'Kilo Router rejected the initial prompt because the selected model is rate limited.',
       phase,
       status,
       error_type: errorType,

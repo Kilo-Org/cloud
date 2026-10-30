@@ -141,47 +141,58 @@ describe('buildSessionModelOptions', () => {
     expect(result.selectedVariant).toBe('high');
   });
 
-  it('strips the vendor prefix the catalog repeats in a CLI model display name', () => {
-    const result = buildSessionModelOptions({
-      activeSessionType: 'remote',
-      remoteModelState: {
-        ownerConnectionId: 'cli-owner',
-        protocol: 'v1',
-        refresh: 'idle',
-        catalog: {
-          protocolVersion: 1,
-          truncated: false,
-          providers: [
-            {
-              id: 'kilo',
-              name: 'Kilo',
-              models: [
-                {
-                  id: 'deepseek/deepseek-v4-flash-0731',
-                  name: 'DeepSeek: DeepSeek V4 Flash 0731',
-                  variants: [],
-                  capabilities: { attachment: false, reasoning: true },
-                  limits: { context: 200_000, output: 8192 },
-                },
-              ],
-            },
-          ],
+  it.each([undefined, 'Kilo', 'Kilo Gateway', 'Kilo Router'])(
+    'normalizes Kilo provider name %s and strips repeated model vendor prefixes',
+    providerName => {
+      const result = buildSessionModelOptions({
+        activeSessionType: 'remote',
+        remoteModelState: {
+          ownerConnectionId: 'cli-owner',
+          protocol: 'v1',
+          refresh: 'idle',
+          catalog: {
+            protocolVersion: 1,
+            truncated: false,
+            providers: [
+              {
+                id: 'kilo',
+                name: providerName,
+                models: [
+                  {
+                    id: 'deepseek/deepseek-v4-flash-0731',
+                    name: 'DeepSeek: DeepSeek V4 Flash 0731',
+                    variants: [],
+                    capabilities: { attachment: false, reasoning: true },
+                    limits: { context: 200_000, output: 8192 },
+                  },
+                ],
+              },
+            ],
+          },
         },
-      },
-      observedModel: null,
-      remoteModelOverride: null,
-      gatewayModels,
-      gatewayModelsLoading: false,
-      organizationId: 'org-persisted',
-    });
+        observedModel: null,
+        remoteModelOverride: null,
+        gatewayModels,
+        gatewayModelsLoading: false,
+        organizationId: 'org-persisted',
+      });
 
-    expect(result.options[0]?.name).toBe('DeepSeek V4 Flash 0731');
-    expect(result.options[0]?.displayId).toBe('deepseek/deepseek-v4-flash-0731');
-    expect(result.options[0]?.modelRef).toEqual({
-      providerID: 'kilo',
-      modelID: 'deepseek/deepseek-v4-flash-0731',
-    });
-  });
+      expect(result.options[0]?.name).toBe('DeepSeek V4 Flash 0731');
+      expect(result.options[0]?.displayId).toBe('deepseek/deepseek-v4-flash-0731');
+      expect(result.options[0]?.modelRef).toEqual({
+        providerID: 'kilo',
+        modelID: 'deepseek/deepseek-v4-flash-0731',
+      });
+      expect(result.options[0]?.provider).toEqual({ id: 'kilo', name: 'Kilo Router' });
+      const rows = buildModelPickerRows({
+        models: result.options,
+        search: 'Kilo Router',
+        favoriteIds: new Set(),
+      });
+      expect(rows).toHaveLength(2);
+      expect(rows[0]).toEqual({ key: 'provider:kilo', title: 'KILO ROUTER', type: 'header' });
+    }
+  );
 
   it('sorts provider-aware CLI rows like the CLI TUI picker', () => {
     const result = buildSessionModelOptions({
@@ -209,7 +220,7 @@ describe('buildSessionModelOptions', () => {
             },
             {
               id: 'kilo',
-              name: 'Kilo Gateway',
+              name: 'Kilo Router',
               models: [
                 {
                   id: 'kilo-later',
@@ -292,7 +303,7 @@ describe('buildSessionModelOptions', () => {
     ]);
   });
 
-  it('uses Kilo Gateway recommendedIndex ranks from CLI metadata', () => {
+  it('uses Kilo Router recommendedIndex ranks from CLI metadata', () => {
     const result = buildSessionModelOptions({
       activeSessionType: 'remote',
       remoteModelState: {
@@ -305,7 +316,7 @@ describe('buildSessionModelOptions', () => {
           providers: [
             {
               id: 'kilo',
-              name: 'Kilo Gateway',
+              name: 'Kilo Router',
               models: [
                 {
                   id: 'zzz-unranked-model',

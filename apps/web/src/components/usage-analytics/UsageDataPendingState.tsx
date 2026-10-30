@@ -21,7 +21,7 @@ export function UsageDataPendingState({ reducedMotion = false }: UsageDataPendin
         <h2 className="type-heading">Usage data is catching up</h2>
         <UsageDataPendingAnimation reducedMotion={reducedMotion} />
         <p className="type-body text-muted-foreground max-w-md">
-          <span className="block">Recent Kilo Gateway activity is still being processed.</span>
+          <span className="block">Recent Kilo Router activity is still being processed.</span>
           <span className="block">Come back soon to see the latest usage.</span>
         </p>
       </CardContent>

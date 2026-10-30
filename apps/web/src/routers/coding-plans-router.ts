@@ -194,7 +194,7 @@ function toCodingPlanSubscriptionView(subscription: CodingPlanSubscriptionRow) {
     planName,
     providerName,
     providerId: subscription.providerId,
-    routeLabel: `${providerName} via Kilo Gateway`,
+    routeLabel: `${providerName} via Kilo Router`,
     features: plan?.features ?? [],
     canQueryUsage: canQueryCodingPlanUsage(subscription),
     hasInstalledByokKey: subscription.installedByokKeyId !== null,

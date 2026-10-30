@@ -214,7 +214,7 @@ describe('ConsentDetails copy', () => {
     const sections = findAllSectionProps(renderer.root);
     const titles = sections.map(s => s.title);
     expect(titles).toContain('AI model providers');
-    expect(titles).toContain('Kilo Gateway (our backend)');
+    expect(titles).toContain('Kilo Router (our backend)');
     expect(titles).toContain('Crash reporting');
     expect(titles).toContain('Product analytics');
     expect(titles).toContain('Error screenshots and session replay');
@@ -308,12 +308,12 @@ describe('ConsentDetails copy', () => {
     const renderer = mount();
     const sections = findAllSectionProps(renderer.root);
     const voiceTranscription = sections.find(s => s.title === 'Voice transcription');
-    const gateway = sections.find(s => s.title === 'Kilo Gateway (our backend)');
+    const gateway = sections.find(s => s.title === 'Kilo Router (our backend)');
     expect(voiceTranscription).toBeDefined();
     expect(gateway).toBeDefined();
 
     expect(voiceTranscription?.who).toBe(
-      'Your device, the Kilo gateway with your chosen transcription model, or Apple or Google for online recognition.'
+      'Your device, the Kilo Router with your chosen transcription model, or Apple or Google for online recognition.'
     );
     expect(gateway?.what).toBe(
       'Account ID, request metadata, token usage, and the prompts and voice recordings the app sends through it.'
@@ -462,7 +462,7 @@ describe('Voice transcription section', () => {
     expect(findSwitches(renderer.root).length).toBe(0);
   });
 
-  it('names the Kilo gateway and drops the On device claim when gateway transcription is on', () => {
+  it('names the Kilo Router and drops the On device claim when gateway transcription is on', () => {
     voiceInputControllerMock.supportsOnDevice.mockReturnValue(true);
     gatewayTranscriptionPreferenceMock.gatewayTranscriptionEnabled = true;
     const renderer = mountVoiceControl();
@@ -470,7 +470,7 @@ describe('Voice transcription section', () => {
     const strings = findTextStrings(renderer.root);
     // Regression: the row printed "On device" from supportsOnDevice() while
     // the gateway engine was the one that actually ran.
-    expect(strings).toContain('Via the Kilo gateway');
+    expect(strings).toContain('Via the Kilo Router');
     expect(strings).not.toContain('On device');
     expect(findSwitches(renderer.root).length).toBe(0);
   });
@@ -483,7 +483,7 @@ describe('Voice transcription section', () => {
     const texts = findTextStrings(renderer.root);
     expect(texts).toContain('Loading…');
     expect(texts).not.toContain('On device');
-    expect(texts).not.toContain('Via the Kilo gateway');
+    expect(texts).not.toContain('Via the Kilo Router');
     expect(findSwitches(renderer.root).length).toBe(0);
   });
 

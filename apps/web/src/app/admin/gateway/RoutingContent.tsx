@@ -43,7 +43,7 @@ export function RoutingContent() {
         void queryClient.invalidateQueries({
           queryKey: trpc.admin.gatewayConfig.get.queryKey(),
         });
-        toast.success('Gateway routing configuration updated');
+        toast.success('Kilo Router routing configuration updated');
       },
       onError: error => {
         toast.error(formatZodError(error));
@@ -82,7 +82,7 @@ export function RoutingContent() {
     <div className="flex w-full flex-col gap-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>Gateway Routing</CardTitle>
+          <CardTitle>Kilo Router Routing</CardTitle>
           <CardDescription>
             When on, all free and paid traffic for models available on the Vercel AI Gateway is
             routed to Vercel. When off, that traffic goes to OpenRouter. Models not available on

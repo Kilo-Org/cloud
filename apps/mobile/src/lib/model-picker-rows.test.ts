@@ -174,14 +174,14 @@ describe('buildModelPickerRows', () => {
       name: 'Auto Efficient',
       displayId: 'kilo-auto/efficient',
       modelRef: { providerID: 'kilo', modelID: 'kilo-auto/efficient' },
-      provider: { id: 'kilo', name: 'Kilo Gateway' },
+      provider: { id: 'kilo', name: 'Kilo Router' },
     };
     const favoriteIds = new Set(['kilo-auto/efficient']);
     for (const search of [
       i18n.t('models.auto.efficient'),
       '  AUTO EFFICIENT  ',
       'kilo-auto/efficient',
-      'Kilo Gateway',
+      'Kilo Router',
       'kilo',
     ]) {
       expect(buildModelPickerRows({ models: [model], search, favoriteIds })).toEqual([

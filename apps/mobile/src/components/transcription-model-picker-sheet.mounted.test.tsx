@@ -264,7 +264,7 @@ describe('TranscriptionModelPickerSheet', () => {
     expect(emptyState?.props).toMatchObject({
       icon: 'Mic',
       title: 'No transcription models',
-      description: 'The gateway offers no transcription models right now.',
+      description: 'Kilo Router offers no transcription models right now.',
     });
     expect(findByType(renderer.root, 'FlashList')).toHaveLength(0);
 

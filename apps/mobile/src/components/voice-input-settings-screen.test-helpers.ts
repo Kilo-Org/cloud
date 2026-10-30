@@ -46,11 +46,11 @@ function findGatewaySwitch(renderer: ReactTestRenderer) {
     node =>
       typeof node.type === 'string' &&
       (node.type as string) === 'Switch' &&
-      node.props.accessibilityLabel === 'Gateway transcription'
+      node.props.accessibilityLabel === 'Kilo Router transcription'
   );
   const foundSwitch = found[0];
   if (!foundSwitch) {
-    throw new Error('Gateway transcription switch not found');
+    throw new Error('Kilo Router transcription switch not found');
   }
   return foundSwitch;
 }

@@ -87,7 +87,7 @@ export default function RequestLoggingOptInsContent() {
       <div>
         <h1 className="type-title">Request Logging Opt-ins</h1>
         <p className="text-muted-foreground mt-1 type-body">
-          Enable AI gateway request and response logging for a specific account or organization.
+          Enable Kilo Router request and response logging for a specific account or organization.
         </p>
       </div>
 

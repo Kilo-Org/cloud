@@ -7,7 +7,7 @@ describe('classifyVoiceInputError - gateway codes', () => {
     expect(classifyVoiceInputError('gateway-unreachable')).toEqual({
       action: 'none',
       availability: 'available',
-      message: "Couldn't reach the Kilo gateway. Check your connection and try again.",
+      message: "Couldn't reach the Kilo Router. Check your connection and try again.",
       retryable: true,
     });
   });
@@ -34,7 +34,7 @@ describe('classifyVoiceInputError - gateway codes', () => {
     expect(classifyVoiceInputError('gateway-auth')).toEqual({
       action: 'none',
       availability: 'available',
-      message: 'Sign in to use gateway transcription.',
+      message: 'Sign in to use Kilo Router transcription.',
       retryable: false,
     });
   });

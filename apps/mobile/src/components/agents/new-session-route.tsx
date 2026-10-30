@@ -7,7 +7,9 @@ import { useNewSessionOrganization } from '@/components/agents/use-new-session-o
 import { ScreenHeader } from '@/components/screen-header';
 import { ActivityIndicator } from '@/components/ui/activity-indicator';
 import { Text } from '@/components/ui/text';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useOrganization } from '@/lib/organization-context';
+import { cn } from '@/lib/utils';
 
 /**
  * The New-session composer with the caller's organization context. Rendered by
@@ -41,7 +43,10 @@ export function NewSessionRoute() {
                 accessibilityRole="button"
                 accessibilityLabel={t('common.retry')}
                 onPress={retry}
-                className="min-h-11 flex-row items-center justify-center active:opacity-70"
+                className={cn(
+                  STATE_ACTION_CLASS,
+                  'flex-row items-center justify-center active:opacity-70'
+                )}
               >
                 <Text className="text-sm text-primary">{t('common.retry')}</Text>
               </Pressable>

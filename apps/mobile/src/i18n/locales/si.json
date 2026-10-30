@@ -148,7 +148,8 @@
     "durationMinuteShort": "මිනි",
     "durationHourShort": "පැය",
     "changes": "වෙනස්කම්",
-    "organizationTrialEnded": "සංවිධානයේ පරීක්ෂණ කාලය අවසන් වී ඇති අතර එයට සක්‍රීය සැලැස්මක් නොමැත. සංවිධාන හිමිකරුවෙකුට kilo.ai හි බිල්පත් යාවත්කාලීන කර නැවත උත්සාහ කළ හැක."
+    "organizationTrialEnded": "සංවිධානයේ පරීක්ෂණ කාලය අවසන් වී ඇති අතර එයට සක්‍රීය සැලැස්මක් නොමැත. සංවිධාන හිමිකරුවෙකුට kilo.ai හි බිල්පත් යාවත්කාලීන කර නැවත උත්සාහ කළ හැක.",
+    "privateRepositoryA11y": "{{name}}, පුද්ගලික කේත ගබඩාව"
   },
   "language": {
     "restarting": "භාෂාව යෙදීමට නැවත ආරම්භ කරමින්",
@@ -644,7 +645,12 @@
       "loading": "එන ලිපි පූරණය කරමින්",
       "noReviewRequests": "සමාලෝචන ඉල්ලීම් නොමැත",
       "noReviewRequestsDescription": "ඔබේ සමාලෝචනය බලාපොරොත්තුවෙන් ඇති පුල් ඉල්ලීම් මෙහි දිස්වේ. ඔබට ඕනෑම PR සබැඳියක් ඉහළින් ඇලවීමටත් හැක.",
-      "couldNotLoad": "එන ලිපි පූරණය කිරීමට නොහැකි විය."
+      "couldNotLoad": "එන ලිපි පූරණය කිරීමට නොහැකි විය.",
+      "accessLostTitle": "මෙම සංවිධානයට ප්‍රවේශය නොමැත",
+      "accessLostDescription": "ඔබ තවදුරටත් මෙම සංවිධානයේ සාමාජිකයෙකු නොවන නිසා එහි සමාලෝචන ඉල්ලීම් පූරණය කළ නොහැක. සමාලෝචනය දිගටම කරගෙන යාමට ඔබේ පෞද්ගලික ගිණුමෙන් ඉදිරියට යන්න.",
+      "organizationUnavailableTitle": "මෙම සංවිධානය තවදුරටත් නොපවතී",
+      "organizationUnavailableDescription": "මෙම සංවිධානය මකා දමා ඇති නිසා එහි සමාලෝචන ඉල්ලීම් පූරණය කළ නොහැක. සමාලෝචනය දිගටම කරගෙන යාමට ඔබේ පෞද්ගලික ගිණුමෙන් ඉදිරියට යන්න.",
+      "continueInPersonal": "පෞද්ගලික ගිණුමෙන් ඉදිරියට"
     },
     "composer": {
       "commentBodyPlaceholder": "ඔබේ අදහස",
@@ -1513,7 +1519,13 @@
         "change_request_failed": "PR අසාර්ථක විය",
         "superseded": "දැනටමත් ඇත"
       },
-      "noProposalsDescription": "Kilo නඩත්තුකරුවන්ගේ පිළිතුරු විශ්ලේෂණය කළ පසු සමාලෝචන මතකයේ යෝජනා මෙහි දිස් වේ."
+      "noProposalsDescription": "Kilo නඩත්තුකරුවන්ගේ පිළිතුරු විශ්ලේෂණය කළ පසු සමාලෝචන මතකයේ යෝජනා මෙහි දිස් වේ.",
+      "changeRequestInProgress": "මෙම යෝජනාව සඳහා Kilo දැනටමත් pull request එකක් විවෘත කරමින් සිටී. මොහොතකින් නැවත උත්සාහ කරන්න.",
+      "changeRequestNotActionable": "මෙම යෝජනාව තවදුරටත් අනුමත කළ නොහැක. එය වසා ලැයිස්තුව නැවුම් කරන්න.",
+      "changeRequestNoGitHubAccess": "මෙම ගබඩාවට ප්‍රවේශය ඇති GitHub සම්බන්ධතාවයක් නොමැත. එයට ප්‍රවේශය සහිතව GitHub නැවත සම්බන්ධ කර නැවත උත්සාහ කරන්න.",
+      "changeRequestMissingPermissions": "Kilo හි GitHub App ට මෙම ගබඩාව තුළ pull request විවෘත කළ නොහැක. ගබඩා හිමිකරුවෙකු විසින් යෙදුමට contents සහ pull requests සඳහා ලිවීමේ ප්‍රවේශය ලබා දිය යුතුය, පසුව නැවත උත්සාහ කරන්න.",
+      "changeRequestFailed": "Kilo ට pull request විවෘත කළ නොහැකි විය. මොහොතකින් නැවත උත්සාහ කරන්න.",
+      "offAction": "සමාලෝචන මතකය අක්‍රීයයි. එය සක්‍රීය කර නැවත උත්සාහ කරන්න."
     },
     "manualReview": {
       "title": "ඔබ විසින් ආරම්භ කරන සමාලෝචනය",
@@ -1932,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "වෙනස්කම් සුරකින්න",
+      "saved": "සැකසුම් සුරකින ලදී",
       "unsavedTitle": "සුරැකී නැති වෙනස්කම්",
       "unsavedMessage": "මෙම තිරයෙන් ඉවත්වීමට පෙර ඔබේ වෙනස්කම් සුරකින්නද?",
       "unsavedInvalidMessage": "මෙම වෙනස්කම් තවම සුරැකිය නොහැක. සුරැකීමට ඒවා නිවැරදි කරන්න, නැතහොත් ඉවත්වීමට ඒවා ඉවතලන්න."
@@ -2309,6 +2322,8 @@
       "couldNotLoadEnvironment": "ඔබේ පරිසරය පූරණය කළ නොහැකි විය.",
       "retryLoadingEnvironment": "පරිසරය පූරණය කිරීමට නැවත උත්සාහ කරන්න",
       "defaultEnvironment": "පෙරනිමි පරිසරය",
+      "environmentAccessibility": "පැතිකඩක් තෝරන්න: {{label}}",
+      "environmentAccessibilityNeedsAttention": "පැතිකඩක් තෝරන්න: {{label}}. {{attention}}",
       "leaveChanges": "වෙනස්කම් තබන්න",
       "commitAndPush": "කමිට් කර පුෂ් කරන්න",
       "startSession": "සැසිය ආරම්භ කරන්න",
@@ -2343,7 +2358,7 @@
       "manageProfiles": "පැතිකඩ කළමනාකරණය කරන්න",
       "noProfiles": "තවම පැතිකඩ නැත. පාරිසරික විචල්‍යයන්, MCP සේවාදායකයන් සහ කුසලතා එක් කිරීමට එකක් සාදන්න.",
       "advancedConfig": "උසස් වින්යාසය",
-      "advancedConfigDescription": "සුරකින ලද වින්‍යාස කිරීම් පූරණය කිරීමට පැතිකඩක් තෝරන්න, සහ අතිරේක පරිසර විචල්‍යයන් සහ සැකසුම් විධානයන් අතින් වින්‍යාස කරන්න",
+      "advancedConfigDescription": "මෙය මෙම සැසියට අදාළ වේ. පැතිකඩක් ලෙස සුරැකීමෙන් එය ඊළඟ වතාවට රැඳේ.",
       "saveAsProfile": "පැතිකඩ ලෙස සුරකින්න",
       "saveProfileDescription": "වත්මන් පරිසර විචල්‍යයන් සහ සැකසුම් විධාන නැවත භාවිත කළ හැකි පැතිකඩක් ලෙස සුරකින්න.",
       "profileSummary": "{{vars}} පරිසර විචල්‍යයන් · {{commands}} පිහිටුවීම් විධාන",
@@ -2971,7 +2986,9 @@
     "permissionDescription": "මෙය බැලීමට ඔබට අවසර නැත.",
     "notFoundDescription": "මෙම අයිතමය ඉවත් කර තිබිය හැකිය, නැතිනම් එය තවදුරටත් ලබාගත නොහැක.",
     "serverTitle": "පූරණය කළ නොහැකි විය.",
-    "serverDescription": "අපේ පද්ධතියේ දෝෂයක් ඇති විය. කරුණාකර නැවත උත්සාහ කරන්න."
+    "serverDescription": "අපේ පද්ධතියේ දෝෂයක් ඇති විය. කරුණාකර නැවත උත්සාහ කරන්න.",
+    "timeoutTitle": "සේවාදායකය ප්‍රමාද වෙමින්",
+    "timeoutDescription": "ඉල්ලීම අවසන් වීමට පෙර කල් ගියේය. කරුණාකර නැවත උත්සාහ කරන්න."
   },
   "screenHeader": {
     "openMenu": "මෙනුව විවෘත කරන්න",
@@ -3824,7 +3841,9 @@
     "commandsTitle": "සැකසුම් විධාන",
     "addCommand": "විධානය එක් කරන්න",
     "commandLabel": "විධානය",
+    "commandLabelPosition": "විධානය {{position}}",
     "commandPlaceholder": "උදා. pnpm install",
+    "commandAtLimit": "විධානය අක්ෂර {{max}}කට සීමා වේ",
     "commandsEmpty": "තවමත් පිහිටුවීම් විධාන නොමැත",
     "commandsSaveFailed": "පිහිටුවීම් විධාන සුරැකීමට නොහැකි විය",
     "moveUp": "ඉහළට ගමන් කරන්න",
@@ -3842,6 +3861,7 @@
     "skillSaveFailed": "කුසලතා සුරැකීමට නොහැකි විය",
     "skillSourceCustom": "අභිරුචි",
     "skillSourceMarketplace": "වෙළඳපොළ",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "SKILL.md එකක් අලවන්න සහ එහි නම පුරවයි; ඇදගෙන යාමකින් තොරව ඔබගේ දුරකථනයෙන් කුසලතා එක් කරන්න.",
     "skillEditTitle": "සංස්කරණ කුසලතා",
     "skillEdit": "කුසලතාව {{name}} සංස්කරණය කරන්න",
@@ -3856,9 +3876,9 @@
       "remoteType": "දුරස්ථ",
       "command": "විධාන රේඛාව",
       "url": "URL",
-      "environment": "පරිසරය (JSON)",
+      "environment": "පරිසර විචල්‍යයන් (JSON)",
       "headers": "ශීර්ෂ (JSON)",
-      "timeout": "කාලය හමාරයි",
+      "timeout": "කල් ඉකුත්වීමේ කාලය",
       "secretCount_one": "{{count}} රහස",
       "secretCount_other": "{{count}} රහස්",
       "namePlaceholder": "my-server",
@@ -3868,6 +3888,7 @@
       "headersHint": "•••• ලෙස පෙන්වන අගයන් ඒවායේ ගබඩා කළ රහස තබා ගනී; අගයක් ප්‍රතිස්ථාපනය කිරීමෙන් එය භ්‍රමණය වේ. URL වෙනස් කිරීමට සෑම අගයක්ම නැවත අවශ්‍ය වේ",
       "nameRequired": "සේවාදායකයේ නමක් ඇතුළත් කරන්න",
       "nameInvalid": "නමට භාවිත කළ හැක්කේ ASCII අකුරු, අංක, යටි ඉරි සහ ඉරි පමණක් වන අතර අක්ෂර 100ක් දක්වා විය යුතුය",
+      "nameConflict": "මෙම නමින් සේවාදායකයක් දැනටමත් පවතී",
       "commandRequired": "විධානයක් ඇතුල් කරන්න",
       "commandTooLong": "උපරිම අක්ෂර 500 බැගින් තර්ක 50ක් භාවිත කරන්න",
       "urlRequired": "URL එකක් ඇතුල් කරන්න",
@@ -3875,7 +3896,7 @@
       "urlTooLong": "URL අක්ෂර 2048ක් හෝ ඊට අඩු විය යුතුය",
       "jsonInvalid": "වලංගු JSON ඇතුලත් කරන්න — තන්තු අගයන් වස්තුවක්",
       "jsonTooLarge": "උපරිම සටහන් 50ක් භාවිත කරන්න, යතුරු 128 දක්වා සහ අගයන් අක්ෂර 4096 දක්වා",
-      "timeoutInvalid": "කල් ඉකුත්වීම සම්පූර්ණ මිලි තත්පර ගණනක් විය යුතුය",
+      "timeoutInvalid": "කල් ඉකුත්වීමේ කාලය සම්පූර්ණ මිලි තත්පර ගණනක් විය යුතුය",
       "edit": "MCP සේවාදායකය {{name}} සංස්කරණය කරන්න",
       "delete": "MCP සේවාදායකය {{name}} මකන්න",
       "saveFailed": "MCP සේවාදායකය සුරැකීමට නොහැකි විය",
@@ -3948,7 +3969,6 @@
       "repo": "ගබඩාව තෝරන්න...",
       "profile": "පැතිකඩ තෝරන්න",
       "remove": "නොබැඳීම",
-      "private": "පුද්ගලිකයි",
       "search": "ගබඩාවන් සොයන්න...",
       "addedToast": "\"{{repo}}\" සඳහා පෙරනිමි පැතිකඩ සකසා ඇත",
       "addFailed": "පෙරනිමි පැතිකඩ සැකසීමට නොහැකි විය",

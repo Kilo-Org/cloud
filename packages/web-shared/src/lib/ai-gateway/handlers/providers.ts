@@ -1,11 +1,9 @@
 import { NextResponse } from 'next/server';
 import { captureException } from '@sentry/nextjs';
-import { modelsByProvider } from '@kilocode/db';
-import { desc } from 'drizzle-orm';
 import type * as z from 'zod';
 import { OpenRouterProvidersResponseSchema } from '@kilocode/web-shared/lib/organizations/organization-types';
-import { createCachedFetch } from '@kilocode/web-shared/lib/cached-fetch';
-import { readDb } from '@kilocode/web-shared/lib/drizzle';
+import { getModelsByProviderSnapshot } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/models-by-provider-snapshot.server';
+import type { NormalizedOpenRouterResponse } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/openrouter-types';
 import { getDirectByokProviderListings } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 
 type ProviderListEntry = z.infer<typeof OpenRouterProvidersResponseSchema>['data'][number];
@@ -24,22 +22,35 @@ export function withDirectByokProviders(
   );
 }
 
-const getProviders = createCachedFetch(
-  async () => {
-    const [row] = await readDb
-      .select({ data: modelsByProvider.data })
-      .from(modelsByProvider)
-      .orderBy(desc(modelsByProvider.id))
-      .limit(1);
-    if (!row) return null;
-    return withDirectByokProviders(
-      OpenRouterProvidersResponseSchema.shape.data.parse(row.data.providers)
+/** Parsed providers for one snapshot; `null` marks a snapshot that failed validation. */
+const compiledProviders = new WeakMap<NormalizedOpenRouterResponse, ProviderListEntry[] | null>();
+
+/**
+ * Validates one snapshot and merges the direct BYOK listings. The snapshot cache
+ * hands out the same object until it refreshes, so both the parse and the report
+ * of a validation failure happen once per snapshot instead of once per request.
+ */
+function compileProviders(snapshot: NormalizedOpenRouterResponse): ProviderListEntry[] | null {
+  const compiled = compiledProviders.get(snapshot);
+  if (compiled !== undefined) return compiled;
+
+  let result: ProviderListEntry[] | null;
+  try {
+    result = withDirectByokProviders(
+      OpenRouterProvidersResponseSchema.shape.data.parse(snapshot.providers)
     );
-  },
-  600_000,
-  null,
-  { name: 'openRouterProviders' }
-);
+  } catch (error) {
+    captureException(error, {
+      tags: { endpoint: 'openrouter/providers' },
+      extra: {
+        action: 'validating_providers',
+      },
+    });
+    result = null;
+  }
+  compiledProviders.set(snapshot, result);
+  return result;
+}
 
 /**
  * Test using:
@@ -47,11 +58,18 @@ const getProviders = createCachedFetch(
  */
 export async function handleProvidersRequest(): Promise<NextResponse> {
   try {
-    const data = await getProviders();
-    if (data === null) {
+    const snapshot = await getModelsByProviderSnapshot();
+    if (snapshot === null) {
       return NextResponse.json(
         { error: 'Service Unavailable', message: 'Providers data not yet available' },
         { status: 503 }
+      );
+    }
+    const data = compileProviders(snapshot);
+    if (data === null) {
+      return NextResponse.json(
+        { error: 'Internal Server Error', message: 'Failed to fetch providers' },
+        { status: 500 }
       );
     }
     return NextResponse.json({ data });

@@ -420,13 +420,18 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
         };
       }
 
+      let linkedObjectKeys: string[] = [];
       try {
         // New-session flows call prepareSession without a follow-up
         // sendMessage, so the attachment rows must be linked before prepare
         // can accept the session; otherwise the reaper deletes new-session
         // objects.
-        await linkAttachmentsForDispatch(ctx.user.id, attachments);
+        linkedObjectKeys = await linkAttachmentsForDispatch(ctx.user.id, attachments);
+      } catch (error) {
+        rethrowCloudAgentError(error);
+      }
 
+      try {
         return await client.prepareSession({
           ...restInput,
           ...gitParams,
@@ -437,6 +442,15 @@ export const organizationCloudAgentNextRouter = createTRPCRouter({
           clientProvenance: isMobileClient(ctx.headersList) ? 'mobile' : 'browser',
         });
       } catch (error) {
+        // Both dispatch paths route a worker's answer through the same helper,
+        // which acts only on a definite refusal and only for the rows this
+        // dispatch linked.
+        await releaseRefusedSend({
+          attachments,
+          error,
+          kiloUserId: ctx.user.id,
+          linkedObjectKeys,
+        });
         rethrowCloudAgentError(error);
       }
     }),

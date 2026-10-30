@@ -2042,6 +2042,56 @@ describe('local delivery', () => {
     renderer.unmount();
   });
 
+  it('encodes a strip of images two at a time and keeps chip order', async () => {
+    const pending: { resolve: (image: { media: string; data: string }) => void }[] = [];
+    hoisted.encodeLocalImage.mockImplementation(() => {
+      const { promise, resolve } = Promise.withResolvers<{ media: string; data: string }>();
+      pending.push({ resolve });
+      return promise;
+    });
+    const renderer = await mountLocal();
+    await act(async () => {
+      await local().addCandidates([
+        { name: 'a.png', uri: 'file:///cache/a.png' },
+        { name: 'b.png', uri: 'file:///cache/b.png' },
+        { name: 'c.png', uri: 'file:///cache/c.png' },
+      ]);
+    });
+    expect(local().attachments.map(chip => chip.status)).toEqual(['local', 'local', 'local']);
+
+    // The send starts here: every chip is a local image, so the read allocates
+    // no chip state until an encode fails.
+    const sending = local().uploadPending();
+    await act(settle);
+    // Two encodes are in flight and the third chip waits for a slot, so the
+    // decoded images held at once do not scale with the strip.
+    expect(hoisted.encodeLocalImage).toHaveBeenCalledTimes(2);
+
+    // Finish the second image first: the strip still reports chip order, and
+    // the third chip starts as soon as a slot frees.
+    pending[1]?.resolve({ media: 'image/jpeg', data: 'B' });
+    await act(settle);
+    expect(hoisted.encodeLocalImage).toHaveBeenCalledTimes(3);
+    pending[2]?.resolve({ media: 'image/jpeg', data: 'C' });
+    pending[0]?.resolve({ media: 'image/jpeg', data: 'A' });
+
+    let result: UploadPendingResult = { ok: false };
+    await act(async () => {
+      result = await sending;
+    });
+    expect(result).toEqual({
+      ok: true,
+      wire: undefined,
+      submission: undefined,
+      images: [
+        { media: 'image/jpeg', data: 'A' },
+        { media: 'image/jpeg', data: 'B' },
+        { media: 'image/jpeg', data: 'C' },
+      ],
+    });
+    renderer.unmount();
+  });
+
   it('refuses a document with a clear message', async () => {
     const renderer = await mountLocal();
     await act(async () => {

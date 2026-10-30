@@ -15,6 +15,7 @@ import {
   setSelectedBranchOverride,
   subscribeNewSessionBranchState,
 } from '@/components/agents/new-session-repository-state';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useRepositoryBranches } from '@/lib/use-new-session-repos';
 import { branchPickerSlot, UNFENCED_ROUTE_KEY } from '@/lib/route-registry';
@@ -135,6 +136,7 @@ export function RepositoryBranchSelector({
             <Button
               variant="outline"
               size="sm"
+              className={STATE_ACTION_CLASS}
               onPress={handleRetry}
               disabled={section.isRetrying}
               loading={section.isRetrying}

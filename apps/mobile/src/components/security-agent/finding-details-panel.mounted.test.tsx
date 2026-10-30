@@ -13,8 +13,10 @@ import { type SecurityFinding } from '@/lib/security-agent';
 
 const mocks = vi.hoisted(() => {
   const deadlineState: Record<string, unknown> = { kind: 'no-deadline' };
+  const interpolations: { key: string; params: Record<string, unknown> }[] = [];
   return {
     deadlineState,
+    interpolations,
     routerPush: vi.fn(),
     openBrowser: vi.fn(),
     linkingOpenUrl: vi.fn(),
@@ -31,8 +33,18 @@ vi.mock('expo-web-browser', () => ({ openBrowserAsync: mocks.openBrowser }));
 vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: mocks.routerPush }),
+  useFocusEffect: () => undefined,
 }));
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key: string) => key }) }));
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, params?: Record<string, unknown>) => {
+      if (params) {
+        mocks.interpolations.push({ key, params });
+      }
+      return key;
+    },
+  }),
+}));
 vi.mock('@/i18n', () => ({ i18n: { t: (key: string) => key } }));
 vi.mock('@/components/ui/icons', () => ({
   ExternalLink: 'ExternalLink',
@@ -214,4 +226,25 @@ describe('FindingDetailsPanel chip row', () => {
 
     expect(tree.root.findAllByType(FindingStatusBadge)).toHaveLength(1);
   });
+});
+
+describe('FindingDetailsPanel stored dismissal values', () => {
+  beforeEach(() => {
+    mocks.deadlineState = { kind: 'closed', superseded: false, at: new Date(0) };
+    mocks.interpolations.length = 0;
+  });
+
+  // A dismissed row reads `ignored_reason` from the stored record, and the
+  // column's type does not guarantee it is still a string.
+  it.each([{ ignored_reason: 7 }, { ignored_reason: true }, { ignored_reason: '  ' }])(
+    'falls back to the review wording for an unusable reason (%j)',
+    override => {
+      renderPanel(findingFixture({ status: 'ignored', ...override }));
+
+      expect(mocks.interpolations).toContainEqual({
+        key: 'securityAgent.findingDetails.dismissedBecause',
+        params: { reason: 'securityAgent.findingDetails.reasonAfterReview' },
+      });
+    }
+  );
 });

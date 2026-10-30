@@ -1,6 +1,7 @@
 import { type RefObject, useCallback, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import * as Haptics from 'expo-haptics';
+import { notificationHaptic } from '@/lib/haptics';
 import { toast } from 'sonner-native';
 
 import { i18n } from '@/i18n';
@@ -279,12 +280,7 @@ export function useNewSessionCreator({
             ...(todoTitle ? { title: todoTitle } : {}),
           });
         }
-        // Contained on its own so a rejected haptics call still navigates.
-        try {
-          await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-        } catch {
-          // A failed haptics call is cosmetic; stay silent and navigate.
-        }
+        notificationHaptic(Haptics.NotificationFeedbackType.Success);
         // One atomic navigation: `replace` drops the new-session route as it
         // pushes the session route, so back still lands on the session list.
         // The previous form — `push` plus a `RESET` dispatched one frame later —

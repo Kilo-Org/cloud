@@ -29,6 +29,7 @@ import {
   supportsCatalogMode,
 } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok';
 import { byokOwner, isInferenceProviderUserByok } from '@kilocode/web-shared/lib/ai-gateway/byok';
+import { isVercelUserByokProviderAllowed } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/inference-provider-id';
 import { sendUpstreamAttempt } from '@kilocode/web-shared/lib/ai-gateway/providers/upstream-attempt';
 import { debugSaveProxyRequest } from '@kilocode/web-shared/lib/debugUtils';
 import { setTag, startInactiveSpan } from '@sentry/nextjs';
@@ -858,9 +859,12 @@ export async function handleLlmProxyRequest(
     let groupModelAllowed = true;
     let groupModelAllowedForInferenceProviderUserByok = true;
     let groupProvidersAllowed = true;
+    let allowedProviders: ReadonlySet<string> | undefined;
     if (groupPolicy) {
       const groupDecision = await getEffectiveModelDecision(groupPolicy, modelId);
       groupModelAllowed = groupDecision.allowed;
+      // An `organization_provider` denial means no allowed provider serves the model.
+      allowedProviders = groupDecision.allowed ? groupDecision.eligibleProviderRoutes : new Set();
       groupModelAllowedForInferenceProviderUserByok =
         allowsInferenceProviderUserByok(groupDecision);
       if (groupDecision.eligibleProviderRoutes) {
@@ -870,6 +874,7 @@ export async function handleLlmProxyRequest(
       }
     }
     return {
+      allowedProviders,
       balance,
       balanceLimitedByUserAllowance,
       effectiveProviderConfig: effectiveProviderConfig
@@ -890,6 +895,9 @@ export async function handleLlmProxyRequest(
       getRoutingProviderConfig: isAnonymousContext(user)
         ? undefined
         : async () => (await get()).effectiveProviderConfig,
+      getAllowedProviders: isAnonymousContext(user)
+        ? undefined
+        : async () => (await get()).allowedProviders,
     };
   }
 
@@ -916,6 +924,7 @@ export async function handleLlmProxyRequest(
     countryCode,
     getRoutingProviderConfig: async () =>
       (await accessCheckResolver.getRoutingProviderConfig?.()) ?? requestBodyParsed.body.provider,
+    getAllowedProviders: accessCheckResolver.getAllowedProviders,
     kiloIgnoredProviders: ignoredProviders,
   });
   if (providerResult.kind === 'chatgpt-reconnect') {
@@ -985,6 +994,7 @@ export async function handleLlmProxyRequest(
   // Skip balance/org checks for anonymous users - they can only use free models
   if (!isAnonymousContext(user) && !effectiveProviderContext.bypassAccessCheck) {
     const {
+      allowedProviders,
       balance,
       balanceLimitedByUserAllowance,
       effectiveProviderConfig,
@@ -1014,6 +1024,14 @@ export async function handleLlmProxyRequest(
       return isAutoRoutedRequest ? efficientPoolBlockedResponse() : modelNotAllowedResponse();
     }
     if (!groupProvidersAllowed) return modelNotAllowedResponse();
+    if (
+      effectiveProviderContext.provider.id === 'vercel' &&
+      effectiveProviderContext.userByok?.some(
+        byok => !isVercelUserByokProviderAllowed(byok.providerId, allowedProviders)
+      )
+    ) {
+      return modelNotAllowedResponse();
+    }
 
     if (effectiveProviderConfig) {
       requestBodyParsed.body.provider = effectiveProviderConfig;

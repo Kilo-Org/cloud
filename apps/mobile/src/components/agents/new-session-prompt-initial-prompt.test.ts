@@ -406,6 +406,27 @@ describe('NewSessionPrompt initialPrompt seed', () => {
     expect(textInputProps!.defaultValue).toBeUndefined();
   });
 
+  it.each([
+    ['an entry that must still pick a repository', false],
+    ['an entry that is already configured', true],
+  ])('takes focus on arrival for %s only when the host allows it', async (_case, allow) => {
+    const { NewSessionPrompt } = await import('./new-session-prompt');
+
+    // eslint-disable-next-line new-cap -- plain function call, matching repo test convention
+    const element = NewSessionPrompt({
+      ...defaultProps(),
+      autoFocusOnMount: allow,
+    }) as Node;
+
+    const textInputProps = findElementByType(element, 'TextInput');
+    expect(textInputProps).not.toBeNull();
+    // The keyboard the input raises on arrival is what shrinks the form frame,
+    // so this prop is the whole behaviour: false leaves the configuration on
+    // screen and the input focuses on a tap instead.
+    // eslint-disable-next-line typescript-eslint/no-non-null-assertion -- guarded by expect above
+    expect(textInputProps!.autoFocus).toBe(allow);
+  });
+
   it('pastes clipboard text at the reported caret, not at the draft end', async () => {
     const { NewSessionPrompt } = await import('./new-session-prompt');
 

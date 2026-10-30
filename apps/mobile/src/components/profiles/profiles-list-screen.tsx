@@ -142,6 +142,10 @@ export function ProfilesListScreen({
           <QueryError
             variant={listError.variant}
             placement="top"
+            // The scroll view already supplies the list's gutter and top pad;
+            // the state's own pin air and padding would inset it 24 dp further
+            // than the rows it replaces and leave a band above it.
+            className="px-0 pt-0"
             title={listError.titleKey ? t(listError.titleKey) : undefined}
             onRetry={listError.showRetry ? () => void refetch() : undefined}
             isRetrying={isRefetching}

@@ -67,6 +67,20 @@ export function captureActiveSessionsQueryRefresh(client: QueryClient, queryKey:
   };
 }
 
+/**
+ * True once this scope settled on something the server said: an accepted
+ * `activeSessions.list` result, or a failure its surface can retry. A socket
+ * write alone establishes neither — it is a manual cache write, so a scope
+ * whose only traffic is socket writes has no outcome and keeps painting its
+ * loading placeholder.
+ */
+export function hasActiveSessionsServerOutcome(client: QueryClient, queryKey: QueryKey): boolean {
+  const metadata = getActiveSessionsQueryMetadata(
+    client.getQueryCache().build(client, { queryKey })
+  );
+  return metadata.acceptedRevision > 0 || metadata.terminalError !== null;
+}
+
 /** Keep canceled account/attachment work out of Query's success reducer. */
 export function fenceActiveSessionsQuery<TData, TKey extends QueryKey>(
   queryFn: QueryFunction<TData, TKey>,

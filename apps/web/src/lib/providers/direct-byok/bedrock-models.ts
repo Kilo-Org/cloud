@@ -1,4 +1,4 @@
-import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import { isGrokModel } from '@kilocode/web-shared/lib/ai-gateway/providers/xai';
 import type { AwsBedrockEndpoint } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/bedrock-byok';
 import {

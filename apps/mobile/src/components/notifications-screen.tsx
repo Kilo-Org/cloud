@@ -36,6 +36,7 @@ import { TabScreenScrollView } from '@/components/tab-screen';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Text } from '@/components/ui/text';
 import { useAuth } from '@/lib/auth/auth-context';
+import { STATE_ACTION_CLASS } from '@/lib/a11y/tap-target';
 import {
   applyAgentPushOptimistic,
   deriveAgentPushEditable,
@@ -101,7 +102,7 @@ function InlineRetry({ label, color, onPress }: InlineRetryProps) {
   const { t } = useTranslation();
   return (
     <Pressable
-      className="flex-row items-center gap-1 active:opacity-70"
+      className={cn(STATE_ACTION_CLASS, 'flex-row items-center gap-1 active:opacity-70')}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={label}

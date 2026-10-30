@@ -2476,6 +2476,21 @@ describe('githubPrReviewRouter PR operation ledger (P1-A-08c)', () => {
     expect(mockMarkReconcilePending).not.toHaveBeenCalled();
   });
 
+  it('refuses an admission stored in another organization scope (no effect, no replay)', async () => {
+    getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
+    mockAdmitOperation.mockResolvedValueOnce({ admission: 'organization_mismatch' });
+    const caller = createCaller({ user: { id: 'user-1' } as User });
+    const t1Octokit = buildOctokit('t1');
+
+    await expect(caller.createReviewComment(ledgerCommentInput)).rejects.toMatchObject({
+      code: 'CONFLICT',
+      message: OPERATION_KEY_REUSE_MISMATCH_MESSAGE,
+    });
+    expect(t1Octokit.pulls.createReviewComment).not.toHaveBeenCalled();
+    expect(mockSettleOperation).not.toHaveBeenCalled();
+    expect(mockMarkReconcilePending).not.toHaveBeenCalled();
+  });
+
   it('rejects operation-key reuse for a different request fingerprint under the same intent', async () => {
     getGitHubUserAccessToken.mockResolvedValueOnce(connected('t1', 'auth_1', 1));
     // Same key, same intent, but the stored row was written for a DIFFERENT

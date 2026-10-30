@@ -28,7 +28,7 @@
 //     the mutation hooks own the cache update + rollback, so the
 //     thread just routes the events and lets the cache flow.
 
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { CheckCheck, ChevronDown, ChevronUp } from '@/components/ui/icons';
 import { useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -131,7 +131,7 @@ export function DiscussionThread({
   const isReacting = addReaction.isPending || removeReaction.isPending;
 
   const onToggleResolve = () => {
-    void Haptics.selectionAsync();
+    selectionHaptic();
     if (thread.isResolved) {
       unresolve.mutate({ threadId: thread.threadId });
     } else {

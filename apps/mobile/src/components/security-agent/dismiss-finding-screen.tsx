@@ -47,6 +47,8 @@ function DismissFindingSkeleton() {
     <View className="flex-1 bg-background">
       <ScreenHeader className="px-6" title={t('securityAgent.dismiss.title')} modal />
       <View className="gap-6 px-6 pt-4">
+        {/* The identity card: p-3 plus a title line and the two meta lines. */}
+        <Skeleton className="h-[86px] w-full rounded-lg" />
         <Skeleton className="h-[224px] w-full rounded-lg" />
         <Skeleton className="h-24 w-full rounded-lg" />
         <Skeleton className="h-11 w-full rounded-md" />
@@ -225,6 +227,20 @@ export function DismissFindingScreen({ scope, findingId }: Readonly<DismissFindi
         automaticallyAdjustKeyboardInsets
         keyboardShouldPersistTaps="handled"
       >
+        {/* The dismissal is irreversible on GitHub, so the form names its
+            target the way finding-details-panel.tsx does: the title, then the
+            repository, then the package. Every line wraps instead of
+            truncating — a long title must stay readable to confirm the
+            finding. */}
+        <View className="gap-1 rounded-lg bg-secondary p-3">
+          <Text className="text-base font-medium">{finding.title}</Text>
+          <Text variant="muted" className="text-xs">
+            {finding.repo_full_name}
+          </Text>
+          <Text variant="muted" className="text-xs">
+            {finding.package_name} ({finding.package_ecosystem})
+          </Text>
+        </View>
         {findingQuery.isError ? (
           <SettingsRecoveryStatus
             message={t('securityAgent.dismiss.couldNotLoad')}

@@ -12,12 +12,6 @@ import {
   waitFor,
 } from '@/test/render-with-providers';
 
-// The inbox is the surface that decides which connection a review link opens
-// under, so the context line has to mount there for real: `pr-review-entry-
-// screen.test.ts` runs the screen as a plain function and can only see a
-// same-named host stub. This suite renders the screen, and the context line
-// inside it, through the real renderer.
-
 const list = vi.hoisted(() => vi.fn());
 const storage = vi.hoisted(() => ({ read: vi.fn(), write: vi.fn(), remove: vi.fn() }));
 const auth = vi.hoisted(() => ({ token: 'token' as string | undefined }));
@@ -64,7 +58,10 @@ vi.mock('react-native', () => ({
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ bottom: 18 }),
 }));
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+vi.mock('@/components/screen-header', () => ({
+  ScreenHeader: (props: { headerRight?: ReactNode }) =>
+    createElement('ScreenHeader', null, props.headerRight),
+}));
 vi.mock('@/components/empty-state', () => ({ EmptyState: 'EmptyState' }));
 vi.mock('@/components/ui/button', () => ({ Button: 'Button' }));
 vi.mock('@/components/ui/dialog', () => ({
@@ -99,10 +96,7 @@ vi.mock('@/lib/a11y/announcing-toast', () => ({ announcingToast: { error: vi.fn(
 const ORG_A = { organizationId: 'org-a', organizationName: 'Acme', role: 'owner' };
 const ORG_B = { organizationId: 'org-b', organizationName: 'Umbrella', role: 'member' };
 
-const Text = 'Text' as ElementType;
 const Pressable = 'Pressable' as ElementType;
-const ScreenHeader = 'ScreenHeader' as ElementType;
-const PrReviewInboxList = 'PrReviewInboxList' as ElementType;
 
 const mounted: RenderWithProvidersResult[] = [];
 
@@ -112,17 +106,6 @@ async function mount(): Promise<RenderWithProvidersResult> {
   });
   mounted.push(result);
   return result;
-}
-
-function orderOf(ui: RenderWithProvidersResult, match: (node: ReactTestInstance) => boolean) {
-  return ui.renderer.root.findAll(() => true).findIndex(node => match(node));
-}
-
-function contextLineCopy(ui: RenderWithProvidersResult) {
-  return ui.renderer.root
-    .findAll(node => node.type === Text)
-    .flatMap(node => node.children)
-    .filter(child => typeof child === 'string' && child.startsWith('For '));
 }
 
 async function press(node: ReactTestInstance) {
@@ -155,34 +138,21 @@ afterEach(() => {
   }
 });
 
-describe('PrReviewEntryScreen context line', () => {
-  it('names the active organization between the header and the inbox', async () => {
+describe('PrReviewEntryScreen account picker', () => {
+  it('switches organization through the header picker', async () => {
     const ui = await mount();
-    await waitFor(() => contextLineCopy(ui).includes('For Acme'));
-
-    const header = orderOf(ui, node => node.type === ScreenHeader);
-    const line = orderOf(ui, node => node.type === Text && node.children.includes('For Acme'));
-    const inbox = orderOf(ui, node => node.type === PrReviewInboxList);
-
-    expect(header).toBeGreaterThanOrEqual(0);
-    expect(line).toBeGreaterThan(header);
-    expect(inbox).toBeGreaterThan(line);
-  });
-
-  it('switches organization from the inbox line through the picker sheet', async () => {
-    const ui = await mount();
-    await waitFor(() => contextLineCopy(ui).includes('For Acme'));
+    await waitFor(
+      () => ui.renderer.root.findAll(node => node.props.accessibilityLabel === 'Acme').length > 0
+    );
 
     const control = ui.renderer.root.findAll(
       node => node.props.accessibilityHint === 'Select account'
     )[0];
     if (!control) {
-      throw new Error('the context line is not switchable in the inbox');
+      throw new Error('the account picker is not switchable');
     }
     await press(control);
 
-    // Every account row is an action button that reports whether it is the
-    // current account.
     const rows = ui.renderer.root.findAll(
       node =>
         node.type === Pressable &&
@@ -196,7 +166,14 @@ describe('PrReviewEntryScreen context line', () => {
       throw new Error('the Umbrella row is missing from the picker');
     }
     await press(umbrella);
-    await waitFor(() => contextLineCopy(ui).includes('For Umbrella'));
+    await waitFor(
+      () =>
+        ui.renderer.root.findAll(
+          node =>
+            node.props.accessibilityLabel === 'Umbrella' &&
+            node.props.accessibilityHint === 'Select account'
+        ).length > 0
+    );
     expect(storage.write).toHaveBeenCalledWith(ORGANIZATION_STORAGE_KEY, 'org-b');
   });
 });

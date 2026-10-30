@@ -8,7 +8,7 @@ import type {
   CloudAgentAttachmentFile,
   UseCloudAgentAttachmentUploadReturn,
 } from '@/hooks/useCloudAgentAttachmentUpload';
-import type { ChatInput as ChatInputComponent } from './ChatInput';
+import type { CloudComposer as ChatInputComponent } from './assistant-ui/CloudComposer';
 
 jest.mock('sonner', () => ({
   toast: {
@@ -148,11 +148,11 @@ function setTextareaValue(rootContainer: HTMLElement, value: string) {
     }
   });
   if (!onChange) throw new Error('textarea onChange not found on fiber tree');
-  onChange({ target: { value } });
+  onChange({ target: { value }, nativeEvent: {} } as never);
 }
 
 /** Drive the textarea's own onKeyDown, the path a second Enter takes. */
-function pressEnter(rootContainer: HTMLElement) {
+function pressEnter(rootContainer: HTMLElement, nativeEvent = { isComposing: false, keyCode: 13 }) {
   type Fiber = {
     type: unknown;
     memoizedProps?: { onKeyDown?: (event: unknown) => void };
@@ -180,7 +180,7 @@ function pressEnter(rootContainer: HTMLElement) {
     key: 'Enter',
     shiftKey: false,
     preventDefault: () => {},
-    nativeEvent: { isComposing: false, keyCode: 13 },
+    nativeEvent,
   });
 }
 
@@ -222,7 +222,21 @@ let mockedUseCloudAgentAttachmentUpload: jest.Mock<
 >;
 
 beforeAll(async () => {
-  ({ ChatInput } = await import('./ChatInput'));
+  const { CloudComposer } = await import('./assistant-ui/CloudComposer');
+  const { CloudChatRuntimeProvider } = await import('./assistant-ui/CloudChatRuntimeProvider');
+  ChatInput = props =>
+    createElement(CloudChatRuntimeProvider, {
+      projection: { messages: [], isStreaming: false },
+      state: {
+        isLoading: false,
+        isRunning: false,
+        isReadOnly: false,
+        isSendDisabled: false,
+        canInterrupt: false,
+      },
+      onNew: async () => {},
+      children: createElement(CloudComposer, props),
+    });
   const sonner = await import('sonner');
   toastError = sonner.toast.error as unknown as jest.Mock;
   const uploadModule = await import('@/hooks/useCloudAgentAttachmentUpload');
@@ -536,11 +550,11 @@ describe('ChatInput finalize failure', () => {
             createElement(ChatInput, {
               onSend,
               onNewChat,
-              initialValue: '/new ',
               attachmentUploadOptions: { messageUuid: 'test-message-uuid' },
             })
           );
         });
+        act(() => setTextareaValue(dom.container, '/new '));
         await act(async () => {
           pressEnter(dom.container);
         });
@@ -785,6 +799,15 @@ describe('ChatInput finalize failure', () => {
         expect(upload.finalizeAttachments).toHaveBeenCalledTimes(1);
 
         render('chat-b');
+        const destinationAttachment = {
+          ...attachment,
+          id: 'destination-attachment',
+          r2Key: 'owner/cloud-agent/b/notes.txt',
+          previewUrl: 'blob:destination',
+        };
+        upload.attachments = [destinationAttachment];
+        render('chat-b');
+        act(() => setTextareaValue(dom.container, 'Draft for B'));
         expect(upload.clearAttachments).not.toHaveBeenCalled();
         expect(upload.removeAttachment).not.toHaveBeenCalled();
         const replaceCalls = (upload.replaceAttachments as jest.Mock).mock.calls;
@@ -794,7 +817,7 @@ describe('ChatInput finalize failure', () => {
           resolveSend(accepted);
           await Promise.resolve();
         });
-        expect(dom.container.querySelector('textarea')?.value).toBe('');
+        expect(dom.container.querySelector('textarea')?.value).toBe('Draft for B');
         expect(upload.clearAttachments).not.toHaveBeenCalled();
 
         expect(revokePreview).toHaveBeenCalledTimes(accepted ? 1 : 0);
@@ -805,6 +828,13 @@ describe('ChatInput finalize failure', () => {
           accepted ? [] : [attachment]
         );
         expect(upload.clearAttachments).not.toHaveBeenCalled();
+        upload.attachments = accepted ? [] : [attachment];
+        render('chat-a');
+        render('chat-b');
+        expect(dom.container.querySelector('textarea')?.value).toBe('Draft for B');
+        expect((upload.replaceAttachments as jest.Mock).mock.calls.at(-1)?.[0]).toEqual([
+          destinationAttachment,
+        ]);
       } finally {
         act(() => {
           root.unmount();
@@ -1087,3 +1117,428 @@ describe('ChatInput finalize failure', () => {
     }
   });
 });
+
+describe('CloudComposer originating draft transaction', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+  it.each([true, false])(
+    'preserves newer typing when the held submission settles accepted=%s',
+    async accepted => {
+      mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());
+      let settle: (value: boolean) => void = () => {
+        throw new Error('Send not started');
+      };
+      const onSend = jest.fn(
+        () =>
+          new Promise<boolean>(resolve => {
+            settle = resolve;
+          })
+      );
+      const dom = installLinkedomDom();
+      const root = createRoot(dom.container);
+      try {
+        act(() =>
+          root.render(
+            createElement(ChatInput, {
+              onSend,
+              conversationKey: 'chat-a',
+              attachmentUploadOptions: { messageUuid: 'transaction' },
+            })
+          )
+        );
+        act(() => setTextareaValue(dom.container, 'Original draft'));
+        await act(async () => {
+          pressEnter(dom.container);
+        });
+        act(() => setTextareaValue(dom.container, 'Newer draft'));
+        await act(async () => {
+          pressEnter(dom.container);
+        });
+        expect(onSend).toHaveBeenCalledTimes(1);
+        await act(async () => {
+          settle(accepted);
+        });
+        expect(dom.container.querySelector('textarea')?.value).toBe('Newer draft');
+        expect(onSend).toHaveBeenCalledTimes(1);
+      } finally {
+        act(() => root.unmount());
+        dom.cleanup();
+      }
+    }
+  );
+  it('does not resurrect an older rejected draft after the user types and clears a new revision', async () => {
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());
+    let settle: (value: boolean) => void = () => {
+      throw new Error('Send not started');
+    };
+    const onSend = jest.fn(
+      () =>
+        new Promise<boolean>(resolve => {
+          settle = resolve;
+        })
+    );
+    const dom = installLinkedomDom();
+    const root = createRoot(dom.container);
+    try {
+      act(() =>
+        root.render(
+          createElement(ChatInput, {
+            onSend,
+            conversationKey: 'chat-a',
+            attachmentUploadOptions: { messageUuid: 'transaction' },
+          })
+        )
+      );
+      act(() => setTextareaValue(dom.container, 'Original draft'));
+      await act(async () => {
+        pressEnter(dom.container);
+      });
+      act(() => setTextareaValue(dom.container, 'New revision'));
+      act(() => setTextareaValue(dom.container, ''));
+      await act(async () => {
+        settle(false);
+      });
+      expect(dom.container.querySelector('textarea')?.value).toBe('');
+    } finally {
+      act(() => root.unmount());
+      dom.cleanup();
+    }
+  });
+  it('does not send into the destination conversation after upload finalization finishes late', async () => {
+    let finalize: (value: CloudAgentAttachments | undefined) => void = () => {
+      throw new Error('Finalization not started');
+    };
+    const upload = buildMockUpload({
+      attachments: [
+        {
+          id: 'file-a',
+          status: 'complete',
+          contentType: 'text/plain',
+          kind: 'document',
+          progress: 100,
+          r2Key: 'fixture/file-a',
+          file: new File(['test'], 'a.txt', { type: 'text/plain' }),
+        },
+      ],
+      finalizeAttachments: jest.fn(
+        () =>
+          new Promise<CloudAgentAttachments | undefined>(resolve => {
+            finalize = resolve;
+          })
+      ),
+    });
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(upload);
+    const onSend = jest.fn(async () => true);
+    const dom = installLinkedomDom();
+    const root = createRoot(dom.container);
+    const render = (conversationKey: string) =>
+      act(() =>
+        root.render(
+          createElement(ChatInput, {
+            onSend,
+            conversationKey,
+            attachmentUploadOptions: { messageUuid: 'transaction' },
+          })
+        )
+      );
+    try {
+      render('chat-a');
+      act(() => setTextareaValue(dom.container, 'Original draft'));
+      await act(async () => {
+        pressEnter(dom.container);
+      });
+      render('chat-b');
+      act(() => setTextareaValue(dom.container, 'Chat B draft'));
+      await act(async () => {
+        finalize({ path: 'transaction', files: ['file-a'] });
+      });
+      expect(onSend).not.toHaveBeenCalled();
+      expect(dom.container.querySelector('textarea')?.value).toBe('Chat B draft');
+    } finally {
+      act(() => root.unmount());
+      dom.cleanup();
+    }
+  });
+});
+
+it.each([
+  { isComposing: true, keyCode: 13 },
+  { isComposing: false, keyCode: 229 },
+])('keeps IME Enter from submitting: %j', async nativeEvent => {
+  mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());
+  const onSend = jest.fn(async () => true);
+  const dom = installLinkedomDom();
+  const root = createRoot(dom.container);
+  try {
+    act(() =>
+      root.render(
+        createElement(ChatInput, {
+          onSend,
+          conversationKey: 'ime',
+          attachmentUploadOptions: { messageUuid: 'ime' },
+        })
+      )
+    );
+    act(() => setTextareaValue(dom.container, 'Composing draft'));
+    await act(async () => {
+      pressEnter(dom.container, nativeEvent);
+    });
+    expect(onSend).not.toHaveBeenCalled();
+    expect(dom.container.querySelector('textarea')?.value).toBe('Composing draft');
+    await act(async () => {
+      pressEnter(dom.container);
+    });
+    expect(onSend).toHaveBeenCalledTimes(1);
+  } finally {
+    act(() => root.unmount());
+    dom.cleanup();
+  }
+});
+
+it.each([false, true])(
+  'guards SDK failedPrompt restoration against newer revisions (newer=%s)',
+  async newer => {
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());
+    let settle: (value: boolean) => void = () => {
+      throw new Error('Send not started');
+    };
+    const onSend = jest.fn(
+      () =>
+        new Promise<boolean>(resolve => {
+          settle = resolve;
+        })
+    );
+    const dom = installLinkedomDom();
+    const root = createRoot(dom.container);
+    const render = (conversationKey: string, initialValue?: string) =>
+      act(() =>
+        root.render(
+          createElement(ChatInput, {
+            onSend,
+            conversationKey,
+            initialValue,
+            attachmentUploadOptions: { messageUuid: 'failure' },
+          })
+        )
+      );
+    try {
+      render('chat-a');
+      act(() => setTextareaValue(dom.container, 'Original draft'));
+      await act(async () => {
+        pressEnter(dom.container);
+      });
+      if (newer) {
+        act(() => setTextareaValue(dom.container, 'New revision'));
+        act(() => setTextareaValue(dom.container, ''));
+      }
+      render('chat-a', 'Original draft');
+      await act(async () => {
+        settle(false);
+      });
+      expect(dom.container.querySelector('textarea')?.value).toBe(newer ? '' : 'Original draft');
+      render('chat-b');
+      act(() => setTextareaValue(dom.container, 'B new revision'));
+      act(() => setTextareaValue(dom.container, ''));
+      render('chat-b', 'B failed prompt');
+      expect(dom.container.querySelector('textarea')?.value).toBe('');
+      render('chat-a', 'Original draft');
+      expect(dom.container.querySelector('textarea')?.value).toBe(newer ? '' : 'Original draft');
+    } finally {
+      act(() => root.unmount());
+      dom.cleanup();
+    }
+  }
+);
+
+it.each(['unsent', 'accepted', 'rejected'] as const)(
+  'retains conversation drafts/files through hidden read-only history (%s)',
+  async outcome => {
+    const attachment: CloudAgentAttachmentFile = {
+      id: 'file-a',
+      file: new File(['a'], 'a.txt', { type: 'text/plain' }),
+      contentType: 'text/plain',
+      kind: 'document',
+      status: 'complete',
+      progress: 100,
+      r2Key: 'fixture/a',
+    };
+    const upload = buildMockUpload({ attachments: [attachment] });
+    upload.replaceAttachments = jest.fn((next: CloudAgentAttachmentFile[]) => {
+      upload.attachments = next;
+    });
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(upload);
+    let settle: (accepted: boolean) => void = () => {
+      throw new Error('No pending send');
+    };
+    const onSend = jest.fn(
+      () =>
+        new Promise<boolean>(resolve => {
+          settle = resolve;
+        })
+    );
+    const dom = installLinkedomDom();
+    const root = createRoot(dom.container);
+    const render = (conversationKey: string, hidden = false) =>
+      act(() =>
+        root.render(
+          createElement(
+            'div',
+            { hidden },
+            createElement(ChatInput, {
+              onSend,
+              conversationKey,
+              disabled: hidden,
+              textareaDisabled: hidden,
+              attachmentsEnabled: !hidden,
+              attachmentUploadOptions: { messageUuid: 'hidden' },
+            })
+          )
+        )
+      );
+    try {
+      render('chat-a');
+      act(() => setTextareaValue(dom.container, 'Draft A'));
+      if (outcome !== 'unsent')
+        await act(async () => {
+          pressEnter(dom.container);
+        });
+      render('history', true);
+      if (outcome !== 'unsent')
+        await act(async () => {
+          settle(outcome === 'accepted');
+        });
+      render('chat-b');
+      expect(dom.container.querySelector('textarea')?.value).toBe('');
+      act(() => setTextareaValue(dom.container, 'Draft B'));
+      render('chat-a');
+      expect(dom.container.querySelector('textarea')?.value).toBe(
+        outcome === 'accepted' ? '' : 'Draft A'
+      );
+      expect(upload.replaceAttachments).toHaveBeenLastCalledWith(
+        outcome === 'accepted' ? [] : [attachment]
+      );
+      render('chat-b');
+      expect(dom.container.querySelector('textarea')?.value).toBe('Draft B');
+    } finally {
+      act(() => root.unmount());
+      dom.cleanup();
+    }
+  }
+);
+
+it.each(['chat-b', 'new'])(
+  'does not copy a stale SDK failure into %s during navigation',
+  async destination => {
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());
+    const dom = installLinkedomDom();
+    const root = createRoot(dom.container);
+    const onSend = jest.fn(async () => false);
+    const render = (conversationKey: string, initialValue?: string) =>
+      act(() =>
+        root.render(
+          createElement(ChatInput, {
+            onSend,
+            conversationKey,
+            initialValue,
+            attachmentUploadOptions: { messageUuid: 'navigation' },
+          })
+        )
+      );
+    try {
+      render('chat-a');
+      act(() => setTextareaValue(dom.container, 'A failed prompt'));
+      await act(async () => {
+        pressEnter(dom.container);
+      });
+      render('chat-a', 'A failed prompt');
+      expect(dom.container.querySelector('textarea')?.value).toBe('A failed prompt');
+      render(destination, 'A failed prompt');
+      render(destination);
+      expect(dom.container.querySelector('textarea')?.value).toBe('');
+      render('chat-a', 'A failed prompt');
+      expect(dom.container.querySelector('textarea')?.value).toBe('A failed prompt');
+    } finally {
+      act(() => root.unmount());
+      dom.cleanup();
+    }
+  }
+);
+
+it('retains submission ownership while another conversation stores its draft', async () => {
+  mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());
+  let settle: (accepted: boolean) => void = () => {
+    throw new Error('Send not started');
+  };
+  const onSend = jest.fn(
+    () =>
+      new Promise<boolean>(resolve => {
+        settle = resolve;
+      })
+  );
+  const dom = installLinkedomDom();
+  const root = createRoot(dom.container);
+  const render = (conversationKey: string, initialValue?: string) =>
+    act(() =>
+      root.render(
+        createElement(ChatInput, {
+          onSend,
+          conversationKey,
+          initialValue,
+          attachmentUploadOptions: { messageUuid: 'ownership' },
+        })
+      )
+    );
+  try {
+    render('chat-a');
+    act(() => setTextareaValue(dom.container, 'Original draft'));
+    await act(async () => {
+      pressEnter(dom.container);
+    });
+    render('chat-b');
+    render('chat-a', 'Original draft');
+    expect(dom.container.querySelector('textarea')?.value).toBe('Original draft');
+    await act(async () => {
+      settle(false);
+    });
+  } finally {
+    act(() => root.unmount());
+    dom.cleanup();
+  }
+});
+
+it.each(['chat-b', 'new'])(
+  'does not seed %s from a stale SDK failure when the composer mounts',
+  destination => {
+    mockedUseCloudAgentAttachmentUpload.mockReturnValue(buildMockUpload());
+    const dom = installLinkedomDom();
+    const root = createRoot(dom.container);
+    const onSend = jest.fn(async () => true);
+    try {
+      act(() =>
+        root.render(
+          createElement(ChatInput, {
+            onSend,
+            conversationKey: destination,
+            initialValue: 'Private prompt from chat A',
+            attachmentUploadOptions: { messageUuid: 'remount' },
+          })
+        )
+      );
+      expect(dom.container.querySelector('textarea')?.value).toBe('');
+      act(() =>
+        root.render(
+          createElement(ChatInput, {
+            onSend,
+            conversationKey: destination,
+            attachmentUploadOptions: { messageUuid: 'remount' },
+          })
+        )
+      );
+      expect(dom.container.querySelector('textarea')?.value).toBe('');
+    } finally {
+      act(() => root.unmount());
+      dom.cleanup();
+    }
+  }
+);

@@ -26,37 +26,13 @@ import { TodoWriteToolCard } from './TodoWriteToolCard';
 import { QuestionToolStatus } from './QuestionToolStatus';
 import { SuggestToolCard } from './SuggestToolCard';
 import { SkillToolCard } from './SkillToolCard';
-import { ChildSessionSection, getTaskToolSessionId } from './ChildSessionSection';
-import type { OpenChildSession, RenderPartFn } from './ChildSessionSection';
 import type { ReactNode } from 'react';
-import { MessageErrorBoundary } from './MessageErrorBoundary';
 import { createMarkdownParseCachePlugin, useMarkdownParseCache } from './markdown-parse-cache';
 import { toSafeHttpUrl, toSafeImageSrc } from '@/lib/safe-http-url';
 import { parsePreviewLinkTarget, previewLinkUrl } from '@/lib/cloud-agent/preview-link';
 import { usePreviewLinks } from './use-preview';
-import type { Part, StoredMessage } from './types';
-import {
-  isTextPart,
-  isToolPart,
-  isFilePart,
-  isReasoningPart,
-  shouldRenderReasoningPart,
-  isStepStartPart,
-  isStepFinishPart,
-  isSubtaskPart,
-  isPatchPart,
-  isPartStreaming,
-} from './types';
-
-export type PartRendererProps = {
-  part: Part;
-  isStreaming?: boolean;
-  /** Messages for child sessions (task tools) - keyed by session ID */
-  childSessionMessages?: Map<string, StoredMessage[]>;
-  /** Function to get messages for a child session ID (for nested sessions) */
-  getChildMessages?: (sessionId: string) => StoredMessage[];
-  onOpenChildSession?: OpenChildSession;
-};
+import type { Part } from './types';
+import { shouldRenderReasoningPart, isPartStreaming } from './types';
 
 /** True when the link text is the address itself, as in a bare autolinked URL. */
 function isAddressText(children: ReactNode, href: string): boolean {
@@ -106,7 +82,7 @@ function LinkRenderer({ href, children }: { href?: string; children?: ReactNode 
 const markdownComponents = { a: LinkRenderer };
 const remarkPlugins = [remarkGfm];
 
-const TextPartRenderer = memo(function TextPartRenderer({
+export const TextPartRenderer = memo(function TextPartRenderer({
   text,
   isStreaming,
 }: {
@@ -198,19 +174,7 @@ function StreamingToolPlaceholder({ toolName }: { toolName: string }) {
   );
 }
 
-const renderPartFn: RenderPartFn = props => <PartRenderer {...props} />;
-
-function ToolPartRenderer({
-  part,
-  childSessionMessages,
-  getChildMessages,
-  onOpenChildSession,
-}: {
-  part: Extract<Part, { type: 'tool' }>;
-  childSessionMessages?: Map<string, StoredMessage[]>;
-  getChildMessages?: (sessionId: string) => StoredMessage[];
-  onOpenChildSession?: OpenChildSession;
-}) {
+export function ToolPartRenderer({ part }: { part: Extract<Part, { type: 'tool' }> }) {
   if (!shouldRenderToolPart(part)) return null;
 
   if (
@@ -228,22 +192,6 @@ function ToolPartRenderer({
   }
 
   switch (part.tool) {
-    case 'task': {
-      const sessionId = getTaskToolSessionId(part);
-      const childMessages = sessionId
-        ? childSessionMessages?.get(sessionId) || getChildMessages?.(sessionId) || []
-        : [];
-      return (
-        <ChildSessionSection
-          taskToolPart={part}
-          sessionId={sessionId}
-          childMessages={childMessages}
-          getChildMessages={getChildMessages}
-          renderPart={renderPartFn}
-          onOpenChildSession={onOpenChildSession}
-        />
-      );
-    }
     case 'read':
       return <ReadToolCard toolPart={part} />;
     case 'edit':
@@ -292,7 +240,7 @@ function ToolPartRenderer({
  * For other files, renders a download link
  * Handles stripped file parts (where url is empty) gracefully
  */
-function FilePartRenderer({ part }: { part: Extract<Part, { type: 'file' }> }) {
+export function FilePartRenderer({ part }: { part: Extract<Part, { type: 'file' }> }) {
   const isImage = part.mime.startsWith('image/');
   const imageSrc = isImage ? toSafeImageSrc(part.url) : undefined;
   const fileHref = isImage ? undefined : toSafeHttpUrl(part.url);
@@ -343,7 +291,7 @@ function FilePartRenderer({ part }: { part: Extract<Part, { type: 'file' }> }) {
 /**
  * Renders a ReasoningPart as a collapsible card matching tool card visual language
  */
-function ReasoningPartRenderer({
+export function ReasoningPartRenderer({
   part,
   isStreaming,
 }: {
@@ -389,7 +337,7 @@ function ReasoningPartRenderer({
 /**
  * Renders a SubtaskPart - placeholder for child session indicator
  */
-function SubtaskPartRenderer({ part }: { part: Extract<Part, { type: 'subtask' }> }) {
+export function SubtaskPartRenderer({ part }: { part: Extract<Part, { type: 'subtask' }> }) {
   return (
     <div className="bg-muted/30 border-muted my-2 rounded-md border px-3 py-2">
       <div className="flex items-center gap-2">
@@ -410,17 +358,9 @@ function SubtaskPartRenderer({ part }: { part: Extract<Part, { type: 'subtask' }
 }
 
 /**
- * PatchPart is internal bookkeeping for file change tracking and revert functionality.
- * It has no visual representation - file modifications are shown through tool parts (edit, write, etc).
- */
-function PatchPartRenderer(_props: { part: Extract<Part, { type: 'patch' }> }) {
-  return null;
-}
-
-/**
  * Renders unknown part types with a graceful fallback
  */
-function UnknownPartRenderer({ part }: { part: Part }) {
+export function UnknownPartRenderer({ part }: { part: Part }) {
   return (
     <div className="bg-muted/20 border-muted/50 my-2 rounded-md border px-3 py-2">
       <div className="text-muted-foreground text-xs">
@@ -429,95 +369,3 @@ function UnknownPartRenderer({ part }: { part: Part }) {
     </div>
   );
 }
-
-/**
- * Error fallback for individual parts
- */
-function PartErrorFallback({ partType }: { partType: string }) {
-  return (
-    <div className="bg-destructive/10 border-destructive/50 text-destructive my-2 rounded-md border p-2">
-      <p className="text-xs">Failed to render {partType} part</p>
-    </div>
-  );
-}
-
-export const PartRenderer = memo(
-  function PartRenderer({
-    part,
-    isStreaming,
-    childSessionMessages,
-    getChildMessages,
-    onOpenChildSession,
-  }: PartRendererProps) {
-    if (isTextPart(part)) {
-      return (
-        <MessageErrorBoundary fallback={<PartErrorFallback partType="text" />}>
-          <TextPartRenderer
-            text={part.text}
-            isStreaming={(isStreaming ?? true) && isPartStreaming(part)}
-          />
-        </MessageErrorBoundary>
-      );
-    }
-
-    if (isToolPart(part)) {
-      return (
-        <MessageErrorBoundary fallback={<PartErrorFallback partType="tool" />}>
-          <ToolPartRenderer
-            part={part}
-            childSessionMessages={childSessionMessages}
-            getChildMessages={getChildMessages}
-            onOpenChildSession={onOpenChildSession}
-          />
-        </MessageErrorBoundary>
-      );
-    }
-
-    if (isFilePart(part)) {
-      return (
-        <MessageErrorBoundary fallback={<PartErrorFallback partType="file" />}>
-          <FilePartRenderer part={part} />
-        </MessageErrorBoundary>
-      );
-    }
-
-    if (isReasoningPart(part)) {
-      if (!shouldRenderReasoningPart(part)) {
-        return null;
-      }
-      return (
-        <MessageErrorBoundary fallback={<PartErrorFallback partType="reasoning" />}>
-          <ReasoningPartRenderer part={part} isStreaming={isStreaming} />
-        </MessageErrorBoundary>
-      );
-    }
-
-    if (isStepStartPart(part) || isStepFinishPart(part)) {
-      return null;
-    }
-
-    if (isSubtaskPart(part)) {
-      return (
-        <MessageErrorBoundary fallback={<PartErrorFallback partType="subtask" />}>
-          <SubtaskPartRenderer part={part} />
-        </MessageErrorBoundary>
-      );
-    }
-
-    if (isPatchPart(part)) {
-      return (
-        <MessageErrorBoundary fallback={<PartErrorFallback partType="patch" />}>
-          <PatchPartRenderer part={part} />
-        </MessageErrorBoundary>
-      );
-    }
-
-    return <UnknownPartRenderer part={part} />;
-  },
-  (previous, next) =>
-    previous.part === next.part &&
-    previous.isStreaming === next.isStreaming &&
-    previous.childSessionMessages === next.childSessionMessages &&
-    previous.getChildMessages === next.getChildMessages &&
-    previous.onOpenChildSession === next.onOpenChildSession
-);

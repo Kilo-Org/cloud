@@ -4,7 +4,8 @@ import { createRequire } from 'node:module';
 import type { CloudChatPage as CloudChatPageComponent } from './CloudChatPage';
 import type { ChatHeader } from './ChatHeader';
 import type { CloudAgentWorkspaceTabs } from './CloudAgentWorkspaceTabs';
-import type { ConversationMessages } from './ConversationMessages';
+import type { StoredMessage } from './types';
+let mockRuntimeMessages: StoredMessage[] = [];
 import type { ResumeAnchor, ResumeAttemptStep } from './resume-anchor';
 import type { SessionStatusIndicator as SessionStatusIndicatorType } from '@kilocode/cloud-agent-sdk';
 
@@ -165,21 +166,30 @@ jest.mock('./ChatHeader', () => ({
 }));
 jest.mock('./WorktreeChanges', () => ({ WorktreeChangesView: () => null }));
 jest.mock('./WorktreeFilePane', () => ({ WorktreeFilePane: () => null }));
-jest.mock('./ChatInput', () => ({
-  ChatInput: (props: Record<string, unknown>) => {
+jest.mock('./assistant-ui/CloudComposer', () => ({
+  CloudComposer: (props: Record<string, unknown>) => {
     mockChatInput = props;
     return createElement('input', { 'data-composer': true });
   },
 }));
-jest.mock('./ConversationMessages', () => ({
-  ConversationMessages: ({
-    staticMessages,
-    dynamicMessages,
-  }: ComponentProps<typeof ConversationMessages>) =>
+jest.mock('./assistant-ui/CloudChatRuntimeProvider', () => ({
+  CloudChatRuntimeProvider: ({
+    projection,
+    children,
+  }: {
+    projection: { messages: StoredMessage[] };
+    children: ReactNode;
+  }) => {
+    mockRuntimeMessages = projection.messages;
+    return children;
+  },
+}));
+jest.mock('./assistant-ui/CloudThread', () => ({
+  CloudThread: () =>
     createElement(
       'section',
       { 'data-conversation': true },
-      ...[...staticMessages, ...dynamicMessages].map(message =>
+      ...mockRuntimeMessages.map(message =>
         createElement(
           'div',
           { key: message.info.id, 'data-message-id': message.info.id },

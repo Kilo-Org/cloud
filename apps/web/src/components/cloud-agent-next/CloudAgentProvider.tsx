@@ -32,6 +32,11 @@ const ManagerContext = createContext<SessionManager | null>(null);
 const UserWebConnectionContext = createContext<UserWebConnection | null>(null);
 const CloudAgentContext = createContext<WorktreeReviewSendApi | null>(null);
 
+/** Historical and child transcripts must not inherit live interaction handlers. */
+export function ReadOnlyCloudAgentBoundary({ children }: { children: ReactNode }) {
+  return <ManagerContext.Provider value={null}>{children}</ManagerContext.Provider>;
+}
+
 type CloudAgentProviderProps = {
   children: ReactNode;
   organizationId?: string;

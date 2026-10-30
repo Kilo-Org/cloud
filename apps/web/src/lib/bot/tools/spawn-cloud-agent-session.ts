@@ -105,6 +105,7 @@ export default async function spawnCloudAgentSession(
     chatPlatform?: string;
     currentStep?: number;
     attachments?: CloudAgentAttachments;
+    variant?: string | null;
     /** Linked Kilo user the caller authenticates as; selects the balance-check client for org payers. */
     payerUserId?: string;
     /** GitHub login of the account that triggered this bot run. */
@@ -130,6 +131,7 @@ export default async function spawnCloudAgentSession(
   let prepareInput: PrepareSessionInput;
   const mode: AgentMode = args.mode;
   const chatPlatform = options?.chatPlatform ?? 'slack';
+  const variant = options?.variant?.trim() ? options.variant.trim() : undefined;
   const payerUserId = options?.payerUserId;
   const callbackTarget = {
     url: buildBotCallbackUrl(botRequestId, options?.currentStep),
@@ -229,6 +231,7 @@ export default async function spawnCloudAgentSession(
       prompt,
       mode,
       model,
+      ...(variant ? { variant } : {}),
       gitUrl,
       gitToken: gitlabToken,
       platform: 'gitlab',
@@ -272,6 +275,7 @@ export default async function spawnCloudAgentSession(
       prompt,
       mode,
       model,
+      ...(variant ? { variant } : {}),
       githubIntegrationId: repository.githubIntegrationId,
       githubAccessPurpose,
       kilocodeOrganizationId,

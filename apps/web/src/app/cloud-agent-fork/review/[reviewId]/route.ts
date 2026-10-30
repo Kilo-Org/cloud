@@ -20,7 +20,7 @@ import {
 } from '@/lib/code-reviews/core/constants';
 import { isSessionStartRateLimited } from '@/lib/code-reviews/core/session-start-rate-limit';
 import { selectFixReviewCommentsForReview } from '@/lib/code-reviews/fix-review/select-comments';
-import { resolveBotModelSlug } from '@/lib/bot/model';
+import { resolveBotModelSettings } from '@/lib/bot/model';
 import { getIntegrationById } from '@/lib/integrations/db/platform-integrations';
 import { createCallerFactory, createTRPCContext } from '@kilocode/web-shared/lib/trpc/init';
 import { rootRouter } from '@/routers/root-router';
@@ -155,6 +155,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
       return redirectToError('fix_session_failed');
     }
 
+    const { modelSlug, thinkingEffort } = resolveBotModelSettings(integration);
+
     // Abuse cap — AFTER the review read above proved access, so an arbitrary org
     // id cannot touch that org's counter. Enforced regardless of model/credits
     // since free-model sessions otherwise skip balance backpressure.
@@ -189,7 +191,8 @@ export async function POST(request: NextRequest, context: RouteContext) {
         nonce: randomUUID(),
       }),
       mode: DEFAULT_CODE_REVIEW_MODE,
-      model: resolveBotModelSlug(integration),
+      model: modelSlug,
+      ...(thinkingEffort ? { variant: thinkingEffort } : {}),
       autoInitiate: true,
       autoCommit: false,
     };

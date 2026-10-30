@@ -3107,10 +3107,9 @@
     "pullRequestUnavailableDescription": "Impossible d'ouvrir cette PR. Elle a peut-être été supprimée, le dépôt est privé ou l'application GitHub de Kilo n'y est pas installée.",
     "reconnectNotice": {
       "title": "La connexion à GitHub a expiré.",
-      "message": "Votre connexion GitHub n'est plus valide. Vérifiez-la à nouveau. Si nécessaire, vous devrez vous reconnecter.",
+      "message": "Vérifiez-la à nouveau. Si nécessaire, vous devrez vous reconnecter.",
       "gitlabTitle": "La connexion à GitLab a expiré.",
-      "bitbucketTitle": "La connexion à Bitbucket a expiré.",
-      "providerMessage": "Vérifiez-la à nouveau. Si nécessaire, vous devrez vous reconnecter."
+      "bitbucketTitle": "La connexion à Bitbucket a expiré."
     },
     "review": "Revue",
     "reviewPullRequest": "Examiner la demande de fusion",

@@ -724,10 +724,9 @@
     },
     "reconnectNotice": {
       "title": "Veza s GitHubom je istekla.",
-      "message": "Tvoja veza s GitHubom više nije valjana. Ponovno provjeri vezu — po potrebi će se zatražiti ponovno povezivanje.",
+      "message": "Ponovno provjeri vezu — po potrebi će se zatražiti ponovno povezivanje.",
       "gitlabTitle": "Veza s GitLabom je istekla.",
-      "bitbucketTitle": "Veza s Bitbucketom je istekla.",
-      "providerMessage": "Ponovno provjeri vezu — po potrebi će se zatražiti ponovno povezivanje."
+      "bitbucketTitle": "Veza s Bitbucketom je istekla."
     },
     "eventChips": {
       "comment": "Komentiraj",

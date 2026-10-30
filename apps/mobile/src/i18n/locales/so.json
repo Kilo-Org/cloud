@@ -708,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Muddadii xiriirka GitHub way dhammaatay.",
-      "message": "Xiriirkaaga GitHub hadda ma ansaxsana. Mar kale hubi xiriirkaaga — waxaa lagu weydiin doonaa inaad dib u xirto haddii loo baahdo.",
+      "message": "Mar kale hubi xiriirkaaga — waxaa lagu weydiin doonaa inaad dib u xirto haddii loo baahdo.",
       "gitlabTitle": "Muddadii xiriirka GitLab way dhammaatay.",
-      "bitbucketTitle": "Muddadii xiriirka Bitbucket way dhammaatay.",
-      "providerMessage": "Mar kale hubi xiriirkaaga — waxaa lagu weydiin doonaa inaad dib u xirto haddii loo baahdo."
+      "bitbucketTitle": "Muddadii xiriirka Bitbucket way dhammaatay."
     },
     "eventChips": {
       "comment": "Faallo",

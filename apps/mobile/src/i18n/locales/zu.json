@@ -708,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Ukuxhumana ne-GitHub kuphelelwe yisikhathi.",
-      "message": "Ukuxhumana kwakho kwe-GitHub akusavumelekile. Bheka kabusha ukuxhumana kwakho — uzocelwa ukuthi uxhumane kabusha uma kudingeka.",
+      "message": "Bheka kabusha ukuxhumana kwakho — uzocelwa ukuthi uxhumane kabusha uma kudingeka.",
       "gitlabTitle": "Ukuxhumana ne-GitLab kuphelelwe yisikhathi.",
-      "bitbucketTitle": "Ukuxhumana ne-Bitbucket kuphelelwe yisikhathi.",
-      "providerMessage": "Bheka kabusha ukuxhumana kwakho — uzocelwa ukuthi uxhumane kabusha uma kudingeka."
+      "bitbucketTitle": "Ukuxhumana ne-Bitbucket kuphelelwe yisikhathi."
     },
     "eventChips": {
       "comment": "Phawula",

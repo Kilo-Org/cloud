@@ -708,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub-yhteys on vanhentunut",
-      "message": "GitHub-yhteytesi ei ole enää voimassa. Tarkista yhteys uudelleen. Sinua pyydetään tarvittaessa muodostamaan yhteys uudelleen.",
+      "message": "Tarkista yhteys uudelleen. Sinua pyydetään tarvittaessa muodostamaan yhteys uudelleen.",
       "gitlabTitle": "GitLab-yhteys on vanhentunut",
-      "bitbucketTitle": "Bitbucket-yhteys on vanhentunut",
-      "providerMessage": "Tarkista yhteys uudelleen. Sinua pyydetään tarvittaessa muodostamaan yhteys uudelleen."
+      "bitbucketTitle": "Bitbucket-yhteys on vanhentunut"
     },
     "eventChips": {
       "comment": "Kommentoi",

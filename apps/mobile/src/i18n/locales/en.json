@@ -774,10 +774,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub connection expired",
-      "message": "Your GitHub connection is no longer valid. Re-check your connection — you'll be prompted to reconnect if needed.",
+      "message": "Re-check your connection — you'll be prompted to reconnect if needed.",
       "gitlabTitle": "GitLab connection expired",
-      "bitbucketTitle": "Bitbucket connection expired",
-      "providerMessage": "Re-check your connection — you'll be prompted to reconnect if needed."
+      "bitbucketTitle": "Bitbucket connection expired"
     },
     "eventChips": {
       "comment": "Comment",

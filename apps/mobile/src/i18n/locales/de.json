@@ -3066,10 +3066,9 @@
     "pullRequestUnavailableDescription": "Dieser PR kann nicht geöffnet werden. Möglicherweise wurde er gelöscht, das Repository ist privat oder die GitHub-App von Kilo ist dort nicht installiert.",
     "reconnectNotice": {
       "title": "Die GitHub-Verbindung ist abgelaufen.",
-      "message": "Deine GitHub-Verbindung ist nicht mehr gültig. Prüfe sie erneut. Falls nötig, wirst du aufgefordert, sie wiederherzustellen.",
+      "message": "Prüfe sie erneut. Falls nötig, wirst du aufgefordert, sie wiederherzustellen.",
       "gitlabTitle": "Die GitLab-Verbindung ist abgelaufen.",
-      "bitbucketTitle": "Die Bitbucket-Verbindung ist abgelaufen.",
-      "providerMessage": "Prüfe sie erneut. Falls nötig, wirst du aufgefordert, sie wiederherzustellen."
+      "bitbucketTitle": "Die Bitbucket-Verbindung ist abgelaufen."
     },
     "review": "Prüfung",
     "reviewPullRequest": "Pull-Request prüfen",

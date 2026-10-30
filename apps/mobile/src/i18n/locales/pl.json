@@ -3148,10 +3148,9 @@
     "pullRequestUnavailableDescription": "Nie można otworzyć tego PR. Być może został usunięty, repozytorium jest prywatne lub nie zainstalowano w nim aplikacji Kilo dla GitHub.",
     "reconnectNotice": {
       "title": "Połączenie z serwisem GitHub wygasło.",
-      "message": "Połączenie z kontem GitHub wygasło. Sprawdź je ponownie — w razie potrzeby aplikacja poprosi o ponowne połączenie.",
+      "message": "Sprawdź je ponownie — w razie potrzeby aplikacja poprosi o ponowne połączenie.",
       "gitlabTitle": "Połączenie z serwisem GitLab wygasło.",
-      "bitbucketTitle": "Połączenie z serwisem Bitbucket wygasło.",
-      "providerMessage": "Sprawdź je ponownie — w razie potrzeby aplikacja poprosi o ponowne połączenie."
+      "bitbucketTitle": "Połączenie z serwisem Bitbucket wygasło."
     },
     "review": "Przegląd",
     "reviewPullRequest": "Przejrzyj PR",

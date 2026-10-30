@@ -240,7 +240,9 @@ export function ProviderConnectGate({
     const reconnect = view === 'reconnect';
     // Reused translated copy: the title above already names the expired
     // provider connection, so the description carries only the re-check
-    // instruction and never restates the title.
+    // instruction and never restates the title. One key serves both the
+    // provider gate and the mid-session notice, so the two surfaces cannot
+    // drift apart.
     const connectTitle =
       platform === 'gitlab' ? t('common.connectGitlab') : t('common.connectBitbucket');
     const connectDescription =
@@ -252,9 +254,7 @@ export function ProviderConnectGate({
         ? t('prReview.reconnectNotice.gitlabTitle')
         : t('prReview.reconnectNotice.bitbucketTitle');
     const title = reconnect ? reconnectTitle : connectTitle;
-    const description = reconnect
-      ? t('prReview.reconnectNotice.providerMessage')
-      : connectDescription;
+    const description = reconnect ? t('prReview.reconnectNotice.message') : connectDescription;
     return (
       <View className="flex-1 bg-background">
         <PrReviewGateHeader />

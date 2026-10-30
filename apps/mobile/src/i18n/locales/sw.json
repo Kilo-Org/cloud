@@ -708,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Muda wa muunganisho wa GitHub umeisha.",
-      "message": "Muunganisho wako wa GitHub si halali tena. Uangalie tena — utaombwa kuunganisha upya ikihitajika.",
+      "message": "Uangalie tena — utaombwa kuunganisha upya ikihitajika.",
       "gitlabTitle": "Muda wa muunganisho wa GitLab umeisha.",
-      "bitbucketTitle": "Muda wa muunganisho wa Bitbucket umeisha.",
-      "providerMessage": "Uangalie tena — utaombwa kuunganisha upya ikihitajika."
+      "bitbucketTitle": "Muda wa muunganisho wa Bitbucket umeisha."
     },
     "eventChips": {
       "comment": "Toa maoni",

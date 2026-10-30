@@ -3066,10 +3066,9 @@
     "pullRequestUnavailableDescription": "PR ini tidak dapat dibuka. PR ini mungkin sudah dihapus, repositorinya bersifat privat, atau aplikasi Kilo untuk GitHub belum dipasang di repositori tersebut.",
     "reconnectNotice": {
       "title": "Koneksi GitHub kedaluwarsa.",
-      "message": "Koneksi GitHub kamu sudah tidak valid. Periksa ulang koneksimu. Kamu akan diminta menghubungkan ulang jika perlu.",
+      "message": "Periksa ulang koneksimu. Kamu akan diminta menghubungkan ulang jika perlu.",
       "gitlabTitle": "Koneksi GitLab kedaluwarsa.",
-      "bitbucketTitle": "Koneksi Bitbucket kedaluwarsa.",
-      "providerMessage": "Periksa ulang koneksimu. Kamu akan diminta menghubungkan ulang jika perlu."
+      "bitbucketTitle": "Koneksi Bitbucket kedaluwarsa."
     },
     "review": "Tinjauan",
     "reviewPullRequest": "Tinjau PR",

@@ -708,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Kua pau te wā o te hononga GitHub.",
-      "message": "Kua kore tō hononga GitHub e whai mana. Tirohia anō tō hononga — ka tonoa koe kia hono anō mēnā e hiahiatia ana.",
+      "message": "Tirohia anō tō hononga — ka tonoa koe kia hono anō mēnā e hiahiatia ana.",
       "gitlabTitle": "Kua pau te wā o te hononga GitLab.",
-      "bitbucketTitle": "Kua pau te wā o te hononga Bitbucket.",
-      "providerMessage": "Tirohia anō tō hononga — ka tonoa koe kia hono anō mēnā e hiahiatia ana."
+      "bitbucketTitle": "Kua pau te wā o te hononga Bitbucket."
     },
     "eventChips": {
       "comment": "Kōrero",

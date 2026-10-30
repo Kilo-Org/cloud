@@ -3066,10 +3066,9 @@
     "pullRequestUnavailableDescription": "Deze PR kan niet worden geopend. Mogelijk is de PR verwijderd, is de repository privé of is de Kilo GitHub-app niet voor deze repository geïnstalleerd.",
     "reconnectNotice": {
       "title": "De GitHub-koppeling is verlopen.",
-      "message": "Je GitHub-verbinding is niet meer geldig. Controleer de verbinding opnieuw. Als dat nodig is, krijg je de vraag om opnieuw verbinding te maken.",
+      "message": "Controleer de verbinding opnieuw. Als dat nodig is, krijg je de vraag om opnieuw verbinding te maken.",
       "gitlabTitle": "De GitLab-koppeling is verlopen.",
-      "bitbucketTitle": "De Bitbucket-koppeling is verlopen.",
-      "providerMessage": "Controleer de verbinding opnieuw. Als dat nodig is, krijg je de vraag om opnieuw verbinding te maken."
+      "bitbucketTitle": "De Bitbucket-koppeling is verlopen."
     },
     "review": "Beoordeling",
     "reviewPullRequest": "PR beoordelen",

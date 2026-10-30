@@ -708,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Àkókò ìsopọ̀ GitHub ti parí.",
-      "message": "Àsopọ̀ GitHub rẹ kò wúlò mọ́. Tún ṣàyẹ̀wò àsopọ̀ rẹ — a ó ní kí o tún sopọ̀ bí ó bá yẹ.",
+      "message": "Tún ṣàyẹ̀wò àsopọ̀ rẹ — a ó ní kí o tún sopọ̀ bí ó bá yẹ.",
       "gitlabTitle": "Àkókò ìsopọ̀ GitLab ti parí.",
-      "bitbucketTitle": "Àkókò ìsopọ̀ Bitbucket ti parí.",
-      "providerMessage": "Tún ṣàyẹ̀wò àsopọ̀ rẹ — a ó ní kí o tún sopọ̀ bí ó bá yẹ."
+      "bitbucketTitle": "Àkókò ìsopọ̀ Bitbucket ti parí."
     },
     "eventChips": {
       "comment": "Àsọyé",

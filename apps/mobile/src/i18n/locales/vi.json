@@ -3066,10 +3066,9 @@
     "pullRequestUnavailableDescription": "Không thể mở PR này. Có thể PR đã bị xóa, kho lưu trữ ở chế độ riêng tư hoặc ứng dụng Kilo trên GitHub chưa được cài đặt cho kho lưu trữ này.",
     "reconnectNotice": {
       "title": "Kết nối GitHub đã hết hạn.",
-      "message": "Kết nối GitHub của bạn không còn hợp lệ. Kiểm tra lại kết nối — bạn sẽ được nhắc kết nối lại nếu cần.",
+      "message": "Kiểm tra lại kết nối — bạn sẽ được nhắc kết nối lại nếu cần.",
       "gitlabTitle": "Kết nối GitLab đã hết hạn.",
-      "bitbucketTitle": "Kết nối Bitbucket đã hết hạn.",
-      "providerMessage": "Kiểm tra lại kết nối — bạn sẽ được nhắc kết nối lại nếu cần."
+      "bitbucketTitle": "Kết nối Bitbucket đã hết hạn."
     },
     "review": "Rà soát",
     "reviewPullRequest": "Đánh giá PR",

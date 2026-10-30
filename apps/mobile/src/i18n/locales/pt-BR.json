@@ -3107,10 +3107,9 @@
     "pullRequestUnavailableDescription": "Não é possível abrir este PR. Ele pode ter sido excluído, o repositório pode ser privado ou o aplicativo do Kilo para GitHub pode não estar instalado nele.",
     "reconnectNotice": {
       "title": "A conexão com o GitHub expirou.",
-      "message": "Sua conexão com o GitHub não é mais válida. Verifique a conexão novamente. Se necessário, o app pedirá que você se reconecte.",
+      "message": "Verifique a conexão novamente. Se necessário, o app pedirá que você se reconecte.",
       "gitlabTitle": "A conexão com o GitLab expirou.",
-      "bitbucketTitle": "A conexão com o Bitbucket expirou.",
-      "providerMessage": "Verifique a conexão novamente. Se necessário, o app pedirá que você se reconecte."
+      "bitbucketTitle": "A conexão com o Bitbucket expirou."
     },
     "review": "Revisão",
     "reviewPullRequest": "Revisar pull request",

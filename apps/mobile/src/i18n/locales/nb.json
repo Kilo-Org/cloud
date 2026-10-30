@@ -708,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub-tilkoblingen er utløpt.",
-      "message": "GitHub-tilkoblingen din er ikke lenger gyldig. Sjekk den på nytt. Du blir bedt om å koble til igjen ved behov.",
+      "message": "Sjekk den på nytt. Du blir bedt om å koble til igjen ved behov.",
       "gitlabTitle": "GitLab-tilkoblingen er utløpt.",
-      "bitbucketTitle": "Bitbucket-tilkoblingen er utløpt.",
-      "providerMessage": "Sjekk den på nytt. Du blir bedt om å koble til igjen ved behov."
+      "bitbucketTitle": "Bitbucket-tilkoblingen er utløpt."
     },
     "eventChips": {
       "comment": "Kommenter",

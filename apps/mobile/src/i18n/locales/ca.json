@@ -724,10 +724,9 @@
     },
     "reconnectNotice": {
       "title": "La connexió amb GitHub ha caducat.",
-      "message": "La teva connexió amb GitHub ja no és vàlida. Torna a comprovar-la. Si cal, se't demanarà que et tornis a connectar.",
+      "message": "Torna a comprovar-la. Si cal, se't demanarà que et tornis a connectar.",
       "gitlabTitle": "La connexió amb GitLab ha caducat.",
-      "bitbucketTitle": "La connexió amb Bitbucket ha caducat.",
-      "providerMessage": "Torna a comprovar-la. Si cal, se't demanarà que et tornis a connectar."
+      "bitbucketTitle": "La connexió amb Bitbucket ha caducat."
     },
     "eventChips": {
       "comment": "Comentari",

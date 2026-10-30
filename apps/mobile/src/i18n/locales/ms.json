@@ -708,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Sambungan GitHub telah tamat tempoh.",
-      "message": "Sambungan GitHub anda tidak lagi sah. Semak semula sambungan anda. Anda akan diminta menyambung semula jika perlu.",
+      "message": "Semak semula sambungan anda. Anda akan diminta menyambung semula jika perlu.",
       "gitlabTitle": "Sambungan GitLab telah tamat tempoh.",
-      "bitbucketTitle": "Sambungan Bitbucket telah tamat tempoh.",
-      "providerMessage": "Semak semula sambungan anda. Anda akan diminta menyambung semula jika perlu."
+      "bitbucketTitle": "Sambungan Bitbucket telah tamat tempoh."
     },
     "eventChips": {
       "comment": "Komen",

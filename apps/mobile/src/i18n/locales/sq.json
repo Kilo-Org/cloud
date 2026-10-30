@@ -708,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Lidhja me GitHub skadoi.",
-      "message": "Lidhja jote me GitHub nuk është më e vlefshme. Rikontrollo lidhjen — do të të kërkohet të rilidhesh nëse është e nevojshme.",
+      "message": "Rikontrollo lidhjen — do të të kërkohet të rilidhesh nëse është e nevojshme.",
       "gitlabTitle": "Lidhja me GitLab skadoi.",
-      "bitbucketTitle": "Lidhja me Bitbucket skadoi.",
-      "providerMessage": "Rikontrollo lidhjen — do të të kërkohet të rilidhesh nëse është e nevojshme."
+      "bitbucketTitle": "Lidhja me Bitbucket skadoi."
     },
     "eventChips": {
       "comment": "Koment",

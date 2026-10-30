@@ -708,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Nag-expire ang koneksyon sa GitHub.",
-      "message": "Wala nang bisa ang koneksyon mo sa GitHub. Suriin muli ang koneksyon mo — hihilinging kumonekta kang muli kung kailangan.",
+      "message": "Suriin muli ang koneksyon mo — hihilinging kumonekta kang muli kung kailangan.",
       "gitlabTitle": "Nag-expire ang koneksyon sa GitLab.",
-      "bitbucketTitle": "Nag-expire ang koneksyon sa Bitbucket.",
-      "providerMessage": "Suriin muli ang koneksyon mo — hihilinging kumonekta kang muli kung kailangan."
+      "bitbucketTitle": "Nag-expire ang koneksyon sa Bitbucket."
     },
     "eventChips": {
       "comment": "Komento",

@@ -772,10 +772,9 @@
     },
     "reconnectNotice": {
       "title": "Mae'r cysylltiad â GitHub wedi dod i ben.",
-      "message": "Nid yw'ch cysylltiad GitHub yn ddilys mwyach. Gwiriwch eich cysylltiad eto — gofynnir i chi ailgysylltu os oes angen.",
+      "message": "Gwiriwch eich cysylltiad eto — gofynnir i chi ailgysylltu os oes angen.",
       "gitlabTitle": "Mae'r cysylltiad â GitLab wedi dod i ben.",
-      "bitbucketTitle": "Mae'r cysylltiad â Bitbucket wedi dod i ben.",
-      "providerMessage": "Gwiriwch eich cysylltiad eto — gofynnir i chi ailgysylltu os oes angen."
+      "bitbucketTitle": "Mae'r cysylltiad â Bitbucket wedi dod i ben."
     },
     "eventChips": {
       "comment": "Sylwadu",

@@ -708,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Wa'adin haɗin GitHub ya ƙare.",
-      "message": "Haɗinka na GitHub ya daina aiki. Sake duba haɗin — za a nemi ka sake haɗawa idan ana buƙata.",
+      "message": "Sake duba haɗin — za a nemi ka sake haɗawa idan ana buƙata.",
       "gitlabTitle": "Wa'adin haɗin GitLab ya ƙare.",
-      "bitbucketTitle": "Wa'adin haɗin Bitbucket ya ƙare.",
-      "providerMessage": "Sake duba haɗin — za a nemi ka sake haɗawa idan ana buƙata."
+      "bitbucketTitle": "Wa'adin haɗin Bitbucket ya ƙare."
     },
     "eventChips": {
       "comment": "Yi tsokaci",

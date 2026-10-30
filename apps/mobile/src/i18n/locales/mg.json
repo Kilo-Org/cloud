@@ -708,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Lany daty ny fifandraisana amin'ny GitHub.",
-      "message": "Tsy manan-kery intsony ny fifandraisanao amin'ny GitHub. Hamarino indray izany — hasaina hampifandray indray ianao raha ilaina.",
+      "message": "Hamarino indray izany — hasaina hampifandray indray ianao raha ilaina.",
       "gitlabTitle": "Lany daty ny fifandraisana amin'ny GitLab.",
-      "bitbucketTitle": "Lany daty ny fifandraisana amin'ny Bitbucket.",
-      "providerMessage": "Hamarino indray izany — hasaina hampifandray indray ianao raha ilaina."
+      "bitbucketTitle": "Lany daty ny fifandraisana amin'ny Bitbucket."
     },
     "eventChips": {
       "comment": "Fanehoan-kevitra",

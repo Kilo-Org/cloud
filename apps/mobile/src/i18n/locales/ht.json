@@ -708,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Koneksyon ak GitHub la ekspire.",
-      "message": "Koneksyon GitHub ou a pa valab ankò. Tcheke koneksyon an ankò — n ap mande ou rekonekte si sa nesesè.",
+      "message": "Tcheke koneksyon an ankò — n ap mande ou rekonekte si sa nesesè.",
       "gitlabTitle": "Koneksyon ak GitLab la ekspire.",
-      "bitbucketTitle": "Koneksyon ak Bitbucket la ekspire.",
-      "providerMessage": "Tcheke koneksyon an ankò — n ap mande ou rekonekte si sa nesesè."
+      "bitbucketTitle": "Koneksyon ak Bitbucket la ekspire."
     },
     "eventChips": {
       "comment": "Kòmantè",

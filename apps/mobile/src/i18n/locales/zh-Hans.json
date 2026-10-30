@@ -3066,10 +3066,9 @@
     "pullRequestUnavailableDescription": "无法打开此 PR。可能是 PR 已被删除、仓库为私有仓库，或仓库尚未安装 Kilo GitHub 应用。",
     "reconnectNotice": {
       "title": "GitHub 连接已过期",
-      "message": "GitHub 连接已失效。请重新检查连接；如需重新连接，系统会提示你。",
+      "message": "请重新检查连接；如需重新连接，系统会提示你。",
       "gitlabTitle": "GitLab 连接已过期",
-      "bitbucketTitle": "Bitbucket 连接已过期",
-      "providerMessage": "请重新检查连接；如需重新连接，系统会提示你。"
+      "bitbucketTitle": "Bitbucket 连接已过期"
     },
     "review": "审查",
     "reviewPullRequest": "审查拉取请求",

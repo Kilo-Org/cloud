@@ -3107,10 +3107,9 @@
     "pullRequestUnavailableDescription": "לא ניתן לפתוח את ה-PR הזה. ייתכן שהוא נמחק, שהמאגר פרטי או שאפליקציית Kilo ל-GitHub אינה מותקנת במאגר.",
     "reconnectNotice": {
       "title": "פג תוקף החיבור ל-GitHub.",
-      "message": "החיבור שלך ל-GitHub אינו תקף עוד. בדוק שוב את החיבור — תתבקש להתחבר מחדש במידת הצורך.",
+      "message": "בדוק שוב את החיבור — תתבקש להתחבר מחדש במידת הצורך.",
       "gitlabTitle": "פג תוקף החיבור ל-GitLab.",
-      "bitbucketTitle": "פג תוקף החיבור ל-Bitbucket.",
-      "providerMessage": "בדוק שוב את החיבור — תתבקש להתחבר מחדש במידת הצורך."
+      "bitbucketTitle": "פג תוקף החיבור ל-Bitbucket."
     },
     "review": "סקירה",
     "reviewPullRequest": "סקירת בקשת המשיכה",

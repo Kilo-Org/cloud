@@ -3066,10 +3066,9 @@
     "pullRequestUnavailableDescription": "このPRを開けません。PRが削除されたか、リポジトリが非公開になっているか、リポジトリにKilo GitHub Appがインストールされていない可能性があります。",
     "reconnectNotice": {
       "title": "GitHubとの連携が期限切れになりました。",
-      "message": "GitHubとの接続が無効になりました。接続を再確認してください。再接続が必要な場合は、案内が表示されます。",
+      "message": "接続を再確認してください。再接続が必要な場合は、案内が表示されます。",
       "gitlabTitle": "GitLabとの連携が期限切れになりました。",
-      "bitbucketTitle": "Bitbucketとの連携が期限切れになりました。",
-      "providerMessage": "接続を再確認してください。再接続が必要な場合は、案内が表示されます。"
+      "bitbucketTitle": "Bitbucketとの連携が期限切れになりました。"
     },
     "review": "レビュー",
     "reviewPullRequest": "プルリクエストをレビュー",

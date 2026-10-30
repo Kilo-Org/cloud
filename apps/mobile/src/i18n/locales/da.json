@@ -708,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub-forbindelsen er udløbet.",
-      "message": "Din GitHub-forbindelse er ikke længere gyldig. Tjek forbindelsen igen. Du bliver bedt om at oprette forbindelse igen, hvis det er nødvendigt.",
+      "message": "Tjek forbindelsen igen. Du bliver bedt om at oprette forbindelse igen, hvis det er nødvendigt.",
       "gitlabTitle": "GitLab-forbindelsen er udløbet.",
-      "bitbucketTitle": "Bitbucket-forbindelsen er udløbet.",
-      "providerMessage": "Tjek forbindelsen igen. Du bliver bedt om at oprette forbindelse igen, hvis det er nødvendigt."
+      "bitbucketTitle": "Bitbucket-forbindelsen er udløbet."
     },
     "eventChips": {
       "comment": "Kommentar",

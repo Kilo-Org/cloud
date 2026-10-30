@@ -708,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHubi ühendus aegus.",
-      "message": "Sinu GitHubi ühendus ei kehti enam. Kontrolli ühendust uuesti — vajaduse korral palutakse sul see taastada.",
+      "message": "Kontrolli ühendust uuesti — vajaduse korral palutakse sul see taastada.",
       "gitlabTitle": "GitLabi ühendus aegus.",
-      "bitbucketTitle": "Bitbucketi ühendus aegus.",
-      "providerMessage": "Kontrolli ühendust uuesti — vajaduse korral palutakse sul see taastada."
+      "bitbucketTitle": "Bitbucketi ühendus aegus."
     },
     "eventChips": {
       "comment": "Kommenteeri",

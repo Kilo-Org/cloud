@@ -708,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Oge njikọ GitHub agwụla.",
-      "message": "Njikọ GitHub gị adịkwaghị irè. Lelee njikọ gị ọzọ — a ga-agwa gị ka ị jikọtaghachi ma ọ bụrụ na ọ dị mkpa.",
+      "message": "Lelee njikọ gị ọzọ — a ga-agwa gị ka ị jikọtaghachi ma ọ bụrụ na ọ dị mkpa.",
       "gitlabTitle": "Oge njikọ GitLab agwụla.",
-      "bitbucketTitle": "Oge njikọ Bitbucket agwụla.",
-      "providerMessage": "Lelee njikọ gị ọzọ — a ga-agwa gị ka ị jikọtaghachi ma ọ bụrụ na ọ dị mkpa."
+      "bitbucketTitle": "Oge njikọ Bitbucket agwụla."
     },
     "eventChips": {
       "comment": "Nkwupụta",

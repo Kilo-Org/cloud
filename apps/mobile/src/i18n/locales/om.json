@@ -708,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Yeroon walitti hidhamiinsa GitHub darbeera.",
-      "message": "Walqunnamtiin GitHub kee kana booda hin hojjetu. Irra deebi'ii ilaali — yoo barbaachise akka irra deebi'ii walqabsiiftu gaafatamta.",
+      "message": "Irra deebi'ii ilaali — yoo barbaachise akka irra deebi'ii walqabsiiftu gaafatamta.",
       "gitlabTitle": "Yeroon walitti hidhamiinsa GitLab darbeera.",
-      "bitbucketTitle": "Yeroon walitti hidhamiinsa Bitbucket darbeera.",
-      "providerMessage": "Irra deebi'ii ilaali — yoo barbaachise akka irra deebi'ii walqabsiiftu gaafatamta."
+      "bitbucketTitle": "Yeroon walitti hidhamiinsa Bitbucket darbeera."
     },
     "eventChips": {
       "comment": "Yaada kenni",

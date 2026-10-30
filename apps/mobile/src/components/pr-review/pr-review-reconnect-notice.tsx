@@ -48,10 +48,10 @@ export function PrReviewReconnectNotice({
   } else if (platform === 'bitbucket') {
     title = t('prReview.reconnectNotice.bitbucketTitle');
   }
-  const message =
-    providerPlatform === null
-      ? t('prReview.reconnectNotice.message')
-      : t('prReview.reconnectNotice.providerMessage');
+  // Both arms name their provider in the title above, so the description is
+  // the same key on either side: the title says which connection expired and
+  // the sentence below only says what to do about it.
+  const message = t('prReview.reconnectNotice.message');
 
   return (
     <View className="gap-3 rounded-lg bg-secondary p-4">

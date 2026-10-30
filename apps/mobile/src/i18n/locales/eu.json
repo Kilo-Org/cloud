@@ -708,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub-erako konexioa iraungi da.",
-      "message": "GitHub-ekiko konexioa ez da jada baliozkoa. Egiaztatu konexioa berriro; behar izanez gero, berriro konektatzeko eskatuko zaizu.",
+      "message": "Egiaztatu konexioa berriro; behar izanez gero, berriro konektatzeko eskatuko zaizu.",
       "gitlabTitle": "GitLab-erako konexioa iraungi da.",
-      "bitbucketTitle": "Bitbucket-erako konexioa iraungi da.",
-      "providerMessage": "Egiaztatu konexioa berriro; behar izanez gero, berriro konektatzeko eskatuko zaizu."
+      "bitbucketTitle": "Bitbucket-erako konexioa iraungi da."
     },
     "eventChips": {
       "comment": "Egin iruzkina",

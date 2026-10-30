@@ -724,10 +724,9 @@
     },
     "reconnectNotice": {
       "title": "A ligação ao GitHub expirou.",
-      "message": "A tua ligação ao GitHub já não é válida. Verifica-a novamente. Se for necessário, ser-te-á pedido que voltes a ligar a conta.",
+      "message": "Verifica-a novamente. Se for necessário, ser-te-á pedido que voltes a ligar a conta.",
       "gitlabTitle": "A ligação ao GitLab expirou.",
-      "bitbucketTitle": "A ligação ao Bitbucket expirou.",
-      "providerMessage": "Verifica-a novamente. Se for necessário, ser-te-á pedido que voltes a ligar a conta."
+      "bitbucketTitle": "A ligação ao Bitbucket expirou."
     },
     "eventChips": {
       "comment": "Comentar",

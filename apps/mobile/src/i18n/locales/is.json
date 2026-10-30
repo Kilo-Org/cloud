@@ -708,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Tengingin við GitHub er útrunnin.",
-      "message": "GitHub-tengingin þín er ekki lengur gild. Athugaðu tenginguna aftur — þú færð beiðni um að tengjast aftur ef þörf er á.",
+      "message": "Athugaðu tenginguna aftur — þú færð beiðni um að tengjast aftur ef þörf er á.",
       "gitlabTitle": "Tengingin við GitLab er útrunnin.",
-      "bitbucketTitle": "Tengingin við Bitbucket er útrunnin.",
-      "providerMessage": "Athugaðu tenginguna aftur — þú færð beiðni um að tengjast aftur ef þörf er á."
+      "bitbucketTitle": "Tengingin við Bitbucket er útrunnin."
     },
     "eventChips": {
       "comment": "Gera athugasemd",

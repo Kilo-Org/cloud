@@ -708,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub bilan ulanish muddati tugadi.",
-      "message": "GitHub ulanishingiz endi amal qilmaydi. Ulanishingizni qayta tekshiring — kerak bo'lsa, qayta ulanish so'raladi.",
+      "message": "Ulanishingizni qayta tekshiring — kerak bo'lsa, qayta ulanish so'raladi.",
       "gitlabTitle": "GitLab bilan ulanish muddati tugadi.",
-      "bitbucketTitle": "Bitbucket bilan ulanish muddati tugadi.",
-      "providerMessage": "Ulanishingizni qayta tekshiring — kerak bo'lsa, qayta ulanish so'raladi."
+      "bitbucketTitle": "Bitbucket bilan ulanish muddati tugadi."
     },
     "eventChips": {
       "comment": "Izoh",

@@ -3107,10 +3107,9 @@
     "pullRequestUnavailableDescription": "Impossibile aprire questa PR. Potrebbe essere stata eliminata, il repository potrebbe essere privato oppure l'app Kilo per GitHub potrebbe non essere installata nel repository.",
     "reconnectNotice": {
       "title": "La connessione a GitHub è scaduta.",
-      "message": "La tua connessione a GitHub non è più valida. Ricontrolla la connessione: ti verrà chiesto di riconnetterti se necessario.",
+      "message": "Ricontrolla la connessione: ti verrà chiesto di riconnetterti se necessario.",
       "gitlabTitle": "La connessione a GitLab è scaduta.",
-      "bitbucketTitle": "La connessione a Bitbucket è scaduta.",
-      "providerMessage": "Ricontrolla la connessione: ti verrà chiesto di riconnetterti se necessario."
+      "bitbucketTitle": "La connessione a Bitbucket è scaduta."
     },
     "review": "Revisione",
     "reviewPullRequest": "Revisiona la pull request",

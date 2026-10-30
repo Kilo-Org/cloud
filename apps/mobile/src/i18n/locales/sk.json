@@ -740,10 +740,9 @@
     },
     "reconnectNotice": {
       "title": "Platnosť pripojenia k službe GitHub vypršala.",
-      "message": "Tvoje pripojenie k službe GitHub už nie je platné. Znova ho skontroluj — v prípade potreby ťa vyzveme na opätovné pripojenie.",
+      "message": "Znova ho skontroluj — v prípade potreby ťa vyzveme na opätovné pripojenie.",
       "gitlabTitle": "Platnosť pripojenia k službe GitLab vypršala.",
-      "bitbucketTitle": "Platnosť pripojenia k službe Bitbucket vypršala.",
-      "providerMessage": "Znova ho skontroluj — v prípade potreby ťa vyzveme na opätovné pripojenie."
+      "bitbucketTitle": "Platnosť pripojenia k službe Bitbucket vypršala."
     },
     "eventChips": {
       "comment": "Komentár",

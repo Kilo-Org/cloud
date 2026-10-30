@@ -708,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "A GitHub-kapcsolat lejárt.",
-      "message": "A GitHub-kapcsolatod már nem érvényes. Ellenőrizd újra a kapcsolatot. Ha szükséges, az alkalmazás kérni fogja az újracsatlakozást.",
+      "message": "Ellenőrizd újra a kapcsolatot. Ha szükséges, az alkalmazás kérni fogja az újracsatlakozást.",
       "gitlabTitle": "A GitLab-kapcsolat lejárt.",
-      "bitbucketTitle": "A Bitbucket-kapcsolat lejárt.",
-      "providerMessage": "Ellenőrizd újra a kapcsolatot. Ha szükséges, az alkalmazás kérni fogja az újracsatlakozást."
+      "bitbucketTitle": "A Bitbucket-kapcsolat lejárt."
     },
     "eventChips": {
       "comment": "Hozzászólás",

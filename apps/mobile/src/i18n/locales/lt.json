@@ -740,10 +740,9 @@
     },
     "reconnectNotice": {
       "title": "Baigėsi GitHub prieigos galiojimas.",
-      "message": "Tavo GitHub ryšys nebegalioja. Patikrink ryšį dar kartą — prireikus bus paprašyta prisijungti iš naujo.",
+      "message": "Patikrink ryšį dar kartą — prireikus bus paprašyta prisijungti iš naujo.",
       "gitlabTitle": "Baigėsi GitLab prieigos galiojimas.",
-      "bitbucketTitle": "Baigėsi Bitbucket prieigos galiojimas.",
-      "providerMessage": "Patikrink ryšį dar kartą — prireikus bus paprašyta prisijungti iš naujo."
+      "bitbucketTitle": "Baigėsi Bitbucket prieigos galiojimas."
     },
     "eventChips": {
       "comment": "Komentuoti",

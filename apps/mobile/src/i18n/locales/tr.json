@@ -3066,10 +3066,9 @@
     "pullRequestUnavailableDescription": "Bu PR açılamıyor. Silinmiş olabilir, depo özel olabilir veya depoda Kilo GitHub uygulaması kurulu olmayabilir.",
     "reconnectNotice": {
       "title": "GitHub bağlantısının süresi doldu.",
-      "message": "GitHub bağlantın artık geçerli değil. Bağlantını tekrar kontrol et. Gerekirse yeniden bağlanman istenecek.",
+      "message": "Bağlantını tekrar kontrol et. Gerekirse yeniden bağlanman istenecek.",
       "gitlabTitle": "GitLab bağlantısının süresi doldu.",
-      "bitbucketTitle": "Bitbucket bağlantısının süresi doldu.",
-      "providerMessage": "Bağlantını tekrar kontrol et. Gerekirse yeniden bağlanman istenecek."
+      "bitbucketTitle": "Bitbucket bağlantısının süresi doldu."
     },
     "review": "İnceleme",
     "reviewPullRequest": "Çekme isteğini incele",

@@ -3107,10 +3107,9 @@
     "pullRequestUnavailableDescription": "No se puede abrir esta PR. Puede que se haya eliminado, que el repositorio sea privado o que la aplicación de Kilo para GitHub no esté instalada en él.",
     "reconnectNotice": {
       "title": "La conexión con GitHub ha caducado.",
-      "message": "Tu conexión con GitHub ya no es válida. Vuelve a comprobarla. Si es necesario, se te pedirá que conectes tu cuenta de nuevo.",
+      "message": "Vuelve a comprobarla. Si es necesario, se te pedirá que conectes tu cuenta de nuevo.",
       "gitlabTitle": "La conexión con GitLab ha caducado.",
-      "bitbucketTitle": "La conexión con Bitbucket ha caducado.",
-      "providerMessage": "Vuelve a comprobarla. Si es necesario, se te pedirá que conectes tu cuenta de nuevo."
+      "bitbucketTitle": "La conexión con Bitbucket ha caducado."
     },
     "review": "Revisión",
     "reviewPullRequest": "Revisar PR",

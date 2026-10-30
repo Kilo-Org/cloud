@@ -708,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub-anslutningen har upphört att gälla.",
-      "message": "Din GitHub-anslutning är inte längre giltig. Kontrollera anslutningen igen. Du blir ombedd att ansluta på nytt om det behövs.",
+      "message": "Kontrollera anslutningen igen. Du blir ombedd att ansluta på nytt om det behövs.",
       "gitlabTitle": "GitLab-anslutningen har upphört att gälla.",
-      "bitbucketTitle": "Bitbucket-anslutningen har upphört att gälla.",
-      "providerMessage": "Kontrollera anslutningen igen. Du blir ombedd att ansluta på nytt om det behövs."
+      "bitbucketTitle": "Bitbucket-anslutningen har upphört att gälla."
     },
     "eventChips": {
       "comment": "Kommentera",

@@ -580,11 +580,19 @@ describe('ScopeEntryScreen retry recovery', () => {
     failingProcedures = new Set(['getConfig']);
     const root = await mount('personal');
     expect(host(root, 'PlatformErrorScreen')[0]?.props.variant).toBe('server');
+    expect(
+      transport.mock.calls.filter(([input]) => procedureFor(input) === 'getConfig')
+    ).toHaveLength(1);
 
     await retry(root);
     await advanceBy();
     await advanceBy();
 
+    // The retried read really ran and rejected, so the frame below is the
+    // failed-retry frame and not the one the tap started from.
+    expect(
+      transport.mock.calls.filter(([input]) => procedureFor(input) === 'getConfig')
+    ).toHaveLength(2);
     const error = host(root, 'PlatformErrorScreen')[0];
     expect(error?.props.variant).toBe('server');
     expect(error?.props.message).toBeUndefined();

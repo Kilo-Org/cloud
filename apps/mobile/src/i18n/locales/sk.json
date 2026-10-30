@@ -714,6 +714,7 @@
       "gitlabDescription": "Pripoj svoj účet GitLab a kontroluj merge requesty v mobile.",
       "bitbucketDescription": "Pripoj Bitbucket k tejto organizácii a kontroluj žiadosti o zlúčenie v mobile.",
       "bitbucketOrgOnlyDescription": "Prepni účet hore na organizáciu a kontroluj jej žiadosti o zlúčenie na Bitbucku.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Tento účet zatiaľ nemá žiadne organizácie. Žiadosti o zlúčenie na Bitbucku môžeš kontrolovať po vytvorení organizácie alebo vstúpení do nej.",
       "contextLine": "Pre {{organization}}",
       "contextLinePersonal": "Pre osobný účet"
     },
@@ -739,10 +740,9 @@
     },
     "reconnectNotice": {
       "title": "Platnosť pripojenia k službe GitHub vypršala.",
-      "message": "Tvoje pripojenie k službe GitHub už nie je platné. Znova ho skontroluj — v prípade potreby ťa vyzveme na opätovné pripojenie.",
+      "message": "Znova ho skontroluj — v prípade potreby ťa vyzveme na opätovné pripojenie.",
       "gitlabTitle": "Platnosť pripojenia k službe GitLab vypršala.",
-      "bitbucketTitle": "Platnosť pripojenia k službe Bitbucket vypršala.",
-      "providerMessage": "Tvoje pripojenie k službe {{provider}} už nie je platné. Znova ho skontroluj — v prípade potreby ťa vyzveme na opätovné pripojenie."
+      "bitbucketTitle": "Platnosť pripojenia k službe Bitbucket vypršala."
     },
     "eventChips": {
       "comment": "Komentár",
@@ -3947,8 +3947,6 @@
     "commandAtLimit": "Príkaz je obmedzený na {{max}} znakov",
     "commandsEmpty": "Zatiaľ žiadne príkazy na nastavenie",
     "commandsSaveFailed": "Nepodarilo sa uložiť príkazy nastavenia",
-    "moveUp": "Posunúť sa hore",
-    "moveDown": "Presuňte sa nadol",
     "moveCommandUp": "Presunúť príkaz {{position}} nahor",
     "moveCommandDown": "Presunúť príkaz {{position}} nadol",
     "skillsTitle": "Zručnosti",

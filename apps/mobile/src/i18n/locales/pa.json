@@ -684,6 +684,7 @@
       "gitlabDescription": "ਮੋਬਾਈਲ ਉੱਤੇ ਮਰਜ਼ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਆਪਣਾ GitLab ਖਾਤਾ ਕਨੈਕਟ ਕਰੋ।",
       "bitbucketDescription": "ਮੋਬਾਈਲ ਉੱਤੇ ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਇਸ ਸੰਗਠਨ ਨੂੰ Bitbucket ਨਾਲ ਕਨੈਕਟ ਕਰੋ।",
       "bitbucketOrgOnlyDescription": "ਇਸ ਦੇ Bitbucket ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕਰਨ ਲਈ ਉੱਪਰ ਦਿੱਤੇ ਖਾਤੇ ਨੂੰ ਇੱਕ ਸੰਗਠਨ ਵਿੱਚ ਬਦਲੋ।",
+      "bitbucketOrgOnlyNoOrganizationDescription": "ਇਸ ਖਾਤੇ ਵਿੱਚ ਹਾਲੇ ਕੋਈ ਸੰਗਠਨ ਨਹੀਂ ਹੈ। ਇੱਕ ਸੰਗਠਨ ਬਣਾਉਣ ਜਾਂ ਉਸ ਵਿੱਚ ਸ਼ਾਮਲ ਹੋਣ ਤੋਂ ਬਾਅਦ ਹੀ Bitbucket ਪੁੱਲ ਰਿਕਵੈਸਟਾਂ ਦੀ ਸਮੀਖਿਆ ਕੀਤੀ ਜਾ ਸਕਦੀ ਹੈ।",
       "contextLine": "{{organization}} ਲਈ",
       "contextLinePersonal": "ਤੁਹਾਡੇ ਨਿੱਜੀ ਖਾਤੇ ਲਈ"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub ਕਨੈਕਸ਼ਨ ਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ ਹੈ।",
-      "message": "ਤੁਹਾਡਾ GitHub ਕਨੈਕਸ਼ਨ ਹੁਣ ਵੈਧ ਨਹੀਂ ਹੈ। ਆਪਣੇ ਕਨੈਕਸ਼ਨ ਦੀ ਦੁਬਾਰਾ ਜਾਂਚ ਕਰੋ — ਲੋੜ ਹੋਣ 'ਤੇ ਤੁਹਾਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਿਹਾ ਜਾਵੇਗਾ।",
+      "message": "ਆਪਣੇ ਕਨੈਕਸ਼ਨ ਦੀ ਦੁਬਾਰਾ ਜਾਂਚ ਕਰੋ — ਲੋੜ ਹੋਣ 'ਤੇ ਤੁਹਾਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਿਹਾ ਜਾਵੇਗਾ।",
       "gitlabTitle": "GitLab ਕਨੈਕਸ਼ਨ ਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ ਹੈ।",
-      "bitbucketTitle": "Bitbucket ਕਨੈਕਸ਼ਨ ਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ ਹੈ।",
-      "providerMessage": "ਤੁਹਾਡਾ {{provider}} ਕਨੈਕਸ਼ਨ ਹੁਣ ਵੈਧ ਨਹੀਂ ਹੈ। ਆਪਣੇ ਕਨੈਕਸ਼ਨ ਦੀ ਦੁਬਾਰਾ ਜਾਂਚ ਕਰੋ — ਲੋੜ ਹੋਣ 'ਤੇ ਤੁਹਾਨੂੰ ਦੁਬਾਰਾ ਕਨੈਕਟ ਕਰਨ ਲਈ ਕਿਹਾ ਜਾਵੇਗਾ।"
+      "bitbucketTitle": "Bitbucket ਕਨੈਕਸ਼ਨ ਦੀ ਮਿਆਦ ਪੁੱਗ ਗਈ ਹੈ।"
     },
     "eventChips": {
       "comment": "ਟਿੱਪਣੀ",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "ਹੁਕਮ {{max}} ਅੱਖਰਾਂ ਤੱਕ ਸੀਮਿਤ ਹੈ",
     "commandsEmpty": "ਹਾਲੇ ਤੱਕ ਕੋਈ ਸੈੱਟਅੱਪ ਕਮਾਂਡ ਨਹੀਂ ਹੈ",
     "commandsSaveFailed": "ਸੈੱਟਅੱਪ ਕਮਾਂਡਾਂ ਨੂੰ ਰੱਖਿਅਤ ਨਹੀਂ ਕੀਤਾ ਜਾ ਸਕਿਆ",
-    "moveUp": "ਉੱਪਰ ਜਾਓ",
-    "moveDown": "ਹੇਠਾਂ ਚਲੇ ਜਾਓ",
     "moveCommandUp": "ਕਮਾਂਡ {{position}} ਉੱਪਰ ਭੇਜੋ",
     "moveCommandDown": "ਕਮਾਂਡ {{position}} ਹੇਠਾਂ ਭੇਜੋ",
     "skillsTitle": "ਹੁਨਰ",

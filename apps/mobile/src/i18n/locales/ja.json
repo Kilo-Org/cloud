@@ -2699,6 +2699,7 @@
       "gitlabDescription": "モバイルでマージリクエストをレビューするには、GitLabアカウントを接続してください。",
       "bitbucketDescription": "モバイルでプルリクエストをレビューするには、この組織をBitbucketに接続してください。",
       "bitbucketOrgOnlyDescription": "Bitbucket のプルリクエストを確認するには、上のアカウントを組織に切り替えてください。",
+      "bitbucketOrgOnlyNoOrganizationDescription": "このアカウントにはまだ組織がありません。組織を作成または参加すると、Bitbucketのプルリクエストをレビューできるようになります。",
       "contextLine": "{{organization}}用",
       "contextLinePersonal": "個人用"
     },
@@ -3065,10 +3066,9 @@
     "pullRequestUnavailableDescription": "このPRを開けません。PRが削除されたか、リポジトリが非公開になっているか、リポジトリにKilo GitHub Appがインストールされていない可能性があります。",
     "reconnectNotice": {
       "title": "GitHubとの連携が期限切れになりました。",
-      "message": "GitHubとの接続が無効になりました。接続を再確認してください。再接続が必要な場合は、案内が表示されます。",
+      "message": "接続を再確認してください。再接続が必要な場合は、案内が表示されます。",
       "gitlabTitle": "GitLabとの連携が期限切れになりました。",
-      "bitbucketTitle": "Bitbucketとの連携が期限切れになりました。",
-      "providerMessage": "{{provider}}との接続が無効になりました。接続を再確認してください。再接続が必要な場合は、案内が表示されます。"
+      "bitbucketTitle": "Bitbucketとの連携が期限切れになりました。"
     },
     "review": "レビュー",
     "reviewPullRequest": "プルリクエストをレビュー",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "コマンドは{{max}}文字以内です",
     "commandsEmpty": "セットアップ コマンドはまだありません",
     "commandsSaveFailed": "セットアップコマンドを保存できませんでした",
-    "moveUp": "上に移動",
-    "moveDown": "下に移動",
     "moveCommandUp": "コマンド{{position}}を上に移動",
     "moveCommandDown": "コマンド{{position}}を下に移動",
     "skillsTitle": "スキル",

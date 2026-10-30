@@ -2699,6 +2699,7 @@
       "gitlabDescription": "Verbinde dein GitLab-Konto, um Merge-Requests in der App zu prüfen.",
       "bitbucketDescription": "Verbinde Bitbucket mit dieser Organisation, um Pull-Requests in der App zu prüfen.",
       "bitbucketOrgOnlyDescription": "Wechsle das Konto oben zu einer Organisation, um deren Pull-Requests in Bitbucket zu prüfen.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Diesem Konto ist noch keine Organisation zugeordnet. Du kannst Bitbucket-Pull-Requests prüfen, sobald du eine Organisation erstellst oder einer beitrittst.",
       "contextLine": "Für {{organization}}",
       "contextLinePersonal": "Für den persönlichen Bereich"
     },
@@ -3065,10 +3066,9 @@
     "pullRequestUnavailableDescription": "Dieser PR kann nicht geöffnet werden. Möglicherweise wurde er gelöscht, das Repository ist privat oder die GitHub-App von Kilo ist dort nicht installiert.",
     "reconnectNotice": {
       "title": "Die GitHub-Verbindung ist abgelaufen.",
-      "message": "Deine GitHub-Verbindung ist nicht mehr gültig. Prüfe sie erneut. Falls nötig, wirst du aufgefordert, sie wiederherzustellen.",
+      "message": "Prüfe sie erneut. Falls nötig, wirst du aufgefordert, sie wiederherzustellen.",
       "gitlabTitle": "Die GitLab-Verbindung ist abgelaufen.",
-      "bitbucketTitle": "Die Bitbucket-Verbindung ist abgelaufen.",
-      "providerMessage": "Deine {{provider}}-Verbindung ist nicht mehr gültig. Prüfe sie erneut. Falls nötig, wirst du aufgefordert, sie wiederherzustellen."
+      "bitbucketTitle": "Die Bitbucket-Verbindung ist abgelaufen."
     },
     "review": "Prüfung",
     "reviewPullRequest": "Pull-Request prüfen",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Der Befehl ist auf {{max}} Zeichen beschränkt",
     "commandsEmpty": "Noch keine Setup-Befehle",
     "commandsSaveFailed": "Setup-Befehle konnten nicht gespeichert werden",
-    "moveUp": "Nach oben verschieben",
-    "moveDown": "Nach unten verschieben",
     "moveCommandUp": "Befehl {{position}} nach oben verschieben",
     "moveCommandDown": "Befehl {{position}} nach unten verschieben",
     "skillsTitle": "Fähigkeiten",

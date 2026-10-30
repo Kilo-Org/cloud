@@ -2699,6 +2699,7 @@
       "gitlabDescription": "Hubungkan akun GitLab kamu untuk meninjau merge request di ponsel.",
       "bitbucketDescription": "Hubungkan Bitbucket ke organisasi ini untuk meninjau PR di ponsel.",
       "bitbucketOrgOnlyDescription": "Ganti akun di atas ke sebuah organisasi untuk meninjau PR Bitbucket-nya.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Akun ini belum memiliki organisasi. PR Bitbucket dapat ditinjau setelah Anda membuat atau bergabung dengan organisasi.",
       "contextLine": "Untuk {{organization}}",
       "contextLinePersonal": "Untuk akun pribadi Anda"
     },
@@ -3065,10 +3066,9 @@
     "pullRequestUnavailableDescription": "PR ini tidak dapat dibuka. PR ini mungkin sudah dihapus, repositorinya bersifat privat, atau aplikasi Kilo untuk GitHub belum dipasang di repositori tersebut.",
     "reconnectNotice": {
       "title": "Koneksi GitHub kedaluwarsa.",
-      "message": "Koneksi GitHub kamu sudah tidak valid. Periksa ulang koneksimu. Kamu akan diminta menghubungkan ulang jika perlu.",
+      "message": "Periksa ulang koneksimu. Kamu akan diminta menghubungkan ulang jika perlu.",
       "gitlabTitle": "Koneksi GitLab kedaluwarsa.",
-      "bitbucketTitle": "Koneksi Bitbucket kedaluwarsa.",
-      "providerMessage": "Koneksi {{provider}} kamu sudah tidak valid. Periksa ulang koneksimu. Kamu akan diminta menghubungkan ulang jika perlu."
+      "bitbucketTitle": "Koneksi Bitbucket kedaluwarsa."
     },
     "review": "Tinjauan",
     "reviewPullRequest": "Tinjau PR",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Perintah dibatasi hingga {{max}} karakter",
     "commandsEmpty": "Belum ada perintah pengaturan",
     "commandsSaveFailed": "Tidak dapat menyimpan perintah penyiapan",
-    "moveUp": "Naik",
-    "moveDown": "Pindah ke bawah",
     "moveCommandUp": "Pindahkan perintah {{position}} ke atas",
     "moveCommandDown": "Pindahkan perintah {{position}} ke bawah",
     "skillsTitle": "Keterampilan",

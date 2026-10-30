@@ -699,6 +699,7 @@
       "gitlabDescription": "Poveži svoj GitLab nalog da pregledaš merge requeste na telefonu.",
       "bitbucketDescription": "Poveži Bitbucket sa ovom organizacijom da pregledaš zahteve za spajanje na telefonu.",
       "bitbucketOrgOnlyDescription": "Prebaci nalog gore na organizaciju da pregledaš njene zahteve za spajanje na Bitbucktu.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Ovaj nalog još nema organizacije. Zahteve za spajanje na Bitbucktu možeš pregledati kada kreiraš ili se pridružiš organizaciji.",
       "contextLine": "Za {{organization}}",
       "contextLinePersonal": "Za lični nalog"
     },
@@ -723,10 +724,9 @@
     },
     "reconnectNotice": {
       "title": "Veza sa GitHub nalogom je istekla.",
-      "message": "Tvoja veza sa GitHub-om više ne važi. Ponovo proveri vezu — po potrebi će se pojaviti zahtev za ponovno povezivanje.",
+      "message": "Ponovo proveri vezu — po potrebi će se pojaviti zahtev za ponovno povezivanje.",
       "gitlabTitle": "Veza sa GitLab nalogom je istekla.",
-      "bitbucketTitle": "Veza sa Bitbucket nalogom je istekla.",
-      "providerMessage": "Tvoja veza sa {{provider}}-om više ne važi. Ponovo proveri vezu — po potrebi će se pojaviti zahtev za ponovno povezivanje."
+      "bitbucketTitle": "Veza sa Bitbucket nalogom je istekla."
     },
     "eventChips": {
       "comment": "Komentariši",
@@ -3897,8 +3897,6 @@
     "commandAtLimit": "Komanda je ograničena na {{max}} znakova",
     "commandsEmpty": "Još nema komandi za podešavanje",
     "commandsSaveFailed": "Nije moguće sačuvati komande za podešavanje",
-    "moveUp": "Pomeri se gore",
-    "moveDown": "Pomeri se dole",
     "moveCommandUp": "Premesti komandu {{position}} gore",
     "moveCommandDown": "Premesti komandu {{position}} dole",
     "skillsTitle": "Veštine",

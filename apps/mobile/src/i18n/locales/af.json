@@ -684,6 +684,7 @@
       "gitlabDescription": "Koppel jou GitLab-rekening om merge requests op jou foon te hersien.",
       "bitbucketDescription": "Koppel Bitbucket aan hierdie organisasie om trekversoeke op jou foon te hersien.",
       "bitbucketOrgOnlyDescription": "Skakel die rekening hierbo oor na 'n organisasie om sy Bitbucket-trekversoeke te hersien.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Hierdie rekening het nog geen organisasies nie. Bitbucket-trekversoeke kan hersien word sodra jy 'n organisasie skep of by een aansluit.",
       "contextLine": "Vir {{organization}}",
       "contextLinePersonal": "Vir jou persoonlike rekening"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Die GitHub-verbinding het verval.",
-      "message": "Jou GitHub-verbinding is nie meer geldig nie. Kontroleer jou verbinding weer — jy sal gevra word om weer te koppel indien nodig.",
+      "message": "Kontroleer jou verbinding weer — jy sal gevra word om weer te koppel indien nodig.",
       "gitlabTitle": "Die GitLab-verbinding het verval.",
-      "bitbucketTitle": "Die Bitbucket-verbinding het verval.",
-      "providerMessage": "Jou {{provider}}-verbinding is nie meer geldig nie. Kontroleer jou verbinding weer — jy sal gevra word om weer te koppel indien nodig."
+      "bitbucketTitle": "Die Bitbucket-verbinding het verval."
     },
     "eventChips": {
       "comment": "Kommentaar",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Die opdrag is beperk tot {{max}} karakters",
     "commandsEmpty": "Nog geen opstelopdragte nie",
     "commandsSaveFailed": "Kon nie opstellingopdragte stoor nie",
-    "moveUp": "Beweeg op",
-    "moveDown": "Beweeg af",
     "moveCommandUp": "Skuif bevel {{position}} op",
     "moveCommandDown": "Skuif bevel {{position}} af",
     "skillsTitle": "Vaardighede",

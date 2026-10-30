@@ -684,6 +684,7 @@
       "gitlabDescription": "Мобильдіде біріктіру сұрауларын қарау үшін GitLab тіркелгіңізді қосыңыз.",
       "bitbucketDescription": "Мобильдіде тарту сұрауларын қарау үшін Bitbucket-ты осы ұйымға қосыңыз.",
       "bitbucketOrgOnlyDescription": "Жоғарыдағы тіркелгіні ұйымға ауыстырыңыз, оның Bitbucket тарту сұрауларын қарау үшін.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Бұл тіркелгіде әзірге ешбір ұйым жоқ. Ұйым құрғаннан немесе оған қосылғаннан кейін Bitbucket тарту сұрауларын қарауға болады.",
       "contextLine": "{{organization}} үшін",
       "contextLinePersonal": "Жеке аккаунтыңыз үшін"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub қосылымының мерзімі аяқталды.",
-      "message": "GitHub қосылымыңыз енді жарамсыз. Қосылымды қайта тексеріңіз — қажет болса, қайта қосылу ұсынылады.",
+      "message": "Қосылымды қайта тексеріңіз — қажет болса, қайта қосылу ұсынылады.",
       "gitlabTitle": "GitLab қосылымының мерзімі аяқталды.",
-      "bitbucketTitle": "Bitbucket қосылымының мерзімі аяқталды.",
-      "providerMessage": "{{provider}} қосылымыңыз енді жарамсыз. Қосылымды қайта тексеріңіз — қажет болса, қайта қосылу ұсынылады."
+      "bitbucketTitle": "Bitbucket қосылымының мерзімі аяқталды."
     },
     "eventChips": {
       "comment": "Пікір жазу",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Пәрмен {{max}} таңбамен шектелген",
     "commandsEmpty": "Орнату пәрмендері әлі жоқ",
     "commandsSaveFailed": "Орнату пәрмендерін сақтау мүмкін болмады",
-    "moveUp": "Жоғары жылжытыңыз",
-    "moveDown": "Төмен жылжытыңыз",
     "moveCommandUp": "{{position}} пәрменін жоғары жылжыту",
     "moveCommandDown": "{{position}} пәрменін төмен жылжыту",
     "skillsTitle": "Дағдылар",

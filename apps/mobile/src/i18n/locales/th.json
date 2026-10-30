@@ -684,6 +684,7 @@
       "gitlabDescription": "เชื่อมต่อบัญชี GitLab ของคุณเพื่อรีวิว merge request บนมือถือ",
       "bitbucketDescription": "เชื่อมต่อ Bitbucket กับองค์กรนี้เพื่อรีวิวพูลรีเควสต์บนมือถือ",
       "bitbucketOrgOnlyDescription": "สลับบัญชีด้านบนไปที่องค์กรเพื่อรีวิวพูลรีเควสต์บน Bitbucket ขององค์กรนั้น",
+      "bitbucketOrgOnlyNoOrganizationDescription": "บัญชีนี้ยังไม่มีองค์กร คุณจะสามารถรีวิวพูลรีเควสต์บน Bitbucket ได้เมื่อสร้างหรือเข้าร่วมองค์กร",
       "contextLine": "สำหรับ {{organization}}",
       "contextLinePersonal": "สำหรับบัญชีส่วนตัวของคุณ"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "การเชื่อมต่อ GitHub หมดอายุแล้ว",
-      "message": "การเชื่อมต่อ GitHub ของคุณใช้ไม่ได้แล้ว ตรวจสอบการเชื่อมต่ออีกครั้ง หากจำเป็น ระบบจะแจ้งให้เชื่อมต่อใหม่",
+      "message": "ตรวจสอบการเชื่อมต่ออีกครั้ง หากจำเป็น ระบบจะแจ้งให้เชื่อมต่อใหม่",
       "gitlabTitle": "การเชื่อมต่อ GitLab หมดอายุแล้ว",
-      "bitbucketTitle": "การเชื่อมต่อ Bitbucket หมดอายุแล้ว",
-      "providerMessage": "การเชื่อมต่อ {{provider}} ของคุณใช้ไม่ได้แล้ว ตรวจสอบการเชื่อมต่ออีกครั้ง หากจำเป็น ระบบจะแจ้งให้เชื่อมต่อใหม่"
+      "bitbucketTitle": "การเชื่อมต่อ Bitbucket หมดอายุแล้ว"
     },
     "eventChips": {
       "comment": "แสดงความคิดเห็น",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "คำสั่งจำกัดไว้ที่ {{max}} อักขระ",
     "commandsEmpty": "ยังไม่มีคำสั่งการตั้งค่า",
     "commandsSaveFailed": "ไม่สามารถบันทึกคำสั่งการตั้งค่าได้",
-    "moveUp": "เลื่อนขึ้น",
-    "moveDown": "เลื่อนลง",
     "moveCommandUp": "ย้ายคำสั่ง {{position}} ขึ้น",
     "moveCommandDown": "ย้ายคำสั่ง {{position}} ลง",
     "skillsTitle": "ทักษะ",

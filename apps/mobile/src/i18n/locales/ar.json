@@ -2811,7 +2811,8 @@
       "gitlabDescription": "اربط حسابك في GitLab لمراجعة طلبات الدمج على الجوال.",
       "bitbucketDescription": "اربط Bitbucket بهذه المؤسسة لمراجعة طلبات السحب على الجوال.",
       "bitbucketOrgOnlyDescription": "بدّل الحساب أعلاه إلى مؤسسة لمراجعة طلبات السحب الخاصة بها على Bitbucket.",
-      "contextLine": "لـ{{organization}}",
+      "bitbucketOrgOnlyNoOrganizationDescription": "لا توجد مؤسسات في هذا الحساب بعد. يمكنك مراجعة طلبات السحب على Bitbucket بعد إنشاء مؤسسة أو الانضمام إلى واحدة.",
+      "contextLine": "للمؤسسة: {{organization}}",
       "contextLinePersonal": "لحسابك الشخصي"
     },
     "connectionExpired": "انتهت صلاحية الربط مع GitHub.",
@@ -3229,10 +3230,9 @@
     "pullRequestUnavailableDescription": "لا يمكن فتح PR هذا. ربما حُذف، أو أن المستودع خاص، أو أن تطبيق Kilo على GitHub غير مثبّت فيه.",
     "reconnectNotice": {
       "title": "انتهت صلاحية الربط مع GitHub.",
-      "message": "لم يعد ربط حسابك على GitHub صالحًا. أعد التحقق من الربط، وسيُطلب منك إعادة ربط الحساب إذا لزم الأمر.",
+      "message": "أعد التحقق من الربط، وسيُطلب منك إعادة ربط الحساب إذا لزم الأمر.",
       "gitlabTitle": "انتهت صلاحية الربط مع GitLab.",
-      "bitbucketTitle": "انتهت صلاحية الربط مع Bitbucket.",
-      "providerMessage": "لم يعد ربط حسابك على {{provider}} صالحًا. أعد التحقق من الربط، وسيُطلب منك إعادة ربط الحساب إذا لزم الأمر."
+      "bitbucketTitle": "انتهت صلاحية الربط مع Bitbucket."
     },
     "review": "مراجعة",
     "reviewPullRequest": "مراجعة طلب السحب",
@@ -4047,8 +4047,6 @@
     "commandAtLimit": "يقتصر الأمر على {{max}} حرفًا",
     "commandsEmpty": "لا توجد أوامر الإعداد حتى الآن",
     "commandsSaveFailed": "تعذر حفظ أوامر الإعداد",
-    "moveUp": "تحرك للأعلى",
-    "moveDown": "تحرك للأسفل",
     "moveCommandUp": "انقل الأمر {{position}} لأعلى",
     "moveCommandDown": "انقل الأمر {{position}} لأسفل",
     "skillsTitle": "مهارات",

@@ -2699,6 +2699,7 @@
       "gitlabDescription": "Kết nối tài khoản GitLab để xem merge request trên thiết bị di động.",
       "bitbucketDescription": "Kết nối Bitbucket với tổ chức này để xem PR trên thiết bị di động.",
       "bitbucketOrgOnlyDescription": "Chuyển tài khoản ở trên sang một tổ chức để xem các PR Bitbucket của tổ chức đó.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Tài khoản này chưa có tổ chức nào. Bạn có thể xem các PR Bitbucket sau khi tạo hoặc tham gia một tổ chức.",
       "contextLine": "Cho {{organization}}",
       "contextLinePersonal": "Cho tài khoản cá nhân"
     },
@@ -3065,10 +3066,9 @@
     "pullRequestUnavailableDescription": "Không thể mở PR này. Có thể PR đã bị xóa, kho lưu trữ ở chế độ riêng tư hoặc ứng dụng Kilo trên GitHub chưa được cài đặt cho kho lưu trữ này.",
     "reconnectNotice": {
       "title": "Kết nối GitHub đã hết hạn.",
-      "message": "Kết nối GitHub của bạn không còn hợp lệ. Kiểm tra lại kết nối — bạn sẽ được nhắc kết nối lại nếu cần.",
+      "message": "Kiểm tra lại kết nối — bạn sẽ được nhắc kết nối lại nếu cần.",
       "gitlabTitle": "Kết nối GitLab đã hết hạn.",
-      "bitbucketTitle": "Kết nối Bitbucket đã hết hạn.",
-      "providerMessage": "Kết nối {{provider}} của bạn không còn hợp lệ. Kiểm tra lại kết nối — bạn sẽ được nhắc kết nối lại nếu cần."
+      "bitbucketTitle": "Kết nối Bitbucket đã hết hạn."
     },
     "review": "Rà soát",
     "reviewPullRequest": "Đánh giá PR",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Lệnh được giới hạn tối đa {{max}} ký tự",
     "commandsEmpty": "Chưa có lệnh thiết lập nào",
     "commandsSaveFailed": "Không thể lưu lệnh thiết lập",
-    "moveUp": "Di chuyển lên",
-    "moveDown": "Di chuyển xuống",
     "moveCommandUp": "Di chuyển lệnh {{position}} lên",
     "moveCommandDown": "Di chuyển lệnh {{position}} xuống",
     "skillsTitle": "Kỹ năng",

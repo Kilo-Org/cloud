@@ -2727,6 +2727,7 @@
       "gitlabDescription": "חברו את חשבון GitLab שלכם כדי לסקור בקשות מיזוג בנייד.",
       "bitbucketDescription": "חברו את Bitbucket לארגון הזה כדי לסקור בקשות משיכה בנייד.",
       "bitbucketOrgOnlyDescription": "החליפו את החשבון שלמעלה לארגון כדי לסקור את בקשות המשיכה שלו ב-Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "לחשבון הזה אין עדיין ארגונים. אפשר לסקור בקשות משיכה ב-Bitbucket לאחר שתיצרו או תצטרפו לארגון.",
       "contextLine": "עבור {{organization}}",
       "contextLinePersonal": "עבור החשבון האישי"
     },
@@ -3106,10 +3107,9 @@
     "pullRequestUnavailableDescription": "לא ניתן לפתוח את ה-PR הזה. ייתכן שהוא נמחק, שהמאגר פרטי או שאפליקציית Kilo ל-GitHub אינה מותקנת במאגר.",
     "reconnectNotice": {
       "title": "פג תוקף החיבור ל-GitHub.",
-      "message": "החיבור שלך ל-GitHub אינו תקף עוד. בדוק שוב את החיבור — תתבקש להתחבר מחדש במידת הצורך.",
+      "message": "בדוק שוב את החיבור — תתבקש להתחבר מחדש במידת הצורך.",
       "gitlabTitle": "פג תוקף החיבור ל-GitLab.",
-      "bitbucketTitle": "פג תוקף החיבור ל-Bitbucket.",
-      "providerMessage": "החיבור שלך ל-{{provider}} אינו תקף עוד. בדוק שוב את החיבור — תתבקש להתחבר מחדש במידת הצורך."
+      "bitbucketTitle": "פג תוקף החיבור ל-Bitbucket."
     },
     "review": "סקירה",
     "reviewPullRequest": "סקירת בקשת המשיכה",
@@ -3897,8 +3897,6 @@
     "commandAtLimit": "הפקודה מוגבלת ל-{{max}} תווים",
     "commandsEmpty": "אין עדיין פקודות הגדרה",
     "commandsSaveFailed": "לא ניתן לשמור פקודות הגדרה",
-    "moveUp": "לזוז למעלה",
-    "moveDown": "לזוז למטה",
     "moveCommandUp": "העבר את הפקודה {{position}} למעלה",
     "moveCommandDown": "העבר את הפקודה {{position}} למטה",
     "skillsTitle": "מיומנויות",

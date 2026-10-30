@@ -750,6 +750,7 @@
       "gitlabDescription": "Connect your GitLab account to review merge requests on mobile.",
       "bitbucketDescription": "Connect Bitbucket to this organization to review pull requests on mobile.",
       "bitbucketOrgOnlyDescription": "Switch the account above to an organization to review its Bitbucket pull requests.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "This account has no organizations yet. Bitbucket pull requests can be reviewed once you create or join an organization.",
       "contextLine": "For {{organization}}",
       "contextLinePersonal": "For your personal account"
     },
@@ -773,10 +774,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub connection expired",
-      "message": "Your GitHub connection is no longer valid. Re-check your connection — you'll be prompted to reconnect if needed.",
+      "message": "Re-check your connection — you'll be prompted to reconnect if needed.",
       "gitlabTitle": "GitLab connection expired",
-      "bitbucketTitle": "Bitbucket connection expired",
-      "providerMessage": "Your {{provider}} connection is no longer valid. Re-check your connection — you'll be prompted to reconnect if needed."
+      "bitbucketTitle": "Bitbucket connection expired"
     },
     "eventChips": {
       "comment": "Comment",
@@ -1491,8 +1491,8 @@
       "manageAccess": "Manage access",
       "bitbucketNoRepositoriesDescription": "No repositories are available in this Bitbucket workspace.",
       "gitlabNoRepositoriesDescription": "You may need to grant access to more groups or projects on GitLab.",
-      "installGithubApp": "Install the GitHub app on repositories",
-      "installGithubAppDescription": "Grant the Kilo GitHub App access to the repositories you want reviewed.",
+      "installGithubApp": "Install the GitHub app",
+      "installGithubAppDescription": "Grant it access to the repositories you want reviewed.",
       "repositoryAccess": "repository access"
     },
     "style": {
@@ -3913,8 +3913,6 @@
     "commandAtLimit": "The command is limited to {{max}} characters",
     "commandsEmpty": "No setup commands yet",
     "commandsSaveFailed": "Couldn't save setup commands",
-    "moveUp": "Move up",
-    "moveDown": "Move down",
     "moveCommandUp": "Move command {{position}} up",
     "moveCommandDown": "Move command {{position}} down",
     "skillsTitle": "Skills",

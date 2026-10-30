@@ -684,6 +684,7 @@
       "gitlabDescription": "په موبایل کې د یوځای کولو د غوښتنو د بیاکتنې لپاره خپل GitLab حساب ونښلوئ.",
       "bitbucketDescription": "په موبایل کې د پول ریکویسټونو د بیاکتنې لپاره Bitbucket له دې بنسټ سره ونښلوئ.",
       "bitbucketOrgOnlyDescription": "د هغې د Bitbucket پول ریکویسټونو د بیاکتنې لپاره پورته حساب یو بنسټ ته وبدلئ.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "دا حساب تر اوسه هېڅ بنسټ نه لري. د Bitbucket پول ریکویسټونو بیاکتنه به وشي چې یو وخت تاسو یو بنسټ جوړ کړئ یا یو بنسټ ته ورشئ.",
       "contextLine": "{{organization}} لپاره",
       "contextLinePersonal": "د ستاسې د شخصي حساب لپاره"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "له GitHub سره د اړیکې موده پای ته ورسېده.",
-      "message": "ستاسو د GitHub اړیکه نور اعتبار نه لري. خپله اړیکه بیا وګورئ — که اړتیا وي، د بیا نښلولو غوښتنه به درڅخه وشي.",
+      "message": "خپله اړیکه بیا وګورئ — که اړتیا وي، د بیا نښلولو غوښتنه به درڅخه وشي.",
       "gitlabTitle": "له GitLab سره د اړیکې موده پای ته ورسېده.",
-      "bitbucketTitle": "له Bitbucket سره د اړیکې موده پای ته ورسېده.",
-      "providerMessage": "ستاسو د {{provider}} اړیکه نور اعتبار نه لري. خپله اړیکه بیا وګورئ — که اړتیا وي، د بیا نښلولو غوښتنه به درڅخه وشي."
+      "bitbucketTitle": "له Bitbucket سره د اړیکې موده پای ته ورسېده."
     },
     "eventChips": {
       "comment": "تبصره",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "امر تر {{max}} توري پورې محدود دی",
     "commandsEmpty": "تر اوسه د تنظیم کولو امرونه ندي",
     "commandsSaveFailed": "د ترتیب کولو کمانډونه خوندي نشو کولی",
-    "moveUp": "پورته لاړ شه",
-    "moveDown": "لاندې حرکت وکړئ",
     "moveCommandUp": "{{position}} امر پورته کړئ",
     "moveCommandDown": "{{position}} امر لاندې کړئ",
     "skillsTitle": "مهارتونه",

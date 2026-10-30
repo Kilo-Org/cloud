@@ -684,6 +684,7 @@
       "gitlabDescription": "Ühenda oma GitLab konto, et liitmistaotlusi mobiilis üle vaadata.",
       "bitbucketDescription": "Ühenda Bitbucket selle organisatsiooniga, et tõmbetaotlusi mobiilis üle vaadata.",
       "bitbucketOrgOnlyDescription": "Vaheta ülalolev konto organisatsioonile, et selle Bitbucketi tõmbetaotlusi üle vaadata.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Sellel kontol pole veel organisatsioone. Bitbucketi tõmbetaotlusi saab üle vaadata, kui lood või liitud organisatsiooniga.",
       "contextLine": "{{organization}} jaoks",
       "contextLinePersonal": "Sinu isikliku konto jaoks"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHubi ühendus aegus.",
-      "message": "Sinu GitHubi ühendus ei kehti enam. Kontrolli ühendust uuesti — vajaduse korral palutakse sul see taastada.",
+      "message": "Kontrolli ühendust uuesti — vajaduse korral palutakse sul see taastada.",
       "gitlabTitle": "GitLabi ühendus aegus.",
-      "bitbucketTitle": "Bitbucketi ühendus aegus.",
-      "providerMessage": "Sinu {{provider}}i ühendus ei kehti enam. Kontrolli ühendust uuesti — vajaduse korral palutakse sul see taastada."
+      "bitbucketTitle": "Bitbucketi ühendus aegus."
     },
     "eventChips": {
       "comment": "Kommenteeri",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Käsu pikkus on piiratud {{max}} tähemärgiga",
     "commandsEmpty": "Seadistuskäske pole veel",
     "commandsSaveFailed": "Seadistuskäske ei saanud salvestada",
-    "moveUp": "Liigu üles",
-    "moveDown": "Liigu alla",
     "moveCommandUp": "Liiguta käsk {{position}} üles",
     "moveCommandDown": "Liiguta käsk {{position}} alla",
     "skillsTitle": "Oskused",

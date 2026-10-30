@@ -684,6 +684,7 @@
       "gitlabDescription": "በሞባይል ላይ የማዋሃድ ጥያቄዎችን ለመገምገም የGitLab መለያዎን ያገናኙ።",
       "bitbucketDescription": "Bitbucketን ከዚህ ድርጅት ጋር ያገናኙ የማዋሃድ ጥያቄዎችን በሞባይል ለመገምገም።",
       "bitbucketOrgOnlyDescription": "ከላይ ያለውን መለያ ወደ ድርጅት ይቀይሩ፣ የዚህ ድርጅት የBitbucket የማዋሃድ ጥያቄዎችን ለመገምገም።",
+      "bitbucketOrgOnlyNoOrganizationDescription": "ይህ መለያ እስካሁን ድርጅቶች የለውም። ድርጅት ሲፈጥሩ ወይም ሲቀላቀሉ የBitbucket የማዋሃድ ጥያቄዎችን ማገምገም ይቻላል።",
       "contextLine": "ለ{{organization}}",
       "contextLinePersonal": "ለግል መለያዎ"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "የGitHub ግንኙነት ጊዜው አልፏል።",
-      "message": "የGitHub ግንኙነትህ ከእንግዲህ አይሠራም። ግንኙነትህን እንደገና ፈትሽ — ካስፈለገ እንደገና እንድታገናኝ ትጠየቃለህ።",
+      "message": "ግንኙነትህን እንደገና ፈትሽ — ካስፈለገ እንደገና እንድታገናኝ ትጠየቃለህ።",
       "gitlabTitle": "የGitLab ግንኙነት ጊዜው አልፏል።",
-      "bitbucketTitle": "የBitbucket ግንኙነት ጊዜው አልፏል።",
-      "providerMessage": "የ{{provider}} ግንኙነትህ ከእንግዲህ አይሠራም። ግንኙነትህን እንደገና ፈትሽ — ካስፈለገ እንደገና እንድታገናኝ ትጠየቃለህ።"
+      "bitbucketTitle": "የBitbucket ግንኙነት ጊዜው አልፏል።"
     },
     "eventChips": {
       "comment": "አስተያየት",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "ትዕዛዙ በ{{max}} ቁምፊዎች የተገደበ ነው",
     "commandsEmpty": "እስካሁን ምንም የማዋቀር ትዕዛዞች የሉም",
     "commandsSaveFailed": "የማዋቀር ትዕዛዞችን ማስቀመጥ አልተቻለም",
-    "moveUp": "ወደ ላይ ተንቀሳቀስ",
-    "moveDown": "ወደ ታች ውሰድ",
     "moveCommandUp": "ትዕዛዝ {{position}} ወደ ላይ አንቀሳቅስ",
     "moveCommandDown": "ትዕዛዝ {{position}} ወደ ታች አንቀሳቅስ",
     "skillsTitle": "ችሎታዎች",

@@ -684,6 +684,7 @@
       "gitlabDescription": "Honoa tō pūkete GitLab kia arotakehia ngā tono whakakotahi i te waea pūkoro.",
       "bitbucketDescription": "Honoa a Bitbucket ki tēnei whakahaere kia arotakehia ngā tono kume i te waea pūkoro.",
       "bitbucketOrgOnlyDescription": "Whakawhiti te pūkete kei runga ake nei ki tētahi whakahaere kia arotakehia ōna tono kume Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Kāore anake he whakahaere ō tēnei pūkete. Ka arotakehia ngā tono kume Bitbucket inā waihanga rānei koe i tētahi whakahaere, inā uru rānei koe ki tētahi.",
       "contextLine": "Mō {{organization}}",
       "contextLinePersonal": "Mō tō whaiaro"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Kua pau te wā o te hononga GitHub.",
-      "message": "Kua kore tō hononga GitHub e whai mana. Tirohia anō tō hononga — ka tonoa koe kia hono anō mēnā e hiahiatia ana.",
+      "message": "Tirohia anō tō hononga — ka tonoa koe kia hono anō mēnā e hiahiatia ana.",
       "gitlabTitle": "Kua pau te wā o te hononga GitLab.",
-      "bitbucketTitle": "Kua pau te wā o te hononga Bitbucket.",
-      "providerMessage": "Kua kore tō hononga {{provider}} e whai mana. Tirohia anō tō hononga — ka tonoa koe kia hono anō mēnā e hiahiatia ana."
+      "bitbucketTitle": "Kua pau te wā o te hononga Bitbucket."
     },
     "eventChips": {
       "comment": "Kōrero",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Ka whakawhāitihia te whakahau ki te {{max}} pūāhua",
     "commandsEmpty": "Kare ano he tono tatūnga",
     "commandsSaveFailed": "Kāore i taea te tiaki i ngā tono tatūnga",
-    "moveUp": "Neke ki runga",
-    "moveDown": "Nuku ki raro",
     "moveCommandUp": "Neke whakahau {{position}} ki runga",
     "moveCommandDown": "Neke whakahau {{position}} ki raro",
     "skillsTitle": "Pukenga",

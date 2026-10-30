@@ -684,6 +684,7 @@
       "gitlabDescription": "Tengdu GitLab-reikninginn þinn til að yfirfara merge requests í símanum.",
       "bitbucketDescription": "Tengdu Bitbucket við þessa stofnun til að yfirfara sameiningarbeiðnir í símanum.",
       "bitbucketOrgOnlyDescription": "Skiptu reikningnum hér að ofan yfir í stofnun til að yfirfara sameiningarbeiðnir hennar á Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Þessi reikningur er ekki með neinar stofnanir ennþá. Hægt er að yfirfara sameiningarbeiðnir á Bitbucket um leið og þú býrð til eða þiggur boð um aðild að stofnun.",
       "contextLine": "Fyrir {{organization}}",
       "contextLinePersonal": "Fyrir persónulegan reikning"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Tengingin við GitHub er útrunnin.",
-      "message": "GitHub-tengingin þín er ekki lengur gild. Athugaðu tenginguna aftur — þú færð beiðni um að tengjast aftur ef þörf er á.",
+      "message": "Athugaðu tenginguna aftur — þú færð beiðni um að tengjast aftur ef þörf er á.",
       "gitlabTitle": "Tengingin við GitLab er útrunnin.",
-      "bitbucketTitle": "Tengingin við Bitbucket er útrunnin.",
-      "providerMessage": "{{provider}}-tengingin þín er ekki lengur gild. Athugaðu tenginguna aftur — þú færð beiðni um að tengjast aftur ef þörf er á."
+      "bitbucketTitle": "Tengingin við Bitbucket er útrunnin."
     },
     "eventChips": {
       "comment": "Gera athugasemd",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Skipunin er takmörkuð við {{max}} stafi",
     "commandsEmpty": "Engar uppsetningarskipanir ennþá",
     "commandsSaveFailed": "Gat ekki vistað uppsetningarskipanir",
-    "moveUp": "Færðu þig upp",
-    "moveDown": "Færðu þig niður",
     "moveCommandUp": "Færa skipun {{position}} upp",
     "moveCommandDown": "Færa skipun {{position}} niður",
     "skillsTitle": "Færni",

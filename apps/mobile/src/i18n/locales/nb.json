@@ -684,6 +684,7 @@
       "gitlabDescription": "Koble til GitLab-kontoen din for å gå gjennom merge requests på mobilen.",
       "bitbucketDescription": "Koble Bitbucket til denne organisasjonen for å gå gjennom PR-er på mobilen.",
       "bitbucketOrgOnlyDescription": "Bytt kontoen over til en organisasjon for å gå gjennom dens PR-er på Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Denne kontoen har ingen organisasjoner ennå. Du kan gå gjennom PR-er på Bitbucket når du oppretter eller blir med i en organisasjon.",
       "contextLine": "For {{organization}}",
       "contextLinePersonal": "For personlig konto"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub-tilkoblingen er utløpt.",
-      "message": "GitHub-tilkoblingen din er ikke lenger gyldig. Sjekk den på nytt. Du blir bedt om å koble til igjen ved behov.",
+      "message": "Sjekk den på nytt. Du blir bedt om å koble til igjen ved behov.",
       "gitlabTitle": "GitLab-tilkoblingen er utløpt.",
-      "bitbucketTitle": "Bitbucket-tilkoblingen er utløpt.",
-      "providerMessage": "{{provider}}-tilkoblingen din er ikke lenger gyldig. Sjekk den på nytt. Du blir bedt om å koble til igjen ved behov."
+      "bitbucketTitle": "Bitbucket-tilkoblingen er utløpt."
     },
     "eventChips": {
       "comment": "Kommenter",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Kommandoen er begrenset til {{max}} tegn",
     "commandsEmpty": "Ingen oppsettkommandoer ennå",
     "commandsSaveFailed": "Kunne ikke lagre oppsettkommandoer",
-    "moveUp": "Flytt opp",
-    "moveDown": "Flytt ned",
     "moveCommandUp": "Flytt kommando {{position}} opp",
     "moveCommandDown": "Flytt kommando {{position}} ned",
     "skillsTitle": "Ferdigheter",

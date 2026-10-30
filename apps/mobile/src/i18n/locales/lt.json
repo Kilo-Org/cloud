@@ -714,6 +714,7 @@
       "gitlabDescription": "Prijunk savo GitLab paskyrą, kad galėtum peržiūrėti merge requests mobiliajame įrenginyje.",
       "bitbucketDescription": "Prijunk Bitbucket prie šios organizacijos, kad galėtum peržiūrėti pakeitimų užklausas mobiliajame įrenginyje.",
       "bitbucketOrgOnlyDescription": "Perjunk aukščiau esančią paskyrą į organizaciją, kad galėtum peržiūrėti jos Bitbucket pakeitimų užklausas.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Ši paskyra dar neturi jokių organizacijų. Sukūręs arba prisijungęs prie organizacijos galėsi peržiūrėti Bitbucket pakeitimų užklausas.",
       "contextLine": "Skirta {{organization}}",
       "contextLinePersonal": "Skirta asmeninei paskyrai"
     },
@@ -739,10 +740,9 @@
     },
     "reconnectNotice": {
       "title": "Baigėsi GitHub prieigos galiojimas.",
-      "message": "Tavo GitHub ryšys nebegalioja. Patikrink ryšį dar kartą — prireikus bus paprašyta prisijungti iš naujo.",
+      "message": "Patikrink ryšį dar kartą — prireikus bus paprašyta prisijungti iš naujo.",
       "gitlabTitle": "Baigėsi GitLab prieigos galiojimas.",
-      "bitbucketTitle": "Baigėsi Bitbucket prieigos galiojimas.",
-      "providerMessage": "Tavo {{provider}} ryšys nebegalioja. Patikrink ryšį dar kartą — prireikus bus paprašyta prisijungti iš naujo."
+      "bitbucketTitle": "Baigėsi Bitbucket prieigos galiojimas."
     },
     "eventChips": {
       "comment": "Komentuoti",
@@ -3947,8 +3947,6 @@
     "commandAtLimit": "Komandos ilgis ribojamas iki {{max}} simbolių",
     "commandsEmpty": "Dar nėra sąrankos komandų",
     "commandsSaveFailed": "Nepavyko išsaugoti sąrankos komandų",
-    "moveUp": "Judėti aukštyn",
-    "moveDown": "Judėti žemyn",
     "moveCommandUp": "Perkelti komandą {{position}} aukštyn",
     "moveCommandDown": "Perkelti komandą {{position}} žemyn",
     "skillsTitle": "Įgūdžiai",

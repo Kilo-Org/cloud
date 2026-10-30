@@ -684,6 +684,7 @@
       "gitlabDescription": "Konektatu zure GitLab kontua merge-eskaerak mugikorrean berrikusteko.",
       "bitbucketDescription": "Konektatu Bitbucket erakunde honetara bateratze-eskaerak mugikorrean berrikusteko.",
       "bitbucketOrgOnlyDescription": "Aldatu goiko kontua erakunde batera haren Bitbucket bateratze-eskaerak berrikusteko.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Kontu honek ez du oraindik erakunderik. Erakunde bat sortu edo batekin bat egiten duzunean, haren Bitbucket bateratze-eskaerak berrikus ditzakezu.",
       "contextLine": "{{organization}}-rako",
       "contextLinePersonal": "Zure kontu pertsonalerako"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "GitHub-erako konexioa iraungi da.",
-      "message": "GitHub-ekiko konexioa ez da jada baliozkoa. Egiaztatu konexioa berriro; behar izanez gero, berriro konektatzeko eskatuko zaizu.",
+      "message": "Egiaztatu konexioa berriro; behar izanez gero, berriro konektatzeko eskatuko zaizu.",
       "gitlabTitle": "GitLab-erako konexioa iraungi da.",
-      "bitbucketTitle": "Bitbucket-erako konexioa iraungi da.",
-      "providerMessage": "{{provider}}-ekiko konexioa ez da jada baliozkoa. Egiaztatu konexioa berriro; behar izanez gero, berriro konektatzeko eskatuko zaizu."
+      "bitbucketTitle": "Bitbucket-erako konexioa iraungi da."
     },
     "eventChips": {
       "comment": "Egin iruzkina",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Komandoa {{max}} karakteretara mugatuta dago",
     "commandsEmpty": "Oraindik ez dago konfigurazio komandorik",
     "commandsSaveFailed": "Ezin izan dira gorde konfigurazio komandoak",
-    "moveUp": "Gora",
-    "moveDown": "Mugitu behera",
     "moveCommandUp": "Mugitu {{position}}. komandoa gora",
     "moveCommandDown": "Mugitu {{position}}. komandoa behera",
     "skillsTitle": "Trebetasunak",

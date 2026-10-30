@@ -684,6 +684,7 @@
       "gitlabDescription": "Xhuma i-akhawunti yakho ye-GitLab ukuze ubuyekeze izicelo zokuhlanganisa kufoni.",
       "bitbucketDescription": "Xhuma i-Bitbucket kule nhlangano ukuze ubuyekeze ama-PR kufoni.",
       "bitbucketOrgOnlyDescription": "Shintsha i-akhawunti engenhla ibe yinhlangano ukuze ubuyekeze ama-PR ayo e-Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Le akhawunti ayikaze ibe nezinhlangano. Uma usuka inhlangano noma ungena kuyinhlangano, uzokwazi ukubuyekeza ama-PR e-Bitbucket.",
       "contextLine": "Ku-{{organization}}",
       "contextLinePersonal": "Kwokomuntu siqu"
     },
@@ -707,10 +708,9 @@
     },
     "reconnectNotice": {
       "title": "Ukuxhumana ne-GitHub kuphelelwe yisikhathi.",
-      "message": "Ukuxhumana kwakho kwe-GitHub akusavumelekile. Bheka kabusha ukuxhumana kwakho — uzocelwa ukuthi uxhumane kabusha uma kudingeka.",
+      "message": "Bheka kabusha ukuxhumana kwakho — uzocelwa ukuthi uxhumane kabusha uma kudingeka.",
       "gitlabTitle": "Ukuxhumana ne-GitLab kuphelelwe yisikhathi.",
-      "bitbucketTitle": "Ukuxhumana ne-Bitbucket kuphelelwe yisikhathi.",
-      "providerMessage": "Ukuxhumana kwakho kwe-{{provider}} akusavumelekile. Bheka kabusha ukuxhumana kwakho — uzocelwa ukuthi uxhumane kabusha uma kudingeka."
+      "bitbucketTitle": "Ukuxhumana ne-Bitbucket kuphelelwe yisikhathi."
     },
     "eventChips": {
       "comment": "Phawula",
@@ -3847,8 +3847,6 @@
     "commandAtLimit": "Umyalo ulinganiselwe ezinhlamvini ezingu-{{max}}",
     "commandsEmpty": "Ayikho imiyalo yokusetha okwamanje",
     "commandsSaveFailed": "Ayikwazanga ukulondoloza imiyalo yokusetha",
-    "moveUp": "Hamba uyephezulu",
-    "moveDown": "Hamba phansi",
     "moveCommandUp": "Hambisa umyalo {{position}} phezulu",
     "moveCommandDown": "Hambisa umyalo {{position}} phansi",
     "skillsTitle": "Amakhono",

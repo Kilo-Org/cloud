@@ -744,6 +744,7 @@
       "gitlabDescription": "Cysylltwch eich cyfrif GitLab i adolygu ceisiadau uno ar y dyfais symudol.",
       "bitbucketDescription": "Cysylltwch Bitbucket â'r sefydliad hwn i adolygu ceisiadau tynnu ar y dyfais symudol.",
       "bitbucketOrgOnlyDescription": "Newidiwch y cyfrif uchod i sefydliad i adolygu ei geisiadau tynnu ar Bitbucket.",
+      "bitbucketOrgOnlyNoOrganizationDescription": "Nid oes unrhyw sefydliadau gyda'r cyfrif hwn eto. Gallwch adolygu ceisiadau tynnu Bitbucket unwaith y byddwch yn creu sefydliad neu'n ymuno ag un.",
       "contextLine": "Ar gyfer {{organization}}",
       "contextLinePersonal": "Ar gyfer eich cyfrif personol"
     },
@@ -771,10 +772,9 @@
     },
     "reconnectNotice": {
       "title": "Mae'r cysylltiad â GitHub wedi dod i ben.",
-      "message": "Nid yw'ch cysylltiad GitHub yn ddilys mwyach. Gwiriwch eich cysylltiad eto — gofynnir i chi ailgysylltu os oes angen.",
+      "message": "Gwiriwch eich cysylltiad eto — gofynnir i chi ailgysylltu os oes angen.",
       "gitlabTitle": "Mae'r cysylltiad â GitLab wedi dod i ben.",
-      "bitbucketTitle": "Mae'r cysylltiad â Bitbucket wedi dod i ben.",
-      "providerMessage": "Nid yw'ch cysylltiad {{provider}} yn ddilys mwyach. Gwiriwch eich cysylltiad eto — gofynnir i chi ailgysylltu os oes angen."
+      "bitbucketTitle": "Mae'r cysylltiad â Bitbucket wedi dod i ben."
     },
     "eventChips": {
       "comment": "Sylwadu",
@@ -4047,8 +4047,6 @@
     "commandAtLimit": "Mae'r gorchymyn wedi'i gyfyngu i {{max}} nod",
     "commandsEmpty": "Dim gorchmynion gosod eto",
     "commandsSaveFailed": "Ni fu modd cadw'r gorchmynion gosod",
-    "moveUp": "Symud i fyny",
-    "moveDown": "Symud i lawr",
     "moveCommandUp": "Symud gorchymyn {{position}} i fyny",
     "moveCommandDown": "Symud gorchymyn {{position}} i lawr",
     "skillsTitle": "Sgiliau",

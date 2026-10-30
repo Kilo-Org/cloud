@@ -40,6 +40,7 @@ export function ProvidersTab({
   onProviderRetainsPromptsFilterChange,
   onProviderLocationsFilterChange,
   onToggleProviderEnabled,
+  onSetProvidersEnabled,
   onOpenProviderDetails,
   scope = 'organization',
   showDetails = true,
@@ -61,6 +62,7 @@ export function ProvidersTab({
   onProviderRetainsPromptsFilterChange: (value: ProviderPolicyFilter) => void;
   onProviderLocationsFilterChange: (value: string[]) => void;
   onToggleProviderEnabled: (providerSlug: string, nextEnabled: boolean) => void;
+  onSetProvidersEnabled?: (providerSlugs: string[], nextEnabled: boolean) => void;
   onOpenProviderDetails: (providerSlug: string) => void;
   scope?: 'organization' | 'group';
   showDetails?: boolean;
@@ -155,6 +157,51 @@ export function ProvidersTab({
                   </div>
                 </div>
 
+                {onSetProvidersEnabled && (
+                  <div className="flex flex-wrap gap-2 border-b px-4 py-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={
+                        !canEdit ||
+                        !filteredProviderRows.some(
+                          row =>
+                            !row.unavailableReason && !enabledProviderSlugs.has(row.providerSlug)
+                        )
+                      }
+                      onClick={() =>
+                        onSetProvidersEnabled(
+                          filteredProviderRows
+                            .filter(row => !row.unavailableReason)
+                            .map(row => row.providerSlug),
+                          true
+                        )
+                      }
+                    >
+                      Select all shown
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      disabled={
+                        !canEdit ||
+                        !filteredProviderRows.some(row =>
+                          enabledProviderSlugs.has(row.providerSlug)
+                        )
+                      }
+                      onClick={() =>
+                        onSetProvidersEnabled(
+                          filteredProviderRows.map(row => row.providerSlug),
+                          false
+                        )
+                      }
+                    >
+                      Deselect all shown
+                    </Button>
+                  </div>
+                )}
                 <div className="max-h-[560px] overflow-y-auto">
                   {filteredProviderRows.map(row => {
                     const checked = enabledProviderSlugs.has(row.providerSlug);

@@ -17,6 +17,7 @@ export function ModelsTab({
   enabledProviderSlugs,
   filteredModelRows,
   onToggleModelAllowed,
+  onSetModelsAllowed,
   onOpenModelDetails,
   scope = 'organization',
   showDetails = true,
@@ -33,6 +34,7 @@ export function ModelsTab({
   enabledProviderSlugs: ReadonlySet<string>;
   filteredModelRows: ReadonlyArray<ModelRow>;
   onToggleModelAllowed: (modelId: string, nextAllowed: boolean) => void;
+  onSetModelsAllowed?: (modelIds: string[], nextAllowed: boolean) => void;
   onOpenModelDetails: (modelId: string) => void;
   scope?: 'organization' | 'group';
   showDetails?: boolean;
@@ -76,6 +78,47 @@ export function ModelsTab({
               </div>
             </div>
 
+            {onSetModelsAllowed && (
+              <div className="flex flex-wrap gap-2 border-b px-4 py-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={
+                    !canEdit ||
+                    !filteredModelRows.some(
+                      row => !row.unavailableReason && !allowedModelIds.has(row.modelId)
+                    )
+                  }
+                  onClick={() =>
+                    onSetModelsAllowed(
+                      filteredModelRows
+                        .filter(row => !row.unavailableReason)
+                        .map(row => row.modelId),
+                      true
+                    )
+                  }
+                >
+                  Select all shown
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  disabled={
+                    !canEdit || !filteredModelRows.some(row => allowedModelIds.has(row.modelId))
+                  }
+                  onClick={() =>
+                    onSetModelsAllowed(
+                      filteredModelRows.map(row => row.modelId),
+                      false
+                    )
+                  }
+                >
+                  Deselect all shown
+                </Button>
+              </div>
+            )}
             <div className="max-h-[560px] overflow-y-auto">
               {filteredModelRows.map(row => {
                 const checked = allowedModelIds.has(row.modelId);

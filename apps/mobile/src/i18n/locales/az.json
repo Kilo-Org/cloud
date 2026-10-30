@@ -1417,7 +1417,9 @@
     "instructions": {
       "title": "Xüsusi təlimatlar",
       "deprecation": "Xüsusi təlimatlar funksiyasının istifadədən çıxarılması planlaşdırılır. Bu təlimatları repozitoriyandakı REVIEW.md faylına köçür.",
-      "placeholder": "məsələn: xətaların emalı qaydalarımıza uyğunluq…"
+      "placeholder": "məsələn: xətaların emalı qaydalarımıza uyğunluq…",
+      "clearTitle": "Xüsusi təlimatlar silinsin?",
+      "clearMessage": "Boş sahənin yadda saxlanması bu rəyçi üçün saxlanılmış xüsusi təlimatları siləcək."
     },
     "repos": {
       "unavailable": "Repozitoriyalar əlçatan deyil. Bitbucket quraşdırmasını kilo.ai saytında tamamla.",
@@ -1600,6 +1602,7 @@
       "allAreas": "Bütün sahələr",
       "customInstructions": "Xüsusi təlimatlar",
       "set": "Təyin edilib",
+      "notSet": "Təyin edilməyib",
       "nSelected": "{{displayCount}} seçilib",
       "proposedReviewMdGuidance": "REVIEW.md üçün təklif olunan təlimatlar"
     },

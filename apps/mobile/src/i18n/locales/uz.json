@@ -1417,7 +1417,9 @@
     "instructions": {
       "title": "Maxsus ko‘rsatmalar",
       "deprecation": "Maxsus ko'rsatmalar funksiyasini bekor qilish rejalashtirilgan. Bu ko'rsatmalarni repozitoriyangizdagi REVIEW.md fayliga ko'chiring.",
-      "placeholder": "masalan, xatolarni qayta ishlash qoidalarimizga rioya qilinishini tekshiring…"
+      "placeholder": "masalan, xatolarni qayta ishlash qoidalarimizga rioya qilinishini tekshiring…",
+      "clearTitle": "Maxsus ko‘rsatmalar olib tashlansinmi?",
+      "clearMessage": "Bo'sh maydonni saqlash ushbu ko'rib chiquvchi uchun saqlangan maxsus ko'rsatmalarni o'chiradi."
     },
     "repos": {
       "unavailable": "Repozitoriyalar mavjud emas. Bitbucketni sozlashni kilo.ai saytida yakunlang.",
@@ -1600,6 +1602,7 @@
       "allAreas": "Barcha yo'nalishlar",
       "customInstructions": "Maxsus ko‘rsatmalar",
       "set": "Belgilangan",
+      "notSet": "Belgilanmagan",
       "nSelected": "{{displayCount}} ta tanlangan",
       "proposedReviewMdGuidance": "Taklif etilgan REVIEW.md yo'riqnomasi"
     },

@@ -1439,7 +1439,9 @@
     "instructions": {
       "title": "Instrucțiuni personalizate",
       "deprecation": "Funcția de instrucțiuni personalizate urmează să fie retrasă. Mută aceste instrucțiuni într-un fișier REVIEW.md din depozitul tău.",
-      "placeholder": "de exemplu: respectarea convențiilor noastre de gestionare a erorilor…"
+      "placeholder": "de exemplu: respectarea convențiilor noastre de gestionare a erorilor…",
+      "clearTitle": "Elimini instrucțiunile personalizate?",
+      "clearMessage": "Salvând un câmp gol, ștergi instrucțiunile personalizate stocate pentru acest recenzor."
     },
     "repos": {
       "unavailable": "Depozitele nu sunt disponibile. Finalizează configurarea Bitbucket pe kilo.ai.",
@@ -1622,6 +1624,7 @@
       "allAreas": "Toate domeniile",
       "customInstructions": "Instrucțiuni personalizate",
       "set": "Configurat",
+      "notSet": "Nu este configurat",
       "nSelected": "{{displayCount}} selectate",
       "proposedReviewMdGuidance": "Instrucțiuni propuse pentru REVIEW.md"
     },

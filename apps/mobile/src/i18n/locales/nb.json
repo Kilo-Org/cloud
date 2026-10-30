@@ -1417,7 +1417,9 @@
     "instructions": {
       "title": "Egendefinerte instruksjoner",
       "deprecation": "Funksjonen for egendefinerte instruksjoner skal fases ut. Flytt disse retningslinjene til en REVIEW.md-fil i kodelageret ditt i stedet.",
-      "placeholder": "f.eks. følg reglene våre for feilhåndtering…"
+      "placeholder": "f.eks. følg reglene våre for feilhåndtering…",
+      "clearTitle": "Fjerne egendefinerte instruksjoner?",
+      "clearMessage": "Hvis du lagrer et tomt felt, slettes de egendefinerte instruksjonene som er lagret for denne anmelderen."
     },
     "repos": {
       "unavailable": "Kodelagrene er ikke tilgjengelige. Fullfør Bitbucket-oppsettet på kilo.ai.",
@@ -1600,6 +1602,7 @@
       "allAreas": "Alle områder",
       "customInstructions": "Egendefinerte instruksjoner",
       "set": "Angitt",
+      "notSet": "Ikke angitt",
       "nSelected": "{{displayCount}} valgt",
       "proposedReviewMdGuidance": "Forslag til retningslinjer i REVIEW.md"
     },

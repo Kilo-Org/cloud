@@ -894,7 +894,9 @@
     "instructions": {
       "title": "Własne instrukcje",
       "deprecation": "Planowane jest wycofanie obsługi niestandardowych instrukcji. Przenieś te wytyczne do pliku REVIEW.md w swoim repozytorium.",
-      "placeholder": "np. sprawdzaj zgodność z naszymi zasadami obsługi błędów…"
+      "placeholder": "np. sprawdzaj zgodność z naszymi zasadami obsługi błędów…",
+      "clearTitle": "Usunąć własne instrukcje?",
+      "clearMessage": "Zapisanie pustego pola usuwa własne instrukcje zapisane dla tego recenzenta."
     },
     "repos": {
       "unavailable": "Repozytoria są niedostępne. Dokończ konfigurację Bitbucket na kilo.ai.",
@@ -1084,7 +1086,8 @@
       "nSelected": "Wybrano: {{displayCount}}",
       "proposedReviewMdGuidance": "Proponowane wytyczne do pliku REVIEW.md",
       "reviewStyle": "Styl przeglądu",
-      "set": "Ustawiono"
+      "set": "Ustawiono",
+      "notSet": "Nie ustawiono"
     },
     "updateFailed": "Nie udało się zaktualizować recenzenta kodu.",
     "configSaveFailed": "Nie udało się zapisać konfiguracji przeglądu.",

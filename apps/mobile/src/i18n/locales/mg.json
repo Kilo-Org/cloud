@@ -1417,7 +1417,9 @@
     "instructions": {
       "title": "Toromarika manokana",
       "deprecation": "Kasaina hatsahatra ny fampiasana torolalana manokana. Afindrao ao anaty rakitra REVIEW.md ao amin'ny tahirin-kaodinao ireo torolalana ireo.",
-      "placeholder": "ohatra: Fanarahana ny fitsipika momba ny fitantanana hadisoana…"
+      "placeholder": "ohatra: Fanarahana ny fitsipika momba ny fitantanana hadisoana…",
+      "clearTitle": "Esory ny toromarika manokana?",
+      "clearMessage": "Raha tahirizinao saha tsy misy votoaty, dia voafafa ny toromarika manokana voatahiry ho an'ity mpandinika ity."
     },
     "repos": {
       "unavailable": "Tsy azo ampiasaina ny tahirin-kaody. Vitao ao amin'ny kilo.ai ny fametrahana ny Bitbucket.",
@@ -1600,6 +1602,7 @@
       "allAreas": "Lafiny rehetra",
       "customInstructions": "Toromarika manokana",
       "set": "Voafaritra",
+      "notSet": "Tsy voafaritra",
       "nSelected": "{{displayCount}} voafidy",
       "proposedReviewMdGuidance": "Torolalana naroso ho an'ny REVIEW.md"
     },

@@ -859,7 +859,9 @@
     "instructions": {
       "title": "Instructions personnalisées",
       "deprecation": "La suppression des instructions personnalisées est prévue. Déplacez ces consignes dans un fichier REVIEW.md de votre dépôt.",
-      "placeholder": "ex. : respecter nos conventions de gestion des erreurs…"
+      "placeholder": "ex. : respecter nos conventions de gestion des erreurs…",
+      "clearTitle": "Supprimer les instructions personnalisées ?",
+      "clearMessage": "L'enregistrement d'un champ vide supprime les instructions personnalisées stockées pour ce réviseur."
     },
     "repos": {
       "unavailable": "Les dépôts sont indisponibles. Terminez la configuration de Bitbucket sur kilo.ai.",
@@ -1049,7 +1051,8 @@
       "nSelected": "{{displayCount}} sélectionnés",
       "proposedReviewMdGuidance": "Consignes proposées pour REVIEW.md",
       "reviewStyle": "Style de revue",
-      "set": "Défini"
+      "set": "Défini",
+      "notSet": "Non défini"
     },
     "updateFailed": "Impossible de mettre à jour l'agent de revue de code.",
     "configSaveFailed": "Impossible d'enregistrer la configuration de la revue.",

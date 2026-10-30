@@ -64,13 +64,20 @@ export type SettingsBackGuardResult = {
  * (the safe choice), Discard, and — while the draft is valid — Save, which
  * persists the draft and then replays the captured navigation action. An
  * invalid draft has nothing valid to persist, so that confirmation offers
- * only Keep editing and Discard and says so instead of asking to save. The
+ * only Keep editing and Discard and says so instead of asking to save. A save
+ * the caller's own confirmation declined settles as `declined`, which keeps
+ * the screen and its draft where they are instead of replaying the leave. The
  * caller renders the returned `dialog` node in its own tree.
  *
  * Not a general form framework: it only classifies dirty/valid into that
  * confirmation and replays the captured navigation action once the user has
  * resolved it.
  */
+/** What a guarded save settled: `declined` means the caller asked its own
+ * destructive question and the reader backed out of it, so the draft stays
+ * unsaved and the screen stays where it is. */
+export type SettingsBackGuardSaveOutcome = 'saved' | 'declined';
+
 export function useSettingsBackGuard({
   dirty,
   valid,
@@ -78,7 +85,7 @@ export function useSettingsBackGuard({
 }: Readonly<{
   dirty: boolean;
   valid: boolean;
-  onSave: () => Promise<void>;
+  onSave: () => Promise<SettingsBackGuardSaveOutcome>;
 }>): SettingsBackGuardResult {
   const navigation = useNavigation();
   const { confirm, dialog } = useConfirmDialog();
@@ -139,7 +146,13 @@ export function useSettingsBackGuard({
             onPress: () => {
               void (async () => {
                 try {
-                  await onSaveRef.current();
+                  // A caller that asks its own destructive question answers
+                  // `declined` when the reader backs out of it there: the
+                  // draft stays unsaved and the screen stays, as with Keep
+                  // editing.
+                  if ((await onSaveRef.current()) === 'declined') {
+                    return;
+                  }
                   leave();
                 } catch {
                   // The save mutation's centralized onError already toasted —

@@ -1439,7 +1439,9 @@
     "instructions": {
       "title": "Pielāgoti norādījumi",
       "deprecation": "Pielāgoto norādījumu funkcijas atbalstu plānots pārtraukt. Tā vietā pārvieto šos norādījumus uz REVIEW.md failu savā repozitorijā.",
-      "placeholder": "piemēram, ievērot mūsu kļūdu apstrādes noteikumus…"
+      "placeholder": "piemēram, ievērot mūsu kļūdu apstrādes noteikumus…",
+      "clearTitle": "Noņemt pielāgotos norādījumus?",
+      "clearMessage": "Saglabājot tukšu lauku, tiks dzēsti šim recenzentam saglabātie pielāgotie norādījumi."
     },
     "repos": {
       "unavailable": "Repozitoriji nav pieejami. Pabeidz Bitbucket iestatīšanu vietnē kilo.ai.",
@@ -1622,6 +1624,7 @@
       "allAreas": "Visas jomas",
       "customInstructions": "Pielāgoti norādījumi",
       "set": "Iestatīts",
+      "notSet": "Nav iestatīts",
       "nSelected": "Atlasīts: {{displayCount}}",
       "proposedReviewMdGuidance": "Ieteiktie REVIEW.md norādījumi"
     },

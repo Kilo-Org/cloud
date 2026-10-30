@@ -1417,7 +1417,9 @@
     "instructions": {
       "title": "Pasgemaakte instruksies",
       "deprecation": "Pasgemaakte instruksies sal uitgefaseer word. Skuif hierdie riglyne eerder na 'n REVIEW.md-lêer in jou bewaarplek.",
-      "placeholder": "bv. Pas ons konvensies vir foutafhandeling toe…"
+      "placeholder": "bv. Pas ons konvensies vir foutafhandeling toe…",
+      "clearTitle": "Pasgemaakte instruksies verwyder?",
+      "clearMessage": "As jy 'n leë veld stoor, word die pasgemaakte instruksies wat vir hierdie resensent gestoor is, verwyder."
     },
     "repos": {
       "unavailable": "Die bewaarplekke is nie beskikbaar nie. Voltooi die Bitbucket-opstelling op kilo.ai.",
@@ -1600,6 +1602,7 @@
       "allAreas": "Alle fokusareas",
       "customInstructions": "Pasgemaakte instruksies",
       "set": "Ingestel",
+      "notSet": "Nie ingestel nie",
       "nSelected": "{{displayCount}} gekies",
       "proposedReviewMdGuidance": "Voorgestelde REVIEW.md-riglyne"
     },

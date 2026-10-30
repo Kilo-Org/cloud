@@ -1417,7 +1417,9 @@
     "instructions": {
       "title": "ብጁ መመሪያዎች",
       "deprecation": "ብጁ መመሪያዎችን የመጠቀም ባህሪ ከአገልግሎት ሊወጣ ታቅዷል። በምትኩ እነዚህን መመሪያዎች በማከማቻዎ ውስጥ ወዳለ REVIEW.md ፋይል ያዛውሩ።",
-      "placeholder": "ለምሳሌ፦ የስህተት አያያዝ መመሪያዎቻችን መከበራቸውን ያረጋግጡ…"
+      "placeholder": "ለምሳሌ፦ የስህተት አያያዝ መመሪያዎቻችን መከበራቸውን ያረጋግጡ…",
+      "clearTitle": "ብጁ መመሪያዎችን ማስወገድ ይፈልጋሉ?",
+      "clearMessage": "ባዶውን መስክ ማስቀመጥ ለዚህ ገምጋሚ የተከማቹትን ብጁ መመሪያዎች ይሰርዛል።"
     },
     "repos": {
       "unavailable": "ማከማቻዎች አይገኙም። በkilo.ai ላይ Bitbucketን ማዋቀር ያጠናቅቁ።",
@@ -1600,6 +1602,7 @@
       "allAreas": "ሁሉም ዘርፎች",
       "customInstructions": "ብጁ መመሪያዎች",
       "set": "ተዘጋጅቷል",
+      "notSet": "አልተዘጋጀም",
       "nSelected": "{{displayCount}} የተመረጡ",
       "proposedReviewMdGuidance": "ለREVIEW.md የቀረቡ መመሪያዎች"
     },

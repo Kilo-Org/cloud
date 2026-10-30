@@ -1417,7 +1417,9 @@
     "instructions": {
       "title": "Anpassade instruktioner",
       "deprecation": "Funktionen för anpassade instruktioner ska fasas ut. Flytta riktlinjerna till en REVIEW.md-fil i kodarkivet i stället.",
-      "placeholder": "t.ex. följ våra regler för felhantering…"
+      "placeholder": "t.ex. följ våra regler för felhantering…",
+      "clearTitle": "Ta bort anpassade instruktioner?",
+      "clearMessage": "Om du sparar ett tomt fält tas de anpassade instruktioner som sparats för den här granskaren bort."
     },
     "repos": {
       "unavailable": "Kodarkiven är inte tillgängliga. Slutför konfigurationen av Bitbucket på kilo.ai.",
@@ -1600,6 +1602,7 @@
       "allAreas": "Alla områden",
       "customInstructions": "Anpassade instruktioner",
       "set": "Angivet",
+      "notSet": "Ej angivet",
       "nSelected": "Valda: {{displayCount}}",
       "proposedReviewMdGuidance": "Föreslagna riktlinjer för REVIEW.md"
     },

@@ -1,5 +1,6 @@
 import { Validator, type Schema } from '@cfworker/json-schema';
 import { z } from 'zod';
+import { patternSafetyIssue } from './pattern-safety';
 
 const MAX_SCHEMA_BYTES = 32_768;
 const MAX_SCHEMA_DEPTH = 16;
@@ -19,17 +20,34 @@ const jsonValue = z.custom<JsonValue>(value => {
   return true;
 }, 'Must contain JSON values');
 const count = z.number().int().nonnegative();
+
+function compilesAsRegExp(value: string): boolean {
+  try {
+    new RegExp(value, 'u');
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+// Write paths only accept a pattern that is inside the documented subset.
 const pattern = z
   .string()
   .max(1024)
-  .refine(value => {
-    try {
-      new RegExp(value, 'u');
-      return true;
-    } catch {
-      return false;
+  .superRefine((value, ctx) => {
+    if (!compilesAsRegExp(value)) {
+      ctx.addIssue({ code: 'custom', message: 'Pattern must be a valid regular expression' });
+      return;
     }
-  }, 'Pattern must be a valid regular expression');
+    const issue = patternSafetyIssue(value);
+    if (issue !== null) ctx.addIssue({ code: 'custom', message: issue });
+  });
+
+// Schemas stored before a policy change must still load, so reads only require a compilable form.
+const storedPattern = z
+  .string()
+  .max(1024)
+  .refine(compilesAsRegExp, 'Pattern must be a valid regular expression');
 
 // Keep RPC contracts shallow. The recursive parser validates every nested keyword.
 export type WebhookBodySchema = Record<string, unknown>;
@@ -62,65 +80,69 @@ type SchemaNode = {
   not?: SchemaNode | undefined;
 };
 
-const recursiveSchema: z.ZodType<SchemaNode> = z.lazy(() =>
-  z.strictObject({
-    type: z.union([instanceType, z.array(instanceType).min(1).max(7)]).optional(),
-    title: z.string().max(256).optional(),
-    description: z.string().max(2048).optional(),
-    properties: ownPropertySchemas.optional(),
-    required: z.array(z.string()).max(256).optional(),
-    additionalProperties: z.union([z.boolean(), recursiveSchema]).optional(),
-    items: recursiveSchema.optional(),
-    enum: z.array(jsonValue).min(1).max(256).optional(),
-    const: jsonValue.optional(),
-    minimum: z.number().optional(),
-    maximum: z.number().optional(),
-    exclusiveMinimum: z.number().optional(),
-    exclusiveMaximum: z.number().optional(),
-    multipleOf: z.number().positive().optional(),
-    minLength: count.optional(),
-    maxLength: count.optional(),
-    pattern: pattern.optional(),
-    minItems: count.optional(),
-    maxItems: count.optional(),
-    uniqueItems: z.boolean().optional(),
-    minProperties: count.optional(),
-    maxProperties: count.optional(),
-    allOf: z.array(recursiveSchema).min(1).max(32).optional(),
-    anyOf: z.array(recursiveSchema).min(1).max(32).optional(),
-    oneOf: z.array(recursiveSchema).min(1).max(32).optional(),
-    not: recursiveSchema.optional(),
-  })
-);
+function createSchemaParser(patternSchema: z.ZodType<string>): z.ZodType<SchemaNode> {
+  const recursiveSchema: z.ZodType<SchemaNode> = z.lazy(() =>
+    z.strictObject({
+      type: z.union([instanceType, z.array(instanceType).min(1).max(7)]).optional(),
+      title: z.string().max(256).optional(),
+      description: z.string().max(2048).optional(),
+      properties: ownPropertySchemas.optional(),
+      required: z.array(z.string()).max(256).optional(),
+      additionalProperties: z.union([z.boolean(), recursiveSchema]).optional(),
+      items: recursiveSchema.optional(),
+      enum: z.array(jsonValue).min(1).max(256).optional(),
+      const: jsonValue.optional(),
+      minimum: z.number().optional(),
+      maximum: z.number().optional(),
+      exclusiveMinimum: z.number().optional(),
+      exclusiveMaximum: z.number().optional(),
+      multipleOf: z.number().positive().optional(),
+      minLength: count.optional(),
+      maxLength: count.optional(),
+      pattern: patternSchema.optional(),
+      minItems: count.optional(),
+      maxItems: count.optional(),
+      uniqueItems: z.boolean().optional(),
+      minProperties: count.optional(),
+      maxProperties: count.optional(),
+      allOf: z.array(recursiveSchema).min(1).max(32).optional(),
+      anyOf: z.array(recursiveSchema).min(1).max(32).optional(),
+      oneOf: z.array(recursiveSchema).min(1).max(32).optional(),
+      not: recursiveSchema.optional(),
+    })
+  );
 
-// z.record intentionally strips __proto__. Schema property names must retain every JSON key.
-const ownPropertySchemas: z.ZodType<Record<string, SchemaNode>> = z
-  .unknown()
-  .transform((value, ctx) => {
-    if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-      ctx.addIssue({ code: 'custom', message: 'Properties must be an object' });
-      return z.NEVER;
-    }
-    const result: Record<string, SchemaNode> = {};
-    let valid = true;
-    for (const [key, child] of Object.entries(value)) {
-      const parsed = recursiveSchema.safeParse(child);
-      if (parsed.success) {
-        Object.defineProperty(result, key, {
-          value: parsed.data,
-          enumerable: true,
-          configurable: true,
-          writable: true,
-        });
-      } else {
-        valid = false;
-        for (const issue of parsed.error.issues) {
-          ctx.addIssue({ ...issue, path: [key, ...issue.path] });
+  // z.record intentionally strips __proto__. Schema property names must retain every JSON key.
+  const ownPropertySchemas: z.ZodType<Record<string, SchemaNode>> = z
+    .unknown()
+    .transform((value, ctx) => {
+      if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+        ctx.addIssue({ code: 'custom', message: 'Properties must be an object' });
+        return z.NEVER;
+      }
+      const result: Record<string, SchemaNode> = {};
+      let valid = true;
+      for (const [key, child] of Object.entries(value)) {
+        const parsed = recursiveSchema.safeParse(child);
+        if (parsed.success) {
+          Object.defineProperty(result, key, {
+            value: parsed.data,
+            enumerable: true,
+            configurable: true,
+            writable: true,
+          });
+        } else {
+          valid = false;
+          for (const issue of parsed.error.issues) {
+            ctx.addIssue({ ...issue, path: [key, ...issue.path] });
+          }
         }
       }
-    }
-    return valid ? result : z.NEVER;
-  });
+      return valid ? result : z.NEVER;
+    });
+
+  return recursiveSchema;
+}
 
 // The validator uses `in` and property reads. Null prototypes give JSON own-key semantics.
 // Iterate so a deeply nested payload cannot overflow this normalization step's call stack.
@@ -195,7 +217,138 @@ const boundedSchema = z.unknown().superRefine((value, ctx) => {
 /** Supported JSON Schema subset. Unknown keywords and all references are rejected. */
 export const webhookBodySchema: z.ZodType<WebhookBodySchema> = boundedSchema
   .transform(value => normalizeJsonObjects(value))
-  .pipe(recursiveSchema);
+  .pipe(createSchemaParser(pattern));
+
+const storedSchemaParser: z.ZodType<WebhookBodySchema> = boundedSchema
+  .transform(value => normalizeJsonObjects(value))
+  .pipe(createSchemaParser(storedPattern));
+
+/**
+ * Parses a schema read back from storage. Schemas written before a pattern policy change stay
+ * loadable; `validateWebhookBody` leaves out a pattern that policy no longer accepts.
+ */
+export function parseStoredWebhookBodySchema(value: unknown): WebhookBodySchema {
+  return storedSchemaParser.parse(value);
+}
+
+const SUBSCHEMA_KEYWORDS = ['items', 'additionalProperties', 'not'] as const;
+const SUBSCHEMA_LIST_KEYWORDS = ['allOf', 'anyOf', 'oneOf'] as const;
+
+function isSchemaObject(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object' && !Array.isArray(value);
+}
+
+function isUnknownArray(value: unknown): value is unknown[] {
+  return Array.isArray(value);
+}
+
+function copySchemaNode(node: Record<string, unknown>): Record<string, unknown> {
+  const copy: Record<string, unknown> = {};
+  Object.setPrototypeOf(copy, null);
+  for (const [key, value] of Object.entries(node)) {
+    Object.defineProperty(copy, key, {
+      value,
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
+  }
+  return copy;
+}
+
+function childSchemas(node: Record<string, unknown>): [string, Record<string, unknown>][] {
+  const children: [string, Record<string, unknown>][] = [];
+  for (const keyword of SUBSCHEMA_KEYWORDS) {
+    const child = node[keyword];
+    if (isSchemaObject(child)) children.push([keyword, child]);
+  }
+  for (const keyword of SUBSCHEMA_LIST_KEYWORDS) {
+    const list = node[keyword];
+    if (!isUnknownArray(list)) continue;
+    list.forEach((child, index) => {
+      if (isSchemaObject(child)) children.push([`${keyword}/${index}`, child]);
+    });
+  }
+  if (isSchemaObject(node.properties)) {
+    for (const [name, child] of Object.entries(node.properties)) {
+      if (isSchemaObject(child)) children.push([`properties/${name}`, child]);
+    }
+  }
+  return children;
+}
+
+/**
+ * Schema locations of `pattern` keywords that the write path no longer accepts. A stored schema
+ * keeps loading, and the delivery check omits these patterns instead of evaluating them.
+ */
+export function unsupportedPatternPaths(schema: WebhookBodySchema): string[] {
+  const paths: string[] = [];
+  const walk = (node: Record<string, unknown>, pointer: string) => {
+    if (typeof node.pattern === 'string' && patternSafetyIssue(node.pattern) !== null) {
+      paths.push(`${pointer}/pattern`);
+    }
+    for (const [path, child] of childSchemas(node)) walk(child, `${pointer}/${path}`);
+  };
+  walk(schema, '');
+  return paths;
+}
+
+function withoutUnsupportedPatterns(node: Record<string, unknown>): Record<string, unknown> | null {
+  let copy: Record<string, unknown> | null = null;
+  const editable = (): Record<string, unknown> => {
+    copy ??= copySchemaNode(node);
+    return copy;
+  };
+  const put = (keyword: string, value: unknown): void => {
+    Object.defineProperty(editable(), keyword, {
+      value,
+      enumerable: true,
+      configurable: true,
+      writable: true,
+    });
+  };
+
+  if (typeof node.pattern === 'string' && patternSafetyIssue(node.pattern) !== null) {
+    delete editable().pattern;
+  }
+  for (const keyword of SUBSCHEMA_KEYWORDS) {
+    const child = node[keyword];
+    if (!isSchemaObject(child)) continue;
+    const replacement = withoutUnsupportedPatterns(child);
+    if (replacement) put(keyword, replacement);
+  }
+  for (const keyword of SUBSCHEMA_LIST_KEYWORDS) {
+    const list = node[keyword];
+    if (!isUnknownArray(list)) continue;
+    let replaced: unknown[] | null = null;
+    list.forEach((child, index) => {
+      if (!isSchemaObject(child)) return;
+      const replacement = withoutUnsupportedPatterns(child);
+      if (!replacement) return;
+      replaced ??= [...list];
+      replaced[index] = replacement;
+    });
+    if (replaced) put(keyword, replaced);
+  }
+  const properties = node.properties;
+  if (isSchemaObject(properties)) {
+    let replaced: Record<string, unknown> | null = null;
+    for (const [name, child] of Object.entries(properties)) {
+      if (!isSchemaObject(child)) continue;
+      const replacement = withoutUnsupportedPatterns(child);
+      if (!replacement) continue;
+      replaced ??= copySchemaNode(properties);
+      Object.defineProperty(replaced, name, {
+        value: replacement,
+        enumerable: true,
+        configurable: true,
+        writable: true,
+      });
+    }
+    if (replaced) put('properties', replaced);
+  }
+  return copy;
+}
 
 export type WebhookBodyIssue = { path: string; message: string };
 export function validateWebhookBody(
@@ -208,12 +361,11 @@ export function validateWebhookBody(
   } catch {
     return { valid: false, issues: [{ path: '/', message: 'Body must be valid JSON' }] };
   }
+  const normalized = normalizeJsonObjects(schema);
+  // A stored schema keeps loading; a pattern the write path refuses is left out of the match.
+  const evaluated = withoutUnsupportedPatterns(normalized) ?? normalized;
   // Short circuit bounds diagnostics and never include payload values in errors.
-  const result = new Validator(
-    normalizeJsonObjects(schema) satisfies Schema,
-    '2020-12',
-    true
-  ).validate(body);
+  const result = new Validator(evaluated satisfies Schema, '2020-12', true).validate(body);
   return result.valid
     ? { valid: true }
     : {

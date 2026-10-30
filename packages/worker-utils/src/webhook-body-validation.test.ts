@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
   webhookBodySchema,
+  parseStoredWebhookBodySchema,
+  unsupportedPatternPaths,
   validateWebhookBody,
   WEBHOOK_BODY_SCHEMA_EXAMPLE,
 } from './webhook-body-validation';
@@ -120,6 +122,64 @@ describe('webhook body validation', () => {
     expect(webhookBodySchema.safeParse(deep).success).toBe(false);
     expect(
       webhookBodySchema.safeParse({ enum: Array.from({ length: 513 }, (_, i) => i) }).success
+    ).toBe(false);
+  });
+
+  it('refuses patterns outside the accepted subset', () => {
+    const unsupported = '^(a+)+$';
+    const root = webhookBodySchema.safeParse({ type: 'string', pattern: unsupported });
+    expect(root.success).toBe(false);
+    expect(root.error?.issues.map(issue => issue.message)).toEqual([
+      'Pattern must not nest quantifiers that exceed 64 combined repetitions',
+    ]);
+    expect(webhookBodySchema.safeParse({ pattern: '(a)\\1' }).error?.issues[0]?.message).toBe(
+      'Pattern must not use backreferences'
+    );
+    const nested = webhookBodySchema.safeParse({
+      type: 'object',
+      properties: { event: { type: 'string', pattern: '(a|a)+' } },
+    });
+    expect(nested.success).toBe(false);
+    expect(nested.error?.issues.map(issue => [issue.path, issue.message])).toEqual([
+      [
+        ['properties', 'event', 'pattern'],
+        'Pattern must not repeat alternatives that can match the same characters',
+      ],
+    ]);
+    expect(webhookBodySchema.safeParse({ pattern: '[' }).error?.issues[0]?.message).toBe(
+      'Pattern must be a valid regular expression'
+    );
+  });
+
+  it('keeps loaded schemas readable and leaves an unsupported stored pattern out of the match', () => {
+    const stored = {
+      type: 'object',
+      properties: {
+        event: { type: 'string', pattern: '^(a+)+$' },
+        keep: { type: 'string', pattern: '^ok$' },
+      },
+      required: ['event', 'keep'],
+      additionalProperties: false,
+    };
+    expect(webhookBodySchema.safeParse(stored).success).toBe(false);
+    expect(parseStoredWebhookBodySchema(stored)).toEqual(stored);
+    expect(unsupportedPatternPaths(parseStoredWebhookBodySchema(stored))).toEqual([
+      '/properties/event/pattern',
+    ]);
+    expect(
+      validateWebhookBody(
+        parseStoredWebhookBodySchema(stored),
+        JSON.stringify({
+          event: `${'a'.repeat(40)}!`,
+          keep: 'ok',
+        })
+      )
+    ).toEqual({ valid: true });
+    expect(
+      validateWebhookBody(
+        parseStoredWebhookBodySchema(stored),
+        JSON.stringify({ event: 'a', keep: 'nope' })
+      ).valid
     ).toBe(false);
   });
 

@@ -1,5 +1,7 @@
 import {
   webhookBodySchema,
+  parseStoredWebhookBodySchema,
+  unsupportedPatternPaths,
   validateWebhookBody,
   type WebhookBodySchema,
   type WebhookBodyIssue,
@@ -321,7 +323,8 @@ export class TriggerDO extends DurableObject<Env> {
       sandboxAllocation: parseSandboxAllocation(record.sandbox_allocation),
       promptTemplate: record.prompt_template,
       profileId: record.profile_id ?? null,
-      bodySchema: record.body_schema == null ? null : webhookBodySchema.parse(record.body_schema),
+      bodySchema:
+        record.body_schema == null ? null : parseStoredWebhookBodySchema(record.body_schema),
       autoCommit: record.auto_commit !== null ? record.auto_commit === 1 : undefined,
       condenseOnComplete:
         record.condense_on_complete !== null ? record.condense_on_complete === 1 : undefined,
@@ -623,6 +626,16 @@ export class TriggerDO extends DurableObject<Env> {
     }
 
     if (config.bodySchema) {
+      const skippedPatterns = unsupportedPatternPaths(config.bodySchema);
+      if (skippedPatterns.length > 0) {
+        // The schema predates the current pattern policy; it still loads and captures, with the
+        // pattern left out until the trigger is saved again.
+        logger.warn('Stored body schema pattern not applied', {
+          triggerId: config.triggerId,
+          namespace: config.namespace,
+          skippedPatterns: skippedPatterns.length,
+        });
+      }
       const validation = validateWebhookBody(config.bodySchema, request.body);
       if (!validation.valid) {
         return { success: false, error: 'Body validation failed', issues: validation.issues };

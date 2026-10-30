@@ -42,7 +42,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Niet gekoppeld",
     "notifications": "Meldingen",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Coderepository's",
     "securityAgent": "Beveiligingsagent",
     "unknown": "Onbekend",
@@ -1657,7 +1657,7 @@
       "dollar_other": "dollar",
       "costSpoken": "kosten {{cost}}",
       "costSpokenWithTime": "kosten {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}",
+      "pullRequest": "PR {{number}}",
       "spokenJoiner": "en"
     },
     "githubInstall": {
@@ -2346,7 +2346,7 @@
       "unavailable": "Deze sessie kan geen toestemmingsverzoeken ontvangen."
     },
     "prBadge": {
-      "open": "pR openen",
+      "open": "PR openen",
       "closed": "gesloten PR",
       "merged": "samengevoegde PR",
       "draft": "concept-PR",

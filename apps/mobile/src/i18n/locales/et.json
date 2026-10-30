@@ -743,7 +743,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Muuda aegunud ootel kommentaari asukohas {{location}}",
       "editA11y": "Muuda ootel kommentaari asukohas {{location}}",
-      "staleHint": "pR on pärast selle kommentaari kirjutamist muutunud.",
+      "staleHint": "PR on pärast selle kommentaari kirjutamist muutunud.",
       "deleteA11y": "Kustuta ootel kommentaar asukohas {{location}}",
       "deletedAnnouncement": "Ootel kommentaar kustutati",
       "noCommentsQueued": "Järjekorras pole kommentaare. Ülevaatus esitatakse ainult ülal valitud toiminguga.",

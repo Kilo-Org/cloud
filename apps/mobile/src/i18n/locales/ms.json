@@ -42,7 +42,7 @@
     "mergeRequest": "permintaan gabungan",
     "notConnected": "Tidak disambungkan",
     "notifications": "Pemberitahuan",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repositori",
     "securityAgent": "Ejen keselamatan",
     "unknown": "Tidak diketahui",
@@ -743,7 +743,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Sunting komen belum dihantar yang merujuk kepada komit lama pada {{location}}",
       "editA11y": "Sunting komen belum dihantar pada {{location}}",
-      "staleHint": "pR telah dikemas kini sejak anda menulis komen ini.",
+      "staleHint": "PR telah dikemas kini sejak anda menulis komen ini.",
       "deleteA11y": "Padam komen belum dihantar pada {{location}}",
       "deletedAnnouncement": "Komen belum dihantar telah dipadam",
       "noCommentsQueued": "Tiada komen dalam senarai menunggu. Semakan akan dihantar dengan jenis semakan yang dipilih di atas sahaja.",
@@ -2873,7 +2873,7 @@
       "open": "buka PR",
       "closed": "permintaan tarik yang ditutup",
       "merged": "permintaan tarik yang digabungkan",
-      "draft": "pR draf",
+      "draft": "PR draf",
       "updating": "Mengemas kini, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },

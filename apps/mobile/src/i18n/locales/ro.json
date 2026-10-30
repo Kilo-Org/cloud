@@ -42,7 +42,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Neconectat",
     "notifications": "Notificări",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Depozite de cod",
     "securityAgent": "Agent de securitate",
     "unknown": "Necunoscut",
@@ -761,7 +761,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Editează comentariul depășit, aflat în așteptare, de la {{location}}",
       "editA11y": "Editează comentariul în așteptare de la {{location}}",
-      "staleHint": "pR-ul s-a modificat de când ai scris acest comentariu.",
+      "staleHint": "PR-ul s-a modificat de când ai scris acest comentariu.",
       "deleteA11y": "Șterge comentariul în așteptare de la {{location}}",
       "deletedAnnouncement": "Comentariu în așteptare șters",
       "noCommentsQueued": "Nu există comentarii în așteptare. Revizuirea va fi trimisă doar cu tipul selectat mai sus.",
@@ -2212,7 +2212,7 @@
       "dollar_few": "dolari",
       "costSpoken": "cost de {{cost}}",
       "costSpokenWithTime": "costul este {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}",
+      "pullRequest": "PR {{number}}",
       "spokenJoiner": "și"
     },
     "githubInstall": {
@@ -2912,9 +2912,9 @@
     },
     "prBadge": {
       "open": "deschidere PR",
-      "closed": "pR închis",
-      "merged": "pR integrat",
-      "draft": "pR în stadiu de ciornă",
+      "closed": "PR închis",
+      "merged": "PR integrat",
+      "draft": "PR în stadiu de ciornă",
       "updating": "Se actualizează, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },

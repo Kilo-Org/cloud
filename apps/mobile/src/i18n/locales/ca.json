@@ -42,7 +42,7 @@
     "mergeRequest": "sol·licitud de fusió",
     "notConnected": "No connectat",
     "notifications": "Notificacions",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repositoris",
     "securityAgent": "Agent de seguretat",
     "unknown": "Desconegut",
@@ -2911,10 +2911,10 @@
       "unavailable": "Aquesta sessió no pot rebre sol·licituds de permís."
     },
     "prBadge": {
-      "open": "pR oberta",
+      "open": "PR oberta",
       "closed": "sol·licitud d'integració tancada",
       "merged": "sol·licitud d'integració fusionada",
-      "draft": "pR en esborrany",
+      "draft": "PR en esborrany",
       "updating": "Actualitzant, {{label}} #{{number}}",
       "label": "{{label}} núm. {{number}}"
     },

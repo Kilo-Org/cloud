@@ -761,7 +761,7 @@
     "pendingComment": {
       "editOutdatedA11y": "Uredi zastarjeli komentar na čekanju na {{location}}",
       "editA11y": "Uredi komentar na čekanju na {{location}}",
-      "staleHint": "pR je promijenjen nakon pisanja ovog komentara.",
+      "staleHint": "PR je promijenjen nakon pisanja ovog komentara.",
       "deleteA11y": "Obriši komentar na čekanju na {{location}}",
       "deletedAnnouncement": "Komentar na čekanju obrisan",
       "noCommentsQueued": "Nema komentara na čekanju. Poslat će se samo odabrana vrsta pregleda.",

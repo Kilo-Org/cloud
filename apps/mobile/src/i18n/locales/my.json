@@ -42,7 +42,7 @@
     "mergeRequest": "merge request",
     "notConnected": "မချိတ်ဆက်ထား",
     "notifications": "အသိပေးချက်များ",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "ကုဒ်သိုလှောင်ရာများ",
     "securityAgent": "လုံခြုံရေးအေးဂျင့်",
     "unknown": "မသိရ",
@@ -2181,7 +2181,7 @@
       "dollar_other": "ဒေါ်လာ",
       "costSpoken": "ကုန်ကျစရိတ် {{cost}}",
       "costSpokenWithTime": "ကုန်ကျစရိတ် {{cost}}၊ {{time}}",
-      "pullRequest": "pR အမှတ် {{number}}",
+      "pullRequest": "PR အမှတ် {{number}}",
       "spokenJoiner": "နှင့်"
     },
     "githubInstall": {
@@ -2870,10 +2870,10 @@
       "unavailable": "ဤစက်ရှင်သည် ခွင့်ပြုချက် တောင်းဆိုမှုများကို လက်ခံနိုင်မည်မဟုတ်ပါ။"
     },
     "prBadge": {
-      "open": "pR ဖွင့်",
+      "open": "PR ဖွင့်",
       "closed": "ပိတ်ထားသော PR",
       "merged": "ပေါင်းစည်းပြီးသော PR",
-      "draft": "pR မူကြမ်း",
+      "draft": "PR မူကြမ်း",
       "updating": "နောက်ဆုံးအခြေအနေကို ရယူနေသည်၊ {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },

@@ -1,8 +1,10 @@
 import { type Href, useRouter } from 'expo-router';
-import { type ReactNode } from 'react';
+import { type ReactNode, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 import Animated, { FadeIn, LinearTransition } from 'react-native-reanimated';
+
+import { type GlanceableStatusKind } from '@kilocode/app-shared/glanceable-agents-snapshot';
 
 import { useSessionRowPress } from '@/components/agents/use-session-row-press';
 import { AdaptiveHomeCardFrame } from '@/components/home/adaptive-home-card-frame';
@@ -22,7 +24,6 @@ import {
 import { LiveSessionFeedback } from '@/components/home/agent-sessions-section';
 import { SectionHeader } from '@/components/home/section-header';
 import { selectReducedMotionEntrance, useMotionPolicy } from '@/lib/a11y/motion';
-import { AGENTS_SESSIONS_HREF } from '@/lib/agents-sessions-route';
 
 /**
  * The briefing that replaces the live card inside the shared adaptive frame.
@@ -45,6 +46,20 @@ export function AgentSessionsSection({
   const notice = useLiveSessionHeaderNotice(context, sessions, failureLabel);
   const showBriefing = briefing?.visible === true;
   const briefingCard = briefing?.card ?? null;
+  // Open the Agents tab, with the status filter a count row names. Same tab
+  // switch and stack reset as `See all`, so a pushed history screen cannot hide
+  // the filtered list. `See all` passes no status, which clears any filter a
+  // previous tap left on the route.
+  const openAgentsIndex = useCallback(
+    (status?: GlanceableStatusKind) => {
+      const href: Href = status
+        ? { pathname: '/(app)/(tabs)/(2_agents)/', params: { status } }
+        : { pathname: '/(app)/(tabs)/(2_agents)/', params: {} };
+      router.navigate(href);
+      router.dismissTo(href);
+    },
+    [router]
+  );
 
   return (
     <View>
@@ -60,9 +75,7 @@ export function AgentSessionsSection({
             router.push('/(app)/agent-briefing' as Href);
             return;
           }
-          // Switch tabs, then pop a previously pushed history screen to the live index.
-          router.navigate(AGENTS_SESSIONS_HREF);
-          router.dismissTo(AGENTS_SESSIONS_HREF);
+          openAgentsIndex();
         }}
         notice={notice && <LiveSessionHeaderNotice notice={notice} />}
       />
@@ -91,6 +104,7 @@ export function AgentSessionsSection({
                     <GlanceableActiveCard
                       sessions={sessions.activeSessions}
                       onPressSession={handleRowPress}
+                      onPressStatus={openAgentsIndex}
                       embedded
                     />
                   )

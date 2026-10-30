@@ -27,6 +27,7 @@ import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import { trpcClient } from '@/lib/trpc';
+import { readTrpcErrorField } from '@/lib/trpc-error';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
@@ -187,28 +188,45 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   // mode is stored, and widening the app's access is the only way out. Naming it
   // only in `selected` mode left the disabled agent's "Select repositories" row
   // landing on a screen whose only controls were the two mode choices.
-  const showRepositorySection = showRepositoryStates || repositoriesEmpty;
+  // Only a settled read qualifies: a `[]` left over from before a failed
+  // refetch (which the return edge below can hit) must not render the grant
+  // state, which would leave the section with a label and no control.
+  const showRepositorySection =
+    showRepositoryStates || (repositoriesEmpty && !repositories.isLoading && !repositories.isError);
 
-  // The GitHub settings page is where installation access is widened, and
-  // `openExternalUrl` resolves when that page closes — on both platforms it
-  // awaits the browser's own dismissal (a launch it could not open is toasted
-  // by that helper and still resolves). Reading the repository list again on
-  // that return edge is what makes a grant show up here: without it the cached
-  // empty answer stays fresh for the whole stale window, and the disabled
+  // The GitHub settings page is where installation access is widened on the
+  // web, and `openExternalUrl` resolves when that page closes — on both
+  // platforms it awaits the browser's own dismissal (a launch it could not open
+  // is toasted by that helper and still resolves). Reading the repository list
+  // again on that return edge is what makes a grant show up here: without it the
+  // cached empty answer stays fresh for the whole stale window, and the disabled
   // agent's enable rule counts exactly these repositories.
+  //
+  // The mint is only the hand-off token. It needs organization manage rights
+  // that this screen's `canManage` does not require, and an organization with an
+  // active installation that cannot hold a second one is refused with
+  // `FORBIDDEN` — the settled-empty-grant state this screen handles. The web
+  // page mints its own state for the signed-in user, so an organization falls
+  // back to the plain settings URL instead of leaving the control inert.
   const manageAccess = async () => {
     const orgId = isPersonalSecurityScope(scope) ? undefined : scope;
+    const open = async (url: string) => {
+      await openExternalUrl(url, {
+        label: t('securityAgent.repositories.githubAppSettings'),
+      });
+    };
     try {
       const { token } = await trpcClient.githubApps.mintInstallState.mutate({
         organizationId: orgId ?? undefined,
         returnTo: '/cloud/sessions',
       });
-      await openExternalUrl(getGitHubIntegrationUrl(WEB_BASE_URL, orgId, token), {
-        label: t('securityAgent.repositories.githubAppSettings'),
-      });
-    } catch {
-      toast.error(t('prReview.couldNotOpenGitHubAppSettings'));
-      return;
+      await open(getGitHubIntegrationUrl(WEB_BASE_URL, orgId, token));
+    } catch (error) {
+      if (readTrpcErrorField(error, 'code') !== 'FORBIDDEN' || !orgId) {
+        toast.error(t('prReview.couldNotOpenGitHubAppSettings'));
+        return;
+      }
+      await open(getGitHubIntegrationUrl(WEB_BASE_URL, orgId));
     }
     await repositories.refetch();
   };

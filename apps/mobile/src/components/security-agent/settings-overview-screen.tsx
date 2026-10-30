@@ -132,6 +132,10 @@ export function SettingsOverviewScreen({
   const data = config.data;
   // A loading or failed repository query must not read as zero repositories.
   const repositoriesEmpty = repositories.data?.length === 0;
+  // Only a settled empty answer names the grant as the next step: a stale `[]`
+  // under a failed refetch, or a read still in flight, keeps the recovery
+  // status and the generic picker copy instead.
+  const repositoriesSettledEmpty = repositoriesEmpty && !repositoriesLoading && !repositoriesError;
   // An enable attempt with no effective repository would be refused by the
   // server, so the switch is disabled up front under the same rule: `selected`
   // mode with zero selected ids, or `all` mode with zero integration repos.
@@ -272,7 +276,7 @@ export function SettingsOverviewScreen({
                   // row names the real next step instead of describing a choice
                   // the user cannot make.
                   subtitle={t(
-                    repositoriesEmpty
+                    repositoriesSettledEmpty
                       ? 'securityAgent.repositories.noRepositoriesDescription'
                       : 'securityAgent.settingsOverview.selectRepositoriesSubtitle'
                   )}

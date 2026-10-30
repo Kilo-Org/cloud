@@ -145,10 +145,8 @@ function configData(mode: 'all' | 'selected', selectedRepositoryIds: number[] = 
 
 const mounts: Awaited<ReturnType<typeof renderWithProviders>>[] = [];
 
-async function mount() {
-  const mounted = await renderWithProviders(
-    createElement(RepositorySettingsScreen, { scope: 'personal' })
-  );
+async function mount(scope = 'personal') {
+  const mounted = await renderWithProviders(createElement(RepositorySettingsScreen, { scope }));
   mounts.push(mounted);
   return mounted;
 }
@@ -346,12 +344,19 @@ describe('RepositorySettingsScreen repository picker', () => {
       0
     );
 
+    // A `[]` still cached under a failed refetch is not the settled empty grant:
+    // the section must not render a label with no state and no control under it.
+    repositories.data = [];
     repositories.isLoading = false;
     repositories.isError = true;
     const failed = await mount();
     expect(failed.renderer.root.findAll(node => String(node.type) === 'QueryError')).toHaveLength(
       0
     );
+    expect(failed.renderer.root.findAll(node => String(node.type) === 'EmptyState')).toHaveLength(
+      0
+    );
+    expect(textContents(failed.renderer)).not.toContain(i18n.t('common.repositories'));
   });
 
   it('reads the repositories again when the GitHub settings page closes', async () => {
@@ -361,7 +366,12 @@ describe('RepositorySettingsScreen repository picker', () => {
     await pressEmptyStateAction(renderer);
 
     expect(manageAccess.openExternalUrl).toHaveBeenCalledTimes(1);
-    expect(repositories.refetch).toHaveBeenCalledTimes(1);
+    expect(manageAccess.openExternalUrl.mock.calls[0]?.[0]).toBe(
+      'https://settings.test/github-app?installState=install-state&fromApp=1'
+    );
+    await vi.waitFor(() => {
+      expect(repositories.refetch).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('does not read the repositories when no settings page was opened', async () => {
@@ -373,6 +383,29 @@ describe('RepositorySettingsScreen repository picker', () => {
 
     expect(manageAccess.openExternalUrl).not.toHaveBeenCalled();
     expect(repositories.refetch).not.toHaveBeenCalled();
+  });
+
+  // An organization whose installation cannot take a second one is refused at
+  // the mint, and organization manage rights are narrower than this screen's
+  // edit permission. The settings page mints its own state for the signed-in
+  // web user, so the control still opens it instead of going inert.
+  it('opens the organization settings page without a minted state', async () => {
+    repositories.data = [];
+    manageAccess.mintInstallState.mockRejectedValueOnce(
+      Object.assign(new Error('This organization already has a GitHub installation'), {
+        data: { code: 'FORBIDDEN', httpStatus: 403 },
+      })
+    );
+    const { renderer } = await mount('org_123');
+
+    await pressEmptyStateAction(renderer);
+
+    expect(manageAccess.openExternalUrl.mock.calls[0]?.[0]).toBe(
+      'https://settings.test/github-app?organizationId=org_123'
+    );
+    await vi.waitFor(() => {
+      expect(repositories.refetch).toHaveBeenCalledTimes(1);
+    });
   });
 
   it('keeps the EmptyState out while the repository query has no data yet', async () => {

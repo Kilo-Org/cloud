@@ -28,6 +28,7 @@ import { SpinningIcon } from '@/components/ui/spinning-icon';
 import { Text } from '@/components/ui/text';
 import { TabScreenScrollView } from '@/components/tab-screen';
 import { i18n } from '@/i18n';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber, formatPercent } from '@/lib/format';
 import {
   useSecurityAgentCapability,
@@ -341,10 +342,19 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
         <View className="flex-row items-center justify-between gap-3">
+          {/* The row's height comes from the 48 dp sync button beside the
+              filter, so the filter's own node carried only its two text lines
+              (~32 dp) and a tap on the row's padding missed it. The shared row
+              frame lifts the filter to the whole row; `justify-center` keeps
+              the lines where they already sat. */}
           <Pressable
             onPress={openRepoFilter}
             disabled={repoFilterUnavailable}
-            className={cn('flex-1 active:opacity-70', repoFilterUnavailable && 'opacity-50')}
+            className={cn(
+              ROW_TARGET_CLASS,
+              'flex-1 justify-center active:opacity-70',
+              repoFilterUnavailable && 'opacity-50'
+            )}
             accessibilityRole="button"
             accessibilityLabel={t('securityAgent.dashboard.filterByRepository')}
             accessibilityState={{ disabled: repoFilterUnavailable }}
@@ -485,6 +495,10 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
 
         {slaEnabled && data && data.sla.overall.total === 0 ? (
           <View className="flex-row items-center gap-4">
+            {/* Both actions take the shared row frame: `min-h-11` measured
+                38.5 dp here (NativeWind's rem is 14 pt), under the touch
+                floor, and the row only grows to the frame the header's icon
+                buttons already use. */}
             <Pressable
               onPress={() => {
                 startSync({ repoFullName });
@@ -497,7 +511,8 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                 busy: triggerSync.isPending,
               }}
               className={cn(
-                'min-h-11 flex-row items-center gap-1.5 active:opacity-70',
+                ROW_TARGET_CLASS,
+                'flex-row items-center gap-1.5 active:opacity-70',
                 syncBlocked && 'opacity-50'
               )}
             >
@@ -514,7 +529,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
               }}
               accessibilityRole="button"
               accessibilityLabel={t('securityAgent.dashboard.manageRepositories')}
-              className="min-h-11 justify-center active:opacity-70"
+              className={cn(ROW_TARGET_CLASS, 'justify-center active:opacity-70')}
             >
               <Text className="text-xs font-medium text-primary">
                 {t('securityAgent.dashboard.manageRepositories')}

@@ -11,6 +11,7 @@ import { EmptyState } from '@/components/empty-state';
 import { KvRow } from '@/components/ui/kv-row';
 import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
+import { ROW_TARGET_CLASS } from '@/lib/a11y/tap-target';
 import { formatNumber, formatPercent } from '@/lib/format';
 import { type useSecurityAgentDashboardStats } from '@/lib/hooks/use-security-agent';
 import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
@@ -259,7 +260,14 @@ function CoverageSection({ scope, data, slaEnabled, repoFullName }: SectionProps
           }}
           className="active:opacity-70"
         >
+          {/* The frame sits on KvRow's own box, not on the wrapper: the
+              divider is that box's bottom edge, so a frame around it would
+              hold the rule above the row's bottom while the next row's
+              padding stacked below — visibly lopsided. With the frame on the
+              row, the padding above and below the label stays even and the
+              pressable still measures the full 48 dp target. */}
           <KvRow
+            className={ROW_TARGET_CLASS}
             label={row.label}
             value={formatNumber(row.value, i18n.language)}
             valueTone="muted"

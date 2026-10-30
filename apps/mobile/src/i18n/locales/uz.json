@@ -42,7 +42,7 @@
     "mergeRequest": "merge so‘rovi",
     "notConnected": "Ulanmagan",
     "notifications": "Bildirishnomalar",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repozitoriylar",
     "securityAgent": "Xavfsizlik agenti",
     "unknown": "Noma’lum",
@@ -148,7 +148,8 @@
     "durationMinuteShort": "daq",
     "durationHourShort": "soat",
     "changes": "O'zgarishlar",
-    "organizationTrialEnded": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Tashkilot egasi kilo.ai saytida hisob-kitobni yangilab, so'ng qayta urinib ko'rishi mumkin."
+    "organizationTrialEnded": "Tashkilotning sinov muddati tugadi va unda faol reja mavjud emas. Tashkilot egasi kilo.ai saytida hisob-kitobni yangilab, so'ng qayta urinib ko'rishi mumkin.",
+    "privateRepositoryA11y": "{{name}}, shaxsiy repozitoriya"
   },
   "language": {
     "restarting": "Tilni qo'llash uchun qayta ishga tushirilmoqda",
@@ -644,7 +645,12 @@
       "loading": "Kiruvchi so'rovlar yuklanmoqda",
       "noReviewRequests": "Ko'rib chiqish so'rovlari yo'q",
       "noReviewRequestsDescription": "Ko'rib chiqishingizni kutayotgan PRlar shu yerda ko'rinadi. Yuqoriga istalgan PR havolasini ham joylashtirishingiz mumkin.",
-      "couldNotLoad": "Kiruvchi so'rovlarni yuklab bo'lmadi."
+      "couldNotLoad": "Kiruvchi so'rovlarni yuklab bo'lmadi.",
+      "accessLostTitle": "Bu tashkilotga kirish huquqi yo'q",
+      "accessLostDescription": "Siz endi bu tashkilotning a'zosi emassiz, shuning uchun uning ko'rib chiqish so'rovlari yuklab olinmaydi. Ko'rib chiqishni davom ettirish uchun shaxsiy profilingizga o'ting.",
+      "organizationUnavailableTitle": "Bu tashkilot endi mavjud emas",
+      "organizationUnavailableDescription": "Bu tashkilot o'chirib tashlangan, shuning uchun uning ko'rib chiqish so'rovlari yuklab olinmaydi. Ko'rib chiqishni davom ettirish uchun shaxsiy profilingizga o'ting.",
+      "continueInPersonal": "Shaxsiy profilda davom etish"
     },
     "composer": {
       "commentBodyPlaceholder": "Izoh matni",
@@ -1513,7 +1519,13 @@
         "change_request_failed": "PR ochilmadi",
         "superseded": "Allaqachon mavjud"
       },
-      "noProposalsDescription": "Kilo loyiha mas'ullarining javoblarini tahlil qilgach, ko'rib chiqish xotirasining takliflari shu yerda ko'rsatiladi."
+      "noProposalsDescription": "Kilo loyiha mas'ullarining javoblarini tahlil qilgach, ko'rib chiqish xotirasining takliflari shu yerda ko'rsatiladi.",
+      "changeRequestInProgress": "Kilo bu taklif uchun allaqachon pull request ochmoqda. Bir ozdan so'ng qayta urinib ko'ring.",
+      "changeRequestNotActionable": "Bu taklifni endi tasdiqlab bo'lmaydi. Uni yoping va ro'yxatni yangilang.",
+      "changeRequestNoGitHubAccess": "Hech bir GitHub ulanishi bu repozitoriyga kira olmaydi. GitHubni bu repozitoriyga kirish huquqi bilan qayta ulang, so'ng qayta urinib ko'ring.",
+      "changeRequestMissingPermissions": "Kilo'ning GitHub ilovasi bu repozitoriyada pull request ocholmaydi. Repozitoriya egasi ilovaga kontent va pull requestlar uchun yozish huquqini berishi kerak, so'ng qayta urinib ko'ring.",
+      "changeRequestFailed": "Kilo pull requestni ocholmadi. Bir ozdan so'ng qayta urinib ko'ring.",
+      "offAction": "Ko'rib chiqish xotirasi o'chiq. Uni yoqing, so'ng qayta urinib ko'ring."
     },
     "manualReview": {
       "title": "Qo'lda ko'rib chiqish",
@@ -1932,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "O'zgarishlarni saqlash",
+      "saved": "Sozlamalar saqlandi",
       "unsavedTitle": "Saqlanmagan o'zgarishlar",
       "unsavedMessage": "Bu ekrandan chiqishdan oldin o'zgarishlar saqlansinmi?",
       "unsavedInvalidMessage": "Bu o'zgarishlarni hali saqlab bo'lmaydi. Saqlash uchun ularni tuzating yoki chiqish uchun bekor qiling."
@@ -2309,6 +2322,8 @@
       "couldNotLoadEnvironment": "Muhitingizni yuklab bo'lmadi.",
       "retryLoadingEnvironment": "Muhitni qayta yuklash",
       "defaultEnvironment": "Standart muhit",
+      "environmentAccessibility": "Profilni tanlang: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Profilni tanlang: {{label}}. {{attention}}",
       "leaveChanges": "O'zgarishlarni qoldirish",
       "commitAndPush": "Kommit va yuborish",
       "startSession": "Sessiyani boshlash",
@@ -2343,7 +2358,7 @@
       "manageProfiles": "Profillarni boshqarish",
       "noProfiles": "Hozircha profil yo'q. Atrof-muhit o'zgaruvchilari, MCP serverlari va ko'nikmalarini qo'shish uchun bitta yarating.",
       "advancedConfig": "Kengaytirilgan konfiguratsiya",
-      "advancedConfigDescription": "Saqlangan konfiguratsiyalarni yuklash va qoʻshimcha muhit oʻzgaruvchilari va sozlash buyruqlarini qoʻlda sozlash uchun profilni tanlang",
+      "advancedConfigDescription": "Bu sessiya uchun amal qiladi. Profil sifatida saqlansa, keyingi safar uchun qoladi.",
       "saveAsProfile": "Profil sifatida saqlash",
       "saveProfileDescription": "Joriy muhit o'zgaruvchilari va sozlash buyruqlarini qayta foydalanish mumkin bo'lgan profil sifatida saqlang.",
       "profileSummary": "{{vars}} muhit o'zgaruvchilari · {{commands}} sozlash buyruqlari",
@@ -2971,7 +2986,9 @@
     "permissionDescription": "Buni ko‘rishga ruxsatingiz yo‘q.",
     "notFoundDescription": "Bu element olib tashlangan yoki undan endi foydalanib bo‘lmaydigan bo‘lishi mumkin.",
     "serverTitle": "Yuklab bo'lmadi.",
-    "serverDescription": "Tizimimizda xato yuz berdi. Iltimos, qayta urinib ko'ring."
+    "serverDescription": "Tizimimizda xato yuz berdi. Iltimos, qayta urinib ko'ring.",
+    "timeoutTitle": "Server juda uzoq javob bermoqda",
+    "timeoutDescription": "So'rov tugashidan oldin vaqt tugadi. Iltimos, qayta urinib ko'ring."
   },
   "screenHeader": {
     "openMenu": "Menyuni ochish",
@@ -3824,7 +3841,9 @@
     "commandsTitle": "O'rnatish buyruqlari",
     "addCommand": "Buyruq qo'shish",
     "commandLabel": "Buyruq",
+    "commandLabelPosition": "{{position}}-raqamli buyruq",
     "commandPlaceholder": "mas. pnpm install",
+    "commandAtLimit": "Buyruq {{max}} ta belgi bilan cheklangan",
     "commandsEmpty": "Hozircha sozlash buyruqlari yo'q",
     "commandsSaveFailed": "Sozlash buyruqlarini saqlab bo‘lmadi",
     "moveUp": "Yuqoriga siljiting",
@@ -3842,6 +3861,7 @@
     "skillSaveFailed": "Mahorat saqlanmadi",
     "skillSourceCustom": "Maxsus",
     "skillSourceMarketplace": "Bozor",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "SKILL.md-ni joylashtiring va uning nomi kiritiladi; sudrab tashlamasdan telefoningizdan mahorat qo'shing.",
     "skillEditTitle": "Tahrirlash mahorati",
     "skillEdit": "{{name}} koʻnikmasini tahrirlang",
@@ -3856,9 +3876,9 @@
       "remoteType": "Masofadan",
       "command": "Buyruqlar qatori",
       "url": "URL",
-      "environment": "Atrof-muhit (JSON)",
+      "environment": "Muhit (JSON)",
       "headers": "Sarlavhalar (JSON)",
-      "timeout": "Taym-aut; turib qolish; tanaffus",
+      "timeout": "Kutish vaqti",
       "secretCount_one": "{{count}} sir",
       "secretCount_other": "{{count}} sir",
       "namePlaceholder": "my-server",
@@ -3868,6 +3888,7 @@
       "headersHint": "•••• ko'rinishida ko'rsatilgan qiymatlar saqlangan yashirin qiymatni o'zgartirmaydi; uni almashtirish uchun qiymatni yangilang. URL manzilini o'zgartirish barcha qiymatlarni qaytadan talab qiladi",
       "nameRequired": "Server nomini kiriting",
       "nameInvalid": "Ism faqat ASCII harflar, raqamlar, pastki chiziq va chiziqlardan foydalanishi mumkin, jami 100 ta belgidan oshmasligi kerak",
+      "nameConflict": "Bunday nomli server allaqachon mavjud",
       "commandRequired": "Buyruqni kiriting",
       "commandTooLong": "Ko'pi bilan 500 belgidan iborat 50 ta argumentdan foydalaning",
       "urlRequired": "URL manzilini kiriting",
@@ -3875,7 +3896,7 @@
       "urlTooLong": "URL 2048 ta belgi yoki undan kam bo'lishi kerak",
       "jsonInvalid": "To'g'ri JSON kiriting - satr qiymatlari ob'ekti",
       "jsonTooLarge": "Ko'pi bilan 50 ta yozuv, kalitlar 128 tagacha va qiymatlar 4096 belgigacha foydalaning",
-      "timeoutInvalid": "Vaqt tugashi butun son millisekund bo'lishi kerak",
+      "timeoutInvalid": "Kutish vaqti butun sonli millisekundlarda bo'lishi kerak",
       "edit": "{{name}} MCP serverini tahrirlang",
       "delete": "{{name}} MCP serverini oʻchiring",
       "saveFailed": "MCP serverini saqlab boʻlmadi",
@@ -3948,7 +3969,6 @@
       "repo": "Repozitoriyni tanlang…",
       "profile": "Profilni tanlang",
       "remove": "Bog'lash",
-      "private": "Shaxsiy",
       "search": "Repozitariylarni qidirish…",
       "addedToast": "“{{repo}}” uchun birlamchi profil oʻrnatilgan",
       "addFailed": "Standart profilni o‘rnatib bo‘lmadi",

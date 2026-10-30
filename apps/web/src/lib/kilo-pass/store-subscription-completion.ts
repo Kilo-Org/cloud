@@ -780,6 +780,10 @@ export async function completeStoreKiloPassPurchase(params: {
     leaseSeconds: PURCHASE_LEDGER_LEASE_SECONDS,
   });
 
+  if (admission.admission === 'organization_mismatch') {
+    throw new TRPCError({ code: 'CONFLICT', message: OPERATION_KEY_REUSE_MISMATCH_MESSAGE });
+  }
+
   if (
     admission.row.intent !== PURCHASE_LEDGER_INTENT ||
     admission.row.resource_key !== resourceKey

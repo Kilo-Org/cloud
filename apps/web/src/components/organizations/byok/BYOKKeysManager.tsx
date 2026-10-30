@@ -1122,8 +1122,8 @@ export function BYOKKeysManager({ organizationId }: BYOKKeysManagerProps) {
                         </p>
                         {organizationId ? (
                           <p className="mt-2">
-                            Models of this provider are subject to organization-configured model
-                            restrictions, but the provider itself is considered trusted.
+                            Organization-configured model and provider restrictions apply. The key
+                            is not used when the provider allow-list excludes this provider.
                           </p>
                         ) : null}
                       </AlertDescription>

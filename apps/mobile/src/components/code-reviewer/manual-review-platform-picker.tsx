@@ -1,4 +1,4 @@
-import * as Haptics from 'expo-haptics';
+import { selectionHaptic } from '@/lib/haptics';
 import { Check } from '@/components/ui/icons';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View } from 'react-native';
@@ -55,7 +55,7 @@ export function ManualReviewPlatformPicker({
               !connected && 'opacity-50'
             )}
             onPress={() => {
-              void Haptics.selectionAsync();
+              selectionHaptic();
               onSelect(option);
             }}
             {...radioItemA11y({

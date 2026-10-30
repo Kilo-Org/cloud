@@ -18,6 +18,28 @@ describe('preflightStartAgent', () => {
     });
   });
 
+  it('refuses a prompt that draws nothing, which no reader could have meant', () => {
+    for (const prompt of ['\u200B\u200B', '\u200B\u00A0\u0301', '\u0000\u001B']) {
+      expect(preflightStartAgent({ prompt })).toEqual({
+        ok: false,
+        result: {
+          ok: false,
+          action: 'StartAgent',
+          code: 'empty-prompt',
+          retryable: false,
+          message: i18n.t('appActions.start.promptRequired'),
+        },
+      });
+    }
+  });
+
+  it('keeps a session-only request whose prompt draws nothing sendable', () => {
+    expect(preflightStartAgent({ prompt: '\u200B', sessionId: 'ses_1' })).toEqual({
+      ok: true,
+      named: null,
+    });
+  });
+
   it('refuses a request that names neither a prompt nor a session', () => {
     expect(preflightStartAgent({ prompt: '  ' })).toEqual({
       ok: false,

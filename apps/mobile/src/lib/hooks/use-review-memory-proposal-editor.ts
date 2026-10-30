@@ -12,6 +12,7 @@ import {
   sameProposalDraft,
   validProposalDraft,
 } from '@/lib/review-memory-proposals';
+import { knownServerErrorMessage } from '@/lib/server-error-copy';
 
 type ProposalAction = 'save' | 'reject' | 'approve';
 type ProposalFailure = { action: ProposalAction; message: string };
@@ -108,7 +109,7 @@ export function useReviewMemoryProposalEditor({
     } catch (error) {
       setFailure({
         action,
-        message: error instanceof Error ? error.message : t('common.somethingWentWrong'),
+        message: knownServerErrorMessage(error) ?? t('common.somethingWentWrong'),
       });
     } finally {
       pendingRef.current = false;

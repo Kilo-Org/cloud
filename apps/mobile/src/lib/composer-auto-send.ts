@@ -1,3 +1,5 @@
+import { hasVisibleComposerText } from './composer-text';
+
 /**
  * Whether the destination composer must submit its share-prefilled content
  * without a further tap. The caller latches `alreadyFired` after it submits,
@@ -40,13 +42,14 @@ export function shouldAutoSendPrefilledShare(input: {
 
 /**
  * Whether to arm the auto-send latch when a share payload is delivered.
- * Arms only when auto-send is requested AND the delivered text is
- * non-empty. An attachments-only delivery must never arm, or the next
- * typed character would auto-send text the user never composed.
+ * Arms only when auto-send is requested AND the delivered text carries
+ * something a reader can see. An attachments-only delivery, or one whose text
+ * is only whitespace and zero-width characters, must never arm: the next typed
+ * character would auto-send text the user never composed.
  */
 export function shouldArmAutoSendOnDelivery(params: {
   autoSend: boolean;
   deliveredText: string;
 }): boolean {
-  return params.autoSend && params.deliveredText.trim().length > 0;
+  return params.autoSend && hasVisibleComposerText(params.deliveredText);
 }

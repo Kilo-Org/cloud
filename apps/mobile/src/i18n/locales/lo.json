@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "ການປ່ຽນແປງ",
-    "organizationTrialEnded": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າຂອງອົງກອນສາມາດອັບເດດການເກັບເງິນໄດ້ທີ່ kilo.ai, ແລ້ວລອງອີກຄັ້ງ."
+    "organizationTrialEnded": "ການທົດລອງຂອງອົງກອນໄດ້ສິ້ນສຸດລົງແລ້ວ ແລະ ອົງກອນບໍ່ມີແຜນທີ່ໃຊ້ງານຢູ່. ເຈົ້າຂອງອົງກອນສາມາດອັບເດດການເກັບເງິນໄດ້ທີ່ kilo.ai, ແລ້ວລອງອີກຄັ້ງ.",
+    "privateRepositoryA11y": "{{name}}, ຄັງໂຄ້ດສ່ວນຕົວ"
   },
   "language": {
     "restarting": "ກຳລັງເປີດແອັບໃໝ່ເພື່ອໃຊ້ພາສາທີ່ເລືອກ",
@@ -644,7 +645,12 @@
       "loading": "ກຳລັງໂຫຼດກ່ອງຂໍ້ຄວາມເຂົ້າ",
       "noReviewRequests": "ບໍ່ມີຄຳຂໍໃຫ້ກວດທານ",
       "noReviewRequestsDescription": "ຄຳຂໍລວມໂຄດທີ່ລໍຖ້າໃຫ້ທ່ານກວດທານຈະປາກົດຢູ່ທີ່ນີ້. ທ່ານຍັງສາມາດວາງລິງ PR ໃດກໍໄດ້ຂ້າງເທິງ.",
-      "couldNotLoad": "ບໍ່ສາມາດໂຫຼດກ່ອງຂໍ້ຄວາມເຂົ້າໄດ້."
+      "couldNotLoad": "ບໍ່ສາມາດໂຫຼດກ່ອງຂໍ້ຄວາມເຂົ້າໄດ້.",
+      "accessLostTitle": "ບໍ່ມີສິດເຂົ້າເຖິງອົງກອນນີ້",
+      "accessLostDescription": "ທ່ານບໍ່ແມ່ນສະມາຊິກຂອງອົງກອນນີ້ອີກແລ້ວ ຈຶ່ງບໍ່ສາມາດໂຫຼດຄຳຂໍໃຫ້ກວດທານຂອງມັນໄດ້. ສືບຕໍ່ໃນບັນຊີສ່ວນຕົວຂອງທ່ານ ເພື່ອກວດທານຕໍ່ໄປ.",
+      "organizationUnavailableTitle": "ອົງກອນນີ້ບໍ່ມີອີກແລ້ວ",
+      "organizationUnavailableDescription": "ອົງກອນນີ້ຖືກລຶບແລ້ວ ຈຶ່ງບໍ່ສາມາດໂຫຼດຄຳຂໍໃຫ້ກວດທານຂອງມັນໄດ້. ສືບຕໍ່ໃນບັນຊີສ່ວນຕົວຂອງທ່ານ ເພື່ອກວດທານຕໍ່ໄປ.",
+      "continueInPersonal": "ສືບຕໍ່ໃນບັນຊີສ່ວນຕົວ"
     },
     "composer": {
       "commentBodyPlaceholder": "ຄຳເຫັນຂອງທ່ານ",
@@ -742,7 +748,7 @@
     "pendingComment": {
       "editOutdatedA11y": "ແກ້ໄຂຄຳເຫັນທີ່ລໍສົ່ງແລະອ້າງອີງໂຄດເກົ່າຢູ່ {{location}}",
       "editA11y": "ແກ້ໄຂຄຳເຫັນທີ່ລໍສົ່ງຢູ່ {{location}}",
-      "staleHint": "pR ມີການອັບເດດຫຼັງຈາກທ່ານຂຽນຄຳເຫັນນີ້.",
+      "staleHint": "PR ມີການອັບເດດຫຼັງຈາກທ່ານຂຽນຄຳເຫັນນີ້.",
       "deleteA11y": "ລຶບຄຳເຫັນທີ່ລໍສົ່ງຢູ່ {{location}}",
       "deletedAnnouncement": "ລຶບຄຳເຫັນທີ່ລໍສົ່ງແລ້ວ",
       "noCommentsQueued": "ບໍ່ມີຄຳເຫັນໃນຄິວ. ລະບົບຈະສົ່ງຜົນການກວດທານຕາມປະເພດທີ່ເລືອກຂ້າງເທິງເທົ່ານັ້ນ.",
@@ -1513,7 +1519,13 @@
         "change_request_failed": "ເປີດ PR ບໍ່ສຳເລັດ",
         "superseded": "ມີຢູ່ແລ້ວ"
       },
-      "noProposalsDescription": "ຂໍ້ສະເໜີຈາກຄວາມຈຳການກວດສອບຈະປາກົດຢູ່ບ່ອນນີ້ ຫຼັງຈາກ Kilo ວິເຄາະຄຳຕອບຂອງຜູ້ດູແລ."
+      "noProposalsDescription": "ຂໍ້ສະເໜີຈາກຄວາມຈຳການກວດສອບຈະປາກົດຢູ່ບ່ອນນີ້ ຫຼັງຈາກ Kilo ວິເຄາະຄຳຕອບຂອງຜູ້ດູແລ.",
+      "changeRequestInProgress": "Kilo ກຳລັງເປີດ PR ສຳລັບຂໍ້ສະເໜີນີ້ຢູ່ແລ້ວ. ລອງອີກຄັ້ງໃນອີກຈັກຄູ່.",
+      "changeRequestNotActionable": "ບໍ່ສາມາດອະນຸມັດຂໍ້ສະເໜີນີ້ໄດ້ອີກແລ້ວ. ປິດມັນ ແລະ ໂຫຼດລາຍການຄືນໃໝ່.",
+      "changeRequestNoGitHubAccess": "ບໍ່ມີການເຊື່ອມຕໍ່ GitHub ໃດທີ່ມີສິດເຂົ້າເຖິງ repository ນີ້. ເຊື່ອມຕໍ່ GitHub ຄືນໃໝ່ພ້ອມກັບສິດເຂົ້າເຖິງ repository ນີ້, ແລ້ວລອງອີກຄັ້ງ.",
+      "changeRequestMissingPermissions": "GitHub App ຂອງ Kilo ບໍ່ສາມາດເປີດ PR ໃນ repository ນີ້ໄດ້. ເຈົ້າຂອງ repository ຕ້ອງໃຫ້ສິດຂຽນແກ່ແອັບສຳລັບເນື້ອຫາ ແລະ PR, ແລ້ວລອງອີກຄັ້ງ.",
+      "changeRequestFailed": "Kilo ບໍ່ສາມາດເປີດ PR ໄດ້. ລອງອີກຄັ້ງໃນອີກຈັກຄູ່.",
+      "offAction": "ຄວາມຈຳການກວດສອບປິດຢູ່. ເປີດໃຊ້ມັນ, ແລ້ວລອງອີກຄັ້ງ."
     },
     "manualReview": {
       "title": "ການກວດສອບທີ່ເລີ່ມເອງ",
@@ -1932,6 +1944,7 @@
     },
     "settingsSave": {
       "saveChanges": "ບັນທຶກການປ່ຽນແປງ",
+      "saved": "ບັນທຶກການຕັ້ງຄ່າແລ້ວ",
       "unsavedTitle": "ການປ່ຽນແປງທີ່ຍັງບໍ່ທັນບັນທຶກ",
       "unsavedMessage": "ບັນທຶກການປ່ຽນແປງກ່ອນອອກຈາກໜ້າຈໍນີ້ບໍ?",
       "unsavedInvalidMessage": "ການປ່ຽນແປງເຫຼົ່ານີ້ຍັງບໍ່ສາມາດບັນທຶກໄດ້. ແກ້ໄຂພວກມັນເພື່ອບັນທຶກ ຫຼື ຖິ້ມພວກມັນເພື່ອອອກ."
@@ -2309,6 +2322,8 @@
       "couldNotLoadEnvironment": "ບໍ່ສາມາດໂຫຼດສະພາບແວດລ້ອມຂອງເຈົ້າໄດ້.",
       "retryLoadingEnvironment": "ລອງໂຫຼດສະພາບແວດລ້ອມໃໝ່",
       "defaultEnvironment": "ສະພາບແວດລ້ອມມາດຕະຖານ",
+      "environmentAccessibility": "ເລືອກໂປຣໄຟລ໌: {{label}}",
+      "environmentAccessibilityNeedsAttention": "ເລືອກໂປຣໄຟລ໌: {{label}}. {{attention}}",
       "leaveChanges": "ປະການປ່ຽນແປງໄວ້",
       "commitAndPush": "ບັນທຶກແລະສົ່ງຂຶ້ນ",
       "startSession": "ເລີ່ມເຊດຊັນ",
@@ -2343,7 +2358,7 @@
       "manageProfiles": "ຈັດການໂປຣໄຟລ໌",
       "noProfiles": "ບໍ່ມີໂປຣໄຟລ໌ເທື່ອ. ສ້າງອັນໜຶ່ງເພື່ອເພີ່ມຕົວແປສະພາບແວດລ້ອມ, ເຊີບເວີ MCP ແລະທັກສະ.",
       "advancedConfig": "ການຕັ້ງຄ່າຂັ້ນສູງ",
-      "advancedConfigDescription": "ເລືອກໂປຣໄຟລ໌ເພື່ອໂຫຼດການຕັ້ງຄ່າທີ່ບັນທຶກໄວ້, ແລະກຳນົດຄ່າຕົວແປສະພາບແວດລ້ອມເພີ່ມເຕີມ ແລະຄຳສັ່ງການຕັ້ງຄ່າດ້ວຍຕົນເອງ",
+      "advancedConfigDescription": "ໃຊ້ກັບເຊສຊັນນີ້. ການບັນທຶກເປັນໂປຣໄຟລ໌ຈະເກັບໄວ້ສຳລັບຄັ້ງຕໍ່ໄປ.",
       "saveAsProfile": "ບັນທຶກເປັນໂປຣໄຟລ໌",
       "saveProfileDescription": "ບັນທຶກຕົວແປສະພາບແວດລ້ອມປັດຈຸບັນ ແລະຄໍາສັ່ງຕັ້ງຄ່າເປັນໂປຣໄຟລ໌ທີ່ສາມາດໃຊ້ຄືນໄດ້.",
       "profileSummary": "{{vars}} ຕົວແປສະພາບແວດລ້ອມ · {{commands}} ຄຳສັ່ງຕັ້ງຄ່າ",
@@ -2862,8 +2877,8 @@
     },
     "prBadge": {
       "open": "ເປີດຄຳຂໍລວມໂຄ້ດ",
-      "closed": "pR ທີ່ປິດແລ້ວ",
-      "merged": "pR ທີ່ລວມໂຄ້ດແລ້ວ",
+      "closed": "PR ທີ່ປິດແລ້ວ",
+      "merged": "PR ທີ່ລວມໂຄ້ດແລ້ວ",
       "draft": "ຄຳຂໍລວມໂຄ້ດສະບັບຮ່າງ",
       "updating": "ກຳລັງອັບເດດ, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
@@ -2971,7 +2986,9 @@
     "permissionDescription": "ທ່ານບໍ່ມີສິດເບິ່ງລາຍການນີ້.",
     "notFoundDescription": "ລາຍການນີ້ອາດຖືກລຶບ ຫຼື ບໍ່ມີອີກແລ້ວ.",
     "serverTitle": "ບໍ່ສາມາດໂຫຼດໄດ້.",
-    "serverDescription": "ເກີດຂໍ້ຜິດພາດໃນລະບົບຂອງເຮົາ. ກະລຸນາລອງອີກຄັ້ງ."
+    "serverDescription": "ເກີດຂໍ້ຜິດພາດໃນລະບົບຂອງເຮົາ. ກະລຸນາລອງອີກຄັ້ງ.",
+    "timeoutTitle": "ເຊີບເວີຕອບສະໜອງຊ້າເກີນໄປ",
+    "timeoutDescription": "ຄຳຮ້ອງຂໍໃຊ້ເວລາເກີນກຳນົດໂດຍບໍ່ສຳເລັດ. ກະລຸນາລອງອີກຄັ້ງ."
   },
   "screenHeader": {
     "openMenu": "ເປີດເມນູ",
@@ -3824,7 +3841,9 @@
     "commandsTitle": "ຕັ້ງຄ່າຄໍາສັ່ງ",
     "addCommand": "ເພີ່ມຄໍາສັ່ງ",
     "commandLabel": "ຄໍາສັ່ງ",
+    "commandLabelPosition": "ຄໍາສັ່ງ {{position}}",
     "commandPlaceholder": "ຕົວຢ່າງ: pnpm install",
+    "commandAtLimit": "ຄຳສັ່ງຈຳກັດບໍ່ເກີນ {{max}} ຕົວອັກສອນ",
     "commandsEmpty": "ບໍ່ມີຄຳສັ່ງຕັ້ງຄ່າເທື່ອ",
     "commandsSaveFailed": "ບໍ່ສາມາດບັນທຶກຄຳສັ່ງຕັ້ງຄ່າໄດ້",
     "moveUp": "ຍ້າຍຂຶ້ນ",
@@ -3842,6 +3861,7 @@
     "skillSaveFailed": "ບໍ່ສາມາດບັນທຶກທັກສະໄດ້",
     "skillSourceCustom": "ກຳນົດເອງ",
     "skillSourceMarketplace": "ຕະຫຼາດ",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "ວາງ SKILL.md ແລະຊື່ຂອງມັນຕື່ມໃສ່; ເພີ່ມທັກສະຈາກໂທລະສັບຂອງທ່ານໂດຍບໍ່ຕ້ອງລາກແລະວາງ.",
     "skillEditTitle": "ແກ້ໄຂທັກສະ",
     "skillEdit": "ແກ້ໄຂທັກສະ {{name}}",
@@ -3856,9 +3876,9 @@
       "remoteType": "ໄລຍະໄກ",
       "command": "ເສັ້ນຄໍາສັ່ງ",
       "url": "URL",
-      "environment": "ສະພາບແວດລ້ອມ (JSON)",
+      "environment": "ຕົວແປສະພາບແວດລ້ອມ (JSON)",
       "headers": "ສ່ວນຫົວ (JSON)",
-      "timeout": "ໝົດເວລາ",
+      "timeout": "ໄລຍະເວລາໝົດກຳນົດ",
       "secretCount_one": "{{count}} ຄວາມລັບ",
       "secretCount_other": "{{count}} ຄວາມລັບ",
       "namePlaceholder": "my-server",
@@ -3868,6 +3888,7 @@
       "headersHint": "ຄ່າທີ່ສະແດງເປັນ •••• ຈະຮັກສາຄວາມລັບທີ່ເກັບໄວ້; ປ່ຽນຄ່າເພື່ອໝຸນຄວາມລັບ. ການປ່ຽນແປງ URL ຕ້ອງການທຸກໆຄ່າອີກຄັ້ງ",
       "nameRequired": "ໃສ່ຊື່ເຊີບເວີ",
       "nameInvalid": "ຊື່ສາມາດໃຊ້ພຽງແຕ່ຕົວອັກສອນ ASCII, ຕົວເລກ, ເຄື່ອງໝາຍຂີດ, ແລະຂີດກ້ອງ, ໄດ້ສູງສຸດ 100 ຕົວອັກສອນ",
+      "nameConflict": "ເຊີບເວີທີ່ມີຊື່ນີ້ຢູ່ແລ້ວ",
       "commandRequired": "ໃສ່ຄໍາສັ່ງ",
       "commandTooLong": "ໃຊ້ອາກູເມັນສູງສຸດ 50 ອັນ ອັນລະ 500 ຕົວອັກສອນ",
       "urlRequired": "ໃສ່ URL",
@@ -3875,7 +3896,7 @@
       "urlTooLong": "URL ຕ້ອງມີ 2048 ຕົວອັກສອນ ຫຼື ໜ້ອຍກວ່າ",
       "jsonInvalid": "ໃສ່ JSON ທີ່ຖືກຕ້ອງ — ວັດຖຸຂອງຄ່າສະຕຣິງ",
       "jsonTooLarge": "ໃຊ້ລາຍການສູງສຸດ 50 ລາຍການ ກະແຈສູງສຸດ 128 ແລະ ຄ່າສູງສຸດ 4096 ຕົວອັກສອນ",
-      "timeoutInvalid": "ໝົດເວລາຕ້ອງເປັນຈຳນວນທັງໝົດຂອງມິນລີວິນາທີ",
+      "timeoutInvalid": "ໄລຍະເວລາໝົດກຳນົດຕ້ອງເປັນຈຳນວນທັງໝົດຂອງມິນລິວິນາທີ",
       "edit": "ແກ້ໄຂເຊີບເວີ MCP {{name}}",
       "delete": "ລຶບເຊີບເວີ MCP {{name}}",
       "saveFailed": "ບໍ່ສາມາດບັນທຶກເຊີບເວີ MCP ໄດ້",
@@ -3948,7 +3969,6 @@
       "repo": "ເລືອກບ່ອນເກັບມ້ຽນ...",
       "profile": "ເລືອກໂປຣໄຟລ໌",
       "remove": "ຍົກເລີກການຜູກມັດ",
-      "private": "ສ່ວນຕົວ",
       "search": "ຊອກຫາບ່ອນເກັບມ້ຽນ...",
       "addedToast": "ຕັ້ງໂປຣໄຟລ໌ເລີ່ມຕົ້ນສຳລັບ \"{{repo}}\" ແລ້ວ",
       "addFailed": "ບໍ່ສາມາດຕັ້ງໂປຣໄຟລ໌ເລີ່ມຕົ້ນໄດ້",

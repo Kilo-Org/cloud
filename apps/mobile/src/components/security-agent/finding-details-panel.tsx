@@ -15,6 +15,7 @@ import {
 } from '@/components/security-agent/finding-tone';
 import { CollapsibleSection } from '@/components/security-agent/collapsible-section';
 import { DISMISSAL_REASON_PHRASE_KEYS } from '@/components/security-agent/dismissal-reason-keys';
+import { storedText } from '@/components/security-agent/stored-text';
 import { getDeadlineCopy } from '@/lib/security-agent-copy';
 import { FindingStatusBadge } from '@/components/security-agent/finding-status-badge';
 import { KvRow } from '@/components/ui/kv-row';
@@ -22,6 +23,7 @@ import { Text } from '@/components/ui/text';
 import { i18n } from '@/i18n';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { getSecurityAgentPath, type SecurityFinding } from '@/lib/security-agent';
 import { openFindingLink } from '@/lib/security-agent-link';
 import { cn, firstNonEmpty, parseTimestamp, timeAgo } from '@/lib/utils';
@@ -54,18 +56,19 @@ function lookup<V>(dictionary: Readonly<Record<string, V>>, key: string): V | un
 }
 
 function getDismissalReasonLabel(reason: string | null): string {
-  if (!reason) {
+  const code = storedText(reason);
+  if (code === null) {
     return i18n.t('securityAgent.findingDetails.reasonAfterReview');
   }
-  const key = lookup(DISMISSAL_REASON_PHRASE_KEYS, reason);
-  return key ? i18n.t(key) : reason.replaceAll('_', ' ');
+  const key = lookup(DISMISSAL_REASON_PHRASE_KEYS, code);
+  return key ? i18n.t(key) : code.replaceAll('_', ' ');
 }
 
 function getFindingSourceLabel(source: string): string {
   if (source === 'dependabot') {
     return i18n.t('securityAgent.findingDetails.sourceDependabot');
   }
-  return source.replaceAll('_', ' ');
+  return storedText(source)?.replaceAll('_', ' ') ?? i18n.t('common.unknown');
 }
 
 function DismissalOrSupersessionNote({
@@ -73,7 +76,7 @@ function DismissalOrSupersessionNote({
   scope,
   supersedingFindingId,
 }: Readonly<{ finding: SecurityFinding; scope: string; supersedingFindingId: string | null }>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const { t } = useTranslation();
   const colors = useThemeColors();
 
@@ -82,7 +85,7 @@ function DismissalOrSupersessionNote({
       <Pressable
         className="gap-1 rounded-lg bg-secondary p-3 active:opacity-70"
         onPress={() => {
-          router.push(getSecurityAgentPath(scope, `findings/${supersedingFindingId}`));
+          pushOnce(getSecurityAgentPath(scope, `findings/${supersedingFindingId}`));
         }}
       >
         <View className="flex-row items-center gap-2">

@@ -1,7 +1,8 @@
 import type * as z from 'zod';
 import { DirectByokModelEndpointSchema } from '@kilocode/db/schema-types';
-import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic.constants';
+import { isClaudeModel } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/claude-model';
 import { isKimiModel } from '@kilocode/web-shared/lib/ai-gateway/providers/moonshotai';
+import { dropThinkingBlocksOnPrefixMismatch } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/thinking-block-binding';
 import { cachedEnhancedDirectByokModelList } from '@kilocode/web-shared/lib/ai-gateway/providers/direct-byok/model-list';
 import {
   BedrockCredentialsSchema,
@@ -141,6 +142,7 @@ export default {
     if (context.request.kind === 'messages') {
       context.extraHeaders['anthropic-version'] ??= ANTHROPIC_VERSION;
     }
+    dropThinkingBlocksOnPrefixMismatch(context);
   },
   models: cachedEnhancedDirectByokModelList({ providerId: 'bedrock-byok', recommendedModels: [] }),
   async resolveUpstream({ credential, model }) {

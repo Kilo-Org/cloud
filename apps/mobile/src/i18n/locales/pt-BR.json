@@ -42,7 +42,7 @@
     "mergeRequest": "merge request",
     "notConnected": "Não conectado",
     "notifications": "Notificações",
-    "pullRequest": "pR",
+    "pullRequest": "PR",
     "repositories": "Repositórios",
     "securityAgent": "Agente de segurança",
     "unknown": "Desconhecido",
@@ -148,7 +148,8 @@
     "durationMinuteShort": "min",
     "durationHourShort": "h",
     "changes": "Alterações",
-    "organizationTrialEnded": "O período de teste da organização terminou e ela não tem nenhum plano ativo. Um proprietário da organização pode atualizar o faturamento em kilo.ai e tentar novamente."
+    "organizationTrialEnded": "O período de teste da organização terminou e ela não tem nenhum plano ativo. Um proprietário da organização pode atualizar o faturamento em kilo.ai e tentar novamente.",
+    "privateRepositoryA11y": "{{name}}, repositório privado"
   },
   "language": {
     "restarting": "Reiniciando para aplicar o idioma",
@@ -1015,6 +1016,12 @@
         "superseded": "Já existe"
       },
       "noProposalsDescription": "As propostas da memória de revisão aparecem aqui depois que o Kilo analisa as respostas dos mantenedores.",
+      "changeRequestInProgress": "O Kilo já está abrindo um pull request para esta proposta. Tente novamente em instantes.",
+      "changeRequestNotActionable": "Esta proposta não pode mais ser aprovada. Feche-a e atualize a lista.",
+      "changeRequestNoGitHubAccess": "Nenhuma conexão do GitHub tem acesso a este repositório. Reconecte o GitHub com acesso a ele e tente novamente.",
+      "changeRequestMissingPermissions": "O GitHub App do Kilo não pode abrir pull requests neste repositório. Peça a um proprietário do repositório que conceda ao app acesso de escrita a conteúdos e pull requests, depois tente novamente.",
+      "changeRequestFailed": "O Kilo não conseguiu abrir o pull request. Tente novamente em instantes.",
+      "offAction": "A memória de revisão está desativada. Ative-a e tente novamente.",
       "off": "A memória de revisão está desativada.",
       "on": "A memória de revisão está ativada.",
       "offDescription": "Ative-a para que o Kilo aprenda com as respostas dos mantenedores e proponha orientações para o REVIEW.md.",
@@ -1440,6 +1447,7 @@
     },
     "settingsSave": {
       "saveChanges": "Salvar alterações",
+      "saved": "Configurações salvas",
       "unsavedMessage": "Salvar suas alterações antes de sair desta tela?",
       "unsavedInvalidMessage": "Essas alterações ainda não podem ser salvas. Corrija-as para salvar ou descarte-as para sair.",
       "unsavedTitle": "Alterações não salvas"
@@ -1630,7 +1638,7 @@
       "dollar_many": "dólares",
       "costSpoken": "custo de {{cost}}",
       "costSpokenWithTime": "custo {{cost}}, {{time}}",
-      "pullRequest": "pR {{number}}",
+      "pullRequest": "PR {{number}}",
       "spokenJoiner": "e"
     },
     "githubInstall": {
@@ -1765,6 +1773,8 @@
       "couldNotLoadEnvironment": "Não foi possível carregar seu ambiente.",
       "retryLoadingEnvironment": "Tentar carregar o ambiente novamente",
       "defaultEnvironment": "Ambiente padrão",
+      "environmentAccessibility": "Escolha um perfil: {{label}}",
+      "environmentAccessibilityNeedsAttention": "Escolha um perfil: {{label}}. {{attention}}",
       "leaveChanges": "Manter alterações",
       "commitAndPush": "Registrar e enviar",
       "startSession": "Iniciar sessão",
@@ -1799,7 +1809,7 @@
       "manageProfiles": "Gerenciar perfis",
       "noProfiles": "Ainda não há perfis. Crie um para adicionar variáveis de ambiente, servidores MCP e habilidades.",
       "advancedConfig": "Configuração avançada",
-      "advancedConfigDescription": "Selecione um perfil para carregar configurações salvas e configure manualmente variáveis de ambiente adicionais e comandos de configuração",
+      "advancedConfigDescription": "Aplica-se a esta sessão. Salvar como perfil mantém para a próxima vez.",
       "saveAsProfile": "Salvar como perfil",
       "saveProfileDescription": "Salve as variáveis de ambiente atuais e os comandos de configuração como um perfil reutilizável.",
       "profileSummary": "{{vars}} variáveis de ambiente · {{commands}} comandos de configuração",
@@ -2328,9 +2338,9 @@
     },
     "prBadge": {
       "open": "abrir PR",
-      "closed": "pR fechado",
-      "merged": "pR mesclado",
-      "draft": "pR em rascunho",
+      "closed": "PR fechado",
+      "merged": "PR mesclado",
+      "draft": "PR em rascunho",
       "updating": "Atualizando, {{label}} #{{number}}",
       "label": "{{label}} #{{number}}"
     },
@@ -2470,7 +2480,9 @@
     "permissionDescription": "Você não tem permissão para ver este conteúdo.",
     "notFoundDescription": "Este item pode ter sido removido ou não está mais disponível.",
     "serverTitle": "Não foi possível carregar os dados.",
-    "serverDescription": "Ocorreu um problema no nosso sistema. Tente novamente."
+    "serverDescription": "Ocorreu um problema no nosso sistema. Tente novamente.",
+    "timeoutTitle": "O servidor está demorando demais",
+    "timeoutDescription": "A solicitação esgotou o tempo limite antes de ser concluída. Tente novamente."
   },
   "screenHeader": {
     "openMenu": "Abrir menu",
@@ -2943,6 +2955,11 @@
     },
     "inbox": {
       "couldNotLoad": "Não foi possível carregar a caixa de entrada.",
+      "accessLostTitle": "Sem acesso a esta organização",
+      "accessLostDescription": "Você não é mais membro desta organização, então as solicitações de revisão dela não podem ser carregadas. Continue na sua conta pessoal para seguir revisando.",
+      "organizationUnavailableTitle": "Esta organização não existe mais",
+      "organizationUnavailableDescription": "Esta organização foi excluída, então as solicitações de revisão dela não podem ser carregadas. Continue na sua conta pessoal para seguir revisando.",
+      "continueInPersonal": "Continuar na conta pessoal",
       "loading": "Carregando caixa de entrada",
       "noReviewRequests": "Nenhuma solicitação de revisão",
       "noReviewRequestsDescription": "Os pull requests que aguardam sua revisão aparecem aqui. Você também pode colar o link de qualquer PR acima.",
@@ -3874,7 +3891,9 @@
     "commandsTitle": "Comandos de configuração",
     "addCommand": "Adicionar comando",
     "commandLabel": "Comando",
+    "commandLabelPosition": "Comando {{position}}",
     "commandPlaceholder": "ex. pnpm install",
+    "commandAtLimit": "O comando é limitado a {{max}} caracteres",
     "commandsEmpty": "Nenhum comando de configuração ainda",
     "commandsSaveFailed": "Não foi possível salvar os comandos de configuração",
     "moveUp": "Subir",
@@ -3892,6 +3911,7 @@
     "skillSaveFailed": "Não foi possível salvar a habilidade",
     "skillSourceCustom": "Personalizado",
     "skillSourceMarketplace": "Marketplace",
+    "skillSourceSkillsSh": "skills.sh",
     "skillsHint": "Cole um SKILL.md e seu nome será preenchido; adicione uma habilidade do seu telefone sem arrastar e soltar.",
     "skillEditTitle": "Editar habilidade",
     "skillEdit": "Editar a habilidade {{name}}",
@@ -3906,9 +3926,9 @@
       "remoteType": "Remoto",
       "command": "Linha de comando",
       "url": "URL",
-      "environment": "Meio Ambiente (JSON)",
+      "environment": "Variáveis de ambiente (JSON)",
       "headers": "Cabeçalhos (JSON)",
-      "timeout": "Tempo esgotado",
+      "timeout": "Tempo limite",
       "secretCount_one": "{{count}} segredo",
       "secretCount_many": "{{count}} segredos",
       "secretCount_other": "{{count}} segredos",
@@ -3919,6 +3939,7 @@
       "headersHint": "Valores exibidos como •••• mantêm o segredo armazenado; substitua um valor para rotacioná-lo. Alterar a URL exige todos os valores novamente",
       "nameRequired": "Insira um nome de servidor",
       "nameInvalid": "O nome pode usar apenas letras ASCII, números, sublinhados e travessões, com até 100 caracteres",
+      "nameConflict": "Já existe um servidor com este nome",
       "commandRequired": "Digite um comando",
       "commandTooLong": "Use no máximo 50 argumentos de 500 caracteres cada",
       "urlRequired": "Insira um URL",
@@ -3999,7 +4020,6 @@
       "repo": "Selecione o repositório…",
       "profile": "Selecione o perfil",
       "remove": "Desvincular",
-      "private": "Privado",
       "search": "Pesquisar repositórios…",
       "addedToast": "Perfil padrão definido para \"{{repo}}\"",
       "addFailed": "Não foi possível definir o perfil padrão",

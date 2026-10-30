@@ -215,7 +215,6 @@ export async function issueSessionCredentials(
 
 /**
  * Rotate a refresh token. On success, returns a new token pair.
- * On failure, returns null with an error code.
  *
  * Precondition checks (session validity, user blocked_reason, and the domain
  * policy of the account's current email) happen BEFORE the atomic consume, so a

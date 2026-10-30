@@ -37,6 +37,7 @@ import {
 } from '@kilocode/web-shared/lib/paidCreditPolicy';
 import {
   bridgeRatio,
+  issuanceBasis,
   monthlyWindowFromOriginalAnchor,
   monthlyWindowContaining,
   roundHalfUpMicrodollars,
@@ -604,8 +605,6 @@ async function issue(
     agreementId: string;
     recipientUserId: string;
     window: IssuanceWindow;
-    kind: 'regular' | 'bridge';
-    bridgeProrationWindow?: IssuanceWindow;
     paidCreditTerms?: PaidCreditTerms;
   }
 ) {
@@ -623,6 +622,8 @@ async function issue(
   // A bridge may cover only part of its containing agreement month. Keep the
   // immutable paid service interval on the snapshot, but price it against the
   // complete anchored month so a partial invoice cannot receive a full month.
+  // The basis derives from the window and the agreement anchor, so a recovered
+  // window keeps the pricing of its original issuance.
   const runKey = `kpo:run:${row.agreement.id}:${input.window.start.toISOString()}`;
   const [existingRun] = await tx
     .select({
@@ -653,12 +654,10 @@ async function issue(
   const window = existingRun
     ? { start: asDate(existingRun.windowStart), end: asDate(existingRun.windowEnd) }
     : input.window;
-  const containingWindow =
-    input.bridgeProrationWindow ??
-    monthlyWindowContaining(asDate(row.agreement.issuance_anchor_at), window.start);
+  const basis = issuanceBasis(asDate(row.agreement.issuance_anchor_at), window);
   const ratio =
-    input.kind === 'bridge'
-      ? bridgeRatio(containingWindow, window)
+    basis.kind === 'bridge'
+      ? bridgeRatio(basis.prorationWindow, window)
       : { numerator: 1, denominator: 1 };
   if (!ratio.numerator) throw new Error('issuance window is not paid');
   const paidCreditTerms =
@@ -792,7 +791,7 @@ async function issue(
       window_end: window.end.toISOString(),
       qualifying_spend_starts_at: window.start.toISOString(),
       kind:
-        input.kind === 'bridge' ? KiloPassOrgIssuanceKind.Bridge : KiloPassOrgIssuanceKind.Regular,
+        basis.kind === 'bridge' ? KiloPassOrgIssuanceKind.Bridge : KiloPassOrgIssuanceKind.Regular,
       tranche_key: 'base',
       allocated_pass_capacity: multiplier,
       base_credit_microdollars: base,
@@ -931,10 +930,7 @@ export async function activatePaidAgreement(input: {
       agreementId: input.agreementId,
       recipientUserId: input.recipientUserId,
       window: firstWindow,
-      kind: input.isBridge ? 'bridge' : 'regular',
       paidCreditTerms,
-      bridgeProrationWindow:
-        input.isBridge && input.paidBridgeInterval ? input.firstWindow : undefined,
     });
   });
 }
@@ -1065,7 +1061,6 @@ export async function retryOrganizationPassRun(input: { agreementId: string; run
         agreementId: input.agreementId,
         recipientUserId: retry.recipientUserId,
         window: retry.window,
-        kind: 'regular',
       })
     );
   } catch (error) {
@@ -2111,7 +2106,6 @@ export async function runOrganizationPassIssuanceCron(
             agreementId: agreement.agreementId,
             recipientUserId,
             window,
-            kind: 'regular',
           });
           if (outcome.blocked) {
             didBlock += 1;

@@ -73,6 +73,7 @@ vi.mock('@/lib/integration-urls', () => ({
 
 vi.mock('@/lib/pr-review/connect-gate-platform', () => ({
   openAuthorizationAndWaitForReturn: vi.fn(async () => undefined),
+  reportLateLaunchFailure: vi.fn(),
 }));
 
 vi.mock('@/lib/use-github-repos-refresh', () => ({

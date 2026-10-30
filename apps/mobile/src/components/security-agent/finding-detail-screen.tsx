@@ -26,6 +26,7 @@ import {
   useSecurityDismissDraft,
 } from '@/lib/hooks/use-security-dismiss-draft';
 import { useSecurityAnalysis, useSecurityFinding } from '@/lib/hooks/use-security-findings';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { findingDetailBackTarget, findingDetailHasLocalHistory } from '@/lib/finding-detail-back';
 import { getSecurityAgentPath } from '@/lib/security-agent';
@@ -58,6 +59,7 @@ type FindingDetailScreenProps = {
 
 export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetailScreenProps>) {
   const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const navigation = useNavigation();
   const colors = useThemeColors();
   const { t } = useTranslation();
@@ -226,7 +228,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
           canDismiss ? (
             <IconButton
               onPress={() => {
-                router.push(getSecurityAgentPath(scope, `dismiss/${findingId}`));
+                pushOnce(getSecurityAgentPath(scope, `dismiss/${findingId}`));
               }}
               accessibilityLabel={t('securityAgent.dismiss.title')}
             >
@@ -250,7 +252,7 @@ export function FindingDetailScreen({ scope, findingId }: Readonly<FindingDetail
             lastError={dismissFailure}
             retryable={dismissDraft.draft.retryable === true}
             onRetry={() => {
-              router.push(getSecurityAgentPath(scope, `dismiss/${findingId}`));
+              pushOnce(getSecurityAgentPath(scope, `dismiss/${findingId}`));
             }}
             onDiscard={() => {
               dismissDraft.clear();

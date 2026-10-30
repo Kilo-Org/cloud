@@ -2383,7 +2383,7 @@
       "manageProfiles": "Gestionar perfils",
       "noProfiles": "Encara no hi ha perfils. Creeu-ne un per afegir variables d'entorn, servidors MCP i habilitats.",
       "advancedConfig": "Configuració avançada",
-      "advancedConfigDescription": "Seleccioneu un perfil per carregar configuracions desades i configureu manualment variables d'entorn addicionals i ordres de configuració",
+      "advancedConfigDescription": "S’aplica a aquesta sessió. Desar-ho com a perfil ho conserva per a la propera vegada.",
       "saveAsProfile": "Desa com a perfil",
       "saveProfileDescription": "Deseu les variables d'entorn actuals i configureu les ordres com a perfil reutilitzable.",
       "profileSummary": "{{vars}} variables d'entorn · {{commands}} ordres de configuració",

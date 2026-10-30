@@ -2352,7 +2352,7 @@
       "manageProfiles": "Phatha amaphrofayili",
       "noProfiles": "Awekho amaphrofayela okwamanje. Dala eyodwa ukuze wengeze okuguquguqukayo kwendawo, amaseva e-MCP, namakhono.",
       "advancedConfig": "Ukucushwa Okuthuthukile",
-      "advancedConfigDescription": "Khetha iphrofayili ukuze ulayishe ukucupha okulondoloziwe, futhi ulungiselele ngokwakho okuguquguqukayo kwemvelo okwengeziwe kanye nemiyalo yokusetha",
+      "advancedConfigDescription": "Kusebenza kulesi sikhathi. Ukulondoloza njengephrofayela kukugcina okwesikhathi esizayo.",
       "saveAsProfile": "Londoloza Njengephrofayela",
       "saveProfileDescription": "Londoloza okuguquguqukayo kwendawo yamanje kanye nemiyalelo yokusetha njengephrofayili esebenziseka kabusha.",
       "profileSummary": "{{vars}} okuguquguqukayo kwemvelo · {{commands}} imiyalo yokusetha",

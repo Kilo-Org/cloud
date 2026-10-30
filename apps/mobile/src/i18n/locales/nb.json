@@ -2352,7 +2352,7 @@
       "manageProfiles": "Administrer profiler",
       "noProfiles": "Ingen profiler ennå. Lag en for å legge til miljøvariabler, MCP-servere og ferdigheter.",
       "advancedConfig": "Avansert konfigurasjon",
-      "advancedConfigDescription": "Velg en profil for å laste lagrede konfigurasjoner, og konfigurer ytterligere miljøvariabler og oppsettkommandoer manuelt",
+      "advancedConfigDescription": "Gjelder for denne økten. Lagres den som profil, beholdes den til neste gang.",
       "saveAsProfile": "Lagre som profil",
       "saveProfileDescription": "Lagre gjeldende miljøvariabler og oppsettkommandoer som en gjenbrukbar profil.",
       "profileSummary": "{{vars}} miljøvariabler · {{commands}} oppsettkommandoer",

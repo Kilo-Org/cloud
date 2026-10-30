@@ -2352,7 +2352,7 @@
       "manageProfiles": "Profaayilii bulchuu",
       "noProfiles": "Ammatti piroofaayilii hin jiru. Jijjiiramoota naannoo, sarvaroota MCP, fi dandeettiiwwan dabaluudhaaf tokko uumi.",
       "advancedConfig": "Qindeessituu Ol'aanaa",
-      "advancedConfigDescription": "Qindaa'inoota qusataman fe'uuf piroofaayilii fili, fi jijjiiramoota naannoo dabalataa fi ajajoota qindeessaa harkaan qindeessii",
+      "advancedConfigDescription": "Kutaa kanaaf ni hojjeta. Akka Profile tti yoo saagte yeroo itti aanuuf ni tura.",
       "saveAsProfile": "Akka Profile tti saagi",
       "saveProfileDescription": "Jijjiiramoota naannoo ammaa fi ajajoota saaguu akka piroofaayilii irra deebi'amee fayyadamuu danda'utti saagi.",
       "profileSummary": "{{vars}} jijjiiramoota naannoo · {{commands}} ajajoota saaguu",

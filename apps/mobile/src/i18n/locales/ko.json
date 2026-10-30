@@ -1828,7 +1828,7 @@
       "manageProfiles": "프로필 관리",
       "noProfiles": "아직 프로필이 없습니다. 환경 변수, MCP 서버 및 기술을 추가하려면 하나를 만드십시오.",
       "advancedConfig": "고급 구성",
-      "advancedConfigDescription": "프로필을 선택하여 저장된 구성을 로드하고 추가 환경 변수 및 설정 명령을 수동으로 구성하세요.",
+      "advancedConfigDescription": "이 세션에 적용됩니다. 프로필로 저장하면 다음에도 그대로 유지됩니다.",
       "saveAsProfile": "프로필로 저장",
       "saveProfileDescription": "현재 환경 변수와 설정 명령을 재사용 가능한 프로필로 저장합니다.",
       "profileSummary": "{{vars}} 환경 변수 · {{commands}} 설정 명령",

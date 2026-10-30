@@ -2352,7 +2352,7 @@
       "manageProfiles": "Maamul profiles",
       "noProfiles": "Weli profiles ma jiraan Abuur mid lagu daro doorsoomayaasha deegaanka, adeegayaasha MCP, iyo xirfadaha.",
       "advancedConfig": "Habaynta Sare",
-      "advancedConfigDescription": "Dooro astaanta si aad ugu shubto qaabaynta kaydsan, oo gacanta ku habayso doorsoomayaal deegaan oo dheeri ah iyo amarrada dejinta",
+      "advancedConfigDescription": "Waxay khusaysaa fadhigan. Kaydinta Profile ahaan waxay u hayn doontaa marka xigta.",
       "saveAsProfile": "U keydi sidii Profile ahaan",
       "saveProfileDescription": "Keydi doorsoomayaasha deegaanka ee hadda jira iyo amarrada dejinta sidii muuqaal dib loo isticmaali karo.",
       "profileSummary": "{{vars}} doorsoomayaasha deegaanka · {{commands}} amarrada dejinta",

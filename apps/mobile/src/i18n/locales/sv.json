@@ -2352,7 +2352,7 @@
       "manageProfiles": "Hantera profiler",
       "noProfiles": "Inga profiler än. Skapa en för att lägga till miljövariabler, MCP-servrar och färdigheter.",
       "advancedConfig": "Avancerad konfiguration",
-      "advancedConfigDescription": "Välj en profil för att ladda sparade konfigurationer och manuellt konfigurera ytterligare miljövariabler och inställningskommandon",
+      "advancedConfigDescription": "Gäller för den här sessionen. Sparas den som profil finns den kvar nästa gång.",
       "saveAsProfile": "Spara som profil",
       "saveProfileDescription": "Spara de aktuella miljövariablerna och inställningskommandona som en återanvändbar profil.",
       "profileSummary": "{{vars}} miljövariabler · {{commands}} inställningskommandon",

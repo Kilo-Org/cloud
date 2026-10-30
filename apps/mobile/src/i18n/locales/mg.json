@@ -2352,7 +2352,7 @@
       "manageProfiles": "Tantano ny mombamomba",
       "noProfiles": "Tsy mbola misy mombamomba. Mamorona iray hanampiana ireo fari-piainan'ny tontolo iainana, mpizara MCP ary fahaiza-manao.",
       "advancedConfig": "Fandrindrana mandroso",
-      "advancedConfigDescription": "Misafidiana piraofilina hametahana ny tefy voatahiry, ary amboary tanana ny fari-piainan'ny tontolo iainana fanampiny sy baiko fanamboarana",
+      "advancedConfigDescription": "Mihatra amin’ity sesiona ity. Raha tehirizina ho profile dia mitoetra ho an’ny manaraka.",
       "saveAsProfile": "Tehirizo ho Profile",
       "saveProfileDescription": "Tehirizo ho profil azo ampiasaina indray ny fari-piainan'ny tontolo iainana ankehitriny sy ny baiko fanamboarana.",
       "profileSummary": "{{vars}} fari-piainan'ny tontolo iainana · {{commands}} baiko fanamboarana",

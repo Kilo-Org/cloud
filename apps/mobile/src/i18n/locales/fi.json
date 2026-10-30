@@ -2352,7 +2352,7 @@
       "manageProfiles": "Hallitse profiileja",
       "noProfiles": "Ei vielä profiileja. Luo sellainen, jonka avulla voit lisätä ympäristömuuttujia, MCP-palvelimia ja taitoja.",
       "advancedConfig": "Lisäasetukset",
-      "advancedConfigDescription": "Valitse profiili ladataksesi tallennetut kokoonpanot ja määritä manuaalisesti lisäympäristömuuttujat ja asennuskomennot",
+      "advancedConfigDescription": "Koskee tätä istuntoa. Profiilina tallentaminen säilyttää sen seuraavaa kertaa varten.",
       "saveAsProfile": "Tallenna profiilina",
       "saveProfileDescription": "Tallenna nykyiset ympäristömuuttujat ja asetuskomennot uudelleen käytettäväksi profiiliksi.",
       "profileSummary": "{{vars}} ympäristömuuttujat · {{commands}} asennuskomennot",

@@ -2352,7 +2352,7 @@
       "manageProfiles": "Urus profil",
       "noProfiles": "Tiada profil lagi. Buat satu untuk menambah pembolehubah persekitaran, pelayan MCP dan kemahiran.",
       "advancedConfig": "Konfigurasi Lanjutan",
-      "advancedConfigDescription": "Pilih profil untuk memuatkan konfigurasi yang disimpan dan konfigurasikan pembolehubah persekitaran tambahan dan arahan persediaan secara manual",
+      "advancedConfigDescription": "Terpakai untuk sesi ini. Menyimpannya sebagai profil mengekalkannya untuk kali seterusnya.",
       "saveAsProfile": "Simpan sebagai Profil",
       "saveProfileDescription": "Simpan pembolehubah persekitaran semasa dan arahan persediaan sebagai profil boleh guna semula.",
       "profileSummary": "{{vars}} pembolehubah persekitaran · {{commands}} arahan persediaan",

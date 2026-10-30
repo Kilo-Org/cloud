@@ -207,15 +207,16 @@ function layout(node: TestRenderer.ReactTestInstance, y: number) {
 
 /**
  * The panel root, or the block it renders while expanded, found by the class
- * that identifies it inside the panel. Both are the views whose layout the
- * reveal depends on.
+ * token that identifies it inside the panel. Both are the views whose layout
+ * the reveal depends on. Matched by token, not by the whole class list, so a
+ * styling change to either view does not have to be mirrored here.
  */
-function layoutView(renderer: TestRenderer.ReactTestRenderer, className: string) {
+function layoutView(renderer: TestRenderer.ReactTestRenderer, token: string) {
   const found = renderer.root
-    .findAll(node => node.props.className === className)
+    .findAll(node => String(node.props.className ?? '').split(' ').includes(token))
     .find(node => typeof node.props.onLayout === 'function');
   if (!found) {
-    throw new Error(`no view with layout class ${className}`);
+    throw new Error(`no view with layout class ${token}`);
   }
   return found;
 }
@@ -328,6 +329,17 @@ describe('AdvancedConfigPanel', () => {
     expect(buttonByText(renderer, 'Save as Profile')).toBeUndefined();
   });
 
+  it('nests the revealed body under the disclosure row it belongs to', () => {
+    const renderer = mount();
+    press(byLabel(renderer, 'Advanced Configuration'));
+
+    // Without the nesting the body's two headings read like the composer's own
+    // top-level sections: same type, same start column, same gap to its control.
+    const body = layoutView(renderer, 'mt-3');
+    expect(String(body.props.className)).toContain('border-s-2');
+    expect(String(body.props.className)).toContain('ps-3');
+  });
+
   it('reports the disclosure as expanded once it is open', () => {
     const renderer = mount();
     expect(byLabel(renderer, 'Advanced Configuration')?.props.accessibilityState).toMatchObject({
@@ -364,13 +376,13 @@ describe('AdvancedConfigPanel', () => {
     // clamp against the collapsed content height and move nothing.
     expect(onRequestReveal).not.toHaveBeenCalled();
 
-    layout(layoutView(renderer, 'mt-3 gap-4'), 860);
+    layout(layoutView(renderer, 'mt-3'), 860);
     expect(onRequestReveal).toHaveBeenCalledTimes(1);
     expect(onRequestReveal).toHaveBeenCalledWith(812);
 
     // A later in-panel layout, such as a new command row, must not scroll the
     // composer under the reader again.
-    layout(layoutView(renderer, 'mt-3 gap-4'), 900);
+    layout(layoutView(renderer, 'mt-3'), 900);
     expect(onRequestReveal).toHaveBeenCalledTimes(1);
 
     // Collapsing reveals nothing.
@@ -380,7 +392,7 @@ describe('AdvancedConfigPanel', () => {
     // Re-expanding reveals against the offset the panel last reported.
     press(byLabel(renderer, 'Advanced Configuration'));
     layout(layoutView(renderer, 'mt-5'), 640);
-    layout(layoutView(renderer, 'mt-3 gap-4'), 690);
+    layout(layoutView(renderer, 'mt-3'), 690);
     expect(onRequestReveal).toHaveBeenCalledTimes(2);
     expect(onRequestReveal).toHaveBeenLastCalledWith(640);
   });

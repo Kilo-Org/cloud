@@ -2383,7 +2383,7 @@
       "manageProfiles": "Pārvaldīt profilus",
       "noProfiles": "Vēl nav neviena profila. Izveidojiet vienu, lai pievienotu vides mainīgos, MCP serverus un prasmes.",
       "advancedConfig": "Papildu konfigurācija",
-      "advancedConfigDescription": "Atlasiet profilu, lai ielādētu saglabātās konfigurācijas, un manuāli konfigurējiet papildu vides mainīgos un iestatīšanas komandas",
+      "advancedConfigDescription": "Attiecas uz šo sesiju. Saglabājot kā profilu, tas paliks nākamajai reizei.",
       "saveAsProfile": "Saglabāt kā profilu",
       "saveProfileDescription": "Saglabājiet pašreizējos vides mainīgos un iestatīšanas komandas kā atkārtoti lietojamu profilu.",
       "profileSummary": "{{vars}} vides mainīgie · {{commands}} iestatīšanas komandas",

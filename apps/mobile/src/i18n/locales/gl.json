@@ -2352,7 +2352,7 @@
       "manageProfiles": "Xestionar perfís",
       "noProfiles": "Aínda non hai perfís. Crea un para engadir variables de ambiente, servidores MCP e habilidades.",
       "advancedConfig": "Configuración avanzada",
-      "advancedConfigDescription": "Seleccione un perfil para cargar configuracións gardadas e configure manualmente variables de ambiente adicionais e comandos de configuración",
+      "advancedConfigDescription": "Aplícase a esta sesión. Gardalo como perfil consérvao para a próxima vez.",
       "saveAsProfile": "Gardar como perfil",
       "saveProfileDescription": "Garda as variables de ambiente actuais e os comandos de configuración como perfil reutilizable.",
       "profileSummary": "{{vars}} variables de ambiente · {{commands}} comandos de configuración",

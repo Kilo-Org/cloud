@@ -2352,7 +2352,7 @@
       "manageProfiles": "Profilok kezelése",
       "noProfiles": "Még nincsenek profilok. Hozz létre egyet a környezeti változók, MCP-kiszolgálók és készségek hozzáadásához.",
       "advancedConfig": "Speciális konfiguráció",
-      "advancedConfigDescription": "Válassz egy profilt a mentett konfigurációk betöltéséhez, és manuálisan konfiguráld a további környezeti változókat és beállítási parancsokat",
+      "advancedConfigDescription": "Erre a munkamenetre érvényes. Profilként mentve a következő alkalomra is megmarad.",
       "saveAsProfile": "Mentés profilként",
       "saveProfileDescription": "Mentsd el az aktuális környezeti változókat és a beállítási parancsokat újrafelhasználható profilként.",
       "profileSummary": "{{vars}} környezeti változó · {{commands}} beállítási parancs",

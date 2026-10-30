@@ -2352,7 +2352,7 @@
       "manageProfiles": "Bestuur profiele",
       "noProfiles": "Nog geen profiele nie. Skep een om omgewingsveranderlikes, MCP-bedieners en vaardighede by te voeg.",
       "advancedConfig": "Gevorderde konfigurasie",
-      "advancedConfigDescription": "Kies 'n profiel om gestoorde konfigurasies te laai, en konfigureer bykomende omgewingsveranderlikes en opstelopdragte handmatig",
+      "advancedConfigDescription": "Geld vir hierdie sessie. As jy dit as profiel stoor, bly dit vir volgende keer.",
       "saveAsProfile": "Stoor as profiel",
       "saveProfileDescription": "Stoor die huidige omgewingsveranderlikes en opstelopdragte as 'n herbruikbare profiel.",
       "profileSummary": "{{vars}} omgewingsveranderlikes · {{commands}} opstelopdragte",

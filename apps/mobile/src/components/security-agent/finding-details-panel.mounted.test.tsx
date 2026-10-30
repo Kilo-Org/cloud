@@ -33,6 +33,7 @@ vi.mock('expo-web-browser', () => ({ openBrowserAsync: mocks.openBrowser }));
 vi.mock('sonner-native', () => ({ toast: { error: mocks.toastError } }));
 vi.mock('expo-router', () => ({
   useRouter: () => ({ push: mocks.routerPush }),
+  useFocusEffect: () => undefined,
 }));
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({

@@ -8,7 +8,7 @@ import {
   isPersonalSecurityScope,
 } from '@kilocode/app-shared/security-agent';
 import { useActionSheet } from '@expo/react-native-action-sheet';
-import { useFocusEffect, useRouter } from 'expo-router';
+import { useFocusEffect } from 'expo-router';
 import { RefreshCw, Settings, ShieldAlert } from '@/components/ui/icons';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
@@ -45,6 +45,7 @@ import {
 import { useMutationOutbox } from '@/lib/persist/use-mutation-outbox';
 import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { useRelativeTimeNow } from '@/lib/hooks/use-now-ticker';
+import { useSinglePushRoute } from '@/lib/hooks/use-single-push-route';
 import { useThemedActionSheetOptions } from '@/lib/hooks/use-themed-action-sheet';
 import { getSecurityAgentPath } from '@/lib/security-agent';
 import { cn, parseTimestamp, timeAgo } from '@/lib/utils';
@@ -166,7 +167,7 @@ export function buildLocalizedMetrics(data: DashboardStats, slaEnabled: boolean)
 }
 
 export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
-  const router = useRouter();
+  const pushOnce = useSinglePushRoute();
   const colors = useThemeColors();
   const { t } = useTranslation();
   const themedSheet = useThemedActionSheetOptions();
@@ -315,7 +316,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           <View className="flex-row items-center gap-2">
             <IconButton
               onPress={() => {
-                router.push(getSecurityAgentPath(scope, 'findings'));
+                pushOnce(getSecurityAgentPath(scope, 'findings'));
               }}
               accessibilityLabel={t('common.findings')}
             >
@@ -323,7 +324,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             </IconButton>
             <IconButton
               onPress={() => {
-                router.push(getSecurityAgentPath(scope, 'settings'));
+                pushOnce(getSecurityAgentPath(scope, 'settings'));
               }}
               accessibilityLabel={t('securityAgent.dashboard.settings')}
             >
@@ -429,7 +430,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             lastError={securityDismissFailureCopy(failure)}
             retryable={failure.retryable === true}
             onRetry={() => {
-              router.push(getSecurityAgentPath(scope, `dismiss/${failure.findingId}`));
+              pushOnce(getSecurityAgentPath(scope, `dismiss/${failure.findingId}`));
             }}
             onDiscard={() => {
               dismissFailures.clear(failure.findingId);
@@ -509,7 +510,7 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
             </Pressable>
             <Pressable
               onPress={() => {
-                router.push(getSecurityAgentPath(scope, 'settings/repositories'));
+                pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
               }}
               accessibilityRole="button"
               accessibilityLabel={t('securityAgent.dashboard.manageRepositories')}

@@ -431,16 +431,53 @@ function firstSet(node: PatternNode): CharSet {
   }
 }
 
+/**
+ * The first two characters a branch must consume, or null when that cannot be stated simply.
+ * Two branches whose first characters match can still be told apart when both need a second
+ * character and those second characters are disjoint.
+ */
+function literalPrefix(node: PatternNode): CharSet[] | null {
+  switch (node.kind) {
+    case 'zero':
+    case 'lookaround':
+      return [];
+    case 'atom':
+      return [node.first];
+    case 'reference':
+    case 'repeat':
+    case 'alternation':
+      return null;
+    case 'sequence': {
+      const chars: CharSet[] = [];
+      for (const item of node.items) {
+        const prefix = literalPrefix(item);
+        if (prefix === null) return null;
+        chars.push(...prefix);
+        if (chars.length >= 2) return chars.slice(0, 2);
+      }
+      return chars;
+    }
+  }
+}
+
 function ambiguityIssue(node: PatternNode): string | null {
   switch (node.kind) {
     case 'alternation': {
       if (node.branches.some(canBeEmpty)) return PATTERN_ISSUE_MESSAGES.ambiguous;
       const sets = node.branches.map(firstSet);
+      const prefixes = node.branches.map(literalPrefix);
       for (let left = 0; left + 1 < sets.length; left++) {
         const current = sets[left];
         if (current === undefined) continue;
-        for (const other of sets.slice(left + 1)) {
-          if (overlaps(current, other)) return PATTERN_ISSUE_MESSAGES.ambiguous;
+        for (let right = left + 1; right < sets.length; right++) {
+          const other = sets[right];
+          if (other === undefined || !overlaps(current, other)) continue;
+          const second = prefixes[left]?.[1];
+          const otherSecond = prefixes[right]?.[1];
+          if (second !== undefined && otherSecond !== undefined && !overlaps(second, otherSecond)) {
+            continue;
+          }
+          return PATTERN_ISSUE_MESSAGES.ambiguous;
         }
       }
       for (const branch of node.branches) {

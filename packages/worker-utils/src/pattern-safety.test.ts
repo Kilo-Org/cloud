@@ -24,6 +24,10 @@ describe('pattern safety', () => {
     '[-a-z]',
     '(?:😀|😁)+',
     '[😀-😃]+',
+    '^(?:cat|cow)+$',
+    '^(?:foo|far)+$',
+    '(?:(?:ab|ac)x)+',
+    '(?:[ab]x|[ab]y)+',
   ])('accepts %s', pattern => {
     expect(patternSafetyIssue(pattern)).toBeNull();
   });
@@ -46,6 +50,8 @@ describe('pattern safety', () => {
     ['(?:(a|a)x)+', PATTERN_ISSUE_MESSAGES.ambiguous],
     ['(?:x(a|a))+', PATTERN_ISSUE_MESSAGES.ambiguous],
     ['(?:😀|😀)+', PATTERN_ISSUE_MESSAGES.ambiguous],
+    ['(?:ab|abc)+', PATTERN_ISSUE_MESSAGES.ambiguous],
+    ['(?:a|ab)+', PATTERN_ISSUE_MESSAGES.ambiguous],
     ['(a)\\1', PATTERN_ISSUE_MESSAGES.backreference],
     ['(?<x>a)\\k<x>', PATTERN_ISSUE_MESSAGES.backreference],
   ])('refuses %s', (pattern, message) => {

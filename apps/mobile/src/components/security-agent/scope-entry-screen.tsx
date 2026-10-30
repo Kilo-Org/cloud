@@ -4,7 +4,10 @@ import { useTranslation } from 'react-i18next';
 import { View } from 'react-native';
 
 import { AuditReportButton } from '@/components/security-agent/audit-report-button';
-import { selectScopeEntryView } from '@/components/security-agent/scope-entry-render';
+import {
+  selectScopeEntryLoadFailure,
+  selectScopeEntryView,
+} from '@/components/security-agent/scope-entry-render';
 import { ScopeAccessDeniedScreen } from '@/components/organization/scope-access-denied-screen';
 import { PlatformErrorScreen } from '@/components/platform-error-screen';
 import { ScreenHeader } from '@/components/screen-header';
@@ -52,7 +55,8 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   const repositories = useSecurityAgentRepositories(scope);
   const capability = useSecurityAgentCapability(scope);
   const recovery = useRetrySecurityAgentSettings(scope);
-  const isConnectivityKnown = useCommittedConnectivityStatus() !== 'unknown';
+  const connectivity = useCommittedConnectivityStatus();
+  const isConnectivityKnown = connectivity !== 'unknown';
   const access = classifyOrganizationScopeAccess({
     isOrganizationScope: !isPersonalSecurityScope(scope),
     errors: [permission.error, config.error, repositories.error],
@@ -66,10 +70,9 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
   // destination is already known from the config read.
   const isGithubStatusUnknown = !permission.data && permission.isError;
   const isEnabledResolved = config.data?.isEnabled ?? false;
+  const isConfigUnread = !config.data && config.isError;
   const isError =
-    (!config.data && config.isError) ||
-    capability.status === 'error' ||
-    (isGithubStatusUnknown && !isEnabledResolved);
+    isConfigUnread || capability.status === 'error' || (isGithubStatusUnknown && !isEnabledResolved);
   const isPaused =
     permission.fetchStatus === 'paused' ||
     config.fetchStatus === 'paused' ||
@@ -193,11 +196,30 @@ export function ScopeEntryScreen({ scope }: Readonly<{ scope: string }>) {
     if (recovery.isRetrying) {
       return <ScopeEntrySkeleton />;
     }
+    // Only the reads that produced this screen carry the cause. A read that
+    // still holds cached data, or that resolved, must not vote on it.
+    const failedReads: unknown[] = [];
+    if (isConfigUnread) {
+      failedReads.push(config.error);
+    }
+    if (capability.status === 'error') {
+      failedReads.push(capability.error);
+    }
+    if (isGithubStatusUnknown) {
+      failedReads.push(permission.error);
+    }
+    const failure = selectScopeEntryLoadFailure({
+      errors: failedReads,
+      isPaused,
+      connectivity,
+      lastAttemptFailed: recovery.lastAttemptFailed,
+    });
     return (
       <PlatformErrorScreen
         title={t('common.securityAgent')}
         errorTitle={t('securityAgent.scopeEntry.couldNotLoad')}
-        message={recovery.lastAttemptFailed ? t('securityAgent.scopeEntry.retryFailed') : undefined}
+        variant={failure.variant}
+        message={failure.descriptionKey ? t(failure.descriptionKey) : undefined}
         onRetry={() => void recovery.retry()}
       />
     );

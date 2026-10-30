@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  type ScopeEntryLoadFailure,
   type ScopeEntryView,
+  selectScopeEntryLoadFailure,
+  type SelectScopeEntryLoadFailureInput,
   selectScopeEntryView,
   type SelectScopeEntryViewInput,
 } from './scope-entry-render';
@@ -104,5 +107,85 @@ describe('selectScopeEntryView', () => {
     expect(result).not.toBe('loading');
     expect(result).not.toBe('error');
     expect(result).not.toBe('dashboard');
+  });
+});
+
+/** A tRPC client rejection, as `readTrpcErrorField` reads it. */
+function serverError(code: string): Error {
+  return Object.assign(new Error('boom'), { data: { code, message: 'boom' } });
+}
+
+const CONNECTION_DESCRIPTION = 'organization.boundary.loadErrorMessage';
+const RETRY_DESCRIPTION = 'securityAgent.scopeEntry.retryFailed';
+
+function failureFor(
+  patch: Partial<SelectScopeEntryLoadFailureInput>
+): ScopeEntryLoadFailure {
+  return selectScopeEntryLoadFailure({
+    errors: [],
+    isPaused: false,
+    connectivity: 'online',
+    lastAttemptFailed: false,
+    ...patch,
+  });
+}
+
+describe('selectScopeEntryLoadFailure', () => {
+  it('names the connection when the failed read never reached the server', () => {
+    // A fetch rejection (timeout, refused, cut) carries no tRPC code: NetInfo
+    // may still report online, and the system wording would blame the app.
+    expect(failureFor({ errors: [new TypeError('Network request failed')] })).toEqual({
+      variant: 'offline',
+      descriptionKey: CONNECTION_DESCRIPTION,
+    });
+  });
+
+  it('names the connection on a confirmed-offline device even for a coded error', () => {
+    expect(
+      failureFor({ errors: [serverError('INTERNAL_SERVER_ERROR')], connectivity: 'offline' })
+    ).toEqual({ variant: 'offline', descriptionKey: CONNECTION_DESCRIPTION });
+  });
+
+  it('names the connection for a read paused by the online manager', () => {
+    expect(failureFor({ isPaused: true })).toEqual({
+      variant: 'offline',
+      descriptionKey: CONNECTION_DESCRIPTION,
+    });
+  });
+
+  it('keeps the server wording when a failed read answered with a code', () => {
+    expect(failureFor({ errors: [serverError('INTERNAL_SERVER_ERROR')] })).toEqual({
+      variant: 'server',
+      descriptionKey: null,
+    });
+  });
+
+  it('keeps the server wording when one read answered and another never did', () => {
+    // Some server answered, so the app's own end is a real suspect.
+    expect(
+      failureFor({
+        errors: [serverError('INTERNAL_SERVER_ERROR'), new TypeError('Network request failed')],
+      })
+    ).toEqual({ variant: 'server', descriptionKey: null });
+  });
+
+  it('keeps the server wording after a failed retry of a coded error', () => {
+    // The "still could not load" line names the connection, which a 500 is not.
+    expect(
+      failureFor({ errors: [serverError('INTERNAL_SERVER_ERROR')], lastAttemptFailed: true })
+    ).toEqual({ variant: 'server', descriptionKey: null });
+  });
+
+  it('distinguishes a failed retry of a connection failure', () => {
+    expect(
+      failureFor({
+        errors: [new TypeError('Network request failed')],
+        lastAttemptFailed: true,
+      })
+    ).toEqual({ variant: 'offline', descriptionKey: RETRY_DESCRIPTION });
+  });
+
+  it('does not claim the connection without a failure to classify', () => {
+    expect(failureFor({})).toEqual({ variant: 'server', descriptionKey: null });
   });
 });

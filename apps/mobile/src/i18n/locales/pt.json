@@ -1471,7 +1471,7 @@
       "fixSettings": "Corrigir definições",
       "couldNotLoad": "Não foi possível carregar a revisão.",
       "couldNotGetLatest": "Não foi possível obter os dados mais recentes.",
-      "byline": "{{repo}} #{{number}} por {{author}}",
+      "byline": "#{{number}} por {{author}}",
       "noFindings": "Não foram detetadas ocorrências.",
       "findingsUnavailable": "Os resultados não estão disponíveis porque esta revisão falhou.",
       "findingsInProgress": "Esta revisão ainda está em curso. As ocorrências aparecem aqui quando terminar.",

@@ -1515,7 +1515,7 @@
       "fixSettings": "Fix settings",
       "couldNotLoad": "Could not load review",
       "couldNotGetLatest": "Couldn't get the latest.",
-      "byline": "{{repo}} #{{number}} by {{author}}",
+      "byline": "#{{number}} by {{author}}",
       "noFindings": "No findings",
       "findingsUnavailable": "Results are unavailable because this review failed.",
       "findingsInProgress": "This review is still in progress. Findings appear here when it finishes.",

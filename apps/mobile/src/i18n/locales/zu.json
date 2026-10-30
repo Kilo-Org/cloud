@@ -1449,7 +1449,7 @@
       "fixSettings": "Lungisa izilungiselelo",
       "couldNotLoad": "Asikwazanga ukulayisha ukuhlolwa.",
       "couldNotGetLatest": "Asikwazanga ukuthola imininingwane yakamuva.",
-      "byline": "{{repo}} #{{number}} ngu-{{author}}",
+      "byline": "#{{number}} ngu-{{author}}",
       "noFindings": "Akukho okutholakele.",
       "findingsUnavailable": "Imiphumela ayitholakali ngoba lokhu kuhlolwa kuhlulekile.",
       "findingsInProgress": "Lokhu kuhlolwa kusaqhubeka. Okutholakele kuzovela lapha uma kuqedile.",

@@ -394,6 +394,25 @@ describe('ReviewDetailScreen outcome-first order', () => {
     expect(texts).toContain('$123.00');
   });
 
+  it('states the review status once, above the findings', () => {
+    detail.data = {
+      success: true,
+      review: makeReview({ status: 'completed', completed_at: '2024-01-01T00:05:00.000Z' }),
+      tokenUsage: { input: 0, output: 0 },
+    };
+
+    const texts = renderScreen();
+    const findingsIndex = texts.indexOf('Findings');
+    const detailsIndex = texts.indexOf('Details');
+    expect(findingsIndex).toBeGreaterThanOrEqual(0);
+    expect(detailsIndex).toBeGreaterThan(findingsIndex);
+
+    // The conclusion above the findings owns the status word; the council and
+    // gate cards never repeat it.
+    expect(texts.slice(0, findingsIndex)).toContain('Completed');
+    expect(texts.slice(findingsIndex, detailsIndex)).not.toContain('Completed');
+  });
+
   it.each([
     ['unrecognized internal failure', 'codeReviewer.reviewDetail.reviewFailed'],
     [
@@ -539,8 +558,9 @@ describe('ReviewDetailScreen details metadata', () => {
     // screen passes.
     expect(collectText(completionRows[0]?.children ?? [])).toEqual([completedLabel, 'now']);
 
-    // The row belongs to the Details card, not the Gate's status row, which
-    // also shows "Completed" but as the value under the "Status" label.
+    // The row belongs to the Details card. The Gate card carries the check run
+    // and the threshold only, so the review status paints once, as the
+    // conclusion above the findings.
     const texts = collectText(renderer.toJSON());
     const completionRowIndex = texts.findIndex(
       (text, index) => text === completedLabel && texts[index + 1] === 'now'

@@ -959,7 +959,7 @@
       "bitbucketError": "Het instellen van Bitbucket kon niet worden geopend. Probeer het opnieuw."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} door {{author}}",
+      "byline": "#{{number}} door {{author}}",
       "cancelMessage": "Dit stopt de lopende codereview.",
       "cancelReview": "Review annuleren",
       "cancelTitle": "Review annuleren?",

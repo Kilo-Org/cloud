@@ -1449,7 +1449,7 @@
       "fixSettings": "Beállítások javítása",
       "couldNotLoad": "Nem sikerült betölteni a kódellenőrzést.",
       "couldNotGetLatest": "Nem sikerült lekérni a legfrissebb adatokat.",
-      "byline": "{{repo}} #{{number}}, szerző: {{author}}",
+      "byline": "#{{number}}, szerző: {{author}}",
       "noFindings": "Nincsenek találatok.",
       "findingsUnavailable": "Az eredmények nem érhetők el, mert ez a kódellenőrzés sikertelen volt.",
       "findingsInProgress": "A kódellenőrzés még folyamatban van. A találatok a befejezése után jelennek meg itt.",

@@ -1449,7 +1449,7 @@
       "fixSettings": "Gyara saituna",
       "couldNotLoad": "An kasa loda bitar.",
       "couldNotGetLatest": "An kasa samun sabbin bayanai.",
-      "byline": "{{repo}} #{{number}} daga {{author}}",
+      "byline": "#{{number}} daga {{author}}",
       "noFindings": "Ba a gano wata matsala ba.",
       "findingsUnavailable": "Babu sakamako saboda wannan bita ta gaza.",
       "findingsInProgress": "Wannan bitar na ci gaba har yanzu. Sakamakon zai bayyana a nan a lokacin da ta kammala.",

@@ -1449,7 +1449,7 @@
       "fixSettings": "સેટિંગ્સ સુધારો",
       "couldNotLoad": "સમીક્ષા લોડ કરી શકાઈ નહીં.",
       "couldNotGetLatest": "નવીનતમ માહિતી મેળવી શકાઈ નહીં.",
-      "byline": "{{author}} દ્વારા {{repo}} #{{number}}",
+      "byline": "{{author}} દ્વારા #{{number}}",
       "noFindings": "કોઈ તારણ મળ્યું નથી.",
       "findingsUnavailable": "આ સમીક્ષા નિષ્ફળ ગઈ હોવાથી પરિણામો ઉપલબ્ધ નથી.",
       "findingsInProgress": "આ સમીક્ષા હજુ પ્રગતિમાં છે. તે પૂર્ણ થતાં તારણ અહીં દેખાશે.",

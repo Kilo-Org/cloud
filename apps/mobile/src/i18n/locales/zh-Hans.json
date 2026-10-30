@@ -959,7 +959,7 @@
       "bitbucketError": "无法打开 Bitbucket 配置页面。请重试。"
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}}，作者 {{author}}",
+      "byline": "#{{number}}，作者 {{author}}",
       "cancelMessage": "这将停止正在进行的代码审查。",
       "cancelReview": "取消审查",
       "cancelTitle": "取消审查？",

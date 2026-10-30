@@ -1493,7 +1493,7 @@
       "fixSettings": "Popravi nastavitve",
       "couldNotLoad": "Pregleda ni bilo mogoče naložiti.",
       "couldNotGetLatest": "Najnovejših podatkov ni bilo mogoče pridobiti.",
-      "byline": "{{repo}} #{{number}} · Avtor: {{author}}",
+      "byline": "#{{number}} · Avtor: {{author}}",
       "noFindings": "Ni ugotovitev.",
       "findingsUnavailable": "Rezultati niso na voljo, ker ta pregled ni uspel.",
       "findingsInProgress": "Ta pregled je še v teku. Ugotovitve se prikažejo tukaj, ko se zaključi.",

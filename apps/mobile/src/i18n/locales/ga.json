@@ -1515,7 +1515,7 @@
       "fixSettings": "Ceartaigh na socruithe",
       "couldNotLoad": "Níorbh fhéidir an t-athbhreithniú a lódáil.",
       "couldNotGetLatest": "Níorbh fhéidir na sonraí is déanaí a fháil.",
-      "byline": "{{repo}} #{{number}} le {{author}}",
+      "byline": "#{{number}} le {{author}}",
       "noFindings": "Níor aimsíodh aon toradh.",
       "findingsUnavailable": "Níl na torthaí ar fáil mar gur theip ar an athbhreithniú seo.",
       "findingsInProgress": "Tá an athbhreithniú seo ar siúl fós. Tiocfaidh na torthaí le feiceáil anseo nuair a bheidh sé críochnaithe.",

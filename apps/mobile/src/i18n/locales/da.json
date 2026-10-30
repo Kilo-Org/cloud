@@ -1449,7 +1449,7 @@
       "fixSettings": "Ret indstillinger",
       "couldNotLoad": "Gennemgangen kunne ikke indlæses.",
       "couldNotGetLatest": "De seneste oplysninger kunne ikke hentes.",
-      "byline": "{{repo}} #{{number}} af {{author}}",
+      "byline": "#{{number}} af {{author}}",
       "noFindings": "Der er ingen fund.",
       "findingsUnavailable": "Resultaterne er ikke tilgængelige, fordi denne gennemgang mislykkedes.",
       "findingsInProgress": "Denne gennemgang er stadig i gang. Fund vises her, når den er færdig.",

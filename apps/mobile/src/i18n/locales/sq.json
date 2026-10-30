@@ -1449,7 +1449,7 @@
       "fixSettings": "Rregullo cilësimet",
       "couldNotLoad": "Nuk u ngarkua shqyrtimi.",
       "couldNotGetLatest": "Nuk u morën të dhënat më të fundit.",
-      "byline": "{{repo}} #{{number}} nga {{author}}",
+      "byline": "#{{number}} nga {{author}}",
       "noFindings": "Nuk ka gjetje.",
       "findingsUnavailable": "Rezultatet nuk janë të disponueshme sepse ky shqyrtim dështoi.",
       "findingsInProgress": "Ky shqyrtim është ende në zhvillim. Gjetjet shfaqen këtu kur ai të përfundojë.",

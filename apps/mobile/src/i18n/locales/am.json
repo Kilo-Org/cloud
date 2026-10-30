@@ -1449,7 +1449,7 @@
       "fixSettings": "ቅንብሮችን አስተካክል",
       "couldNotLoad": "ግምገማውን መጫን አልተቻለም።",
       "couldNotGetLatest": "የቅርብ ጊዜ መረጃውን ማግኘት አልተቻለም።",
-      "byline": "{{repo}} #{{number}} በ{{author}}",
+      "byline": "#{{number}} በ{{author}}",
       "noFindings": "ምንም ግኝቶች የሉም።",
       "findingsUnavailable": "ይህ ግምገማ ስላልተሳካ ውጤቶች አይገኙም።",
       "findingsInProgress": "ይህ ግምገማ እስካሁን በሂደት ላይ ነው። ሲጠናቀቅ ግኝቶች እዚህ ይታያሉ።",

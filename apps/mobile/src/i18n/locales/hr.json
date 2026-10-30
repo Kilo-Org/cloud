@@ -1471,7 +1471,7 @@
       "fixSettings": "Popravi postavke",
       "couldNotLoad": "Nije moguće učitati pregled.",
       "couldNotGetLatest": "Nije moguće dohvatiti najnovije podatke.",
-      "byline": "{{repo}} #{{number}} · autor: {{author}}",
+      "byline": "#{{number}} · autor: {{author}}",
       "noFindings": "Nema nalaza.",
       "findingsUnavailable": "Rezultati nisu dostupni jer ovaj pregled nije uspio.",
       "findingsInProgress": "Ovaj pregled je još u tijeku. Nalazi će se ovdje pojaviti kada završi.",

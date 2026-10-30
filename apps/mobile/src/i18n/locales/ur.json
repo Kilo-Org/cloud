@@ -1449,7 +1449,7 @@
       "fixSettings": "ترتیبات درست کریں",
       "couldNotLoad": "جائزہ لوڈ نہیں ہو سکا۔",
       "couldNotGetLatest": "تازہ ترین معلومات حاصل نہیں ہو سکیں۔",
-      "byline": "{{repo}} #{{number}}، مصنف: {{author}}",
+      "byline": "#{{number}}، مصنف: {{author}}",
       "noFindings": "کوئی مسئلہ نہیں ملا۔",
       "findingsUnavailable": "اس جائزے کی ناکامی کی وجہ سے نتائج دستیاب نہیں ہیں۔",
       "findingsInProgress": "یہ جائزہ ابھی جاری ہے۔ مکمل ہونے پر مسائل یہاں نظر آئیں گے۔",

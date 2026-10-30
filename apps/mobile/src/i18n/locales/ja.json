@@ -959,7 +959,7 @@
       "bitbucketError": "Bitbucketのセットアップを開けませんでした。もう一度お試しください。"
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} · {{author}}",
+      "byline": "#{{number}} · {{author}}",
       "cancelMessage": "実行中のコードレビューを停止します。",
       "cancelReview": "レビューをキャンセル",
       "cancelTitle": "レビューをキャンセルしますか？",

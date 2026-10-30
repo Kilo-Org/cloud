@@ -1493,7 +1493,7 @@
       "fixSettings": "Pataisyti nustatymus",
       "couldNotLoad": "Nepavyko įkelti peržiūros.",
       "couldNotGetLatest": "Nepavyko gauti naujausių duomenų.",
-      "byline": "{{repo}} #{{number}} · Autorius: {{author}}",
+      "byline": "#{{number}} · Autorius: {{author}}",
       "noFindings": "Radinių nerasta.",
       "findingsUnavailable": "Rezultatai nepasiekiami, nes ši peržiūra nepavyko.",
       "findingsInProgress": "Ši peržiūra vis dar vyksta. Radiniai čia atsiras jai pasibaigus.",

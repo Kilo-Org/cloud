@@ -959,7 +959,7 @@
       "bitbucketError": "Die Bitbucket-Einrichtung konnte nicht geöffnet werden. Bitte versuche es erneut."
     },
     "reviewDetail": {
-      "byline": "{{repo}} #{{number}} von {{author}}",
+      "byline": "#{{number}} von {{author}}",
       "cancelMessage": "Das laufende Code-Review wird abgebrochen.",
       "cancelReview": "Review abbrechen",
       "cancelTitle": "Review abbrechen?",

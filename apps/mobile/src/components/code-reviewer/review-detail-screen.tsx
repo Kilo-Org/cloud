@@ -261,7 +261,6 @@ export function ReviewDetailScreen({
           <Text className="text-base font-medium">{review.pr_title}</Text>
           <Text variant="muted" className="text-xs">
             {t('codeReviewer.reviewDetail.byline', {
-              repo: review.repo_full_name,
               number: review.pr_number,
               author: review.pr_author,
             })}
@@ -318,11 +317,11 @@ export function ReviewDetailScreen({
         {/* Council: decision plus specialist names/votes as text. */}
         {review.council_result ? <CouncilSection councilResult={review.council_result} /> : null}
 
-        {/* Gate: check-run presence, review status, and threshold when set. */}
+        {/* Gate: check-run presence and threshold when set. The review status is
+            the conclusion above, so the card never repeats it. */}
         <GateSection
           checkRunId={review.check_run_id}
           checkRunRedacted={review.rawIdsRedacted}
-          statusLabel={meta.label}
           gateThreshold={gateThreshold}
         />
 
@@ -371,10 +370,10 @@ export function ReviewDetailScreen({
           </View>
         </View>
 
-        {/* Actions. */}
+        {/* Actions. The pull request is the screen's primary action, so it takes
+            the filled primary style; every other action stays secondary. */}
         <View className="gap-3">
           <Button
-            variant="secondary"
             onPress={() => {
               if (isPersonal(scope)) {
                 const destination = resolveCodeReviewerOpenPrDestination(review.pr_url);

@@ -1,5 +1,6 @@
 import { generateKeyPairSync } from 'node:crypto';
 import type * as DbClientModule from '@kilocode/db/client';
+import { oauth_refresh_exchange_leases } from '@kilocode/db/schema';
 import { encryptKeyedEnvelope } from '@kilocode/encryption';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -10,6 +11,8 @@ const database = vi.hoisted(() => ({
   returnedCredential: undefined as Record<string, unknown> | undefined,
   locks: 0,
   depth: 0,
+  leaseDenied: false,
+  releaseDenied: false,
 }));
 
 vi.mock('@kilocode/db/client', async importOriginal => {
@@ -53,6 +56,22 @@ vi.mock('@kilocode/db/client', async importOriginal => {
             };
             return { where: () => result };
           },
+        }),
+        insert: () => ({
+          values: (values: Record<string, unknown>) => ({
+            onConflictDoUpdate: () => ({
+              returning: async () =>
+                database.leaseDenied ? [] : [{ attemptId: values.attempt_id as string }],
+            }),
+          }),
+        }),
+        delete: (table?: unknown) => ({
+          where: () => ({
+            returning: async () => {
+              if (table !== oauth_refresh_exchange_leases) throw new Error('Unexpected table');
+              return database.releaseDenied ? [] : [{ id: 'lease-1' }];
+            },
+          }),
         }),
       };
       return {
@@ -190,6 +209,8 @@ describe('BitbucketAuthorizationService', () => {
     database.returnedCredential = undefined;
     database.locks = 0;
     database.depth = 0;
+    database.leaseDenied = false;
+    database.releaseDenied = false;
     vi.restoreAllMocks();
   });
 
@@ -525,5 +546,32 @@ describe('BitbucketAuthorizationService', () => {
       service().getAuthorization({ userId: 'user-1' }, BITBUCKET_CLOUD_AGENT_MINIMUM_VALIDITY_MS)
     ).resolves.toMatchObject({ status: 'available', token: 'winner-token' });
     expect(database.updates.filter(update => 'credential_version' in update)).toEqual([]);
+  });
+
+  it('does not exchange the refresh token while another attempt holds the exchange lease', async () => {
+    database.row = activeRow(-1);
+    database.leaseDenied = true;
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(
+      service().getAuthorization({ userId: 'user-1' }, BITBUCKET_CLOUD_AGENT_MINIMUM_VALIDITY_MS)
+    ).resolves.toEqual({ status: 'temporarily_unavailable' });
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(database.updates).toEqual([]);
+  });
+
+  it('does not revoke when another attempt took over the exchange lease', async () => {
+    database.row = activeRow(-1);
+    database.releaseDenied = true;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(Response.json({ error: 'invalid_grant' }, { status: 400 }))
+    );
+
+    await expect(
+      service().getAuthorization({ userId: 'user-1' }, BITBUCKET_CLOUD_AGENT_MINIMUM_VALIDITY_MS)
+    ).resolves.toEqual({ status: 'temporarily_unavailable' });
+    expect(database.updates).toEqual([]);
   });
 });

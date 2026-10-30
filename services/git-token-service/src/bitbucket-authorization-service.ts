@@ -17,6 +17,11 @@ import {
 } from '@kilocode/worker-utils/bitbucket-workspace-access-token';
 import { and, eq, exists, isNull, or, sql } from 'drizzle-orm';
 import { z } from 'zod';
+import {
+  claimRefreshLease,
+  newRefreshLeaseAttemptId,
+  releaseRefreshLease,
+} from './lib/oauth-refresh-lease.js';
 
 const BITBUCKET_PLATFORM = 'bitbucket';
 const TOKEN_SCHEME = 'bitbucket-oauth-credential-rsa-aes-256-gcm';
@@ -336,18 +341,22 @@ export class BitbucketAuthorizationService {
     candidate: ActiveAuthorization,
     minimumValidityMs: number
   ): Promise<BitbucketRefreshOutcome> {
+    const attemptId = newRefreshLeaseAttemptId();
     const decision = await db.transaction(tx =>
-      this.readRefreshDecision(tx, candidate, minimumValidityMs)
+      this.readRefreshDecision(tx, candidate, attemptId, minimumValidityMs)
     );
     if (decision.status !== 'refresh') return decision;
 
     const refreshed = await this.requestRefreshToken(decision.inputs);
-    return db.transaction(tx => this.commitRefresh(tx, candidate, decision.inputs, refreshed));
+    return db.transaction(tx =>
+      this.commitRefresh(tx, candidate, decision.inputs, refreshed, attemptId)
+    );
   }
 
   private async readRefreshDecision(
     tx: WorkerTransaction,
     candidate: ActiveAuthorization,
+    attemptId: string,
     minimumValidityMs: number
   ): Promise<{ status: 'refresh'; inputs: BitbucketRefreshInputs } | BitbucketRefreshOutcome> {
     const current = await this.loadAuthorization(tx, candidate.owner);
@@ -369,6 +378,16 @@ export class BitbucketAuthorizationService {
     ]);
     if (!clientId || !clientSecret) return { status: 'temporarily_unavailable' };
     if (!refreshToken) return { status: 'reconnect_required' };
+    // Only the attempt that holds the exchange lease may use the rotating
+    // refresh token: a second concurrent exchange would make one of the two
+    // attempts look like a rejected credential.
+    const claimed = await claimRefreshLease(tx, {
+      kind: 'platform-oauth-credential',
+      credentialId: candidate.credential.id,
+      attemptId,
+      providerRequestBudgetMs: BITBUCKET_OAUTH_TOKEN_TIMEOUT_MS,
+    });
+    if (!claimed) return { status: 'temporarily_unavailable' };
     return { status: 'refresh', inputs: { clientId, clientSecret, refreshToken } };
   }
 
@@ -426,11 +445,21 @@ export class BitbucketAuthorizationService {
     tx: WorkerTransaction,
     candidate: ActiveAuthorization,
     inputs: BitbucketRefreshInputs,
-    refreshed: BitbucketProviderRefreshResult
+    refreshed: BitbucketProviderRefreshResult,
+    attemptId: string
   ): Promise<BitbucketRefreshOutcome> {
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${`bitbucket-oauth-credential:${candidate.credential.id}`}, 0))`
     );
+    // Losing the lease means it expired mid-exchange and another attempt owns
+    // the provider exchange, so this answer describes a generation that may no
+    // longer be current: neither persist it nor revoke on it.
+    const holdsLease = await releaseRefreshLease(tx, {
+      kind: 'platform-oauth-credential',
+      credentialId: candidate.credential.id,
+      attemptId,
+    });
+    if (!holdsLease) return { status: 'temporarily_unavailable' };
     const current = await this.loadAuthorization(tx, candidate.owner);
     if (current.status !== 'available') return current;
     const authorization = current.authorization;

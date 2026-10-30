@@ -8,6 +8,11 @@ import { user_github_app_tokens } from '@kilocode/db/schema';
 import { createPrivateKey, createPublicKey } from 'node:crypto';
 import { and, eq, isNull, sql } from 'drizzle-orm';
 import { z } from 'zod';
+import {
+  claimRefreshLease,
+  newRefreshLeaseAttemptId,
+  releaseRefreshLease,
+} from './lib/oauth-refresh-lease.js';
 
 export type GitAuthorConfig = {
   name: string;
@@ -489,16 +494,20 @@ export class GitHubUserAuthorizationService {
     candidate: AuthorizationRow,
     options: { force?: boolean } = {}
   ): Promise<RefreshResult> {
-    const decision = await db.transaction(tx => this.readRefreshDecision(tx, candidate, options));
+    const attemptId = newRefreshLeaseAttemptId();
+    const decision = await db.transaction(tx =>
+      this.readRefreshDecision(tx, candidate, attemptId, options)
+    );
     if (typeof decision !== 'object') return decision;
 
     const refreshed = await this.requestAuthorizationRefresh(decision.inputs);
-    return db.transaction(tx => this.commitRefresh(tx, candidate, refreshed));
+    return db.transaction(tx => this.commitRefresh(tx, candidate, refreshed, attemptId));
   }
 
   private async readRefreshDecision(
     tx: WorkerTransaction,
     candidate: AuthorizationRow,
+    attemptId: string,
     options: { force?: boolean }
   ): Promise<{ status: 'refresh'; inputs: AuthorizationRefreshInputs } | RefreshResult> {
     const [authorization] = await tx
@@ -524,6 +533,16 @@ export class GitHubUserAuthorizationService {
     const clientId = this.env.GITHUB_APP_CLIENT_ID;
     const clientSecret = this.env.GITHUB_APP_CLIENT_SECRET;
     if (!clientId || !clientSecret) return 'transient_failure';
+    // Only the attempt that holds the exchange lease may use the rotating
+    // refresh token: a second concurrent exchange would make one of the two
+    // attempts look like a rejected credential.
+    const claimed = await claimRefreshLease(tx, {
+      kind: 'user-github-app-token',
+      credentialId: authorization.id,
+      attemptId,
+      providerRequestBudgetMs: GITHUB_USER_AUTHORIZATION_REQUEST_TIMEOUT_MS,
+    });
+    if (!claimed) return 'transient_failure';
     return {
       status: 'refresh',
       inputs: {
@@ -575,9 +594,19 @@ export class GitHubUserAuthorizationService {
   private async commitRefresh(
     tx: WorkerTransaction,
     candidate: AuthorizationRow,
-    refreshed: GitHubProviderRefreshResult
+    refreshed: GitHubProviderRefreshResult,
+    attemptId: string
   ): Promise<RefreshResult> {
     await this.lockAuthorizationGrant(tx, candidate.github_user_id);
+    // Losing the lease means it expired mid-exchange and another attempt owns
+    // the provider exchange, so this answer describes a generation that may no
+    // longer be current: neither persist it nor report it as a rejection.
+    const holdsLease = await releaseRefreshLease(tx, {
+      kind: 'user-github-app-token',
+      credentialId: candidate.id,
+      attemptId,
+    });
+    if (!holdsLease) return 'transient_failure';
     const [authorization] = await tx
       .select()
       .from(user_github_app_tokens)

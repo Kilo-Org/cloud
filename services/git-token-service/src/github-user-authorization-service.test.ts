@@ -1,6 +1,7 @@
 import { generateKeyPairSync } from 'node:crypto';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { encryptKeyedEnvelope } from '@kilocode/encryption';
+import { oauth_refresh_exchange_leases } from '@kilocode/db/schema';
 
 const database = vi.hoisted(() => ({
   rows: [] as Array<Record<string, unknown>>,
@@ -11,6 +12,8 @@ const database = vi.hoisted(() => ({
   rowAfterDelete: undefined as Record<string, unknown> | undefined,
   lockExecutions: 0,
   depth: 0,
+  leaseDenied: false,
+  releaseDenied: false,
   // When set, successive `select().limit()` calls shift from this queue,
   // letting a test model a row that another request rotated between the
   // outer read and the post-lock re-read.
@@ -53,12 +56,23 @@ vi.mock('@kilocode/db/client', () => ({
           };
         },
       }),
-      delete: () => ({
+      delete: (table?: unknown) => ({
         where: () => ({
           returning: async () => {
+            if (table === oauth_refresh_exchange_leases) {
+              return database.releaseDenied ? [] : [{ id: 'lease_1' }];
+            }
             database.deleted = true;
             return database.deleteWinsRace ? [{ id: 'authorization_1' }] : [];
           },
+        }),
+      }),
+      insert: () => ({
+        values: (values: Record<string, unknown>) => ({
+          onConflictDoUpdate: () => ({
+            returning: async () =>
+              database.leaseDenied ? [] : [{ attemptId: values.attempt_id as string }],
+          }),
         }),
       }),
     };
@@ -149,6 +163,8 @@ describe('GitHubUserAuthorizationService envelope selection', () => {
     database.rowAfterDelete = undefined;
     database.lockExecutions = 0;
     database.depth = 0;
+    database.leaseDenied = false;
+    database.releaseDenied = false;
     vi.restoreAllMocks();
     vi.stubGlobal(
       'fetch',
@@ -312,6 +328,8 @@ describe('GitHubUserAuthorizationService disconnect', () => {
     database.rowAfterDelete = undefined;
     database.lockExecutions = 0;
     database.depth = 0;
+    database.leaseDenied = false;
+    database.releaseDenied = false;
     vi.restoreAllMocks();
   });
 
@@ -607,6 +625,8 @@ describe('GitHubUserAuthorizationService.getUserAccessToken', () => {
     database.lockExecutions = 0;
     database.depth = 0;
     database.selectSequence = undefined;
+    database.leaseDenied = false;
+    database.releaseDenied = false;
     vi.restoreAllMocks();
   });
 
@@ -997,5 +1017,36 @@ describe('GitHubUserAuthorizationService.getUserAccessToken', () => {
       'temporarily_unavailable'
     );
     expect(database.updates).toHaveLength(0);
+  });
+
+  it('does not exchange the refresh token while another attempt holds the exchange lease', async () => {
+    const row = makeRow();
+    row.access_token_expires_at = new Date(Date.now() - 1000).toISOString();
+    database.rows = [row];
+    database.leaseDenied = true;
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(makeService().getUserAccessToken('user_1', { op: 'fetch' })).rejects.toThrow(
+      'temporarily_unavailable'
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+    expect(database.updates).toEqual([]);
+  });
+
+  it('does not revoke when another attempt took over the exchange lease', async () => {
+    const row = makeRow();
+    row.access_token_expires_at = new Date(Date.now() - 1000).toISOString();
+    database.rows = [row];
+    database.releaseDenied = true;
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(Response.json({ error: 'bad_refresh_token' }))
+    );
+
+    await expect(makeService().getUserAccessToken('user_1', { op: 'fetch' })).rejects.toThrow(
+      'temporarily_unavailable'
+    );
+    expect(database.updates).toEqual([]);
   });
 });

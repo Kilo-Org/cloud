@@ -14,6 +14,11 @@ import {
 import type { GitLabOAuthCredentialRefresher as GitLabOAuthCredentialRefresherContract } from './gitlab-credential-service.js';
 import { normalizeGitLabInstanceUrl } from './gitlab-url.js';
 import { readBoundedJsonBody } from './lib/bounded-read.js';
+import {
+  claimRefreshLease,
+  newRefreshLeaseAttemptId,
+  releaseRefreshLease,
+} from './lib/oauth-refresh-lease.js';
 
 type Secret = SecretsStoreSecret | string | undefined;
 type GitLabOAuthCredentialRefresherEnv = GitLabCredentialCryptoEnv & {
@@ -136,8 +141,9 @@ export class GitLabOAuthCredentialRefresher implements GitLabOAuthCredentialRefr
     if (!this.env.HYPERDRIVE) return { status: 'temporarily_unavailable' };
     const db = getWorkerDb(this.env.HYPERDRIVE.connectionString, { statement_timeout: 10_000 });
     const now = (this.dependencies.now ?? (() => new Date()))();
+    const attemptId = newRefreshLeaseAttemptId();
     try {
-      const phase = await db.transaction(tx => this.readRefreshPhase(tx, input, now));
+      const phase = await db.transaction(tx => this.readRefreshPhase(tx, input, now, attemptId));
       if (phase.status !== 'refresh') return phase;
 
       const refreshed = await this.requestOAuthRefresh({
@@ -147,7 +153,7 @@ export class GitLabOAuthCredentialRefresher implements GitLabOAuthCredentialRefr
         refreshToken: phase.inputs.refreshToken,
       });
       return await db.transaction(tx =>
-        this.commitRefresh(tx, input, phase.inputs, refreshed, now)
+        this.commitRefresh(tx, input, phase.inputs, refreshed, now, attemptId)
       );
     } catch {
       return { status: 'temporarily_unavailable' };
@@ -209,7 +215,8 @@ export class GitLabOAuthCredentialRefresher implements GitLabOAuthCredentialRefr
   private async readRefreshPhase(
     tx: WorkerTransaction,
     input: RefreshInput,
-    now: Date
+    now: Date,
+    attemptId: string
   ): Promise<RefreshPhase> {
     const loaded = await this.loadRefreshRow(tx, input);
     if (!loaded) return { status: 'reconnect_required' };
@@ -246,6 +253,17 @@ export class GitLabOAuthCredentialRefresher implements GitLabOAuthCredentialRefr
     }
     if (!clientId || !clientSecret) return { status: 'temporarily_unavailable' };
 
+    // Only the attempt that holds the exchange lease may use the rotating
+    // refresh token: a second concurrent exchange would make one of the two
+    // attempts look like a rejected credential.
+    const claimed = await claimRefreshLease(tx, {
+      kind: 'platform-oauth-credential',
+      credentialId: credential.id,
+      attemptId,
+      providerRequestBudgetMs: GITLAB_OAUTH_REFRESH_TIMEOUT_MS,
+    });
+    if (!claimed) return { status: 'temporarily_unavailable' };
+
     return {
       status: 'refresh',
       inputs: {
@@ -264,11 +282,21 @@ export class GitLabOAuthCredentialRefresher implements GitLabOAuthCredentialRefr
     input: RefreshInput,
     inputs: RefreshInputs,
     refreshed: OAuthProviderRefreshResult,
-    now: Date
+    now: Date,
+    attemptId: string
   ): Promise<RefreshResult> {
     await tx.execute(
       sql`SELECT pg_advisory_xact_lock(hashtextextended(${`gitlab-integration:${input.parent.integrationId}`}, 0))`
     );
+    // Losing the lease means it expired mid-exchange and another attempt owns
+    // the provider exchange, so this answer describes a generation that may no
+    // longer be current: neither persist it nor revoke on it.
+    const holdsLease = await releaseRefreshLease(tx, {
+      kind: 'platform-oauth-credential',
+      credentialId: inputs.credential.id,
+      attemptId,
+    });
+    if (!holdsLease) return { status: 'temporarily_unavailable' };
     const loaded = await this.loadRefreshRow(tx, input);
     if (!loaded) return { status: 'reconnect_required' };
     const credential = loaded.credential;

@@ -163,7 +163,7 @@
     "allLanguages": "Svi jezici"
   },
   "login": {
-    "welcome": "Dobro došao u Kilo",
+    "welcome": "Dobro došao",
     "retrySignIn": "Ponovo se prijavi",
     "logo": "Kilo logotip",
     "continuingSignIn": "Prijava se nastavlja.",

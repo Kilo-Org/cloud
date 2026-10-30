@@ -163,7 +163,7 @@
     "allLanguages": "Vsi jeziki"
   },
   "login": {
-    "welcome": "Dobrodošel v aplikaciji Kilo",
+    "welcome": "Dobrodošel",
     "retrySignIn": "Znova poskusi s prijavo",
     "logo": "Logotip Kilo",
     "continuingSignIn": "Nadaljujemo tvojo prijavo.",

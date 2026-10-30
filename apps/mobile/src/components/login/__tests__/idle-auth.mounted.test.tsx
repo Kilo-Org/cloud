@@ -326,6 +326,16 @@ async function compiledNumber(classes: string, property: string): Promise<number
   return undefined;
 }
 
+/** The value of one compiled declaration, through the app's pipeline. */
+async function compiledValue(classes: string, property: string): Promise<unknown> {
+  for (const declaration of await compiledDeclarations(classes)) {
+    if (!Array.isArray(declaration) && property in (declaration as object)) {
+      return (declaration as Record<string, unknown>)[property];
+    }
+  }
+  return undefined;
+}
+
 /** A Button that keeps the default (brand-filled) variant is a primary action. */
 function filledPrimaryLabels(root: I): (string | undefined)[] {
   return root
@@ -393,6 +403,50 @@ describe('IdleAuth provider chrome parity', () => {
     expect(apple.findByType('AppleLogo')).toBeTruthy();
 
     expect(filledPrimaryLabels(renderer.root)).toEqual(['Continue with email']);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('centers every provider label on the button, not beside its mark', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    for (const button of providerRows(renderer.root)) {
+      // The label owns the whole content width and centers inside it…
+      expect(String(labelText(button).props.className).split(/\s+/)).toContain('flex-1');
+      const rowClasses = String(button.props.className).split(/\s+/);
+      expect(rowClasses).toContain('justify-center');
+      // …and the row adds no gap an in-flow mark could push the label by.
+      expect(rowClasses.filter(name => name.startsWith('gap-'))).toEqual([]);
+      expect(String(glyphSlot(button).props.className)).toBe(PROVIDER_GLYPH_SLOT_CLASS);
+    }
+
+    // Compiled once, because every row shares the slot className asserted above:
+    // the mark sits out of flow at the leading edge, vertically centered, so it
+    // contributes no width to the row the label is centered in.
+    expect(await compiledValue(PROVIDER_GLYPH_SLOT_CLASS, 'position')).toBe('absolute');
+    expect(await compiledValue(PROVIDER_GLYPH_SLOT_CLASS, 'justifyContent')).toBe('center');
+    expect(await compiledValue(PROVIDER_GLYPH_SLOT_CLASS, 'top')).toBe(0);
+    expect(await compiledValue(PROVIDER_GLYPH_SLOT_CLASS, 'bottom')).toBe(0);
+
+    act(() => {
+      renderer.unmount();
+    });
+  });
+
+  it('sizes the primary Continue label like the provider rows', async () => {
+    const renderer = await mountIdleAuth(vi.fn<StartFn>());
+
+    const proceed = findButton(renderer.root, 'Continue with email');
+    const google = findButton(renderer.root, 'Sign in with Google');
+    // The filled primary action reads at the provider label size; at the button
+    // variant's 14pt it read weaker than the two outlined ways in above it.
+    expect(await compiledNumber(String(labelText(proceed).props.className), 'fontSize')).toBe(
+      await compiledNumber(String(labelText(google).props.className), 'fontSize')
+    );
+    // It keeps the brand fill, so it still reads as the primary action.
+    expect(proceed.props.variant).toBeUndefined();
 
     act(() => {
       renderer.unmount();

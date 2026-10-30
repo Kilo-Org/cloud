@@ -163,7 +163,7 @@
     "allLanguages": "Все языки"
   },
   "login": {
-    "welcome": "Добро пожаловать в Kilo",
+    "welcome": "Добро пожаловать",
     "retrySignIn": "Повторить вход",
     "logo": "Логотип Kilo",
     "continuingSignIn": "Вход продолжается.",

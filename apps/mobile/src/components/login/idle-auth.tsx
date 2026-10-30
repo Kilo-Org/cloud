@@ -27,12 +27,15 @@ import { useThemeColors } from '@/lib/hooks/use-theme-colors';
 import { setLoginEmailDraft, setSsoRecoveryDraft, type SsoRecoveryDraft } from '@/lib/login-draft';
 import { cn } from '@/lib/utils';
 
-// One fixed slot per provider row. It reserves the same width in all three
-// rows, so the flex-1 label starts from the same x, and it holds whichever of
-// the mark or the inline spinner the row has - swapping an 18pt mark for the
-// spinner cannot move the label. All three rows draw a mark in the slot (the
-// passkey row included), so the three provider options read as one group.
-export const PROVIDER_GLYPH_SLOT_CLASS = 'h-[18px] w-[18px] items-center justify-center';
+// One fixed slot per provider row, taken out of flow at the leading edge. The
+// label is centered over the button's own width, so a mark in the row could not
+// push it off center; out of flow it also cannot change the row's height or the
+// text's box. The slot stretches the row's content height and centers whichever
+// of the mark or the inline spinner the row holds, so swapping an 18pt mark for
+// the spinner moves nothing. All three rows draw a mark in the slot (the
+// passkey row included), so the provider options read as one group.
+export const PROVIDER_GLYPH_SLOT_CLASS =
+  'absolute start-0 top-0 bottom-0 w-[18px] items-center justify-center';
 
 /** The two links the legal sentence exposes as custom accessibility actions. */
 const LEGAL_LINK_ACTIONS = [
@@ -288,10 +291,11 @@ export function IdleAuth({
         <Button
           variant="outline"
           size="lg"
-          // Same chrome and no-flex-wrap row as the Google and passkey rows
-          // below: the label must stay on the icon's line at the shared 44pt
-          // floor, so all three provider rows keep one height.
-          className="min-h-[44px] w-full flex-row gap-2 rounded-[8px] py-2.5"
+          // Same chrome and label axis as the Google and passkey rows below:
+          // the mark is out of flow at the leading edge, so the label centers
+          // on the button's own width at the shared 44pt floor and all three
+          // provider rows keep one height.
+          className="relative min-h-[44px] w-full flex-row justify-center rounded-[8px] py-2.5"
           disabled={authBusy}
           onPress={() => {
             onSignInStart?.();
@@ -321,7 +325,9 @@ export function IdleAuth({
           // pinned to one line (no flex-wrap) so the Google and passkey buttons
           // keep the same height: a wrapped label made the passkey button a row
           // taller than the Google button above it (2026-09-20 device finding).
-          className="min-h-[44px] w-full flex-row gap-2 rounded-[8px] py-2.5"
+          // The label takes the whole content width, so it centers on the
+          // button rather than on the space the mark leaves over.
+          className="relative min-h-[44px] w-full flex-row justify-center rounded-[8px] py-2.5"
           disabled={authBusy}
           onPress={() => {
             onSignInStart?.();
@@ -348,12 +354,13 @@ export function IdleAuth({
             size="lg"
             // min-h (not fixed h) so Dynamic Type can grow the control, matching
             // the Google button's Apple-parity 44pt floor. No flex-wrap: the
-            // label must stay on the icon's line, never wrap to its own. The
-            // Arabic label ("تسجيل الدخول بمفتاح المرور") wrapped onto two lines
-            // and made this button visibly taller than the single-line Google
-            // button directly above it; the flex-1 label box gives the copy the
-            // whole remaining row width, so the stack keeps one row height.
-            className="min-h-[44px] w-full flex-row gap-2 rounded-[8px] py-2.5"
+            // label must never wrap to its own line. The Arabic label
+            // ("تسجيل الدخول بمفتاح المرور") once wrapped onto two lines and made
+            // this button visibly taller than the single-line Google button
+            // directly above it; the flex-1 label box gives the copy the whole
+            // content width and centers it on the button, so the stack keeps one
+            // row height.
+            className="relative min-h-[44px] w-full flex-row justify-center rounded-[8px] py-2.5"
             disabled={authBusy}
             onPress={() => {
               onSignInStart?.();
@@ -428,7 +435,11 @@ export function IdleAuth({
         onPress={() => void handleSendCode()}
         accessibilityLabel={t('login.continueWithEmail')}
       >
-        <Text>{t('common.continue')}</Text>
+        {/* The primary action's label takes the provider rows' 17pt label size;
+            at the button variant's 14pt the filled Continue read weaker than
+            the two outlined ways in below it. The variant keeps the weight
+            (`font-semibold`) and the brand fill. */}
+        <Text className="text-[17px]">{t('common.continue')}</Text>
       </Button>
       {/* The sentence is one accessible element: Android's screen reader does
             not keep the row's visual order once the line wraps (in pt-BR the

@@ -163,7 +163,7 @@
     "allLanguages": "Todos los idiomas"
   },
   "login": {
-    "welcome": "Te damos la bienvenida a Kilo",
+    "welcome": "Te damos la bienvenida",
     "retrySignIn": "Reintentar inicio de sesión",
     "logo": "Logotipo de Kilo",
     "continuingSignIn": "Se está completando el inicio de sesión.",

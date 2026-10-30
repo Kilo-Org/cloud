@@ -1,6 +1,6 @@
 import { getEnvVariable } from '@kilocode/web-shared/lib/dotenvx';
 import type { Provider } from '@kilocode/web-shared/lib/ai-gateway/providers/types';
-import { dropThinkingBlocksOnPrefixMismatch } from '@kilocode/web-shared/lib/ai-gateway/providers/thinking-block-binding';
+import { dropThinkingBlocksOnPrefixMismatch } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/thinking-block-binding';
 
 export const VERCEL_AI_GATEWAY = {
   id: 'vercel',

@@ -1,6 +1,6 @@
 import { describe, expect, it } from '@jest/globals';
 import type { GatewayRequest } from '@kilocode/web-shared/lib/ai-gateway/providers/openrouter/types';
-import { dropThinkingBlocksOnPrefixMismatch } from '@kilocode/web-shared/lib/ai-gateway/providers/thinking-block-binding';
+import { dropThinkingBlocksOnPrefixMismatch } from '@kilocode/web-shared/lib/ai-gateway/providers/anthropic/thinking-block-binding';
 
 type MessagesRequest = Extract<GatewayRequest, { kind: 'messages' }>;
 type Thinking = MessagesRequest['body']['thinking'];

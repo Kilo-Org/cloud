@@ -531,6 +531,7 @@ async function worktreeIntentFingerprint(
             egressAllowlist: source.workspace.egressAllowlist ?? [],
           }
         : {}),
+      ...(source.workspace.egressAudit === true ? { egressAudit: true } : {}),
     })
   );
 }
@@ -773,6 +774,7 @@ function assertRegisteredMetadata(
     workspace.sandboxProvider !== source.workspace.sandboxProvider ||
     workspace.sandboxAllocation !== source.workspace.sandboxAllocation ||
     (workspace.egressMode ?? 'unrestricted') !== (source.workspace.egressMode ?? 'unrestricted') ||
+    (workspace.egressAudit ?? false) !== (source.workspace.egressAudit ?? false) ||
     JSON.stringify(workspace.egressAllowlist ?? []) !==
       JSON.stringify(source.workspace.egressAllowlist ?? []) ||
     !sameSandboxProviderBinding(

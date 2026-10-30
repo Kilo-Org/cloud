@@ -51,6 +51,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
   allocationName: string;
   instance?: ContainerInstanceSize;
   egressAllowlist?: string[];
+  egressAudit?: boolean;
   getContainer: (logicalSandboxId: string) => DurableObjectStub<SandboxContainers>;
   /**
    * Trusted cold-launch inputs. Absent, and a descriptor absent within it, keep
@@ -163,6 +164,7 @@ export function createCloudflareContainersProviderAdapter(deps: {
         containment: owned.containment,
         ...(deps.egressAllowlist === undefined ? {} : { egressAllowlist: deps.egressAllowlist }),
         ...(options?.snapshot === undefined ? {} : { snapshot: options.snapshot }),
+        ...(deps.egressAudit === true ? { egressAudit: true } : {}),
         ...(options?.deadlineAt === undefined ? {} : { deadlineAt: options.deadlineAt }),
         ...(options?.nativeImage === undefined ? {} : { nativeImage: options.nativeImage }),
         env: {

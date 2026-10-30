@@ -711,10 +711,17 @@ export function CodeReviewJobsCard({
   // Retrigger mutation for failed/cancelled/interrupted reviews
   const retriggerMutation = useMutation(
     trpc.codeReviews.retrigger.mutationOptions({
-      onSuccess: async () => {
-        toast.success('Code review retriggered', {
-          description: 'The code review has been queued for processing.',
-        });
+      onSuccess: async result => {
+        if (!result.success) {
+          // Dispatch marked the review failed again, so the retry never started.
+          toast.error('Failed to retrigger code review', {
+            description: result.error,
+          });
+        } else {
+          toast.success('Code review retriggered', {
+            description: 'The code review has been queued for processing.',
+          });
+        }
         setActionInProgressId(null);
         // Invalidate the query to refetch the list
         await queryClient.invalidateQueries({

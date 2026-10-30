@@ -1075,7 +1075,6 @@
     },
     "overview": {
       "allAreas": "Tüm alanlar",
-      "customInstructions": "Özel talimatlar",
       "focusAreas": "Odak alanları",
       "nSelected": "{{displayCount}} seçili",
       "proposedReviewMdGuidance": "Önerilen REVIEW.md yönergeleri",

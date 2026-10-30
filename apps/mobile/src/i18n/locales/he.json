@@ -1078,7 +1078,6 @@
     },
     "overview": {
       "allAreas": "כל התחומים",
-      "customInstructions": "הוראות מותאמות אישית",
       "focusAreas": "תחומי מיקוד",
       "nSelected": "{{displayCount}} נבחרו",
       "proposedReviewMdGuidance": "הנחיות מוצעות לקובץ REVIEW.md",

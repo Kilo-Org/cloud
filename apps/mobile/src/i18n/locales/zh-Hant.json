@@ -1075,7 +1075,6 @@
     },
     "overview": {
       "allAreas": "所有面向",
-      "customInstructions": "自訂指示",
       "focusAreas": "審查重點",
       "nSelected": "已選取 {{displayCount}} 項",
       "proposedReviewMdGuidance": "建議的 REVIEW.md 指引",

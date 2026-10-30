@@ -1075,7 +1075,6 @@
     },
     "overview": {
       "allAreas": "Alle aandachtspunten",
-      "customInstructions": "Eigen instructies",
       "focusAreas": "Aandachtspunten",
       "nSelected": "{{displayCount}} geselecteerd",
       "proposedReviewMdGuidance": "Voorgestelde REVIEW.md-richtlijnen",

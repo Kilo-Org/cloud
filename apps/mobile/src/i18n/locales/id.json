@@ -1075,7 +1075,6 @@
     },
     "overview": {
       "allAreas": "Semua area",
-      "customInstructions": "Instruksi kustom",
       "focusAreas": "Area fokus",
       "nSelected": "{{displayCount}} dipilih",
       "proposedReviewMdGuidance": "Panduan REVIEW.md yang diusulkan",

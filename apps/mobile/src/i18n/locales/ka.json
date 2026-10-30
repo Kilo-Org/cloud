@@ -1600,7 +1600,6 @@
       "reviewStyle": "შემოწმების სტილი",
       "focusAreas": "პრიორიტეტული მიმართულებები",
       "allAreas": "ყველა მიმართულება",
-      "customInstructions": "მორგებული ინსტრუქციები",
       "set": "მითითებულია",
       "notSet": "არ არის მითითებული",
       "nSelected": "არჩეულია {{displayCount}}",

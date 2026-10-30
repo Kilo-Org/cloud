@@ -1075,7 +1075,6 @@
     },
     "overview": {
       "allAreas": "所有方面",
-      "customInstructions": "自定义说明",
       "focusAreas": "审查重点",
       "nSelected": "已选 {{displayCount}} 项",
       "proposedReviewMdGuidance": "REVIEW.md 审查准则建议",

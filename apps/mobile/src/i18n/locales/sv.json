@@ -1600,7 +1600,6 @@
       "reviewStyle": "Granskningsstil",
       "focusAreas": "Fokusområden",
       "allAreas": "Alla områden",
-      "customInstructions": "Anpassade instruktioner",
       "set": "Angivet",
       "notSet": "Ej angivet",
       "nSelected": "Valda: {{displayCount}}",

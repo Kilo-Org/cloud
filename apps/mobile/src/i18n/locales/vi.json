@@ -1075,7 +1075,6 @@
     },
     "overview": {
       "allAreas": "Tất cả nội dung",
-      "customInstructions": "Hướng dẫn tùy chỉnh",
       "focusAreas": "Nội dung trọng tâm",
       "nSelected": "Đã chọn {{displayCount}}",
       "proposedReviewMdGuidance": "Hướng dẫn đề xuất cho REVIEW.md",

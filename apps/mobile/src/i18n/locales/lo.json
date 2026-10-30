@@ -1600,7 +1600,6 @@
       "reviewStyle": "ຮູບແບບການກວດສອບ",
       "focusAreas": "ຫົວຂໍ້ທີ່ເນັ້ນ",
       "allAreas": "ທຸກດ້ານ",
-      "customInstructions": "ຄຳສັ່ງທີ່ກຳນົດເອງ",
       "set": "ຕັ້ງຄ່າແລ້ວ",
       "notSet": "ບໍ່ໄດ້ຕັ້ງຄ່າ",
       "nSelected": "ເລືອກແລ້ວ {{displayCount}} ລາຍການ",

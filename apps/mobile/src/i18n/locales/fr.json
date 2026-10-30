@@ -1046,7 +1046,6 @@
     },
     "overview": {
       "allAreas": "Tous les domaines",
-      "customInstructions": "Instructions personnalisées",
       "focusAreas": "Points à vérifier",
       "nSelected": "{{displayCount}} sélectionnés",
       "proposedReviewMdGuidance": "Consignes proposées pour REVIEW.md",

@@ -1644,7 +1644,6 @@
       "reviewStyle": "Peržiūros stilius",
       "focusAreas": "Peržiūros sritys",
       "allAreas": "Visos sritys",
-      "customInstructions": "Individualios instrukcijos",
       "set": "Nustatyta",
       "notSet": "Nenustatyta",
       "nSelected": "Pasirinkta {{displayCount}}",

@@ -1046,7 +1046,6 @@
     },
     "overview": {
       "allAreas": "Todas as áreas",
-      "customInstructions": "Instruções personalizadas",
       "focusAreas": "Áreas prioritárias",
       "nSelected": "{{displayCount}} selecionados",
       "proposedReviewMdGuidance": "Orientações propostas para o REVIEW.md",

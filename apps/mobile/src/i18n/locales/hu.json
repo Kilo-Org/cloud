@@ -1600,7 +1600,6 @@
       "reviewStyle": "Ellenőrzési stílus",
       "focusAreas": "Kiemelt területek",
       "allAreas": "Minden terület",
-      "customInstructions": "Egyéni utasítások",
       "set": "Beállítva",
       "notSet": "Nincs beállítva",
       "nSelected": "{{displayCount}} kijelölve",

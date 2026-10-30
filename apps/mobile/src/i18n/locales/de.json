@@ -1075,7 +1075,6 @@
     },
     "overview": {
       "allAreas": "Alle Bereiche",
-      "customInstructions": "Benutzerdefinierte Anweisungen",
       "focusAreas": "Schwerpunkte",
       "nSelected": "{{displayCount}} ausgewählt",
       "proposedReviewMdGuidance": "Vorgeschlagene Richtlinien für REVIEW.md",

@@ -1600,7 +1600,6 @@
       "reviewStyle": "Estilo de revisión",
       "focusAreas": "Áreas prioritarias",
       "allAreas": "Todas as áreas",
-      "customInstructions": "Instrucións personalizadas",
       "set": "Definido",
       "notSet": "Non definido",
       "nSelected": "{{displayCount}} seleccionados",

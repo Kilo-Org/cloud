@@ -1600,7 +1600,6 @@
       "reviewStyle": "Rýnistíll",
       "focusAreas": "Áherslusvið",
       "allAreas": "Allir þættir",
-      "customInstructions": "Sérsniðnar leiðbeiningar",
       "set": "Stillt",
       "notSet": "Ekki stillt",
       "nSelected": "Valið: {{displayCount}}",

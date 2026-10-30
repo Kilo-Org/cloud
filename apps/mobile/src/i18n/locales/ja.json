@@ -1075,7 +1075,6 @@
     },
     "overview": {
       "allAreas": "すべての領域",
-      "customInstructions": "カスタム指示",
       "focusAreas": "重点項目",
       "nSelected": "{{displayCount}}件選択中",
       "proposedReviewMdGuidance": "REVIEW.mdに記載する指針の提案",

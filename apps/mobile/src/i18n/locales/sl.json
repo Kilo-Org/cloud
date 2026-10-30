@@ -1644,7 +1644,6 @@
       "reviewStyle": "Slog pregleda",
       "focusAreas": "Prednostna področja",
       "allAreas": "Vsa področja",
-      "customInstructions": "Navodila po meri",
       "set": "Nastavljeno",
       "notSet": "Ni nastavljeno",
       "nSelected": "Izbrano {{displayCount}}",

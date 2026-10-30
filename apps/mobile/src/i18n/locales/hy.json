@@ -1600,7 +1600,6 @@
       "reviewStyle": "Ստուգման ոճ",
       "focusAreas": "Ստուգման ուղղություններ",
       "allAreas": "Բոլոր ոլորտները",
-      "customInstructions": "Անհատական հրահանգներ",
       "set": "Սահմանված է",
       "notSet": "Սահմանված չէ",
       "nSelected": "Ընտրված է {{displayCount}}",

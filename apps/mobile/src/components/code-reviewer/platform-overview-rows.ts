@@ -93,14 +93,16 @@ export function buildOverviewRows({
             )
           : i18n.t('codeReviewer.overview.allAreas'),
     },
-    // Custom Instructions is deprecated in favour of REVIEW.md, but the row
+    // Custom instructions is deprecated in favour of REVIEW.md, but the row
     // stays on the overview for every config: it is the only way into the
     // editor, so hiding it while nothing is stored would leave a reader who
-    // cleared the field with no way back to it.
+    // cleared the field with no way back to it. The row names the screen with
+    // the screen's own title, so the entry point and the header cannot drift
+    // apart in wording or case.
     {
       field: 'instructions',
       icon: ScrollText,
-      title: i18n.t('codeReviewer.overview.customInstructions'),
+      title: i18n.t('codeReviewer.instructions.title'),
       subtitle: data.customInstructions?.trim()
         ? i18n.t('codeReviewer.overview.set')
         : i18n.t('codeReviewer.overview.notSet'),

@@ -1075,7 +1075,6 @@
     },
     "overview": {
       "allAreas": "सभी क्षेत्र",
-      "customInstructions": "कस्टम निर्देश",
       "focusAreas": "ध्यान देने वाले क्षेत्र",
       "nSelected": "{{displayCount}} चयनित",
       "proposedReviewMdGuidance": "REVIEW.md के लिए प्रस्तावित दिशानिर्देश",

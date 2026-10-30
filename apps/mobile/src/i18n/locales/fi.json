@@ -1600,7 +1600,6 @@
       "reviewStyle": "Katselmointityyli",
       "focusAreas": "Painopisteet",
       "allAreas": "Kaikki osa-alueet",
-      "customInstructions": "Mukautetut ohjeet",
       "set": "Määritetty",
       "notSet": "Ei määritetty",
       "nSelected": "Valittu: {{displayCount}}",

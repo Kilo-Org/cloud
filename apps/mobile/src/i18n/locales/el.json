@@ -1600,7 +1600,6 @@
       "reviewStyle": "Τρόπος ελέγχου",
       "focusAreas": "Τομείς εστίασης",
       "allAreas": "Όλοι οι τομείς",
-      "customInstructions": "Προσαρμοσμένες οδηγίες",
       "set": "Έχει οριστεί",
       "notSet": "Δεν έχει οριστεί",
       "nSelected": "Επιλεγμένα: {{displayCount}}",

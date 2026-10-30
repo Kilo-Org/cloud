@@ -1600,7 +1600,6 @@
       "reviewStyle": "समीक्षा शैली",
       "focusAreas": "ध्यान दिनुपर्ने क्षेत्रहरू",
       "allAreas": "सबै क्षेत्रहरू",
-      "customInstructions": "आफ्नै निर्देशनहरू",
       "set": "तोकिएको",
       "notSet": "तोकिएको छैन",
       "nSelected": "{{displayCount}} चयन गरिएको",

@@ -1078,7 +1078,6 @@
     },
     "overview": {
       "allAreas": "Todas las áreas",
-      "customInstructions": "Instrucciones personalizadas",
       "focusAreas": "Aspectos de la revisión",
       "nSelected": "{{displayCount}} seleccionados",
       "proposedReviewMdGuidance": "Directrices propuestas para REVIEW.md",

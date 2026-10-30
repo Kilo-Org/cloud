@@ -1087,7 +1087,6 @@
     },
     "overview": {
       "allAreas": "جميع المجالات",
-      "customInstructions": "تعليمات مخصصة",
       "focusAreas": "مجالات التركيز",
       "nSelected": "{{displayCount}} محدد",
       "proposedReviewMdGuidance": "إرشادات REVIEW.md المقترحة",

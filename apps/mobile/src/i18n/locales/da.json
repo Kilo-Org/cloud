@@ -1600,7 +1600,6 @@
       "reviewStyle": "Gennemgangsstil",
       "focusAreas": "Fokusområder",
       "allAreas": "Alle områder",
-      "customInstructions": "Brugerdefinerede instruktioner",
       "set": "Angivet",
       "notSet": "Ikke angivet",
       "nSelected": "{{displayCount}} valgt",

@@ -1622,7 +1622,6 @@
       "reviewStyle": "Estil de revisió",
       "focusAreas": "Àrees de revisió",
       "allAreas": "Totes les àrees",
-      "customInstructions": "Instruccions personalitzades",
       "set": "Definit",
       "notSet": "No definit",
       "nSelected": "{{displayCount}} àrees seleccionades",

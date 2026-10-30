@@ -1600,7 +1600,6 @@
       "reviewStyle": "Ülevaatuse stiil",
       "focusAreas": "Fookusvaldkonnad",
       "allAreas": "Kõik valdkonnad",
-      "customInstructions": "Kohandatud juhised",
       "set": "Määratud",
       "notSet": "Pole määratud",
       "nSelected": "Valitud {{displayCount}}",

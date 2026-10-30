@@ -1,8 +1,10 @@
 import { Switch as NativeSwitch, Platform, type SwitchProps } from 'react-native';
 
+import { useThemeColors } from '@/lib/hooks/use-theme-colors';
+
 /**
  * The native `Switch` with its disabled state mirrored into
- * `accessibilityState`.
+ * `accessibilityState`, and both of its colours taken from the app palette.
  *
  * Fabric derives the accessibility traits from the role and
  * `accessibilityState`, then assigns them to the native control, replacing the
@@ -10,13 +12,27 @@ import { Switch as NativeSwitch, Platform, type SwitchProps } from 'react-native
  * `disabled` but not the matching state, so a switch that cannot be toggled
  * still announces itself as enabled. Android already folds `disabled` into that
  * state; doing it here keeps both platforms honest.
+ *
+ * The colours are stated here because Android otherwise resolves the track and
+ * the thumb from the device theme: the on track came out as the framework
+ * accent (a teal that is in no palette) and the off thumb as near-white in dark
+ * mode, which made one control look unlike every other surface.
  */
-export function Switch({ disabled, accessibilityState, ...props }: SwitchProps) {
+export function Switch({
+  disabled,
+  accessibilityState,
+  thumbColor,
+  trackColor,
+  ...props
+}: SwitchProps) {
   const resolvedDisabled = disabled ?? accessibilityState?.disabled;
+  const colors = useThemeColors();
 
   return (
     <NativeSwitch
       {...props}
+      thumbColor={thumbColor ?? colors.primaryForeground}
+      trackColor={trackColor ?? { false: colors.mutedForeground, true: colors.primary }}
       disabled={resolvedDisabled}
       accessibilityState={
         Platform.OS === 'ios'

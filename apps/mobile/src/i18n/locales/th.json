@@ -1600,7 +1600,6 @@
       "reviewStyle": "รูปแบบการตรวจสอบ",
       "focusAreas": "ประเด็นที่เน้น",
       "allAreas": "ทุกด้าน",
-      "customInstructions": "คำแนะนำที่กำหนดเอง",
       "set": "ตั้งค่าแล้ว",
       "notSet": "ยังไม่ได้ตั้งค่า",
       "nSelected": "เลือกแล้ว {{displayCount}} รายการ",

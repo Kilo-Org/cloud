@@ -1081,7 +1081,6 @@
     },
     "overview": {
       "allAreas": "Wszystkie obszary",
-      "customInstructions": "Własne instrukcje",
       "focusAreas": "Obszary przeglądu",
       "nSelected": "Wybrano: {{displayCount}}",
       "proposedReviewMdGuidance": "Proponowane wytyczne do pliku REVIEW.md",

@@ -1622,7 +1622,6 @@
       "reviewStyle": "Estilo de revisão",
       "focusAreas": "Áreas prioritárias",
       "allAreas": "Todas as áreas",
-      "customInstructions": "Instruções personalizadas",
       "set": "Definido",
       "notSet": "Não definido",
       "nSelected": "{{displayCount}} selecionados",

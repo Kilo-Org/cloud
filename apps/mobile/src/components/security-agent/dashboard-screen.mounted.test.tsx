@@ -1151,6 +1151,44 @@ describe('DashboardScreen before the first sync', () => {
     expect(sectionsProps.props).toHaveLength(1);
   });
 
+  it('keeps findings visible when the sync stamp is missing', () => {
+    // A partial sync can leave findings behind with no owner-level stamp, so
+    // the prompt may only replace an empty grid.
+    dashboardStats.data = { ...zeroStats, analysis: { ...zeroStats.analysis, total: 3 } };
+    const root = renderScreen();
+
+    expect(emptyState.props).toHaveLength(0);
+    expect(sectionsProps.props).toHaveLength(1);
+    expect(renderedTexts(root.root)).toContain(
+      i18n.t('securityAgent.dashboardMetrics.openFindings')
+    );
+  });
+
+  it('waits for the stats read before offering the prompt', () => {
+    dashboardStats.isPending = true;
+    dashboardStats.data = undefined;
+    const root = renderScreen();
+
+    expect(emptyState.props).toHaveLength(0);
+    expect(
+      root.root.findAll(n => typeof n.type === 'string' && (n.type as string) === 'Skeleton')
+    ).toHaveLength(4);
+  });
+
+  it('offers repository setup beside the first sync', () => {
+    // A sync without a configured repository answers PRECONDITION_FAILED, so
+    // the pristine state cannot depend on the prompt's single action.
+    const root = renderScreen();
+    const manage = root.root.findAll(
+      n =>
+        typeof n.type === 'string' &&
+        (n.type as string) === 'Pressable' &&
+        n.props.accessibilityLabel === i18n.t('securityAgent.dashboard.manageRepositories')
+    );
+
+    expect(manage).toHaveLength(1);
+  });
+
   it('keeps the counts while the sync-time read has not answered', () => {
     // Only a read that succeeded and reports no time proves the scope never
     // synced; a failed read has its own label and must not hide the counts.

@@ -227,10 +227,12 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
   const metrics = data ? buildLocalizedMetrics(data, slaEnabled) : [];
 
   const lastSyncTime = lastSync.data?.lastSyncTime;
-  // A read that succeeded and reports no sync time is the only proof that this
-  // scope has never synced: a failed read keeps its own retry surface, and a
-  // pending one still paints the skeleton.
-  const neverSynced = lastSync.data !== undefined && !lastSyncTime;
+  // The prompt stands in for an empty grid, never for counts: a scope whose
+  // owner-level sync stamp is missing can still hold findings from a partial
+  // run, and those must stay visible. A read that has not answered yet keeps
+  // its own surface (the skeleton or the retry card).
+  const syncReadAnswered = lastSync.data !== undefined;
+  const neverSynced = syncReadAnswered && !lastSyncTime && data?.analysis.total === 0;
   const now = useRelativeTimeNow();
   let lastSyncLabel = t('securityAgent.dashboard.notYetSynced');
   if (lastSync.isError) {
@@ -497,6 +499,26 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
           />
         ) : null}
 
+        {slaEnabled && data && data.sla.overall.total === 0 ? (
+          // One row, one link, outside the branches below: the header's
+          // refresh control already starts a sync, and a pristine scope needs
+          // its way into repository setup before that sync can succeed.
+          <View className="flex-row items-center">
+            <Pressable
+              onPress={() => {
+                pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t('securityAgent.dashboard.manageRepositories')}
+              className={cn(ROW_TARGET_CLASS, 'justify-center active:opacity-70')}
+            >
+              <Text className="text-xs font-medium text-primary dark:text-info">
+                {t('securityAgent.dashboard.manageRepositories')}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
+
         {neverSynced ? (
           // Every count reads 0 before the first sync finishes, so the KPI grid
           // and the posture sections looked like a clean result. Until a sync
@@ -554,26 +576,6 @@ export function DashboardScreen({ scope }: Readonly<{ scope: string }>) {
                 ))}
               </View>
             )}
-
-            {slaEnabled && data && data.sla.overall.total === 0 ? (
-              // One row, one link: the header's refresh control already starts
-              // a sync, so a second "Sync findings" text action beside the
-              // first-sync prompt would offer the same action twice.
-              <View className="flex-row items-center">
-                <Pressable
-                  onPress={() => {
-                    pushOnce(getSecurityAgentPath(scope, 'settings/repositories'));
-                  }}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('securityAgent.dashboard.manageRepositories')}
-                  className={cn(ROW_TARGET_CLASS, 'justify-center active:opacity-70')}
-                >
-                  <Text className="text-xs font-medium text-primary dark:text-info">
-                    {t('securityAgent.dashboard.manageRepositories')}
-                  </Text>
-                </Pressable>
-              </View>
-            ) : null}
 
             {data ? (
               <DashboardSections

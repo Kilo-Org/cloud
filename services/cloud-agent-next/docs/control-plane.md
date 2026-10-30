@@ -498,7 +498,7 @@ These keep their current owners and evidence; the rewrite ports them, it does no
 
 Scope: `workspace_*` routes on `cloudflare-containers` whose directory is the isolated path
 `/workspace/app` and whose session was admitted with a repository environment. Sessions never
-capture. One `EnvironmentBuild` Durable Object per environment ID builds, publishes and serves the
+publish environment snapshots. One `EnvironmentBuild` Durable Object per environment ID builds, publishes and serves the
 snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Environment snapshots".
 
 - **Reference.** For an origin under the `include-web-defaults` profile policy, session preflight
@@ -531,7 +531,7 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   launch uses the image once (`previousSnapshotStartFailed`); a completed image start clears this.
   A failure never changes the published snapshot. Each native container coordinator retains up to 16 failed snapshot IDs.
   After three failed restores of one snapshot, it starts from the image until a replacement is offered.
-- **No session capture.** A wrapper that predates this change may still send `workspace.capture`;
+- **No legacy capture.** A wrapper that predates this change may still send `workspace.capture`;
   the Sandbox DO answers `workspace.captured` with `ok: false` at once. The `REPO_SNAPSHOTS` index,
   repository keys and route `repo_key` are removed.
 - **Builder.** A build runs in its own `sbx-` container DO named `environment-build:v1:<envId>`
@@ -561,6 +561,50 @@ snapshot (`src/environment-build/`); see `.specs/cloud-agent-session.md` "Enviro
   newer compatible runtime over a snapshot. The artifact read grant travels in the installer
   command and expires at the startup deadline. A restored session supplies a new command and its
   own credentials. Native snapshot retention of start configuration still needs deployed validation.
+
+### Session disk snapshots
+
+Session snapshots are private root-filesystem checkpoints, not reusable environment templates.
+`SESSION_SNAPSHOT_ORG_IDS` and `SESSION_SNAPSHOT_USER_IDS` are independent comma-separated explicit
+allowlists; both default empty and neither accepts `*`. Removing enrollment prevents capture and
+restore. The first rollout supports only isolated native `cloudflare-containers` allocations at
+`/workspace/app` with one interactive session (`cloud-agent-web`, `desktop` or `agent-manager`)
+throughout the allocation's lifetime. Unattended sessions, shared worktrees and other
+providers retain their current recovery behavior.
+
+- **Capture.** `src/control-plane/sandbox/session-snapshot.ts` owns checkpoint metadata, capture
+  and selection. The existing `heartbeat.active` signal and `lastActivityAt` schedule the existing
+  Sandbox DO alarm after two minutes idle (`SESSION_SNAPSHOT_IDLE_MS`). Capture runs outside the
+  serial queue, once per idle period, through the native snapshot API. No Session DO coordination,
+  event classification, new idle detector or capture retry loop is involved.
+- **Ownership and freshness.** Metadata stays in the Sandbox DO. Publication checks the same
+  allocation, connection, activity timestamp, ready route and session identity. Active heartbeats,
+  delivery, Stop and release invalidate the checkpoint. A container that hosted a second session
+  is ineligible even after that route leaves. Capture failure never fails a user turn.
+- **Cold start.** Selection prefers a compatible private session checkpoint, then the existing
+  environment lookup, then the image. Selection reads local metadata without an RPC. Startup
+  mode, image selection and base-image compatibility are checked, not the runtime release.
+  Downloaded startup installs the currently selected Kilo and wrapper over the restored disk.
+  Only a confirmed physical snapshot start adds frame-only
+  `spec.sessionSnapshot: { sourceAllocationId }`; early wrapper
+  hello cannot race this decision. Registration rejects client-supplied provenance. An incompatible
+  wrapper or failed restore/preparation takes the bounded fresh-start fallback, retaining the
+  queued turn and existing ingest/worktree recovery.
+- **Preparation.** The wrapper validates the source allocation in the workspace stamp; session
+  ownership is checked by the Sandbox DO. It preserves local refs and commits, index, dirty/untracked/
+  ignored files, and HOME instead of running environment adoption, checkout or setup again. Current
+  credentials and profile configuration are refreshed. The restored Kilo session is reused; ordinary
+  ingest recovery remains a fallback with file restoration disabled. Saved worktree patches cannot
+  overwrite the disk either. The new stamp is published after session preparation succeeds and
+  remains discoverable if a bare workspace later runs `git init`.
+- **Retention and rollout.** A full disk can contain credentials, configuration, caches and user
+  secrets; these checkpoints must remain private and are not sanitized environment snapshots.
+  Invalidation and session release remove eligibility, not the physical artifact.
+  The provider's existing 30-day unused retention applies; this release has no list/delete API.
+  Ship the capability-bearing wrapper/runtime before enrollment. Native live-disk consistency,
+  database WAL recovery, heartbeat behavior during capture, and startup-configuration replacement
+  still require deployed provider validation before expanding rollout. These are disk checkpoints,
+  not suspended processes or memory snapshots.
 
 ## 7. Wrapper
 

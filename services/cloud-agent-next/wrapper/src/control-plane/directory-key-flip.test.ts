@@ -25,6 +25,7 @@ import { createPreparationManager, runtimeKey, type PreparationManager } from '.
 import { createTurnManager, type TurnManager } from './turn.js';
 import { createControlPlaneTerminals, type ControlPlaneTerminalRuntime } from './terminals.js';
 import { createControlPlaneFrameDispatcher } from './main.js';
+import type { WorkspaceStamp } from './workspace-stamp.js';
 
 const TEST_TIMERS: ControlPlaneTimers = {
   ...CONTROL_PLANE_TIMERS,
@@ -144,6 +145,7 @@ function createScheduler(): KiloRuntimeScheduler {
 
 function createHarness() {
   const frames: ControlPlaneWrapperFrame[] = [];
+  const stamps = new Map<string, WorkspaceStamp>();
   const send = (frame: ControlPlaneWrapperFrame): void => {
     frames.push(frame);
   };
@@ -208,6 +210,10 @@ function createHarness() {
     inheritedEnv: {},
     mkdir: async () => undefined,
     hasGit: async () => false,
+    readStamp: async directory => stamps.get(directory) ?? null,
+    writeStamp: async (directory, stamp) => {
+      stamps.set(directory, stamp);
+    },
     sessionExists: async () => true,
     seedRegistration: async () => undefined,
     runSetup: async () => ({ stdout: '', stderr: '', exitCode: 0 }),

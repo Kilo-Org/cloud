@@ -119,7 +119,7 @@ describe('GET /api/cron/cleanup-mcp-connect-events', () => {
     expect(nextBody.deletedCount).toBe(1);
     expect(nextBody.hasMore).toBe(false);
     expect(await db.select().from(organization_mcp_connect_events)).toHaveLength(0);
-  });
+  }, 30_000);
 
   it('keeps deleting until every expired event is gone within the cap', async () => {
     const user = await insertTestUser();

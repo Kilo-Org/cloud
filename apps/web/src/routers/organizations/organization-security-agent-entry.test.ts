@@ -10,7 +10,7 @@
  * `0259` could not rank, or any row written outside the connection writers)
  * therefore disagreed: the app said the organization was connected while the
  * entry gate said connect-GitHub, and the organization's findings were
- * unreachable. `0320` gives those rows the workflow role so both resolutions
+ * unreachable. `0321` gives those rows the workflow role so both resolutions
  * name the same installation.
  */
 import { afterEach, beforeEach, describe, expect, test } from '@jest/globals';

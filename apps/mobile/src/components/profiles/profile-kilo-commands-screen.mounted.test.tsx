@@ -355,10 +355,16 @@ describe('ProfileKiloCommandsScreen row controls', () => {
   it('gives every row action a slop that carries its icon box to the touch target', async () => {
     const { renderer, unmount } = await mountScreen();
 
+    const labels = [
+      'Move slash command release-notes up',
+      'Move slash command release-notes down',
+      'Edit slash command release-notes',
+      'Delete slash command release-notes',
+    ];
     const actions = findAll(renderer.root, 'Pressable').filter(node =>
-      String(node.props.accessibilityLabel).startsWith('Move slash command')
+      labels.includes(String(node.props.accessibilityLabel))
     );
-    expect(actions).toHaveLength(2);
+    expect(actions.map(node => node.props.accessibilityLabel)).toEqual(labels);
     for (const action of actions) {
       expect(action.props.hitSlop).toBe(COMPACT_CONTROL_HIT_SLOP_DP);
     }

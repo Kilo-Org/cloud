@@ -3423,21 +3423,21 @@
     "step": {
       "editing": "સંપાદન",
       "reading": "વાંચન",
-      "running": "ચલાવો",
+      "running": "રન",
       "searching": "વેબ શોધ",
       "thinking": "વિચારી રહ્યું છે"
     },
-    "planOf": "માંથી",
+    "planOf": "/",
     "filesChanged": "ફાઇલો બદલાઈ",
     "finishedIn": "માં પૂર્ણ",
-    "noActivityFor": "કોઈ પ્રવૃત્તિ નથી",
+    "noActivityFor": "છેલ્લી પ્રવૃત્તિ પછી",
     "prOpened": "પુલ રિક્વેસ્ટ ખૂલી",
     "permissionWants": "ચલાવવા માંગે છે",
     "failure": {
       "provider": "બંધ થયું: પ્રદાતા ભૂલ",
       "tool": "બંધ થયું: સાધન ભૂલ",
       "cancelled": "બંધ થયું: રદ કર્યું",
-      "other": "રોકાયેલું"
+      "other": "બંધ થયું"
     }
   },
   "transcriptionModel": {

@@ -42,6 +42,96 @@ function refreshInput() {
   };
 }
 
+function loadedRow(
+  input: ReturnType<typeof refreshInput>,
+  overrides: {
+    credential?: Partial<ReturnType<typeof refreshInput>['credential']>;
+    metadata?: Record<string, unknown>;
+  } = {}
+) {
+  return {
+    credential: { ...input.credential, ...overrides.credential },
+    integrationId: input.parent.integrationId,
+    platform: 'gitlab',
+    integrationType: 'oauth',
+    integrationStatus: 'active',
+    ownedByUserId: 'user-1',
+    ownedByOrganizationId: null,
+    accountId: '123',
+    accountLogin: 'octocat',
+    metadata: { gitlab_instance_url: 'https://gitlab.example.com', ...overrides.metadata },
+  };
+}
+
+/**
+ * Fake worker database that serves one row per `select()` call in order and
+ * records whether a transaction is open, so a test can assert the provider
+ * call never runs inside one.
+ */
+function installDatabase(rows: Array<Record<string, unknown> | undefined>) {
+  const state = {
+    depth: 0,
+    selectCount: 0,
+    credentialUpdates: [] as Record<string, unknown>[],
+    integrationUpdates: [] as Record<string, unknown>[],
+  };
+  const tx = {
+    execute: vi.fn(async () => {
+      if (state.depth !== 1) throw new Error('advisory lock taken outside a transaction');
+    }),
+    select: vi.fn(() => ({
+      from: vi.fn(() => ({
+        innerJoin: vi.fn(() => ({
+          where: vi.fn(() => ({
+            limit: vi.fn(async () => {
+              const row = rows[state.selectCount];
+              state.selectCount += 1;
+              return row === undefined ? [] : [row];
+            }),
+          })),
+        })),
+      })),
+    })),
+    update: vi.fn((table: unknown) => ({
+      set: vi.fn((values: Record<string, unknown>) => ({
+        where: vi.fn(() => {
+          if (table === platform_integrations) {
+            state.integrationUpdates.push(values);
+            return Promise.resolve();
+          }
+          if (table === platform_oauth_credentials) {
+            state.credentialUpdates.push(values);
+            return { returning: vi.fn(async () => [{ id: 'credential-1' }]) };
+          }
+          throw new Error('Unexpected table');
+        }),
+      })),
+    })),
+  };
+  getWorkerDbMock.mockReturnValue({
+    transaction: async (callback: (transaction: typeof tx) => Promise<unknown>) => {
+      state.depth += 1;
+      try {
+        return await callback(tx);
+      } finally {
+        state.depth -= 1;
+      }
+    },
+  });
+  return state;
+}
+
+function refreshedTokenResponse() {
+  return Response.json({
+    access_token: 'new-access-token',
+    refresh_token: 'new-refresh-token',
+    token_type: 'Bearer',
+    expires_in: 3600,
+    created_at: 1_784_118_000,
+    scope: 'api read_user',
+  });
+}
+
 describe('GitLabOAuthCredentialRefresher', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -278,6 +368,152 @@ describe('GitLabOAuthCredentialRefresher', () => {
         refresh_token_encrypted: 'new-refresh-envelope',
         oauth_client_secret_encrypted: 'new-client-secret-envelope',
         credential_version: 2,
+      }),
+    ]);
+  });
+
+  it('persists a refreshed credential after a single bounded token request', async () => {
+    const input = refreshInput();
+    const row = loadedRow(input);
+    const state = installDatabase([row, row]);
+    const crypto = new GitLabCredentialCrypto({});
+    vi.spyOn(crypto, 'decrypt').mockResolvedValue({ status: 'available', token: 'refresh-token' });
+    vi.spyOn(crypto, 'encrypt')
+      .mockResolvedValueOnce({ status: 'available', ciphertext: 'new-access-envelope' })
+      .mockResolvedValueOnce({ status: 'available', ciphertext: 'new-refresh-envelope' });
+    const depthDuringCall: number[] = [];
+    const fetchMock = vi.fn(async (_url: string, init?: RequestInit) => {
+      depthDuringCall.push(state.depth);
+      expect(init?.signal).toBeInstanceOf(AbortSignal);
+      return refreshedTokenResponse();
+    });
+
+    await expect(
+      new GitLabOAuthCredentialRefresher(
+        {
+          HYPERDRIVE: { connectionString: 'postgres://test' } as Hyperdrive,
+          GITLAB_CLIENT_ID: 'client-id',
+          GITLAB_CLIENT_SECRET: 'client-secret',
+        },
+        {
+          crypto,
+          now: () => new Date('2026-07-13T12:00:00.000Z'),
+          fetch: fetchMock as unknown as typeof fetch,
+        }
+      ).refresh(input)
+    ).resolves.toEqual({ status: 'available', token: 'new-access-token', credentialVersion: 2 });
+    expect(depthDuringCall).toEqual([0]);
+    expect(state.depth).toBe(0);
+  });
+
+  it('classifies an unanswered token request as temporary unavailability', async () => {
+    const input = refreshInput();
+    const row = loadedRow(input);
+    const state = installDatabase([row, row]);
+    const crypto = new GitLabCredentialCrypto({});
+    vi.spyOn(crypto, 'decrypt').mockResolvedValue({ status: 'available', token: 'refresh-token' });
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation(() => {
+      const controller = new AbortController();
+      controller.abort(new DOMException('The operation timed out.', 'TimeoutError'));
+      return controller.signal;
+    });
+    const fetchMock = vi.fn((_url: string, init?: RequestInit) => {
+      const { promise, reject } = Promise.withResolvers<Response>();
+      const signal = init?.signal;
+      if (!signal) {
+        reject(new Error('missing signal'));
+      } else if (signal.aborted) {
+        reject(signal.reason);
+      } else {
+        signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+      }
+      return promise;
+    });
+
+    await expect(
+      new GitLabOAuthCredentialRefresher(
+        {
+          HYPERDRIVE: { connectionString: 'postgres://test' } as Hyperdrive,
+          GITLAB_CLIENT_ID: 'client-id',
+          GITLAB_CLIENT_SECRET: 'client-secret',
+        },
+        {
+          crypto,
+          now: () => new Date('2026-07-13T12:00:00.000Z'),
+          fetch: fetchMock as unknown as typeof fetch,
+        }
+      ).refresh(input)
+    ).resolves.toEqual({ status: 'temporarily_unavailable' });
+    expect(state.credentialUpdates).toEqual([]);
+    expect(state.integrationUpdates).toEqual([]);
+    expect(state.depth).toBe(0);
+  });
+
+  it('returns the concurrent winner when another refresh commits first', async () => {
+    const input = refreshInput();
+    const candidate = loadedRow(input);
+    const winner = loadedRow(input, {
+      credential: {
+        credential_version: 2,
+        access_token_encrypted: 'winner-envelope',
+        access_token_expires_at: '2026-07-13T13:00:00.000Z',
+      },
+    });
+    const state = installDatabase([candidate, winner]);
+    const crypto = new GitLabCredentialCrypto({});
+    vi.spyOn(crypto, 'decrypt')
+      .mockResolvedValueOnce({ status: 'available', token: 'refresh-token' })
+      .mockResolvedValueOnce({ status: 'available', token: 'winner-token' });
+
+    await expect(
+      new GitLabOAuthCredentialRefresher(
+        {
+          HYPERDRIVE: { connectionString: 'postgres://test' } as Hyperdrive,
+          GITLAB_CLIENT_ID: 'client-id',
+          GITLAB_CLIENT_SECRET: 'client-secret',
+        },
+        {
+          crypto,
+          now: () => new Date('2026-07-13T12:00:00.000Z'),
+          fetch: vi.fn(async () => refreshedTokenResponse()) as unknown as typeof fetch,
+        }
+      ).refresh(input)
+    ).resolves.toEqual({ status: 'available', token: 'winner-token', credentialVersion: 2 });
+    expect(state.credentialUpdates).toEqual([]);
+    expect(state.integrationUpdates).toEqual([]);
+  });
+
+  it('revokes the credential when the instance rejects the refresh token', async () => {
+    const input = refreshInput();
+    const row = loadedRow(input);
+    const state = installDatabase([row, row]);
+    const crypto = new GitLabCredentialCrypto({});
+    vi.spyOn(crypto, 'decrypt').mockResolvedValue({ status: 'available', token: 'refresh-token' });
+
+    await expect(
+      new GitLabOAuthCredentialRefresher(
+        {
+          HYPERDRIVE: { connectionString: 'postgres://test' } as Hyperdrive,
+          GITLAB_CLIENT_ID: 'client-id',
+          GITLAB_CLIENT_SECRET: 'client-secret',
+        },
+        {
+          crypto,
+          now: () => new Date('2026-07-13T12:00:00.000Z'),
+          fetch: vi.fn(
+            async () =>
+              new Response(JSON.stringify({ error: 'invalid_grant' }), {
+                status: 401,
+                headers: { 'Content-Type': 'application/json' },
+              })
+          ) as unknown as typeof fetch,
+        }
+      ).refresh(input)
+    ).resolves.toEqual({ status: 'reconnect_required' });
+    expect(state.credentialUpdates).toEqual([
+      expect.objectContaining({
+        revoked_at: '2026-07-13T12:00:00.000Z',
+        revocation_reason: 'refresh_token_rejected',
       }),
     ]);
   });

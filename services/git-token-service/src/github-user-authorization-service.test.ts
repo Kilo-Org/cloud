@@ -10,6 +10,7 @@ const database = vi.hoisted(() => ({
   deleteWinsRace: true,
   rowAfterDelete: undefined as Record<string, unknown> | undefined,
   lockExecutions: 0,
+  depth: 0,
   // When set, successive `select().limit()` calls shift from this queue,
   // letting a test model a row that another request rotated between the
   // outer read and the post-lock re-read.
@@ -63,8 +64,14 @@ vi.mock('@kilocode/db/client', () => ({
     };
     return {
       ...transactionDb,
-      transaction: async (operation: (tx: typeof transactionDb) => Promise<unknown>) =>
-        operation(transactionDb),
+      transaction: async (operation: (tx: typeof transactionDb) => Promise<unknown>) => {
+        database.depth += 1;
+        try {
+          return await operation(transactionDb);
+        } finally {
+          database.depth -= 1;
+        }
+      },
     };
   },
 }));
@@ -141,6 +148,7 @@ describe('GitHubUserAuthorizationService envelope selection', () => {
     database.deleteWinsRace = true;
     database.rowAfterDelete = undefined;
     database.lockExecutions = 0;
+    database.depth = 0;
     vi.restoreAllMocks();
     vi.stubGlobal(
       'fetch',
@@ -303,6 +311,7 @@ describe('GitHubUserAuthorizationService disconnect', () => {
     database.deleteWinsRace = true;
     database.rowAfterDelete = undefined;
     database.lockExecutions = 0;
+    database.depth = 0;
     vi.restoreAllMocks();
   });
 
@@ -554,6 +563,7 @@ describe('GitHubUserAuthorizationService.getUserAccessToken', () => {
     database.deleteWinsRace = true;
     database.rowAfterDelete = undefined;
     database.lockExecutions = 0;
+    database.depth = 0;
     database.selectSequence = undefined;
     vi.restoreAllMocks();
   });
@@ -658,6 +668,72 @@ describe('GitHubUserAuthorizationService.getUserAccessToken', () => {
       expect.objectContaining({ method: 'POST' })
     );
     expect(database.lockExecutions).toBe(1);
+  });
+
+  it('persists a refreshed authorization after a single bounded token request', async () => {
+    const row = makeRow();
+    row.access_token_expires_at = new Date(Date.now() - 1000).toISOString();
+    database.rows = [row];
+    database.updatedRow = {
+      ...makeRow(activePublicKey, 'active', {
+        access: 'refreshed-access',
+        refresh: 'refreshed-refresh',
+      }),
+      credential_version: 2,
+      access_token_expires_at: new Date(Date.now() + 3600 * 1000).toISOString(),
+      refresh_token_expires_at: new Date(Date.now() + 7200 * 1000).toISOString(),
+    };
+    const depths: number[] = [];
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init?: RequestInit) => {
+        depths.push(database.depth);
+        expect(init?.signal).toBeInstanceOf(AbortSignal);
+        return Response.json({
+          access_token: 'refreshed-access',
+          expires_in: 3600,
+          refresh_token: 'refreshed-refresh',
+          refresh_token_expires_in: 7200,
+        });
+      })
+    );
+
+    await expect(
+      makeService().getUserAccessToken('user_1', { op: 'fetch' })
+    ).resolves.toMatchObject({ connected: true, token: 'refreshed-access' });
+    expect(depths).toEqual([0]);
+    expect(database.depth).toBe(0);
+  });
+
+  it('classifies an unanswered token request as temporary unavailability', async () => {
+    const row = makeRow();
+    row.access_token_expires_at = new Date(Date.now() - 1000).toISOString();
+    database.rows = [row];
+    vi.spyOn(AbortSignal, 'timeout').mockImplementation(() => {
+      const controller = new AbortController();
+      controller.abort(new DOMException('The operation timed out.', 'TimeoutError'));
+      return controller.signal;
+    });
+    vi.stubGlobal(
+      'fetch',
+      vi.fn((_url: string, init?: RequestInit) => {
+        const { promise, reject } = Promise.withResolvers<Response>();
+        const signal = init?.signal;
+        if (!signal) {
+          reject(new Error('missing signal'));
+        } else if (signal.aborted) {
+          reject(signal.reason);
+        } else {
+          signal.addEventListener('abort', () => reject(signal.reason), { once: true });
+        }
+        return promise;
+      })
+    );
+
+    await expect(makeService().getUserAccessToken('user_1', { op: 'fetch' })).rejects.toThrow(
+      'temporarily_unavailable'
+    );
+    expect(database.updates.filter(update => 'credential_version' in update)).toEqual([]);
   });
 
   it('strips multiple trailing slashes from the configured OAuth base URL', async () => {

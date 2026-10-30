@@ -75,6 +75,20 @@ type CredentialKind = 'access' | 'refresh';
 type RevokeResult = 'revoked' | 'token_invalid';
 type DisconnectRefreshResult = AuthorizationRow | 'terminal_refresh_token' | null;
 type RefreshResult = 'refreshed' | 'transient_failure' | 'terminal_rejection';
+
+const GITHUB_USER_AUTHORIZATION_REQUEST_TIMEOUT_MS = 10_000;
+
+type AuthorizationRefreshInputs = {
+  authorization: AuthorizationRow;
+  clientId: string;
+  clientSecret: string;
+  refreshToken: string;
+};
+
+type GitHubProviderRefreshResult =
+  | { status: 'available'; data: z.infer<typeof RefreshResponseSchema> }
+  | { status: 'terminal_rejection' }
+  | { status: 'transient_failure' };
 const DEFAULT_GITHUB_OAUTH_BASE_URL = 'https://github.com';
 const DEFAULT_GITHUB_API_BASE_URL = 'https://api.github.com';
 
@@ -475,87 +489,126 @@ export class GitHubUserAuthorizationService {
     candidate: AuthorizationRow,
     options: { force?: boolean } = {}
   ): Promise<RefreshResult> {
-    return db.transaction(async tx => {
-      await this.lockAuthorizationGrant(tx, candidate.github_user_id);
-      const [authorization] = await tx
-        .select()
-        .from(user_github_app_tokens)
-        .where(eq(user_github_app_tokens.id, candidate.id))
-        .limit(1);
-      if (!authorization) return 'transient_failure';
-      if (authorization.revoked_at) return 'terminal_rejection';
-      if (authorization.credential_version !== candidate.credential_version) {
-        // Another request already refreshed/rotated this grant while we
-        // waited for the lock. The current row is healthy (present and not
-        // revoked), so accept the concurrent winner's credential rather
-        // than failing: the caller re-reads the current row and returns it.
-        return 'refreshed';
-      }
-      if (
-        !options.force &&
-        new Date(authorization.access_token_expires_at).getTime() - Date.now() >= EXPIRY_BUFFER_MS
-      ) {
-        return 'refreshed';
-      }
-      return this.refreshAuthorization(tx, authorization);
-    });
+    const decision = await db.transaction(tx => this.readRefreshDecision(tx, candidate, options));
+    if (typeof decision !== 'object') return decision;
+
+    const refreshed = await this.requestAuthorizationRefresh(decision.inputs);
+    return db.transaction(tx => this.commitRefresh(tx, candidate, refreshed));
   }
 
-  private async refreshAuthorization(
-    db: WorkerTransaction,
-    authorization: AuthorizationRow
-  ): Promise<RefreshResult> {
+  private async readRefreshDecision(
+    tx: WorkerTransaction,
+    candidate: AuthorizationRow,
+    options: { force?: boolean }
+  ): Promise<{ status: 'refresh'; inputs: AuthorizationRefreshInputs } | RefreshResult> {
+    const [authorization] = await tx
+      .select()
+      .from(user_github_app_tokens)
+      .where(eq(user_github_app_tokens.id, candidate.id))
+      .limit(1);
+    if (!authorization) return 'transient_failure';
+    if (authorization.revoked_at) return 'terminal_rejection';
+    if (authorization.credential_version !== candidate.credential_version) {
+      // Another request already refreshed/rotated this grant. The current row is
+      // healthy (present and not revoked), so accept the concurrent winner's
+      // credential rather than failing: the caller re-reads the current row.
+      return 'refreshed';
+    }
+    if (
+      !options.force &&
+      new Date(authorization.access_token_expires_at).getTime() - Date.now() >= EXPIRY_BUFFER_MS
+    ) {
+      return 'refreshed';
+    }
+
     const clientId = this.env.GITHUB_APP_CLIENT_ID;
     const clientSecret = this.env.GITHUB_APP_CLIENT_SECRET;
     if (!clientId || !clientSecret) return 'transient_failure';
-    const refreshToken = this.decryptCredential(authorization, 'refresh');
+    return {
+      status: 'refresh',
+      inputs: {
+        authorization,
+        clientId,
+        clientSecret,
+        refreshToken: this.decryptCredential(authorization, 'refresh'),
+      },
+    };
+  }
 
+  private async requestAuthorizationRefresh(
+    inputs: AuthorizationRefreshInputs
+  ): Promise<GitHubProviderRefreshResult> {
     let response: Response;
     try {
       response = await fetch(this.getGitHubOAuthAccessTokenUrl(), {
         method: 'POST',
         headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          client_id: clientId,
-          client_secret: clientSecret,
+          client_id: inputs.clientId,
+          client_secret: inputs.clientSecret,
           grant_type: 'refresh_token',
-          refresh_token: refreshToken,
+          refresh_token: inputs.refreshToken,
         }),
+        // Bounded deadline for the provider token request.
+        signal: AbortSignal.timeout(GITHUB_USER_AUTHORIZATION_REQUEST_TIMEOUT_MS),
       });
     } catch {
-      return 'transient_failure';
+      return { status: 'transient_failure' };
     }
 
     let responseBody: unknown;
     try {
       responseBody = await response.json();
     } catch {
-      return 'transient_failure';
+      return { status: 'transient_failure' };
     }
     if (RefreshErrorResponseSchema.safeParse(responseBody).success) {
-      return 'terminal_rejection';
+      return { status: 'terminal_rejection' };
     }
-    if (!response.ok) return 'transient_failure';
+    if (!response.ok) return { status: 'transient_failure' };
     const parsed = RefreshResponseSchema.safeParse(responseBody);
-    if (!parsed.success) return 'transient_failure';
+    return parsed.success
+      ? { status: 'available', data: parsed.data }
+      : { status: 'transient_failure' };
+  }
+
+  private async commitRefresh(
+    tx: WorkerTransaction,
+    candidate: AuthorizationRow,
+    refreshed: GitHubProviderRefreshResult
+  ): Promise<RefreshResult> {
+    await this.lockAuthorizationGrant(tx, candidate.github_user_id);
+    const [authorization] = await tx
+      .select()
+      .from(user_github_app_tokens)
+      .where(eq(user_github_app_tokens.id, candidate.id))
+      .limit(1);
+    if (!authorization) return 'transient_failure';
+    if (authorization.revoked_at) return 'terminal_rejection';
+    if (authorization.credential_version !== candidate.credential_version) {
+      // A concurrent refresh committed the new secrets while this request
+      // waited on the token endpoint: its credential is current and healthy.
+      return 'refreshed';
+    }
+    if (refreshed.status !== 'available') return refreshed.status;
 
     const now = Date.now();
-    const [updated] = await db
+    const [updated] = await tx
       .update(user_github_app_tokens)
       .set({
         access_token_encrypted: this.encryptCredential(
-          parsed.data.access_token,
+          refreshed.data.access_token,
           authorization,
           'access'
         ),
-        access_token_expires_at: new Date(now + parsed.data.expires_in * 1000).toISOString(),
+        access_token_expires_at: new Date(now + refreshed.data.expires_in * 1000).toISOString(),
         refresh_token_encrypted: this.encryptCredential(
-          parsed.data.refresh_token,
+          refreshed.data.refresh_token,
           authorization,
           'refresh'
         ),
         refresh_token_expires_at: new Date(
-          now + parsed.data.refresh_token_expires_in * 1000
+          now + refreshed.data.refresh_token_expires_in * 1000
         ).toISOString(),
         credential_version: sql`${user_github_app_tokens.credential_version} + 1`,
         last_used_at: new Date().toISOString(),
@@ -570,7 +623,7 @@ export class GitHubUserAuthorizationService {
       .returning();
     if (updated) return 'refreshed';
 
-    const [winner] = await db
+    const [winner] = await tx
       .select()
       .from(user_github_app_tokens)
       .where(eq(user_github_app_tokens.id, authorization.id))
@@ -597,6 +650,8 @@ export class GitHubUserAuthorizationService {
         'User-Agent': 'Kilo-Git-Token-Service',
       },
       body: JSON.stringify({ access_token: accessToken }),
+      // Bounded deadline for the provider revocation request.
+      signal: AbortSignal.timeout(GITHUB_USER_AUTHORIZATION_REQUEST_TIMEOUT_MS),
     });
     if (response.ok || response.status === 404) return 'revoked';
     if (response.status === 401 || response.status === 403 || response.status === 422) {
@@ -627,6 +682,8 @@ export class GitHubUserAuthorizationService {
           grant_type: 'refresh_token',
           refresh_token: refreshToken,
         }),
+        // Bounded deadline for the provider token request.
+        signal: AbortSignal.timeout(GITHUB_USER_AUTHORIZATION_REQUEST_TIMEOUT_MS),
       });
     } catch {
       return null;

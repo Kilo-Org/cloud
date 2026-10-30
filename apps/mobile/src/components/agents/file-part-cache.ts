@@ -26,6 +26,8 @@ export type FilePartCacheEntry = {
   renewing?: boolean;
   // last on-demand presign failed; cleared on success/retry
   resolveFailed?: boolean;
+  // a `data:` body is being written; `url` lands when the write resolves
+  writePending?: boolean;
 };
 
 /** Reactive map of partId → captured FilePart entry. First write wins. */
@@ -108,8 +110,9 @@ function persistAndPublish(
  * as a `file://` URI; an `http(s)` URL is stored as-is. Never downloads bytes.
  * A cloud-agent sandbox `file://` attachment URL stores a ref-only entry (no
  * `url` key) for later on-demand presigning. First write wins: a later call
- * for the same `partId` is a no-op. A `data:` entry is published when its
- * write resolves, so the caller's turn never decodes or writes the body.
+ * for the same `partId` is a no-op. A `data:` part publishes a `writePending`
+ * entry immediately and its `url` when the write resolves, so the renderer
+ * shows a loading surface instead of the inline base64 body.
  */
 export function cacheFilePart(
   partId: string,
@@ -136,10 +139,13 @@ export function cacheFilePart(
     emitChange(partId);
     return;
   }
+  entriesByPartId.set(partId, {
+    mime: payload.mime,
+    ...(payload.filename ? { filename: payload.filename } : {}),
+    writePending: true,
+  });
+  emitChange(partId);
   persistAndPublish(partId, payload, url => {
-    if (entriesByPartId.has(partId)) {
-      return;
-    }
     entriesByPartId.set(partId, entryFor(payload, url));
     emitChange(partId);
   });

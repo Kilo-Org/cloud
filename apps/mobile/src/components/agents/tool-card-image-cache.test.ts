@@ -11,6 +11,7 @@ import {
   extensionForImageMime,
   extensionForMime,
   getToolCardImageUri,
+  isToolCardImagePending,
   stripDataUrlBase64Prefix,
   useToolCardImageUri,
 } from '@/components/agents/tool-card-image-cache';
@@ -395,7 +396,7 @@ describe('clearToolCardImageCache', () => {
 });
 
 describe('cacheToolAttachment write lifetime', () => {
-  it('returns before the write resolves and records the URI only afterwards', async () => {
+  it('reports pending before the write resolves and records the URI only afterwards', async () => {
     const write = Promise.withResolvers<undefined>();
     expoFileSystemMock.File.mockImplementationOnce(function FilePending(
       directory: { name?: string },
@@ -416,11 +417,13 @@ describe('cacheToolAttachment write lifetime', () => {
 
     await drainCacheWrites();
     expect(getToolCardImageUri('part-slow')).toBeUndefined();
+    expect(isToolCardImagePending('part-slow')).toBe(true);
 
     write.resolve(undefined);
     await vi.waitFor(() => {
       expect(getToolCardImageUri('part-slow')).toBe('file:///cache/tool-card-images/part-slow.png');
     });
+    expect(isToolCardImagePending('part-slow')).toBe(false);
   });
 
   it('does not publish a write that resolves after a sign-out reset', async () => {
@@ -456,6 +459,7 @@ describe('cacheToolAttachment write lifetime', () => {
     cacheToolAttachment('part-retry', { mime: 'image/png', dataUrl: 'data:image/png;base64,AAA' });
     await drainCacheWrites();
     expect(getToolCardImageUri('part-retry')).toBeUndefined();
+    expect(isToolCardImagePending('part-retry')).toBe(false);
 
     cacheToolAttachment('part-retry', { mime: 'image/png', dataUrl: 'data:image/png;base64,AAA' });
     await vi.waitFor(() => {
@@ -492,9 +496,13 @@ describe('useToolCardImageUri', () => {
 
     cacheToolAttachment('part-a', { mime: 'image/png', dataUrl: 'data:image/png;base64,AAA' });
     await vi.waitFor(() => {
-      expect(rendersA).toHaveBeenCalledTimes(2);
+      expect(getToolCardImageUri('part-a')).toBe('file:///cache/tool-card-images/part-a.png');
     });
+    await drainCacheWrites();
 
+    // part-a re-renders for its pending state and again for its recorded URI;
+    // part-b's subscriber is never woken.
+    expect(rendersA.mock.calls.length).toBeGreaterThan(1);
     expect(rendersB).toHaveBeenCalledTimes(1);
     expect(getToolCardImageUri('part-b')).toBeUndefined();
 

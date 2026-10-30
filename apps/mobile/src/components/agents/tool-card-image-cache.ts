@@ -9,15 +9,28 @@ const CACHE_DIR_NAME = 'tool-card-images';
 
 /** part ids currently writing or already written this process lifetime */
 const inFlightOrDone = new Set<string>();
+/** part ids whose write is in flight; the card shows a loading surface instead
+ *  of reporting the attachment unavailable. */
+const pendingPartIds = new Set<string>();
 
 /** Reactive map of partId → file:// URI, updated only after a successful write. */
 const urisByPartId = new Map<string, string>();
+/** Per-part snapshot counter, so a subscriber re-renders on every state change
+ *  of its own part (a landed URI, or a pending write turning into a failure)
+ *  and is never woken by another part. */
+const versionByPartId = new Map<string, number>();
 const subscriptions = createPartSubscriptions();
 /** Bumped by every reset; a write that started before a reset never publishes
  *  its URI into the next account's map. */
 let cacheGeneration = 0;
 
 let cacheDirectory: Directory | undefined = undefined;
+
+/** Wake the subscribers of one part whose state changed. */
+function emitChange(partId: string): void {
+  versionByPartId.set(partId, (versionByPartId.get(partId) ?? 0) + 1);
+  subscriptions.notify(partId);
+}
 
 function ensureCacheDirectory(): Directory {
   if (!cacheDirectory) {
@@ -89,25 +102,19 @@ function cacheFilenameForAttachment(partId: string, mime: string, filename?: str
   return safe.replace(new RegExp(`-${pattern}(?!.*-${pattern})`), '.');
 }
 
-function recordUri(partId: string, uri: string): void {
-  if (urisByPartId.get(partId) === uri) {
-    return;
-  }
-  urisByPartId.set(partId, uri);
-  subscriptions.notify(partId);
-}
-
 /**
  * Fire-and-forget sink for completed tool-part attachments.
  * Never throws. First attachment wins for a multi-attachment part (no tool
  * emits multi-attachment parts today; documented, not handled specially beyond
  * the part-id Set which also covers that case).
  *
- * The part id is marked synchronously, then the directory, the exists check and
- * the write run off the caller's turn: `File.write` is the asynchronous API, so
- * the base64 decode and the disk write of an arbitrarily large attachment never
- * hold the JS thread that is publishing the stream. The URI is published when
- * the write resolves.
+ * The part id is marked synchronously so a live-stream pass and a history-replay
+ * pass cannot double-write it, and the card renders a loading surface while the
+ * body is written. The directory create and the exists check are synchronous
+ * native calls on the caller's turn; the base64 decode and the disk write are
+ * not — `await file.write(...)` hands those to the native file-system thread, so
+ * an arbitrarily large attachment no longer holds the JS thread that publishes
+ * the stream. The URI is recorded when the write resolves.
  *
  * When `filename` is provided (non-image attachments), the cache filename is
  * derived via `getSafeCacheFilename`. When absent (images), the legacy
@@ -132,6 +139,8 @@ export function cacheToolAttachment(
   }
 
   const generation = cacheGeneration;
+  pendingPartIds.add(partId);
+  emitChange(partId);
   void (async () => {
     try {
       const directory = ensureCacheDirectory();
@@ -139,12 +148,16 @@ export function cacheToolAttachment(
       if (!file.exists) {
         await file.write(payload, { encoding: 'base64' });
       }
+      pendingPartIds.delete(partId);
       if (generation === cacheGeneration) {
-        recordUri(partId, file.uri);
+        urisByPartId.set(partId, file.uri);
       }
+      emitChange(partId);
     } catch {
       // A failed create or write clears the mark so the next pass retries.
+      pendingPartIds.delete(partId);
       inFlightOrDone.delete(partId);
+      emitChange(partId);
     }
   })();
 }
@@ -164,19 +177,25 @@ export function getToolCardImageUri(partId: string): string | undefined {
   return urisByPartId.get(partId);
 }
 
+/** True while the part's body is being written and no URI is recorded yet. */
+export function isToolCardImagePending(partId: string): boolean {
+  return pendingPartIds.has(partId);
+}
+
 /**
  * Reactive lookup of a cached tool-card image URI.
  * Returns `undefined` until a successful write (or a pre-existing file) is
- * recorded for `partId`. Each hook subscribes to its own part, so recording one
- * attachment's URI re-renders only the cards mounted for that part.
+ * recorded for `partId`. Each hook subscribes to its own part, so a change to
+ * one attachment's state re-renders only the cards mounted for that part.
  */
 export function useToolCardImageUri(partId: string): string | undefined {
   const subscribe = useCallback(
     (listener: () => void) => subscriptions.subscribe(partId, listener),
     [partId]
   );
-  const getSnapshot = useCallback(() => urisByPartId.get(partId), [partId]);
-  return useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  const getSnapshot = useCallback(() => versionByPartId.get(partId) ?? 0, [partId]);
+  useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
+  return urisByPartId.get(partId);
 }
 
 /**
@@ -197,7 +216,9 @@ export function clearToolCardImageCache(): void {
   }
   cacheGeneration += 1;
   inFlightOrDone.clear();
+  pendingPartIds.clear();
   urisByPartId.clear();
+  versionByPartId.clear();
   cacheDirectory = undefined;
   subscriptions.notifyAll();
 }
@@ -206,7 +227,9 @@ export function clearToolCardImageCache(): void {
 export function __resetToolCardImageCacheForTests(): void {
   cacheGeneration += 1;
   inFlightOrDone.clear();
+  pendingPartIds.clear();
   urisByPartId.clear();
+  versionByPartId.clear();
   cacheDirectory = undefined;
   subscriptions.notifyAll();
 }

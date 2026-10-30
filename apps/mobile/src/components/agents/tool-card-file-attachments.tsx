@@ -13,7 +13,7 @@ import {
 } from '@/lib/share-remote-file';
 
 import { getToolFileAttachments } from './tool-card-attachments';
-import { useToolCardImageUri } from './tool-card-image-cache';
+import { isToolCardImagePending, useToolCardImageUri } from './tool-card-image-cache';
 
 function FileChip({
   label,
@@ -27,9 +27,23 @@ function FileChip({
   const colors = useThemeColors();
   const { t } = useTranslation();
   const uri = useToolCardImageUri(partId);
-  const available = uri !== undefined;
 
-  if (!available) {
+  if (uri === undefined) {
+    if (isToolCardImagePending(partId)) {
+      // The body is still being written: show the attachment without a share
+      // action instead of reporting it unavailable.
+      return (
+        <View className="flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900">
+          <FileIcon size={16} color={colors.mutedForeground} />
+          <View className="flex-1">
+            <Text className="text-xs font-medium text-foreground" numberOfLines={1}>
+              {label}
+            </Text>
+            <Text className="text-xs text-muted-foreground">{mime}</Text>
+          </View>
+        </View>
+      );
+    }
     return (
       <View className="flex-row items-center gap-2 rounded-md bg-neutral-100 px-3 py-2 dark:bg-neutral-900">
         <FileIcon size={14} color={colors.mutedForeground} />

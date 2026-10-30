@@ -600,7 +600,7 @@ describe('clearFilePartCache', () => {
 });
 
 describe('cacheFilePart write lifetime', () => {
-  it('returns before the write resolves and publishes the entry only afterwards', async () => {
+  it('publishes a pending entry at once and the file URI only after the write resolves', async () => {
     const write = Promise.withResolvers<undefined>();
     expoFileSystemMock.File.mockImplementationOnce(function FilePending(
       _directory: { name?: string },
@@ -622,7 +622,11 @@ describe('cacheFilePart write lifetime', () => {
     });
 
     await drainCacheWrites();
-    expect(getFilePartCacheEntry('part-slow')).toBeUndefined();
+    expect(getFilePartCacheEntry('part-slow')).toEqual({
+      mime: 'application/pdf',
+      filename: 'report.pdf',
+      writePending: true,
+    });
 
     write.resolve(undefined);
     await vi.waitFor(() => {
@@ -630,6 +634,7 @@ describe('cacheFilePart write lifetime', () => {
         'file:///cache/session-file-parts/part-slow-report.pdf'
       );
     });
+    expect(getFilePartCacheEntry('part-slow')).not.toHaveProperty('writePending');
   });
 
   it('does not publish a write that resolves after a sign-out reset', async () => {

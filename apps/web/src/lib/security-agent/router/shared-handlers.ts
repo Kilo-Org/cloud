@@ -11,7 +11,10 @@ import {
   updateRepositoriesForIntegration,
 } from '@/lib/integrations/db/platform-integrations';
 import { fetchGitHubRepositories } from '@/lib/integrations/platforms/github/adapter';
-import { type PlatformRepository } from '@/lib/integrations/core/types';
+import {
+  shouldSyncProviderRepositories,
+  type PlatformRepository,
+} from '@/lib/integrations/core/types';
 import {
   getSecurityAgentConfigWithStatus,
   saveSecurityAgentConfigWithRevision,
@@ -1343,12 +1346,20 @@ export function createSecurityAgentHandlers<TExtra = {}>(deps: SecurityAgentDeps
 
       const snapshot = readRepositorySnapshot(owner, integration);
       let repos = snapshot.repositories;
-      // A dropped entry is a snapshot this router cannot fully read, so refetch
-      // and rewrite it the same way as one it read as empty: otherwise the
-      // dropped repositories stay invisible in every repository picker.
+      // A snapshot this router cannot fully read is rebuilt from the provider, so
+      // the dropped repositories do not stay invisible in every repository
+      // picker. Otherwise the shared snapshot policy decides: a synchronized
+      // snapshot answers the list as-is, including an empty one, and only a
+      // snapshot that was never synchronized is read from the provider.
+      const cachedRepositories = integration.repositories ? snapshot.repositories : null;
       if (
         integration.platform_installation_id &&
-        (repos.length === 0 || snapshot.unreadableCount > 0)
+        (snapshot.unreadableCount > 0 ||
+          shouldSyncProviderRepositories({
+            forceRefresh: false,
+            cachedRepositories,
+            repositoriesSyncedAt: integration.repositories_synced_at ?? null,
+          }))
       ) {
         const readableCount = repos.length;
         try {

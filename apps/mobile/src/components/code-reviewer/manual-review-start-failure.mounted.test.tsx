@@ -214,9 +214,7 @@ describe('ManualReviewScreen start failure copy', () => {
     const { renderer, unmount } = await renderScreen();
     const handlers = startReview(renderer);
 
-    act(() =>
-      handlers.onError?.(trpcError('FORBIDDEN', 'Organization trial has expired.'))
-    );
+    act(() => handlers.onError?.(trpcError('FORBIDDEN', 'Organization trial has expired.')));
 
     const texts = renderedTexts(renderer);
     expect(texts).toContain(i18n.t('common.organizationTrialEnded'));
@@ -240,7 +238,10 @@ describe('ManualReviewScreen start failure copy', () => {
 
     act(() =>
       handlers.onError?.(
-        trpcError('FORBIDDEN', 'You do not have the required organizational role to access this feature')
+        trpcError(
+          'FORBIDDEN',
+          'You do not have the required organizational role to access this feature'
+        )
       )
     );
 

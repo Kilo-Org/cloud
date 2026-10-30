@@ -14,7 +14,8 @@ function trpcError(code: string, message: string) {
 // the copy the screen renders, so the assertion proves code-based mapping.
 const SERVER_NOT_FOUND = 'No connected GitHub installation can read this pull request.';
 // The refusal `ensureOrganizationAccess` throws for a narrower role.
-const SERVER_MEMBER_ROLE = 'You do not have the required organizational role to access this feature';
+const SERVER_MEMBER_ROLE =
+  'You do not have the required organizational role to access this feature';
 
 describe('manualReviewStartFailure copy', () => {
   it.each([
@@ -33,9 +34,9 @@ describe('manualReviewStartFailure copy', () => {
   });
 
   it('keeps the generic copy for a code it does not map', () => {
-    expect(manualReviewStartFailure(trpcError('INTERNAL_SERVER_ERROR', 'boom'), 'github').message).toBe(
-      i18n.t('codeReviewer.unknownError')
-    );
+    expect(
+      manualReviewStartFailure(trpcError('INTERNAL_SERVER_ERROR', 'boom'), 'github').message
+    ).toBe(i18n.t('codeReviewer.unknownError'));
   });
 
   it('uses the transport copy for an error that carries no code', () => {
@@ -54,7 +55,9 @@ describe('manualReviewStartFailure copy', () => {
         requestNoun: i18n.t('common.pullRequest'),
       })
     );
-    expect(manualReviewStartFailure({ shape: { data: { code: 'CONFLICT' } } }, 'github').message).toBe(
+    expect(
+      manualReviewStartFailure({ shape: { data: { code: 'CONFLICT' } } }, 'github').message
+    ).toBe(
       i18n.t('codeReviewer.manualReview.startAlreadyRunning', {
         provider: 'GitHub',
         requestNoun: i18n.t('common.pullRequest'),
@@ -126,7 +129,10 @@ describe('manualReviewStartFailure retryability', () => {
 
 describe('manualReviewStartFailure localization', () => {
   it('renders localized copy instead of the server message', () => {
-    const { message } = manualReviewStartFailure(trpcError('NOT_FOUND', SERVER_NOT_FOUND), 'github');
+    const { message } = manualReviewStartFailure(
+      trpcError('NOT_FOUND', SERVER_NOT_FOUND),
+      'github'
+    );
     expect(message).toBe(
       'Could not read that pull request from GitHub. Check the URL and that the repository is accessible.'
     );

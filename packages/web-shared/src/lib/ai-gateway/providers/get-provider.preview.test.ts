@@ -1,3 +1,4 @@
+import { randomBytes } from 'node:crypto';
 import { beforeEach, describe, expect, test } from '@jest/globals';
 import {
   getProvider,
@@ -356,6 +357,39 @@ describe('getProvider with an organization provider allow-list', () => {
     await expect(
       routeForOrganizationKeys(['moonshotai', 'openrouter'], new Set(['anthropic']))
     ).resolves.toEqual({ route: 'gateway-byok', providerId: 'openrouter' });
+  });
+
+  test('fails closed when the allowed key cannot be decrypted, even if a disallowed key can', async () => {
+    const user = await insertTestUser();
+    const organization = await createTestOrganization(`Allow ${crypto.randomUUID()}`, user.id, 0);
+    const wrongKey = randomBytes(32).toString('base64');
+    await db.insert(byok_api_keys).values([
+      {
+        organization_id: organization.id,
+        provider_id: 'moonshotai',
+        encrypted_api_key: encryptApiKey('moonshotai-secret', wrongKey),
+        created_by: user.id,
+      },
+      {
+        organization_id: organization.id,
+        provider_id: 'anthropic',
+        encrypted_api_key: encryptApiKey('anthropic-secret', BYOK_ENCRYPTION_KEY),
+        created_by: user.id,
+      },
+    ]);
+    jest.mocked(findDirectByokCatalogModels).mockResolvedValue([]);
+    jest.mocked(getModelInferenceUserByokProviders).mockResolvedValue(['moonshotai', 'anthropic']);
+    jest.mocked(shouldRouteToVercel).mockResolvedValue(false);
+
+    await expect(
+      getProvider({
+        requestedModel: MODEL,
+        request: request('chat_completions'),
+        user,
+        organizationId: organization.id,
+        getAllowedProviders: async () => new Set(['moonshotai']),
+      })
+    ).rejects.toThrow();
   });
 
   test('skips every provider key when no allowed provider serves the model', async () => {

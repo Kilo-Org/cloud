@@ -412,20 +412,20 @@ async function getGatewayRoutedByok(
 ): Promise<GatewayRoutedByok<BYOKResult>> {
   const none: GatewayRoutedByok<BYOKResult> = { inference: [], gateway: [] };
   if (isAnonymousContext(user)) return none;
-  const candidateProviders = await getGatewayRoutedByokCandidateProviders(requestedModel, options);
+  const allProviders = await getGatewayRoutedByokCandidateProviders(requestedModel, options);
+  if (allProviders.length === 0) return none;
+  // Keys for providers outside the organization allow-list are never loaded, so a later route that
+  // honors the allow-list takes the request, and an undecryptable allowed key still fails closed.
+  const allowedProviders = await options.getAllowedProviders();
+  const candidateProviders = allProviders.filter(providerId =>
+    isVercelUserByokProviderAllowed(providerId, allowedProviders)
+  );
   if (candidateProviders.length === 0) return none;
   const userByok =
     (organizationId
       ? await getBYOKforOrganization(readDb, organizationId, candidateProviders)
       : await getBYOKforUser(readDb, user.id, candidateProviders)) ?? [];
-  if (userByok.length === 0) return none;
-  // Keys for providers outside the organization allow-list are skipped, so a later route that
-  // honors the allow-list takes the request.
-  const allowedProviders = await options.getAllowedProviders();
-  return splitGatewayRoutedByok(
-    userByok.filter(byok => isVercelUserByokProviderAllowed(byok.providerId, allowedProviders)),
-    requestedModel
-  );
+  return splitGatewayRoutedByok(userByok, requestedModel);
 }
 
 const noProviderAllowList = async () => undefined;

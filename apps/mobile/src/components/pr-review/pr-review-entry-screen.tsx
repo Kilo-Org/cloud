@@ -123,7 +123,7 @@ export function PrReviewEntryScreen() {
   const handleRemoveRecent = (entry: RecentPr) => {
     confirm({
       title: t('prReview.entry.removeFromRecentsTitle'),
-      message: t('prReview.entry.removeFromRecentsMessage'),
+      message: `${providerPrRefLabel(providerRefFromRecentPr(entry))}\n${t('prReview.entry.removeFromRecentsMessage')}`,
       confirmLabel: t('common.remove'),
       onConfirm: () => {
         void (async () => {

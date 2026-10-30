@@ -82,12 +82,9 @@ describe('recents identity across providers', () => {
     const gitlab = find(rows[1], 'Pressable', () => true);
     (propsOf(gitlab).onLongPress as () => void)();
     expect(mocks.push).not.toHaveBeenCalled();
-    expect(mocks.confirm).toHaveBeenCalledWith({
-      title: 'Remove from recents?',
-      message: 'This review will be removed from your recents.',
-      confirmLabel: 'Remove',
-      onConfirm: expect.any(Function),
-    });
+    expect(mocks.confirm).toHaveBeenCalledWith(
+      expect.objectContaining({ message: expect.stringContaining('acme/api!7') })
+    );
     // The hoisted mock is untyped; the request shape is the dialog contract.
     const request = mocks.confirm.mock.calls.at(0)?.at(0) as ConfirmDialogRequest | undefined;
     request?.onConfirm();

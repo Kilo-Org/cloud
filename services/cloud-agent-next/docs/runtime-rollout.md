@@ -13,7 +13,9 @@ images from the catalog. Manual mode, descriptor, cohort or image drift fails be
 
 The runtime-free/preinstalled pair is invalid in the shared configuration schema and the Worker.
 Native Cloudflare Containers select downloaded startup through the catalog. BYOC Vercel always uses
-downloaded startup and requires a published runtime release. SDK pins keep preinstalled startup.
+downloaded startup and requires a published runtime release. A catalog target marked `vercel: true`
+provisions that release even when its native startup is preinstalled, so native mode and Vercel
+startup stay independent. SDK pins keep preinstalled startup.
 
 BYOC Vercel uses its customer-owned snapshot as the base. The snapshot setup provides the fixed Node
 path and Bun version required by the bootstrap. Downloaded startup installs the selected immutable CLI
@@ -35,7 +37,9 @@ metadata, not an authorization boundary.
 The renderer retains `app` alongside `runtime-free`; the allocation's selected startup mode and image
 are used together, including snapshot fallback. Existing allocations keep their running image and mode.
 An absent `interactiveOrgIds` means deployment-wide startup selection; an empty catalog list is
-rejected. For a complete rollback, remove the production override so it inherits the preinstalled default.
+rejected. A mode rollback sets the target to preinstalled while keeping `vercel: true`, so the
+published release remains available to Vercel sessions; a target without Vercel can instead inherit
+the preinstalled default.
 
 Environment snapshot builders use downloaded startup over a runtime-free base. Snapshot enrollment
 remains controlled by `ENVIRONMENT_SNAPSHOT_ORG_IDS`, independently of the interactive runtime cohort.
@@ -50,15 +54,16 @@ compatibility when the runtime-free base image and ABI stay unchanged.
 ## Approval and rollout order
 
 Production uses downloaded runtime-free for its `interactiveOrgIds` cohort; every other target and session
-uses preinstalled all-in-one. A downloaded catalog entry is the only
-switch: it makes main CI publish a handoff for that SHA, and deployment waits for that handoff.
+uses preinstalled all-in-one. A downloaded catalog entry or a `vercel: true` target makes main CI
+publish a handoff for that SHA, and deployment waits for that handoff.
 Real-provider qualification runs on the production test-organization cohort. Record the Worker name,
 exact source SHA, bucket and instance type for each qualification deployment.
 
 1. Provision publication through the process in [runtime-publication.md](runtime-publication.md).
-   Verify that a main CI run with a downloaded catalog entry publishes the exact-SHA handoff, and that
-   a preinstalled-only catalog skips publication. Failed CI, PR, fork and merge-group runs must not
-   publish. Repeat successful publication and confirm identical retained objects.
+   Verify that a main CI run with a downloaded or Vercel target publishes the exact-SHA handoff, and
+   that a catalog without downloaded or Vercel targets skips publication. Failed CI, PR, fork and
+   merge-group runs must not publish. Repeat successful publication and confirm identical retained
+   objects.
 2. Runtime-free relies on B1 ([PR #7914](https://github.com/Kilo-Org/cloud/pull/7914)): a running
    container captures under its start image. B1 is merged into main, and its regression test runs
    in CI.
@@ -72,10 +77,10 @@ For a clean checkout, preview deployment preparation without running Wrangler:
     SOURCE_SHA=$(git rev-parse HEAD)
     pnpm exec tsx scripts/prepare-runtime-deploy.ts production "$SOURCE_SHA"
 
-The generated wrangler.runtime-generated.json stays ignored. Preinstalled preparation requires no runtime
-bucket or registry credentials. Downloaded preparation needs the approved read credentials and exact-SHA
-handoff. Inspect the generated image reference and vars before an approved deployment. The existing
-Worker workflow consumes that exact generated config.
+The generated wrangler.runtime-generated.json stays ignored. Preinstalled preparation for a target
+without Vercel requires no runtime bucket or registry credentials. Downloaded and Vercel preparation
+need the approved read credentials and exact-SHA handoff. Inspect the generated image reference and
+vars before an approved deployment. The existing Worker workflow consumes that exact generated config.
 
 ## Required provider evidence
 
@@ -107,9 +112,11 @@ Provider metadata retention remains unmeasured until the approved real-provider 
 Use the current compatible Worker build with a reviewed catalog change. Image rollback changes
 runtime-free to all-in-one while mode stays downloaded. Mode rollback then selects preinstalled/all-in-one.
 The renderer applies each change to new allocations. It does not rewrite existing allocations or their
-deadlines. Do not deploy an older Worker that cannot read stored startup modes. A mode rollback also
-removes the rendered `RUNTIME_RELEASE_BUCKET` binding. A downloaded allocation that is still
-bootstrapping then gets 503 for artifact reads and restarts on the preinstalled path.
+deadlines. Do not deploy an older Worker that cannot read stored startup modes. On a target without
+Vercel, a mode rollback also removes the rendered `RUNTIME_RELEASE_BUCKET` binding. A downloaded
+allocation that is still bootstrapping then gets 503 for artifact reads and restarts on the
+preinstalled path. A `vercel: true` target keeps the descriptor and binding so Vercel startup keeps
+working after the native mode rollback.
 
 Keep earlier descriptors, payloads, handoffs and image digests. Do not delete snapshots or publication
 objects during rollback. A mode change uses a separate repository snapshot namespace.

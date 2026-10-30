@@ -7,6 +7,10 @@ import {
   allocation as allocationTable,
   routes as routesTable,
 } from '../../src/control-plane/sandbox/sqlite-schema.js';
+import {
+  listPendingProviderReplacements,
+  writePendingProviderReplacement,
+} from '../../src/control-plane/sandbox/provider-replacement.js';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/durable-sqlite';
 import type { SnapshotResolution } from '../../src/environment-build/coordinator.js';
@@ -119,6 +123,9 @@ const WITH_SNAPSHOT = { ENVIRONMENT_BUILD: fakeEnvironmentBuild().namespace };
 const WITHOUT_SNAPSHOT = { ENVIRONMENT_BUILD: fakeEnvironmentBuild(MISSING).namespace };
 const VERCEL_ENV = {
   ...WITH_SNAPSHOT,
+  VERCEL_SANDBOX_RUNTIME: 'node24',
+  VERCEL_SANDBOX_INITIAL_TIMEOUT_MS: '300000',
+  VERCEL_SANDBOX_EXTEND_DURATION_MS: '600000',
   RUNTIME_RELEASE_DESCRIPTOR: RUNTIME_DESCRIPTOR,
   RUNTIME_RELEASE_BUCKET: {
     async head() {
@@ -177,6 +184,9 @@ function createFakeProvider(
     launchError?: Error;
     launches?: Array<ProviderLaunchResult | Error>;
     creates?: Array<{ snapshotFailed?: true } | { unresolved: true } | undefined>;
+    createErrors?: Array<Error | undefined>;
+    createErrorsBeforeRef?: Array<Error | undefined>;
+    observeReplacement?: () => 'unknown' | { providerRef: string };
     /** Physical refs include the allocation name, like the real Vercel provider. */
     vercel?: boolean;
     events?: string[];
@@ -219,10 +229,14 @@ function createFakeProvider(
       }
       const configured = options.creates?.[createIndex];
       if (configured !== undefined && 'unresolved' in configured) return configured;
+      const createErrorBeforeRef = options.createErrorsBeforeRef?.[createIndex];
+      if (createErrorBeforeRef !== undefined) throw createErrorBeforeRef;
       const providerRef = options.vercel
         ? `mem_${intent.allocationName}_${intent.intentId}`
         : `mem_${intent.intentId}`;
       provider.createdRefs.push(providerRef);
+      const createError = options.createErrors?.[createIndex];
+      if (createError !== undefined) throw createError;
       return configured?.snapshotFailed === true
         ? { providerRef, snapshotFailed: true as const }
         : { providerRef };
@@ -245,7 +259,17 @@ function createFakeProvider(
       if (result instanceof Error) throw result;
       return result ?? { startSource: options.startSource ?? 'image' };
     },
-    async observe(ref) {
+    async observe(ref, intent) {
+      if (ref === null && intent !== undefined && options.vercel) {
+        const scripted = options.observeReplacement?.();
+        if (scripted === 'unknown') return { status: 'unknown' as const };
+        if (scripted !== undefined)
+          return { status: 'active' as const, providerRef: scripted.providerRef };
+        const expected = `mem_${intent.allocationName}_${intent.intentId}`;
+        return provider.createdRefs.includes(expected)
+          ? { status: 'active' as const, providerRef: expected }
+          : { status: 'unknown' as const };
+      }
       return { status: 'active', ...(ref === null ? {} : { providerRef: ref }) };
     },
     async stop(ref) {
@@ -371,6 +395,16 @@ function readProviderPin(stub: DurableObjectStub<SandboxControlV2>) {
     const [row] = await db.select({ pin: allocationTable.provider_pin }).from(allocationTable);
     return typeof row?.pin === 'string' ? JSON.parse(row.pin) : null;
   });
+}
+
+function readPendingReplacements(stub: DurableObjectStub<SandboxControlV2>) {
+  return runInDurableObject(stub, (_instance, state) =>
+    listPendingProviderReplacements(state.storage)
+  );
+}
+
+function readAlarm(stub: DurableObjectStub<SandboxControlV2>) {
+  return runInDurableObject(stub, (_instance, state) => state.storage.getAlarm());
 }
 
 async function connect(sandboxId: string, provider: FakeProvider, launchCount = 1) {
@@ -1595,6 +1629,7 @@ describe('Vercel BYOC environment snapshot restore', () => {
       provider: 'vercel',
       allocationName: `${initialName}-image`,
     });
+    expect(await readPendingReplacements(rebuilt)).toEqual([]);
   });
 
   it('keeps the original pin through a held replacement create and stops the late replacement', async () => {
@@ -1652,5 +1687,332 @@ describe('Vercel BYOC environment snapshot restore', () => {
       provider: 'vercel',
       allocationName: originalName,
     });
+  });
+
+  it('stops a replacement whose create response was lost and keeps the original pin', async () => {
+    const sandboxId = 'sbx__vercel_snapshot_replacement_lost';
+    const provider = createFakeProvider({
+      vercel: true,
+      holdCreateIndex: 1,
+      launches: [{ startSource: 'repository', snapshotFailed: true }],
+      createErrors: [undefined, new Error('Sandbox fallback create timed out')],
+    });
+    const { stub } = await setup(sandboxId, provider, {
+      ...VERCEL_ENV,
+      ENVIRONMENT_BUILD: fakeEnvironmentBuild(RESOLVED_VERCEL).namespace,
+    });
+    await stub.prepare({ ...prepareInput(), sandboxSelection: VERCEL_SELECTION });
+    await waitFor(() => expect(provider.createIntents).toHaveLength(2));
+
+    const originalName = provider.createIntents[0]?.allocationName;
+    const originalRef = provider.createdRefs[0]!;
+    const replacementRef = `mem_${originalName}-image_${provider.createIntents[1]!.intentId}`;
+
+    await stub.release({ sessionId: SESSION });
+    await releaseHeld(stub, () => provider.releaseCreate());
+
+    await waitFor(() => expect(provider.stopRefs).toContain(replacementRef));
+    expect(provider.stopRefs[0]).toBe(originalRef);
+    expect(provider.stopMismatches).toEqual([]);
+    expect(provider.launchRefs).toEqual([originalRef]);
+    expect(provider.launchEnvs).toHaveLength(1);
+    expect(await readProviderPin(stub)).toMatchObject({
+      provider: 'vercel',
+      allocationName: originalName,
+    });
+    await waitFor(async () => expect(await readPendingReplacements(stub)).toEqual([]));
+  });
+
+  it('stops a replacement that resolves after its create timed out', async () => {
+    const sandboxId = 'sbx__vercel_snapshot_replacement_timeout';
+    const provider = createFakeProvider({
+      vercel: true,
+      snapshots: false,
+      holdCreateIndex: 1,
+      launches: [{ startSource: 'repository', snapshotFailed: true }],
+    });
+    const { stub } = await setup(sandboxId, provider, {
+      ...VERCEL_ENV,
+      ENVIRONMENT_BUILD: fakeEnvironmentBuild(RESOLVED_VERCEL).namespace,
+    });
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance, {
+        sandboxTimers: () => ({
+          ...CONTROL_PLANE_TIMERS.sandbox,
+          providerCreateMs: 800,
+        }),
+      });
+    });
+    await stub.prepare({ ...prepareInput(), sandboxSelection: VERCEL_SELECTION });
+    await waitFor(() => expect(provider.createIntents).toHaveLength(2));
+
+    const originalName = provider.createIntents[0]?.allocationName;
+    const originalRef = provider.createdRefs[0]!;
+    const replacementRef = `mem_${originalName}-image_${provider.createIntents[1]!.intentId}`;
+
+    await stub.release({ sessionId: SESSION });
+    await waitFor(async () => expect((await stub.getAllocationState()).kind).toBe('stopped'), {
+      timeout: 2_500,
+    });
+
+    await releaseHeld(stub, () => provider.releaseCreate());
+    await waitFor(() => expect(provider.stopRefs).toContain(replacementRef));
+    expect(provider.stopMismatches).toEqual([]);
+    expect(provider.launchRefs).toEqual([originalRef]);
+    expect(provider.launchEnvs).toHaveLength(1);
+    expect(await readProviderPin(stub)).toMatchObject({
+      provider: 'vercel',
+      allocationName: originalName,
+    });
+    await waitFor(async () => expect(await readPendingReplacements(stub)).toEqual([]));
+  });
+
+  it('reconciles a replacement rejected after its create timed out', async () => {
+    const sandboxId = 'sbx__vercel_snapshot_replacement_rejected';
+    const provider = createFakeProvider({
+      vercel: true,
+      snapshots: false,
+      holdCreateIndex: 1,
+      launches: [{ startSource: 'repository', snapshotFailed: true }],
+      createErrors: [undefined, new Error('network reset after the replacement was accepted')],
+    });
+    const { stub } = await setup(sandboxId, provider, {
+      ...VERCEL_ENV,
+      ENVIRONMENT_BUILD: fakeEnvironmentBuild(RESOLVED_VERCEL).namespace,
+    });
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance, {
+        sandboxTimers: () => ({
+          ...CONTROL_PLANE_TIMERS.sandbox,
+          providerCreateMs: 800,
+        }),
+      });
+    });
+    await stub.prepare({ ...prepareInput(), sandboxSelection: VERCEL_SELECTION });
+    await waitFor(() => expect(provider.createIntents).toHaveLength(2));
+
+    const replacementRef = `mem_${provider.createIntents[0]?.allocationName}-image_${provider.createIntents[1]!.intentId}`;
+
+    await stub.release({ sessionId: SESSION });
+    await waitFor(async () => expect((await stub.getAllocationState()).kind).toBe('stopped'), {
+      timeout: 2_500,
+    });
+    await waitFor(async () => expect(await readAlarm(stub)).not.toBeNull());
+    expect(await readPendingReplacements(stub)).toHaveLength(1);
+
+    await releaseHeld(stub, () => provider.releaseCreate());
+    await waitFor(() => expect(provider.stopRefs).toContain(replacementRef));
+    expect(provider.stopMismatches).toEqual([]);
+    await waitFor(async () => expect(await readPendingReplacements(stub)).toEqual([]));
+  });
+
+  it('keeps a durable replacement alarm after an ambiguous network rejection', async () => {
+    const sandboxId = 'sbx__vercel_snapshot_replacement_lost_task';
+    const provider = createFakeProvider({
+      vercel: true,
+      snapshots: false,
+      holdCreateIndex: 1,
+      launches: [{ startSource: 'repository', snapshotFailed: true }],
+      createErrorsBeforeRef: [
+        undefined,
+        new Error('network reset after the replacement was accepted'),
+      ],
+    });
+    const { stub } = await setup(sandboxId, provider, {
+      ...VERCEL_ENV,
+      ENVIRONMENT_BUILD: fakeEnvironmentBuild(RESOLVED_VERCEL).namespace,
+    });
+    await runInDurableObject(stub, instance => {
+      Object.assign(instance, {
+        sandboxTimers: () => ({
+          ...CONTROL_PLANE_TIMERS.sandbox,
+          providerCreateMs: 800,
+        }),
+      });
+    });
+    await stub.prepare({ ...prepareInput(), sandboxSelection: VERCEL_SELECTION });
+    await waitFor(() => expect(provider.createIntents).toHaveLength(2));
+
+    const replacementName = `${provider.createIntents[0]?.allocationName}-image`;
+    const replacementRef = `mem_${replacementName}_${provider.createIntents[1]!.intentId}`;
+
+    await stub.release({ sessionId: SESSION });
+    await waitFor(async () => expect((await stub.getAllocationState()).kind).toBe('stopped'), {
+      timeout: 2_500,
+    });
+    await waitFor(async () => expect(await readAlarm(stub)).not.toBeNull());
+    expect(await readPendingReplacements(stub)).toHaveLength(1);
+
+    await releaseHeld(stub, () => provider.releaseCreate());
+    await waitFor(async () => expect(await readAlarm(stub)).not.toBeNull());
+    expect(await readPendingReplacements(stub)).toHaveLength(1);
+
+    provider.createdRefs.push(replacementRef);
+    await runInDurableObject(stub, async (instance, state) => {
+      const [pending] = await listPendingProviderReplacements(state.storage);
+      if (pending === undefined) throw new Error('missing pending replacement');
+      await writePendingProviderReplacement(state.storage, {
+        ...pending,
+        nextReconcileAt: Date.now() - 1,
+      });
+      await instance.alarm();
+    });
+
+    await waitFor(() => expect(provider.stopRefs).toContain(replacementRef));
+    expect(provider.stopMismatches).toEqual([]);
+    await waitFor(async () => expect(await readPendingReplacements(stub)).toEqual([]));
+  });
+
+  it('keeps an unknown replacement journal past create settle until a confirmed stop', async () => {
+    const sandboxId = 'sbx__vercel_snapshot_replacement_unknown';
+    const allocationId = 'allocation-replacement-unknown';
+    const replacementName = 'sbx-original-image';
+    const replacementRef = `mem_${replacementName}_${allocationId}`;
+    let observation: 'unknown' | { providerRef: string } = 'unknown';
+    const provider = createFakeProvider({
+      vercel: true,
+      observeReplacement: () => observation,
+    });
+    const { stub } = await setup(sandboxId, provider, VERCEL_ENV);
+    const staleCreatedAt = Date.now() - 6 * 60_000;
+    await runInDurableObject(stub, async (_instance, state) => {
+      await writePendingProviderReplacement(state.storage, {
+        allocationId,
+        createdAt: staleCreatedAt,
+        expiresAt: staleCreatedAt + 10 * 60_000,
+        nextReconcileAt: Date.now() - 1,
+        pin: {
+          allocationName: replacementName,
+          byoc: BYOC,
+          configuration: { provider: 'vercel' },
+          locator: null,
+        },
+        intent: {
+          intentId: allocationId,
+          createdAt: staleCreatedAt,
+          allocationName: replacementName,
+        },
+      });
+    });
+
+    const reconcileNow = () =>
+      runInDurableObject(stub, async (instance, state) => {
+        const [pending] = await listPendingProviderReplacements(state.storage);
+        if (pending === undefined) throw new Error('missing pending replacement');
+        await writePendingProviderReplacement(state.storage, {
+          ...pending,
+          nextReconcileAt: Date.now() - 1,
+        });
+        await instance.alarm();
+      });
+
+    await reconcileNow();
+    expect(await readPendingReplacements(stub)).toHaveLength(1);
+    expect(await readAlarm(stub)).not.toBeNull();
+
+    await reconcileNow();
+    expect(await readPendingReplacements(stub)).toHaveLength(1);
+    expect(await readAlarm(stub)).not.toBeNull();
+    expect(provider.stopRefs).not.toContain(replacementRef);
+
+    observation = { providerRef: replacementRef };
+    await reconcileNow();
+    await waitFor(() => expect(provider.stopRefs).toContain(replacementRef));
+    expect(provider.stopMismatches).toEqual([]);
+    await waitFor(async () => expect(await readPendingReplacements(stub)).toEqual([]));
+  });
+
+  it('releases an unobservable replacement only after its pinned provider expiry', async () => {
+    const sandboxId = 'sbx__vercel_snapshot_replacement_expired';
+    const allocationId = 'allocation-replacement-expired';
+    const replacementName = 'sbx-expired-image';
+    const provider = createFakeProvider({
+      vercel: true,
+      observeReplacement: () => 'unknown',
+    });
+    const { stub } = await setup(sandboxId, provider, VERCEL_ENV);
+    await runInDurableObject(stub, async (instance, state) => {
+      const now = Date.now();
+      await writePendingProviderReplacement(state.storage, {
+        allocationId,
+        createdAt: now - 10 * 60_000,
+        expiresAt: now + 60_000,
+        nextReconcileAt: now - 1,
+        pin: {
+          allocationName: replacementName,
+          byoc: BYOC,
+          configuration: { provider: 'vercel' },
+          locator: null,
+        },
+        intent: {
+          intentId: allocationId,
+          createdAt: now - 10 * 60_000,
+          allocationName: replacementName,
+        },
+      });
+      await instance.alarm();
+    });
+    expect(await readPendingReplacements(stub)).toHaveLength(1);
+    expect(await readAlarm(stub)).not.toBeNull();
+
+    await runInDurableObject(stub, async (instance, state) => {
+      const [pending] = await listPendingProviderReplacements(state.storage);
+      if (pending === undefined) throw new Error('missing pending replacement');
+      await writePendingProviderReplacement(state.storage, {
+        ...pending,
+        expiresAt: Date.now() - 1,
+        nextReconcileAt: Date.now() - 1,
+      });
+      await instance.alarm();
+    });
+    expect(await readPendingReplacements(stub)).toEqual([]);
+    expect(await readAlarm(stub)).toBeNull();
+  });
+
+  it('reconciles a pending replacement after reconstruction', async () => {
+    const sandboxId = 'sbx__vercel_snapshot_replacement_reconstructed';
+    const provider = createFakeProvider({ vercel: true });
+    const { stub } = await setup(sandboxId, provider, VERCEL_ENV);
+    const allocationId = 'allocation-replacement-reconstructed';
+    const replacementName = 'sbx-original-image';
+    const replacementRef = `mem_${replacementName}_${allocationId}`;
+    provider.createdRefs.push(replacementRef);
+    await runInDurableObject(stub, async (_instance, state) => {
+      await writePendingProviderReplacement(state.storage, {
+        allocationId,
+        createdAt: Date.now(),
+        expiresAt: Date.now() + 10 * 60_000,
+        nextReconcileAt: Date.now(),
+        pin: {
+          allocationName: replacementName,
+          byoc: BYOC,
+          configuration: { provider: 'vercel' },
+          locator: null,
+        },
+        intent: {
+          intentId: allocationId,
+          createdAt: Date.now(),
+          allocationName: replacementName,
+        },
+      });
+    });
+
+    await evictAllDurableObjects();
+    const { stub: rebuilt } = await setup(sandboxId, provider, VERCEL_ENV);
+    await waitFor(
+      async () => {
+        if ((await readPendingReplacements(rebuilt)).length === 0) {
+          expect(provider.stopRefs).toContain(replacementRef);
+          return;
+        }
+        expect(await readAlarm(rebuilt)).not.toBeNull();
+      },
+      { timeout: 2_000 }
+    );
+    await runInDurableObject(rebuilt, instance => instance.alarm());
+
+    await waitFor(() => expect(provider.stopRefs).toContain(replacementRef));
+    expect(provider.stopMismatches).toEqual([]);
+    expect(await readPendingReplacements(rebuilt)).toEqual([]);
   });
 });

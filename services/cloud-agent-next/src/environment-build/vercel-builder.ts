@@ -7,6 +7,7 @@ import {
   type VercelSandboxSnapshot,
 } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import {
+  ByocCredentialMissingError,
   ByocCredentialResolverError,
   resolveByocVercelAccessConfig,
 } from '../byoc/vercel-credential-resolver.js';
@@ -61,6 +62,12 @@ const lifecycleStateSchema = z
   .object({
     sessionId: z.string().min(1).optional(),
     createRequestedAt: z.number().int().nonnegative().optional(),
+    /**
+     * Upper bound on when the provider expires a sandbox created by this build.
+     * The create timeout is fixed at creation and is never extended here, so after
+     * this instant the sandbox is gone even when its credential can no longer stop it.
+     */
+    createExpiresAt: z.number().int().nonnegative().optional(),
     captureRequestedAt: z.number().int().nonnegative().optional(),
     captureStartedAt: z.number().int().nonnegative().optional(),
     snapshotId: z.string().min(1).optional(),
@@ -70,9 +77,10 @@ const lifecycleStateSchema = z
   .strict();
 type LifecycleState = z.infer<typeof lifecycleStateSchema>;
 
-const TERMINAL_SESSION_STATUSES = new Set(['failed', 'aborted', 'stopping', 'stopped']);
+const TERMINAL_SESSION_STATUSES = new Set(['failed', 'aborted', 'stopped']);
 const TERMINAL_SNAPSHOT_STATUSES = new Set(['failed', 'aborted', 'deleted']);
 const MAX_BUILDER_TIMEOUT_MS = 45 * 60_000;
+const CREATE_LANDING_MARGIN_MS = DEADLINE_MS.createSettle;
 const START_MARKER_PREFIX = '--kilocode-envbuild-start=';
 
 async function readState(state: BuilderLifecycleState): Promise<LifecycleState> {
@@ -136,6 +144,19 @@ function timeoutMsFor(initialTimeoutMs: number, deadlineAt: number, now: number)
     1_000,
     Math.min(MAX_BUILDER_TIMEOUT_MS, Math.max(initialTimeoutMs, deadlineAt - now + 60_000))
   );
+}
+
+/**
+ * A sandbox cannot outlive its create timeout. When the lifecycle state predates
+ * the stored expiry, assume the longest possible create timeout and allow the
+ * create request to land within its settle window.
+ */
+function createExpiryBound(state: LifecycleState, now: number): number {
+  if (state.createExpiresAt !== undefined) return state.createExpiresAt;
+  if (state.createRequestedAt !== undefined) {
+    return state.createRequestedAt + MAX_BUILDER_TIMEOUT_MS + CREATE_LANDING_MARGIN_MS;
+  }
+  return now + MAX_BUILDER_TIMEOUT_MS + CREATE_LANDING_MARGIN_MS;
 }
 
 export async function openVercelBuilder(
@@ -220,18 +241,23 @@ export async function launchVercelBuilder(input: {
       }
       throw new BuilderCreateUncertainError();
     }
-    state = await writeState(input.state, { ...state, createRequestedAt: now() });
+    const timeoutMs = timeoutMsFor(input.initialTimeoutMs, input.launch.deadlineAt, now());
+    state = await writeState(input.state, {
+      ...state,
+      createRequestedAt: now(),
+      createExpiresAt: now() + timeoutMs + CREATE_LANDING_MARGIN_MS,
+    });
     try {
       created = await input.client.createSandbox({
         ...inspectInput(input.allocation, input.runtime),
-        timeoutMs: timeoutMsFor(input.initialTimeoutMs, input.launch.deadlineAt, now()),
+        timeoutMs,
         ...(input.allocation.target.resources
           ? { resources: input.allocation.target.resources }
           : {}),
       });
     } catch (error) {
       if (isDefiniteRejection(error)) {
-        const { createRequestedAt: _requestedAt, ...rest } = state;
+        const { createRequestedAt: _requestedAt, createExpiresAt: _expiresAt, ...rest } = state;
         await writeState(input.state, rest);
       }
       wrapTransient(error, 'Vercel builder create failed');
@@ -438,6 +464,15 @@ export async function captureVercelBuilder(input: {
   try {
     snapshot = await input.client.createSnapshot(sessionId);
   } catch (error) {
+    if (hasStatus(error, 429)) {
+      // The platform definitely refused the request, so no snapshot exists.
+      // Drop the reconciliation marker and submit again while the build is live.
+      const { captureRequestedAt: _requestedAt, ...rest } = state;
+      await writeState(input.state, rest);
+      throw new BuilderRetryableError('Vercel snapshot request was rate limited', {
+        cause: error,
+      });
+    }
     if (isDefiniteRejection(error)) {
       const { captureRequestedAt: _requestedAt, ...rest } = state;
       await writeState(input.state, rest);
@@ -458,20 +493,57 @@ export async function captureVercelBuilder(input: {
   );
 }
 
+async function stopWithoutProviderCredential(input: {
+  state: BuilderLifecycleState;
+  lifecycle: LifecycleState;
+  now: number;
+}): Promise<'terminal' | 'retryable'> {
+  const expiresAt = createExpiryBound(input.lifecycle, input.now);
+  if (input.lifecycle.createExpiresAt === undefined) {
+    await writeState(input.state, { ...input.lifecycle, createExpiresAt: expiresAt });
+  }
+  if (input.now < expiresAt) return 'retryable';
+  // The create timeout is fixed, so the sandbox is gone even though its deleted
+  // credential can no longer confirm the stop.
+  await input.state.clear();
+  return 'terminal';
+}
+
 export async function stopVercelBuilder(input: {
   allocation: VercelBuilderAllocation;
   state: BuilderLifecycleState;
-  client: VercelBuilderClient;
-  runtime: VercelSandboxRuntime;
+  /** Resolve the pinned credential only after the state proves a create may exist. */
+  open(): Promise<OpenedVercelBuilder>;
   now?: () => number;
 }): Promise<'terminal' | 'retryable'> {
   const now = input.now ?? Date.now;
   const state = await readState(input.state);
+  if (
+    state.sessionId === undefined &&
+    state.createRequestedAt === undefined &&
+    state.createExpiresAt === undefined
+  ) {
+    // No create was ever requested, so no provider state can exist to stop.
+    await input.state.clear();
+    return 'terminal';
+  }
+
+  let opened;
+  try {
+    opened = await input.open();
+  } catch (error) {
+    if (error instanceof ByocCredentialMissingError) {
+      return stopWithoutProviderCredential({ state: input.state, lifecycle: state, now: now() });
+    }
+    if (error instanceof BuilderRetryableError) return 'retryable';
+    throw error;
+  }
+  const { client, runtime } = opened;
   let sessionId = state.sessionId;
   if (sessionId === undefined) {
     let inspected;
     try {
-      inspected = await input.client.inspectByName(inspectInput(input.allocation, input.runtime));
+      inspected = await client.inspectByName(inspectInput(input.allocation, runtime));
     } catch (error) {
       wrapTransient(error, 'Vercel builder stop inspect failed');
     }
@@ -491,12 +563,16 @@ export async function stopVercelBuilder(input: {
   }
 
   try {
-    const session = await input.client.getSession(sessionId, input.allocation.sandboxId);
+    const session = await client.getSession(sessionId, input.allocation.sandboxId);
     if (TERMINAL_SESSION_STATUSES.has(session.session.status)) {
       await input.state.clear();
       return 'terminal';
     }
-    await input.client.stopSession(sessionId, input.allocation.sandboxId);
+    const stopped = await client.stopSession(sessionId, input.allocation.sandboxId);
+    if (!TERMINAL_SESSION_STATUSES.has(stopped.status)) {
+      // Stop was accepted but the sandbox has not reached a terminal status yet.
+      return 'retryable';
+    }
     await input.state.clear();
     return 'terminal';
   } catch (error) {

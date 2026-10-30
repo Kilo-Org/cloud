@@ -4,6 +4,7 @@
     "production": {
       "mode": "downloaded",
       "image": "runtime-free",
+      "vercel": true,
       "interactiveOrgIds": ["9d278969-5453-4ae3-a51f-a8d2274a7b56"]
     }
   }

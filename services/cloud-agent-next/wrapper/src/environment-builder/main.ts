@@ -112,8 +112,16 @@ async function main(): Promise<void> {
 
   let result: EnvironmentBuildResult;
   // A container builder is PID 1 and may use kill(-1). A Vercel builder is an
-  // exec process, so it records the children it starts and stops only those.
+  // exec process, so it records which processes already existed before its
+  // first child and stops every user process that appeared after that baseline.
   const ownedScope = process.pid === 1 ? undefined : createOwnedProcessScope();
+  if (
+    ownedScope !== undefined &&
+    process.platform === 'linux' &&
+    !(await ownedScope.captureSpawnBaseline())
+  ) {
+    log('environment builder process baseline unavailable; capture will be refused');
+  }
   let ownedStopped = false;
   const outsideScope: ProcessSpawn = (command, args, options) => spawn(command, args, options);
   const runGit = (args: string[], options?: Parameters<typeof git>[1]) =>

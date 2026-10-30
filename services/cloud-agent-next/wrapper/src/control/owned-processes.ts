@@ -78,24 +78,35 @@ export type OwnedProcessScope = {
   dispose(): boolean;
   observesOccupancy(): boolean;
   captureBaseline(allowed: (argv: string[]) => boolean, deadlineAt?: number): Promise<void>;
+  /**
+   * Record the processes already running before this scope spawned anything, so
+   * `stopSpawned` can tell provider-managed processes from setup descendants
+   * without cgroup delegation. Returns false when no snapshot is available, and
+   * `stopSpawned` then refuses to claim the setup is stopped.
+   */
+  captureSpawnBaseline(): Promise<boolean>;
   verify(baseline?: boolean, deadlineAt?: number): Promise<boolean>;
   stop(deadlineAt: number): Promise<boolean>;
   /**
-   * Stop only process groups this scope spawned. Unlike `stop`, this does not
-   * require cgroup delegation or proof over the whole container, so it is safe
-   * for a dedicated builder that runs as an exec process rather than PID 1.
+   * Stop the setup processes this scope started, including descendants that
+   * daemonized into another process group or reparented to init. Unlike `stop`,
+   * this does not require cgroup delegation or proof over the whole container,
+   * so it is safe for a dedicated builder that runs as an exec process rather
+   * than PID 1. It refuses when no pre-spawn snapshot is available.
    */
   stopSpawned(deadlineAt: number): Promise<boolean>;
   latestSnapshot(): WorkloadSnapshot | undefined;
 };
 
-type ProcessIdentity = {
+export type ProcessIdentity = {
   pid: number;
   parent: number;
   group: number;
   identity: string;
   state: string;
+  flags: number;
 };
+export const PF_KTHREAD = 0x00200000;
 type OwnedChild = {
   process: ChildProcessWithoutNullStreams;
   identity?: string;
@@ -199,7 +210,7 @@ function population(value: string): number {
   return Number(entries[0].slice('populated '.length));
 }
 
-function processIdentity(pid: number, value: string): ProcessIdentity {
+export function processIdentity(pid: number, value: string): ProcessIdentity {
   if (!value.startsWith(`${pid} (`) || !value.includes(') ')) {
     throw new Error('Process identity unavailable');
   }
@@ -211,6 +222,8 @@ function processIdentity(pid: number, value: string): ProcessIdentity {
   const startedAt = fields[19];
   const parent = Number(fields[1]);
   const group = Number(fields[2]);
+  const flags = Number(fields[6]);
+  const kernelThread = Number.isSafeInteger(flags) && (flags & PF_KTHREAD) !== 0;
   if (
     !state ||
     !/^[A-Za-z]$/.test(state) ||
@@ -219,15 +232,67 @@ function processIdentity(pid: number, value: string): ProcessIdentity {
     !Number.isSafeInteger(parent) ||
     parent < 0 ||
     !Number.isSafeInteger(group) ||
-    group <= 0
+    group < 0 ||
+    (!kernelThread && group <= 0) ||
+    !fields[6] ||
+    !/^\d+$/.test(fields[6]) ||
+    !Number.isSafeInteger(flags)
   ) {
     throw new Error('Process identity unavailable');
   }
-  return { pid, parent, group, identity: `${pid}:${startedAt}`, state };
+  return { pid, parent, group, identity: `${pid}:${startedAt}`, state, flags };
+}
+
+export function isKernelThread(identity: ProcessIdentity): boolean {
+  return (identity.flags & PF_KTHREAD) !== 0;
+}
+
+function isDefinitelyGone(error: unknown): boolean {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'code' in error &&
+    (error.code === 'ENOENT' || error.code === 'ESRCH')
+  );
 }
 
 function isLiveProcessState(state: string): boolean {
   return state !== 'Z' && state !== 'X' && state !== 'x';
+}
+
+export type ProcessScan = {
+  procRoot: string;
+  readdir: (directory: string) => Promise<string[]>;
+  readFile: (file: string) => Promise<string>;
+};
+
+/**
+ * Read process identities from a proc root. Kernel threads are excluded because
+ * a microVM can start workers after the builder's baseline. An unreadable or
+ * malformed stat for a process that is not definitely gone is an error rather
+ * than evidence that the process no longer exists.
+ */
+export async function scanProcessIdentities(input: ProcessScan): Promise<ProcessIdentity[]> {
+  const names = await input.readdir(input.procRoot);
+  const entries = await Promise.all(
+    names
+      .filter(name => /^\d+$/.test(name))
+      .map(async name => {
+        const pid = Number(name);
+        try {
+          return processIdentity(
+            pid,
+            await input.readFile(path.join(input.procRoot, name, 'stat'))
+          );
+        } catch (error) {
+          if (isDefinitelyGone(error)) return undefined;
+          throw error;
+        }
+      })
+  );
+  return entries.filter(
+    (entry): entry is ProcessIdentity => entry !== undefined && !isKernelThread(entry)
+  );
 }
 
 export function classifyDirectProcessState(input: {
@@ -661,8 +726,9 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
   };
   let workloadSnapshot: WorkloadSnapshot | undefined;
   const children = new Set<OwnedChild>();
-  const spawnedGroups = new Set<number>();
   const baseline = new Set<string>();
+  const preSpawnIdentities = new Set<string>();
+  let preSpawnCaptured = false;
   const observations = new Set<Deadline>();
   const workloadReporter = placement?.report ? createWorkloadReporter(placement.report) : undefined;
   const live = (child: OwnedChild): boolean => !child.exited && child.process.pid !== undefined;
@@ -913,46 +979,59 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
     }
   };
 
-  const liveSpawnedGroups = async (deadline: Deadline): Promise<Set<number>> => {
-    if (spawnedGroups.size === 0) return new Set();
-    let names: string[];
+  const capturePreSpawnIdentities = async (): Promise<boolean> => {
+    if (process.platform !== 'linux' || used || children.size > 0 || sealed) return false;
+    preSpawnIdentities.clear();
+    preSpawnCaptured = false;
     try {
-      names = await deadline.wait(() => readdir('/proc'));
+      const identities = await scanProcessIdentities({
+        procRoot: '/proc',
+        readdir: () => readdir('/proc'),
+        readFile: file => readFile(file, 'utf8'),
+      });
+      if (identities.length === 0) return false;
+      for (const identity of identities) preSpawnIdentities.add(identity.identity);
+      preSpawnCaptured = true;
+      return true;
     } catch {
-      return new Set(spawnedGroups);
+      return false;
     }
-    const live = new Set<number>();
-    await Promise.all(
-      names
-        .filter(name => /^\d+$/.test(name))
-        .map(async name => {
-          try {
-            const stat = await readText(`/proc/${name}/stat`, deadline);
-            const after = stat
-              .slice(stat.lastIndexOf(')') + 2)
-              .trim()
-              .split(/\s+/);
-            const group = Number(after[2]);
-            if (spawnedGroups.has(group)) live.add(group);
-          } catch {
-            // The process exited between readdir and stat.
-          }
-        })
-    );
-    return live;
   };
 
-  const signalSpawnedGroups = async (signal: NodeJS.Signals, deadline: Deadline): Promise<void> => {
-    for (const group of spawnedGroups) {
+  const unbaselinedProcesses = async (deadline: Deadline): Promise<ProcessIdentity[]> => {
+    const entries = await scanProcessIdentities({
+      procRoot: '/proc',
+      readdir: () => deadline.wait(() => readdir('/proc')),
+      readFile: file => readText(file, deadline),
+    });
+    return entries.filter(
+      entry =>
+        entry.pid !== process.pid &&
+        isLiveProcessState(entry.state) &&
+        !preSpawnIdentities.has(entry.identity)
+    );
+  };
+
+  const signalUnbaselinedProcesses = async (
+    signal: NodeJS.Signals,
+    deadline: Deadline
+  ): Promise<void> => {
+    for (const entry of await unbaselinedProcesses(deadline)) {
       deadline.check();
-      // A detached child is its own group leader. Never target the builder's
-      // own group or an uninspectable special group.
-      if (group <= 1 || group === process.pid) continue;
+      let fresh: ProcessIdentity;
       try {
-        process.kill(-group, signal);
+        fresh = processIdentity(entry.pid, await readText(`/proc/${entry.pid}/stat`, deadline));
+      } catch (error) {
+        deadline.check();
+        if (isDefinitelyGone(error)) continue;
+        throw error;
+      }
+      if (fresh.identity !== entry.identity || !isLiveProcessState(fresh.state)) continue;
+      try {
+        process.kill(entry.pid, signal);
       } catch (error) {
         if ((error as NodeJS.ErrnoException).code !== 'ESRCH') {
-          console.warn('Owned process group signal failed; cleanup requires verification');
+          console.warn('Owned process descendant signal failed; cleanup requires verification');
         }
       }
     }
@@ -1010,8 +1089,6 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
         });
         if (child.pid !== undefined) {
           used = true;
-          // `detached: true` makes this child its own process-group leader.
-          spawnedGroups.add(child.pid);
           try {
             const fresh = processIdentity(
               child.pid,
@@ -1019,7 +1096,9 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
             );
             if (fresh.parent === process.pid) record.identity = fresh.identity;
           } catch {
-            console.warn('Owned process child identity unavailable; group signals remain disabled');
+            console.warn(
+              'Owned process child identity unavailable; verified child signals disabled'
+            );
           }
           if (!gatedChild) contained = false;
         }
@@ -1081,7 +1160,6 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
         } catch {
           console.warn('Owned process gated child kill failed; continuing unmanaged');
         }
-        if (record.process.pid !== undefined) spawnedGroups.delete(record.process.pid);
         return spawnChild(false).process;
       }
       startSweep();
@@ -1170,6 +1248,9 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
       removed = true;
       children.clear();
       return true;
+    },
+    captureSpawnBaseline() {
+      return capturePreSpawnIdentities();
     },
     async captureBaseline(allowed, deadlineAt = Date.now() + OBSERVATION_TIMEOUT_MS) {
       baseline.clear();
@@ -1320,15 +1401,16 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
       const deadline = createDeadline(deadlineAt);
       stopDeadline = deadline;
       const run = async (): Promise<boolean> => {
-        if (spawnedGroups.size === 0) return true;
-        await signalSpawnedGroups('SIGTERM', deadline);
-        if ((await liveSpawnedGroups(deadline)).size > 0) {
+        if (!used) return true;
+        if (!preSpawnCaptured) return false;
+        await signalUnbaselinedProcesses('SIGTERM', deadline);
+        if ((await unbaselinedProcesses(deadline)).length > 0) {
           const graceMs = Math.min(250, Math.max(0, (deadline.deadlineAt - Date.now()) / 2));
           await deadline.wait(signal => delay(graceMs, undefined, { signal })).catch(() => false);
         }
-        await signalSpawnedGroups('SIGKILL', deadline);
+        await signalUnbaselinedProcesses('SIGKILL', deadline);
         while (true) {
-          if ((await liveSpawnedGroups(deadline)).size === 0) return true;
+          if ((await unbaselinedProcesses(deadline)).length === 0) return true;
           await deadline.wait(signal => delay(25, undefined, { signal }));
         }
       };
@@ -1339,7 +1421,6 @@ export function createOwnedProcessScope(placement?: WorkloadPlacement): OwnedPro
           if (result) {
             stopped = true;
             children.clear();
-            spawnedGroups.clear();
             if (group && !removed && !cgroupRemoval) {
               const removalDeadline = createDeadline(deadline.deadlineAt);
               cgroupRemoval = removeCgroupBeforeDeadline(group, removalDeadline)

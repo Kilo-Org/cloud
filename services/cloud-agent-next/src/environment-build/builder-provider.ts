@@ -234,19 +234,12 @@ export function createBuilderProvider(deps: {
     },
     async stop(allocation, state) {
       if (allocation.provider === 'vercel') {
-        try {
-          const opened = await openVercelBuilder(deps.env, allocation, deps.fetch);
-          return await stopVercelBuilder({
-            allocation,
-            state,
-            client: opened.client,
-            runtime: opened.runtime,
-            now: deps.now,
-          });
-        } catch (error) {
-          if (error instanceof BuilderRetryableError) return 'retryable';
-          throw error;
-        }
+        return stopVercelBuilder({
+          allocation,
+          state,
+          open: () => openVercelBuilder(deps.env, allocation, deps.fetch),
+          now: deps.now,
+        });
       }
       return adapterFor(allocation).stop(providerRef(allocation));
     },

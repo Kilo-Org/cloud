@@ -2210,6 +2210,58 @@ describe('VercelSnapshotBuild runtime preparation', () => {
     expect(command.args[1]).toContain('test -w /workspace');
   });
 
+  it.each(['upload_runtime_artifacts', 'verify_runtime_artifacts'])(
+    'resumes the persisted %s step after reconstruction',
+    async step => {
+      const fixture = createFixture();
+      await fixture.build.start(startInput());
+      updateRow(fixture, {
+        step,
+        builder_session_id: 'builder-session',
+        retry_count: 2,
+        last_error: 'previous transient error',
+      });
+      fixture.build = createBuild(fixture.storage);
+
+      await fixture.build.alarm();
+
+      expect(storedRow(fixture)).toMatchObject({
+        step: 'snapshot_builder',
+        builder_session_id: 'builder-session',
+        snapshot_source_session_id: 'builder-session',
+        snapshot_baseline_json: null,
+        snapshot_requested: 0,
+        retry_count: 0,
+        last_error: null,
+      });
+      expect(mocks.projectStatus).toHaveBeenLastCalledWith(
+        expect.anything(),
+        expect.objectContaining({ setupStatus: 'building', setupStep: 'snapshot_builder' })
+      );
+      expect(mocks.client.executeCommand).not.toHaveBeenCalled();
+      expect(mocks.client.createSnapshot).not.toHaveBeenCalled();
+
+      await runNextAlarm(fixture);
+
+      expect(storedRow(fixture)).toMatchObject({
+        step: 'snapshot_builder',
+        snapshot_source_session_id: 'builder-session',
+        snapshot_baseline_json: '[]',
+        snapshot_requested: 0,
+      });
+      await runNextAlarm(fixture);
+      expect(storedRow(fixture)).toMatchObject({
+        snapshot_requested: 1,
+      });
+      mocks.client.createSnapshot.mockResolvedValueOnce({ id: 'snapshot-resumed' });
+      await runNextAlarm(fixture);
+      expect(storedRow(fixture)).toMatchObject({
+        step: 'create_validator',
+        snapshot_id: 'snapshot-resumed',
+      });
+    }
+  );
+
   it('snapshots the base image without baking a CLI or control wrapper', async () => {
     const fixture = createFixture();
     await fixture.build.start(startInput());

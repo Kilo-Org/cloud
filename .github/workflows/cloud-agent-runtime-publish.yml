@@ -46,8 +46,8 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           SOURCE_SHA: ${{ inputs.source_sha }}
         run: node services/cloud-agent-next/scripts/runtime-manual-admission.mjs
-      # The catalog at the source SHA owns enablement: only downloaded targets need a release.
-      - name: Check catalog for downloaded startup
+      # The catalog at the source SHA owns enablement: downloaded or Vercel targets need a release.
+      - name: Check catalog for runtime publication
         id: catalog
         if: github.event_name == 'workflow_run'
         env:

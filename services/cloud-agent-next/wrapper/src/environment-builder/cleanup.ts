@@ -61,10 +61,11 @@ export async function stopOtherProcesses(
 export const OWNED_STOP_DEADLINE_MS = 15_000;
 
 /**
- * Stop only the processes this builder started. A Vercel builder is an exec
- * process, not PID 1, so `kill(-1)` is not available and cgroup delegation may
- * be absent. The owned-process scope records each setup child, which is spawned
- * detached as its own process-group leader, and this signals only those groups.
+ * Stop the processes this builder started. A Vercel builder is an exec process,
+ * not PID 1, so `kill(-1)` is not available and cgroup delegation may be
+ * absent. The owned-process scope preserves the provider-managed processes that
+ * predated the build and stops every user process that appeared after them,
+ * including descendants that daemonized into another group or reparented.
  */
 export async function stopOwnedProcesses(
   scope: Pick<OwnedProcessScope, 'stopSpawned' | 'dispose' | 'releaseAbandoned'>,

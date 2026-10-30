@@ -44,6 +44,7 @@ import {
   type BillingScheduleEntries,
 } from '../../src/sandbox-control/billing-schedule.js';
 import { CONTROL_PLANE_TIMERS } from '../../src/shared/control-plane-timers.js';
+import { RUNTIME_BASE_ABI } from '../../src/sandbox-control/runtime-release.js';
 import { logger } from '../../src/logger.js';
 import { encryptWithPublicKey } from '../../src/utils/encryption.js';
 import { FakeWrapper } from './helpers/fake-wrapper.js';
@@ -61,6 +62,33 @@ const CUSTOM_ALLOCATION_NAME = 'usr-shared-allocation-name';
 const LEGACY_ALLOCATION_NAME = 'usr-legacy-shared-allocation';
 const MINUTE = 60 * 1000;
 const TIMERS = CONTROL_PLANE_TIMERS.sandbox;
+const VERCEL_RUNTIME_DESCRIPTOR = JSON.stringify({
+  format: 1,
+  bootstrap: 1,
+  platform: { os: 'linux', arch: 'x64', libc: 'glibc', cpu: 'baseline' },
+  abi: RUNTIME_BASE_ABI,
+  cliVersion: '7.8.1',
+  cliExecutable: 'package/bin/kilo',
+  wrapperSdkVersion: '7.8.1',
+  protocol: '1',
+  artifacts: [
+    { role: 'cli', sha256: 'a'.repeat(64), transferBytes: 1, expandedBytes: 1, fileCount: 1 },
+    { role: 'control', sha256: 'b'.repeat(64), transferBytes: 1, expandedBytes: 1, fileCount: 1 },
+  ],
+  caps: { maxTransferBytes: 100, maxExpandedBytes: 100, maxFileCount: 10 },
+  inventory: [
+    ['cli', 'package/bin/kilo', 0o755, 1, 'a'.repeat(64)],
+    ['control', 'usr/local/bin/wrapper', 0o755, 1, 'b'.repeat(64)],
+  ],
+});
+const VERCEL_RUNTIME_ENV = {
+  RUNTIME_RELEASE_DESCRIPTOR: VERCEL_RUNTIME_DESCRIPTOR,
+  RUNTIME_RELEASE_BUCKET: {
+    async head() {
+      return { size: 1 };
+    },
+  },
+};
 
 type SandboxControlNamespace = DurableObjectNamespace<SandboxControlV2>;
 const sandboxNamespace = (env as unknown as { SANDBOX_CONTROL: SandboxControlNamespace })
@@ -183,6 +211,7 @@ async function startAllocation(
   const stub = sandboxNamespace.getByName(sandboxId);
   await runInDurableObject(stub, async (instance, state) => {
     await instance.getAllocationState();
+    if (options.provider === 'vercel') Object.assign(instance.env, VERCEL_RUNTIME_ENV);
     if (options.meter !== undefined) await state.storage.put('control_plane_owner', 'owner-1');
     Object.assign(instance, {
       createProviderAdapter: () => provider.adapter,

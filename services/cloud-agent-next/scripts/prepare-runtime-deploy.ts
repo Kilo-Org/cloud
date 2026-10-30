@@ -4,10 +4,6 @@ import { fileURLToPath } from 'node:url';
 import { parse as parseJsonc, type ParseError } from 'jsonc-parser';
 import { z } from 'zod';
 import type { ArtifactObjectStore } from '../src/sandbox-control/runtime-artifact-keys.js';
-import {
-  runtimeStartupConfigSchema,
-  type RuntimeStartupConfig,
-} from '../src/shared/runtime-startup-config.js';
 import { verifyRuntimeSourceCheckout } from './runtime-source.js';
 import { remoteArtifactStore } from './runtime-publish-store.js';
 import { loadRuntimeHandoff, runtimeHandoffKey } from './runtime-handoff.js';
@@ -18,17 +14,19 @@ import {
   type RuntimeBase,
 } from './runtime-base.js';
 import {
+  runtimeTargetConfigSchema,
   selectRuntimeTarget,
   renderRuntimeTarget,
   validateRuntimeTarget,
   runtimeBucketBindings,
+  type RuntimeTargetConfig,
 } from './runtime-target.js';
 
 /** Validate references and render JSON. */
 export async function prepareRuntimeDeployment(input: {
   config: unknown;
   environment: string;
-  startup: RuntimeStartupConfig;
+  startup: RuntimeTargetConfig;
   sourceSha: string;
   bucket: string;
   accountId: string;
@@ -36,8 +34,8 @@ export async function prepareRuntimeDeployment(input: {
   store: ArtifactObjectStore;
   verifyBase: (base: RuntimeBase) => void | Promise<void>;
 }) {
-  const startup = runtimeStartupConfigSchema.parse(input.startup);
-  if (startup.mode === 'preinstalled')
+  const startup = runtimeTargetConfigSchema.parse(input.startup);
+  if (startup.mode === 'preinstalled' && startup.vercel !== true)
     return renderRuntimeTarget({ config: input.config, environment: input.environment, startup });
   const { target } = validateRuntimeTarget(input.config, input.environment);
   runtimeBucketBindings(target.r2_buckets, input.bucket);
@@ -98,7 +96,7 @@ export async function main(
     environment
   );
   const { target } = validateRuntimeTarget(raw, environment);
-  if (startup.mode === 'preinstalled') {
+  if (startup.mode === 'preinstalled' && startup.vercel !== true) {
     await writeDeploymentConfig(
       packageRoot,
       environment,

@@ -1,5 +1,8 @@
 import { describe, expect, it, vi } from 'vitest';
-import type { VercelSandboxSnapshot } from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
+import {
+  VercelSandboxRestError,
+  type VercelSandboxSnapshot,
+} from '../agent-sandbox/vercel/vercel-sandbox-rest-client.js';
 import { vercelSnapshotBaseImage } from '../byoc/vercel-snapshot-compatibility.js';
 import { DEADLINE_MS } from '../sandbox-control/deadlines.js';
 import type { BuilderLifecycleState, VercelBuilderAllocation } from './builder-provider.js';
@@ -86,7 +89,7 @@ function client(overrides: Partial<Record<keyof VercelBuilderClient, unknown>> =
       input.wait ? { command: { exitCode: 0 }, finished: { exitCode: 0 } } : commandRecord(null)
     ),
     getSession: vi.fn(async () => ({ session: { status: 'running' } })),
-    stopSession: vi.fn(async () => ({})),
+    stopSession: vi.fn(async () => ({ status: 'stopped' })),
     createSnapshot: vi.fn(async () => snapshot('snap-env')),
     listCommands: vi.fn(async () => []),
     listSnapshots: vi.fn(async () => []),
@@ -269,18 +272,13 @@ describe('Vercel environment builder', () => {
   it('does not declare stop terminal while a create may still land', async () => {
     const state = memoryState({ createRequestedAt: now() });
     const rest = client();
-    expect(
-      await stopVercelBuilder({ allocation, state, client: rest, runtime: 'node24', now })
-    ).toBe('retryable');
-    expect(
-      await stopVercelBuilder({
-        allocation,
-        state,
-        client: rest,
-        runtime: 'node24',
-        now: afterSettle,
-      })
-    ).toBe('terminal');
+    const open = async () => ({
+      client: rest,
+      runtime: 'node24' as const,
+      initialTimeoutMs: 300_000,
+    });
+    expect(await stopVercelBuilder({ allocation, state, open, now })).toBe('retryable');
+    expect(await stopVercelBuilder({ allocation, state, open, now: afterSettle })).toBe('terminal');
   });
 
   it('fails closed on invalid lifecycle state', async () => {
@@ -302,10 +300,102 @@ describe('Vercel environment builder', () => {
   it('stops the builder session and clears non-secret lifecycle state', async () => {
     const state = memoryState({ sessionId: 'session-1' });
     const rest = client();
-    expect(
-      await stopVercelBuilder({ allocation, state, client: rest, runtime: 'node24', now })
-    ).toBe('terminal');
+    const open = async () => ({
+      client: rest,
+      runtime: 'node24' as const,
+      initialTimeoutMs: 300_000,
+    });
+    expect(await stopVercelBuilder({ allocation, state, open, now })).toBe('terminal');
     expect(rest.stopSession).toHaveBeenCalledWith('session-1', allocation.sandboxId);
     expect(await state.get()).toBeUndefined();
+  });
+
+  it('retains lifecycle state while the provider only reports stopping', async () => {
+    const state = memoryState({ sessionId: 'session-1' });
+    const rest = client({
+      getSession: vi.fn(async () => ({ session: { status: 'stopping' } })),
+      stopSession: vi.fn(async () => ({ status: 'stopping' })),
+    });
+    const open = async () => ({
+      client: rest,
+      runtime: 'node24' as const,
+      initialTimeoutMs: 300_000,
+    });
+
+    expect(await stopVercelBuilder({ allocation, state, open, now })).toBe('retryable');
+    expect(await state.get()).toMatchObject({ sessionId: 'session-1' });
+
+    vi.mocked(rest.getSession).mockResolvedValue({ session: { status: 'stopped' } } as never);
+    expect(await stopVercelBuilder({ allocation, state, open, now })).toBe('terminal');
+    expect(await state.get()).toBeUndefined();
+  });
+
+  it('does not clear lifecycle state before a just-stopping provider reaches terminal', async () => {
+    const state = memoryState({ sessionId: 'session-1' });
+    const rest = client({
+      stopSession: vi.fn(async () => ({ status: 'stopping' })),
+    });
+    const open = async () => ({
+      client: rest,
+      runtime: 'node24' as const,
+      initialTimeoutMs: 300_000,
+    });
+
+    expect(await stopVercelBuilder({ allocation, state, open, now })).toBe('retryable');
+    expect(await state.get()).toMatchObject({ sessionId: 'session-1' });
+  });
+
+  it('treats a missing builder session as terminal on 404', async () => {
+    const state = memoryState({ sessionId: 'session-1' });
+    const rest = client({
+      getSession: vi.fn(async () => {
+        throw new VercelSandboxRestError('request_failed', 'get-session', 404);
+      }),
+    });
+    const open = async () => ({
+      client: rest,
+      runtime: 'node24' as const,
+      initialTimeoutMs: 300_000,
+    });
+
+    expect(await stopVercelBuilder({ allocation, state, open, now })).toBe('terminal');
+    expect(await state.get()).toBeUndefined();
+  });
+
+  it('clears a rate-limited capture request and retries within the deadline', async () => {
+    const state = memoryState({ sessionId: 'session-1' });
+    let attempts = 0;
+    const rest = client({
+      createSnapshot: vi.fn(async () => {
+        attempts += 1;
+        if (attempts === 1) {
+          throw new VercelSandboxRestError('request_failed', 'create-snapshot', 429);
+        }
+        return snapshot('snap-retried');
+      }),
+    });
+
+    await expect(
+      captureVercelBuilder({
+        allocation,
+        captureId: 'capture',
+        state,
+        client: rest,
+        runtime: 'node24',
+        now,
+      })
+    ).rejects.toBeInstanceOf(BuilderRetryableError);
+    expect(await state.get()).not.toHaveProperty('captureRequestedAt');
+
+    const result = await captureVercelBuilder({
+      allocation,
+      captureId: 'capture',
+      state,
+      client: rest,
+      runtime: 'node24',
+      now,
+    });
+    expect(rest.createSnapshot).toHaveBeenCalledTimes(2);
+    expect(result).toMatchObject({ status: 'stored', snapshotId: 'snap-retried' });
   });
 });

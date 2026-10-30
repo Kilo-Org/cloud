@@ -112,7 +112,7 @@ describe('deployment preparation', () => {
     ];
     const result = await prepareRuntimeDeployment({
       config: raw,
-      startup: { mode: 'downloaded', image: 'all-in-one' },
+      startup: { mode: 'downloaded', image: 'all-in-one', vercel: true },
       environment: 'production',
       sourceSha: f.sourceSha,
       bucket: 'runtime-test',
@@ -176,6 +176,34 @@ describe('deployment preparation', () => {
     });
     expect(result?.vars?.RUNTIME_STARTUP_MODE).toBe('preinstalled');
     expect(reads).toBe(0);
+  });
+  it('preinstalled Vercel targets retain the release and keep the all-in-one image', async () => {
+    const f = await fixture();
+    await publishRuntimeHandoff({ ...f, descriptor: f.packaged.descriptor });
+    const changed = config();
+    Object.assign(changed.vars, { BYOC_VERCEL_IDS: '9d278969-5453-4ae3-a51f-a8d2274a7b56' });
+    const result = await prepareRuntimeDeployment({
+      config: changed,
+      startup: { mode: 'preinstalled', image: 'all-in-one', vercel: true },
+      environment: 'production',
+      sourceSha: f.sourceSha,
+      bucket: 'runtime-test',
+      accountId: 'c'.repeat(32),
+      baseInputId: f.base.inputId,
+      store: f.store,
+      verifyBase: base => {
+        expect(base).toEqual(f.base);
+      },
+    });
+    expect(result?.vars?.RUNTIME_STARTUP_MODE).toBe('preinstalled');
+    expect(result?.vars?.NATIVE_RUNTIME_IMAGE).toBe('all-in-one');
+    expect(result?.vars?.RUNTIME_RELEASE_DESCRIPTOR).toBe(f.published.descriptor.sha256);
+    expect(result?.vars?.RUNTIME_INTERACTIVE_ORG_IDS).toBeUndefined();
+    expect(result?.r2_buckets).toContainEqual({
+      binding: 'RUNTIME_RELEASE_BUCKET',
+      bucket_name: 'runtime-test',
+    });
+    expect(result?.containers?.[0].images?.['runtime-free']).toBeUndefined();
   });
   it('renders the verified digest and descriptor only after verification', async () => {
     const f = await fixture();

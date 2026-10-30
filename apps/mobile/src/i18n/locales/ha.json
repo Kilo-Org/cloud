@@ -3851,6 +3851,8 @@
     "skillNameInvalid": "Dole ne sunan gwani ya fara da harafi ko lambobi kuma yayi amfani da ƙananan haruffa kawai, lambobi, da dashes",
     "skillContentRequired": "Ana buƙatar abun ciki gwaninta",
     "skillSaveFailed": "An kasa ajiye fasaha. Sake gwadawa.",
+    "skillDeleteFailed": "An kasa share fasaha. Sake gwadawa.",
+    "skillToggleFailed": "An kasa sabunta fasaha. Sake gwadawa.",
     "skillLimitReached": "Bayanan martaba na iya ɗaukar ƙwarewa har {{max}}. Share ɗaya don ƙara wata.",
     "skillSourceCustom": "Al'ada",
     "skillSourceMarketplace": "Kasuwa",

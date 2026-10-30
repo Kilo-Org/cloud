@@ -448,6 +448,48 @@ describe('ProfileSkillsScreen', () => {
     unmount();
   });
 
+  it('names the delete action when a delete fails without a message', async () => {
+    h.query.data = testSkills([testSkill()]);
+    h.query.isPending = false;
+    const error = new Error('placeholder');
+    error.message = '';
+    h.mutations.deleteSkill.mutateAsync.mockRejectedValue(error);
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'Delete skill code-review');
+    await act(async () => {
+      confirmRequest(h.confirm as TestConfirmMock);
+      await Promise.resolve();
+    });
+
+    await waitFor(() => h.error.mock.calls.length > 0);
+    expect(h.error).toHaveBeenCalledWith(i18n.t('profiles.skillDeleteFailed'));
+
+    unmount();
+  });
+
+  it('names the toggle action when enabling a skill fails without a message', async () => {
+    h.query.data = testSkills([testSkill()]);
+    h.query.isPending = false;
+    const error = new Error('placeholder');
+    error.message = '';
+    h.mutations.setSkillEnabled.mutate.mockImplementation(
+      (_variables: unknown, options?: { onError?: (failure: Error) => void }) => {
+        options?.onError?.(error);
+      }
+    );
+
+    const { renderer, unmount } = await mountScreen();
+    const toggle = findOne(renderer.root, 'Switch');
+    act(() => {
+      (toggle.props as { onValueChange: (value: boolean) => void }).onValueChange(false);
+    });
+
+    expect(h.error).toHaveBeenCalledWith(i18n.t('profiles.skillToggleFailed'));
+
+    unmount();
+  });
+
   it('happy: confirming delete calls deleteSkill', async () => {
     h.query.data = testSkills([testSkill()]);
     h.query.isPending = false;

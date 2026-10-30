@@ -3851,6 +3851,8 @@
     "skillNameInvalid": "Orukọ ogbon gbọdọ bẹrẹ pẹlu lẹta tabi nọmba ati lo awọn lẹta kekere nikan, awọn nọmba, ati dashes",
     "skillContentRequired": "Akoonu ogbon ni a nilo",
     "skillSaveFailed": "Ko le fi ogbon pamọ. Gbiyanju lẹẹkansi.",
+    "skillDeleteFailed": "Ko le pa ogbon rẹ. Gbiyanju lẹẹkansi.",
+    "skillToggleFailed": "Ko le ṣe imudojuiwọn ogbon. Gbiyanju lẹẹkansi.",
     "skillLimitReached": "Profaili le gba awọn ogbon to {{max}}. Paarẹ ọkan lati fi omiran kun.",
     "skillSourceCustom": "Ti ara rẹ",
     "skillSourceMarketplace": "Ọjà",

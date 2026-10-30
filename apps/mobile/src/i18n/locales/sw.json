@@ -3851,6 +3851,8 @@
     "skillNameInvalid": "Jina la ustadi lazima lianze na herufi au tarakimu na litumie herufi ndogo, tarakimu na deshi pekee.",
     "skillContentRequired": "Maudhui ya ujuzi yanahitajika",
     "skillSaveFailed": "Haikuweza kuhifadhi ujuzi. Jaribu tena.",
+    "skillDeleteFailed": "Haikuweza kufuta ujuzi. Jaribu tena.",
+    "skillToggleFailed": "Haikuweza kusasisha ujuzi. Jaribu tena.",
     "skillLimitReached": "Wasifu unaweza kubeba hadi {{max}} ujuzi. Futa mmoja ili kuongeza mwingine.",
     "skillSourceCustom": "Maalum",
     "skillSourceMarketplace": "Soko",

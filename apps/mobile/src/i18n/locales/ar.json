@@ -4051,6 +4051,8 @@
     "skillNameInvalid": "يجب أن يبدأ اسم المهارة بحرف أو رقم ويستخدم فقط الأحرف الصغيرة والأرقام والشرطات",
     "skillContentRequired": "مطلوب محتوى المهارة",
     "skillSaveFailed": "لا يمكن حفظ المهارة. حاول مرة أخرى.",
+    "skillDeleteFailed": "لا يمكن حذف المهارة. حاول مرة أخرى.",
+    "skillToggleFailed": "لا يمكن تحديث المهارة. حاول مرة أخرى.",
     "skillLimitReached": "يمكن أن يستوعب الملف الشخصي حتى {{max}} مهارة. احذف واحدة لإضافة أخرى.",
     "skillSourceCustom": "مخصص",
     "skillSourceMarketplace": "المتجر",

@@ -3851,6 +3851,8 @@
     "skillNameInvalid": "Oskuste nimi peab algama tähe või numbriga ning kasutama ainult väiketähti, numbreid ja sidekriipse",
     "skillContentRequired": "Vajalik on oskuste sisu",
     "skillSaveFailed": "Oskust ei õnnestunud salvestada. Proovi uuesti.",
+    "skillDeleteFailed": "Oskust ei õnnestunud kustutada. Proovi uuesti.",
+    "skillToggleFailed": "Oskust ei õnnestunud uuendada. Proovi uuesti.",
     "skillLimitReached": "Profiil mahutab kuni {{max}} oskust. Teise lisamiseks kustutage üks.",
     "skillSourceCustom": "Kohandatud",
     "skillSourceMarketplace": "Turg",

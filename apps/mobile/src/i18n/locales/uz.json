@@ -3851,6 +3851,8 @@
     "skillNameInvalid": "Malaka nomi harf yoki raqam bilan boshlanishi va faqat kichik harflar, raqamlar va tirelardan foydalanishi kerak",
     "skillContentRequired": "Ko'nikma tarkibi talab qilinadi",
     "skillSaveFailed": "Mahorat saqlanmadi. Qayta urinib ko'ring.",
+    "skillDeleteFailed": "Mahorat o'chirilmadi. Qayta urinib ko'ring.",
+    "skillToggleFailed": "Mahorat yangilanmadi. Qayta urinib ko'ring.",
     "skillLimitReached": "Profil {{max}} tagacha ko'nikmani saqlashi mumkin. Boshqasini qo'shish uchun bittasini o'chiring.",
     "skillSourceCustom": "Maxsus",
     "skillSourceMarketplace": "Bozor",

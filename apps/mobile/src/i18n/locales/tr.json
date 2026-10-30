@@ -3851,6 +3851,8 @@
     "skillNameInvalid": "Beceri adı bir harf veya rakamla başlamalı ve yalnızca küçük harfler, rakamlar ve kısa çizgiler kullanmalıdır",
     "skillContentRequired": "Beceri içeriği gerekli",
     "skillSaveFailed": "Beceri kaydedilemedi. Tekrar deneyin.",
+    "skillDeleteFailed": "Beceri silinemedi. Tekrar deneyin.",
+    "skillToggleFailed": "Beceri güncellenemedi. Tekrar deneyin.",
     "skillLimitReached": "Bir profil en fazla {{max}} beceri barındırabilir. Bir tane daha eklemek için birini silin.",
     "skillSourceCustom": "Özel",
     "skillSourceMarketplace": "Marketplace",

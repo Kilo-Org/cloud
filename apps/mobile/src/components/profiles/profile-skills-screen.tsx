@@ -199,7 +199,7 @@ export function ProfileSkillsScreen({
       await deleteSkill.mutateAsync({ profileId, skillId });
     } catch (error) {
       if (!hasUsableMessage(error)) {
-        toast.error(t('profiles.skillSaveFailed'));
+        toast.error(t('profiles.skillDeleteFailed'));
       }
     }
   };
@@ -259,7 +259,7 @@ export function ProfileSkillsScreen({
                       {
                         onError: error => {
                           if (!hasUsableMessage(error)) {
-                            toast.error(t('profiles.skillSaveFailed'));
+                            toast.error(t('profiles.skillToggleFailed'));
                           }
                         },
                       }

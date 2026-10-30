@@ -3851,6 +3851,8 @@
     "skillNameInvalid": "Aha nka ga-ebidorịrị site na mkpụrụedemede ma ọ bụ mkpụrụọnụọgụgụ ma jiri naanị obere mkpụrụedemede, mkpụrụọnụọgụgụ na ngwucha",
     "skillContentRequired": "Achọrọ ọdịnaya nka",
     "skillSaveFailed": "Enweghị ike ichekwa nka. Nwaa ọzọ.",
+    "skillDeleteFailed": "Enweghị ike ihichapụ nka. Nwaa ọzọ.",
+    "skillToggleFailed": "Enweghị ike imelite nka. Nwaa ọzọ.",
     "skillLimitReached": "Profaịlụ nwere ike ijide ruo {{max}} nkà. Hichapụ otu iji tinye nke ọzọ.",
     "skillSourceCustom": "Nke onwe",
     "skillSourceMarketplace": "Ahịa",

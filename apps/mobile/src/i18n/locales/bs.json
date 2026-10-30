@@ -3901,6 +3901,8 @@
     "skillNameInvalid": "Ime vještine mora početi slovom ili cifrom i koristiti samo mala slova, cifre i crtice",
     "skillContentRequired": "Sadržaj vještina je obavezan",
     "skillSaveFailed": "Nije moguće sačuvati vještinu. Pokušajte ponovo.",
+    "skillDeleteFailed": "Nije moguće izbrisati vještinu. Pokušajte ponovo.",
+    "skillToggleFailed": "Nije moguće ažurirati vještinu. Pokušajte ponovo.",
     "skillLimitReached": "Profil može sadržavati najviše {{max}} vještina. Izbrišite jednu da biste dodali drugu.",
     "skillSourceCustom": "Prilagođeno",
     "skillSourceMarketplace": "Marketplace",

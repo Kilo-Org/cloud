@@ -3951,6 +3951,8 @@
     "skillNameInvalid": "Názov zručnosti musí začínať písmenom alebo číslicou a používať iba malé písmená, číslice a pomlčky",
     "skillContentRequired": "Vyžaduje sa obsah zručností",
     "skillSaveFailed": "Nepodarilo sa zachrániť zručnosť. Skúste to znova.",
+    "skillDeleteFailed": "Nepodarilo sa odstrániť zručnosť. Skúste to znova.",
+    "skillToggleFailed": "Nepodarilo sa aktualizovať zručnosť. Skúste to znova.",
     "skillLimitReached": "Profil môže obsahovať až {{max}} zručností. Vymažte jednu, aby ste pridali ďalšiu.",
     "skillSourceCustom": "Vlastné",
     "skillSourceMarketplace": "Obchod",

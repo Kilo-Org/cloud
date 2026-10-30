@@ -3857,6 +3857,7 @@
     "skillMarkdownLabel": "Færniefni",
     "skillsEmpty": "Engin kunnátta ennþá",
     "skillNameRequired": "Sláðu inn hæfileikaheiti",
+    "skillNameTooLong": "Hæfniheiti má ekki vera lengra en {{max}} stafir",
     "skillNameInvalid": "Hæfniheiti verður að byrja á bókstaf eða tölustaf og nota aðeins lágstafi, tölustafi og bandstrik",
     "skillContentRequired": "Færniefni er krafist",
     "skillSaveFailed": "Ekki tókst að bjarga kunnáttu. Reyndu aftur.",

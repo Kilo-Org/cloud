@@ -3857,6 +3857,7 @@
     "skillMarkdownLabel": "Vaardigheid inhoud",
     "skillsEmpty": "Nog geen vaardigheden",
     "skillNameRequired": "Voer een vaardigheidsnaam in",
+    "skillNameTooLong": "De naam van de vaardigheid mag maximaal {{max}} tekens bevatten",
     "skillNameInvalid": "De naam van de vaardigheid moet beginnen met een letter of cijfer en mag alleen kleine letters, cijfers en streepjes bevatten",
     "skillContentRequired": "Vaardigheidsinhoud is vereist",
     "skillSaveFailed": "Kan vaardigheid niet opslaan. Probeer het opnieuw.",

@@ -3907,6 +3907,7 @@
     "skillMarkdownLabel": "Conteúdo da competência",
     "skillsEmpty": "Ainda não há competências",
     "skillNameRequired": "Introduza um nome de competência",
+    "skillNameTooLong": "O nome da competência deve ter {{max}} caracteres ou menos",
     "skillNameInvalid": "O nome da competência deve começar por uma letra ou dígito e usar apenas letras minúsculas, dígitos e hífenes",
     "skillContentRequired": "O conteúdo da competência é obrigatório",
     "skillSaveFailed": "Não foi possível guardar a competência. Tente novamente.",

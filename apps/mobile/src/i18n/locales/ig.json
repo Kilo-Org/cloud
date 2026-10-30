@@ -3857,6 +3857,7 @@
     "skillMarkdownLabel": "Ọdịnaya nka",
     "skillsEmpty": "Enweghị nka ma",
     "skillNameRequired": "Tinye aha nka",
+    "skillNameTooLong": "Aha nka ga-abụ {{max}} mkpụrụedemede ma ọ bụ obere",
     "skillNameInvalid": "Aha nka ga-ebidorịrị site na mkpụrụedemede ma ọ bụ mkpụrụọnụọgụgụ ma jiri naanị obere mkpụrụedemede, mkpụrụọnụọgụgụ na ngwucha",
     "skillContentRequired": "Achọrọ ọdịnaya nka",
     "skillSaveFailed": "Enweghị ike ichekwa nka. Nwaa ọzọ.",

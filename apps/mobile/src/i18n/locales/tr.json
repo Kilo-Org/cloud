@@ -3857,6 +3857,7 @@
     "skillMarkdownLabel": "Beceri içeriği",
     "skillsEmpty": "Henüz beceri yok",
     "skillNameRequired": "Bir beceri adı girin",
+    "skillNameTooLong": "Beceri adı {{max}} karakter veya daha az olmalıdır",
     "skillNameInvalid": "Beceri adı bir harf veya rakamla başlamalı ve yalnızca küçük harfler, rakamlar ve kısa çizgiler kullanmalıdır",
     "skillContentRequired": "Beceri içeriği gerekli",
     "skillSaveFailed": "Beceri kaydedilemedi. Tekrar deneyin.",

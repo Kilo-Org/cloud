@@ -3957,6 +3957,7 @@
     "skillMarkdownLabel": "Įgūdžių turinys",
     "skillsEmpty": "Įgūdžių dar nėra",
     "skillNameRequired": "Įveskite įgūdžių pavadinimą",
+    "skillNameTooLong": "Įgūdžio pavadinimas turi būti ne ilgesnis kaip {{max}} simbolių",
     "skillNameInvalid": "Įgūdžio pavadinimas turi prasidėti raide arba skaitmeniu ir naudoti tik mažąsias raides, skaitmenis ir brūkšnelius",
     "skillContentRequired": "Reikalingas įgūdžių turinys",
     "skillSaveFailed": "Nepavyko išsaugoti įgūdžių. Bandykite dar kartą.",

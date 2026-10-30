@@ -3857,6 +3857,7 @@
     "skillMarkdownLabel": "스킬 내용",
     "skillsEmpty": "아직 기술이 없습니다",
     "skillNameRequired": "스킬 이름을 입력하세요",
+    "skillNameTooLong": "스킬 이름은 {{max}}자 이하여야 합니다.",
     "skillNameInvalid": "스킬 이름은 문자 또는 숫자로 시작해야 하며 소문자, 숫자, 대시만 사용할 수 있습니다.",
     "skillContentRequired": "스킬 내용이 필요합니다",
     "skillSaveFailed": "스킬 저장이 안되네요. 다시 시도해 주세요.",

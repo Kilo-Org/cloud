@@ -3907,6 +3907,7 @@
     "skillMarkdownLabel": "Sadržaj vještina",
     "skillsEmpty": "Još nema vještina",
     "skillNameRequired": "Unesite naziv vještine",
+    "skillNameTooLong": "Ime vještine može sadržavati najviše {{max}} znakova",
     "skillNameInvalid": "Ime vještine mora početi slovom ili cifrom i koristiti samo mala slova, cifre i crtice",
     "skillContentRequired": "Sadržaj vještina je obavezan",
     "skillSaveFailed": "Nije moguće sačuvati vještinu. Pokušajte ponovo.",

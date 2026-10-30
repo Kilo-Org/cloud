@@ -3857,6 +3857,7 @@
     "skillMarkdownLabel": "Nilalaman ng kasanayan",
     "skillsEmpty": "Wala pang skills",
     "skillNameRequired": "Maglagay ng pangalan ng kasanayan",
+    "skillNameTooLong": "Ang pangalan ng kasanayan ay dapat na {{max}} character o mas kaunti",
     "skillNameInvalid": "Ang pangalan ng kasanayan ay dapat magsimula sa isang titik o digit at gumamit lamang ng maliliit na titik, digit, at gitling",
     "skillContentRequired": "Kinakailangan ang nilalaman ng kasanayan",
     "skillSaveFailed": "Hindi makapag-save ng kasanayan. Subukan muli.",

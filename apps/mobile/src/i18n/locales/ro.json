@@ -3907,6 +3907,7 @@
     "skillMarkdownLabel": "Conținut de abilități",
     "skillsEmpty": "Nu există încă abilități",
     "skillNameRequired": "Introduceți un nume de abilitate",
+    "skillNameTooLong": "Numele aptitudinii trebuie să aibă cel mult {{max}} caractere",
     "skillNameInvalid": "Numele aptitudinii trebuie să înceapă cu o literă sau o cifră și să folosească numai litere mici, cifre și liniuțe",
     "skillContentRequired": "Conținutul de calificare este necesar",
     "skillSaveFailed": "Nu s-a putut salva calificarea. Încearcă din nou.",

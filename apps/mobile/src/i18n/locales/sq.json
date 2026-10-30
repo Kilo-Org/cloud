@@ -3857,6 +3857,7 @@
     "skillMarkdownLabel": "Përmbajtja e aftësive",
     "skillsEmpty": "Ende nuk ka aftësi",
     "skillNameRequired": "Futni një emër aftësie",
+    "skillNameTooLong": "Emri i aftësisë duhet të ketë {{max}} karaktere ose më pak",
     "skillNameInvalid": "Emri i aftësisë duhet të fillojë me një shkronjë ose shifër dhe të përdorë vetëm shkronja të vogla, shifra dhe viza",
     "skillContentRequired": "Kërkohet përmbajtja e aftësive",
     "skillSaveFailed": "Aftësia nuk mund të kursehej. Provoni përsëri.",

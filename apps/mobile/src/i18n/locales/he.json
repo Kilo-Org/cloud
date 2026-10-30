@@ -3907,6 +3907,7 @@
     "skillMarkdownLabel": "תוכן מיומנות",
     "skillsEmpty": "עדיין אין כישורים",
     "skillNameRequired": "הזן שם מיומנות",
+    "skillNameTooLong": "שם המיומנות חייב להכיל {{max}} תווים או פחות",
     "skillNameInvalid": "שם המיומנות חייב להתחיל באות או ספרה ולהשתמש רק באותיות קטנות, ספרות ומקפים",
     "skillContentRequired": "נדרש תוכן מיומנות",
     "skillSaveFailed": "לא ניתן היה לשמור את המיומנות. נסה שוב.",

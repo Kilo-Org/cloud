@@ -3857,6 +3857,7 @@
     "skillMarkdownLabel": "Færdighedsindhold",
     "skillsEmpty": "Ingen færdigheder endnu",
     "skillNameRequired": "Indtast et færdighedsnavn",
+    "skillNameTooLong": "Færdighedsnavn må højst være {{max}} tegn",
     "skillNameInvalid": "Færdighedsnavn skal starte med et bogstav eller ciffer og kun bruge små bogstaver, cifre og bindestreger",
     "skillContentRequired": "Færdighedsindhold er påkrævet",
     "skillSaveFailed": "Kunne ikke gemme færdighed. Prøv igen.",

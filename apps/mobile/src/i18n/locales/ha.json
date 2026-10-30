@@ -3857,6 +3857,7 @@
     "skillMarkdownLabel": "Abubuwan gwaninta",
     "skillsEmpty": "Babu fasaha tukuna",
     "skillNameRequired": "Shigar da sunan fasaha",
+    "skillNameTooLong": "Dole ne sunan fasaha ya kasance haruffa {{max}} ko ƙasa da haka",
     "skillNameInvalid": "Dole ne sunan gwani ya fara da harafi ko lambobi kuma yayi amfani da ƙananan haruffa kawai, lambobi, da dashes",
     "skillContentRequired": "Ana buƙatar abun ciki gwaninta",
     "skillSaveFailed": "An kasa ajiye fasaha. Sake gwadawa.",

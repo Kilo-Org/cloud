@@ -3957,6 +3957,7 @@
     "skillMarkdownLabel": "Treść umiejętności",
     "skillsEmpty": "Nie ma jeszcze żadnych umiejętności",
     "skillNameRequired": "Wpisz nazwę umiejętności",
+    "skillNameTooLong": "Nazwa umiejętności musi mieć {{max}} znaków lub mniej",
     "skillNameInvalid": "Nazwa umiejętności musi zaczynać się od litery lub cyfry i zawierać wyłącznie małe litery, cyfry i myślniki",
     "skillContentRequired": "Wymagane są umiejętności",
     "skillSaveFailed": "Nie udało się zapisać umiejętności. Spróbuj ponownie.",

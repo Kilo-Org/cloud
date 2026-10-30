@@ -3907,6 +3907,7 @@
     "skillMarkdownLabel": "Prasmju saturs",
     "skillsEmpty": "Vēl nav prasmju",
     "skillNameRequired": "Ievadiet prasmes nosaukumu",
+    "skillNameTooLong": "Prasmes nosaukums nedrīkst būt garāks par {{max}} rakstzīmēm",
     "skillNameInvalid": "Prasmes nosaukumam jāsākas ar burtu vai ciparu, un tajā jāizmanto tikai mazie burti, cipari un domuzīmes.",
     "skillContentRequired": "Nepieciešams prasmju saturs",
     "skillSaveFailed": "Nevarēja saglabāt prasmi. Mēģiniet vēlreiz.",

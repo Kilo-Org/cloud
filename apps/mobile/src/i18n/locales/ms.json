@@ -3857,6 +3857,7 @@
     "skillMarkdownLabel": "Kandungan kemahiran",
     "skillsEmpty": "Belum ada kemahiran",
     "skillNameRequired": "Masukkan nama kemahiran",
+    "skillNameTooLong": "Nama kemahiran mesti {{max}} aksara atau kurang",
     "skillNameInvalid": "Nama kemahiran mesti bermula dengan huruf atau digit dan hanya menggunakan huruf kecil, angka dan sempang",
     "skillContentRequired": "Kandungan kemahiran diperlukan",
     "skillSaveFailed": "Tidak dapat menyelamatkan kemahiran. Cuba lagi.",

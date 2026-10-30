@@ -3857,6 +3857,7 @@
     "skillMarkdownLabel": "የክህሎት ይዘት",
     "skillsEmpty": "እስካሁን ምንም ችሎታ የለም።",
     "skillNameRequired": "የክህሎት ስም አስገባ",
+    "skillNameTooLong": "የክህሎት ስም ከ{{max}} ቁምፊዎች መብለጥ የለበትም",
     "skillNameInvalid": "የክህሎት ስም በፊደል ወይም ዲጂት መጀመር አለበት እና ትንሽ ሆሄያትን፣ አሃዞችን እና ሰረዞችን ብቻ መጠቀም አለበት።",
     "skillContentRequired": "የክህሎት ይዘት ያስፈልጋል",
     "skillSaveFailed": "ችሎታ ማዳን አልተቻለም። እንደገና ይሞክሩ።",

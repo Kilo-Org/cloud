@@ -3957,6 +3957,7 @@
     "skillMarkdownLabel": "Obsah zručností",
     "skillsEmpty": "Zatiaľ žiadne zručnosti",
     "skillNameRequired": "Zadajte názov zručnosti",
+    "skillNameTooLong": "Názov zručnosti musí mať {{max}} znakov alebo menej",
     "skillNameInvalid": "Názov zručnosti musí začínať písmenom alebo číslicou a používať iba malé písmená, číslice a pomlčky",
     "skillContentRequired": "Vyžaduje sa obsah zručností",
     "skillSaveFailed": "Nepodarilo sa zachrániť zručnosť. Skúste to znova.",

@@ -3957,6 +3957,7 @@
     "skillMarkdownLabel": "Obsah dovedností",
     "skillsEmpty": "Zatím žádné dovednosti",
     "skillNameRequired": "Zadejte název dovednosti",
+    "skillNameTooLong": "Název dovednosti musí mít maximálně {{max}} znaků",
     "skillNameInvalid": "Název dovednosti musí začínat písmenem nebo číslicí a používat pouze malá písmena, číslice a pomlčky",
     "skillContentRequired": "Je vyžadován obsah dovedností",
     "skillSaveFailed": "Nepodařilo se zachránit dovednost. Zkuste to znovu.",

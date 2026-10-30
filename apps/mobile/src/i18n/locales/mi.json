@@ -3857,6 +3857,7 @@
     "skillMarkdownLabel": "Te ihirangi pukenga",
     "skillsEmpty": "Kaore ano he pukenga",
     "skillNameRequired": "Whakauruhia he ingoa pukenga",
+    "skillNameTooLong": "Kia {{max}} pūāhua te roa o te ingoa pukenga, kaua e neke ake",
     "skillNameInvalid": "Me timata te ingoa pukenga ki te reta, mati ranei me te whakamahi i nga reta iti, mati, me nga tohu",
     "skillContentRequired": "Kei te hiahiatia nga ihirangi pukenga",
     "skillSaveFailed": "Kaore i taea te penapena pukenga. Whakamātauria anō.",

@@ -85,6 +85,9 @@ vi.mock('@/components/ui/icons', () => ({
   Trash2: 'Trash2',
 }));
 
+/** The props a mocked Switch host element exposes, which the renderer keeps untyped. */
+type ToggleProps = { onValueChange: (value: boolean) => void };
+
 describe('ProfileMcpScreen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -468,9 +471,7 @@ describe('ProfileMcpScreen', () => {
 
     const { renderer, unmount } = await mountScreen();
     // The test renderer exposes host props untyped; the screen passes this handler.
-    const toggleProps = findOne(renderer.root, 'Switch').props as {
-      onValueChange: (value: boolean) => void;
-    };
+    const toggleProps = findOne(renderer.root, 'Switch').props as ToggleProps;
     act(() => {
       toggleProps.onValueChange(false);
     });
@@ -492,6 +493,31 @@ describe('ProfileMcpScreen', () => {
       await Promise.resolve();
     });
     expect(findOne(renderer.root, 'Switch').props.accessibilityLabel).toBe('docs');
+
+    unmount();
+  });
+
+  it('drops the row presses of the burst that saved the sheet', async () => {
+    h.query.data = testProfile([testServer()]);
+    h.query.isPending = false;
+    h.mutations.updateMcp.mutateAsync.mockResolvedValue({ success: true });
+
+    const { renderer, unmount } = await mountScreen();
+    pressPressable(renderer.root, 'Edit MCP server docs');
+    pressSheetDone(renderer.root);
+    await waitFor(() => findAll(renderer.root, 'SheetHeader').length === 0);
+
+    pressPressable(renderer.root, 'Delete MCP server docs');
+    pressPressable(renderer.root, 'Edit MCP server docs');
+    // The test renderer exposes host props untyped; the screen passes this handler.
+    const toggleProps = findOne(renderer.root, 'Switch').props as ToggleProps;
+    act(() => {
+      toggleProps.onValueChange(false);
+    });
+
+    expect(h.confirm).not.toHaveBeenCalled();
+    expect(findAll(renderer.root, 'SheetHeader')).toHaveLength(0);
+    expect(h.mutations.setMcpEnabled.mutate).not.toHaveBeenCalled();
 
     unmount();
   });

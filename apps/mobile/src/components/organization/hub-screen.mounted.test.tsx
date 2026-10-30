@@ -12,7 +12,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { renderWithProviders } from '@/test/render-with-providers';
 import { compiledDimensions } from '@/test/native-dimensions';
 
-import '@/i18n';
+import { i18n } from '@/i18n';
 import { OrganizationHubScreen } from './hub-screen';
 
 /** The smallest box the control-size audit accepts on a control's own node. */
@@ -22,7 +22,11 @@ const MIN_REACH_DP = 44;
 /** One Tailwind spacing unit, in dp. */
 const SPACING_UNIT_DP = 4;
 
-const boundary = vi.hoisted(() => ({ role: 'owner' as string }));
+const boundary = vi.hoisted(() => ({
+  role: 'owner' as string,
+  requireSeats: false,
+  seatCount: { used: 1, total: 1 },
+}));
 const routerPush = vi.hoisted(() => vi.fn());
 const membersQuery = vi.hoisted(() => ({
   data: undefined as
@@ -51,8 +55,8 @@ vi.mock('@/lib/hooks/use-organization-queries', () => ({
       organizationId: 'org-1',
       organizationName: 'Acme',
       balance: 5_000_000,
-      requireSeats: false,
-      seatCount: { used: 1, total: 1 },
+      requireSeats: boundary.requireSeats,
+      seatCount: boundary.seatCount,
     },
     isResolving: false,
   }),
@@ -102,7 +106,18 @@ vi.mock('@/components/organization/organization-boundary', () => ({
 
 vi.mock('@/components/rename-modal', () => ({ RenameModal: 'RenameModal' }));
 
-vi.mock('@/components/screen-header', () => ({ ScreenHeader: 'ScreenHeader' }));
+// The header is not what this suite measures, but the rename control now lives
+// in its trailing slot, so the mock renders `headerRight` as its child instead
+// of dropping it: the control keeps being found, measured and pressed below.
+// `vi.mock` hoists this factory above the file's imports, so it imports
+// `createElement` itself; a top-level import is not initialized yet here.
+vi.mock('@/components/screen-header', async () => {
+  const { createElement: h } = await import('react');
+  return {
+    ScreenHeader: ({ headerRight, title }: { headerRight?: React.ReactNode; title?: string }) =>
+      h('ScreenHeader', { title }, headerRight),
+  };
+});
 
 vi.mock('@/components/tab-screen', () => ({ TabScreenScrollView: 'TabScreenScrollView' }));
 
@@ -183,11 +198,41 @@ async function renderHub() {
 
 beforeEach(() => {
   boundary.role = 'owner';
+  boundary.requireSeats = false;
+  boundary.seatCount = { used: 1, total: 1 };
   routerPush.mockClear();
   membersQuery.data = { parent_organization_id: null, settings: {} };
   membersQuery.isError = false;
   membersQuery.isPaused = false;
   membersQuery.refetch.mockClear();
+});
+
+describe('Organization hub card', () => {
+  it('shows the organization name once, in the header beside the rename control', async () => {
+    const { renderer, unmount } = await renderHub();
+
+    const header = renderer.root.findAllByType('ScreenHeader')[0];
+    expect(header?.props.title).toBe('Acme');
+    // The card used to repeat the name in its first row, directly under a
+    // header that already carried it.
+    expect(renderer.root.findAll(node => node.props.children === 'Acme')).toHaveLength(0);
+    unmount();
+  });
+
+  it('isolates the seat pair so a right-to-left layout cannot mirror it', async () => {
+    boundary.requireSeats = true;
+    boundary.seatCount = { used: 1, total: 5 };
+
+    const { renderer, unmount } = await renderHub();
+
+    const seats = renderer.root
+      .findAllByType('KvRow')
+      .find(node => node.props.label === i18n.t('organization.hub.organizationSeats'));
+    // Left-to-right isolate (U+2066) and pop-directional-isolate (U+2069): the
+    // pair reads 1 of 5 in either interface direction.
+    expect(seats?.props.value).toBe('\u20661 / 5\u2069');
+    unmount();
+  });
 });
 
 describe('OrganizationHubScreen rename control', () => {

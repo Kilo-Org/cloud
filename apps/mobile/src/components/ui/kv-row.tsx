@@ -26,6 +26,13 @@ type KvRowProps = {
   selectable?: boolean;
   /** Extra classes for the value text only (e.g. `uppercase` for a status readout). */
   valueClassName?: string;
+  /**
+   * Value font. `mono` (the default) is the shared readout for numbers and
+   * identifiers. Use `sans` where the row's values sit beside the screen's other
+   * values in the body face — the organization card's balance and seat count
+   * above the usage tiles — so one screen does not mix two value faces.
+   */
+  valueVariant?: 'mono' | 'sans';
 };
 
 const VALUE_TONE = {
@@ -54,6 +61,7 @@ export function KvRow({
   className,
   selectable,
   valueClassName,
+  valueVariant = 'mono',
 }: Readonly<KvRowProps>) {
   const colors = useThemeColors();
   // Android's `selectable` routes the value through ReactTextView, which
@@ -79,7 +87,7 @@ export function KvRow({
         </Text>
       </View>
       <Text
-        variant="mono"
+        variant={valueVariant === 'sans' ? 'default' : 'mono'}
         selectable={selectable}
         numberOfLines={valueLineLimit}
         ellipsizeMode={valueLineLimit ? 'middle' : undefined}

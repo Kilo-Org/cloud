@@ -59,6 +59,17 @@ const STATUS_LABEL_KEYS = {
   unknown: 'common.unknown',
 } satisfies Record<string, string>;
 
+/**
+ * The badge every status without a hue of its own wears: the gray the model
+ * badges use, which differs from the row's `bg-secondary` in both themes (the
+ * theme's `--muted` equals `--secondary`, so a `bg-muted` pill has no band on
+ * this row). `text-ink2` stays readable on it; the muted foreground does not.
+ */
+const NEUTRAL_BADGE = {
+  pillClass: 'bg-neutral-200 dark:bg-neutral-700',
+  textClass: 'text-ink2',
+} as const;
+
 const STATUS_META = {
   paid: {
     pillClass: 'bg-good',
@@ -68,10 +79,7 @@ const STATUS_META = {
     pillClass: 'bg-warn',
     textClass: 'text-warn-foreground',
   },
-  void: {
-    pillClass: 'bg-muted',
-    textClass: 'text-muted-foreground',
-  },
+  void: NEUTRAL_BADGE,
 } as const satisfies Record<string, { pillClass: string; textClass: string }>;
 
 /** Looks up a possibly-unknown key in a literal dictionary without widening its type. */
@@ -84,8 +92,8 @@ function statusMeta(status: string) {
   const labelKey = lookup(STATUS_LABEL_KEYS, status);
   return {
     label: labelKey ? i18n.t(labelKey) : status,
-    pillClass: meta?.pillClass ?? 'bg-muted',
-    textClass: meta?.textClass ?? 'text-muted-foreground',
+    pillClass: meta?.pillClass ?? NEUTRAL_BADGE.pillClass,
+    textClass: meta?.textClass ?? NEUTRAL_BADGE.textClass,
   };
 }
 

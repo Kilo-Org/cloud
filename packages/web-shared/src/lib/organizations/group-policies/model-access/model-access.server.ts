@@ -163,6 +163,14 @@ export async function getEffectiveModelDecision(
   providerLookup: ProviderLookup = getProviderSlugsForModel
 ): Promise<EffectiveModelDecision> {
   const normalizedModelId = normalizeModelId(modelId);
+  // An unrestricted grant admits every model, and `evaluateEffectiveModelAccessPolicy`
+  // only ever pairs it with `requireModelInCurrentSnapshot: false`. Neither the
+  // exemption nor the pinned-provider lookup below can change that decision, because
+  // the set the provider lookup pins is never empty: a public custom LLM declares at
+  // least one inference provider. Resolving them per model is pure cost.
+  if (policy.memberGrant.mode === 'unrestricted') {
+    return { allowed: true };
+  }
   if (await isModelRestrictionExempt(modelId, policy.customLlmGrantee)) {
     return { allowed: true };
   }
@@ -198,9 +206,6 @@ export async function getEffectiveModelDecision(
       : { allowed: false, denialSource: 'organization_provider' };
   }
 
-  if (policy.memberGrant.mode === 'unrestricted') {
-    return { allowed: true };
-  }
   if (policy.memberGrant.mode === 'organization_baseline') {
     return await decisionWithinOrganizationBaseline();
   }

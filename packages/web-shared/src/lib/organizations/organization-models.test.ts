@@ -23,8 +23,15 @@ const mockReplicaSelect = jest.fn(() => {
 const mockGetContext = jest.fn(
   async (_params: { organizationId: string; subject: OrganizationPolicySubject }) => mockContext
 );
-const mockPolicy = { policyRevision: 7 };
-const mockEvaluatePolicy = jest.fn((_context: OrganizationGroupPolicyContext) => mockPolicy);
+/** Only the grant mode is read from the policy by the catalog filter under test. */
+type MockModelPolicy = { policyRevision: number; memberGrant: { mode: string } };
+const mockPolicy: MockModelPolicy = {
+  policyRevision: 7,
+  memberGrant: { mode: 'selected' },
+};
+const mockEvaluatePolicy = jest.fn(
+  (_context: OrganizationGroupPolicyContext): MockModelPolicy => mockPolicy
+);
 const ALLOWED_MODEL_ROUTES: ReadonlySet<string> = new Set(['groq']);
 const DENIAL_SOURCES: Record<string, string> = {
   'provider/blocked': 'group_model',
@@ -603,5 +610,30 @@ describe('organization model producer publication', () => {
     expect(mockInferenceProviderUserByok).toHaveBeenCalledTimes(2);
     expect(debug).toHaveBeenCalledTimes(1);
     expect(debug.mock.calls[0]?.[0]).toContain('1 of 2 models');
+  });
+
+  it('lists the whole catalog without per-model access lookups for an unrestricted grant', async () => {
+    await primeAnnotatedCatalog();
+    mockEvaluatePolicy.mockReturnValueOnce({
+      policyRevision: 8,
+      memberGrant: { mode: 'unrestricted' },
+    });
+    mockDecision.mockClear();
+    mockInferenceProviderUserByok.mockClear();
+
+    const result = await resultFor();
+
+    // Every catalog model is admitted, including the ones the restricted
+    // fixture denies, and no provider route is recorded in this mode.
+    expect(result.data.map(model => model.id)).toEqual([
+      'provider/allowed',
+      'provider/blocked',
+      'provider/training',
+      'morph-byok/private',
+      'kilo-internal/private',
+    ]);
+    expect(mockDecision).not.toHaveBeenCalled();
+    expect(mockInferenceProviderUserByok).not.toHaveBeenCalled();
+    expect(mockAvailability.mock.calls[0][2]?.('provider/allowed')).toBeUndefined();
   });
 });

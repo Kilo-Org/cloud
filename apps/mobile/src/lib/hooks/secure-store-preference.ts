@@ -63,6 +63,13 @@ export function createSecureStorePreference<T>(options: {
    * clear just reset.
    */
   let writeEpoch = 0;
+  /**
+   * Bumped by clear() and by nothing else. `writeEpoch` also moves when a
+   * `mergeOnLoad` reconcile repaints the value, which is not a reset: a
+   * persist-then-apply write must not report its own choice as discarded
+   * because the disk and its pending edit were reconciled.
+   */
+  let clearEpoch = 0;
   let markLoaded = noop;
   // Resolves once the disk read settles, so a caller with no React tree (the
   // Android widget task) can await the stored value instead of reading the
@@ -113,7 +120,7 @@ export function createSecureStorePreference<T>(options: {
 
   /** Applies a value the disk now holds. Skipped once clear() superseded it. */
   const applyPersisted = (next: T, epoch: number) => {
-    if (epoch !== writeEpoch) {
+    if (epoch !== clearEpoch) {
       return;
     }
     value = next;
@@ -136,7 +143,7 @@ export function createSecureStorePreference<T>(options: {
         const target = requested;
         requested = undefined;
         inFlight = target;
-        const epoch = writeEpoch;
+        const epoch = clearEpoch;
         try {
           // eslint-disable-next-line no-await-in-loop -- one write at a time is the ordering guarantee
           await setAccountMetadata(key, serialize(target));
@@ -271,27 +278,34 @@ export function createSecureStorePreference<T>(options: {
      * toast, leaves memory unchanged, and returns false. `toastLng` pins the
      * toast language when the caller already switched the active language.
      *
-     * A `clear()` that runs during either wait supersedes the choice: it is
-     * not written to disk and not applied, and the call returns false without a
-     * toast, because nothing failed — the value was reset on purpose.
+     * A `clear()` that runs during either wait supersedes the choice: a write
+     * that has not started is skipped, the value is never applied, and the call
+     * returns false without a toast, because nothing failed — the value was
+     * reset on purpose. A write already handed to the store cannot be recalled.
      */
     setAsync: async (next: T, toastLng?: string): Promise<boolean> => {
-      // The same fence `clear()` sets for a write already on its way to disk.
-      // A sign-out during either await below reset this preference, and this
+      // The fence `clear()` sets for a write already on its way to disk. A
+      // sign-out during either await below reset this preference, and this
       // choice belongs to the account that just left: it must not land on disk
-      // and must not repaint memory afterwards.
-      const epoch = writeEpoch;
+      // (when it has not started yet) and must not repaint memory afterwards.
+      const epoch = clearEpoch;
       await whenPersisted();
-      if (epoch !== writeEpoch) {
+      if (epoch !== clearEpoch) {
         return false;
       }
       try {
         await setAccountMetadata(key, serialize(next));
       } catch {
-        toast.error(i18n.t('common.couldNotSaveSetting', toastLng ? { lng: toastLng } : undefined));
+        // A superseded choice is not a save failure, so it does not toast: the
+        // reset already explains why the value is gone.
+        if (epoch === clearEpoch) {
+          toast.error(
+            i18n.t('common.couldNotSaveSetting', toastLng ? { lng: toastLng } : undefined)
+          );
+        }
         return false;
       }
-      if (epoch !== writeEpoch) {
+      if (epoch !== clearEpoch) {
         return false;
       }
       value = next;
@@ -305,6 +319,7 @@ export function createSecureStorePreference<T>(options: {
       // A write already on its way to disk must not repaint the value this
       // clear resets; the delete it queues behind still removes the entry.
       writeEpoch += 1;
+      clearEpoch += 1;
       requested = undefined;
       inFlight = undefined;
       value = defaultValue;

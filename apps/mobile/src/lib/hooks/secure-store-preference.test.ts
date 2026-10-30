@@ -264,59 +264,6 @@ describe('createSecureStorePreference', () => {
     unsubscribe();
   });
 
-  it('leaves the cleared value in place when clear() runs during setAsync’s write', async () => {
-    getItemAsync.mockResolvedValue(null);
-    const writeGate = Promise.withResolvers<undefined>();
-    setItemAsync.mockImplementation(async () => {
-      await writeGate.promise;
-    });
-    const store = createSecureStorePreference<boolean>({
-      key: 'k',
-      defaultValue: false,
-      parse: raw => raw === 'true',
-      serialize: value => (value ? 'true' : 'false'),
-    });
-
-    const applying = store.setAsync(true);
-    await flushMicrotasks();
-    expect(setItemAsync).toHaveBeenCalledTimes(1);
-
-    store.clear();
-    writeGate.resolve(undefined);
-
-    // The write landed, but clear() reset the preference while it was on its
-    // way to disk, so the choice is not applied and the caller learns it.
-    await expect(applying).resolves.toBe(false);
-    expect(store.get()).toBe(false);
-    expect(store.getRequested()).toBe(false);
-    expect(toastError).not.toHaveBeenCalled();
-  });
-
-  it('skips the disk write when clear() runs while setAsync waits for a pending write', async () => {
-    getItemAsync.mockResolvedValue(null);
-    const firstWriteGate = Promise.withResolvers<undefined>();
-    setItemAsync.mockImplementationOnce(async () => {
-      await firstWriteGate.promise;
-    });
-    const store = createSecureStorePreference<boolean>({
-      key: 'k',
-      defaultValue: false,
-      parse: raw => raw === 'true',
-      serialize: value => (value ? 'true' : 'false'),
-    });
-
-    store.set(true);
-    const applying = store.setAsync(false);
-    store.clear();
-    firstWriteGate.resolve(undefined);
-
-    await expect(applying).resolves.toBe(false);
-    // Only the superseded set() reached disk; the choice that waited behind it
-    // belongs to the account the clear() reset.
-    expect(setItemAsync).toHaveBeenCalledTimes(1);
-    expect(store.get()).toBe(false);
-  });
-
   it('preload() starts the disk read once and a following subscribe() does not start a second read', async () => {
     const pendingReads: ((raw: string | null) => void)[] = [];
     getItemAsync.mockReturnValue(

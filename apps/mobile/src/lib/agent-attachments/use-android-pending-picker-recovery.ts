@@ -31,9 +31,9 @@ type UseAndroidPendingPickerRecoveryOptions = {
  * A non-expired mismatch (wrong account/surface/session) is left untouched so
  * the matching composer — multiple composers stay mounted — can still read it.
  *
- * Best effort: a failed storage read, clear, or candidate add is reported once
- * and swallowed, and the stored context stays for the next app-active edge to
- * retry. Both call sites fire this off without awaiting it.
+ * Best effort: a failed consume, candidate add, or clear is reported once and
+ * swallowed, and a failed clear leaves the stored context for the next
+ * app-active edge to retry. Both call sites fire this off without awaiting it.
  */
 export function useAndroidPendingPickerRecovery(
   options: UseAndroidPendingPickerRecoveryOptions
@@ -76,10 +76,14 @@ export function useAndroidPendingPickerRecovery(
         context.sessionId === sessionIdRef.current;
       if (matches) {
         const assets = await consumeAndroidPendingPickerResult();
-        await clearPickerLaunchContext();
+        // Attach before clearing: the result is already consumed and cannot be
+        // read again, so a failed clear must not skip the assets the person
+        // picked. A clear that still fails leaves the context for the next
+        // app-active edge, which consumes nothing and retries the clear.
         if (assets.length > 0) {
           await addCandidatesRef.current(assets.map(asset => normalizeImageAsset(asset)));
         }
+        await clearPickerLaunchContext();
         return;
       }
       if (expired) {
@@ -94,9 +98,8 @@ export function useAndroidPendingPickerRecovery(
     } catch (error) {
       // Best effort and self-contained: the call sites fire this off with
       // `void recover()`, so a rejection must not escape as an unhandled one.
-      // The stored launch context is only removed after a successful read or
-      // clear, so a failure here leaves it for the next app-active edge to
-      // retry.
+      // A failed clear leaves the stored context in place, so the next
+      // app-active edge retries it.
       captureTelemetry({
         error,
         level: 'warning',

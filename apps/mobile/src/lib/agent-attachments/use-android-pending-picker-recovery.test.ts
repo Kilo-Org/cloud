@@ -231,6 +231,12 @@ describe('useAndroidPendingPickerRecovery', () => {
       tags: { 'error.subsystem': 'agent_attachments', 'error.operation': 'picker_recovery' },
     });
 
+    // The picked asset reached the composer before the clear failed, so the
+    // failed clear costs the stored context and nothing else.
+    expect(mocks.addCandidates).toHaveBeenCalledExactlyOnceWith([
+      { name: 'photo.jpg', uri: 'file:///photo.jpg' },
+    ]);
+
     // The stored context was never cleared, so the next app-active edge runs
     // the recovery again and the clear lands.
     mocks.readPickerLaunchContext.mockResolvedValue(makeContext());
@@ -242,5 +248,8 @@ describe('useAndroidPendingPickerRecovery', () => {
 
     expect(mocks.clearPickerLaunchContext).toHaveBeenCalledTimes(2);
     expect(events).toHaveLength(1);
+    // The result was consumed on the first pass, so the retry attaches
+    // nothing a second time.
+    expect(mocks.addCandidates).toHaveBeenCalledTimes(1);
   });
 });

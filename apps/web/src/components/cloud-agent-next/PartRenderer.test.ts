@@ -54,6 +54,17 @@ describe('TextPartRenderer markdown images', () => {
     expect(markup).toContain('>Build status</a>');
   });
 
+  it('renders an image inside a link as one link', () => {
+    const markup = renderText(
+      '[![Build status](https://cdn.example.com/status.png)](https://example.com/build)'
+    );
+
+    expect(markup.match(/<a /g) ?? []).toHaveLength(1);
+    expect(markup).toContain('href="https://example.com/build"');
+    expect(markup).toContain('Build status');
+    expect(markup).not.toContain('<img');
+  });
+
   it('labels an image without alt text', () => {
     const markup = renderText('![](https://cdn.example.com/status.png)');
 

@@ -3,7 +3,7 @@
 import ReactMarkdown from 'react-markdown';
 import type { Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { memo } from 'react';
+import { createContext, memo, useContext } from 'react';
 import { Brain, Loader2 } from 'lucide-react';
 import { ToolCardShell } from './ToolCardShell';
 import { ReadToolCard } from './ReadToolCard';
@@ -29,7 +29,7 @@ import { SuggestToolCard } from './SuggestToolCard';
 import { SkillToolCard } from './SkillToolCard';
 import { ChildSessionSection, getTaskToolSessionId } from './ChildSessionSection';
 import type { OpenChildSession, RenderPartFn } from './ChildSessionSection';
-import type { ReactNode } from 'react';
+import type { ComponentProps, ReactNode } from 'react';
 import { MessageErrorBoundary } from './MessageErrorBoundary';
 import { createMarkdownParseCachePlugin, useMarkdownParseCache } from './markdown-parse-cache';
 import { toSafeHttpUrl, toSafeImageSrc } from '@/lib/safe-http-url';
@@ -65,6 +65,9 @@ function isAddressText(children: ReactNode, href: string): boolean {
   return text === href;
 }
 
+/** True inside a markdown link, so a nested image stays plain text. */
+const InsideLinkContext = createContext(false);
+
 function LinkRenderer({ href, children }: { href?: string; children?: ReactNode }) {
   const previewLinks = usePreviewLinks();
   const previewTarget = previewLinks ? parsePreviewLinkTarget(href) : null;
@@ -72,24 +75,26 @@ function LinkRenderer({ href, children }: { href?: string; children?: ReactNode 
     // A localhost address in a cloud chat means the sandbox, so link to its preview.
     const previewUrl = previewLinkUrl(previewLinks.urlTemplate, previewTarget);
     return (
-      <a
-        href={previewUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        title="Open a preview of this sandbox server"
-        onClick={event => {
-          event.preventDefault();
-          previewLinks.open(previewTarget.port, previewTarget.path);
-        }}
-        // A middle click must also mint a ticket; the bare preview host needs the cookie.
-        onAuxClick={event => {
-          if (event.button !== 1) return;
-          event.preventDefault();
-          previewLinks.open(previewTarget.port, previewTarget.path);
-        }}
-      >
-        {isAddressText(children, href) ? previewUrl : children}
-      </a>
+      <InsideLinkContext value={true}>
+        <a
+          href={previewUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          title="Open a preview of this sandbox server"
+          onClick={event => {
+            event.preventDefault();
+            previewLinks.open(previewTarget.port, previewTarget.path);
+          }}
+          // A middle click must also mint a ticket; the bare preview host needs the cookie.
+          onAuxClick={event => {
+            if (event.button !== 1) return;
+            event.preventDefault();
+            previewLinks.open(previewTarget.port, previewTarget.path);
+          }}
+        >
+          {isAddressText(children, href) ? previewUrl : children}
+        </a>
+      </InsideLinkContext>
     );
   }
 
@@ -98,17 +103,27 @@ function LinkRenderer({ href, children }: { href?: string; children?: ReactNode 
     return <>{children}</>;
   }
   return (
-    <a href={safeHref} target="_blank" rel="noopener noreferrer">
-      {children}
-    </a>
+    <InsideLinkContext value={true}>
+      <a href={safeHref} target="_blank" rel="noopener noreferrer">
+        {children}
+      </a>
+    </InsideLinkContext>
   );
+}
+
+/** An image source renders as a link, or as its label when a surrounding link already wraps it. */
+function MarkdownImageRenderer({ src, alt }: ComponentProps<'img'>) {
+  const insideLink = useContext(InsideLinkContext);
+  const label = alt || 'Image';
+  if (insideLink) {
+    return <>{label}</>;
+  }
+  return <LinkRenderer href={typeof src === 'string' ? src : undefined}>{label}</LinkRenderer>;
 }
 
 const markdownComponents: Components = {
   a: LinkRenderer,
-  img: ({ src, alt }) => (
-    <LinkRenderer href={typeof src === 'string' ? src : undefined}>{alt || 'Image'}</LinkRenderer>
-  ),
+  img: MarkdownImageRenderer,
 };
 const remarkPlugins = [remarkGfm];
 

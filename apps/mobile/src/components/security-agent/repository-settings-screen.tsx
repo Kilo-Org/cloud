@@ -27,7 +27,6 @@ import { getGitHubIntegrationUrl } from '@/lib/agent-github-integration';
 import { WEB_BASE_URL } from '@/lib/config';
 import { openExternalUrl } from '@/lib/external-link';
 import { trpcClient } from '@/lib/trpc';
-import { readTrpcErrorField } from '@/lib/trpc-error';
 import {
   useSecurityAgentSettingsRedirect,
   useSettingsBackGuard,
@@ -202,12 +201,18 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
   // cached empty answer stays fresh for the whole stale window, and the disabled
   // agent's enable rule counts exactly these repositories.
   //
-  // The mint is only the hand-off token. It needs organization manage rights
-  // that this screen's `canManage` does not require, and an organization with an
-  // active installation that cannot hold a second one is refused with
-  // `FORBIDDEN` — the settled-empty-grant state this screen handles. The web
-  // page mints its own state for the signed-in user, so an organization falls
-  // back to the plain settings URL instead of leaving the control inert.
+  // The mint is only the hand-off token. An organization's mint needs
+  // `ORGANIZATION_MANAGE_ROLES` (`owner`/`admin`), which is narrower than this
+  // screen's `canManage` (`canManageOrganizationBilling` admits
+  // `billing_manager`), and `ensureOrganizationAccess` refuses the role with
+  // `UNAUTHORIZED`; an organization whose installation cannot take a second one
+  // is refused with `FORBIDDEN`. Both are ordinary states here, and both are
+  // exactly the settled-empty-grant case this screen exists for. The web page
+  // mints its own state for the signed-in user, so any organization refusal
+  // falls back to the plain settings URL instead of leaving the control inert —
+  // the same rule the Code Reviewer's GitHub recovery control applies. A
+  // personal mint failure has no such page-level fallback to reach, so it keeps
+  // the toast.
   const manageAccess = async () => {
     const orgId = isPersonalSecurityScope(scope) ? undefined : scope;
     const open = async (url: string) => {
@@ -221,8 +226,8 @@ export function RepositorySettingsScreen({ scope }: Readonly<{ scope: string }>)
         returnTo: '/cloud/sessions',
       });
       await open(getGitHubIntegrationUrl(WEB_BASE_URL, orgId, token));
-    } catch (error) {
-      if (readTrpcErrorField(error, 'code') !== 'FORBIDDEN' || !orgId) {
+    } catch {
+      if (!orgId) {
         toast.error(t('prReview.couldNotOpenGitHubAppSettings'));
         return;
       }

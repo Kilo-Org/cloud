@@ -385,28 +385,30 @@ describe('RepositorySettingsScreen repository picker', () => {
     expect(repositories.refetch).not.toHaveBeenCalled();
   });
 
-  // An organization whose installation cannot take a second one is refused at
-  // the mint, and organization manage rights are narrower than this screen's
-  // edit permission. The settings page mints its own state for the signed-in
-  // web user, so the control still opens it instead of going inert.
-  it('opens the organization settings page without a minted state', async () => {
-    repositories.data = [];
-    manageAccess.mintInstallState.mockRejectedValueOnce(
-      Object.assign(new Error('This organization already has a GitHub installation'), {
-        data: { code: 'FORBIDDEN', httpStatus: 403 },
-      })
-    );
-    const { renderer } = await mount('org_123');
+  // An organization's mint is refused for a role that may edit these settings
+  // but not manage the installation (`UNAUTHORIZED`) and for an organization
+  // that already holds an installation and cannot take a second one
+  // (`FORBIDDEN`). The settings page mints its own state for the signed-in web
+  // user, so the control still opens it instead of going inert.
+  it.each(['UNAUTHORIZED', 'FORBIDDEN'])(
+    'opens the organization settings page without a minted state on %s',
+    async code => {
+      repositories.data = [];
+      manageAccess.mintInstallState.mockRejectedValueOnce(
+        Object.assign(new Error('mint refused'), { data: { code, httpStatus: 403 } })
+      );
+      const { renderer } = await mount('org_123');
 
-    await pressEmptyStateAction(renderer);
+      await pressEmptyStateAction(renderer);
 
-    expect(manageAccess.openExternalUrl.mock.calls[0]?.[0]).toBe(
-      'https://settings.test/github-app?organizationId=org_123'
-    );
-    await vi.waitFor(() => {
-      expect(repositories.refetch).toHaveBeenCalledTimes(1);
-    });
-  });
+      expect(manageAccess.openExternalUrl.mock.calls[0]?.[0]).toBe(
+        'https://settings.test/github-app?organizationId=org_123'
+      );
+      await vi.waitFor(() => {
+        expect(repositories.refetch).toHaveBeenCalledTimes(1);
+      });
+    }
+  );
 
   it('keeps the EmptyState out while the repository query has no data yet', async () => {
     // TanStack Query reports this shape while an enabled query is paused (the

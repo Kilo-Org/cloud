@@ -163,7 +163,7 @@
     "allLanguages": "所有语言"
   },
   "login": {
-    "welcome": "欢迎使用 Kilo",
+    "welcome": "欢迎",
     "retrySignIn": "重新尝试登录",
     "logo": "Kilo 标志",
     "continuingSignIn": "正在继续登录流程。",

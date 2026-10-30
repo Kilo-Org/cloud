@@ -6,6 +6,10 @@ on:
 
 jobs:
   stale:
+    # Guard: a fork with Actions enabled can trigger this on schedule, and it
+    # marks/closes PRs and posts comments via GITHUB_TOKEN. Only the
+    # canonical repo needs this automation.
+    if: github.repository == 'Kilo-Org/cloud'
     runs-on: ${{ vars.RUNNER_DEFAULT_LABEL || 'ubuntu-latest' }}
     permissions:
       issues: write

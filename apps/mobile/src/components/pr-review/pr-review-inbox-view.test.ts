@@ -36,25 +36,10 @@ describe('selectPrInboxView', () => {
   // A first read that is pending but not fetching never settles on its own:
   // the query is paused (the device reports itself offline), cancelled, or
   // never started. The skeleton would sit there with nothing to press, so the
-  // empty state owns the body until a retry restarts the read.
-  it('settles on the empty state when the first read is paused, not fetching', () => {
+  // retryable body owns it — nothing loaded, nothing was reported empty.
+  it('selects the retryable body for a first read that cannot progress', () => {
     expect(selectPrInboxView({ ...idle, isPending: true, isFetching: false })).toEqual({
-      kind: 'empty',
-      showLoadMoreRetry: false,
-    });
-  });
-
-  it('settles on the empty state for a cancelled first read', () => {
-    // A cancellation drops back to pending with nothing in flight.
-    expect(selectPrInboxView({ ...idle, isPending: true, isFetching: false })).toEqual({
-      kind: 'empty',
-      showLoadMoreRetry: false,
-    });
-  });
-
-  it('settles on the empty state for an idle, never-started inbox', () => {
-    expect(selectPrInboxView({ ...idle, isPending: true, isFetching: false })).toEqual({
-      kind: 'empty',
+      kind: 'retryable',
       showLoadMoreRetry: false,
     });
   });

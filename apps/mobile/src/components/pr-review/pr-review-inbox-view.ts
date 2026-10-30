@@ -47,10 +47,11 @@ export function selectPrInboxView(args: {
   // The skeleton is only honest while a read is actually in flight. A first
   // page that is pending without fetching — paused because the device reports
   // itself offline, cancelled, or never started — would otherwise keep the
-  // skeleton up forever with nothing to press; it settles on the empty state
-  // instead, which the user can retry from.
+  // skeleton up forever with nothing to press. It never settles on its own, so
+  // it takes the retryable body: nothing has loaded, nothing was reported
+  // empty, and the user gets the Retry that restarts the read.
   if (isPending) {
-    return { kind: isFetching ? 'loading' : 'empty', showLoadMoreRetry: false };
+    return { kind: isFetching ? 'loading' : 'retryable', showLoadMoreRetry: false };
   }
 
   if (itemCount === 0) {

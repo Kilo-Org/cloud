@@ -1511,6 +1511,7 @@
       "retryMessage": "Dan se jerġa' jwettaq ir-reviżjoni tal-kodiċi.",
       "retryReview": "Erġa' pprova r-reviżjoni",
       "retryNeedsSettings": "Ir-Reviżur tal-kodiċi mitfi jew is-settings tiegħu jeħtieġu attenzjoni. Irranġa s-settings, imbagħad erġa' pprova din ir-reviżjoni.",
+      "retryNotStarted": "L-erġa' pprova ma nbeda xejn.",
       "fixSettings": "Irranġa s-settings",
       "couldNotLoad": "Ma setgħetx titgħabba r-reviżjoni.",
       "couldNotGetLatest": "Ma setgħetx tinkiseb l-aħħar dejta.",

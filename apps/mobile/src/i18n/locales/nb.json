@@ -1445,6 +1445,7 @@
       "retryMessage": "Dette kjører kodegjennomgangen på nytt.",
       "retryReview": "Prøv gjennomgang på nytt",
       "retryNeedsSettings": "Kodegjennomgang er slått av, eller innstillingene trenger oppmerksomhet. Rett innstillingene, og prøv deretter denne gjennomgangen på nytt.",
+      "retryNotStarted": "Forsøket på nytt ble ikke startet.",
       "fixSettings": "Rett innstillingene",
       "couldNotLoad": "Kunne ikke laste inn gjennomgangen.",
       "couldNotGetLatest": "Kunne ikke hente de nyeste opplysningene.",

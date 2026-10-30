@@ -981,6 +981,7 @@
       "retryMessage": "这将重新执行代码审查。",
       "retryReview": "重试审查",
       "retryNeedsSettings": "代码审查器已关闭，或其设置需要处理。请修复设置，然后重试此审查。",
+      "retryNotStarted": "重试未能开始。",
       "fixSettings": "修复设置",
       "retryTitle": "重试审查？",
       "showMore": "显示更多",

@@ -981,6 +981,7 @@
       "retryMessage": "Das Code-Review wird erneut ausgeführt.",
       "retryReview": "Review erneut ausführen",
       "retryNeedsSettings": "Der Code-Prüfer ist ausgeschaltet oder seine Einstellungen erfordern Aufmerksamkeit. Korrigiere die Einstellungen und führe dieses Review dann erneut aus.",
+      "retryNotStarted": "Der erneute Versuch konnte nicht gestartet werden.",
       "fixSettings": "Einstellungen korrigieren",
       "retryTitle": "Review erneut ausführen?",
       "showMore": "Mehr anzeigen",

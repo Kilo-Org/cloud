@@ -1445,6 +1445,7 @@
       "retryMessage": "Kode-berrikuspena berriro exekutatuko da.",
       "retryReview": "Egin berrikuspena berriro",
       "retryNeedsSettings": "Kode-berrikuslea desaktibatuta dago edo haren ezarpenek arreta behar dute. Konpondu ezarpenak eta egin berrikuspen hau berriro.",
+      "retryNotStarted": "Berriro saiatzea ez da abiarazi.",
       "fixSettings": "Konpondu ezarpenak",
       "couldNotLoad": "Ezin izan da berrikuspena kargatu.",
       "couldNotGetLatest": "Ezin izan da azken egoera lortu.",

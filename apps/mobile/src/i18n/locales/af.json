@@ -1445,6 +1445,7 @@
       "retryMessage": "Dit sal die kodehersiening weer uitvoer.",
       "retryReview": "Probeer hersiening weer",
       "retryNeedsSettings": "Kodehersiener is af of sy instellings vereis aandag. Herstel die instellings en probeer dan hierdie hersiening weer.",
+      "retryNotStarted": "Die herprobeerslag het nie begin nie.",
       "fixSettings": "Herstel instellings",
       "couldNotLoad": "Die hersiening kon nie gelaai word nie.",
       "couldNotGetLatest": "Die jongste data kon nie verkry word nie.",

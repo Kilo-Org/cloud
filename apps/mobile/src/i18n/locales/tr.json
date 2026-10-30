@@ -981,6 +981,7 @@
       "retryMessage": "Kod incelemesi yeniden çalıştırılacak.",
       "retryReview": "İncelemeyi tekrar dene",
       "retryNeedsSettings": "Kod inceleyici kapalı veya ayarlarının ilgilenilmesi gerekiyor. Ayarları düzeltin, ardından bu incelemeyi tekrar deneyin.",
+      "retryNotStarted": "Tekrar deneme başlatılamadı.",
       "fixSettings": "Ayarları düzelt",
       "retryTitle": "İnceleme tekrar denensin mi?",
       "showMore": "Daha fazla göster",

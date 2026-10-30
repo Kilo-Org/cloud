@@ -1511,6 +1511,7 @@
       "retryMessage": "This will re-run the code review.",
       "retryReview": "Retry review",
       "retryNeedsSettings": "Code Reviewer is off or its settings need attention. Fix the settings, then retry this review.",
+      "retryNotStarted": "The retry did not start.",
       "fixSettings": "Fix settings",
       "couldNotLoad": "Could not load review",
       "couldNotGetLatest": "Couldn't get the latest.",

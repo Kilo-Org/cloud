@@ -987,6 +987,7 @@
       "retryMessage": "Spowoduje to ponowne uruchomienie przeglądu kodu.",
       "retryReview": "Ponów przegląd",
       "retryNeedsSettings": "Asystent przeglądu kodu jest wyłączony albo jego ustawienia wymagają uwagi. Popraw ustawienia, a następnie ponów ten przegląd.",
+      "retryNotStarted": "Ponowienie nie zostało uruchomione.",
       "fixSettings": "Popraw ustawienia",
       "retryTitle": "Ponowić przegląd?",
       "showMore": "Pokaż więcej",

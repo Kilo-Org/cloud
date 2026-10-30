@@ -1467,6 +1467,7 @@
       "retryMessage": "Això tornarà a executar la revisió de codi.",
       "retryReview": "Torna a provar la revisió",
       "retryNeedsSettings": "El Revisor de codi està desactivat o la seva configuració requereix atenció. Corregeix la configuració i torna a provar aquesta revisió.",
+      "retryNotStarted": "No s'ha pogut iniciar el reintent.",
       "fixSettings": "Corregeix la configuració",
       "couldNotLoad": "No s'ha pogut carregar la revisió.",
       "couldNotGetLatest": "No s'han pogut obtenir les dades més recents.",

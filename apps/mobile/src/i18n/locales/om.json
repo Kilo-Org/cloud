@@ -1445,6 +1445,7 @@
       "retryMessage": "Kun sakatta'a koodii irra deebi'ee raawwata.",
       "retryReview": "Sakatta'a irra deebi'ii yaali",
       "retryNeedsSettings": "Sakatta'aan koodii dhaameera ykn qindaa'inni isaa xiyyeeffannaa barbaada. Qindaa'ina sirreessi, achiis sakatta'a kana irra deebi'ii yaali.",
+      "retryNotStarted": "Irra deebiin hin jalqabne.",
       "fixSettings": "Qindaa'ina sirreessi",
       "couldNotLoad": "Sakatta'a fe'uun hin danda'amne.",
       "couldNotGetLatest": "Odeeffannoo ammaa argachuun hin danda'amne.",

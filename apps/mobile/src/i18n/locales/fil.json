@@ -1445,6 +1445,7 @@
       "retryMessage": "Uulitin nito ang pagsusuri ng code.",
       "retryReview": "Subukang muli ang pagsusuri",
       "retryNeedsSettings": "Naka-off ang Tagasuri ng code o kailangang ayusin ang mga setting nito. Ayusin ang mga setting, pagkatapos ay subukang muli ang pagsusuring ito.",
+      "retryNotStarted": "Hindi nasimulan ang muling pagsubok.",
       "fixSettings": "Ayusin ang mga setting",
       "couldNotLoad": "Hindi ma-load ang pagsusuri.",
       "couldNotGetLatest": "Hindi makuha ang pinakabagong data.",

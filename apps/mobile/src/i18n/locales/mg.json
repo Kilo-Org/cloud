@@ -1445,6 +1445,7 @@
       "retryMessage": "Hamerina ny fanamarinana kaody izany.",
       "retryReview": "Andramo indray ny fanamarinana",
       "retryNeedsSettings": "Maty ny Mpandinika kaody na mila fiheverana ny fikirany. Amboary ny fikirana, dia andramo indray ity fanamarinana ity.",
+      "retryNotStarted": "Tsy nisy nanomboka ny fanandramana indray.",
       "fixSettings": "Amboary ny fikirana",
       "couldNotLoad": "Tsy nety nampidirina ny fanamarinana.",
       "couldNotGetLatest": "Tsy nety nalaina ny angona farany.",

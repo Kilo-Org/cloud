@@ -133,6 +133,10 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
   }
 
   const modelName = (slug: string) => modelLabelFromCatalogue(models, slug);
+  // A failed catalogue refetch keeps the last list. Hide the rows only when the
+  // failure left nothing to show, so an offline visit with a warm catalogue keeps
+  // the current slugs readable and pickable, as the new-session picker does.
+  const modelsUnavailable = modelsError && models.length === 0;
   const modelRowOnPress = (value: string, onSelect: (modelSlug: string) => void) =>
     canManage && !modelsLoading && models.length > 0
       ? () => {
@@ -210,7 +214,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
             <Skeleton className="h-12 w-full rounded-lg" />
           </View>
         )}
-        {modelsError && (
+        {modelsUnavailable && (
           <QueryError
             variant="server"
             placement="top"
@@ -219,7 +223,7 @@ export function AnalysisSettingsScreen({ scope }: Readonly<{ scope: string }>) {
             isRetrying={modelsLoading}
           />
         )}
-        {!modelsLoading && !modelsError && (
+        {!modelsLoading && !modelsUnavailable && (
           <View>
             <ConfigureRow
               icon={Search}

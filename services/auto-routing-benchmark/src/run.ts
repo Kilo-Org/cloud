@@ -19,6 +19,7 @@ import {
   taxonomyRouteKey,
 } from '@kilocode/auto-routing-contracts';
 import { formatError } from '@kilocode/worker-utils';
+import { chunkArray } from '@kilocode/worker-utils/chunk-array';
 import * as z from 'zod';
 import { getBenchmarkConfig } from './config';
 import { CLASSIFIER_CASES } from './datasets/classifier-cases';
@@ -219,14 +220,6 @@ export const BENCHMARK_CLASSIFIER_PARALLELISM = 80;
 // can exceed that because each classifier case is its own message, so dispatch
 // must be sliced.
 const QUEUE_SEND_BATCH_LIMIT = 100;
-
-export function chunkArray<T>(items: readonly T[], size: number): T[][] {
-  const chunks: T[][] = [];
-  for (let i = 0; i < items.length; i += size) {
-    chunks.push(items.slice(i, i + size));
-  }
-  return chunks;
-}
 
 // Enqueues messages in sendBatch-sized slices. A mid-dispatch failure leaves a
 // partially-enqueued run that can never reach its expected result count, so the

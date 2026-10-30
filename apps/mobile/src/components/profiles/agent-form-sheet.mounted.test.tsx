@@ -46,6 +46,13 @@ vi.mock('react-native', async () => {
 vi.mock('react-native-safe-area-context', () => ({
   useSafeAreaInsets: () => ({ top: 0, bottom: 0, left: 0, right: 0 }),
 }));
+// The shared Switch reads the theme for its track and thumb; this suite replaces
+// `react-native` with a partial factory, so the palette comes from the generated
+// tokens directly.
+vi.mock('@/lib/hooks/use-theme-colors', async () => {
+  const { lightColors } = await import('@/lib/hooks/theme-colors.generated');
+  return { useThemeColors: () => lightColors };
+});
 vi.mock('@/components/agents/session-page-sheet', () => ({ SessionPageSheet: 'SessionPageSheet' }));
 vi.mock('@/components/sheet-header', () => ({ SheetHeader: 'SheetHeader' }));
 vi.mock('@/components/ui/form-field', () => ({ FormField: 'FormField' }));

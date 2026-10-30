@@ -145,6 +145,13 @@ vi.mock('react-native', () => ({
   Switch: 'Switch',
   View: 'View',
 }));
+// The shared Switch reads the theme for its track and thumb; the suites that
+// replace `react-native` with a partial factory have no colour scheme, so the
+// palette comes from the generated tokens directly.
+vi.mock('@/lib/hooks/use-theme-colors', async () => {
+  const { lightColors } = await import('@/lib/hooks/theme-colors.generated');
+  return { useThemeColors: () => lightColors };
+});
 
 /* The sheet confirms through the app's dialog. The real one renders a native
    sheet, which this DOM-free renderer cannot mount, so the test reads the

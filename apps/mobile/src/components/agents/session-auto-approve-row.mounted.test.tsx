@@ -13,6 +13,13 @@ vi.mock('react-native', () => ({
   Text: 'Text',
   I18nManager: { isRTL: false },
 }));
+// The shared Switch reads the theme for its track and thumb; the suites that
+// replace `react-native` with a partial factory have no colour scheme, so the
+// palette comes from the generated tokens directly.
+vi.mock('@/lib/hooks/use-theme-colors', async () => {
+  const { lightColors } = await import('@/lib/hooks/theme-colors.generated');
+  return { useThemeColors: () => lightColors };
+});
 vi.mock('@/components/ui/text', () => ({ Text: 'Text' }));
 
 type R = TestRenderer.ReactTestRenderer;

@@ -1273,7 +1273,7 @@
       "repoSummaryOpen_other": "{{displayCount}} ouverts",
       "repoSummaryOpen_zero": "{{displayCount}} ouverts",
       "repoSummaryCritical": "{{displayCount}} critiques",
-      "repoSummaryCritical_one": "{{displayCount}} critiques",
+      "repoSummaryCritical_one": "{{displayCount}} critique",
       "repoSummaryCritical_many": "{{displayCount}} critiques",
       "repoSummaryCritical_other": "{{displayCount}} critiques",
       "repoSummaryCritical_zero": "{{displayCount}} critiques",

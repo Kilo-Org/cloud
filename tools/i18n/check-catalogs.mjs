@@ -977,9 +977,19 @@ for (const catalog of CATALOGS) {
       }
       const variants = new Map();
       // A plural family's own categories carry this language's forms for the
-      // counts it distinguishes, so they differ by design: the family's flat
-      // base key speaks for the family here.
-      for (const key of keys.filter(key => pluralParts(key) === null)) {
+      // counts it distinguishes, so they differ by design. One member of each
+      // family speaks for it here: its flat base key when the group has one,
+      // otherwise its first category.
+      const representative = new Map();
+      for (const key of [...keys].sort(
+        (a, b) => Number(pluralParts(a) !== null) - Number(pluralParts(b) !== null)
+      )) {
+        const base = pluralBaseKey(key);
+        if (!representative.has(base)) {
+          representative.set(base, key);
+        }
+      }
+      for (const key of representative.values()) {
         const value = translated.get(key);
         if (value === undefined) {
           continue;

@@ -1773,7 +1773,7 @@
       "repoSummaryOpen_one": "{{displayCount}} avoin",
       "repoSummaryOpen_other": "{{displayCount}} avointa",
       "repoSummaryCritical": "{{displayCount}} kriittistä",
-      "repoSummaryCritical_one": "{{displayCount}} kriitiline",
+      "repoSummaryCritical_one": "{{displayCount}} kriittinen",
       "repoSummaryCritical_other": "{{displayCount}} kriittistä",
       "repoSummaryHigh": "{{displayCount}} vakavaa",
       "repoSummaryHigh_one": "{{displayCount}} vakava",

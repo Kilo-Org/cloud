@@ -1492,7 +1492,7 @@
       "bitbucketNoRepositoriesDescription": "No repositories are available in this Bitbucket workspace.",
       "gitlabNoRepositoriesDescription": "You may need to grant access to more groups or projects on GitLab.",
       "installGithubApp": "Install the GitHub app",
-      "installGithubAppDescription": "Choose which repositories Kilo reviews.",
+      "installGithubAppDescription": "Grant it access to the repositories you want reviewed.",
       "repositoryAccess": "repository access"
     },
     "style": {
